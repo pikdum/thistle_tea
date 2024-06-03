@@ -9,7 +9,8 @@ defmodule ThistleTea.Application do
   def start(_type, _args) do
     children = [
       # {ThousandIsland, port: 8085, handler_module: ThistleTea.GameProxy},
-      {ThousandIsland, port: 3724, handler_module: ThistleTea.AuthProxy}
+      # {ThousandIsland, port: 3724, handler_module: ThistleTea.AuthProxy, handler_options: %{}}
+      {ThousandIsland, port: 3724, handler_module: ThistleTea.Auth, handler_options: %{}}
       # Starts a worker by calling: ThistleTea.Worker.start_link(arg)
       # {ThistleTea.Worker, arg}
     ]
