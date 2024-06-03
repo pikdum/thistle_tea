@@ -20,7 +20,7 @@ defmodule ThistleTea.AuthProxy do
       IO.inspect(security_flags, label: "Security Flags")
       server = state[:server]
       # private_server_session_key = Strap.session_key(server, a)
-      IO.inspect(private_server_session_key, label: "Private Server Session Key")
+      # IO.inspect(private_server_session_key, label: "Private Server Session Key")
     end
 
     if opcode == 0 do
@@ -77,7 +77,7 @@ defmodule ThistleTea.AuthProxy do
 
       # should B be reversed too?
       # not sure how to test, since this has some randomness
-      IO.inspect(b, label: "B")
+      # IO.inspect(b, label: "B")
       # looks good, just an int
       IO.inspect(g, label: "g")
       # looks good, had to reverse
@@ -89,7 +89,7 @@ defmodule ThistleTea.AuthProxy do
       random = :crypto.strong_rand_bytes(16)
       IO.inspect(random, label: "Random")
 
-      %{server: server, b: b, g: g, n: reversed_n, s: reversed_s, random: random}
+      # %{server: server, b: b, g: g, n: reversed_n, s: reversed_s, random: random}
 
       # <<0, 0, 0, B::32, 1, g, 32, N::32, s::32, random::16, 0>>
     end
