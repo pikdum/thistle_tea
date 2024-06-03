@@ -27,7 +27,11 @@ defmodule ThistleTea.Auth do
       ) do
     # TODO: this is just temporary
     Logger.info("Handling logon challenge")
-    salt = :crypto.strong_rand_bytes(32)
+
+    salt =
+      <<0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0>>
+
     hash = :crypto.hash(:sha, String.upcase(@username) <> ":" <> String.upcase(@password))
     x = reverse(:crypto.hash(:sha, salt <> hash))
     verifier = :crypto.mod_pow(@g, x, @n)
@@ -36,12 +40,10 @@ defmodule ThistleTea.Auth do
     private_b = :crypto.strong_rand_bytes(19)
     {public_b, _} = :crypto.generate_key(:srp, {:host, [verifier, @g, @n, :"6"]}, private_b)
 
-    # just random bytes
-    unk3 = :crypto.strong_rand_bytes(16)
-
     response =
       <<0, 0, 0>> <>
-        reverse(public_b) <> <<1, @g, 32>> <> reverse(@n) <> salt <> unk3 <> <<0>>
+        reverse(public_b) <>
+        <<1, @g, 32>> <> reverse(@n) <> salt <> :crypto.strong_rand_bytes(16) <> <<0>>
 
     IO.inspect(response, label: "Response", limit: :infinity)
 
@@ -100,22 +102,8 @@ defmodule ThistleTea.Auth do
       Logger.info("Client proof matches!")
     else
       Logger.error("Client proof does not match!")
-      Logger.info("public_a: #{inspect(public_a)}")
       Logger.info("client_proof: #{inspect(client_proof)}")
       Logger.info("m: #{inspect(m)}")
-      Logger.info("state: #{inspect(state)}")
-      Logger.info("session: #{inspect(session)}")
-      Logger.info("scrambler: #{inspect(scrambler)}")
-      Logger.info("public_b: #{inspect(state.public_b)}")
-      Logger.info("salt: #{inspect(state.salt)}")
-      Logger.info("verifier: #{inspect(state.verifier)}")
-      Logger.info("private_b: #{inspect(state.private_b)}")
-      Logger.info("n: #{inspect(@n)}")
-      Logger.info("g: #{inspect(@g)}")
-      Logger.info("t3: #{inspect(t3)}")
-      Logger.info("t4: #{inspect(t4)}")
-      Logger.info("mod_hash: #{inspect(mod_hash)}")
-      Logger.info("generator_hash: #{inspect(generator_hash)}")
     end
 
     ThousandIsland.Socket.send(socket, <<0, 0, 5>>)
