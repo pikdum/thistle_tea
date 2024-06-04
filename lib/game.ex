@@ -16,11 +16,14 @@ defmodule ThistleTea.Game do
   @cmsg_char_enum 0x037
   @smg_char_enum 0x03B
 
+  @cmsg_ping 0x1DC
+  @smg_pong 0x1DD
+
   @impl ThousandIsland.Handler
   def handle_connection(socket, _state) do
     # send SMSG_AUTH_CHALLENGE
     seed = :crypto.strong_rand_bytes(4)
-    Logger.info("[GameServer] Sending SMSG_AUTH_CHALLENGE with seed: #{inspect(seed)}")
+    Logger.info("[GameServer] SMSG_AUTH_CHALLENGE")
 
     ThousandIsland.Socket.send(
       socket,
@@ -38,12 +41,11 @@ defmodule ThistleTea.Game do
       ) do
     <<build::little-size(32), server_id::little-size(32), rest::binary>> = body
 
-    Logger.info(
-      "[GameServer] Received CMSG_AUTH_SESSION with build: #{build}, server_id: #{server_id}"
-    )
-
     {:ok, username, rest} = parse_string(rest)
-    Logger.info("[GameServer] Username: #{username}")
+
+    Logger.info(
+      "[GameServer] CMSG_AUTH_SESSION: username: #{username}, build: #{build}, server_id: #{server_id}"
+    )
 
     <<client_seed::little-bytes-size(4), client_proof::little-bytes-size(20), _rest::binary>> =
       rest
@@ -57,7 +59,7 @@ defmodule ThistleTea.Game do
       )
 
     if client_proof == server_proof do
-      Logger.info("[GameServer] Authentication successful for #{username}")
+      Logger.info("[GameServer] Authentication successful: #{username}")
       crypt = %{key: session, send_i: 0, send_j: 0, recv_i: 0, recv_j: 0}
       {:ok, crypto_pid} = CryptoStorage.start_link(crypt)
 
@@ -70,7 +72,7 @@ defmodule ThistleTea.Game do
 
       {:continue, Map.merge(state, %{username: username, crypto_pid: crypto_pid})}
     else
-      Logger.error("[GameServer] Authentication failed for #{username}")
+      Logger.error("[GameServer] Authentication failed: #{username}")
       {:close, state}
     end
   end
@@ -83,14 +85,10 @@ defmodule ThistleTea.Game do
       ) do
     case CryptoStorage.decrypt_header(state.crypto_pid, header) do
       <<size::big-size(16), opcode::little-size(32)>> ->
-        Logger.info(
-          "[GameServer] #{inspect(opcode, base: :hex)}, size: #{size}, calculated_size: #{byte_size(body) + 4}"
-        )
-
         handle_packet(opcode, size, body, state, socket)
 
       other ->
-        Logger.error("[GameServer] Unknown decrypted header: #{inspect(other)}")
+        Logger.error("[GameServer] Error decrypting header: #{inspect(other, limit: :infinity)}")
     end
 
     {:continue, state}
@@ -99,7 +97,7 @@ defmodule ThistleTea.Game do
   def handle_packet(opcode, size, body, state, socket) do
     case opcode do
       @cmsg_char_enum ->
-        Logger.info("[GameServer] Received CMSG_CHAR_ENUM")
+        Logger.info("[GameServer] CMSG_CHAR_ENUM")
 
         CryptoStorage.send_packet(
           state.crypto_pid,
@@ -110,8 +108,22 @@ defmodule ThistleTea.Game do
 
         {:continue, state}
 
+      @cmsg_ping ->
+        <<sequence_id::little-size(32), latency::little-size(32)>> = body
+
+        Logger.info("[GameServer] CMSG_PING: sequence_id: #{sequence_id}, latency: #{latency}")
+
+        CryptoStorage.send_packet(
+          state.crypto_pid,
+          @smg_pong,
+          <<sequence_id::little-size(32)>>,
+          socket
+        )
+
+        {:continue, Map.put(state, :latency, latency)}
+
       _ ->
-        Logger.error("[GameServer] Unhandled: #{inspect(opcode, base: :hex)}")
+        Logger.error("[GameServer] Unimplemented opcode: #{inspect(opcode, base: :hex)}")
         {:continue, state}
     end
   end

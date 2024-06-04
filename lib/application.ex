@@ -5,6 +5,8 @@ defmodule ThistleTea.Application do
 
   use Application
 
+  require Logger
+
   @impl true
   def start(_type, _args) do
     children = [
@@ -12,6 +14,8 @@ defmodule ThistleTea.Application do
       {ThousandIsland, port: 3724, handler_module: ThistleTea.Auth, handler_options: %{}},
       {ThousandIsland, port: 8085, handler_module: ThistleTea.Game, handler_options: %{}}
     ]
+
+    Logger.info("ThistleTea starting...")
 
     # See https://hexdocs.pm/elixir/Supervisor.html
     # for other strategies and supported options

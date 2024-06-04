@@ -1,6 +1,9 @@
 defmodule ThistleTea.Auth do
   use ThousandIsland.Handler
+
   require Logger
+
+  alias ThistleTea.SessionStorage
 
   import Binary, only: [reverse: 1]
 
@@ -62,7 +65,7 @@ defmodule ThistleTea.Auth do
         socket,
         _state
       ) do
-    Logger.info("[AuthChallenge] #{account_name}")
+    Logger.info("[AuthServer] CMD_AUTH_LOGON_CHALLENGE: #{account_name}")
     state = logon_challenge_state(account_name)
 
     packet =
@@ -84,7 +87,7 @@ defmodule ThistleTea.Auth do
         socket,
         state
       ) do
-    Logger.info("[AuthProof] #{state.account_name}")
+    Logger.info("[AuthServer] CMD_AUTH_LOGON_PROOF: #{state.account_name}")
     public_a = reverse(client_public_key)
     scrambler = :crypto.hash(:sha, reverse(public_a) <> reverse(state.public_b))
 
@@ -117,15 +120,12 @@ defmodule ThistleTea.Auth do
       state =
         Map.merge(state, %{public_a: public_a, session: session, server_proof: server_proof})
 
-      ThistleTea.SessionStorage.put(state.account_name, state.session)
+      SessionStorage.put(state.account_name, state.session)
 
       ThousandIsland.Socket.send(socket, <<1, 0>> <> state.server_proof <> <<0, 0, 0, 0>>)
       {:continue, state}
     else
-      Logger.error("Client proof does not match!")
-      Logger.info("client_proof: #{inspect(client_proof)}")
-      Logger.info("m: #{inspect(m)}")
-
+      Logger.error("[AuthServer] Authentication failed: #{state.account_name}")
       ThousandIsland.Socket.send(socket, <<0, 0, 5>>)
       {:close, state}
     end
@@ -133,7 +133,7 @@ defmodule ThistleTea.Auth do
 
   @impl ThousandIsland.Handler
   def handle_data(<<@cmd_realm_list, _padding::binary>>, socket, state) do
-    Logger.info("[RealmList]")
+    Logger.info("[AuthServer] CMD_REALM_LIST")
 
     realm =
       <<8::little-size(32), 0::little-size(8)>> <>
@@ -162,16 +162,17 @@ defmodule ThistleTea.Auth do
         _socket,
         state
       ) do
-    Logger.info("[ReconnectChallenge] #{account_name}")
+    Logger.info("[AuthServer] CMD_AUTH_RECONNECT_CHALLENGE: #{account_name}")
 
-    # TODO: think i need some state outside of here to associate account with session
+    session = SessionStorage.get(account_name)
+    # TODO: finish implementing
 
     {:close, state}
   end
 
   @impl ThousandIsland.Handler
   def handle_data(<<opcode, _packet::binary>>, socket, state) do
-    Logger.error("Unhandled opcode: #{opcode}")
+    Logger.error("[AuthServer] Unimplemented opcode: #{opcode}")
     ThousandIsland.Socket.send(socket, <<0, 0, 5>>)
     {:close, state}
   end
