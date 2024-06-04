@@ -73,13 +73,13 @@ defmodule ThistleTea.Auth do
     Logger.info("Handling logon proof")
     Logger.info("state: #{inspect(state)}")
     public_a_reversed = reverse(public_a)
-    scrambler = :crypto.hash(:sha, public_a_reversed <> reverse(state.public_b))
+    scrambler = :crypto.hash(:sha, public_a <> reverse(state.public_b))
 
     s =
       reverse(
         :crypto.compute_key(
           :srp,
-          public_a,
+          public_a_reversed,
           {state.public_b, state.private_b},
           {:host, [state.verifier, @n, :"6", reverse(scrambler)]}
         )
@@ -95,7 +95,7 @@ defmodule ThistleTea.Auth do
     m =
       :crypto.hash(
         :sha,
-        t3 <> t4 <> state.salt <> public_a_reversed <> reverse(state.public_b) <> session
+        t3 <> t4 <> state.salt <> public_a <> reverse(state.public_b) <> session
       )
 
     if m == client_proof do
