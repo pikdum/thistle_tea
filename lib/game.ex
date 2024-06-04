@@ -204,14 +204,23 @@ defmodule ThistleTea.Game do
 
         Logger.info("[GameServer] Character: #{inspect(character, limit: :infinity)}")
 
-        CharacterStorage.add_character(state.username, character)
+        case CharacterStorage.add_character(state.username, character) do
+          {:error, error_value} ->
+            CryptoStorage.send_packet(
+              state.crypto_pid,
+              @smg_char_create,
+              <<error_value>>,
+              socket
+            )
 
-        CryptoStorage.send_packet(
-          state.crypto_pid,
-          @smg_char_create,
-          <<0x2E>>,
-          socket
-        )
+          _ ->
+            CryptoStorage.send_packet(
+              state.crypto_pid,
+              @smg_char_create,
+              <<0x2E>>,
+              socket
+            )
+        end
 
         {:continue, state}
 

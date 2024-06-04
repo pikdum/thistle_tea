@@ -19,8 +19,9 @@ defmodule ThistleTea.CharacterStorage do
       nil ->
         Agent.update(__MODULE__, fn state -> Map.put(state, username, [character]) end)
 
+      # CHAR_CREATE_ACCOUNT_LIMIT
       characters when length(characters) >= 10 ->
-        {:error, "Character limit reached"}
+        {:error, 0x35}
 
       characters ->
         Agent.update(__MODULE__, fn state ->
