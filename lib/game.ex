@@ -151,8 +151,6 @@ defmodule ThistleTea.Game do
             _ -> <<length>> <> Enum.join(characters_payload)
           end
 
-        Logger.info("packet: #{inspect(packet, limit: :infinity)}")
-
         CryptoStorage.send_packet(
           state.crypto_pid,
           @smg_char_enum,
