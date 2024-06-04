@@ -14,65 +14,78 @@ defmodule ThistleTea.Auth do
   @username "pikdum"
   @password "pikdum"
 
-  @impl ThousandIsland.Handler
-  def handle_data(
-        <<@cmd_auth_logon_challenge, _error::little-size(8), _size::little-size(16),
-          _game::bytes-little-size(4), _v1::little-size(8), _v2::little-size(8),
-          _v3::little-size(8), _build::little-size(16), _platform::bytes-little-size(4),
-          _os::bytes-size(4), _locale::bytes-size(4), _utc_offset::little-size(32),
-          _ip::little-size(32), username_length::unsigned-little-size(8),
-          username::bytes-little-size(username_length)>>,
-        socket,
-        _state
-      ) do
-    # TODO: this is just temporary
-    Logger.info("Handling logon challenge")
-
-    salt =
-      <<0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0>>
-
-    hash = :crypto.hash(:sha, String.upcase(@username) <> ":" <> String.upcase(@password))
-    x = reverse(:crypto.hash(:sha, salt <> hash))
-    verifier = :crypto.mod_pow(@g, x, @n)
-    # verifier is what should be stored in the database
-
+  defp calculate_b(state) do
     private_b = :crypto.strong_rand_bytes(19)
-    {public_b, _} = :crypto.generate_key(:srp, {:host, [verifier, @g, @n, :"6"]}, private_b)
+    Map.merge(state, %{private_b: private_b})
+  end
 
-    response =
-      <<0, 0, 0>> <>
-        reverse(public_b) <>
-        <<1, @g, 32>> <> reverse(@n) <> salt <> :crypto.strong_rand_bytes(16) <> <<0>>
+  defp calculate_B(state) do
+    {public_b, _} =
+      :crypto.generate_key(
+        :srp,
+        {:host, [state.verifier, state.g, state.n, :"6"]},
+        state.private_b
+      )
 
-    IO.inspect(response, label: "Response", limit: :infinity)
+    Map.merge(state, %{public_b: public_b})
+  end
 
-    ThousandIsland.Socket.send(
-      socket,
-      response
-    )
+  defp account_state(account) do
+    %{n: @n, g: @g}
+    |> Map.merge(%{account_name: account})
+    |> Map.merge(%{
+      verifier:
+        <<34, 54, 51, 44, 77, 56, 96, 52, 2, 253, 163, 246, 128, 63, 103, 166, 81, 9, 71, 120, 41,
+          87, 250, 125, 141, 73, 124, 172, 157, 84, 95, 126>>
+    })
+    |> Map.merge(%{
+      salt:
+        <<0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+          0, 0, 0>>
+    })
+  end
 
-    {:continue,
-     %{
-       salt: salt,
-       verifier: verifier,
-       private_b: private_b,
-       public_b: public_b,
-       username: username
-     }}
+  defp logon_challenge_state(account) do
+    account_state(account)
+    |> calculate_b()
+    |> calculate_B()
   end
 
   @impl ThousandIsland.Handler
   def handle_data(
-        <<@cmd_auth_logon_proof, public_a_raw::little-bytes-size(32),
+        <<@cmd_auth_logon_challenge, _protocol_version::little-size(8), _size::little-size(16),
+          _game_name::bytes-little-size(4), _version::bytes-little-size(3),
+          _build::little-size(16), _platform::bytes-little-size(4), _os::bytes-size(4),
+          _locale::bytes-size(4), _worldregion_bias::little-size(32), _ip::little-size(32),
+          account_name_length::unsigned-little-size(8),
+          account_name::bytes-little-size(account_name_length)>>,
+        socket,
+        _state
+      ) do
+    Logger.info("[AuthChallenge] #{account_name}")
+    state = logon_challenge_state(account_name)
+
+    packet =
+      <<0, 0, 0>> <>
+        reverse(state.public_b) <>
+        <<1>> <>
+        state.g <>
+        <<32>> <> reverse(state.n) <> state.salt <> :crypto.strong_rand_bytes(16) <> <<0>>
+
+    ThousandIsland.Socket.send(socket, packet)
+    {:continue, state}
+  end
+
+  @impl ThousandIsland.Handler
+  def handle_data(
+        <<@cmd_auth_logon_proof, client_public_key::little-bytes-size(32),
           client_proof::little-bytes-size(20), _crc_hash::little-bytes-size(20),
-          _number_of_keys::little-size(8), _security_flags::little-size(8)>>,
+          _num_keys::little-size(8), _security_flags::little-size(8)>>,
         socket,
         state
       ) do
-    Logger.info("Handling logon proof")
-    Logger.info("state: #{inspect(state)}")
-    public_a = reverse(public_a_raw)
+    Logger.info("[AuthProof] #{state.account_name}")
+    public_a = reverse(client_public_key)
     scrambler = :crypto.hash(:sha, reverse(public_a) <> reverse(state.public_b))
 
     s =
@@ -90,7 +103,7 @@ defmodule ThistleTea.Auth do
     mod_hash = :crypto.hash(:sha, reverse(@n))
     generator_hash = :crypto.hash(:sha, @g)
     t3 = :crypto.exor(mod_hash, generator_hash)
-    t4 = :crypto.hash(:sha, state.username)
+    t4 = :crypto.hash(:sha, state.account_name)
 
     m =
       :crypto.hash(
@@ -99,15 +112,21 @@ defmodule ThistleTea.Auth do
       )
 
     if m == client_proof do
-      Logger.info("Client proof matches!")
+      server_proof = :crypto.hash(:sha, reverse(public_a) <> client_proof <> session)
+
+      state =
+        Map.merge(state, %{public_a: public_a, session: session, server_proof: server_proof})
+
+      ThousandIsland.Socket.send(socket, <<1, 0>> <> state.server_proof <> <<0, 0, 0, 0>>)
+      {:continue, state}
     else
       Logger.error("Client proof does not match!")
       Logger.info("client_proof: #{inspect(client_proof)}")
       Logger.info("m: #{inspect(m)}")
-    end
 
-    ThousandIsland.Socket.send(socket, <<0, 0, 5>>)
-    {:close, state}
+      ThousandIsland.Socket.send(socket, <<0, 0, 5>>)
+      {:close, state}
+    end
   end
 
   @impl ThousandIsland.Handler
