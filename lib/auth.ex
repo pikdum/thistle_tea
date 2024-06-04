@@ -6,6 +6,7 @@ defmodule ThistleTea.Auth do
 
   @cmd_auth_logon_challenge 0
   @cmd_auth_logon_proof 1
+  @cmd_auth_reconnect_challenge 2
   @cmd_realm_list 16
 
   @n <<137, 75, 100, 94, 137, 225, 83, 91, 189, 173, 91, 139, 41, 6, 80, 83, 8, 1, 177, 142, 191,
@@ -131,7 +132,7 @@ defmodule ThistleTea.Auth do
   end
 
   @impl ThousandIsland.Handler
-  def handle_data(<<@cmd_realm_list, _rest::binary>>, socket, state) do
+  def handle_data(<<@cmd_realm_list, _padding::binary>>, socket, state) do
     Logger.info("[RealmList]")
 
     realm =
@@ -147,6 +148,25 @@ defmodule ThistleTea.Auth do
     packet = header <> body
     ThousandIsland.Socket.send(socket, packet)
     {:continue, state}
+  end
+
+  @impl ThousandIsland.Handler
+  def handle_data(
+        <<@cmd_auth_reconnect_challenge, _protocol_version::little-size(8),
+          _size::little-size(16), _game_name::bytes-little-size(4),
+          _version::bytes-little-size(3), _build::little-size(16),
+          _platform::bytes-little-size(4), _os::bytes-little-size(4),
+          _locale::bytes-little-size(4), _worldregion_bias::little-size(32), _ip::little-size(32),
+          account_name_length::little-size(8),
+          account_name::bytes-little-size(account_name_length)>>,
+        socket,
+        state
+      ) do
+    Logger.info("[ReconnectChallenge] #{account_name}")
+
+    # TODO: think i need some state outside of here to associate account with session
+
+    {:close, state}
   end
 
   @impl ThousandIsland.Handler
