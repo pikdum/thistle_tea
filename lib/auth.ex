@@ -64,7 +64,7 @@ defmodule ThistleTea.Auth do
 
   @impl ThousandIsland.Handler
   def handle_data(
-        <<@cmd_auth_logon_proof, public_a::little-bytes-size(32),
+        <<@cmd_auth_logon_proof, public_a_raw::little-bytes-size(32),
           client_proof::little-bytes-size(20), _crc_hash::little-bytes-size(20),
           _number_of_keys::little-size(8), _security_flags::little-size(8)>>,
         socket,
@@ -72,14 +72,14 @@ defmodule ThistleTea.Auth do
       ) do
     Logger.info("Handling logon proof")
     Logger.info("state: #{inspect(state)}")
-    public_a_reversed = reverse(public_a)
-    scrambler = :crypto.hash(:sha, public_a <> reverse(state.public_b))
+    public_a = reverse(public_a_raw)
+    scrambler = :crypto.hash(:sha, reverse(public_a) <> reverse(state.public_b))
 
     s =
       reverse(
         :crypto.compute_key(
           :srp,
-          public_a_reversed,
+          public_a,
           {state.public_b, state.private_b},
           {:host, [state.verifier, @n, :"6", reverse(scrambler)]}
         )
@@ -95,7 +95,7 @@ defmodule ThistleTea.Auth do
     m =
       :crypto.hash(
         :sha,
-        t3 <> t4 <> state.salt <> public_a <> reverse(state.public_b) <> session
+        t3 <> t4 <> state.salt <> reverse(public_a) <> reverse(state.public_b) <> session
       )
 
     if m == client_proof do
