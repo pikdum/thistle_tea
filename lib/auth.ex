@@ -159,7 +159,7 @@ defmodule ThistleTea.Auth do
           _locale::bytes-little-size(4), _worldregion_bias::little-size(32), _ip::little-size(32),
           account_name_length::little-size(8),
           account_name::bytes-little-size(account_name_length)>>,
-        socket,
+        _socket,
         state
       ) do
     Logger.info("[ReconnectChallenge] #{account_name}")

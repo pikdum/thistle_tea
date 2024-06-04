@@ -1,9 +1,12 @@
 defmodule ThistleTea.Game do
   use ThousandIsland.Handler
+
   require Logger
 
-  import Binary, only: [split_at: 2, trim_trailing: 1, pad_trailing: 2]
-  import Bitwise, only: [bxor: 2]
+  alias ThistleTea.CryptoStorage
+  alias ThistleTea.SessionStorage
+
+  import Binary, only: [split_at: 2, trim_trailing: 1]
 
   @cmsg_auth_session 0x1ED
 
@@ -34,7 +37,7 @@ defmodule ThistleTea.Game do
     <<client_seed::little-bytes-size(4), client_proof::little-bytes-size(20), _rest::binary>> =
       rest
 
-    session = ThistleTea.SessionStorage.get(username)
+    session = SessionStorage.get(username)
 
     server_proof =
       :crypto.hash(
@@ -45,19 +48,16 @@ defmodule ThistleTea.Game do
     if client_proof == server_proof do
       Logger.info("[GameServer] Authentication successful for #{username}")
       crypt = %{key: session, send_i: 0, send_j: 0, recv_i: 0, recv_j: 0}
+      {:ok, crypto_pid} = CryptoStorage.start_link(crypt)
 
-      # TODO: keeping track of crypt seems like it's synchronous, so try a different abtraction rather than using state
-      {packet, crypt} =
-        build_packet(0x1EE, <<0x0C, 0::little-size(32), 0, 0::little-size(32)>>, crypt)
-
-      Logger.info("[GameServer] Packet: #{inspect(packet, limit: :infinity)}")
-
-      ThousandIsland.Socket.send(
-        socket,
-        packet
+      CryptoStorage.send_packet(
+        crypto_pid,
+        0x1EE,
+        <<0x0C, 0::little-size(32), 0, 0::little-size(32)>>,
+        socket
       )
 
-      {:continue, Map.merge(state, %{username: username, crypt: crypt})}
+      {:continue, Map.merge(state, %{username: username, crypto_pid: crypto_pid})}
     else
       Logger.error("[GameServer] Authentication failed for #{username}")
       {:close, state}
@@ -66,53 +66,21 @@ defmodule ThistleTea.Game do
 
   @impl ThousandIsland.Handler
   def handle_data(
-        packet,
+        <<header::bytes-size(6), _body::binary>>,
         _socket,
         state
       ) do
-    Logger.error("[GameServer] Unhandled packet: #{inspect(packet, limit: :infinity)})}")
+    case CryptoStorage.decrypt_header(state.crypto_pid, header) do
+      <<size::big-size(16), opcode::little-size(32)>> ->
+        Logger.info(
+          "[GameServer] Decrypted header: size: #{size}, opcode: #{inspect(opcode, base: :hex)}"
+        )
+
+      other ->
+        Logger.error("[GameServer] Unknown decrypted header: #{inspect(other)}")
+    end
+
     {:continue, state}
-  end
-
-  def encrypt_header(header, state) do
-    initial_acc = {<<>>, %{send_i: state.send_i, send_j: state.send_j}}
-
-    {header, crypt_state} =
-      Enum.reduce(
-        :binary.bin_to_list(header),
-        initial_acc,
-        fn byte, {header, crypt} ->
-          send_i = rem(crypt.send_i, byte_size(state.key))
-          x = bxor(byte, :binary.at(state.key, send_i)) + crypt.send_j
-          <<truncated_x>> = <<x::little-size(8)>>
-          {header <> <<truncated_x>>, %{send_i: send_i + 1, send_j: truncated_x}}
-        end
-      )
-
-    {header, Map.merge(state, crypt_state)}
-  end
-
-  defp build_packet(opcode, payload) do
-    size = byte_size(payload) + 2
-    header = <<size::big-size(16), opcode::little-size(16)>>
-    header <> payload
-  end
-
-  defp build_packet(opcode, payload, crypt) do
-    size = byte_size(payload) + 2
-    header = <<size::big-size(16), opcode::little-size(16)>>
-
-    Logger.info(
-      "[GameServer] Encrypting header: #{inspect(header)} with crypt: #{inspect(crypt)}"
-    )
-
-    {encrypted_header, new_crypt} = encrypt_header(header, crypt)
-
-    Logger.info(
-      "[GameServer] Encrypted header: #{inspect(encrypted_header)} with new crypt: #{inspect(new_crypt)}"
-    )
-
-    {encrypted_header <> payload, new_crypt}
   end
 
   def parse_string(payload, pos \\ 1)
