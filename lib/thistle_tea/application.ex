@@ -8,11 +8,9 @@ defmodule ThistleTea.Application do
   @impl true
   def start(_type, _args) do
     children = [
-      # {ThousandIsland, port: 8085, handler_module: ThistleTea.GameProxy},
-      # {ThousandIsland, port: 3724, handler_module: ThistleTea.AuthProxy, handler_options: %{}}
-      {ThousandIsland, port: 3724, handler_module: ThistleTea.Auth, handler_options: %{}}
-      # Starts a worker by calling: ThistleTea.Worker.start_link(arg)
-      # {ThistleTea.Worker, arg}
+      ThistleTea.SessionStorage,
+      {ThousandIsland, port: 3724, handler_module: ThistleTea.Auth, handler_options: %{}},
+      {ThousandIsland, port: 8085, handler_module: ThistleTea.Game, handler_options: %{}}
     ]
 
     # See https://hexdocs.pm/elixir/Supervisor.html

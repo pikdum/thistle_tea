@@ -13,9 +13,6 @@ defmodule ThistleTea.Auth do
        191, 94, 143, 171, 60, 130, 135, 42, 62, 155, 183>>
   @g <<7>>
 
-  @username "pikdum"
-  @password "pikdum"
-
   defp calculate_b(state) do
     private_b = :crypto.strong_rand_bytes(19)
     Map.merge(state, %{private_b: private_b})
@@ -32,6 +29,7 @@ defmodule ThistleTea.Auth do
     Map.merge(state, %{public_b: public_b})
   end
 
+  # TODO: password hardcoded to pikdum
   defp account_state(account) do
     %{n: @n, g: @g}
     |> Map.merge(%{account_name: account})
@@ -118,6 +116,8 @@ defmodule ThistleTea.Auth do
 
       state =
         Map.merge(state, %{public_a: public_a, session: session, server_proof: server_proof})
+
+      ThistleTea.SessionStorage.put(state.account_name, state.session)
 
       ThousandIsland.Socket.send(socket, <<1, 0>> <> state.server_proof <> <<0, 0, 0, 0>>)
       {:continue, state}
