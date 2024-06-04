@@ -6,6 +6,7 @@ defmodule ThistleTea.Auth do
 
   @cmd_auth_logon_challenge 0
   @cmd_auth_logon_proof 1
+  @cmd_realm_list 16
 
   @n <<137, 75, 100, 94, 137, 225, 83, 91, 189, 173, 91, 139, 41, 6, 80, 83, 8, 1, 177, 142, 191,
        191, 94, 143, 171, 60, 130, 135, 42, 62, 155, 183>>
@@ -127,6 +128,25 @@ defmodule ThistleTea.Auth do
       ThousandIsland.Socket.send(socket, <<0, 0, 5>>)
       {:close, state}
     end
+  end
+
+  @impl ThousandIsland.Handler
+  def handle_data(<<@cmd_realm_list, _rest::binary>>, socket, state) do
+    Logger.info("[RealmList]")
+
+    realm =
+      <<8::little-size(32), 0::little-size(8)>> <>
+        "kuudere.moe" <>
+        <<0>> <>
+        "127.0.0.1:8085" <> <<0>> <> <<200::little-float-size(32), 0::size(8), 0::size(8), 0>>
+
+    num_realms = 1
+
+    header = <<16, byte_size(realm) + 7::little-size(16), 0, 0, 0, 0, num_realms>>
+    body = realm <> <<2, 0>>
+    packet = header <> body
+    ThousandIsland.Socket.send(socket, packet)
+    {:continue, state}
   end
 
   @impl ThousandIsland.Handler
