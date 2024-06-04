@@ -5,6 +5,7 @@ defmodule ThistleTea.Game do
 
   alias ThistleTea.CryptoStorage
   alias ThistleTea.SessionStorage
+  alias ThistleTea.CharacterStorage
 
   import Binary, only: [split_at: 2, trim_trailing: 1]
 
@@ -18,6 +19,9 @@ defmodule ThistleTea.Game do
 
   @cmsg_ping 0x1DC
   @smg_pong 0x1DD
+
+  @cmsg_char_create 0x036
+  @smg_char_create 0x03A
 
   @impl ThousandIsland.Handler
   def handle_connection(socket, _state) do
@@ -99,10 +103,60 @@ defmodule ThistleTea.Game do
       @cmsg_char_enum ->
         Logger.info("[GameServer] CMSG_CHAR_ENUM")
 
+        characters = CharacterStorage.get_characters(state.username)
+        length = characters |> Enum.count()
+
+        characters_payload =
+          characters
+          |> Enum.map(fn c ->
+            <<c.guid::little-size(64)>> <>
+              c.name <>
+              <<0, c.race, c.class, c.gender, c.skin, c.face, c.hairstyle, c.haircolor,
+                c.facialhair>> <>
+              <<
+                c.level,
+                c.area::little-size(32),
+                c.map::little-size(32),
+                c.x::float-size(32),
+                c.y::float-size(32),
+                c.z::float-size(32)
+              >> <>
+              <<
+                # guild_id
+                0::little-size(32),
+                # flags
+                0::little-size(32),
+                # first_login
+                0,
+                # pet_display_id
+                0::little-size(32),
+                # pet_level
+                0::little-size(32),
+                # pet_family
+                0::little-size(32)
+              >> <>
+              <<
+                # equipment
+                0::little-size(760),
+                # first_bag_display_id
+                0::little-size(32),
+                # first_bag_inventory_type
+                0
+              >>
+          end)
+
+        packet =
+          case length do
+            0 -> <<0>>
+            _ -> <<length>> <> Enum.join(characters_payload)
+          end
+
+        Logger.info("packet: #{inspect(packet, limit: :infinity)}")
+
         CryptoStorage.send_packet(
           state.crypto_pid,
           @smg_char_enum,
-          <<0>>,
+          packet,
           socket
         )
 
@@ -121,6 +175,45 @@ defmodule ThistleTea.Game do
         )
 
         {:continue, Map.put(state, :latency, latency)}
+
+      @cmsg_char_create ->
+        {:ok, character_name, rest} = parse_string(body)
+        <<race, class, gender, skin, face, hairstyle, haircolor, facialhair, outfit_id>> = rest
+        Logger.info("[GameServer] CMSG_CHAR_CREATE: character_name: #{character_name}")
+
+        character = %{
+          guid: :binary.decode_unsigned(:crypto.strong_rand_bytes(64)),
+          name: character_name,
+          race: race,
+          class: class,
+          gender: gender,
+          skin: skin,
+          face: face,
+          hairstyle: hairstyle,
+          haircolor: haircolor,
+          facialhair: facialhair,
+          outfit_id: outfit_id,
+          level: 1,
+          area: 85,
+          map: 0,
+          x: 1676.71,
+          y: 1678.31,
+          z: 121.67,
+          orientation: 2.70526
+        }
+
+        Logger.info("[GameServer] Character: #{inspect(character, limit: :infinity)}")
+
+        CharacterStorage.add_character(state.username, character)
+
+        CryptoStorage.send_packet(
+          state.crypto_pid,
+          @smg_char_create,
+          <<0x2E>>,
+          socket
+        )
+
+        {:continue, state}
 
       _ ->
         Logger.error("[GameServer] Unimplemented opcode: #{inspect(opcode, base: :hex)}")
