@@ -9,10 +9,12 @@ defmodule ThistleTea.Game do
   import Binary, only: [split_at: 2, trim_trailing: 1]
 
   @smsg_auth_challenge 0x1EC
-  @smg_auth_response 0x1EE
 
   @cmsg_auth_session 0x1ED
+  @smg_auth_response 0x1EE
+
   @cmsg_char_enum 0x037
+  @smg_char_enum 0x03B
 
   @impl ThousandIsland.Handler
   def handle_connection(socket, _state) do
@@ -76,7 +78,7 @@ defmodule ThistleTea.Game do
   @impl ThousandIsland.Handler
   def handle_data(
         <<header::bytes-size(6), body::binary>>,
-        _socket,
+        socket,
         state
       ) do
     case CryptoStorage.decrypt_header(state.crypto_pid, header) do
@@ -85,11 +87,33 @@ defmodule ThistleTea.Game do
           "[GameServer] #{inspect(opcode, base: :hex)}, size: #{size}, calculated_size: #{byte_size(body) + 4}"
         )
 
+        handle_packet(opcode, size, body, state, socket)
+
       other ->
         Logger.error("[GameServer] Unknown decrypted header: #{inspect(other)}")
     end
 
     {:continue, state}
+  end
+
+  def handle_packet(opcode, size, body, state, socket) do
+    case opcode do
+      @cmsg_char_enum ->
+        Logger.info("[GameServer] Received CMSG_CHAR_ENUM")
+
+        CryptoStorage.send_packet(
+          state.crypto_pid,
+          @smg_char_enum,
+          <<0>>,
+          socket
+        )
+
+        {:continue, state}
+
+      _ ->
+        Logger.error("[GameServer] Unhandled: #{inspect(opcode, base: :hex)}")
+        {:continue, state}
+    end
   end
 
   def parse_string(payload, pos \\ 1)
