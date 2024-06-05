@@ -414,45 +414,26 @@ defmodule ThistleTea.Game do
             >> <>
             <<
               # walk speed
-              0,
-              0,
-              128,
-              63
+              1.0::float-little-size(32)
             >> <>
             <<
               # run speed
-              0,
-              0,
-              140,
-              66
+              7.0::float-little-size(32)
             >> <>
             <<
               # run back speed
-              0,
-              0,
-              144,
-              64
+              4.5::float-little-size(32)
             >> <>
             <<
               # swim speed
-              0,
-              0,
-              0,
-              0
+              0::float-little-size(32)
             >> <>
             <<
               # swim back speed
-              0,
-              0,
-              0,
-              0
+              0::float-little-size(32)
             >> <>
             <<
-              # turn speed
-              219,
-              15,
-              73,
-              64
+              3.1415::float-little-size(32)
             >> <>
             <<
               # is player
