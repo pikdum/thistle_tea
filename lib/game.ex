@@ -42,11 +42,14 @@ defmodule ThistleTea.Game do
     GenServer.cast(self(), {:handle_packet, opcode, size, body})
   end
 
+  def send_packet(opcode, payload) do
+    GenServer.cast(self(), {:send_packet, opcode, payload})
+  end
+
   @impl ThousandIsland.Handler
   def handle_connection(socket, _state) do
-    # send SMSG_AUTH_CHALLENGE
-    seed = :crypto.strong_rand_bytes(4)
     Logger.info("[GameServer] SMSG_AUTH_CHALLENGE")
+    seed = :crypto.strong_rand_bytes(4)
 
     ThousandIsland.Socket.send(
       socket,
@@ -59,16 +62,11 @@ defmodule ThistleTea.Game do
   @impl ThousandIsland.Handler
   def handle_data(
         <<size::big-size(16), @cmsg_auth_session::little-size(32), body::binary-size(size - 4)>>,
-        socket,
+        _socket,
         state
       ) do
-    <<build::little-size(32), server_id::little-size(32), rest::binary>> = body
-
+    <<_build::little-size(32), _server_id::little-size(32), rest::binary>> = body
     {:ok, username, rest} = parse_string(rest)
-
-    Logger.info(
-      "[GameServer] CMSG_AUTH_SESSION: username: #{username}, build: #{build}, server_id: #{server_id}"
-    )
 
     <<client_seed::little-bytes-size(4), client_proof::little-bytes-size(20), _rest::binary>> =
       rest
@@ -82,20 +80,13 @@ defmodule ThistleTea.Game do
       )
 
     if client_proof == server_proof do
-      Logger.info("[GameServer] Authentication successful: #{username}")
+      Logger.info("[GameServer] CMSG_AUTH_SESSION: success: #{username}")
       crypt = %{key: session, send_i: 0, send_j: 0, recv_i: 0, recv_j: 0}
       {:ok, crypto_pid} = CryptoStorage.start_link(crypt)
-
-      CryptoStorage.send_packet(
-        crypto_pid,
-        @smg_auth_response,
-        <<0x0C, 0::little-size(32), 0, 0::little-size(32)>>,
-        socket
-      )
-
+      send_packet(@smg_auth_response, <<0x0C, 0::little-size(32), 0, 0::little-size(32)>>)
       {:continue, Map.merge(state, %{username: username, crypto_pid: crypto_pid})}
     else
-      Logger.error("[GameServer] Authentication failed: #{username}")
+      Logger.error("[GameServer] CMSG_AUTH_SESSION: error: #{username}")
       {:close, state}
     end
   end
@@ -265,29 +256,15 @@ defmodule ThistleTea.Game do
         _ -> <<length>> <> Enum.join(characters_payload)
       end
 
-    CryptoStorage.send_packet(
-      state.crypto_pid,
-      @smg_char_enum,
-      packet,
-      socket
-    )
-
+    send_packet(@smg_char_enum, packet)
     {:noreply, {socket, state}}
   end
 
   @impl GenServer
   def handle_cast({:handle_packet, @cmsg_ping, _size, body}, {socket, state}) do
     <<sequence_id::little-size(32), latency::little-size(32)>> = body
-
     Logger.info("[GameServer] CMSG_PING: sequence_id: #{sequence_id}, latency: #{latency}")
-
-    CryptoStorage.send_packet(
-      state.crypto_pid,
-      @smg_pong,
-      <<sequence_id::little-size(32)>>,
-      socket
-    )
-
+    send_packet(@smg_pong, <<sequence_id::little-size(32)>>)
     {:noreply, {socket, Map.put(state, :latency, latency)}}
   end
 
@@ -322,20 +299,10 @@ defmodule ThistleTea.Game do
 
     case CharacterStorage.add_character(state.username, character) do
       {:error, error_value} ->
-        CryptoStorage.send_packet(
-          state.crypto_pid,
-          @smg_char_create,
-          <<error_value>>,
-          socket
-        )
+        send_packet(@smg_char_create, <<error_value>>)
 
       _ ->
-        CryptoStorage.send_packet(
-          state.crypto_pid,
-          @smg_char_create,
-          <<0x2E>>,
-          socket
-        )
+        send_packet(@smg_char_create, <<0x2E>>)
     end
 
     {:noreply, {socket, state}}
@@ -350,20 +317,13 @@ defmodule ThistleTea.Game do
 
     Logger.info("[GameServer] Character: #{inspect(c)}")
 
-    CryptoStorage.send_packet(
-      state.crypto_pid,
+    send_packet(
       @smg_login_verify_world,
       <<c.map::little-size(32), c.x::little-float-size(32), c.y::little-float-size(32),
-        c.z::little-float-size(32), c.orientation::little-float-size(32)>>,
-      socket
+        c.z::little-float-size(32), c.orientation::little-float-size(32)>>
     )
 
-    CryptoStorage.send_packet(
-      state.crypto_pid,
-      @smg_tutorial_flags,
-      <<0::little-size(256)>>,
-      socket
-    )
+    send_packet(@smg_tutorial_flags, <<0::little-size(256)>>)
 
     chr_race = DBC.get_by(ChrRaces, id: c.race)
 
@@ -541,22 +501,14 @@ defmodule ThistleTea.Game do
         <<unit_display_id::little-size(32)>> <>
         <<unit_display_id::little-size(32)>>
 
-    CryptoStorage.send_packet(state.crypto_pid, @smg_update_object, packet, socket)
-
+    send_packet(@smg_update_object, packet)
     {:noreply, {socket, state}}
   end
 
   @impl GenServer
   def handle_cast({:handle_packet, @cmsg_logout_request, _size, _body}, {socket, state}) do
     Logger.info("[GameServer] CMSG_LOGOUT_REQUEST")
-
-    CryptoStorage.send_packet(
-      state.crypto_pid,
-      @smsg_logout_response,
-      <<0::little-size(32)>>,
-      socket
-    )
-
+    send_packet(@smsg_logout_response, <<0::little-size(32)>>)
     logout_timer = Process.send_after(self(), :send_logout_complete, 20_000)
     {:noreply, {socket, Map.put(state, :logout_timer, logout_timer)}}
   end
@@ -575,13 +527,7 @@ defmodule ThistleTea.Game do
           Map.delete(state, :logout_timer)
       end
 
-    CryptoStorage.send_packet(
-      state.crypto_pid,
-      @smsg_logout_cancel_ack,
-      <<>>,
-      socket
-    )
-
+    send_packet(@smsg_logout_cancel_ack, <<>>)
     {:noreply, {socket, state}}
   end
 
@@ -592,14 +538,20 @@ defmodule ThistleTea.Game do
   end
 
   @impl GenServer
-  def handle_info(:send_logout_complete, {socket, state}) do
+  def handle_cast({:send_packet, opcode, payload}, {socket, state}) do
     CryptoStorage.send_packet(
       state.crypto_pid,
-      @smsg_logout_complete,
-      <<>>,
+      opcode,
+      payload,
       socket
     )
 
+    {:noreply, {socket, state}}
+  end
+
+  @impl GenServer
+  def handle_info(:send_logout_complete, {socket, state}) do
+    send_packet(@smsg_logout_complete, <<>>)
     {:noreply, {socket, state}}
   end
 
