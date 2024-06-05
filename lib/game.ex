@@ -24,6 +24,12 @@ defmodule ThistleTea.Game do
   @cmsg_char_create 0x036
   @smg_char_create 0x03A
 
+  @cmsg_player_login 0x03D
+  @smg_login_verify_world 0x236
+  @smg_tutorial_flags 0x0FD
+  @smg_update_object 0x0A9
+  # @smg_character_login_failed 0x03C
+
   @impl ThousandIsland.Handler
   def handle_connection(socket, _state) do
     # send SMSG_AUTH_CHALLENGE
@@ -107,6 +113,7 @@ defmodule ThistleTea.Game do
         characters = CharacterStorage.get_characters(state.username)
         length = characters |> Enum.count()
 
+        # TODO: use actual character equipment
         weapon = Mangos.get(ItemTemplate, 13262)
         tabard = Mangos.get(ItemTemplate, 15196)
 
@@ -279,7 +286,7 @@ defmodule ThistleTea.Game do
         info = Mangos.get_by(PlayerCreateInfo, race: race, class: class)
 
         character = %{
-          guid: :binary.decode_unsigned(:crypto.strong_rand_bytes(64)),
+          guid: :binary.decode_unsigned(:crypto.strong_rand_bytes(8)),
           name: character_name,
           race: race,
           class: class,
@@ -316,6 +323,209 @@ defmodule ThistleTea.Game do
               socket
             )
         end
+
+        {:continue, state}
+
+      @cmsg_player_login ->
+        <<character_guid::little-size(64)>> = body
+        Logger.info("[GameServer] CMSG_PLAYER_LOGIN: character_guid: #{character_guid}")
+
+        c = CharacterStorage.get_by_guid(state.username, character_guid)
+
+        CryptoStorage.send_packet(
+          state.crypto_pid,
+          @smg_login_verify_world,
+          <<c.map::little-size(32), c.x::little-float-size(32), c.y::little-float-size(32),
+            c.z::little-float-size(32), c.orientation::little-float-size(32)>>,
+          socket
+        )
+
+        CryptoStorage.send_packet(
+          state.crypto_pid,
+          @smg_tutorial_flags,
+          <<0::little-size(256)>>,
+          socket
+        )
+
+        packet =
+          <<
+            # block count (1)
+            1,
+            0,
+            0,
+            0
+          >> <>
+            <<
+              # has transport
+              0
+            >> <>
+            <<
+              # update type = CREATE_NEW_OBJECT2
+              3
+            >> <>
+            <<
+              # packet guid, guid = 4
+              1,
+              4
+            >> <>
+            <<
+              # object type = WO_PLAYER
+              4
+            >> <>
+            <<
+              # update flags 0x71
+              113
+            >> <>
+            <<
+              # movement flags
+              0,
+              0,
+              0,
+              0
+            >> <>
+            <<
+              # timestamp
+              0,
+              0,
+              0,
+              0
+            >> <>
+            <<
+              # position x
+              205,
+              215,
+              11,
+              198
+            >> <>
+            <<
+              # position y
+              53,
+              126,
+              4,
+              195
+            >> <>
+            <<
+              # position z
+              249,
+              15,
+              167,
+              66
+            >> <>
+            <<
+              # orientation
+              0,
+              0,
+              0,
+              0
+            >> <>
+            <<
+              # fall time
+              0,
+              0,
+              0,
+              0
+            >> <>
+            <<
+              # walk speed
+              0,
+              0,
+              128,
+              63
+            >> <>
+            <<
+              # run speed
+              0,
+              0,
+              140,
+              66
+            >> <>
+            <<
+              # run back speed
+              0,
+              0,
+              144,
+              64
+            >> <>
+            <<
+              # swim speed
+              0,
+              0,
+              0,
+              0
+            >> <>
+            <<
+              # swim back speed
+              0,
+              0,
+              0,
+              0
+            >> <>
+            <<
+              # turn speed
+              219,
+              15,
+              73,
+              64
+            >> <>
+            <<
+              # is player
+              1
+            >> <>
+            <<
+              # unknown hardcoded
+              1,
+              0,
+              0
+            >> <>
+            <<
+              # amount of mask blocks
+              2
+            >> <>
+            <<
+              # mask blocks
+              7,
+              0,
+              64,
+              0,
+              16,
+              0,
+              0,
+              0
+            >> <>
+            <<
+              # object_field_guid
+              4,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            >> <>
+            <<
+              # object_field_type
+              25,
+              0,
+              0,
+              0
+            >> <>
+            <<
+              # unit_field_health
+              100,
+              0,
+              0,
+              0
+            >> <>
+            <<
+              c.race,
+              c.class,
+              c.gender,
+              # power (rage)
+              1
+            >>
+
+        CryptoStorage.send_packet(state.crypto_pid, @smg_update_object, packet, socket)
 
         {:continue, state}
 

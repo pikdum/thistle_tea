@@ -12,6 +12,13 @@ defmodule ThistleTea.CharacterStorage do
     end
   end
 
+  def get_by_guid(username, guid) do
+    case get_characters(username) do
+      nil -> nil
+      characters -> Enum.find(characters, &(&1.guid == guid))
+    end
+  end
+
   def add_character(username, character) do
     case get_characters(username) do
       nil ->
