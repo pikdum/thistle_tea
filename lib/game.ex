@@ -276,6 +276,8 @@ defmodule ThistleTea.Game do
         <<race, class, gender, skin, face, hairstyle, haircolor, facialhair, outfit_id>> = rest
         Logger.info("[GameServer] CMSG_CHAR_CREATE: character_name: #{character_name}")
 
+        info = Mangos.get_by(PlayerCreateInfo, race: race, class: class)
+
         character = %{
           guid: :binary.decode_unsigned(:crypto.strong_rand_bytes(64)),
           name: character_name,
@@ -289,15 +291,13 @@ defmodule ThistleTea.Game do
           facialhair: facialhair,
           outfit_id: outfit_id,
           level: 1,
-          area: 85,
-          map: 0,
-          x: 1676.71,
-          y: 1678.31,
-          z: 121.67,
-          orientation: 2.70526
+          area: info.zone,
+          map: info.map,
+          x: info.position_x,
+          y: info.position_y,
+          z: info.position_z,
+          orientation: info.orientation
         }
-
-        Logger.info("[GameServer] Character: #{inspect(character, limit: :infinity)}")
 
         case CharacterStorage.add_character(state.username, character) do
           {:error, error_value} ->
