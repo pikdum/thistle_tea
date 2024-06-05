@@ -7,6 +7,7 @@ defmodule ThistleTea.Game do
   alias ThistleTea.SessionStorage
   alias ThistleTea.CharacterStorage
   alias ThistleTea.Mangos
+  alias ThistleTea.DBC
 
   import Binary, only: [split_at: 2, trim_trailing: 1]
 
@@ -349,6 +350,14 @@ defmodule ThistleTea.Game do
           socket
         )
 
+        chr_race = DBC.get_by(ChrRaces, id: c.race)
+
+        unit_display_id =
+          case(c.gender) do
+            0 -> chr_race.male_display
+            1 -> chr_race.female_display
+          end
+
         packet =
           <<
             # block count (1)
@@ -535,14 +544,14 @@ defmodule ThistleTea.Game do
             >> <>
             <<
               # unit_field_displayd (50, human female)
-              50,
+              unit_display_id,
               0,
               0,
               0
             >> <>
             <<
               # unit_field_nativedisplayid (50, human female)
-              50,
+              unit_display_id,
               0,
               0,
               0
