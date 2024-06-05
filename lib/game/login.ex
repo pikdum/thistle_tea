@@ -218,7 +218,8 @@ defmodule ThistleTea.Game.Login do
               0
             >> <>
             <<
-              # object_field_guid
+              # object_guid
+              # what's this?
               4,
               0,
               0,
@@ -229,7 +230,8 @@ defmodule ThistleTea.Game.Login do
               0
             >> <>
             <<
-              # object_field_type
+              # object_type
+              # what's this?
               25,
               0,
               0,
@@ -237,24 +239,15 @@ defmodule ThistleTea.Game.Login do
             >> <>
             <<
               # scale 1.0
-              0,
-              0,
-              128,
-              63
+              1.0::little-float-size(32)
             >> <>
             <<
               # unit_field_health
-              100,
-              0,
-              0,
-              0
+              100::little-size(32)
             >> <>
             <<
               # unit_field_max_health
-              100,
-              0,
-              0,
-              0
+              1000::little-size(32)
             >> <>
             <<c.level::little-size(32)>> <>
             <<
