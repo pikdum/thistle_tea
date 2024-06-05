@@ -4,17 +4,13 @@ defmodule ThistleTea.Game do
   require Logger
 
   alias ThistleTea.CryptoStorage
-  alias ThistleTea.SessionStorage
   alias ThistleTea.CharacterStorage
   alias ThistleTea.Mangos
   alias ThistleTea.DBC
 
-  import Binary, only: [split_at: 2, trim_trailing: 1]
+  import ThistleTea.Util, only: [parse_string: 1]
 
-  @smsg_auth_challenge 0x1EC
-
-  @cmsg_auth_session 0x1ED
-  @smg_auth_response 0x1EE
+  use ThistleTea.Game.Auth
 
   @cmsg_char_enum 0x037
   @smg_char_enum 0x03B
@@ -44,51 +40,6 @@ defmodule ThistleTea.Game do
 
   def send_packet(opcode, payload) do
     GenServer.cast(self(), {:send_packet, opcode, payload})
-  end
-
-  @impl ThousandIsland.Handler
-  def handle_connection(socket, _state) do
-    Logger.info("[GameServer] SMSG_AUTH_CHALLENGE")
-    seed = :crypto.strong_rand_bytes(4)
-
-    ThousandIsland.Socket.send(
-      socket,
-      <<6::big-size(16), @smsg_auth_challenge::little-size(16)>> <> seed
-    )
-
-    {:continue, %{seed: seed}}
-  end
-
-  @impl ThousandIsland.Handler
-  def handle_data(
-        <<size::big-size(16), @cmsg_auth_session::little-size(32), body::binary-size(size - 4)>>,
-        _socket,
-        state
-      ) do
-    <<_build::little-size(32), _server_id::little-size(32), rest::binary>> = body
-    {:ok, username, rest} = parse_string(rest)
-
-    <<client_seed::little-bytes-size(4), client_proof::little-bytes-size(20), _rest::binary>> =
-      rest
-
-    session = SessionStorage.get(username)
-
-    server_proof =
-      :crypto.hash(
-        :sha,
-        username <> <<0::little-size(32)>> <> client_seed <> state.seed <> session
-      )
-
-    if client_proof == server_proof do
-      Logger.info("[GameServer] CMSG_AUTH_SESSION: success: #{username}")
-      crypt = %{key: session, send_i: 0, send_j: 0, recv_i: 0, recv_j: 0}
-      {:ok, crypto_pid} = CryptoStorage.start_link(crypt)
-      send_packet(@smg_auth_response, <<0x0C, 0::little-size(32), 0, 0::little-size(32)>>)
-      {:continue, Map.merge(state, %{username: username, crypto_pid: crypto_pid})}
-    else
-      Logger.error("[GameServer] CMSG_AUTH_SESSION: error: #{username}")
-      {:close, state}
-    end
   end
 
   @impl ThousandIsland.Handler
@@ -554,19 +505,5 @@ defmodule ThistleTea.Game do
   def handle_info(:send_logout_complete, {socket, state}) do
     send_packet(@smsg_logout_complete, <<>>)
     {:noreply, {socket, state}}
-  end
-
-  def parse_string(payload, pos \\ 1)
-  def parse_string(payload, _pos) when byte_size(payload) == 0, do: {:ok, payload, <<>>}
-
-  def parse_string(payload, pos) do
-    case :binary.at(payload, pos - 1) do
-      0 ->
-        {string, rest} = split_at(payload, pos)
-        {:ok, trim_trailing(string), rest}
-
-      _ ->
-        parse_string(payload, pos + 1)
-    end
   end
 end
