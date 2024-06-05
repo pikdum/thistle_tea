@@ -332,6 +332,8 @@ defmodule ThistleTea.Game do
 
         c = CharacterStorage.get_by_guid(state.username, character_guid)
 
+        Logger.info("[GameServer] Character: #{inspect(c)}")
+
         CryptoStorage.send_packet(
           state.crypto_pid,
           @smg_login_verify_world,
@@ -390,27 +392,9 @@ defmodule ThistleTea.Game do
               0,
               0
             >> <>
-            <<
-              # position x
-              205,
-              215,
-              11,
-              198
-            >> <>
-            <<
-              # position y
-              53,
-              126,
-              4,
-              195
-            >> <>
-            <<
-              # position z
-              249,
-              15,
-              167,
-              66
-            >> <>
+            <<c.x::little-float-size(32)>> <>
+            <<c.y::little-float-size(32)>> <>
+            <<c.z::little-float-size(32)>> <>
             <<
               # orientation
               0,
