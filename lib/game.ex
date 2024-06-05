@@ -395,13 +395,7 @@ defmodule ThistleTea.Game do
             <<c.x::little-float-size(32)>> <>
             <<c.y::little-float-size(32)>> <>
             <<c.z::little-float-size(32)>> <>
-            <<
-              # orientation
-              0,
-              0,
-              0,
-              0
-            >> <>
+            <<c.orientation::little-float-size(32)>> <>
             <<
               # fall time
               0,
