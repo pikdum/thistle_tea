@@ -9,6 +9,55 @@ defmodule ThistleTea.Game.Login do
       @smg_tutorial_flags 0x0FD
       @smg_update_object 0x0A9
 
+      # https://gtker.com/wow_messages/types/update-mask.html
+      @field_defs %{
+        object_guid: %{
+          size: 2,
+          offset: 0x0
+        },
+        object_type: %{
+          size: 1,
+          offset: 0x2
+        },
+        object_scale_x: %{
+          size: 1,
+          offset: 0x4
+        },
+        unit_health: %{
+          size: 1,
+          offset: 0x16
+        },
+        unit_max_health: %{
+          size: 1,
+          offset: 0x1C
+        },
+        unit_level: %{
+          size: 1,
+          offset: 0x22
+        },
+        unit_faction_template: %{
+          size: 1,
+          offset: 0x23
+        },
+        unit_bytes_0: %{
+          size: 1,
+          offset: 0x24
+        },
+        unit_display_id: %{
+          size: 1,
+          offset: 0x98
+        },
+        unit_native_display_id: %{
+          size: 1,
+          offset: 0x99
+        }
+      }
+
+      def mask_blocks_count(fields) do
+        max_offset = Enum.max(Enum.map(Map.keys(fields), &Map.get(@field_defs, &1).offset))
+        trunc(:math.ceil(max_offset / 32))
+      end
+
       def encode_movement_block(m) do
         {x, y, z, orientation} = m.position
 
@@ -92,6 +141,22 @@ defmodule ThistleTea.Game.Login do
           turn_rate: 3.1415
         }
 
+        fields = %{
+          object_guid: 4,
+          object_type: 25,
+          object_scale_x: 1.0,
+          unit_health: 100,
+          unit_max_health: 100,
+          unit_level: c.level,
+          unit_faction_template: 1,
+          unit_bytes_0: <<c.race, c.class, c.gender, 1>>,
+          unit_display_id: unit_display_id,
+          unit_native_display_id: unit_display_id
+        }
+
+        mask_count = mask_blocks_count(fields)
+        Logger.info("[GameServer] Mask count: #{mask_count}")
+
         packet =
           <<
             # block count (1)
@@ -128,10 +193,7 @@ defmodule ThistleTea.Game.Login do
               0,
               0
             >> <>
-            <<
-              # amount of mask blocks
-              5
-            >> <>
+            <<mask_count>> <>
             <<
               # mask blocks
               23,
