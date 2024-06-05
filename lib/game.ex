@@ -323,7 +323,8 @@ defmodule ThistleTea.Game do
         c.z::little-float-size(32), c.orientation::little-float-size(32)>>
     )
 
-    send_packet(@smg_tutorial_flags, <<0::little-size(256)>>)
+    # no tutorials
+    send_packet(@smg_tutorial_flags, <<0xFFFFFFFFFFFFFFFF::little-size(256)>>)
 
     chr_race = DBC.get_by(ChrRaces, id: c.race)
 
