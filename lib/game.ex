@@ -6,6 +6,7 @@ defmodule ThistleTea.Game do
   alias ThistleTea.CryptoStorage
   alias ThistleTea.SessionStorage
   alias ThistleTea.CharacterStorage
+  alias ThistleTea.Mangos
 
   import Binary, only: [split_at: 2, trim_trailing: 1]
 
@@ -106,6 +107,9 @@ defmodule ThistleTea.Game do
         characters = CharacterStorage.get_characters(state.username)
         length = characters |> Enum.count()
 
+        weapon = Mangos.get(ItemTemplate, 13262)
+        tabard = Mangos.get(ItemTemplate, 15196)
+
         characters_payload =
           characters
           |> Enum.map(fn c ->
@@ -136,8 +140,101 @@ defmodule ThistleTea.Game do
                 0::little-size(32)
               >> <>
               <<
-                # equipment
-                0::little-size(760),
+                # head
+                0::little-size(32),
+                0
+              >> <>
+              <<
+                # neck
+                0::little-size(32),
+                0
+              >> <>
+              <<
+                # shoulders
+                0::little-size(32),
+                0
+              >> <>
+              <<
+                # body
+                0::little-size(32),
+                0
+              >> <>
+              <<
+                # chest
+                0::little-size(32),
+                0
+              >> <>
+              <<
+                # waist
+                0::little-size(32),
+                0
+              >> <>
+              <<
+                # legs
+                0::little-size(32),
+                0
+              >> <>
+              <<
+                # feet
+                0::little-size(32),
+                0
+              >> <>
+              <<
+                # wrists
+                0::little-size(32),
+                0
+              >> <>
+              <<
+                # hands
+                0::little-size(32),
+                0
+              >> <>
+              <<
+                # finger1
+                0::little-size(32),
+                0
+              >> <>
+              <<
+                # finger2
+                0::little-size(32),
+                0
+              >> <>
+              <<
+                # trinket1
+                0::little-size(32),
+                0
+              >> <>
+              <<
+                # trinket2
+                0::little-size(32),
+                0
+              >> <>
+              <<
+                # back
+                0::little-size(32),
+                0
+              >> <>
+              <<
+                # mainhand
+                weapon.display_id::little-size(32),
+                0
+              >> <>
+              <<
+                # offhand
+                weapon.display_id::little-size(32),
+                0
+              >> <>
+              <<
+                # ranged
+                0::little-size(32),
+                0
+              >> <>
+              <<
+                # tabard
+                tabard.display_id::little-size(32),
+                0
+              >> <>
+              <<
                 # first_bag_display_id
                 0::little-size(32),
                 # first_bag_inventory_type

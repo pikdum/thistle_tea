@@ -10,6 +10,8 @@ defmodule ThistleTea.Application do
   @impl true
   def start(_type, _args) do
     children = [
+      ThistleTea.DBC,
+      ThistleTea.Mangos,
       ThistleTea.CharacterStorage,
       ThistleTea.SessionStorage,
       {ThousandIsland, port: 3724, handler_module: ThistleTea.Auth, handler_options: %{}},
