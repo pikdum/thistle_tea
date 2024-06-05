@@ -457,15 +457,27 @@ defmodule ThistleTea.Game do
             >> <>
             <<
               # amount of mask blocks
-              2
+              5
             >> <>
             <<
               # mask blocks
-              7,
+              23,
               0,
               64,
-              0,
               16,
+              28,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              24,
               0,
               0,
               0
@@ -489,6 +501,13 @@ defmodule ThistleTea.Game do
               0
             >> <>
             <<
+              # scale 1.0
+              0,
+              0,
+              128,
+              63
+            >> <>
+            <<
               # unit_field_health
               100,
               0,
@@ -496,11 +515,37 @@ defmodule ThistleTea.Game do
               0
             >> <>
             <<
+              # unit_field_max_health
+              100,
+              0,
+              0,
+              0
+            >> <>
+            <<c.level::little-size(32)>> <>
+            <<
+              # unit_field_faction_template
+              1::little-size(32)
+            >> <>
+            <<
               c.race,
               c.class,
               c.gender,
               # power (rage)
               1
+            >> <>
+            <<
+              # unit_field_displayd (50, human female)
+              50,
+              0,
+              0,
+              0
+            >> <>
+            <<
+              # unit_field_nativedisplayid (50, human female)
+              50,
+              0,
+              0,
+              0
             >>
 
         CryptoStorage.send_packet(state.crypto_pid, @smg_update_object, packet, socket)
