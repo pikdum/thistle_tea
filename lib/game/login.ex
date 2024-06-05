@@ -8,7 +8,36 @@ defmodule ThistleTea.Game.Login do
       @smg_login_verify_world 0x236
       @smg_tutorial_flags 0x0FD
       @smg_update_object 0x0A9
-      # @smg_character_login_failed 0x03C
+
+      def encode_movement_block(m) do
+        {x, y, z, orientation} = m.position
+
+        <<m.update_flag::little-size(8)>> <>
+          <<
+            m.movement_flags::little-size(32),
+            # unknown (timestamp?)
+            0::little-size(32),
+            # position
+            x::little-float-size(32),
+            y::little-float-size(32),
+            z::little-float-size(32),
+            orientation::little-float-size(32)
+          >> <>
+          <<m.fall_time::little-float-size(32)>> <>
+          <<
+            # speed block
+            m.walk_speed::float-little-size(32),
+            m.run_speed::float-little-size(32),
+            m.run_back_speed::float-little-size(32),
+            m.swim_speed::float-little-size(32),
+            m.swim_back_speed::float-little-size(32),
+            m.turn_rate::float-little-size(32)
+          >>
+
+        # do i need is_player?
+        # or unknown hardcoded?
+        # looks like yes, but why?
+      end
 
       @impl GenServer
       def handle_cast({:handle_packet, @cmsg_player_login, _size, body}, {socket, state}) do
@@ -25,8 +54,21 @@ defmodule ThistleTea.Game.Login do
             c.z::little-float-size(32), c.orientation::little-float-size(32)>>
         )
 
+        # SMSG_ACCOUNT_DATA_TIMES needed for no white chatbox :)
+        # https://gtker.com/wow_messages/docs/smsg_account_data_times.html
+
+        # SMG_SET_REST_START - maybe useless?
+        # SMSG_BINDPOINTUPDATE - they send this just before tutorial
+
         # no tutorials
         send_packet(@smg_tutorial_flags, <<0xFFFFFFFFFFFFFFFF::little-size(256)>>)
+
+        # send initial spells
+        # send initial action buttons
+        # send initial repuations
+
+        # SMSG_LOGIN_SETTIMESPEED
+        # SMSG_TRIGGER_CINEMATIC
 
         chr_race = DBC.get_by(ChrRaces, id: c.race)
 
@@ -35,6 +77,20 @@ defmodule ThistleTea.Game.Login do
             0 -> chr_race.male_display
             1 -> chr_race.female_display
           end
+
+        movement_block = %{
+          # what is 0x71?
+          update_flag: 0x71,
+          movement_flags: 0,
+          position: {c.x, c.y, c.z, c.orientation},
+          fall_time: 0.0,
+          walk_speed: 1.0,
+          run_speed: 7.0,
+          run_back_speed: 4.5,
+          swim_speed: 0.0,
+          swim_back_speed: 0.0,
+          turn_rate: 3.1415
+        }
 
         packet =
           <<
@@ -61,58 +117,7 @@ defmodule ThistleTea.Game.Login do
               # object type = WO_PLAYER
               4
             >> <>
-            <<
-              # update flags 0x71
-              113
-            >> <>
-            <<
-              # movement flags
-              0,
-              0,
-              0,
-              0
-            >> <>
-            <<
-              # timestamp
-              0,
-              0,
-              0,
-              0
-            >> <>
-            <<c.x::little-float-size(32)>> <>
-            <<c.y::little-float-size(32)>> <>
-            <<c.z::little-float-size(32)>> <>
-            <<c.orientation::little-float-size(32)>> <>
-            <<
-              # fall time
-              0,
-              0,
-              0,
-              0
-            >> <>
-            <<
-              # walk speed
-              1.0::float-little-size(32)
-            >> <>
-            <<
-              # run speed
-              7.0::float-little-size(32)
-            >> <>
-            <<
-              # run back speed
-              4.5::float-little-size(32)
-            >> <>
-            <<
-              # swim speed
-              0::float-little-size(32)
-            >> <>
-            <<
-              # swim back speed
-              0::float-little-size(32)
-            >> <>
-            <<
-              3.1415::float-little-size(32)
-            >> <>
+            encode_movement_block(movement_block) <>
             <<
               # is player
               1
