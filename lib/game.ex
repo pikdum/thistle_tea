@@ -31,6 +31,13 @@ defmodule ThistleTea.Game do
   @smg_update_object 0x0A9
   # @smg_character_login_failed 0x03C
 
+  @cmsg_logout_request 0x04B
+  @smsg_logout_response 0x04C
+  @smsg_logout_complete 0x04D
+
+  @cmsg_logout_cancel 0x04E
+  @smsg_logout_cancel_ack 0x04F
+
   @impl ThousandIsland.Handler
   def handle_connection(socket, _state) do
     # send SMSG_AUTH_CHALLENGE
@@ -101,9 +108,8 @@ defmodule ThistleTea.Game do
 
       other ->
         Logger.error("[GameServer] Error decrypting header: #{inspect(other, limit: :infinity)}")
+        {:continue, state}
     end
-
-    {:continue, state}
   end
 
   def handle_packet(opcode, size, body, state, socket) do
@@ -530,10 +536,48 @@ defmodule ThistleTea.Game do
 
         {:continue, state}
 
+      @cmsg_logout_request ->
+        Logger.info("[GameServer] CMSG_LOGOUT_REQUEST")
+
+        CryptoStorage.send_packet(
+          state.crypto_pid,
+          @smsg_logout_response,
+          <<0::little-size(32)>>,
+          socket
+        )
+
+        logout_timer = Process.send_after(self(), :send_logout_complete, 20_000)
+        {:continue, Map.put(state, :logout_timer, logout_timer)}
+
+      @cmsg_logout_cancel ->
+        Logger.info("[GameServer] CMSG_LOGOUT_CANCEL")
+
+        Process.cancel_timer(state.logout_timer)
+
+        CryptoStorage.send_packet(
+          state.crypto_pid,
+          @smsg_logout_cancel_ack,
+          <<>>,
+          socket
+        )
+
+        {:continue, Map.delete(state, :logout_timer)}
+
       _ ->
         Logger.error("[GameServer] Unimplemented opcode: #{inspect(opcode, base: :hex)}")
         {:continue, state}
     end
+  end
+
+  def handle_info(:send_logout_complete, {socket, state}) do
+    CryptoStorage.send_packet(
+      state.crypto_pid,
+      @smsg_logout_complete,
+      <<>>,
+      socket
+    )
+
+    {:noreply, {socket, state}}
   end
 
   def parse_string(payload, pos \\ 1)
