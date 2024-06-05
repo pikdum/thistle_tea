@@ -542,20 +542,8 @@ defmodule ThistleTea.Game do
               # power (rage)
               1
             >> <>
-            <<
-              # unit_field_displayd (50, human female)
-              unit_display_id,
-              0,
-              0,
-              0
-            >> <>
-            <<
-              # unit_field_nativedisplayid (50, human female)
-              unit_display_id,
-              0,
-              0,
-              0
-            >>
+            <<unit_display_id::little-size(32)>> <>
+            <<unit_display_id::little-size(32)>>
 
         CryptoStorage.send_packet(state.crypto_pid, @smg_update_object, packet, socket)
 
