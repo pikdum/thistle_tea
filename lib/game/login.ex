@@ -90,6 +90,10 @@ defmodule ThistleTea.Game.Login do
         player_next_level_xp: %{
           size: 1,
           offset: 0x2CD
+        },
+        player_rest_state_experience: %{
+          size: 1,
+          offset: 0x497
         }
       }
 
@@ -142,6 +146,7 @@ defmodule ThistleTea.Game.Login do
             :player_features -> value
             :player_xp -> <<value::little-size(32)>>
             :player_next_level_xp -> <<value::little-size(32)>>
+            :player_rest_state_experience -> <<value::little-size(32)>>
             _ -> raise "Unknown field: #{field}"
           end
         end)
@@ -249,7 +254,8 @@ defmodule ThistleTea.Game.Login do
           unit_native_display_id: unit_display_id,
           player_features: <<c.skin, c.face, c.hairstyle, c.haircolor>>,
           player_xp: 1,
-          player_next_level_xp: 100
+          player_next_level_xp: 100,
+          player_rest_state_experience: 100
         }
 
         mask_count = mask_blocks_count(fields)
