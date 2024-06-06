@@ -29,6 +29,31 @@ defmodule ThistleTea.Game.Login do
           size: 1,
           offset: 0x16
         },
+        unit_power_1: %{
+          # mana
+          size: 1,
+          offset: 0x17
+        },
+        unit_power_2: %{
+          # rage
+          size: 1,
+          offset: 0x18
+        },
+        unit_power_3: %{
+          # focus
+          size: 1,
+          offset: 0x19
+        },
+        unit_power_4: %{
+          # energy
+          size: 1,
+          offset: 0x1A
+        },
+        unit_power_5: %{
+          # happiness
+          size: 1,
+          offset: 0x1B
+        },
         unit_max_health: %{
           size: 1,
           offset: 0x1C
@@ -52,6 +77,14 @@ defmodule ThistleTea.Game.Login do
         unit_native_display_id: %{
           size: 1,
           offset: 0x84
+        },
+        player_xp: %{
+          size: 1,
+          offset: 0x2CC
+        },
+        player_next_level_xp: %{
+          size: 1,
+          offset: 0x2CD
         }
       }
 
@@ -90,12 +123,19 @@ defmodule ThistleTea.Game.Login do
             :object_type -> <<value::little-size(32)>>
             :object_scale_x -> <<value::float-little-size(32)>>
             :unit_health -> <<value::little-size(32)>>
+            :unit_power_1 -> <<value::little-size(32)>>
+            :unit_power_2 -> <<value::little-size(32)>>
+            :unit_power_3 -> <<value::little-size(32)>>
+            :unit_power_4 -> <<value::little-size(32)>>
+            :unit_power_5 -> <<value::little-size(32)>>
             :unit_max_health -> <<value::little-size(32)>>
             :unit_level -> <<value::little-size(32)>>
             :unit_faction_template -> <<value::little-size(32)>>
             :unit_bytes_0 -> value
             :unit_display_id -> <<value::little-size(32)>>
             :unit_native_display_id -> <<value::little-size(32)>>
+            :player_xp -> <<value::little-size(32)>>
+            :player_next_level_xp -> <<value::little-size(32)>>
             _ -> raise "Unknown field: #{field}"
           end
         end)
@@ -190,12 +230,19 @@ defmodule ThistleTea.Game.Login do
           object_type: 25,
           object_scale_x: 1.0,
           unit_health: 100,
+          unit_power_1: 100,
+          unit_power_2: 100,
+          unit_power_3: 100,
+          unit_power_4: 100,
+          unit_power_5: 100,
           unit_max_health: 100,
           unit_level: c.level,
           unit_faction_template: 1,
           unit_bytes_0: <<c.race, c.class, c.gender, 1>>,
           unit_display_id: unit_display_id,
-          unit_native_display_id: unit_display_id
+          unit_native_display_id: unit_display_id,
+          player_xp: 1,
+          player_next_level_xp: 100
         }
 
         mask_count = mask_blocks_count(fields)
