@@ -5,11 +5,15 @@ defmodule ThistleTea.Game.Login do
       alias ThistleTea.DBC
 
       import Binary, only: [reverse: 1]
+      import Bitwise, only: [<<<: 2, |||: 2]
 
       @cmsg_player_login 0x03D
       @smsg_login_verify_world 0x236
       @smsg_account_data_times 0x209
+      @smsg_set_rest_start 0x21E
+      @smsg_bindpointupdate 0x155
       @smsg_tutorial_flags 0x0FD
+      @smsg_login_settimespeed 0x042
       @smsg_update_object 0x0A9
 
       # https://gtker.com/wow_messages/types/update-mask.html
@@ -199,14 +203,26 @@ defmodule ThistleTea.Game.Login do
             c.z::little-float-size(32), c.orientation::little-float-size(32)>>
         )
 
-        # needed for no white chatbox
+        # needed for no white chatbox + keybinds
         send_packet(
           @smsg_account_data_times,
           <<0::little-size(128)>>
         )
 
-        # SMG_SET_REST_START - maybe useless?
-        # SMSG_BINDPOINTUPDATE - they send this just before tutorial
+        # maybe useless? mangos sends it, though
+        send_packet(
+          @smsg_set_rest_start,
+          <<0::little-size(32)>>
+        )
+
+        # SMSG_BINDPOINTUPDATE
+        # let's just init it to character's position for now
+        send_packet(
+          @smsg_bindpointupdate,
+          <<c.map::little-size(32), c.x::little-float-size(32), c.y::little-float-size(32),
+            c.z::little-float-size(32), c.orientation::little-float-size(32),
+            c.map::little-size(32), c.area::little-size(32)>>
+        )
 
         # no tutorials
         send_packet(@smsg_tutorial_flags, <<0xFFFFFFFFFFFFFFFF::little-size(256)>>)
@@ -216,6 +232,18 @@ defmodule ThistleTea.Game.Login do
         # send initial repuations
 
         # SMSG_LOGIN_SETTIMESPEED
+        # TODO: verify this
+        dt = DateTime.utc_now()
+
+        date =
+          (dt.year - 100) <<< 24 ||| dt.month <<< 20 ||| (dt.day - 1) <<< 14 |||
+            Date.day_of_week(dt) <<< 11 ||| dt.hour <<< 6 ||| dt.minute
+
+        send_packet(
+          @smsg_login_settimespeed,
+          <<date::little-size(32), 0.01666667::little-float-size(32)>>
+        )
+
         # SMSG_TRIGGER_CINEMATIC
 
         chr_race = DBC.get_by(ChrRaces, id: c.race)
