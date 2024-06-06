@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Login do
 
       @cmsg_player_login 0x03D
       @smsg_login_verify_world 0x236
+      @smsg_account_data_times 0x209
       @smsg_tutorial_flags 0x0FD
       @smsg_update_object 0x0A9
 
@@ -198,8 +199,11 @@ defmodule ThistleTea.Game.Login do
             c.z::little-float-size(32), c.orientation::little-float-size(32)>>
         )
 
-        # SMSG_ACCOUNT_DATA_TIMES needed for no white chatbox :)
-        # https://gtker.com/wow_messages/docs/smsg_account_data_times.html
+        # needed for no white chatbox
+        send_packet(
+          @smsg_account_data_times,
+          <<0::little-size(128)>>
+        )
 
         # SMG_SET_REST_START - maybe useless?
         # SMSG_BINDPOINTUPDATE - they send this just before tutorial
