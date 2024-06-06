@@ -4,6 +4,8 @@ defmodule ThistleTea.Game.Login do
       alias ThistleTea.CharacterStorage
       alias ThistleTea.DBC
 
+      import Binary, only: [reverse: 1]
+
       @cmsg_player_login 0x03D
       @smg_login_verify_world 0x236
       @smg_tutorial_flags 0x0FD
@@ -45,17 +47,36 @@ defmodule ThistleTea.Game.Login do
         },
         unit_display_id: %{
           size: 1,
-          offset: 0x98
+          offset: 0x83
         },
         unit_native_display_id: %{
           size: 1,
-          offset: 0x99
+          offset: 0x84
         }
       }
 
       def mask_blocks_count(fields) do
         max_offset = Enum.max(Enum.map(Map.keys(fields), &Map.get(@field_defs, &1).offset))
         trunc(:math.ceil(max_offset / 32))
+      end
+
+      def generate_mask(fields) do
+        mask_count = mask_blocks_count(fields)
+        mask_size = 32 * mask_count
+        mask = <<0::size(mask_size)>>
+
+        mask =
+          Enum.reduce(fields, mask, fn {field, value}, acc ->
+            field_def = Map.get(@field_defs, field)
+            size = field_def.size
+            offset = field_def.offset
+
+            <<left::size(mask_size - offset - size), _::size(size), right::size(offset)>> = acc
+
+            <<left::size(mask_size - offset - size), 0xFFFFFF::size(size), right::size(offset)>>
+          end)
+
+        reverse(mask)
       end
 
       def encode_movement_block(m) do
@@ -156,6 +177,8 @@ defmodule ThistleTea.Game.Login do
 
         mask_count = mask_blocks_count(fields)
         Logger.info("[GameServer] Mask count: #{mask_count}")
+        mask = generate_mask(fields)
+        Logger.info("[GameServer] Mask: #{inspect(mask)}")
 
         packet =
           <<
@@ -194,29 +217,7 @@ defmodule ThistleTea.Game.Login do
               0
             >> <>
             <<mask_count>> <>
-            <<
-              # mask blocks
-              23,
-              0,
-              64,
-              16,
-              28,
-              0,
-              0,
-              0,
-              0,
-              0,
-              0,
-              0,
-              0,
-              0,
-              0,
-              0,
-              24,
-              0,
-              0,
-              0
-            >> <>
+            mask <>
             <<
               # object_guid
               # what's this?
