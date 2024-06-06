@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.Login do
       @smsg_bindpointupdate 0x155
       @smsg_tutorial_flags 0x0FD
       @smsg_login_settimespeed 0x042
+      @smsg_trigger_cinematic 0x0FA
       @smsg_update_object 0x0A9
 
       # https://gtker.com/wow_messages/types/update-mask.html
@@ -244,9 +245,13 @@ defmodule ThistleTea.Game.Login do
           <<date::little-size(32), 0.01666667::little-float-size(32)>>
         )
 
-        # SMSG_TRIGGER_CINEMATIC
-
         chr_race = DBC.get_by(ChrRaces, id: c.race)
+
+        # SMSG_TRIGGER_CINEMATIC
+        send_packet(
+          @smsg_trigger_cinematic,
+          <<chr_race.cinematic_sequence::little-size(32)>>
+        )
 
         unit_display_id =
           case(c.gender) do
