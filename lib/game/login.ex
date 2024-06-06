@@ -79,6 +79,29 @@ defmodule ThistleTea.Game.Login do
         reverse(mask)
       end
 
+      def generate_objects(fields) do
+        fields
+        |> Enum.sort(fn {f1, _}, {f2, _} ->
+          Map.get(@field_defs, f1).offset < Map.get(@field_defs, f2).offset
+        end)
+        |> Enum.map(fn {field, value} ->
+          case(field) do
+            :object_guid -> <<value::little-size(64)>>
+            :object_type -> <<value::little-size(32)>>
+            :object_scale_x -> <<value::float-little-size(32)>>
+            :unit_health -> <<value::little-size(32)>>
+            :unit_max_health -> <<value::little-size(32)>>
+            :unit_level -> <<value::little-size(32)>>
+            :unit_faction_template -> <<value::little-size(32)>>
+            :unit_bytes_0 -> value
+            :unit_display_id -> <<value::little-size(32)>>
+            :unit_native_display_id -> <<value::little-size(32)>>
+            _ -> raise "Unknown field: #{field}"
+          end
+        end)
+        |> Enum.reduce(<<>>, fn x, acc -> acc <> x end)
+      end
+
       def encode_movement_block(m) do
         {x, y, z, orientation} = m.position
 
@@ -176,9 +199,9 @@ defmodule ThistleTea.Game.Login do
         }
 
         mask_count = mask_blocks_count(fields)
-        Logger.info("[GameServer] Mask count: #{mask_count}")
         mask = generate_mask(fields)
-        Logger.info("[GameServer] Mask: #{inspect(mask)}")
+        objects = generate_objects(fields)
+        Logger.info("[GameServer] Objects: #{inspect(objects, limit: :infinity)}")
 
         packet =
           <<
@@ -218,52 +241,7 @@ defmodule ThistleTea.Game.Login do
             >> <>
             <<mask_count>> <>
             mask <>
-            <<
-              # object_guid
-              # what's this?
-              4,
-              0,
-              0,
-              0,
-              0,
-              0,
-              0,
-              0
-            >> <>
-            <<
-              # object_type
-              # what's this?
-              25,
-              0,
-              0,
-              0
-            >> <>
-            <<
-              # scale 1.0
-              1.0::little-float-size(32)
-            >> <>
-            <<
-              # unit_field_health
-              100::little-size(32)
-            >> <>
-            <<
-              # unit_field_max_health
-              1000::little-size(32)
-            >> <>
-            <<c.level::little-size(32)>> <>
-            <<
-              # unit_field_faction_template
-              1::little-size(32)
-            >> <>
-            <<
-              c.race,
-              c.class,
-              c.gender,
-              # power (rage)
-              1
-            >> <>
-            <<unit_display_id::little-size(32)>> <>
-            <<unit_display_id::little-size(32)>>
+            objects
 
         send_packet(@smg_update_object, packet)
         {:noreply, {socket, state}}
