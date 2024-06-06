@@ -8,7 +8,7 @@ defmodule ThistleTea.Game.Auth do
       @smsg_auth_challenge 0x1EC
 
       @cmsg_auth_session 0x1ED
-      @smg_auth_response 0x1EE
+      @smsg_auth_response 0x1EE
 
       @impl ThousandIsland.Handler
       def handle_connection(socket, _state) do
@@ -48,7 +48,7 @@ defmodule ThistleTea.Game.Auth do
           Logger.info("[GameServer] CMSG_AUTH_SESSION: success: #{username}")
           crypt = %{key: session, send_i: 0, send_j: 0, recv_i: 0, recv_j: 0}
           {:ok, crypto_pid} = CryptoStorage.start_link(crypt)
-          send_packet(@smg_auth_response, <<0x0C, 0::little-size(32), 0, 0::little-size(32)>>)
+          send_packet(@smsg_auth_response, <<0x0C, 0::little-size(32), 0, 0::little-size(32)>>)
           {:continue, Map.merge(state, %{username: username, crypto_pid: crypto_pid})}
         else
           Logger.error("[GameServer] CMSG_AUTH_SESSION: error: #{username}")

@@ -6,10 +6,10 @@ defmodule ThistleTea.Game.Character do
       import ThistleTea.Util, only: [parse_string: 1]
 
       @cmsg_char_enum 0x037
-      @smg_char_enum 0x03B
+      @smsg_char_enum 0x03B
 
       @cmsg_char_create 0x036
-      @smg_char_create 0x03A
+      @smsg_char_create 0x03A
 
       @impl GenServer
       def handle_cast({:handle_packet, @cmsg_char_enum, _size, _body}, {socket, state}) do
@@ -160,7 +160,7 @@ defmodule ThistleTea.Game.Character do
             _ -> <<length>> <> Enum.join(characters_payload)
           end
 
-        send_packet(@smg_char_enum, packet)
+        send_packet(@smsg_char_enum, packet)
         {:noreply, {socket, state}}
       end
 
@@ -195,10 +195,10 @@ defmodule ThistleTea.Game.Character do
 
         case CharacterStorage.add_character(state.username, character) do
           {:error, error_value} ->
-            send_packet(@smg_char_create, <<error_value>>)
+            send_packet(@smsg_char_create, <<error_value>>)
 
           _ ->
-            send_packet(@smg_char_create, <<0x2E>>)
+            send_packet(@smsg_char_create, <<0x2E>>)
         end
 
         {:noreply, {socket, state}}

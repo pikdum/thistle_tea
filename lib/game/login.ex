@@ -7,9 +7,9 @@ defmodule ThistleTea.Game.Login do
       import Binary, only: [reverse: 1]
 
       @cmsg_player_login 0x03D
-      @smg_login_verify_world 0x236
-      @smg_tutorial_flags 0x0FD
-      @smg_update_object 0x0A9
+      @smsg_login_verify_world 0x236
+      @smsg_tutorial_flags 0x0FD
+      @smsg_update_object 0x0A9
 
       # https://gtker.com/wow_messages/types/update-mask.html
       @field_defs %{
@@ -193,7 +193,7 @@ defmodule ThistleTea.Game.Login do
         Logger.info("[GameServer] Character: #{inspect(c)}")
 
         send_packet(
-          @smg_login_verify_world,
+          @smsg_login_verify_world,
           <<c.map::little-size(32), c.x::little-float-size(32), c.y::little-float-size(32),
             c.z::little-float-size(32), c.orientation::little-float-size(32)>>
         )
@@ -205,7 +205,7 @@ defmodule ThistleTea.Game.Login do
         # SMSG_BINDPOINTUPDATE - they send this just before tutorial
 
         # no tutorials
-        send_packet(@smg_tutorial_flags, <<0xFFFFFFFFFFFFFFFF::little-size(256)>>)
+        send_packet(@smsg_tutorial_flags, <<0xFFFFFFFFFFFFFFFF::little-size(256)>>)
 
         # send initial spells
         # send initial action buttons
@@ -303,7 +303,7 @@ defmodule ThistleTea.Game.Login do
             mask <>
             objects
 
-        send_packet(@smg_update_object, packet)
+        send_packet(@smsg_update_object, packet)
         {:noreply, {socket, state}}
       end
     end
