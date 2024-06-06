@@ -78,6 +78,11 @@ defmodule ThistleTea.Game.Login do
           size: 1,
           offset: 0x84
         },
+        player_features: %{
+          # skin, face, hair_style, hair_color
+          size: 1,
+          offset: 0xC1
+        },
         player_xp: %{
           size: 1,
           offset: 0x2CC
@@ -134,6 +139,7 @@ defmodule ThistleTea.Game.Login do
             :unit_bytes_0 -> value
             :unit_display_id -> <<value::little-size(32)>>
             :unit_native_display_id -> <<value::little-size(32)>>
+            :player_features -> value
             :player_xp -> <<value::little-size(32)>>
             :player_next_level_xp -> <<value::little-size(32)>>
             _ -> raise "Unknown field: #{field}"
@@ -241,6 +247,7 @@ defmodule ThistleTea.Game.Login do
           unit_bytes_0: <<c.race, c.class, c.gender, 1>>,
           unit_display_id: unit_display_id,
           unit_native_display_id: unit_display_id,
+          player_features: <<c.skin, c.face, c.hairstyle, c.haircolor>>,
           player_xp: 1,
           player_next_level_xp: 100
         }
