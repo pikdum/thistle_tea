@@ -101,7 +101,7 @@ defmodule ThistleTea.Game.UpdateObject do
     mask = <<0::size(mask_size)>>
 
     mask =
-      Enum.reduce(fields, mask, fn {field, value}, acc ->
+      Enum.reduce(fields, mask, fn {field, _value}, acc ->
         field_def = Map.get(@field_defs, field)
         size = field_def.size
         offset = field_def.offset
