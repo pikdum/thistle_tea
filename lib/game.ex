@@ -9,7 +9,11 @@ defmodule ThistleTea.Game do
   use ThistleTea.Game.Character
   use ThistleTea.Game.Login
   use ThistleTea.Game.Logout
+  use ThistleTea.Game.Movement
   use ThistleTea.Game.Ping
+
+  @smsg_update_object 0x0A9
+  @smsg_compressed_update_object 0x1F6
 
   def handle_packet(opcode, size, body) do
     GenServer.cast(self(), {:handle_packet, opcode, size, body})

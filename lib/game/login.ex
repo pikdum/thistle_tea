@@ -3,6 +3,7 @@ defmodule ThistleTea.Game.Login do
     quote do
       alias ThistleTea.CharacterStorage
       alias ThistleTea.DBC
+      alias ThistleTea.PlayerStorage
 
       import ThistleTea.Game.UpdateObject
       import Bitwise, only: [<<<: 2, |||: 2]
@@ -15,8 +16,6 @@ defmodule ThistleTea.Game.Login do
       @smsg_tutorial_flags 0x0FD
       @smsg_login_settimespeed 0x042
       @smsg_trigger_cinematic 0x0FA
-      @smsg_update_object 0x0A9
-      @smsg_compressed_update_object 0x1F6
 
       @impl GenServer
       def handle_cast({:handle_packet, @cmsg_player_login, _size, body}, {socket, state}) do
@@ -26,6 +25,9 @@ defmodule ThistleTea.Game.Login do
         c = CharacterStorage.get_by_guid(state.username, character_guid)
 
         Logger.info("[GameServer] Character: #{inspect(c)}")
+
+        {:ok, player_pid} = PlayerStorage.start_link(c)
+        state = Map.put(state, :player_pid, player_pid)
 
         send_packet(
           @smsg_login_verify_world,
@@ -77,10 +79,12 @@ defmodule ThistleTea.Game.Login do
         chr_race = DBC.get_by(ChrRaces, id: c.race)
 
         # SMSG_TRIGGER_CINEMATIC
-        send_packet(
-          @smsg_trigger_cinematic,
-          <<chr_race.cinematic_sequence::little-size(32)>>
-        )
+        if false do
+          send_packet(
+            @smsg_trigger_cinematic,
+            <<chr_race.cinematic_sequence::little-size(32)>>
+          )
+        end
 
         unit_display_id =
           case(c.gender) do
