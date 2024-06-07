@@ -1,5 +1,8 @@
 defmodule ThistleTea.Game.UpdateObject do
   import Binary, only: [reverse: 1]
+  import Bitwise, only: [&&&: 2]
+
+  require Logger
 
   @field_defs %{
     object_guid: %{
@@ -175,5 +178,78 @@ defmodule ThistleTea.Game.UpdateObject do
     # do i need is_player?
     # or unknown hardcoded?
     # looks like yes, but why?
+  end
+
+  def decode_movement_info(m) do
+    <<
+      # movement flags
+      movement_flags::little-size(32),
+      # timestamp
+      timestamp::little-size(32),
+      # position block
+      x::little-float-size(32),
+      y::little-float-size(32),
+      z::little-float-size(32),
+      orientation::little-float-size(32),
+      rest::binary
+    >> = m
+
+    movement_block = %{
+      movement_flags: movement_flags,
+      timestamp: timestamp,
+      position: {x, y, z, orientation}
+    }
+
+    # on_transport
+    if (movement_flags &&& 0x00000200) > 0 do
+      # TODO: need to parse a packed guid
+      Logger.error("[GameServer] on_transport unimplemented")
+    end
+
+    # swimming
+    {movement_block, rest} =
+      case (movement_flags &&& 0x00200000) > 1 do
+        true ->
+          <<pitch::little-float-size(32), rest::binary>> = rest
+          {Map.put(movement_block, :pitch, pitch), rest}
+
+        false ->
+          {movement_block, rest}
+      end
+
+    <<fall_time::little-float-size(32), rest::binary>> = rest
+    movement_block = Map.put(movement_block, :fall_time, fall_time)
+
+    # jumping
+    {movement_block, rest} =
+      case (movement_flags &&& 0x00002000) > 0 do
+        true ->
+          <<z_speed::float-little-size(32), cos_angle::float-little-size(32),
+            sin_angle::float-little-size(32), xy_speed::float-little-size(32),
+            rest::binary>> = rest
+
+          {Map.merge(movement_block, %{
+             z_speed: z_speed,
+             cos_angle: cos_angle,
+             sin_angle: sin_angle,
+             xy_speed: xy_speed
+           }), rest}
+
+        false ->
+          {movement_block, rest}
+      end
+
+    # spline
+    {movement_block, _rest} =
+      case (movement_flags &&& 0x04000000) > 0 do
+        true ->
+          <<spline_elevation::float-little-size(32), rest::binary>> = rest
+          {Map.put(movement_block, :spline_elevation, spline_elevation), rest}
+
+        false ->
+          {movement_block, rest}
+      end
+
+    movement_block
   end
 end
