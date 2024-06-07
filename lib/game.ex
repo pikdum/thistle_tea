@@ -19,6 +19,21 @@ defmodule ThistleTea.Game do
     GenServer.cast(self(), {:send_packet, opcode, payload})
   end
 
+  def send_update_packet(packet) do
+    compressed_packet = :zlib.compress(packet)
+    original_size = byte_size(packet)
+    compressed_size = byte_size(compressed_packet)
+
+    if compressed_size >= original_size do
+      send_packet(@smsg_update_object, packet)
+    else
+      send_packet(
+        @smsg_compressed_update_object,
+        <<original_size::little-size(32)>> <> compressed_packet
+      )
+    end
+  end
+
   @impl ThousandIsland.Handler
   def handle_data(
         <<header::bytes-size(6), body::binary>>,
