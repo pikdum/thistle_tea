@@ -94,7 +94,7 @@ defmodule ThistleTea.Game.Login do
           end
 
         movement_block = %{
-          # what is 0x71?
+          # what is 0x71?: SELF ||| ALL ||| LIVING ||| HAS_POSITION
           update_flag: 0x71,
           movement_flags: 0,
           position: {c.x, c.y, c.z, c.orientation},
@@ -140,41 +140,23 @@ defmodule ThistleTea.Game.Login do
 
         packet =
           <<
-            # block count (1)
-            1,
-            0,
-            0,
+            # amount_of_objects
+            1::little-size(32),
+            # has transport
             0
           >> <>
-            <<
-              # has transport
-              0
-            >> <>
             <<
               # update type = CREATE_NEW_OBJECT2
               3
             >> <>
             <<
-              # TODO: i'm not understanding this piece, thought it was packed guid but even <<1, 5>> crashes
-              1,
-              4
-            >> <>
-            <<
-              # object type = WO_PLAYER
+              # packed guid - but anything other than 4 in the second byte crashes?
+              0xFF::little-size(8),
+              4::little-size(64),
+              # object type
               4
             >> <>
             encode_movement_block(movement_block) <>
-            <<
-              # is player
-              #  UPDATE
-              1
-            >> <>
-            <<
-              # unknown hardcoded
-              1,
-              0,
-              0
-            >> <>
             <<mask_count>> <>
             mask <>
             objects

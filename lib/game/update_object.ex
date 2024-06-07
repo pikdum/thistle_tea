@@ -4,6 +4,54 @@ defmodule ThistleTea.Game.UpdateObject do
 
   require Logger
 
+  @update_flag_none 0x00
+  @update_flag_self 0x01
+  @update_flag_transport 0x02
+  @update_flag_melee_attacking 0x04
+  @update_flag_high_guid 0x08
+  @update_flag_all 0x10
+  @update_flag_living 0x20
+  @update_flag_has_position 0x40
+
+  @movement_flag_none 0x00000000
+  @movement_flag_forward 0x00000001
+  @movement_flag_backward 0x00000002
+  @movement_flag_strafe_left 0x00000004
+  @movement_flag_strafe_right 0x00000008
+  @movement_flag_turn_left 0x00000010
+  @movement_flag_turn_right 0x00000020
+  @movement_flag_pitch_up 0x00000040
+  @movement_flag_pitch_down 0x00000080
+  @movement_flag_walk_mode 0x00000100
+  @movement_flag_on_transport 0x00000200
+  @movement_flag_levitating 0x00000400
+  @movement_flag_fixed_z 0x00000800
+  @movement_flag_root 0x00001000
+  @movement_flag_jumping 0x00002000
+  @movement_flag_falling_far 0x00004000
+  @movement_flag_swimming 0x00200000
+  @movement_flag_spline_enabled 0x00400000
+  @movement_flag_can_fly 0x00800000
+  @movement_flag_flying 0x01000000
+  @movement_flag_on_transport 0x02000000
+  @movement_flag_spline_elevation 0x04000000
+  @movement_flag_water_walking 0x10000000
+  @movement_flag_safe_fall 0x20000000
+  @movement_flag_hover 0x40000000
+
+  @spline_flag_none 0x00000000
+  @spline_flag_done 0x00000001
+  @spline_flag_falling 0x00000002
+  @spline_flag_run_mode 0x00000100
+  @spline_flag_flying 0x00000200
+  @spline_flag_no_spline 0x00000400
+  @spline_flag_final_point 0x00010000
+  @spline_flag_final_target 0x00020000
+  @spline_flag_final_angle 0x00040000
+  @spline_flag_cyclic 0x00100000
+  @spline_flag_enter_cycle 0x00200000
+  @spline_flag_frozen 0x00400000
+
   @field_defs %{
     object_guid: %{
       size: 2,
@@ -154,30 +202,116 @@ defmodule ThistleTea.Game.UpdateObject do
     {x, y, z, orientation} = m.position
 
     <<m.update_flag::little-size(8)>> <>
-      <<
-        m.movement_flags::little-size(32),
-        # unknown (timestamp?)
-        0::little-size(32),
-        # position
-        x::little-float-size(32),
-        y::little-float-size(32),
-        z::little-float-size(32),
-        orientation::little-float-size(32)
-      >> <>
-      <<m.fall_time::little-float-size(32)>> <>
-      <<
-        # speed block
-        m.walk_speed::float-little-size(32),
-        m.run_speed::float-little-size(32),
-        m.run_back_speed::float-little-size(32),
-        m.swim_speed::float-little-size(32),
-        m.swim_back_speed::float-little-size(32),
-        m.turn_rate::float-little-size(32)
-      >>
+      cond do
+        (m.update_flag &&& @update_flag_self) > 0 ->
+          <<
+            m.movement_flags::little-size(32),
+            # timestamp
+            0::little-size(32),
+            # living position
+            x::little-float-size(32),
+            y::little-float-size(32),
+            z::little-float-size(32),
+            # living orientation
+            orientation::little-float-size(32)
+          >> <>
+            if (m.movement_flags &&& @movement_flag_on_transport) > 0 do
+              {x, y, z, orientation} = m.transport_position
 
-    # do i need is_player?
-    # or unknown hardcoded?
-    # looks like yes, but why?
+              # TODO: packed guid
+              <<1, 4>> <>
+                <<x::little-float-size(32), y::little-float-size(32), z::little-float-size(32),
+                  orientation::little-float-size(32)>>
+            else
+              <<>>
+            end <>
+            if (m.movement_flags &&& @movement_flag_swimming) > 0 do
+              <<m.pitch::little-float-size(32)>>
+            else
+              <<>>
+            end <>
+            <<m.fall_time::little-float-size(32)>> <>
+            if (m.movement_flags &&& @movement_flag_jumping) > 0 do
+              <<
+                m.z_speed::float-little-size(32),
+                m.cos_angle::float-little-size(32),
+                m.sin_angle::float-little-size(32),
+                m.xy_speed::float-little-size(32)
+              >>
+            else
+              <<>>
+            end <>
+            if (m.movement_flags &&& @movement_flag_spline_elevation) > 0 do
+              <<m.spline_elevation::float-little-size(32)>>
+            else
+              <<>>
+            end <>
+            <<
+              m.walk_speed::float-little-size(32),
+              m.run_speed::float-little-size(32),
+              m.run_back_speed::float-little-size(32),
+              m.swim_speed::float-little-size(32),
+              m.swim_back_speed::float-little-size(32),
+              m.turn_rate::float-little-size(32)
+            >> <>
+            if (m.movement_flags &&& @movement_flag_spline_enabled) > 0 do
+              <<m.spline_flags::size(32)>> <>
+                cond do
+                  (m.spline_flags &&& @spline_flag_final_angle) > 0 ->
+                    <<m.angle::float-little-size(32)>>
+
+                  (m.spline_flags &&& @spline_flag_final_target) > 0 ->
+                    <<m.target_guid::little-size(64)>>
+
+                  (m.spline_flags &&& @spline_flag_final_point) > 0 ->
+                    {x, y, z} = m.final_point
+
+                    <<x::little-float-size(32), y::little-float-size(32),
+                      z::little-float-size(32)>>
+
+                  true ->
+                    <<>>
+                end <>
+                <<m.time_passed::little-size(32), m.duration::little-size(32),
+                  Enum.count(m.spline_nodes) - 1::little-size(32)>> <>
+                Enum.reduce(m.spline_nodes, <<>>, fn node, acc ->
+                  {x, y, z} = node
+
+                  acc <>
+                    <<x::little-float-size(32), y::little-float-size(32),
+                      z::little-float-size(32)>>
+                end)
+            else
+              <<>>
+            end
+
+        (m.update_flag &&& @update_flag_has_position) > 0 ->
+          <<x::little-float-size(32), y::little-float-size(32), z::little-float-size(32),
+            orientation::little-float-size(32)>>
+      end <>
+      if (m.update_flag &&& @update_flag_high_guid) > 0 do
+        # unknown - mangos sets to 0
+        <<0::little-size(32)>>
+      else
+        <<>>
+      end <>
+      if (m.update_flag &&& @update_flag_all) > 0 do
+        # unknown - mangos sets to 1
+        <<1::little-size(32)>>
+      else
+        <<>>
+      end <>
+      if (m.update_flag &&& @update_flag_melee_attacking) > 0 do
+        # TODO: packed guid
+        <<1, 4>>
+      else
+        <<>>
+      end <>
+      if (m.update_flag &&& @update_flag_transport) > 0 do
+        <<m.transport_progress_in_ms::little-size(32)>>
+      else
+        <<>>
+      end
   end
 
   def decode_movement_info(m) do
@@ -201,14 +335,14 @@ defmodule ThistleTea.Game.UpdateObject do
     }
 
     # on_transport
-    if (movement_flags &&& 0x00000200) > 0 do
+    if (movement_flags &&& @movement_flag_on_transport) > 0 do
       # TODO: need to parse a packed guid
       Logger.error("[GameServer] on_transport unimplemented")
     end
 
     # swimming
     {movement_block, rest} =
-      case (movement_flags &&& 0x00200000) > 1 do
+      case (movement_flags &&& @movement_flag_swimming) > 1 do
         true ->
           <<pitch::little-float-size(32), rest::binary>> = rest
           {Map.put(movement_block, :pitch, pitch), rest}
@@ -222,7 +356,7 @@ defmodule ThistleTea.Game.UpdateObject do
 
     # jumping
     {movement_block, rest} =
-      case (movement_flags &&& 0x00002000) > 0 do
+      case (movement_flags &&& @movement_flag_jumping) > 0 do
         true ->
           <<z_speed::float-little-size(32), cos_angle::float-little-size(32),
             sin_angle::float-little-size(32), xy_speed::float-little-size(32),
@@ -241,7 +375,7 @@ defmodule ThistleTea.Game.UpdateObject do
 
     # spline
     {movement_block, _rest} =
-      case (movement_flags &&& 0x04000000) > 0 do
+      case (movement_flags &&& @movement_flag_spline_elevation) > 0 do
         true ->
           <<spline_elevation::float-little-size(32), rest::binary>> = rest
           {Map.put(movement_block, :spline_elevation, spline_elevation), rest}
