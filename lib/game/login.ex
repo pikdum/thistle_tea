@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.Login do
 
       import ThistleTea.Game.UpdateObject
       import Bitwise, only: [<<<: 2, |||: 2]
+      import ThistleTea.Util, only: [pack_guid: 1]
 
       @cmsg_player_login 0x03D
       @smsg_login_verify_world 0x236
@@ -26,7 +27,7 @@ defmodule ThistleTea.Game.Login do
 
         Logger.info("[GameServer] Character: #{inspect(c)}")
 
-        {:ok, player_pid} = PlayerStorage.start_link(c)
+        {:ok, player_pid} = PlayerStorage.start_link(%{character: c})
         state = Map.put(state, :player_pid, player_pid)
 
         send_packet(
@@ -132,7 +133,10 @@ defmodule ThistleTea.Game.Login do
         mask_count = mask_blocks_count(fields)
         mask = generate_mask(fields)
         objects = generate_objects(fields)
-        Logger.info("[GameServer] Objects: #{inspect(objects, limit: :infinity)}")
+        Logger.info("characer guid: #{inspect(c.guid)}")
+
+        packed_guid = pack_guid(c.guid)
+        Logger.info("packed guid: #{inspect(packed_guid)}")
 
         packet =
           <<
@@ -151,7 +155,7 @@ defmodule ThistleTea.Game.Login do
               3
             >> <>
             <<
-              # packet guid, guid = 4
+              # TODO: i'm not understanding this piece, thought it was packed guid but even <<1, 5>> crashes
               1,
               4
             >> <>
@@ -162,6 +166,7 @@ defmodule ThistleTea.Game.Login do
             encode_movement_block(movement_block) <>
             <<
               # is player
+              #  UPDATE
               1
             >> <>
             <<
@@ -174,6 +179,7 @@ defmodule ThistleTea.Game.Login do
             mask <>
             objects
 
+        Logger.info("packet: #{inspect(packet)}")
         send_update_packet(packet)
 
         {:noreply, {socket, state}}
