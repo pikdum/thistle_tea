@@ -173,7 +173,8 @@ defmodule ThistleTea.Game.Character do
         info = Mangos.get_by(PlayerCreateInfo, race: race, class: class)
 
         character = %{
-          guid: :binary.decode_unsigned(:crypto.strong_rand_bytes(8)),
+          # TODO: had to take last FF off, but why?
+          guid: :random.uniform(0xFFFFFFFFFFFFFF),
           name: character_name,
           race: race,
           class: class,
