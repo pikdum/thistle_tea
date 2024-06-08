@@ -157,6 +157,21 @@ defmodule ThistleTea.Game.Login do
 
         send_update_packet(packet)
 
+        fields = Map.put(fields, :object_guid, 4)
+
+        mb =
+          Map.put(
+            mb,
+            :update_flag,
+            @update_flag_high_guid ||| @update_flag_living ||| @update_flag_has_position
+          )
+
+        Logger.info("[GameServer] mb: #{inspect(mb)}, fields: #{inspect(fields)}")
+
+        packet = generate_packet(@update_type_create_object2, @object_type_player, fields, mb)
+        # send packet after 5s
+        Process.send_after(self(), {:send_update_packet, packet}, 5_000)
+
         {:noreply, {socket, state}}
       end
     end

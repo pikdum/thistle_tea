@@ -246,7 +246,7 @@ defmodule ThistleTea.Game.UpdateObject do
 
     <<m.update_flag::little-size(8)>> <>
       cond do
-        (m.update_flag &&& @update_flag_self) > 0 ->
+        (m.update_flag &&& @update_flag_living) > 0 ->
           <<
             m.movement_flags::little-size(32),
             # timestamp
