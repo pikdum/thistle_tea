@@ -167,13 +167,18 @@ defmodule ThistleTea.Game.Login do
 
         packet = generate_packet(@update_type_create_object2, @object_type_player, fields, mb)
 
-        # send packets to everybody else
         Registry.dispatch(ThistleTea.PubSub, "test", fn entries ->
-          for {pid, _} <- entries, do: send(pid, {:send_update_packet, packet})
+          for {pid, spawn_packet} <- entries do
+            Logger.info("[GameServer] Spawn: #{inspect(spawn_packet)}")
+            # send packets to everybody else
+            send(pid, {:send_update_packet, packet})
+            # spawn them for us
+            send_update_packet(spawn_packet)
+          end
         end)
 
         # join
-        {:ok, _} = Registry.register(ThistleTea.PubSub, "test", [])
+        {:ok, _} = Registry.register(ThistleTea.PubSub, "test", packet)
 
         {:noreply, {socket, state}}
       end
