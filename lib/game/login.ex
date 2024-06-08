@@ -42,6 +42,7 @@ defmodule ThistleTea.Game.Login do
 
         {:ok, player_pid} = PlayerStorage.start_link(%{character: c})
         state = Map.put(state, :player_pid, player_pid)
+        state = Map.put(state, :guid, character_guid)
 
         send_packet(
           @smsg_login_verify_world,

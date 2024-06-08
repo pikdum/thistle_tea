@@ -75,6 +75,12 @@ defmodule ThistleTea.Game do
   end
 
   @impl GenServer
+  def handle_info({:send_packet, opcode, payload}, {socket, state}) do
+    send_packet(opcode, payload)
+    {:noreply, {socket, state}}
+  end
+
+  @impl GenServer
   def handle_info({:send_update_packet, packet}, {socket, state}) do
     send_update_packet(packet)
     {:noreply, {socket, state}}

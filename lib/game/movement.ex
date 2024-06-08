@@ -3,6 +3,8 @@ defmodule ThistleTea.Game.Movement do
     quote do
       alias ThistleTea.PlayerStorage
 
+      import ThistleTea.Util, only: [pack_guid: 1]
+
       @msg_move_start_forward 0x0B5
       @msg_move_start_backward 0x0B6
       @msg_move_stop 0x0B7
@@ -52,13 +54,19 @@ defmodule ThistleTea.Game.Movement do
                  @msg_move_heartbeat,
                  @cmsg_move_fall_reset
                ] do
-        Logger.info("[GameServer] movement packet: #{inspect(msg, base: :hex)}")
+        # TODO: no real need for us to persist on every movement change
+        # Logger.info("[GameServer] movement packet: #{inspect(msg, base: :hex)}")
+        # player_pid = Map.get(state, :player_pid)
+        # Logger.info("[GameServer] player_pid: #{inspect(player_pid)}")
+        # PlayerStorage.update_movement(player_pid, body)
 
-        player_pid = Map.get(state, :player_pid)
-
-        Logger.info("[GameServer] player_pid: #{inspect(player_pid)}")
-
-        PlayerStorage.update_movement(player_pid, body)
+        Registry.dispatch(ThistleTea.PubSub, "test", fn entries ->
+          for {pid, _} <- entries do
+            if pid != self() do
+              send(pid, {:send_packet, msg, pack_guid(state.guid) <> body})
+            end
+          end
+        end)
 
         {:noreply, {socket, state}}
       end
