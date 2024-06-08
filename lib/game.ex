@@ -10,6 +10,7 @@ defmodule ThistleTea.Game do
   use ThistleTea.Game.Login
   use ThistleTea.Game.Logout
   use ThistleTea.Game.Movement
+  use ThistleTea.Game.Name
   use ThistleTea.Game.Ping
 
   @smsg_update_object 0x0A9
