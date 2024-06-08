@@ -18,6 +18,19 @@ defmodule ThistleTea.Game.Login do
       @smsg_login_settimespeed 0x042
       @smsg_trigger_cinematic 0x0FA
 
+      @update_flag_none 0x00
+      @update_flag_self 0x01
+      @update_flag_transport 0x02
+      @update_flag_melee_attacking 0x04
+      @update_flag_high_guid 0x08
+      @update_flag_all 0x10
+      @update_flag_living 0x20
+      @update_flag_has_position 0x40
+
+      @object_type_player 4
+
+      @update_type_create_object2 3
+
       @impl GenServer
       def handle_cast({:handle_packet, @cmsg_player_login, _size, body}, {socket, state}) do
         <<character_guid::little-size(64)>> = body
@@ -95,7 +108,9 @@ defmodule ThistleTea.Game.Login do
 
         mb = %{
           # what is 0x71?: SELF ||| ALL ||| LIVING ||| HAS_POSITION
-          update_flag: 0x71,
+          update_flag:
+            @update_flag_self ||| @update_flag_all ||| @update_flag_living |||
+              @update_flag_has_position,
           movement_flags: 0,
           position: {c.x, c.y, c.z, c.orientation},
           fall_time: 0.0,
@@ -107,6 +122,8 @@ defmodule ThistleTea.Game.Login do
           swim_back_speed: 0.0,
           turn_rate: 3.1415
         }
+
+        Logger.info("[GameServer] mb: #{inspect(mb)}")
 
         fields = %{
           object_guid: c.guid,
@@ -136,33 +153,7 @@ defmodule ThistleTea.Game.Login do
           player_rest_state_experience: 100
         }
 
-        packed_guid = pack_guid(c.guid)
-        movement_block = encode_movement_block(mb)
-        mask_count = mask_blocks_count(fields)
-        mask = generate_mask(fields)
-        objects = generate_objects(fields)
-
-        packet =
-          <<
-            # amount_of_objects
-            1::little-size(32),
-            # has transport
-            0
-          >> <>
-            <<
-              # object start, there can be mulitple
-              # update_type = CREATE_NEW_OBJECT2
-              3
-            >> <>
-            packed_guid <>
-            <<
-              # object type
-              4
-            >> <>
-            movement_block <>
-            <<mask_count>> <>
-            mask <>
-            objects
+        packet = generate_packet(@update_type_create_object2, @object_type_player, fields, mb)
 
         send_update_packet(packet)
 

@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.Auth do
       def handle_connection(socket, _state) do
         Logger.info("[GameServer] SMSG_AUTH_CHALLENGE")
         seed = :crypto.strong_rand_bytes(4)
+        Logger.info("[GameServer] pid: #{inspect(self())}")
 
         ThousandIsland.Socket.send(
           socket,
