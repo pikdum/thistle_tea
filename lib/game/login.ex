@@ -93,7 +93,7 @@ defmodule ThistleTea.Game.Login do
             1 -> chr_race.female_display
           end
 
-        movement_block = %{
+        mb = %{
           # what is 0x71?: SELF ||| ALL ||| LIVING ||| HAS_POSITION
           update_flag: 0x71,
           movement_flags: 0,
@@ -138,6 +138,8 @@ defmodule ThistleTea.Game.Login do
         packed_guid = pack_guid(c.guid)
         Logger.info("packed guid: #{inspect(packed_guid)}")
 
+        movement_block = encode_movement_block(mb)
+
         packet =
           <<
             # amount_of_objects
@@ -146,17 +148,16 @@ defmodule ThistleTea.Game.Login do
             0
           >> <>
             <<
-              # update type = CREATE_NEW_OBJECT2
-              3
-            >> <>
-            <<
-              # packed guid - but anything other than 4 in the second byte crashes?
-              0xFF::little-size(8),
-              4::little-size(64),
+              # object start, there can be mulitple
+              # update_type = CREATE_NEW_OBJECT2
+              3,
+              # packed guid - but anything except 1, 4 crashes?
+              1,
+              4,
               # object type
               4
             >> <>
-            encode_movement_block(movement_block) <>
+            movement_block <>
             <<mask_count>> <>
             mask <>
             objects
