@@ -108,7 +108,7 @@ defmodule ThistleTea.Game.Login do
         }
 
         fields = %{
-          object_guid: 4,
+          object_guid: c.guid,
           object_type: 25,
           object_scale_x: 1.0,
           unit_health: 100,
@@ -135,15 +135,11 @@ defmodule ThistleTea.Game.Login do
           player_rest_state_experience: 100
         }
 
+        packed_guid = pack_guid(c.guid)
+        movement_block = encode_movement_block(mb)
         mask_count = mask_blocks_count(fields)
         mask = generate_mask(fields)
         objects = generate_objects(fields)
-        Logger.info("characer guid: #{inspect(c.guid)}")
-
-        packed_guid = pack_guid(c.guid)
-        Logger.info("packed guid: #{inspect(packed_guid)}")
-
-        movement_block = encode_movement_block(mb)
 
         packet =
           <<
@@ -155,10 +151,10 @@ defmodule ThistleTea.Game.Login do
             <<
               # object start, there can be mulitple
               # update_type = CREATE_NEW_OBJECT2
-              3,
-              # packed guid - but anything except 1, 4 crashes?
-              1,
-              4,
+              3
+            >> <>
+            packed_guid <>
+            <<
               # object type
               4
             >> <>
@@ -167,7 +163,6 @@ defmodule ThistleTea.Game.Login do
             mask <>
             objects
 
-        Logger.info("packet: #{inspect(packet)}")
         send_update_packet(packet)
 
         {:noreply, {socket, state}}
