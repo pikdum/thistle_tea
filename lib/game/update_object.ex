@@ -98,6 +98,26 @@ defmodule ThistleTea.Game.UpdateObject do
       size: 1,
       offset: 0x1C
     },
+    unit_max_power_1: %{
+      size: 1,
+      offset: 0x1D
+    },
+    unit_max_power_2: %{
+      size: 1,
+      offset: 0x1E
+    },
+    unit_max_power_3: %{
+      size: 1,
+      offset: 0x1F
+    },
+    unit_max_power_4: %{
+      size: 1,
+      offset: 0x20
+    },
+    unit_max_power_5: %{
+      size: 1,
+      offset: 0x21
+    },
     unit_level: %{
       size: 1,
       offset: 0x22
@@ -182,6 +202,11 @@ defmodule ThistleTea.Game.UpdateObject do
         :unit_power_4 -> <<value::little-size(32)>>
         :unit_power_5 -> <<value::little-size(32)>>
         :unit_max_health -> <<value::little-size(32)>>
+        :unit_max_power_1 -> <<value::little-size(32)>>
+        :unit_max_power_2 -> <<value::little-size(32)>>
+        :unit_max_power_3 -> <<value::little-size(32)>>
+        :unit_max_power_4 -> <<value::little-size(32)>>
+        :unit_max_power_5 -> <<value::little-size(32)>>
         :unit_level -> <<value::little-size(32)>>
         :unit_faction_template -> <<value::little-size(32)>>
         :unit_bytes_0 -> value
