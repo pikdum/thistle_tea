@@ -47,13 +47,19 @@ defmodule ThistleTea.Game do
       ) do
     case CryptoStorage.decrypt_header(state.crypto_pid, header) do
       <<size::big-size(16), opcode::little-size(32)>> ->
-        handle_packet(opcode, size, body)
+        # does size match what was received?
+        if size === byte_size(body) + 4 do
+          handle_packet(opcode, size, body)
+          {:continue, state}
+        else
+          Logger.error("[GameServer] Error decrypting - closing connection: #{inspect(state)}")
+          {:quit, state}
+        end
 
       other ->
         Logger.error("[GameServer] Error decrypting header: #{inspect(other, limit: :infinity)}")
+        {:continue, state}
     end
-
-    {:continue, state}
   end
 
   @impl GenServer
