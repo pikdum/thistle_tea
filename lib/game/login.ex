@@ -38,6 +38,8 @@ defmodule ThistleTea.Game.Login do
 
         c = CharacterStorage.get_by_guid(state.username, character_guid)
 
+        :ets.insert(:guid_name, {character_guid, c.name, "", c.race, c.gender, c.class})
+
         Logger.info("[GameServer] Character: #{inspect(c)}")
 
         {:ok, player_pid} = PlayerStorage.start_link(%{character: c})
@@ -159,6 +161,7 @@ defmodule ThistleTea.Game.Login do
         # player logged in
         send_update_packet(packet)
 
+        # TODO: maybe this should be in response to a CMSG_SET_ACTIVE_MOVER?
         mb =
           Map.put(
             mb,

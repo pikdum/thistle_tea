@@ -19,6 +19,8 @@ defmodule ThistleTea.Application do
       {ThousandIsland, port: 8085, handler_module: ThistleTea.Game, handler_options: %{}}
     ]
 
+    :ets.new(:guid_name, [:named_table, :public])
+
     Logger.info("ThistleTea starting...")
 
     # See https://hexdocs.pm/elixir/Supervisor.html
