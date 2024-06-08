@@ -10,6 +10,7 @@ defmodule ThistleTea.Application do
   @impl true
   def start(_type, _args) do
     children = [
+      {Registry, keys: :duplicate, name: ThistleTea.PubSub},
       ThistleTea.DBC,
       ThistleTea.Mangos,
       ThistleTea.CharacterStorage,

@@ -155,9 +155,8 @@ defmodule ThistleTea.Game.Login do
 
         packet = generate_packet(@update_type_create_object2, @object_type_player, fields, mb)
 
+        # player logged in
         send_update_packet(packet)
-
-        fields = Map.put(fields, :object_guid, 4)
 
         mb =
           Map.put(
@@ -166,11 +165,15 @@ defmodule ThistleTea.Game.Login do
             @update_flag_high_guid ||| @update_flag_living ||| @update_flag_has_position
           )
 
-        Logger.info("[GameServer] mb: #{inspect(mb)}, fields: #{inspect(fields)}")
-
         packet = generate_packet(@update_type_create_object2, @object_type_player, fields, mb)
-        # send packet after 5s
-        Process.send_after(self(), {:send_update_packet, packet}, 5_000)
+
+        # send packets to everybody else
+        Registry.dispatch(ThistleTea.PubSub, "test", fn entries ->
+          for {pid, _} <- entries, do: send(pid, {:send_update_packet, packet})
+        end)
+
+        # join
+        {:ok, _} = Registry.register(ThistleTea.PubSub, "test", [])
 
         {:noreply, {socket, state}}
       end
