@@ -2,7 +2,25 @@ defmodule ThistleTea.Game.UpdateObject do
   import Binary, only: [reverse: 1]
   import Bitwise, only: [&&&: 2]
 
+  import ThistleTea.Util, only: [pack_guid: 1]
+
   require Logger
+
+  @update_type_values 0
+  @update_type_movement 1
+  @update_type_create_object 2
+  @update_type_create_object2 3
+  @update_type_out_of_range_objects 4
+  @update_type_near_objects 5
+
+  @object_type_object 0
+  @object_type_item 1
+  @object_type_container 2
+  @object_type_unit 3
+  @object_type_player 4
+  @object_type_game_object 5
+  @object_type_dynamic_object 6
+  @object_type_corpse 7
 
   @update_flag_none 0x00
   @update_flag_self 0x01
@@ -410,5 +428,21 @@ defmodule ThistleTea.Game.UpdateObject do
       end
 
     movement_block
+  end
+
+  def generate_packet(update_type, object_type, fields, movement) do
+    packed_guid = pack_guid(Map.get(fields, :object_guid))
+    movement_block = encode_movement_block(movement)
+    mask_count = mask_blocks_count(fields)
+    mask = generate_mask(fields)
+    objects = generate_objects(fields)
+
+    <<1::little-size(32), 0, update_type>> <>
+      packed_guid <>
+      <<object_type>> <>
+      movement_block <>
+      <<mask_count>> <>
+      mask <>
+      objects
   end
 end

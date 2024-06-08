@@ -24,6 +24,7 @@ defmodule ThistleTea.Game do
   end
 
   def send_update_packet(packet) do
+    Logger.info("[GameServer] Update: #{inspect(packet, limit: :infinity)}")
     compressed_packet = :zlib.compress(packet)
     original_size = byte_size(packet)
     compressed_size = byte_size(compressed_packet)
