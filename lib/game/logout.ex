@@ -13,7 +13,7 @@ defmodule ThistleTea.Game.Logout do
       def handle_cast({:handle_packet, @cmsg_logout_request, _size, _body}, {socket, state}) do
         Logger.info("[GameServer] CMSG_LOGOUT_REQUEST")
         send_packet(@smsg_logout_response, <<0::little-size(32)>>)
-        logout_timer = Process.send_after(self(), :send_logout_complete, 20_000)
+        logout_timer = Process.send_after(self(), :send_logout_complete, 1_000)
         {:noreply, {socket, Map.put(state, :logout_timer, logout_timer)}}
       end
 
