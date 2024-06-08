@@ -174,7 +174,7 @@ defmodule ThistleTea.Game.Character do
 
         character = %{
           # TODO: had to take last FF off, but why?
-          guid: :random.uniform(0xFFFFFFFFFFFFFF),
+          guid: :rand.uniform(0xFFFFFFFFFFFFFF),
           name: character_name,
           race: race,
           class: class,
