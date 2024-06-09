@@ -50,10 +50,10 @@ defmodule ThistleTea.Game.Logout do
       end
 
       def broadcast_logout(state) do
-        Registry.unregister(ThistleTea.PubSub, "test")
+        Registry.unregister(ThistleTea.PubSub, "logged_in")
 
         if Map.get(state, :guid) do
-          Registry.dispatch(ThistleTea.PubSub, "test", fn entries ->
+          Registry.dispatch(ThistleTea.PubSub, "logged_in", fn entries ->
             for {pid, _} <- entries do
               send(pid, {:send_packet, @smsg_destroy_object, <<state.guid::little-size(64)>>})
             end
