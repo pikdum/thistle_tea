@@ -17,7 +17,7 @@ defmodule ThistleTea.Game.Name do
             character_name <> <<0>> <> realm_name <> <<0>> <> <<race, gender, class>>
         )
 
-        {:noreply, {socket, state}}
+        {:noreply, {socket, state}, socket.read_timeout}
       end
     end
   end

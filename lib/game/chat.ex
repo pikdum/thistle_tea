@@ -73,7 +73,7 @@ defmodule ThistleTea.Game.Chat do
             Logger.info("[GameServer] CMSG_MESSAGECHAT: UNKNOWN: #{inspect(chat_type)}")
         end
 
-        {:noreply, {socket, state}}
+        {:noreply, {socket, state}, socket.read_timeout}
       end
 
       @impl GenServer
@@ -82,7 +82,7 @@ defmodule ThistleTea.Game.Chat do
         {:ok, channel_password, _} = parse_string(rest)
         Logger.info("[GameServer] CMSG_JOIN_CHANNEL: #{channel_name} -> #{channel_password}")
 
-        {:noreply, {socket, state}}
+        {:noreply, {socket, state}, socket.read_timeout}
       end
     end
   end

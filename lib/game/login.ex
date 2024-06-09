@@ -184,7 +184,7 @@ defmodule ThistleTea.Game.Login do
         # join
         {:ok, _} = Registry.register(ThistleTea.PubSub, "logged_in", packet)
 
-        {:noreply, {socket, state}}
+        {:noreply, {socket, state}, socket.read_timeout}
       end
     end
   end

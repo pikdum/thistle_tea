@@ -65,7 +65,7 @@ defmodule ThistleTea.Game do
   @impl GenServer
   def handle_cast({:handle_packet, opcode, _size, _body}, {socket, state}) do
     Logger.error("[GameServer] Unhandled packet: #{inspect(opcode, base: :hex)}")
-    {:noreply, {socket, state}}
+    {:noreply, {socket, state}, socket.read_timeout}
   end
 
   @impl GenServer
@@ -77,18 +77,18 @@ defmodule ThistleTea.Game do
       socket
     )
 
-    {:noreply, {socket, state}}
+    {:noreply, {socket, state}, socket.read_timeout}
   end
 
   @impl GenServer
   def handle_info({:send_packet, opcode, payload}, {socket, state}) do
     send_packet(opcode, payload)
-    {:noreply, {socket, state}}
+    {:noreply, {socket, state}, socket.read_timeout}
   end
 
   @impl GenServer
   def handle_info({:send_update_packet, packet}, {socket, state}) do
     send_update_packet(packet)
-    {:noreply, {socket, state}}
+    {:noreply, {socket, state}, socket.read_timeout}
   end
 end

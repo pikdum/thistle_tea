@@ -161,7 +161,7 @@ defmodule ThistleTea.Game.Character do
           end
 
         send_packet(@smsg_char_enum, packet)
-        {:noreply, {socket, state}}
+        {:noreply, {socket, state}, socket.read_timeout}
       end
 
       @impl GenServer
@@ -202,7 +202,7 @@ defmodule ThistleTea.Game.Character do
             send_packet(@smsg_char_create, <<0x2E>>)
         end
 
-        {:noreply, {socket, state}}
+        {:noreply, {socket, state}, socket.read_timeout}
       end
     end
   end
