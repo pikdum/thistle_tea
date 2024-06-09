@@ -10,11 +10,15 @@ defmodule ThistleTea.Auth do
   @cmd_auth_logon_challenge 0
   @cmd_auth_logon_proof 1
   @cmd_auth_reconnect_challenge 2
+  @cmd_auth_reconnect_proof 3
   @cmd_realm_list 16
 
   @n <<137, 75, 100, 94, 137, 225, 83, 91, 189, 173, 91, 139, 41, 6, 80, 83, 8, 1, 177, 142, 191,
        191, 94, 143, 171, 60, 130, 135, 42, 62, 155, 183>>
   @g <<7>>
+
+  @salt <<0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+          0, 0, 0>>
 
   defp calculate_b(state) do
     private_b = :crypto.strong_rand_bytes(19)
@@ -42,9 +46,7 @@ defmodule ThistleTea.Auth do
           87, 250, 125, 141, 73, 124, 172, 157, 84, 95, 126>>
     })
     |> Map.merge(%{
-      salt:
-        <<0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-          0, 0, 0>>
+      salt: @salt
     })
   end
 
@@ -65,7 +67,7 @@ defmodule ThistleTea.Auth do
         socket,
         _state
       ) do
-    Logger.info("[AuthServer] CMD_AUTH_LOGON_CHALLENGE: #{account_name}")
+    Logger.info("[AuthServer] CMD_AUTH_LOGON_CHALLENGE: #{account_name}, pid: #{inspect(self())}")
     state = logon_challenge_state(account_name)
 
     packet =
@@ -159,15 +161,39 @@ defmodule ThistleTea.Auth do
           _locale::bytes-little-size(4), _worldregion_bias::little-size(32), _ip::little-size(32),
           account_name_length::little-size(8),
           account_name::bytes-little-size(account_name_length)>>,
-        _socket,
+        socket,
         state
       ) do
     Logger.info("[AuthServer] CMD_AUTH_RECONNECT_CHALLENGE: #{account_name}")
+    # TODO: need to get salt from account storage
+    # and need to test this flow more in-depth
+    challenge_data = :crypto.strong_rand_bytes(16)
+    ThousandIsland.Socket.send(socket, <<2, 0>> <> challenge_data <> @salt)
+    {:continue, Map.merge(state, %{account_name: account_name, challenge_data: challenge_data})}
+  end
 
-    session = SessionStorage.get(account_name)
-    # TODO: finish implementing
+  @impl ThousandIsland.Handler
+  def handle_data(
+        <<@cmd_auth_reconnect_proof, proof_data::little-bytes-size(16),
+          client_proof::little-bytes-size(20), _client_checksum::little-bytes-size(20),
+          _key_count>>,
+        socket,
+        state
+      ) do
+    Logger.info("[AuthServer] CMD_AUTH_RECONNECT_PROOF: #{state.account_name}")
+    session = SessionStorage.get(state.account_name)
 
-    {:close, state}
+    server_proof =
+      :crypto.hash(:sha, state.account_name <> proof_data <> state.challenge_data <> session)
+
+    if client_proof === server_proof do
+      Logger.info("[AuthServer] CMD_AUTH_RECONNECT_PROOF: success: #{state.account_name}")
+      {:continue, state}
+      ThousandIsland.Socket.send(socket, <<3, 0>>)
+    else
+      ThousandIsland.Socket.send(socket, <<3, 1>>)
+      {:close, state}
+    end
   end
 
   @impl ThousandIsland.Handler
