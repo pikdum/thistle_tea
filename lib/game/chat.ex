@@ -40,8 +40,7 @@ defmodule ThistleTea.Game.Chat do
         case chat_type do
           @chat_type_say ->
             packet =
-              <<chat_type::little-size(32), language::little-size(32),
-                state.guid::little-size(64),
+              <<chat_type::little-size(8), language::little-size(32), state.guid::little-size(64),
                 state.guid::little-size(64)>> <>
                 message <>
                 <<
