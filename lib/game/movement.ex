@@ -60,7 +60,7 @@ defmodule ThistleTea.Game.Movement do
         # Logger.info("[GameServer] player_pid: #{inspect(player_pid)}")
         # PlayerStorage.update_movement(player_pid, body)
 
-        Registry.dispatch(ThistleTea.PubSub, "test", fn entries ->
+        Registry.dispatch(ThistleTea.PubSub, "logged_in", fn entries ->
           for {pid, _} <- entries do
             if pid != self() do
               send(pid, {:send_packet, msg, pack_guid(state.guid) <> body})
