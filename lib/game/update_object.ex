@@ -6,24 +6,24 @@ defmodule ThistleTea.Game.UpdateObject do
 
   require Logger
 
-  @update_type_values 0
-  @update_type_movement 1
-  @update_type_create_object 2
-  @update_type_create_object2 3
-  @update_type_out_of_range_objects 4
-  @update_type_near_objects 5
+  # @update_type_values 0
+  # @update_type_movement 1
+  # @update_type_create_object 2
+  # @update_type_create_object2 3
+  # @update_type_out_of_range_objects 4
+  # @update_type_near_objects 5
 
-  @object_type_object 0
-  @object_type_item 1
-  @object_type_container 2
-  @object_type_unit 3
-  @object_type_player 4
-  @object_type_game_object 5
-  @object_type_dynamic_object 6
-  @object_type_corpse 7
+  # @object_type_object 0
+  # @object_type_item 1
+  # @object_type_container 2
+  # @object_type_unit 3
+  # @object_type_player 4
+  # @object_type_game_object 5
+  # @object_type_dynamic_object 6
+  # @object_type_corpse 7
 
-  @update_flag_none 0x00
-  @update_flag_self 0x01
+  # @update_flag_none 0x00
+  # @update_flag_self 0x01
   @update_flag_transport 0x02
   @update_flag_melee_attacking 0x04
   @update_flag_high_guid 0x08
@@ -31,44 +31,44 @@ defmodule ThistleTea.Game.UpdateObject do
   @update_flag_living 0x20
   @update_flag_has_position 0x40
 
-  @movement_flag_none 0x00000000
-  @movement_flag_forward 0x00000001
-  @movement_flag_backward 0x00000002
-  @movement_flag_strafe_left 0x00000004
-  @movement_flag_strafe_right 0x00000008
-  @movement_flag_turn_left 0x00000010
-  @movement_flag_turn_right 0x00000020
-  @movement_flag_pitch_up 0x00000040
-  @movement_flag_pitch_down 0x00000080
-  @movement_flag_walk_mode 0x00000100
+  # @movement_flag_none 0x00000000
+  # @movement_flag_forward 0x00000001
+  # @movement_flag_backward 0x00000002
+  # @movement_flag_strafe_left 0x00000004
+  # @movement_flag_strafe_right 0x00000008
+  # @movement_flag_turn_left 0x00000010
+  # @movement_flag_turn_right 0x00000020
+  # @movement_flag_pitch_up 0x00000040
+  # @movement_flag_pitch_down 0x00000080
+  # @movement_flag_walk_mode 0x00000100
   @movement_flag_on_transport 0x00000200
-  @movement_flag_levitating 0x00000400
-  @movement_flag_fixed_z 0x00000800
-  @movement_flag_root 0x00001000
+  # @movement_flag_levitating 0x00000400
+  # @movement_flag_fixed_z 0x00000800
+  # @movement_flag_root 0x00001000
   @movement_flag_jumping 0x00002000
-  @movement_flag_falling_far 0x00004000
+  # @movement_flag_falling_far 0x00004000
   @movement_flag_swimming 0x00200000
   @movement_flag_spline_enabled 0x00400000
-  @movement_flag_can_fly 0x00800000
-  @movement_flag_flying 0x01000000
+  # @movement_flag_can_fly 0x00800000
+  # @movement_flag_flying 0x01000000
   @movement_flag_on_transport 0x02000000
   @movement_flag_spline_elevation 0x04000000
-  @movement_flag_water_walking 0x10000000
-  @movement_flag_safe_fall 0x20000000
-  @movement_flag_hover 0x40000000
+  # @movement_flag_water_walking 0x10000000
+  # @movement_flag_safe_fall 0x20000000
+  # @movement_flag_hover 0x40000000
 
-  @spline_flag_none 0x00000000
-  @spline_flag_done 0x00000001
-  @spline_flag_falling 0x00000002
-  @spline_flag_run_mode 0x00000100
-  @spline_flag_flying 0x00000200
-  @spline_flag_no_spline 0x00000400
+  # @spline_flag_none 0x00000000
+  # @spline_flag_done 0x00000001
+  # @spline_flag_falling 0x00000002
+  # @spline_flag_run_mode 0x00000100
+  # @spline_flag_flying 0x00000200
+  # @spline_flag_no_spline 0x00000400
   @spline_flag_final_point 0x00010000
   @spline_flag_final_target 0x00020000
   @spline_flag_final_angle 0x00040000
-  @spline_flag_cyclic 0x00100000
-  @spline_flag_enter_cycle 0x00200000
-  @spline_flag_frozen 0x00400000
+  # @spline_flag_cyclic 0x00100000
+  # @spline_flag_enter_cycle 0x00200000
+  # @spline_flag_frozen 0x00400000
 
   @field_defs %{
     object_guid: %{

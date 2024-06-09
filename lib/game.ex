@@ -52,7 +52,7 @@ defmodule ThistleTea.Game do
         handle_packet(opcode, size, body)
         {:continue, state}
 
-      {:error, <<size::big-size(16), opcode::little-size(32)>>} ->
+      {:error, <<_size::big-size(16), opcode::little-size(32)>>} ->
         Logger.error("[GameServer] Received unencrypted #{inspect(opcode, base: :hex)} packet")
         {:continue, state}
 
