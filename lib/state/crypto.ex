@@ -11,8 +11,8 @@ defmodule ThistleTea.CryptoStorage do
     GenServer.cast(pid, {:send_packet, opcode, payload, socket})
   end
 
-  def decrypt_header(pid, header) do
-    GenServer.call(pid, {:decrypt_header, header})
+  def decrypt_header(pid, header, expected_size) do
+    GenServer.call(pid, {:decrypt_header, header, expected_size})
   end
 
   @impl true
@@ -31,9 +31,15 @@ defmodule ThistleTea.CryptoStorage do
   end
 
   @impl true
-  def handle_call({:decrypt_header, header}, _from, state) do
-    {decrypted_header, new_state} = internal_decrypt_header(header, state)
-    {:reply, decrypted_header, new_state}
+  def handle_call({:decrypt_header, header, expected_size}, _from, state) do
+    {decrypted_header, new_state} = decrypt_header(header, state)
+    <<size::big-size(16), _opcode::little-size(32)>> = decrypted_header
+
+    if size === expected_size do
+      {:reply, {:ok, decrypted_header}, new_state}
+    else
+      {:reply, {:error, header}, state}
+    end
   end
 
   defp encrypt_header(header, state) do
@@ -54,7 +60,7 @@ defmodule ThistleTea.CryptoStorage do
     {header, Map.merge(state, crypt_state)}
   end
 
-  defp internal_decrypt_header(header, state) do
+  def decrypt_header(header, state) do
     initial_acc = {<<>>, %{recv_i: state.recv_i, recv_j: state.recv_j}}
 
     {header, crypt_state} =
