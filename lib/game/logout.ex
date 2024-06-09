@@ -39,13 +39,17 @@ defmodule ThistleTea.Game.Logout do
       @impl GenServer
       def handle_info(:send_logout_complete, {socket, state}) do
         send_packet(@smsg_logout_complete, <<>>)
-        # trigger :broadcast_logout
-        GenServer.cast(self(), :broadcast_logout)
+        broadcast_logout(state)
         {:noreply, {socket, state}}
       end
 
-      @impl GenServer
-      def handle_cast(:broadcast_logout, {socket, state}) do
+      @impl ThousandIsland.Handler
+      def handle_close(_socket, state) do
+        Logger.info("[GameServer] Client disconnected")
+        broadcast_logout(state)
+      end
+
+      def broadcast_logout(state) do
         Registry.unregister(ThistleTea.PubSub, "test")
 
         if Map.get(state, :guid) do
@@ -55,8 +59,6 @@ defmodule ThistleTea.Game.Logout do
             end
           end)
         end
-
-        {:noreply, {socket, state}}
       end
     end
   end
