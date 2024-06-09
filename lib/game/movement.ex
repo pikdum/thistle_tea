@@ -68,7 +68,7 @@ defmodule ThistleTea.Game.Movement do
           end
         end)
 
-        {:noreply, {socket, state}}
+        {:noreply, {socket, state}, socket.read_timeout}
       end
     end
   end
