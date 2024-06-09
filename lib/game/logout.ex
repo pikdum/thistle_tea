@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Logout do
       @smsg_logout_cancel_ack 0x04F
 
       @smsg_logout_complete 0x04D
+      @smsg_destroy_object 0x0AA
 
       @impl GenServer
       def handle_cast({:handle_packet, @cmsg_logout_request, _size, _body}, {socket, state}) do
@@ -38,6 +39,23 @@ defmodule ThistleTea.Game.Logout do
       @impl GenServer
       def handle_info(:send_logout_complete, {socket, state}) do
         send_packet(@smsg_logout_complete, <<>>)
+        # trigger :broadcast_logout
+        GenServer.cast(self(), :broadcast_logout)
+        {:noreply, {socket, state}}
+      end
+
+      @impl GenServer
+      def handle_cast(:broadcast_logout, {socket, state}) do
+        Registry.unregister(ThistleTea.PubSub, "test")
+
+        if Map.get(state, :guid) do
+          Registry.dispatch(ThistleTea.PubSub, "test", fn entries ->
+            for {pid, _} <- entries do
+              send(pid, {:send_packet, @smsg_destroy_object, <<state.guid::little-size(64)>>})
+            end
+          end)
+        end
+
         {:noreply, {socket, state}}
       end
     end
