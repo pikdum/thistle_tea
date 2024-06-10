@@ -43,8 +43,6 @@ defmodule ThistleTea.Game.Login do
         Logger.info("[GameServer] Character: #{inspect(c)}")
 
         {:ok, player_pid} = PlayerStorage.start_link(%{character: c})
-        state = Map.put(state, :player_pid, player_pid)
-        state = Map.put(state, :guid, character_guid)
 
         send_packet(
           @smsg_login_verify_world,
@@ -184,7 +182,14 @@ defmodule ThistleTea.Game.Login do
         # join
         {:ok, _} = Registry.register(ThistleTea.PubSub, "logged_in", packet)
 
-        {:noreply, {socket, state}, socket.read_timeout}
+        new_state =
+          Map.merge(state, %{
+            player_pid: player_pid,
+            guid: character_guid,
+            packed_guid: pack_guid(character_guid)
+          })
+
+        {:noreply, {socket, new_state}, socket.read_timeout}
       end
     end
   end
