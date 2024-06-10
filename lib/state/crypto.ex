@@ -52,7 +52,7 @@ defmodule ThistleTea.CryptoStorage do
     {header, Map.merge(state, crypt_state)}
   end
 
-  def internal_decrypt_header(header, state) do
+  defp internal_decrypt_header(header, state) do
     initial_acc = {<<>>, %{recv_i: state.recv_i, recv_j: state.recv_j}}
 
     {header, crypt_state} =
