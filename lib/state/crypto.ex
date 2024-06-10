@@ -7,12 +7,12 @@ defmodule ThistleTea.CryptoStorage do
     GenServer.start_link(__MODULE__, initial)
   end
 
-  def send_packet(pid, opcode, payload, socket) do
-    GenServer.cast(pid, {:send_packet, opcode, payload, socket})
+  def encrypt_header(pid, opcode, payload) do
+    GenServer.call(pid, {:encrypt_header, opcode, payload})
   end
 
-  def decrypt_header(pid, header, expected_size) do
-    GenServer.call(pid, {:decrypt_header, header, expected_size})
+  def decrypt_header(pid, header) do
+    GenServer.call(pid, {:decrypt_header, header})
   end
 
   @impl true
@@ -21,28 +21,20 @@ defmodule ThistleTea.CryptoStorage do
   end
 
   @impl true
-  def handle_cast({:send_packet, opcode, payload, socket}, state) do
-    # do these actually need to be sent, or just encrypted?
+  def handle_call({:encrypt_header, opcode, payload}, _from, state) do
     size = byte_size(payload) + 2
     header = <<size::big-size(16), opcode::little-size(16)>>
-    {encrypted_header, new_state} = encrypt_header(header, state)
-    ThousandIsland.Socket.send(socket, encrypted_header <> payload)
-    {:noreply, new_state}
+    {encrypted_header, new_state} = internal_encrypt_header(header, state)
+    {:reply, {:ok, encrypted_header}, new_state}
   end
 
   @impl true
-  def handle_call({:decrypt_header, header, expected_size}, _from, state) do
-    {decrypted_header, new_state} = decrypt_header(header, state)
-    <<size::big-size(16), _opcode::little-size(32)>> = decrypted_header
-
-    if size === expected_size do
-      {:reply, {:ok, decrypted_header}, new_state}
-    else
-      {:reply, {:error, header}, state}
-    end
+  def handle_call({:decrypt_header, header}, _from, state) do
+    {decrypted_header, new_state} = internal_decrypt_header(header, state)
+    {:reply, {:ok, decrypted_header}, new_state}
   end
 
-  defp encrypt_header(header, state) do
+  defp internal_encrypt_header(header, state) do
     initial_acc = {<<>>, %{send_i: state.send_i, send_j: state.send_j}}
 
     {header, crypt_state} =
@@ -60,7 +52,7 @@ defmodule ThistleTea.CryptoStorage do
     {header, Map.merge(state, crypt_state)}
   end
 
-  def decrypt_header(header, state) do
+  def internal_decrypt_header(header, state) do
     initial_acc = {<<>>, %{recv_i: state.recv_i, recv_j: state.recv_j}}
 
     {header, crypt_state} =

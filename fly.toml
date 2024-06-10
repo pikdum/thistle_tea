@@ -1,0 +1,41 @@
+# fly.toml app configuration file generated for thistle-tea on 2024-06-09T15:13:10-05:00
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
+
+app = 'thistle-tea'
+primary_region = 'ord'
+
+[build]
+
+[[services]]
+  internal_port = 3724
+  processes = ['app']
+  protocol = 'tcp'
+
+  [[services.ports]]
+    port = 3724
+
+  [[services.tcp_checks]]
+    grace_period = "1s"
+    interval = "15s"
+    restart_limit = 0
+    timeout = "2s"
+
+
+[[services]]
+  internal_port = 8085
+  processes = ['app']
+  protocol = 'tcp'
+
+  [[services.ports]]
+    port = 8085
+
+  [[services.tcp_checks]]
+    grace_period = "1s"
+    interval = "15s"
+    restart_limit = 0
+    timeout = "2s"
+
+[[vm]]
+  size = 'shared-cpu-1x'
