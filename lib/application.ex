@@ -16,6 +16,13 @@ defmodule ThistleTea.Application do
 
   require Logger
 
+  def setup_database do
+    # in memory for now, so need to re-seed on startup
+    Memento.Table.create!(ThistleTea.Account)
+    ThistleTea.Account.register("pikdum", "pikdum")
+    ThistleTea.Account.register("test", "test")
+  end
+
   @impl true
   def start(_type, _args) do
     children = [
@@ -31,6 +38,7 @@ defmodule ThistleTea.Application do
 
     :ets.new(:session, [:named_table, :public])
     :ets.new(:guid_name, [:named_table, :public])
+    setup_database()
 
     Logger.info("ThistleTea starting...")
 
