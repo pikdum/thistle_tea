@@ -17,9 +17,6 @@ defmodule ThistleTea.Auth do
        191, 94, 143, 171, 60, 130, 135, 42, 62, 155, 183>>
   @g <<7>>
 
-  @salt <<0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-          0, 0, 0>>
-
   defp calculate_b(state) do
     private_b = :crypto.strong_rand_bytes(19)
     Map.merge(state, %{private_b: private_b})
@@ -38,15 +35,12 @@ defmodule ThistleTea.Auth do
 
   # TODO: password hardcoded to pikdum
   defp account_state(account) do
-    %{n: @n, g: @g}
-    |> Map.merge(%{account_name: account})
-    |> Map.merge(%{
-      verifier:
-        <<34, 54, 51, 44, 77, 56, 96, 52, 2, 253, 163, 246, 128, 63, 103, 166, 81, 9, 71, 120, 41,
-          87, 250, 125, 141, 73, 124, 172, 157, 84, 95, 126>>
-    })
-    |> Map.merge(%{
-      salt: @salt
+    {:ok, a} = ThistleTea.Account.get_user(account)
+
+    Map.merge(%{n: @n, g: @g}, %{
+      account_name: account,
+      verifier: a.password_verifier,
+      salt: a.password_salt
     })
   end
 
@@ -167,10 +161,10 @@ defmodule ThistleTea.Auth do
         state
       ) do
     Logger.info("[AuthServer] CMD_AUTH_RECONNECT_CHALLENGE: #{account_name}")
-    # TODO: need to get salt from account storage
     # and need to test this flow more in-depth
     challenge_data = :crypto.strong_rand_bytes(16)
-    ThousandIsland.Socket.send(socket, <<2, 0>> <> challenge_data <> @salt)
+    {:ok, a} = ThistleTea.Account.get_user(account_name)
+    ThousandIsland.Socket.send(socket, <<2, 0>> <> challenge_data <> a.password_salt)
     {:continue, Map.merge(state, %{account_name: account_name, challenge_data: challenge_data})}
   end
 
