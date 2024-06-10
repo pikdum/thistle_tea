@@ -49,22 +49,23 @@ defmodule ThistleTea.Game do
       ) do
     case CryptoStorage.decrypt_header(state.crypto_pid, header) do
       {:ok, <<size::big-size(16), opcode::little-size(32)>>} ->
-        # handle first packet
         payload_size = size - 4
-        <<payload::binary-size(payload_size), rest::binary>> = body
+        <<payload::binary-size(payload_size), additional_data::binary>> = body
+        if byte_size(additional_data) > 0, do: handle_data(additional_data, socket, state)
+
         handle_packet(opcode, size, payload)
-
-        # handle when packet data is combined
-        if byte_size(rest) > 0 do
-          handle_data(rest, socket, state)
-        end
-
         {:continue, state}
 
       other ->
         Logger.error("[GameServer] ???: #{inspect(other, limit: :infinity)}")
         {:continue, state}
     end
+  end
+
+  @impl ThousandIsland.Handler
+  def handle_data(data, _socket, state) do
+    Logger.error("[GameServer] Received unknown data: #{inspect(data, limit: :infinity)}")
+    {:continue, state}
   end
 
   @impl GenServer

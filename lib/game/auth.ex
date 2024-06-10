@@ -27,10 +27,11 @@ defmodule ThistleTea.Game.Auth do
       @impl ThousandIsland.Handler
       def handle_data(
             <<size::big-size(16), @cmsg_auth_session::little-size(32),
-              body::binary-size(size - 4)>>,
-            _socket,
+              body::binary-size(size - 4), additional_data::binary>>,
+            socket,
             state
           ) do
+        if byte_size(additional_data) > 0, do: handle_data(additional_data, socket, state)
         <<_build::little-size(32), _server_id::little-size(32), rest::binary>> = body
         {:ok, username, rest} = parse_string(rest)
 
