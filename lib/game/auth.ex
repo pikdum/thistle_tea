@@ -1,7 +1,6 @@
 defmodule ThistleTea.Game.Auth do
   defmacro __using__(_) do
     quote do
-      alias ThistleTea.SessionStorage
       alias ThistleTea.CryptoStorage
       import ThistleTea.Util, only: [parse_string: 1]
 
@@ -38,7 +37,7 @@ defmodule ThistleTea.Game.Auth do
         <<client_seed::little-bytes-size(4), client_proof::little-bytes-size(20), _rest::binary>> =
           rest
 
-        session = SessionStorage.get(username)
+        [{^username, session}] = :ets.lookup(:session, username)
 
         server_proof =
           :crypto.hash(

@@ -23,13 +23,13 @@ defmodule ThistleTea.Application do
       ThistleTea.DBC,
       ThistleTea.Mangos,
       ThistleTea.CharacterStorage,
-      ThistleTea.SessionStorage,
       {ThousandIsland,
        port: 3724, handler_module: ThistleTea.Auth, handler_options: @handler_options},
       {ThousandIsland,
        port: 8085, handler_module: ThistleTea.Game, handler_options: @handler_options}
     ]
 
+    :ets.new(:session, [:named_table, :public])
     :ets.new(:guid_name, [:named_table, :public])
 
     Logger.info("ThistleTea starting...")
