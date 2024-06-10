@@ -3,8 +3,6 @@ defmodule ThistleTea.Game.Movement do
     quote do
       alias ThistleTea.PlayerStorage
 
-      import ThistleTea.Util, only: [pack_guid: 1]
-
       @msg_move_start_forward 0x0B5
       @msg_move_start_backward 0x0B6
       @msg_move_stop 0x0B7
@@ -63,7 +61,7 @@ defmodule ThistleTea.Game.Movement do
         Registry.dispatch(ThistleTea.PubSub, "logged_in", fn entries ->
           for {pid, _} <- entries do
             if pid != self() do
-              send(pid, {:send_packet, msg, pack_guid(state.guid) <> body})
+              send(pid, {:send_packet, msg, state.packed_guid <> body})
             end
           end
         end)
