@@ -122,7 +122,7 @@ defmodule ThistleTea.Auth do
       state =
         Map.merge(state, %{public_a: public_a, session: session, server_proof: server_proof})
 
-      SessionStorage.put(state.account_name, state.session)
+      :ets.insert(:session, {state.account_name, state.session})
 
       ThousandIsland.Socket.send(socket, <<1, 0>> <> state.server_proof <> <<0, 0, 0, 0>>)
       {:continue, state}
