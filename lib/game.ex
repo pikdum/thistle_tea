@@ -44,16 +44,21 @@ defmodule ThistleTea.Game do
   @impl ThousandIsland.Handler
   def handle_data(
         <<header::bytes-size(6), body::binary>>,
-        _socket,
+        socket,
         state
       ) do
-    case CryptoStorage.decrypt_header(state.crypto_pid, header, byte_size(body) + 4) do
+    case CryptoStorage.decrypt_header(state.crypto_pid, header) do
       {:ok, <<size::big-size(16), opcode::little-size(32)>>} ->
-        handle_packet(opcode, size, body)
-        {:continue, state}
+        # handle first packet
+        payload_size = size - 4
+        <<payload::binary-size(payload_size), rest::binary>> = body
+        handle_packet(opcode, size, payload)
 
-      {:error, <<_size::big-size(16), opcode::little-size(32)>>} ->
-        Logger.error("[GameServer] Received unencrypted #{inspect(opcode, base: :hex)} packet")
+        # handle when packet data is combined
+        if byte_size(rest) > 0 do
+          handle_data(rest, socket, state)
+        end
+
         {:continue, state}
 
       other ->
@@ -70,13 +75,8 @@ defmodule ThistleTea.Game do
 
   @impl GenServer
   def handle_cast({:send_packet, opcode, payload}, {socket, state}) do
-    CryptoStorage.send_packet(
-      state.crypto_pid,
-      opcode,
-      payload,
-      socket
-    )
-
+    {:ok, header} = CryptoStorage.encrypt_header(state.crypto_pid, opcode, payload)
+    ThousandIsland.Socket.send(socket, header <> payload)
     {:noreply, {socket, state}, socket.read_timeout}
   end
 

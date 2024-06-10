@@ -3,6 +3,15 @@ defmodule ThistleTea.Application do
   # for more information on OTP Applications
   @moduledoc false
 
+  # these are the defaults anyways
+  @handler_options %{
+    backlog: 1024,
+    nodelay: true,
+    send_timeout: 30_000,
+    send_timeout_close: true,
+    reuseaddr: true
+  }
+
   use Application
 
   require Logger
@@ -15,8 +24,10 @@ defmodule ThistleTea.Application do
       ThistleTea.Mangos,
       ThistleTea.CharacterStorage,
       ThistleTea.SessionStorage,
-      {ThousandIsland, port: 3724, handler_module: ThistleTea.Auth, handler_options: %{}},
-      {ThousandIsland, port: 8085, handler_module: ThistleTea.Game, handler_options: %{}}
+      {ThousandIsland,
+       port: 3724, handler_module: ThistleTea.Auth, handler_options: @handler_options},
+      {ThousandIsland,
+       port: 8085, handler_module: ThistleTea.Game, handler_options: @handler_options}
     ]
 
     :ets.new(:guid_name, [:named_table, :public])
