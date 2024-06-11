@@ -1,7 +1,6 @@
 defmodule ThistleTea.Game.Login do
   defmacro __using__(_) do
     quote do
-      alias ThistleTea.CharacterStorage
       alias ThistleTea.DBC
       alias ThistleTea.PlayerStorage
 
@@ -36,7 +35,7 @@ defmodule ThistleTea.Game.Login do
         <<character_guid::little-size(64)>> = body
         Logger.info("[GameServer] CMSG_PLAYER_LOGIN: character_guid: #{character_guid}")
 
-        c = CharacterStorage.get_by_guid(state.username, character_guid)
+        {:ok, c} = ThistleTea.Character.get_character(state.account.id, character_guid)
 
         :ets.insert(:guid_name, {character_guid, c.name, "", c.race, c.gender, c.class})
 
@@ -127,7 +126,7 @@ defmodule ThistleTea.Game.Login do
         Logger.info("[GameServer] mb: #{inspect(mb)}")
 
         fields = %{
-          object_guid: c.guid,
+          object_guid: c.id,
           object_type: 25,
           object_scale_x: 1.0,
           unit_health: 100,
@@ -148,7 +147,7 @@ defmodule ThistleTea.Game.Login do
           unit_display_id: unit_display_id,
           unit_native_display_id: unit_display_id,
           player_flags: 0,
-          player_features: <<c.skin, c.face, c.hairstyle, c.haircolor>>,
+          player_features: <<c.skin, c.face, c.hair_style, c.hair_color>>,
           player_xp: 1,
           player_next_level_xp: 100,
           player_rest_state_experience: 100
