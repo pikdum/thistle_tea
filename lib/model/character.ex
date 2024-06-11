@@ -80,9 +80,7 @@ defmodule ThistleTea.Character do
     end)
   end
 
-  def update_position!(character, position) do
-    character = Map.merge(character, position)
-
+  def save(character) do
     Memento.transaction!(fn ->
       Memento.Query.write(character)
     end)

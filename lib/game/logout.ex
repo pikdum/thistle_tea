@@ -39,19 +39,26 @@ defmodule ThistleTea.Game.Logout do
       @impl GenServer
       def handle_info(:send_logout_complete, {socket, state}) do
         send_packet(@smsg_logout_complete, <<>>)
-        broadcast_logout(state)
+        handle_logout(state)
         {:noreply, {socket, state}, socket.read_timeout}
       end
 
       @impl ThousandIsland.Handler
       def handle_close(_socket, state) do
         Logger.info("[GameServer] Client disconnected")
-        broadcast_logout(state)
+        handle_logout(state)
       end
 
-      def broadcast_logout(state) do
+      def handle_logout(state) do
+        # save current character state
+        if Map.get(state, :character) do
+          ThistleTea.Character.save(state.character)
+        end
+
+        # remove from pubsub
         Registry.unregister(ThistleTea.PubSub, "logged_in")
 
+        # broadcast destroy object
         if Map.get(state, :guid) do
           Registry.dispatch(ThistleTea.PubSub, "logged_in", fn entries ->
             for {pid, _} <- entries do
