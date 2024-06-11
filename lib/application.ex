@@ -21,6 +21,7 @@ defmodule ThistleTea.Application do
     Memento.Table.create!(ThistleTea.Account)
     ThistleTea.Account.register("pikdum", "pikdum")
     ThistleTea.Account.register("test", "test")
+    Memento.Table.create!(ThistleTea.Character)
   end
 
   @impl true

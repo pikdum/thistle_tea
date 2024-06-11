@@ -1,7 +1,6 @@
 defmodule ThistleTea.Game.Character do
   defmacro __using__(_) do
     quote do
-      alias ThistleTea.CharacterStorage
       alias ThistleTea.Mangos
       import ThistleTea.Util, only: [parse_string: 1]
 
@@ -15,8 +14,10 @@ defmodule ThistleTea.Game.Character do
       def handle_cast({:handle_packet, @cmsg_char_enum, _size, _body}, {socket, state}) do
         Logger.info("[GameServer] CMSG_CHAR_ENUM")
 
-        characters = CharacterStorage.get_characters(state.username)
+        characters = ThistleTea.Character.get_characters!(state.account.id)
         length = characters |> Enum.count()
+
+        Logger.info("[GameServer] CMSG_CHAR_ENUM: characters: #{inspect(characters)}")
 
         # TODO: use actual character equipment
         weapon = Mangos.get(ItemTemplate, 13262)
@@ -25,10 +26,10 @@ defmodule ThistleTea.Game.Character do
         characters_payload =
           characters
           |> Enum.map(fn c ->
-            <<c.guid::little-size(64)>> <>
+            <<c.id::little-size(64)>> <>
               c.name <>
-              <<0, c.race, c.class, c.gender, c.skin, c.face, c.hairstyle, c.haircolor,
-                c.facialhair>> <>
+              <<0, c.race, c.class, c.gender, c.skin, c.face, c.hair_style, c.hair_color,
+                c.facial_hair>> <>
               <<
                 c.level,
                 c.area::little-size(32),
@@ -167,23 +168,22 @@ defmodule ThistleTea.Game.Character do
       @impl GenServer
       def handle_cast({:handle_packet, @cmsg_char_create, _size, body}, {socket, state}) do
         {:ok, character_name, rest} = parse_string(body)
-        <<race, class, gender, skin, face, hairstyle, haircolor, facialhair, outfit_id>> = rest
+        <<race, class, gender, skin, face, hair_style, hair_color, facial_hair, outfit_id>> = rest
         Logger.info("[GameServer] CMSG_CHAR_CREATE: character_name: #{character_name}")
 
         info = Mangos.get_by(PlayerCreateInfo, race: race, class: class)
 
-        character = %{
-          # TODO: had to take last FF off, but why?
-          guid: :rand.uniform(0xFFFFFFFFFFFFFF),
+        character = %ThistleTea.Character{
+          account_id: state.account.id,
           name: character_name,
           race: race,
           class: class,
           gender: gender,
           skin: skin,
           face: face,
-          hairstyle: hairstyle,
-          haircolor: haircolor,
-          facialhair: facialhair,
+          hair_style: hair_style,
+          hair_color: hair_color,
+          facial_hair: facial_hair,
           outfit_id: outfit_id,
           level: 1,
           area: info.zone,
@@ -194,11 +194,17 @@ defmodule ThistleTea.Game.Character do
           orientation: info.orientation
         }
 
-        case CharacterStorage.add_character(state.username, character) do
-          {:error, error_value} ->
-            send_packet(@smsg_char_create, <<error_value>>)
+        case ThistleTea.Character.create(character) do
+          {:error, :character_exists} ->
+            send_packet(@smsg_char_create, <<0x31>>)
 
-          _ ->
+          {:error, :character_limit} ->
+            send_packet(@smsg_char_create, <<0x35>>)
+
+          {:error, _} ->
+            send_packet(@smsg_char_create, <<0x30>>)
+
+          {:ok, _} ->
             send_packet(@smsg_char_create, <<0x2E>>)
         end
 

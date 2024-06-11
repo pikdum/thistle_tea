@@ -48,6 +48,7 @@ defmodule ThistleTea.Account do
       Memento.transaction!(fn ->
         Memento.Query.write(%ThistleTea.Account{
           username: username,
+          # TODO: use something better than sha256 here
           password_hash: :crypto.hash(:sha256, password),
           password_salt: salt,
           password_verifier: verifier

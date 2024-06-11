@@ -3,8 +3,6 @@ defmodule ThistleTea.Auth do
 
   require Logger
 
-  alias ThistleTea.SessionStorage
-
   import Binary, only: [reverse: 1]
 
   @cmd_auth_logon_challenge 0
@@ -177,7 +175,7 @@ defmodule ThistleTea.Auth do
         state
       ) do
     Logger.info("[AuthServer] CMD_AUTH_RECONNECT_PROOF: #{state.account_name}")
-    session = SessionStorage.get(state.account_name)
+    [{_, session}] = :ets.lookup(:session, state.account_name)
 
     server_proof =
       :crypto.hash(:sha, state.account_name <> proof_data <> state.challenge_data <> session)

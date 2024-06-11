@@ -49,8 +49,10 @@ defmodule ThistleTea.Game.Auth do
           Logger.info("[GameServer] CMSG_AUTH_SESSION: success: #{username}")
           crypt = %{key: session, send_i: 0, send_j: 0, recv_i: 0, recv_j: 0}
           {:ok, crypto_pid} = CryptoStorage.start_link(crypt)
+          {:ok, account} = ThistleTea.Account.get_user(username)
           send_packet(@smsg_auth_response, <<0x0C, 0::little-size(32), 0, 0::little-size(32)>>)
-          {:continue, Map.merge(state, %{username: username, crypto_pid: crypto_pid})}
+
+          {:continue, Map.merge(state, %{crypto_pid: crypto_pid, account: account})}
         else
           Logger.error("[GameServer] CMSG_AUTH_SESSION: error: #{username}")
           {:close, state}
