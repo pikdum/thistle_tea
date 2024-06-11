@@ -21,6 +21,11 @@ defmodule ThistleTea.Application do
     Memento.Table.create!(ThistleTea.Account)
     ThistleTea.Account.register("pikdum", "pikdum")
     ThistleTea.Account.register("test", "test")
+
+    Enum.each(1..10, fn i ->
+      ThistleTea.Account.register("test#{i}", "test#{i}")
+    end)
+
     Memento.Table.create!(ThistleTea.Character)
   end
 
