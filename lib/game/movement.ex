@@ -52,7 +52,6 @@ defmodule ThistleTea.Game.Movement do
                  @msg_move_heartbeat,
                  @cmsg_move_fall_reset
                ] do
-        # movement_info = decode_movement_info(body)
         <<
           # ignore these
           _flags::little-size(32),
@@ -66,7 +65,7 @@ defmodule ThistleTea.Game.Movement do
         >> = body
 
         character =
-          ThistleTea.Character.update_position!(state.character, %{
+          Map.merge(state.character, %{
             x: x,
             y: y,
             z: z,
