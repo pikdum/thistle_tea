@@ -2,7 +2,6 @@ defmodule ThistleTea.Game.Login do
   defmacro __using__(_) do
     quote do
       alias ThistleTea.DBC
-      alias ThistleTea.PlayerStorage
 
       import ThistleTea.Game.UpdateObject
       import Bitwise, only: [<<<: 2, |||: 2]
@@ -40,8 +39,6 @@ defmodule ThistleTea.Game.Login do
         :ets.insert(:guid_name, {character_guid, c.name, "", c.race, c.gender, c.class})
 
         Logger.info("[GameServer] Character: #{inspect(c)}")
-
-        {:ok, player_pid} = PlayerStorage.start_link(%{character: c})
 
         send_packet(
           @smsg_login_verify_world,
@@ -183,7 +180,6 @@ defmodule ThistleTea.Game.Login do
 
         new_state =
           Map.merge(state, %{
-            player_pid: player_pid,
             guid: character_guid,
             packed_guid: pack_guid(character_guid),
             character: c
