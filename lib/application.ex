@@ -35,7 +35,6 @@ defmodule ThistleTea.Application do
       {Registry, keys: :duplicate, name: ThistleTea.PubSub},
       ThistleTea.DBC,
       ThistleTea.Mangos,
-      ThistleTea.CharacterStorage,
       {ThousandIsland,
        port: 3724, handler_module: ThistleTea.Auth, handler_options: @handler_options},
       {ThousandIsland,
