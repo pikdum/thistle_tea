@@ -1,7 +1,7 @@
 defmodule ThistleTea.Game.Movement do
   defmacro __using__(_) do
     quote do
-      alias ThistleTea.PlayerStorage
+      import ThistleTea.Game.UpdateObject
 
       @msg_move_start_forward 0x0B5
       @msg_move_start_backward 0x0B6
@@ -52,11 +52,26 @@ defmodule ThistleTea.Game.Movement do
                  @msg_move_heartbeat,
                  @cmsg_move_fall_reset
                ] do
-        # TODO: no real need for us to persist on every movement change
-        # Logger.info("[GameServer] movement packet: #{inspect(msg, base: :hex)}")
-        # player_pid = Map.get(state, :player_pid)
-        # Logger.info("[GameServer] player_pid: #{inspect(player_pid)}")
-        # PlayerStorage.update_movement(player_pid, body)
+        # movement_info = decode_movement_info(body)
+        <<
+          # ignore these
+          _flags::little-size(32),
+          _time::little-size(32),
+          # we only want position here
+          x::little-float-size(32),
+          y::little-float-size(32),
+          z::little-float-size(32),
+          orientation::little-float-size(32),
+          _rest::binary
+        >> = body
+
+        character =
+          ThistleTea.Character.update_position!(state.character, %{
+            x: x,
+            y: y,
+            z: z,
+            orientation: orientation
+          })
 
         Registry.dispatch(ThistleTea.PubSub, "logged_in", fn entries ->
           for {pid, _} <- entries do
@@ -66,7 +81,7 @@ defmodule ThistleTea.Game.Movement do
           end
         end)
 
-        {:noreply, {socket, state}, socket.read_timeout}
+        {:noreply, {socket, Map.put(state, :character, character)}, socket.read_timeout}
       end
     end
   end
