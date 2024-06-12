@@ -379,8 +379,7 @@ defmodule ThistleTea.Game.UpdateObject do
 
     # on_transport
     if (movement_flags &&& @movement_flag_on_transport) > 0 do
-      # TODO: need to parse a packed guid
-      Logger.error("[GameServer] on_transport unimplemented")
+      Logger.error("TODO: parse packed guid for transport")
     end
 
     # swimming

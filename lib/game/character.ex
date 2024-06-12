@@ -12,12 +12,10 @@ defmodule ThistleTea.Game.Character do
 
       @impl GenServer
       def handle_cast({:handle_packet, @cmsg_char_enum, _size, _body}, {socket, state}) do
-        Logger.info("[GameServer] CMSG_CHAR_ENUM")
+        Logger.info("CMSG_CHAR_ENUM")
 
         characters = ThistleTea.Character.get_characters!(state.account.id)
         length = characters |> Enum.count()
-
-        Logger.info("[GameServer] CMSG_CHAR_ENUM: characters: #{inspect(characters)}")
 
         # TODO: use actual character equipment
         weapon = Mangos.get(ItemTemplate, 13262)
@@ -169,7 +167,7 @@ defmodule ThistleTea.Game.Character do
       def handle_cast({:handle_packet, @cmsg_char_create, _size, body}, {socket, state}) do
         {:ok, character_name, rest} = parse_string(body)
         <<race, class, gender, skin, face, hair_style, hair_color, facial_hair, outfit_id>> = rest
-        Logger.info("[GameServer] CMSG_CHAR_CREATE: character_name: #{character_name}")
+        Logger.info("CMSG_CHAR_CREATE: #{character_name}")
 
         info = Mangos.get_by(PlayerCreateInfo, race: race, class: class)
 

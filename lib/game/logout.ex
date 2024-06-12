@@ -12,7 +12,7 @@ defmodule ThistleTea.Game.Logout do
 
       @impl GenServer
       def handle_cast({:handle_packet, @cmsg_logout_request, _size, _body}, {socket, state}) do
-        Logger.info("[GameServer] CMSG_LOGOUT_REQUEST")
+        Logger.info("CMSG_LOGOUT_REQUEST")
         send_packet(@smsg_logout_response, <<0::little-size(32)>>)
         logout_timer = Process.send_after(self(), :send_logout_complete, 1_000)
         {:noreply, {socket, Map.put(state, :logout_timer, logout_timer)}, socket.read_timeout}
@@ -20,7 +20,7 @@ defmodule ThistleTea.Game.Logout do
 
       @impl GenServer
       def handle_cast({:handle_packet, @cmsg_logout_cancel, _size, _body}, {socket, state}) do
-        Logger.info("[GameServer] CMSG_LOGOUT_CANCEL")
+        Logger.info("CMSG_LOGOUT_CANCEL")
 
         state =
           case Map.get(state, :logout_timer, nil) do
@@ -45,7 +45,7 @@ defmodule ThistleTea.Game.Logout do
 
       @impl ThousandIsland.Handler
       def handle_close(_socket, state) do
-        Logger.info("[GameServer] Client disconnected")
+        Logger.info("CLIENT DISCONNECTED")
         handle_logout(state)
       end
 

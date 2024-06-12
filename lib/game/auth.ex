@@ -11,9 +11,8 @@ defmodule ThistleTea.Game.Auth do
 
       @impl ThousandIsland.Handler
       def handle_connection(socket, _state) do
-        Logger.info("[GameServer] SMSG_AUTH_CHALLENGE")
+        Logger.info("SMSG_AUTH_CHALLENGE")
         seed = :crypto.strong_rand_bytes(4)
-        Logger.info("[GameServer] pid: #{inspect(self())}")
 
         ThousandIsland.Socket.send(
           socket,
@@ -33,6 +32,8 @@ defmodule ThistleTea.Game.Auth do
         if byte_size(additional_data) > 0, do: handle_data(additional_data, socket, state)
         <<_build::little-size(32), _server_id::little-size(32), rest::binary>> = body
         {:ok, username, rest} = parse_string(rest)
+        Logger.metadata(username: username)
+        Logger.info("CMSG_AUTH_SESSION")
 
         <<client_seed::little-bytes-size(4), client_proof::little-bytes-size(20), _rest::binary>> =
           rest
@@ -46,7 +47,7 @@ defmodule ThistleTea.Game.Auth do
           )
 
         if client_proof == server_proof do
-          Logger.info("[GameServer] CMSG_AUTH_SESSION: success: #{username}")
+          Logger.info("AUTH SUCCESS")
           crypt = %{key: session, send_i: 0, send_j: 0, recv_i: 0, recv_j: 0}
           {:ok, crypto_pid} = CryptoStorage.start_link(crypt)
           {:ok, account} = ThistleTea.Account.get_user(username)
@@ -54,7 +55,7 @@ defmodule ThistleTea.Game.Auth do
 
           {:continue, Map.merge(state, %{crypto_pid: crypto_pid, account: account})}
         else
-          Logger.error("[GameServer] CMSG_AUTH_SESSION: error: #{username}")
+          Logger.error("AUTH FAILURE")
           {:close, state}
         end
       end

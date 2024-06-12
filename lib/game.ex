@@ -26,7 +26,6 @@ defmodule ThistleTea.Game do
   end
 
   def send_update_packet(packet) do
-    Logger.info("[GameServer] Update: #{inspect(packet, limit: :infinity)}")
     compressed_packet = :zlib.compress(packet)
     original_size = byte_size(packet)
     compressed_size = byte_size(compressed_packet)
@@ -47,30 +46,26 @@ defmodule ThistleTea.Game do
         socket,
         state
       ) do
-    case CryptoStorage.decrypt_header(state.crypto_pid, header) do
-      {:ok, <<size::big-size(16), opcode::little-size(32)>>} ->
-        payload_size = size - 4
-        <<payload::binary-size(payload_size), additional_data::binary>> = body
-        if byte_size(additional_data) > 0, do: handle_data(additional_data, socket, state)
+    {:ok, <<size::big-size(16), opcode::little-size(32)>>} =
+      CryptoStorage.decrypt_header(state.crypto_pid, header)
 
-        handle_packet(opcode, size, payload)
-        {:continue, state}
+    payload_size = size - 4
+    <<payload::binary-size(payload_size), additional_data::binary>> = body
+    if byte_size(additional_data) > 0, do: handle_data(additional_data, socket, state)
 
-      other ->
-        Logger.error("[GameServer] ???: #{inspect(other, limit: :infinity)}")
-        {:continue, state}
-    end
+    handle_packet(opcode, size, payload)
+    {:continue, state}
   end
 
   @impl ThousandIsland.Handler
   def handle_data(data, _socket, state) do
-    Logger.error("[GameServer] Received unknown data: #{inspect(data, limit: :infinity)}")
+    Logger.error("UNKNOWN: #{inspect(data, limit: :infinity)}")
     {:continue, state}
   end
 
   @impl GenServer
   def handle_cast({:handle_packet, opcode, _size, _body}, {socket, state}) do
-    Logger.error("[GameServer] Unhandled packet: #{inspect(opcode, base: :hex)}")
+    Logger.error("UNIMPLEMENTED: #{inspect(opcode, base: :hex)}")
     {:noreply, {socket, state}, socket.read_timeout}
   end
 

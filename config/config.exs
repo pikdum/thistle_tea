@@ -10,6 +10,8 @@ config :logger, :default_formatter,
   format: "[$level] $message $metadata\n",
   metadata: [
     :username,
+    :character_name,
+    :target_name,
     :file,
     :pid,
     :mfa,
