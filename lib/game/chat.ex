@@ -9,7 +9,9 @@ defmodule ThistleTea.Game.Chat do
       @cmsg_join_channel 0x097
 
       @chat_type_say 0
+      @chat_type_yell 5
       @chat_type_whisper 6
+      @chat_type_emote 8
       @chat_type_channel 14
 
       @impl GenServer
@@ -57,6 +59,26 @@ defmodule ThistleTea.Game.Chat do
                   0
                 >>
 
+            # TODO: for now, everybody receives
+            Registry.dispatch(ThistleTea.PubSub, "logged_in", fn entries ->
+              for {pid, _} <- entries do
+                send(pid, {:send_packet, @smsg_messagechat, packet})
+              end
+            end)
+
+          @chat_type_yell ->
+            packet =
+              <<chat_type::little-size(8), language::little-size(32), state.guid::little-size(64),
+                state.guid::little-size(64)>> <>
+                <<message_length::little-size(32)>> <>
+                message <>
+                <<
+                  0,
+                  # player chat tag - hard code to 0 for now
+                  0
+                >>
+
+            # TODO: for now, everybody receives
             Registry.dispatch(ThistleTea.PubSub, "logged_in", fn entries ->
               for {pid, _} <- entries do
                 send(pid, {:send_packet, @smsg_messagechat, packet})
@@ -68,8 +90,51 @@ defmodule ThistleTea.Game.Chat do
               "UNIMPLEMENTED: CMSG_MESSAGECHAT: WHISPER: #{target_player} -> #{message}"
             )
 
+          @chat_type_emote ->
+            packet =
+              <<chat_type::little-size(8), language::little-size(32),
+                state.guid::little-size(64)>> <>
+                <<message_length::little-size(32)>> <>
+                message <>
+                <<
+                  0,
+                  # player chat tag - hard code to 0 for now
+                  0
+                >>
+
+            # TODO: for now, everybody receives
+            Registry.dispatch(ThistleTea.PubSub, "logged_in", fn entries ->
+              for {pid, _} <- entries do
+                send(pid, {:send_packet, @smsg_messagechat, packet})
+              end
+            end)
+
           @chat_type_channel ->
-            Logger.error("UNIMPLEMENTED: CMSG_MESSAGECHAT: CHANNEL: #{channel} -> #{message}")
+            packet =
+              <<chat_type::little-size(8), language::little-size(32)>> <>
+                channel <>
+                <<
+                  0,
+                  # player rank
+                  0::little-size(32),
+                  # player guid
+                  state.guid::little-size(64)
+                >> <>
+                <<message_length::little-size(32)>> <>
+                message <>
+                <<
+                  0,
+                  # player chat tag - hard code to 0 for now
+                  0
+                >>
+
+            # TODO: untested
+            # TODO: for now, everybody receives
+            Registry.dispatch(ThistleTea.PubSub, "logged_in", fn entries ->
+              for {pid, _} <- entries do
+                send(pid, {:send_packet, @smsg_messagechat, packet})
+              end
+            end)
 
           unknown ->
             Logger.error("UNIMPLEMENTED: CMSG_MESSAGECHAT: UNKNOWN: #{inspect(unknown)}")
