@@ -15,7 +15,7 @@ defmodule ThistleTea.Game.Chat do
       @impl GenServer
       def handle_cast({:handle_packet, @cmsg_messagechat, _size, body}, {socket, state}) do
         <<chat_type::little-size(32), language::little-size(32), rest::binary>> = body
-        Logger.info("[GameServer] CMSG_MESSAGECHAT: chat_type: #{inspect(chat_type)}")
+        Logger.info("CMSG_MESSAGECHAT")
 
         {target_player, rest} =
           case chat_type do
@@ -64,13 +64,15 @@ defmodule ThistleTea.Game.Chat do
             end)
 
           @chat_type_whisper ->
-            Logger.info("[GameServer] CMSG_MESSAGECHAT: WHISPER: #{target_player} -> #{message}")
+            Logger.error(
+              "UNIMPLEMENTED: CMSG_MESSAGECHAT: WHISPER: #{target_player} -> #{message}"
+            )
 
           @chat_type_channel ->
-            Logger.info("[GameServer] CMSG_MESSAGECHAT: CHANNEL: #{channel} -> #{message}")
+            Logger.error("UNIMPLEMENTED: CMSG_MESSAGECHAT: CHANNEL: #{channel} -> #{message}")
 
-          _ ->
-            Logger.info("[GameServer] CMSG_MESSAGECHAT: UNKNOWN: #{inspect(chat_type)}")
+          unknown ->
+            Logger.error("UNIMPLEMENTED: CMSG_MESSAGECHAT: UNKNOWN: #{inspect(unknown)}")
         end
 
         {:noreply, {socket, state}, socket.read_timeout}
@@ -80,7 +82,7 @@ defmodule ThistleTea.Game.Chat do
       def handle_cast({:handle_packet, @cmsg_join_channel, _size, body}, {socket, state}) do
         {:ok, channel_name, rest} = parse_string(body)
         {:ok, channel_password, _} = parse_string(rest)
-        Logger.info("[GameServer] CMSG_JOIN_CHANNEL: #{channel_name} -> #{channel_password}")
+        Logger.info("CMSG_JOIN_CHANNEL: #{channel_name}")
 
         {:noreply, {socket, state}, socket.read_timeout}
       end

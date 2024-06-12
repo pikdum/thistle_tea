@@ -9,7 +9,7 @@ defmodule ThistleTea.Game.Name do
         <<guid::little-size(64)>> = body
         [{^guid, character_name, realm_name, race, gender, class}] = :ets.lookup(:guid_name, guid)
 
-        Logger.info("[GameServer] CMSG_NAME_QUERY: #{character_name} <- #{guid}")
+        Logger.info("CMSG_NAME_QUERY", target_name: character_name)
 
         send_packet(
           @smsg_name_query_response,

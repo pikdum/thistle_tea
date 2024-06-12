@@ -32,13 +32,13 @@ defmodule ThistleTea.Game.Login do
       @impl GenServer
       def handle_cast({:handle_packet, @cmsg_player_login, _size, body}, {socket, state}) do
         <<character_guid::little-size(64)>> = body
-        Logger.info("[GameServer] CMSG_PLAYER_LOGIN: character_guid: #{character_guid}")
+        Logger.info("CMSG_PLAYER_LOGIN")
 
         {:ok, c} = ThistleTea.Character.get_character(state.account.id, character_guid)
 
         :ets.insert(:guid_name, {character_guid, c.name, "", c.race, c.gender, c.class})
 
-        Logger.info("[GameServer] Character: #{inspect(c)}")
+        Logger.metadata(character_name: c.name)
 
         send_packet(
           @smsg_login_verify_world,
@@ -120,8 +120,6 @@ defmodule ThistleTea.Game.Login do
           turn_rate: 3.1415
         }
 
-        Logger.info("[GameServer] mb: #{inspect(mb)}")
-
         fields = %{
           object_guid: c.id,
           object_type: 25,
@@ -167,7 +165,6 @@ defmodule ThistleTea.Game.Login do
 
         Registry.dispatch(ThistleTea.PubSub, "logged_in", fn entries ->
           for {pid, spawn_packet} <- entries do
-            Logger.info("[GameServer] Spawn: #{inspect(spawn_packet)}")
             # send packets to everybody else
             send(pid, {:send_update_packet, packet})
             # spawn them for us

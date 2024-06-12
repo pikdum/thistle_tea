@@ -9,9 +9,7 @@ defmodule ThistleTea.Game.Ping do
       def handle_cast({:handle_packet, @cmsg_ping, _size, body}, {socket, state}) do
         <<sequence_id::little-size(32), latency::little-size(32)>> = body
 
-        Logger.info(
-          "[GameServer] Encrypted CMSG_PING: sequence_id: #{sequence_id}, latency: #{latency}"
-        )
+        Logger.info("CMSG_PING: #{latency}")
 
         send_packet(@smsg_pong, <<sequence_id::little-size(32)>>)
         {:noreply, {socket, Map.put(state, :latency, latency)}, socket.read_timeout}
@@ -28,9 +26,7 @@ defmodule ThistleTea.Game.Ping do
         if byte_size(additional_data) > 0, do: handle_data(additional_data, socket, state)
         <<sequence_id::little-size(32), latency::little-size(32)>> = body
 
-        Logger.info(
-          "[GameServer] Unencrypted CMSG_PING: sequence_id: #{sequence_id}, latency: #{latency}"
-        )
+        Logger.info("CMSG_PING latency=#{latency}")
 
         ThousandIsland.Socket.send(
           socket,
