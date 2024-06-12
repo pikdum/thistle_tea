@@ -24,21 +24,18 @@ defmodule ThistleTea.Auth do
     {public_b, _} =
       :crypto.generate_key(
         :srp,
-        {:host, [state.verifier, state.g, state.n, :"6"]},
+        {:host, [state.account.password_verifier, state.g, state.n, :"6"]},
         state.private_b
       )
 
     Map.merge(state, %{public_b: public_b})
   end
 
-  # TODO: password hardcoded to pikdum
-  defp account_state(account) do
-    {:ok, a} = ThistleTea.Account.get_user(account)
+  defp account_state(username) do
+    {:ok, account} = ThistleTea.Account.get_user(username)
 
     Map.merge(%{n: @n, g: @g}, %{
-      account_name: account,
-      verifier: a.password_verifier,
-      salt: a.password_salt
+      account: account
     })
   end
 
@@ -54,20 +51,22 @@ defmodule ThistleTea.Auth do
           _game_name::bytes-little-size(4), _version::bytes-little-size(3),
           _build::little-size(16), _platform::bytes-little-size(4), _os::bytes-size(4),
           _locale::bytes-size(4), _worldregion_bias::little-size(32), _ip::little-size(32),
-          account_name_length::unsigned-little-size(8),
-          account_name::bytes-little-size(account_name_length)>>,
+          username_length::unsigned-little-size(8),
+          username::bytes-little-size(username_length)>>,
         socket,
         _state
       ) do
-    Logger.info("[AuthServer] CMD_AUTH_LOGON_CHALLENGE: #{account_name}, pid: #{inspect(self())}")
-    state = logon_challenge_state(account_name)
+    Logger.metadata(username: username)
+    Logger.info("CMD_AUTH_LOGON_CHALLENGE")
+    state = logon_challenge_state(username)
 
     packet =
       <<0, 0, 0>> <>
         reverse(state.public_b) <>
         <<1>> <>
         state.g <>
-        <<32>> <> reverse(state.n) <> state.salt <> :crypto.strong_rand_bytes(16) <> <<0>>
+        <<32>> <>
+        reverse(state.n) <> state.account.password_salt <> :crypto.strong_rand_bytes(16) <> <<0>>
 
     ThousandIsland.Socket.send(socket, packet)
     {:continue, state}
@@ -81,7 +80,8 @@ defmodule ThistleTea.Auth do
         socket,
         state
       ) do
-    Logger.info("[AuthServer] CMD_AUTH_LOGON_PROOF: #{state.account_name}")
+    Logger.info("CMD_AUTH_LOGON_PROOF")
+    username = state.account.username
     public_a = reverse(client_public_key)
     scrambler = :crypto.hash(:sha, reverse(public_a) <> reverse(state.public_b))
 
@@ -91,7 +91,7 @@ defmodule ThistleTea.Auth do
           :srp,
           public_a,
           {state.public_b, state.private_b},
-          {:host, [state.verifier, @n, :"6", reverse(scrambler)]}
+          {:host, [state.account.password_verifier, @n, :"6", reverse(scrambler)]}
         )
       )
 
@@ -100,26 +100,29 @@ defmodule ThistleTea.Auth do
     mod_hash = :crypto.hash(:sha, reverse(@n))
     generator_hash = :crypto.hash(:sha, @g)
     t3 = :crypto.exor(mod_hash, generator_hash)
-    t4 = :crypto.hash(:sha, state.account_name)
+    t4 = :crypto.hash(:sha, username)
 
     m =
       :crypto.hash(
         :sha,
-        t3 <> t4 <> state.salt <> reverse(public_a) <> reverse(state.public_b) <> session
+        t3 <>
+          t4 <>
+          state.account.password_salt <> reverse(public_a) <> reverse(state.public_b) <> session
       )
 
     if m == client_proof do
+      Logger.info("AUTH SUCCESS")
       server_proof = :crypto.hash(:sha, reverse(public_a) <> client_proof <> session)
 
       state =
         Map.merge(state, %{public_a: public_a, session: session, server_proof: server_proof})
 
-      :ets.insert(:session, {state.account_name, state.session})
+      :ets.insert(:session, {username, state.session})
 
       ThousandIsland.Socket.send(socket, <<1, 0>> <> state.server_proof <> <<0, 0, 0, 0>>)
       {:continue, state}
     else
-      Logger.error("[AuthServer] Authentication failed: #{state.account_name}")
+      Logger.error("AUTH FAILURE")
       ThousandIsland.Socket.send(socket, <<0, 0, 5>>)
       {:close, state}
     end
@@ -127,7 +130,7 @@ defmodule ThistleTea.Auth do
 
   @impl ThousandIsland.Handler
   def handle_data(<<@cmd_realm_list, _padding::binary>>, socket, state) do
-    Logger.info("[AuthServer] CMD_REALM_LIST")
+    Logger.info("CMD_REALM_LIST")
 
     ip = Application.fetch_env!(:thistle_tea, :ip)
 
@@ -153,17 +156,17 @@ defmodule ThistleTea.Auth do
           _version::bytes-little-size(3), _build::little-size(16),
           _platform::bytes-little-size(4), _os::bytes-little-size(4),
           _locale::bytes-little-size(4), _worldregion_bias::little-size(32), _ip::little-size(32),
-          account_name_length::little-size(8),
-          account_name::bytes-little-size(account_name_length)>>,
+          username_length::little-size(8), username::bytes-little-size(username_length)>>,
         socket,
         state
       ) do
-    Logger.info("[AuthServer] CMD_AUTH_RECONNECT_CHALLENGE: #{account_name}")
+    Logger.metadata(username: username)
+    Logger.info("CMD_AUTH_RECONNECT_CHALLENGE")
     # and need to test this flow more in-depth
     challenge_data = :crypto.strong_rand_bytes(16)
-    {:ok, a} = ThistleTea.Account.get_user(account_name)
+    {:ok, a} = ThistleTea.Account.get_user(username)
     ThousandIsland.Socket.send(socket, <<2, 0>> <> challenge_data <> a.password_salt)
-    {:continue, Map.merge(state, %{account_name: account_name, challenge_data: challenge_data})}
+    {:continue, Map.merge(state, %{username: username, challenge_data: challenge_data})}
   end
 
   @impl ThousandIsland.Handler
@@ -174,17 +177,19 @@ defmodule ThistleTea.Auth do
         socket,
         state
       ) do
-    Logger.info("[AuthServer] CMD_AUTH_RECONNECT_PROOF: #{state.account_name}")
-    [{_, session}] = :ets.lookup(:session, state.account_name)
+    username = state.account.username
+    Logger.info("CMD_AUTH_RECONNECT_PROOF")
+    [{_, session}] = :ets.lookup(:session, username)
 
     server_proof =
-      :crypto.hash(:sha, state.account_name <> proof_data <> state.challenge_data <> session)
+      :crypto.hash(:sha, username <> proof_data <> state.challenge_data <> session)
 
     if client_proof === server_proof do
-      Logger.info("[AuthServer] CMD_AUTH_RECONNECT_PROOF: success: #{state.account_name}")
+      Logger.info("RECONNECT SUCCESS")
       {:continue, state}
       ThousandIsland.Socket.send(socket, <<3, 0>>)
     else
+      Logger.error("RECONNECT FAILURE")
       ThousandIsland.Socket.send(socket, <<3, 1>>)
       {:close, state}
     end
@@ -192,7 +197,7 @@ defmodule ThistleTea.Auth do
 
   @impl ThousandIsland.Handler
   def handle_data(<<opcode, _packet::binary>>, socket, state) do
-    Logger.error("[AuthServer] Unimplemented opcode: #{opcode}")
+    Logger.error("UNIMPLEMENTED: #{inspect(opcode, base: :hex)}")
     ThousandIsland.Socket.send(socket, <<0, 0, 5>>)
     {:close, state}
   end
