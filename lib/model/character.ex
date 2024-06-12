@@ -21,7 +21,8 @@ defmodule ThistleTea.Character do
       :z,
       :orientation,
       # TODO: is this needed?
-      :outfit_id
+      :outfit_id,
+      :equipment
     ],
     index: [:account_id, :name],
     type: :ordered_set,

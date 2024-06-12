@@ -10,6 +10,15 @@ defmodule ThistleTea.Game.Character do
       @cmsg_char_create 0x036
       @smsg_char_create 0x03A
 
+      def get_equipment(character, slot) do
+        with equipment when not is_nil(equipment) <- Map.get(character, :equipment),
+             item when not is_nil(item) <- Map.get(equipment, slot) do
+          <<item.display_id::little-size(32), item.inventory_type>>
+        else
+          _ -> <<0::little-size(32), 0>>
+        end
+      end
+
       @impl GenServer
       def handle_cast({:handle_packet, @cmsg_char_enum, _size, _body}, {socket, state}) do
         Logger.info("CMSG_CHAR_ENUM")
@@ -50,101 +59,25 @@ defmodule ThistleTea.Game.Character do
                 # pet_family
                 0::little-size(32)
               >> <>
-              <<
-                # head
-                0::little-size(32),
-                0
-              >> <>
-              <<
-                # neck
-                0::little-size(32),
-                0
-              >> <>
-              <<
-                # shoulders
-                0::little-size(32),
-                0
-              >> <>
-              <<
-                # body
-                0::little-size(32),
-                0
-              >> <>
-              <<
-                # chest
-                0::little-size(32),
-                0
-              >> <>
-              <<
-                # waist
-                0::little-size(32),
-                0
-              >> <>
-              <<
-                # legs
-                0::little-size(32),
-                0
-              >> <>
-              <<
-                # feet
-                0::little-size(32),
-                0
-              >> <>
-              <<
-                # wrists
-                0::little-size(32),
-                0
-              >> <>
-              <<
-                # hands
-                0::little-size(32),
-                0
-              >> <>
-              <<
-                # finger1
-                0::little-size(32),
-                0
-              >> <>
-              <<
-                # finger2
-                0::little-size(32),
-                0
-              >> <>
-              <<
-                # trinket1
-                0::little-size(32),
-                0
-              >> <>
-              <<
-                # trinket2
-                0::little-size(32),
-                0
-              >> <>
-              <<
-                # back
-                0::little-size(32),
-                0
-              >> <>
-              <<
-                # mainhand
-                weapon.display_id::little-size(32),
-                0
-              >> <>
-              <<
-                # offhand
-                weapon.display_id::little-size(32),
-                0
-              >> <>
-              <<
-                # ranged
-                0::little-size(32),
-                0
-              >> <>
-              <<
-                # tabard
-                tabard.display_id::little-size(32),
-                0
-              >> <>
+              get_equipment(c, :head) <>
+              get_equipment(c, :neck) <>
+              get_equipment(c, :shoulders) <>
+              get_equipment(c, :body) <>
+              get_equipment(c, :chest) <>
+              get_equipment(c, :waist) <>
+              get_equipment(c, :legs) <>
+              get_equipment(c, :feet) <>
+              get_equipment(c, :wrists) <>
+              get_equipment(c, :hands) <>
+              get_equipment(c, :finger1) <>
+              get_equipment(c, :finger2) <>
+              get_equipment(c, :trinket1) <>
+              get_equipment(c, :trinket2) <>
+              get_equipment(c, :back) <>
+              get_equipment(c, :mainhand) <>
+              get_equipment(c, :offhand) <>
+              get_equipment(c, :ranged) <>
+              get_equipment(c, :tabard) <>
               <<
                 # first_bag_display_id
                 0::little-size(32),
@@ -189,7 +122,25 @@ defmodule ThistleTea.Game.Character do
           x: info.position_x,
           y: info.position_y,
           z: info.position_z,
-          orientation: info.orientation
+          orientation: info.orientation,
+          equipment: %{
+            head: ItemTemplate.random_by_type(1),
+            neck: ItemTemplate.random_by_type(2),
+            shoulders: ItemTemplate.random_by_type(3),
+            body: ItemTemplate.random_by_type(4),
+            chest: ItemTemplate.random_by_type(5),
+            waist: ItemTemplate.random_by_type(6),
+            legs: ItemTemplate.random_by_type(7),
+            feet: ItemTemplate.random_by_type(8),
+            wrists: ItemTemplate.random_by_type(9),
+            hands: ItemTemplate.random_by_type(10),
+            finger1: ItemTemplate.random_by_type(11),
+            finger2: ItemTemplate.random_by_type(11),
+            trinket1: ItemTemplate.random_by_type(12),
+            trinket2: ItemTemplate.random_by_type(12),
+            mainhand: ItemTemplate.random_by_type(13),
+            tabard: ItemTemplate.random_by_type(19)
+          }
         }
 
         case ThistleTea.Character.create(character) do
