@@ -1,5 +1,6 @@
 defmodule ItemTemplate do
   use Ecto.Schema
+  import Ecto.Query
 
   @primary_key {:entry, :integer, autogenerate: false}
 
@@ -130,5 +131,16 @@ defmodule ItemTemplate do
     field(:max_money_loot, :integer, default: 0, source: :maxMoneyLoot)
     field(:duration, :integer, default: 0)
     field(:extra_flags, :integer, default: 0, source: :ExtraFlags)
+  end
+
+  def random_by_type(inventory_type) do
+    query =
+      from(it in ItemTemplate,
+        where: it.inventory_type == ^inventory_type,
+        order_by: fragment("RANDOM()"),
+        limit: 1
+      )
+
+    ThistleTea.Mangos.one(query)
   end
 end
