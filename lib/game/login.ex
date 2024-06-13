@@ -146,7 +146,26 @@ defmodule ThistleTea.Game.Login do
           player_xp: 1,
           player_next_level_xp: 100,
           player_rest_state_experience: 100,
-          player_visible_item_1_0: c.equipment.head.entry
+          # TODO: handle empty equipment slot
+          player_visible_item_1_0: c.equipment.head.entry,
+          player_visible_item_2_0: c.equipment.neck.entry,
+          player_visible_item_3_0: c.equipment.shoulders.entry,
+          player_visible_item_4_0: c.equipment.body.entry,
+          player_visible_item_5_0: c.equipment.chest.entry,
+          player_visible_item_6_0: c.equipment.waist.entry,
+          player_visible_item_7_0: c.equipment.legs.entry,
+          player_visible_item_8_0: c.equipment.feet.entry,
+          player_visible_item_9_0: c.equipment.wrists.entry,
+          player_visible_item_10_0: c.equipment.hands.entry,
+          player_visible_item_11_0: c.equipment.finger1.entry,
+          player_visible_item_12_0: c.equipment.finger2.entry,
+          player_visible_item_13_0: c.equipment.trinket1.entry,
+          player_visible_item_14_0: c.equipment.trinket2.entry,
+          player_visible_item_15_0: c.equipment.back.entry,
+          player_visible_item_16_0: c.equipment.mainhand.entry,
+          # player_visible_item_17_0: c.equipment.offhand.entry,
+          # player_visible_item_18_0: c.equipment.ranged.entry,
+          player_visible_item_19_0: c.equipment.tabard.entry
         }
 
         packet = generate_packet(@update_type_create_object2, @object_type_player, fields, mb)
