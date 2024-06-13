@@ -8,6 +8,7 @@ defmodule ThistleTea.Game do
   use ThistleTea.Game.Auth
   use ThistleTea.Game.Character
   use ThistleTea.Game.Chat
+  use ThistleTea.Game.Item
   use ThistleTea.Game.Login
   use ThistleTea.Game.Logout
   use ThistleTea.Game.Movement
