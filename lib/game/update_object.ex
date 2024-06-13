@@ -165,6 +165,14 @@ defmodule ThistleTea.Game.UpdateObject do
       size: 1,
       offset: 0xC1
     },
+    # player_visible_item_1_creator: %{
+    #   size: 2,
+    #   offset: 0x102
+    # },
+    player_visible_item_1_0: %{
+      size: 2,
+      offset: 0x104
+    },
     player_xp: %{
       size: 1,
       offset: 0x2CC
@@ -232,6 +240,7 @@ defmodule ThistleTea.Game.UpdateObject do
         :unit_native_display_id -> <<value::little-size(32)>>
         :player_flags -> <<value::little-size(32)>>
         :player_features -> value
+        :player_visible_item_1_0 -> <<value::little-size(32)>>
         :player_xp -> <<value::little-size(32)>>
         :player_next_level_xp -> <<value::little-size(32)>>
         :player_rest_state_experience -> <<value::little-size(32)>>

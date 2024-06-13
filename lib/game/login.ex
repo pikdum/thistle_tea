@@ -145,7 +145,8 @@ defmodule ThistleTea.Game.Login do
           player_features: <<c.skin, c.face, c.hair_style, c.hair_color>>,
           player_xp: 1,
           player_next_level_xp: 100,
-          player_rest_state_experience: 100
+          player_rest_state_experience: 100,
+          player_visible_item_1_0: c.equipment.head.entry
         }
 
         packet = generate_packet(@update_type_create_object2, @object_type_player, fields, mb)
