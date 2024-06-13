@@ -170,8 +170,80 @@ defmodule ThistleTea.Game.UpdateObject do
     #   offset: 0x102
     # },
     player_visible_item_1_0: %{
-      size: 2,
+      size: 1,
       offset: 0x104
+    },
+    player_visible_item_2_0: %{
+      size: 1,
+      offset: 0x110
+    },
+    player_visible_item_3_0: %{
+      size: 1,
+      offset: 0x11C
+    },
+    player_visible_item_4_0: %{
+      size: 1,
+      offset: 0x128
+    },
+    player_visible_item_5_0: %{
+      size: 1,
+      offset: 0x134
+    },
+    player_visible_item_6_0: %{
+      size: 1,
+      offset: 0x140
+    },
+    player_visible_item_7_0: %{
+      size: 1,
+      offset: 0x14C
+    },
+    player_visible_item_8_0: %{
+      size: 1,
+      offset: 0x158
+    },
+    player_visible_item_9_0: %{
+      size: 1,
+      offset: 0x164
+    },
+    player_visible_item_10_0: %{
+      size: 1,
+      offset: 0x170
+    },
+    player_visible_item_11_0: %{
+      size: 1,
+      offset: 0x17C
+    },
+    player_visible_item_12_0: %{
+      size: 1,
+      offset: 0x188
+    },
+    player_visible_item_13_0: %{
+      size: 1,
+      offset: 0x194
+    },
+    player_visible_item_14_0: %{
+      size: 1,
+      offset: 0x1A0
+    },
+    player_visible_item_15_0: %{
+      size: 1,
+      offset: 0x1AC
+    },
+    player_visible_item_16_0: %{
+      size: 1,
+      offset: 0x1B8
+    },
+    player_visible_item_17_0: %{
+      size: 1,
+      offset: 0x1C4
+    },
+    player_visible_item_18_0: %{
+      size: 1,
+      offset: 0x1D0
+    },
+    player_visible_item_19_0: %{
+      size: 1,
+      offset: 0x1DC
     },
     player_xp: %{
       size: 1,
@@ -241,6 +313,24 @@ defmodule ThistleTea.Game.UpdateObject do
         :player_flags -> <<value::little-size(32)>>
         :player_features -> value
         :player_visible_item_1_0 -> <<value::little-size(32)>>
+        :player_visible_item_2_0 -> <<value::little-size(32)>>
+        :player_visible_item_3_0 -> <<value::little-size(32)>>
+        :player_visible_item_4_0 -> <<value::little-size(32)>>
+        :player_visible_item_5_0 -> <<value::little-size(32)>>
+        :player_visible_item_6_0 -> <<value::little-size(32)>>
+        :player_visible_item_7_0 -> <<value::little-size(32)>>
+        :player_visible_item_8_0 -> <<value::little-size(32)>>
+        :player_visible_item_9_0 -> <<value::little-size(32)>>
+        :player_visible_item_10_0 -> <<value::little-size(32)>>
+        :player_visible_item_11_0 -> <<value::little-size(32)>>
+        :player_visible_item_12_0 -> <<value::little-size(32)>>
+        :player_visible_item_13_0 -> <<value::little-size(32)>>
+        :player_visible_item_14_0 -> <<value::little-size(32)>>
+        :player_visible_item_15_0 -> <<value::little-size(32)>>
+        :player_visible_item_16_0 -> <<value::little-size(32)>>
+        :player_visible_item_17_0 -> <<value::little-size(32)>>
+        :player_visible_item_18_0 -> <<value::little-size(32)>>
+        :player_visible_item_19_0 -> <<value::little-size(32)>>
         :player_xp -> <<value::little-size(32)>>
         :player_next_level_xp -> <<value::little-size(32)>>
         :player_rest_state_experience -> <<value::little-size(32)>>
