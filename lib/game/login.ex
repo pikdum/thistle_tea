@@ -199,7 +199,8 @@ defmodule ThistleTea.Game.Login do
           Map.merge(state, %{
             guid: character_guid,
             packed_guid: pack_guid(character_guid),
-            character: c
+            character: c,
+            unit_display_id: unit_display_id
           })
 
         {:noreply, {socket, new_state}, socket.read_timeout}
