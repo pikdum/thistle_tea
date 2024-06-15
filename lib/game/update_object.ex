@@ -6,10 +6,10 @@ defmodule ThistleTea.Game.UpdateObject do
 
   require Logger
 
-  # @update_type_values 0
+  @update_type_values 0
   # @update_type_movement 1
-  # @update_type_create_object 2
-  # @update_type_create_object2 3
+  @update_type_create_object 2
+  @update_type_create_object2 3
   # @update_type_out_of_range_objects 4
   # @update_type_near_objects 5
 
@@ -346,21 +346,19 @@ defmodule ThistleTea.Game.UpdateObject do
   end
 
   def encode_movement_block(m) do
-    {x, y, z, orientation} = m.position
-
     <<m.update_flag::little-size(8)>> <>
       cond do
         (m.update_flag &&& @update_flag_living) > 0 ->
           <<
             m.movement_flags::little-size(32),
             # timestamp
-            0::little-size(32),
+            m.timestamp::little-size(32),
             # living position
-            x::little-float-size(32),
-            y::little-float-size(32),
-            z::little-float-size(32),
+            m.x::little-float-size(32),
+            m.y::little-float-size(32),
+            m.z::little-float-size(32),
             # living orientation
-            orientation::little-float-size(32)
+            m.orientation::little-float-size(32)
           >> <>
             if (m.movement_flags &&& @movement_flag_on_transport) > 0 do
               {x, y, z, orientation} = m.transport_position
@@ -433,8 +431,8 @@ defmodule ThistleTea.Game.UpdateObject do
             end
 
         (m.update_flag &&& @update_flag_has_position) > 0 ->
-          <<x::little-float-size(32), y::little-float-size(32), z::little-float-size(32),
-            orientation::little-float-size(32)>>
+          <<m.x::little-float-size(32), m.y::little-float-size(32), m.z::little-float-size(32),
+            m.orientation::little-float-size(32)>>
       end <>
       if (m.update_flag &&& @update_flag_high_guid) > 0 do
         # unknown - mangos sets to 0
@@ -478,7 +476,10 @@ defmodule ThistleTea.Game.UpdateObject do
     movement_block = %{
       movement_flags: movement_flags,
       timestamp: timestamp,
-      position: {x, y, z, orientation}
+      x: x,
+      y: y,
+      z: z,
+      orientation: orientation
     }
 
     # on_transport
@@ -535,17 +536,24 @@ defmodule ThistleTea.Game.UpdateObject do
 
   def generate_packet(update_type, object_type, fields, movement) do
     packed_guid = pack_guid(Map.get(fields, :object_guid))
-    movement_block = encode_movement_block(movement)
     mask_count = mask_blocks_count(fields)
     mask = generate_mask(fields)
     objects = generate_objects(fields)
 
     <<1::little-size(32), 0, update_type>> <>
-      packed_guid <>
-      <<object_type>> <>
-      movement_block <>
-      <<mask_count>> <>
-      mask <>
-      objects
+      cond do
+        update_type === @update_type_values ->
+          packed_guid <> <<mask_count>> <> mask <> objects
+
+        update_type === @update_type_create_object || update_type === @update_type_create_object2 ->
+          movement_block = encode_movement_block(movement)
+
+          packed_guid <>
+            <<object_type>> <>
+            movement_block <>
+            <<mask_count>> <>
+            mask <>
+            objects
+      end
   end
 end
