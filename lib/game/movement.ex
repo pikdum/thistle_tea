@@ -80,7 +80,7 @@ defmodule ThistleTea.Game.Movement do
             character = Map.put(character, :equipment, generate_random_equipment())
             fields = get_update_fields(character)
             Logger.info("Fields: #{inspect(fields)}")
-            packet = generate_packet(@update_type_values, 0, fields, nil)
+            packet = generate_packet(@update_type_values, fields)
 
             Registry.dispatch(ThistleTea.PubSub, "logged_in", fn entries ->
               for {pid, _} <- entries do
@@ -100,13 +100,11 @@ defmodule ThistleTea.Game.Movement do
       def handle_cast({:handle_packet, @cmsg_standstatechange, _size, body}, {socket, state}) do
         <<animation_state::little-size(32)>> = body
 
-        mb = Map.put(state.character.movement, :update_flag, @update_flag_living)
-
         # TODO: add :unit_bytes_1 to fields?
         fields =
           Map.put(get_update_fields(state.character), :unit_bytes_1, <<animation_state, 0, 0, 0>>)
 
-        packet = generate_packet(@update_type_create_object2, @object_type_player, fields, mb)
+        packet = generate_packet(@update_type_values, fields)
 
         Registry.dispatch(ThistleTea.PubSub, "logged_in", fn entries ->
           for {pid, _} <- entries do

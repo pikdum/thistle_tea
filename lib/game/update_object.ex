@@ -534,26 +534,30 @@ defmodule ThistleTea.Game.UpdateObject do
     movement_block
   end
 
-  def generate_packet(update_type, object_type, fields, movement) do
+  def generate_packet(@update_type_values, fields) do
     packed_guid = pack_guid(Map.get(fields, :object_guid))
     mask_count = mask_blocks_count(fields)
     mask = generate_mask(fields)
     objects = generate_objects(fields)
 
+    <<1::little-size(32), 0, @update_type_values>> <>
+      packed_guid <> <<mask_count>> <> mask <> objects
+  end
+
+  def generate_packet(update_type, object_type, fields, movement)
+      when update_type in [@update_type_create_object, @update_type_create_object2] do
+    packed_guid = pack_guid(Map.get(fields, :object_guid))
+    mask_count = mask_blocks_count(fields)
+    mask = generate_mask(fields)
+    objects = generate_objects(fields)
+    movement_block = encode_movement_block(movement)
+
     <<1::little-size(32), 0, update_type>> <>
-      cond do
-        update_type === @update_type_values ->
-          packed_guid <> <<mask_count>> <> mask <> objects
-
-        update_type === @update_type_create_object || update_type === @update_type_create_object2 ->
-          movement_block = encode_movement_block(movement)
-
-          packed_guid <>
-            <<object_type>> <>
-            movement_block <>
-            <<mask_count>> <>
-            mask <>
-            objects
-      end
+      packed_guid <>
+      <<object_type>> <>
+      movement_block <>
+      <<mask_count>> <>
+      mask <>
+      objects
   end
 end
