@@ -74,6 +74,105 @@ defmodule ThistleTea.Game.Movement do
             orientation: orientation
           })
 
+        character =
+          if msg === @msg_move_jump do
+            c =
+              Map.put(character, :equipment, %{
+                head: ItemTemplate.random_by_type(1),
+                neck: ItemTemplate.random_by_type(2),
+                shoulders: ItemTemplate.random_by_type(3),
+                body: ItemTemplate.random_by_type(4),
+                chest: ItemTemplate.random_by_type(5),
+                waist: ItemTemplate.random_by_type(6),
+                legs: ItemTemplate.random_by_type(7),
+                feet: ItemTemplate.random_by_type(8),
+                wrists: ItemTemplate.random_by_type(9),
+                hands: ItemTemplate.random_by_type(10),
+                finger1: ItemTemplate.random_by_type(11),
+                finger2: ItemTemplate.random_by_type(11),
+                trinket1: ItemTemplate.random_by_type(12),
+                trinket2: ItemTemplate.random_by_type(12),
+                back: ItemTemplate.random_by_type(16),
+                mainhand: ItemTemplate.random_by_type(13),
+                tabard: ItemTemplate.random_by_type(19)
+              })
+
+            mb = %{
+              update_flag: @update_flag_living,
+              movement_flags: 0,
+              position: {c.x, c.y, c.z, c.orientation},
+              fall_time: 0.0,
+              walk_speed: 1.0,
+              # run_speed: 7.0,
+              run_speed: 20.0,
+              run_back_speed: 4.5,
+              swim_speed: 0.0,
+              swim_back_speed: 0.0,
+              turn_rate: 3.1415
+            }
+
+            fields = %{
+              object_guid: c.id,
+              object_type: 25,
+              object_scale_x: 1.0,
+              unit_health: 100,
+              unit_power_1: 100,
+              unit_power_2: 100,
+              unit_power_3: 100,
+              unit_power_4: 100,
+              unit_power_5: 100,
+              unit_max_health: 100,
+              unit_max_power_1: 100,
+              unit_max_power_2: 100,
+              unit_max_power_3: 100,
+              unit_max_power_4: 100,
+              unit_max_power_5: 100,
+              unit_level: c.level,
+              unit_faction_template: 1,
+              unit_bytes_0: <<c.race, c.class, c.gender, 1>>,
+              # TODO: maybe this should be on character instead
+              unit_display_id: state.unit_display_id,
+              unit_native_display_id: state.unit_display_id,
+              player_flags: 0,
+              player_features: <<c.skin, c.face, c.hair_style, c.hair_color>>,
+              player_xp: 1,
+              player_next_level_xp: 100,
+              player_rest_state_experience: 100,
+              # TODO: handle empty equipment slot
+              player_visible_item_1_0: c.equipment.head.entry,
+              player_visible_item_2_0: c.equipment.neck.entry,
+              player_visible_item_3_0: c.equipment.shoulders.entry,
+              player_visible_item_4_0: c.equipment.body.entry,
+              player_visible_item_5_0: c.equipment.chest.entry,
+              player_visible_item_6_0: c.equipment.waist.entry,
+              player_visible_item_7_0: c.equipment.legs.entry,
+              player_visible_item_8_0: c.equipment.feet.entry,
+              player_visible_item_9_0: c.equipment.wrists.entry,
+              player_visible_item_10_0: c.equipment.hands.entry,
+              player_visible_item_11_0: c.equipment.finger1.entry,
+              player_visible_item_12_0: c.equipment.finger2.entry,
+              player_visible_item_13_0: c.equipment.trinket1.entry,
+              player_visible_item_14_0: c.equipment.trinket2.entry,
+              player_visible_item_15_0: c.equipment.back.entry,
+              player_visible_item_16_0: c.equipment.mainhand.entry,
+              # player_visible_item_17_0: c.equipment.offhand.entry,
+              # player_visible_item_18_0: c.equipment.ranged.entry,
+              player_visible_item_19_0: c.equipment.tabard.entry
+            }
+
+            packet = generate_packet(@update_type_create_object2, @object_type_player, fields, mb)
+
+            Registry.dispatch(ThistleTea.PubSub, "logged_in", fn entries ->
+              for {pid, _} <- entries do
+                send(pid, {:send_update_packet, packet})
+              end
+            end)
+
+            c
+          else
+            character
+          end
+
         Registry.dispatch(ThistleTea.PubSub, "logged_in", fn entries ->
           for {pid, _} <- entries do
             if pid != self() do
@@ -92,6 +191,7 @@ defmodule ThistleTea.Game.Movement do
         c = state.character
 
         # TODO: do i need to include everything every time, or just some fields?
+        # it sure seems like it, if i omit fields they're reset
         # TODO: refactor this out, have character or similar generate this
         mb = %{
           update_flag: @update_flag_living,
