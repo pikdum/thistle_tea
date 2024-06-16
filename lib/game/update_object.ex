@@ -3,6 +3,7 @@ defmodule ThistleTea.Game.UpdateObject do
   import Bitwise, only: [&&&: 2]
 
   import ThistleTea.Util, only: [pack_guid: 1]
+  import ThistleTea.Character, only: [get_update_fields: 1]
 
   require Logger
 
@@ -559,5 +560,26 @@ defmodule ThistleTea.Game.UpdateObject do
       <<mask_count>> <>
       mask <>
       objects
+  end
+
+  def build_update_packet(
+        character,
+        update_type,
+        object_type,
+        update_flag
+      )
+      when update_type in [@update_type_create_object, @update_type_create_object2] do
+    fields = get_update_fields(character)
+
+    generate_packet(
+      update_type,
+      object_type,
+      fields,
+      Map.put(
+        character.movement,
+        :update_flag,
+        update_flag
+      )
+    )
   end
 end

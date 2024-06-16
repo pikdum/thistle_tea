@@ -1,11 +1,9 @@
 defmodule ThistleTea.Game do
   use ThousandIsland.Handler
 
-  import ThistleTea.Character, only: [get_update_fields: 1]
   import ThistleTea.Game.Logout, only: [handle_logout: 1]
-  import ThistleTea.Game.UpdateObject, only: [generate_packet: 4]
+  import ThistleTea.Game.UpdateObject, only: [build_update_packet: 4]
   import ThistleTea.Util, only: [send_packet: 2, send_update_packet: 1, parse_string: 1]
-  import Bitwise, only: [|||: 2]
 
   alias ThistleTea.CryptoStorage
 
@@ -16,13 +14,6 @@ defmodule ThistleTea.Game do
   @smsg_auth_response 0x1EE
 
   @smsg_logout_complete 0x04D
-
-  @object_type_player 4
-  @update_type_create_object2 3
-
-  @update_flag_high_guid 0x08
-  @update_flag_living 0x20
-  @update_flag_has_position 0x40
 
   @cmsg_char_enum 0x037
   @cmsg_char_create 0x036
@@ -227,20 +218,12 @@ defmodule ThistleTea.Game do
   end
 
   @impl GenServer
-  def handle_call(:build_update_packet, _from, {socket, state}) do
-    fields = get_update_fields(state.character)
-
-    packet =
-      generate_packet(
-        @update_type_create_object2,
-        @object_type_player,
-        fields,
-        Map.put(
-          state.character.movement,
-          :update_flag,
-          @update_flag_high_guid ||| @update_flag_living ||| @update_flag_has_position
-        )
-      )
+  def handle_call(
+        {:build_update_packet, update_type, object_type, update_flag},
+        _from,
+        {socket, state}
+      ) do
+    packet = build_update_packet(state.character, update_type, object_type, update_flag)
 
     {:reply, packet, {socket, state}}
   end
