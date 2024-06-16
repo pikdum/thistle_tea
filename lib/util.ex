@@ -2,6 +2,28 @@ defmodule ThistleTea.Util do
   import Binary, only: [split_at: 2, trim_trailing: 1, reverse: 1]
   import Bitwise, only: [|||: 2, <<<: 2]
 
+  @smsg_update_object 0x0A9
+  @smsg_compressed_update_object 0x1F6
+
+  def send_packet(opcode, payload) do
+    GenServer.cast(self(), {:send_packet, opcode, payload})
+  end
+
+  def send_update_packet(packet) do
+    compressed_packet = :zlib.compress(packet)
+    original_size = byte_size(packet)
+    compressed_size = byte_size(compressed_packet)
+
+    if compressed_size >= original_size do
+      send_packet(@smsg_update_object, packet)
+    else
+      send_packet(
+        @smsg_compressed_update_object,
+        <<original_size::little-size(32)>> <> compressed_packet
+      )
+    end
+  end
+
   def pack_guid(guid) when is_integer(guid) do
     pack_guid(<<guid::size(64)>>)
   end

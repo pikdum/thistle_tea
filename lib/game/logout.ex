@@ -1,72 +1,56 @@
 defmodule ThistleTea.Game.Logout do
-  defmacro __using__(_) do
-    quote do
-      @cmsg_logout_request 0x04B
-      @smsg_logout_response 0x04C
+  import ThistleTea.Util, only: [send_packet: 2]
 
-      @cmsg_logout_cancel 0x04E
-      @smsg_logout_cancel_ack 0x04F
+  require Logger
 
-      @smsg_logout_complete 0x04D
-      @smsg_destroy_object 0x0AA
+  @cmsg_logout_request 0x04B
+  @smsg_logout_response 0x04C
 
-      @impl GenServer
-      def handle_cast({:handle_packet, @cmsg_logout_request, _size, _body}, {socket, state}) do
-        Logger.info("CMSG_LOGOUT_REQUEST")
-        send_packet(@smsg_logout_response, <<0::little-size(32)>>)
-        logout_timer = Process.send_after(self(), :send_logout_complete, 1_000)
-        {:noreply, {socket, Map.put(state, :logout_timer, logout_timer)}, socket.read_timeout}
+  @cmsg_logout_cancel 0x04E
+  @smsg_logout_cancel_ack 0x04F
+
+  @smsg_destroy_object 0x0AA
+
+  def handle_packet(@cmsg_logout_request, _body, state) do
+    Logger.info("CMSG_LOGOUT_REQUEST")
+    send_packet(@smsg_logout_response, <<0::little-size(32)>>)
+    logout_timer = Process.send_after(self(), :logout_complete, 1_000)
+    {:continue, Map.put(state, :logout_timer, logout_timer)}
+  end
+
+  def handle_packet(@cmsg_logout_cancel, _body, state) do
+    Logger.info("CMSG_LOGOUT_CANCEL")
+
+    state =
+      case Map.get(state, :logout_timer, nil) do
+        nil ->
+          state
+
+        timer ->
+          Process.cancel_timer(timer)
+          Map.delete(state, :logout_timer)
       end
 
-      @impl GenServer
-      def handle_cast({:handle_packet, @cmsg_logout_cancel, _size, _body}, {socket, state}) do
-        Logger.info("CMSG_LOGOUT_CANCEL")
+    send_packet(@smsg_logout_cancel_ack, <<>>)
+    {:continue, state}
+  end
 
-        state =
-          case Map.get(state, :logout_timer, nil) do
-            nil ->
-              state
+  def handle_logout(state) do
+    # save current character state
+    if Map.get(state, :character) do
+      ThistleTea.Character.save(state.character)
+    end
 
-            timer ->
-              Process.cancel_timer(timer)
-              Map.delete(state, :logout_timer)
-          end
+    # remove from pubsub
+    Registry.unregister(ThistleTea.PubSub, "logged_in")
 
-        send_packet(@smsg_logout_cancel_ack, <<>>)
-        {:noreply, {socket, state}, socket.read_timeout}
-      end
-
-      @impl GenServer
-      def handle_info(:send_logout_complete, {socket, state}) do
-        send_packet(@smsg_logout_complete, <<>>)
-        handle_logout(state)
-        {:noreply, {socket, state}, socket.read_timeout}
-      end
-
-      @impl ThousandIsland.Handler
-      def handle_close(_socket, state) do
-        Logger.info("CLIENT DISCONNECTED")
-        handle_logout(state)
-      end
-
-      def handle_logout(state) do
-        # save current character state
-        if Map.get(state, :character) do
-          ThistleTea.Character.save(state.character)
+    # broadcast destroy object
+    if Map.get(state, :guid) do
+      Registry.dispatch(ThistleTea.PubSub, "logged_in", fn entries ->
+        for {pid, _} <- entries do
+          send(pid, {:send_packet, @smsg_destroy_object, <<state.guid::little-size(64)>>})
         end
-
-        # remove from pubsub
-        Registry.unregister(ThistleTea.PubSub, "logged_in")
-
-        # broadcast destroy object
-        if Map.get(state, :guid) do
-          Registry.dispatch(ThistleTea.PubSub, "logged_in", fn entries ->
-            for {pid, _} <- entries do
-              send(pid, {:send_packet, @smsg_destroy_object, <<state.guid::little-size(64)>>})
-            end
-          end)
-        end
-      end
+      end)
     end
   end
 end
