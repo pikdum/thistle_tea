@@ -1,8 +1,7 @@
 defmodule ThistleTea.Game.Login do
-  import ThistleTea.Game.UpdateObject, only: [generate_packet: 4]
+  import ThistleTea.Game.UpdateObject, only: [build_update_packet: 4]
   import Bitwise, only: [<<<: 2, |||: 2]
   import ThistleTea.Util, only: [pack_guid: 1, send_packet: 2, send_update_packet: 1]
-  import ThistleTea.Character, only: [get_update_fields: 1]
 
   alias ThistleTea.DBC
 
@@ -100,36 +99,31 @@ defmodule ThistleTea.Game.Login do
       )
     end
 
-    mb =
-      Map.put(
-        c.movement,
-        :update_flag,
-        @update_flag_self ||| @update_flag_all ||| @update_flag_living |||
-          @update_flag_has_position
-      )
+    # packet for player
+    update_flag =
+      @update_flag_self ||| @update_flag_all ||| @update_flag_living ||| @update_flag_has_position
 
-    fields = get_update_fields(c)
-    packet = generate_packet(@update_type_create_object2, @object_type_player, fields, mb)
-
-    # player logged in
+    packet = build_update_packet(c, @update_type_create_object2, @object_type_player, update_flag)
     send_update_packet(packet)
 
-    # TODO: maybe this should be in response to a CMSG_SET_ACTIVE_MOVER?
-    mb =
-      Map.put(
-        mb,
-        :update_flag,
-        @update_flag_high_guid ||| @update_flag_living ||| @update_flag_has_position
-      )
+    # packet for others
+    update_flag = @update_flag_high_guid ||| @update_flag_living ||| @update_flag_has_position
+    packet = build_update_packet(c, @update_type_create_object2, @object_type_player, update_flag)
 
-    packet = generate_packet(@update_type_create_object2, @object_type_player, fields, mb)
+    # TODO: can clean up the interface here
+    # :spawn_player? :update_object?
 
     Registry.dispatch(ThistleTea.PubSub, "logged_in", fn entries ->
       for {pid, _} <- entries do
         # send packets to everybody else
         send(pid, {:send_update_packet, packet})
         # spawn them for us
-        spawn_packet = GenServer.call(pid, :build_update_packet)
+        spawn_packet =
+          GenServer.call(
+            pid,
+            {:build_update_packet, @update_type_create_object2, @object_type_player, update_flag}
+          )
+
         send_update_packet(spawn_packet)
       end
     end)
