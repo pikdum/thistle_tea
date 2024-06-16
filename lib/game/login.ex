@@ -1,5 +1,5 @@
 defmodule ThistleTea.Game.Login do
-  import ThistleTea.Game.UpdateObject
+  import ThistleTea.Game.UpdateObject, only: [generate_packet: 4]
   import Bitwise, only: [<<<: 2, |||: 2]
   import ThistleTea.Util, only: [pack_guid: 1, send_packet: 2, send_update_packet: 1]
   import ThistleTea.Character, only: [get_update_fields: 1]
@@ -125,16 +125,17 @@ defmodule ThistleTea.Game.Login do
     packet = generate_packet(@update_type_create_object2, @object_type_player, fields, mb)
 
     Registry.dispatch(ThistleTea.PubSub, "logged_in", fn entries ->
-      for {pid, spawn_packet} <- entries do
+      for {pid, _} <- entries do
         # send packets to everybody else
         send(pid, {:send_update_packet, packet})
         # spawn them for us
+        spawn_packet = GenServer.call(pid, :build_update_packet)
         send_update_packet(spawn_packet)
       end
     end)
 
     # join
-    {:ok, _} = Registry.register(ThistleTea.PubSub, "logged_in", packet)
+    {:ok, _} = Registry.register(ThistleTea.PubSub, "logged_in", c.name)
 
     new_state =
       Map.merge(state, %{
