@@ -1,5 +1,6 @@
 defmodule ThistleTea.Game.Chat do
-  import ThistleTea.Util, only: [parse_string: 1]
+  import ThistleTea.Util, only: [parse_string: 1, send_update_packet: 1]
+  import ThistleTea.Game.UpdateObject, only: [generate_packet: 4]
 
   require Logger
 
@@ -13,6 +14,10 @@ defmodule ThistleTea.Game.Chat do
   @chat_type_whisper 6
   @chat_type_emote 8
   @chat_type_channel 14
+
+  @update_type_create_object2 3
+  @object_type_unit 3
+  @update_flag_living 0x20
 
   # TODO: could pattern match on chat type
   def handle_packet(@cmsg_messagechat, body, state) do
@@ -58,6 +63,36 @@ defmodule ThistleTea.Game.Chat do
               # player chat tag - hard code to 0 for now
               0
             >>
+
+        fields = %{
+          object_guid: :rand.uniform(10000) + 100,
+          # unit + object
+          object_type: 9,
+          object_scale_x: :rand.uniform(5) + 0.0,
+          unit_health: 100,
+          unit_power_1: 100,
+          unit_power_2: 100,
+          unit_power_3: 100,
+          unit_power_4: 100,
+          unit_power_5: 100,
+          unit_max_health: 100,
+          unit_max_power_1: 100,
+          unit_max_power_2: 100,
+          unit_max_power_3: 100,
+          unit_max_power_4: 100,
+          unit_max_power_5: 100,
+          unit_level: 5,
+          # need to find mapping for these - factionalliance/factionhorde?
+          unit_faction_template: 189,
+          # boar
+          unit_display_id: 503,
+          unit_native_display_id: 503
+        }
+
+        mb = Map.put(state.character.movement, :update_flag, @update_flag_living)
+
+        boarpacket = generate_packet(@update_type_create_object2, @object_type_unit, fields, mb)
+        send_update_packet(boarpacket)
 
         # TODO: for now, everybody receives
         Registry.dispatch(ThistleTea.PubSub, "logged_in", fn entries ->
