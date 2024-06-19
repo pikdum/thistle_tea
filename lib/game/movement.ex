@@ -135,7 +135,6 @@ defmodule ThistleTea.Game.Movement do
       if msg === @msg_move_jump do
         character = Map.put(character, :equipment, generate_random_equipment())
         fields = get_update_fields(character)
-        Logger.info("Fields: #{inspect(fields)}")
         packet = generate_packet(@update_type_values, fields)
 
         Registry.dispatch(ThistleTea.PlayerRegistry, state.character.map, fn entries ->
