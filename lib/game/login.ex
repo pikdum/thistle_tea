@@ -134,7 +134,7 @@ defmodule ThistleTea.Game.Login do
     # spawn mobs in as they come into range
     # despawn mobs as they go out of range
     # do i need to keep track of mobs a player has spawned?
-    Registry.dispatch(ThistleTea.Mobs, "usezonehere", fn entries ->
+    Registry.dispatch(ThistleTea.Mobs, c.map, fn entries ->
       for {pid, values} <- entries do
         {x1, y1, z1} = {c.movement.x, c.movement.y, c.movement.z}
         {guid, x2, y2, z2} = values
