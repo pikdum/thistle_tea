@@ -35,6 +35,31 @@ defmodule ThistleTea.Mob do
 
   @impl GenServer
   def handle_call(:spawn_packet, _from, state) do
+    packet = spawn_packet(state)
+    {:reply, packet, state}
+  end
+
+  @impl GenServer
+  def handle_call({:spawn_packet, character}, _from, state) do
+    if within_range(character, state.creature) do
+      packet = spawn_packet(state)
+      {:reply, {:ok, packet}, state}
+    else
+      {:reply, {:error, "out of range"}, state}
+    end
+  end
+
+  def within_range(character, creature) do
+    if abs(character.movement.x - creature.position_x) <= 50 &&
+         abs(character.movement.y - creature.position_y) <= 50 &&
+         abs(character.movement.z - creature.position_z) <= 50 do
+      true
+    else
+      false
+    end
+  end
+
+  def spawn_packet(state) do
     fields = %{
       # TODO: how to avoid collision with player guids?
       object_guid: state.creature.guid,
@@ -70,7 +95,6 @@ defmodule ThistleTea.Mob do
       turn_rate: 3.1415
     }
 
-    packet = generate_packet(@update_type_create_object2, @object_type_unit, fields, mb)
-    {:reply, packet, state}
+    generate_packet(@update_type_create_object2, @object_type_unit, fields, mb)
   end
 end
