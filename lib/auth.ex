@@ -136,7 +136,7 @@ defmodule ThistleTea.Auth do
 
     realm =
       <<8::little-size(32), 0::little-size(8)>> <>
-        "kuudere.moe" <>
+        "Thistle Tea" <>
         <<0>> <>
         "#{ip}:8085" <> <<0>> <> <<200::little-float-size(32), 0::size(8), 0::size(8), 0>>
 
