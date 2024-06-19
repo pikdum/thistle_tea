@@ -2,11 +2,12 @@ defmodule ThistleTea.Game.Movement do
   import ThistleTea.Character, only: [get_update_fields: 1]
   import ThistleTea.Game.Character, only: [generate_random_equipment: 0]
   import ThistleTea.Game.UpdateObject, only: [generate_packet: 2, decode_movement_info: 1]
-  import ThistleTea.Util, only: [within_range: 2, send_update_packet: 1]
+  import ThistleTea.Util, only: [within_range: 2, send_update_packet: 1, send_packet: 2]
 
   require Logger
 
   @update_type_values 0
+  @smsg_destroy_object 0x0AA
 
   @msg_move_start_forward 0x0B5
   @msg_move_start_backward 0x0B6
@@ -74,15 +75,26 @@ defmodule ThistleTea.Game.Movement do
       end
     end)
 
-    # spawn mobs for player
     Registry.dispatch(ThistleTea.Mobs, "usezonehere", fn entries ->
       for {pid, values} <- entries do
-        if within_range(
-             {character.movement.x, character.movement.y, character.movement.z},
-             values
-           ) do
-          packet = GenServer.call(pid, :spawn_packet)
-          send_update_packet(packet)
+        {x1, y1, z1} =
+          {state.character.movement.x, state.character.movement.y, state.character.movement.z}
+
+        {guid, x2, y2, z2} = values
+        in_range = within_range({x1, y1, z1}, {x2, y2, z2})
+
+        cond do
+          in_range && not :ets.member(state.spawned_guids, guid) ->
+            packet = GenServer.call(pid, :spawn_packet)
+            send_update_packet(packet)
+            :ets.insert(state.spawned_guids, {guid, true})
+
+          not in_range && :ets.member(state.spawned_guids, guid) ->
+            send_packet(@smsg_destroy_object, <<guid::little-size(64)>>)
+            :ets.delete(state.spawned_guids, guid)
+
+          true ->
+            :ok
         end
       end
     end)

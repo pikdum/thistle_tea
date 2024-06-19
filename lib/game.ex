@@ -257,7 +257,9 @@ defmodule ThistleTea.Game do
       <<6::big-size(16), @smsg_auth_challenge::little-size(16)>> <> seed
     )
 
-    {:continue, %{seed: seed}}
+    spawned_guids = :ets.new(:spawned_guids, [:set])
+
+    {:continue, %{seed: seed, spawned_guids: spawned_guids}}
   end
 
   @impl ThousandIsland.Handler
