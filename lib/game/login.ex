@@ -128,6 +128,13 @@ defmodule ThistleTea.Game.Login do
       end
     end)
 
+    # is there an easier way to select all from a unique registry? lol
+    Registry.select(ThistleTea.Mobs, [{{:"$1", :"$2", :"$3"}, [], [{{:"$1", :"$2", :"$3"}}]}])
+    |> Enum.each(fn {_, pid, _} ->
+      spawn_packet = GenServer.call(pid, :spawn_packet)
+      send_update_packet(spawn_packet)
+    end)
+
     # join
     {:ok, _} = Registry.register(ThistleTea.PubSub, "logged_in", c.name)
 
