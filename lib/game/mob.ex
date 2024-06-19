@@ -3,8 +3,6 @@ defmodule ThistleTea.Mob do
 
   import ThistleTea.Game.UpdateObject, only: [generate_packet: 4]
 
-  alias ThistleTea.Mangos
-
   require Logger
 
   @update_type_create_object2 3
