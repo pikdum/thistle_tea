@@ -2,6 +2,7 @@ defmodule ThistleTea.Game.Movement do
   import ThistleTea.Character, only: [get_update_fields: 1]
   import ThistleTea.Game.Character, only: [generate_random_equipment: 0]
   import ThistleTea.Game.UpdateObject, only: [generate_packet: 2, decode_movement_info: 1]
+  import ThistleTea.Util, only: [within_range: 2, send_update_packet: 1]
 
   require Logger
 
@@ -73,6 +74,20 @@ defmodule ThistleTea.Game.Movement do
       end
     end)
 
+    # spawn mobs for player
+    Registry.dispatch(ThistleTea.Mobs, "usezonehere", fn entries ->
+      for {pid, values} <- entries do
+        if within_range(
+             {character.movement.x, character.movement.y, character.movement.z},
+             values
+           ) do
+          packet = GenServer.call(pid, :spawn_packet)
+          send_update_packet(packet)
+        end
+      end
+    end)
+
+    # randomizes equipment on jump
     character =
       if msg === @msg_move_jump do
         character = Map.put(character, :equipment, generate_random_equipment())

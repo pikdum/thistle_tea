@@ -1,7 +1,9 @@
 defmodule ThistleTea.Game.Login do
   import ThistleTea.Game.UpdateObject, only: [build_update_packet: 4]
   import Bitwise, only: [<<<: 2, |||: 2]
-  import ThistleTea.Util, only: [pack_guid: 1, send_packet: 2, send_update_packet: 1]
+
+  import ThistleTea.Util,
+    only: [pack_guid: 1, send_packet: 2, send_update_packet: 1, within_range: 2]
 
   alias ThistleTea.DBC
 
@@ -128,6 +130,10 @@ defmodule ThistleTea.Game.Login do
       end
     end)
 
+    # TODO
+    # spawn mobs in as they come into range
+    # despawn mobs as they go out of range
+    # do i need to keep track of mobs a player has spawned?
     Registry.dispatch(ThistleTea.Mobs, "usezonehere", fn entries ->
       for {pid, values} <- entries do
         if within_range({c.movement.x, c.movement.y, c.movement.z}, values) do
@@ -148,12 +154,5 @@ defmodule ThistleTea.Game.Login do
       })
 
     {:continue, new_state}
-  end
-
-  def within_range(a, b) do
-    {x1, y1, z1} = a
-    {x2, y2, z2} = b
-
-    abs(x1 - x2) <= 50 && abs(y1 - y2) <= 50 && abs(z1 - z2) <= 50
   end
 end
