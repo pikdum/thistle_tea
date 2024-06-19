@@ -128,14 +128,12 @@ defmodule ThistleTea.Game.Login do
       end
     end)
 
-    # is there an easier way to select all from a unique registry? lol
-    Registry.select(ThistleTea.Mobs, [{{:"$1", :"$2", :"$3"}, [], [{{:"$1", :"$2", :"$3"}}]}])
-    |> Enum.each(fn {_, pid, _} ->
-      with {:ok, packet} <- GenServer.call(pid, {:spawn_packet, c}) do
-        send_update_packet(packet)
-      else
-        {:error, error} ->
-          Logger.error("Error: #{error}")
+    Registry.dispatch(ThistleTea.Mobs, "usezonehere", fn entries ->
+      for {pid, values} <- entries do
+        if within_range({c.movement.x, c.movement.y, c.movement.z}, values) do
+          packet = GenServer.call(pid, :spawn_packet)
+          send_update_packet(packet)
+        end
       end
     end)
 
@@ -150,5 +148,12 @@ defmodule ThistleTea.Game.Login do
       })
 
     {:continue, new_state}
+  end
+
+  def within_range(a, b) do
+    {x1, y1, z1} = a
+    {x2, y2, z2} = b
+
+    abs(x1 - x2) <= 50 && abs(y1 - y2) <= 50 && abs(z1 - z2) <= 50
   end
 end

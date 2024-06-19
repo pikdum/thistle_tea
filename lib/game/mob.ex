@@ -11,17 +11,19 @@ defmodule ThistleTea.Mob do
   @object_type_unit 3
   @update_flag_living 0x20
 
-  def start_link(creature_guid) do
-    GenServer.start_link(__MODULE__, creature_guid,
-      name: {:via, Registry, {ThistleTea.Mobs, creature_guid}}
-    )
+  def start_link(creature, creature_template) do
+    GenServer.start_link(__MODULE__, [creature, creature_template])
   end
 
   @impl GenServer
-  def init(creature_guid) do
-    creature = Mangos.get_by(Creature, guid: creature_guid)
-    creature_template = Mangos.get_by(CreatureTemplate, entry: creature.id)
-    Logger.info("mob started: #{creature.guid}, pid: #{inspect(self())}")
+  def init([creature, creature_template]) do
+    Logger.info("Initializing Mob: #{creature_template.name} - #{creature.guid}")
+
+    Registry.register(
+      ThistleTea.Mobs,
+      "usezonehere",
+      {creature.position_x, creature.position_y, creature.position_z}
+    )
 
     {:ok,
      %{
@@ -37,26 +39,6 @@ defmodule ThistleTea.Mob do
   def handle_call(:spawn_packet, _from, state) do
     packet = spawn_packet(state)
     {:reply, packet, state}
-  end
-
-  @impl GenServer
-  def handle_call({:spawn_packet, character}, _from, state) do
-    if within_range(character, state.creature) do
-      packet = spawn_packet(state)
-      {:reply, {:ok, packet}, state}
-    else
-      {:reply, {:error, "out of range"}, state}
-    end
-  end
-
-  def within_range(character, creature) do
-    if abs(character.movement.x - creature.position_x) <= 50 &&
-         abs(character.movement.y - creature.position_y) <= 50 &&
-         abs(character.movement.z - creature.position_z) <= 50 do
-      true
-    else
-      false
-    end
   end
 
   def spawn_packet(state) do
