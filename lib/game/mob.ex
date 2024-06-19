@@ -16,9 +16,9 @@ defmodule ThistleTea.Mob do
   @impl GenServer
   def init([creature, creature_template]) do
     Registry.register(
-      ThistleTea.Mobs,
+      ThistleTea.MobRegistry,
       creature.map,
-      {creature.guid, creature.position_x, creature.position_y, creature.position_z}
+      {creature.guid + 1_000_000, creature.position_x, creature.position_y, creature.position_z}
     )
 
     {:ok,
@@ -40,7 +40,7 @@ defmodule ThistleTea.Mob do
   def spawn_packet(state) do
     fields = %{
       # TODO: how to avoid collision with player guids?
-      object_guid: state.creature.guid,
+      object_guid: state.creature.guid + 1_000_000,
       object_type: 9,
       object_scale_x: 1.0,
       unit_health: state.creature.curhealth,

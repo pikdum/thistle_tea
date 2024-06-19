@@ -8,10 +8,14 @@ defmodule ThistleTea.Util do
   @range 250
 
   def within_range(a, b) do
+    within_range(a, b, @range)
+  end
+
+  def within_range(a, b, range) do
     {x1, y1, z1} = a
     {x2, y2, z2} = b
 
-    abs(x1 - x2) <= @range && abs(y1 - y2) <= @range && abs(z1 - z2) <= @range
+    abs(x1 - x2) <= range && abs(y1 - y2) <= range && abs(z1 - z2) <= range
   end
 
   def send_packet(opcode, payload) do

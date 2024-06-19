@@ -67,19 +67,50 @@ defmodule ThistleTea.Game.Movement do
         Map.merge(state.character.movement, decode_movement_info(body))
       )
 
-    Registry.dispatch(ThistleTea.PubSub, "logged_in", fn entries ->
-      for {pid, _} <- entries do
-        if pid != self() do
+    # update registry metadata
+    %{x: x1, y: y1, z: z1} = character.movement
+
+    # this feels like a hack, why can't i just update?
+    # TODO: maybe move position data to ets?
+    # TODO: when destroying player, should also destroy self from them
+    Registry.unregister(ThistleTea.PlayerRegistry, character.map)
+
+    {:ok, _} =
+      Registry.register(ThistleTea.PlayerRegistry, character.map, {state.guid, x1, y1, z1})
+
+    Registry.dispatch(ThistleTea.PlayerRegistry, character.map, fn entries ->
+      for {pid, values} <- entries do
+        {guid, x2, y2, z2} = values
+        in_range = within_range({x1, y1, z1}, {x2, y2, z2})
+
+        # broadcast movement packets
+        if pid != self() and in_range do
           send(pid, {:send_packet, msg, state.packed_guid <> body})
+        end
+
+        # spawn in players as you move around
+        cond do
+          pid == self() ->
+            :ok
+
+          in_range && not :ets.member(state.spawned_guids, guid) ->
+            packet = GenServer.call(pid, :spawn_packet)
+            send_update_packet(packet)
+            :ets.insert(state.spawned_guids, {guid, true})
+
+          not in_range && :ets.member(state.spawned_guids, guid) ->
+            send_packet(@smsg_destroy_object, <<guid::little-size(64)>>)
+            :ets.delete(state.spawned_guids, guid)
+
+          true ->
+            :ok
         end
       end
     end)
 
-    Registry.dispatch(ThistleTea.Mobs, state.character.map, fn entries ->
+    # spawn in mobs as you move around
+    Registry.dispatch(ThistleTea.MobRegistry, state.character.map, fn entries ->
       for {pid, values} <- entries do
-        {x1, y1, z1} =
-          {state.character.movement.x, state.character.movement.y, state.character.movement.z}
-
         {guid, x2, y2, z2} = values
         in_range = within_range({x1, y1, z1}, {x2, y2, z2})
 
@@ -107,9 +138,13 @@ defmodule ThistleTea.Game.Movement do
         Logger.info("Fields: #{inspect(fields)}")
         packet = generate_packet(@update_type_values, fields)
 
-        Registry.dispatch(ThistleTea.PubSub, "logged_in", fn entries ->
-          for {pid, _} <- entries do
-            send(pid, {:send_update_packet, packet})
+        Registry.dispatch(ThistleTea.PlayerRegistry, state.character.map, fn entries ->
+          for {pid, values} <- entries do
+            {_guid, x2, y2, z2} = values
+
+            if within_range({x1, y1, z1}, {x2, y2, z2}) do
+              send(pid, {:send_update_packet, packet})
+            end
           end
         end)
 
@@ -130,7 +165,7 @@ defmodule ThistleTea.Game.Movement do
 
     packet = generate_packet(@update_type_values, fields)
 
-    Registry.dispatch(ThistleTea.PubSub, "logged_in", fn entries ->
+    Registry.dispatch(ThistleTea.PlayerRegistry, "logged_in", fn entries ->
       for {pid, _} <- entries do
         if pid != self() do
           send(pid, {:send_update_packet, packet})
