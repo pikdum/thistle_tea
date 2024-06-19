@@ -33,18 +33,7 @@ defmodule ThistleTea.Mob do
   end
 
   def random_movement(state) do
-    spin_increment = :math.pi() / 10.0
-    o1 = state.creature.orientation
-    o2 = o1 + spin_increment
-
-    # ensure it's within [0, 2pi]
-    # can't use rem/2 because it's a float
-    o2 =
-      if o2 > 2.0 * :math.pi() do
-        o2 - 2.0 * :math.pi()
-      else
-        o2
-      end
+    o2 = :rand.uniform(2 * 31415) / 10000.0
 
     %{
       state
@@ -63,7 +52,7 @@ defmodule ThistleTea.Mob do
       {creature.guid, creature.position_x, creature.position_y, creature.position_z}
     )
 
-    update_rate = :rand.uniform(1_000)
+    update_rate = :rand.uniform(4_000) + 1_000
 
     Process.send_after(self(), :random_movement, update_rate)
 
