@@ -17,7 +17,7 @@ defmodule ThistleTea.Mob do
   def init([creature, creature_template]) do
     Registry.register(
       ThistleTea.Mobs,
-      "usezonehere",
+      creature.map,
       {creature.guid, creature.position_x, creature.position_y, creature.position_z}
     )
 

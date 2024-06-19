@@ -75,7 +75,7 @@ defmodule ThistleTea.Game.Movement do
       end
     end)
 
-    Registry.dispatch(ThistleTea.Mobs, "usezonehere", fn entries ->
+    Registry.dispatch(ThistleTea.Mobs, state.character.map, fn entries ->
       for {pid, values} <- entries do
         {x1, y1, z1} =
           {state.character.movement.x, state.character.movement.y, state.character.movement.z}
