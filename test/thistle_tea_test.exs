@@ -1,8 +1,12 @@
 defmodule ThistleTeaTest do
   use ExUnit.Case
-  doctest ThistleTea
+  import ThistleTea.Mob
 
-  test "greets the world" do
-    assert ThistleTea.hello() == :world
+  test "future_position" do
+    assert future_position(0, 0, 0, 1, 1) == {1, 0}
+    assert future_position(0, 0, 0, 10, 1) == {10, 0}
+    assert future_position(0, 0, 0, 1, 10) == {10, 0}
+    {x, _} = future_position(0, 0, :math.pi(), 1, 10)
+    assert x == -10
   end
 end
