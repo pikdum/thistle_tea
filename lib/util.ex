@@ -5,11 +5,13 @@ defmodule ThistleTea.Util do
   @smsg_update_object 0x0A9
   @smsg_compressed_update_object 0x1F6
 
+  @range 250
+
   def within_range(a, b) do
     {x1, y1, z1} = a
     {x2, y2, z2} = b
 
-    abs(x1 - x2) <= 50 && abs(y1 - y2) <= 50 && abs(z1 - z2) <= 50
+    abs(x1 - x2) <= @range && abs(y1 - y2) <= @range && abs(z1 - z2) <= @range
   end
 
   def send_packet(opcode, payload) do

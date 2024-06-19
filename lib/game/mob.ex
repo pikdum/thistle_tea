@@ -15,12 +15,10 @@ defmodule ThistleTea.Mob do
 
   @impl GenServer
   def init([creature, creature_template]) do
-    Logger.info("Initializing Mob: #{creature_template.name} - #{creature.guid}")
-
     Registry.register(
       ThistleTea.Mobs,
       "usezonehere",
-      {creature.position_x, creature.position_y, creature.position_z}
+      {creature.guid, creature.position_x, creature.position_y, creature.position_z}
     )
 
     {:ok,

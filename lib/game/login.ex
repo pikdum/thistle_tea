@@ -136,9 +136,13 @@ defmodule ThistleTea.Game.Login do
     # do i need to keep track of mobs a player has spawned?
     Registry.dispatch(ThistleTea.Mobs, "usezonehere", fn entries ->
       for {pid, values} <- entries do
-        if within_range({c.movement.x, c.movement.y, c.movement.z}, values) do
+        {x1, y1, z1} = {c.movement.x, c.movement.y, c.movement.z}
+        {guid, x2, y2, z2} = values
+
+        if within_range({x1, y1, z1}, {x2, y2, z2}) do
           packet = GenServer.call(pid, :spawn_packet)
           send_update_packet(packet)
+          :ets.insert(state.spawned_guids, {guid, true})
         end
       end
     end)
