@@ -1,5 +1,5 @@
 defmodule ThistleTea.Game.Logout do
-  import ThistleTea.Util, only: [send_packet: 2]
+  import ThistleTea.Util, only: [send_packet: 2, within_range: 2]
 
   require Logger
 
@@ -42,13 +42,21 @@ defmodule ThistleTea.Game.Logout do
     end
 
     # remove from pubsub
-    Registry.unregister(ThistleTea.PubSub, "logged_in")
+    Registry.unregister(ThistleTea.PlayerRegistry, "all")
+    Registry.unregister(ThistleTea.PlayerRegistry, state.character.map)
 
     # broadcast destroy object
     if Map.get(state, :guid) do
-      Registry.dispatch(ThistleTea.PubSub, "logged_in", fn entries ->
-        for {pid, _} <- entries do
-          send(pid, {:send_packet, @smsg_destroy_object, <<state.guid::little-size(64)>>})
+      Registry.dispatch(ThistleTea.PlayerRegistry, state.character.map, fn entries ->
+        {x1, y1, z1} =
+          {state.character.movement.x, state.character.movement.y, state.character.movement.z}
+
+        for {pid, values} <- entries do
+          {_guid, x2, y2, z2} = values
+
+          if within_range({x1, y1, z1}, {x2, y2, z2}) do
+            send(pid, {:send_packet, @smsg_destroy_object, <<state.guid::little-size(64)>>})
+          end
         end
       end)
     end

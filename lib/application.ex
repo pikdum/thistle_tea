@@ -33,8 +33,8 @@ defmodule ThistleTea.Application do
   def start(_type, _args) do
     children =
       [
-        {Registry, keys: :duplicate, name: ThistleTea.Mobs},
-        {Registry, keys: :duplicate, name: ThistleTea.PubSub},
+        {Registry, keys: :duplicate, name: ThistleTea.MobRegistry},
+        {Registry, keys: :duplicate, name: ThistleTea.PlayerRegistry},
         ThistleTea.DBC,
         ThistleTea.Mangos,
         ThistleTea.MobSupervisor,

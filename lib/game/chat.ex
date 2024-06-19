@@ -95,7 +95,7 @@ defmodule ThistleTea.Game.Chat do
         send_update_packet(boarpacket)
 
         # TODO: for now, everybody receives
-        Registry.dispatch(ThistleTea.PubSub, "logged_in", fn entries ->
+        Registry.dispatch(ThistleTea.PlayerRegistry, "all", fn entries ->
           for {pid, _} <- entries do
             send(pid, {:send_packet, @smsg_messagechat, packet})
           end
@@ -114,7 +114,7 @@ defmodule ThistleTea.Game.Chat do
             >>
 
         # TODO: for now, everybody receives
-        Registry.dispatch(ThistleTea.PubSub, "logged_in", fn entries ->
+        Registry.dispatch(ThistleTea.PlayerRegistry, "all", fn entries ->
           for {pid, _} <- entries do
             send(pid, {:send_packet, @smsg_messagechat, packet})
           end
@@ -135,7 +135,7 @@ defmodule ThistleTea.Game.Chat do
             >>
 
         # TODO: for now, everybody receives
-        Registry.dispatch(ThistleTea.PubSub, "logged_in", fn entries ->
+        Registry.dispatch(ThistleTea.PlayerRegistry, "all", fn entries ->
           for {pid, _} <- entries do
             send(pid, {:send_packet, @smsg_messagechat, packet})
           end
@@ -162,7 +162,7 @@ defmodule ThistleTea.Game.Chat do
 
         # TODO: untested
         # TODO: for now, everybody receives
-        Registry.dispatch(ThistleTea.PubSub, "logged_in", fn entries ->
+        Registry.dispatch(ThistleTea.PlayerRegistry, "all", fn entries ->
           for {pid, _} <- entries do
             send(pid, {:send_packet, @smsg_messagechat, packet})
           end

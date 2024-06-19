@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game do
   use ThousandIsland.Handler
 
+  import Bitwise, only: [|||: 2]
   import ThistleTea.Game.Logout, only: [handle_logout: 1]
   import ThistleTea.Game.UpdateObject, only: [build_update_packet: 4]
   import ThistleTea.Util, only: [send_packet: 2, send_update_packet: 1, parse_string: 1]
@@ -113,6 +114,12 @@ defmodule ThistleTea.Game do
     @cmsg_ping
   ]
 
+  @update_type_create_object2 3
+  @object_type_player 4
+  @update_flag_high_guid 0x08
+  @update_flag_living 0x20
+  @update_flag_has_position 0x40
+
   def dispatch_packet(opcode, payload, state) when opcode in @character_opcodes do
     ThistleTea.Game.Character.handle_packet(opcode, payload, state)
   end
@@ -224,6 +231,19 @@ defmodule ThistleTea.Game do
         {socket, state}
       ) do
     packet = build_update_packet(state.character, update_type, object_type, update_flag)
+
+    {:reply, packet, {socket, state}}
+  end
+
+  @impl GenServer
+  def handle_call(:spawn_packet, _from, {socket, state}) do
+    packet =
+      build_update_packet(
+        state.character,
+        @update_type_create_object2,
+        @object_type_player,
+        @update_flag_high_guid ||| @update_flag_living ||| @update_flag_has_position
+      )
 
     {:reply, packet, {socket, state}}
   end

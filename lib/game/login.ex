@@ -112,31 +112,23 @@ defmodule ThistleTea.Game.Login do
     update_flag = @update_flag_high_guid ||| @update_flag_living ||| @update_flag_has_position
     packet = build_update_packet(c, @update_type_create_object2, @object_type_player, update_flag)
 
-    # TODO: can clean up the interface here
-    # :spawn_player? :update_object?
+    {x1, y1, z1} = {c.movement.x, c.movement.y, c.movement.z}
 
-    Registry.dispatch(ThistleTea.PubSub, "logged_in", fn entries ->
-      for {pid, _} <- entries do
-        # send packets to everybody else
-        send(pid, {:send_update_packet, packet})
-        # spawn them for us
-        spawn_packet =
-          GenServer.call(
-            pid,
-            {:build_update_packet, @update_type_create_object2, @object_type_player, update_flag}
-          )
+    Registry.dispatch(ThistleTea.PlayerRegistry, c.map, fn entries ->
+      for {pid, values} <- entries do
+        {guid, x2, y2, z2} = values
 
-        send_update_packet(spawn_packet)
+        if within_range({x1, y1, z1}, {x2, y2, z2}) do
+          send(pid, {:send_update_packet, packet})
+          packet = GenServer.call(pid, :spawn_packet)
+          send_update_packet(packet)
+          :ets.insert(state.spawned_guids, {guid, true})
+        end
       end
     end)
 
-    # TODO
-    # spawn mobs in as they come into range
-    # despawn mobs as they go out of range
-    # do i need to keep track of mobs a player has spawned?
-    Registry.dispatch(ThistleTea.Mobs, c.map, fn entries ->
+    Registry.dispatch(ThistleTea.MobRegistry, c.map, fn entries ->
       for {pid, values} <- entries do
-        {x1, y1, z1} = {c.movement.x, c.movement.y, c.movement.z}
         {guid, x2, y2, z2} = values
 
         if within_range({x1, y1, z1}, {x2, y2, z2}) do
@@ -148,7 +140,8 @@ defmodule ThistleTea.Game.Login do
     end)
 
     # join
-    {:ok, _} = Registry.register(ThistleTea.PubSub, "logged_in", c.name)
+    {:ok, _} = Registry.register(ThistleTea.PlayerRegistry, "all", c.name)
+    {:ok, _} = Registry.register(ThistleTea.PlayerRegistry, c.map, {character_guid, x1, y1, z1})
 
     new_state =
       Map.merge(state, %{
