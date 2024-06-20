@@ -80,6 +80,10 @@ defmodule ThistleTea.Game.UpdateObject do
       size: 1,
       offset: 0x2
     },
+    object_entry: %{
+      size: 1,
+      offset: 0x3
+    },
     object_scale_x: %{
       size: 1,
       offset: 0x4
@@ -301,6 +305,7 @@ defmodule ThistleTea.Game.UpdateObject do
       case(field) do
         :object_guid -> <<value::little-size(64)>>
         :object_type -> <<value::little-size(32)>>
+        :object_entry -> <<value::little-size(32)>>
         :object_scale_x -> <<value::float-little-size(32)>>
         :unit_health -> <<value::little-size(32)>>
         :unit_power_1 -> <<value::little-size(32)>>
