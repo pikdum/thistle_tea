@@ -15,19 +15,22 @@ defmodule ThistleTea.MobSupervisor do
   def init(_args) do
     query =
       from(c in Creature,
-        join: ct in CreatureTemplate,
-        on: ct.entry == c.id,
-        select: {c, ct}
+        join: ct in assoc(c, :creature_template),
+        left_join: cm in assoc(c, :creature_movement),
+        preload: [creature_template: ct, creature_movement: cm],
+        select: c
       )
 
     children =
       Mangos.all(query)
-      |> Enum.map(fn {creature, creature_template} ->
+      |> Enum.map(fn creature ->
         %{
           id: {ThistleTea.Mob, creature.guid},
-          start: {ThistleTea.Mob, :start_link, [creature, creature_template]}
+          start: {ThistleTea.Mob, :start_link, [creature]}
         }
       end)
+
+    Logger.info("Spawned #{length(children)} mobs.")
 
     Supervisor.init(children, strategy: :one_for_one)
   end

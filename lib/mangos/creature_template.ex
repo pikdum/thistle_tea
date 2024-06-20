@@ -76,5 +76,7 @@ defmodule CreatureTemplate do
     field(:equipment_template_id, :integer, source: :EquipmentTemplateId, default: 0)
     field(:civilian, :integer, default: 0)
     field(:ai_name, :string, source: :AIName, default: "")
+
+    # has_many(:creature, Creature, foreign_key: :id, references: :entry)
   end
 end
