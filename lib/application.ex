@@ -12,6 +12,9 @@ defmodule ThistleTea.Application do
     reuseaddr: true
   }
 
+  @auth_port 3724
+  @game_port 8085
+
   use Application
 
   require Logger
@@ -39,16 +42,16 @@ defmodule ThistleTea.Application do
         ThistleTea.Mangos,
         ThistleTea.MobSupervisor,
         {ThousandIsland,
-         port: 3724, handler_module: ThistleTea.Auth, handler_options: @handler_options},
+         port: @auth_port, handler_module: ThistleTea.Auth, handler_options: @handler_options},
         {ThousandIsland,
-         port: 8085, handler_module: ThistleTea.Game, handler_options: @handler_options}
+         port: @game_port, handler_module: ThistleTea.Game, handler_options: @handler_options}
       ]
 
     :ets.new(:session, [:named_table, :public])
     :ets.new(:guid_name, [:named_table, :public])
     setup_database()
 
-    Logger.info("ThistleTea starting...")
+    Logger.info("ThistleTea started.")
 
     # See https://hexdocs.pm/elixir/Supervisor.html
     # for other strategies and supported options

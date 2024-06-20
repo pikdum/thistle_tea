@@ -19,5 +19,13 @@ defmodule Creature do
     field(:curmana, :integer, default: 0)
     field(:death_state, :integer, source: :DeathState, default: 0)
     field(:movement_type, :integer, source: :MovementType, default: 0)
+
+    belongs_to(:creature_template, CreatureTemplate,
+      foreign_key: :id,
+      references: :entry,
+      define_field: false
+    )
+
+    has_many(:creature_movement, CreatureMovement, foreign_key: :id, references: :guid)
   end
 end

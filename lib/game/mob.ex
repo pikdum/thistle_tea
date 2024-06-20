@@ -18,8 +18,8 @@ defmodule ThistleTea.Mob do
   # @movement_flag_forward 0x00000001
   @movement_flag_fixed_z 0x00000800
 
-  def start_link(creature, creature_template) do
-    GenServer.start_link(__MODULE__, [creature, creature_template])
+  def start_link(creature) do
+    GenServer.start_link(__MODULE__, creature)
   end
 
   def future_position(x, y, o, speed, seconds) do
@@ -45,7 +45,7 @@ defmodule ThistleTea.Mob do
   end
 
   @impl GenServer
-  def init([creature, creature_template]) do
+  def init(creature) do
     Registry.register(
       ThistleTea.MobRegistry,
       creature.map,
@@ -54,12 +54,13 @@ defmodule ThistleTea.Mob do
 
     update_rate = :rand.uniform(4_000) + 1_000
 
-    Process.send_after(self(), :random_movement, update_rate)
+    if creature.movement_type == 1 do
+      Process.send_after(self(), :random_movement, update_rate)
+    end
 
     {:ok,
      %{
        creature: creature,
-       creature_template: creature_template,
        packed_guid: pack_guid(creature.guid),
        # extract out some initial values?
        max_health: creature.curhealth,
@@ -107,8 +108,8 @@ defmodule ThistleTea.Mob do
       unit_max_health: state.max_health,
       unit_max_power_1: state.max_mana,
       unit_level: 1,
-      unit_faction_template: state.creature_template.faction_alliance,
-      unit_flags: state.creature_template.unit_flags,
+      unit_faction_template: state.creature.creature_template.faction_alliance,
+      unit_flags: state.creature.creature_template.unit_flags,
       unit_display_id: state.creature.modelid,
       unit_native_display_id: state.creature.modelid
     }
@@ -124,11 +125,11 @@ defmodule ThistleTea.Mob do
       timestamp: 0,
       fall_time: 0.0,
       # from creature_template
-      walk_speed: state.creature_template.speed_walk,
-      run_speed: state.creature_template.speed_run,
-      run_back_speed: state.creature_template.speed_run,
-      swim_speed: state.creature_template.speed_run,
-      swim_back_speed: state.creature_template.speed_run,
+      walk_speed: state.creature.creature_template.speed_walk,
+      run_speed: state.creature.creature_template.speed_run,
+      run_back_speed: state.creature.creature_template.speed_run,
+      swim_speed: state.creature.creature_template.speed_run,
+      swim_back_speed: state.creature.creature_template.speed_run,
       turn_rate: 3.1415
     }
 
