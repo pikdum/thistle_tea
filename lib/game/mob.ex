@@ -102,6 +102,7 @@ defmodule ThistleTea.Mob do
       # TODO: how to avoid collision with player guids?
       object_guid: state.creature.guid,
       object_type: 9,
+      object_entry: state.creature.id,
       object_scale_x: 1.0,
       unit_health: state.creature.curhealth,
       unit_power_1: state.creature.curmana,
