@@ -91,8 +91,9 @@ defmodule ThistleTea.Game.Chat do
 
         mb = Map.put(state.character.movement, :update_flag, @update_flag_living)
 
-        boarpacket = generate_packet(@update_type_create_object2, @object_type_unit, fields, mb)
-        send_update_packet(boarpacket)
+        _boarpacket = generate_packet(@update_type_create_object2, @object_type_unit, fields, mb)
+        # send_update_packet(boarpacket)
+        # TODO: come up with proper debug chat interface
 
         # TODO: for now, everybody receives
         Registry.dispatch(ThistleTea.PlayerRegistry, "all", fn entries ->
