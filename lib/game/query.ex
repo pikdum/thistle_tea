@@ -203,7 +203,6 @@ defmodule ThistleTea.Game.Query do
         else
           <<0>>
         end <>
-        <<0>> <>
         <<
           # the rest
           ct.creature_type_flags::little-size(32),
