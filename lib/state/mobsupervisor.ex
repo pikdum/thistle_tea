@@ -18,6 +18,7 @@ defmodule ThistleTea.MobSupervisor do
         join: ct in assoc(c, :creature_template),
         left_join: cm in assoc(c, :creature_movement),
         preload: [creature_template: ct, creature_movement: cm],
+        where: c.modelid != 0,
         select: c
       )
 
