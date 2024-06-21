@@ -13,6 +13,7 @@ defmodule ThistleTea.Game do
   @smsg_auth_challenge 0x1EC
   @cmsg_auth_session 0x1ED
   @smsg_auth_response 0x1EE
+  @smsg_pong 0x1DD
 
   @smsg_logout_complete 0x04D
 
@@ -187,6 +188,26 @@ defmodule ThistleTea.Game do
       Logger.error("AUTH FAILURE")
       {:close, state}
     end
+  end
+
+  @impl ThousandIsland.Handler
+  def handle_data(
+        <<size::big-size(16), @cmsg_ping::little-size(32), body::binary-size(size - 4),
+          additional_data::binary>>,
+        socket,
+        state
+      ) do
+    if byte_size(additional_data) > 0, do: handle_data(additional_data, socket, state)
+    <<sequence_id::little-size(32), latency::little-size(32)>> = body
+
+    Logger.info("CMSG_PING latency=#{latency}")
+
+    ThousandIsland.Socket.send(
+      socket,
+      <<6::big-size(16), @smsg_pong::little-size(16), sequence_id::little-size(32)>>
+    )
+
+    {:continue, Map.put(state, :latency, latency)}
   end
 
   @impl ThousandIsland.Handler
