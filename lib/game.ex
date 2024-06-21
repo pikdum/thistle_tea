@@ -32,12 +32,6 @@ defmodule ThistleTea.Game do
     @cmsg_join_channel
   ]
 
-  @cmsg_item_query_single 0x056
-
-  @item_opcodes [
-    @cmsg_item_query_single
-  ]
-
   @cmsg_player_login 0x03D
 
   @login_opcodes [
@@ -102,16 +96,20 @@ defmodule ThistleTea.Game do
     @cmsg_standstatechange
   ]
 
-  @cmsg_name_query 0x050
-
-  @name_opcodes [
-    @cmsg_name_query
-  ]
-
   @cmsg_ping 0x1DC
 
   @ping_opcodes [
     @cmsg_ping
+  ]
+
+  @cmsg_name_query 0x050
+  @cmsg_item_query_single 0x056
+  @cmsg_creature_query 0x060
+
+  @query_opcodes [
+    @cmsg_name_query,
+    @cmsg_item_query_single,
+    @cmsg_creature_query
   ]
 
   @update_type_create_object2 3
@@ -128,10 +126,6 @@ defmodule ThistleTea.Game do
     ThistleTea.Game.Chat.handle_packet(opcode, payload, state)
   end
 
-  def dispatch_packet(opcode, payload, state) when opcode in @item_opcodes do
-    ThistleTea.Game.Item.handle_packet(opcode, payload, state)
-  end
-
   def dispatch_packet(opcode, payload, state) when opcode in @login_opcodes do
     ThistleTea.Game.Login.handle_packet(opcode, payload, state)
   end
@@ -144,12 +138,12 @@ defmodule ThistleTea.Game do
     ThistleTea.Game.Movement.handle_packet(opcode, payload, state)
   end
 
-  def dispatch_packet(opcode, payload, state) when opcode in @name_opcodes do
-    ThistleTea.Game.Name.handle_packet(opcode, payload, state)
-  end
-
   def dispatch_packet(opcode, payload, state) when opcode in @ping_opcodes do
     ThistleTea.Game.Ping.handle_packet(opcode, payload, state)
+  end
+
+  def dispatch_packet(opcode, payload, state) when opcode in @query_opcodes do
+    ThistleTea.Game.Query.handle_packet(opcode, payload, state)
   end
 
   def dispatch_packet(opcode, _payload, state) do
