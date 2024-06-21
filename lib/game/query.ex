@@ -199,7 +199,7 @@ defmodule ThistleTea.Game.Query do
           0
         >> <>
         if ct.sub_name do
-          ct.sub_name
+          ct.sub_name <> <<0>>
         else
           <<0>>
         end <>
