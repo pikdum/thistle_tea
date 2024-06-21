@@ -1,16 +1,39 @@
-defmodule ThistleTea.Game.Item do
+defmodule ThistleTea.Game.Query do
   import ThistleTea.Util, only: [send_packet: 2]
+
+  alias ThistleTea.Mangos
 
   require Logger
 
+  @cmsg_name_query 0x050
+  @smsg_name_query_response 0x051
+
   @cmsg_item_query_single 0x056
   @smsg_item_query_single_response 0x058
+
+  @cmsg_creature_query 0x060
+  @smsg_creature_query_response 0x061
+
+  def handle_packet(@cmsg_name_query, body, state) do
+    <<guid::little-size(64)>> = body
+    [{^guid, character_name, realm_name, race, gender, class}] = :ets.lookup(:guid_name, guid)
+
+    Logger.info("CMSG_NAME_QUERY", target_name: character_name)
+
+    send_packet(
+      @smsg_name_query_response,
+      <<guid::little-size(64)>> <>
+        character_name <> <<0>> <> realm_name <> <<0>> <> <<race, gender, class>>
+    )
+
+    {:continue, state}
+  end
 
   def handle_packet(@cmsg_item_query_single, body, state) do
     <<item_id::little-size(32), guid::little-size(64)>> = body
     Logger.info("CMSG_ITEM_QUERY_SINGLE: #{item_id} - #{guid}")
 
-    item = ThistleTea.Mangos.get(ItemTemplate, item_id)
+    item = Mangos.get(ItemTemplate, item_id)
 
     packet =
       <<item_id::little-size(32)>> <>
@@ -150,6 +173,55 @@ defmodule ThistleTea.Game.Item do
         end
 
     send_packet(@smsg_item_query_single_response, packet)
+    {:continue, state}
+  end
+
+  def handle_packet(@cmsg_creature_query, body, state) do
+    <<entry::little-size(32), guid::little-size(64)>> = body
+
+    # should i just get the template instead?
+    creature = Mangos.get_by(Creature, guid: guid) |> Mangos.preload(:creature_template)
+    ct = creature.creature_template
+
+    Logger.info("CMSG_CREATURE_QUERY",
+      target_name: ct.name
+    )
+
+    send_packet(
+      @smsg_creature_query_response,
+      <<entry::little-size(32)>> <>
+        ct.name <>
+        <<
+          0,
+          # names 2-4
+          0,
+          0,
+          0
+        >> <>
+        if ct.sub_name do
+          ct.sub_name
+        else
+          <<0>>
+        end <>
+        <<0>> <>
+        <<
+          # the rest
+          ct.creature_type_flags::little-size(32),
+          ct.creature_type::little-size(32),
+          ct.family::little-size(32),
+          ct.rank::little-size(32),
+          # unknown
+          0::little-size(32),
+          # spell data
+          0::little-size(32),
+          creature.modelid::little-size(32),
+          # civilian
+          0,
+          # leader
+          0
+        >>
+    )
+
     {:continue, state}
   end
 end
