@@ -6,6 +6,9 @@ defmodule ThistleTea.Mob do
 
   require Logger
 
+  # prevent collisions with player guids
+  @creature_guid_offset 0x100000
+
   # @update_type_movement 1
   @update_type_create_object2 3
   @object_type_unit 3
@@ -46,6 +49,8 @@ defmodule ThistleTea.Mob do
 
   @impl GenServer
   def init(creature) do
+    creature = Map.put(creature, :guid, creature.guid + @creature_guid_offset)
+
     Registry.register(
       ThistleTea.MobRegistry,
       creature.map,

@@ -5,6 +5,9 @@ defmodule ThistleTea.Game.Query do
 
   require Logger
 
+  # prevent collisions with player guids
+  @creature_guid_offset 0x100000
+
   @cmsg_name_query 0x050
   @smsg_name_query_response 0x051
 
@@ -180,7 +183,10 @@ defmodule ThistleTea.Game.Query do
     <<entry::little-size(32), guid::little-size(64)>> = body
 
     # should i just get the template instead?
-    creature = Mangos.get_by(Creature, guid: guid) |> Mangos.preload(:creature_template)
+    creature =
+      Mangos.get_by(Creature, guid: guid - @creature_guid_offset)
+      |> Mangos.preload(:creature_template)
+
     ct = creature.creature_template
 
     Logger.info("CMSG_CREATURE_QUERY",
