@@ -212,25 +212,35 @@ defmodule ThistleTea.Game do
 
   @impl ThousandIsland.Handler
   def handle_data(
-        <<header::bytes-size(6), body::binary>>,
-        socket,
+        data,
+        _socket,
         state
       ) do
-    {:ok, <<size::big-size(16), opcode::little-size(32)>>} =
-      CryptoStorage.decrypt_header(state.crypto_pid, header)
-
-    payload_size = size - 4
-    <<payload::binary-size(payload_size), additional_data::binary>> = body
-    if byte_size(additional_data) > 0, do: handle_data(additional_data, socket, state)
-
-    dispatch_packet(opcode, payload, state)
+    state = Map.put(state, :packet_stream, Map.get(state, :packet_stream, <<>>) <> data)
+    handle_packet(state)
   end
 
-  @impl ThousandIsland.Handler
-  def handle_data(data, _socket, state) do
-    Logger.error("UNKNOWN: #{inspect(data, limit: :infinity)}")
-    {:continue, state}
+  def handle_packet(%{packet_stream: <<header::bytes-size(6), rest::binary>>} = state) do
+    with {:ok, decrypted_header} <-
+           CryptoStorage.decrypt_header(state.crypto_pid, header, byte_size(rest)) do
+      <<size::big-size(16), opcode::little-size(32)>> = decrypted_header
+      <<payload::binary-size(size - 4), rest::binary>> = rest
+      state = Map.put(state, :packet_stream, rest)
+      {action, state} = dispatch_packet(opcode, payload, state)
+
+      # try to handle the next packet
+      if byte_size(rest) >= 6 do
+        handle_packet(state)
+      else
+        {action, state}
+      end
+    else
+      {:error, _} -> {:continue, state}
+    end
   end
+
+  # accumulate packet_stream until enough data
+  def handle_packet(state), do: state
 
   @impl GenServer
   def handle_cast({:send_packet, opcode, payload}, {socket, state}) do
