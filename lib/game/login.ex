@@ -118,7 +118,7 @@ defmodule ThistleTea.Game.Login do
       for {pid, values} <- entries do
         {guid, x2, y2, z2} = values
 
-        if within_range({x1, y1, z1}, {x2, y2, z2}) do
+        if pid != self() and within_range({x1, y1, z1}, {x2, y2, z2}) do
           send(pid, {:send_update_packet, packet})
           packet = GenServer.call(pid, :spawn_packet)
           send_update_packet(packet)
