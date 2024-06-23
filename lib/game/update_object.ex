@@ -389,32 +389,32 @@ defmodule ThistleTea.Game.UpdateObject do
             <<m.fall_time::little-float-size(32)>> <>
             if (m.movement_flags &&& @movement_flag_jumping) > 0 do
               <<
-                m.z_speed::float-little-size(32),
-                m.cos_angle::float-little-size(32),
-                m.sin_angle::float-little-size(32),
-                m.xy_speed::float-little-size(32)
+                m.z_speed::little-float-size(32),
+                m.cos_angle::little-float-size(32),
+                m.sin_angle::little-float-size(32),
+                m.xy_speed::little-float-size(32)
               >>
             else
               <<>>
             end <>
             if (m.movement_flags &&& @movement_flag_spline_elevation) > 0 do
-              <<m.spline_elevation::float-little-size(32)>>
+              <<m.spline_elevation::little-float-size(32)>>
             else
               <<>>
             end <>
             <<
-              m.walk_speed::float-little-size(32),
-              m.run_speed::float-little-size(32),
-              m.run_back_speed::float-little-size(32),
-              m.swim_speed::float-little-size(32),
-              m.swim_back_speed::float-little-size(32),
-              m.turn_rate::float-little-size(32)
+              m.walk_speed::little-float-size(32),
+              m.run_speed::little-float-size(32),
+              m.run_back_speed::little-float-size(32),
+              m.swim_speed::little-float-size(32),
+              m.swim_back_speed::little-float-size(32),
+              m.turn_rate::little-float-size(32)
             >> <>
             if (m.movement_flags &&& @movement_flag_spline_enabled) > 0 do
               <<m.spline_flags::size(32)>> <>
                 cond do
                   (m.spline_flags &&& @spline_flag_final_angle) > 0 ->
-                    <<m.angle::float-little-size(32)>>
+                    <<m.angle::little-float-size(32)>>
 
                   (m.spline_flags &&& @spline_flag_final_target) > 0 ->
                     <<m.target_guid::little-size(64)>>
@@ -516,8 +516,8 @@ defmodule ThistleTea.Game.UpdateObject do
     {movement_block, rest} =
       case (movement_flags &&& @movement_flag_jumping) > 0 do
         true ->
-          <<z_speed::float-little-size(32), cos_angle::float-little-size(32),
-            sin_angle::float-little-size(32), xy_speed::float-little-size(32),
+          <<z_speed::little-float-size(32), cos_angle::little-float-size(32),
+            sin_angle::little-float-size(32), xy_speed::little-float-size(32),
             rest::binary>> = rest
 
           {Map.merge(movement_block, %{
@@ -535,7 +535,7 @@ defmodule ThistleTea.Game.UpdateObject do
     {movement_block, _rest} =
       case (movement_flags &&& @movement_flag_spline_elevation) > 0 do
         true ->
-          <<spline_elevation::float-little-size(32), rest::binary>> = rest
+          <<spline_elevation::little-float-size(32), rest::binary>> = rest
           {Map.put(movement_block, :spline_elevation, spline_elevation), rest}
 
         false ->
