@@ -157,6 +157,10 @@ defmodule ThistleTea.Game.UpdateObject do
       size: 1,
       offset: 0x2E
     },
+    unit_base_attack_time: %{
+      size: 2,
+      offset: 0x93
+    },
     unit_display_id: %{
       size: 1,
       offset: 0x83
@@ -168,6 +172,34 @@ defmodule ThistleTea.Game.UpdateObject do
     unit_bytes_1: %{
       size: 1,
       offset: 0x8A
+    },
+    unit_strength: %{
+      size: 1,
+      offset: 0x96
+    },
+    unit_agility: %{
+      size: 1,
+      offset: 0x97
+    },
+    unit_stamina: %{
+      size: 1,
+      offset: 0x98
+    },
+    unit_intellect: %{
+      size: 1,
+      offset: 0x99
+    },
+    unit_spirit: %{
+      size: 1,
+      offset: 0x9A
+    },
+    unit_base_mana: %{
+      size: 1,
+      offset: 0xA2
+    },
+    unit_base_health: %{
+      size: 1,
+      offset: 0xA3
     },
     player_flags: %{
       size: 1,
@@ -306,7 +338,7 @@ defmodule ThistleTea.Game.UpdateObject do
         :object_guid -> <<value::little-size(64)>>
         :object_type -> <<value::little-size(32)>>
         :object_entry -> <<value::little-size(32)>>
-        :object_scale_x -> <<value::float-little-size(32)>>
+        :object_scale_x -> <<value::little-float-size(32)>>
         :unit_health -> <<value::little-size(32)>>
         :unit_power_1 -> <<value::little-size(32)>>
         :unit_power_2 -> <<value::little-size(32)>>
@@ -323,9 +355,17 @@ defmodule ThistleTea.Game.UpdateObject do
         :unit_faction_template -> <<value::little-size(32)>>
         :unit_bytes_0 -> value
         :unit_flags -> <<value::little-size(32)>>
+        :unit_base_attack_time -> <<value::little-size(64)>>
         :unit_display_id -> <<value::little-size(32)>>
         :unit_native_display_id -> <<value::little-size(32)>>
         :unit_bytes_1 -> value
+        :unit_strength -> <<value::little-size(32)>>
+        :unit_agility -> <<value::little-size(32)>>
+        :unit_stamina -> <<value::little-size(32)>>
+        :unit_intellect -> <<value::little-size(32)>>
+        :unit_spirit -> <<value::little-size(32)>>
+        :unit_base_mana -> <<value::little-size(32)>>
+        :unit_base_health -> <<value::little-size(32)>>
         :player_flags -> <<value::little-size(32)>>
         :player_features -> value
         :player_visible_item_1_0 -> <<value::little-size(32)>>
