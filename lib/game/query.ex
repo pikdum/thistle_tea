@@ -14,6 +14,9 @@ defmodule ThistleTea.Game.Query do
   @cmsg_item_query_single 0x056
   @smsg_item_query_single_response 0x058
 
+  @cmsg_item_name_query 0x2C4
+  @smsg_item_name_query_response 0x2C5
+
   @cmsg_creature_query 0x060
   @smsg_creature_query_response 0x061
 
@@ -176,6 +179,16 @@ defmodule ThistleTea.Game.Query do
         end
 
     send_packet(@smsg_item_query_single_response, packet)
+    {:continue, state}
+  end
+
+  def handle_packet(@cmsg_item_name_query, body, state) do
+    <<item_id::little-size(32), _guid::little-size(64)>> = body
+    item = Mangos.get(ItemTemplate, item_id)
+    Logger.info("CMSG_ITEM_NAME_QUERY: #{item.name}")
+    packet = <<item_id::little-size(32)>> <> item.name <> <<0>>
+
+    send_packet(@smsg_item_name_query_response, packet)
     {:continue, state}
   end
 

@@ -105,11 +105,13 @@ defmodule ThistleTea.Game do
 
   @cmsg_name_query 0x050
   @cmsg_item_query_single 0x056
+  @cmsg_item_name_query 0x2C4
   @cmsg_creature_query 0x060
 
   @query_opcodes [
     @cmsg_name_query,
     @cmsg_item_query_single,
+    @cmsg_item_name_query,
     @cmsg_creature_query
   ]
 
