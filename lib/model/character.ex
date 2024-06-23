@@ -92,7 +92,7 @@ defmodule ThistleTea.Character do
       player_visible_item_14_0: c.equipment.trinket2.entry,
       player_visible_item_15_0: c.equipment.back.entry,
       player_visible_item_16_0: c.equipment.mainhand.entry,
-      # player_visible_item_17_0: c.equipment.offhand.entry,
+      player_visible_item_17_0: c.equipment.offhand.entry,
       # player_visible_item_18_0: c.equipment.ranged.entry,
       player_visible_item_19_0: c.equipment.tabard.entry
     }
