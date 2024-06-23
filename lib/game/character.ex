@@ -30,6 +30,7 @@ defmodule ThistleTea.Game.Character do
       trinket2: ItemTemplate.random_by_type(12),
       back: ItemTemplate.random_by_type(16),
       mainhand: ItemTemplate.random_by_type(13),
+      offhand: ItemTemplate.random_by_type(13),
       tabard: ItemTemplate.random_by_type(19)
     }
   end
