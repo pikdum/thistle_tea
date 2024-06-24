@@ -78,6 +78,7 @@ defmodule ThistleTea.Character do
       unit_base_attack_time: 2000,
       unit_display_id: c.unit_display_id,
       unit_native_display_id: c.unit_display_id,
+      unit_mod_cast_speed: 1.0,
       unit_strength: 50,
       unit_agility: 50,
       unit_stamina: 50,
