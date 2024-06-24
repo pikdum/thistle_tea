@@ -1,6 +1,5 @@
 defmodule Spell do
   use Ecto.Schema
-  import Ecto.Query
 
   @primary_key {:id, :integer, autogenerate: false}
   schema "Spell" do
@@ -178,10 +177,5 @@ defmodule Spell do
     field(:required_aura_vision, :integer)
 
     has_one(:spell_cast_time, SpellCastTimes, foreign_key: :id, references: :casting_time_index)
-  end
-
-  def generate_random_spells(count) do
-    query = from(s in Spell, order_by: fragment("RANDOM()"), limit: ^count, select: s.id)
-    ThistleTea.DBC.all(query)
   end
 end

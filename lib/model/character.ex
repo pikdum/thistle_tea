@@ -19,7 +19,8 @@ defmodule ThistleTea.Character do
       :outfit_id,
       :unit_display_id,
       :equipment,
-      :movement
+      :movement,
+      :spells
     ],
     index: [:account_id, :name],
     type: :ordered_set,
@@ -34,6 +35,20 @@ defmodule ThistleTea.Character do
       {:exists, true} -> {:error, :character_exists}
       {:limit, true} -> {:error, :character_limit}
       {:error, reason} -> {:error, reason}
+    end
+  end
+
+  def get_power(class) do
+    case class do
+      1 -> 1
+      2 -> 0
+      3 -> 0
+      4 -> 3
+      5 -> 0
+      7 -> 0
+      8 -> 0
+      9 -> 0
+      11 -> 0
     end
   end
 
@@ -59,17 +74,7 @@ defmodule ThistleTea.Character do
       unit_max_power_5: 100,
       unit_level: c.level,
       unit_faction_template: 1,
-      unit_bytes_0: <<c.race, c.class, c.gender, 0>>,
-      # *         POWER_MANA        = 0,
-      # *         POWER_RAGE        = 1,
-      # *         POWER_FOCUS       = 2,
-      # *         POWER_ENERGY      = 3,
-      # *         POWER_HAPPINESS   = 4,
-      # *         POWER_RUNE        = 5,
-      # *         POWER_RUNIC_POWER = 6,
-      # *         MAX_POWERS        = 7,
-      # *         POWER_ALL         = 127,         // default for class?
-      # *         POWER_HEALTH      = 0xFFFFFFFE   // (-2 as signed value)
+      unit_bytes_0: <<c.race, c.class, c.gender, get_power(c.class)>>,
       unit_base_attack_time: 2000,
       unit_display_id: c.unit_display_id,
       unit_native_display_id: c.unit_display_id,

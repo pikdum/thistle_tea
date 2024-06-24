@@ -1,6 +1,5 @@
 defmodule SpellCastTimes do
   use Ecto.Schema
-  import Ecto.Query
 
   @primary_key {:id, :integer, autogenerate: false}
   schema "SpellCastTimes" do
