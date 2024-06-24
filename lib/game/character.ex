@@ -1,7 +1,6 @@
 defmodule ThistleTea.Game.Character do
   import ThistleTea.Util, only: [parse_string: 1, send_packet: 2]
 
-  alias ThistleTea.Mangos
   alias ThistleTea.DBC
 
   require Logger
@@ -121,7 +120,8 @@ defmodule ThistleTea.Game.Character do
     <<race, class, gender, skin, face, hair_style, hair_color, facial_hair, outfit_id>> = rest
     Logger.info("CMSG_CHAR_CREATE: #{character_name}")
 
-    info = Mangos.get_by(PlayerCreateInfo, race: race, class: class)
+    info = PlayerCreateInfo.get(race, class)
+    spells = PlayerCreateInfoSpell.get_all(race, class)
 
     chr_race = DBC.get_by(ChrRaces, id: race)
 
@@ -163,7 +163,8 @@ defmodule ThistleTea.Game.Character do
         turn_rate: 3.1415,
         timestamp: 0
       },
-      equipment: generate_random_equipment()
+      equipment: generate_random_equipment(),
+      spells: spells
     }
 
     case ThistleTea.Character.create(character) do

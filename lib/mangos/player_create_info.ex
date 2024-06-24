@@ -12,4 +12,8 @@ defmodule PlayerCreateInfo do
     field(:position_z, :float)
     field(:orientation, :float)
   end
+
+  def get(race, class) do
+    ThistleTea.Mangos.get_by(PlayerCreateInfo, race: race, class: class)
+  end
 end

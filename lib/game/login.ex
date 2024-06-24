@@ -75,16 +75,15 @@ defmodule ThistleTea.Game.Login do
     send_packet(@smsg_tutorial_flags, <<0xFFFFFFFFFFFFFFFF::little-size(256)>>)
 
     # send initial spells
-    random_spells = Spell.generate_random_spells(25)
-
-    encoded_spells =
-      Enum.map(random_spells, &<<&1::little-size(16), 0::little-size(16)>>)
+    spells =
+      Enum.map(c.spells, &<<&1::little-size(16), 0::little-size(16)>>)
       |> Enum.reduce(<<>>, fn x, acc -> acc <> x end)
 
+    # TODO: why are durations instant when they shouldn't be?
     send_packet(
       @smsg_initial_spells,
-      <<0, Enum.count(random_spells)>> <>
-        encoded_spells <>
+      <<0, Enum.count(c.spells)::little-size(16)>> <>
+        spells <>
         <<0::little-size(16)>>
     )
 
