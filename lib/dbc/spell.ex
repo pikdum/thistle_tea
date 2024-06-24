@@ -3,7 +3,7 @@ defmodule Spell do
   import Ecto.Query
 
   @primary_key {:id, :integer, autogenerate: false}
-  schema "spell" do
+  schema "Spell" do
     field(:school, :integer)
     field(:category, :integer)
     field(:cast_ui, :integer)
@@ -176,6 +176,8 @@ defmodule Spell do
     field(:min_faction, :integer)
     field(:min_reputation, :integer)
     field(:required_aura_vision, :integer)
+
+    has_one(:spell_cast_time, SpellCastTimes, foreign_key: :id, references: :casting_time_index)
   end
 
   def generate_random_spells(count) do
