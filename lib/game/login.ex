@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.Login do
   @smsg_set_rest_start 0x21E
   @smsg_bindpointupdate 0x155
   @smsg_tutorial_flags 0x0FD
+  @smsg_initial_spells 0x12A
   @smsg_login_settimespeed 0x042
   @smsg_trigger_cinematic 0x0FA
 
@@ -74,6 +75,19 @@ defmodule ThistleTea.Game.Login do
     send_packet(@smsg_tutorial_flags, <<0xFFFFFFFFFFFFFFFF::little-size(256)>>)
 
     # send initial spells
+    random_spells = Spell.generate_random_spells(25)
+
+    encoded_spells =
+      Enum.map(random_spells, &<<&1::little-size(16), 0::little-size(16)>>)
+      |> Enum.reduce(<<>>, fn x, acc -> acc <> x end)
+
+    send_packet(
+      @smsg_initial_spells,
+      <<0, Enum.count(random_spells)>> <>
+        encoded_spells <>
+        <<0::little-size(16)>>
+    )
+
     # send initial action buttons
     # send initial repuations
 
