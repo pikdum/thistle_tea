@@ -115,6 +115,14 @@ defmodule ThistleTea.Game do
     @cmsg_creature_query
   ]
 
+  @cmsg_cast_spell 0x12E
+  @cmsg_cancel_cast 0x12F
+
+  @spell_opcodes [
+    @cmsg_cast_spell,
+    @cmsg_cancel_cast
+  ]
+
   @update_type_create_object2 3
   @object_type_player 4
   @update_flag_high_guid 0x08
@@ -147,6 +155,10 @@ defmodule ThistleTea.Game do
 
   def dispatch_packet(opcode, payload, state) when opcode in @query_opcodes do
     ThistleTea.Game.Query.handle_packet(opcode, payload, state)
+  end
+
+  def dispatch_packet(opcode, payload, state) when opcode in @spell_opcodes do
+    ThistleTea.Game.Spell.handle_packet(opcode, payload, state)
   end
 
   def dispatch_packet(opcode, _payload, state) do
