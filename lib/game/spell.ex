@@ -46,16 +46,7 @@ defmodule ThistleTea.Game.Spell do
 
     state = cancel_spell(state)
 
-    # TODO: refactor
-    cast_timer =
-      Process.send_after(
-        self(),
-        {:send_packet, @smsg_cast_result, cast_result},
-        spell.spell_cast_time.base
-      )
-
-    spell_start_flags = 0x20 + 0x2
-    ammo = <<spell.spell_visual_1::little-size(32), 5998::little-size(32)>>
+    spell_start_flags = 0x2
 
     spell_start =
       state.packed_guid <>
@@ -67,14 +58,13 @@ defmodule ThistleTea.Game.Spell do
           # timer
           spell.spell_cast_time.base::little-size(32)
         >> <>
-        spell_cast_targets <>
-        ammo
+        spell_cast_targets
 
     # TODO: should broadcast this
     send_packet(@smsg_spell_start, spell_start)
 
-    # ammo + unknown9
-    spell_go_flags = 0x20 + 0x100
+    # unknown9
+    spell_go_flags = 0x100
 
     spell_go =
       state.packed_guid <>
@@ -85,18 +75,25 @@ defmodule ThistleTea.Game.Spell do
           spell_go_flags::little-size(16),
           # number of hits
           1::little-size(8),
-          # guid 1
-          unit_target,
-          # misses,
+          # guid
+          unit_target::little-size(64),
+          # miss
           0
         >> <>
-        spell_cast_targets <>
-        ammo
+        spell_cast_targets
 
     spell_go_timer =
       Process.send_after(
         self(),
         {:send_packet, @smsg_spell_go, spell_go},
+        spell.spell_cast_time.base
+      )
+
+    # TODO: refactor
+    cast_timer =
+      Process.send_after(
+        self(),
+        {:send_packet, @smsg_cast_result, cast_result},
         spell.spell_cast_time.base
       )
 
