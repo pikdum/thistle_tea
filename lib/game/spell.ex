@@ -13,7 +13,7 @@ defmodule ThistleTea.Game.Spell do
   @smsg_spell_start 0x131
   @smsg_spell_go 0x132
 
-  # @spell_cast_target_self 0x00000000
+  @spell_cast_target_self 0x00000000
   @spell_cast_target_unit 0x00000002
 
   def cancel_spell(state) do
@@ -33,10 +33,15 @@ defmodule ThistleTea.Game.Spell do
     <<spell_cast_target_flags::little-size(16), rest::binary>> = spell_cast_targets
 
     {unit_target, rest} =
-      if spell_cast_target_flags &&& @spell_cast_target_unit do
-        unpack_guid(rest)
-      else
-        {nil, rest}
+      cond do
+        spell_cast_target_flags == @spell_cast_target_self ->
+          {state.guid, rest}
+
+        (spell_cast_target_flags &&& @spell_cast_target_unit) > 0 ->
+          unpack_guid(rest)
+
+        true ->
+          {nil, rest}
       end
 
     spell = DBC.get_by(Spell, id: spell_id) |> DBC.preload(:spell_cast_time)
