@@ -1,5 +1,5 @@
 defmodule ThistleTea.Game.Spell do
-  import ThistleTea.Util, only: [send_packet: 2, unpack_guid: 1]
+  import ThistleTea.Util, only: [send_packet: 2, unpack_guid: 1, within_range: 2]
   import Bitwise, only: [&&&: 2]
 
   alias ThistleTea.DBC
@@ -12,6 +12,8 @@ defmodule ThistleTea.Game.Spell do
   @smsg_cast_result 0x130
   @smsg_spell_start 0x131
   @smsg_spell_go 0x132
+  @smsg_spell_failure 0x133
+  @smsg_spell_failed_other 0x2A6
 
   @spell_cast_target_self 0x00000000
   @spell_cast_target_unit 0x00000002
@@ -29,8 +31,29 @@ defmodule ThistleTea.Game.Spell do
 
         send_packet(
           @smsg_cast_result,
-          <<spell.spell_id::little-size(32), 2::little-size(8), reason::little-size(32)>>
+          <<spell.spell_id::little-size(32), 2::little-size(8), reason::little-size(8)>>
         )
+
+        send_packet(
+          @smsg_spell_failure,
+          <<state.guid::little-size(64), spell.spell_id::little-size(32), reason::little-size(8)>>
+        )
+
+        Registry.dispatch(ThistleTea.PlayerRegistry, state.character.map, fn entries ->
+          %{x: x1, y: y1, z: z1} = state.character.movement
+
+          for {pid, values} <- entries do
+            {_guid, x2, y2, z2} = values
+
+            if pid != self() and within_range({x1, y1, z1}, {x2, y2, z2}) do
+              send(
+                pid,
+                {:send_packet, @smsg_spell_failed_other,
+                 <<state.guid::little-size(64), spell.spell_id::little-size(32)>>}
+              )
+            end
+          end
+        end)
 
         Map.delete(state, :spell)
     end
@@ -72,8 +95,17 @@ defmodule ThistleTea.Game.Spell do
         >> <>
         spell_cast_targets
 
-    # TODO: should broadcast this
-    send_packet(@smsg_spell_start, spell_start)
+    Registry.dispatch(ThistleTea.PlayerRegistry, state.character.map, fn entries ->
+      %{x: x1, y: y1, z: z1} = state.character.movement
+
+      for {pid, values} <- entries do
+        {_guid, x2, y2, z2} = values
+
+        if within_range({x1, y1, z1}, {x2, y2, z2}) do
+          send(pid, {:send_packet, @smsg_spell_start, spell_start})
+        end
+      end
+    end)
 
     cast_timer =
       Process.send_after(
@@ -99,6 +131,7 @@ defmodule ThistleTea.Game.Spell do
 
   def handle_spell_complete(state) do
     s = state.spell
+    # TODO: verify orientation, etc.
     cast_result = <<s.spell_id::little-size(32), 0::little-size(8)>>
     send_packet(@smsg_cast_result, cast_result)
 
@@ -120,7 +153,18 @@ defmodule ThistleTea.Game.Spell do
         >> <>
         s.spell_cast_targets
 
-    send_packet(@smsg_spell_go, spell_go)
+    Registry.dispatch(ThistleTea.PlayerRegistry, state.character.map, fn entries ->
+      %{x: x1, y: y1, z: z1} = state.character.movement
+
+      for {pid, values} <- entries do
+        {_guid, x2, y2, z2} = values
+
+        if within_range({x1, y1, z1}, {x2, y2, z2}) do
+          send(pid, {:send_packet, @smsg_spell_go, spell_go})
+        end
+      end
+    end)
+
     Map.delete(state, :spell)
   end
 end
