@@ -16,14 +16,27 @@ defmodule ThistleTea.Game.Spell do
   @spell_cast_target_self 0x00000000
   @spell_cast_target_unit 0x00000002
 
-  def cancel_spell(state) do
+  # @spell_failed_unknown 0x91
+  @spell_failed_interrupted 0x23
+
+  def cancel_spell(state, reason \\ @spell_failed_interrupted) do
+    Logger.info("Cancelling spell")
+
     case Map.get(state, :cast_timer, nil) do
       nil ->
         state
 
       timer ->
         Process.cancel_timer(timer)
-        Map.delete(state, :cast_timer)
+
+        send_packet(
+          @smsg_cast_result,
+          <<state.spell_id::little-size(32), 2::little-size(8), reason::little-size(32)>>
+        )
+
+        state
+        |> Map.delete(:cast_timer)
+        |> Map.delete(:spell_id)
     end
   end
 
@@ -46,8 +59,6 @@ defmodule ThistleTea.Game.Spell do
 
     spell = DBC.get_by(Spell, id: spell_id) |> DBC.preload(:spell_cast_time)
     Logger.info("CMSG_CAST_SPELL: #{spell.name_en_gb} - #{spell_id}", target_name: unit_target)
-
-    cast_result = <<spell_id::little-size(32), 0::little-size(32)>>
 
     state = cancel_spell(state)
 
@@ -87,27 +98,26 @@ defmodule ThistleTea.Game.Spell do
         >> <>
         spell_cast_targets
 
-    spell_go_timer =
-      Process.send_after(
-        self(),
-        {:send_packet, @smsg_spell_go, spell_go},
-        spell.spell_cast_time.base
-      )
-
-    # TODO: refactor
     cast_timer =
       Process.send_after(
         self(),
-        {:send_packet, @smsg_cast_result, cast_result},
+        {:spell_complete, spell_go, spell_id},
         spell.spell_cast_time.base
       )
 
-    {:continue, Map.put(state, :cast_timer, cast_timer)}
+    {:continue, Map.merge(state, %{cast_timer: cast_timer, spell_id: spell_id})}
   end
 
   def handle_packet(@cmsg_cancel_cast, _body, state) do
     Logger.info("CMSG_CANCEL_CAST")
     state = cancel_spell(state)
     {:continue, state}
+  end
+
+  def handle_spell_complete(spell_go, spell_id, state) do
+    cast_result = <<state.spell_id::little-size(32), 0::little-size(8)>>
+    send_packet(@smsg_cast_result, cast_result)
+    send_packet(@smsg_spell_go, spell_go)
+    Map.delete(state, :cast_timer)
   end
 end

@@ -306,6 +306,12 @@ defmodule ThistleTea.Game do
     {:noreply, {socket, state}, socket.read_timeout}
   end
 
+  @impl GenServer
+  def handle_info({:spell_complete, spell_go_packet, spell_id}, {socket, state}) do
+    state = ThistleTea.Game.Spell.handle_spell_complete(spell_go_packet, spell_id, state)
+    {:noreply, {socket, state}, socket.read_timeout}
+  end
+
   @impl ThousandIsland.Handler
   def handle_connection(socket, _state) do
     Logger.info("SMSG_AUTH_CHALLENGE")

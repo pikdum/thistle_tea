@@ -34,6 +34,8 @@ defmodule ThistleTea.Game.Movement do
 
   @cmsg_standstatechange 0x101
 
+  @spell_failed_moving 0x2E
+
   def handle_packet(msg, body, state)
       when msg in [
              @msg_move_start_forward,
@@ -59,6 +61,8 @@ defmodule ThistleTea.Game.Movement do
              @msg_move_heartbeat,
              @cmsg_move_fall_reset
            ] do
+    %{x: x0, y: y0, z: z0} = state.character.movement
+
     # TODO: try update_in
     character =
       Map.put(
@@ -67,9 +71,16 @@ defmodule ThistleTea.Game.Movement do
         Map.merge(state.character.movement, decode_movement_info(body))
       )
 
-    # update registry metadata
     %{x: x1, y: y1, z: z1} = character.movement
 
+    state =
+      if x0 != x1 and y0 != y1 and z0 != z1 do
+        ThistleTea.Game.Spell.cancel_spell(state, @spell_failed_moving)
+      else
+        state
+      end
+
+    # update registry metadata
     # this feels like a hack, why can't i just update?
     # TODO: maybe move position data to ets?
     # TODO: when destroying player, should also destroy self from them
