@@ -4,6 +4,7 @@ defmodule ThistleTea.Game do
   import Bitwise, only: [|||: 2]
   import ThistleTea.Game.Logout, only: [handle_logout: 1]
   import ThistleTea.Game.UpdateObject, only: [build_update_packet: 4]
+  import ThistleTea.Game.Spell, only: [handle_spell_complete: 1]
   import ThistleTea.Util, only: [send_packet: 2, send_update_packet: 1, parse_string: 1]
 
   alias ThistleTea.CryptoStorage
@@ -307,8 +308,8 @@ defmodule ThistleTea.Game do
   end
 
   @impl GenServer
-  def handle_info({:spell_complete, spell_go_packet, spell_id}, {socket, state}) do
-    state = ThistleTea.Game.Spell.handle_spell_complete(spell_go_packet, spell_id, state)
+  def handle_info(:spell_complete, {socket, state}) do
+    state = handle_spell_complete(state)
     {:noreply, {socket, state}, socket.read_timeout}
   end
 

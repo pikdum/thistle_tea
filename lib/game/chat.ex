@@ -1,5 +1,5 @@
 defmodule ThistleTea.Game.Chat do
-  import ThistleTea.Util, only: [parse_string: 1, send_update_packet: 1]
+  import ThistleTea.Util, only: [parse_string: 1]
   import ThistleTea.Game.UpdateObject, only: [generate_packet: 4]
 
   require Logger
