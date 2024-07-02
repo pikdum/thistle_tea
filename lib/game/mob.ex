@@ -2,7 +2,7 @@ defmodule ThistleTea.Mob do
   use GenServer
 
   import ThistleTea.Game.UpdateObject, only: [generate_packet: 4]
-  import ThistleTea.Util, only: [pack_guid: 1, within_range: 2]
+  import ThistleTea.Util, only: [pack_guid: 1, within_range: 2, random_int: 2]
 
   require Logger
 
@@ -70,7 +70,9 @@ defmodule ThistleTea.Mob do
        # extract out some initial values?
        max_health: creature.curhealth,
        max_mana: creature.curmana,
-       update_rate: update_rate
+       update_rate: update_rate,
+       level:
+         random_int(creature.creature_template.min_level, creature.creature_template.max_level)
      }}
   end
 
@@ -113,7 +115,7 @@ defmodule ThistleTea.Mob do
       unit_power_1: state.creature.curmana,
       unit_max_health: state.max_health,
       unit_max_power_1: state.max_mana,
-      unit_level: 1,
+      unit_level: state.level,
       unit_faction_template: state.creature.creature_template.faction_alliance,
       unit_flags: state.creature.creature_template.unit_flags,
       unit_display_id: state.creature.modelid,

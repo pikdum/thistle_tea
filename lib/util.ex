@@ -7,6 +7,10 @@ defmodule ThistleTea.Util do
 
   @range 250
 
+  def random_int(min, max) do
+    :rand.uniform(max - min + 1) + min - 1
+  end
+
   def within_range(a, b) do
     within_range(a, b, @range)
   end
