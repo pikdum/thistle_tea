@@ -107,20 +107,28 @@ defmodule ThistleTea.Game.Spell do
       end
     end)
 
-    cast_timer =
-      Process.send_after(
-        self(),
-        :spell_complete,
-        spell.spell_cast_time.base
-      )
+    state =
+      Map.put(state, :spell, %{
+        spell_id: spell_id,
+        target: unit_target,
+        spell_cast_targets: spell_cast_targets
+      })
 
-    {:continue,
-     Map.put(state, :spell, %{
-       spell_id: spell_id,
-       target: unit_target,
-       spell_cast_targets: spell_cast_targets,
-       cast_timer: cast_timer
-     })}
+    state =
+      if spell.spell_cast_time.base == 0 do
+        handle_spell_complete(state)
+      else
+        cast_timer =
+          Process.send_after(
+            self(),
+            :spell_complete,
+            spell.spell_cast_time.base
+          )
+
+        Map.put(state, :spell, Map.put(state.spell, :cast_timer, cast_timer))
+      end
+
+    {:continue, state}
   end
 
   def handle_packet(@cmsg_cancel_cast, _body, state) do
