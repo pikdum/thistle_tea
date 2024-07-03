@@ -102,16 +102,21 @@ defmodule ThistleTea.Mob do
 
   @impl GenServer
   def handle_info(:random_movement, state) do
-    state = random_movement(state)
-    send_updates(state)
+    if state.creature.curhealth != 0 do
+      state = random_movement(state)
+      send_updates(state)
 
-    Process.send_after(self(), :random_movement, state.update_rate)
-    {:noreply, state}
+      Process.send_after(self(), :random_movement, state.update_rate)
+      {:noreply, state}
+    else
+      state = Map.put(state, :movement_flags, 0)
+      {:noreply, state}
+    end
   end
 
   @impl GenServer
-  def handle_info({:receive_spell, caster, spell_id}, state) do
-    damage = random_int(10, 20)
+  def handle_info({:receive_spell, _caster, _spell_id}, state) do
+    damage = random_int(100, 200)
     new_health = state.creature.curhealth - damage
     new_health = if new_health < 0, do: 0, else: new_health
     state = Map.put(state, :creature, Map.put(state.creature, :curhealth, new_health))
