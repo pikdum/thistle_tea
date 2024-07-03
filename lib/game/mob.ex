@@ -47,6 +47,23 @@ defmodule ThistleTea.Mob do
     }
   end
 
+  def send_updates(state) do
+    packet = spawn_packet(state, state.movement_flags)
+
+    %{position_x: x1, position_y: y1, position_z: z1} = state.creature
+
+    Registry.dispatch(ThistleTea.PlayerRegistry, state.creature.map, fn entries ->
+      for {pid, values} <- entries do
+        {_guid, x2, y2, z2} = values
+        in_range = within_range({x1, y1, z1}, {x2, y2, z2})
+
+        if in_range do
+          send(pid, {:send_update_packet, packet})
+        end
+      end
+    end)
+  end
+
   @impl GenServer
   def init(creature) do
     creature = Map.put(creature, :guid, creature.guid + @creature_guid_offset)
@@ -55,6 +72,12 @@ defmodule ThistleTea.Mob do
       ThistleTea.MobRegistry,
       creature.map,
       {creature.guid, creature.position_x, creature.position_y, creature.position_z}
+    )
+
+    Registry.register(
+      ThistleTea.UnitRegistry,
+      creature.guid,
+      nil
     )
 
     update_rate = :rand.uniform(4_000) + 1_000
@@ -68,6 +91,7 @@ defmodule ThistleTea.Mob do
        creature: creature,
        packed_guid: pack_guid(creature.guid),
        # extract out some initial values?
+       movement_flags: @movement_flag_fixed_z,
        max_health: creature.curhealth,
        max_mana: creature.curmana,
        update_rate: update_rate,
@@ -78,24 +102,21 @@ defmodule ThistleTea.Mob do
 
   @impl GenServer
   def handle_info(:random_movement, state) do
-    new_state = random_movement(state)
-    packet = spawn_packet(new_state, @movement_flag_fixed_z)
-
-    %{position_x: x1, position_y: y1, position_z: z1} = new_state.creature
-
-    Registry.dispatch(ThistleTea.PlayerRegistry, new_state.creature.map, fn entries ->
-      for {pid, values} <- entries do
-        {_guid, x2, y2, z2} = values
-        in_range = within_range({x1, y1, z1}, {x2, y2, z2})
-
-        if in_range do
-          send(pid, {:send_update_packet, packet})
-        end
-      end
-    end)
+    state = random_movement(state)
+    send_updates(state)
 
     Process.send_after(self(), :random_movement, state.update_rate)
-    {:noreply, new_state}
+    {:noreply, state}
+  end
+
+  @impl GenServer
+  def handle_info({:receive_spell, caster, spell_id}, state) do
+    damage = random_int(10, 20)
+    new_health = state.creature.curhealth - damage
+    new_health = if new_health < 0, do: 0, else: new_health
+    state = Map.put(state, :creature, Map.put(state.creature, :curhealth, new_health))
+    send_updates(state)
+    {:noreply, state}
   end
 
   @impl GenServer

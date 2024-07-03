@@ -161,6 +161,14 @@ defmodule ThistleTea.Game.Spell do
         >> <>
         s.spell_cast_targets
 
+    if s.target != state.guid do
+      Registry.dispatch(ThistleTea.UnitRegistry, s.target, fn entries ->
+        for {pid, _} <- entries do
+          send(pid, {:receive_spell, state.guid, s.spell_id})
+        end
+      end)
+    end
+
     Registry.dispatch(ThistleTea.PlayerRegistry, state.character.map, fn entries ->
       %{x: x1, y: y1, z: z1} = state.character.movement
 
