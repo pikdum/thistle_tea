@@ -48,7 +48,7 @@ defmodule ThistleTea.Mob do
   end
 
   def send_updates(state) do
-    packet = spawn_packet(state, state.movement_flags)
+    packet = update_packet(state, state.movement_flags)
 
     %{position_x: x1, position_y: y1, position_z: z1} = state.creature
 
@@ -58,7 +58,7 @@ defmodule ThistleTea.Mob do
         in_range = within_range({x1, y1, z1}, {x2, y2, z2})
 
         if in_range do
-          send(pid, {:send_update_packet, packet})
+          GenServer.cast(pid, {:send_update_packet, packet})
         end
       end
     end)
@@ -115,7 +115,7 @@ defmodule ThistleTea.Mob do
   end
 
   @impl GenServer
-  def handle_info({:receive_spell, _caster, _spell_id}, state) do
+  def handle_cast({:receive_spell, _caster, _spell_id}, state) do
     damage = random_int(100, 200)
     new_health = state.creature.curhealth - damage
     new_health = if new_health < 0, do: 0, else: new_health
@@ -125,14 +125,14 @@ defmodule ThistleTea.Mob do
   end
 
   @impl GenServer
-  def handle_call(:spawn_packet, _from, state) do
-    packet = spawn_packet(state)
-    {:reply, packet, state}
+  def handle_cast({:send_update_to, pid}, state) do
+    packet = update_packet(state, state.movement_flags)
+    GenServer.cast(pid, {:send_update_packet, packet})
+    {:noreply, state}
   end
 
-  def spawn_packet(state, movement_flags \\ 0) do
+  def update_packet(state, movement_flags \\ 0) do
     fields = %{
-      # TODO: how to avoid collision with player guids?
       object_guid: state.creature.guid,
       object_type: 9,
       object_entry: state.creature.id,

@@ -96,7 +96,7 @@ defmodule ThistleTea.Game.Movement do
 
         # broadcast movement packets
         if pid != self() and in_range do
-          send(pid, {:send_packet, msg, state.packed_guid <> body})
+          GenServer.cast(pid, {:send_packet, msg, state.packed_guid <> body})
         end
 
         # spawn in players as you move around
@@ -105,8 +105,7 @@ defmodule ThistleTea.Game.Movement do
             :ok
 
           in_range && not :ets.member(state.spawned_guids, guid) ->
-            packet = GenServer.call(pid, :spawn_packet)
-            send_update_packet(packet)
+            GenServer.cast(pid, {:send_update_to, self()})
             :ets.insert(state.spawned_guids, {guid, true})
 
           not in_range && :ets.member(state.spawned_guids, guid) ->
@@ -127,8 +126,7 @@ defmodule ThistleTea.Game.Movement do
 
         cond do
           in_range && not :ets.member(state.spawned_guids, guid) ->
-            packet = GenServer.call(pid, :spawn_packet)
-            send_update_packet(packet)
+            GenServer.cast(pid, {:send_update_to, self()})
             :ets.insert(state.spawned_guids, {guid, true})
 
           not in_range && :ets.member(state.spawned_guids, guid) ->
@@ -153,7 +151,7 @@ defmodule ThistleTea.Game.Movement do
             {_guid, x2, y2, z2} = values
 
             if within_range({x1, y1, z1}, {x2, y2, z2}) do
-              send(pid, {:send_update_packet, packet})
+              GenServer.cast(pid, {:send_update_packet, packet})
             end
           end
         end)
@@ -178,7 +176,7 @@ defmodule ThistleTea.Game.Movement do
     Registry.dispatch(ThistleTea.PlayerRegistry, "logged_in", fn entries ->
       for {pid, _} <- entries do
         if pid != self() do
-          send(pid, {:send_update_packet, packet})
+          GenServer.cast(pid, {:send_update_packet, packet})
         end
       end
     end)

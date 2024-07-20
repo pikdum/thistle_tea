@@ -265,18 +265,13 @@ defmodule ThistleTea.Game do
   end
 
   @impl GenServer
-  def handle_call(
-        {:build_update_packet, update_type, object_type, update_flag},
-        _from,
-        {socket, state}
-      ) do
-    packet = build_update_packet(state.character, update_type, object_type, update_flag)
-
-    {:reply, packet, {socket, state}}
+  def handle_cast({:send_update_packet, packet}, {socket, state}) do
+    send_update_packet(packet)
+    {:noreply, {socket, state}, socket.read_timeout}
   end
 
   @impl GenServer
-  def handle_call(:spawn_packet, _from, {socket, state}) do
+  def handle_cast({:send_update_to, pid}, {socket, state}) do
     packet =
       build_update_packet(
         state.character,
@@ -285,18 +280,7 @@ defmodule ThistleTea.Game do
         @update_flag_high_guid ||| @update_flag_living ||| @update_flag_has_position
       )
 
-    {:reply, packet, {socket, state}}
-  end
-
-  @impl GenServer
-  def handle_info({:send_packet, opcode, payload}, {socket, state}) do
-    send_packet(opcode, payload)
-    {:noreply, {socket, state}, socket.read_timeout}
-  end
-
-  @impl GenServer
-  def handle_info({:send_update_packet, packet}, {socket, state}) do
-    send_update_packet(packet)
+    GenServer.cast(pid, {:send_update_packet, packet})
     {:noreply, {socket, state}, socket.read_timeout}
   end
 
