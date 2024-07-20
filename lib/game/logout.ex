@@ -55,7 +55,10 @@ defmodule ThistleTea.Game.Logout do
           {_guid, x2, y2, z2} = values
 
           if within_range({x1, y1, z1}, {x2, y2, z2}) do
-            send(pid, {:send_packet, @smsg_destroy_object, <<state.guid::little-size(64)>>})
+            GenServer.cast(
+              pid,
+              {:send_packet, @smsg_destroy_object, <<state.guid::little-size(64)>>}
+            )
           end
         end
       end)

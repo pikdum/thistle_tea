@@ -46,7 +46,7 @@ defmodule ThistleTea.Game.Spell do
             {_guid, x2, y2, z2} = values
 
             if pid != self() and within_range({x1, y1, z1}, {x2, y2, z2}) do
-              send(
+              GenServer.cast(
                 pid,
                 {:send_packet, @smsg_spell_failed_other,
                  <<state.guid::little-size(64), spell.spell_id::little-size(32)>>}
@@ -102,7 +102,7 @@ defmodule ThistleTea.Game.Spell do
         {_guid, x2, y2, z2} = values
 
         if within_range({x1, y1, z1}, {x2, y2, z2}) do
-          send(pid, {:send_packet, @smsg_spell_start, spell_start})
+          GenServer.cast(pid, {:send_packet, @smsg_spell_start, spell_start})
         end
       end
     end)
@@ -164,7 +164,7 @@ defmodule ThistleTea.Game.Spell do
     if s.target != state.guid do
       Registry.dispatch(ThistleTea.UnitRegistry, s.target, fn entries ->
         for {pid, _} <- entries do
-          send(pid, {:receive_spell, state.guid, s.spell_id})
+          GenServer.cast(pid, {:receive_spell, state.guid, s.spell_id})
         end
       end)
     end
@@ -176,7 +176,7 @@ defmodule ThistleTea.Game.Spell do
         {_guid, x2, y2, z2} = values
 
         if within_range({x1, y1, z1}, {x2, y2, z2}) do
-          send(pid, {:send_packet, @smsg_spell_go, spell_go})
+          GenServer.cast(pid, {:send_packet, @smsg_spell_go, spell_go})
         end
       end
     end)

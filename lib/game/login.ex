@@ -132,9 +132,8 @@ defmodule ThistleTea.Game.Login do
         {guid, x2, y2, z2} = values
 
         if pid != self() and within_range({x1, y1, z1}, {x2, y2, z2}) do
-          send(pid, {:send_update_packet, packet})
-          packet = GenServer.call(pid, :spawn_packet)
-          send_update_packet(packet)
+          GenServer.cast(pid, {:send_update_packet, packet})
+          GenServer.cast(pid, {:send_update_to, self()})
           :ets.insert(state.spawned_guids, {guid, true})
         end
       end
@@ -145,8 +144,7 @@ defmodule ThistleTea.Game.Login do
         {guid, x2, y2, z2} = values
 
         if within_range({x1, y1, z1}, {x2, y2, z2}) do
-          packet = GenServer.call(pid, :spawn_packet)
-          send_update_packet(packet)
+          GenServer.cast(pid, {:send_update_to, self()})
           :ets.insert(state.spawned_guids, {guid, true})
         end
       end

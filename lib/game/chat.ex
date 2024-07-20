@@ -98,7 +98,7 @@ defmodule ThistleTea.Game.Chat do
         # TODO: for now, everybody receives
         Registry.dispatch(ThistleTea.PlayerRegistry, "all", fn entries ->
           for {pid, _} <- entries do
-            send(pid, {:send_packet, @smsg_messagechat, packet})
+            GenServer.cast(pid, {:send_packet, @smsg_messagechat, packet})
           end
         end)
 
@@ -117,7 +117,7 @@ defmodule ThistleTea.Game.Chat do
         # TODO: for now, everybody receives
         Registry.dispatch(ThistleTea.PlayerRegistry, "all", fn entries ->
           for {pid, _} <- entries do
-            send(pid, {:send_packet, @smsg_messagechat, packet})
+            GenServer.cast(pid, {:send_packet, @smsg_messagechat, packet})
           end
         end)
 
@@ -138,7 +138,7 @@ defmodule ThistleTea.Game.Chat do
         # TODO: for now, everybody receives
         Registry.dispatch(ThistleTea.PlayerRegistry, "all", fn entries ->
           for {pid, _} <- entries do
-            send(pid, {:send_packet, @smsg_messagechat, packet})
+            GenServer.cast(pid, {:send_packet, @smsg_messagechat, packet})
           end
         end)
 
@@ -165,7 +165,7 @@ defmodule ThistleTea.Game.Chat do
         # TODO: for now, everybody receives
         Registry.dispatch(ThistleTea.PlayerRegistry, "all", fn entries ->
           for {pid, _} <- entries do
-            send(pid, {:send_packet, @smsg_messagechat, packet})
+            GenServer.cast(pid, {:send_packet, @smsg_messagechat, packet})
           end
         end)
 
