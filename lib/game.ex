@@ -241,7 +241,12 @@ defmodule ThistleTea.Game do
       <<size::big-size(16), opcode::little-size(32)>> = decrypted_header
       <<payload::binary-size(size - 4), rest::binary>> = rest
       state = Map.put(state, :packet_stream, rest)
-      {action, state} = dispatch_packet(opcode, payload, state)
+
+      {action, state} =
+        :telemetry.span([:thistle_tea, :handle_packet], %{opcode: opcode}, fn ->
+          {action, state} = dispatch_packet(opcode, payload, state)
+          {{action, state}, %{opcode: opcode}}
+        end)
 
       # try to handle the next packet
       if byte_size(rest) >= 6 do
