@@ -36,6 +36,7 @@ defmodule ThistleTea.Application do
   def start(_type, _args) do
     children =
       [
+        ThistleTea.Telemetry,
         {Registry, keys: :unique, name: ThistleTea.UnitRegistry},
         {Registry, keys: :duplicate, name: ThistleTea.MobRegistry},
         {Registry, keys: :duplicate, name: ThistleTea.PlayerRegistry},
@@ -51,6 +52,14 @@ defmodule ThistleTea.Application do
     :ets.new(:session, [:named_table, :public])
     :ets.new(:guid_name, [:named_table, :public])
     setup_database()
+
+    :ok =
+      :telemetry.attach(
+        "handle-packet-handler",
+        [:thistle_tea, :handle_packet, :stop],
+        &ThistleTea.Telemetry.handle_event/4,
+        nil
+      )
 
     Logger.info("ThistleTea started.")
 
