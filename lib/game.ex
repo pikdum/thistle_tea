@@ -163,7 +163,7 @@ defmodule ThistleTea.Game do
   end
 
   def dispatch_packet(opcode, _payload, state) do
-    Logger.error("UNIMPLEMENTED: #{inspect(opcode, base: :hex)}")
+    Logger.error("UNIMPLEMENTED: #{ThistleTea.Opcodes.get(opcode)}")
     {:continue, state}
   end
 
