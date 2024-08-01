@@ -5,7 +5,9 @@ defmodule ThistleTea.Game do
   import ThistleTea.Game.Logout, only: [handle_logout: 1]
   import ThistleTea.Game.UpdateObject, only: [build_update_packet: 4]
   import ThistleTea.Game.Spell, only: [handle_spell_complete: 1]
-  import ThistleTea.Util, only: [send_packet: 2, send_update_packet: 1, parse_string: 1]
+
+  import ThistleTea.Util,
+    only: [send_packet: 2, send_update_packet: 1, parse_string: 1, within_range: 2]
 
   alias ThistleTea.CryptoStorage
 
@@ -15,6 +17,8 @@ defmodule ThistleTea.Game do
   @cmsg_auth_session 0x1ED
   @smsg_auth_response 0x1EE
   @smsg_pong 0x1DD
+
+  @smsg_destroy_object 0x0AA
 
   @smsg_logout_complete 0x04D
 
@@ -290,9 +294,16 @@ defmodule ThistleTea.Game do
   end
 
   @impl GenServer
+  def handle_cast({:destroy_object, guid}, {socket, state}) do
+    send_packet(@smsg_destroy_object, <<guid::little-size(64)>>)
+    :ets.delete(state.spawned_guids, guid)
+    {:noreply, {socket, state}, socket.read_timeout}
+  end
+
+  @impl GenServer
   def handle_info(:logout_complete, {socket, state}) do
     send_packet(@smsg_logout_complete, <<>>)
-    handle_logout(state)
+    state = handle_logout(state)
     {:noreply, {socket, state}, socket.read_timeout}
   end
 
@@ -300,6 +311,79 @@ defmodule ThistleTea.Game do
   def handle_info(:spell_complete, {socket, state}) do
     state = handle_spell_complete(state)
     {:noreply, {socket, state}, socket.read_timeout}
+  end
+
+  @impl GenServer
+  def handle_info(:spawn_objects, {socket, state}) do
+    # get all {pid, values} from registry
+    # filter to only those in range
+
+    if Map.get(state, :character) do
+      %{x: x1, y: y1, z: z1} = state.character.movement
+
+      player_pids =
+        ThistleTea.PlayerRegistry
+        |> Registry.select([
+          {{state.character.map, :"$1", {:"$2", :"$3", :"$4", :"$5"}}, [],
+           [{{:"$1", :"$2", :"$3", :"$4", :"$5"}}]}
+        ])
+        |> Enum.filter(fn {pid, guid, x2, y2, z2} ->
+          in_range = within_range({x1, y1, z1}, {x2, y2, z2})
+
+          cond do
+            pid == self() ->
+              :ok
+
+            in_range && not :ets.member(state.spawned_guids, guid) ->
+              GenServer.cast(pid, {:send_update_to, self()})
+              :ets.insert(state.spawned_guids, {guid, true})
+
+            not in_range && :ets.member(state.spawned_guids, guid) ->
+              send_packet(@smsg_destroy_object, <<guid::little-size(64)>>)
+              :ets.delete(state.spawned_guids, guid)
+
+            true ->
+              :ok
+          end
+
+          in_range
+        end)
+        |> Enum.map(fn {pid, _guid, _x, _y, _z} -> pid end)
+
+      mob_pids =
+        ThistleTea.MobRegistry
+        |> Registry.select([
+          {{state.character.map, :"$1", {:"$2", :"$3", :"$4", :"$5"}}, [],
+           [{{:"$1", :"$2", :"$3", :"$4", :"$5"}}]}
+        ])
+        |> Enum.filter(fn {pid, guid, x2, y2, z2} ->
+          in_range = within_range({x1, y1, z1}, {x2, y2, z2})
+
+          cond do
+            in_range && not :ets.member(state.spawned_guids, guid) ->
+              GenServer.cast(pid, {:send_update_to, self()})
+              :ets.insert(state.spawned_guids, {guid, true})
+
+            not in_range && :ets.member(state.spawned_guids, guid) ->
+              send_packet(@smsg_destroy_object, <<guid::little-size(64)>>)
+              :ets.delete(state.spawned_guids, guid)
+
+            true ->
+              :ok
+          end
+
+          in_range
+        end)
+        |> Enum.map(fn {pid, _guid, _x, _y, _z} -> pid end)
+
+      Process.send_after(self(), :spawn_objects, 1000)
+
+      new_state = Map.merge(state, %{player_pids: player_pids, mob_pids: mob_pids})
+
+      {:noreply, {socket, new_state}, socket.read_timeout}
+    else
+      {:noreply, {socket, state}, socket.read_timeout}
+    end
   end
 
   @impl ThousandIsland.Handler

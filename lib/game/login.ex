@@ -2,8 +2,7 @@ defmodule ThistleTea.Game.Login do
   import ThistleTea.Game.UpdateObject, only: [build_update_packet: 4]
   import Bitwise, only: [<<<: 2, |||: 2]
 
-  import ThistleTea.Util,
-    only: [pack_guid: 1, send_packet: 2, send_update_packet: 1, within_range: 2]
+  import ThistleTea.Util, only: [pack_guid: 1, send_packet: 2, send_update_packet: 1]
 
   alias ThistleTea.DBC
 
@@ -23,7 +22,7 @@ defmodule ThistleTea.Game.Login do
   @update_flag_self 0x01
   # @update_flag_transport 0x02
   # @update_flag_melee_attacking 0x04
-  @update_flag_high_guid 0x08
+  # @update_flag_high_guid 0x08
   @update_flag_all 0x10
   @update_flag_living 0x20
   @update_flag_has_position 0x40
@@ -121,34 +120,7 @@ defmodule ThistleTea.Game.Login do
     packet = build_update_packet(c, @update_type_create_object2, @object_type_player, update_flag)
     send_update_packet(packet)
 
-    # packet for others
-    update_flag = @update_flag_high_guid ||| @update_flag_living ||| @update_flag_has_position
-    packet = build_update_packet(c, @update_type_create_object2, @object_type_player, update_flag)
-
     {x1, y1, z1} = {c.movement.x, c.movement.y, c.movement.z}
-
-    Registry.dispatch(ThistleTea.PlayerRegistry, c.map, fn entries ->
-      for {pid, values} <- entries do
-        {guid, x2, y2, z2} = values
-
-        if pid != self() and within_range({x1, y1, z1}, {x2, y2, z2}) do
-          GenServer.cast(pid, {:send_update_packet, packet})
-          GenServer.cast(pid, {:send_update_to, self()})
-          :ets.insert(state.spawned_guids, {guid, true})
-        end
-      end
-    end)
-
-    Registry.dispatch(ThistleTea.MobRegistry, c.map, fn entries ->
-      for {pid, values} <- entries do
-        {guid, x2, y2, z2} = values
-
-        if within_range({x1, y1, z1}, {x2, y2, z2}) do
-          GenServer.cast(pid, {:send_update_to, self()})
-          :ets.insert(state.spawned_guids, {guid, true})
-        end
-      end
-    end)
 
     # join
     {:ok, _} = Registry.register(ThistleTea.PlayerRegistry, "all", c.name)
@@ -160,6 +132,8 @@ defmodule ThistleTea.Game.Login do
         packed_guid: pack_guid(character_guid),
         character: c
       })
+
+    Process.send_after(self(), :spawn_objects, 1000)
 
     {:continue, new_state}
   end
