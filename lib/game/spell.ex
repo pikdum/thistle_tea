@@ -1,5 +1,5 @@
 defmodule ThistleTea.Game.Spell do
-  import ThistleTea.Util, only: [send_packet: 2, unpack_guid: 1, within_range: 2]
+  import ThistleTea.Util, only: [send_packet: 2, unpack_guid: 1]
   import Bitwise, only: [&&&: 2]
 
   alias ThistleTea.DBC
@@ -39,21 +39,15 @@ defmodule ThistleTea.Game.Spell do
           <<state.guid::little-size(64), spell.spell_id::little-size(32), reason::little-size(8)>>
         )
 
-        Registry.dispatch(ThistleTea.PlayerRegistry, state.character.map, fn entries ->
-          %{x: x1, y: y1, z: z1} = state.character.movement
-
-          for {pid, values} <- entries do
-            {_guid, x2, y2, z2} = values
-
-            if pid != self() and within_range({x1, y1, z1}, {x2, y2, z2}) do
-              GenServer.cast(
-                pid,
-                {:send_packet, @smsg_spell_failed_other,
-                 <<state.guid::little-size(64), spell.spell_id::little-size(32)>>}
-              )
-            end
+        for pid <- Map.get(state, :player_pids, []) do
+          if pid != self() do
+            GenServer.cast(
+              pid,
+              {:send_packet, @smsg_spell_failed_other,
+               <<state.guid::little-size(64), spell.spell_id::little-size(32)>>}
+            )
           end
-        end)
+        end
 
         Map.delete(state, :spell)
     end
@@ -95,17 +89,9 @@ defmodule ThistleTea.Game.Spell do
         >> <>
         spell_cast_targets
 
-    Registry.dispatch(ThistleTea.PlayerRegistry, state.character.map, fn entries ->
-      %{x: x1, y: y1, z: z1} = state.character.movement
-
-      for {pid, values} <- entries do
-        {_guid, x2, y2, z2} = values
-
-        if within_range({x1, y1, z1}, {x2, y2, z2}) do
-          GenServer.cast(pid, {:send_packet, @smsg_spell_start, spell_start})
-        end
-      end
-    end)
+    for pid <- Map.get(state, :player_pids, []) do
+      GenServer.cast(pid, {:send_packet, @smsg_spell_start, spell_start})
+    end
 
     state =
       Map.put(state, :spell, %{
@@ -169,17 +155,9 @@ defmodule ThistleTea.Game.Spell do
       end)
     end
 
-    Registry.dispatch(ThistleTea.PlayerRegistry, state.character.map, fn entries ->
-      %{x: x1, y: y1, z: z1} = state.character.movement
-
-      for {pid, values} <- entries do
-        {_guid, x2, y2, z2} = values
-
-        if within_range({x1, y1, z1}, {x2, y2, z2}) do
-          GenServer.cast(pid, {:send_packet, @smsg_spell_go, spell_go})
-        end
-      end
-    end)
+    for pid <- Map.get(state, :player_pids, []) do
+      GenServer.cast(pid, {:send_packet, @smsg_spell_go, spell_go})
+    end
 
     Map.delete(state, :spell)
   end

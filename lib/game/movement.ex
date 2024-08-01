@@ -2,12 +2,10 @@ defmodule ThistleTea.Game.Movement do
   import ThistleTea.Character, only: [get_update_fields: 1]
   import ThistleTea.Game.Character, only: [generate_random_equipment: 0]
   import ThistleTea.Game.UpdateObject, only: [generate_packet: 2, decode_movement_info: 1]
-  import ThistleTea.Util, only: [within_range: 2, send_update_packet: 1, send_packet: 2]
 
   require Logger
 
   @update_type_values 0
-  @smsg_destroy_object 0x0AA
 
   @msg_move_start_forward 0x0B5
   @msg_move_start_backward 0x0B6
@@ -61,8 +59,6 @@ defmodule ThistleTea.Game.Movement do
              @msg_move_heartbeat,
              @cmsg_move_fall_reset
            ] do
-    %{x: x0, y: y0, z: z0} = state.character.movement
-
     # TODO: try update_in
     character =
       Map.put(
@@ -71,6 +67,7 @@ defmodule ThistleTea.Game.Movement do
         Map.merge(state.character.movement, decode_movement_info(body))
       )
 
+    %{x: x0, y: y0, z: z0} = state.character.movement
     %{x: x1, y: y1, z: z1} = character.movement
 
     state =
@@ -89,55 +86,12 @@ defmodule ThistleTea.Game.Movement do
     {:ok, _} =
       Registry.register(ThistleTea.PlayerRegistry, character.map, {state.guid, x1, y1, z1})
 
-    Registry.dispatch(ThistleTea.PlayerRegistry, character.map, fn entries ->
-      for {pid, values} <- entries do
-        {guid, x2, y2, z2} = values
-        in_range = within_range({x1, y1, z1}, {x2, y2, z2})
-
-        # broadcast movement packets
-        if pid != self() and in_range do
-          GenServer.cast(pid, {:send_packet, msg, state.packed_guid <> body})
-        end
-
-        # spawn in players as you move around
-        cond do
-          pid == self() ->
-            :ok
-
-          in_range && not :ets.member(state.spawned_guids, guid) ->
-            GenServer.cast(pid, {:send_update_to, self()})
-            :ets.insert(state.spawned_guids, {guid, true})
-
-          not in_range && :ets.member(state.spawned_guids, guid) ->
-            send_packet(@smsg_destroy_object, <<guid::little-size(64)>>)
-            :ets.delete(state.spawned_guids, guid)
-
-          true ->
-            :ok
-        end
+    # broadcast movement to nearby players
+    for pid <- Map.get(state, :player_pids, []) do
+      if pid != self() do
+        GenServer.cast(pid, {:send_packet, msg, state.packed_guid <> body})
       end
-    end)
-
-    # spawn in mobs as you move around
-    Registry.dispatch(ThistleTea.MobRegistry, state.character.map, fn entries ->
-      for {pid, values} <- entries do
-        {guid, x2, y2, z2} = values
-        in_range = within_range({x1, y1, z1}, {x2, y2, z2})
-
-        cond do
-          in_range && not :ets.member(state.spawned_guids, guid) ->
-            GenServer.cast(pid, {:send_update_to, self()})
-            :ets.insert(state.spawned_guids, {guid, true})
-
-          not in_range && :ets.member(state.spawned_guids, guid) ->
-            send_packet(@smsg_destroy_object, <<guid::little-size(64)>>)
-            :ets.delete(state.spawned_guids, guid)
-
-          true ->
-            :ok
-        end
-      end
-    end)
+    end
 
     # randomizes equipment on jump
     character =
@@ -146,15 +100,9 @@ defmodule ThistleTea.Game.Movement do
         fields = get_update_fields(character)
         packet = generate_packet(@update_type_values, fields)
 
-        Registry.dispatch(ThistleTea.PlayerRegistry, state.character.map, fn entries ->
-          for {pid, values} <- entries do
-            {_guid, x2, y2, z2} = values
-
-            if within_range({x1, y1, z1}, {x2, y2, z2}) do
-              GenServer.cast(pid, {:send_update_packet, packet})
-            end
-          end
-        end)
+        for pid <- Map.get(state, :player_pids, []) do
+          GenServer.cast(pid, {:send_update_packet, packet})
+        end
 
         character
       else
@@ -173,13 +121,11 @@ defmodule ThistleTea.Game.Movement do
 
     packet = generate_packet(@update_type_values, fields)
 
-    Registry.dispatch(ThistleTea.PlayerRegistry, "logged_in", fn entries ->
-      for {pid, _} <- entries do
-        if pid != self() do
-          GenServer.cast(pid, {:send_update_packet, packet})
-        end
+    for pid <- Map.get(state, :player_pids, []) do
+      if pid != self() do
+        GenServer.cast(pid, {:send_update_packet, packet})
       end
-    end)
+    end
 
     {:continue, state}
   end

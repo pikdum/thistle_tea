@@ -1,5 +1,5 @@
 defmodule ThistleTea.Game.Logout do
-  import ThistleTea.Util, only: [send_packet: 2, within_range: 2]
+  import ThistleTea.Util, only: [send_packet: 2]
 
   require Logger
 
@@ -8,8 +8,6 @@ defmodule ThistleTea.Game.Logout do
 
   @cmsg_logout_cancel 0x04E
   @smsg_logout_cancel_ack 0x04F
-
-  @smsg_destroy_object 0x0AA
 
   def handle_packet(@cmsg_logout_request, _body, state) do
     Logger.info("CMSG_LOGOUT_REQUEST")
@@ -41,27 +39,26 @@ defmodule ThistleTea.Game.Logout do
       ThistleTea.Character.save(state.character)
     end
 
-    # remove from pubsub
+    # cleanup
     Registry.unregister(ThistleTea.PlayerRegistry, "all")
     Registry.unregister(ThistleTea.PlayerRegistry, state.character.map)
+    :ets.delete_all_objects(state.spawned_guids)
 
     # broadcast destroy object
     if Map.get(state, :guid) do
-      Registry.dispatch(ThistleTea.PlayerRegistry, state.character.map, fn entries ->
-        {x1, y1, z1} =
-          {state.character.movement.x, state.character.movement.y, state.character.movement.z}
-
-        for {pid, values} <- entries do
-          {_guid, x2, y2, z2} = values
-
-          if within_range({x1, y1, z1}, {x2, y2, z2}) do
-            GenServer.cast(
-              pid,
-              {:send_packet, @smsg_destroy_object, <<state.guid::little-size(64)>>}
-            )
-          end
+      for pid <- Map.get(state, :player_pids, []) do
+        if pid != self() do
+          GenServer.cast(pid, {:destroy_object, state.guid})
         end
-      end)
+      end
     end
+
+    # reset state so nothing lingers
+    %{
+      seed: state.seed,
+      spawned_guids: state.spawned_guids,
+      crypto_pid: Map.get(state, :crypto_pid),
+      account: Map.get(state, :account)
+    }
   end
 end
