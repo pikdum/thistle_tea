@@ -20,7 +20,8 @@ defmodule ThistleTea.Character do
       :unit_display_id,
       :equipment,
       :movement,
-      :spells
+      :spells,
+      :sheath_state
     ],
     index: [:account_id, :name],
     type: :ordered_set,
@@ -86,6 +87,15 @@ defmodule ThistleTea.Character do
       unit_spirit: 50,
       unit_base_mana: 100_000,
       unit_base_health: 100,
+      unit_bytes_2: <<
+        c.sheath_state,
+        # unit pvp state
+        0,
+        # unit rename
+        0,
+        # ???
+        0
+      >>,
       player_flags: 0,
       player_features: <<c.skin, c.face, c.hair_style, c.hair_color>>,
       player_xp: 1,

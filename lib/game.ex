@@ -38,6 +38,16 @@ defmodule ThistleTea.Game do
     @cmsg_join_channel
   ]
 
+  @cmsg_attackswing 0x141
+  @cmsg_attackstop 0x142
+  @cmsg_setsheathed 0x1E0
+
+  @combat_opcodes [
+    @cmsg_attackswing,
+    @cmsg_attackstop,
+    @cmsg_setsheathed
+  ]
+
   @cmsg_player_login 0x03D
 
   @login_opcodes [
@@ -140,6 +150,10 @@ defmodule ThistleTea.Game do
 
   def dispatch_packet(opcode, payload, state) when opcode in @chat_opcodes do
     ThistleTea.Game.Chat.handle_packet(opcode, payload, state)
+  end
+
+  def dispatch_packet(opcode, payload, state) when opcode in @combat_opcodes do
+    ThistleTea.Game.Combat.handle_packet(opcode, payload, state)
   end
 
   def dispatch_packet(opcode, payload, state) when opcode in @login_opcodes do

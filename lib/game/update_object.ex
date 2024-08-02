@@ -205,6 +205,10 @@ defmodule ThistleTea.Game.UpdateObject do
       size: 1,
       offset: 0xA3
     },
+    unit_bytes_2: %{
+      size: 1,
+      offset: 0xA4
+    },
     player_flags: %{
       size: 1,
       offset: 0xBE
@@ -371,6 +375,7 @@ defmodule ThistleTea.Game.UpdateObject do
         :unit_spirit -> <<value::little-size(32)>>
         :unit_base_mana -> <<value::little-size(32)>>
         :unit_base_health -> <<value::little-size(32)>>
+        :unit_bytes_2 -> value
         :player_flags -> <<value::little-size(32)>>
         :player_features -> value
         :player_visible_item_1_0 -> <<value::little-size(32)>>

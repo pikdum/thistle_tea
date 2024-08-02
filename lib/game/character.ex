@@ -164,7 +164,8 @@ defmodule ThistleTea.Game.Character do
         timestamp: 0
       },
       equipment: generate_random_equipment(),
-      spells: spells
+      spells: spells,
+      sheath_state: 0
     }
 
     case ThistleTea.Character.create(character) do
