@@ -40,8 +40,9 @@ defmodule ThistleTea.Game.Logout do
     end
 
     # cleanup
-    Registry.unregister(ThistleTea.PlayerRegistry, "all")
-    Registry.unregister(ThistleTea.PlayerRegistry, state.character.map)
+    Registry.keys(ThistleTea.PlayerRegistry, self())
+    |> Enum.each(&Registry.unregister(ThistleTea.PlayerRegistry, &1))
+
     :ets.delete_all_objects(state.spawned_guids)
 
     # broadcast destroy object
