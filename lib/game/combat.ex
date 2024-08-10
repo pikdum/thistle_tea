@@ -27,7 +27,7 @@ defmodule ThistleTea.Game.Combat do
       GenServer.cast(pid, {:send_packet, @smsg_attackstart, payload})
     end
 
-    # use existing timer if already attacking?
+    # use existing timer if already attacking
     attack_timer =
       case Map.fetch(state, :attack_timer) do
         {:ok, timer} -> timer
@@ -38,17 +38,6 @@ defmodule ThistleTea.Game.Combat do
   end
 
   def handle_packet(@cmsg_attackstop, _body, state) do
-    # cancel attack timer, if any
-    state =
-      case Map.fetch(state, :attack_timer) do
-        {:ok, timer} ->
-          Process.cancel_timer(timer)
-          Map.delete(state, :attack_timer)
-
-        :error ->
-          state
-      end
-
     case Map.fetch(state, :attacking) do
       {:ok, target_guid} ->
         payload =
@@ -91,7 +80,7 @@ defmodule ThistleTea.Game.Combat do
         hit_info = 0x2
 
         # TODO: actual damage calculation + attack speed
-        # TODO: showing fist animation instead of equipped weapon
+        # TODO: showing fist animation instead of equipped weapon animation
         # TODO: do damage to target
         # TODO: range check, etc.
         payload =
@@ -121,7 +110,7 @@ defmodule ThistleTea.Game.Combat do
         Map.put(state, :attack_timer, attack_timer)
 
       :error ->
-        state
+        state |> Map.delete(:attack_timer)
     end
   end
 end
