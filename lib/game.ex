@@ -186,6 +186,14 @@ defmodule ThistleTea.Game do
     {:continue, state}
   end
 
+  def handle_additional_data(data, socket, state) do
+    if byte_size(data) > 0 do
+      handle_data(data, socket, state)
+    else
+      {:continue, state}
+    end
+  end
+
   @impl ThousandIsland.Handler
   def handle_data(
         <<size::big-size(16), @cmsg_auth_session::little-size(32), body::binary-size(size - 4),
@@ -193,7 +201,6 @@ defmodule ThistleTea.Game do
         socket,
         state
       ) do
-    if byte_size(additional_data) > 0, do: handle_data(additional_data, socket, state)
     <<_build::little-size(32), _server_id::little-size(32), rest::binary>> = body
     {:ok, username, rest} = parse_string(rest)
     Logger.metadata(username: username)
@@ -217,7 +224,8 @@ defmodule ThistleTea.Game do
       {:ok, account} = ThistleTea.Account.get_user(username)
       send_packet(@smsg_auth_response, <<0x0C, 0::little-size(32), 0, 0::little-size(32)>>)
 
-      {:continue, Map.merge(state, %{crypto_pid: crypto_pid, account: account})}
+      state = Map.merge(state, %{crypto_pid: crypto_pid, account: account})
+      handle_additional_data(additional_data, socket, state)
     else
       Logger.error("AUTH FAILURE")
       {:close, state}
@@ -231,7 +239,6 @@ defmodule ThistleTea.Game do
         socket,
         state
       ) do
-    if byte_size(additional_data) > 0, do: handle_data(additional_data, socket, state)
     <<sequence_id::little-size(32), latency::little-size(32)>> = body
 
     Logger.info("CMSG_PING latency=#{latency}")
@@ -241,45 +248,46 @@ defmodule ThistleTea.Game do
       <<6::big-size(16), @smsg_pong::little-size(16), sequence_id::little-size(32)>>
     )
 
-    {:continue, Map.put(state, :latency, latency)}
+    state = Map.put(state, :latency, latency)
+    handle_additional_data(additional_data, socket, state)
   end
 
   @impl ThousandIsland.Handler
   def handle_data(
         data,
-        _socket,
+        socket,
         state
       ) do
     state = Map.put(state, :packet_stream, Map.get(state, :packet_stream, <<>>) <> data)
-    handle_packet(state)
+    handle_packet(socket, state)
   end
 
-  def handle_packet(%{packet_stream: <<header::bytes-size(6), rest::binary>>} = state) do
-    with {:ok, decrypted_header} <-
-           CryptoStorage.decrypt_header(state.crypto_pid, header, byte_size(rest)) do
-      <<size::big-size(16), opcode::little-size(32)>> = decrypted_header
-      <<payload::binary-size(size - 4), rest::binary>> = rest
-      state = Map.put(state, :packet_stream, rest)
+  def handle_packet(socket, %{packet_stream: <<header::bytes-size(6), rest::binary>>} = state) do
+    case CryptoStorage.decrypt_header(state.crypto_pid, header, byte_size(rest)) do
+      {:ok, decrypted_header} ->
+        <<size::big-size(16), opcode::little-size(32)>> = decrypted_header
+        <<payload::binary-size(size - 4), rest::binary>> = rest
+        state = Map.delete(state, :packet_stream)
 
-      {action, state} =
-        :telemetry.span([:thistle_tea, :handle_packet], %{opcode: opcode}, fn ->
-          {action, state} = dispatch_packet(opcode, payload, state)
-          {{action, state}, %{opcode: opcode}}
-        end)
+        {action, state} =
+          :telemetry.span([:thistle_tea, :handle_packet], %{opcode: opcode}, fn ->
+            {action, state} = dispatch_packet(opcode, payload, state)
+            {{action, state}, %{opcode: opcode}}
+          end)
 
-      # try to handle the next packet
-      if byte_size(rest) >= 6 do
-        handle_packet(state)
-      else
-        {action, state}
-      end
-    else
-      {:error, _} -> {:continue, state}
+        if action == :continue do
+          handle_additional_data(rest, socket, state)
+        else
+          {action, state}
+        end
+
+      {:error, _} ->
+        {:continue, state}
     end
   end
 
   # accumulate packet_stream until enough data
-  def handle_packet(state), do: state
+  def handle_packet(_socket, state), do: {:continue, state}
 
   @impl GenServer
   def handle_cast({:send_packet, opcode, payload}, {socket, state}) do
