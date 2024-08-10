@@ -11,6 +11,10 @@ defmodule ThistleTea.Game.Combat do
 
   @smsg_attackstart 0x143
   @smsg_attackstop 0x144
+  @smsg_attackerstateupdate 0x14A
+
+  # TODO: hardcoded for now
+  @attack_speed 1_000
 
   @update_type_values 0
 
@@ -23,10 +27,28 @@ defmodule ThistleTea.Game.Combat do
       GenServer.cast(pid, {:send_packet, @smsg_attackstart, payload})
     end
 
-    {:continue, Map.put(state, :attacking, target_guid)}
+    # use existing timer if already attacking?
+    attack_timer =
+      case Map.fetch(state, :attack_timer) do
+        {:ok, timer} -> timer
+        :error -> Process.send_after(self(), :attack_swing, @attack_speed)
+      end
+
+    {:continue, Map.merge(state, %{attacking: target_guid, attack_timer: attack_timer})}
   end
 
   def handle_packet(@cmsg_attackstop, _body, state) do
+    # cancel attack timer, if any
+    state =
+      case Map.fetch(state, :attack_timer) do
+        {:ok, timer} ->
+          Process.cancel_timer(timer)
+          Map.delete(state, :attack_timer)
+
+        :error ->
+          state
+      end
+
     case Map.fetch(state, :attacking) do
       {:ok, target_guid} ->
         payload =
@@ -60,5 +82,46 @@ defmodule ThistleTea.Game.Combat do
     end
 
     {:continue, Map.put(state, :character, character)}
+  end
+
+  def handle_attack_swing(state) do
+    case Map.fetch(state, :attacking) do
+      {:ok, target_guid} ->
+        # normal_swing + affects_victim
+        hit_info = 0x2
+
+        # TODO: actual damage calculation + attack speed
+        # TODO: showing fist animation instead of equipped weapon
+        # TODO: do damage to target
+        # TODO: range check, etc.
+        payload =
+          <<hit_info::little-size(32)>> <>
+            state.packed_guid <>
+            pack_guid(target_guid) <>
+            <<
+              # damage
+              1::little-size(32),
+              # amount_of_damages
+              1::little-size(8),
+              # damage_state
+              0::little-size(32),
+              # unknown1
+              0::little-size(32),
+              # spell_id,
+              0::little-size(32),
+              # blocked_amount,
+              0::little-size(32)
+            >>
+
+        for pid <- Map.get(state, :player_pids, []) do
+          GenServer.cast(pid, {:send_packet, @smsg_attackerstateupdate, payload})
+        end
+
+        attack_timer = Process.send_after(self(), :attack_swing, @attack_speed)
+        Map.put(state, :attack_timer, attack_timer)
+
+      :error ->
+        state
+    end
   end
 end

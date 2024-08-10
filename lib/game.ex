@@ -5,6 +5,7 @@ defmodule ThistleTea.Game do
   import ThistleTea.Game.Logout, only: [handle_logout: 1]
   import ThistleTea.Game.UpdateObject, only: [build_update_packet: 4]
   import ThistleTea.Game.Spell, only: [handle_spell_complete: 1]
+  import ThistleTea.Game.Combat, only: [handle_attack_swing: 1]
 
   import ThistleTea.Util,
     only: [send_packet: 2, send_update_packet: 1, parse_string: 1, within_range: 2]
@@ -324,6 +325,12 @@ defmodule ThistleTea.Game do
   @impl GenServer
   def handle_info(:spell_complete, {socket, state}) do
     state = handle_spell_complete(state)
+    {:noreply, {socket, state}, socket.read_timeout}
+  end
+
+  @impl GenServer
+  def handle_info(:attack_swing, {socket, state}) do
+    state = handle_attack_swing(state)
     {:noreply, {socket, state}, socket.read_timeout}
   end
 
