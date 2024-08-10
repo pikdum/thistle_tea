@@ -120,7 +120,27 @@ defmodule ThistleTea.Character do
       player_visible_item_16_0: c.equipment.mainhand.entry,
       player_visible_item_17_0: c.equipment.offhand.entry,
       # player_visible_item_18_0: c.equipment.ranged.entry,
-      player_visible_item_19_0: c.equipment.tabard.entry
+      player_visible_item_19_0: c.equipment.tabard.entry,
+      # TODO: these are supposed to be guids, not template entries
+      player_field_inv_head: c.equipment.head.entry,
+      player_field_inv_neck: c.equipment.neck.entry,
+      player_field_inv_shoulders: c.equipment.shoulders.entry,
+      player_field_inv_body: c.equipment.body.entry,
+      player_field_inv_chest: c.equipment.chest.entry,
+      player_field_inv_waist: c.equipment.waist.entry,
+      player_field_inv_legs: c.equipment.legs.entry,
+      player_field_inv_feet: c.equipment.feet.entry,
+      player_field_inv_wrists: c.equipment.wrists.entry,
+      player_field_inv_hands: c.equipment.hands.entry,
+      player_field_inv_finger1: c.equipment.finger1.entry,
+      player_field_inv_finger2: c.equipment.finger2.entry,
+      player_field_inv_trinket1: c.equipment.trinket1.entry,
+      player_field_inv_trinket2: c.equipment.trinket2.entry,
+      player_field_inv_back: c.equipment.back.entry,
+      player_field_inv_mainhand: c.equipment.mainhand.entry,
+      player_field_inv_offhand: c.equipment.offhand.entry,
+      # player_field_inv_ranged: c.equipment.ranged.entry,
+      player_field_inv_tabard: c.equipment.tabard.entry
     }
   end
 

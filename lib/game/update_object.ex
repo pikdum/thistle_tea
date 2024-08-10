@@ -298,6 +298,89 @@ defmodule ThistleTea.Game.UpdateObject do
       size: 1,
       offset: 0x1DC
     },
+    # TODO: don't seem to be working
+    # maybe i'm missing something
+    player_field_inv_head: %{
+      size: 2,
+      offset: 0x1E6
+    },
+    player_field_inv_neck: %{
+      size: 2,
+      offset: 0x1E8
+    },
+    player_field_inv_shoulders: %{
+      size: 2,
+      offset: 0x1EA
+    },
+    player_field_inv_body: %{
+      size: 2,
+      offset: 0x1EC
+    },
+    player_field_inv_chest: %{
+      size: 2,
+      offset: 0x1EE
+    },
+    player_field_inv_waist: %{
+      size: 2,
+      offset: 0x1F0
+    },
+    player_field_inv_legs: %{
+      size: 2,
+      offset: 0x1F2
+    },
+    player_field_inv_feet: %{
+      size: 2,
+      offset: 0x1F4
+    },
+    player_field_inv_wrists: %{
+      size: 2,
+      offset: 0x1F6
+    },
+    player_field_inv_hands: %{
+      size: 2,
+      offset: 0x1F8
+    },
+    player_field_inv_finger1: %{
+      size: 2,
+      offset: 0x1FA
+    },
+    player_field_inv_finger2: %{
+      size: 2,
+      offset: 0x1FC
+    },
+    player_field_inv_trinket1: %{
+      size: 2,
+      offset: 0x1FE
+    },
+    player_field_inv_trinket2: %{
+      size: 2,
+      offset: 0x200
+    },
+    player_field_inv_back: %{
+      size: 2,
+      offset: 0x202
+    },
+    player_field_inv_mainhand: %{
+      size: 2,
+      offset: 0x204
+    },
+    player_field_inv_offhand: %{
+      size: 2,
+      offset: 0x206
+    },
+    player_field_inv_ranged: %{
+      size: 2,
+      offset: 0x208
+    },
+    player_field_inv_tabard: %{
+      size: 2,
+      offset: 0x20A
+    },
+    # to show where equipment should end
+    player_field_pack_1: %{
+      size: 2,
+      offset: 0x214
+    },
     player_xp: %{
       size: 1,
       offset: 0x2CC
@@ -397,6 +480,25 @@ defmodule ThistleTea.Game.UpdateObject do
         :player_visible_item_17_0 -> <<value::little-size(32)>>
         :player_visible_item_18_0 -> <<value::little-size(32)>>
         :player_visible_item_19_0 -> <<value::little-size(32)>>
+        :player_field_inv_head -> <<value::little-size(64)>>
+        :player_field_inv_neck -> <<value::little-size(64)>>
+        :player_field_inv_shoulders -> <<value::little-size(64)>>
+        :player_field_inv_body -> <<value::little-size(64)>>
+        :player_field_inv_chest -> <<value::little-size(64)>>
+        :player_field_inv_waist -> <<value::little-size(64)>>
+        :player_field_inv_legs -> <<value::little-size(64)>>
+        :player_field_inv_feet -> <<value::little-size(64)>>
+        :player_field_inv_wrists -> <<value::little-size(64)>>
+        :player_field_inv_hands -> <<value::little-size(64)>>
+        :player_field_inv_finger1 -> <<value::little-size(64)>>
+        :player_field_inv_finger2 -> <<value::little-size(64)>>
+        :player_field_inv_trinket1 -> <<value::little-size(64)>>
+        :player_field_inv_trinket2 -> <<value::little-size(64)>>
+        :player_field_inv_back -> <<value::little-size(64)>>
+        :player_field_inv_mainhand -> <<value::little-size(64)>>
+        :player_field_inv_offhand -> <<value::little-size(64)>>
+        :player_field_inv_ranged -> <<value::little-size(64)>>
+        :player_field_inv_tabard -> <<value::little-size(64)>>
         :player_xp -> <<value::little-size(32)>>
         :player_next_level_xp -> <<value::little-size(32)>>
         :player_rest_state_experience -> <<value::little-size(32)>>
