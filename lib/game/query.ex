@@ -44,7 +44,7 @@ defmodule ThistleTea.Game.Query do
     packet =
       <<item_id::little-size(32)>> <>
         if item do
-          <<item.class::big-size(32), item.subclass::big-size(32)>> <>
+          <<item.class::little-size(32), item.subclass::little-size(32)>> <>
             item.name <>
             <<0, 0, 0, 0>> <>
             <<

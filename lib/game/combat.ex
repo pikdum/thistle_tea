@@ -81,7 +81,6 @@ defmodule ThistleTea.Game.Combat do
 
         # TODO: actual damage calculation + attack speed
         damage = random_int(1, 50)
-        # TODO: showing fist animation instead of equipped weapon animation
         # TODO: do damage to target
         # TODO: range check, etc.
         payload =
