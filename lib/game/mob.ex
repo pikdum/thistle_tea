@@ -47,6 +47,24 @@ defmodule ThistleTea.Mob do
     }
   end
 
+  def take_damage(state, damage) do
+    new_health = state.creature.curhealth - damage
+    new_health = if new_health < 0, do: 0, else: new_health
+    state |> Map.put(:creature, %{state.creature | curhealth: new_health})
+  end
+
+  def face_player(state, player_guid) do
+    [{x2, y2}] =
+      ThistleTea.PlayerRegistry
+      |> Registry.select([
+        {{:_, :_, {player_guid, :"$1", :"$2", :_}}, [], [{{:"$1", :"$2"}}]}
+      ])
+
+    %{position_x: x1, position_y: y1} = state.creature
+    orientation = :math.atan2(y2 - y1, x2 - x1)
+    state |> Map.put(:creature, %{state.creature | orientation: orientation})
+  end
+
   def send_updates(state) do
     packet = update_packet(state, state.movement_flags)
 
@@ -116,29 +134,25 @@ defmodule ThistleTea.Mob do
 
   @impl GenServer
   def handle_cast({:receive_spell, caster, _spell_id}, state) do
+    # TODO: look up and apply spell effects
+
     damage = random_int(100, 200)
-    new_health = state.creature.curhealth - damage
-    new_health = if new_health < 0, do: 0, else: new_health
-
-    # TODO: look up and apply spell effects?
-
-    # orient the mob towards the caster
-    %{position_x: x1, position_y: y1} = state.creature
-
-    [{x2, y2}] =
-      ThistleTea.PlayerRegistry
-      |> Registry.select([
-        {{:_, :_, {caster, :"$1", :"$2", :_}}, [], [{{:"$1", :"$2"}}]}
-      ])
-
-    orientation = :math.atan2(y2 - y1, x2 - x1)
 
     state =
-      Map.put(
-        state,
-        :creature,
-        Map.merge(state.creature, %{orientation: orientation, curhealth: new_health})
-      )
+      state
+      |> take_damage(damage)
+      |> face_player(caster)
+
+    send_updates(state)
+    {:noreply, state}
+  end
+
+  @impl GenServer
+  def handle_cast({:receive_attack, caster, damage}, state) do
+    state =
+      state
+      |> take_damage(damage)
+      |> face_player(caster)
 
     send_updates(state)
     {:noreply, state}

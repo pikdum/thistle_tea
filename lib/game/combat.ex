@@ -1,7 +1,7 @@
 defmodule ThistleTea.Game.Combat do
   import ThistleTea.Character, only: [get_update_fields: 1]
   import ThistleTea.Game.UpdateObject, only: [generate_packet: 2]
-  import ThistleTea.Util, only: [pack_guid: 1]
+  import ThistleTea.Util, only: [pack_guid: 1, random_int: 2]
 
   require Logger
 
@@ -80,6 +80,7 @@ defmodule ThistleTea.Game.Combat do
         hit_info = 0x2
 
         # TODO: actual damage calculation + attack speed
+        damage = random_int(1, 50)
         # TODO: showing fist animation instead of equipped weapon animation
         # TODO: do damage to target
         # TODO: range check, etc.
@@ -89,7 +90,7 @@ defmodule ThistleTea.Game.Combat do
             pack_guid(target_guid) <>
             <<
               # damage
-              1::little-size(32),
+              damage::little-size(32),
               # amount_of_damages
               1::little-size(8),
               # damage_state
@@ -105,6 +106,14 @@ defmodule ThistleTea.Game.Combat do
         for pid <- Map.get(state, :player_pids, []) do
           GenServer.cast(pid, {:send_packet, @smsg_attackerstateupdate, payload})
         end
+
+        # TODO: come up with an abstraction for this + simplify
+        ThistleTea.UnitRegistry
+        |> Registry.dispatch(target_guid, fn entries ->
+          for {pid, _} <- entries do
+            GenServer.cast(pid, {:receive_attack, state.guid, damage})
+          end
+        end)
 
         attack_timer = Process.send_after(self(), :attack_swing, @attack_speed)
         Map.put(state, :attack_timer, attack_timer)
