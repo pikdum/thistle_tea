@@ -1,5 +1,4 @@
 defmodule ThistleTea.Game.UpdateObject do
-  import Binary, only: [reverse: 1]
   import Bitwise, only: [&&&: 2]
 
   import ThistleTea.Util, only: [pack_guid: 1]
@@ -397,26 +396,28 @@ defmodule ThistleTea.Game.UpdateObject do
 
   def mask_blocks_count(fields) do
     max_offset = Enum.max(Enum.map(Map.keys(fields), &Map.get(@field_defs, &1).offset))
-    trunc(:math.ceil(max_offset / 32))
+    max(trunc(:math.ceil(max_offset / 32)), 1)
   end
 
   def generate_mask(fields) do
     mask_count = mask_blocks_count(fields)
     mask_size = 32 * mask_count
-    mask = <<0::size(mask_size)>>
+    mask = Bitmap.new(mask_size)
 
     mask =
       Enum.reduce(fields, mask, fn {field, _value}, acc ->
         field_def = Map.get(@field_defs, field)
         size = field_def.size
-        offset = field_def.offset
+        start = field_def.offset
+        stop = start + size - 1
 
-        <<left::size(mask_size - offset - size), _::size(size), right::size(offset)>> = acc
-
-        <<left::size(mask_size - offset - size), 0xFFFFFF::size(size), right::size(offset)>>
+        # from start to stop, set bits to 1
+        Enum.reduce(start..stop, acc, fn i, acc ->
+          Bitmap.set(acc, i)
+        end)
       end)
 
-    reverse(mask)
+    <<mask.data::little-size(mask_size)>>
   end
 
   def generate_objects(fields) do
