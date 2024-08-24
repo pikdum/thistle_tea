@@ -78,7 +78,6 @@ defmodule ThistleTea.Game.Login do
       Enum.map(c.spells, &<<&1::little-size(16), 0::little-size(16)>>)
       |> Enum.reduce(<<>>, fn x, acc -> acc <> x end)
 
-    # TODO: why are durations instant when they shouldn't be?
     send_packet(
       @smsg_initial_spells,
       <<0, Enum.count(c.spells)::little-size(16)>> <>
@@ -94,7 +93,7 @@ defmodule ThistleTea.Game.Login do
     dt = DateTime.utc_now()
 
     date =
-      (dt.year - 100) <<< 24 ||| dt.month <<< 20 ||| (dt.day - 1) <<< 14 |||
+      (dt.year - 80) <<< 24 ||| (dt.month - 1) <<< 20 ||| (dt.day - 1) <<< 14 |||
         Date.day_of_week(dt) <<< 11 ||| dt.hour <<< 6 ||| dt.minute
 
     send_packet(
