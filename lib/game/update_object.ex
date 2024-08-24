@@ -168,6 +168,14 @@ defmodule ThistleTea.Game.UpdateObject do
       size: 1,
       offset: 0x84
     },
+    unit_min_damage: %{
+      size: 1,
+      offset: 0x86
+    },
+    unit_max_damage: %{
+      size: 1,
+      offset: 0x87
+    },
     unit_bytes_1: %{
       size: 1,
       offset: 0x8A
@@ -450,6 +458,8 @@ defmodule ThistleTea.Game.UpdateObject do
         :unit_base_attack_time -> <<value::little-size(64)>>
         :unit_display_id -> <<value::little-size(32)>>
         :unit_native_display_id -> <<value::little-size(32)>>
+        :unit_min_damage -> <<value::little-float-size(32)>>
+        :unit_max_damage -> <<value::little-float-size(32)>>
         :unit_bytes_1 -> value
         :unit_mod_cast_speed -> <<value::little-float-size(32)>>
         :unit_strength -> <<value::little-size(32)>>
@@ -500,6 +510,7 @@ defmodule ThistleTea.Game.UpdateObject do
         :player_field_inv_offhand -> <<value::little-size(64)>>
         :player_field_inv_ranged -> <<value::little-size(64)>>
         :player_field_inv_tabard -> <<value::little-size(64)>>
+        :player_field_pack_1 -> <<value::little-size(64)>>
         :player_xp -> <<value::little-size(32)>>
         :player_next_level_xp -> <<value::little-size(32)>>
         :player_rest_state_experience -> <<value::little-size(32)>>
