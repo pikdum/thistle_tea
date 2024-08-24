@@ -60,9 +60,9 @@ defmodule ThistleTea.Game.Character do
             c.level,
             c.area::little-size(32),
             c.map::little-size(32),
-            c.movement.x::float-size(32),
-            c.movement.y::float-size(32),
-            c.movement.z::float-size(32)
+            c.movement.x::little-float-size(32),
+            c.movement.y::little-float-size(32),
+            c.movement.z::little-float-size(32)
           >> <>
           <<
             # guild_id
