@@ -76,7 +76,8 @@ defmodule ThistleTea.Character do
       unit_level: c.level,
       unit_faction_template: 1,
       unit_bytes_0: <<c.race, c.class, c.gender, get_power(c.class)>>,
-      unit_base_attack_time: 1_000,
+      # TODO: safer way to get this, but is it even used here?
+      unit_base_attack_time: c.equipment.mainhand.delay,
       unit_display_id: c.unit_display_id,
       unit_native_display_id: c.unit_display_id,
       unit_min_damage: 10,
@@ -124,6 +125,7 @@ defmodule ThistleTea.Character do
       # player_visible_item_18_0: c.equipment.ranged.entry,
       player_visible_item_19_0: c.equipment.tabard.entry,
       # TODO: these are supposed to be guids, not template entries
+      # don't think this works anyways
       player_field_inv_head: c.equipment.head.entry,
       player_field_inv_neck: c.equipment.neck.entry,
       player_field_inv_shoulders: c.equipment.shoulders.entry,

@@ -7,7 +7,11 @@ defmodule ThistleTea.Util do
 
   @range 250
 
-  def random_int(min, max) do
+  def random_int(min, max) when is_float(min) and is_float(max) do
+    random_int(round(min), round(max))
+  end
+
+  def random_int(min, max) when is_integer(min) and is_integer(max) do
     :rand.uniform(max - min + 1) + min - 1
   end
 

@@ -21,6 +21,8 @@ defmodule ThistleTea.Mob do
   # @movement_flag_forward 0x00000001
   @movement_flag_fixed_z 0x00000800
 
+  @smsg_attackerstateupdate 0x14A
+
   def start_link(creature) do
     GenServer.start_link(__MODULE__, creature)
   end
@@ -63,6 +65,40 @@ defmodule ThistleTea.Mob do
     %{position_x: x1, position_y: y1} = state.creature
     orientation = :math.atan2(y2 - y1, x2 - x1)
     state |> Map.put(:creature, %{state.creature | orientation: orientation})
+  end
+
+  def send_attacker_state_update(state, attack) do
+    payload =
+      <<Map.get(attack, :hit_info, 0x2)::little-size(32)>> <>
+        pack_guid(Map.get(attack, :caster)) <>
+        pack_guid(state.creature.guid) <>
+        <<
+          # damage
+          Map.get(attack, :damage, 0)::little-size(32),
+          # amount_of_damages
+          Map.get(attack, :damage_count, 1)::little-size(8),
+          # damage_state
+          Map.get(attack, :damage_state, 0)::little-size(32),
+          # unknown1
+          0::little-size(32),
+          # spell_id,
+          Map.get(attack, :spell_id, 0)::little-size(32),
+          # blocked_amount,
+          Map.get(attack, :blocked_amount, 0)::little-size(32)
+        >>
+
+    %{position_x: x1, position_y: y1, position_z: z1} = state.creature
+
+    Registry.dispatch(ThistleTea.PlayerRegistry, state.creature.map, fn entries ->
+      for {pid, values} <- entries do
+        {_guid, x2, y2, z2} = values
+        in_range = within_range({x1, y1, z1}, {x2, y2, z2})
+
+        if in_range do
+          GenServer.cast(pid, {:send_packet, @smsg_attackerstateupdate, payload})
+        end
+      end
+    end)
   end
 
   def send_updates(state) do
@@ -143,17 +179,30 @@ defmodule ThistleTea.Mob do
       |> take_damage(damage)
       |> face_player(caster)
 
+    # attack = %{
+    #   caster: caster,
+    #   spell_id: spell_id,
+    #   damage: damage,
+    #   hit_info: 0x10000
+    # }
+
+    # send_attacker_state_update(state, attack)
     send_updates(state)
     {:noreply, state}
   end
 
   @impl GenServer
-  def handle_cast({:receive_attack, caster, damage}, state) do
+  def handle_cast({:receive_attack, attack}, state) do
+    # TODO: calculate damage, send over everything necessary?
+    damage = random_int(Map.get(attack, :min_damage, 5), Map.get(attack, :max_damage, 25))
+
     state =
       state
       |> take_damage(damage)
-      |> face_player(caster)
+      |> face_player(Map.get(attack, :caster))
 
+    attack = Map.merge(attack, %{damage: damage})
+    send_attacker_state_update(state, attack)
     send_updates(state)
     {:noreply, state}
   end

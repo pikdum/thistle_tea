@@ -143,7 +143,7 @@ defmodule ThistleTea.Game.Character do
       hair_color: hair_color,
       facial_hair: facial_hair,
       outfit_id: outfit_id,
-      level: 1,
+      level: 60,
       area: info.zone,
       map: info.map,
       unit_display_id: unit_display_id,

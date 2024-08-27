@@ -1,7 +1,7 @@
 defmodule ThistleTea.Game.Combat do
   import ThistleTea.Character, only: [get_update_fields: 1]
   import ThistleTea.Game.UpdateObject, only: [generate_packet: 2]
-  import ThistleTea.Util, only: [pack_guid: 1, random_int: 2]
+  import ThistleTea.Util, only: [pack_guid: 1]
 
   require Logger
 
@@ -11,10 +11,6 @@ defmodule ThistleTea.Game.Combat do
 
   @smsg_attackstart 0x143
   @smsg_attackstop 0x144
-  @smsg_attackerstateupdate 0x14A
-
-  # TODO: hardcoded for now
-  @attack_speed 1_000
 
   @update_type_values 0
 
@@ -27,11 +23,14 @@ defmodule ThistleTea.Game.Combat do
       GenServer.cast(pid, {:send_packet, @smsg_attackstart, payload})
     end
 
+    # TODO: safer way to get this
+    attack_speed = state.character.equipment.mainhand.delay
+
     # use existing timer if already attacking
     attack_timer =
       case Map.fetch(state, :attack_timer) do
         {:ok, timer} -> timer
-        :error -> Process.send_after(self(), :attack_swing, @attack_speed)
+        :error -> Process.send_after(self(), :attack_swing, attack_speed)
       end
 
     {:continue, Map.merge(state, %{attacking: target_guid, attack_timer: attack_timer})}
@@ -76,45 +75,24 @@ defmodule ThistleTea.Game.Combat do
   def handle_attack_swing(state) do
     case Map.fetch(state, :attacking) do
       {:ok, target_guid} ->
-        # normal_swing + affects_victim
-        hit_info = 0x2
-
-        # TODO: actual damage calculation + attack speed
-        damage = random_int(1, 50)
-        # TODO: do damage to target
-        # TODO: range check, etc.
-        payload =
-          <<hit_info::little-size(32)>> <>
-            state.packed_guid <>
-            pack_guid(target_guid) <>
-            <<
-              # damage
-              damage::little-size(32),
-              # amount_of_damages
-              1::little-size(8),
-              # damage_state
-              0::little-size(32),
-              # unknown1
-              0::little-size(32),
-              # spell_id,
-              0::little-size(32),
-              # blocked_amount,
-              0::little-size(32)
-            >>
-
-        for pid <- Map.get(state, :player_pids, []) do
-          GenServer.cast(pid, {:send_packet, @smsg_attackerstateupdate, payload})
-        end
+        weapon = state.character.equipment.mainhand
 
         # TODO: come up with an abstraction for this + simplify
         ThistleTea.UnitRegistry
         |> Registry.dispatch(target_guid, fn entries ->
           for {pid, _} <- entries do
-            GenServer.cast(pid, {:receive_attack, state.guid, damage})
+            GenServer.cast(
+              pid,
+              {:receive_attack,
+               %{caster: state.guid, min_damage: weapon.dmg_min1, max_damage: weapon.dmg_max1}}
+            )
           end
         end)
 
-        attack_timer = Process.send_after(self(), :attack_swing, @attack_speed)
+        # TODO: safer way to get this
+        attack_speed = weapon.delay
+
+        attack_timer = Process.send_after(self(), :attack_swing, attack_speed)
         Map.put(state, :attack_timer, attack_timer)
 
       :error ->
