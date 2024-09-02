@@ -27,6 +27,9 @@ defmodule ThistleTea.Character do
     type: :ordered_set,
     autoincrement: true
 
+  # TODO: use high guids properly for all guid types
+  @item_guid_offset 0x40000000
+
   def create(character) do
     with {:exists, false} <- {:exists, character_exists?(character.name)},
          {:limit, false} <- {:limit, at_character_limit?(character.account_id)},
@@ -126,25 +129,26 @@ defmodule ThistleTea.Character do
       player_visible_item_19_0: c.equipment.tabard.entry,
       # TODO: these are supposed to be guids, not template entries
       # don't think this works anyways
-      player_field_inv_head: c.equipment.head.entry,
-      player_field_inv_neck: c.equipment.neck.entry,
-      player_field_inv_shoulders: c.equipment.shoulders.entry,
-      player_field_inv_body: c.equipment.body.entry,
-      player_field_inv_chest: c.equipment.chest.entry,
-      player_field_inv_waist: c.equipment.waist.entry,
-      player_field_inv_legs: c.equipment.legs.entry,
-      player_field_inv_feet: c.equipment.feet.entry,
-      player_field_inv_wrists: c.equipment.wrists.entry,
-      player_field_inv_hands: c.equipment.hands.entry,
-      player_field_inv_finger1: c.equipment.finger1.entry,
-      player_field_inv_finger2: c.equipment.finger2.entry,
-      player_field_inv_trinket1: c.equipment.trinket1.entry,
-      player_field_inv_trinket2: c.equipment.trinket2.entry,
-      player_field_inv_back: c.equipment.back.entry,
-      player_field_inv_mainhand: c.equipment.mainhand.entry,
-      player_field_inv_offhand: c.equipment.offhand.entry,
-      # player_field_inv_ranged: c.equipment.ranged.entry,
-      player_field_inv_tabard: c.equipment.tabard.entry
+      player_field_inv_head: c.equipment.head.entry + @item_guid_offset,
+      player_field_inv_neck: c.equipment.neck.entry + @item_guid_offset,
+      player_field_inv_shoulders: c.equipment.shoulders.entry + @item_guid_offset,
+      player_field_inv_body: c.equipment.body.entry + @item_guid_offset,
+      player_field_inv_chest: c.equipment.chest.entry + @item_guid_offset,
+      player_field_inv_waist: c.equipment.waist.entry + @item_guid_offset,
+      player_field_inv_legs: c.equipment.legs.entry + @item_guid_offset,
+      player_field_inv_feet: c.equipment.feet.entry + @item_guid_offset,
+      player_field_inv_wrists: c.equipment.wrists.entry + @item_guid_offset,
+      player_field_inv_hands: c.equipment.hands.entry + @item_guid_offset,
+      player_field_inv_finger1: c.equipment.finger1.entry + @item_guid_offset,
+      player_field_inv_finger2: c.equipment.finger2.entry + @item_guid_offset,
+      player_field_inv_trinket1: c.equipment.trinket1.entry + @item_guid_offset,
+      player_field_inv_trinket2: c.equipment.trinket2.entry + @item_guid_offset,
+      player_field_inv_back: c.equipment.back.entry + @item_guid_offset,
+      player_field_inv_mainhand: c.equipment.mainhand.entry + @item_guid_offset,
+      player_field_inv_offhand: c.equipment.offhand.entry + @item_guid_offset,
+      # player_field_inv_ranged: c.equipment.ranged.entry + @item_guid_offset,
+      player_field_inv_tabard: c.equipment.tabard.entry + @item_guid_offset
+      # player_field_pack_1: c.equipment.mainhand.entry + @item_guid_offset
     }
   end
 
