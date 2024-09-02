@@ -87,6 +87,62 @@ defmodule ThistleTea.Game.UpdateObject do
       size: 1,
       offset: 0x4
     },
+    item_owner: %{
+      size: 2,
+      offset: 0x6
+    },
+    item_contained: %{
+      size: 2,
+      offset: 0x8
+    },
+    item_creator: %{
+      size: 2,
+      offset: 0xA
+    },
+    item_gift_creator: %{
+      size: 2,
+      offset: 0xC
+    },
+    item_stack_count: %{
+      size: 1,
+      offset: 0xE
+    },
+    item_duration: %{
+      size: 1,
+      offset: 0xF
+    },
+    item_spell_charges: %{
+      size: 5,
+      offset: 0x10
+    },
+    item_flags: %{
+      size: 1,
+      offset: 0x15
+    },
+    item_enchantment: %{
+      size: 21,
+      offset: 0x16
+    },
+    item_property_seed: %{
+      size: 1,
+      offset: 0x2B
+    },
+    item_random_properties_id: %{
+      size: 1,
+      offset: 0x2C
+    },
+    item_item_text_id: %{
+      size: 1,
+      offset: 0x2D
+    },
+    item_durability: %{
+      size: 1,
+      offset: 0x2E
+    },
+    item_max_durability: %{
+      size: 1,
+      offset: 0x2F
+    },
     unit_health: %{
       size: 1,
       offset: 0x16
@@ -388,6 +444,10 @@ defmodule ThistleTea.Game.UpdateObject do
       size: 2,
       offset: 0x214
     },
+    player_field_bank_1: %{
+      size: 2,
+      offset: 0x234
+    },
     player_xp: %{
       size: 1,
       offset: 0x2CC
@@ -439,6 +499,15 @@ defmodule ThistleTea.Game.UpdateObject do
         :object_type -> <<value::little-size(32)>>
         :object_entry -> <<value::little-size(32)>>
         :object_scale_x -> <<value::little-float-size(32)>>
+        :item_owner -> <<value::little-size(64)>>
+        :item_contained -> <<value::little-size(64)>>
+        :item_creator -> <<value::little-size(64)>>
+        :item_gift_creator -> <<value::little-size(64)>>
+        :item_stack_count -> <<value::little-size(32)>>
+        :item_duration -> <<value::little-size(32)>>
+        :item_durability -> <<value::little-size(32)>>
+        :item_max_durability -> <<value::little-size(32)>>
+        :item_flags -> <<value::little-size(32)>>
         :unit_health -> <<value::little-size(32)>>
         :unit_power_1 -> <<value::little-size(32)>>
         :unit_power_2 -> <<value::little-size(32)>>
@@ -608,6 +677,9 @@ defmodule ThistleTea.Game.UpdateObject do
         (m.update_flag &&& @update_flag_has_position) > 0 ->
           <<m.x::little-float-size(32), m.y::little-float-size(32), m.z::little-float-size(32),
             m.orientation::little-float-size(32)>>
+
+        true ->
+          <<>>
       end <>
       if (m.update_flag &&& @update_flag_high_guid) > 0 do
         # unknown - mangos sets to 0
