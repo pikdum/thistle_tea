@@ -8,7 +8,7 @@ defmodule ThistleTea.Game do
   import ThistleTea.Game.Combat, only: [handle_attack_swing: 1]
 
   import ThistleTea.Util,
-    only: [send_packet: 2, send_update_packet: 1, parse_string: 1, within_range: 2]
+    only: [send_packet: 2, send_update_packet: 1, parse_string: 1]
 
   alias ThistleTea.CryptoStorage
 
@@ -319,7 +319,7 @@ defmodule ThistleTea.Game do
   @impl GenServer
   def handle_cast({:destroy_object, guid}, {socket, state}) do
     send_packet(@smsg_destroy_object, <<guid::little-size(64)>>)
-    :ets.delete(state.spawned_guids, guid)
+    # TODO: remove from spawned_players/etc.?
     {:noreply, {socket, state}, socket.read_timeout}
   end
 
@@ -344,70 +344,55 @@ defmodule ThistleTea.Game do
 
   @impl GenServer
   def handle_info(:spawn_objects, {socket, state}) do
-    # get all {pid, values} from registry
-    # filter to only those in range
-
+    # TODO: add telemetry for periodic tasks
     if Map.get(state, :character) do
-      %{x: x1, y: y1, z: z1} = state.character.movement
+      %{x: x, y: y, z: z} = state.character.movement
 
-      player_pids =
-        ThistleTea.PlayerRegistry
-        |> Registry.select([
-          {{state.character.map, :"$1", {:"$2", :"$3", :"$4", :"$5"}}, [],
-           [{{:"$1", :"$2", :"$3", :"$4", :"$5"}}]}
-        ])
-        |> Enum.filter(fn {pid, guid, x2, y2, z2} ->
-          in_range = within_range({x1, y1, z1}, {x2, y2, z2})
+      old_players = Map.get(state, :spawned_players, MapSet.new())
+      old_mobs = Map.get(state, :spawned_mobs, MapSet.new())
 
-          cond do
-            pid == self() ->
-              :ok
+      new_players =
+        SpatialHash.query(:players, state.character.map, x, y, z, 250)
+        |> Enum.map(fn {guid, pid, _distance} -> {guid, pid} end)
+        |> MapSet.new()
 
-            in_range && not :ets.member(state.spawned_guids, guid) ->
-              GenServer.cast(pid, {:send_update_to, self()})
-              :ets.insert(state.spawned_guids, {guid, true})
+      new_mobs =
+        SpatialHash.query(:mobs, state.character.map, x, y, z, 250)
+        |> Enum.map(fn {guid, pid, _distance} -> {guid, pid} end)
+        |> MapSet.new()
 
-            not in_range && :ets.member(state.spawned_guids, guid) ->
-              send_packet(@smsg_destroy_object, <<guid::little-size(64)>>)
-              :ets.delete(state.spawned_guids, guid)
+      players_to_remove = MapSet.difference(old_players, new_players)
+      mobs_to_remove = MapSet.difference(old_mobs, new_mobs)
 
-            true ->
-              :ok
-          end
+      players_to_add = MapSet.difference(new_players, old_players)
+      mobs_to_add = MapSet.difference(new_mobs, old_mobs)
 
-          in_range
-        end)
-        |> Enum.map(fn {pid, _guid, _x, _y, _z} -> pid end)
+      # TODO: update a reverse mapping, so mobs know nearby players
+      for {guid, pid} <- MapSet.union(players_to_remove, mobs_to_remove) do
+        if pid != self() do
+          send_packet(@smsg_destroy_object, <<guid::little-size(64)>>)
+        end
+      end
 
-      mob_pids =
-        ThistleTea.MobRegistry
-        |> Registry.select([
-          {{state.character.map, :"$1", {:"$2", :"$3", :"$4", :"$5"}}, [],
-           [{{:"$1", :"$2", :"$3", :"$4", :"$5"}}]}
-        ])
-        |> Enum.filter(fn {pid, guid, x2, y2, z2} ->
-          in_range = within_range({x1, y1, z1}, {x2, y2, z2})
+      for {_guid, pid} <- MapSet.union(players_to_add, mobs_to_add) do
+        if pid != self() do
+          GenServer.cast(pid, {:send_update_to, self()})
+        end
+      end
 
-          cond do
-            in_range && not :ets.member(state.spawned_guids, guid) ->
-              GenServer.cast(pid, {:send_update_to, self()})
-              :ets.insert(state.spawned_guids, {guid, true})
+      # TODO: redundant, refactor out?
+      player_pids = new_players |> Enum.map(fn {_guid, pid} -> pid end)
+      mob_pids = new_mobs |> Enum.map(fn {_guid, pid} -> pid end)
 
-            not in_range && :ets.member(state.spawned_guids, guid) ->
-              send_packet(@smsg_destroy_object, <<guid::little-size(64)>>)
-              :ets.delete(state.spawned_guids, guid)
-
-            true ->
-              :ok
-          end
-
-          in_range
-        end)
-        |> Enum.map(fn {pid, _guid, _x, _y, _z} -> pid end)
+      new_state =
+        Map.merge(state, %{
+          spawned_players: new_players,
+          spawned_mobs: new_mobs,
+          player_pids: player_pids,
+          mob_pids: mob_pids
+        })
 
       Process.send_after(self(), :spawn_objects, 1000)
-
-      new_state = Map.merge(state, %{player_pids: player_pids, mob_pids: mob_pids})
 
       {:noreply, {socket, new_state}, socket.read_timeout}
     else
@@ -425,9 +410,7 @@ defmodule ThistleTea.Game do
       <<6::big-size(16), @smsg_auth_challenge::little-size(16)>> <> seed
     )
 
-    spawned_guids = :ets.new(:spawned_guids, [:set])
-
-    {:continue, %{seed: seed, spawned_guids: spawned_guids}}
+    {:continue, %{seed: seed}}
   end
 
   @impl ThousandIsland.Handler

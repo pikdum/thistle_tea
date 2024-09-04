@@ -52,6 +52,7 @@ defmodule ThistleTea.Application do
     :ets.new(:session, [:named_table, :public])
     :ets.new(:guid_name, [:named_table, :public])
     setup_database()
+    SpatialHash.setup_tables()
 
     :ok =
       :telemetry.attach(

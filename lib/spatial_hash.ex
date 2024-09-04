@@ -1,5 +1,6 @@
 defmodule SpatialHash do
-  @cell_size 50
+  @cell_size 125
+  # TODO: benchmark different cell sizes
 
   def setup_tables do
     :ets.new(:players, [:named_table, :public, :duplicate_bag])
@@ -8,30 +9,35 @@ defmodule SpatialHash do
     :ets.new(:locations, [:named_table, :public, :set])
   end
 
-  def insert(table, guid, map, x, y, z) do
+  def insert(table, guid, pid, map, x, y, z) do
     hash = hash_position(map, x, y, z)
     :ets.insert(table, {hash, guid})
-    :ets.insert(:locations, {guid, map, x, y, z})
+    :ets.insert(:locations, {guid, pid, map, x, y, z})
   end
 
-  def update(table, guid, new_map, new_x, new_y, new_z) do
+  def update(table, guid, pid, new_map, new_x, new_y, new_z) do
     case :ets.lookup(:locations, guid) do
-      [{^guid, old_map, old_x, old_y, old_z}] ->
+      [{^guid, _pid, old_map, old_x, old_y, old_z}] ->
         old_hash = hash_position(old_map, old_x, old_y, old_z)
         new_hash = hash_position(new_map, new_x, new_y, new_z)
 
-        :ets.delete_object(table, {old_hash, guid})
-        :ets.insert(table, {new_hash, guid})
-        :ets.insert(:locations, {guid, new_map, new_x, new_y, new_z})
+        # update exact location regardless
+        :ets.insert(:locations, {guid, pid, new_map, new_x, new_y, new_z})
+
+        # only update cell if it changed
+        if old_hash != new_hash do
+          :ets.delete_object(table, {old_hash, guid})
+          :ets.insert(table, {new_hash, guid})
+        end
 
       [] ->
-        insert(table, guid, new_map, new_x, new_y, new_z)
+        insert(table, guid, pid, new_map, new_x, new_y, new_z)
     end
   end
 
   def remove(table, guid) do
     case :ets.lookup(:locations, guid) do
-      [{^guid, map, x, y, z}] ->
+      [{^guid, _pid, map, x, y, z}] ->
         hash = hash_position(map, x, y, z)
         :ets.delete_object(table, {hash, guid})
         :ets.delete(:locations, guid)
@@ -41,25 +47,18 @@ defmodule SpatialHash do
     end
   end
 
-  def query_range(table, map, x, y, z, range) do
-    cells_to_check = cells_in_range(map, x, y, z, range)
-
-    nearby_guids =
-      cells_to_check
-      |> Enum.flat_map(fn cell ->
-        :ets.lookup(table, cell)
-      end)
-      |> Enum.map(fn {_hash, guid} -> guid end)
-
-    nearby_guids
-    |> Enum.filter(fn guid ->
-      case :ets.lookup(:locations, guid) do
-        [{^guid, ^map, obj_x, obj_y, obj_z}] ->
-          distance({x, y, z}, {obj_x, obj_y, obj_z}) <= range
-
-        _ ->
-          false
-      end
+  def query(table, map, x1, y1, z1, range) do
+    cells_in_range(map, x1, y1, z1, range)
+    |> Stream.flat_map(fn cell ->
+      :ets.lookup(table, cell)
+    end)
+    |> Stream.map(fn {_hash, guid} ->
+      [{^guid, pid, ^map, x2, y2, z2}] = :ets.lookup(:locations, guid)
+      distance = distance({x1, y1, z1}, {x2, y2, z2})
+      {guid, pid, distance}
+    end)
+    |> Enum.filter(fn {_guid, _pid, distance} ->
+      distance <= range
     end)
   end
 

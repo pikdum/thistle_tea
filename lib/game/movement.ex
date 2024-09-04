@@ -86,6 +86,16 @@ defmodule ThistleTea.Game.Movement do
     {:ok, _} =
       Registry.register(ThistleTea.PlayerRegistry, character.map, {state.guid, x1, y1, z1})
 
+    SpatialHash.update(
+      :players,
+      state.guid,
+      self(),
+      character.map,
+      x1,
+      y1,
+      z1
+    )
+
     # broadcast movement to nearby players
     for pid <- Map.get(state, :player_pids, []) do
       if pid != self() do

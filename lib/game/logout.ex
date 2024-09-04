@@ -40,13 +40,15 @@ defmodule ThistleTea.Game.Logout do
     end
 
     # cleanup
+    # TODO: refactor out player registry
     Registry.keys(ThistleTea.PlayerRegistry, self())
     |> Enum.each(&Registry.unregister(ThistleTea.PlayerRegistry, &1))
 
-    :ets.delete_all_objects(state.spawned_guids)
-
     # broadcast destroy object
     if Map.get(state, :guid) do
+      # remove from map
+      SpatialHash.remove(:players, state.guid)
+
       for pid <- Map.get(state, :player_pids, []) do
         if pid != self() do
           GenServer.cast(pid, {:destroy_object, state.guid})
@@ -57,7 +59,6 @@ defmodule ThistleTea.Game.Logout do
     # reset state so nothing lingers
     %{
       seed: state.seed,
-      spawned_guids: state.spawned_guids,
       crypto_pid: Map.get(state, :crypto_pid),
       account: Map.get(state, :account)
     }
