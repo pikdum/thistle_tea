@@ -134,6 +134,16 @@ defmodule ThistleTea.Mob do
       nil
     )
 
+    SpatialHash.update(
+      :mobs,
+      creature.guid,
+      self(),
+      creature.map,
+      creature.position_x,
+      creature.position_y,
+      creature.position_z
+    )
+
     update_rate = :rand.uniform(4_000) + 1_000
 
     if creature.movement_type == 1 do
