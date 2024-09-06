@@ -39,14 +39,17 @@ defmodule ThistleTea.Game.Logout do
       ThistleTea.Character.save(state.character)
     end
 
-    # cleanup
-    # TODO: refactor out player registry
-    Registry.keys(ThistleTea.PlayerRegistry, self())
-    |> Enum.each(&Registry.unregister(ThistleTea.PlayerRegistry, &1))
-
     if Map.get(state, :guid) do
       # remove from map
       SpatialHash.remove(:players, state.guid)
+
+      # leave all chat channels
+      ThistleTea.ChatChannel
+      |> Registry.keys(self())
+      |> Enum.each(fn channel ->
+        ThistleTea.ChatChannel
+        |> Registry.unregister(channel)
+      end)
 
       # broadcast destroy object
       for pid <- Map.get(state, :player_pids, []) do
