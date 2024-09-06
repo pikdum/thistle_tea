@@ -1,0 +1,38 @@
+FROM ubuntu:24.04
+WORKDIR /app
+RUN apt-get update && apt-get install -y \
+    git \
+    make \
+    cmake \
+    clang \
+    libssl-dev \
+    libbz2-dev \
+    build-essential \
+    default-libmysqlclient-dev \
+    libace-dev \
+    cargo \
+    && rm -rf /var/lib/apt/lists/*
+RUN update-alternatives --install /usr/bin/cc cc /usr/bin/clang 100 \
+    && update-alternatives --install /usr/bin/c++ c++ /usr/bin/clang 100
+RUN git clone https://github.com/mangoszero/server.git \
+    && cd server \
+    && git submodule update --init \
+    && mkdir _build _install \
+    && cd _build \
+    && cmake .. -DCMAKE_INSTALL_PREFIX=/app/server/_install \
+                -DBUILD_TOOLS=1 \
+                -DBUILD_MANGOSD=0 \
+                -DBUILD_REALMD=0 \
+                -DSOAP=0 \
+                -DSCRIPT_LIB_ELUNA=0 \
+                -DSCRIPT_LIB_SD3=0 \
+                -DPLAYERBOTS=0 \
+                -DUSE_STORMLIB=0 \
+    && make -j$(nproc) \
+    && make install \
+    && cp /app/server/_install/bin/tools/* /usr/local/bin/
+RUN git clone https://github.com/gtker/wow_dbc.git \
+    && cd wow_dbc \
+    && cargo build --release \
+    && cp target/release/wow_dbc_converter /usr/local/bin/
+RUN rm -rf /app/server /app/wow_dbc

@@ -24,6 +24,28 @@ vanilla private server
 
 ## running
 
+```bash
+# requires git lfs
+git clone https://github.com/pikdum/thistle_tea.git
+cd thistle_tea
+mix deps.get
+
+# need a vanilla wow client, this is directory with WoW.exe
+# also, change server to localhost in realmlist.wtf
+export WOW_DIR="/path/to/vanilla/client"
+
+# need docker
+./scripts/generate-dbc-db.sh
+
+iex -S mix
+# default logins are in application.ex
+# test:test
+```
+
+## generating databases
+
+these are included in the repo with git lfs now, but here's how they were made:
+
 - need world database (mangos0.sqlite) and dbc database (vanilla_dbcs.sqlite)
 - world database is created from mangos dump + mysql2sqlite
   - `./mysql2sqlite mangos0-dump.sql | sqlite3 mangos0.sqlite`
