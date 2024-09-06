@@ -54,13 +54,26 @@ defmodule ThistleTea.Application do
     setup_database()
     SpatialHash.setup_tables()
 
-    :ok =
-      :telemetry.attach(
-        "handle-packet-handler",
-        [:thistle_tea, :handle_packet, :stop],
-        &ThistleTea.Telemetry.handle_event/4,
-        nil
-      )
+    :telemetry.attach(
+      "handle-packet-handler",
+      [:thistle_tea, :handle_packet, :stop],
+      &ThistleTea.Telemetry.handle_event/4,
+      nil
+    )
+
+    :telemetry.attach(
+      "mob-wake-up-handler",
+      [:thistle_tea, :mob, :wake_up],
+      &ThistleTea.Telemetry.handle_event/4,
+      nil
+    )
+
+    :telemetry.attach(
+      "mob-try-sleep-handler",
+      [:thistle_tea, :mob, :try_sleep],
+      &ThistleTea.Telemetry.handle_event/4,
+      nil
+    )
 
     Logger.info("ThistleTea started.")
 

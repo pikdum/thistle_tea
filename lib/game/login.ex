@@ -133,7 +133,7 @@ defmodule ThistleTea.Game.Login do
         character: c
       })
 
-    Process.send_after(self(), :spawn_objects, 1000)
+    Process.send(self(), :spawn_objects, [])
 
     {:continue, new_state}
   end
