@@ -368,16 +368,26 @@ defmodule ThistleTea.Game do
       mobs_to_add = MapSet.difference(new_mobs, old_mobs)
 
       # TODO: update a reverse mapping, so mobs know nearby players
-      for {guid, pid} <- MapSet.union(players_to_remove, mobs_to_remove) do
+      for {guid, pid} <- players_to_remove do
         if pid != self() do
           send_packet(@smsg_destroy_object, <<guid::little-size(64)>>)
         end
       end
 
-      for {_guid, pid} <- MapSet.union(players_to_add, mobs_to_add) do
+      for {guid, pid} <- mobs_to_remove do
+        send_packet(@smsg_destroy_object, <<guid::little-size(64)>>)
+        GenServer.cast(pid, :try_sleep)
+      end
+
+      for {_guid, pid} <- players_to_add do
         if pid != self() do
           GenServer.cast(pid, {:send_update_to, self()})
         end
+      end
+
+      for {_guid, pid} <- mobs_to_add do
+        GenServer.cast(pid, :wake_up)
+        GenServer.cast(pid, {:send_update_to, self()})
       end
 
       # TODO: redundant, refactor out?
@@ -392,7 +402,7 @@ defmodule ThistleTea.Game do
           mob_pids: mob_pids
         })
 
-      Process.send_after(self(), :spawn_objects, 1000)
+      Process.send_after(self(), :spawn_objects, 1_000)
 
       {:noreply, {socket, new_state}, socket.read_timeout}
     else

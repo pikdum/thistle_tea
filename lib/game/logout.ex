@@ -44,15 +44,20 @@ defmodule ThistleTea.Game.Logout do
     Registry.keys(ThistleTea.PlayerRegistry, self())
     |> Enum.each(&Registry.unregister(ThistleTea.PlayerRegistry, &1))
 
-    # broadcast destroy object
     if Map.get(state, :guid) do
       # remove from map
       SpatialHash.remove(:players, state.guid)
 
+      # broadcast destroy object
       for pid <- Map.get(state, :player_pids, []) do
         if pid != self() do
           GenServer.cast(pid, {:destroy_object, state.guid})
         end
+      end
+
+      # let mobs try to idle down
+      for pid <- Map.get(state, :mob_pids, []) do
+        GenServer.cast(pid, :try_sleep)
       end
     end
 
