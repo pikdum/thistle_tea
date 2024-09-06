@@ -38,7 +38,6 @@ defmodule ThistleTea.Application do
       [
         ThistleTea.Telemetry,
         {Registry, keys: :unique, name: ThistleTea.UnitRegistry},
-        {Registry, keys: :duplicate, name: ThistleTea.MobRegistry},
         {Registry, keys: :duplicate, name: ThistleTea.PlayerRegistry},
         ThistleTea.DBC,
         ThistleTea.Mangos,
