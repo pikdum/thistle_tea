@@ -147,12 +147,9 @@ defmodule ThistleTea.Game.Spell do
         >> <>
         s.spell_cast_targets
 
-    if s.target != state.guid do
-      Registry.dispatch(ThistleTea.UnitRegistry, s.target, fn entries ->
-        for {pid, _} <- entries do
-          GenServer.cast(pid, {:receive_spell, state.guid, s.spell_id})
-        end
-      end)
+    with true <- s.target != state.guid,
+         pid <- :ets.lookup_element(:locations, s.target, 2) do
+      GenServer.cast(pid, {:receive_spell, state.guid, s.spell_id})
     end
 
     for pid <- Map.get(state, :player_pids, []) do
