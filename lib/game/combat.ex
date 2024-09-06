@@ -76,21 +76,12 @@ defmodule ThistleTea.Game.Combat do
     case Map.fetch(state, :attacking) do
       {:ok, target_guid} ->
         weapon = state.character.equipment.mainhand
+        %{dmg_min1: min_damage, dmg_max1: max_damage, delay: attack_speed} = weapon
 
-        # TODO: come up with an abstraction for this + simplify
-        ThistleTea.UnitRegistry
-        |> Registry.dispatch(target_guid, fn entries ->
-          for {pid, _} <- entries do
-            GenServer.cast(
-              pid,
-              {:receive_attack,
-               %{caster: state.guid, min_damage: weapon.dmg_min1, max_damage: weapon.dmg_max1}}
-            )
-          end
-        end)
-
-        # TODO: safer way to get this
-        attack_speed = weapon.delay
+        with pid <- :ets.lookup_element(:locations, target_guid, 2) do
+          attack = %{caster: state.guid, min_damage: min_damage, max_damage: max_damage}
+          GenServer.cast(pid, {:receive_attack, attack})
+        end
 
         attack_timer = Process.send_after(self(), :attack_swing, attack_speed)
         Map.put(state, :attack_timer, attack_timer)

@@ -119,12 +119,6 @@ defmodule ThistleTea.Mob do
   def init(creature) do
     creature = Map.put(creature, :guid, creature.guid + @creature_guid_offset)
 
-    Registry.register(
-      ThistleTea.UnitRegistry,
-      creature.guid,
-      nil
-    )
-
     SpatialHash.update(
       :mobs,
       creature.guid,
