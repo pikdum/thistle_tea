@@ -148,7 +148,7 @@ defmodule ThistleTea.Game.Spell do
         s.spell_cast_targets
 
     with true <- s.target != state.guid,
-         pid <- :ets.lookup_element(:locations, s.target, 2) do
+         pid <- :ets.lookup_element(:entities, s.target, 2) do
       GenServer.cast(pid, {:receive_spell, state.guid, s.spell_id})
     end
 
