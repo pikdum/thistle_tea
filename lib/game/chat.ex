@@ -64,6 +64,77 @@ defmodule ThistleTea.Game.Chat do
     # message + names
   end
 
+  def system_message(state, message) do
+    packet = messagechat_packet(0x0A, 0, message, state.guid, nil)
+
+    send_packet(
+      @smsg_messagechat,
+      packet
+    )
+
+    state
+  end
+
+  def teleport_player(state, x, y, z, map) do
+    character =
+      state.character
+      |> Map.put(:map, map)
+      |> Map.put(
+        :movement,
+        state.character.movement
+        |> Map.merge(%{x: x, y: y, z: z})
+      )
+
+    SpatialHash.update(
+      :players,
+      state.guid,
+      self(),
+      character.map,
+      x,
+      y,
+      z
+    )
+
+    Process.send(self(), :logout_complete, [])
+
+    Map.put(state, :character, character)
+    |> system_message("Relog to spawn at #{x}, #{y}, #{z} on map #{map}")
+  end
+
+  defp parse_coords([x, y, z, map]) do
+    with {x, _} <- Float.parse(x),
+         {y, _} <- Float.parse(y),
+         {z, _} <- Float.parse(z),
+         {map, _} <- Integer.parse(map) do
+      {:ok, x, y, z, map}
+    else
+      _ -> :error
+    end
+  end
+
+  defp parse_coords([x, y, z]) do
+    with {x, _} <- Float.parse(x),
+         {y, _} <- Float.parse(y),
+         {z, _} <- Float.parse(z) do
+      {:ok, x, y, z}
+    else
+      _ -> :error
+    end
+  end
+
+  def handle_chat(state, _, _, ".help" <> _, _) do
+    state
+    |> system_message("Commands: .help, .go xyz <x> <y> <z> [map]")
+  end
+
+  def handle_chat(state, _, _, ".go xyz " <> rest, _) do
+    case rest |> String.split(" ", trim: true) |> parse_coords() do
+      {:ok, x, y, z, map} -> teleport_player(state, x, y, z, map)
+      {:ok, x, y, z} -> teleport_player(state, x, y, z, state.character.map)
+      :error -> system_message(state, "Invalid command. Use: .go xyz <x> <y> <z> [map]")
+    end
+  end
+
   def handle_chat(state, chat_type, language, message, _target_name)
       when chat_type in [@chat_type_say, @chat_type_yell, @chat_type_emote] do
     packet = messagechat_packet(chat_type, language, message, state.guid, nil)
@@ -81,6 +152,8 @@ defmodule ThistleTea.Game.Chat do
     for {_guid, pid, _distance} <- nearby_players do
       GenServer.cast(pid, {:send_packet, @smsg_messagechat, packet})
     end
+
+    state
   end
 
   # TODO: prevent whispering self
@@ -97,6 +170,8 @@ defmodule ThistleTea.Game.Chat do
         packet = target_name <> <<0>>
         send_packet(@smsg_chat_player_not_found, packet)
     end
+
+    state
   end
 
   def handle_chat(
@@ -114,6 +189,8 @@ defmodule ThistleTea.Game.Chat do
         GenServer.cast(pid, {:send_packet, @smsg_messagechat, packet})
       end
     end)
+
+    state
   end
 
   def handle_chat(
@@ -133,6 +210,8 @@ defmodule ThistleTea.Game.Chat do
     for pid <- all_players do
       GenServer.cast(pid, {:send_packet, @smsg_messagechat, packet})
     end
+
+    state
   end
 
   def handle_packet(@cmsg_messagechat, body, state) do
@@ -150,7 +229,7 @@ defmodule ThistleTea.Game.Chat do
 
     {:ok, message, _rest} = parse_string(rest)
 
-    handle_chat(state, chat_type, language, message, target_name)
+    state = handle_chat(state, chat_type, language, message, target_name)
     {:continue, state}
   end
 
