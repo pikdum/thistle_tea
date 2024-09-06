@@ -77,15 +77,6 @@ defmodule ThistleTea.Game.Movement do
         state
       end
 
-    # update registry metadata
-    # this feels like a hack, why can't i just update?
-    # TODO: maybe move position data to ets?
-    # TODO: when destroying player, should also destroy self from them
-    Registry.unregister(ThistleTea.PlayerRegistry, character.map)
-
-    {:ok, _} =
-      Registry.register(ThistleTea.PlayerRegistry, character.map, {state.guid, x1, y1, z1})
-
     SpatialHash.update(
       :players,
       state.guid,

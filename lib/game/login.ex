@@ -122,8 +122,6 @@ defmodule ThistleTea.Game.Login do
     {x1, y1, z1} = {c.movement.x, c.movement.y, c.movement.z}
 
     # join
-    {:ok, _} = Registry.register(ThistleTea.PlayerRegistry, "all", c.name)
-    {:ok, _} = Registry.register(ThistleTea.PlayerRegistry, c.map, {character_guid, x1, y1, z1})
     SpatialHash.update(:players, character_guid, self(), c.map, x1, y1, z1)
 
     new_state =

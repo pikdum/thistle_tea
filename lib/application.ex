@@ -37,7 +37,7 @@ defmodule ThistleTea.Application do
     children =
       [
         ThistleTea.Telemetry,
-        {Registry, keys: :duplicate, name: ThistleTea.PlayerRegistry},
+        {Registry, keys: :duplicate, name: ThistleTea.ChatChannel},
         ThistleTea.DBC,
         ThistleTea.Mangos,
         ThistleTea.MobSupervisor,
