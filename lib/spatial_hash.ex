@@ -75,9 +75,15 @@ defmodule SpatialHash do
     for dx <- -cell_range..cell_range,
         dy <- -cell_range..cell_range,
         dz <- -cell_range..cell_range do
-      {map, div(rounded_x + dx * @cell_size, @cell_size),
-       div(rounded_y + dy * @cell_size, @cell_size), div(rounded_z + dz * @cell_size, @cell_size)}
+      {
+        map,
+        #
+        div(rounded_x + dx * @cell_size, @cell_size),
+        div(rounded_y + dy * @cell_size, @cell_size),
+        div(rounded_z + dz * @cell_size, @cell_size)
+      }
     end
+    |> Enum.uniq()
   end
 
   defp distance({x1, y1, z1}, {x2, y2, z2}) do

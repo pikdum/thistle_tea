@@ -2,7 +2,7 @@ defmodule ThistleTea.Mob do
   use GenServer
 
   import ThistleTea.Game.UpdateObject, only: [generate_packet: 4]
-  import ThistleTea.Util, only: [pack_guid: 1, within_range: 2, random_int: 2]
+  import ThistleTea.Util, only: [pack_guid: 1, random_int: 2]
 
   require Logger
 
@@ -64,15 +64,16 @@ defmodule ThistleTea.Mob do
   end
 
   def face_player(state, player_guid) do
-    [{x2, y2}] =
-      ThistleTea.PlayerRegistry
-      |> Registry.select([
-        {{:_, :_, {player_guid, :"$1", :"$2", :_}}, [], [{{:"$1", :"$2"}}]}
-      ])
+    %{position_x: x1, position_y: y1, map: map} = state.creature
 
-    %{position_x: x1, position_y: y1} = state.creature
-    orientation = :math.atan2(y2 - y1, x2 - x1)
-    state |> Map.put(:creature, %{state.creature | orientation: orientation})
+    case :ets.lookup(:locations, player_guid) do
+      [{^player_guid, _pid, ^map, x2, y2, _z2}] ->
+        orientation = :math.atan2(y2 - y1, x2 - x1)
+        state |> Map.put(:creature, %{state.creature | orientation: orientation})
+
+      [] ->
+        state
+    end
   end
 
   def send_attacker_state_update(state, attack) do
@@ -95,46 +96,28 @@ defmodule ThistleTea.Mob do
           Map.get(attack, :blocked_amount, 0)::little-size(32)
         >>
 
-    %{position_x: x1, position_y: y1, position_z: z1} = state.creature
+    %{position_x: x1, position_y: y1, position_z: z1, map: map} = state.creature
+    nearby_players = SpatialHash.query(:players, map, x1, y1, z1, 250)
 
-    Registry.dispatch(ThistleTea.PlayerRegistry, state.creature.map, fn entries ->
-      for {pid, values} <- entries do
-        {_guid, x2, y2, z2} = values
-        in_range = within_range({x1, y1, z1}, {x2, y2, z2})
-
-        if in_range do
-          GenServer.cast(pid, {:send_packet, @smsg_attackerstateupdate, payload})
-        end
-      end
-    end)
+    for {_guid, pid, _distance} <- nearby_players do
+      GenServer.cast(pid, {:send_packet, @smsg_attackerstateupdate, payload})
+    end
   end
 
   def send_updates(state) do
     packet = update_packet(state, state.movement_flags)
 
-    %{position_x: x1, position_y: y1, position_z: z1} = state.creature
+    %{position_x: x1, position_y: y1, position_z: z1, map: map} = state.creature
+    nearby_players = SpatialHash.query(:players, map, x1, y1, z1, 250)
 
-    Registry.dispatch(ThistleTea.PlayerRegistry, state.creature.map, fn entries ->
-      for {pid, values} <- entries do
-        {_guid, x2, y2, z2} = values
-        in_range = within_range({x1, y1, z1}, {x2, y2, z2})
-
-        if in_range do
-          GenServer.cast(pid, {:send_update_packet, packet})
-        end
-      end
-    end)
+    for {_guid, pid, _distance} <- nearby_players do
+      GenServer.cast(pid, {:send_update_packet, packet})
+    end
   end
 
   @impl GenServer
   def init(creature) do
     creature = Map.put(creature, :guid, creature.guid + @creature_guid_offset)
-
-    Registry.register(
-      ThistleTea.MobRegistry,
-      creature.map,
-      {creature.guid, creature.position_x, creature.position_y, creature.position_z}
-    )
 
     Registry.register(
       ThistleTea.UnitRegistry,
@@ -224,21 +207,20 @@ defmodule ThistleTea.Mob do
 
   @impl GenServer
   def handle_cast(:try_sleep, state) do
-    nearby_players =
-      SpatialHash.query(
-        :players,
-        state.creature.map,
-        state.creature.position_x,
-        state.creature.position_y,
-        state.creature.position_z,
-        250
-      )
+    case state.current_behavior do
+      :idle ->
+        {:noreply, state}
 
-    if Enum.empty?(nearby_players) do
-      :telemetry.execute([:thistle_tea, :mob, :try_sleep], %{guid: state.creature.guid})
-      {:noreply, state |> Map.put(:current_behavior, :idle)}
-    else
-      {:noreply, state}
+      _ ->
+        %{position_x: x, position_y: y, position_z: z, map: map} = state.creature
+        nearby_players = SpatialHash.query(:players, map, x, y, z, 250)
+
+        if Enum.empty?(nearby_players) do
+          :telemetry.execute([:thistle_tea, :mob, :try_sleep], %{guid: state.creature.guid})
+          {:noreply, state |> Map.put(:current_behavior, :idle)}
+        else
+          {:noreply, state}
+        end
     end
   end
 
