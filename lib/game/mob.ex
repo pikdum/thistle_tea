@@ -66,7 +66,7 @@ defmodule ThistleTea.Mob do
   def face_player(state, player_guid) do
     %{position_x: x1, position_y: y1, map: map} = state.creature
 
-    case :ets.lookup(:locations, player_guid) do
+    case :ets.lookup(:entities, player_guid) do
       [{^player_guid, _pid, ^map, x2, y2, _z2}] ->
         orientation = :math.atan2(y2 - y1, x2 - x1)
         state |> Map.put(:creature, %{state.creature | orientation: orientation})
