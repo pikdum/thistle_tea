@@ -1,3 +1,3 @@
 import Config
 
-config :thistle_tea, :ip, "nyarlathotep.usagi.zone"
+config :thistle_tea, :ip, "localhost"
