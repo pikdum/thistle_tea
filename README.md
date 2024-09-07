@@ -9,7 +9,9 @@ vanilla private server
 - entering world
 - seeing other players
 - chatting
-- mob spawns
+- mob spawns/respawns
+- casting spells
+- auto-attacks
 
 ## helpful resources
 
