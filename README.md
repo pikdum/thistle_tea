@@ -27,12 +27,18 @@ vanilla private server
 ## running
 
 ```bash
-# requires git lfs
+# need elixir
 git clone https://github.com/pikdum/thistle_tea.git
 cd thistle_tea
 mix deps.get
 
+# need docker + expect + no running mysql/mariadb
+./scripts/generate-mangos0-db.sh
+# or, just download it
+# wget https://pomf2.lain.la/f/jxcam7ob.sqlite -O ./db/mangos0.sqlite
+
 # need a vanilla wow client, this is directory with WoW.exe
+# this is only for generating dbc.sqlite
 # also, change server to localhost in realmlist.wtf
 export WOW_DIR="/path/to/vanilla/client"
 
@@ -46,7 +52,7 @@ iex -S mix
 
 ## required databases
 
-- **dbc.sqlite** `./scripts/generate-dbc-db.sh`
-  - need to generate from wow client
 - **mangos0.sqlite** `./scripts/generate-mangos0-db.sh`
-  - included in repo with git lfs
+  - can generate or download
+- **dbc.sqlite** `./scripts/generate-dbc-db.sh`
+  - need to generate from wow client, since this can't be distributed
