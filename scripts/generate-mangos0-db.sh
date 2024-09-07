@@ -4,7 +4,7 @@ set -eu
 DB_CONTAINER="mangos0-mariadb"
 DB_PASSWORD="mangos"
 SCRIPT_DIR="$(dirname "$(realpath "$0")")"
-OUTPUT_DIR="$(realpath "$SCRIPT_DIR/../")"
+OUTPUT_DIR="$(realpath "$SCRIPT_DIR/../db/")"
 
 TEMP_DIR=$(mktemp -d)
 trap 'rm -rf $TEMP_DIR' EXIT
@@ -39,7 +39,7 @@ echo "Converting mangos0 to sqlite..."
 cd ../
 git clone https://github.com/vdechef/mysql2sqlite.git
 cd mysql2sqlite/
-docker exec -t "$DB_CONTAINER" mariadb-dump --skip-extended-insert --compact mangos0 -p"$DB_PASSWORD" > dump.sql
+docker exec -t "$DB_CONTAINER" mariadb-dump --skip-extended-insert --compact mangos0 -p"$DB_PASSWORD" >dump.sql
 ./mysql2sqlite dump.sql | sqlite3 mangos0.sqlite
 
 rm -f "$OUTPUT_DIR"/mangos0.sqlite*

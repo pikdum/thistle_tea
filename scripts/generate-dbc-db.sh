@@ -3,7 +3,7 @@ set -eu
 
 IMAGE="ghcr.io/pikdum/wow-tools:latest"
 SCRIPT_DIR="$(dirname "$(realpath "$0")")"
-OUTPUT_DIR="$(realpath "$SCRIPT_DIR/../")"
+OUTPUT_DIR="$(realpath "$SCRIPT_DIR/../db/")"
 
 TEMP_DIR=$(mktemp -d)
 trap 'rm -rf $TEMP_DIR' EXIT
