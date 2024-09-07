@@ -42,12 +42,9 @@ iex -S mix
 # test:test
 ```
 
-## generating databases
+## required databases
 
-these are included in the repo with git lfs now, but here's how they were made:
-
-- need world database (mangos0.sqlite) and dbc database (vanilla_dbcs.sqlite)
-- world database is created from mangos dump + mysql2sqlite
-  - `./mysql2sqlite mangos0-dump.sql | sqlite3 mangos0.sqlite`
-- dbc database is created from wow_dbc_converter
-  - `./wow_dbc_converter vanilla -i ~/code/wowfiles/dbc/ -o ~/code/wowfiles/out/`
+- **dbc.sqlite** `./scripts/generate-dbc-db.sh`
+  - need to generate from wow client
+- **mangos0.sqlite** `./scripts/generate-mangos0-db.sh`
+  - included in repo with git lfs

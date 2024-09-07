@@ -10,26 +10,29 @@ trap 'rm -rf $TEMP_DIR' EXIT
 
 echo "Extracting DBCs from: $WOW_DIR"
 
-# remove existing files
-rm -f "$OUTPUT_DIR"/vanilla_dbcs.sqlite*
-
 # extract mpq to dbc
 docker run \
+    --rm \
     -v "$WOW_DIR":/input/ \
     -v "$TEMP_DIR":/output/ \
-    -it "$IMAGE" /usr/local/bin/map-extractor -- -i /input/ -o /output/ -e 2
+    -t "$IMAGE" /usr/local/bin/map-extractor -- -i /input/ -o /output/ -e 2
+
+# remove existing files
+rm -f "$OUTPUT_DIR"/dbc.sqlite*
 
 # transform dbc to sqlite
 docker run \
+    --rm \
     --user "$(id -u):$(id -g)" \
     -v "$TEMP_DIR/dbc"/:/input/ \
     -v "$OUTPUT_DIR":/output/ \
-    -it "$IMAGE" /usr/local/bin/wow_dbc_converter vanilla -i /input/ -o /output/vanilla_dbcs.sqlite
+    -t "$IMAGE" /usr/local/bin/wow_dbc_converter vanilla -i /input/ -o /output/dbc.sqlite
 
 # cleanup
 docker run \
+    --rm \
     -v "$TEMP_DIR"/:/input/ \
-    -it "$IMAGE" sh -c "rm -rf /input/*"
+    -t "$IMAGE" sh -c "rm -rf /input/*"
 
 echo ""
-echo "Generated $OUTPUT_DIR/vanilla_dbcs.sqlite"
+echo "Generated $OUTPUT_DIR/dbc.sqlite"

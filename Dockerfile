@@ -12,7 +12,7 @@ FROM elixir:1.17-alpine
 WORKDIR /app
 COPY --from=build /app/_build/prod/rel/thistle_tea ./
 COPY --from=build /app/mangos0.sqlite ./
-COPY --from=build /app/vanilla_dbcs.sqlite ./
+COPY --from=build /app/dbc.sqlite ./
 EXPOSE 3724
 EXPOSE 8085
 CMD ["/app/bin/thistle_tea", "start"]
