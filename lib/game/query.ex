@@ -1,5 +1,5 @@
 defmodule ThistleTea.Game.Query do
-  import ThistleTea.Util, only: [send_packet: 2]
+  import ThistleTea.Util, only: [send_packet: 2, parse_string: 1]
 
   alias ThistleTea.Mangos
 
@@ -19,6 +19,9 @@ defmodule ThistleTea.Game.Query do
 
   @cmsg_creature_query 0x060
   @smsg_creature_query_response 0x061
+
+  @cmsg_who 0x62
+  @smsg_who 0x63
 
   def handle_packet(@cmsg_name_query, body, state) do
     <<guid::little-size(64)>> = body
@@ -238,6 +241,40 @@ defmodule ThistleTea.Game.Query do
           # leader
           0
         >>
+    )
+
+    {:continue, state}
+  end
+
+  def handle_packet(@cmsg_who, body, state) do
+    # get all logged in characters
+    characters =
+      ThistleTea.Character.get_all()
+      |> Enum.filter(fn c -> :ets.member(:entities, c.id) end)
+
+    count = Enum.count(characters)
+
+    listed_players =
+      characters
+      |> Enum.map(fn c ->
+        c.name <>
+          <<0>> <>
+          "Test Guild" <>
+          <<0>> <>
+          <<
+            c.level::little-size(32),
+            c.class::little-size(32),
+            c.race::little-size(32),
+            c.area::little-size(32)
+            # https://gtker.com/wow_messages/docs/smsg_who.html
+            # looks like docs are for an older version?
+          >>
+      end)
+      |> Enum.reduce(<<>>, fn x, acc -> acc <> x end)
+
+    send_packet(
+      @smsg_who,
+      <<count::little-size(32), count::little-size(32)>> <> listed_players
     )
 
     {:continue, state}

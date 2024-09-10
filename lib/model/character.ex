@@ -193,6 +193,12 @@ defmodule ThistleTea.Character do
     end)
   end
 
+  def get_all() do
+    Memento.transaction!(fn ->
+      Memento.Query.all(ThistleTea.Character)
+    end)
+  end
+
   def save(character) do
     Memento.transaction!(fn ->
       Memento.Query.write(character)

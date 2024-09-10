@@ -51,8 +51,7 @@ defmodule ThistleTea.Auth do
           _game_name::bytes-little-size(4), _version::bytes-little-size(3),
           _build::little-size(16), _platform::bytes-little-size(4), _os::bytes-size(4),
           _locale::bytes-size(4), _worldregion_bias::little-size(32), _ip::little-size(32),
-          username_length::unsigned-little-size(8),
-          username::bytes-little-size(username_length)>>,
+          username_length::little-size(8), username::bytes-little-size(username_length)>>,
         socket,
         _state
       ) do
