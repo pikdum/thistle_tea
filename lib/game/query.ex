@@ -1,5 +1,5 @@
 defmodule ThistleTea.Game.Query do
-  import ThistleTea.Util, only: [send_packet: 2, parse_string: 1]
+  import ThistleTea.Util, only: [send_packet: 2]
 
   alias ThistleTea.Mangos
 
@@ -246,7 +246,7 @@ defmodule ThistleTea.Game.Query do
     {:continue, state}
   end
 
-  def handle_packet(@cmsg_who, body, state) do
+  def handle_packet(@cmsg_who, _body, state) do
     # get all logged in characters
     characters =
       ThistleTea.Character.get_all()
