@@ -25,4 +25,7 @@ thistle_tea-*.tar
 # Temporary files, for example, from tests.
 /tmp/
 
+# rustler nif
+/priv/
+
 *.sqlite*
