@@ -28,4 +28,6 @@ thistle_tea-*.tar
 # rustler nif
 /priv/
 
+/maps/
+
 *.sqlite*
