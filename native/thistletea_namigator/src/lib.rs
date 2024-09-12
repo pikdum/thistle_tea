@@ -147,7 +147,7 @@ fn get_zone_and_area(map_id: u32, x: f32, y: f32, z: f32) -> NifResult<Option<(u
     }
 }
 
-#[rustler::nif]
+#[rustler::nif(schedule = "DirtyCpu")]
 fn find_random_point_around_circle(
     map_id: u32,
     x: f32,
