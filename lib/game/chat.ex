@@ -76,8 +76,15 @@ defmodule ThistleTea.Game.Chat do
   end
 
   def teleport_player(state, x, y, z, map) do
+    area =
+      case ThistleTea.Pathfinding.get_zone_and_area(map, {x, y, z}) do
+        {_zone, area} -> area
+        nil -> state.character.area
+      end
+
     character =
       state.character
+      |> Map.put(:area, area)
       |> Map.put(:map, map)
       |> Map.put(
         :movement,
