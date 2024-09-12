@@ -73,6 +73,10 @@ defmodule ThistleTea.Application do
       nil
     )
 
+    Logger.info("Loading maps...")
+    map_dir = Application.fetch_env!(:thistle_tea, :map_dir)
+    ThistleTea.Namigator.load(map_dir)
+
     Logger.info("ThistleTea started.")
 
     # See https://hexdocs.pm/elixir/Supervisor.html

@@ -38,12 +38,16 @@ mix deps.get
 # wget https://pomf2.lain.la/f/jxcam7ob.sqlite -O ./db/mangos0.sqlite
 
 # need a vanilla wow client, this is directory with WoW.exe
-# this is only for generating dbc.sqlite
+# this is only for generating dbc.sqlite + maps
 # also, change server to localhost in realmlist.wtf
 export WOW_DIR="/path/to/vanilla/client"
 
 # need docker
 ./scripts/generate-dbc-db.sh
+
+# this takes a very long time
+# probably 30+ minutes
+mix build_maps
 
 iex -S mix
 # default logins are in application.ex
