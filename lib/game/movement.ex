@@ -34,6 +34,31 @@ defmodule ThistleTea.Game.Movement do
 
   @spell_failed_moving 0x2E
 
+  defp update_area(character) do
+    %{x: x, y: y, z: z} = character.movement
+
+    case ThistleTea.Pathfinding.get_zone_and_area(character.map, {x, y, z}) do
+      {_zone, area} -> Map.put(character, :area, area)
+      nil -> character
+    end
+  end
+
+  defp randomize_equipment(state, msg) do
+    if msg === @msg_move_jump do
+      character = Map.put(state.character, :equipment, generate_random_equipment())
+      fields = get_update_fields(character)
+      packet = generate_packet(@update_type_values, fields)
+
+      for pid <- Map.get(state, :player_pids, []) do
+        GenServer.cast(pid, {:send_update_packet, packet})
+      end
+
+      Map.put(state, :character, character)
+    else
+      state
+    end
+  end
+
   def handle_packet(msg, body, state)
       when msg in [
              @msg_move_start_forward,
@@ -59,42 +84,23 @@ defmodule ThistleTea.Game.Movement do
              @msg_move_heartbeat,
              @cmsg_move_fall_reset
            ] do
-    # TODO: try update_in
-    character =
-      Map.put(
-        state.character,
-        :movement,
-        Map.merge(state.character.movement, decode_movement_info(body))
-      )
-
-    %{x: x0, y: y0, z: z0} = state.character.movement
-    %{x: x1, y: y1, z: z1} = character.movement
-    map = character.map
-
     state =
-      if x0 != x1 and y0 != y1 and z0 != z1 do
-        ThistleTea.Game.Spell.cancel_spell(state, @spell_failed_moving)
+      with %{x: x0, y: y0, z: z0} <- state.character.movement,
+           %{x: x1, y: y1, z: z1} = movement <- decode_movement_info(body),
+           movement <- Map.merge(state.character.movement, movement),
+           %{map: map} = character <- state.character |> Map.put(:movement, movement) do
+        if x0 != x1 or y0 != y1 or z0 != z1 do
+          SpatialHash.update(:players, state.guid, self(), map, x1, y1, z1)
+
+          Map.put(state, :character, character |> update_area)
+          |> ThistleTea.Game.Spell.cancel_spell(@spell_failed_moving)
+        else
+          Map.put(state, :character, character)
+        end
       else
-        state
+        nil -> state
       end
-
-    area =
-      case ThistleTea.Pathfinding.get_zone_and_area(map, {x1, y1, z1}) do
-        {_zone, area} -> area
-        nil -> character.area
-      end
-
-    character = Map.put(character, :area, area)
-
-    SpatialHash.update(
-      :players,
-      state.guid,
-      self(),
-      map,
-      x1,
-      y1,
-      z1
-    )
+      |> randomize_equipment(msg)
 
     # broadcast movement to nearby players
     for pid <- Map.get(state, :player_pids, []) do
@@ -103,23 +109,7 @@ defmodule ThistleTea.Game.Movement do
       end
     end
 
-    # randomizes equipment on jump
-    character =
-      if msg === @msg_move_jump do
-        character = Map.put(character, :equipment, generate_random_equipment())
-        fields = get_update_fields(character)
-        packet = generate_packet(@update_type_values, fields)
-
-        for pid <- Map.get(state, :player_pids, []) do
-          GenServer.cast(pid, {:send_update_packet, packet})
-        end
-
-        character
-      else
-        character
-      end
-
-    {:continue, Map.put(state, :character, character)}
+    {:continue, state}
   end
 
   def handle_packet(@cmsg_standstatechange, body, state) do
