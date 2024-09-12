@@ -69,6 +69,7 @@ defmodule ThistleTea.Game.Movement do
 
     %{x: x0, y: y0, z: z0} = state.character.movement
     %{x: x1, y: y1, z: z1} = character.movement
+    map = character.map
 
     state =
       if x0 != x1 and y0 != y1 and z0 != z1 do
@@ -77,11 +78,19 @@ defmodule ThistleTea.Game.Movement do
         state
       end
 
+    area =
+      case ThistleTea.Pathfinding.get_zone_and_area(map, {x1, y1, z1}) do
+        {_zone, area} -> area
+        nil -> character.area
+      end
+
+    character = Map.put(character, :area, area)
+
     SpatialHash.update(
       :players,
       state.guid,
       self(),
-      character.map,
+      map,
       x1,
       y1,
       z1
