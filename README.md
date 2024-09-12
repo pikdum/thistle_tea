@@ -27,10 +27,11 @@ vanilla private server
 ## running
 
 ```bash
-# need elixir
+# need elixir + cargo
 git clone https://github.com/pikdum/thistle_tea.git
 cd thistle_tea
 mix deps.get
+mix deps.compile
 
 # need docker + expect + no running mysql/mariadb
 ./scripts/generate-mangos0-db.sh
