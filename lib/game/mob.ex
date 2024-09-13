@@ -49,8 +49,9 @@ defmodule ThistleTea.Mob do
     packed_guid = state.packed_guid
 
     move_type = 0
-    spline_id = random_int(1, 10_000_000)
-    spline_flags = 0
+    spline_id = 0
+    # NO_SPLINE
+    spline_flags = 0x400
     spline_count = 1
 
     # TODO: figure out how to do multiple spline points
