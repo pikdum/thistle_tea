@@ -156,7 +156,7 @@ defmodule ThistleTea.Mob do
 
   defp randomize_rate(state) do
     # TODO: test different rates
-    update_rate = :rand.uniform(90_000)
+    update_rate = :rand.uniform(10_000)
     state |> Map.put(:update_rate, update_rate)
   end
 
@@ -342,12 +342,8 @@ defmodule ThistleTea.Mob do
   end
 
   def queue_follow_path(state, delay) do
-    if Map.get(state, :path, []) |> Enum.count() > 0 do
-      path_timer = Process.send_after(self(), :follow_path, delay)
-      state |> Map.put(:path_timer, path_timer)
-    else
-      state |> Map.delete(:path_timer)
-    end
+    path_timer = Process.send_after(self(), :follow_path, delay)
+    state |> Map.put(:path_timer, path_timer)
   end
 
   def follow_path(state) do
@@ -387,6 +383,7 @@ defmodule ThistleTea.Mob do
 
       _ ->
         state
+        |> Map.delete(:path_timer)
     end
   end
 
