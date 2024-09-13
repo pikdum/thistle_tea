@@ -2,7 +2,13 @@ defmodule ThistleTea.Mob do
   use GenServer
 
   import ThistleTea.Game.UpdateObject, only: [generate_packet: 4]
-  import ThistleTea.Util, only: [pack_guid: 1, random_int: 2]
+
+  import ThistleTea.Util,
+    only: [
+      pack_guid: 1,
+      random_int: 2,
+      calculate_movement_duration: 3
+    ]
 
   require Logger
 
@@ -19,9 +25,11 @@ defmodule ThistleTea.Mob do
   @update_flag_living 0x20
 
   # @movement_flag_forward 0x00000001
-  @movement_flag_fixed_z 0x00000800
+  # @movement_flag_fixed_z 0x00000800
 
   @smsg_attackerstateupdate 0x14A
+
+  @smsg_monster_move 0x0DD
 
   def start_link(creature) do
     GenServer.start_link(__MODULE__, creature)
@@ -37,16 +45,46 @@ defmodule ThistleTea.Mob do
     {x_new, y_new}
   end
 
-  def random_movement(state) do
-    o2 = :rand.uniform(2 * 31415) / 10000.0
+  def move_packet(state, {x0, y0, z0}, {x1, y1, z1}, duration) do
+    packed_guid = state.packed_guid
 
-    %{
-      state
-      | creature: %{
-          state.creature
-          | orientation: o2
-        }
-    }
+    move_type = 0
+    spline_id = random_int(1, 10_000_000)
+    spline_flags = 0
+    spline_count = 1
+
+    # TODO: figure out how to do multiple spline points
+    packed_guid <>
+      <<
+        # initial position
+        x0::little-float-size(32),
+        y0::little-float-size(32),
+        z0::little-float-size(32),
+        spline_id::little-size(32),
+        move_type::little-size(8),
+        spline_flags::little-size(32),
+        duration::little-size(32),
+        spline_count::little-size(32),
+        # target position
+        x1::little-float-size(32),
+        y1::little-float-size(32),
+        z1::little-float-size(32)
+      >>
+  end
+
+  def random_movement(state) do
+    with [] <- Map.get(state, :path, []),
+         nil <- Map.get(state, :path_timer) do
+      %{map: map} = state.creature
+      %{x0: x0, y0: y0, z0: z0} = state
+
+      {x1, y1, z1} =
+        ThistleTea.Pathfinding.find_random_point_around_circle(map, {x0, y0, z0}, 10.0)
+
+      state |> move_to({x1, y1, z1})
+    else
+      _ -> state
+    end
   end
 
   def take_damage(state, damage) do
@@ -115,6 +153,12 @@ defmodule ThistleTea.Mob do
     end
   end
 
+  defp randomize_rate(state) do
+    # TODO: test different rates
+    update_rate = :rand.uniform(90_000)
+    state |> Map.put(:update_rate, update_rate)
+  end
+
   @impl GenServer
   def init(creature) do
     creature = Map.put(creature, :guid, creature.guid + @creature_guid_offset)
@@ -129,8 +173,6 @@ defmodule ThistleTea.Mob do
       creature.position_z
     )
 
-    update_rate = :rand.uniform(4_000) + 1_000
-
     # :idle - do nothing
     # :random_movement - move around randomly
 
@@ -141,20 +183,26 @@ defmodule ThistleTea.Mob do
         :idle
       end
 
-    {:ok,
-     %{
-       default_behavior: default_behavior,
-       current_behavior: :idle,
-       creature: creature,
-       packed_guid: pack_guid(creature.guid),
-       # extract out some initial values?
-       movement_flags: @movement_flag_fixed_z,
-       max_health: creature.curhealth,
-       max_mana: creature.curmana,
-       update_rate: update_rate,
-       level:
-         random_int(creature.creature_template.min_level, creature.creature_template.max_level)
-     }}
+    state =
+      %{
+        default_behavior: default_behavior,
+        current_behavior: :idle,
+        creature: creature,
+        packed_guid: pack_guid(creature.guid),
+        # extract out some initial values?
+        # movement_flags: @movement_flag_fixed_z,
+        movement_flags: 0,
+        max_health: creature.curhealth,
+        max_mana: creature.curmana,
+        level:
+          random_int(creature.creature_template.min_level, creature.creature_template.max_level),
+        x0: creature.position_x,
+        y0: creature.position_y,
+        z0: creature.position_z
+      }
+      |> randomize_rate()
+
+    {:ok, state}
   end
 
   @impl GenServer
@@ -165,14 +213,19 @@ defmodule ThistleTea.Mob do
         {:noreply, state}
 
       {_, :random_movement} ->
-        state = random_movement(state)
-        send_updates(state)
+        state = random_movement(state) |> randomize_rate()
         Process.send_after(self(), :behavior_event, state.update_rate)
         {:noreply, state}
 
       {_, _} ->
         {:noreply, state}
     end
+  end
+
+  @impl GenServer
+  def handle_info(:follow_path, state) do
+    state = follow_path(state)
+    {:noreply, state}
   end
 
   @impl GenServer
@@ -219,6 +272,12 @@ defmodule ThistleTea.Mob do
   end
 
   @impl GenServer
+  def handle_cast({:move_to, x, y, z}, state) do
+    state = state |> move_to({x, y, z})
+    {:noreply, state}
+  end
+
+  @impl GenServer
   def handle_cast({:receive_spell, caster, _spell_id}, state) do
     # TODO: look up and apply spell effects
 
@@ -262,6 +321,72 @@ defmodule ThistleTea.Mob do
     packet = update_packet(state, state.movement_flags)
     GenServer.cast(pid, {:send_update_packet, packet})
     {:noreply, state}
+  end
+
+  def send_movement_packet(state, payload) do
+    %{position_x: x0, position_y: y0, position_z: z0, map: map} = state.creature
+    nearby_players = SpatialHash.query(:players, map, x0, y0, z0, 250)
+
+    for {_guid, pid, _distance} <- nearby_players do
+      GenServer.cast(pid, {:send_packet, @smsg_monster_move, payload})
+    end
+
+    state
+  end
+
+  def move_to(state, {x, y, z}) do
+    %{position_x: x0, position_y: y0, position_z: z0, map: map} = state.creature
+    path = ThistleTea.Pathfinding.find_path(map, {x0, y0, z0}, {x, y, z})
+    state |> Map.put(:path, path) |> follow_path()
+  end
+
+  def queue_follow_path(state, delay) do
+    if Map.get(state, :path, []) |> Enum.count() > 0 do
+      path_timer = Process.send_after(self(), :follow_path, delay)
+      state |> Map.put(:path_timer, path_timer)
+    else
+      state |> Map.delete(:path_timer)
+    end
+  end
+
+  def follow_path(state) do
+    case Map.get(state, :path) do
+      [{x1, y1, z1} | rest] ->
+        %{position_x: x0, position_y: y0, position_z: z0} = state.creature
+        speed = state.creature.creature_template.speed_walk
+
+        duration =
+          (calculate_movement_duration({x0, y0, z0}, {x1, y1, z1}, speed) * 1_000) |> trunc()
+
+        packet = move_packet(state, {x0, y0, z0}, {x1, y1, z1}, duration)
+
+        # TODO: this will be ahead of actual movement
+        # could maybe start a timer to update in intervals?
+        creature =
+          state.creature
+          |> Map.put(:position_x, x1)
+          |> Map.put(:position_y, y1)
+          |> Map.put(:position_z, z1)
+
+        SpatialHash.update(
+          :mobs,
+          creature.guid,
+          self(),
+          creature.map,
+          creature.position_x,
+          creature.position_y,
+          creature.position_z
+        )
+
+        state
+        |> Map.put(:path, rest)
+        |> Map.put(:creature, creature)
+        |> send_movement_packet(packet)
+        |> queue_follow_path(duration)
+
+      _ ->
+        state
+    end
   end
 
   def update_packet(state, movement_flags \\ 0) do

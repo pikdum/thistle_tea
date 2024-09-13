@@ -142,6 +142,17 @@ defmodule ThistleTea.Game.Chat do
     end
   end
 
+  def handle_chat(state, _, _, ".move" <> _, _) do
+    with target <- Map.get(state, :target),
+         pid <- :ets.lookup_element(:entities, target, 2, nil),
+         %{x: x, y: y, z: z} <- Map.get(state.character, :movement) do
+      GenServer.cast(pid, {:move_to, x, y, z})
+      state
+    else
+      nil -> state
+    end
+  end
+
   def handle_chat(state, chat_type, language, message, _target_name)
       when chat_type in [@chat_type_say, @chat_type_yell, @chat_type_emote] do
     packet = messagechat_packet(chat_type, language, message, state.guid, nil)

@@ -82,6 +82,39 @@ defmodule ThistleTea.Util do
     {:binary.decode_unsigned(<<guid::64>>), remaining_data}
   end
 
+  def pack_vector({x, y, z}) do
+    x_packed = Bitwise.band(trunc(x / 0.25), 0x7FF)
+    y_packed = Bitwise.band(trunc(y / 0.25), 0x7FF)
+    z_packed = Bitwise.band(trunc(z / 0.25), 0x3FF)
+
+    x_packed
+    |> Bitwise.bor(Bitwise.bsl(y_packed, 11))
+    |> Bitwise.bor(Bitwise.bsl(z_packed, 22))
+  end
+
+  def unpack_vector(packed) do
+    x = Bitwise.band(packed, 0x7FF) / 4
+    y = Bitwise.band(Bitwise.bsr(packed, 11), 0x7FF) / 4
+    z = Bitwise.band(Bitwise.bsr(packed, 22), 0x3FF) / 4
+
+    {x, y, z}
+  end
+
+  def calculate_movement_duration({x0, y0, z0}, {x1, y1, z1}, speed)
+      when is_float(speed) and speed > 0 do
+    distance = :math.sqrt(:math.pow(x1 - x0, 2) + :math.pow(y1 - y0, 2) + :math.pow(z1 - z0, 2))
+    duration = distance / speed
+    duration
+  end
+
+  def calculate_total_duration(path_list, speed)
+      when is_list(path_list) and length(path_list) > 1 do
+    path_list
+    |> Enum.chunk_every(2, 1, :discard)
+    |> Enum.map(fn [start, finish] -> calculate_movement_duration(start, finish, speed) end)
+    |> Enum.sum()
+  end
+
   def parse_string(payload, pos \\ 1)
   def parse_string(payload, _pos) when byte_size(payload) == 0, do: {:ok, payload, <<>>}
 

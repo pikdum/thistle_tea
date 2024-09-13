@@ -9,6 +9,8 @@ defmodule ThistleTea.Game.Combat do
   @cmsg_attackstop 0x142
   @cmsg_setsheathed 0x1E0
 
+  @cmsg_set_selection 0x13D
+
   @smsg_attackstart 0x143
   @smsg_attackstop 0x144
 
@@ -70,6 +72,11 @@ defmodule ThistleTea.Game.Combat do
     end
 
     {:continue, Map.put(state, :character, character)}
+  end
+
+  def handle_packet(@cmsg_set_selection, body, state) do
+    <<guid::little-size(64)>> = body
+    {:continue, Map.put(state, :target, guid)}
   end
 
   def handle_attack_swing(state) do

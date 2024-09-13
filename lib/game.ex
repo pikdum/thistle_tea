@@ -44,11 +44,13 @@ defmodule ThistleTea.Game do
   @cmsg_attackswing 0x141
   @cmsg_attackstop 0x142
   @cmsg_setsheathed 0x1E0
+  @cmsg_set_selection 0x13D
 
   @combat_opcodes [
     @cmsg_attackswing,
     @cmsg_attackstop,
-    @cmsg_setsheathed
+    @cmsg_setsheathed,
+    @cmsg_set_selection
   ]
 
   @cmsg_player_login 0x03D
