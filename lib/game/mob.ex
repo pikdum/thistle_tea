@@ -156,7 +156,7 @@ defmodule ThistleTea.Mob do
 
   defp randomize_rate(state) do
     # TODO: test different rates
-    update_rate = :rand.uniform(10_000)
+    update_rate = :rand.uniform(5_000)
     state |> Map.put(:update_rate, update_rate)
   end
 
