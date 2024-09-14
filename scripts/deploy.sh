@@ -6,6 +6,12 @@ SCRIPT_DIR="$(dirname "$(realpath "$0")")"
 SOURCE_DIR="$(realpath "$SCRIPT_DIR/../")"
 
 # exclude _build and .git
-rsync -avz --exclude '.*' --exclude 'priv' --exclude '_build' --exclude 'deps' "$SOURCE_DIR/" $SERVER:~/thistle_tea/
+rsync -avz \
+    --exclude '.git' \
+    --exclude '.lexical' \
+    --exclude 'priv' \
+    --exclude '_build' \
+    --exclude 'deps' \
+    "$SOURCE_DIR/" $SERVER:~/thistle_tea/
 
 ssh $SERVER "/home/opc/thistle_tea/scripts/run.sh"

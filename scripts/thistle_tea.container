@@ -1,0 +1,14 @@
+# /etc/containers/systemd/thistle_tea.container
+[Container]
+Image=localhost/thistle_tea:latest
+PublishPort=3724:3724
+PublishPort=8085:8085
+Volume=/home/opc/thistle_tea/db:/app/db:Z
+Volume=/home/opc/thistle_tea/maps:/app/maps:Z
+AutoUpdate=local
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target

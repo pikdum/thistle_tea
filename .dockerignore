@@ -1,5 +1,6 @@
-_build
-db
-deps
-maps
-priv
+.git/
+_build/
+db/
+deps/
+maps/
+priv/

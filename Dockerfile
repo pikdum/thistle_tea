@@ -1,7 +1,10 @@
-FROM elixir:1.17 AS build
+FROM docker.io/library/elixir:1.17 AS build
 ENV MIX_ENV=prod
-COPY --from=rust:latest /usr/local/cargo/bin/* /usr/local/bin/
-RUN rustup default stable
+COPY --from=docker.io/library/rust:slim /usr/local/cargo /usr/local/cargo
+COPY --from=docker.io/library/rust:slim /usr/local/rustup /usr/local/rustup
+ENV RUSTUP_HOME=/usr/local/rustup
+ENV CARGO_HOME=/usr/local/cargo
+ENV PATH=/usr/local/cargo/bin:$PATH
 WORKDIR /app
 RUN mix local.hex --force && mix local.rebar --force
 COPY mix.exs mix.lock ./
@@ -10,7 +13,7 @@ COPY . .
 RUN mix compile
 RUN mix release
 
-FROM elixir:1.17
+FROM docker.io/library/elixir:1.17
 WORKDIR /app
 COPY --from=build /app/_build/prod/rel/thistle_tea ./
 EXPOSE 3724
