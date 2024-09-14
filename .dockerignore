@@ -1,4 +1,5 @@
 _build
+db
 deps
-.git
-.elixir_ls
+maps
+priv
