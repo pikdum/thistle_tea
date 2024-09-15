@@ -92,7 +92,7 @@ defmodule ThistleTea.Game.Movement do
         if x0 != x1 or y0 != y1 or z0 != z1 do
           SpatialHash.update(:players, state.guid, self(), map, x1, y1, z1)
 
-          Map.put(state, :character, character |> update_area)
+          Map.put(state, :character, character)
           |> ThistleTea.Game.Spell.cancel_spell(@spell_failed_moving)
         else
           Map.put(state, :character, character)
