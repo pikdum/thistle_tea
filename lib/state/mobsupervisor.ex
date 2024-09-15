@@ -33,6 +33,7 @@ defmodule ThistleTea.MobSupervisor do
 
     Logger.info("Spawned #{length(children)} mobs.")
 
-    Supervisor.init(children, strategy: :one_for_one)
+    opts = [strategy: :one_for_one, max_restarts: 100]
+    Supervisor.init(children, opts)
   end
 end

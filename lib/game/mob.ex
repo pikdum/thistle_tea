@@ -75,13 +75,15 @@ defmodule ThistleTea.Mob do
 
   def random_movement(state) do
     with [] <- Map.get(state, :path, []),
-         nil <- Map.get(state, :path_timer) do
-      %{map: map, spawndist: wander_distance} = state.creature
-      %{x0: x0, y0: y0, z0: z0} = state
-
-      {x1, y1, z1} =
-        ThistleTea.Pathfinding.find_random_point_around_circle(map, {x0, y0, z0}, wander_distance)
-
+         nil <- Map.get(state, :path_timer),
+         %{map: map, spawndist: wander_distance} <- state.creature,
+         %{x0: x0, y0: y0, z0: z0} <- state,
+         {x1, y1, z1} <-
+           ThistleTea.Pathfinding.find_random_point_around_circle(
+             map,
+             {x0, y0, z0},
+             wander_distance
+           ) do
       state |> move_to({x1, y1, z1})
     else
       _ -> state
