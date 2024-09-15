@@ -43,17 +43,7 @@ impl PathfindingMaps {
         Ok(())
     }
 
-    fn with_map<F, R>(&self, map_id: u32, f: F) -> Result<R, String>
-    where
-        F: FnOnce(&PathfindMap) -> Result<R, String>,
-    {
-        self.maps
-            .get(&map_id)
-            .ok_or_else(|| format!("Map with ID '{}' not found", map_id))
-            .and_then(f)
-    }
-
-    fn with_map_mut<F, R>(&mut self, map_id: u32, f: F) -> Result<R, String>
+    fn with_map<F, R>(&mut self, map_id: u32, f: F) -> Result<R, String>
     where
         F: FnOnce(&mut PathfindMap) -> Result<R, String>,
     {
@@ -144,15 +134,15 @@ fn find_random_point_around_circle(
 
 #[rustler::nif(schedule = "DirtyCpu")]
 fn load_all_adts(map_id: u32) -> NifResult<Option<u32>> {
-    with_global_maps_mut(|maps| {
-        maps.with_map_mut(map_id, |map| map.load_all_adts().map_err(|e| e.to_string()))
+    with_global_maps(|maps| {
+        maps.with_map(map_id, |map| map.load_all_adts().map_err(|e| e.to_string()))
     })
 }
 
 #[rustler::nif]
 fn load_adt_at(map_id: u32, x: f32, y: f32) -> NifResult<Option<(f32, f32)>> {
-    with_global_maps_mut(|maps| {
-        maps.with_map_mut(map_id, |map| {
+    with_global_maps(|maps| {
+        maps.with_map(map_id, |map| {
             map.load_adt_at(x, y).map_err(|e| e.to_string())
         })
     })
@@ -177,8 +167,8 @@ fn find_path(
     stop_y: f32,
     stop_z: f32,
 ) -> NifResult<Option<Vec<(f32, f32, f32)>>> {
-    with_global_maps_mut(|maps| {
-        maps.with_map_mut(map_id, |map| {
+    with_global_maps(|maps| {
+        maps.with_map(map_id, |map| {
             let start = Vector3d {
                 x: start_x,
                 y: start_y,
@@ -197,20 +187,6 @@ fn find_path(
 }
 
 fn with_global_maps<F, R>(f: F) -> NifResult<Option<R>>
-where
-    F: FnOnce(&PathfindingMaps) -> Result<R, String>,
-{
-    let global_maps = PATHFINDING_MAPS.lock().unwrap();
-    match &*global_maps {
-        Some(maps) => match f(maps) {
-            Ok(result) => Ok(Some(result)),
-            Err(_) => Ok(None),
-        },
-        None => Ok(None),
-    }
-}
-
-fn with_global_maps_mut<F, R>(f: F) -> NifResult<Option<R>>
 where
     F: FnOnce(&mut PathfindingMaps) -> Result<R, String>,
 {
