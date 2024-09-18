@@ -200,4 +200,4 @@ where
     }
 }
 
-rustler::init!("Elixir.ThistleTea.Namigator");
+rustler::init!("Elixir.Namigator");

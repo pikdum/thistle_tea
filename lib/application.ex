@@ -75,7 +75,7 @@ defmodule ThistleTea.Application do
 
     Logger.info("Loading maps...")
     map_dir = Application.fetch_env!(:thistle_tea, :map_dir)
-    ThistleTea.Namigator.load(map_dir)
+    Namigator.load(map_dir)
 
     Logger.info("ThistleTea started.")
 

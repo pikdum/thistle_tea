@@ -1,11 +1,11 @@
 [package]
-name = "thistletea_namigator"
+name = "namigator"
 version = "0.1.0"
 authors = []
 edition = "2021"
 
 [lib]
-name = "thistletea_namigator"
+name = "namigator"
 path = "src/lib.rs"
 crate-type = ["cdylib"]
 

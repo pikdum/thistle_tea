@@ -7,7 +7,7 @@ defmodule Mix.Tasks.BuildMaps do
     data_dir = Path.join(wow_dir, "Data")
     map_dir = Application.fetch_env!(:thistle_tea, :map_dir)
 
-    case ThistleTea.Namigator.build(data_dir, map_dir) do
+    case Namigator.build(data_dir, map_dir) do
       true -> Mix.shell().info("Maps built successfully.")
       false -> Mix.shell().error("Failed to build maps.")
     end

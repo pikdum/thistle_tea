@@ -1,5 +1,5 @@
-defmodule ThistleTea.Namigator do
-  use Rustler, otp_app: :thistle_tea, crate: "thistletea_namigator"
+defmodule Namigator do
+  use Rustler, otp_app: :thistle_tea, crate: "namigator"
 
   def build(_wow_dir, _out_dir), do: :erlang.nif_error(:nif_not_loaded)
   def load(_out_dir), do: :erlang.nif_error(:nif_not_loaded)
