@@ -73,29 +73,16 @@ defmodule ThistleTea.Mob do
       >>
   end
 
-  def random_movement(state) do
-    with [] <- Map.get(state, :path, []),
-         nil <- Map.get(state, :path_timer),
-         %{map: map, spawndist: wander_distance} <- state.creature,
-         %{x0: x0, y0: y0, z0: z0} <- state,
-         {x1, y1, z1} <-
-           ThistleTea.Pathfinding.find_random_point_around_circle(
-             map,
-             {x0, y0, z0},
-             wander_distance
-           ) do
-      state |> move_to({x1, y1, z1})
-    else
-      _ -> state
-    end
-  end
-
   def take_damage(state, damage) do
     new_health = max(state.creature.curhealth - damage, 0)
 
     state = state |> Map.put(:creature, %{state.creature | curhealth: new_health})
 
     if new_health == 0 do
+      with pid <- Map.get(state, :behavior_pid) do
+        GenServer.stop(pid)
+      end
+
       respawn_timer = state.creature.spawntimesecs * 1_000
       Process.send_after(self(), :respawn, respawn_timer)
       state |> Map.put(:movement_flags, 0)
@@ -156,12 +143,6 @@ defmodule ThistleTea.Mob do
     end
   end
 
-  defp randomize_rate(state) do
-    # TODO: test different rates
-    update_rate = :rand.uniform(5_000)
-    state |> Map.put(:update_rate, update_rate)
-  end
-
   @impl GenServer
   def init(creature) do
     creature = Map.put(creature, :guid, creature.guid + @creature_guid_offset)
@@ -176,20 +157,8 @@ defmodule ThistleTea.Mob do
       creature.position_z
     )
 
-    # :idle - do nothing
-    # :random_movement - move around randomly
-
-    default_behavior =
-      if creature.movement_type == 1 do
-        :random_movement
-      else
-        :idle
-      end
-
     state =
       %{
-        default_behavior: default_behavior,
-        current_behavior: :idle,
         creature: creature,
         packed_guid: pack_guid(creature.guid),
         # extract out some initial values?
@@ -203,26 +172,8 @@ defmodule ThistleTea.Mob do
         y0: creature.position_y,
         z0: creature.position_z
       }
-      |> randomize_rate()
 
     {:ok, state}
-  end
-
-  @impl GenServer
-  def handle_info(:behavior_event, state) do
-    case {state.creature.curhealth, state.current_behavior} do
-      {0, _} ->
-        # don't do anything if dead
-        {:noreply, state}
-
-      {_, :random_movement} ->
-        state = random_movement(state) |> randomize_rate()
-        Process.send_after(self(), :behavior_event, state.update_rate)
-        {:noreply, state}
-
-      {_, _} ->
-        {:noreply, state}
-    end
   end
 
   @impl GenServer
@@ -233,41 +184,55 @@ defmodule ThistleTea.Mob do
 
   @impl GenServer
   def handle_info(:respawn, state) do
-    if state.current_behavior != :idle do
-      # prevent counts from leaking, maybe?
-      :telemetry.execute([:thistle_tea, :mob, :try_sleep], %{guid: state.creature.guid})
+    GenServer.stop(self())
+    {:noreply, state}
+  end
+
+  @impl GenServer
+  def handle_info(:sleep_timer, state) do
+    with _pid <- Map.get(state, :behavior_pid) do
+      GenServer.cast(self(), :try_sleep)
+      Process.send_after(self(), :sleep_timer, 60_000)
     end
 
-    Process.exit(self(), :normal)
     {:noreply, state}
   end
 
   @impl GenServer
   def handle_cast(:wake_up, state) do
-    case state.current_behavior do
-      :idle ->
-        :telemetry.execute([:thistle_tea, :mob, :wake_up], %{guid: state.creature.guid})
-        Process.send_after(self(), :behavior_event, state.update_rate)
-        {:noreply, state |> Map.put(:current_behavior, state.default_behavior)}
+    case {Map.get(state, :behavior_pid), state.creature.movement_type} do
+      {nil, 1} ->
+        {:ok, behavior_pid} =
+          ThistleTea.WanderBehavior.start_link(%{
+            pid: self(),
+            guid: state.creature.guid,
+            x0: state.x0,
+            y0: state.y0,
+            z0: state.z0,
+            map: state.creature.map,
+            wander_distance: state.creature.spawndist
+          })
 
-      _ ->
+        {:noreply, state |> Map.put(:behavior_pid, behavior_pid)}
+
+      {_, _} ->
         {:noreply, state}
     end
   end
 
   @impl GenServer
   def handle_cast(:try_sleep, state) do
-    case state.current_behavior do
-      :idle ->
+    case Map.get(state, :behavior_pid) do
+      nil ->
         {:noreply, state}
 
-      _ ->
+      pid ->
         %{position_x: x, position_y: y, position_z: z, map: map} = state.creature
         nearby_players = SpatialHash.query(:players, map, x, y, z, 250)
 
         if Enum.empty?(nearby_players) do
-          :telemetry.execute([:thistle_tea, :mob, :try_sleep], %{guid: state.creature.guid})
-          {:noreply, state |> Map.put(:current_behavior, :idle)}
+          GenServer.stop(pid)
+          {:noreply, state |> Map.delete(:behavior_pid)}
         else
           {:noreply, state}
         end
@@ -384,6 +349,10 @@ defmodule ThistleTea.Mob do
         |> queue_follow_path(duration)
 
       _ ->
+        with pid <- Map.get(state, :behavior_pid) do
+          GenServer.cast(pid, :movement_finished)
+        end
+
         state
         |> Map.delete(:path_timer)
     end
