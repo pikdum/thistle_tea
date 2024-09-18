@@ -12,6 +12,7 @@ rsync -avz \
     --exclude 'priv' \
     --exclude '_build' \
     --exclude 'deps' \
+    --exclude 'target' \
     "$SOURCE_DIR/" $SERVER:~/thistle_tea/
 
 ssh $SERVER "/home/opc/thistle_tea/scripts/run.sh"
