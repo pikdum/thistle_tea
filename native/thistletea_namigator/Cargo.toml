@@ -12,4 +12,4 @@ crate-type = ["cdylib"]
 [dependencies]
 rustler = "0.34.0"
 once_cell = "1.19.0"
-namigator = { git="https://github.com/gtker/namigator-rs.git", rev = "6ba7b71f86204cc1d626e1454589dd8eed4a0fb8", features = ["vanilla"] }
+namigator = { git = "https://github.com/gtker/namigator-rs.git", rev = "6ba7b71f86204cc1d626e1454589dd8eed4a0fb8", features = ["vanilla"] }
