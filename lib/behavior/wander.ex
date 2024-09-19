@@ -1,8 +1,6 @@
 defmodule ThistleTea.WanderBehavior do
   use GenServer
-
   alias ThistleTea.Pathfinding
-
   require Logger
 
   def start_link(initial) do

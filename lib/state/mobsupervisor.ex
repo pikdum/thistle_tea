@@ -17,14 +17,28 @@ defmodule ThistleTea.MobSupervisor do
       from(c in Creature,
         join: ct in assoc(c, :creature_template),
         left_join: cm in assoc(c, :creature_movement),
-        preload: [creature_template: ct, creature_movement: cm],
         where: c.modelid != 0,
-        select: c
+        select: {c, ct, cm}
       )
 
     children =
       Mangos.all(query)
-      |> Enum.map(fn creature ->
+      # workaround since this wasn't working in ecto
+      |> Enum.group_by(fn {%{guid: guid}, _, _} -> guid end)
+      |> Enum.map(fn {_, entries} ->
+        {creature, creature_template, _} = List.first(entries)
+
+        movements =
+          entries
+          |> Enum.map(fn {_, _, cm} -> cm end)
+          |> Enum.filter(fn cm -> cm end)
+
+        creature = %Creature{
+          creature
+          | creature_template: creature_template,
+            creature_movement: movements
+        }
+
         %{
           id: {ThistleTea.Mob, creature.guid},
           start: {ThistleTea.Mob, :start_link, [creature]}

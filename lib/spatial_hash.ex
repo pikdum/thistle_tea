@@ -2,6 +2,11 @@ defmodule SpatialHash do
   @cell_size 125
   # TODO: benchmark different cell sizes
 
+  # TODO: benchmark some different options:
+  # - :write_concurrency
+  # - :read_concurrency
+  # - :decentralized_counters
+  # - :compressed: doesn't seem worth it, since data is small
   def setup_tables do
     :ets.new(:players, [:named_table, :public, :duplicate_bag])
     :ets.new(:mobs, [:named_table, :public, :duplicate_bag])
