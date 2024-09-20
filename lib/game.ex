@@ -416,6 +416,11 @@ defmodule ThistleTea.Game do
     end
   end
 
+  @impl GenServer
+  def handle_call(:get_entity, _from, state) do
+    {:reply, :player, state}
+  end
+
   @impl ThousandIsland.Handler
   def handle_connection(socket, _state) do
     Logger.info("SMSG_AUTH_CHALLENGE")

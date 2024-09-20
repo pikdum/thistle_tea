@@ -39,6 +39,19 @@ defmodule ThistleTea.WanderBehavior do
   end
 
   @impl GenServer
+  def handle_call(:get_state, _from, state) do
+    {:reply,
+     %{
+       behavior: __MODULE__,
+       state: state.state,
+       x0: state.x0,
+       y0: state.y0,
+       z0: state.z0,
+       wander_distance: state.wander_distance
+     }, state}
+  end
+
+  @impl GenServer
   def init(initial) do
     :telemetry.execute([:thistle_tea, :mob, :wake_up], %{guid: initial.guid})
     timer = Process.send_after(self(), :start_wandering, :rand.uniform(6_000))

@@ -32,6 +32,7 @@ defmodule ThistleTea.MobSupervisor do
           entries
           |> Enum.map(fn {_, _, cm} -> cm end)
           |> Enum.filter(fn cm -> cm end)
+          |> Enum.sort_by(fn cm -> cm.point end)
 
         creature = %Creature{
           creature

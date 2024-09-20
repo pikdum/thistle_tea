@@ -130,8 +130,63 @@ defmodule ThistleTea.Game.Chat do
   end
 
   def handle_chat(state, _, _, ".help" <> _, _) do
+    commands = [
+      ".behavior - show mob behavior",
+      ".go xyz <x> <y> <z> [map] - teleport",
+      ".guid - show target guid",
+      ".help - show help",
+      ".move - move target to you",
+      ".pid - show target pid"
+    ]
+
+    system_message(state, "Commands:")
+
+    commands
+    |> Enum.sort()
+    |> Enum.reduce(state, fn command, acc ->
+      system_message(acc, command)
+    end)
+  end
+
+  def handle_chat(state, _, _, ".pos" <> _, _) do
+    %{x: x, y: y, z: z} = state.character.movement
+    map = state.character.map
+
     state
-    |> system_message("Commands: .help, .go xyz <x> <y> <z> [map]")
+    |> system_message("#{x} #{y} #{z} #{map}")
+  end
+
+  def handle_chat(state, _, _, ".guid" <> _, _) do
+    state
+    |> system_message("Target GUID: #{state.target}")
+  end
+
+  def handle_chat(state, _, _, ".pid" <> _, _) do
+    with pid when not is_nil(pid) <- :ets.lookup_element(:entities, state.target, 2, nil) do
+      state
+      |> system_message("Target PID: #{inspect(pid)}")
+    else
+      nil ->
+        state
+        |> system_message("No PID found.")
+    end
+  end
+
+  def handle_chat(state, _, _, ".behavior" <> _, _) do
+    with pid when not is_nil(pid) <- :ets.lookup_element(:entities, state.target, 2, nil),
+         :mob <- GenServer.call(pid, :get_entity),
+         {:ok, behavior_state} <- GenServer.call(pid, :get_behavior) do
+      behavior_state
+      |> inspect(pretty: true)
+      |> String.split("\n")
+      |> Enum.each(fn line ->
+        system_message(state, line)
+      end)
+
+      state
+    else
+      _ -> state |> system_message("No behavior found.")
+    end
   end
 
   def handle_chat(state, _, _, ".go xyz " <> rest, _) do

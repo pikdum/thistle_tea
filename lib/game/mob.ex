@@ -170,7 +170,8 @@ defmodule ThistleTea.Mob do
           random_int(creature.creature_template.min_level, creature.creature_template.max_level),
         x0: creature.position_x,
         y0: creature.position_y,
-        z0: creature.position_z
+        z0: creature.position_z,
+        initial_point: 0
       }
 
     {:ok, state}
@@ -200,8 +201,12 @@ defmodule ThistleTea.Mob do
 
   @impl GenServer
   def handle_cast(:wake_up, state) do
-    case {Map.get(state, :behavior_pid), state.creature.movement_type} do
-      {nil, 1} ->
+    case {
+      Map.get(state, :behavior_pid),
+      state.creature.movement_type,
+      state.creature.creature_movement
+    } do
+      {nil, 1, _} ->
         {:ok, behavior_pid} =
           ThistleTea.WanderBehavior.start_link(%{
             pid: self(),
@@ -215,7 +220,24 @@ defmodule ThistleTea.Mob do
 
         {:noreply, state |> Map.put(:behavior_pid, behavior_pid)}
 
-      {_, _} ->
+      {nil, 2, []} ->
+        # no movement data, but follow path movement_type
+        # probably never happens?
+        {:noreply, state}
+
+      {nil, 2, waypoints} ->
+        {:ok, behavior_pid} =
+          ThistleTea.FollowPathBehavior.start_link(%{
+            pid: self(),
+            guid: state.creature.guid,
+            map: state.creature.map,
+            waypoints: waypoints,
+            initial_point: state.initial_point
+          })
+
+        {:noreply, state |> Map.put(:behavior_pid, behavior_pid)}
+
+      {_, _, _} ->
         {:noreply, state}
     end
   end
@@ -237,6 +259,11 @@ defmodule ThistleTea.Mob do
           {:noreply, state}
         end
     end
+  end
+
+  @impl GenServer
+  def handle_cast({:set_initial_point, point}, state) do
+    {:noreply, state |> Map.put(:initial_point, point)}
   end
 
   @impl GenServer
@@ -289,6 +316,21 @@ defmodule ThistleTea.Mob do
     packet = update_packet(state, state.movement_flags)
     GenServer.cast(pid, {:send_update_packet, packet})
     {:noreply, state}
+  end
+
+  @impl GenServer
+  def handle_call(:get_entity, _from, state) do
+    {:reply, :mob, state}
+  end
+
+  @impl GenServer
+  def handle_call(:get_behavior, _from, state) do
+    with behavior_pid when not is_nil(behavior_pid) <- Map.get(state, :behavior_pid),
+         behavior_state <- GenServer.call(behavior_pid, :get_state) do
+      {:reply, {:ok, behavior_state}, state}
+    else
+      _ -> {:reply, {:error, "No behavior."}, state}
+    end
   end
 
   def send_movement_packet(state, payload) do
