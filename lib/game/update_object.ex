@@ -459,6 +459,54 @@ defmodule ThistleTea.Game.UpdateObject do
     player_rest_state_experience: %{
       size: 1,
       offset: 0x497
+    },
+    game_object_display_id: %{
+      size: 1,
+      offset: 0x008
+    },
+    game_object_flags: %{
+      size: 1,
+      offset: 0x009
+    },
+    game_object_rotation0: %{
+      size: 1,
+      offset: 0x00A
+    },
+    game_object_rotation1: %{
+      size: 1,
+      offset: 0x00B
+    },
+    game_object_rotation2: %{
+      size: 1,
+      offset: 0x00C
+    },
+    game_object_rotation3: %{
+      size: 1,
+      offset: 0x00D
+    },
+    game_object_state: %{
+      size: 1,
+      offset: 0x00E
+    },
+    game_object_pos_x: %{
+      size: 1,
+      offset: 0x00F
+    },
+    game_object_pos_y: %{
+      size: 1,
+      offset: 0x010
+    },
+    game_object_pos_z: %{
+      size: 1,
+      offset: 0x011
+    },
+    game_object_type_id: %{
+      size: 1,
+      offset: 0x015
+    },
+    game_object_animprogress: %{
+      size: 1,
+      offset: 0x018
     }
   }
 
@@ -583,6 +631,18 @@ defmodule ThistleTea.Game.UpdateObject do
         :player_xp -> <<value::little-size(32)>>
         :player_next_level_xp -> <<value::little-size(32)>>
         :player_rest_state_experience -> <<value::little-size(32)>>
+        :game_object_display_id -> <<value::little-size(32)>>
+        :game_object_flags -> <<value::little-size(32)>>
+        :game_object_rotation0 -> <<value::little-float-size(32)>>
+        :game_object_rotation1 -> <<value::little-float-size(32)>>
+        :game_object_rotation2 -> <<value::little-float-size(32)>>
+        :game_object_rotation3 -> <<value::little-float-size(32)>>
+        :game_object_state -> <<value::little-size(32)>>
+        :game_object_pos_x -> <<value::little-float-size(32)>>
+        :game_object_pos_y -> <<value::little-float-size(32)>>
+        :game_object_pos_z -> <<value::little-float-size(32)>>
+        :game_object_type_id -> <<value::little-size(32)>>
+        :game_object_animprogress -> <<value::little-size(32)>>
         _ -> raise "Unknown field: #{field}"
       end
     end)

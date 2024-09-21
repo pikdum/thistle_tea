@@ -6,7 +6,7 @@ defmodule ThistleTea.Game.Query do
   require Logger
 
   # prevent collisions with player guids
-  @creature_guid_offset 0x100000
+  @creature_guid_offset 0xF1300000
 
   @cmsg_name_query 0x050
   @smsg_name_query_response 0x051

@@ -1,6 +1,5 @@
 defmodule ThistleTea.FollowPathBehavior do
   use GenServer
-  alias ThistleTea.Pathfinding
   require Logger
 
   defp get_next_point(state) do
@@ -21,6 +20,8 @@ defmodule ThistleTea.FollowPathBehavior do
   @impl GenServer
   def handle_cast(:movement_finished, %{state: :pathing} = state) do
     next_point = get_next_point(state)
+
+    # TODO: handle orientation, script, text, etc.
 
     delay =
       Map.get(state, :waypoints, [])

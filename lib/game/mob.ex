@@ -13,7 +13,7 @@ defmodule ThistleTea.Mob do
   require Logger
 
   # prevent collisions with player guids
-  @creature_guid_offset 0x100000
+  @creature_guid_offset 0xF1300000
 
   # @update_type_movement 1
   @update_type_create_object2 3
@@ -400,12 +400,21 @@ defmodule ThistleTea.Mob do
     end
   end
 
+  defp get_scale(state) do
+    # no idea why it's like this
+    if state.creature.creature_template.scale > 0 do
+      state.creature.creature_template.scale
+    else
+      1.0
+    end
+  end
+
   def update_packet(state, movement_flags \\ 0) do
     fields = %{
       object_guid: state.creature.guid,
       object_type: 9,
       object_entry: state.creature.id,
-      object_scale_x: 1.0,
+      object_scale_x: get_scale(state),
       unit_health: state.creature.curhealth,
       unit_power_1: state.creature.curmana,
       unit_max_health: state.max_health,

@@ -356,6 +356,7 @@ defmodule ThistleTea.Game do
 
       old_players = Map.get(state, :spawned_players, MapSet.new())
       old_mobs = Map.get(state, :spawned_mobs, MapSet.new())
+      old_game_objects = Map.get(state, :spawned_game_objects, MapSet.new())
 
       new_players =
         SpatialHash.query(:players, state.character.map, x, y, z, 250)
@@ -367,13 +368,20 @@ defmodule ThistleTea.Game do
         |> Enum.map(fn {guid, pid, _distance} -> {guid, pid} end)
         |> MapSet.new()
 
+      new_game_objects =
+        SpatialHash.query(:game_objects, state.character.map, x, y, z, 250)
+        |> Enum.map(fn {guid, pid, _distance} -> {guid, pid} end)
+        |> MapSet.new()
+
       players_to_remove = MapSet.difference(old_players, new_players)
       mobs_to_remove = MapSet.difference(old_mobs, new_mobs)
+      game_objects_to_remove = MapSet.difference(old_game_objects, new_game_objects)
 
       players_to_add = MapSet.difference(new_players, old_players)
       mobs_to_add = MapSet.difference(new_mobs, old_mobs)
+      game_objects_to_add = MapSet.difference(new_game_objects, old_game_objects)
 
-      # TODO: update a reverse mapping, so mobs know nearby players
+      # TODO: update a reverse mapping, so mobs know nearby players?
       for {guid, pid} <- players_to_remove do
         if pid != self() do
           send_packet(@smsg_destroy_object, <<guid::little-size(64)>>)
@@ -383,6 +391,10 @@ defmodule ThistleTea.Game do
       for {guid, pid} <- mobs_to_remove do
         send_packet(@smsg_destroy_object, <<guid::little-size(64)>>)
         GenServer.cast(pid, :try_sleep)
+      end
+
+      for {guid, _pid} <- game_objects_to_remove do
+        send_packet(@smsg_destroy_object, <<guid::little-size(64)>>)
       end
 
       for {_guid, pid} <- players_to_add do
@@ -396,6 +408,10 @@ defmodule ThistleTea.Game do
         GenServer.cast(pid, {:send_update_to, self()})
       end
 
+      for {_guid, pid} <- game_objects_to_add do
+        GenServer.cast(pid, {:send_update_to, self()})
+      end
+
       # TODO: redundant, refactor out?
       player_pids = new_players |> Enum.map(fn {_guid, pid} -> pid end)
       mob_pids = new_mobs |> Enum.map(fn {_guid, pid} -> pid end)
@@ -404,6 +420,7 @@ defmodule ThistleTea.Game do
         Map.merge(state, %{
           spawned_players: new_players,
           spawned_mobs: new_mobs,
+          spawned_game_objects: new_game_objects,
           player_pids: player_pids,
           mob_pids: mob_pids
         })

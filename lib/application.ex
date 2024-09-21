@@ -41,6 +41,7 @@ defmodule ThistleTea.Application do
         ThistleTea.DBC,
         ThistleTea.Mangos,
         ThistleTea.MobSupervisor,
+        ThistleTea.GameObjectSupervisor,
         {ThousandIsland,
          port: @auth_port, handler_module: ThistleTea.Auth, handler_options: @handler_options},
         {ThousandIsland,
