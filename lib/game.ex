@@ -126,6 +126,7 @@ defmodule ThistleTea.Game do
   @cmsg_name_query 0x050
   @cmsg_item_query_single 0x056
   @cmsg_item_name_query 0x2C4
+  @cmsg_gameobject_query 0x05E
   @cmsg_creature_query 0x060
   @cmsg_who 0x62
 
@@ -133,6 +134,7 @@ defmodule ThistleTea.Game do
     @cmsg_name_query,
     @cmsg_item_query_single,
     @cmsg_item_name_query,
+    @cmsg_gameobject_query,
     @cmsg_creature_query,
     @cmsg_who
   ]

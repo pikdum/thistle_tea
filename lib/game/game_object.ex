@@ -20,7 +20,10 @@ defmodule ThistleTea.GameObject do
     fields =
       %{
         object_guid: state.game_object.guid,
-        object_type: @object_type_game_object,
+        # TODO: maybe change some names so this can't be confused with @object_type_*?
+        # TODO: this is probably why my item updates didn't work earlier
+        # object + game_object
+        object_type: 33,
         object_entry: state.game_object.id,
         object_scale_x: state.game_object.game_object_template.size,
         game_object_display_id: state.game_object.game_object_template.display_id,
@@ -33,6 +36,8 @@ defmodule ThistleTea.GameObject do
         game_object_pos_x: state.game_object.position_x,
         game_object_pos_y: state.game_object.position_y,
         game_object_pos_z: state.game_object.position_z,
+        game_object_facing: state.game_object.orientation,
+        game_object_faction: state.game_object.game_object_template.faction,
         game_object_type_id: state.game_object.game_object_template.type,
         game_object_animprogress: state.game_object.animprogress
       }
@@ -50,7 +55,6 @@ defmodule ThistleTea.GameObject do
 
   @impl GenServer
   def handle_cast({:send_update_to, pid}, state) do
-    Logger.debug("Spawning object: #{state.game_object.game_object_template.name}")
     packet = update_packet(state)
     GenServer.cast(pid, {:send_update_packet, packet})
     {:noreply, state}

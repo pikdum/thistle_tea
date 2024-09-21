@@ -5,14 +5,18 @@ defmodule ThistleTea.Game.Query do
 
   require Logger
 
-  # prevent collisions with player guids
+  # prevent collisions
   @creature_guid_offset 0xF1300000
+  @game_object_guid_offset 0xF1100000
 
   @cmsg_name_query 0x050
   @smsg_name_query_response 0x051
 
   @cmsg_item_query_single 0x056
   @smsg_item_query_single_response 0x058
+
+  @cmsg_gameobject_query 0x05E
+  @smsg_gameobject_query_response 0x05F
 
   @cmsg_item_name_query 0x2C4
   @smsg_item_name_query_response 0x2C5
@@ -186,6 +190,7 @@ defmodule ThistleTea.Game.Query do
   end
 
   def handle_packet(@cmsg_item_name_query, body, state) do
+    # TODO: am i not getting guid because i'm not sending a create object packet first?
     <<item_id::little-size(32), _guid::little-size(64)>> = body
     item = Mangos.get(ItemTemplate, item_id)
     Logger.info("CMSG_ITEM_NAME_QUERY: #{item.name}")
@@ -195,10 +200,75 @@ defmodule ThistleTea.Game.Query do
     {:continue, state}
   end
 
+  def handle_packet(@cmsg_gameobject_query, body, state) do
+    <<entry::little-size(32), guid::little-size(64)>> = body
+
+    game_object =
+      Mangos.get(GameObject, guid - @game_object_guid_offset)
+      |> Mangos.preload(:game_object_template)
+
+    template = game_object.game_object_template
+
+    Logger.info("CMSG_GAMEOBJECT_QUERY: #{entry} - #{guid}",
+      target_name: template.name
+    )
+
+    data =
+      [
+        template.data0,
+        template.data1,
+        template.data2,
+        template.data3,
+        template.data4,
+        template.data5,
+        template.data6,
+        template.data7,
+        template.data8,
+        template.data9,
+        template.data10,
+        template.data11,
+        template.data12,
+        template.data13,
+        template.data14,
+        template.data15,
+        template.data16,
+        template.data17,
+        template.data18,
+        template.data19,
+        template.data20,
+        template.data21,
+        template.data22,
+        template.data23
+      ]
+      |> Enum.reduce(<<>>, fn x, acc -> acc <> <<x::little-size(32)>> end)
+
+    payload =
+      <<
+        template.entry::little-size(32),
+        template.type::little-size(32),
+        template.display_id::little-size(32)
+      >> <>
+        template.name <>
+        <<
+          0,
+          # name 2
+          0,
+          # name 3
+          0,
+          # name 4
+          0,
+          # name 5
+          0
+        >> <> data
+
+    send_packet(@smsg_gameobject_query_response, payload)
+
+    {:continue, state}
+  end
+
   def handle_packet(@cmsg_creature_query, body, state) do
     <<entry::little-size(32), guid::little-size(64)>> = body
 
-    # should i just get the template instead?
     creature =
       Mangos.get_by(Creature, guid: guid - @creature_guid_offset)
       |> Mangos.preload(:creature_template)

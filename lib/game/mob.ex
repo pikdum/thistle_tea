@@ -412,6 +412,7 @@ defmodule ThistleTea.Mob do
   def update_packet(state, movement_flags \\ 0) do
     fields = %{
       object_guid: state.creature.guid,
+      # unit + object
       object_type: 9,
       object_entry: state.creature.id,
       object_scale_x: get_scale(state),

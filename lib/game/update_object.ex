@@ -75,6 +75,16 @@ defmodule ThistleTea.Game.UpdateObject do
       size: 2,
       offset: 0x0
     },
+    # TYPEMASK_OBJECT         = 0x0001,
+    # TYPEMASK_ITEM           = 0x0002,
+    # TYPEMASK_CONTAINER      = 0x0004,
+    # TYPEMASK_UNIT           = 0x0008, // players also have it
+    # TYPEMASK_PLAYER         = 0x0010,
+    # TYPEMASK_GAMEOBJECT     = 0x0020,
+    # TYPEMASK_DYNAMICOBJECT  = 0x0040,
+    # TYPEMASK_CORPSE         = 0x0080,
+    # this is not the same as @object_type_player and others
+    # feel like it could be set dynamically based on which fields are used
     object_type: %{
       size: 1,
       offset: 0x2
@@ -500,6 +510,14 @@ defmodule ThistleTea.Game.UpdateObject do
       size: 1,
       offset: 0x011
     },
+    game_object_facing: %{
+      size: 1,
+      offset: 0x012
+    },
+    game_object_faction: %{
+      size: 1,
+      offset: 0x014
+    },
     game_object_type_id: %{
       size: 1,
       offset: 0x015
@@ -641,6 +659,8 @@ defmodule ThistleTea.Game.UpdateObject do
         :game_object_pos_x -> <<value::little-float-size(32)>>
         :game_object_pos_y -> <<value::little-float-size(32)>>
         :game_object_pos_z -> <<value::little-float-size(32)>>
+        :game_object_facing -> <<value::little-float-size(32)>>
+        :game_object_faction -> <<value::little-size(32)>>
         :game_object_type_id -> <<value::little-size(32)>>
         :game_object_animprogress -> <<value::little-size(32)>>
         _ -> raise "Unknown field: #{field}"
