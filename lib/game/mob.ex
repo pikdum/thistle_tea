@@ -171,7 +171,7 @@ defmodule ThistleTea.Mob do
         x0: creature.position_x,
         y0: creature.position_y,
         z0: creature.position_z,
-        initial_point: 0
+        initial_point: creature.currentwaypoint
       }
 
     {:ok, state}
