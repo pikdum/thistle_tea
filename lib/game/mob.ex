@@ -79,13 +79,13 @@ defmodule ThistleTea.Mob do
     state = state |> Map.put(:creature, %{state.creature | curhealth: new_health})
 
     if new_health == 0 do
-      with pid <- Map.get(state, :behavior_pid) do
+      with pid when not is_nil(pid) <- Map.get(state, :behavior_pid) do
         GenServer.stop(pid)
       end
 
       respawn_timer = state.creature.spawntimesecs * 1_000
       Process.send_after(self(), :respawn, respawn_timer)
-      state |> Map.put(:movement_flags, 0)
+      state |> Map.put(:movement_flags, 0) |> Map.delete(:behavior_pid)
     else
       state
     end
@@ -185,7 +185,7 @@ defmodule ThistleTea.Mob do
 
   @impl GenServer
   def handle_info(:respawn, state) do
-    GenServer.stop(self())
+    Process.exit(self(), :normal)
     {:noreply, state}
   end
 

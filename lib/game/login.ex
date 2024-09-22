@@ -2,7 +2,8 @@ defmodule ThistleTea.Game.Login do
   import ThistleTea.Game.UpdateObject, only: [build_update_packet: 4]
   import Bitwise, only: [<<<: 2, |||: 2]
 
-  import ThistleTea.Util, only: [pack_guid: 1, send_packet: 2, send_update_packet: 1]
+  import ThistleTea.Util,
+    only: [pack_guid: 1, send_packet: 2, send_update_packet: 1, get_item_packets: 1]
 
   alias ThistleTea.DBC
 
@@ -111,6 +112,10 @@ defmodule ThistleTea.Game.Login do
         <<chr_race.cinematic_sequence::little-size(32)>>
       )
     end
+
+    # item packets
+    get_item_packets(c.equipment)
+    |> Enum.each(fn packet -> send_update_packet(packet) end)
 
     # packet for player
     update_flag =

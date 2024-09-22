@@ -1,9 +1,15 @@
 defmodule ThistleTea.Util do
   import Binary, only: [split_at: 2, trim_trailing: 1, reverse: 1]
   import Bitwise, only: [|||: 2, <<<: 2, &&&: 2]
+  import ThistleTea.Game.UpdateObject, only: [generate_packet: 4]
 
   @smsg_update_object 0x0A9
   @smsg_compressed_update_object 0x1F6
+
+  @update_type_create_object2 3
+  @object_type_item 1
+
+  @item_guid_offset 0x40000000
 
   @range 250
 
@@ -43,6 +49,26 @@ defmodule ThistleTea.Util do
         <<original_size::little-size(32)>> <> compressed_packet
       )
     end
+  end
+
+  # TODO: i really need to clean this up
+  def get_item_packets(items) do
+    items
+    |> Enum.map(fn {_, item} ->
+      fields = %{
+        object_guid: item.entry + @item_guid_offset,
+        # object + item
+        object_type: 3,
+        object_entry: item.entry,
+        item_flags: item.flags
+      }
+
+      mb = %{
+        update_flag: 0
+      }
+
+      generate_packet(@update_type_create_object2, @object_type_item, fields, mb)
+    end)
   end
 
   def pack_guid(guid) when is_integer(guid) do
