@@ -1,8 +1,11 @@
 defmodule ThistleTea.Game.Movement do
   import ThistleTea.Character, only: [get_update_fields: 1]
   import ThistleTea.Game.Character, only: [generate_random_equipment: 0]
-  import ThistleTea.Game.UpdateObject, only: [generate_packet: 2, decode_movement_info: 1]
-  import ThistleTea.Util, only: [send_update_packet: 1, get_item_packets: 1]
+
+  import ThistleTea.Game.UpdateObject,
+    only: [generate_packet: 2, decode_movement_info: 1, get_item_packets: 1]
+
+  import ThistleTea.Util, only: [send_update_packet: 1]
 
   require Logger
 

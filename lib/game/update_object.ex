@@ -14,7 +14,7 @@ defmodule ThistleTea.Game.UpdateObject do
   # @update_type_near_objects 5
 
   # @object_type_object 0
-  # @object_type_item 1
+  @object_type_item 1
   # @object_type_container 2
   # @object_type_unit 3
   # @object_type_player 4
@@ -69,6 +69,8 @@ defmodule ThistleTea.Game.UpdateObject do
   # @spline_flag_cyclic 0x00100000
   # @spline_flag_enter_cycle 0x00200000
   # @spline_flag_frozen 0x00400000
+
+  @item_guid_offset 0x40000000
 
   @field_defs %{
     object_guid: %{
@@ -907,5 +909,25 @@ defmodule ThistleTea.Game.UpdateObject do
         update_flag
       )
     )
+  end
+
+  # TODO: i really need to clean this up
+  def get_item_packets(items) do
+    items
+    |> Enum.map(fn {_, item} ->
+      fields = %{
+        object_guid: item.entry + @item_guid_offset,
+        # object + item
+        object_type: 3,
+        object_entry: item.entry,
+        item_flags: item.flags
+      }
+
+      mb = %{
+        update_flag: 0
+      }
+
+      generate_packet(@update_type_create_object2, @object_type_item, fields, mb)
+    end)
   end
 end
