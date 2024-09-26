@@ -83,9 +83,17 @@ defmodule ThistleTea.Mob do
         GenServer.stop(pid)
       end
 
+      # cancel any movement if dead
+      Map.get(state, :movement_timers, [])
+      |> Enum.each(&Process.cancel_timer/1)
+
       respawn_timer = state.creature.spawntimesecs * 1_000
       Process.send_after(self(), :respawn, respawn_timer)
-      state |> Map.put(:movement_flags, 0) |> Map.delete(:behavior_pid)
+
+      state
+      |> Map.put(:movement_flags, 0)
+      |> Map.delete(:behavior_pid)
+      |> Map.delete(:movement_timers)
     else
       state
     end
@@ -175,6 +183,15 @@ defmodule ThistleTea.Mob do
       }
 
     {:ok, state}
+  end
+
+  @impl GenServer
+  def handle_info({:update_position, {x, y, z}}, state) do
+    state =
+      state |> Map.put(:creature, %{state.creature | position_x: x, position_y: y, position_z: z})
+
+    SpatialHash.update(:mobs, state.creature.guid, self(), state.creature.map, x, y, z)
+    {:noreply, state}
   end
 
   @impl GenServer
@@ -362,12 +379,28 @@ defmodule ThistleTea.Mob do
         speed = state.creature.creature_template.speed_walk
 
         duration =
-          (calculate_movement_duration({x0, y0, z0}, {x1, y1, z1}, speed) * 1_000) |> trunc()
+          (calculate_movement_duration({x0, y0, z0}, {x1, y1, z1}, speed) * 1_000)
+          |> trunc()
+          |> max(1)
 
         packet = move_packet(state, {x0, y0, z0}, {x1, y1, z1}, duration)
 
-        # TODO: this will be ahead of actual movement
-        # could maybe start a timer to update in intervals?
+        # calculate where mob will be in 10ms increments
+        increments =
+          for t <- 0..(duration - 10)//10 do
+            ratio = t / duration
+            x = x0 + ratio * (x1 - x0)
+            y = y0 + ratio * (y1 - y0)
+            z = z0 + ratio * (z1 - z0)
+            {t, {x, y, z}}
+          end ++ [{duration, {x1, y1, z1}}]
+
+        # start timers to update position
+        timers =
+          Enum.map(increments, fn {t, {x, y, z}} ->
+            Process.send_after(self(), {:update_position, {x, y, z}}, t)
+          end)
+
         creature =
           state.creature
           |> Map.put(:position_x, x1)
@@ -387,6 +420,7 @@ defmodule ThistleTea.Mob do
         state
         |> Map.put(:path, rest)
         |> Map.put(:creature, creature)
+        |> Map.put(:movement_timers, timers)
         |> send_movement_packet(packet)
         |> queue_follow_path(duration)
 
@@ -397,6 +431,7 @@ defmodule ThistleTea.Mob do
 
         state
         |> Map.delete(:path_timer)
+        |> Map.delete(:movement_timers)
     end
   end
 
