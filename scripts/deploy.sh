@@ -7,6 +7,7 @@ SOURCE_DIR="$(realpath "$SCRIPT_DIR/../")"
 
 # exclude _build and .git
 rsync -avz \
+    --delete \
     --exclude '.git' \
     --exclude '.lexical' \
     --exclude 'priv' \
