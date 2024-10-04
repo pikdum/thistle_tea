@@ -386,6 +386,8 @@ defmodule ThistleTea.Mob do
         packet = move_packet(state, {x0, y0, z0}, {x1, y1, z1}, duration)
 
         # calculate where mob will be in 10ms increments
+        # TODO: this is expensive
+        # explore updating position in response to events like getting attacked instead
         increments =
           for t <- 0..(duration - 10)//10 do
             ratio = t / duration
