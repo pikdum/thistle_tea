@@ -15,6 +15,24 @@ defmodule ThistleTea.Pathfinding do
     Namigator.find_path(map_id, start_x, start_y, start_z, stop_x, stop_y, stop_z)
   end
 
+  def find_point_between_points(
+        map_id,
+        {start_x, start_y, start_z},
+        {stop_x, stop_y, stop_z},
+        distance
+      ) do
+    Namigator.find_point_between_points(
+      map_id,
+      start_x,
+      start_y,
+      start_z,
+      stop_x,
+      stop_y,
+      stop_z,
+      distance
+    )
+  end
+
   defp load_adt_at(map_id, {x, y}) do
     # TODO: store in :ets or similar, maybe with last access time, and unload periodically?
     Namigator.load_adt_at(map_id, x, y)

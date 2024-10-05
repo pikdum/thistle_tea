@@ -186,6 +186,36 @@ fn find_path(
     })
 }
 
+#[rustler::nif]
+fn find_point_between_points(
+    map_id: u32,
+    start_x: f32,
+    start_y: f32,
+    start_z: f32,
+    stop_x: f32,
+    stop_y: f32,
+    stop_z: f32,
+    distance: f32,
+) -> NifResult<Option<(f32, f32, f32)>> {
+    with_global_maps(|maps| {
+        maps.with_map(map_id, |map| {
+            let start = Vector3d {
+                x: start_x,
+                y: start_y,
+                z: start_z,
+            };
+            let stop = Vector3d {
+                x: stop_x,
+                y: stop_y,
+                z: stop_z,
+            };
+            map.find_point_between_points(distance, start, stop)
+                .map(|point| (point.x, point.y, point.z))
+                .map_err(|e| e.to_string())
+        })
+    })
+}
+
 fn with_global_maps<F, R>(f: F) -> NifResult<Option<R>>
 where
     F: FnOnce(&mut PathfindingMaps) -> Result<R, String>,
