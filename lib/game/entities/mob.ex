@@ -35,23 +35,39 @@ defmodule ThistleTea.Mob do
     GenServer.start_link(__MODULE__, creature)
   end
 
-  def future_position(x, y, o, speed, seconds) do
-    distance = speed * seconds
-    delta_x = distance * :math.cos(o)
-    delta_y = distance * :math.sin(o)
+  def attack_behavior(state, _target) do
+    # TODO: hack to prevent attack behavior from starting multiple timers
+    # but it should probably just run once when combat starts instead
+    case Map.get(state, :behavior) do
+      :attack ->
+        state
 
-    x_new = x + delta_x
-    y_new = y + delta_y
-    {x_new, y_new}
+      _ ->
+        Logger.info("Starting attack behavior")
+
+        state = stop_behavior(state)
+
+        # {:ok, behavior_pid} =
+        #   ThistleTea.AttackBehavior.start_link(%{
+        #     pid: self(),
+        #     guid: state.creature.guid,
+        #     target: target
+        #   })
+
+        state
+        # |> Map.put(:behavior_pid, behavior_pid)
+        # |> Map.put(:running, true)
+        # |> Map.put(:behavior, :attack)
+    end
   end
 
   def move_packet(state, {x0, y0, z0}, {x1, y1, z1}, duration) do
     packed_guid = state.packed_guid
 
+    # TODO: figure out how to cancel/overwrite spline
     move_type = 0
-    spline_id = 0
-    # NO_SPLINE
-    spline_flags = 0x400
+    spline_id = state.creature.low_guid
+    spline_flags = 0
     spline_count = 1
 
     # TODO: figure out how to do multiple spline points
@@ -73,27 +89,28 @@ defmodule ThistleTea.Mob do
       >>
   end
 
+  def stop_behavior(state) do
+    with pid when not is_nil(pid) <- Map.get(state, :behavior_pid) do
+      GenServer.stop(pid)
+    end
+
+    state
+    |> interrupt_movement()
+    |> Map.delete(:behavior_pid)
+  end
+
   def take_damage(state, damage) do
     new_health = max(state.creature.curhealth - damage, 0)
 
     state = state |> Map.put(:creature, %{state.creature | curhealth: new_health})
 
     if new_health == 0 do
-      with pid when not is_nil(pid) <- Map.get(state, :behavior_pid) do
-        GenServer.stop(pid)
-      end
-
-      # cancel any movement if dead
-      Map.get(state, :movement_timers, [])
-      |> Enum.each(&Process.cancel_timer/1)
-
       respawn_timer = state.creature.spawntimesecs * 1_000
       Process.send_after(self(), :respawn, respawn_timer)
 
       state
+      |> stop_behavior()
       |> Map.put(:movement_flags, 0)
-      |> Map.delete(:behavior_pid)
-      |> Map.delete(:movement_timers)
     else
       state
     end
@@ -153,7 +170,10 @@ defmodule ThistleTea.Mob do
 
   @impl GenServer
   def init(creature) do
-    creature = Map.put(creature, :guid, creature.guid + @creature_guid_offset)
+    creature =
+      creature
+      |> Map.put(:low_guid, creature.guid)
+      |> Map.put(:guid, creature.guid + @creature_guid_offset)
 
     SpatialHash.update(
       :mobs,
@@ -179,7 +199,9 @@ defmodule ThistleTea.Mob do
         x0: creature.position_x,
         y0: creature.position_y,
         z0: creature.position_z,
-        initial_point: creature.currentwaypoint
+        initial_point: creature.currentwaypoint,
+        running: false,
+        behavior: nil
       }
 
     {:ok, state}
@@ -219,11 +241,16 @@ defmodule ThistleTea.Mob do
   @impl GenServer
   def handle_cast(:wake_up, state) do
     case {
+      Map.get(state.creature, :curhealth),
       Map.get(state, :behavior_pid),
       state.creature.movement_type,
       state.creature.creature_movement
     } do
-      {nil, 1, _} ->
+      {0, _, _, _} ->
+        # prevent starting a new behavior if dead
+        {:noreply, state}
+
+      {_, nil, 1, _} ->
         {:ok, behavior_pid} =
           ThistleTea.WanderBehavior.start_link(%{
             pid: self(),
@@ -235,14 +262,14 @@ defmodule ThistleTea.Mob do
             wander_distance: state.creature.spawndist
           })
 
-        {:noreply, state |> Map.put(:behavior_pid, behavior_pid)}
+        {:noreply, state |> Map.put(:behavior_pid, behavior_pid) |> Map.put(:running, false)}
 
-      {nil, 2, []} ->
+      {_, nil, 2, []} ->
         # no movement data, but follow path movement_type
         # probably never happens?
         {:noreply, state}
 
-      {nil, 2, waypoints} ->
+      {_, nil, 2, waypoints} ->
         {:ok, behavior_pid} =
           ThistleTea.FollowPathBehavior.start_link(%{
             pid: self(),
@@ -252,9 +279,9 @@ defmodule ThistleTea.Mob do
             initial_point: state.initial_point
           })
 
-        {:noreply, state |> Map.put(:behavior_pid, behavior_pid)}
+        {:noreply, state |> Map.put(:behavior_pid, behavior_pid) |> Map.put(:running, false)}
 
-      {_, _, _} ->
+      {_, _, _, _} ->
         {:noreply, state}
     end
   end
@@ -265,13 +292,12 @@ defmodule ThistleTea.Mob do
       nil ->
         {:noreply, state}
 
-      pid ->
+      _pid ->
         %{position_x: x, position_y: y, position_z: z, map: map} = state.creature
         nearby_players = SpatialHash.query(:players, map, x, y, z, 250)
 
         if Enum.empty?(nearby_players) do
-          GenServer.stop(pid)
-          {:noreply, state |> Map.delete(:behavior_pid)}
+          {:noreply, stop_behavior(state)}
         else
           {:noreply, state}
         end
@@ -297,6 +323,7 @@ defmodule ThistleTea.Mob do
 
     state =
       state
+      |> attack_behavior(caster)
       |> take_damage(damage)
       |> face_player(caster)
 
@@ -319,11 +346,13 @@ defmodule ThistleTea.Mob do
 
     state =
       state
+      |> attack_behavior(Map.get(attack, :caster))
       |> take_damage(damage)
       |> face_player(Map.get(attack, :caster))
 
     attack = Map.merge(attack, %{damage: damage})
     send_attacker_state_update(state, attack)
+    # TODO: should only send values, not movement
     send_updates(state)
     {:noreply, state}
   end
@@ -361,10 +390,17 @@ defmodule ThistleTea.Mob do
     state
   end
 
+  def interrupt_movement(state) do
+    case Map.get(state, :interrupt_movement) do
+      nil -> state
+      interrupt_movement -> interrupt_movement.(state)
+    end
+  end
+
   def move_to(state, {x, y, z}) do
     %{position_x: x0, position_y: y0, position_z: z0, map: map} = state.creature
     path = ThistleTea.Pathfinding.find_path(map, {x0, y0, z0}, {x, y, z})
-    state |> Map.put(:path, path) |> follow_path()
+    state |> interrupt_movement() |> Map.put(:path, path) |> follow_path()
   end
 
   def queue_follow_path(state, delay) do
@@ -372,11 +408,24 @@ defmodule ThistleTea.Mob do
     state |> Map.put(:path_timer, path_timer)
   end
 
+  def get_speed(state) do
+    if Map.get(state, :running, false) do
+      state.creature.creature_template.speed_run * 7.0
+    else
+      state.creature.creature_template.speed_walk
+    end
+  end
+
+  def get_distance(speed, duration) do
+    speed * duration / 1_000
+  end
+
   def follow_path(state) do
     case Map.get(state, :path) do
       [{x1, y1, z1} | rest] ->
         %{position_x: x0, position_y: y0, position_z: z0} = state.creature
-        speed = state.creature.creature_template.speed_walk
+
+        speed = get_speed(state)
 
         duration =
           (calculate_movement_duration({x0, y0, z0}, {x1, y1, z1}, speed) * 1_000)
@@ -385,24 +434,9 @@ defmodule ThistleTea.Mob do
 
         packet = move_packet(state, {x0, y0, z0}, {x1, y1, z1}, duration)
 
-        # calculate where mob will be in 10ms increments
-        # TODO: this is expensive
-        # explore updating position in response to events like getting attacked instead
-        increments =
-          for t <- 0..(duration - 10)//10 do
-            ratio = t / duration
-            x = x0 + ratio * (x1 - x0)
-            y = y0 + ratio * (y1 - y0)
-            z = z0 + ratio * (z1 - z0)
-            {t, {x, y, z}}
-          end ++ [{duration, {x1, y1, z1}}]
+        start_time = System.monotonic_time(:millisecond)
 
-        # start timers to update position
-        timers =
-          Enum.map(increments, fn {t, {x, y, z}} ->
-            Process.send_after(self(), {:update_position, {x, y, z}}, t)
-          end)
-
+        # TODO: make this update on completion if not interrupted?
         creature =
           state.creature
           |> Map.put(:position_x, x1)
@@ -419,10 +453,50 @@ defmodule ThistleTea.Mob do
           creature.position_z
         )
 
+        interrupt_movement = fn state ->
+          with current_duration <- System.monotonic_time(:millisecond) - start_time,
+               true <- current_duration < duration,
+               distance <- get_distance(speed, current_duration),
+               {x2, y2, z2} <-
+                 ThistleTea.Pathfinding.find_point_between_points(
+                   state.creature.map,
+                   {x0, y0, z0},
+                   {x1, y1, z1},
+                   distance
+                 ) do
+            if Map.get(state, :path_timer) do
+              Process.cancel_timer(Map.get(state, :path_timer))
+            end
+
+            SpatialHash.update(
+              :mobs,
+              state.creature.guid,
+              self(),
+              state.creature.map,
+              x2,
+              y2,
+              z2
+            )
+
+            state
+            |> Map.put(:creature, %{
+              state.creature
+              | position_x: x2,
+                position_y: y2,
+                position_z: z2
+            })
+            |> Map.delete(:path_timer)
+            |> Map.delete(:interrupt_movement)
+          else
+            _ ->
+              state |> Map.delete(:interrupt_movement)
+          end
+        end
+
         state
         |> Map.put(:path, rest)
         |> Map.put(:creature, creature)
-        |> Map.put(:movement_timers, timers)
+        |> Map.put(:interrupt_movement, interrupt_movement)
         |> send_movement_packet(packet)
         |> queue_follow_path(duration)
 
@@ -433,7 +507,6 @@ defmodule ThistleTea.Mob do
 
         state
         |> Map.delete(:path_timer)
-        |> Map.delete(:movement_timers)
     end
   end
 
