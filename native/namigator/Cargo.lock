@@ -13,9 +13,9 @@ dependencies = [
 
 [[package]]
 name = "cc"
-version = "1.1.18"
+version = "1.1.28"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b62ac837cdb5cb22e10a256099b4fc502b1dfe560cb282963a974d7abd80e476"
+checksum = "2e80e3b6a3ab07840e1cae9b0666a63970dc28e8ed5ffbcdacbfc760c281bfc1"
 dependencies = [
  "jobserver",
  "libc",
@@ -45,9 +45,9 @@ dependencies = [
 
 [[package]]
 name = "libc"
-version = "0.2.158"
+version = "0.2.159"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d8adc4bb1803a324070e64a98ae98f38934d91957a99cfb3a43dcbc01bc56439"
+checksum = "561d97a539a36e26a9a5fad1ea11a3039a67714694aaa379433e580854bc3dc5"
 
 [[package]]
 name = "memchr"
@@ -59,7 +59,7 @@ checksum = "78ca9ab1a0babb1e7d5695e3530886289c18cf2f87ec19a575a0abdce112e3a3"
 name = "namigator"
 version = "0.1.0"
 dependencies = [
- "namigator 0.1.0 (git+https://github.com/gtker/namigator-rs.git?rev=6ba7b71f86204cc1d626e1454589dd8eed4a0fb8)",
+ "namigator 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "once_cell",
  "rustler",
 ]
@@ -67,7 +67,8 @@ dependencies = [
 [[package]]
 name = "namigator"
 version = "0.1.0"
-source = "git+https://github.com/gtker/namigator-rs.git?rev=6ba7b71f86204cc1d626e1454589dd8eed4a0fb8#6ba7b71f86204cc1d626e1454589dd8eed4a0fb8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f921b8f39f6eaf376385f596dac42c8a55b800168c10a8944f1ee21bdb23f979"
 dependencies = [
  "namigator-sys",
  "wow_world_base",
@@ -75,8 +76,9 @@ dependencies = [
 
 [[package]]
 name = "namigator-sys"
-version = "0.1.0"
-source = "git+https://github.com/gtker/namigator-rs.git?rev=6ba7b71f86204cc1d626e1454589dd8eed4a0fb8#6ba7b71f86204cc1d626e1454589dd8eed4a0fb8"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7cde1ca2f952fce18e9e5527bae431173afde021d89cb4b924c4f174124a3a88"
 dependencies = [
  "cc",
 ]
@@ -89,9 +91,9 @@ checksum = "1261fe7e33c73b354eab43b1273a57c8f967d0391e80353e51f764ac02cf6775"
 
 [[package]]
 name = "proc-macro2"
-version = "1.0.86"
+version = "1.0.87"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5e719e8df665df0d1c8fbfd238015744736151d4445ec0836b8e628aae103b77"
+checksum = "b3e4daa0dcf6feba26f985457cdf104d4b4256fc5a09547140f3631bb076b19a"
 dependencies = [
  "unicode-ident",
 ]
@@ -107,9 +109,9 @@ dependencies = [
 
 [[package]]
 name = "regex"
-version = "1.10.6"
+version = "1.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4219d74c6b67a3654a9fbebc4b419e22126d13d2f3c4a07ee0cb61ff79a79619"
+checksum = "38200e5ee88914975b69f657f0801b6f6dccafd44fd9326302a4aaeecfacb1d8"
 dependencies = [
  "aho-corasick",
  "memchr",
@@ -119,9 +121,9 @@ dependencies = [
 
 [[package]]
 name = "regex-automata"
-version = "0.4.7"
+version = "0.4.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "38caf58cc5ef2fed281f89292ef23f6365465ed9a41b7a7754eb4e26496c92df"
+checksum = "368758f23274712b504848e9d5a6f010445cc8b87a7cdb4d7cbee666c1288da3"
 dependencies = [
  "aho-corasick",
  "memchr",
@@ -130,9 +132,9 @@ dependencies = [
 
 [[package]]
 name = "regex-syntax"
-version = "0.8.4"
+version = "0.8.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7a66a03ae7c801facd77a29370b4faec201768915ac14a721ba36f20bc9c209b"
+checksum = "2b15c43186be67a4fd63bee50d0303afffcef381492ebe2c5d87f324e1b8815c"
 
 [[package]]
 name = "rustler"
@@ -176,9 +178,9 @@ checksum = "0fda2ff0d084019ba4d7c6f371c95d8fd75ce3524c3cb8fb653a3023f6323e64"
 
 [[package]]
 name = "syn"
-version = "2.0.77"
+version = "2.0.79"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9f35bcdf61fd8e7be6caf75f429fdca8beb3ed76584befb503b1569faee373ed"
+checksum = "89132cd0bf050864e1d38dc3bbc07a0eb8e7530af26344d3d2bbbef83499f590"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -208,5 +210,6 @@ checksum = "6a02e4885ed3bc0f2de90ea6dd45ebcbb66dacffe03547fadbb0eeae2770887d"
 
 [[package]]
 name = "wow_world_base"
-version = "0.1.1"
-source = "git+https://github.com/gtker/wow_messages.git?rev=e8dc643aea0647083e5f5a1fa6d2c5e4fb274d08#e8dc643aea0647083e5f5a1fa6d2c5e4fb274d08"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d3e7f722a488637c33c707dc29de57a12908eba56b3f07db69ee476d1f7f3f8f"
