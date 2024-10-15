@@ -1,28 +1,12 @@
-# thistle_tea
+# thistle tea
 
-vanilla private server
+wip vanilla private server written in elixir
 
-## what (somewhat) works
+## contributing
 
-- logging in
-- creating characters
-- entering world
-- seeing other players
-- chatting
-- mob spawns/respawns
-- casting spells
-- auto-attacks
+i've had a lot of fun hacking on this and it would be neat if you did too
 
-## helpful resources
-
-- [idewave](https://github.com/idewave/idewave-core) - reference implementation
-- [mangos](https://github.com/mangoszero/server/) - reference implementation
-- [mangos database](https://github.com/mangoszero/database) - world database
-- [mysql2sqlite](https://github.com/vdechef/mysql2sqlite) - convert world database to sqlite
-- [shadowburn](https://shadowburn-project.org/) - auth crypto + reference implementation
-- [wow_dbc_converter](https://github.com/gtker/wow_dbc/tree/main/wow_dbc_converter) - convert dbc to sqlite
-- [wow_messages](https://gtker.com/wow_messages/) - packet structure
-- [wowdev](https://wowdev.wiki/Main_Page) - documentation
+hop in the [discord](https://discord.gg/dSYsRXHDhb) if you're interested in helping out
 
 ## running
 
@@ -55,9 +39,34 @@ iex -S mix
 # test:test
 ```
 
-## required databases
+## databases
 
 - **mangos0.sqlite** `./scripts/generate-mangos0-db.sh`
   - can generate or download
+  - this has mobs, items, etc.
 - **dbc.sqlite** `./scripts/generate-dbc-db.sh`
   - need to generate from wow client, since this can't be distributed
+  - this has spell info and similar
+
+## what (somewhat) works
+
+- logging in
+- creating characters
+- entering world
+- seeing other players
+- chatting
+- mob spawns/respawns
+- casting spells
+- auto-attacks
+- mob navigation
+
+## helpful resources
+
+- [idewave](https://github.com/idewave/idewave-core) - reference implementation
+- [mangos](https://github.com/mangoszero/server/) - reference implementation
+- [mangos database](https://github.com/mangoszero/database) - world database
+- [mysql2sqlite](https://github.com/vdechef/mysql2sqlite) - convert world database to sqlite
+- [shadowburn](https://shadowburn-project.org/) - auth crypto + reference implementation
+- [wow_dbc_converter](https://github.com/gtker/wow_dbc/tree/main/wow_dbc_converter) - convert dbc to sqlite
+- [wow_messages](https://gtker.com/wow_messages/) - packet structure
+- [wowdev](https://wowdev.wiki/Main_Page) - documentation
