@@ -17,14 +17,14 @@ cd thistle_tea
 mix deps.get
 mix deps.compile
 
-# need docker + expect + no running mysql/mariadb
+# need docker + expect + mariadb cli + nothing running on port 3306
 ./scripts/generate-mangos0-db.sh
 # or, just download it
 # wget https://pomf2.lain.la/f/jxcam7ob.sqlite -O ./db/mangos0.sqlite
 
-# need a vanilla wow client, this is directory with WoW.exe
+# path to vanilla client, the directory with WoW.exe
+# you'll want version 1.12.1 build 5875
 # this is only for generating dbc.sqlite + maps
-# also, change server to localhost in realmlist.wtf
 export WOW_DIR="/path/to/vanilla/client"
 
 # need docker
@@ -35,9 +35,9 @@ export WOW_DIR="/path/to/vanilla/client"
 mix build_maps
 
 iex -S mix
-# default logins are in application.ex
-# test:test
-# also, test server at 150.230.28.221
+# change server to localhost in realmlist.wtf
+# default logins are in application.ex (test:test)
+# also, there's a test server at 150.230.28.221
 ```
 
 ## databases
