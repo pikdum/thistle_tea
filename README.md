@@ -37,6 +37,7 @@ mix build_maps
 iex -S mix
 # default logins are in application.ex
 # test:test
+# also, test server at 150.230.28.221
 ```
 
 ## databases
