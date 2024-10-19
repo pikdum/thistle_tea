@@ -17,7 +17,7 @@ cd thistle_tea
 mix deps.get
 mix deps.compile
 
-# need docker + expect + mariadb cli + nothing running on port 3306
+# need docker + no mariadb port 3306 conflict
 ./scripts/generate-mangos0-db.sh
 # or, just download it
 # wget https://pomf2.lain.la/f/jxcam7ob.sqlite -O ./db/mangos0.sqlite

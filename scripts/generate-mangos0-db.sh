@@ -27,23 +27,34 @@ until docker exec "$DB_CONTAINER" mariadb -uroot -p"$DB_PASSWORD" -e "SELECT 1" 
     sleep 1
 done
 
-cd "$TEMP_DIR"
+docker run \
+    --rm \
+    -v "$SCRIPT_DIR:/scripts:ro" \
+    -v "$TEMP_DIR:/output" \
+    -e DB_PASSWORD="$DB_PASSWORD" \
+    --net=host \
+    -i ubuntu:24.04 bash <<'EOF'
+echo "Installing dependencies..."
+export DEBIAN_FRONTEND=noninteractive
+apt-get update
+apt-get install -y git expect mariadb-client sqlite3
 
 echo "Installing latest mangoszero/database..."
 git clone https://github.com/mangoszero/database.git
 cd database/
-cp "$SCRIPT_DIR/install-databases.exp" .
+cp /scripts/install-databases.exp .
 ./install-databases.exp
 
 echo "Converting mangos0 to sqlite..."
 cd ../
 git clone https://github.com/vdechef/mysql2sqlite.git
 cd mysql2sqlite/
-docker exec -t "$DB_CONTAINER" mariadb-dump --skip-extended-insert --compact mangos0 -p"$DB_PASSWORD" >dump.sql
-./mysql2sqlite dump.sql | sqlite3 mangos0.sqlite
+mariadb-dump -h 127.0.0.1 --skip-extended-insert --compact mangos0 -p"$DB_PASSWORD" >dump.sql
+./mysql2sqlite dump.sql | sqlite3 /output/mangos0.sqlite
+EOF
 
 rm -f "$OUTPUT_DIR"/mangos0.sqlite*
-mv mangos0.sqlite "$OUTPUT_DIR"
+mv "$TEMP_DIR/mangos0.sqlite" "$OUTPUT_DIR"
 
 echo ""
 echo "Generated $OUTPUT_DIR/mangos0.sqlite"
