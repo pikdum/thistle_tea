@@ -168,6 +168,29 @@ defmodule ThistleTea.Mob do
     end
   end
 
+  # creature.currentwaypoint doesn't seem reliable
+  # so instead, find the nearest to start with
+  def get_nearest_waypoint({x, y, z}, waypoints) do
+    case waypoints do
+      [] ->
+        0
+
+      _ ->
+        waypoints
+        |> Enum.min_by(fn cm ->
+          SpatialHash.distance(
+            {
+              cm.position_x,
+              cm.position_y,
+              cm.position_z
+            },
+            {x, y, z}
+          )
+        end)
+        |> Map.get(:point)
+    end
+  end
+
   @impl GenServer
   def init(creature) do
     creature =
@@ -185,6 +208,12 @@ defmodule ThistleTea.Mob do
       creature.position_z
     )
 
+    nearest_waypoint =
+      get_nearest_waypoint(
+        {creature.position_x, creature.position_y, creature.position_z},
+        creature.creature_movement
+      )
+
     state =
       %{
         creature: creature,
@@ -199,7 +228,7 @@ defmodule ThistleTea.Mob do
         x0: creature.position_x,
         y0: creature.position_y,
         z0: creature.position_z,
-        initial_point: creature.currentwaypoint,
+        initial_point: nearest_waypoint,
         running: false,
         behavior: nil
       }

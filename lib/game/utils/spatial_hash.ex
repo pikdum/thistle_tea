@@ -91,7 +91,7 @@ defmodule SpatialHash do
     |> Enum.uniq()
   end
 
-  defp distance({x1, y1, z1}, {x2, y2, z2}) do
+  def distance({x1, y1, z1}, {x2, y2, z2}) do
     dx = x2 - x1
     dy = y2 - y1
     dz = z2 - z1
