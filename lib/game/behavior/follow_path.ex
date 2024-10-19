@@ -19,16 +19,14 @@ defmodule ThistleTea.FollowPathBehavior do
 
   @impl GenServer
   def handle_cast(:movement_finished, %{state: :pathing} = state) do
-    next_point = get_next_point(state)
-
     # TODO: handle orientation, script, text, etc.
 
     delay =
       Map.get(state, :waypoints, [])
-      |> Enum.at(next_point)
+      |> Enum.at(state.current_point)
       |> Map.get(:waittime, 0)
-      |> Kernel.*(1_000)
 
+    next_point = get_next_point(state)
     timer = Process.send_after(self(), {:start_pathing_to, next_point}, delay)
     {:noreply, Map.put(state, :state, :waiting) |> Map.put(:timer, timer)}
   end
@@ -65,8 +63,15 @@ defmodule ThistleTea.FollowPathBehavior do
      %{
        behavior: __MODULE__,
        state: state.state,
+       # current point is where we're currently going to
        current_point: state.current_point,
-       initial_point: state.initial_point
+       # initial point is the first point we're going to
+       initial_point: state.initial_point,
+       waypoint_count: Map.get(state, :waypoints, []) |> Enum.count(),
+       delay:
+         Map.get(state, :waypoints, [])
+         |> Enum.at(state.current_point)
+         |> Map.get(:waittime, 0)
      }, state}
   end
 
