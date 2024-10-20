@@ -131,13 +131,14 @@ defmodule ThistleTea.Auth do
   def handle_data(<<@cmd_realm_list, _padding::binary>>, socket, state) do
     Logger.info("CMD_REALM_LIST")
 
-    ip = Application.fetch_env!(:thistle_tea, :ip)
+    game_server = Application.fetch_env!(:thistle_tea, :game_server)
 
     realm =
       <<8::little-size(32), 0::little-size(8)>> <>
         "Thistle Tea" <>
         <<0>> <>
-        "#{ip}:8085" <> <<0>> <> <<200::little-float-size(32), 0::size(8), 0::size(8), 0>>
+        "#{game_server}:8085" <>
+        <<0>> <> <<200::little-float-size(32), 0::size(8), 0::size(8), 0>>
 
     num_realms = 1
 
