@@ -19,4 +19,4 @@ config :logger, :default_formatter,
     :error_code
   ]
 
-import_config "#{config_env()}.exs"
+import_config "runtime.exs"
