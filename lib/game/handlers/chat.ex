@@ -136,7 +136,8 @@ defmodule ThistleTea.Game.Chat do
       ".guid - show target guid",
       ".help - show help",
       ".move - move target to you",
-      ".pid - show target pid"
+      ".pid - show target pid",
+      ".pos - show current position"
     ]
 
     system_message(state, "Commands:")
