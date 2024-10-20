@@ -34,6 +34,8 @@ export WOW_DIR="/path/to/vanilla/client"
 # probably 30+ minutes
 mix build_maps
 
+# if not localhost, set GAME_SERVER:
+# GAME_SERVER=192.168.1.110 iex -S mix
 iex -S mix
 # change server to localhost in realmlist.wtf
 # default logins are in application.ex (test:test)
