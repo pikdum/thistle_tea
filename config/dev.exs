@@ -13,11 +13,11 @@ config :thistle_tea, ThistleTeaWeb.Endpoint,
     tailwind: {Tailwind, :install_and_run, [:thistle_tea, ~w(--watch)]}
   ]
 
-config :thistle_tea, BazWeb.Endpoint,
+config :thistle_tea, ThistleTeaWeb.Endpoint,
   live_reload: [
     patterns: [
       ~r"priv/static/(?!uploads/).*(js|css|png|jpeg|jpg|gif|svg)$",
-      ~r"lib/baz_web/(controllers|live|components)/.*(ex|heex)$"
+      ~r"lib/web/(controllers|live|components)/.*(ex|heex)$"
     ]
   ]
 
