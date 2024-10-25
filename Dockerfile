@@ -8,9 +8,10 @@ ENV PATH=/usr/local/cargo/bin:$PATH
 WORKDIR /app
 RUN mix local.hex --force && mix local.rebar --force
 COPY mix.exs mix.lock ./
-RUN mix deps.get
+RUN mix deps.get --only prod
 COPY . .
 RUN mix compile
+RUN mix assets.deploy
 RUN mix release
 
 FROM docker.io/library/elixir:1.17
@@ -18,4 +19,5 @@ WORKDIR /app
 COPY --from=build /app/_build/prod/rel/thistle_tea ./
 EXPOSE 3724
 EXPOSE 8085
+EXPOSE 4000
 CMD ["/app/bin/thistle_tea", "start"]
