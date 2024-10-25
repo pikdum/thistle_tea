@@ -9,12 +9,7 @@ defmodule ThistleTeaWeb.MapLive.Index do
   def render(assigns) do
     ~H"""
     <div class="relative h-screen w-screen bg-stone-200">
-      <div
-        class="h-full w-full cursor-grab active:cursor-grabbing"
-        id="map"
-        phx-hook="Map"
-        phx-update="ignore"
-      />
+      <div class="h-full w-full" id="map" phx-hook="Map" phx-update="ignore" />
       <%= if @map_ready do %>
         <div class="absolute top-4 right-4 rounded-md bg-black p-2 px-4 text-white opacity-80">
           <h1 class="font-semibold">Thistle Tea</h1>
@@ -66,7 +61,7 @@ defmodule ThistleTeaWeb.MapLive.Index do
     :ets.tab2list(:entities)
     |> Enum.filter(fn {guid, _pid, map, _x, _y, _z} ->
       # anything under is a player
-      map == 0 and guid < 0x1FC00000
+      map <= 1 and guid < 0x1FC00000
     end)
     |> Enum.map(fn {guid, _pid, map, x, y, z} ->
       [{^guid, name, _realm, _race, _gender, _class}] = :ets.lookup(:guid_name, guid)
