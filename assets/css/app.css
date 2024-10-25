@@ -3,3 +3,4 @@
 @import "tailwindcss/utilities";
 
 /* This file is for your main application CSS */
+@import "../node_modules/ol/ol.css";
