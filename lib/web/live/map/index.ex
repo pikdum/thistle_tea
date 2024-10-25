@@ -9,18 +9,18 @@ defmodule ThistleTeaWeb.MapLive.Index do
   def render(assigns) do
     ~H"""
     <div class="relative w-screen h-screen bg-stone-200">
-        <div
-            class="w-full h-full cursor-grab active:cursor-grabbing"
-            id="map"
-            phx-hook="Map"
-            phx-update="ignore"
-        />
-        <%= if @map_ready do %>
+      <div
+        class="w-full h-full cursor-grab active:cursor-grabbing"
+        id="map"
+        phx-hook="Map"
+        phx-update="ignore"
+      />
+      <%= if @map_ready do %>
         <div class="absolute top-4 right-4 rounded-md bg-black text-white opacity-80 p-2 px-4">
-        <h1 class="font-semibold">Thistle Tea</h1>
-            Online: <%= length(assigns.entities) %>
+          <h1 class="font-semibold">Thistle Tea</h1>
+          Online: <%= length(assigns.entities) %>
         </div>
-        <% end %>
+      <% end %>
     </div>
     """
   end
