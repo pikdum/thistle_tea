@@ -13,23 +13,19 @@ defmodule ThistleTeaWeb.MapLive.Index do
       id="map"
       phx-hook="Map"
       phx-update="ignore"
-      data-entities={Jason.encode!(@initial_entities)}
     ></div>
     """
   end
 
   @impl true
   def mount(_params, _session, socket) do
-    if connected?(socket) do
-      :timer.send_interval(@update_interval, self(), :update_entities)
-    end
+    {:ok, socket |> assign(entities: []), layout: false}
+  end
 
-    entities = fetch_entities()
-
-    {:ok,
-     socket
-     |> assign(entities: entities)
-     |> assign(initial_entities: entities), layout: false}
+  @impl true
+  def handle_event("map_ready", true, socket) do
+    :timer.send_interval(@update_interval, self(), :update_entities)
+    handle_info(:update_entities, socket)
   end
 
   @impl true

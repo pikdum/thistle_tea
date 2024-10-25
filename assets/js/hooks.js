@@ -5,15 +5,12 @@ const hooks = {};
 hooks.Map = {
   mounted() {
     const { addMarker, removeMarker, updateMarker } = setupMap(this.el);
-    window.addEventListener("phx:entity_updates", (e) => {
-      const { added, updated, removed } = e.detail;
+    this.handleEvent("entity_updates", ({ added, updated, removed }) => {
       added.forEach(addMarker);
       updated.forEach(updateMarker);
       removed.forEach(removeMarker);
     });
-  },
-  destroyed() {
-    window.removeEventListener("phx:entity_updates");
+    this.pushEvent("map_ready", true);
   },
 };
 

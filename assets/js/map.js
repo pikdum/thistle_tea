@@ -116,9 +116,6 @@ export const setupMap = (el) => {
     0: createCoordinateMapper(sourcePoints[0], targetPoints[0]),
   };
 
-  const entitiesData = el.getAttribute("data-entities");
-  const entities = JSON.parse(entitiesData);
-
   const markers = {};
 
   const addMarker = (entity) => {
@@ -143,8 +140,6 @@ export const setupMap = (el) => {
     const marker = markers[entity.guid];
     marker.getGeometry().setCoordinates([x, y]);
   };
-
-  entities.forEach(addMarker);
 
   return { addMarker, removeMarker, updateMarker };
 };
