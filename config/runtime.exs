@@ -11,11 +11,12 @@ if config_env() == :prod do
       You can generate one by calling: mix phx.gen.secret
       """
 
-  # host = System.get_env("PHX_HOST", "example.com")
+  host = System.get_env("PHX_HOST", "example.com")
   port = String.to_integer(System.get_env("PORT", "4000"))
 
   config :thistle_tea, ThistleTeaWeb.Endpoint,
     # url: [host: host, port: 443, scheme: "https"],
+    url: [host: host, port: 4000, scheme: "http"],
     http: [
       ip: {0, 0, 0, 0, 0, 0, 0, 0},
       port: port
