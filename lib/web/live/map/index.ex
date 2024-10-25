@@ -13,7 +13,7 @@ defmodule ThistleTeaWeb.MapLive.Index do
   def mount(_params, _session, socket) do
     entities =
       :ets.tab2list(:entities)
-      |> Enum.filter(fn {guid, _pid, map, x, y, z} ->
+      |> Enum.filter(fn {guid, _pid, map, x, y, _z} ->
         # anything under is a player
         map == 0 and guid < 0x1FC00000
       end)
