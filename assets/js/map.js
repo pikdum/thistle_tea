@@ -126,27 +126,23 @@ export const setupMap = (el) => {
   });
 
   // these are their actual in-game coordinates
+  // TODO: right now this only uses 4 points
+  // would be better if they were on the corners of the map
+  // or figure out a better homography implementation
   const sourcePoints = {
-    // TODO: not very accurate, but good enough
     // Eastern Kingdoms
     0: [
       [-8913.14, -137.78], // Northshire Abbey
       [1668.45, 1662.34], // Shadow Grave
       [2271.09, -5341.49], // Light's Hope Chapel
-      [-846.85, -520.79], // Southshore
       [-10619.08, 1036.77], // Sentinel Hill
     ],
     // Kalimdor
-    // TODO: these seem even less accurate
     1: [
-      [7981.32, -2576.5], // Moonglade
-      [6462.24, 807.09], // Auberdine
-      [2751.61, -419.84], // Astranaar
-      [-456.4, -2642.82], // Crossroads
-      [-956.86, -3754.77], // Ratchet
       [-6815.12, 730.3], // Cenarion Hold
+      [6462.24, 807.09], // Auberdine
+      [-956.86, -3754.77], // Ratchet
       [-6291.55, -1158.62], // Marshal's Refuge
-      [-1280.03, 127.35], // Thunderbluff
     ],
   };
 
@@ -157,19 +153,14 @@ export const setupMap = (el) => {
       [9315.15, 3893.04], // Northshire Abbey
       [8656.9, 7777.56], // Shadow Grave
       [11247.6, 8037.48], // Light's Hope Chapel
-      [9445.61, 6829.92], // Southshore
       [8866.79, 3240.56], // Sentinel Hill
     ],
     // Kalimdor
     1: [
-      [3313.47, 8667.19], // Moonglade
-      [2037.43, 8088.06], // Auberdine
-      [2513.56, 6691.44], // Astranaar
-      [3348.72, 5550.98], // Crossroads
-      [3758.78, 5379.7], // Ratchet
       [2115.13, 3181.3], // Cenarion Hold
+      [2037.43, 8088.06], // Auberdine
+      [3758.78, 5379.7], // Ratchet
       [2876.54, 3348.07], // Marshal's Refuge
-      [2314.04, 5223.38], // Thunderbluff
     ],
   };
 
