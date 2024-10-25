@@ -38,7 +38,7 @@ defmodule ThistleTeaWeb.MapLive.Index do
 
   @impl true
   def handle_event("map_ready", _, socket) do
-    {:noreply, socket}
+    handle_info(:update_entities, socket)
   end
 
   @impl true

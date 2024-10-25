@@ -155,7 +155,7 @@ export const setupMap = (el) => {
     0: createCoordinateMapper(sourcePoints[0], targetPoints[0]),
   };
 
-  const markers = {};
+  let markers = {};
 
   const addMarker = (entity) => {
     const convertCoords = coordinateMapper[entity.map];
@@ -181,5 +181,10 @@ export const setupMap = (el) => {
     marker.getGeometry().setCoordinates([x, y]);
   };
 
-  return { addMarker, removeMarker, updateMarker };
+  const removeAllMarkers = () => {
+    vectorSource.clear();
+    markers = {};
+  };
+
+  return { addMarker, removeMarker, updateMarker, removeAllMarkers };
 };
