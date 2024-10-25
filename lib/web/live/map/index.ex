@@ -8,24 +8,37 @@ defmodule ThistleTeaWeb.MapLive.Index do
   @impl true
   def render(assigns) do
     ~H"""
-    <div
-      class="w-screen h-screen"
-      id="map"
-      phx-hook="Map"
-      phx-update="ignore"
-    ></div>
+    <div class="relative w-screen h-screen bg-stone-200">
+        <div
+            class="w-full h-full cursor-grab active:cursor-grabbing"
+            id="map"
+            phx-hook="Map"
+            phx-update="ignore"
+        />
+        <%= if @map_ready do %>
+        <div class="absolute top-4 right-4 rounded-md bg-black text-white opacity-80 p-2 px-4">
+        <h1 class="font-semibold">Thistle Tea</h1>
+            Online: <%= length(assigns.entities) %>
+        </div>
+        <% end %>
+    </div>
     """
   end
 
   @impl true
   def mount(_params, _session, socket) do
-    {:ok, socket |> assign(entities: []), layout: false}
+    {:ok, socket |> assign(entities: []) |> assign(map_ready: false), layout: false}
   end
 
   @impl true
-  def handle_event("map_ready", true, socket) do
+  def handle_event("map_ready", true, %{assigns: %{map_ready: false}} = socket) do
     :timer.send_interval(@update_interval, self(), :update_entities)
-    handle_info(:update_entities, socket)
+    handle_info(:update_entities, socket |> assign(map_ready: true))
+  end
+
+  @impl true
+  def handle_event("map_ready", _, socket) do
+    {:noreply, socket}
   end
 
   @impl true
@@ -56,7 +69,10 @@ defmodule ThistleTeaWeb.MapLive.Index do
       map == 0 and guid < 0x1FC00000
     end)
     |> Enum.map(fn {guid, _pid, map, x, y, z} ->
+      [{^guid, name, _realm, _race, _gender, _class}] = :ets.lookup(:guid_name, guid)
+
       %{
+        name: name,
         guid: guid,
         map: map,
         x: x,

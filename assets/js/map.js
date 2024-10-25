@@ -1,4 +1,4 @@
-import { Map, View } from "ol";
+import { Map, View, Overlay } from "ol";
 import TileLayer from "ol/layer/Tile";
 import VectorLayer from "ol/layer/Vector";
 import VectorSource from "ol/source/Vector";
@@ -57,6 +57,17 @@ export const setupMap = (el) => {
     },
   });
 
+  const popup = document.createElement("div");
+  popup.className =
+    "absolute bottom-4 -translate-x-1/2 rounded-md bg-black text-white opacity-80 p-2 px-4";
+
+  const overlay = new Overlay({
+    element: popup,
+    offset: [0, 0],
+    positioning: "bottom-center",
+    stopEvent: false,
+  });
+
   const map = new Map({
     target: el.id,
     layers: [
@@ -70,6 +81,7 @@ export const setupMap = (el) => {
       }),
       markerLayer,
     ],
+    overlays: [overlay],
     view: new View({
       projection: projection,
       center: [WIDTH / 2, HEIGHT / 2],
@@ -79,6 +91,33 @@ export const setupMap = (el) => {
       minZoom: 0,
       zoom: 2,
     }),
+  });
+
+  map.on("pointermove", (event) => {
+    if (event.dragging) {
+      popup.style.display = "none";
+      return;
+    }
+
+    const feature = map.forEachFeatureAtPixel(
+      event.pixel,
+      (feature) => feature,
+    );
+
+    if (feature) {
+      const features = feature.get("features");
+      if (features) {
+        const names = features
+          .map((f) => f.get("guid"))
+          .sort((a, b) => a.localeCompare(b))
+          .join("\n");
+        popup.innerHTML = names;
+        popup.style.display = "block";
+        overlay.setPosition(event.coordinate);
+      }
+    } else {
+      popup.style.display = "none";
+    }
   });
 
   map.on("click", (event) => {
@@ -123,6 +162,7 @@ export const setupMap = (el) => {
     const [x, y] = convertCoords(entity.x, entity.y);
     const marker = new Feature({
       geometry: new Point([x, y]),
+      guid: entity.name,
     });
     vectorSource.addFeature(marker);
     markers[entity.guid] = marker;
