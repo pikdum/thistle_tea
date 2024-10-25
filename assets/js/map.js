@@ -38,7 +38,7 @@ export const setupMap = (el) => {
       const size = feature.get("features").length;
       return new Style({
         image: new Circle({
-          radius: size > 1 ? 15 : 5,
+          radius: size > 1 ? 20 : 10,
           fill: new Fill({ color: size > 1 ? "orange" : "brown" }),
           stroke: new Stroke({
             color: "white",
