@@ -4,3 +4,9 @@
 
 /* This file is for your main application CSS */
 @import "../node_modules/ol/ol.css";
+
+.ol-full-screen {
+    top: auto;
+    bottom: 0.5em;
+    right: 0.5em;
+}

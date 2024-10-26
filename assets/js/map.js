@@ -9,12 +9,17 @@ import Point from "ol/geom/Point";
 import { Style, Circle, Fill, Stroke, Text } from "ol/style";
 import Cluster from "ol/source/Cluster";
 import { bbox as bboxStrategy } from "ol/loadingstrategy";
+import { FullScreen, defaults as defaultControls } from "ol/control";
 
 import { createCoordinateMapper } from "./coordinate_mapper";
 
 const WIDTH = 14476;
 const HEIGHT = 10800;
 const extent = [0, 0, WIDTH, HEIGHT];
+
+// bit custom to make it look nice
+const CENTER = [6328.524649884811, 6002.505656354451];
+const INITIAL_ZOOM = 1.3;
 
 export const setupMap = (el) => {
   const projection = new Projection({
@@ -70,6 +75,9 @@ export const setupMap = (el) => {
 
   const map = new Map({
     target: el.id,
+    controls: defaultControls().extend([
+      new FullScreen({ source: "map-wrapper", inactiveClassName: "bottom-4" }),
+    ]),
     layers: [
       new TileLayer({
         source: new XYZ({
@@ -84,12 +92,12 @@ export const setupMap = (el) => {
     overlays: [overlay],
     view: new View({
       projection: projection,
-      center: [WIDTH / 2, HEIGHT / 2],
+      center: CENTER,
       extent: extent,
       constrainOnlyCenter: true,
       maxZoom: 7,
       minZoom: 0,
-      zoom: 2,
+      zoom: INITIAL_ZOOM,
     }),
   });
 

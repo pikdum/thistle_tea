@@ -1,5 +1,6 @@
 defmodule ThistleTeaWeb.MapLive.Index do
-  use ThistleTeaWeb, :live_view
+  # use ThistleTeaWeb, :live_view
+  use Phoenix.LiveView, container: {:div, class: "h-full w-full"}
 
   require Logger
 
@@ -8,11 +9,13 @@ defmodule ThistleTeaWeb.MapLive.Index do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="relative h-screen w-screen bg-stone-200">
+    <div
+      class="relative h-full w-full cursor-grab bg-stone-200 active:cursor-grabbing"
+      id="map-wrapper"
+    >
       <div class="h-full w-full" id="map" phx-hook="Map" phx-update="ignore" />
       <%= if @map_ready do %>
-        <div class="absolute top-4 right-4 rounded-md bg-black p-2 px-4 text-white opacity-80">
-          <h1 class="font-semibold">Thistle Tea</h1>
+        <div class="absolute top-2 right-2 cursor-text rounded-md bg-black p-2 px-4 text-white opacity-80">
           Online: <%= length(assigns.entities) %>
         </div>
       <% end %>
