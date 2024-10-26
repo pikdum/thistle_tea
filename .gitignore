@@ -30,4 +30,6 @@ thistle_tea-*.tar
 
 /maps/
 
+node_modules/
+
 *.sqlite*

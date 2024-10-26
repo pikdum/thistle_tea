@@ -45,7 +45,10 @@ defmodule ThistleTea.Application do
         {ThousandIsland,
          port: @auth_port, handler_module: ThistleTea.Auth, handler_options: @handler_options},
         {ThousandIsland,
-         port: @game_port, handler_module: ThistleTea.Game, handler_options: @handler_options}
+         port: @game_port, handler_module: ThistleTea.Game, handler_options: @handler_options},
+        ThistleTeaWeb.Telemetry,
+        {Phoenix.PubSub, name: ThistleTea.PubSub},
+        ThistleTeaWeb.Endpoint
       ]
 
     :ets.new(:session, [:named_table, :public])
@@ -84,5 +87,11 @@ defmodule ThistleTea.Application do
     # for other strategies and supported options
     opts = [strategy: :one_for_one, name: ThistleTea.Supervisor]
     Supervisor.start_link(children, opts)
+  end
+
+  @impl true
+  def config_change(changed, _new, removed) do
+    ThistleTeaWeb.Endpoint.config_change(changed, removed)
+    :ok
   end
 end

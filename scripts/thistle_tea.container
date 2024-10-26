@@ -3,9 +3,13 @@
 Image=localhost/thistle_tea:latest
 PublishPort=3724:3724
 PublishPort=8085:8085
+PublishPort=4000:4000
 Volume=/home/opc/thistle_tea/db:/app/db:Z
 Volume=/home/opc/thistle_tea/maps:/app/maps:Z
 AutoUpdate=local
+Environment=GAME_SERVER=
+Environment=SECRET_KEY_BASE=
+Environment=PHX_HOST=
 
 [Service]
 Restart=always

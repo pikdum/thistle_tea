@@ -17,6 +17,9 @@ cd thistle_tea
 mix deps.get
 mix deps.compile
 
+# need npm or bun or similar
+cd assets && npm install && cd ../
+
 # need docker + no mariadb port 3306 conflict
 ./scripts/generate-mangos0-db.sh
 # or, just download it

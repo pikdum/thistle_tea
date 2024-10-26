@@ -4,3 +4,4 @@ db/
 deps/
 maps/
 priv/
+node_modules/

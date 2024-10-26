@@ -1,0 +1,49 @@
+<.flash_group flash={@flash} />
+<div class="grid-rows-[auto_1fr_auto] grid min-h-screen">
+  <div class="bg-emerald-600 text-stone-50">
+    <div class="max-w-[60rem] mx-auto p-4">
+      <h1 class="font-serif text-7xl md:text-9xl">Thistle Tea</h1>
+      <div class="text-xl md:px-16">A World of Warcraft server written in Elixir.</div>
+    </div>
+  </div>
+  <div class="bg-stone-50">
+    <div class="max-w-[60rem] mx-auto grid grid-cols-1 gap-4 p-4 lg:grid-cols-2">
+      <div>
+        <h2 class="text-3xl">Connect to this instance</h2>
+        <ul class="list-decimal px-8 py-2 leading-8">
+          <li>Install World of Warcraft v1.12.1 build 5875</li>
+          <li>
+            Edit realmlist.wtf to:
+            <br /><pre class="inline-block bg-emerald-50 p-2 leading-6">set realmlist <%=  @game_server %></pre>
+          </li>
+          <li>
+            Log in with credentials:
+            <br /><pre class="inline-block bg-emerald-50 p-2 leading-6">Username: test
+Password: test</pre>
+          </li>
+        </ul>
+      </div>
+      <div class="h-96">
+        <%= live_render(@conn, ThistleTeaWeb.MapLive.Index, id: "map-live-view") %>
+      </div>
+    </div>
+  </div>
+  <div class="bg-emerald-50 text-center">
+    <div class="max-w-[60rem] mx-auto p-4">
+      <h2 class="text-3xl">Contribute to the project</h2>
+      <p class="mt-4 leading-8">
+        Thistle Tea is a new project and there's a ton to do.
+        We're looking for contributors of all skill levels interested in helping out.
+        Check out the project on
+        <a href="https://github.com/pikdum/thistle_tea" class="text-emerald-600 hover:underline">
+          GitHub
+        </a>
+        and join our
+        <a href="https://discord.gg/dSYsRXHDhb" class="text-emerald-600 hover:underline">
+          Discord
+        </a>
+        channel to chat.
+      </p>
+    </div>
+  </div>
+</div>
