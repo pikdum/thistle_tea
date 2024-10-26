@@ -14,9 +14,9 @@ defmodule ThistleTeaWeb.Homography do
           # Light's Hope Chapel
           [2271.09, -5341.49],
           # Southshore
-          [-846.85, -520.79]
+          [-846.85, -520.79],
           # Sentinel Hill
-          # [-10619.08, 1036.77]
+          [-10619.08, 1036.77]
         ],
         [
           # Northshire Abbey
@@ -26,55 +26,59 @@ defmodule ThistleTeaWeb.Homography do
           # Light's Hope Chapel
           [11247.6, 8037.48],
           # Southshore
-          [9445.61, 6829.92]
+          [9445.61, 6829.92],
           # Sentinel Hill
-          # [8866.79, 3240.56]
+          [8866.79, 3240.56]
         ]
       },
       1 => {
         [
           # Moonglade
-          # [7981.32, -2576.5],
+          [7981.32, -2576.5],
           # Auberdine
           [6462.24, 807.09],
           # Astranaar
-          # [2751.61, -419.84],
+          [2751.61, -419.84],
           # Crossroads
-          # [-456.4, -2642.82],
+          [-456.4, -2642.82],
           # Ratchet
           [-956.86, -3754.77],
           # Cenarion Hold
-          # [-6815.12, 730.3],
+          [-6815.12, 730.3],
           # Marshal's Refuge
           [-6291.55, -1158.62],
           # Thunderbluff
-          # [-1280.03, 127.35],
+          [-1280.03, 127.35],
           # Aldrassil
-          [10390.99, 758.16]
+          [10390.99, 758.16],
           # Wellspring River Waterfall
-          # [10870.0, 1014.0]
+          [10870.0, 1014.0],
+          # Valley of Trials Fire Pit
+          [-602.40, -4250.58]
         ],
         [
           # Moonglade
-          # [3313.47, 8667.19],
+          [3313.47, 8667.19],
           # Auberdine
           [2037.43, 8088.06],
           # Astranaar
-          # [2513.56, 6691.44],
+          [2513.56, 6691.44],
           # Crossroads
-          # [3348.72, 5550.98],
+          [3348.72, 5550.98],
           # Ratchet
           [3758.78, 5379.7],
           # Cenarion Hold
-          # [2115.13, 3181.3],
+          [2115.13, 3181.3],
           # Marshal's Refuge
           [2876.54, 3348.07],
           # Thunderbluff
-          # [2314.04, 5223.38],
+          [2314.04, 5223.38],
           # Aldrassil
-          [2043.013, 9515.08]
+          [2043.013, 9515.08],
           # Wellspring River Waterfall
-          # [1773.04, 9722.90]
+          [1773.04, 9722.90],
+          # Valley of Trials Fire Pit
+          [3932.46, 5479.56]
         ]
       }
     }
@@ -98,7 +102,10 @@ defmodule ThistleTeaWeb.Homography do
   def find_homography(a, b) do
     source = Nx.tensor(a, type: :f32)
     target = Nx.tensor(b, type: :f32)
-    {homography, _} = Evision.findHomography(source, target)
+
+    {homography, _} =
+      Evision.findHomography(source, target, method: Evision.Constant.cv_RANSAC())
+
     homography |> Evision.Mat.to_nx(Nx.BinaryBackend)
   end
 
