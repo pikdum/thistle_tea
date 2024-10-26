@@ -51,6 +51,8 @@ defmodule ThistleTea.Application do
         ThistleTeaWeb.Endpoint
       ]
 
+    :ok = ThistleTeaWeb.Homography.init()
+
     :ets.new(:session, [:named_table, :public])
     :ets.new(:guid_name, [:named_table, :public])
     setup_database()

@@ -54,7 +54,8 @@ defmodule ThistleTea.MixProject do
        github: "100phlecs/tailwind_formatter",
        ref: "3896f735be23ea4d6c15f8e9e39b65430d972925",
        only: [:dev, :test],
-       runtime: false}
+       runtime: false},
+      {:nx, "~> 0.9.1"}
       # {:dep_from_hexpm, "~> 0.3.0"},
       # {:dep_from_git, git: "https://github.com/elixir-lang/my_dep.git", tag: "0.1.0"}
     ]

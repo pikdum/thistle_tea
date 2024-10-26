@@ -11,8 +11,6 @@ import Cluster from "ol/source/Cluster";
 import { bbox as bboxStrategy } from "ol/loadingstrategy";
 import { FullScreen, defaults as defaultControls } from "ol/control";
 
-import { createCoordinateMapper } from "./coordinate_mapper";
-
 const WIDTH = 14476;
 const HEIGHT = 10800;
 const extent = [0, 0, WIDTH, HEIGHT];
@@ -133,57 +131,11 @@ export const setupMap = (el) => {
     console.log(`[${coords[0]}, ${coords[1]}]`);
   });
 
-  // these are their actual in-game coordinates
-  // TODO: right now this only uses 4 points
-  // would be better if they were on the corners of the map
-  // or figure out a better homography implementation
-  const sourcePoints = {
-    // Eastern Kingdoms
-    0: [
-      [-8913.14, -137.78], // Northshire Abbey
-      [1668.45, 1662.34], // Shadow Grave
-      [2271.09, -5341.49], // Light's Hope Chapel
-      [-10619.08, 1036.77], // Sentinel Hill
-    ],
-    // Kalimdor
-    1: [
-      [-6815.12, 730.3], // Cenarion Hold
-      [6462.24, 807.09], // Auberdine
-      [-956.86, -3754.77], // Ratchet
-      [-6291.55, -1158.62], // Marshal's Refuge
-    ],
-  };
-
-  // coordinates on map image
-  const targetPoints = {
-    // Eastern Kingdoms
-    0: [
-      [9315.15, 3893.04], // Northshire Abbey
-      [8656.9, 7777.56], // Shadow Grave
-      [11247.6, 8037.48], // Light's Hope Chapel
-      [8866.79, 3240.56], // Sentinel Hill
-    ],
-    // Kalimdor
-    1: [
-      [2115.13, 3181.3], // Cenarion Hold
-      [2037.43, 8088.06], // Auberdine
-      [3758.78, 5379.7], // Ratchet
-      [2876.54, 3348.07], // Marshal's Refuge
-    ],
-  };
-
-  const coordinateMapper = {
-    0: createCoordinateMapper(sourcePoints[0], targetPoints[0]),
-    1: createCoordinateMapper(sourcePoints[1], targetPoints[1]),
-  };
-
   let markers = {};
 
   const addMarker = (entity) => {
-    const convertCoords = coordinateMapper[entity.map];
-    const [x, y] = convertCoords(entity.x, entity.y);
     const marker = new Feature({
-      geometry: new Point([x, y]),
+      geometry: new Point([entity.x, entity.y]),
       guid: entity.name,
     });
     vectorSource.addFeature(marker);
@@ -197,10 +149,8 @@ export const setupMap = (el) => {
   };
 
   const updateMarker = (entity) => {
-    const convertCoords = coordinateMapper[entity.map];
-    const [x, y] = convertCoords(entity.x, entity.y);
     const marker = markers[entity.guid];
-    marker.getGeometry().setCoordinates([x, y]);
+    marker.getGeometry().setCoordinates([entity.x, entity.y]);
   };
 
   const removeAllMarkers = () => {
