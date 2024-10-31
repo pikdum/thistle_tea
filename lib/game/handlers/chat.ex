@@ -137,7 +137,8 @@ defmodule ThistleTea.Game.Chat do
       ".help - show help",
       ".move - move target to you",
       ".pid - show target pid",
-      ".pos - show current position"
+      ".pos - show current position",
+      ".interrupt_movement - interrupt mob movement"
     ]
 
     system_message(state, "Commands:")
@@ -155,6 +156,22 @@ defmodule ThistleTea.Game.Chat do
 
     state
     |> system_message("#{x} #{y} #{z} #{map}")
+  end
+
+  def handle_chat(state, _, _, ".interrupt_movement" <> _, _) do
+    # TODO: interrupting movement should probably fire movement_finished?
+    # otherwise behavior never triggers movement again
+    # or at least reset state
+    with pid when not is_nil(pid) <- :ets.lookup_element(:entities, state.target, 2, nil) do
+      GenServer.cast(pid, :interrupt_movement)
+
+      state
+      |> system_message("Interrupted movement.")
+    else
+      nil ->
+        state
+        |> system_message("No mob found to interrupt.")
+    end
   end
 
   def handle_chat(state, _, _, ".guid" <> _, _) do
