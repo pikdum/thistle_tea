@@ -53,6 +53,14 @@ defmodule ThistleTea.Game do
     @cmsg_set_selection
   ]
 
+  @cmsg_gossip_hello 0x17B
+  @cmsg_npc_text_query 0x17F
+
+  @gossip_opcodes [
+    @cmsg_gossip_hello,
+    @cmsg_npc_text_query
+  ]
+
   @cmsg_player_login 0x03D
 
   @login_opcodes [
@@ -163,6 +171,10 @@ defmodule ThistleTea.Game do
 
   def dispatch_packet(opcode, payload, state) when opcode in @combat_opcodes do
     ThistleTea.Game.Combat.handle_packet(opcode, payload, state)
+  end
+
+  def dispatch_packet(opcode, payload, state) when opcode in @gossip_opcodes do
+    ThistleTea.Game.Gossip.handle_packet(opcode, payload, state)
   end
 
   def dispatch_packet(opcode, payload, state) when opcode in @login_opcodes do

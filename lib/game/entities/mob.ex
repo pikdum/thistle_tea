@@ -62,7 +62,7 @@ defmodule ThistleTea.Mob do
   end
 
   def stop_move_packet(state) do
-    Logger.info("Stopping movement")
+    # Logger.info("Stopping movement")
     packed_guid = state.packed_guid
 
     spline_id = state.spline_id
