@@ -12,7 +12,7 @@ defmodule ThistleTea.Game.Gossip do
   @smsg_gossip_message 0x17D
   @smsg_npc_text_update 0x180
 
-  def text_groups(npc_text) do
+  defp text_groups(npc_text) do
     0..7
     |> Enum.reduce([], fn i, acc ->
       text_group = %{
@@ -38,28 +38,48 @@ defmodule ThistleTea.Game.Gossip do
 
     # TODO: what to do if there are multiple gossip menus?
     # send a packet for each?
-    gm =
-      from(c in Creature,
-        where: c.guid == ^low_guid,
-        join: ct in assoc(c, :creature_template),
-        left_join: gm in assoc(ct, :gossip_menu),
-        select: gm,
-        limit: 1
-      )
-      |> ThistleTea.Mangos.one()
+    # check conditions?
+    case from(c in Creature,
+           where: c.guid == ^low_guid,
+           join: ct in assoc(c, :creature_template),
+           left_join: gm in assoc(ct, :gossip_menu),
+           select: gm,
+           limit: 1
+         )
+         |> ThistleTea.Mangos.one()
+         |> ThistleTea.Mangos.preload(:gossip_menu_option) do
+      nil ->
+        {:continue, state}
 
-    header =
-      <<
-        guid::little-size(64),
-        # title_text_id
-        # TODO: this can be nil and crash
-        gm.text_id::little-size(32),
-        # amount of gossip items
-        0::little-size(32)
-      >>
+      gm ->
+        Logger.info("gm: #{inspect(gm)}")
+        %{gossip_menu_option: gmo} = gm
 
-    send_packet(@smsg_gossip_message, header)
-    {:continue, state}
+        gossip_items =
+          gmo
+          |> Enum.map(fn o ->
+            <<
+              # TODO: should this be loop index instead?
+              o.id::little-size(32),
+              o.option_icon::little-size(8),
+              o.box_coded::little-size(8)
+            >> <> o.option_text <> <<0>>
+          end)
+          |> Enum.reduce(<<>>, fn x, acc -> acc <> x end)
+
+        packet =
+          <<
+            guid::little-size(64),
+            # title_text_id
+            gm.text_id::little-size(32),
+            # amount of gossip items
+            Enum.count(gmo)::little-size(32)
+          >> <>
+            gossip_items
+
+        send_packet(@smsg_gossip_message, packet)
+        {:continue, state}
+    end
   end
 
   def handle_packet(
@@ -67,45 +87,45 @@ defmodule ThistleTea.Game.Gossip do
         <<text_id::little-size(32), _guid::little-size(64)>>,
         state
       ) do
-    npc_text =
-      from(nt in NpcText, where: nt.id == ^text_id, select: nt)
-      |> ThistleTea.Mangos.one()
+    case ThistleTea.Mangos.get(NpcText, text_id) do
+      nil ->
+        {:continue, state}
 
-    header = <<text_id::little-size(32)>>
+      npc_text ->
+        header = <<text_id::little-size(32)>>
 
-    body =
-      text_groups(npc_text)
-      |> IO.inspect(limit: :infinity)
-      |> Enum.map(fn t ->
-        <<t.prob::little-float-size(32)>> <>
-          if Map.get(t, :text_0) do
-            t.text_0 <> <<0>>
-          else
-            <<0>>
-          end <>
-          if Map.get(t, :text_1) do
-            t.text_1 <> <<0>>
-          else
-            <<0>>
-          end <>
-          <<
-            # TODO: universal language
-            0::little-size(32)
-          >> <>
-          <<
-            # emote blocks
-            t.em_0_delay::little-size(32),
-            t.em_0::little-size(32),
-            t.em_1_delay::little-size(32),
-            t.em_1::little-size(32),
-            t.em_2_delay::little-size(32),
-            t.em_2::little-size(32)
-          >>
-      end)
-      |> Enum.reduce(<<>>, fn x, acc -> acc <> x end)
+        body =
+          text_groups(npc_text)
+          |> Enum.map(fn t ->
+            <<t.prob::little-float-size(32)>> <>
+              if Map.get(t, :text_0) do
+                t.text_0 <> <<0>>
+              else
+                <<0>>
+              end <>
+              if Map.get(t, :text_1) do
+                t.text_1 <> <<0>>
+              else
+                <<0>>
+              end <>
+              <<
+                # TODO: universal language
+                0::little-size(32)
+              >> <>
+              <<
+                # emote blocks
+                t.em_0_delay::little-size(32),
+                t.em_0::little-size(32),
+                t.em_1_delay::little-size(32),
+                t.em_1::little-size(32),
+                t.em_2_delay::little-size(32),
+                t.em_2::little-size(32)
+              >>
+          end)
+          |> Enum.reduce(<<>>, fn x, acc -> acc <> x end)
 
-    send_packet(@smsg_npc_text_update, header <> body)
-
-    {:continue, state}
+        send_packet(@smsg_npc_text_update, header <> body)
+        {:continue, state}
+    end
   end
 end
