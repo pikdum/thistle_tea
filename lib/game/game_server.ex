@@ -54,10 +54,12 @@ defmodule ThistleTea.Game do
   ]
 
   @cmsg_gossip_hello 0x17B
+  @cmsg_gossip_select_option 0x17C
   @cmsg_npc_text_query 0x17F
 
   @gossip_opcodes [
     @cmsg_gossip_hello,
+    @cmsg_gossip_select_option,
     @cmsg_npc_text_query
   ]
 

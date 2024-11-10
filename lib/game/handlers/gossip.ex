@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.Gossip do
   @creature_guid_offset 0xF1300000
 
   @cmsg_gossip_hello 0x17B
+  @cmsg_gossip_select_option 0x17C
   @cmsg_npc_text_query 0x17F
 
   @smsg_gossip_message 0x17D
@@ -33,6 +34,19 @@ defmodule ThistleTea.Game.Gossip do
     |> Enum.reverse()
   end
 
+  defp encode_gossip_options(gmo) do
+    gmo
+    |> Enum.map(fn o ->
+      <<
+        # TODO: should this be loop index instead?
+        o.id::little-size(32),
+        o.option_icon::little-size(8),
+        o.box_coded::little-size(8)
+      >> <> o.option_text <> <<0>>
+    end)
+    |> Enum.reduce(<<>>, fn x, acc -> acc <> x end)
+  end
+
   def handle_packet(@cmsg_gossip_hello, <<guid::little-size(64)>>, state) do
     low_guid = guid - @creature_guid_offset
 
@@ -52,20 +66,8 @@ defmodule ThistleTea.Game.Gossip do
         {:continue, state}
 
       gm ->
-        Logger.info("gm: #{inspect(gm)}")
-        %{gossip_menu_option: gmo} = gm
-
-        gossip_items =
-          gmo
-          |> Enum.map(fn o ->
-            <<
-              # TODO: should this be loop index instead?
-              o.id::little-size(32),
-              o.option_icon::little-size(8),
-              o.box_coded::little-size(8)
-            >> <> o.option_text <> <<0>>
-          end)
-          |> Enum.reduce(<<>>, fn x, acc -> acc <> x end)
+        gmo = Map.get(gm, :gossip_menu_option, [])
+        gossip_items = encode_gossip_options(gmo)
 
         packet =
           <<
@@ -78,7 +80,7 @@ defmodule ThistleTea.Game.Gossip do
             gossip_items
 
         send_packet(@smsg_gossip_message, packet)
-        {:continue, state}
+        {:continue, state |> Map.put(:gossip_menu_options, gmo)}
     end
   end
 
@@ -126,6 +128,43 @@ defmodule ThistleTea.Game.Gossip do
 
         send_packet(@smsg_npc_text_update, header <> body)
         {:continue, state}
+    end
+  end
+
+  def handle_packet(@cmsg_gossip_select_option, body, state) do
+    <<guid::little-size(64), gossip_list_id::little-size(32), _rest::binary>> = body
+
+    state
+    |> Map.get(:gossip_menu_options, [])
+    |> Enum.find(fn o -> o.id == gossip_list_id end)
+    |> case do
+      nil ->
+        {:continue, state}
+
+      option ->
+        case from(gm in GossipMenu, where: gm.entry == ^option.action_menu_id, limit: 1)
+             |> ThistleTea.Mangos.one()
+             |> ThistleTea.Mangos.preload(:gossip_menu_option) do
+          nil ->
+            {:continue, state}
+
+          gm ->
+            gmo = Map.get(gm, :gossip_menu_option, [])
+            gossip_items = encode_gossip_options(gmo)
+
+            packet =
+              <<
+                guid::little-size(64),
+                # title_text_id
+                gm.text_id::little-size(32),
+                # amount of gossip items
+                Enum.count(gmo)::little-size(32)
+              >> <>
+                gossip_items
+
+            send_packet(@smsg_gossip_message, packet)
+            {:continue, state |> Map.put(:gossip_menu_options, gmo)}
+        end
     end
   end
 end
