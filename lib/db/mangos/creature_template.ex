@@ -77,6 +77,6 @@ defmodule CreatureTemplate do
     field(:civilian, :integer, default: 0)
     field(:ai_name, :string, source: :AIName, default: "")
 
-    # has_many(:creature, Creature, foreign_key: :id, references: :entry)
+    has_many(:gossip_menu, GossipMenu, foreign_key: :entry, references: :gossip_menu_id)
   end
 end

@@ -252,6 +252,10 @@ defmodule ThistleTea.Game.UpdateObject do
       size: 1,
       offset: 0x91
     },
+    unit_npc_flags: %{
+      size: 1,
+      offset: 0x93
+    },
     unit_strength: %{
       size: 1,
       offset: 0x96
@@ -599,6 +603,7 @@ defmodule ThistleTea.Game.UpdateObject do
         :unit_max_damage -> <<value::little-float-size(32)>>
         :unit_bytes_1 -> value
         :unit_mod_cast_speed -> <<value::little-float-size(32)>>
+        :unit_npc_flags -> <<value::little-size(32)>>
         :unit_strength -> <<value::little-size(32)>>
         :unit_agility -> <<value::little-size(32)>>
         :unit_stamina -> <<value::little-size(32)>>

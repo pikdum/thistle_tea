@@ -62,7 +62,7 @@ defmodule ThistleTea.Mob do
   end
 
   def stop_move_packet(state) do
-    Logger.info("Stopping movement")
+    # Logger.info("Stopping movement")
     packed_guid = state.packed_guid
 
     spline_id = state.spline_id
@@ -595,7 +595,8 @@ defmodule ThistleTea.Mob do
       unit_faction_template: state.creature.creature_template.faction_alliance,
       unit_flags: state.creature.creature_template.unit_flags,
       unit_display_id: state.creature.modelid,
-      unit_native_display_id: state.creature.modelid
+      unit_native_display_id: state.creature.modelid,
+      unit_npc_flags: state.creature.creature_template.npc_flags
     }
 
     mb = %{
