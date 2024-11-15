@@ -47,27 +47,51 @@ defmodule ThistleTea.Game.Gossip do
     |> Enum.reduce(<<>>, fn x, acc -> acc <> x end)
   end
 
+  defp encode_quests(quests) do
+    quests
+    |> Enum.map(fn q ->
+      <<
+        q.entry::little-size(32),
+        # quest icon - where do i get this?
+        0::little-size(32),
+        q.quest_level::little-size(32)
+      >> <> q.title <> <<0>>
+    end)
+    |> Enum.reduce(<<>>, fn x, acc -> acc <> x end)
+  end
+
   def handle_packet(@cmsg_gossip_hello, <<guid::little-size(64)>>, state) do
     low_guid = guid - @creature_guid_offset
 
     # TODO: what to do if there are multiple gossip menus?
     # send a packet for each?
     # check conditions?
+    # TODO: this query is ugly, could extract + clean up
     case from(c in Creature,
            where: c.guid == ^low_guid,
            join: ct in assoc(c, :creature_template),
            left_join: gm in assoc(ct, :gossip_menu),
-           select: gm,
-           limit: 1
+           left_join: qr in QuestRelations,
+           on: qr.entry == ct.entry and qr.actor == 0,
+           left_join: qt in QuestTemplate,
+           on: qt.entry == qr.quest,
+           select: {gm, qt}
          )
-         |> ThistleTea.Mangos.one()
-         |> ThistleTea.Mangos.preload(:gossip_menu_option) do
+         |> ThistleTea.Mangos.all()
+         |> Enum.group_by(&elem(&1, 0), &elem(&1, 1))
+         |> Enum.at(0) do
       nil ->
         {:continue, state}
 
-      gm ->
+      {nil, _} ->
+        {:continue, state}
+
+      {gm, quests} ->
+        quests = Enum.reject(quests, &is_nil/1)
+        gm = ThistleTea.Mangos.preload(gm, :gossip_menu_option)
         gmo = Map.get(gm, :gossip_menu_option, [])
         gossip_items = encode_gossip_options(gmo)
+        quest_items = encode_quests(quests)
 
         packet =
           <<
@@ -77,10 +101,13 @@ defmodule ThistleTea.Game.Gossip do
             # amount of gossip items
             Enum.count(gmo)::little-size(32)
           >> <>
-            gossip_items
+            gossip_items <>
+            <<Enum.count(quests)::little-size(32)>> <> quest_items
 
         send_packet(@smsg_gossip_message, packet)
-        {:continue, state |> Map.put(:gossip_menu_options, gmo)}
+
+        {:continue,
+         state |> Map.put(:gossip_menu_options, gmo) |> Map.put(:available_quests, quests)}
     end
   end
 
