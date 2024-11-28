@@ -79,7 +79,7 @@ export const setupMap = (el) => {
     layers: [
       new TileLayer({
         source: new XYZ({
-          url: "https://fly.storage.tigris.dev/vanilla-map/{z}/{x}/{y}.png",
+          url: "https://vanilla-map.pikdum.dev/{z}/{x}/{y}.png",
           minZoom: 0,
           maxZoom: 7,
           projection: projection,
