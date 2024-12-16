@@ -18,7 +18,7 @@ defmodule ThistleTeaWeb.MapLive.Index do
       <div class="h-full w-full" id="map" phx-hook="Map" phx-update="ignore" />
       <%= if @map_ready do %>
         <div class="absolute top-2 right-2 cursor-text rounded-md bg-black p-2 px-4 text-white opacity-80">
-          Online: <%= length(assigns.entities) %>
+          Online: {length(assigns.entities)}
         </div>
       <% end %>
     </div>
