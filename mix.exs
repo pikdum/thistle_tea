@@ -8,8 +8,8 @@ defmodule ThistleTea.MixProject do
       elixir: "~> 1.16",
       start_permanent: Mix.env() == :prod,
       aliases: aliases(),
-      deps: deps(),
-      listeners: [Phoenix.CodeReloader]
+      deps: deps()
+      # listeners: [Phoenix.CodeReloader]
     ]
   end
 
