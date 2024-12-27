@@ -25,7 +25,7 @@ defmodule ThistleTea.MixProject do
   defp deps do
     [
       {:binary, "~> 0.0.5"},
-      {:ecto_sqlite3, "~> 0.17"},
+      {:ecto_sqlite3, "~> 0.18"},
       {:memento, "~> 0.4.0"},
       {:thousand_island, "~> 1.0"},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
