@@ -1,4 +1,4 @@
-FROM docker.io/library/elixir:1.17 AS build
+FROM docker.io/library/elixir:1.18 AS build
 ENV MIX_ENV=prod
 COPY --from=docker.io/library/rust:slim /usr/local/cargo /usr/local/cargo
 COPY --from=docker.io/library/rust:slim /usr/local/rustup /usr/local/rustup
@@ -16,7 +16,7 @@ RUN cd assets && bun install
 RUN mix assets.deploy
 RUN mix release
 
-FROM docker.io/library/elixir:1.17
+FROM docker.io/library/elixir:1.18
 WORKDIR /app
 COPY --from=build /app/_build/prod/rel/thistle_tea ./
 EXPOSE 3724
