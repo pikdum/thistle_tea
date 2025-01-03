@@ -52,7 +52,7 @@ defmodule ThistleTea.MixProject do
       {:bandit, "~> 1.5"},
       {:tailwind_formatter,
        github: "100phlecs/tailwind_formatter",
-       ref: "3896f735be23ea4d6c15f8e9e39b65430d972925",
+       ref: "847b66d76c52584165c44771f23d3772c20c2b5a",
        only: [:dev, :test],
        runtime: false},
       {:nx, "~> 0.9.1"},
