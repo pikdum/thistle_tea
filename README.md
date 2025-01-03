@@ -76,3 +76,20 @@ iex -S mix
 - [wow_dbc_converter](https://github.com/gtker/wow_dbc/tree/main/wow_dbc_converter) - convert dbc to sqlite
 - [wow_messages](https://gtker.com/wow_messages/) - packet structure
 - [wowdev](https://wowdev.wiki/Main_Page) - documentation
+
+## For Mac Users
+
+If you use a Mac with Intel chip I think you can use [Wine](https://www.winehq.org/) (as long as it supports 32-bit programs)
+
+For all the mac users that run with an Apple Silicon Wine is not an option. I strongly suggest to use a Virtual Machine with Windows.
+
+Here's what I did to run Wow on a M1 Macbook pro: 
+
+1. Download and install [VMware Fusion](https://blogs.vmware.com/teamfusion/2024/05/fusion-pro-now-available-free-for-personal-use.html) (it's free for personal use so you don't have to pay for Windows license)
+2. Download a Wow Vanilla Client (I used this [site](https://zremax.com/blog/vanilla-wow-client-download)) on your host and execute **ALL** the setup commands on your host (some of them needs a wow folder).
+3. Move the Wow folder from your host to the Virtual Machine
+4. Then Go to Vmware fusion > Virtual Machine > Network Adapter > Host only (this way your virtual machine will only connect to your host)
+5. On your host open a terminal and type `ifconfig` and look at your host IP address (probably under **bridge100** or something like that, and should be something like 192.168.X.X )
+6. Inside the folder of your Wow client change the realmist to `set realmist <YOUR_HOST_IP_ADDRESS>`
+7. Run the Elixir server on your host
+8. Open your Wow client on your Virtual machine and your good to go!
