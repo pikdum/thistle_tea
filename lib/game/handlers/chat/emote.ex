@@ -1,5 +1,8 @@
 defmodule ThistleTea.Game.Chat.Emote do
+  alias ThistleTea.Game.Chat
   import ThistleTea.Util, only: [unpack_guid: 1]
+
+  @range 25
 
   @smsg_text_emote 0x105
   @smsg_emote 0x103
@@ -29,7 +32,7 @@ defmodule ThistleTea.Game.Chat.Emote do
       <<sender_guid::little-size(64)>>
   end
 
-  defp get_target_name(nil) do
+  defp get_target_name(0) do
     ""
   end
 
@@ -51,7 +54,9 @@ defmodule ThistleTea.Game.Chat.Emote do
     text_emote_p = text_emote_packet(state.guid, text_emote, emote, target_name)
     emote_p = emote_packet(state.guid, text_emote)
 
-    for pid <- Map.get(state, :player_pids, []) do
+    pids_in_range = Chat.get_player_pids_in_chat_range(state, @range)
+
+    for pid <- pids_in_range do
       GenServer.cast(pid, {:send_packet, @smsg_emote, emote_p})
       GenServer.cast(pid, {:send_packet, @smsg_text_emote, text_emote_p})
     end

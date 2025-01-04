@@ -132,6 +132,13 @@ defmodule ThistleTea.Game.Chat do
     end
   end
 
+  def get_player_pids_in_chat_range(state, range) do
+    %{x: x, y: y, z: z} = state.character.movement
+    nearby_players = SpatialHash.query(:players, state.character.map, x, y, z, range)
+
+    nearby_players |> Enum.map(fn {_, pid, _} -> pid end)
+  end
+
   def handle_chat(state, _, _, ".help" <> _, _) do
     commands = [
       ".behavior - show mob behavior",
@@ -240,10 +247,8 @@ defmodule ThistleTea.Game.Chat do
         @chat_type_emote -> @emote_range
       end
 
-    %{x: x, y: y, z: z} = state.character.movement
-    nearby_players = SpatialHash.query(:players, state.character.map, x, y, z, range)
-
-    for {_guid, pid, _distance} <- nearby_players do
+    pids_in_range = get_player_pids_in_chat_range(state, range)
+    for pid <- pids_in_range do
       GenServer.cast(pid, {:send_packet, @smsg_messagechat, packet})
     end
 
