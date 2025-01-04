@@ -82,6 +82,8 @@ defmodule ThistleTea.Util do
     {:binary.decode_unsigned(<<guid::64>>), remaining_data}
   end
 
+  def unpack_guid(payload) when byte_size(payload) == 0, do: {nil, nil}
+
   def pack_vector({x, y, z}) do
     x_packed = Bitwise.band(trunc(x / 0.25), 0x7FF)
     y_packed = Bitwise.band(trunc(y / 0.25), 0x7FF)

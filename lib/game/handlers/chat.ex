@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Chat do
+  alias ThistleTea.Game.Chat.Emote
   import ThistleTea.Util, only: [parse_string: 1, send_packet: 2]
 
   require Logger
@@ -8,6 +9,8 @@ defmodule ThistleTea.Game.Chat do
 
   @cmsg_join_channel 0x097
   @cmsg_leave_channel 0x098
+
+  @csmsg_text_emote 0x104
 
   @smsg_channel_notify 0x099
   # @smsg_channel_list 0x09B
@@ -361,6 +364,11 @@ defmodule ThistleTea.Game.Chat do
       >> <> channel_name <> <<0>>
 
     send_packet(@smsg_channel_notify, notify_packet)
+    {:continue, state}
+  end
+
+  def handle_packet(@csmsg_text_emote, body, state) do
+    Emote.handle_packet(body, state)
     {:continue, state}
   end
 end
