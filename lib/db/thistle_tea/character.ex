@@ -118,6 +118,15 @@ defmodule ThistleTea.Character do
       >>,
       player_flags: 0,
       player_features: <<c.skin, c.face, c.hair_style, c.hair_color>>,
+      player_bytes_2: <<
+        # facial hair
+        0,
+        # bank bag slot count
+        0,
+        0,
+        # rested state. rested=1 normal=2
+        1
+      >>,
       player_xp: 1,
       player_next_level_xp: 100,
       player_rest_state_experience: 100,
