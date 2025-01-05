@@ -10,7 +10,7 @@ defmodule ThistleTea.Game.Chat do
   @cmsg_join_channel 0x097
   @cmsg_leave_channel 0x098
 
-  @csmsg_text_emote 0x104
+  @cmsg_text_emote 0x104
 
   @smsg_channel_notify 0x099
   # @smsg_channel_list 0x09B
@@ -372,7 +372,7 @@ defmodule ThistleTea.Game.Chat do
     {:continue, state}
   end
 
-  def handle_packet(@csmsg_text_emote, body, state) do
+  def handle_packet(@cmsg_text_emote, body, state) do
     Emote.handle_packet(body, state)
     {:continue, state}
   end
