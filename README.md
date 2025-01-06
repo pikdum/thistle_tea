@@ -45,6 +45,8 @@ iex -S mix
 # also, there's a test server at 150.230.28.221
 ```
 
+More documentation, like platform-specific setup guides, can be found in the [Wiki](https://github.com/pikdum/thistle_tea/wiki).
+
 ## databases
 
 - **mangos0.sqlite** `./scripts/generate-mangos0-db.sh`
