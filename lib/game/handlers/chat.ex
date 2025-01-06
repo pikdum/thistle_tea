@@ -13,6 +13,9 @@ defmodule ThistleTea.Game.Chat do
   # @smsg_channel_list 0x09B
   @smsg_chat_player_not_found 0x2A9
 
+  @smsg_transfer_pending 0x03F
+  @smsg_new_world 0x03E
+
   @chat_type_say 0x0
   @chat_type_party 0x1
   # @chat_type_raid 0x2
@@ -76,6 +79,13 @@ defmodule ThistleTea.Game.Chat do
   end
 
   def teleport_player(state, x, y, z, map) do
+    # Send player's client to loading screen to load the new map
+    transfer_pending_packet = <<map::little-size(32)>>
+    send_packet(@smsg_transfer_pending, transfer_pending_packet)
+
+    # Pause the spawning loop until we're ready for it
+    GenServer.cast(self(), :stop_spawning)
+
     area =
       case ThistleTea.Pathfinding.get_zone_and_area(map, {x, y, z}) do
         {_zone, area} -> area
@@ -102,10 +112,16 @@ defmodule ThistleTea.Game.Chat do
       z
     )
 
-    Process.send(self(), :logout_complete, [])
+    # Tell player client the location change is finished to load in
+    Process.send_after(self(), {:teleport_complete, x, y, z, map}, 500)
+    #send_packet(@smsg_new_world, new_world_packet)
+
+    # Test this out with: 0 -8949.95, -132.493, 83.5312
+    # 1 -6240.32, 331.033, 382.758
+    #Process.send(self(), :logout_complete, [])
 
     Map.put(state, :character, character)
-    |> system_message("Relog to spawn at #{x}, #{y}, #{z} on map #{map}")
+    |> system_message("Teleporting to #{x}, #{y}, #{z} on map #{map}")
   end
 
   defp parse_coords([x, y, z, map]) do

@@ -64,9 +64,11 @@ defmodule ThistleTea.Game do
   ]
 
   @cmsg_player_login 0x03D
+  @msg_move_worldport_ack 0x0DC
 
   @login_opcodes [
-    @cmsg_player_login
+    @cmsg_player_login,
+    @msg_move_worldport_ack
   ]
 
   @cmsg_logout_request 0x04B
@@ -162,6 +164,9 @@ defmodule ThistleTea.Game do
   @update_flag_high_guid 0x08
   @update_flag_living 0x20
   @update_flag_has_position 0x40
+
+  @smsg_new_world 0x03E
+
 
   def dispatch_packet(opcode, payload, state) when opcode in @character_opcodes do
     ThistleTea.Game.Character.handle_packet(opcode, payload, state)
@@ -339,9 +344,42 @@ defmodule ThistleTea.Game do
   end
 
   @impl GenServer
+  def handle_cast(:stop_spawning, {socket, state}) do
+    new_state = case Map.get(state, :spawn_timer_ref) do
+      _ ->
+        Process.cancel_timer(state.spawn_timer_ref)
+        %{state | spawn_timer_ref: nil}
+      nil -> state
+    end
+
+    {:noreply, {socket, new_state}, socket.read_timeout}
+  end
+
+  @impl GenServer
   def handle_cast({:destroy_object, guid}, {socket, state}) do
     send_packet(@smsg_destroy_object, <<guid::little-size(64)>>)
     # TODO: remove from spawned_players/etc.?
+    {:noreply, {socket, state}, socket.read_timeout}
+  end
+
+  @impl GenServer
+  def handle_info({:teleport_complete, x, y, z, map}, {socket, state}) do
+    orientation = 0
+    new_world_packet = <<
+      map::little-size(32),
+      x::little-float-size(32),
+      y::little-float-size(32),
+      z::little-float-size(32),
+      orientation::little-float-size(32)
+    >>
+
+    dbg(x)
+    dbg(y)
+    dbg(z)
+    dbg(map)
+    dbg(new_world_packet)
+
+    send_packet(@smsg_new_world, new_world_packet)
     {:noreply, {socket, state}, socket.read_timeout}
   end
 
@@ -366,6 +404,11 @@ defmodule ThistleTea.Game do
 
   @impl GenServer
   def handle_info(:spawn_objects, {socket, state}) do
+    # Cancel the spawn timer if it's set already
+    if Map.get(state, :spawn_timer_ref) do
+      Process.cancel_timer(state.spawn_timer_ref)
+    end
+
     # TODO: add telemetry for periodic tasks
     if Map.get(state, :character) do
       %{x: x, y: y, z: z} = state.character.movement
@@ -396,6 +439,12 @@ defmodule ThistleTea.Game do
       players_to_add = MapSet.difference(new_players, old_players)
       mobs_to_add = MapSet.difference(new_mobs, old_mobs)
       game_objects_to_add = MapSet.difference(new_game_objects, old_game_objects)
+
+      #dbg(mobs_to_remove)
+
+      if MapSet.size(mobs_to_add) > 0 do
+       dbg(mobs_to_add)
+      end
 
       # TODO: update a reverse mapping, so mobs know nearby players?
       for {guid, pid} <- players_to_remove do
@@ -432,16 +481,18 @@ defmodule ThistleTea.Game do
       player_pids = new_players |> Enum.map(fn {_guid, pid} -> pid end)
       mob_pids = new_mobs |> Enum.map(fn {_guid, pid} -> pid end)
 
+      spawn_timer_ref = Process.send_after(self(), :spawn_objects, 1_000)
+
       new_state =
         Map.merge(state, %{
           spawned_players: new_players,
           spawned_mobs: new_mobs,
           spawned_game_objects: new_game_objects,
           player_pids: player_pids,
-          mob_pids: mob_pids
+          mob_pids: mob_pids,
+          spawn_timer_ref: spawn_timer_ref
         })
 
-      Process.send_after(self(), :spawn_objects, 1_000)
 
       {:noreply, {socket, new_state}, socket.read_timeout}
     else
