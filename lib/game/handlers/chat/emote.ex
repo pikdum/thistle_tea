@@ -26,7 +26,7 @@ defmodule ThistleTea.Game.Chat.Emote do
   end
 
   defp emote_packet(sender_guid, text_emote) do
-    emote_id = text_emote_to_emote()[text_emote]
+    emote_id = text_emote_to_emote()[text_emote] || 0
 
     <<emote_id::little-size(32)>> <>
       <<sender_guid::little-size(64)>>
@@ -37,20 +37,15 @@ defmodule ThistleTea.Game.Chat.Emote do
   end
 
   defp get_target_name(target_guid) do
-    # TODO: Allow for targets to be mobs, not just players
-    case :ets.lookup(:guid_name, target_guid) do
-      [{^target_guid, character_name, _, _, _, _}] ->
-        character_name
-      [] -> ""
+    with pid <- :ets.lookup_element(:entities, target_guid, 2) do
+      GenServer.call(pid, :get_name)
     end
   end
 
   def handle_packet(body, state) do
-    <<text_emote::little-size(32), emote::little-size(32), rest::binary>> = body
+    <<text_emote::little-size(32), emote::little-size(32), target::little-size(64)>> = body
 
-    {target, _} = unpack_guid(rest)
     target_name = get_target_name(target)
-
     text_emote_p = text_emote_packet(state.guid, text_emote, emote, target_name)
     emote_p = emote_packet(state.guid, text_emote)
 
