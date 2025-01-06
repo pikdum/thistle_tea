@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Chat do
+  alias ThistleTea.Game.Chat.Emote
   import ThistleTea.Util, only: [parse_string: 1, send_packet: 2]
 
   require Logger
@@ -8,6 +9,8 @@ defmodule ThistleTea.Game.Chat do
 
   @cmsg_join_channel 0x097
   @cmsg_leave_channel 0x098
+
+  @cmsg_text_emote 0x104
 
   @smsg_channel_notify 0x099
   # @smsg_channel_list 0x09B
@@ -129,6 +132,13 @@ defmodule ThistleTea.Game.Chat do
     end
   end
 
+  def get_player_pids_in_chat_range(state, range) do
+    %{x: x, y: y, z: z} = state.character.movement
+    nearby_players = SpatialHash.query(:players, state.character.map, x, y, z, range)
+
+    nearby_players |> Enum.map(fn {_, pid, _} -> pid end)
+  end
+
   def handle_chat(state, _, _, ".help" <> _, _) do
     commands = [
       ".behavior - show mob behavior",
@@ -237,10 +247,8 @@ defmodule ThistleTea.Game.Chat do
         @chat_type_emote -> @emote_range
       end
 
-    %{x: x, y: y, z: z} = state.character.movement
-    nearby_players = SpatialHash.query(:players, state.character.map, x, y, z, range)
-
-    for {_guid, pid, _distance} <- nearby_players do
+    pids_in_range = get_player_pids_in_chat_range(state, range)
+    for pid <- pids_in_range do
       GenServer.cast(pid, {:send_packet, @smsg_messagechat, packet})
     end
 
@@ -361,6 +369,11 @@ defmodule ThistleTea.Game.Chat do
       >> <> channel_name <> <<0>>
 
     send_packet(@smsg_channel_notify, notify_packet)
+    {:continue, state}
+  end
+
+  def handle_packet(@cmsg_text_emote, body, state) do
+    Emote.handle_packet(body, state)
     {:continue, state}
   end
 end

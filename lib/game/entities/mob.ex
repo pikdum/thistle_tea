@@ -422,6 +422,11 @@ defmodule ThistleTea.Mob do
   end
 
   @impl GenServer
+  def handle_call(:get_name, _from, state) do
+    {:reply, state.creature.creature_template.name, state}
+  end
+
+  @impl GenServer
   def handle_call(:get_behavior, _from, state) do
     with behavior_pid when not is_nil(behavior_pid) <- Map.get(state, :behavior_pid),
          behavior_state <- GenServer.call(behavior_pid, :get_state) do
