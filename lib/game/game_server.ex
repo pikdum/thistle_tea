@@ -481,12 +481,6 @@ defmodule ThistleTea.Game do
       mobs_to_add = MapSet.difference(new_mobs, old_mobs)
       game_objects_to_add = MapSet.difference(new_game_objects, old_game_objects)
 
-      #dbg(mobs_to_remove)
-
-      if MapSet.size(mobs_to_add) > 0 do
-       dbg(mobs_to_add)
-      end
-
       # TODO: update a reverse mapping, so mobs know nearby players?
       for {guid, pid} <- players_to_remove do
         if pid != self() do
