@@ -1,6 +1,5 @@
 defmodule ThistleTea.Game.Chat.Emote do
   alias ThistleTea.Game.Chat
-  import ThistleTea.Util, only: [unpack_guid: 1]
 
   @range 25
 

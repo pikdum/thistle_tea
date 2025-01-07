@@ -38,14 +38,15 @@ defmodule ThistleTea.Game.Movement do
 
   @spell_failed_moving 0x2E
 
-  defp update_area(character) do
-    %{x: x, y: y, z: z} = character.movement
+  # TODO: this can crash, waiting for namigator fix
+  # defp update_area(character) do
+  #   %{x: x, y: y, z: z} = character.movement
 
-    case ThistleTea.Pathfinding.get_zone_and_area(character.map, {x, y, z}) do
-      {_zone, area} -> Map.put(character, :area, area)
-      nil -> character
-    end
-  end
+  #   case ThistleTea.Pathfinding.get_zone_and_area(character.map, {x, y, z}) do
+  #     {_zone, area} -> Map.put(character, :area, area)
+  #     nil -> character
+  #   end
+  # end
 
   defp randomize_equipment(state, msg) do
     if msg === @msg_move_jump do
