@@ -36,7 +36,6 @@ defmodule ThistleTea.Game.Login do
 
   def handle_packet(@cmsg_player_login, body, state) do
     <<character_guid::little-size(64)>> = body
-    Logger.info("CMSG_PLAYER_LOGIN")
 
     {:ok, c} = ThistleTea.Character.get_character(state.account.id, character_guid)
 
@@ -73,12 +72,7 @@ defmodule ThistleTea.Game.Login do
   end
 
   def handle_packet(@msg_move_worldport_ack, _body, state) do
-    # TODO: we can probably unify this handler and the above player login handler at some point
-    Logger.info("MSG_MOVE_WORLDPORT_ACK")
-
-    # Send the same login initialization packets to set things up again
     send_login_init_packets(state.character)
-
     {:continue, state |> Map.put(:ready, true)}
   end
 
