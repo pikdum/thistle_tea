@@ -68,7 +68,7 @@ defmodule ThistleTea.Game.Movement do
     end
   end
 
-  def handle_packet(msg, body, state)
+  def handle_packet(msg, body, %{ready: true} = state)
       when msg in [
              @msg_move_start_forward,
              @msg_move_start_backward,
@@ -136,6 +136,10 @@ defmodule ThistleTea.Game.Movement do
       end
     end
 
+    {:continue, state}
+  end
+
+  def handle_packet(_msg, _body, state) do
     {:continue, state}
   end
 end
