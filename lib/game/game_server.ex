@@ -387,7 +387,11 @@ defmodule ThistleTea.Game do
       z
     )
 
-    state = Map.put(state, :character, character)
+    state =
+      Map.merge(state, %{
+        character: character,
+        ready: false
+      })
 
     # Send player's client the new location
     orientation = 0
@@ -404,7 +408,7 @@ defmodule ThistleTea.Game do
 
     # The client responds with a MSG_MOVE_WORLDPORT_ACK message which
     # is handled in the login handler as they share the same init process
-    {:noreply, {socket, state |> Map.put(:ready, false)}, socket.read_timeout}
+    {:noreply, {socket, state}, socket.read_timeout}
   end
 
   @impl GenServer
