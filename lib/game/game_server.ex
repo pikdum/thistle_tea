@@ -19,6 +19,9 @@ defmodule ThistleTea.Game do
   @smsg_auth_response 0x1EE
   @smsg_pong 0x1DD
 
+  @smsg_transfer_pending 0x03F
+  @smsg_new_world 0x03E
+
   @smsg_destroy_object 0x0AA
 
   @smsg_logout_complete 0x04D
@@ -363,7 +366,49 @@ defmodule ThistleTea.Game do
   end
 
   @impl GenServer
-  def handle_info({:teleport_complete, x, y, z, map}, {socket, state}) do
+  def handle_cast({:start_teleport, x, y, z, map}, {socket, state}) do
+    # Send player's client to loading screen to load the new map
+    transfer_pending_packet = <<map::little-size(32)>>
+    send_packet(@smsg_transfer_pending, transfer_pending_packet)
+
+    # Pause the spawning loop until client is ready again
+    new_state = case Map.get(state, :spawn_timer_ref) do
+      _ ->
+        Process.cancel_timer(state.spawn_timer_ref)
+        %{state | spawn_timer_ref: nil}
+      nil -> state
+    end
+
+    # Update player's location
+    area =
+      case ThistleTea.Pathfinding.get_zone_and_area(map, {x, y, z}) do
+        {_zone, area} -> area
+        nil -> state.character.area
+      end
+
+    character =
+      new_state.character
+      |> Map.put(:area, area)
+      |> Map.put(:map, map)
+      |> Map.put(
+        :movement,
+        new_state.character.movement
+        |> Map.merge(%{x: x, y: y, z: z})
+      )
+
+    SpatialHash.update(
+      :players,
+      new_state.guid,
+      self(),
+      character.map,
+      x,
+      y,
+      z
+    )
+
+    new_state = Map.put(new_state, :character, character)
+
+    # Send player's client the new location
     orientation = 0
     new_world_packet = <<
       map::little-size(32),
@@ -372,15 +417,11 @@ defmodule ThistleTea.Game do
       z::little-float-size(32),
       orientation::little-float-size(32)
     >>
-
-    dbg(x)
-    dbg(y)
-    dbg(z)
-    dbg(map)
-    dbg(new_world_packet)
-
     send_packet(@smsg_new_world, new_world_packet)
-    {:noreply, {socket, state}, socket.read_timeout}
+
+    # The client responds with a MSG_MOVE_WORLDPORT_ACK message which
+    # is handled in the login handler as they share the same init process
+    {:noreply, {socket, new_state}, socket.read_timeout}
   end
 
   @impl GenServer

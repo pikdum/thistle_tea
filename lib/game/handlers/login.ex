@@ -51,7 +51,7 @@ defmodule ThistleTea.Game.Login do
         c.movement.orientation::little-float-size(32)>>
     )
 
-    send_various_login_packets(c)
+    send_login_init_packets(c)
 
     {x1, y1, z1} = {c.movement.x, c.movement.y, c.movement.z}
 
@@ -71,21 +71,19 @@ defmodule ThistleTea.Game.Login do
   end
 
   def handle_packet(@msg_move_worldport_ack, body, state) do
+    # TODO: we can probably unify this handler and the above player login handler at some point
     Logger.info("MSG_MOVE_WORLDPORT_ACK")
 
-    # {:ok, c} = ThistleTea.Character.get_character(state.account.id, state.guid)
-    #dbg(c)
+    # Send the same login initialization packets to set things up again
+    send_login_init_packets(state.character)
 
-    send_various_login_packets(state.character)
-
-    dbg(state.character)
+    # Restart spawn loop
     Process.send(self(), :spawn_objects, [])
-    #dbg(c)
 
     {:continue, state}
   end
 
-  def send_various_login_packets(c) do
+  def send_login_init_packets(c) do
     # needed for no white chatbox + keybinds
     send_packet(
       @smsg_account_data_times,
