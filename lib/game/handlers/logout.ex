@@ -39,6 +39,10 @@ defmodule ThistleTea.Game.Logout do
       ThistleTea.Character.save(state.character)
     end
 
+    if Map.get(state, :spawn_timer) do
+      :timer.cancel(state.spawn_timer)
+    end
+
     if Map.get(state, :guid) do
       # remove from map
       SpatialHash.remove(:players, state.guid)

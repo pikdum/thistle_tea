@@ -19,6 +19,8 @@ defmodule ThistleTea.Game.Login do
   @smsg_login_settimespeed 0x042
   @smsg_trigger_cinematic 0x0FA
 
+  @msg_move_worldport_ack 0x0DC
+
   # @update_flag_none 0x00
   @update_flag_self 0x01
   # @update_flag_transport 0x02
@@ -34,7 +36,6 @@ defmodule ThistleTea.Game.Login do
 
   def handle_packet(@cmsg_player_login, body, state) do
     <<character_guid::little-size(64)>> = body
-    Logger.info("CMSG_PLAYER_LOGIN")
 
     {:ok, c} = ThistleTea.Character.get_character(state.account.id, character_guid)
 
@@ -49,6 +50,33 @@ defmodule ThistleTea.Game.Login do
         c.movement.orientation::little-float-size(32)>>
     )
 
+    send_login_init_packets(c)
+
+    {x1, y1, z1} = {c.movement.x, c.movement.y, c.movement.z}
+
+    # join
+    SpatialHash.update(:players, character_guid, self(), c.map, x1, y1, z1)
+
+    {:ok, spawn_timer} = :timer.send_interval(1000, :spawn_objects)
+
+    new_state =
+      Map.merge(state, %{
+        guid: character_guid,
+        packed_guid: pack_guid(character_guid),
+        character: c,
+        spawn_timer: spawn_timer,
+        ready: true
+      })
+
+    {:continue, new_state}
+  end
+
+  def handle_packet(@msg_move_worldport_ack, _body, state) do
+    send_login_init_packets(state.character)
+    {:continue, state |> Map.put(:ready, true)}
+  end
+
+  def send_login_init_packets(c) do
     # needed for no white chatbox + keybinds
     send_packet(
       @smsg_account_data_times,
@@ -123,21 +151,5 @@ defmodule ThistleTea.Game.Login do
 
     packet = build_update_packet(c, @update_type_create_object2, @object_type_player, update_flag)
     send_update_packet(packet)
-
-    {x1, y1, z1} = {c.movement.x, c.movement.y, c.movement.z}
-
-    # join
-    SpatialHash.update(:players, character_guid, self(), c.map, x1, y1, z1)
-
-    new_state =
-      Map.merge(state, %{
-        guid: character_guid,
-        packed_guid: pack_guid(character_guid),
-        character: c
-      })
-
-    Process.send(self(), :spawn_objects, [])
-
-    {:continue, new_state}
   end
 end

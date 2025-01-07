@@ -79,36 +79,11 @@ defmodule ThistleTea.Game.Chat do
   end
 
   def teleport_player(state, x, y, z, map) do
-    area =
-      case ThistleTea.Pathfinding.get_zone_and_area(map, {x, y, z}) do
-        {_zone, area} -> area
-        nil -> state.character.area
-      end
+    system_message(state, "Teleporting to #{x}, #{y}, #{z} on map #{map}")
 
-    character =
-      state.character
-      |> Map.put(:area, area)
-      |> Map.put(:map, map)
-      |> Map.put(
-        :movement,
-        state.character.movement
-        |> Map.merge(%{x: x, y: y, z: z})
-      )
+    GenServer.cast(self(), {:start_teleport, x, y, z, map})
 
-    SpatialHash.update(
-      :players,
-      state.guid,
-      self(),
-      character.map,
-      x,
-      y,
-      z
-    )
-
-    Process.send(self(), :logout_complete, [])
-
-    Map.put(state, :character, character)
-    |> system_message("Relog to spawn at #{x}, #{y}, #{z} on map #{map}")
+    state
   end
 
   defp parse_coords([x, y, z, map]) do
