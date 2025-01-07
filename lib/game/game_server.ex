@@ -37,11 +37,13 @@ defmodule ThistleTea.Game do
   @cmsg_messagechat 0x095
   @cmsg_join_channel 0x097
   @cmsg_leave_channel 0x098
+  @cmsg_text_emote 0x104
 
   @chat_opcodes [
     @cmsg_messagechat,
     @cmsg_join_channel,
-    @cmsg_leave_channel
+    @cmsg_leave_channel,
+    @cmsg_text_emote
   ]
 
   @cmsg_attackswing 0x141
@@ -511,6 +513,12 @@ defmodule ThistleTea.Game do
   @impl GenServer
   def handle_call(:get_entity, _from, state) do
     {:reply, :player, state}
+  end
+
+  @impl GenServer
+  def handle_call(:get_name, _from, state) do
+    {_socket, s} = state
+    {:reply, s.character.name, state}
   end
 
   @impl ThousandIsland.Handler
