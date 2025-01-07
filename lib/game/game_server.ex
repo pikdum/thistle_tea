@@ -170,7 +170,6 @@ defmodule ThistleTea.Game do
 
   @smsg_new_world 0x03E
 
-
   def dispatch_packet(opcode, payload, state) when opcode in @character_opcodes do
     ThistleTea.Game.Character.handle_packet(opcode, payload, state)
   end
@@ -347,18 +346,6 @@ defmodule ThistleTea.Game do
   end
 
   @impl GenServer
-  def handle_cast(:stop_spawning, {socket, state}) do
-    new_state = case Map.get(state, :spawn_timer_ref) do
-      _ ->
-        Process.cancel_timer(state.spawn_timer_ref)
-        %{state | spawn_timer_ref: nil}
-      nil -> state
-    end
-
-    {:noreply, {socket, new_state}, socket.read_timeout}
-  end
-
-  @impl GenServer
   def handle_cast({:destroy_object, guid}, {socket, state}) do
     send_packet(@smsg_destroy_object, <<guid::little-size(64)>>)
     # TODO: remove from spawned_players/etc.?
@@ -371,14 +358,6 @@ defmodule ThistleTea.Game do
     transfer_pending_packet = <<map::little-size(32)>>
     send_packet(@smsg_transfer_pending, transfer_pending_packet)
 
-    # Pause the spawning loop until client is ready again
-    new_state = case Map.get(state, :spawn_timer_ref) do
-      _ ->
-        Process.cancel_timer(state.spawn_timer_ref)
-        %{state | spawn_timer_ref: nil}
-      nil -> state
-    end
-
     # Update player's location
     area =
       case ThistleTea.Pathfinding.get_zone_and_area(map, {x, y, z}) do
@@ -387,18 +366,18 @@ defmodule ThistleTea.Game do
       end
 
     character =
-      new_state.character
+      state.character
       |> Map.put(:area, area)
       |> Map.put(:map, map)
       |> Map.put(
         :movement,
-        new_state.character.movement
+        state.character.movement
         |> Map.merge(%{x: x, y: y, z: z})
       )
 
     SpatialHash.update(
       :players,
-      new_state.guid,
+      state.guid,
       self(),
       character.map,
       x,
@@ -406,10 +385,11 @@ defmodule ThistleTea.Game do
       z
     )
 
-    new_state = Map.put(new_state, :character, character)
+    state = Map.put(state, :character, character)
 
     # Send player's client the new location
     orientation = 0
+
     new_world_packet = <<
       map::little-size(32),
       x::little-float-size(32),
@@ -417,11 +397,12 @@ defmodule ThistleTea.Game do
       z::little-float-size(32),
       orientation::little-float-size(32)
     >>
+
     send_packet(@smsg_new_world, new_world_packet)
 
     # The client responds with a MSG_MOVE_WORLDPORT_ACK message which
     # is handled in the login handler as they share the same init process
-    {:noreply, {socket, new_state}, socket.read_timeout}
+    {:noreply, {socket, state |> Map.put(:ready, false)}, socket.read_timeout}
   end
 
   @impl GenServer
@@ -444,95 +425,87 @@ defmodule ThistleTea.Game do
   end
 
   @impl GenServer
-  def handle_info(:spawn_objects, {socket, state}) do
-    # Cancel the spawn timer if it's set already
-    if Map.get(state, :spawn_timer_ref) do
-      Process.cancel_timer(state.spawn_timer_ref)
-    end
-
+  def handle_info(:spawn_objects, {socket, %{character: c, ready: true} = state}) do
     # TODO: add telemetry for periodic tasks
-    if Map.get(state, :character) do
-      %{x: x, y: y, z: z} = state.character.movement
+    %{x: x, y: y, z: z} = c.movement
 
-      old_players = Map.get(state, :spawned_players, MapSet.new())
-      old_mobs = Map.get(state, :spawned_mobs, MapSet.new())
-      old_game_objects = Map.get(state, :spawned_game_objects, MapSet.new())
+    old_players = Map.get(state, :spawned_players, MapSet.new())
+    old_mobs = Map.get(state, :spawned_mobs, MapSet.new())
+    old_game_objects = Map.get(state, :spawned_game_objects, MapSet.new())
 
-      new_players =
-        SpatialHash.query(:players, state.character.map, x, y, z, 250)
-        |> Enum.map(fn {guid, pid, _distance} -> {guid, pid} end)
-        |> MapSet.new()
+    new_players =
+      SpatialHash.query(:players, c.map, x, y, z, 250)
+      |> Enum.map(fn {guid, pid, _distance} -> {guid, pid} end)
+      |> MapSet.new()
 
-      new_mobs =
-        SpatialHash.query(:mobs, state.character.map, x, y, z, 250)
-        |> Enum.map(fn {guid, pid, _distance} -> {guid, pid} end)
-        |> MapSet.new()
+    new_mobs =
+      SpatialHash.query(:mobs, c.map, x, y, z, 250)
+      |> Enum.map(fn {guid, pid, _distance} -> {guid, pid} end)
+      |> MapSet.new()
 
-      new_game_objects =
-        SpatialHash.query(:game_objects, state.character.map, x, y, z, 250)
-        |> Enum.map(fn {guid, pid, _distance} -> {guid, pid} end)
-        |> MapSet.new()
+    new_game_objects =
+      SpatialHash.query(:game_objects, c.map, x, y, z, 250)
+      |> Enum.map(fn {guid, pid, _distance} -> {guid, pid} end)
+      |> MapSet.new()
 
-      players_to_remove = MapSet.difference(old_players, new_players)
-      mobs_to_remove = MapSet.difference(old_mobs, new_mobs)
-      game_objects_to_remove = MapSet.difference(old_game_objects, new_game_objects)
+    players_to_remove = MapSet.difference(old_players, new_players)
+    mobs_to_remove = MapSet.difference(old_mobs, new_mobs)
+    game_objects_to_remove = MapSet.difference(old_game_objects, new_game_objects)
 
-      players_to_add = MapSet.difference(new_players, old_players)
-      mobs_to_add = MapSet.difference(new_mobs, old_mobs)
-      game_objects_to_add = MapSet.difference(new_game_objects, old_game_objects)
+    players_to_add = MapSet.difference(new_players, old_players)
+    mobs_to_add = MapSet.difference(new_mobs, old_mobs)
+    game_objects_to_add = MapSet.difference(new_game_objects, old_game_objects)
 
-      # TODO: update a reverse mapping, so mobs know nearby players?
-      for {guid, pid} <- players_to_remove do
-        if pid != self() do
-          send_packet(@smsg_destroy_object, <<guid::little-size(64)>>)
-        end
-      end
-
-      for {guid, pid} <- mobs_to_remove do
-        send_packet(@smsg_destroy_object, <<guid::little-size(64)>>)
-        GenServer.cast(pid, :try_sleep)
-      end
-
-      for {guid, _pid} <- game_objects_to_remove do
+    # TODO: update a reverse mapping, so mobs know nearby players?
+    for {guid, pid} <- players_to_remove do
+      if pid != self() do
         send_packet(@smsg_destroy_object, <<guid::little-size(64)>>)
       end
-
-      for {_guid, pid} <- players_to_add do
-        if pid != self() do
-          GenServer.cast(pid, {:send_update_to, self()})
-        end
-      end
-
-      for {_guid, pid} <- mobs_to_add do
-        GenServer.cast(pid, :wake_up)
-        GenServer.cast(pid, {:send_update_to, self()})
-      end
-
-      for {_guid, pid} <- game_objects_to_add do
-        GenServer.cast(pid, {:send_update_to, self()})
-      end
-
-      # TODO: redundant, refactor out?
-      player_pids = new_players |> Enum.map(fn {_guid, pid} -> pid end)
-      mob_pids = new_mobs |> Enum.map(fn {_guid, pid} -> pid end)
-
-      spawn_timer_ref = Process.send_after(self(), :spawn_objects, 1_000)
-
-      new_state =
-        Map.merge(state, %{
-          spawned_players: new_players,
-          spawned_mobs: new_mobs,
-          spawned_game_objects: new_game_objects,
-          player_pids: player_pids,
-          mob_pids: mob_pids,
-          spawn_timer_ref: spawn_timer_ref
-        })
-
-
-      {:noreply, {socket, new_state}, socket.read_timeout}
-    else
-      {:noreply, {socket, state}, socket.read_timeout}
     end
+
+    for {guid, pid} <- mobs_to_remove do
+      send_packet(@smsg_destroy_object, <<guid::little-size(64)>>)
+      GenServer.cast(pid, :try_sleep)
+    end
+
+    for {guid, _pid} <- game_objects_to_remove do
+      send_packet(@smsg_destroy_object, <<guid::little-size(64)>>)
+    end
+
+    for {_guid, pid} <- players_to_add do
+      if pid != self() do
+        GenServer.cast(pid, {:send_update_to, self()})
+      end
+    end
+
+    for {_guid, pid} <- mobs_to_add do
+      GenServer.cast(pid, :wake_up)
+      GenServer.cast(pid, {:send_update_to, self()})
+    end
+
+    for {_guid, pid} <- game_objects_to_add do
+      GenServer.cast(pid, {:send_update_to, self()})
+    end
+
+    # TODO: redundant, refactor out?
+    player_pids = new_players |> Enum.map(fn {_guid, pid} -> pid end)
+    mob_pids = new_mobs |> Enum.map(fn {_guid, pid} -> pid end)
+
+    state =
+      Map.merge(state, %{
+        spawned_players: new_players,
+        spawned_mobs: new_mobs,
+        spawned_game_objects: new_game_objects,
+        player_pids: player_pids,
+        mob_pids: mob_pids
+      })
+
+    {:noreply, {socket, state}, socket.read_timeout}
+  end
+
+  @impl GenServer
+  def handle_info(:spawn_objects, {socket, state}) do
+    {:noreply, {socket, state}, socket.read_timeout}
   end
 
   @impl GenServer

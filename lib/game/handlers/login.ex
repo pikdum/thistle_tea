@@ -58,29 +58,28 @@ defmodule ThistleTea.Game.Login do
     # join
     SpatialHash.update(:players, character_guid, self(), c.map, x1, y1, z1)
 
+    {:ok, spawn_timer} = :timer.send_interval(1000, :spawn_objects)
+
     new_state =
       Map.merge(state, %{
         guid: character_guid,
         packed_guid: pack_guid(character_guid),
-        character: c
+        character: c,
+        spawn_timer: spawn_timer,
+        ready: true
       })
-
-    Process.send(self(), :spawn_objects, [])
 
     {:continue, new_state}
   end
 
-  def handle_packet(@msg_move_worldport_ack, body, state) do
+  def handle_packet(@msg_move_worldport_ack, _body, state) do
     # TODO: we can probably unify this handler and the above player login handler at some point
     Logger.info("MSG_MOVE_WORLDPORT_ACK")
 
     # Send the same login initialization packets to set things up again
     send_login_init_packets(state.character)
 
-    # Restart spawn loop
-    Process.send(self(), :spawn_objects, [])
-
-    {:continue, state}
+    {:continue, state |> Map.put(:ready, true)}
   end
 
   def send_login_init_packets(c) do
