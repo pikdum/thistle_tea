@@ -392,6 +392,7 @@ defmodule ThistleTea.Game do
         character: character,
         ready: false
       })
+      |> Map.drop([:spawned_players, :spawned_mobs, :spawned_game_objects])
 
     # Send player's client the new location
     orientation = 0
