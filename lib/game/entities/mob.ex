@@ -32,7 +32,7 @@ defmodule ThistleTea.Mob do
   @smsg_monster_move 0x0DD
 
   def start_link(creature) do
-    GenServer.start_link(__MODULE__, creature)
+    GenServer.start_link(__MODULE__, creature, hibernate_after: 15_000)
   end
 
   def attack_behavior(state, target) do
