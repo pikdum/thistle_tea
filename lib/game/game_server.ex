@@ -171,6 +171,7 @@ defmodule ThistleTea.Game do
   @update_flag_has_position 0x40
 
   @smsg_new_world 0x03E
+  @smsg_force_run_speed_change 0x0E2
 
   def dispatch_packet(opcode, payload, state) when opcode in @character_opcodes do
     ThistleTea.Game.Character.handle_packet(opcode, payload, state)
@@ -409,6 +410,36 @@ defmodule ThistleTea.Game do
 
     # The client responds with a MSG_MOVE_WORLDPORT_ACK message which
     # is handled in the login handler as they share the same init process
+    {:noreply, {socket, state}, socket.read_timeout}
+  end
+
+  def handle_cast({:modify, :speed, rate}, {socket, state}) do
+    new_rate = rate * 7.0
+
+    character =
+      state.character
+      |> Map.put(
+        :movement,
+        state.character.movement
+        |> Map.merge(%{run_speed: new_rate})
+      )
+
+    state =
+      Map.merge(state, %{
+        character: character
+      })
+
+    move_event = 0
+
+    run_speed_change_packet =
+      ThistleTea.Util.pack_guid(state.guid) <>
+        <<
+          move_event::little-float-size(32),
+          new_rate::little-float-size(32)
+        >>
+
+    send_packet(@smsg_force_run_speed_change, run_speed_change_packet)
+
     {:noreply, {socket, state}, socket.read_timeout}
   end
 
