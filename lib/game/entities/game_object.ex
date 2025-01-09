@@ -13,7 +13,7 @@ defmodule ThistleTea.GameObject do
   @update_flag_has_position 0x40
 
   def start_link(game_object) do
-    GenServer.start_link(__MODULE__, game_object)
+    GenServer.start_link(__MODULE__, game_object, hibernate_after: 30_000)
   end
 
   def update_packet(state) do
