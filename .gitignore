@@ -27,6 +27,7 @@ thistle_tea-*.tar
 
 # rustler nif
 /priv/
+/target/
 
 /maps/
 
