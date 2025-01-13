@@ -31,7 +31,7 @@ defmodule ThistleTea.MixProject do
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:telemetry, "~> 1.0"},
       {:bitmap, "~> 1.0"},
-      {:rustler, "~> 0.35.0"},
+      {:rustler, "~> 0.36.0"},
       {:phoenix, "~> 1.7.14"},
       {:phoenix_html, "~> 4.1"},
       {:phoenix_live_reload, "~> 1.2", only: :dev},
