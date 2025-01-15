@@ -26,7 +26,7 @@ defmodule ThistleTea.MixProject do
     [
       {:binary, "~> 0.0.5"},
       {:ecto_sqlite3, "~> 0.17"},
-      {:memento, "~> 0.4.0"},
+      {:memento, "~> 0.5.0"},
       {:thousand_island, "~> 1.0"},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:telemetry, "~> 1.0"},
