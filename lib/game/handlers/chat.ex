@@ -120,10 +120,12 @@ defmodule ThistleTea.Game.Chat do
       ".go xyz <x> <y> <z> [map] - teleport",
       ".guid - show target guid",
       ".help - show help",
+      ".interrupt_movement - interrupt mob movement",
+      ".modify <type> <n> - modify player attribute",
       ".move - move target to you",
       ".pid - show target pid",
       ".pos - show current position",
-      ".interrupt_movement - interrupt mob movement"
+      ".speed <rate> - modify player speed from 0.1 to 10"
     ]
 
     system_message(state, "Commands:")
@@ -133,6 +135,33 @@ defmodule ThistleTea.Game.Chat do
     |> Enum.reduce(state, fn command, acc ->
       system_message(acc, command)
     end)
+  end
+
+  def handle_chat(state, a, b, ".speed" <> rest, c) do
+    handle_chat(state, a, b, ".modify speed" <> rest, c)
+  end
+
+  def handle_chat(state, _, _, ".modify" <> params, _) do
+    case params |> String.split(" ", trim: true) do
+      ["speed", rate] ->
+        case Float.parse(rate) do
+          {rate, _} when rate >= 0.1 and rate <= 10.0 ->
+            GenServer.cast(self(), {:modify, :speed, rate})
+
+            state
+            |> system_message("Speed set to #{rate}")
+
+          _ ->
+            state
+            |> system_message("Invalid speed. Use: .modify speed <rate 0.1 - 10.0>")
+        end
+
+      _ ->
+        Logger.error("Unhandled .modify call: #{params}")
+
+        state
+        |> system_message("Invalid command. Use: .modify <type> <n>")
+    end
   end
 
   def handle_chat(state, _, _, ".pos" <> _, _) do
@@ -160,8 +189,13 @@ defmodule ThistleTea.Game.Chat do
   end
 
   def handle_chat(state, _, _, ".guid" <> _, _) do
-    state
-    |> system_message("Target GUID: #{state.target}")
+    if Map.has_key?(state, :target) do
+      state
+      |> system_message("Target GUID: #{state.target}")
+    else
+      state
+      |> system_message("No target found.")
+    end
   end
 
   def handle_chat(state, _, _, ".pid" <> _, _) do
@@ -223,6 +257,7 @@ defmodule ThistleTea.Game.Chat do
       end
 
     pids_in_range = get_player_pids_in_chat_range(state, range)
+
     for pid <- pids_in_range do
       GenServer.cast(pid, {:send_packet, @smsg_messagechat, packet})
     end
