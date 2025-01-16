@@ -61,6 +61,14 @@ defmodule ThistleTea.Mob do
     end
   end
 
+  def update_position(state, {x, y, z}) do
+    state =
+      state |> Map.put(:creature, %{state.creature | position_x: x, position_y: y, position_z: z})
+
+    SpatialHash.update(:mobs, state.creature.guid, self(), state.creature.map, x, y, z)
+    state
+  end
+
   def stop_move_packet(state) do
     # Logger.info("Stopping movement")
     packed_guid = state.packed_guid
@@ -85,8 +93,9 @@ defmodule ThistleTea.Mob do
     # TODO: figure out how to cancel/overwrite spline
     move_type = 0
     spline_id = state.spline_id
-    spline_flags = 0
-    spline_count = 1
+    # final point
+    spline_flags = 0x00010000
+    spline_count = 0
 
     # TODO: figure out how to do multiple spline points
     packed_guid <>
@@ -256,10 +265,11 @@ defmodule ThistleTea.Mob do
 
   @impl GenServer
   def handle_info({:update_position, {x, y, z}}, state) do
-    state =
-      state |> Map.put(:creature, %{state.creature | position_x: x, position_y: y, position_z: z})
+    if :attack == Map.get(state, :behavior) do
+      Logger.info("Reached path goal!")
+    end
 
-    SpatialHash.update(:mobs, state.creature.guid, self(), state.creature.map, x, y, z)
+    state = update_position(state, {x, y, z})
     {:noreply, state}
   end
 
@@ -440,6 +450,10 @@ defmodule ThistleTea.Mob do
     %{position_x: x0, position_y: y0, position_z: z0, map: map} = state.creature
     nearby_players = SpatialHash.query(:players, map, x0, y0, z0, 250)
 
+    if :attack == Map.get(state, :behavior) do
+      Logger.info("Movement packet sent.")
+    end
+
     for {_guid, pid, _distance} <- nearby_players do
       GenServer.cast(pid, {:send_packet, @smsg_monster_move, payload})
     end
@@ -455,9 +469,21 @@ defmodule ThistleTea.Mob do
   end
 
   def move_to(state, {x, y, z}) do
+    state = interrupt_movement(state)
     %{position_x: x0, position_y: y0, position_z: z0, map: map} = state.creature
     path = ThistleTea.Pathfinding.find_path(map, {x0, y0, z0}, {x, y, z})
-    state |> interrupt_movement() |> Map.put(:path, path) |> follow_path()
+
+    path =
+      case path do
+        [_head | tail] -> tail
+        _ -> path
+      end
+
+    if :attack == Map.get(state, :behavior) do
+      Logger.info(path |> inspect())
+    end
+
+    state |> Map.put(:path, path) |> follow_path()
   end
 
   def queue_follow_path(state, delay) do
@@ -485,7 +511,7 @@ defmodule ThistleTea.Mob do
         speed = get_speed(state)
         # TODO: when will this overflow?
         # TODO: handle that
-        spline_id = :ets.update_counter(:spline_counters, :spline_id, 1)
+        spline_id = 0
         state = state |> Map.put(:spline_id, spline_id)
 
         duration =
@@ -497,22 +523,11 @@ defmodule ThistleTea.Mob do
 
         start_time = System.monotonic_time(:millisecond)
 
-        # TODO: make this update on completion if not interrupted?
-        creature =
-          state.creature
-          |> Map.put(:position_x, x1)
-          |> Map.put(:position_y, y1)
-          |> Map.put(:position_z, z1)
+        if Map.get(state, :update_timer) do
+          Process.cancel_timer(Map.get(state, :update_timer))
+        end
 
-        SpatialHash.update(
-          :mobs,
-          creature.guid,
-          self(),
-          creature.map,
-          creature.position_x,
-          creature.position_y,
-          creature.position_z
-        )
+        update_timer = Process.send_after(self(), {:update_position, {x1, y1, z1}}, duration)
 
         interrupt_movement = fn state ->
           with current_duration <- System.monotonic_time(:millisecond) - start_time,
@@ -529,30 +544,16 @@ defmodule ThistleTea.Mob do
               Process.cancel_timer(Map.get(state, :path_timer))
             end
 
-            SpatialHash.update(
-              :mobs,
-              state.creature.guid,
-              self(),
-              state.creature.map,
-              x2,
-              y2,
-              z2
-            )
+            Process.cancel_timer(update_timer)
 
             state =
               state
-              |> Map.put(:creature, %{
-                state.creature
-                | position_x: x2,
-                  position_y: y2,
-                  position_z: z2
-              })
+              |> update_position({x2, y2, z2})
               |> Map.delete(:path_timer)
+              |> Map.delete(:update_timer)
               |> Map.delete(:interrupt_movement)
 
-            payload = stop_move_packet(state)
-
-            state |> send_movement_packet(payload) |> Map.delete(:spline_id)
+            state |> Map.delete(:spline_id)
           else
             _ ->
               state |> Map.delete(:interrupt_movement)
@@ -561,8 +562,8 @@ defmodule ThistleTea.Mob do
 
         state
         |> Map.put(:path, rest)
-        |> Map.put(:creature, creature)
         |> Map.put(:interrupt_movement, interrupt_movement)
+        |> Map.put(:update_timer, update_timer)
         |> send_movement_packet(packet)
         |> queue_follow_path(duration)
 
