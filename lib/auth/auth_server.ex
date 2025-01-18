@@ -1,6 +1,8 @@
 defmodule ThistleTea.Auth do
   use ThousandIsland.Handler
 
+  alias WowMessagesEx.Login.CMD_AUTH_LOGON_CHALLENGE_Server
+
   require Logger
 
   import Binary, only: [reverse: 1]
@@ -47,7 +49,7 @@ defmodule ThistleTea.Auth do
 
   @impl ThousandIsland.Handler
   def handle_data(
-        <<@cmd_auth_logon_challenge, _protocol_version::little-size(8), _size::little-size(16),
+        <<@cmd_auth_logon_challenge, protocol_version::little-size(8), _size::little-size(16),
           _game_name::bytes-little-size(4), _version::bytes-little-size(3),
           _build::little-size(16), _platform::bytes-little-size(4), _os::bytes-size(4),
           _locale::bytes-size(4), _worldregion_bias::little-size(32), _ip::little-size(32),
@@ -56,16 +58,25 @@ defmodule ThistleTea.Auth do
         _state
       ) do
     Logger.metadata(username: username)
-    Logger.info("CMD_AUTH_LOGON_CHALLENGE")
+    Logger.info("CMD_AUTH_LOGON_CHALLENGE: #{protocol_version}")
     state = logon_challenge_state(username)
 
     packet =
-      <<0, 0, 0>> <>
-        reverse(state.public_b) <>
-        <<1>> <>
-        state.g <>
-        <<32>> <>
-        reverse(state.n) <> state.account.password_salt <> :crypto.strong_rand_bytes(16) <> <<0>>
+      %CMD_AUTH_LOGON_CHALLENGE_Server{
+        protocol_version: 0,
+        result: 0,
+        server_public_key: reverse(state.public_b),
+        generator_length: 1,
+        generator: state.g,
+        large_safe_prime_length: 32,
+        large_safe_prime: reverse(state.n),
+        salt: state.account.password_salt,
+        crc_salt: :crypto.strong_rand_bytes(16),
+        security_flag: 0,
+        pin_grid_seed: nil,
+        pin_salt: nil
+      }
+      |> CMD_AUTH_LOGON_CHALLENGE_Server.packet()
 
     ThousandIsland.Socket.send(socket, packet)
     {:continue, state}
