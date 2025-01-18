@@ -76,7 +76,12 @@ defmodule ThistleTea.Auth do
         pin_grid_seed: nil,
         pin_salt: nil
       }
-      |> CMD_AUTH_LOGON_CHALLENGE_Server.packet()
+      |> CMD_AUTH_LOGON_CHALLENGE_Server.build()
+      |> CMD_AUTH_LOGON_CHALLENGE_Server.add_header()
+      |> CMD_AUTH_LOGON_CHALLENGE_Server.remove_header()
+      |> CMD_AUTH_LOGON_CHALLENGE_Server.parse!()
+      |> CMD_AUTH_LOGON_CHALLENGE_Server.build()
+      |> CMD_AUTH_LOGON_CHALLENGE_Server.add_header()
 
     ThousandIsland.Socket.send(socket, packet)
     {:continue, state}
