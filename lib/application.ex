@@ -34,14 +34,16 @@ defmodule ThistleTea.Application do
 
   @impl true
   def start(_type, _args) do
+    test = Mix.env() == :test
+
     children =
       [
         ThistleTea.Telemetry,
         {Registry, keys: :duplicate, name: ThistleTea.ChatChannel},
         ThistleTea.DBC,
         ThistleTea.Mangos,
-        ThistleTea.MobSupervisor,
-        ThistleTea.GameObjectSupervisor,
+        !test && ThistleTea.MobSupervisor,
+        !test && ThistleTea.GameObjectSupervisor,
         {ThousandIsland,
          port: @auth_port, handler_module: ThistleTea.Auth, handler_options: @handler_options},
         {ThousandIsland,
@@ -50,6 +52,7 @@ defmodule ThistleTea.Application do
         {Phoenix.PubSub, name: ThistleTea.PubSub},
         ThistleTeaWeb.Endpoint
       ]
+      |> Enum.filter(& &1)
 
     :ok = ThistleTeaWeb.Homography.init()
 
