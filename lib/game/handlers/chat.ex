@@ -223,6 +223,7 @@ defmodule ThistleTea.Game.Chat do
       end
 
     pids_in_range = get_player_pids_in_chat_range(state, range)
+
     for pid <- pids_in_range do
       GenServer.cast(pid, {:send_packet, @smsg_messagechat, packet})
     end

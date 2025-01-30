@@ -1,0 +1,25 @@
+name: CI
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build .
+  elixir:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        otp: ["26", "27"]
+        elixir: ["1.17", "1.18"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: erlef/setup-beam@v1
+        with:
+          elixir-version: "1.18"
+          otp-version: "27"
+      - run: mix deps.get
+      - run: mix format --check-formatted
+      - run: mix test
