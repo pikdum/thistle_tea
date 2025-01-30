@@ -211,7 +211,7 @@ defmodule ThistleTea.Auth do
     t1_hash = Binary.to_list(:crypto.hash(:sha, t1))
     t2_hash = Binary.to_list(:crypto.hash(:sha, t2))
 
-    Binary.from_list(List.flatten(Enum.map(List.zip([t1_hash, t2_hash]), &Tuple.to_list/1)))
+    Binary.from_list(List.flatten(Enum.map(Enum.zip([t1_hash, t2_hash]), &Tuple.to_list/1)))
   end
 
   defp interleave_t1([a, _ | rest]), do: [a | interleave_t1(rest)]
