@@ -6,8 +6,7 @@ defmodule ThistleTea.Mob do
   import ThistleTea.Util,
     only: [
       pack_guid: 1,
-      random_int: 2,
-      calculate_movement_duration: 3
+      random_int: 2
     ]
 
   require Logger
@@ -61,30 +60,40 @@ defmodule ThistleTea.Mob do
     end
   end
 
-  def stop_move_packet(state) do
-    # Logger.info("Stopping movement")
-    packed_guid = state.packed_guid
+  def update_position(state, {x, y, z}) do
+    state =
+      state |> Map.put(:creature, %{state.creature | position_x: x, position_y: y, position_z: z})
 
-    spline_id = state.spline_id
-    move_type = 1
-
-    packed_guid <>
-      <<
-        # initial position
-        state.creature.position_x::little-float-size(32),
-        state.creature.position_y::little-float-size(32),
-        state.creature.position_z::little-float-size(32),
-        spline_id::little-size(32),
-        move_type::little-size(8)
-      >>
+    SpatialHash.update(:mobs, state.creature.guid, self(), state.creature.map, x, y, z)
+    state
   end
+
+  # def stop_move_packet(state) do
+  #   # Logger.info("Stopping movement")
+  #   packed_guid = state.packed_guid
+
+  #   spline_id = state.spline_id
+  #   move_type = 1
+
+  #   packed_guid <>
+  #     <<
+  #       # initial position
+  #       state.creature.position_x::little-float-size(32),
+  #       state.creature.position_y::little-float-size(32),
+  #       state.creature.position_z::little-float-size(32),
+  #       spline_id::little-size(32),
+  #       move_type::little-size(8)
+  #     >>
+  # end
 
   def move_packet(state, {x0, y0, z0}, {x1, y1, z1}, duration) do
     packed_guid = state.packed_guid
 
     # TODO: figure out how to cancel/overwrite spline
     move_type = 0
-    spline_id = state.spline_id
+    spline_id = 0
+    # final point
+    # spline_flags = 0x00010000
     spline_flags = 0
     spline_count = 1
 
@@ -256,18 +265,25 @@ defmodule ThistleTea.Mob do
 
   @impl GenServer
   def handle_info({:update_position, {x, y, z}}, state) do
-    state =
-      state |> Map.put(:creature, %{state.creature | position_x: x, position_y: y, position_z: z})
+    with pid <- Map.get(state, :behavior_pid) do
+      GenServer.cast(pid, :movement_finished)
+    end
 
-    SpatialHash.update(:mobs, state.creature.guid, self(), state.creature.map, x, y, z)
+    state = update_position(state, {x, y, z})
     {:noreply, state}
   end
 
   @impl GenServer
-  def handle_info(:follow_path, state) do
-    state = follow_path(state)
+  def handle_info({:send_movement_packet, payload}, state) do
+    state = send_movement_packet(state, payload)
     {:noreply, state}
   end
+
+  # @impl GenServer
+  # def handle_info(:follow_path, state) do
+  #   state = follow_path(state)
+  #   {:noreply, state}
+  # end
 
   @impl GenServer
   def handle_info(:respawn, state) do
@@ -455,15 +471,46 @@ defmodule ThistleTea.Mob do
   end
 
   def move_to(state, {x, y, z}) do
+    # state = interrupt_movement(state)
     %{position_x: x0, position_y: y0, position_z: z0, map: map} = state.creature
     path = ThistleTea.Pathfinding.find_path(map, {x0, y0, z0}, {x, y, z})
-    state |> interrupt_movement() |> Map.put(:path, path) |> follow_path()
+    speed = get_speed(state)
+
+    # TODO: would be better to update at very point rather than just the end?
+    pn = List.last(path)
+
+    state
+    |> Map.get(:movement_timers, [])
+    |> Enum.each(&Process.cancel_timer/1)
+
+    movement_timers =
+      [{x0, y0, z0} | path]
+      |> Enum.zip(path)
+      |> Enum.map(fn {p0, p1} ->
+        duration =
+          ThistleTea.Util.calculate_movement_duration(p0, p1, speed)
+          |> Kernel.*(1_000)
+          |> trunc()
+
+        packet = move_packet(state, p0, p1, duration)
+        {duration, packet}
+      end)
+      |> Enum.reduce({0, []}, fn {duration, packet}, {delay, timers} ->
+        timer = Process.send_after(self(), {:send_movement_packet, packet}, delay)
+        {delay + duration, [timer | timers]}
+      end)
+      |> then(fn {delay, timers} ->
+        timer = Process.send_after(self(), {:update_position, pn}, delay)
+        [timer | timers]
+      end)
+
+    state |> Map.put(:movement_timers, movement_timers)
   end
 
-  def queue_follow_path(state, delay) do
-    path_timer = Process.send_after(self(), :follow_path, delay)
-    state |> Map.put(:path_timer, path_timer)
-  end
+  # def queue_follow_path(state, delay) do
+  #   path_timer = Process.send_after(self(), :follow_path, delay)
+  #   state |> Map.put(:path_timer, path_timer)
+  # end
 
   def get_speed(state) do
     if Map.get(state, :running, false) do
@@ -477,104 +524,79 @@ defmodule ThistleTea.Mob do
     speed * duration / 1_000
   end
 
-  def follow_path(state) do
-    case Map.get(state, :path) do
-      [{x1, y1, z1} | rest] ->
-        %{position_x: x0, position_y: y0, position_z: z0} = state.creature
+  # def follow_path(state) do
+  #   case Map.get(state, :path) do
+  #     [{x1, y1, z1} | rest] ->
+  #       %{position_x: x0, position_y: y0, position_z: z0} = state.creature
 
-        speed = get_speed(state)
-        # TODO: when will this overflow?
-        # TODO: handle that
-        spline_id = :ets.update_counter(:spline_counters, :spline_id, 1)
-        state = state |> Map.put(:spline_id, spline_id)
+  #       speed = get_speed(state)
+  #       # TODO: when will this overflow?
+  #       # TODO: handle that
+  #       # spline_id = 0
+  #       # state = state |> Map.put(:spline_id, spline_id)
 
-        duration =
-          (calculate_movement_duration({x0, y0, z0}, {x1, y1, z1}, speed) * 1_000)
-          |> trunc()
-          |> max(1)
+  #       duration =
+  #         (calculate_movement_duration({x0, y0, z0}, {x1, y1, z1}, speed) * 1_000)
+  #         |> trunc()
+  #         |> max(1)
 
-        packet = move_packet(state, {x0, y0, z0}, {x1, y1, z1}, duration)
+  #       packet = move_packet(state, {x0, y0, z0}, {x1, y1, z1}, duration)
 
-        start_time = System.monotonic_time(:millisecond)
+  #       start_time = System.monotonic_time(:millisecond)
 
-        # TODO: make this update on completion if not interrupted?
-        creature =
-          state.creature
-          |> Map.put(:position_x, x1)
-          |> Map.put(:position_y, y1)
-          |> Map.put(:position_z, z1)
+  #       if Map.get(state, :update_timer) do
+  #         Process.cancel_timer(Map.get(state, :update_timer))
+  #       end
 
-        SpatialHash.update(
-          :mobs,
-          creature.guid,
-          self(),
-          creature.map,
-          creature.position_x,
-          creature.position_y,
-          creature.position_z
-        )
+  #       update_timer = Process.send_after(self(), {:update_position, {x1, y1, z1}}, duration)
 
-        interrupt_movement = fn state ->
-          with current_duration <- System.monotonic_time(:millisecond) - start_time,
-               true <- current_duration < duration,
-               distance <- get_distance(speed, current_duration),
-               {x2, y2, z2} <-
-                 ThistleTea.Pathfinding.find_point_between_points(
-                   state.creature.map,
-                   {x0, y0, z0},
-                   {x1, y1, z1},
-                   distance
-                 ) do
-            if Map.get(state, :path_timer) do
-              Process.cancel_timer(Map.get(state, :path_timer))
-            end
+  #       interrupt_movement = fn state ->
+  #         with current_duration <- System.monotonic_time(:millisecond) - start_time,
+  #              true <- current_duration < duration,
+  #              distance <- get_distance(speed, current_duration),
+  #              {x2, y2, z2} <-
+  #                ThistleTea.Pathfinding.find_point_between_points(
+  #                  state.creature.map,
+  #                  {x0, y0, z0},
+  #                  {x1, y1, z1},
+  #                  distance
+  #                ) do
+  #           if Map.get(state, :path_timer) do
+  #             Process.cancel_timer(Map.get(state, :path_timer))
+  #           end
 
-            SpatialHash.update(
-              :mobs,
-              state.creature.guid,
-              self(),
-              state.creature.map,
-              x2,
-              y2,
-              z2
-            )
+  #           Process.cancel_timer(update_timer)
 
-            state =
-              state
-              |> Map.put(:creature, %{
-                state.creature
-                | position_x: x2,
-                  position_y: y2,
-                  position_z: z2
-              })
-              |> Map.delete(:path_timer)
-              |> Map.delete(:interrupt_movement)
+  #           state =
+  #             state
+  #             |> update_position({x2, y2, z2})
+  #             |> Map.delete(:path_timer)
+  #             |> Map.delete(:update_timer)
+  #             |> Map.delete(:interrupt_movement)
 
-            payload = stop_move_packet(state)
+  #           state |> Map.delete(:spline_id)
+  #         else
+  #           _ ->
+  #             state |> Map.delete(:interrupt_movement)
+  #         end
+  #       end
 
-            state |> send_movement_packet(payload) |> Map.delete(:spline_id)
-          else
-            _ ->
-              state |> Map.delete(:interrupt_movement)
-          end
-        end
+  #       state
+  #       |> Map.put(:path, rest)
+  #       |> Map.put(:interrupt_movement, interrupt_movement)
+  #       |> Map.put(:update_timer, update_timer)
+  #       |> send_movement_packet(packet)
+  #       |> queue_follow_path(duration)
 
-        state
-        |> Map.put(:path, rest)
-        |> Map.put(:creature, creature)
-        |> Map.put(:interrupt_movement, interrupt_movement)
-        |> send_movement_packet(packet)
-        |> queue_follow_path(duration)
+  #     _ ->
+  #       with pid <- Map.get(state, :behavior_pid) do
+  #         GenServer.cast(pid, :movement_finished)
+  #       end
 
-      _ ->
-        with pid <- Map.get(state, :behavior_pid) do
-          GenServer.cast(pid, :movement_finished)
-        end
-
-        state
-        |> Map.delete(:path_timer)
-    end
-  end
+  #       state
+  #       |> Map.delete(:path_timer)
+  #   end
+  # end
 
   defp get_scale(state) do
     # no idea why it's like this
