@@ -2,6 +2,8 @@ defmodule ThistleTea.AttackBehavior do
   use GenServer
   require Logger
 
+  @update_interval 100
+
   def start_link(initial) do
     GenServer.start_link(__MODULE__, initial)
   end
@@ -16,7 +18,7 @@ defmodule ThistleTea.AttackBehavior do
     with target when not is_nil(target) <- Map.get(state, :target),
          [{^target, _pid, _map, x, y, z}] <- :ets.lookup(:entities, target) do
       GenServer.cast(state.pid, {:move_to, x, y, z})
-      Process.send_after(self(), :update_movement, 10)
+      Process.send_after(self(), :update_movement, @update_interval)
       {:noreply, state |> Map.put(:state, :moving) |> Map.put(:target_position, {x, y, z})}
     else
       _ -> {:noreply, state}
@@ -32,11 +34,11 @@ defmodule ThistleTea.AttackBehavior do
          false <- ThistleTea.Util.within_range({x0, y0, z0}, {x1, y1, z1}, 1),
          false <- ThistleTea.Util.within_range({x1, y1, z1}, Map.get(state, :target_position), 1) do
       GenServer.cast(state.pid, {:move_to, x1, y1, z1})
-      Process.send_after(self(), :update_movement, 10)
+      Process.send_after(self(), :update_movement, @update_interval)
       {:noreply, state |> Map.put(:target_position, {x1, y1, z1})}
     else
       _ ->
-        Process.send_after(self(), :update_movement, 100)
+        Process.send_after(self(), :update_movement, @update_interval)
         {:noreply, state}
     end
   end
