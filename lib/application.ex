@@ -15,6 +15,8 @@ defmodule ThistleTea.Application do
   @auth_port 3724
   @game_port 8085
 
+  @env Mix.env()
+
   use Application
 
   require Logger
@@ -34,7 +36,7 @@ defmodule ThistleTea.Application do
 
   @impl true
   def start(_type, _args) do
-    test = Mix.env() == :test
+    test = @env == :test
 
     children =
       [
