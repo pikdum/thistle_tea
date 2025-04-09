@@ -70,6 +70,24 @@ defmodule ThistleTea.Character do
     end
   end
 
+  @doc """
+  Used to set the proper faction based on the characters
+  race.
+  #Todo: set the faction on character creation.
+  """
+  def get_alliance(c) do
+    case c.race do
+      1 -> 1
+      2 -> 2
+      3 -> 1
+      4 -> 1
+      5 -> 2
+      6 -> 2
+      7 -> 1
+      8 -> 2
+    end
+  end
+
   def get_update_fields(c) do
     # TODO: maybe have these part of character itself
     # TODO: add more of these to the data model
@@ -91,7 +109,7 @@ defmodule ThistleTea.Character do
       unit_max_power_4: 1000,
       unit_max_power_5: 1000,
       unit_level: c.level,
-      unit_faction_template: 1,
+      unit_faction_template: get_alliance(c),
       unit_bytes_0: <<c.race, c.class, c.gender, get_power(c.class)>>,
       # TODO: safer way to get this, but is it even used here?
       unit_base_attack_time: c.equipment.mainhand.delay,
