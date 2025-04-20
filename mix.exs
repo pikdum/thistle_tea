@@ -6,6 +6,7 @@ defmodule ThistleTea.MixProject do
       app: :thistle_tea,
       version: "0.1.0",
       elixir: "~> 1.16",
+      elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
       consolidate_protocols: Mix.env() != :dev,
       aliases: aliases(),
@@ -24,6 +25,10 @@ defmodule ThistleTea.MixProject do
       extra_applications: [:logger, :crypto, :runtime_tools]
     ]
   end
+
+  # Specifies which paths to compile per environment.
+  defp elixirc_paths(:test), do: ["lib", "test/support"]
+  defp elixirc_paths(_), do: ["lib"]
 
   # Run "mix help deps" to learn about dependencies.
   defp deps do
