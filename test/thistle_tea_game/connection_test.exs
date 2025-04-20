@@ -54,8 +54,7 @@ defmodule ThistleTeaGame.ConnectionTest do
           session_key: DecryptPacketRecording.session_key()
         }
         |> Map.merge(input)
-
-      conn = Connection.decrypt_packets(conn)
+        |> Connection.decrypt_packets()
 
       assert %{
                size: 4,
@@ -71,14 +70,18 @@ defmodule ThistleTeaGame.ConnectionTest do
 
       DecryptPacketRecording.log()
       |> Enum.reduce(conn, fn %{input: input, output: output}, conn ->
-        conn = Map.merge(conn, input)
-        conn = Connection.decrypt_packets(conn)
+        conn =
+          conn
+          |> Map.merge(input)
+          |> Map.put(:packet_queue, [])
+          |> Connection.decrypt_packets()
+
         assert not Enum.empty?(conn.packet_queue)
 
-        <<size::big-size(16), opcode::little-size(32)>> = output[:header]
-        first = Enum.at(conn.packet_queue, 0)
-        assert first.size == size
-        assert first.opcode == opcode
+        [first | _] = conn.packet_queue
+
+        assert output[:header] == <<first.size::big-size(16), first.opcode::little-size(32)>>
+
         conn
       end)
     end

@@ -54,19 +54,13 @@ defmodule ThistleTeaGame.Connection do
 
   def decrypt_header(conn), do: {:error, conn, :not_enough_data}
 
-  def decrypt_packets(
-        %ThistleTeaGame.Connection{
-          packet_stream: packet_stream,
-          packet_queue: packet_queue
-        } =
-          conn
-      ) do
+  def decrypt_packets(conn) do
     case decrypt_header(conn) do
       {:ok, conn, decrypted_header} ->
         <<size::big-size(16), opcode::little-size(32)>> = decrypted_header
 
         <<_encrypted_header::bytes-size(6), payload::binary-size(size - 4), rest::binary>> =
-          packet_stream
+          conn.packet_stream
 
         packet = %{
           opcode: opcode,
@@ -77,7 +71,7 @@ defmodule ThistleTeaGame.Connection do
         conn =
           Map.merge(conn, %{
             packet_stream: rest,
-            packet_queue: packet_queue ++ [packet]
+            packet_queue: conn.packet_queue ++ [packet]
           })
 
         decrypt_packets(conn)
