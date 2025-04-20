@@ -26,15 +26,15 @@ defmodule ThistleTeaGame.ConnectionTest do
     end
   end
 
-  describe "decrypt_packets/1" do
-    test "can decrypt all packets in recording" do
+  describe "enqueue_packets/1" do
+    test "can queue all packets in recording" do
       for %{input: input, output: output} <- DecryptPacketRecording.log() do
         conn =
           %Connection{
             session_key: DecryptPacketRecording.session_key()
           }
           |> Map.merge(input)
-          |> Connection.decrypt_packets()
+          |> Connection.enqueue_packets()
 
         assert not Enum.empty?(conn.packet_queue)
 

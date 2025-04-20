@@ -49,7 +49,7 @@ defmodule ThistleTeaGame.Connection do
 
   def decrypt_header(conn), do: {:error, conn, :not_enough_data}
 
-  def decrypt_packets(conn) do
+  def enqueue_packets(conn) do
     case decrypt_header(conn) do
       {:ok, conn, decrypted_header} ->
         <<size::big-size(16), opcode::little-size(32)>> = decrypted_header
@@ -69,7 +69,7 @@ defmodule ThistleTeaGame.Connection do
             packet_queue: conn.packet_queue ++ [packet]
           })
 
-        decrypt_packets(conn)
+        enqueue_packets(conn)
 
       {:error, conn, _} ->
         conn
