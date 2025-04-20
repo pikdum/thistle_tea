@@ -1,7 +1,6 @@
 defmodule ThistleTeaGame.ClientPacket do
   alias ThistleTeaGame.ClientPacket.Parse
   alias ThistleTeaGame.ClientPacket.CmsgAuthSession
-  alias ThistleTeaGame.Packet
 
   defstruct [
     :opcode,
@@ -11,7 +10,8 @@ defmodule ThistleTeaGame.ClientPacket do
 
   @cmsg_auth_session 0x1ED
 
-  def decode(%ThistleTeaGame.ClientPacket{opcode: @cmsg_auth_session, payload: payload} = packet) do
+  def decode(%__MODULE__{opcode: @cmsg_auth_session, payload: payload}) do
+    # TODO: use with to pass :error on failure to parse
     <<build::little-size(32), server_id::little-size(32), rest::binary>> = payload
     {:ok, username, rest} = Parse.parse_string(rest)
 

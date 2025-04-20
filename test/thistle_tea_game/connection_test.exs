@@ -48,7 +48,7 @@ defmodule ThistleTeaGame.ConnectionTest do
       assert packet.size == 177
       {:ok, decoded} = ClientPacket.decode(packet)
       assert %ClientPacket.CmsgAuthSession{} = decoded
-      {:error, conn} = Packet.handle(decoded, conn)
+      {:error, _conn} = Packet.handle(decoded, conn)
     end
   end
 end

@@ -20,11 +20,11 @@ defmodule ThistleTeaGame.ClientPacket.CmsgAuthSession do
           username: username,
           client_seed: client_seed,
           client_proof: client_proof
-        } = packet,
+        },
         %Connection{} = conn
       ) do
     with [{^username, session_key}] <- :ets.lookup(:session, username),
-         {:ok, conn} <- verify_proof(conn, username, client_seed, client_proof) do
+         {:ok, conn} <- verify_proof(conn, session_key, username, client_seed, client_proof) do
       # TODO: how to model sending packet side effects?
       {:ok, conn}
     else
@@ -33,15 +33,15 @@ defmodule ThistleTeaGame.ClientPacket.CmsgAuthSession do
     end
   end
 
-  defp verify_proof(%Connection{} = conn, username, client_seed, client_proof) do
+  defp verify_proof(%Connection{} = conn, session_key, username, client_seed, client_proof) do
     server_proof =
       :crypto.hash(
         :sha,
-        username <> <<0::little-size(32)>> <> client_seed <> conn.seed <> conn.session_key
+        username <> <<0::little-size(32)>> <> client_seed <> conn.seed <> session_key
       )
 
     if client_proof == server_proof do
-      {:ok, conn}
+      {:ok, conn |> Map.put(:session_key, session_key)}
     else
       {:error, nil}
     end
