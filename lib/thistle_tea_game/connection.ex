@@ -41,12 +41,7 @@ defmodule ThistleTeaGame.Connection do
     <<size::big-size(16), _opcode::little-size(32)>> = decrypted_header
 
     if rest_size < size - 4 do
-      {:error, conn,
-       %{
-         size: size,
-         rest_size: rest_size,
-         decrypted_header: decrypted_header
-       }}
+      {:error, conn, :not_enough_data}
     else
       {:ok, new_conn, decrypted_header}
     end
