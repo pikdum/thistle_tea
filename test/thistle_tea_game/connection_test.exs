@@ -2,7 +2,7 @@ defmodule ThistleTeaGame.ConnectionTest do
   use ExUnit.Case
 
   alias ThistleTea.Test.EncryptHeaderRecording
-  alias ThistleTea.Test.DecryptPacketRecording
+  alias ThistleTea.Test.DecryptHeaderRecording
   alias ThistleTeaGame.Connection
 
   describe "decrypt_header/1" do
@@ -12,10 +12,10 @@ defmodule ThistleTeaGame.ConnectionTest do
     end
 
     test "can decrypt all headers in recording" do
-      for %{input: input, output: output} <- DecryptPacketRecording.log() do
+      for %{input: input, output: output} <- DecryptHeaderRecording.log() do
         conn =
           %Connection{
-            session_key: DecryptPacketRecording.session_key()
+            session_key: DecryptHeaderRecording.session_key()
           }
           |> Map.merge(input)
 
@@ -46,10 +46,10 @@ defmodule ThistleTeaGame.ConnectionTest do
 
   describe "enqueue_packets/1" do
     test "can queue all packets in recording" do
-      for %{input: input, output: output} <- DecryptPacketRecording.log() do
+      for %{input: input, output: output} <- DecryptHeaderRecording.log() do
         conn =
           %Connection{
-            session_key: DecryptPacketRecording.session_key()
+            session_key: DecryptHeaderRecording.session_key()
           }
           |> Map.merge(input)
           |> Connection.enqueue_packets()

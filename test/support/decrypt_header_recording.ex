@@ -1,4 +1,4 @@
-defmodule ThistleTea.Test.DecryptPacketRecording do
+defmodule ThistleTea.Test.DecryptHeaderRecording do
   def session_key do
     <<252, 130, 166, 210, 85, 37, 104, 33, 194, 145, 137, 32, 69, 203, 150, 87, 124, 57, 201, 9,
       138, 28, 177, 44, 28, 190, 27, 23, 220, 186, 20, 41, 239, 120, 172, 253, 140, 219, 55, 205>>
