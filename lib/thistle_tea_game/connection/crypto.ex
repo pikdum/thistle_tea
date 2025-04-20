@@ -56,18 +56,4 @@ defmodule ThistleTeaGame.Connection.Crypto do
     new_conn = Map.merge(conn, crypt_state)
     {:ok, new_conn, encrypted_header}
   end
-
-  def verify_proof(%Connection{} = conn, username, client_seed, client_proof) do
-    server_proof =
-      :crypto.hash(
-        :sha,
-        username <> <<0::little-size(32)>> <> client_seed <> conn.seed <> conn.session_key
-      )
-
-    if client_proof == server_proof do
-      {:ok, conn}
-    else
-      {:error, nil}
-    end
-  end
 end
