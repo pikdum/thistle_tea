@@ -1,6 +1,7 @@
 defmodule ThistleTeaGame.ConnectionTest do
   use ExUnit.Case
 
+  alias ThistleTea.Test.EncryptHeaderRecording
   alias ThistleTea.Test.DecryptPacketRecording
   alias ThistleTeaGame.Connection
 
@@ -22,6 +23,23 @@ defmodule ThistleTeaGame.ConnectionTest do
         assert decrypted_header == output[:header]
         assert conn.recv_i == output[:recv_i]
         assert conn.recv_j == output[:recv_j]
+      end
+    end
+  end
+
+  describe "encrypt_header/1" do
+    test "can encrypt all headers in recording" do
+      for %{input: input, output: output} <- EncryptHeaderRecording.log() do
+        conn =
+          %{
+            session_key: EncryptHeaderRecording.session_key()
+          }
+          |> Map.merge(input)
+
+        {:ok, conn, encrypted_header} = Connection.encrypt_header(conn, input[:header])
+        assert encrypted_header == output[:header]
+        assert conn.send_i == output[:send_i]
+        assert conn.send_j == output[:send_j]
       end
     end
   end
