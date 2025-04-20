@@ -8,8 +8,13 @@ defmodule ThistleTeaGame.Connection.CryptoTest do
   alias ThistleTea.Test.DecryptHeaderRecording
 
   describe "decrypt_header/1" do
-    test "returns an error when there is not enough data" do
+    test "returns an error when there is no session key" do
       conn = %Connection{}
+      assert {:error, ^conn, :no_session_key} = Crypto.decrypt_header(conn)
+    end
+
+    test "returns an error when there is not enough data" do
+      conn = %Connection{session_key: DecryptHeaderRecording.session_key()}
       assert {:error, ^conn, :not_enough_data} = Crypto.decrypt_header(conn)
     end
 
@@ -43,6 +48,11 @@ defmodule ThistleTeaGame.Connection.CryptoTest do
         assert conn.send_i == output[:send_i]
         assert conn.send_j == output[:send_j]
       end
+    end
+  end
+
+  describe "verify_proof/3" do
+    test "can verify proof" do
     end
   end
 end
