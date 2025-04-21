@@ -1,8 +1,5 @@
 defmodule ThistleTeaGame.ClientPacket.CmsgAuthSession do
-  alias ThistleTeaGame.ClientPacket
-  alias ThistleTeaGame.Connection
-  alias ThistleTeaGame.Effect
-  alias ThistleTeaGame.ServerPacket
+  use ThistleTeaGame.ClientPacket, opcode: 0x1ED
 
   defstruct [
     :build,
@@ -12,13 +9,7 @@ defmodule ThistleTeaGame.ClientPacket.CmsgAuthSession do
     :client_proof
   ]
 
-  # TODO: can i wire this up with a macro?
-  defimpl ThistleTeaGame.Packet do
-    def handle(packet, conn), do: ThistleTeaGame.ClientPacket.CmsgAuthSession.handle(packet, conn)
-    def encode(_packet), do: nil
-  end
-
-  # TODO: can handle be a behavior?
+  @impl ThistleTeaGame.ClientPacket
   def handle(
         %__MODULE__{} = packet,
         %Connection{} = conn
@@ -42,7 +33,7 @@ defmodule ThistleTeaGame.ClientPacket.CmsgAuthSession do
     end
   end
 
-  # TODO: can decode be a behavior?
+  @impl ThistleTeaGame.ClientPacket
   def decode(%ClientPacket{payload: payload}) do
     with <<build::little-size(32), server_id::little-size(32), rest::binary>> <- payload,
          {:ok, username, rest} <- ClientPacket.Parse.parse_string(rest),
