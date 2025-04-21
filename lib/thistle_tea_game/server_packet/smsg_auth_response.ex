@@ -1,5 +1,4 @@
 defmodule ThistleTeaGame.ServerPacket.SmsgAuthResponse do
-  alias ThisleTeaGame.Connection
   alias ThistleTeaGame.ServerPacket
 
   @smsg_auth_response 0x1EE
@@ -16,7 +15,7 @@ defmodule ThistleTeaGame.ServerPacket.SmsgAuthResponse do
   # TODO: should this be separate for client/server packets?
   defimpl ThistleTeaGame.Packet do
     def encode(packet), do: ThistleTeaGame.ServerPacket.SmsgAuthResponse.encode(packet)
-    def handle(packet), do: nil
+    def handle(_packet, _conn), do: nil
   end
 
   def encode(%__MODULE__{
@@ -36,10 +35,10 @@ defmodule ThistleTeaGame.ServerPacket.SmsgAuthResponse do
         end
 
     size = byte_size(body) + 2
-    header = <<size::big-size(16), @smsg_auth_response::little-size(16)>>
 
     %ServerPacket{
       opcode: @smsg_auth_response,
+      size: size,
       payload: body
     }
   end

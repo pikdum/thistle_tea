@@ -13,7 +13,11 @@ defmodule ThistleTeaGame.Connection.Server do
   end
 
   @impl ThousandIsland.Handler
-  def handle_data(data, _socket, %Connection{} = conn) do
-    conn |> Connection.receive_data(data) |> Connection.enqueue_packets()
+  def handle_data(data, socket, %Connection{} = conn) do
+    conn
+    |> Connection.receive_data(data)
+    |> Connection.enqueue_packets()
+    |> Connection.handle_packets()
+    |> Connection.process_effects(socket)
   end
 end

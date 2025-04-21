@@ -14,7 +14,7 @@ defmodule ThistleTeaGame.ClientPacket.CmsgAuthSession do
   # TODO: can i wire this up with a macro?
   defimpl ThistleTeaGame.Packet do
     def handle(packet, conn), do: ThistleTeaGame.ClientPacket.CmsgAuthSession.handle(packet, conn)
-    def encode(packet), do: nil
+    def encode(_packet), do: nil
   end
 
   # TODO: can handle be a behavior?

@@ -1,6 +1,7 @@
 defmodule ThistleTeaGame.Connection do
   @cmsg_auth_session 0x1ED
 
+  alias ThistleTeaGame.Effect
   alias ThistleTeaGame.Packet
   alias ThistleTeaGame.ClientPacket
   alias ThistleTeaGame.Connection.Crypto
@@ -82,7 +83,7 @@ defmodule ThistleTeaGame.Connection do
     end
   end
 
-  def process_packets(%__MODULE__{} = conn) do
+  def handle_packets(%__MODULE__{} = conn) do
     Enum.reduce(conn.packet_queue, conn, fn packet, conn ->
       case ClientPacket.decode(packet) do
         {:ok, decoded} ->
@@ -94,5 +95,12 @@ defmodule ThistleTeaGame.Connection do
       end
     end)
     |> Map.put(:packet_queue, [])
+  end
+
+  def process_effects(%__MODULE__{} = conn, socket) do
+    Enum.reduce(conn.effect_queue, conn, fn effect, conn ->
+      Effect.process(effect, conn, socket)
+    end)
+    |> Map.put(:effect_queue, [])
   end
 end
