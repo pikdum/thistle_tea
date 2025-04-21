@@ -1,4 +1,5 @@
 defmodule ThistleTeaGame.ClientPacket.CmsgAuthSession do
+  alias ThistleTeaGame.ClientPacket
   alias ThistleTeaGame.Connection
   alias ThistleTeaGame.Effect
   alias ThistleTeaGame.ServerPacket
@@ -38,6 +39,25 @@ defmodule ThistleTeaGame.ClientPacket.CmsgAuthSession do
 
       {:error, _} ->
         {:error, conn}
+    end
+  end
+
+  # TODO: can decode be a behavior?
+  def decode(%ClientPacket{payload: payload}) do
+    with <<build::little-size(32), server_id::little-size(32), rest::binary>> <- payload,
+         {:ok, username, rest} <- ClientPacket.Parse.parse_string(rest),
+         <<client_seed::little-bytes-size(4), client_proof::little-bytes-size(20), _rest::binary>> <-
+           rest do
+      {:ok,
+       %__MODULE__{
+         build: build,
+         server_id: server_id,
+         username: username,
+         client_seed: client_seed,
+         client_proof: client_proof
+       }}
+    else
+      _ -> {:error, :invalid_packet}
     end
   end
 
