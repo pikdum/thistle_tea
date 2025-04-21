@@ -22,4 +22,12 @@ defmodule ThistleTeaGame.ServerPacket do
     :size,
     :payload
   ]
+
+  def build(payload, opcode) do
+    %__MODULE__{
+      opcode: opcode,
+      size: byte_size(payload) + 2,
+      payload: payload
+    }
+  end
 end
