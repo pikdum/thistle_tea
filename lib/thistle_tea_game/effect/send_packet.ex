@@ -29,6 +29,6 @@ defmodule ThistleTeaGame.Effect.SendPacket do
     header = <<size::big-size(16), opcode::little-size(16)>>
     {:ok, conn, encrypted_header} = Connection.Crypto.encrypt_header(conn, header)
     Socket.send(socket, encrypted_header <> payload)
-    conn
+    {:ok, conn}
   end
 end

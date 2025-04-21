@@ -7,16 +7,24 @@ defmodule ThistleTeaGame.Connection.Server do
   @smsg_auth_challenge ThistleTeaGame.Opcodes.get(:SMSG_AUTH_CHALLENGE)
 
   @impl ThousandIsland.Handler
-  def handle_connection(socket, %Connection{} = conn) do
+  def handle_connection(socket, _) do
+    conn = %Connection{}
     Socket.send(socket, <<6::big-size(16), @smsg_auth_challenge::little-size(16)>> <> conn.seed)
+    {:continue, conn}
   end
 
   @impl ThousandIsland.Handler
   def handle_data(data, socket, %Connection{} = conn) do
-    conn
-    |> Connection.receive_data(data)
-    |> Connection.enqueue_packets()
-    |> Connection.handle_packets()
-    |> Connection.process_effects(socket)
+    conn =
+      conn
+      |> Connection.receive_data(data)
+      |> Connection.enqueue_packets()
+      |> Connection.decode_packets()
+      |> Connection.handle_packets()
+      |> Connection.process_effects(socket)
+
+    # |> dbg()
+
+    {:continue, conn}
   end
 end

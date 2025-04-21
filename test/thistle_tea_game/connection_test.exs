@@ -17,9 +17,9 @@ defmodule ThistleTeaGame.ConnectionTest do
           |> Map.merge(input)
           |> Connection.enqueue_packets()
 
-        assert not Enum.empty?(conn.packet_queue)
+        assert not Enum.empty?(conn.raw_packet_queue)
 
-        [first | _] = conn.packet_queue
+        [first | _] = conn.raw_packet_queue
 
         assert output[:header] == <<first.size::big-size(16), first.opcode::little-size(32)>>
       end
@@ -42,7 +42,7 @@ defmodule ThistleTeaGame.ConnectionTest do
         %Connection{packet_stream: packet_stream}
         |> Connection.enqueue_packets()
 
-      [packet | _] = conn.packet_queue
+      [packet | _] = conn.raw_packet_queue
       assert packet.opcode == @cmsg_auth_session
       assert packet.size == 177
       {:ok, decoded} = ClientPacket.decode(packet)

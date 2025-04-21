@@ -15,8 +15,13 @@ defmodule ThistleTeaGame.ClientPacket do
       alias ThistleTeaGame.ServerPacket
 
       defimpl ThistleTeaGame.Packet do
-        def handle(packet, conn),
-          do: unquote(Macro.escape(__CALLER__.module)).handle(packet, conn)
+        def handle(packet, conn) do
+          unquote(Macro.escape(__CALLER__.module)).handle(packet, conn)
+        end
+
+        def opcode(packet) do
+          unquote(Macro.escape(__CALLER__.module)).opcode()
+        end
 
         def encode(_packet), do: nil
       end
@@ -47,7 +52,7 @@ defmodule ThistleTeaGame.ClientPacket do
 
     case Map.fetch(registry, opcode) do
       {:ok, mod} -> mod.decode(packet)
-      :error -> {:error, :unknown_opcode, opcode}
+      :error -> {:error, :unhandled_opcode, opcode}
     end
   end
 end

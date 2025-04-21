@@ -14,22 +14,28 @@ defmodule ThistleTeaGame.ClientPacket.CmsgAuthSession do
         %__MODULE__{} = packet,
         %Connection{} = conn
       ) do
-    case verify_proof(conn, packet) do
-      {:ok, conn} ->
+    with {:ok, conn} <- get_session_key(conn, packet),
+         {:ok, conn} <- verify_proof(conn, packet) do
+      effect = %Effect.SendPacket{
+        packet: %ServerPacket.SmsgAuthResponse{
+          result: 0x0C,
+          billing_time: 0,
+          billing_flags: 0,
+          billing_rested: 0,
+          queue_position: 0
+        }
+      }
+
+      {:ok, conn |> Connection.add_effect(effect)}
+    else
+      {:error, _} ->
         effect = %Effect.SendPacket{
           packet: %ServerPacket.SmsgAuthResponse{
-            result: 0x0C,
-            billing_time: 0,
-            billing_flags: 0,
-            billing_rested: 0,
-            queue_position: 0
+            result: 0x0D
           }
         }
 
         {:ok, conn |> Connection.add_effect(effect)}
-
-      {:error, _} ->
-        {:error, conn}
     end
   end
 
@@ -49,6 +55,13 @@ defmodule ThistleTeaGame.ClientPacket.CmsgAuthSession do
        }}
     else
       _ -> {:error, :invalid_packet}
+    end
+  end
+
+  defp get_session_key(%Connection{} = conn, %__MODULE__{username: username}) do
+    case :ets.lookup(:session, username) do
+      [{^username, session_key}] -> {:ok, Map.put(conn, :session_key, session_key)}
+      _ -> {:error, conn}
     end
   end
 

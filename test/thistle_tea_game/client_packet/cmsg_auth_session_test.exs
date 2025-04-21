@@ -52,6 +52,8 @@ defmodule ThistleTeaGame.ClientPacket.CmsgAuthSessionTest do
 
   describe "handle/2" do
     test "adds effect on success" do
+      :ets.insert(:session, {@username, @session_key})
+
       packet = %CmsgAuthSession{
         username: @username,
         client_seed: @client_seed,

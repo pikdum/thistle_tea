@@ -9,8 +9,15 @@ defmodule ThistleTeaGame.ServerPacket do
       alias ThistleTeaGame.ServerPacket
 
       defimpl ThistleTeaGame.Packet do
+        def encode(packet) do
+          unquote(Macro.escape(__CALLER__.module)).encode(packet)
+        end
+
+        def opcode(packet) do
+          unquote(Macro.escape(__CALLER__.module)).opcode()
+        end
+
         def handle(_packet, _conn), do: nil
-        def encode(packet), do: unquote(Macro.escape(__CALLER__.module)).encode(packet)
       end
 
       def opcode, do: @opcode
