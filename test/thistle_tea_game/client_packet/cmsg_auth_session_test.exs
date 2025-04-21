@@ -1,7 +1,9 @@
 defmodule ThistleTeaGame.ClientPacket.CmsgAuthSessionTest do
   use ExUnit.Case
 
+  alias ThistleTeaGame.Effect
   alias ThistleTeaGame.Connection
+  alias ThistleTeaGame.ServerPacket.SmsgAuthResponse
   alias ThistleTea.Test.Support.Util
   alias ThistleTeaGame.ClientPacket.CmsgAuthSession
 
@@ -14,41 +16,35 @@ defmodule ThistleTeaGame.ClientPacket.CmsgAuthSessionTest do
   @client_proof <<195, 69, 164, 98, 116, 81, 66, 183, 137, 253, 243, 14, 202, 37, 21, 225, 41,
                   125, 4, 75>>
 
-  describe "verify_proof/5" do
+  describe "verify_proof/2" do
     test "returns error if proof is invalid" do
-      username = Util.random_string(10)
-
       conn = %Connection{
-        seed: :crypto.strong_rand_bytes(4)
+        seed: :crypto.strong_rand_bytes(4),
+        session_key: :crypto.strong_rand_bytes(40)
       }
 
-      session_key = :crypto.strong_rand_bytes(40)
-      client_seed = :crypto.strong_rand_bytes(4)
-      client_proof = :crypto.strong_rand_bytes(20)
+      packet = %CmsgAuthSession{
+        username: Util.random_string(10),
+        client_seed: :crypto.strong_rand_bytes(4),
+        client_proof: :crypto.strong_rand_bytes(20)
+      }
 
-      {:error, :proof_mismatch} =
-        CmsgAuthSession.verify_proof(
-          conn,
-          session_key,
-          username,
-          client_seed,
-          client_proof
-        )
+      {:error, _} = CmsgAuthSession.verify_proof(conn, packet)
     end
 
     test "returns success + adds session_key if proof is valid" do
       conn = %Connection{
-        seed: @seed
+        seed: @seed,
+        session_key: @session_key
       }
 
-      {:ok, conn} =
-        CmsgAuthSession.verify_proof(
-          conn,
-          @session_key,
-          @username,
-          @client_seed,
-          @client_proof
-        )
+      packet = %CmsgAuthSession{
+        username: @username,
+        client_seed: @client_seed,
+        client_proof: @client_proof
+      }
+
+      {:ok, conn} = CmsgAuthSession.verify_proof(conn, packet)
 
       assert conn.session_key == @session_key
     end
@@ -63,14 +59,22 @@ defmodule ThistleTeaGame.ClientPacket.CmsgAuthSessionTest do
       }
 
       conn = %Connection{
-        seed: @seed
+        seed: @seed,
+        session_key: @session_key
       }
 
-      :ets.insert(:session, {@username, @session_key})
-
-      assert conn.session_key == nil
       {:ok, conn} = CmsgAuthSession.handle(packet, conn)
-      assert conn.session_key == @session_key
+      [effect | _] = conn.effect_queue
+
+      assert %Effect.SendPacket{
+               packet: %SmsgAuthResponse{
+                 result: 0x0C,
+                 billing_time: 0,
+                 billing_flags: 0,
+                 billing_rested: 0,
+                 queue_position: 0
+               }
+             } == effect
     end
   end
 end

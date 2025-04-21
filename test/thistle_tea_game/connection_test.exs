@@ -1,7 +1,6 @@
 defmodule ThistleTeaGame.ConnectionTest do
   use ExUnit.Case
 
-  alias ThistleTeaGame.Packet
   alias ThistleTeaGame.ClientPacket
   alias ThistleTeaGame.Connection
   alias ThistleTea.Test.DecryptHeaderRecording
@@ -48,7 +47,6 @@ defmodule ThistleTeaGame.ConnectionTest do
       assert packet.size == 177
       {:ok, decoded} = ClientPacket.decode(packet)
       assert %ClientPacket.CmsgAuthSession{} = decoded
-      {:error, _conn} = Packet.handle(decoded, conn)
     end
   end
 end

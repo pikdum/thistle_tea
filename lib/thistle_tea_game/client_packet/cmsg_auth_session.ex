@@ -19,41 +19,41 @@ defmodule ThistleTeaGame.ClientPacket.CmsgAuthSession do
 
   # TODO: can handle be a behavior?
   def handle(
-        %__MODULE__{
-          username: username,
-          client_seed: client_seed,
-          client_proof: client_proof
-        },
+        %__MODULE__{} = packet,
         %Connection{} = conn
       ) do
-    with [{^username, session_key}] <- :ets.lookup(:session, username),
-         {:ok, conn} <- verify_proof(conn, session_key, username, client_seed, client_proof) do
-      effect = %Effect.SendPacket{
-        packet: %ServerPacket.SmsgAuthResponse{
-          result: 0x0C,
-          billing_time: 0,
-          billing_flags: 0,
-          billing_rested: 0,
-          queue_position: 0
+    case verify_proof(conn, packet) do
+      {:ok, conn} ->
+        effect = %Effect.SendPacket{
+          packet: %ServerPacket.SmsgAuthResponse{
+            result: 0x0C,
+            billing_time: 0,
+            billing_flags: 0,
+            billing_rested: 0,
+            queue_position: 0
+          }
         }
-      }
 
-      {:ok, conn |> Connection.add_effect(effect)}
-    else
-      _ ->
+        {:ok, conn |> Connection.add_effect(effect)}
+
+      {:error, _} ->
         {:error, conn}
     end
   end
 
-  def verify_proof(%Connection{} = conn, session_key, username, client_seed, client_proof) do
+  def verify_proof(%Connection{seed: seed, session_key: session_key} = conn, %__MODULE__{
+        username: username,
+        client_seed: client_seed,
+        client_proof: client_proof
+      }) do
     server_proof =
       :crypto.hash(
         :sha,
-        username <> <<0::little-size(32)>> <> client_seed <> conn.seed <> session_key
+        username <> <<0::little-size(32)>> <> client_seed <> seed <> session_key
       )
 
     if client_proof == server_proof do
-      {:ok, conn |> Map.put(:session_key, session_key)}
+      {:ok, conn}
     else
       {:error, :proof_mismatch}
     end

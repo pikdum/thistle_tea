@@ -13,7 +13,7 @@ defmodule ThistleTeaGame.Connection do
     :session_key,
     packet_stream: <<>>,
     packet_queue: [],
-    event_queue: [],
+    effect_queue: [],
     send_i: 0,
     send_j: 0,
     recv_i: 0,
@@ -26,11 +26,11 @@ defmodule ThistleTeaGame.Connection do
   end
 
   def add_effect(%__MODULE__{} = conn, effect) when is_list(effect) do
-    Map.put(conn, :event_queue, conn.event_queue ++ effect)
+    Map.put(conn, :effect_queue, conn.effect_queue ++ effect)
   end
 
   def add_effect(%__MODULE__{} = conn, effect) do
-    Map.put(conn, :event_queue, conn.event_queue ++ [effect])
+    Map.put(conn, :effect_queue, conn.effect_queue ++ [effect])
   end
 
   def enqueue_packets(
