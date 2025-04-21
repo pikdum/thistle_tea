@@ -1,7 +1,6 @@
 defmodule ThistleTeaGame.ServerPacket.SmsgAuthResponse do
-  alias ThistleTeaGame.ServerPacket
+  use ThistleTeaGame.ServerPacket, opcode: 0x1EE
 
-  @smsg_auth_response 0x1EE
   @result_auth_ok 0x0C
 
   defstruct [
@@ -12,12 +11,7 @@ defmodule ThistleTeaGame.ServerPacket.SmsgAuthResponse do
     :queue_position
   ]
 
-  # TODO: should this be separate for client/server packets?
-  defimpl ThistleTeaGame.Packet do
-    def encode(packet), do: ThistleTeaGame.ServerPacket.SmsgAuthResponse.encode(packet)
-    def handle(_packet, _conn), do: nil
-  end
-
+  @impl ThistleTeaGame.ServerPacket
   def encode(%__MODULE__{
         result: result,
         billing_time: billing_time,
@@ -37,7 +31,7 @@ defmodule ThistleTeaGame.ServerPacket.SmsgAuthResponse do
     size = byte_size(body) + 2
 
     %ServerPacket{
-      opcode: @smsg_auth_response,
+      opcode: @opcode,
       size: size,
       payload: body
     }
