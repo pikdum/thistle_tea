@@ -4,8 +4,7 @@ defmodule ThistleTeaGame.Connection.Server do
   alias ThousandIsland.Socket
   alias ThistleTeaGame.Connection
 
-  # TODO: how to get rid of these magic numbers?
-  @smsg_auth_challenge 0x1EC
+  @smsg_auth_challenge ThistleTeaGame.Opcodes.get(:SMSG_AUTH_CHALLENGE)
 
   @impl ThousandIsland.Handler
   def handle_connection(socket, %Connection{} = conn) do

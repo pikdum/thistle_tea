@@ -1,5 +1,5 @@
 defmodule ThistleTeaGame.ServerPacket.SmsgAuthResponse do
-  use ThistleTeaGame.ServerPacket, opcode: 0x1EE
+  use ThistleTeaGame.ServerPacket, opcode: :SMSG_AUTH_RESPONSE
 
   @result_auth_ok 0x0C
 

@@ -7,7 +7,7 @@ defmodule ThistleTeaGame.ClientPacket do
   defmacro __using__(opts) do
     quote do
       @behaviour ThistleTeaGame.ClientPacket
-      @opcode unquote(opts[:opcode])
+      @opcode unquote(ThistleTeaGame.Opcodes.get(opts[:opcode]))
 
       alias ThistleTeaGame.ClientPacket
       alias ThistleTeaGame.Connection

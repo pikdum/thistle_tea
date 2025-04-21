@@ -1,5 +1,5 @@
 defmodule ThistleTeaGame.ClientPacket.CmsgAuthSession do
-  use ThistleTeaGame.ClientPacket, opcode: 0x1ED
+  use ThistleTeaGame.ClientPacket, opcode: :CMSG_AUTH_SESSION
 
   defstruct [
     :build,

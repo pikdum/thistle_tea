@@ -1,6 +1,4 @@
 defmodule ThistleTeaGame.Connection do
-  @cmsg_auth_session 0x1ED
-
   alias ThistleTeaGame.Effect
   alias ThistleTeaGame.Packet
   alias ThistleTeaGame.ClientPacket
@@ -8,7 +6,7 @@ defmodule ThistleTeaGame.Connection do
 
   require Logger
 
-  @cmsg_auth_session 0x1ED
+  @cmsg_auth_session ThistleTeaGame.Opcodes.get(:CMSG_AUTH_SESSION)
 
   defstruct [
     :session_key,
@@ -34,6 +32,7 @@ defmodule ThistleTeaGame.Connection do
     Map.put(conn, :effect_queue, conn.effect_queue ++ [effect])
   end
 
+  # handle separately since this isn't encrypted
   def enqueue_packets(
         %__MODULE__{
           packet_stream:
