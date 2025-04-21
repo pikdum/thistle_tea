@@ -11,7 +11,7 @@ defmodule ThistleTeaGame.ServerPacket.SmsgAuthResponse do
     :queue_position
   ]
 
-  @impl ThistleTeaGame.ServerPacket
+  @impl ServerPacket
   def encode(%__MODULE__{
         result: result,
         billing_time: billing_time,

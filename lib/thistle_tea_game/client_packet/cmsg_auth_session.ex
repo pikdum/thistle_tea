@@ -9,7 +9,7 @@ defmodule ThistleTeaGame.ClientPacket.CmsgAuthSession do
     :client_proof
   ]
 
-  @impl ThistleTeaGame.ClientPacket
+  @impl ClientPacket
   def handle(
         %__MODULE__{} = packet,
         %Connection{} = conn
@@ -33,7 +33,7 @@ defmodule ThistleTeaGame.ClientPacket.CmsgAuthSession do
     end
   end
 
-  @impl ThistleTeaGame.ClientPacket
+  @impl ClientPacket
   def decode(%ClientPacket{payload: payload}) do
     with <<build::little-size(32), server_id::little-size(32), rest::binary>> <- payload,
          {:ok, username, rest} <- ClientPacket.Parse.parse_string(rest),
