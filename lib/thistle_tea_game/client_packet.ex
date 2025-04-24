@@ -4,6 +4,10 @@ defmodule ThistleTeaGame.ClientPacket do
   @callback decode(packet :: %ThistleTeaGame.ClientPacket{}) :: any()
   @callback handle(packet :: struct(), conn :: struct()) :: any()
 
+  # TODO: does it make sense to unify client/server packet structs?
+  # to handle MSG_* where it's both client and server?
+  # then maybe i could have `use ServerPacket`, `use ClientPacket`, in the same thing
+  # and a behavior + protocol for each too?
   @lookup Opcodes.opcodes()
           |> Enum.map(fn {opcode, name} ->
             {opcode, Module.concat("ThistleTeaGame.ClientPacket", Opcodes.module_name(name))}
