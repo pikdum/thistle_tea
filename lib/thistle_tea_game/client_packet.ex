@@ -2,7 +2,13 @@ defmodule ThistleTeaGame.ClientPacket do
   @callback decode(packet :: %ThistleTeaGame.ClientPacket{}) :: any()
   @callback handle(packet :: struct(), conn :: struct()) :: any()
 
-  @registry_key :thistle_tea_client_packet_registry
+  @lookup %{
+    :CMSG_AUTH_SESSION => ThistleTeaGame.ClientPacket.CmsgAuthSession
+  }
+
+  @raw_lookup @lookup
+              |> Enum.map(fn {k, v} -> {ThistleTeaGame.Opcodes.get(k), v} end)
+              |> Map.new()
 
   defmacro __using__(opts) do
     quote do
@@ -27,12 +33,6 @@ defmodule ThistleTeaGame.ClientPacket do
       end
 
       def opcode, do: @opcode
-
-      @on_load :__register__
-      def __register__ do
-        ThistleTeaGame.ClientPacket.register_module(__MODULE__, @opcode)
-        :ok
-      end
     end
   end
 
@@ -42,15 +42,8 @@ defmodule ThistleTeaGame.ClientPacket do
     :payload
   ]
 
-  def register_module(module, opcode) do
-    registry = Application.get_env(:thistle_tea_game, @registry_key, %{})
-    Application.put_env(:thistle_tea_game, @registry_key, Map.put(registry, opcode, module))
-  end
-
   def decode(%__MODULE__{opcode: opcode} = packet) do
-    registry = Application.get_env(:thistle_tea_game, @registry_key, %{})
-
-    case Map.fetch(registry, opcode) do
+    case Map.fetch(@raw_lookup, opcode) do
       {:ok, mod} -> mod.decode(packet)
       :error -> {:error, :unhandled_opcode, opcode}
     end
