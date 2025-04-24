@@ -3,7 +3,8 @@ defmodule ThistleTeaGame.ClientPacket do
   @callback handle(packet :: struct(), conn :: struct()) :: any()
 
   @lookup %{
-    :CMSG_AUTH_SESSION => ThistleTeaGame.ClientPacket.CmsgAuthSession
+    :CMSG_AUTH_SESSION => ThistleTeaGame.ClientPacket.CmsgAuthSession,
+    :CMSG_CHAR_ENUM => ThistleTeaGame.ClientPacket.CmsgCharEnum
   }
 
   @raw_lookup @lookup
