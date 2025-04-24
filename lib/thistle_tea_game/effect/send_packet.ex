@@ -2,7 +2,6 @@ defmodule ThistleTeaGame.Effect.SendPacket do
   alias ThousandIsland.Socket
   alias ThistleTeaGame.Connection
   alias ThistleTeaGame.ServerPacket
-  alias ThistleTeaGame.Packet
 
   defstruct [
     :packet
@@ -24,7 +23,7 @@ defmodule ThistleTeaGame.Effect.SendPacket do
       opcode: opcode,
       size: size,
       payload: payload
-    } = Packet.encode(packet)
+    } = ServerPacket.Protocol.encode(packet)
 
     header = <<size::big-size(16), opcode::little-size(16)>>
     {:ok, conn, encrypted_header} = Connection.Crypto.encrypt_header(conn, header)

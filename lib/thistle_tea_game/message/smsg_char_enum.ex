@@ -1,4 +1,4 @@
-defmodule ThistleTeaGame.ServerPacket.SmsgCharEnum do
+defmodule ThistleTeaGame.Message.SmsgCharEnum do
   use ThistleTeaGame.ServerPacket, opcode: :SMSG_CHAR_ENUM
 
   defstruct characters: []

@@ -1,7 +1,6 @@
 defmodule ThistleTeaGame.Connection do
   alias ThistleTeaGame.Opcodes
   alias ThistleTeaGame.Effect
-  alias ThistleTeaGame.Packet
   alias ThistleTeaGame.ClientPacket
   alias ThistleTeaGame.Connection.Crypto
 
@@ -120,9 +119,9 @@ defmodule ThistleTeaGame.Connection do
   end
 
   def handle_packets(%__MODULE__{decoded_packet_queue: [decoded_packet | rest]} = conn) do
-    opcode = decoded_packet |> Packet.opcode() |> Opcodes.get()
+    opcode = decoded_packet |> ClientPacket.Protocol.opcode() |> Opcodes.get()
 
-    case Packet.handle(decoded_packet, conn) do
+    case ClientPacket.Protocol.handle(decoded_packet, conn) do
       {:ok, conn} ->
         Logger.debug("Handled: #{opcode}")
 

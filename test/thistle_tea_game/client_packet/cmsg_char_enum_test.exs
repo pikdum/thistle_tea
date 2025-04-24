@@ -4,18 +4,18 @@ defmodule ThistleTeaGame.ClientPacket.CmsgCharEnumTest do
   alias ThistleTeaGame.Effect
   alias ThistleTeaGame.Connection
   alias ThistleTeaGame.ClientPacket
-  alias ThistleTeaGame.ServerPacket
+  alias ThistleTeaGame.Message
 
   describe "handle/2" do
     test "returns a SMSG_CHAR_ENUM packet" do
       conn = %Connection{}
-      packet = %ClientPacket.CmsgCharEnum{}
+      packet = %Message.CmsgCharEnum{}
 
-      {:ok, conn} = ClientPacket.CmsgCharEnum.handle(packet, conn)
+      {:ok, conn} = ClientPacket.Protocol.handle(packet, conn)
       [effect | _] = conn.effect_queue
 
       assert %Effect.SendPacket{
-               packet: %ServerPacket.SmsgCharEnum{
+               packet: %Message.SmsgCharEnum{
                  characters: []
                }
              } == effect

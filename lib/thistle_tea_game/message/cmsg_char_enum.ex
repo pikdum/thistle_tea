@@ -1,4 +1,4 @@
-defmodule ThistleTeaGame.ClientPacket.CmsgCharEnum do
+defmodule ThistleTeaGame.Message.CmsgCharEnum do
   use ThistleTeaGame.ClientPacket, opcode: :CMSG_CHAR_ENUM
 
   defstruct []
@@ -6,7 +6,7 @@ defmodule ThistleTeaGame.ClientPacket.CmsgCharEnum do
   @impl ClientPacket
   def handle(%__MODULE__{}, %Connection{} = conn) do
     effect = %Effect.SendPacket{
-      packet: %ServerPacket.SmsgCharEnum{characters: []}
+      packet: %Message.SmsgCharEnum{characters: []}
     }
 
     {:ok, conn |> Connection.add_effect(effect)}

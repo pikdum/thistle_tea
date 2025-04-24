@@ -3,9 +3,8 @@ defmodule ThistleTeaGame.ClientPacket.CmsgAuthSessionTest do
 
   alias ThistleTeaGame.Effect
   alias ThistleTeaGame.Connection
-  alias ThistleTeaGame.ServerPacket.SmsgAuthResponse
+  alias ThistleTeaGame.Message
   alias ThistleTea.Test.Support.Util
-  alias ThistleTeaGame.ClientPacket.CmsgAuthSession
 
   @username "PIKDUM"
   @seed <<8, 52, 218, 78>>
@@ -23,13 +22,13 @@ defmodule ThistleTeaGame.ClientPacket.CmsgAuthSessionTest do
         session_key: :crypto.strong_rand_bytes(40)
       }
 
-      packet = %CmsgAuthSession{
+      packet = %Message.CmsgAuthSession{
         username: Util.random_string(10),
         client_seed: :crypto.strong_rand_bytes(4),
         client_proof: :crypto.strong_rand_bytes(20)
       }
 
-      {:error, _} = CmsgAuthSession.verify_proof(conn, packet)
+      {:error, _} = Message.CmsgAuthSession.verify_proof(conn, packet)
     end
 
     test "returns success + adds session_key if proof is valid" do
@@ -38,13 +37,13 @@ defmodule ThistleTeaGame.ClientPacket.CmsgAuthSessionTest do
         session_key: @session_key
       }
 
-      packet = %CmsgAuthSession{
+      packet = %Message.CmsgAuthSession{
         username: @username,
         client_seed: @client_seed,
         client_proof: @client_proof
       }
 
-      {:ok, conn} = CmsgAuthSession.verify_proof(conn, packet)
+      {:ok, conn} = Message.CmsgAuthSession.verify_proof(conn, packet)
 
       assert conn.session_key == @session_key
     end
@@ -54,7 +53,7 @@ defmodule ThistleTeaGame.ClientPacket.CmsgAuthSessionTest do
     test "adds effect on success" do
       :ets.insert(:session, {@username, @session_key})
 
-      packet = %CmsgAuthSession{
+      packet = %Message.CmsgAuthSession{
         username: @username,
         client_seed: @client_seed,
         client_proof: @client_proof
@@ -65,11 +64,11 @@ defmodule ThistleTeaGame.ClientPacket.CmsgAuthSessionTest do
         session_key: @session_key
       }
 
-      {:ok, conn} = CmsgAuthSession.handle(packet, conn)
+      {:ok, conn} = Message.CmsgAuthSession.handle(packet, conn)
       [effect | _] = conn.effect_queue
 
       assert %Effect.SendPacket{
-               packet: %SmsgAuthResponse{
+               packet: %Message.SmsgAuthResponse{
                  result: 0x0C,
                  billing_time: 0,
                  billing_flags: 0,

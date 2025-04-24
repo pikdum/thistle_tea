@@ -1,4 +1,4 @@
-defmodule ThistleTeaGame.ClientPacket.CmsgAuthSession do
+defmodule ThistleTeaGame.Message.CmsgAuthSession do
   use ThistleTeaGame.ClientPacket, opcode: :CMSG_AUTH_SESSION
 
   defstruct [
@@ -17,7 +17,7 @@ defmodule ThistleTeaGame.ClientPacket.CmsgAuthSession do
     with {:ok, conn} <- get_session_key(conn, packet),
          {:ok, conn} <- verify_proof(conn, packet) do
       effect = %Effect.SendPacket{
-        packet: %ServerPacket.SmsgAuthResponse{
+        packet: %Message.SmsgAuthResponse{
           result: 0x0C,
           billing_time: 0,
           billing_flags: 0,
@@ -30,7 +30,7 @@ defmodule ThistleTeaGame.ClientPacket.CmsgAuthSession do
     else
       {:error, _} ->
         effect = %Effect.SendPacket{
-          packet: %ServerPacket.SmsgAuthResponse{
+          packet: %Message.SmsgAuthResponse{
             result: 0x0D
           }
         }

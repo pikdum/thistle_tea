@@ -10,7 +10,7 @@ defmodule ThistleTeaGame.ClientPacket do
   # and a behavior + protocol for each too?
   @lookup Opcodes.opcodes()
           |> Enum.map(fn {opcode, name} ->
-            {opcode, Module.concat("ThistleTeaGame.ClientPacket", Opcodes.module_name(name))}
+            {opcode, Module.concat("ThistleTeaGame.Message", Opcodes.module_name(name))}
           end)
           |> Map.new()
 
@@ -22,9 +22,9 @@ defmodule ThistleTeaGame.ClientPacket do
       alias ThistleTeaGame.ClientPacket
       alias ThistleTeaGame.Connection
       alias ThistleTeaGame.Effect
-      alias ThistleTeaGame.ServerPacket
+      alias ThistleTeaGame.Message
 
-      defimpl ThistleTeaGame.Packet do
+      defimpl ThistleTeaGame.ClientPacket.Protocol do
         def handle(packet, conn) do
           unquote(Macro.escape(__CALLER__.module)).handle(packet, conn)
         end
@@ -32,8 +32,6 @@ defmodule ThistleTeaGame.ClientPacket do
         def opcode(packet) do
           unquote(Macro.escape(__CALLER__.module)).opcode()
         end
-
-        def encode(_packet), do: nil
       end
 
       def opcode, do: @opcode

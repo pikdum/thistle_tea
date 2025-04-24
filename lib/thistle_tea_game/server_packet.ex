@@ -7,8 +7,9 @@ defmodule ThistleTeaGame.ServerPacket do
       @opcode unquote(ThistleTeaGame.Opcodes.get(opts[:opcode]))
 
       alias ThistleTeaGame.ServerPacket
+      alias ThistleTeaGame.Message
 
-      defimpl ThistleTeaGame.Packet do
+      defimpl ThistleTeaGame.ServerPacket.Protocol do
         def encode(packet) do
           unquote(Macro.escape(__CALLER__.module)).encode(packet)
         end
