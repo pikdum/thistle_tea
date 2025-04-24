@@ -918,4 +918,16 @@ defmodule ThistleTeaGame.Opcodes do
   def get(key) do
     @reverse_opcodes[key]
   end
+
+  def opcodes do
+    @opcodes
+  end
+
+  def module_name(atom) when is_atom(atom) do
+    atom
+    |> Atom.to_string()
+    |> String.split("_")
+    |> Enum.map(&String.capitalize/1)
+    |> Enum.join()
+  end
 end

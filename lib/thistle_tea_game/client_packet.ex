@@ -1,15 +1,14 @@
 defmodule ThistleTeaGame.ClientPacket do
+  alias ThistleTeaGame.Opcodes
+
   @callback decode(packet :: %ThistleTeaGame.ClientPacket{}) :: any()
   @callback handle(packet :: struct(), conn :: struct()) :: any()
 
-  @lookup %{
-    :CMSG_AUTH_SESSION => ThistleTeaGame.ClientPacket.CmsgAuthSession,
-    :CMSG_CHAR_ENUM => ThistleTeaGame.ClientPacket.CmsgCharEnum
-  }
-
-  @raw_lookup @lookup
-              |> Enum.map(fn {k, v} -> {ThistleTeaGame.Opcodes.get(k), v} end)
-              |> Map.new()
+  @lookup Opcodes.opcodes()
+          |> Enum.map(fn {opcode, name} ->
+            {opcode, Module.concat("ThistleTeaGame.ClientPacket", Opcodes.module_name(name))}
+          end)
+          |> Map.new()
 
   defmacro __using__(opts) do
     quote do
@@ -44,9 +43,12 @@ defmodule ThistleTeaGame.ClientPacket do
   ]
 
   def decode(%__MODULE__{opcode: opcode} = packet) do
-    case Map.fetch(@raw_lookup, opcode) do
-      {:ok, mod} -> mod.decode(packet)
-      :error -> {:error, :unhandled_opcode, opcode}
+    with {:ok, mod} <- Map.fetch(@lookup, opcode),
+         {:module, ^mod} <- Code.ensure_loaded(mod) do
+      mod.decode(packet)
+    else
+      {:error, _} ->
+        {:error, :unhandled_opcode, opcode}
     end
   end
 end
