@@ -49,7 +49,9 @@ defmodule ThistleTea.Application do
         {ThousandIsland,
          port: @auth_port, handler_module: ThistleTea.Auth, handler_options: @handler_options},
         {ThousandIsland,
-         port: @game_port, handler_module: ThistleTea.Game, handler_options: @handler_options},
+         port: @game_port,
+         handler_module: ThistleTeaGame.Connection.Server,
+         handler_options: @handler_options},
         ThistleTeaWeb.Telemetry,
         {Phoenix.PubSub, name: ThistleTea.PubSub},
         ThistleTeaWeb.Endpoint

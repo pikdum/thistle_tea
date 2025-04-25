@@ -6,9 +6,14 @@ defmodule ThistleTea.MixProject do
       app: :thistle_tea,
       version: "0.1.0",
       elixir: "~> 1.16",
+      elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
+      consolidate_protocols: Mix.env() != :dev,
       aliases: aliases(),
-      deps: deps()
+      deps: deps(),
+      preferred_cli_env: [
+        "test.watch": :test
+      ]
       # listeners: [Phoenix.CodeReloader]
     ]
   end
@@ -21,9 +26,15 @@ defmodule ThistleTea.MixProject do
     ]
   end
 
+  # Specifies which paths to compile per environment.
+  defp elixirc_paths(:test), do: ["lib", "test/support"]
+  defp elixirc_paths(_), do: ["lib"]
+
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
+      {:mix_test_watch, "~> 1.0", only: [:dev, :test], runtime: false},
+      {:igniter, "~> 0.5", only: [:dev, :test]},
       {:binary, "~> 0.0.5"},
       {:ecto_sqlite3, "~> 0.19"},
       {:memento, "~> 0.5.0"},

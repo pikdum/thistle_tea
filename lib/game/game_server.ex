@@ -249,6 +249,14 @@ defmodule ThistleTea.Game do
       )
 
     if client_proof == server_proof do
+      debug_info = %{
+        sesion_key: session,
+        client_seed: client_seed,
+        client_proof: client_proof,
+        server_proof: server_proof
+      }
+
+      Logger.debug("AUTH DEBUG INFO: #{inspect(debug_info, limit: :infinity)}")
       Logger.info("AUTH SUCCESS")
       crypt = %{key: session, send_i: 0, send_j: 0, recv_i: 0, recv_j: 0}
       {:ok, crypto_pid} = CryptoStorage.start_link(crypt)
@@ -530,6 +538,7 @@ defmodule ThistleTea.Game do
   def handle_connection(socket, _state) do
     Logger.info("SMSG_AUTH_CHALLENGE")
     seed = :crypto.strong_rand_bytes(4)
+    Logger.debug("seed: #{inspect(seed, limit: :infinity)}")
 
     ThousandIsland.Socket.send(
       socket,
