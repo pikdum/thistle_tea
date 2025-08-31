@@ -55,7 +55,7 @@ defmodule ThistleTea.MixProject do
        ref: "002b45269e69036b3a028cfd94d77b78c8a8a0ad",
        only: [:dev, :test],
        runtime: false},
-      {:nx, "~> 0.9.1"},
+      {:nx, "~> 0.10.0"},
       {:evision, "~> 0.2.9"}
       # {:dep_from_hexpm, "~> 0.3.0"},
       # {:dep_from_git, git: "https://github.com/elixir-lang/my_dep.git", tag: "0.1.0"}
