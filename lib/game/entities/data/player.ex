@@ -4,9 +4,38 @@ defmodule ThistleTea.Game.Entities.Data.Player do
     flags: {0x00BE, 1, :int},
     guild_id: {0x00BF, 1, :int},
     guild_rank: {0x00C0, 1, :int},
-    features: {0x00C1, 1, :bytes},
-    bytes_2: {0x00C2, 1, :bytes},
-    bytes_3: {0x00C3, 1, :bytes},
+    features:
+      {0x00C1, 1,
+       {:bytes,
+        [
+          skin: :tinyint,
+          face: :tinyint,
+          hair_style: :tinyint,
+          hair_color: :tinyint
+        ]}},
+    bytes_2:
+      {0x00C2, 1,
+       {:bytes,
+        [
+          facial_hair: :tinyint,
+          bytes_2_unk: :tinyint,
+          bank_bag_slots: :smallint,
+          rest_state: :tinyint
+        ]}},
+    bytes_3:
+      {0x00C3, 1,
+       {:bytes,
+        [
+          # vmangos Player.h
+          # ;_;
+          # how do i represent this
+          # // uint16, 1 bit for gender, rest for drunk state
+          # player->SetByteValue(UNIT_FIELD_BYTES_0, UNIT_BYTES_0_OFFSET_GENDER, gender);
+          # player->SetUInt16Value(PLAYER_BYTES_3, PLAYER_BYTES_3_OFFSET_GENDER_AND_INEBRIATION, uint16(gender) | (player->GetDrunkValue() & 0xFFFE));
+          gender_and_inebriation: :smallint,
+          city_protector_title: :tinyint,
+          honor_rank: :tinyint
+        ]}},
     duel_team: {0x00C4, 1, :int},
     guild_timestamp: {0x00C5, 1, :int},
     quest_log: {0x00C6, 60, :custom},
@@ -36,7 +65,22 @@ defmodule ThistleTea.Game.Entities.Data.Player do
     mod_damage_done_pos: {0x04B1, 7, :int},
     mod_damage_done_neg: {0x04B8, 7, :int},
     mod_damage_done_pct: {0x04BF, 7, :int},
-    bytes: {0x04C6, 1, :bytes},
+    field_bytes:
+      {0x04C6, 1,
+       {:bytes,
+        [
+          # // used in (PLAYER_FIELD_BYTES, 0) byte values
+          # enum PlayerFieldByteFlags
+          # {
+          #     PLAYER_FIELD_BYTE_TRACK_STEALTHED   = 0x02,
+          #     PLAYER_FIELD_BYTE_RELEASE_TIMER     = 0x08,             // Display time till auto release spirit
+          #     PLAYER_FIELD_BYTE_NO_RELEASE_WINDOW = 0x10              // Display no "release spirit" window at all
+          # };
+          field_bytes_flags: :tinyint,
+          combo_points: :tinyint,
+          action_bars: :tinyint,
+          highest_honor_rank: :tinyint
+        ]}},
     ammo_id: {0x04C7, 1, :int},
     self_res_spell: {0x04C8, 1, :int},
     pvp_medals: {0x04C9, 1, :int},
@@ -52,7 +96,22 @@ defmodule ThistleTea.Game.Entities.Data.Player do
     yesterday_contribution: {0x04E9, 1, :int},
     last_week_contribution: {0x04EA, 1, :int},
     last_week_rank: {0x04EB, 1, :int},
-    bytes2: {0x04EC, 1, :bytes},
+    field_bytes2:
+      {0x04EC, 1,
+       {:bytes,
+        [
+          honor_rank_bar: :tinyint,
+          # // used in byte (PLAYER_FIELD_BYTES2,1) values
+          # enum PlayerFieldByte2Flags
+          # {
+          #     PLAYER_FIELD_BYTE2_NONE              = 0x00,
+          #     PLAYER_FIELD_BYTE2_DETECT_AMORE      = 0x01,            // SPELL_AURA_DETECT_AMORE
+          #     PLAYER_FIELD_BYTE2_STEALTH           = 0x20,
+          #     PLAYER_FIELD_BYTE2_INVISIBILITY_GLOW = 0x40
+          # };
+          field_bytes2_flags: :tinyint,
+          field_bytes2_unk: :smallint
+        ]}},
     watched_faction_index: {0x04ED, 1, :int},
     combat_rating: {0x04EE, 20, :int}
 end

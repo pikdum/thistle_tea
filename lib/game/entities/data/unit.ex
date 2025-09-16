@@ -22,7 +22,15 @@ defmodule ThistleTea.Game.Entities.Data.Unit do
     max_power5: {0x0021, 1, :int},
     level: {0x0022, 1, :int},
     faction_template: {0x0023, 1, :int},
-    bytes_0: {0x0024, 1, :bytes},
+    bytes_0:
+      {0x0024, 1,
+       {:bytes,
+        [
+          race: :tinyint,
+          class: :tinyint,
+          gender: :tinyint,
+          power_type: :tinyint
+        ]}},
     virtual_item_slot_display: {0x0025, 3, :int},
     virtual_item_info: {0x0028, 6, :bytes},
     flags: {0x002E, 1, :int},
@@ -42,7 +50,15 @@ defmodule ThistleTea.Game.Entities.Data.Unit do
     max_damage: {0x0087, 1, :float},
     min_offhand_damage: {0x0088, 1, :float},
     max_offhand_damage: {0x0089, 1, :float},
-    bytes_1: {0x008A, 1, :bytes},
+    bytes_1:
+      {0x008A, 1,
+       {:bytes,
+        [
+          stand_state: :tinyint,
+          pet_loyalty: :tinyint,
+          shapeshift_form: :tinyint,
+          vis_flag: :tinyint
+        ]}},
     pet_number: {0x008B, 1, :int},
     pet_name_timestamp: {0x008C, 1, :int},
     pet_experience: {0x008D, 1, :int},
@@ -68,7 +84,16 @@ defmodule ThistleTea.Game.Entities.Data.Unit do
     arcane_resistance: {0x00A1, 1, :int},
     base_mana: {0x00A2, 1, :int},
     base_health: {0x00A3, 1, :int},
-    bytes_2: {0x00A4, 1, :bytes},
+    bytes_2:
+      {0x00A4, 1,
+       {:bytes,
+        [
+          # vmangos UnitDefines.h
+          sheath_state: :tinyint,
+          misc_flags: :tinyint,
+          pet_flags: :tinyint,
+          bytes_2_unk: :tinyint
+        ]}},
     attack_power: {0x00A5, 1, :int},
     attack_power_mods: {0x00A6, 1, :two_short},
     attack_power_multiplier: {0x00A7, 1, :float},
