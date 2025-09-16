@@ -5,14 +5,11 @@ defmodule ThistleTea.Game.Entities.Data.Player do
     guild_id: {0x00BF, 1, :int},
     guild_rank: {0x00C0, 1, :int},
     features:
-      {0x00C1, 1,
-       {:bytes,
-        [
-          skin: :tinyint,
-          face: :tinyint,
-          hair_style: :tinyint,
-          hair_color: :tinyint
-        ]}},
+      {0x00C1, 1, {:fn, [:skin, :face, :hair_style, :hair_color], &__MODULE__.features/1}},
+    skin: :virtual,
+    face: :virtual,
+    hair_style: :virtual,
+    hair_color: :virtual,
     bytes_2:
       {0x00C2, 1,
        {:bytes,
@@ -114,4 +111,9 @@ defmodule ThistleTea.Game.Entities.Data.Player do
         ]}},
     watched_faction_index: {0x04ED, 1, :int},
     combat_rating: {0x04EE, 20, :int}
+
+  def features(%{skin: skin, face: face, hair_style: hair_style, hair_color: hair_color}) do
+    <<skin::little-size(8), face::little-size(8), hair_style::little-size(8),
+      hair_color::little-size(8)>>
+  end
 end
