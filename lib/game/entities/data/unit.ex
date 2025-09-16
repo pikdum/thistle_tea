@@ -24,13 +24,17 @@ defmodule ThistleTea.Game.Entities.Data.Unit do
     faction_template: {0x0023, 1, :int},
     bytes_0:
       {0x0024, 1,
-       {:bytes,
+       {:fn,
         [
-          race: :tinyint,
-          class: :tinyint,
-          gender: :tinyint,
-          power_type: :tinyint
-        ]}},
+          :race,
+          :class,
+          :gender,
+          :power_type
+        ], &__MODULE__.bytes_0/1}},
+    race: :virtual,
+    class: :virtual,
+    gender: :virtual,
+    power_type: :virtual,
     virtual_item_slot_display: {0x0025, 3, :int},
     virtual_item_info: {0x0028, 6, :bytes},
     flags: {0x002E, 1, :int},
@@ -52,13 +56,17 @@ defmodule ThistleTea.Game.Entities.Data.Unit do
     max_offhand_damage: {0x0089, 1, :float},
     bytes_1:
       {0x008A, 1,
-       {:bytes,
+       {:fn,
         [
-          stand_state: :tinyint,
-          pet_loyalty: :tinyint,
-          shapeshift_form: :tinyint,
-          vis_flag: :tinyint
-        ]}},
+          :stand_state,
+          :pet_loyalty,
+          :shapeshift_form,
+          :vis_flag
+        ], &__MODULE__.bytes_1/1}},
+    stand_state: :virtual,
+    pet_loyalty: :virtual,
+    shapeshift_form: :virtual,
+    vis_flag: :virtual,
     pet_number: {0x008B, 1, :int},
     pet_name_timestamp: {0x008C, 1, :int},
     pet_experience: {0x008D, 1, :int},
@@ -86,14 +94,15 @@ defmodule ThistleTea.Game.Entities.Data.Unit do
     base_health: {0x00A3, 1, :int},
     bytes_2:
       {0x00A4, 1,
-       {:bytes,
+       {:fn,
         [
-          # vmangos UnitDefines.h
-          sheath_state: :tinyint,
-          misc_flags: :tinyint,
-          pet_flags: :tinyint,
-          bytes_2_unk: :tinyint
-        ]}},
+          :sheath_state,
+          :misc_flags,
+          :pet_flags
+        ], &__MODULE__.bytes_2/1}},
+    sheath_state: :virtual,
+    misc_flags: :virtual,
+    pet_flags: :virtual,
     attack_power: {0x00A5, 1, :int},
     attack_power_mods: {0x00A6, 1, :two_short},
     attack_power_multiplier: {0x00A7, 1, :float},
@@ -104,4 +113,16 @@ defmodule ThistleTea.Game.Entities.Data.Unit do
     max_ranged_damage: {0x00AC, 1, :float},
     power_cost_modifier: {0x00AD, 7, :int},
     power_cost_multiplier: {0x00B4, 7, :float}
+
+  def bytes_0(%{race: race, class: class, gender: gender, power_type: power_type}) do
+    <<race::little-size(8), class::little-size(8), gender::little-size(8), power_type::little-size(8)>>
+  end
+
+  def bytes_1(%{stand_state: stand_state, pet_loyalty: pet_loyalty, shapeshift_form: shapeshift_form, vis_flag: vis_flag}) do
+    <<stand_state::little-size(8), pet_loyalty::little-size(8), shapeshift_form::little-size(8), vis_flag::little-size(8)>>
+  end
+
+  def bytes_2(%{sheath_state: sheath_state, misc_flags: misc_flags, pet_flags: pet_flags}) do
+    <<sheath_state::little-size(8), misc_flags::little-size(8), pet_flags::little-size(8), 0::little-size(8)>>
+  end
 end

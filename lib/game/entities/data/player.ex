@@ -5,34 +5,42 @@ defmodule ThistleTea.Game.Entities.Data.Player do
     guild_id: {0x00BF, 1, :int},
     guild_rank: {0x00C0, 1, :int},
     features:
-      {0x00C1, 1, {:fn, [:skin, :face, :hair_style, :hair_color], &__MODULE__.features/1}},
+      {0x00C1, 1,
+       {:fn,
+        [
+          :skin,
+          :face,
+          :hair_style,
+          :hair_color
+        ], &__MODULE__.features/1}},
     skin: :virtual,
     face: :virtual,
     hair_style: :virtual,
     hair_color: :virtual,
     bytes_2:
       {0x00C2, 1,
-       {:bytes,
+       {:fn,
         [
-          facial_hair: :tinyint,
-          bytes_2_unk: :tinyint,
-          bank_bag_slots: :smallint,
-          rest_state: :tinyint
-        ]}},
+          :facial_hair,
+          :bank_bag_slots,
+          :rest_state
+        ], &__MODULE__.bytes_2/1}},
+    facial_hair: :virtual,
+    bank_bag_slots: :virtual,
+    rest_state: :virtual,
     bytes_3:
       {0x00C3, 1,
-       {:bytes,
+       {:fn,
         [
-          # vmangos Player.h
-          # ;_;
-          # how do i represent this
-          # // uint16, 1 bit for gender, rest for drunk state
-          # player->SetByteValue(UNIT_FIELD_BYTES_0, UNIT_BYTES_0_OFFSET_GENDER, gender);
-          # player->SetUInt16Value(PLAYER_BYTES_3, PLAYER_BYTES_3_OFFSET_GENDER_AND_INEBRIATION, uint16(gender) | (player->GetDrunkValue() & 0xFFFE));
-          gender_and_inebriation: :smallint,
-          city_protector_title: :tinyint,
-          honor_rank: :tinyint
-        ]}},
+          :gender,
+          :drunk_value,
+          :city_protector_title,
+          :honor_rank
+        ], &__MODULE__.bytes_3/1}},
+    gender: :virtual,
+    drunk_value: :virtual,
+    city_protector_title: :virtual,
+    honor_rank: :virtual,
     duel_team: {0x00C4, 1, :int},
     guild_timestamp: {0x00C5, 1, :int},
     quest_log: {0x00C6, 60, :custom},
@@ -64,20 +72,17 @@ defmodule ThistleTea.Game.Entities.Data.Player do
     mod_damage_done_pct: {0x04BF, 7, :int},
     field_bytes:
       {0x04C6, 1,
-       {:bytes,
+       {:fn,
         [
-          # // used in (PLAYER_FIELD_BYTES, 0) byte values
-          # enum PlayerFieldByteFlags
-          # {
-          #     PLAYER_FIELD_BYTE_TRACK_STEALTHED   = 0x02,
-          #     PLAYER_FIELD_BYTE_RELEASE_TIMER     = 0x08,             // Display time till auto release spirit
-          #     PLAYER_FIELD_BYTE_NO_RELEASE_WINDOW = 0x10              // Display no "release spirit" window at all
-          # };
-          field_bytes_flags: :tinyint,
-          combo_points: :tinyint,
-          action_bars: :tinyint,
-          highest_honor_rank: :tinyint
-        ]}},
+          :field_bytes_flags,
+          :combo_points,
+          :action_bars,
+          :highest_honor_rank
+        ], &__MODULE__.field_bytes/1}},
+    field_bytes_flags: :virtual,
+    combo_points: :virtual,
+    action_bars: :virtual,
+    highest_honor_rank: :virtual,
     ammo_id: {0x04C7, 1, :int},
     self_res_spell: {0x04C8, 1, :int},
     pvp_medals: {0x04C9, 1, :int},
@@ -95,25 +100,44 @@ defmodule ThistleTea.Game.Entities.Data.Player do
     last_week_rank: {0x04EB, 1, :int},
     field_bytes2:
       {0x04EC, 1,
-       {:bytes,
+       {:fn,
         [
-          honor_rank_bar: :tinyint,
-          # // used in byte (PLAYER_FIELD_BYTES2,1) values
-          # enum PlayerFieldByte2Flags
-          # {
-          #     PLAYER_FIELD_BYTE2_NONE              = 0x00,
-          #     PLAYER_FIELD_BYTE2_DETECT_AMORE      = 0x01,            // SPELL_AURA_DETECT_AMORE
-          #     PLAYER_FIELD_BYTE2_STEALTH           = 0x20,
-          #     PLAYER_FIELD_BYTE2_INVISIBILITY_GLOW = 0x40
-          # };
-          field_bytes2_flags: :tinyint,
-          field_bytes2_unk: :smallint
-        ]}},
+          :honor_rank_bar,
+          :field_bytes2_flags
+        ], &__MODULE__.field_bytes2/1}},
+    honor_rank_bar: :virtual,
+    field_bytes2_flags: :virtual,
     watched_faction_index: {0x04ED, 1, :int},
     combat_rating: {0x04EE, 20, :int}
 
   def features(%{skin: skin, face: face, hair_style: hair_style, hair_color: hair_color}) do
     <<skin::little-size(8), face::little-size(8), hair_style::little-size(8),
       hair_color::little-size(8)>>
+  end
+
+  def bytes_2(%{facial_hair: facial_hair, bank_bag_slots: bank_bag_slots, rest_state: rest_state}) do
+    <<facial_hair::little-size(8), 0::little-size(8), bank_bag_slots::little-size(8),
+      rest_state::little-size(8)>>
+  end
+
+  def bytes_3(%{
+        gender: gender,
+        drunk_value: drunk_value,
+        city_protector_title: city_protector_title,
+        honor_rank: honor_rank
+      }) do
+    gender_and_inebriation = Bitwise.bor(gender, Bitwise.band(drunk_value, 0xFFFE))
+
+    <<gender_and_inebriation::little-size(16), city_protector_title::little-size(8),
+      honor_rank::little-size(8)>>
+  end
+
+  def field_bytes(%{field_bytes_flags: field_bytes_flags, combo_points: combo_points, action_bars: action_bars, highest_honor_rank: highest_honor_rank}) do
+    <<field_bytes_flags::little-size(8), combo_points::little-size(8), action_bars::little-size(8),
+      highest_honor_rank::little-size(8)>>
+  end
+
+  def field_bytes2(%{honor_rank_bar: honor_rank_bar, field_bytes2_flags: field_bytes2_flags}) do
+    <<honor_rank_bar::little-size(8), field_bytes2_flags::little-size(8), 0::little-size(16)>>
   end
 end
