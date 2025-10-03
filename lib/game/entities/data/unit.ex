@@ -1,4 +1,6 @@
 defmodule ThistleTea.Game.Entities.Data.Unit do
+  alias ThistleTea.Game.Utils.NewUpdateObject
+
   use ThistleTea.Game.FieldStruct,
     charm: {0x0006, 2, :guid},
     summon: {0x0008, 2, :guid},
@@ -115,14 +117,34 @@ defmodule ThistleTea.Game.Entities.Data.Unit do
     power_cost_multiplier: {0x00B4, 7, :float}
 
   def bytes_0(%{race: race, class: class, gender: gender, power_type: power_type}) do
-    <<race::little-size(8), class::little-size(8), gender::little-size(8), power_type::little-size(8)>>
+    NewUpdateObject.build_bytes([
+      {8, race},
+      {8, class},
+      {8, gender},
+      {8, power_type}
+    ])
   end
 
-  def bytes_1(%{stand_state: stand_state, pet_loyalty: pet_loyalty, shapeshift_form: shapeshift_form, vis_flag: vis_flag}) do
-    <<stand_state::little-size(8), pet_loyalty::little-size(8), shapeshift_form::little-size(8), vis_flag::little-size(8)>>
+  def bytes_1(%{
+        stand_state: stand_state,
+        pet_loyalty: pet_loyalty,
+        shapeshift_form: shapeshift_form,
+        vis_flag: vis_flag
+      }) do
+    NewUpdateObject.build_bytes([
+      {8, stand_state},
+      {8, pet_loyalty},
+      {8, shapeshift_form},
+      {8, vis_flag}
+    ])
   end
 
   def bytes_2(%{sheath_state: sheath_state, misc_flags: misc_flags, pet_flags: pet_flags}) do
-    <<sheath_state::little-size(8), misc_flags::little-size(8), pet_flags::little-size(8), 0::little-size(8)>>
+    NewUpdateObject.build_bytes([
+      {8, sheath_state},
+      {8, misc_flags},
+      {8, pet_flags},
+      {8, 0}
+    ])
   end
 end

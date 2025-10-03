@@ -1,4 +1,6 @@
 defmodule ThistleTea.Game.Entities.Data.Player do
+  alias ThistleTea.Game.Utils.NewUpdateObject
+
   use ThistleTea.Game.FieldStruct,
     duel_arbiter: {0x00BC, 2, :guid},
     flags: {0x00BE, 1, :int},
@@ -111,13 +113,21 @@ defmodule ThistleTea.Game.Entities.Data.Player do
     combat_rating: {0x04EE, 20, :int}
 
   def features(%{skin: skin, face: face, hair_style: hair_style, hair_color: hair_color}) do
-    <<skin::little-size(8), face::little-size(8), hair_style::little-size(8),
-      hair_color::little-size(8)>>
+    NewUpdateObject.build_bytes([
+      {8, skin},
+      {8, face},
+      {8, hair_style},
+      {8, hair_color}
+    ])
   end
 
   def bytes_2(%{facial_hair: facial_hair, bank_bag_slots: bank_bag_slots, rest_state: rest_state}) do
-    <<facial_hair::little-size(8), 0::little-size(8), bank_bag_slots::little-size(8),
-      rest_state::little-size(8)>>
+    NewUpdateObject.build_bytes([
+      {8, facial_hair},
+      {8, 0},
+      {8, bank_bag_slots},
+      {8, rest_state}
+    ])
   end
 
   def bytes_3(%{
@@ -126,18 +136,32 @@ defmodule ThistleTea.Game.Entities.Data.Player do
         city_protector_title: city_protector_title,
         honor_rank: honor_rank
       }) do
+    gender = gender || 0
+    drunk_value = drunk_value || 0
     gender_and_inebriation = Bitwise.bor(gender, Bitwise.band(drunk_value, 0xFFFE))
 
-    <<gender_and_inebriation::little-size(16), city_protector_title::little-size(8),
-      honor_rank::little-size(8)>>
+    NewUpdateObject.build_bytes([
+      {16, gender_and_inebriation},
+      {8, city_protector_title},
+      {8, honor_rank}
+    ])
   end
 
-  def field_bytes(%{field_bytes_flags: field_bytes_flags, combo_points: combo_points, action_bars: action_bars, highest_honor_rank: highest_honor_rank}) do
-    <<field_bytes_flags::little-size(8), combo_points::little-size(8), action_bars::little-size(8),
-      highest_honor_rank::little-size(8)>>
+  def field_bytes(%{
+        field_bytes_flags: field_bytes_flags,
+        combo_points: combo_points,
+        action_bars: action_bars,
+        highest_honor_rank: highest_honor_rank
+      }) do
+    NewUpdateObject.build_bytes([
+      {8, field_bytes_flags},
+      {8, combo_points},
+      {8, action_bars},
+      {8, highest_honor_rank}
+    ])
   end
 
   def field_bytes2(%{honor_rank_bar: honor_rank_bar, field_bytes2_flags: field_bytes2_flags}) do
-    <<honor_rank_bar::little-size(8), field_bytes2_flags::little-size(8), 0::little-size(16)>>
+    NewUpdateObject.build_bytes([{8, honor_rank_bar}, {8, field_bytes2_flags}, {16, 0}])
   end
 end
