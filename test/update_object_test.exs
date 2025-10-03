@@ -2,11 +2,13 @@ defmodule ThistleTea.UpdateObjectTest do
   use ExUnit.Case
 
   alias ThistleTea.Game.Utils.NewUpdateObject
+  alias ThistleTea.Game.Utils.MovementBlock
+  alias ThistleTea.Game.Entities.Data.Object
   alias ThistleTea.Game.Entities.Data.Player
   alias ThistleTea.Game.Entities.Data.Unit
 
   describe "sanity check" do
-    setup [:player, :unit]
+    setup [:player, :unit, :object, :values_update, :create_object_update]
 
     test "flatten_field_structs/1", %{player: player, unit: unit} do
       fields = NewUpdateObject.flatten_field_structs([player, unit])
@@ -25,6 +27,51 @@ defmodule ThistleTea.UpdateObjectTest do
       objects = NewUpdateObject.generate_objects(fields)
       assert byte_size(objects) > 0
     end
+
+    test "to_packet/1 - :values", %{values_update: values_update} do
+      packet = NewUpdateObject.to_packet(values_update)
+      assert byte_size(packet) > 0
+    end
+
+    test "to_packet/1 - :create_object", %{create_object_update: create_object_update} do
+      packet = NewUpdateObject.to_packet(create_object_update)
+      assert byte_size(packet) > 0
+    end
+  end
+
+  defp values_update(context) do
+    values_update = %NewUpdateObject{
+      update_type: :values,
+      object: context.object,
+      player: context.player,
+      unit: context.unit
+    }
+
+    {:ok, Map.put(context, :values_update, values_update)}
+  end
+
+  defp create_object_update(context) do
+    create_object_update = %NewUpdateObject{
+      update_type: :create_object,
+      object_type: :player,
+      movement_block: %MovementBlock{update_flag: 0, position: {0.0, 0.0, 0.0, 0.0}},
+      object: context.object,
+      player: context.player,
+      unit: context.unit
+    }
+
+    {:ok, Map.put(context, :create_object_update, create_object_update)}
+  end
+
+  defp object(context) do
+    object = %Object{
+      guid: 123_456_789,
+      type: 1,
+      entry: 1001,
+      scale_x: 1.0
+    }
+
+    {:ok, Map.put(context, :object, object)}
   end
 
   defp player(context) do

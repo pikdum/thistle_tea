@@ -1,4 +1,67 @@
 defmodule ThistleTea.Game.Utils.NewUpdateObject do
+  defstruct [
+    :update_type,
+    :object_type,
+    :movement_block,
+    :object,
+    :item,
+    :container,
+    :unit,
+    :player,
+    :game_object,
+    :dynamic_object,
+    :corpse
+  ]
+
+  alias ThistleTea.Util
+  alias ThistleTea.Game.Utils.MovementBlock
+
+  # TODO: would be neat to have a module to define flags + enums
+  # or one module per enum/flag set?
+
+  @update_type_values 0
+  @update_type_movement 1
+  @update_type_create_object 2
+  @update_type_create_object2 3
+  @update_type_out_of_range_objects 4
+  @update_type_near_objects 5
+
+  defp update_type(:values), do: @update_type_values
+  defp update_type(:movement), do: @update_type_movement
+  defp update_type(:create_object), do: @update_type_create_object
+  defp update_type(:create_object2), do: @update_type_create_object2
+  defp update_type(:out_of_range_objects), do: @update_type_out_of_range_objects
+  defp update_type(:near_objects), do: @update_type_near_objects
+
+  @object_type_object 0x00
+  @object_type_item 0x01
+  @object_type_container 0x02
+  @object_type_unit 0x03
+  @object_type_player 0x04
+  @object_type_game_object 0x05
+  @object_type_dynamic_object 0x06
+  @object_type_corpse 0x07
+
+  defp object_type(:object), do: @object_type_object
+  defp object_type(:item), do: @object_type_item
+  defp object_type(:container), do: @object_type_container
+  defp object_type(:unit), do: @object_type_unit
+  defp object_type(:player), do: @object_type_player
+  defp object_type(:game_object), do: @object_type_game_object
+  defp object_type(:dynamic_object), do: @object_type_dynamic_object
+  defp object_type(:corpse), do: @object_type_corpse
+
+  @object_type_flags_map %{
+    object: 0x01,
+    item: 0x02,
+    container: 0x04,
+    unit: 0x08,
+    player: 0x10,
+    game_object: 0x20,
+    dynamic_object: 0x40,
+    corpse: 0x80
+  }
+
   def mask_blocks_count(fields) do
     fields
     |> max_offset()
@@ -40,6 +103,21 @@ defmodule ThistleTea.Game.Utils.NewUpdateObject do
     |> Enum.reduce(<<>>, fn x, acc -> acc <> x end)
   end
 
+  def flatten_field_structs(%__MODULE__{} = obj) do
+    [
+      obj.object,
+      obj.item,
+      obj.container,
+      obj.unit,
+      obj.player,
+      obj.game_object,
+      obj.dynamic_object,
+      obj.corpse
+    ]
+    |> Enum.reject(&is_nil/1)
+    |> flatten_field_structs()
+  end
+
   def flatten_field_structs(field_structs) do
     field_structs
     |> Enum.flat_map(fn field_struct ->
@@ -65,6 +143,54 @@ defmodule ThistleTea.Game.Utils.NewUpdateObject do
     <<value::little-size(size)>> <> build_bytes(rest)
   end
 
-  # TODO: figure out how to handle arrays of structs
-  # do i just use functions for the custom ones too?
+  def to_packet(
+        %__MODULE__{
+          update_type: :values,
+          object: object
+        } = obj
+      ) do
+    fields = flatten_field_structs(obj)
+    packed_guid = Util.pack_guid(object.guid)
+    mask_count = mask_blocks_count(fields)
+    mask = generate_mask(fields)
+    objects = generate_objects(fields)
+
+    <<1::little-size(32), 0, @update_type_values>> <>
+      packed_guid <> <<mask_count>> <> mask <> objects
+  end
+
+  def to_packet(
+        %__MODULE__{
+          update_type: update_type,
+          object: object,
+          object_type: object_type
+        } = obj
+      )
+      when update_type in [:create_object, :create_object2] do
+    obj = %{obj | object: Map.put(object, :type, object_type_flags(obj))}
+    fields = flatten_field_structs(obj)
+    packed_guid = Util.pack_guid(object.guid)
+    mask_count = mask_blocks_count(fields)
+    mask = generate_mask(fields)
+    objects = generate_objects(fields)
+    movement_block = MovementBlock.to_binary(obj.movement_block)
+
+    <<1::little-size(32), 0, update_type(update_type)>> <>
+      packed_guid <>
+      <<object_type(object_type)>> <>
+      movement_block <>
+      <<mask_count>> <>
+      mask <>
+      objects
+  end
+
+  def object_type_flags(%__MODULE__{} = obj) do
+    Enum.reduce(@object_type_flags_map, 0, fn {field, type}, acc ->
+      if Map.get(obj, field) != nil do
+        Bitwise.bor(acc, type)
+      else
+        acc
+      end
+    end)
+  end
 end
