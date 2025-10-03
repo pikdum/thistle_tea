@@ -1,8 +1,6 @@
 defmodule ThistleTea.Mob do
   use GenServer
 
-  import ThistleTea.Game.UpdateObject, only: [generate_packet: 4]
-
   import ThistleTea.Util,
     only: [
       pack_guid: 1,
@@ -10,14 +8,15 @@ defmodule ThistleTea.Mob do
       calculate_movement_duration: 3
     ]
 
+  alias ThistleTea.Game.Entities.Data.Object
+  alias ThistleTea.Game.Entities.Data.Unit
+  alias ThistleTea.Game.Utils.NewUpdateObject
+  alias ThistleTea.Game.Utils.MovementBlock
+
   require Logger
 
   # prevent collisions with player guids
   @creature_guid_offset 0xF1300000
-
-  # @update_type_movement 1
-  @update_type_create_object2 3
-  @object_type_unit 3
 
   # @update_flag_all 0x10
   # @update_flag_has_position 0x40
@@ -586,43 +585,48 @@ defmodule ThistleTea.Mob do
   end
 
   def update_packet(state, movement_flags \\ 0) do
-    fields = %{
-      object_guid: state.creature.guid,
-      # unit + object
-      object_type: 9,
-      object_entry: state.creature.id,
-      object_scale_x: get_scale(state),
-      unit_health: state.creature.curhealth,
-      unit_power_1: state.creature.curmana,
-      unit_max_health: state.max_health,
-      unit_max_power_1: state.max_mana,
-      unit_level: state.level,
-      unit_faction_template: state.creature.creature_template.faction_alliance,
-      unit_flags: state.creature.creature_template.unit_flags,
-      unit_display_id: state.creature.modelid,
-      unit_native_display_id: state.creature.modelid,
-      unit_npc_flags: state.creature.creature_template.npc_flags
+    update_object = %NewUpdateObject{
+      update_type: :create_object2,
+      object_type: :unit,
+      object: %Object{
+        guid: state.creature.guid,
+        entry: state.creature.id,
+        scale_x: get_scale(state)
+      },
+      unit: %Unit{
+        health: state.creature.curhealth,
+        power1: state.creature.curmana,
+        max_health: state.max_health,
+        max_power1: state.max_mana,
+        level: state.level,
+        faction_template: state.creature.creature_template.faction_alliance,
+        flags: state.creature.creature_template.unit_flags,
+        display_id: state.creature.modelid,
+        native_display_id: state.creature.modelid,
+        npc_flags: state.creature.creature_template.npc_flags
+      },
+      movement_block: %MovementBlock{
+        update_flag: @update_flag_living,
+        position: {
+          state.creature.position_x,
+          state.creature.position_y,
+          state.creature.position_z,
+          state.creature.orientation
+        },
+        movement_flags: movement_flags,
+        # TODO: figure out how to generate these
+        timestamp: 0,
+        fall_time: 0.0,
+        # from creature_template
+        walk_speed: state.creature.creature_template.speed_walk,
+        run_speed: state.creature.creature_template.speed_run,
+        run_back_speed: state.creature.creature_template.speed_run,
+        swim_speed: state.creature.creature_template.speed_run,
+        swim_back_speed: state.creature.creature_template.speed_run,
+        turn_rate: 3.1415
+      }
     }
 
-    mb = %{
-      update_flag: @update_flag_living,
-      x: state.creature.position_x,
-      y: state.creature.position_y,
-      z: state.creature.position_z,
-      orientation: state.creature.orientation,
-      movement_flags: movement_flags,
-      # TODO: figure out how to generate these
-      timestamp: 0,
-      fall_time: 0.0,
-      # from creature_template
-      walk_speed: state.creature.creature_template.speed_walk,
-      run_speed: state.creature.creature_template.speed_run,
-      run_back_speed: state.creature.creature_template.speed_run,
-      swim_speed: state.creature.creature_template.speed_run,
-      swim_back_speed: state.creature.creature_template.speed_run,
-      turn_rate: 3.1415
-    }
-
-    generate_packet(@update_type_create_object2, @object_type_unit, fields, mb)
+    NewUpdateObject.to_packet(update_object)
   end
 end
