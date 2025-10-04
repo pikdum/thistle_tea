@@ -62,15 +62,6 @@ dependencies = [
 [[package]]
 name = "namigator"
 version = "0.1.0"
-dependencies = [
- "namigator 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "once_cell",
- "rustler",
-]
-
-[[package]]
-name = "namigator"
-version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f921b8f39f6eaf376385f596dac42c8a55b800168c10a8944f1ee21bdb23f979"
 dependencies = [
@@ -85,6 +76,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7cde1ca2f952fce18e9e5527bae431173afde021d89cb4b924c4f174124a3a88"
 dependencies = [
  "cc",
+]
+
+[[package]]
+name = "namigator_ex"
+version = "0.1.0"
+dependencies = [
+ "namigator",
+ "once_cell",
+ "rustler",
 ]
 
 [[package]]
@@ -119,9 +119,9 @@ checksum = "53a49587ad06b26609c52e423de037e7f57f20d53535d66e08c695f347df952a"
 
 [[package]]
 name = "rustler"
-version = "0.36.0"
+version = "0.37.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1f7b219d7473cf473409665a4898d66688b34736e51bb5791098b0d3390e4c98"
+checksum = "fb867bb35b291ef105abbe0a0d04bd4d7af372e023d08845698687bc254f222b"
 dependencies = [
  "inventory",
  "libloading",
@@ -131,9 +131,9 @@ dependencies = [
 
 [[package]]
 name = "rustler_codegen"
-version = "0.36.0"
+version = "0.37.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "743ec5267bd5f18fd88d89f7e729c0f43b97d9c2539959915fa1f234300bb621"
+checksum = "90993223c5ac0fb580ff966fb9477289c4e8a610a2f4639912a2639c5e7b5095"
 dependencies = [
  "heck",
  "inventory",
