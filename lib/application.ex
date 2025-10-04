@@ -3,7 +3,9 @@ defmodule ThistleTea.Application do
   # for more information on OTP Applications
   @moduledoc false
   use Application
+
   alias ThistleTea.DB.Mangos.Repo
+
   require Logger
 
   # these are the defaults anyways

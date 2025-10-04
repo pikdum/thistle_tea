@@ -67,6 +67,30 @@ defmodule SpatialHash do
     end)
   end
 
+  @doc """
+  Calculates the coordinate boundaries of a spatial hash cell.
+
+  Given a hash tuple `{map, cx, cy, cz}`, it returns a tuple of tuples
+  representing the min (inclusive) and max (exclusive) coordinates for the cell.
+
+  The boundaries take into account the rounding behavior of `hash_position/4`.
+
+  ## Example
+
+      iex> SpatialHash.cell_bounds({0, 1, 2, 3})
+      {{124.5, 249.5}, {249.5, 374.5}, {374.5, 499.5}}
+
+  """
+  def cell_bounds({_map, cx, cy, cz}) do
+    x1 = cx * @cell_size - 0.5
+    x2 = (cx + 1) * @cell_size - 0.5
+    y1 = cy * @cell_size - 0.5
+    y2 = (cy + 1) * @cell_size - 0.5
+    z1 = cz * @cell_size - 0.5
+    z2 = (cz + 1) * @cell_size - 0.5
+    {{x1, x2}, {y1, y2}, {z1, z2}}
+  end
+
   defp hash_position(map, x, y, z) do
     {map, div(round(x), @cell_size), div(round(y), @cell_size), div(round(z), @cell_size)}
   end
