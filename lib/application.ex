@@ -43,7 +43,7 @@ defmodule ThistleTea.Application do
         ThistleTea.Telemetry,
         {Registry, keys: :duplicate, name: ThistleTea.ChatChannel},
         ThistleTea.DBC,
-        ThistleTea.Mangos,
+        ThistleTea.DB.Mangos.Repo,
         !test && ThistleTea.MobSupervisor,
         !test && ThistleTea.GameObjectSupervisor,
         !test &&

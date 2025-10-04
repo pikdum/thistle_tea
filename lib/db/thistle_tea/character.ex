@@ -31,7 +31,7 @@ defmodule ThistleTea.Character do
   alias ThistleTea.Game.FieldStruct.Unit
   alias ThistleTea.Game.FieldStruct.Player
   alias ThistleTea.Game.Utils.UpdateObject
-  alias ThistleTea.Game.Utils.MovementBlock
+  alias ThistleTea.Game.FieldStruct.MovementBlock
 
   # TODO: use high guids properly for all guid types
   # enum HighGuid

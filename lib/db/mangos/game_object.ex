@@ -1,5 +1,7 @@
-defmodule GameObject do
+defmodule ThistleTea.DB.Mangos.GameObject do
   use Ecto.Schema
+
+  alias ThistleTea.DB.Mangos
 
   @primary_key {:guid, :integer, autogenerate: false}
   schema "gameobject" do
@@ -17,7 +19,7 @@ defmodule GameObject do
     field(:animprogress, :integer, default: 0)
     field(:state, :integer, default: 0)
 
-    belongs_to(:game_object_template, GameObjectTemplate,
+    belongs_to(:game_object_template, Mangos.GameObjectTemplate,
       foreign_key: :id,
       references: :entry,
       define_field: false

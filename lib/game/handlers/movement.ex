@@ -4,7 +4,7 @@ defmodule ThistleTea.Game.Movement do
   import ThistleTea.Util, only: [send_update_packet: 1]
 
   alias ThistleTea.Game.Utils.UpdateObject
-  alias ThistleTea.Game.Utils.MovementBlock
+  alias ThistleTea.Game.FieldStruct.MovementBlock
 
   require Logger
 

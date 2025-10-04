@@ -1,5 +1,7 @@
-defmodule PlayerCreateInfo do
+defmodule ThistleTea.DB.Mangos.PlayerCreateInfo do
   use Ecto.Schema
+
+  alias ThistleTea.DB.Mangos
 
   @primary_key false
   schema "playercreateinfo" do
@@ -14,6 +16,6 @@ defmodule PlayerCreateInfo do
   end
 
   def get(race, class) do
-    ThistleTea.Mangos.get_by(PlayerCreateInfo, race: race, class: class)
+    Mangos.Repo.get_by(Mangos.PlayerCreateInfo, race: race, class: class)
   end
 end

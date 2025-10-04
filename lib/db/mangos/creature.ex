@@ -1,5 +1,7 @@
-defmodule Creature do
+defmodule ThistleTea.DB.Mangos.Creature do
   use Ecto.Schema
+
+  alias ThistleTea.DB.Mangos
 
   @primary_key {:guid, :integer, autogenerate: false}
 
@@ -20,12 +22,12 @@ defmodule Creature do
     field(:death_state, :integer, source: :DeathState, default: 0)
     field(:movement_type, :integer, source: :MovementType, default: 0)
 
-    belongs_to(:creature_template, CreatureTemplate,
+    belongs_to(:creature_template, Mangos.CreatureTemplate,
       foreign_key: :id,
       references: :entry,
       define_field: false
     )
 
-    has_many(:creature_movement, CreatureMovement, foreign_key: :id, references: :guid)
+    has_many(:creature_movement, Mangos.CreatureMovement, foreign_key: :id, references: :guid)
   end
 end

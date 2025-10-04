@@ -3,7 +3,7 @@ defmodule ThistleTea.MobSupervisor do
 
   import Ecto.Query
 
-  alias ThistleTea.Mangos
+  alias ThistleTea.DB.Mangos
 
   require Logger
 
@@ -14,7 +14,7 @@ defmodule ThistleTea.MobSupervisor do
   @impl Supervisor
   def init(_args) do
     query =
-      from(c in Creature,
+      from(c in Mangos.Creature,
         join: ct in assoc(c, :creature_template),
         left_join: cm in assoc(c, :creature_movement),
         where: c.modelid != 0,
@@ -22,7 +22,7 @@ defmodule ThistleTea.MobSupervisor do
       )
 
     children =
-      Mangos.all(query)
+      Mangos.Repo.all(query)
       # workaround since this wasn't working in ecto
       |> Enum.group_by(fn {%{guid: guid}, _, _} -> guid end)
       |> Enum.map(fn {_, entries} ->
@@ -34,7 +34,7 @@ defmodule ThistleTea.MobSupervisor do
           |> Enum.filter(fn cm -> cm end)
           |> Enum.sort_by(fn cm -> cm.point end)
 
-        creature = %Creature{
+        creature = %Mangos.Creature{
           creature
           | creature_template: creature_template,
             creature_movement: movements

@@ -1,4 +1,4 @@
-defmodule GossipMenuOption do
+defmodule ThistleTea.DB.Mangos.GossipMenuOption do
   use Ecto.Schema
 
   @primary_key false

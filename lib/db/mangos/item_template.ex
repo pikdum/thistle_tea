@@ -1,6 +1,9 @@
-defmodule ItemTemplate do
+defmodule ThistleTea.DB.Mangos.ItemTemplate do
   use Ecto.Schema
+
   import Ecto.Query
+
+  alias ThistleTea.DB.Mangos
 
   @primary_key {:entry, :integer, autogenerate: false}
 
@@ -135,12 +138,12 @@ defmodule ItemTemplate do
 
   def random_by_type(inventory_type) do
     query =
-      from(it in ItemTemplate,
+      from(it in Mangos.ItemTemplate,
         where: it.inventory_type == ^inventory_type,
         order_by: fragment("RANDOM()"),
         limit: 1
       )
 
-    ThistleTea.Mangos.one(query)
+    Mangos.Repo.one(query)
   end
 end

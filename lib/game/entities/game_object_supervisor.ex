@@ -1,7 +1,7 @@
 defmodule ThistleTea.GameObjectSupervisor do
   use Supervisor
   import Ecto.Query
-  alias ThistleTea.Mangos
+  alias ThistleTea.DB.Mangos
   require Logger
 
   def start_link(args) do
@@ -11,14 +11,14 @@ defmodule ThistleTea.GameObjectSupervisor do
   @impl Supervisor
   def init(_args) do
     query =
-      from(g in GameObject,
+      from(g in Mangos.GameObject,
         join: gt in assoc(g, :game_object_template),
         preload: [game_object_template: gt],
         select: g
       )
 
     children =
-      Mangos.all(query)
+      Mangos.Repo.all(query)
       |> Enum.map(fn game_object ->
         %{
           id: {ThistleTea.GameObject, game_object.guid},

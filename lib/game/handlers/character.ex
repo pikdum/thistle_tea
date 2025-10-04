@@ -2,8 +2,9 @@ defmodule ThistleTea.Game.Character do
   import ThistleTea.Util, only: [parse_string: 1, send_packet: 2]
 
   alias ThistleTea.DBC
-
-  alias ThistleTea.Game.Utils.MovementBlock
+  alias ThistleTea.Game.FieldStruct.MovementBlock
+  alias ThistleTea.DB.Mangos
+  alias ThistleTea.DB.Mangos.ItemTemplate
 
   require Logger
 
@@ -124,8 +125,8 @@ defmodule ThistleTea.Game.Character do
     <<race, class, gender, skin, face, hair_style, hair_color, facial_hair, outfit_id>> = rest
     Logger.info("CMSG_CHAR_CREATE: #{character_name}")
 
-    info = PlayerCreateInfo.get(race, class)
-    spells = PlayerCreateInfoSpell.get_all(race, class)
+    info = Mangos.PlayerCreateInfo.get(race, class)
+    spells = Mangos.PlayerCreateInfoSpell.get_all(race, class)
 
     chr_race = DBC.get_by(ChrRaces, id: race)
 

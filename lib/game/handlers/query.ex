@@ -1,7 +1,7 @@
 defmodule ThistleTea.Game.Query do
   import ThistleTea.Util, only: [send_packet: 2]
 
-  alias ThistleTea.Mangos
+  alias ThistleTea.DB.Mangos
 
   require Logger
 
@@ -46,7 +46,7 @@ defmodule ThistleTea.Game.Query do
     <<item_id::little-size(32), guid::little-size(64)>> = body
     Logger.info("CMSG_ITEM_QUERY_SINGLE: #{item_id} - #{guid}")
 
-    item = Mangos.get(ItemTemplate, item_id)
+    item = Mangos.Repo.get(Mangos.ItemTemplate, item_id)
 
     packet =
       <<item_id::little-size(32)>> <>
@@ -192,7 +192,7 @@ defmodule ThistleTea.Game.Query do
   def handle_packet(@cmsg_item_name_query, body, state) do
     # TODO: am i not getting guid because i'm not sending a create object packet first?
     <<item_id::little-size(32), _guid::little-size(64)>> = body
-    item = Mangos.get(ItemTemplate, item_id)
+    item = Mangos.Repo.get(Mangos.ItemTemplate, item_id)
     Logger.info("CMSG_ITEM_NAME_QUERY: #{item.name}")
     packet = <<item_id::little-size(32)>> <> item.name <> <<0>>
 
@@ -204,8 +204,8 @@ defmodule ThistleTea.Game.Query do
     <<entry::little-size(32), guid::little-size(64)>> = body
 
     game_object =
-      Mangos.get(GameObject, guid - @game_object_guid_offset)
-      |> Mangos.preload(:game_object_template)
+      Mangos.Repo.get(Mangos.GameObject, guid - @game_object_guid_offset)
+      |> Mangos.Repo.preload(:game_object_template)
 
     template = game_object.game_object_template
 
@@ -270,8 +270,8 @@ defmodule ThistleTea.Game.Query do
     <<entry::little-size(32), guid::little-size(64)>> = body
 
     creature =
-      Mangos.get_by(Creature, guid: guid - @creature_guid_offset)
-      |> Mangos.preload(:creature_template)
+      Mangos.Repo.get_by(Mangos.Creature, guid: guid - @creature_guid_offset)
+      |> Mangos.Repo.preload(:creature_template)
 
     ct = creature.creature_template
 

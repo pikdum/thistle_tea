@@ -1,4 +1,4 @@
-defmodule CreatureMovement do
+defmodule ThistleTea.DB.Mangos.CreatureMovement do
   use Ecto.Schema
 
   @primary_key {:id, :integer, autogenerate: false}

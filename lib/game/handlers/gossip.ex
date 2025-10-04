@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.Gossip do
   import Ecto.Query
   import ThistleTea.Util, only: [send_packet: 2]
+  alias ThistleTea.DB.Mangos
 
   require Logger
 
@@ -53,15 +54,15 @@ defmodule ThistleTea.Game.Gossip do
     # TODO: what to do if there are multiple gossip menus?
     # send a packet for each?
     # check conditions?
-    case from(c in Creature,
+    case from(c in Mangos.Creature,
            where: c.guid == ^low_guid,
            join: ct in assoc(c, :creature_template),
            left_join: gm in assoc(ct, :gossip_menu),
            select: gm,
            limit: 1
          )
-         |> ThistleTea.Mangos.one()
-         |> ThistleTea.Mangos.preload(:gossip_menu_option) do
+         |> Mangos.Repo.one()
+         |> Mangos.Repo.preload(:gossip_menu_option) do
       nil ->
         {:continue, state}
 
@@ -89,7 +90,7 @@ defmodule ThistleTea.Game.Gossip do
         <<text_id::little-size(32), _guid::little-size(64)>>,
         state
       ) do
-    case ThistleTea.Mangos.get(NpcText, text_id) do
+    case ThistleTea.DB.Mangos.Repo.get(NpcText, text_id) do
       nil ->
         {:continue, state}
 
@@ -142,9 +143,9 @@ defmodule ThistleTea.Game.Gossip do
         {:continue, state}
 
       option ->
-        case from(gm in GossipMenu, where: gm.entry == ^option.action_menu_id, limit: 1)
-             |> ThistleTea.Mangos.one()
-             |> ThistleTea.Mangos.preload(:gossip_menu_option) do
+        case from(gm in Mangos.GossipMenu, where: gm.entry == ^option.action_menu_id, limit: 1)
+             |> Mangos.Repo.one()
+             |> Mangos.Repo.preload(:gossip_menu_option) do
           nil ->
             {:continue, state}
 

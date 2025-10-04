@@ -1,5 +1,7 @@
-defmodule CreatureTemplate do
+defmodule ThistleTea.DB.Mangos.CreatureTemplate do
   use Ecto.Schema
+
+  alias ThistleTea.DB.Mangos
 
   @primary_key {:entry, :integer, autogenerate: false}
   schema "creature_template" do
@@ -77,6 +79,6 @@ defmodule CreatureTemplate do
     field(:civilian, :integer, default: 0)
     field(:ai_name, :string, source: :AIName, default: "")
 
-    has_many(:gossip_menu, GossipMenu, foreign_key: :entry, references: :gossip_menu_id)
+    has_many(:gossip_menu, Mangos.GossipMenu, foreign_key: :entry, references: :gossip_menu_id)
   end
 end

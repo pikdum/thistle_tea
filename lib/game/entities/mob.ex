@@ -11,7 +11,7 @@ defmodule ThistleTea.Mob do
   alias ThistleTea.Game.FieldStruct.Object
   alias ThistleTea.Game.FieldStruct.Unit
   alias ThistleTea.Game.Utils.UpdateObject
-  alias ThistleTea.Game.Utils.MovementBlock
+  alias ThistleTea.Game.FieldStruct.MovementBlock
 
   require Logger
 

@@ -1,4 +1,4 @@
-defmodule ThistleTea.Game.Utils.MovementBlock do
+defmodule ThistleTea.Game.FieldStruct.MovementBlock do
   import Bitwise, only: [&&&: 2]
 
   require Logger

@@ -6,7 +6,7 @@ defmodule ThistleTea.GameObject do
   alias ThistleTea.Game.FieldStruct.Object
   alias ThistleTea.Game.FieldStruct.GameObject
   alias ThistleTea.Game.Utils.UpdateObject
-  alias ThistleTea.Game.Utils.MovementBlock
+  alias ThistleTea.Game.FieldStruct.MovementBlock
 
   @game_object_guid_offset 0xF1100000
 

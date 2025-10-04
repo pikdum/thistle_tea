@@ -1,4 +1,4 @@
-defmodule GameObjectTemplate do
+defmodule ThistleTea.DB.Mangos.GameObjectTemplate do
   use Ecto.Schema
 
   @primary_key {:entry, :integer, autogenerate: false}

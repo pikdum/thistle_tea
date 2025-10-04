@@ -1,6 +1,8 @@
-defmodule PlayerCreateInfoSpell do
+defmodule ThistleTea.DB.Mangos.PlayerCreateInfoSpell do
   use Ecto.Schema
   import Ecto.Query
+
+  alias ThistleTea.DB.Mangos
 
   @primary_key false
   schema "playercreateinfo_spell" do
@@ -12,11 +14,11 @@ defmodule PlayerCreateInfoSpell do
 
   def get_all(race, class) do
     query =
-      from(p in PlayerCreateInfoSpell,
+      from(p in Mangos.PlayerCreateInfoSpell,
         where: p.race == ^race and p.class == ^class,
         select: p.spell
       )
 
-    ThistleTea.Mangos.all(query)
+    Mangos.Repo.all(query)
   end
 end

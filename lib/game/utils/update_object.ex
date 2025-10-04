@@ -14,7 +14,7 @@ defmodule ThistleTea.Game.Utils.UpdateObject do
   ]
 
   alias ThistleTea.Util
-  alias ThistleTea.Game.Utils.MovementBlock
+  alias ThistleTea.Game.FieldStruct.MovementBlock
   alias ThistleTea.Game.FieldStruct.Object
   alias ThistleTea.Game.FieldStruct.Item
 
