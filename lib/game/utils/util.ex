@@ -71,11 +71,11 @@ defmodule ThistleTea.Util do
     {guid, remaining_data} =
       0..7
       |> Enum.reduce({0, rest}, fn i, {guid_acc, data} ->
-        if (mask &&& 1 <<< i) != 0 do
+        if (mask &&& 1 <<< i) == 0 do
+          {guid_acc, data}
+        else
           <<byte::8, remaining::binary>> = data
           {guid_acc ||| byte <<< (i * 8), remaining}
-        else
-          {guid_acc, data}
         end
       end)
 
@@ -100,15 +100,13 @@ defmodule ThistleTea.Util do
     {x, y, z}
   end
 
-  def calculate_movement_duration({x0, y0, z0}, {x1, y1, z1}, speed)
-      when is_float(speed) and speed > 0 do
+  def calculate_movement_duration({x0, y0, z0}, {x1, y1, z1}, speed) when is_float(speed) and speed > 0 do
     distance = :math.sqrt(:math.pow(x1 - x0, 2) + :math.pow(y1 - y0, 2) + :math.pow(z1 - z0, 2))
     duration = distance / speed
     duration
   end
 
-  def calculate_total_duration(path_list, speed)
-      when is_list(path_list) and length(path_list) > 1 do
+  def calculate_total_duration(path_list, speed) when is_list(path_list) and length(path_list) > 1 do
     path_list
     |> Enum.chunk_every(2, 1, :discard)
     |> Enum.map(fn [start, finish] -> calculate_movement_duration(start, finish, speed) end)

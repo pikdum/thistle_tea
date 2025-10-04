@@ -15,12 +15,7 @@ defmodule ThistleTea.Pathfinding do
     Namigator.find_path(map_id, start_x, start_y, start_z, stop_x, stop_y, stop_z)
   end
 
-  def find_point_between_points(
-        map_id,
-        {start_x, start_y, start_z},
-        {stop_x, stop_y, stop_z},
-        distance
-      ) do
+  def find_point_between_points(map_id, {start_x, start_y, start_z}, {stop_x, stop_y, stop_z}, distance) do
     Namigator.find_point_between_points(
       map_id,
       start_x,

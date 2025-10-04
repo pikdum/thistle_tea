@@ -1,5 +1,12 @@
 import Config
 
+config :phoenix, :plug_init_mode, :runtime
+config :phoenix, :stacktrace_depth, 20
+
+config :phoenix_live_view,
+  debug_heex_annotations: true,
+  enable_expensive_runtime_checks: true
+
 config :thistle_tea, ThistleTeaWeb.Endpoint,
   # Binding to loopback ipv4 address prevents access from other machines.
   # Change to `ip: {0, 0, 0, 0}` to allow access from other machines.
@@ -22,11 +29,3 @@ config :thistle_tea, ThistleTeaWeb.Endpoint,
   ]
 
 config :thistle_tea, dev_routes: true
-
-config :phoenix, :stacktrace_depth, 20
-
-config :phoenix, :plug_init_mode, :runtime
-
-config :phoenix_live_view,
-  debug_heex_annotations: true,
-  enable_expensive_runtime_checks: true

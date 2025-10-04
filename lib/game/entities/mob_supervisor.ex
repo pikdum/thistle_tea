@@ -34,7 +34,7 @@ defmodule ThistleTea.MobSupervisor do
           |> Enum.filter(fn cm -> cm end)
           |> Enum.sort_by(fn cm -> cm.point end)
 
-        creature = %Mangos.Creature{
+        creature = %{
           creature
           | creature_template: creature_template,
             creature_movement: movements

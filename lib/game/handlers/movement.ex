@@ -1,10 +1,10 @@
 defmodule ThistleTea.Game.Movement do
   import ThistleTea.Game.Character, only: [generate_random_equipment: 0]
-
   import ThistleTea.Util, only: [send_update_packet: 1]
 
-  alias ThistleTea.Game.Utils.UpdateObject
   alias ThistleTea.Game.FieldStruct.MovementBlock
+  alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Utils.UpdateObject
 
   require Logger
 
@@ -102,7 +102,7 @@ defmodule ThistleTea.Game.Movement do
           SpatialHash.update(:players, state.guid, self(), map, x1, y1, z1)
 
           Map.put(state, :character, character)
-          |> ThistleTea.Game.Spell.cancel_spell(@spell_failed_moving)
+          |> Spell.cancel_spell(@spell_failed_moving)
         else
           Map.put(state, :character, character)
         end

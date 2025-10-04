@@ -1,5 +1,6 @@
 defmodule ThistleTea.DB.Mangos.PlayerCreateInfoSpell do
   use Ecto.Schema
+
   import Ecto.Query
 
   alias ThistleTea.DB.Mangos

@@ -5,8 +5,7 @@ defmodule Namigator do
   def load(_out_dir), do: :erlang.nif_error(:nif_not_loaded)
   def get_zone_and_area(_map_id, _x, _y, _z), do: :erlang.nif_error(:nif_not_loaded)
 
-  def find_random_point_around_circle(_map_id, _x, _y, _z, _radius),
-    do: :erlang.nif_error(:nif_not_loaded)
+  def find_random_point_around_circle(_map_id, _x, _y, _z, _radius), do: :erlang.nif_error(:nif_not_loaded)
 
   def load_all_adts(_map_id), do: :erlang.nif_error(:nif_not_loaded)
   def load_adt_at(_map_id, _x, _y), do: :erlang.nif_error(:nif_not_loaded)
@@ -15,15 +14,6 @@ defmodule Namigator do
   def find_path(_map_id, _start_x, _start_y, _start_z, _stop_x, _stop_y, _stop_z),
     do: :erlang.nif_error(:nif_not_loaded)
 
-  def find_point_between_points(
-        _map_id,
-        _start_x,
-        _start_y,
-        _start_z,
-        _stop_x,
-        _stop_y,
-        _stop_z,
-        _distance
-      ),
-      do: :erlang.nif_error(:nif_not_loaded)
+  def find_point_between_points(_map_id, _start_x, _start_y, _start_z, _stop_x, _stop_y, _stop_z, _distance),
+    do: :erlang.nif_error(:nif_not_loaded)
 end

@@ -43,8 +43,8 @@ defmodule ThistleTea.Game.Login do
 
     send_packet(
       @smsg_login_verify_world,
-      <<c.map::little-size(32), x::little-float-size(32), y::little-float-size(32),
-        z::little-float-size(32), o::little-float-size(32)>>
+      <<c.map::little-size(32), x::little-float-size(32), y::little-float-size(32), z::little-float-size(32),
+        o::little-float-size(32)>>
     )
 
     send_login_init_packets(c)
@@ -92,9 +92,8 @@ defmodule ThistleTea.Game.Login do
     # let's just init it to character's position for now
     send_packet(
       @smsg_bindpointupdate,
-      <<c.map::little-size(32), x::little-float-size(32), y::little-float-size(32),
-        z::little-float-size(32), o::little-float-size(32), c.map::little-size(32),
-        c.area::little-size(32)>>
+      <<c.map::little-size(32), x::little-float-size(32), y::little-float-size(32), z::little-float-size(32),
+        o::little-float-size(32), c.map::little-size(32), c.area::little-size(32)>>
     )
 
     # no tutorials

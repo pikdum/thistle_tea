@@ -1,7 +1,7 @@
 defmodule Mix.Tasks.BuildMaps do
+  @shortdoc "Builds the maps for pathfinding"
   use Mix.Task
 
-  @shortdoc "Builds the maps for pathfinding"
   def run(_) do
     wow_dir = System.get_env("WOW_DIR")
     data_dir = Path.join(wow_dir, "Data")

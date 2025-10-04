@@ -1,7 +1,9 @@
 defmodule ThistleTea.Game.Gossip do
   import Ecto.Query
   import ThistleTea.Util, only: [send_packet: 2]
+
   alias ThistleTea.DB.Mangos
+  alias ThistleTea.DB.Mangos.Repo
 
   require Logger
 
@@ -85,12 +87,8 @@ defmodule ThistleTea.Game.Gossip do
     end
   end
 
-  def handle_packet(
-        @cmsg_npc_text_query,
-        <<text_id::little-size(32), _guid::little-size(64)>>,
-        state
-      ) do
-    case ThistleTea.DB.Mangos.Repo.get(NpcText, text_id) do
+  def handle_packet(@cmsg_npc_text_query, <<text_id::little-size(32), _guid::little-size(64)>>, state) do
+    case Repo.get(NpcText, text_id) do
       nil ->
         {:continue, state}
 

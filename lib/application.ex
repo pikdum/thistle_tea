@@ -2,6 +2,9 @@ defmodule ThistleTea.Application do
   # See https://hexdocs.pm/elixir/Application.html
   # for more information on OTP Applications
   @moduledoc false
+  use Application
+  alias ThistleTea.DB.Mangos.Repo
+  require Logger
 
   # these are the defaults anyways
   @handler_options %{
@@ -16,10 +19,6 @@ defmodule ThistleTea.Application do
   @game_port 8085
 
   @env Mix.env()
-
-  use Application
-
-  require Logger
 
   def setup_database do
     # in memory for now, so need to re-seed on startup
@@ -43,15 +42,13 @@ defmodule ThistleTea.Application do
         ThistleTea.Telemetry,
         {Registry, keys: :duplicate, name: ThistleTea.ChatChannel},
         ThistleTea.DBC,
-        ThistleTea.DB.Mangos.Repo,
+        Repo,
         !test && ThistleTea.MobSupervisor,
         !test && ThistleTea.GameObjectSupervisor,
         !test &&
-          {ThousandIsland,
-           port: @auth_port, handler_module: ThistleTea.Auth, handler_options: @handler_options},
+          {ThousandIsland, port: @auth_port, handler_module: ThistleTea.Auth, handler_options: @handler_options},
         !test &&
-          {ThousandIsland,
-           port: @game_port, handler_module: ThistleTea.Game, handler_options: @handler_options},
+          {ThousandIsland, port: @game_port, handler_module: ThistleTea.Game, handler_options: @handler_options},
         ThistleTeaWeb.Telemetry,
         {Phoenix.PubSub, name: ThistleTea.PubSub},
         !test && ThistleTeaWeb.Endpoint

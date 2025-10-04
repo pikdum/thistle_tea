@@ -1,6 +1,4 @@
 defmodule ThistleTea.Game.FieldStruct.Unit do
-  alias ThistleTea.Game.Utils.UpdateObject
-
   use ThistleTea.Game.FieldStruct,
     charm: {0x0006, 2, :guid},
     summon: {0x0008, 2, :guid},
@@ -115,6 +113,8 @@ defmodule ThistleTea.Game.FieldStruct.Unit do
     max_ranged_damage: {0x00AC, 1, :float},
     power_cost_modifier: {0x00AD, 7, :int},
     power_cost_multiplier: {0x00B4, 7, :float}
+
+  alias ThistleTea.Game.Utils.UpdateObject
 
   def bytes_0(%{race: race, class: class, gender: gender, power_type: power_type}) do
     UpdateObject.build_bytes([

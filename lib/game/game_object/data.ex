@@ -1,6 +1,6 @@
 defmodule ThistleTea.Game.GameObject.Data do
-  alias ThistleTea.Game.FieldStruct
   alias ThistleTea.DB.Mangos
+  alias ThistleTea.Game.FieldStruct
 
   @game_object_guid_offset 0xF1100000
 

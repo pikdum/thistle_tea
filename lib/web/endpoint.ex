@@ -4,6 +4,9 @@ defmodule ThistleTeaWeb.Endpoint do
   # The session will be stored in the cookie and signed,
   # this means its contents can be read but not tampered with.
   # Set :encryption_salt if you would also like to encrypt it.
+  alias Phoenix.LiveDashboard.RequestLogger
+  alias Phoenix.LiveView.Socket
+
   @session_options [
     store: :cookie,
     key: "_thistle_tea_key",
@@ -11,7 +14,7 @@ defmodule ThistleTeaWeb.Endpoint do
     same_site: "Lax"
   ]
 
-  socket("/live", Phoenix.LiveView.Socket,
+  socket("/live", Socket,
     websocket: [connect_info: [session: @session_options]],
     longpoll: [connect_info: [session: @session_options]]
   )
@@ -35,7 +38,7 @@ defmodule ThistleTeaWeb.Endpoint do
     plug(Phoenix.CodeReloader)
   end
 
-  plug(Phoenix.LiveDashboard.RequestLogger,
+  plug(RequestLogger,
     param_key: "request_logger",
     cookie_key: "request_logger"
   )

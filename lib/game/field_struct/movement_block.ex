@@ -97,9 +97,8 @@ defmodule ThistleTea.Game.FieldStruct.MovementBlock do
     {movement_block, rest} =
       case (movement_flags &&& @movement_flag_jumping) > 0 do
         true ->
-          <<z_speed::little-float-size(32), cos_angle::little-float-size(32),
-            sin_angle::little-float-size(32), xy_speed::little-float-size(32),
-            rest::binary>> = rest
+          <<z_speed::little-float-size(32), cos_angle::little-float-size(32), sin_angle::little-float-size(32),
+            xy_speed::little-float-size(32), rest::binary>> = rest
 
           {Map.merge(movement_block, %{
              z_speed: z_speed,
@@ -194,8 +193,7 @@ defmodule ThistleTea.Game.FieldStruct.MovementBlock do
                   (m.spline_flags &&& @spline_flag_final_point) > 0 ->
                     {x, y, z} = m.final_point
 
-                    <<x::little-float-size(32), y::little-float-size(32),
-                      z::little-float-size(32)>>
+                    <<x::little-float-size(32), y::little-float-size(32), z::little-float-size(32)>>
 
                   true ->
                     <<>>
@@ -206,8 +204,7 @@ defmodule ThistleTea.Game.FieldStruct.MovementBlock do
                   {x, y, z} = node
 
                   acc <>
-                    <<x::little-float-size(32), y::little-float-size(32),
-                      z::little-float-size(32)>>
+                    <<x::little-float-size(32), y::little-float-size(32), z::little-float-size(32)>>
                 end)
             else
               <<>>

@@ -1,9 +1,9 @@
 defmodule ThistleTea.Auth do
   use ThousandIsland.Handler
 
-  require Logger
-
   import Binary, only: [reverse: 1]
+
+  require Logger
 
   @cmd_auth_logon_challenge 0
   @cmd_auth_logon_proof 1
@@ -11,13 +11,13 @@ defmodule ThistleTea.Auth do
   @cmd_auth_reconnect_proof 3
   @cmd_realm_list 16
 
-  @n <<137, 75, 100, 94, 137, 225, 83, 91, 189, 173, 91, 139, 41, 6, 80, 83, 8, 1, 177, 142, 191,
-       191, 94, 143, 171, 60, 130, 135, 42, 62, 155, 183>>
+  @n <<137, 75, 100, 94, 137, 225, 83, 91, 189, 173, 91, 139, 41, 6, 80, 83, 8, 1, 177, 142, 191, 191, 94, 143, 171, 60,
+       130, 135, 42, 62, 155, 183>>
   @g <<7>>
 
   defp calculate_b(state) do
     private_b = :crypto.strong_rand_bytes(19)
-    Map.merge(state, %{private_b: private_b})
+    Map.put(state, :private_b, private_b)
   end
 
   defp calculate_B(state) do
@@ -28,15 +28,13 @@ defmodule ThistleTea.Auth do
         state.private_b
       )
 
-    Map.merge(state, %{public_b: public_b})
+    Map.put(state, :public_b, public_b)
   end
 
   defp account_state(username) do
     {:ok, account} = ThistleTea.Account.get_user(username)
 
-    Map.merge(%{n: @n, g: @g}, %{
-      account: account
-    })
+    Map.put(%{n: @n, g: @g}, :account, account)
   end
 
   defp logon_challenge_state(account) do
@@ -48,10 +46,10 @@ defmodule ThistleTea.Auth do
   @impl ThousandIsland.Handler
   def handle_data(
         <<@cmd_auth_logon_challenge, _protocol_version::little-size(8), _size::little-size(16),
-          _game_name::bytes-little-size(4), _version::bytes-little-size(3),
-          _build::little-size(16), _platform::bytes-little-size(4), _os::bytes-size(4),
-          _locale::bytes-size(4), _worldregion_bias::little-size(32), _ip::little-size(32),
-          username_length::little-size(8), username::bytes-little-size(username_length)>>,
+          _game_name::bytes-little-size(4), _version::bytes-little-size(3), _build::little-size(16),
+          _platform::bytes-little-size(4), _os::bytes-size(4), _locale::bytes-size(4),
+          _worldregion_bias::little-size(32), _ip::little-size(32), username_length::little-size(8),
+          username::bytes-little-size(username_length)>>,
         socket,
         _state
       ) do
@@ -73,9 +71,8 @@ defmodule ThistleTea.Auth do
 
   @impl ThousandIsland.Handler
   def handle_data(
-        <<@cmd_auth_logon_proof, client_public_key::little-bytes-size(32),
-          client_proof::little-bytes-size(20), _crc_hash::little-bytes-size(20),
-          _num_keys::little-size(8), _security_flags::little-size(8)>>,
+        <<@cmd_auth_logon_proof, client_public_key::little-bytes-size(32), client_proof::little-bytes-size(20),
+          _crc_hash::little-bytes-size(20), _num_keys::little-size(8), _security_flags::little-size(8)>>,
         socket,
         state
       ) do
@@ -151,12 +148,11 @@ defmodule ThistleTea.Auth do
 
   @impl ThousandIsland.Handler
   def handle_data(
-        <<@cmd_auth_reconnect_challenge, _protocol_version::little-size(8),
-          _size::little-size(16), _game_name::bytes-little-size(4),
-          _version::bytes-little-size(3), _build::little-size(16),
-          _platform::bytes-little-size(4), _os::bytes-little-size(4),
-          _locale::bytes-little-size(4), _worldregion_bias::little-size(32), _ip::little-size(32),
-          username_length::little-size(8), username::bytes-little-size(username_length)>>,
+        <<@cmd_auth_reconnect_challenge, _protocol_version::little-size(8), _size::little-size(16),
+          _game_name::bytes-little-size(4), _version::bytes-little-size(3), _build::little-size(16),
+          _platform::bytes-little-size(4), _os::bytes-little-size(4), _locale::bytes-little-size(4),
+          _worldregion_bias::little-size(32), _ip::little-size(32), username_length::little-size(8),
+          username::bytes-little-size(username_length)>>,
         socket,
         state
       ) do
@@ -171,9 +167,8 @@ defmodule ThistleTea.Auth do
 
   @impl ThousandIsland.Handler
   def handle_data(
-        <<@cmd_auth_reconnect_proof, proof_data::little-bytes-size(16),
-          client_proof::little-bytes-size(20), _client_checksum::little-bytes-size(20),
-          _key_count>>,
+        <<@cmd_auth_reconnect_proof, proof_data::little-bytes-size(16), client_proof::little-bytes-size(20),
+          _client_checksum::little-bytes-size(20), _key_count>>,
         socket,
         state
       ) do

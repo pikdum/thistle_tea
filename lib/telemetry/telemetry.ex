@@ -9,30 +9,15 @@ defmodule ThistleTea.Telemetry do
     GenServer.start_link(__MODULE__, initial)
   end
 
-  def handle_event(
-        [:thistle_tea, :handle_packet, :stop],
-        %{duration: duration},
-        %{opcode: opcode},
-        _config
-      ) do
+  def handle_event([:thistle_tea, :handle_packet, :stop], %{duration: duration}, %{opcode: opcode}, _config) do
     :ets.insert(:telemetry, {:handle_packet, opcode, duration})
   end
 
-  def handle_event(
-        [:thistle_tea, :mob, :wake_up],
-        _measurements,
-        _metadata,
-        _config
-      ) do
+  def handle_event([:thistle_tea, :mob, :wake_up], _measurements, _metadata, _config) do
     :ets.update_counter(:telemetry_counters, :active_mobs, 1)
   end
 
-  def handle_event(
-        [:thistle_tea, :mob, :try_sleep],
-        _measurements,
-        _metadata,
-        _config
-      ) do
+  def handle_event([:thistle_tea, :mob, :try_sleep], _measurements, _metadata, _config) do
     :ets.update_counter(:telemetry_counters, :active_mobs, -1)
   end
 
@@ -61,7 +46,7 @@ defmodule ThistleTea.Telemetry do
       end)
       |> Enum.sort(&(Map.get(&1, :max_duration) > Map.get(&2, :max_duration)))
 
-    if Enum.count(packet_data) > 0 do
+    if not Enum.empty?(packet_data) do
       Logger.info("Packets: #{inspect(packet_data, pretty: true)}")
     end
 

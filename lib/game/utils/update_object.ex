@@ -1,4 +1,9 @@
 defmodule ThistleTea.Game.Utils.UpdateObject do
+  alias ThistleTea.Game.FieldStruct.Item
+  alias ThistleTea.Game.FieldStruct.MovementBlock
+  alias ThistleTea.Game.FieldStruct.Object
+  alias ThistleTea.Util
+
   defstruct [
     :update_type,
     :object_type,
@@ -12,11 +17,6 @@ defmodule ThistleTea.Game.Utils.UpdateObject do
     :dynamic_object,
     :corpse
   ]
-
-  alias ThistleTea.Util
-  alias ThistleTea.Game.FieldStruct.MovementBlock
-  alias ThistleTea.Game.FieldStruct.Object
-  alias ThistleTea.Game.FieldStruct.Item
 
   @item_guid_offset 0x40000000
 
@@ -147,12 +147,7 @@ defmodule ThistleTea.Game.Utils.UpdateObject do
     <<value::little-size(size)>> <> build_bytes(rest)
   end
 
-  defp packet_body(
-         %__MODULE__{
-           update_type: :values,
-           object: object
-         } = obj
-       ) do
+  defp packet_body(%__MODULE__{update_type: :values, object: object} = obj) do
     fields = flatten_field_structs(obj)
     packed_guid = Util.pack_guid(object.guid)
     mask_count = mask_blocks_count(fields)
@@ -162,13 +157,7 @@ defmodule ThistleTea.Game.Utils.UpdateObject do
     <<@update_type_values>> <> packed_guid <> <<mask_count>> <> mask <> objects
   end
 
-  defp packet_body(
-         %__MODULE__{
-           update_type: update_type,
-           object: object,
-           object_type: object_type
-         } = obj
-       )
+  defp packet_body(%__MODULE__{update_type: update_type, object: object, object_type: object_type} = obj)
        when update_type in [:create_object, :create_object2] do
     obj = %{obj | object: Map.put(object, :type, object_type_flags(obj))}
     fields = flatten_field_structs(obj)
@@ -209,10 +198,10 @@ defmodule ThistleTea.Game.Utils.UpdateObject do
 
   def object_type_flags(%__MODULE__{} = obj) do
     Enum.reduce(@object_type_flags_map, 0, fn {field, type}, acc ->
-      if Map.get(obj, field) != nil do
-        Bitwise.bor(acc, type)
-      else
+      if Map.get(obj, field) == nil do
         acc
+      else
+        Bitwise.bor(acc, type)
       end
     end)
   end

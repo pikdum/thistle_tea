@@ -27,11 +27,11 @@ defmodule ThistleTea.Character do
     type: :ordered_set,
     autoincrement: true
 
-  alias ThistleTea.Game.FieldStruct.Object
-  alias ThistleTea.Game.FieldStruct.Unit
-  alias ThistleTea.Game.FieldStruct.Player
-  alias ThistleTea.Game.Utils.UpdateObject
   alias ThistleTea.Game.FieldStruct.MovementBlock
+  alias ThistleTea.Game.FieldStruct.Object
+  alias ThistleTea.Game.FieldStruct.Player
+  alias ThistleTea.Game.FieldStruct.Unit
+  alias ThistleTea.Game.Utils.UpdateObject
 
   # TODO: use high guids properly for all guid types
   # enum HighGuid
@@ -229,7 +229,7 @@ defmodule ThistleTea.Character do
     end)
   end
 
-  def get_all() do
+  def get_all do
     Memento.transaction!(fn ->
       Memento.Query.all(ThistleTea.Character)
     end)

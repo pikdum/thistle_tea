@@ -1,6 +1,4 @@
 defmodule ThistleTea.Game.FieldStruct.Player do
-  alias ThistleTea.Game.Utils.UpdateObject
-
   use ThistleTea.Game.FieldStruct,
     duel_arbiter: {0x00BC, 2, :guid},
     flags: {0x00BE, 1, :int},
@@ -122,10 +120,10 @@ defmodule ThistleTea.Game.FieldStruct.Player do
     visible_item_19_0: {0x01DC, 8, :int},
     visible_item_19_properties: {0x01E4, 1, :two_short},
     visible_item_19_pad: {0x01E5, 1, :int},
-    # field_inv: {0x01E6, 226, :custom},
     head: {0x01E6, 2, :guid},
     neck: {0x01E8, 2, :guid},
     shoulders: {0x01EA, 2, :guid},
+    # field_inv: {0x01E6, 226, :custom},
     body: {0x01EC, 2, :guid},
     chest: {0x01EE, 2, :guid},
     waist: {0x01F0, 2, :guid},
@@ -162,10 +160,10 @@ defmodule ThistleTea.Game.FieldStruct.Player do
     inv14: {0x022E, 2, :guid},
     inv15: {0x0230, 2, :guid},
     inv16: {0x0232, 2, :guid},
-    # this is right
     bank1: {0x0234, 2, :guid},
     bank2: {0x0236, 2, :guid},
     bank3: {0x0238, 2, :guid},
+    # this is right
     bank4: {0x023A, 2, :guid},
     bank5: {0x023C, 2, :guid},
     bank6: {0x023E, 2, :guid},
@@ -209,10 +207,10 @@ defmodule ThistleTea.Game.FieldStruct.Player do
     buyback10: {0x028A, 2, :guid},
     buyback11: {0x028C, 2, :guid},
     buyback12: {0x028E, 2, :guid},
-    # 32? 16? keyrings after buyback?
     farsight: {0x02C8, 2, :guid},
     field_combo_target: {0x02CA, 2, :guid},
     xp: {0x02CC, 1, :int},
+    # 32? 16? keyrings after buyback?
     next_level_xp: {0x02CD, 1, :int},
     skill_info: {0x02CE, 384, :custom},
     character_points1: {0x044E, 1, :int},
@@ -273,6 +271,8 @@ defmodule ThistleTea.Game.FieldStruct.Player do
     field_bytes2_flags: :virtual,
     watched_faction_index: {0x04ED, 1, :int},
     combat_rating: {0x04EE, 20, :int}
+
+  alias ThistleTea.Game.Utils.UpdateObject
 
   def features(%{skin: skin, face: face, hair_style: hair_style, hair_color: hair_color}) do
     UpdateObject.build_bytes([

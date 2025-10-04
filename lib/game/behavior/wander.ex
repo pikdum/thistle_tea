@@ -1,6 +1,8 @@
 defmodule ThistleTea.WanderBehavior do
   use GenServer
+
   alias ThistleTea.Pathfinding
+
   require Logger
 
   def start_link(initial) do
@@ -20,16 +22,17 @@ defmodule ThistleTea.WanderBehavior do
 
   @impl GenServer
   def handle_info(:start_wandering, %{state: :waiting} = state) do
-    with {x, y, z} <-
-           Pathfinding.find_random_point_around_circle(
-             state.map,
-             {state.x0, state.y0, state.z0},
-             state.wander_distance
-           ) do
-      GenServer.cast(state.pid, {:move_to, x, y, z})
-      {:noreply, Map.put(state, :state, :wandering)}
-    else
-      _ -> {:noreply, state}
+    case Pathfinding.find_random_point_around_circle(
+           state.map,
+           {state.x0, state.y0, state.z0},
+           state.wander_distance
+         ) do
+      {x, y, z} ->
+        GenServer.cast(state.pid, {:move_to, x, y, z})
+        {:noreply, Map.put(state, :state, :wandering)}
+
+      _ ->
+        {:noreply, state}
     end
   end
 

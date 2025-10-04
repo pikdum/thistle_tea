@@ -2,16 +2,26 @@ defmodule ThistleTea.Game do
   use ThousandIsland.Handler
 
   import Bitwise, only: [|||: 2]
+  import ThistleTea.Game.Combat, only: [handle_attack_swing: 1]
   import ThistleTea.Game.Logout, only: [handle_logout: 1]
   import ThistleTea.Game.Spell, only: [handle_spell_complete: 1]
-  import ThistleTea.Game.Combat, only: [handle_attack_swing: 1]
 
   import ThistleTea.Util,
     only: [send_packet: 2, send_update_packet: 1, parse_string: 1]
 
-  alias ThistleTea.Game.Utils.UpdateObject
-
   alias ThistleTea.CryptoStorage
+  alias ThistleTea.Game.Character
+  alias ThistleTea.Game.Chat
+  alias ThistleTea.Game.Combat
+  alias ThistleTea.Game.Entity
+  alias ThistleTea.Game.Gossip
+  alias ThistleTea.Game.Login
+  alias ThistleTea.Game.Logout
+  alias ThistleTea.Game.Movement
+  alias ThistleTea.Game.Ping
+  alias ThistleTea.Game.Query
+  alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Utils.UpdateObject
 
   require Logger
 
@@ -172,43 +182,43 @@ defmodule ThistleTea.Game do
   @smsg_new_world 0x03E
 
   def dispatch_packet(opcode, payload, state) when opcode in @character_opcodes do
-    ThistleTea.Game.Character.handle_packet(opcode, payload, state)
+    Character.handle_packet(opcode, payload, state)
   end
 
   def dispatch_packet(opcode, payload, state) when opcode in @chat_opcodes do
-    ThistleTea.Game.Chat.handle_packet(opcode, payload, state)
+    Chat.handle_packet(opcode, payload, state)
   end
 
   def dispatch_packet(opcode, payload, state) when opcode in @combat_opcodes do
-    ThistleTea.Game.Combat.handle_packet(opcode, payload, state)
+    Combat.handle_packet(opcode, payload, state)
   end
 
   def dispatch_packet(opcode, payload, state) when opcode in @gossip_opcodes do
-    ThistleTea.Game.Gossip.handle_packet(opcode, payload, state)
+    Gossip.handle_packet(opcode, payload, state)
   end
 
   def dispatch_packet(opcode, payload, state) when opcode in @login_opcodes do
-    ThistleTea.Game.Login.handle_packet(opcode, payload, state)
+    Login.handle_packet(opcode, payload, state)
   end
 
   def dispatch_packet(opcode, payload, state) when opcode in @logout_opcodes do
-    ThistleTea.Game.Logout.handle_packet(opcode, payload, state)
+    Logout.handle_packet(opcode, payload, state)
   end
 
   def dispatch_packet(opcode, payload, state) when opcode in @movement_opcodes do
-    ThistleTea.Game.Movement.handle_packet(opcode, payload, state)
+    Movement.handle_packet(opcode, payload, state)
   end
 
   def dispatch_packet(opcode, payload, state) when opcode in @ping_opcodes do
-    ThistleTea.Game.Ping.handle_packet(opcode, payload, state)
+    Ping.handle_packet(opcode, payload, state)
   end
 
   def dispatch_packet(opcode, payload, state) when opcode in @query_opcodes do
-    ThistleTea.Game.Query.handle_packet(opcode, payload, state)
+    Query.handle_packet(opcode, payload, state)
   end
 
   def dispatch_packet(opcode, payload, state) when opcode in @spell_opcodes do
-    ThistleTea.Game.Spell.handle_packet(opcode, payload, state)
+    Spell.handle_packet(opcode, payload, state)
   end
 
   def dispatch_packet(opcode, _payload, state) do
@@ -264,8 +274,7 @@ defmodule ThistleTea.Game do
 
   @impl ThousandIsland.Handler
   def handle_data(
-        <<size::big-size(16), @cmsg_ping::little-size(32), body::binary-size(size - 4),
-          additional_data::binary>>,
+        <<size::big-size(16), @cmsg_ping::little-size(32), body::binary-size(size - 4), additional_data::binary>>,
         socket,
         state
       ) do
@@ -283,11 +292,7 @@ defmodule ThistleTea.Game do
   end
 
   @impl ThousandIsland.Handler
-  def handle_data(
-        data,
-        socket,
-        state
-      ) do
+  def handle_data(data, socket, state) do
     state = Map.put(state, :packet_stream, Map.get(state, :packet_stream, <<>>) <> data)
     handle_packet(socket, state)
   end
@@ -447,18 +452,15 @@ defmodule ThistleTea.Game do
 
     new_players =
       SpatialHash.query(:players, c.map, x, y, z, 250)
-      |> Enum.map(fn {guid, pid, _distance} -> {guid, pid} end)
-      |> MapSet.new()
+      |> MapSet.new(fn {guid, pid, _distance} -> {guid, pid} end)
 
     new_mobs =
       SpatialHash.query(:mobs, c.map, x, y, z, 250)
-      |> Enum.map(fn {guid, pid, _distance} -> {guid, pid} end)
-      |> MapSet.new()
+      |> MapSet.new(fn {guid, pid, _distance} -> {guid, pid} end)
 
     new_game_objects =
       SpatialHash.query(:game_objects, c.map, x, y, z, 250)
-      |> Enum.map(fn {guid, pid, _distance} -> {guid, pid} end)
-      |> MapSet.new()
+      |> MapSet.new(fn {guid, pid, _distance} -> {guid, pid} end)
 
     players_to_remove = MapSet.difference(old_players, new_players)
     mobs_to_remove = MapSet.difference(old_mobs, new_mobs)
@@ -486,17 +488,17 @@ defmodule ThistleTea.Game do
 
     for {_guid, pid} <- players_to_add do
       if pid != self() do
-        ThistleTea.Game.Entity.request_update_from(pid)
+        Entity.request_update_from(pid)
       end
     end
 
     for {_guid, pid} <- mobs_to_add do
       GenServer.cast(pid, :wake_up)
-      ThistleTea.Game.Entity.request_update_from(pid)
+      Entity.request_update_from(pid)
     end
 
     for {_guid, pid} <- game_objects_to_add do
-      ThistleTea.Game.Entity.request_update_from(pid)
+      Entity.request_update_from(pid)
     end
 
     # TODO: redundant, refactor out?

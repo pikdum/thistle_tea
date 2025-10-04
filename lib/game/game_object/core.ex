@@ -1,18 +1,16 @@
 defmodule ThistleTea.Game.GameObject.Core do
-  alias ThistleTea.Game.GameObject
-  alias ThistleTea.Game.FieldStruct
-  alias ThistleTea.Game.Utils.UpdateObject
-
   import Bitwise, only: [|||: 2]
+
+  alias ThistleTea.Game.FieldStruct
+  alias ThistleTea.Game.GameObject
+  alias ThistleTea.Game.Utils.UpdateObject
 
   @update_flag_all 0x10
   @update_flag_has_position 0x40
 
   def update_packet(
-        %GameObject.Data{
-          object: %FieldStruct.Object{} = object,
-          game_object: %FieldStruct.GameObject{} = game_object
-        } = _state
+        %GameObject.Data{object: %FieldStruct.Object{} = object, game_object: %FieldStruct.GameObject{} = game_object} =
+          _state
       ) do
     %UpdateObject{
       update_type: :create_object2,

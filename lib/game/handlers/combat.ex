@@ -86,11 +86,9 @@ defmodule ThistleTea.Game.Combat do
         weapon = state.character.equipment.mainhand
         %{dmg_min1: min_damage, dmg_max1: max_damage, delay: attack_speed} = weapon
 
-        with pid <- :ets.lookup_element(:entities, target_guid, 2) do
-          attack = %{caster: state.guid, min_damage: min_damage, max_damage: max_damage}
-          GenServer.cast(pid, {:receive_attack, attack})
-        end
-
+        pid = :ets.lookup_element(:entities, target_guid, 2)
+        attack = %{caster: state.guid, min_damage: min_damage, max_damage: max_damage}
+        GenServer.cast(pid, {:receive_attack, attack})
         attack_timer = Process.send_after(self(), :attack_swing, attack_speed)
         Map.put(state, :attack_timer, attack_timer)
 

@@ -110,9 +110,8 @@ defmodule ThistleTea.Game.Chat.Emote do
   end
 
   defp get_target_name(target_guid) do
-    with pid <- :ets.lookup_element(:entities, target_guid, 2) do
-      GenServer.call(pid, :get_name)
-    end
+    pid = :ets.lookup_element(:entities, target_guid, 2)
+    GenServer.call(pid, :get_name)
   end
 
   def handle_packet(body, state) do

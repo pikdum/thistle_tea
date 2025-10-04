@@ -1,5 +1,6 @@
 defmodule ThistleTea.FollowPathBehavior do
   use GenServer
+
   require Logger
 
   defp get_next_point(state) do
@@ -38,17 +39,18 @@ defmodule ThistleTea.FollowPathBehavior do
 
   @impl GenServer
   def handle_info({:start_pathing_to, point}, %{state: :waiting} = state) do
-    with %{
-           position_x: x,
-           position_y: y,
-           position_z: z
-         } <-
-           Map.get(state, :waypoints, [])
-           |> Enum.at(point) do
-      GenServer.cast(state.pid, {:move_to, x, y, z})
-      {:noreply, Map.put(state, :state, :pathing) |> Map.put(:current_point, point)}
-    else
-      _ -> {:noreply, state}
+    case Map.get(state, :waypoints, [])
+         |> Enum.at(point) do
+      %{
+        position_x: x,
+        position_y: y,
+        position_z: z
+      } ->
+        GenServer.cast(state.pid, {:move_to, x, y, z})
+        {:noreply, Map.put(state, :state, :pathing) |> Map.put(:current_point, point)}
+
+      _ ->
+        {:noreply, state}
     end
   end
 

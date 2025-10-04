@@ -1,10 +1,10 @@
 defmodule ThistleTea.Game.Character do
   import ThistleTea.Util, only: [parse_string: 1, send_packet: 2]
 
-  alias ThistleTea.DBC
-  alias ThistleTea.Game.FieldStruct.MovementBlock
   alias ThistleTea.DB.Mangos
   alias ThistleTea.DB.Mangos.ItemTemplate
+  alias ThistleTea.DBC
+  alias ThistleTea.Game.FieldStruct.MovementBlock
 
   require Logger
 
@@ -59,8 +59,7 @@ defmodule ThistleTea.Game.Character do
 
         <<c.id::little-size(64)>> <>
           c.name <>
-          <<0, c.race, c.class, c.gender, c.skin, c.face, c.hair_style, c.hair_color,
-            c.facial_hair>> <>
+          <<0, c.race, c.class, c.gender, c.skin, c.face, c.hair_style, c.hair_color, c.facial_hair>> <>
           <<
             c.level,
             c.area::little-size(32),

@@ -8,10 +8,10 @@ defmodule ThistleTea.Mob do
       calculate_movement_duration: 3
     ]
 
+  alias ThistleTea.Game.FieldStruct.MovementBlock
   alias ThistleTea.Game.FieldStruct.Object
   alias ThistleTea.Game.FieldStruct.Unit
   alias ThistleTea.Game.Utils.UpdateObject
-  alias ThistleTea.Game.FieldStruct.MovementBlock
 
   require Logger
 
@@ -240,8 +240,7 @@ defmodule ThistleTea.Mob do
         movement_flags: 0,
         max_health: creature.curhealth,
         max_mana: creature.curmana,
-        level:
-          random_int(creature.creature_template.min_level, creature.creature_template.max_level),
+        level: random_int(creature.creature_template.min_level, creature.creature_template.max_level),
         x0: creature.position_x,
         y0: creature.position_y,
         z0: creature.position_z,
@@ -276,11 +275,9 @@ defmodule ThistleTea.Mob do
 
   @impl GenServer
   def handle_info(:sleep_timer, state) do
-    with _pid <- Map.get(state, :behavior_pid) do
-      GenServer.cast(self(), :try_sleep)
-      Process.send_after(self(), :sleep_timer, 60_000)
-    end
-
+    _pid = Map.get(state, :behavior_pid)
+    GenServer.cast(self(), :try_sleep)
+    Process.send_after(self(), :sleep_timer, 60_000)
     {:noreply, state}
   end
 
@@ -401,7 +398,7 @@ defmodule ThistleTea.Mob do
       |> take_damage(damage)
       |> face_player(Map.get(attack, :caster))
 
-    attack = Map.merge(attack, %{damage: damage})
+    attack = Map.put(attack, :damage, damage)
     send_attacker_state_update(state, attack)
     # TODO: should only send values, not movement
     send_updates(state)
@@ -427,11 +424,13 @@ defmodule ThistleTea.Mob do
 
   @impl GenServer
   def handle_call(:get_behavior, _from, state) do
-    with behavior_pid when not is_nil(behavior_pid) <- Map.get(state, :behavior_pid),
-         behavior_state <- GenServer.call(behavior_pid, :get_state) do
-      {:reply, {:ok, behavior_state}, state}
-    else
-      _ -> {:reply, {:error, "No behavior."}, state}
+    case Map.get(state, :behavior_pid) do
+      behavior_pid when not is_nil(behavior_pid) ->
+        behavior_state = GenServer.call(behavior_pid, :get_state)
+        {:reply, {:ok, behavior_state}, state}
+
+      _ ->
+        {:reply, {:error, "No behavior."}, state}
     end
   end
 
@@ -514,9 +513,10 @@ defmodule ThistleTea.Mob do
         )
 
         interrupt_movement = fn state ->
-          with current_duration <- System.monotonic_time(:millisecond) - start_time,
-               true <- current_duration < duration,
-               distance <- get_distance(speed, current_duration),
+          current_duration = System.monotonic_time(:millisecond) - start_time
+
+          with true <- current_duration < duration,
+               distance = get_distance(speed, current_duration),
                {x2, y2, z2} <-
                  ThistleTea.Pathfinding.find_point_between_points(
                    state.creature.map,
@@ -546,8 +546,7 @@ defmodule ThistleTea.Mob do
                   position_y: y2,
                   position_z: z2
               })
-              |> Map.delete(:path_timer)
-              |> Map.delete(:interrupt_movement)
+              |> Map.drop([:path_timer, :interrupt_movement])
 
             payload = stop_move_packet(state)
 
@@ -566,9 +565,8 @@ defmodule ThistleTea.Mob do
         |> queue_follow_path(duration)
 
       _ ->
-        with pid <- Map.get(state, :behavior_pid) do
-          GenServer.cast(pid, :movement_finished)
-        end
+        pid = Map.get(state, :behavior_pid)
+        GenServer.cast(pid, :movement_finished)
 
         state
         |> Map.delete(:path_timer)

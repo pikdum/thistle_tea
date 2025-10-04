@@ -1,11 +1,11 @@
 defmodule ThistleTea.UpdateObjectTest do
   use ExUnit.Case
 
-  alias ThistleTea.Game.Utils.UpdateObject
   alias ThistleTea.Game.FieldStruct.MovementBlock
   alias ThistleTea.Game.FieldStruct.Object
   alias ThistleTea.Game.FieldStruct.Player
   alias ThistleTea.Game.FieldStruct.Unit
+  alias ThistleTea.Game.Utils.UpdateObject
 
   describe "sanity check" do
     setup [:player, :unit, :object, :values_update, :create_object_update]

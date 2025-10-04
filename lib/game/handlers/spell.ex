@@ -1,6 +1,6 @@
 defmodule ThistleTea.Game.Spell do
-  import ThistleTea.Util, only: [send_packet: 2, unpack_guid: 1]
   import Bitwise, only: [&&&: 2]
+  import ThistleTea.Util, only: [send_packet: 2, unpack_guid: 1]
 
   alias ThistleTea.DBC
 
@@ -43,8 +43,7 @@ defmodule ThistleTea.Game.Spell do
           if pid != self() do
             GenServer.cast(
               pid,
-              {:send_packet, @smsg_spell_failed_other,
-               <<state.guid::little-size(64), spell.spell_id::little-size(32)>>}
+              {:send_packet, @smsg_spell_failed_other, <<state.guid::little-size(64), spell.spell_id::little-size(32)>>}
             )
           end
         end
@@ -147,8 +146,8 @@ defmodule ThistleTea.Game.Spell do
         >> <>
         s.spell_cast_targets
 
-    with true <- s.target != state.guid,
-         pid <- :ets.lookup_element(:entities, s.target, 2) do
+    if s.target != state.guid do
+      pid = :ets.lookup_element(:entities, s.target, 2)
       GenServer.cast(pid, {:receive_spell, state.guid, s.spell_id})
     end
 

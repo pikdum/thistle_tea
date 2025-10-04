@@ -1,5 +1,6 @@
 defmodule ThistleTeaTest do
   use ExUnit.Case
+
   alias ThistleTea.Util
 
   require Logger

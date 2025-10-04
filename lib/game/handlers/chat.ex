@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.Chat do
-  alias ThistleTea.Game.Chat.Emote
   import ThistleTea.Util, only: [parse_string: 1, send_packet: 2]
+
+  alias ThistleTea.Game.Chat.Emote
 
   require Logger
 
@@ -29,13 +30,7 @@ defmodule ThistleTea.Game.Chat do
   @yell_range 300
   @emote_range 25
 
-  defp messagechat_packet(
-         chat_type,
-         language,
-         message,
-         sender_guid,
-         target_name
-       ) do
+  defp messagechat_packet(chat_type, language, message, sender_guid, target_name) do
     message_length = String.length(message) + 1
 
     <<chat_type::little-size(8), language::little-size(32)>> <>
@@ -147,12 +142,13 @@ defmodule ThistleTea.Game.Chat do
     # TODO: interrupting movement should probably fire movement_finished?
     # otherwise behavior never triggers movement again
     # or at least reset state
-    with pid when not is_nil(pid) <- :ets.lookup_element(:entities, state.target, 2, nil) do
-      GenServer.cast(pid, :interrupt_movement)
+    case :ets.lookup_element(:entities, state.target, 2, nil) do
+      pid when not is_nil(pid) ->
+        GenServer.cast(pid, :interrupt_movement)
 
-      state
-      |> system_message("Interrupted movement.")
-    else
+        state
+        |> system_message("Interrupted movement.")
+
       nil ->
         state
         |> system_message("No mob found to interrupt.")
@@ -165,10 +161,11 @@ defmodule ThistleTea.Game.Chat do
   end
 
   def handle_chat(state, _, _, ".pid" <> _, _) do
-    with pid when not is_nil(pid) <- :ets.lookup_element(:entities, state.target, 2, nil) do
-      state
-      |> system_message("Target PID: #{inspect(pid)}")
-    else
+    case :ets.lookup_element(:entities, state.target, 2, nil) do
+      pid when not is_nil(pid) ->
+        state
+        |> system_message("Target PID: #{inspect(pid)}")
+
       nil ->
         state
         |> system_message("No PID found.")
@@ -201,13 +198,16 @@ defmodule ThistleTea.Game.Chat do
   end
 
   def handle_chat(state, _, _, ".move" <> _, _) do
-    with target <- Map.get(state, :target),
-         pid <- :ets.lookup_element(:entities, target, 2, nil),
-         {x, y, z, _o} <- state.character.movement.position do
-      GenServer.cast(pid, {:move_to, x, y, z})
-      state
-    else
-      nil -> state
+    target = Map.get(state, :target)
+    pid = :ets.lookup_element(:entities, target, 2, nil)
+
+    case state.character.movement.position do
+      {x, y, z, _o} ->
+        GenServer.cast(pid, {:move_to, x, y, z})
+        state
+
+      nil ->
+        state
     end
   end
 
@@ -234,13 +234,15 @@ defmodule ThistleTea.Game.Chat do
   # TODO: prevent whispering self
   def handle_chat(state, @chat_type_whisper, language, message, target_name) do
     # TODO: should extract to functions
-    with [[guid]] <- :ets.match(:guid_name, {:"$1", target_name, :_, :_, :_, :_}),
-         pid <- :ets.lookup_element(:entities, guid, 2, nil) do
-      packet =
-        messagechat_packet(@chat_type_whisper, language, message, state.guid, target_name)
+    case :ets.match(:guid_name, {:"$1", target_name, :_, :_, :_, :_}) do
+      [[guid]] ->
+        pid = :ets.lookup_element(:entities, guid, 2, nil)
 
-      GenServer.cast(pid, {:send_packet, @smsg_messagechat, packet})
-    else
+        packet =
+          messagechat_packet(@chat_type_whisper, language, message, state.guid, target_name)
+
+        GenServer.cast(pid, {:send_packet, @smsg_messagechat, packet})
+
       _ ->
         packet = target_name <> <<0>>
         send_packet(@smsg_chat_player_not_found, packet)
@@ -249,13 +251,7 @@ defmodule ThistleTea.Game.Chat do
     state
   end
 
-  def handle_chat(
-        state,
-        @chat_type_channel,
-        language,
-        message,
-        target_name
-      ) do
+  def handle_chat(state, @chat_type_channel, language, message, target_name) do
     packet = messagechat_packet(@chat_type_channel, language, message, state.guid, target_name)
 
     ThistleTea.ChatChannel
@@ -268,13 +264,7 @@ defmodule ThistleTea.Game.Chat do
     state
   end
 
-  def handle_chat(
-        state,
-        chat_type,
-        language,
-        message,
-        target_name
-      ) do
+  def handle_chat(state, chat_type, language, message, target_name) do
     Logger.error("Unhandled chat type: #{chat_type}")
     packet = messagechat_packet(chat_type, language, message, state.guid, target_name)
 

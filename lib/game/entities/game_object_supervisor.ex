@@ -1,7 +1,12 @@
 defmodule ThistleTea.GameObjectSupervisor do
   use Supervisor
+
   import Ecto.Query
+
   alias ThistleTea.DB.Mangos
+  alias ThistleTea.Game.GameObject.Data
+  alias ThistleTea.Game.GameObject.Server
+
   require Logger
 
   def start_link(args) do
@@ -20,11 +25,11 @@ defmodule ThistleTea.GameObjectSupervisor do
     children =
       Mangos.Repo.all(query)
       |> Enum.map(fn game_object ->
-        game_object = ThistleTea.Game.GameObject.Data.build(game_object)
+        game_object = Data.build(game_object)
 
         %{
-          id: {ThistleTea.Game.GameObject.Server, game_object.object.guid},
-          start: {ThistleTea.Game.GameObject.Server, :start_link, [game_object]}
+          id: {Server, game_object.object.guid},
+          start: {Server, :start_link, [game_object]}
         }
       end)
 

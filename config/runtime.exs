@@ -1,7 +1,7 @@
 import Config
 
-config :thistle_tea, :game_server, System.get_env("GAME_SERVER", "localhost")
 config :thistle_tea, ThistleTeaWeb.Endpoint, server: true
+config :thistle_tea, :game_server, System.get_env("GAME_SERVER", "localhost")
 
 if config_env() == :prod do
   secret_key_base =

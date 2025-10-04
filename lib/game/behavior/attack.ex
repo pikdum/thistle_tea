@@ -1,5 +1,6 @@
 defmodule ThistleTea.AttackBehavior do
   use GenServer
+
   require Logger
 
   def start_link(initial) do
@@ -26,7 +27,7 @@ defmodule ThistleTea.AttackBehavior do
   @impl GenServer
   def handle_info(:update_movement, %{state: :moving} = state) do
     with target when not is_nil(target) <- Map.get(state, :target),
-         guid <- Map.get(state, :guid),
+         guid = Map.get(state, :guid),
          [{^guid, _pid, map, x0, y0, z0}] <- :ets.lookup(:entities, guid),
          [{^target, _pid, ^map, x1, y1, z1}] <- :ets.lookup(:entities, target),
          false <- ThistleTea.Util.within_range({x0, y0, z0}, {x1, y1, z1}, 1),

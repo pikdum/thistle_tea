@@ -1,7 +1,7 @@
 defmodule ThistleTeaWeb.Homography do
   require Logger
 
-  def init() do
+  def init do
     # TODO: getting worse results the more points
     # there has to be a better way
     points = %{
@@ -16,7 +16,7 @@ defmodule ThistleTeaWeb.Homography do
           # Southshore
           [-846.85, -520.79],
           # Sentinel Hill
-          [-10619.08, 1036.77]
+          [-10_619.08, 1036.77]
         ],
         [
           # Northshire Abbey
@@ -24,7 +24,7 @@ defmodule ThistleTeaWeb.Homography do
           # Shadow Grave
           [8656.9, 7777.56],
           # Light's Hope Chapel
-          [11247.6, 8037.48],
+          [11_247.6, 8037.48],
           # Southshore
           [9445.61, 6829.92],
           # Sentinel Hill
@@ -50,9 +50,9 @@ defmodule ThistleTeaWeb.Homography do
           # Thunderbluff
           [-1280.03, 127.35],
           # Aldrassil
-          [10390.99, 758.16],
+          [10_390.99, 758.16],
           # Wellspring River Waterfall
-          [10870.0, 1014.0],
+          [10_870.0, 1014.0],
           # Valley of Trials Fire Pit
           [-602.40, -4250.58]
         ],
