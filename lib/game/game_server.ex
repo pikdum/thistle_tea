@@ -3,12 +3,13 @@ defmodule ThistleTea.Game do
 
   import Bitwise, only: [|||: 2]
   import ThistleTea.Game.Logout, only: [handle_logout: 1]
-  import ThistleTea.Game.UpdateObject, only: [build_update_packet: 4]
   import ThistleTea.Game.Spell, only: [handle_spell_complete: 1]
   import ThistleTea.Game.Combat, only: [handle_attack_swing: 1]
 
   import ThistleTea.Util,
     only: [send_packet: 2, send_update_packet: 1, parse_string: 1]
+
+  alias ThistleTea.Game.Utils.NewUpdateObject
 
   alias ThistleTea.CryptoStorage
 
@@ -164,8 +165,6 @@ defmodule ThistleTea.Game do
     @cmsg_cancel_cast
   ]
 
-  @update_type_create_object2 3
-  @object_type_player 4
   @update_flag_high_guid 0x08
   @update_flag_living 0x20
   @update_flag_has_position 0x40
@@ -336,12 +335,19 @@ defmodule ThistleTea.Game do
   @impl GenServer
   def handle_cast({:send_update_to, pid}, {socket, state}) do
     packet =
-      build_update_packet(
-        state.character,
-        @update_type_create_object2,
-        @object_type_player,
-        @update_flag_high_guid ||| @update_flag_living ||| @update_flag_has_position
-      )
+      state.character
+      |> ThistleTea.Character.get_update_fields()
+      |> Map.merge(%{
+        update_type: :create_object2,
+        object_type: :player,
+        movement_block:
+          Map.put(
+            state.character.movement,
+            :update_flag,
+            @update_flag_high_guid ||| @update_flag_living ||| @update_flag_has_position
+          )
+      })
+      |> NewUpdateObject.to_packet()
 
     GenServer.cast(pid, {:send_update_packet, packet})
     {:noreply, {socket, state}, socket.read_timeout}
@@ -434,7 +440,7 @@ defmodule ThistleTea.Game do
   @impl GenServer
   def handle_info(:spawn_objects, {socket, %{character: c, ready: true} = state}) do
     # TODO: add telemetry for periodic tasks
-    %{x: x, y: y, z: z} = c.movement
+    {x, y, z, _o} = c.movement.position
 
     old_players = Map.get(state, :spawned_players, MapSet.new())
     old_mobs = Map.get(state, :spawned_mobs, MapSet.new())

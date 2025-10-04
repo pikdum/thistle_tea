@@ -3,6 +3,8 @@ defmodule ThistleTea.Game.Character do
 
   alias ThistleTea.DBC
 
+  alias ThistleTea.Game.Utils.MovementBlock
+
   require Logger
 
   @cmsg_char_enum 0x037
@@ -52,6 +54,8 @@ defmodule ThistleTea.Game.Character do
     characters_payload =
       characters
       |> Enum.map(fn c ->
+        {x, y, z, _o} = c.movement.position
+
         <<c.id::little-size(64)>> <>
           c.name <>
           <<0, c.race, c.class, c.gender, c.skin, c.face, c.hair_style, c.hair_color,
@@ -60,9 +64,9 @@ defmodule ThistleTea.Game.Character do
             c.level,
             c.area::little-size(32),
             c.map::little-size(32),
-            c.movement.x::little-float-size(32),
-            c.movement.y::little-float-size(32),
-            c.movement.z::little-float-size(32)
+            x::little-float-size(32),
+            y::little-float-size(32),
+            z::little-float-size(32)
           >> <>
           <<
             # guild_id
@@ -147,12 +151,9 @@ defmodule ThistleTea.Game.Character do
       area: info.zone,
       map: info.map,
       unit_display_id: unit_display_id,
-      movement: %{
+      movement: %MovementBlock{
         movement_flags: 0,
-        x: info.position_x,
-        y: info.position_y,
-        z: info.position_z,
-        orientation: info.orientation,
+        position: {info.position_x, info.position_y, info.position_z, info.orientation},
         fall_time: 0.0,
         walk_speed: 1.0,
         # run_speed: 7.0,

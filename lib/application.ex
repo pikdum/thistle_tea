@@ -46,13 +46,15 @@ defmodule ThistleTea.Application do
         ThistleTea.Mangos,
         !test && ThistleTea.MobSupervisor,
         !test && ThistleTea.GameObjectSupervisor,
-        {ThousandIsland,
-         port: @auth_port, handler_module: ThistleTea.Auth, handler_options: @handler_options},
-        {ThousandIsland,
-         port: @game_port, handler_module: ThistleTea.Game, handler_options: @handler_options},
+        !test &&
+          {ThousandIsland,
+           port: @auth_port, handler_module: ThistleTea.Auth, handler_options: @handler_options},
+        !test &&
+          {ThousandIsland,
+           port: @game_port, handler_module: ThistleTea.Game, handler_options: @handler_options},
         ThistleTeaWeb.Telemetry,
         {Phoenix.PubSub, name: ThistleTea.PubSub},
-        ThistleTeaWeb.Endpoint
+        !test && ThistleTeaWeb.Endpoint
       ]
       |> Enum.filter(& &1)
 

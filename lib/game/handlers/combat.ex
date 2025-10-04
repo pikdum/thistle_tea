@@ -1,7 +1,7 @@
 defmodule ThistleTea.Game.Combat do
-  import ThistleTea.Character, only: [get_update_fields: 1]
-  import ThistleTea.Game.UpdateObject, only: [generate_packet: 2]
   import ThistleTea.Util, only: [pack_guid: 1]
+
+  alias ThistleTea.Game.Utils.NewUpdateObject
 
   require Logger
 
@@ -13,8 +13,6 @@ defmodule ThistleTea.Game.Combat do
 
   @smsg_attackstart 0x143
   @smsg_attackstop 0x144
-
-  @update_type_values 0
 
   def handle_packet(@cmsg_attackswing, body, state) do
     <<target_guid::little-size(64)>> = body
@@ -63,8 +61,11 @@ defmodule ThistleTea.Game.Combat do
     Logger.info("CMSG_SETSHEATHED")
     <<sheath_state::little-size(32)>> = body
     character = Map.put(state.character, :sheath_state, sheath_state)
-    fields = get_update_fields(character)
-    packet = generate_packet(@update_type_values, fields)
+
+    update_object =
+      character |> ThistleTea.Character.get_update_fields() |> Map.put(:update_type, :values)
+
+    packet = NewUpdateObject.to_packet(update_object)
 
     # TODO: this doesn't show the unsheathing animation
     for pid <- Map.get(state, :player_pids, []) do

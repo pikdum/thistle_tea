@@ -8,7 +8,10 @@ defmodule ThistleTea.MixProject do
       elixir: "~> 1.16",
       start_permanent: Mix.env() == :prod,
       aliases: aliases(),
-      deps: deps()
+      deps: deps(),
+      preferred_cli_env: [
+        "test.watch": :test
+      ]
       # listeners: [Phoenix.CodeReloader]
     ]
   end
@@ -24,6 +27,7 @@ defmodule ThistleTea.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
+      {:mix_test_watch, "~> 1.0", only: [:dev, :test], runtime: false},
       {:binary, "~> 0.0.5"},
       {:ecto_sqlite3, "~> 0.19"},
       {:memento, "~> 0.5.0"},

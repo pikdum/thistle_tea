@@ -1,11 +1,12 @@
 defmodule ThistleTea.Game.Login do
-  import ThistleTea.Game.UpdateObject, only: [build_update_packet: 4, get_item_packets: 1]
+  import ThistleTea.Game.UpdateObject, only: [get_item_packets: 1]
   import Bitwise, only: [<<<: 2, |||: 2]
 
   import ThistleTea.Util,
     only: [pack_guid: 1, send_packet: 2, send_update_packet: 1]
 
   alias ThistleTea.DBC
+  alias ThistleTea.Game.Utils.NewUpdateObject
 
   require Logger
 
@@ -30,10 +31,6 @@ defmodule ThistleTea.Game.Login do
   @update_flag_living 0x20
   @update_flag_has_position 0x40
 
-  @object_type_player 4
-
-  @update_type_create_object2 3
-
   def handle_packet(@cmsg_player_login, body, state) do
     <<character_guid::little-size(64)>> = body
 
@@ -43,16 +40,17 @@ defmodule ThistleTea.Game.Login do
 
     Logger.metadata(character_name: c.name)
 
+    {x, y, z, o} = c.movement.position
+
     send_packet(
       @smsg_login_verify_world,
-      <<c.map::little-size(32), c.movement.x::little-float-size(32),
-        c.movement.y::little-float-size(32), c.movement.z::little-float-size(32),
-        c.movement.orientation::little-float-size(32)>>
+      <<c.map::little-size(32), x::little-float-size(32), y::little-float-size(32),
+        z::little-float-size(32), o::little-float-size(32)>>
     )
 
     send_login_init_packets(c)
 
-    {x1, y1, z1} = {c.movement.x, c.movement.y, c.movement.z}
+    {x1, y1, z1, _o1} = c.movement.position
 
     # join
     SpatialHash.update(:players, character_guid, self(), c.map, x1, y1, z1)
@@ -89,13 +87,14 @@ defmodule ThistleTea.Game.Login do
       <<0::little-size(32)>>
     )
 
+    {x, y, z, o} = c.movement.position
+
     # SMSG_BINDPOINTUPDATE
     # let's just init it to character's position for now
     send_packet(
       @smsg_bindpointupdate,
-      <<c.map::little-size(32), c.movement.x::little-float-size(32),
-        c.movement.y::little-float-size(32), c.movement.z::little-float-size(32),
-        c.movement.orientation::little-float-size(32), c.map::little-size(32),
+      <<c.map::little-size(32), x::little-float-size(32), y::little-float-size(32),
+        z::little-float-size(32), o::little-float-size(32), c.map::little-size(32),
         c.area::little-size(32)>>
     )
 
@@ -149,7 +148,16 @@ defmodule ThistleTea.Game.Login do
     update_flag =
       @update_flag_self ||| @update_flag_all ||| @update_flag_living ||| @update_flag_has_position
 
-    packet = build_update_packet(c, @update_type_create_object2, @object_type_player, update_flag)
+    packet =
+      c
+      |> ThistleTea.Character.get_update_fields()
+      |> Map.merge(%{
+        update_type: :create_object2,
+        object_type: :player,
+        movement_block: Map.put(c.movement, :update_flag, update_flag)
+      })
+      |> NewUpdateObject.to_packet()
+
     send_update_packet(packet)
   end
 end

@@ -1,0 +1,21 @@
+defmodule ThistleTea.Game.Entities.Data.GameObject do
+  use ThistleTea.Game.FieldStruct,
+    created_by: {0x0006, 2, :guid},
+    display_id: {0x0008, 1, :int},
+    flags: {0x0009, 1, :int},
+    rotation0: {0x000A, 1, :float},
+    rotation1: {0x000B, 1, :float},
+    rotation2: {0x000C, 1, :float},
+    rotation3: {0x000D, 1, :float},
+    state: {0x000E, 1, :int},
+    pos_x: {0x000F, 1, :float},
+    pos_y: {0x0010, 1, :float},
+    pos_z: {0x0011, 1, :float},
+    facing: {0x0012, 1, :float},
+    dyn_flags: {0x0013, 1, :int},
+    faction: {0x0014, 1, :int},
+    type_id: {0x0015, 1, :int},
+    level: {0x0016, 1, :int},
+    art_kit: {0x0017, 1, :int},
+    anim_progress: {0x0018, 1, :int}
+end

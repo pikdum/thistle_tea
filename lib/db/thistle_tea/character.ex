@@ -27,6 +27,12 @@ defmodule ThistleTea.Character do
     type: :ordered_set,
     autoincrement: true
 
+  alias ThistleTea.Game.Entities.Data.Object
+  alias ThistleTea.Game.Entities.Data.Unit
+  alias ThistleTea.Game.Entities.Data.Player
+  alias ThistleTea.Game.Utils.NewUpdateObject
+  alias ThistleTea.Game.Utils.MovementBlock
+
   # TODO: use high guids properly for all guid types
   # enum HighGuid
   # {
@@ -89,107 +95,96 @@ defmodule ThistleTea.Character do
   end
 
   def get_update_fields(c) do
-    # TODO: maybe have these part of character itself
-    # TODO: add more of these to the data model
-    %{
-      object_guid: c.id,
-      # TODO: what is 25?
-      object_type: 25,
-      object_scale_x: 1.0,
-      unit_health: 100,
-      unit_power_1: 10_000,
-      unit_power_2: 1000,
-      unit_power_3: 1000,
-      unit_power_4: 1000,
-      unit_power_5: 1000,
-      unit_max_health: 100,
-      unit_max_power_1: 10_000,
-      unit_max_power_2: 1000,
-      unit_max_power_3: 1000,
-      unit_max_power_4: 1000,
-      unit_max_power_5: 1000,
-      unit_level: c.level,
-      unit_faction_template: get_alliance(c),
-      unit_bytes_0: <<c.race, c.class, c.gender, get_power(c.class)>>,
-      # TODO: safer way to get this, but is it even used here?
-      unit_base_attack_time: c.equipment.mainhand.delay,
-      unit_display_id: c.unit_display_id,
-      unit_native_display_id: c.unit_display_id,
-      unit_min_damage: 10,
-      unit_max_damage: 50,
-      unit_mod_cast_speed: 1.0,
-      unit_strength: 50,
-      unit_agility: 50,
-      unit_stamina: 50,
-      unit_intellect: 50,
-      unit_spirit: 50,
-      unit_base_mana: 100_000,
-      unit_base_health: 100,
-      unit_bytes_2: <<
-        c.sheath_state,
-        # unit pvp state
-        0,
-        # unit rename
-        0,
-        # ???
-        0
-      >>,
-      player_flags: 0,
-      player_features: <<c.skin, c.face, c.hair_style, c.hair_color>>,
-      player_bytes_2: <<
-        # facial hair
-        0,
-        # bank bag slot count
-        0,
-        0,
-        # rested state. rested=1 normal=2
-        1
-      >>,
-      player_xp: 1,
-      player_next_level_xp: 100,
-      player_rest_state_experience: 100,
-      # TODO: handle empty equipment slot
-      player_visible_item_1_0: c.equipment.head.entry,
-      player_visible_item_2_0: c.equipment.neck.entry,
-      player_visible_item_3_0: c.equipment.shoulders.entry,
-      player_visible_item_4_0: c.equipment.body.entry,
-      player_visible_item_5_0: c.equipment.chest.entry,
-      player_visible_item_6_0: c.equipment.waist.entry,
-      player_visible_item_7_0: c.equipment.legs.entry,
-      player_visible_item_8_0: c.equipment.feet.entry,
-      player_visible_item_9_0: c.equipment.wrists.entry,
-      player_visible_item_10_0: c.equipment.hands.entry,
-      player_visible_item_11_0: c.equipment.finger1.entry,
-      player_visible_item_12_0: c.equipment.finger2.entry,
-      player_visible_item_13_0: c.equipment.trinket1.entry,
-      player_visible_item_14_0: c.equipment.trinket2.entry,
-      player_visible_item_15_0: c.equipment.back.entry,
-      player_visible_item_16_0: c.equipment.mainhand.entry,
-      player_visible_item_17_0: c.equipment.offhand.entry,
-      # player_visible_item_18_0: c.equipment.ranged.entry,
-      player_visible_item_19_0: c.equipment.tabard.entry,
-      # TODO: these are supposed to be guids, not template entries
-      # don't think this works anyways
-      player_field_inv_head: c.equipment.head.entry + @item_guid_offset,
-      player_field_inv_neck: c.equipment.neck.entry + @item_guid_offset,
-      player_field_inv_shoulders: c.equipment.shoulders.entry + @item_guid_offset,
-      player_field_inv_body: c.equipment.body.entry + @item_guid_offset,
-      player_field_inv_chest: c.equipment.chest.entry + @item_guid_offset,
-      player_field_inv_waist: c.equipment.waist.entry + @item_guid_offset,
-      player_field_inv_legs: c.equipment.legs.entry + @item_guid_offset,
-      player_field_inv_feet: c.equipment.feet.entry + @item_guid_offset,
-      player_field_inv_wrists: c.equipment.wrists.entry + @item_guid_offset,
-      player_field_inv_hands: c.equipment.hands.entry + @item_guid_offset,
-      player_field_inv_finger1: c.equipment.finger1.entry + @item_guid_offset,
-      player_field_inv_finger2: c.equipment.finger2.entry + @item_guid_offset,
-      player_field_inv_trinket1: c.equipment.trinket1.entry + @item_guid_offset,
-      player_field_inv_trinket2: c.equipment.trinket2.entry + @item_guid_offset,
-      player_field_inv_back: c.equipment.back.entry + @item_guid_offset,
-      player_field_inv_mainhand: c.equipment.mainhand.entry + @item_guid_offset,
-      player_field_inv_offhand: c.equipment.offhand.entry + @item_guid_offset,
-      # player_field_inv_ranged: c.equipment.ranged.entry + @item_guid_offset,
-      player_field_inv_tabard: c.equipment.tabard.entry + @item_guid_offset
-      # player_field_pack_1: c.equipment.mainhand.entry + @item_guid_offset
+    # TODO: move up to player data model
+    %NewUpdateObject{
+      object: %Object{
+        guid: c.id,
+        scale_x: 1.0
+      },
+      unit: %Unit{
+        health: 100,
+        power1: 10_000,
+        power2: 1000,
+        power3: 1000,
+        power4: 1000,
+        power5: 1000,
+        max_health: 100,
+        max_power1: 10_000,
+        max_power2: 1000,
+        max_power3: 1000,
+        max_power4: 1000,
+        max_power5: 1000,
+        level: c.level,
+        faction_template: get_alliance(c),
+        race: c.race,
+        class: c.class,
+        gender: c.gender,
+        power_type: get_power(c.class),
+        base_attack_time: c.equipment.mainhand.delay,
+        display_id: c.unit_display_id,
+        native_display_id: c.unit_display_id,
+        min_damage: 10,
+        max_damage: 50,
+        mod_cast_speed: 1.0,
+        strength: 50,
+        agility: 50,
+        stamina: 50,
+        intellect: 50,
+        spirit: 50,
+        base_mana: 100_000,
+        base_health: 100,
+        sheath_state: c.sheath_state
+      },
+      player: %Player{
+        flags: 0,
+        skin: c.skin,
+        face: c.face,
+        hair_style: c.hair_style,
+        hair_color: c.hair_color,
+        rest_state: 1,
+        xp: 1,
+        next_level_xp: 100,
+        rest_state_experience: 100,
+        visible_item_1_0: c.equipment.head.entry,
+        visible_item_2_0: c.equipment.neck.entry,
+        visible_item_3_0: c.equipment.shoulders.entry,
+        visible_item_4_0: c.equipment.body.entry,
+        visible_item_5_0: c.equipment.chest.entry,
+        visible_item_6_0: c.equipment.waist.entry,
+        visible_item_7_0: c.equipment.legs.entry,
+        visible_item_8_0: c.equipment.feet.entry,
+        visible_item_9_0: c.equipment.wrists.entry,
+        visible_item_10_0: c.equipment.hands.entry,
+        visible_item_11_0: c.equipment.finger1.entry,
+        visible_item_12_0: c.equipment.finger2.entry,
+        visible_item_13_0: c.equipment.trinket1.entry,
+        visible_item_14_0: c.equipment.trinket2.entry,
+        visible_item_15_0: c.equipment.back.entry,
+        visible_item_16_0: c.equipment.mainhand.entry,
+        visible_item_17_0: c.equipment.offhand.entry,
+        # visible_item_18_0: c.equipment.ranged.entry,
+        visible_item_19_0: c.equipment.tabard.entry,
+        head: c.equipment.head.entry + @item_guid_offset,
+        neck: c.equipment.neck.entry + @item_guid_offset,
+        shoulders: c.equipment.shoulders.entry + @item_guid_offset,
+        body: c.equipment.body.entry + @item_guid_offset,
+        chest: c.equipment.chest.entry + @item_guid_offset,
+        waist: c.equipment.waist.entry + @item_guid_offset,
+        legs: c.equipment.legs.entry + @item_guid_offset,
+        feet: c.equipment.feet.entry + @item_guid_offset,
+        wrists: c.equipment.wrists.entry + @item_guid_offset,
+        hands: c.equipment.hands.entry + @item_guid_offset,
+        finger1: c.equipment.finger1.entry + @item_guid_offset,
+        finger2: c.equipment.finger2.entry + @item_guid_offset,
+        trinket1: c.equipment.trinket1.entry + @item_guid_offset,
+        trinket2: c.equipment.trinket2.entry + @item_guid_offset,
+        back: c.equipment.back.entry + @item_guid_offset,
+        mainhand: c.equipment.mainhand.entry + @item_guid_offset,
+        offhand: c.equipment.offhand.entry + @item_guid_offset,
+        # ranged: c.equipment.ranged.entry + @item_guid_offset,
+        tabard: c.equipment.tabard.entry + @item_guid_offset
+      },
+      movement_block: %MovementBlock{} = c.movement
     }
   end
 
