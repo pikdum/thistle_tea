@@ -119,7 +119,7 @@ defmodule ThistleTea.Game.Utils.MovementBlock do
           {movement_block, rest}
       end
 
-    movement_block
+    %__MODULE__{} = movement_block
   end
 
   def to_binary(%__MODULE__{} = m) do

@@ -1,15 +1,14 @@
 defmodule ThistleTea.Game.Movement do
-  import ThistleTea.Character, only: [get_update_fields: 1]
   import ThistleTea.Game.Character, only: [generate_random_equipment: 0]
 
-  import ThistleTea.Game.UpdateObject,
-    only: [generate_packet: 2, decode_movement_info: 1, get_item_packets: 1]
+  import ThistleTea.Game.UpdateObject, only: [get_item_packets: 1]
 
   import ThistleTea.Util, only: [send_update_packet: 1]
 
-  require Logger
+  alias ThistleTea.Game.Utils.NewUpdateObject
+  alias ThistleTea.Game.Utils.MovementBlock
 
-  @update_type_values 0
+  require Logger
 
   @msg_move_start_forward 0x0B5
   @msg_move_start_backward 0x0B6
@@ -51,8 +50,11 @@ defmodule ThistleTea.Game.Movement do
   defp randomize_equipment(state, msg) do
     if msg === @msg_move_jump do
       character = Map.put(state.character, :equipment, generate_random_equipment())
-      fields = get_update_fields(character)
-      packet = generate_packet(@update_type_values, fields)
+
+      update_object =
+        character |> ThistleTea.Character.get_update_fields() |> Map.put(:update_type, :values)
+
+      packet = NewUpdateObject.to_packet(update_object)
 
       # item packets
       get_item_packets(character.equipment)
@@ -94,8 +96,9 @@ defmodule ThistleTea.Game.Movement do
              @cmsg_move_fall_reset
            ] do
     state =
-      with %{x: x0, y: y0, z: z0} <- state.character.movement,
-           %{x: x1, y: y1, z: z1} = movement <- decode_movement_info(body),
+      with %MovementBlock{position: {x0, y0, z0, _}} <- state.character.movement,
+           %MovementBlock{position: {x1, y1, z1, _}} = movement <-
+             MovementBlock.from_binary(body),
            movement <- Map.merge(state.character.movement, movement),
            %{map: map} = character <- state.character |> Map.put(:movement, movement) do
         if x0 != x1 or y0 != y1 or z0 != z1 do
@@ -125,10 +128,15 @@ defmodule ThistleTea.Game.Movement do
     <<animation_state::little-size(32)>> = body
 
     # TODO: add :unit_bytes_1 to fields?
-    fields =
-      Map.put(get_update_fields(state.character), :unit_bytes_1, <<animation_state, 0, 0, 0>>)
+    update_object = ThistleTea.Character.get_update_fields(state.character)
 
-    packet = generate_packet(@update_type_values, fields)
+    update_object = %{
+      update_object
+      | unit: Map.put(update_object.unit, :stand_state, animation_state),
+        update_type: :values
+    }
+
+    packet = NewUpdateObject.to_packet(update_object)
 
     for pid <- Map.get(state, :player_pids, []) do
       if pid != self() do
