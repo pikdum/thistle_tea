@@ -3,6 +3,10 @@ defmodule ThistleTea.Game.GameObject.Server do
 
   alias ThistleTea.Game.GameObject
 
+  def start_link(%GameObject.Data{} = state) do
+    GenServer.start_link(__MODULE__, state)
+  end
+
   @impl GenServer
   def init(%GameObject.Data{} = state) do
     GameObject.Core.set_position(state)
