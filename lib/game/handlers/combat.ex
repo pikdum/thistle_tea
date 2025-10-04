@@ -1,7 +1,7 @@
 defmodule ThistleTea.Game.Combat do
   import ThistleTea.Util, only: [pack_guid: 1]
 
-  alias ThistleTea.Game.Utils.NewUpdateObject
+  alias ThistleTea.Game.Utils.UpdateObject
 
   require Logger
 
@@ -65,7 +65,7 @@ defmodule ThistleTea.Game.Combat do
     update_object =
       character |> ThistleTea.Character.get_update_fields() |> Map.put(:update_type, :values)
 
-    packet = NewUpdateObject.to_packet(update_object)
+    packet = UpdateObject.to_packet(update_object)
 
     # TODO: this doesn't show the unsheathing animation
     for pid <- Map.get(state, :player_pids, []) do

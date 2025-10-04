@@ -30,7 +30,7 @@ defmodule ThistleTea.Character do
   alias ThistleTea.Game.Entities.Data.Object
   alias ThistleTea.Game.Entities.Data.Unit
   alias ThistleTea.Game.Entities.Data.Player
-  alias ThistleTea.Game.Utils.NewUpdateObject
+  alias ThistleTea.Game.Utils.UpdateObject
   alias ThistleTea.Game.Utils.MovementBlock
 
   # TODO: use high guids properly for all guid types
@@ -96,7 +96,7 @@ defmodule ThistleTea.Character do
 
   def get_update_fields(c) do
     # TODO: move up to player data model
-    %NewUpdateObject{
+    %UpdateObject{
       object: %Object{
         guid: c.id,
         scale_x: 1.0

@@ -9,7 +9,7 @@ defmodule ThistleTea.Game do
   import ThistleTea.Util,
     only: [send_packet: 2, send_update_packet: 1, parse_string: 1]
 
-  alias ThistleTea.Game.Utils.NewUpdateObject
+  alias ThistleTea.Game.Utils.UpdateObject
 
   alias ThistleTea.CryptoStorage
 
@@ -347,7 +347,7 @@ defmodule ThistleTea.Game do
             @update_flag_high_guid ||| @update_flag_living ||| @update_flag_has_position
           )
       })
-      |> NewUpdateObject.to_packet()
+      |> UpdateObject.to_packet()
 
     GenServer.cast(pid, {:send_update_packet, packet})
     {:noreply, {socket, state}, socket.read_timeout}

@@ -1,5 +1,5 @@
 defmodule ThistleTea.Game.Entities.Data.Player do
-  alias ThistleTea.Game.Utils.NewUpdateObject
+  alias ThistleTea.Game.Utils.UpdateObject
 
   use ThistleTea.Game.FieldStruct,
     duel_arbiter: {0x00BC, 2, :guid},
@@ -275,7 +275,7 @@ defmodule ThistleTea.Game.Entities.Data.Player do
     combat_rating: {0x04EE, 20, :int}
 
   def features(%{skin: skin, face: face, hair_style: hair_style, hair_color: hair_color}) do
-    NewUpdateObject.build_bytes([
+    UpdateObject.build_bytes([
       {8, skin},
       {8, face},
       {8, hair_style},
@@ -284,7 +284,7 @@ defmodule ThistleTea.Game.Entities.Data.Player do
   end
 
   def bytes_2(%{facial_hair: facial_hair, bank_bag_slots: bank_bag_slots, rest_state: rest_state}) do
-    NewUpdateObject.build_bytes([
+    UpdateObject.build_bytes([
       {8, facial_hair},
       {8, 0},
       {8, bank_bag_slots},
@@ -302,7 +302,7 @@ defmodule ThistleTea.Game.Entities.Data.Player do
     drunk_value = drunk_value || 0
     gender_and_inebriation = Bitwise.bor(gender, Bitwise.band(drunk_value, 0xFFFE))
 
-    NewUpdateObject.build_bytes([
+    UpdateObject.build_bytes([
       {16, gender_and_inebriation},
       {8, city_protector_title},
       {8, honor_rank}
@@ -315,7 +315,7 @@ defmodule ThistleTea.Game.Entities.Data.Player do
         action_bars: action_bars,
         highest_honor_rank: highest_honor_rank
       }) do
-    NewUpdateObject.build_bytes([
+    UpdateObject.build_bytes([
       {8, field_bytes_flags},
       {8, combo_points},
       {8, action_bars},
@@ -324,6 +324,6 @@ defmodule ThistleTea.Game.Entities.Data.Player do
   end
 
   def field_bytes2(%{honor_rank_bar: honor_rank_bar, field_bytes2_flags: field_bytes2_flags}) do
-    NewUpdateObject.build_bytes([{8, honor_rank_bar}, {8, field_bytes2_flags}, {16, 0}])
+    UpdateObject.build_bytes([{8, honor_rank_bar}, {8, field_bytes2_flags}, {16, 0}])
   end
 end

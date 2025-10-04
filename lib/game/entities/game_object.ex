@@ -5,7 +5,7 @@ defmodule ThistleTea.GameObject do
 
   alias ThistleTea.Game.Entities.Data.Object
   alias ThistleTea.Game.Entities.Data.GameObject
-  alias ThistleTea.Game.Utils.NewUpdateObject
+  alias ThistleTea.Game.Utils.UpdateObject
   alias ThistleTea.Game.Utils.MovementBlock
 
   @game_object_guid_offset 0xF1100000
@@ -18,7 +18,7 @@ defmodule ThistleTea.GameObject do
   end
 
   def update_packet(state) do
-    update_object = %NewUpdateObject{
+    update_object = %UpdateObject{
       update_type: :create_object2,
       object_type: :game_object,
       object: %Object{
@@ -50,7 +50,7 @@ defmodule ThistleTea.GameObject do
       }
     }
 
-    NewUpdateObject.to_packet(update_object)
+    UpdateObject.to_packet(update_object)
   end
 
   @impl GenServer

@@ -1,7 +1,7 @@
 defmodule ThistleTea.UpdateObjectTest do
   use ExUnit.Case
 
-  alias ThistleTea.Game.Utils.NewUpdateObject
+  alias ThistleTea.Game.Utils.UpdateObject
   alias ThistleTea.Game.Utils.MovementBlock
   alias ThistleTea.Game.Entities.Data.Object
   alias ThistleTea.Game.Entities.Data.Player
@@ -11,36 +11,36 @@ defmodule ThistleTea.UpdateObjectTest do
     setup [:player, :unit, :object, :values_update, :create_object_update]
 
     test "flatten_field_structs/1", %{player: player, unit: unit} do
-      fields = NewUpdateObject.flatten_field_structs([player, unit])
+      fields = UpdateObject.flatten_field_structs([player, unit])
       assert Enum.any?(fields, fn {field, _value, _metadata} -> field == :coinage end)
       assert Enum.any?(fields, fn {field, _value, _metadata} -> field == :health end)
     end
 
     test "generate_mask/1", %{player: player, unit: unit} do
-      fields = NewUpdateObject.flatten_field_structs([player, unit])
-      mask = NewUpdateObject.generate_mask(fields)
+      fields = UpdateObject.flatten_field_structs([player, unit])
+      mask = UpdateObject.generate_mask(fields)
       assert byte_size(mask) > 0
     end
 
     test "generate_objects/1", %{player: player, unit: unit} do
-      fields = NewUpdateObject.flatten_field_structs([player, unit])
-      objects = NewUpdateObject.generate_objects(fields)
+      fields = UpdateObject.flatten_field_structs([player, unit])
+      objects = UpdateObject.generate_objects(fields)
       assert byte_size(objects) > 0
     end
 
     test "to_packet/1 - :values", %{values_update: values_update} do
-      packet = NewUpdateObject.to_packet(values_update)
+      packet = UpdateObject.to_packet(values_update)
       assert byte_size(packet) > 0
     end
 
     test "to_packet/1 - :create_object", %{create_object_update: create_object_update} do
-      packet = NewUpdateObject.to_packet(create_object_update)
+      packet = UpdateObject.to_packet(create_object_update)
       assert byte_size(packet) > 0
     end
   end
 
   defp values_update(context) do
-    values_update = %NewUpdateObject{
+    values_update = %UpdateObject{
       update_type: :values,
       object: context.object,
       player: context.player,
@@ -51,7 +51,7 @@ defmodule ThistleTea.UpdateObjectTest do
   end
 
   defp create_object_update(context) do
-    create_object_update = %NewUpdateObject{
+    create_object_update = %UpdateObject{
       update_type: :create_object,
       object_type: :player,
       movement_block: %MovementBlock{update_flag: 0, position: {0.0, 0.0, 0.0, 0.0}},

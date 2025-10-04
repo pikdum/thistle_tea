@@ -1,11 +1,9 @@
 defmodule ThistleTea.Game.Movement do
   import ThistleTea.Game.Character, only: [generate_random_equipment: 0]
 
-  import ThistleTea.Game.UpdateObject, only: [get_item_packets: 1]
-
   import ThistleTea.Util, only: [send_update_packet: 1]
 
-  alias ThistleTea.Game.Utils.NewUpdateObject
+  alias ThistleTea.Game.Utils.UpdateObject
   alias ThistleTea.Game.Utils.MovementBlock
 
   require Logger
@@ -54,10 +52,10 @@ defmodule ThistleTea.Game.Movement do
       update_object =
         character |> ThistleTea.Character.get_update_fields() |> Map.put(:update_type, :values)
 
-      packet = NewUpdateObject.to_packet(update_object)
+      packet = UpdateObject.to_packet(update_object)
 
       # item packets
-      get_item_packets(character.equipment)
+      UpdateObject.get_item_packets(character.equipment)
       |> Enum.each(fn packet -> send_update_packet(packet) end)
 
       for pid <- Map.get(state, :player_pids, []) do
@@ -135,7 +133,7 @@ defmodule ThistleTea.Game.Movement do
         update_type: :values
     }
 
-    packet = NewUpdateObject.to_packet(update_object)
+    packet = UpdateObject.to_packet(update_object)
 
     for pid <- Map.get(state, :player_pids, []) do
       if pid != self() do

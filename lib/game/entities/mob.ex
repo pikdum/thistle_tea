@@ -10,7 +10,7 @@ defmodule ThistleTea.Mob do
 
   alias ThistleTea.Game.Entities.Data.Object
   alias ThistleTea.Game.Entities.Data.Unit
-  alias ThistleTea.Game.Utils.NewUpdateObject
+  alias ThistleTea.Game.Utils.UpdateObject
   alias ThistleTea.Game.Utils.MovementBlock
 
   require Logger
@@ -585,7 +585,7 @@ defmodule ThistleTea.Mob do
   end
 
   def update_packet(state, movement_flags \\ 0) do
-    update_object = %NewUpdateObject{
+    update_object = %UpdateObject{
       update_type: :create_object2,
       object_type: :unit,
       object: %Object{
@@ -627,6 +627,6 @@ defmodule ThistleTea.Mob do
       }
     }
 
-    NewUpdateObject.to_packet(update_object)
+    UpdateObject.to_packet(update_object)
   end
 end

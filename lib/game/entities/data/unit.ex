@@ -1,5 +1,5 @@
 defmodule ThistleTea.Game.Entities.Data.Unit do
-  alias ThistleTea.Game.Utils.NewUpdateObject
+  alias ThistleTea.Game.Utils.UpdateObject
 
   use ThistleTea.Game.FieldStruct,
     charm: {0x0006, 2, :guid},
@@ -117,7 +117,7 @@ defmodule ThistleTea.Game.Entities.Data.Unit do
     power_cost_multiplier: {0x00B4, 7, :float}
 
   def bytes_0(%{race: race, class: class, gender: gender, power_type: power_type}) do
-    NewUpdateObject.build_bytes([
+    UpdateObject.build_bytes([
       {8, race},
       {8, class},
       {8, gender},
@@ -131,7 +131,7 @@ defmodule ThistleTea.Game.Entities.Data.Unit do
         shapeshift_form: shapeshift_form,
         vis_flag: vis_flag
       }) do
-    NewUpdateObject.build_bytes([
+    UpdateObject.build_bytes([
       {8, stand_state},
       {8, pet_loyalty},
       {8, shapeshift_form},
@@ -140,7 +140,7 @@ defmodule ThistleTea.Game.Entities.Data.Unit do
   end
 
   def bytes_2(%{sheath_state: sheath_state, misc_flags: misc_flags, pet_flags: pet_flags}) do
-    NewUpdateObject.build_bytes([
+    UpdateObject.build_bytes([
       {8, sheath_state},
       {8, misc_flags},
       {8, pet_flags},

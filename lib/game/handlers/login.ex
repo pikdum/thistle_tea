@@ -1,12 +1,11 @@
 defmodule ThistleTea.Game.Login do
-  import ThistleTea.Game.UpdateObject, only: [get_item_packets: 1]
   import Bitwise, only: [<<<: 2, |||: 2]
 
   import ThistleTea.Util,
     only: [pack_guid: 1, send_packet: 2, send_update_packet: 1]
 
   alias ThistleTea.DBC
-  alias ThistleTea.Game.Utils.NewUpdateObject
+  alias ThistleTea.Game.Utils.UpdateObject
 
   require Logger
 
@@ -141,7 +140,7 @@ defmodule ThistleTea.Game.Login do
     end
 
     # item packets
-    get_item_packets(c.equipment)
+    UpdateObject.get_item_packets(c.equipment)
     |> Enum.each(fn packet -> send_update_packet(packet) end)
 
     # packet for player
@@ -156,7 +155,7 @@ defmodule ThistleTea.Game.Login do
         object_type: :player,
         movement_block: Map.put(c.movement, :update_flag, update_flag)
       })
-      |> NewUpdateObject.to_packet()
+      |> UpdateObject.to_packet()
 
     send_update_packet(packet)
   end
