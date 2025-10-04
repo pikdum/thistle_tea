@@ -147,30 +147,29 @@ defmodule ThistleTea.Game.Utils.UpdateObject do
     <<value::little-size(size)>> <> build_bytes(rest)
   end
 
-  def to_packet(
-        %__MODULE__{
-          update_type: :values,
-          object: object
-        } = obj
-      ) do
+  defp packet_body(
+         %__MODULE__{
+           update_type: :values,
+           object: object
+         } = obj
+       ) do
     fields = flatten_field_structs(obj)
     packed_guid = Util.pack_guid(object.guid)
     mask_count = mask_blocks_count(fields)
     mask = generate_mask(fields)
     objects = generate_objects(fields)
 
-    <<1::little-size(32), 0, @update_type_values>> <>
-      packed_guid <> <<mask_count>> <> mask <> objects
+    <<@update_type_values>> <> packed_guid <> <<mask_count>> <> mask <> objects
   end
 
-  def to_packet(
-        %__MODULE__{
-          update_type: update_type,
-          object: object,
-          object_type: object_type
-        } = obj
-      )
-      when update_type in [:create_object, :create_object2] do
+  defp packet_body(
+         %__MODULE__{
+           update_type: update_type,
+           object: object,
+           object_type: object_type
+         } = obj
+       )
+       when update_type in [:create_object, :create_object2] do
     obj = %{obj | object: Map.put(object, :type, object_type_flags(obj))}
     fields = flatten_field_structs(obj)
     packed_guid = Util.pack_guid(object.guid)
@@ -179,13 +178,33 @@ defmodule ThistleTea.Game.Utils.UpdateObject do
     objects = generate_objects(fields)
     movement_block = MovementBlock.to_binary(obj.movement_block)
 
-    <<1::little-size(32), 0, update_type(update_type)>> <>
+    <<update_type(update_type)>> <>
       packed_guid <>
       <<object_type(object_type)>> <>
       movement_block <>
       <<mask_count>> <>
       mask <>
       objects
+  end
+
+  defp packet_header(%__MODULE__{} = _obj) do
+    <<1::little-size(32), 0>>
+  end
+
+  defp packet_header(objects) when is_list(objects) do
+    <<Enum.count(objects)::little-size(32), 0>>
+  end
+
+  def to_packet(objects) when is_list(objects) do
+    header = packet_header(objects)
+
+    Enum.reduce(objects, header, fn obj, acc ->
+      acc <> packet_body(obj)
+    end)
+  end
+
+  def to_packet(%__MODULE__{} = obj) do
+    packet_header(obj) <> packet_body(obj)
   end
 
   def object_type_flags(%__MODULE__{} = obj) do
@@ -216,7 +235,8 @@ defmodule ThistleTea.Game.Utils.UpdateObject do
           update_flag: 0
         }
       }
-      |> to_packet()
     end)
+    |> Enum.chunk_every(20)
+    |> Enum.map(&to_packet/1)
   end
 end
