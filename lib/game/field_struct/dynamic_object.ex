@@ -1,4 +1,4 @@
-defmodule ThistleTea.Game.Entities.Data.DynamicObject do
+defmodule ThistleTea.Game.FieldStruct.DynamicObject do
   use ThistleTea.Game.FieldStruct,
     caster: {0x0006, 2, :guid},
     bytes: {0x0008, 1, :bytes},

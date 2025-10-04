@@ -1,4 +1,4 @@
-defmodule ThistleTea.Game.Entities.Data.Object do
+defmodule ThistleTea.Game.FieldStruct.Object do
   use ThistleTea.Game.FieldStruct,
     guid: {0x0000, 2, :guid},
     type: {0x0002, 1, :int},

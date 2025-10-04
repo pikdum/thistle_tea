@@ -1,4 +1,4 @@
-defmodule ThistleTea.Game.Entities.Data.Corpse do
+defmodule ThistleTea.Game.FieldStruct.Corpse do
   use ThistleTea.Game.FieldStruct,
     owner: {0x0006, 2, :guid},
     facing: {0x0008, 1, :float},

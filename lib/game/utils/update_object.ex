@@ -15,8 +15,8 @@ defmodule ThistleTea.Game.Utils.UpdateObject do
 
   alias ThistleTea.Util
   alias ThistleTea.Game.Utils.MovementBlock
-  alias ThistleTea.Game.Entities.Data.Object
-  alias ThistleTea.Game.Entities.Data.Item
+  alias ThistleTea.Game.FieldStruct.Object
+  alias ThistleTea.Game.FieldStruct.Item
 
   @item_guid_offset 0x40000000
 

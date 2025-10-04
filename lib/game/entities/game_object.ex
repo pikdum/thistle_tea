@@ -3,8 +3,8 @@ defmodule ThistleTea.GameObject do
   import Bitwise, only: [|||: 2]
   require Logger
 
-  alias ThistleTea.Game.Entities.Data.Object
-  alias ThistleTea.Game.Entities.Data.GameObject
+  alias ThistleTea.Game.FieldStruct.Object
+  alias ThistleTea.Game.FieldStruct.GameObject
   alias ThistleTea.Game.Utils.UpdateObject
   alias ThistleTea.Game.Utils.MovementBlock
 

@@ -1,4 +1,4 @@
-defmodule ThistleTea.Game.Entities.Data.Unit do
+defmodule ThistleTea.Game.FieldStruct.Unit do
   alias ThistleTea.Game.Utils.UpdateObject
 
   use ThistleTea.Game.FieldStruct,

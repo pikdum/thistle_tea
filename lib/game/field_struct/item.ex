@@ -1,4 +1,4 @@
-defmodule ThistleTea.Game.Entities.Data.Item do
+defmodule ThistleTea.Game.FieldStruct.Item do
   use ThistleTea.Game.FieldStruct,
     owner: {0x0006, 2, :guid},
     contained: {0x0008, 2, :guid},

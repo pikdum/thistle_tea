@@ -3,9 +3,9 @@ defmodule ThistleTea.UpdateObjectTest do
 
   alias ThistleTea.Game.Utils.UpdateObject
   alias ThistleTea.Game.Utils.MovementBlock
-  alias ThistleTea.Game.Entities.Data.Object
-  alias ThistleTea.Game.Entities.Data.Player
-  alias ThistleTea.Game.Entities.Data.Unit
+  alias ThistleTea.Game.FieldStruct.Object
+  alias ThistleTea.Game.FieldStruct.Player
+  alias ThistleTea.Game.FieldStruct.Unit
 
   describe "sanity check" do
     setup [:player, :unit, :object, :values_update, :create_object_update]
