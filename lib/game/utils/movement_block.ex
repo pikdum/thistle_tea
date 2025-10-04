@@ -50,7 +50,7 @@ defmodule ThistleTea.Game.Utils.MovementBlock do
   @spline_flag_final_target 0x00020000
   @spline_flag_final_angle 0x00040000
 
-  def from_binary(m) do
+  def from_binary(m, acc \\ %__MODULE__{}) do
     <<
       # movement flags
       movement_flags::little-size(32),
@@ -64,11 +64,15 @@ defmodule ThistleTea.Game.Utils.MovementBlock do
       rest::binary
     >> = m
 
-    movement_block = %__MODULE__{
-      movement_flags: movement_flags,
-      timestamp: timestamp,
-      position: {x, y, z, orientation}
-    }
+    movement_block =
+      Map.merge(
+        acc,
+        %{
+          movement_flags: movement_flags,
+          timestamp: timestamp,
+          position: {x, y, z, orientation}
+        }
+      )
 
     # on_transport
     if (movement_flags &&& @movement_flag_on_transport) > 0 do

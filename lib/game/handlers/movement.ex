@@ -98,8 +98,7 @@ defmodule ThistleTea.Game.Movement do
     state =
       with %MovementBlock{position: {x0, y0, z0, _}} <- state.character.movement,
            %MovementBlock{position: {x1, y1, z1, _}} = movement <-
-             MovementBlock.from_binary(body),
-           movement <- Map.merge(state.character.movement, movement),
+             MovementBlock.from_binary(body, state.character.movement),
            %{map: map} = character <- state.character |> Map.put(:movement, movement) do
         if x0 != x1 or y0 != y1 or z0 != z1 do
           SpatialHash.update(:players, state.guid, self(), map, x1, y1, z1)
