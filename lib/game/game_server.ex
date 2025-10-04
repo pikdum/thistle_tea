@@ -486,17 +486,17 @@ defmodule ThistleTea.Game do
 
     for {_guid, pid} <- players_to_add do
       if pid != self() do
-        GenServer.cast(pid, {:send_update_to, self()})
+        ThistleTea.Game.Entity.request_update_from(pid)
       end
     end
 
     for {_guid, pid} <- mobs_to_add do
       GenServer.cast(pid, :wake_up)
-      GenServer.cast(pid, {:send_update_to, self()})
+      ThistleTea.Game.Entity.request_update_from(pid)
     end
 
     for {_guid, pid} <- game_objects_to_add do
-      GenServer.cast(pid, {:send_update_to, self()})
+      ThistleTea.Game.Entity.request_update_from(pid)
     end
 
     # TODO: redundant, refactor out?
