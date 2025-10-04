@@ -373,15 +373,14 @@ defmodule ThistleTea.Game do
         nil -> state.character.area
       end
 
-    character =
-      state.character
-      |> Map.put(:area, area)
-      |> Map.put(:map, map)
-      |> Map.put(
-        :movement,
-        state.character.movement
-        |> Map.merge(%{x: x, y: y, z: z})
-      )
+    character = state.character
+
+    character = %{
+      character
+      | area: area,
+        map: map,
+        movement: %{character.movement | position: {x, y, z, 0.0}}
+    }
 
     SpatialHash.update(
       :players,

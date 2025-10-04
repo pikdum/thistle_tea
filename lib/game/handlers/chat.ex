@@ -108,7 +108,7 @@ defmodule ThistleTea.Game.Chat do
   end
 
   def get_player_pids_in_chat_range(state, range) do
-    %{x: x, y: y, z: z} = state.character.movement
+    {x, y, z, _o} = state.character.movement.position
     nearby_players = SpatialHash.query(:players, state.character.map, x, y, z, range)
 
     nearby_players |> Enum.map(fn {_, pid, _} -> pid end)
@@ -136,7 +136,7 @@ defmodule ThistleTea.Game.Chat do
   end
 
   def handle_chat(state, _, _, ".pos" <> _, _) do
-    %{x: x, y: y, z: z} = state.character.movement
+    {x, y, z, _o} = state.character.movement.position
     map = state.character.map
 
     state
@@ -203,7 +203,7 @@ defmodule ThistleTea.Game.Chat do
   def handle_chat(state, _, _, ".move" <> _, _) do
     with target <- Map.get(state, :target),
          pid <- :ets.lookup_element(:entities, target, 2, nil),
-         %{x: x, y: y, z: z} <- Map.get(state.character, :movement) do
+         {x, y, z, _o} <- state.character.movement.position do
       GenServer.cast(pid, {:move_to, x, y, z})
       state
     else
