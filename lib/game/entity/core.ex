@@ -16,9 +16,16 @@ defmodule ThistleTea.Game.Entity.Core do
     |> UpdateObject.to_packet()
   end
 
-  def take_damage(%{unit: %FieldStruct.Unit{health: health} = unit} = entity, damage) do
+  def take_damage(
+        %{
+          unit: %FieldStruct.Unit{health: health} = unit,
+          movement_block: %FieldStruct.MovementBlock{movement_flags: movement_flags} = mb
+        } = entity,
+        damage
+      ) do
     new_health = max(health - damage, 0)
-    {:ok, %{entity | unit: %{unit | health: new_health}}}
+    new_movement_flags = if new_health == 0, do: 0, else: movement_flags
+    {:ok, %{entity | unit: %{unit | health: new_health}, movement_block: %{mb | movement_flags: new_movement_flags}}}
   end
 
   def set_position(%Mob.Data{} = entity), do: set_position(entity, :mobs)
