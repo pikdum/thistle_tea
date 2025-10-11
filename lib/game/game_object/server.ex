@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.GameObject.Server do
 
   @impl GenServer
   def init(%GameObject.Data{} = state) do
+    Process.flag(:trap_exit, true)
     GameObject.Core.set_position(state)
     {:ok, state}
   end
@@ -19,4 +20,7 @@ defmodule ThistleTea.Game.GameObject.Server do
     GenServer.cast(pid, {:send_update_packet, packet})
     {:noreply, state}
   end
+
+  @impl GenServer
+  def terminate(_reason, state), do: GameObject.Core.terminate(state)
 end

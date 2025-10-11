@@ -8,10 +8,10 @@ defmodule ThistleTea.Game.GameObject.Core do
   @update_flag_all 0x10
   @update_flag_has_position 0x40
 
-  def update_packet(
-        %GameObject.Data{object: %FieldStruct.Object{} = object, game_object: %FieldStruct.GameObject{} = game_object} =
-          _state
-      ) do
+  def update_packet(%GameObject.Data{
+        object: %FieldStruct.Object{} = object,
+        game_object: %FieldStruct.GameObject{} = game_object
+      }) do
     %UpdateObject{
       update_type: :create_object2,
       object_type: :game_object,
@@ -25,13 +25,11 @@ defmodule ThistleTea.Game.GameObject.Core do
     |> UpdateObject.to_packet()
   end
 
-  def set_position(
-        %GameObject.Data{
-          object: %FieldStruct.Object{} = object,
-          game_object: %FieldStruct.GameObject{} = game_object,
-          internal: %FieldStruct.Internal{} = internal
-        } = _state
-      ) do
+  def set_position(%GameObject.Data{
+        object: %FieldStruct.Object{} = object,
+        game_object: %FieldStruct.GameObject{} = game_object,
+        internal: %FieldStruct.Internal{} = internal
+      }) do
     SpatialHash.update(
       :game_objects,
       object.guid,
@@ -41,5 +39,9 @@ defmodule ThistleTea.Game.GameObject.Core do
       game_object.pos_y,
       game_object.pos_z
     )
+  end
+
+  def terminate(%GameObject.Data{object: %FieldStruct.Object{} = object}) do
+    SpatialHash.remove(:game_objects, object.guid)
   end
 end

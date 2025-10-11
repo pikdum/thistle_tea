@@ -1,6 +1,8 @@
 defmodule ThistleTea.DB.Mangos.Creature do
   use Ecto.Schema
 
+  import Ecto.Query
+
   alias ThistleTea.DB.Mangos
 
   @primary_key {:guid, :integer, autogenerate: false}
@@ -29,5 +31,19 @@ defmodule ThistleTea.DB.Mangos.Creature do
     )
 
     has_many(:creature_movement, Mangos.CreatureMovement, foreign_key: :id, references: :guid)
+  end
+
+  def query_cell({map, _x, _y, _z} = cell) do
+    {{x1, x2}, {y1, y2}, {z1, z2}} = SpatialHash.cell_bounds(cell)
+
+    from(c in __MODULE__,
+      where:
+        c.map == ^map and c.position_x >= ^x1 and c.position_x < ^x2 and c.position_y >= ^y1 and
+          c.position_y < ^y2 and c.position_z >= ^z1 and c.position_z < ^z2,
+      join: ct in assoc(c, :creature_template),
+      where: c.modelid != 0,
+      preload: [creature_template: ct],
+      select: c
+    )
   end
 end

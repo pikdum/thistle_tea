@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.World.Manager do
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.CellRegistry
   alias ThistleTea.Game.World.Mangos.GameObjectSupervisor
+  alias ThistleTea.Game.World.Mangos.MobSupervisor
 
   require Logger
 
@@ -42,11 +43,19 @@ defmodule ThistleTea.Game.World.Manager do
   end
 
   defp start_cell(cell) do
+    cell
+    |> start_cell(GameObjectSupervisor)
+    |> start_cell(MobSupervisor)
+  end
+
+  defp start_cell(cell, supervisor) do
     {:ok, _pid} =
       DynamicSupervisor.start_child(
         World.DynamicSupervisor,
-        {GameObjectSupervisor, cell}
+        {supervisor, cell}
       )
+
+    cell
   end
 
   defp stop_cells(cells) do
@@ -54,10 +63,18 @@ defmodule ThistleTea.Game.World.Manager do
   end
 
   defp stop_cell(cell) do
-    case Registry.lookup(CellRegistry, {GameObjectSupervisor, cell}) do
+    cell
+    |> stop_cell(GameObjectSupervisor)
+    |> stop_cell(MobSupervisor)
+  end
+
+  defp stop_cell(cell, supervisor) do
+    case Registry.lookup(CellRegistry, {supervisor, cell}) do
       [] -> :ok
       [{pid, _}] -> DynamicSupervisor.terminate_child(World.DynamicSupervisor, pid)
     end
+
+    cell
   end
 
   defp players do

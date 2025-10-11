@@ -50,11 +50,13 @@ defmodule ThistleTea.Telemetry do
       Logger.info("Packets: #{inspect(packet_data, pretty: true)}")
     end
 
-    active_mobs = :ets.lookup_element(:telemetry_counters, :active_mobs, 2)
-
-    if active_mobs > 0 do
-      Logger.info("Active Mobs: #{active_mobs}")
-    end
+    [:mobs, :game_objects, :players]
+    |> Enum.map(fn table ->
+      {table, :ets.tab2list(table) |> Enum.count()}
+    end)
+    |> Enum.each(fn {table, count} ->
+      Logger.info("Active #{table}: #{count}")
+    end)
 
     :ets.match_delete(:telemetry, {:handle_packet, :_, :_})
     Process.send_after(self(), :summarize_data, @telemetry_interval)

@@ -1,5 +1,6 @@
 defmodule ThistleTea.Game.FieldStruct.Internal do
   defstruct [
-    :map
+    :map,
+    :name
   ]
 end

@@ -477,9 +477,8 @@ defmodule ThistleTea.Game do
       end
     end
 
-    for {guid, pid} <- mobs_to_remove do
+    for {guid, _pid} <- mobs_to_remove do
       send_packet(@smsg_destroy_object, <<guid::little-size(64)>>)
-      GenServer.cast(pid, :try_sleep)
     end
 
     for {guid, _pid} <- game_objects_to_remove do
@@ -493,7 +492,6 @@ defmodule ThistleTea.Game do
     end
 
     for {_guid, pid} <- mobs_to_add do
-      GenServer.cast(pid, :wake_up)
       Entity.request_update_from(pid)
     end
 

@@ -48,7 +48,7 @@ defmodule ThistleTea.Application do
         {Registry, keys: :unique, name: CellRegistry},
         ThistleTea.DBC,
         Repo,
-        !test && ThistleTea.MobSupervisor,
+        # !test && ThistleTea.MobSupervisor,
         !test &&
           {ThousandIsland, port: @auth_port, handler_module: ThistleTea.Auth, handler_options: @handler_options},
         !test &&

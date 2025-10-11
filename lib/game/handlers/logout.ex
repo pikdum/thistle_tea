@@ -61,11 +61,6 @@ defmodule ThistleTea.Game.Logout do
           GenServer.cast(pid, {:destroy_object, state.guid})
         end
       end
-
-      # let mobs try to idle down
-      for pid <- Map.get(state, :mob_pids, []) do
-        GenServer.cast(pid, :try_sleep)
-      end
     end
 
     # reset state so nothing lingers

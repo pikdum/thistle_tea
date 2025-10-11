@@ -11,8 +11,8 @@ defmodule ThistleTea.MixProject do
       deps: deps(),
       preferred_cli_env: [
         "test.watch": :test
-      ]
-      # listeners: [Phoenix.CodeReloader]
+      ],
+      listeners: [Phoenix.CodeReloader]
     ]
   end
 
