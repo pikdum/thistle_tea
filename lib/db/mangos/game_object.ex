@@ -1,6 +1,8 @@
 defmodule ThistleTea.DB.Mangos.GameObject do
   use Ecto.Schema
 
+  import Ecto.Query
+
   alias ThistleTea.DB.Mangos
 
   @primary_key {:guid, :integer, autogenerate: false}
@@ -23,6 +25,19 @@ defmodule ThistleTea.DB.Mangos.GameObject do
       foreign_key: :id,
       references: :entry,
       define_field: false
+    )
+  end
+
+  def query_cell({map, _x, _y, _z} = cell) do
+    {{x1, x2}, {y1, y2}, {z1, z2}} = SpatialHash.cell_bounds(cell)
+
+    from(g in __MODULE__,
+      where:
+        g.map == ^map and g.position_x >= ^x1 and g.position_x < ^x2 and g.position_y >= ^y1 and
+          g.position_y < ^y2 and g.position_z >= ^z1 and g.position_z < ^z2,
+      join: gt in assoc(g, :game_object_template),
+      preload: [game_object_template: gt],
+      select: g
     )
   end
 end

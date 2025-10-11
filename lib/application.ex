@@ -5,6 +5,8 @@ defmodule ThistleTea.Application do
   use Application
 
   alias ThistleTea.DB.Mangos.Repo
+  alias ThistleTea.Game.World
+  alias ThistleTea.Game.World.CellRegistry
 
   require Logger
 
@@ -43,17 +45,19 @@ defmodule ThistleTea.Application do
       [
         ThistleTea.Telemetry,
         {Registry, keys: :duplicate, name: ThistleTea.ChatChannel},
+        {Registry, keys: :unique, name: CellRegistry},
         ThistleTea.DBC,
         Repo,
         !test && ThistleTea.MobSupervisor,
-        !test && ThistleTea.GameObjectSupervisor,
         !test &&
           {ThousandIsland, port: @auth_port, handler_module: ThistleTea.Auth, handler_options: @handler_options},
         !test &&
           {ThousandIsland, port: @game_port, handler_module: ThistleTea.Game, handler_options: @handler_options},
         ThistleTeaWeb.Telemetry,
         {Phoenix.PubSub, name: ThistleTea.PubSub},
-        !test && ThistleTeaWeb.Endpoint
+        !test && ThistleTeaWeb.Endpoint,
+        {DynamicSupervisor, strategy: :one_for_one, name: ThistleTea.Game.World.DynamicSupervisor},
+        World.Manager
       ]
       |> Enum.filter(& &1)
 
