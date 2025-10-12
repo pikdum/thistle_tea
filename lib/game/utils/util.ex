@@ -100,16 +100,16 @@ defmodule ThistleTea.Util do
     {x, y, z}
   end
 
-  def calculate_movement_duration({x0, y0, z0}, {x1, y1, z1}, speed) when is_float(speed) and speed > 0 do
+  def movement_duration({x0, y0, z0}, {x1, y1, z1}, speed) when is_float(speed) and speed > 0 do
     distance = :math.sqrt(:math.pow(x1 - x0, 2) + :math.pow(y1 - y0, 2) + :math.pow(z1 - z0, 2))
     duration = distance / speed
     duration
   end
 
-  def calculate_total_duration(path_list, speed) when is_list(path_list) and length(path_list) > 1 do
+  def movement_duration(path_list, speed) when is_list(path_list) and length(path_list) > 1 do
     path_list
     |> Enum.chunk_every(2, 1, :discard)
-    |> Enum.map(fn [start, finish] -> calculate_movement_duration(start, finish, speed) end)
+    |> Enum.map(fn [start, finish] -> movement_duration(start, finish, speed) end)
     |> Enum.sum()
   end
 

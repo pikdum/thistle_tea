@@ -30,6 +30,10 @@ defmodule ThistleTea.Game.Mob.Server do
     state = Entity.Movement.start_move_to(state, {x, y, z})
     payload = SmsgMonsterMove.build(state) |> SmsgMonsterMove.to_binary()
 
+    # TODO: how do i want to handle updating the position on the server side?
+    # sounds like vmangos does this every 100ms
+    # i could instead do it whenever position is requested?
+    # or a timer at the end of the movement duration?
     {_, _, _, o} = state.movement_block.position
     {xd, yd, zd} = List.last(state.movement_block.spline_nodes)
 

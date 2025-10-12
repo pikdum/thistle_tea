@@ -6,9 +6,9 @@ defmodule ThistleTeaTest do
   require Logger
 
   test "movement duration" do
-    assert Util.calculate_movement_duration({0.0, 0.0, 0.0}, {3.0, 4.0, 0.0}, 1.0) == 5.0
+    assert Util.movement_duration({0.0, 0.0, 0.0}, {3.0, 4.0, 0.0}, 1.0) == 5.0
     path = [{0.0, 0.0, 0.0}, {3.0, 4.0, 0.0}, {3.0, 4.0, 5.0}]
-    assert Util.calculate_total_duration(path, 1.0) === 10.0
+    assert Util.movement_duration(path, 1.0) === 10.0
   end
 
   test "pack guid" do

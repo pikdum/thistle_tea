@@ -21,11 +21,12 @@ defmodule ThistleTea.Game.Entity.Movement do
 
     duration =
       [{x0, y0, z0} | path]
-      |> Util.calculate_total_duration(run_speed * 7.0)
+      |> Util.movement_duration(run_speed * 7.0)
       |> trunc()
       |> max(1)
 
     # TODO how does it use time_passed when sent in an update packet?
+    # likely need to store when movement started?
     %{entity | movement_block: %{mb | spline_nodes: path, duration: duration, time_passed: 0, spline_flags: 0x100}}
     |> increment_spline_id()
   end

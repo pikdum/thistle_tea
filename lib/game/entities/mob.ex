@@ -5,7 +5,7 @@ defmodule ThistleTea.Mob do
     only: [
       pack_guid: 1,
       random_int: 2,
-      calculate_movement_duration: 3
+      movement_duration: 3
     ]
 
   alias ThistleTea.Game.FieldStruct.MovementBlock
@@ -487,7 +487,7 @@ defmodule ThistleTea.Mob do
         state = state |> Map.put(:spline_id, spline_id)
 
         duration =
-          (calculate_movement_duration({x0, y0, z0}, {x1, y1, z1}, speed) * 1_000)
+          (movement_duration({x0, y0, z0}, {x1, y1, z1}, speed) * 1_000)
           |> trunc()
           |> max(1)
 
