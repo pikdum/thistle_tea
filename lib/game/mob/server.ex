@@ -4,7 +4,6 @@ defmodule ThistleTea.Game.Mob.Server do
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Message.SmsgMonsterMove
   alias ThistleTea.Game.Mob
-  alias ThistleTea.Util
 
   @smsg_monster_move 0x0DD
 
@@ -28,30 +27,16 @@ defmodule ThistleTea.Game.Mob.Server do
 
   @impl GenServer
   def handle_cast({:move_to, x, y, z}, state) do
-    {x0, y0, z0, o} = state.movement_block.position
-    map = state.internal.map
-    guid = state.object.guid
+    state = Entity.Movement.start_move_to(state, {x, y, z})
+    payload = SmsgMonsterMove.build(state) |> SmsgMonsterMove.to_binary()
 
-    nearby_players = SpatialHash.query(:players, map, x0, y0, z0, 250)
-    path = ThistleTea.Pathfinding.find_path(map, {x0, y0, z0}, {x, y, z})
+    {_, _, _, o} = state.movement_block.position
+    {xd, yd, zd} = List.last(state.movement_block.spline_nodes)
 
-    duration =
-      Util.calculate_total_duration([{x0, y0, z0} | path], state.movement_block.run_speed * 7.0) |> trunc() |> max(1)
+    nearby_players = Entity.Core.nearby_players(state)
 
-    {xd, yd, zd} = List.last(path)
-
-    move = %SmsgMonsterMove{
-      guid: guid,
-      spline_point: {x0, y0, z0},
-      spline_id: 0,
-      move_type: 0,
-      spline_flags: 0x100,
-      duration: duration,
-      splines: path
-    }
-
-    payload = SmsgMonsterMove.to_binary(move)
-
+    # TODO: i should come up with a packet struct that takes opcode as atom, payload as binary
+    # and then use that as the interface instead of raw binaries
     for {_guid, pid, _distance} <- nearby_players do
       GenServer.cast(pid, {:send_packet, @smsg_monster_move, payload})
     end

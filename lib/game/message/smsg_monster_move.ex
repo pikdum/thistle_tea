@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Message.SmsgMonsterMove do
+  alias ThistleTea.Game.FieldStruct
   alias ThistleTea.Util
 
   # @move_type_normal 0
@@ -19,6 +20,27 @@ defmodule ThistleTea.Game.Message.SmsgMonsterMove do
     :duration,
     :splines
   ]
+
+  def build(%{
+        object: %FieldStruct.Object{guid: guid},
+        movement_block: %FieldStruct.MovementBlock{
+          position: {x0, y0, z0, _o},
+          spline_nodes: spline_nodes,
+          duration: duration,
+          spline_flags: spline_flags
+        },
+        internal: %FieldStruct.Internal{spline_id: spline_id}
+      }) do
+    %__MODULE__{
+      guid: guid,
+      spline_point: {x0, y0, z0},
+      spline_id: spline_id,
+      move_type: 0,
+      spline_flags: spline_flags,
+      duration: duration,
+      splines: spline_nodes
+    }
+  end
 
   def to_binary(%__MODULE__{
         guid: guid,

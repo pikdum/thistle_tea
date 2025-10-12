@@ -203,6 +203,7 @@ defmodule ThistleTea.Game.FieldStruct.MovementBlock do
                 Enum.reduce(m.spline_nodes, <<>>, fn node, acc ->
                   {x, y, z} = node
 
+                  # TODO: does this need the same logic as smsg_monster_move?
                   acc <>
                     <<x::little-float-size(32), y::little-float-size(32), z::little-float-size(32)>>
                 end)

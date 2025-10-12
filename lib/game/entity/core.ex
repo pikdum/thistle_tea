@@ -56,4 +56,14 @@ defmodule ThistleTea.Game.Entity.Core do
   def remove_position(%{object: %FieldStruct.Object{guid: guid}}, table) do
     SpatialHash.remove(table, guid)
   end
+
+  def nearby_players(
+        %{
+          internal: %FieldStruct.Internal{map: map},
+          movement_block: %FieldStruct.MovementBlock{position: {x, y, z, _o}}
+        },
+        range \\ 250
+      ) do
+    SpatialHash.query(:players, map, x, y, z, range)
+  end
 end
