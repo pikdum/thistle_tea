@@ -88,7 +88,7 @@ defmodule ThistleTea.Game.Gossip do
   end
 
   def handle_packet(@cmsg_npc_text_query, <<text_id::little-size(32), _guid::little-size(64)>>, state) do
-    case Repo.get(NpcText, text_id) do
+    case Repo.get(Mangos.NpcText, text_id) do
       nil ->
         {:continue, state}
 
