@@ -13,10 +13,13 @@ defmodule ThistleTea.Game.Entity.Movement do
     rem(id, @max_u32) + 1
   end
 
-  def start_move_to(%{movement_block: %FieldStruct.MovementBlock{run_speed: run_speed} = mb} = entity, {x, y, z}) do
-    {x0, y0, z0, _o} = entity.movement_block.position
-    map = entity.internal.map
-
+  def start_move_to(
+        %{
+          movement_block: %FieldStruct.MovementBlock{run_speed: run_speed, position: {x0, y0, z0, _o}} = mb,
+          internal: %FieldStruct.Internal{map: map}
+        } = entity,
+        {x, y, z}
+      ) do
     path = ThistleTea.Pathfinding.find_path(map, {x0, y0, z0}, {x, y, z})
 
     duration =
