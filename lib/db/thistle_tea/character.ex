@@ -133,7 +133,9 @@ defmodule ThistleTea.Character do
         spirit: 50,
         base_mana: 100_000,
         base_health: 100,
-        sheath_state: c.sheath_state
+        sheath_state: c.sheath_state,
+        # UNIT_FLAG_USE_SWIM_ANIMATION
+        flags: 0x00008000
       },
       player: %Player{
         flags: 0,

@@ -159,8 +159,8 @@ defmodule ThistleTea.Game.Character do
         # run_speed: 7.0,
         run_speed: 20.0,
         run_back_speed: 4.5,
-        swim_speed: 0.0,
-        swim_back_speed: 0.0,
+        swim_speed: 4.722222,
+        swim_back_speed: 2.5,
         turn_rate: 3.1415,
         timestamp: 0
       },
