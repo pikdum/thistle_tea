@@ -49,7 +49,12 @@ defmodule ThistleTea.Game.Mob.Data do
         swim_back_speed: ct.speed_run,
         turn_rate: 3.1415
       },
-      internal: %FieldStruct.Internal{map: c.map, name: ct.name}
+      internal: %FieldStruct.Internal{
+        map: c.map,
+        name: ct.name,
+        spawn_distance: c.spawndist,
+        movement_type: c.movement_type
+      }
     }
   end
 

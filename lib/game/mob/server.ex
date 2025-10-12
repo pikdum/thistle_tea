@@ -2,6 +2,7 @@ defmodule ThistleTea.Game.Mob.Server do
   use GenServer
 
   alias ThistleTea.Game.Entity
+  alias ThistleTea.Game.FieldStruct
   alias ThistleTea.Game.Mob
 
   def start_link(%Mob.Data{} = state) do
@@ -9,9 +10,14 @@ defmodule ThistleTea.Game.Mob.Server do
   end
 
   @impl GenServer
-  def init(%Mob.Data{} = state) do
+  def init(%Mob.Data{internal: %FieldStruct.Internal{movement_type: movement_type}} = state) do
     Process.flag(:trap_exit, true)
     Entity.Core.set_position(state)
+
+    if movement_type == 1 do
+      Process.send_after(self(), :wander, :rand.uniform(6_000))
+    end
+
     {:ok, state}
   end
 
@@ -25,6 +31,14 @@ defmodule ThistleTea.Game.Mob.Server do
   @impl GenServer
   def handle_cast({:move_to, x, y, z}, state) do
     state = Entity.Movement.move_to(state, {x, y, z})
+    {:noreply, state}
+  end
+
+  @impl GenServer
+  def handle_info(:wander, state) do
+    state = Entity.Movement.wander(state)
+    delay = state.movement_block.duration + :rand.uniform(6_000) + 4_000
+    Process.send_after(self(), :wander, delay)
     {:noreply, state}
   end
 

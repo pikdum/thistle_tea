@@ -18,16 +18,18 @@ defmodule ThistleTea.Game.Entity.Movement do
 
   def start_move_to(
         %{
-          movement_block: %FieldStruct.MovementBlock{run_speed: run_speed, position: {x0, y0, z0, _o}} = mb,
+          movement_block: %FieldStruct.MovementBlock{walk_speed: walk_speed, position: {x0, y0, z0, _o}} = mb,
           internal: %FieldStruct.Internal{map: map}
         } = entity,
         {x, y, z}
       ) do
     path = ThistleTea.Pathfinding.find_path(map, {x0, y0, z0}, {x, y, z})
 
+    # TODO handle running and walking
     duration =
       [{x0, y0, z0} | path]
-      |> Util.movement_duration(run_speed * 7.0)
+      |> Util.movement_duration(walk_speed)
+      |> Kernel.*(1_000)
       |> trunc()
       |> max(1)
 
@@ -58,5 +60,15 @@ defmodule ThistleTea.Game.Entity.Movement do
     end
 
     %{state | movement_block: %{state.movement_block | position: {xd, yd, zd, o}}}
+  end
+
+  def wander(
+        %{
+          movement_block: %FieldStruct.MovementBlock{position: {x0, y0, z0, _o}},
+          internal: %FieldStruct.Internal{spawn_distance: spawn_distance, map: map}
+        } = state
+      ) do
+    {x, y, z} = ThistleTea.Pathfinding.find_random_point_around_circle(map, {x0, y0, z0}, spawn_distance)
+    move_to(state, {x, y, z})
   end
 end
