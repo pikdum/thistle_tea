@@ -1,7 +1,10 @@
 defmodule ThistleTea.Game.Entity.Movement do
+  alias ThistleTea.Game.Entity
   alias ThistleTea.Game.FieldStruct
+  alias ThistleTea.Game.Message.SmsgMonsterMove
   alias ThistleTea.Util
 
+  @smsg_monster_move 0x0DD
   @max_u32 0xFFFFFFFF
 
   def increment_spline_id(%{internal: %FieldStruct.Internal{spline_id: spline_id} = internal} = entity) do
@@ -32,5 +35,28 @@ defmodule ThistleTea.Game.Entity.Movement do
     # likely need to store when movement started?
     %{entity | movement_block: %{mb | spline_nodes: path, duration: duration, time_passed: 0, spline_flags: 0x100}}
     |> increment_spline_id()
+  end
+
+  def move_to(state, {x, y, z}) do
+    state = start_move_to(state, {x, y, z})
+    payload = SmsgMonsterMove.build(state) |> SmsgMonsterMove.to_binary()
+
+    # TODO: how do i want to handle updating the position on the server side?
+    # sounds like vmangos does this every 100ms
+    # i could instead do it whenever position is requested?
+    # or a timer at the end of the movement duration?
+    {_, _, _, o} = state.movement_block.position
+    {xd, yd, zd} = List.last(state.movement_block.spline_nodes)
+
+    nearby_players = Entity.Core.nearby_players(state)
+
+    # TODO: i should come up with a packet struct that takes opcode as atom, payload as binary
+    # and then use that as the interface instead of raw binaries
+    # TODO: would also be nice to treat these like a side effect - can i use handle_continue or similar?
+    for {_guid, pid, _distance} <- nearby_players do
+      GenServer.cast(pid, {:send_packet, @smsg_monster_move, payload})
+    end
+
+    %{state | movement_block: %{state.movement_block | position: {xd, yd, zd, o}}}
   end
 end
