@@ -37,7 +37,8 @@ defmodule ThistleTea.Game.Mob.Server do
   @impl GenServer
   def handle_info(:wander, state) do
     state = Entity.Movement.wander(state)
-    delay = state.movement_block.duration + :rand.uniform(6_000) + 4_000
+    duration = state.movement_block.duration || 0
+    delay = duration + :rand.uniform(6_000) + 4_000
     Process.send_after(self(), :wander, delay)
     {:noreply, state}
   end

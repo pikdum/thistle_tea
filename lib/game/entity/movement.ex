@@ -68,7 +68,9 @@ defmodule ThistleTea.Game.Entity.Movement do
           internal: %FieldStruct.Internal{spawn_distance: spawn_distance, map: map}
         } = state
       ) do
-    {x, y, z} = ThistleTea.Pathfinding.find_random_point_around_circle(map, {x0, y0, z0}, spawn_distance)
-    move_to(state, {x, y, z})
+    case ThistleTea.Pathfinding.find_random_point_around_circle(map, {x0, y0, z0}, spawn_distance) do
+      nil -> state
+      {x, y, z} -> move_to(state, {x, y, z})
+    end
   end
 end
