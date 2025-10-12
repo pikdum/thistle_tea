@@ -53,7 +53,8 @@ defmodule ThistleTea.Game.Mob.Data do
         map: c.map,
         name: ct.name,
         spawn_distance: c.spawndist,
-        movement_type: c.movement_type
+        movement_type: c.movement_type,
+        initial_position: {c.position_x, c.position_y, c.position_z}
       }
     }
   end

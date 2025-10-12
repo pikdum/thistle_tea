@@ -63,12 +63,10 @@ defmodule ThistleTea.Game.Entity.Movement do
   end
 
   def wander(
-        %{
-          movement_block: %FieldStruct.MovementBlock{position: {x0, y0, z0, _o}},
-          internal: %FieldStruct.Internal{spawn_distance: spawn_distance, map: map}
-        } = state
+        %{internal: %FieldStruct.Internal{spawn_distance: spawn_distance, map: map, initial_position: {xi, yi, zi}}} =
+          state
       ) do
-    case ThistleTea.Pathfinding.find_random_point_around_circle(map, {x0, y0, z0}, spawn_distance) do
+    case ThistleTea.Pathfinding.find_random_point_around_circle(map, {xi, yi, zi}, spawn_distance) do
       nil -> state
       {x, y, z} -> move_to(state, {x, y, z})
     end
