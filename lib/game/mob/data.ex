@@ -25,9 +25,11 @@ defmodule ThistleTea.Game.Mob.Data do
         level: level(c),
         faction_template: ct.faction_alliance,
         flags: ct.unit_flags,
+        npc_flags: ct.npc_flags,
+        dynamic_flags: ct.dynamic_flags,
+        misc_flags: ct.extra_flags,
         display_id: c.modelid,
-        native_display_id: c.modelid,
-        npc_flags: ct.npc_flags
+        native_display_id: c.modelid
       },
       movement_block: %FieldStruct.MovementBlock{
         update_flag: @update_flag_living,

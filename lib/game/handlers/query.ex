@@ -307,9 +307,9 @@ defmodule ThistleTea.Game.Query do
           0::little-size(32),
           creature.modelid::little-size(32),
           # civilian
-          0,
+          ct.civilian::little-size(8),
           # leader
-          0
+          ct.racial_leader::little-size(8)
         >>
     )
 
