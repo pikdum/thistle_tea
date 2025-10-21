@@ -14,8 +14,10 @@ defmodule ThistleTea.Game.Mob.Server do
     Process.flag(:trap_exit, true)
     Entity.Core.set_position(state)
 
-    if movement_type == 1 do
-      Process.send_after(self(), :wander, :rand.uniform(6_000))
+    case movement_type do
+      1 -> Process.send_after(self(), :wander, :rand.uniform(6_000))
+      # 2 -> Process.send_after(self(), :follow_waypoint_route, 0)
+      _ -> :ok
     end
 
     {:ok, state}
@@ -37,9 +39,16 @@ defmodule ThistleTea.Game.Mob.Server do
   @impl GenServer
   def handle_info(:wander, state) do
     state = Entity.Movement.wander(state)
-    duration = state.movement_block.duration || 0
-    delay = duration + :rand.uniform(6_000) + 4_000
+    delay = Entity.Movement.wander_delay(state)
     Process.send_after(self(), :wander, delay)
+    {:noreply, state}
+  end
+
+  @impl GenServer
+  def handle_info(:follow_waypoint_route, state) do
+    state = Entity.Movement.follow_waypoint_route(state)
+    delay = Entity.Movement.follow_waypoint_route_delay(state)
+    Process.send_after(self(), :follow_waypoint_route, delay)
     {:noreply, state}
   end
 

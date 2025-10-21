@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.FieldStruct.Internal do
     :spawn_distance,
     :movement_type,
     :initial_position,
+    :waypoint_route,
     spline_id: 0
   ]
 end

@@ -1,5 +1,7 @@
 defmodule ThistleTea.Game.Entity.Movement do
   alias ThistleTea.Game.Entity
+  alias ThistleTea.Game.Entity.Waypoint
+  alias ThistleTea.Game.Entity.WaypointRoute
   alias ThistleTea.Game.FieldStruct
   alias ThistleTea.Game.Message.SmsgMonsterMove
   alias ThistleTea.Util
@@ -70,5 +72,37 @@ defmodule ThistleTea.Game.Entity.Movement do
       nil -> state
       {x, y, z} -> move_to(state, {x, y, z})
     end
+  end
+
+  def wander_delay(%{movement_block: %FieldStruct.MovementBlock{duration: duration}}) do
+    duration = duration || 0
+    duration + :rand.uniform(6_000) + 4_000
+  end
+
+  def follow_waypoint_route(%{internal: %FieldStruct.Internal{waypoint_route: %WaypointRoute{} = route}} = state) do
+    %Waypoint{position: {x, y, z, o}} = WaypointRoute.destination_waypoint(route)
+
+    state
+    |> move_to({x, y, z})
+    |> set_orientation(o)
+    |> increment_waypoint()
+  end
+
+  def follow_waypoint_route_delay(%{
+        movement_block: %FieldStruct.MovementBlock{duration: duration},
+        internal: %FieldStruct.Internal{waypoint_route: route}
+      }) do
+    duration = duration || 0
+    wait_time = WaypointRoute.destination_waypoint(route).wait_time || 0
+    duration + wait_time
+  end
+
+  defp increment_waypoint(%{internal: %FieldStruct.Internal{waypoint_route: route} = internal} = state) do
+    route = WaypointRoute.increment_waypoint(route)
+    %{state | internal: %{internal | waypoint_route: route}}
+  end
+
+  defp set_orientation(%{movement_block: %FieldStruct.MovementBlock{position: {x, y, z, _o}}} = entity, o) do
+    %{entity | movement_block: %{entity.movement_block | position: {x, y, z, o}}}
   end
 end
