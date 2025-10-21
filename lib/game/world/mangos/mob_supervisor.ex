@@ -25,7 +25,16 @@ defmodule ThistleTea.Game.World.Mangos.MobSupervisor do
   defp children(cell) do
     Mangos.Creature.query_cell(cell)
     |> Mangos.Repo.all()
+    |> Enum.map(&load_creature_movement/1)
     |> Enum.map(&spec/1)
+  end
+
+  defp load_creature_movement(%Mangos.Creature{} = creature) do
+    creature_movement =
+      Mangos.CreatureMovement.query(creature.guid)
+      |> Mangos.Repo.all()
+
+    Map.put(creature, :creature_movement, creature_movement)
   end
 
   defp spec(%Mangos.Creature{} = creature) do

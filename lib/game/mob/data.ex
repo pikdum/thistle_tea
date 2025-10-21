@@ -1,5 +1,6 @@
 defmodule ThistleTea.Game.Mob.Data do
   alias ThistleTea.DB.Mangos
+  alias ThistleTea.Game.Entity.WaypointRoute
   alias ThistleTea.Game.FieldStruct
 
   @creature_guid_offset 0xF1300000
@@ -56,7 +57,8 @@ defmodule ThistleTea.Game.Mob.Data do
         name: ct.name,
         spawn_distance: c.spawndist,
         movement_type: c.movement_type,
-        initial_position: {c.position_x, c.position_y, c.position_z}
+        initial_position: {c.position_x, c.position_y, c.position_z},
+        waypoint_route: WaypointRoute.build(c)
       }
     }
   end

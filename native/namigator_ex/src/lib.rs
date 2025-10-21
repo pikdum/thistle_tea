@@ -13,6 +13,7 @@ static MAPS_TO_PROCESS: &[Map] = &[
     Map::EasternKingdoms,
     Map::Kalimdor,
     Map::DevelopmentLand,
+    Map::RagefireChasm
     // TODO: add all other maps here
 ];
 

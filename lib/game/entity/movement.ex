@@ -27,6 +27,11 @@ defmodule ThistleTea.Game.Entity.Movement do
       ) do
     path = ThistleTea.Pathfinding.find_path(map, {x0, y0, z0}, {x, y, z})
 
+    if is_nil(path) do
+      # handles maps that haven't been built yet
+      raise "No path found from #{inspect({x0, y0, z0})} to #{inspect({x, y, z})}"
+    end
+
     # TODO handle running and walking
     duration =
       [{x0, y0, z0} | path]
