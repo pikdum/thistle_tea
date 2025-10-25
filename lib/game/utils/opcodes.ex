@@ -304,7 +304,7 @@ defmodule ThistleTea.Opcodes do
     0x12D => :CMSG_NEW_SPELL_SLOT,
     0x12E => :CMSG_CAST_SPELL,
     0x12F => :CMSG_CANCEL_CAST,
-    0x130 => :SMSG_CAST_FAILED,
+    0x130 => :SMSG_CAST_RESULT,
     0x131 => :SMSG_SPELL_START,
     0x132 => :SMSG_SPELL_GO,
     0x133 => :SMSG_SPELL_FAILURE,
@@ -926,6 +926,11 @@ defmodule ThistleTea.Opcodes do
   defmacro __using__(opcodes) do
     for opcode <- opcodes do
       opcode_value = Map.get(@reverse_opcodes, opcode)
+
+      if opcode_value == nil do
+        raise KeyError, "Opcode #{inspect(opcode)} not found in opcodes list"
+      end
+
       attr_name = opcode |> Atom.to_string() |> String.downcase() |> String.to_atom()
 
       quote do
