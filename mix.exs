@@ -9,11 +9,12 @@ defmodule ThistleTea.MixProject do
       start_permanent: Mix.env() == :prod,
       aliases: aliases(),
       deps: deps(),
-      preferred_cli_env: [
-        "test.watch": :test
-      ],
       listeners: [Phoenix.CodeReloader]
     ]
+  end
+
+  def cli do
+    [preferred_envs: ["test.watch": :test]]
   end
 
   # Run "mix help compile.app" to learn about applications.
