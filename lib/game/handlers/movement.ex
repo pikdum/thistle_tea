@@ -1,4 +1,31 @@
 defmodule ThistleTea.Game.Movement do
+  use ThistleTea.Opcodes,
+      [
+        :MSG_MOVE_START_FORWARD,
+        :MSG_MOVE_START_BACKWARD,
+        :MSG_MOVE_STOP,
+        :MSG_MOVE_START_STRAFE_LEFT,
+        :MSG_MOVE_START_STRAFE_RIGHT,
+        :MSG_MOVE_STOP_STRAFE,
+        :MSG_MOVE_JUMP,
+        :MSG_MOVE_START_TURN_LEFT,
+        :MSG_MOVE_START_TURN_RIGHT,
+        :MSG_MOVE_STOP_TURN,
+        :MSG_MOVE_START_PITCH_UP,
+        :MSG_MOVE_START_PITCH_DOWN,
+        :MSG_MOVE_STOP_PITCH,
+        :MSG_MOVE_SET_RUN_MODE,
+        :MSG_MOVE_SET_WALK_MODE,
+        :MSG_MOVE_FALL_LAND,
+        :MSG_MOVE_START_SWIM,
+        :MSG_MOVE_STOP_SWIM,
+        :MSG_MOVE_SET_FACING,
+        :MSG_MOVE_SET_PITCH,
+        :MSG_MOVE_HEARTBEAT,
+        :CMSG_MOVE_FALL_RESET,
+        :CMSG_STANDSTATECHANGE
+      ]
+
   import ThistleTea.Game.Character, only: [generate_random_equipment: 0]
   import ThistleTea.Util, only: [send_update_packet: 1]
 
@@ -7,31 +34,6 @@ defmodule ThistleTea.Game.Movement do
   alias ThistleTea.Game.Utils.UpdateObject
 
   require Logger
-
-  @msg_move_start_forward 0x0B5
-  @msg_move_start_backward 0x0B6
-  @msg_move_stop 0x0B7
-  @msg_move_start_strafe_left 0x0B8
-  @msg_move_start_strafe_right 0x0B9
-  @msg_move_stop_strafe 0x0BA
-  @msg_move_jump 0x0BB
-  @msg_move_start_turn_left 0x0BC
-  @msg_move_start_turn_right 0x0BD
-  @msg_move_stop_turn 0x0BE
-  @msg_move_start_pitch_up 0x0BF
-  @msg_move_start_pitch_down 0x0C0
-  @msg_move_stop_pitch 0x0C1
-  @msg_move_set_run_mode 0x0C2
-  @msg_move_set_walk_mode 0x0C3
-  @msg_move_fall_land 0x0C9
-  @msg_move_start_swim 0x0CA
-  @msg_move_stop_swim 0x0CB
-  @msg_move_set_facing 0x0DA
-  @msg_move_set_pitch 0x0DB
-  @msg_move_heartbeat 0x0EE
-  @cmsg_move_fall_reset 0x2CA
-
-  @cmsg_standstatechange 0x101
 
   @spell_failed_moving 0x2E
 

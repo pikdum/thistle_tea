@@ -1,4 +1,6 @@
 defmodule ThistleTea.Game.Entity.Movement do
+  use ThistleTea.Opcodes, [:SMSG_MONSTER_MOVE]
+
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Waypoint
   alias ThistleTea.Game.Entity.WaypointRoute
@@ -6,7 +8,6 @@ defmodule ThistleTea.Game.Entity.Movement do
   alias ThistleTea.Game.Message.SmsgMonsterMove
   alias ThistleTea.Util
 
-  @smsg_monster_move 0x0DD
   @max_u32 0xFFFFFFFF
 
   def increment_spline_id(%{internal: %FieldStruct.Internal{spline_id: spline_id} = internal} = entity) do

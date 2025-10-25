@@ -1,4 +1,19 @@
 defmodule ThistleTea.Game.Query do
+  use ThistleTea.Opcodes, [
+    :CMSG_NAME_QUERY,
+    :SMSG_NAME_QUERY_RESPONSE,
+    :CMSG_ITEM_QUERY_SINGLE,
+    :SMSG_ITEM_QUERY_SINGLE_RESPONSE,
+    :CMSG_GAMEOBJECT_QUERY,
+    :SMSG_GAMEOBJECT_QUERY_RESPONSE,
+    :CMSG_ITEM_NAME_QUERY,
+    :SMSG_ITEM_NAME_QUERY_RESPONSE,
+    :CMSG_CREATURE_QUERY,
+    :SMSG_CREATURE_QUERY_RESPONSE,
+    :CMSG_WHO,
+    :SMSG_WHO
+  ]
+
   import ThistleTea.Util, only: [send_packet: 2]
 
   alias ThistleTea.DB.Mangos
@@ -8,24 +23,6 @@ defmodule ThistleTea.Game.Query do
   # prevent collisions
   @creature_guid_offset 0xF1300000
   @game_object_guid_offset 0xF1100000
-
-  @cmsg_name_query 0x050
-  @smsg_name_query_response 0x051
-
-  @cmsg_item_query_single 0x056
-  @smsg_item_query_single_response 0x058
-
-  @cmsg_gameobject_query 0x05E
-  @smsg_gameobject_query_response 0x05F
-
-  @cmsg_item_name_query 0x2C4
-  @smsg_item_name_query_response 0x2C5
-
-  @cmsg_creature_query 0x060
-  @smsg_creature_query_response 0x061
-
-  @cmsg_who 0x62
-  @smsg_who 0x63
 
   def handle_packet(@cmsg_name_query, body, state) do
     <<guid::little-size(64)>> = body

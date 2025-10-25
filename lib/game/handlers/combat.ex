@@ -1,18 +1,18 @@
 defmodule ThistleTea.Game.Combat do
+  use ThistleTea.Opcodes, [
+    :CMSG_ATTACKSWING,
+    :CMSG_ATTACKSTOP,
+    :CMSG_SETSHEATHED,
+    :CMSG_SET_SELECTION,
+    :SMSG_ATTACKSTART,
+    :SMSG_ATTACKSTOP
+  ]
+
   import ThistleTea.Util, only: [pack_guid: 1]
 
   alias ThistleTea.Game.Utils.UpdateObject
 
   require Logger
-
-  @cmsg_attackswing 0x141
-  @cmsg_attackstop 0x142
-  @cmsg_setsheathed 0x1E0
-
-  @cmsg_set_selection 0x13D
-
-  @smsg_attackstart 0x143
-  @smsg_attackstop 0x144
 
   def handle_packet(@cmsg_attackswing, body, state) do
     <<target_guid::little-size(64)>> = body

@@ -1,4 +1,17 @@
 defmodule ThistleTea.Game.Login do
+  use ThistleTea.Opcodes, [
+    :CMSG_PLAYER_LOGIN,
+    :SMSG_LOGIN_VERIFY_WORLD,
+    :SMSG_ACCOUNT_DATA_TIMES,
+    :SMSG_SET_REST_START,
+    :SMSG_BINDPOINTUPDATE,
+    :SMSG_TUTORIAL_FLAGS,
+    :SMSG_INITIAL_SPELLS,
+    :SMSG_LOGIN_SETTIMESPEED,
+    :SMSG_TRIGGER_CINEMATIC,
+    :MSG_MOVE_WORLDPORT_ACK
+  ]
+
   import Bitwise, only: [<<<: 2, |||: 2]
 
   import ThistleTea.Util,
@@ -8,18 +21,6 @@ defmodule ThistleTea.Game.Login do
   alias ThistleTea.Game.Utils.UpdateObject
 
   require Logger
-
-  @cmsg_player_login 0x03D
-  @smsg_login_verify_world 0x236
-  @smsg_account_data_times 0x209
-  @smsg_set_rest_start 0x21E
-  @smsg_bindpointupdate 0x155
-  @smsg_tutorial_flags 0x0FD
-  @smsg_initial_spells 0x12A
-  @smsg_login_settimespeed 0x042
-  @smsg_trigger_cinematic 0x0FA
-
-  @msg_move_worldport_ack 0x0DC
 
   # @update_flag_none 0x00
   @update_flag_self 0x01

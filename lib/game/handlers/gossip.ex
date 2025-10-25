@@ -1,4 +1,12 @@
 defmodule ThistleTea.Game.Gossip do
+  use ThistleTea.Opcodes, [
+    :CMSG_GOSSIP_HELLO,
+    :CMSG_GOSSIP_SELECT_OPTION,
+    :CMSG_NPC_TEXT_QUERY,
+    :SMSG_GOSSIP_MESSAGE,
+    :SMSG_NPC_TEXT_UPDATE
+  ]
+
   import Ecto.Query
   import ThistleTea.Util, only: [send_packet: 2]
 
@@ -8,13 +16,6 @@ defmodule ThistleTea.Game.Gossip do
   require Logger
 
   @creature_guid_offset 0xF1300000
-
-  @cmsg_gossip_hello 0x17B
-  @cmsg_gossip_select_option 0x17C
-  @cmsg_npc_text_query 0x17F
-
-  @smsg_gossip_message 0x17D
-  @smsg_npc_text_update 0x180
 
   defp text_groups(npc_text) do
     0..7

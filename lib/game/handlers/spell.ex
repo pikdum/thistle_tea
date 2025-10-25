@@ -1,19 +1,20 @@
 defmodule ThistleTea.Game.Spell do
+  use ThistleTea.Opcodes, [
+    :CMSG_CAST_SPELL,
+    :CMSG_CANCEL_CAST,
+    :SMSG_CAST_RESULT,
+    :SMSG_SPELL_START,
+    :SMSG_SPELL_GO,
+    :SMSG_SPELL_FAILURE,
+    :SMSG_SPELL_FAILED_OTHER
+  ]
+
   import Bitwise, only: [&&&: 2]
   import ThistleTea.Util, only: [send_packet: 2, unpack_guid: 1]
 
   alias ThistleTea.DBC
 
   require Logger
-
-  @cmsg_cast_spell 0x12E
-  @cmsg_cancel_cast 0x12F
-
-  @smsg_cast_result 0x130
-  @smsg_spell_start 0x131
-  @smsg_spell_go 0x132
-  @smsg_spell_failure 0x133
-  @smsg_spell_failed_other 0x2A6
 
   @spell_cast_target_self 0x00000000
   @spell_cast_target_unit 0x00000002

@@ -1,4 +1,6 @@
 defmodule ThistleTea.Game.Character do
+  use ThistleTea.Opcodes, [:CMSG_CHAR_ENUM, :SMSG_CHAR_ENUM, :CMSG_CHAR_CREATE, :SMSG_CHAR_CREATE]
+
   import ThistleTea.Util, only: [parse_string: 1, send_packet: 2]
 
   alias ThistleTea.DB.Mangos
@@ -7,12 +9,6 @@ defmodule ThistleTea.Game.Character do
   alias ThistleTea.Game.FieldStruct.MovementBlock
 
   require Logger
-
-  @cmsg_char_enum 0x037
-  @smsg_char_enum 0x03B
-
-  @cmsg_char_create 0x036
-  @smsg_char_create 0x03A
 
   def generate_random_equipment do
     %{

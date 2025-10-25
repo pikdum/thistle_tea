@@ -922,4 +922,15 @@ defmodule ThistleTea.Opcodes do
   def opcodes do
     @opcodes
   end
+
+  defmacro __using__(opcodes) do
+    for opcode <- opcodes do
+      opcode_value = Map.get(@reverse_opcodes, opcode)
+      attr_name = opcode |> Atom.to_string() |> String.downcase() |> String.to_atom()
+
+      quote do
+        Module.put_attribute(__MODULE__, unquote(attr_name), unquote(opcode_value))
+      end
+    end
+  end
 end

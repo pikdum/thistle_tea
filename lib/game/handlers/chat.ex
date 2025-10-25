@@ -1,21 +1,19 @@
 defmodule ThistleTea.Game.Chat do
+  use ThistleTea.Opcodes, [
+    :CMSG_MESSAGECHAT,
+    :SMSG_MESSAGECHAT,
+    :CMSG_JOIN_CHANNEL,
+    :CMSG_LEAVE_CHANNEL,
+    :CMSG_TEXT_EMOTE,
+    :SMSG_CHANNEL_NOTIFY,
+    :SMSG_CHAT_PLAYER_NOT_FOUND
+  ]
+
   import ThistleTea.Util, only: [parse_string: 1, send_packet: 2]
 
   alias ThistleTea.Game.Chat.Emote
 
   require Logger
-
-  @cmsg_messagechat 0x095
-  @smsg_messagechat 0x096
-
-  @cmsg_join_channel 0x097
-  @cmsg_leave_channel 0x098
-
-  @cmsg_text_emote 0x104
-
-  @smsg_channel_notify 0x099
-  # @smsg_channel_list 0x09B
-  @smsg_chat_player_not_found 0x2A9
 
   @chat_type_say 0x0
   @chat_type_party 0x1

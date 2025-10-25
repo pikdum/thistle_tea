@@ -1,13 +1,14 @@
 defmodule ThistleTea.Game.Logout do
+  use ThistleTea.Opcodes, [
+    :CMSG_LOGOUT_REQUEST,
+    :SMSG_LOGOUT_RESPONSE,
+    :CMSG_LOGOUT_CANCEL,
+    :SMSG_LOGOUT_CANCEL_ACK
+  ]
+
   import ThistleTea.Util, only: [send_packet: 2]
 
   require Logger
-
-  @cmsg_logout_request 0x04B
-  @smsg_logout_response 0x04C
-
-  @cmsg_logout_cancel 0x04E
-  @smsg_logout_cancel_ack 0x04F
 
   def handle_packet(@cmsg_logout_request, _body, state) do
     Logger.info("CMSG_LOGOUT_REQUEST")

@@ -1,9 +1,8 @@
 defmodule ThistleTea.Util do
+  use ThistleTea.Opcodes, [:SMSG_UPDATE_OBJECT, :SMSG_COMPRESSED_UPDATE_OBJECT]
+
   import Binary, only: [split_at: 2, trim_trailing: 1, reverse: 1]
   import Bitwise, only: [|||: 2, <<<: 2, &&&: 2]
-
-  @smsg_update_object 0x0A9
-  @smsg_compressed_update_object 0x1F6
 
   @range 250
 

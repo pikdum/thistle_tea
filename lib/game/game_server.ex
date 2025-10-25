@@ -1,6 +1,66 @@
 defmodule ThistleTea.Game do
   use ThousandIsland.Handler
 
+  use ThistleTea.Opcodes, [
+    :SMSG_AUTH_CHALLENGE,
+    :CMSG_AUTH_SESSION,
+    :SMSG_AUTH_RESPONSE,
+    :SMSG_PONG,
+    :SMSG_TRANSFER_PENDING,
+    :SMSG_NEW_WORLD,
+    :SMSG_DESTROY_OBJECT,
+    :SMSG_LOGOUT_COMPLETE,
+    :CMSG_CHAR_ENUM,
+    :CMSG_CHAR_CREATE,
+    :CMSG_MESSAGECHAT,
+    :CMSG_JOIN_CHANNEL,
+    :CMSG_LEAVE_CHANNEL,
+    :CMSG_TEXT_EMOTE,
+    :CMSG_ATTACKSWING,
+    :CMSG_ATTACKSTOP,
+    :CMSG_SETSHEATHED,
+    :CMSG_SET_SELECTION,
+    :CMSG_GOSSIP_HELLO,
+    :CMSG_GOSSIP_SELECT_OPTION,
+    :CMSG_NPC_TEXT_QUERY,
+    :CMSG_PLAYER_LOGIN,
+    :MSG_MOVE_WORLDPORT_ACK,
+    :CMSG_LOGOUT_REQUEST,
+    :CMSG_LOGOUT_CANCEL,
+    :MSG_MOVE_START_FORWARD,
+    :MSG_MOVE_START_BACKWARD,
+    :MSG_MOVE_STOP,
+    :MSG_MOVE_START_STRAFE_LEFT,
+    :MSG_MOVE_START_STRAFE_RIGHT,
+    :MSG_MOVE_STOP_STRAFE,
+    :MSG_MOVE_JUMP,
+    :MSG_MOVE_START_TURN_LEFT,
+    :MSG_MOVE_START_TURN_RIGHT,
+    :MSG_MOVE_STOP_TURN,
+    :MSG_MOVE_START_PITCH_UP,
+    :MSG_MOVE_START_PITCH_DOWN,
+    :MSG_MOVE_STOP_PITCH,
+    :MSG_MOVE_SET_RUN_MODE,
+    :MSG_MOVE_SET_WALK_MODE,
+    :MSG_MOVE_FALL_LAND,
+    :MSG_MOVE_START_SWIM,
+    :MSG_MOVE_STOP_SWIM,
+    :MSG_MOVE_SET_FACING,
+    :MSG_MOVE_SET_PITCH,
+    :MSG_MOVE_HEARTBEAT,
+    :CMSG_MOVE_FALL_RESET,
+    :CMSG_STANDSTATECHANGE,
+    :CMSG_PING,
+    :CMSG_NAME_QUERY,
+    :CMSG_ITEM_QUERY_SINGLE,
+    :CMSG_ITEM_NAME_QUERY,
+    :CMSG_GAMEOBJECT_QUERY,
+    :CMSG_CREATURE_QUERY,
+    :CMSG_WHO,
+    :CMSG_CAST_SPELL,
+    :CMSG_CANCEL_CAST
+  ]
+
   import Bitwise, only: [|||: 2]
   import ThistleTea.Game.Combat, only: [handle_attack_swing: 1]
   import ThistleTea.Game.Logout, only: [handle_logout: 1]
@@ -25,30 +85,10 @@ defmodule ThistleTea.Game do
 
   require Logger
 
-  @smsg_auth_challenge 0x1EC
-  @cmsg_auth_session 0x1ED
-  @smsg_auth_response 0x1EE
-  @smsg_pong 0x1DD
-
-  @smsg_transfer_pending 0x03F
-  @smsg_new_world 0x03E
-
-  @smsg_destroy_object 0x0AA
-
-  @smsg_logout_complete 0x04D
-
-  @cmsg_char_enum 0x037
-  @cmsg_char_create 0x036
-
   @character_opcodes [
     @cmsg_char_enum,
     @cmsg_char_create
   ]
-
-  @cmsg_messagechat 0x095
-  @cmsg_join_channel 0x097
-  @cmsg_leave_channel 0x098
-  @cmsg_text_emote 0x104
 
   @chat_opcodes [
     @cmsg_messagechat,
@@ -57,11 +97,6 @@ defmodule ThistleTea.Game do
     @cmsg_text_emote
   ]
 
-  @cmsg_attackswing 0x141
-  @cmsg_attackstop 0x142
-  @cmsg_setsheathed 0x1E0
-  @cmsg_set_selection 0x13D
-
   @combat_opcodes [
     @cmsg_attackswing,
     @cmsg_attackstop,
@@ -69,55 +104,21 @@ defmodule ThistleTea.Game do
     @cmsg_set_selection
   ]
 
-  @cmsg_gossip_hello 0x17B
-  @cmsg_gossip_select_option 0x17C
-  @cmsg_npc_text_query 0x17F
-
   @gossip_opcodes [
     @cmsg_gossip_hello,
     @cmsg_gossip_select_option,
     @cmsg_npc_text_query
   ]
 
-  @cmsg_player_login 0x03D
-  @msg_move_worldport_ack 0x0DC
-
   @login_opcodes [
     @cmsg_player_login,
     @msg_move_worldport_ack
   ]
 
-  @cmsg_logout_request 0x04B
-  @cmsg_logout_cancel 0x04E
-
   @logout_opcodes [
     @cmsg_logout_request,
     @cmsg_logout_cancel
   ]
-
-  @msg_move_start_forward 0x0B5
-  @msg_move_start_backward 0x0B6
-  @msg_move_stop 0x0B7
-  @msg_move_start_strafe_left 0x0B8
-  @msg_move_start_strafe_right 0x0B9
-  @msg_move_stop_strafe 0x0BA
-  @msg_move_jump 0x0BB
-  @msg_move_start_turn_left 0x0BC
-  @msg_move_start_turn_right 0x0BD
-  @msg_move_stop_turn 0x0BE
-  @msg_move_start_pitch_up 0x0BF
-  @msg_move_start_pitch_down 0x0C0
-  @msg_move_stop_pitch 0x0C1
-  @msg_move_set_run_mode 0x0C2
-  @msg_move_set_walk_mode 0x0C3
-  @msg_move_fall_land 0x0C9
-  @msg_move_start_swim 0x0CA
-  @msg_move_stop_swim 0x0CB
-  @msg_move_set_facing 0x0DA
-  @msg_move_set_pitch 0x0DB
-  @msg_move_heartbeat 0x0EE
-  @cmsg_move_fall_reset 0x2CA
-  @cmsg_standstatechange 0x101
 
   @movement_opcodes [
     @msg_move_start_forward,
@@ -145,18 +146,9 @@ defmodule ThistleTea.Game do
     @cmsg_standstatechange
   ]
 
-  @cmsg_ping 0x1DC
-
   @ping_opcodes [
     @cmsg_ping
   ]
-
-  @cmsg_name_query 0x050
-  @cmsg_item_query_single 0x056
-  @cmsg_item_name_query 0x2C4
-  @cmsg_gameobject_query 0x05E
-  @cmsg_creature_query 0x060
-  @cmsg_who 0x62
 
   @query_opcodes [
     @cmsg_name_query,
@@ -167,9 +159,6 @@ defmodule ThistleTea.Game do
     @cmsg_who
   ]
 
-  @cmsg_cast_spell 0x12E
-  @cmsg_cancel_cast 0x12F
-
   @spell_opcodes [
     @cmsg_cast_spell,
     @cmsg_cancel_cast
@@ -178,8 +167,6 @@ defmodule ThistleTea.Game do
   @update_flag_high_guid 0x08
   @update_flag_living 0x20
   @update_flag_has_position 0x40
-
-  @smsg_new_world 0x03E
 
   def dispatch_packet(opcode, payload, state) when opcode in @character_opcodes do
     Character.handle_packet(opcode, payload, state)

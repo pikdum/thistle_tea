@@ -1,10 +1,9 @@
 defmodule ThistleTea.Game.Chat.Emote do
+  use ThistleTea.Opcodes, [:SMSG_TEXT_EMOTE, :SMSG_EMOTE]
+
   alias ThistleTea.Game.Chat
 
   @range 25
-
-  @smsg_text_emote 0x105
-  @smsg_emote 0x103
 
   @text_emote_agree 1
   @text_emote_applaud 5
