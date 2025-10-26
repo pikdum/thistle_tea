@@ -1,26 +1,14 @@
-defmodule ThistleTea.Game.Chat do
-  use ThistleTea.Opcodes, [
-    :CMSG_MESSAGECHAT,
-    :SMSG_MESSAGECHAT,
-    :CMSG_JOIN_CHANNEL,
-    :CMSG_LEAVE_CHANNEL,
-    :CMSG_TEXT_EMOTE,
-    :SMSG_CHANNEL_NOTIFY,
-    :SMSG_CHAT_PLAYER_NOT_FOUND
-  ]
+defmodule ThistleTea.Game.Message.CmsgMessagechat do
+  use ThistleTea.Game.ClientMessage, :CMSG_MESSAGECHAT
 
-  import ThistleTea.Util, only: [parse_string: 1]
-
-  alias ThistleTea.Game.Chat.Emote
   alias ThistleTea.Game.Message
   alias ThistleTea.Util
 
   require Logger
 
+  defstruct [:chat_type, :language, :message, :target_name]
+
   @chat_type_say 0x0
-  # @chat_type_party 0x1
-  # @chat_type_raid 0x2
-  # @chat_type_guild 0x3
   @chat_type_yell 0x5
   @chat_type_whisper 0x6
   @chat_type_emote 0x8
@@ -73,7 +61,7 @@ defmodule ThistleTea.Game.Chat do
     end
   end
 
-  def get_player_pids_in_chat_range(state, range) do
+  def player_pids_in_range(state, range) do
     {x, y, z, _o} = state.character.movement.position
     nearby_players = SpatialHash.query(:players, state.character.map, x, y, z, range)
 
@@ -202,7 +190,7 @@ defmodule ThistleTea.Game.Chat do
         @chat_type_emote -> @emote_range
       end
 
-    pids_in_range = get_player_pids_in_chat_range(state, range)
+    pids_in_range = player_pids_in_range(state, range)
 
     for pid <- pids_in_range do
       GenServer.cast(pid, {:send_packet, packet.opcode, packet.payload})
@@ -283,60 +271,30 @@ defmodule ThistleTea.Game.Chat do
     state
   end
 
-  def handle_packet(@cmsg_messagechat, body, state) do
-    <<chat_type::little-size(32), _language::little-size(32), rest::binary>> = body
-    # hardcoded to universal language for now
-    language = 0
+  @impl ClientMessage
+  def handle(%__MODULE__{chat_type: chat_type, language: language, message: message, target_name: target_name}, state) do
+    handle_chat(state, chat_type, language, message, target_name)
+  end
+
+  @impl ClientMessage
+  def from_binary(payload) do
+    <<chat_type::little-size(32), language::little-size(32), rest::binary>> = payload
 
     {target_name, rest} =
       if chat_type in [@chat_type_whisper, @chat_type_channel] do
-        {:ok, target_name, rest} = parse_string(rest)
+        {:ok, target_name, rest} = Util.parse_string(rest)
         {target_name, rest}
       else
         {nil, rest}
       end
 
-    {:ok, message, _rest} = parse_string(rest)
+    {:ok, message, _rest} = Util.parse_string(rest)
 
-    state = handle_chat(state, chat_type, language, message, target_name)
-    {:continue, state}
-  end
-
-  def handle_packet(@cmsg_join_channel, body, state) do
-    {:ok, channel_name, rest} = parse_string(body)
-    {:ok, _channel_password, _} = parse_string(rest)
-    Logger.info("CMSG_JOIN_CHANNEL: #{channel_name}")
-
-    with [] <- ThistleTea.ChatChannel |> Registry.values(channel_name, self()) do
-      ThistleTea.ChatChannel
-      |> Registry.register(channel_name, state.guid)
-
-      Util.send_packet(%Message.SmsgChannelNotify{
-        notify_type: 0x02,
-        channel_name: channel_name
-      })
-    end
-
-    {:continue, state}
-  end
-
-  def handle_packet(@cmsg_leave_channel, body, state) do
-    {:ok, channel_name, _} = parse_string(body)
-    Logger.info("CMSG_LEAVE_CHANNEL: #{channel_name}")
-
-    ThistleTea.ChatChannel
-    |> Registry.unregister(channel_name)
-
-    Util.send_packet(%Message.SmsgChannelNotify{
-      notify_type: 0x03,
-      channel_name: channel_name
-    })
-
-    {:continue, state}
-  end
-
-  def handle_packet(@cmsg_text_emote, body, state) do
-    Emote.handle_packet(body, state)
-    {:continue, state}
+    %__MODULE__{
+      chat_type: chat_type,
+      language: language,
+      message: message,
+      target_name: target_name
+    }
   end
 end

@@ -1,7 +1,10 @@
-defmodule ThistleTea.Game.Chat.Emote do
-  use ThistleTea.Opcodes, [:SMSG_TEXT_EMOTE, :SMSG_EMOTE]
+defmodule ThistleTea.Game.Message.CmsgTextEmote do
+  use ThistleTea.Game.ClientMessage, :CMSG_TEXT_EMOTE
 
-  alias ThistleTea.Game.Chat
+  alias ThistleTea.Game.Message
+  alias ThistleTea.Game.Message.CmsgMessagechat
+
+  defstruct [:text_emote, :emote, :target]
 
   @range 25
 
@@ -88,22 +91,6 @@ defmodule ThistleTea.Game.Chat.Emote do
     }
   end
 
-  defp text_emote_packet(sender_guid, text_emote, emote_num, target_name) do
-    target_name_length = String.length(target_name) + 1
-
-    <<sender_guid::little-size(64)>> <>
-      <<text_emote::little-size(32)>> <>
-      <<emote_num::little-size(32)>> <>
-      <<target_name_length::little-size(32)>> <> target_name <> <<0>>
-  end
-
-  defp emote_packet(sender_guid, text_emote) do
-    emote_id = text_emote_to_emote()[text_emote] || 0
-
-    <<emote_id::little-size(32)>> <>
-      <<sender_guid::little-size(64)>>
-  end
-
   defp get_target_name(0) do
     ""
   end
@@ -113,18 +100,35 @@ defmodule ThistleTea.Game.Chat.Emote do
     GenServer.call(pid, :get_name)
   end
 
-  def handle_packet(body, state) do
-    <<text_emote::little-size(32), emote::little-size(32), target::little-size(64)>> = body
-
+  @impl ClientMessage
+  def handle(%__MODULE__{text_emote: text_emote, emote: emote, target: target}, state) do
     target_name = get_target_name(target)
-    text_emote_p = text_emote_packet(state.guid, text_emote, emote, target_name)
-    emote_p = emote_packet(state.guid, text_emote)
+    emote_id = text_emote_to_emote()[text_emote] || 0
 
-    pids_in_range = Chat.get_player_pids_in_chat_range(state, @range)
+    text_emote_msg = %Message.SmsgTextEmote{guid: state.guid, text_emote: text_emote, emote: emote, name: target_name}
+    emote_msg = %Message.SmsgEmote{emote: emote_id, guid: state.guid}
+
+    packet_text = Message.to_packet(text_emote_msg)
+    packet_emote = Message.to_packet(emote_msg)
+
+    pids_in_range = CmsgMessagechat.player_pids_in_range(state, @range)
 
     for pid <- pids_in_range do
-      GenServer.cast(pid, {:send_packet, @smsg_emote, emote_p})
-      GenServer.cast(pid, {:send_packet, @smsg_text_emote, text_emote_p})
+      GenServer.cast(pid, {:send_packet, packet_text.opcode, packet_text.payload})
+      GenServer.cast(pid, {:send_packet, packet_emote.opcode, packet_emote.payload})
     end
+
+    state
+  end
+
+  @impl ClientMessage
+  def from_binary(payload) do
+    <<text_emote::little-size(32), emote::little-size(32), target::little-size(64)>> = payload
+
+    %__MODULE__{
+      text_emote: text_emote,
+      emote: emote,
+      target: target
+    }
   end
 end

@@ -1,16 +1,5 @@
-defmodule ThistleTea.Game.Login do
-  use ThistleTea.Opcodes, [
-    :CMSG_PLAYER_LOGIN,
-    :SMSG_LOGIN_VERIFY_WORLD,
-    :SMSG_ACCOUNT_DATA_TIMES,
-    :SMSG_SET_REST_START,
-    :SMSG_BINDPOINTUPDATE,
-    :SMSG_TUTORIAL_FLAGS,
-    :SMSG_INITIAL_SPELLS,
-    :SMSG_LOGIN_SETTIMESPEED,
-    :SMSG_TRIGGER_CINEMATIC,
-    :MSG_MOVE_WORLDPORT_ACK
-  ]
+defmodule ThistleTea.Game.Message.CmsgPlayerLogin do
+  use ThistleTea.Game.ClientMessage, :CMSG_PLAYER_LOGIN
 
   import Bitwise, only: [<<<: 2, |||: 2]
 
@@ -34,9 +23,10 @@ defmodule ThistleTea.Game.Login do
   @update_flag_living 0x20
   @update_flag_has_position 0x40
 
-  def handle_packet(@cmsg_player_login, body, state) do
-    <<character_guid::little-size(64)>> = body
+  defstruct [:character_guid]
 
+  @impl ClientMessage
+  def handle(%__MODULE__{character_guid: character_guid}, state) do
     {:ok, c} = ThistleTea.Character.get_character(state.account.id, character_guid)
 
     :ets.insert(:guid_name, {character_guid, c.name, "", c.race, c.gender, c.class})
@@ -60,21 +50,22 @@ defmodule ThistleTea.Game.Login do
 
     {:ok, spawn_timer} = :timer.send_interval(1000, :spawn_objects)
 
-    new_state =
-      Map.merge(state, %{
-        guid: character_guid,
-        packed_guid: pack_guid(character_guid),
-        character: c,
-        spawn_timer: spawn_timer,
-        ready: true
-      })
-
-    {:continue, new_state}
+    Map.merge(state, %{
+      guid: character_guid,
+      packed_guid: pack_guid(character_guid),
+      character: c,
+      spawn_timer: spawn_timer,
+      ready: true
+    })
   end
 
-  def handle_packet(@msg_move_worldport_ack, _body, state) do
-    send_login_init_packets(state.character)
-    {:continue, state |> Map.put(:ready, true)}
+  @impl ClientMessage
+  def from_binary(payload) do
+    <<character_guid::little-size(64)>> = payload
+
+    %__MODULE__{
+      character_guid: character_guid
+    }
   end
 
   def send_login_init_packets(c) do
