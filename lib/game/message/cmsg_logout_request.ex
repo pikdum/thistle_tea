@@ -1,38 +1,24 @@
-defmodule ThistleTea.Game.Logout do
-  use ThistleTea.Opcodes, [
-    :CMSG_LOGOUT_REQUEST,
-    :SMSG_LOGOUT_RESPONSE,
-    :CMSG_LOGOUT_CANCEL,
-    :SMSG_LOGOUT_CANCEL_ACK
-  ]
+defmodule ThistleTea.Game.Message.CmsgLogoutRequest do
+  use ThistleTea.Game.ClientMessage, :CMSG_LOGOUT_REQUEST
 
   alias ThistleTea.Game.Message
   alias ThistleTea.Util
 
   require Logger
 
-  def handle_packet(@cmsg_logout_request, _body, state) do
+  defstruct []
+
+  @impl ClientMessage
+  def handle(%__MODULE__{}, state) do
     Logger.info("CMSG_LOGOUT_REQUEST")
     Util.send_packet(%Message.SmsgLogoutResponse{result: 0, speed: 0})
     logout_timer = Process.send_after(self(), :logout_complete, 1_000)
-    {:continue, Map.put(state, :logout_timer, logout_timer)}
+    Map.put(state, :logout_timer, logout_timer)
   end
 
-  def handle_packet(@cmsg_logout_cancel, _body, state) do
-    Logger.info("CMSG_LOGOUT_CANCEL")
-
-    state =
-      case Map.get(state, :logout_timer, nil) do
-        nil ->
-          state
-
-        timer ->
-          Process.cancel_timer(timer)
-          Map.delete(state, :logout_timer)
-      end
-
-    Util.send_packet(%Message.SmsgLogoutCancelAck{})
-    {:continue, state}
+  @impl ClientMessage
+  def from_binary(_payload) do
+    %__MODULE__{}
   end
 
   def handle_logout(state) do

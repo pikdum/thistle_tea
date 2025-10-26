@@ -9,24 +9,10 @@ defmodule ThistleTea.Game do
     :SMSG_TRANSFER_PENDING,
     :SMSG_NEW_WORLD,
     :SMSG_DESTROY_OBJECT,
-    :SMSG_LOGOUT_COMPLETE,
     :CMSG_CHAR_ENUM,
     :CMSG_CHAR_CREATE,
-    :CMSG_MESSAGECHAT,
-    :CMSG_JOIN_CHANNEL,
-    :CMSG_LEAVE_CHANNEL,
-    :CMSG_TEXT_EMOTE,
-    :CMSG_ATTACKSWING,
-    :CMSG_ATTACKSTOP,
-    :CMSG_SETSHEATHED,
-    :CMSG_SET_SELECTION,
-    :CMSG_GOSSIP_HELLO,
-    :CMSG_GOSSIP_SELECT_OPTION,
-    :CMSG_NPC_TEXT_QUERY,
     :CMSG_PLAYER_LOGIN,
     :MSG_MOVE_WORLDPORT_ACK,
-    :CMSG_LOGOUT_REQUEST,
-    :CMSG_LOGOUT_CANCEL,
     :MSG_MOVE_START_FORWARD,
     :MSG_MOVE_START_BACKWARD,
     :MSG_MOVE_STOP,
@@ -50,35 +36,19 @@ defmodule ThistleTea.Game do
     :MSG_MOVE_HEARTBEAT,
     :CMSG_MOVE_FALL_RESET,
     :CMSG_STANDSTATECHANGE,
-    :CMSG_PING,
-    :CMSG_NAME_QUERY,
-    :CMSG_ITEM_QUERY_SINGLE,
-    :CMSG_ITEM_NAME_QUERY,
-    :CMSG_GAMEOBJECT_QUERY,
-    :CMSG_CREATURE_QUERY,
-    :CMSG_WHO,
     :CMSG_CAST_SPELL,
     :CMSG_CANCEL_CAST
   ]
 
   import Bitwise, only: [|||: 2]
-  import ThistleTea.Game.Combat, only: [handle_attack_swing: 1]
-  import ThistleTea.Game.Logout, only: [handle_logout: 1]
   import ThistleTea.Game.Spell, only: [handle_spell_complete: 1]
 
-  alias ThistleTea.Game.Character
-  alias ThistleTea.Game.Chat
-  alias ThistleTea.Game.Combat
   alias ThistleTea.Game.Connection
   alias ThistleTea.Game.Entity
-  alias ThistleTea.Game.Gossip
   alias ThistleTea.Game.Login
-  alias ThistleTea.Game.Logout
   alias ThistleTea.Game.Message
   alias ThistleTea.Game.Movement
   alias ThistleTea.Game.Packet
-  alias ThistleTea.Game.Ping
-  alias ThistleTea.Game.Query
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Utils.UpdateObject
   alias ThistleTea.Util
@@ -86,39 +56,9 @@ defmodule ThistleTea.Game do
 
   require Logger
 
-  @character_opcodes [
-    @cmsg_char_enum,
-    @cmsg_char_create
-  ]
-
-  @chat_opcodes [
-    @cmsg_messagechat,
-    @cmsg_join_channel,
-    @cmsg_leave_channel,
-    @cmsg_text_emote
-  ]
-
-  @combat_opcodes [
-    @cmsg_attackswing,
-    @cmsg_attackstop,
-    @cmsg_setsheathed,
-    @cmsg_set_selection
-  ]
-
-  @gossip_opcodes [
-    @cmsg_gossip_hello,
-    @cmsg_gossip_select_option,
-    @cmsg_npc_text_query
-  ]
-
   @login_opcodes [
     @cmsg_player_login,
     @msg_move_worldport_ack
-  ]
-
-  @logout_opcodes [
-    @cmsg_logout_request,
-    @cmsg_logout_cancel
   ]
 
   @movement_opcodes [
@@ -147,19 +87,6 @@ defmodule ThistleTea.Game do
     @cmsg_standstatechange
   ]
 
-  @ping_opcodes [
-    @cmsg_ping
-  ]
-
-  @query_opcodes [
-    @cmsg_name_query,
-    @cmsg_item_query_single,
-    @cmsg_item_name_query,
-    @cmsg_gameobject_query,
-    @cmsg_creature_query,
-    @cmsg_who
-  ]
-
   @spell_opcodes [
     @cmsg_cast_spell,
     @cmsg_cancel_cast
@@ -169,40 +96,12 @@ defmodule ThistleTea.Game do
   @update_flag_living 0x20
   @update_flag_has_position 0x40
 
-  def dispatch_packet(opcode, payload, state) when opcode in @character_opcodes do
-    Character.handle_packet(opcode, payload, state)
-  end
-
-  def dispatch_packet(opcode, payload, state) when opcode in @chat_opcodes do
-    Chat.handle_packet(opcode, payload, state)
-  end
-
-  def dispatch_packet(opcode, payload, state) when opcode in @combat_opcodes do
-    Combat.handle_packet(opcode, payload, state)
-  end
-
-  def dispatch_packet(opcode, payload, state) when opcode in @gossip_opcodes do
-    Gossip.handle_packet(opcode, payload, state)
-  end
-
   def dispatch_packet(opcode, payload, state) when opcode in @login_opcodes do
     Login.handle_packet(opcode, payload, state)
   end
 
-  def dispatch_packet(opcode, payload, state) when opcode in @logout_opcodes do
-    Logout.handle_packet(opcode, payload, state)
-  end
-
   def dispatch_packet(opcode, payload, state) when opcode in @movement_opcodes do
     Movement.handle_packet(opcode, payload, state)
-  end
-
-  def dispatch_packet(opcode, payload, state) when opcode in @ping_opcodes do
-    Ping.handle_packet(opcode, payload, state)
-  end
-
-  def dispatch_packet(opcode, payload, state) when opcode in @query_opcodes do
-    Query.handle_packet(opcode, payload, state)
   end
 
   def dispatch_packet(opcode, payload, state) when opcode in @spell_opcodes do
@@ -341,7 +240,7 @@ defmodule ThistleTea.Game do
   @impl GenServer
   def handle_info(:logout_complete, {socket, state}) do
     Util.send_packet(%Message.SmsgLogoutComplete{})
-    state = handle_logout(state)
+    state = Message.CmsgLogoutRequest.handle_logout(state)
     {:noreply, {socket, state}, socket.read_timeout}
   end
 
@@ -353,7 +252,7 @@ defmodule ThistleTea.Game do
 
   @impl GenServer
   def handle_info(:attack_swing, {socket, state}) do
-    state = handle_attack_swing(state)
+    state = Message.CmsgAttackswing.handle_attack_swing(state)
     {:noreply, {socket, state}, socket.read_timeout}
   end
 
@@ -457,6 +356,6 @@ defmodule ThistleTea.Game do
   @impl ThousandIsland.Handler
   def handle_close(_socket, state) do
     Logger.info("CLIENT DISCONNECTED")
-    handle_logout(state)
+    Message.CmsgLogoutRequest.handle_logout(state)
   end
 end

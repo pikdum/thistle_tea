@@ -26,7 +26,7 @@ defmodule ThistleTea.Game.Movement do
         :CMSG_STANDSTATECHANGE
       ]
 
-  import ThistleTea.Game.Character, only: [generate_random_equipment: 0]
+  import ThistleTea.Game.Message.CmsgCharCreate, only: [generate_random_equipment: 0]
   import ThistleTea.Util, only: [send_update_packet: 1]
 
   alias ThistleTea.Game.FieldStruct.MovementBlock

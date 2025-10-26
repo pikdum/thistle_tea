@@ -31,7 +31,7 @@ defmodule ThistleTea.Game.Message.SmsgMessagechat do
   @impl ServerMessage
   def to_binary(%__MODULE__{
         chat_type: chat_type,
-        language: language,
+        language: _language,
         sender_guid: sender_guid,
         message: message,
         channel_name: channel_name,
@@ -39,6 +39,8 @@ defmodule ThistleTea.Game.Message.SmsgMessagechat do
         tag: tag
       }) do
     message_length = String.length(message) + 1
+    # TODO: hardcoded language to 0 (universal) for now
+    language = 0
 
     <<chat_type::little-size(8), language::little-size(32)>> <>
       case chat_type do
