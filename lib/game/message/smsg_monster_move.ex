@@ -1,7 +1,8 @@
 defmodule ThistleTea.Game.Message.SmsgMonsterMove do
+  use ThistleTea.Game.ServerMessage, :SMSG_MONSTER_MOVE
+
   alias ThistleTea.Game.FieldStruct
   alias ThistleTea.Game.Message
-  alias ThistleTea.Game.Message.SmsgMonsterMove
   alias ThistleTea.Util
 
   # @move_type_normal 0
@@ -22,10 +23,6 @@ defmodule ThistleTea.Game.Message.SmsgMonsterMove do
     :duration,
     :splines
   ]
-
-  defimpl Message do
-    def to_binary(message), do: SmsgMonsterMove.to_binary(message)
-  end
 
   def build(%{
         object: %FieldStruct.Object{guid: guid},

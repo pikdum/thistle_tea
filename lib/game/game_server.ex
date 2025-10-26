@@ -224,42 +224,33 @@ defmodule ThistleTea.Game do
 
     state = handle_packets(%{state | conn: conn})
 
-    Logger.info("State after handling packets: #{inspect(state)}")
-
     {:continue, state}
   end
 
   def handle_packets(%{conn: %Connection{packet_queue: []}} = state), do: state
 
-  def handle_packets(%{conn: %Connection{packet_queue: [packet | rest]} = conn} = state) do
-    dbg(conn)
-    Logger.debug("Received packet: #{inspect(packet)}")
-
+  def handle_packets(%{conn: %Connection{packet_queue: [packet | rest]}} = state) do
     case Packet.implemented?(packet.opcode) do
       true ->
-        Logger.info("Handling packet (new): #{ThistleTea.Opcodes.get(packet.opcode)}")
-
+        Logger.info("Handling packet opcode=#{packet.opcode}")
         state = Packet.to_message(packet) |> Handler.handle(state) |> handle_outbox() |> dbg()
-
-        Logger.info("Is this happening?")
-
         %{state | conn: %{state.conn | packet_queue: rest}}
 
       false ->
-        Logger.info("Handling packet (legacy): #{ThistleTea.Opcodes.get(packet.opcode)}")
+        Logger.info("Handling packet opcode=#{packet.opcode} (legacy)")
         {_, state} = dispatch_packet(packet.opcode, packet.payload, state)
         %{state | conn: %{state.conn | packet_queue: rest}}
     end
+    |> handle_packets()
   end
 
   def handle_outbox(%{conn: %Connection{outbox: []}} = state), do: state
 
-  def handle_outbox(%{conn: %Connection{outbox: [message | rest]} = conn} = state) do
-    dbg(conn)
-    Logger.info("Sending packet from outbox: #{inspect(message)}")
+  def handle_outbox(%{conn: %Connection{outbox: [message | rest]}} = state) do
     packet = message |> Message.to_packet()
     send_packet(packet.opcode, packet.payload)
-    %{state | conn: %{conn | outbox: rest}}
+    state = %{state | conn: %{state.conn | outbox: rest}}
+    handle_outbox(state)
   end
 
   @impl GenServer

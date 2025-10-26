@@ -1,8 +1,5 @@
 defmodule ThistleTea.Game.Message.CmsgAuthSession do
-  alias ThistleTea.Game.Connection
-  alias ThistleTea.Game.Handler
-  alias ThistleTea.Game.Message
-  alias ThistleTea.Util
+  use ThistleTea.Game.ClientMessage, :CMSG_AUTH_SESSION
 
   defstruct [
     :build,
@@ -12,10 +9,7 @@ defmodule ThistleTea.Game.Message.CmsgAuthSession do
     :client_proof
   ]
 
-  defimpl Handler do
-    def handle(message, state), do: Message.CmsgAuthSession.handle(message, state)
-  end
-
+  @impl ClientMessage
   def handle(%__MODULE__{username: username} = message, %{conn: %Connection{} = conn} = state) do
     with {:ok, conn} <- get_session_key(conn, message),
          {:ok, conn} <- verify_proof(conn, message) do
