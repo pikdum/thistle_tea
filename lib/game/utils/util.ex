@@ -4,6 +4,9 @@ defmodule ThistleTea.Util do
   import Binary, only: [split_at: 2, trim_trailing: 1, reverse: 1]
   import Bitwise, only: [|||: 2, <<<: 2, &&&: 2]
 
+  alias ThistleTea.Game.Message
+  alias ThistleTea.Game.Packet
+
   @range 250
 
   def random_int(min, max) when is_float(min) and is_float(max) do
@@ -23,6 +26,15 @@ defmodule ThistleTea.Util do
     {x2, y2, z2} = b
 
     abs(x1 - x2) <= range && abs(y1 - y2) <= range && abs(z1 - z2) <= range
+  end
+
+  def send_packet(%Packet{opcode: opcode, payload: payload}) do
+    send_packet(opcode, payload)
+  end
+
+  def send_packet(message) do
+    packet = message |> Message.to_packet()
+    send_packet(packet.opcode, packet.payload)
   end
 
   def send_packet(opcode, payload) do

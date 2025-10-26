@@ -65,7 +65,6 @@ defmodule ThistleTea.Game do
   import ThistleTea.Game.Combat, only: [handle_attack_swing: 1]
   import ThistleTea.Game.Logout, only: [handle_logout: 1]
   import ThistleTea.Game.Spell, only: [handle_spell_complete: 1]
-  import ThistleTea.Util, only: [send_packet: 2, send_update_packet: 1]
 
   alias ThistleTea.Game.Character
   alias ThistleTea.Game.Chat
@@ -82,6 +81,7 @@ defmodule ThistleTea.Game do
   alias ThistleTea.Game.Query
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Utils.UpdateObject
+  alias ThistleTea.Util
   alias ThousandIsland.Socket
 
   require Logger
@@ -229,14 +229,16 @@ defmodule ThistleTea.Game do
   def handle_packets(%{conn: %Connection{packet_queue: []}} = state), do: state
 
   def handle_packets(%{conn: %Connection{packet_queue: [packet | rest]}} = state) do
+    message_name = ThistleTea.Opcodes.get(packet.opcode)
+
     case Packet.implemented?(packet.opcode) do
       true ->
-        Logger.info("Handling packet opcode=#{packet.opcode}")
+        Logger.debug("Received: #{message_name}")
         state = Packet.to_message(packet) |> Message.handle(state) |> handle_outbox() |> dbg()
         %{state | conn: %{state.conn | packet_queue: rest}}
 
       false ->
-        Logger.info("Handling packet opcode=#{packet.opcode} (legacy)")
+        Logger.debug("Received: #{message_name} (legacy)")
         {_, state} = dispatch_packet(packet.opcode, packet.payload, state)
         %{state | conn: %{state.conn | packet_queue: rest}}
     end
@@ -246,15 +248,15 @@ defmodule ThistleTea.Game do
   def handle_outbox(%{conn: %Connection{outbox: []}} = state), do: state
 
   def handle_outbox(%{conn: %Connection{outbox: [message | rest]}} = state) do
-    packet = message |> Message.to_packet()
-    send_packet(packet.opcode, packet.payload)
+    Util.send_packet(message)
     state = %{state | conn: %{state.conn | outbox: rest}}
     handle_outbox(state)
   end
 
   @impl GenServer
   def handle_cast({:send_packet, opcode, payload}, {socket, state}) do
-    Logger.debug("Sending packet opcode=#{opcode} payload_size=#{byte_size(payload)}")
+    message_name = ThistleTea.Opcodes.get(opcode)
+    Logger.debug("Sent: #{message_name}")
     size = byte_size(payload) + 2
     header = <<size::big-size(16), opcode::little-size(16)>>
 
@@ -265,7 +267,7 @@ defmodule ThistleTea.Game do
 
   @impl GenServer
   def handle_cast({:send_update_packet, packet}, {socket, state}) do
-    send_update_packet(packet)
+    Util.send_update_packet(packet)
     {:noreply, {socket, state}, socket.read_timeout}
   end
 
@@ -292,7 +294,7 @@ defmodule ThistleTea.Game do
 
   @impl GenServer
   def handle_cast({:destroy_object, guid}, {socket, state}) do
-    send_packet(@smsg_destroy_object, <<guid::little-size(64)>>)
+    Util.send_packet(@smsg_destroy_object, <<guid::little-size(64)>>)
     # TODO: remove from spawned_players/etc.?
     {:noreply, {socket, state}, socket.read_timeout}
   end
@@ -301,7 +303,7 @@ defmodule ThistleTea.Game do
   def handle_cast({:start_teleport, x, y, z, map}, {socket, state}) do
     # Send player's client to loading screen to load the new map
     transfer_pending_packet = <<map::little-size(32)>>
-    send_packet(@smsg_transfer_pending, transfer_pending_packet)
+    Util.send_packet(@smsg_transfer_pending, transfer_pending_packet)
 
     # Update player's location
     area =
@@ -347,7 +349,7 @@ defmodule ThistleTea.Game do
       orientation::little-float-size(32)
     >>
 
-    send_packet(@smsg_new_world, new_world_packet)
+    Util.send_packet(@smsg_new_world, new_world_packet)
 
     # The client responds with a MSG_MOVE_WORLDPORT_ACK message which
     # is handled in the login handler as they share the same init process
@@ -356,7 +358,7 @@ defmodule ThistleTea.Game do
 
   @impl GenServer
   def handle_info(:logout_complete, {socket, state}) do
-    send_packet(@smsg_logout_complete, <<>>)
+    Util.send_packet(@smsg_logout_complete, <<>>)
     state = handle_logout(state)
     {:noreply, {socket, state}, socket.read_timeout}
   end
@@ -405,16 +407,16 @@ defmodule ThistleTea.Game do
     # TODO: update a reverse mapping, so mobs know nearby players?
     for {guid, pid} <- players_to_remove do
       if pid != self() do
-        send_packet(@smsg_destroy_object, <<guid::little-size(64)>>)
+        Util.send_packet(@smsg_destroy_object, <<guid::little-size(64)>>)
       end
     end
 
     for {guid, _pid} <- mobs_to_remove do
-      send_packet(@smsg_destroy_object, <<guid::little-size(64)>>)
+      Util.send_packet(@smsg_destroy_object, <<guid::little-size(64)>>)
     end
 
     for {guid, _pid} <- game_objects_to_remove do
-      send_packet(@smsg_destroy_object, <<guid::little-size(64)>>)
+      Util.send_packet(@smsg_destroy_object, <<guid::little-size(64)>>)
     end
 
     for {_guid, pid} <- players_to_add do
