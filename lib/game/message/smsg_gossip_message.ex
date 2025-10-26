@@ -27,12 +27,7 @@ defmodule ThistleTea.Game.Message.SmsgGossipMessage do
   end
 
   @impl ServerMessage
-  def to_binary(%__MODULE__{
-        guid: guid,
-        title_text_id: title_text_id,
-        gossips: gossips,
-        quests: quests
-      }) do
+  def to_binary(%__MODULE__{guid: guid, title_text_id: title_text_id, gossips: gossips, quests: quests}) do
     gossip_data =
       gossips
       |> Enum.map(fn %GossipItem{id: id, item_icon: item_icon, coded: coded, message: message} ->

@@ -29,10 +29,10 @@ defmodule ThistleTea.Game.Message.SmsgSpellStart do
       caster <>
       <<spell::little-size(32), flags::little-size(16), timer::little-size(32)>> <>
       targets <>
-      if Bitwise.band(flags, @cast_flags_ammo) != 0 do
-        <<ammo_display_id::little-size(32), ammo_inventory_type::little-size(32)>>
-      else
+      if Bitwise.band(flags, @cast_flags_ammo) == 0 do
         <<>>
+      else
+        <<ammo_display_id::little-size(32), ammo_inventory_type::little-size(32)>>
       end
   end
 end

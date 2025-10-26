@@ -19,11 +19,7 @@ defmodule ThistleTea.Game.Message.SmsgWho do
   ]
 
   @impl ServerMessage
-  def to_binary(%__MODULE__{
-        listed_players: listed_players,
-        online_players: online_players,
-        players: players
-      }) do
+  def to_binary(%__MODULE__{listed_players: listed_players, online_players: online_players, players: players}) do
     players_binary =
       players
       |> Enum.map(fn player ->

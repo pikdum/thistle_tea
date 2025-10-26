@@ -9,12 +9,7 @@ defmodule ThistleTea.Game.Message.SmsgTransferPending do
   ]
 
   @impl ServerMessage
-  def to_binary(%__MODULE__{
-        map: map,
-        has_transport: has_transport,
-        transport: transport,
-        transport_map: transport_map
-      }) do
+  def to_binary(%__MODULE__{map: map, has_transport: has_transport, transport: transport, transport_map: transport_map}) do
     <<map::little-size(32)>> <>
       if has_transport do
         <<transport::little-size(32), transport_map::little-size(32)>>

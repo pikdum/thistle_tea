@@ -15,10 +15,7 @@ defmodule ThistleTea.Game.Message.SmsgNpcTextUpdate do
   end
 
   @impl ServerMessage
-  def to_binary(%__MODULE__{
-        text_id: text_id,
-        texts: texts
-      }) do
+  def to_binary(%__MODULE__{text_id: text_id, texts: texts}) do
     <<text_id::little-size(32)>> <>
       Enum.map_join(texts, fn text ->
         <<text.probability::little-float-size(32)>> <>

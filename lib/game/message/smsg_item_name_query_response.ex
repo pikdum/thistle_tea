@@ -7,10 +7,7 @@ defmodule ThistleTea.Game.Message.SmsgItemNameQueryResponse do
   ]
 
   @impl ServerMessage
-  def to_binary(%__MODULE__{
-        item_id: item_id,
-        item_name: item_name
-      }) do
+  def to_binary(%__MODULE__{item_id: item_id, item_name: item_name}) do
     <<item_id::little-size(32)>> <> item_name <> <<0>>
   end
 end

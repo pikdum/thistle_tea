@@ -8,11 +8,7 @@ defmodule ThistleTea.Game.Message.SmsgNewWorld do
   ]
 
   @impl ServerMessage
-  def to_binary(%__MODULE__{
-        map: map,
-        position: %{x: x, y: y, z: z},
-        orientation: orientation
-      }) do
+  def to_binary(%__MODULE__{map: map, position: %{x: x, y: y, z: z}, orientation: orientation}) do
     <<
       map::little-size(32),
       x::little-float-size(32),

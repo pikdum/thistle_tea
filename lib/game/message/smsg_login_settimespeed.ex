@@ -7,10 +7,7 @@ defmodule ThistleTea.Game.Message.SmsgLoginSettimespeed do
   ]
 
   @impl ServerMessage
-  def to_binary(%__MODULE__{
-        datetime: datetime,
-        timescale: timescale
-      }) do
+  def to_binary(%__MODULE__{datetime: datetime, timescale: timescale}) do
     <<datetime::little-size(32), timescale::little-float-size(32)>>
   end
 end

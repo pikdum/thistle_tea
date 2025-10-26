@@ -41,8 +41,7 @@ defmodule ThistleTea.Game.Message.SmsgCastResult do
                 <<area::little-size(32)>>
 
               @cast_failure_reason_equipped_item_class ->
-                <<equipped_item_class::little-size(32),
-                  equipped_item_subclass_mask::little-size(32),
+                <<equipped_item_class::little-size(32), equipped_item_subclass_mask::little-size(32),
                   equipped_item_inventory_type_mask::little-size(32)>>
 
               _ ->

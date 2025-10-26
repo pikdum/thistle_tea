@@ -16,11 +16,7 @@ defmodule ThistleTea.Game.Message.SmsgInitialSpells do
   ]
 
   @impl ServerMessage
-  def to_binary(%__MODULE__{
-        unknown1: unknown1,
-        initial_spells: initial_spells,
-        cooldowns: cooldowns
-      }) do
+  def to_binary(%__MODULE__{unknown1: unknown1, initial_spells: initial_spells, cooldowns: cooldowns}) do
     spell_count = length(initial_spells)
     cooldown_count = length(cooldowns)
 

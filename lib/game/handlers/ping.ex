@@ -1,7 +1,8 @@
 defmodule ThistleTea.Game.Ping do
   use ThistleTea.Opcodes, [:CMSG_PING, :SMSG_PONG]
 
-  import ThistleTea.Util, only: [send_packet: 2]
+  alias ThistleTea.Game.Message
+  alias ThistleTea.Util
 
   require Logger
 
@@ -10,7 +11,7 @@ defmodule ThistleTea.Game.Ping do
 
     Logger.info("CMSG_PING: #{latency}")
 
-    send_packet(@smsg_pong, <<sequence_id::little-size(32)>>)
+    Util.send_packet(%Message.SmsgPong{sequence_id: sequence_id})
     {:continue, Map.put(state, :latency, latency)}
   end
 end

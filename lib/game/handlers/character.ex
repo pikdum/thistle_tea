@@ -1,12 +1,16 @@
 defmodule ThistleTea.Game.Character do
   use ThistleTea.Opcodes, [:CMSG_CHAR_ENUM, :SMSG_CHAR_ENUM, :CMSG_CHAR_CREATE, :SMSG_CHAR_CREATE]
 
-  import ThistleTea.Util, only: [parse_string: 1, send_packet: 2]
+  import ThistleTea.Util, only: [parse_string: 1]
 
   alias ThistleTea.DB.Mangos
   alias ThistleTea.DB.Mangos.ItemTemplate
   alias ThistleTea.DBC
   alias ThistleTea.Game.FieldStruct.MovementBlock
+  alias ThistleTea.Game.Message
+  alias ThistleTea.Game.Message.SmsgCharEnum.Character
+  alias ThistleTea.Game.Message.SmsgCharEnum.CharacterGear
+  alias ThistleTea.Util
 
   require Logger
 
@@ -46,72 +50,82 @@ defmodule ThistleTea.Game.Character do
     Logger.info("CMSG_CHAR_ENUM")
 
     characters = ThistleTea.Character.get_characters!(state.account.id)
-    length = characters |> Enum.count()
 
-    characters_payload =
+    characters_structs =
       characters
       |> Enum.map(fn c ->
         {x, y, z, _o} = c.movement.position
 
-        <<c.id::little-size(64)>> <>
-          c.name <>
-          <<0, c.race, c.class, c.gender, c.skin, c.face, c.hair_style, c.hair_color, c.facial_hair>> <>
-          <<
-            c.level,
-            c.area::little-size(32),
-            c.map::little-size(32),
-            x::little-float-size(32),
-            y::little-float-size(32),
-            z::little-float-size(32)
-          >> <>
-          <<
-            # guild_id
-            0::little-size(32),
-            # flags
-            0::little-size(32),
-            # first_login
-            0,
-            # pet_display_id
-            0::little-size(32),
-            # pet_level
-            0::little-size(32),
-            # pet_family
-            0::little-size(32)
-          >> <>
-          get_equipment(c, :head) <>
-          get_equipment(c, :neck) <>
-          get_equipment(c, :shoulders) <>
-          get_equipment(c, :body) <>
-          get_equipment(c, :chest) <>
-          get_equipment(c, :waist) <>
-          get_equipment(c, :legs) <>
-          get_equipment(c, :feet) <>
-          get_equipment(c, :wrists) <>
-          get_equipment(c, :hands) <>
-          get_equipment(c, :finger1) <>
-          get_equipment(c, :finger2) <>
-          get_equipment(c, :trinket1) <>
-          get_equipment(c, :trinket2) <>
-          get_equipment(c, :back) <>
-          get_equipment(c, :mainhand) <>
-          get_equipment(c, :offhand) <>
-          get_equipment(c, :ranged) <>
-          get_equipment(c, :tabard) <>
-          <<
-            # first_bag_display_id
-            0::little-size(32),
-            # first_bag_inventory_type
-            0
-          >>
+        equipment =
+          [
+            :head,
+            :neck,
+            :shoulders,
+            :body,
+            :chest,
+            :waist,
+            :legs,
+            :feet,
+            :wrists,
+            :hands,
+            :finger1,
+            :finger2,
+            :trinket1,
+            :trinket2,
+            :back,
+            :mainhand,
+            :offhand,
+            :ranged,
+            :tabard
+          ]
+          |> Enum.map(fn slot ->
+            with equipment when not is_nil(equipment) <- Map.get(c, :equipment),
+                 item when not is_nil(item) <- Map.get(equipment, slot) do
+              %CharacterGear{
+                equipment_display_id: item.display_id,
+                inventory_type: item.inventory_type
+              }
+            else
+              _ ->
+                %CharacterGear{
+                  equipment_display_id: 0,
+                  inventory_type: 0
+                }
+            end
+          end)
+
+        %Character{
+          guid: c.id,
+          name: c.name,
+          race: c.race,
+          class: c.class,
+          gender: c.gender,
+          skin: c.skin,
+          face: c.face,
+          hair_style: c.hair_style,
+          hair_color: c.hair_color,
+          facial_hair: c.facial_hair,
+          level: c.level,
+          area: c.area,
+          map: c.map,
+          position: {x, y, z},
+          guild_id: 0,
+          flags: 0,
+          first_login: 0,
+          pet_display_id: 0,
+          pet_level: 0,
+          pet_family: 0,
+          equipment: equipment,
+          first_bag_display_id: 0,
+          first_bag_inventory_type: 0
+        }
       end)
 
-    packet =
-      case length do
-        0 -> <<0>>
-        _ -> <<length>> <> Enum.join(characters_payload)
-      end
+    Util.send_packet(%Message.SmsgCharEnum{
+      amount_of_characters: Enum.count(characters_structs),
+      characters: characters_structs
+    })
 
-    send_packet(@smsg_char_enum, packet)
     {:continue, state}
   end
 
@@ -167,16 +181,16 @@ defmodule ThistleTea.Game.Character do
 
     case ThistleTea.Character.create(character) do
       {:error, :character_exists} ->
-        send_packet(@smsg_char_create, <<0x31>>)
+        Util.send_packet(%Message.SmsgCharCreate{result: 0x31})
 
       {:error, :character_limit} ->
-        send_packet(@smsg_char_create, <<0x35>>)
+        Util.send_packet(%Message.SmsgCharCreate{result: 0x35})
 
       {:error, _} ->
-        send_packet(@smsg_char_create, <<0x30>>)
+        Util.send_packet(%Message.SmsgCharCreate{result: 0x30})
 
       {:ok, _} ->
-        send_packet(@smsg_char_create, <<0x2E>>)
+        Util.send_packet(%Message.SmsgCharCreate{result: 0x2E})
     end
 
     {:continue, state}

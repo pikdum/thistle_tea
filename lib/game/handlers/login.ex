@@ -15,10 +15,13 @@ defmodule ThistleTea.Game.Login do
   import Bitwise, only: [<<<: 2, |||: 2]
 
   import ThistleTea.Util,
-    only: [pack_guid: 1, send_packet: 2, send_update_packet: 1]
+    only: [pack_guid: 1, send_update_packet: 1]
 
   alias ThistleTea.DBC
+  alias ThistleTea.Game.Message
+  alias ThistleTea.Game.Message.SmsgInitialSpells.InitialSpell
   alias ThistleTea.Game.Utils.UpdateObject
+  alias ThistleTea.Util
 
   require Logger
 
@@ -42,11 +45,11 @@ defmodule ThistleTea.Game.Login do
 
     {x, y, z, o} = c.movement.position
 
-    send_packet(
-      @smsg_login_verify_world,
-      <<c.map::little-size(32), x::little-float-size(32), y::little-float-size(32), z::little-float-size(32),
-        o::little-float-size(32)>>
-    )
+    Util.send_packet(%Message.SmsgLoginVerifyWorld{
+      map: c.map,
+      position: {x, y, z},
+      orientation: o
+    })
 
     send_login_init_packets(c)
 
@@ -76,41 +79,39 @@ defmodule ThistleTea.Game.Login do
 
   def send_login_init_packets(c) do
     # needed for no white chatbox + keybinds
-    send_packet(
-      @smsg_account_data_times,
-      <<0::little-size(128)>>
-    )
+    Util.send_packet(%Message.SmsgAccountDataTimes{data: [0, 0, 0, 0]})
 
     # maybe useless? mangos sends it, though
-    send_packet(
-      @smsg_set_rest_start,
-      <<0::little-size(32)>>
-    )
+    Util.send_packet(%Message.SmsgSetRestStart{unknown1: 0})
 
-    {x, y, z, o} = c.movement.position
+    {x, y, z, _o} = c.movement.position
 
     # SMSG_BINDPOINTUPDATE
     # let's just init it to character's position for now
-    send_packet(
-      @smsg_bindpointupdate,
-      <<c.map::little-size(32), x::little-float-size(32), y::little-float-size(32), z::little-float-size(32),
-        o::little-float-size(32), c.map::little-size(32), c.area::little-size(32)>>
-    )
+    Util.send_packet(%Message.SmsgBindpointupdate{
+      x: x,
+      y: y,
+      z: z,
+      map: c.map,
+      area: c.area
+    })
 
     # no tutorials
-    send_packet(@smsg_tutorial_flags, <<0xFFFFFFFFFFFFFFFF::little-size(256)>>)
+    Util.send_packet(%Message.SmsgTutorialFlags{
+      tutorial_data: [0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF]
+    })
 
     # send initial spells
     spells =
-      Enum.map(c.spells, &<<&1::little-size(16), 0::little-size(16)>>)
-      |> Enum.reduce(<<>>, fn x, acc -> acc <> x end)
+      Enum.map(c.spells, fn spell_id ->
+        %InitialSpell{spell_id: spell_id, unknown1: 0}
+      end)
 
-    send_packet(
-      @smsg_initial_spells,
-      <<0, Enum.count(c.spells)::little-size(16)>> <>
-        spells <>
-        <<0::little-size(16)>>
-    )
+    Util.send_packet(%Message.SmsgInitialSpells{
+      unknown1: 0,
+      initial_spells: spells,
+      cooldowns: []
+    })
 
     # send initial action buttons
     # send initial repuations
@@ -123,20 +124,19 @@ defmodule ThistleTea.Game.Login do
       (dt.year - 80) <<< 24 ||| (dt.month - 1) <<< 20 ||| (dt.day - 1) <<< 14 |||
         Date.day_of_week(dt) <<< 11 ||| dt.hour <<< 6 ||| dt.minute
 
-    send_packet(
-      @smsg_login_settimespeed,
-      <<date::little-size(32), 0.01666667::little-float-size(32)>>
-    )
+    Util.send_packet(%Message.SmsgLoginSettimespeed{
+      datetime: date,
+      timescale: 0.01666667
+    })
 
     chr_race = DBC.get_by(ChrRaces, id: c.race)
 
     # SMSG_TRIGGER_CINEMATIC
     # TODO: on first login only
     if false do
-      send_packet(
-        @smsg_trigger_cinematic,
-        <<chr_race.cinematic_sequence::little-size(32)>>
-      )
+      Util.send_packet(%Message.SmsgTriggerCinematic{
+        cinematic_sequence_id: chr_race.cinematic_sequence
+      })
     end
 
     # item packets

@@ -7,10 +7,7 @@ defmodule ThistleTea.Game.Message.SmsgAttackstart do
   ]
 
   @impl ServerMessage
-  def to_binary(%__MODULE__{
-        attacker: attacker,
-        victim: victim
-      }) do
+  def to_binary(%__MODULE__{attacker: attacker, victim: victim}) do
     <<attacker::little-size(64), victim::little-size(64)>>
   end
 end
