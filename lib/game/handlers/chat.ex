@@ -9,14 +9,16 @@ defmodule ThistleTea.Game.Chat do
     :SMSG_CHAT_PLAYER_NOT_FOUND
   ]
 
-  import ThistleTea.Util, only: [parse_string: 1, send_packet: 2]
+  import ThistleTea.Util, only: [parse_string: 1]
 
   alias ThistleTea.Game.Chat.Emote
+  alias ThistleTea.Game.Message
+  alias ThistleTea.Util
 
   require Logger
 
   @chat_type_say 0x0
-  @chat_type_party 0x1
+  # @chat_type_party 0x1
   # @chat_type_raid 0x2
   # @chat_type_guild 0x3
   @chat_type_yell 0x5
@@ -28,45 +30,16 @@ defmodule ThistleTea.Game.Chat do
   @yell_range 300
   @emote_range 25
 
-  defp messagechat_packet(chat_type, language, message, sender_guid, target_name) do
-    message_length = String.length(message) + 1
-
-    <<chat_type::little-size(8), language::little-size(32)>> <>
-      case chat_type do
-        type when type in [@chat_type_say, @chat_type_party, @chat_type_yell] ->
-          <<sender_guid::little-size(64), sender_guid::little-size(64)>>
-
-        @chat_type_channel ->
-          target_name <>
-            <<
-              0,
-              # player rank
-              0::little-size(32),
-              sender_guid::little-size(64)
-            >>
-
-        _ ->
-          <<sender_guid::little-size(64)>>
-      end <>
-      <<message_length::little-size(32)>> <>
-      message <>
-      <<
-        0,
-        # player chat tag
-        0
-      >>
-
-    # SizedCString = size + string + null byte
-    # message + names
-  end
-
   def system_message(state, message) do
-    packet = messagechat_packet(0x0A, 0, message, state.guid, nil)
-
-    send_packet(
-      @smsg_messagechat,
-      packet
-    )
+    Util.send_packet(%Message.SmsgMessagechat{
+      chat_type: 0x0A,
+      language: 0,
+      sender_guid: state.guid,
+      message: message,
+      channel_name: nil,
+      player_rank: 0,
+      tag: 0
+    })
 
     state
   end
@@ -211,7 +184,16 @@ defmodule ThistleTea.Game.Chat do
 
   def handle_chat(state, chat_type, language, message, _target_name)
       when chat_type in [@chat_type_say, @chat_type_yell, @chat_type_emote] do
-    packet = messagechat_packet(chat_type, language, message, state.guid, nil)
+    packet =
+      Message.to_packet(%Message.SmsgMessagechat{
+        chat_type: chat_type,
+        language: language,
+        sender_guid: state.guid,
+        message: message,
+        channel_name: nil,
+        player_rank: 0,
+        tag: 0
+      })
 
     range =
       case chat_type do
@@ -223,39 +205,53 @@ defmodule ThistleTea.Game.Chat do
     pids_in_range = get_player_pids_in_chat_range(state, range)
 
     for pid <- pids_in_range do
-      GenServer.cast(pid, {:send_packet, @smsg_messagechat, packet})
+      GenServer.cast(pid, {:send_packet, packet.opcode, packet.payload})
     end
 
     state
   end
 
-  # TODO: prevent whispering self
   def handle_chat(state, @chat_type_whisper, language, message, target_name) do
-    # TODO: should extract to functions
     case :ets.match(:guid_name, {:"$1", target_name, :_, :_, :_, :_}) do
       [[guid]] ->
         pid = :ets.lookup_element(:entities, guid, 2, nil)
 
         packet =
-          messagechat_packet(@chat_type_whisper, language, message, state.guid, target_name)
+          Message.to_packet(%Message.SmsgMessagechat{
+            chat_type: @chat_type_whisper,
+            language: language,
+            sender_guid: state.guid,
+            message: message,
+            channel_name: nil,
+            player_rank: 0,
+            tag: 0
+          })
 
-        GenServer.cast(pid, {:send_packet, @smsg_messagechat, packet})
+        GenServer.cast(pid, {:send_packet, packet.opcode, packet.payload})
 
       _ ->
-        packet = target_name <> <<0>>
-        send_packet(@smsg_chat_player_not_found, packet)
+        Util.send_packet(%Message.SmsgChatPlayerNotFound{name: target_name})
     end
 
     state
   end
 
   def handle_chat(state, @chat_type_channel, language, message, target_name) do
-    packet = messagechat_packet(@chat_type_channel, language, message, state.guid, target_name)
+    packet =
+      Message.to_packet(%Message.SmsgMessagechat{
+        chat_type: @chat_type_channel,
+        language: language,
+        sender_guid: state.guid,
+        message: message,
+        channel_name: target_name,
+        player_rank: 0,
+        tag: 0
+      })
 
     ThistleTea.ChatChannel
     |> Registry.dispatch(target_name, fn entries ->
       for {pid, _} <- entries do
-        GenServer.cast(pid, {:send_packet, @smsg_messagechat, packet})
+        GenServer.cast(pid, {:send_packet, packet.opcode, packet.payload})
       end
     end)
 
@@ -264,14 +260,24 @@ defmodule ThistleTea.Game.Chat do
 
   def handle_chat(state, chat_type, language, message, target_name) do
     Logger.error("Unhandled chat type: #{chat_type}")
-    packet = messagechat_packet(chat_type, language, message, state.guid, target_name)
+
+    packet =
+      Message.to_packet(%Message.SmsgMessagechat{
+        chat_type: chat_type,
+        language: language,
+        sender_guid: state.guid,
+        message: message,
+        channel_name: target_name,
+        player_rank: 0,
+        tag: 0
+      })
 
     all_players =
       :ets.tab2list(:players)
       |> Enum.map(fn {_, guid} -> :ets.lookup_element(:entities, guid, 2) end)
 
     for pid <- all_players do
-      GenServer.cast(pid, {:send_packet, @smsg_messagechat, packet})
+      GenServer.cast(pid, {:send_packet, packet.opcode, packet.payload})
     end
 
     state
@@ -301,19 +307,14 @@ defmodule ThistleTea.Game.Chat do
     {:ok, _channel_password, _} = parse_string(rest)
     Logger.info("CMSG_JOIN_CHANNEL: #{channel_name}")
 
-    # TODO: is there an easier way to do this with registries?
-    # to prevent duplicate channel joins
     with [] <- ThistleTea.ChatChannel |> Registry.values(channel_name, self()) do
       ThistleTea.ChatChannel
       |> Registry.register(channel_name, state.guid)
 
-      notify_packet =
-        <<
-          # YOU_JOINED_NOTICE
-          0x02::little-size(8)
-        >> <> channel_name <> <<0>>
-
-      send_packet(@smsg_channel_notify, notify_packet)
+      Util.send_packet(%Message.SmsgChannelNotify{
+        notify_type: 0x02,
+        channel_name: channel_name
+      })
     end
 
     {:continue, state}
@@ -326,13 +327,11 @@ defmodule ThistleTea.Game.Chat do
     ThistleTea.ChatChannel
     |> Registry.unregister(channel_name)
 
-    notify_packet =
-      <<
-        # YOU_LEFT_NOTICE
-        0x03::little-size(8)
-      >> <> channel_name <> <<0>>
+    Util.send_packet(%Message.SmsgChannelNotify{
+      notify_type: 0x03,
+      channel_name: channel_name
+    })
 
-    send_packet(@smsg_channel_notify, notify_packet)
     {:continue, state}
   end
 

@@ -10,9 +10,11 @@ defmodule ThistleTea.Game.Spell do
   ]
 
   import Bitwise, only: [&&&: 2]
-  import ThistleTea.Util, only: [send_packet: 2, unpack_guid: 1]
+  import ThistleTea.Util, only: [unpack_guid: 1]
 
   alias ThistleTea.DBC
+  alias ThistleTea.Game.Message
+  alias ThistleTea.Util
 
   require Logger
 
@@ -30,22 +32,32 @@ defmodule ThistleTea.Game.Spell do
       spell ->
         Process.cancel_timer(spell.cast_timer)
 
-        send_packet(
-          @smsg_cast_result,
-          <<spell.spell_id::little-size(32), 2::little-size(8), reason::little-size(8)>>
-        )
+        Util.send_packet(%Message.SmsgCastResult{
+          spell: spell.spell_id,
+          result: 2,
+          reason: reason,
+          required_spell_focus: nil,
+          area: nil,
+          equipped_item_class: nil,
+          equipped_item_subclass_mask: nil,
+          equipped_item_inventory_type_mask: nil
+        })
 
-        send_packet(
-          @smsg_spell_failure,
-          <<state.guid::little-size(64), spell.spell_id::little-size(32), reason::little-size(8)>>
-        )
+        Util.send_packet(%Message.SmsgSpellFailure{
+          guid: state.guid,
+          spell: spell.spell_id,
+          result: reason
+        })
+
+        packet =
+          Message.to_packet(%Message.SmsgSpellFailedOther{
+            caster: state.guid,
+            id: spell.spell_id
+          })
 
         for pid <- Map.get(state, :player_pids, []) do
           if pid != self() do
-            GenServer.cast(
-              pid,
-              {:send_packet, @smsg_spell_failed_other, <<state.guid::little-size(64), spell.spell_id::little-size(32)>>}
-            )
+            GenServer.cast(pid, {:send_packet, packet.opcode, packet.payload})
           end
         end
 
@@ -77,20 +89,20 @@ defmodule ThistleTea.Game.Spell do
 
     spell_start_flags = 0x2
 
-    spell_start =
-      state.packed_guid <>
-        state.packed_guid <>
-        <<
-          spell_id::little-size(32),
-          # cast flags
-          spell_start_flags::little-size(16),
-          # timer
-          spell.spell_cast_time.base::little-size(32)
-        >> <>
-        spell_cast_targets
+    packet =
+      Message.to_packet(%Message.SmsgSpellStart{
+        cast_item: state.packed_guid,
+        caster: state.packed_guid,
+        spell: spell_id,
+        flags: spell_start_flags,
+        timer: spell.spell_cast_time.base,
+        targets: spell_cast_targets,
+        ammo_display_id: nil,
+        ammo_inventory_type: nil
+      })
 
     for pid <- Map.get(state, :player_pids, []) do
-      GenServer.cast(pid, {:send_packet, @smsg_spell_start, spell_start})
+      GenServer.cast(pid, {:send_packet, packet.opcode, packet.payload})
     end
 
     state =
@@ -125,27 +137,32 @@ defmodule ThistleTea.Game.Spell do
 
   def handle_spell_complete(state) do
     s = state.spell
-    # TODO: verify orientation, etc.
-    cast_result = <<s.spell_id::little-size(32), 0::little-size(8)>>
-    send_packet(@smsg_cast_result, cast_result)
+
+    Util.send_packet(%Message.SmsgCastResult{
+      spell: s.spell_id,
+      result: 0,
+      reason: nil,
+      required_spell_focus: nil,
+      area: nil,
+      equipped_item_class: nil,
+      equipped_item_subclass_mask: nil,
+      equipped_item_inventory_type_mask: nil
+    })
 
     spell_go_flags = 0x100
 
-    spell_go =
-      state.packed_guid <>
-        state.packed_guid <>
-        <<
-          s.spell_id::little-size(32),
-          # flags
-          spell_go_flags::little-size(16),
-          # number of hits
-          1::little-size(8),
-          # guid
-          s.target::little-size(64),
-          # miss
-          0
-        >> <>
-        s.spell_cast_targets
+    packet =
+      Message.to_packet(%Message.SmsgSpellGo{
+        cast_item: state.guid,
+        caster: state.guid,
+        spell: s.spell_id,
+        flags: spell_go_flags,
+        hits: [s.target],
+        misses: [],
+        targets: s.spell_cast_targets,
+        ammo_display_id: nil,
+        ammo_inventory_type: nil
+      })
 
     if s.target != state.guid do
       pid = :ets.lookup_element(:entities, s.target, 2)
@@ -153,7 +170,7 @@ defmodule ThistleTea.Game.Spell do
     end
 
     for pid <- Map.get(state, :player_pids, []) do
-      GenServer.cast(pid, {:send_packet, @smsg_spell_go, spell_go})
+      GenServer.cast(pid, {:send_packet, packet.opcode, packet.payload})
     end
 
     Map.delete(state, :spell)

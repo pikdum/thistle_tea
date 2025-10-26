@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.Entity.Movement do
   alias ThistleTea.Game.Entity.Waypoint
   alias ThistleTea.Game.Entity.WaypointRoute
   alias ThistleTea.Game.FieldStruct
+  alias ThistleTea.Game.Message
   alias ThistleTea.Game.Message.SmsgMonsterMove
   alias ThistleTea.Util
 
@@ -49,7 +50,7 @@ defmodule ThistleTea.Game.Entity.Movement do
 
   def move_to(state, {x, y, z}) do
     state = start_move_to(state, {x, y, z})
-    payload = SmsgMonsterMove.build(state) |> SmsgMonsterMove.to_binary()
+    packet = Message.to_packet(SmsgMonsterMove.build(state))
 
     # TODO: how do i want to handle updating the position on the server side?
     # sounds like vmangos does this every 100ms
@@ -60,11 +61,10 @@ defmodule ThistleTea.Game.Entity.Movement do
 
     nearby_players = Entity.Core.nearby_players(state)
 
-    # TODO: i should come up with a packet struct that takes opcode as atom, payload as binary
-    # and then use that as the interface instead of raw binaries
-    # TODO: would also be nice to treat these like a side effect - can i use handle_continue or similar?
+    # TODO: could be done in handle_continue instead?
+    # or at least abstracted to a separate function
     for {_guid, pid, _distance} <- nearby_players do
-      GenServer.cast(pid, {:send_packet, @smsg_monster_move, payload})
+      GenServer.cast(pid, {:send_packet, packet.opcode, packet.payload})
     end
 
     %{state | movement_block: %{state.movement_block | position: {xd, yd, zd, o}}}

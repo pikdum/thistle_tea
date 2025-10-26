@@ -8,10 +8,14 @@ defmodule ThistleTea.Game.Gossip do
   ]
 
   import Ecto.Query
-  import ThistleTea.Util, only: [send_packet: 2]
 
   alias ThistleTea.DB.Mangos
   alias ThistleTea.DB.Mangos.Repo
+  alias ThistleTea.Game.Message
+  alias ThistleTea.Game.Message.SmsgGossipMessage.GossipItem
+  alias ThistleTea.Game.Message.SmsgNpcTextUpdate.NpcTextUpdate
+  alias ThistleTea.Game.Message.SmsgNpcTextUpdate.NpcTextUpdateEmote
+  alias ThistleTea.Util
 
   require Logger
 
@@ -38,19 +42,6 @@ defmodule ThistleTea.Game.Gossip do
     |> Enum.reverse()
   end
 
-  defp encode_gossip_options(gmo) do
-    gmo
-    |> Enum.map(fn o ->
-      <<
-        # TODO: should this be loop index instead?
-        o.id::little-size(32),
-        o.option_icon::little-size(8),
-        o.box_coded::little-size(8)
-      >> <> o.option_text <> <<0>>
-    end)
-    |> Enum.reduce(<<>>, fn x, acc -> acc <> x end)
-  end
-
   def handle_packet(@cmsg_gossip_hello, <<guid::little-size(64)>>, state) do
     low_guid = guid - @creature_guid_offset
 
@@ -71,19 +62,24 @@ defmodule ThistleTea.Game.Gossip do
 
       gm ->
         gmo = Map.get(gm, :gossip_menu_option, [])
-        gossip_items = encode_gossip_options(gmo)
 
-        packet =
-          <<
-            guid::little-size(64),
-            # title_text_id
-            gm.text_id::little-size(32),
-            # amount of gossip items
-            Enum.count(gmo)::little-size(32)
-          >> <>
-            gossip_items
+        gossips =
+          Enum.map(gmo, fn o ->
+            %GossipItem{
+              id: o.id,
+              item_icon: o.option_icon,
+              coded: o.box_coded,
+              message: o.option_text
+            }
+          end)
 
-        send_packet(@smsg_gossip_message, packet)
+        Util.send_packet(%Message.SmsgGossipMessage{
+          guid: guid,
+          title_text_id: gm.text_id,
+          gossips: gossips,
+          quests: []
+        })
+
         {:continue, state |> Map.put(:gossip_menu_options, gmo)}
     end
   end
@@ -94,39 +90,26 @@ defmodule ThistleTea.Game.Gossip do
         {:continue, state}
 
       npc_text ->
-        header = <<text_id::little-size(32)>>
-
-        body =
+        texts =
           text_groups(npc_text)
           |> Enum.map(fn t ->
-            <<t.prob::little-float-size(32)>> <>
-              if Map.get(t, :text_0) do
-                t.text_0 <> <<0>>
-              else
-                <<0>>
-              end <>
-              if Map.get(t, :text_1) do
-                t.text_1 <> <<0>>
-              else
-                <<0>>
-              end <>
-              <<
-                # TODO: universal language
-                0::little-size(32)
-              >> <>
-              <<
-                # emote blocks
-                t.em_0_delay::little-size(32),
-                t.em_0::little-size(32),
-                t.em_1_delay::little-size(32),
-                t.em_1::little-size(32),
-                t.em_2_delay::little-size(32),
-                t.em_2::little-size(32)
-              >>
+            %NpcTextUpdate{
+              probability: t.prob,
+              texts: [Map.get(t, :text_0), Map.get(t, :text_1)],
+              language: 0,
+              emotes: [
+                %NpcTextUpdateEmote{delay: t.em_0_delay, emote: t.em_0},
+                %NpcTextUpdateEmote{delay: t.em_1_delay, emote: t.em_1},
+                %NpcTextUpdateEmote{delay: t.em_2_delay, emote: t.em_2}
+              ]
+            }
           end)
-          |> Enum.reduce(<<>>, fn x, acc -> acc <> x end)
 
-        send_packet(@smsg_npc_text_update, header <> body)
+        Util.send_packet(%Message.SmsgNpcTextUpdate{
+          text_id: text_id,
+          texts: texts
+        })
+
         {:continue, state}
     end
   end
@@ -150,19 +133,24 @@ defmodule ThistleTea.Game.Gossip do
 
           gm ->
             gmo = Map.get(gm, :gossip_menu_option, [])
-            gossip_items = encode_gossip_options(gmo)
 
-            packet =
-              <<
-                guid::little-size(64),
-                # title_text_id
-                gm.text_id::little-size(32),
-                # amount of gossip items
-                Enum.count(gmo)::little-size(32)
-              >> <>
-                gossip_items
+            gossips =
+              Enum.map(gmo, fn o ->
+                %GossipItem{
+                  id: o.id,
+                  item_icon: o.option_icon,
+                  coded: o.box_coded,
+                  message: o.option_text
+                }
+              end)
 
-            send_packet(@smsg_gossip_message, packet)
+            Util.send_packet(%Message.SmsgGossipMessage{
+              guid: guid,
+              title_text_id: gm.text_id,
+              gossips: gossips,
+              quests: []
+            })
+
             {:continue, state |> Map.put(:gossip_menu_options, gmo)}
         end
     end

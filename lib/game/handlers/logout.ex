@@ -6,13 +6,14 @@ defmodule ThistleTea.Game.Logout do
     :SMSG_LOGOUT_CANCEL_ACK
   ]
 
-  import ThistleTea.Util, only: [send_packet: 2]
+  alias ThistleTea.Game.Message
+  alias ThistleTea.Util
 
   require Logger
 
   def handle_packet(@cmsg_logout_request, _body, state) do
     Logger.info("CMSG_LOGOUT_REQUEST")
-    send_packet(@smsg_logout_response, <<0::little-size(32)>>)
+    Util.send_packet(%Message.SmsgLogoutResponse{result: 0, speed: 0})
     logout_timer = Process.send_after(self(), :logout_complete, 1_000)
     {:continue, Map.put(state, :logout_timer, logout_timer)}
   end
@@ -30,7 +31,7 @@ defmodule ThistleTea.Game.Logout do
           Map.delete(state, :logout_timer)
       end
 
-    send_packet(@smsg_logout_cancel_ack, <<>>)
+    Util.send_packet(%Message.SmsgLogoutCancelAck{})
     {:continue, state}
   end
 
