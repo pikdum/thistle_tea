@@ -12,6 +12,7 @@ end
 defmodule ThistleTea.Game.ClientMessage do
   @callback opcode() :: integer()
   @callback handle(message :: struct(), state :: map()) :: map()
+  @callback from_binary(payload :: binary()) :: struct()
   defmacro __using__(opcode) do
     opcode = ThistleTea.Opcodes.get(opcode)
 
