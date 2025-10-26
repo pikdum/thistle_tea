@@ -8,6 +8,8 @@ defmodule ThistleTea.Game.Logout do
 
   import ThistleTea.Util, only: [send_packet: 2]
 
+  alias ThistleTea.Game.Connection
+
   require Logger
 
   def handle_packet(@cmsg_logout_request, _body, state) do
@@ -67,7 +69,7 @@ defmodule ThistleTea.Game.Logout do
     # reset state so nothing lingers
     %{
       seed: state.seed,
-      crypto_pid: Map.get(state, :crypto_pid),
+      conn: %Connection{},
       account: Map.get(state, :account)
     }
   end

@@ -65,23 +65,25 @@ defmodule ThistleTea.Game do
   import ThistleTea.Game.Combat, only: [handle_attack_swing: 1]
   import ThistleTea.Game.Logout, only: [handle_logout: 1]
   import ThistleTea.Game.Spell, only: [handle_spell_complete: 1]
+  import ThistleTea.Util, only: [send_packet: 2, send_update_packet: 1]
 
-  import ThistleTea.Util,
-    only: [send_packet: 2, send_update_packet: 1, parse_string: 1]
-
-  alias ThistleTea.CryptoStorage
   alias ThistleTea.Game.Character
   alias ThistleTea.Game.Chat
   alias ThistleTea.Game.Combat
+  alias ThistleTea.Game.Connection
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Gossip
+  alias ThistleTea.Game.Handler
   alias ThistleTea.Game.Login
   alias ThistleTea.Game.Logout
+  alias ThistleTea.Game.Message
   alias ThistleTea.Game.Movement
+  alias ThistleTea.Game.Packet
   alias ThistleTea.Game.Ping
   alias ThistleTea.Game.Query
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Utils.UpdateObject
+  alias ThousandIsland.Socket
 
   require Logger
 
@@ -213,109 +215,62 @@ defmodule ThistleTea.Game do
     {:continue, state}
   end
 
-  def handle_additional_data(data, socket, state) do
-    if byte_size(data) > 0 do
-      handle_data(data, socket, state)
-    else
-      {:continue, state}
+  @impl ThousandIsland.Handler
+  def handle_data(data, _socket, %{conn: %Connection{} = conn} = state) do
+    conn =
+      conn
+      |> Connection.receive_data(data)
+      |> Connection.enqueue_packets()
+
+    state = handle_packets(%{state | conn: conn})
+
+    Logger.info("State after handling packets: #{inspect(state)}")
+
+    {:continue, state}
+  end
+
+  def handle_packets(%{conn: %Connection{packet_queue: []}} = state), do: state
+
+  def handle_packets(%{conn: %Connection{packet_queue: [packet | rest]} = conn} = state) do
+    dbg(conn)
+    Logger.debug("Received packet: #{inspect(packet)}")
+
+    case Packet.implemented?(packet.opcode) do
+      true ->
+        Logger.info("Handling packet (new): #{ThistleTea.Opcodes.get(packet.opcode)}")
+
+        state = Packet.to_message(packet) |> Handler.handle(state) |> handle_outbox() |> dbg()
+
+        Logger.info("Is this happening?")
+
+        %{state | conn: %{state.conn | packet_queue: rest}}
+
+      false ->
+        Logger.info("Handling packet (legacy): #{ThistleTea.Opcodes.get(packet.opcode)}")
+        {_, state} = dispatch_packet(packet.opcode, packet.payload, state)
+        %{state | conn: %{state.conn | packet_queue: rest}}
     end
   end
 
-  @impl ThousandIsland.Handler
-  def handle_data(
-        <<size::big-size(16), @cmsg_auth_session::little-size(32), body::binary-size(size - 4),
-          additional_data::binary>>,
-        socket,
-        state
-      ) do
-    <<_build::little-size(32), _server_id::little-size(32), rest::binary>> = body
-    {:ok, username, rest} = parse_string(rest)
-    Logger.metadata(username: username)
-    Logger.info("CMSG_AUTH_SESSION")
+  def handle_outbox(%{conn: %Connection{outbox: []}} = state), do: state
 
-    <<client_seed::little-bytes-size(4), client_proof::little-bytes-size(20), _rest::binary>> =
-      rest
-
-    [{^username, session}] = :ets.lookup(:session, username)
-
-    server_proof =
-      :crypto.hash(
-        :sha,
-        username <> <<0::little-size(32)>> <> client_seed <> state.seed <> session
-      )
-
-    if client_proof == server_proof do
-      Logger.info("AUTH SUCCESS")
-      crypt = %{key: session, send_i: 0, send_j: 0, recv_i: 0, recv_j: 0}
-      {:ok, crypto_pid} = CryptoStorage.start_link(crypt)
-      {:ok, account} = ThistleTea.Account.get_user(username)
-      send_packet(@smsg_auth_response, <<0x0C, 0::little-size(32), 0, 0::little-size(32)>>)
-
-      state = Map.merge(state, %{crypto_pid: crypto_pid, account: account})
-      handle_additional_data(additional_data, socket, state)
-    else
-      Logger.error("AUTH FAILURE")
-      {:close, state}
-    end
+  def handle_outbox(%{conn: %Connection{outbox: [message | rest]} = conn} = state) do
+    dbg(conn)
+    Logger.info("Sending packet from outbox: #{inspect(message)}")
+    packet = message |> Message.to_packet()
+    send_packet(packet.opcode, packet.payload)
+    %{state | conn: %{conn | outbox: rest}}
   end
-
-  @impl ThousandIsland.Handler
-  def handle_data(
-        <<size::big-size(16), @cmsg_ping::little-size(32), body::binary-size(size - 4), additional_data::binary>>,
-        socket,
-        state
-      ) do
-    <<sequence_id::little-size(32), latency::little-size(32)>> = body
-
-    Logger.info("CMSG_PING latency=#{latency}")
-
-    ThousandIsland.Socket.send(
-      socket,
-      <<6::big-size(16), @smsg_pong::little-size(16), sequence_id::little-size(32)>>
-    )
-
-    state = Map.put(state, :latency, latency)
-    handle_additional_data(additional_data, socket, state)
-  end
-
-  @impl ThousandIsland.Handler
-  def handle_data(data, socket, state) do
-    state = Map.put(state, :packet_stream, Map.get(state, :packet_stream, <<>>) <> data)
-    handle_packet(socket, state)
-  end
-
-  def handle_packet(socket, %{packet_stream: <<header::bytes-size(6), rest::binary>>} = state) do
-    case CryptoStorage.decrypt_header(state.crypto_pid, header, byte_size(rest)) do
-      {:ok, decrypted_header} ->
-        <<size::big-size(16), opcode::little-size(32)>> = decrypted_header
-        <<payload::binary-size(size - 4), rest::binary>> = rest
-        state = Map.delete(state, :packet_stream)
-
-        {action, state} =
-          :telemetry.span([:thistle_tea, :handle_packet], %{opcode: opcode}, fn ->
-            {action, state} = dispatch_packet(opcode, payload, state)
-            {{action, state}, %{opcode: opcode}}
-          end)
-
-        if action == :continue do
-          handle_additional_data(rest, socket, state)
-        else
-          {action, state}
-        end
-
-      {:error, _} ->
-        {:continue, state}
-    end
-  end
-
-  # accumulate packet_stream until enough data
-  def handle_packet(_socket, state), do: {:continue, state}
 
   @impl GenServer
   def handle_cast({:send_packet, opcode, payload}, {socket, state}) do
-    {:ok, header} = CryptoStorage.encrypt_header(state.crypto_pid, opcode, payload)
-    ThousandIsland.Socket.send(socket, header <> payload)
-    {:noreply, {socket, state}, socket.read_timeout}
+    Logger.debug("Sending packet opcode=#{opcode} payload_size=#{byte_size(payload)}")
+    size = byte_size(payload) + 2
+    header = <<size::big-size(16), opcode::little-size(16)>>
+
+    {:ok, conn, header} = Connection.Crypto.encrypt_header(state.conn, header)
+    Socket.send(socket, header <> payload)
+    {:noreply, {socket, %{state | conn: conn}}, socket.read_timeout}
   end
 
   @impl GenServer
@@ -519,16 +474,10 @@ defmodule ThistleTea.Game do
   end
 
   @impl ThousandIsland.Handler
-  def handle_connection(socket, _state) do
-    Logger.info("SMSG_AUTH_CHALLENGE")
-    seed = :crypto.strong_rand_bytes(4)
-
-    ThousandIsland.Socket.send(
-      socket,
-      <<6::big-size(16), @smsg_auth_challenge::little-size(16)>> <> seed
-    )
-
-    {:continue, %{seed: seed}}
+  def handle_connection(socket, _) do
+    conn = %Connection{}
+    Socket.send(socket, <<6::big-size(16), @smsg_auth_challenge::little-size(16)>> <> conn.seed)
+    {:continue, %{conn: conn}}
   end
 
   @impl ThousandIsland.Handler
