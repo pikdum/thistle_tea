@@ -230,27 +230,18 @@ defmodule ThistleTea.Game do
 
   def handle_packets(%{conn: %Connection{packet_queue: [packet | rest]}} = state) do
     message_name = ThistleTea.Opcodes.get(packet.opcode)
+    Logger.debug("Received: #{message_name}")
 
     case Packet.implemented?(packet.opcode) do
       true ->
-        Logger.debug("Received: #{message_name}")
-        state = Packet.to_message(packet) |> Message.handle(state) |> handle_outbox() |> dbg()
+        state = Packet.to_message(packet) |> Message.handle(state)
         %{state | conn: %{state.conn | packet_queue: rest}}
 
       false ->
-        Logger.debug("Received: #{message_name} (legacy)")
         {_, state} = dispatch_packet(packet.opcode, packet.payload, state)
         %{state | conn: %{state.conn | packet_queue: rest}}
     end
     |> handle_packets()
-  end
-
-  def handle_outbox(%{conn: %Connection{outbox: []}} = state), do: state
-
-  def handle_outbox(%{conn: %Connection{outbox: [message | rest]}} = state) do
-    Util.send_packet(message)
-    state = %{state | conn: %{state.conn | outbox: rest}}
-    handle_outbox(state)
   end
 
   @impl GenServer
@@ -469,7 +460,7 @@ defmodule ThistleTea.Game do
   def handle_connection(socket, _) do
     conn = %Connection{}
     Socket.send(socket, <<6::big-size(16), @smsg_auth_challenge::little-size(16)>> <> conn.seed)
-    {:continue, %{conn: conn}}
+    {:continue, %{conn: conn, account: nil}}
   end
 
   @impl ThousandIsland.Handler

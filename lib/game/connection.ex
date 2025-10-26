@@ -2,9 +2,7 @@ defmodule ThistleTea.Game.Connection do
   use ThistleTea.Opcodes, [:CMSG_AUTH_SESSION]
 
   alias ThistleTea.Game.Connection.Crypto
-  alias ThistleTea.Game.Message
   alias ThistleTea.Game.Packet
-  alias ThistleTea.Opcodes
 
   require Logger
 
@@ -12,20 +10,12 @@ defmodule ThistleTea.Game.Connection do
     :session_key,
     binary_stream: <<>>,
     packet_queue: [],
-    message_queue: [],
-    outbox: [],
     send_i: 0,
     send_j: 0,
     recv_i: 0,
     recv_j: 0,
     seed: :crypto.strong_rand_bytes(4)
   ]
-
-  # TODO: look into prepending
-
-  def queue(%__MODULE__{outbox: outbox} = conn, message) do
-    %{conn | outbox: outbox ++ [message]}
-  end
 
   def receive_data(%__MODULE__{} = conn, data) do
     Map.put(conn, :binary_stream, conn.binary_stream <> data)
@@ -79,44 +69,5 @@ defmodule ThistleTea.Game.Connection do
       {:error, conn, _} ->
         conn
     end
-  end
-
-  # TODO: don't really need a separate pass for messages, could do it in one pass
-  def enqueue_messages(%__MODULE__{packet_queue: []} = conn) do
-    conn
-  end
-
-  def enqueue_messages(%__MODULE__{packet_queue: [packet | rest], message_queue: message_queue} = conn) do
-    case Packet.to_message(packet) do
-      {:ok, message} ->
-        Map.merge(conn, %{
-          packet_queue: rest,
-          message_queue: message_queue ++ [message]
-        })
-
-      {:error, :unhandled_opcode, opcode} ->
-        Logger.warning("Unhandled: #{Opcodes.get(opcode)}")
-
-        Map.merge(conn, %{
-          packet_queue: rest,
-          message_queue: message_queue
-        })
-    end
-    |> enqueue_messages()
-  end
-
-  def handle_messages(%__MODULE__{message_queue: []} = conn) do
-    conn
-  end
-
-  def handle_messages(%__MODULE__{message_queue: [message | rest]} = conn) do
-    case Message.handle(message, conn) do
-      {:ok, conn} ->
-        Map.put(conn, :message_queue, rest)
-
-      {:error, _} ->
-        Map.put(conn, :message_queue, rest)
-    end
-    |> handle_messages()
   end
 end
