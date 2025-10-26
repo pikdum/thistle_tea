@@ -3,7 +3,6 @@ defmodule ThistleTea.Game do
 
   use ThistleTea.Opcodes, [
     :SMSG_AUTH_CHALLENGE,
-    :MSG_MOVE_WORLDPORT_ACK,
     :MSG_MOVE_START_FORWARD,
     :MSG_MOVE_START_BACKWARD,
     :MSG_MOVE_STOP,
