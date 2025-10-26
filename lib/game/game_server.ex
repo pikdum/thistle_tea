@@ -1,38 +1,12 @@
 defmodule ThistleTea.Game do
   use ThousandIsland.Handler
-
-  use ThistleTea.Opcodes, [
-    :SMSG_AUTH_CHALLENGE,
-    :MSG_MOVE_START_FORWARD,
-    :MSG_MOVE_START_BACKWARD,
-    :MSG_MOVE_STOP,
-    :MSG_MOVE_START_STRAFE_LEFT,
-    :MSG_MOVE_START_STRAFE_RIGHT,
-    :MSG_MOVE_STOP_STRAFE,
-    :MSG_MOVE_JUMP,
-    :MSG_MOVE_START_TURN_LEFT,
-    :MSG_MOVE_START_TURN_RIGHT,
-    :MSG_MOVE_STOP_TURN,
-    :MSG_MOVE_START_PITCH_UP,
-    :MSG_MOVE_START_PITCH_DOWN,
-    :MSG_MOVE_STOP_PITCH,
-    :MSG_MOVE_SET_RUN_MODE,
-    :MSG_MOVE_SET_WALK_MODE,
-    :MSG_MOVE_FALL_LAND,
-    :MSG_MOVE_START_SWIM,
-    :MSG_MOVE_STOP_SWIM,
-    :MSG_MOVE_SET_FACING,
-    :MSG_MOVE_SET_PITCH,
-    :MSG_MOVE_HEARTBEAT,
-    :CMSG_MOVE_FALL_RESET
-  ]
+  use ThistleTea.Opcodes, [:SMSG_AUTH_CHALLENGE]
 
   import Bitwise, only: [|||: 2]
 
   alias ThistleTea.Game.Connection
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Message
-  alias ThistleTea.Game.Movement
   alias ThistleTea.Game.Packet
   alias ThistleTea.Game.Utils.UpdateObject
   alias ThistleTea.Util
@@ -40,43 +14,9 @@ defmodule ThistleTea.Game do
 
   require Logger
 
-  @movement_opcodes [
-    @msg_move_start_forward,
-    @msg_move_start_backward,
-    @msg_move_stop,
-    @msg_move_start_strafe_left,
-    @msg_move_start_strafe_right,
-    @msg_move_stop_strafe,
-    @msg_move_jump,
-    @msg_move_start_turn_left,
-    @msg_move_start_turn_right,
-    @msg_move_stop_turn,
-    @msg_move_start_pitch_up,
-    @msg_move_start_pitch_down,
-    @msg_move_stop_pitch,
-    @msg_move_set_run_mode,
-    @msg_move_set_walk_mode,
-    @msg_move_fall_land,
-    @msg_move_start_swim,
-    @msg_move_stop_swim,
-    @msg_move_set_facing,
-    @msg_move_set_pitch,
-    @msg_move_heartbeat,
-    @cmsg_move_fall_reset
-  ]
-
   @update_flag_high_guid 0x08
   @update_flag_living 0x20
   @update_flag_has_position 0x40
-
-  def dispatch_packet(opcode, payload, state) when opcode in @movement_opcodes do
-    Movement.handle_packet(opcode, payload, state)
-  end
-
-  def dispatch_packet(opcode, _payload, state) do
-    Logger.error("UNIMPLEMENTED: #{ThistleTea.Opcodes.get(opcode)}")
-    {:continue, state}
-  end
 
   @impl ThousandIsland.Handler
   def handle_data(data, _socket, %{conn: %Connection{} = conn} = state) do
@@ -94,15 +34,21 @@ defmodule ThistleTea.Game do
 
   def handle_packets(%{conn: %Connection{packet_queue: [packet | rest]}} = state) do
     message_name = ThistleTea.Opcodes.get(packet.opcode)
-    Logger.debug("Received: #{message_name}")
 
     case Packet.implemented?(packet.opcode) do
       true ->
-        state = Packet.to_message(packet) |> Message.handle(state)
+        Logger.debug("Received: #{message_name}")
+
+        state =
+          :telemetry.span([:thistle_tea, :handle_packet], %{opcode: packet.opcode}, fn ->
+            state = Packet.to_message(packet) |> Message.handle(state)
+            {state, %{opcode: packet.opcode}}
+          end)
+
         %{state | conn: %{state.conn | packet_queue: rest}}
 
       false ->
-        {_, state} = dispatch_packet(packet.opcode, packet.payload, state)
+        Logger.warning("Unimplemented: #{message_name}")
         %{state | conn: %{state.conn | packet_queue: rest}}
     end
     |> handle_packets()
