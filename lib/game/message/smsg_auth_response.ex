@@ -3,6 +3,7 @@ defmodule ThistleTea.Game.Message.SmsgAuthResponse do
 
   @result_auth_ok 0x0C
   @result_auth_wait_queue 0x1B
+
   defstruct [
     :result,
     :billing_time,
