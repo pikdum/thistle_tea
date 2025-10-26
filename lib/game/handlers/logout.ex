@@ -8,8 +8,6 @@ defmodule ThistleTea.Game.Logout do
 
   import ThistleTea.Util, only: [send_packet: 2]
 
-  alias ThistleTea.Game.Connection
-
   require Logger
 
   def handle_packet(@cmsg_logout_request, _body, state) do
