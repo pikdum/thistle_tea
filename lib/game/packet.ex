@@ -29,10 +29,12 @@ defmodule ThistleTea.Game.Packet do
        CMSG_ATTACKSTOP: Message.CmsgAttackstop,
        CMSG_SETSHEATHED: Message.CmsgSetsheathed,
        CMSG_SET_SELECTION: Message.CmsgSetSelection,
+       CMSG_STANDSTATECHANGE: Message.CmsgStandstatechange,
+       CMSG_CAST_SPELL: Message.CmsgCastSpell,
        CMSG_PLAYER_LOGIN: Message.CmsgPlayerLogin,
+       MSG_MOVE_WORLDPORT_ACK: Message.CmsgMoveWorldportAck,
        CMSG_LOGOUT_REQUEST: Message.CmsgLogoutRequest,
        CMSG_LOGOUT_CANCEL: Message.CmsgLogoutCancel,
-       CMSG_CAST_SPELL: Message.CmsgCastSpell,
        CMSG_CANCEL_CAST: Message.CmsgCancelCast
      }
      |> Map.new(fn {k, v} -> {ThistleTea.Opcodes.get(k), v} end)

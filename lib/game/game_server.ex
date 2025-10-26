@@ -3,15 +3,6 @@ defmodule ThistleTea.Game do
 
   use ThistleTea.Opcodes, [
     :SMSG_AUTH_CHALLENGE,
-    :CMSG_AUTH_SESSION,
-    :SMSG_AUTH_RESPONSE,
-    :SMSG_PONG,
-    :SMSG_TRANSFER_PENDING,
-    :SMSG_NEW_WORLD,
-    :SMSG_DESTROY_OBJECT,
-    :CMSG_CHAR_ENUM,
-    :CMSG_CHAR_CREATE,
-    :CMSG_PLAYER_LOGIN,
     :MSG_MOVE_WORLDPORT_ACK,
     :MSG_MOVE_START_FORWARD,
     :MSG_MOVE_START_BACKWARD,
@@ -34,32 +25,21 @@ defmodule ThistleTea.Game do
     :MSG_MOVE_SET_FACING,
     :MSG_MOVE_SET_PITCH,
     :MSG_MOVE_HEARTBEAT,
-    :CMSG_MOVE_FALL_RESET,
-    :CMSG_STANDSTATECHANGE,
-    :CMSG_CAST_SPELL,
-    :CMSG_CANCEL_CAST
+    :CMSG_MOVE_FALL_RESET
   ]
 
   import Bitwise, only: [|||: 2]
-  import ThistleTea.Game.Spell, only: [handle_spell_complete: 1]
 
   alias ThistleTea.Game.Connection
   alias ThistleTea.Game.Entity
-  alias ThistleTea.Game.Login
   alias ThistleTea.Game.Message
   alias ThistleTea.Game.Movement
   alias ThistleTea.Game.Packet
-  alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Utils.UpdateObject
   alias ThistleTea.Util
   alias ThousandIsland.Socket
 
   require Logger
-
-  @login_opcodes [
-    @cmsg_player_login,
-    @msg_move_worldport_ack
-  ]
 
   @movement_opcodes [
     @msg_move_start_forward,
@@ -83,29 +63,15 @@ defmodule ThistleTea.Game do
     @msg_move_set_facing,
     @msg_move_set_pitch,
     @msg_move_heartbeat,
-    @cmsg_move_fall_reset,
-    @cmsg_standstatechange
-  ]
-
-  @spell_opcodes [
-    @cmsg_cast_spell,
-    @cmsg_cancel_cast
+    @cmsg_move_fall_reset
   ]
 
   @update_flag_high_guid 0x08
   @update_flag_living 0x20
   @update_flag_has_position 0x40
 
-  def dispatch_packet(opcode, payload, state) when opcode in @login_opcodes do
-    Login.handle_packet(opcode, payload, state)
-  end
-
   def dispatch_packet(opcode, payload, state) when opcode in @movement_opcodes do
     Movement.handle_packet(opcode, payload, state)
-  end
-
-  def dispatch_packet(opcode, payload, state) when opcode in @spell_opcodes do
-    Spell.handle_packet(opcode, payload, state)
   end
 
   def dispatch_packet(opcode, _payload, state) do
@@ -246,7 +212,7 @@ defmodule ThistleTea.Game do
 
   @impl GenServer
   def handle_info(:spell_complete, {socket, state}) do
-    state = handle_spell_complete(state)
+    state = Message.CmsgCastSpell.handle_spell_complete(state)
     {:noreply, {socket, state}, socket.read_timeout}
   end
 

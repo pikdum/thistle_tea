@@ -22,15 +22,14 @@ defmodule ThistleTea.Game.Movement do
         :MSG_MOVE_SET_FACING,
         :MSG_MOVE_SET_PITCH,
         :MSG_MOVE_HEARTBEAT,
-        :CMSG_MOVE_FALL_RESET,
-        :CMSG_STANDSTATECHANGE
+        :CMSG_MOVE_FALL_RESET
       ]
 
   import ThistleTea.Game.Message.CmsgCharCreate, only: [generate_random_equipment: 0]
   import ThistleTea.Util, only: [send_update_packet: 1]
 
   alias ThistleTea.Game.FieldStruct.MovementBlock
-  alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Message.CmsgCancelCast
   alias ThistleTea.Game.Utils.UpdateObject
 
   require Logger
@@ -104,7 +103,7 @@ defmodule ThistleTea.Game.Movement do
           SpatialHash.update(:players, state.guid, self(), map, x1, y1, z1)
 
           Map.put(state, :character, character)
-          |> Spell.cancel_spell(@spell_failed_moving)
+          |> CmsgCancelCast.cancel_spell(@spell_failed_moving)
         else
           Map.put(state, :character, character)
         end
@@ -117,29 +116,6 @@ defmodule ThistleTea.Game.Movement do
     for pid <- Map.get(state, :player_pids, []) do
       if pid != self() do
         GenServer.cast(pid, {:send_packet, msg, state.packed_guid <> body})
-      end
-    end
-
-    {:continue, state}
-  end
-
-  def handle_packet(@cmsg_standstatechange, body, state) do
-    <<animation_state::little-size(32)>> = body
-
-    # TODO: add :unit_bytes_1 to fields?
-    update_object = ThistleTea.Character.get_update_fields(state.character)
-
-    update_object = %{
-      update_object
-      | unit: Map.put(update_object.unit, :stand_state, animation_state),
-        update_type: :values
-    }
-
-    packet = UpdateObject.to_packet(update_object)
-
-    for pid <- Map.get(state, :player_pids, []) do
-      if pid != self() do
-        GenServer.cast(pid, {:send_update_packet, packet})
       end
     end
 

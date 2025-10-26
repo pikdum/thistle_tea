@@ -1,13 +1,5 @@
-defmodule ThistleTea.Game.Spell do
-  use ThistleTea.Opcodes, [
-    :CMSG_CAST_SPELL,
-    :CMSG_CANCEL_CAST,
-    :SMSG_CAST_RESULT,
-    :SMSG_SPELL_START,
-    :SMSG_SPELL_GO,
-    :SMSG_SPELL_FAILURE,
-    :SMSG_SPELL_FAILED_OTHER
-  ]
+defmodule ThistleTea.Game.Message.CmsgCastSpell do
+  use ThistleTea.Game.ClientMessage, :CMSG_CAST_SPELL
 
   import Bitwise, only: [&&&: 2]
   import ThistleTea.Util, only: [unpack_guid: 1]
@@ -21,71 +13,29 @@ defmodule ThistleTea.Game.Spell do
   @spell_cast_target_self 0x00000000
   @spell_cast_target_unit 0x00000002
 
-  # @spell_failed_unknown 0x91
-  @spell_failed_interrupted 0x23
+  defstruct [:spell_id, :spell_cast_targets]
 
-  def cancel_spell(state, reason \\ @spell_failed_interrupted) do
-    case Map.get(state, :spell) do
-      nil ->
-        state
-
-      spell ->
-        Process.cancel_timer(spell.cast_timer)
-
-        Util.send_packet(%Message.SmsgCastResult{
-          spell: spell.spell_id,
-          result: 2,
-          reason: reason,
-          required_spell_focus: nil,
-          area: nil,
-          equipped_item_class: nil,
-          equipped_item_subclass_mask: nil,
-          equipped_item_inventory_type_mask: nil
-        })
-
-        Util.send_packet(%Message.SmsgSpellFailure{
-          guid: state.guid,
-          spell: spell.spell_id,
-          result: reason
-        })
-
-        packet =
-          Message.to_packet(%Message.SmsgSpellFailedOther{
-            caster: state.guid,
-            id: spell.spell_id
-          })
-
-        for pid <- Map.get(state, :player_pids, []) do
-          if pid != self() do
-            GenServer.cast(pid, {:send_packet, packet.opcode, packet.payload})
-          end
-        end
-
-        Map.delete(state, :spell)
-    end
-  end
-
-  def handle_packet(@cmsg_cast_spell, body, state) do
-    <<spell_id::little-size(32), spell_cast_targets::binary>> = body
-
+  @impl ClientMessage
+  def handle(%__MODULE__{spell_id: spell_id, spell_cast_targets: spell_cast_targets}, state) do
     <<spell_cast_target_flags::little-size(16), rest::binary>> = spell_cast_targets
 
-    {unit_target, _rest} =
+    unit_target =
       cond do
         spell_cast_target_flags == @spell_cast_target_self ->
-          {state.guid, rest}
+          state.guid
 
         (spell_cast_target_flags &&& @spell_cast_target_unit) > 0 ->
-          unpack_guid(rest)
+          {target, _} = unpack_guid(rest)
+          target
 
         true ->
-          {nil, rest}
+          nil
       end
 
     spell = DBC.get_by(Spell, id: spell_id) |> DBC.preload(:spell_cast_time)
     Logger.info("CMSG_CAST_SPELL: #{spell.name_en_gb} - #{spell_id}", target_name: unit_target)
 
-    state = cancel_spell(state)
+    state = Message.CmsgCancelCast.cancel_spell(state)
 
     spell_start_flags = 0x2
 
@@ -112,27 +62,28 @@ defmodule ThistleTea.Game.Spell do
         spell_cast_targets: spell_cast_targets
       })
 
-    state =
-      if spell.spell_cast_time.base == 0 do
-        handle_spell_complete(state)
-      else
-        cast_timer =
-          Process.send_after(
-            self(),
-            :spell_complete,
-            spell.spell_cast_time.base
-          )
+    if spell.spell_cast_time.base == 0 do
+      handle_spell_complete(state)
+    else
+      cast_timer =
+        Process.send_after(
+          self(),
+          :spell_complete,
+          spell.spell_cast_time.base
+        )
 
-        Map.put(state, :spell, Map.put(state.spell, :cast_timer, cast_timer))
-      end
-
-    {:continue, state}
+      Map.put(state, :spell, Map.put(state.spell, :cast_timer, cast_timer))
+    end
   end
 
-  def handle_packet(@cmsg_cancel_cast, _body, state) do
-    Logger.info("CMSG_CANCEL_CAST")
-    state = cancel_spell(state)
-    {:continue, state}
+  @impl ClientMessage
+  def from_binary(payload) do
+    <<spell_id::little-size(32), spell_cast_targets::binary>> = payload
+
+    %__MODULE__{
+      spell_id: spell_id,
+      spell_cast_targets: spell_cast_targets
+    }
   end
 
   def handle_spell_complete(state) do
