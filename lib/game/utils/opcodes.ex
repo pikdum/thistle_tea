@@ -912,25 +912,16 @@ defmodule ThistleTea.Opcodes do
   @reverse_opcodes Map.new(@opcodes, fn {k, v} -> {v, k} end)
 
   def get(key) when is_number(key) do
-    @opcodes[key]
+    Map.fetch!(@opcodes, key)
   end
 
   def get(key) when is_atom(key) do
-    @reverse_opcodes[key]
-  end
-
-  def opcodes do
-    @opcodes
+    Map.fetch!(@reverse_opcodes, key)
   end
 
   defmacro __using__(opcodes) do
     for opcode <- opcodes do
-      opcode_value = Map.get(@reverse_opcodes, opcode)
-
-      if opcode_value == nil do
-        raise KeyError, "Opcode #{inspect(opcode)} not found in opcodes list"
-      end
-
+      opcode_value = get(opcode)
       attr_name = opcode |> Atom.to_string() |> String.downcase() |> String.to_atom()
 
       quote do
