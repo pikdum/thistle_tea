@@ -66,9 +66,8 @@ defmodule ThistleTea.Game.Logout do
 
     # reset state so nothing lingers
     %{
-      seed: state.seed,
-      crypto_pid: Map.get(state, :crypto_pid),
-      account: Map.get(state, :account)
+      account: Map.get(state, :account),
+      conn: Map.get(state, :conn)
     }
   end
 end

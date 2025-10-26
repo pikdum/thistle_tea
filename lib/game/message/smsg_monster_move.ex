@@ -1,5 +1,8 @@
 defmodule ThistleTea.Game.Message.SmsgMonsterMove do
+  use ThistleTea.Game.ServerMessage, :SMSG_MONSTER_MOVE
+
   alias ThistleTea.Game.FieldStruct
+  alias ThistleTea.Game.Message
   alias ThistleTea.Util
 
   # @move_type_normal 0
