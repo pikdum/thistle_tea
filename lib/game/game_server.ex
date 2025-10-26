@@ -73,7 +73,6 @@ defmodule ThistleTea.Game do
   alias ThistleTea.Game.Connection
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Gossip
-  alias ThistleTea.Game.Handler
   alias ThistleTea.Game.Login
   alias ThistleTea.Game.Logout
   alias ThistleTea.Game.Message
@@ -233,7 +232,7 @@ defmodule ThistleTea.Game do
     case Packet.implemented?(packet.opcode) do
       true ->
         Logger.info("Handling packet opcode=#{packet.opcode}")
-        state = Packet.to_message(packet) |> Handler.handle(state) |> handle_outbox() |> dbg()
+        state = Packet.to_message(packet) |> Message.handle(state) |> handle_outbox() |> dbg()
         %{state | conn: %{state.conn | packet_queue: rest}}
 
       false ->

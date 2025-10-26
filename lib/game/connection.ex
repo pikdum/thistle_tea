@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Connection do
   use ThistleTea.Opcodes, [:CMSG_AUTH_SESSION]
 
   alias ThistleTea.Game.Connection.Crypto
-  alias ThistleTea.Game.Handler
+  alias ThistleTea.Game.Message
   alias ThistleTea.Game.Packet
   alias ThistleTea.Opcodes
 
@@ -110,7 +110,7 @@ defmodule ThistleTea.Game.Connection do
   end
 
   def handle_messages(%__MODULE__{message_queue: [message | rest]} = conn) do
-    case Handler.handle(message, conn) do
+    case Message.handle(message, conn) do
       {:ok, conn} ->
         Map.put(conn, :message_queue, rest)
 

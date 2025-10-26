@@ -2,11 +2,7 @@ defprotocol ThistleTea.Game.Message do
   def to_binary(message)
   def to_packet(message)
   def opcode(message)
-end
-
-defprotocol ThistleTea.Game.Handler do
   def handle(message, state)
-  def opcode(message)
 end
 
 defmodule ThistleTea.Game.ClientMessage do
@@ -21,14 +17,16 @@ defmodule ThistleTea.Game.ClientMessage do
 
       alias ThistleTea.Game.ClientMessage
       alias ThistleTea.Game.Connection
-      alias ThistleTea.Game.Handler
       alias ThistleTea.Game.Message
       alias ThistleTea.Util
 
       @impl ClientMessage
       def opcode, do: unquote(opcode)
 
-      defimpl Handler do
+      defimpl Message do
+        def to_binary(_message), do: raise("unimplemented")
+        def to_packet(_message), do: raise("unimplemented")
+
         def handle(message, state) do
           unquote(Macro.escape(__CALLER__.module)).handle(message, state)
         end
@@ -66,6 +64,8 @@ defmodule ThistleTea.Game.ServerMessage do
       end
 
       defimpl Message do
+        def handle(_message, _state), do: raise("unimplemented")
+
         def to_packet(message) do
           unquote(Macro.escape(__CALLER__.module)).to_packet(message)
         end
