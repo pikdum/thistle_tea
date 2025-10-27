@@ -1,6 +1,8 @@
 defmodule ThistleTea.Game.Message.CmsgCharEnum do
   use ThistleTea.Game.ClientMessage, :CMSG_CHAR_ENUM
 
+  alias ThistleTea.DB.Mangos.ItemTemplate
+  alias ThistleTea.DB.Mangos.Repo
   alias ThistleTea.Game.Message
   alias ThistleTea.Game.Message.SmsgCharEnum.Character
   alias ThistleTea.Game.Message.SmsgCharEnum.CharacterGear
@@ -19,60 +21,63 @@ defmodule ThistleTea.Game.Message.CmsgCharEnum do
     characters_structs =
       characters
       |> Enum.map(fn c ->
-        {x, y, z, _o} = c.movement.position
+        {x, y, z, _o} = c.movement_block.position
+
+        item_entries = [
+          c.player.visible_item_1_0,
+          c.player.visible_item_2_0,
+          c.player.visible_item_3_0,
+          c.player.visible_item_4_0,
+          c.player.visible_item_5_0,
+          c.player.visible_item_6_0,
+          c.player.visible_item_7_0,
+          c.player.visible_item_8_0,
+          c.player.visible_item_9_0,
+          c.player.visible_item_10_0,
+          c.player.visible_item_11_0,
+          c.player.visible_item_12_0,
+          c.player.visible_item_13_0,
+          c.player.visible_item_14_0,
+          c.player.visible_item_15_0,
+          c.player.visible_item_16_0,
+          c.player.visible_item_17_0,
+          c.player.visible_item_18_0,
+          c.player.visible_item_19_0
+        ]
 
         equipment =
-          [
-            :head,
-            :neck,
-            :shoulders,
-            :body,
-            :chest,
-            :waist,
-            :legs,
-            :feet,
-            :wrists,
-            :hands,
-            :finger1,
-            :finger2,
-            :trinket1,
-            :trinket2,
-            :back,
-            :mainhand,
-            :offhand,
-            :ranged,
-            :tabard
-          ]
-          |> Enum.map(fn slot ->
-            with equipment when not is_nil(equipment) <- Map.get(c, :equipment),
-                 item when not is_nil(item) <- Map.get(equipment, slot) do
-              %CharacterGear{
-                equipment_display_id: item.display_id,
-                inventory_type: item.inventory_type
-              }
-            else
-              _ ->
+          item_entries
+          |> Enum.map(fn entry ->
+            if is_integer(entry) and entry > 0 do
+              item = Repo.get(ItemTemplate, entry)
+
+              if item do
                 %CharacterGear{
-                  equipment_display_id: 0,
-                  inventory_type: 0
+                  equipment_display_id: item.display_id,
+                  inventory_type: item.inventory_type
                 }
+              else
+                %CharacterGear{equipment_display_id: 0, inventory_type: 0}
+              end
+            else
+              %CharacterGear{equipment_display_id: 0, inventory_type: 0}
             end
           end)
 
         %Character{
           guid: c.id,
-          name: c.name,
-          race: c.race,
-          class: c.class,
-          gender: c.gender,
-          skin: c.skin,
-          face: c.face,
-          hair_style: c.hair_style,
-          hair_color: c.hair_color,
-          facial_hair: c.facial_hair,
-          level: c.level,
-          area: c.area,
-          map: c.map,
+          name: c.internal.name,
+          race: c.unit.race,
+          class: c.unit.class,
+          gender: c.unit.gender,
+          skin: c.player.skin,
+          face: c.player.face,
+          hair_style: c.player.hair_style,
+          hair_color: c.player.hair_color,
+          facial_hair: c.player.facial_hair,
+          level: c.unit.level,
+          area: c.internal.area,
+          map: c.internal.map,
           position: {x, y, z},
           guild_id: 0,
           flags: 0,

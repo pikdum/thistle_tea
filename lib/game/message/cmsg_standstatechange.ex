@@ -8,7 +8,7 @@ defmodule ThistleTea.Game.Message.CmsgStandstatechange do
   @impl ClientMessage
   def handle(%__MODULE__{animation_state: animation_state}, state) do
     # Update the character's stand state
-    update_object = ThistleTea.Character.get_update_fields(state.character)
+    update_object = struct(UpdateObject, state.character)
 
     update_object = %{
       update_object

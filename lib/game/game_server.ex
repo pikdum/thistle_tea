@@ -74,15 +74,16 @@ defmodule ThistleTea.Game do
 
   @impl GenServer
   def handle_cast({:send_update_to, pid}, {socket, state}) do
+    character = state.character
+
     packet =
-      state.character
-      |> ThistleTea.Character.get_update_fields()
+      struct(UpdateObject, character)
       |> Map.merge(%{
         update_type: :create_object2,
         object_type: :player,
         movement_block:
           Map.put(
-            state.character.movement,
+            character.movement_block,
             :update_flag,
             @update_flag_high_guid ||| @update_flag_living ||| @update_flag_has_position
           )
@@ -109,23 +110,22 @@ defmodule ThistleTea.Game do
     area =
       case ThistleTea.Pathfinding.get_zone_and_area(map, {x, y, z}) do
         {_zone, area} -> area
-        nil -> state.character.area
+        nil -> state.character.internal.area
       end
 
     character = state.character
 
     character = %{
       character
-      | area: area,
-        map: map,
-        movement: %{character.movement | position: {x, y, z, 0.0}}
+      | internal: %{character.internal | area: area, map: map},
+        movement_block: %{character.movement_block | position: {x, y, z, 0.0}}
     }
 
     SpatialHash.update(
       :players,
       state.guid,
       self(),
-      character.map,
+      character.internal.map,
       x,
       y,
       z
@@ -170,22 +170,22 @@ defmodule ThistleTea.Game do
   @impl GenServer
   def handle_info(:spawn_objects, {socket, %{character: c, ready: true} = state}) do
     # TODO: add telemetry for periodic tasks
-    {x, y, z, _o} = c.movement.position
+    {x, y, z, _o} = c.movement_block.position
 
     old_players = Map.get(state, :spawned_players, MapSet.new())
     old_mobs = Map.get(state, :spawned_mobs, MapSet.new())
     old_game_objects = Map.get(state, :spawned_game_objects, MapSet.new())
 
     new_players =
-      SpatialHash.query(:players, c.map, x, y, z, 250)
+      SpatialHash.query(:players, c.internal.map, x, y, z, 250)
       |> MapSet.new(fn {guid, pid, _distance} -> {guid, pid} end)
 
     new_mobs =
-      SpatialHash.query(:mobs, c.map, x, y, z, 250)
+      SpatialHash.query(:mobs, c.internal.map, x, y, z, 250)
       |> MapSet.new(fn {guid, pid, _distance} -> {guid, pid} end)
 
     new_game_objects =
-      SpatialHash.query(:game_objects, c.map, x, y, z, 250)
+      SpatialHash.query(:game_objects, c.internal.map, x, y, z, 250)
       |> MapSet.new(fn {guid, pid, _distance} -> {guid, pid} end)
 
     players_to_remove = MapSet.difference(old_players, new_players)
@@ -254,7 +254,7 @@ defmodule ThistleTea.Game do
   @impl GenServer
   def handle_call(:get_name, _from, state) do
     {_socket, s} = state
-    {:reply, s.character.name, state}
+    {:reply, s.character.internal.name, state}
   end
 
   @impl ThousandIsland.Handler

@@ -10,10 +10,10 @@ defmodule ThistleTea.Game.Message.CmsgSetsheathed do
   @impl ClientMessage
   def handle(%__MODULE__{sheath_state: sheath_state}, state) do
     Logger.info("CMSG_SETSHEATHED")
-    character = Map.put(state.character, :sheath_state, sheath_state)
+    character = put_in(state.character.unit.sheath_state, sheath_state)
 
     update_object =
-      character |> ThistleTea.Character.get_update_fields() |> Map.put(:update_type, :values)
+      struct(UpdateObject, character) |> Map.put(:update_type, :values)
 
     packet = UpdateObject.to_packet(update_object)
 

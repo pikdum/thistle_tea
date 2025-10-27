@@ -29,24 +29,24 @@ defmodule ThistleTea.Game.Message.CmsgPlayerLogin do
   def handle(%__MODULE__{character_guid: character_guid}, state) do
     {:ok, c} = ThistleTea.Character.get_character(state.account.id, character_guid)
 
-    :ets.insert(:guid_name, {character_guid, c.name, "", c.race, c.gender, c.class})
+    :ets.insert(:guid_name, {character_guid, c.internal.name, "", c.unit.race, c.unit.gender, c.unit.class})
 
-    Logger.metadata(character_name: c.name)
+    Logger.metadata(character_name: c.internal.name)
 
-    {x, y, z, o} = c.movement.position
+    {x, y, z, o} = c.movement_block.position
 
     Util.send_packet(%Message.SmsgLoginVerifyWorld{
-      map: c.map,
+      map: c.internal.map,
       position: {x, y, z},
       orientation: o
     })
 
     send_login_init_packets(c)
 
-    {x1, y1, z1, _o1} = c.movement.position
+    {x1, y1, z1, _o1} = c.movement_block.position
 
     # join
-    SpatialHash.update(:players, character_guid, self(), c.map, x1, y1, z1)
+    SpatialHash.update(:players, character_guid, self(), c.internal.map, x1, y1, z1)
 
     {:ok, spawn_timer} = :timer.send_interval(1000, :spawn_objects)
 
@@ -75,7 +75,7 @@ defmodule ThistleTea.Game.Message.CmsgPlayerLogin do
     # maybe useless? mangos sends it, though
     Util.send_packet(%Message.SmsgSetRestStart{unknown1: 0})
 
-    {x, y, z, _o} = c.movement.position
+    {x, y, z, _o} = c.movement_block.position
 
     # SMSG_BINDPOINTUPDATE
     # let's just init it to character's position for now
@@ -83,8 +83,8 @@ defmodule ThistleTea.Game.Message.CmsgPlayerLogin do
       x: x,
       y: y,
       z: z,
-      map: c.map,
-      area: c.area
+      map: c.internal.map,
+      area: c.internal.area
     })
 
     # no tutorials
@@ -94,7 +94,7 @@ defmodule ThistleTea.Game.Message.CmsgPlayerLogin do
 
     # send initial spells
     spells =
-      Enum.map(c.spells, fn spell_id ->
+      Enum.map(c.internal.spells, fn spell_id ->
         %InitialSpell{spell_id: spell_id, unknown1: 0}
       end)
 
@@ -120,7 +120,7 @@ defmodule ThistleTea.Game.Message.CmsgPlayerLogin do
       timescale: 0.01666667
     })
 
-    chr_race = DBC.get_by(ChrRaces, id: c.race)
+    chr_race = DBC.get_by(ChrRaces, id: c.unit.race)
 
     # SMSG_TRIGGER_CINEMATIC
     # TODO: on first login only
@@ -131,21 +131,22 @@ defmodule ThistleTea.Game.Message.CmsgPlayerLogin do
     end
 
     # item packets
-    UpdateObject.get_item_packets(c.equipment)
+    UpdateObject.get_item_packets(c.player)
     |> Enum.each(fn packet -> send_update_packet(packet) end)
 
     # packet for player
     update_flag =
       @update_flag_self ||| @update_flag_all ||| @update_flag_living ||| @update_flag_has_position
 
+    movement_block = Map.put(c.movement_block, :update_flag, update_flag)
+
     packet =
-      c
-      |> ThistleTea.Character.get_update_fields()
-      |> Map.merge(%{
+      %UpdateObject{
         update_type: :create_object2,
-        object_type: :player,
-        movement_block: Map.put(c.movement, :update_flag, update_flag)
-      })
+        object_type: :player
+      }
+      |> struct(Map.from_struct(c))
+      |> Map.put(:movement_block, movement_block)
       |> UpdateObject.to_packet()
 
     send_update_packet(packet)
