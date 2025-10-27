@@ -138,7 +138,7 @@ defmodule ThistleTea.Game.Message.CmsgPlayerLogin do
     update_flag =
       @update_flag_self ||| @update_flag_all ||| @update_flag_living ||| @update_flag_has_position
 
-    movement_block = Map.put(c.movement_block, :update_flag, update_flag)
+    movement_block = %{c.movement_block | update_flag: update_flag}
 
     packet =
       %UpdateObject{

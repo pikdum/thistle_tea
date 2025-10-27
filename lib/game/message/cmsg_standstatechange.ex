@@ -6,17 +6,16 @@ defmodule ThistleTea.Game.Message.CmsgStandstatechange do
   defstruct [:animation_state]
 
   @impl ClientMessage
-  def handle(%__MODULE__{animation_state: animation_state}, state) do
-    # Update the character's stand state
-    update_object = struct(UpdateObject, state.character)
+  def handle(
+        %__MODULE__{animation_state: animation_state},
+        %{character: %Character{unit: %FieldStruct.Unit{} = unit} = character} = state
+      ) do
+    character = %{character | unit: %{unit | stand_state: animation_state}}
 
-    update_object = %{
-      update_object
-      | unit: Map.put(update_object.unit, :stand_state, animation_state),
-        update_type: :values
-    }
-
-    packet = UpdateObject.to_packet(update_object)
+    packet =
+      %UpdateObject{update_type: :values, object_type: :player}
+      |> struct(Map.from_struct(character))
+      |> UpdateObject.to_packet()
 
     # Broadcast to nearby players
     for pid <- Map.get(state, :player_pids, []) do
@@ -25,7 +24,8 @@ defmodule ThistleTea.Game.Message.CmsgStandstatechange do
       end
     end
 
-    state
+    # TODO: for some reason players are stuck sitting
+    %{state | character: character}
   end
 
   @impl ClientMessage

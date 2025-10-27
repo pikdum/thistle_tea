@@ -6,6 +6,7 @@ defmodule ThistleTea.Game do
 
   alias ThistleTea.Game.Connection
   alias ThistleTea.Game.Entity
+  alias ThistleTea.Game.FieldStruct
   alias ThistleTea.Game.Message
   alias ThistleTea.Game.Packet
   alias ThistleTea.Game.Utils.UpdateObject
@@ -56,8 +57,6 @@ defmodule ThistleTea.Game do
 
   @impl GenServer
   def handle_cast({:send_packet, opcode, payload}, {socket, state}) do
-    message_name = ThistleTea.Opcodes.get(opcode)
-    Logger.debug("Sent: #{message_name}")
     size = byte_size(payload) + 2
     header = <<size::big-size(16), opcode::little-size(16)>>
 
@@ -73,21 +72,22 @@ defmodule ThistleTea.Game do
   end
 
   @impl GenServer
-  def handle_cast({:send_update_to, pid}, {socket, state}) do
-    character = state.character
+  def handle_cast(
+        {:send_update_to, pid},
+        {socket,
+         %{character: %ThistleTea.Character{movement_block: %FieldStruct.MovementBlock{} = movement_block} = character} =
+           state}
+      ) do
+    update_flag = @update_flag_high_guid ||| @update_flag_living ||| @update_flag_has_position
+    movement_block = %{movement_block | update_flag: update_flag}
 
     packet =
-      struct(UpdateObject, character)
-      |> Map.merge(%{
+      %UpdateObject{
         update_type: :create_object2,
-        object_type: :player,
-        movement_block:
-          Map.put(
-            character.movement_block,
-            :update_flag,
-            @update_flag_high_guid ||| @update_flag_living ||| @update_flag_has_position
-          )
-      })
+        object_type: :player
+      }
+      |> struct(Map.from_struct(character))
+      |> Map.put(:movement_block, movement_block)
       |> UpdateObject.to_packet()
 
     GenServer.cast(pid, {:send_update_packet, packet})

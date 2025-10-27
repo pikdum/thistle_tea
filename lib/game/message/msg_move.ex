@@ -17,11 +17,19 @@ defmodule ThistleTea.Game.Message.MsgMove do
   ]
 
   @impl ClientMessage
-  def handle(%__MODULE__{opcode: opcode, payload: payload} = message, %{ready: true} = state) do
-    movement_block = MovementBlock.from_binary(payload, state.character.movement_block)
+  def handle(
+        %__MODULE__{opcode: opcode, payload: payload} = message,
+        %{
+          ready: true,
+          character:
+            %Character{movement_block: %FieldStruct.MovementBlock{} = movement_block, unit: %FieldStruct.Unit{} = unit} =
+              character
+        } = state
+      ) do
+    movement_block = MovementBlock.from_binary(payload, movement_block)
 
     if movement_block do
-      character = %{state.character | movement_block: movement_block}
+      character = %{character | movement_block: movement_block, unit: %{unit | stand_state: 0}}
       %{internal: %{map: map}} = character
       %MovementBlock{position: {x0, y0, z0, _}} = state.character.movement_block
       %MovementBlock{position: {x1, y1, z1, _}} = movement_block
