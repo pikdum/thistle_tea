@@ -17,24 +17,39 @@ defmodule ThistleTea.Game.Message.MsgMove do
   ]
 
   @impl ClientMessage
-  def handle(%__MODULE__{opcode: opcode, payload: payload} = message, %{ready: true} = state) do
-    with %MovementBlock{position: {x0, y0, z0, _}} <- state.character.movement,
-         %MovementBlock{position: {x1, y1, z1, _}} = movement <-
-           MovementBlock.from_binary(payload, state.character.movement),
-         %{map: map} = character <- state.character |> Map.put(:movement, movement) do
-      if x0 != x1 or y0 != y1 or z0 != z1 do
-        SpatialHash.update(:players, state.guid, self(), map, x1, y1, z1)
+  def handle(
+        %__MODULE__{opcode: opcode, payload: payload} = message,
+        %{
+          ready: true,
+          character:
+            %Character{movement_block: %FieldStruct.MovementBlock{} = movement_block, unit: %FieldStruct.Unit{} = unit} =
+              character
+        } = state
+      ) do
+    movement_block = MovementBlock.from_binary(payload, movement_block)
 
-        Map.put(state, :character, character)
-        |> Message.CmsgCancelCast.cancel_spell(@spell_failed_moving)
-      else
-        Map.put(state, :character, character)
-      end
+    if movement_block do
+      character = %{character | movement_block: movement_block, unit: %{unit | stand_state: 0}}
+      %{internal: %{map: map}} = character
+      %MovementBlock{position: {x0, y0, z0, _}} = state.character.movement_block
+      %MovementBlock{position: {x1, y1, z1, _}} = movement_block
+
+      new_state =
+        if x0 != x1 or y0 != y1 or z0 != z1 do
+          SpatialHash.update(:players, state.guid, self(), map, x1, y1, z1)
+
+          Map.put(state, :character, character)
+          |> Message.CmsgCancelCast.cancel_spell(@spell_failed_moving)
+        else
+          Map.put(state, :character, character)
+        end
+
+      new_state
+      |> randomize_equipment(opcode)
+      |> broadcast(message)
     else
-      nil -> state
+      state
     end
-    |> randomize_equipment(opcode)
-    |> broadcast(message)
   end
 
   def handle(_message, state), do: state
@@ -58,15 +73,18 @@ defmodule ThistleTea.Game.Message.MsgMove do
 
   defp randomize_equipment(state, opcode) do
     if opcode === @msg_move_jump do
-      character = Map.put(state.character, :equipment, Message.CmsgCharCreate.generate_random_equipment())
+      character = ThistleTea.Character.generate_and_assign_equipment(state.character)
 
-      update_object =
-        character |> ThistleTea.Character.get_update_fields() |> Map.put(:update_type, :values)
-
-      packet = UpdateObject.to_packet(update_object)
+      packet =
+        %UpdateObject{
+          update_type: :values,
+          object_type: :player
+        }
+        |> struct(Map.from_struct(character))
+        |> UpdateObject.to_packet()
 
       # item packets
-      UpdateObject.get_item_packets(character.equipment)
+      UpdateObject.get_item_packets(character.player)
       |> Enum.each(fn packet -> Util.send_update_packet(packet) end)
 
       for pid <- Map.get(state, :player_pids, []) do

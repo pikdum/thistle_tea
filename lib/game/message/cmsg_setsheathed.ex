@@ -8,21 +8,24 @@ defmodule ThistleTea.Game.Message.CmsgSetsheathed do
   defstruct [:sheath_state]
 
   @impl ClientMessage
-  def handle(%__MODULE__{sheath_state: sheath_state}, state) do
+  def handle(
+        %__MODULE__{sheath_state: sheath_state},
+        %{character: %Character{unit: %FieldStruct.Unit{} = unit} = character} = state
+      ) do
     Logger.info("CMSG_SETSHEATHED")
-    character = Map.put(state.character, :sheath_state, sheath_state)
+    character = %{character | unit: %{unit | sheath_state: sheath_state}}
 
-    update_object =
-      character |> ThistleTea.Character.get_update_fields() |> Map.put(:update_type, :values)
-
-    packet = UpdateObject.to_packet(update_object)
+    packet =
+      %UpdateObject{update_type: :values, object_type: :player}
+      |> struct(Map.from_struct(character))
+      |> UpdateObject.to_packet()
 
     # TODO: this doesn't show the unsheathing animation
     for pid <- Map.get(state, :player_pids, []) do
       GenServer.cast(pid, {:send_update_packet, packet})
     end
 
-    Map.put(state, :character, character)
+    %{state | character: character}
   end
 
   @impl ClientMessage

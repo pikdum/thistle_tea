@@ -15,8 +15,10 @@ defmodule ThistleTea.Game.ClientMessage do
     quote do
       @behaviour ThistleTea.Game.ClientMessage
 
+      alias ThistleTea.Character
       alias ThistleTea.Game.ClientMessage
       alias ThistleTea.Game.Connection
+      alias ThistleTea.Game.FieldStruct
       alias ThistleTea.Game.Message
       alias ThistleTea.Util
 
@@ -49,6 +51,8 @@ defmodule ThistleTea.Game.ServerMessage do
     quote do
       @behaviour ThistleTea.Game.ServerMessage
 
+      alias ThistleTea.Character
+      alias ThistleTea.Game.FieldStruct
       alias ThistleTea.Game.Message
       alias ThistleTea.Game.Packet
       alias ThistleTea.Game.ServerMessage

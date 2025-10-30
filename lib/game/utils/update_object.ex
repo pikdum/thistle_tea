@@ -1,7 +1,10 @@
 defmodule ThistleTea.Game.Utils.UpdateObject do
+  alias ThistleTea.DB.Mangos.ItemTemplate
+  alias ThistleTea.DB.Mangos.Repo
   alias ThistleTea.Game.FieldStruct.Item
   alias ThistleTea.Game.FieldStruct.MovementBlock
   alias ThistleTea.Game.FieldStruct.Object
+  alias ThistleTea.Game.FieldStruct.Player
   alias ThistleTea.Util
 
   defstruct [
@@ -207,9 +210,32 @@ defmodule ThistleTea.Game.Utils.UpdateObject do
   end
 
   # TODO: items need a proper lifecycle, this is just a hack
-  def get_item_packets(items) do
-    items
-    |> Enum.map(fn {_, item} ->
+  def get_item_packets(%Player{} = player) do
+    [
+      player.visible_item_1_0,
+      player.visible_item_2_0,
+      player.visible_item_3_0,
+      player.visible_item_4_0,
+      player.visible_item_5_0,
+      player.visible_item_6_0,
+      player.visible_item_7_0,
+      player.visible_item_8_0,
+      player.visible_item_9_0,
+      player.visible_item_10_0,
+      player.visible_item_11_0,
+      player.visible_item_12_0,
+      player.visible_item_13_0,
+      player.visible_item_14_0,
+      player.visible_item_15_0,
+      player.visible_item_16_0,
+      player.visible_item_17_0,
+      player.visible_item_18_0,
+      player.visible_item_19_0
+    ]
+    |> Enum.filter(fn item_entry -> is_integer(item_entry) and item_entry > 0 end)
+    |> Enum.map(fn item_entry ->
+      item = Repo.get(ItemTemplate, item_entry)
+
       %__MODULE__{
         update_type: :create_object2,
         object_type: :item,

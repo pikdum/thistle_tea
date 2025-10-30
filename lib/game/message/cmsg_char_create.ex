@@ -1,10 +1,7 @@
 defmodule ThistleTea.Game.Message.CmsgCharCreate do
   use ThistleTea.Game.ClientMessage, :CMSG_CHAR_CREATE
 
-  alias ThistleTea.DB.Mangos
   alias ThistleTea.DB.Mangos.ItemTemplate
-  alias ThistleTea.DBC
-  alias ThistleTea.Game.FieldStruct.MovementBlock
   alias ThistleTea.Game.Message
   alias ThistleTea.Util
 
@@ -24,66 +21,13 @@ defmodule ThistleTea.Game.Message.CmsgCharCreate do
   ]
 
   @impl ClientMessage
-  def handle(
-        %__MODULE__{
-          name: character_name,
-          race: race,
-          class: class,
-          gender: gender,
-          skin_color: skin,
-          face: face,
-          hair_style: hair_style,
-          hair_color: hair_color,
-          facial_hair: facial_hair,
-          outfit_id: outfit_id
-        },
-        state
-      ) do
-    Logger.info("CMSG_CHAR_CREATE: #{character_name}")
+  def handle(%__MODULE__{} = message, state) do
+    Logger.info("CMSG_CHAR_CREATE: #{message.name}")
 
-    info = Mangos.PlayerCreateInfo.get(race, class)
-    spells = Mangos.PlayerCreateInfoSpell.get_all(race, class)
-
-    chr_race = DBC.get_by(ChrRaces, id: race)
-
-    unit_display_id =
-      case(gender) do
-        0 -> chr_race.male_display
-        1 -> chr_race.female_display
-      end
-
-    character = %ThistleTea.Character{
-      account_id: state.account.id,
-      name: character_name,
-      race: race,
-      class: class,
-      gender: gender,
-      skin: skin,
-      face: face,
-      hair_style: hair_style,
-      hair_color: hair_color,
-      facial_hair: facial_hair,
-      outfit_id: outfit_id,
-      level: 60,
-      area: info.zone,
-      map: info.map,
-      unit_display_id: unit_display_id,
-      movement: %MovementBlock{
-        movement_flags: 0,
-        position: {info.position_x, info.position_y, info.position_z, info.orientation},
-        fall_time: 0.0,
-        walk_speed: 1.0,
-        run_speed: 20.0,
-        run_back_speed: 4.5,
-        swim_speed: 4.722222,
-        swim_back_speed: 2.5,
-        turn_rate: 3.1415,
-        timestamp: 0
-      },
-      equipment: generate_random_equipment(),
-      spells: spells,
-      sheath_state: 0
-    }
+    character =
+      message
+      |> ThistleTea.Character.build(state.account.id)
+      |> ThistleTea.Character.generate_and_assign_equipment()
 
     case ThistleTea.Character.create(character) do
       {:error, :character_exists} ->

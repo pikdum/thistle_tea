@@ -62,8 +62,8 @@ defmodule ThistleTea.Game.Message.CmsgMessagechat do
   end
 
   def player_pids_in_range(state, range) do
-    {x, y, z, _o} = state.character.movement.position
-    nearby_players = SpatialHash.query(:players, state.character.map, x, y, z, range)
+    {x, y, z, _o} = state.character.movement_block.position
+    nearby_players = SpatialHash.query(:players, state.character.internal.map, x, y, z, range)
 
     nearby_players |> Enum.map(fn {_, pid, _} -> pid end)
   end
@@ -90,8 +90,8 @@ defmodule ThistleTea.Game.Message.CmsgMessagechat do
   end
 
   def handle_chat(state, _, _, ".pos" <> _, _) do
-    {x, y, z, _o} = state.character.movement.position
-    map = state.character.map
+    {x, y, z, _o} = state.character.movement_block.position
+    map = state.character.internal.map
 
     state
     |> system_message("#{x} #{y} #{z} #{map}")
@@ -151,7 +151,7 @@ defmodule ThistleTea.Game.Message.CmsgMessagechat do
   def handle_chat(state, _, _, ".go xyz " <> rest, _) do
     case rest |> String.split(" ", trim: true) |> parse_coords() do
       {:ok, x, y, z, map} -> teleport_player(state, x, y, z, map)
-      {:ok, x, y, z} -> teleport_player(state, x, y, z, state.character.map)
+      {:ok, x, y, z} -> teleport_player(state, x, y, z, state.character.internal.map)
       :error -> system_message(state, "Invalid command. Use: .go xyz <x> <y> <z> [map]")
     end
   end
@@ -160,7 +160,7 @@ defmodule ThistleTea.Game.Message.CmsgMessagechat do
     target = Map.get(state, :target)
     pid = :ets.lookup_element(:entities, target, 2, nil)
 
-    case state.character.movement.position do
+    case state.character.movement_block.position do
       {x, y, z, _o} ->
         GenServer.cast(pid, {:move_to, x, y, z})
         state

@@ -2,6 +2,8 @@ defmodule ThistleTea.Game.Message.CmsgAttackswing do
   use ThistleTea.Game.ClientMessage, :CMSG_ATTACKSWING
   use ThistleTea.Opcodes, [:SMSG_ATTACKSTART, :SMSG_ATTACKSTOP]
 
+  alias ThistleTea.DB.Mangos.ItemTemplate
+  alias ThistleTea.DB.Mangos.Repo
   alias ThistleTea.Game.Message
 
   require Logger
@@ -17,8 +19,9 @@ defmodule ThistleTea.Game.Message.CmsgAttackswing do
       GenServer.cast(pid, {:send_packet, @smsg_attackstart, payload})
     end
 
-    # TODO: safer way to get this
-    attack_speed = state.character.equipment.mainhand.delay
+    mainhand_entry = state.character.player.visible_item_16_0
+    weapon = Repo.get(ItemTemplate, mainhand_entry)
+    attack_speed = weapon.delay
 
     # use existing timer if already attacking
     attack_timer =
@@ -42,7 +45,8 @@ defmodule ThistleTea.Game.Message.CmsgAttackswing do
   def handle_attack_swing(state) do
     case Map.fetch(state, :attacking) do
       {:ok, target_guid} ->
-        weapon = state.character.equipment.mainhand
+        mainhand_entry = state.character.player.visible_item_16_0
+        weapon = Repo.get(ItemTemplate, mainhand_entry)
         %{dmg_min1: min_damage, dmg_max1: max_damage, delay: attack_speed} = weapon
 
         pid = :ets.lookup_element(:entities, target_guid, 2)

@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.Entity.Core do
 
   def update_packet(%Mob.Data{} = entity), do: update_packet(entity, :unit)
   def update_packet(%GameObject.Data{} = entity), do: update_packet(entity, :game_object)
+  def update_packet(%ThistleTea.Character{} = entity), do: update_packet(entity, :player)
 
   def update_packet(entity, object_type) do
     %UpdateObject{
