@@ -2,7 +2,8 @@ defmodule ThistleTea.Game.World.Mangos.GameObjectSupervisor do
   use Supervisor
 
   alias ThistleTea.DB.Mangos
-  alias ThistleTea.Game.GameObject
+  alias ThistleTea.Game.Entity.Data.GameObject
+  alias ThistleTea.Game.Entity.Server.GameObject, as: GameObjectServer
   alias ThistleTea.Game.World.CellRegistry
 
   require Logger
@@ -29,11 +30,11 @@ defmodule ThistleTea.Game.World.Mangos.GameObjectSupervisor do
   end
 
   defp spec(game_object) do
-    game_object = GameObject.Data.build(game_object)
+    game_object = GameObject.build(game_object)
 
     %{
-      id: {GameObject.Server, game_object.object.guid},
-      start: {GameObject.Server, :start_link, [game_object]}
+      id: {GameObjectServer, game_object.object.guid},
+      start: {GameObjectServer, :start_link, [game_object]}
     }
   end
 end

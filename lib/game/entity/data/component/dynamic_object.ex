@@ -1,5 +1,5 @@
-defmodule ThistleTea.Game.FieldStruct.DynamicObject do
-  use ThistleTea.Game.FieldStruct,
+defmodule ThistleTea.Game.Entity.Data.Component.DynamicObject do
+  use ThistleTea.Game.Entity.UpdateMask,
     caster: {0x0006, 2, :guid},
     bytes: {0x0008, 1, :bytes},
     spell_id: {0x0009, 1, :int},

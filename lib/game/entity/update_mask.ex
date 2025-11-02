@@ -1,4 +1,4 @@
-defmodule ThistleTea.Game.FieldStruct do
+defmodule ThistleTea.Game.Entity.UpdateMask do
   defp build_struct(fields) do
     fields
     |> Keyword.reject(&fn_field?/1)

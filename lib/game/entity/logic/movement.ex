@@ -1,17 +1,18 @@
-defmodule ThistleTea.Game.Entity.Movement do
+defmodule ThistleTea.Game.Entity.Logic.Movement do
   use ThistleTea.Game.Network.Opcodes, [:SMSG_MONSTER_MOVE]
 
-  alias ThistleTea.Game.Entity
-  alias ThistleTea.Game.Entity.Waypoint
-  alias ThistleTea.Game.Entity.WaypointRoute
-  alias ThistleTea.Game.FieldStruct
+  alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Waypoint
+  alias ThistleTea.Game.Entity.Data.Component.Internal.WaypointRoute
+  alias ThistleTea.Game.Entity.Data.Component.MovementBlock
+  alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Message.SmsgMonsterMove
   alias ThistleTea.Util
 
   @max_u32 0xFFFFFFFF
 
-  def increment_spline_id(%{internal: %FieldStruct.Internal{spline_id: spline_id} = internal} = entity) do
+  def increment_spline_id(%{internal: %Internal{spline_id: spline_id} = internal} = entity) do
     new_spline_id = increment_spline_id(spline_id)
     %{entity | internal: %{internal | spline_id: new_spline_id}}
   end
@@ -22,8 +23,8 @@ defmodule ThistleTea.Game.Entity.Movement do
 
   def start_move_to(
         %{
-          movement_block: %FieldStruct.MovementBlock{walk_speed: walk_speed, position: {x0, y0, z0, _o}} = mb,
-          internal: %FieldStruct.Internal{map: map}
+          movement_block: %MovementBlock{walk_speed: walk_speed, position: {x0, y0, z0, _o}} = mb,
+          internal: %Internal{map: map}
         } = entity,
         {x, y, z}
       ) do
@@ -59,7 +60,7 @@ defmodule ThistleTea.Game.Entity.Movement do
     {_, _, _, o} = state.movement_block.position
     {xd, yd, zd} = List.last(state.movement_block.spline_nodes)
 
-    nearby_players = Entity.Core.nearby_players(state)
+    nearby_players = Core.nearby_players(state)
 
     # TODO: could be done in handle_continue instead?
     # or at least abstracted to a separate function
@@ -70,22 +71,19 @@ defmodule ThistleTea.Game.Entity.Movement do
     %{state | movement_block: %{state.movement_block | position: {xd, yd, zd, o}}}
   end
 
-  def wander(
-        %{internal: %FieldStruct.Internal{spawn_distance: spawn_distance, map: map, initial_position: {xi, yi, zi}}} =
-          state
-      ) do
+  def wander(%{internal: %Internal{spawn_distance: spawn_distance, map: map, initial_position: {xi, yi, zi}}} = state) do
     case ThistleTea.Pathfinding.find_random_point_around_circle(map, {xi, yi, zi}, spawn_distance) do
       nil -> state
       {x, y, z} -> move_to(state, {x, y, z})
     end
   end
 
-  def wander_delay(%{movement_block: %FieldStruct.MovementBlock{duration: duration}}) do
+  def wander_delay(%{movement_block: %MovementBlock{duration: duration}}) do
     duration = duration || 0
     duration + :rand.uniform(6_000) + 4_000
   end
 
-  def follow_waypoint_route(%{internal: %FieldStruct.Internal{waypoint_route: %WaypointRoute{} = route}} = state) do
+  def follow_waypoint_route(%{internal: %Internal{waypoint_route: %WaypointRoute{} = route}} = state) do
     %Waypoint{position: {x, y, z, o}} = WaypointRoute.destination_waypoint(route)
 
     state
@@ -95,20 +93,20 @@ defmodule ThistleTea.Game.Entity.Movement do
   end
 
   def follow_waypoint_route_delay(%{
-        movement_block: %FieldStruct.MovementBlock{duration: duration},
-        internal: %FieldStruct.Internal{waypoint_route: route}
+        movement_block: %MovementBlock{duration: duration},
+        internal: %Internal{waypoint_route: route}
       }) do
     duration = duration || 0
     wait_time = WaypointRoute.destination_waypoint(route).wait_time || 0
     duration + wait_time
   end
 
-  defp increment_waypoint(%{internal: %FieldStruct.Internal{waypoint_route: route} = internal} = state) do
+  defp increment_waypoint(%{internal: %Internal{waypoint_route: route} = internal} = state) do
     route = WaypointRoute.increment_waypoint(route)
     %{state | internal: %{internal | waypoint_route: route}}
   end
 
-  defp set_orientation(%{movement_block: %FieldStruct.MovementBlock{position: {x, y, z, _o}}} = entity, o) do
+  defp set_orientation(%{movement_block: %MovementBlock{position: {x, y, z, _o}}} = entity, o) do
     %{entity | movement_block: %{entity.movement_block | position: {x, y, z, o}}}
   end
 end

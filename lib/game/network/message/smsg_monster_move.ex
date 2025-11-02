@@ -1,7 +1,9 @@
 defmodule ThistleTea.Game.Network.Message.SmsgMonsterMove do
   use ThistleTea.Game.Network.ServerMessage, :SMSG_MONSTER_MOVE
 
-  alias ThistleTea.Game.FieldStruct
+  alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.Entity.Data.Component.MovementBlock
+  alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Util
 
@@ -25,14 +27,14 @@ defmodule ThistleTea.Game.Network.Message.SmsgMonsterMove do
   ]
 
   def build(%{
-        object: %FieldStruct.Object{guid: guid},
-        movement_block: %FieldStruct.MovementBlock{
+        object: %Object{guid: guid},
+        movement_block: %MovementBlock{
           position: {x0, y0, z0, _o},
           spline_nodes: spline_nodes,
           duration: duration,
           spline_flags: spline_flags
         },
-        internal: %FieldStruct.Internal{spline_id: spline_id}
+        internal: %Internal{spline_id: spline_id}
       }) do
     %__MODULE__{
       guid: guid,

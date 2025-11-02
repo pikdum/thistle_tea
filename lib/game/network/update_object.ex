@@ -1,10 +1,10 @@
 defmodule ThistleTea.Game.Network.UpdateObject do
   alias ThistleTea.DB.Mangos.ItemTemplate
   alias ThistleTea.DB.Mangos.Repo
-  alias ThistleTea.Game.FieldStruct.Item
-  alias ThistleTea.Game.FieldStruct.MovementBlock
-  alias ThistleTea.Game.FieldStruct.Object
-  alias ThistleTea.Game.FieldStruct.Player
+  alias ThistleTea.Game.Entity.Data.Component.Item
+  alias ThistleTea.Game.Entity.Data.Component.MovementBlock
+  alias ThistleTea.Game.Entity.Data.Component.Object
+  alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Util
 
   defstruct [

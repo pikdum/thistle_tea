@@ -1,8 +1,6 @@
 defmodule ThistleTea.Game.Network.Message.CmsgSetsheathed do
   use ThistleTea.Game.Network.ClientMessage, :CMSG_SETSHEATHED
 
-  alias ThistleTea.Game.Network.UpdateObject
-
   require Logger
 
   defstruct [:sheath_state]
@@ -10,7 +8,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgSetsheathed do
   @impl ClientMessage
   def handle(
         %__MODULE__{sheath_state: sheath_state},
-        %{character: %Character{unit: %FieldStruct.Unit{} = unit} = character} = state
+        %{character: %Character{unit: %Unit{} = unit} = character} = state
       ) do
     Logger.info("CMSG_SETSHEATHED")
     character = %{character | unit: %{unit | sheath_state: sheath_state}}

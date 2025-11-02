@@ -1,7 +1,7 @@
-defmodule ThistleTea.Game.Entity.WaypointRoute do
+defmodule ThistleTea.Game.Entity.Data.Component.Internal.WaypointRoute do
   alias ThistleTea.DB.Mangos.Creature
   alias ThistleTea.DB.Mangos.CreatureMovement
-  alias ThistleTea.Game.Entity.Waypoint
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Waypoint
 
   defstruct first_point: 0,
             destination_point: 0,

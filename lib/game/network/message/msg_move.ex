@@ -2,7 +2,6 @@ defmodule ThistleTea.Game.Network.Message.MsgMove do
   use ThistleTea.Game.Network.ClientMessage, :MSG_MOVE_JUMP
   use ThistleTea.Game.Network.Opcodes, [:MSG_MOVE_JUMP]
 
-  alias ThistleTea.Game.FieldStruct.MovementBlock
   alias ThistleTea.Game.Network.ClientMessage
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.UpdateObject
@@ -21,9 +20,7 @@ defmodule ThistleTea.Game.Network.Message.MsgMove do
         %__MODULE__{opcode: opcode, payload: payload} = message,
         %{
           ready: true,
-          character:
-            %Character{movement_block: %FieldStruct.MovementBlock{} = movement_block, unit: %FieldStruct.Unit{} = unit} =
-              character
+          character: %Character{movement_block: %MovementBlock{} = movement_block, unit: %Unit{} = unit} = character
         } = state
       ) do
     movement_block = MovementBlock.from_binary(payload, movement_block)

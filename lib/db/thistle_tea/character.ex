@@ -14,11 +14,11 @@ defmodule ThistleTea.Character do
 
   alias ThistleTea.DB.Mangos
   alias ThistleTea.DBC
-  alias ThistleTea.Game.FieldStruct.Internal
-  alias ThistleTea.Game.FieldStruct.MovementBlock
-  alias ThistleTea.Game.FieldStruct.Object
-  alias ThistleTea.Game.FieldStruct.Player
-  alias ThistleTea.Game.FieldStruct.Unit
+  alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.Entity.Data.Component.MovementBlock
+  alias ThistleTea.Game.Entity.Data.Component.Object
+  alias ThistleTea.Game.Entity.Data.Component.Player
+  alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Network.Message.CmsgCharCreate
 
   @item_guid_offset 0x40000000

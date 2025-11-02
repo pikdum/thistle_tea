@@ -1,4 +1,4 @@
-defmodule ThistleTea.Game.FieldStruct.Internal do
+defmodule ThistleTea.Game.Entity.Data.Component.Internal do
   defstruct [
     :map,
     :name,

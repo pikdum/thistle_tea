@@ -18,10 +18,12 @@ defmodule ThistleTea.Game.Network.ClientMessage do
       @behaviour ThistleTea.Game.Network.ClientMessage
 
       alias ThistleTea.Character
-      alias ThistleTea.Game.FieldStruct
+      alias ThistleTea.Game.Entity.Data.Component.MovementBlock
+      alias ThistleTea.Game.Entity.Data.Component.Unit
       alias ThistleTea.Game.Network.ClientMessage
       alias ThistleTea.Game.Network.Connection
       alias ThistleTea.Game.Network.Message
+      alias ThistleTea.Game.Network.UpdateObject
       alias ThistleTea.Util
 
       @impl ClientMessage
@@ -55,7 +57,6 @@ defmodule ThistleTea.Game.Network.ServerMessage do
       @behaviour ThistleTea.Game.Network.ServerMessage
 
       alias ThistleTea.Character
-      alias ThistleTea.Game.FieldStruct
       alias ThistleTea.Game.Network.Message
       alias ThistleTea.Game.Network.Packet
       alias ThistleTea.Game.Network.ServerMessage

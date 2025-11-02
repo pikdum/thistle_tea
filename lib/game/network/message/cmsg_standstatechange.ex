@@ -1,14 +1,12 @@
 defmodule ThistleTea.Game.Network.Message.CmsgStandstatechange do
   use ThistleTea.Game.Network.ClientMessage, :CMSG_STANDSTATECHANGE
 
-  alias ThistleTea.Game.Network.UpdateObject
-
   defstruct [:animation_state]
 
   @impl ClientMessage
   def handle(
         %__MODULE__{animation_state: animation_state},
-        %{character: %Character{unit: %FieldStruct.Unit{} = unit} = character} = state
+        %{character: %Character{unit: %Unit{} = unit} = character} = state
       ) do
     character = %{character | unit: %{unit | stand_state: animation_state}}
 

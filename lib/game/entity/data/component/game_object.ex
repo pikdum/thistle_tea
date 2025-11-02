@@ -1,5 +1,5 @@
-defmodule ThistleTea.Game.FieldStruct.GameObject do
-  use ThistleTea.Game.FieldStruct,
+defmodule ThistleTea.Game.Entity.Data.Component.GameObject do
+  use ThistleTea.Game.Entity.UpdateMask,
     created_by: {0x0006, 2, :guid},
     display_id: {0x0008, 1, :int},
     flags: {0x0009, 1, :int},

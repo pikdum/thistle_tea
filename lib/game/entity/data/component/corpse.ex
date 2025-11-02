@@ -1,5 +1,5 @@
-defmodule ThistleTea.Game.FieldStruct.Corpse do
-  use ThistleTea.Game.FieldStruct,
+defmodule ThistleTea.Game.Entity.Data.Component.Corpse do
+  use ThistleTea.Game.Entity.UpdateMask,
     owner: {0x0006, 2, :guid},
     facing: {0x0008, 1, :float},
     pos_x: {0x0009, 1, :float},

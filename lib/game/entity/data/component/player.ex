@@ -1,5 +1,5 @@
-defmodule ThistleTea.Game.FieldStruct.Player do
-  use ThistleTea.Game.FieldStruct,
+defmodule ThistleTea.Game.Entity.Data.Component.Player do
+  use ThistleTea.Game.Entity.UpdateMask,
     duel_arbiter: {0x00BC, 2, :guid},
     flags: {0x00BE, 1, :int},
     guild_id: {0x00BF, 1, :int},

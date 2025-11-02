@@ -5,7 +5,7 @@ defmodule ThistleTea.Game.Network.Server do
   import Bitwise, only: [|||: 2]
 
   alias ThistleTea.Game.Entity
-  alias ThistleTea.Game.FieldStruct
+  alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Network.Connection
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Opcodes
@@ -76,8 +76,7 @@ defmodule ThistleTea.Game.Network.Server do
   def handle_cast(
         {:send_update_to, pid},
         {socket,
-         %{character: %ThistleTea.Character{movement_block: %FieldStruct.MovementBlock{} = movement_block} = character} =
-           state}
+         %{character: %ThistleTea.Character{movement_block: %MovementBlock{} = movement_block} = character} = state}
       ) do
     update_flag = @update_flag_high_guid ||| @update_flag_living ||| @update_flag_has_position
     movement_block = %{movement_block | update_flag: update_flag}

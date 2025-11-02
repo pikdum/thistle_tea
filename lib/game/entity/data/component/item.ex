@@ -1,5 +1,5 @@
-defmodule ThistleTea.Game.FieldStruct.Item do
-  use ThistleTea.Game.FieldStruct,
+defmodule ThistleTea.Game.Entity.Data.Component.Item do
+  use ThistleTea.Game.Entity.UpdateMask,
     owner: {0x0006, 2, :guid},
     contained: {0x0008, 2, :guid},
     creator: {0x000A, 2, :guid},

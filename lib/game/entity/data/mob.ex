@@ -1,24 +1,27 @@
-defmodule ThistleTea.Game.Mob.Data do
+defmodule ThistleTea.Game.Entity.Data.Mob do
   alias ThistleTea.DB.Mangos
-  alias ThistleTea.Game.Entity.WaypointRoute
-  alias ThistleTea.Game.FieldStruct
+  alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.Entity.Data.Component.Internal.WaypointRoute
+  alias ThistleTea.Game.Entity.Data.Component.MovementBlock
+  alias ThistleTea.Game.Entity.Data.Component.Object
+  alias ThistleTea.Game.Entity.Data.Component.Unit
 
   @creature_guid_offset 0xF1300000
   @update_flag_living 0x20
 
-  defstruct object: %FieldStruct.Object{},
-            unit: %FieldStruct.Unit{},
-            movement_block: %FieldStruct.MovementBlock{},
-            internal: %FieldStruct.Internal{}
+  defstruct object: %Object{},
+            unit: %Unit{},
+            movement_block: %MovementBlock{},
+            internal: %Internal{}
 
   def build(%Mangos.Creature{creature_template: %Mangos.CreatureTemplate{} = ct} = c) do
     %__MODULE__{
-      object: %FieldStruct.Object{
+      object: %Object{
         guid: c.guid + @creature_guid_offset,
         entry: c.id,
         scale_x: scale(c)
       },
-      unit: %FieldStruct.Unit{
+      unit: %Unit{
         health: c.curhealth,
         power1: c.curmana,
         max_health: c.curhealth,
@@ -32,7 +35,7 @@ defmodule ThistleTea.Game.Mob.Data do
         display_id: c.modelid,
         native_display_id: c.modelid
       },
-      movement_block: %FieldStruct.MovementBlock{
+      movement_block: %MovementBlock{
         update_flag: @update_flag_living,
         position: {
           c.position_x,
@@ -52,7 +55,7 @@ defmodule ThistleTea.Game.Mob.Data do
         swim_back_speed: ct.speed_run,
         turn_rate: 3.1415
       },
-      internal: %FieldStruct.Internal{
+      internal: %Internal{
         map: c.map,
         name: ct.name,
         spawn_distance: c.spawndist,

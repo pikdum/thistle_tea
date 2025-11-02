@@ -1,5 +1,5 @@
-defmodule ThistleTea.Game.FieldStruct.Unit do
-  use ThistleTea.Game.FieldStruct,
+defmodule ThistleTea.Game.Entity.Data.Component.Unit do
+  use ThistleTea.Game.Entity.UpdateMask,
     charm: {0x0006, 2, :guid},
     summon: {0x0008, 2, :guid},
     charmed_by: {0x000A, 2, :guid},
