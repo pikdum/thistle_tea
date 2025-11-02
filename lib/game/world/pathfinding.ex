@@ -1,4 +1,6 @@
-defmodule ThistleTea.Pathfinding do
+defmodule ThistleTea.Game.World.Pathfinding do
+  alias ThistleTea.Native.Namigator
+
   def get_zone_and_area(map_id, {x, y, z}) do
     load_adt_at(map_id, {x, y})
     Namigator.get_zone_and_area(map_id, x, y, z)

@@ -8,6 +8,8 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.Network.Server, as: GameServer
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.CellRegistry
+  alias ThistleTea.Game.World.SpatialHash
+  alias ThistleTea.Native.Namigator
 
   require Logger
 

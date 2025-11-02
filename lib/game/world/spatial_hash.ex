@@ -1,4 +1,4 @@
-defmodule SpatialHash do
+defmodule ThistleTea.Game.World.SpatialHash do
   @cell_size 125
   # TODO: benchmark different cell sizes
 

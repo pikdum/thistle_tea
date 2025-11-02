@@ -2,6 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgLogoutRequest do
   use ThistleTea.Game.Network.ClientMessage, :CMSG_LOGOUT_REQUEST
 
   alias ThistleTea.Game.Network.Message
+  alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Util
 
   require Logger

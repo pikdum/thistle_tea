@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
   alias ThistleTea.Game.Entity.Data.GameObject
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Network.UpdateObject
+  alias ThistleTea.Game.World.SpatialHash
 
   def update_packet(%Mob{} = entity), do: update_packet(entity, :unit)
   def update_packet(%GameObject{} = entity), do: update_packet(entity, :game_object)

@@ -4,6 +4,7 @@ defmodule ThistleTea.DB.Mangos.Creature do
   import Ecto.Query
 
   alias ThistleTea.DB.Mangos
+  alias ThistleTea.Game.World.SpatialHash
 
   @primary_key {:guid, :integer, autogenerate: false}
 

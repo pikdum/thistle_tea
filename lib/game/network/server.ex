@@ -11,6 +11,8 @@ defmodule ThistleTea.Game.Network.Server do
   alias ThistleTea.Game.Network.Opcodes
   alias ThistleTea.Game.Network.Packet
   alias ThistleTea.Game.Network.UpdateObject
+  alias ThistleTea.Game.World.Pathfinding
+  alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Util
   alias ThousandIsland.Socket
 
@@ -108,7 +110,7 @@ defmodule ThistleTea.Game.Network.Server do
 
     # Update player's location
     area =
-      case ThistleTea.Pathfinding.get_zone_and_area(map, {x, y, z}) do
+      case Pathfinding.get_zone_and_area(map, {x, y, z}) do
         {_zone, area} -> area
         nil -> state.character.internal.area
       end

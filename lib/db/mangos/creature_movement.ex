@@ -3,6 +3,8 @@ defmodule ThistleTea.DB.Mangos.CreatureMovement do
 
   import Ecto.Query
 
+  alias ThistleTea.Game.World.SpatialHash
+
   @primary_key {:id, :integer, autogenerate: false}
   schema "creature_movement" do
     field(:point, :integer)

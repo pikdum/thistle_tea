@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgPlayerLogin do
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Message.SmsgInitialSpells.InitialSpell
   alias ThistleTea.Game.Network.UpdateObject
+  alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Util
 
   require Logger

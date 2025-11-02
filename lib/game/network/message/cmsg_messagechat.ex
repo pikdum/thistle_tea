@@ -2,6 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgMessagechat do
   use ThistleTea.Game.Network.ClientMessage, :CMSG_MESSAGECHAT
 
   alias ThistleTea.Game.Network.Message
+  alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Util
 
   require Logger

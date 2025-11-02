@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Message.SmsgMonsterMove
+  alias ThistleTea.Game.World.Pathfinding
   alias ThistleTea.Util
 
   @max_u32 0xFFFFFFFF
@@ -28,7 +29,7 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
         } = entity,
         {x, y, z}
       ) do
-    path = ThistleTea.Pathfinding.find_path(map, {x0, y0, z0}, {x, y, z})
+    path = Pathfinding.find_path(map, {x0, y0, z0}, {x, y, z})
 
     if is_nil(path) do
       # handles maps that haven't been built yet
@@ -72,7 +73,7 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
   end
 
   def wander(%{internal: %Internal{spawn_distance: spawn_distance, map: map, initial_position: {xi, yi, zi}}} = state) do
-    case ThistleTea.Pathfinding.find_random_point_around_circle(map, {xi, yi, zi}, spawn_distance) do
+    case Pathfinding.find_random_point_around_circle(map, {xi, yi, zi}, spawn_distance) do
       nil -> state
       {x, y, z} -> move_to(state, {x, y, z})
     end

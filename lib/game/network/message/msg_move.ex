@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.Network.Message.MsgMove do
   alias ThistleTea.Game.Network.ClientMessage
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.UpdateObject
+  alias ThistleTea.Game.World.SpatialHash
 
   require Logger
 
