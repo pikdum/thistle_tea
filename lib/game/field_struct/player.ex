@@ -272,7 +272,7 @@ defmodule ThistleTea.Game.FieldStruct.Player do
     watched_faction_index: {0x04ED, 1, :int},
     combat_rating: {0x04EE, 20, :int}
 
-  alias ThistleTea.Game.Utils.UpdateObject
+  alias ThistleTea.Game.Network.UpdateObject
 
   def features(%{skin: skin, face: face, hair_style: hair_style, hair_color: hair_color}) do
     UpdateObject.build_bytes([

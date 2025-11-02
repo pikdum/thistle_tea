@@ -1,6 +1,8 @@
 defmodule ThistleTea.Telemetry do
   use GenServer
 
+  alias ThistleTea.Game.Network.Opcodes
+
   require Logger
 
   @telemetry_interval 30_000
@@ -39,7 +41,7 @@ defmodule ThistleTea.Telemetry do
       |> Enum.group_by(&elem(&1, 1), &elem(&1, 2))
       |> Enum.map(fn {k, v} ->
         %{
-          opcode: ThistleTea.Opcodes.get(k),
+          opcode: Opcodes.get(k),
           max_duration: Enum.max(v) |> System.convert_time_unit(:native, :microsecond),
           count: Enum.count(v)
         }

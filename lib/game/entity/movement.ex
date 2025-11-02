@@ -1,12 +1,12 @@
 defmodule ThistleTea.Game.Entity.Movement do
-  use ThistleTea.Opcodes, [:SMSG_MONSTER_MOVE]
+  use ThistleTea.Game.Network.Opcodes, [:SMSG_MONSTER_MOVE]
 
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Waypoint
   alias ThistleTea.Game.Entity.WaypointRoute
   alias ThistleTea.Game.FieldStruct
-  alias ThistleTea.Game.Message
-  alias ThistleTea.Game.Message.SmsgMonsterMove
+  alias ThistleTea.Game.Network.Message
+  alias ThistleTea.Game.Network.Message.SmsgMonsterMove
   alias ThistleTea.Util
 
   @max_u32 0xFFFFFFFF

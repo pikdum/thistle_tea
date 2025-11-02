@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Entity.Core do
   alias ThistleTea.Game.FieldStruct
   alias ThistleTea.Game.GameObject
   alias ThistleTea.Game.Mob
-  alias ThistleTea.Game.Utils.UpdateObject
+  alias ThistleTea.Game.Network.UpdateObject
 
   def update_packet(%Mob.Data{} = entity), do: update_packet(entity, :unit)
   def update_packet(%GameObject.Data{} = entity), do: update_packet(entity, :game_object)

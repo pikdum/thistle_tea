@@ -5,6 +5,7 @@ defmodule ThistleTea.Application do
   use Application
 
   alias ThistleTea.DB.Mangos.Repo
+  alias ThistleTea.Game.Network.Server, as: GameServer
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.CellRegistry
 
@@ -52,7 +53,7 @@ defmodule ThistleTea.Application do
         !test &&
           {ThousandIsland, port: @auth_port, handler_module: ThistleTea.Auth, handler_options: @handler_options},
         !test &&
-          {ThousandIsland, port: @game_port, handler_module: ThistleTea.Game, handler_options: @handler_options},
+          {ThousandIsland, port: @game_port, handler_module: GameServer, handler_options: @handler_options},
         ThistleTeaWeb.Telemetry,
         {Phoenix.PubSub, name: ThistleTea.PubSub},
         !test && ThistleTeaWeb.Endpoint,

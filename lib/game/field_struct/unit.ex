@@ -114,7 +114,7 @@ defmodule ThistleTea.Game.FieldStruct.Unit do
     power_cost_modifier: {0x00AD, 7, :int},
     power_cost_multiplier: {0x00B4, 7, :float}
 
-  alias ThistleTea.Game.Utils.UpdateObject
+  alias ThistleTea.Game.Network.UpdateObject
 
   def bytes_0(%{race: race, class: class, gender: gender, power_type: power_type}) do
     UpdateObject.build_bytes([

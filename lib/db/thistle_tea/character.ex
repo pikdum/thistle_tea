@@ -19,7 +19,7 @@ defmodule ThistleTea.Character do
   alias ThistleTea.Game.FieldStruct.Object
   alias ThistleTea.Game.FieldStruct.Player
   alias ThistleTea.Game.FieldStruct.Unit
-  alias ThistleTea.Game.Message.CmsgCharCreate
+  alias ThistleTea.Game.Network.Message.CmsgCharCreate
 
   @item_guid_offset 0x40000000
 

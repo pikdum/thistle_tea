@@ -1,11 +1,11 @@
 defmodule ThistleTea.Util do
-  use ThistleTea.Opcodes, [:SMSG_UPDATE_OBJECT, :SMSG_COMPRESSED_UPDATE_OBJECT]
+  use ThistleTea.Game.Network.Opcodes, [:SMSG_UPDATE_OBJECT, :SMSG_COMPRESSED_UPDATE_OBJECT]
 
   import Binary, only: [split_at: 2, trim_trailing: 1, reverse: 1]
   import Bitwise, only: [|||: 2, <<<: 2, &&&: 2]
 
-  alias ThistleTea.Game.Message
-  alias ThistleTea.Game.Packet
+  alias ThistleTea.Game.Network.Message
+  alias ThistleTea.Game.Network.Packet
 
   @range 250
 
