@@ -13,7 +13,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgAuthSession do
   def handle(%__MODULE__{username: username} = message, %{conn: %Connection{} = conn} = state) do
     with {:ok, conn} <- get_session_key(conn, message),
          {:ok, conn} <- verify_proof(conn, message) do
-      Util.send_packet(%Message.SmsgAuthResponse{
+      Network.send_packet(%Message.SmsgAuthResponse{
         result: 0x0C,
         billing_time: 0,
         billing_flags: 0,
@@ -26,7 +26,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgAuthSession do
       %{state | conn: conn, account: account}
     else
       _ ->
-        Util.send_packet(%Message.SmsgAuthResponse{
+        Network.send_packet(%Message.SmsgAuthResponse{
           result: 0x0D
         })
 

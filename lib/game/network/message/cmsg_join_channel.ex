@@ -16,7 +16,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgJoinChannel do
       ThistleTea.ChatChannel
       |> Registry.register(channel_name, state.guid)
 
-      Util.send_packet(%Message.SmsgChannelNotify{
+      Network.send_packet(%Message.SmsgChannelNotify{
         notify_type: 0x02,
         channel_name: channel_name
       })

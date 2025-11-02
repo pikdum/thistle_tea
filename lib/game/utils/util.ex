@@ -4,8 +4,7 @@ defmodule ThistleTea.Util do
   import Binary, only: [split_at: 2, trim_trailing: 1, reverse: 1]
   import Bitwise, only: [|||: 2, <<<: 2, &&&: 2]
 
-  alias ThistleTea.Game.Network.Message
-  alias ThistleTea.Game.Network.Packet
+  alias ThistleTea.Game.Network
 
   @range 250
 
@@ -28,28 +27,15 @@ defmodule ThistleTea.Util do
     abs(x1 - x2) <= range && abs(y1 - y2) <= range && abs(z1 - z2) <= range
   end
 
-  def send_packet(%Packet{opcode: opcode, payload: payload}) do
-    send_packet(opcode, payload)
-  end
-
-  def send_packet(message) do
-    packet = message |> Message.to_packet()
-    send_packet(packet.opcode, packet.payload)
-  end
-
-  def send_packet(opcode, payload) do
-    GenServer.cast(self(), {:send_packet, opcode, payload})
-  end
-
   def send_update_packet(packet) do
     compressed_packet = :zlib.compress(packet)
     original_size = byte_size(packet)
     compressed_size = byte_size(compressed_packet)
 
     if compressed_size >= original_size do
-      send_packet(@smsg_update_object, packet)
+      Network.send_packet(@smsg_update_object, packet)
     else
-      send_packet(
+      Network.send_packet(
         @smsg_compressed_update_object,
         <<original_size::little-size(32)>> <> compressed_packet
       )

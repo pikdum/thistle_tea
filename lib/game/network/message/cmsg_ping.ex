@@ -2,7 +2,6 @@ defmodule ThistleTea.Game.Network.Message.CmsgPing do
   use ThistleTea.Game.Network.ClientMessage, :CMSG_PING
 
   alias ThistleTea.Game.Network.Message
-  alias ThistleTea.Util
 
   require Logger
 
@@ -12,7 +11,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgPing do
   def handle(%__MODULE__{sequence_id: sequence_id, latency: latency}, state) do
     Logger.info("CMSG_PING: #{latency}")
 
-    Util.send_packet(%Message.SmsgPong{sequence_id: sequence_id})
+    Network.send_packet(%Message.SmsgPong{sequence_id: sequence_id})
     Map.put(state, :latency, latency)
   end
 

@@ -2,7 +2,6 @@ defmodule ThistleTea.Game.Network.Message.CmsgLogoutCancel do
   use ThistleTea.Game.Network.ClientMessage, :CMSG_LOGOUT_CANCEL
 
   alias ThistleTea.Game.Network.Message
-  alias ThistleTea.Util
 
   require Logger
 
@@ -22,7 +21,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgLogoutCancel do
           Map.delete(state, :logout_timer)
       end
 
-    Util.send_packet(%Message.SmsgLogoutCancelAck{})
+    Network.send_packet(%Message.SmsgLogoutCancelAck{})
     state
   end
 

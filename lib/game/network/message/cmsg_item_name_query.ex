@@ -3,7 +3,6 @@ defmodule ThistleTea.Game.Network.Message.CmsgItemNameQuery do
 
   alias ThistleTea.DB.Mangos
   alias ThistleTea.Game.Network.Message
-  alias ThistleTea.Util
 
   require Logger
 
@@ -14,7 +13,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgItemNameQuery do
     item = Mangos.Repo.get(Mangos.ItemTemplate, item_id)
     Logger.info("CMSG_ITEM_NAME_QUERY: #{item.name}")
 
-    Util.send_packet(%Message.SmsgItemNameQueryResponse{
+    Network.send_packet(%Message.SmsgItemNameQueryResponse{
       item_id: item_id,
       item_name: item.name
     })

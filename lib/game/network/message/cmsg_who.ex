@@ -3,7 +3,6 @@ defmodule ThistleTea.Game.Network.Message.CmsgWho do
 
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Message.SmsgWho.WhoPlayer
-  alias ThistleTea.Util
 
   defstruct []
 
@@ -28,7 +27,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgWho do
         }
       end)
 
-    Util.send_packet(%Message.SmsgWho{
+    Network.send_packet(%Message.SmsgWho{
       listed_players: count,
       online_players: count,
       players: players

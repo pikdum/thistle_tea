@@ -6,7 +6,6 @@ defmodule ThistleTea.Game.Network.Message.CmsgGossipSelectOption do
   alias ThistleTea.DB.Mangos
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Message.SmsgGossipMessage.GossipItem
-  alias ThistleTea.Util
 
   require Logger
 
@@ -41,7 +40,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgGossipSelectOption do
                 }
               end)
 
-            Util.send_packet(%Message.SmsgGossipMessage{
+            Network.send_packet(%Message.SmsgGossipMessage{
               guid: guid,
               title_text_id: gm.text_id,
               gossips: gossips,

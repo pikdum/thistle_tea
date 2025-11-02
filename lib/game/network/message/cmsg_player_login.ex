@@ -11,7 +11,6 @@ defmodule ThistleTea.Game.Network.Message.CmsgPlayerLogin do
   alias ThistleTea.Game.Network.Message.SmsgInitialSpells.InitialSpell
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.World.SpatialHash
-  alias ThistleTea.Util
 
   require Logger
 
@@ -36,7 +35,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgPlayerLogin do
 
     {x, y, z, o} = c.movement_block.position
 
-    Util.send_packet(%Message.SmsgLoginVerifyWorld{
+    Network.send_packet(%Message.SmsgLoginVerifyWorld{
       map: c.internal.map,
       position: {x, y, z},
       orientation: o
@@ -71,16 +70,16 @@ defmodule ThistleTea.Game.Network.Message.CmsgPlayerLogin do
 
   def send_login_init_packets(c) do
     # needed for no white chatbox + keybinds
-    Util.send_packet(%Message.SmsgAccountDataTimes{data: [0, 0, 0, 0]})
+    Network.send_packet(%Message.SmsgAccountDataTimes{data: [0, 0, 0, 0]})
 
     # maybe useless? mangos sends it, though
-    Util.send_packet(%Message.SmsgSetRestStart{unknown1: 0})
+    Network.send_packet(%Message.SmsgSetRestStart{unknown1: 0})
 
     {x, y, z, _o} = c.movement_block.position
 
     # SMSG_BINDPOINTUPDATE
     # let's just init it to character's position for now
-    Util.send_packet(%Message.SmsgBindpointupdate{
+    Network.send_packet(%Message.SmsgBindpointupdate{
       x: x,
       y: y,
       z: z,
@@ -89,7 +88,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgPlayerLogin do
     })
 
     # no tutorials
-    Util.send_packet(%Message.SmsgTutorialFlags{
+    Network.send_packet(%Message.SmsgTutorialFlags{
       tutorial_data: [0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF]
     })
 
@@ -99,7 +98,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgPlayerLogin do
         %InitialSpell{spell_id: spell_id, unknown1: 0}
       end)
 
-    Util.send_packet(%Message.SmsgInitialSpells{
+    Network.send_packet(%Message.SmsgInitialSpells{
       unknown1: 0,
       initial_spells: spells,
       cooldowns: []
@@ -116,7 +115,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgPlayerLogin do
       (dt.year - 80) <<< 24 ||| (dt.month - 1) <<< 20 ||| (dt.day - 1) <<< 14 |||
         Date.day_of_week(dt) <<< 11 ||| dt.hour <<< 6 ||| dt.minute
 
-    Util.send_packet(%Message.SmsgLoginSettimespeed{
+    Network.send_packet(%Message.SmsgLoginSettimespeed{
       datetime: date,
       timescale: 0.01666667
     })
@@ -126,7 +125,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgPlayerLogin do
     # SMSG_TRIGGER_CINEMATIC
     # TODO: on first login only
     if false do
-      Util.send_packet(%Message.SmsgTriggerCinematic{
+      Network.send_packet(%Message.SmsgTriggerCinematic{
         cinematic_sequence_id: chr_race.cinematic_sequence
       })
     end

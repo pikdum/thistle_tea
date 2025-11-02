@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.Network.Server do
 
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
+  alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Connection
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Opcodes
@@ -98,7 +99,7 @@ defmodule ThistleTea.Game.Network.Server do
 
   @impl GenServer
   def handle_cast({:destroy_object, guid}, {socket, state}) do
-    Util.send_packet(%Message.SmsgDestroyObject{guid: guid})
+    Network.send_packet(%Message.SmsgDestroyObject{guid: guid})
     # TODO: remove from spawned_players/etc.?
     {:noreply, {socket, state}, socket.read_timeout}
   end
@@ -106,7 +107,7 @@ defmodule ThistleTea.Game.Network.Server do
   @impl GenServer
   def handle_cast({:start_teleport, x, y, z, map}, {socket, state}) do
     # Send player's client to loading screen to load the new map
-    Util.send_packet(%Message.SmsgTransferPending{map: map, has_transport: false})
+    Network.send_packet(%Message.SmsgTransferPending{map: map, has_transport: false})
 
     # Update player's location
     area =
@@ -143,7 +144,7 @@ defmodule ThistleTea.Game.Network.Server do
     # Send player's client the new location
     orientation = 0
 
-    Util.send_packet(%Message.SmsgNewWorld{map: map, position: %{x: x, y: y, z: z}, orientation: orientation})
+    Network.send_packet(%Message.SmsgNewWorld{map: map, position: %{x: x, y: y, z: z}, orientation: orientation})
 
     # The client responds with a MSG_MOVE_WORLDPORT_ACK message which
     # is handled in the login handler as they share the same init process
@@ -152,7 +153,7 @@ defmodule ThistleTea.Game.Network.Server do
 
   @impl GenServer
   def handle_info(:logout_complete, {socket, state}) do
-    Util.send_packet(%Message.SmsgLogoutComplete{})
+    Network.send_packet(%Message.SmsgLogoutComplete{})
     state = Message.CmsgLogoutRequest.handle_logout(state)
     {:noreply, {socket, state}, socket.read_timeout}
   end
@@ -201,16 +202,16 @@ defmodule ThistleTea.Game.Network.Server do
     # TODO: update a reverse mapping, so mobs know nearby players?
     for {guid, pid} <- players_to_remove do
       if pid != self() do
-        Util.send_packet(%Message.SmsgDestroyObject{guid: guid})
+        Network.send_packet(%Message.SmsgDestroyObject{guid: guid})
       end
     end
 
     for {guid, _pid} <- mobs_to_remove do
-      Util.send_packet(%Message.SmsgDestroyObject{guid: guid})
+      Network.send_packet(%Message.SmsgDestroyObject{guid: guid})
     end
 
     for {guid, _pid} <- game_objects_to_remove do
-      Util.send_packet(%Message.SmsgDestroyObject{guid: guid})
+      Network.send_packet(%Message.SmsgDestroyObject{guid: guid})
     end
 
     for {_guid, pid} <- players_to_add do

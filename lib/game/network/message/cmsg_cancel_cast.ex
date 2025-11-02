@@ -2,7 +2,6 @@ defmodule ThistleTea.Game.Network.Message.CmsgCancelCast do
   use ThistleTea.Game.Network.ClientMessage, :CMSG_CANCEL_CAST
 
   alias ThistleTea.Game.Network.Message
-  alias ThistleTea.Util
 
   require Logger
 
@@ -29,7 +28,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgCancelCast do
       spell ->
         Process.cancel_timer(spell.cast_timer)
 
-        Util.send_packet(%Message.SmsgCastResult{
+        Network.send_packet(%Message.SmsgCastResult{
           spell: spell.spell_id,
           result: 2,
           reason: reason,
@@ -40,7 +39,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgCancelCast do
           equipped_item_inventory_type_mask: nil
         })
 
-        Util.send_packet(%Message.SmsgSpellFailure{
+        Network.send_packet(%Message.SmsgSpellFailure{
           guid: state.guid,
           spell: spell.spell_id,
           result: reason

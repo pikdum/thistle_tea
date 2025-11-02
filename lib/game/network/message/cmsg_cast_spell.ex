@@ -6,7 +6,6 @@ defmodule ThistleTea.Game.Network.Message.CmsgCastSpell do
 
   alias ThistleTea.DBC
   alias ThistleTea.Game.Network.Message
-  alias ThistleTea.Util
 
   require Logger
 
@@ -89,7 +88,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgCastSpell do
   def handle_spell_complete(state) do
     s = state.spell
 
-    Util.send_packet(%Message.SmsgCastResult{
+    Network.send_packet(%Message.SmsgCastResult{
       spell: s.spell_id,
       result: 0,
       reason: nil,

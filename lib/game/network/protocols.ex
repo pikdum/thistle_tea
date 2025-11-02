@@ -20,6 +20,7 @@ defmodule ThistleTea.Game.Network.ClientMessage do
       alias ThistleTea.Character
       alias ThistleTea.Game.Entity.Data.Component.MovementBlock
       alias ThistleTea.Game.Entity.Data.Component.Unit
+      alias ThistleTea.Game.Network
       alias ThistleTea.Game.Network.ClientMessage
       alias ThistleTea.Game.Network.Connection
       alias ThistleTea.Game.Network.Message

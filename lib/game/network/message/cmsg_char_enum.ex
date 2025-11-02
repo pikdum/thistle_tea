@@ -6,7 +6,6 @@ defmodule ThistleTea.Game.Network.Message.CmsgCharEnum do
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Message.SmsgCharEnum.Character
   alias ThistleTea.Game.Network.Message.SmsgCharEnum.CharacterGear
-  alias ThistleTea.Util
 
   require Logger
 
@@ -91,7 +90,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgCharEnum do
         }
       end)
 
-    Util.send_packet(%Message.SmsgCharEnum{
+    Network.send_packet(%Message.SmsgCharEnum{
       amount_of_characters: Enum.count(characters_structs),
       characters: characters_structs
     })

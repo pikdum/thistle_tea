@@ -3,7 +3,6 @@ defmodule ThistleTea.Game.Network.Message.CmsgItemQuerySingle do
 
   alias ThistleTea.DB.Mangos
   alias ThistleTea.Game.Network.Message
-  alias ThistleTea.Util
 
   require Logger
 
@@ -15,7 +14,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgItemQuerySingle do
 
     item = Mangos.Repo.get(Mangos.ItemTemplate, item_id)
 
-    Util.send_packet(%Message.SmsgItemQuerySingleResponse{
+    Network.send_packet(%Message.SmsgItemQuerySingleResponse{
       item_id: item_id,
       item: item
     })

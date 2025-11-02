@@ -3,7 +3,6 @@ defmodule ThistleTea.Game.Network.Message.CmsgCreatureQuery do
 
   alias ThistleTea.DB.Mangos
   alias ThistleTea.Game.Network.Message
-  alias ThistleTea.Util
 
   require Logger
 
@@ -24,7 +23,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgCreatureQuery do
       target_name: ct.name
     )
 
-    Util.send_packet(%Message.SmsgCreatureQueryResponse{
+    Network.send_packet(%Message.SmsgCreatureQueryResponse{
       creature_entry: entry,
       found: true,
       name1: ct.name,

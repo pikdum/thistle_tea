@@ -3,7 +3,6 @@ defmodule ThistleTea.Game.Network.Message.CmsgGameobjectQuery do
 
   alias ThistleTea.DB.Mangos
   alias ThistleTea.Game.Network.Message
-  alias ThistleTea.Util
 
   require Logger
 
@@ -51,7 +50,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgGameobjectQuery do
       template.data23
     ]
 
-    Util.send_packet(%Message.SmsgGameobjectQueryResponse{
+    Network.send_packet(%Message.SmsgGameobjectQueryResponse{
       entry_id: template.entry,
       info_type: template.type,
       display_id: template.display_id,

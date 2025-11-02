@@ -6,7 +6,6 @@ defmodule ThistleTea.Game.Network.Message.CmsgNpcTextQuery do
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Message.SmsgNpcTextUpdate.NpcTextUpdate
   alias ThistleTea.Game.Network.Message.SmsgNpcTextUpdate.NpcTextUpdateEmote
-  alias ThistleTea.Util
 
   require Logger
 
@@ -55,7 +54,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgNpcTextQuery do
             }
           end)
 
-        Util.send_packet(%Message.SmsgNpcTextUpdate{
+        Network.send_packet(%Message.SmsgNpcTextUpdate{
           text_id: text_id,
           texts: texts
         })

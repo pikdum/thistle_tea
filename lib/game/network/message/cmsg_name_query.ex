@@ -2,7 +2,6 @@ defmodule ThistleTea.Game.Network.Message.CmsgNameQuery do
   use ThistleTea.Game.Network.ClientMessage, :CMSG_NAME_QUERY
 
   alias ThistleTea.Game.Network.Message
-  alias ThistleTea.Util
 
   require Logger
 
@@ -14,7 +13,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgNameQuery do
 
     Logger.info("CMSG_NAME_QUERY", target_name: character_name)
 
-    Util.send_packet(%Message.SmsgNameQueryResponse{
+    Network.send_packet(%Message.SmsgNameQueryResponse{
       guid: guid,
       character_name: character_name,
       realm_name: realm_name,

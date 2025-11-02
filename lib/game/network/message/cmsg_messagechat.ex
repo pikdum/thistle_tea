@@ -20,7 +20,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgMessagechat do
   @emote_range 25
 
   def system_message(state, message) do
-    Util.send_packet(%Message.SmsgMessagechat{
+    Network.send_packet(%Message.SmsgMessagechat{
       chat_type: 0x0A,
       language: 0,
       sender_guid: state.guid,
@@ -219,7 +219,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgMessagechat do
         GenServer.cast(pid, {:send_packet, packet.opcode, packet.payload})
 
       _ ->
-        Util.send_packet(%Message.SmsgChatPlayerNotFound{name: target_name})
+        Network.send_packet(%Message.SmsgChatPlayerNotFound{name: target_name})
     end
 
     state

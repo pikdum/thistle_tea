@@ -31,16 +31,16 @@ defmodule ThistleTea.Game.Network.Message.CmsgCharCreate do
 
     case ThistleTea.Character.create(character) do
       {:error, :character_exists} ->
-        Util.send_packet(%Message.SmsgCharCreate{result: 0x31})
+        Network.send_packet(%Message.SmsgCharCreate{result: 0x31})
 
       {:error, :character_limit} ->
-        Util.send_packet(%Message.SmsgCharCreate{result: 0x35})
+        Network.send_packet(%Message.SmsgCharCreate{result: 0x35})
 
       {:error, _} ->
-        Util.send_packet(%Message.SmsgCharCreate{result: 0x30})
+        Network.send_packet(%Message.SmsgCharCreate{result: 0x30})
 
       {:ok, _} ->
-        Util.send_packet(%Message.SmsgCharCreate{result: 0x2E})
+        Network.send_packet(%Message.SmsgCharCreate{result: 0x2E})
     end
 
     state
