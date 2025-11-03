@@ -60,13 +60,9 @@ defmodule ThistleTea.Game.Network.Server do
   end
 
   @impl GenServer
-  def handle_cast({:send_packet, opcode, payload}, {socket, state}) do
-    size = byte_size(payload) + 2
-    header = <<size::big-size(16), opcode::little-size(16)>>
-
-    {:ok, conn, header} = Connection.Crypto.encrypt_header(state.conn, header)
-    Socket.send(socket, header <> payload)
-    {:noreply, {socket, %{state | conn: conn}}, socket.read_timeout}
+  def handle_cast({:send_packet, packet}, {socket, state}) do
+    state = Network.Send.send_packet(packet, {socket, state})
+    {:noreply, {socket, state}, socket.read_timeout}
   end
 
   @impl GenServer

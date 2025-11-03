@@ -38,21 +38,17 @@ defmodule ThistleTea.Game.Network.Message.CmsgCastSpell do
 
     spell_start_flags = 0x2
 
-    packet =
-      Message.to_packet(%Message.SmsgSpellStart{
-        cast_item: state.packed_guid,
-        caster: state.packed_guid,
-        spell: spell_id,
-        flags: spell_start_flags,
-        timer: spell.spell_cast_time.base,
-        targets: spell_cast_targets,
-        ammo_display_id: nil,
-        ammo_inventory_type: nil
-      })
-
-    for pid <- Map.get(state, :player_pids, []) do
-      GenServer.cast(pid, {:send_packet, packet.opcode, packet.payload})
-    end
+    %Message.SmsgSpellStart{
+      cast_item: state.packed_guid,
+      caster: state.packed_guid,
+      spell: spell_id,
+      flags: spell_start_flags,
+      timer: spell.spell_cast_time.base,
+      targets: spell_cast_targets,
+      ammo_display_id: nil,
+      ammo_inventory_type: nil
+    }
+    |> World.broadcast_packet(state.character)
 
     state =
       Map.put(state, :spell, %{
@@ -88,7 +84,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgCastSpell do
   def handle_spell_complete(state) do
     s = state.spell
 
-    Network.send_packet(%Message.SmsgCastResult{
+    %Message.SmsgCastResult{
       spell: s.spell_id,
       result: 0,
       reason: nil,
@@ -97,30 +93,27 @@ defmodule ThistleTea.Game.Network.Message.CmsgCastSpell do
       equipped_item_class: nil,
       equipped_item_subclass_mask: nil,
       equipped_item_inventory_type_mask: nil
-    })
+    }
+    |> Network.send_packet()
 
     spell_go_flags = 0x100
 
-    packet =
-      Message.to_packet(%Message.SmsgSpellGo{
-        cast_item: state.guid,
-        caster: state.guid,
-        spell: s.spell_id,
-        flags: spell_go_flags,
-        hits: [s.target],
-        misses: [],
-        targets: s.spell_cast_targets,
-        ammo_display_id: nil,
-        ammo_inventory_type: nil
-      })
+    %Message.SmsgSpellGo{
+      cast_item: state.guid,
+      caster: state.guid,
+      spell: s.spell_id,
+      flags: spell_go_flags,
+      hits: [s.target],
+      misses: [],
+      targets: s.spell_cast_targets,
+      ammo_display_id: nil,
+      ammo_inventory_type: nil
+    }
+    |> World.broadcast_packet(state.character)
 
     if s.target != state.guid do
       pid = :ets.lookup_element(:entities, s.target, 2)
       GenServer.cast(pid, {:receive_spell, state.guid, s.spell_id})
-    end
-
-    for pid <- Map.get(state, :player_pids, []) do
-      GenServer.cast(pid, {:send_packet, packet.opcode, packet.payload})
     end
 
     Map.delete(state, :spell)

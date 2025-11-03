@@ -2,11 +2,8 @@ defmodule ThistleTea.Game.Network.Message.CmsgTextEmote do
   use ThistleTea.Game.Network.ClientMessage, :CMSG_TEXT_EMOTE
 
   alias ThistleTea.Game.Network.Message
-  alias ThistleTea.Game.Network.Message.CmsgMessagechat
 
   defstruct [:text_emote, :emote, :target]
-
-  @range 25
 
   @text_emote_agree 1
   @text_emote_applaud 5
@@ -105,18 +102,11 @@ defmodule ThistleTea.Game.Network.Message.CmsgTextEmote do
     target_name = get_target_name(target)
     emote_id = text_emote_to_emote()[text_emote] || 0
 
-    text_emote_msg = %Message.SmsgTextEmote{guid: state.guid, text_emote: text_emote, emote: emote, name: target_name}
-    emote_msg = %Message.SmsgEmote{emote: emote_id, guid: state.guid}
-
-    packet_text = Message.to_packet(text_emote_msg)
-    packet_emote = Message.to_packet(emote_msg)
-
-    pids_in_range = CmsgMessagechat.player_pids_in_range(state, @range)
-
-    for pid <- pids_in_range do
-      GenServer.cast(pid, {:send_packet, packet_text.opcode, packet_text.payload})
-      GenServer.cast(pid, {:send_packet, packet_emote.opcode, packet_emote.payload})
-    end
+    [
+      %Message.SmsgTextEmote{guid: state.guid, text_emote: text_emote, emote: emote, name: target_name},
+      %Message.SmsgEmote{emote: emote_id, guid: state.guid}
+    ]
+    |> World.broadcast_packet(state.character, range: 25)
 
     state
   end

@@ -5,9 +5,8 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
   alias ThistleTea.Game.Entity.Data.Component.Internal.Waypoint
   alias ThistleTea.Game.Entity.Data.Component.Internal.WaypointRoute
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
-  alias ThistleTea.Game.Entity.Logic.Core
-  alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Message.SmsgMonsterMove
+  alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Pathfinding
   alias ThistleTea.Util
 
@@ -52,7 +51,6 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
 
   def move_to(state, {x, y, z}) do
     state = start_move_to(state, {x, y, z})
-    packet = Message.to_packet(SmsgMonsterMove.build(state))
 
     # TODO: how do i want to handle updating the position on the server side?
     # sounds like vmangos does this every 100ms
@@ -61,13 +59,10 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
     {_, _, _, o} = state.movement_block.position
     {xd, yd, zd} = List.last(state.movement_block.spline_nodes)
 
-    nearby_players = Core.nearby_players(state)
-
     # TODO: could be done in handle_continue instead?
-    # or at least abstracted to a separate function
-    for {_guid, pid, _distance} <- nearby_players do
-      GenServer.cast(pid, {:send_packet, packet.opcode, packet.payload})
-    end
+    # treat more like a side effect?
+    SmsgMonsterMove.build(state)
+    |> World.broadcast_packet(state.character)
 
     %{state | movement_block: %{state.movement_block | position: {xd, yd, zd, o}}}
   end

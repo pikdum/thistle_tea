@@ -4,6 +4,7 @@ defmodule ThistleTea.Game.Network.Message.MsgMove do
 
   alias ThistleTea.Game.Network.ClientMessage
   alias ThistleTea.Game.Network.Message
+  alias ThistleTea.Game.Network.Packet
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.World.SpatialHash
 
@@ -60,11 +61,8 @@ defmodule ThistleTea.Game.Network.Message.MsgMove do
   end
 
   defp broadcast(state, message) do
-    for pid <- Map.get(state, :player_pids, []) do
-      if pid != self() do
-        GenServer.cast(pid, {:send_packet, message.opcode, state.packed_guid <> message.payload})
-      end
-    end
+    Packet.build(state.packed_guid <> message.payload, message.opcode)
+    |> World.broadcast_packet(state.character, include_self?: false)
 
     state
   end

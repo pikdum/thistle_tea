@@ -33,13 +33,17 @@ defmodule ThistleTea.Util do
     compressed_size = byte_size(compressed_packet)
 
     if compressed_size >= original_size do
-      Network.send_packet(@smsg_update_object, packet)
+      %Network.Packet{
+        opcode: @smsg_update_object,
+        payload: packet
+      }
     else
-      Network.send_packet(
-        @smsg_compressed_update_object,
-        <<original_size::little-size(32)>> <> compressed_packet
-      )
+      %Network.Packet{
+        opcode: @smsg_compressed_update_object,
+        payload: <<original_size::little-size(32)>> <> compressed_packet
+      }
     end
+    |> Network.send_packet()
   end
 
   def pack_guid(guid) when is_integer(guid) do

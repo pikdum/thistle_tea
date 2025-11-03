@@ -13,11 +13,12 @@ defmodule ThistleTea.Game.Network.Message.CmsgAttackswing do
   @impl ClientMessage
   def handle(%__MODULE__{target_guid: target_guid}, state) do
     Logger.info("CMSG_ATTACKSWING: #{target_guid}")
-    payload = <<state.guid::little-size(64), target_guid::little-size(64)>>
 
-    for pid <- Map.get(state, :player_pids, []) do
-      GenServer.cast(pid, {:send_packet, @smsg_attackstart, payload})
-    end
+    %Message.SmsgAttackstart{
+      attacker: state.guid,
+      victim: target_guid
+    }
+    |> World.broadcast_packet(state.character)
 
     mainhand_entry = state.character.player.visible_item_16_0
     weapon = Repo.get(ItemTemplate, mainhand_entry)

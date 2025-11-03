@@ -2,7 +2,6 @@ defmodule ThistleTea.Game.Network.Message.CmsgMessagechat do
   use ThistleTea.Game.Network.ClientMessage, :CMSG_MESSAGECHAT
 
   alias ThistleTea.Game.Network.Message
-  alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Util
 
   require Logger
@@ -60,13 +59,6 @@ defmodule ThistleTea.Game.Network.Message.CmsgMessagechat do
     else
       _ -> :error
     end
-  end
-
-  def player_pids_in_range(state, range) do
-    {x, y, z, _o} = state.character.movement_block.position
-    nearby_players = SpatialHash.query(:players, state.character.internal.map, x, y, z, range)
-
-    nearby_players |> Enum.map(fn {_, pid, _} -> pid end)
   end
 
   def handle_chat(state, _, _, ".help" <> _, _) do
@@ -173,17 +165,6 @@ defmodule ThistleTea.Game.Network.Message.CmsgMessagechat do
 
   def handle_chat(state, chat_type, language, message, _target_name)
       when chat_type in [@chat_type_say, @chat_type_yell, @chat_type_emote] do
-    packet =
-      Message.to_packet(%Message.SmsgMessagechat{
-        chat_type: chat_type,
-        language: language,
-        sender_guid: state.guid,
-        message: message,
-        channel_name: nil,
-        player_rank: 0,
-        tag: 0
-      })
-
     range =
       case chat_type do
         @chat_type_say -> @say_range
@@ -191,11 +172,16 @@ defmodule ThistleTea.Game.Network.Message.CmsgMessagechat do
         @chat_type_emote -> @emote_range
       end
 
-    pids_in_range = player_pids_in_range(state, range)
-
-    for pid <- pids_in_range do
-      GenServer.cast(pid, {:send_packet, packet.opcode, packet.payload})
-    end
+    %Message.SmsgMessagechat{
+      chat_type: chat_type,
+      language: language,
+      sender_guid: state.guid,
+      message: message,
+      channel_name: nil,
+      player_rank: 0,
+      tag: 0
+    }
+    |> World.broadcast_packet(state.character, range: range)
 
     state
   end
@@ -205,42 +191,40 @@ defmodule ThistleTea.Game.Network.Message.CmsgMessagechat do
       [[guid]] ->
         pid = :ets.lookup_element(:entities, guid, 2, nil)
 
-        packet =
-          Message.to_packet(%Message.SmsgMessagechat{
-            chat_type: @chat_type_whisper,
-            language: language,
-            sender_guid: state.guid,
-            message: message,
-            channel_name: nil,
-            player_rank: 0,
-            tag: 0
-          })
-
-        GenServer.cast(pid, {:send_packet, packet.opcode, packet.payload})
+        %Message.SmsgMessagechat{
+          chat_type: @chat_type_whisper,
+          language: language,
+          sender_guid: state.guid,
+          message: message,
+          channel_name: nil,
+          player_rank: 0,
+          tag: 0
+        }
+        |> Network.send_packet(pid)
 
       _ ->
-        Network.send_packet(%Message.SmsgChatPlayerNotFound{name: target_name})
+        %Message.SmsgChatPlayerNotFound{name: target_name}
+        |> Network.send_packet()
     end
 
     state
   end
 
   def handle_chat(state, @chat_type_channel, language, message, target_name) do
-    packet =
-      Message.to_packet(%Message.SmsgMessagechat{
-        chat_type: @chat_type_channel,
-        language: language,
-        sender_guid: state.guid,
-        message: message,
-        channel_name: target_name,
-        player_rank: 0,
-        tag: 0
-      })
+    message = %Message.SmsgMessagechat{
+      chat_type: @chat_type_channel,
+      language: language,
+      sender_guid: state.guid,
+      message: message,
+      channel_name: target_name,
+      player_rank: 0,
+      tag: 0
+    }
 
     ThistleTea.ChatChannel
     |> Registry.dispatch(target_name, fn entries ->
       for {pid, _} <- entries do
-        GenServer.cast(pid, {:send_packet, packet.opcode, packet.payload})
+        Network.send_packet(message, pid)
       end
     end)
 
@@ -250,23 +234,22 @@ defmodule ThistleTea.Game.Network.Message.CmsgMessagechat do
   def handle_chat(state, chat_type, language, message, target_name) do
     Logger.error("Unhandled chat type: #{chat_type}")
 
-    packet =
-      Message.to_packet(%Message.SmsgMessagechat{
-        chat_type: chat_type,
-        language: language,
-        sender_guid: state.guid,
-        message: message,
-        channel_name: target_name,
-        player_rank: 0,
-        tag: 0
-      })
+    message = %Message.SmsgMessagechat{
+      chat_type: chat_type,
+      language: language,
+      sender_guid: state.guid,
+      message: message,
+      channel_name: target_name,
+      player_rank: 0,
+      tag: 0
+    }
 
     all_players =
       :ets.tab2list(:players)
       |> Enum.map(fn {_, guid} -> :ets.lookup_element(:entities, guid, 2) end)
 
     for pid <- all_players do
-      GenServer.cast(pid, {:send_packet, packet.opcode, packet.payload})
+      Network.send_packet(message, pid)
     end
 
     state

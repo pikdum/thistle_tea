@@ -45,17 +45,11 @@ defmodule ThistleTea.Game.Network.Message.CmsgCancelCast do
           result: reason
         })
 
-        packet =
-          Message.to_packet(%Message.SmsgSpellFailedOther{
-            caster: state.guid,
-            id: spell.spell_id
-          })
-
-        for pid <- Map.get(state, :player_pids, []) do
-          if pid != self() do
-            GenServer.cast(pid, {:send_packet, packet.opcode, packet.payload})
-          end
-        end
+        %Message.SmsgSpellFailedOther{
+          caster: state.guid,
+          id: spell.spell_id
+        }
+        |> World.broadcast_packet(state.character, exclude_self?: true)
 
         Map.delete(state, :spell)
     end

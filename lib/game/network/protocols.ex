@@ -25,6 +25,7 @@ defmodule ThistleTea.Game.Network.ClientMessage do
       alias ThistleTea.Game.Network.Connection
       alias ThistleTea.Game.Network.Message
       alias ThistleTea.Game.Network.UpdateObject
+      alias ThistleTea.Game.World
       alias ThistleTea.Util
 
       @impl ClientMessage
