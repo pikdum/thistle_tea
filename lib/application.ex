@@ -60,7 +60,7 @@ defmodule ThistleTea.Application do
         {Phoenix.PubSub, name: ThistleTea.PubSub},
         !test && ThistleTeaWeb.Endpoint,
         {DynamicSupervisor, strategy: :one_for_one, name: ThistleTea.Game.World.DynamicSupervisor},
-        World.Manager
+        World.CellManager
       ]
       |> Enum.filter(& &1)
 

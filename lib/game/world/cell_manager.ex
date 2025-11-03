@@ -1,4 +1,4 @@
-defmodule ThistleTea.Game.World.Manager do
+defmodule ThistleTea.Game.World.CellManager do
   @moduledoc """
   Spawns and despawns cells based on nearby players.
   """
