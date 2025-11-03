@@ -62,7 +62,7 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
     # TODO: could be done in handle_continue instead?
     # treat more like a side effect?
     SmsgMonsterMove.build(state)
-    |> World.broadcast_packet(state.character)
+    |> World.broadcast_packet(state)
 
     %{state | movement_block: %{state.movement_block | position: {xd, yd, zd, o}}}
   end
