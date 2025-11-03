@@ -71,21 +71,17 @@ defmodule ThistleTea.Game.Network.Message.MsgMove do
     if opcode === @msg_move_jump do
       character = ThistleTea.Character.generate_and_assign_equipment(state.character)
 
-      packet =
-        %UpdateObject{
-          update_type: :values,
-          object_type: :player
-        }
-        |> struct(Map.from_struct(character))
-        |> UpdateObject.to_packet()
+      %UpdateObject{
+        update_type: :values,
+        object_type: :player
+      }
+      |> struct(Map.from_struct(character))
+      |> UpdateObject.to_packet()
+      |> World.broadcast_packet(character)
 
       # item packets
       UpdateObject.get_item_packets(character.player)
-      |> Enum.each(fn packet -> Util.send_update_packet(packet) end)
-
-      for pid <- Map.get(state, :player_pids, []) do
-        GenServer.cast(pid, {:send_update_packet, packet})
-      end
+      |> Network.send_packet()
 
       Map.put(state, :character, character)
     else

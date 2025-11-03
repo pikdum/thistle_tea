@@ -3,9 +3,6 @@ defmodule ThistleTea.Game.Network.Message.CmsgPlayerLogin do
 
   import Bitwise, only: [<<<: 2, |||: 2]
 
-  import ThistleTea.Util,
-    only: [pack_guid: 1, send_update_packet: 1]
-
   alias ThistleTea.DBC
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Message.SmsgInitialSpells.InitialSpell
@@ -52,7 +49,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgPlayerLogin do
 
     Map.merge(state, %{
       guid: character_guid,
-      packed_guid: pack_guid(character_guid),
+      packed_guid: Util.pack_guid(character_guid),
       character: c,
       spawn_timer: spawn_timer,
       ready: true
@@ -132,7 +129,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgPlayerLogin do
 
     # item packets
     UpdateObject.get_item_packets(c.player)
-    |> Enum.each(fn packet -> send_update_packet(packet) end)
+    |> Network.send_packet()
 
     # packet for player
     update_flag =
@@ -140,15 +137,13 @@ defmodule ThistleTea.Game.Network.Message.CmsgPlayerLogin do
 
     movement_block = %{c.movement_block | update_flag: update_flag}
 
-    packet =
-      %UpdateObject{
-        update_type: :create_object2,
-        object_type: :player
-      }
-      |> struct(Map.from_struct(c))
-      |> Map.put(:movement_block, movement_block)
-      |> UpdateObject.to_packet()
-
-    send_update_packet(packet)
+    %UpdateObject{
+      update_type: :create_object2,
+      object_type: :player
+    }
+    |> struct(Map.from_struct(c))
+    |> Map.put(:movement_block, movement_block)
+    |> UpdateObject.to_packet()
+    |> Network.send_packet()
   end
 end

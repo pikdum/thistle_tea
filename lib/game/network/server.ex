@@ -1,6 +1,6 @@
 defmodule ThistleTea.Game.Network.Server do
   use ThousandIsland.Handler
-  use ThistleTea.Game.Network.Opcodes, [:SMSG_AUTH_CHALLENGE]
+  use ThistleTea.Game.Network.Opcodes, [:SMSG_AUTH_CHALLENGE, :SMSG_UPDATE_OBJECT]
 
   import Bitwise, only: [|||: 2]
 
@@ -14,7 +14,6 @@ defmodule ThistleTea.Game.Network.Server do
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.World.Pathfinding
   alias ThistleTea.Game.World.SpatialHash
-  alias ThistleTea.Util
   alias ThousandIsland.Socket
 
   require Logger
@@ -59,15 +58,35 @@ defmodule ThistleTea.Game.Network.Server do
     |> handle_packets()
   end
 
+  def accumulate_updates(size, body) do
+    receive do
+      {:"$gen_cast",
+       {:send_packet,
+        %Packet{opcode: @smsg_update_object, payload: <<next_size::little-size(32), 0, next_body::binary>>}}}
+      when size + next_size <= 100 ->
+        accumulate_updates(size + next_size, body <> next_body)
+    after
+      0 ->
+        if size > 1 do
+          Logger.debug("Accumulated update object of size #{size}")
+        end
+
+        %Packet{opcode: @smsg_update_object, payload: <<size::little-size(32), 0, body::binary>>}
+    end
+  end
+
   @impl GenServer
-  def handle_cast({:send_packet, packet}, {socket, state}) do
+  def handle_cast(
+        {:send_packet, %Packet{opcode: @smsg_update_object, payload: <<size::little-size(32), 0, body::binary>>}},
+        {socket, state}
+      ) do
+    packet = accumulate_updates(size, body)
     state = Network.Send.send_packet(packet, {socket, state})
     {:noreply, {socket, state}, socket.read_timeout}
   end
 
-  @impl GenServer
-  def handle_cast({:send_update_packet, packet}, {socket, state}) do
-    Util.send_update_packet(packet)
+  def handle_cast({:send_packet, packet}, {socket, state}) do
+    state = Network.Send.send_packet(packet, {socket, state})
     {:noreply, {socket, state}, socket.read_timeout}
   end
 
@@ -80,16 +99,15 @@ defmodule ThistleTea.Game.Network.Server do
     update_flag = @update_flag_high_guid ||| @update_flag_living ||| @update_flag_has_position
     movement_block = %{movement_block | update_flag: update_flag}
 
-    packet =
-      %UpdateObject{
-        update_type: :create_object2,
-        object_type: :player
-      }
-      |> struct(Map.from_struct(character))
-      |> Map.put(:movement_block, movement_block)
-      |> UpdateObject.to_packet()
+    %UpdateObject{
+      update_type: :create_object2,
+      object_type: :player
+    }
+    |> struct(Map.from_struct(character))
+    |> Map.put(:movement_block, movement_block)
+    |> UpdateObject.to_packet()
+    |> Network.send_packet(pid)
 
-    GenServer.cast(pid, {:send_update_packet, packet})
     {:noreply, {socket, state}, socket.read_timeout}
   end
 

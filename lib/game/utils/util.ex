@@ -4,8 +4,6 @@ defmodule ThistleTea.Util do
   import Binary, only: [split_at: 2, trim_trailing: 1, reverse: 1]
   import Bitwise, only: [|||: 2, <<<: 2, &&&: 2]
 
-  alias ThistleTea.Game.Network
-
   @range 250
 
   def random_int(min, max) when is_float(min) and is_float(max) do
@@ -25,25 +23,6 @@ defmodule ThistleTea.Util do
     {x2, y2, z2} = b
 
     abs(x1 - x2) <= range && abs(y1 - y2) <= range && abs(z1 - z2) <= range
-  end
-
-  def send_update_packet(packet) do
-    compressed_packet = :zlib.compress(packet)
-    original_size = byte_size(packet)
-    compressed_size = byte_size(compressed_packet)
-
-    if compressed_size >= original_size do
-      %Network.Packet{
-        opcode: @smsg_update_object,
-        payload: packet
-      }
-    else
-      %Network.Packet{
-        opcode: @smsg_compressed_update_object,
-        payload: <<original_size::little-size(32)>> <> compressed_packet
-      }
-    end
-    |> Network.send_packet()
   end
 
   def pack_guid(guid) when is_integer(guid) do

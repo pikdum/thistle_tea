@@ -10,17 +10,10 @@ defmodule ThistleTea.Game.Network.Message.CmsgStandstatechange do
       ) do
     character = %{character | unit: %{unit | stand_state: animation_state}}
 
-    packet =
-      %UpdateObject{update_type: :values, object_type: :player}
-      |> struct(Map.from_struct(character))
-      |> UpdateObject.to_packet()
-
-    # Broadcast to nearby players
-    for pid <- Map.get(state, :player_pids, []) do
-      if pid != self() do
-        GenServer.cast(pid, {:send_update_packet, packet})
-      end
-    end
+    %UpdateObject{update_type: :values, object_type: :player}
+    |> struct(Map.from_struct(character))
+    |> UpdateObject.to_packet()
+    |> World.broadcast_packet(character, include_self?: false)
 
     # TODO: for some reason players are stuck sitting
     %{state | character: character}

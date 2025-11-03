@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Movement
+  alias ThistleTea.Game.Network
 
   def start_link(%Mob{} = state) do
     GenServer.start_link(__MODULE__, state)
@@ -26,8 +27,9 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
   @impl GenServer
   def handle_cast({:send_update_to, pid}, state) do
-    packet = Core.update_packet(state)
-    GenServer.cast(pid, {:send_update_packet, packet})
+    Core.update_packet(state)
+    |> Network.send_packet(pid)
+
     {:noreply, state}
   end
 

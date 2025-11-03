@@ -30,12 +30,12 @@ defmodule ThistleTea.UpdateObjectTest do
 
     test "to_packet/1 - :values", %{values_update: values_update} do
       packet = UpdateObject.to_packet(values_update)
-      assert byte_size(packet) > 0
+      assert byte_size(packet.payload) > 0
     end
 
     test "to_packet/1 - :create_object", %{create_object_update: create_object_update} do
       packet = UpdateObject.to_packet(create_object_update)
-      assert byte_size(packet) > 0
+      assert byte_size(packet.payload) > 0
     end
   end
 

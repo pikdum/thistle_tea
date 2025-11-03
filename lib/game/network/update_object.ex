@@ -1,10 +1,13 @@
 defmodule ThistleTea.Game.Network.UpdateObject do
+  use ThistleTea.Game.Network.Opcodes, [:SMSG_UPDATE_OBJECT]
+
   alias ThistleTea.DB.Mangos.ItemTemplate
   alias ThistleTea.DB.Mangos.Repo
   alias ThistleTea.Game.Entity.Data.Component.Item
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Player
+  alias ThistleTea.Game.Network.Packet
   alias ThistleTea.Util
 
   defstruct [
@@ -190,13 +193,22 @@ defmodule ThistleTea.Game.Network.UpdateObject do
   def to_packet(objects) when is_list(objects) do
     header = packet_header(objects)
 
-    Enum.reduce(objects, header, fn obj, acc ->
-      acc <> packet_body(obj)
-    end)
+    payload =
+      Enum.reduce(objects, header, fn obj, acc ->
+        acc <> packet_body(obj)
+      end)
+
+    %Packet{
+      opcode: @smsg_update_object,
+      payload: payload
+    }
   end
 
   def to_packet(%__MODULE__{} = obj) do
-    packet_header(obj) <> packet_body(obj)
+    %Packet{
+      opcode: @smsg_update_object,
+      payload: packet_header(obj) <> packet_body(obj)
+    }
   end
 
   def object_type_flags(%__MODULE__{} = obj) do
