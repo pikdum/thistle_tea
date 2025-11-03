@@ -3,8 +3,11 @@ defmodule ThistleTea.Game.Network.Send do
 
   alias ThistleTea.Game.Network.Connection.Crypto
   alias ThistleTea.Game.Network.Message
+  alias ThistleTea.Game.Network.Opcodes
   alias ThistleTea.Game.Network.Packet
   alias ThousandIsland.Socket
+
+  require Logger
 
   def send_packet(%Packet{opcode: @smsg_update_object, payload: payload}, {socket, state}) do
     compressed_payload = :zlib.compress(payload)
@@ -18,6 +21,7 @@ defmodule ThistleTea.Game.Network.Send do
   end
 
   def send_packet(%Packet{opcode: opcode, payload: payload}, {socket, state}) do
+    Logger.debug("Sending: #{Opcodes.get(opcode)}")
     size = byte_size(payload) + 2
     header = <<size::big-size(16), opcode::little-size(16)>>
     {:ok, conn, header} = Crypto.encrypt_header(state.conn, header)

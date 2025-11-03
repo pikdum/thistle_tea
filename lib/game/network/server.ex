@@ -66,12 +66,7 @@ defmodule ThistleTea.Game.Network.Server do
       when size + next_size <= 100 ->
         accumulate_updates(size + next_size, body <> next_body)
     after
-      0 ->
-        if size > 1 do
-          Logger.debug("Accumulated update object of size #{size}")
-        end
-
-        %Packet{opcode: @smsg_update_object, payload: <<size::little-size(32), 0, body::binary>>}
+      0 -> %Packet{opcode: @smsg_update_object, payload: <<size::little-size(32), 0, body::binary>>}
     end
   end
 
