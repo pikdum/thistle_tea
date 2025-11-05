@@ -21,7 +21,7 @@ defmodule ThistleTea.MixProject do
   def application do
     [
       mod: {ThistleTea.Application, []},
-      extra_applications: [:logger, :crypto, :runtime_tools]
+      extra_applications: [:logger, :crypto, :runtime_tools, :observer, :wx]
     ]
   end
 
