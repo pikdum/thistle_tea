@@ -3,7 +3,6 @@ defmodule ThistleTea.Game.Network.Message.CmsgCharCreate do
 
   alias ThistleTea.DB.Mangos.ItemTemplate
   alias ThistleTea.Game.Network.Message
-  alias ThistleTea.Util
 
   require Logger
 
@@ -48,7 +47,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgCharCreate do
 
   @impl ClientMessage
   def from_binary(payload) do
-    with {:ok, name, rest} <- Util.parse_string(payload),
+    with {:ok, name, rest} <- BinaryUtils.parse_string(payload),
          <<race, class, gender, skin_color, face, hair_style, hair_color, facial_hair, outfit_id>> <- rest do
       %__MODULE__{
         name: name,

@@ -1,9 +1,6 @@
 defmodule ThistleTea.Game.Network.Message.CmsgJoinChannel do
   use ThistleTea.Game.Network.ClientMessage, :CMSG_JOIN_CHANNEL
 
-  alias ThistleTea.Game.Network.Message
-  alias ThistleTea.Util
-
   require Logger
 
   defstruct [:channel_name, :password]
@@ -27,8 +24,8 @@ defmodule ThistleTea.Game.Network.Message.CmsgJoinChannel do
 
   @impl ClientMessage
   def from_binary(payload) do
-    {:ok, channel_name, rest} = Util.parse_string(payload)
-    {:ok, password, _} = Util.parse_string(rest)
+    {:ok, channel_name, rest} = BinaryUtils.parse_string(payload)
+    {:ok, password, _} = BinaryUtils.parse_string(rest)
 
     %__MODULE__{
       channel_name: channel_name,

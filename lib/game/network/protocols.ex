@@ -21,12 +21,12 @@ defmodule ThistleTea.Game.Network.ClientMessage do
       alias ThistleTea.Game.Entity.Data.Component.MovementBlock
       alias ThistleTea.Game.Entity.Data.Component.Unit
       alias ThistleTea.Game.Network
+      alias ThistleTea.Game.Network.BinaryUtils
       alias ThistleTea.Game.Network.ClientMessage
       alias ThistleTea.Game.Network.Connection
       alias ThistleTea.Game.Network.Message
       alias ThistleTea.Game.Network.UpdateObject
       alias ThistleTea.Game.World
-      alias ThistleTea.Util
 
       @impl ClientMessage
       def opcode, do: unquote(opcode)
@@ -59,10 +59,10 @@ defmodule ThistleTea.Game.Network.ServerMessage do
       @behaviour ThistleTea.Game.Network.ServerMessage
 
       alias ThistleTea.Character
+      alias ThistleTea.Game.Network.BinaryUtils
       alias ThistleTea.Game.Network.Message
       alias ThistleTea.Game.Network.Packet
       alias ThistleTea.Game.Network.ServerMessage
-      alias ThistleTea.Util
 
       @impl ServerMessage
       def opcode, do: unquote(opcode)

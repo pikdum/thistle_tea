@@ -1,9 +1,6 @@
 defmodule ThistleTea.Game.Network.Message.CmsgMessagechat do
   use ThistleTea.Game.Network.ClientMessage, :CMSG_MESSAGECHAT
 
-  alias ThistleTea.Game.Network.Message
-  alias ThistleTea.Util
-
   require Logger
 
   defstruct [:chat_type, :language, :message, :target_name]
@@ -266,13 +263,13 @@ defmodule ThistleTea.Game.Network.Message.CmsgMessagechat do
 
     {target_name, rest} =
       if chat_type in [@chat_type_whisper, @chat_type_channel] do
-        {:ok, target_name, rest} = Util.parse_string(rest)
+        {:ok, target_name, rest} = BinaryUtils.parse_string(rest)
         {target_name, rest}
       else
         {nil, rest}
       end
 
-    {:ok, message, _rest} = Util.parse_string(rest)
+    {:ok, message, _rest} = BinaryUtils.parse_string(rest)
 
     %__MODULE__{
       chat_type: chat_type,

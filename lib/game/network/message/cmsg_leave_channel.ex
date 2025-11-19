@@ -1,9 +1,6 @@
 defmodule ThistleTea.Game.Network.Message.CmsgLeaveChannel do
   use ThistleTea.Game.Network.ClientMessage, :CMSG_LEAVE_CHANNEL
 
-  alias ThistleTea.Game.Network.Message
-  alias ThistleTea.Util
-
   require Logger
 
   defstruct [:channel_name]
@@ -25,7 +22,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgLeaveChannel do
 
   @impl ClientMessage
   def from_binary(payload) do
-    {:ok, channel_name, _} = Util.parse_string(payload)
+    {:ok, channel_name, _} = BinaryUtils.parse_string(payload)
 
     %__MODULE__{
       channel_name: channel_name

@@ -2,7 +2,6 @@ defmodule ThistleTea.Game.Network.Message.CmsgCastSpell do
   use ThistleTea.Game.Network.ClientMessage, :CMSG_CAST_SPELL
 
   import Bitwise, only: [&&&: 2]
-  import ThistleTea.Util, only: [unpack_guid: 1]
 
   alias ThistleTea.DBC
   alias ThistleTea.Game.Network.Message
@@ -24,7 +23,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgCastSpell do
           state.guid
 
         (spell_cast_target_flags &&& @spell_cast_target_unit) > 0 ->
-          {target, _} = unpack_guid(rest)
+          {target, _} = BinaryUtils.unpack_guid(rest)
           target
 
         true ->

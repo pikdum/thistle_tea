@@ -1,8 +1,6 @@
 defmodule ThistleTea.Game.Network.Message.SmsgSpellGo do
   use ThistleTea.Game.Network.ServerMessage, :SMSG_SPELL_GO
 
-  alias ThistleTea.Util
-
   @cast_flags_ammo 0x20
 
   defstruct [
@@ -42,8 +40,8 @@ defmodule ThistleTea.Game.Network.Message.SmsgSpellGo do
         acc <> <<miss.guid::little-size(64), miss.reason::little-size(8)>>
       end)
 
-    Util.pack_guid(cast_item) <>
-      Util.pack_guid(caster) <>
+    BinaryUtils.pack_guid(cast_item) <>
+      BinaryUtils.pack_guid(caster) <>
       <<spell::little-size(32), flags::little-size(16), length(hits)::little-size(8)>> <>
       hits_binary <>
       <<length(misses)::little-size(8)>> <>

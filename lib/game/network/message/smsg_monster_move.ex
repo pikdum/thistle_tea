@@ -4,8 +4,6 @@ defmodule ThistleTea.Game.Network.Message.SmsgMonsterMove do
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Object
-  alias ThistleTea.Game.Network.Message
-  alias ThistleTea.Util
 
   # @move_type_normal 0
   # @move_type_stop 1
@@ -72,11 +70,11 @@ defmodule ThistleTea.Game.Network.Message.SmsgMonsterMove do
     splines_binary =
       Enum.reduce(splines, initial_acc, fn vec, acc ->
         offset = offset(destination, vec) |> adjust_offset()
-        packed = Util.pack_vector(offset)
+        packed = BinaryUtils.pack_vector(offset)
         acc <> <<packed::little-size(32)>>
       end)
 
-    Util.pack_guid(guid) <>
+    BinaryUtils.pack_guid(guid) <>
       <<
         # initial position
         x0::little-float-size(32),

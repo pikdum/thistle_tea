@@ -4,7 +4,6 @@ defmodule ThistleTea.Game.Network.Message.CmsgPlayerLogin do
   import Bitwise, only: [<<<: 2, |||: 2]
 
   alias ThistleTea.DBC
-  alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Message.SmsgInitialSpells.InitialSpell
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.World.SpatialHash
@@ -49,7 +48,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgPlayerLogin do
 
     Map.merge(state, %{
       guid: character_guid,
-      packed_guid: Util.pack_guid(character_guid),
+      packed_guid: BinaryUtils.pack_guid(character_guid),
       character: c,
       spawn_timer: spawn_timer,
       ready: true

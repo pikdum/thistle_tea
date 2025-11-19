@@ -7,8 +7,8 @@ defmodule ThistleTea.Game.Network.UpdateObject do
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Player
+  alias ThistleTea.Game.Network.BinaryUtils
   alias ThistleTea.Game.Network.Packet
-  alias ThistleTea.Util
 
   defstruct [
     :update_type,
@@ -155,7 +155,7 @@ defmodule ThistleTea.Game.Network.UpdateObject do
 
   defp packet_body(%__MODULE__{update_type: :values, object: object} = obj) do
     fields = flatten_field_structs(obj)
-    packed_guid = Util.pack_guid(object.guid)
+    packed_guid = BinaryUtils.pack_guid(object.guid)
     mask_count = mask_blocks_count(fields)
     mask = generate_mask(fields)
     objects = generate_objects(fields)
@@ -167,7 +167,7 @@ defmodule ThistleTea.Game.Network.UpdateObject do
        when update_type in [:create_object, :create_object2] do
     obj = %{obj | object: Map.put(object, :type, object_type_flags(obj))}
     fields = flatten_field_structs(obj)
-    packed_guid = Util.pack_guid(object.guid)
+    packed_guid = BinaryUtils.pack_guid(object.guid)
     mask_count = mask_blocks_count(fields)
     mask = generate_mask(fields)
     objects = generate_objects(fields)

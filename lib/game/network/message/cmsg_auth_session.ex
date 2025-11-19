@@ -37,7 +37,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgAuthSession do
   @impl ClientMessage
   def from_binary(payload) do
     with <<build::little-size(32), server_id::little-size(32), rest::binary>> <- payload,
-         {:ok, username, rest} <- Util.parse_string(rest),
+         {:ok, username, rest} <- BinaryUtils.parse_string(rest),
          <<client_seed::little-bytes-size(4), client_proof::little-bytes-size(20), _rest::binary>> <-
            rest do
       %__MODULE__{

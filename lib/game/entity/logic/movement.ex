@@ -5,10 +5,10 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
   alias ThistleTea.Game.Entity.Data.Component.Internal.Waypoint
   alias ThistleTea.Game.Entity.Data.Component.Internal.WaypointRoute
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
+  alias ThistleTea.Game.Math
   alias ThistleTea.Game.Network.Message.SmsgMonsterMove
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Pathfinding
-  alias ThistleTea.Util
 
   @max_u32 0xFFFFFFFF
 
@@ -38,7 +38,7 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
     # TODO handle running and walking
     duration =
       [{x0, y0, z0} | path]
-      |> Util.movement_duration(walk_speed)
+      |> Math.movement_duration(walk_speed)
       |> Kernel.*(1_000)
       |> trunc()
       |> max(1)
