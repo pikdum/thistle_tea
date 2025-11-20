@@ -45,8 +45,7 @@ defmodule ThistleTea.Game.Network.Message.SmsgMonsterMove do
     }
   end
 
-  def to_binary(%__MODULE__{
-        guid: guid,
+  def monster_move(%__MODULE__{
         spline_point: spline_point,
         spline_id: spline_id,
         move_type: move_type,
@@ -74,15 +73,14 @@ defmodule ThistleTea.Game.Network.Message.SmsgMonsterMove do
         acc <> <<packed::little-size(32)>>
       end)
 
-    BinaryUtils.pack_guid(guid) <>
-      <<
-        # initial position
-        x0::little-float-size(32),
-        y0::little-float-size(32),
-        z0::little-float-size(32),
-        spline_id::little-size(32),
-        move_type::little-size(8)
-      >> <>
+    <<
+      # initial position (spline_point Vector3d)
+      x0::little-float-size(32),
+      y0::little-float-size(32),
+      z0::little-float-size(32),
+      spline_id::little-size(32),
+      move_type::little-size(8)
+    >> <>
       case move_type do
         @move_type_facing_target ->
           <<target::little-size(64)>>
@@ -101,6 +99,10 @@ defmodule ThistleTea.Game.Network.Message.SmsgMonsterMove do
         spline_flags::little-size(32),
         duration::little-size(32)
       >> <> splines_binary
+  end
+
+  def to_binary(%__MODULE__{guid: guid} = message) do
+    BinaryUtils.pack_guid(guid) <> monster_move(message)
   end
 
   defp offset({xd, yd, zd}, {xi, yi, zi}) do
