@@ -28,12 +28,10 @@ defmodule ThistleTea.Game.Network.Send do
   end
 
   def send_packet(%Packet{opcode: @smsg_compressed_moves, payload: payload}, {socket, state}) do
-    # SMSG_COMPRESSED_MOVES uses zlib compression like SMSG_COMPRESSED_UPDATE_OBJECT
+    Logger.debug("Sending: #{Opcodes.get(@smsg_compressed_moves)}")
     compressed_payload = :zlib.compress(payload)
     original_size = byte_size(payload)
 
-    # Send the compressed packet with original size prefix
-    Logger.debug("Sending: #{Opcodes.get(@smsg_compressed_moves)}")
     compressed_data = <<original_size::little-size(32)>> <> compressed_payload
     size = byte_size(compressed_data) + 2
     header = <<size::big-size(16), @smsg_compressed_moves::little-size(16)>>

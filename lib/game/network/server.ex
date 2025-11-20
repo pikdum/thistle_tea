@@ -1,14 +1,16 @@
 defmodule ThistleTea.Game.Network.Server do
   use ThousandIsland.Handler
-  use ThistleTea.Game.Network.Opcodes, [:SMSG_AUTH_CHALLENGE, :SMSG_UPDATE_OBJECT]
+  use ThistleTea.Game.Network.Opcodes, [:SMSG_AUTH_CHALLENGE, :SMSG_UPDATE_OBJECT, :SMSG_COMPRESSED_MOVES]
 
   import Bitwise, only: [|||: 2]
 
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Network
+  alias ThistleTea.Game.Network.CompressedMove
   alias ThistleTea.Game.Network.Connection
   alias ThistleTea.Game.Network.Message
+  alias ThistleTea.Game.Network.Message.SmsgMonsterMove
   alias ThistleTea.Game.Network.Opcodes
   alias ThistleTea.Game.Network.Packet
   alias ThistleTea.Game.Network.UpdateObject
@@ -70,12 +72,33 @@ defmodule ThistleTea.Game.Network.Server do
     end
   end
 
+  def accumulate_moves(size, body) do
+    if size > 0 do
+      Logger.warning("Accumulated moves so far: #{size}")
+    end
+
+    receive do
+      {:"$gen_cast", {:send_packet, %SmsgMonsterMove{} = message}} when size <= 25 ->
+        next_body = message |> CompressedMove.from_monster_move() |> CompressedMove.to_binary()
+        accumulate_moves(size + 1, body <> next_body)
+    after
+      0 -> %Packet{opcode: @smsg_compressed_moves, payload: body}
+    end
+  end
+
   @impl GenServer
   def handle_cast(
         {:send_packet, %Packet{opcode: @smsg_update_object, payload: <<size::little-size(32), 0, body::binary>>}},
         {socket, state}
       ) do
     packet = accumulate_updates(size, body)
+    state = Network.Send.send_packet(packet, {socket, state})
+    {:noreply, {socket, state}, socket.read_timeout}
+  end
+
+  def handle_cast({:send_packet, %SmsgMonsterMove{} = message}, {socket, state}) do
+    payload = message |> CompressedMove.from_monster_move() |> CompressedMove.to_binary()
+    packet = accumulate_moves(0, payload)
     state = Network.Send.send_packet(packet, {socket, state})
     {:noreply, {socket, state}, socket.read_timeout}
   end
