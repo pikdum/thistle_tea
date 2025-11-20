@@ -121,4 +121,21 @@ defmodule ThistleTea.Game.World.SpatialHash do
     dz = z2 - z1
     :math.sqrt(dx * dx + dy * dy + dz * dz)
   end
+
+  def get_entity(guid) do
+    case :ets.lookup(:entities, guid) do
+      [entity] -> entity
+      [] -> nil
+    end
+  end
+
+  def entities(table, cell) do
+    :ets.lookup(table, cell)
+  end
+
+  def cells(table) do
+    :ets.match(table, {:"$1", :_})
+    |> List.flatten()
+    |> MapSet.new()
+  end
 end

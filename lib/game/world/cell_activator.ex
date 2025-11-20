@@ -4,10 +4,9 @@ defmodule ThistleTea.Game.World.CellActivator do
   """
   use GenServer
 
-  alias ThistleTea.Game.World
-  alias ThistleTea.Game.World.CellRegistry
-  alias ThistleTea.Game.World.Mangos.GameObjectSupervisor
-  alias ThistleTea.Game.World.Mangos.MobSupervisor
+  alias ThistleTea.Game.World.EntitySupervisor
+  alias ThistleTea.Game.World.Loader
+  alias ThistleTea.Game.World.SpatialHash
 
   require Logger
 
@@ -28,9 +27,16 @@ defmodule ThistleTea.Game.World.CellActivator do
 
   @impl GenServer
   def handle_info(:poll, %__MODULE__{cells: old_cells} = state) do
-    cells = players() |> expand_cells()
+    cells = player_cells() |> expand_cells()
+
+    occupied_cells =
+      MapSet.union(
+        SpatialHash.cells(:mobs),
+        SpatialHash.cells(:game_objects)
+      )
+
     to_add = MapSet.difference(cells, old_cells)
-    to_remove = MapSet.difference(old_cells, cells)
+    to_remove = MapSet.difference(occupied_cells, cells)
 
     :ok = start_cells(to_add)
     :ok = stop_cells(to_remove)
@@ -38,47 +44,39 @@ defmodule ThistleTea.Game.World.CellActivator do
     {:noreply, %{state | cells: cells}}
   end
 
-  defp start_cells(cells) do
-    Enum.each(cells, &start_cell/1)
-  end
+  defp start_cells(cells), do: Enum.each(cells, &start_cell/1)
+  defp stop_cells(cells), do: Enum.each(cells, &stop_cell/1)
 
   defp start_cell(cell) do
-    cell
-    |> start_cell(GameObjectSupervisor)
-    |> start_cell(MobSupervisor)
-  end
+    Logger.debug("Activating cell: #{inspect(cell)}")
 
-  defp start_cell(cell, supervisor) do
-    {:ok, _pid} =
-      DynamicSupervisor.start_child(
-        World.DynamicSupervisor,
-        {supervisor, cell}
-      )
-
-    cell
-  end
-
-  defp stop_cells(cells) do
-    Enum.each(cells, &stop_cell/1)
+    Task.start(fn ->
+      Loader.Mob.load(cell)
+      Loader.GameObject.load(cell)
+    end)
   end
 
   defp stop_cell(cell) do
-    cell
-    |> stop_cell(GameObjectSupervisor)
-    |> stop_cell(MobSupervisor)
+    Logger.debug("Deactivating cell: #{inspect(cell)}")
+
+    stop_entities(:mobs, cell)
+    stop_entities(:game_objects, cell)
   end
 
-  defp stop_cell(cell, supervisor) do
-    case Registry.lookup(CellRegistry, {supervisor, cell}) do
-      [] -> :ok
-      [{pid, _}] -> DynamicSupervisor.terminate_child(World.DynamicSupervisor, pid)
+  defp stop_entities(table, cell) do
+    SpatialHash.entities(table, cell)
+    |> Enum.each(&stop_entity/1)
+  end
+
+  defp stop_entity({_cell, guid}) do
+    case SpatialHash.get_entity(guid) do
+      {^guid, pid, _map, _x, _y, _z} -> DynamicSupervisor.terminate_child(EntitySupervisor, pid)
+      nil -> :ok
     end
-
-    cell
   end
 
-  defp players do
-    :ets.tab2list(:players) |> MapSet.new(fn {cell, _guid} -> cell end)
+  defp player_cells do
+    SpatialHash.cells(:players)
   end
 
   defp expand_cells(cells) do

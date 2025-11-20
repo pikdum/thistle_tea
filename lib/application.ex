@@ -7,7 +7,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.DB.Mangos.Repo
   alias ThistleTea.Game.Network.Server, as: GameServer
   alias ThistleTea.Game.World
-  alias ThistleTea.Game.World.CellRegistry
+  alias ThistleTea.Game.World.EntitySupervisor
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Native.Namigator
 
@@ -48,7 +48,6 @@ defmodule ThistleTea.Application do
       [
         ThistleTea.Telemetry,
         {Registry, keys: :duplicate, name: ThistleTea.ChatChannel},
-        {Registry, keys: :unique, name: CellRegistry},
         ThistleTea.DBC,
         Repo,
         # !test && ThistleTea.MobSupervisor,
@@ -59,7 +58,7 @@ defmodule ThistleTea.Application do
         ThistleTeaWeb.Telemetry,
         {Phoenix.PubSub, name: ThistleTea.PubSub},
         !test && ThistleTeaWeb.Endpoint,
-        {DynamicSupervisor, strategy: :one_for_one, name: ThistleTea.Game.World.DynamicSupervisor},
+        {DynamicSupervisor, strategy: :one_for_one, name: EntitySupervisor},
         World.CellActivator
       ]
       |> Enum.filter(& &1)
