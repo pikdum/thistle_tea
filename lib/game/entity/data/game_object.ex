@@ -18,6 +18,12 @@ defmodule ThistleTea.Game.Entity.Data.GameObject do
             internal: %Internal{}
 
   def build(%Mangos.GameObject{game_object_template: %Mangos.GameObjectTemplate{} = ot} = o) do
+    event =
+      case o.game_event_game_object do
+        %Mangos.GameEventGameObject{event: event} -> event
+        _ -> nil
+      end
+
     %__MODULE__{
       object: %Object{
         guid: o.guid + @game_object_guid_offset,
@@ -44,7 +50,7 @@ defmodule ThistleTea.Game.Entity.Data.GameObject do
         update_flag: @update_flag_all ||| @update_flag_has_position,
         position: {o.position_x, o.position_y, o.position_z, o.orientation}
       },
-      internal: %Internal{map: o.map}
+      internal: %Internal{map: o.map, event: event}
     }
   end
 end

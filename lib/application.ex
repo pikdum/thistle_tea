@@ -9,6 +9,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.EntitySupervisor
   alias ThistleTea.Game.World.SpatialHash
+  alias ThistleTea.Game.World.System.GameEvent, as: GameEventSystem
   alias ThistleTea.Native.Namigator
 
   require Logger
@@ -47,6 +48,7 @@ defmodule ThistleTea.Application do
     children =
       [
         ThistleTea.Telemetry,
+        GameEventSystem,
         {Registry, keys: :duplicate, name: ThistleTea.ChatChannel},
         ThistleTea.DBC,
         Repo,

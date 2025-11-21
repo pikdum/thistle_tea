@@ -4,7 +4,7 @@ defmodule ThistleTea.Game.World.CellActivator do
   """
   use GenServer
 
-  alias ThistleTea.Game.World.EntitySupervisor
+  alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Loader
   alias ThistleTea.Game.World.SpatialHash
 
@@ -69,10 +69,7 @@ defmodule ThistleTea.Game.World.CellActivator do
   end
 
   defp stop_entity({_cell, guid}) do
-    case SpatialHash.get_entity(guid) do
-      {^guid, pid, _map, _x, _y, _z} -> DynamicSupervisor.terminate_child(EntitySupervisor, pid)
-      nil -> :ok
-    end
+    World.stop_entity(guid)
   end
 
   defp player_cells do
