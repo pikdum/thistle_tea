@@ -58,7 +58,7 @@ defmodule ThistleTea.Application do
         ThistleTeaWeb.Telemetry,
         {Phoenix.PubSub, name: ThistleTea.PubSub},
         !test && ThistleTeaWeb.Endpoint,
-        {DynamicSupervisor, strategy: :one_for_one, name: EntitySupervisor},
+        {DynamicSupervisor, strategy: :one_for_one, name: EntitySupervisor, max_restarts: 1_000_000, max_seconds: 1},
         World.CellActivator
       ]
       |> Enum.filter(& &1)
