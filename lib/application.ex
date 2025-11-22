@@ -6,9 +6,9 @@ defmodule ThistleTea.Application do
 
   alias ThistleTea.DB.Mangos.Repo
   alias ThistleTea.Game.Network.Server, as: GameServer
-  alias ThistleTea.Game.World
   alias ThistleTea.Game.World.EntitySupervisor
   alias ThistleTea.Game.World.SpatialHash
+  alias ThistleTea.Game.World.System.CellActivator
   alias ThistleTea.Game.World.System.GameEvent, as: GameEventSystem
   alias ThistleTea.Native.Namigator
 
@@ -61,7 +61,7 @@ defmodule ThistleTea.Application do
         ThistleTeaWeb.Telemetry,
         !test && ThistleTeaWeb.Endpoint,
         {DynamicSupervisor, strategy: :one_for_one, name: EntitySupervisor, max_restarts: 1_000_000, max_seconds: 1},
-        World.CellActivator
+        CellActivator
       ]
       |> Enum.filter(& &1)
 
