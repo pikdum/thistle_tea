@@ -53,7 +53,6 @@ defmodule ThistleTea.Application do
         {Registry, keys: :duplicate, name: ThistleTea.ChatChannel},
         ThistleTea.DBC,
         Repo,
-        # !test && ThistleTea.MobSupervisor,
         !test &&
           {ThousandIsland, port: @auth_port, handler_module: ThistleTea.Auth, handler_options: @handler_options},
         !test &&
