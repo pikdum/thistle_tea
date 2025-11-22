@@ -50,7 +50,7 @@ defmodule ThistleTea.DB.Mangos.Creature do
       left_join: ce in assoc(c, :game_event_creature),
       where: ce.event in ^events or is_nil(ce.event),
       where: c.modelid != 0,
-      preload: [creature_template: ct],
+      preload: [creature_template: ct, game_event_creature: ce],
       select: c
     )
   end
