@@ -34,12 +34,15 @@ defmodule ThistleTea.Game.World do
     end)
   end
 
-  def start_entity(%GameObject{} = entity) do
-    DynamicSupervisor.start_child(EntitySupervisor, {GameObjectServer, entity})
-  end
+  def start_entity(%GameObject{} = entity), do: start_entity(entity, GameObjectServer)
+  def start_entity(%Mob{} = entity), do: start_entity(entity, MobServer)
 
-  def start_entity(%Mob{} = entity) do
-    DynamicSupervisor.start_child(EntitySupervisor, {MobServer, entity})
+  def start_entity(entity, server) do
+    # TODO needed to prevent dupes, but maybe a registry is better
+    case SpatialHash.get_entity(entity.object.guid) do
+      nil -> DynamicSupervisor.start_child(EntitySupervisor, {server, entity})
+      _ -> :ok
+    end
   end
 
   def stop_entity(pid) when is_pid(pid) do

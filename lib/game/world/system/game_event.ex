@@ -2,6 +2,7 @@ defmodule ThistleTea.Game.World.System.GameEvent do
   use GenServer
 
   alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.World.System.CellActivator
 
   @events MapSet.new([2])
 
@@ -44,13 +45,20 @@ defmodule ThistleTea.Game.World.System.GameEvent do
   end
 
   defp notify(%MapSet{} = new_events, %MapSet{} = old_events) do
-    new_events
-    |> MapSet.difference(old_events)
-    |> Enum.each(&notify(&1, {:event_start, &1}))
+    start = MapSet.difference(new_events, old_events)
+    stop = MapSet.difference(old_events, new_events)
 
-    old_events
-    |> MapSet.difference(new_events)
-    |> Enum.each(&notify(&1, {:event_stop, &1}))
+    # not implemented yet
+    # but some models change depending on current event
+    Enum.each(start, &notify(&1, {:event_start, &1}))
+
+    # despawn
+    Enum.each(stop, &notify(&1, {:event_stop, &1}))
+
+    # spawn
+    if start != MapSet.new() do
+      CellActivator.invalidate()
+    end
   end
 
   defp notify(event, message) do

@@ -19,10 +19,19 @@ defmodule ThistleTea.Game.World.System.CellActivator do
     GenServer.start_link(__MODULE__, nil, name: __MODULE__)
   end
 
+  def invalidate do
+    GenServer.cast(__MODULE__, :invalidate)
+  end
+
   @impl GenServer
   def init(_) do
     :timer.send_interval(@poll_interval, :poll)
     {:ok, %__MODULE__{}}
+  end
+
+  @impl GenServer
+  def handle_cast(:invalidate, state) do
+    {:noreply, %{state | cells: MapSet.new()}}
   end
 
   @impl GenServer
