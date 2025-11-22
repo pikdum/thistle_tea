@@ -32,9 +32,14 @@ defmodule ThistleTea.DB.Mangos.Creature do
     )
 
     has_many(:creature_movement, Mangos.CreatureMovement, foreign_key: :id, references: :guid)
+
+    has_one(:game_event_creature, Mangos.GameEventCreature,
+      foreign_key: :guid,
+      references: :guid
+    )
   end
 
-  def query_cell({map, _x, _y, _z} = cell) do
+  def query_cell({map, _x, _y, _z} = cell, events \\ []) do
     {{x1, x2}, {y1, y2}, {z1, z2}} = SpatialHash.cell_bounds(cell)
 
     from(c in __MODULE__,
@@ -42,8 +47,10 @@ defmodule ThistleTea.DB.Mangos.Creature do
         c.map == ^map and c.position_x >= ^x1 and c.position_x < ^x2 and c.position_y >= ^y1 and
           c.position_y < ^y2 and c.position_z >= ^z1 and c.position_z < ^z2,
       join: ct in assoc(c, :creature_template),
+      left_join: ce in assoc(c, :game_event_creature),
+      where: ce.event in ^events or is_nil(ce.event),
       where: c.modelid != 0,
-      preload: [creature_template: ct],
+      preload: [creature_template: ct, game_event_creature: ce],
       select: c
     )
   end

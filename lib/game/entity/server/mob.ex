@@ -6,6 +6,8 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.Network
+  alias ThistleTea.Game.World
+  alias ThistleTea.Game.World.System.GameEvent
 
   def start_link(%Mob{} = state) do
     GenServer.start_link(__MODULE__, state)
@@ -13,6 +15,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
   @impl GenServer
   def init(%Mob{internal: %Internal{movement_type: movement_type}} = state) do
+    GameEvent.subscribe(state)
     Process.flag(:trap_exit, true)
     Core.set_position(state)
 
@@ -49,7 +52,6 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     _ -> {:noreply, state}
   end
 
-  @impl GenServer
   def handle_info(:follow_waypoint_route, %Mob{internal: %Internal{waypoint_route: nil}} = state) do
     {:noreply, state}
   end
@@ -61,6 +63,20 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     {:noreply, state}
   rescue
     _ -> {:noreply, state}
+  end
+
+  def handle_info({:event_stop, _event}, state) do
+    pid = self()
+
+    Task.start(fn ->
+      World.stop_entity(pid)
+    end)
+
+    {:noreply, state}
+  end
+
+  def handle_info({:event_start, _event}, state) do
+    {:noreply, state}
   end
 
   @impl GenServer

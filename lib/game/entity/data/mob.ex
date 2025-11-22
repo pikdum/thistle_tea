@@ -15,6 +15,12 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
             internal: %Internal{}
 
   def build(%Mangos.Creature{creature_template: %Mangos.CreatureTemplate{} = ct} = c) do
+    event =
+      case c.game_event_creature do
+        %Mangos.GameEventCreature{event: event} -> event
+        _ -> nil
+      end
+
     %__MODULE__{
       object: %Object{
         guid: c.guid + @creature_guid_offset,
@@ -61,7 +67,8 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
         spawn_distance: c.spawndist,
         movement_type: c.movement_type,
         initial_position: {c.position_x, c.position_y, c.position_z},
-        waypoint_route: WaypointRoute.build(c)
+        waypoint_route: WaypointRoute.build(c),
+        event: event
       }
     }
   end

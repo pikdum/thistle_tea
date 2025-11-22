@@ -6,9 +6,10 @@ defmodule ThistleTea.Application do
 
   alias ThistleTea.DB.Mangos.Repo
   alias ThistleTea.Game.Network.Server, as: GameServer
-  alias ThistleTea.Game.World
   alias ThistleTea.Game.World.EntitySupervisor
   alias ThistleTea.Game.World.SpatialHash
+  alias ThistleTea.Game.World.System.CellActivator
+  alias ThistleTea.Game.World.System.GameEvent, as: GameEventSystem
   alias ThistleTea.Native.Namigator
 
   require Logger
@@ -46,20 +47,20 @@ defmodule ThistleTea.Application do
 
     children =
       [
+        {Phoenix.PubSub, name: ThistleTea.PubSub},
         ThistleTea.Telemetry,
+        GameEventSystem,
         {Registry, keys: :duplicate, name: ThistleTea.ChatChannel},
         ThistleTea.DBC,
         Repo,
-        # !test && ThistleTea.MobSupervisor,
         !test &&
           {ThousandIsland, port: @auth_port, handler_module: ThistleTea.Auth, handler_options: @handler_options},
         !test &&
           {ThousandIsland, port: @game_port, handler_module: GameServer, handler_options: @handler_options},
         ThistleTeaWeb.Telemetry,
-        {Phoenix.PubSub, name: ThistleTea.PubSub},
         !test && ThistleTeaWeb.Endpoint,
         {DynamicSupervisor, strategy: :one_for_one, name: EntitySupervisor, max_restarts: 1_000_000, max_seconds: 1},
-        World.CellActivator
+        CellActivator
       ]
       |> Enum.filter(& &1)
 

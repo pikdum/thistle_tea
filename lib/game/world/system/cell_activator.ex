@@ -1,10 +1,10 @@
-defmodule ThistleTea.Game.World.CellActivator do
+defmodule ThistleTea.Game.World.System.CellActivator do
   @moduledoc """
   Spawns and despawns cells based on nearby players.
   """
   use GenServer
 
-  alias ThistleTea.Game.World.EntitySupervisor
+  alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Loader
   alias ThistleTea.Game.World.SpatialHash
 
@@ -19,10 +19,19 @@ defmodule ThistleTea.Game.World.CellActivator do
     GenServer.start_link(__MODULE__, nil, name: __MODULE__)
   end
 
+  def invalidate do
+    GenServer.cast(__MODULE__, :invalidate)
+  end
+
   @impl GenServer
   def init(_) do
     :timer.send_interval(@poll_interval, :poll)
     {:ok, %__MODULE__{}}
+  end
+
+  @impl GenServer
+  def handle_cast(:invalidate, state) do
+    {:noreply, %{state | cells: MapSet.new()}}
   end
 
   @impl GenServer
@@ -69,10 +78,7 @@ defmodule ThistleTea.Game.World.CellActivator do
   end
 
   defp stop_entity({_cell, guid}) do
-    case SpatialHash.get_entity(guid) do
-      {^guid, pid, _map, _x, _y, _z} -> DynamicSupervisor.terminate_child(EntitySupervisor, pid)
-      nil -> :ok
-    end
+    World.stop_entity(guid)
   end
 
   defp player_cells do
