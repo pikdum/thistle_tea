@@ -4,6 +4,8 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
   alias ThistleTea.Game.Entity.Data.GameObject
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Network
+  alias ThistleTea.Game.World
+  alias ThistleTea.Game.World.System.GameEvent
 
   def start_link(%GameObject{} = state) do
     GenServer.start_link(__MODULE__, state)
@@ -11,6 +13,7 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
 
   @impl GenServer
   def init(%GameObject{} = state) do
+    GameEvent.subscribe(state)
     Process.flag(:trap_exit, true)
     Core.set_position(state)
     {:ok, state}
@@ -21,6 +24,21 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
     Core.update_packet(state)
     |> Network.send_packet(pid)
 
+    {:noreply, state}
+  end
+
+  @impl GenServer
+  def handle_info({:event_stop, _event}, state) do
+    pid = self()
+
+    Task.start(fn ->
+      World.stop_entity(pid)
+    end)
+
+    {:noreply, state}
+  end
+
+  def handle_info({:event_start, _event}, state) do
     {:noreply, state}
   end
 

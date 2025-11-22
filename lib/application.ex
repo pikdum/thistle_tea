@@ -47,6 +47,7 @@ defmodule ThistleTea.Application do
 
     children =
       [
+        {Phoenix.PubSub, name: ThistleTea.PubSub},
         ThistleTea.Telemetry,
         GameEventSystem,
         {Registry, keys: :duplicate, name: ThistleTea.ChatChannel},
@@ -58,7 +59,6 @@ defmodule ThistleTea.Application do
         !test &&
           {ThousandIsland, port: @game_port, handler_module: GameServer, handler_options: @handler_options},
         ThistleTeaWeb.Telemetry,
-        {Phoenix.PubSub, name: ThistleTea.PubSub},
         !test && ThistleTeaWeb.Endpoint,
         {DynamicSupervisor, strategy: :one_for_one, name: EntitySupervisor, max_restarts: 1_000_000, max_seconds: 1},
         World.CellActivator

@@ -19,11 +19,13 @@ defmodule ThistleTea.Game.World.System.GameEvent do
     GenServer.call(__MODULE__, {:set_events, events})
   end
 
-  def subscribe(%{internal: %Internal{} = %{event: event}}), do: subscribe(event)
+  def subscribe(%{internal: %Internal{event: event}}), do: subscribe(event)
 
   def subscribe(event) when is_integer(event) do
-    Phoenix.PubSub.subscribe(ThistleTea.PubSUb, "game_event:#{event}")
+    :ok = Phoenix.PubSub.subscribe(ThistleTea.PubSub, "game_event:#{event}")
   end
+
+  def subscribe(_), do: :ok
 
   @impl GenServer
   def init(_) do
@@ -44,11 +46,11 @@ defmodule ThistleTea.Game.World.System.GameEvent do
   defp notify(%MapSet{} = new_events, %MapSet{} = old_events) do
     new_events
     |> MapSet.difference(old_events)
-    |> Enum.each(&notify(&1, :up))
+    |> Enum.each(&notify(&1, {:event_start, &1}))
 
     old_events
     |> MapSet.difference(new_events)
-    |> Enum.each(&notify(&1, :down))
+    |> Enum.each(&notify(&1, {:event_stop, &1}))
   end
 
   defp notify(event, message) do
