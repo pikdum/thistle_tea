@@ -42,15 +42,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
         },
         table
       ) do
-    SpatialHash.update(
-      table,
-      guid,
-      self(),
-      map,
-      x,
-      y,
-      z
-    )
+    SpatialHash.update(table, guid, self(), map, x, y, z)
   end
 
   def remove_position(%Mob{} = entity), do: remove_position(entity, :mobs)

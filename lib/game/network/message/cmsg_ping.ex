@@ -1,8 +1,6 @@
 defmodule ThistleTea.Game.Network.Message.CmsgPing do
   use ThistleTea.Game.Network.ClientMessage, :CMSG_PING
 
-  alias ThistleTea.Game.Network.Message
-
   require Logger
 
   defstruct [:sequence_id, :latency]
