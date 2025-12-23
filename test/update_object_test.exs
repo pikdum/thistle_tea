@@ -1,5 +1,5 @@
 defmodule ThistleTea.UpdateObjectTest do
-  use ExUnit.Case
+  use ExUnit.Case, async: true
 
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Object
