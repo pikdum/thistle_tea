@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.HTN.Mob do
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.AI.HTN
   alias ThistleTea.Game.Entity.Logic.Movement
+  alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Pathfinding
 
   def htn do
@@ -13,14 +14,17 @@ defmodule ThistleTea.Game.Entity.Logic.AI.HTN.Mob do
     |> HTN.root(:mob_behavior)
     |> HTN.task(:mob_behavior, [
       HTN.method(&dead?/1, [:idle_dead]),
+      HTN.method(&in_combat?/1, [:resolve_unit_target, :move_to_target, :combat_wait]),
       HTN.method(&has_waypoints?/1, [:pick_waypoint, :move_to_target, :apply_waypoint, :wait_waypoint]),
       HTN.method(&can_wander?/1, [:pick_wander_point, :move_to_target, :wait_after_move]),
       HTN.method(fn _ -> true end, [:idle])
     ])
+    |> HTN.step(:resolve_unit_target, &resolve_unit_target/2)
     |> HTN.step(:pick_wander_point, &pick_wander_point/2)
     |> HTN.step(:pick_waypoint, &pick_waypoint/2)
     |> HTN.step(:move_to_target, &move_to_target/2)
     |> HTN.step(:apply_waypoint, &apply_waypoint/2)
+    |> HTN.step(:combat_wait, &combat_wait/2)
     |> HTN.step(:wait_after_move, &wait_after_move/2)
     |> HTN.step(:wait_waypoint, &wait_waypoint/2)
     |> HTN.step(:idle, &idle/2)
@@ -51,7 +55,42 @@ defmodule ThistleTea.Game.Entity.Logic.AI.HTN.Mob do
     false
   end
 
+  defp in_combat?(%Mob{internal: %Internal{in_combat: true}, unit: %Unit{target: target}})
+       when is_integer(target) and target > 0 do
+    true
+  end
+
+  defp in_combat?(%Mob{}) do
+    false
+  end
+
+  defp resolve_unit_target(%Mob{} = state, ctx) do
+    state = set_running(state, true)
+    target = state.unit.target
+
+    case World.target_position(target) do
+      {map, x, y, z} when map == state.internal.map ->
+        distance = World.distance_to_guid(state, target)
+
+        if in_combat_range?(state, distance) do
+          {:replan, state, Map.drop(ctx, [:target, :target_guid]), combat_wait_delay()}
+        else
+          ctx =
+            ctx
+            |> Map.put(:target, {x, y, z})
+            |> Map.put(:target_guid, target)
+
+          {:ok, state, ctx, 0}
+        end
+
+      _ ->
+        {:replan, state, Map.drop(ctx, [:target, :target_guid]), idle_delay()}
+    end
+  end
+
   defp pick_wander_point(%Mob{} = state, ctx) do
+    state = set_running(state, false)
+
     case Pathfinding.find_random_point_around_circle(
            state.internal.map,
            state.internal.initial_position,
@@ -66,6 +105,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.HTN.Mob do
   end
 
   defp pick_waypoint(%Mob{} = state, ctx) do
+    state = set_running(state, false)
+
     case waypoint_destination(state) do
       nil ->
         {:replan, state, Map.drop(ctx, [:target, :orientation, :wait_time]), idle_delay()}
@@ -107,16 +148,22 @@ defmodule ThistleTea.Game.Entity.Logic.AI.HTN.Mob do
     {:ok, state, ctx, wander_wait_delay()}
   end
 
+  defp combat_wait(%Mob{} = state, ctx) do
+    {:ok, state, Map.drop(ctx, [:target]), combat_wait_delay()}
+  end
+
   defp wait_waypoint(%Mob{} = state, ctx) do
     delay = Map.get(ctx, :wait_time, 0)
     {:ok, state, Map.drop(ctx, [:target, :orientation, :wait_time]), delay}
   end
 
   defp idle(%Mob{} = state, ctx) do
+    state = set_running(state, false)
     {:ok, state, ctx, idle_delay()}
   end
 
   defp idle_dead(%Mob{} = state, ctx) do
+    state = set_running(state, false)
     {:ok, state, ctx, idle_dead_delay()}
   end
 
@@ -145,6 +192,15 @@ defmodule ThistleTea.Game.Entity.Logic.AI.HTN.Mob do
     duration || 0
   end
 
+  defp in_combat_range?(%Mob{unit: %Unit{combat_reach: combat_reach}}, distance)
+       when is_number(distance) and is_number(combat_reach) do
+    distance <= max(combat_reach, 2.0)
+  end
+
+  defp in_combat_range?(%Mob{}, distance) when is_number(distance) do
+    distance <= 2.0
+  end
+
   defp idle_delay do
     :rand.uniform(4_000) + 2_000
   end
@@ -155,5 +211,13 @@ defmodule ThistleTea.Game.Entity.Logic.AI.HTN.Mob do
 
   defp wander_wait_delay do
     :rand.uniform(6_000) + 4_000
+  end
+
+  defp combat_wait_delay do
+    :rand.uniform(1_000) + 500
+  end
+
+  defp set_running(%Mob{internal: %Internal{} = internal} = state, running) when is_boolean(running) do
+    %{state | internal: %{internal | running: running}}
   end
 end

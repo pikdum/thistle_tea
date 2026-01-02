@@ -41,6 +41,24 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   end
 
   @impl GenServer
+  def handle_cast({:receive_spell, caster, _spell_id}, state) do
+    state = engage_combat(state, caster)
+    {:ok, state} = Core.take_damage(state, 5)
+    Core.update_packet(state) |> World.broadcast_packet(state)
+    state = HTN.interrupt(state)
+    schedule_ai(0)
+    {:noreply, state}
+  end
+
+  @impl GenServer
+  def handle_cast({:receive_attack, attack}, state) do
+    state = engage_combat(state, Map.get(attack, :caster))
+    state = HTN.interrupt(state)
+    schedule_ai(0)
+    {:noreply, state}
+  end
+
+  @impl GenServer
   def handle_info(:ai, state) do
     {state, delay} = HTN.step(state, MobHTN.htn())
     schedule_ai(delay)
@@ -75,4 +93,13 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   defp schedule_ai(delay) when is_integer(delay) and delay >= 0 do
     Process.send_after(self(), :ai, delay)
   end
+
+  defp engage_combat(%Mob{unit: unit, internal: internal} = state, caster) when is_integer(caster) do
+    %{state | unit: %{unit | target: caster}, internal: %{internal | in_combat: true}}
+  end
+
+  defp engage_combat(%Mob{} = state, _caster) do
+    state
+  end
+
 end

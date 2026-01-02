@@ -68,7 +68,9 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
         movement_type: c.movement_type,
         initial_position: {c.position_x, c.position_y, c.position_z},
         waypoint_route: WaypointRoute.build(c),
-        event: event
+        event: event,
+        in_combat: false,
+        running: false
       }
     }
   end

@@ -55,4 +55,22 @@ defmodule ThistleTea.Game.World do
       nil -> :ok
     end
   end
+
+  def target_position(guid) when is_integer(guid) do
+    case SpatialHash.get_entity(guid) do
+      {^guid, _pid, map, x, y, z} -> {map, x, y, z}
+      nil -> nil
+    end
+  end
+
+  def distance_to_guid(
+        %{internal: %Internal{map: map}, movement_block: %MovementBlock{position: {x1, y1, z1, _o}}},
+        guid
+      )
+      when is_integer(guid) do
+    case target_position(guid) do
+      {^map, x2, y2, z2} -> SpatialHash.distance({x1, y1, z1}, {x2, y2, z2})
+      _ -> nil
+    end
+  end
 end

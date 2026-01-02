@@ -21,15 +21,27 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
     |> UpdateObject.to_packet()
   end
 
-  def take_damage(
-        %{unit: %Unit{health: health} = unit, movement_block: %MovementBlock{movement_flags: movement_flags} = mb} =
-          entity,
-        damage
-      ) do
+  def take_damage(%{unit: %Unit{health: health} = unit} = entity, damage) do
     new_health = max(health - damage, 0)
-    new_movement_flags = if new_health == 0, do: 0, else: movement_flags
-    {:ok, %{entity | unit: %{unit | health: new_health}, movement_block: %{mb | movement_flags: new_movement_flags}}}
+
+    entity =
+      %{entity | unit: %{unit | health: new_health}}
+      |> maybe_dead()
+
+    {:ok, entity}
   end
+
+  defp maybe_dead(
+         %{internal: %Internal{} = internal, unit: %Unit{health: 0} = unit, movement_block: %MovementBlock{} = mb} =
+           entity
+       ) do
+    unit = %{unit | target: 0}
+    internal = %{internal | in_combat: false, running: false}
+    mb = %{mb | movement_flags: 0}
+    %{entity | unit: unit, internal: internal, movement_block: mb}
+  end
+
+  defp maybe_dead(entity), do: entity
 
   def set_position(%Mob{} = entity), do: set_position(entity, :mobs)
   def set_position(%GameObject{} = entity), do: set_position(entity, :game_objects)

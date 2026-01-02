@@ -24,7 +24,7 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
   def start_move_to(
         %{
           movement_block: %MovementBlock{walk_speed: walk_speed, position: {x0, y0, z0, _o}} = mb,
-          internal: %Internal{map: map}
+          internal: %Internal{map: map, running: running}
         } = entity,
         {x, y, z}
       ) do
@@ -35,10 +35,11 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
       raise "No path found from #{inspect({x0, y0, z0})} to #{inspect({x, y, z})}"
     end
 
-    # TODO handle running and walking
+    speed = if running, do: mb.run_speed * 7.0, else: walk_speed
+
     duration =
       [{x0, y0, z0} | path]
-      |> Math.movement_duration(walk_speed)
+      |> Math.movement_duration(speed)
       |> Kernel.*(1_000)
       |> trunc()
       |> max(1)

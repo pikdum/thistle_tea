@@ -47,6 +47,16 @@ defmodule ThistleTea.Game.Entity.Logic.AI.HTN do
     end
   end
 
+  def interrupt(state) do
+    case htn_map(state) do
+      %{} = htn_state when map_size(htn_state) > 0 ->
+        put_htn_state(state, [], %{}, Map.get(htn_state, :root))
+
+      _ ->
+        state
+    end
+  end
+
   defp apply_step(state, %__MODULE__{steps: steps}, step, htn_ctx, rest) do
     case Map.get(steps, step) do
       nil ->
