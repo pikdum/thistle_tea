@@ -8,13 +8,14 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.World.SpatialHash
 
-  def update_packet(%Mob{} = entity), do: update_packet(entity, :unit)
-  def update_packet(%GameObject{} = entity), do: update_packet(entity, :game_object)
-  def update_packet(%ThistleTea.Character{} = entity), do: update_packet(entity, :player)
+  def update_packet(entity, update_type \\ :create_object2)
+  def update_packet(%Mob{} = entity, update_type), do: update_packet(entity, update_type, :unit)
+  def update_packet(%GameObject{} = entity, update_type), do: update_packet(entity, update_type, :game_object)
+  def update_packet(%ThistleTea.Character{} = entity, update_type), do: update_packet(entity, update_type, :player)
 
-  def update_packet(entity, object_type) do
+  def update_packet(entity, update_type, object_type) do
     %UpdateObject{
-      update_type: :create_object2,
+      update_type: update_type,
       object_type: object_type
     }
     |> struct(Map.from_struct(entity))

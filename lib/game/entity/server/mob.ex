@@ -44,7 +44,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   def handle_cast({:receive_spell, caster, _spell_id}, state) do
     state = engage_combat(state, caster)
     {:ok, state} = Core.take_damage(state, 5)
-    Core.update_packet(state) |> World.broadcast_packet(state)
+    Core.update_packet(state, :values) |> World.broadcast_packet(state)
     state = HTN.interrupt(state)
     schedule_ai(0)
     {:noreply, state}
@@ -101,5 +101,4 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   defp engage_combat(%Mob{} = state, _caster) do
     state
   end
-
 end

@@ -80,7 +80,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.HTN.Mob do
             |> Map.put(:target, {x, y, z})
             |> Map.put(:target_guid, target)
 
-          {:ok, state, ctx, 0}
+          {:ok, state, ctx, 100}
         end
 
       _ ->
@@ -129,7 +129,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.HTN.Mob do
         {:ok, state, ctx, move_duration(state)}
 
       _ ->
-        {:replan, state, Map.drop(ctx, [:target]), idle_delay()}
+        {:replan, state, Map.delete(ctx, :target), idle_delay()}
     end
   end
 
@@ -149,7 +149,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.HTN.Mob do
   end
 
   defp combat_wait(%Mob{} = state, ctx) do
-    {:ok, state, Map.drop(ctx, [:target]), combat_wait_delay()}
+    {:ok, state, Map.delete(ctx, :target), combat_wait_delay()}
   end
 
   defp wait_waypoint(%Mob{} = state, ctx) do

@@ -12,6 +12,9 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal do
     :in_combat,
     :running,
     :ai_state,
+    :ai_timer,
+    :movement_start_time,
+    :movement_start_position,
     spline_id: 0
   ]
 end
