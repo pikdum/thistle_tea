@@ -1,8 +1,9 @@
 defmodule ThistleTea.Game.Entity.Server.Mob do
   use GenServer
 
-  alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Mob
+  alias ThistleTea.Game.Entity.Logic.AI.HTN
+  alias ThistleTea.Game.Entity.Logic.AI.HTN.Mob, as: MobHTN
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.Network
@@ -14,16 +15,13 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   end
 
   @impl GenServer
-  def init(%Mob{internal: %Internal{movement_type: movement_type}} = state) do
+  def init(%Mob{} = state) do
     GameEvent.subscribe(state)
     Process.flag(:trap_exit, true)
     Core.set_position(state)
 
-    case movement_type do
-      1 -> Process.send_after(self(), :wander, :rand.uniform(6_000))
-      2 -> Process.send_after(self(), :follow_waypoint_route, 0)
-      _ -> :ok
-    end
+    {state, delay} = HTN.start(state, MobHTN.htn())
+    schedule_ai(delay)
 
     {:ok, state}
   end
@@ -43,23 +41,9 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   end
 
   @impl GenServer
-  def handle_info(:wander, state) do
-    state = Movement.wander(state)
-    delay = Movement.wander_delay(state)
-    Process.send_after(self(), :wander, delay)
-    {:noreply, state}
-  rescue
-    _ -> {:noreply, state}
-  end
-
-  def handle_info(:follow_waypoint_route, %Mob{internal: %Internal{waypoint_route: nil}} = state) do
-    {:noreply, state}
-  end
-
-  def handle_info(:follow_waypoint_route, state) do
-    state = Movement.follow_waypoint_route(state)
-    delay = Movement.follow_waypoint_route_delay(state)
-    Process.send_after(self(), :follow_waypoint_route, delay)
+  def handle_info(:ai, state) do
+    {state, delay} = HTN.step(state, MobHTN.htn())
+    schedule_ai(delay)
     {:noreply, state}
   rescue
     _ -> {:noreply, state}
@@ -87,4 +71,8 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
   @impl GenServer
   def terminate(_reason, state), do: Core.remove_position(state)
+
+  defp schedule_ai(delay) when is_integer(delay) and delay >= 0 do
+    Process.send_after(self(), :ai, delay)
+  end
 end

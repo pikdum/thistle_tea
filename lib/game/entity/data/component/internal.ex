@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal do
     :initial_position,
     :waypoint_route,
     :event,
+    :ai_state,
     spline_id: 0
   ]
 end
