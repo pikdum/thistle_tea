@@ -12,8 +12,15 @@ defmodule ThistleTea.Game.Entity.Logic.AI.HTN.Mob do
 
   @chase_first_delay 500
   @chase_tick_delay 100
-  @chase_stop_distance 1.0
+
+  # TODO: a lot of these should be pulled from entity data
+  @chase_stop_distance 1.5
   @chase_repath_threshold 2.0
+
+  @chase_attacker_radius 10.0
+  @target_radius_guess 0.9
+  @default_bounding_radius 0.6
+  @attack_angle_scale 0.6
 
   def htn do
     HTN.new()
@@ -82,7 +89,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.HTN.Mob do
           {:ok, state, clear_chase_ctx(ctx), combat_wait_delay()}
         else
           {ctx, delay} = chase_delay(ctx)
-          {state, ctx} = maybe_repath_chase(state, ctx, {x, y, z})
+          {state, ctx} = maybe_repath_chase(state, ctx, {x, y, z}, target)
           {:ok, state, ctx, delay}
         end
 
@@ -99,13 +106,13 @@ defmodule ThistleTea.Game.Entity.Logic.AI.HTN.Mob do
     end
   end
 
-  defp maybe_repath_chase(%Mob{} = state, ctx, target_pos) do
+  defp maybe_repath_chase(%Mob{} = state, ctx, target_pos, target_guid) do
     target_moved = target_moved_enough?(ctx, target_pos)
     should_repath = target_moved or not Movement.is_moving?(state)
 
     if should_repath do
       destination = chase_destination(state, target_pos)
-      state = Movement.move_to(state, destination)
+      state = Movement.move_to(state, destination, face_target: target_guid)
       {state, Map.put(ctx, :last_target_pos, target_pos)}
     else
       {state, ctx}
@@ -113,12 +120,63 @@ defmodule ThistleTea.Game.Entity.Logic.AI.HTN.Mob do
   end
 
   defp chase_destination(
-         %Mob{movement_block: %MovementBlock{position: {mx, my, mz, _o}}, internal: %Internal{map: map}},
+         %Mob{
+           object: %{guid: guid},
+           movement_block: %MovementBlock{position: {mx, my, mz, _o}},
+           internal: %Internal{map: map},
+           unit: %Unit{bounding_radius: mob_radius}
+         },
          {tx, ty, tz}
        ) do
-    Pathfinding.find_point_between_points(map, {tx, ty, tz}, {mx, my, mz}, @chase_stop_distance) ||
-      {tx, ty, tz}
+    base_angle = base_chase_angle({mx, my}, {tx, ty})
+    attacker_count = nearby_attacker_count(map, guid, {tx, ty, tz}, {mx, my, mz})
+
+    mob_radius =
+      case mob_radius do
+        value when is_number(value) -> value
+        _ -> @default_bounding_radius
+      end
+
+    size_factor = max(@target_radius_guess + mob_radius, @default_bounding_radius)
+    angle_offset = attack_angle_offset(attacker_count, size_factor)
+    angle = base_angle + angle_offset
+
+    {
+      tx + :math.cos(angle) * @chase_stop_distance,
+      ty + :math.sin(angle) * @chase_stop_distance,
+      tz
+    }
   end
+
+  defp base_chase_angle({mx, my}, {tx, ty}) do
+    dx = mx - tx
+    dy = my - ty
+
+    if abs(dx) < 1.0e-4 and abs(dy) < 1.0e-4 do
+      :rand.uniform() * :math.pi() * 2.0
+    else
+      :math.atan2(dy, dx)
+    end
+  end
+
+  # TODO: this should actually be the count of mobs attacking the target, but we don't have that handy yet
+  defp nearby_attacker_count(map, guid, {tx, ty, tz}, {mx, my, mz}) do
+    target_count = count_nearby_mobs(map, guid, {tx, ty, tz})
+    mob_count = count_nearby_mobs(map, guid, {mx, my, mz})
+    max(target_count, mob_count)
+  end
+
+  defp count_nearby_mobs(map, guid, {x, y, z}) do
+    SpatialHash.query(:mobs, map, x, y, z, @chase_attacker_radius)
+    |> Enum.count(fn {mob_guid, _pid, _distance} -> mob_guid != guid end)
+  end
+
+  defp attack_angle_offset(attacker_count, size_factor) when attacker_count > 0 do
+    spread = :math.pi() / 2.0 - :math.pi() * :rand.uniform()
+    spread * (attacker_count / size_factor) * @attack_angle_scale
+  end
+
+  defp attack_angle_offset(_attacker_count, _size_factor), do: 0.0
 
   defp target_moved_enough?(ctx, {x, y, z}) do
     case Map.get(ctx, :last_target_pos) do

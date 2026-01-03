@@ -79,12 +79,12 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
     |> increment_spline_id()
   end
 
-  def move_to(state, {x, y, z}) do
+  def move_to(state, {x, y, z}, opts \\ []) do
     state = start_move_to(state, {x, y, z})
 
     # TODO: could be done in handle_continue instead?
     # treat more like a side effect?
-    SmsgMonsterMove.build(state)
+    SmsgMonsterMove.build(state, opts)
     |> World.broadcast_packet(state)
 
     state
