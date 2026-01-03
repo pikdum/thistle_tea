@@ -11,7 +11,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   alias ThistleTea.Game.World.Pathfinding
   alias ThistleTea.Game.World.SpatialHash
 
-  @chase_first_delay 500
   @chase_tick_delay 100
 
   # TODO: a lot of these should be pulled from entity data
@@ -31,7 +30,24 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
       ]),
       BT.sequence([
         BT.condition(&in_combat?/2),
-        BT.action(&chase_target/2)
+        BT.action(&set_running_true/2),
+        BT.selector([
+          BT.sequence([
+            BT.condition(&target_valid_same_map?/2),
+            BT.condition(&in_combat_range?/2),
+            BT.action(&combat_wait/2)
+          ]),
+          BT.sequence([
+            BT.condition(&target_valid_same_map?/2),
+            BT.condition(&chase_ready?/2),
+            BT.action(&chase_repath_and_schedule/2)
+          ]),
+          BT.sequence([
+            BT.condition(&target_valid_same_map?/2),
+            BT.action(&wait_for_chase_tick/2)
+          ]),
+          BT.action(&clear_chase_and_idle/2)
+        ])
       ]),
       BT.sequence([
         BT.condition(&has_waypoints?/2),
@@ -87,42 +103,62 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     false
   end
 
-  defp chase_target(%Mob{} = state, blackboard) do
-    state = set_running(state, true)
+  defp set_running_true(%Mob{} = state, %Blackboard{} = blackboard) do
+    {:success, set_running(state, true), blackboard}
+  end
+
+  defp target_valid_same_map?(%Mob{internal: %Internal{map: map}, unit: %Unit{target: target}}, _blackboard) do
+    case World.target_position(target) do
+      {^map, _x, _y, _z} -> true
+      _ -> false
+    end
+  end
+
+  defp in_combat_range?(%Mob{} = state, %Blackboard{}) do
+    case World.distance_to_guid(state, state.unit.target) do
+      distance when is_number(distance) -> in_combat_distance?(state, distance)
+      _ -> false
+    end
+  end
+
+  defp chase_ready?(_state, %Blackboard{} = blackboard) do
+    Blackboard.ready_for?(blackboard, :next_chase_at)
+  end
+
+  defp combat_wait(%Mob{} = state, %Blackboard{} = blackboard) do
+    blackboard =
+      blackboard
+      |> Blackboard.clear_chase()
+      |> Blackboard.put_next_at(:next_chase_at, combat_wait_delay())
+
+    {:running, state, blackboard}
+  end
+
+  defp chase_repath_and_schedule(%Mob{} = state, %Blackboard{} = blackboard) do
     target = state.unit.target
 
     case World.target_position(target) do
       {map, x, y, z} when map == state.internal.map ->
-        distance = World.distance_to_guid(state, target)
-
-        if is_number(distance) and in_combat_range?(state, distance) do
-          blackboard = Blackboard.clear_chase(blackboard)
-          blackboard = Blackboard.put_next_at(blackboard, :next_chase_at, combat_wait_delay())
-          {:running, state, blackboard}
-        else
-          if Blackboard.ready_for?(blackboard, :next_chase_at) do
-            {state, blackboard} = maybe_repath_chase(state, blackboard, {x, y, z}, target)
-            {delay, blackboard} = chase_delay(blackboard)
-            blackboard = Blackboard.put_next_at(blackboard, :next_chase_at, delay)
-            {:running, state, blackboard}
-          else
-            {:running, state, blackboard}
-          end
-        end
+        {state, blackboard} = maybe_repath_chase(state, blackboard, {x, y, z}, target)
+        blackboard = Blackboard.put_next_at(blackboard, :next_chase_at, @chase_tick_delay)
+        {:running, state, blackboard}
 
       _ ->
-        blackboard = Blackboard.clear_chase(blackboard)
-        blackboard = Blackboard.put_next_at(blackboard, :next_chase_at, idle_delay())
-        {:running, state, blackboard}
+        clear_chase_and_idle(state, blackboard)
     end
   end
 
-  defp chase_delay(%Blackboard{chase_started: true} = blackboard) do
-    {@chase_tick_delay, blackboard}
+  defp wait_for_chase_tick(%Mob{} = state, %Blackboard{} = blackboard) do
+    {:running, state, blackboard}
   end
 
-  defp chase_delay(%Blackboard{} = blackboard) do
-    {@chase_first_delay, %{blackboard | chase_started: true}}
+  defp clear_chase_and_idle(%Mob{} = state, %Blackboard{} = blackboard) do
+    blackboard =
+      blackboard
+      |> Blackboard.clear_chase()
+      |> Blackboard.put_next_at(:next_chase_at, idle_delay())
+
+    {:running, state, blackboard}
   end
 
   defp maybe_repath_chase(%Mob{} = state, %Blackboard{} = blackboard, target_pos, target_guid) do
@@ -342,12 +378,12 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     %{state | movement_block: %{state.movement_block | position: {x, y, z, o}}}
   end
 
-  defp in_combat_range?(%Mob{unit: %Unit{combat_reach: combat_reach}}, distance)
+  defp in_combat_distance?(%Mob{unit: %Unit{combat_reach: combat_reach}}, distance)
        when is_number(distance) and is_number(combat_reach) do
     distance <= max(combat_reach, 2.0)
   end
 
-  defp in_combat_range?(%Mob{}, distance) when is_number(distance) do
+  defp in_combat_distance?(%Mob{}, distance) when is_number(distance) do
     distance <= 2.0
   end
 
