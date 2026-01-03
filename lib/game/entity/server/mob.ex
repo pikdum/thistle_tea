@@ -1,14 +1,17 @@
 defmodule ThistleTea.Game.Entity.Server.Mob do
   use GenServer
 
+  alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Mob
-  alias ThistleTea.Game.Entity.Logic.AI.HTN
-  alias ThistleTea.Game.Entity.Logic.AI.HTN.Mob, as: MobHTN
+  alias ThistleTea.Game.Entity.Logic.AI.BT
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Mob, as: MobBT
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.System.GameEvent
+
+  @ai_tick_ms 100
 
   def start_link(%Mob{} = state) do
     GenServer.start_link(__MODULE__, state)
@@ -18,10 +21,10 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   def init(%Mob{} = state) do
     GameEvent.subscribe(state)
     Process.flag(:trap_exit, true)
+    state = BT.init(state, MobBT.tree())
     Core.set_position(state)
 
-    {state, delay} = HTN.start(state, MobHTN.htn())
-    schedule_ai(delay)
+    schedule_ai_tick(500)
 
     {:ok, state}
   end
@@ -42,26 +45,36 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
   @impl GenServer
   def handle_cast({:receive_spell, caster, _spell_id}, state) do
-    state = engage_combat(state, caster)
-    {:ok, state} = Core.take_damage(state, 5)
+    state =
+      state
+      |> engage_combat(caster)
+      |> Core.take_damage(10)
+      |> BT.interrupt()
+
     Core.update_packet(state, :values) |> World.broadcast_packet(state)
-    state = HTN.interrupt(state)
-    schedule_ai(0)
+    schedule_ai_tick(0)
     {:noreply, state}
   end
 
   @impl GenServer
-  def handle_cast({:receive_attack, attack}, state) do
-    state = engage_combat(state, Map.get(attack, :caster))
-    state = HTN.interrupt(state)
-    schedule_ai(0)
+  def handle_cast({:receive_attack, %{caster: caster}}, state) do
+    damage = 2
+
+    state =
+      state
+      |> engage_combat(caster)
+      |> Core.take_damage(damage)
+      |> BT.interrupt()
+
+    schedule_ai_tick(0)
     {:noreply, state}
   end
 
   @impl GenServer
-  def handle_info(:ai, state) do
-    {state, delay} = HTN.step(state, MobHTN.htn())
-    schedule_ai(delay)
+  def handle_info(:ai_tick, %{internal: %Internal{behavior_tree: behavior_tree}} = state) do
+    state = Movement.sync_position(state)
+    {_status, state} = BT.tick(behavior_tree, state)
+    schedule_ai_tick(@ai_tick_ms)
     {:noreply, state}
   rescue
     _ -> {:noreply, state}
@@ -90,8 +103,8 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   @impl GenServer
   def terminate(_reason, state), do: Core.remove_position(state)
 
-  defp schedule_ai(delay) when is_integer(delay) and delay >= 0 do
-    Process.send_after(self(), :ai, delay)
+  defp schedule_ai_tick(delay) when is_integer(delay) and delay >= 0 do
+    Process.send_after(self(), :ai_tick, delay)
   end
 
   defp engage_combat(%Mob{unit: unit, internal: internal} = state, caster) when is_integer(caster) do

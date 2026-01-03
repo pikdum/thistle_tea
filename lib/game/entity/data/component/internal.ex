@@ -11,8 +11,8 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal do
     :event,
     :in_combat,
     :running,
-    :ai_state,
-    :ai_timer,
+    :behavior_tree,
+    :blackboard,
     :movement_start_time,
     :movement_start_position,
     spline_id: 0

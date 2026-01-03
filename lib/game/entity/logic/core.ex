@@ -25,11 +25,8 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
   def take_damage(%{unit: %Unit{health: health} = unit} = entity, damage) do
     new_health = max(health - damage, 0)
 
-    entity =
-      %{entity | unit: %{unit | health: new_health}}
-      |> maybe_dead()
-
-    {:ok, entity}
+    %{entity | unit: %{unit | health: new_health}}
+    |> maybe_dead()
   end
 
   defp maybe_dead(
