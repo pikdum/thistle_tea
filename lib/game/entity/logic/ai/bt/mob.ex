@@ -23,6 +23,37 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   @default_bounding_radius 0.6
   @attack_angle_scale 0.6
 
+  def tree do
+    BT.selector([
+      BT.sequence([
+        BT.condition(&dead?/2),
+        BT.action(&idle_dead/2)
+      ]),
+      BT.sequence([
+        BT.condition(&in_combat?/2),
+        BT.action(&chase_target/2)
+      ]),
+      BT.sequence([
+        BT.condition(&has_waypoints?/2),
+        BT.action(&wait_until_waypoint_ready/2),
+        BT.action(&pick_waypoint/2),
+        BT.action(&move_to_target/2),
+        BT.action(&wait_for_arrival/2),
+        BT.action(&apply_waypoint/2),
+        BT.action(&set_next_waypoint_wait/2)
+      ]),
+      BT.sequence([
+        BT.condition(&can_wander?/2),
+        BT.action(&wait_until_wander_ready/2),
+        BT.action(&pick_wander_point/2),
+        BT.action(&move_to_target/2),
+        BT.action(&wait_for_arrival/2),
+        BT.action(&set_next_wander_wait/2)
+      ]),
+      BT.action(&idle/2)
+    ])
+  end
+
   defp dead?(%Mob{unit: %Unit{health: health}}, _blackboard) when is_number(health) do
     health <= 0
   end
@@ -334,40 +365,5 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
 
   defp set_running(%Mob{internal: %Internal{} = internal} = state, running) when is_boolean(running) do
     %{state | internal: %{internal | running: running}}
-  end
-
-  def tree do
-    build_tree()
-  end
-
-  defp build_tree do
-    BT.selector([
-      BT.sequence([
-        BT.condition(&dead?/2),
-        BT.action(&idle_dead/2)
-      ]),
-      BT.sequence([
-        BT.condition(&in_combat?/2),
-        BT.action(&chase_target/2)
-      ]),
-      BT.sequence([
-        BT.condition(&has_waypoints?/2),
-        BT.action(&wait_until_waypoint_ready/2),
-        BT.action(&pick_waypoint/2),
-        BT.action(&move_to_target/2),
-        BT.action(&wait_for_arrival/2),
-        BT.action(&apply_waypoint/2),
-        BT.action(&set_next_waypoint_wait/2)
-      ]),
-      BT.sequence([
-        BT.condition(&can_wander?/2),
-        BT.action(&wait_until_wander_ready/2),
-        BT.action(&pick_wander_point/2),
-        BT.action(&move_to_target/2),
-        BT.action(&wait_for_arrival/2),
-        BT.action(&set_next_wander_wait/2)
-      ]),
-      BT.action(&idle/2)
-    ])
   end
 end
