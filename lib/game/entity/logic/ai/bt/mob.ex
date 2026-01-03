@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
+  alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Pathfinding
@@ -25,6 +26,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   def tree do
     BT.selector([
       BT.sequence([
+        BT.condition(&tethering_to_spawn?/2),
+        BT.action(&wait_for_arrival/2)
+      ]),
+      BT.sequence([
         BT.condition(&dead?/2),
         BT.action(&idle_dead/2)
       ]),
@@ -32,6 +37,12 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
         BT.condition(&in_combat?/2),
         BT.action(&set_running_true/2),
         BT.selector([
+          BT.sequence([
+            BT.condition(&should_tether?/2),
+            BT.action(&set_tether_target/2),
+            BT.action(&clear_combat/2),
+            BT.action(&move_to_target/2)
+          ]),
           BT.sequence([
             BT.condition(&target_valid_same_map?/2),
             BT.condition(&in_combat_range?/2),
@@ -105,6 +116,43 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
 
   defp set_running_true(%Mob{} = state, %Blackboard{} = blackboard) do
     {:success, set_running(state, true), blackboard}
+  end
+
+  defp should_tether?(%Mob{} = state, _blackboard) do
+    Core.should_tether?(state)
+  end
+
+  defp tethering_to_spawn?(%Mob{internal: %Internal{initial_position: {x, y, z}}} = state, %Blackboard{
+         move_target: {x, y, z}
+       }) do
+    Movement.is_moving?(state)
+  end
+
+  defp tethering_to_spawn?(_state, _blackboard) do
+    false
+  end
+
+  defp set_tether_target(%Mob{internal: %Internal{initial_position: {x, y, z}}} = state, %Blackboard{} = blackboard) do
+    {:success, state, %{blackboard | target: {x, y, z}}}
+  end
+
+  defp set_tether_target(%Mob{} = state, %Blackboard{} = blackboard) do
+    {:failure, state, blackboard}
+  end
+
+  defp clear_combat(
+         %Mob{unit: %Unit{max_health: max_health} = unit, internal: %Internal{} = internal} = state,
+         %Blackboard{} = blackboard
+       ) do
+    health = if is_number(max_health), do: max_health, else: unit.health
+    unit = %{unit | target: 0, health: health}
+    internal = %{internal | in_combat: false}
+    blackboard = Blackboard.clear_chase(blackboard)
+    state = %{state | unit: unit, internal: internal}
+
+    Core.update_packet(state, :values) |> World.broadcast_packet(state)
+
+    {:success, state, blackboard}
   end
 
   defp target_valid_same_map?(%Mob{internal: %Internal{map: map}, unit: %Unit{target: target}}, _blackboard) do

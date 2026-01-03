@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal do
     :waypoint_route,
     :event,
     :in_combat,
+    :last_hostile_time,
     :running,
     :behavior_tree,
     :blackboard,

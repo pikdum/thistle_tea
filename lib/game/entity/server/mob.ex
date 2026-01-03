@@ -107,8 +107,18 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     Process.send_after(self(), :ai_tick, delay)
   end
 
+  defp current_time_ms do
+    System.monotonic_time(:millisecond)
+  end
+
   defp engage_combat(%Mob{unit: unit, internal: internal} = state, caster) when is_integer(caster) do
-    %{state | unit: %{unit | target: caster}, internal: %{internal | in_combat: true}}
+    now = current_time_ms()
+
+    %{
+      state
+      | unit: %{unit | target: caster},
+        internal: %{internal | in_combat: true, last_hostile_time: now}
+    }
   end
 
   defp engage_combat(%Mob{} = state, _caster) do

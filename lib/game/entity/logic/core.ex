@@ -8,6 +8,8 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.World.SpatialHash
 
+  @leash_timeout_ms 6_000
+
   def update_packet(entity, update_type \\ :create_object2)
   def update_packet(%Mob{} = entity, update_type), do: update_packet(entity, update_type, :unit)
   def update_packet(%GameObject{} = entity, update_type), do: update_packet(entity, update_type, :game_object)
@@ -27,6 +29,40 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
 
     %{entity | unit: %{unit | health: new_health}}
     |> maybe_dead()
+  end
+
+  def tether_range(%{unit: %Unit{level: level}}) when is_number(level) do
+    40 + 2 * level
+  end
+
+  def tether_range(_entity) do
+    nil
+  end
+
+  def out_of_tether_range?(
+        %{internal: %Internal{initial_position: {xi, yi, zi}}, movement_block: %MovementBlock{position: {x, y, z, _o}}} =
+          entity
+      ) do
+    case tether_range(entity) do
+      range when is_number(range) ->
+        SpatialHash.distance({xi, yi, zi}, {x, y, z}) > range
+
+      _ ->
+        false
+    end
+  end
+
+  def out_of_tether_range?(_entity) do
+    false
+  end
+
+  def should_tether?(%{internal: %Internal{last_hostile_time: last_hostile_time}} = entity)
+      when is_integer(last_hostile_time) do
+    out_of_tether_range?(entity) and current_time_ms() - last_hostile_time >= @leash_timeout_ms
+  end
+
+  def should_tether?(_entity) do
+    false
   end
 
   defp maybe_dead(
@@ -67,5 +103,9 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
         range \\ 250
       ) do
     SpatialHash.query(:players, map, x, y, z, range)
+  end
+
+  defp current_time_ms do
+    System.monotonic_time(:millisecond)
   end
 end
