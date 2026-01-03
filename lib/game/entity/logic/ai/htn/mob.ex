@@ -8,18 +8,24 @@ defmodule ThistleTea.Game.Entity.Logic.AI.HTN.Mob do
   alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Pathfinding
+  alias ThistleTea.Game.World.SpatialHash
+
+  @chase_first_delay 500
+  @chase_tick_delay 100
+  @chase_stop_distance 1.0
+  @chase_repath_threshold 2.0
 
   def htn do
     HTN.new()
     |> HTN.root(:mob_behavior)
     |> HTN.task(:mob_behavior, [
       HTN.method(&dead?/1, [:idle_dead]),
-      HTN.method(&in_combat?/1, [:resolve_unit_target, :move_to_target, :combat_wait]),
+      HTN.method(&in_combat?/1, [:chase_target]),
       HTN.method(&has_waypoints?/1, [:pick_waypoint, :move_to_target, :apply_waypoint, :wait_waypoint]),
       HTN.method(&can_wander?/1, [:pick_wander_point, :move_to_target, :wait_after_move]),
       HTN.method(fn _ -> true end, [:idle])
     ])
-    |> HTN.step(:resolve_unit_target, &resolve_unit_target/2)
+    |> HTN.step(:chase_target, &chase_target/2)
     |> HTN.step(:pick_wander_point, &pick_wander_point/2)
     |> HTN.step(:pick_waypoint, &pick_waypoint/2)
     |> HTN.step(:move_to_target, &move_to_target/2)
@@ -64,7 +70,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.HTN.Mob do
     false
   end
 
-  defp resolve_unit_target(%Mob{} = state, ctx) do
+  defp chase_target(%Mob{} = state, ctx) do
     state = set_running(state, true)
     target = state.unit.target
 
@@ -72,20 +78,60 @@ defmodule ThistleTea.Game.Entity.Logic.AI.HTN.Mob do
       {map, x, y, z} when map == state.internal.map ->
         distance = World.distance_to_guid(state, target)
 
-        if in_combat_range?(state, distance) do
-          {:replan, state, Map.drop(ctx, [:target, :target_guid]), combat_wait_delay()}
+        if is_number(distance) and in_combat_range?(state, distance) do
+          {:ok, state, clear_chase_ctx(ctx), combat_wait_delay()}
         else
-          ctx =
-            ctx
-            |> Map.put(:target, {x, y, z})
-            |> Map.put(:target_guid, target)
-
-          {:ok, state, ctx, 100}
+          {ctx, delay} = chase_delay(ctx)
+          {state, ctx} = maybe_repath_chase(state, ctx, {x, y, z})
+          {:ok, state, ctx, delay}
         end
 
       _ ->
-        {:replan, state, Map.drop(ctx, [:target, :target_guid]), idle_delay()}
+        {:replan, state, clear_chase_ctx(ctx), idle_delay()}
     end
+  end
+
+  defp chase_delay(ctx) do
+    if Map.get(ctx, :chase_started) do
+      {ctx, @chase_tick_delay}
+    else
+      {Map.put(ctx, :chase_started, true), @chase_first_delay}
+    end
+  end
+
+  defp maybe_repath_chase(%Mob{} = state, ctx, target_pos) do
+    target_moved = target_moved_enough?(ctx, target_pos)
+    should_repath = target_moved or not Movement.is_moving?(state)
+
+    if should_repath do
+      destination = chase_destination(state, target_pos)
+      state = Movement.move_to(state, destination)
+      {state, Map.put(ctx, :last_target_pos, target_pos)}
+    else
+      {state, ctx}
+    end
+  end
+
+  defp chase_destination(
+         %Mob{movement_block: %MovementBlock{position: {mx, my, mz, _o}}, internal: %Internal{map: map}},
+         {tx, ty, tz}
+       ) do
+    Pathfinding.find_point_between_points(map, {tx, ty, tz}, {mx, my, mz}, @chase_stop_distance) ||
+      {tx, ty, tz}
+  end
+
+  defp target_moved_enough?(ctx, {x, y, z}) do
+    case Map.get(ctx, :last_target_pos) do
+      {lx, ly, lz} ->
+        SpatialHash.distance({lx, ly, lz}, {x, y, z}) >= @chase_repath_threshold
+
+      _ ->
+        true
+    end
+  end
+
+  defp clear_chase_ctx(ctx) do
+    Map.drop(ctx, [:chase_started, :last_target_pos])
   end
 
   defp pick_wander_point(%Mob{} = state, ctx) do
