@@ -45,6 +45,17 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Blackboard do
     end
   end
 
+  def delay_until(%__MODULE__{} = blackboard, key) when is_atom(key) do
+    now = now(blackboard)
+
+    case Map.get(blackboard, key) do
+      nil -> 0
+      0 -> 0
+      ready_at when is_integer(ready_at) -> max(ready_at - now, 0)
+      _ -> 0
+    end
+  end
+
   def put_next_at(%__MODULE__{} = blackboard, key, delay_ms) when is_atom(key) and is_integer(delay_ms) do
     Map.put(blackboard, key, System.monotonic_time(:millisecond) + delay_ms)
   end

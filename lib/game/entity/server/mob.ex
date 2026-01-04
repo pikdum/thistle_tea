@@ -73,8 +73,8 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   @impl GenServer
   def handle_info(:ai_tick, %{internal: %Internal{behavior_tree: behavior_tree}} = state) do
     state = Movement.sync_position(state)
-    {_status, state} = BT.tick(behavior_tree, state)
-    schedule_ai_tick(@ai_tick_ms)
+    {status, state} = BT.tick(behavior_tree, state)
+    schedule_ai_tick(ai_tick_delay(status))
     {:noreply, state}
   rescue
     _ -> {:noreply, state}
@@ -106,6 +106,12 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   defp schedule_ai_tick(delay) when is_integer(delay) and delay >= 0 do
     Process.send_after(self(), :ai_tick, delay)
   end
+
+  defp ai_tick_delay({:running, delay_ms}) when is_integer(delay_ms) and delay_ms >= 0 do
+    delay_ms
+  end
+
+  defp ai_tick_delay(_status), do: @ai_tick_ms
 
   defp current_time_ms do
     System.monotonic_time(:millisecond)

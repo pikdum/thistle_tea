@@ -50,6 +50,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT do
         {:failure, s, b} -> {:cont, {:failure, s, b}}
         {:success, s, b} -> {:halt, {:success, s, b}}
         {:running, s, b} -> {:halt, {:running, s, b}}
+        {{:running, _delay} = status, s, b} -> {:halt, {status, s, b}}
       end
     end)
   end
@@ -60,6 +61,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT do
         {:success, s, b} -> {:cont, {:success, s, b}}
         {:failure, s, b} -> {:halt, {:failure, s, b}}
         {:running, s, b} -> {:halt, {:running, s, b}}
+        {{:running, _delay} = status, s, b} -> {:halt, {status, s, b}}
       end
     end)
   end
