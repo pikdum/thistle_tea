@@ -4,6 +4,7 @@ defmodule ThistleTea.Game.Entity.Logic.MovementTest do
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Logic.Movement
+  alias ThistleTea.Game.Time
 
   defp build_entity(opts) do
     internal = %Internal{
@@ -25,7 +26,7 @@ defmodule ThistleTea.Game.Entity.Logic.MovementTest do
   end
 
   test "is_moving? reflects movement window" do
-    now = System.monotonic_time(:millisecond)
+    now = Time.now()
 
     moving =
       build_entity(
@@ -44,7 +45,7 @@ defmodule ThistleTea.Game.Entity.Logic.MovementTest do
   end
 
   test "sync_position updates time_passed while moving" do
-    now = System.monotonic_time(:millisecond)
+    now = Time.now()
 
     entity =
       build_entity(
@@ -63,7 +64,7 @@ defmodule ThistleTea.Game.Entity.Logic.MovementTest do
   end
 
   test "sync_position finalizes movement when complete" do
-    now = System.monotonic_time(:millisecond)
+    now = Time.now()
 
     entity =
       build_entity(

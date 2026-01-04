@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
   alias ThistleTea.Game.Entity.Data.GameObject
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Network.UpdateObject
+  alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.SpatialHash
 
   @leash_timeout_ms 6_000
@@ -58,7 +59,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
 
   def should_tether?(%{internal: %Internal{last_hostile_time: last_hostile_time}} = entity)
       when is_integer(last_hostile_time) do
-    out_of_tether_range?(entity) and current_time_ms() - last_hostile_time >= @leash_timeout_ms
+    out_of_tether_range?(entity) and Time.now() - last_hostile_time >= @leash_timeout_ms
   end
 
   def should_tether?(_entity) do
@@ -103,9 +104,5 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
         range \\ 250
       ) do
     SpatialHash.query(:players, map, x, y, z, range)
-  end
-
-  defp current_time_ms do
-    System.monotonic_time(:millisecond)
   end
 end

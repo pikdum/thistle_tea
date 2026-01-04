@@ -20,8 +20,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT do
     %__MODULE__{type: :action, fun: fun}
   end
 
-  def tick(tree, state, now \\ current_time_ms()) do
-    blackboard = state |> blackboard() |> Blackboard.with_now(now)
+  def tick(tree, state) do
+    blackboard = blackboard(state)
     {status, state, blackboard} = run(tree, state, blackboard)
     {status, put_blackboard(state, blackboard)}
   end
@@ -85,8 +85,4 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT do
   end
 
   defp put_blackboard(state, _blackboard), do: state
-
-  defp current_time_ms do
-    System.monotonic_time(:millisecond)
-  end
 end

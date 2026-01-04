@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Math
   alias ThistleTea.Game.Network.Message.SmsgMonsterMove
+  alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Pathfinding
 
@@ -28,10 +29,20 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
         internal: %Internal{movement_start_time: start_time}
       })
       when is_integer(duration) and is_integer(start_time) and duration > 0 do
-    current_time_ms() <= start_time + duration
+    Time.now() <= start_time + duration
   end
 
   def is_moving?(_), do: false
+
+  def remaining_move_duration(%{
+        internal: %Internal{movement_start_time: start_time},
+        movement_block: %MovementBlock{duration: duration}
+      })
+      when is_integer(start_time) and is_integer(duration) and duration > 0 do
+    max(start_time + duration - Time.now(), 0)
+  end
+
+  def remaining_move_duration(_entity), do: 0
 
   def sync_position(%{movement_block: %MovementBlock{spline_nodes: spline_nodes}} = entity)
       when spline_nodes in [nil, []] do
@@ -70,7 +81,7 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
       |> trunc()
       |> max(1)
 
-    start_time = current_time_ms()
+    start_time = Time.now()
     internal = %{internal | movement_start_time: start_time, movement_start_position: {x0, y0, z0}}
 
     movement_block = %{mb | spline_nodes: path, duration: duration, time_passed: 0, spline_flags: 0x100}
@@ -127,7 +138,7 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
          } = entity
        )
        when is_integer(duration) and duration > 0 and not is_nil(start_time) and not is_nil(start_position) do
-    now = current_time_ms()
+    now = Time.now()
     elapsed = max(now - start_time, 0)
     elapsed = min(elapsed, duration)
 
@@ -211,10 +222,6 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
       {last, _remaining} ->
         last
     end
-  end
-
-  defp current_time_ms do
-    System.monotonic_time(:millisecond)
   end
 
   defp increment_waypoint(%{internal: %Internal{waypoint_route: route} = internal} = state) do

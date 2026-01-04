@@ -369,23 +369,12 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
 
   defp wait_for_arrival(%Mob{} = state, %Blackboard{} = blackboard) do
     if Movement.is_moving?(state) do
-      delay_ms = movement_remaining_ms(state, blackboard)
+      delay_ms = Movement.remaining_move_duration(state)
       {{:running, delay_ms}, state, blackboard}
     else
       {:success, state, Blackboard.clear_move_target(blackboard)}
     end
   end
-
-  defp movement_remaining_ms(
-         %Mob{internal: %Internal{movement_start_time: start_time}, movement_block: %MovementBlock{duration: duration}},
-         %Blackboard{} = blackboard
-       )
-       when is_integer(start_time) and is_integer(duration) and duration > 0 do
-    now = Blackboard.now(blackboard)
-    max(start_time + duration - now, 0)
-  end
-
-  defp movement_remaining_ms(_state, _blackboard), do: 0
 
   defp apply_waypoint(%Mob{} = state, %Blackboard{} = blackboard) do
     state =

@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.Network
+  alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.System.GameEvent
 
@@ -113,12 +114,8 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
   defp ai_tick_delay(_status), do: @ai_tick_ms
 
-  defp current_time_ms do
-    System.monotonic_time(:millisecond)
-  end
-
   defp engage_combat(%Mob{unit: unit, internal: internal} = state, caster) when is_integer(caster) do
-    now = current_time_ms()
+    now = Time.now()
 
     %{
       state

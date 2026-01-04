@@ -31,10 +31,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BTTest do
 
     state = build_state()
 
-    {:success, state} = BT.tick(tree, state, 123)
+    {:success, state} = BT.tick(tree, state)
 
     assert state.internal.blackboard.target == :selected
-    assert state.internal.blackboard.now == 123
   end
 
   test "sequence stops on running child" do
@@ -42,7 +41,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BTTest do
 
     state = build_state()
 
-    {:running, state} = BT.tick(tree, state, 456)
+    {:running, state} = BT.tick(tree, state)
 
     assert state.internal.blackboard.target == :running
   end
