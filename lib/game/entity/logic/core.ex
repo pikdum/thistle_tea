@@ -5,31 +5,106 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.GameObject
   alias ThistleTea.Game.Entity.Data.Mob
+  alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.Network.UpdateObject
+  alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.SpatialHash
 
-  def update_packet(%Mob{} = entity), do: update_packet(entity, :unit)
-  def update_packet(%GameObject{} = entity), do: update_packet(entity, :game_object)
-  def update_packet(%ThistleTea.Character{} = entity), do: update_packet(entity, :player)
+  @leash_timeout_ms 6_000
 
-  def update_packet(entity, object_type) do
+  def update_packet(entity, update_type \\ :create_object2)
+  def update_packet(%Mob{} = entity, update_type), do: update_packet(entity, update_type, :unit)
+  def update_packet(%GameObject{} = entity, update_type), do: update_packet(entity, update_type, :game_object)
+  def update_packet(%ThistleTea.Character{} = entity, update_type), do: update_packet(entity, update_type, :player)
+
+  def update_packet(entity, update_type, object_type) do
     %UpdateObject{
-      update_type: :create_object2,
+      update_type: update_type,
       object_type: object_type
     }
     |> struct(Map.from_struct(entity))
     |> UpdateObject.to_packet()
   end
 
-  def take_damage(
-        %{unit: %Unit{health: health} = unit, movement_block: %MovementBlock{movement_flags: movement_flags} = mb} =
-          entity,
-        damage
-      ) do
+  def take_damage(%{unit: %Unit{health: health} = unit} = entity, damage) do
     new_health = max(health - damage, 0)
-    new_movement_flags = if new_health == 0, do: 0, else: movement_flags
-    {:ok, %{entity | unit: %{unit | health: new_health}, movement_block: %{mb | movement_flags: new_movement_flags}}}
+
+    %{entity | unit: %{unit | health: new_health}}
+    |> mark_broadcast_update()
+    |> maybe_dead()
   end
+
+  def dead?(%{unit: %Unit{health: health}}) when is_number(health) do
+    health <= 0
+  end
+
+  def dead?(_entity), do: false
+
+  def mark_broadcast_update(%{internal: %Internal{} = internal} = entity) do
+    %{entity | internal: %{internal | broadcast_update?: true}}
+  end
+
+  def mark_broadcast_update(entity), do: entity
+
+  def tether_range(%{unit: %Unit{level: level}}) when is_number(level) do
+    40 + 2 * level
+  end
+
+  def tether_range(_entity) do
+    nil
+  end
+
+  def out_of_tether_range?(
+        %{internal: %Internal{initial_position: {xi, yi, zi}}, movement_block: %MovementBlock{position: {x, y, z, _o}}} =
+          entity
+      ) do
+    case tether_range(entity) do
+      range when is_number(range) ->
+        SpatialHash.distance({xi, yi, zi}, {x, y, z}) > range
+
+      _ ->
+        false
+    end
+  end
+
+  def out_of_tether_range?(_entity) do
+    false
+  end
+
+  def should_tether?(%{internal: %Internal{last_hostile_time: last_hostile_time}} = entity)
+      when is_integer(last_hostile_time) do
+    out_of_tether_range?(entity) and Time.now() - last_hostile_time >= @leash_timeout_ms
+  end
+
+  def should_tether?(_entity) do
+    false
+  end
+
+  defp maybe_dead(%{internal: %Internal{}, unit: %Unit{health: 0}, movement_block: %MovementBlock{}} = entity) do
+    entity = Movement.sync_position(entity)
+    %{internal: internal, unit: unit, movement_block: mb} = entity
+    unit = %{unit | target: 0}
+
+    internal = %{
+      internal
+      | in_combat: false,
+        running: false,
+        movement_start_time: nil,
+        movement_start_position: nil
+    }
+
+    movement_block = %{
+      mb
+      | movement_flags: 0,
+        spline_nodes: [],
+        spline_flags: 0,
+        time_passed: mb.duration || 0
+    }
+
+    %{entity | unit: unit, internal: internal, movement_block: movement_block}
+  end
+
+  defp maybe_dead(entity), do: entity
 
   def set_position(%Mob{} = entity), do: set_position(entity, :mobs)
   def set_position(%GameObject{} = entity), do: set_position(entity, :game_objects)

@@ -24,16 +24,19 @@ defmodule ThistleTea.Game.Network.Message.SmsgMonsterMove do
     :splines
   ]
 
-  def build(%{
-        object: %Object{guid: guid},
-        movement_block: %MovementBlock{
-          position: {x0, y0, z0, _o},
-          spline_nodes: spline_nodes,
-          duration: duration,
-          spline_flags: spline_flags
+  def build(
+        %{
+          object: %Object{guid: guid},
+          movement_block: %MovementBlock{
+            position: {x0, y0, z0, _o},
+            spline_nodes: spline_nodes,
+            duration: duration,
+            spline_flags: spline_flags
+          },
+          internal: %Internal{spline_id: spline_id}
         },
-        internal: %Internal{spline_id: spline_id}
-      }) do
+        opts \\ []
+      ) do
     %__MODULE__{
       guid: guid,
       spline_point: {x0, y0, z0},
@@ -43,6 +46,17 @@ defmodule ThistleTea.Game.Network.Message.SmsgMonsterMove do
       duration: duration,
       splines: spline_nodes
     }
+    |> apply_facing(opts)
+  end
+
+  defp apply_facing(%__MODULE__{} = msg, opts) do
+    case Keyword.get(opts, :face_target) do
+      target when is_integer(target) and target > 0 ->
+        %{msg | move_type: @move_type_facing_target, target: target}
+
+      _ ->
+        msg
+    end
   end
 
   def to_binary(%__MODULE__{
