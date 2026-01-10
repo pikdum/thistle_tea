@@ -52,9 +52,8 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
       |> Core.take_damage(10)
       |> BT.interrupt()
 
-    Core.update_packet(state, :values) |> World.broadcast_packet(state)
     schedule_ai_tick(0)
-    {:noreply, state}
+    {:noreply, state, {:continue, :maybe_broadcast}}
   end
 
   @impl GenServer
@@ -68,15 +67,16 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
       |> BT.interrupt()
 
     schedule_ai_tick(0)
-    {:noreply, state}
+    {:noreply, state, {:continue, :maybe_broadcast}}
   end
 
   @impl GenServer
   def handle_info(:ai_tick, %{internal: %Internal{behavior_tree: behavior_tree}} = state) do
     state = Movement.sync_position(state)
+    Core.set_position(state)
     {status, state} = BT.tick(behavior_tree, state)
     schedule_ai_tick(ai_tick_delay(status))
-    {:noreply, state}
+    {:noreply, state, {:continue, :maybe_broadcast}}
   rescue
     _ -> {:noreply, state}
   end
@@ -92,6 +92,18 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   end
 
   def handle_info({:event_start, _event}, state) do
+    {:noreply, state}
+  end
+
+  @impl GenServer
+  def handle_continue(:maybe_broadcast, %{internal: %Internal{broadcast_update?: true}} = state) do
+    update_type = if Core.dead?(state), do: :create_object2, else: :values
+    Core.update_packet(state, update_type) |> World.broadcast_packet(state)
+    internal = %{state.internal | broadcast_update?: false}
+    {:noreply, %{state | internal: internal}}
+  end
+
+  def handle_continue(:maybe_broadcast, state) do
     {:noreply, state}
   end
 

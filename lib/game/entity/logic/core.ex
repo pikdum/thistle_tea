@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.GameObject
   alias ThistleTea.Game.Entity.Data.Mob
+  alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.SpatialHash
@@ -29,8 +30,21 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
     new_health = max(health - damage, 0)
 
     %{entity | unit: %{unit | health: new_health}}
+    |> mark_broadcast_update()
     |> maybe_dead()
   end
+
+  def dead?(%{unit: %Unit{health: health}}) when is_number(health) do
+    health <= 0
+  end
+
+  def dead?(_entity), do: false
+
+  def mark_broadcast_update(%{internal: %Internal{} = internal} = entity) do
+    %{entity | internal: %{internal | broadcast_update?: true}}
+  end
+
+  def mark_broadcast_update(entity), do: entity
 
   def tether_range(%{unit: %Unit{level: level}}) when is_number(level) do
     40 + 2 * level
@@ -66,14 +80,28 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
     false
   end
 
-  defp maybe_dead(
-         %{internal: %Internal{} = internal, unit: %Unit{health: 0} = unit, movement_block: %MovementBlock{} = mb} =
-           entity
-       ) do
+  defp maybe_dead(%{internal: %Internal{}, unit: %Unit{health: 0}, movement_block: %MovementBlock{}} = entity) do
+    entity = Movement.sync_position(entity)
+    %{internal: internal, unit: unit, movement_block: mb} = entity
     unit = %{unit | target: 0}
-    internal = %{internal | in_combat: false, running: false}
-    mb = %{mb | movement_flags: 0}
-    %{entity | unit: unit, internal: internal, movement_block: mb}
+
+    internal = %{
+      internal
+      | in_combat: false,
+        running: false,
+        movement_start_time: nil,
+        movement_start_position: nil
+    }
+
+    movement_block = %{
+      mb
+      | movement_flags: 0,
+        spline_nodes: [],
+        spline_flags: 0,
+        time_passed: mb.duration || 0
+    }
+
+    %{entity | unit: unit, internal: internal, movement_block: movement_block}
   end
 
   defp maybe_dead(entity), do: entity

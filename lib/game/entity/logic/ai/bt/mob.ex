@@ -18,10 +18,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   @chase_stop_distance 1.5
   @chase_repath_threshold 2.0
 
-  @chase_attacker_radius 10.0
+  @chase_attacker_radius 4.0
   @target_radius_guess 0.9
   @default_bounding_radius 0.6
-  @attack_angle_scale 0.6
+  @attack_angle_scale 0.3
 
   def tree do
     BT.selector([
@@ -81,11 +81,11 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     ])
   end
 
-  defp dead?(%Mob{unit: %Unit{health: health}}, _blackboard) when is_number(health) do
-    health <= 0
+  defp dead?(%Mob{} = state, _blackboard) do
+    Core.dead?(state)
   end
 
-  defp dead?(%Mob{}, _blackboard) do
+  defp dead?(_state, _blackboard) do
     false
   end
 
@@ -150,7 +150,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     blackboard = Blackboard.clear_chase(blackboard)
     state = %{state | unit: unit, internal: internal}
 
-    Core.update_packet(state, :values) |> World.broadcast_packet(state)
+    state = Core.mark_broadcast_update(state)
 
     {:success, state, blackboard}
   end
