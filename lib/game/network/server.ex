@@ -306,7 +306,7 @@ defmodule ThistleTea.Game.Network.Server do
   defp tick_player(character), do: {:running, character}
 
   defp schedule_player_tick(state, character, status) do
-    if player_in_combat?(character) do
+    if player_needs_tick?(character) do
       delay_ms = player_tick_delay(status)
       ref = Process.send_after(self(), :player_tick, delay_ms)
       Map.put(state, :player_tick_ref, ref)
@@ -321,17 +321,26 @@ defmodule ThistleTea.Game.Network.Server do
 
   defp player_tick_delay(_status), do: @player_tick_ms
 
-  defp player_in_combat?(%{internal: %Internal{in_combat: true}, unit: %Unit{target: target}})
+  defp player_needs_tick?(%{internal: %Internal{casting: casting}}) when is_map(casting) do
+    true
+  end
+
+  defp player_needs_tick?(%{internal: %Internal{in_combat: true}, unit: %Unit{target: target}})
        when is_integer(target) and target > 0 do
     true
   end
 
-  defp player_in_combat?(_character), do: false
+  defp player_needs_tick?(_character), do: false
 
   @impl ThousandIsland.Handler
   def handle_connection(socket, _) do
     conn = %Connection{}
-    Socket.send(socket, <<6::big-size(16), @smsg_auth_challenge::little-size(16)>> <> conn.seed)
+
+    Socket.send(
+      socket,
+      <<6::big-size(16), @smsg_auth_challenge::little-size(16)>> <> conn.seed
+    )
+
     {:continue, %{conn: conn, account: nil}}
   end
 
