@@ -1,37 +1,29 @@
 defmodule ThistleTea.Game.Network.Message.CmsgAttackswing do
   use ThistleTea.Game.Network.ClientMessage, :CMSG_ATTACKSWING
-  use ThistleTea.Game.Network.Opcodes, [:SMSG_ATTACKSTART, :SMSG_ATTACKSTOP]
 
-  alias ThistleTea.DB.Mangos.ItemTemplate
-  alias ThistleTea.DB.Mangos.Repo
-  alias ThistleTea.Game.Network.Message
+  alias ThistleTea.Game.Entity.Logic.AI.BT
+  alias ThistleTea.Game.Entity.Logic.Core
+  alias ThistleTea.Game.Time
 
   require Logger
 
   defstruct [:target_guid]
 
   @impl ClientMessage
-  def handle(%__MODULE__{target_guid: target_guid}, state) do
+  def handle(%__MODULE__{target_guid: target_guid}, %{character: character} = state) do
     Logger.info("CMSG_ATTACKSWING: #{target_guid}")
 
-    %Message.SmsgAttackstart{
-      attacker: state.guid,
-      victim: target_guid
-    }
-    |> World.broadcast_packet(state.character)
+    character =
+      character
+      |> BT.interrupt()
+      |> engage_combat(target_guid)
 
-    mainhand_entry = state.character.player.visible_item_16_0
-    weapon = Repo.get(ItemTemplate, mainhand_entry)
-    attack_speed = weapon.delay
+    Core.update_packet(character, :values)
+    |> World.broadcast_packet(character)
 
-    # use existing timer if already attacking
-    attack_timer =
-      case Map.fetch(state, :attack_timer) do
-        {:ok, timer} -> timer
-        :error -> Process.send_after(self(), :attack_swing, attack_speed)
-      end
-
-    Map.merge(state, %{attacking: target_guid, attack_timer: attack_timer})
+    state
+    |> Map.put(:character, character)
+    |> ensure_player_tick()
   end
 
   @impl ClientMessage
@@ -43,21 +35,28 @@ defmodule ThistleTea.Game.Network.Message.CmsgAttackswing do
     }
   end
 
-  def handle_attack_swing(state) do
-    case Map.fetch(state, :attacking) do
-      {:ok, target_guid} ->
-        mainhand_entry = state.character.player.visible_item_16_0
-        weapon = Repo.get(ItemTemplate, mainhand_entry)
-        %{dmg_min1: min_damage, dmg_max1: max_damage, delay: attack_speed} = weapon
+  def handle_attack_swing(state), do: state
 
-        pid = :ets.lookup_element(:entities, target_guid, 2)
-        attack = %{caster: state.guid, min_damage: min_damage, max_damage: max_damage}
-        GenServer.cast(pid, {:receive_attack, attack})
-        attack_timer = Process.send_after(self(), :attack_swing, attack_speed)
-        Map.put(state, :attack_timer, attack_timer)
+  defp engage_combat(%ThistleTea.Character{unit: unit, internal: internal} = character, target_guid)
+       when is_integer(target_guid) do
+    now = Time.now()
+    unit = %{unit | target: target_guid}
+    internal = %{internal | in_combat: true, last_hostile_time: now}
+    %{character | unit: unit, internal: internal}
+  end
 
-      :error ->
-        state |> Map.delete(:attack_timer)
+  defp engage_combat(character, _target_guid), do: character
+
+  defp ensure_player_tick(state) do
+    case Map.get(state, :player_tick_ref) do
+      nil ->
+        ref = Process.send_after(self(), :player_tick, 0)
+        Map.put(state, :player_tick_ref, ref)
+
+      ref ->
+        Process.cancel_timer(ref)
+        new_ref = Process.send_after(self(), :player_tick, 0)
+        Map.put(state, :player_tick_ref, new_ref)
     end
   end
 end

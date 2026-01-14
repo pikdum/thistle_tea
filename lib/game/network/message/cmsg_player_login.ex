@@ -4,6 +4,8 @@ defmodule ThistleTea.Game.Network.Message.CmsgPlayerLogin do
   import Bitwise, only: [<<<: 2, |||: 2]
 
   alias ThistleTea.DBC
+  alias ThistleTea.Game.Entity.Logic.AI.BT
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Player, as: PlayerBT
   alias ThistleTea.Game.Network.Message.SmsgInitialSpells.InitialSpell
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.World.SpatialHash
@@ -24,6 +26,11 @@ defmodule ThistleTea.Game.Network.Message.CmsgPlayerLogin do
   @impl ClientMessage
   def handle(%__MODULE__{character_guid: character_guid}, state) do
     {:ok, c} = ThistleTea.Character.get_character(state.account.id, character_guid)
+
+    c =
+      c
+      |> normalize_combat_stats()
+      |> BT.init(PlayerBT.tree())
 
     :ets.insert(:guid_name, {character_guid, c.internal.name, "", c.unit.race, c.unit.gender, c.unit.class})
 
@@ -144,5 +151,23 @@ defmodule ThistleTea.Game.Network.Message.CmsgPlayerLogin do
     |> Map.put(:movement_block, movement_block)
     |> UpdateObject.to_packet()
     |> Network.send_packet()
+  end
+
+  defp normalize_combat_stats(%ThistleTea.Character{unit: unit, internal: internal} = character) do
+    unit =
+      unit
+      |> normalize_unit_value(:base_attack_time, 2000)
+      |> normalize_unit_value(:min_damage, 2)
+      |> normalize_unit_value(:max_damage, 2)
+
+    internal = %{internal | in_combat: false}
+    %{character | unit: unit, internal: internal}
+  end
+
+  defp normalize_unit_value(unit, key, default) do
+    case Map.get(unit, key) do
+      value when is_number(value) and value > 0 -> unit
+      _ -> Map.put(unit, key, default)
+    end
   end
 end

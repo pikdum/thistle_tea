@@ -5,7 +5,10 @@ defmodule ThistleTea.Game.Network.Server do
   import Bitwise, only: [|||: 2]
 
   alias ThistleTea.Game.Entity
+  alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
+  alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.Combat
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Network
@@ -24,6 +27,7 @@ defmodule ThistleTea.Game.Network.Server do
   @update_flag_high_guid 0x08
   @update_flag_living 0x20
   @update_flag_has_position 0x40
+  @player_tick_ms 100
 
   @impl ThousandIsland.Handler
   def handle_data(data, _socket, %{conn: %Connection{} = conn} = state) do
@@ -196,6 +200,16 @@ defmodule ThistleTea.Game.Network.Server do
   end
 
   @impl GenServer
+  def handle_info(:player_tick, {socket, %{character: character} = state}) do
+    {status, character} = tick_player(character)
+    state = Map.put(state, :character, character)
+    state = schedule_player_tick(state, character, status)
+    {:noreply, {socket, state}, socket.read_timeout}
+  rescue
+    _ -> {:noreply, {socket, state}, socket.read_timeout}
+  end
+
+  @impl GenServer
   def handle_info(:spawn_objects, {socket, %{character: c, ready: true} = state}) do
     # TODO: add telemetry for periodic tasks
     {x, y, z, _o} = c.movement_block.position
@@ -284,6 +298,35 @@ defmodule ThistleTea.Game.Network.Server do
     {_socket, s} = state
     {:reply, s.character.internal.name, state}
   end
+
+  defp tick_player(%{internal: %Internal{behavior_tree: behavior_tree}} = character) when not is_nil(behavior_tree) do
+    BT.tick(behavior_tree, character)
+  end
+
+  defp tick_player(character), do: {:running, character}
+
+  defp schedule_player_tick(state, character, status) do
+    if player_in_combat?(character) do
+      delay_ms = player_tick_delay(status)
+      ref = Process.send_after(self(), :player_tick, delay_ms)
+      Map.put(state, :player_tick_ref, ref)
+    else
+      Map.put(state, :player_tick_ref, nil)
+    end
+  end
+
+  defp player_tick_delay({:running, delay_ms}) when is_integer(delay_ms) and delay_ms > 0 do
+    delay_ms
+  end
+
+  defp player_tick_delay(_status), do: @player_tick_ms
+
+  defp player_in_combat?(%{internal: %Internal{in_combat: true}, unit: %Unit{target: target}})
+       when is_integer(target) and target > 0 do
+    true
+  end
+
+  defp player_in_combat?(_character), do: false
 
   @impl ThousandIsland.Handler
   def handle_connection(socket, _) do

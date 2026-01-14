@@ -6,7 +6,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
-  alias ThistleTea.Game.Entity.Logic.Combat
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Combat, as: CombatBT
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.World
@@ -107,13 +107,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     false
   end
 
-  defp in_combat?(%Mob{internal: %Internal{in_combat: true}, unit: %Unit{target: target}}, _blackboard)
-       when is_integer(target) and target > 0 do
-    true
-  end
-
-  defp in_combat?(%Mob{}, _blackboard) do
-    false
+  defp in_combat?(%Mob{} = state, %Blackboard{} = blackboard) do
+    CombatBT.in_combat?(state, blackboard)
   end
 
   defp set_running_true(%Mob{} = state, %Blackboard{} = blackboard) do
@@ -162,18 +157,12 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     {:success, state, blackboard}
   end
 
-  defp target_valid_same_map?(%Mob{internal: %Internal{map: map}, unit: %Unit{target: target}}, _blackboard) do
-    case World.target_position(target) do
-      {^map, _x, _y, _z} -> true
-      _ -> false
-    end
+  defp target_valid_same_map?(%Mob{} = state, %Blackboard{} = blackboard) do
+    CombatBT.target_valid_same_map?(state, blackboard)
   end
 
-  defp in_combat_range?(%Mob{} = state, %Blackboard{}) do
-    case World.distance_to_guid(state, state.unit.target) do
-      distance when is_number(distance) -> in_combat_distance?(state, distance)
-      _ -> false
-    end
+  defp in_combat_range?(%Mob{} = state, %Blackboard{} = blackboard) do
+    CombatBT.in_combat_range?(state, blackboard)
   end
 
   defp chase_ready?(_state, %Blackboard{} = blackboard) do
@@ -189,23 +178,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     {:running, state, blackboard}
   end
 
-  defp melee_attack(%Mob{unit: %Unit{target: target}} = state, %Blackboard{} = blackboard)
-       when is_integer(target) and target > 0 do
-    blackboard = maybe_start_melee_attack(state, target, blackboard)
-
-    blackboard =
-      if Blackboard.ready_for?(blackboard, :next_attack_at) do
-        send_melee_attack(state, target)
-        Blackboard.put_next_at(blackboard, :next_attack_at, Combat.attack_speed_ms(state))
-      else
-        blackboard
-      end
-
-    {:success, state, blackboard}
-  end
-
   defp melee_attack(%Mob{} = state, %Blackboard{} = blackboard) do
-    {:success, state, blackboard}
+    CombatBT.melee_attack(state, blackboard)
   end
 
   defp chase_repath_and_schedule(%Mob{} = state, %Blackboard{} = blackboard) do
@@ -233,37 +207,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
       |> Blackboard.put_next_at(:next_chase_at, idle_delay())
 
     {:running, state, blackboard}
-  end
-
-  defp maybe_start_melee_attack(
-         %Mob{object: %{guid: _guid}} = _state,
-         target,
-         %Blackboard{attack_started: true} = blackboard
-       )
-       when is_integer(target) do
-    blackboard
-  end
-
-  defp maybe_start_melee_attack(%Mob{object: %{guid: guid}} = state, target, %Blackboard{} = blackboard)
-       when is_integer(target) do
-    Combat.attack_start(guid, target)
-    |> World.broadcast_packet(state)
-
-    %{blackboard | attack_started: true}
-  end
-
-  defp send_melee_attack(%Mob{} = state, target) when is_integer(target) do
-    attack = melee_attack_payload(state)
-
-    case :ets.lookup(:entities, target) do
-      [{^target, pid, _map, _x, _y, _z}] -> GenServer.cast(pid, {:receive_attack, attack})
-      [] -> :ok
-    end
-  end
-
-  defp melee_attack_payload(%Mob{object: %{guid: guid}} = state) do
-    {min_damage, max_damage} = Combat.damage_range(state)
-    %{caster: guid, min_damage: min_damage, max_damage: max_damage}
   end
 
   defp maybe_repath_chase(%Mob{} = state, %Blackboard{} = blackboard, target_pos, target_guid) do
@@ -484,15 +427,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
 
   defp set_orientation(%Mob{movement_block: %MovementBlock{position: {x, y, z, _o}}} = state, o) do
     %{state | movement_block: %{state.movement_block | position: {x, y, z, o}}}
-  end
-
-  defp in_combat_distance?(%Mob{unit: %Unit{combat_reach: combat_reach}}, distance)
-       when is_number(distance) and is_number(combat_reach) do
-    distance <= max(combat_reach, 2.0)
-  end
-
-  defp in_combat_distance?(%Mob{}, distance) when is_number(distance) do
-    distance <= 2.0
   end
 
   defp idle_delay do
