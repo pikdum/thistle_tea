@@ -5,11 +5,10 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Mob, as: MobBT
+  alias ThistleTea.Game.Entity.Logic.Combat
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Movement
-  alias ThistleTea.Game.Math
   alias ThistleTea.Game.Network
-  alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.System.GameEvent
@@ -60,7 +59,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
   @impl GenServer
   def handle_cast({:receive_attack, %{caster: caster} = attack}, state) do
-    damage = attack_damage(attack)
+    damage = Combat.attack_damage(attack)
 
     state =
       state
@@ -68,7 +67,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
       |> Core.take_damage(damage)
       |> BT.interrupt()
 
-    attacker_state_update(state, attack, damage)
+    Combat.attacker_state_update(Map.get(attack, :caster, 0), state.object.guid, damage, attack)
     |> World.broadcast_packet(state)
 
     schedule_ai_tick(0)
@@ -130,37 +129,6 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   end
 
   defp ai_tick_delay(_status), do: @ai_tick_ms
-
-  defp attacker_state_update(%Mob{} = state, attack, damage) do
-    %Message.SmsgAttackerstateupdate{
-      attacker: Map.get(attack, :caster, 0),
-      target: state.object.guid,
-      hit_info: Map.get(attack, :hit_info, 0x2),
-      total_damage: damage,
-      damages: [
-        %{
-          spell_school_mask: Map.get(attack, :spell_school_mask, 0),
-          damage_float: damage * 1.0,
-          damage_uint: damage,
-          absorb: Map.get(attack, :absorb, 0),
-          resist: Map.get(attack, :resist, 0)
-        }
-      ],
-      damage_state: Map.get(attack, :damage_state, 0),
-      spell_id: Map.get(attack, :spell_id, 0),
-      blocked_amount: Map.get(attack, :blocked_amount, 0)
-    }
-  end
-
-  defp attack_damage(%{min_damage: min_damage, max_damage: max_damage})
-       when is_number(min_damage) and is_number(max_damage) do
-    min_value = min(min_damage, max_damage)
-    max_value = max(min_damage, max_damage)
-    Math.random_int(min_value, max_value)
-  end
-
-  defp attack_damage(%{damage: damage}) when is_number(damage), do: trunc(damage)
-  defp attack_damage(_attack), do: 2
 
   defp engage_combat(%Mob{unit: unit, internal: internal} = state, caster) when is_integer(caster) do
     now = Time.now()

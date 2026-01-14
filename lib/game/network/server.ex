@@ -6,12 +6,15 @@ defmodule ThistleTea.Game.Network.Server do
 
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
+  alias ThistleTea.Game.Entity.Logic.Combat
+  alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Connection
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Opcodes
   alias ThistleTea.Game.Network.Packet
   alias ThistleTea.Game.Network.UpdateObject
+  alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Pathfinding
   alias ThistleTea.Game.World.SpatialHash
   alias ThousandIsland.Socket
@@ -104,6 +107,19 @@ defmodule ThistleTea.Game.Network.Server do
     |> Network.send_packet(pid)
 
     {:noreply, {socket, state}, socket.read_timeout}
+  end
+
+  def handle_cast({:receive_attack, attack}, {socket, %{character: character} = state}) do
+    damage = Combat.attack_damage(attack)
+    character = Core.take_damage(character, damage)
+
+    Combat.attacker_state_update(Map.get(attack, :caster, 0), state.guid, damage, attack)
+    |> World.broadcast_packet(character)
+
+    Core.update_packet(character, :values)
+    |> World.broadcast_packet(character)
+
+    {:noreply, {socket, %{state | character: character}}, socket.read_timeout}
   end
 
   @impl GenServer

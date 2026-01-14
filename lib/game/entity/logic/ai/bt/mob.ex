@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
+  alias ThistleTea.Game.Entity.Logic.Combat
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.World
@@ -46,6 +47,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
           BT.sequence([
             BT.condition(&target_valid_same_map?/2),
             BT.condition(&in_combat_range?/2),
+            BT.action(&melee_attack/2),
             BT.action(&combat_wait/2)
           ]),
           BT.sequence([
@@ -147,7 +149,12 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     health = if is_number(max_health), do: max_health, else: unit.health
     unit = %{unit | target: 0, health: health}
     internal = %{internal | in_combat: false}
-    blackboard = Blackboard.clear_chase(blackboard)
+
+    blackboard =
+      blackboard
+      |> Blackboard.clear_chase()
+      |> Blackboard.clear_attack()
+
     state = %{state | unit: unit, internal: internal}
 
     state = Core.mark_broadcast_update(state)
@@ -182,6 +189,25 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     {:running, state, blackboard}
   end
 
+  defp melee_attack(%Mob{unit: %Unit{target: target}} = state, %Blackboard{} = blackboard)
+       when is_integer(target) and target > 0 do
+    blackboard = maybe_start_melee_attack(state, target, blackboard)
+
+    blackboard =
+      if Blackboard.ready_for?(blackboard, :next_attack_at) do
+        send_melee_attack(state, target)
+        Blackboard.put_next_at(blackboard, :next_attack_at, Combat.attack_speed_ms(state))
+      else
+        blackboard
+      end
+
+    {:success, state, blackboard}
+  end
+
+  defp melee_attack(%Mob{} = state, %Blackboard{} = blackboard) do
+    {:success, state, blackboard}
+  end
+
   defp chase_repath_and_schedule(%Mob{} = state, %Blackboard{} = blackboard) do
     target = state.unit.target
 
@@ -207,6 +233,37 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
       |> Blackboard.put_next_at(:next_chase_at, idle_delay())
 
     {:running, state, blackboard}
+  end
+
+  defp maybe_start_melee_attack(
+         %Mob{object: %{guid: _guid}} = _state,
+         target,
+         %Blackboard{attack_started: true} = blackboard
+       )
+       when is_integer(target) do
+    blackboard
+  end
+
+  defp maybe_start_melee_attack(%Mob{object: %{guid: guid}} = state, target, %Blackboard{} = blackboard)
+       when is_integer(target) do
+    Combat.attack_start(guid, target)
+    |> World.broadcast_packet(state)
+
+    %{blackboard | attack_started: true}
+  end
+
+  defp send_melee_attack(%Mob{} = state, target) when is_integer(target) do
+    attack = melee_attack_payload(state)
+
+    case :ets.lookup(:entities, target) do
+      [{^target, pid, _map, _x, _y, _z}] -> GenServer.cast(pid, {:receive_attack, attack})
+      [] -> :ok
+    end
+  end
+
+  defp melee_attack_payload(%Mob{object: %{guid: guid}} = state) do
+    {min_damage, max_damage} = Combat.damage_range(state)
+    %{caster: guid, min_damage: min_damage, max_damage: max_damage}
   end
 
   defp maybe_repath_chase(%Mob{} = state, %Blackboard{} = blackboard, target_pos, target_guid) do

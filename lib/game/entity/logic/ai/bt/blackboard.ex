@@ -8,6 +8,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Blackboard do
             last_target_pos: nil,
             chase_started: false,
             next_chase_at: 0,
+            next_attack_at: 0,
+            attack_started: false,
             next_wander_at: 0,
             next_waypoint_at: 0
 
@@ -61,5 +63,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Blackboard do
 
   def clear_chase(%__MODULE__{} = blackboard) do
     %{blackboard | chase_started: false, last_target_pos: nil}
+  end
+
+  def clear_attack(%__MODULE__{} = blackboard) do
+    %{blackboard | next_attack_at: 0, attack_started: false}
   end
 end
