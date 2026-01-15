@@ -13,6 +13,9 @@
 
 ## Code Style
 
+### Development
+- Ensure `mix test` passes before completing tasks
+
 ### Testing
 - Use `describe "function/arity" do ... end` to group tests by function
 - Use `setup [:named_setup]` for reusable test data
@@ -35,7 +38,6 @@
 - Entity-component inspired design: entities = composition of component structs
 
 ### Formatting
-- Max line length: 120 characters
 - No comments in code (keep functions self-documenting via naming)
 - Use snake_case for atoms and files, PascalCase for modules
 
