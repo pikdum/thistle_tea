@@ -2,6 +2,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   use GenServer
 
   alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Mob, as: MobBT
@@ -49,9 +50,9 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   def handle_cast({:receive_spell, caster, _spell_id}, state) do
     state =
       state
+      |> maybe_reset_attack_started(caster)
       |> engage_combat(caster)
       |> Core.take_damage(10)
-      |> BT.interrupt()
 
     schedule_ai_tick(0)
     {:noreply, state, {:continue, :maybe_broadcast}}
@@ -63,9 +64,9 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
     state =
       state
+      |> maybe_reset_attack_started(caster)
       |> engage_combat(caster)
       |> Core.take_damage(damage)
-      |> BT.interrupt()
 
     Combat.attacker_state_update(Map.get(attack, :caster, 0), state.object.guid, damage, attack)
     |> World.broadcast_packet(state)
@@ -143,4 +144,14 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   defp engage_combat(%Mob{} = state, _caster) do
     state
   end
+
+  defp maybe_reset_attack_started(%Mob{unit: %Unit{target: target}} = state, caster) when is_integer(caster) do
+    if target == caster do
+      state
+    else
+      BT.reset_attack_started(state)
+    end
+  end
+
+  defp maybe_reset_attack_started(state, _caster), do: state
 end
