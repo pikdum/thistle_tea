@@ -153,14 +153,16 @@ defmodule ThistleTea.Game.Network.Message.CmsgPlayerLogin do
     |> Network.send_packet()
   end
 
-  defp normalize_combat_stats(%ThistleTea.Character{unit: unit, internal: internal} = character) do
+  defp normalize_combat_stats(%ThistleTea.Character{} = character) do
+    character = ThistleTea.Character.sync_mainhand_stats(character)
+
     unit =
-      unit
+      character.unit
       |> normalize_unit_value(:base_attack_time, 2000)
       |> normalize_unit_value(:min_damage, 2)
       |> normalize_unit_value(:max_damage, 2)
 
-    internal = %{internal | in_combat: false}
+    internal = %{character.internal | in_combat: false}
     %{character | unit: unit, internal: internal}
   end
 
