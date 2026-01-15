@@ -52,15 +52,31 @@ defmodule ThistleTea.Game.World.Metadata do
     :ok
   end
 
-  def increment(table \\ __MODULE__, guid, key, max \\ nil)
+  def increment(guid, key), do: update_counter(__MODULE__, guid, key, 1, nil)
 
-  def increment(table, guid, key, max) do
+  def increment(table, guid, key) when is_atom(table) or is_reference(table) do
+    update_counter(table, guid, key, 1, nil)
+  end
+
+  def increment(guid, key, max) do
+    update_counter(__MODULE__, guid, key, 1, max)
+  end
+
+  def increment(table, guid, key, max) when is_atom(table) or is_reference(table) do
     update_counter(table, guid, key, 1, max)
   end
 
-  def decrement(table \\ __MODULE__, guid, key, min \\ nil)
+  def decrement(guid, key), do: update_counter(__MODULE__, guid, key, -1, nil)
 
-  def decrement(table, guid, key, min) do
+  def decrement(table, guid, key) when is_atom(table) or is_reference(table) do
+    update_counter(table, guid, key, -1, nil)
+  end
+
+  def decrement(guid, key, min) do
+    update_counter(__MODULE__, guid, key, -1, min)
+  end
+
+  def decrement(table, guid, key, min) when is_atom(table) or is_reference(table) do
     update_counter(table, guid, key, -1, min)
   end
 
