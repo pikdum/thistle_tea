@@ -12,7 +12,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
     BT.sequence([
       BT.condition(&in_combat?/2),
       BT.condition(&target_valid_same_map?/2),
-      BT.condition(&in_combat_range?/2),
       BT.action(&melee_attack/2),
       BT.action(&wait_for_next_attack/2)
     ])
@@ -46,17 +45,22 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
   def melee_attack(%{unit: %Unit{target: target}} = state, %Blackboard{} = blackboard)
       when is_integer(target) and target > 0 do
     blackboard = maybe_start_melee_attack(state, target, blackboard)
-    attack_speed = CombatLogic.attack_speed_ms(state)
 
-    blackboard =
-      if Blackboard.ready_for?(blackboard, :next_attack_at) do
-        send_melee_attack(state, target)
-        Blackboard.put_next_at(blackboard, :next_attack_at, attack_speed)
-      else
-        blackboard
-      end
+    if in_combat_range?(state, blackboard) do
+      attack_speed = CombatLogic.attack_speed_ms(state)
 
-    {:success, state, blackboard}
+      blackboard =
+        if Blackboard.ready_for?(blackboard, :next_attack_at) do
+          send_melee_attack(state, target)
+          Blackboard.put_next_at(blackboard, :next_attack_at, attack_speed)
+        else
+          blackboard
+        end
+
+      {:success, state, blackboard}
+    else
+      {:success, state, blackboard}
+    end
   end
 
   def melee_attack(state, blackboard), do: {:success, state, blackboard}
