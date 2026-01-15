@@ -147,4 +147,10 @@ defmodule ThistleTea.Game.Entity.Data.Component.Unit do
       {8, 0}
     ])
   end
+
+  @default_bounding_radius 0.389
+  @default_combat_reach 1.5
+
+  def default_bounding_radius, do: @default_bounding_radius
+  def default_combat_reach, do: @default_combat_reach
 end

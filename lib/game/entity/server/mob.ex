@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
+  alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.System.GameEvent
 
   @ai_tick_ms 100
@@ -52,7 +53,13 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
       state
       |> maybe_reset_attack_started(caster)
       |> engage_combat(caster)
+
+    target = state.unit.target
+
+    state =
+      state
       |> Core.take_damage(10)
+      |> maybe_decrement_on_death(target)
 
     schedule_ai_tick(0)
     {:noreply, state, {:continue, :maybe_broadcast}}
@@ -66,7 +73,13 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
       state
       |> maybe_reset_attack_started(caster)
       |> engage_combat(caster)
+
+    target = state.unit.target
+
+    state =
+      state
       |> Core.take_damage(damage)
+      |> maybe_decrement_on_death(target)
 
     Combat.attacker_state_update(Map.get(attack, :caster, 0), state.object.guid, damage, attack)
     |> World.broadcast_packet(state)
@@ -128,8 +141,11 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
   defp ai_tick_delay(_status), do: @ai_tick_ms
 
-  defp engage_combat(%Mob{unit: unit, internal: internal} = state, caster) when is_integer(caster) do
+  defp engage_combat(%Mob{unit: %Unit{target: current_target} = unit, internal: internal} = state, caster)
+       when is_integer(caster) do
     now = Time.now()
+
+    state = update_attacker_count(state, current_target, caster)
 
     %{
       state
@@ -151,4 +167,26 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   end
 
   defp maybe_reset_attack_started(state, _caster), do: state
+
+  defp update_attacker_count(%Mob{} = state, current_target, caster) do
+    if is_integer(current_target) and current_target > 0 and current_target != caster do
+      Metadata.decrement(current_target, :attacker_count, 0)
+    end
+
+    if is_integer(caster) and caster > 0 and current_target != caster do
+      Metadata.increment(caster, :attacker_count)
+    end
+
+    state
+  end
+
+  defp update_attacker_count(state, _current_target, _caster), do: state
+
+  defp maybe_decrement_on_death(state, target) do
+    if Core.dead?(state) and is_integer(target) and target > 0 do
+      Metadata.decrement(target, :attacker_count, 0)
+    end
+
+    state
+  end
 end

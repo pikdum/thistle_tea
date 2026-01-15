@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.World
+  alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Pathfinding
   alias ThistleTea.Game.World.SpatialHash
 
@@ -19,7 +20,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   @chase_stop_distance 1.5
   @chase_repath_threshold 2.0
 
-  @chase_attacker_radius 4.0
   @target_radius_guess 0.9
   @default_bounding_radius 0.6
   @attack_angle_scale 0.3
@@ -138,9 +138,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   end
 
   defp clear_combat(
-         %Mob{unit: %Unit{max_health: max_health} = unit, internal: %Internal{} = internal} = state,
+         %Mob{unit: %Unit{max_health: max_health, target: target} = unit, internal: %Internal{} = internal} = state,
          %Blackboard{} = blackboard
        ) do
+    decrement_attacker_count(target)
     health = if is_number(max_health), do: max_health, else: unit.health
     unit = %{unit | target: 0, health: health}
     internal = %{internal | in_combat: false}
@@ -214,7 +215,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     should_repath = target_moved or not Movement.is_moving?(state)
 
     if should_repath do
-      destination = chase_destination(state, target_pos)
+      destination = chase_destination(state, target_pos, target_guid)
       state = Movement.move_to(state, destination, face_target: target_guid)
       {state, %{blackboard | last_target_pos: target_pos}}
     else
@@ -223,16 +224,12 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   end
 
   defp chase_destination(
-         %Mob{
-           object: %{guid: guid},
-           movement_block: %MovementBlock{position: {mx, my, mz, _o}},
-           internal: %Internal{map: map},
-           unit: %Unit{bounding_radius: mob_radius}
-         },
-         {tx, ty, tz}
+         %Mob{movement_block: %MovementBlock{position: {mx, my, _mz, _o}}, unit: %Unit{bounding_radius: mob_radius}},
+         {tx, ty, tz},
+         target_guid
        ) do
     base_angle = base_chase_angle({mx, my}, {tx, ty})
-    attacker_count = nearby_attacker_count(map, guid, {tx, ty, tz}, {mx, my, mz})
+    attacker_count = attacker_count(target_guid)
 
     mob_radius =
       case mob_radius do
@@ -262,17 +259,20 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     end
   end
 
-  # TODO: this should actually be the count of mobs attacking the target, but we don't have that handy yet
-  defp nearby_attacker_count(map, guid, {tx, ty, tz}, {mx, my, mz}) do
-    target_count = count_nearby_mobs(map, guid, {tx, ty, tz})
-    mob_count = count_nearby_mobs(map, guid, {mx, my, mz})
-    max(target_count, mob_count)
+  defp attacker_count(target_guid) when is_integer(target_guid) do
+    case Metadata.query(target_guid, [:attacker_count]) do
+      %{attacker_count: count} when is_number(count) and count > 0 -> count
+      _ -> 0
+    end
   end
 
-  defp count_nearby_mobs(map, guid, {x, y, z}) do
-    SpatialHash.query(:mobs, map, x, y, z, @chase_attacker_radius)
-    |> Enum.count(fn {mob_guid, _pid, _distance} -> mob_guid != guid end)
+  defp attacker_count(_target_guid), do: 0
+
+  defp decrement_attacker_count(target) when is_integer(target) and target > 0 do
+    Metadata.decrement(target, :attacker_count, 0)
   end
+
+  defp decrement_attacker_count(_target), do: :ok
 
   defp attack_angle_offset(attacker_count, size_factor) when attacker_count > 0 do
     spread = :math.pi() / 2.0 - :math.pi() * :rand.uniform()

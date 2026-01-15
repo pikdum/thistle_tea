@@ -52,6 +52,18 @@ defmodule ThistleTea.Game.World.Metadata do
     :ok
   end
 
+  def increment(table \\ __MODULE__, guid, key, max \\ nil)
+
+  def increment(table, guid, key, max) do
+    update_counter(table, guid, key, 1, max)
+  end
+
+  def decrement(table \\ __MODULE__, guid, key, min \\ nil)
+
+  def decrement(table, guid, key, min) do
+    update_counter(table, guid, key, -1, min)
+  end
+
   def find_guid_by(table \\ __MODULE__, key, value) do
     :ets.foldl(
       fn {guid, data}, acc ->
@@ -65,6 +77,26 @@ defmodule ThistleTea.Game.World.Metadata do
       table
     )
   end
+
+  defp update_counter(table, guid, key, delta, bound) do
+    current = get(table, guid) || %{}
+    value = Map.get(current, key, 0)
+    value = if is_number(value), do: value, else: 0
+    updated = value + delta
+    updated = apply_bound(updated, delta, bound)
+    :ets.insert(table, {guid, Map.put(current, key, updated)})
+    updated
+  end
+
+  defp apply_bound(value, delta, bound) when is_number(bound) do
+    cond do
+      delta > 0 -> min(value, bound)
+      delta < 0 -> max(value, bound)
+      true -> value
+    end
+  end
+
+  defp apply_bound(value, _delta, _bound), do: value
 
   defp normalize_metadata(metadata) when is_map(metadata), do: metadata
   defp normalize_metadata(metadata) when is_list(metadata), do: Map.new(metadata)

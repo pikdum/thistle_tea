@@ -61,6 +61,8 @@ defmodule ThistleTea.Character do
         power_type: get_power(params.class),
         # TODO: this is wrong
         base_attack_time: 2000,
+        bounding_radius: Unit.default_bounding_radius(),
+        combat_reach: Unit.default_combat_reach(),
         display_id: unit_display_id,
         native_display_id: unit_display_id,
         min_damage: 10,

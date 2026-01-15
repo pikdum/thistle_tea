@@ -68,6 +68,26 @@ defmodule ThistleTea.Game.World.MetadataTest do
     end
   end
 
+  describe "increment/4 and decrement/4" do
+    test "increments from zero", %{table: table} do
+      guid = 400
+      assert Metadata.increment(table, guid, :attacker_count) == 1
+      assert Metadata.get(table, guid) == %{attacker_count: 1}
+    end
+
+    test "respects max bound", %{table: table} do
+      guid = 401
+      Metadata.put(table, guid, %{attacker_count: 2})
+      assert Metadata.increment(table, guid, :attacker_count, 2) == 2
+    end
+
+    test "respects min bound", %{table: table} do
+      guid = 402
+      Metadata.put(table, guid, %{attacker_count: 0})
+      assert Metadata.decrement(table, guid, :attacker_count, 0) == 0
+    end
+  end
+
   describe "find_guid_by/3" do
     test "finds guid by metadata value", %{table: table} do
       guid = 444

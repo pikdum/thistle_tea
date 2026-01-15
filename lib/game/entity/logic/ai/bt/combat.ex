@@ -9,9 +9,11 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
   alias ThistleTea.Game.Network.Opcodes
   alias ThistleTea.Game.Network.Packet
   alias ThistleTea.Game.World
+  alias ThistleTea.Game.World.Metadata
 
   @attack_retry_delay_ms 100
   @default_attack_range 2.0
+  @melee_range_offset 1.333
 
   def melee_sequence do
     BT.sequence([
@@ -40,7 +42,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
 
   def in_combat_range?(%{unit: %Unit{target: target}} = state, _blackboard) do
     case World.distance_to_guid(state, target) do
-      distance when is_number(distance) -> in_combat_distance?(state, distance)
+      distance when is_number(distance) -> distance <= combat_reach(state, target)
       _ -> false
     end
   end
@@ -141,12 +143,31 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
     %{caster: guid, min_damage: min_damage, max_damage: max_damage}
   end
 
-  defp in_combat_distance?(%{unit: %Unit{combat_reach: combat_reach}}, distance)
-       when is_number(distance) and is_number(combat_reach) do
-    distance <= max(combat_reach, @default_attack_range)
+  defp combat_reach(%{unit: unit} = state, target) do
+    reach = combat_reach_value(unit) + target_combat_reach(state, target) + @melee_range_offset
+    max(reach, @default_attack_range)
   end
 
-  defp in_combat_distance?(_state, distance) when is_number(distance) do
-    distance <= @default_attack_range
+  defp combat_reach_value(%Unit{combat_reach: combat_reach}) when is_number(combat_reach) and combat_reach > 0 do
+    combat_reach
   end
+
+  defp combat_reach_value(combat_reach) when is_number(combat_reach) and combat_reach > 0 do
+    combat_reach
+  end
+
+  defp combat_reach_value(_unit), do: Unit.default_combat_reach()
+
+  defp target_combat_reach(%{object: %{guid: guid}, unit: unit}, target) when is_integer(target) and target == guid do
+    combat_reach_value(unit)
+  end
+
+  defp target_combat_reach(_state, target) when is_integer(target) do
+    case Metadata.query(target, [:combat_reach]) do
+      %{combat_reach: combat_reach} -> combat_reach_value(combat_reach)
+      _ -> Unit.default_combat_reach()
+    end
+  end
+
+  defp target_combat_reach(_state, _target), do: Unit.default_combat_reach()
 end
