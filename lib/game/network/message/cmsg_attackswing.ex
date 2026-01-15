@@ -17,7 +17,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgAttackswing do
     if valid_attack_target?(state, target_guid) do
       character =
         character
-        |> BT.interrupt()
+        |> maybe_reset_attack_started(target_guid)
         |> engage_combat(target_guid)
 
       Core.update_packet(character, :values)
@@ -41,6 +41,17 @@ defmodule ThistleTea.Game.Network.Message.CmsgAttackswing do
   end
 
   def handle_attack_swing(state), do: state
+
+  defp maybe_reset_attack_started(%ThistleTea.Character{unit: %Unit{target: target}} = character, target_guid)
+       when is_integer(target_guid) do
+    if target == target_guid do
+      character
+    else
+      BT.reset_attack_started(character)
+    end
+  end
+
+  defp maybe_reset_attack_started(character, _target_guid), do: character
 
   defp valid_attack_target?(%{guid: guid, character: %ThistleTea.Character{internal: %{map: map}}}, target_guid)
        when is_integer(target_guid) and target_guid > 0 do

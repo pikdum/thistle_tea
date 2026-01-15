@@ -68,4 +68,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Blackboard do
   def clear_attack(%__MODULE__{} = blackboard) do
     %{blackboard | next_attack_at: 0, attack_started: false}
   end
+
+  def clear_attack_started(%__MODULE__{} = blackboard) do
+    %{blackboard | attack_started: false}
+  end
 end
