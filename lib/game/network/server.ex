@@ -293,12 +293,6 @@ defmodule ThistleTea.Game.Network.Server do
     {:reply, :player, state}
   end
 
-  @impl GenServer
-  def handle_call(:get_name, _from, state) do
-    {_socket, s} = state
-    {:reply, s.character.internal.name, state}
-  end
-
   defp tick_player(%{internal: %Internal{behavior_tree: behavior_tree}} = character) when not is_nil(behavior_tree) do
     BT.tick(behavior_tree, character)
   end

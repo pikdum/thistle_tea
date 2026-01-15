@@ -116,9 +116,6 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   def handle_call(:get_entity, _from, state), do: {:reply, :mob, state}
 
   @impl GenServer
-  def handle_call(:get_name, _from, state), do: {:reply, state.internal.name, state}
-
-  @impl GenServer
   def terminate(_reason, state), do: Core.remove_position(state)
 
   defp schedule_ai_tick(delay) when is_integer(delay) and delay >= 0 do

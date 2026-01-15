@@ -1,6 +1,8 @@
 defmodule ThistleTea.Game.Network.Message.CmsgMessagechat do
   use ThistleTea.Game.Network.ClientMessage, :CMSG_MESSAGECHAT
 
+  alias ThistleTea.Game.World.Metadata
+
   require Logger
 
   defstruct [:chat_type, :language, :message, :target_name]
@@ -184,8 +186,8 @@ defmodule ThistleTea.Game.Network.Message.CmsgMessagechat do
   end
 
   def handle_chat(state, @chat_type_whisper, language, message, target_name) do
-    case :ets.match(:guid_name, {:"$1", target_name, :_, :_, :_, :_}) do
-      [[guid]] ->
+    case Metadata.find_guid_by(:name, target_name) do
+      guid when is_integer(guid) ->
         pid = :ets.lookup_element(:entities, guid, 2, nil)
 
         %Message.SmsgMessagechat{

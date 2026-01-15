@@ -4,10 +4,12 @@ defmodule ThistleTea.Game.Network.Message.CmsgPlayerLogin do
   import Bitwise, only: [<<<: 2, |||: 2]
 
   alias ThistleTea.DBC
+  alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Player, as: PlayerBT
   alias ThistleTea.Game.Network.Message.SmsgInitialSpells.InitialSpell
   alias ThistleTea.Game.Network.UpdateObject
+  alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
 
   require Logger
@@ -32,7 +34,15 @@ defmodule ThistleTea.Game.Network.Message.CmsgPlayerLogin do
       |> normalize_combat_stats()
       |> BT.init(PlayerBT.tree())
 
-    :ets.insert(:guid_name, {character_guid, c.internal.name, "", c.unit.race, c.unit.gender, c.unit.class})
+    Metadata.put(character_guid, %{
+      name: c.internal.name,
+      realm: "",
+      race: c.unit.race,
+      gender: c.unit.gender,
+      class: c.unit.class,
+      bounding_radius: c.unit.bounding_radius,
+      combat_reach: c.unit.combat_reach
+    })
 
     Logger.metadata(character_name: c.internal.name)
 
@@ -159,6 +169,8 @@ defmodule ThistleTea.Game.Network.Message.CmsgPlayerLogin do
     unit =
       character.unit
       |> normalize_unit_value(:base_attack_time, 2000)
+      |> normalize_unit_value(:bounding_radius, Unit.default_bounding_radius())
+      |> normalize_unit_value(:combat_reach, Unit.default_combat_reach())
       |> normalize_unit_value(:min_damage, 2)
       |> normalize_unit_value(:max_damage, 2)
 

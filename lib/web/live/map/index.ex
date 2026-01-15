@@ -2,6 +2,7 @@ defmodule ThistleTeaWeb.MapLive.Index do
   # use ThistleTeaWeb, :live_view
   use Phoenix.LiveView, container: {:div, class: "h-full w-full"}
 
+  alias ThistleTea.Game.World.Metadata
   alias ThistleTeaWeb.Homography
 
   require Logger
@@ -69,7 +70,7 @@ defmodule ThistleTeaWeb.MapLive.Index do
       map <= 1 and guid < 0x1FC00000
     end)
     |> Enum.map(fn {guid, _pid, map, x, y, _z} ->
-      [{^guid, name, _realm, _race, _gender, _class}] = :ets.lookup(:guid_name, guid)
+      %{name: name} = Metadata.query(guid, [:name])
 
       {x, y} = Homography.transform({x, y}, map)
 
