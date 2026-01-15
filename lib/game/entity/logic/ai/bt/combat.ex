@@ -1,11 +1,16 @@
 defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
+  alias ThistleTea.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.Combat, as: CombatLogic
+  alias ThistleTea.Game.Network
+  alias ThistleTea.Game.Network.Opcodes
+  alias ThistleTea.Game.Network.Packet
   alias ThistleTea.Game.World
 
+  @attack_retry_delay_ms 100
   @default_attack_range 2.0
 
   def melee_sequence do
@@ -45,22 +50,27 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
   def melee_attack(%{unit: %Unit{target: target}} = state, %Blackboard{} = blackboard)
       when is_integer(target) and target > 0 do
     blackboard = maybe_start_melee_attack(state, target, blackboard)
+    in_range = in_combat_range?(state, blackboard)
+    attack_ready = Blackboard.ready_for?(blackboard, :next_attack_at)
 
-    if in_combat_range?(state, blackboard) do
-      attack_speed = CombatLogic.attack_speed_ms(state)
-
-      blackboard =
-        if Blackboard.ready_for?(blackboard, :next_attack_at) do
+    {state, blackboard} =
+      cond do
+        in_range and attack_ready ->
+          attack_speed = CombatLogic.attack_speed_ms(state)
           send_melee_attack(state, target)
-          Blackboard.put_next_at(blackboard, :next_attack_at, attack_speed)
-        else
-          blackboard
-        end
+          {state, Blackboard.put_next_at(blackboard, :next_attack_at, attack_speed)}
 
-      {:success, state, blackboard}
-    else
-      {:success, state, blackboard}
-    end
+        in_range ->
+          {state, blackboard}
+
+        attack_ready ->
+          handle_out_of_range(state, blackboard)
+
+        true ->
+          {state, blackboard}
+      end
+
+    {:success, state, blackboard}
   end
 
   def melee_attack(state, blackboard), do: {:success, state, blackboard}
@@ -99,6 +109,20 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
   end
 
   defp maybe_start_attack_timer(blackboard, _state), do: blackboard
+
+  defp handle_out_of_range(state, blackboard) do
+    blackboard = Blackboard.put_next_at(blackboard, :next_attack_at, @attack_retry_delay_ms)
+    {send_out_of_range(state), blackboard}
+  end
+
+  defp send_out_of_range(%Character{} = state) do
+    Packet.build(<<>>, Opcodes.get(:SMSG_ATTACKSWING_NOTINRANGE))
+    |> Network.send_packet()
+
+    state
+  end
+
+  defp send_out_of_range(state), do: state
 
   defp send_melee_attack(state, target) when is_integer(target) do
     attack = melee_attack_payload(state)
