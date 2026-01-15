@@ -4,6 +4,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgAttackswing do
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Time
+  alias ThistleTea.Game.World.SpatialHash
 
   require Logger
 
@@ -13,17 +14,21 @@ defmodule ThistleTea.Game.Network.Message.CmsgAttackswing do
   def handle(%__MODULE__{target_guid: target_guid}, %{character: character} = state) do
     Logger.info("CMSG_ATTACKSWING: #{target_guid}")
 
-    character =
-      character
-      |> BT.interrupt()
-      |> engage_combat(target_guid)
+    if valid_attack_target?(state, target_guid) do
+      character =
+        character
+        |> BT.interrupt()
+        |> engage_combat(target_guid)
 
-    Core.update_packet(character, :values)
-    |> World.broadcast_packet(character)
+      Core.update_packet(character, :values)
+      |> World.broadcast_packet(character)
 
-    state
-    |> Map.put(:character, character)
-    |> ensure_player_tick()
+      state
+      |> Map.put(:character, character)
+      |> ensure_player_tick()
+    else
+      send_attack_stop(state, target_guid)
+    end
   end
 
   @impl ClientMessage
@@ -36,6 +41,30 @@ defmodule ThistleTea.Game.Network.Message.CmsgAttackswing do
   end
 
   def handle_attack_swing(state), do: state
+
+  defp valid_attack_target?(%{guid: guid, character: %ThistleTea.Character{internal: %{map: map}}}, target_guid)
+       when is_integer(target_guid) and target_guid > 0 do
+    target_guid != guid and
+      match?({^target_guid, _pid, ^map, _x, _y, _z}, SpatialHash.get_entity(target_guid)) and
+      unit_target?(target_guid)
+  end
+
+  defp valid_attack_target?(_state, _target_guid), do: false
+
+  defp unit_target?(target_guid) when is_integer(target_guid) do
+    :ets.match(:players, {:"$1", target_guid}) != [] or
+      :ets.match(:mobs, {:"$1", target_guid}) != []
+  end
+
+  defp unit_target?(_target_guid), do: false
+
+  defp send_attack_stop(%{guid: guid} = state, target_guid) when is_integer(guid) do
+    enemy = if is_integer(target_guid) and target_guid > 0, do: target_guid, else: 0
+    Network.send_packet(%Message.SmsgAttackstop{player: guid, enemy: enemy})
+    state
+  end
+
+  defp send_attack_stop(state, _target_guid), do: state
 
   defp engage_combat(%ThistleTea.Character{unit: unit, internal: internal} = character, target_guid)
        when is_integer(target_guid) do
