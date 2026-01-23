@@ -1,0 +1,3 @@
+[submodule "refs/wow_messages"]
+	path = refs/wow_messages
+	url = https://github.com/gtker/wow_messages
