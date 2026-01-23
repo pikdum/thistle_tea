@@ -18,6 +18,7 @@ defmodule ThistleTea.Game.Network.Server do
   alias ThistleTea.Game.Network.Packet
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.World
+  alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Pathfinding
   alias ThistleTea.Game.World.SpatialHash
   alias ThousandIsland.Socket
@@ -293,6 +294,7 @@ defmodule ThistleTea.Game.Network.Server do
     Core.update_packet(character, :values)
     |> World.broadcast_packet(character)
 
+    Metadata.update(state.guid, %{alive?: not Core.dead?(character)})
     internal = %{character.internal | broadcast_update?: false}
     character = %{character | internal: internal}
 

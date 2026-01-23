@@ -42,7 +42,8 @@ defmodule ThistleTea.Game.Network.Message.CmsgPlayerLogin do
       class: c.unit.class,
       bounding_radius: c.unit.bounding_radius,
       combat_reach: c.unit.combat_reach,
-      attacker_count: 0
+      attacker_count: 0,
+      alive?: c.unit.health > 0
     })
 
     Logger.metadata(character_name: c.internal.name)

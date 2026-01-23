@@ -39,6 +39,12 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
         BT.action(&set_running_true/2),
         BT.selector([
           BT.sequence([
+            BT.condition(&target_dead?/2),
+            BT.action(&set_tether_target/2),
+            BT.action(&clear_combat/2),
+            BT.action(&move_to_target/2)
+          ]),
+          BT.sequence([
             BT.condition(&should_tether?/2),
             BT.action(&set_tether_target/2),
             BT.action(&clear_combat/2),
@@ -117,6 +123,17 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
 
   defp should_tether?(%Mob{} = state, _blackboard) do
     Core.should_tether?(state)
+  end
+
+  defp target_dead?(%Mob{unit: %Unit{target: target}}, _blackboard) when is_integer(target) and target > 0 do
+    case Metadata.query(target, [:alive?]) do
+      %{alive?: false} -> true
+      _ -> false
+    end
+  end
+
+  defp target_dead?(_state, _blackboard) do
+    false
   end
 
   defp tethering_to_spawn?(%Mob{internal: %Internal{initial_position: {x, y, z}}} = state, %Blackboard{

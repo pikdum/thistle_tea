@@ -125,6 +125,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   def handle_continue(:maybe_broadcast, %{internal: %Internal{broadcast_update?: true}} = state) do
     update_type = if Core.dead?(state), do: :create_object2, else: :values
     Core.update_packet(state, update_type) |> World.broadcast_packet(state)
+    Metadata.update(state.object.guid, %{alive?: not Core.dead?(state)})
     internal = %{state.internal | broadcast_update?: false}
     {:noreply, %{state | internal: internal}}
   end
