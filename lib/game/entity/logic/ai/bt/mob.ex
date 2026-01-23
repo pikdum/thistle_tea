@@ -12,14 +12,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Pathfinding
-  alias ThistleTea.Game.World.SpatialHash
 
   @chase_tick_delay 100
 
   # TODO: a lot of these should be pulled from entity data
-  @chase_stop_distance 1.5
-  @chase_repath_threshold 2.0
-
   @target_radius_guess 0.9
   @default_bounding_radius 0.6
   @attack_angle_scale 0.3
@@ -228,7 +224,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   end
 
   defp maybe_repath_chase(%Mob{} = state, %Blackboard{} = blackboard, target_pos, target_guid) do
-    target_moved = target_moved_enough?(blackboard, target_pos)
+    target_moved = target_moved_enough?(state, target_pos, target_guid)
     should_repath = target_moved or not Movement.is_moving?(state)
 
     if should_repath do
@@ -247,6 +243,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
        ) do
     base_angle = base_chase_angle({mx, my}, {tx, ty})
     attacker_count = attacker_count(target_guid)
+    chase_distance = chase_stop_distance(target_guid)
 
     mob_radius =
       case mob_radius do
@@ -259,8 +256,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     angle = base_angle + angle_offset
 
     {
-      tx + :math.cos(angle) * @chase_stop_distance,
-      ty + :math.sin(angle) * @chase_stop_distance,
+      tx + :math.cos(angle) * chase_distance,
+      ty + :math.sin(angle) * chase_distance,
       tz
     }
   end
@@ -298,13 +295,63 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
 
   defp attack_angle_offset(_attacker_count, _size_factor), do: 0.0
 
-  defp target_moved_enough?(%Blackboard{last_target_pos: {lx, ly, lz}}, {x, y, z}) do
-    SpatialHash.distance({lx, ly, lz}, {x, y, z}) >= @chase_repath_threshold
+  defp target_moved_enough?(
+         %Mob{movement_block: %MovementBlock{position: {mx, my, mz, _o}, spline_nodes: nodes}},
+         {tx, ty, tz},
+         target_guid
+       ) do
+    destination = current_destination(nodes, {mx, my, mz})
+    threshold = chase_repath_distance(target_guid)
+    planar_distance(destination, {tx, ty, tz}) > threshold
   end
 
-  defp target_moved_enough?(%Blackboard{}, {_x, _y, _z}) do
+  defp target_moved_enough?(%Mob{}, {_x, _y, _z}, _target_guid) do
     true
   end
+
+  defp current_destination(nodes, fallback) when is_list(nodes) do
+    case List.last(nodes) do
+      {x, y, z} -> {x, y, z}
+      _ -> fallback
+    end
+  end
+
+  defp current_destination(_nodes, fallback), do: fallback
+
+  defp planar_distance({x1, y1, _z1}, {x2, y2, _z2}) do
+    dx = x2 - x1
+    dy = y2 - y1
+    :math.sqrt(dx * dx + dy * dy)
+  end
+
+  defp chase_repath_distance(target_guid) do
+    combat_reach = target_combat_reach(target_guid)
+    bounding_radius = target_bounding_radius(target_guid)
+    max(combat_reach * 0.75 - bounding_radius, 0.0)
+  end
+
+  defp chase_stop_distance(target_guid) do
+    combat_reach = target_combat_reach(target_guid)
+    max(combat_reach * 0.5, 0.0)
+  end
+
+  defp target_combat_reach(target_guid) when is_integer(target_guid) do
+    case Metadata.query(target_guid, [:combat_reach]) do
+      %{combat_reach: combat_reach} when is_number(combat_reach) -> combat_reach
+      _ -> Unit.default_combat_reach()
+    end
+  end
+
+  defp target_combat_reach(_target_guid), do: Unit.default_combat_reach()
+
+  defp target_bounding_radius(target_guid) when is_integer(target_guid) do
+    case Metadata.query(target_guid, [:bounding_radius]) do
+      %{bounding_radius: bounding_radius} when is_number(bounding_radius) -> bounding_radius
+      _ -> Unit.default_bounding_radius()
+    end
+  end
+
+  defp target_bounding_radius(_target_guid), do: Unit.default_bounding_radius()
 
   defp wait_until_wander_ready(%Mob{} = state, %Blackboard{} = blackboard) do
     if Blackboard.ready_for?(blackboard, :next_wander_at) do
