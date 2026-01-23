@@ -6,19 +6,16 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Combat, as: CombatBT
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.World
+  alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Pathfinding
-  alias ThistleTea.Game.World.SpatialHash
 
   @chase_tick_delay 100
 
   # TODO: a lot of these should be pulled from entity data
-  @chase_stop_distance 1.5
-  @chase_repath_threshold 2.0
-
-  @chase_attacker_radius 4.0
   @target_radius_guess 0.9
   @default_bounding_radius 0.6
   @attack_angle_scale 0.3
@@ -38,6 +35,12 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
         BT.action(&set_running_true/2),
         BT.selector([
           BT.sequence([
+            BT.condition(&target_dead?/2),
+            BT.action(&set_tether_target/2),
+            BT.action(&clear_combat/2),
+            BT.action(&move_to_target/2)
+          ]),
+          BT.sequence([
             BT.condition(&should_tether?/2),
             BT.action(&set_tether_target/2),
             BT.action(&clear_combat/2),
@@ -46,6 +49,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
           BT.sequence([
             BT.condition(&target_valid_same_map?/2),
             BT.condition(&in_combat_range?/2),
+            BT.action(&melee_attack/2),
             BT.action(&combat_wait/2)
           ]),
           BT.sequence([
@@ -105,13 +109,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     false
   end
 
-  defp in_combat?(%Mob{internal: %Internal{in_combat: true}, unit: %Unit{target: target}}, _blackboard)
-       when is_integer(target) and target > 0 do
-    true
-  end
-
-  defp in_combat?(%Mob{}, _blackboard) do
-    false
+  defp in_combat?(%Mob{} = state, %Blackboard{} = blackboard) do
+    CombatBT.in_combat?(state, blackboard)
   end
 
   defp set_running_true(%Mob{} = state, %Blackboard{} = blackboard) do
@@ -120,6 +119,17 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
 
   defp should_tether?(%Mob{} = state, _blackboard) do
     Core.should_tether?(state)
+  end
+
+  defp target_dead?(%Mob{unit: %Unit{target: target}}, _blackboard) when is_integer(target) and target > 0 do
+    case Metadata.query(target, [:alive?]) do
+      %{alive?: false} -> true
+      _ -> false
+    end
+  end
+
+  defp target_dead?(_state, _blackboard) do
+    false
   end
 
   defp tethering_to_spawn?(%Mob{internal: %Internal{initial_position: {x, y, z}}} = state, %Blackboard{
@@ -141,13 +151,19 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   end
 
   defp clear_combat(
-         %Mob{unit: %Unit{max_health: max_health} = unit, internal: %Internal{} = internal} = state,
+         %Mob{unit: %Unit{max_health: max_health, target: target} = unit, internal: %Internal{} = internal} = state,
          %Blackboard{} = blackboard
        ) do
+    decrement_attacker_count(target)
     health = if is_number(max_health), do: max_health, else: unit.health
     unit = %{unit | target: 0, health: health}
     internal = %{internal | in_combat: false}
-    blackboard = Blackboard.clear_chase(blackboard)
+
+    blackboard =
+      blackboard
+      |> Blackboard.clear_chase()
+      |> Blackboard.clear_attack()
+
     state = %{state | unit: unit, internal: internal}
 
     state = Core.mark_broadcast_update(state)
@@ -155,18 +171,12 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     {:success, state, blackboard}
   end
 
-  defp target_valid_same_map?(%Mob{internal: %Internal{map: map}, unit: %Unit{target: target}}, _blackboard) do
-    case World.target_position(target) do
-      {^map, _x, _y, _z} -> true
-      _ -> false
-    end
+  defp target_valid_same_map?(%Mob{} = state, %Blackboard{} = blackboard) do
+    CombatBT.target_valid_same_map?(state, blackboard)
   end
 
-  defp in_combat_range?(%Mob{} = state, %Blackboard{}) do
-    case World.distance_to_guid(state, state.unit.target) do
-      distance when is_number(distance) -> in_combat_distance?(state, distance)
-      _ -> false
-    end
+  defp in_combat_range?(%Mob{} = state, %Blackboard{} = blackboard) do
+    CombatBT.in_combat_range?(state, blackboard)
   end
 
   defp chase_ready?(_state, %Blackboard{} = blackboard) do
@@ -180,6 +190,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
       |> Blackboard.put_next_at(:next_chase_at, combat_wait_delay())
 
     {:running, state, blackboard}
+  end
+
+  defp melee_attack(%Mob{} = state, %Blackboard{} = blackboard) do
+    CombatBT.melee_attack(state, blackboard)
   end
 
   defp chase_repath_and_schedule(%Mob{} = state, %Blackboard{} = blackboard) do
@@ -210,11 +224,11 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   end
 
   defp maybe_repath_chase(%Mob{} = state, %Blackboard{} = blackboard, target_pos, target_guid) do
-    target_moved = target_moved_enough?(blackboard, target_pos)
+    target_moved = target_moved_enough?(blackboard, target_pos, target_guid)
     should_repath = target_moved or not Movement.is_moving?(state)
 
     if should_repath do
-      destination = chase_destination(state, target_pos)
+      destination = chase_destination(state, target_pos, target_guid)
       state = Movement.move_to(state, destination, face_target: target_guid)
       {state, %{blackboard | last_target_pos: target_pos}}
     else
@@ -223,16 +237,13 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   end
 
   defp chase_destination(
-         %Mob{
-           object: %{guid: guid},
-           movement_block: %MovementBlock{position: {mx, my, mz, _o}},
-           internal: %Internal{map: map},
-           unit: %Unit{bounding_radius: mob_radius}
-         },
-         {tx, ty, tz}
+         %Mob{movement_block: %MovementBlock{position: {mx, my, _mz, _o}}, unit: %Unit{bounding_radius: mob_radius}},
+         {tx, ty, tz},
+         target_guid
        ) do
     base_angle = base_chase_angle({mx, my}, {tx, ty})
-    attacker_count = nearby_attacker_count(map, guid, {tx, ty, tz}, {mx, my, mz})
+    attacker_count = attacker_count(target_guid)
+    chase_distance = chase_stop_distance(target_guid)
 
     mob_radius =
       case mob_radius do
@@ -245,8 +256,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     angle = base_angle + angle_offset
 
     {
-      tx + :math.cos(angle) * @chase_stop_distance,
-      ty + :math.sin(angle) * @chase_stop_distance,
+      tx + :math.cos(angle) * chase_distance,
+      ty + :math.sin(angle) * chase_distance,
       tz
     }
   end
@@ -262,17 +273,20 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     end
   end
 
-  # TODO: this should actually be the count of mobs attacking the target, but we don't have that handy yet
-  defp nearby_attacker_count(map, guid, {tx, ty, tz}, {mx, my, mz}) do
-    target_count = count_nearby_mobs(map, guid, {tx, ty, tz})
-    mob_count = count_nearby_mobs(map, guid, {mx, my, mz})
-    max(target_count, mob_count)
+  defp attacker_count(target_guid) when is_integer(target_guid) do
+    case Metadata.query(target_guid, [:attacker_count]) do
+      %{attacker_count: count} when is_number(count) and count > 0 -> count
+      _ -> 0
+    end
   end
 
-  defp count_nearby_mobs(map, guid, {x, y, z}) do
-    SpatialHash.query(:mobs, map, x, y, z, @chase_attacker_radius)
-    |> Enum.count(fn {mob_guid, _pid, _distance} -> mob_guid != guid end)
+  defp attacker_count(_target_guid), do: 0
+
+  defp decrement_attacker_count(target) when is_integer(target) and target > 0 do
+    Metadata.decrement(target, :attacker_count, 0)
   end
+
+  defp decrement_attacker_count(_target), do: :ok
 
   defp attack_angle_offset(attacker_count, size_factor) when attacker_count > 0 do
     spread = :math.pi() / 2.0 - :math.pi() * :rand.uniform()
@@ -281,13 +295,49 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
 
   defp attack_angle_offset(_attacker_count, _size_factor), do: 0.0
 
-  defp target_moved_enough?(%Blackboard{last_target_pos: {lx, ly, lz}}, {x, y, z}) do
-    SpatialHash.distance({lx, ly, lz}, {x, y, z}) >= @chase_repath_threshold
+  defp target_moved_enough?(%Blackboard{last_target_pos: {lx, ly, lz}}, {tx, ty, tz}, target_guid) do
+    threshold = chase_repath_distance(target_guid)
+    planar_distance({lx, ly, lz}, {tx, ty, tz}) > threshold
   end
 
-  defp target_moved_enough?(%Blackboard{}, {_x, _y, _z}) do
+  defp target_moved_enough?(%Blackboard{}, {_x, _y, _z}, _target_guid) do
     true
   end
+
+  defp planar_distance({x1, y1, _z1}, {x2, y2, _z2}) do
+    dx = x2 - x1
+    dy = y2 - y1
+    :math.sqrt(dx * dx + dy * dy)
+  end
+
+  defp chase_repath_distance(target_guid) do
+    combat_reach = target_combat_reach(target_guid)
+    bounding_radius = target_bounding_radius(target_guid)
+    max(combat_reach * 0.75 - bounding_radius, 0.0)
+  end
+
+  defp chase_stop_distance(target_guid) do
+    combat_reach = target_combat_reach(target_guid)
+    max(combat_reach * 0.5, 0.0)
+  end
+
+  defp target_combat_reach(target_guid) when is_integer(target_guid) do
+    case Metadata.query(target_guid, [:combat_reach]) do
+      %{combat_reach: combat_reach} when is_number(combat_reach) -> combat_reach
+      _ -> Unit.default_combat_reach()
+    end
+  end
+
+  defp target_combat_reach(_target_guid), do: Unit.default_combat_reach()
+
+  defp target_bounding_radius(target_guid) when is_integer(target_guid) do
+    case Metadata.query(target_guid, [:bounding_radius]) do
+      %{bounding_radius: bounding_radius} when is_number(bounding_radius) -> bounding_radius
+      _ -> Unit.default_bounding_radius()
+    end
+  end
+
+  defp target_bounding_radius(_target_guid), do: Unit.default_bounding_radius()
 
   defp wait_until_wander_ready(%Mob{} = state, %Blackboard{} = blackboard) do
     if Blackboard.ready_for?(blackboard, :next_wander_at) do
@@ -427,15 +477,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
 
   defp set_orientation(%Mob{movement_block: %MovementBlock{position: {x, y, z, _o}}} = state, o) do
     %{state | movement_block: %{state.movement_block | position: {x, y, z, o}}}
-  end
-
-  defp in_combat_distance?(%Mob{unit: %Unit{combat_reach: combat_reach}}, distance)
-       when is_number(distance) and is_number(combat_reach) do
-    distance <= max(combat_reach, 2.0)
-  end
-
-  defp in_combat_distance?(%Mob{}, distance) when is_number(distance) do
-    distance <= 2.0
   end
 
   defp idle_delay do

@@ -4,6 +4,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgCastSpell do
   import Bitwise, only: [&&&: 2]
 
   alias ThistleTea.DBC
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Spell, as: SpellBT
   alias ThistleTea.Game.Network.Message
 
   require Logger
@@ -30,8 +31,14 @@ defmodule ThistleTea.Game.Network.Message.CmsgCastSpell do
           nil
       end
 
-    spell = DBC.get_by(Spell, id: spell_id) |> DBC.preload(:spell_cast_time)
-    Logger.info("CMSG_CAST_SPELL: #{spell.name_en_gb} - #{spell_id}", target_name: unit_target)
+    spell =
+      DBC.get_by(Spell, id: spell_id)
+      |> DBC.preload(:spell_cast_time)
+
+    Logger.info(
+      "CMSG_CAST_SPELL: #{spell.name_en_gb} - #{spell_id}",
+      target_name: unit_target
+    )
 
     state = Message.CmsgCancelCast.cancel_spell(state)
 
@@ -49,24 +56,23 @@ defmodule ThistleTea.Game.Network.Message.CmsgCastSpell do
     }
     |> World.broadcast_packet(state.character)
 
-    state =
-      Map.put(state, :spell, %{
-        spell_id: spell_id,
-        target: unit_target,
-        spell_cast_targets: spell_cast_targets
-      })
+    cast_time_ms = spell.spell_cast_time.base || 0
 
-    if spell.spell_cast_time.base == 0 do
+    character =
+      SpellBT.start_cast(
+        state.character,
+        spell_id,
+        unit_target,
+        spell_cast_targets,
+        cast_time_ms
+      )
+
+    state = Map.put(state, :character, character)
+
+    if cast_time_ms == 0 do
       handle_spell_complete(state)
     else
-      cast_timer =
-        Process.send_after(
-          self(),
-          :spell_complete,
-          spell.spell_cast_time.base
-        )
-
-      Map.put(state, :spell, Map.put(state.spell, :cast_timer, cast_timer))
+      ensure_player_tick(state)
     end
   end
 
@@ -80,41 +86,26 @@ defmodule ThistleTea.Game.Network.Message.CmsgCastSpell do
     }
   end
 
-  def handle_spell_complete(state) do
-    s = state.spell
+  def handle_spell_complete(%{character: character} = state) do
+    character = SpellBT.complete_cast(character)
 
-    %Message.SmsgCastResult{
-      spell: s.spell_id,
-      result: 0,
-      reason: nil,
-      required_spell_focus: nil,
-      area: nil,
-      equipped_item_class: nil,
-      equipped_item_subclass_mask: nil,
-      equipped_item_inventory_type_mask: nil
-    }
-    |> Network.send_packet()
+    state
+    |> Map.put(:character, character)
+    |> Map.delete(:spell)
+  end
 
-    spell_go_flags = 0x100
+  def handle_spell_complete(state), do: state
 
-    %Message.SmsgSpellGo{
-      cast_item: state.guid,
-      caster: state.guid,
-      spell: s.spell_id,
-      flags: spell_go_flags,
-      hits: [s.target],
-      misses: [],
-      targets: s.spell_cast_targets,
-      ammo_display_id: nil,
-      ammo_inventory_type: nil
-    }
-    |> World.broadcast_packet(state.character)
+  defp ensure_player_tick(state) do
+    case Map.get(state, :player_tick_ref) do
+      nil ->
+        ref = Process.send_after(self(), :player_tick, 0)
+        Map.put(state, :player_tick_ref, ref)
 
-    if s.target != state.guid do
-      pid = :ets.lookup_element(:entities, s.target, 2)
-      GenServer.cast(pid, {:receive_spell, state.guid, s.spell_id})
+      ref ->
+        Process.cancel_timer(ref)
+        new_ref = Process.send_after(self(), :player_tick, 0)
+        Map.put(state, :player_tick_ref, new_ref)
     end
-
-    Map.delete(state, :spell)
   end
 end

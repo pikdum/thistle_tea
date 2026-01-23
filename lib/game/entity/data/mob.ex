@@ -21,6 +21,8 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
         _ -> nil
       end
 
+    model_info = creature_model_info(c)
+
     %__MODULE__{
       object: %Object{
         guid: c.guid + @creature_guid_offset,
@@ -38,6 +40,8 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
         npc_flags: ct.npc_flags,
         dynamic_flags: ct.dynamic_flags,
         misc_flags: ct.extra_flags,
+        bounding_radius: mob_bounding_radius(ct, model_info),
+        combat_reach: mob_combat_reach(ct, model_info),
         display_id: c.modelid,
         native_display_id: c.modelid
       },
@@ -82,4 +86,33 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
   defp level(%Mangos.Creature{creature_template: %Mangos.CreatureTemplate{min_level: min_level, max_level: max_level}}) do
     Enum.random(min_level..max_level)
   end
+
+  defp mob_bounding_radius(%Mangos.CreatureTemplate{} = template, model_info) do
+    normalize_model_value(model_info, :bounding_radius, Unit.default_bounding_radius()) * scale_factor(template)
+  end
+
+  defp mob_combat_reach(%Mangos.CreatureTemplate{} = template, model_info) do
+    normalize_model_value(model_info, :combat_reach, Unit.default_combat_reach()) * scale_factor(template)
+  end
+
+  defp scale_factor(%Mangos.CreatureTemplate{scale: scale}) when is_number(scale) and scale > 0 do
+    scale
+  end
+
+  defp scale_factor(_template), do: 1.0
+
+  defp creature_model_info(%Mangos.Creature{modelid: modelid}) when is_integer(modelid) and modelid > 0 do
+    Mangos.Repo.get(Mangos.CreatureModelInfo, modelid)
+  end
+
+  defp creature_model_info(_creature), do: nil
+
+  defp normalize_model_value(%Mangos.CreatureModelInfo{} = model_info, key, default) do
+    case Map.get(model_info, key) do
+      value when is_number(value) and value > 0 -> value
+      _ -> default
+    end
+  end
+
+  defp normalize_model_value(_model_info, _key, default), do: default
 end

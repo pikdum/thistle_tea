@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.Network.Message.CmsgCancelCast do
   use ThistleTea.Game.Network.ClientMessage, :CMSG_CANCEL_CAST
 
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Spell, as: SpellBT
   alias ThistleTea.Game.Network.Message
 
   require Logger
@@ -20,16 +21,18 @@ defmodule ThistleTea.Game.Network.Message.CmsgCancelCast do
     %__MODULE__{}
   end
 
-  def cancel_spell(state, reason \\ @spell_failed_interrupted) do
-    case Map.get(state, :spell) do
+  def cancel_spell(state, reason \\ @spell_failed_interrupted)
+
+  def cancel_spell(%{character: character} = state, reason) do
+    case Map.get(character.internal, :casting) do
       nil ->
         state
 
-      spell ->
-        Process.cancel_timer(spell.cast_timer)
+      casting ->
+        spell_id = Map.get(casting, :spell_id, 0)
 
         Network.send_packet(%Message.SmsgCastResult{
-          spell: spell.spell_id,
+          spell: spell_id,
           result: 2,
           reason: reason,
           required_spell_focus: nil,
@@ -41,17 +44,23 @@ defmodule ThistleTea.Game.Network.Message.CmsgCancelCast do
 
         Network.send_packet(%Message.SmsgSpellFailure{
           guid: state.guid,
-          spell: spell.spell_id,
+          spell: spell_id,
           result: reason
         })
 
         %Message.SmsgSpellFailedOther{
           caster: state.guid,
-          id: spell.spell_id
+          id: spell_id
         }
-        |> World.broadcast_packet(state.character, exclude_self?: true)
+        |> World.broadcast_packet(character, exclude_self?: true)
 
-        Map.delete(state, :spell)
+        character = SpellBT.clear_cast(character)
+
+        state
+        |> Map.put(:character, character)
+        |> Map.delete(:spell)
     end
   end
+
+  def cancel_spell(state, _reason), do: state
 end

@@ -5,13 +5,20 @@ defmodule ThistleTea.Game.Network.Server do
   import Bitwise, only: [|||: 2]
 
   alias ThistleTea.Game.Entity
+  alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
+  alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Logic.AI.BT
+  alias ThistleTea.Game.Entity.Logic.Combat
+  alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Connection
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Opcodes
   alias ThistleTea.Game.Network.Packet
   alias ThistleTea.Game.Network.UpdateObject
+  alias ThistleTea.Game.World
+  alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Pathfinding
   alias ThistleTea.Game.World.SpatialHash
   alias ThousandIsland.Socket
@@ -21,6 +28,7 @@ defmodule ThistleTea.Game.Network.Server do
   @update_flag_high_guid 0x08
   @update_flag_living 0x20
   @update_flag_has_position 0x40
+  @player_tick_ms 100
 
   @impl ThousandIsland.Handler
   def handle_data(data, _socket, %{conn: %Connection{} = conn} = state) do
@@ -106,6 +114,16 @@ defmodule ThistleTea.Game.Network.Server do
     {:noreply, {socket, state}, socket.read_timeout}
   end
 
+  def handle_cast({:receive_attack, attack}, {socket, %{character: character} = state}) do
+    damage = Combat.attack_damage(attack)
+    character = Core.take_damage(character, damage)
+
+    Combat.attacker_state_update(Map.get(attack, :caster, 0), state.guid, damage, attack)
+    |> World.broadcast_packet(character)
+
+    {:noreply, {socket, %{state | character: character}}, {:continue, :maybe_broadcast_update}}
+  end
+
   @impl GenServer
   def handle_cast({:destroy_object, guid}, {socket, state}) do
     Network.send_packet(%Message.SmsgDestroyObject{guid: guid})
@@ -177,6 +195,16 @@ defmodule ThistleTea.Game.Network.Server do
   def handle_info(:attack_swing, {socket, state}) do
     state = Message.CmsgAttackswing.handle_attack_swing(state)
     {:noreply, {socket, state}, socket.read_timeout}
+  end
+
+  @impl GenServer
+  def handle_info(:player_tick, {socket, %{character: character} = state}) do
+    {status, character} = tick_player(character)
+    state = Map.put(state, :character, character)
+    state = schedule_player_tick(state, character, status)
+    {:noreply, {socket, state}, socket.read_timeout}
+  rescue
+    _ -> {:noreply, {socket, state}, socket.read_timeout}
   end
 
   @impl GenServer
@@ -259,20 +287,71 @@ defmodule ThistleTea.Game.Network.Server do
   end
 
   @impl GenServer
+  def handle_continue(
+        :maybe_broadcast_update,
+        {socket, %{character: %ThistleTea.Character{internal: %Internal{broadcast_update?: true}} = character} = state}
+      ) do
+    Core.update_packet(character, :values)
+    |> World.broadcast_packet(character)
+
+    Metadata.update(state.guid, %{alive?: not Core.dead?(character)})
+    internal = %{character.internal | broadcast_update?: false}
+    character = %{character | internal: internal}
+
+    {:noreply, {socket, %{state | character: character}}, socket.read_timeout}
+  end
+
+  def handle_continue(:maybe_broadcast_update, {socket, state}) do
+    {:noreply, {socket, state}, socket.read_timeout}
+  end
+
+  @impl GenServer
   def handle_call(:get_entity, _from, state) do
     {:reply, :player, state}
   end
 
-  @impl GenServer
-  def handle_call(:get_name, _from, state) do
-    {_socket, s} = state
-    {:reply, s.character.internal.name, state}
+  defp tick_player(%{internal: %Internal{behavior_tree: behavior_tree}} = character) when not is_nil(behavior_tree) do
+    BT.tick(behavior_tree, character)
   end
+
+  defp tick_player(character), do: {:running, character}
+
+  defp schedule_player_tick(state, character, status) do
+    if player_needs_tick?(character) do
+      delay_ms = player_tick_delay(status)
+      ref = Process.send_after(self(), :player_tick, delay_ms)
+      Map.put(state, :player_tick_ref, ref)
+    else
+      Map.put(state, :player_tick_ref, nil)
+    end
+  end
+
+  defp player_tick_delay({:running, delay_ms}) when is_integer(delay_ms) and delay_ms > 0 do
+    delay_ms
+  end
+
+  defp player_tick_delay(_status), do: @player_tick_ms
+
+  defp player_needs_tick?(%{internal: %Internal{casting: casting}}) when is_map(casting) do
+    true
+  end
+
+  defp player_needs_tick?(%{internal: %Internal{in_combat: true}, unit: %Unit{target: target}})
+       when is_integer(target) and target > 0 do
+    true
+  end
+
+  defp player_needs_tick?(_character), do: false
 
   @impl ThousandIsland.Handler
   def handle_connection(socket, _) do
     conn = %Connection{}
-    Socket.send(socket, <<6::big-size(16), @smsg_auth_challenge::little-size(16)>> <> conn.seed)
+
+    Socket.send(
+      socket,
+      <<6::big-size(16), @smsg_auth_challenge::little-size(16)>> <> conn.seed
+    )
+
     {:continue, %{conn: conn, account: nil}}
   end
 

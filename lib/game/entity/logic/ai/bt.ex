@@ -36,6 +36,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT do
     put_blackboard(state, Blackboard.new())
   end
 
+  def reset_attack_started(state) do
+    update_blackboard(state, &Blackboard.clear_attack_started/1)
+  end
+
   defp run(%__MODULE__{type: :condition, fun: fun}, state, blackboard) do
     if fun.(state, blackboard), do: {:success, state, blackboard}, else: {:failure, state, blackboard}
   end
@@ -73,6 +77,13 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT do
   defp blackboard(_state) do
     Blackboard.new()
   end
+
+  defp update_blackboard(state, fun) when is_function(fun, 1) do
+    blackboard = blackboard(state)
+    put_blackboard(state, fun.(blackboard))
+  end
+
+  defp update_blackboard(state, _fun), do: state
 
   defp put_behavior_tree(%{internal: %Internal{} = internal} = state, behavior_tree) do
     %{state | internal: %{internal | behavior_tree: behavior_tree}}

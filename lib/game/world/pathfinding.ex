@@ -14,7 +14,11 @@ defmodule ThistleTea.Game.World.Pathfinding do
   def find_path(map_id, {start_x, start_y, start_z}, {stop_x, stop_y, stop_z}) do
     load_adt_at(map_id, {start_x, start_y})
     load_adt_at(map_id, {stop_x, stop_y})
-    Namigator.find_path(map_id, start_x, start_y, start_z, stop_x, stop_y, stop_z)
+
+    case Namigator.find_path(map_id, start_x, start_y, start_z, stop_x, stop_y, stop_z) do
+      [_first | [_second | _rest] = path] -> path
+      path -> path
+    end
   end
 
   def find_point_between_points(map_id, {start_x, start_y, start_z}, {stop_x, stop_y, stop_z}, distance) do

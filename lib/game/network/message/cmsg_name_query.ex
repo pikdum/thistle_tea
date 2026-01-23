@@ -2,6 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgNameQuery do
   use ThistleTea.Game.Network.ClientMessage, :CMSG_NAME_QUERY
 
   alias ThistleTea.Game.Network.Message
+  alias ThistleTea.Game.World.Metadata
 
   require Logger
 
@@ -9,7 +10,8 @@ defmodule ThistleTea.Game.Network.Message.CmsgNameQuery do
 
   @impl ClientMessage
   def handle(%__MODULE__{guid: guid}, state) do
-    [{^guid, character_name, realm_name, race, gender, class}] = :ets.lookup(:guid_name, guid)
+    %{name: character_name, realm: realm_name, race: race, gender: gender, class: class} =
+      Metadata.query(guid, [:name, :realm, :race, :gender, :class])
 
     Logger.info("CMSG_NAME_QUERY", target_name: character_name)
 

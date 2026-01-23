@@ -2,6 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgTextEmote do
   use ThistleTea.Game.Network.ClientMessage, :CMSG_TEXT_EMOTE
 
   alias ThistleTea.Game.Network.Message
+  alias ThistleTea.Game.World.Metadata
 
   defstruct [:text_emote, :emote, :target]
 
@@ -92,10 +93,14 @@ defmodule ThistleTea.Game.Network.Message.CmsgTextEmote do
     ""
   end
 
-  defp get_target_name(target_guid) do
-    pid = :ets.lookup_element(:entities, target_guid, 2)
-    GenServer.call(pid, :get_name)
+  defp get_target_name(target_guid) when is_integer(target_guid) do
+    case Metadata.query(target_guid, [:name]) do
+      %{name: name} -> name
+      _ -> ""
+    end
   end
+
+  defp get_target_name(_target_guid), do: ""
 
   @impl ClientMessage
   def handle(%__MODULE__{text_emote: text_emote, emote: emote, target: target}, state) do

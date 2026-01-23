@@ -7,6 +7,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.DB.Mangos.Repo
   alias ThistleTea.Game.Network.Server, as: GameServer
   alias ThistleTea.Game.World.EntitySupervisor
+  alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.System.CellActivator
   alias ThistleTea.Game.World.System.GameEvent, as: GameEventSystem
@@ -67,7 +68,7 @@ defmodule ThistleTea.Application do
     :ok = ThistleTeaWeb.Homography.init()
 
     :ets.new(:session, [:named_table, :public])
-    :ets.new(:guid_name, [:named_table, :public])
+    Metadata.init()
     :ets.new(:spline_counters, [:named_table, :public])
     :ets.insert(:spline_counters, {:spline_id, 0})
     setup_database()

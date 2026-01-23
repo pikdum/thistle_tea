@@ -2,6 +2,7 @@ defmodule ThistleTea.Game.World.Loader.Mob do
   alias ThistleTea.DB.Mangos
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.World
+  alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.System.GameEvent
 
   def load(cell) do
@@ -22,8 +23,16 @@ defmodule ThistleTea.Game.World.Loader.Mob do
   end
 
   defp start(%Mangos.Creature{} = creature) do
-    creature
-    |> Mob.build()
-    |> World.start_entity()
+    mob = Mob.build(creature)
+
+    Metadata.put(mob.object.guid, %{
+      name: mob.internal.name,
+      bounding_radius: mob.unit.bounding_radius,
+      combat_reach: mob.unit.combat_reach,
+      attacker_count: 0,
+      alive?: mob.unit.health > 0
+    })
+
+    World.start_entity(mob)
   end
 end

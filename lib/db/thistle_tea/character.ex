@@ -13,6 +13,7 @@ defmodule ThistleTea.Character do
     autoincrement: true
 
   alias ThistleTea.DB.Mangos
+  alias ThistleTea.DB.Mangos.ItemTemplate
   alias ThistleTea.DBC
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
@@ -60,6 +61,8 @@ defmodule ThistleTea.Character do
         power_type: get_power(params.class),
         # TODO: this is wrong
         base_attack_time: 2000,
+        bounding_radius: Unit.default_bounding_radius(),
+        combat_reach: Unit.default_combat_reach(),
         display_id: unit_display_id,
         native_display_id: unit_display_id,
         min_damage: 10,
@@ -152,7 +155,38 @@ defmodule ThistleTea.Character do
         tabard: equipment.tabard.entry + @item_guid_offset
     }
 
-    %{character | player: player}
+    character = %{character | player: player}
+    sync_mainhand_stats(character, equipment.mainhand)
+  end
+
+  def sync_mainhand_stats(%__MODULE__{player: %Player{visible_item_16_0: entry}} = character)
+      when is_integer(entry) and entry > 0 do
+    case Mangos.Repo.get(ItemTemplate, entry) do
+      %ItemTemplate{} = weapon -> sync_mainhand_stats(character, weapon)
+      _ -> character
+    end
+  end
+
+  def sync_mainhand_stats(%__MODULE__{} = character), do: character
+
+  def sync_mainhand_stats(%__MODULE__{unit: %Unit{} = unit} = character, %ItemTemplate{} = weapon) do
+    unit =
+      unit
+      |> maybe_update_unit_value(:base_attack_time, weapon.delay)
+      |> maybe_update_unit_value(:min_damage, weapon.dmg_min1)
+      |> maybe_update_unit_value(:max_damage, weapon.dmg_max1)
+
+    %{character | unit: unit}
+  end
+
+  def sync_mainhand_stats(%__MODULE__{} = character, _weapon), do: character
+
+  defp maybe_update_unit_value(%Unit{} = unit, key, value) do
+    case value do
+      value when is_integer(value) and value > 0 -> Map.put(unit, key, value)
+      value when is_float(value) and value > 0 -> Map.put(unit, key, value)
+      _ -> unit
+    end
   end
 
   def create(character) do
