@@ -120,10 +120,7 @@ defmodule ThistleTea.Game.Network.Server do
     Combat.attacker_state_update(Map.get(attack, :caster, 0), state.guid, damage, attack)
     |> World.broadcast_packet(character)
 
-    Core.update_packet(character, :values)
-    |> World.broadcast_packet(character)
-
-    {:noreply, {socket, %{state | character: character}}, socket.read_timeout}
+    {:noreply, {socket, %{state | character: character}}, {:continue, :maybe_broadcast_update}}
   end
 
   @impl GenServer
@@ -285,6 +282,24 @@ defmodule ThistleTea.Game.Network.Server do
 
   @impl GenServer
   def handle_info(:spawn_objects, {socket, state}) do
+    {:noreply, {socket, state}, socket.read_timeout}
+  end
+
+  @impl GenServer
+  def handle_continue(
+        :maybe_broadcast_update,
+        {socket, %{character: %ThistleTea.Character{internal: %Internal{broadcast_update?: true}} = character} = state}
+      ) do
+    Core.update_packet(character, :values)
+    |> World.broadcast_packet(character)
+
+    internal = %{character.internal | broadcast_update?: false}
+    character = %{character | internal: internal}
+
+    {:noreply, {socket, %{state | character: character}}, socket.read_timeout}
+  end
+
+  def handle_continue(:maybe_broadcast_update, {socket, state}) do
     {:noreply, {socket, state}, socket.read_timeout}
   end
 
