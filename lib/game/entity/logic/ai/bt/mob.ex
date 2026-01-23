@@ -224,7 +224,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   end
 
   defp maybe_repath_chase(%Mob{} = state, %Blackboard{} = blackboard, target_pos, target_guid) do
-    target_moved = target_moved_enough?(state, target_pos, target_guid)
+    target_moved = target_moved_enough?(blackboard, target_pos, target_guid)
     should_repath = target_moved or not Movement.is_moving?(state)
 
     if should_repath do
@@ -295,28 +295,14 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
 
   defp attack_angle_offset(_attacker_count, _size_factor), do: 0.0
 
-  defp target_moved_enough?(
-         %Mob{movement_block: %MovementBlock{position: {mx, my, mz, _o}, spline_nodes: nodes}},
-         {tx, ty, tz},
-         target_guid
-       ) do
-    destination = current_destination(nodes, {mx, my, mz})
+  defp target_moved_enough?(%Blackboard{last_target_pos: {lx, ly, lz}}, {tx, ty, tz}, target_guid) do
     threshold = chase_repath_distance(target_guid)
-    planar_distance(destination, {tx, ty, tz}) > threshold
+    planar_distance({lx, ly, lz}, {tx, ty, tz}) > threshold
   end
 
-  defp target_moved_enough?(%Mob{}, {_x, _y, _z}, _target_guid) do
+  defp target_moved_enough?(%Blackboard{}, {_x, _y, _z}, _target_guid) do
     true
   end
-
-  defp current_destination(nodes, fallback) when is_list(nodes) do
-    case List.last(nodes) do
-      {x, y, z} -> {x, y, z}
-      _ -> fallback
-    end
-  end
-
-  defp current_destination(_nodes, fallback), do: fallback
 
   defp planar_distance({x1, y1, _z1}, {x2, y2, _z2}) do
     dx = x2 - x1
