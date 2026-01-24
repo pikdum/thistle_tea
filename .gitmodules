@@ -1,3 +1,6 @@
 [submodule "refs/wow_messages"]
 	path = refs/wow_messages
 	url = https://github.com/gtker/wow_messages
+[submodule "refs/mangos"]
+	path = refs/mangos
+	url = https://github.com/mangoszero/server.git
