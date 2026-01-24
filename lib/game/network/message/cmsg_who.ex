@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.Network.Message.CmsgWho do
   use ThistleTea.Game.Network.ClientMessage, :CMSG_WHO
 
+  alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Message.SmsgWho.WhoPlayer
 
@@ -10,7 +11,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgWho do
   def handle(%__MODULE__{}, state) do
     characters =
       ThistleTea.Character.get_all()
-      |> Enum.filter(fn c -> :ets.member(:entities, c.id) end)
+      |> Enum.filter(fn c -> Entity.online?(c.id) end)
 
     count = Enum.count(characters)
 

@@ -1,5 +1,6 @@
 defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
   alias ThistleTea.Character
+  alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.AI.BT
@@ -129,13 +130,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
   defp send_melee_attack(state, target) when is_integer(target) do
     attack = melee_attack_payload(state)
 
-    case :ets.lookup(:entities, target) do
-      [{^target, pid, _map, _x, _y, _z}] ->
-        GenServer.cast(pid, {:receive_attack, attack})
-
-      [] ->
-        :ok
-    end
+    Entity.receive_attack(target, attack)
   end
 
   defp melee_attack_payload(%{object: %{guid: guid}} = state) do

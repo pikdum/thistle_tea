@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.Network.Message.CmsgMessagechat do
   use ThistleTea.Game.Network.ClientMessage, :CMSG_MESSAGECHAT
 
+  alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.World.Metadata
 
@@ -66,7 +67,6 @@ defmodule ThistleTea.Game.Network.Message.CmsgMessagechat do
 
   def handle_chat(state, _, _, ".help" <> _, _) do
     commands = [
-      ".behavior - show mob behavior",
       ".go xyz <x> <y> <z> [map] - teleport",
       ".guid - show target guid",
       ".help - show help",
@@ -74,8 +74,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgMessagechat do
       ".move - move target to you",
       ".pid - show target pid",
       ".pos - show current position",
-      ".speed <rate> - modify player speed from 0.1 to 10",
-      ".interrupt_movement - interrupt mob movement"
+      ".speed <rate> - modify player speed from 0.1 to 10"
     ]
 
     system_message(state, "Commands:")
@@ -112,54 +111,20 @@ defmodule ThistleTea.Game.Network.Message.CmsgMessagechat do
     |> system_message("#{x} #{y} #{z} #{map}")
   end
 
-  def handle_chat(state, _, _, ".interrupt_movement" <> _, _) do
-    # TODO: interrupting movement should probably fire movement_finished?
-    # otherwise behavior never triggers movement again
-    # or at least reset state
-    case :ets.lookup_element(:entities, state.target, 2, nil) do
-      pid when not is_nil(pid) ->
-        GenServer.cast(pid, :interrupt_movement)
-
-        state
-        |> system_message("Interrupted movement.")
-
-      nil ->
-        state
-        |> system_message("No mob found to interrupt.")
-    end
-  end
-
   def handle_chat(state, _, _, ".guid" <> _, _) do
     state
     |> system_message("Target GUID: #{state.target}")
   end
 
   def handle_chat(state, _, _, ".pid" <> _, _) do
-    case :ets.lookup_element(:entities, state.target, 2, nil) do
-      pid when not is_nil(pid) ->
+    case Entity.pid(state.target) do
+      pid when is_pid(pid) ->
         state
         |> system_message("Target PID: #{inspect(pid)}")
 
-      nil ->
+      _ ->
         state
         |> system_message("No PID found.")
-    end
-  end
-
-  def handle_chat(state, _, _, ".behavior" <> _, _) do
-    with pid when not is_nil(pid) <- :ets.lookup_element(:entities, state.target, 2, nil),
-         :mob <- Guid.entity_type(state.target),
-         {:ok, behavior_state} <- GenServer.call(pid, :get_behavior) do
-      behavior_state
-      |> inspect(pretty: true)
-      |> String.split("\n")
-      |> Enum.each(fn line ->
-        system_message(state, line)
-      end)
-
-      state
-    else
-      _ -> state |> system_message("No behavior found.")
     end
   end
 
@@ -173,14 +138,13 @@ defmodule ThistleTea.Game.Network.Message.CmsgMessagechat do
 
   def handle_chat(state, _, _, ".move" <> _, _) do
     target = Map.get(state, :target)
-    pid = :ets.lookup_element(:entities, target, 2, nil)
 
     case state.character.movement_block.position do
       {x, y, z, _o} ->
-        GenServer.cast(pid, {:move_to, x, y, z})
+        Entity.move_to(target, {x, y, z})
         state
 
-      nil ->
+      _ ->
         state
     end
   end
@@ -211,9 +175,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgMessagechat do
   def handle_chat(state, @chat_type_whisper, language, message, target_name) do
     case Metadata.find_guid_by(:name, target_name) do
       guid when is_integer(guid) ->
-        pid = :ets.lookup_element(:entities, guid, 2, nil)
-
-        %Message.SmsgMessagechat{
+        message = %Message.SmsgMessagechat{
           chat_type: @chat_type_whisper,
           language: language,
           sender_guid: state.guid,
@@ -222,7 +184,15 @@ defmodule ThistleTea.Game.Network.Message.CmsgMessagechat do
           player_rank: 0,
           tag: 0
         }
-        |> Network.send_packet(pid)
+
+        case Network.send_packet(message, guid) do
+          :ok ->
+            :ok
+
+          _ ->
+            %Message.SmsgChatPlayerNotFound{name: target_name}
+            |> Network.send_packet()
+        end
 
       _ ->
         %Message.SmsgChatPlayerNotFound{name: target_name}
@@ -268,10 +238,10 @@ defmodule ThistleTea.Game.Network.Message.CmsgMessagechat do
 
     all_players =
       :ets.tab2list(:players)
-      |> Enum.map(fn {_, guid} -> :ets.lookup_element(:entities, guid, 2) end)
+      |> Enum.map(fn {_, guid} -> guid end)
 
-    for pid <- all_players do
-      Network.send_packet(message, pid)
+    for guid <- all_players do
+      Network.send_packet(message, guid)
     end
 
     state
@@ -280,11 +250,11 @@ defmodule ThistleTea.Game.Network.Message.CmsgMessagechat do
   defp handle_modify_speed(state, rate) do
     case Float.parse(rate) do
       {rate, _} when rate >= @speed_min and rate <= @speed_max ->
-        {pid, guid} = resolve_speed_target(state)
+        {target, guid} = resolve_speed_target(state)
         speed = rate * @speed_base
 
         %Message.SmsgForceRunSpeedChange{guid: guid, speed: speed}
-        |> Network.send_packet(pid)
+        |> Network.send_packet(target)
 
         state
         |> system_message("Speed set to #{rate}")
@@ -298,22 +268,18 @@ defmodule ThistleTea.Game.Network.Message.CmsgMessagechat do
   defp resolve_speed_target(state) do
     target_guid = Map.get(state, :target)
 
-    pid =
-      if is_integer(target_guid) do
-        :ets.lookup_element(:entities, target_guid, 2, nil)
-      end
-
     cond do
-      is_nil(pid) ->
+      not is_integer(target_guid) ->
         {self(), state.guid}
 
-      pid == self() ->
+      target_guid == state.guid ->
         {self(), state.guid}
 
       true ->
-        case Guid.entity_type(target_guid) do
-          :player -> {pid, target_guid}
-          _ -> {self(), state.guid}
+        if Guid.entity_type(target_guid) == :player and Entity.online?(target_guid) do
+          {target_guid, target_guid}
+        else
+          {self(), state.guid}
         end
     end
   end

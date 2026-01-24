@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.Entity.Server.Mob do
   use GenServer
 
+  alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
@@ -25,6 +26,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   def init(%Mob{} = state) do
     GameEvent.subscribe(state)
     Process.flag(:trap_exit, true)
+    Entity.register(state.object.guid)
     state = BT.init(state, MobBT.tree())
     Core.set_position(state)
 

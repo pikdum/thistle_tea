@@ -5,6 +5,7 @@ defmodule ThistleTea.Application do
   use Application
 
   alias ThistleTea.DB.Mangos.Repo
+  alias ThistleTea.Game.Entity.Registry, as: EntityRegistry
   alias ThistleTea.Game.Network.Server, as: GameServer
   alias ThistleTea.Game.World.EntitySupervisor
   alias ThistleTea.Game.World.Metadata
@@ -51,6 +52,7 @@ defmodule ThistleTea.Application do
         {Phoenix.PubSub, name: ThistleTea.PubSub},
         ThistleTea.Telemetry,
         GameEventSystem,
+        EntityRegistry,
         {Registry, keys: :duplicate, name: ThistleTea.ChatChannel},
         ThistleTea.DBC,
         Repo,

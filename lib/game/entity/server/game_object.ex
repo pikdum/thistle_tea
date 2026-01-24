@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.Entity.Server.GameObject do
   use GenServer
 
+  alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.GameObject
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Network
@@ -15,6 +16,7 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
   def init(%GameObject{} = state) do
     GameEvent.subscribe(state)
     Process.flag(:trap_exit, true)
+    Entity.register(state.object.guid)
     Core.set_position(state)
     {:ok, state}
   end

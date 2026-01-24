@@ -4,6 +4,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgPlayerLogin do
   import Bitwise, only: [<<<: 2, |||: 2]
 
   alias ThistleTea.DBC
+  alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Player, as: PlayerBT
@@ -47,6 +48,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgPlayerLogin do
     })
 
     Logger.metadata(character_name: c.internal.name)
+    Entity.register(character_guid)
 
     {x, y, z, o} = c.movement_block.position
 

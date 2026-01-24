@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
+  alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
@@ -131,13 +132,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
   defp apply_spell_hit(%{object: %{guid: guid}} = character, %{target: target, spell_id: spell_id})
        when is_integer(guid) and is_integer(spell_id) do
     if is_integer(target) and target != guid do
-      case :ets.lookup(:entities, target) do
-        [{^target, pid, _map, _x, _y, _z}] ->
-          GenServer.cast(pid, {:receive_spell, guid, spell_id})
-
-        [] ->
-          :ok
-      end
+      Entity.receive_spell(target, guid, spell_id)
     end
 
     character

@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.Network.Message.CmsgLogoutRequest do
   use ThistleTea.Game.Network.ClientMessage, :CMSG_LOGOUT_REQUEST
 
+  alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World.SpatialHash
 
@@ -32,6 +33,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgLogoutRequest do
     end
 
     if Map.get(state, :guid) do
+      Entity.unregister(state.guid)
       # remove from map
       SpatialHash.remove(:players, state.guid)
 
