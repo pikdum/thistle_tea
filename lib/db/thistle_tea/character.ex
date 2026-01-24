@@ -96,7 +96,7 @@ defmodule ThistleTea.Character do
         position: {info.position_x, info.position_y, info.position_z, info.orientation},
         fall_time: 0.0,
         walk_speed: 1.0,
-        run_speed: 20.0,
+        run_speed: 7.0,
         run_back_speed: 4.5,
         swim_speed: 4.722222,
         swim_back_speed: 2.5,

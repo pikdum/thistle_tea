@@ -16,6 +16,9 @@ defmodule ThistleTea.Game.Network.Message.CmsgMessagechat do
   @say_range 25
   @yell_range 300
   @emote_range 25
+  @speed_base 7.0
+  @speed_min 0.1
+  @speed_max 10.0
 
   def system_message(state, message) do
     Network.send_packet(%Message.SmsgMessagechat{
@@ -66,9 +69,11 @@ defmodule ThistleTea.Game.Network.Message.CmsgMessagechat do
       ".go xyz <x> <y> <z> [map] - teleport",
       ".guid - show target guid",
       ".help - show help",
+      ".modify speed <rate> - modify player speed from 0.1 to 10",
       ".move - move target to you",
       ".pid - show target pid",
       ".pos - show current position",
+      ".speed <rate> - modify player speed from 0.1 to 10",
       ".interrupt_movement - interrupt mob movement"
     ]
 
@@ -79,6 +84,23 @@ defmodule ThistleTea.Game.Network.Message.CmsgMessagechat do
     |> Enum.reduce(state, fn command, acc ->
       system_message(acc, command)
     end)
+  end
+
+  def handle_chat(state, a, b, ".speed" <> rest, c) do
+    handle_chat(state, a, b, ".modify speed" <> rest, c)
+  end
+
+  def handle_chat(state, _, _, ".modify" <> params, _) do
+    case params |> String.split(" ", trim: true) do
+      ["speed", rate] ->
+        handle_modify_speed(state, rate)
+
+      _ ->
+        Logger.error("Unhandled .modify call: #{params}")
+
+        state
+        |> system_message("Invalid command. Use: .modify <type> <n>")
+    end
   end
 
   def handle_chat(state, _, _, ".pos" <> _, _) do
@@ -252,6 +274,47 @@ defmodule ThistleTea.Game.Network.Message.CmsgMessagechat do
     end
 
     state
+  end
+
+  defp handle_modify_speed(state, rate) do
+    case Float.parse(rate) do
+      {rate, _} when rate >= @speed_min and rate <= @speed_max ->
+        {pid, guid} = resolve_speed_target(state)
+        speed = rate * @speed_base
+
+        %Message.SmsgForceRunSpeedChange{guid: guid, speed: speed}
+        |> Network.send_packet(pid)
+
+        state
+        |> system_message("Speed set to #{rate}")
+
+      _ ->
+        state
+        |> system_message("Invalid speed. Use: .modify speed <rate 0.1 - 10.0>")
+    end
+  end
+
+  defp resolve_speed_target(state) do
+    target_guid = Map.get(state, :target)
+
+    pid =
+      if is_integer(target_guid) do
+        :ets.lookup_element(:entities, target_guid, 2, nil)
+      end
+
+    cond do
+      is_nil(pid) ->
+        {self(), state.guid}
+
+      pid == self() ->
+        {self(), state.guid}
+
+      true ->
+        case GenServer.call(pid, :get_entity) do
+          :player -> {pid, target_guid}
+          _ -> {self(), state.guid}
+        end
+    end
   end
 
   @impl ClientMessage
