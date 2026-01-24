@@ -63,7 +63,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgPlayerLogin do
     {x1, y1, z1, _o1} = c.movement_block.position
 
     # join
-    SpatialHash.update(:players, character_guid, self(), c.internal.map, x1, y1, z1)
+    SpatialHash.update(:players, character_guid, c.internal.map, x1, y1, z1)
 
     {:ok, spawn_timer} = :timer.send_interval(1000, :spawn_objects)
 

@@ -56,7 +56,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgAttackswing do
   defp valid_attack_target?(%{guid: guid, character: %ThistleTea.Character{internal: %{map: map}}}, target_guid)
        when is_integer(target_guid) and target_guid > 0 do
     target_guid != guid and
-      match?({^target_guid, _pid, ^map, _x, _y, _z}, SpatialHash.get_entity(target_guid)) and
+      match?({^target_guid, ^map, _x, _y, _z}, SpatialHash.get_entity(target_guid)) and
       unit_target?(target_guid)
   end
 

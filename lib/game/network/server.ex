@@ -154,7 +154,6 @@ defmodule ThistleTea.Game.Network.Server do
     SpatialHash.update(
       :players,
       state.guid,
-      self(),
       character.internal.map,
       x,
       y,
@@ -218,15 +217,15 @@ defmodule ThistleTea.Game.Network.Server do
 
     new_players =
       SpatialHash.query(:players, c.internal.map, x, y, z, 250)
-      |> MapSet.new(fn {guid, pid, _distance} -> {guid, pid} end)
+      |> MapSet.new(fn {guid, _distance} -> guid end)
 
     new_mobs =
       SpatialHash.query(:mobs, c.internal.map, x, y, z, 250)
-      |> MapSet.new(fn {guid, pid, _distance} -> {guid, pid} end)
+      |> MapSet.new(fn {guid, _distance} -> guid end)
 
     new_game_objects =
       SpatialHash.query(:game_objects, c.internal.map, x, y, z, 250)
-      |> MapSet.new(fn {guid, pid, _distance} -> {guid, pid} end)
+      |> MapSet.new(fn {guid, _distance} -> guid end)
 
     players_to_remove = MapSet.difference(old_players, new_players)
     mobs_to_remove = MapSet.difference(old_mobs, new_mobs)
@@ -237,45 +236,45 @@ defmodule ThistleTea.Game.Network.Server do
     game_objects_to_add = MapSet.difference(new_game_objects, old_game_objects)
 
     # TODO: update a reverse mapping, so mobs know nearby players?
-    for {guid, pid} <- players_to_remove do
-      if pid != self() do
+    for guid <- players_to_remove do
+      if guid != state.guid do
         Network.send_packet(%Message.SmsgDestroyObject{guid: guid})
       end
     end
 
-    for {guid, _pid} <- mobs_to_remove do
+    for guid <- mobs_to_remove do
       Network.send_packet(%Message.SmsgDestroyObject{guid: guid})
     end
 
-    for {guid, _pid} <- game_objects_to_remove do
+    for guid <- game_objects_to_remove do
       Network.send_packet(%Message.SmsgDestroyObject{guid: guid})
     end
 
-    for {_guid, pid} <- players_to_add do
-      if pid != self() do
-        Entity.request_update_from(pid)
+    for guid <- players_to_add do
+      if guid != state.guid do
+        Entity.request_update_from(guid, state.guid)
       end
     end
 
-    for {_guid, pid} <- mobs_to_add do
-      Entity.request_update_from(pid)
+    for guid <- mobs_to_add do
+      Entity.request_update_from(guid, state.guid)
     end
 
-    for {_guid, pid} <- game_objects_to_add do
-      Entity.request_update_from(pid)
+    for guid <- game_objects_to_add do
+      Entity.request_update_from(guid, state.guid)
     end
 
     # TODO: redundant, refactor out?
-    player_pids = new_players |> Enum.map(fn {_guid, pid} -> pid end)
-    mob_pids = new_mobs |> Enum.map(fn {_guid, pid} -> pid end)
+    player_guids = MapSet.to_list(new_players)
+    mob_guids = MapSet.to_list(new_mobs)
 
     state =
       Map.merge(state, %{
         spawned_players: new_players,
         spawned_mobs: new_mobs,
         spawned_game_objects: new_game_objects,
-        player_pids: player_pids,
-        mob_pids: mob_pids
+        player_guids: player_guids,
+        mob_guids: mob_guids
       })
 
     {:noreply, {socket, state}, socket.read_timeout}

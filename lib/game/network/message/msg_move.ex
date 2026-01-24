@@ -35,7 +35,7 @@ defmodule ThistleTea.Game.Network.Message.MsgMove do
 
       new_state =
         if x0 != x1 or y0 != y1 or z0 != z1 do
-          SpatialHash.update(:players, state.guid, self(), map, x1, y1, z1)
+          SpatialHash.update(:players, state.guid, map, x1, y1, z1)
 
           Map.put(state, :character, character)
           |> Message.CmsgCancelCast.cancel_spell(@spell_failed_moving)

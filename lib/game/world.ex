@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.World do
+  alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.GameObject
@@ -25,11 +26,12 @@ defmodule ThistleTea.Game.World do
   def broadcast_packet(packet, entity, opts) do
     range = Keyword.get(opts, :range, 250)
     include_self? = Keyword.get(opts, :include_self?, true)
+    source_guid = entity_guid(entity)
 
     nearby_players(entity, range)
-    |> Enum.each(fn {_guid, pid, _distance} ->
-      if include_self? or pid != self() do
-        Network.send_packet(packet, pid)
+    |> Enum.each(fn {guid, _distance} ->
+      if include_self? or guid != source_guid do
+        Network.send_packet(packet, guid)
       end
     end)
   end
@@ -50,15 +52,15 @@ defmodule ThistleTea.Game.World do
   end
 
   def stop_entity(guid) when is_integer(guid) do
-    case SpatialHash.get_entity(guid) do
-      {^guid, pid, _map, _x, _y, _z} -> DynamicSupervisor.terminate_child(EntitySupervisor, pid)
-      nil -> :ok
+    case Entity.pid(guid) do
+      pid when is_pid(pid) -> DynamicSupervisor.terminate_child(EntitySupervisor, pid)
+      _ -> :ok
     end
   end
 
   def target_position(guid) when is_integer(guid) do
     case SpatialHash.get_entity(guid) do
-      {^guid, _pid, map, x, y, z} -> {map, x, y, z}
+      {^guid, map, x, y, z} -> {map, x, y, z}
       nil -> nil
     end
   end
@@ -73,4 +75,8 @@ defmodule ThistleTea.Game.World do
       _ -> nil
     end
   end
+
+  defp entity_guid(%{object: %{guid: guid}}) when is_integer(guid), do: guid
+  defp entity_guid(%{guid: guid}) when is_integer(guid), do: guid
+  defp entity_guid(_entity), do: nil
 end

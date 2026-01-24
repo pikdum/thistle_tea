@@ -65,11 +65,11 @@ defmodule ThistleTeaWeb.MapLive.Index do
 
   defp fetch_entities do
     :ets.tab2list(:entities)
-    |> Enum.filter(fn {guid, _pid, map, _x, _y, _z} ->
+    |> Enum.filter(fn {guid, map, _x, _y, _z} ->
       # anything under is a player
       map <= 1 and guid < 0x1FC00000
     end)
-    |> Enum.map(fn {guid, _pid, map, x, y, _z} ->
+    |> Enum.map(fn {guid, map, x, y, _z} ->
       %{name: name} = Metadata.query(guid, [:name])
 
       {x, y} = Homography.transform({x, y}, map)

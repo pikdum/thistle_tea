@@ -46,9 +46,9 @@ defmodule ThistleTea.Game.Network.Message.CmsgLogoutRequest do
       end)
 
       # broadcast destroy object
-      for pid <- Map.get(state, :player_pids, []) do
-        if pid != self() do
-          GenServer.cast(pid, {:destroy_object, state.guid})
+      for guid <- Map.get(state, :player_guids, []) do
+        if guid != state.guid do
+          Entity.destroy_object(guid, state.guid)
         end
       end
     end

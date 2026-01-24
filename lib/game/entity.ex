@@ -28,6 +28,10 @@ defmodule ThistleTea.Game.Entity do
     dispatch_cast(entity, {:receive_attack, attack})
   end
 
+  def destroy_object(entity, guid) do
+    dispatch_cast(entity, {:destroy_object, guid})
+  end
+
   defp dispatch_cast(target, message) do
     case resolve_pid(target) do
       {:ok, pid} -> GenServer.cast(pid, message)
