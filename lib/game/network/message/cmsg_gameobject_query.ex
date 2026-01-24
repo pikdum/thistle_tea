@@ -2,19 +2,19 @@ defmodule ThistleTea.Game.Network.Message.CmsgGameobjectQuery do
   use ThistleTea.Game.Network.ClientMessage, :CMSG_GAMEOBJECT_QUERY
 
   alias ThistleTea.DB.Mangos
+  alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.Message
 
   require Logger
 
   defstruct [:entry, :guid]
 
-  # prevent collisions
-  @game_object_guid_offset 0xF1100000
-
   @impl ClientMessage
   def handle(%__MODULE__{entry: entry, guid: guid}, state) do
+    low_guid = Guid.low_guid(guid)
+
     game_object =
-      Mangos.Repo.get(Mangos.GameObject, guid - @game_object_guid_offset)
+      Mangos.Repo.get(Mangos.GameObject, low_guid)
       |> Mangos.Repo.preload(:game_object_template)
 
     template = game_object.game_object_template

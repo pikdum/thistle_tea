@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.Network.UpdateObject do
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Player
+  alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.BinaryUtils
   alias ThistleTea.Game.Network.Packet
 
@@ -23,8 +24,6 @@ defmodule ThistleTea.Game.Network.UpdateObject do
     :dynamic_object,
     :corpse
   ]
-
-  @item_guid_offset 0x40000000
 
   # TODO: would be neat to have a module to define flags + enums
   # or one module per enum/flag set?
@@ -252,7 +251,7 @@ defmodule ThistleTea.Game.Network.UpdateObject do
         update_type: :create_object2,
         object_type: :item,
         object: %Object{
-          guid: item.entry + @item_guid_offset,
+          guid: Guid.from_low_guid(:item, item.entry),
           entry: item.entry
         },
         item: %Item{

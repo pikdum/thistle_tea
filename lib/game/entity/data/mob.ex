@@ -5,8 +5,8 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Guid
 
-  @creature_guid_offset 0xF1300000
   @update_flag_living 0x20
 
   defstruct object: %Object{},
@@ -25,7 +25,7 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
 
     %__MODULE__{
       object: %Object{
-        guid: c.guid + @creature_guid_offset,
+        guid: Guid.from_low_guid(:mob, c.id, c.guid),
         entry: c.id,
         scale_x: scale(c)
       },

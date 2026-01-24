@@ -4,6 +4,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgGossipHello do
   import Ecto.Query
 
   alias ThistleTea.DB.Mangos
+  alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Message.SmsgGossipMessage.GossipItem
 
@@ -11,11 +12,9 @@ defmodule ThistleTea.Game.Network.Message.CmsgGossipHello do
 
   defstruct [:guid]
 
-  @creature_guid_offset 0xF1300000
-
   @impl ClientMessage
   def handle(%__MODULE__{guid: guid}, state) do
-    low_guid = guid - @creature_guid_offset
+    low_guid = Guid.low_guid(guid)
 
     # TODO: what to do if there are multiple gossip menus?
     # send a packet for each?

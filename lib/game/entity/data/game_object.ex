@@ -6,8 +6,7 @@ defmodule ThistleTea.Game.Entity.Data.GameObject do
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Object
-
-  @game_object_guid_offset 0xF1100000
+  alias ThistleTea.Game.Guid
 
   @update_flag_all 0x10
   @update_flag_has_position 0x40
@@ -26,7 +25,7 @@ defmodule ThistleTea.Game.Entity.Data.GameObject do
 
     %__MODULE__{
       object: %Object{
-        guid: o.guid + @game_object_guid_offset,
+        guid: Guid.from_low_guid(:game_object, o.id, o.guid),
         entry: o.id,
         scale_x: ot.size
       },

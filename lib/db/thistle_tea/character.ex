@@ -20,9 +20,8 @@ defmodule ThistleTea.Character do
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.Message.CmsgCharCreate
-
-  @item_guid_offset 0x40000000
 
   def build(%CmsgCharCreate{} = params, account_id) do
     info = Mangos.PlayerCreateInfo.get(params.race, params.class)
@@ -135,24 +134,24 @@ defmodule ThistleTea.Character do
         visible_item_16_0: equipment.mainhand.entry,
         visible_item_17_0: equipment.offhand.entry,
         visible_item_19_0: equipment.tabard.entry,
-        head: equipment.head.entry + @item_guid_offset,
-        neck: equipment.neck.entry + @item_guid_offset,
-        shoulders: equipment.shoulders.entry + @item_guid_offset,
-        body: equipment.body.entry + @item_guid_offset,
-        chest: equipment.chest.entry + @item_guid_offset,
-        waist: equipment.waist.entry + @item_guid_offset,
-        legs: equipment.legs.entry + @item_guid_offset,
-        feet: equipment.feet.entry + @item_guid_offset,
-        wrists: equipment.wrists.entry + @item_guid_offset,
-        hands: equipment.hands.entry + @item_guid_offset,
-        finger1: equipment.finger1.entry + @item_guid_offset,
-        finger2: equipment.finger2.entry + @item_guid_offset,
-        trinket1: equipment.trinket1.entry + @item_guid_offset,
-        trinket2: equipment.trinket2.entry + @item_guid_offset,
-        back: equipment.back.entry + @item_guid_offset,
-        mainhand: equipment.mainhand.entry + @item_guid_offset,
-        offhand: equipment.offhand.entry + @item_guid_offset,
-        tabard: equipment.tabard.entry + @item_guid_offset
+        head: Guid.from_low_guid(:item, equipment.head.entry),
+        neck: Guid.from_low_guid(:item, equipment.neck.entry),
+        shoulders: Guid.from_low_guid(:item, equipment.shoulders.entry),
+        body: Guid.from_low_guid(:item, equipment.body.entry),
+        chest: Guid.from_low_guid(:item, equipment.chest.entry),
+        waist: Guid.from_low_guid(:item, equipment.waist.entry),
+        legs: Guid.from_low_guid(:item, equipment.legs.entry),
+        feet: Guid.from_low_guid(:item, equipment.feet.entry),
+        wrists: Guid.from_low_guid(:item, equipment.wrists.entry),
+        hands: Guid.from_low_guid(:item, equipment.hands.entry),
+        finger1: Guid.from_low_guid(:item, equipment.finger1.entry),
+        finger2: Guid.from_low_guid(:item, equipment.finger2.entry),
+        trinket1: Guid.from_low_guid(:item, equipment.trinket1.entry),
+        trinket2: Guid.from_low_guid(:item, equipment.trinket2.entry),
+        back: Guid.from_low_guid(:item, equipment.back.entry),
+        mainhand: Guid.from_low_guid(:item, equipment.mainhand.entry),
+        offhand: Guid.from_low_guid(:item, equipment.offhand.entry),
+        tabard: Guid.from_low_guid(:item, equipment.tabard.entry)
     }
 
     character = %{character | player: player}
@@ -292,7 +291,7 @@ defmodule ThistleTea.Character do
         Memento.Query.write(character)
       end)
 
-    character = %{character | object: %{character.object | guid: character.id}}
+    character = %{character | object: %{character.object | guid: Guid.from_low_guid(:player, character.id)}}
     save(character)
 
     {:ok, character}

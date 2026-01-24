@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.Network.Message.CmsgMessagechat do
   use ThistleTea.Game.Network.ClientMessage, :CMSG_MESSAGECHAT
 
+  alias ThistleTea.Game.Guid
   alias ThistleTea.Game.World.Metadata
 
   require Logger
@@ -147,7 +148,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgMessagechat do
 
   def handle_chat(state, _, _, ".behavior" <> _, _) do
     with pid when not is_nil(pid) <- :ets.lookup_element(:entities, state.target, 2, nil),
-         :mob <- GenServer.call(pid, :get_entity),
+         :mob <- Guid.entity_type(state.target),
          {:ok, behavior_state} <- GenServer.call(pid, :get_behavior) do
       behavior_state
       |> inspect(pretty: true)
@@ -310,7 +311,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgMessagechat do
         {self(), state.guid}
 
       true ->
-        case GenServer.call(pid, :get_entity) do
+        case Guid.entity_type(target_guid) do
           :player -> {pid, target_guid}
           _ -> {self(), state.guid}
         end
