@@ -1,5 +1,7 @@
 # thistle tea
 
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/pikdum/thistle_tea)
+
 wip vanilla private server written in elixir
 
 ## contributing
