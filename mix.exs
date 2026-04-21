@@ -37,7 +37,7 @@ defmodule ThistleTea.MixProject do
       {:quokka, "~> 2.11", only: [:dev, :test], runtime: false},
       {:telemetry, "~> 1.0"},
       {:bitmap, "~> 1.0"},
-      {:rustler, "~> 0.36"},
+      {:rustler, "~> 0.37"},
       {:phoenix, "~> 1.8"},
       {:phoenix_html, "~> 4.1"},
       {:phoenix_live_reload, "~> 1.2", only: :dev},
