@@ -28,6 +28,7 @@ thistle_tea-*.tar
 # rustler nif
 /priv/
 /target/
+/native/*/target/
 
 /maps/
 
@@ -45,3 +46,9 @@ devenv.local.yaml
 
 # pre-commit
 .pre-commit-config.yaml
+
+# dexter
+.dexter*
+
+refs/
+result
