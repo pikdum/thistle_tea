@@ -59,6 +59,7 @@ defmodule ThistleTea.Game.Network.Packet do
        CMSG_STANDSTATECHANGE: Message.CmsgStandstatechange,
        CMSG_CAST_SPELL: Message.CmsgCastSpell,
        CMSG_PLAYER_LOGIN: Message.CmsgPlayerLogin,
+       CMSG_SET_ACTIVE_MOVER: Message.CmsgSetActiveMover,
        MSG_MOVE_WORLDPORT_ACK: Message.CmsgMoveWorldportAck,
        CMSG_FORCE_RUN_SPEED_CHANGE_ACK: Message.CmsgForceRunSpeedChangeAck,
        CMSG_LOGOUT_REQUEST: Message.CmsgLogoutRequest,

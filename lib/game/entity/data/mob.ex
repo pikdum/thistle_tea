@@ -1,4 +1,6 @@
 defmodule ThistleTea.Game.Entity.Data.Mob do
+  import Bitwise, only: [|||: 2]
+
   alias ThistleTea.DB.Mangos
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Internal.WaypointRoute
@@ -7,7 +9,9 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Guid
 
+  @update_flag_all 0x10
   @update_flag_living 0x20
+  @update_flag_has_position 0x40
 
   defstruct object: %Object{},
             unit: %Unit{},
@@ -46,7 +50,7 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
         native_display_id: c.modelid
       },
       movement_block: %MovementBlock{
-        update_flag: @update_flag_living,
+        update_flag: @update_flag_all ||| @update_flag_living ||| @update_flag_has_position,
         position: {
           c.position_x,
           c.position_y,

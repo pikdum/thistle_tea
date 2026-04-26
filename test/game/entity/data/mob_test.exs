@@ -25,6 +25,7 @@ defmodule ThistleTea.Game.Entity.Data.MobTest do
 
       mob = Mob.build(creature)
 
+      assert mob.movement_block.update_flag == 0x70
       assert mob.movement_block.walk_speed == 3.0
       assert mob.movement_block.run_speed == 10.5
       assert mob.movement_block.run_back_speed == 6.75

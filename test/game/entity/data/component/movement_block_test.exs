@@ -107,6 +107,19 @@ defmodule ThistleTea.Game.Entity.Data.Component.MovementBlockTest do
       assert byte_size(result) > 0
     end
 
+    test "serializes MaNGOS-style idle unit create movement block", context do
+      movement_block = %{context.base_movement_block | update_flag: 0x70}
+
+      result = MovementBlock.to_binary(movement_block)
+
+      assert result ==
+               <<0x70, 0::little-size(32), 1000::little-size(32)>> <>
+                 vector({1.0, 2.0, 3.0}) <>
+                 <<0.5::little-float-size(32), 0::little-size(32), 2.5::little-float-size(32),
+                   7.0::little-float-size(32), 4.5::little-float-size(32), 4.7::little-float-size(32),
+                   2.5::little-float-size(32), 3.14::little-float-size(32), 1::little-size(32)>>
+    end
+
     test "includes swimming data when flag set", context do
       movement_block = %{context.base_movement_block | movement_flags: 0x00200000, pitch: 1.25, fall_time: 500}
 

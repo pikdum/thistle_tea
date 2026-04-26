@@ -72,7 +72,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgPlayerLogin do
       packed_guid: BinaryUtils.pack_guid(character_guid),
       character: c,
       spawn_timer: spawn_timer,
-      ready: true
+      ready: false
     })
   end
 
