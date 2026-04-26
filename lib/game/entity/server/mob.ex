@@ -30,15 +30,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     state = BT.init(state, MobBT.tree())
     Core.set_position(state)
 
-    # 1s delay is a temporary workaround for race condition:
-    # 1. mob process starts
-    # 2. mob starts moving
-    # 3. player spawns mobs, didn't get the smsg_monster_move packet
-    # 4. player sees mob stationary in wrong position until next movement
-    # this shouldn't happen, since smsg_update_object should contain the current movement info
-    # but it isn't working right now
-
-    schedule_ai_tick(1000)
+    schedule_ai_tick(0)
 
     {:ok, state}
   end
