@@ -100,7 +100,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.MovementBlock do
     {movement_block, rest} =
       case (movement_flags &&& @movement_flag_jumping) > 0 do
         true ->
-          <<z_speed::little-float-size(32), sin_angle::little-float-size(32), cos_angle::little-float-size(32),
+          <<z_speed::little-float-size(32), cos_angle::little-float-size(32), sin_angle::little-float-size(32),
             xy_speed::little-float-size(32), rest::binary>> = rest
 
           {Map.merge(movement_block, %{
@@ -165,8 +165,8 @@ defmodule ThistleTea.Game.Entity.Data.Component.MovementBlock do
             if (movement_flags &&& @movement_flag_jumping) > 0 do
               <<
                 m.z_speed::little-float-size(32),
-                m.sin_angle::little-float-size(32),
                 m.cos_angle::little-float-size(32),
+                m.sin_angle::little-float-size(32),
                 m.xy_speed::little-float-size(32)
               >>
             else
@@ -225,9 +225,14 @@ defmodule ThistleTea.Game.Entity.Data.Component.MovementBlock do
       end
   end
 
-  defp object_update_movement_flags(%__MODULE__{movement_flags: movement_flags}) do
+  defp object_update_movement_flags(%__MODULE__{movement_flags: movement_flags} = m) do
     movement_flags = movement_flags || 0
-    band(movement_flags, bnot(bor(@movement_flag_spline_enabled, @movement_flag_forward)))
+
+    if (movement_flags &&& @movement_flag_spline_enabled) > 0 and not active_spline?(m) do
+      band(movement_flags, bnot(bor(@movement_flag_spline_enabled, @movement_flag_forward)))
+    else
+      movement_flags
+    end
   end
 
   defp spline_create_binary(%__MODULE__{} = m) do
@@ -240,9 +245,40 @@ defmodule ThistleTea.Game.Entity.Data.Component.MovementBlock do
       facing_binary(m) <>
       <<time_passed::little-size(32), duration::little-size(32), spline_id::little-size(32),
         Enum.count(path)::little-size(32)>> <>
-      Enum.reduce(path, <<>>, fn node, acc -> acc <> vector_binary(node) end) <>
+      spline_path_binary(path) <>
       vector_binary(final_destination(m))
   end
+
+  defp active_spline?(%__MODULE__{
+         spline_flags: spline_flags,
+         spline_nodes: [_ | _],
+         duration: duration,
+         spline_id: spline_id
+       })
+       when is_integer(spline_flags) and is_integer(duration) and duration > 0 and is_integer(spline_id) do
+    true
+  end
+
+  defp active_spline?(%__MODULE__{}), do: false
+
+  defp spline_path_binary(path) do
+    path
+    |> Enum.with_index()
+    |> Enum.reduce({<<>>, nil}, fn {node, index}, {acc, previous} ->
+      {acc <> vector_binary(adjust_repeated_node(node, previous, index)), node}
+    end)
+    |> elem(0)
+  end
+
+  defp adjust_repeated_node({x, y, z}, {x, y, z}, index) do
+    if rem(index, 2) == 1 do
+      {x, y, z + 0.01}
+    else
+      {x, y, z + 0.02}
+    end
+  end
+
+  defp adjust_repeated_node(node, _previous, _index), do: node
 
   defp facing_binary(%__MODULE__{spline_flags: spline_flags} = m) when is_integer(spline_flags) do
     cond do
@@ -266,10 +302,14 @@ defmodule ThistleTea.Game.Entity.Data.Component.MovementBlock do
 
   defp create_spline_path(%__MODULE__{spline_nodes: [_ | _] = spline_nodes} = m) do
     controls = [spline_start_position(m) | spline_nodes]
-    controls ++ [List.last(controls)]
+    [virtual_start_position(controls) | controls] ++ [List.last(controls)]
   end
 
   defp create_spline_path(%__MODULE__{} = m), do: [spline_start_position(m), final_destination(m)]
+
+  defp virtual_start_position([{x1, y1, z1}, {x2, y2, z2} | _]) do
+    {2.0 * x1 - x2, 2.0 * y1 - y2, 2.0 * z1 - z2}
+  end
 
   defp spline_start_position(%__MODULE__{spline_start_position: {x, y, z}}), do: {x, y, z}
   defp spline_start_position(%__MODULE__{position: {x, y, z, _o}}), do: {x, y, z}

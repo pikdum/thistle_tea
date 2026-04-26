@@ -45,6 +45,9 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
   @impl GenServer
   def handle_cast({:send_update_to, pid}, state) do
+    state = Movement.sync_position(state)
+    Core.set_position(state)
+
     Core.update_packet(state)
     |> Network.send_packet(pid)
 

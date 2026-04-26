@@ -61,7 +61,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.MovementBlockTest do
       packet =
         <<jumping_flag::little-size(32), 1000::little-size(32), 1.0::little-float-size(32), 2.0::little-float-size(32),
           3.0::little-float-size(32), 0.5::little-float-size(32), 0::little-size(32), 10.0::little-float-size(32),
-          0.866::little-float-size(32), 0.5::little-float-size(32), 5.0::little-float-size(32)>>
+          0.5::little-float-size(32), 0.866::little-float-size(32), 5.0::little-float-size(32)>>
 
       result = MovementBlock.from_binary(packet)
 
@@ -141,7 +141,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.MovementBlockTest do
       assert byte_size(result) > 0
     end
 
-    test "strips active spline movement flags from object updates", context do
+    test "serializes active spline create data", context do
       movement_block = %{
         context.base_movement_block
         | update_flag: 0x20,
@@ -158,8 +158,17 @@ defmodule ThistleTea.Game.Entity.Data.Component.MovementBlockTest do
 
       prefix_size = 1 + 4 + 4 + 16 + 4 + 24
 
-      <<0x20, 0::little-size(32), _rest::binary>> = result
-      assert byte_size(result) == prefix_size
+      active_spline_binary = binary_part(result, prefix_size, byte_size(result) - prefix_size)
+
+      assert active_spline_binary ==
+               <<0x100::little-size(32), 50::little-size(32), 1_000::little-size(32), 7::little-size(32),
+                 5::little-size(32)>> <>
+                 vector({-1.0, 0.0, 0.0}) <>
+                 vector({0.0, 0.0, 0.0}) <>
+                 vector({1.0, 0.0, 0.0}) <>
+                 vector({2.0, 0.0, 0.0}) <>
+                 vector({2.0, 0.0, 0.02}) <>
+                 vector({2.0, 0.0, 0.0})
     end
 
     test "strips stale spline movement flags without active spline data", context do
@@ -179,5 +188,9 @@ defmodule ThistleTea.Game.Entity.Data.Component.MovementBlockTest do
       <<0x20, 0x100::little-size(32), _rest::binary>> = result
       assert byte_size(result) == prefix_size
     end
+  end
+
+  defp vector({x, y, z}) do
+    <<x::little-float-size(32), y::little-float-size(32), z::little-float-size(32)>>
   end
 end
