@@ -66,17 +66,23 @@ defmodule ThistleTea.Game.Network.Server do
     |> handle_packets()
   end
 
+  # TODO: temporarily disabled batching due to issues
+  # it seems like it doesn't like mixing player + mob packets?
   def accumulate_updates(size, body) do
-    receive do
-      {:"$gen_cast",
-       {:send_packet,
-        %Packet{opcode: @smsg_update_object, payload: <<next_size::little-size(32), 0, next_body::binary>>}}}
-      when size + next_size <= 100 ->
-        accumulate_updates(size + next_size, body <> next_body)
-    after
-      0 -> %Packet{opcode: @smsg_update_object, payload: <<size::little-size(32), 0, body::binary>>}
-    end
+    %Packet{opcode: @smsg_update_object, payload: <<size::little-size(32), 0, body::binary>>}
   end
+
+  # def accumulate_updates(size, body) do
+  #   receive do
+  #     {:"$gen_cast",
+  #      {:send_packet,
+  #       %Packet{opcode: @smsg_update_object, payload: <<next_size::little-size(32), 0, next_body::binary>>}}}
+  #     when size + next_size <= 100 ->
+  #       accumulate_updates(size + next_size, body <> next_body)
+  #   after
+  #     0 -> %Packet{opcode: @smsg_update_object, payload: <<size::little-size(32), 0, body::binary>>}
+  #   end
+  # end
 
   @impl GenServer
   def handle_cast(
