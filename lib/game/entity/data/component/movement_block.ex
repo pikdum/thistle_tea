@@ -29,6 +29,8 @@ defmodule ThistleTea.Game.Entity.Data.Component.MovementBlock do
     :time_passed,
     :duration,
     :spline_nodes,
+    :spline_id,
+    :spline_start_position,
     :transport_progress_in_ms
   ]
 
@@ -182,31 +184,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.MovementBlock do
               m.turn_rate::little-float-size(32)
             >> <>
             if (m.movement_flags &&& @movement_flag_spline_enabled) > 0 do
-              <<m.spline_flags::size(32)>> <>
-                cond do
-                  (m.spline_flags &&& @spline_flag_final_angle) > 0 ->
-                    <<m.angle::little-float-size(32)>>
-
-                  (m.spline_flags &&& @spline_flag_final_target) > 0 ->
-                    <<m.target_guid::little-size(64)>>
-
-                  (m.spline_flags &&& @spline_flag_final_point) > 0 ->
-                    {x, y, z} = m.final_point
-
-                    <<x::little-float-size(32), y::little-float-size(32), z::little-float-size(32)>>
-
-                  true ->
-                    <<>>
-                end <>
-                <<m.time_passed::little-size(32), m.duration::little-size(32),
-                  Enum.count(m.spline_nodes) - 1::little-size(32)>> <>
-                Enum.reduce(m.spline_nodes, <<>>, fn node, acc ->
-                  {x, y, z} = node
-
-                  # TODO: does this need the same logic as smsg_monster_move?
-                  acc <>
-                    <<x::little-float-size(32), y::little-float-size(32), z::little-float-size(32)>>
-                end)
+              spline_create_binary(m)
             else
               <<>>
             end
@@ -243,5 +221,58 @@ defmodule ThistleTea.Game.Entity.Data.Component.MovementBlock do
       else
         <<>>
       end
+  end
+
+  defp spline_create_binary(%__MODULE__{} = m) do
+    path = create_spline_path(m)
+    time_passed = m.time_passed || 0
+    duration = m.duration || 0
+    spline_id = m.spline_id || 0
+
+    <<m.spline_flags::little-size(32)>> <>
+      facing_binary(m) <>
+      <<time_passed::little-size(32), duration::little-size(32), spline_id::little-size(32),
+        Enum.count(path)::little-size(32)>> <>
+      Enum.reduce(path, <<>>, fn node, acc -> acc <> vector_binary(node) end) <>
+      vector_binary(final_destination(m))
+  end
+
+  defp facing_binary(%__MODULE__{spline_flags: spline_flags} = m) when is_integer(spline_flags) do
+    cond do
+      (spline_flags &&& @spline_flag_final_angle) > 0 ->
+        angle = m.angle || 0.0
+        <<angle::little-float-size(32)>>
+
+      (spline_flags &&& @spline_flag_final_target) > 0 ->
+        target_guid = m.target_guid || 0
+        <<target_guid::little-size(64)>>
+
+      (spline_flags &&& @spline_flag_final_point) > 0 ->
+        vector_binary(m.final_point || final_destination(m))
+
+      true ->
+        <<>>
+    end
+  end
+
+  defp facing_binary(%__MODULE__{}), do: <<>>
+
+  defp create_spline_path(%__MODULE__{spline_nodes: spline_nodes} = m) when is_list(spline_nodes) do
+    [spline_start_position(m) | spline_nodes] ++ [final_destination(m)]
+  end
+
+  defp create_spline_path(%__MODULE__{} = m), do: [spline_start_position(m), final_destination(m)]
+
+  defp spline_start_position(%__MODULE__{spline_start_position: {x, y, z}}), do: {x, y, z}
+  defp spline_start_position(%__MODULE__{position: {x, y, z, _o}}), do: {x, y, z}
+
+  defp final_destination(%__MODULE__{spline_nodes: spline_nodes}) when is_list(spline_nodes) and spline_nodes != [] do
+    List.last(spline_nodes)
+  end
+
+  defp final_destination(%__MODULE__{position: {x, y, z, _o}}), do: {x, y, z}
+
+  defp vector_binary({x, y, z}) do
+    <<x::little-float-size(32), y::little-float-size(32), z::little-float-size(32)>>
   end
 end

@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
   alias ThistleTea.Game.World.Pathfinding
 
   @max_u32 0xFFFFFFFF
+  @spline_flag_runmode 0x00000100
 
   def increment_spline_id(%{internal: %Internal{spline_id: spline_id} = internal} = entity) do
     new_spline_id = increment_spline_id(spline_id)
@@ -59,10 +60,11 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
 
   def start_move_to(entity, {x, y, z}) do
     entity = sync_position(entity)
+    entity = increment_spline_id(entity)
 
     %{
       movement_block: %MovementBlock{walk_speed: walk_speed, position: {x0, y0, z0, _o}} = mb,
-      internal: %Internal{map: map, running: running} = internal
+      internal: %Internal{map: map, running: running, spline_id: spline_id} = internal
     } = entity
 
     path = Pathfinding.find_path(map, {x0, y0, z0}, {x, y, z})
@@ -72,7 +74,7 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
       raise "No path found from #{inspect({x0, y0, z0})} to #{inspect({x, y, z})}"
     end
 
-    speed = if running, do: mb.run_speed * 7.0, else: walk_speed
+    speed = if running, do: mb.run_speed, else: walk_speed
 
     duration =
       [{x0, y0, z0} | path]
@@ -84,10 +86,17 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
     start_time = Time.now()
     internal = %{internal | movement_start_time: start_time, movement_start_position: {x0, y0, z0}}
 
-    movement_block = %{mb | spline_nodes: path, duration: duration, time_passed: 0, spline_flags: 0x100}
+    movement_block = %{
+      mb
+      | spline_nodes: path,
+        duration: duration,
+        time_passed: 0,
+        spline_flags: @spline_flag_runmode,
+        spline_id: spline_id,
+        spline_start_position: {x0, y0, z0}
+    }
 
     %{entity | movement_block: movement_block, internal: internal}
-    |> increment_spline_id()
   end
 
   def move_to(state, {x, y, z}, opts \\ []) do
@@ -187,7 +196,9 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
             spline_nodes: [],
             movement_flags: 0,
             time_passed: mb.duration,
-            spline_flags: 0
+            spline_flags: 0,
+            spline_id: nil,
+            spline_start_position: nil
         }
 
         internal = %{internal | movement_start_time: nil, movement_start_position: nil}

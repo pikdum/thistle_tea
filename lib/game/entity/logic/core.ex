@@ -98,6 +98,8 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
       | movement_flags: 0,
         spline_nodes: [],
         spline_flags: 0,
+        spline_id: nil,
+        spline_start_position: nil,
         time_passed: mb.duration || 0
     }
 

@@ -143,5 +143,28 @@ defmodule ThistleTea.Game.Entity.Data.Component.MovementBlockTest do
       assert is_binary(result)
       assert byte_size(result) > 0
     end
+
+    test "serializes active spline create data", context do
+      movement_block = %{
+        context.base_movement_block
+        | update_flag: 0x20,
+          movement_flags: 0x00400001,
+          spline_flags: 0x100,
+          time_passed: 50,
+          duration: 1_000,
+          spline_id: 7,
+          spline_start_position: {0.0, 0.0, 0.0},
+          spline_nodes: [{1.0, 0.0, 0.0}, {2.0, 0.0, 0.0}]
+      }
+
+      result = MovementBlock.to_binary(movement_block)
+
+      prefix_size = 1 + 4 + 4 + 16 + 4 + 24
+
+      <<_prefix::binary-size(prefix_size), 0x100::little-size(32), 50::little-size(32), 1_000::little-size(32),
+        7::little-size(32), 4::little-size(32), path_and_destination::binary>> = result
+
+      assert byte_size(path_and_destination) == 5 * 12
+    end
   end
 end

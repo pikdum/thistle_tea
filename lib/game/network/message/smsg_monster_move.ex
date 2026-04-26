@@ -1,6 +1,8 @@
 defmodule ThistleTea.Game.Network.Message.SmsgMonsterMove do
   use ThistleTea.Game.Network.ServerMessage, :SMSG_MONSTER_MOVE
 
+  import Bitwise, only: [bnot: 1, band: 2, bor: 2]
+
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Object
@@ -10,6 +12,8 @@ defmodule ThistleTea.Game.Network.Message.SmsgMonsterMove do
   @move_type_facing_spot 2
   @move_type_facing_target 3
   @move_type_facing_angle 4
+  @spline_flag_runmode 0x00000100
+  @spline_flag_final_facing 0x00070000
 
   defstruct [
     :guid,
@@ -42,7 +46,7 @@ defmodule ThistleTea.Game.Network.Message.SmsgMonsterMove do
       spline_point: {x0, y0, z0},
       spline_id: spline_id,
       move_type: 0,
-      spline_flags: spline_flags,
+      spline_flags: monster_move_spline_flags(spline_flags),
       duration: duration,
       splines: spline_nodes
     }
@@ -57,6 +61,14 @@ defmodule ThistleTea.Game.Network.Message.SmsgMonsterMove do
       _ ->
         msg
     end
+  end
+
+  defp monster_move_spline_flags(spline_flags) do
+    spline_flags = spline_flags || 0
+
+    spline_flags
+    |> bor(@spline_flag_runmode)
+    |> band(bnot(@spline_flag_final_facing))
   end
 
   def to_binary(%__MODULE__{

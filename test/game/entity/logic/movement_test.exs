@@ -19,7 +19,9 @@ defmodule ThistleTea.Game.Entity.Logic.MovementTest do
       spline_nodes: Keyword.get(opts, :spline_nodes, []),
       time_passed: Keyword.get(opts, :time_passed, 0),
       movement_flags: Keyword.get(opts, :movement_flags, 1),
-      spline_flags: Keyword.get(opts, :spline_flags, 0x100)
+      spline_flags: Keyword.get(opts, :spline_flags, 0x100),
+      spline_id: Keyword.get(opts, :spline_id),
+      spline_start_position: Keyword.get(opts, :spline_start_position)
     }
 
     %{internal: internal, movement_block: movement_block}
@@ -72,6 +74,8 @@ defmodule ThistleTea.Game.Entity.Logic.MovementTest do
         start_position: {0.0, 0.0, 0.0},
         duration: 1_000,
         spline_nodes: [{0.0, 0.0, 0.0}],
+        spline_id: 7,
+        spline_start_position: {0.0, 0.0, 0.0},
         movement_flags: 123,
         spline_flags: 0x100
       )
@@ -83,6 +87,8 @@ defmodule ThistleTea.Game.Entity.Logic.MovementTest do
     assert updated.movement_block.movement_flags == 0
     assert updated.movement_block.spline_flags == 0
     assert updated.movement_block.time_passed == updated.movement_block.duration
+    assert is_nil(updated.movement_block.spline_id)
+    assert is_nil(updated.movement_block.spline_start_position)
     assert is_nil(updated.internal.movement_start_time)
     assert is_nil(updated.internal.movement_start_position)
   end

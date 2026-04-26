@@ -58,11 +58,11 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
         timestamp: 0,
         fall_time: 0.0,
         # from creature_template
-        walk_speed: ct.speed_walk,
-        run_speed: ct.speed_run,
-        run_back_speed: ct.speed_run,
-        swim_speed: ct.speed_run,
-        swim_back_speed: ct.speed_run,
+        walk_speed: ct.speed_walk * 2.5,
+        run_speed: ct.speed_run * 7.0,
+        run_back_speed: ct.speed_run * 4.5,
+        swim_speed: ct.speed_run * 4.722222,
+        swim_back_speed: ct.speed_run * 2.5,
         turn_rate: 3.1415
       },
       internal: %Internal{
