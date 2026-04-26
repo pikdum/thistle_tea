@@ -56,7 +56,7 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
         movement_flags: 0,
         # TODO: figure out how to generate these
         timestamp: 0,
-        fall_time: 0.0,
+        fall_time: 0,
         # from creature_template
         walk_speed: ct.speed_walk * 2.5,
         run_speed: ct.speed_run * 7.0,

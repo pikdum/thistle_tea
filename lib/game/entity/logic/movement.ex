@@ -1,6 +1,8 @@
 defmodule ThistleTea.Game.Entity.Logic.Movement do
   use ThistleTea.Game.Network.Opcodes, [:SMSG_MONSTER_MOVE]
 
+  import Bitwise, only: [&&&: 2, bnot: 1, bor: 2]
+
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Internal.Waypoint
   alias ThistleTea.Game.Entity.Data.Component.Internal.WaypointRoute
@@ -12,6 +14,9 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
   alias ThistleTea.Game.World.Pathfinding
 
   @max_u32 0xFFFFFFFF
+  @movement_flag_forward 0x00000001
+  @movement_flag_walk_mode 0x00000100
+  @movement_flag_spline_enabled 0x00400000
   @spline_flag_runmode 0x00000100
 
   def increment_spline_id(%{internal: %Internal{spline_id: spline_id} = internal} = entity) do
@@ -91,7 +96,8 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
       | spline_nodes: path,
         duration: duration,
         time_passed: 0,
-        spline_flags: @spline_flag_runmode,
+        movement_flags: movement_flags(mb.movement_flags, running),
+        spline_flags: spline_flags(running),
         spline_id: spline_id,
         spline_start_position: {x0, y0, z0}
     }
@@ -173,6 +179,20 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
   end
 
   defp update_position_from_spline(entity), do: finalize_movement(entity)
+
+  defp movement_flags(flags, running) do
+    flags = flags || 0
+    flags = bor(flags, bor(@movement_flag_forward, @movement_flag_spline_enabled))
+
+    if running do
+      flags &&& bnot(@movement_flag_walk_mode)
+    else
+      bor(flags, @movement_flag_walk_mode)
+    end
+  end
+
+  defp spline_flags(true), do: @spline_flag_runmode
+  defp spline_flags(false), do: 0
 
   defp finalize_movement(
          %{

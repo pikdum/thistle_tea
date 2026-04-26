@@ -7,7 +7,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.MovementBlockTest do
     %{
       base_packet:
         <<0::little-size(32), 1000::little-size(32), 1.0::little-float-size(32), 2.0::little-float-size(32),
-          3.0::little-float-size(32), 0.5::little-float-size(32), 0.0::little-float-size(32)>>
+          3.0::little-float-size(32), 0.5::little-float-size(32), 0::little-size(32)>>
     }
   end
 
@@ -18,7 +18,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.MovementBlockTest do
         movement_flags: 0,
         timestamp: 1000,
         position: {1.0, 2.0, 3.0, 0.5},
-        fall_time: 0.0,
+        fall_time: 0,
         walk_speed: 2.5,
         run_speed: 7.0,
         run_back_speed: 4.5,
@@ -38,7 +38,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.MovementBlockTest do
       assert result.movement_flags == 0
       assert result.timestamp == 1000
       assert result.position == {1.0, 2.0, 3.0, 0.5}
-      assert result.fall_time == 0.0
+      assert result.fall_time == 0
     end
 
     test "parses with swimming flag" do
@@ -46,14 +46,13 @@ defmodule ThistleTea.Game.Entity.Data.Component.MovementBlockTest do
 
       packet =
         <<swimming_flag::little-size(32), 1000::little-size(32), 1.0::little-float-size(32), 2.0::little-float-size(32),
-          3.0::little-float-size(32), 0.5::little-float-size(32), 1.25::little-float-size(32),
-          0.5::little-float-size(32)>>
+          3.0::little-float-size(32), 0.5::little-float-size(32), 1.25::little-float-size(32), 500::little-size(32)>>
 
       result = MovementBlock.from_binary(packet)
 
       assert result.movement_flags == swimming_flag
       assert result.pitch == 1.25
-      assert result.fall_time == 0.5
+      assert result.fall_time == 500
     end
 
     test "parses with jumping flag" do
@@ -61,9 +60,8 @@ defmodule ThistleTea.Game.Entity.Data.Component.MovementBlockTest do
 
       packet =
         <<jumping_flag::little-size(32), 1000::little-size(32), 1.0::little-float-size(32), 2.0::little-float-size(32),
-          3.0::little-float-size(32), 0.5::little-float-size(32), 0.0::little-float-size(32),
-          10.0::little-float-size(32), 0.5::little-float-size(32), 0.866::little-float-size(32),
-          5.0::little-float-size(32)>>
+          3.0::little-float-size(32), 0.5::little-float-size(32), 0::little-size(32), 10.0::little-float-size(32),
+          0.866::little-float-size(32), 0.5::little-float-size(32), 5.0::little-float-size(32)>>
 
       result = MovementBlock.from_binary(packet)
 
@@ -79,8 +77,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.MovementBlockTest do
 
       packet =
         <<spline_flag::little-size(32), 1000::little-size(32), 1.0::little-float-size(32), 2.0::little-float-size(32),
-          3.0::little-float-size(32), 0.5::little-float-size(32), 0.0::little-float-size(32),
-          5.5::little-float-size(32)>>
+          3.0::little-float-size(32), 0.5::little-float-size(32), 0::little-size(32), 5.5::little-float-size(32)>>
 
       result = MovementBlock.from_binary(packet)
 
@@ -93,7 +90,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.MovementBlockTest do
 
       packet =
         <<0::little-size(32), 1000::little-size(32), 1.0::little-float-size(32), 2.0::little-float-size(32),
-          3.0::little-float-size(32), 0.5::little-float-size(32), 0.0::little-float-size(32)>>
+          3.0::little-float-size(32), 0.5::little-float-size(32), 0::little-size(32)>>
 
       result = MovementBlock.from_binary(packet, acc)
 
@@ -111,7 +108,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.MovementBlockTest do
     end
 
     test "includes swimming data when flag set", context do
-      movement_block = %{context.base_movement_block | movement_flags: 0x00200000, pitch: 1.25, fall_time: 0.5}
+      movement_block = %{context.base_movement_block | movement_flags: 0x00200000, pitch: 1.25, fall_time: 500}
 
       result = MovementBlock.to_binary(movement_block)
 
@@ -144,7 +141,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.MovementBlockTest do
       assert byte_size(result) > 0
     end
 
-    test "serializes active spline create data", context do
+    test "strips active spline movement flags from object updates", context do
       movement_block = %{
         context.base_movement_block
         | update_flag: 0x20,
@@ -161,10 +158,26 @@ defmodule ThistleTea.Game.Entity.Data.Component.MovementBlockTest do
 
       prefix_size = 1 + 4 + 4 + 16 + 4 + 24
 
-      <<_prefix::binary-size(prefix_size), 0x100::little-size(32), 50::little-size(32), 1_000::little-size(32),
-        7::little-size(32), 4::little-size(32), path_and_destination::binary>> = result
+      <<0x20, 0::little-size(32), _rest::binary>> = result
+      assert byte_size(result) == prefix_size
+    end
 
-      assert byte_size(path_and_destination) == 5 * 12
+    test "strips stale spline movement flags without active spline data", context do
+      movement_block = %{
+        context.base_movement_block
+        | update_flag: 0x20,
+          movement_flags: 0x00400101,
+          spline_nodes: [],
+          duration: 0,
+          spline_id: nil
+      }
+
+      result = MovementBlock.to_binary(movement_block)
+
+      prefix_size = 1 + 4 + 4 + 16 + 4 + 24
+
+      <<0x20, 0x100::little-size(32), _rest::binary>> = result
+      assert byte_size(result) == prefix_size
     end
   end
 end

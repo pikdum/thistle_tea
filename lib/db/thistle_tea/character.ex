@@ -93,7 +93,7 @@ defmodule ThistleTea.Character do
       movement_block: %MovementBlock{
         movement_flags: 0,
         position: {info.position_x, info.position_y, info.position_z, info.orientation},
-        fall_time: 0.0,
+        fall_time: 0,
         walk_speed: 1.0,
         run_speed: 7.0,
         run_back_speed: 4.5,

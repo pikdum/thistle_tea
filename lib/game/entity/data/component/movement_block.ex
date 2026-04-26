@@ -1,5 +1,5 @@
 defmodule ThistleTea.Game.Entity.Data.Component.MovementBlock do
-  import Bitwise, only: [&&&: 2]
+  import Bitwise, only: [&&&: 2, band: 2, bnot: 1, bor: 2]
 
   require Logger
 
@@ -41,6 +41,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.MovementBlock do
   @update_flag_living 0x20
   @update_flag_has_position 0x40
 
+  @movement_flag_forward 0x00000001
   @movement_flag_on_transport 0x00000200
   @movement_flag_jumping 0x00002000
   @movement_flag_swimming 0x00200000
@@ -92,14 +93,14 @@ defmodule ThistleTea.Game.Entity.Data.Component.MovementBlock do
           {movement_block, rest}
       end
 
-    <<fall_time::little-float-size(32), rest::binary>> = rest
+    <<fall_time::little-size(32), rest::binary>> = rest
     movement_block = Map.put(movement_block, :fall_time, fall_time)
 
     # jumping
     {movement_block, rest} =
       case (movement_flags &&& @movement_flag_jumping) > 0 do
         true ->
-          <<z_speed::little-float-size(32), cos_angle::little-float-size(32), sin_angle::little-float-size(32),
+          <<z_speed::little-float-size(32), sin_angle::little-float-size(32), cos_angle::little-float-size(32),
             xy_speed::little-float-size(32), rest::binary>> = rest
 
           {Map.merge(movement_block, %{
@@ -132,9 +133,10 @@ defmodule ThistleTea.Game.Entity.Data.Component.MovementBlock do
       cond do
         (m.update_flag &&& @update_flag_living) > 0 ->
           {x, y, z, orientation} = m.position
+          movement_flags = object_update_movement_flags(m)
 
           <<
-            m.movement_flags::little-size(32),
+            movement_flags::little-size(32),
             # timestamp
             m.timestamp::little-size(32),
             # living position
@@ -144,7 +146,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.MovementBlock do
             # living orientation
             orientation::little-float-size(32)
           >> <>
-            if (m.movement_flags &&& @movement_flag_on_transport) > 0 do
+            if (movement_flags &&& @movement_flag_on_transport) > 0 do
               {x, y, z, orientation} = m.transport_position
 
               # TODO: packed guid
@@ -154,23 +156,23 @@ defmodule ThistleTea.Game.Entity.Data.Component.MovementBlock do
             else
               <<>>
             end <>
-            if (m.movement_flags &&& @movement_flag_swimming) > 0 do
+            if (movement_flags &&& @movement_flag_swimming) > 0 do
               <<m.pitch::little-float-size(32)>>
             else
               <<>>
             end <>
-            <<m.fall_time::little-float-size(32)>> <>
-            if (m.movement_flags &&& @movement_flag_jumping) > 0 do
+            <<m.fall_time::little-size(32)>> <>
+            if (movement_flags &&& @movement_flag_jumping) > 0 do
               <<
                 m.z_speed::little-float-size(32),
-                m.cos_angle::little-float-size(32),
                 m.sin_angle::little-float-size(32),
+                m.cos_angle::little-float-size(32),
                 m.xy_speed::little-float-size(32)
               >>
             else
               <<>>
             end <>
-            if (m.movement_flags &&& @movement_flag_spline_elevation) > 0 do
+            if (movement_flags &&& @movement_flag_spline_elevation) > 0 do
               <<m.spline_elevation::little-float-size(32)>>
             else
               <<>>
@@ -183,7 +185,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.MovementBlock do
               m.swim_back_speed::little-float-size(32),
               m.turn_rate::little-float-size(32)
             >> <>
-            if (m.movement_flags &&& @movement_flag_spline_enabled) > 0 do
+            if (movement_flags &&& @movement_flag_spline_enabled) > 0 do
               spline_create_binary(m)
             else
               <<>>
@@ -223,6 +225,11 @@ defmodule ThistleTea.Game.Entity.Data.Component.MovementBlock do
       end
   end
 
+  defp object_update_movement_flags(%__MODULE__{movement_flags: movement_flags}) do
+    movement_flags = movement_flags || 0
+    band(movement_flags, bnot(bor(@movement_flag_spline_enabled, @movement_flag_forward)))
+  end
+
   defp spline_create_binary(%__MODULE__{} = m) do
     path = create_spline_path(m)
     time_passed = m.time_passed || 0
@@ -257,8 +264,9 @@ defmodule ThistleTea.Game.Entity.Data.Component.MovementBlock do
 
   defp facing_binary(%__MODULE__{}), do: <<>>
 
-  defp create_spline_path(%__MODULE__{spline_nodes: spline_nodes} = m) when is_list(spline_nodes) do
-    [spline_start_position(m) | spline_nodes] ++ [final_destination(m)]
+  defp create_spline_path(%__MODULE__{spline_nodes: [_ | _] = spline_nodes} = m) do
+    controls = [spline_start_position(m) | spline_nodes]
+    controls ++ [List.last(controls)]
   end
 
   defp create_spline_path(%__MODULE__{} = m), do: [spline_start_position(m), final_destination(m)]
