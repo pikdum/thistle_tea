@@ -1,5 +1,5 @@
 defmodule ThistleTea.Game.Entity.Data.Mob do
-  import Bitwise, only: [|||: 2]
+  import Bitwise, only: [|||: 2, <<<: 2]
 
   alias ThistleTea.DB.Mangos
   alias ThistleTea.Game.Entity.Data.Component.Internal
@@ -26,6 +26,7 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
       end
 
     model_info = creature_model_info(c)
+    {virtual_item_slot_display, virtual_item_info} = virtual_items(ct)
 
     %__MODULE__{
       object: %Object{
@@ -51,7 +52,9 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
         min_damage: ct.min_melee_dmg,
         max_damage: ct.max_melee_dmg,
         base_attack_time: ct.melee_base_attack_time,
-        attack_power: ct.melee_attack_power
+        attack_power: ct.melee_attack_power,
+        virtual_item_slot_display: virtual_item_slot_display,
+        virtual_item_info: virtual_item_info
       },
       movement_block: %MovementBlock{
         update_flag: @update_flag_all ||| @update_flag_living ||| @update_flag_has_position,
@@ -114,6 +117,54 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
   end
 
   defp creature_model_info(_creature), do: nil
+
+  defp virtual_items(%Mangos.CreatureTemplate{equipment_template_id: id}) when is_integer(id) and id > 0 do
+    case Mangos.Repo.get(Mangos.CreatureEquipTemplate, id) do
+      %Mangos.CreatureEquipTemplate{} = equip -> virtual_items_from_equip(equip)
+      nil -> {nil, nil}
+    end
+  end
+
+  defp virtual_items(_template), do: {nil, nil}
+
+  defp virtual_items_from_equip(%Mangos.CreatureEquipTemplate{equipentry1: e1, equipentry2: e2, equipentry3: e3}) do
+    items = Enum.map([e1, e2, e3], &creature_item_template/1)
+
+    if Enum.all?(items, &is_nil/1) do
+      {nil, nil}
+    else
+      {pack_virtual_item_slot_display(items), pack_virtual_item_info(items)}
+    end
+  end
+
+  defp creature_item_template(entry) when is_integer(entry) and entry > 0 do
+    Mangos.Repo.get(Mangos.CreatureItemTemplate, entry)
+  end
+
+  defp creature_item_template(_entry), do: nil
+
+  defp pack_virtual_item_slot_display([a, b, c]) do
+    item_display_id(a) ||| item_display_id(b) <<< 32 ||| item_display_id(c) <<< 64
+  end
+
+  defp pack_virtual_item_info([a, b, c]) do
+    virtual_item_info_for(a) <> virtual_item_info_for(b) <> virtual_item_info_for(c)
+  end
+
+  defp virtual_item_info_for(%Mangos.CreatureItemTemplate{
+         class: class,
+         subclass: subclass,
+         material: material,
+         inventory_type: inventory_type,
+         sheath_type: sheath_type
+       }) do
+    <<class, subclass, material, inventory_type, sheath_type, 0, 0, 0>>
+  end
+
+  defp virtual_item_info_for(nil), do: <<0::64>>
+
+  defp item_display_id(%Mangos.CreatureItemTemplate{display_id: id}), do: id
+  defp item_display_id(nil), do: 0
 
   defp normalize_model_value(%Mangos.CreatureModelInfo{} = model_info, key, default) do
     case Map.get(model_info, key) do
