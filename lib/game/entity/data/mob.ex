@@ -47,7 +47,11 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
         bounding_radius: mob_bounding_radius(ct, model_info),
         combat_reach: mob_combat_reach(ct, model_info),
         display_id: c.modelid,
-        native_display_id: c.modelid
+        native_display_id: c.modelid,
+        min_damage: ct.min_melee_dmg,
+        max_damage: ct.max_melee_dmg,
+        base_attack_time: ct.melee_base_attack_time,
+        attack_power: ct.melee_attack_power
       },
       movement_block: %MovementBlock{
         update_flag: @update_flag_all ||| @update_flag_living ||| @update_flag_has_position,
