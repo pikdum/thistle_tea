@@ -1,49 +1,198 @@
 <.flash_group flash={@flash} />
-<div class="grid-rows-[auto_1fr_auto] grid min-h-screen">
-  <div class="bg-emerald-600 text-stone-50">
-    <div class="max-w-[60rem] mx-auto p-4">
-      <h1 class="font-serif text-7xl md:text-9xl">Thistle Tea</h1>
-      <div class="text-xl md:px-16">A World of Warcraft server written in Elixir.</div>
-    </div>
-  </div>
-  <div class="bg-stone-50">
-    <div class="max-w-[60rem] mx-auto grid grid-cols-1 gap-4 p-4 lg:grid-cols-2">
-      <div>
-        <h2 class="text-3xl">Connect to this instance</h2>
-        <ul class="list-decimal px-8 py-2 leading-8">
-          <li>Install World of Warcraft v1.12.1 build 5875</li>
-          <li>
-            Edit realmlist.wtf to:
-            <br /><pre class="inline-block bg-emerald-50 p-2 leading-6">set realmlist <%=  @game_server %></pre>
-          </li>
-          <li>
-            Log in with credentials:
-            <br /><pre class="inline-block bg-emerald-50 p-2 leading-6">Username: test
-Password: test</pre>
-          </li>
-        </ul>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link
+  href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap"
+  rel="stylesheet"
+/>
+
+<div
+  class="min-h-screen text-[#2a2a1a]"
+  style="background: radial-gradient(ellipse at top, #f4eedc 0%, #e8e0c4 100%); font-family: 'JetBrains Mono', 'IBM Plex Mono', ui-monospace, monospace; font-size: 14px; line-height: 1.6;"
+>
+  <div class="mx-auto max-w-[1280px] px-6 pt-9 pb-14 md:px-12 lg:px-24">
+    <%!-- top bar --%>
+    <div class="mb-8 flex items-center justify-between text-[13px]">
+      <div class="flex items-center gap-[10px]">
+        <svg width="22" height="22" viewBox="0 0 32 32" class="block">
+          <path
+            d="M11 4 Q9 7 11 9 Q13 11 11 13"
+            stroke="#a8a058"
+            stroke-width="1.2"
+            fill="none"
+            stroke-linecap="round"
+          />
+          <path
+            d="M16 3 Q14 6 16 8 Q18 10 16 12"
+            stroke="#a8a058"
+            stroke-width="1.2"
+            fill="none"
+            stroke-linecap="round"
+          />
+          <path
+            d="M21 4 Q19 7 21 9 Q23 11 21 13"
+            stroke="#a8a058"
+            stroke-width="1.2"
+            fill="none"
+            stroke-linecap="round"
+          />
+          <path
+            d="M7 14 L25 14 L23.5 27 Q23 29 21 29 L11 29 Q9 29 8.5 27 Z"
+            fill="#fdfaf0"
+            stroke="#3a2e14"
+            stroke-width="1.5"
+            stroke-linejoin="round"
+          />
+          <ellipse cx="16" cy="15" rx="8" ry="1.6" fill="#6b7a4a" />
+          <path
+            d="M25 17 Q29 18 28.5 22 Q28 25 24.5 24.5"
+            fill="none"
+            stroke="#3a2e14"
+            stroke-width="1.5"
+            stroke-linecap="round"
+          />
+        </svg>
+        <span class="font-semibold">thistle tea</span>
       </div>
-      <div class="h-96">
+      <div class="flex gap-6 text-[#6b7a4a]">
+        <a href="https://pikdum.dev/tags/world-of-warcraft/" class="hover:underline">devlog</a>
+        <a href="https://github.com/pikdum/thistle_tea" class="hover:underline">github</a>
+        <a href="https://discord.gg/dSYsRXHDhb" class="hover:underline">discord</a>
+      </div>
+    </div>
+
+    <%!-- hero --%>
+    <div class="mb-7 max-w-[820px]">
+      <h1
+        class="m-0 text-[28px] font-medium leading-snug text-[#2a2a14]"
+        style="letter-spacing: -0.2px;"
+      >
+        a <span class="text-[#6b7a4a]">vanilla 1.12.1 wow server</span>, written in elixir.
+      </h1>
+      <p class="mt-2 mb-0 text-[13px] text-[#5a5a3a]">
+        open source · hobby project · since 2024
+      </p>
+    </div>
+
+    <%!-- connect + register --%>
+    <div class="mb-12 grid grid-cols-1 gap-12 lg:grid-cols-2">
+      <div>
+        <div class="mb-3 text-[11px] tracking-[2px] text-[#6b7a4a] uppercase">
+          how to come and play
+        </div>
+        <ol class="mt-1.5 mb-3 list-decimal pl-[18px] text-[14px] leading-7">
+          <li>get a WoW <strong>1.12.1</strong> client (build 5875)</li>
+          <li>edit <code class="text-[#6b7a4a]">realmlist.wtf</code>:</li>
+        </ol>
+        <div
+          class="rounded text-[13px] text-[#e8dcb4]"
+          style="background: #3a2e14; padding: 10px 14px;"
+        >
+          set realmlist {@game_server}
+        </div>
+        <div class="mt-2.5 text-[12px] text-[#8a7a4a]">
+          log in with your account, or use the shared
+          <span class="text-[#2a2a14]">test / test</span>
+          to try it out
+        </div>
+      </div>
+
+      <div>
+        <div class="mb-3 text-[11px] tracking-[2px] text-[#6b7a4a] uppercase">
+          open an account
+        </div>
+        <.form
+          for={%{}}
+          action={~p"/register"}
+          class="mt-1.5 grid grid-cols-[1fr_1fr_auto] gap-2"
+        >
+          <input
+            type="text"
+            name="username"
+            placeholder="account name"
+            maxlength="16"
+            required
+            class="w-full rounded border border-[#c8b878] bg-[#fdfaf0] px-3 py-2.5 text-[13px] text-[#2a2a14] outline-none placeholder:text-[#a8a078] focus:border-[#6b7a4a] focus:ring-0"
+            style="font-family: inherit;"
+          />
+          <input
+            type="password"
+            name="password"
+            placeholder="password"
+            maxlength="16"
+            required
+            class="w-full rounded border border-[#c8b878] bg-[#fdfaf0] px-3 py-2.5 text-[13px] text-[#2a2a14] outline-none placeholder:text-[#a8a078] focus:border-[#6b7a4a] focus:ring-0"
+            style="font-family: inherit;"
+          />
+          <button
+            type="submit"
+            class="rounded border-0 px-[18px] text-[13px] font-semibold whitespace-nowrap text-[#f4eedc]"
+            style="background: #3a2e14; font-family: inherit;"
+          >
+            create →
+          </button>
+        </.form>
+        <div class="mt-2.5 text-[12px] text-[#8a7a4a]">
+          local to this realm · no email needed
+        </div>
+      </div>
+    </div>
+
+    <%!-- live map --%>
+    <div class="mb-14">
+      <div class="mb-3 flex items-baseline justify-between">
+        <div class="text-[11px] tracking-[2px] text-[#6b7a4a] uppercase">
+          live · where everyone is
+        </div>
+        <div class="text-[12px] text-[#8a7a4a]">updates every second</div>
+      </div>
+      <div
+        class="overflow-hidden rounded-md"
+        style="border: 1px solid #c8bc94; background: #3a2e14; height: 540px;"
+      >
         {live_render(@conn, ThistleTeaWeb.MapLive.Index, id: "map-live-view")}
       </div>
     </div>
-  </div>
-  <div class="bg-emerald-50 text-center">
-    <div class="max-w-[60rem] mx-auto p-4">
-      <h2 class="text-3xl">Contribute to the project</h2>
-      <p class="mt-4 leading-8">
-        Thistle Tea is a new project and there's a ton to do.
-        We're looking for contributors of all skill levels interested in helping out.
-        Check out the project on
-        <a href="https://github.com/pikdum/thistle_tea" class="text-emerald-600 hover:underline">
-          GitHub
-        </a>
-        and join our
-        <a href="https://discord.gg/dSYsRXHDhb" class="text-emerald-600 hover:underline">
-          Discord
-        </a>
-        channel to chat.
-      </p>
+
+    <%!-- about --%>
+    <div
+      class="grid grid-cols-1 gap-12 pt-9 md:grid-cols-3"
+      style="border-top: 1px solid #d8cfa8;"
+    >
+      <div>
+        <div class="mb-2.5 text-[14px] font-semibold text-[#2a2a14]">brewed in elixir</div>
+        <div class="text-[13px] leading-7 text-[#5a5a3a]">
+          every mob and player session runs as its own otp process. when one crashes, its supervisor reaches for the kettle and pours another.
+        </div>
+      </div>
+      <div>
+        <div class="mb-2.5 text-[14px] font-semibold text-[#2a2a14]">properly steeped</div>
+        <div class="text-[13px] leading-7 text-[#5a5a3a]">
+          patch 1.12.1, build 5875. the world unchanged: no transmog, no tokens, no flying. the bugs we keep are the ones we love.
+        </div>
+      </div>
+      <div>
+        <div class="mb-2.5 text-[14px] font-semibold text-[#2a2a14]">help brew the next pot</div>
+        <div class="text-[13px] leading-7 text-[#5a5a3a]">
+          thistle tea is a new project and there's a ton to do. we're looking for contributors of all skill levels — hop on
+          <a href="https://github.com/pikdum/thistle_tea" class="text-[#6b7a4a] hover:underline">github</a>
+          or join the
+          <a href="https://discord.gg/dSYsRXHDhb" class="text-[#6b7a4a] hover:underline">discord</a>
+          to chat.
+        </div>
+      </div>
+    </div>
+
+    <div
+      class="mt-10 flex flex-col gap-2 pt-5 text-[12px] text-[#8a7a4a] sm:flex-row sm:justify-between"
+      style="border-top: 1px solid #d8cfa8;"
+    >
+      <span>thistle tea · agpl-3.0</span>
+      <span class="flex gap-4">
+        <a href="https://github.com/pikdum/thistle_tea" class="hover:underline">github</a>
+        <a href="https://discord.gg/dSYsRXHDhb" class="hover:underline">discord</a>
+        <a href="https://pikdum.dev/tags/world-of-warcraft/" class="hover:underline">devlog</a>
+      </span>
     </div>
   </div>
 </div>

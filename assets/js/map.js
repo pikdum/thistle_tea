@@ -17,7 +17,7 @@ const extent = [0, 0, WIDTH, HEIGHT];
 
 // bit custom to make it look nice
 const CENTER = [6328.524649884811, 6002.505656354451];
-const INITIAL_ZOOM = 1.3;
+const INITIAL_ZOOM = 2.3;
 
 export const setupMap = (el) => {
   const projection = new Projection({

@@ -18,6 +18,7 @@ defmodule ThistleTeaWeb.Router do
     pipe_through(:browser)
 
     get("/", PageController, :home)
+    post("/register", PageController, :register)
     # live("/map", MapLive.Index)
   end
 
