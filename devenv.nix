@@ -9,6 +9,7 @@
 {
   # https://devenv.sh/packages/
   packages = [
+    pkgs.docker
     pkgs.git
     pkgs.bun
     pkgs.inotify-tools
