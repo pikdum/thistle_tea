@@ -11,6 +11,8 @@ defmodule ThistleTea.Game.World.Loader.Mob do
     Mangos.Creature.query_cell(cell, events)
     |> Mangos.Repo.all()
     |> Enum.map(&load_creature_movement/1)
+    |> Enum.map(&load_creature_model_info/1)
+    |> Enum.map(&load_equip_items/1)
     |> Enum.each(&start/1)
   end
 
@@ -21,6 +23,41 @@ defmodule ThistleTea.Game.World.Loader.Mob do
 
     Map.put(creature, :creature_movement, creature_movement)
   end
+
+  defp load_creature_model_info(%Mangos.Creature{modelid: modelid} = creature)
+       when is_integer(modelid) and modelid > 0 do
+    Map.put(creature, :creature_model_info, Mangos.Repo.get(Mangos.CreatureModelInfo, modelid))
+  end
+
+  defp load_creature_model_info(%Mangos.Creature{} = creature) do
+    Map.put(creature, :creature_model_info, nil)
+  end
+
+  defp load_equip_items(
+         %Mangos.Creature{creature_template: %Mangos.CreatureTemplate{equipment_template_id: id}} = creature
+       )
+       when is_integer(id) and id > 0 do
+    items =
+      case Mangos.Repo.get(Mangos.CreatureEquipTemplate, id) do
+        %Mangos.CreatureEquipTemplate{equipentry1: e1, equipentry2: e2, equipentry3: e3} ->
+          Enum.map([e1, e2, e3], &creature_item_template/1)
+
+        nil ->
+          [nil, nil, nil]
+      end
+
+    Map.put(creature, :equip_items, items)
+  end
+
+  defp load_equip_items(%Mangos.Creature{} = creature) do
+    Map.put(creature, :equip_items, [nil, nil, nil])
+  end
+
+  defp creature_item_template(entry) when is_integer(entry) and entry > 0 do
+    Mangos.Repo.get(Mangos.CreatureItemTemplate, entry)
+  end
+
+  defp creature_item_template(_entry), do: nil
 
   defp start(%Mangos.Creature{} = creature) do
     mob = Mob.build(creature)

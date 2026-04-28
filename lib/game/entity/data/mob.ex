@@ -25,8 +25,8 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
         _ -> nil
       end
 
-    model_info = creature_model_info(c)
-    {virtual_item_slot_display, virtual_item_info} = virtual_items(ct)
+    model_info = Map.get(c, :creature_model_info)
+    {virtual_item_slot_display, virtual_item_info} = virtual_items(Map.get(c, :equip_items))
 
     %__MODULE__{
       object: %Object{
@@ -112,24 +112,7 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
 
   defp scale_factor(_template), do: 1.0
 
-  defp creature_model_info(%Mangos.Creature{modelid: modelid}) when is_integer(modelid) and modelid > 0 do
-    Mangos.Repo.get(Mangos.CreatureModelInfo, modelid)
-  end
-
-  defp creature_model_info(_creature), do: nil
-
-  defp virtual_items(%Mangos.CreatureTemplate{equipment_template_id: id}) when is_integer(id) and id > 0 do
-    case Mangos.Repo.get(Mangos.CreatureEquipTemplate, id) do
-      %Mangos.CreatureEquipTemplate{} = equip -> virtual_items_from_equip(equip)
-      nil -> {nil, nil}
-    end
-  end
-
-  defp virtual_items(_template), do: {nil, nil}
-
-  defp virtual_items_from_equip(%Mangos.CreatureEquipTemplate{equipentry1: e1, equipentry2: e2, equipentry3: e3}) do
-    items = Enum.map([e1, e2, e3], &creature_item_template/1)
-
+  defp virtual_items([_, _, _] = items) do
     if Enum.all?(items, &is_nil/1) do
       {nil, nil}
     else
@@ -137,11 +120,7 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
     end
   end
 
-  defp creature_item_template(entry) when is_integer(entry) and entry > 0 do
-    Mangos.Repo.get(Mangos.CreatureItemTemplate, entry)
-  end
-
-  defp creature_item_template(_entry), do: nil
+  defp virtual_items(_items), do: {nil, nil}
 
   defp pack_virtual_item_slot_display([a, b, c]) do
     item_display_id(a) ||| item_display_id(b) <<< 32 ||| item_display_id(c) <<< 64

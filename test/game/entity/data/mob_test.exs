@@ -6,22 +6,25 @@ defmodule ThistleTea.Game.Entity.Data.MobTest do
 
   describe "build/1" do
     test "stores creature movement speeds as actual speeds" do
-      creature = %Mangos.Creature{
-        guid: 1,
-        id: 2,
-        modelid: 3,
-        curhealth: 10,
-        creature_movement: [],
-        creature_template: %Mangos.CreatureTemplate{
-          entry: 2,
-          name: "Test Creature",
-          speed_walk: 1.2,
-          speed_run: 1.5,
-          min_level: 1,
-          max_level: 1,
-          scale: 1.0
+      creature =
+        %Mangos.Creature{
+          guid: 1,
+          id: 2,
+          modelid: 3,
+          curhealth: 10,
+          creature_movement: [],
+          creature_template: %Mangos.CreatureTemplate{
+            entry: 2,
+            name: "Test Creature",
+            speed_walk: 1.2,
+            speed_run: 1.5,
+            min_level: 1,
+            max_level: 1,
+            scale: 1.0
+          }
         }
-      }
+        |> Map.put(:creature_model_info, nil)
+        |> Map.put(:equip_items, [nil, nil, nil])
 
       mob = Mob.build(creature)
 
