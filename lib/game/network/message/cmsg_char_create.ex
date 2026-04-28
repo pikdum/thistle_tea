@@ -50,7 +50,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgCharCreate do
     with {:ok, name, rest} <- BinaryUtils.parse_string(payload),
          <<race, class, gender, skin_color, face, hair_style, hair_color, facial_hair, outfit_id>> <- rest do
       %__MODULE__{
-        name: name,
+        name: String.capitalize(name),
         race: race,
         class: class,
         gender: gender,
