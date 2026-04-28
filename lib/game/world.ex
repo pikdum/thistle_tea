@@ -17,6 +17,18 @@ defmodule ThistleTea.Game.World do
     SpatialHash.query(:players, map, x, y, z, range)
   end
 
+  def nearby_mobs(
+        %{
+          object: %{guid: self_guid},
+          internal: %Internal{map: map},
+          movement_block: %MovementBlock{position: {x, y, z, _o}}
+        },
+        range \\ 30
+      ) do
+    SpatialHash.query(:mobs, map, x, y, z, range)
+    |> Enum.reject(fn {guid, _distance} -> guid == self_guid end)
+  end
+
   def broadcast_packet(packet, entity, opts \\ [])
 
   def broadcast_packet(packets, entity, opts) when is_list(packets) do

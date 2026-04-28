@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Combat, as: CombatBT
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Movement
+  alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Pathfinding
@@ -20,6 +21,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   @default_bounding_radius 0.6
   @attack_angle_scale 0.3
 
+  @aggro_radius 30.0
+  @aggro_check_delay 1_000
+
   def tree do
     BT.selector([
       BT.sequence([
@@ -29,6 +33,11 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
       BT.sequence([
         BT.condition(&dead?/2),
         BT.action(&idle_dead/2)
+      ]),
+      BT.sequence([
+        BT.condition(&aggro_check_ready?/2),
+        BT.condition(&not_in_combat?/2),
+        BT.action(&try_aggro/2)
       ]),
       BT.sequence([
         BT.condition(&in_combat?/2),
@@ -111,6 +120,50 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
 
   defp in_combat?(%Mob{} = state, %Blackboard{} = blackboard) do
     CombatBT.in_combat?(state, blackboard)
+  end
+
+  defp not_in_combat?(%Mob{} = state, %Blackboard{} = blackboard) do
+    not in_combat?(state, blackboard)
+  end
+
+  defp aggro_check_ready?(_state, %Blackboard{} = blackboard) do
+    Blackboard.ready_for?(blackboard, :next_aggro_at)
+  end
+
+  defp try_aggro(%Mob{} = state, %Blackboard{} = blackboard) do
+    blackboard = Blackboard.put_next_at(blackboard, :next_aggro_at, @aggro_check_delay)
+
+    state =
+      case pick_aggro_target(state) do
+        nil -> state
+        target_guid -> apply_aggro(state, target_guid)
+      end
+
+    {:failure, state, blackboard}
+  end
+
+  defp pick_aggro_target(%Mob{} = state) do
+    World.nearby_mobs(state, @aggro_radius)
+    |> Enum.filter(fn {guid, _distance} -> aggro_candidate?(guid) end)
+    |> case do
+      [] -> nil
+      candidates -> candidates |> Enum.random() |> elem(0)
+    end
+  end
+
+  defp aggro_candidate?(guid) when is_integer(guid) do
+    case Metadata.query(guid, [:alive?]) do
+      %{alive?: false} -> false
+      _ -> true
+    end
+  end
+
+  defp apply_aggro(%Mob{unit: %Unit{} = unit, internal: %Internal{} = internal} = state, target_guid) do
+    Metadata.increment(target_guid, :attacker_count)
+    unit = %{unit | target: target_guid}
+    internal = %{internal | in_combat: true, last_hostile_time: Time.now()}
+    state = %{state | unit: unit, internal: internal}
+    Core.mark_broadcast_update(state)
   end
 
   defp set_running_true(%Mob{} = state, %Blackboard{} = blackboard) do

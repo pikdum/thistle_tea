@@ -17,6 +17,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.World.System.GameEvent
 
   @ai_tick_ms 100
+  @ai_tick_max_ms 1_000
 
   def start_link(%Mob{} = state) do
     GenServer.start_link(__MODULE__, state)
@@ -139,7 +140,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   end
 
   defp ai_tick_delay({:running, delay_ms}) when is_integer(delay_ms) and delay_ms >= 0 do
-    delay_ms
+    min(delay_ms, @ai_tick_max_ms)
   end
 
   defp ai_tick_delay(_status), do: @ai_tick_ms
