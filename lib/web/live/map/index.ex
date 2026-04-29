@@ -13,8 +13,9 @@ defmodule ThistleTeaWeb.MapLive.Index do
   def render(assigns) do
     ~H"""
     <div
-      class="relative h-full w-full cursor-grab bg-stone-200 active:cursor-grabbing"
+      class="relative h-full w-full cursor-grab active:cursor-grabbing"
       id="map-wrapper"
+      style="background: #f0e9d4;"
     >
       <div class="h-full w-full" id="map" phx-hook="Map" phx-update="ignore" />
       <%= if @map_ready do %>
