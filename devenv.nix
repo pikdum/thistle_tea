@@ -7,6 +7,8 @@
 }:
 
 {
+  env.MIX_OS_DEPS_COMPILE_PARTITION_COUNT = 4;
+
   # https://devenv.sh/packages/
   packages = [
     pkgs.docker
@@ -17,8 +19,11 @@
 
   # https://devenv.sh/languages/
   languages.rust.enable = true;
-  languages.elixir.enable = true;
-  languages.erlang.enable = true;
+  languages.elixir = {
+    enable = true;
+    package = pkgs.elixir_1_19;
+  };
+  languages.nix.enable = true;
 
   # https://devenv.sh/git-hooks/
   git-hooks.hooks = {
