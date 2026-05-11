@@ -147,8 +147,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgPlayerLogin do
       })
     end
 
-    # item packets
-    UpdateObject.get_item_packets(c.player)
+    UpdateObject.get_item_updates(c.player)
     |> Network.send_packet()
 
     # packet for player
@@ -163,7 +162,6 @@ defmodule ThistleTea.Game.Network.Message.CmsgPlayerLogin do
     }
     |> struct(Map.from_struct(c))
     |> Map.put(:movement_block, movement_block)
-    |> UpdateObject.to_packet()
     |> Network.send_packet()
   end
 

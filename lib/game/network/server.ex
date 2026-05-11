@@ -29,6 +29,7 @@ defmodule ThistleTea.Game.Network.Server do
   @update_flag_living 0x20
   @update_flag_has_position 0x40
   @player_tick_ms 100
+  @update_batch_max 100
 
   @impl ThousandIsland.Handler
   def handle_data(data, _socket, %{conn: %Connection{} = conn} = state) do
@@ -66,32 +67,33 @@ defmodule ThistleTea.Game.Network.Server do
     |> handle_packets()
   end
 
-  # TODO: temporarily disabled batching due to issues
-  # it seems like it doesn't like mixing player + mob packets?
-  def accumulate_updates(size, body) do
-    %Packet{opcode: @smsg_update_object, payload: <<size::little-size(32), 0, body::binary>>}
+  def accumulate_updates(%UpdateObject{} = update, recipient_guid) do
+    [update]
+    |> drain_pending_updates(1)
+    |> Enum.reverse()
+    |> UpdateObject.to_packet(recipient_guid)
   end
 
-  # def accumulate_updates(size, body) do
-  #   receive do
-  #     {:"$gen_cast",
-  #      {:send_packet,
-  #       %Packet{opcode: @smsg_update_object, payload: <<next_size::little-size(32), 0, next_body::binary>>}}}
-  #     when size + next_size <= 100 ->
-  #       accumulate_updates(size + next_size, body <> next_body)
-  #   after
-  #     0 -> %Packet{opcode: @smsg_update_object, payload: <<size::little-size(32), 0, body::binary>>}
-  #   end
-  # end
+  defp drain_pending_updates(updates, count) when count < @update_batch_max do
+    receive do
+      {:"$gen_cast", {:send_packet, %UpdateObject{} = update}} ->
+        drain_pending_updates([update | updates], count + 1)
+    after
+      0 -> updates
+    end
+  end
+
+  defp drain_pending_updates(updates, _count), do: updates
 
   @impl GenServer
-  def handle_cast(
-        {:send_packet, %Packet{opcode: @smsg_update_object, payload: <<size::little-size(32), 0, body::binary>>}},
-        {socket, state}
-      ) do
-    packet = accumulate_updates(size, body)
+  def handle_cast({:send_packet, %UpdateObject{} = update}, {socket, state}) do
+    packet = accumulate_updates(update, Map.get(state, :guid))
     state = Network.Send.send_packet(packet, {socket, state})
     {:noreply, {socket, state}, socket.read_timeout}
+  end
+
+  def handle_cast({:send_packet, %Packet{opcode: @smsg_update_object}}, {_socket, _state}) do
+    raise "SMSG_UPDATE_OBJECT packets must be sent as UpdateObject structs"
   end
 
   def handle_cast({:send_packet, packet}, {socket, state}) do
@@ -114,7 +116,6 @@ defmodule ThistleTea.Game.Network.Server do
     }
     |> struct(Map.from_struct(character))
     |> Map.put(:movement_block, movement_block)
-    |> UpdateObject.to_packet()
     |> Network.send_packet(pid)
 
     {:noreply, {socket, state}, socket.read_timeout}
@@ -296,7 +297,7 @@ defmodule ThistleTea.Game.Network.Server do
         :maybe_broadcast_update,
         {socket, %{character: %ThistleTea.Character{internal: %Internal{broadcast_update?: true}} = character} = state}
       ) do
-    Core.update_packet(character, :values)
+    Core.update_object(character, :values)
     |> World.broadcast_packet(character)
 
     Metadata.update(state.guid, %{alive?: not Core.dead?(character)})

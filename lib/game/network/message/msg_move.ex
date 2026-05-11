@@ -76,11 +76,9 @@ defmodule ThistleTea.Game.Network.Message.MsgMove do
         object_type: :player
       }
       |> struct(Map.from_struct(character))
-      |> UpdateObject.to_packet()
       |> World.broadcast_packet(character)
 
-      # item packets
-      UpdateObject.get_item_packets(character.player)
+      UpdateObject.get_item_updates(character.player)
       |> Network.send_packet()
 
       Map.put(state, :character, character)

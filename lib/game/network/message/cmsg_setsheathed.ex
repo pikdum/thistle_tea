@@ -16,7 +16,6 @@ defmodule ThistleTea.Game.Network.Message.CmsgSetsheathed do
     # TODO: this doesn't show the unsheathing animation
     %UpdateObject{update_type: :values, object_type: :player}
     |> struct(Map.from_struct(character))
-    |> UpdateObject.to_packet()
     |> World.broadcast_packet(state.character)
 
     %{state | character: character}

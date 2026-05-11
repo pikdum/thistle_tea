@@ -73,17 +73,18 @@ defmodule ThistleTea.Game.Network.UpdateObject do
 
   def mask_blocks_count(fields) do
     fields
-    |> max_offset()
+    |> highest_bit()
+    |> Kernel.+(1)
     |> Kernel./(32)
     |> ceil()
     |> trunc()
     |> max(1)
   end
 
-  def max_offset(fields) do
+  def highest_bit(fields) do
     fields
-    |> Enum.map(fn {_key, _value, {offset, _size, _type}} -> offset end)
-    |> Enum.max()
+    |> Enum.map(fn {_key, _value, {offset, size, _type}} -> offset + size - 1 end)
+    |> Enum.max(fn -> 0 end)
   end
 
   # TODO: this still feels ugly
@@ -112,7 +113,9 @@ defmodule ThistleTea.Game.Network.UpdateObject do
     |> Enum.reduce(<<>>, fn x, acc -> acc <> x end)
   end
 
-  def flatten_field_structs(%__MODULE__{} = obj) do
+  def flatten_field_structs(obj_or_structs, target \\ :self)
+
+  def flatten_field_structs(%__MODULE__{} = obj, target) do
     [
       obj.object,
       obj.item,
@@ -124,13 +127,13 @@ defmodule ThistleTea.Game.Network.UpdateObject do
       obj.corpse
     ]
     |> Enum.reject(&is_nil/1)
-    |> flatten_field_structs()
+    |> flatten_field_structs(target)
   end
 
-  def flatten_field_structs(field_structs) do
+  def flatten_field_structs(field_structs, target) when is_list(field_structs) do
     field_structs
     |> Enum.flat_map(fn field_struct ->
-      field_struct.__struct__.to_list(field_struct)
+      field_struct.__struct__.to_list(field_struct, target)
     end)
   end
 
@@ -152,8 +155,9 @@ defmodule ThistleTea.Game.Network.UpdateObject do
     <<value::little-size(size)>> <> build_bytes(rest)
   end
 
-  defp packet_body(%__MODULE__{update_type: :values, object: object} = obj) do
-    fields = flatten_field_structs(obj)
+  defp packet_body(%__MODULE__{update_type: :values, object: object} = obj, recipient_guid) do
+    target = visibility_target(object.guid, recipient_guid)
+    fields = flatten_field_structs(obj, target)
     packed_guid = BinaryUtils.pack_guid(object.guid)
     mask_count = mask_blocks_count(fields)
     mask = generate_mask(fields)
@@ -162,10 +166,14 @@ defmodule ThistleTea.Game.Network.UpdateObject do
     <<@update_type_values>> <> packed_guid <> <<mask_count>> <> mask <> objects
   end
 
-  defp packet_body(%__MODULE__{update_type: update_type, object: object, object_type: object_type} = obj)
+  defp packet_body(
+         %__MODULE__{update_type: update_type, object: object, object_type: object_type} = obj,
+         recipient_guid
+       )
        when update_type in [:create_object, :create_object2] do
     obj = %{obj | object: Map.put(object, :type, object_type_flags(obj))}
-    fields = flatten_field_structs(obj)
+    target = visibility_target(object.guid, recipient_guid)
+    fields = flatten_field_structs(obj, target)
     packed_guid = BinaryUtils.pack_guid(object.guid)
     mask_count = mask_blocks_count(fields)
     mask = generate_mask(fields)
@@ -181,6 +189,10 @@ defmodule ThistleTea.Game.Network.UpdateObject do
       objects
   end
 
+  defp visibility_target(_object_guid, nil), do: :self
+  defp visibility_target(guid, guid), do: :self
+  defp visibility_target(_object_guid, _recipient_guid), do: :other
+
   defp packet_header(%__MODULE__{} = _obj) do
     <<1::little-size(32), 0>>
   end
@@ -189,12 +201,14 @@ defmodule ThistleTea.Game.Network.UpdateObject do
     <<Enum.count(objects)::little-size(32), 0>>
   end
 
-  def to_packet(objects) when is_list(objects) do
+  def to_packet(obj_or_objects, recipient_guid \\ nil)
+
+  def to_packet(objects, recipient_guid) when is_list(objects) do
     header = packet_header(objects)
 
     payload =
       Enum.reduce(objects, header, fn obj, acc ->
-        acc <> packet_body(obj)
+        acc <> packet_body(obj, recipient_guid)
       end)
 
     %Packet{
@@ -203,10 +217,10 @@ defmodule ThistleTea.Game.Network.UpdateObject do
     }
   end
 
-  def to_packet(%__MODULE__{} = obj) do
+  def to_packet(%__MODULE__{} = obj, recipient_guid) do
     %Packet{
       opcode: @smsg_update_object,
-      payload: packet_header(obj) <> packet_body(obj)
+      payload: packet_header(obj) <> packet_body(obj, recipient_guid)
     }
   end
 
@@ -221,7 +235,7 @@ defmodule ThistleTea.Game.Network.UpdateObject do
   end
 
   # TODO: items need a proper lifecycle, this is just a hack
-  def get_item_packets(%Player{} = player) do
+  def get_item_updates(%Player{} = player) do
     [
       player.visible_item_1_0,
       player.visible_item_2_0,
@@ -262,7 +276,5 @@ defmodule ThistleTea.Game.Network.UpdateObject do
         }
       }
     end)
-    |> Enum.chunk_every(20)
-    |> Enum.map(&to_packet/1)
   end
 end

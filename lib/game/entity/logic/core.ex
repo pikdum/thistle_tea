@@ -12,18 +12,17 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
 
   @leash_timeout_ms 6_000
 
-  def update_packet(entity, update_type \\ :create_object2)
-  def update_packet(%Mob{} = entity, update_type), do: update_packet(entity, update_type, :unit)
-  def update_packet(%GameObject{} = entity, update_type), do: update_packet(entity, update_type, :game_object)
-  def update_packet(%ThistleTea.Character{} = entity, update_type), do: update_packet(entity, update_type, :player)
+  def update_object(entity, update_type \\ :create_object2)
+  def update_object(%Mob{} = entity, update_type), do: update_object(entity, update_type, :unit)
+  def update_object(%GameObject{} = entity, update_type), do: update_object(entity, update_type, :game_object)
+  def update_object(%ThistleTea.Character{} = entity, update_type), do: update_object(entity, update_type, :player)
 
-  def update_packet(entity, update_type, object_type) do
+  def update_object(entity, update_type, object_type) do
     %UpdateObject{
       update_type: update_type,
       object_type: object_type
     }
     |> struct(Map.from_struct(entity))
-    |> UpdateObject.to_packet()
   end
 
   def take_damage(%{unit: %Unit{health: health} = unit} = entity, damage) do

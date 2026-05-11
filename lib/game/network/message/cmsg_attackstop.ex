@@ -27,7 +27,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgAttackstop do
       |> BT.reset_attack_started()
       |> clear_combat()
 
-    Core.update_packet(character, :values)
+    Core.update_object(character, :values)
     |> World.broadcast_packet(character)
 
     case Map.get(state, :player_tick_ref) do

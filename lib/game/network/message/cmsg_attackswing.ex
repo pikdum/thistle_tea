@@ -20,7 +20,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgAttackswing do
         |> maybe_reset_attack_started(target_guid)
         |> engage_combat(target_guid)
 
-      Core.update_packet(character, :values)
+      Core.update_object(character, :values)
       |> World.broadcast_packet(character)
 
       state

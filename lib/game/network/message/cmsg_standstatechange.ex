@@ -12,7 +12,6 @@ defmodule ThistleTea.Game.Network.Message.CmsgStandstatechange do
 
     %UpdateObject{update_type: :values, object_type: :player}
     |> struct(Map.from_struct(character))
-    |> UpdateObject.to_packet()
     |> World.broadcast_packet(character, include_self?: false)
 
     # TODO: for some reason players are stuck sitting

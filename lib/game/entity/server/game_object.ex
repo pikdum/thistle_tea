@@ -23,7 +23,7 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
 
   @impl GenServer
   def handle_cast({:send_update_to, pid}, state) do
-    Core.update_packet(state)
+    Core.update_object(state)
     |> Network.send_packet(pid)
 
     {:noreply, state}
