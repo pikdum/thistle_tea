@@ -12,7 +12,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgLogoutCancel do
     Logger.info("CMSG_LOGOUT_CANCEL")
 
     state =
-      case Map.get(state, :logout_timer, nil) do
+      case Map.get(state, :logout_timer) do
         nil ->
           state
 

@@ -91,7 +91,9 @@ defmodule ThistleTea.Game.Network.Message.CmsgMessagechat do
   end
 
   def handle_chat(state, _, _, ".modify" <> params, _) do
-    case params |> String.split(" ", trim: true) do
+    params
+    |> String.split(" ", trim: true)
+    |> case do
       ["speed", rate] ->
         handle_modify_speed(state, rate)
 
@@ -129,7 +131,10 @@ defmodule ThistleTea.Game.Network.Message.CmsgMessagechat do
   end
 
   def handle_chat(state, _, _, ".go xyz " <> rest, _) do
-    case rest |> String.split(" ", trim: true) |> parse_coords() do
+    rest
+    |> String.split(" ", trim: true)
+    |> parse_coords()
+    |> case do
       {:ok, x, y, z, map} -> teleport_player(state, x, y, z, map)
       {:ok, x, y, z} -> teleport_player(state, x, y, z, state.character.internal.map)
       :error -> system_message(state, "Invalid command. Use: .go xyz <x> <y> <z> [map]")

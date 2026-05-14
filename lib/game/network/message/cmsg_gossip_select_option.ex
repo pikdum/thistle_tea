@@ -21,9 +21,10 @@ defmodule ThistleTea.Game.Network.Message.CmsgGossipSelectOption do
         state
 
       option ->
-        case from(gm in Mangos.GossipMenu, where: gm.entry == ^option.action_menu_id, limit: 1)
-             |> Mangos.Repo.one()
-             |> Mangos.Repo.preload(:gossip_menu_option) do
+        from(gm in Mangos.GossipMenu, where: gm.entry == ^option.action_menu_id, limit: 1)
+        |> Mangos.Repo.one()
+        |> Mangos.Repo.preload(:gossip_menu_option)
+        |> case do
           nil ->
             state
 

@@ -19,15 +19,16 @@ defmodule ThistleTea.Game.Network.Message.CmsgGossipHello do
     # TODO: what to do if there are multiple gossip menus?
     # send a packet for each?
     # check conditions?
-    case from(c in Mangos.Creature,
-           where: c.guid == ^low_guid,
-           join: ct in assoc(c, :creature_template),
-           left_join: gm in assoc(ct, :gossip_menu),
-           select: gm,
-           limit: 1
-         )
-         |> Mangos.Repo.one()
-         |> Mangos.Repo.preload(:gossip_menu_option) do
+    from(c in Mangos.Creature,
+      where: c.guid == ^low_guid,
+      join: ct in assoc(c, :creature_template),
+      left_join: gm in assoc(ct, :gossip_menu),
+      select: gm,
+      limit: 1
+    )
+    |> Mangos.Repo.one()
+    |> Mangos.Repo.preload(:gossip_menu_option)
+    |> case do
       nil ->
         state
 
