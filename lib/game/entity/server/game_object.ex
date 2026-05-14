@@ -1,22 +1,21 @@
 defmodule ThistleTea.Game.Entity.Server.GameObject do
   use GenServer
 
-  alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.GameObject
   alias ThistleTea.Game.Entity.Logic.Core
+  alias ThistleTea.Game.Entity.Registry, as: EntityRegistry
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.System.GameEvent
 
   def start_link(%GameObject{} = state) do
-    GenServer.start_link(__MODULE__, state)
+    GenServer.start_link(__MODULE__, state, name: EntityRegistry.via(state.object.guid))
   end
 
   @impl GenServer
   def init(%GameObject{} = state) do
     GameEvent.subscribe(state)
     Process.flag(:trap_exit, true)
-    Entity.register(state.object.guid)
     Core.set_position(state)
     {:ok, state}
   end
