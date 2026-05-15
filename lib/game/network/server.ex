@@ -68,10 +68,13 @@ defmodule ThistleTea.Game.Network.Server do
   end
 
   def accumulate_updates(%UpdateObject{} = update, recipient_guid) do
-    [update]
-    |> drain_pending_updates(1)
-    |> Enum.reverse()
-    |> UpdateObject.to_packet(recipient_guid)
+    updates =
+      [update]
+      |> drain_pending_updates(1)
+      |> Enum.reverse()
+      |> remove_redundant_values_before_creates()
+
+    UpdateObject.to_packet(updates, recipient_guid)
   end
 
   defp drain_pending_updates(updates, count) when count < @update_batch_max do
@@ -84,6 +87,25 @@ defmodule ThistleTea.Game.Network.Server do
   end
 
   defp drain_pending_updates(updates, _count), do: updates
+
+  defp remove_redundant_values_before_creates(updates) do
+    create_guids =
+      updates
+      |> Enum.filter(&create_update?/1)
+      |> MapSet.new(& &1.object.guid)
+
+    Enum.reject(updates, fn
+      %UpdateObject{update_type: :values, object: %{guid: guid}} -> MapSet.member?(create_guids, guid)
+      %UpdateObject{} -> false
+    end)
+  end
+
+  defp create_update?(%UpdateObject{update_type: update_type, object: %{guid: guid}})
+       when update_type in [:create_object, :create_object2] and is_integer(guid) do
+    true
+  end
+
+  defp create_update?(%UpdateObject{}), do: false
 
   @impl GenServer
   def handle_cast({:send_packet, %UpdateObject{} = update}, {socket, state}) do

@@ -32,6 +32,19 @@ defmodule ThistleTea.Game.Network.ServerTest do
 
       assert_received {:"$gen_cast", {:send_packet, %Packet{opcode: 0x123}}}
     end
+
+    test "drops values updates when the same batch creates that object" do
+      values_update = update_object(:unit, 2, :values)
+      create_update = update_object(:unit, 2, :create_object2)
+      other_create_update = update_object(:unit, 3, :create_object2)
+
+      send(self(), {:"$gen_cast", {:send_packet, create_update}})
+      send(self(), {:"$gen_cast", {:send_packet, other_create_update}})
+
+      packet = Server.accumulate_updates(values_update, nil)
+
+      assert object_count(packet) == 2
+    end
   end
 
   describe "handle_cast/2" do
@@ -47,8 +60,16 @@ defmodule ThistleTea.Game.Network.ServerTest do
   end
 
   defp update_object(:player, guid) do
+    update_object(:player, guid, :create_object2)
+  end
+
+  defp update_object(:unit, guid) do
+    update_object(:unit, guid, :create_object2)
+  end
+
+  defp update_object(:player, guid, update_type) do
     %UpdateObject{
-      update_type: :create_object2,
+      update_type: update_type,
       object_type: :player,
       movement_block: %MovementBlock{update_flag: 0, position: {0.0, 0.0, 0.0, 0.0}},
       object: object(guid),
@@ -64,9 +85,9 @@ defmodule ThistleTea.Game.Network.ServerTest do
     }
   end
 
-  defp update_object(:unit, guid) do
+  defp update_object(:unit, guid, update_type) do
     %UpdateObject{
-      update_type: :create_object2,
+      update_type: update_type,
       object_type: :unit,
       movement_block: %MovementBlock{update_flag: 0, position: {0.0, 0.0, 0.0, 0.0}},
       object: object(guid),
