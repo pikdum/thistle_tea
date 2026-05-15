@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Network.Server do
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.Combat
   alias ThistleTea.Game.Entity.Logic.Core
+  alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Connection
   alias ThistleTea.Game.Network.Message
@@ -68,13 +69,20 @@ defmodule ThistleTea.Game.Network.Server do
   end
 
   def accumulate_updates(%UpdateObject{} = update, recipient_guid) do
-    updates =
-      [update]
-      |> drain_pending_updates(1)
-      |> Enum.reverse()
-      |> remove_redundant_values_before_creates()
+    update
+    |> accumulate_update_batch()
+    |> UpdateObject.to_packet(recipient_guid)
+  end
 
-    UpdateObject.to_packet(updates, recipient_guid)
+  defp accumulate_updates_with_batch(%UpdateObject{} = update, recipient_guid) do
+    updates = accumulate_update_batch(update)
+    {UpdateObject.to_packet(updates, recipient_guid), updates}
+  end
+
+  defp accumulate_update_batch(%UpdateObject{} = update) do
+    [update]
+    |> drain_pending_updates(1)
+    |> Enum.reverse()
   end
 
   defp drain_pending_updates(updates, count) when count < @update_batch_max do
@@ -88,18 +96,6 @@ defmodule ThistleTea.Game.Network.Server do
 
   defp drain_pending_updates(updates, _count), do: updates
 
-  defp remove_redundant_values_before_creates(updates) do
-    create_guids =
-      updates
-      |> Enum.filter(&create_update?/1)
-      |> MapSet.new(& &1.object.guid)
-
-    Enum.reject(updates, fn
-      %UpdateObject{update_type: :values, object: %{guid: guid}} -> MapSet.member?(create_guids, guid)
-      %UpdateObject{} -> false
-    end)
-  end
-
   defp create_update?(%UpdateObject{update_type: update_type, object: %{guid: guid}})
        when update_type in [:create_object, :create_object2] and is_integer(guid) do
     true
@@ -107,15 +103,89 @@ defmodule ThistleTea.Game.Network.Server do
 
   defp create_update?(%UpdateObject{}), do: false
 
+  defp track_created_updates(state, updates) do
+    created_guids =
+      updates
+      |> Enum.filter(&create_update?/1)
+      |> MapSet.new(& &1.object.guid)
+
+    Map.update(state, :tracked_entities, created_guids, &MapSet.union(&1, created_guids))
+  end
+
+  defp untrack_entity(state, guid) when is_integer(guid) do
+    Map.update(state, :tracked_entities, MapSet.new(), &MapSet.delete(&1, guid))
+  end
+
+  defp source_tracked?(_state, nil), do: true
+
+  defp source_tracked?(state, source_guid) when is_integer(source_guid) do
+    entity_tracked?(state, source_guid)
+  end
+
+  defp source_tracked?(_state, _source_guid), do: false
+
+  defp entity_tracked?(state, guid) when is_integer(guid) do
+    state
+    |> Map.get(:tracked_entities, MapSet.new())
+    |> MapSet.member?(guid)
+  end
+
+  defp entity_tracked?(_state, _guid), do: false
+
   @impl GenServer
   def handle_cast({:send_packet, %UpdateObject{} = update}, {socket, state}) do
-    packet = accumulate_updates(update, Map.get(state, :guid))
+    {packet, updates} = accumulate_updates_with_batch(update, Map.get(state, :guid))
     state = Network.Send.send_packet(packet, {socket, state})
+    state = track_created_updates(state, updates)
     {:noreply, {socket, state}, socket.read_timeout}
+  end
+
+  def handle_cast({:send_packet, %UpdateObject{} = update, opts}, {socket, state}) do
+    if source_tracked?(state, Keyword.get(opts, :source_guid)) do
+      {packet, updates} = accumulate_updates_with_batch(update, Map.get(state, :guid))
+      state = Network.Send.send_packet(packet, {socket, state})
+      state = track_created_updates(state, updates)
+      {:noreply, {socket, state}, socket.read_timeout}
+    else
+      {:noreply, {socket, state}, socket.read_timeout}
+    end
   end
 
   def handle_cast({:send_packet, %Packet{opcode: @smsg_update_object}}, {_socket, _state}) do
     raise "SMSG_UPDATE_OBJECT packets must be sent as UpdateObject structs"
+  end
+
+  def handle_cast({:send_packet, %Packet{opcode: @smsg_update_object}, _opts}, {_socket, _state}) do
+    raise "SMSG_UPDATE_OBJECT packets must be sent as UpdateObject structs"
+  end
+
+  def handle_cast({:send_packet, %Message.SmsgDestroyObject{guid: guid} = packet}, {socket, state}) do
+    if entity_tracked?(state, guid) do
+      state = Network.Send.send_packet(packet, {socket, state})
+      state = untrack_entity(state, guid)
+      {:noreply, {socket, state}, socket.read_timeout}
+    else
+      {:noreply, {socket, state}, socket.read_timeout}
+    end
+  end
+
+  def handle_cast({:send_packet, %Message.SmsgDestroyObject{guid: guid} = packet, opts}, {socket, state}) do
+    if source_tracked?(state, Keyword.get(opts, :source_guid)) do
+      state = Network.Send.send_packet(packet, {socket, state})
+      state = untrack_entity(state, guid)
+      {:noreply, {socket, state}, socket.read_timeout}
+    else
+      {:noreply, {socket, state}, socket.read_timeout}
+    end
+  end
+
+  def handle_cast({:send_packet, packet, opts}, {socket, state}) do
+    if source_tracked?(state, Keyword.get(opts, :source_guid)) do
+      state = Network.Send.send_packet(packet, {socket, state})
+      {:noreply, {socket, state}, socket.read_timeout}
+    else
+      {:noreply, {socket, state}, socket.read_timeout}
+    end
   end
 
   def handle_cast({:send_packet, packet}, {socket, state}) do
@@ -156,7 +226,6 @@ defmodule ThistleTea.Game.Network.Server do
   @impl GenServer
   def handle_cast({:destroy_object, guid}, {socket, state}) do
     Network.send_packet(%Message.SmsgDestroyObject{guid: guid})
-    # TODO: remove from spawned_players/etc.?
     {:noreply, {socket, state}, socket.read_timeout}
   end
 
@@ -192,9 +261,9 @@ defmodule ThistleTea.Game.Network.Server do
     state =
       Map.merge(state, %{
         character: character,
-        ready: false
+        ready: false,
+        tracked_entities: MapSet.new()
       })
-      |> Map.drop([:spawned_players, :spawned_mobs, :spawned_game_objects])
 
     # Send player's client the new location
     orientation = 0
@@ -240,9 +309,9 @@ defmodule ThistleTea.Game.Network.Server do
     # TODO: add telemetry for periodic tasks
     {x, y, z, _o} = c.movement_block.position
 
-    old_players = Map.get(state, :spawned_players, MapSet.new())
-    old_mobs = Map.get(state, :spawned_mobs, MapSet.new())
-    old_game_objects = Map.get(state, :spawned_game_objects, MapSet.new())
+    old_players = tracked_entities(state, :player)
+    old_mobs = tracked_entities(state, :mob)
+    old_game_objects = tracked_entities(state, :game_object)
 
     new_players =
       SpatialHash.query(:players, c.internal.map, x, y, z, 250)
@@ -299,9 +368,6 @@ defmodule ThistleTea.Game.Network.Server do
 
     state =
       Map.merge(state, %{
-        spawned_players: new_players,
-        spawned_mobs: new_mobs,
-        spawned_game_objects: new_game_objects,
         player_guids: player_guids,
         mob_guids: mob_guids
       })
@@ -312,6 +378,13 @@ defmodule ThistleTea.Game.Network.Server do
   @impl GenServer
   def handle_info(:spawn_objects, {socket, state}) do
     {:noreply, {socket, state}, socket.read_timeout}
+  end
+
+  defp tracked_entities(state, entity_type) do
+    state
+    |> Map.get(:tracked_entities, MapSet.new())
+    |> Enum.filter(&(Guid.entity_type(&1) == entity_type))
+    |> MapSet.new()
   end
 
   @impl GenServer

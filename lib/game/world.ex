@@ -43,7 +43,7 @@ defmodule ThistleTea.Game.World do
     nearby_players(entity, range)
     |> Enum.each(fn {guid, _distance} ->
       if include_self? or guid != source_guid do
-        Network.send_packet(packet, guid)
+        Network.send_packet(packet, guid, source_guid: source_guid)
       end
     end)
   end

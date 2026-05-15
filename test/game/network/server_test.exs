@@ -6,6 +6,8 @@ defmodule ThistleTea.Game.Network.ServerTest do
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Network
+  alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Packet
   alias ThistleTea.Game.Network.Server
   alias ThistleTea.Game.Network.UpdateObject
@@ -32,22 +34,26 @@ defmodule ThistleTea.Game.Network.ServerTest do
 
       assert_received {:"$gen_cast", {:send_packet, %Packet{opcode: 0x123}}}
     end
-
-    test "drops values updates when the same batch creates that object" do
-      values_update = update_object(:unit, 2, :values)
-      create_update = update_object(:unit, 2, :create_object2)
-      other_create_update = update_object(:unit, 3, :create_object2)
-
-      send(self(), {:"$gen_cast", {:send_packet, create_update}})
-      send(self(), {:"$gen_cast", {:send_packet, other_create_update}})
-
-      packet = Server.accumulate_updates(values_update, nil)
-
-      assert object_count(packet) == 2
-    end
   end
 
   describe "handle_cast/2" do
+    test "drops source-scoped packets for untracked entities" do
+      socket = %{read_timeout: 0}
+      state = %{tracked_entities: MapSet.new()}
+      packet = %Packet{opcode: 0x123, payload: <<>>}
+
+      assert {:noreply, {^socket, ^state}, 0} =
+               Server.handle_cast({:send_packet, packet, source_guid: 1}, {socket, state})
+    end
+
+    test "drops destroy packets for untracked entities" do
+      socket = %{read_timeout: 0}
+      state = %{tracked_entities: MapSet.new()}
+      packet = %Message.SmsgDestroyObject{guid: 1}
+
+      assert {:noreply, {^socket, ^state}, 0} = Server.handle_cast({:send_packet, packet}, {socket, state})
+    end
+
     test "raises when a serialized update object packet reaches the server" do
       socket = %{read_timeout: 0}
       state = %{}
@@ -56,6 +62,16 @@ defmodule ThistleTea.Game.Network.ServerTest do
       assert_raise RuntimeError, "SMSG_UPDATE_OBJECT packets must be sent as UpdateObject structs", fn ->
         Server.handle_cast({:send_packet, packet}, {socket, state})
       end
+    end
+  end
+
+  describe "Network.send_packet/3" do
+    test "includes source guid metadata in casts" do
+      packet = %Packet{opcode: 0x123, payload: <<>>}
+
+      assert :ok = Network.send_packet(packet, self(), source_guid: 1)
+
+      assert_receive {:"$gen_cast", {:send_packet, ^packet, [source_guid: 1]}}
     end
   end
 
