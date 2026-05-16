@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
   alias ThistleTea.Game.Entity.Logic.Combat, as: CombatLogic
   alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.Entity.Logic.MeleeSpell
+  alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Metadata
 
@@ -50,22 +51,23 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
 
   def melee_attack(%{unit: %Unit{target: target}} = state, %Blackboard{} = blackboard)
       when is_integer(target) and target > 0 do
-    {state, blackboard} = maybe_start_melee_attack(state, target, blackboard)
+    now = Time.now()
+    {state, blackboard} = maybe_start_melee_attack(state, target, blackboard, now)
     in_range = in_combat_range?(state, blackboard)
-    attack_ready = Blackboard.ready_for?(blackboard, :next_attack_at)
+    attack_ready = Blackboard.ready_for?(blackboard, :next_attack_at, now)
 
     {state, blackboard} =
       cond do
         in_range and attack_ready ->
           attack_speed = CombatLogic.attack_speed_ms(state)
           state = send_melee_attack(state, target)
-          {state, Blackboard.put_next_at(blackboard, :next_attack_at, attack_speed)}
+          {state, Blackboard.put_next_at(blackboard, :next_attack_at, attack_speed, now)}
 
         in_range ->
           {state, blackboard}
 
         attack_ready ->
-          handle_out_of_range(state, blackboard)
+          handle_out_of_range(state, blackboard, now)
 
         true ->
           {state, blackboard}
@@ -77,7 +79,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
   def melee_attack(state, blackboard), do: {:success, state, blackboard}
 
   def wait_for_next_attack(state, %Blackboard{} = blackboard) do
-    delay_ms = Blackboard.delay_until(blackboard, :next_attack_at)
+    delay_ms = Blackboard.delay_until(blackboard, :next_attack_at, Time.now())
 
     status =
       if delay_ms > 0 do
@@ -89,35 +91,35 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
     {status, state, blackboard}
   end
 
-  defp maybe_start_melee_attack(state, target, %Blackboard{attack_started: true} = blackboard)
+  defp maybe_start_melee_attack(state, target, %Blackboard{attack_started: true} = blackboard, _now)
        when is_integer(target) do
     {state, blackboard}
   end
 
-  defp maybe_start_melee_attack(%{object: %{guid: guid}} = state, target, %Blackboard{} = blackboard)
+  defp maybe_start_melee_attack(%{object: %{guid: guid}} = state, target, %Blackboard{} = blackboard, now)
        when is_integer(target) do
     state = Event.enqueue(state, CombatLogic.attack_start(guid, target))
 
     blackboard
     |> Map.put(:attack_started, true)
-    |> maybe_start_attack_timer(state)
+    |> maybe_start_attack_timer(state, now)
     |> then(&{state, &1})
   end
 
-  defp maybe_start_attack_timer(%Blackboard{next_attack_at: 0} = blackboard, state) do
+  defp maybe_start_attack_timer(%Blackboard{next_attack_at: 0} = blackboard, state, now) do
     attack_speed = CombatLogic.attack_speed_ms(state)
-    Blackboard.put_next_at(blackboard, :next_attack_at, attack_speed)
+    Blackboard.put_next_at(blackboard, :next_attack_at, attack_speed, now)
   end
 
-  defp maybe_start_attack_timer(blackboard, _state), do: blackboard
+  defp maybe_start_attack_timer(blackboard, _state, _now), do: blackboard
 
-  defp handle_out_of_range(%Character{} = state, blackboard) do
-    blackboard = Blackboard.put_next_at(blackboard, :next_attack_at, @attack_retry_delay_ms)
+  defp handle_out_of_range(%Character{} = state, blackboard, now) do
+    blackboard = Blackboard.put_next_at(blackboard, :next_attack_at, @attack_retry_delay_ms, now)
     {Event.enqueue(state, Event.attack_not_in_range()), blackboard}
   end
 
-  defp handle_out_of_range(state, blackboard) do
-    blackboard = Blackboard.put_next_at(blackboard, :next_attack_at, @attack_retry_delay_ms)
+  defp handle_out_of_range(state, blackboard, now) do
+    blackboard = Blackboard.put_next_at(blackboard, :next_attack_at, @attack_retry_delay_ms, now)
     {state, blackboard}
   end
 

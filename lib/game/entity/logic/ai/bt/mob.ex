@@ -129,16 +129,17 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   end
 
   defp aggro_check_ready?(_state, %Blackboard{} = blackboard) do
-    Blackboard.ready_for?(blackboard, :next_aggro_at)
+    Blackboard.ready_for?(blackboard, :next_aggro_at, Time.now())
   end
 
   defp try_aggro(%Mob{} = state, %Blackboard{} = blackboard) do
-    blackboard = Blackboard.put_next_at(blackboard, :next_aggro_at, @aggro_check_delay)
+    now = Time.now()
+    blackboard = Blackboard.put_next_at(blackboard, :next_aggro_at, @aggro_check_delay, now)
 
     state =
       case pick_aggro_target(state) do
         nil -> state
-        target_guid -> apply_aggro(state, target_guid)
+        target_guid -> apply_aggro(state, target_guid, now)
       end
 
     {:failure, state, blackboard}
@@ -160,10 +161,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     end
   end
 
-  defp apply_aggro(%Mob{unit: %Unit{} = unit, internal: %Internal{} = internal} = state, target_guid) do
+  defp apply_aggro(%Mob{unit: %Unit{} = unit, internal: %Internal{} = internal} = state, target_guid, now) do
     Metadata.increment(target_guid, :attacker_count)
     unit = %{unit | target: target_guid}
-    internal = %{internal | in_combat: true, last_hostile_time: Time.now()}
+    internal = %{internal | in_combat: true, last_hostile_time: now}
     state = %{state | unit: unit, internal: internal}
     Core.mark_broadcast_update(state)
   end
@@ -235,14 +236,16 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   end
 
   defp chase_ready?(_state, %Blackboard{} = blackboard) do
-    Blackboard.ready_for?(blackboard, :next_chase_at)
+    Blackboard.ready_for?(blackboard, :next_chase_at, Time.now())
   end
 
   defp combat_wait(%Mob{} = state, %Blackboard{} = blackboard) do
+    now = Time.now()
+
     blackboard =
       blackboard
       |> Blackboard.clear_chase()
-      |> Blackboard.put_next_at(:next_chase_at, combat_wait_delay())
+      |> Blackboard.put_next_at(:next_chase_at, combat_wait_delay(), now)
 
     {:running, state, blackboard}
   end
@@ -253,11 +256,12 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
 
   defp chase_repath_and_schedule(%Mob{} = state, %Blackboard{} = blackboard) do
     target = state.unit.target
+    now = Time.now()
 
     case World.target_position(target) do
       {map, x, y, z} when map == state.internal.map ->
-        {state, blackboard} = maybe_repath_chase(state, blackboard, {x, y, z}, target)
-        blackboard = Blackboard.put_next_at(blackboard, :next_chase_at, @chase_tick_delay)
+        {state, blackboard} = maybe_repath_chase(state, blackboard, {x, y, z}, target, now)
+        blackboard = Blackboard.put_next_at(blackboard, :next_chase_at, @chase_tick_delay, now)
         {:running, state, blackboard}
 
       _ ->
@@ -270,17 +274,18 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   end
 
   defp clear_chase_and_idle(%Mob{} = state, %Blackboard{} = blackboard) do
+    now = Time.now()
+
     blackboard =
       blackboard
       |> Blackboard.clear_chase()
-      |> Blackboard.put_next_at(:next_chase_at, idle_delay())
+      |> Blackboard.put_next_at(:next_chase_at, idle_delay(), now)
 
     {:running, state, blackboard}
   end
 
-  defp maybe_repath_chase(%Mob{} = state, %Blackboard{} = blackboard, target_pos, target_guid) do
+  defp maybe_repath_chase(%Mob{} = state, %Blackboard{} = blackboard, target_pos, target_guid, now) do
     target_moved = target_moved_enough?(blackboard, target_pos, target_guid)
-    now = Time.now()
     should_repath = target_moved or not Movement.is_moving?(state, now)
 
     if should_repath do
@@ -396,19 +401,23 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   defp target_bounding_radius(_target_guid), do: Unit.default_bounding_radius()
 
   defp wait_until_wander_ready(%Mob{} = state, %Blackboard{} = blackboard) do
-    if Blackboard.ready_for?(blackboard, :next_wander_at) do
+    now = Time.now()
+
+    if Blackboard.ready_for?(blackboard, :next_wander_at, now) do
       {:success, state, blackboard}
     else
-      delay_ms = Blackboard.delay_until(blackboard, :next_wander_at)
+      delay_ms = Blackboard.delay_until(blackboard, :next_wander_at, now)
       {{:running, delay_ms}, state, blackboard}
     end
   end
 
   defp wait_until_waypoint_ready(%Mob{} = state, %Blackboard{} = blackboard) do
-    if Blackboard.ready_for?(blackboard, :next_waypoint_at) do
+    now = Time.now()
+
+    if Blackboard.ready_for?(blackboard, :next_waypoint_at, now) do
       {:success, state, blackboard}
     else
-      delay_ms = Blackboard.delay_until(blackboard, :next_waypoint_at)
+      delay_ms = Blackboard.delay_until(blackboard, :next_waypoint_at, now)
       {{:running, delay_ms}, state, blackboard}
     end
   end
@@ -425,7 +434,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
              state.internal.spawn_distance
            ) do
         nil ->
-          blackboard = Blackboard.put_next_at(blackboard, :next_wander_at, idle_delay())
+          blackboard = Blackboard.put_next_at(blackboard, :next_wander_at, idle_delay(), Time.now())
           {:running, state, Blackboard.clear_move_target(blackboard)}
 
         {x, y, z} ->
@@ -442,7 +451,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     else
       case waypoint_destination(state) do
         nil ->
-          blackboard = Blackboard.put_next_at(blackboard, :next_waypoint_at, idle_delay())
+          blackboard = Blackboard.put_next_at(blackboard, :next_waypoint_at, idle_delay(), Time.now())
           {:running, state, Blackboard.clear_waypoint(blackboard)}
 
         %{position: {x, y, z, o}, wait_time: wait_time} ->
@@ -502,12 +511,12 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
 
   defp set_next_waypoint_wait(%Mob{} = state, %Blackboard{} = blackboard) do
     wait_time = blackboard.wait_time || 0
-    blackboard = Blackboard.put_next_at(blackboard, :next_waypoint_at, wait_time)
+    blackboard = Blackboard.put_next_at(blackboard, :next_waypoint_at, wait_time, Time.now())
     {:success, state, Blackboard.clear_waypoint(blackboard)}
   end
 
   defp set_next_wander_wait(%Mob{} = state, %Blackboard{} = blackboard) do
-    blackboard = Blackboard.put_next_at(blackboard, :next_wander_at, wander_wait_delay())
+    blackboard = Blackboard.put_next_at(blackboard, :next_wander_at, wander_wait_delay(), Time.now())
     {:success, state, Blackboard.clear_move_target(blackboard)}
   end
 

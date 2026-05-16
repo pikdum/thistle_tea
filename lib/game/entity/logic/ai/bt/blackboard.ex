@@ -26,8 +26,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Blackboard do
   end
 
   def ready_for?(%__MODULE__{} = blackboard, key) when is_atom(key) do
-    now = Time.now()
+    ready_for?(blackboard, key, Time.now())
+  end
 
+  def ready_for?(%__MODULE__{} = blackboard, key, now) when is_atom(key) and is_integer(now) do
     case Map.get(blackboard, key) do
       nil -> true
       0 -> true
@@ -36,8 +38,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Blackboard do
   end
 
   def delay_until(%__MODULE__{} = blackboard, key) when is_atom(key) do
-    now = Time.now()
+    delay_until(blackboard, key, Time.now())
+  end
 
+  def delay_until(%__MODULE__{} = blackboard, key, now) when is_atom(key) and is_integer(now) do
     case Map.get(blackboard, key) do
       nil -> 0
       0 -> 0
@@ -47,10 +51,19 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Blackboard do
   end
 
   def put_next_at(%__MODULE__{} = blackboard, key, delay_ms) when is_atom(key) and is_integer(delay_ms) do
-    Map.put(blackboard, key, Time.now() + delay_ms)
+    put_next_at(blackboard, key, delay_ms, Time.now())
   end
 
   def put_next_at(%__MODULE__{} = blackboard, _key, _delay_ms) do
+    blackboard
+  end
+
+  def put_next_at(%__MODULE__{} = blackboard, key, delay_ms, now)
+      when is_atom(key) and is_integer(delay_ms) and is_integer(now) do
+    Map.put(blackboard, key, now + delay_ms)
+  end
+
+  def put_next_at(%__MODULE__{} = blackboard, _key, _delay_ms, _now) do
     blackboard
   end
 
