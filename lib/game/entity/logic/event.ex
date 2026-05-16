@@ -13,6 +13,8 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
     :speed,
     :rooted?,
     :move_opts,
+    :hit_guids,
+    :raw_targets,
     :attack
   ]
 
@@ -50,6 +52,21 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
 
   def monster_move(opts \\ []) when is_list(opts) do
     %__MODULE__{type: :monster_move, move_opts: opts}
+  end
+
+  def spell_cast_result(spell_id) when is_integer(spell_id) do
+    %__MODULE__{type: :spell_cast_result, spell_id: spell_id}
+  end
+
+  def spell_go(source_guid, spell_id, hit_guids, raw_targets)
+      when is_integer(source_guid) and is_integer(spell_id) and is_list(hit_guids) and is_binary(raw_targets) do
+    %__MODULE__{
+      type: :spell_go,
+      source_guid: source_guid,
+      spell_id: spell_id,
+      hit_guids: hit_guids,
+      raw_targets: raw_targets
+    }
   end
 
   def attack_start(source_guid, target_guid) when is_integer(source_guid) and is_integer(target_guid) do

@@ -1,16 +1,14 @@
 defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Component.Internal
-  alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
   alias ThistleTea.Game.Entity.Logic.Core
+  alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.Entity.Logic.MeleeSpell
   alias ThistleTea.Game.Entity.Logic.SpellEffect
   alias ThistleTea.Game.Entity.Logic.SpellTarget
-  alias ThistleTea.Game.Network
-  alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Cast
   alias ThistleTea.Game.Spell.CastContext
@@ -83,12 +81,12 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
 
   def complete_cast(character), do: character
 
-  def complete_cast(%{internal: %Internal{} = internal} = character, %Cast{} = casting) do
+  def complete_cast(%{internal: %Internal{}} = character, %Cast{} = casting) do
     character
-    |> send_cast_result(casting)
-    |> send_spell_go(casting)
+    |> queue_cast_result(casting)
+    |> queue_spell_go(casting)
     |> apply_spell_hit(casting)
-    |> clear_casting(internal)
+    |> clear_cast()
   end
 
   def complete_cast(character, _casting), do: character
@@ -99,22 +97,11 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
 
   def clear_cast(character), do: character
 
-  defp send_cast_result(character, %{spell: %Spell{id: spell_id}}) do
-    Network.send_packet(%Message.SmsgCastResult{
-      spell: spell_id,
-      result: 0,
-      reason: nil,
-      required_spell_focus: nil,
-      area: nil,
-      equipped_item_class: nil,
-      equipped_item_subclass_mask: nil,
-      equipped_item_inventory_type_mask: nil
-    })
-
-    character
+  defp queue_cast_result(character, %{spell: %Spell{id: spell_id}}) do
+    Event.enqueue(character, Event.spell_cast_result(spell_id))
   end
 
-  defp send_cast_result(character, _casting), do: character
+  defp queue_cast_result(character, _casting), do: character
 
   defp channel_tick(%{internal: %Internal{}} = character, %Cast{} = casting, now) do
     if is_integer(casting.next_channel_tick_at) and now >= casting.next_channel_tick_at do
@@ -134,32 +121,20 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
   defp channel_tick(character, casting, now), do: {character, Cast.next_channel_delay(casting, now)}
 
   defp maybe_send_channel_spell_go(character, %Cast{channel_go_sent?: false} = casting) do
-    send_spell_go(character, casting)
+    queue_spell_go(character, casting)
   end
 
   defp maybe_send_channel_spell_go(character, _casting), do: character
 
-  defp send_spell_go(%{object: %{guid: guid}} = character, %Cast{spell: %Spell{id: spell_id}} = casting)
+  defp queue_spell_go(%{object: %{guid: guid}} = character, %Cast{spell: %Spell{id: spell_id}} = casting)
        when is_integer(guid) do
     hits = resolve_targets(character, casting)
+    raw_targets = if is_binary(casting.targets.raw), do: casting.targets.raw, else: <<>>
 
-    %Message.SmsgSpellGo{
-      cast_item: guid,
-      caster: guid,
-      spell: spell_id,
-      flags: 0x100,
-      hits: hits,
-      misses: [],
-      targets: casting.targets.raw,
-      ammo_display_id: nil,
-      ammo_inventory_type: nil
-    }
-    |> World.broadcast_packet(character)
-
-    character
+    Event.enqueue(character, Event.spell_go(guid, spell_id, hits, raw_targets))
   end
 
-  defp send_spell_go(character, _casting), do: character
+  defp queue_spell_go(character, _casting), do: character
 
   defp apply_spell_hit(%{object: %{guid: caster_guid}} = character, %Cast{spell: %Spell{} = spell} = casting)
        when is_integer(caster_guid) do
@@ -179,7 +154,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
     duration_events = AuraLogic.self_duration_events(character)
 
     character
-    |> EventSink.emit(events ++ duration_events)
+    |> Event.enqueue(events ++ duration_events)
     |> broadcast_self_update()
   end
 
@@ -204,8 +179,4 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
   end
 
   defp broadcast_self_update(character), do: character
-
-  defp clear_casting(character, internal) do
-    %{character | internal: %{internal | casting: nil}}
-  end
 end

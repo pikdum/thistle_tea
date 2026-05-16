@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AI.BT.Spell, as: SpellBT
+  alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Cast
   alias ThistleTea.Game.Spell.Effect
@@ -88,6 +89,68 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
       assert delay_ms > 0
       assert mob.internal.casting.channel_go_sent? == true
       assert mob.internal.casting.next_channel_tick_at > now
+      assert [%Event{type: :spell_go, spell_id: 10, hit_guids: [1]}] = mob.internal.events
+    end
+  end
+
+  describe "complete_cast/2" do
+    test "queues cast result and spell go events before clearing cast state" do
+      spell = %Spell{id: 133, effects: []}
+
+      casting = %Cast{
+        spell: spell,
+        targets: %Targets{raw: <<0::little-size(16)>>, unit_guid: 1},
+        ends_at: Time.now()
+      }
+
+      mob = %Mob{
+        object: %Object{guid: 1},
+        unit: %Unit{health: 100, max_health: 100},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+        internal: %Internal{map: 0, casting: casting}
+      }
+
+      mob = SpellBT.complete_cast(mob, casting)
+
+      assert mob.internal.casting == nil
+
+      assert [
+               %Event{type: :spell_cast_result, spell_id: 133},
+               %Event{
+                 type: :spell_go,
+                 spell_id: 133,
+                 source_guid: 1,
+                 hit_guids: [1],
+                 raw_targets: <<0::little-size(16)>>
+               }
+             ] = mob.internal.events
+    end
+
+    test "queues self spell hit events after spell go" do
+      spell = %Spell{id: 133, school: :fire, effects: [%Effect{type: :school_damage, base_points: 5, die_sides: 0}]}
+
+      casting = %Cast{
+        spell: spell,
+        targets: %Targets{raw: <<0::little-size(16)>>, unit_guid: 1},
+        ends_at: Time.now()
+      }
+
+      mob = %Mob{
+        object: %Object{guid: 1},
+        unit: %Unit{health: 20, max_health: 20},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+        internal: %Internal{map: 0, casting: casting}
+      }
+
+      mob = SpellBT.complete_cast(mob, casting)
+
+      assert mob.unit.health == 15
+
+      assert [
+               %Event{type: :spell_cast_result},
+               %Event{type: :spell_go},
+               %Event{type: :spell_damage, damage: 5, periodic?: false}
+             ] = mob.internal.events
     end
   end
 end

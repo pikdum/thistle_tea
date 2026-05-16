@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.Network.Message.CmsgCastSpell do
   use ThistleTea.Game.Network.ClientMessage, :CMSG_CAST_SPELL
 
+  alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.Logic.AI.BT.Spell, as: SpellBT
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Spell
@@ -29,7 +30,10 @@ defmodule ThistleTea.Game.Network.Message.CmsgCastSpell do
   end
 
   def handle_spell_complete(%{character: character} = state) do
-    character = SpellBT.complete_cast(character)
+    character =
+      character
+      |> SpellBT.complete_cast()
+      |> EventSink.emit_pending()
 
     state
     |> Map.put(:character, character)

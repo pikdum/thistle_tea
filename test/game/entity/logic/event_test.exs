@@ -8,4 +8,22 @@ defmodule ThistleTea.Game.Entity.Logic.EventTest do
       assert %Event{type: :monster_move, move_opts: [face_target: 1]} = Event.monster_move(face_target: 1)
     end
   end
+
+  describe "spell_cast_result/1" do
+    test "returns a spell cast result event" do
+      assert %Event{type: :spell_cast_result, spell_id: 133} = Event.spell_cast_result(133)
+    end
+  end
+
+  describe "spell_go/4" do
+    test "returns a spell go event with resolved hits and raw targets" do
+      assert %Event{
+               type: :spell_go,
+               source_guid: 1,
+               spell_id: 133,
+               hit_guids: [2],
+               raw_targets: <<1, 2>>
+             } = Event.spell_go(1, 133, [2], <<1, 2>>)
+    end
+  end
 end

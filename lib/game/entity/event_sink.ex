@@ -87,6 +87,40 @@ defmodule ThistleTea.Game.Entity.EventSink do
 
   def emit(entity, %Event{type: :monster_move}), do: entity
 
+  def emit(entity, %Event{type: :spell_cast_result, spell_id: spell_id}) do
+    Network.send_packet(%Message.SmsgCastResult{
+      spell: spell_id,
+      result: 0,
+      reason: nil,
+      required_spell_focus: nil,
+      area: nil,
+      equipped_item_class: nil,
+      equipped_item_subclass_mask: nil,
+      equipped_item_inventory_type_mask: nil
+    })
+
+    entity
+  end
+
+  def emit(%{object: %{guid: guid}} = entity, %Event{type: :spell_go} = event) when is_integer(guid) do
+    %Message.SmsgSpellGo{
+      cast_item: event.source_guid || guid,
+      caster: event.source_guid || guid,
+      spell: event.spell_id,
+      flags: 0x100,
+      hits: event.hit_guids || [],
+      misses: [],
+      targets: event.raw_targets || <<>>,
+      ammo_display_id: nil,
+      ammo_inventory_type: nil
+    }
+    |> World.broadcast_packet(entity)
+
+    entity
+  end
+
+  def emit(entity, %Event{type: :spell_go}), do: entity
+
   def emit(entity, %Event{type: :attack_start} = event) do
     %Message.SmsgAttackstart{
       attacker: event.source_guid,
