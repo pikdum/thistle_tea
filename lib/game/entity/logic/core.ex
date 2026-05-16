@@ -8,7 +8,6 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
   alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.Math
   alias ThistleTea.Game.Network.UpdateObject
-  alias ThistleTea.Game.Time
 
   @leash_timeout_ms 6_000
 
@@ -72,12 +71,12 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
     false
   end
 
-  def should_tether?(%{internal: %Internal{last_hostile_time: last_hostile_time}} = entity)
-      when is_integer(last_hostile_time) do
-    out_of_tether_range?(entity) and Time.now() - last_hostile_time >= @leash_timeout_ms
+  def should_tether?(%{internal: %Internal{last_hostile_time: last_hostile_time}} = entity, now)
+      when is_integer(last_hostile_time) and is_integer(now) do
+    out_of_tether_range?(entity) and now - last_hostile_time >= @leash_timeout_ms
   end
 
-  def should_tether?(_entity) do
+  def should_tether?(_entity, _now) do
     false
   end
 

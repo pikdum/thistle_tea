@@ -1,0 +1,39 @@
+defmodule ThistleTea.Game.Entity.Logic.CoreTest do
+  use ExUnit.Case, async: true
+
+  alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.Entity.Data.Component.MovementBlock
+  alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Logic.Core
+
+  describe "should_tether?/2" do
+    test "returns true when outside tether range after timeout" do
+      entity = entity(position: {100.0, 0.0, 0.0, 0.0}, last_hostile_time: 1_000)
+
+      assert Core.should_tether?(entity, 7_000)
+    end
+
+    test "returns false inside tether range" do
+      entity = entity(position: {10.0, 0.0, 0.0, 0.0}, last_hostile_time: 1_000)
+
+      refute Core.should_tether?(entity, 7_000)
+    end
+
+    test "returns false before timeout" do
+      entity = entity(position: {100.0, 0.0, 0.0, 0.0}, last_hostile_time: 1_000)
+
+      refute Core.should_tether?(entity, 6_999)
+    end
+  end
+
+  defp entity(opts) do
+    %{
+      unit: %Unit{level: 1},
+      internal: %Internal{
+        initial_position: {0.0, 0.0, 0.0},
+        last_hostile_time: Keyword.fetch!(opts, :last_hostile_time)
+      },
+      movement_block: %MovementBlock{position: Keyword.fetch!(opts, :position)}
+    }
+  end
+end

@@ -173,7 +173,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   end
 
   defp should_tether?(%Mob{} = state, _blackboard) do
-    Core.should_tether?(state)
+    Core.should_tether?(state, Time.now())
   end
 
   defp target_dead?(%Mob{unit: %Unit{target: target}}, _blackboard) when is_integer(target) and target > 0 do
