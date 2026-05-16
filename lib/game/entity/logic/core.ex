@@ -25,6 +25,8 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
     |> struct(Map.from_struct(entity))
   end
 
+  def take_damage(%{internal: %Internal{godmode: true}} = entity, _damage), do: entity
+
   def take_damage(%{unit: %Unit{health: health} = unit} = entity, damage) do
     new_health = max(health - damage, 0)
 

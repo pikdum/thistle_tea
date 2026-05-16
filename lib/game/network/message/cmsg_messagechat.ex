@@ -78,7 +78,8 @@ defmodule ThistleTea.Game.Network.Message.CmsgMessagechat do
       ".move - move target to you",
       ".pid - show target pid",
       ".pos - show current position",
-      ".speed <rate> - modify player speed from 0.1 to 10"
+      ".speed <rate> - modify player speed from 0.1 to 10",
+      ".tgm - toggle god mode (no damage taken)"
     ]
 
     system_message(state, "Commands:")
@@ -143,6 +144,16 @@ defmodule ThistleTea.Game.Network.Message.CmsgMessagechat do
         |> Map.put(:character, character)
         |> system_message("Learned: #{names}")
     end
+  end
+
+  def handle_chat(state, _, _, ".tgm" <> _, _) do
+    %{character: %ThistleTea.Character{internal: internal} = character} = state
+    new_godmode = not (internal.godmode || false)
+    character = %{character | internal: %{internal | godmode: new_godmode}}
+
+    state
+    |> Map.put(:character, character)
+    |> system_message("God mode #{if new_godmode, do: "ON", else: "OFF"}.")
   end
 
   def handle_chat(state, _, _, ".pos" <> _, _) do

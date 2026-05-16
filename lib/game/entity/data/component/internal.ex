@@ -26,6 +26,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal do
     :movement_start_time,
     :movement_start_position,
     broadcast_update?: false,
-    spline_id: 0
+    spline_id: 0,
+    godmode: false
   ]
 end
