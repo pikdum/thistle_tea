@@ -33,6 +33,10 @@ defmodule ThistleTea.Game.World do
     SpatialHash.query(:mobs, map, x, y, z, range)
   end
 
+  def nearby_players_at(map, {x, y, z}, range \\ 30) do
+    SpatialHash.query(:players, map, x, y, z, range)
+  end
+
   def update_position(%ThistleTea.Character{} = entity), do: update_position(entity, :players)
   def update_position(%Mob{} = entity), do: update_position(entity, :mobs)
   def update_position(%GameObject{} = entity), do: update_position(entity, :game_objects)

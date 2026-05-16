@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Entity.Logic.SpellTarget do
+  alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.Spell.Targets
@@ -44,7 +45,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellTarget do
 
   defp nearby_enemy_guids(caster, caster_guid, radius) when is_number(radius) and radius > 0 do
     caster
-    |> World.nearby_mobs(radius)
+    |> nearby_hostiles(radius)
     |> living_guids(caster_guid)
   end
 
@@ -53,11 +54,27 @@ defmodule ThistleTea.Game.Entity.Logic.SpellTarget do
   defp nearby_enemy_guids_at(%{internal: %{map: map}}, caster_guid, {x, y, z}, radius)
        when is_number(radius) and radius > 0 do
     map
-    |> World.nearby_mobs_at({x, y, z}, radius)
+    |> nearby_hostiles_at(caster_guid, {x, y, z}, radius)
     |> living_guids(caster_guid)
   end
 
   defp nearby_enemy_guids_at(_caster, _caster_guid, _position, _radius), do: []
+
+  defp nearby_hostiles(%{object: %{guid: guid}} = caster, radius) do
+    case Guid.entity_type(guid) do
+      :mob -> World.nearby_players(caster, radius)
+      :player -> World.nearby_mobs(caster, radius)
+      _ -> World.nearby_mobs(caster, radius)
+    end
+  end
+
+  defp nearby_hostiles_at(map, caster_guid, position, radius) do
+    case Guid.entity_type(caster_guid) do
+      :mob -> World.nearby_players_at(map, position, radius)
+      :player -> World.nearby_mobs_at(map, position, radius)
+      _ -> World.nearby_mobs_at(map, position, radius)
+    end
+  end
 
   defp living_guids(results, caster_guid) do
     results
