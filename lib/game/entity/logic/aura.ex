@@ -335,7 +335,13 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
   end
 
   defp sync_aura_fields(%Unit{} = unit) do
-    %{unit | aura: nil, aura_flags: nil, aura_levels: nil, aura_applications: nil}
+    %{
+      unit
+      | aura: 0,
+        aura_flags: <<0::size(@max_slots * 4)>>,
+        aura_levels: <<0::size(@max_slots * 8)>>,
+        aura_applications: <<0::size(@max_slots * 8)>>
+    }
   end
 
   defp pack_aura_ids(holders) do

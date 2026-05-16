@@ -80,16 +80,15 @@
     "wow-dbc-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1778917407,
+        "lastModified": 1778917773,
         "narHash": "sha256-8ROLMpPPZBMUqA5CfrlzbGxHzMdqiQLk5akUedyCEr8=",
         "owner": "pikdum",
         "repo": "wow_dbc",
-        "rev": "3a2822ec2a20f40ed3887ea9fe37d51dd2671f9f",
+        "rev": "1c4eaa8c8765f0e028504daa55941693580d8b86",
         "type": "github"
       },
       "original": {
         "owner": "pikdum",
-        "ref": "fix/vanilla-spell-interrupt-flags",
         "repo": "wow_dbc",
         "type": "github"
       }
