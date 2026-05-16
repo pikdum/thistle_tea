@@ -21,8 +21,7 @@ defmodule ThistleTea.Game.Spell.Targets do
 
     %__MODULE__{flags: flags, raw: payload}
     |> put_self_target(caster_guid)
-    |> parse_unit(rest)
-    |> parse_locations(rest)
+    |> parse_fields(rest)
   end
 
   def parse(_payload, caster_guid) do
@@ -39,14 +38,7 @@ defmodule ThistleTea.Game.Spell.Targets do
 
   defp put_self_target(targets, _caster_guid), do: targets
 
-  defp parse_unit(%__MODULE__{flags: flags} = targets, rest) when (flags &&& @unit) > 0 do
-    {guid, _rest} = BinaryUtils.unpack_guid(rest)
-    %{targets | unit_guid: guid}
-  end
-
-  defp parse_unit(targets, _rest), do: targets
-
-  defp parse_locations(%__MODULE__{flags: flags} = targets, rest) do
+  defp parse_fields(%__MODULE__{flags: flags} = targets, rest) do
     {_rest, targets} =
       [
         {@unit, :unit_guid},
@@ -54,9 +46,8 @@ defmodule ThistleTea.Game.Spell.Targets do
         {@destination_location, :destination_location}
       ]
       |> Enum.reduce({rest, targets}, fn
-        {@unit, _field}, {rest, acc} when (flags &&& @unit) > 0 ->
-          {_guid, rest} = BinaryUtils.unpack_guid(rest)
-          {rest, acc}
+        {@unit, :unit_guid}, {rest, acc} when (flags &&& @unit) > 0 ->
+          parse_unit(rest, acc)
 
         {mask, field}, {rest, acc} when (flags &&& mask) > 0 ->
           parse_location(rest, acc, field)
@@ -66,6 +57,11 @@ defmodule ThistleTea.Game.Spell.Targets do
       end)
 
     targets
+  end
+
+  defp parse_unit(rest, targets) do
+    {guid, rest} = BinaryUtils.unpack_guid(rest)
+    {rest, %{targets | unit_guid: guid}}
   end
 
   defp parse_location(rest, targets, field) do

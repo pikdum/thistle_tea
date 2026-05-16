@@ -33,6 +33,18 @@ defmodule ThistleTea.Game.Spell.TargetsTest do
       assert targets.unit_guid == nil
     end
 
+    test "unit and destination location parse in field order" do
+      payload =
+        <<0x42::little-size(16)>> <>
+          BinaryUtils.pack_guid(0xAABBCC) <>
+          <<1.0::little-float-size(32), 2.0::little-float-size(32), 3.0::little-float-size(32)>>
+
+      targets = Targets.parse(payload, 123)
+
+      assert targets.unit_guid == 0xAABBCC
+      assert targets.destination_location == {1.0, 2.0, 3.0}
+    end
+
     test "source location parses ground-target coordinates" do
       payload =
         <<0x20::little-size(16)>> <>
