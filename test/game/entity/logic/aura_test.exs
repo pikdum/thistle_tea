@@ -73,6 +73,16 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
       assert entity.unit.holy_resistance == 0
     end
 
+    test "layers mod_resistance on top of base resistance" do
+      entity = put_in(fixture_entity().unit.normal_resistance, 7)
+      spell = frost_armor_fixture()
+
+      {entity, _events} = Aura.apply_spell(entity, 1, 1, spell)
+
+      assert entity.unit.base_normal_resistance == 7
+      assert entity.unit.normal_resistance == 36
+    end
+
     test "packs spell_id into the aura wire field at the holder slot" do
       entity = fixture_entity()
       spell = frost_armor_fixture()
@@ -231,6 +241,19 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
 
       assert entity.unit.auras == []
       assert entity.unit.normal_resistance == 0
+    end
+
+    test "removing expired holders preserves base resistance" do
+      entity = put_in(fixture_entity().unit.normal_resistance, 7)
+      spell = frost_armor_fixture()
+      {entity, _events} = Aura.apply_spell(entity, 1, 1, spell)
+
+      future = entity.unit.auras |> hd() |> Map.fetch!(:expires_at)
+      {entity, _events} = Aura.expire_due(entity, future + 1)
+
+      assert entity.unit.auras == []
+      assert entity.unit.base_normal_resistance == 7
+      assert entity.unit.normal_resistance == 7
     end
 
     test "keeps non-expired holders" do

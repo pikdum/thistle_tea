@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.Entity.Logic.Movement
+  alias ThistleTea.Game.Entity.Logic.Stats
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Effect
@@ -307,56 +308,9 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
 
   def sync_unit(%Unit{} = unit) do
     unit
-    |> reset_resistances()
-    |> apply_resistance_mods()
+    |> Stats.sync_aura_mods()
     |> sync_aura_fields()
   end
-
-  defp reset_resistances(%Unit{} = unit) do
-    %{
-      unit
-      | normal_resistance: 0,
-        holy_resistance: 0,
-        fire_resistance: 0,
-        nature_resistance: 0,
-        frost_resistance: 0,
-        shadow_resistance: 0,
-        arcane_resistance: 0
-    }
-  end
-
-  defp apply_resistance_mods(%Unit{auras: holders} = unit) when is_list(holders) do
-    Enum.reduce(holders, unit, fn %Holder{auras: auras}, u ->
-      Enum.reduce(auras, u, &apply_aura_mod/2)
-    end)
-  end
-
-  defp apply_resistance_mods(unit), do: unit
-
-  defp apply_aura_mod(%Aura{type: :mod_resistance, amount: amount, misc_value: mask}, %Unit{} = unit)
-       when is_integer(amount) do
-    Enum.reduce(school_fields_for_mask(mask), unit, fn field, u ->
-      Map.update!(u, field, &(&1 + amount))
-    end)
-  end
-
-  defp apply_aura_mod(_aura, unit), do: unit
-
-  defp school_fields_for_mask(mask) when is_integer(mask) do
-    [
-      {0x01, :normal_resistance},
-      {0x02, :holy_resistance},
-      {0x04, :fire_resistance},
-      {0x08, :nature_resistance},
-      {0x10, :frost_resistance},
-      {0x20, :shadow_resistance},
-      {0x40, :arcane_resistance}
-    ]
-    |> Enum.filter(fn {bit, _} -> (mask &&& bit) != 0 end)
-    |> Enum.map(fn {_, field} -> field end)
-  end
-
-  defp school_fields_for_mask(_), do: []
 
   defp sync_aura_fields(%Unit{auras: holders} = unit) when is_list(holders) and holders != [] do
     %{

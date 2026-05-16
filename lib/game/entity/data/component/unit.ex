@@ -90,6 +90,13 @@ defmodule ThistleTea.Game.Entity.Data.Component.Unit do
     frost_resistance: {0x009F, 1, :int, :private},
     shadow_resistance: {0x00A0, 1, :int, :private},
     arcane_resistance: {0x00A1, 1, :int, :private},
+    base_normal_resistance: :virtual,
+    base_holy_resistance: :virtual,
+    base_fire_resistance: :virtual,
+    base_nature_resistance: :virtual,
+    base_frost_resistance: :virtual,
+    base_shadow_resistance: :virtual,
+    base_arcane_resistance: :virtual,
     base_mana: {0x00A2, 1, :int, :private},
     base_health: {0x00A3, 1, :int, :private},
     bytes_2:
