@@ -31,11 +31,11 @@ defmodule ThistleTea.Game.Entity.Logic.CombatTest do
     end
   end
 
-  describe "receive_attack/2" do
+  describe "receive_attack/3" do
     test "applies damage and returns attacker update events" do
       mob = mob(2, 100)
 
-      {mob, events} = Combat.receive_attack(mob, %{caster: 1, damage: 12})
+      {mob, events} = Combat.receive_attack(mob, %{caster: 1, damage: 12}, 1_000)
 
       assert mob.unit.health == 88
       assert mob.internal.broadcast_update? == true
@@ -54,7 +54,7 @@ defmodule ThistleTea.Game.Entity.Logic.CombatTest do
       spell = damage_shield_spell()
       {mob, _events} = Aura.apply_spell(mob(2, 100), 2, 10, spell, 1_000)
 
-      {_mob, events} = Combat.receive_attack(mob, %{caster: 1, damage: 12})
+      {_mob, events} = Combat.receive_attack(mob, %{caster: 1, damage: 12}, 1_000)
 
       assert [
                %Event{type: :attacker_state_update},
@@ -72,7 +72,7 @@ defmodule ThistleTea.Game.Entity.Logic.CombatTest do
       spell = damage_shield_spell()
       {mob, _events} = Aura.apply_spell(mob(2, 10), 2, 10, spell, 1_000)
 
-      {_mob, events} = Combat.receive_attack(mob, %{caster: 1, damage: 12})
+      {_mob, events} = Combat.receive_attack(mob, %{caster: 1, damage: 12}, 1_000)
 
       assert [%Event{type: :attacker_state_update}] = events
     end

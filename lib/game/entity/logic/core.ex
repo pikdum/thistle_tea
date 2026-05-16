@@ -24,14 +24,14 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
     |> struct(Map.from_struct(entity))
   end
 
-  def take_damage(%{internal: %Internal{godmode: true}} = entity, _damage), do: entity
+  def take_damage(%{internal: %Internal{godmode: true}} = entity, _damage, _now), do: entity
 
-  def take_damage(%{unit: %Unit{health: health} = unit} = entity, damage) do
+  def take_damage(%{unit: %Unit{health: health} = unit} = entity, damage, now) when is_integer(now) do
     new_health = max(health - damage, 0)
 
     %{entity | unit: %{unit | health: new_health}}
     |> mark_broadcast_update()
-    |> maybe_dead()
+    |> maybe_dead(now)
   end
 
   def dead?(%{unit: %Unit{health: health}}) when is_number(health) do
@@ -80,8 +80,8 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
     false
   end
 
-  defp maybe_dead(%{internal: %Internal{}, unit: %Unit{health: 0}, movement_block: %MovementBlock{}} = entity) do
-    entity = Movement.sync_position(entity)
+  defp maybe_dead(%{internal: %Internal{}, unit: %Unit{health: 0}, movement_block: %MovementBlock{}} = entity, now) do
+    entity = Movement.sync_position(entity, now)
     %{internal: internal, unit: unit, movement_block: mb} = entity
 
     unit =
@@ -109,5 +109,5 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
     %{entity | unit: unit, internal: internal, movement_block: movement_block}
   end
 
-  defp maybe_dead(entity), do: entity
+  defp maybe_dead(entity, _now), do: entity
 end

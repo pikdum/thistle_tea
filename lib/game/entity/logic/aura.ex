@@ -248,7 +248,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
   defp tick_aura(entity, %Holder{} = holder, %Aura{type: :periodic_damage, next_tick_at: at} = aura, now)
        when is_integer(at) and now >= at do
     damage = aura.amount
-    entity = Core.take_damage(entity, damage)
+    entity = Core.take_damage(entity, damage, now)
 
     event =
       Event.spell_damage(holder.caster_guid, entity.object.guid, holder.spell, damage, periodic?: true)

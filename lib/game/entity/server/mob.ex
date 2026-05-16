@@ -91,7 +91,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     target = state.unit.target
     dead_before = Core.dead?(state)
 
-    {state, events} = Combat.receive_attack(state, attack)
+    {state, events} = Combat.receive_attack(state, attack, Time.now())
 
     state =
       state

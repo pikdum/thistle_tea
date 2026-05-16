@@ -32,8 +32,8 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
     apply_effects(target, context, rest, events ++ effect_events, now)
   end
 
-  defp apply_effect(state, %CastContext{} = context, spell, %Effect{type: :school_damage} = effect, _now) do
-    apply_damage_effect(state, context, spell, effect)
+  defp apply_effect(state, %CastContext{} = context, spell, %Effect{type: :school_damage} = effect, now) do
+    apply_damage_effect(state, context, spell, effect, now)
   end
 
   defp apply_effect(
@@ -41,9 +41,9 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
          %CastContext{} = context,
          spell,
          %Effect{type: :persistent_area_aura, aura: :periodic_damage} = effect,
-         _now
+         now
        ) do
-    apply_damage_effect(state, context, spell, effect, periodic?: true)
+    apply_damage_effect(state, context, spell, effect, now, periodic?: true)
   end
 
   defp apply_effect(state, %CastContext{} = context, spell, %Effect{type: :apply_aura}, now) do
@@ -64,10 +64,11 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
 
   defp apply_effect(state, _context, _spell, _effect, _now), do: {state, []}
 
-  defp apply_damage_effect(state, %CastContext{} = context, spell, %Effect{} = effect, opts \\ []) do
+  defp apply_damage_effect(state, %CastContext{} = context, spell, %Effect{} = effect, now, opts \\ [])
+       when is_integer(now) do
     damage = Effect.damage_roll(effect)
 
-    state = Core.take_damage(state, damage)
+    state = Core.take_damage(state, damage, now)
     event = Event.spell_damage(context.caster_guid, state.object.guid, spell, damage, opts)
 
     {state, [event]}

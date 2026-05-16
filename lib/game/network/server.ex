@@ -221,7 +221,7 @@ defmodule ThistleTea.Game.Network.Server do
   end
 
   def handle_cast({:receive_attack, attack}, {socket, %{character: character} = state}) do
-    {character, events} = Combat.receive_attack(character, attack)
+    {character, events} = Combat.receive_attack(character, attack, Time.now())
     character = EventSink.emit(character, events)
 
     {:noreply, {socket, %{state | character: character}}, {:continue, :maybe_broadcast_update}}
