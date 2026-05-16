@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.Aura.Holder do
     :slot,
     :applied_at,
     :expires_at,
-    auras: []
+    auras: [],
+    negative?: false
   ]
 end

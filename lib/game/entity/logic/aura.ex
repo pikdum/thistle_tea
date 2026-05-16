@@ -15,11 +15,14 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
   require Logger
 
   @max_slots 48
+  @max_positive_slots 32
 
   @aflag_cancelable 0x01
   @aflag_eff_index_2 0x02
   @aflag_eff_index_1 0x04
   @aflag_eff_index_0 0x08
+
+  @negative_auras [:periodic_damage, :mod_root, :mod_decrease_speed, :mod_stun, :mod_fear]
 
   def apply_spell(entity, caster_guid, caster_level, %Spell{} = spell) do
     aura_effects = Spell.aura_effects(spell)
@@ -30,6 +33,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
 
       auras ->
         now = Time.now()
+        target_guid = entity.object.guid
 
         holder = %Holder{
           spell: spell,
@@ -37,10 +41,19 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
           caster_level: caster_level,
           applied_at: now,
           expires_at: expires_at(now, spell.duration_ms),
-          auras: auras
+          auras: auras,
+          negative?: negative?(auras, caster_guid, target_guid)
         }
 
         do_apply(entity, holder)
+    end
+  end
+
+  defp negative?(auras, caster_guid, target_guid) do
+    cond do
+      caster_guid == target_guid -> false
+      Enum.any?(auras, fn %Aura{type: type} -> type in @negative_auras end) -> true
+      true -> false
     end
   end
 
@@ -60,7 +73,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
   defp upsert_holder(existing, %Holder{spell: %Spell{id: spell_id}, caster_guid: caster_guid} = incoming) do
     case Enum.find_index(existing, &same_source?(&1, spell_id, caster_guid)) do
       nil ->
-        slot = next_free_slot(existing)
+        slot = next_free_slot(existing, incoming.negative?)
         existing ++ [%{incoming | slot: slot}]
 
       index ->
@@ -252,9 +265,10 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
 
   defp next_tick(_effect, _now), do: nil
 
-  defp next_free_slot(holders) do
+  defp next_free_slot(holders, negative?) do
     used = MapSet.new(holders, & &1.slot)
-    Enum.find(0..(@max_slots - 1), &(not MapSet.member?(used, &1)))
+    range = if negative?, do: @max_positive_slots..(@max_slots - 1), else: 0..(@max_positive_slots - 1)
+    Enum.find(range, &(not MapSet.member?(used, &1)))
   end
 
   def sync_unit(%Unit{} = unit) do
@@ -339,8 +353,10 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
     <<int::little-size(24 * 8)>>
   end
 
-  defp holder_flag_bits(%Holder{auras: auras}) do
-    Enum.reduce(auras, @aflag_cancelable, fn %Aura{index: index}, acc ->
+  defp holder_flag_bits(%Holder{auras: auras, negative?: negative?}) do
+    base = if negative?, do: 0, else: @aflag_cancelable
+
+    Enum.reduce(auras, base, fn %Aura{index: index}, acc ->
       acc ||| aura_index_bit(index)
     end)
   end
