@@ -265,6 +265,73 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
     end
   end
 
+  describe "movement speed modifiers" do
+    test "mod_decrease_speed layers on top of base movement speeds" do
+      entity = %{
+        fixture_entity()
+        | movement_block: %MovementBlock{
+            position: {0.0, 0.0, 0.0, 0.0},
+            walk_speed: 2.5,
+            run_speed: 7.0,
+            run_back_speed: 4.5,
+            swim_speed: 4.7,
+            swim_back_speed: 2.5
+          }
+      }
+
+      spell = %Spell{
+        id: 6136,
+        name: "Chilled",
+        school: :frost,
+        duration_ms: 5_000,
+        effects: [
+          %Effect{
+            index: 1,
+            type: :apply_aura,
+            base_points: -31,
+            die_sides: 1,
+            aura: :mod_decrease_speed
+          }
+        ]
+      }
+
+      {entity, _events} = Aura.apply_spell(entity, 1, 1, spell)
+
+      assert entity.movement_block.base_run_speed == 7.0
+      assert_in_delta entity.movement_block.run_speed, 4.9, 0.000001
+    end
+
+    test "expiring mod_decrease_speed restores base movement speeds" do
+      entity = %{
+        fixture_entity()
+        | movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}, run_speed: 7.0}
+      }
+
+      spell = %Spell{
+        id: 6136,
+        name: "Chilled",
+        school: :frost,
+        duration_ms: 5_000,
+        effects: [
+          %Effect{
+            index: 1,
+            type: :apply_aura,
+            base_points: -31,
+            die_sides: 1,
+            aura: :mod_decrease_speed
+          }
+        ]
+      }
+
+      {entity, _events} = Aura.apply_spell(entity, 1, 1, spell)
+      future = entity.unit.auras |> hd() |> Map.fetch!(:expires_at)
+      {entity, _events} = Aura.expire_due(entity, future + 1)
+
+      assert entity.movement_block.base_run_speed == 7.0
+      assert entity.movement_block.run_speed == 7.0
+    end
+  end
+
   describe "expire_due/2" do
     test "removes expired holders and reverses their mods" do
       entity = fixture_entity()

@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.Entity.Logic.Movement
+  alias ThistleTea.Game.Entity.Logic.MovementStats
   alias ThistleTea.Game.Entity.Logic.Stats
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
@@ -79,6 +80,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
     {entity, events} =
       entity
       |> Map.put(:unit, unit)
+      |> MovementStats.sync_aura_mods()
       |> sync_movement_flags()
 
     {Core.mark_broadcast_update(entity), events}
@@ -134,6 +136,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
       {entity, events} =
         entity
         |> Map.put(:unit, unit)
+        |> MovementStats.sync_aura_mods()
         |> sync_movement_flags()
 
       {Core.mark_broadcast_update(entity), events}
