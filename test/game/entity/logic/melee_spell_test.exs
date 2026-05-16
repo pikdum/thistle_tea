@@ -35,6 +35,7 @@ defmodule ThistleTea.Game.Entity.Logic.MeleeSpellTest do
       spell = %Spell{
         id: 78,
         name: "Heroic Strike",
+        school: :physical,
         effects: [%Effect{type: :weapon_damage_noschool, base_points: 10, die_sides: 0}]
       }
 
@@ -44,6 +45,7 @@ defmodule ThistleTea.Game.Entity.Logic.MeleeSpellTest do
       assert attack.max_damage == 14
       assert attack.spell_id == 78
       assert attack.queued_spell_id == 78
+      assert attack.spell_school_mask == 1
     end
   end
 end

@@ -23,6 +23,7 @@ defmodule ThistleTea.Game.Entity.Logic.MeleeSpell do
     |> Map.update(:max_damage, damage_bonus, &(&1 + damage_bonus))
     |> Map.put(:spell_id, spell.id)
     |> Map.put(:queued_spell_id, spell.id)
+    |> Map.put(:spell_school_mask, Spell.school_mask(spell))
   end
 
   def apply_to_attack(attack, _spell), do: attack
