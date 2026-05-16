@@ -128,8 +128,12 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     not in_combat?(state, blackboard)
   end
 
-  defp aggro_check_ready?(_state, %Blackboard{} = blackboard) do
-    Blackboard.ready_for?(blackboard, :next_aggro_at, Time.now())
+  defp aggro_check_ready?(state, %Blackboard{} = blackboard) do
+    aggro_check_ready?(state, blackboard, Time.now())
+  end
+
+  def aggro_check_ready?(_state, %Blackboard{} = blackboard, now) when is_integer(now) do
+    Blackboard.ready_for?(blackboard, :next_aggro_at, now)
   end
 
   defp try_aggro(%Mob{} = state, %Blackboard{} = blackboard) do
@@ -173,8 +177,12 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     {:success, set_running(state, true), blackboard}
   end
 
-  defp should_tether?(%Mob{} = state, _blackboard) do
-    Core.should_tether?(state, Time.now())
+  defp should_tether?(%Mob{} = state, blackboard) do
+    should_tether?(state, blackboard, Time.now())
+  end
+
+  def should_tether?(%Mob{} = state, _blackboard, now) when is_integer(now) do
+    Core.should_tether?(state, now)
   end
 
   defp target_dead?(%Mob{unit: %Unit{target: target}}, _blackboard) when is_integer(target) and target > 0 do
@@ -188,15 +196,27 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     false
   end
 
-  defp tethering_to_spawn?(%Mob{internal: %Internal{initial_position: {x, y, z}}} = state, %Blackboard{
-         move_target: {x, y, z}
-       }) do
-    Movement.is_moving?(state, Time.now())
+  defp tethering_to_spawn?(
+         %Mob{internal: %Internal{initial_position: {x, y, z}}} = state,
+         %Blackboard{move_target: {x, y, z}} = blackboard
+       ) do
+    tethering_to_spawn?(state, blackboard, Time.now())
   end
 
   defp tethering_to_spawn?(_state, _blackboard) do
     false
   end
+
+  def tethering_to_spawn?(
+        %Mob{internal: %Internal{initial_position: {x, y, z}}} = state,
+        %Blackboard{move_target: {x, y, z}},
+        now
+      )
+      when is_integer(now) do
+    Movement.is_moving?(state, now)
+  end
+
+  def tethering_to_spawn?(_state, _blackboard, _now), do: false
 
   defp set_tether_target(%Mob{internal: %Internal{initial_position: {x, y, z}}} = state, %Blackboard{} = blackboard) do
     {:success, state, %{blackboard | target: {x, y, z}}}
@@ -235,13 +255,19 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     CombatBT.in_combat_range?(state, blackboard)
   end
 
-  defp chase_ready?(_state, %Blackboard{} = blackboard) do
-    Blackboard.ready_for?(blackboard, :next_chase_at, Time.now())
+  defp chase_ready?(state, %Blackboard{} = blackboard) do
+    chase_ready?(state, blackboard, Time.now())
+  end
+
+  def chase_ready?(_state, %Blackboard{} = blackboard, now) when is_integer(now) do
+    Blackboard.ready_for?(blackboard, :next_chase_at, now)
   end
 
   defp combat_wait(%Mob{} = state, %Blackboard{} = blackboard) do
-    now = Time.now()
+    combat_wait(state, blackboard, Time.now())
+  end
 
+  def combat_wait(%Mob{} = state, %Blackboard{} = blackboard, now) when is_integer(now) do
     blackboard =
       blackboard
       |> Blackboard.clear_chase()
@@ -274,8 +300,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   end
 
   defp clear_chase_and_idle(%Mob{} = state, %Blackboard{} = blackboard) do
-    now = Time.now()
+    clear_chase_and_idle(state, blackboard, Time.now())
+  end
 
+  def clear_chase_and_idle(%Mob{} = state, %Blackboard{} = blackboard, now) when is_integer(now) do
     blackboard =
       blackboard
       |> Blackboard.clear_chase()
@@ -401,8 +429,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   defp target_bounding_radius(_target_guid), do: Unit.default_bounding_radius()
 
   defp wait_until_wander_ready(%Mob{} = state, %Blackboard{} = blackboard) do
-    now = Time.now()
+    wait_until_wander_ready(state, blackboard, Time.now())
+  end
 
+  def wait_until_wander_ready(%Mob{} = state, %Blackboard{} = blackboard, now) when is_integer(now) do
     if Blackboard.ready_for?(blackboard, :next_wander_at, now) do
       {:success, state, blackboard}
     else
@@ -412,8 +442,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   end
 
   defp wait_until_waypoint_ready(%Mob{} = state, %Blackboard{} = blackboard) do
-    now = Time.now()
+    wait_until_waypoint_ready(state, blackboard, Time.now())
+  end
 
+  def wait_until_waypoint_ready(%Mob{} = state, %Blackboard{} = blackboard, now) when is_integer(now) do
     if Blackboard.ready_for?(blackboard, :next_waypoint_at, now) do
       {:success, state, blackboard}
     else
@@ -468,6 +500,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   end
 
   defp move_to_target(%Mob{} = state, %Blackboard{} = blackboard) do
+    move_to_target(state, blackboard, Time.now())
+  end
+
+  def move_to_target(%Mob{} = state, %Blackboard{} = blackboard, now) when is_integer(now) do
     case blackboard.target do
       {x, y, z} = target ->
         cond do
@@ -478,7 +514,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
             {:success, state, blackboard}
 
           true ->
-            state = Movement.move_to(state, {x, y, z}, [], Time.now())
+            state = Movement.move_to(state, {x, y, z}, [], now)
             {:success, state, %{blackboard | move_target: target}}
         end
 
@@ -488,8 +524,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   end
 
   defp wait_for_arrival(%Mob{} = state, %Blackboard{} = blackboard) do
-    now = Time.now()
+    wait_for_arrival(state, blackboard, Time.now())
+  end
 
+  def wait_for_arrival(%Mob{} = state, %Blackboard{} = blackboard, now) when is_integer(now) do
     if Movement.is_moving?(state, now) do
       delay_ms = Movement.remaining_move_duration(state, now)
       {{:running, delay_ms}, state, blackboard}
@@ -510,13 +548,21 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   end
 
   defp set_next_waypoint_wait(%Mob{} = state, %Blackboard{} = blackboard) do
+    set_next_waypoint_wait(state, blackboard, Time.now())
+  end
+
+  def set_next_waypoint_wait(%Mob{} = state, %Blackboard{} = blackboard, now) when is_integer(now) do
     wait_time = blackboard.wait_time || 0
-    blackboard = Blackboard.put_next_at(blackboard, :next_waypoint_at, wait_time, Time.now())
+    blackboard = Blackboard.put_next_at(blackboard, :next_waypoint_at, wait_time, now)
     {:success, state, Blackboard.clear_waypoint(blackboard)}
   end
 
   defp set_next_wander_wait(%Mob{} = state, %Blackboard{} = blackboard) do
-    blackboard = Blackboard.put_next_at(blackboard, :next_wander_at, wander_wait_delay(), Time.now())
+    set_next_wander_wait(state, blackboard, Time.now())
+  end
+
+  def set_next_wander_wait(%Mob{} = state, %Blackboard{} = blackboard, now) when is_integer(now) do
+    blackboard = Blackboard.put_next_at(blackboard, :next_wander_at, wander_wait_delay(), now)
     {:success, state, Blackboard.clear_move_target(blackboard)}
   end
 
