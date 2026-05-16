@@ -58,6 +58,32 @@ More documentation, like platform-specific setup guides, can be found in the [Wi
   - need to generate from wow client, since this can't be distributed
   - this has spell info and similar
 
+### nix (no docker)
+
+alternative to the scripts above. needs nix with flakes enabled. all upstreams
+(mangoszero/server, mangoszero/database, gtker/wow_dbc, vdechef/mysql2sqlite)
+are pinned in `flake.lock`; bump them with `nix flake update`.
+
+```bash
+# generates db/mangos0.sqlite (runs mariadb inside the nix sandbox, no docker)
+nix run .#mangos0-db -- ./db
+
+# generates db/dbc.sqlite from your local wow 1.12 client
+nix run .#dbc-db -- "/path/to/vanilla/client" ./db
+```
+
+individual targets if you just want the tools on PATH:
+
+```bash
+nix build .#mangos-map-extractor   # map-extractor, vmap-extractor, mmap-extractor
+nix build .#wow-dbc-converter      # wow_dbc_converter
+nix develop .#wow-tools            # shell with all of the above + sqlite + mariadb
+```
+
+note: `nix/wow-dbc.Cargo.lock` is checked in because upstream gtker/wow_dbc
+doesn't ship one. if you `nix flake update` to a wow-dbc-src revision that
+changes dependencies, regenerate it (recipe is in a comment in `flake.nix`).
+
 ## what (somewhat) works
 
 - logging in

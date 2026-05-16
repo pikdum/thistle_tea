@@ -1,0 +1,99 @@
+{
+  "nodes": {
+    "mangoszero-database": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1778822823,
+        "narHash": "sha256-vybBkGMZ+lZzwK8NcqE3Ai0u6kVtwKD0ql1fWSQOQL0=",
+        "ref": "refs/heads/master",
+        "rev": "e6df4ee1cc3f7a2eee6473cf09326e4b3654ddab",
+        "revCount": 795,
+        "submodules": true,
+        "type": "git",
+        "url": "https://github.com/mangoszero/database.git"
+      },
+      "original": {
+        "submodules": true,
+        "type": "git",
+        "url": "https://github.com/mangoszero/database.git"
+      }
+    },
+    "mangoszero-server": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1778828263,
+        "narHash": "sha256-F52uWIlGqMi3RJIdNkWH0nZYm6nsyE9i42rhmX0g5yE=",
+        "ref": "refs/heads/master",
+        "rev": "1df821fad9a12fc742c5e70549273e653b379a60",
+        "revCount": 1489,
+        "submodules": true,
+        "type": "git",
+        "url": "https://github.com/mangoszero/server.git"
+      },
+      "original": {
+        "submodules": true,
+        "type": "git",
+        "url": "https://github.com/mangoszero/server.git"
+      }
+    },
+    "mysql2sqlite-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1696255316,
+        "narHash": "sha256-apMySGpjV7fPoN2uvP7DeOkN8NStq2QDSLlQgbuLlfE=",
+        "owner": "vdechef",
+        "repo": "mysql2sqlite",
+        "rev": "8fc7a69c5c6588c132b2ea3fb38a02a946b28dec",
+        "type": "github"
+      },
+      "original": {
+        "owner": "vdechef",
+        "repo": "mysql2sqlite",
+        "type": "github"
+      }
+    },
+    "nixpkgs": {
+      "locked": {
+        "lastModified": 1778443072,
+        "narHash": "sha256-zi7/fsqM/kFdNuED//4WOCUtezGtKKqRNORjMvfwjnA=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "da5ad661ba4e5ef59ba743f0d112cbc30e474f32",
+        "type": "github"
+      },
+      "original": {
+        "owner": "NixOS",
+        "ref": "nixos-unstable",
+        "repo": "nixpkgs",
+        "type": "github"
+      }
+    },
+    "root": {
+      "inputs": {
+        "mangoszero-database": "mangoszero-database",
+        "mangoszero-server": "mangoszero-server",
+        "mysql2sqlite-src": "mysql2sqlite-src",
+        "nixpkgs": "nixpkgs",
+        "wow-dbc-src": "wow-dbc-src"
+      }
+    },
+    "wow-dbc-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1744046658,
+        "narHash": "sha256-NutocsaiAPF84gTGWZTv2s/bGWVU49kwTA34+bPfpTk=",
+        "owner": "gtker",
+        "repo": "wow_dbc",
+        "rev": "a5c27dbbb5116e1d673f3e9548a6b6b1b70ea11d",
+        "type": "github"
+      },
+      "original": {
+        "owner": "gtker",
+        "repo": "wow_dbc",
+        "type": "github"
+      }
+    }
+  },
+  "root": "root",
+  "version": 7
+}
