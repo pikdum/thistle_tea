@@ -51,7 +51,13 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
 
   def melee_attack(%{unit: %Unit{target: target}} = state, %Blackboard{} = blackboard)
       when is_integer(target) and target > 0 do
-    now = Time.now()
+    melee_attack(state, blackboard, Time.now())
+  end
+
+  def melee_attack(state, blackboard), do: {:success, state, blackboard}
+
+  def melee_attack(%{unit: %Unit{target: target}} = state, %Blackboard{} = blackboard, now)
+      when is_integer(target) and target > 0 and is_integer(now) do
     {state, blackboard} = maybe_start_melee_attack(state, target, blackboard, now)
     in_range = in_combat_range?(state, blackboard)
     attack_ready = Blackboard.ready_for?(blackboard, :next_attack_at, now)
@@ -76,10 +82,14 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
     {:success, state, blackboard}
   end
 
-  def melee_attack(state, blackboard), do: {:success, state, blackboard}
+  def melee_attack(state, blackboard, _now), do: {:success, state, blackboard}
 
   def wait_for_next_attack(state, %Blackboard{} = blackboard) do
-    delay_ms = Blackboard.delay_until(blackboard, :next_attack_at, Time.now())
+    wait_for_next_attack(state, blackboard, Time.now())
+  end
+
+  def wait_for_next_attack(state, %Blackboard{} = blackboard, now) when is_integer(now) do
+    delay_ms = Blackboard.delay_until(blackboard, :next_attack_at, now)
 
     status =
       if delay_ms > 0 do
@@ -90,6 +100,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
 
     {status, state, blackboard}
   end
+
+  def wait_for_next_attack(state, blackboard, _now), do: {:running, state, blackboard}
 
   defp maybe_start_melee_attack(state, target, %Blackboard{attack_started: true} = blackboard, _now)
        when is_integer(target) do

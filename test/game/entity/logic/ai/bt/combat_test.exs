@@ -11,7 +11,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.CombatTest do
   alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.World.SpatialHash
 
-  describe "melee_attack/2" do
+  describe "melee_attack/3" do
     test "queues attack delivery events instead of dispatching directly" do
       target_guid = 2
       SpatialHash.update(:players, target_guid, 0, 1.0, 0.0, 0.0)
@@ -32,7 +32,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.CombatTest do
 
       blackboard = %Blackboard{attack_started: true, next_attack_at: 0}
 
-      assert {:success, mob, %Blackboard{}} = Combat.melee_attack(mob, blackboard)
+      assert {:success, mob, %Blackboard{}} = Combat.melee_attack(mob, blackboard, 1_000)
 
       assert [
                %Event{
@@ -41,6 +41,15 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.CombatTest do
                  attack: %{caster: 1, min_damage: 3, max_damage: 3}
                }
              ] = mob.internal.events
+    end
+  end
+
+  describe "wait_for_next_attack/3" do
+    test "returns running delay from explicit time" do
+      blackboard = %Blackboard{next_attack_at: 1_250}
+      state = %Mob{}
+
+      assert {{:running, 250}, ^state, ^blackboard} = Combat.wait_for_next_attack(state, blackboard, 1_000)
     end
   end
 end
