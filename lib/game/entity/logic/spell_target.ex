@@ -7,22 +7,40 @@ defmodule ThistleTea.Game.Entity.Logic.SpellTarget do
   alias ThistleTea.Game.World.Metadata
 
   def resolve(%{object: %{guid: caster_guid}} = caster, %Spell{} = spell, %Targets{} = targets) do
-    cond do
-      caster_aoe_spell?(spell) ->
-        nearby_enemy_guids(caster, caster_guid, max_aoe_radius(spell))
+    case target_query(spell, targets) do
+      {:caster_aoe, radius} ->
+        nearby_enemy_guids(caster, caster_guid, radius)
 
-      targeted_aoe_spell?(spell) and is_tuple(Targets.ground_location(targets)) ->
-        nearby_enemy_guids_at(caster, caster_guid, Targets.ground_location(targets), max_aoe_radius(spell))
+      {:targeted_aoe, position, radius} ->
+        nearby_enemy_guids_at(caster, caster_guid, position, radius)
 
-      is_integer(targets.unit_guid) ->
-        [targets.unit_guid]
+      {:unit, guid} ->
+        [guid]
 
-      true ->
+      :none ->
         []
     end
   end
 
   def resolve(_caster, _spell, _targets), do: []
+
+  def target_query(%Spell{} = spell, %Targets{} = targets) do
+    cond do
+      caster_aoe_spell?(spell) ->
+        {:caster_aoe, max_aoe_radius(spell)}
+
+      targeted_aoe_spell?(spell) and is_tuple(Targets.ground_location(targets)) ->
+        {:targeted_aoe, Targets.ground_location(targets), max_aoe_radius(spell)}
+
+      is_integer(targets.unit_guid) ->
+        {:unit, targets.unit_guid}
+
+      true ->
+        :none
+    end
+  end
+
+  def target_query(_spell, _targets), do: :none
 
   defp caster_aoe_spell?(%Spell{effects: effects}) do
     Enum.any?(effects, &effect_targets?(&1, [:aoe_enemy_at_caster]))
