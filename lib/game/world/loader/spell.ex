@@ -132,6 +132,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp target_type(15), do: :aoe_enemy_at_caster
   defp target_type(22), do: :aoe_enemy_at_caster
   defp target_type(28), do: :aoe_enemy_at_channel
+  defp target_type(53), do: :aoe_enemy_at_dest
   defp target_type(other) when is_integer(other), do: other
 
   @on_next_swing_1 0x00000004

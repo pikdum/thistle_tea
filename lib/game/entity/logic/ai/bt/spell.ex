@@ -7,14 +7,14 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.SpellEffect
+  alias ThistleTea.Game.Entity.Logic.SpellTarget
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
-  alias ThistleTea.Game.Spell.Effect
+  alias ThistleTea.Game.Spell.Targets
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
-  alias ThistleTea.Game.World.Metadata
 
   def casting_sequence do
     BT.sequence([
@@ -23,8 +23,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
     ])
   end
 
-  def start_cast(%{internal: %Internal{} = internal} = character, %Spell{} = spell, target, spell_cast_targets)
-      when is_binary(spell_cast_targets) do
+  def start_cast(%{internal: %Internal{} = internal} = character, %Spell{} = spell, %Targets{} = targets) do
     now = Time.now()
     cast_time_ms = normalize_time(spell.cast_time_ms)
 
@@ -33,8 +32,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
 
     casting = %{
       spell: spell,
-      target: target,
-      spell_cast_targets: spell_cast_targets,
+      targets: targets,
       cast_time_ms: cast_time_ms,
       channel_ms: channel_ms,
       started_at: now,
@@ -44,7 +42,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
     %{character | internal: %{internal | casting: casting}}
   end
 
-  def start_cast(character, _spell, _target, _spell_cast_targets) do
+  def start_cast(character, _spell, _targets) do
     character
   end
 
@@ -111,7 +109,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
 
   defp send_spell_go(%{object: %{guid: guid}} = character, %{spell: %Spell{id: spell_id}} = casting)
        when is_integer(guid) do
-    hits = build_hits(casting.target, guid)
+    hits = resolve_targets(character, casting)
 
     %Message.SmsgSpellGo{
       cast_item: guid,
@@ -120,7 +118,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
       flags: 0x100,
       hits: hits,
       misses: [],
-      targets: casting.spell_cast_targets,
+      targets: casting.targets.raw,
       ammo_display_id: nil,
       ammo_inventory_type: nil
     }
@@ -160,46 +158,11 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
 
   defp dispatch_to_target(character, _context, _spell, _target_guid), do: character
 
-  defp resolve_targets(%{object: %{guid: caster_guid}} = caster, %{spell: %Spell{} = spell, target: target}) do
-    cond do
-      aoe_caster_spell?(spell) -> nearby_enemy_guids(caster, caster_guid, max_aoe_radius(spell))
-      is_integer(target) -> [target]
-      true -> []
-    end
+  defp resolve_targets(caster, %{spell: %Spell{} = spell, targets: %Targets{} = targets}) do
+    SpellTarget.resolve(caster, spell, targets)
   end
 
-  defp aoe_caster_spell?(%Spell{effects: effects}) do
-    Enum.any?(effects, fn
-      %Effect{implicit_target_a: :aoe_enemy_at_caster, radius_yards: r} when is_number(r) and r > 0 -> true
-      _ -> false
-    end)
-  end
-
-  defp max_aoe_radius(%Spell{effects: effects}) do
-    effects
-    |> Enum.map(& &1.radius_yards)
-    |> Enum.filter(&is_number/1)
-    |> Enum.max(fn -> 0.0 end)
-  end
-
-  defp nearby_enemy_guids(caster, caster_guid, radius) when is_number(radius) and radius > 0 do
-    caster
-    |> World.nearby_mobs(radius)
-    |> Enum.reject(fn {guid, _distance} -> guid == caster_guid end)
-    |> Enum.filter(fn {guid, _distance} -> alive_target?(guid) end)
-    |> Enum.map(fn {guid, _distance} -> guid end)
-  end
-
-  defp nearby_enemy_guids(_caster, _caster_guid, _radius), do: []
-
-  defp alive_target?(guid) when is_integer(guid) do
-    case Metadata.query(guid, [:alive?]) do
-      %{alive?: false} -> false
-      _ -> true
-    end
-  end
-
-  defp alive_target?(_guid), do: false
+  defp resolve_targets(_caster, _casting), do: []
 
   defp broadcast_self_update(%{internal: %Internal{broadcast_update?: true} = internal} = character) do
     Core.update_object(character, :values)
@@ -213,12 +176,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
   defp clear_casting(character, internal) do
     %{character | internal: %{internal | casting: nil}}
   end
-
-  defp build_hits(target, guid) when is_integer(target) and is_integer(guid) do
-    [target]
-  end
-
-  defp build_hits(_target, _guid), do: []
 
   defp normalize_time(value) when is_integer(value) and value > 0, do: value
   defp normalize_time(_value), do: 0

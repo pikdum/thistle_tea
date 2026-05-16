@@ -1,16 +1,12 @@
 defmodule ThistleTea.Game.Network.Message.CmsgCastSpell do
   use ThistleTea.Game.Network.ClientMessage, :CMSG_CAST_SPELL
 
-  import Bitwise, only: [&&&: 2]
-
   alias ThistleTea.Game.Entity.Logic.AI.BT.Spell, as: SpellBT
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.Targets
 
   require Logger
-
-  @spell_cast_target_self 0x00000000
-  @spell_cast_target_unit 0x00000002
 
   defstruct [:spell_id, :spell_cast_targets]
 
@@ -43,13 +39,11 @@ defmodule ThistleTea.Game.Network.Message.CmsgCastSpell do
   def handle_spell_complete(state), do: state
 
   defp cast_spell(state, %Spell{} = spell, spell_cast_targets) do
-    <<spell_cast_target_flags::little-size(16), rest::binary>> = spell_cast_targets
-
-    unit_target = resolve_unit_target(spell_cast_target_flags, rest, state.guid)
+    targets = Targets.parse(spell_cast_targets, state.guid)
 
     Logger.info(
       "CMSG_CAST_SPELL: #{spell.name} - #{spell.id}",
-      target_name: unit_target
+      target_name: targets.unit_guid
     )
 
     state = Message.CmsgCancelCast.cancel_spell(state)
@@ -66,7 +60,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgCastSpell do
     }
     |> World.broadcast_packet(state.character)
 
-    character = SpellBT.start_cast(state.character, spell, unit_target, spell_cast_targets)
+    character = SpellBT.start_cast(state.character, spell, targets)
     state = Map.put(state, :character, character)
 
     if spell.cast_time_ms == 0 and not Spell.attribute?(spell, :channeled) do
@@ -86,15 +80,6 @@ defmodule ThistleTea.Game.Network.Message.CmsgCastSpell do
   end
 
   defp lookup_spell(_state, _spell_id), do: nil
-
-  defp resolve_unit_target(@spell_cast_target_self, _rest, caster_guid), do: caster_guid
-
-  defp resolve_unit_target(flags, rest, _caster_guid) when (flags &&& @spell_cast_target_unit) > 0 do
-    {target, _} = BinaryUtils.unpack_guid(rest)
-    target
-  end
-
-  defp resolve_unit_target(_flags, _rest, _caster_guid), do: nil
 
   defp ensure_player_tick(state) do
     case Map.get(state, :player_tick_ref) do
