@@ -108,19 +108,29 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
   def tick(entity, _now), do: entity
 
   defp tick_periodics(%{unit: %Unit{auras: holders}} = entity, now) do
-    {entity, new_holders} =
-      Enum.reduce(holders, {entity, []}, fn holder, {ent, acc} ->
+    result =
+      Enum.reduce_while(holders, {entity, []}, fn holder, {ent, acc} ->
         {ent, new_holder} = tick_holder(ent, holder, now)
-        {ent, [new_holder | acc]}
+
+        if Core.dead?(ent) do
+          {:halt, {ent, :died}}
+        else
+          {:cont, {ent, [new_holder | acc]}}
+        end
       end)
 
-    new_holders = Enum.reverse(new_holders)
+    case result do
+      {entity, :died} ->
+        entity
 
-    if new_holders == holders do
-      entity
-    else
-      unit = %{entity.unit | auras: new_holders}
-      %{entity | unit: unit}
+      {entity, acc} ->
+        new_holders = Enum.reverse(acc)
+
+        if new_holders == holders do
+          entity
+        else
+          %{entity | unit: %{entity.unit | auras: new_holders}}
+        end
     end
   end
 
@@ -164,26 +174,15 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
     entity
   end
 
-  defp send_duration_update(%Holder{
-         slot: slot,
-         applied_at: applied_at,
-         expires_at: expires_at,
-         spell: %Spell{id: spell_id, name: name}
-       })
-       when is_integer(slot) and is_integer(applied_at) and is_integer(expires_at) and expires_at > 0 do
-    duration = max(expires_at - applied_at, 0)
-    Logger.info("SMSG_UPDATE_AURA_DURATION: spell=#{spell_id} (#{name}) slot=#{slot} duration=#{duration}ms")
-
+  defp send_duration_update(%Holder{slot: slot, applied_at: applied_at, expires_at: expires_at})
+       when is_integer(slot) and is_integer(applied_at) and is_integer(expires_at) do
     Network.send_packet(%Message.SmsgUpdateAuraDuration{
       aura_slot: slot,
-      duration_ms: duration
+      duration_ms: max(expires_at - applied_at, 0)
     })
   end
 
-  defp send_duration_update(holder) do
-    Logger.warning("send_duration_update skipped: #{inspect(holder)}")
-    :ok
-  end
+  defp send_duration_update(_holder), do: :ok
 
   defp school_index(:physical), do: 0
   defp school_index(:holy), do: 1
