@@ -1,7 +1,9 @@
 defmodule ThistleTea.Game.Entity.EventSink do
   alias ThistleTea.Character
   alias ThistleTea.Game.Entity
+  alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Mob
+  alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.Entity.Logic.SpellEffect
   alias ThistleTea.Game.Network
@@ -120,6 +122,15 @@ defmodule ThistleTea.Game.Entity.EventSink do
   end
 
   def emit(entity, %Event{type: :spell_go}), do: entity
+
+  def emit(%{internal: %Internal{broadcast_update?: true} = internal} = entity, %Event{type: :object_update} = event) do
+    Core.update_object(entity, event.update_type || :values)
+    |> World.broadcast_packet(entity)
+
+    %{entity | internal: %{internal | broadcast_update?: false}}
+  end
+
+  def emit(entity, %Event{type: :object_update}), do: entity
 
   def emit(entity, %Event{type: :attack_start} = event) do
     %Message.SmsgAttackstart{

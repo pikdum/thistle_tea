@@ -149,7 +149,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
       assert [
                %Event{type: :spell_cast_result},
                %Event{type: :spell_go},
-               %Event{type: :spell_damage, damage: 5, periodic?: false}
+               %Event{type: :spell_damage, damage: 5, periodic?: false},
+               %Event{type: :object_update, update_type: :values}
              ] = mob.internal.events
     end
   end

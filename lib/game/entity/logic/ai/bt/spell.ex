@@ -4,7 +4,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
-  alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.Entity.Logic.MeleeSpell
   alias ThistleTea.Game.Entity.Logic.SpellEffect
@@ -14,7 +13,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Targets
   alias ThistleTea.Game.Time
-  alias ThistleTea.Game.World
 
   def casting_sequence do
     BT.sequence([
@@ -155,7 +153,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
 
     character
     |> Event.enqueue(events ++ duration_events)
-    |> broadcast_self_update()
+    |> queue_self_update()
   end
 
   defp dispatch_to_target(character, %CastContext{} = context, spell, target_guid) when is_integer(target_guid) do
@@ -171,12 +169,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
 
   defp resolve_targets(_caster, _casting), do: []
 
-  defp broadcast_self_update(%{internal: %Internal{broadcast_update?: true} = internal} = character) do
-    Core.update_object(character, :values)
-    |> World.broadcast_packet(character)
-
-    %{character | internal: %{internal | broadcast_update?: false}}
+  defp queue_self_update(%{internal: %Internal{broadcast_update?: true}} = character) do
+    Event.enqueue(character, Event.object_update(:values))
   end
 
-  defp broadcast_self_update(character), do: character
+  defp queue_self_update(character), do: character
 end

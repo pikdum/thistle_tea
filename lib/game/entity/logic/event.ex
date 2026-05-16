@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
     :move_opts,
     :hit_guids,
     :raw_targets,
+    :update_type,
     :attack
   ]
 
@@ -67,6 +68,10 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
       hit_guids: hit_guids,
       raw_targets: raw_targets
     }
+  end
+
+  def object_update(update_type \\ :values) do
+    %__MODULE__{type: :object_update, update_type: update_type}
   end
 
   def attack_start(source_guid, target_guid) when is_integer(source_guid) and is_integer(target_guid) do

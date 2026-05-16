@@ -26,4 +26,10 @@ defmodule ThistleTea.Game.Entity.Logic.EventTest do
              } = Event.spell_go(1, 133, [2], <<1, 2>>)
     end
   end
+
+  describe "object_update/1" do
+    test "returns an object update event" do
+      assert %Event{type: :object_update, update_type: :values} = Event.object_update(:values)
+    end
+  end
 end
