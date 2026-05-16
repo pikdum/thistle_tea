@@ -2,6 +2,7 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
   defstruct [
     :type,
     :source_guid,
+    :source_level,
     :target_guid,
     :spell_id,
     :school,
@@ -68,6 +69,17 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
   end
 
   def enqueue(entity, _event), do: entity
+
+  def trigger_spell(source_guid, source_level, target_guid, spell_id)
+      when is_integer(target_guid) and is_integer(spell_id) do
+    %__MODULE__{
+      type: :trigger_spell,
+      source_guid: source_guid,
+      source_level: source_level,
+      target_guid: target_guid,
+      spell_id: spell_id
+    }
+  end
 
   def drain(%{internal: %{events: events} = internal} = entity) when is_list(events) do
     {%{entity | internal: %{internal | events: []}}, events}

@@ -230,6 +230,41 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
     end
   end
 
+  describe "reactions/3" do
+    test "returns trigger spell events for on-hit proc auras" do
+      entity = fixture_entity()
+
+      spell = %Spell{
+        id: 168,
+        name: "Frost Armor",
+        school: :frost,
+        duration_ms: 600_000,
+        effects: [
+          %Effect{
+            index: 0,
+            type: :apply_aura,
+            base_points: 0,
+            die_sides: 0,
+            aura: :damage_shield,
+            trigger_spell_id: 6136
+          }
+        ]
+      }
+
+      {entity, _events} = Aura.apply_spell(entity, 1, 10, spell)
+
+      assert [
+               %{
+                 type: :trigger_spell,
+                 source_guid: 1,
+                 source_level: 10,
+                 target_guid: 999,
+                 spell_id: 6136
+               }
+             ] = Aura.reactions(entity, :hit_taken, %{attacker_guid: 999})
+    end
+  end
+
   describe "expire_due/2" do
     test "removes expired holders and reverses their mods" do
       entity = fixture_entity()

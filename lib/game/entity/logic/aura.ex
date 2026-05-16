@@ -113,6 +113,16 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
 
   def self_duration_events(_entity), do: []
 
+  def reactions(%{object: %{guid: owner_guid}, unit: %Unit{auras: holders}}, :hit_taken, %{attacker_guid: attacker_guid})
+      when is_list(holders) and is_integer(attacker_guid) do
+    holders
+    |> Enum.flat_map(fn %Holder{} = holder ->
+      Enum.flat_map(holder.auras, &reaction_event(&1, holder, owner_guid, attacker_guid))
+    end)
+  end
+
+  def reactions(_entity, _event, _context), do: []
+
   def expire_due(%{unit: %Unit{auras: holders}} = entity, now) when is_list(holders) do
     {kept, expired} = Enum.split_with(holders, &alive?(&1, now))
 
@@ -289,9 +299,19 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
       amount: Effect.damage_roll(effect),
       misc_value: effect.misc_value,
       amplitude_ms: effect.amplitude_ms,
-      next_tick_at: next_tick(effect, now)
+      next_tick_at: next_tick(effect, now),
+      trigger_spell_id: effect.trigger_spell_id
     }
   end
+
+  defp reaction_event(%Aura{type: type, trigger_spell_id: spell_id}, %Holder{} = holder, owner_guid, attacker_guid)
+       when type in [:damage_shield, :proc_trigger_spell] and is_integer(spell_id) and spell_id > 0 do
+    source_guid = holder.caster_guid || owner_guid
+    source_level = holder.caster_level || 1
+    [Event.trigger_spell(source_guid, source_level, attacker_guid, spell_id)]
+  end
+
+  defp reaction_event(_aura, _holder, _owner_guid, _attacker_guid), do: []
 
   defp next_tick(%Effect{aura: aura, amplitude_ms: amp}, now)
        when aura in [:periodic_damage, :periodic_heal] and is_integer(amp) and amp > 0 do

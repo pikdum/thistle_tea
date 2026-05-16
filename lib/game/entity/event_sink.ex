@@ -1,12 +1,16 @@
 defmodule ThistleTea.Game.Entity.EventSink do
   alias ThistleTea.Character
+  alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.Event
+  alias ThistleTea.Game.Entity.Logic.SpellEffect
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Opcodes
   alias ThistleTea.Game.Network.Packet
+  alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.World
+  alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
 
   def emit_pending(entity) do
     {entity, events} = Event.drain(entity)
@@ -100,7 +104,38 @@ defmodule ThistleTea.Game.Entity.EventSink do
     entity
   end
 
+  def emit(entity, %Event{type: :trigger_spell} = event) do
+    case SpellLoader.load(event.spell_id) do
+      nil ->
+        entity
+
+      spell ->
+        dispatch_triggered_spell(entity, event, spell)
+    end
+  end
+
   def emit(entity, _event), do: entity
+
+  defp dispatch_triggered_spell(%{object: %{guid: guid}} = entity, %Event{target_guid: guid} = event, spell) do
+    context = trigger_context(event, spell)
+    {entity, events} = SpellEffect.receive(entity, context, spell)
+    emit(entity, events)
+  end
+
+  defp dispatch_triggered_spell(entity, %Event{} = event, spell) do
+    context = trigger_context(event, spell)
+    Entity.receive_spell(event.target_guid, context, spell)
+    entity
+  end
+
+  defp trigger_context(%Event{} = event, spell) do
+    %CastContext{
+      caster_guid: event.source_guid,
+      caster_level: event.source_level || 1,
+      target_guid: event.target_guid,
+      spell: spell
+    }
+  end
 
   defp school_index(:physical), do: 0
   defp school_index(:holy), do: 1
