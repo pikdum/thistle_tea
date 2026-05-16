@@ -80,8 +80,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
     {entity, events} =
       entity
       |> Map.put(:unit, unit)
-      |> MovementStats.sync_aura_mods()
-      |> sync_movement_flags()
+      |> sync_movement_state()
 
     {Core.mark_broadcast_update(entity), events}
   end
@@ -136,8 +135,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
       {entity, events} =
         entity
         |> Map.put(:unit, unit)
-        |> MovementStats.sync_aura_mods()
-        |> sync_movement_flags()
+        |> sync_movement_state()
 
       {Core.mark_broadcast_update(entity), events}
     end
@@ -175,6 +173,26 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
   end
 
   defp sync_movement_flags(entity), do: {entity, []}
+
+  defp sync_movement_state(entity) do
+    old_run_speed = run_speed(entity)
+    entity = MovementStats.sync_aura_mods(entity)
+    {entity, events} = sync_movement_flags(entity)
+    {entity, speed_change_events(entity, old_run_speed) ++ events}
+  end
+
+  defp speed_change_events(entity, old_run_speed) do
+    new_run_speed = run_speed(entity)
+
+    if is_number(old_run_speed) and is_number(new_run_speed) and old_run_speed != new_run_speed do
+      [Event.movement_speed_changed(new_run_speed)]
+    else
+      []
+    end
+  end
+
+  defp run_speed(%{movement_block: %MovementBlock{run_speed: run_speed}}), do: run_speed
+  defp run_speed(_entity), do: nil
 
   def tick(%{unit: %Unit{auras: holders}} = entity, now) when is_list(holders) and holders != [] do
     entity

@@ -59,6 +59,14 @@ defmodule ThistleTea.Game.Entity.EventSink do
     entity
   end
 
+  def emit(%Character{object: %{guid: guid}} = entity, %Event{type: :movement_speed_changed, speed: speed})
+      when is_number(speed) do
+    Network.send_packet(%Message.SmsgForceRunSpeedChange{guid: guid, speed: speed})
+    entity
+  end
+
+  def emit(entity, %Event{type: :movement_speed_changed}), do: entity
+
   def emit(entity, %Event{type: :attack_start} = event) do
     %Message.SmsgAttackstart{
       attacker: event.source_guid,

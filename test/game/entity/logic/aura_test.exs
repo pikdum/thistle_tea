@@ -295,10 +295,12 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
         ]
       }
 
-      {entity, _events} = Aura.apply_spell(entity, 1, 1, spell)
+      {entity, events} = Aura.apply_spell(entity, 1, 1, spell)
 
       assert entity.movement_block.base_run_speed == 7.0
       assert_in_delta entity.movement_block.run_speed, 4.9, 0.000001
+      assert [%{type: :movement_speed_changed, speed: speed}] = events
+      assert_in_delta speed, 4.9, 0.000001
     end
 
     test "expiring mod_decrease_speed restores base movement speeds" do
@@ -325,10 +327,11 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
 
       {entity, _events} = Aura.apply_spell(entity, 1, 1, spell)
       future = entity.unit.auras |> hd() |> Map.fetch!(:expires_at)
-      {entity, _events} = Aura.expire_due(entity, future + 1)
+      {entity, events} = Aura.expire_due(entity, future + 1)
 
       assert entity.movement_block.base_run_speed == 7.0
       assert entity.movement_block.run_speed == 7.0
+      assert [%{type: :movement_speed_changed, speed: 7.0}] = events
     end
   end
 

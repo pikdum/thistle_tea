@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
     :periodic?,
     :aura_slot,
     :duration_ms,
+    :speed,
     :attack
   ]
 
@@ -35,6 +36,10 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
 
   def movement_stopped do
     %__MODULE__{type: :movement_stopped}
+  end
+
+  def movement_speed_changed(speed) when is_number(speed) do
+    %__MODULE__{type: :movement_speed_changed, speed: speed}
   end
 
   def attack_start(source_guid, target_guid) when is_integer(source_guid) and is_integer(target_guid) do
