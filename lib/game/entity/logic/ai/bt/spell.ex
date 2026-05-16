@@ -48,11 +48,16 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
     channel_ms =
       if Spell.attribute?(spell, :channeled), do: normalize_time(spell.duration_ms), else: 0
 
+    channel_tick_ms = if channel_ms > 0, do: Spell.channel_tick_ms(spell)
+
     casting = %{
       spell: spell,
       targets: targets,
       cast_time_ms: cast_time_ms,
       channel_ms: channel_ms,
+      channel_tick_ms: channel_tick_ms,
+      next_channel_tick_at: next_channel_tick_at(now, cast_time_ms, channel_tick_ms),
+      channel_go_sent?: false,
       started_at: now,
       ends_at: now + cast_time_ms + channel_ms
     }
@@ -71,12 +76,21 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
     now = Time.now()
     ends_at = Map.get(casting, :ends_at, now)
 
-    if now >= ends_at do
-      character = complete_cast(character, casting)
-      {:success, character, blackboard}
-    else
-      delay_ms = max(ends_at - now, 0)
-      {{:running, delay_ms}, character, blackboard}
+    cond do
+      channeled?(casting) and now >= ends_at ->
+        {:success, clear_cast(character), blackboard}
+
+      channeled?(casting) ->
+        {character, delay_ms} = channel_tick(character, casting, now)
+        {{:running, delay_ms}, character, blackboard}
+
+      now >= ends_at ->
+        character = complete_cast(character, casting)
+        {:success, character, blackboard}
+
+      true ->
+        delay_ms = max(ends_at - now, 0)
+        {{:running, delay_ms}, character, blackboard}
     end
   end
 
@@ -120,6 +134,55 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
   end
 
   defp send_cast_result(character, _casting), do: character
+
+  defp channel_tick(%{internal: %Internal{}} = character, casting, now) do
+    next_tick_at = Map.get(casting, :next_channel_tick_at)
+
+    if is_integer(next_tick_at) and now >= next_tick_at do
+      casting = advance_channel_tick(casting, now)
+
+      character =
+        character
+        |> maybe_send_channel_spell_go(casting)
+        |> apply_spell_hit(casting)
+
+      delay_ms = next_channel_delay(casting, now)
+      {%{character | internal: %{character.internal | casting: casting}}, delay_ms}
+    else
+      {character, next_channel_delay(casting, now)}
+    end
+  end
+
+  defp channel_tick(character, casting, now), do: {character, next_channel_delay(casting, now)}
+
+  defp maybe_send_channel_spell_go(character, %{channel_go_sent?: false} = casting) do
+    send_spell_go(character, casting)
+  end
+
+  defp maybe_send_channel_spell_go(character, _casting), do: character
+
+  defp advance_channel_tick(%{channel_tick_ms: tick_ms, next_channel_tick_at: next_tick_at} = casting, now)
+       when is_integer(tick_ms) and tick_ms > 0 and is_integer(next_tick_at) do
+    %{casting | next_channel_tick_at: advance_tick(next_tick_at, tick_ms, now), channel_go_sent?: true}
+  end
+
+  defp advance_channel_tick(casting, _now), do: casting
+
+  defp advance_tick(last_tick, tick_ms, now) do
+    next = last_tick + tick_ms
+    if next > now, do: next, else: advance_tick(next, tick_ms, now)
+  end
+
+  defp next_channel_delay(%{ends_at: ends_at, next_channel_tick_at: next_tick_at}, now)
+       when is_integer(ends_at) and is_integer(next_tick_at) do
+    min(max(next_tick_at - now, 0), max(ends_at - now, 0))
+  end
+
+  defp next_channel_delay(%{ends_at: ends_at}, now) when is_integer(ends_at), do: max(ends_at - now, 0)
+  defp next_channel_delay(_casting, _now), do: 0
+
+  defp channeled?(%{channel_ms: channel_ms}) when is_integer(channel_ms) and channel_ms > 0, do: true
+  defp channeled?(_casting), do: false
 
   defp send_spell_go(%{object: %{guid: guid}} = character, %{spell: %Spell{id: spell_id}} = casting)
        when is_integer(guid) do
@@ -193,4 +256,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
 
   defp normalize_time(value) when is_integer(value) and value > 0, do: value
   defp normalize_time(_value), do: 0
+
+  defp next_channel_tick_at(_now, _cast_time_ms, nil), do: nil
+  defp next_channel_tick_at(now, cast_time_ms, tick_ms), do: now + cast_time_ms + tick_ms
 end
