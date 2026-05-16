@@ -3,9 +3,12 @@ defmodule ThistleTea.Game.Network.Message.CmsgMessagechat do
 
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Metadata
 
   require Logger
+
+  @debug_spells [78, 133, 168, 122, 10]
 
   defstruct [:chat_type, :language, :message, :target_name]
 
@@ -67,6 +70,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgMessagechat do
 
   def handle_chat(state, _, _, ".help" <> _, _) do
     commands = [
+      ".debug spells - learn the MVP spell test set (Fireball, Frost Armor, Frost Nova, Blizzard, Heroic Strike)",
       ".go xyz <x> <y> <z> [map] - teleport",
       ".guid - show target guid",
       ".help - show help",
@@ -102,6 +106,42 @@ defmodule ThistleTea.Game.Network.Message.CmsgMessagechat do
 
         state
         |> system_message("Invalid command. Use: .modify <type> <n>")
+    end
+  end
+
+  def handle_chat(state, _, _, ".debug spells" <> _, _) do
+    %{character: %ThistleTea.Character{internal: internal} = character} = state
+
+    existing_ids = MapSet.new(internal.spells || [])
+    new_ids = Enum.reject(@debug_spells, &MapSet.member?(existing_ids, &1))
+
+    case new_ids do
+      [] ->
+        system_message(state, "Already know all debug spells.")
+
+      _ ->
+        all_ids = (internal.spells || []) ++ new_ids
+        spellbook = SpellLoader.build_spellbook(all_ids)
+
+        character = %{character | internal: %{internal | spells: all_ids, spellbook: spellbook}}
+        ThistleTea.Character.save(character)
+
+        for id <- new_ids do
+          Network.send_packet(%Message.SmsgLearnedSpell{spell_id: id})
+        end
+
+        names =
+          new_ids
+          |> Enum.map_join(", ", fn id ->
+            case Map.get(spellbook, id) do
+              %{name: name} -> name
+              _ -> "spell #{id}"
+            end
+          end)
+
+        state
+        |> Map.put(:character, character)
+        |> system_message("Learned: #{names}")
     end
   end
 
