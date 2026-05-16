@@ -164,7 +164,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
   defp dispatch_to_target(character, _context, _spell, _target_guid, _now), do: character
 
   defp resolve_targets(caster, %Cast{spell: %Spell{} = spell, targets: %Targets{} = targets}) do
-    SpellTarget.resolve(caster, spell, targets)
+    query = SpellTarget.target_query(spell, targets)
+    SpellTarget.resolve_query(caster, query)
   end
 
   defp resolve_targets(_caster, _casting), do: []

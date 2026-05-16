@@ -102,6 +102,26 @@ defmodule ThistleTea.Game.Entity.Logic.SpellTargetTest do
     end
   end
 
+  describe "resolve_query/2" do
+    test "returns direct unit query targets" do
+      caster = %{object: %{guid: 1}}
+
+      assert SpellTarget.resolve_query(caster, {:unit, 2}) == [2]
+    end
+
+    test "resolves targeted aoe queries against world state" do
+      player_guid = player_guid()
+      mob_guid = mob_guid()
+
+      put_spatial_target(:players, player_guid, {40.0, 0.0, 0.0})
+      put_spatial_target(:mobs, mob_guid, {3.0, 0.0, 0.0})
+
+      caster = caster(player_guid, {40.0, 0.0, 0.0})
+
+      assert SpellTarget.resolve_query(caster, {:targeted_aoe, {0.0, 0.0, 0.0}, 10.0}) == [mob_guid]
+    end
+  end
+
   defp player_guid do
     Guid.from_low_guid(:player, bounded_unique(0xFFFFFFFF))
   end

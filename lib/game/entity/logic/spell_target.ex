@@ -7,7 +7,19 @@ defmodule ThistleTea.Game.Entity.Logic.SpellTarget do
   alias ThistleTea.Game.World.Metadata
 
   def resolve(%{object: %{guid: caster_guid}} = caster, %Spell{} = spell, %Targets{} = targets) do
-    case target_query(spell, targets) do
+    resolve_query(caster, caster_guid, target_query(spell, targets))
+  end
+
+  def resolve(_caster, _spell, _targets), do: []
+
+  def resolve_query(%{object: %{guid: caster_guid}} = caster, query) do
+    resolve_query(caster, caster_guid, query)
+  end
+
+  def resolve_query(_caster, _query), do: []
+
+  defp resolve_query(caster, caster_guid, query) do
+    case query do
       {:caster_aoe, radius} ->
         nearby_enemy_guids(caster, caster_guid, radius)
 
@@ -21,8 +33,6 @@ defmodule ThistleTea.Game.Entity.Logic.SpellTarget do
         []
     end
   end
-
-  def resolve(_caster, _spell, _targets), do: []
 
   def target_query(%Spell{} = spell, %Targets{} = targets) do
     cond do
