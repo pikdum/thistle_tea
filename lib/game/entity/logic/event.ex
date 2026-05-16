@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
     :duration_ms,
     :speed,
     :rooted?,
+    :move_opts,
     :attack
   ]
 
@@ -45,6 +46,10 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
 
   def movement_root_changed(rooted?) when is_boolean(rooted?) do
     %__MODULE__{type: :movement_root_changed, rooted?: rooted?}
+  end
+
+  def monster_move(opts \\ []) when is_list(opts) do
+    %__MODULE__{type: :monster_move, move_opts: opts}
   end
 
   def attack_start(source_guid, target_guid) when is_integer(source_guid) and is_integer(target_guid) do

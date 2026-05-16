@@ -54,6 +54,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   @impl GenServer
   def handle_cast({:move_to, x, y, z}, state) do
     state = Movement.move_to(state, {x, y, z})
+    state = EventSink.emit_pending(state)
     {:noreply, state}
   end
 

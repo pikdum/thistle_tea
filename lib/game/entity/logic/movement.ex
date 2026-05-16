@@ -1,16 +1,13 @@
 defmodule ThistleTea.Game.Entity.Logic.Movement do
-  use ThistleTea.Game.Network.Opcodes, [:SMSG_MONSTER_MOVE]
-
   import Bitwise, only: [&&&: 2, bnot: 1, bor: 2]
 
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Internal.Waypoint
   alias ThistleTea.Game.Entity.Data.Component.Internal.WaypointRoute
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
+  alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.Math
-  alias ThistleTea.Game.Network.Message.SmsgMonsterMove
   alias ThistleTea.Game.Time
-  alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Pathfinding
 
   @max_u32 0xFFFFFFFF
@@ -114,12 +111,9 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
   end
 
   def move_to(state, {x, y, z}, opts) do
-    state = start_move_to(state, {x, y, z})
-
-    SmsgMonsterMove.build(state, opts)
-    |> World.broadcast_packet(state)
-
     state
+    |> start_move_to({x, y, z})
+    |> Event.enqueue(Event.monster_move(opts))
   end
 
   def halt(%{movement_block: %MovementBlock{} = mb, internal: %Internal{} = internal} = entity) do

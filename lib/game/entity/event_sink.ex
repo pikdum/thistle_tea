@@ -78,6 +78,15 @@ defmodule ThistleTea.Game.Entity.EventSink do
 
   def emit(entity, %Event{type: :movement_speed_changed}), do: entity
 
+  def emit(%Mob{} = entity, %Event{type: :monster_move, move_opts: opts}) do
+    Message.SmsgMonsterMove.build(entity, opts || [])
+    |> World.broadcast_packet(entity)
+
+    entity
+  end
+
+  def emit(entity, %Event{type: :monster_move}), do: entity
+
   def emit(entity, %Event{type: :attack_start} = event) do
     %Message.SmsgAttackstart{
       attacker: event.source_guid,
