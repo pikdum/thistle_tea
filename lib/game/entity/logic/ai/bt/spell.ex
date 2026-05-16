@@ -73,21 +73,11 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
 
   def cast_tick(character, blackboard), do: {:failure, character, blackboard}
 
-  def complete_cast(%{internal: %Internal{casting: %Cast{} = casting}} = character) do
-    complete_cast(character, casting, Time.now())
-  end
-
-  def complete_cast(character), do: character
-
   def complete_cast(%{internal: %Internal{casting: %Cast{} = casting}} = character, now) when is_integer(now) do
     complete_cast(character, casting, now)
   end
 
-  def complete_cast(%{internal: %Internal{}} = character, %Cast{} = casting) do
-    complete_cast(character, casting, Time.now())
-  end
-
-  def complete_cast(character, _casting), do: character
+  def complete_cast(character, now) when is_integer(now), do: character
 
   def complete_cast(%{internal: %Internal{}} = character, %Cast{} = casting, now) when is_integer(now) do
     targets = resolve_targets(character, casting)

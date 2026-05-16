@@ -93,7 +93,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
     end
   end
 
-  describe "complete_cast/2" do
+  describe "complete_cast/3" do
     test "queues cast result and spell go events before clearing cast state" do
       spell = %Spell{id: 133, effects: []}
 
@@ -110,7 +110,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
         internal: %Internal{map: 0, casting: casting}
       }
 
-      mob = SpellBT.complete_cast(mob, casting)
+      mob = SpellBT.complete_cast(mob, casting, 1_000)
 
       assert mob.internal.casting == nil
 
@@ -142,7 +142,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
         internal: %Internal{map: 0, casting: casting}
       }
 
-      mob = SpellBT.complete_cast(mob, casting)
+      mob = SpellBT.complete_cast(mob, casting, 1_000)
 
       assert mob.unit.health == 15
 
@@ -170,7 +170,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
         internal: %Internal{map: 0, casting: casting}
       }
 
-      mob = SpellBT.complete_cast(mob, casting)
+      mob = SpellBT.complete_cast(mob, casting, 1_000)
 
       assert [
                %Event{type: :spell_cast_result},
