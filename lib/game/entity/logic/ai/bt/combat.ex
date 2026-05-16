@@ -1,6 +1,5 @@
 defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
   alias ThistleTea.Character
-  alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.AI.BT
@@ -124,9 +123,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
 
   defp send_melee_attack(state, target) when is_integer(target) do
     {state, attack} = melee_attack_payload(state)
-
-    Entity.receive_attack(target, attack)
-    state
+    Event.enqueue(state, Event.deliver_attack(target, attack))
   end
 
   defp melee_attack_payload(%{object: %{guid: guid}} = state) do

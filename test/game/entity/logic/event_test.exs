@@ -32,4 +32,12 @@ defmodule ThistleTea.Game.Entity.Logic.EventTest do
       assert %Event{type: :object_update, update_type: :values} = Event.object_update(:values)
     end
   end
+
+  describe "deliver_attack/2" do
+    test "returns an attack delivery event" do
+      attack = %{caster: 1, min_damage: 2, max_damage: 3}
+
+      assert %Event{type: :deliver_attack, target_guid: 2, attack: ^attack} = Event.deliver_attack(2, attack)
+    end
+  end
 end

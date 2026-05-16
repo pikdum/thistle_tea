@@ -74,6 +74,10 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
     %__MODULE__{type: :object_update, update_type: update_type}
   end
 
+  def deliver_attack(target_guid, attack) when is_integer(target_guid) and is_map(attack) do
+    %__MODULE__{type: :deliver_attack, target_guid: target_guid, attack: attack}
+  end
+
   def attack_start(source_guid, target_guid) when is_integer(source_guid) and is_integer(target_guid) do
     %__MODULE__{type: :attack_start, source_guid: source_guid, target_guid: target_guid}
   end

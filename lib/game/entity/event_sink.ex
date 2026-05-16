@@ -132,6 +132,11 @@ defmodule ThistleTea.Game.Entity.EventSink do
 
   def emit(entity, %Event{type: :object_update}), do: entity
 
+  def emit(entity, %Event{type: :deliver_attack} = event) do
+    Entity.receive_attack(event.target_guid, event.attack)
+    entity
+  end
+
   def emit(entity, %Event{type: :attack_start} = event) do
     %Message.SmsgAttackstart{
       attacker: event.source_guid,
