@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
   alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.Entity.Logic.MeleeSpell
   alias ThistleTea.Game.Entity.Logic.Resources
+  alias ThistleTea.Game.Network.BinaryUtils
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Metadata
@@ -137,13 +138,14 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
   end
 
   defp send_melee_attack(state, target) when is_integer(target) do
-    {state, attack} = melee_attack_payload(state)
+    {state, attack, queued_spell} = melee_attack_payload(state)
     attack = CombatLogic.finalize_attack(attack)
 
     state =
       state
       |> Resources.gain_outgoing_auto_attack_rage(attack)
       |> queue_self_update()
+      |> queue_queued_spell_go(queued_spell, target)
 
     Event.enqueue(state, Event.deliver_attack(target, attack))
   end
@@ -152,7 +154,18 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
     {state, queued_spell} = MeleeSpell.consume_next_swing(state)
     {min_damage, max_damage} = CombatLogic.damage_range(state)
     attack = %{caster: guid, min_damage: min_damage, max_damage: max_damage}
-    {state, MeleeSpell.apply_to_attack(attack, queued_spell)}
+    {state, MeleeSpell.apply_to_attack(attack, queued_spell), queued_spell}
+  end
+
+  defp queue_queued_spell_go(%{object: %{guid: guid}} = state, %{id: spell_id}, target)
+       when is_integer(guid) and is_integer(spell_id) and is_integer(target) do
+    Event.enqueue(state, Event.spell_go(guid, spell_id, [target], unit_target_raw(target)))
+  end
+
+  defp queue_queued_spell_go(state, _queued_spell, _target), do: state
+
+  defp unit_target_raw(target) do
+    <<0x0002::little-size(16)>> <> BinaryUtils.pack_guid(target)
   end
 
   defp queue_self_update(%{internal: %Internal{broadcast_update?: true}} = state) do

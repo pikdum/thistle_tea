@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.CombatTest do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Combat
   alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.Spell
   alias ThistleTea.Game.World.SpatialHash
 
   describe "melee_attack/3" do
@@ -42,6 +43,36 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.CombatTest do
                  target_guid: ^target_guid,
                  attack: %{caster: 1, min_damage: 3, max_damage: 3, damage: 3}
                }
+             ] = mob.internal.events
+    end
+
+    test "sends queued melee spell go before delivering the attack" do
+      target_guid = 2
+      SpatialHash.update(:players, target_guid, 0, 1.0, 0.0, 0.0)
+      on_exit(fn -> SpatialHash.remove(:players, target_guid) end)
+
+      spell = %Spell{id: 78}
+
+      mob = %Mob{
+        object: %Object{guid: 1},
+        unit: %Unit{
+          target: target_guid,
+          min_damage: 3,
+          max_damage: 3,
+          combat_reach: 1.0,
+          base_attack_time: 1_000
+        },
+        internal: %Internal{map: 0, in_combat: true, next_swing_spell: spell},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
+      }
+
+      blackboard = %Blackboard{attack_started: true, next_attack_at: 0}
+
+      assert {:success, mob, %Blackboard{}} = Combat.melee_attack(mob, blackboard, 1_000)
+
+      assert [
+               %Event{type: :spell_go, spell_id: 78, hit_guids: [^target_guid]},
+               %Event{type: :deliver_attack, attack: %{spell_id: 78, queued_spell_id: 78}}
              ] = mob.internal.events
     end
 

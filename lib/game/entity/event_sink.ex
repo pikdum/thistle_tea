@@ -125,6 +125,24 @@ defmodule ThistleTea.Game.Entity.EventSink do
 
   def emit(entity, %Event{type: :spell_go}), do: entity
 
+  def emit(%Character{} = entity, %Event{type: :channel_start} = event) do
+    Network.send_packet(%Message.MsgChannelStart{
+      spell_id: event.spell_id,
+      duration_ms: event.channel_time_ms
+    })
+
+    entity
+  end
+
+  def emit(entity, %Event{type: :channel_start}), do: entity
+
+  def emit(%Character{} = entity, %Event{type: :channel_update} = event) do
+    Network.send_packet(%Message.MsgChannelUpdate{time_ms: event.channel_time_ms})
+    entity
+  end
+
+  def emit(entity, %Event{type: :channel_update}), do: entity
+
   def emit(%{internal: %Internal{broadcast_update?: true} = internal} = entity, %Event{type: :object_update} = event) do
     Core.update_object(entity, event.update_type || :values)
     |> World.broadcast_packet(entity)

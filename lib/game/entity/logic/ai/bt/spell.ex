@@ -3,6 +3,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
+  alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.Entity.Logic.MeleeSpell
   alias ThistleTea.Game.Entity.Logic.SpellEffect
@@ -24,7 +25,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
   def start_cast(%{internal: %Internal{} = internal} = character, %Spell{} = spell, %Targets{} = targets, now)
       when is_integer(now) do
     if Spell.attribute?(spell, :on_next_swing) do
-      MeleeSpell.queue_next_swing(character, spell)
+      character
+      |> MeleeSpell.queue_next_swing(spell)
+      |> queue_cast_result(%{spell: spell})
     else
       do_start_cast(character, internal, spell, targets, now)
     end
@@ -41,7 +44,15 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
          %Targets{} = targets,
          now
        ) do
-    %{character | internal: %{internal | casting: Cast.new(spell, targets, now)}}
+    casting = Cast.new(spell, targets, now)
+
+    character = %{character | internal: %{internal | casting: casting}}
+
+    if Cast.channeled?(casting) do
+      start_channel(character, casting)
+    else
+      character
+    end
   end
 
   def casting?(%{internal: %Internal{casting: %Cast{}}}, _blackboard) do
@@ -61,7 +72,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
       when is_struct(casting, Cast) and is_integer(now) do
     cond do
       Cast.channeled?(casting) and now >= casting.ends_at ->
-        {:success, clear_cast(character), blackboard}
+        {:success, stop_channel(character, casting), blackboard}
 
       Cast.channeled?(casting) ->
         {character, delay_ms} = channel_tick(character, casting, now)
@@ -98,10 +109,46 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
   def complete_cast(character, _casting, _now), do: character
 
   def clear_cast(%{internal: %Internal{} = internal} = character) do
-    %{character | internal: %{internal | casting: nil}}
+    case internal.casting do
+      %Cast{channel_ms: channel_ms} = casting when is_integer(channel_ms) and channel_ms > 0 ->
+        stop_channel(character, casting)
+
+      _ ->
+        %{character | internal: %{internal | casting: nil}}
+    end
   end
 
   def clear_cast(character), do: character
+
+  defp start_channel(%{object: %{guid: guid}, unit: unit} = character, %Cast{
+         spell: %Spell{id: spell_id},
+         channel_ms: duration_ms
+       })
+       when is_integer(guid) and is_integer(duration_ms) and duration_ms > 0 do
+    %{character | unit: %{unit | channel_spell: spell_id}}
+    |> Core.mark_broadcast_update()
+    |> Event.enqueue([Event.channel_start(guid, spell_id, duration_ms), Event.object_update(:values)])
+  end
+
+  defp start_channel(character, _casting), do: character
+
+  defp stop_channel(%{internal: %Internal{} = internal, unit: unit} = character, %Cast{}) do
+    character = %{character | internal: %{internal | casting: nil}, unit: %{unit | channel_object: 0, channel_spell: 0}}
+
+    events =
+      case character do
+        %{object: %{guid: guid}} when is_integer(guid) -> [Event.channel_update(guid, 0), Event.object_update(:values)]
+        _ -> [Event.object_update(:values)]
+      end
+
+    character
+    |> Core.mark_broadcast_update()
+    |> Event.enqueue(events)
+  end
+
+  defp stop_channel(%{internal: %Internal{} = internal} = character, %Cast{}) do
+    %{character | internal: %{internal | casting: nil}}
+  end
 
   defp queue_cast_result(character, %{spell: %Spell{id: spell_id}}) do
     Event.enqueue(character, Event.spell_cast_result(spell_id))

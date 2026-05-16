@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.Network.Message.CmsgCancelCast do
   use ThistleTea.Game.Network.ClientMessage, :CMSG_CANCEL_CAST
 
+  alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.Logic.AI.BT.Spell, as: SpellBT
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Spell.Cast
@@ -55,7 +56,10 @@ defmodule ThistleTea.Game.Network.Message.CmsgCancelCast do
         }
         |> World.broadcast_packet(character, exclude_self?: true)
 
-        character = SpellBT.clear_cast(character)
+        character =
+          character
+          |> SpellBT.clear_cast()
+          |> EventSink.emit_pending()
 
         state
         |> Map.put(:character, character)

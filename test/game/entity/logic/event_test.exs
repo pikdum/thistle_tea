@@ -29,6 +29,23 @@ defmodule ThistleTea.Game.Entity.Logic.EventTest do
     end
   end
 
+  describe "channel_start/3" do
+    test "returns a channel start event" do
+      assert %Event{
+               type: :channel_start,
+               source_guid: 1,
+               spell_id: 10,
+               channel_time_ms: 8_000
+             } = Event.channel_start(1, 10, 8_000)
+    end
+  end
+
+  describe "channel_update/2" do
+    test "returns a channel update event" do
+      assert %Event{type: :channel_update, source_guid: 1, channel_time_ms: 0} = Event.channel_update(1, 0)
+    end
+  end
+
   describe "object_update/1" do
     test "returns an object update event" do
       assert %Event{type: :object_update, update_type: :values} = Event.object_update(:values)

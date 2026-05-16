@@ -24,9 +24,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
 
       assert mob.internal.next_swing_spell == spell
       assert mob.internal.casting == nil
+      assert [%Event{type: :spell_cast_result, spell_id: 78}] = mob.internal.events
     end
 
-    test "initializes channel tick scheduling for channeled spells" do
+    test "initializes channel tick scheduling and visuals for channeled spells" do
       spell = %Spell{
         id: 10,
         duration_ms: 8_000,
@@ -34,13 +35,20 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
         effects: [%Effect{amplitude_ms: 2_000}]
       }
 
-      mob = %Mob{internal: %Internal{}}
+      mob = %Mob{object: %Object{guid: 1}, unit: %Unit{}, internal: %Internal{}}
 
       mob = SpellBT.start_cast(mob, spell, %Targets{raw: <<0::little-size(16)>>}, 1_000)
 
       assert mob.internal.casting.channel_ms == 8_000
       assert mob.internal.casting.channel_tick_ms == 2_000
       assert mob.internal.casting.next_channel_tick_at == 3_000
+      assert mob.unit.channel_spell == 10
+      assert mob.internal.broadcast_update? == true
+
+      assert [
+               %Event{type: :channel_start, spell_id: 10, channel_time_ms: 8_000},
+               %Event{type: :object_update, update_type: :values}
+             ] = mob.internal.events
     end
   end
 
@@ -50,6 +58,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
       spell = %Spell{id: 10, attributes: MapSet.new([:channeled])}
 
       mob = %Mob{
+        object: %Object{guid: 1},
         internal: %Internal{
           casting: %Cast{
             spell: spell,
@@ -62,6 +71,12 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
 
       assert {:success, mob, %Blackboard{}} = SpellBT.cast_tick(mob, Blackboard.new(), now)
       assert mob.internal.casting == nil
+      assert mob.unit.channel_spell == 0
+
+      assert [
+               %Event{type: :channel_update, channel_time_ms: 0},
+               %Event{type: :object_update, update_type: :values}
+             ] = mob.internal.events
     end
 
     test "first channel tick marks spell go as sent and advances the next tick" do

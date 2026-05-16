@@ -18,7 +18,8 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
     :update_type,
     :cast_context,
     :spell,
-    :attack
+    :attack,
+    :channel_time_ms
   ]
 
   def spell_damage(source_guid, target_guid, spell, damage, opts \\ []) do
@@ -69,6 +70,24 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
       spell_id: spell_id,
       hit_guids: hit_guids,
       raw_targets: raw_targets
+    }
+  end
+
+  def channel_start(source_guid, spell_id, duration_ms)
+      when is_integer(source_guid) and is_integer(spell_id) and is_integer(duration_ms) do
+    %__MODULE__{
+      type: :channel_start,
+      source_guid: source_guid,
+      spell_id: spell_id,
+      channel_time_ms: duration_ms
+    }
+  end
+
+  def channel_update(source_guid, time_ms) when is_integer(source_guid) and is_integer(time_ms) do
+    %__MODULE__{
+      type: :channel_update,
+      source_guid: source_guid,
+      channel_time_ms: time_ms
     }
   end
 
