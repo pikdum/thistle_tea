@@ -190,7 +190,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   defp tethering_to_spawn?(%Mob{internal: %Internal{initial_position: {x, y, z}}} = state, %Blackboard{
          move_target: {x, y, z}
        }) do
-    Movement.is_moving?(state)
+    Movement.is_moving?(state, Time.now())
   end
 
   defp tethering_to_spawn?(_state, _blackboard) do
@@ -280,11 +280,12 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
 
   defp maybe_repath_chase(%Mob{} = state, %Blackboard{} = blackboard, target_pos, target_guid) do
     target_moved = target_moved_enough?(blackboard, target_pos, target_guid)
-    should_repath = target_moved or not Movement.is_moving?(state)
+    now = Time.now()
+    should_repath = target_moved or not Movement.is_moving?(state, now)
 
     if should_repath do
       destination = chase_destination(state, target_pos, target_guid)
-      state = Movement.move_to(state, destination, face_target: target_guid)
+      state = Movement.move_to(state, destination, [face_target: target_guid], now)
       {state, %{blackboard | last_target_pos: target_pos}}
     else
       {state, blackboard}
@@ -468,7 +469,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
             {:success, state, blackboard}
 
           true ->
-            state = Movement.move_to(state, {x, y, z})
+            state = Movement.move_to(state, {x, y, z}, [], Time.now())
             {:success, state, %{blackboard | move_target: target}}
         end
 
@@ -478,8 +479,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   end
 
   defp wait_for_arrival(%Mob{} = state, %Blackboard{} = blackboard) do
-    if Movement.is_moving?(state) do
-      delay_ms = Movement.remaining_move_duration(state)
+    now = Time.now()
+
+    if Movement.is_moving?(state, now) do
+      delay_ms = Movement.remaining_move_duration(state, now)
       {{:running, delay_ms}, state, blackboard}
     else
       {:success, state, Blackboard.clear_move_target(blackboard)}

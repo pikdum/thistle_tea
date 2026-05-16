@@ -48,7 +48,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
           negative?: negative?(auras, context.caster_guid, target_guid)
         }
 
-        do_apply(entity, holder)
+        do_apply(entity, holder, now)
     end
   end
 
@@ -71,20 +71,20 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
     end
   end
 
-  defp do_apply(%{unit: %Unit{auras: existing}} = entity, %Holder{} = holder) when is_list(existing) do
+  defp do_apply(%{unit: %Unit{auras: existing}} = entity, %Holder{} = holder, now) when is_list(existing) do
     holders = upsert_holder(existing, holder)
     unit = sync_unit(%{entity.unit | auras: holders})
 
     {entity, events} =
       entity
       |> Map.put(:unit, unit)
-      |> sync_movement_state()
+      |> sync_movement_state(now)
 
     {Core.mark_broadcast_update(entity), events}
   end
 
-  defp do_apply(entity, %Holder{} = holder) do
-    do_apply(%{entity | unit: %{entity.unit | auras: []}}, holder)
+  defp do_apply(entity, %Holder{} = holder, now) do
+    do_apply(%{entity | unit: %{entity.unit | auras: []}}, holder, now)
   end
 
   defp upsert_holder(existing, %Holder{spell: %Spell{id: spell_id}, caster_guid: caster_guid} = incoming) do
@@ -133,7 +133,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
       {entity, events} =
         entity
         |> Map.put(:unit, unit)
-        |> sync_movement_state()
+        |> sync_movement_state(now)
 
       {Core.mark_broadcast_update(entity), events}
     end
@@ -151,7 +151,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
     Enum.any?(auras, fn %Aura{type: t} -> t == type end)
   end
 
-  defp sync_movement_flags(%{movement_block: %MovementBlock{} = mb, unit: %Unit{auras: holders}} = entity) do
+  defp sync_movement_flags(%{movement_block: %MovementBlock{} = mb, unit: %Unit{auras: holders}} = entity, now) do
     flags = mb.movement_flags || 0
     was_rooted? = (flags &&& @movement_flag_root) != 0
     has_root? = Enum.any?(holders, &has_aura_type?(&1, :mod_root))
@@ -165,18 +165,18 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
     root_events = if has_root? == was_rooted?, do: [], else: [Event.movement_root_changed(has_root?)]
 
     if has_root? and not was_rooted? do
-      {Movement.halt(entity), [Event.movement_stopped() | root_events]}
+      {Movement.halt(entity, now), [Event.movement_stopped() | root_events]}
     else
       {entity, root_events}
     end
   end
 
-  defp sync_movement_flags(entity), do: {entity, []}
+  defp sync_movement_flags(entity, _now), do: {entity, []}
 
-  defp sync_movement_state(entity) do
+  defp sync_movement_state(entity, now) do
     old_run_speed = run_speed(entity)
     entity = MovementStats.sync_aura_mods(entity)
-    {entity, events} = sync_movement_flags(entity)
+    {entity, events} = sync_movement_flags(entity, now)
     {entity, speed_change_events(entity, old_run_speed) ++ events}
   end
 

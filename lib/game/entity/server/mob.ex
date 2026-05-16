@@ -42,7 +42,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
   @impl GenServer
   def handle_cast({:send_update_to, pid}, state) do
-    state = Movement.sync_position(state)
+    state = Movement.sync_position(state, Time.now())
     World.update_position(state)
 
     Core.update_object(state)
@@ -53,7 +53,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
   @impl GenServer
   def handle_cast({:move_to, x, y, z}, state) do
-    state = Movement.move_to(state, {x, y, z})
+    state = Movement.move_to(state, {x, y, z}, [], Time.now())
     state = EventSink.emit_pending(state)
     {:noreply, state}
   end
@@ -104,7 +104,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
   @impl GenServer
   def handle_info(:ai_tick, %{internal: %Internal{behavior_tree: behavior_tree}} = state) do
-    state = Movement.sync_position(state)
+    state = Movement.sync_position(state, Time.now())
     World.update_position(state)
     {status, state} = BT.tick(behavior_tree, state)
     state = EventSink.emit_pending(state)

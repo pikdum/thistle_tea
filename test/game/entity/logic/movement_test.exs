@@ -4,7 +4,6 @@ defmodule ThistleTea.Game.Entity.Logic.MovementTest do
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Logic.Movement
-  alias ThistleTea.Game.Time
 
   defp build_entity(opts) do
     internal = %Internal{
@@ -28,7 +27,7 @@ defmodule ThistleTea.Game.Entity.Logic.MovementTest do
   end
 
   test "is_moving? reflects movement window" do
-    now = Time.now()
+    now = 5_000
 
     moving =
       build_entity(
@@ -42,12 +41,24 @@ defmodule ThistleTea.Game.Entity.Logic.MovementTest do
         duration: 1_000
       )
 
-    assert Movement.is_moving?(moving)
-    refute Movement.is_moving?(not_moving)
+    assert Movement.is_moving?(moving, now)
+    refute Movement.is_moving?(not_moving, now)
+  end
+
+  test "remaining_move_duration/2 reflects explicit time" do
+    now = 5_000
+
+    entity =
+      build_entity(
+        start_time: now - 250,
+        duration: 1_000
+      )
+
+    assert Movement.remaining_move_duration(entity, now) == 750
   end
 
   test "sync_position updates time_passed while moving" do
-    now = Time.now()
+    now = 5_000
 
     entity =
       build_entity(
@@ -57,7 +68,7 @@ defmodule ThistleTea.Game.Entity.Logic.MovementTest do
         spline_nodes: [{0.0, 0.0, 0.0}]
       )
 
-    updated = Movement.sync_position(entity)
+    updated = Movement.sync_position(entity, now)
 
     assert updated.movement_block.time_passed > 0
     assert updated.movement_block.time_passed < updated.movement_block.duration
@@ -66,7 +77,7 @@ defmodule ThistleTea.Game.Entity.Logic.MovementTest do
   end
 
   test "sync_position finalizes movement when complete" do
-    now = Time.now()
+    now = 5_000
 
     entity =
       build_entity(
@@ -80,7 +91,7 @@ defmodule ThistleTea.Game.Entity.Logic.MovementTest do
         spline_flags: 0x100
       )
 
-    updated = Movement.sync_position(entity)
+    updated = Movement.sync_position(entity, now)
 
     assert updated.movement_block.position == {0.0, 0.0, 0.0, 0.0}
     assert updated.movement_block.spline_nodes == []

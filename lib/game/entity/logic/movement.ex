@@ -26,43 +26,51 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
     rem(id, @max_u32) + 1
   end
 
-  def is_moving?(%{internal: %Internal{movement_start_time: nil}}), do: false
+  def is_moving?(entity), do: is_moving?(entity, Time.now())
 
-  def is_moving?(%{
-        movement_block: %MovementBlock{duration: duration},
-        internal: %Internal{movement_start_time: start_time}
-      })
-      when is_integer(duration) and is_integer(start_time) and duration > 0 do
-    Time.now() <= start_time + duration
+  def is_moving?(%{internal: %Internal{movement_start_time: nil}}, _now), do: false
+
+  def is_moving?(
+        %{movement_block: %MovementBlock{duration: duration}, internal: %Internal{movement_start_time: start_time}},
+        now
+      )
+      when is_integer(duration) and is_integer(start_time) and is_integer(now) and duration > 0 do
+    now <= start_time + duration
   end
 
-  def is_moving?(_), do: false
+  def is_moving?(_entity, _now), do: false
 
-  def remaining_move_duration(%{
-        internal: %Internal{movement_start_time: start_time},
-        movement_block: %MovementBlock{duration: duration}
-      })
-      when is_integer(start_time) and is_integer(duration) and duration > 0 do
-    max(start_time + duration - Time.now(), 0)
+  def remaining_move_duration(entity), do: remaining_move_duration(entity, Time.now())
+
+  def remaining_move_duration(
+        %{internal: %Internal{movement_start_time: start_time}, movement_block: %MovementBlock{duration: duration}},
+        now
+      )
+      when is_integer(start_time) and is_integer(duration) and is_integer(now) and duration > 0 do
+    max(start_time + duration - now, 0)
   end
 
-  def remaining_move_duration(_entity), do: 0
+  def remaining_move_duration(_entity, _now), do: 0
 
-  def sync_position(%{movement_block: %MovementBlock{spline_nodes: spline_nodes}} = entity)
+  def sync_position(entity), do: sync_position(entity, Time.now())
+
+  def sync_position(%{movement_block: %MovementBlock{spline_nodes: spline_nodes}} = entity, _now)
       when spline_nodes in [nil, []] do
     entity
   end
 
-  def sync_position(%{movement_block: %MovementBlock{}, internal: %Internal{}} = entity) do
-    if is_moving?(entity) do
-      update_position_from_spline(entity)
+  def sync_position(%{movement_block: %MovementBlock{}, internal: %Internal{}} = entity, now) when is_integer(now) do
+    if is_moving?(entity, now) do
+      update_position_from_spline(entity, now)
     else
       finalize_movement(entity)
     end
   end
 
-  def start_move_to(entity, {x, y, z}) do
-    entity = sync_position(entity)
+  def start_move_to(entity, destination), do: start_move_to(entity, destination, Time.now())
+
+  def start_move_to(entity, {x, y, z}, now) when is_integer(now) do
+    entity = sync_position(entity, now)
     entity = increment_spline_id(entity)
 
     %{
@@ -86,8 +94,7 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
       |> trunc()
       |> max(1)
 
-    start_time = Time.now()
-    internal = %{internal | movement_start_time: start_time, movement_start_position: {x0, y0, z0}}
+    internal = %{internal | movement_start_time: now, movement_start_position: {x0, y0, z0}}
 
     movement_block = %{
       mb
@@ -105,19 +112,26 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
 
   def move_to(state, destination, opts \\ [])
 
-  def move_to(%{movement_block: %MovementBlock{movement_flags: flags}} = state, _destination, _opts)
+  def move_to(state, destination, opts) do
+    move_to(state, destination, opts, Time.now())
+  end
+
+  def move_to(%{movement_block: %MovementBlock{movement_flags: flags}} = state, _destination, _opts, _now)
       when is_integer(flags) and (flags &&& @movement_flag_root) > 0 do
     state
   end
 
-  def move_to(state, {x, y, z}, opts) do
+  def move_to(state, {x, y, z}, opts, now) when is_integer(now) do
     state
-    |> start_move_to({x, y, z})
+    |> start_move_to({x, y, z}, now)
     |> Event.enqueue(Event.monster_move(opts))
   end
 
-  def halt(%{movement_block: %MovementBlock{} = mb, internal: %Internal{} = internal} = entity) do
-    entity = sync_position(entity)
+  def halt(entity), do: halt(entity, Time.now())
+
+  def halt(%{movement_block: %MovementBlock{} = mb, internal: %Internal{} = internal} = entity, now)
+      when is_integer(now) do
+    entity = sync_position(entity, now)
 
     movement_block = %{
       entity.movement_block
@@ -181,10 +195,10 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
          %{
            movement_block: %MovementBlock{duration: duration, spline_nodes: spline_nodes, position: {_, _, _, o}} = mb,
            internal: %Internal{map: map, movement_start_time: start_time, movement_start_position: start_position}
-         } = entity
+         } = entity,
+         now
        )
        when is_integer(duration) and duration > 0 and not is_nil(start_time) and not is_nil(start_position) do
-    now = Time.now()
     elapsed = max(now - start_time, 0)
     elapsed = min(elapsed, duration)
 
@@ -209,7 +223,7 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
     end
   end
 
-  defp update_position_from_spline(entity), do: finalize_movement(entity)
+  defp update_position_from_spline(entity, _now), do: finalize_movement(entity)
 
   defp movement_flags(flags, running) do
     flags = flags || 0
