@@ -48,5 +48,29 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
       assert target.unit.auras == []
       assert [%{type: :spell_damage, damage: 50, source_guid: 999, target_guid: 1}] = events
     end
+
+    test "persistent periodic area damage applies as spell damage for channel ticks" do
+      spell = %Spell{
+        id: 10,
+        name: "Blizzard",
+        school: :frost,
+        effects: [
+          %Effect{
+            index: 0,
+            type: :persistent_area_aura,
+            aura: :periodic_damage,
+            base_points: 24,
+            die_sides: 0
+          }
+        ]
+      }
+
+      context = %CastContext{caster_guid: 999, caster_level: 10}
+
+      {target, events} = SpellEffect.receive(target_fixture(), context, spell)
+
+      assert target.unit.health == 0
+      assert [%{type: :spell_damage, damage: 24, periodic?: true, spell_id: 10}] = events
+    end
   end
 end

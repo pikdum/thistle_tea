@@ -41,6 +41,20 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
     {state, [event]}
   end
 
+  defp apply_effect(
+         state,
+         %CastContext{} = context,
+         spell,
+         %Effect{type: :persistent_area_aura, aura: :periodic_damage} = effect
+       ) do
+    damage = Effect.damage_roll(effect)
+
+    state = Core.take_damage(state, damage)
+    event = Event.spell_damage(context.caster_guid, state.object.guid, spell, damage, periodic?: true)
+
+    {state, [event]}
+  end
+
   defp apply_effect(state, %CastContext{} = context, spell, %Effect{type: :apply_aura}) do
     Aura.apply_spell(state, context, spell)
   end
