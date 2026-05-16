@@ -17,6 +17,7 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
   @movement_flag_forward 0x00000001
   @movement_flag_walk_mode 0x00000100
   @movement_flag_spline_enabled 0x00400000
+  @movement_flag_root 0x08000000
   @spline_flag_runmode 0x00000100
 
   def increment_spline_id(%{internal: %Internal{spline_id: spline_id} = internal} = entity) do
@@ -105,11 +106,16 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
     %{entity | movement_block: movement_block, internal: internal}
   end
 
-  def move_to(state, {x, y, z}, opts \\ []) do
+  def move_to(state, destination, opts \\ [])
+
+  def move_to(%{movement_block: %MovementBlock{movement_flags: flags}} = state, _destination, _opts)
+      when is_integer(flags) and (flags &&& @movement_flag_root) > 0 do
+    state
+  end
+
+  def move_to(state, {x, y, z}, opts) do
     state = start_move_to(state, {x, y, z})
 
-    # TODO: could be done in handle_continue instead?
-    # treat more like a side effect?
     SmsgMonsterMove.build(state, opts)
     |> World.broadcast_packet(state)
 

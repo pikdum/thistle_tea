@@ -1,8 +1,9 @@
 defmodule ThistleTea.Game.Entity.Logic.Aura do
-  import Bitwise, only: [&&&: 2, |||: 2, <<<: 2]
+  import Bitwise, only: [&&&: 2, |||: 2, <<<: 2, bnot: 1]
 
   alias ThistleTea.Game.Aura
   alias ThistleTea.Game.Aura.Holder
+  alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Network
@@ -13,6 +14,8 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
   alias ThistleTea.Game.World
 
   require Logger
+
+  @movement_flag_root 0x08000000
 
   @max_slots 48
   @max_positive_slots 32
@@ -63,6 +66,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
 
     entity
     |> Map.put(:unit, unit)
+    |> sync_movement_flags()
     |> Core.mark_broadcast_update()
   end
 
@@ -106,11 +110,36 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
 
       entity
       |> Map.put(:unit, unit)
+      |> sync_movement_flags()
       |> Core.mark_broadcast_update()
     end
   end
 
   def expire_due(entity, _now), do: entity
+
+  def rooted?(%{unit: %Unit{auras: holders}}) when is_list(holders) do
+    Enum.any?(holders, &has_aura_type?(&1, :mod_root))
+  end
+
+  def rooted?(_entity), do: false
+
+  defp has_aura_type?(%Holder{auras: auras}, type) do
+    Enum.any?(auras, fn %Aura{type: t} -> t == type end)
+  end
+
+  defp sync_movement_flags(%{movement_block: %MovementBlock{} = mb, unit: %Unit{auras: holders}} = entity) do
+    flags = mb.movement_flags || 0
+    has_root? = Enum.any?(holders, &has_aura_type?(&1, :mod_root))
+
+    flags =
+      if has_root?,
+        do: flags ||| @movement_flag_root,
+        else: flags &&& bnot(@movement_flag_root)
+
+    %{entity | movement_block: %{mb | movement_flags: flags}}
+  end
+
+  defp sync_movement_flags(entity), do: entity
 
   def tick(%{unit: %Unit{auras: holders}} = entity, now) when is_list(holders) and holders != [] do
     entity

@@ -9,8 +9,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
+  alias ThistleTea.Game.World.Metadata
 
   def casting_sequence do
     BT.sequence([
@@ -127,25 +129,68 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
 
   defp send_spell_go(character, _casting), do: character
 
-  defp apply_spell_hit(%{object: %{guid: guid}} = character, %{target: target, spell: %Spell{} = spell})
-       when is_integer(guid) do
-    cond do
-      is_integer(target) and target == guid ->
-        character
-        |> SpellEffect.receive(guid, spell)
-        |> broadcast_self_update()
-        |> AuraLogic.notify_self_durations()
-
-      is_integer(target) ->
-        Entity.receive_spell(target, guid, spell)
-        character
-
-      true ->
-        character
-    end
+  defp apply_spell_hit(%{object: %{guid: caster_guid}} = character, %{spell: %Spell{} = spell} = casting)
+       when is_integer(caster_guid) do
+    targets = resolve_targets(character, casting)
+    Enum.reduce(targets, character, &dispatch_to_target(&2, caster_guid, spell, &1))
   end
 
   defp apply_spell_hit(character, _casting), do: character
+
+  defp dispatch_to_target(character, caster_guid, spell, target_guid) when target_guid == caster_guid do
+    character
+    |> SpellEffect.receive(caster_guid, spell)
+    |> broadcast_self_update()
+    |> AuraLogic.notify_self_durations()
+  end
+
+  defp dispatch_to_target(character, caster_guid, spell, target_guid) when is_integer(target_guid) do
+    Entity.receive_spell(target_guid, caster_guid, spell)
+    character
+  end
+
+  defp dispatch_to_target(character, _caster_guid, _spell, _target_guid), do: character
+
+  defp resolve_targets(%{object: %{guid: caster_guid}} = caster, %{spell: %Spell{} = spell, target: target}) do
+    cond do
+      aoe_caster_spell?(spell) -> nearby_enemy_guids(caster, caster_guid, max_aoe_radius(spell))
+      is_integer(target) -> [target]
+      true -> []
+    end
+  end
+
+  defp aoe_caster_spell?(%Spell{effects: effects}) do
+    Enum.any?(effects, fn
+      %Effect{implicit_target_a: :aoe_enemy_at_caster, radius_yards: r} when is_number(r) and r > 0 -> true
+      _ -> false
+    end)
+  end
+
+  defp max_aoe_radius(%Spell{effects: effects}) do
+    effects
+    |> Enum.map(& &1.radius_yards)
+    |> Enum.filter(&is_number/1)
+    |> Enum.max(fn -> 0.0 end)
+  end
+
+  defp nearby_enemy_guids(caster, caster_guid, radius) when is_number(radius) and radius > 0 do
+    caster
+    |> World.nearby_mobs(radius)
+    |> Enum.reject(fn {guid, _distance} -> guid == caster_guid end)
+    |> Enum.filter(fn {guid, _distance} -> alive_target?(guid) end)
+    |> Enum.map(fn {guid, _distance} -> guid end)
+  end
+
+  defp nearby_enemy_guids(_caster, _caster_guid, _radius), do: []
+
+  defp alive_target?(guid) when is_integer(guid) do
+    case Metadata.query(guid, [:alive?]) do
+      %{alive?: false} -> false
+      _ -> true
+    end
+  end
+
+  defp alive_target?(_guid), do: false
 
   defp broadcast_self_update(%{internal: %Internal{broadcast_update?: true} = internal} = character) do
     Core.update_object(character, :values)
