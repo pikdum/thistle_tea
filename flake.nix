@@ -130,6 +130,75 @@
             };
           };
 
+          # The Rustler NIF that lib/native/namigator.ex loads. Built separately
+          # so the mix release doesn't need cargo + network in its sandbox; the
+          # .so is dropped into priv/native/ before `mix release` runs and the
+          # `use Rustler` macro is patched to `skip_compilation?: true`.
+          #
+          # The project's root Cargo.toml is a workspace ({ members = ["native/namigator_ex"] })
+          # so we have to feed the build the workspace root, not just the crate
+          # dir — otherwise cargo can't see the workspace Cargo.lock. We scope
+          # the source tightly with fileset so unrelated edits don't bust the
+          # cache.
+          thistle-tea-nif = pkgs.rustPlatform.buildRustPackage {
+            pname = "thistle-tea-nif";
+            version = "0.1.0";
+            src = pkgs.lib.fileset.toSource {
+              root = ./.;
+              fileset = pkgs.lib.fileset.unions [
+                ./Cargo.toml
+                ./Cargo.lock
+                ./native/namigator_ex
+              ];
+            };
+
+            cargoLock.lockFile = ./Cargo.lock;
+
+            cargoBuildFlags = [
+              "-p"
+              "namigator_ex"
+            ];
+
+            doCheck = false;
+            # cdylib, not a bin — buildRustPackage's default cargo install won't
+            # do the right thing. We also drop the `lib` prefix to match what
+            # Rustler expects when it loads via `crate: "namigator_ex"`
+            # (default load path is priv/native/<crate>.so, no lib prefix).
+            installPhase = ''
+              runHook preInstall
+              mkdir -p "$out/lib"
+              cp target/${pkgs.stdenv.hostPlatform.rust.rustcTarget}/release/libnamigator_ex.so "$out/lib/namigator_ex.so"
+              runHook postInstall
+            '';
+
+            meta = with pkgs.lib; {
+              description = "Rustler NIF for ThistleTea (namigator pathfinding bindings)";
+              platforms = platforms.linux;
+            };
+          };
+
+          # The JS deps (just `ol` directly, ~18MB transitive). Asset bundling
+          # itself is done inside the mixRelease — esbuild's `import "phoenix"`
+          # / `"phoenix_live_view"` resolution depends on the Elixir deps/ dir
+          # being present (NODE_PATH=../deps), so we can't pre-bundle here.
+          thistle-tea-node-modules = pkgs.buildNpmPackage {
+            pname = "thistle-tea-node-modules";
+            version = "0.1.0";
+            src = ./assets;
+            # Bump via `prefetch-npm-deps assets/package-lock.json`.
+            npmDepsHash = "sha256-gmFzwKg+2a/KQmhvP6/u7GME5+CGAVgm/KNO0HV4jDU=";
+            dontNpmBuild = true;
+
+            installPhase = ''
+              runHook preInstall
+              mkdir -p "$out"
+              cp -r node_modules "$out/node_modules"
+              runHook postInstall
+            '';
+
+            meta.description = "thistle_tea JS dep closure (assets/node_modules/)";
+          };
+
           mysql2sqlite = pkgs.stdenv.mkDerivation {
             pname = "mysql2sqlite";
             version = "0-${builtins.substring 0 7 mysql2sqlite-src.rev}";
@@ -294,6 +363,104 @@
               platforms = platforms.linux;
             };
           };
+
+          beam = pkgs.beam.packagesWith pkgs.erlang;
+
+          # evision (used by lib/web/utils/homography.ex) downloads a precompiled
+          # NIF tarball during `mix compile`. The build sandbox has no network,
+          # so we fetch it as a FOD and drop it into ELIXIR_MAKE_CACHE_DIR so
+          # evision's downloader finds it cached.
+          # Bump version + sha256 in lockstep with the :evision hex pin.
+          evision-precompiled-tarball = pkgs.fetchurl {
+            url = "https://github.com/cocoa-xu/evision/releases/download/v0.2.15/evision-nif_2.16-x86_64-linux-gnu-contrib-0.2.15.tar.gz";
+            hash = "sha256-j2kZYKTi2ASJDRIo9N8EcnltM3YlFyjRc5QvhCPqAfk=";
+          };
+
+          # The mix release. Composes the pre-built NIF + pre-built assets so
+          # the build sandbox doesn't need cargo or npm/esbuild/tailwind.
+          thistle-tea = beam.mixRelease {
+            pname = "thistle_tea";
+            version = "0.1.0";
+            src = ./.;
+            removeCookie = false;
+
+            # Hex/git deps as a single fixed-output derivation. To refresh after
+            # changing mix.lock: set this to an empty/wrong hash, run the build,
+            # and copy the "got:" hash from the error.
+            mixFodDeps = beam.fetchMixDeps {
+              pname = "mix-deps-thistle-tea";
+              version = "0.1.0";
+              src = ./.;
+              hash = "sha256-5biusF/eL1FYrCOwOhoh+h6IztPDqG4tEN6BVv37CLU=";
+            };
+
+            nativeBuildInputs = [
+              pkgs.esbuild
+              pkgs.tailwindcss_3
+            ];
+
+            # 1. Drop the prebuilt NIF where `use Rustler` expects it.
+            # 2. Inject `skip_compilation?: true` so mix compile doesn't shell out
+            #    to cargo (the build sandbox has no network).
+            # 3. Pull in the vendored node_modules so esbuild can resolve `ol/*`.
+            postPatch = ''
+              mkdir -p priv/native
+              cp ${thistle-tea-nif}/lib/namigator_ex.so priv/native/
+
+              sed -i \
+                's|use Rustler, otp_app: :thistle_tea, crate: "namigator_ex"|use Rustler, otp_app: :thistle_tea, crate: "namigator_ex", skip_compilation?: true|' \
+                lib/native/namigator.ex
+
+              cp -r ${thistle-tea-node-modules}/node_modules assets/node_modules
+            '';
+
+            # evision's downloader checks $ELIXIR_MAKE_CACHE_DIR first; if the
+            # tarball is already there it skips network. Build sandbox $HOME is
+            # /homeless-shelter (deps try to mkdir in there), so redirect both.
+            ELIXIR_MAKE_CACHE_DIR = "/build/elixir-make-cache";
+
+            # mixRelease's configurePhase runs `mix deps.compile` (which triggers
+            # evision's downloader), so the cache has to be seeded BEFORE that —
+            # preBuild runs too late.
+            preConfigure = ''
+              export HOME=$TMPDIR
+              mkdir -p "$ELIXIR_MAKE_CACHE_DIR"
+              cp ${evision-precompiled-tarball} "$ELIXIR_MAKE_CACHE_DIR/evision-nif_2.16-x86_64-linux-gnu-contrib-0.2.15.tar.gz"
+            '';
+
+            # Run esbuild + tailwind directly (skipping the mix esbuild/tailwind
+            # tasks, which would try to download their own binaries). Args mirror
+            # config/config.exs plus --minify from the assets.deploy alias.
+            #
+            # Note: we deliberately skip `mix phx.digest`. It triggers Mix's git
+            # lock check, which fails because fetchMixDeps strips git objects
+            # from /nix/store deps. The release still serves assets correctly,
+            # it just lacks the cache_manifest.json fingerprinting. If/when we
+            # need cache busting we can either re-fetch git deps with their
+            # objects intact or run phx.digest as a post-install step.
+            preBuild = ''
+              mkdir -p priv/static/assets
+              (cd assets && NODE_PATH="../deps" esbuild \
+                js/app.js \
+                --bundle \
+                --target=es2017 \
+                --outdir=../priv/static/assets \
+                --external:/fonts/* \
+                --external:/images/* \
+                --minify)
+              (cd assets && tailwindcss \
+                --config=tailwind.config.js \
+                --input=css/app.css \
+                --output=../priv/static/assets/app.css \
+                --minify)
+            '';
+
+            meta = with pkgs.lib; {
+              description = "thistle_tea WoW 1.12 server (mix release)";
+              platforms = platforms.linux;
+              mainProgram = "thistle_tea";
+            };
+          };
         in
         {
           inherit
@@ -302,7 +469,11 @@
             mysql2sqlite
             mangos0-db
             dbc-db
+            thistle-tea-nif
+            thistle-tea-node-modules
+            thistle-tea
             ;
+          default = thistle-tea;
         }
       );
 
@@ -334,6 +505,14 @@
           mangos0-db = {
             type = "app";
             program = "${mangos0-db-runner}/bin/mangos0-db";
+          };
+          thistle-tea = {
+            type = "app";
+            program = "${self.packages.${system}.thistle-tea}/bin/thistle_tea";
+          };
+          default = {
+            type = "app";
+            program = "${self.packages.${system}.thistle-tea}/bin/thistle_tea";
           };
         }
       );
