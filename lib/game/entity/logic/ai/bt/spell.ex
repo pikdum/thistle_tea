@@ -139,13 +139,12 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
     next_tick_at = Map.get(casting, :next_channel_tick_at)
 
     if is_integer(next_tick_at) and now >= next_tick_at do
-      casting = advance_channel_tick(casting, now)
-
       character =
         character
         |> maybe_send_channel_spell_go(casting)
         |> apply_spell_hit(casting)
 
+      casting = advance_channel_tick(casting, now)
       delay_ms = next_channel_delay(casting, now)
       {%{character | internal: %{character.internal | casting: casting}}, delay_ms}
     else
