@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   import Bitwise, only: [&&&: 2]
 
   alias ThistleTea.DBC
-  alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell, as: SpellData
   alias ThistleTea.Game.Spell.Effect
 
   def load(spell_id) when is_integer(spell_id) and spell_id > 0 do
@@ -19,7 +19,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
     |> Enum.uniq()
     |> Enum.map(&load/1)
     |> Enum.reject(&is_nil/1)
-    |> Map.new(fn %Spell{id: id} = spell -> {id, spell} end)
+    |> Map.new(fn %SpellData{id: id} = spell -> {id, spell} end)
   end
 
   def build_spellbook(_), do: %{}
@@ -27,7 +27,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp build(row) do
     row = DBC.preload(row, [:spell_cast_time, :spell_duration, :spell_range])
 
-    %Spell{
+    %SpellData{
       id: row.id,
       name: row.name_en_gb,
       school: school(row.school),
