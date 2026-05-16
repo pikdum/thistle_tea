@@ -5,7 +5,6 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.Math
-  alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.Pathfinding
 
   @max_u32 0xFFFFFFFF
@@ -24,8 +23,6 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
     rem(id, @max_u32) + 1
   end
 
-  def is_moving?(entity), do: is_moving?(entity, Time.now())
-
   def is_moving?(%{internal: %Internal{movement_start_time: nil}}, _now), do: false
 
   def is_moving?(
@@ -38,8 +35,6 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
 
   def is_moving?(_entity, _now), do: false
 
-  def remaining_move_duration(entity), do: remaining_move_duration(entity, Time.now())
-
   def remaining_move_duration(
         %{internal: %Internal{movement_start_time: start_time}, movement_block: %MovementBlock{duration: duration}},
         now
@@ -49,8 +44,6 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
   end
 
   def remaining_move_duration(_entity, _now), do: 0
-
-  def sync_position(entity), do: sync_position(entity, Time.now())
 
   def sync_position(%{movement_block: %MovementBlock{spline_nodes: spline_nodes}} = entity, _now)
       when spline_nodes in [nil, []] do
@@ -64,8 +57,6 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
       finalize_movement(entity)
     end
   end
-
-  def start_move_to(entity, destination), do: start_move_to(entity, destination, Time.now())
 
   def start_move_to(entity, {x, y, z}, now) when is_integer(now) do
     entity = sync_position(entity, now)
@@ -108,12 +99,6 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
     %{entity | movement_block: movement_block, internal: internal}
   end
 
-  def move_to(state, destination, opts \\ [])
-
-  def move_to(state, destination, opts) do
-    move_to(state, destination, opts, Time.now())
-  end
-
   def move_to(%{movement_block: %MovementBlock{movement_flags: flags}} = state, _destination, _opts, _now)
       when is_integer(flags) and (flags &&& @movement_flag_root) > 0 do
     state
@@ -124,8 +109,6 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
     |> start_move_to({x, y, z}, now)
     |> Event.enqueue(Event.monster_move(opts))
   end
-
-  def halt(entity), do: halt(entity, Time.now())
 
   def halt(%{movement_block: %MovementBlock{} = mb, internal: %Internal{} = internal} = entity, now)
       when is_integer(now) do
