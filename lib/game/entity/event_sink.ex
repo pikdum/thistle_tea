@@ -18,8 +18,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
   end
 
   def emit(entity, events) when is_list(events) do
-    Enum.each(events, &emit(entity, &1))
-    entity
+    Enum.reduce(events, entity, &emit(&2, &1))
   end
 
   def emit(entity, %Event{type: :spell_damage} = event) do
