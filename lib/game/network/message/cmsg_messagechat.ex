@@ -8,7 +8,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgMessagechat do
 
   require Logger
 
-  @debug_spells [78, 133, 168, 122, 10]
+  @debug_spells [78, 116, 133, 168, 122, 10, 1449]
 
   defstruct [:chat_type, :language, :message, :target_name]
 
@@ -70,7 +70,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgMessagechat do
 
   def handle_chat(state, _, _, ".help" <> _, _) do
     commands = [
-      ".debug spells - learn the MVP spell test set (Fireball, Frost Armor, Frost Nova, Blizzard, Heroic Strike)",
+      ".debug spells - learn the MVP spell test set (Heroic Strike, Frostbolt, Fireball, Frost Armor, Frost Nova, Blizzard, Arcane Explosion)",
       ".go xyz <x> <y> <z> [map] - teleport",
       ".guid - show target guid",
       ".help - show help",

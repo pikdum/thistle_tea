@@ -32,6 +32,12 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
 
   def attack_damage(_attack), do: @default_damage
 
+  def finalize_attack(attack) when is_map(attack) do
+    Map.put_new(attack, :damage, attack_damage(attack))
+  end
+
+  def finalize_attack(attack), do: attack
+
   def attack_start(attacker, target) when is_integer(attacker) and is_integer(target) do
     Event.attack_start(attacker, target)
   end

@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
   alias ThistleTea.Game.Entity.Logic.Combat, as: CombatLogic
   alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.Entity.Logic.MeleeSpell
+  alias ThistleTea.Game.Entity.Logic.Resources
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Metadata
@@ -137,6 +138,13 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
 
   defp send_melee_attack(state, target) when is_integer(target) do
     {state, attack} = melee_attack_payload(state)
+    attack = CombatLogic.finalize_attack(attack)
+
+    state =
+      state
+      |> Resources.gain_outgoing_auto_attack_rage(attack)
+      |> queue_self_update()
+
     Event.enqueue(state, Event.deliver_attack(target, attack))
   end
 
@@ -146,6 +154,12 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
     attack = %{caster: guid, min_damage: min_damage, max_damage: max_damage}
     {state, MeleeSpell.apply_to_attack(attack, queued_spell)}
   end
+
+  defp queue_self_update(%{internal: %Internal{broadcast_update?: true}} = state) do
+    Event.enqueue(state, Event.object_update(:values))
+  end
+
+  defp queue_self_update(state), do: state
 
   defp combat_reach(%{unit: unit} = state, target) do
     reach = combat_reach_value(unit) + target_combat_reach(state, target) + @melee_range_offset
