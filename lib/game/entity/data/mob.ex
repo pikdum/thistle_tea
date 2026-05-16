@@ -27,6 +27,7 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
       end
 
     model_info = Map.get(c, :creature_model_info)
+    effective_scale = effective_scale(ct, Map.get(c, :display_scale))
     {virtual_item_slot_display, virtual_item_info} = virtual_items(Map.get(c, :equip_items))
 
     unit = %Unit{
@@ -40,8 +41,8 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
       npc_flags: ct.npc_flags,
       dynamic_flags: ct.dynamic_flags,
       misc_flags: ct.extra_flags,
-      bounding_radius: mob_bounding_radius(ct, model_info),
-      combat_reach: mob_combat_reach(ct, model_info),
+      bounding_radius: mob_bounding_radius(model_info, effective_scale),
+      combat_reach: mob_combat_reach(model_info, effective_scale),
       display_id: c.modelid,
       native_display_id: c.modelid,
       min_damage: ct.min_melee_dmg,
@@ -77,7 +78,7 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
       object: %Object{
         guid: Guid.from_low_guid(:mob, c.id, c.guid),
         entry: c.id,
-        scale_x: scale(c)
+        scale_x: effective_scale
       },
       unit: unit,
       movement_block: movement_block,
@@ -121,9 +122,12 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
     %{mob | unit: unit, movement_block: movement_block, internal: internal}
   end
 
-  defp scale(%Mangos.Creature{creature_template: %Mangos.CreatureTemplate{scale: scale}}) do
-    if scale > 0, do: scale, else: 1.0
-  end
+  defp effective_scale(%Mangos.CreatureTemplate{scale: scale}, _display_scale) when is_number(scale) and scale > 0,
+    do: scale
+
+  defp effective_scale(_template, display_scale) when is_number(display_scale) and display_scale > 0, do: display_scale
+
+  defp effective_scale(_template, _display_scale), do: 1.0
 
   defp level(%Mangos.Creature{creature_template: %Mangos.CreatureTemplate{min_level: min_level, max_level: max_level}}) do
     Enum.random(min_level..max_level)
@@ -165,19 +169,13 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
     %{movement_block | movement_flags: 0}
   end
 
-  defp mob_bounding_radius(%Mangos.CreatureTemplate{} = template, model_info) do
-    normalize_model_value(model_info, :bounding_radius, Unit.default_bounding_radius()) * scale_factor(template)
+  defp mob_bounding_radius(model_info, scale) do
+    normalize_model_value(model_info, :bounding_radius, Unit.default_bounding_radius()) * scale
   end
 
-  defp mob_combat_reach(%Mangos.CreatureTemplate{} = template, model_info) do
-    normalize_model_value(model_info, :combat_reach, Unit.default_combat_reach()) * scale_factor(template)
+  defp mob_combat_reach(model_info, scale) do
+    normalize_model_value(model_info, :combat_reach, Unit.default_combat_reach()) * scale
   end
-
-  defp scale_factor(%Mangos.CreatureTemplate{scale: scale}) when is_number(scale) and scale > 0 do
-    scale
-  end
-
-  defp scale_factor(_template), do: 1.0
 
   defp virtual_items([_, _, _] = items) do
     if Enum.all?(items, &is_nil/1) do

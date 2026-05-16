@@ -1,5 +1,6 @@
 defmodule ThistleTea.Game.World.Loader.Mob do
   alias ThistleTea.DB.Mangos
+  alias ThistleTea.DBC
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Metadata
@@ -12,6 +13,7 @@ defmodule ThistleTea.Game.World.Loader.Mob do
     |> Mangos.Repo.all()
     |> Enum.map(&load_creature_movement/1)
     |> Enum.map(&load_creature_model_info/1)
+    |> Enum.map(&load_display_scale/1)
     |> Enum.map(&load_equip_items/1)
     |> Enum.each(&start/1)
   end
@@ -31,6 +33,26 @@ defmodule ThistleTea.Game.World.Loader.Mob do
 
   defp load_creature_model_info(%Mangos.Creature{} = creature) do
     Map.put(creature, :creature_model_info, nil)
+  end
+
+  defp load_display_scale(%Mangos.Creature{modelid: modelid} = creature) when is_integer(modelid) and modelid > 0 do
+    Map.put(creature, :display_scale, display_scale(modelid))
+  end
+
+  defp load_display_scale(%Mangos.Creature{} = creature) do
+    Map.put(creature, :display_scale, nil)
+  end
+
+  defp display_scale(display_id) do
+    with %CreatureDisplayInfo{model: model_id, creature_model_scale: display_scale}
+         when is_integer(model_id) and is_number(display_scale) <-
+           DBC.get(CreatureDisplayInfo, display_id),
+         %CreatureModelData{model_scale: model_scale} when is_number(model_scale) <-
+           DBC.get(CreatureModelData, model_id) do
+      display_scale * model_scale
+    else
+      _ -> nil
+    end
   end
 
   defp load_equip_items(
