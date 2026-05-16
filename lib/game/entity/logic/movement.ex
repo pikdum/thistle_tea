@@ -2,8 +2,6 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
   import Bitwise, only: [&&&: 2, bnot: 1, bor: 2]
 
   alias ThistleTea.Game.Entity.Data.Component.Internal
-  alias ThistleTea.Game.Entity.Data.Component.Internal.Waypoint
-  alias ThistleTea.Game.Entity.Data.Component.Internal.WaypointRoute
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.Math
@@ -161,36 +159,6 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
 
   defp clear_motion_flags(_flags), do: 0
 
-  def wander(%{internal: %Internal{spawn_distance: spawn_distance, map: map, initial_position: {xi, yi, zi}}} = state) do
-    case Pathfinding.find_random_point_around_circle(map, {xi, yi, zi}, spawn_distance) do
-      nil -> state
-      {x, y, z} -> move_to(state, {x, y, z})
-    end
-  end
-
-  def wander_delay(%{movement_block: %MovementBlock{duration: duration}}) do
-    duration = duration || 0
-    duration + :rand.uniform(6_000) + 4_000
-  end
-
-  def follow_waypoint_route(%{internal: %Internal{waypoint_route: %WaypointRoute{} = route}} = state) do
-    %Waypoint{position: {x, y, z, o}} = WaypointRoute.destination_waypoint(route)
-
-    state
-    |> move_to({x, y, z})
-    |> set_orientation(o)
-    |> increment_waypoint()
-  end
-
-  def follow_waypoint_route_delay(%{
-        movement_block: %MovementBlock{duration: duration},
-        internal: %Internal{waypoint_route: route}
-      }) do
-    duration = duration || 0
-    wait_time = WaypointRoute.destination_waypoint(route).wait_time || 0
-    duration + wait_time
-  end
-
   defp update_position_from_spline(
          %{
            movement_block: %MovementBlock{duration: duration, spline_nodes: spline_nodes, position: {_, _, _, o}} = mb,
@@ -298,14 +266,5 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
       {last, _remaining} ->
         last
     end
-  end
-
-  defp increment_waypoint(%{internal: %Internal{waypoint_route: route} = internal} = state) do
-    route = WaypointRoute.increment_waypoint(route)
-    %{state | internal: %{internal | waypoint_route: route}}
-  end
-
-  defp set_orientation(%{movement_block: %MovementBlock{position: {x, y, z, _o}}} = entity, o) do
-    %{entity | movement_block: %{entity.movement_block | position: {x, y, z, o}}}
   end
 end
