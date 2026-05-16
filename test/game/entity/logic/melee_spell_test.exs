@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.Entity.Logic.MeleeSpellTest do
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.MeleeSpell
   alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.Effect
 
   describe "queue_next_swing/2" do
     test "stores an on-next-swing spell in internal state" do
@@ -26,6 +27,23 @@ defmodule ThistleTea.Game.Entity.Logic.MeleeSpellTest do
 
       assert consumed == spell
       assert mob.internal.next_swing_spell == nil
+    end
+  end
+
+  describe "apply_to_attack/2" do
+    test "adds queued weapon damage and spell metadata to the melee attack" do
+      spell = %Spell{
+        id: 78,
+        name: "Heroic Strike",
+        effects: [%Effect{type: :weapon_damage_noschool, base_points: 10, die_sides: 0}]
+      }
+
+      attack = MeleeSpell.apply_to_attack(%{min_damage: 2, max_damage: 4}, spell)
+
+      assert attack.min_damage == 12
+      assert attack.max_damage == 14
+      assert attack.spell_id == 78
+      assert attack.queued_spell_id == 78
     end
   end
 end

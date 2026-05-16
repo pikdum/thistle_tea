@@ -21,7 +21,10 @@ defmodule ThistleTea.Game.Spell do
   end
 
   def damage_effects(%__MODULE__{effects: effects}) do
-    Enum.filter(effects, &match?(%Effect{type: type} when type in [:school_damage, :weapon_damage], &1))
+    Enum.filter(
+      effects,
+      &match?(%Effect{type: type} when type in [:school_damage, :weapon_damage, :weapon_damage_noschool], &1)
+    )
   end
 
   def channel_tick_ms(%__MODULE__{effects: effects}) do

@@ -8,7 +8,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
   alias ThistleTea.Game.Entity.Logic.Combat, as: CombatLogic
   alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.Entity.Logic.MeleeSpell
-  alias ThistleTea.Game.Spell
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Metadata
 
@@ -134,16 +133,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
     {state, queued_spell} = MeleeSpell.consume_next_swing(state)
     {min_damage, max_damage} = CombatLogic.damage_range(state)
     attack = %{caster: guid, min_damage: min_damage, max_damage: max_damage}
-    {state, put_queued_spell(attack, queued_spell)}
+    {state, MeleeSpell.apply_to_attack(attack, queued_spell)}
   end
-
-  defp put_queued_spell(attack, %Spell{id: spell_id}) do
-    attack
-    |> Map.put(:spell_id, spell_id)
-    |> Map.put(:queued_spell_id, spell_id)
-  end
-
-  defp put_queued_spell(attack, _spell), do: attack
 
   defp combat_reach(%{unit: unit} = state, target) do
     reach = combat_reach_value(unit) + target_combat_reach(state, target) + @melee_range_offset
