@@ -1,65 +1,49 @@
 defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Core
-  alias ThistleTea.Game.Network.Message
+  alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Effect
-  alias ThistleTea.Game.World
 
-  def receive(target, caster_guid, %Spell{} = spell) do
-    target
-    |> apply_damage_effects(caster_guid, spell)
-    |> maybe_apply_auras(caster_guid, spell)
+  def receive(target, %CastContext{} = context, %Spell{} = spell) do
+    context = %{context | target_guid: target.object.guid, spell: spell}
+    apply_effects(target, context, spell.effects, [])
   end
 
-  def receive(target, _caster_guid, _spell), do: target
-
-  defp apply_damage_effects(target, caster_guid, %Spell{effects: effects} = spell) do
-    Enum.reduce(effects, target, fn effect, state ->
-      apply_damage_effect(state, caster_guid, spell, effect)
-    end)
+  def receive(target, caster_guid, %Spell{} = spell) when is_integer(caster_guid) do
+    receive(target, %CastContext{caster_guid: caster_guid, caster_level: 1}, spell)
   end
 
-  defp apply_damage_effect(state, caster_guid, spell, %Effect{type: :school_damage} = effect) do
-    damage = Effect.damage_roll(effect)
+  def receive(target, _context, _spell), do: {target, []}
 
-    state
-    |> Core.take_damage(damage)
-    |> broadcast_spell_damage(caster_guid, spell, damage)
-  end
+  defp apply_effects(target, _context, [], events), do: {target, events}
 
-  defp apply_damage_effect(state, _caster_guid, _spell, _effect), do: state
-
-  defp maybe_apply_auras(target, caster_guid, %Spell{} = spell) do
-    case Spell.aura_effects(spell) do
-      [] -> target
-      _ -> Aura.apply_spell(target, caster_guid, caster_level(target, caster_guid), spell)
+  defp apply_effects(target, context, effects, events) do
+    if Core.dead?(target) do
+      {target, events}
+    else
+      do_apply_effects(target, context, effects, events)
     end
   end
 
-  defp caster_level(%{unit: %{level: level}}, _caster_guid) when is_integer(level), do: level
-  defp caster_level(_target, _caster_guid), do: 1
-
-  defp broadcast_spell_damage(state, caster_guid, %Spell{} = spell, damage) do
-    %Message.SmsgSpellNonMeleeDamageLog{
-      attacker: caster_guid,
-      target: state.object.guid,
-      spell_id: spell.id,
-      damage: damage,
-      school: school_index(spell.school)
-    }
-    |> World.broadcast_packet(state)
-
-    state
+  defp do_apply_effects(target, context, [effect | rest], events) do
+    {target, effect_events} = apply_effect(target, context, context.spell, effect)
+    apply_effects(target, context, rest, events ++ effect_events)
   end
 
-  defp school_index(:physical), do: 0
-  defp school_index(:holy), do: 1
-  defp school_index(:fire), do: 2
-  defp school_index(:nature), do: 3
-  defp school_index(:frost), do: 4
-  defp school_index(:shadow), do: 5
-  defp school_index(:arcane), do: 6
-  defp school_index(other) when is_integer(other), do: other
-  defp school_index(_), do: 0
+  defp apply_effect(state, %CastContext{} = context, spell, %Effect{type: :school_damage} = effect) do
+    damage = Effect.damage_roll(effect)
+
+    state = Core.take_damage(state, damage)
+    event = Event.spell_damage(context.caster_guid, state.object.guid, spell, damage)
+
+    {state, [event]}
+  end
+
+  defp apply_effect(state, %CastContext{} = context, spell, %Effect{type: :apply_aura}) do
+    Aura.apply_spell(state, context, spell)
+  end
+
+  defp apply_effect(state, _context, _spell, _effect), do: {state, []}
 end

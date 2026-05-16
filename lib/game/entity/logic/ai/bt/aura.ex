@@ -1,5 +1,6 @@
 defmodule ThistleTea.Game.Entity.Logic.AI.BT.Aura do
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
@@ -10,7 +11,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Aura do
   end
 
   def tick(%{unit: %Unit{auras: [_ | _]}} = entity, %Blackboard{} = blackboard) do
-    entity = AuraLogic.tick(entity, Time.now())
+    {entity, events} = AuraLogic.tick(entity, Time.now())
+    EventSink.emit(entity, events)
     {:failure, entity, blackboard}
   end
 

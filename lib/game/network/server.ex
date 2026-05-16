@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Network.Server do
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.AI.BT
+  alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Combat
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Experience
@@ -20,6 +21,7 @@ defmodule ThistleTea.Game.Network.Server do
   alias ThistleTea.Game.Network.Opcodes
   alias ThistleTea.Game.Network.Packet
   alias ThistleTea.Game.Network.UpdateObject
+  alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Pathfinding
@@ -445,7 +447,7 @@ defmodule ThistleTea.Game.Network.Server do
 
   defp schedule_player_tick(state, character, status) do
     if player_needs_tick?(character) do
-      delay_ms = player_tick_delay(status)
+      delay_ms = player_tick_delay(character, status)
       ref = Process.send_after(self(), :player_tick, delay_ms)
       Map.put(state, :player_tick_ref, ref)
     else
@@ -453,11 +455,20 @@ defmodule ThistleTea.Game.Network.Server do
     end
   end
 
-  defp player_tick_delay({:running, delay_ms}) when is_integer(delay_ms) and delay_ms > 0 do
+  defp player_tick_delay(_character, {:running, delay_ms}) when is_integer(delay_ms) and delay_ms > 0 do
     delay_ms
   end
 
-  defp player_tick_delay(_status), do: @player_tick_ms
+  defp player_tick_delay(character, _status) do
+    if player_only_needs_aura_tick?(character) do
+      case Aura.next_event_at(character) do
+        at when is_integer(at) -> max(at - Time.now(), 0)
+        _ -> @player_tick_ms
+      end
+    else
+      @player_tick_ms
+    end
+  end
 
   defp player_needs_tick?(%{internal: %Internal{casting: casting}}) when is_map(casting) do
     true
@@ -471,6 +482,15 @@ defmodule ThistleTea.Game.Network.Server do
   defp player_needs_tick?(%{unit: %Unit{auras: [_ | _]}}), do: true
 
   defp player_needs_tick?(_character), do: false
+
+  defp player_only_needs_aura_tick?(%{
+         internal: %Internal{casting: casting, in_combat: in_combat},
+         unit: %Unit{target: target, auras: [_ | _]}
+       }) do
+    not is_map(casting) and not (in_combat == true and is_integer(target) and target > 0)
+  end
+
+  defp player_only_needs_aura_tick?(_character), do: false
 
   defp kill_xp(%Character{unit: %Unit{health: health, level: player_level}}, %{
          unit: %Unit{level: mob_level},

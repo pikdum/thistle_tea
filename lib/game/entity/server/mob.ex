@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
+  alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Mob, as: MobBT
   alias ThistleTea.Game.Entity.Logic.Combat
@@ -58,17 +59,21 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
   @impl GenServer
   def handle_cast({:receive_spell, caster, spell}, state) do
+    caster_guid = caster_guid(caster)
+
     state =
       state
-      |> maybe_reset_attack_started(caster)
-      |> engage_combat(caster)
+      |> maybe_reset_attack_started(caster_guid)
+      |> engage_combat(caster_guid)
 
     target = state.unit.target
     dead_before = Core.dead?(state)
 
+    {state, events} = SpellEffect.receive(state, caster, spell)
+
     state =
       state
-      |> SpellEffect.receive(caster, spell)
+      |> EventSink.emit(events)
       |> handle_death_transition(target, dead_before)
 
     schedule_ai_tick(0)
@@ -247,6 +252,10 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   end
 
   defp maybe_reward_kill(%Mob{} = state, _target), do: state
+
+  defp caster_guid(%{caster_guid: caster_guid}) when is_integer(caster_guid), do: caster_guid
+  defp caster_guid(caster_guid) when is_integer(caster_guid), do: caster_guid
+  defp caster_guid(_caster), do: nil
 
   defp schedule_respawn(%Mob{internal: %Internal{respawn_ref: ref}} = state) when is_reference(ref) do
     state

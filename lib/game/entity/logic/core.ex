@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.GameObject
   alias ThistleTea.Game.Entity.Data.Mob
+  alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.Time
@@ -85,15 +86,9 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
     entity = Movement.sync_position(entity)
     %{internal: internal, unit: unit, movement_block: mb} = entity
 
-    unit = %{
-      unit
-      | target: 0,
-        auras: [],
-        aura: nil,
-        aura_flags: nil,
-        aura_levels: nil,
-        aura_applications: nil
-    }
+    unit =
+      %{unit | target: 0, auras: []}
+      |> Aura.sync_unit()
 
     internal = %{
       internal

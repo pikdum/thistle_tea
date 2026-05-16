@@ -460,11 +460,16 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   defp move_to_target(%Mob{} = state, %Blackboard{} = blackboard) do
     case blackboard.target do
       {x, y, z} = target ->
-        if blackboard.move_target == target do
-          {:success, state, blackboard}
-        else
-          state = Movement.move_to(state, {x, y, z})
-          {:success, state, %{blackboard | move_target: target}}
+        cond do
+          Movement.blocked?(state) ->
+            {{:running, @chase_tick_delay}, state, blackboard}
+
+          blackboard.move_target == target ->
+            {:success, state, blackboard}
+
+          true ->
+            state = Movement.move_to(state, {x, y, z})
+            {:success, state, %{blackboard | move_target: target}}
         end
 
       _ ->

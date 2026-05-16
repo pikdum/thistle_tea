@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
@@ -9,6 +10,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
@@ -132,24 +134,31 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
   defp apply_spell_hit(%{object: %{guid: caster_guid}} = character, %{spell: %Spell{} = spell} = casting)
        when is_integer(caster_guid) do
     targets = resolve_targets(character, casting)
-    Enum.reduce(targets, character, &dispatch_to_target(&2, caster_guid, spell, &1))
+
+    Enum.reduce(targets, character, fn target_guid, caster ->
+      context = CastContext.from_caster(caster, spell, target_guid)
+      dispatch_to_target(caster, context, spell, target_guid)
+    end)
   end
 
   defp apply_spell_hit(character, _casting), do: character
 
-  defp dispatch_to_target(character, caster_guid, spell, target_guid) when target_guid == caster_guid do
+  defp dispatch_to_target(character, %CastContext{caster_guid: caster_guid} = context, spell, target_guid)
+       when target_guid == caster_guid do
+    {character, events} = SpellEffect.receive(character, context, spell)
+    duration_events = AuraLogic.self_duration_events(character)
+
     character
-    |> SpellEffect.receive(caster_guid, spell)
+    |> EventSink.emit(events ++ duration_events)
     |> broadcast_self_update()
-    |> AuraLogic.notify_self_durations()
   end
 
-  defp dispatch_to_target(character, caster_guid, spell, target_guid) when is_integer(target_guid) do
-    Entity.receive_spell(target_guid, caster_guid, spell)
+  defp dispatch_to_target(character, %CastContext{} = context, spell, target_guid) when is_integer(target_guid) do
+    Entity.receive_spell(target_guid, context, spell)
     character
   end
 
-  defp dispatch_to_target(character, _caster_guid, _spell, _target_guid), do: character
+  defp dispatch_to_target(character, _context, _spell, _target_guid), do: character
 
   defp resolve_targets(%{object: %{guid: caster_guid}} = caster, %{spell: %Spell{} = spell, target: target}) do
     cond do

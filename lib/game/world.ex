@@ -29,6 +29,22 @@ defmodule ThistleTea.Game.World do
     |> Enum.reject(fn {guid, _distance} -> guid == self_guid end)
   end
 
+  def update_position(%ThistleTea.Character{} = entity), do: update_position(entity, :players)
+  def update_position(%Mob{} = entity), do: update_position(entity, :mobs)
+  def update_position(%GameObject{} = entity), do: update_position(entity, :game_objects)
+  def update_position(_entity), do: :ok
+
+  def update_position(
+        %{
+          object: %{guid: guid},
+          internal: %Internal{map: map},
+          movement_block: %MovementBlock{position: {x, y, z, _o}}
+        },
+        table
+      ) do
+    SpatialHash.update(table, guid, map, x, y, z)
+  end
+
   def broadcast_packet(packet, entity, opts \\ [])
 
   def broadcast_packet(packets, entity, opts) when is_list(packets) do

@@ -6,13 +6,12 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.Core
+  alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.Entity.Logic.Movement
-  alias ThistleTea.Game.Network
-  alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.Time
-  alias ThistleTea.Game.World
 
   require Logger
 
@@ -28,12 +27,12 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
 
   @negative_auras [:periodic_damage, :mod_root, :mod_decrease_speed, :mod_stun, :mod_fear]
 
-  def apply_spell(entity, caster_guid, caster_level, %Spell{} = spell) do
+  def apply_spell(entity, %CastContext{} = context, %Spell{} = spell) do
     aura_effects = Spell.aura_effects(spell)
 
     case build_auras(aura_effects) do
       [] ->
-        entity
+        {entity, []}
 
       auras ->
         now = Time.now()
@@ -41,16 +40,27 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
 
         holder = %Holder{
           spell: spell,
-          caster_guid: caster_guid,
-          caster_level: caster_level,
+          caster_guid: context.caster_guid,
+          caster_level: context.caster_level,
           applied_at: now,
           expires_at: expires_at(now, spell.duration_ms),
           auras: auras,
-          negative?: negative?(auras, caster_guid, target_guid)
+          negative?: negative?(auras, context.caster_guid, target_guid)
         }
 
         do_apply(entity, holder)
     end
+  end
+
+  def apply_spell(entity, caster_guid, caster_level, %Spell{} = spell) do
+    context = %CastContext{
+      caster_guid: caster_guid,
+      caster_level: caster_level,
+      target_guid: entity.object.guid,
+      spell: spell
+    }
+
+    apply_spell(entity, context, spell)
   end
 
   defp negative?(auras, caster_guid, target_guid) do
@@ -65,10 +75,12 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
     holders = upsert_holder(existing, holder)
     unit = sync_unit(%{entity.unit | auras: holders})
 
-    entity
-    |> Map.put(:unit, unit)
-    |> sync_movement_flags()
-    |> Core.mark_broadcast_update()
+    {entity, events} =
+      entity
+      |> Map.put(:unit, unit)
+      |> sync_movement_flags()
+
+    {Core.mark_broadcast_update(entity), events}
   end
 
   defp do_apply(entity, %Holder{} = holder) do
@@ -94,29 +106,30 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
 
   defp same_source?(_holder, _spell_id, _caster_guid), do: false
 
-  def notify_self_durations(%ThistleTea.Character{unit: %Unit{auras: holders}} = entity) when is_list(holders) do
-    Enum.each(holders, &send_duration_update/1)
-    entity
+  def self_duration_events(%ThistleTea.Character{unit: %Unit{auras: holders}}) when is_list(holders) do
+    Enum.flat_map(holders, &duration_event/1)
   end
 
-  def notify_self_durations(entity), do: entity
+  def self_duration_events(_entity), do: []
 
   def expire_due(%{unit: %Unit{auras: holders}} = entity, now) when is_list(holders) do
     {kept, expired} = Enum.split_with(holders, &alive?(&1, now))
 
     if expired == [] do
-      entity
+      {entity, []}
     else
       unit = sync_unit(%{entity.unit | auras: kept})
 
-      entity
-      |> Map.put(:unit, unit)
-      |> sync_movement_flags()
-      |> Core.mark_broadcast_update()
+      {entity, events} =
+        entity
+        |> Map.put(:unit, unit)
+        |> sync_movement_flags()
+
+      {Core.mark_broadcast_update(entity), events}
     end
   end
 
-  def expire_due(entity, _now), do: entity
+  def expire_due(entity, _now), do: {entity, []}
 
   def rooted?(%{unit: %Unit{auras: holders}}) when is_list(holders) do
     Enum.any?(holders, &has_aura_type?(&1, :mod_root))
@@ -141,67 +154,78 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
     entity = %{entity | movement_block: %{mb | movement_flags: new_flags}}
 
     if has_root? and not was_rooted? do
-      Movement.halt(entity)
+      {Movement.halt(entity), [Event.movement_stopped()]}
     else
-      entity
+      {entity, []}
     end
   end
 
-  defp sync_movement_flags(entity), do: entity
+  defp sync_movement_flags(entity), do: {entity, []}
 
   def tick(%{unit: %Unit{auras: holders}} = entity, now) when is_list(holders) and holders != [] do
     entity
     |> tick_periodics(now)
-    |> expire_due(now)
+    |> then(fn {entity, events} ->
+      {entity, expire_events} = expire_due(entity, now)
+      {entity, events ++ expire_events}
+    end)
   end
 
-  def tick(entity, _now), do: entity
+  def tick(entity, _now), do: {entity, []}
 
   defp tick_periodics(%{unit: %Unit{auras: holders}} = entity, now) do
     result =
-      Enum.reduce_while(holders, {entity, []}, fn holder, {ent, acc} ->
-        {ent, new_holder} = tick_holder(ent, holder, now)
+      Enum.reduce_while(holders, {entity, [], []}, fn holder, {ent, acc, events} ->
+        {ent, new_holder, holder_events} = tick_holder(ent, holder, now)
+        events = events ++ holder_events
 
         if Core.dead?(ent) do
-          {:halt, {ent, :died}}
+          {:halt, {ent, :died, events}}
         else
-          {:cont, {ent, [new_holder | acc]}}
+          {:cont, {ent, [new_holder | acc], events}}
         end
       end)
 
     case result do
-      {entity, :died} ->
-        entity
+      {entity, :died, events} ->
+        {entity, events}
 
-      {entity, acc} ->
+      {entity, acc, events} ->
         new_holders = Enum.reverse(acc)
 
-        if new_holders == holders do
-          entity
-        else
-          %{entity | unit: %{entity.unit | auras: new_holders}}
-        end
+        entity =
+          if new_holders == holders do
+            entity
+          else
+            %{entity | unit: %{entity.unit | auras: new_holders}}
+          end
+
+        {entity, events}
     end
   end
 
   defp tick_holder(entity, %Holder{auras: auras} = holder, now) do
-    {entity, new_auras} =
-      Enum.reduce(auras, {entity, []}, fn aura, {ent, acc} ->
-        {ent, new_aura} = tick_aura(ent, holder, aura, now)
-        {ent, [new_aura | acc]}
+    {entity, new_auras, events} =
+      Enum.reduce(auras, {entity, [], []}, fn aura, {ent, acc, events} ->
+        {ent, new_aura, aura_events} = tick_aura(ent, holder, aura, now)
+        {ent, [new_aura | acc], events ++ aura_events}
       end)
 
-    {entity, %{holder | auras: Enum.reverse(new_auras)}}
+    {entity, %{holder | auras: Enum.reverse(new_auras)}, events}
   end
 
   defp tick_aura(entity, %Holder{} = holder, %Aura{type: :periodic_damage, next_tick_at: at} = aura, now)
        when is_integer(at) and now >= at do
     damage = aura.amount
-    entity = entity |> Core.take_damage(damage) |> broadcast_periodic_damage(holder, damage)
-    {entity, %{aura | next_tick_at: advance_tick(at, aura.amplitude_ms, now)}}
+    entity = Core.take_damage(entity, damage)
+
+    event =
+      Event.spell_damage(holder.caster_guid, entity.object.guid, holder.spell, damage, periodic?: true)
+
+    {entity, %{aura | next_tick_at: advance_tick(at, aura.amplitude_ms, now)}, [event]}
   end
 
-  defp tick_aura(entity, _holder, aura, _now), do: {entity, aura}
+  defp tick_aura(entity, _holder, aura, _now), do: {entity, aura, []}
 
   defp advance_tick(last_tick, amplitude_ms, now) when is_integer(amplitude_ms) and amplitude_ms > 0 do
     next = last_tick + amplitude_ms
@@ -210,39 +234,12 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
 
   defp advance_tick(_last_tick, _amplitude_ms, now), do: now + 1_000
 
-  defp broadcast_periodic_damage(entity, %Holder{} = holder, damage) do
-    %Message.SmsgSpellNonMeleeDamageLog{
-      attacker: holder.caster_guid || 0,
-      target: entity.object.guid,
-      spell_id: holder.spell.id,
-      damage: damage,
-      school: school_index(holder.spell.school),
-      periodic?: true
-    }
-    |> World.broadcast_packet(entity)
-
-    entity
-  end
-
-  defp send_duration_update(%Holder{slot: slot, applied_at: applied_at, expires_at: expires_at})
+  defp duration_event(%Holder{slot: slot, applied_at: applied_at, expires_at: expires_at})
        when is_integer(slot) and is_integer(applied_at) and is_integer(expires_at) do
-    Network.send_packet(%Message.SmsgUpdateAuraDuration{
-      aura_slot: slot,
-      duration_ms: max(expires_at - applied_at, 0)
-    })
+    [Event.aura_duration(slot, max(expires_at - applied_at, 0))]
   end
 
-  defp send_duration_update(_holder), do: :ok
-
-  defp school_index(:physical), do: 0
-  defp school_index(:holy), do: 1
-  defp school_index(:fire), do: 2
-  defp school_index(:nature), do: 3
-  defp school_index(:frost), do: 4
-  defp school_index(:shadow), do: 5
-  defp school_index(:arcane), do: 6
-  defp school_index(other) when is_integer(other), do: other
-  defp school_index(_), do: 0
+  defp duration_event(_holder), do: []
 
   def next_event_at(%{unit: %Unit{auras: holders}}) when is_list(holders) do
     holders

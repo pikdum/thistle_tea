@@ -12,7 +12,6 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Pathfinding
-  alias ThistleTea.Game.World.SpatialHash
 
   @max_u32 0xFFFFFFFF
   @movement_flag_forward 0x00000001
@@ -125,7 +124,6 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
 
   def halt(%{movement_block: %MovementBlock{} = mb, internal: %Internal{} = internal} = entity) do
     entity = sync_position(entity)
-    {x, y, z, _o} = entity.movement_block.position
 
     movement_block = %{
       entity.movement_block
@@ -139,13 +137,15 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
     }
 
     internal = %{internal | movement_start_time: nil, movement_start_position: nil}
-    halted = %{entity | movement_block: movement_block, internal: internal}
-
-    SpatialHash.update(:mobs, halted.object.guid, internal.map, x, y, z)
-    SmsgMonsterMove.build_stop(halted) |> World.broadcast_packet(halted)
-
-    halted
+    %{entity | movement_block: movement_block, internal: internal}
   end
+
+  def blocked?(%{movement_block: %MovementBlock{movement_flags: flags}})
+      when is_integer(flags) and (flags &&& @movement_flag_root) > 0 do
+    true
+  end
+
+  def blocked?(_entity), do: false
 
   defp clear_motion_flags(flags) when is_integer(flags) do
     flags &&& bnot(bor(@movement_flag_forward, @movement_flag_spline_enabled))
