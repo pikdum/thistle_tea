@@ -63,10 +63,10 @@ defmodule ThistleTea.Game.Network.Message.CmsgCastSpell do
     character = SpellBT.start_cast(state.character, spell, targets)
     state = Map.put(state, :character, character)
 
-    if spell.cast_time_ms == 0 and not Spell.attribute?(spell, :channeled) do
-      handle_spell_complete(state)
-    else
-      ensure_player_tick(state)
+    cond do
+      Spell.attribute?(spell, :on_next_swing) -> ensure_player_tick(state)
+      spell.cast_time_ms == 0 and not Spell.attribute?(spell, :channeled) -> handle_spell_complete(state)
+      true -> ensure_player_tick(state)
     end
   end
 

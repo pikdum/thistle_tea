@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal do
     :spells,
     :spellbook,
     :casting,
+    :next_swing_spell,
     :spawn_distance,
     :movement_type,
     :experience_multiplier,

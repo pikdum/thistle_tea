@@ -7,6 +7,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.Combat, as: CombatLogic
   alias ThistleTea.Game.Entity.Logic.Event
+  alias ThistleTea.Game.Entity.Logic.MeleeSpell
+  alias ThistleTea.Game.Spell
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Metadata
 
@@ -58,7 +60,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
       cond do
         in_range and attack_ready ->
           attack_speed = CombatLogic.attack_speed_ms(state)
-          send_melee_attack(state, target)
+          state = send_melee_attack(state, target)
           {state, Blackboard.put_next_at(blackboard, :next_attack_at, attack_speed)}
 
         in_range ->
@@ -122,15 +124,26 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
   end
 
   defp send_melee_attack(state, target) when is_integer(target) do
-    attack = melee_attack_payload(state)
+    {state, attack} = melee_attack_payload(state)
 
     Entity.receive_attack(target, attack)
+    state
   end
 
   defp melee_attack_payload(%{object: %{guid: guid}} = state) do
+    {state, queued_spell} = MeleeSpell.consume_next_swing(state)
     {min_damage, max_damage} = CombatLogic.damage_range(state)
-    %{caster: guid, min_damage: min_damage, max_damage: max_damage}
+    attack = %{caster: guid, min_damage: min_damage, max_damage: max_damage}
+    {state, put_queued_spell(attack, queued_spell)}
   end
+
+  defp put_queued_spell(attack, %Spell{id: spell_id}) do
+    attack
+    |> Map.put(:spell_id, spell_id)
+    |> Map.put(:queued_spell_id, spell_id)
+  end
+
+  defp put_queued_spell(attack, _spell), do: attack
 
   defp combat_reach(%{unit: unit} = state, target) do
     reach = combat_reach_value(unit) + target_combat_reach(state, target) + @melee_range_offset

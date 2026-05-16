@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
   alias ThistleTea.Game.Entity.Logic.Core
+  alias ThistleTea.Game.Entity.Logic.MeleeSpell
   alias ThistleTea.Game.Entity.Logic.SpellEffect
   alias ThistleTea.Game.Entity.Logic.SpellTarget
   alias ThistleTea.Game.Network
@@ -24,6 +25,23 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
   end
 
   def start_cast(%{internal: %Internal{} = internal} = character, %Spell{} = spell, %Targets{} = targets) do
+    if Spell.attribute?(spell, :on_next_swing) do
+      MeleeSpell.queue_next_swing(character, spell)
+    else
+      do_start_cast(character, internal, spell, targets)
+    end
+  end
+
+  def start_cast(character, _spell, _targets) do
+    character
+  end
+
+  defp do_start_cast(
+         %{internal: %Internal{} = internal} = character,
+         %Internal{},
+         %Spell{} = spell,
+         %Targets{} = targets
+       ) do
     now = Time.now()
     cast_time_ms = normalize_time(spell.cast_time_ms)
 
@@ -40,10 +58,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
     }
 
     %{character | internal: %{internal | casting: casting}}
-  end
-
-  def start_cast(character, _spell, _targets) do
-    character
   end
 
   def casting?(%{internal: %Internal{casting: %{} = casting}}, _blackboard) when is_map(casting) do
