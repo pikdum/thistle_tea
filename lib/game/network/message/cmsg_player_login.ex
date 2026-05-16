@@ -41,6 +41,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgPlayerLogin do
       race: c.unit.race,
       gender: c.unit.gender,
       class: c.unit.class,
+      level: c.unit.level,
       bounding_radius: c.unit.bounding_radius,
       combat_reach: c.unit.combat_reach,
       attacker_count: 0,

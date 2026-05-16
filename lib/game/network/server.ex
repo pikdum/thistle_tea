@@ -4,6 +4,7 @@ defmodule ThistleTea.Game.Network.Server do
 
   import Bitwise, only: [|||: 2]
 
+  alias ThistleTea.Character
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
@@ -11,6 +12,7 @@ defmodule ThistleTea.Game.Network.Server do
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.Combat
   alias ThistleTea.Game.Entity.Logic.Core
+  alias ThistleTea.Game.Entity.Logic.Experience
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Connection
@@ -221,6 +223,35 @@ defmodule ThistleTea.Game.Network.Server do
     |> World.broadcast_packet(character)
 
     {:noreply, {socket, %{state | character: character}}, {:continue, :maybe_broadcast_update}}
+  end
+
+  def handle_cast({:reward_kill, victim}, {socket, %{character: %Character{} = character} = state}) do
+    xp = kill_xp(character, victim)
+
+    state =
+      if xp > 0 do
+        Network.send_packet(%Message.SmsgLogXpgain{
+          target: victim.object.guid,
+          total_exp: xp,
+          exp_type: :kill
+        })
+
+        {character, level_ups} = Character.gain_xp(character, xp)
+        send_level_ups(level_ups)
+
+        Character.save(character)
+        Metadata.update(state.guid, %{level: character.unit.level})
+
+        update = Core.update_object(character, :values)
+        Network.send_packet(update)
+        World.broadcast_packet(update, character, include_self?: false)
+
+        %{state | character: character}
+      else
+        state
+      end
+
+    {:noreply, {socket, state}, socket.read_timeout}
   end
 
   @impl GenServer
@@ -438,6 +469,29 @@ defmodule ThistleTea.Game.Network.Server do
   end
 
   defp player_needs_tick?(_character), do: false
+
+  defp kill_xp(%Character{unit: %Unit{health: health, level: player_level}}, %{
+         unit: %Unit{level: mob_level},
+         internal: %Internal{} = internal
+       })
+       when health > 0 do
+    Experience.kill_xp(player_level, mob_level,
+      experience_multiplier: internal.experience_multiplier,
+      extra_flags: internal.extra_flags,
+      elite?: elite?(internal.rank)
+    )
+  end
+
+  defp kill_xp(_character, _victim), do: 0
+
+  defp elite?(rank) when rank in [1, 2, 3], do: true
+  defp elite?(_rank), do: false
+
+  defp send_level_ups(level_ups) do
+    Enum.each(level_ups, fn level_up ->
+      Network.send_packet(struct(Message.SmsgLevelupInfo, level_up))
+    end)
+  end
 
   @impl ThousandIsland.Handler
   def handle_connection(socket, _) do

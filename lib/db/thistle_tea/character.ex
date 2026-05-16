@@ -22,11 +22,13 @@ defmodule ThistleTea.Character do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.Message.CmsgCharCreate
+  alias ThistleTea.Game.Player.Stats
 
   def build(%CmsgCharCreate{} = params, account_id) do
     info = Mangos.PlayerCreateInfo.get(params.race, params.class)
     spells = Mangos.PlayerCreateInfoSpell.get_all(params.race, params.class)
     chr_race = DBC.get_by(ChrRaces, id: params.race)
+    stats = Stats.get!(params.race, params.class, 1)
 
     unit_display_id =
       case(params.gender) do
@@ -40,25 +42,24 @@ defmodule ThistleTea.Character do
         scale_x: 1.0
       },
       unit: %Unit{
-        health: 100,
-        power1: 10_000,
-        power2: 1000,
-        power3: 1000,
-        power4: 1000,
-        power5: 1000,
-        max_health: 100,
-        max_power1: 10_000,
-        max_power2: 1000,
-        max_power3: 1000,
-        max_power4: 1000,
-        max_power5: 1000,
-        level: 1,
+        health: stats.max_health,
+        power1: stats.max_mana,
+        power2: 0,
+        power3: 0,
+        power4: initial_energy(params.class),
+        power5: 0,
+        max_health: stats.max_health,
+        max_power1: stats.max_mana,
+        max_power2: max_rage(params.class),
+        max_power3: 0,
+        max_power4: initial_energy(params.class),
+        max_power5: 0,
+        level: stats.level,
         faction_template: get_alliance(params.race),
         race: params.race,
         class: params.class,
         gender: params.gender,
         power_type: get_power(params.class),
-        # TODO: this is wrong
         base_attack_time: 2000,
         bounding_radius: Unit.default_bounding_radius(),
         combat_reach: Unit.default_combat_reach(),
@@ -67,13 +68,13 @@ defmodule ThistleTea.Character do
         min_damage: 10,
         max_damage: 50,
         mod_cast_speed: 1.0,
-        strength: 50,
-        agility: 50,
-        stamina: 50,
-        intellect: 50,
-        spirit: 50,
-        base_mana: 100_000,
-        base_health: 100,
+        strength: stats.strength,
+        agility: stats.agility,
+        stamina: stats.stamina,
+        intellect: stats.intellect,
+        spirit: stats.spirit,
+        base_mana: stats.base_mana,
+        base_health: stats.base_health,
         sheath_state: 0,
         # UNIT_FLAG_USE_SWIM_ANIMATION
         flags: 0x00008000
@@ -86,9 +87,9 @@ defmodule ThistleTea.Character do
         hair_color: params.hair_color,
         facial_hair: params.facial_hair,
         rest_state: 1,
-        xp: 1,
-        next_level_xp: 100,
-        rest_state_experience: 100
+        xp: 0,
+        next_level_xp: stats.next_level_xp,
+        rest_state_experience: 0
       },
       movement_block: %MovementBlock{
         movement_flags: 0,
@@ -110,6 +111,16 @@ defmodule ThistleTea.Character do
       }
     }
   end
+
+  def gain_xp(%__MODULE__{} = character, amount) when is_integer(amount) and amount > 0 do
+    if character.unit.level >= Stats.max_level() do
+      {character, []}
+    else
+      do_gain_xp(character, current_xp(character) + amount, [])
+    end
+  end
+
+  def gain_xp(%__MODULE__{} = character, _amount), do: {character, []}
 
   def generate_and_assign_equipment(character) do
     equipment = CmsgCharCreate.generate_random_equipment()
@@ -213,6 +224,44 @@ defmodule ThistleTea.Character do
       11 -> 0
     end
   end
+
+  defp do_gain_xp(%__MODULE__{unit: %Unit{level: level}, player: %Player{} = player} = character, xp, events) do
+    next_level_xp = player.next_level_xp || Stats.next_level_xp(level)
+
+    cond do
+      next_level_xp <= 0 ->
+        {%{character | player: %{player | xp: 0}}, Enum.reverse(events)}
+
+      xp >= next_level_xp and level < Stats.max_level() ->
+        old_stats = Stats.from_character(character)
+        new_stats = Stats.get!(character.unit.race, character.unit.class, level + 1)
+
+        character =
+          character
+          |> Stats.apply(new_stats)
+          |> put_xp_after_level(xp - next_level_xp)
+
+        event = Stats.level_delta(old_stats, new_stats)
+        do_gain_xp(character, character.player.xp, [event | events])
+
+      true ->
+        {%{character | player: %{player | xp: xp}}, Enum.reverse(events)}
+    end
+  end
+
+  defp put_xp_after_level(%__MODULE__{unit: %Unit{level: level}, player: %Player{} = player} = character, xp) do
+    xp = if level >= Stats.max_level(), do: 0, else: xp
+    %{character | player: %{player | xp: xp}}
+  end
+
+  defp current_xp(%__MODULE__{player: %Player{xp: xp}}) when is_integer(xp), do: xp
+  defp current_xp(%__MODULE__{}), do: 0
+
+  defp max_rage(1), do: 1000
+  defp max_rage(_class), do: 0
+
+  defp initial_energy(4), do: 100
+  defp initial_energy(_class), do: 0
 
   @doc """
   Used to set the proper faction based on the characters

@@ -28,6 +28,10 @@ defmodule ThistleTea.Game.Entity do
     dispatch_cast(entity, {:receive_attack, attack})
   end
 
+  def reward_kill(entity, victim) do
+    dispatch_cast(entity, {:reward_kill, victim})
+  end
+
   def destroy_object(entity, guid) do
     dispatch_cast(entity, {:destroy_object, guid})
   end

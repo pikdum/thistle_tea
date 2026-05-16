@@ -66,6 +66,7 @@ defmodule ThistleTea.Game.World.Loader.Mob do
       name: mob.internal.name,
       bounding_radius: mob.unit.bounding_radius,
       combat_reach: mob.unit.combat_reach,
+      level: mob.unit.level,
       attacker_count: 0,
       alive?: mob.unit.health > 0
     })

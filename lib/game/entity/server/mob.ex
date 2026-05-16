@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.Entity.Server.Mob do
   use GenServer
 
+  alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
@@ -10,6 +11,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.Entity.Registry, as: EntityRegistry
+  alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
@@ -60,11 +62,13 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
       |> engage_combat(caster)
 
     target = state.unit.target
+    dead_before = Core.dead?(state)
 
     state =
       state
       |> Core.take_damage(10)
       |> maybe_decrement_on_death(target)
+      |> maybe_reward_kill(target, dead_before)
 
     schedule_ai_tick(0)
     {:noreply, state, {:continue, :maybe_broadcast}}
@@ -80,11 +84,13 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
       |> engage_combat(caster)
 
     target = state.unit.target
+    dead_before = Core.dead?(state)
 
     state =
       state
       |> Core.take_damage(damage)
       |> maybe_decrement_on_death(target)
+      |> maybe_reward_kill(target, dead_before)
 
     Combat.attacker_state_update(Map.get(attack, :caster, 0), state.object.guid, damage, attack)
     |> World.broadcast_packet(state)
@@ -192,4 +198,14 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
     state
   end
+
+  defp maybe_reward_kill(%Mob{} = state, target, false) when is_integer(target) and target > 0 do
+    if Core.dead?(state) and Guid.entity_type(target) == :player do
+      Entity.reward_kill(target, state)
+    end
+
+    state
+  end
+
+  defp maybe_reward_kill(%Mob{} = state, _target, _dead_before), do: state
 end
