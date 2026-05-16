@@ -32,5 +32,24 @@ defmodule ThistleTea.Game.Spell.TargetsTest do
       assert targets.destination_location == {1.0, 2.0, 3.0}
       assert targets.unit_guid == nil
     end
+
+    test "source location parses ground-target coordinates" do
+      payload =
+        <<0x20::little-size(16)>> <>
+          <<4.0::little-float-size(32), 5.0::little-float-size(32), 6.0::little-float-size(32)>>
+
+      targets = Targets.parse(payload, 123)
+
+      assert targets.source_location == {4.0, 5.0, 6.0}
+      assert Targets.ground_location(targets) == {4.0, 5.0, 6.0}
+    end
+  end
+
+  describe "ground_location/1" do
+    test "prefers destination over source" do
+      targets = %Targets{source_location: {1.0, 1.0, 1.0}, destination_location: {2.0, 2.0, 2.0}}
+
+      assert Targets.ground_location(targets) == {2.0, 2.0, 2.0}
+    end
   end
 end

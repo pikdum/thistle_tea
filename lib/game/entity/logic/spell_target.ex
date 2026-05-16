@@ -10,8 +10,8 @@ defmodule ThistleTea.Game.Entity.Logic.SpellTarget do
       caster_aoe_spell?(spell) ->
         nearby_enemy_guids(caster, caster_guid, max_aoe_radius(spell))
 
-      targeted_aoe_spell?(spell) and is_tuple(targets.destination_location) ->
-        nearby_enemy_guids_at(caster, caster_guid, targets.destination_location, max_aoe_radius(spell))
+      targeted_aoe_spell?(spell) and is_tuple(Targets.ground_location(targets)) ->
+        nearby_enemy_guids_at(caster, caster_guid, Targets.ground_location(targets), max_aoe_radius(spell))
 
       is_integer(targets.unit_guid) ->
         [targets.unit_guid]

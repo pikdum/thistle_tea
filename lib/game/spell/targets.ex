@@ -29,6 +29,10 @@ defmodule ThistleTea.Game.Spell.Targets do
     %__MODULE__{flags: @self, raw: <<@self::little-size(16)>>, unit_guid: caster_guid}
   end
 
+  def ground_location(%__MODULE__{destination_location: location}) when is_tuple(location), do: location
+  def ground_location(%__MODULE__{source_location: location}) when is_tuple(location), do: location
+  def ground_location(_targets), do: nil
+
   defp put_self_target(%__MODULE__{flags: @self} = targets, caster_guid) do
     %{targets | unit_guid: caster_guid}
   end
