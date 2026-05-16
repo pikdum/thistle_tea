@@ -36,6 +36,10 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
     apply_damage_effect(state, context, spell, effect, now)
   end
 
+  defp apply_effect(state, %CastContext{}, _spell, %Effect{type: :heal} = effect, _now) do
+    {Core.heal(state, Effect.damage_roll(effect)), []}
+  end
+
   defp apply_effect(
          state,
          %CastContext{} = context,

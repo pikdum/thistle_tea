@@ -34,6 +34,21 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
     |> maybe_dead(now)
   end
 
+  def heal(%{unit: %Unit{health: health, max_health: max_health} = unit} = entity, amount)
+      when is_number(health) and is_number(amount) and amount > 0 do
+    new_health =
+      if is_number(max_health) and max_health > 0 do
+        min(health + amount, max_health)
+      else
+        health + amount
+      end
+
+    %{entity | unit: %{unit | health: new_health}}
+    |> mark_broadcast_update()
+  end
+
+  def heal(entity, _amount), do: entity
+
   def dead?(%{unit: %Unit{health: health}}) when is_number(health) do
     health <= 0
   end

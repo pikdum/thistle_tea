@@ -250,6 +250,43 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
     end
   end
 
+  describe "tick/2 with periodic_heal" do
+    test "restores health when amplitude elapses and advances the tick" do
+      entity = %{fixture_entity() | unit: %Unit{level: 1, health: 40, max_health: 100, auras: []}}
+
+      spell = %Spell{
+        id: 139,
+        name: "Renew",
+        school: :holy,
+        duration_ms: 12_000,
+        effects: [
+          %Effect{
+            index: 0,
+            type: :apply_aura,
+            base_points: 25,
+            die_sides: 0,
+            aura: :periodic_heal,
+            amplitude_ms: 3_000
+          }
+        ]
+      }
+
+      {entity, _events} = apply_spell(entity, 999, 1, spell)
+
+      [holder] = entity.unit.auras
+      [aura] = holder.auras
+      first_tick_at = aura.next_tick_at
+
+      {entity, events} = Aura.tick(entity, first_tick_at)
+
+      assert entity.unit.health == 65
+      assert events == []
+      [updated] = entity.unit.auras
+      [updated_aura] = updated.auras
+      assert updated_aura.next_tick_at == first_tick_at + 3_000
+    end
+  end
+
   describe "reactions/3" do
     test "returns trigger spell events for on-hit proc auras" do
       entity = fixture_entity()

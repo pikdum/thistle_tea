@@ -75,6 +75,31 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
       assert [%{type: :spell_damage, damage: 24, periodic?: true, spell_id: 10}] = events
     end
 
+    test "heal effects restore health without emitting damage events" do
+      spell = %Spell{
+        id: 2050,
+        name: "Lesser Heal",
+        school: :holy,
+        effects: [
+          %Effect{
+            index: 0,
+            type: :heal,
+            base_points: 15,
+            die_sides: 0
+          }
+        ]
+      }
+
+      target = %{target_fixture() | unit: %Unit{health: 10, max_health: 20, level: 1, auras: []}}
+      context = %CastContext{caster_guid: 999, caster_level: 10}
+
+      {target, events} = SpellEffect.receive(target, context, spell, 1_000)
+
+      assert target.unit.health == 20
+      assert target.internal.broadcast_update? == true
+      assert events == []
+    end
+
     test "trigger spell effects return trigger events" do
       spell = %Spell{
         id: 168,

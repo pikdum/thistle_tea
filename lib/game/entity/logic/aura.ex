@@ -256,6 +256,12 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
     {entity, %{aura | next_tick_at: advance_tick(at, aura.amplitude_ms, now)}, [event]}
   end
 
+  defp tick_aura(entity, _holder, %Aura{type: :periodic_heal, next_tick_at: at} = aura, now)
+       when is_integer(at) and now >= at do
+    entity = Core.heal(entity, aura.amount)
+    {entity, %{aura | next_tick_at: advance_tick(at, aura.amplitude_ms, now)}, []}
+  end
+
   defp tick_aura(entity, _holder, aura, _now), do: {entity, aura, []}
 
   defp advance_tick(last_tick, amplitude_ms, now) when is_integer(amplitude_ms) and amplitude_ms > 0 do
