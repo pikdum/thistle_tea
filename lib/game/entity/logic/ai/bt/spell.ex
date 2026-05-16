@@ -20,15 +20,16 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
     ])
   end
 
-  def start_cast(%{internal: %Internal{} = internal} = character, %Spell{} = spell, %Targets{} = targets) do
+  def start_cast(%{internal: %Internal{} = internal} = character, %Spell{} = spell, %Targets{} = targets, now)
+      when is_integer(now) do
     if Spell.attribute?(spell, :on_next_swing) do
       MeleeSpell.queue_next_swing(character, spell)
     else
-      do_start_cast(character, internal, spell, targets)
+      do_start_cast(character, internal, spell, targets, now)
     end
   end
 
-  def start_cast(character, _spell, _targets) do
+  def start_cast(character, _spell, _targets, _now) do
     character
   end
 
@@ -36,9 +37,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
          %{internal: %Internal{} = internal} = character,
          %Internal{},
          %Spell{} = spell,
-         %Targets{} = targets
+         %Targets{} = targets,
+         now
        ) do
-    now = Time.now()
     %{character | internal: %{internal | casting: Cast.new(spell, targets, now)}}
   end
 

@@ -65,7 +65,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgCastSpell do
     }
     |> World.broadcast_packet(state.character)
 
-    character = SpellBT.start_cast(state.character, spell, targets)
+    character = SpellBT.start_cast(state.character, spell, targets, Time.now())
     state = Map.put(state, :character, character)
 
     cond do
