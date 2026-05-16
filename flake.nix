@@ -12,7 +12,7 @@
     };
 
     wow-dbc-src = {
-      url = "github:gtker/wow_dbc";
+      url = "github:pikdum/wow_dbc/fix/vanilla-spell-interrupt-flags";
       flake = false;
     };
 
