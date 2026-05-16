@@ -1,5 +1,7 @@
 defmodule ThistleTea.Game.Entity.Logic.Combat do
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Logic.Aura
+  alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.Math
 
@@ -37,4 +39,21 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
   def attacker_state_update(attacker, target, damage, attack \\ %{}) when is_integer(attacker) and is_integer(target) do
     Event.attacker_state_update(attacker, target, damage, attack)
   end
+
+  def receive_attack(%{object: %{guid: target_guid}} = entity, attack)
+      when is_map(attack) and is_integer(target_guid) do
+    damage = attack_damage(attack)
+    entity = Core.take_damage(entity, damage)
+    event = attacker_state_update(Map.get(attack, :caster, 0), target_guid, damage, attack)
+
+    {entity, [event | attack_reaction_events(entity, attack)]}
+  end
+
+  def receive_attack(entity, _attack), do: {entity, []}
+
+  defp attack_reaction_events(entity, %{caster: attacker_guid}) when is_integer(attacker_guid) do
+    if Core.dead?(entity), do: [], else: Aura.reactions(entity, :hit_taken, %{attacker_guid: attacker_guid})
+  end
+
+  defp attack_reaction_events(_entity, _attack), do: []
 end

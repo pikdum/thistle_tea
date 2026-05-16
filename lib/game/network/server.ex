@@ -221,15 +221,8 @@ defmodule ThistleTea.Game.Network.Server do
   end
 
   def handle_cast({:receive_attack, attack}, {socket, %{character: character} = state}) do
-    damage = Combat.attack_damage(attack)
-    character = Core.take_damage(character, damage)
-
-    character =
-      EventSink.emit(
-        character,
-        Combat.attacker_state_update(Map.get(attack, :caster, 0), state.guid, damage, attack)
-      )
-      |> EventSink.emit(attack_reaction_events(character, attack))
+    {character, events} = Combat.receive_attack(character, attack)
+    character = EventSink.emit(character, events)
 
     {:noreply, {socket, %{state | character: character}}, {:continue, :maybe_broadcast_update}}
   end
@@ -509,12 +502,6 @@ defmodule ThistleTea.Game.Network.Server do
   end
 
   defp player_only_needs_aura_tick?(_character), do: false
-
-  defp attack_reaction_events(character, %{caster: attacker_guid}) when is_integer(attacker_guid) do
-    if Core.dead?(character), do: [], else: Aura.reactions(character, :hit_taken, %{attacker_guid: attacker_guid})
-  end
-
-  defp attack_reaction_events(_character, _attack), do: []
 
   defp kill_xp(%Character{unit: %Unit{health: health, level: player_level}}, %{
          unit: %Unit{level: mob_level},

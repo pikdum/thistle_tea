@@ -8,7 +8,6 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Mob, as: MobBT
-  alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Combat
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Movement
@@ -83,8 +82,6 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
   @impl GenServer
   def handle_cast({:receive_attack, %{caster: caster} = attack}, state) do
-    damage = Combat.attack_damage(attack)
-
     state =
       state
       |> maybe_reset_attack_started(caster)
@@ -93,17 +90,12 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     target = state.unit.target
     dead_before = Core.dead?(state)
 
-    state =
-      state
-      |> Core.take_damage(damage)
-      |> handle_death_transition(target, dead_before)
+    {state, events} = Combat.receive_attack(state, attack)
 
     state =
-      EventSink.emit(
-        state,
-        Combat.attacker_state_update(Map.get(attack, :caster, 0), state.object.guid, damage, attack)
-      )
-      |> EventSink.emit(attack_reaction_events(state, attack))
+      state
+      |> handle_death_transition(target, dead_before)
+      |> EventSink.emit(events)
 
     schedule_ai_tick(0)
     {:noreply, state, {:continue, :maybe_broadcast}}
@@ -258,12 +250,6 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   end
 
   defp maybe_reward_kill(%Mob{} = state, _target), do: state
-
-  defp attack_reaction_events(state, %{caster: attacker_guid}) when is_integer(attacker_guid) do
-    if Core.dead?(state), do: [], else: Aura.reactions(state, :hit_taken, %{attacker_guid: attacker_guid})
-  end
-
-  defp attack_reaction_events(_state, _attack), do: []
 
   defp caster_guid(%{caster_guid: caster_guid}) when is_integer(caster_guid), do: caster_guid
   defp caster_guid(caster_guid) when is_integer(caster_guid), do: caster_guid
