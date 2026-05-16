@@ -1,6 +1,4 @@
 defmodule ThistleTea.Game.Entity.Logic.AI.BT.Blackboard do
-  alias ThistleTea.Game.Time
-
   defstruct target: nil,
             move_target: nil,
             orientation: nil,
@@ -25,20 +23,12 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Blackboard do
     struct(__MODULE__, data)
   end
 
-  def ready_for?(%__MODULE__{} = blackboard, key) when is_atom(key) do
-    ready_for?(blackboard, key, Time.now())
-  end
-
   def ready_for?(%__MODULE__{} = blackboard, key, now) when is_atom(key) and is_integer(now) do
     case Map.get(blackboard, key) do
       nil -> true
       0 -> true
       ready_at -> now >= ready_at
     end
-  end
-
-  def delay_until(%__MODULE__{} = blackboard, key) when is_atom(key) do
-    delay_until(blackboard, key, Time.now())
   end
 
   def delay_until(%__MODULE__{} = blackboard, key, now) when is_atom(key) and is_integer(now) do
@@ -48,14 +38,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Blackboard do
       ready_at when is_integer(ready_at) -> max(ready_at - now, 0)
       _ -> 0
     end
-  end
-
-  def put_next_at(%__MODULE__{} = blackboard, key, delay_ms) when is_atom(key) and is_integer(delay_ms) do
-    put_next_at(blackboard, key, delay_ms, Time.now())
-  end
-
-  def put_next_at(%__MODULE__{} = blackboard, _key, _delay_ms) do
-    blackboard
   end
 
   def put_next_at(%__MODULE__{} = blackboard, key, delay_ms, now)
