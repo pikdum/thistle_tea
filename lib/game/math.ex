@@ -24,9 +24,12 @@ defmodule ThistleTea.Game.Math do
     abs(x1 - x2) <= range && abs(y1 - y2) <= range && abs(z1 - z2) <= range
   end
 
+  def distance({x0, y0, z0}, {x1, y1, z1}) do
+    :math.sqrt(:math.pow(x1 - x0, 2) + :math.pow(y1 - y0, 2) + :math.pow(z1 - z0, 2))
+  end
+
   def movement_duration({x0, y0, z0}, {x1, y1, z1}, speed) when is_float(speed) and speed > 0 do
-    distance = :math.sqrt(:math.pow(x1 - x0, 2) + :math.pow(y1 - y0, 2) + :math.pow(z1 - z0, 2))
-    distance / speed
+    distance({x0, y0, z0}, {x1, y1, z1}) / speed
   end
 
   def movement_duration(path_list, speed) when is_list(path_list) do

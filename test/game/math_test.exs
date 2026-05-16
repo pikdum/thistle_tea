@@ -47,6 +47,12 @@ defmodule ThistleTea.Game.MathTest do
     end
   end
 
+  describe "distance/2" do
+    test "calculates euclidean distance" do
+      assert Math.distance({0.0, 0.0, 0.0}, {3.0, 4.0, 12.0}) == 13.0
+    end
+  end
+
   describe "movement_duration/3" do
     test "calculates correct duration for 3-4-5 triangle" do
       assert Math.movement_duration({0.0, 0.0, 0.0}, {3.0, 4.0, 0.0}, 1.0) == 5.0

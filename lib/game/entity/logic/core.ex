@@ -1,15 +1,14 @@
 defmodule ThistleTea.Game.Entity.Logic.Core do
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
-  alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.GameObject
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Movement
+  alias ThistleTea.Game.Math
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.Time
-  alias ThistleTea.Game.World.SpatialHash
 
   @leash_timeout_ms 6_000
 
@@ -62,7 +61,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
       ) do
     case tether_range(entity) do
       range when is_number(range) ->
-        SpatialHash.distance({xi, yi, zi}, {x, y, z}) > range
+        Math.distance({xi, yi, zi}, {x, y, z}) > range
 
       _ ->
         false
@@ -112,32 +111,4 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
   end
 
   defp maybe_dead(entity), do: entity
-
-  def set_position(%Mob{} = entity), do: set_position(entity, :mobs)
-  def set_position(%GameObject{} = entity), do: set_position(entity, :game_objects)
-
-  def set_position(
-        %{
-          object: %Object{guid: guid},
-          movement_block: %MovementBlock{position: {x, y, z, _o}},
-          internal: %Internal{map: map}
-        },
-        table
-      ) do
-    SpatialHash.update(table, guid, map, x, y, z)
-  end
-
-  def remove_position(%Mob{} = entity), do: remove_position(entity, :mobs)
-  def remove_position(%GameObject{} = entity), do: remove_position(entity, :game_objects)
-
-  def remove_position(%{object: %Object{guid: guid}}, table) do
-    SpatialHash.remove(table, guid)
-  end
-
-  def nearby_players(
-        %{internal: %Internal{map: map}, movement_block: %MovementBlock{position: {x, y, z, _o}}},
-        range \\ 250
-      ) do
-    SpatialHash.query(:players, map, x, y, z, range)
-  end
 end

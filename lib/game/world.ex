@@ -53,6 +53,15 @@ defmodule ThistleTea.Game.World do
     SpatialHash.update(table, guid, map, x, y, z)
   end
 
+  def remove_position(%ThistleTea.Character{} = entity), do: remove_position(entity, :players)
+  def remove_position(%Mob{} = entity), do: remove_position(entity, :mobs)
+  def remove_position(%GameObject{} = entity), do: remove_position(entity, :game_objects)
+  def remove_position(_entity), do: :ok
+
+  def remove_position(%{object: %{guid: guid}}, table) do
+    SpatialHash.remove(table, guid)
+  end
+
   def broadcast_packet(packet, entity, opts \\ [])
 
   def broadcast_packet(packets, entity, opts) when is_list(packets) do

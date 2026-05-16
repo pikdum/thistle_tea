@@ -33,7 +33,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     GameEvent.subscribe(state)
     Process.flag(:trap_exit, true)
     state = BT.init(state, MobBT.tree())
-    Core.set_position(state)
+    World.update_position(state)
 
     schedule_ai_tick(0)
 
@@ -43,7 +43,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   @impl GenServer
   def handle_cast({:send_update_to, pid}, state) do
     state = Movement.sync_position(state)
-    Core.set_position(state)
+    World.update_position(state)
 
     Core.update_object(state)
     |> Network.send_packet(pid)
@@ -105,7 +105,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   @impl GenServer
   def handle_info(:ai_tick, %{internal: %Internal{behavior_tree: behavior_tree}} = state) do
     state = Movement.sync_position(state)
-    Core.set_position(state)
+    World.update_position(state)
     {status, state} = BT.tick(behavior_tree, state)
     state = EventSink.emit_pending(state)
     schedule_ai_tick(ai_tick_delay(status))
@@ -158,7 +158,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   end
 
   @impl GenServer
-  def terminate(_reason, state), do: Core.remove_position(state)
+  def terminate(_reason, state), do: World.remove_position(state)
 
   defp schedule_ai_tick(delay) when is_integer(delay) and delay >= 0 do
     Process.send_after(self(), :ai_tick, delay)
@@ -171,7 +171,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   defp ai_tick_delay(_status), do: @ai_tick_ms
 
   defp put_spawn_position(%Mob{} = state) do
-    Core.set_position(state)
+    World.update_position(state)
     update_metadata(state)
     state
   end

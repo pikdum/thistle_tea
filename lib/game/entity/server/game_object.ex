@@ -16,7 +16,7 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
   def init(%GameObject{} = state) do
     GameEvent.subscribe(state)
     Process.flag(:trap_exit, true)
-    Core.set_position(state)
+    World.update_position(state)
     {:ok, state}
   end
 
@@ -44,5 +44,5 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
   end
 
   @impl GenServer
-  def terminate(_reason, state), do: Core.remove_position(state)
+  def terminate(_reason, state), do: World.remove_position(state)
 end
