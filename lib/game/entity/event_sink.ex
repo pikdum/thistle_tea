@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
   alias ThistleTea.Game.Network.Opcodes
   alias ThistleTea.Game.Network.Packet
   alias ThistleTea.Game.Spell.CastContext
+  alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
 
@@ -201,7 +202,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
 
   defp dispatch_triggered_spell(%{object: %{guid: guid}} = entity, %Event{target_guid: guid} = event, spell) do
     context = trigger_context(event, spell)
-    {entity, events} = SpellEffect.receive(entity, context, spell)
+    {entity, events} = SpellEffect.receive(entity, context, spell, Time.now())
     emit(entity, events)
   end
 

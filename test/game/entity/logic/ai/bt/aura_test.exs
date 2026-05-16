@@ -16,7 +16,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.AuraTest do
     test "queues periodic aura events on the entity" do
       entity = fixture_entity()
       spell = dot_spell()
-      {entity, _events} = Aura.apply_spell(entity, 999, 1, spell)
+      {entity, _events} = Aura.apply_spell(entity, 999, 1, spell, Time.now())
 
       entity =
         update_in(entity.unit.auras, fn [holder] ->

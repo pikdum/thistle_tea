@@ -27,6 +27,10 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
     }
   end
 
+  defp apply_spell(entity, caster_guid, caster_level, spell) do
+    Aura.apply_spell(entity, caster_guid, caster_level, spell, 1_000)
+  end
+
   defp frost_armor_fixture do
     %Spell{
       id: 168,
@@ -71,12 +75,12 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
     }
   end
 
-  describe "apply_spell/4" do
+  describe "apply_spell/5" do
     test "appends a holder with the spell to the unit" do
       entity = fixture_entity()
       spell = frost_armor_fixture()
 
-      {entity, _events} = Aura.apply_spell(entity, 1, 1, spell)
+      {entity, _events} = apply_spell(entity, 1, 1, spell)
 
       assert [%Holder{spell: ^spell, caster_guid: 1, slot: 0}] = entity.unit.auras
     end
@@ -85,7 +89,7 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
       entity = fixture_entity()
       spell = frost_armor_fixture()
 
-      {entity, _events} = Aura.apply_spell(entity, 1, 1, spell)
+      {entity, _events} = apply_spell(entity, 1, 1, spell)
 
       assert entity.unit.normal_resistance == 29
       assert entity.unit.holy_resistance == 0
@@ -95,7 +99,7 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
       entity = put_in(fixture_entity().unit.normal_resistance, 7)
       spell = frost_armor_fixture()
 
-      {entity, _events} = Aura.apply_spell(entity, 1, 1, spell)
+      {entity, _events} = apply_spell(entity, 1, 1, spell)
 
       assert entity.unit.base_normal_resistance == 7
       assert entity.unit.normal_resistance == 36
@@ -105,7 +109,7 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
       entity = fixture_entity()
       spell = frost_armor_fixture()
 
-      {entity, _events} = Aura.apply_spell(entity, 1, 1, spell)
+      {entity, _events} = apply_spell(entity, 1, 1, spell)
 
       assert <<spell_at_slot_0::little-size(32), _rest::binary>> =
                <<entity.unit.aura::little-size(48 * 32)>>
@@ -117,7 +121,7 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
       entity = fixture_entity()
       spell = frost_armor_fixture()
 
-      {entity, _events} = Aura.apply_spell(entity, 1, 1, spell)
+      {entity, _events} = apply_spell(entity, 1, 1, spell)
 
       assert entity.internal.broadcast_update? == true
     end
@@ -126,8 +130,8 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
       entity = fixture_entity()
       spell = frost_armor_fixture()
 
-      {entity, _events} = Aura.apply_spell(entity, 1, 1, spell)
-      {entity, _events} = Aura.apply_spell(entity, 2, 1, spell)
+      {entity, _events} = apply_spell(entity, 1, 1, spell)
+      {entity, _events} = apply_spell(entity, 2, 1, spell)
 
       assert length(entity.unit.auras) == 2
       assert Enum.map(entity.unit.auras, & &1.slot) == [0, 1]
@@ -146,7 +150,7 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
 
       spell = root_spell()
 
-      {entity, events} = Aura.apply_spell(entity, 999, 1, spell)
+      {entity, events} = apply_spell(entity, 999, 1, spell)
 
       assert [%{type: :movement_stopped}, %{type: :movement_root_changed, rooted?: true}] = events
       assert (entity.movement_block.movement_flags &&& 0x08000000) != 0
@@ -159,7 +163,7 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
       entity = fixture_entity()
       spell = root_spell()
 
-      {entity, _events} = Aura.apply_spell(entity, 999, 1, spell)
+      {entity, _events} = apply_spell(entity, 999, 1, spell)
       future = entity.unit.auras |> hd() |> Map.fetch!(:expires_at)
       {entity, events} = Aura.expire_due(entity, future + 1)
 
@@ -198,7 +202,7 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
     test "applies damage when amplitude elapses and advances the tick" do
       entity = fixture_entity()
       spell = dot_fixture()
-      {entity, _events} = Aura.apply_spell(entity, 999, 1, spell)
+      {entity, _events} = apply_spell(entity, 999, 1, spell)
 
       [holder] = entity.unit.auras
       [aura] = holder.auras
@@ -217,7 +221,7 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
     test "does not tick before amplitude has elapsed" do
       entity = fixture_entity()
       spell = dot_fixture()
-      {entity, _events} = Aura.apply_spell(entity, 999, 1, spell)
+      {entity, _events} = apply_spell(entity, 999, 1, spell)
 
       [holder] = entity.unit.auras
       [aura] = holder.auras
@@ -232,7 +236,7 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
     test "catches up multiple missed ticks in one call" do
       entity = fixture_entity()
       spell = dot_fixture()
-      {entity, _events} = Aura.apply_spell(entity, 999, 1, spell)
+      {entity, _events} = apply_spell(entity, 999, 1, spell)
 
       [holder] = entity.unit.auras
       [aura] = holder.auras
@@ -267,7 +271,7 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
         ]
       }
 
-      {entity, _events} = Aura.apply_spell(entity, 1, 10, spell)
+      {entity, _events} = apply_spell(entity, 1, 10, spell)
 
       assert [
                %{
@@ -311,7 +315,7 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
         ]
       }
 
-      {entity, events} = Aura.apply_spell(entity, 1, 1, spell)
+      {entity, events} = apply_spell(entity, 1, 1, spell)
 
       assert entity.movement_block.base_run_speed == 7.0
       assert_in_delta entity.movement_block.run_speed, 4.9, 0.000001
@@ -341,7 +345,7 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
         ]
       }
 
-      {entity, _events} = Aura.apply_spell(entity, 1, 1, spell)
+      {entity, _events} = apply_spell(entity, 1, 1, spell)
       future = entity.unit.auras |> hd() |> Map.fetch!(:expires_at)
       {entity, events} = Aura.expire_due(entity, future + 1)
 
@@ -355,7 +359,7 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
     test "removes expired holders and reverses their mods" do
       entity = fixture_entity()
       spell = frost_armor_fixture()
-      {entity, _events} = Aura.apply_spell(entity, 1, 1, spell)
+      {entity, _events} = apply_spell(entity, 1, 1, spell)
 
       future = entity.unit.auras |> hd() |> Map.fetch!(:expires_at)
       {entity, _events} = Aura.expire_due(entity, future + 1)
@@ -367,7 +371,7 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
     test "removing expired holders preserves base resistance" do
       entity = put_in(fixture_entity().unit.normal_resistance, 7)
       spell = frost_armor_fixture()
-      {entity, _events} = Aura.apply_spell(entity, 1, 1, spell)
+      {entity, _events} = apply_spell(entity, 1, 1, spell)
 
       future = entity.unit.auras |> hd() |> Map.fetch!(:expires_at)
       {entity, _events} = Aura.expire_due(entity, future + 1)
@@ -380,7 +384,7 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
     test "keeps non-expired holders" do
       entity = fixture_entity()
       spell = frost_armor_fixture()
-      {entity, _events} = Aura.apply_spell(entity, 1, 1, spell)
+      {entity, _events} = apply_spell(entity, 1, 1, spell)
 
       now = entity.unit.auras |> hd() |> Map.fetch!(:applied_at)
       {entity, _events} = Aura.expire_due(entity, now + 1)

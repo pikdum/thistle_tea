@@ -70,7 +70,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     target = state.unit.target
     dead_before = Core.dead?(state)
 
-    {state, events} = SpellEffect.receive(state, caster, spell)
+    {state, events} = SpellEffect.receive(state, caster, spell, Time.now())
 
     state =
       state

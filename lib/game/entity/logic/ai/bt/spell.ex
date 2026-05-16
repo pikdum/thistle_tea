@@ -61,7 +61,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
         {{:running, delay_ms}, character, blackboard}
 
       now >= casting.ends_at ->
-        character = complete_cast(character, casting)
+        character = complete_cast(character, casting, now)
         {:success, character, blackboard}
 
       true ->
@@ -73,22 +73,32 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
   def cast_tick(character, blackboard), do: {:failure, character, blackboard}
 
   def complete_cast(%{internal: %Internal{casting: %Cast{} = casting}} = character) do
-    complete_cast(character, casting)
+    complete_cast(character, casting, Time.now())
   end
 
   def complete_cast(character), do: character
 
+  def complete_cast(%{internal: %Internal{casting: %Cast{} = casting}} = character, now) when is_integer(now) do
+    complete_cast(character, casting, now)
+  end
+
   def complete_cast(%{internal: %Internal{}} = character, %Cast{} = casting) do
+    complete_cast(character, casting, Time.now())
+  end
+
+  def complete_cast(character, _casting), do: character
+
+  def complete_cast(%{internal: %Internal{}} = character, %Cast{} = casting, now) when is_integer(now) do
     targets = resolve_targets(character, casting)
 
     character
     |> queue_cast_result(casting)
     |> queue_spell_go(casting, targets)
-    |> apply_spell_hit(casting, targets)
+    |> apply_spell_hit(casting, targets, now)
     |> clear_cast()
   end
 
-  def complete_cast(character, _casting), do: character
+  def complete_cast(character, _casting, _now), do: character
 
   def clear_cast(%{internal: %Internal{} = internal} = character) do
     %{character | internal: %{internal | casting: nil}}
@@ -109,7 +119,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
       character =
         character
         |> maybe_queue_channel_spell_go(casting, targets)
-        |> apply_spell_hit(casting, targets)
+        |> apply_spell_hit(casting, targets, now)
 
       casting = Cast.advance_channel_tick(casting, now)
       delay_ms = Cast.next_channel_delay(casting, now)
@@ -136,19 +146,19 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
 
   defp queue_spell_go(character, _casting, _targets), do: character
 
-  defp apply_spell_hit(%{object: %{guid: caster_guid}} = character, %Cast{spell: %Spell{} = spell}, targets)
+  defp apply_spell_hit(%{object: %{guid: caster_guid}} = character, %Cast{spell: %Spell{} = spell}, targets, now)
        when is_integer(caster_guid) and is_list(targets) do
     Enum.reduce(targets, character, fn target_guid, caster ->
       context = CastContext.from_caster(caster, spell, target_guid)
-      dispatch_to_target(caster, context, spell, target_guid)
+      dispatch_to_target(caster, context, spell, target_guid, now)
     end)
   end
 
-  defp apply_spell_hit(character, _casting, _targets), do: character
+  defp apply_spell_hit(character, _casting, _targets, _now), do: character
 
-  defp dispatch_to_target(character, %CastContext{caster_guid: caster_guid} = context, spell, target_guid)
+  defp dispatch_to_target(character, %CastContext{caster_guid: caster_guid} = context, spell, target_guid, now)
        when target_guid == caster_guid do
-    {character, events} = SpellEffect.receive(character, context, spell)
+    {character, events} = SpellEffect.receive(character, context, spell, now)
     duration_events = AuraLogic.self_duration_events(character)
 
     character
@@ -156,11 +166,11 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
     |> queue_self_update()
   end
 
-  defp dispatch_to_target(character, %CastContext{} = context, spell, target_guid) when is_integer(target_guid) do
+  defp dispatch_to_target(character, %CastContext{} = context, spell, target_guid, _now) when is_integer(target_guid) do
     Event.enqueue(character, Event.deliver_spell(target_guid, context, spell))
   end
 
-  defp dispatch_to_target(character, _context, _spell, _target_guid), do: character
+  defp dispatch_to_target(character, _context, _spell, _target_guid, _now), do: character
 
   defp resolve_targets(caster, %Cast{spell: %Spell{} = spell, targets: %Targets{} = targets}) do
     SpellTarget.resolve(caster, spell, targets)

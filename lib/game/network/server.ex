@@ -228,7 +228,7 @@ defmodule ThistleTea.Game.Network.Server do
   end
 
   def handle_cast({:receive_spell, caster, spell}, {socket, %{character: character} = state}) do
-    {character, events} = SpellEffect.receive(character, caster, spell)
+    {character, events} = SpellEffect.receive(character, caster, spell, Time.now())
 
     character =
       character

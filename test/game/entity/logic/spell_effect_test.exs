@@ -20,7 +20,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
     }
   end
 
-  describe "receive/3" do
+  describe "receive/4" do
     test "lethal damage prevents later aura effects from being applied" do
       spell = %Spell{
         id: 133,
@@ -42,7 +42,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
 
       context = %CastContext{caster_guid: 999, caster_level: 10}
 
-      {target, events} = SpellEffect.receive(target_fixture(), context, spell)
+      {target, events} = SpellEffect.receive(target_fixture(), context, spell, 1_000)
 
       assert target.unit.health == 0
       assert target.unit.auras == []
@@ -69,7 +69,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
 
       context = %CastContext{caster_guid: 999, caster_level: 10}
 
-      {target, events} = SpellEffect.receive(target_fixture(), context, spell)
+      {target, events} = SpellEffect.receive(target_fixture(), context, spell, 1_000)
 
       assert target.unit.health == 0
       assert [%{type: :spell_damage, damage: 24, periodic?: true, spell_id: 10}] = events

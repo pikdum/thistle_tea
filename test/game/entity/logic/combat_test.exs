@@ -52,7 +52,7 @@ defmodule ThistleTea.Game.Entity.Logic.CombatTest do
 
     test "includes hit reaction events while target survives" do
       spell = damage_shield_spell()
-      {mob, _events} = Aura.apply_spell(mob(2, 100), 2, 10, spell)
+      {mob, _events} = Aura.apply_spell(mob(2, 100), 2, 10, spell, 1_000)
 
       {_mob, events} = Combat.receive_attack(mob, %{caster: 1, damage: 12})
 
@@ -70,7 +70,7 @@ defmodule ThistleTea.Game.Entity.Logic.CombatTest do
 
     test "does not include hit reaction events when target dies" do
       spell = damage_shield_spell()
-      {mob, _events} = Aura.apply_spell(mob(2, 10), 2, 10, spell)
+      {mob, _events} = Aura.apply_spell(mob(2, 10), 2, 10, spell, 1_000)
 
       {_mob, events} = Combat.receive_attack(mob, %{caster: 1, damage: 12})
 

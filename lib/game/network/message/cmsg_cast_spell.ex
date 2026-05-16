@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgCastSpell do
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Targets
+  alias ThistleTea.Game.Time
 
   require Logger
 
@@ -32,7 +33,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgCastSpell do
   def handle_spell_complete(%{character: character} = state) do
     character =
       character
-      |> SpellBT.complete_cast()
+      |> SpellBT.complete_cast(Time.now())
       |> EventSink.emit_pending()
 
     state

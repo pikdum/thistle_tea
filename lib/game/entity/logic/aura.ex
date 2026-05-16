@@ -13,7 +13,6 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Effect
-  alias ThistleTea.Game.Time
 
   require Logger
 
@@ -29,15 +28,14 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
 
   @negative_auras [:periodic_damage, :mod_root, :mod_decrease_speed, :mod_stun, :mod_fear]
 
-  def apply_spell(entity, %CastContext{} = context, %Spell{} = spell) do
+  def apply_spell(entity, %CastContext{} = context, %Spell{} = spell, now) when is_integer(now) do
     aura_effects = Spell.aura_effects(spell)
 
-    case build_auras(aura_effects) do
+    case build_auras(aura_effects, now) do
       [] ->
         {entity, []}
 
       auras ->
-        now = Time.now()
         target_guid = entity.object.guid
 
         holder = %Holder{
@@ -54,7 +52,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
     end
   end
 
-  def apply_spell(entity, caster_guid, caster_level, %Spell{} = spell) do
+  def apply_spell(entity, caster_guid, caster_level, %Spell{} = spell, now) when is_integer(now) do
     context = %CastContext{
       caster_guid: caster_guid,
       caster_level: caster_level,
@@ -62,7 +60,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
       spell: spell
     }
 
-    apply_spell(entity, context, spell)
+    apply_spell(entity, context, spell, now)
   end
 
   defp negative?(auras, caster_guid, target_guid) do
@@ -300,9 +298,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
   defp expires_at(_now, -1), do: -1
   defp expires_at(now, duration_ms) when is_integer(duration_ms), do: now + duration_ms
 
-  defp build_auras(effects) do
-    now = Time.now()
-
+  defp build_auras(effects, now) do
     Enum.reduce(effects, [], fn effect, acc ->
       case build_aura(effect, now) do
         nil -> acc
