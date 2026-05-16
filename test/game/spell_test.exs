@@ -14,4 +14,16 @@ defmodule ThistleTea.Game.SpellTest do
       assert Spell.school_mask(nil) == 0
     end
   end
+
+  describe "school_index/1" do
+    test "returns packet indexes for spell schools" do
+      assert Spell.school_index(:physical) == 0
+      assert Spell.school_index(:frost) == 4
+      assert Spell.school_index(%Spell{school: :arcane}) == 6
+    end
+
+    test "preserves integer school values" do
+      assert Spell.school_index(7) == 7
+    end
+  end
 end
