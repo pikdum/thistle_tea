@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
     :aura_slot,
     :duration_ms,
     :speed,
+    :rooted?,
     :attack
   ]
 
@@ -40,6 +41,10 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
 
   def movement_speed_changed(speed) when is_number(speed) do
     %__MODULE__{type: :movement_speed_changed, speed: speed}
+  end
+
+  def movement_root_changed(rooted?) when is_boolean(rooted?) do
+    %__MODULE__{type: :movement_root_changed, rooted?: rooted?}
   end
 
   def attack_start(source_guid, target_guid) when is_integer(source_guid) and is_integer(target_guid) do

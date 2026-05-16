@@ -53,6 +53,24 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
     }
   end
 
+  defp root_spell do
+    %Spell{
+      id: 122,
+      name: "Frost Nova",
+      school: :frost,
+      duration_ms: 8_000,
+      effects: [
+        %Effect{
+          index: 0,
+          type: :apply_aura,
+          base_points: 0,
+          die_sides: 0,
+          aura: :mod_root
+        }
+      ]
+    }
+  end
+
   describe "apply_spell/4" do
     test "appends a holder with the spell to the unit" do
       entity = fixture_entity()
@@ -126,29 +144,27 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
         |> put_in([Access.key!(:internal), Access.key!(:movement_start_time)], ThistleTea.Game.Time.now())
         |> put_in([Access.key!(:internal), Access.key!(:movement_start_position)], {0.0, 0.0, 0.0})
 
-      spell = %Spell{
-        id: 122,
-        name: "Frost Nova",
-        school: :frost,
-        duration_ms: 8_000,
-        effects: [
-          %Effect{
-            index: 0,
-            type: :apply_aura,
-            base_points: 0,
-            die_sides: 0,
-            aura: :mod_root
-          }
-        ]
-      }
+      spell = root_spell()
 
       {entity, events} = Aura.apply_spell(entity, 999, 1, spell)
 
-      assert [%{type: :movement_stopped}] = events
+      assert [%{type: :movement_stopped}, %{type: :movement_root_changed, rooted?: true}] = events
       assert (entity.movement_block.movement_flags &&& 0x08000000) != 0
       assert (entity.movement_block.movement_flags &&& 0x00400001) == 0
       assert entity.movement_block.spline_nodes == []
       assert entity.internal.movement_start_time == nil
+    end
+
+    test "expiring root aura emits an unroot event" do
+      entity = fixture_entity()
+      spell = root_spell()
+
+      {entity, _events} = Aura.apply_spell(entity, 999, 1, spell)
+      future = entity.unit.auras |> hd() |> Map.fetch!(:expires_at)
+      {entity, events} = Aura.expire_due(entity, future + 1)
+
+      assert [%{type: :movement_root_changed, rooted?: false}] = events
+      assert (entity.movement_block.movement_flags &&& 0x08000000) == 0
     end
   end
 

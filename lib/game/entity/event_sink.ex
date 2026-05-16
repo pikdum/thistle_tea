@@ -58,6 +58,18 @@ defmodule ThistleTea.Game.Entity.EventSink do
     entity
   end
 
+  def emit(%Character{object: %{guid: guid}} = entity, %Event{type: :movement_root_changed, rooted?: true}) do
+    Network.send_packet(%Message.SmsgForceMoveRoot{guid: guid})
+    entity
+  end
+
+  def emit(%Character{object: %{guid: guid}} = entity, %Event{type: :movement_root_changed, rooted?: false}) do
+    Network.send_packet(%Message.SmsgForceMoveUnroot{guid: guid})
+    entity
+  end
+
+  def emit(entity, %Event{type: :movement_root_changed}), do: entity
+
   def emit(%Character{object: %{guid: guid}} = entity, %Event{type: :movement_speed_changed, speed: speed})
       when is_number(speed) do
     Network.send_packet(%Message.SmsgForceRunSpeedChange{guid: guid, speed: speed})

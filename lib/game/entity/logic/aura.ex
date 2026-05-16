@@ -164,11 +164,12 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
         else: flags &&& bnot(@movement_flag_root)
 
     entity = %{entity | movement_block: %{mb | movement_flags: new_flags}}
+    root_events = if has_root? == was_rooted?, do: [], else: [Event.movement_root_changed(has_root?)]
 
     if has_root? and not was_rooted? do
-      {Movement.halt(entity), [Event.movement_stopped()]}
+      {Movement.halt(entity), [Event.movement_stopped() | root_events]}
     else
-      {entity, []}
+      {entity, root_events}
     end
   end
 
