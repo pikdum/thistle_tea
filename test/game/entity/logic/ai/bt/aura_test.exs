@@ -10,24 +10,24 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.AuraTest do
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Effect
-  alias ThistleTea.Game.Time
 
-  describe "tick/2" do
+  describe "tick/3" do
     test "queues periodic aura events on the entity" do
+      now = 1_000
       entity = fixture_entity()
       spell = dot_spell()
-      {entity, _events} = Aura.apply_spell(entity, 999, 1, spell, Time.now())
+      {entity, _events} = Aura.apply_spell(entity, 999, 1, spell, now)
 
       entity =
         update_in(entity.unit.auras, fn [holder] ->
           [
             update_in(holder.auras, fn [aura] ->
-              [%{aura | next_tick_at: Time.now() - 1}]
+              [%{aura | next_tick_at: now - 1}]
             end)
           ]
         end)
 
-      assert {:failure, entity, %Blackboard{}} = AuraBT.tick(entity, Blackboard.new())
+      assert {:failure, entity, %Blackboard{}} = AuraBT.tick(entity, Blackboard.new(), now)
 
       assert entity.unit.health == 50
 
@@ -46,7 +46,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.AuraTest do
     test "leaves entities without auras unchanged" do
       entity = fixture_entity()
 
-      assert {:failure, ^entity, %Blackboard{}} = AuraBT.tick(entity, Blackboard.new())
+      assert {:failure, ^entity, %Blackboard{}} = AuraBT.tick(entity, Blackboard.new(), 1_000)
     end
   end
 

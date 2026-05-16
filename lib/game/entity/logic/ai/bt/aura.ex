@@ -11,9 +11,15 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Aura do
   end
 
   def tick(%{unit: %Unit{auras: [_ | _]}} = entity, %Blackboard{} = blackboard) do
-    {entity, events} = AuraLogic.tick(entity, Time.now())
-    {:failure, Event.enqueue(entity, events), blackboard}
+    tick(entity, blackboard, Time.now())
   end
 
   def tick(entity, %Blackboard{} = blackboard), do: {:failure, entity, blackboard}
+
+  def tick(%{unit: %Unit{auras: [_ | _]}} = entity, %Blackboard{} = blackboard, now) when is_integer(now) do
+    {entity, events} = AuraLogic.tick(entity, now)
+    {:failure, Event.enqueue(entity, events), blackboard}
+  end
+
+  def tick(entity, %Blackboard{} = blackboard, _now), do: {:failure, entity, blackboard}
 end
