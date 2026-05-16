@@ -46,7 +46,9 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
 
       assert target.unit.health == 0
       assert target.unit.auras == []
-      assert [%{type: :spell_damage, damage: 50, source_guid: 999, target_guid: 1}] = events
+
+      assert [%{type: :spell_damage, damage: 50, source_guid: 999, target_guid: 1, periodic?: false}] =
+               events
     end
 
     test "persistent periodic area damage applies as spell damage for channel ticks" do
