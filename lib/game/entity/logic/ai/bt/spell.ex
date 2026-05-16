@@ -79,10 +79,12 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
   def complete_cast(character), do: character
 
   def complete_cast(%{internal: %Internal{}} = character, %Cast{} = casting) do
+    targets = resolve_targets(character, casting)
+
     character
     |> queue_cast_result(casting)
-    |> queue_spell_go(casting)
-    |> apply_spell_hit(casting)
+    |> queue_spell_go(casting, targets)
+    |> apply_spell_hit(casting, targets)
     |> clear_cast()
   end
 
@@ -102,10 +104,12 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
 
   defp channel_tick(%{internal: %Internal{}} = character, %Cast{} = casting, now) do
     if is_integer(casting.next_channel_tick_at) and now >= casting.next_channel_tick_at do
+      targets = resolve_targets(character, casting)
+
       character =
         character
-        |> maybe_send_channel_spell_go(casting)
-        |> apply_spell_hit(casting)
+        |> maybe_queue_channel_spell_go(casting, targets)
+        |> apply_spell_hit(casting, targets)
 
       casting = Cast.advance_channel_tick(casting, now)
       delay_ms = Cast.next_channel_delay(casting, now)
@@ -117,33 +121,30 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
 
   defp channel_tick(character, casting, now), do: {character, Cast.next_channel_delay(casting, now)}
 
-  defp maybe_send_channel_spell_go(character, %Cast{channel_go_sent?: false} = casting) do
-    queue_spell_go(character, casting)
+  defp maybe_queue_channel_spell_go(character, %Cast{channel_go_sent?: false} = casting, targets) do
+    queue_spell_go(character, casting, targets)
   end
 
-  defp maybe_send_channel_spell_go(character, _casting), do: character
+  defp maybe_queue_channel_spell_go(character, _casting, _targets), do: character
 
-  defp queue_spell_go(%{object: %{guid: guid}} = character, %Cast{spell: %Spell{id: spell_id}} = casting)
+  defp queue_spell_go(%{object: %{guid: guid}} = character, %Cast{spell: %Spell{id: spell_id}} = casting, targets)
        when is_integer(guid) do
-    hits = resolve_targets(character, casting)
     raw_targets = if is_binary(casting.targets.raw), do: casting.targets.raw, else: <<>>
 
-    Event.enqueue(character, Event.spell_go(guid, spell_id, hits, raw_targets))
+    Event.enqueue(character, Event.spell_go(guid, spell_id, targets, raw_targets))
   end
 
-  defp queue_spell_go(character, _casting), do: character
+  defp queue_spell_go(character, _casting, _targets), do: character
 
-  defp apply_spell_hit(%{object: %{guid: caster_guid}} = character, %Cast{spell: %Spell{} = spell} = casting)
-       when is_integer(caster_guid) do
-    targets = resolve_targets(character, casting)
-
+  defp apply_spell_hit(%{object: %{guid: caster_guid}} = character, %Cast{spell: %Spell{} = spell}, targets)
+       when is_integer(caster_guid) and is_list(targets) do
     Enum.reduce(targets, character, fn target_guid, caster ->
       context = CastContext.from_caster(caster, spell, target_guid)
       dispatch_to_target(caster, context, spell, target_guid)
     end)
   end
 
-  defp apply_spell_hit(character, _casting), do: character
+  defp apply_spell_hit(character, _casting, _targets), do: character
 
   defp dispatch_to_target(character, %CastContext{caster_guid: caster_guid} = context, spell, target_guid)
        when target_guid == caster_guid do
