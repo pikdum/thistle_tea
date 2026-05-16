@@ -23,6 +23,7 @@ defmodule ThistleTea.Game.Network.Server do
   alias ThistleTea.Game.Network.Opcodes
   alias ThistleTea.Game.Network.Packet
   alias ThistleTea.Game.Network.UpdateObject
+  alias ThistleTea.Game.Spell.Cast
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Metadata
@@ -487,7 +488,7 @@ defmodule ThistleTea.Game.Network.Server do
     end
   end
 
-  defp player_needs_tick?(%{internal: %Internal{casting: casting}}) when is_map(casting) do
+  defp player_needs_tick?(%{internal: %Internal{casting: %Cast{}}}) do
     true
   end
 
@@ -504,7 +505,7 @@ defmodule ThistleTea.Game.Network.Server do
          internal: %Internal{casting: casting, in_combat: in_combat},
          unit: %Unit{target: target, auras: [_ | _]}
        }) do
-    not is_map(casting) and not (in_combat == true and is_integer(target) and target > 0)
+    not is_struct(casting, Cast) and not (in_combat == true and is_integer(target) and target > 0)
   end
 
   defp player_only_needs_aura_tick?(_character), do: false

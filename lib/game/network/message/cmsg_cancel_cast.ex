@@ -3,6 +3,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgCancelCast do
 
   alias ThistleTea.Game.Entity.Logic.AI.BT.Spell, as: SpellBT
   alias ThistleTea.Game.Network.Message
+  alias ThistleTea.Game.Spell.Cast
 
   require Logger
 
@@ -29,7 +30,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgCancelCast do
         state
 
       casting ->
-        spell_id = Map.get(casting, :spell_id, 0)
+        spell_id = Cast.spell_id(casting)
 
         Network.send_packet(%Message.SmsgCastResult{
           spell: spell_id,

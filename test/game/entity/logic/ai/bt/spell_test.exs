@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AI.BT.Spell, as: SpellBT
   alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.Cast
   alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.Spell.Targets
   alias ThistleTea.Game.Time
@@ -48,7 +49,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
 
       mob = %Mob{
         internal: %Internal{
-          casting: %{
+          casting: %Cast{
             spell: spell,
             targets: %Targets{raw: <<0::little-size(16)>>},
             channel_ms: 8_000,
@@ -71,7 +72,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
         movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
         internal: %Internal{
           map: 0,
-          casting: %{
+          casting: %Cast{
             spell: spell,
             targets: %Targets{raw: <<0::little-size(16)>>, unit_guid: 1},
             channel_ms: 8_000,
