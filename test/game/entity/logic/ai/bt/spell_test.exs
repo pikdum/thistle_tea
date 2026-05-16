@@ -44,8 +44,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
     end
   end
 
-  describe "cast_tick/2" do
+  describe "cast_tick/3" do
     test "ending a channel clears casting without applying a final spell hit" do
+      now = 1_000
       spell = %Spell{id: 10, attributes: MapSet.new([:channeled])}
 
       mob = %Mob{
@@ -54,17 +55,17 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
             spell: spell,
             targets: %Targets{raw: <<0::little-size(16)>>},
             channel_ms: 8_000,
-            ends_at: Time.now() - 1
+            ends_at: now - 1
           }
         }
       }
 
-      assert {:success, mob, %Blackboard{}} = SpellBT.cast_tick(mob, Blackboard.new())
+      assert {:success, mob, %Blackboard{}} = SpellBT.cast_tick(mob, Blackboard.new(), now)
       assert mob.internal.casting == nil
     end
 
     test "first channel tick marks spell go as sent and advances the next tick" do
-      now = Time.now()
+      now = 1_000
       spell = %Spell{id: 10, attributes: MapSet.new([:channeled]), effects: []}
 
       mob = %Mob{
@@ -85,7 +86,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
         }
       }
 
-      assert {{:running, delay_ms}, mob, %Blackboard{}} = SpellBT.cast_tick(mob, Blackboard.new())
+      assert {{:running, delay_ms}, mob, %Blackboard{}} = SpellBT.cast_tick(mob, Blackboard.new(), now)
       assert delay_ms > 0
       assert mob.internal.casting.channel_go_sent? == true
       assert mob.internal.casting.next_channel_tick_at > now

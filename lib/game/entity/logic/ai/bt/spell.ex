@@ -51,8 +51,13 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
 
   def cast_tick(%{internal: %Internal{casting: casting}} = character, %Blackboard{} = blackboard)
       when is_struct(casting, Cast) do
-    now = Time.now()
+    cast_tick(character, blackboard, Time.now())
+  end
 
+  def cast_tick(character, blackboard), do: {:failure, character, blackboard}
+
+  def cast_tick(%{internal: %Internal{casting: casting}} = character, %Blackboard{} = blackboard, now)
+      when is_struct(casting, Cast) and is_integer(now) do
     cond do
       Cast.channeled?(casting) and now >= casting.ends_at ->
         {:success, clear_cast(character), blackboard}
@@ -71,7 +76,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
     end
   end
 
-  def cast_tick(character, blackboard), do: {:failure, character, blackboard}
+  def cast_tick(character, blackboard, _now), do: {:failure, character, blackboard}
 
   def complete_cast(%{internal: %Internal{casting: %Cast{} = casting}} = character, now) when is_integer(now) do
     complete_cast(character, casting, now)
