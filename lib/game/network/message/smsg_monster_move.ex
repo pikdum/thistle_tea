@@ -8,7 +8,7 @@ defmodule ThistleTea.Game.Network.Message.SmsgMonsterMove do
   alias ThistleTea.Game.Entity.Data.Component.Object
 
   # @move_type_normal 0
-  # @move_type_stop 1
+  @move_type_stop 1
   @move_type_facing_spot 2
   @move_type_facing_target 3
   @move_type_facing_angle 4
@@ -69,6 +69,31 @@ defmodule ThistleTea.Game.Network.Message.SmsgMonsterMove do
     spline_flags
     |> bor(@spline_flag_runmode)
     |> band(bnot(@spline_flag_final_facing))
+  end
+
+  def build_stop(%{
+        object: %Object{guid: guid},
+        movement_block: %MovementBlock{position: {x, y, z, _o}},
+        internal: %Internal{spline_id: spline_id}
+      }) do
+    %__MODULE__{
+      guid: guid,
+      spline_point: {x, y, z},
+      spline_id: spline_id || 0,
+      move_type: @move_type_stop,
+      splines: []
+    }
+  end
+
+  def to_binary(%__MODULE__{guid: guid, spline_point: {x0, y0, z0}, spline_id: spline_id, move_type: @move_type_stop}) do
+    BinaryUtils.pack_guid(guid) <>
+      <<
+        x0::little-float-size(32),
+        y0::little-float-size(32),
+        z0::little-float-size(32),
+        spline_id::little-size(32),
+        @move_type_stop::little-size(8)
+      >>
   end
 
   def to_binary(%__MODULE__{

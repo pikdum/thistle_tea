@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.Core
+  alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Spell
@@ -129,14 +130,21 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
 
   defp sync_movement_flags(%{movement_block: %MovementBlock{} = mb, unit: %Unit{auras: holders}} = entity) do
     flags = mb.movement_flags || 0
+    was_rooted? = (flags &&& @movement_flag_root) != 0
     has_root? = Enum.any?(holders, &has_aura_type?(&1, :mod_root))
 
-    flags =
+    new_flags =
       if has_root?,
         do: flags ||| @movement_flag_root,
         else: flags &&& bnot(@movement_flag_root)
 
-    %{entity | movement_block: %{mb | movement_flags: flags}}
+    entity = %{entity | movement_block: %{mb | movement_flags: new_flags}}
+
+    if has_root? and not was_rooted? do
+      Movement.halt(entity)
+    else
+      entity
+    end
   end
 
   defp sync_movement_flags(entity), do: entity
