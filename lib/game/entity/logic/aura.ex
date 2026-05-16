@@ -12,6 +12,8 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
 
+  require Logger
+
   @max_slots 48
 
   @aflag_cancelable 0x01
@@ -43,9 +45,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
   end
 
   defp do_apply(%{unit: %Unit{auras: existing}} = entity, %Holder{} = holder) when is_list(existing) do
-    slot = next_free_slot(existing)
-    holder = %{holder | slot: slot}
-    holders = existing ++ [holder]
+    holders = upsert_holder(existing, holder)
     unit = sync_unit(%{entity.unit | auras: holders})
 
     entity
@@ -56,6 +56,25 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
   defp do_apply(entity, %Holder{} = holder) do
     do_apply(%{entity | unit: %{entity.unit | auras: []}}, holder)
   end
+
+  defp upsert_holder(existing, %Holder{spell: %Spell{id: spell_id}, caster_guid: caster_guid} = incoming) do
+    case Enum.find_index(existing, &same_source?(&1, spell_id, caster_guid)) do
+      nil ->
+        slot = next_free_slot(existing)
+        existing ++ [%{incoming | slot: slot}]
+
+      index ->
+        old = Enum.at(existing, index)
+        refreshed = %{incoming | slot: old.slot}
+        List.replace_at(existing, index, refreshed)
+    end
+  end
+
+  defp same_source?(%Holder{spell: %Spell{id: id}, caster_guid: caster}, spell_id, caster_guid) do
+    id == spell_id and caster == caster_guid
+  end
+
+  defp same_source?(_holder, _spell_id, _caster_guid), do: false
 
   def notify_self_durations(%ThistleTea.Character{unit: %Unit{auras: holders}} = entity) when is_list(holders) do
     Enum.each(holders, &send_duration_update/1)
@@ -145,15 +164,26 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
     entity
   end
 
-  defp send_duration_update(%Holder{slot: slot, applied_at: applied_at, expires_at: expires_at})
+  defp send_duration_update(%Holder{
+         slot: slot,
+         applied_at: applied_at,
+         expires_at: expires_at,
+         spell: %Spell{id: spell_id, name: name}
+       })
        when is_integer(slot) and is_integer(applied_at) and is_integer(expires_at) and expires_at > 0 do
+    duration = max(expires_at - applied_at, 0)
+    Logger.info("SMSG_UPDATE_AURA_DURATION: spell=#{spell_id} (#{name}) slot=#{slot} duration=#{duration}ms")
+
     Network.send_packet(%Message.SmsgUpdateAuraDuration{
       aura_slot: slot,
-      duration_ms: max(expires_at - applied_at, 0)
+      duration_ms: duration
     })
   end
 
-  defp send_duration_update(_holder), do: :ok
+  defp send_duration_update(holder) do
+    Logger.warning("send_duration_update skipped: #{inspect(holder)}")
+    :ok
+  end
 
   defp school_index(:physical), do: 0
   defp school_index(:holy), do: 1
@@ -204,11 +234,6 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
   end
 
   defp build_aura(%Effect{aura: nil}, _now), do: nil
-
-  defp build_aura(%Effect{aura: aura, base_points: base}, _now)
-       when aura in [:periodic_damage, :periodic_heal] and base <= 0 do
-    nil
-  end
 
   defp build_aura(%Effect{} = effect, now) do
     %Aura{
