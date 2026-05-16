@@ -137,6 +137,11 @@ defmodule ThistleTea.Game.Entity.EventSink do
     entity
   end
 
+  def emit(entity, %Event{type: :deliver_spell} = event) do
+    Entity.receive_spell(event.target_guid, event.cast_context, event.spell)
+    entity
+  end
+
   def emit(entity, %Event{type: :attack_start} = event) do
     %Message.SmsgAttackstart{
       attacker: event.source_guid,

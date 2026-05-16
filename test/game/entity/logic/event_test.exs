@@ -2,6 +2,8 @@ defmodule ThistleTea.Game.Entity.Logic.EventTest do
   use ExUnit.Case, async: true
 
   alias ThistleTea.Game.Entity.Logic.Event
+  alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.CastContext
 
   describe "monster_move/1" do
     test "returns a monster movement event with packet options" do
@@ -38,6 +40,16 @@ defmodule ThistleTea.Game.Entity.Logic.EventTest do
       attack = %{caster: 1, min_damage: 2, max_damage: 3}
 
       assert %Event{type: :deliver_attack, target_guid: 2, attack: ^attack} = Event.deliver_attack(2, attack)
+    end
+  end
+
+  describe "deliver_spell/3" do
+    test "returns a spell delivery event" do
+      context = %CastContext{caster_guid: 1, target_guid: 2}
+      spell = %Spell{id: 133}
+
+      assert %Event{type: :deliver_spell, target_guid: 2, cast_context: ^context, spell: ^spell} =
+               Event.deliver_spell(2, context, spell)
     end
   end
 end

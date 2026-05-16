@@ -16,6 +16,8 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
     :hit_guids,
     :raw_targets,
     :update_type,
+    :cast_context,
+    :spell,
     :attack
   ]
 
@@ -76,6 +78,10 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
 
   def deliver_attack(target_guid, attack) when is_integer(target_guid) and is_map(attack) do
     %__MODULE__{type: :deliver_attack, target_guid: target_guid, attack: attack}
+  end
+
+  def deliver_spell(target_guid, cast_context, spell) when is_integer(target_guid) do
+    %__MODULE__{type: :deliver_spell, target_guid: target_guid, cast_context: cast_context, spell: spell}
   end
 
   def attack_start(source_guid, target_guid) when is_integer(source_guid) and is_integer(target_guid) do

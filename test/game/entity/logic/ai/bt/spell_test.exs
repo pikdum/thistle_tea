@@ -153,5 +153,30 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
                %Event{type: :object_update, update_type: :values}
              ] = mob.internal.events
     end
+
+    test "queues remote spell delivery events after spell go" do
+      spell = %Spell{id: 133, effects: []}
+
+      casting = %Cast{
+        spell: spell,
+        targets: %Targets{raw: <<0::little-size(16)>>, unit_guid: 2},
+        ends_at: Time.now()
+      }
+
+      mob = %Mob{
+        object: %Object{guid: 1},
+        unit: %Unit{health: 20, max_health: 20},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+        internal: %Internal{map: 0, casting: casting}
+      }
+
+      mob = SpellBT.complete_cast(mob, casting)
+
+      assert [
+               %Event{type: :spell_cast_result},
+               %Event{type: :spell_go, hit_guids: [2]},
+               %Event{type: :deliver_spell, target_guid: 2, spell: ^spell}
+             ] = mob.internal.events
+    end
   end
 end

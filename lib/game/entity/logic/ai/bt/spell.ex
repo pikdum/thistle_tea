@@ -1,5 +1,4 @@
 defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
-  alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
@@ -157,8 +156,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
   end
 
   defp dispatch_to_target(character, %CastContext{} = context, spell, target_guid) when is_integer(target_guid) do
-    Entity.receive_spell(target_guid, context, spell)
-    character
+    Event.enqueue(character, Event.deliver_spell(target_guid, context, spell))
   end
 
   defp dispatch_to_target(character, _context, _spell, _target_guid), do: character
