@@ -3,6 +3,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
+  alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.SpellEffect
   alias ThistleTea.Game.Network
@@ -133,6 +134,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
         character
         |> SpellEffect.receive(guid, spell)
         |> broadcast_self_update()
+        |> AuraLogic.notify_self_durations()
 
       is_integer(target) ->
         Entity.receive_spell(target, guid, spell)

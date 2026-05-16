@@ -82,7 +82,16 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
   defp maybe_dead(%{internal: %Internal{}, unit: %Unit{health: 0}, movement_block: %MovementBlock{}} = entity) do
     entity = Movement.sync_position(entity)
     %{internal: internal, unit: unit, movement_block: mb} = entity
-    unit = %{unit | target: 0}
+
+    unit = %{
+      unit
+      | target: 0,
+        auras: [],
+        aura: nil,
+        aura_flags: nil,
+        aura_levels: nil,
+        aura_applications: nil
+    }
 
     internal = %{
       internal

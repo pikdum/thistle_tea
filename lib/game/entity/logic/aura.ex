@@ -13,7 +13,11 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
   alias ThistleTea.Game.World
 
   @max_slots 48
-  @flag_active 0x09
+
+  @aflag_cancelable 0x01
+  @aflag_eff_index_2 0x02
+  @aflag_eff_index_1 0x04
+  @aflag_eff_index_0 0x08
 
   def apply_spell(entity, caster_guid, caster_level, %Spell{} = spell) do
     aura_effects = Spell.aura_effects(spell)
@@ -47,12 +51,18 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
     entity
     |> Map.put(:unit, unit)
     |> Core.mark_broadcast_update()
-    |> send_duration_update(holder)
   end
 
   defp do_apply(entity, %Holder{} = holder) do
     do_apply(%{entity | unit: %{entity.unit | auras: []}}, holder)
   end
+
+  def notify_self_durations(%ThistleTea.Character{unit: %Unit{auras: holders}} = entity) when is_list(holders) do
+    Enum.each(holders, &send_duration_update/1)
+    entity
+  end
+
+  def notify_self_durations(entity), do: entity
 
   def expire_due(%{unit: %Unit{auras: holders}} = entity, now) when is_list(holders) do
     {kept, expired} = Enum.split_with(holders, &alive?(&1, now))
@@ -135,21 +145,15 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
     entity
   end
 
-  defp send_duration_update(%ThistleTea.Character{} = entity, %Holder{
-         slot: slot,
-         applied_at: applied_at,
-         expires_at: expires_at
-       })
+  defp send_duration_update(%Holder{slot: slot, applied_at: applied_at, expires_at: expires_at})
        when is_integer(slot) and is_integer(applied_at) and is_integer(expires_at) and expires_at > 0 do
     Network.send_packet(%Message.SmsgUpdateAuraDuration{
       aura_slot: slot,
       duration_ms: max(expires_at - applied_at, 0)
     })
-
-    entity
   end
 
-  defp send_duration_update(entity, _holder), do: entity
+  defp send_duration_update(_holder), do: :ok
 
   defp school_index(:physical), do: 0
   defp school_index(:holy), do: 1
@@ -201,8 +205,8 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
 
   defp build_aura(%Effect{aura: nil}, _now), do: nil
 
-  defp build_aura(%Effect{aura: aura, base_points: 0, die_sides: 0}, _now)
-       when aura in [:periodic_damage, :periodic_heal] do
+  defp build_aura(%Effect{aura: aura, base_points: base}, _now)
+       when aura in [:periodic_damage, :periodic_heal] and base <= 0 do
     nil
   end
 
@@ -304,12 +308,23 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
 
   defp pack_aura_flags(holders) do
     int =
-      Enum.reduce(holders, 0, fn %Holder{slot: slot}, acc ->
-        acc ||| @flag_active <<< (4 * slot)
+      Enum.reduce(holders, 0, fn %Holder{} = holder, acc ->
+        acc ||| holder_flag_bits(holder) <<< (4 * holder.slot)
       end)
 
     <<int::little-size(24 * 8)>>
   end
+
+  defp holder_flag_bits(%Holder{auras: auras}) do
+    Enum.reduce(auras, @aflag_cancelable, fn %Aura{index: index}, acc ->
+      acc ||| aura_index_bit(index)
+    end)
+  end
+
+  defp aura_index_bit(0), do: @aflag_eff_index_0
+  defp aura_index_bit(1), do: @aflag_eff_index_1
+  defp aura_index_bit(2), do: @aflag_eff_index_2
+  defp aura_index_bit(_), do: 0
 
   defp pack_aura_levels(holders) do
     for slot <- 0..(@max_slots - 1), into: <<>> do
