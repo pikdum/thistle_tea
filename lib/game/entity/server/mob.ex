@@ -20,6 +20,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
   @ai_tick_ms 100
   @ai_tick_max_ms 1_000
+  @default_respawn_delay_ms 120_000
 
   def start_link(%Mob{} = state) do
     GenServer.start_link(__MODULE__, state, name: EntityRegistry.via(state.object.guid))
@@ -67,8 +68,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     state =
       state
       |> Core.take_damage(10)
-      |> maybe_decrement_on_death(target)
-      |> maybe_reward_kill(target, dead_before)
+      |> handle_death_transition(target, dead_before)
 
     schedule_ai_tick(0)
     {:noreply, state, {:continue, :maybe_broadcast}}
@@ -89,8 +89,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     state =
       state
       |> Core.take_damage(damage)
-      |> maybe_decrement_on_death(target)
-      |> maybe_reward_kill(target, dead_before)
+      |> handle_death_transition(target, dead_before)
 
     Combat.attacker_state_update(Map.get(attack, :caster, 0), state.object.guid, damage, attack)
     |> World.broadcast_packet(state)
@@ -108,6 +107,22 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     {:noreply, state, {:continue, :maybe_broadcast}}
   rescue
     _ -> {:noreply, state}
+  end
+
+  def handle_info(:respawn, %Mob{} = state) do
+    state =
+      if Core.dead?(state) do
+        state
+        |> Mob.respawn()
+        |> BT.init(MobBT.tree())
+        |> put_spawn_position()
+        |> broadcast_respawn()
+      else
+        clear_respawn_ref(state)
+      end
+
+    schedule_ai_tick(0)
+    {:noreply, state}
   end
 
   def handle_info({:event_stop, _event}, state) do
@@ -150,6 +165,17 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
   defp ai_tick_delay(_status), do: @ai_tick_ms
 
+  defp put_spawn_position(%Mob{} = state) do
+    Core.set_position(state)
+    update_metadata(state)
+    state
+  end
+
+  defp broadcast_respawn(%Mob{} = state) do
+    Core.update_object(state, :create_object2) |> World.broadcast_packet(state)
+    state
+  end
+
   defp engage_combat(%Mob{unit: %Unit{target: current_target} = unit, internal: internal} = state, caster)
        when is_integer(caster) do
     now = Time.now()
@@ -191,21 +217,58 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
   defp update_attacker_count(state, _current_target, _caster), do: state
 
-  defp maybe_decrement_on_death(state, target) do
-    if Core.dead?(state) and is_integer(target) and target > 0 do
-      Metadata.decrement(target, :attacker_count, 0)
+  defp handle_death_transition(%Mob{} = state, target, false) do
+    if Core.dead?(state) do
+      state
+      |> maybe_decrement_on_death(target)
+      |> maybe_reward_kill(target)
+      |> schedule_respawn()
+    else
+      state
     end
+  end
 
+  defp handle_death_transition(%Mob{} = state, _target, _dead_before), do: state
+
+  defp maybe_decrement_on_death(%Mob{} = state, target) when is_integer(target) and target > 0 do
+    Metadata.decrement(target, :attacker_count, 0)
     state
   end
 
-  defp maybe_reward_kill(%Mob{} = state, target, false) when is_integer(target) and target > 0 do
-    if Core.dead?(state) and Guid.entity_type(target) == :player do
+  defp maybe_decrement_on_death(%Mob{} = state, _target), do: state
+
+  defp maybe_reward_kill(%Mob{} = state, target) when is_integer(target) and target > 0 do
+    if Guid.entity_type(target) == :player do
       Entity.reward_kill(target, state)
     end
 
     state
   end
 
-  defp maybe_reward_kill(%Mob{} = state, _target, _dead_before), do: state
+  defp maybe_reward_kill(%Mob{} = state, _target), do: state
+
+  defp schedule_respawn(%Mob{internal: %Internal{respawn_ref: ref}} = state) when is_reference(ref) do
+    state
+  end
+
+  defp schedule_respawn(%Mob{internal: %Internal{} = internal} = state) do
+    ref = Process.send_after(self(), :respawn, respawn_delay_ms(internal.respawn_delay_ms))
+    %{state | internal: %{internal | respawn_ref: ref}}
+  end
+
+  defp clear_respawn_ref(%Mob{internal: %Internal{} = internal} = state) do
+    %{state | internal: %{internal | respawn_ref: nil}}
+  end
+
+  defp respawn_delay_ms(delay) when is_integer(delay) and delay >= 0, do: delay
+  defp respawn_delay_ms(_delay), do: @default_respawn_delay_ms
+
+  defp update_metadata(%Mob{} = state) do
+    Metadata.update(state.object.guid, %{
+      bounding_radius: state.unit.bounding_radius,
+      combat_reach: state.unit.combat_reach,
+      level: state.unit.level,
+      alive?: state.unit.health > 0
+    })
+  end
 end
