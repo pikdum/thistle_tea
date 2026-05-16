@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
   alias ThistleTea.Game.Entity.Logic.MeleeSpell
   alias ThistleTea.Game.Entity.Logic.SpellEffect
   alias ThistleTea.Game.Entity.Logic.SpellTarget
+  alias ThistleTea.Game.Entity.SpellTargetResolver
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Cast
   alias ThistleTea.Game.Spell.CastContext
@@ -170,7 +171,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
 
   defp resolve_targets(caster, %Cast{spell: %Spell{} = spell, targets: %Targets{} = targets}) do
     query = SpellTarget.target_query(spell, targets)
-    SpellTarget.resolve_query(caster, query)
+    SpellTargetResolver.resolve_query(caster, query)
   end
 
   defp resolve_targets(_caster, _casting), do: []
