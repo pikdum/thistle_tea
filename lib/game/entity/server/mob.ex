@@ -97,8 +97,11 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
       |> Core.take_damage(damage)
       |> handle_death_transition(target, dead_before)
 
-    Combat.attacker_state_update(Map.get(attack, :caster, 0), state.object.guid, damage, attack)
-    |> World.broadcast_packet(state)
+    state =
+      EventSink.emit(
+        state,
+        Combat.attacker_state_update(Map.get(attack, :caster, 0), state.object.guid, damage, attack)
+      )
 
     schedule_ai_tick(0)
     {:noreply, state, {:continue, :maybe_broadcast}}
@@ -109,6 +112,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     state = Movement.sync_position(state)
     Core.set_position(state)
     {status, state} = BT.tick(behavior_tree, state)
+    state = EventSink.emit_pending(state)
     schedule_ai_tick(ai_tick_delay(status))
     {:noreply, state, {:continue, :maybe_broadcast}}
   rescue

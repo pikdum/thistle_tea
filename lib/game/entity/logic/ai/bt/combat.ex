@@ -6,9 +6,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.Combat, as: CombatLogic
-  alias ThistleTea.Game.Network
-  alias ThistleTea.Game.Network.Opcodes
-  alias ThistleTea.Game.Network.Packet
+  alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Metadata
 
@@ -52,7 +50,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
 
   def melee_attack(%{unit: %Unit{target: target}} = state, %Blackboard{} = blackboard)
       when is_integer(target) and target > 0 do
-    blackboard = maybe_start_melee_attack(state, target, blackboard)
+    {state, blackboard} = maybe_start_melee_attack(state, target, blackboard)
     in_range = in_combat_range?(state, blackboard)
     attack_ready = Blackboard.ready_for?(blackboard, :next_attack_at)
 
@@ -91,19 +89,19 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
     {status, state, blackboard}
   end
 
-  defp maybe_start_melee_attack(_state, target, %Blackboard{attack_started: true} = blackboard)
+  defp maybe_start_melee_attack(state, target, %Blackboard{attack_started: true} = blackboard)
        when is_integer(target) do
-    blackboard
+    {state, blackboard}
   end
 
   defp maybe_start_melee_attack(%{object: %{guid: guid}} = state, target, %Blackboard{} = blackboard)
        when is_integer(target) do
-    CombatLogic.attack_start(guid, target)
-    |> World.broadcast_packet(state)
+    state = Event.enqueue(state, CombatLogic.attack_start(guid, target))
 
     blackboard
     |> Map.put(:attack_started, true)
     |> maybe_start_attack_timer(state)
+    |> then(&{state, &1})
   end
 
   defp maybe_start_attack_timer(%Blackboard{next_attack_at: 0} = blackboard, state) do
@@ -113,19 +111,15 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
 
   defp maybe_start_attack_timer(blackboard, _state), do: blackboard
 
+  defp handle_out_of_range(%Character{} = state, blackboard) do
+    blackboard = Blackboard.put_next_at(blackboard, :next_attack_at, @attack_retry_delay_ms)
+    {Event.enqueue(state, Event.attack_not_in_range()), blackboard}
+  end
+
   defp handle_out_of_range(state, blackboard) do
     blackboard = Blackboard.put_next_at(blackboard, :next_attack_at, @attack_retry_delay_ms)
-    {send_out_of_range(state), blackboard}
+    {state, blackboard}
   end
-
-  defp send_out_of_range(%Character{} = state) do
-    Packet.build(<<>>, Opcodes.get(:SMSG_ATTACKSWING_NOTINRANGE))
-    |> Network.send_packet()
-
-    state
-  end
-
-  defp send_out_of_range(state), do: state
 
   defp send_melee_attack(state, target) when is_integer(target) do
     attack = melee_attack_payload(state)

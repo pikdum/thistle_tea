@@ -4,7 +4,14 @@ defmodule ThistleTea.Game.Entity.EventSink do
   alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
+  alias ThistleTea.Game.Network.Opcodes
+  alias ThistleTea.Game.Network.Packet
   alias ThistleTea.Game.World
+
+  def emit_pending(entity) do
+    {entity, events} = Event.drain(entity)
+    emit(entity, events)
+  end
 
   def emit(entity, events) when is_list(events) do
     Enum.each(events, &emit(entity, &1))
@@ -45,6 +52,51 @@ defmodule ThistleTea.Game.Entity.EventSink do
 
   def emit(%Character{} = entity, %Event{type: :movement_stopped}) do
     World.update_position(entity)
+    entity
+  end
+
+  def emit(entity, %Event{type: :attack_start} = event) do
+    %Message.SmsgAttackstart{
+      attacker: event.source_guid,
+      victim: event.target_guid
+    }
+    |> World.broadcast_packet(entity)
+
+    entity
+  end
+
+  def emit(entity, %Event{type: :attacker_state_update} = event) do
+    attack = event.attack || %{}
+    damage = event.damage || 0
+
+    %Message.SmsgAttackerstateupdate{
+      attacker: event.source_guid,
+      target: event.target_guid,
+      hit_info: Map.get(attack, :hit_info, 0x2),
+      total_damage: damage,
+      damages: [
+        %{
+          spell_school_mask: Map.get(attack, :spell_school_mask, 0),
+          damage_float: damage * 1.0,
+          damage_uint: damage,
+          absorb: Map.get(attack, :absorb, 0),
+          resist: Map.get(attack, :resist, 0)
+        }
+      ],
+      damage_state: Map.get(attack, :damage_state, 0),
+      unknown1: Map.get(attack, :unknown1, 0),
+      spell_id: Map.get(attack, :spell_id, 0),
+      blocked_amount: Map.get(attack, :blocked_amount, 0)
+    }
+    |> World.broadcast_packet(entity)
+
+    entity
+  end
+
+  def emit(entity, %Event{type: :attack_not_in_range}) do
+    Packet.build(<<>>, Opcodes.get(:SMSG_ATTACKSWING_NOTINRANGE))
+    |> Network.send_packet()
+
     entity
   end
 

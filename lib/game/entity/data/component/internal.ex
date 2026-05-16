@@ -25,6 +25,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal do
     :blackboard,
     :movement_start_time,
     :movement_start_position,
+    events: [],
     broadcast_update?: false,
     spline_id: 0,
     godmode: false

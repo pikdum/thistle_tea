@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Network.Server do
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Combat
@@ -221,8 +222,11 @@ defmodule ThistleTea.Game.Network.Server do
     damage = Combat.attack_damage(attack)
     character = Core.take_damage(character, damage)
 
-    Combat.attacker_state_update(Map.get(attack, :caster, 0), state.guid, damage, attack)
-    |> World.broadcast_packet(character)
+    character =
+      EventSink.emit(
+        character,
+        Combat.attacker_state_update(Map.get(attack, :caster, 0), state.guid, damage, attack)
+      )
 
     {:noreply, {socket, %{state | character: character}}, {:continue, :maybe_broadcast_update}}
   end
@@ -330,6 +334,7 @@ defmodule ThistleTea.Game.Network.Server do
   @impl GenServer
   def handle_info(:player_tick, {socket, %{character: character} = state}) do
     {status, character} = tick_player(character)
+    character = EventSink.emit_pending(character)
     state = Map.put(state, :character, character)
     state = schedule_player_tick(state, character, status)
     {:noreply, {socket, state}, socket.read_timeout}

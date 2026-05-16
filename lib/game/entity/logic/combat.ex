@@ -1,7 +1,7 @@
 defmodule ThistleTea.Game.Entity.Logic.Combat do
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.Math
-  alias ThistleTea.Game.Network.Message
 
   @default_attack_speed_ms 2000
   @default_damage 2
@@ -31,28 +31,10 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
   def attack_damage(_attack), do: @default_damage
 
   def attack_start(attacker, target) when is_integer(attacker) and is_integer(target) do
-    %Message.SmsgAttackstart{attacker: attacker, victim: target}
+    Event.attack_start(attacker, target)
   end
 
   def attacker_state_update(attacker, target, damage, attack \\ %{}) when is_integer(attacker) and is_integer(target) do
-    %Message.SmsgAttackerstateupdate{
-      attacker: attacker,
-      target: target,
-      hit_info: Map.get(attack, :hit_info, 0x2),
-      total_damage: damage,
-      damages: [
-        %{
-          spell_school_mask: Map.get(attack, :spell_school_mask, 0),
-          damage_float: damage * 1.0,
-          damage_uint: damage,
-          absorb: Map.get(attack, :absorb, 0),
-          resist: Map.get(attack, :resist, 0)
-        }
-      ],
-      damage_state: Map.get(attack, :damage_state, 0),
-      unknown1: Map.get(attack, :unknown1, 0),
-      spell_id: Map.get(attack, :spell_id, 0),
-      blocked_amount: Map.get(attack, :blocked_amount, 0)
-    }
+    Event.attacker_state_update(attacker, target, damage, attack)
   end
 end

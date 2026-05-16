@@ -8,7 +8,8 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
     :damage,
     :periodic?,
     :aura_slot,
-    :duration_ms
+    :duration_ms,
+    :attack
   ]
 
   def spell_damage(source_guid, target_guid, spell, damage, opts \\ []) do
@@ -34,4 +35,43 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
   def movement_stopped do
     %__MODULE__{type: :movement_stopped}
   end
+
+  def attack_start(source_guid, target_guid) when is_integer(source_guid) and is_integer(target_guid) do
+    %__MODULE__{type: :attack_start, source_guid: source_guid, target_guid: target_guid}
+  end
+
+  def attack_not_in_range do
+    %__MODULE__{type: :attack_not_in_range}
+  end
+
+  def attacker_state_update(source_guid, target_guid, damage, attack \\ %{})
+      when is_integer(source_guid) and is_integer(target_guid) do
+    %__MODULE__{
+      type: :attacker_state_update,
+      source_guid: source_guid,
+      target_guid: target_guid,
+      damage: damage,
+      attack: attack
+    }
+  end
+
+  def enqueue(entity, events) when is_list(events) do
+    Enum.reduce(events, entity, &enqueue(&2, &1))
+  end
+
+  def enqueue(%{internal: %{events: events} = internal} = entity, %__MODULE__{} = event) when is_list(events) do
+    %{entity | internal: %{internal | events: events ++ [event]}}
+  end
+
+  def enqueue(%{internal: internal} = entity, %__MODULE__{} = event) do
+    %{entity | internal: %{internal | events: [event]}}
+  end
+
+  def enqueue(entity, _event), do: entity
+
+  def drain(%{internal: %{events: events} = internal} = entity) when is_list(events) do
+    {%{entity | internal: %{internal | events: []}}, events}
+  end
+
+  def drain(entity), do: {entity, []}
 end
