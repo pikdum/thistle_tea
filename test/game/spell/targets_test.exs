@@ -13,6 +13,14 @@ defmodule ThistleTea.Game.Spell.TargetsTest do
       assert targets.unit_guid == 123
     end
 
+    test "short payload falls back to self target" do
+      targets = Targets.parse(<<>>, 123)
+
+      assert targets.flags == 0
+      assert targets.raw == <<0::little-size(16)>>
+      assert targets.unit_guid == 123
+    end
+
     test "unit target unpacks the target guid" do
       payload = <<0x02::little-size(16)>> <> BinaryUtils.pack_guid(0xAABBCC)
 
@@ -20,6 +28,16 @@ defmodule ThistleTea.Game.Spell.TargetsTest do
 
       assert targets.unit_guid == 0xAABBCC
       assert targets.raw == payload
+    end
+
+    test "truncated unit target leaves target unset" do
+      payload = <<0x02::little-size(16), 0xFF::8, 0xAA::8>>
+
+      targets = Targets.parse(payload, 123)
+
+      assert targets.flags == 0x02
+      assert targets.raw == payload
+      assert targets.unit_guid == nil
     end
 
     test "destination location parses ground-target coordinates" do

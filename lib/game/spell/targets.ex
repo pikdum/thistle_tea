@@ -16,16 +16,14 @@ defmodule ThistleTea.Game.Spell.Targets do
     :destination_location
   ]
 
-  def parse(payload, caster_guid) when is_binary(payload) do
-    <<flags::little-size(16), rest::binary>> = payload
-
+  def parse(<<flags::little-size(16), rest::binary>> = payload, caster_guid) do
     %__MODULE__{flags: flags, raw: payload}
     |> put_self_target(caster_guid)
     |> parse_fields(rest)
   end
 
   def parse(_payload, caster_guid) do
-    %__MODULE__{flags: @self, raw: <<@self::little-size(16)>>, unit_guid: caster_guid}
+    self_target(caster_guid)
   end
 
   def ground_location(%__MODULE__{destination_location: location}) when is_tuple(location), do: location
@@ -37,6 +35,10 @@ defmodule ThistleTea.Game.Spell.Targets do
   end
 
   defp put_self_target(targets, _caster_guid), do: targets
+
+  defp self_target(caster_guid) do
+    %__MODULE__{flags: @self, raw: <<@self::little-size(16)>>, unit_guid: caster_guid}
+  end
 
   defp parse_fields(%__MODULE__{flags: flags} = targets, rest) do
     {_rest, targets} =
@@ -60,8 +62,10 @@ defmodule ThistleTea.Game.Spell.Targets do
   end
 
   defp parse_unit(rest, targets) do
-    {guid, rest} = BinaryUtils.unpack_guid(rest)
-    {rest, %{targets | unit_guid: guid}}
+    case unpack_guid(rest) do
+      {guid, rest} -> {rest, %{targets | unit_guid: guid}}
+      :error -> {rest, targets}
+    end
   end
 
   defp parse_location(rest, targets, field) do
@@ -72,5 +76,11 @@ defmodule ThistleTea.Game.Spell.Targets do
       _ ->
         {rest, targets}
     end
+  end
+
+  defp unpack_guid(rest) do
+    BinaryUtils.unpack_guid(rest)
+  rescue
+    _ -> :error
   end
 end
