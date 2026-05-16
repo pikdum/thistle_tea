@@ -74,5 +74,34 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
       assert target.unit.health == 0
       assert [%{type: :spell_damage, damage: 24, periodic?: true, spell_id: 10}] = events
     end
+
+    test "trigger spell effects return trigger events" do
+      spell = %Spell{
+        id: 168,
+        name: "Frost Armor",
+        school: :frost,
+        effects: [
+          %Effect{
+            index: 0,
+            type: :trigger_spell,
+            trigger_spell_id: 6136
+          }
+        ]
+      }
+
+      context = %CastContext{caster_guid: 999, caster_level: 10}
+
+      {_target, events} = SpellEffect.receive(target_fixture(), context, spell, 1_000)
+
+      assert [
+               %{
+                 type: :trigger_spell,
+                 source_guid: 999,
+                 source_level: 10,
+                 target_guid: 1,
+                 spell_id: 6136
+               }
+             ] = events
+    end
   end
 end
