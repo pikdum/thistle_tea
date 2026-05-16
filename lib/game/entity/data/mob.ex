@@ -50,7 +50,8 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
       base_attack_time: ct.melee_base_attack_time,
       attack_power: ct.melee_attack_power,
       virtual_item_slot_display: virtual_item_slot_display,
-      virtual_item_info: virtual_item_info
+      virtual_item_info: virtual_item_info,
+      auras: []
     }
 
     movement_block = %MovementBlock{
@@ -97,7 +98,8 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
         waypoint_route: WaypointRoute.build(c),
         event: event,
         in_combat: false,
-        running: false
+        running: false,
+        spellbook: Map.get(c, :spellbook, %{})
       }
     }
   end

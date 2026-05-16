@@ -20,8 +20,8 @@ defmodule ThistleTea.Game.Entity do
     dispatch_cast(entity, {:move_to, x, y, z})
   end
 
-  def receive_spell(entity, caster, spell_id) do
-    dispatch_cast(entity, {:receive_spell, caster, spell_id})
+  def receive_spell(entity, caster, spell) do
+    dispatch_cast(entity, {:receive_spell, caster, spell})
   end
 
   def receive_attack(entity, attack) do

@@ -4,6 +4,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal do
     :name,
     :area,
     :spells,
+    :spellbook,
     :casting,
     :spawn_distance,
     :movement_type,

@@ -3,9 +3,9 @@ defmodule ThistleTea.Game.Network.Message.CmsgCastSpell do
 
   import Bitwise, only: [&&&: 2]
 
-  alias ThistleTea.DBC
   alias ThistleTea.Game.Entity.Logic.AI.BT.Spell, as: SpellBT
   alias ThistleTea.Game.Network.Message
+  alias ThistleTea.Game.Spell
 
   require Logger
 
@@ -16,63 +16,9 @@ defmodule ThistleTea.Game.Network.Message.CmsgCastSpell do
 
   @impl ClientMessage
   def handle(%__MODULE__{spell_id: spell_id, spell_cast_targets: spell_cast_targets}, state) do
-    <<spell_cast_target_flags::little-size(16), rest::binary>> = spell_cast_targets
-
-    unit_target =
-      cond do
-        spell_cast_target_flags == @spell_cast_target_self ->
-          state.guid
-
-        (spell_cast_target_flags &&& @spell_cast_target_unit) > 0 ->
-          {target, _} = BinaryUtils.unpack_guid(rest)
-          target
-
-        true ->
-          nil
-      end
-
-    spell =
-      DBC.get_by(Spell, id: spell_id)
-      |> DBC.preload(:spell_cast_time)
-
-    Logger.info(
-      "CMSG_CAST_SPELL: #{spell.name_en_gb} - #{spell_id}",
-      target_name: unit_target
-    )
-
-    state = Message.CmsgCancelCast.cancel_spell(state)
-
-    spell_start_flags = 0x2
-
-    %Message.SmsgSpellStart{
-      cast_item: state.packed_guid,
-      caster: state.packed_guid,
-      spell: spell_id,
-      flags: spell_start_flags,
-      timer: spell.spell_cast_time.base,
-      targets: spell_cast_targets,
-      ammo_display_id: nil,
-      ammo_inventory_type: nil
-    }
-    |> World.broadcast_packet(state.character)
-
-    cast_time_ms = spell.spell_cast_time.base || 0
-
-    character =
-      SpellBT.start_cast(
-        state.character,
-        spell_id,
-        unit_target,
-        spell_cast_targets,
-        cast_time_ms
-      )
-
-    state = Map.put(state, :character, character)
-
-    if cast_time_ms == 0 do
-      handle_spell_complete(state)
-    else
-      ensure_player_tick(state)
+    case lookup_spell(state, spell_id) do
+      %Spell{} = spell -> cast_spell(state, spell, spell_cast_targets)
+      nil -> handle_unknown_spell(state, spell_id)
     end
   end
 
@@ -95,6 +41,60 @@ defmodule ThistleTea.Game.Network.Message.CmsgCastSpell do
   end
 
   def handle_spell_complete(state), do: state
+
+  defp cast_spell(state, %Spell{} = spell, spell_cast_targets) do
+    <<spell_cast_target_flags::little-size(16), rest::binary>> = spell_cast_targets
+
+    unit_target = resolve_unit_target(spell_cast_target_flags, rest, state.guid)
+
+    Logger.info(
+      "CMSG_CAST_SPELL: #{spell.name} - #{spell.id}",
+      target_name: unit_target
+    )
+
+    state = Message.CmsgCancelCast.cancel_spell(state)
+
+    %Message.SmsgSpellStart{
+      cast_item: state.packed_guid,
+      caster: state.packed_guid,
+      spell: spell.id,
+      flags: 0x2,
+      timer: spell.cast_time_ms,
+      targets: spell_cast_targets,
+      ammo_display_id: nil,
+      ammo_inventory_type: nil
+    }
+    |> World.broadcast_packet(state.character)
+
+    character = SpellBT.start_cast(state.character, spell, unit_target, spell_cast_targets)
+    state = Map.put(state, :character, character)
+
+    if spell.cast_time_ms == 0 and not Spell.attribute?(spell, :channeled) do
+      handle_spell_complete(state)
+    else
+      ensure_player_tick(state)
+    end
+  end
+
+  defp handle_unknown_spell(state, spell_id) do
+    Logger.warning("CMSG_CAST_SPELL: spell #{spell_id} not in caster's spellbook")
+    state
+  end
+
+  defp lookup_spell(%{character: %{internal: %{spellbook: spellbook}}}, spell_id) when is_map(spellbook) do
+    Map.get(spellbook, spell_id)
+  end
+
+  defp lookup_spell(_state, _spell_id), do: nil
+
+  defp resolve_unit_target(@spell_cast_target_self, _rest, caster_guid), do: caster_guid
+
+  defp resolve_unit_target(flags, rest, _caster_guid) when (flags &&& @spell_cast_target_unit) > 0 do
+    {target, _} = BinaryUtils.unpack_guid(rest)
+    target
+  end
+
+  defp resolve_unit_target(_flags, _rest, _caster_guid), do: nil
 
   defp ensure_player_tick(state) do
     case Map.get(state, :player_tick_ref) do

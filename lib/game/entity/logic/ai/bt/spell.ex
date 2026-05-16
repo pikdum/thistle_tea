@@ -3,8 +3,11 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
+  alias ThistleTea.Game.Entity.Logic.Core
+  alias ThistleTea.Game.Entity.Logic.SpellEffect
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
+  alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
 
@@ -15,23 +18,16 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
     ])
   end
 
-  def start_cast(character, spell_id, target, spell_cast_targets, cast_time_ms, channel_ms \\ 0)
-
-  def start_cast(
-        %{internal: %Internal{} = internal} = character,
-        spell_id,
-        target,
-        spell_cast_targets,
-        cast_time_ms,
-        channel_ms
-      )
-      when is_integer(spell_id) and is_binary(spell_cast_targets) do
+  def start_cast(%{internal: %Internal{} = internal} = character, %Spell{} = spell, target, spell_cast_targets)
+      when is_binary(spell_cast_targets) do
     now = Time.now()
-    cast_time_ms = normalize_time(cast_time_ms)
-    channel_ms = normalize_time(channel_ms)
+    cast_time_ms = normalize_time(spell.cast_time_ms)
+
+    channel_ms =
+      if Spell.attribute?(spell, :channeled), do: normalize_time(spell.duration_ms), else: 0
 
     casting = %{
-      spell_id: spell_id,
+      spell: spell,
       target: target,
       spell_cast_targets: spell_cast_targets,
       cast_time_ms: cast_time_ms,
@@ -43,7 +39,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
     %{character | internal: %{internal | casting: casting}}
   end
 
-  def start_cast(character, _spell_id, _target, _spell_cast_targets, _cast_time_ms, _channel_ms) do
+  def start_cast(character, _spell, _target, _spell_cast_targets) do
     character
   end
 
@@ -91,7 +87,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
 
   def clear_cast(character), do: character
 
-  defp send_cast_result(character, %{spell_id: spell_id}) do
+  defp send_cast_result(character, %{spell: %Spell{id: spell_id}}) do
     Network.send_packet(%Message.SmsgCastResult{
       spell: spell_id,
       result: 0,
@@ -108,13 +104,14 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
 
   defp send_cast_result(character, _casting), do: character
 
-  defp send_spell_go(%{object: %{guid: guid}} = character, casting) when is_integer(guid) do
+  defp send_spell_go(%{object: %{guid: guid}} = character, %{spell: %Spell{id: spell_id}} = casting)
+       when is_integer(guid) do
     hits = build_hits(casting.target, guid)
 
     %Message.SmsgSpellGo{
       cast_item: guid,
       caster: guid,
-      spell: casting.spell_id,
+      spell: spell_id,
       flags: 0x100,
       hits: hits,
       misses: [],
@@ -129,16 +126,33 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
 
   defp send_spell_go(character, _casting), do: character
 
-  defp apply_spell_hit(%{object: %{guid: guid}} = character, %{target: target, spell_id: spell_id})
-       when is_integer(guid) and is_integer(spell_id) do
-    if is_integer(target) and target != guid do
-      Entity.receive_spell(target, guid, spell_id)
-    end
+  defp apply_spell_hit(%{object: %{guid: guid}} = character, %{target: target, spell: %Spell{} = spell})
+       when is_integer(guid) do
+    cond do
+      is_integer(target) and target == guid ->
+        character
+        |> SpellEffect.receive(guid, spell)
+        |> broadcast_self_update()
 
-    character
+      is_integer(target) ->
+        Entity.receive_spell(target, guid, spell)
+        character
+
+      true ->
+        character
+    end
   end
 
   defp apply_spell_hit(character, _casting), do: character
+
+  defp broadcast_self_update(%{internal: %Internal{broadcast_update?: true} = internal} = character) do
+    Core.update_object(character, :values)
+    |> World.broadcast_packet(character)
+
+    %{character | internal: %{internal | broadcast_update?: false}}
+  end
+
+  defp broadcast_self_update(character), do: character
 
   defp clear_casting(character, internal) do
     %{character | internal: %{internal | casting: nil}}

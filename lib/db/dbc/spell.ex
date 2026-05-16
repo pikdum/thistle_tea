@@ -177,5 +177,7 @@ defmodule Spell do
     field(:required_aura_vision, :integer)
 
     has_one(:spell_cast_time, SpellCastTimes, foreign_key: :id, references: :casting_time_index)
+    has_one(:spell_duration, SpellDuration, foreign_key: :id, references: :duration)
+    has_one(:spell_range, SpellRange, foreign_key: :id, references: :range)
   end
 end

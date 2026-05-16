@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.AI.BT
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Aura, as: AuraBT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AI.BT.Combat, as: CombatBT
   alias ThistleTea.Game.Entity.Logic.Core
@@ -26,6 +27,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
 
   def tree do
     BT.selector([
+      AuraBT.tick_step(),
       BT.sequence([
         BT.condition(&tethering_to_spawn?/2),
         BT.action(&wait_for_arrival/2)

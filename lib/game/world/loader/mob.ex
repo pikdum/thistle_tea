@@ -3,6 +3,7 @@ defmodule ThistleTea.Game.World.Loader.Mob do
   alias ThistleTea.DBC
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.World
+  alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.System.GameEvent
 
@@ -15,7 +16,22 @@ defmodule ThistleTea.Game.World.Loader.Mob do
     |> Enum.map(&load_creature_model_info/1)
     |> Enum.map(&load_display_scale/1)
     |> Enum.map(&load_equip_items/1)
+    |> Enum.map(&load_spells/1)
     |> Enum.each(&start/1)
+  end
+
+  defp load_spells(%Mangos.Creature{creature_template: %Mangos.CreatureTemplate{entry: entry}} = creature) do
+    spell_ids =
+      case Mangos.Repo.get(Mangos.CreatureTemplateSpells, entry) do
+        %Mangos.CreatureTemplateSpells{} = row -> Mangos.CreatureTemplateSpells.spell_ids(row)
+        _ -> []
+      end
+
+    Map.put(creature, :spellbook, SpellLoader.build_spellbook(spell_ids))
+  end
+
+  defp load_spells(%Mangos.Creature{} = creature) do
+    Map.put(creature, :spellbook, %{})
   end
 
   defp load_creature_movement(%Mangos.Creature{} = creature) do

@@ -112,7 +112,8 @@ defmodule ThistleTea.Game.Entity.Data.Component.Unit do
     min_ranged_damage: {0x00AB, 1, :float, :private},
     max_ranged_damage: {0x00AC, 1, :float, :private},
     power_cost_modifier: {0x00AD, 7, :int, :private},
-    power_cost_multiplier: {0x00B4, 7, :float, :private}
+    power_cost_multiplier: {0x00B4, 7, :float, :private},
+    auras: :virtual
 
   alias ThistleTea.Game.Network.UpdateObject
 

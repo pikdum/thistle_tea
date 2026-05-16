@@ -77,7 +77,8 @@ defmodule ThistleTea.Character do
         base_health: stats.base_health,
         sheath_state: 0,
         # UNIT_FLAG_USE_SWIM_ANIMATION
-        flags: 0x00008000
+        flags: 0x00008000,
+        auras: []
       },
       player: %Player{
         flags: 0,

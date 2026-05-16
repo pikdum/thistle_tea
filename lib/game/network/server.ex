@@ -468,6 +468,8 @@ defmodule ThistleTea.Game.Network.Server do
     true
   end
 
+  defp player_needs_tick?(%{unit: %Unit{auras: [_ | _]}}), do: true
+
   defp player_needs_tick?(_character), do: false
 
   defp kill_xp(%Character{unit: %Unit{health: health, level: player_level}}, %{

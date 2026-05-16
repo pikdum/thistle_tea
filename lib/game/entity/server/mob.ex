@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Entity.Logic.Combat
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Movement
+  alias ThistleTea.Game.Entity.Logic.SpellEffect
   alias ThistleTea.Game.Entity.Registry, as: EntityRegistry
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network
@@ -56,7 +57,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   end
 
   @impl GenServer
-  def handle_cast({:receive_spell, caster, _spell_id}, state) do
+  def handle_cast({:receive_spell, caster, spell}, state) do
     state =
       state
       |> maybe_reset_attack_started(caster)
@@ -67,7 +68,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
     state =
       state
-      |> Core.take_damage(10)
+      |> SpellEffect.receive(caster, spell)
       |> handle_death_transition(target, dead_before)
 
     schedule_ai_tick(0)

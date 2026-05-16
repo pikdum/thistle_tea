@@ -1,12 +1,14 @@
 defmodule ThistleTea.Game.Entity.Logic.AI.BT.Player do
   alias ThistleTea.Character
   alias ThistleTea.Game.Entity.Logic.AI.BT
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Aura, as: AuraBT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AI.BT.Combat, as: CombatBT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Spell, as: SpellBT
 
   def tree do
     BT.selector([
+      AuraBT.tick_step(),
       SpellBT.casting_sequence(),
       CombatBT.melee_sequence(),
       BT.action(&idle/2)

@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgPlayerLogin do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Player, as: PlayerBT
   alias ThistleTea.Game.Network.Message.SmsgInitialSpells.InitialSpell
   alias ThistleTea.Game.Network.UpdateObject
+  alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
 
@@ -33,6 +34,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgPlayerLogin do
     c =
       c
       |> normalize_combat_stats()
+      |> build_spellbook()
       |> BT.init(PlayerBT.tree())
 
     Metadata.put(character_guid, %{
@@ -165,6 +167,11 @@ defmodule ThistleTea.Game.Network.Message.CmsgPlayerLogin do
     |> struct(Map.from_struct(c))
     |> Map.put(:movement_block, movement_block)
     |> Network.send_packet()
+  end
+
+  defp build_spellbook(%ThistleTea.Character{internal: internal} = character) do
+    spellbook = SpellLoader.build_spellbook(internal.spells || [])
+    %{character | internal: %{internal | spellbook: spellbook}}
   end
 
   defp normalize_combat_stats(%ThistleTea.Character{} = character) do
