@@ -91,7 +91,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgPlayerLogin do
 
   def send_login_init_packets(c) do
     # needed for no white chatbox + keybinds
-    Network.send_packet(%Message.SmsgAccountDataTimes{data: [0, 0, 0, 0]})
+    Network.send_packet(%Message.SmsgAccountDataTimes{})
 
     # maybe useless? mangos sends it, though
     Network.send_packet(%Message.SmsgSetRestStart{unknown1: 0})
@@ -134,7 +134,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgPlayerLogin do
 
     date =
       (dt.year - 80) <<< 24 ||| (dt.month - 1) <<< 20 ||| (dt.day - 1) <<< 14 |||
-        Date.day_of_week(dt) <<< 11 ||| dt.hour <<< 6 ||| dt.minute
+        rem(Date.day_of_week(dt), 7) <<< 11 ||| dt.hour <<< 6 ||| dt.minute
 
     Network.send_packet(%Message.SmsgLoginSettimespeed{
       datetime: date,
