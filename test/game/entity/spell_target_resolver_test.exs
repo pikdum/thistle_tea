@@ -33,6 +33,19 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolverTest do
       assert SpellTargetResolver.resolve(caster, spell, %Targets{}) == [mob_guid]
     end
 
+    test "does not return nearby neutral mobs for player-cast caster aoe" do
+      player_guid = player_guid()
+      mob_guid = mob_guid()
+
+      put_spatial_target(:players, player_guid, {0.0, 0.0, 0.0})
+      put_spatial_target(:mobs, mob_guid, {3.0, 0.0, 0.0}, neutral_creature())
+
+      caster = caster(player_guid, {0.0, 0.0, 0.0})
+      spell = aoe_spell(:aoe_enemy_at_caster)
+
+      assert SpellTargetResolver.resolve(caster, spell, %Targets{}) == []
+    end
+
     test "returns nearby players for mob-cast caster aoe" do
       player_guid = player_guid()
       mob_guid = mob_guid()
@@ -116,8 +129,12 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolverTest do
   end
 
   defp put_spatial_target(table, guid, {x, y, z}) do
+    put_spatial_target(table, guid, {x, y, z}, faction_template(table))
+  end
+
+  defp put_spatial_target(table, guid, {x, y, z}, faction_template) do
     SpatialHash.update(table, guid, 0, x, y, z)
-    Metadata.put(guid, %{alive?: true})
+    Metadata.put(guid, %{alive?: true, faction_template: faction_template, unit_flags: 0})
 
     on_exit(fn ->
       SpatialHash.remove(table, guid)
@@ -135,5 +152,17 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolverTest do
         }
       ]
     }
+  end
+
+  defp faction_template(:players) do
+    %FactionTemplate{id: 1, faction: 1, flags: 72, faction_group: 3, friend_group: 2, enemy_group: 12}
+  end
+
+  defp faction_template(:mobs) do
+    %FactionTemplate{id: 17, faction: 15, flags: 1, faction_group: 8, friend_group: 0, enemy_group: 1, friends_0: 15}
+  end
+
+  defp neutral_creature do
+    %FactionTemplate{id: 7, faction: 7, flags: 0, faction_group: 0, friend_group: 0, enemy_group: 0}
   end
 end

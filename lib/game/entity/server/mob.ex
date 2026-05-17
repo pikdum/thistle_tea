@@ -17,6 +17,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
+  alias ThistleTea.Game.World.Loader.Faction, as: FactionLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.System.GameEvent
 
@@ -277,7 +278,10 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
       bounding_radius: state.unit.bounding_radius,
       combat_reach: state.unit.combat_reach,
       level: state.unit.level,
+      unit_flags: state.unit.flags,
       alive?: state.unit.health > 0
     })
+
+    Metadata.update(state.object.guid, FactionLoader.metadata(state.unit.faction_template))
   end
 end

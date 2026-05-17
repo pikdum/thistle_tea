@@ -3,6 +3,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgAttackswing do
 
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.Core
+  alias ThistleTea.Game.Entity.Logic.Hostility
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.SpatialHash
 
@@ -53,11 +54,15 @@ defmodule ThistleTea.Game.Network.Message.CmsgAttackswing do
 
   defp maybe_reset_attack_started(character, _target_guid), do: character
 
-  defp valid_attack_target?(%{guid: guid, character: %ThistleTea.Character{internal: %{map: map}}}, target_guid)
+  defp valid_attack_target?(
+         %{guid: guid, character: %ThistleTea.Character{internal: %{map: map}} = character},
+         target_guid
+       )
        when is_integer(target_guid) and target_guid > 0 do
     target_guid != guid and
       match?({^target_guid, ^map, _x, _y, _z}, SpatialHash.get_entity(target_guid)) and
-      unit_target?(target_guid)
+      unit_target?(target_guid) and
+      Hostility.attackable?(character, target_guid)
   end
 
   defp valid_attack_target?(_state, _target_guid), do: false

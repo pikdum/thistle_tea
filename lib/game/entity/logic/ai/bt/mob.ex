@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AI.BT.Combat, as: CombatBT
   alias ThistleTea.Game.Entity.Logic.Core
+  alias ThistleTea.Game.Entity.Logic.Hostility
   alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
@@ -22,7 +23,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   @default_bounding_radius 0.6
   @attack_angle_scale 0.3
 
-  @aggro_radius 30.0
+  @base_aggro_radius 18.0
+  @max_level_aggro_bonus 25
+  @min_aggro_radius 5.0
+  @max_aggro_radius @base_aggro_radius + @max_level_aggro_bonus
   @aggro_check_delay 1_000
 
   def tree do
@@ -138,6 +142,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
 
   defp try_aggro(%Mob{} = state, %Blackboard{} = blackboard) do
     now = Time.now()
+    try_aggro(state, blackboard, now)
+  end
+
+  def try_aggro(%Mob{} = state, %Blackboard{} = blackboard, now) when is_integer(now) do
     blackboard = Blackboard.put_next_at(blackboard, :next_aggro_at, @aggro_check_delay, now)
 
     state =
@@ -150,18 +158,40 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   end
 
   defp pick_aggro_target(%Mob{} = state) do
-    World.nearby_mobs(state, @aggro_radius)
-    |> Enum.filter(fn {guid, _distance} -> aggro_candidate?(guid) end)
-    |> case do
-      [] -> nil
-      candidates -> candidates |> Enum.random() |> elem(0)
+    if Hostility.can_initiate_attack?(state) do
+      state
+      |> nearby_aggro_candidates()
+      |> Enum.filter(fn {guid, distance} -> aggro_candidate?(state, guid, distance) end)
+      |> Enum.min_by(fn {_guid, distance} -> distance end, fn -> nil end)
+      |> case do
+        nil -> nil
+        {guid, _distance} -> guid
+      end
     end
   end
 
-  defp aggro_candidate?(guid) when is_integer(guid) do
-    case Metadata.query(guid, [:alive?]) do
-      %{alive?: false} -> false
-      _ -> true
+  defp nearby_aggro_candidates(%Mob{} = state) do
+    World.nearby_players(state, @max_aggro_radius) ++ World.nearby_mobs(state, @max_aggro_radius)
+  end
+
+  defp aggro_candidate?(%Mob{} = state, guid, distance) when is_integer(guid) and is_number(distance) do
+    Hostility.valid_hostile_target?(state, guid) and distance <= aggro_radius(state, guid)
+  end
+
+  defp aggro_candidate?(_state, _guid, _distance), do: false
+
+  defp aggro_radius(%Mob{unit: %Unit{level: level}}, target_guid) when is_integer(level) and is_integer(target_guid) do
+    target_level = target_level(target_guid)
+    level_diff = max(target_level - level, -@max_level_aggro_bonus)
+    max(@base_aggro_radius - level_diff, @min_aggro_radius)
+  end
+
+  defp aggro_radius(%Mob{}, _target_guid), do: @base_aggro_radius
+
+  defp target_level(guid) when is_integer(guid) do
+    case Metadata.query(guid, [:level]) do
+      %{level: level} when is_integer(level) -> level
+      _ -> 1
     end
   end
 

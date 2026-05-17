@@ -3,6 +3,7 @@ defmodule ThistleTea.Game.World.Loader.Mob do
   alias ThistleTea.DBC
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.World
+  alias ThistleTea.Game.World.Loader.Faction, as: FactionLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.System.GameEvent
@@ -100,14 +101,19 @@ defmodule ThistleTea.Game.World.Loader.Mob do
   defp start(%Mangos.Creature{} = creature) do
     mob = Mob.build(creature)
 
-    Metadata.put(mob.object.guid, %{
-      name: mob.internal.name,
-      bounding_radius: mob.unit.bounding_radius,
-      combat_reach: mob.unit.combat_reach,
-      level: mob.unit.level,
-      attacker_count: 0,
-      alive?: mob.unit.health > 0
-    })
+    Metadata.put(
+      mob.object.guid,
+      %{
+        name: mob.internal.name,
+        bounding_radius: mob.unit.bounding_radius,
+        combat_reach: mob.unit.combat_reach,
+        level: mob.unit.level,
+        unit_flags: mob.unit.flags,
+        attacker_count: 0,
+        alive?: mob.unit.health > 0
+      }
+      |> Map.merge(FactionLoader.metadata(mob.unit.faction_template))
+    )
 
     World.start_entity(mob)
   end

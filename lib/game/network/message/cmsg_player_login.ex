@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgPlayerLogin do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Player, as: PlayerBT
   alias ThistleTea.Game.Network.Message.SmsgInitialSpells.InitialSpell
   alias ThistleTea.Game.Network.UpdateObject
+  alias ThistleTea.Game.World.Loader.Faction, as: FactionLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
@@ -34,21 +35,27 @@ defmodule ThistleTea.Game.Network.Message.CmsgPlayerLogin do
     c =
       c
       |> normalize_combat_stats()
+      |> normalize_faction_template()
       |> build_spellbook()
       |> BT.init(PlayerBT.tree())
 
-    Metadata.put(character_guid, %{
-      name: c.internal.name,
-      realm: "",
-      race: c.unit.race,
-      gender: c.unit.gender,
-      class: c.unit.class,
-      level: c.unit.level,
-      bounding_radius: c.unit.bounding_radius,
-      combat_reach: c.unit.combat_reach,
-      attacker_count: 0,
-      alive?: c.unit.health > 0
-    })
+    Metadata.put(
+      character_guid,
+      %{
+        name: c.internal.name,
+        realm: "",
+        race: c.unit.race,
+        gender: c.unit.gender,
+        class: c.unit.class,
+        level: c.unit.level,
+        bounding_radius: c.unit.bounding_radius,
+        combat_reach: c.unit.combat_reach,
+        unit_flags: c.unit.flags,
+        attacker_count: 0,
+        alive?: c.unit.health > 0
+      }
+      |> Map.merge(FactionLoader.metadata(c.unit.faction_template))
+    )
 
     Logger.metadata(character_name: c.internal.name)
     Entity.register(character_guid)
@@ -188,6 +195,19 @@ defmodule ThistleTea.Game.Network.Message.CmsgPlayerLogin do
     internal = %{character.internal | in_combat: false}
     %{character | unit: unit, internal: internal}
   end
+
+  defp normalize_faction_template(%ThistleTea.Character{unit: %Unit{race: race} = unit} = character)
+       when is_integer(race) do
+    case DBC.get_by(ChrRaces, id: race) do
+      %ChrRaces{faction: faction_template_id} when is_integer(faction_template_id) and faction_template_id > 0 ->
+        %{character | unit: %{unit | faction_template: faction_template_id}}
+
+      _ ->
+        character
+    end
+  end
+
+  defp normalize_faction_template(character), do: character
 
   defp normalize_unit_value(unit, key, default) do
     case Map.get(unit, key) do

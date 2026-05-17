@@ -55,7 +55,7 @@ defmodule ThistleTea.Character do
         max_power4: initial_energy(params.class),
         max_power5: 0,
         level: stats.level,
-        faction_template: get_alliance(params.race),
+        faction_template: chr_race.faction,
         race: params.race,
         class: params.class,
         gender: params.gender,
@@ -263,24 +263,6 @@ defmodule ThistleTea.Character do
 
   defp initial_energy(4), do: 100
   defp initial_energy(_class), do: 0
-
-  @doc """
-  Used to set the proper faction based on the characters
-  race.
-  #Todo: set the faction on character creation.
-  """
-  def get_alliance(race) do
-    case race do
-      1 -> 1
-      2 -> 2
-      3 -> 1
-      4 -> 1
-      5 -> 2
-      6 -> 2
-      7 -> 1
-      8 -> 2
-    end
-  end
 
   def character_exists?(name) do
     case get_character(name) do
