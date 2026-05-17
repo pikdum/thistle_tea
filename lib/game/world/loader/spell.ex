@@ -6,6 +6,8 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   alias ThistleTea.Game.Spell, as: SpellData
   alias ThistleTea.Game.Spell.Effect
 
+  @learn_spell_effect 36
+
   def load(spell_id) when is_integer(spell_id) and spell_id > 0 do
     case DBC.get(Spell, spell_id) do
       nil -> nil
@@ -37,6 +39,30 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   end
 
   def build_spellbook(_), do: %{}
+
+  def learned_spell_ids(spell_ids) when is_list(spell_ids) do
+    spell_ids = Enum.uniq(spell_ids)
+
+    DBC.all(
+      from(s in Spell,
+        where: s.id in ^spell_ids,
+        select: %{
+          id: s.id,
+          effect_0: s.effect_0,
+          effect_1: s.effect_1,
+          effect_2: s.effect_2,
+          effect_trigger_spell_0: s.effect_trigger_spell_0,
+          effect_trigger_spell_1: s.effect_trigger_spell_1,
+          effect_trigger_spell_2: s.effect_trigger_spell_2
+        }
+      )
+    )
+    |> Enum.flat_map(&learned_spell_ids_from_row/1)
+    |> Enum.uniq()
+    |> Enum.sort()
+  end
+
+  def learned_spell_ids(_spell_ids), do: []
 
   defp build(row) do
     row = DBC.preload(row, [:spell_cast_time, :spell_duration, :spell_range])
@@ -131,6 +157,19 @@ defmodule ThistleTea.Game.World.Loader.Spell do
 
   defp nonzero(value) when is_integer(value) and value > 0, do: value
   defp nonzero(_), do: nil
+
+  defp learned_spell_ids_from_row(row) do
+    learned_ids =
+      0..2
+      |> Enum.filter(&(Map.get(row, :"effect_#{&1}") == @learn_spell_effect))
+      |> Enum.map(&Map.get(row, :"effect_trigger_spell_#{&1}"))
+      |> Enum.filter(&(is_integer(&1) and &1 > 0))
+
+    case learned_ids do
+      [] -> [row.id]
+      ids -> ids
+    end
+  end
 
   defp school(0), do: :physical
   defp school(1), do: :holy

@@ -5,12 +5,11 @@ defmodule ThistleTea.Game.Network.Message.CmsgMessagechat do
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Player.Stats
+  alias ThistleTea.Game.World.Loader.ClassSpell
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Metadata
 
   require Logger
-
-  @debug_spells [78, 116, 133, 168, 122, 10, 1449]
 
   defstruct [:chat_type, :language, :message, :target_name]
 
@@ -72,7 +71,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgMessagechat do
 
   def handle_chat(state, _, _, ".help" <> _, _) do
     commands = [
-      ".debug spells - learn the MVP spell test set (Heroic Strike, Frostbolt, Fireball, Frost Armor, Frost Nova, Blizzard, Arcane Explosion)",
+      ".debug spells - learn class trainer spells up to your level",
       ".character level <level> - set player level",
       ".go xyz <x> <y> <z> [map] - teleport",
       ".guid - show target guid",
@@ -144,7 +143,9 @@ defmodule ThistleTea.Game.Network.Message.CmsgMessagechat do
   end
 
   def handle_chat(state, _, _, ".debug spells" <> _, _) do
-    learn_spells(state, @debug_spells, "Already know all debug spells.")
+    state
+    |> debug_spell_ids()
+    |> then(&learn_spells(state, &1, "Already know all debug spells."))
   end
 
   def handle_chat(state, _, _, ".tgm" <> _, _) do
@@ -435,6 +436,12 @@ defmodule ThistleTea.Game.Network.Message.CmsgMessagechat do
         |> system_message("Learned: #{names}")
     end
   end
+
+  defp debug_spell_ids(%{character: %ThistleTea.Character{unit: %{class: class, level: level}}}) do
+    ClassSpell.trainable_spell_ids(class, level)
+  end
+
+  defp debug_spell_ids(_state), do: []
 
   defp parse_positive_integer(value) do
     case Integer.parse(value) do
