@@ -38,8 +38,21 @@ config :tailwind,
     cd: Path.expand("../assets", __DIR__)
   ]
 
-config :thistle_tea, Repo, database: "db/mangos0.sqlite", log: false
-config :thistle_tea, ThistleTea.DBC, database: "db/dbc.sqlite", log: false
+config :thistle_tea, Repo,
+  database: "db/mangos0.sqlite",
+  log: false,
+  pool_size: 10,
+  queue_target: 1_000,
+  queue_interval: 5_000,
+  busy_timeout: 5_000
+
+config :thistle_tea, ThistleTea.DBC,
+  database: "db/dbc.sqlite",
+  log: false,
+  pool_size: 20,
+  queue_target: 1_000,
+  queue_interval: 5_000,
+  busy_timeout: 5_000
 
 config :thistle_tea, ThistleTeaWeb.Endpoint,
   url: [host: "localhost"],

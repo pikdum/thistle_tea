@@ -1,5 +1,6 @@
 defmodule ThistleTea.Game.World.Loader.Spell do
   import Bitwise, only: [&&&: 2]
+  import Ecto.Query
 
   alias ThistleTea.DBC
   alias ThistleTea.Game.Spell, as: SpellData
@@ -14,11 +15,24 @@ defmodule ThistleTea.Game.World.Loader.Spell do
 
   def load(_), do: nil
 
+  def build_spellbook([]), do: %{}
+
   def build_spellbook(spell_ids) when is_list(spell_ids) do
-    spell_ids
-    |> Enum.uniq()
-    |> Enum.map(&load/1)
-    |> Enum.reject(&is_nil/1)
+    spell_ids = Enum.uniq(spell_ids)
+
+    rows =
+      DBC.all(
+        from(s in Spell,
+          where: s.id in ^spell_ids,
+          preload: [:spell_cast_time, :spell_duration, :spell_range]
+        )
+      )
+
+    radius_map = load_radius_map(rows)
+    radius_lookup = fn radius_id -> Map.get(radius_map, radius_id) end
+
+    rows
+    |> Enum.map(&build_preloaded(&1, radius_lookup))
     |> Map.new(fn %SpellData{id: id} = spell -> {id, spell} end)
   end
 
@@ -26,7 +40,10 @@ defmodule ThistleTea.Game.World.Loader.Spell do
 
   defp build(row) do
     row = DBC.preload(row, [:spell_cast_time, :spell_duration, :spell_range])
+    build_preloaded(row, &lookup_radius/1)
+  end
 
+  defp build_preloaded(row, radius_lookup) do
     %SpellData{
       id: row.id,
       name: row.name_en_gb,
@@ -37,17 +54,17 @@ defmodule ThistleTea.Game.World.Loader.Spell do
       mana_cost: row.mana_cost || 0,
       gcd_ms: row.start_recovery_time || 0,
       attributes: attributes(row.attributes, row.attributes_ex1),
-      effects: build_effects(row)
+      effects: build_effects(row, radius_lookup)
     }
   end
 
-  defp build_effects(row) do
+  defp build_effects(row, radius_lookup) do
     0..2
-    |> Enum.map(&build_effect(row, &1))
+    |> Enum.map(&build_effect(row, &1, radius_lookup))
     |> Enum.reject(&is_nil/1)
   end
 
-  defp build_effect(row, index) do
+  defp build_effect(row, index, radius_lookup) do
     type_int = Map.get(row, :"effect_#{index}") || 0
 
     case effect_type(type_int) do
@@ -64,12 +81,32 @@ defmodule ThistleTea.Game.World.Loader.Spell do
           aura: aura_type(Map.get(row, :"effect_aura_#{index}") || 0),
           amplitude_ms: amplitude_ms(Map.get(row, :"effect_amplitude_#{index}")),
           misc_value: Map.get(row, :"effect_misc_value_#{index}") || 0,
-          radius_yards: lookup_radius(Map.get(row, :"effect_radius_#{index}")),
+          radius_yards: radius_lookup.(Map.get(row, :"effect_radius_#{index}")),
           implicit_target_a: target_type(Map.get(row, :"implicit_target_a_#{index}") || 0),
           implicit_target_b: target_type(Map.get(row, :"implicit_target_b_#{index}") || 0),
           chain_targets: Map.get(row, :"effect_chain_target_#{index}") || 0,
           trigger_spell_id: nonzero(Map.get(row, :"effect_trigger_spell_#{index}"))
         }
+    end
+  end
+
+  defp load_radius_map(rows) do
+    radius_ids =
+      rows
+      |> Enum.flat_map(fn row -> Enum.map(0..2, &Map.get(row, :"effect_radius_#{&1}")) end)
+      |> Enum.filter(&(is_integer(&1) and &1 > 0))
+      |> Enum.uniq()
+
+    case radius_ids do
+      [] ->
+        %{}
+
+      _ ->
+        DBC.all(from(r in SpellRadius, where: r.id in ^radius_ids))
+        |> Enum.reduce(%{}, fn
+          %SpellRadius{id: id, radius: radius}, acc when is_number(radius) -> Map.put(acc, id, radius)
+          _, acc -> acc
+        end)
     end
   end
 
