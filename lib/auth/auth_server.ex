@@ -11,6 +11,10 @@ defmodule ThistleTea.Auth do
   @cmd_auth_reconnect_proof 3
   @cmd_realm_list 16
 
+  @logon_proof_size 75
+  @reconnect_proof_size 58
+  @realm_list_size 5
+
   @n <<137, 75, 100, 94, 137, 225, 83, 91, 189, 173, 91, 139, 41, 6, 80, 83, 8, 1, 177, 142, 191, 191, 94, 143, 171, 60,
        130, 135, 42, 62, 155, 183>>
   @g <<7>>
@@ -28,7 +32,9 @@ defmodule ThistleTea.Auth do
         state.private_b
       )
 
-    Map.put(state, :public_b, public_b)
+    state
+    |> Map.put(:public_b, public_b)
+    |> Map.put(:public_b_wire, pad_leading(public_b, byte_size(@n)))
   end
 
   defp account_state(username) do
@@ -44,42 +50,100 @@ defmodule ThistleTea.Auth do
   end
 
   @impl ThousandIsland.Handler
-  def handle_data(
-        <<@cmd_auth_logon_challenge, _protocol_version::little-size(8), _size::little-size(16),
-          _game_name::bytes-little-size(4), _version::bytes-little-size(3), _build::little-size(16),
-          _platform::bytes-little-size(4), _os::bytes-size(4), _locale::bytes-size(4),
-          _worldregion_bias::little-size(32), _ip::little-size(32), username_length::little-size(8),
-          username::bytes-little-size(username_length)>>,
-        socket,
-        _state
-      ) do
+  def handle_data(data, socket, state) do
+    state = Map.update(state, :buffer, data, &(&1 <> data))
+    drain_buffer(socket, state)
+  end
+
+  defp drain_buffer(_socket, %{buffer: <<>>} = state), do: {:continue, state}
+
+  defp drain_buffer(socket, %{buffer: buf} = state) do
+    case packet_length(buf) do
+      :incomplete ->
+        {:continue, state}
+
+      :unknown ->
+        <<opcode, _::binary>> = buf
+        Logger.error("UNIMPLEMENTED: #{inspect(opcode, base: :hex)}")
+        ThousandIsland.Socket.send(socket, <<0, 0, 5>>)
+        {:close, state}
+
+      {:ok, len} ->
+        <<packet::binary-size(len), rest::binary>> = buf
+        state = %{state | buffer: rest}
+
+        case handle_packet(packet, socket, state) do
+          {:continue, state} -> drain_buffer(socket, state)
+          other -> other
+        end
+    end
+  end
+
+  defp packet_length(<<@cmd_auth_logon_challenge, _proto, size::little-size(16), _::binary>> = buf) do
+    total = 4 + size
+    if byte_size(buf) >= total, do: {:ok, total}, else: :incomplete
+  end
+
+  defp packet_length(<<@cmd_auth_logon_challenge, _::binary>>), do: :incomplete
+
+  defp packet_length(<<@cmd_auth_logon_proof, _::binary>> = buf) do
+    if byte_size(buf) >= @logon_proof_size, do: {:ok, @logon_proof_size}, else: :incomplete
+  end
+
+  defp packet_length(<<@cmd_auth_reconnect_challenge, _proto, size::little-size(16), _::binary>> = buf) do
+    total = 4 + size
+    if byte_size(buf) >= total, do: {:ok, total}, else: :incomplete
+  end
+
+  defp packet_length(<<@cmd_auth_reconnect_challenge, _::binary>>), do: :incomplete
+
+  defp packet_length(<<@cmd_auth_reconnect_proof, _::binary>> = buf) do
+    if byte_size(buf) >= @reconnect_proof_size, do: {:ok, @reconnect_proof_size}, else: :incomplete
+  end
+
+  defp packet_length(<<@cmd_realm_list, _::binary>> = buf) do
+    if byte_size(buf) >= @realm_list_size, do: {:ok, @realm_list_size}, else: :incomplete
+  end
+
+  defp packet_length(_), do: :unknown
+
+  defp handle_packet(
+         <<@cmd_auth_logon_challenge, protocol_version::little-size(8), _size::little-size(16),
+           _game_name::bytes-little-size(4), _version::bytes-little-size(3), _build::little-size(16),
+           _platform::bytes-little-size(4), _os::bytes-size(4), _locale::bytes-size(4),
+           _worldregion_bias::little-size(32), _ip::little-size(32), username_length::little-size(8),
+           username::bytes-little-size(username_length)>>,
+         socket,
+         state
+       ) do
     Logger.metadata(username: username)
     Logger.info("CMD_AUTH_LOGON_CHALLENGE")
-    state = logon_challenge_state(username)
+    challenge = logon_challenge_state(username)
+
+    security_flag = if protocol_version >= 3, do: <<0>>, else: <<>>
 
     packet =
       <<0, 0, 0>> <>
-        reverse(state.public_b) <>
+        reverse(challenge.public_b_wire) <>
         <<1>> <>
-        state.g <>
+        challenge.g <>
         <<32>> <>
-        reverse(state.n) <> state.account.password_salt <> :crypto.strong_rand_bytes(16) <> <<0>>
+        reverse(challenge.n) <> challenge.account.password_salt <> :crypto.strong_rand_bytes(16) <> security_flag
 
     ThousandIsland.Socket.send(socket, packet)
-    {:continue, state}
+    {:continue, Map.merge(state, Map.put(challenge, :protocol_version, protocol_version))}
   end
 
-  @impl ThousandIsland.Handler
-  def handle_data(
-        <<@cmd_auth_logon_proof, client_public_key::little-bytes-size(32), client_proof::little-bytes-size(20),
-          _crc_hash::little-bytes-size(20), _num_keys::little-size(8), _security_flags::little-size(8)>>,
-        socket,
-        state
-      ) do
+  defp handle_packet(
+         <<@cmd_auth_logon_proof, client_public_key::little-bytes-size(32), client_proof::little-bytes-size(20),
+           _crc_hash::little-bytes-size(20), _num_keys::little-size(8), _security_flags::little-size(8)>>,
+         socket,
+         state
+       ) do
     Logger.info("CMD_AUTH_LOGON_PROOF")
     username = state.account.username
     public_a = reverse(client_public_key)
-    scrambler = :crypto.hash(:sha, reverse(public_a) <> reverse(state.public_b))
+    scrambler = :crypto.hash(:sha, reverse(public_a) <> reverse(state.public_b_wire))
 
     s =
       reverse(
@@ -103,7 +167,7 @@ defmodule ThistleTea.Auth do
         :sha,
         t3 <>
           t4 <>
-          state.account.password_salt <> reverse(public_a) <> reverse(state.public_b) <> session
+          state.account.password_salt <> reverse(public_a) <> reverse(state.public_b_wire) <> session
       )
 
     if m == client_proof do
@@ -124,8 +188,7 @@ defmodule ThistleTea.Auth do
     end
   end
 
-  @impl ThousandIsland.Handler
-  def handle_data(<<@cmd_realm_list, _padding::binary>>, socket, state) do
+  defp handle_packet(<<@cmd_realm_list, _padding::bytes-size(4)>>, socket, state) do
     Logger.info("CMD_REALM_LIST")
 
     game_server = Application.fetch_env!(:thistle_tea, :game_server)
@@ -146,32 +209,29 @@ defmodule ThistleTea.Auth do
     {:continue, state}
   end
 
-  @impl ThousandIsland.Handler
-  def handle_data(
-        <<@cmd_auth_reconnect_challenge, _protocol_version::little-size(8), _size::little-size(16),
-          _game_name::bytes-little-size(4), _version::bytes-little-size(3), _build::little-size(16),
-          _platform::bytes-little-size(4), _os::bytes-little-size(4), _locale::bytes-little-size(4),
-          _worldregion_bias::little-size(32), _ip::little-size(32), username_length::little-size(8),
-          username::bytes-little-size(username_length)>>,
-        socket,
-        state
-      ) do
+  defp handle_packet(
+         <<@cmd_auth_reconnect_challenge, _protocol_version::little-size(8), _size::little-size(16),
+           _game_name::bytes-little-size(4), _version::bytes-little-size(3), _build::little-size(16),
+           _platform::bytes-little-size(4), _os::bytes-little-size(4), _locale::bytes-little-size(4),
+           _worldregion_bias::little-size(32), _ip::little-size(32), username_length::little-size(8),
+           username::bytes-little-size(username_length)>>,
+         socket,
+         state
+       ) do
     Logger.metadata(username: username)
     Logger.info("CMD_AUTH_RECONNECT_CHALLENGE")
-    # and need to test this flow more in-depth
     challenge_data = :crypto.strong_rand_bytes(16)
     {:ok, a} = ThistleTea.Account.get_user(username)
     ThousandIsland.Socket.send(socket, <<2, 0>> <> challenge_data <> a.password_salt)
     {:continue, Map.merge(state, %{username: username, challenge_data: challenge_data})}
   end
 
-  @impl ThousandIsland.Handler
-  def handle_data(
-        <<@cmd_auth_reconnect_proof, proof_data::little-bytes-size(16), client_proof::little-bytes-size(20),
-          _client_checksum::little-bytes-size(20), _key_count>>,
-        socket,
-        state
-      ) do
+  defp handle_packet(
+         <<@cmd_auth_reconnect_proof, proof_data::little-bytes-size(16), client_proof::little-bytes-size(20),
+           _client_checksum::little-bytes-size(20), _key_count>>,
+         socket,
+         state
+       ) do
     username = state.account.username
     Logger.info("CMD_AUTH_RECONNECT_PROOF")
     [{_, session}] = :ets.lookup(:session, username)
@@ -181,8 +241,8 @@ defmodule ThistleTea.Auth do
 
     if client_proof === server_proof do
       Logger.info("RECONNECT SUCCESS")
-      {:continue, state}
       ThousandIsland.Socket.send(socket, <<3, 0>>)
+      {:continue, state}
     else
       Logger.error("RECONNECT FAILURE")
       ThousandIsland.Socket.send(socket, <<3, 1>>)
@@ -190,15 +250,14 @@ defmodule ThistleTea.Auth do
     end
   end
 
-  @impl ThousandIsland.Handler
-  def handle_data(<<opcode, _packet::binary>>, socket, state) do
+  defp handle_packet(<<opcode, _packet::binary>>, socket, state) do
     Logger.error("UNIMPLEMENTED: #{inspect(opcode, base: :hex)}")
     ThousandIsland.Socket.send(socket, <<0, 0, 5>>)
     {:close, state}
   end
 
   defp interleave(s) do
-    list = Binary.to_list(s)
+    list = Binary.to_list(pad_trailing(s, 32))
 
     t1 = Binary.from_list(interleave_t1(list))
     t2 = Binary.from_list(interleave_t2(list))
@@ -214,4 +273,10 @@ defmodule ThistleTea.Auth do
 
   defp interleave_t2([_, b | rest]), do: [b | interleave_t2(rest)]
   defp interleave_t2([]), do: []
+
+  defp pad_trailing(bin, size) when byte_size(bin) >= size, do: bin
+  defp pad_trailing(bin, size), do: bin <> :binary.copy(<<0>>, size - byte_size(bin))
+
+  defp pad_leading(bin, size) when byte_size(bin) >= size, do: bin
+  defp pad_leading(bin, size), do: :binary.copy(<<0>>, size - byte_size(bin)) <> bin
 end
