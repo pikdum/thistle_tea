@@ -22,6 +22,16 @@ defmodule ThistleTea.Game.World.MetadataTest do
       assert :ets.whereis(table) != :undefined
       :ets.delete(table)
     end
+
+    test "creates a read and write concurrent table" do
+      table = :"metadata_options_test_#{System.unique_integer([:positive])}"
+      Metadata.init(table)
+
+      assert :ets.info(table, :read_concurrency) == true
+      assert :ets.info(table, :write_concurrency) == :auto
+
+      :ets.delete(table)
+    end
   end
 
   describe "put/3 and get/2" do

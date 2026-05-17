@@ -1,9 +1,11 @@
 defmodule ThistleTea.Game.World.Metadata do
+  @table_options [:named_table, :public, read_concurrency: true, write_concurrency: :auto]
+
   def init(table \\ __MODULE__) do
     if is_atom(table) do
       case :ets.whereis(table) do
         :undefined ->
-          :ets.new(table, [:named_table, :public, read_concurrency: true, write_concurrency: true])
+          :ets.new(table, @table_options)
 
         _table_id ->
           table

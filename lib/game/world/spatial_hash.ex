@@ -1,17 +1,13 @@
 defmodule ThistleTea.Game.World.SpatialHash do
   @cell_size 125
-  # TODO: benchmark different cell sizes
+  @cell_table_options [:named_table, :public, :duplicate_bag, read_concurrency: true, write_concurrency: :auto]
+  @entity_table_options [:named_table, :public, :set, read_concurrency: true, write_concurrency: :auto]
 
-  # TODO: benchmark some different options:
-  # - :write_concurrency
-  # - :read_concurrency
-  # - :decentralized_counters
-  # - :compressed: doesn't seem worth it, since data is small
   def setup_tables do
-    :ets.new(:players, [:named_table, :public, :duplicate_bag])
-    :ets.new(:mobs, [:named_table, :public, :duplicate_bag])
-    :ets.new(:game_objects, [:named_table, :public, :duplicate_bag])
-    :ets.new(:entities, [:named_table, :public, :set])
+    :ets.new(:players, @cell_table_options)
+    :ets.new(:mobs, @cell_table_options)
+    :ets.new(:game_objects, @cell_table_options)
+    :ets.new(:entities, @entity_table_options)
   end
 
   def insert(table, guid, map, x, y, z) do

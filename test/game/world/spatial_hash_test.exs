@@ -3,6 +3,15 @@ defmodule ThistleTea.Game.World.SpatialHashTest do
 
   alias ThistleTea.Game.World.SpatialHash
 
+  describe "setup_tables/0" do
+    test "creates read and write concurrent lookup tables" do
+      for table <- [:players, :mobs, :game_objects, :entities] do
+        assert :ets.info(table, :read_concurrency) == true
+        assert :ets.info(table, :write_concurrency) == :auto
+      end
+    end
+  end
+
   describe "distance/2" do
     test "calculates euclidean distance" do
       assert SpatialHash.distance({0, 0, 0}, {3, 4, 0}) == 5.0

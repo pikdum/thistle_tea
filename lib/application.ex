@@ -69,9 +69,9 @@ defmodule ThistleTea.Application do
 
     :ok = ThistleTeaWeb.Homography.init()
 
-    :ets.new(:session, [:named_table, :public])
+    :ets.new(:session, [:named_table, :public, read_concurrency: true, write_concurrency: :auto])
     Metadata.init()
-    :ets.new(:spline_counters, [:named_table, :public])
+    :ets.new(:spline_counters, [:named_table, :public, write_concurrency: :auto])
     :ets.insert(:spline_counters, {:spline_id, 0})
     setup_database()
     SpatialHash.setup_tables()
