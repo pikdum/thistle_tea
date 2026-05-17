@@ -2,7 +2,9 @@ defmodule ThistleTea.Game.Network.Message.CmsgMessagechat do
   use ThistleTea.Game.Network.ClientMessage, :CMSG_MESSAGECHAT
 
   alias ThistleTea.Game.Entity
+  alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.Player.Stats
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Metadata
 
@@ -71,9 +73,12 @@ defmodule ThistleTea.Game.Network.Message.CmsgMessagechat do
   def handle_chat(state, _, _, ".help" <> _, _) do
     commands = [
       ".debug spells - learn the MVP spell test set (Heroic Strike, Frostbolt, Fireball, Frost Armor, Frost Nova, Blizzard, Arcane Explosion)",
+      ".character level <level> - set player level",
       ".go xyz <x> <y> <z> [map] - teleport",
       ".guid - show target guid",
       ".help - show help",
+      ".learn <spell_id> - learn a spell",
+      ".levelup [levels] - increase player level",
       ".modify speed <rate> - modify player speed from 0.1 to 10",
       ".move - move target to you",
       ".pid - show target pid",
@@ -95,6 +100,34 @@ defmodule ThistleTea.Game.Network.Message.CmsgMessagechat do
     handle_chat(state, a, b, ".modify speed" <> rest, c)
   end
 
+  def handle_chat(state, _, _, ".character level" <> params, _) do
+    params
+    |> String.split(" ", trim: true)
+    |> case do
+      [level] -> handle_set_level(state, level)
+      _ -> system_message(state, "Invalid command. Use: .character level <level>")
+    end
+  end
+
+  def handle_chat(state, _, _, ".levelup" <> params, _) do
+    params
+    |> String.split(" ", trim: true)
+    |> case do
+      [] -> handle_levelup(state, "1")
+      [levels] -> handle_levelup(state, levels)
+      _ -> system_message(state, "Invalid command. Use: .levelup [levels]")
+    end
+  end
+
+  def handle_chat(state, _, _, ".learn" <> params, _) do
+    params
+    |> String.split(" ", trim: true)
+    |> case do
+      [spell_id] -> handle_learn_spell(state, spell_id)
+      _ -> system_message(state, "Invalid command. Use: .learn <spell_id>")
+    end
+  end
+
   def handle_chat(state, _, _, ".modify" <> params, _) do
     params
     |> String.split(" ", trim: true)
@@ -111,39 +144,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgMessagechat do
   end
 
   def handle_chat(state, _, _, ".debug spells" <> _, _) do
-    %{character: %ThistleTea.Character{internal: internal} = character} = state
-
-    existing_ids = MapSet.new(internal.spells || [])
-    new_ids = Enum.reject(@debug_spells, &MapSet.member?(existing_ids, &1))
-
-    case new_ids do
-      [] ->
-        system_message(state, "Already know all debug spells.")
-
-      _ ->
-        all_ids = (internal.spells || []) ++ new_ids
-        spellbook = SpellLoader.build_spellbook(all_ids)
-
-        character = %{character | internal: %{internal | spells: all_ids, spellbook: spellbook}}
-        ThistleTea.Character.save(character)
-
-        for id <- new_ids do
-          Network.send_packet(%Message.SmsgLearnedSpell{spell_id: id})
-        end
-
-        names =
-          new_ids
-          |> Enum.map_join(", ", fn id ->
-            case Map.get(spellbook, id) do
-              %{name: name} -> name
-              _ -> "spell #{id}"
-            end
-          end)
-
-        state
-        |> Map.put(:character, character)
-        |> system_message("Learned: #{names}")
-    end
+    learn_spells(state, @debug_spells, "Already know all debug spells.")
   end
 
   def handle_chat(state, _, _, ".tgm" <> _, _) do
@@ -318,6 +319,127 @@ defmodule ThistleTea.Game.Network.Message.CmsgMessagechat do
       _ ->
         state
         |> system_message("Invalid speed. Use: .modify speed <rate 0.1 - 10.0>")
+    end
+  end
+
+  defp handle_set_level(%{character: %ThistleTea.Character{}} = state, level) do
+    with {:ok, level} <- parse_positive_integer(level),
+         {:ok, character, level_up} <- set_character_level(state.character, level) do
+      state
+      |> maybe_send_level_up(level_up)
+      |> put_character(character)
+      |> system_message("Level set to #{character.unit.level}.")
+    else
+      _ -> system_message(state, "Invalid level.")
+    end
+  end
+
+  defp handle_levelup(%{character: %ThistleTea.Character{unit: %{level: level}}} = state, levels) do
+    with {:ok, levels} <- parse_positive_integer(levels),
+         {:ok, character, level_up} <- set_character_level(state.character, level + levels) do
+      state
+      |> maybe_send_level_up(level_up)
+      |> put_character(character)
+      |> system_message("Level set to #{character.unit.level}.")
+    else
+      _ -> system_message(state, "Invalid level count.")
+    end
+  end
+
+  defp handle_learn_spell(state, spell_id) do
+    case parse_positive_integer(spell_id) do
+      {:ok, spell_id} -> learn_spells(state, [spell_id], "Already know spell #{spell_id}.")
+      :error -> system_message(state, "Invalid spell id.")
+    end
+  end
+
+  defp set_character_level(%ThistleTea.Character{} = character, level) do
+    level = min(level, Stats.max_level())
+    old_stats = Stats.from_character(character)
+
+    case Stats.get(character.unit.race, character.unit.class, level) do
+      {:ok, new_stats} ->
+        character =
+          character
+          |> Stats.apply(new_stats)
+          |> put_player_xp(0)
+
+        level_up =
+          if new_stats.level > old_stats.level do
+            Stats.level_delta(old_stats, new_stats)
+          end
+
+        {:ok, character, level_up}
+
+      _ ->
+        :error
+    end
+  end
+
+  defp put_player_xp(%ThistleTea.Character{player: player} = character, xp) do
+    %{character | player: %{player | xp: xp}}
+  end
+
+  defp put_character(%{guid: guid} = state, %ThistleTea.Character{} = character) do
+    ThistleTea.Character.save(character)
+    Metadata.update(guid, %{level: character.unit.level, alive?: character.unit.health > 0})
+
+    update = Core.update_object(character, :values)
+    Network.send_packet(update)
+    World.broadcast_packet(update, character, include_self?: false)
+
+    %{state | character: character}
+  end
+
+  defp maybe_send_level_up(state, nil), do: state
+
+  defp maybe_send_level_up(state, level_up) when is_map(level_up) do
+    Network.send_packet(struct(Message.SmsgLevelupInfo, level_up))
+    state
+  end
+
+  defp learn_spells(
+         %{character: %ThistleTea.Character{internal: internal} = character} = state,
+         spell_ids,
+         known_message
+       ) do
+    existing_ids = MapSet.new(internal.spells || [])
+    new_ids = Enum.reject(spell_ids, &MapSet.member?(existing_ids, &1))
+
+    case new_ids do
+      [] ->
+        system_message(state, known_message)
+
+      _ ->
+        all_ids = (internal.spells || []) ++ new_ids
+        spellbook = SpellLoader.build_spellbook(all_ids)
+
+        character = %{character | internal: %{internal | spells: all_ids, spellbook: spellbook}}
+        ThistleTea.Character.save(character)
+
+        for id <- new_ids do
+          Network.send_packet(%Message.SmsgLearnedSpell{spell_id: id})
+        end
+
+        names =
+          new_ids
+          |> Enum.map_join(", ", fn id ->
+            case Map.get(spellbook, id) do
+              %{name: name} -> name
+              _ -> "spell #{id}"
+            end
+          end)
+
+        state
+        |> Map.put(:character, character)
+        |> system_message("Learned: #{names}")
+    end
+  end
+
+  defp parse_positive_integer(value) do
+    case Integer.parse(value) do
+      {value, ""} when value > 0 -> {:ok, value}
+      _ -> :error
     end
   end
 
