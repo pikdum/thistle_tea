@@ -2,6 +2,7 @@ defmodule ThistleTea.Game.Entity.Logic.HostilityTest do
   use ExUnit.Case, async: true
 
   alias ThistleTea.Game.Entity.Logic.Hostility
+  alias ThistleTea.Game.Guid
 
   describe "hostile?/2" do
     test "uses faction template enemy masks" do
@@ -12,6 +13,34 @@ defmodule ThistleTea.Game.Entity.Logic.HostilityTest do
     test "honors explicit friend factions before masks" do
       assert FactionTemplate.friendly_to?(friendly_defias(), defias())
       refute FactionTemplate.hostile_to?(friendly_defias(), defias())
+    end
+  end
+
+  describe "valid_attack_target?/2" do
+    test "allows players to attack neutral creature factions without reputation" do
+      player = player(alliance())
+      target = mob(wolf(), faction_can_have_reputation?: false)
+
+      refute Hostility.valid_hostile_target?(player, target)
+      assert Hostility.valid_attack_target?(player, target)
+    end
+
+    test "does not allow players to attack friendly neutral targets" do
+      player = player(alliance())
+      target = mob(friendly(), faction_can_have_reputation?: false)
+
+      refute Hostility.valid_attack_target?(player, target)
+    end
+
+    test "does not allow neutral player creature attacks when the creature faction has reputation" do
+      player = player(alliance())
+      target = mob(wolf(), faction_can_have_reputation?: true)
+
+      refute Hostility.valid_attack_target?(player, target)
+    end
+
+    test "does not allow neutral creature versus creature attacks" do
+      refute Hostility.valid_attack_target?(mob(wolf()), mob(neutral_creature()))
     end
   end
 
@@ -43,5 +72,28 @@ defmodule ThistleTea.Game.Entity.Logic.HostilityTest do
 
   defp neutral_creature do
     %FactionTemplate{id: 7, faction: 7, flags: 0, faction_group: 0, friend_group: 0, enemy_group: 0}
+  end
+
+  defp friendly do
+    %FactionTemplate{id: 35, faction: 31, flags: 0, faction_group: 0, friend_group: 1, enemy_group: 0, friends_0: 31}
+  end
+
+  defp player(faction_template) do
+    %{
+      object: %{guid: Guid.from_low_guid(:player, 1)},
+      faction_template: faction_template,
+      unit_flags: 0,
+      alive?: true
+    }
+  end
+
+  defp mob(faction_template, opts \\ []) do
+    %{
+      guid: Guid.from_low_guid(:mob, faction_template.id || 1, System.unique_integer([:positive])),
+      faction_template: faction_template,
+      faction_can_have_reputation?: Keyword.get(opts, :faction_can_have_reputation?, false),
+      unit_flags: 0,
+      alive?: true
+    }
   end
 end

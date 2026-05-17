@@ -61,7 +61,7 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
   defp hostile_living_guids(results, caster, caster_guid) do
     results
     |> Enum.reject(fn {guid, _distance} -> guid == caster_guid end)
-    |> Enum.filter(fn {guid, _distance} -> Hostility.valid_hostile_target?(caster, guid) end)
+    |> Enum.filter(fn {guid, _distance} -> Hostility.valid_attack_target?(caster, guid) end)
     |> Enum.map(fn {guid, _distance} -> guid end)
   end
 end

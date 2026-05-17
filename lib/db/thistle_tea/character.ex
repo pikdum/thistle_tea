@@ -12,6 +12,8 @@ defmodule ThistleTea.Character do
     type: :ordered_set,
     autoincrement: true
 
+  import Bitwise, only: [|||: 2]
+
   alias ThistleTea.DB.Mangos
   alias ThistleTea.DB.Mangos.ItemTemplate
   alias ThistleTea.DBC
@@ -23,6 +25,9 @@ defmodule ThistleTea.Character do
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.Message.CmsgCharCreate
   alias ThistleTea.Game.Player.Stats
+
+  @unit_flag_player_controlled 0x00000008
+  @unit_flag_use_swim_animation 0x00008000
 
   def build(%CmsgCharCreate{} = params, account_id) do
     info = Mangos.PlayerCreateInfo.get(params.race, params.class)
@@ -76,8 +81,7 @@ defmodule ThistleTea.Character do
         base_mana: stats.base_mana,
         base_health: stats.base_health,
         sheath_state: 0,
-        # UNIT_FLAG_USE_SWIM_ANIMATION
-        flags: 0x00008000,
+        flags: @unit_flag_player_controlled ||| @unit_flag_use_swim_animation,
         auras: []
       },
       player: %Player{
