@@ -45,6 +45,7 @@
 ### Formatting
 - No comments in code (keep functions self-documenting via naming)
 - Use snake_case for atoms and files, PascalCase for modules
+- Use conventional commits
 
 ### Error Handling
 - Use `rescue` blocks in GenServer handle callbacks to prevent crashes
