@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.Network.Message.CmsgCastSpell do
   use ThistleTea.Game.Network.ClientMessage, :CMSG_CAST_SPELL
 
+  alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.Logic.AI.BT.Spell, as: SpellBT
   alias ThistleTea.Game.Network.Message
@@ -39,6 +40,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgCastSpell do
     state
     |> Map.put(:character, character)
     |> Map.delete(:spell)
+    |> ensure_player_tick_for_auras()
   end
 
   def handle_spell_complete(state), do: state
@@ -85,6 +87,12 @@ defmodule ThistleTea.Game.Network.Message.CmsgCastSpell do
   end
 
   defp lookup_spell(_state, _spell_id), do: nil
+
+  defp ensure_player_tick_for_auras(%{character: %{unit: %Unit{auras: [_ | _]}}} = state) do
+    ensure_player_tick(state)
+  end
+
+  defp ensure_player_tick_for_auras(state), do: state
 
   defp ensure_player_tick(state) do
     case Map.get(state, :player_tick_ref) do

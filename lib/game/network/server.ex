@@ -343,7 +343,7 @@ defmodule ThistleTea.Game.Network.Server do
     character = EventSink.emit_pending(character)
     state = Map.put(state, :character, character)
     state = schedule_player_tick(state, character, status)
-    {:noreply, {socket, state}, socket.read_timeout}
+    {:noreply, {socket, state}, {:continue, :maybe_broadcast_update}}
   rescue
     _ -> {:noreply, {socket, state}, socket.read_timeout}
   end
