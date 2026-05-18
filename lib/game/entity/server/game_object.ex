@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.System.GameEvent
+  alias ThistleTea.Game.World.Visibility
 
   def start_link(%GameObject{} = state) do
     GenServer.start_link(__MODULE__, state, name: EntityRegistry.via(state.object.guid))
@@ -17,6 +18,7 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
     GameEvent.subscribe(state)
     Process.flag(:trap_exit, true)
     World.update_position(state)
+    state = Visibility.join_entity(state)
     {:ok, state}
   end
 
@@ -44,5 +46,8 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
   end
 
   @impl GenServer
-  def terminate(_reason, state), do: World.remove_position(state)
+  def terminate(_reason, state) do
+    World.remove_position(state)
+    Visibility.leave_entity(state)
+  end
 end

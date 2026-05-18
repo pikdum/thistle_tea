@@ -75,13 +75,10 @@ defmodule ThistleTea.Game.Network.Message.CmsgPlayerLogin do
     # join
     SpatialHash.update(:players, character_guid, c.internal.map, x1, y1, z1)
 
-    {:ok, spawn_timer} = :timer.send_interval(1000, :spawn_objects)
-
     Map.merge(state, %{
       guid: character_guid,
       packed_guid: BinaryUtils.pack_guid(character_guid),
       character: c,
-      spawn_timer: spawn_timer,
       tracked_entities: MapSet.new(),
       ready: false
     })

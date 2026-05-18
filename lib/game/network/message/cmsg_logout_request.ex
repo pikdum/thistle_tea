@@ -4,6 +4,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgLogoutRequest do
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World.SpatialHash
+  alias ThistleTea.Game.World.Visibility
 
   require Logger
 
@@ -28,14 +29,11 @@ defmodule ThistleTea.Game.Network.Message.CmsgLogoutRequest do
       ThistleTea.Character.save(state.character)
     end
 
-    if Map.get(state, :spawn_timer) do
-      :timer.cancel(state.spawn_timer)
-    end
-
     if Map.get(state, :guid) do
       Entity.unregister(state.guid)
       # remove from map
       SpatialHash.remove(:players, state.guid)
+      state = Visibility.leave_player(state)
 
       # leave all chat channels
       ThistleTea.ChatChannel

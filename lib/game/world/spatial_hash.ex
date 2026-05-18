@@ -11,7 +11,7 @@ defmodule ThistleTea.Game.World.SpatialHash do
   end
 
   def insert(table, guid, map, x, y, z) do
-    hash = hash_position(map, x, y, z)
+    hash = cell(map, x, y, z)
     :ets.insert(table, {hash, guid})
     :ets.insert(:entities, {guid, map, x, y, z})
   end
@@ -19,8 +19,8 @@ defmodule ThistleTea.Game.World.SpatialHash do
   def update(table, guid, new_map, new_x, new_y, new_z) do
     case :ets.lookup(:entities, guid) do
       [{^guid, old_map, old_x, old_y, old_z}] ->
-        old_hash = hash_position(old_map, old_x, old_y, old_z)
-        new_hash = hash_position(new_map, new_x, new_y, new_z)
+        old_hash = cell(old_map, old_x, old_y, old_z)
+        new_hash = cell(new_map, new_x, new_y, new_z)
 
         :ets.insert(:entities, {guid, new_map, new_x, new_y, new_z})
 
@@ -37,7 +37,7 @@ defmodule ThistleTea.Game.World.SpatialHash do
   def remove(table, guid) do
     case :ets.lookup(:entities, guid) do
       [{^guid, map, x, y, z}] ->
-        hash = hash_position(map, x, y, z)
+        hash = cell(map, x, y, z)
         :ets.delete_object(table, {hash, guid})
         :ets.delete(:entities, guid)
 
@@ -67,7 +67,7 @@ defmodule ThistleTea.Game.World.SpatialHash do
   Given a hash tuple `{map, cx, cy}`, it returns a tuple of tuples
   representing the min (inclusive) and max (exclusive) coordinates for the cell.
 
-  The boundaries take into account the rounding behavior of `hash_position/4`.
+  The boundaries take into account the rounding behavior of `cell/4`.
 
   ## Example
 
@@ -83,11 +83,11 @@ defmodule ThistleTea.Game.World.SpatialHash do
     {{x1, x2}, {y1, y2}}
   end
 
-  defp hash_position(map, x, y, _z) do
+  def cell(map, x, y, _z) do
     {map, div(round(x), @cell_size), div(round(y), @cell_size)}
   end
 
-  defp cells_in_range(map, x, y, _z, range) do
+  def cells_in_range(map, x, y, _z, range) do
     cell_range = div(round(range), @cell_size) + 1
     rounded_x = round(x)
     rounded_y = round(y)

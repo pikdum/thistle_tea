@@ -5,7 +5,6 @@ defmodule ThistleTea.Game.Network.Server do
   import Bitwise, only: [|||: 2]
 
   alias ThistleTea.Character
-  alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Unit
@@ -16,7 +15,6 @@ defmodule ThistleTea.Game.Network.Server do
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Experience
   alias ThistleTea.Game.Entity.Logic.SpellEffect
-  alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Connection
   alias ThistleTea.Game.Network.Message
@@ -29,6 +27,7 @@ defmodule ThistleTea.Game.Network.Server do
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Pathfinding
   alias ThistleTea.Game.World.SpatialHash
+  alias ThistleTea.Game.World.Visibility
   alias ThousandIsland.Socket
 
   require Logger
@@ -272,6 +271,8 @@ defmodule ThistleTea.Game.Network.Server do
 
   @impl GenServer
   def handle_cast({:start_teleport, x, y, z, map}, {socket, state}) do
+    state = Visibility.leave_player(state)
+
     # Send player's client to loading screen to load the new map
     Network.send_packet(%Message.SmsgTransferPending{map: map, has_transport: false})
 
@@ -347,86 +348,9 @@ defmodule ThistleTea.Game.Network.Server do
   end
 
   @impl GenServer
-  def handle_info(:spawn_objects, {socket, %{character: c, ready: true} = state}) do
-    # TODO: add telemetry for periodic tasks
-    {x, y, z, _o} = c.movement_block.position
-
-    old_players = tracked_entities(state, :player)
-    old_mobs = tracked_entities(state, :mob)
-    old_game_objects = tracked_entities(state, :game_object)
-
-    new_players =
-      SpatialHash.query(:players, c.internal.map, x, y, z, 250)
-      |> MapSet.new(fn {guid, _distance} -> guid end)
-
-    new_mobs =
-      SpatialHash.query(:mobs, c.internal.map, x, y, z, 250)
-      |> MapSet.new(fn {guid, _distance} -> guid end)
-
-    new_game_objects =
-      SpatialHash.query(:game_objects, c.internal.map, x, y, z, 250)
-      |> MapSet.new(fn {guid, _distance} -> guid end)
-
-    players_to_remove = MapSet.difference(old_players, new_players)
-    mobs_to_remove = MapSet.difference(old_mobs, new_mobs)
-    game_objects_to_remove = MapSet.difference(old_game_objects, new_game_objects)
-
-    players_to_add = MapSet.difference(new_players, old_players)
-    mobs_to_add = MapSet.difference(new_mobs, old_mobs)
-    game_objects_to_add = MapSet.difference(new_game_objects, old_game_objects)
-
-    # TODO: update a reverse mapping, so mobs know nearby players?
-    for guid <- players_to_remove do
-      if guid != state.guid do
-        Network.send_packet(%Message.SmsgDestroyObject{guid: guid})
-      end
-    end
-
-    for guid <- mobs_to_remove do
-      Network.send_packet(%Message.SmsgDestroyObject{guid: guid})
-    end
-
-    for guid <- game_objects_to_remove do
-      Network.send_packet(%Message.SmsgDestroyObject{guid: guid})
-    end
-
-    for guid <- players_to_add do
-      if guid != state.guid do
-        Entity.request_update_from(guid, state.guid)
-      end
-    end
-
-    for guid <- mobs_to_add do
-      Entity.request_update_from(guid, state.guid)
-    end
-
-    for guid <- game_objects_to_add do
-      Entity.request_update_from(guid, state.guid)
-    end
-
-    # TODO: redundant, refactor out?
-    player_guids = MapSet.to_list(new_players)
-    mob_guids = MapSet.to_list(new_mobs)
-
-    state =
-      Map.merge(state, %{
-        player_guids: player_guids,
-        mob_guids: mob_guids
-      })
-
+  def handle_info({:group, events, _info}, {socket, state}) do
+    state = Visibility.handle_events(state, events)
     {:noreply, {socket, state}, socket.read_timeout}
-  end
-
-  @impl GenServer
-  def handle_info(:spawn_objects, {socket, state}) do
-    {:noreply, {socket, state}, socket.read_timeout}
-  end
-
-  defp tracked_entities(state, entity_type) do
-    state
-    |> Map.get(:tracked_entities, MapSet.new())
-    |> Enum.filter(&(Guid.entity_type(&1) == entity_type))
-    |> MapSet.new()
   end
 
   @impl GenServer

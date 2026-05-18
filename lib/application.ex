@@ -8,6 +8,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.Entity.Registry, as: EntityRegistry
   alias ThistleTea.Game.Network.Server, as: GameServer
   alias ThistleTea.Game.World.EntitySupervisor
+  alias ThistleTea.Game.World.Groups
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.System.CellActivator
@@ -57,6 +58,7 @@ defmodule ThistleTea.Application do
         {Phoenix.PubSub, name: ThistleTea.PubSub},
         ThistleTea.Telemetry,
         GameEventSystem,
+        {Group, name: Groups, log: false},
         EntityRegistry,
         {Registry, keys: :duplicate, name: ThistleTea.ChatChannel},
         ThistleTea.DBC,

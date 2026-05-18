@@ -24,6 +24,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal do
     :running,
     :behavior_tree,
     :blackboard,
+    :visibility_cell,
     :movement_start_time,
     :movement_start_position,
     events: [],

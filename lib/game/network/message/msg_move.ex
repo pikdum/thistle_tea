@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.Network.Message.MsgMove do
   alias ThistleTea.Game.Network.Packet
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.World.SpatialHash
+  alias ThistleTea.Game.World.Visibility
 
   require Logger
 
@@ -44,6 +45,7 @@ defmodule ThistleTea.Game.Network.Message.MsgMove do
         end
 
       new_state
+      |> Visibility.refresh_player()
       |> randomize_equipment(opcode)
       |> broadcast(message)
     else

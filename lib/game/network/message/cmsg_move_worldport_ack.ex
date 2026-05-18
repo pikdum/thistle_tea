@@ -2,6 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgMoveWorldportAck do
   use ThistleTea.Game.Network.ClientMessage, :MSG_MOVE_WORLDPORT_ACK
 
   alias ThistleTea.Game.Network.Message.CmsgPlayerLogin
+  alias ThistleTea.Game.World.Visibility
 
   require Logger
 
@@ -10,7 +11,10 @@ defmodule ThistleTea.Game.Network.Message.CmsgMoveWorldportAck do
   @impl ClientMessage
   def handle(%__MODULE__{}, state) do
     CmsgPlayerLogin.send_login_init_packets(state.character)
-    %{state | ready: true}
+
+    state
+    |> Map.put(:ready, true)
+    |> Visibility.enter_player()
   end
 
   @impl ClientMessage

@@ -10,11 +10,11 @@ defmodule ThistleTea.Game.Network.Message.CmsgSetActiveMoverTest do
   end
 
   describe "handle/2" do
-    test "marks matching player ready and requests object spawn" do
+    test "marks matching player ready" do
       state = CmsgSetActiveMover.handle(%CmsgSetActiveMover{guid: 23}, %{guid: 23, ready: false})
 
       assert state.ready
-      assert_receive :spawn_objects
+      refute_receive :spawn_objects
     end
 
     test "ignores mismatched mover" do

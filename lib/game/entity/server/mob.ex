@@ -20,6 +20,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.World.Loader.Faction, as: FactionLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.System.GameEvent
+  alias ThistleTea.Game.World.Visibility
 
   @ai_tick_ms 100
   @ai_tick_max_ms 1_000
@@ -35,6 +36,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     Process.flag(:trap_exit, true)
     state = BT.init(state, MobBT.tree())
     World.update_position(state)
+    state = Visibility.join_entity(state)
 
     schedule_ai_tick(0)
 
@@ -45,6 +47,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   def handle_cast({:send_update_to, pid}, state) do
     state = Movement.sync_position(state, Time.now())
     World.update_position(state)
+    state = Visibility.refresh_entity(state)
 
     Core.update_object(state)
     |> Network.send_packet(pid)
@@ -107,6 +110,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   def handle_info(:ai_tick, %{internal: %Internal{behavior_tree: behavior_tree}} = state) do
     state = Movement.sync_position(state, Time.now())
     World.update_position(state)
+    state = Visibility.refresh_entity(state)
     {status, state} = BT.tick(behavior_tree, state)
     state = EventSink.emit_pending(state)
     schedule_ai_tick(ai_tick_delay(status))
@@ -159,7 +163,10 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   end
 
   @impl GenServer
-  def terminate(_reason, state), do: World.remove_position(state)
+  def terminate(_reason, state) do
+    World.remove_position(state)
+    Visibility.leave_entity(state)
+  end
 
   defp schedule_ai_tick(delay) when is_integer(delay) and delay >= 0 do
     Process.send_after(self(), :ai_tick, delay)
@@ -173,6 +180,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
   defp put_spawn_position(%Mob{} = state) do
     World.update_position(state)
+    state = Visibility.join_entity(state)
     update_metadata(state)
     state
   end

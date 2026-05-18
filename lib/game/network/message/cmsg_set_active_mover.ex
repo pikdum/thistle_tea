@@ -1,6 +1,8 @@
 defmodule ThistleTea.Game.Network.Message.CmsgSetActiveMover do
   use ThistleTea.Game.Network.ClientMessage, :CMSG_SET_ACTIVE_MOVER
 
+  alias ThistleTea.Game.World.Visibility
+
   defstruct [:guid]
 
   @impl ClientMessage
@@ -22,7 +24,8 @@ defmodule ThistleTea.Game.Network.Message.CmsgSetActiveMover do
   defp enter_world(%{ready: true} = state), do: state
 
   defp enter_world(state) do
-    Process.send(self(), :spawn_objects, [])
-    Map.put(state, :ready, true)
+    state
+    |> Map.put(:ready, true)
+    |> Visibility.enter_player()
   end
 end
