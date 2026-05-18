@@ -86,11 +86,10 @@ defmodule ThistleTea.Game.World.System.CellActivator do
   end
 
   defp expand_cells(cells) do
-    Enum.flat_map(cells, fn {map, x, y, z} ->
+    Enum.flat_map(cells, fn {map, x, y} ->
       for dx <- -@adjacent_cells..@adjacent_cells,
-          dy <- -@adjacent_cells..@adjacent_cells,
-          dz <- -@adjacent_cells..@adjacent_cells do
-        {map, x + dx, y + dy, z + dz}
+          dy <- -@adjacent_cells..@adjacent_cells do
+        {map, x + dx, y + dy}
       end
     end)
     |> MapSet.new()

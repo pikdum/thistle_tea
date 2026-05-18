@@ -73,8 +73,9 @@ defmodule ThistleTea.Game.World do
     include_self? = Keyword.get(opts, :include_self?, true)
     source_guid = entity_guid(entity)
 
-    nearby_players(entity, range)
-    |> Enum.each(fn {guid, _distance} ->
+    opts
+    |> broadcast_recipients(entity, range)
+    |> Enum.each(fn guid ->
       if include_self? or guid != source_guid do
         Network.send_packet(packet, guid, source_guid: source_guid)
       end
@@ -124,4 +125,19 @@ defmodule ThistleTea.Game.World do
   defp entity_guid(%{object: %{guid: guid}}) when is_integer(guid), do: guid
   defp entity_guid(%{guid: guid}) when is_integer(guid), do: guid
   defp entity_guid(_entity), do: nil
+
+  defp broadcast_recipients(opts, entity, range) do
+    opts
+    |> Keyword.get(:recipients)
+    |> normalize_recipients(entity, range)
+  end
+
+  defp normalize_recipients(recipients, _entity, _range) when is_list(recipients), do: recipients
+  defp normalize_recipients(%MapSet{} = recipients, _entity, _range), do: MapSet.to_list(recipients)
+
+  defp normalize_recipients(_recipients, entity, range) do
+    entity
+    |> nearby_players(range)
+    |> Enum.map(fn {guid, _distance} -> guid end)
+  end
 end

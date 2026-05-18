@@ -58,8 +58,6 @@ defmodule ThistleTea.Game.Network.Server do
 
     case Packet.implemented?(packet.opcode) do
       true ->
-        Logger.debug("Received: #{message_name}")
-
         state =
           :telemetry.span([:thistle_tea, :handle_packet], %{opcode: packet.opcode}, fn ->
             state = Packet.to_message(packet) |> Message.handle(state)

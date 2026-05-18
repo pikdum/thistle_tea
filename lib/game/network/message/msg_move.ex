@@ -62,7 +62,7 @@ defmodule ThistleTea.Game.Network.Message.MsgMove do
 
   defp broadcast(state, message) do
     Packet.build(state.packed_guid <> message.payload, message.opcode)
-    |> World.broadcast_packet(state.character, include_self?: false)
+    |> World.broadcast_packet(state.character, include_self?: false, recipients: Map.get(state, :player_guids))
 
     state
   end

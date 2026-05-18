@@ -39,13 +39,13 @@ defmodule ThistleTea.DB.Mangos.Creature do
     )
   end
 
-  def query_cell({map, _x, _y, _z} = cell, events \\ []) do
-    {{x1, x2}, {y1, y2}, {z1, z2}} = SpatialHash.cell_bounds(cell)
+  def query_cell({map, _x, _y} = cell, events \\ []) do
+    {{x1, x2}, {y1, y2}} = SpatialHash.cell_bounds(cell)
 
     from(c in __MODULE__,
       where:
         c.map == ^map and c.position_x >= ^x1 and c.position_x < ^x2 and c.position_y >= ^y1 and
-          c.position_y < ^y2 and c.position_z >= ^z1 and c.position_z < ^z2,
+          c.position_y < ^y2,
       join: ct in assoc(c, :creature_template),
       left_join: ce in assoc(c, :game_event_creature),
       where: ce.event in ^events or is_nil(ce.event),

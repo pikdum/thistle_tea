@@ -22,10 +22,8 @@ defmodule ThistleTea.Game.World.SpatialHash do
         old_hash = hash_position(old_map, old_x, old_y, old_z)
         new_hash = hash_position(new_map, new_x, new_y, new_z)
 
-        # update exact location regardless
         :ets.insert(:entities, {guid, new_map, new_x, new_y, new_z})
 
-        # only update cell if it changed
         if old_hash != new_hash do
           :ets.delete_object(table, {old_hash, guid})
           :ets.insert(table, {new_hash, guid})
@@ -66,46 +64,40 @@ defmodule ThistleTea.Game.World.SpatialHash do
   @doc """
   Calculates the coordinate boundaries of a spatial hash cell.
 
-  Given a hash tuple `{map, cx, cy, cz}`, it returns a tuple of tuples
+  Given a hash tuple `{map, cx, cy}`, it returns a tuple of tuples
   representing the min (inclusive) and max (exclusive) coordinates for the cell.
 
   The boundaries take into account the rounding behavior of `hash_position/4`.
 
   ## Example
 
-      iex> SpatialHash.cell_bounds({0, 1, 2, 3})
-      {{124.5, 249.5}, {249.5, 374.5}, {374.5, 499.5}}
+      iex> SpatialHash.cell_bounds({0, 1, 2})
+      {{124.5, 249.5}, {249.5, 374.5}}
 
   """
-  def cell_bounds({_map, cx, cy, cz}) do
+  def cell_bounds({_map, cx, cy}) do
     x1 = cx * @cell_size - 0.5
     x2 = (cx + 1) * @cell_size - 0.5
     y1 = cy * @cell_size - 0.5
     y2 = (cy + 1) * @cell_size - 0.5
-    z1 = cz * @cell_size - 0.5
-    z2 = (cz + 1) * @cell_size - 0.5
-    {{x1, x2}, {y1, y2}, {z1, z2}}
+    {{x1, x2}, {y1, y2}}
   end
 
-  defp hash_position(map, x, y, z) do
-    {map, div(round(x), @cell_size), div(round(y), @cell_size), div(round(z), @cell_size)}
+  defp hash_position(map, x, y, _z) do
+    {map, div(round(x), @cell_size), div(round(y), @cell_size)}
   end
 
-  defp cells_in_range(map, x, y, z, range) do
+  defp cells_in_range(map, x, y, _z, range) do
     cell_range = div(round(range), @cell_size) + 1
     rounded_x = round(x)
     rounded_y = round(y)
-    rounded_z = round(z)
 
     for dx <- -cell_range..cell_range,
-        dy <- -cell_range..cell_range,
-        dz <- -cell_range..cell_range do
+        dy <- -cell_range..cell_range do
       {
         map,
-        #
         div(rounded_x + dx * @cell_size, @cell_size),
-        div(rounded_y + dy * @cell_size, @cell_size),
-        div(rounded_z + dz * @cell_size, @cell_size)
+        div(rounded_y + dy * @cell_size, @cell_size)
       }
     end
     |> Enum.uniq()
