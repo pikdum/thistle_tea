@@ -40,6 +40,11 @@ defmodule ThistleTea.Application do
       ThistleTea.Account.register("test#{i}", "test#{i}")
     end)
 
+    Enum.each(0..999, fn i ->
+      name = "BOT" <> String.pad_leading(Integer.to_string(i), 4, "0")
+      ThistleTea.Account.register(name, name)
+    end)
+
     Memento.Table.create!(ThistleTea.Character)
   end
 
