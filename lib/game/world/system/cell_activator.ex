@@ -1,31 +1,30 @@
 defmodule ThistleTea.Game.World.System.CellActivator do
   @moduledoc """
-  Spawns and despawns cells based on nearby players.
+  Spawns cells that are visible to players.
   """
   use GenServer
 
   alias ThistleTea.Game.World.Loader
-  alias ThistleTea.Game.World.SpatialHash
 
   require Logger
 
-  defstruct cells: MapSet.new()
+  defstruct cells: MapSet.new(), loader: nil
 
-  @adjacent_cells 2
-  @poll_interval 1_000
-
-  def start_link(_) do
-    GenServer.start_link(__MODULE__, nil, name: __MODULE__)
+  def start_link(opts) do
+    GenServer.start_link(__MODULE__, opts, name: Keyword.get(opts, :name, __MODULE__))
   end
 
-  def invalidate do
-    GenServer.cast(__MODULE__, :invalidate)
+  def activate(cells, server \\ __MODULE__) do
+    GenServer.cast(server, {:activate, cells})
+  end
+
+  def invalidate(server \\ __MODULE__) do
+    GenServer.cast(server, :invalidate)
   end
 
   @impl GenServer
-  def init(_) do
-    :timer.send_interval(@poll_interval, :poll)
-    {:ok, %__MODULE__{}}
+  def init(opts) do
+    {:ok, %__MODULE__{loader: Keyword.get(opts, :loader, &load_cell/1)}}
   end
 
   @impl GenServer
@@ -33,36 +32,25 @@ defmodule ThistleTea.Game.World.System.CellActivator do
     {:noreply, %{state | cells: MapSet.new()}}
   end
 
-  @impl GenServer
-  def handle_info(:poll, %__MODULE__{cells: old_cells} = state) do
-    cells = player_cells() |> expand_cells()
+  def handle_cast({:activate, cells}, %__MODULE__{cells: old_cells} = state) do
+    cells = MapSet.new(cells)
     to_add = MapSet.difference(cells, old_cells)
-    :ok = start_cells(to_add)
-    {:noreply, %{state | cells: cells}}
+    :ok = start_cells(to_add, state.loader)
+    {:noreply, %{state | cells: MapSet.union(old_cells, cells)}}
   end
 
-  defp start_cells(cells), do: Enum.each(cells, &start_cell/1)
+  defp start_cells(cells, loader), do: Enum.each(cells, &start_cell(&1, loader))
 
-  defp start_cell(cell) do
+  defp start_cell(cell, loader) do
     Logger.debug("Activating cell: #{inspect(cell)}")
 
     Task.start(fn ->
-      Loader.Mob.load(cell)
-      Loader.GameObject.load(cell)
+      loader.(cell)
     end)
   end
 
-  defp player_cells do
-    SpatialHash.cells(:players)
-  end
-
-  defp expand_cells(cells) do
-    Enum.flat_map(cells, fn {map, x, y} ->
-      for dx <- -@adjacent_cells..@adjacent_cells,
-          dy <- -@adjacent_cells..@adjacent_cells do
-        {map, x + dx, y + dy}
-      end
-    end)
-    |> MapSet.new()
+  defp load_cell(cell) do
+    Loader.Mob.load(cell)
+    Loader.GameObject.load(cell)
   end
 end

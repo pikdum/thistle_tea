@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.World.Visibility do
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World.Groups
   alias ThistleTea.Game.World.SpatialHash
+  alias ThistleTea.Game.World.System.CellActivator
 
   @group Groups
   @range 250
@@ -18,6 +19,7 @@ defmodule ThistleTea.Game.World.Visibility do
   def enter_player(%{character: character, guid: guid} = state) do
     character = join_entity(character)
     cells = visible_cells(character)
+    activate_cells(state, cells)
     Enum.each(cells, &Group.monitor(@group, cell_key(&1)))
 
     state
@@ -40,6 +42,7 @@ defmodule ThistleTea.Game.World.Visibility do
       removed_cells = MapSet.difference(old_cells, new_cells)
       added_cells = MapSet.difference(new_cells, old_cells)
 
+      activate_cells(state, added_cells)
       Enum.each(removed_cells, &Group.demonitor(@group, cell_key(&1)))
       Enum.each(added_cells, &Group.monitor(@group, cell_key(&1)))
 
@@ -258,5 +261,11 @@ defmodule ThistleTea.Game.World.Visibility do
 
   defp put_visibility_cell(%{internal: %Internal{} = internal} = entity, cell) do
     %{entity | internal: %{internal | visibility_cell: cell}}
+  end
+
+  defp activate_cells(%{cell_activator: nil}, _cells), do: :ok
+
+  defp activate_cells(state, cells) do
+    CellActivator.activate(cells, Map.get(state, :cell_activator, CellActivator))
   end
 end

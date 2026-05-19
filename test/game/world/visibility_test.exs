@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.World.VisibilityTest do
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World.SpatialHash
+  alias ThistleTea.Game.World.System.CellActivator
   alias ThistleTea.Game.World.Visibility
 
   describe "enter_player/1" do
@@ -20,7 +21,7 @@ defmodule ThistleTea.Game.World.VisibilityTest do
       mob_pid = start_member(cell, %{guid: mob_guid, type: :mob})
 
       state =
-        %{guid: self_guid, character: entity(self_guid), tracked_entities: MapSet.new()}
+        %{guid: self_guid, character: entity(self_guid), tracked_entities: MapSet.new(), cell_activator: nil}
         |> Visibility.enter_player()
 
       assert self_guid in state.player_guids
@@ -32,6 +33,27 @@ defmodule ThistleTea.Game.World.VisibilityTest do
       Visibility.leave_player(state)
       stop_member(other_pid)
       stop_member(mob_pid)
+    end
+
+    test "activates visible cells through the configured cell activator" do
+      parent = self()
+      loader = fn cell -> send(parent, {:activated, cell}) end
+      name = :"visibility_cell_activator_test_#{System.unique_integer([:positive])}"
+      start_supervised!({CellActivator, name: name, loader: loader})
+
+      self_guid = Guid.from_low_guid(:player, unique_low())
+
+      state =
+        %{
+          guid: self_guid,
+          character: entity(self_guid),
+          tracked_entities: MapSet.new(),
+          cell_activator: name
+        }
+        |> Visibility.enter_player()
+
+      assert_receive {:activated, {0, 0, 0}}
+      Visibility.leave_player(state)
     end
   end
 
