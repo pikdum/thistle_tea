@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
   alias ThistleTea.Game.Entity.Registry, as: EntityRegistry
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.World
+  alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.System.GameEvent
   alias ThistleTea.Game.World.Visibility
 
@@ -49,5 +50,6 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
   def terminate(_reason, state) do
     World.remove_position(state)
     Visibility.leave_entity(state)
+    Metadata.delete(state.object.guid)
   end
 end

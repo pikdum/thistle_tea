@@ -166,6 +166,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   def terminate(_reason, state) do
     World.remove_position(state)
     Visibility.leave_entity(state)
+    Metadata.delete(state.object.guid)
   end
 
   defp schedule_ai_tick(delay) when is_integer(delay) and delay >= 0 do

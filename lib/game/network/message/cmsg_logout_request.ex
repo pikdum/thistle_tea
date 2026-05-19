@@ -3,6 +3,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgLogoutRequest do
 
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Network.Message
+  alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.Visibility
 
@@ -31,6 +32,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgLogoutRequest do
 
     if Map.get(state, :guid) do
       Entity.unregister(state.guid)
+      Metadata.delete(state.guid)
       # remove from map
       SpatialHash.remove(:players, state.guid)
       state = Visibility.leave_player(state)
