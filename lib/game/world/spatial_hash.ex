@@ -84,7 +84,7 @@ defmodule ThistleTea.Game.World.SpatialHash do
   end
 
   def cell(map, x, y, _z) do
-    {map, div(round(x), @cell_size), div(round(y), @cell_size)}
+    {map, Integer.floor_div(round(x), @cell_size), Integer.floor_div(round(y), @cell_size)}
   end
 
   def cells_in_range(map, x, y, _z, range) do
@@ -96,8 +96,8 @@ defmodule ThistleTea.Game.World.SpatialHash do
         dy <- -cell_range..cell_range do
       {
         map,
-        div(rounded_x + dx * @cell_size, @cell_size),
-        div(rounded_y + dy * @cell_size, @cell_size)
+        Integer.floor_div(rounded_x + dx * @cell_size, @cell_size),
+        Integer.floor_div(rounded_y + dy * @cell_size, @cell_size)
       }
     end
     |> Enum.uniq()

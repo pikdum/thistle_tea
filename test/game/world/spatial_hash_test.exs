@@ -51,6 +51,12 @@ defmodule ThistleTea.Game.World.SpatialHashTest do
     end
   end
 
+  describe "cell/4" do
+    test "assigns negative coordinates to the previous cell" do
+      assert SpatialHash.cell(0, -1, -1, 0) == {0, -1, -1}
+    end
+  end
+
   describe "cell_bounds/1" do
     test "calculates cell boundaries for origin cell" do
       bounds = SpatialHash.cell_bounds({0, 0, 0})
