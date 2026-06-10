@@ -72,6 +72,8 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
     slot_is_empty: 22,
     item_not_found: 23,
     cant_drop_soulbound: 24,
+    tried_to_split_more_than_count: 26,
+    couldnt_split_items: 27,
     not_a_bag: 30,
     can_only_do_with_empty_bags: 31,
     int_bag_error: 40,
@@ -151,10 +153,45 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
 
   def store(%Player{} = player, owner_guid, %Item{} = item, get_item) do
     ctx = ctx(player, nil, owner_guid, get_item)
+    {ctx, remaining} = merge_into_stacks(ctx, item)
 
-    case free_position(ctx) do
-      nil -> {:error, :inventory_full}
-      pos -> {:ok, ctx |> put_pos(pos, item) |> result(), pos}
+    cond do
+      remaining == 0 ->
+        {:ok, result(ctx), :merged}
+
+      free_position(ctx) == nil ->
+        {:error, :inventory_full}
+
+      true ->
+        pos = free_position(ctx)
+        item = put_stack_count(item, remaining)
+        ctx = put_pos(ctx, pos, item)
+        {ctx, placed} = pop_changed(ctx, item)
+        {:ok, result(ctx), {:placed, pos, placed}}
+    end
+  end
+
+  def item_guid_at(%Player{} = player, pos, get_item) do
+    guid_at(ctx(player, nil, nil, get_item), pos)
+  end
+
+  def can_store?(%Player{} = player, %ItemTemplate{} = template, count, get_item) do
+    ctx = ctx(player, nil, nil, get_item)
+    free_position(ctx) != nil or stack_room(ctx, template) >= count
+  end
+
+  def split(%Player{} = player, owner_guid, src_pos, dst_pos, %Item{} = new_item, get_item) do
+    ctx = ctx(player, nil, owner_guid, get_item)
+    count = new_item.item.stack_count
+
+    with {:ok, src_item} <- fetch_item(ctx, src_pos),
+         :ok <- validate_split(ctx, src_item, dst_pos, count) do
+      ctx = mark_changed(ctx, add_stack(src_item, -count))
+      ctx = put_pos(ctx, dst_pos, new_item)
+      {ctx, placed} = pop_changed(ctx, new_item)
+      {:ok, result(ctx), placed}
+    else
+      {:error, error} -> {:error, error, guid_at(ctx, src_pos) || 0, 0}
     end
   end
 
@@ -205,11 +242,16 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
   def can_dual_wield?(class), do: class in @dual_wield_classes
 
   defp ctx(player, unit, owner_guid, get_item) do
-    %{player: player, unit: unit, owner: owner_guid, get_item: get_item, changed: %{}}
+    %{player: player, unit: unit, owner: owner_guid, get_item: get_item, changed: %{}, destroyed: []}
   end
 
   defp result(ctx) do
-    %{player: ctx.player, items: Map.values(ctx.changed)}
+    %{player: ctx.player, items: Map.values(ctx.changed), destroyed: ctx.destroyed}
+  end
+
+  defp pop_changed(ctx, %Item{object: %Object{guid: guid}} = item) do
+    placed = Map.get(ctx.changed, guid, item)
+    {%{ctx | changed: Map.delete(ctx.changed, guid)}, placed}
   end
 
   defp do_swap(ctx, src_pos, dst_pos) do
@@ -220,16 +262,132 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
          :ok <- validate_placement(ctx, src_item, dst_pos),
          :ok <- validate_placement(ctx, dst_item, src_pos),
          :ok <- validate_two_hand(ctx, src_item, src_pos, dst_pos, dst_item) do
-      ctx =
-        ctx
-        |> put_pos(src_pos, dst_item)
-        |> put_pos(dst_pos, src_item)
-        |> store_offhand_if_two_hand(src_item, dst_pos)
+      if mergeable?(src_item, dst_item) do
+        merge_stacks(ctx, src_pos, src_item, dst_item)
+      else
+        ctx =
+          ctx
+          |> put_pos(src_pos, dst_item)
+          |> put_pos(dst_pos, src_item)
+          |> store_offhand_if_two_hand(src_item, dst_pos)
 
-      {:ok, result(ctx)}
+        {:ok, result(ctx)}
+      end
     else
       {:error, error} -> {:error, error, guid_at(ctx, src_pos) || 0, guid_at(ctx, dst_pos) || 0}
     end
+  end
+
+  defp mergeable?(%Item{} = src_item, %Item{} = dst_item) do
+    src_item.object.entry == dst_item.object.entry and
+      max_stack(dst_item) > 1 and
+      stack_count(dst_item) < max_stack(dst_item)
+  end
+
+  defp mergeable?(_src_item, _dst_item), do: false
+
+  defp merge_stacks(ctx, src_pos, src_item, dst_item) do
+    space = max_stack(dst_item) - stack_count(dst_item)
+    moved = min(space, stack_count(src_item))
+    ctx = mark_changed(ctx, add_stack(dst_item, moved))
+
+    ctx =
+      if moved == stack_count(src_item) do
+        ctx = put_pos(ctx, src_pos, nil)
+        %{ctx | changed: Map.delete(ctx.changed, src_item.object.guid), destroyed: [src_item | ctx.destroyed]}
+      else
+        mark_changed(ctx, add_stack(src_item, -moved))
+      end
+
+    {:ok, result(ctx)}
+  end
+
+  defp merge_into_stacks(ctx, %Item{} = item) do
+    max_stack = max_stack(item)
+    entry = item.object.entry
+    incoming_guid = item.object.guid
+
+    if max_stack > 1 do
+      Enum.reduce_while(storage_positions(ctx), {ctx, stack_count(item)}, fn pos, {ctx, remaining} ->
+        case item_at(ctx, pos) do
+          %Item{object: %Object{entry: ^entry, guid: guid}} = stack when guid != incoming_guid ->
+            space = max_stack - stack_count(stack)
+            moved = min(max(space, 0), remaining)
+            ctx = if moved > 0, do: mark_changed(ctx, add_stack(stack, moved)), else: ctx
+            remaining = remaining - moved
+            if remaining == 0, do: {:halt, {ctx, 0}}, else: {:cont, {ctx, remaining}}
+
+          _ ->
+            {:cont, {ctx, remaining}}
+        end
+      end)
+    else
+      {ctx, stack_count(item)}
+    end
+  end
+
+  defp stack_room(ctx, %ItemTemplate{entry: entry} = template) do
+    max_stack = max(template.stackable, 1)
+
+    storage_positions(ctx)
+    |> Enum.map(fn pos ->
+      case item_at(ctx, pos) do
+        %Item{object: %Object{entry: ^entry}} = stack -> max(max_stack - stack_count(stack), 0)
+        _ -> 0
+      end
+    end)
+    |> Enum.sum()
+  end
+
+  defp storage_positions(ctx) do
+    backpack = Enum.map(@backpack_slot_start..(@slot_count - 1), fn slot -> {@bag_0, slot} end)
+
+    bags =
+      Enum.flat_map(@bag_slots, fn bag_slot ->
+        case item_at(ctx, {@bag_0, bag_slot}) do
+          %Item{container: %Container{}} = bag ->
+            Enum.map(0..(container_size(bag.container) - 1)//1, fn slot -> {bag_slot, slot} end)
+
+          _ ->
+            []
+        end
+      end)
+
+    backpack ++ bags
+  end
+
+  defp validate_split(ctx, %Item{} = src_item, dst_pos, count) do
+    cond do
+      count <= 0 or count >= stack_count(src_item) -> {:error, :tried_to_split_more_than_count}
+      not match?({:ok, _}, valid_destination(ctx, dst_pos)) -> {:error, :couldnt_split_items}
+      equipment_pos?(dst_pos) or bag_bar_pos?(dst_pos) -> {:error, :couldnt_split_items}
+      guid_at(ctx, dst_pos) != nil -> {:error, :couldnt_split_items}
+      true -> :ok
+    end
+  end
+
+  defp equipment_pos?({@bag_0, slot}), do: equipment_slot?(slot)
+  defp equipment_pos?(_pos), do: false
+
+  defp bag_bar_pos?({@bag_0, slot}), do: bag_slot?(slot)
+  defp bag_bar_pos?(_pos), do: false
+
+  defp stack_count(%Item{item: %{stack_count: count}}) when is_integer(count) and count > 0, do: count
+  defp stack_count(%Item{}), do: 1
+
+  defp max_stack(%Item{} = item) do
+    case Item.template(item).stackable do
+      n when is_integer(n) and n > 1 -> n
+      _ -> 1
+    end
+  end
+
+  defp add_stack(%Item{} = item, delta) do
+    put_stack_count(item, stack_count(item) + delta)
+  end
+
+  defp put_stack_count(%Item{} = item, count) do
+    %{item | item: %{item.item | stack_count: count}}
   end
 
   defp candidate_slots(%ItemTemplate{inventory_type: inventory_type} = template, class) do

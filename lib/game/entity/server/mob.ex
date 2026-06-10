@@ -131,6 +131,12 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
   def handle_call({:loot_take_item, _slot}, _from, state), do: {:reply, {:error, :no_loot}, state}
 
+  def handle_call({:loot_return_item, slot}, _from, %Mob{internal: %Internal{loot: %Loot{} = loot} = internal} = state) do
+    {:reply, :ok, %{state | internal: %{internal | loot: Loot.return_item(loot, slot)}}}
+  end
+
+  def handle_call({:loot_return_item, _slot}, _from, state), do: {:reply, :ok, state}
+
   def handle_call(:loot_take_gold, _from, %Mob{internal: %Internal{loot: %Loot{} = loot} = internal} = state) do
     case Loot.take_gold(loot) do
       {:ok, gold, loot} -> {:reply, {:ok, gold}, %{state | internal: %{internal | loot: loot}}}

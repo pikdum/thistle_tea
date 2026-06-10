@@ -5,16 +5,22 @@ defmodule ThistleTea.Game.Network.InventoryUpdate do
   alias ThistleTea.Game.Entity.Data.Item
   alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Network
+  alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Message.SmsgInventoryChangeFailure
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.ItemStore
 
   def apply(state, {:ok, %Player{} = player}) do
-    apply(state, {:ok, %{player: player, items: []}})
+    apply(state, {:ok, %{player: player, items: [], destroyed: []}})
   end
 
-  def apply(state, {:ok, %{player: %Player{} = player, items: items}}) do
+  def apply(state, {:ok, %{player: %Player{} = player, items: items} = result}) do
+    Enum.each(Map.get(result, :destroyed, []), fn item ->
+      ItemStore.delete(item.object.guid)
+      Network.send_packet(%Message.SmsgDestroyObject{guid: item.object.guid})
+    end)
+
     Enum.each(items, fn item ->
       ItemStore.put(item)
 

@@ -57,15 +57,15 @@ defmodule ThistleTea.Game.Network.Message.CmsgMessagechat do
     case ItemStore.create(item_id, owner: state.guid, stack_count: count) do
       %DataItem{} = item ->
         case Inventory.store(state.character.player, state.guid, item, &ItemStore.get/1) do
-          {:ok, result, {dst_bag, dst_slot}} ->
-            Network.send_packet(UpdateObject.from_item(item))
+          {:ok, result, placement} ->
+            {bag_slot, item_slot} = finish_placement(item, placement)
             state = InventoryUpdate.apply(state, {:ok, result})
 
             Network.send_packet(%Message.SmsgItemPushResult{
               player_guid: state.guid,
               item_id: item_id,
-              bag_slot: dst_bag,
-              item_slot: dst_slot,
+              bag_slot: bag_slot,
+              item_slot: item_slot,
               count: count,
               created: 1
             })
@@ -80,6 +80,17 @@ defmodule ThistleTea.Game.Network.Message.CmsgMessagechat do
       _ ->
         system_message(state, "Item #{item_id} not found.")
     end
+  end
+
+  defp finish_placement(_item, {:placed, {bag, slot}, placed}) do
+    ItemStore.put(placed)
+    Network.send_packet(UpdateObject.from_item(placed))
+    {bag, slot}
+  end
+
+  defp finish_placement(item, :merged) do
+    ItemStore.delete(item.object.guid)
+    {Inventory.bag_0(), 0xFFFFFFFF}
   end
 
   def teleport_player(state, x, y, z, map) do

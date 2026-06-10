@@ -31,8 +31,8 @@ defmodule ThistleTea.Game.Entity.Logic.InventoryTest do
      bag: build_item(8, %ItemTemplate{entry: 800, inventory_type: 18, container_slots: 6, class: 1})}
   end
 
-  defp build_item(low_guid, template) do
-    Item.build(template, 0x4000_0000_0000_0000 + low_guid, owner: @owner)
+  defp build_item(low_guid, template, opts \\ []) do
+    Item.build(template, 0x4000_0000_0000_0000 + low_guid, Keyword.merge([owner: @owner], opts))
   end
 
   defp get_item_fn(items) do
@@ -272,10 +272,11 @@ defmodule ThistleTea.Game.Entity.Logic.InventoryTest do
 
   describe "store/4" do
     test "uses the first free backpack slot", %{chest: chest} do
-      assert {:ok, %{player: player}, {@bag_0, @backpack_start}} =
+      assert {:ok, %{player: player}, {:placed, {@bag_0, @backpack_start}, placed}} =
                Inventory.store(%Player{}, @owner, chest, get_item_fn([chest]))
 
       assert player.inv1 == chest.object.guid
+      assert placed.object.guid == chest.object.guid
     end
 
     test "overflows into an equipped bag when the backpack is full", %{chest: chest, bag: bag} do
@@ -286,11 +287,11 @@ defmodule ThistleTea.Game.Entity.Logic.InventoryTest do
           store(p, @backpack_start + i, filler)
         end)
 
-      assert {:ok, %{items: items}, {@first_bag_slot, 0}} =
+      assert {:ok, %{items: items}, {:placed, {@first_bag_slot, 0}, placed}} =
                Inventory.store(player, @owner, chest, get_item_fn([chest, bag, filler]))
 
       assert updated(items, bag).container.slot_1 == chest.object.guid
-      assert updated(items, chest).item.contained == bag.object.guid
+      assert placed.item.contained == bag.object.guid
     end
 
     test "fails when everything is full", %{chest: chest} do
@@ -298,6 +299,161 @@ defmodule ThistleTea.Game.Entity.Logic.InventoryTest do
       player = Enum.reduce(0..15, %Player{}, fn i, p -> store(p, @backpack_start + i, filler) end)
 
       assert {:error, :inventory_full} = Inventory.store(player, @owner, chest, get_item_fn([chest, filler]))
+    end
+
+    test "merges fully into an existing stack" do
+      stack = build_item(20, %ItemTemplate{entry: 2000, stackable: 10}, stack_count: 4)
+      incoming = build_item(21, %ItemTemplate{entry: 2000, stackable: 10}, stack_count: 3)
+      player = store(%Player{}, @backpack_start, stack)
+
+      assert {:ok, %{items: items}, :merged} =
+               Inventory.store(player, @owner, incoming, get_item_fn([stack, incoming]))
+
+      assert updated(items, stack).item.stack_count == 7
+    end
+
+    test "fills a stack and places the remainder" do
+      stack = build_item(20, %ItemTemplate{entry: 2000, stackable: 10}, stack_count: 8)
+      incoming = build_item(21, %ItemTemplate{entry: 2000, stackable: 10}, stack_count: 5)
+      player = store(%Player{}, @backpack_start, stack)
+
+      assert {:ok, %{items: items}, {:placed, pos, placed}} =
+               Inventory.store(player, @owner, incoming, get_item_fn([stack, incoming]))
+
+      assert pos == {@bag_0, @backpack_start + 1}
+      assert updated(items, stack).item.stack_count == 10
+      assert placed.item.stack_count == 3
+    end
+  end
+
+  describe "swap/6 stacking" do
+    test "merges a stack dropped onto a matching stack", %{unit: unit} do
+      src = build_item(20, %ItemTemplate{entry: 2000, stackable: 10}, stack_count: 3)
+      dst = build_item(21, %ItemTemplate{entry: 2000, stackable: 10}, stack_count: 4)
+
+      player =
+        %Player{}
+        |> store(@backpack_start, src)
+        |> store(@backpack_start + 1, dst)
+
+      assert {:ok, %{player: player, items: items, destroyed: [destroyed]}} =
+               Inventory.swap(
+                 player,
+                 unit,
+                 @owner,
+                 {@bag_0, @backpack_start},
+                 {@bag_0, @backpack_start + 1},
+                 get_item_fn([src, dst])
+               )
+
+      assert player.inv1 == 0
+      assert updated(items, dst).item.stack_count == 7
+      assert destroyed.object.guid == src.object.guid
+    end
+
+    test "partially fills a nearly full stack", %{unit: unit} do
+      src = build_item(20, %ItemTemplate{entry: 2000, stackable: 10}, stack_count: 5)
+      dst = build_item(21, %ItemTemplate{entry: 2000, stackable: 10}, stack_count: 8)
+
+      player =
+        %Player{}
+        |> store(@backpack_start, src)
+        |> store(@backpack_start + 1, dst)
+
+      assert {:ok, %{player: player, items: items, destroyed: []}} =
+               Inventory.swap(
+                 player,
+                 unit,
+                 @owner,
+                 {@bag_0, @backpack_start},
+                 {@bag_0, @backpack_start + 1},
+                 get_item_fn([src, dst])
+               )
+
+      assert player.inv1 == src.object.guid
+      assert updated(items, src).item.stack_count == 3
+      assert updated(items, dst).item.stack_count == 10
+    end
+
+    test "swaps positions when the target stack is full", %{unit: unit} do
+      src = build_item(20, %ItemTemplate{entry: 2000, stackable: 10}, stack_count: 5)
+      dst = build_item(21, %ItemTemplate{entry: 2000, stackable: 10}, stack_count: 10)
+
+      player =
+        %Player{}
+        |> store(@backpack_start, src)
+        |> store(@backpack_start + 1, dst)
+
+      assert {:ok, %{player: player}} =
+               Inventory.swap(
+                 player,
+                 unit,
+                 @owner,
+                 {@bag_0, @backpack_start},
+                 {@bag_0, @backpack_start + 1},
+                 get_item_fn([src, dst])
+               )
+
+      assert player.inv1 == dst.object.guid
+      assert player.inv2 == src.object.guid
+    end
+  end
+
+  describe "split/6" do
+    test "splits a stack into an empty slot" do
+      src = build_item(20, %ItemTemplate{entry: 2000, stackable: 10}, stack_count: 8)
+      new_item = build_item(21, %ItemTemplate{entry: 2000, stackable: 10}, stack_count: 3)
+      player = store(%Player{}, @backpack_start, src)
+
+      assert {:ok, %{player: player, items: items}, placed} =
+               Inventory.split(
+                 player,
+                 @owner,
+                 {@bag_0, @backpack_start},
+                 {@bag_0, @backpack_start + 1},
+                 new_item,
+                 get_item_fn([src])
+               )
+
+      assert player.inv2 == new_item.object.guid
+      assert updated(items, src).item.stack_count == 5
+      assert placed.item.stack_count == 3
+    end
+
+    test "rejects splitting the whole stack" do
+      src = build_item(20, %ItemTemplate{entry: 2000, stackable: 10}, stack_count: 3)
+      new_item = build_item(21, %ItemTemplate{entry: 2000, stackable: 10}, stack_count: 3)
+      player = store(%Player{}, @backpack_start, src)
+
+      assert {:error, :tried_to_split_more_than_count, _, 0} =
+               Inventory.split(
+                 player,
+                 @owner,
+                 {@bag_0, @backpack_start},
+                 {@bag_0, @backpack_start + 1},
+                 new_item,
+                 get_item_fn([src])
+               )
+    end
+
+    test "rejects splitting onto an occupied slot", %{chest: chest} do
+      src = build_item(20, %ItemTemplate{entry: 2000, stackable: 10}, stack_count: 8)
+      new_item = build_item(21, %ItemTemplate{entry: 2000, stackable: 10}, stack_count: 3)
+
+      player =
+        %Player{}
+        |> store(@backpack_start, src)
+        |> store(@backpack_start + 1, chest)
+
+      assert {:error, :couldnt_split_items, _, 0} =
+               Inventory.split(
+                 player,
+                 @owner,
+                 {@bag_0, @backpack_start},
+                 {@bag_0, @backpack_start + 1},
+                 new_item,
+                 get_item_fn([src, chest])
+               )
     end
   end
 

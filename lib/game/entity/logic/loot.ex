@@ -23,6 +23,11 @@ defmodule ThistleTea.Game.Entity.Logic.Loot do
     end
   end
 
+  def return_item(%__MODULE__{items: items} = loot, slot) do
+    items = Enum.map(items, fn i -> if i.slot == slot, do: %{i | looted: false}, else: i end)
+    %{loot | items: items}
+  end
+
   def take_gold(%__MODULE__{gold: gold} = loot) when gold > 0 do
     {:ok, gold, %{loot | gold: 0}}
   end
