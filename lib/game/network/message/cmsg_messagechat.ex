@@ -143,6 +143,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgMessagechat do
       ".help - show help",
       ".learn <spell_id> - learn a spell",
       ".levelup [levels] - increase player level",
+      ".modify hp <value> - set current health (clamped to max)",
       ".modify speed <rate> - modify player speed from 0.1 to 10",
       ".move - move target to you",
       ".pid - show target pid",
@@ -198,6 +199,9 @@ defmodule ThistleTea.Game.Network.Message.CmsgMessagechat do
     |> case do
       ["speed", rate] ->
         handle_modify_speed(state, rate)
+
+      ["hp", value] ->
+        handle_modify_hp(state, value)
 
       _ ->
         Logger.error("Unhandled .modify call: #{params}")
@@ -385,6 +389,21 @@ defmodule ThistleTea.Game.Network.Message.CmsgMessagechat do
       _ ->
         state
         |> system_message("Invalid speed. Use: .modify speed <rate 0.1 - 10.0>")
+    end
+  end
+
+  defp handle_modify_hp(%{character: %ThistleTea.Character{unit: %Unit{} = unit} = character} = state, value) do
+    case parse_positive_integer(value) do
+      {:ok, hp} ->
+        hp = min(hp, unit.max_health || hp)
+        character = %{character | unit: %{unit | health: hp}}
+
+        state
+        |> put_character(character)
+        |> system_message("Health set to #{hp}.")
+
+      _ ->
+        system_message(state, "Invalid command. Use: .modify hp <value>")
     end
   end
 

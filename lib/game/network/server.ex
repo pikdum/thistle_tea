@@ -87,6 +87,28 @@ defmodule ThistleTea.Game.Network.Server do
     [update]
     |> drain_pending_updates(1)
     |> Enum.reverse()
+    |> dedupe_values_updates()
+  end
+
+  defp dedupe_values_updates(updates) do
+    {kept, _seen} =
+      updates
+      |> Enum.reverse()
+      |> Enum.reduce({[], MapSet.new()}, fn update, {acc, seen} ->
+        case update do
+          %UpdateObject{update_type: :values, object: %{guid: guid}} when is_integer(guid) ->
+            if MapSet.member?(seen, guid) do
+              {acc, seen}
+            else
+              {[update | acc], MapSet.put(seen, guid)}
+            end
+
+          _ ->
+            {[update | acc], seen}
+        end
+      end)
+
+    kept
   end
 
   defp drain_pending_updates(updates, count) when count < @update_batch_max do
