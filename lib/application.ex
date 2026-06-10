@@ -11,6 +11,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.World.Groups
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
+  alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader
   alias ThistleTea.Game.World.Loader.Vendor, as: VendorLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
@@ -84,6 +85,7 @@ defmodule ThistleTea.Application do
     ItemLoader.init()
     ItemStore.init()
     VendorLoader.init()
+    QuestLoader.init()
     :ets.new(:spline_counters, [:named_table, :public, write_concurrency: :auto])
     :ets.insert(:spline_counters, {:spline_id, 0})
     setup_database()
@@ -119,7 +121,15 @@ defmodule ThistleTea.Application do
     # See https://hexdocs.pm/elixir/Supervisor.html
     # for other strategies and supported options
     opts = [strategy: :one_for_one, name: ThistleTea.Supervisor]
-    Supervisor.start_link(children, opts)
+
+    with {:ok, pid} <- Supervisor.start_link(children, opts) do
+      if !test do
+        Logger.info("Loading quests...")
+        QuestLoader.load_all()
+      end
+
+      {:ok, pid}
+    end
   end
 
   @impl true
