@@ -2,6 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgGossipHello do
   use ThistleTea.Game.Network.ClientMessage, :CMSG_GOSSIP_HELLO
 
   alias ThistleTea.Game.Entity.Data.Quest
+  alias ThistleTea.Game.Entity.Logic.Death
   alias ThistleTea.Game.Entity.Logic.QuestDialogStatus
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.Message
@@ -53,12 +54,16 @@ defmodule ThistleTea.Game.Network.Message.CmsgGossipHello do
     Map.put(state, :gossip_menu_options, options)
   end
 
-  defp visible_options(options, npc_guid, %Character{unit: unit}) do
+  defp visible_options(options, npc_guid, %Character{unit: unit} = character) do
     trainer_option_id = GossipLoader.option_trainer()
+    spirit_healer_option_id = GossipLoader.option_spirit_healer()
 
     Enum.filter(options, fn
       %{option_id: ^trainer_option_id} ->
         GossipLoader.trainer_of?(Guid.entry(npc_guid), unit.class, unit.race)
+
+      %{option_id: ^spirit_healer_option_id} ->
+        not Death.alive?(character)
 
       _option ->
         true

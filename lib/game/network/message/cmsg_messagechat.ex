@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgMessagechat do
   alias ThistleTea.Game.Entity.Data.Item, as: DataItem
   alias ThistleTea.Game.Entity.Data.Quest
   alias ThistleTea.Game.Entity.Logic.Core
+  alias ThistleTea.Game.Entity.Logic.Death
   alias ThistleTea.Game.Entity.Logic.EquipmentStats
   alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Entity.Logic.QuestLog
@@ -169,6 +170,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgMessagechat do
       ".addquest <quest_id> - add a quest to your quest log",
       ".debug spells - learn class trainer spells up to your level",
       ".character level <level> - set player level",
+      ".die - kill your character",
       ".go xyz <x> <y> <z> [map] - teleport",
       ".guid - show target guid",
       ".help - show help",
@@ -246,6 +248,25 @@ defmodule ThistleTea.Game.Network.Message.CmsgMessagechat do
     state
     |> debug_spell_ids()
     |> then(&learn_spells(state, &1, "Already know all debug spells."))
+  end
+
+  def handle_chat(state, _, _, ".die" <> _, _) do
+    %{character: %ThistleTea.Character{} = character} = state
+
+    cond do
+      not Death.alive?(character) ->
+        system_message(state, "Already dead.")
+
+      character.internal.godmode ->
+        system_message(state, "Disable god mode first (.tgm).")
+
+      true ->
+        character = Core.take_damage(character, character.unit.health, ThistleTea.Game.Time.now())
+
+        state
+        |> put_character(character)
+        |> system_message("You died.")
+    end
   end
 
   def handle_chat(state, _, _, ".tgm" <> _, _) do
@@ -501,7 +522,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgMessagechat do
 
   defp put_character(%{guid: guid} = state, %ThistleTea.Character{} = character) do
     ThistleTea.Character.save(character)
-    Metadata.update(guid, %{level: character.unit.level, alive?: character.unit.health > 0})
+    Metadata.update(guid, %{level: character.unit.level, alive?: Death.alive?(character)})
 
     update = Core.update_object(character, :values)
     Network.send_packet(update)

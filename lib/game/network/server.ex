@@ -13,6 +13,8 @@ defmodule ThistleTea.Game.Network.Server do
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Combat
   alias ThistleTea.Game.Entity.Logic.Core
+  alias ThistleTea.Game.Entity.Logic.Death
+  alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.Entity.Logic.Experience
   alias ThistleTea.Game.Entity.Logic.SpellEffect
   alias ThistleTea.Game.Network
@@ -296,6 +298,40 @@ defmodule ThistleTea.Game.Network.Server do
   end
 
   @impl GenServer
+  def handle_cast(
+        {:start_teleport, x, y, z, map},
+        {socket, %{character: %ThistleTea.Character{internal: %Internal{map: map}} = character} = state}
+      ) do
+    area =
+      case Pathfinding.get_zone_and_area(map, {x, y, z}) do
+        {_zone, area} -> area
+        nil -> character.internal.area
+      end
+
+    {_x, _y, _z, o} = character.movement_block.position
+
+    character = %{
+      character
+      | internal: %{character.internal | area: area},
+        movement_block: %{character.movement_block | position: {x, y, z, o}, movement_flags: 0}
+    }
+
+    SpatialHash.update(:players, state.guid, map, x, y, z)
+
+    Network.send_packet(%Message.MsgMoveTeleportAck{
+      guid: state.guid,
+      position: {x, y, z, o},
+      timestamp: character.movement_block.timestamp || 0,
+      fall_time: character.movement_block.fall_time || 0
+    })
+
+    state =
+      %{state | character: character}
+      |> Visibility.refresh_player()
+
+    {:noreply, {socket, state}, socket.read_timeout}
+  end
+
   def handle_cast({:start_teleport, x, y, z, map}, {socket, state}) do
     state = Visibility.leave_player(state)
 
@@ -392,10 +428,12 @@ defmodule ThistleTea.Game.Network.Server do
         :maybe_broadcast_update,
         {socket, %{character: %ThistleTea.Character{internal: %Internal{broadcast_update?: true}} = character} = state}
       ) do
+    character = maybe_handle_death_transition(state, character)
+
     Core.update_object(character, :values)
     |> World.broadcast_packet(character)
 
-    Metadata.update(state.guid, %{alive?: not Core.dead?(character)})
+    Metadata.update(state.guid, %{alive?: Death.alive?(character)})
     internal = %{character.internal | broadcast_update?: false}
     character = %{character | internal: internal}
 
@@ -404,6 +442,20 @@ defmodule ThistleTea.Game.Network.Server do
 
   def handle_continue(:maybe_broadcast_update, {socket, state}) do
     {:noreply, {socket, state}, socket.read_timeout}
+  end
+
+  defp maybe_handle_death_transition(state, character) do
+    was_alive? =
+      case Metadata.query(state.guid, [:alive?]) do
+        %{alive?: alive?} -> alive?
+        _ -> true
+      end
+
+    if was_alive? and Core.dead?(character) do
+      EventSink.emit(character, Event.movement_root_changed(true))
+    else
+      character
+    end
   end
 
   defp tick_player(%{internal: %Internal{behavior_tree: behavior_tree}} = character) when not is_nil(behavior_tree) do

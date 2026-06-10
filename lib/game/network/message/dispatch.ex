@@ -83,7 +83,12 @@ defmodule ThistleTea.Game.Network.Message.Dispatch do
               CMSG_QUESTLOG_REMOVE_QUEST: Message.CmsgQuestlogRemoveQuest,
               CMSG_QUESTGIVER_COMPLETE_QUEST: Message.CmsgQuestgiverCompleteQuest,
               CMSG_QUESTGIVER_REQUEST_REWARD: Message.CmsgQuestgiverRequestReward,
-              CMSG_QUESTGIVER_CHOOSE_REWARD: Message.CmsgQuestgiverChooseReward
+              CMSG_QUESTGIVER_CHOOSE_REWARD: Message.CmsgQuestgiverChooseReward,
+              CMSG_REPOP_REQUEST: Message.CmsgRepopRequest,
+              MSG_MOVE_TELEPORT_ACK: Message.CmsgMoveTeleportAck,
+              MSG_CORPSE_QUERY: Message.MsgCorpseQuery,
+              CMSG_RECLAIM_CORPSE: Message.CmsgReclaimCorpse,
+              CMSG_SPIRIT_HEALER_ACTIVATE: Message.CmsgSpiritHealerActivate
             }
             |> Map.merge(@movement_opcodes)
             |> Map.new(fn {opcode, module} -> {Opcodes.get(opcode), module} end)

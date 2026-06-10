@@ -8,7 +8,8 @@ defmodule ThistleTea.Game.World.Loader.Gossip do
   @option_gossip 1
   @option_vendor 3
   @option_trainer 5
-  @supported_option_ids [@option_gossip, @option_vendor, @option_trainer]
+  @option_spirit_healer 6
+  @supported_option_ids [@option_gossip, @option_vendor, @option_trainer, @option_spirit_healer]
 
   defmodule Menu do
     defstruct [:menu_id, :text_id, options: []]
@@ -101,4 +102,5 @@ defmodule ThistleTea.Game.World.Loader.Gossip do
   def option_vendor, do: @option_vendor
   def option_gossip, do: @option_gossip
   def option_trainer, do: @option_trainer
+  def option_spirit_healer, do: @option_spirit_healer
 end

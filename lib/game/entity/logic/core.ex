@@ -2,6 +2,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Data.Corpse
   alias ThistleTea.Game.Entity.Data.GameObject
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.Aura
@@ -14,6 +15,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
   def update_object(entity, update_type \\ :create_object2)
   def update_object(%Mob{} = entity, update_type), do: update_object(entity, update_type, :unit)
   def update_object(%GameObject{} = entity, update_type), do: update_object(entity, update_type, :game_object)
+  def update_object(%Corpse{} = entity, update_type), do: update_object(entity, update_type, :corpse)
   def update_object(%ThistleTea.Character{} = entity, update_type), do: update_object(entity, update_type, :player)
 
   def update_object(entity, update_type, object_type) do

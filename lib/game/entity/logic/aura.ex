@@ -176,6 +176,26 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
 
   def remove_with_interrupt_flags(entity, _mask, _now), do: {entity, []}
 
+  def remove_spells(%{unit: %Unit{auras: holders}} = entity, spell_ids, now)
+      when is_list(holders) and holders != [] and is_list(spell_ids) do
+    {removed, kept} = Enum.split_with(holders, fn %Holder{spell: %Spell{id: id}} -> id in spell_ids end)
+
+    if removed == [] do
+      {entity, []}
+    else
+      unit = sync_unit(%{entity.unit | auras: kept})
+
+      {entity, events} =
+        entity
+        |> Map.put(:unit, unit)
+        |> sync_movement_state(now)
+
+      {Core.mark_broadcast_update(entity), events}
+    end
+  end
+
+  def remove_spells(entity, _spell_ids, _now), do: {entity, []}
+
   defp interruptible?(%Holder{spell: %Spell{aura_interrupt_flags: flags}}, mask) when is_integer(flags) do
     (flags &&& mask) != 0
   end
@@ -335,7 +355,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
   defp advance_tick(_last_tick, _amplitude_ms, now), do: now + 1_000
 
   defp duration_event(%Holder{slot: slot, applied_at: applied_at, expires_at: expires_at})
-       when is_integer(slot) and is_integer(applied_at) and is_integer(expires_at) do
+       when is_integer(slot) and is_integer(applied_at) and is_integer(expires_at) and expires_at != -1 do
     [Event.aura_duration(slot, max(expires_at - applied_at, 0))]
   end
 
@@ -351,7 +371,12 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
 
   defp holder_event_times(%Holder{} = holder) do
     tick_times = Enum.flat_map(holder.auras, &aura_tick_time/1)
-    if is_integer(holder.expires_at), do: [holder.expires_at | tick_times], else: tick_times
+
+    if is_integer(holder.expires_at) and holder.expires_at != -1 do
+      [holder.expires_at | tick_times]
+    else
+      tick_times
+    end
   end
 
   defp aura_tick_time(%Aura{next_tick_at: at}) when is_integer(at), do: [at]
@@ -425,8 +450,24 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
   def sync_unit(%Unit{} = unit) do
     unit
     |> Stats.sync_aura_mods()
+    |> sync_transform()
     |> sync_aura_fields()
   end
+
+  defp sync_transform(%Unit{auras: holders} = unit) when is_list(holders) do
+    transform =
+      holders
+      |> Enum.flat_map(fn %Holder{auras: auras} -> auras end)
+      |> Enum.find(fn %Aura{type: type, misc_value: misc} -> type == :transform and is_integer(misc) and misc > 0 end)
+
+    case {transform, unit.native_display_id} do
+      {%Aura{misc_value: display_id}, _native} -> %{unit | display_id: display_id}
+      {nil, native} when is_integer(native) and native > 0 -> %{unit | display_id: native}
+      _ -> unit
+    end
+  end
+
+  defp sync_transform(unit), do: unit
 
   defp sync_aura_fields(%Unit{auras: holders} = unit) when is_list(holders) and holders != [] do
     %{

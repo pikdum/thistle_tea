@@ -6,11 +6,14 @@ defmodule ThistleTea.Game.Network.Message.CmsgPlayerLogin do
   alias ThistleTea.DBC
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Data.Corpse
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Player, as: PlayerBT
+  alias ThistleTea.Game.Entity.Logic.Death
   alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Network.Message.SmsgInitialSpells.InitialSpell
   alias ThistleTea.Game.Network.UpdateObject
+  alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Faction, as: FactionLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
@@ -38,6 +41,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgPlayerLogin do
       c
       |> normalize_combat_stats()
       |> normalize_faction_template()
+      |> normalize_death_state(character_guid)
       |> build_spellbook()
       |> BT.init(PlayerBT.tree())
 
@@ -54,7 +58,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgPlayerLogin do
         combat_reach: c.unit.combat_reach,
         unit_flags: c.unit.flags,
         attacker_count: 0,
-        alive?: c.unit.health > 0
+        alive?: Death.alive?(c)
       }
       |> Map.merge(FactionLoader.metadata(c.unit.faction_template))
     )
@@ -213,6 +217,15 @@ defmodule ThistleTea.Game.Network.Message.CmsgPlayerLogin do
   end
 
   defp normalize_faction_template(character), do: character
+
+  defp normalize_death_state(%ThistleTea.Character{} = character, character_guid) do
+    if Death.ghost?(character) and is_nil(SpatialHash.get_entity(Corpse.guid_for(character_guid))) do
+      {character, _events} = Death.resurrect(character, 0.5, Time.now())
+      %{character | internal: %{character.internal | broadcast_update?: false}}
+    else
+      character
+    end
+  end
 
   defp normalize_unit_value(unit, key, default) do
     case Map.get(unit, key) do

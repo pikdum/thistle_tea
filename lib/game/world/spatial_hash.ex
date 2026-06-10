@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.World.SpatialHash do
     :ets.new(:players, @cell_table_options)
     :ets.new(:mobs, @cell_table_options)
     :ets.new(:game_objects, @cell_table_options)
+    :ets.new(:corpses, @cell_table_options)
     :ets.new(:entities, @entity_table_options)
     :ets.new(:entity_movement, @entity_table_options)
   end

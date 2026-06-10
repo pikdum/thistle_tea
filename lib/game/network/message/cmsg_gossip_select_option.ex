@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.Network.Message.CmsgGossipSelectOption do
   use ThistleTea.Game.Network.ClientMessage, :CMSG_GOSSIP_SELECT_OPTION
 
+  alias ThistleTea.Game.Entity.Logic.Death
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Message.CmsgGossipHello
@@ -14,6 +15,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgGossipSelectOption do
   @impl ClientMessage
   def handle(%__MODULE__{guid: guid, gossip_list_id: gossip_list_id}, %{character: %Character{} = c} = state) do
     vendor_option_id = GossipLoader.option_vendor()
+    spirit_healer_option_id = GossipLoader.option_spirit_healer()
 
     state
     |> Map.get(:gossip_menu_options, [])
@@ -27,6 +29,13 @@ defmodule ThistleTea.Game.Network.Message.CmsgGossipSelectOption do
           vendor_guid: guid,
           items: VendorLoader.items(Guid.entry(guid))
         })
+
+        state
+
+      %Option{option_id: ^spirit_healer_option_id} ->
+        if not Death.alive?(c) do
+          Network.send_packet(%Message.SmsgSpiritHealerConfirm{guid: guid})
+        end
 
         state
 
