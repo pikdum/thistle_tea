@@ -8,7 +8,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgPlayerLogin do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Player, as: PlayerBT
-  alias ThistleTea.Game.Entity.Logic.Equipment
+  alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Network.Message.SmsgInitialSpells.InitialSpell
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.World.ItemStore
@@ -159,7 +159,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgPlayerLogin do
 
     item_updates =
       c.player
-      |> Equipment.equipped_guids()
+      |> Inventory.equipped_guids()
       |> Enum.map(&ItemStore.get/1)
       |> Enum.reject(&is_nil/1)
       |> Enum.map(&UpdateObject.from_item/1)

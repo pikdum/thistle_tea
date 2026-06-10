@@ -20,33 +20,35 @@ defmodule ThistleTea.Game.World.Loader.Item do
 
   def get_template(_entry), do: nil
 
-  def random_template_by_inventory_type(inventory_type) do
-    case Mangos.ItemTemplate.random_by_type(inventory_type) do
+  def random_usable_template(inventory_type, race, class, level) do
+    case Mangos.ItemTemplate.random_usable_by_type(inventory_type, race, class, level) do
       %Mangos.ItemTemplate{} = row -> cache(ItemTemplate.build(row))
       _ -> nil
     end
   end
 
-  def random_equipment do
+  def random_equipment(race, class, level) do
+    random = fn inventory_type -> random_usable_template(inventory_type, race, class, level) end
+
     %{
-      head: random_template_by_inventory_type(1),
-      neck: random_template_by_inventory_type(2),
-      shoulders: random_template_by_inventory_type(3),
-      body: random_template_by_inventory_type(4),
-      chest: random_template_by_inventory_type(5),
-      waist: random_template_by_inventory_type(6),
-      legs: random_template_by_inventory_type(7),
-      feet: random_template_by_inventory_type(8),
-      wrists: random_template_by_inventory_type(9),
-      hands: random_template_by_inventory_type(10),
-      finger1: random_template_by_inventory_type(11),
-      finger2: random_template_by_inventory_type(11),
-      trinket1: random_template_by_inventory_type(12),
-      trinket2: random_template_by_inventory_type(12),
-      back: random_template_by_inventory_type(16),
-      mainhand: random_template_by_inventory_type(13),
-      offhand: random_template_by_inventory_type(13),
-      tabard: random_template_by_inventory_type(19)
+      head: random.(1),
+      neck: random.(2),
+      shoulders: random.(3),
+      body: random.(4),
+      chest: random.(5),
+      waist: random.(6),
+      legs: random.(7),
+      feet: random.(8),
+      wrists: random.(9),
+      hands: random.(10),
+      finger1: random.(11),
+      finger2: random.(11),
+      trinket1: random.(12),
+      trinket2: random.(12),
+      back: random.(16),
+      mainhand: random.(13),
+      offhand: random.(13),
+      tabard: random.(19)
     }
   end
 

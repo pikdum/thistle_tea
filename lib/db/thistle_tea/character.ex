@@ -23,7 +23,7 @@ defmodule ThistleTea.Character do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Item
   alias ThistleTea.Game.Entity.Data.ItemTemplate
-  alias ThistleTea.Game.Entity.Logic.Equipment
+  alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.Message.CmsgCharCreate
   alias ThistleTea.Game.Player.Stats
@@ -131,13 +131,13 @@ defmodule ThistleTea.Character do
 
   def gain_xp(%__MODULE__{} = character, _amount), do: {character, []}
 
-  def generate_and_assign_equipment(%__MODULE__{object: %Object{guid: owner_guid}} = character)
+  def generate_and_assign_equipment(%__MODULE__{object: %Object{guid: owner_guid}, unit: %Unit{} = unit} = character)
       when is_integer(owner_guid) and owner_guid > 0 do
     player =
-      ItemLoader.random_equipment()
+      ItemLoader.random_equipment(unit.race, unit.class, unit.level)
       |> Enum.reduce(character.player, fn {slot, template}, player ->
         case template && ItemStore.create(template, owner: owner_guid) do
-          %Item{} = item -> Equipment.equip(player, slot, item)
+          %Item{} = item -> Inventory.equip(player, slot, item)
           _ -> player
         end
       end)
@@ -154,7 +154,9 @@ defmodule ThistleTea.Character do
     end
   end
 
-  def sync_mainhand_stats(%__MODULE__{} = character), do: character
+  def sync_mainhand_stats(%__MODULE__{unit: %Unit{} = unit} = character) do
+    %{character | unit: %{unit | base_attack_time: 2000, min_damage: 2, max_damage: 2}}
+  end
 
   def sync_mainhand_stats(%__MODULE__{unit: %Unit{} = unit} = character, %ItemTemplate{} = weapon) do
     unit =

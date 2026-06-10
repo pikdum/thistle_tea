@@ -66,7 +66,11 @@ defmodule ThistleTea.Game.Network.Packet do
        CMSG_FORCE_MOVE_UNROOT_ACK: Message.CmsgForceMoveUnrootAck,
        CMSG_LOGOUT_REQUEST: Message.CmsgLogoutRequest,
        CMSG_LOGOUT_CANCEL: Message.CmsgLogoutCancel,
-       CMSG_CANCEL_CAST: Message.CmsgCancelCast
+       CMSG_CANCEL_CAST: Message.CmsgCancelCast,
+       CMSG_AUTOEQUIP_ITEM: Message.CmsgAutoequipItem,
+       CMSG_SWAP_INV_ITEM: Message.CmsgSwapInvItem,
+       CMSG_SWAP_ITEM: Message.CmsgSwapItem,
+       CMSG_DESTROYITEM: Message.CmsgDestroyitem
      }
      |> Map.merge(@m)
      |> Map.new(fn {k, v} -> {Opcodes.get(k), v} end)

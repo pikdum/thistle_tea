@@ -1,6 +1,7 @@
 defmodule ThistleTea.DB.Mangos.ItemTemplate do
   use Ecto.Schema
 
+  import Bitwise, only: [<<<: 2]
   import Ecto.Query
 
   alias ThistleTea.DB.Mangos
@@ -136,10 +137,16 @@ defmodule ThistleTea.DB.Mangos.ItemTemplate do
     field(:extra_flags, :integer, default: 0, source: :ExtraFlags)
   end
 
-  def random_by_type(inventory_type) do
+  def random_usable_by_type(inventory_type, race, class, level) do
+    race_mask = 1 <<< (race - 1)
+    class_mask = 1 <<< (class - 1)
+
     query =
       from(it in Mangos.ItemTemplate,
         where: it.inventory_type == ^inventory_type,
+        where: it.required_level <= ^level,
+        where: fragment("? & ?", it.allowable_race, ^race_mask) != 0,
+        where: fragment("? & ?", it.allowable_class, ^class_mask) != 0,
         order_by: fragment("RANDOM()"),
         limit: 1
       )
