@@ -31,7 +31,7 @@ defmodule ThistleTea.Game.Network.InventoryUpdate do
 
     character =
       %{state.character | player: player}
-      |> ThistleTea.Character.sync_mainhand_stats()
+      |> ThistleTea.Character.sync_equipment_stats()
 
     %UpdateObject{
       update_type: :values,

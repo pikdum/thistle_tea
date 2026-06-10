@@ -4,6 +4,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgMessagechat do
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Item, as: DataItem
   alias ThistleTea.Game.Entity.Logic.Core
+  alias ThistleTea.Game.Entity.Logic.EquipmentStats
   alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.InventoryUpdate
@@ -426,7 +427,10 @@ defmodule ThistleTea.Game.Network.Message.CmsgMessagechat do
       {:ok, new_stats} ->
         character =
           character
+          |> EquipmentStats.remove()
           |> Stats.apply(new_stats)
+          |> ThistleTea.Character.sync_equipment_stats()
+          |> ThistleTea.Character.restore_health_and_mana()
           |> put_player_xp(0)
 
         level_up =

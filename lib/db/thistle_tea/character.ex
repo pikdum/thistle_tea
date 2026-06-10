@@ -23,6 +23,7 @@ defmodule ThistleTea.Character do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Item
   alias ThistleTea.Game.Entity.Data.ItemTemplate
+  alias ThistleTea.Game.Entity.Logic.EquipmentStats
   alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.Message.CmsgCharCreate
@@ -143,7 +144,17 @@ defmodule ThistleTea.Character do
       end)
 
     character = %{character | player: player}
-    sync_mainhand_stats(character)
+    sync_equipment_stats(character)
+  end
+
+  def sync_equipment_stats(%__MODULE__{} = character) do
+    character
+    |> sync_mainhand_stats()
+    |> EquipmentStats.resync(&ItemStore.get/1)
+  end
+
+  def restore_health_and_mana(%__MODULE__{unit: %Unit{} = unit} = character) do
+    %{character | unit: %{unit | health: unit.max_health, power1: unit.max_power1}}
   end
 
   def sync_mainhand_stats(%__MODULE__{player: %Player{visible_item_16_0: entry}} = character)
@@ -217,7 +228,10 @@ defmodule ThistleTea.Character do
 
         character =
           character
+          |> EquipmentStats.remove()
           |> Stats.apply(new_stats)
+          |> sync_equipment_stats()
+          |> restore_health_and_mana()
           |> put_xp_after_level(xp - next_level_xp)
 
         event = Stats.level_delta(old_stats, new_stats)
@@ -304,6 +318,7 @@ defmodule ThistleTea.Character do
     character =
       %{character | object: %{character.object | guid: Guid.from_low_guid(:player, character.id)}}
       |> generate_and_assign_equipment()
+      |> restore_health_and_mana()
 
     save(character)
 

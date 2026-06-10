@@ -31,6 +31,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal do
     :min_loot_gold,
     :max_loot_gold,
     :loot,
+    :equipment_bonuses,
     events: [],
     broadcast_update?: false,
     spline_id: 0,

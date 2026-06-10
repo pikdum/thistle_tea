@@ -142,11 +142,11 @@ defmodule ThistleTea.Game.Player.Stats do
 
   defp max_mana(%__MODULE__{}), do: 0
 
-  defp stamina_health_bonus(stamina) when stamina < 20, do: stamina
-  defp stamina_health_bonus(stamina), do: 20 + (stamina - 20) * 10
+  def stamina_health_bonus(stamina) when stamina < 20, do: stamina
+  def stamina_health_bonus(stamina), do: 20 + (stamina - 20) * 10
 
-  defp mana_bonus(intellect) when intellect < 20, do: intellect
-  defp mana_bonus(intellect), do: 20 + (intellect - 20) * 15
+  def mana_bonus(intellect) when intellect < 20, do: intellect
+  def mana_bonus(intellect), do: 20 + (intellect - 20) * 15
 
   defp power_fields(class, %__MODULE__{} = stats) do
     %{

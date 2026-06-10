@@ -106,6 +106,15 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
     |> Map.put(visible_entry_field(index), item.object.entry)
   end
 
+  def equipped_templates(%Player{} = player, get_item) do
+    @equipment_fields
+    |> Enum.map(fn field -> Map.get(player, field) end)
+    |> Enum.filter(fn guid -> is_integer(guid) and guid > 0 end)
+    |> Enum.map(get_item)
+    |> Enum.reject(&is_nil/1)
+    |> Enum.map(&Item.template/1)
+  end
+
   def owned_items(%Player{} = player, get_item) do
     direct =
       @slot_fields

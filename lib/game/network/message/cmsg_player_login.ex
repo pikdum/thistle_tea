@@ -187,7 +187,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgPlayerLogin do
   end
 
   defp normalize_combat_stats(%ThistleTea.Character{} = character) do
-    character = ThistleTea.Character.sync_mainhand_stats(character)
+    character = ThistleTea.Character.sync_equipment_stats(character)
 
     unit =
       character.unit
