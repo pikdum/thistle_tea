@@ -36,6 +36,15 @@ defmodule ThistleTea.Game.Entity do
     dispatch_cast(entity, {:destroy_object, guid})
   end
 
+  def call(entity, message) do
+    case resolve_pid(entity) do
+      {:ok, pid} -> GenServer.call(pid, message)
+      error -> error
+    end
+  catch
+    :exit, _ -> {:error, :not_found}
+  end
+
   defp dispatch_cast(target, message) do
     case resolve_pid(target) do
       {:ok, pid} -> GenServer.cast(pid, message)

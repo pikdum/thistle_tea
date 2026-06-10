@@ -67,7 +67,9 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
     slot_is_empty: 22,
     item_not_found: 23,
     cant_drop_soulbound: 24,
-    int_bag_error: 40
+    int_bag_error: 40,
+    already_looted: 49,
+    inventory_full: 50
   }
 
   def bag_0, do: @bag_0
@@ -142,6 +144,13 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
       {:ok, player}
     else
       {:error, error} -> {:error, error, item_guid(player, src_slot) || 0, item_guid(player, dst_slot) || 0}
+    end
+  end
+
+  def store(%Player{} = player, %Item{} = item) do
+    case free_backpack_slot(player) do
+      nil -> {:error, :inventory_full}
+      slot -> {:ok, put_slot(player, slot, item), slot}
     end
   end
 
@@ -286,7 +295,7 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
     free_backpack_slot(player) != nil or (backpack_slot?(src_slot) and dst_item == nil)
   end
 
-  defp free_backpack_slot(%Player{} = player) do
+  def free_backpack_slot(%Player{} = player) do
     Enum.find(@backpack_slot_start..(@slot_count - 1), fn slot ->
       item_guid(player, slot) == nil
     end)

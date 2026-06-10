@@ -70,7 +70,11 @@ defmodule ThistleTea.Game.Network.Packet do
        CMSG_AUTOEQUIP_ITEM: Message.CmsgAutoequipItem,
        CMSG_SWAP_INV_ITEM: Message.CmsgSwapInvItem,
        CMSG_SWAP_ITEM: Message.CmsgSwapItem,
-       CMSG_DESTROYITEM: Message.CmsgDestroyitem
+       CMSG_DESTROYITEM: Message.CmsgDestroyitem,
+       CMSG_LOOT: Message.CmsgLoot,
+       CMSG_AUTOSTORE_LOOT_ITEM: Message.CmsgAutostoreLootItem,
+       CMSG_LOOT_MONEY: Message.CmsgLootMoney,
+       CMSG_LOOT_RELEASE: Message.CmsgLootRelease
      }
      |> Map.merge(@m)
      |> Map.new(fn {k, v} -> {Opcodes.get(k), v} end)

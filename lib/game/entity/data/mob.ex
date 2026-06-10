@@ -92,6 +92,9 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
         extra_flags: ct.extra_flags,
         rank: ct.rank,
         respawn_delay_ms: respawn_delay_ms(c.spawntimesecs),
+        loot_id: ct.loot_id,
+        min_loot_gold: ct.min_loot_gold,
+        max_loot_gold: ct.max_loot_gold,
         spawn_unit: unit,
         spawn_movement_block: movement_block,
         initial_position: {c.position_x, c.position_y, c.position_z},
@@ -118,7 +121,8 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
         behavior_tree: nil,
         blackboard: nil,
         respawn_ref: nil,
-        broadcast_update?: false
+        broadcast_update?: false,
+        loot: nil
     }
 
     %{mob | unit: unit, movement_block: movement_block, internal: internal}

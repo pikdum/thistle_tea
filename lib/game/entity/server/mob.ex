@@ -1,6 +1,8 @@
 defmodule ThistleTea.Game.Entity.Server.Mob do
   use GenServer
 
+  import Bitwise, only: [|||: 2, &&&: 2, bnot: 1]
+
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Unit
@@ -10,6 +12,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Mob, as: MobBT
   alias ThistleTea.Game.Entity.Logic.Combat
   alias ThistleTea.Game.Entity.Logic.Core
+  alias ThistleTea.Game.Entity.Logic.Loot
   alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.Entity.Logic.SpellEffect
   alias ThistleTea.Game.Entity.Registry, as: EntityRegistry
@@ -18,6 +21,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Loader.Faction, as: FactionLoader
+  alias ThistleTea.Game.World.Loader.Loot, as: LootLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.System.GameEvent
   alias ThistleTea.Game.World.Visibility
@@ -25,6 +29,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   @ai_tick_ms 100
   @ai_tick_max_ms 1_000
   @default_respawn_delay_ms 120_000
+  @dynamic_flag_lootable 0x0001
 
   def start_link(%Mob{} = state) do
     GenServer.start_link(__MODULE__, state, name: EntityRegistry.via(state.object.guid))
@@ -105,6 +110,51 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     schedule_ai_tick(0)
     {:noreply, state, {:continue, :maybe_broadcast}}
   end
+
+  @impl GenServer
+  def handle_call(:loot_view, _from, %Mob{internal: %Internal{loot: %Loot{} = loot}} = state) do
+    if Core.dead?(state) do
+      {:reply, {:ok, loot}, state}
+    else
+      {:reply, {:error, :no_loot}, state}
+    end
+  end
+
+  def handle_call(:loot_view, _from, state), do: {:reply, {:error, :no_loot}, state}
+
+  def handle_call({:loot_take_item, slot}, _from, %Mob{internal: %Internal{loot: %Loot{} = loot} = internal} = state) do
+    case Loot.take_item(loot, slot) do
+      {:ok, item, loot} -> {:reply, {:ok, item}, %{state | internal: %{internal | loot: loot}}}
+      error -> {:reply, error, state}
+    end
+  end
+
+  def handle_call({:loot_take_item, _slot}, _from, state), do: {:reply, {:error, :no_loot}, state}
+
+  def handle_call(:loot_take_gold, _from, %Mob{internal: %Internal{loot: %Loot{} = loot} = internal} = state) do
+    case Loot.take_gold(loot) do
+      {:ok, gold, loot} -> {:reply, {:ok, gold}, %{state | internal: %{internal | loot: loot}}}
+      error -> {:reply, error, state}
+    end
+  end
+
+  def handle_call(:loot_take_gold, _from, state), do: {:reply, {:error, :no_loot}, state}
+
+  def handle_call(:loot_release, _from, %Mob{internal: %Internal{loot: %Loot{} = loot} = internal} = state) do
+    state =
+      if Loot.empty?(loot) do
+        state = %{state | internal: %{internal | loot: nil}}
+        state = clear_lootable_flag(state)
+        Core.update_object(state, :values) |> World.broadcast_packet(state)
+        state
+      else
+        state
+      end
+
+    {:reply, :ok, state}
+  end
+
+  def handle_call(:loot_release, _from, state), do: {:reply, :ok, state}
 
   @impl GenServer
   def handle_info({:deliver_spell, event}, state) do
@@ -245,6 +295,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
       state
       |> maybe_decrement_on_death(target)
       |> maybe_reward_kill(target)
+      |> generate_loot()
       |> schedule_respawn()
     else
       state
@@ -252,6 +303,24 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   end
 
   defp handle_death_transition(%Mob{} = state, _target, _dead_before), do: state
+
+  defp generate_loot(%Mob{internal: %Internal{} = internal, unit: %Unit{} = unit} = state) do
+    loot = LootLoader.generate(internal.loot_id, internal.min_loot_gold, internal.max_loot_gold)
+
+    if Loot.empty?(loot) do
+      state
+    else
+      %{
+        state
+        | internal: %{internal | loot: loot},
+          unit: %{unit | dynamic_flags: (unit.dynamic_flags || 0) ||| @dynamic_flag_lootable}
+      }
+    end
+  end
+
+  defp clear_lootable_flag(%Mob{unit: %Unit{} = unit} = state) do
+    %{state | unit: %{unit | dynamic_flags: (unit.dynamic_flags || 0) &&& bnot(@dynamic_flag_lootable)}}
+  end
 
   defp maybe_decrement_on_death(%Mob{} = state, target) when is_integer(target) and target > 0 do
     Metadata.decrement(target, :attacker_count, 0)
