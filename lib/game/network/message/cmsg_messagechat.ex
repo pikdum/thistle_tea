@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgMessagechat do
   alias ThistleTea.Game.Entity.Logic.QuestLog
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.InventoryUpdate
+  alias ThistleTea.Game.Player.Quests
   alias ThistleTea.Game.Player.Stats
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.ClassSpell
@@ -97,19 +98,19 @@ defmodule ThistleTea.Game.Network.Message.CmsgMessagechat do
     {Inventory.bag_0(), 0xFFFFFFFF}
   end
 
-  defp handle_addquest(%{character: %ThistleTea.Character{player: player} = character} = state, quest_id_str) do
+  defp handle_addquest(state, quest_id_str) do
     with {quest_id, ""} <- Integer.parse(quest_id_str),
-         %Quest{} = quest <- QuestLoader.get(quest_id),
-         {:ok, quest_log} <- QuestLog.add(player.quest_log, quest_id) do
-      character = %{character | player: %{player | quest_log: quest_log}}
-
-      state
-      |> put_character(character)
-      |> system_message("Added quest: #{quest.title} (#{quest_id})")
+         %Quest{} = quest <- QuestLoader.get(quest_id) do
+      case Quests.force_accept(state, quest_id) do
+        %{character: %ThistleTea.Character{player: %{quest_log: quest_log}}} = state ->
+          if QuestLog.active?(quest_log, quest_id) do
+            system_message(state, "Added quest: #{quest.title} (#{quest_id})")
+          else
+            system_message(state, "Could not accept quest #{quest_id}.")
+          end
+      end
     else
       nil -> system_message(state, "Quest #{quest_id_str} not found.")
-      {:error, :already_active} -> system_message(state, "Quest is already in your log.")
-      {:error, :log_full} -> system_message(state, "Quest log is full.")
       _ -> system_message(state, "Invalid command. Use: .addquest <quest_id>")
     end
   end

@@ -81,7 +81,11 @@ defmodule ThistleTea.Game.Network.Packet do
        CMSG_LOOT_MONEY: Message.CmsgLootMoney,
        CMSG_LOOT_RELEASE: Message.CmsgLootRelease,
        CMSG_QUESTGIVER_STATUS_QUERY: Message.CmsgQuestgiverStatusQuery,
-       CMSG_QUEST_QUERY: Message.CmsgQuestQuery
+       CMSG_QUEST_QUERY: Message.CmsgQuestQuery,
+       CMSG_QUESTGIVER_HELLO: Message.CmsgQuestgiverHello,
+       CMSG_QUESTGIVER_QUERY_QUEST: Message.CmsgQuestgiverQueryQuest,
+       CMSG_QUESTGIVER_ACCEPT_QUEST: Message.CmsgQuestgiverAcceptQuest,
+       CMSG_QUESTLOG_REMOVE_QUEST: Message.CmsgQuestlogRemoveQuest
      }
      |> Map.merge(@m)
      |> Map.new(fn {k, v} -> {Opcodes.get(k), v} end)
