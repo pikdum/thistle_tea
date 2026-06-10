@@ -430,4 +430,88 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
       assert entity.unit.normal_resistance == 29
     end
   end
+
+  describe "regen auras and interrupts" do
+    @not_seated 0x40000
+
+    defp food_fixture do
+      %Spell{
+        id: 433,
+        name: "Food",
+        school: :physical,
+        cast_time_ms: 0,
+        duration_ms: 18_000,
+        mana_cost: 0,
+        gcd_ms: 0,
+        aura_interrupt_flags: @not_seated,
+        effects: [
+          %Effect{
+            index: 0,
+            type: :apply_aura,
+            base_points: 16,
+            die_sides: 0,
+            aura: :mod_regen,
+            amplitude_ms: 0,
+            misc_value: 0,
+            implicit_target_a: :caster
+          }
+        ]
+      }
+    end
+
+    defp drink_fixture do
+      %{
+        food_fixture()
+        | id: 430,
+          name: "Drink",
+          effects: [%Effect{index: 0, type: :apply_aura, base_points: 41, die_sides: 0, aura: :mod_power_regen}]
+      }
+    end
+
+    test "sits the target when applying a not-seated aura" do
+      {entity, events} = apply_spell(fixture_entity(), 1, 1, food_fixture())
+
+      assert entity.unit.stand_state == 1
+      assert Enum.any?(events, &(&1.type == :stand_state and &1.stand_state == 1))
+    end
+
+    test "food heals every regen tick" do
+      entity = fixture_entity()
+      entity = %{entity | unit: %{entity.unit | health: 50}}
+      {entity, _events} = apply_spell(entity, 1, 1, food_fixture())
+
+      {entity, _events} = Aura.tick(entity, 1_000 + 4_999)
+      assert entity.unit.health == 50
+
+      {entity, _events} = Aura.tick(entity, 1_000 + 5_000)
+      assert entity.unit.health == 66
+    end
+
+    test "drink restores mana every regen tick" do
+      entity = fixture_entity()
+      entity = %{entity | unit: %{entity.unit | power1: 10, max_power1: 100}}
+      {entity, _events} = apply_spell(entity, 1, 1, drink_fixture())
+
+      {entity, _events} = Aura.tick(entity, 1_000 + 5_000)
+      assert entity.unit.power1 == 51
+    end
+
+    test "remove_with_interrupt_flags removes matching auras only" do
+      {entity, _events} = apply_spell(fixture_entity(), 1, 1, food_fixture())
+      {entity, _events} = apply_spell(entity, 1, 1, frost_armor_fixture())
+
+      {entity, _events} = Aura.remove_with_interrupt_flags(entity, Aura.interrupt_mask(:move), 2_000)
+
+      spell_ids = Enum.map(entity.unit.auras, & &1.spell.id)
+      assert spell_ids == [168]
+    end
+
+    test "turn mask does not remove not-seated auras" do
+      {entity, _events} = apply_spell(fixture_entity(), 1, 1, food_fixture())
+
+      {entity, _events} = Aura.remove_with_interrupt_flags(entity, Aura.interrupt_mask(:turn), 2_000)
+
+      assert length(entity.unit.auras) == 1
+    end
+  end
 end

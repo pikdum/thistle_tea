@@ -1,9 +1,13 @@
 defmodule ThistleTea.Game.Network.Message.MsgMove do
   use ThistleTea.Game.Network.ClientMessage, :MSG_MOVE_JUMP
 
+  alias ThistleTea.Game.Entity.EventSink
+  alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
+  alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.Network.ClientMessage
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Packet
+  alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.Visibility
 
@@ -31,9 +35,11 @@ defmodule ThistleTea.Game.Network.Message.MsgMove do
       %{internal: %{map: map}} = character
       %MovementBlock{position: {x0, y0, z0, _}} = state.character.movement_block
       %MovementBlock{position: {x1, y1, z1, _}} = movement_block
+      position_changed? = x0 != x1 or y0 != y1 or z0 != z1
+      character = interrupt_auras(character, position_changed?)
 
       new_state =
-        if x0 != x1 or y0 != y1 or z0 != z1 do
+        if position_changed? do
           SpatialHash.update(:players, state.guid, map, x1, y1, z1)
 
           Map.put(state, :character, character)
@@ -64,5 +70,24 @@ defmodule ThistleTea.Game.Network.Message.MsgMove do
     |> World.broadcast_packet(state.character, include_self?: false, recipients: Map.get(state, :player_guids))
 
     state
+  end
+
+  defp interrupt_auras(character, position_changed?) do
+    mask = if position_changed?, do: AuraLogic.interrupt_mask(:move), else: AuraLogic.interrupt_mask(:turn)
+    auras_before = character.unit.auras
+    {character, events} = AuraLogic.remove_with_interrupt_flags(character, mask, Time.now())
+
+    character =
+      character
+      |> Event.enqueue(events)
+      |> EventSink.emit_pending()
+
+    if character.unit.auras != auras_before do
+      %UpdateObject{update_type: :values, object_type: :player}
+      |> struct(Map.from_struct(character))
+      |> World.broadcast_packet(character)
+    end
+
+    character
   end
 end

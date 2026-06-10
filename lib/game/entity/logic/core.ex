@@ -49,6 +49,14 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
 
   def heal(entity, _amount), do: entity
 
+  def restore_mana(%{unit: %Unit{power1: power, max_power1: max_power} = unit} = entity, amount)
+      when is_number(power) and is_number(max_power) and max_power > 0 and is_number(amount) and amount > 0 do
+    %{entity | unit: %{unit | power1: min(power + amount, max_power)}}
+    |> mark_broadcast_update()
+  end
+
+  def restore_mana(entity, _amount), do: entity
+
   def dead?(%{unit: %Unit{health: health}}) when is_number(health) do
     health <= 0
   end

@@ -80,6 +80,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
       mana_cost: row.mana_cost || 0,
       gcd_ms: row.start_recovery_time || 0,
       speed: row.speed || 0.0,
+      aura_interrupt_flags: row.aura_interrupt_flags || 0,
       attributes: attributes(row.attributes, row.attributes_ex1),
       effects: build_effects(row, radius_lookup)
     }
@@ -202,6 +203,8 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp aura_type(31), do: :mod_increase_speed
   defp aura_type(33), do: :mod_decrease_speed
   defp aura_type(42), do: :proc_trigger_spell
+  defp aura_type(84), do: :mod_regen
+  defp aura_type(85), do: :mod_power_regen
   defp aura_type(other) when is_integer(other), do: other
 
   defp target_type(0), do: nil

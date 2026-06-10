@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Spell do
     :mana_cost,
     :gcd_ms,
     speed: 0.0,
+    aura_interrupt_flags: 0,
     attributes: MapSet.new(),
     effects: []
   ]

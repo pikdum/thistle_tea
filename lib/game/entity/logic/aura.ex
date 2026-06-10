@@ -28,6 +28,19 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
 
   @negative_auras [:periodic_damage, :mod_root, :mod_decrease_speed, :mod_stun, :mod_fear]
 
+  @aura_interrupt_move 0x08
+  @aura_interrupt_turning 0x10
+  @aura_interrupt_not_seated 0x40000
+
+  @regen_tick_ms 5000
+  @regen_auras [:mod_regen, :mod_power_regen]
+
+  @stand_state_sit 1
+
+  def interrupt_mask(:move), do: @aura_interrupt_move ||| @aura_interrupt_turning ||| @aura_interrupt_not_seated
+  def interrupt_mask(:turn), do: @aura_interrupt_turning
+  def interrupt_mask(:stand), do: @aura_interrupt_not_seated
+
   def apply_spell(entity, %CastContext{} = context, %Spell{} = spell, now) when is_integer(now) do
     aura_effects = Spell.aura_effects(spell)
 
@@ -75,12 +88,14 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
     holders = upsert_holder(existing, holder)
     unit = sync_unit(%{entity.unit | auras: holders})
 
-    {entity, events} =
+    {entity, sit_events} =
       entity
       |> Map.put(:unit, unit)
-      |> sync_movement_state(now)
+      |> maybe_sit(holder)
 
-    {Core.mark_broadcast_update(entity), events}
+    {entity, events} = sync_movement_state(entity, now)
+
+    {Core.mark_broadcast_update(entity), sit_events ++ events}
   end
 
   defp do_apply(entity, %Holder{} = holder, now) do
@@ -140,6 +155,42 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
   end
 
   def expire_due(entity, _now), do: {entity, []}
+
+  def remove_with_interrupt_flags(%{unit: %Unit{auras: holders}} = entity, mask, now)
+      when is_list(holders) and holders != [] and is_integer(mask) do
+    {removed, kept} = Enum.split_with(holders, &interruptible?(&1, mask))
+
+    if removed == [] do
+      {entity, []}
+    else
+      unit = sync_unit(%{entity.unit | auras: kept})
+
+      {entity, events} =
+        entity
+        |> Map.put(:unit, unit)
+        |> sync_movement_state(now)
+
+      {Core.mark_broadcast_update(entity), events}
+    end
+  end
+
+  def remove_with_interrupt_flags(entity, _mask, _now), do: {entity, []}
+
+  defp interruptible?(%Holder{spell: %Spell{aura_interrupt_flags: flags}}, mask) when is_integer(flags) do
+    (flags &&& mask) != 0
+  end
+
+  defp interruptible?(_holder, _mask), do: false
+
+  defp maybe_sit(%{unit: %Unit{stand_state: stand_state} = unit} = entity, %Holder{spell: %Spell{} = spell}) do
+    if (spell.aura_interrupt_flags &&& @aura_interrupt_not_seated) != 0 and stand_state != @stand_state_sit do
+      {%{entity | unit: %{unit | stand_state: @stand_state_sit}}, [Event.stand_state(@stand_state_sit)]}
+    else
+      {entity, []}
+    end
+  end
+
+  defp maybe_sit(entity, _holder), do: {entity, []}
 
   def rooted?(%{unit: %Unit{auras: holders}}) when is_list(holders) do
     Enum.any?(holders, &has_aura_type?(&1, :mod_root))
@@ -262,6 +313,18 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
     {entity, %{aura | next_tick_at: advance_tick(at, aura.amplitude_ms, now)}, []}
   end
 
+  defp tick_aura(entity, _holder, %Aura{type: :mod_regen, next_tick_at: at} = aura, now)
+       when is_integer(at) and now >= at do
+    entity = Core.heal(entity, aura.amount)
+    {entity, %{aura | next_tick_at: advance_tick(at, aura.amplitude_ms, now)}, []}
+  end
+
+  defp tick_aura(entity, _holder, %Aura{type: :mod_power_regen, next_tick_at: at} = aura, now)
+       when is_integer(at) and now >= at do
+    entity = Core.restore_mana(entity, aura.amount)
+    {entity, %{aura | next_tick_at: advance_tick(at, aura.amplitude_ms, now)}, []}
+  end
+
   defp tick_aura(entity, _holder, aura, _now), do: {entity, aura, []}
 
   defp advance_tick(last_tick, amplitude_ms, now) when is_integer(amplitude_ms) and amplitude_ms > 0 do
@@ -317,16 +380,24 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
   defp build_aura(%Effect{aura: nil}, _now), do: nil
 
   defp build_aura(%Effect{} = effect, now) do
+    amplitude_ms = effective_amplitude(effect)
+
     %Aura{
       index: effect.index,
       type: effect.aura,
       amount: Effect.damage_roll(effect),
       misc_value: effect.misc_value,
-      amplitude_ms: effect.amplitude_ms,
-      next_tick_at: next_tick(effect, now),
+      amplitude_ms: amplitude_ms,
+      next_tick_at: next_tick(effect, amplitude_ms, now),
       trigger_spell_id: effect.trigger_spell_id
     }
   end
+
+  defp effective_amplitude(%Effect{aura: aura, amplitude_ms: amp}) when aura in @regen_auras do
+    if is_integer(amp) and amp > 0, do: amp, else: @regen_tick_ms
+  end
+
+  defp effective_amplitude(%Effect{amplitude_ms: amp}), do: amp
 
   defp reaction_event(%Aura{type: type, trigger_spell_id: spell_id}, %Holder{} = holder, owner_guid, attacker_guid)
        when type in [:damage_shield, :proc_trigger_spell] and is_integer(spell_id) and spell_id > 0 do
@@ -337,12 +408,13 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
 
   defp reaction_event(_aura, _holder, _owner_guid, _attacker_guid), do: []
 
-  defp next_tick(%Effect{aura: aura, amplitude_ms: amp}, now)
-       when aura in [:periodic_damage, :periodic_heal] and is_integer(amp) and amp > 0 do
-    now + amp
+  defp next_tick(%Effect{aura: aura}, amplitude_ms, now)
+       when aura in [:periodic_damage, :periodic_heal, :mod_regen, :mod_power_regen] and is_integer(amplitude_ms) and
+              amplitude_ms > 0 do
+    now + amplitude_ms
   end
 
-  defp next_tick(_effect, _now), do: nil
+  defp next_tick(_effect, _amplitude_ms, _now), do: nil
 
   defp next_free_slot(holders, negative?) do
     used = MapSet.new(holders, & &1.slot)

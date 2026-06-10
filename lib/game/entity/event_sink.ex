@@ -128,6 +128,13 @@ defmodule ThistleTea.Game.Entity.EventSink do
 
   def emit(entity, %Event{type: :spell_go}), do: entity
 
+  def emit(%Character{} = entity, %Event{type: :stand_state} = event) do
+    Network.send_packet(%Message.SmsgStandstateUpdate{stand_state: event.stand_state})
+    entity
+  end
+
+  def emit(entity, %Event{type: :stand_state}), do: entity
+
   def emit(%Character{} = entity, %Event{type: :channel_start} = event) do
     Network.send_packet(%Message.MsgChannelStart{
       spell_id: event.spell_id,

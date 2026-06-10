@@ -16,6 +16,7 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
     :hit_guids,
     :raw_targets,
     :cast_item_guid,
+    :stand_state,
     :update_type,
     :cast_context,
     :spell,
@@ -61,6 +62,10 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
 
   def spell_cast_result(spell_id) when is_integer(spell_id) do
     %__MODULE__{type: :spell_cast_result, spell_id: spell_id}
+  end
+
+  def stand_state(stand_state) when is_integer(stand_state) do
+    %__MODULE__{type: :stand_state, stand_state: stand_state}
   end
 
   def spell_go(source_guid, spell_id, hit_guids, raw_targets, cast_item_guid \\ nil)
