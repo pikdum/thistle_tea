@@ -71,6 +71,9 @@ defmodule ThistleTea.Character do
         gender: params.gender,
         power_type: get_power(params.class),
         base_attack_time: 2000,
+        offhand_attack_time: 2000,
+        min_offhand_damage: 0.0,
+        max_offhand_damage: 0.0,
         bounding_radius: Unit.default_bounding_radius(),
         combat_reach: Unit.default_combat_reach(),
         display_id: unit_display_id,
@@ -91,6 +94,13 @@ defmodule ThistleTea.Character do
       },
       player: %Player{
         flags: 0,
+        mod_damage_done_pct_physical: 1.0,
+        mod_damage_done_pct_holy: 1.0,
+        mod_damage_done_pct_fire: 1.0,
+        mod_damage_done_pct_nature: 1.0,
+        mod_damage_done_pct_frost: 1.0,
+        mod_damage_done_pct_shadow: 1.0,
+        mod_damage_done_pct_arcane: 1.0,
         skin: params.skin_color,
         face: params.face,
         hair_style: params.hair_style,
@@ -150,6 +160,7 @@ defmodule ThistleTea.Character do
   def sync_equipment_stats(%__MODULE__{} = character) do
     character
     |> sync_mainhand_stats()
+    |> sync_offhand_stats()
     |> EquipmentStats.resync(&ItemStore.get/1)
   end
 
@@ -180,6 +191,37 @@ defmodule ThistleTea.Character do
   end
 
   def sync_mainhand_stats(%__MODULE__{} = character, _weapon), do: character
+
+  @item_class_weapon 2
+
+  def sync_offhand_stats(%__MODULE__{unit: %Unit{} = unit, player: %Player{visible_item_17_0: entry}} = character) do
+    weapon =
+      case is_integer(entry) and entry > 0 and ItemLoader.get_template(entry) do
+        %ItemTemplate{class: @item_class_weapon} = template -> template
+        _ -> nil
+      end
+
+    unit =
+      if weapon do
+        %{
+          unit
+          | offhand_attack_time: positive_or(weapon.delay, 2000),
+            min_offhand_damage: positive_or(weapon.dmg_min1, 0.0),
+            max_offhand_damage: positive_or(weapon.dmg_max1, 0.0)
+        }
+      else
+        %{unit | offhand_attack_time: 2000, min_offhand_damage: 0.0, max_offhand_damage: 0.0}
+      end
+
+    %{character | unit: unit}
+  end
+
+  defp positive_or(value, default) do
+    case value do
+      value when is_number(value) and value > 0 -> value
+      _ -> default
+    end
+  end
 
   defp maybe_update_unit_value(%Unit{} = unit, key, value) do
     case value do
