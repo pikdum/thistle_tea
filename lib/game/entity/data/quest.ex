@@ -29,6 +29,11 @@ defmodule ThistleTea.Game.Entity.Data.Quest do
     objective_texts: [],
     required_items: [],
     required_kills: [],
+    objective_slots: [],
+    point_map_id: 0,
+    point_x: 0.0,
+    point_y: 0.0,
+    point_opt: 0,
     reward_items: [],
     reward_choice_items: [],
     reward_money: 0,
@@ -69,6 +74,11 @@ defmodule ThistleTea.Game.Entity.Data.Quest do
       objective_texts: Enum.map(1..4, fn i -> Map.get(row, :"objective_text#{i}") || "" end),
       required_items: indexed_id_counts(row, :req_item_id, :req_item_count, 4),
       required_kills: required_kills(row),
+      objective_slots: objective_slots(row),
+      point_map_id: row.point_map_id,
+      point_x: row.point_x,
+      point_y: row.point_y,
+      point_opt: row.point_opt,
       reward_items: id_count_pairs(row, :rew_item_id, :rew_item_count, 4),
       reward_choice_items: id_count_pairs(row, :rew_choice_item_id, :rew_choice_item_count, 6),
       reward_money: row.rew_or_req_money,
@@ -108,6 +118,17 @@ defmodule ThistleTea.Game.Entity.Data.Quest do
       count = Map.get(row, :"req_creature_or_go_count#{i}") || 0
       spell = Map.get(row, :"req_spell_cast#{i}") || 0
       if entry > 0 and spell == 0, do: [{i - 1, entry, max(count, 1)}], else: []
+    end)
+  end
+
+  defp objective_slots(row) do
+    Enum.map(1..4, fn i ->
+      %{
+        creature_or_go_id: Map.get(row, :"req_creature_or_go_id#{i}") || 0,
+        creature_or_go_count: Map.get(row, :"req_creature_or_go_count#{i}") || 0,
+        item_id: Map.get(row, :"req_item_id#{i}") || 0,
+        item_count: Map.get(row, :"req_item_count#{i}") || 0
+      }
     end)
   end
 

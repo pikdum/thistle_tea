@@ -3,14 +3,17 @@ defmodule ThistleTea.Game.Network.Message.CmsgMessagechat do
 
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Item, as: DataItem
+  alias ThistleTea.Game.Entity.Data.Quest
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.EquipmentStats
   alias ThistleTea.Game.Entity.Logic.Inventory
+  alias ThistleTea.Game.Entity.Logic.QuestLog
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.InventoryUpdate
   alias ThistleTea.Game.Player.Stats
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.ClassSpell
+  alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Metadata
 
@@ -94,6 +97,23 @@ defmodule ThistleTea.Game.Network.Message.CmsgMessagechat do
     {Inventory.bag_0(), 0xFFFFFFFF}
   end
 
+  defp handle_addquest(%{character: %ThistleTea.Character{player: player} = character} = state, quest_id_str) do
+    with {quest_id, ""} <- Integer.parse(quest_id_str),
+         %Quest{} = quest <- QuestLoader.get(quest_id),
+         {:ok, quest_log} <- QuestLog.add(player.quest_log, quest_id) do
+      character = %{character | player: %{player | quest_log: quest_log}}
+
+      state
+      |> put_character(character)
+      |> system_message("Added quest: #{quest.title} (#{quest_id})")
+    else
+      nil -> system_message(state, "Quest #{quest_id_str} not found.")
+      {:error, :already_active} -> system_message(state, "Quest is already in your log.")
+      {:error, :log_full} -> system_message(state, "Quest log is full.")
+      _ -> system_message(state, "Invalid command. Use: .addquest <quest_id>")
+    end
+  end
+
   def teleport_player(state, x, y, z, map) do
     system_message(state, "Teleporting to #{x}, #{y}, #{z} on map #{map}")
 
@@ -133,9 +153,19 @@ defmodule ThistleTea.Game.Network.Message.CmsgMessagechat do
     end
   end
 
+  def handle_chat(state, _, _, ".addquest" <> params, _) do
+    params
+    |> String.split(" ", trim: true)
+    |> case do
+      [quest_id] -> handle_addquest(state, quest_id)
+      _ -> system_message(state, "Invalid command. Use: .addquest <quest_id>")
+    end
+  end
+
   def handle_chat(state, _, _, ".help" <> _, _) do
     commands = [
       ".additem <item_id> [count] - add an item to your inventory",
+      ".addquest <quest_id> - add a quest to your quest log",
       ".debug spells - learn class trainer spells up to your level",
       ".character level <level> - set player level",
       ".go xyz <x> <y> <z> [map] - teleport",

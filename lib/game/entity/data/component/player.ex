@@ -43,7 +43,28 @@ defmodule ThistleTea.Game.Entity.Data.Component.Player do
     honor_rank: :virtual,
     duel_team: {0x00C4, 1, :int},
     guild_timestamp: {0x00C5, 1, :int},
-    quest_log: {0x00C6, 60, :custom, :private},
+    quest_log: :virtual,
+    rewarded_quests: :virtual,
+    quest_slot_1: {0x00C6, 3, {:fn, [:quest_log], &__MODULE__.quest_slot_1/1}, :private},
+    quest_slot_2: {0x00C9, 3, {:fn, [:quest_log], &__MODULE__.quest_slot_2/1}, :private},
+    quest_slot_3: {0x00CC, 3, {:fn, [:quest_log], &__MODULE__.quest_slot_3/1}, :private},
+    quest_slot_4: {0x00CF, 3, {:fn, [:quest_log], &__MODULE__.quest_slot_4/1}, :private},
+    quest_slot_5: {0x00D2, 3, {:fn, [:quest_log], &__MODULE__.quest_slot_5/1}, :private},
+    quest_slot_6: {0x00D5, 3, {:fn, [:quest_log], &__MODULE__.quest_slot_6/1}, :private},
+    quest_slot_7: {0x00D8, 3, {:fn, [:quest_log], &__MODULE__.quest_slot_7/1}, :private},
+    quest_slot_8: {0x00DB, 3, {:fn, [:quest_log], &__MODULE__.quest_slot_8/1}, :private},
+    quest_slot_9: {0x00DE, 3, {:fn, [:quest_log], &__MODULE__.quest_slot_9/1}, :private},
+    quest_slot_10: {0x00E1, 3, {:fn, [:quest_log], &__MODULE__.quest_slot_10/1}, :private},
+    quest_slot_11: {0x00E4, 3, {:fn, [:quest_log], &__MODULE__.quest_slot_11/1}, :private},
+    quest_slot_12: {0x00E7, 3, {:fn, [:quest_log], &__MODULE__.quest_slot_12/1}, :private},
+    quest_slot_13: {0x00EA, 3, {:fn, [:quest_log], &__MODULE__.quest_slot_13/1}, :private},
+    quest_slot_14: {0x00ED, 3, {:fn, [:quest_log], &__MODULE__.quest_slot_14/1}, :private},
+    quest_slot_15: {0x00F0, 3, {:fn, [:quest_log], &__MODULE__.quest_slot_15/1}, :private},
+    quest_slot_16: {0x00F3, 3, {:fn, [:quest_log], &__MODULE__.quest_slot_16/1}, :private},
+    quest_slot_17: {0x00F6, 3, {:fn, [:quest_log], &__MODULE__.quest_slot_17/1}, :private},
+    quest_slot_18: {0x00F9, 3, {:fn, [:quest_log], &__MODULE__.quest_slot_18/1}, :private},
+    quest_slot_19: {0x00FC, 3, {:fn, [:quest_log], &__MODULE__.quest_slot_19/1}, :private},
+    quest_slot_20: {0x00FF, 3, {:fn, [:quest_log], &__MODULE__.quest_slot_20/1}, :private},
     visible_item_1_creator: {0x0102, 2, :guid},
     visible_item_1_0: {0x0104, 8, :int},
     visible_item_1_properties: {0x010C, 1, :two_short},
@@ -284,7 +305,14 @@ defmodule ThistleTea.Game.Entity.Data.Component.Player do
     watched_faction_index: {0x04ED, 1, :int, :private},
     combat_rating: {0x04EE, 20, :int, :private}
 
+  alias ThistleTea.Game.Entity.Logic.QuestLog
   alias ThistleTea.Game.Network.UpdateObject
+
+  for n <- 1..20 do
+    def unquote(:"quest_slot_#{n}")(%{quest_log: quest_log}) do
+      QuestLog.slot_binary(Map.get(quest_log || %{}, unquote(n - 1)))
+    end
+  end
 
   def features(%{skin: skin, face: face, hair_style: hair_style, hair_color: hair_color}) do
     UpdateObject.build_bytes([
