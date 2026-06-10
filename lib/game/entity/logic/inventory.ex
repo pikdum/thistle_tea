@@ -175,6 +175,28 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
     guid_at(ctx(player, nil, nil, get_item), pos)
   end
 
+  def find_position(%Player{} = player, guid, get_item) do
+    ctx = ctx(player, nil, nil, get_item)
+
+    direct = Enum.map(0..(@slot_count - 1), fn slot -> {@bag_0, slot} end)
+
+    Enum.find(direct ++ storage_positions(ctx), fn pos ->
+      guid_at(ctx, pos) == guid
+    end)
+  end
+
+  def reduce_stack(%Player{} = player, pos, count, get_item) do
+    ctx = ctx(player, nil, nil, get_item)
+
+    with {:ok, item} <- fetch_item(ctx, pos),
+         true <- count > 0 and count < stack_count(item) do
+      ctx = mark_changed(ctx, add_stack(item, -count))
+      {:ok, result(ctx)}
+    else
+      _ -> {:error, :item_not_found, guid_at(ctx, pos) || 0, 0}
+    end
+  end
+
   def can_store?(%Player{} = player, %ItemTemplate{} = template, count, get_item) do
     ctx = ctx(player, nil, nil, get_item)
     free_position(ctx) != nil or stack_room(ctx, template) >= count

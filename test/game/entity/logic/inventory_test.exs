@@ -491,6 +491,44 @@ defmodule ThistleTea.Game.Entity.Logic.InventoryTest do
     end
   end
 
+  describe "find_position/3" do
+    test "finds items in equipment, backpack, and bags", %{chest: chest, sword: sword, bag: bag} do
+      bag = %{bag | container: %{bag.container | slot_3: sword.object.guid}}
+
+      player =
+        %Player{}
+        |> Inventory.equip(:chest, chest)
+        |> Map.put(:bag1, bag.object.guid)
+
+      get_item = get_item_fn([chest, sword, bag])
+
+      assert Inventory.find_position(player, chest.object.guid, get_item) == {@bag_0, 4}
+      assert Inventory.find_position(player, bag.object.guid, get_item) == {@bag_0, @first_bag_slot}
+      assert Inventory.find_position(player, sword.object.guid, get_item) == {@first_bag_slot, 2}
+      assert Inventory.find_position(player, 999, get_item) == nil
+    end
+  end
+
+  describe "reduce_stack/4" do
+    test "reduces a stack in place" do
+      stack = build_item(20, %ItemTemplate{entry: 2000, stackable: 10}, stack_count: 8)
+      player = store(%Player{}, @backpack_start, stack)
+
+      assert {:ok, %{items: items}} =
+               Inventory.reduce_stack(player, {@bag_0, @backpack_start}, 3, get_item_fn([stack]))
+
+      assert updated(items, stack).item.stack_count == 5
+    end
+
+    test "rejects reducing by the full count" do
+      stack = build_item(20, %ItemTemplate{entry: 2000, stackable: 10}, stack_count: 3)
+      player = store(%Player{}, @backpack_start, stack)
+
+      assert {:error, :item_not_found, _, 0} =
+               Inventory.reduce_stack(player, {@bag_0, @backpack_start}, 3, get_item_fn([stack]))
+    end
+  end
+
   describe "owned_items/2" do
     test "includes equipment, backpack, bags, and bag contents", %{chest: chest, sword: sword, bag: bag} do
       bag = %{bag | container: %{bag.container | slot_1: sword.object.guid}}

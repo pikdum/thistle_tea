@@ -4,10 +4,14 @@ defmodule ThistleTea.Game.Network.Message.CmsgGossipSelectOption do
   import Ecto.Query
 
   alias ThistleTea.DB.Mangos
+  alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Message.SmsgGossipMessage.GossipItem
+  alias ThistleTea.Game.World.Loader.Vendor, as: VendorLoader
 
   require Logger
+
+  @gossip_option_vendor 3
 
   defstruct [:guid, :gossip_list_id, :code]
 
@@ -18,6 +22,14 @@ defmodule ThistleTea.Game.Network.Message.CmsgGossipSelectOption do
     |> Enum.find(fn o -> o.id == gossip_list_id end)
     |> case do
       nil ->
+        state
+
+      %{option_id: @gossip_option_vendor} ->
+        Network.send_packet(%Message.SmsgListInventory{
+          vendor_guid: guid,
+          items: VendorLoader.items(Guid.entry(guid))
+        })
+
         state
 
       option ->

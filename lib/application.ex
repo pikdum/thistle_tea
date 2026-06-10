@@ -11,6 +11,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.World.Groups
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
+  alias ThistleTea.Game.World.Loader.Vendor, as: VendorLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.System.CellActivator
@@ -82,6 +83,7 @@ defmodule ThistleTea.Application do
     Metadata.init()
     ItemLoader.init()
     ItemStore.init()
+    VendorLoader.init()
     :ets.new(:spline_counters, [:named_table, :public, write_concurrency: :auto])
     :ets.insert(:spline_counters, {:spline_id, 0})
     setup_database()
