@@ -8,6 +8,22 @@ defmodule ThistleTea.Game.World.SpatialHash do
     :ets.new(:mobs, @cell_table_options)
     :ets.new(:game_objects, @cell_table_options)
     :ets.new(:entities, @entity_table_options)
+    :ets.new(:entity_movement, @entity_table_options)
+  end
+
+  def put_movement(guid, {_map, _start_position, _spline_nodes, _start_time, _duration} = movement) do
+    :ets.insert(:entity_movement, {guid, movement})
+  end
+
+  def clear_movement(guid) do
+    :ets.delete(:entity_movement, guid)
+  end
+
+  def get_movement(guid) do
+    case :ets.lookup(:entity_movement, guid) do
+      [{^guid, movement}] -> movement
+      [] -> nil
+    end
   end
 
   def insert(table, guid, map, x, y, z) do
@@ -40,8 +56,10 @@ defmodule ThistleTea.Game.World.SpatialHash do
         hash = cell(map, x, y, z)
         :ets.delete_object(table, {hash, guid})
         :ets.delete(:entities, guid)
+        :ets.delete(:entity_movement, guid)
 
       [] ->
+        :ets.delete(:entity_movement, guid)
         :ok
     end
   end

@@ -4,7 +4,6 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Targets
   alias ThistleTea.Game.World
-  alias ThistleTea.Game.World.SpatialHash
 
   @cone_arc_radians :math.pi() / 3
 
@@ -58,8 +57,8 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
   defp nearby_cone_enemy_guids(_caster, _caster_guid, _radius), do: []
 
   defp in_cone?(guid, {x, y}, orientation) do
-    case SpatialHash.get_entity(guid) do
-      {_guid, _map, tx, ty, _tz} ->
+    case World.position(guid) do
+      {_map, tx, ty, _tz} ->
         angle = :math.atan2(ty - y, tx - x)
         abs(normalize_angle(angle - orientation)) <= @cone_arc_radians / 2
 
@@ -88,12 +87,17 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
 
   defp nearby_enemy_guids_at(_caster, _caster_guid, _position, _radius), do: []
 
-  defp nearby_units(caster, radius) do
-    World.nearby_players(caster, radius) ++ World.nearby_mobs(caster, radius)
+  defp nearby_units(
+         %{object: %{guid: self_guid}, internal: %{map: map}, movement_block: %{position: {x, y, z, _o}}},
+         radius
+       ) do
+    nearby_units_at(map, {x, y, z}, radius)
+    |> Enum.reject(fn {guid, _distance} -> guid == self_guid end)
   end
 
   defp nearby_units_at(map, position, radius) do
-    World.nearby_players_at(map, position, radius) ++ World.nearby_mobs_at(map, position, radius)
+    World.nearby_units_exact(:players, map, position, radius) ++
+      World.nearby_units_exact(:mobs, map, position, radius)
   end
 
   defp hostile_living_guids(results, caster, caster_guid) do

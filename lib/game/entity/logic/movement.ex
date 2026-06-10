@@ -222,6 +222,44 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
     end
   end
 
+  def position_at(start_position, spline_nodes, duration, elapsed)
+      when is_tuple(start_position) and is_list(spline_nodes) and spline_nodes != [] and is_integer(duration) and
+             duration > 0 do
+    path = [start_position | spline_nodes]
+    total_distance = path_length(path)
+
+    if total_distance <= 0 do
+      List.last(path)
+    else
+      elapsed = min(max(elapsed, 0), duration)
+      lerp_along_path(path, total_distance * elapsed / duration)
+    end
+  end
+
+  def position_at(start_position, _spline_nodes, _duration, _elapsed), do: start_position
+
+  defp lerp_along_path([start | rest], distance) do
+    case Enum.reduce_while(rest, {start, distance}, fn node, {prev, remaining} ->
+           segment_distance = segment_distance(prev, node)
+
+           if remaining <= segment_distance do
+             {:halt, {:point, lerp_point(prev, node, segment_distance, remaining)}}
+           else
+             {:cont, {node, remaining - segment_distance}}
+           end
+         end) do
+      {:point, point} -> point
+      {last, _remaining} -> last
+    end
+  end
+
+  defp lerp_point({x1, y1, z1}, {x2, y2, z2}, segment_distance, remaining) when segment_distance > 0 do
+    t = remaining / segment_distance
+    {x1 + (x2 - x1) * t, y1 + (y2 - y1) * t, z1 + (z2 - z1) * t}
+  end
+
+  defp lerp_point(_start, finish, _segment_distance, _remaining), do: finish
+
   defp path_length(points) when is_list(points) do
     points
     |> Enum.chunk_every(2, 1, :discard)

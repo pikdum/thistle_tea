@@ -4,9 +4,11 @@ defmodule ThistleTea.Game.World do
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.GameObject
   alias ThistleTea.Game.Entity.Data.Mob
+  alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.Entity.Server.GameObject, as: GameObjectServer
   alias ThistleTea.Game.Entity.Server.Mob, as: MobServer
   alias ThistleTea.Game.Network
+  alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.EntitySupervisor
   alias ThistleTea.Game.World.SpatialHash
 
@@ -33,6 +35,22 @@ defmodule ThistleTea.Game.World do
     SpatialHash.query(:mobs, map, x, y, z, range)
   end
 
+  @position_drift_margin 15.0
+
+  def nearby_units_exact(table, map, {x, y, z} = origin, range, now \\ Time.now()) do
+    SpatialHash.query(table, map, x, y, z, range + @position_drift_margin)
+    |> Enum.flat_map(fn {guid, _stale_distance} ->
+      case position(guid, now) do
+        {^map, tx, ty, tz} ->
+          distance = SpatialHash.distance(origin, {tx, ty, tz})
+          if distance <= range, do: [{guid, distance}], else: []
+
+        _ ->
+          []
+      end
+    end)
+  end
+
   def nearby_players_at(map, {x, y, z}, range \\ 30) do
     SpatialHash.query(:players, map, x, y, z, range)
   end
@@ -46,10 +64,11 @@ defmodule ThistleTea.Game.World do
         %{
           object: %{guid: guid},
           internal: %Internal{map: map},
-          movement_block: %MovementBlock{position: {x, y, z, _o}}
+          movement_block: %MovementBlock{position: {x, y, z, _o}, spline_nodes: spline_nodes}
         },
         table
       ) do
+    if spline_nodes in [nil, []], do: SpatialHash.clear_movement(guid)
     SpatialHash.update(table, guid, map, x, y, z)
   end
 
@@ -105,11 +124,40 @@ defmodule ThistleTea.Game.World do
   end
 
   def target_position(guid) when is_integer(guid) do
-    case SpatialHash.get_entity(guid) do
-      {^guid, map, x, y, z} -> {map, x, y, z}
-      nil -> nil
+    position(guid)
+  end
+
+  def position(guid, now \\ Time.now()) when is_integer(guid) do
+    case SpatialHash.get_movement(guid) do
+      {map, start_position, spline_nodes, start_time, duration} ->
+        {x, y, z} = Movement.position_at(start_position, spline_nodes, duration, now - start_time)
+        {map, x, y, z}
+
+      nil ->
+        case SpatialHash.get_entity(guid) do
+          {^guid, map, x, y, z} -> {map, x, y, z}
+          nil -> nil
+        end
     end
   end
+
+  def publish_movement(%{
+        object: %{guid: guid},
+        internal: %Internal{map: map, movement_start_time: start_time, movement_start_position: start_position},
+        movement_block: %MovementBlock{spline_nodes: spline_nodes, duration: duration}
+      })
+      when is_integer(start_time) and is_tuple(start_position) and is_list(spline_nodes) and spline_nodes != [] and
+             is_integer(duration) and duration > 0 do
+    SpatialHash.put_movement(guid, {map, start_position, spline_nodes, start_time, duration})
+  end
+
+  def publish_movement(_entity), do: :ok
+
+  def clear_movement(%{object: %{guid: guid}}) when is_integer(guid) do
+    SpatialHash.clear_movement(guid)
+  end
+
+  def clear_movement(_entity), do: :ok
 
   def distance_to_guid(
         %{internal: %Internal{map: map}, movement_block: %MovementBlock{position: {x1, y1, z1, _o}}},

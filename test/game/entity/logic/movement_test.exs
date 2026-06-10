@@ -103,4 +103,25 @@ defmodule ThistleTea.Game.Entity.Logic.MovementTest do
     assert is_nil(updated.internal.movement_start_time)
     assert is_nil(updated.internal.movement_start_position)
   end
+
+  describe "position_at/4" do
+    test "interpolates linearly along the path" do
+      assert Movement.position_at({0.0, 0.0, 0.0}, [{10.0, 0.0, 0.0}], 1_000, 500) == {5.0, 0.0, 0.0}
+    end
+
+    test "clamps before the start and after the end" do
+      assert Movement.position_at({0.0, 0.0, 0.0}, [{10.0, 0.0, 0.0}], 1_000, -50) == {0.0, 0.0, 0.0}
+      assert Movement.position_at({0.0, 0.0, 0.0}, [{10.0, 0.0, 0.0}], 1_000, 5_000) == {10.0, 0.0, 0.0}
+    end
+
+    test "walks across multiple segments" do
+      nodes = [{10.0, 0.0, 0.0}, {10.0, 10.0, 0.0}]
+
+      assert Movement.position_at({0.0, 0.0, 0.0}, nodes, 2_000, 1_500) == {10.0, 5.0, 0.0}
+    end
+
+    test "returns the start position without spline nodes" do
+      assert Movement.position_at({1.0, 2.0, 3.0}, [], 1_000, 500) == {1.0, 2.0, 3.0}
+    end
+  end
 end

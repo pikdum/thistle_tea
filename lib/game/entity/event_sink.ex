@@ -15,7 +15,6 @@ defmodule ThistleTea.Game.Entity.EventSink do
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
-  alias ThistleTea.Game.World.SpatialHash
 
   def emit_pending(entity) do
     {entity, events} = Event.drain(entity)
@@ -51,6 +50,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
 
   def emit(%Mob{} = entity, %Event{type: :movement_stopped}) do
     World.update_position(entity)
+    World.clear_movement(entity)
 
     Message.SmsgMonsterMove.build_stop(entity)
     |> World.broadcast_packet(entity)
@@ -84,6 +84,8 @@ defmodule ThistleTea.Game.Entity.EventSink do
   def emit(entity, %Event{type: :movement_speed_changed}), do: entity
 
   def emit(%Mob{} = entity, %Event{type: :monster_move, move_opts: opts}) do
+    World.publish_movement(entity)
+
     Message.SmsgMonsterMove.build(entity, opts || [])
     |> World.broadcast_packet(entity)
 
@@ -261,8 +263,8 @@ defmodule ThistleTea.Game.Entity.EventSink do
          target_guid: target_guid
        })
        when is_number(speed) and speed > 0 and is_integer(target_guid) do
-    case SpatialHash.get_entity(target_guid) do
-      {_guid, _map, tx, ty, tz} ->
+    case World.position(target_guid) do
+      {_map, tx, ty, tz} ->
         distance = :math.sqrt(:math.pow(tx - x, 2) + :math.pow(ty - y, 2) + :math.pow(tz - z, 2))
         trunc(distance / speed * 1000)
 
