@@ -1,9 +1,6 @@
 defmodule ThistleTea.Game.Network.Message.CmsgGossipHello do
   use ThistleTea.Game.Network.ClientMessage, :CMSG_GOSSIP_HELLO
 
-  import Ecto.Query
-
-  alias ThistleTea.DB.Mangos
   alias ThistleTea.Game.Entity.Data.Quest
   alias ThistleTea.Game.Entity.Logic.QuestDialogStatus
   alias ThistleTea.Game.Guid
@@ -11,8 +8,8 @@ defmodule ThistleTea.Game.Network.Message.CmsgGossipHello do
   alias ThistleTea.Game.Network.Message.SmsgGossipMessage.GossipItem
   alias ThistleTea.Game.Network.Message.SmsgGossipMessage.QuestItem
   alias ThistleTea.Game.Player.Quests
-
-  require Logger
+  alias ThistleTea.Game.World.Loader.Gossip, as: GossipLoader
+  alias ThistleTea.Game.World.Loader.Gossip.Menu
 
   @default_gossip_text_id 68
 
@@ -33,59 +30,54 @@ defmodule ThistleTea.Game.Network.Message.CmsgGossipHello do
     end)
   end
 
+  def send_menu(npc_guid, %Menu{} = menu, quests, %{character: %Character{} = c} = state) do
+    options = visible_options(menu.options, npc_guid, c)
+
+    gossips =
+      Enum.map(options, fn o ->
+        %GossipItem{
+          id: o.id,
+          item_icon: o.icon,
+          coded: o.coded,
+          message: o.text
+        }
+      end)
+
+    Network.send_packet(%Message.SmsgGossipMessage{
+      guid: npc_guid,
+      title_text_id: menu.text_id,
+      gossips: gossips,
+      quests: quests
+    })
+
+    Map.put(state, :gossip_menu_options, options)
+  end
+
+  defp visible_options(options, npc_guid, %Character{unit: unit}) do
+    trainer_option_id = GossipLoader.option_trainer()
+
+    Enum.filter(options, fn
+      %{option_id: ^trainer_option_id} ->
+        GossipLoader.trainer_of?(Guid.entry(npc_guid), unit.class, unit.race)
+
+      _option ->
+        true
+    end)
+  end
+
   @impl ClientMessage
-  def handle(%__MODULE__{guid: guid}, %{character: %Character{} = c} = state) do
-    low_guid = Guid.low_guid(guid)
+  def handle(%__MODULE__{guid: guid}, %{ready: true, character: %Character{} = c} = state) do
     quests = quest_items(guid, c)
 
-    # TODO: what to do if there are multiple gossip menus?
-    # send a packet for each?
-    # check conditions?
-    from(c in Mangos.Creature,
-      where: c.guid == ^low_guid,
-      join: ct in assoc(c, :creature_template),
-      left_join: gm in assoc(ct, :gossip_menu),
-      select: gm,
-      limit: 1
-    )
-    |> Mangos.Repo.one()
-    |> Mangos.Repo.preload(:gossip_menu_option)
-    |> case do
+    case GossipLoader.menu_for_creature(Guid.entry(guid)) do
+      %Menu{} = menu ->
+        send_menu(guid, menu, quests, state)
+
+      nil when quests != [] ->
+        send_menu(guid, %Menu{text_id: @default_gossip_text_id, options: []}, quests, state)
+
       nil ->
-        if quests == [] do
-          state
-        else
-          Network.send_packet(%Message.SmsgGossipMessage{
-            guid: guid,
-            title_text_id: @default_gossip_text_id,
-            gossips: [],
-            quests: quests
-          })
-
-          Map.put(state, :gossip_menu_options, [])
-        end
-
-      gm ->
-        gmo = Map.get(gm, :gossip_menu_option, [])
-
-        gossips =
-          Enum.map(gmo, fn o ->
-            %GossipItem{
-              id: o.id,
-              item_icon: o.option_icon,
-              coded: o.box_coded,
-              message: o.option_text
-            }
-          end)
-
-        Network.send_packet(%Message.SmsgGossipMessage{
-          guid: guid,
-          title_text_id: gm.text_id,
-          gossips: gossips,
-          quests: quests
-        })
-
-        Map.put(state, :gossip_menu_options, gmo)
+        state
     end
   end
 
