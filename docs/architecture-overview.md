@@ -1072,7 +1072,8 @@ sequenceDiagram
 | Game Server | `lib/game/network/server.ex` | TCP handler, packet routing |
 | Connection | `lib/game/network/connection.ex` | Session state, packet queue |
 | Crypto | `lib/game/network/connection/crypto.ex` | RC4-style encryption |
-| Packet | `lib/game/network/packet.ex` | Opcode dispatch |
+| Packet | `lib/game/network/packet.ex` | Packet struct + payload/opcode wrapping |
+| Message Dispatch | `lib/game/network/message/dispatch.ex` | Opcode-to-client-message routing |
 | Update Object | `lib/game/network/update_object.ex` | Update mask + field serialization |
 | Entity | `lib/game/entity.ex` | Entity state utilities |
 | Character | `lib/db/thistle_tea/character.ex` | Character CRUD |

@@ -18,6 +18,7 @@ defmodule ThistleTea.Game.Network.Server do
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Connection
   alias ThistleTea.Game.Network.Message
+  alias ThistleTea.Game.Network.Message.Dispatch
   alias ThistleTea.Game.Network.Opcodes
   alias ThistleTea.Game.Network.Packet
   alias ThistleTea.Game.Network.UpdateObject
@@ -56,11 +57,11 @@ defmodule ThistleTea.Game.Network.Server do
   def handle_packets(%{conn: %Connection{packet_queue: [packet | rest]}} = state) do
     message_name = Opcodes.get(packet.opcode)
 
-    case Packet.implemented?(packet.opcode) do
+    case Dispatch.implemented?(packet.opcode) do
       true ->
         state =
           :telemetry.span([:thistle_tea, :handle_packet], %{opcode: packet.opcode}, fn ->
-            state = Packet.to_message(packet) |> Message.handle(state)
+            state = Dispatch.to_message(packet) |> Message.handle(state)
             {state, %{opcode: packet.opcode}}
           end)
 

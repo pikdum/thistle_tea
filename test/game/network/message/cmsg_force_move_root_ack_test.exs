@@ -5,8 +5,8 @@ defmodule ThistleTea.Game.Network.Message.CmsgForceMoveRootAckTest do
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Network.Message.CmsgForceMoveRootAck
   alias ThistleTea.Game.Network.Message.CmsgForceMoveUnrootAck
+  alias ThistleTea.Game.Network.Message.Dispatch
   alias ThistleTea.Game.Network.Opcodes
-  alias ThistleTea.Game.Network.Packet
 
   describe "from_binary/1" do
     test "parses force root acknowledgements" do
@@ -46,10 +46,10 @@ defmodule ThistleTea.Game.Network.Message.CmsgForceMoveRootAckTest do
     end
   end
 
-  describe "Packet.implemented?/1" do
+  describe "Dispatch.implemented?/1" do
     test "recognizes force root acknowledgement opcodes" do
-      assert Packet.implemented?(Opcodes.get(:CMSG_FORCE_MOVE_ROOT_ACK))
-      assert Packet.implemented?(Opcodes.get(:CMSG_FORCE_MOVE_UNROOT_ACK))
+      assert Dispatch.implemented?(Opcodes.get(:CMSG_FORCE_MOVE_ROOT_ACK))
+      assert Dispatch.implemented?(Opcodes.get(:CMSG_FORCE_MOVE_UNROOT_ACK))
     end
   end
 

@@ -26,10 +26,4 @@ defmodule ThistleTea.Game.Network.PacketTest do
       assert packet.size == 12
     end
   end
-
-  describe "implemented?/1" do
-    test "returns true for implemented opcode" do
-      assert Packet.implemented?(0x123) == false
-    end
-  end
 end
