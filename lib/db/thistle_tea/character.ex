@@ -30,6 +30,7 @@ defmodule ThistleTea.Character do
   alias ThistleTea.Game.Player.Stats
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
+  alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
 
   @unit_flag_player_controlled 0x00000008
   @unit_flag_use_swim_animation 0x00008000
@@ -159,7 +160,7 @@ defmodule ThistleTea.Character do
 
   def sync_equipment_stats(%__MODULE__{} = character) do
     character
-    |> EquipmentStats.resync(&ItemStore.get/1)
+    |> EquipmentStats.resync(&ItemStore.get/1, &SpellLoader.load/1)
     |> sync_attack_power()
     |> sync_mainhand_stats()
     |> sync_offhand_stats()
@@ -174,8 +175,9 @@ defmodule ThistleTea.Character do
   @base_max_damage 2.0
   @item_class_weapon 2
 
-  def sync_attack_power(%__MODULE__{unit: %Unit{} = unit} = character) do
-    attack_power = Stats.melee_attack_power(unit.class, unit.level, unit.strength || 0, unit.agility || 0)
+  def sync_attack_power(%__MODULE__{unit: %Unit{} = unit, internal: %Internal{} = internal} = character) do
+    bonus = (internal.equipment_bonuses || %{}) |> Map.get(:attack_power, 0)
+    attack_power = Stats.melee_attack_power(unit.class, unit.level, unit.strength || 0, unit.agility || 0) + bonus
     ranged_attack_power = Stats.ranged_attack_power(unit.class, unit.level, unit.agility || 0)
     %{character | unit: %{unit | attack_power: attack_power, ranged_attack_power: ranged_attack_power}}
   end

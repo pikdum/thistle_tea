@@ -8,6 +8,8 @@ defmodule ThistleTea.Game.Entity.Logic.EquipmentStatsTest do
   alias ThistleTea.Game.Entity.Data.ItemTemplate
   alias ThistleTea.Game.Entity.Logic.EquipmentStats
   alias ThistleTea.Game.Entity.Logic.Inventory
+  alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.Effect
 
   setup [:build_character]
 
@@ -122,6 +124,44 @@ defmodule ThistleTea.Game.Entity.Logic.EquipmentStatsTest do
 
       assert character.unit.max_health == 170 + 50
       assert character.unit.max_power1 == 200 + 20 + 30
+    end
+
+    test "collects spell power from on-equip spells", %{character: character} do
+      robe =
+        Item.build(
+          %ItemTemplate{entry: 300, inventory_type: 20, spellid_1: 9000, spelltrigger_1: 1},
+          0x4000_0000_0000_0003,
+          owner: 1
+        )
+
+      equip_spell = %Spell{
+        id: 9000,
+        name: "Increase Spell Dam",
+        school: :physical,
+        cast_time_ms: 0,
+        duration_ms: -1,
+        mana_cost: 0,
+        gcd_ms: 0,
+        effects: [
+          %Effect{index: 0, type: :apply_aura, aura: :mod_damage_done, base_points: 20, misc_value: 126},
+          %Effect{index: 1, type: :apply_aura, aura: :mod_healing_done, base_points: 32},
+          %Effect{index: 2, type: :apply_aura, aura: :mod_attack_power, base_points: 9}
+        ]
+      }
+
+      get_spell = fn 9000 -> equip_spell end
+
+      player = Inventory.equip(character.player, :chest, robe)
+      character = EquipmentStats.resync(%{character | player: player}, get_item_fn([robe]), get_spell)
+
+      bonuses = character.internal.equipment_bonuses
+      assert bonuses.spell_fire == 20
+      assert bonuses.spell_shadow == 20
+      assert bonuses.spell_physical == 0
+      assert bonuses.healing == 32
+      assert bonuses.attack_power == 9
+      assert character.player.mod_damage_done_pos_fire == 20
+      assert character.player.mod_damage_done_pos_physical == 0
     end
 
     test "remove/1 strips all bonuses even with items equipped", %{character: character, chest: chest} do

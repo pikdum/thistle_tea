@@ -1,29 +1,40 @@
 defmodule ThistleTea.Game.Entity.Logic.EquipmentStats do
+  import Bitwise, only: [&&&: 2, <<<: 2]
+
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.ItemTemplate
   alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Player.Stats
+  alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.Effect
+
+  @schools [:physical, :holy, :fire, :nature, :frost, :shadow, :arcane]
+  @spell_damage_keys Enum.map(@schools, fn school -> :"spell_#{school}" end)
 
   @bonus_keys [
-    :strength,
-    :agility,
-    :stamina,
-    :intellect,
-    :spirit,
-    :health,
-    :mana,
-    :armor,
-    :holy,
-    :fire,
-    :nature,
-    :frost,
-    :shadow,
-    :arcane
-  ]
+                :strength,
+                :agility,
+                :stamina,
+                :intellect,
+                :spirit,
+                :health,
+                :mana,
+                :armor,
+                :holy,
+                :fire,
+                :nature,
+                :frost,
+                :shadow,
+                :arcane,
+                :healing,
+                :attack_power
+              ] ++ @spell_damage_keys
 
   @zero Map.new(@bonus_keys, fn key -> {key, 0} end)
+
+  @spelltrigger_on_equip 1
 
   @stat_mods %{0 => :mana, 1 => :health, 3 => :agility, 4 => :strength, 5 => :intellect, 6 => :spirit, 7 => :stamina}
 
@@ -46,12 +57,15 @@ defmodule ThistleTea.Game.Entity.Logic.EquipmentStats do
     resync(character, fn _guid -> nil end)
   end
 
+  def resync(character, get_item, get_spell \\ fn _spell_id -> nil end)
+
   def resync(
         %{unit: %Unit{} = unit, player: %Player{} = player, internal: %Internal{} = internal} = character,
-        get_item
+        get_item,
+        get_spell
       ) do
     old = internal.equipment_bonuses || @zero
-    new = player |> Inventory.equipped_templates(get_item) |> bonuses()
+    new = player |> Inventory.equipped_templates(get_item) |> bonuses(get_spell)
 
     unit =
       unit
@@ -59,14 +73,16 @@ defmodule ThistleTea.Game.Entity.Logic.EquipmentStats do
       |> apply_health(new)
       |> apply_mana(new)
 
-    %{character | unit: unit, internal: %{internal | equipment_bonuses: new}}
+    player = apply_spell_damage_fields(player, new)
+
+    %{character | unit: unit, player: player, internal: %{internal | equipment_bonuses: new}}
   end
 
-  def bonuses(templates) do
-    Enum.reduce(templates, @zero, &add_template/2)
+  def bonuses(templates, get_spell \\ fn _spell_id -> nil end) do
+    Enum.reduce(templates, @zero, &add_template(&2, &1, get_spell))
   end
 
-  defp add_template(%ItemTemplate{} = template, acc) do
+  defp add_template(acc, %ItemTemplate{} = template, get_spell) do
     acc =
       acc
       |> add(:armor, template.armor)
@@ -76,12 +92,64 @@ defmodule ThistleTea.Game.Entity.Logic.EquipmentStats do
       |> add(:frost, template.frost_res)
       |> add(:shadow, template.shadow_res)
       |> add(:arcane, template.arcane_res)
+      |> add_equip_spells(template, get_spell)
 
     Enum.reduce(1..10, acc, fn i, acc ->
       case Map.get(@stat_mods, Map.get(template, :"stat_type#{i}")) do
         nil -> acc
         key -> add(acc, key, Map.get(template, :"stat_value#{i}"))
       end
+    end)
+  end
+
+  defp add_equip_spells(acc, %ItemTemplate{} = template, get_spell) do
+    Enum.reduce(1..5, acc, fn i, acc ->
+      spell_id = Map.get(template, :"spellid_#{i}")
+      trigger = Map.get(template, :"spelltrigger_#{i}")
+
+      if is_integer(spell_id) and spell_id > 0 and trigger == @spelltrigger_on_equip do
+        add_spell_auras(acc, get_spell.(spell_id))
+      else
+        acc
+      end
+    end)
+  end
+
+  defp add_spell_auras(acc, %Spell{effects: effects}) do
+    Enum.reduce(effects, acc, fn
+      %Effect{type: :apply_aura, aura: :mod_damage_done} = effect, acc ->
+        add_schools(acc, effect.misc_value, Effect.damage_roll(effect))
+
+      %Effect{type: :apply_aura, aura: :mod_healing_done} = effect, acc ->
+        add(acc, :healing, Effect.damage_roll(effect))
+
+      %Effect{type: :apply_aura, aura: :mod_attack_power} = effect, acc ->
+        add(acc, :attack_power, Effect.damage_roll(effect))
+
+      _effect, acc ->
+        acc
+    end)
+  end
+
+  defp add_spell_auras(acc, _spell), do: acc
+
+  defp add_schools(acc, mask, amount) when is_integer(mask) do
+    @schools
+    |> Enum.with_index()
+    |> Enum.reduce(acc, fn {school, index}, acc ->
+      if (mask &&& 1 <<< index) == 0 do
+        acc
+      else
+        add(acc, :"spell_#{school}", amount)
+      end
+    end)
+  end
+
+  defp add_schools(acc, _mask, _amount), do: acc
+
+  defp apply_spell_damage_fields(%Player{} = player, bonuses) do
+    Enum.reduce(@schools, player, fn school, player ->
+      Map.put(player, :"mod_damage_done_pos_#{school}", Map.fetch!(bonuses, :"spell_#{school}"))
     end)
   end
 

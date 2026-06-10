@@ -6,6 +6,8 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Effect
 
+  @schools [:physical, :holy, :fire, :nature, :frost, :shadow, :arcane]
+
   def receive(target, %CastContext{} = context, %Spell{} = spell, now) when is_integer(now) do
     context = %{context | target_guid: target.object.guid, spell: spell}
     apply_effects(target, context, spell.effects, [], now)
@@ -36,8 +38,9 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
     apply_damage_effect(state, context, spell, effect, now)
   end
 
-  defp apply_effect(state, %CastContext{}, _spell, %Effect{type: :heal} = effect, _now) do
-    {Core.heal(state, Effect.damage_roll(effect)), []}
+  defp apply_effect(state, %CastContext{} = context, spell, %Effect{type: :heal} = effect, _now) do
+    healing = Effect.damage_roll(effect) + bonus_amount(context.healing_bonus, spell)
+    {Core.heal(state, healing), []}
   end
 
   defp apply_effect(
@@ -82,11 +85,34 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
 
   defp apply_damage_effect(state, %CastContext{} = context, spell, %Effect{} = effect, now, opts \\ [])
        when is_integer(now) do
-    damage = Effect.damage_roll(effect)
+    damage = Effect.damage_roll(effect) + damage_bonus(context, spell, opts)
 
     state = Core.take_damage(state, damage, now)
     event = Event.spell_damage(context.caster_guid, state.object.guid, spell, damage, opts)
 
     {state, [event]}
   end
+
+  defp damage_bonus(%CastContext{} = context, %Spell{} = spell, opts) do
+    if Keyword.get(opts, :periodic?, false) do
+      0
+    else
+      school_bonus = Map.get(context.spell_damage_bonus, school_atom(spell), 0)
+      bonus_amount(school_bonus, spell)
+    end
+  end
+
+  defp bonus_amount(bonus, %Spell{} = spell) when is_integer(bonus) and bonus > 0 do
+    trunc(bonus * coefficient(spell))
+  end
+
+  defp bonus_amount(_bonus, _spell), do: 0
+
+  defp coefficient(%Spell{cast_time_ms: cast_time_ms}) do
+    cast_time_ms = if is_integer(cast_time_ms), do: cast_time_ms, else: 0
+    min(max(cast_time_ms, 1500), 7000) / 3500
+  end
+
+  defp school_atom(%Spell{school: school}) when is_atom(school), do: school
+  defp school_atom(%Spell{} = spell), do: Enum.at(@schools, Spell.school_index(spell), :physical)
 end

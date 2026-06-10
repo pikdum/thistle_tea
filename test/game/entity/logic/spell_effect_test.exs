@@ -154,4 +154,69 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
              ] = events
     end
   end
+
+  describe "spell power bonuses" do
+    test "direct damage gains spell power scaled by cast time" do
+      spell = %Spell{
+        id: 133,
+        name: "Fireball",
+        school: :fire,
+        cast_time_ms: 3_500,
+        effects: [%Effect{index: 0, type: :school_damage, base_points: 5, die_sides: 0}]
+      }
+
+      context = %CastContext{caster_guid: 999, caster_level: 10, spell_damage_bonus: %{fire: 100}}
+
+      {target, _events} = SpellEffect.receive(target_fixture(), context, spell, 1_000)
+
+      assert target.unit.health == 0
+      assert [%{damage: 105}] = elem(SpellEffect.receive(target_fixture(), context, spell, 1_000), 1)
+    end
+
+    test "instant spells use the minimum coefficient" do
+      spell = %Spell{
+        id: 133,
+        name: "Fire Blast",
+        school: :fire,
+        cast_time_ms: 0,
+        effects: [%Effect{index: 0, type: :school_damage, base_points: 5, die_sides: 0}]
+      }
+
+      context = %CastContext{caster_guid: 999, caster_level: 10, spell_damage_bonus: %{fire: 70}}
+
+      assert [%{damage: 35}] = elem(SpellEffect.receive(target_fixture(), context, spell, 1_000), 1)
+    end
+
+    test "wrong school bonus does not apply" do
+      spell = %Spell{
+        id: 133,
+        name: "Fireball",
+        school: :fire,
+        cast_time_ms: 3_500,
+        effects: [%Effect{index: 0, type: :school_damage, base_points: 5, die_sides: 0}]
+      }
+
+      context = %CastContext{caster_guid: 999, caster_level: 10, spell_damage_bonus: %{shadow: 100}}
+
+      assert [%{damage: 5}] = elem(SpellEffect.receive(target_fixture(), context, spell, 1_000), 1)
+    end
+
+    test "healing gains the healing bonus" do
+      spell = %Spell{
+        id: 2050,
+        name: "Lesser Heal",
+        school: :holy,
+        cast_time_ms: 3_500,
+        effects: [%Effect{index: 0, type: :heal, base_points: 5, die_sides: 0}]
+      }
+
+      context = %CastContext{caster_guid: 999, caster_level: 10, healing_bonus: 10}
+
+      target = target_fixture()
+      target = %{target | unit: %{target.unit | health: 1}}
+      {target, _events} = SpellEffect.receive(target, context, spell, 1_000)
+
+      assert target.unit.health == 16
+    end
+  end
 end
