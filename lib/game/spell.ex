@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.Spell do
     :range_yards,
     :mana_cost,
     :gcd_ms,
+    speed: 0.0,
     attributes: MapSet.new(),
     effects: []
   ]

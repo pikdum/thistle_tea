@@ -107,6 +107,14 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   end
 
   @impl GenServer
+  def handle_info({:deliver_spell, event}, state) do
+    EventSink.deliver_spell(event)
+    {:noreply, state}
+  rescue
+    _ -> {:noreply, state}
+  end
+
+  @impl GenServer
   def handle_info(:ai_tick, %{internal: %Internal{behavior_tree: behavior_tree}} = state) do
     state = Movement.sync_position(state, Time.now())
     World.update_position(state)

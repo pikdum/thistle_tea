@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
+  alias ThistleTea.Game.World.SpatialHash
 
   def emit_pending(entity) do
     {entity, events} = Event.drain(entity)
@@ -158,7 +159,14 @@ defmodule ThistleTea.Game.Entity.EventSink do
   end
 
   def emit(entity, %Event{type: :deliver_spell} = event) do
-    Entity.receive_spell(event.target_guid, event.cast_context, event.spell)
+    case projectile_delay_ms(entity, event) do
+      delay_ms when is_integer(delay_ms) and delay_ms > 0 ->
+        Process.send_after(self(), {:deliver_spell, event}, delay_ms)
+
+      _ ->
+        deliver_spell(event)
+    end
+
     entity
   end
 
@@ -222,6 +230,10 @@ defmodule ThistleTea.Game.Entity.EventSink do
 
   def emit(entity, _event), do: entity
 
+  def deliver_spell(%Event{type: :deliver_spell} = event) do
+    Entity.receive_spell(event.target_guid, event.cast_context, event.spell)
+  end
+
   defp redirect_enemy_trigger(%{object: %{guid: guid}, unit: unit}, %Event{target_guid: guid} = event, %Spell{
          effects: effects
        }) do
@@ -244,6 +256,23 @@ defmodule ThistleTea.Game.Entity.EventSink do
 
   defp preferred_enemy_guid(_unit, _self_guid), do: nil
 
+  defp projectile_delay_ms(%{movement_block: %{position: {x, y, z, _o}}}, %Event{
+         spell: %Spell{speed: speed},
+         target_guid: target_guid
+       })
+       when is_number(speed) and speed > 0 and is_integer(target_guid) do
+    case SpatialHash.get_entity(target_guid) do
+      {_guid, _map, tx, ty, tz} ->
+        distance = :math.sqrt(:math.pow(tx - x, 2) + :math.pow(ty - y, 2) + :math.pow(tz - z, 2))
+        trunc(distance / speed * 1000)
+
+      _ ->
+        0
+    end
+  end
+
+  defp projectile_delay_ms(_entity, _event), do: 0
+
   defp dispatch_triggered_spell(%{object: %{guid: guid}} = entity, %Event{target_guid: guid} = event, spell) do
     context = trigger_context(event, spell)
     {entity, events} = SpellEffect.receive(entity, context, spell, Time.now())
@@ -252,8 +281,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
 
   defp dispatch_triggered_spell(entity, %Event{} = event, spell) do
     context = trigger_context(event, spell)
-    Entity.receive_spell(event.target_guid, context, spell)
-    entity
+    emit(entity, Event.deliver_spell(event.target_guid, context, spell))
   end
 
   defp trigger_context(%Event{} = event, spell) do

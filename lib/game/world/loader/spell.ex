@@ -79,6 +79,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
       range_yards: range_yards(row.spell_range),
       mana_cost: row.mana_cost || 0,
       gcd_ms: row.start_recovery_time || 0,
+      speed: row.speed || 0.0,
       attributes: attributes(row.attributes, row.attributes_ex1),
       effects: build_effects(row, radius_lookup)
     }

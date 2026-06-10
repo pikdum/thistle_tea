@@ -337,6 +337,14 @@ defmodule ThistleTea.Game.Network.Server do
   end
 
   @impl GenServer
+  def handle_info({:deliver_spell, event}, {socket, state}) do
+    EventSink.deliver_spell(event)
+    {:noreply, {socket, state}, socket.read_timeout}
+  rescue
+    _ -> {:noreply, {socket, state}, socket.read_timeout}
+  end
+
+  @impl GenServer
   def handle_info(:player_tick, {socket, %{character: character} = state}) do
     {status, character} = tick_player(character)
     character = EventSink.emit_pending(character)
