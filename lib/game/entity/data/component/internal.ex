@@ -32,6 +32,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal do
     :max_loot_gold,
     :loot,
     :equipment_bonuses,
+    :creature_type_flags,
     events: [],
     broadcast_update?: false,
     spline_id: 0,

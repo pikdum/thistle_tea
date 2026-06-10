@@ -522,7 +522,12 @@ defmodule ThistleTea.Game.Network.Message.CmsgMessagechat do
 
   defp put_character(%{guid: guid} = state, %ThistleTea.Character{} = character) do
     ThistleTea.Character.save(character)
-    Metadata.update(guid, %{level: character.unit.level, alive?: Death.alive?(character)})
+
+    Metadata.update(guid, %{
+      level: character.unit.level,
+      alive?: Death.alive?(character),
+      ghost?: Death.ghost?(character)
+    })
 
     update = Core.update_object(character, :values)
     Network.send_packet(update)

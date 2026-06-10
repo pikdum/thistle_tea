@@ -58,7 +58,8 @@ defmodule ThistleTea.Game.Network.Message.CmsgPlayerLogin do
         combat_reach: c.unit.combat_reach,
         unit_flags: c.unit.flags,
         attacker_count: 0,
-        alive?: Death.alive?(c)
+        alive?: Death.alive?(c),
+        ghost?: Death.ghost?(c)
       }
       |> Map.merge(FactionLoader.metadata(c.unit.faction_template))
     )

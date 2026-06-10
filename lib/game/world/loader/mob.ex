@@ -112,6 +112,7 @@ defmodule ThistleTea.Game.World.Loader.Mob do
         attacker_count: 0,
         alive?: mob.unit.health > 0
       }
+      |> Map.merge(Mob.visibility_metadata(mob))
       |> Map.merge(FactionLoader.metadata(mob.unit.faction_template))
     )
 

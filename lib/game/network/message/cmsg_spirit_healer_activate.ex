@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgSpiritHealerActivate do
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.Visibility
 
   @restore_percent 0.5
 
@@ -47,10 +48,13 @@ defmodule ThistleTea.Game.Network.Message.CmsgSpiritHealerActivate do
     update = Core.update_object(character, :values)
     Network.send_packet(update)
     World.broadcast_packet(update, character, include_self?: false)
-    Metadata.update(state.guid, %{alive?: true})
+    Metadata.update(state.guid, %{alive?: true, ghost?: false})
 
     character = %{character | internal: %{character.internal | broadcast_update?: false}}
-    %{state | character: character}
+    state = %{state | character: character}
+
+    Visibility.notify_visibility_changed(character)
+    Visibility.resync_player(state)
   end
 
   defp apply_resurrection_sickness(character, now) do

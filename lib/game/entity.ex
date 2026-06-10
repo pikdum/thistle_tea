@@ -36,6 +36,10 @@ defmodule ThistleTea.Game.Entity do
     dispatch_cast(entity, {:destroy_object, guid})
   end
 
+  def visibility_changed(entity, guid) do
+    dispatch_cast(entity, {:visibility_changed, guid})
+  end
+
   def call(entity, message) do
     case resolve_pid(entity) do
       {:ok, pid} -> GenServer.call(pid, message)

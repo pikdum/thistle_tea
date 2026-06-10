@@ -1,5 +1,5 @@
 defmodule ThistleTea.Game.Entity.Data.Mob do
-  import Bitwise, only: [|||: 2, <<<: 2]
+  import Bitwise, only: [|||: 2, <<<: 2, &&&: 2]
 
   alias ThistleTea.DB.Mangos
   alias ThistleTea.Game.Entity.Data.Component.Internal
@@ -90,6 +90,7 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
         movement_type: c.movement_type,
         experience_multiplier: ct.experience_multiplier,
         extra_flags: ct.extra_flags,
+        creature_type_flags: ct.creature_type_flags,
         rank: ct.rank,
         respawn_delay_ms: respawn_delay_ms(c.spawntimesecs),
         loot_id: ct.loot_id,
@@ -104,6 +105,16 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
         running: false,
         spellbook: Map.get(c, :spellbook, %{})
       }
+    }
+  end
+
+  @npc_flag_spirit_service 0x60
+  @creature_type_flag_ghost_visible 0x02
+
+  def visibility_metadata(%__MODULE__{unit: %Unit{} = unit, internal: %Internal{} = internal}) do
+    %{
+      spirit_service?: ((unit.npc_flags || 0) &&& @npc_flag_spirit_service) != 0,
+      ghost_visible?: ((internal.creature_type_flags || 0) &&& @creature_type_flag_ghost_visible) != 0
     }
   end
 

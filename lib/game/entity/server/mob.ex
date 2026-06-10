@@ -374,6 +374,8 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
       alive?: state.unit.health > 0
     })
 
+    Metadata.update(state.object.guid, Mob.visibility_metadata(state))
+
     Metadata.update(state.object.guid, FactionLoader.metadata(state.unit.faction_template))
   end
 end

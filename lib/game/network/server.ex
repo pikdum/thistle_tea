@@ -200,7 +200,7 @@ defmodule ThistleTea.Game.Network.Server do
   end
 
   def handle_cast({:send_packet, %Message.SmsgDestroyObject{guid: guid} = packet, opts}, {socket, state}) do
-    if source_tracked?(state, Keyword.get(opts, :source_guid)) do
+    if Keyword.get(opts, :force, false) or source_tracked?(state, Keyword.get(opts, :source_guid)) do
       state = Network.Send.send_packet(packet, {socket, state})
       state = untrack_entity(state, guid)
       {:noreply, {socket, state}, socket.read_timeout}
@@ -298,6 +298,12 @@ defmodule ThistleTea.Game.Network.Server do
   end
 
   @impl GenServer
+  def handle_cast({:visibility_changed, guid}, {socket, state}) do
+    state = Visibility.reevaluate_entity(state, guid)
+    {:noreply, {socket, state}, socket.read_timeout}
+  end
+
+  @impl GenServer
   def handle_cast(
         {:start_teleport, x, y, z, map},
         {socket, %{character: %ThistleTea.Character{internal: %Internal{map: map}} = character} = state}
@@ -328,6 +334,7 @@ defmodule ThistleTea.Game.Network.Server do
     state =
       %{state | character: character}
       |> Visibility.refresh_player()
+      |> Visibility.resync_player()
 
     {:noreply, {socket, state}, socket.read_timeout}
   end
@@ -433,7 +440,7 @@ defmodule ThistleTea.Game.Network.Server do
     Core.update_object(character, :values)
     |> World.broadcast_packet(character)
 
-    Metadata.update(state.guid, %{alive?: Death.alive?(character)})
+    Metadata.update(state.guid, %{alive?: Death.alive?(character), ghost?: Death.ghost?(character)})
     internal = %{character.internal | broadcast_update?: false}
     character = %{character | internal: internal}
 

@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgReclaimCorpse do
   alias ThistleTea.Game.Entity.Logic.Death
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.Visibility
 
   @restore_percent 0.5
 
@@ -44,9 +45,12 @@ defmodule ThistleTea.Game.Network.Message.CmsgReclaimCorpse do
     update = Core.update_object(character, :values)
     Network.send_packet(update)
     World.broadcast_packet(update, character, include_self?: false)
-    Metadata.update(state.guid, %{alive?: true})
+    Metadata.update(state.guid, %{alive?: true, ghost?: false})
 
-    %{state | character: clear_broadcast_flag(character)}
+    state = %{state | character: clear_broadcast_flag(character)}
+
+    Visibility.notify_visibility_changed(character)
+    Visibility.resync_player(state)
   end
 
   defp reclaimable?(character, corpse_guid, now) do

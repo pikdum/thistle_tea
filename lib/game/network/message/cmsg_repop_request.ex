@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgRepopRequest do
   alias ThistleTea.Game.World.Loader.Graveyard, as: GraveyardLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.Visibility
 
   defstruct []
 
@@ -48,14 +49,19 @@ defmodule ThistleTea.Game.Network.Message.CmsgRepopRequest do
     update = Core.update_object(character, :values)
     Network.send_packet(update)
     World.broadcast_packet(update, character, include_self?: false)
-    Metadata.update(state.guid, %{alive?: false})
+    Metadata.update(state.guid, %{alive?: false, ghost?: true})
 
     Network.send_packet(%Message.SmsgCorpseReclaimDelay{delay_ms: Death.reclaim_delay_ms()})
 
     character = clear_broadcast_flag(character)
+    state = %{state | character: character}
+
+    Visibility.notify_visibility_changed(character)
+    state = Visibility.resync_player(state)
+
     teleport_to_graveyard(character)
 
-    %{state | character: character}
+    state
   end
 
   def spawn_corpse(character) do

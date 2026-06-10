@@ -4,12 +4,17 @@ defmodule ThistleTea.Game.World.Visibility do
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
+  alias ThistleTea.Game.Entity.Data.Corpse
+  alias ThistleTea.Game.Entity.Logic.Death
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
+  alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Groups
+  alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.System.CellActivator
+  alias ThistleTea.Game.World.Visibility.Filter
 
   @group Groups
   @range 250
@@ -143,14 +148,82 @@ defmodule ThistleTea.Game.World.Visibility do
 
   def cell_key({map, x, y}), do: "cell/#{map}/#{x}/#{y}"
 
+  def resync_player(%{guid: guid, visibility_cells: %MapSet{} = cells} = state) do
+    sync_visible_entities(state, guid, cells)
+  end
+
+  def resync_player(state), do: state
+
+  def reevaluate_entity(%{visibility_cells: %MapSet{}, guid: self_guid} = state, guid) when guid != self_guid do
+    visible? = currently_visible?(state, guid) and can_see?(state, guid)
+
+    cond do
+      visible? and not tracked?(state, guid) ->
+        Entity.request_update_from(guid, self_guid)
+        state
+
+      not visible? and tracked?(state, guid) ->
+        send_destroy(guid)
+        state
+
+      true ->
+        state
+    end
+  end
+
+  def reevaluate_entity(state, _guid), do: state
+
+  def notify_visibility_changed(%{object: %{guid: guid}} = character) do
+    character
+    |> World.nearby_players()
+    |> Enum.each(fn {player_guid, _distance} ->
+      if player_guid != guid do
+        Entity.visibility_changed(player_guid, guid)
+      end
+    end)
+  end
+
+  def notify_visibility_changed(_character), do: :ok
+
+  defp can_see?(state, guid) do
+    case Map.get(state, :character) do
+      %ThistleTea.Character{} = character ->
+        ghost? = Death.ghost?(character)
+        type = Guid.entity_type(guid)
+        distance = if ghost? and type == :mob, do: corpse_distance(character, guid)
+        Filter.can_see?(ghost?, type, Metadata.get(guid) || %{}, distance)
+
+      _missing ->
+        true
+    end
+  end
+
+  defp corpse_distance(%{object: %{guid: viewer_guid}}, target_guid) do
+    corpse_guid = Corpse.guid_for(viewer_guid)
+
+    with {_, map, cx, cy, cz} <- SpatialHash.get_entity(corpse_guid),
+         {_, ^map, tx, ty, tz} <- SpatialHash.get_entity(target_guid) do
+      SpatialHash.distance({cx, cy, cz}, {tx, ty, tz})
+    else
+      _ -> nil
+    end
+  end
+
+  defp corpse_distance(_character, _target_guid), do: nil
+
   defp sync_visible_entities(%{tracked_entities: tracked} = state, self_guid, cells) do
     visible = visible_members(cells)
-    visible_guids = MapSet.new(visible, & &1.guid)
+
+    visible_guids =
+      visible
+      |> Enum.filter(fn %{guid: guid} -> guid == self_guid or can_see?(state, guid) end)
+      |> MapSet.new(& &1.guid)
+
     tracked = tracked || MapSet.new()
 
     tracked
     |> MapSet.difference(visible_guids)
-    |> Enum.each(&Network.send_packet(%Message.SmsgDestroyObject{guid: &1}))
+    |> Enum.each(&send_destroy/1)
 
     visible_guids
     |> MapSet.difference(tracked)
@@ -183,7 +256,7 @@ defmodule ThistleTea.Game.World.Visibility do
   defp track_joined(state, %{guid: guid} = meta) do
     state = add_to_entity_lists(state, meta)
 
-    if tracked?(state, guid) do
+    if tracked?(state, guid) or not can_see?(state, guid) do
       state
     else
       Entity.request_update_from(guid, state.guid)
@@ -195,11 +268,15 @@ defmodule ThistleTea.Game.World.Visibility do
     state = remove_from_entity_lists(state, guid, type)
 
     if tracked?(state, guid) and not currently_visible?(state, guid) do
-      Network.send_packet(%Message.SmsgDestroyObject{guid: guid})
+      send_destroy(guid)
       Map.update(state, :tracked_entities, MapSet.new(), &MapSet.delete(&1, guid))
     else
       state
     end
+  end
+
+  defp send_destroy(guid) do
+    Network.send_packet(%Message.SmsgDestroyObject{guid: guid}, self(), force: true)
   end
 
   defp currently_visible?(%{visibility_cells: cells}, guid) do
