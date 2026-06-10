@@ -71,8 +71,6 @@ defmodule ThistleTea.Game.Entity.Logic.QuestLog do
   end
 
   def add(quest_log, quest_id) do
-    quest_log = quest_log || %{}
-
     cond do
       active?(quest_log, quest_id) -> {:error, :already_active}
       free_slot(quest_log) == nil -> {:error, :log_full}
@@ -95,7 +93,7 @@ defmodule ThistleTea.Game.Entity.Logic.QuestLog do
   end
 
   def find(quest_log, quest_id) do
-    (quest_log || %{})
+    quest_log
     |> Enum.find(fn
       {_slot, %Entry{quest_id: ^quest_id}} -> true
       _entry -> false
@@ -112,14 +110,14 @@ defmodule ThistleTea.Game.Entity.Logic.QuestLog do
   def active?(quest_log, quest_id), do: find(quest_log, quest_id) != nil
 
   def active_entries(quest_log) do
-    (quest_log || %{})
+    quest_log
     |> Enum.flat_map(fn
       {_slot, %Entry{} = entry} -> [entry]
       _entry -> []
     end)
   end
 
-  def full?(quest_log), do: free_slot(quest_log || %{}) == nil
+  def full?(quest_log), do: free_slot(quest_log) == nil
 
   def slot_binary(nil), do: nil
   def slot_binary(:empty), do: <<0::size(96)>>

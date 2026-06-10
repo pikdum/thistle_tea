@@ -39,7 +39,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgBuyItem do
   defp buy(state, c, message, vendor_item, template, count) do
     price = template.buy_price * count
     total_count = max(template.buy_count, 1) * count
-    coinage = c.player.coinage || 0
+    coinage = c.player.coinage
 
     cond do
       coinage < price ->
@@ -61,7 +61,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgBuyItem do
     case Inventory.store(c.player, state.guid, item, &ItemStore.get/1) do
       {:ok, result, placement} ->
         {bag_slot, item_slot} = finish_placement(item, placement)
-        player = %{result.player | coinage: (c.player.coinage || 0) - price}
+        player = %{result.player | coinage: c.player.coinage - price}
         state = InventoryUpdate.apply(state, {:ok, %{result | player: player}})
 
         Network.send_packet(%Message.SmsgBuyItem{

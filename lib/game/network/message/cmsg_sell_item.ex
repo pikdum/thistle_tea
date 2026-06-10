@@ -74,7 +74,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgSellItem do
 
     case result do
       {:ok, result} ->
-        player = %{result.player | coinage: (c.player.coinage || 0) + sell_price * count}
+        player = %{result.player | coinage: c.player.coinage + sell_price * count}
         InventoryUpdate.apply(state, {:ok, %{result | player: player}})
 
       {:sell_error, error} ->

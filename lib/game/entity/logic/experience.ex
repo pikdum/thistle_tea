@@ -36,6 +36,32 @@ defmodule ThistleTea.Game.Entity.Logic.Experience do
     end
   end
 
+  def quest_xp(quest_level, rew_money_max_level, player_level)
+      when is_integer(rew_money_max_level) and rew_money_max_level > 0 do
+    full_xp = rew_money_max_level / quest_xp_divisor(quest_level)
+
+    multiplier =
+      case player_level - max(quest_level, 0) do
+        diff when diff <= 5 -> 1.0
+        6 -> 0.8
+        7 -> 0.6
+        8 -> 0.4
+        9 -> 0.2
+        _diff -> 0.1
+      end
+
+    trunc(Float.ceil(full_xp * multiplier))
+  end
+
+  def quest_xp(_quest_level, _rew_money_max_level, _player_level), do: 0
+
+  defp quest_xp_divisor(quest_level) when quest_level >= 65, do: 6.0
+  defp quest_xp_divisor(64), do: 4.8
+  defp quest_xp_divisor(63), do: 3.6
+  defp quest_xp_divisor(62), do: 2.4
+  defp quest_xp_divisor(61), do: 1.2
+  defp quest_xp_divisor(_quest_level), do: 0.6
+
   def gray_level(player_level) when player_level <= 5, do: 0
   def gray_level(player_level) when player_level <= 39, do: player_level - 5 - div(player_level, 10)
   def gray_level(60), do: 51

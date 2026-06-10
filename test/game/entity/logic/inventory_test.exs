@@ -40,6 +40,19 @@ defmodule ThistleTea.Game.Entity.Logic.InventoryTest do
     fn guid -> Map.get(by_guid, guid) end
   end
 
+  defp get_item_after(result, get_item) do
+    changed = Map.new(result.items, fn item -> {item.object.guid, item} end)
+    destroyed = MapSet.new(result.destroyed, fn item -> item.object.guid end)
+
+    fn guid ->
+      cond do
+        MapSet.member?(destroyed, guid) -> nil
+        Map.has_key?(changed, guid) -> Map.get(changed, guid)
+        true -> get_item.(guid)
+      end
+    end
+  end
+
   defp store(player, slot, item) do
     Map.put(player, :"inv#{slot - @backpack_start + 1}", item.object.guid)
   end
@@ -65,6 +78,45 @@ defmodule ThistleTea.Game.Entity.Logic.InventoryTest do
 
       assert Inventory.count_entry(player, 750, get_item) == 5
       assert Inventory.count_entry(player, 999, get_item) == 0
+    end
+  end
+
+  describe "remove_count/4" do
+    test "reduces a stack partially" do
+      pelt = build_item(20, %ItemTemplate{entry: 750, stackable: 10}, stack_count: 5)
+      player = store(%Player{}, @backpack_start, pelt)
+      get_item = get_item_fn([pelt])
+
+      assert {:ok, result} = Inventory.remove_count(player, 750, 3, get_item)
+      assert [updated_pelt] = result.items
+      assert updated_pelt.item.stack_count == 2
+      assert result.destroyed == []
+    end
+
+    test "destroys whole stacks and spills into the next" do
+      pelt1 = build_item(20, %ItemTemplate{entry: 750, stackable: 10}, stack_count: 4)
+      pelt2 = build_item(21, %ItemTemplate{entry: 750, stackable: 10}, stack_count: 4)
+
+      player =
+        %Player{}
+        |> store(@backpack_start, pelt1)
+        |> store(@backpack_start + 1, pelt2)
+
+      get_item = get_item_fn([pelt1, pelt2])
+
+      assert {:ok, result} = Inventory.remove_count(player, 750, 6, get_item)
+      assert length(result.destroyed) == 1
+      assert [updated] = result.items
+      assert updated.item.stack_count == 2
+      assert Inventory.count_entry(result.player, 750, get_item_after(result, get_item)) == 2
+    end
+
+    test "errors when there are not enough items" do
+      pelt = build_item(20, %ItemTemplate{entry: 750, stackable: 10}, stack_count: 2)
+      player = store(%Player{}, @backpack_start, pelt)
+
+      assert {:error, :item_not_found, 0, 0} =
+               Inventory.remove_count(player, 750, 5, get_item_fn([pelt]))
     end
   end
 

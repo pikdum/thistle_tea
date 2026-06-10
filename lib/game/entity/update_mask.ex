@@ -2,7 +2,10 @@ defmodule ThistleTea.Game.Entity.UpdateMask do
   defp build_struct(fields) do
     fields
     |> Keyword.reject(&fn_field?/1)
-    |> Keyword.keys()
+    |> Enum.map(fn
+      {key, {:virtual, default}} -> {key, default}
+      {key, _metadata} -> key
+    end)
   end
 
   defp fn_field?({_, {_offset, _size, {:fn, _args, _fn}}}), do: true
@@ -15,6 +18,7 @@ defmodule ThistleTea.Game.Entity.UpdateMask do
       defstruct unquote(build_struct(fields))
 
       defp virtual_field?({_, :virtual}), do: true
+      defp virtual_field?({_, {:virtual, _default}}), do: true
       defp virtual_field?(_), do: false
 
       defp private_field?({_, {_, _, _, :private}}), do: true

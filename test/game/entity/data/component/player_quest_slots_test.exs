@@ -13,7 +13,6 @@ defmodule ThistleTea.Game.Entity.Data.Component.PlayerQuestSlotsTest do
   end
 
   test "emits nothing when the quest log is empty" do
-    assert quest_slot_fields(%Player{}) == []
     assert quest_slot_fields(%Player{quest_log: %{}}) == []
   end
 

@@ -115,6 +115,40 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
     |> Enum.map(&Item.template/1)
   end
 
+  def remove_count(%Player{} = player, entry, count, get_item) do
+    remove_count(player, entry, count, get_item, %{items: [], destroyed: []})
+  end
+
+  defp remove_count(player, _entry, 0, _get_item, acc) do
+    {:ok, %{player: player, items: acc.items, destroyed: acc.destroyed}}
+  end
+
+  defp remove_count(player, entry, count, get_item, acc) do
+    stack =
+      player
+      |> owned_items(get_item)
+      |> Enum.find(fn %Item{object: object} -> object.entry == entry end)
+
+    with %Item{} = stack <- stack,
+         pos when pos != nil <- find_position(player, stack.object.guid, get_item) do
+      stack_count = stack.item.stack_count || 1
+
+      if stack_count > count do
+        {:ok, result} = reduce_stack(player, pos, count, get_item)
+        remove_count(result.player, entry, 0, get_item, merge_removal(acc, result, []))
+      else
+        {:ok, result, destroyed} = destroy(player, pos, get_item)
+        remove_count(result.player, entry, count - stack_count, get_item, merge_removal(acc, result, [destroyed]))
+      end
+    else
+      _missing -> {:error, :item_not_found, 0, 0}
+    end
+  end
+
+  defp merge_removal(acc, result, destroyed) do
+    %{items: acc.items ++ result.items, destroyed: acc.destroyed ++ result.destroyed ++ destroyed}
+  end
+
   def count_entry(%Player{} = player, entry, get_item) do
     player
     |> owned_items(get_item)

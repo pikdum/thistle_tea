@@ -43,8 +43,8 @@ defmodule ThistleTea.Game.Entity.Data.Component.Player do
     honor_rank: :virtual,
     duel_team: {0x00C4, 1, :int},
     guild_timestamp: {0x00C5, 1, :int},
-    quest_log: :virtual,
-    rewarded_quests: :virtual,
+    quest_log: {:virtual, %{}},
+    rewarded_quests: {:virtual, MapSet.new()},
     quest_slot_1: {0x00C6, 3, {:fn, [:quest_log], &__MODULE__.quest_slot_1/1}, :private},
     quest_slot_2: {0x00C9, 3, {:fn, [:quest_log], &__MODULE__.quest_slot_2/1}, :private},
     quest_slot_3: {0x00CC, 3, {:fn, [:quest_log], &__MODULE__.quest_slot_3/1}, :private},
@@ -310,7 +310,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.Player do
 
   for n <- 1..20 do
     def unquote(:"quest_slot_#{n}")(%{quest_log: quest_log}) do
-      QuestLog.slot_binary(Map.get(quest_log || %{}, unquote(n - 1)))
+      QuestLog.slot_binary(Map.get(quest_log, unquote(n - 1)))
     end
   end
 

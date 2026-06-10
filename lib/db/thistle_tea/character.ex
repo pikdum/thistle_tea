@@ -110,7 +110,8 @@ defmodule ThistleTea.Character do
         rest_state: 1,
         xp: 0,
         next_level_xp: stats.next_level_xp,
-        rest_state_experience: 0
+        rest_state_experience: 0,
+        coinage: 0
       },
       movement_block: %MovementBlock{
         movement_flags: 0,

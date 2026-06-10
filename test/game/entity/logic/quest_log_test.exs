@@ -7,7 +7,7 @@ defmodule ThistleTea.Game.Entity.Logic.QuestLogTest do
 
   describe "add/2" do
     test "assigns the lowest free slot" do
-      {:ok, quest_log} = QuestLog.add(nil, 33)
+      {:ok, quest_log} = QuestLog.add(%{}, 33)
       assert %Entry{quest_id: 33, status: :incomplete} = quest_log[0]
 
       {:ok, quest_log} = QuestLog.add(quest_log, 62)

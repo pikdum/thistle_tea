@@ -11,7 +11,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgLootMoney do
       when is_integer(loot_guid) do
     case Entity.call(loot_guid, :loot_take_gold) do
       {:ok, gold} ->
-        player = %{c.player | coinage: (c.player.coinage || 0) + gold}
+        player = %{c.player | coinage: c.player.coinage + gold}
         Network.send_packet(%Message.SmsgLootMoneyNotify{money: gold})
         Network.send_packet(%Message.SmsgLootClearMoney{})
         InventoryUpdate.apply(state, {:ok, player})
