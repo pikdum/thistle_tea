@@ -15,15 +15,16 @@ defmodule ThistleTea.Game.World.Loader.Loot do
     Mangos.CreatureLootTemplate.query(loot_id)
     |> Mangos.Repo.all()
     |> Loot.roll(&reference_rows/1)
-    |> Enum.map(fn {item_id, count} -> {ItemLoader.get_template(item_id), count} end)
-    |> Enum.reject(fn {template, _count} -> is_nil(template) end)
+    |> Enum.map(fn {item_id, count, quest_item} -> {ItemLoader.get_template(item_id), count, quest_item} end)
+    |> Enum.reject(fn {template, _count, _quest_item} -> is_nil(template) end)
     |> Enum.with_index()
-    |> Enum.map(fn {{%ItemTemplate{} = template, count}, index} ->
+    |> Enum.map(fn {{%ItemTemplate{} = template, count, quest_item}, index} ->
       %Loot.Item{
         slot: index,
         item_id: template.entry,
         display_id: template.display_id,
-        count: count
+        count: count,
+        quest_item: quest_item
       }
     end)
   end

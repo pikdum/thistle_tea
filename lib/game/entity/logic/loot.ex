@@ -1,6 +1,6 @@
 defmodule ThistleTea.Game.Entity.Logic.Loot do
   defmodule Item do
-    defstruct [:slot, :item_id, :display_id, count: 1, looted: false]
+    defstruct [:slot, :item_id, :display_id, count: 1, looted: false, quest_item: false]
   end
 
   defstruct gold: 0, items: []
@@ -43,12 +43,11 @@ defmodule ThistleTea.Game.Entity.Logic.Loot do
   defp roll_rows(_rows, _get_reference_rows, _rand, depth) when depth > @max_reference_depth, do: []
 
   defp roll_rows(rows, get_reference_rows, rand, depth) do
-    rows = Enum.reject(rows, fn row -> row.chance < 0 end)
     {grouped, ungrouped} = Enum.split_with(rows, fn row -> row.groupid > 0 end)
 
     ungrouped_drops =
       ungrouped
-      |> Enum.filter(fn row -> rand.() * 100 < row.chance end)
+      |> Enum.filter(fn row -> rand.() * 100 < abs(row.chance) end)
       |> Enum.flat_map(fn row -> resolve_row(row, get_reference_rows, rand, depth) end)
 
     grouped_drops =
@@ -74,12 +73,12 @@ defmodule ThistleTea.Game.Entity.Logic.Loot do
 
   defp resolve_row(row, _get_reference_rows, rand, _depth) do
     count = row.mincount_or_ref + trunc(rand.() * (max(row.maxcount, row.mincount_or_ref) - row.mincount_or_ref + 1))
-    [{row.item, max(min(count, row.maxcount), row.mincount_or_ref)}]
+    [{row.item, max(min(count, row.maxcount), row.mincount_or_ref), row.chance < 0}]
   end
 
   defp roll_group(group, rand) do
     roll = rand.() * 100
-    {explicit, equal} = Enum.split_with(group, fn row -> row.chance > 0 end)
+    {explicit, equal} = Enum.split_with(group, fn row -> row.chance != 0 end)
 
     case pick_explicit(explicit, roll) do
       nil -> pick_equal_chanced(equal, rand)
@@ -90,10 +89,10 @@ defmodule ThistleTea.Game.Entity.Logic.Loot do
   defp pick_explicit(rows, roll) do
     rows
     |> Enum.reduce_while({roll, nil}, fn row, {remaining, _} ->
-      if remaining < row.chance do
+      if remaining < abs(row.chance) do
         {:halt, {remaining, row}}
       else
-        {:cont, {remaining - row.chance, nil}}
+        {:cont, {remaining - abs(row.chance), nil}}
       end
     end)
     |> elem(1)

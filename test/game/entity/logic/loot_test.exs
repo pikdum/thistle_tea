@@ -13,13 +13,14 @@ defmodule ThistleTea.Game.Entity.Logic.LootTest do
     test "drops items that pass their chance roll" do
       rows = [row(%{item: 10, chance: 50.0}), row(%{item: 20, chance: 30.0})]
 
-      assert [{10, 1}] = Loot.roll(rows, &no_references/1, fn -> 0.4 end)
+      assert [{10, 1, false}] = Loot.roll(rows, &no_references/1, fn -> 0.4 end)
     end
 
-    test "skips quest items with negative chance" do
+    test "rolls quest items with negative chance and tags them" do
       rows = [row(%{item: 10, chance: -80.0})]
 
-      assert [] = Loot.roll(rows, &no_references/1, fn -> 0.0 end)
+      assert [{10, 1, true}] = Loot.roll(rows, &no_references/1, fn -> 0.5 end)
+      assert [] = Loot.roll(rows, &no_references/1, fn -> 0.9 end)
     end
 
     test "drops at most one item per group" do
@@ -28,21 +29,21 @@ defmodule ThistleTea.Game.Entity.Logic.LootTest do
         row(%{item: 20, chance: 40.0, groupid: 1})
       ]
 
-      assert [{10, 1}] = Loot.roll(rows, &no_references/1, fn -> 0.3 end)
-      assert [{20, 1}] = Loot.roll(rows, &no_references/1, fn -> 0.7 end)
+      assert [{10, 1, false}] = Loot.roll(rows, &no_references/1, fn -> 0.3 end)
+      assert [{20, 1, false}] = Loot.roll(rows, &no_references/1, fn -> 0.7 end)
     end
 
     test "resolves references through the reference table" do
       rows = [row(%{item: 0, chance: 100.0, mincount_or_ref: -5000, maxcount: 1})]
       references = fn 5000 -> [row(%{item: 42, chance: 100.0})] end
 
-      assert [{42, 1}] = Loot.roll(rows, references, fn -> 0.5 end)
+      assert [{42, 1, false}] = Loot.roll(rows, references, fn -> 0.5 end)
     end
 
     test "rolls counts within min and max" do
       rows = [row(%{item: 10, chance: 100.0, mincount_or_ref: 2, maxcount: 4})]
 
-      assert [{10, count}] = Loot.roll(rows, &no_references/1, fn -> 0.5 end)
+      assert [{10, count, false}] = Loot.roll(rows, &no_references/1, fn -> 0.5 end)
       assert count in 2..4
     end
   end

@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.Player.Quests do
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Experience
   alias ThistleTea.Game.Entity.Logic.Inventory
+  alias ThistleTea.Game.Entity.Logic.Loot
   alias ThistleTea.Game.Entity.Logic.QuestDialogStatus
   alias ThistleTea.Game.Entity.Logic.QuestLog
   alias ThistleTea.Game.Entity.Logic.QuestLog.Entry
@@ -283,6 +284,36 @@ defmodule ThistleTea.Game.Player.Quests do
       _error ->
         state
     end
+  end
+
+  def needs_item?(%Character{player: player}, item_id) do
+    player.quest_log
+    |> QuestLog.active_entries()
+    |> Enum.any?(fn
+      %Entry{quest_id: quest_id, status: :incomplete} ->
+        case QuestLoader.get(quest_id) do
+          %Quest{required_items: required_items} ->
+            Enum.any?(required_items, fn {_index, required_id, required_count} ->
+              required_id == item_id and
+                Inventory.count_entry(player, item_id, &ItemStore.get/1) < required_count
+            end)
+
+          nil ->
+            false
+        end
+
+      %Entry{} ->
+        false
+    end)
+  end
+
+  def filter_loot(%Loot{} = loot, %Character{} = character) do
+    items =
+      Enum.filter(loot.items, fn item ->
+        not item.quest_item or needs_item?(character, item.item_id)
+      end)
+
+    %{loot | items: items}
   end
 
   def npc_quests(npc_guid) do
