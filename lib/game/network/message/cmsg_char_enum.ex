@@ -1,11 +1,10 @@
 defmodule ThistleTea.Game.Network.Message.CmsgCharEnum do
   use ThistleTea.Game.Network.ClientMessage, :CMSG_CHAR_ENUM
 
-  alias ThistleTea.DB.Mangos.ItemTemplate
-  alias ThistleTea.DB.Mangos.Repo
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Message.SmsgCharEnum.Character
   alias ThistleTea.Game.Network.Message.SmsgCharEnum.CharacterGear
+  alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
 
   require Logger
 
@@ -48,7 +47,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgCharEnum do
           item_entries
           |> Enum.map(fn entry ->
             if is_integer(entry) and entry > 0 do
-              item = Repo.get(ItemTemplate, entry)
+              item = ItemLoader.get_template(entry)
 
               if item do
                 %CharacterGear{

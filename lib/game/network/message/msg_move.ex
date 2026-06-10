@@ -1,11 +1,9 @@
 defmodule ThistleTea.Game.Network.Message.MsgMove do
   use ThistleTea.Game.Network.ClientMessage, :MSG_MOVE_JUMP
-  use ThistleTea.Game.Network.Opcodes, [:MSG_MOVE_JUMP]
 
   alias ThistleTea.Game.Network.ClientMessage
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Packet
-  alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.Visibility
 
@@ -20,7 +18,7 @@ defmodule ThistleTea.Game.Network.Message.MsgMove do
 
   @impl ClientMessage
   def handle(
-        %__MODULE__{opcode: opcode, payload: payload} = message,
+        %__MODULE__{payload: payload} = message,
         %{
           ready: true,
           character: %Character{movement_block: %MovementBlock{} = movement_block, unit: %Unit{} = unit} = character
@@ -46,7 +44,6 @@ defmodule ThistleTea.Game.Network.Message.MsgMove do
 
       new_state
       |> Visibility.refresh_player()
-      |> randomize_equipment(opcode)
       |> broadcast(message)
     else
       state
@@ -67,25 +64,5 @@ defmodule ThistleTea.Game.Network.Message.MsgMove do
     |> World.broadcast_packet(state.character, include_self?: false, recipients: Map.get(state, :player_guids))
 
     state
-  end
-
-  defp randomize_equipment(state, opcode) do
-    if opcode === @msg_move_jump do
-      character = ThistleTea.Character.generate_and_assign_equipment(state.character)
-
-      %UpdateObject{
-        update_type: :values,
-        object_type: :player
-      }
-      |> struct(Map.from_struct(character))
-      |> World.broadcast_packet(character)
-
-      UpdateObject.get_item_updates(character.player)
-      |> Network.send_packet()
-
-      Map.put(state, :character, character)
-    else
-      state
-    end
   end
 end

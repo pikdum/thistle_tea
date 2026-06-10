@@ -8,8 +8,10 @@ defmodule ThistleTea.Game.Network.Message.CmsgPlayerLogin do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Player, as: PlayerBT
+  alias ThistleTea.Game.Entity.Logic.Equipment
   alias ThistleTea.Game.Network.Message.SmsgInitialSpells.InitialSpell
   alias ThistleTea.Game.Network.UpdateObject
+  alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Faction, as: FactionLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Metadata
@@ -155,8 +157,16 @@ defmodule ThistleTea.Game.Network.Message.CmsgPlayerLogin do
       })
     end
 
-    UpdateObject.get_item_updates(c.player)
-    |> Network.send_packet()
+    item_updates =
+      c.player
+      |> Equipment.equipped_guids()
+      |> Enum.map(&ItemStore.get/1)
+      |> Enum.reject(&is_nil/1)
+      |> Enum.map(&UpdateObject.from_item/1)
+
+    if item_updates != [] do
+      Network.send_packet(item_updates)
+    end
 
     # packet for player
     update_flag =

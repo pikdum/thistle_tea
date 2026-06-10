@@ -1,8 +1,8 @@
 defmodule ThistleTea.Game.Network.Message.CmsgItemQuerySingle do
   use ThistleTea.Game.Network.ClientMessage, :CMSG_ITEM_QUERY_SINGLE
 
-  alias ThistleTea.DB.Mangos
   alias ThistleTea.Game.Network.Message
+  alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
 
   require Logger
 
@@ -12,7 +12,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgItemQuerySingle do
   def handle(%__MODULE__{item_id: item_id, guid: _guid}, state) do
     Logger.info("CMSG_ITEM_QUERY_SINGLE: #{item_id}")
 
-    item = Mangos.Repo.get(Mangos.ItemTemplate, item_id)
+    item = ItemLoader.get_template(item_id)
 
     Network.send_packet(%Message.SmsgItemQuerySingleResponse{
       item_id: item_id,

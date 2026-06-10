@@ -15,16 +15,20 @@ defmodule ThistleTea.Character do
   import Bitwise, only: [|||: 2]
 
   alias ThistleTea.DB.Mangos
-  alias ThistleTea.DB.Mangos.ItemTemplate
   alias ThistleTea.DBC
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Data.Item
+  alias ThistleTea.Game.Entity.Data.ItemTemplate
+  alias ThistleTea.Game.Entity.Logic.Equipment
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.Message.CmsgCharCreate
   alias ThistleTea.Game.Player.Stats
+  alias ThistleTea.Game.World.ItemStore
+  alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
 
   @unit_flag_player_controlled 0x00000008
   @unit_flag_use_swim_animation 0x00008000
@@ -127,56 +131,24 @@ defmodule ThistleTea.Character do
 
   def gain_xp(%__MODULE__{} = character, _amount), do: {character, []}
 
-  def generate_and_assign_equipment(character) do
-    equipment = CmsgCharCreate.generate_random_equipment()
-
-    player = %{
-      character.player
-      | visible_item_1_0: equipment.head.entry,
-        visible_item_2_0: equipment.neck.entry,
-        visible_item_3_0: equipment.shoulders.entry,
-        visible_item_4_0: equipment.body.entry,
-        visible_item_5_0: equipment.chest.entry,
-        visible_item_6_0: equipment.waist.entry,
-        visible_item_7_0: equipment.legs.entry,
-        visible_item_8_0: equipment.feet.entry,
-        visible_item_9_0: equipment.wrists.entry,
-        visible_item_10_0: equipment.hands.entry,
-        visible_item_11_0: equipment.finger1.entry,
-        visible_item_12_0: equipment.finger2.entry,
-        visible_item_13_0: equipment.trinket1.entry,
-        visible_item_14_0: equipment.trinket2.entry,
-        visible_item_15_0: equipment.back.entry,
-        visible_item_16_0: equipment.mainhand.entry,
-        visible_item_17_0: equipment.offhand.entry,
-        visible_item_19_0: equipment.tabard.entry,
-        head: Guid.from_low_guid(:item, equipment.head.entry),
-        neck: Guid.from_low_guid(:item, equipment.neck.entry),
-        shoulders: Guid.from_low_guid(:item, equipment.shoulders.entry),
-        body: Guid.from_low_guid(:item, equipment.body.entry),
-        chest: Guid.from_low_guid(:item, equipment.chest.entry),
-        waist: Guid.from_low_guid(:item, equipment.waist.entry),
-        legs: Guid.from_low_guid(:item, equipment.legs.entry),
-        feet: Guid.from_low_guid(:item, equipment.feet.entry),
-        wrists: Guid.from_low_guid(:item, equipment.wrists.entry),
-        hands: Guid.from_low_guid(:item, equipment.hands.entry),
-        finger1: Guid.from_low_guid(:item, equipment.finger1.entry),
-        finger2: Guid.from_low_guid(:item, equipment.finger2.entry),
-        trinket1: Guid.from_low_guid(:item, equipment.trinket1.entry),
-        trinket2: Guid.from_low_guid(:item, equipment.trinket2.entry),
-        back: Guid.from_low_guid(:item, equipment.back.entry),
-        mainhand: Guid.from_low_guid(:item, equipment.mainhand.entry),
-        offhand: Guid.from_low_guid(:item, equipment.offhand.entry),
-        tabard: Guid.from_low_guid(:item, equipment.tabard.entry)
-    }
+  def generate_and_assign_equipment(%__MODULE__{object: %Object{guid: owner_guid}} = character)
+      when is_integer(owner_guid) and owner_guid > 0 do
+    player =
+      ItemLoader.random_equipment()
+      |> Enum.reduce(character.player, fn {slot, template}, player ->
+        case template && ItemStore.create(template, owner: owner_guid) do
+          %Item{} = item -> Equipment.equip(player, slot, item)
+          _ -> player
+        end
+      end)
 
     character = %{character | player: player}
-    sync_mainhand_stats(character, equipment.mainhand)
+    sync_mainhand_stats(character)
   end
 
   def sync_mainhand_stats(%__MODULE__{player: %Player{visible_item_16_0: entry}} = character)
       when is_integer(entry) and entry > 0 do
-    case Mangos.Repo.get(ItemTemplate, entry) do
+    case ItemLoader.get_template(entry) do
       %ItemTemplate{} = weapon -> sync_mainhand_stats(character, weapon)
       _ -> character
     end
@@ -327,7 +299,10 @@ defmodule ThistleTea.Character do
         Memento.Query.write(character)
       end)
 
-    character = %{character | object: %{character.object | guid: Guid.from_low_guid(:player, character.id)}}
+    character =
+      %{character | object: %{character.object | guid: Guid.from_low_guid(:player, character.id)}}
+      |> generate_and_assign_equipment()
+
     save(character)
 
     {:ok, character}

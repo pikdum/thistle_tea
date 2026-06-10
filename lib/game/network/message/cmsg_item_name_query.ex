@@ -1,8 +1,8 @@
 defmodule ThistleTea.Game.Network.Message.CmsgItemNameQuery do
   use ThistleTea.Game.Network.ClientMessage, :CMSG_ITEM_NAME_QUERY
 
-  alias ThistleTea.DB.Mangos
   alias ThistleTea.Game.Network.Message
+  alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
 
   require Logger
 
@@ -10,15 +10,20 @@ defmodule ThistleTea.Game.Network.Message.CmsgItemNameQuery do
 
   @impl ClientMessage
   def handle(%__MODULE__{item_id: item_id, guid: _guid}, state) do
-    item = Mangos.Repo.get(Mangos.ItemTemplate, item_id)
-    Logger.info("CMSG_ITEM_NAME_QUERY: #{item.name}")
+    case ItemLoader.get_template(item_id) do
+      nil ->
+        state
 
-    Network.send_packet(%Message.SmsgItemNameQueryResponse{
-      item_id: item_id,
-      item_name: item.name
-    })
+      item ->
+        Logger.info("CMSG_ITEM_NAME_QUERY: #{item.name}")
 
-    state
+        Network.send_packet(%Message.SmsgItemNameQueryResponse{
+          item_id: item_id,
+          item_name: item.name
+        })
+
+        state
+    end
   end
 
   @impl ClientMessage

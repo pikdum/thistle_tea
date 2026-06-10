@@ -1,13 +1,8 @@
 defmodule ThistleTea.Game.Network.UpdateObject do
   use ThistleTea.Game.Network.Opcodes, [:SMSG_UPDATE_OBJECT]
 
-  alias ThistleTea.DB.Mangos.ItemTemplate
-  alias ThistleTea.DB.Mangos.Repo
-  alias ThistleTea.Game.Entity.Data.Component.Item
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
-  alias ThistleTea.Game.Entity.Data.Component.Object
-  alias ThistleTea.Game.Entity.Data.Component.Player
-  alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.Entity.Data.Item, as: DataItem
   alias ThistleTea.Game.Network.BinaryUtils
   alias ThistleTea.Game.Network.Packet
 
@@ -234,47 +229,15 @@ defmodule ThistleTea.Game.Network.UpdateObject do
     end)
   end
 
-  # TODO: items need a proper lifecycle, this is just a hack
-  def get_item_updates(%Player{} = player) do
-    [
-      player.visible_item_1_0,
-      player.visible_item_2_0,
-      player.visible_item_3_0,
-      player.visible_item_4_0,
-      player.visible_item_5_0,
-      player.visible_item_6_0,
-      player.visible_item_7_0,
-      player.visible_item_8_0,
-      player.visible_item_9_0,
-      player.visible_item_10_0,
-      player.visible_item_11_0,
-      player.visible_item_12_0,
-      player.visible_item_13_0,
-      player.visible_item_14_0,
-      player.visible_item_15_0,
-      player.visible_item_16_0,
-      player.visible_item_17_0,
-      player.visible_item_18_0,
-      player.visible_item_19_0
-    ]
-    |> Enum.filter(fn item_entry -> is_integer(item_entry) and item_entry > 0 end)
-    |> Enum.map(fn item_entry ->
-      item = Repo.get(ItemTemplate, item_entry)
-
-      %__MODULE__{
-        update_type: :create_object2,
-        object_type: :item,
-        object: %Object{
-          guid: Guid.from_low_guid(:item, item.entry),
-          entry: item.entry
-        },
-        item: %Item{
-          flags: item.flags
-        },
-        movement_block: %MovementBlock{
-          update_flag: 0
-        }
+  def from_item(%DataItem{object: object, item: item}) do
+    %__MODULE__{
+      update_type: :create_object2,
+      object_type: :item,
+      object: object,
+      item: item,
+      movement_block: %MovementBlock{
+        update_flag: 0
       }
-    end)
+    }
   end
 end
