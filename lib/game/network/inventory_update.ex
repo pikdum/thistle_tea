@@ -1,4 +1,6 @@
 defmodule ThistleTea.Game.Network.InventoryUpdate do
+  import Kernel, except: [apply: 2]
+
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Item
   alias ThistleTea.Game.Entity.Logic.Inventory
@@ -9,6 +11,18 @@ defmodule ThistleTea.Game.Network.InventoryUpdate do
   alias ThistleTea.Game.World.ItemStore
 
   def apply(state, {:ok, %Player{} = player}) do
+    apply(state, {:ok, %{player: player, items: []}})
+  end
+
+  def apply(state, {:ok, %{player: %Player{} = player, items: items}}) do
+    Enum.each(items, fn item ->
+      ItemStore.put(item)
+
+      item
+      |> UpdateObject.item_values_update()
+      |> Network.send_packet()
+    end)
+
     character =
       %{state.character | player: player}
       |> ThistleTea.Character.sync_mainhand_stats()

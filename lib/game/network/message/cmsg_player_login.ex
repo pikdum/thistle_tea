@@ -159,9 +159,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgPlayerLogin do
 
     item_updates =
       c.player
-      |> Inventory.equipped_guids()
-      |> Enum.map(&ItemStore.get/1)
-      |> Enum.reject(&is_nil/1)
+      |> Inventory.owned_items(&ItemStore.get/1)
       |> Enum.map(&UpdateObject.from_item/1)
 
     if item_updates != [] do

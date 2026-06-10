@@ -12,7 +12,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgAutostoreLootItem do
   @impl ClientMessage
   def handle(%__MODULE__{slot: slot}, %{ready: true, character: %Character{} = c, loot_guid: loot_guid} = state)
       when is_integer(loot_guid) do
-    if Inventory.free_backpack_slot(c.player) == nil do
+    if Inventory.free_position(c.player, &ItemStore.get/1) == nil do
       InventoryUpdate.send_failure(:inventory_full, 0, 0)
       state
     else
@@ -41,16 +41,16 @@ defmodule ThistleTea.Game.Network.Message.CmsgAutostoreLootItem do
   defp store_loot_item(%{character: c} = state, %Loot.Item{} = loot_item, loot_slot) do
     item = ItemStore.create(loot_item.item_id, owner: state.guid, stack_count: loot_item.count)
 
-    case item && Inventory.store(c.player, item) do
-      {:ok, player, dst_slot} ->
+    case item && Inventory.store(c.player, state.guid, item, &ItemStore.get/1) do
+      {:ok, result, {dst_bag, dst_slot}} ->
         Network.send_packet(UpdateObject.from_item(item))
-        state = InventoryUpdate.apply(state, {:ok, player})
+        state = InventoryUpdate.apply(state, {:ok, result})
         Network.send_packet(%Message.SmsgLootRemoved{slot: loot_slot})
 
         Network.send_packet(%Message.SmsgItemPushResult{
           player_guid: state.guid,
           item_id: loot_item.item_id,
-          bag_slot: Inventory.bag_0(),
+          bag_slot: dst_bag,
           item_slot: dst_slot,
           count: loot_item.count
         })

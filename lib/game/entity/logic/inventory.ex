@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.Entity.Logic.Inventory do
   import Bitwise, only: [&&&: 2, <<<: 2]
 
+  alias ThistleTea.Game.Entity.Data.Component.Container
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
@@ -43,10 +44,13 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
   @backpack_slot_start @bag_slot_start + length(@bag_fields)
   @slot_count length(@slot_fields)
 
+  @bag_slots Enum.to_list(@bag_slot_start..(@backpack_slot_start - 1))
+
   @mainhand_slot @slot_by_field[:mainhand]
   @offhand_slot @slot_by_field[:offhand]
 
   @invtype_two_hand 17
+  @invtype_bag 18
 
   @item_flag_indestructible 0x20
 
@@ -58,6 +62,7 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
     ok: 0,
     cant_equip_level_i: 1,
     item_doesnt_go_to_slot: 3,
+    nonempty_bag_over_other_bag: 5,
     no_required_proficiency: 8,
     you_can_never_use_that_item: 10,
     cant_equip_with_twohanded: 13,
@@ -67,6 +72,8 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
     slot_is_empty: 22,
     item_not_found: 23,
     cant_drop_soulbound: 24,
+    not_a_bag: 30,
+    can_only_do_with_empty_bags: 31,
     int_bag_error: 40,
     already_looted: 49,
     inventory_full: 50
@@ -80,8 +87,6 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
 
   def slot_index(field), do: Map.fetch!(@slot_by_field, field)
 
-  def valid_slot?(slot), do: is_integer(slot) and slot >= 0 and slot < @slot_count
-
   def equipment_slot?(slot), do: is_integer(slot) and slot >= 0 and slot < @equipment_slot_count
 
   def bag_slot?(slot), do: is_integer(slot) and slot >= @bag_slot_start and slot < @backpack_slot_start
@@ -91,79 +96,85 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
   def visible_entry_field(slot) when is_atom(slot), do: visible_entry_field(slot_index(slot))
   def visible_entry_field(slot) when is_integer(slot), do: :"visible_item_#{slot + 1}_0"
 
-  def visible_entry(%Player{} = player, slot) do
-    Map.get(player, visible_entry_field(slot))
-  end
-
-  def item_guid(%Player{} = player, slot) when is_integer(slot) do
-    with field when is_atom(field) <- Map.get(@field_by_slot, slot),
-         guid when is_integer(guid) and guid > 0 <- Map.get(player, field) do
-      guid
-    else
-      _ -> nil
-    end
-  end
-
   def equip(%Player{} = player, slot, %Item{} = item) when is_atom(slot) do
-    put_slot(player, slot_index(slot), item)
+    index = slot_index(slot)
+
+    player
+    |> Map.put(Map.fetch!(@field_by_slot, index), item.object.guid)
+    |> Map.put(visible_entry_field(index), item.object.entry)
   end
 
-  def equipped_guids(%Player{} = player) do
-    @equipment_fields
-    |> Enum.map(fn field -> Map.get(player, field) end)
-    |> Enum.filter(fn guid -> is_integer(guid) and guid > 0 end)
+  def owned_items(%Player{} = player, get_item) do
+    direct =
+      @slot_fields
+      |> Enum.map(fn field -> Map.get(player, field) end)
+      |> Enum.filter(fn guid -> is_integer(guid) and guid > 0 end)
+      |> Enum.map(get_item)
+      |> Enum.reject(&is_nil/1)
+
+    contents =
+      direct
+      |> Enum.filter(&Item.container?/1)
+      |> Enum.flat_map(fn bag ->
+        bag_slot_guids(bag)
+        |> Enum.map(get_item)
+        |> Enum.reject(&is_nil/1)
+      end)
+
+    direct ++ contents
   end
 
-  def auto_equip(%Player{} = player, %Unit{} = unit, src_slot, get_item) do
-    with {:ok, src_item} <- fetch_item(player, src_slot, get_item),
+  def auto_equip(%Player{} = player, %Unit{} = unit, owner_guid, src_pos, get_item) do
+    ctx = ctx(player, unit, owner_guid, get_item)
+
+    with {:ok, src_item} <- fetch_item(ctx, src_pos),
          {:ok, dest} <- find_equip_slot(player, unit, src_item, get_item) do
-      if dest == src_slot do
-        {:ok, player}
+      if {@bag_0, dest} == src_pos do
+        {:ok, result(ctx)}
       else
-        swap(player, unit, src_slot, dest, get_item)
+        do_swap(ctx, src_pos, {@bag_0, dest})
       end
     else
-      {:error, error} -> {:error, error, item_guid(player, src_slot) || 0, 0}
+      {:error, error} -> {:error, error, guid_at(ctx, src_pos) || 0, 0}
     end
   end
 
-  def swap(%Player{} = player, %Unit{}, slot, slot, _get_item), do: {:ok, player}
+  def swap(%Player{} = player, %Unit{} = unit, owner_guid, src_pos, dst_pos, get_item) do
+    ctx = ctx(player, unit, owner_guid, get_item)
 
-  def swap(%Player{} = player, %Unit{} = unit, src_slot, dst_slot, get_item) do
-    with {:ok, src_item} <- fetch_item(player, src_slot, get_item),
-         dst_item = item_at(player, dst_slot, get_item),
-         :ok <- validate_placement(player, unit, src_item, dst_slot, get_item),
-         :ok <- validate_placement(player, unit, dst_item, src_slot, get_item),
-         :ok <- validate_two_hand(player, src_item, src_slot, dst_slot, dst_item) do
-      player =
-        player
-        |> put_slot(src_slot, dst_item)
-        |> put_slot(dst_slot, src_item)
-        |> store_offhand_if_two_hand(src_item, dst_slot, get_item)
-
-      {:ok, player}
+    if src_pos == dst_pos do
+      {:ok, result(ctx)}
     else
-      {:error, error} -> {:error, error, item_guid(player, src_slot) || 0, item_guid(player, dst_slot) || 0}
+      do_swap(ctx, src_pos, dst_pos)
     end
   end
 
-  def store(%Player{} = player, %Item{} = item) do
-    case free_backpack_slot(player) do
+  def store(%Player{} = player, owner_guid, %Item{} = item, get_item) do
+    ctx = ctx(player, nil, owner_guid, get_item)
+
+    case free_position(ctx) do
       nil -> {:error, :inventory_full}
-      slot -> {:ok, put_slot(player, slot, item), slot}
+      pos -> {:ok, ctx |> put_pos(pos, item) |> result(), pos}
     end
   end
 
-  def destroy(%Player{} = player, slot, get_item) do
-    with {:ok, item} <- fetch_item(player, slot, get_item),
-         :ok <- validate_destructible(item) do
-      {:ok, put_slot(player, slot, nil), item}
+  def destroy(%Player{} = player, pos, get_item) do
+    ctx = ctx(player, nil, nil, get_item)
+
+    with {:ok, item} <- fetch_item(ctx, pos),
+         :ok <- validate_destructible(ctx, item) do
+      {:ok, ctx |> put_pos(pos, nil) |> result(), item}
     else
-      {:error, error} -> {:error, error, item_guid(player, slot) || 0, 0}
+      {:error, error} -> {:error, error, guid_at(ctx, pos) || 0, 0}
     end
+  end
+
+  def free_position(%Player{} = player, get_item) do
+    free_position(ctx(player, nil, nil, get_item))
   end
 
   def find_equip_slot(%Player{} = player, %Unit{} = unit, %Item{} = item, get_item) do
+    ctx = ctx(player, unit, nil, get_item)
     template = Item.template(item)
 
     with :ok <- can_use(unit, template) do
@@ -174,7 +185,7 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
         candidates ->
           free =
             Enum.find(candidates, fn slot ->
-              item_guid(player, slot) == nil and not blocked_offhand?(player, slot, get_item)
+              guid_at(ctx, {@bag_0, slot}) == nil and not blocked_offhand?(ctx, slot)
             end)
 
           {:ok, free || hd(candidates)}
@@ -193,10 +204,31 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
 
   def can_dual_wield?(class), do: class in @dual_wield_classes
 
-  def two_hand_used?(%Player{} = player, get_item) do
-    case item_at(player, @mainhand_slot, get_item) do
-      %Item{} = item -> Item.template(item).inventory_type == @invtype_two_hand
-      _ -> false
+  defp ctx(player, unit, owner_guid, get_item) do
+    %{player: player, unit: unit, owner: owner_guid, get_item: get_item, changed: %{}}
+  end
+
+  defp result(ctx) do
+    %{player: ctx.player, items: Map.values(ctx.changed)}
+  end
+
+  defp do_swap(ctx, src_pos, dst_pos) do
+    with {:ok, src_item} <- fetch_item(ctx, src_pos),
+         {:ok, _dst} <- valid_destination(ctx, dst_pos),
+         dst_item = item_at(ctx, dst_pos),
+         :ok <- validate_bag_cycle(ctx, src_item, dst_pos),
+         :ok <- validate_placement(ctx, src_item, dst_pos),
+         :ok <- validate_placement(ctx, dst_item, src_pos),
+         :ok <- validate_two_hand(ctx, src_item, src_pos, dst_pos, dst_item) do
+      ctx =
+        ctx
+        |> put_pos(src_pos, dst_item)
+        |> put_pos(dst_pos, src_item)
+        |> store_offhand_if_two_hand(src_item, dst_pos)
+
+      {:ok, result(ctx)}
+    else
+      {:error, error} -> {:error, error, guid_at(ctx, src_pos) || 0, guid_at(ctx, dst_pos) || 0}
     end
   end
 
@@ -225,14 +257,22 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
       15 -> [slot_index(:ranged)]
       25 -> [slot_index(:ranged)]
       26 -> [slot_index(:ranged)]
+      18 -> @bag_slots
       19 -> [slot_index(:tabard)]
       28 -> relic_slots(template, class)
       _ -> []
     end
   end
 
-  defp blocked_offhand?(%Player{} = player, slot, get_item) do
-    slot == @offhand_slot and two_hand_used?(player, get_item)
+  defp blocked_offhand?(ctx, slot) do
+    slot == @offhand_slot and two_hand_used?(ctx)
+  end
+
+  defp two_hand_used?(ctx) do
+    case item_at(ctx, {@bag_0, @mainhand_slot}) do
+      %Item{} = item -> Item.template(item).inventory_type == @invtype_two_hand
+      _ -> false
+    end
   end
 
   defp relic_slots(%ItemTemplate{subclass: subclass}, class) do
@@ -243,102 +283,238 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
     end
   end
 
-  defp validate_placement(_player, _unit, nil, _slot, _get_item), do: :ok
+  defp validate_bag_cycle(ctx, %Item{object: %Object{guid: guid}}, {dst_bag, _slot}) when dst_bag != @bag_0 do
+    case item_at(ctx, {@bag_0, dst_bag}) do
+      %Item{object: %Object{guid: ^guid}} -> {:error, :items_cant_be_swapped}
+      _ -> :ok
+    end
+  end
 
-  defp validate_placement(%Player{} = player, %Unit{} = unit, %Item{} = item, slot, get_item) do
+  defp validate_bag_cycle(_ctx, _item, _dst_pos), do: :ok
+
+  defp validate_placement(_ctx, nil, _pos), do: :ok
+
+  defp validate_placement(ctx, %Item{} = item, {@bag_0, slot}) do
     template = Item.template(item)
 
     cond do
       equipment_slot?(slot) ->
-        with :ok <- can_use(unit, template) do
+        with :ok <- can_use(ctx.unit, template) do
           cond do
-            slot not in candidate_slots(template, unit.class) -> {:error, :item_doesnt_go_to_slot}
-            slot == @offhand_slot and two_hand_used?(player, get_item) -> {:error, :cant_equip_with_twohanded}
+            slot not in candidate_slots(template, ctx.unit.class) -> {:error, :item_doesnt_go_to_slot}
+            slot == @offhand_slot and two_hand_used?(ctx) -> {:error, :cant_equip_with_twohanded}
             true -> :ok
           end
         end
 
+      bag_slot?(slot) ->
+        if template.inventory_type == @invtype_bag, do: :ok, else: {:error, :not_a_bag}
+
       backpack_slot?(slot) ->
-        :ok
+        validate_bag_empty_if_bag(ctx, item)
 
       true ->
         {:error, :item_doesnt_go_to_slot}
     end
   end
 
-  defp validate_two_hand(%Player{} = player, %Item{} = src_item, src_slot, dst_slot, dst_item) do
-    if equipping_two_hand?(src_item, dst_slot) and item_guid(player, @offhand_slot) != nil and
-         not offhand_storable?(player, src_slot, dst_item) do
+  defp validate_placement(ctx, %Item{} = item, {_bag, _slot}) do
+    if Item.container?(item) and not bag_empty?(ctx, item) do
+      {:error, :nonempty_bag_over_other_bag}
+    else
+      :ok
+    end
+  end
+
+  defp validate_bag_empty_if_bag(ctx, %Item{} = item) do
+    if Item.container?(item) and not bag_empty?(ctx, item) do
+      {:error, :can_only_do_with_empty_bags}
+    else
+      :ok
+    end
+  end
+
+  defp bag_empty?(ctx, %Item{object: %Object{guid: guid}} = bag) do
+    bag = Map.get(ctx.changed, guid, bag)
+    bag_slot_guids(bag) == []
+  end
+
+  defp bag_slot_guids(%Item{container: container}) when not is_nil(container) do
+    1..container_size(container)
+    |> Enum.map(fn i -> Map.get(container, :"slot_#{i}") end)
+    |> Enum.filter(fn guid -> is_integer(guid) and guid > 0 end)
+  end
+
+  defp bag_slot_guids(_item), do: []
+
+  defp container_size(container) do
+    case container.num_slots do
+      n when is_integer(n) and n > 0 -> min(n, 36)
+      _ -> 0
+    end
+  end
+
+  defp validate_two_hand(ctx, %Item{} = src_item, src_pos, dst_pos, dst_item) do
+    if equipping_two_hand?(src_item, dst_pos) and guid_at(ctx, {@bag_0, @offhand_slot}) != nil and
+         not offhand_storable?(ctx, src_pos, dst_item) do
       {:error, :cant_equip_with_twohanded}
     else
       :ok
     end
   end
 
-  defp store_offhand_if_two_hand(%Player{} = player, %Item{} = src_item, dst_slot, get_item) do
-    with true <- equipping_two_hand?(src_item, dst_slot),
-         %Item{} = offhand_item <- item_at(player, @offhand_slot, get_item),
-         free_slot when is_integer(free_slot) <- free_backpack_slot(player) do
-      player
-      |> put_slot(@offhand_slot, nil)
-      |> put_slot(free_slot, offhand_item)
+  defp store_offhand_if_two_hand(ctx, %Item{} = src_item, dst_pos) do
+    with true <- equipping_two_hand?(src_item, dst_pos),
+         %Item{} = offhand_item <- item_at(ctx, {@bag_0, @offhand_slot}),
+         pos when pos != nil <- free_position(ctx) do
+      ctx
+      |> put_pos({@bag_0, @offhand_slot}, nil)
+      |> put_pos(pos, offhand_item)
     else
-      _ -> player
+      _ -> ctx
     end
   end
 
-  defp equipping_two_hand?(%Item{} = item, dst_slot) do
-    dst_slot == @mainhand_slot and Item.template(item).inventory_type == @invtype_two_hand
+  defp equipping_two_hand?(%Item{} = item, {@bag_0, @mainhand_slot}) do
+    Item.template(item).inventory_type == @invtype_two_hand
   end
 
-  defp offhand_storable?(%Player{} = player, src_slot, dst_item) do
-    free_backpack_slot(player) != nil or (backpack_slot?(src_slot) and dst_item == nil)
+  defp equipping_two_hand?(_item, _dst_pos), do: false
+
+  defp offhand_storable?(ctx, src_pos, dst_item) do
+    free_position(ctx) != nil or (dst_item == nil and storage_pos?(src_pos))
   end
 
-  def free_backpack_slot(%Player{} = player) do
-    Enum.find(@backpack_slot_start..(@slot_count - 1), fn slot ->
-      item_guid(player, slot) == nil
+  defp storage_pos?({@bag_0, slot}), do: backpack_slot?(slot)
+  defp storage_pos?({_bag, _slot}), do: true
+
+  defp free_position(ctx) do
+    backpack =
+      Enum.find_value(@backpack_slot_start..(@slot_count - 1), fn slot ->
+        if guid_at(ctx, {@bag_0, slot}) == nil, do: {@bag_0, slot}
+      end)
+
+    backpack || free_bag_position(ctx)
+  end
+
+  defp free_bag_position(ctx) do
+    Enum.find_value(@bag_slots, fn bag_slot ->
+      case item_at(ctx, {@bag_0, bag_slot}) do
+        %Item{container: %Container{}} = bag ->
+          Enum.find_value(0..(container_size(bag.container) - 1)//1, fn slot ->
+            if guid_at(ctx, {bag_slot, slot}) == nil, do: {bag_slot, slot}
+          end)
+
+        _ ->
+          nil
+      end
     end)
   end
 
-  defp validate_destructible(%Item{} = item) do
-    if (Item.template(item).flags &&& @item_flag_indestructible) == 0 do
-      :ok
-    else
-      {:error, :cant_drop_soulbound}
+  defp validate_destructible(ctx, %Item{} = item) do
+    cond do
+      (Item.template(item).flags &&& @item_flag_indestructible) != 0 -> {:error, :cant_drop_soulbound}
+      Item.container?(item) and not bag_empty?(ctx, item) -> {:error, :can_only_do_with_empty_bags}
+      true -> :ok
     end
   end
 
-  defp fetch_item(%Player{} = player, slot, get_item) do
-    with true <- valid_slot?(slot),
-         %Item{} = item <- item_at(player, slot, get_item) do
+  defp fetch_item(ctx, pos) do
+    with {:ok, _} <- valid_destination(ctx, pos),
+         %Item{} = item <- item_at(ctx, pos) do
       {:ok, item}
     else
       _ -> {:error, :item_not_found}
     end
   end
 
-  defp item_at(%Player{} = player, slot, get_item) do
-    case item_guid(player, slot) do
-      guid when is_integer(guid) -> get_item.(guid)
+  defp valid_destination(_ctx, {@bag_0, slot}) when is_integer(slot) and slot >= 0 and slot < @slot_count do
+    {:ok, {@bag_0, slot}}
+  end
+
+  defp valid_destination(ctx, {bag, slot} = pos) when is_integer(bag) and is_integer(slot) do
+    with true <- bag_slot?(bag),
+         %Item{container: %Container{}} = bag_item <- item_at(ctx, {@bag_0, bag}),
+         true <- slot >= 0 and slot < container_size(bag_item.container) do
+      {:ok, pos}
+    else
+      _ -> {:error, :item_doesnt_go_to_slot}
+    end
+  end
+
+  defp valid_destination(_ctx, _pos), do: {:error, :item_doesnt_go_to_slot}
+
+  defp guid_at(ctx, {@bag_0, slot}) do
+    with field when is_atom(field) <- Map.get(@field_by_slot, slot),
+         guid when is_integer(guid) and guid > 0 <- Map.get(ctx.player, field) do
+      guid
+    else
       _ -> nil
     end
   end
 
-  defp put_slot(%Player{} = player, slot, nil) do
-    player
-    |> Map.put(Map.fetch!(@field_by_slot, slot), 0)
-    |> put_visible_entry(slot, 0)
+  defp guid_at(ctx, {bag, slot}) do
+    with %Item{container: %Container{}} = bag_item <- item_at(ctx, {@bag_0, bag}),
+         true <- slot >= 0 and slot < container_size(bag_item.container),
+         guid when is_integer(guid) and guid > 0 <- Map.get(bag_item.container, :"slot_#{slot + 1}") do
+      guid
+    else
+      _ -> nil
+    end
   end
 
-  defp put_slot(%Player{} = player, slot, %Item{object: %Object{guid: guid, entry: entry}}) do
-    player
-    |> Map.put(Map.fetch!(@field_by_slot, slot), guid)
-    |> put_visible_entry(slot, entry)
+  defp item_at(ctx, pos) do
+    case guid_at(ctx, pos) do
+      guid when is_integer(guid) -> get_item(ctx, guid)
+      _ -> nil
+    end
   end
 
-  defp put_visible_entry(%Player{} = player, slot, entry) do
+  defp get_item(ctx, guid) do
+    Map.get(ctx.changed, guid) || ctx.get_item.(guid)
+  end
+
+  defp put_pos(ctx, {@bag_0, slot}, item) do
+    field = Map.fetch!(@field_by_slot, slot)
+
+    player =
+      ctx.player
+      |> Map.put(field, item_guid_or_zero(item))
+      |> put_visible_entry(slot, item)
+
+    ctx = %{ctx | player: player}
+    set_contained(ctx, item, ctx.owner)
+  end
+
+  defp put_pos(ctx, {bag, slot}, item) do
+    %Item{} = bag_item = item_at(ctx, {@bag_0, bag})
+    container = Map.put(bag_item.container, :"slot_#{slot + 1}", item_guid_or_zero(item))
+    ctx = mark_changed(ctx, %{bag_item | container: container})
+    set_contained(ctx, item, bag_item.object.guid)
+  end
+
+  defp set_contained(ctx, nil, _contained), do: ctx
+
+  defp set_contained(ctx, %Item{} = item, contained) do
+    item = get_item(ctx, item.object.guid) || item
+
+    if item.item.contained == contained do
+      ctx
+    else
+      mark_changed(ctx, %{item | item: %{item.item | contained: contained}})
+    end
+  end
+
+  defp mark_changed(ctx, %Item{} = item) do
+    %{ctx | changed: Map.put(ctx.changed, item.object.guid, item)}
+  end
+
+  defp item_guid_or_zero(nil), do: 0
+  defp item_guid_or_zero(%Item{object: %Object{guid: guid}}), do: guid
+
+  defp put_visible_entry(%Player{} = player, slot, item) do
     if equipment_slot?(slot) do
+      entry = if item, do: item.object.entry, else: 0
       Map.put(player, visible_entry_field(slot), entry)
     else
       player

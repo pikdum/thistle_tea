@@ -9,13 +9,15 @@ defmodule ThistleTea.Game.Network.Message.CmsgSwapItem do
 
   @impl ClientMessage
   def handle(%__MODULE__{} = message, %{ready: true, character: %Character{} = c} = state) do
-    if message.src_bag == Inventory.bag_0() and message.dst_bag == Inventory.bag_0() do
-      Inventory.swap(c.player, c.unit, message.src_slot, message.dst_slot, &ItemStore.get/1)
-      |> then(&InventoryUpdate.apply(state, &1))
-    else
-      InventoryUpdate.send_failure(:item_doesnt_go_to_slot, 0, 0)
-      state
-    end
+    Inventory.swap(
+      c.player,
+      c.unit,
+      state.guid,
+      {message.src_bag, message.src_slot},
+      {message.dst_bag, message.dst_slot},
+      &ItemStore.get/1
+    )
+    |> then(&InventoryUpdate.apply(state, &1))
   end
 
   def handle(_message, state), do: state

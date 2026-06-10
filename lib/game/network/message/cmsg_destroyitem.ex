@@ -9,19 +9,14 @@ defmodule ThistleTea.Game.Network.Message.CmsgDestroyitem do
 
   @impl ClientMessage
   def handle(%__MODULE__{bag: bag, slot: slot}, %{ready: true, character: %Character{} = c} = state) do
-    if bag == Inventory.bag_0() do
-      case Inventory.destroy(c.player, slot, &ItemStore.get/1) do
-        {:ok, player, item} ->
-          ItemStore.delete(item.object.guid)
-          Network.send_packet(%Message.SmsgDestroyObject{guid: item.object.guid})
-          InventoryUpdate.apply(state, {:ok, player})
+    case Inventory.destroy(c.player, {bag, slot}, &ItemStore.get/1) do
+      {:ok, result, item} ->
+        ItemStore.delete(item.object.guid)
+        Network.send_packet(%Message.SmsgDestroyObject{guid: item.object.guid})
+        InventoryUpdate.apply(state, {:ok, result})
 
-        error ->
-          InventoryUpdate.apply(state, error)
-      end
-    else
-      InventoryUpdate.send_failure(:item_not_found, 0, 0)
-      state
+      error ->
+        InventoryUpdate.apply(state, error)
     end
   end
 

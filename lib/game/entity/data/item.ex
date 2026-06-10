@@ -1,10 +1,12 @@
 defmodule ThistleTea.Game.Entity.Data.Item do
+  alias ThistleTea.Game.Entity.Data.Component.Container
   alias ThistleTea.Game.Entity.Data.Component.Item, as: ItemComponent
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.ItemTemplate
 
   defstruct object: %Object{},
             item: %ItemComponent{},
+            container: nil,
             internal: %{template: nil}
 
   def build(%ItemTemplate{} = template, guid, opts \\ []) do
@@ -26,9 +28,21 @@ defmodule ThistleTea.Game.Entity.Data.Item do
         durability: template.max_durability,
         max_durability: template.max_durability
       },
+      container: build_container(template),
       internal: %{template: template}
     }
   end
 
   def template(%__MODULE__{internal: %{template: template}}), do: template
+
+  def container?(%__MODULE__{container: %Container{}}), do: true
+  def container?(%__MODULE__{}), do: false
+
+  defp build_container(%ItemTemplate{container_slots: num_slots}) when is_integer(num_slots) and num_slots > 0 do
+    Enum.reduce(1..36, %Container{num_slots: num_slots}, fn i, container ->
+      Map.put(container, :"slot_#{i}", 0)
+    end)
+  end
+
+  defp build_container(_template), do: nil
 end

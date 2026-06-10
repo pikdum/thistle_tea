@@ -2,9 +2,13 @@ defmodule ThistleTea.Game.Network.Message.CmsgMessagechat do
   use ThistleTea.Game.Network.ClientMessage, :CMSG_MESSAGECHAT
 
   alias ThistleTea.Game.Entity
+  alias ThistleTea.Game.Entity.Data.Item, as: DataItem
   alias ThistleTea.Game.Entity.Logic.Core
+  alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.Network.InventoryUpdate
   alias ThistleTea.Game.Player.Stats
+  alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.ClassSpell
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Metadata
@@ -40,6 +44,44 @@ defmodule ThistleTea.Game.Network.Message.CmsgMessagechat do
     state
   end
 
+  defp handle_additem(state, item_id_str, count_str) do
+    with {item_id, ""} <- Integer.parse(item_id_str),
+         {count, ""} when count > 0 <- Integer.parse(count_str) do
+      give_item(state, item_id, count)
+    else
+      _ -> system_message(state, "Invalid command. Use: .additem <item_id> [count]")
+    end
+  end
+
+  defp give_item(state, item_id, count) do
+    case ItemStore.create(item_id, owner: state.guid, stack_count: count) do
+      %DataItem{} = item ->
+        case Inventory.store(state.character.player, state.guid, item, &ItemStore.get/1) do
+          {:ok, result, {dst_bag, dst_slot}} ->
+            Network.send_packet(UpdateObject.from_item(item))
+            state = InventoryUpdate.apply(state, {:ok, result})
+
+            Network.send_packet(%Message.SmsgItemPushResult{
+              player_guid: state.guid,
+              item_id: item_id,
+              bag_slot: dst_bag,
+              item_slot: dst_slot,
+              count: count,
+              created: 1
+            })
+
+            state
+
+          _ ->
+            ItemStore.delete(item.object.guid)
+            system_message(state, "Inventory full.")
+        end
+
+      _ ->
+        system_message(state, "Item #{item_id} not found.")
+    end
+  end
+
   def teleport_player(state, x, y, z, map) do
     system_message(state, "Teleporting to #{x}, #{y}, #{z} on map #{map}")
 
@@ -69,8 +111,19 @@ defmodule ThistleTea.Game.Network.Message.CmsgMessagechat do
     end
   end
 
+  def handle_chat(state, _, _, ".additem" <> params, _) do
+    params
+    |> String.split(" ", trim: true)
+    |> case do
+      [item_id] -> handle_additem(state, item_id, "1")
+      [item_id, count] -> handle_additem(state, item_id, count)
+      _ -> system_message(state, "Invalid command. Use: .additem <item_id> [count]")
+    end
+  end
+
   def handle_chat(state, _, _, ".help" <> _, _) do
     commands = [
+      ".additem <item_id> [count] - add an item to your inventory",
       ".debug spells - learn class trainer spells up to your level",
       ".character level <level> - set player level",
       ".go xyz <x> <y> <z> [map] - teleport",

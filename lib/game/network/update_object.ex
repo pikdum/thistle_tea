@@ -229,15 +229,26 @@ defmodule ThistleTea.Game.Network.UpdateObject do
     end)
   end
 
-  def from_item(%DataItem{object: object, item: item}) do
+  def from_item(%DataItem{object: object, item: item, container: container} = data_item) do
     %__MODULE__{
       update_type: :create_object2,
-      object_type: :item,
+      object_type: if(DataItem.container?(data_item), do: :container, else: :item),
       object: object,
       item: item,
+      container: container,
       movement_block: %MovementBlock{
         update_flag: 0
       }
+    }
+  end
+
+  def item_values_update(%DataItem{object: object, item: item, container: container} = data_item) do
+    %__MODULE__{
+      update_type: :values,
+      object_type: if(DataItem.container?(data_item), do: :container, else: :item),
+      object: object,
+      item: item,
+      container: container
     }
   end
 end

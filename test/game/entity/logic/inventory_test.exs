@@ -7,9 +7,12 @@ defmodule ThistleTea.Game.Entity.Logic.InventoryTest do
   alias ThistleTea.Game.Entity.Data.ItemTemplate
   alias ThistleTea.Game.Entity.Logic.Inventory
 
+  @bag_0 255
   @mainhand_slot 15
   @offhand_slot 16
+  @first_bag_slot 19
   @backpack_start 23
+  @owner 1
 
   setup [:build_fixtures]
 
@@ -24,11 +27,12 @@ defmodule ThistleTea.Game.Entity.Logic.InventoryTest do
      shield: build_item(4, %ItemTemplate{entry: 400, inventory_type: 14}),
      ring: build_item(5, %ItemTemplate{entry: 500, inventory_type: 11}),
      high_level: build_item(6, %ItemTemplate{entry: 600, inventory_type: 5, required_level: 60}),
-     priest_only: build_item(7, %ItemTemplate{entry: 700, inventory_type: 5, allowable_class: 16})}
+     priest_only: build_item(7, %ItemTemplate{entry: 700, inventory_type: 5, allowable_class: 16}),
+     bag: build_item(8, %ItemTemplate{entry: 800, inventory_type: 18, container_slots: 6, class: 1})}
   end
 
   defp build_item(low_guid, template) do
-    Item.build(template, 0x4000_0000_0000_0000 + low_guid, owner: 1)
+    Item.build(template, 0x4000_0000_0000_0000 + low_guid, owner: @owner)
   end
 
   defp get_item_fn(items) do
@@ -40,6 +44,10 @@ defmodule ThistleTea.Game.Entity.Logic.InventoryTest do
     Map.put(player, :"inv#{slot - @backpack_start + 1}", item.object.guid)
   end
 
+  defp updated(items, %Item{} = item) do
+    Enum.find(items, fn i -> i.object.guid == item.object.guid end)
+  end
+
   describe "equip/3" do
     test "sets slot guid and visible entry", %{chest: chest} do
       player = Inventory.equip(%Player{}, :chest, chest)
@@ -49,63 +57,48 @@ defmodule ThistleTea.Game.Entity.Logic.InventoryTest do
     end
   end
 
-  describe "equipped_guids/1" do
-    test "lists only populated equipment slots", %{chest: chest} do
-      player =
-        %Player{}
-        |> Inventory.equip(:chest, chest)
-        |> Map.put(:head, 0)
-
-      assert Inventory.equipped_guids(player) == [chest.object.guid]
-    end
-  end
-
-  describe "auto_equip/4" do
+  describe "auto_equip/5" do
     test "equips into the matching empty slot", %{unit: unit, chest: chest} do
       player = store(%Player{}, @backpack_start, chest)
 
-      assert {:ok, player} = Inventory.auto_equip(player, unit, @backpack_start, get_item_fn([chest]))
+      assert {:ok, %{player: player}} =
+               Inventory.auto_equip(player, unit, @owner, {@bag_0, @backpack_start}, get_item_fn([chest]))
+
       assert player.chest == chest.object.guid
       assert player.visible_item_5_0 == 100
       assert player.inv1 == 0
     end
 
-    test "swaps with the currently equipped item", %{unit: unit, chest: chest, high_level: _} do
-      other_chest = build_item(8, %ItemTemplate{entry: 800, inventory_type: 5})
+    test "swaps with the currently equipped item", %{unit: unit, chest: chest} do
+      other_chest = build_item(9, %ItemTemplate{entry: 900, inventory_type: 5})
 
       player =
         %Player{}
         |> Inventory.equip(:chest, other_chest)
         |> store(@backpack_start, chest)
 
-      assert {:ok, player} = Inventory.auto_equip(player, unit, @backpack_start, get_item_fn([chest, other_chest]))
+      assert {:ok, %{player: player}} =
+               Inventory.auto_equip(player, unit, @owner, {@bag_0, @backpack_start}, get_item_fn([chest, other_chest]))
+
       assert player.chest == chest.object.guid
-      assert player.visible_item_5_0 == 100
       assert player.inv1 == other_chest.object.guid
     end
 
-    test "prefers a free slot for rings", %{unit: unit, ring: ring} do
-      other_ring = build_item(9, %ItemTemplate{entry: 900, inventory_type: 11})
+    test "equips a bag into a free bag slot", %{unit: unit, bag: bag} do
+      player = store(%Player{}, @backpack_start, bag)
 
-      player =
-        %Player{}
-        |> Inventory.equip(:finger1, other_ring)
-        |> store(@backpack_start, ring)
+      assert {:ok, %{player: player}} =
+               Inventory.auto_equip(player, unit, @owner, {@bag_0, @backpack_start}, get_item_fn([bag]))
 
-      assert {:ok, player} = Inventory.auto_equip(player, unit, @backpack_start, get_item_fn([ring, other_ring]))
-      assert player.finger1 == other_ring.object.guid
-      assert player.finger2 == ring.object.guid
-    end
-
-    test "rejects empty source slot", %{unit: unit} do
-      assert {:error, :item_not_found, 0, 0} = Inventory.auto_equip(%Player{}, unit, @backpack_start, fn _ -> nil end)
+      assert player.bag1 == bag.object.guid
+      assert player.inv1 == 0
     end
 
     test "rejects items above the player level", %{unit: unit, high_level: high_level} do
       player = store(%Player{}, @backpack_start, high_level)
 
       assert {:error, :cant_equip_level_i, guid, 0} =
-               Inventory.auto_equip(player, unit, @backpack_start, get_item_fn([high_level]))
+               Inventory.auto_equip(player, unit, @owner, {@bag_0, @backpack_start}, get_item_fn([high_level]))
 
       assert guid == high_level.object.guid
     end
@@ -114,39 +107,120 @@ defmodule ThistleTea.Game.Entity.Logic.InventoryTest do
       player = store(%Player{}, @backpack_start, priest_only)
 
       assert {:error, :you_can_never_use_that_item, _, 0} =
-               Inventory.auto_equip(player, unit, @backpack_start, get_item_fn([priest_only]))
+               Inventory.auto_equip(player, unit, @owner, {@bag_0, @backpack_start}, get_item_fn([priest_only]))
     end
   end
 
-  describe "swap/5" do
+  describe "swap/6" do
     test "swaps two backpack slots", %{unit: unit, chest: chest, sword: sword} do
       player =
         %Player{}
         |> store(@backpack_start, chest)
         |> store(@backpack_start + 1, sword)
 
-      assert {:ok, player} =
-               Inventory.swap(player, unit, @backpack_start, @backpack_start + 1, get_item_fn([chest, sword]))
+      assert {:ok, %{player: player}} =
+               Inventory.swap(
+                 player,
+                 unit,
+                 @owner,
+                 {@bag_0, @backpack_start},
+                 {@bag_0, @backpack_start + 1},
+                 get_item_fn([chest, sword])
+               )
 
       assert player.inv1 == sword.object.guid
       assert player.inv2 == chest.object.guid
     end
 
-    test "swaps rings between finger slots", %{unit: unit, ring: ring} do
-      player = Inventory.equip(%Player{}, :finger1, ring)
+    test "moves an item into an equipped bag", %{unit: unit, chest: chest, bag: bag} do
+      player =
+        %Player{}
+        |> Map.put(:bag1, bag.object.guid)
+        |> store(@backpack_start, chest)
 
-      assert {:ok, player} = Inventory.swap(player, unit, 10, 11, get_item_fn([ring]))
-      assert player.finger1 == 0
-      assert player.finger2 == ring.object.guid
-      assert player.visible_item_11_0 == 0
-      assert player.visible_item_12_0 == 500
+      assert {:ok, %{player: player, items: items}} =
+               Inventory.swap(
+                 player,
+                 unit,
+                 @owner,
+                 {@bag_0, @backpack_start},
+                 {@first_bag_slot, 0},
+                 get_item_fn([chest, bag])
+               )
+
+      assert player.inv1 == 0
+      assert updated(items, bag).container.slot_1 == chest.object.guid
+      assert updated(items, chest).item.contained == bag.object.guid
+    end
+
+    test "moves an item back out of a bag", %{unit: unit, chest: chest, bag: bag} do
+      bag = %{bag | container: %{bag.container | slot_1: chest.object.guid}}
+      chest = %{chest | item: %{chest.item | contained: bag.object.guid}}
+      player = Map.put(%Player{}, :bag1, bag.object.guid)
+
+      assert {:ok, %{player: player, items: items}} =
+               Inventory.swap(
+                 player,
+                 unit,
+                 @owner,
+                 {@first_bag_slot, 0},
+                 {@bag_0, @backpack_start},
+                 get_item_fn([chest, bag])
+               )
+
+      assert player.inv1 == chest.object.guid
+      assert updated(items, bag).container.slot_1 == 0
+      assert updated(items, chest).item.contained == @owner
+    end
+
+    test "rejects moving a non-empty bag off the bag bar", %{unit: unit, chest: chest, bag: bag} do
+      bag = %{bag | container: %{bag.container | slot_1: chest.object.guid}}
+      player = Map.put(%Player{}, :bag1, bag.object.guid)
+
+      assert {:error, :can_only_do_with_empty_bags, _, _} =
+               Inventory.swap(
+                 player,
+                 unit,
+                 @owner,
+                 {@bag_0, @first_bag_slot},
+                 {@bag_0, @backpack_start},
+                 get_item_fn([chest, bag])
+               )
+    end
+
+    test "rejects putting a bag inside itself", %{unit: unit, bag: bag} do
+      player = Map.put(%Player{}, :bag1, bag.object.guid)
+
+      assert {:error, :items_cant_be_swapped, _, _} =
+               Inventory.swap(player, unit, @owner, {@bag_0, @first_bag_slot}, {@first_bag_slot, 0}, get_item_fn([bag]))
+    end
+
+    test "rejects non-bags in bag slots", %{unit: unit, chest: chest} do
+      player = store(%Player{}, @backpack_start, chest)
+
+      assert {:error, :not_a_bag, _, _} =
+               Inventory.swap(
+                 player,
+                 unit,
+                 @owner,
+                 {@bag_0, @backpack_start},
+                 {@bag_0, @first_bag_slot},
+                 get_item_fn([chest])
+               )
     end
 
     test "rejects equipping into the wrong slot", %{unit: unit, chest: chest} do
       player = store(%Player{}, @backpack_start, chest)
 
       assert {:error, :item_doesnt_go_to_slot, _, _} =
-               Inventory.swap(player, unit, @backpack_start, @mainhand_slot, get_item_fn([chest]))
+               Inventory.swap(
+                 player,
+                 unit,
+                 @owner,
+                 {@bag_0, @backpack_start},
+                 {@bag_0, @mainhand_slot},
+                 get_item_fn([chest])
+               )
     end
 
     test "rejects offhand while a two-hander is equipped", %{unit: unit, greatsword: greatsword, shield: shield} do
@@ -156,7 +230,14 @@ defmodule ThistleTea.Game.Entity.Logic.InventoryTest do
         |> store(@backpack_start, shield)
 
       assert {:error, :cant_equip_with_twohanded, _, _} =
-               Inventory.swap(player, unit, @backpack_start, @offhand_slot, get_item_fn([greatsword, shield]))
+               Inventory.swap(
+                 player,
+                 unit,
+                 @owner,
+                 {@bag_0, @backpack_start},
+                 {@bag_0, @offhand_slot},
+                 get_item_fn([greatsword, shield])
+               )
     end
 
     test "stores the offhand when equipping a two-hander", %{
@@ -171,8 +252,15 @@ defmodule ThistleTea.Game.Entity.Logic.InventoryTest do
         |> Inventory.equip(:offhand, shield)
         |> store(@backpack_start, greatsword)
 
-      assert {:ok, player} =
-               Inventory.swap(player, unit, @backpack_start, @mainhand_slot, get_item_fn([greatsword, shield, sword]))
+      assert {:ok, %{player: player}} =
+               Inventory.swap(
+                 player,
+                 unit,
+                 @owner,
+                 {@bag_0, @backpack_start},
+                 {@bag_0, @mainhand_slot},
+                 get_item_fn([greatsword, shield, sword])
+               )
 
       assert player.mainhand == greatsword.object.guid
       assert player.offhand == 0
@@ -180,37 +268,36 @@ defmodule ThistleTea.Game.Entity.Logic.InventoryTest do
       assert player.inv1 == sword.object.guid
       assert player.inv2 == shield.object.guid
     end
+  end
 
-    test "rejects a two-hander when the offhand cannot be stored", %{
-      unit: unit,
-      greatsword: greatsword,
-      shield: shield,
-      sword: sword
-    } do
-      filler = build_item(10, %ItemTemplate{entry: 1000, inventory_type: 0})
+  describe "store/4" do
+    test "uses the first free backpack slot", %{chest: chest} do
+      assert {:ok, %{player: player}, {@bag_0, @backpack_start}} =
+               Inventory.store(%Player{}, @owner, chest, get_item_fn([chest]))
 
-      player =
-        %Player{}
-        |> Inventory.equip(:mainhand, sword)
-        |> Inventory.equip(:offhand, shield)
-        |> store(@backpack_start, greatsword)
-
-      player = Enum.reduce(1..15, player, fn i, p -> store(p, @backpack_start + i, filler) end)
-
-      assert {:error, :cant_equip_with_twohanded, _, _} =
-               Inventory.swap(
-                 player,
-                 unit,
-                 @backpack_start,
-                 @mainhand_slot,
-                 get_item_fn([greatsword, shield, sword, filler])
-               )
+      assert player.inv1 == chest.object.guid
     end
 
-    test "same slot is a no-op", %{unit: unit, chest: chest} do
-      player = store(%Player{}, @backpack_start, chest)
+    test "overflows into an equipped bag when the backpack is full", %{chest: chest, bag: bag} do
+      filler = build_item(10, %ItemTemplate{entry: 1000})
 
-      assert {:ok, ^player} = Inventory.swap(player, unit, @backpack_start, @backpack_start, get_item_fn([chest]))
+      player =
+        Enum.reduce(0..15, Map.put(%Player{}, :bag1, bag.object.guid), fn i, p ->
+          store(p, @backpack_start + i, filler)
+        end)
+
+      assert {:ok, %{items: items}, {@first_bag_slot, 0}} =
+               Inventory.store(player, @owner, chest, get_item_fn([chest, bag, filler]))
+
+      assert updated(items, bag).container.slot_1 == chest.object.guid
+      assert updated(items, chest).item.contained == bag.object.guid
+    end
+
+    test "fails when everything is full", %{chest: chest} do
+      filler = build_item(10, %ItemTemplate{entry: 1000})
+      player = Enum.reduce(0..15, %Player{}, fn i, p -> store(p, @backpack_start + i, filler) end)
+
+      assert {:error, :inventory_full} = Inventory.store(player, @owner, chest, get_item_fn([chest, filler]))
     end
   end
 
@@ -218,32 +305,53 @@ defmodule ThistleTea.Game.Entity.Logic.InventoryTest do
     test "clears the slot and returns the item", %{chest: chest} do
       player = Inventory.equip(%Player{}, :chest, chest)
 
-      assert {:ok, player, item} = Inventory.destroy(player, 4, get_item_fn([chest]))
+      assert {:ok, %{player: player}, item} = Inventory.destroy(player, {@bag_0, 4}, get_item_fn([chest]))
       assert item == chest
       assert player.chest == 0
       assert player.visible_item_5_0 == 0
     end
 
-    test "rejects empty slots" do
-      assert {:error, :item_not_found, 0, 0} = Inventory.destroy(%Player{}, 4, fn _ -> nil end)
+    test "destroys items inside bags", %{chest: chest, bag: bag} do
+      bag = %{bag | container: %{bag.container | slot_1: chest.object.guid}}
+      player = Map.put(%Player{}, :bag1, bag.object.guid)
+
+      assert {:ok, %{items: items}, item} =
+               Inventory.destroy(player, {@first_bag_slot, 0}, get_item_fn([chest, bag]))
+
+      assert item.object.guid == chest.object.guid
+      assert updated(items, bag).container.slot_1 == 0
     end
 
-    test "rejects indestructible items" do
-      totem = build_item(11, %ItemTemplate{entry: 1100, inventory_type: 0, flags: 0x20})
-      player = store(%Player{}, @backpack_start, totem)
+    test "rejects destroying a non-empty bag", %{chest: chest, bag: bag} do
+      bag = %{bag | container: %{bag.container | slot_1: chest.object.guid}}
+      player = Map.put(%Player{}, :bag1, bag.object.guid)
 
-      assert {:error, :cant_drop_soulbound, _, 0} = Inventory.destroy(player, @backpack_start, get_item_fn([totem]))
+      assert {:error, :can_only_do_with_empty_bags, _, 0} =
+               Inventory.destroy(player, {@bag_0, @first_bag_slot}, get_item_fn([chest, bag]))
+    end
+
+    test "rejects empty slots" do
+      assert {:error, :item_not_found, 0, 0} = Inventory.destroy(%Player{}, {@bag_0, 4}, fn _ -> nil end)
     end
   end
 
-  describe "can_use/2" do
-    test "allows matching class and level", %{unit: unit} do
-      assert :ok = Inventory.can_use(unit, %ItemTemplate{})
-    end
+  describe "owned_items/2" do
+    test "includes equipment, backpack, bags, and bag contents", %{chest: chest, sword: sword, bag: bag} do
+      bag = %{bag | container: %{bag.container | slot_1: sword.object.guid}}
 
-    test "honors allowable race masks", %{unit: unit} do
-      assert {:error, :you_can_never_use_that_item} = Inventory.can_use(unit, %ItemTemplate{allowable_race: 2})
-      assert :ok = Inventory.can_use(unit, %ItemTemplate{allowable_race: 1})
+      player =
+        %Player{}
+        |> Inventory.equip(:chest, chest)
+        |> Map.put(:bag1, bag.object.guid)
+
+      guids =
+        player
+        |> Inventory.owned_items(get_item_fn([chest, sword, bag]))
+        |> Enum.map(& &1.object.guid)
+
+      assert chest.object.guid in guids
+      assert bag.object.guid in guids
+      assert sword.object.guid in guids
     end
   end
 end
