@@ -45,7 +45,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgCastSpell do
 
   def handle_spell_complete(state), do: state
 
-  defp cast_spell(state, %Spell{} = spell, spell_cast_targets) do
+  def cast_spell(state, %Spell{} = spell, spell_cast_targets, cast_item_guid \\ nil) do
     targets = Targets.parse(spell_cast_targets, state.guid)
 
     Logger.info(
@@ -55,8 +55,11 @@ defmodule ThistleTea.Game.Network.Message.CmsgCastSpell do
 
     state = Message.CmsgCancelCast.cancel_spell(state)
 
+    cast_item =
+      if cast_item_guid, do: BinaryUtils.pack_guid(cast_item_guid), else: state.packed_guid
+
     %Message.SmsgSpellStart{
-      cast_item: state.packed_guid,
+      cast_item: cast_item,
       caster: state.packed_guid,
       spell: spell.id,
       flags: 0x2,
@@ -67,7 +70,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgCastSpell do
     }
     |> World.broadcast_packet(state.character)
 
-    character = SpellBT.start_cast(state.character, spell, targets, Time.now())
+    character = SpellBT.start_cast(state.character, spell, targets, Time.now(), cast_item_guid)
     state = Map.put(state, :character, character)
 
     cond do

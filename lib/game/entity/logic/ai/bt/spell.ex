@@ -22,18 +22,26 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
     ])
   end
 
-  def start_cast(%{internal: %Internal{} = internal} = character, %Spell{} = spell, %Targets{} = targets, now)
+  def start_cast(character, spell, targets, now, cast_item_guid \\ nil)
+
+  def start_cast(
+        %{internal: %Internal{} = internal} = character,
+        %Spell{} = spell,
+        %Targets{} = targets,
+        now,
+        cast_item_guid
+      )
       when is_integer(now) do
     if Spell.attribute?(spell, :on_next_swing) do
       character
       |> MeleeSpell.queue_next_swing(spell)
       |> queue_cast_result(%{spell: spell})
     else
-      do_start_cast(character, internal, spell, targets, now)
+      do_start_cast(character, internal, spell, targets, now, cast_item_guid)
     end
   end
 
-  def start_cast(character, _spell, _targets, _now) do
+  def start_cast(character, _spell, _targets, _now, _cast_item_guid) do
     character
   end
 
@@ -42,9 +50,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
          %Internal{},
          %Spell{} = spell,
          %Targets{} = targets,
-         now
+         now,
+         cast_item_guid
        ) do
-    casting = Cast.new(spell, targets, now)
+    casting = %{Cast.new(spell, targets, now) | cast_item_guid: cast_item_guid}
 
     character = %{character | internal: %{internal | casting: casting}}
 
@@ -196,7 +205,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
        when is_integer(guid) do
     raw_targets = if is_binary(casting.targets.raw), do: casting.targets.raw, else: <<>>
 
-    Event.enqueue(character, Event.spell_go(guid, spell_id, targets, raw_targets))
+    Event.enqueue(character, Event.spell_go(guid, spell_id, targets, raw_targets, casting.cast_item_guid))
   end
 
   defp queue_spell_go(character, _casting, _targets), do: character

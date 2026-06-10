@@ -1,4 +1,6 @@
 defmodule ThistleTea.Game.Entity.Data.Item do
+  import Bitwise, only: [&&&: 2, <<<: 2, |||: 2]
+
   alias ThistleTea.Game.Entity.Data.Component.Container
   alias ThistleTea.Game.Entity.Data.Component.Item, as: ItemComponent
   alias ThistleTea.Game.Entity.Data.Component.Object
@@ -24,6 +26,7 @@ defmodule ThistleTea.Game.Entity.Data.Item do
         contained: owner,
         stack_count: stack_count,
         duration: template.duration,
+        spell_charges: pack_spell_charges(template),
         flags: template.flags,
         durability: template.max_durability,
         max_durability: template.max_durability
@@ -45,4 +48,11 @@ defmodule ThistleTea.Game.Entity.Data.Item do
   end
 
   defp build_container(_template), do: nil
+
+  defp pack_spell_charges(%ItemTemplate{} = template) do
+    Enum.reduce(5..1//-1, 0, fn i, acc ->
+      charges = Map.get(template, :"spellcharges_#{i}") || 0
+      acc <<< 32 ||| (charges &&& 0xFFFFFFFF)
+    end)
+  end
 end

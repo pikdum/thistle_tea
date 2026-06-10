@@ -111,7 +111,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
 
   def emit(%{object: %{guid: guid}} = entity, %Event{type: :spell_go} = event) when is_integer(guid) do
     %Message.SmsgSpellGo{
-      cast_item: event.source_guid || guid,
+      cast_item: event.cast_item_guid || event.source_guid || guid,
       caster: event.source_guid || guid,
       spell: event.spell_id,
       flags: 0x100,

@@ -72,6 +72,7 @@ defmodule ThistleTea.Game.Network.Packet do
        CMSG_SWAP_ITEM: Message.CmsgSwapItem,
        CMSG_SPLIT_ITEM: Message.CmsgSplitItem,
        CMSG_DESTROYITEM: Message.CmsgDestroyitem,
+       CMSG_USE_ITEM: Message.CmsgUseItem,
        CMSG_LIST_INVENTORY: Message.CmsgListInventory,
        CMSG_BUY_ITEM: Message.CmsgBuyItem,
        CMSG_SELL_ITEM: Message.CmsgSellItem,

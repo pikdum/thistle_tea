@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
     :move_opts,
     :hit_guids,
     :raw_targets,
+    :cast_item_guid,
     :update_type,
     :cast_context,
     :spell,
@@ -62,14 +63,15 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
     %__MODULE__{type: :spell_cast_result, spell_id: spell_id}
   end
 
-  def spell_go(source_guid, spell_id, hit_guids, raw_targets)
+  def spell_go(source_guid, spell_id, hit_guids, raw_targets, cast_item_guid \\ nil)
       when is_integer(source_guid) and is_integer(spell_id) and is_list(hit_guids) and is_binary(raw_targets) do
     %__MODULE__{
       type: :spell_go,
       source_guid: source_guid,
       spell_id: spell_id,
       hit_guids: hit_guids,
-      raw_targets: raw_targets
+      raw_targets: raw_targets,
+      cast_item_guid: cast_item_guid
     }
   end
 
