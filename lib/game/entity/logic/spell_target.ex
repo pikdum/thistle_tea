@@ -8,6 +8,9 @@ defmodule ThistleTea.Game.Entity.Logic.SpellTarget do
       caster_aoe_spell?(spell) ->
         {:caster_aoe, max_aoe_radius(spell)}
 
+      cone_aoe_spell?(spell) ->
+        {:caster_cone, max_aoe_radius(spell)}
+
       targeted_aoe_spell?(spell) and is_tuple(Targets.ground_location(targets)) ->
         {:targeted_aoe, Targets.ground_location(targets), max_aoe_radius(spell)}
 
@@ -23,6 +26,10 @@ defmodule ThistleTea.Game.Entity.Logic.SpellTarget do
 
   defp caster_aoe_spell?(%Spell{effects: effects}) do
     Enum.any?(effects, &effect_targets?(&1, [:aoe_enemy_at_caster]))
+  end
+
+  defp cone_aoe_spell?(%Spell{effects: effects}) do
+    Enum.any?(effects, &effect_targets?(&1, [:aoe_enemy_in_cone]))
   end
 
   defp targeted_aoe_spell?(%Spell{effects: effects}) do

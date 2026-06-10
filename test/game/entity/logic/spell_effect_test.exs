@@ -51,6 +51,31 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
                events
     end
 
+    test "periodic trigger spell auras fire the triggered spell instead of applying an aura" do
+      spell = %Spell{
+        id: 5143,
+        name: "Arcane Missiles",
+        school: :arcane,
+        effects: [
+          %Effect{
+            index: 0,
+            type: :apply_aura,
+            aura: :periodic_trigger_spell,
+            trigger_spell_id: 7268,
+            amplitude_ms: 1_000
+          }
+        ]
+      }
+
+      context = %CastContext{caster_guid: 999, caster_level: 10}
+
+      {target, events} = SpellEffect.receive(target_fixture(), context, spell, 1_000)
+
+      assert target.unit.auras == []
+
+      assert [%{type: :trigger_spell, source_guid: 999, target_guid: 1, spell_id: 7268}] = events
+    end
+
     test "persistent periodic area damage applies as spell damage for channel ticks" do
       spell = %Spell{
         id: 10,

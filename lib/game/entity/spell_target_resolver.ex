@@ -4,6 +4,9 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Targets
   alias ThistleTea.Game.World
+  alias ThistleTea.Game.World.SpatialHash
+
+  @cone_arc_radians :math.pi() / 3
 
   def resolve(%{object: %{guid: caster_guid}} = caster, %Spell{} = spell, %Targets{} = targets) do
     resolve_query(caster, caster_guid, SpellTarget.target_query(spell, targets))
@@ -21,6 +24,9 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
     case query do
       {:caster_aoe, radius} ->
         nearby_enemy_guids(caster, caster_guid, radius)
+
+      {:caster_cone, radius} ->
+        nearby_cone_enemy_guids(caster, caster_guid, radius)
 
       {:targeted_aoe, position, radius} ->
         nearby_enemy_guids_at(caster, caster_guid, position, radius)
@@ -40,6 +46,38 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
   end
 
   defp nearby_enemy_guids(_caster, _caster_guid, _radius), do: []
+
+  defp nearby_cone_enemy_guids(%{movement_block: %{position: {x, y, _z, orientation}}} = caster, caster_guid, radius)
+       when is_number(radius) and radius > 0 do
+    caster
+    |> nearby_units(radius)
+    |> hostile_living_guids(caster, caster_guid)
+    |> Enum.filter(&in_cone?(&1, {x, y}, orientation))
+  end
+
+  defp nearby_cone_enemy_guids(_caster, _caster_guid, _radius), do: []
+
+  defp in_cone?(guid, {x, y}, orientation) do
+    case SpatialHash.get_entity(guid) do
+      {_guid, _map, tx, ty, _tz} ->
+        angle = :math.atan2(ty - y, tx - x)
+        abs(normalize_angle(angle - orientation)) <= @cone_arc_radians / 2
+
+      _ ->
+        false
+    end
+  end
+
+  defp normalize_angle(angle) do
+    two_pi = 2 * :math.pi()
+    angle = :math.fmod(angle, two_pi)
+
+    cond do
+      angle > :math.pi() -> angle - two_pi
+      angle < -:math.pi() -> angle + two_pi
+      true -> angle
+    end
+  end
 
   defp nearby_enemy_guids_at(%{internal: %{map: map}} = caster, caster_guid, {x, y, z}, radius)
        when is_number(radius) and radius > 0 do

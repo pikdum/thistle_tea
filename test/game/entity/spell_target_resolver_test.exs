@@ -86,6 +86,21 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolverTest do
 
       assert SpellTargetResolver.resolve(caster, spell, targets) == [player_guid]
     end
+
+    test "caster cone hits enemies in front and excludes the caster and targets behind" do
+      player_guid = player_guid()
+      front_mob_guid = mob_guid()
+      behind_mob_guid = mob_guid()
+
+      put_spatial_target(:players, player_guid, {0.0, 0.0, 0.0})
+      put_spatial_target(:mobs, front_mob_guid, {3.0, 0.0, 0.0})
+      put_spatial_target(:mobs, behind_mob_guid, {-3.0, 0.0, 0.0})
+
+      caster = caster(player_guid, {0.0, 0.0, 0.0})
+      spell = aoe_spell(:aoe_enemy_in_cone)
+
+      assert SpellTargetResolver.resolve(caster, spell, %Targets{unit_guid: front_mob_guid}) == [front_mob_guid]
+    end
   end
 
   describe "resolve_query/2" do

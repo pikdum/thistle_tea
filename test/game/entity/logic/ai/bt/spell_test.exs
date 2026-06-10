@@ -35,7 +35,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
         effects: [%Effect{amplitude_ms: 2_000}]
       }
 
-      mob = %Mob{object: %Object{guid: 1}, unit: %Unit{}, internal: %Internal{}}
+      mob = %Mob{object: %Object{guid: 1}, unit: %Unit{target: 7}, internal: %Internal{}}
 
       mob = SpellBT.start_cast(mob, spell, %Targets{raw: <<0::little-size(16)>>}, 1_000)
 
@@ -43,9 +43,12 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
       assert mob.internal.casting.channel_tick_ms == 2_000
       assert mob.internal.casting.next_channel_tick_at == 3_000
       assert mob.unit.channel_spell == 10
+      assert mob.unit.channel_object == 7
       assert mob.internal.broadcast_update? == true
 
       assert [
+               %Event{type: :spell_cast_result, spell_id: 10},
+               %Event{type: :spell_go, spell_id: 10},
                %Event{type: :channel_start, spell_id: 10, channel_time_ms: 8_000},
                %Event{type: :object_update, update_type: :values}
              ] = mob.internal.events
@@ -79,7 +82,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
              ] = mob.internal.events
     end
 
-    test "first channel tick marks spell go as sent and advances the next tick" do
+    test "channel tick applies the spell hit and advances the next tick" do
       now = 1_000
       spell = %Spell{id: 10, attributes: MapSet.new([:channeled]), effects: []}
 
@@ -94,7 +97,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
             targets: %Targets{raw: <<0::little-size(16)>>, unit_guid: 1},
             channel_ms: 8_000,
             channel_tick_ms: 1_000,
-            channel_go_sent?: false,
             next_channel_tick_at: now - 1,
             ends_at: now + 8_000
           }
@@ -103,9 +105,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
 
       assert {{:running, delay_ms}, mob, %Blackboard{}} = SpellBT.cast_tick(mob, Blackboard.new(), now)
       assert delay_ms > 0
-      assert mob.internal.casting.channel_go_sent? == true
       assert mob.internal.casting.next_channel_tick_at > now
-      assert [%Event{type: :spell_go, spell_id: 10, hit_guids: [1]}] = mob.internal.events
+      assert mob.internal.events == []
     end
   end
 

@@ -9,7 +9,6 @@ defmodule ThistleTea.Game.Spell.Cast do
     :channel_ms,
     :channel_tick_ms,
     :next_channel_tick_at,
-    channel_go_sent?: false,
     started_at: 0,
     ends_at: 0
   ]
@@ -39,7 +38,7 @@ defmodule ThistleTea.Game.Spell.Cast do
 
   def advance_channel_tick(%__MODULE__{channel_tick_ms: tick_ms, next_channel_tick_at: next_tick_at} = cast, now)
       when is_integer(tick_ms) and tick_ms > 0 and is_integer(next_tick_at) do
-    %{cast | next_channel_tick_at: advance_tick(next_tick_at, tick_ms, now), channel_go_sent?: true}
+    %{cast | next_channel_tick_at: advance_tick(next_tick_at, tick_ms, now)}
   end
 
   def advance_channel_tick(cast, _now), do: cast

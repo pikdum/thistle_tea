@@ -20,6 +20,12 @@ defmodule ThistleTea.Game.Entity.Logic.SpellTargetTest do
       assert SpellTarget.target_query(spell, targets) == {:targeted_aoe, {1.0, 2.0, 3.0}, 10.0}
     end
 
+    test "returns caster cone query for cone spells" do
+      spell = aoe_spell(:aoe_enemy_in_cone)
+
+      assert SpellTarget.target_query(spell, %Targets{unit_guid: 2}) == {:caster_cone, 10.0}
+    end
+
     test "returns unit query for direct unit targets" do
       spell = %Spell{id: 133, effects: []}
 

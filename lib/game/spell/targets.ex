@@ -26,6 +26,14 @@ defmodule ThistleTea.Game.Spell.Targets do
     self_target(caster_guid)
   end
 
+  def unit(guid) when is_integer(guid) and guid > 0 do
+    %__MODULE__{
+      flags: @unit,
+      raw: <<@unit::little-size(16)>> <> BinaryUtils.pack_guid(guid),
+      unit_guid: guid
+    }
+  end
+
   def ground_location(%__MODULE__{destination_location: location}) when is_tuple(location), do: location
   def ground_location(%__MODULE__{source_location: location}) when is_tuple(location), do: location
   def ground_location(_targets), do: nil

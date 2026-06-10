@@ -49,7 +49,12 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
     character = %{character | internal: %{internal | casting: casting}}
 
     if Cast.channeled?(casting) do
-      start_channel(character, casting)
+      targets = resolve_targets(character, casting)
+
+      character
+      |> queue_cast_result(casting)
+      |> queue_spell_go(casting, targets)
+      |> start_channel(casting)
     else
       character
     end
@@ -120,17 +125,29 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
 
   def clear_cast(character), do: character
 
-  defp start_channel(%{object: %{guid: guid}, unit: unit} = character, %Cast{
-         spell: %Spell{id: spell_id},
-         channel_ms: duration_ms
-       })
+  defp start_channel(
+         %{object: %{guid: guid}, unit: unit} = character,
+         %Cast{spell: %Spell{id: spell_id}, channel_ms: duration_ms} = casting
+       )
        when is_integer(guid) and is_integer(duration_ms) and duration_ms > 0 do
-    %{character | unit: %{unit | channel_spell: spell_id}}
+    channel_object = channel_target_guid(character, casting.targets)
+
+    %{character | unit: %{unit | channel_spell: spell_id, channel_object: channel_object}}
     |> Core.mark_broadcast_update()
     |> Event.enqueue([Event.channel_start(guid, spell_id, duration_ms), Event.object_update(:values)])
   end
 
   defp start_channel(character, _casting), do: character
+
+  defp channel_target_guid(%{object: %{guid: guid}, unit: %{target: target}}, %Targets{unit_guid: unit_guid}) do
+    cond do
+      is_integer(unit_guid) and unit_guid > 0 and unit_guid != guid -> unit_guid
+      is_integer(target) and target > 0 and target != guid -> target
+      true -> 0
+    end
+  end
+
+  defp channel_target_guid(_character, _targets), do: 0
 
   defp stop_channel(%{internal: %Internal{} = internal, unit: unit} = character, %Cast{}) do
     character = %{character | internal: %{internal | casting: nil}, unit: %{unit | channel_object: 0, channel_spell: 0}}
@@ -162,7 +179,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
 
       character =
         character
-        |> maybe_queue_channel_spell_go(casting, targets)
+        |> queue_trigger_spell_go(casting, targets)
         |> apply_spell_hit(casting, targets, now)
 
       casting = Cast.advance_channel_tick(casting, now)
@@ -175,12 +192,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
 
   defp channel_tick(character, casting, now), do: {character, Cast.next_channel_delay(casting, now)}
 
-  defp maybe_queue_channel_spell_go(character, %Cast{channel_go_sent?: false} = casting, targets) do
-    queue_spell_go(character, casting, targets)
-  end
-
-  defp maybe_queue_channel_spell_go(character, _casting, _targets), do: character
-
   defp queue_spell_go(%{object: %{guid: guid}} = character, %Cast{spell: %Spell{id: spell_id}} = casting, targets)
        when is_integer(guid) do
     raw_targets = if is_binary(casting.targets.raw), do: casting.targets.raw, else: <<>>
@@ -189,6 +200,38 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
   end
 
   defp queue_spell_go(character, _casting, _targets), do: character
+
+  defp queue_trigger_spell_go(
+         %{object: %{guid: guid}} = character,
+         %Cast{spell: %Spell{effects: effects}} = casting,
+         targets
+       )
+       when is_integer(guid) do
+    hits = redirect_self_hits(character, targets)
+
+    raw_targets =
+      case hits do
+        [hit] when hit != guid -> Targets.unit(hit).raw
+        _ -> if is_binary(casting.targets.raw), do: casting.targets.raw, else: <<>>
+      end
+
+    events =
+      for %Spell.Effect{type: :apply_aura, aura: :periodic_trigger_spell, trigger_spell_id: spell_id} <- effects,
+          is_integer(spell_id) and spell_id > 0 do
+        Event.spell_go(guid, spell_id, hits, raw_targets)
+      end
+
+    Event.enqueue(character, events)
+  end
+
+  defp queue_trigger_spell_go(character, _casting, _targets), do: character
+
+  defp redirect_self_hits(%{object: %{guid: guid}, unit: %{channel_object: channel_object}}, [guid])
+       when is_integer(channel_object) and channel_object > 0 and channel_object != guid do
+    [channel_object]
+  end
+
+  defp redirect_self_hits(_character, targets), do: targets
 
   defp apply_spell_hit(%{object: %{guid: caster_guid}} = character, %Cast{spell: %Spell{} = spell}, targets, now)
        when is_integer(caster_guid) and is_list(targets) do

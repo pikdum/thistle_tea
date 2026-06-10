@@ -196,6 +196,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp aura_type(12), do: :mod_stun
   defp aura_type(15), do: :damage_shield
   defp aura_type(22), do: :mod_resistance
+  defp aura_type(23), do: :periodic_trigger_spell
   defp aura_type(26), do: :mod_root
   defp aura_type(31), do: :mod_increase_speed
   defp aura_type(33), do: :mod_decrease_speed
@@ -207,6 +208,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp target_type(6), do: :target_enemy
   defp target_type(15), do: :aoe_enemy_at_caster
   defp target_type(22), do: :aoe_enemy_at_caster
+  defp target_type(24), do: :aoe_enemy_in_cone
   defp target_type(28), do: :aoe_enemy_at_channel
   defp target_type(53), do: :aoe_enemy_at_dest
   defp target_type(other) when is_integer(other), do: other

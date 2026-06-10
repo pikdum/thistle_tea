@@ -50,6 +50,18 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
     apply_damage_effect(state, context, spell, effect, now, periodic?: true)
   end
 
+  defp apply_effect(
+         state,
+         %CastContext{} = context,
+         _spell,
+         %Effect{type: :apply_aura, aura: :periodic_trigger_spell, trigger_spell_id: spell_id},
+         _now
+       )
+       when is_integer(spell_id) and spell_id > 0 do
+    event = Event.trigger_spell(context.caster_guid, context.caster_level, state.object.guid, spell_id)
+    {state, [event]}
+  end
+
   defp apply_effect(state, %CastContext{} = context, spell, %Effect{type: :apply_aura}, now) do
     Aura.apply_spell(state, context, spell, now)
   end

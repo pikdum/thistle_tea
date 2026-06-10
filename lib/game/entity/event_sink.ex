@@ -213,11 +213,36 @@ defmodule ThistleTea.Game.Entity.EventSink do
         entity
 
       spell ->
-        dispatch_triggered_spell(entity, event, spell)
+        case redirect_enemy_trigger(entity, event, spell) do
+          nil -> entity
+          event -> dispatch_triggered_spell(entity, event, spell)
+        end
     end
   end
 
   def emit(entity, _event), do: entity
+
+  defp redirect_enemy_trigger(%{object: %{guid: guid}, unit: unit}, %Event{target_guid: guid} = event, %Spell{
+         effects: effects
+       }) do
+    cond do
+      not Enum.any?(effects, &(&1.implicit_target_a == :target_enemy)) -> event
+      enemy_guid = preferred_enemy_guid(unit, guid) -> %{event | target_guid: enemy_guid}
+      true -> nil
+    end
+  end
+
+  defp redirect_enemy_trigger(_entity, event, _spell), do: event
+
+  defp preferred_enemy_guid(%{channel_object: channel_object, target: target}, self_guid) do
+    cond do
+      is_integer(channel_object) and channel_object > 0 and channel_object != self_guid -> channel_object
+      is_integer(target) and target > 0 and target != self_guid -> target
+      true -> nil
+    end
+  end
+
+  defp preferred_enemy_guid(_unit, _self_guid), do: nil
 
   defp dispatch_triggered_spell(%{object: %{guid: guid}} = entity, %Event{target_guid: guid} = event, spell) do
     context = trigger_context(event, spell)
