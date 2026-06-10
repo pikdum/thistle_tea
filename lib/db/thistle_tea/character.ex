@@ -159,40 +159,43 @@ defmodule ThistleTea.Character do
 
   def sync_equipment_stats(%__MODULE__{} = character) do
     character
+    |> EquipmentStats.resync(&ItemStore.get/1)
+    |> sync_attack_power()
     |> sync_mainhand_stats()
     |> sync_offhand_stats()
-    |> EquipmentStats.resync(&ItemStore.get/1)
   end
 
   def restore_health_and_mana(%__MODULE__{unit: %Unit{} = unit} = character) do
     %{character | unit: %{unit | health: unit.max_health, power1: unit.max_power1}}
   end
 
-  def sync_mainhand_stats(%__MODULE__{player: %Player{visible_item_16_0: entry}} = character)
-      when is_integer(entry) and entry > 0 do
-    case ItemLoader.get_template(entry) do
-      %ItemTemplate{} = weapon -> sync_mainhand_stats(character, weapon)
-      _ -> character
-    end
+  @base_attack_time 2000
+  @base_min_damage 1.0
+  @base_max_damage 2.0
+  @item_class_weapon 2
+
+  def sync_attack_power(%__MODULE__{unit: %Unit{} = unit} = character) do
+    attack_power = Stats.melee_attack_power(unit.class, unit.level, unit.strength || 0, unit.agility || 0)
+    ranged_attack_power = Stats.ranged_attack_power(unit.class, unit.level, unit.agility || 0)
+    %{character | unit: %{unit | attack_power: attack_power, ranged_attack_power: ranged_attack_power}}
   end
 
   def sync_mainhand_stats(%__MODULE__{unit: %Unit{} = unit} = character) do
-    %{character | unit: %{unit | base_attack_time: 2000, min_damage: 2, max_damage: 2}}
-  end
+    {delay, weapon_min, weapon_max} =
+      case mainhand_weapon(character) do
+        %ItemTemplate{} = weapon ->
+          {positive_or(weapon.delay, @base_attack_time), positive_or(weapon.dmg_min1, @base_min_damage),
+           positive_or(weapon.dmg_max1, @base_max_damage)}
 
-  def sync_mainhand_stats(%__MODULE__{unit: %Unit{} = unit} = character, %ItemTemplate{} = weapon) do
-    unit =
-      unit
-      |> maybe_update_unit_value(:base_attack_time, weapon.delay)
-      |> maybe_update_unit_value(:min_damage, weapon.dmg_min1)
-      |> maybe_update_unit_value(:max_damage, weapon.dmg_max1)
+        _ ->
+          {@base_attack_time, @base_min_damage, @base_max_damage}
+      end
 
+    bonus = attack_power_bonus(unit, delay)
+
+    unit = %{unit | base_attack_time: delay, min_damage: weapon_min + bonus, max_damage: weapon_max + bonus}
     %{character | unit: unit}
   end
-
-  def sync_mainhand_stats(%__MODULE__{} = character, _weapon), do: character
-
-  @item_class_weapon 2
 
   def sync_offhand_stats(%__MODULE__{unit: %Unit{} = unit, player: %Player{visible_item_17_0: entry}} = character) do
     weapon =
@@ -203,31 +206,39 @@ defmodule ThistleTea.Character do
 
     unit =
       if weapon do
+        delay = positive_or(weapon.delay, @base_attack_time)
+        bonus = attack_power_bonus(unit, delay)
+
         %{
           unit
-          | offhand_attack_time: positive_or(weapon.delay, 2000),
-            min_offhand_damage: positive_or(weapon.dmg_min1, 0.0),
-            max_offhand_damage: positive_or(weapon.dmg_max1, 0.0)
+          | offhand_attack_time: delay,
+            min_offhand_damage: positive_or(weapon.dmg_min1, 0.0) + bonus,
+            max_offhand_damage: positive_or(weapon.dmg_max1, 0.0) + bonus
         }
       else
-        %{unit | offhand_attack_time: 2000, min_offhand_damage: 0.0, max_offhand_damage: 0.0}
+        %{unit | offhand_attack_time: @base_attack_time, min_offhand_damage: 0.0, max_offhand_damage: 0.0}
       end
 
     %{character | unit: unit}
   end
 
+  defp mainhand_weapon(%__MODULE__{player: %Player{visible_item_16_0: entry}}) when is_integer(entry) and entry > 0 do
+    ItemLoader.get_template(entry)
+  end
+
+  defp mainhand_weapon(%__MODULE__{}), do: nil
+
+  defp attack_power_bonus(%Unit{attack_power: attack_power}, delay)
+       when is_integer(attack_power) and attack_power > 0 do
+    attack_power / 14 * (delay / 1000)
+  end
+
+  defp attack_power_bonus(%Unit{}, _delay), do: 0.0
+
   defp positive_or(value, default) do
     case value do
       value when is_number(value) and value > 0 -> value
       _ -> default
-    end
-  end
-
-  defp maybe_update_unit_value(%Unit{} = unit, key, value) do
-    case value do
-      value when is_integer(value) and value > 0 -> Map.put(unit, key, value)
-      value when is_float(value) and value > 0 -> Map.put(unit, key, value)
-      _ -> unit
     end
   end
 
