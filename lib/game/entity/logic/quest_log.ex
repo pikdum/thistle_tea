@@ -1,6 +1,8 @@
 defmodule ThistleTea.Game.Entity.Logic.QuestLog do
   import Bitwise
 
+  alias ThistleTea.Game.Entity.Data.Quest
+
   @max_slots 20
   @max_counter 63
 
@@ -11,6 +13,62 @@ defmodule ThistleTea.Game.Entity.Logic.QuestLog do
   end
 
   def max_slots, do: @max_slots
+
+  def increment_kill(quest_log, %Quest{} = quest, creature_entry) do
+    with %Entry{status: :incomplete, counts: counts} <- get(quest_log, quest.id),
+         {index, _entry, required} <-
+           Enum.find(quest.required_kills, fn {_index, entry, _required} ->
+             entry == creature_entry
+           end),
+         current when current < required <- Map.get(counts, index, 0) do
+      count = current + 1
+
+      {:ok, quest_log} =
+        update(quest_log, quest.id, fn entry ->
+          %{entry | counts: Map.put(entry.counts, index, count)}
+        end)
+
+      {:ok, quest_log, %{index: index, count: count, required: required}}
+    else
+      _other -> :no_credit
+    end
+  end
+
+  def evaluate(quest_log, %Quest{} = quest, item_count_fn) do
+    case get(quest_log, quest.id) do
+      %Entry{status: status} = entry when status in [:incomplete, :complete] ->
+        satisfied = objectives_satisfied?(quest, entry, item_count_fn)
+
+        cond do
+          satisfied and status == :incomplete -> transition(quest_log, quest, :complete)
+          not satisfied and status == :complete -> transition(quest_log, quest, :incomplete)
+          true -> {quest_log, :unchanged}
+        end
+
+      _entry ->
+        {quest_log, :unchanged}
+    end
+  end
+
+  def objectives_satisfied?(%Quest{} = quest, %Entry{counts: counts}, item_count_fn) do
+    kills_satisfied =
+      Enum.all?(quest.required_kills, fn {index, _entry, required} ->
+        Map.get(counts, index, 0) >= required
+      end)
+
+    items_satisfied =
+      Enum.all?(quest.required_items, fn {_index, item_id, required} ->
+        item_count_fn.(item_id) >= required
+      end)
+
+    kills_satisfied and items_satisfied
+  end
+
+  defp transition(quest_log, %Quest{} = quest, status) do
+    {:ok, quest_log} = update(quest_log, quest.id, fn entry -> %{entry | status: status} end)
+    event = if status == :complete, do: :completed, else: :incompleted
+    {quest_log, event}
+  end
 
   def add(quest_log, quest_id) do
     quest_log = quest_log || %{}

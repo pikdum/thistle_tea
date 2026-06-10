@@ -48,6 +48,26 @@ defmodule ThistleTea.Game.Entity.Logic.InventoryTest do
     Enum.find(items, fn i -> i.object.guid == item.object.guid end)
   end
 
+  describe "count_entry/3" do
+    test "sums stacks across backpack and bag contents" do
+      pelt_template = %ItemTemplate{entry: 750, stackable: 10}
+      pelt1 = build_item(20, pelt_template, stack_count: 3)
+      pelt2 = build_item(21, pelt_template, stack_count: 2)
+      bag = build_item(22, %ItemTemplate{entry: 800, inventory_type: 18, container_slots: 6, class: 1})
+      bag = put_in(bag.container.slot_1, pelt2.object.guid)
+
+      player =
+        %Player{}
+        |> store(@backpack_start, pelt1)
+        |> Map.put(:bag1, bag.object.guid)
+
+      get_item = get_item_fn([pelt1, pelt2, bag])
+
+      assert Inventory.count_entry(player, 750, get_item) == 5
+      assert Inventory.count_entry(player, 999, get_item) == 0
+    end
+  end
+
   describe "equip/3" do
     test "sets slot guid and visible entry", %{chest: chest} do
       player = Inventory.equip(%Player{}, :chest, chest)

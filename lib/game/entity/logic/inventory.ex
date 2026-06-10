@@ -115,6 +115,14 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
     |> Enum.map(&Item.template/1)
   end
 
+  def count_entry(%Player{} = player, entry, get_item) do
+    player
+    |> owned_items(get_item)
+    |> Enum.filter(fn %Item{object: object} -> object.entry == entry end)
+    |> Enum.map(fn %Item{item: item} -> item.stack_count || 1 end)
+    |> Enum.sum()
+  end
+
   def owned_items(%Player{} = player, get_item) do
     direct =
       @slot_fields

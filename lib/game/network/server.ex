@@ -21,6 +21,7 @@ defmodule ThistleTea.Game.Network.Server do
   alias ThistleTea.Game.Network.Opcodes
   alias ThistleTea.Game.Network.Packet
   alias ThistleTea.Game.Network.UpdateObject
+  alias ThistleTea.Game.Player.Quests
   alias ThistleTea.Game.Spell.Cast
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
@@ -281,6 +282,8 @@ defmodule ThistleTea.Game.Network.Server do
       else
         state
       end
+
+    state = Quests.credit_kill(state, victim.object.guid)
 
     {:noreply, {socket, state}, socket.read_timeout}
   end

@@ -67,19 +67,26 @@ defmodule ThistleTea.Game.Player.Quests do
   end
 
   def accept(state, npc_guid, quest_id) do
-    if quest_id in QuestLoader.given_by(Guid.entry(npc_guid)) do
+    with %Quest{} = quest <- QuestLoader.get(quest_id),
+         true <- quest_id in QuestLoader.given_by(Guid.entry(npc_guid)),
+         :ok <- QuestRequirements.can_take(quest, ctx(state.character)) do
       force_accept(state, quest_id)
     else
-      state
+      _other -> state
     end
   end
 
-  def force_accept(%{character: %Character{player: player} = character} = state, quest_id) do
+  def force_accept(%{character: %Character{player: player}} = state, quest_id) do
     with %Quest{} = quest <- QuestLoader.get(quest_id),
-         :ok <- QuestRequirements.can_take(quest, ctx(character)),
          {:ok, quest_log} <- QuestLog.add(player.quest_log, quest_id),
          {:ok, state} <- grant_source_item(state, quest) do
-      quest_log = maybe_autocomplete(quest_log, quest)
+      {quest_log, event} =
+        QuestLog.evaluate(quest_log, quest, item_counter(state.character.player))
+
+      if event == :completed do
+        Network.send_packet(%Message.SmsgQuestupdateComplete{quest_id: quest.id})
+      end
+
       character = state.character
       character = %{character | player: %{character.player | quest_log: quest_log}}
       put_character(state, character)
@@ -129,14 +136,105 @@ defmodule ThistleTea.Game.Player.Quests do
     })
   end
 
-  defp maybe_autocomplete(quest_log, %Quest{required_kills: [], required_items: []} = quest) do
-    case QuestLog.update(quest_log, quest.id, fn entry -> %{entry | status: :complete} end) do
-      {:ok, quest_log} -> quest_log
-      _error -> quest_log
+  def credit_kill(%{character: %Character{} = character} = state, victim_guid) do
+    creature_entry = Guid.entry(victim_guid)
+    player = character.player
+
+    {quest_log, credited?} =
+      Enum.reduce(active_quests(player), {player.quest_log, false}, fn quest, {quest_log, credited?} ->
+        case QuestLog.increment_kill(quest_log, quest, creature_entry) do
+          {:ok, quest_log, credit} ->
+            Network.send_packet(%Message.SmsgQuestupdateAddKill{
+              quest_id: quest.id,
+              creature_entry: creature_entry,
+              count: credit.count,
+              required: credit.required,
+              victim_guid: victim_guid
+            })
+
+            {quest_log, _event} = complete_check(quest_log, quest, player)
+            {quest_log, true}
+
+          :no_credit ->
+            {quest_log, credited?}
+        end
+      end)
+
+    if credited? do
+      put_character(state, %{character | player: %{player | quest_log: quest_log}})
+    else
+      state
     end
   end
 
-  defp maybe_autocomplete(quest_log, %Quest{}), do: quest_log
+  def on_inventory_changed(%{character: %Character{} = character} = state, old_player) do
+    player = character.player
+
+    quests =
+      player
+      |> active_quests()
+      |> Enum.filter(fn quest -> quest.required_items != [] end)
+
+    if quests == [] do
+      state
+    else
+      send_item_progress(quests, player, old_player)
+
+      {quest_log, changed?} =
+        Enum.reduce(quests, {player.quest_log, false}, fn quest, {quest_log, changed?} ->
+          case complete_check(quest_log, quest, player) do
+            {quest_log, :unchanged} -> {quest_log, changed?}
+            {quest_log, _event} -> {quest_log, true}
+          end
+        end)
+
+      if changed? do
+        put_character(state, %{character | player: %{player | quest_log: quest_log}})
+      else
+        state
+      end
+    end
+  end
+
+  defp send_item_progress(_quests, _player, nil), do: :ok
+
+  defp send_item_progress(quests, player, old_player) do
+    quests
+    |> Enum.flat_map(fn quest -> quest.required_items end)
+    |> Enum.map(fn {_index, item_id, _required} -> item_id end)
+    |> Enum.uniq()
+    |> Enum.each(fn item_id ->
+      delta =
+        Inventory.count_entry(player, item_id, &ItemStore.get/1) -
+          Inventory.count_entry(old_player, item_id, &ItemStore.get/1)
+
+      if delta > 0 do
+        Network.send_packet(%Message.SmsgQuestupdateAddItem{item_id: item_id, count: delta})
+      end
+    end)
+  end
+
+  defp complete_check(quest_log, %Quest{} = quest, player) do
+    case QuestLog.evaluate(quest_log, quest, item_counter(player)) do
+      {quest_log, :completed} ->
+        Network.send_packet(%Message.SmsgQuestupdateComplete{quest_id: quest.id})
+        {quest_log, :completed}
+
+      result ->
+        result
+    end
+  end
+
+  defp active_quests(player) do
+    player.quest_log
+    |> QuestLog.active_entries()
+    |> Enum.map(fn %Entry{quest_id: quest_id} -> QuestLoader.get(quest_id) end)
+    |> Enum.reject(&is_nil/1)
+  end
+
+  defp item_counter(player) do
+    fn item_id -> Inventory.count_entry(player, item_id, &ItemStore.get/1) end
+  end
 
   defp grant_source_item(state, %Quest{src_item_id: src_item_id}) when src_item_id <= 0, do: {:ok, state}
 
