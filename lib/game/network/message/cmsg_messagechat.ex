@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgMessagechat do
   alias ThistleTea.Game.Entity.Logic.EquipmentStats
   alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Entity.Logic.QuestLog
+  alias ThistleTea.Game.Entity.Logic.SpellBook
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.InventoryUpdate
   alias ThistleTea.Game.Player.Quests
@@ -548,36 +549,47 @@ defmodule ThistleTea.Game.Network.Message.CmsgMessagechat do
          spell_ids,
          known_message
        ) do
-    existing_ids = MapSet.new(internal.spells || [])
-    new_ids = Enum.reject(spell_ids, &MapSet.member?(existing_ids, &1))
+    existing_ids = internal.spells || []
+    superseded_by = SpellLoader.superseded_by_map(existing_ids ++ spell_ids)
+    {all_ids, events} = SpellBook.learn(existing_ids, spell_ids, superseded_by)
 
-    case new_ids do
+    case events do
       [] ->
         system_message(state, known_message)
 
       _ ->
-        all_ids = (internal.spells || []) ++ new_ids
         spellbook = SpellLoader.build_spellbook(all_ids)
 
         character = %{character | internal: %{internal | spells: all_ids, spellbook: spellbook}}
         ThistleTea.Character.save(character)
 
-        for id <- new_ids do
-          Network.send_packet(%Message.SmsgLearnedSpell{spell_id: id})
+        for event <- events do
+          case event do
+            {:learned, id} ->
+              Network.send_packet(%Message.SmsgLearnedSpell{spell_id: id})
+
+            {:superseded, old_id, new_id} ->
+              Network.send_packet(%Message.SmsgSupercededSpell{old_spell_id: old_id, new_spell_id: new_id})
+          end
         end
 
         names =
-          new_ids
-          |> Enum.map_join(", ", fn id ->
-            case Map.get(spellbook, id) do
-              %{name: name} -> name
-              _ -> "spell #{id}"
-            end
+          events
+          |> Enum.map_join(", ", fn
+            {:learned, id} -> spell_name(spellbook, id)
+            {:superseded, _old_id, id} -> spell_name(spellbook, id)
           end)
 
         state
         |> Map.put(:character, character)
         |> system_message("Learned: #{names}")
+    end
+  end
+
+  defp spell_name(spellbook, spell_id) do
+    case Map.get(spellbook, spell_id) do
+      %{name: name} -> name
+      _ -> "spell #{spell_id}"
     end
   end
 

@@ -65,6 +65,20 @@ defmodule ThistleTea.Game.World.Loader.Spell do
 
   def learned_spell_ids(_spell_ids), do: []
 
+  def superseded_by_map(spell_ids) when is_list(spell_ids) do
+    spell_ids = Enum.uniq(spell_ids)
+
+    DBC.all(
+      from(s in SkillLineAbility,
+        where: s.spell in ^spell_ids and s.superseded_by > 0,
+        select: {s.spell, s.superseded_by}
+      )
+    )
+    |> Map.new()
+  end
+
+  def superseded_by_map(_spell_ids), do: %{}
+
   defp build(row) do
     row = DBC.preload(row, [:spell_cast_time, :spell_duration, :spell_range])
     build_preloaded(row, &lookup_radius/1)
