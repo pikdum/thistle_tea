@@ -25,6 +25,11 @@ defmodule ThistleTea.Game.Network.Message.CmsgLogoutRequest do
   end
 
   def handle_logout(state) do
+    case Map.get(state, :player_tick_ref) do
+      ref when is_reference(ref) -> Process.cancel_timer(ref)
+      _ -> :ok
+    end
+
     # save current character state
     if Map.get(state, :character) do
       ThistleTea.Character.save(state.character)

@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Network.Server do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.Logic.AI.BT
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Combat
   alias ThistleTea.Game.Entity.Logic.Core
@@ -18,6 +19,7 @@ defmodule ThistleTea.Game.Network.Server do
   alias ThistleTea.Game.Entity.Logic.Experience
   alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Entity.Logic.MovementStats
+  alias ThistleTea.Game.Entity.Logic.Regen
   alias ThistleTea.Game.Entity.Logic.SpellEffect
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network
@@ -27,6 +29,7 @@ defmodule ThistleTea.Game.Network.Server do
   alias ThistleTea.Game.Network.Message.Dispatch
   alias ThistleTea.Game.Network.Opcodes
   alias ThistleTea.Game.Network.Packet
+  alias ThistleTea.Game.Network.PlayerTick
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.Player.Quests
   alias ThistleTea.Game.Spell.Cast
@@ -464,6 +467,10 @@ defmodule ThistleTea.Game.Network.Server do
     _ -> {:noreply, {socket, state}, socket.read_timeout}
   end
 
+  def handle_info(:player_tick, {socket, state}) do
+    {:noreply, {socket, state}, socket.read_timeout}
+  end
+
   @impl GenServer
   def handle_info({:group, events, _info}, {socket, state}) do
     state = Visibility.handle_events(state, events)
@@ -483,8 +490,9 @@ defmodule ThistleTea.Game.Network.Server do
     Metadata.update(state.guid, %{alive?: Death.alive?(character), ghost?: Death.ghost?(character)})
     internal = %{character.internal | broadcast_update?: false}
     character = %{character | internal: internal}
+    state = PlayerTick.ensure_scheduled(%{state | character: character})
 
-    {:noreply, {socket, %{state | character: character}}, socket.read_timeout}
+    {:noreply, {socket, state}, socket.read_timeout}
   end
 
   def handle_continue(:maybe_broadcast_update, {socket, state}) do
@@ -521,42 +529,54 @@ defmodule ThistleTea.Game.Network.Server do
     end
   end
 
-  defp player_tick_delay(_character, {:running, delay_ms}) when is_integer(delay_ms) and delay_ms > 0 do
-    delay_ms
+  defp player_tick_delay(character, {:running, delay_ms}) when is_integer(delay_ms) and delay_ms > 0 do
+    case regen_tick_delay(character, Time.now()) do
+      regen_delay when is_integer(regen_delay) -> min(delay_ms, regen_delay)
+      _ -> delay_ms
+    end
   end
 
   defp player_tick_delay(character, _status) do
-    if player_only_needs_aura_tick?(character) do
-      case Aura.next_event_at(character) do
-        at when is_integer(at) -> max(at - Time.now(), 0)
-        _ -> @player_tick_ms
-      end
+    if player_passive?(character) do
+      passive_tick_delay(character, Time.now())
     else
       @player_tick_ms
     end
   end
 
-  defp player_needs_tick?(%{internal: %Internal{casting: %Cast{}}}) do
-    true
+  defp passive_tick_delay(character, now) do
+    [aura_tick_delay(character, now), regen_tick_delay(character, now)]
+    |> Enum.reject(&is_nil/1)
+    |> case do
+      [] -> @player_tick_ms
+      delays -> delays |> Enum.min() |> max(0)
+    end
   end
 
-  defp player_needs_tick?(%{internal: %Internal{in_combat: true}, unit: %Unit{target: target}})
-       when is_integer(target) and target > 0 do
-    true
+  defp aura_tick_delay(%{unit: %Unit{auras: [_ | _]}} = character, now) do
+    case Aura.next_event_at(character) do
+      at when is_integer(at) -> max(at - now, 0)
+      _ -> @player_tick_ms
+    end
   end
 
-  defp player_needs_tick?(%{unit: %Unit{auras: [_ | _]}}), do: true
+  defp aura_tick_delay(_character, _now), do: nil
 
-  defp player_needs_tick?(_character), do: false
+  defp regen_tick_delay(%{internal: %Internal{blackboard: blackboard}} = character, now) do
+    if Regen.needs_regen?(character) do
+      Blackboard.delay_until(Blackboard.from_any(blackboard), :next_regen_at, now)
+    end
+  end
 
-  defp player_only_needs_aura_tick?(%{
-         internal: %Internal{casting: casting, in_combat: in_combat},
-         unit: %Unit{target: target, auras: [_ | _]}
-       }) do
+  defp regen_tick_delay(_character, _now), do: nil
+
+  defp player_needs_tick?(character), do: PlayerTick.needs_tick?(character)
+
+  defp player_passive?(%{internal: %Internal{casting: casting, in_combat: in_combat}, unit: %Unit{target: target}}) do
     not is_struct(casting, Cast) and not (in_combat == true and is_integer(target) and target > 0)
   end
 
-  defp player_only_needs_aura_tick?(_character), do: false
+  defp player_passive?(_character), do: false
 
   defp kill_xp(%Character{unit: %Unit{health: health, level: player_level}}, %{
          unit: %Unit{level: mob_level},

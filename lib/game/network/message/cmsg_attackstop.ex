@@ -3,6 +3,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgAttackstop do
 
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.Core
+  alias ThistleTea.Game.Network.PlayerTick
 
   require Logger
 
@@ -38,6 +39,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgAttackstop do
     state
     |> Map.put(:character, character)
     |> Map.put(:player_tick_ref, nil)
+    |> PlayerTick.ensure_scheduled()
   end
 
   def handle(%__MODULE__{}, state), do: state
