@@ -39,6 +39,22 @@ defmodule ThistleTea.Game.Entity.Data.Component.MovementBlock do
     :transport_progress_in_ms
   ]
 
+  @player_speeds %{
+    walk_speed: 1.0,
+    run_speed: 7.0,
+    run_back_speed: 4.5,
+    swim_speed: 4.722222,
+    swim_back_speed: 2.5
+  }
+
+  def player_speeds do
+    Enum.reduce(@player_speeds, @player_speeds, fn {field, speed}, acc ->
+      Map.put(acc, :"base_#{field}", speed)
+    end)
+  end
+
+  def default_run_speed, do: @player_speeds.run_speed
+
   @update_flag_transport 0x02
   @update_flag_melee_attacking 0x04
   @update_flag_high_guid 0x08

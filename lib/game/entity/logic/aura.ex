@@ -424,7 +424,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
 
   defp sync_movement_state(entity, now) do
     old_run_speed = run_speed(entity)
-    entity = MovementStats.sync_aura_mods(entity)
+    entity = MovementStats.recompute(entity)
     {entity, events} = sync_movement_flags(entity, now)
     {entity, feather_events} = sync_feather_fall(entity)
     {entity, speed_change_events(entity, old_run_speed) ++ events ++ feather_events}

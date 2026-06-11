@@ -333,7 +333,12 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
             run_speed: 7.0,
             run_back_speed: 4.5,
             swim_speed: 4.7,
-            swim_back_speed: 2.5
+            swim_back_speed: 2.5,
+            base_walk_speed: 2.5,
+            base_run_speed: 7.0,
+            base_run_back_speed: 4.5,
+            base_swim_speed: 4.7,
+            base_swim_back_speed: 2.5
           }
       }
 
@@ -364,7 +369,7 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
     test "expiring mod_decrease_speed restores base movement speeds" do
       entity = %{
         fixture_entity()
-        | movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}, run_speed: 7.0}
+        | movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}, run_speed: 7.0, base_run_speed: 7.0}
       }
 
       spell = %Spell{

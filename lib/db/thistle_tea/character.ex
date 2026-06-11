@@ -119,18 +119,17 @@ defmodule ThistleTea.Character do
         rest_state_experience: 0,
         coinage: 0
       },
-      movement_block: %MovementBlock{
-        movement_flags: 0,
-        position: {info.position_x, info.position_y, info.position_z, info.orientation},
-        fall_time: 0,
-        walk_speed: 1.0,
-        run_speed: 7.0,
-        run_back_speed: 4.5,
-        swim_speed: 4.722222,
-        swim_back_speed: 2.5,
-        turn_rate: 3.1415,
-        timestamp: 0
-      },
+      movement_block:
+        Map.merge(
+          %MovementBlock{
+            movement_flags: 0,
+            position: {info.position_x, info.position_y, info.position_z, info.orientation},
+            fall_time: 0,
+            turn_rate: 3.1415,
+            timestamp: 0
+          },
+          MovementBlock.player_speeds()
+        ),
       internal: %Internal{
         name: params.name,
         area: info.zone,

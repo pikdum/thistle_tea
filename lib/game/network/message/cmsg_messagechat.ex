@@ -4,9 +4,12 @@ defmodule ThistleTea.Game.Network.Message.CmsgMessagechat do
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Item, as: DataItem
   alias ThistleTea.Game.Entity.Data.Quest
+  alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Death
+  alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.Entity.Logic.Inventory
+  alias ThistleTea.Game.Entity.Logic.MovementStats
   alias ThistleTea.Game.Entity.Logic.QuestLog
   alias ThistleTea.Game.Entity.Logic.SpellBook
   alias ThistleTea.Game.Guid
@@ -32,7 +35,6 @@ defmodule ThistleTea.Game.Network.Message.CmsgMessagechat do
   @say_range 25
   @yell_range 300
   @emote_range 25
-  @speed_base 7.0
   @speed_min 0.1
   @speed_max 10.0
 
@@ -429,19 +431,25 @@ defmodule ThistleTea.Game.Network.Message.CmsgMessagechat do
   defp handle_modify_speed(state, rate) do
     case Float.parse(rate) do
       {rate, _} when rate >= @speed_min and rate <= @speed_max ->
-        {target, guid} = resolve_speed_target(state)
-        speed = rate * @speed_base
-
-        %Message.SmsgForceRunSpeedChange{guid: guid, speed: speed}
-        |> Network.send_packet(target)
-
         state
+        |> apply_speed_rate(rate, resolve_speed_target(state))
         |> system_message("Speed set to #{rate}")
 
       _ ->
         state
         |> system_message("Invalid speed. Use: .modify speed <rate 0.1 - 10.0>")
     end
+  end
+
+  defp apply_speed_rate(state, rate, {target, _guid}) when is_pid(target) do
+    character = MovementStats.set_run_speed_rate(state.character, rate)
+    character = EventSink.emit(character, [Event.movement_speed_changed(character.movement_block.run_speed)])
+    put_character(state, character)
+  end
+
+  defp apply_speed_rate(state, rate, {target_guid, _guid}) do
+    Entity.set_speed(target_guid, rate)
+    state
   end
 
   defp handle_modify_hp(%{character: %ThistleTea.Character{unit: %Unit{} = unit} = character} = state, value) do

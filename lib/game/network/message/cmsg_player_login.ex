@@ -5,12 +5,14 @@ defmodule ThistleTea.Game.Network.Message.CmsgPlayerLogin do
 
   alias ThistleTea.DBC
   alias ThistleTea.Game.Entity
+  alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Corpse
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Player, as: PlayerBT
   alias ThistleTea.Game.Entity.Logic.Death
   alias ThistleTea.Game.Entity.Logic.Inventory
+  alias ThistleTea.Game.Entity.Logic.MovementStats
   alias ThistleTea.Game.Network.Message.SmsgInitialSpells.InitialSpell
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.Player.Stats, as: PlayerStats
@@ -197,11 +199,15 @@ defmodule ThistleTea.Game.Network.Message.CmsgPlayerLogin do
   end
 
   defp normalize_movement_state(%ThistleTea.Character{movement_block: movement_block, internal: internal} = character) do
-    %{
+    movement_block =
+      %{movement_block | movement_flags: 0, timestamp: 0, fall_time: 0}
+      |> Map.merge(MovementBlock.player_speeds())
+
+    MovementStats.recompute(%{
       character
-      | movement_block: %{movement_block | movement_flags: 0, timestamp: 0, fall_time: 0},
+      | movement_block: movement_block,
         internal: %{internal | visibility_cell: nil}
-    }
+    })
   end
 
   defp normalize_combat_stats(%ThistleTea.Character{} = character) do

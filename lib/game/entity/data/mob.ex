@@ -72,6 +72,11 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
       run_back_speed: ct.speed_run * 4.5,
       swim_speed: ct.speed_run * 4.722222,
       swim_back_speed: ct.speed_run * 2.5,
+      base_walk_speed: ct.speed_walk * 2.5,
+      base_run_speed: ct.speed_run * 7.0,
+      base_run_back_speed: ct.speed_run * 4.5,
+      base_swim_speed: ct.speed_run * 4.722222,
+      base_swim_back_speed: ct.speed_run * 2.5,
       turn_rate: 3.1415
     }
 

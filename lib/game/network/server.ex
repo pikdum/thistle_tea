@@ -17,6 +17,7 @@ defmodule ThistleTea.Game.Network.Server do
   alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.Entity.Logic.Experience
   alias ThistleTea.Game.Entity.Logic.Inventory
+  alias ThistleTea.Game.Entity.Logic.MovementStats
   alias ThistleTea.Game.Entity.Logic.SpellEffect
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network
@@ -305,6 +306,14 @@ defmodule ThistleTea.Game.Network.Server do
   def handle_cast({:visibility_changed, guid}, {socket, state}) do
     state = Visibility.reevaluate_entity(state, guid)
     {:noreply, {socket, state}, socket.read_timeout}
+  end
+
+  @impl GenServer
+  def handle_cast({:set_speed, rate}, {socket, %{character: %Character{} = character} = state}) do
+    character = MovementStats.set_run_speed_rate(character, rate)
+    character = EventSink.emit(character, [Event.movement_speed_changed(character.movement_block.run_speed)])
+
+    {:noreply, {socket, %{state | character: character}}, {:continue, :maybe_broadcast_update}}
   end
 
   @impl GenServer

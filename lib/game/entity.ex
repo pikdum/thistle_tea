@@ -40,6 +40,10 @@ defmodule ThistleTea.Game.Entity do
     dispatch_cast(entity, {:visibility_changed, guid})
   end
 
+  def set_speed(entity, rate) do
+    dispatch_cast(entity, {:set_speed, rate})
+  end
+
   def call(entity, message) do
     case resolve_pid(entity) do
       {:ok, pid} -> GenServer.call(pid, message)

@@ -35,7 +35,7 @@ defmodule ThistleTea.Game.Entity.Logic.DeathTest do
         auras: []
       },
       player: %Player{flags: Keyword.get(opts, :player_flags, 0)},
-      movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}, run_speed: 7.0},
+      movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}, run_speed: 7.0, base_run_speed: 7.0},
       internal: %Internal{map: 0}
     }
   end
