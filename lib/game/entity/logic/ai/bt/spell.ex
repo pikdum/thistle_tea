@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.Entity.Logic.MeleeSpell
+  alias ThistleTea.Game.Entity.Logic.Resources
   alias ThistleTea.Game.Entity.Logic.SpellEffect
   alias ThistleTea.Game.Entity.Logic.SpellTarget
   alias ThistleTea.Game.Entity.SpellTargetResolver
@@ -62,6 +63,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
       targets = resolve_targets(character, casting)
 
       character
+      |> Resources.spend_power(casting.spell, now)
       |> queue_cast_result(casting)
       |> queue_spell_go(casting, targets)
       |> queue_area_effects(casting)
@@ -117,6 +119,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
     targets = resolve_targets(character, casting)
 
     character
+    |> Resources.spend_power(casting.spell, now)
     |> queue_cast_result(casting)
     |> queue_spell_go(casting, targets)
     |> queue_area_effects(casting)

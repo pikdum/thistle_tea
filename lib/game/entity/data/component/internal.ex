@@ -21,6 +21,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal do
     :event,
     :in_combat,
     :last_hostile_time,
+    :last_mana_use_at,
     :running,
     :behavior_tree,
     :blackboard,

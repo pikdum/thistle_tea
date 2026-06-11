@@ -95,6 +95,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
       duration_ms: duration_ms(row.spell_duration),
       range_yards: range_yards(row.spell_range),
       mana_cost: row.mana_cost || 0,
+      power_type: row.power_type || 0,
       gcd_ms: row.start_recovery_time || 0,
       dispel_type: row.dispel_type || 0,
       speed: row.speed || 0.0,

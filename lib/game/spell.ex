@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Spell do
     :duration_ms,
     :range_yards,
     :mana_cost,
+    :power_type,
     :gcd_ms,
     :dispel_type,
     :first_in_chain,
