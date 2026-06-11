@@ -16,6 +16,7 @@ Minimal payload (`CMSG_PING`):
 
 ```elixir
 defmodule ThistleTea.Game.Network.Message.CmsgPing do
+  @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_PING
 
   defstruct [:sequence_id, :latency]

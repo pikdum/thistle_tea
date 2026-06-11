@@ -7,14 +7,14 @@
 - `mix test test/path/to/file_test.exs` - Run specific test file
 - `mix test test/path/to/file_test.exs:123` - Run specific test at line 123
 - `mix test.watch` - Run tests in watch mode
-- `mix credo` - Run linting
+- `mix credo --strict` - Run linting (must stay at zero issues; enforced as a pre-commit hook via devenv)
 - `mix format` - Format code
 - `mix build_maps` - Generate navigation meshes from map files
 
 ## Code Style
 
 ### Development
-- Ensure `mix test` passes before completing tasks
+- Ensure `mix test` and `mix credo --strict` pass before completing tasks
 
 ### Testing
 - Use `describe "function/arity" do ... end` to group tests by function
@@ -44,7 +44,8 @@
 - Behavior trees are the primary abstraction for AI/action logic — mob combat + movement, player combat + spellcasting, etc. all run through the same framework. Core primitives in `lib/game/entity/logic/ai/bt/bt.ex` (`selector`, `sequence`, `condition`, `action`, with `:success | :failure | :running | {:running, delay_ms}` status) plus a shared `Blackboard` for per-entity scheduling. Mob and player trees (`bt/mob.ex`, `bt/player.ex`) compose shared subtrees like `BT.Combat.melee_sequence` and `BT.Spell.casting_sequence`. Trees are ticked from the entity's owning process (mob GenServer, player network handler) and respect `{:running, delay_ms}` to schedule the next tick — prefer extending existing nodes/subtrees over adding ad-hoc logic in the surrounding GenServers
 
 ### Formatting
-- No comments in code (keep functions self-documenting via naming)
+- No comments in code (keep functions self-documenting via naming); the only exceptions are TODO comments and `# credo:disable-for-next-line` markers where a refactor would hurt clarity
+- Every module needs a `@moduledoc`; use `@moduledoc false` for self-explanatory modules (packet messages, ecto schemas, pure field-declaration components)
 - Use snake_case for atoms and files, PascalCase for modules
 - Use conventional commits
 

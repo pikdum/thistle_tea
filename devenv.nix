@@ -29,6 +29,11 @@
   git-hooks.hooks = {
     nixfmt.enable = true;
     mix-format.enable = true;
+    credo = {
+      enable = true;
+      entry = "mix credo --strict";
+      pass_filenames = false;
+    };
   };
 
   # See full reference at https://devenv.sh/reference/options/

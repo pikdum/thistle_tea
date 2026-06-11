@@ -15,6 +15,7 @@ Minimal payload (`SMSG_PONG`):
 
 ```elixir
 defmodule ThistleTea.Game.Network.Message.SmsgPong do
+  @moduledoc false
   use ThistleTea.Game.Network.ServerMessage, :SMSG_PONG
 
   defstruct [:sequence_id]
@@ -30,6 +31,7 @@ Conditional payload (`SMSG_AUTH_RESPONSE`):
 
 ```elixir
 defmodule ThistleTea.Game.Network.Message.SmsgAuthResponse do
+  @moduledoc false
   use ThistleTea.Game.Network.ServerMessage, :SMSG_AUTH_RESPONSE
 
   @result_auth_ok 0x0C
