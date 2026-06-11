@@ -180,6 +180,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgMessagechat do
       ".learn <spell_id> - learn a spell",
       ".levelup [levels] - increase player level",
       ".modify hp <value> - set current health (clamped to max)",
+      ".modify money <copper> - add money (negative to remove)",
       ".modify speed <rate> - modify player speed from 0.1 to 10",
       ".move - move target to you",
       ".pid - show target pid",
@@ -238,6 +239,9 @@ defmodule ThistleTea.Game.Network.Message.CmsgMessagechat do
 
       ["hp", value] ->
         handle_modify_hp(state, value)
+
+      ["money", value] ->
+        handle_modify_money(state, value)
 
       _ ->
         Logger.error("Unhandled .modify call: #{params}")
@@ -466,6 +470,27 @@ defmodule ThistleTea.Game.Network.Message.CmsgMessagechat do
       _ ->
         system_message(state, "Invalid command. Use: .modify hp <value>")
     end
+  end
+
+  @max_coinage 0x7FFFFFFF
+
+  defp handle_modify_money(%{character: %ThistleTea.Character{player: player} = character} = state, value) do
+    case Integer.parse(value) do
+      {amount, ""} ->
+        coinage = ((player.coinage || 0) + amount) |> max(0) |> min(@max_coinage)
+        character = %{character | player: %{player | coinage: coinage}}
+
+        state
+        |> put_character(character)
+        |> system_message("Money set to #{format_money(coinage)}.")
+
+      _ ->
+        system_message(state, "Invalid command. Use: .modify money <copper>")
+    end
+  end
+
+  defp format_money(copper) do
+    "#{div(copper, 10_000)}g #{div(rem(copper, 10_000), 100)}s #{rem(copper, 100)}c"
   end
 
   defp handle_set_level(%{character: %ThistleTea.Character{}} = state, level) do
