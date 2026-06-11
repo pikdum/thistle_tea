@@ -15,6 +15,8 @@ defmodule ThistleTea.Game.World.Loader.Gossip do
   @option_spirit_healer 6
   @supported_option_ids [@option_gossip, @option_vendor, @option_trainer, @option_spirit_healer]
 
+  @npc_flag_trainer 0x10
+
   defmodule Menu do
     @moduledoc false
     defstruct [:menu_id, :text_id, options: []]
@@ -67,12 +69,19 @@ defmodule ThistleTea.Game.World.Loader.Gossip do
 
     from(ct in Mangos.CreatureTemplate,
       where: ct.gossip_menu_id > 0,
-      select: {ct.entry, ct.gossip_menu_id, ct.trainer_type, ct.trainer_class, ct.trainer_race}
+      select: {ct.entry, ct.gossip_menu_id}
     )
     |> Mangos.Repo.all()
-    |> Enum.each(fn {creature_entry, menu_id, trainer_type, trainer_class, trainer_race} ->
+    |> Enum.each(fn {creature_entry, menu_id} ->
       :ets.insert(__MODULE__, {{:creature_menu, creature_entry}, menu_id})
+    end)
 
+    from(ct in Mangos.CreatureTemplate,
+      where: fragment("? & ?", ct.npc_flags, ^@npc_flag_trainer) != 0,
+      select: {ct.entry, ct.trainer_type, ct.trainer_class, ct.trainer_race}
+    )
+    |> Mangos.Repo.all()
+    |> Enum.each(fn {creature_entry, trainer_type, trainer_class, trainer_race} ->
       :ets.insert(
         __MODULE__,
         {{:trainer, creature_entry}, %{type: trainer_type, class: trainer_class, race: trainer_race}}

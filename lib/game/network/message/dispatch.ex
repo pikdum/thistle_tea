@@ -88,6 +88,8 @@ defmodule ThistleTea.Game.Network.Message.Dispatch do
               CMSG_QUESTGIVER_COMPLETE_QUEST: Message.CmsgQuestgiverCompleteQuest,
               CMSG_QUESTGIVER_REQUEST_REWARD: Message.CmsgQuestgiverRequestReward,
               CMSG_QUESTGIVER_CHOOSE_REWARD: Message.CmsgQuestgiverChooseReward,
+              CMSG_TRAINER_LIST: Message.CmsgTrainerList,
+              CMSG_TRAINER_BUY_SPELL: Message.CmsgTrainerBuySpell,
               CMSG_REPOP_REQUEST: Message.CmsgRepopRequest,
               MSG_MOVE_TELEPORT_ACK: Message.CmsgMoveTeleportAck,
               MSG_CORPSE_QUERY: Message.MsgCorpseQuery,

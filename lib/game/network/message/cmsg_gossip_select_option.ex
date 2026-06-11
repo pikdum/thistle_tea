@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgGossipSelectOption do
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Message.CmsgGossipHello
+  alias ThistleTea.Game.Network.Message.CmsgTrainerList
   alias ThistleTea.Game.World.Loader.Gossip, as: GossipLoader
   alias ThistleTea.Game.World.Loader.Gossip.Menu
   alias ThistleTea.Game.World.Loader.Gossip.Option
@@ -16,6 +17,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgGossipSelectOption do
   @impl ClientMessage
   def handle(%__MODULE__{guid: guid, gossip_list_id: gossip_list_id}, %{character: %Character{} = c} = state) do
     vendor_option_id = GossipLoader.option_vendor()
+    trainer_option_id = GossipLoader.option_trainer()
     spirit_healer_option_id = GossipLoader.option_spirit_healer()
 
     state
@@ -32,6 +34,9 @@ defmodule ThistleTea.Game.Network.Message.CmsgGossipSelectOption do
         })
 
         state
+
+      %Option{option_id: ^trainer_option_id} ->
+        CmsgTrainerList.send_list(state, guid)
 
       %Option{option_id: ^spirit_healer_option_id} ->
         if not Death.alive?(c) do

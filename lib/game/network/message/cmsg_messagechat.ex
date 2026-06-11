@@ -12,15 +12,14 @@ defmodule ThistleTea.Game.Network.Message.CmsgMessagechat do
   alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Entity.Logic.MovementStats
   alias ThistleTea.Game.Entity.Logic.QuestLog
-  alias ThistleTea.Game.Entity.Logic.SpellBook
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.InventoryUpdate
   alias ThistleTea.Game.Player.Quests
+  alias ThistleTea.Game.Player.Spells
   alias ThistleTea.Game.Player.Stats
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.ClassSpell
   alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader
-  alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Metadata
 
   require Logger
@@ -552,35 +551,13 @@ defmodule ThistleTea.Game.Network.Message.CmsgMessagechat do
     state
   end
 
-  defp learn_spells(
-         %{character: %ThistleTea.Character{internal: internal} = character} = state,
-         spell_ids,
-         known_message
-       ) do
-    existing_ids = internal.spells || []
-    superseded_by = SpellLoader.superseded_by_map(existing_ids ++ spell_ids)
-    {all_ids, events} = SpellBook.learn(existing_ids, spell_ids, superseded_by)
-
-    case events do
-      [] ->
+  defp learn_spells(%{character: %ThistleTea.Character{} = character} = state, spell_ids, known_message) do
+    case Spells.learn(character, spell_ids) do
+      :already_known ->
         system_message(state, known_message)
 
-      _ ->
-        spellbook = SpellLoader.build_spellbook(all_ids)
-
-        character = %{character | internal: %{internal | spells: all_ids, spellbook: spellbook}}
-        ThistleTea.Character.save(character)
-
-        for event <- events do
-          # credo:disable-for-next-line Credo.Check.Refactor.Nesting
-          case event do
-            {:learned, id} ->
-              Network.send_packet(%Message.SmsgLearnedSpell{spell_id: id})
-
-            {:superseded, old_id, new_id} ->
-              Network.send_packet(%Message.SmsgSupercededSpell{old_spell_id: old_id, new_spell_id: new_id})
-          end
-        end
+      {:ok, character, events} ->
+        spellbook = character.internal.spellbook
 
         names =
           events

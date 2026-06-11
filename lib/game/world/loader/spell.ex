@@ -71,6 +71,28 @@ defmodule ThistleTea.Game.World.Loader.Spell do
 
   def learned_spell_ids(_spell_ids), do: []
 
+  def learned_spell_map(spell_ids) when is_list(spell_ids) do
+    spell_ids = Enum.uniq(spell_ids)
+
+    DBC.all(
+      from(s in Spell,
+        where: s.id in ^spell_ids,
+        select: %{
+          id: s.id,
+          effect_0: s.effect_0,
+          effect_1: s.effect_1,
+          effect_2: s.effect_2,
+          effect_trigger_spell_0: s.effect_trigger_spell_0,
+          effect_trigger_spell_1: s.effect_trigger_spell_1,
+          effect_trigger_spell_2: s.effect_trigger_spell_2
+        }
+      )
+    )
+    |> Map.new(fn row -> {row.id, row |> learned_spell_ids_from_row() |> List.first()} end)
+  end
+
+  def learned_spell_map(_spell_ids), do: %{}
+
   def superseded_by_map(spell_ids) when is_list(spell_ids) do
     spell_ids = Enum.uniq(spell_ids)
 
