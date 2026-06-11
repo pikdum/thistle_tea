@@ -5,11 +5,15 @@ defmodule ThistleTea.Game.Network.Message.CmsgCastSpell do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.Logic.AI.BT.Spell, as: SpellBT
-  alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
+  alias ThistleTea.Game.Entity.Logic.Hostility
+  alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.CastValidation
   alias ThistleTea.Game.Spell.Targets
   alias ThistleTea.Game.Time
+  alias ThistleTea.Game.World.ItemStore
+  alias ThistleTea.Game.World.Metadata
 
   require Logger
 
@@ -47,9 +51,6 @@ defmodule ThistleTea.Game.Network.Message.CmsgCastSpell do
 
   def handle_spell_complete(state), do: state
 
-  @simple_spell_cast_result_failure 2
-  @cast_failure_reason_more_powerful_spell_active 0x07
-
   def cast_spell(state, %Spell{} = spell, spell_cast_targets, cast_item_guid \\ nil) do
     targets = Targets.parse(spell_cast_targets, state.guid)
 
@@ -58,25 +59,52 @@ defmodule ThistleTea.Game.Network.Message.CmsgCastSpell do
       target_name: targets.unit_guid
     )
 
-    if targets.unit_guid == state.guid and AuraLogic.blocked_by_stronger_rank?(state.character, spell) do
-      fail_cast(spell)
-      state
-    else
-      do_cast_spell(state, spell, spell_cast_targets, targets, cast_item_guid)
+    case validate_cast(state, spell, targets) do
+      :ok ->
+        do_cast_spell(state, spell, spell_cast_targets, targets, cast_item_guid)
+
+      {:error, reason} ->
+        fail_cast(spell, reason)
+        state
     end
   end
 
-  defp fail_cast(%Spell{id: spell_id}) do
-    Network.send_packet(%Message.SmsgCastResult{
-      spell: spell_id,
-      result: @simple_spell_cast_result_failure,
-      reason: @cast_failure_reason_more_powerful_spell_active,
-      required_spell_focus: nil,
-      area: nil,
-      equipped_item_class: nil,
-      equipped_item_subclass_mask: nil,
-      equipped_item_inventory_type_mask: nil
-    })
+  defp validate_cast(%{character: character} = state, %Spell{} = spell, %Targets{} = targets) do
+    CastValidation.validate(
+      character,
+      spell,
+      targets,
+      build_target_info(state, targets),
+      Time.now(),
+      count_item: fn item_id -> Inventory.count_entry(character.player, item_id, &ItemStore.get/1) end
+    )
+  end
+
+  defp build_target_info(%{guid: caster_guid}, %Targets{unit_guid: caster_guid}) when is_integer(caster_guid) do
+    :self
+  end
+
+  defp build_target_info(%{character: character}, %Targets{unit_guid: guid}) when is_integer(guid) and guid > 0 do
+    case Metadata.query(guid, [:alive?, :faction_template, :unit_flags]) do
+      nil ->
+        :unknown
+
+      metadata ->
+        %{
+          guid: guid,
+          alive?: Map.get(metadata, :alive?, true),
+          hostile?: Hostility.hostile?(character, metadata),
+          friendly?: Hostility.friendly?(character, metadata),
+          attackable?: Hostility.attackable?(character, guid),
+          position: World.position(guid)
+        }
+    end
+  end
+
+  defp build_target_info(_state, _targets), do: nil
+
+  defp fail_cast(%Spell{id: spell_id}, reason) do
+    Network.send_packet(Message.SmsgCastResult.failure(spell_id, reason))
   end
 
   defp do_cast_spell(state, %Spell{} = spell, spell_cast_targets, targets, cast_item_guid) do
@@ -109,6 +137,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgCastSpell do
 
   defp handle_unknown_spell(state, spell_id) do
     Logger.warning("CMSG_CAST_SPELL: spell #{spell_id} not in caster's spellbook")
+    Network.send_packet(Message.SmsgCastResult.failure(spell_id, :not_known))
     state
   end
 

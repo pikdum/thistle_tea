@@ -22,6 +22,9 @@ defmodule ThistleTea.Game.Spell do
     :rank,
     :exclusive_category,
     speed: 0.0,
+    category: 0,
+    recovery_time_ms: 0,
+    category_recovery_time_ms: 0,
     aura_interrupt_flags: 0,
     attributes: MapSet.new(),
     effects: [],
@@ -69,6 +72,12 @@ defmodule ThistleTea.Game.Spell do
 
   defp school_mask_index(school) when is_integer(school) and school >= 0, do: 1 <<< school
   defp school_mask_index(_school), do: 0
+
+  def requires_hostile_target?(%__MODULE__{effects: effects}) do
+    Enum.any?(effects, fn %Effect{implicit_target_a: a, implicit_target_b: b} ->
+      a == :target_enemy or b == :target_enemy
+    end)
+  end
 
   def aura_effects(%__MODULE__{effects: effects}) do
     Enum.filter(effects, &match?(%Effect{type: :apply_aura}, &1))

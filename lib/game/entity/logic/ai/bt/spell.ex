@@ -17,6 +17,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Cast
   alias ThistleTea.Game.Spell.CastContext
+  alias ThistleTea.Game.Spell.Cooldowns
   alias ThistleTea.Game.Spell.Targets
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.Metadata
@@ -68,6 +69,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
 
       character
       |> Resources.spend_power(casting.spell, now)
+      |> start_cooldown(casting, now)
       |> queue_cast_result(casting)
       |> queue_spell_go(casting, targets)
       |> queue_area_effects(casting)
@@ -124,6 +126,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
 
     character
     |> Resources.spend_power(casting.spell, now)
+    |> start_cooldown(casting, now)
     |> queue_cast_result(casting)
     |> queue_spell_go(casting, targets)
     |> queue_area_effects(casting)
@@ -232,6 +235,21 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
   end
 
   defp queue_consume_reagents(character, _casting), do: character
+
+  defp start_cooldown(%{object: %{guid: guid}} = character, %Cast{spell: %Spell{} = spell}, now)
+       when is_integer(guid) do
+    case Cooldowns.client_cooldown_ms(spell) do
+      cooldown_ms when cooldown_ms > 0 ->
+        character
+        |> Cooldowns.start(spell, now)
+        |> Event.enqueue(Event.spell_cooldown(guid, spell.id, cooldown_ms))
+
+      _ ->
+        character
+    end
+  end
+
+  defp start_cooldown(character, _casting, _now), do: character
 
   defp queue_cast_result(character, %{spell: %Spell{id: spell_id}}) do
     Event.enqueue(character, Event.spell_cast_result(spell_id))

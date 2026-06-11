@@ -41,6 +41,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal do
     :creature_type_flags,
     :regenerate_stats,
     action_buttons: %{},
+    cooldowns: %{},
     events: [],
     area_effect_guids: [],
     broadcast_update?: false,

@@ -8,6 +8,26 @@ defmodule ThistleTea.Game.Network.Message.SmsgCastResult do
   @cast_failure_reason_requires_area 0x5D
   @cast_failure_reason_equipped_item_class 0x19
 
+  @cast_failure_reasons %{
+    aura_bounced: 0x07,
+    bad_implicit_targets: 0x09,
+    bad_targets: 0x0A,
+    caster_dead: 0x13,
+    equipped_item_class: @cast_failure_reason_equipped_item_class,
+    item_not_ready: 0x28,
+    not_known: 0x38,
+    not_ready: 0x3C,
+    no_power: 0x4D,
+    out_of_range: 0x59,
+    reagents: 0x5C,
+    requires_area: @cast_failure_reason_requires_area,
+    requires_spell_focus: @cast_failure_reason_requires_spell_focus,
+    spell_in_progress: 0x61,
+    targets_dead: 0x65,
+    target_enemy: 0x69,
+    target_friendly: 0x6B
+  }
+
   defstruct [
     :spell,
     :result,
@@ -18,6 +38,14 @@ defmodule ThistleTea.Game.Network.Message.SmsgCastResult do
     :equipped_item_subclass_mask,
     :equipped_item_inventory_type_mask
   ]
+
+  def failure(spell_id, reason) when is_integer(spell_id) and is_atom(reason) do
+    %__MODULE__{
+      spell: spell_id,
+      result: @simple_spell_cast_result_failure,
+      reason: Map.fetch!(@cast_failure_reasons, reason)
+    }
+  end
 
   @impl ServerMessage
   def to_binary(%__MODULE__{

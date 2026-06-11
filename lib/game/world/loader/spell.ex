@@ -131,6 +131,15 @@ defmodule ThistleTea.Game.World.Loader.Spell do
       effects: build_effects(row, radius_lookup),
       reagents: build_reagents(row)
     }
+    |> struct!(cooldown_fields(row))
+  end
+
+  defp cooldown_fields(row) do
+    %{
+      category: row.category || 0,
+      recovery_time_ms: row.recovery_time || 0,
+      category_recovery_time_ms: row.category_recovery_time || 0
+    }
   end
 
   defp load_chain_map(spell_ids) do

@@ -132,6 +132,17 @@ defmodule ThistleTea.Game.Entity.EventSink do
     entity
   end
 
+  def emit(%Character{} = entity, %Event{type: :spell_cooldown} = event) do
+    Network.send_packet(%Message.SmsgSpellCooldown{
+      guid: event.source_guid,
+      cooldowns: [{event.spell_id, event.duration_ms}]
+    })
+
+    entity
+  end
+
+  def emit(entity, %Event{type: :spell_cooldown}), do: entity
+
   def emit(%{object: %{guid: guid}} = entity, %Event{type: :spell_go} = event) when is_integer(guid) do
     %Message.SmsgSpellGo{
       cast_item: event.cast_item_guid || event.source_guid || guid,
