@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.SmsgCharCreate do
+  @moduledoc false
   use ThistleTea.Game.Network.ServerMessage, :SMSG_CHAR_CREATE
 
   @result %{

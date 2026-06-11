@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.SmsgTextEmote do
+  @moduledoc false
   use ThistleTea.Game.Network.ServerMessage, :SMSG_TEXT_EMOTE
 
   defstruct [

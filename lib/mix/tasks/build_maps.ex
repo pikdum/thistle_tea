@@ -1,5 +1,9 @@
 defmodule Mix.Tasks.BuildMaps do
   @shortdoc "Builds the maps for pathfinding"
+  @moduledoc """
+  Generates navigation meshes from the WoW client's map files via namigator;
+  expects `WOW_DIR` to point at the client data.
+  """
   use Mix.Task
 
   alias ThistleTea.Native.Namigator

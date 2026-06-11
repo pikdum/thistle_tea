@@ -1,4 +1,10 @@
 defmodule ThistleTea.Game.Entity.Logic.Aura do
+  @moduledoc """
+  Pure aura lifecycle logic: applying a cast spell's auras to an entity with
+  rank, same-source, and exclusive-category stacking rules, expiring auras whose
+  duration has elapsed, and deriving interrupt/reaction events (e.g. breaking
+  fear on hit, cancelling seated auras on move).
+  """
   import Bitwise, only: [&&&: 2, |||: 2, <<<: 2, bnot: 1]
 
   alias ThistleTea.Game.Aura

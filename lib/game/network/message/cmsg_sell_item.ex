@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.CmsgSellItem do
+  @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_SELL_ITEM
 
   alias ThistleTea.Game.Entity.Data.Item, as: DataItem

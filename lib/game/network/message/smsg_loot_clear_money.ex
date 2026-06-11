@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.SmsgLootClearMoney do
+  @moduledoc false
   use ThistleTea.Game.Network.ServerMessage, :SMSG_LOOT_CLEAR_MONEY
 
   defstruct []

@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.CmsgGossipHello do
+  @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_GOSSIP_HELLO
 
   alias ThistleTea.Game.Entity.Data.Quest

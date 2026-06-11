@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.CmsgForceMoveUnrootAck do
+  @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_FORCE_MOVE_UNROOT_ACK
 
   defstruct [:guid, :counter, :movement_payload]

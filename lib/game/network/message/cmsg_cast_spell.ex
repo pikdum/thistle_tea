@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.CmsgCastSpell do
+  @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_CAST_SPELL
 
   alias ThistleTea.Game.Entity.Data.Component.Unit

@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.SmsgBindpointupdate do
+  @moduledoc false
   use ThistleTea.Game.Network.ServerMessage, :SMSG_BINDPOINTUPDATE
 
   defstruct [

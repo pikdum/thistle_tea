@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.CmsgMoveTeleportAck do
+  @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :MSG_MOVE_TELEPORT_ACK
 
   alias ThistleTea.Game.World.Visibility

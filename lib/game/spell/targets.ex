@@ -1,4 +1,9 @@
 defmodule ThistleTea.Game.Spell.Targets do
+  @moduledoc """
+  The spell-cast targets blob from CMSG_CAST_SPELL: parses target flags into
+  unit guid and source/destination locations, and keeps the raw binary for
+  echoing back in SMSG_SPELL_GO.
+  """
   import Bitwise, only: [&&&: 2]
 
   alias ThistleTea.Game.Network.BinaryUtils

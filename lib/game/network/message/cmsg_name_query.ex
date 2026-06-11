@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.CmsgNameQuery do
+  @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_NAME_QUERY
 
   alias ThistleTea.Game.Network.Message

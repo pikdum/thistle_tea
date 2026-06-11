@@ -1,4 +1,7 @@
 defmodule ThistleTea.Game.World.Loader.ClassSpell do
+  @moduledoc """
+  Looks up trainable class spells by class and level from the DBC.
+  """
   import Ecto.Query
 
   alias ThistleTea.DB.Mangos

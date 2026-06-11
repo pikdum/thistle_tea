@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.SmsgLootMoneyNotify do
+  @moduledoc false
   use ThistleTea.Game.Network.ServerMessage, :SMSG_LOOT_MONEY_NOTIFY
 
   defstruct [:money]

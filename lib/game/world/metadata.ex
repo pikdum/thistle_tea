@@ -1,4 +1,8 @@
 defmodule ThistleTea.Game.World.Metadata do
+  @moduledoc """
+  ETS map of per-guid metadata (name, faction, flags, …) readable without
+  calling into the owning process.
+  """
   @table_options [:named_table, :public, read_concurrency: true, write_concurrency: :auto]
 
   def init(table \\ __MODULE__) do

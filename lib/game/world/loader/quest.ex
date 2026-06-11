@@ -1,4 +1,8 @@
 defmodule ThistleTea.Game.World.Loader.Quest do
+  @moduledoc """
+  ETS cache of quest templates and questgiver/quest-ender relations from
+  Mangos.
+  """
   import Ecto.Query
 
   alias ThistleTea.DB.Mangos

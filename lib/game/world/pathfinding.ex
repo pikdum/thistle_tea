@@ -1,4 +1,8 @@
 defmodule ThistleTea.Game.World.Pathfinding do
+  @moduledoc """
+  Navigation-mesh queries over the namigator NIF: pathfinding, random points,
+  terrain heights, and zone/area lookup.
+  """
   alias ThistleTea.Native.Namigator
 
   def get_zone_and_area(map_id, {x, y, z}) do

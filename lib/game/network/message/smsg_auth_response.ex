@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.SmsgAuthResponse do
+  @moduledoc false
   use ThistleTea.Game.Network.ServerMessage, :SMSG_AUTH_RESPONSE
 
   @result_auth_ok 0x0C

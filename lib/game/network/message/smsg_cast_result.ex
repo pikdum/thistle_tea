@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.SmsgCastResult do
+  @moduledoc false
   use ThistleTea.Game.Network.ServerMessage, :SMSG_CAST_RESULT
 
   @simple_spell_cast_result_failure 2

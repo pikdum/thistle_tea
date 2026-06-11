@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.CmsgPlayerLogin do
+  @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_PLAYER_LOGIN
 
   import Bitwise, only: [<<<: 2, |||: 2]

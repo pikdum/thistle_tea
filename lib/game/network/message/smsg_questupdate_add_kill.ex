@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.SmsgQuestupdateAddKill do
+  @moduledoc false
   use ThistleTea.Game.Network.ServerMessage, :SMSG_QUESTUPDATE_ADD_KILL
 
   defstruct [:quest_id, :creature_entry, :count, :required, :victim_guid]

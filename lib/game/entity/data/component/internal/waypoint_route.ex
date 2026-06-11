@@ -1,4 +1,8 @@
 defmodule ThistleTea.Game.Entity.Data.Component.Internal.WaypointRoute do
+  @moduledoc """
+  A mob's waypoint patrol route built from `creature_movement` rows, tracking
+  the current destination point and advancing through the loop.
+  """
   alias ThistleTea.DB.Mangos.Creature
   alias ThistleTea.DB.Mangos.CreatureMovement
   alias ThistleTea.Game.Entity.Data.Component.Internal.Waypoint

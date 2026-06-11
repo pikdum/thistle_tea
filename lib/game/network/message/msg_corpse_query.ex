@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.MsgCorpseQuery do
+  @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :MSG_CORPSE_QUERY
 
   alias ThistleTea.Game.Entity.Data.Corpse

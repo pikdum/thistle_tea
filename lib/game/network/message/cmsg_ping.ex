@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.CmsgPing do
+  @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_PING
 
   require Logger

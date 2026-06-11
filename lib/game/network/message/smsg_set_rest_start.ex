@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.SmsgSetRestStart do
+  @moduledoc false
   use ThistleTea.Game.Network.ServerMessage, :SMSG_SET_REST_START
 
   defstruct [:unknown1]

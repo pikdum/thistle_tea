@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.SmsgNameQueryResponse do
+  @moduledoc false
   use ThistleTea.Game.Network.ServerMessage, :SMSG_NAME_QUERY_RESPONSE
 
   defstruct [

@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.SmsgLogoutCancelAck do
+  @moduledoc false
   use ThistleTea.Game.Network.ServerMessage, :SMSG_LOGOUT_CANCEL_ACK
 
   defstruct []

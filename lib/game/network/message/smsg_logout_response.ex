@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.SmsgLogoutResponse do
+  @moduledoc false
   use ThistleTea.Game.Network.ServerMessage, :SMSG_LOGOUT_RESPONSE
 
   @result %{

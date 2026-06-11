@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.SmsgAccountDataTimes do
+  @moduledoc false
   use ThistleTea.Game.Network.ServerMessage, :SMSG_ACCOUNT_DATA_TIMES
 
   defstruct data: List.duplicate(0, 32)

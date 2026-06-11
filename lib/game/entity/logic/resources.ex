@@ -1,4 +1,9 @@
 defmodule ThistleTea.Game.Entity.Logic.Resources do
+  @moduledoc """
+  Spending and gaining unit power: spell power costs (marking the five-second
+  rule) and rage generation from auto attacks. Rage is stored pre-scaled ×10,
+  matching the client's units.
+  """
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.Core

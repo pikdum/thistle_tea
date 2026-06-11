@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.CmsgSetActionButton do
+  @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_SET_ACTION_BUTTON
 
   @max_action_buttons 120

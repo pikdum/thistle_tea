@@ -1,4 +1,8 @@
 defmodule ThistleTea.Game.World.System.GameEvent do
+  @moduledoc """
+  Tracks which seasonal/world game events are active and notifies subscribed
+  event-gated spawns when their event starts or stops.
+  """
   use GenServer
 
   alias ThistleTea.Game.Entity.Data.Component.Internal

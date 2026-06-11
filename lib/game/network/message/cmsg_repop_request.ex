@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.CmsgRepopRequest do
+  @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_REPOP_REQUEST
 
   alias ThistleTea.Game.Entity.Data.Component.Internal

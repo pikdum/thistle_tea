@@ -1,7 +1,9 @@
 defmodule ThistleTea.Game.Network.Message.SmsgWho do
+  @moduledoc false
   use ThistleTea.Game.Network.ServerMessage, :SMSG_WHO
 
   defmodule WhoPlayer do
+    @moduledoc false
     defstruct [
       :name,
       :guild,

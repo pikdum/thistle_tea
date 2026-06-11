@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Entity.Data.Component.Object do
+  @moduledoc false
   use ThistleTea.Game.Entity.UpdateMask,
     guid: {0x0000, 2, :guid},
     type: {0x0002, 1, :int},

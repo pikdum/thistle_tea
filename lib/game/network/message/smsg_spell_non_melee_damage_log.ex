@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.SmsgSpellNonMeleeDamageLog do
+  @moduledoc false
   use ThistleTea.Game.Network.ServerMessage, :SMSG_SPELLNONMELEEDAMAGELOG
 
   defstruct attacker: 0,

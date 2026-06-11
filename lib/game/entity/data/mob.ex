@@ -1,4 +1,8 @@
 defmodule ThistleTea.Game.Entity.Data.Mob do
+  @moduledoc """
+  Mob entity built from Mangos `creature` spawn rows and their templates,
+  including respawn reset and the metadata used for visibility queries.
+  """
   import Bitwise, only: [|||: 2, <<<: 2, &&&: 2]
 
   alias ThistleTea.DB.Mangos

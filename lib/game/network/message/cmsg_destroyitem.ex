@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.CmsgDestroyitem do
+  @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_DESTROYITEM
 
   alias ThistleTea.Game.Entity.Logic.Inventory

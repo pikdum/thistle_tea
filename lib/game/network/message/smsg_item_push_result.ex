@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.SmsgItemPushResult do
+  @moduledoc false
   use ThistleTea.Game.Network.ServerMessage, :SMSG_ITEM_PUSH_RESULT
 
   defstruct [

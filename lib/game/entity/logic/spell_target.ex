@@ -1,4 +1,8 @@
 defmodule ThistleTea.Game.Entity.Logic.SpellTarget do
+  @moduledoc """
+  Classifies a spell + targets blob into a target query — caster AoE, cone,
+  ground-targeted AoE, or a single unit — for the spatial target resolver.
+  """
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.Spell.Targets

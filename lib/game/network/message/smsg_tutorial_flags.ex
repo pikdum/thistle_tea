@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.SmsgTutorialFlags do
+  @moduledoc false
   use ThistleTea.Game.Network.ServerMessage, :SMSG_TUTORIAL_FLAGS
 
   defstruct [:tutorial_data]

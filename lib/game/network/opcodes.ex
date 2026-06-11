@@ -1,4 +1,8 @@
 defmodule ThistleTea.Game.Network.Opcodes do
+  @moduledoc """
+  The full 1.12 opcode table, with a `use` macro that defines module
+  attributes for the opcodes a module asks for (e.g. `@smsg_foo`).
+  """
   @opcodes %{
     0x000 => :MSG_NULL_ACTION,
     0x001 => :CMSG_BOOTME,

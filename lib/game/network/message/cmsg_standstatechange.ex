@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.CmsgStandstatechange do
+  @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_STANDSTATECHANGE
 
   alias ThistleTea.Game.Entity.EventSink

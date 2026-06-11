@@ -1,4 +1,8 @@
 defmodule ThistleTea.Game.World.SpatialHash do
+  @moduledoc """
+  ETS-backed spatial hash with 125-yard cells per entity table, plus active
+  spline-movement records, powering range queries and visibility cells.
+  """
   @cell_size 125
   @cell_table_options [:named_table, :public, :duplicate_bag, read_concurrency: true, write_concurrency: :auto]
   @entity_table_options [:named_table, :public, :set, read_concurrency: true, write_concurrency: :auto]

@@ -1,4 +1,8 @@
 defmodule ThistleTea.Game.Network.UpdateObject do
+  @moduledoc """
+  Builds SMSG_UPDATE_OBJECT blocks: flattens component field structs into
+  field values, generates the update mask, and encodes create/values blocks.
+  """
   use ThistleTea.Game.Network.Opcodes, [:SMSG_UPDATE_OBJECT]
 
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock

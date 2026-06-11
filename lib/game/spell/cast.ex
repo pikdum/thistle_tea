@@ -1,4 +1,8 @@
 defmodule ThistleTea.Game.Spell.Cast do
+  @moduledoc """
+  An in-progress cast: spell, targets, completion time, and channel tick
+  state for channeled spells.
+  """
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Targets
 

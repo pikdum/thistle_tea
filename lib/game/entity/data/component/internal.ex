@@ -1,4 +1,9 @@
 defmodule ThistleTea.Game.Entity.Data.Component.Internal do
+  @moduledoc """
+  Server-only entity state that is never sent to the client: map/area, AI and
+  combat bookkeeping, pending events, loot, casting state, and similar
+  runtime-internal fields.
+  """
   defstruct [
     :map,
     :name,

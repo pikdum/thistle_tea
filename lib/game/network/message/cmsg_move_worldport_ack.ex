@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.CmsgMoveWorldportAck do
+  @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :MSG_MOVE_WORLDPORT_ACK
 
   alias ThistleTea.Game.Network.Message.CmsgPlayerLogin

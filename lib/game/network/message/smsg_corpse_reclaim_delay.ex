@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.SmsgCorpseReclaimDelay do
+  @moduledoc false
   use ThistleTea.Game.Network.ServerMessage, :SMSG_CORPSE_RECLAIM_DELAY
 
   defstruct [:delay_ms]

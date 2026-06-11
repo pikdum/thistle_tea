@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.MsgChannelUpdate do
+  @moduledoc false
   use ThistleTea.Game.Network.ServerMessage, :MSG_CHANNEL_UPDATE
 
   defstruct time_ms: 0

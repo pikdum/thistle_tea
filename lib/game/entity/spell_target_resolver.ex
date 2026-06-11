@@ -1,4 +1,8 @@
 defmodule ThistleTea.Game.Entity.SpellTargetResolver do
+  @moduledoc """
+  Boundary that resolves a spell's target query into concrete guids using
+  spatial lookups and hostility checks.
+  """
   alias ThistleTea.Game.Entity.Logic.Hostility
   alias ThistleTea.Game.Entity.Logic.SpellTarget
   alias ThistleTea.Game.Spell

@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.CmsgGameobjectQuery do
+  @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_GAMEOBJECT_QUERY
 
   alias ThistleTea.DB.Mangos

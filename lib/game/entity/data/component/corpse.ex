@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Entity.Data.Component.Corpse do
+  @moduledoc false
   use ThistleTea.Game.Entity.UpdateMask,
     owner: {0x0006, 2, :guid},
     facing: {0x0008, 1, :float},

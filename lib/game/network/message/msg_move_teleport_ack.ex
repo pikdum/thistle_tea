@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.MsgMoveTeleportAck do
+  @moduledoc false
   use ThistleTea.Game.Network.ServerMessage, :MSG_MOVE_TELEPORT_ACK
 
   defstruct [:guid, :position, counter: 0, movement_flags: 0, timestamp: 0, fall_time: 0]

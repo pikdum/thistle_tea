@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.SmsgQuestgiverOfferReward do
+  @moduledoc false
   use ThistleTea.Game.Network.ServerMessage, :SMSG_QUESTGIVER_OFFER_REWARD
 
   alias ThistleTea.Game.Entity.Data.ItemTemplate

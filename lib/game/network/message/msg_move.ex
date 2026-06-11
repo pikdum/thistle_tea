@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.MsgMove do
+  @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :MSG_MOVE_JUMP
 
   alias ThistleTea.Game.Entity.EventSink

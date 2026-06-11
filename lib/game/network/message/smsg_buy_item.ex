@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.SmsgBuyItem do
+  @moduledoc false
   use ThistleTea.Game.Network.ServerMessage, :SMSG_BUY_ITEM
 
   defstruct [:vendor_guid, :vendor_slot, new_count: 0xFFFFFFFF, count: 1]

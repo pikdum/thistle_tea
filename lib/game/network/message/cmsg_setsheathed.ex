@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.CmsgSetsheathed do
+  @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_SETSHEATHED
 
   require Logger

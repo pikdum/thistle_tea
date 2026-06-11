@@ -1,4 +1,5 @@
 defmodule ThistleTea.Account do
+  @moduledoc false
   use Memento.Table,
     attributes: [:id, :username, :password_hash, :password_salt, :password_verifier],
     index: [:username],

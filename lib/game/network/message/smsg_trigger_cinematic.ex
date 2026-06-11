@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.SmsgTriggerCinematic do
+  @moduledoc false
   use ThistleTea.Game.Network.ServerMessage, :SMSG_TRIGGER_CINEMATIC
 
   defstruct [:cinematic_sequence_id]

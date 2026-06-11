@@ -1,4 +1,8 @@
 defmodule ThistleTea.Game.Entity do
+  @moduledoc """
+  Boundary facade for talking to live entities by guid: registry lookups and
+  casts to the owning process (movement, attacks, spells, update requests).
+  """
   alias ThistleTea.Game.Entity.Registry, as: EntityRegistry
 
   def register(guid), do: EntityRegistry.register(guid)

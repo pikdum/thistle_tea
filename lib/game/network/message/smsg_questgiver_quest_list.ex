@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.SmsgQuestgiverQuestList do
+  @moduledoc false
   use ThistleTea.Game.Network.ServerMessage, :SMSG_QUESTGIVER_QUEST_LIST
 
   alias ThistleTea.Game.Entity.Data.Quest

@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.CmsgAutoequipItem do
+  @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_AUTOEQUIP_ITEM
 
   alias ThistleTea.Game.Entity.Logic.Inventory

@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.CmsgListInventory do
+  @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_LIST_INVENTORY
 
   alias ThistleTea.Game.Entity.Logic.Core

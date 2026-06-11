@@ -1,4 +1,8 @@
 defmodule ThistleTea.Game.Network.Connection.Crypto do
+  @moduledoc """
+  Vanilla header crypto: XOR/shift cipher over packet headers keyed by the
+  SRP6 session key, with rolling send/recv state on the connection.
+  """
   alias ThistleTea.Game.Network.Connection
 
   def decrypt_header(%Connection{session_key: session_key} = conn) when is_nil(session_key) do

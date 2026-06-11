@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.CmsgItemQuerySingle do
+  @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_ITEM_QUERY_SINGLE
 
   alias ThistleTea.Game.Network.Message

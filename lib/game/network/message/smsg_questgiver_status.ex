@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.SmsgQuestgiverStatus do
+  @moduledoc false
   use ThistleTea.Game.Network.ServerMessage, :SMSG_QUESTGIVER_STATUS
 
   defstruct [:guid, :status]

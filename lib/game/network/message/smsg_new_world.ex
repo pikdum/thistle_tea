@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.SmsgNewWorld do
+  @moduledoc false
   use ThistleTea.Game.Network.ServerMessage, :SMSG_NEW_WORLD
 
   defstruct [

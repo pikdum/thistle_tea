@@ -1,4 +1,9 @@
 defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
+  @moduledoc """
+  Shared melee combat behavior-tree subtree: in-combat and range checks, swing
+  execution, and waiting out the attack timer. Used by both mob and player
+  trees.
+  """
   alias ThistleTea.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Unit

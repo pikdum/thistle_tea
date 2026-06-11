@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.SmsgLoginSettimespeed do
+  @moduledoc false
   use ThistleTea.Game.Network.ServerMessage, :SMSG_LOGIN_SETTIMESPEED
 
   defstruct [

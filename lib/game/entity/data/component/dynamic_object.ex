@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Entity.Data.Component.DynamicObject do
+  @moduledoc false
   use ThistleTea.Game.Entity.UpdateMask,
     caster: {0x0006, 2, :guid},
     bytes: {0x0008, 1, :bytes},

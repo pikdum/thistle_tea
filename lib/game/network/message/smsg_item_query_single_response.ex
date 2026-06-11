@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.SmsgItemQuerySingleResponse do
+  @moduledoc false
   use ThistleTea.Game.Network.ServerMessage, :SMSG_ITEM_QUERY_SINGLE_RESPONSE
 
   defstruct [

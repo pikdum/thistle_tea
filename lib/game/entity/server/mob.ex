@@ -1,4 +1,8 @@
 defmodule ThistleTea.Game.Entity.Server.Mob do
+  @moduledoc """
+  Owning GenServer for a mob: ticks its behavior tree, applies incoming
+  attacks and spells through the pure core, and serves loot-window calls.
+  """
   use GenServer
 
   import Bitwise, only: [|||: 2, &&&: 2, bnot: 1]

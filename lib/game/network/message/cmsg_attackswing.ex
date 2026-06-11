@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.CmsgAttackswing do
+  @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_ATTACKSWING
 
   alias ThistleTea.Game.Entity.Logic.AI.BT

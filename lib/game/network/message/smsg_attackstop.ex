@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.SmsgAttackstop do
+  @moduledoc false
   use ThistleTea.Game.Network.ServerMessage, :SMSG_ATTACKSTOP
 
   defstruct [

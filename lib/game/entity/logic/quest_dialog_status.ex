@@ -1,4 +1,8 @@
 defmodule ThistleTea.Game.Entity.Logic.QuestDialogStatus do
+  @moduledoc """
+  Computes the questgiver status icon and the gossip quest-menu entries for an
+  NPC from its given/ended quest lists and the player's quest context.
+  """
   alias ThistleTea.Game.Entity.Data.Quest
   alias ThistleTea.Game.Entity.Logic.QuestLog
   alias ThistleTea.Game.Entity.Logic.QuestLog.Entry

@@ -1,4 +1,8 @@
 defmodule ThistleTea.Game.Entity.Logic.AI.BT.Aura do
+  @moduledoc """
+  Behavior-tree step that expires due auras and schedules periodic aura ticks
+  while the entity has any auras active.
+  """
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard

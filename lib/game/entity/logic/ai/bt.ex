@@ -1,4 +1,11 @@
 defmodule ThistleTea.Game.Entity.Logic.AI.BT do
+  @moduledoc """
+  Behavior-tree primitives (`selector`, `sequence`, `condition`, `action`)
+  used for all entity AI/action logic. Nodes return
+  `:success | :failure | :running | {:running, delay_ms}`; trees are ticked
+  from the entity's owning process, which honors the returned delay when
+  scheduling the next tick.
+  """
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
 

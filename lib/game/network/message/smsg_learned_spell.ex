@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.SmsgLearnedSpell do
+  @moduledoc false
   use ThistleTea.Game.Network.ServerMessage, :SMSG_LEARNED_SPELL
 
   defstruct [:spell_id]

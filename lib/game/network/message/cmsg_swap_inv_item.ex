@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.CmsgSwapInvItem do
+  @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_SWAP_INV_ITEM
 
   alias ThistleTea.Game.Entity.Logic.Inventory

@@ -1,4 +1,9 @@
 defmodule ThistleTea.Game.Network.PlayerTick do
+  @moduledoc """
+  Decides whether a player needs behavior-tree ticking (casting, combat,
+  auras, regen) and schedules the next tick on the network handler only when
+  needed.
+  """
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.Regen

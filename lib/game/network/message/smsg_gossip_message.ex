@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.SmsgGossipMessage do
+  @moduledoc false
   use ThistleTea.Game.Network.ServerMessage, :SMSG_GOSSIP_MESSAGE
 
   defstruct [
@@ -9,6 +10,7 @@ defmodule ThistleTea.Game.Network.Message.SmsgGossipMessage do
   ]
 
   defmodule GossipItem do
+    @moduledoc false
     defstruct [
       :id,
       :item_icon,
@@ -18,6 +20,7 @@ defmodule ThistleTea.Game.Network.Message.SmsgGossipMessage do
   end
 
   defmodule QuestItem do
+    @moduledoc false
     defstruct [
       :quest_id,
       :quest_icon,

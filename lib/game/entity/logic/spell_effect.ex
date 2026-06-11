@@ -1,4 +1,8 @@
 defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
+  @moduledoc """
+  Applies a cast spell's effects (damage, healing, auras, item creation, …) to
+  a target entity, returning the updated entity and the events to emit.
+  """
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Event

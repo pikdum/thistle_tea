@@ -1,4 +1,8 @@
 defmodule ThistleTea.Game.Entity.Logic.AI.BT.Blackboard do
+  @moduledoc """
+  Per-entity scratch state shared across behavior-tree ticks: current targets
+  and per-key next-run timestamps used to pace actions between ticks.
+  """
   defstruct target: nil,
             move_target: nil,
             orientation: nil,

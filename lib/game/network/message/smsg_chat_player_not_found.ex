@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.SmsgChatPlayerNotFound do
+  @moduledoc false
   use ThistleTea.Game.Network.ServerMessage, :SMSG_CHAT_PLAYER_NOT_FOUND
 
   defstruct [:name]

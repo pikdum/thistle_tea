@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.SmsgDestroyObject do
+  @moduledoc false
   use ThistleTea.Game.Network.ServerMessage, :SMSG_DESTROY_OBJECT
 
   defstruct [:guid]

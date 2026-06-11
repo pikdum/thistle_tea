@@ -1,4 +1,8 @@
 defmodule ThistleTea.Game.Entity.Data.Corpse do
+  @moduledoc """
+  Corpse entity built from a dead character, including its derived guid and
+  the packed equipment display worn at death.
+  """
   import Bitwise, only: [|||: 2, <<<: 2]
 
   alias ThistleTea.Game.Entity.Data.Component.Corpse, as: CorpseComponent

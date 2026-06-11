@@ -1,4 +1,8 @@
 defmodule ThistleTea.Game.Entity.Data.DynamicObject do
+  @moduledoc """
+  Dynamic object entity for ground-targeted area spells (e.g. Blizzard),
+  built from the caster, spell, and target location.
+  """
   import Bitwise, only: [|||: 2]
 
   alias ThistleTea.Game.Entity.Data.Component.DynamicObject, as: DynamicObjectComponent

@@ -1,4 +1,8 @@
 defmodule ThistleTea.Game.Entity.Logic.MovementStats do
+  @moduledoc """
+  Recomputes the derived movement speeds on `movement_block` from base speed
+  rates and movement-modifying auras; never reads current speeds as input.
+  """
   alias ThistleTea.Game.Aura
   alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock

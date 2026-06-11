@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.SmsgAuthChallenge do
+  @moduledoc false
   use ThistleTea.Game.Network.ServerMessage, :SMSG_AUTH_CHALLENGE
 
   defstruct [:server_seed]

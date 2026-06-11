@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.SmsgMoveFeatherFall do
+  @moduledoc false
   use ThistleTea.Game.Network.ServerMessage, :SMSG_MOVE_FEATHER_FALL
 
   defstruct [:guid, counter: 0]

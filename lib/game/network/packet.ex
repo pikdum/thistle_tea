@@ -1,4 +1,7 @@
 defmodule ThistleTea.Game.Network.Packet do
+  @moduledoc """
+  A framed world packet: opcode, size, and payload.
+  """
   defstruct [
     :opcode,
     :size,

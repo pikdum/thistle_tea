@@ -1,4 +1,10 @@
 defmodule ThistleTea.Game.Entity.Logic.Stats do
+  @moduledoc """
+  Pure recompute of derived unit stats from the canonical inputs (`base_*`
+  fields, equipment bonuses, active auras): displayed stats, resistances,
+  health/mana maxima, attack power, and weapon damage. Fields whose base
+  inputs are nil are skipped, which keeps mob DB values untouched.
+  """
   import Bitwise, only: [&&&: 2]
 
   alias ThistleTea.Game.Aura

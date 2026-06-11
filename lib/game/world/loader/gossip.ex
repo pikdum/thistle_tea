@@ -1,4 +1,8 @@
 defmodule ThistleTea.Game.World.Loader.Gossip do
+  @moduledoc """
+  Loads gossip menus and options from Mangos into ETS, filtered to the option
+  types the server supports, with creature-to-menu and trainer lookups.
+  """
   import Ecto.Query
 
   alias ThistleTea.DB.Mangos
@@ -12,10 +16,12 @@ defmodule ThistleTea.Game.World.Loader.Gossip do
   @supported_option_ids [@option_gossip, @option_vendor, @option_trainer, @option_spirit_healer]
 
   defmodule Menu do
+    @moduledoc false
     defstruct [:menu_id, :text_id, options: []]
   end
 
   defmodule Option do
+    @moduledoc false
     defstruct [:id, :icon, :text, :option_id, :action_menu_id, coded: 0]
   end
 

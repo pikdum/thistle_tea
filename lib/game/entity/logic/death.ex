@@ -1,4 +1,9 @@
 defmodule ThistleTea.Game.Entity.Logic.Death do
+  @moduledoc """
+  Player death and resurrection: spirit release with race-specific ghost auras,
+  resurrecting with partial health/mana restore, and resurrection sickness
+  duration by level.
+  """
   import Bitwise, only: [&&&: 2, |||: 2, bnot: 1]
 
   alias ThistleTea.Game.Entity.Data.Component.Player

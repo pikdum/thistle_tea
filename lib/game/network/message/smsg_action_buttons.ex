@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.SmsgActionButtons do
+  @moduledoc false
   use ThistleTea.Game.Network.ServerMessage, :SMSG_ACTION_BUTTONS
 
   @max_action_buttons 120

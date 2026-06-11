@@ -1,4 +1,8 @@
 defmodule ThistleTea.Game.Spell do
+  @moduledoc """
+  Internal spell struct translated from the spell DBC: attributes, effects,
+  rank-chain and exclusive-category info, plus school-mask helpers.
+  """
   import Bitwise, only: [<<<: 2]
 
   alias ThistleTea.Game.Spell.Effect

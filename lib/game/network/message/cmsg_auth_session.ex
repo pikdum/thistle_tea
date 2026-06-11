@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.CmsgAuthSession do
+  @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_AUTH_SESSION
 
   defstruct [

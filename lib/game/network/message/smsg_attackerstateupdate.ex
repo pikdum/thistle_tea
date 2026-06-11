@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.SmsgAttackerstateupdate do
+  @moduledoc false
   use ThistleTea.Game.Network.ServerMessage, :SMSG_ATTACKERSTATEUPDATE
 
   @default_hit_info 0x00000002

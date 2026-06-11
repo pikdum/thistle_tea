@@ -1,4 +1,8 @@
 defmodule ThistleTea.Game.World.Loader.Loot do
+  @moduledoc """
+  Generates a loot instance for a loot id by feeding Mangos loot-template rows
+  through the pure loot roller.
+  """
   alias ThistleTea.DB.Mangos
   alias ThistleTea.Game.Entity.Data.ItemTemplate
   alias ThistleTea.Game.Entity.Logic.Loot

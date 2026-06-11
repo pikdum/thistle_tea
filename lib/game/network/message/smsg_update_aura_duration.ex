@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.SmsgUpdateAuraDuration do
+  @moduledoc false
   use ThistleTea.Game.Network.ServerMessage, :SMSG_UPDATE_AURA_DURATION
 
   defstruct [:aura_slot, :duration_ms]

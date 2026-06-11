@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.SmsgStandstateUpdate do
+  @moduledoc false
   use ThistleTea.Game.Network.ServerMessage, :SMSG_STANDSTATE_UPDATE
 
   defstruct [:stand_state]

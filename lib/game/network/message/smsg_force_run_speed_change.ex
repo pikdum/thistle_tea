@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.SmsgForceRunSpeedChange do
+  @moduledoc false
   use ThistleTea.Game.Network.ServerMessage, :SMSG_FORCE_RUN_SPEED_CHANGE
 
   defstruct [:guid, :speed, move_event: 0]

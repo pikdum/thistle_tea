@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.MsgCorpseQueryResponse do
+  @moduledoc false
   use ThistleTea.Game.Network.ServerMessage, :MSG_CORPSE_QUERY
 
   defstruct [:map, :position]

@@ -1,4 +1,8 @@
 defmodule ThistleTea.Game.World.Loader.Mob do
+  @moduledoc """
+  Loads the creature spawns for a cell from Mangos (with templates, movement,
+  and display info) into mob entity structs.
+  """
   alias ThistleTea.DB.Mangos
   alias ThistleTea.DBC
   alias ThistleTea.Game.Entity.Data.Mob

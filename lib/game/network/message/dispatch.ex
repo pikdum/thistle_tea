@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.Dispatch do
+  @moduledoc false
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Opcodes
   alias ThistleTea.Game.Network.Packet

@@ -1,4 +1,8 @@
 defmodule ThistleTea.Game.World.ItemStore do
+  @moduledoc """
+  ETS store of live item instances by guid — the runtime home of items, which
+  deliberately never enter visibility tracking.
+  """
   alias ThistleTea.Game.Entity.Data.Item
   alias ThistleTea.Game.Entity.Data.ItemTemplate
   alias ThistleTea.Game.Guid

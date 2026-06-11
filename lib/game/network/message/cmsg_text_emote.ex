@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.CmsgTextEmote do
+  @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_TEXT_EMOTE
 
   alias ThistleTea.Game.Network.Message

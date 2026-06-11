@@ -1,4 +1,7 @@
 defmodule ThistleTea.Game.World.Loader.Vendor do
+  @moduledoc """
+  ETS cache of vendor inventories from Mangos `npc_vendor` rows.
+  """
   alias ThistleTea.DB.Mangos
   alias ThistleTea.Game.Entity.Data.ItemTemplate
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader

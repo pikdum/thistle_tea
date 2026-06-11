@@ -1,4 +1,8 @@
 defmodule ThistleTea.Game.Network.Send do
+  @moduledoc """
+  Writes packets to the socket with encrypted headers, compressing large
+  update-object payloads into SMSG_COMPRESSED_UPDATE_OBJECT.
+  """
   use ThistleTea.Game.Network.Opcodes, [:SMSG_UPDATE_OBJECT, :SMSG_COMPRESSED_UPDATE_OBJECT]
 
   alias ThistleTea.Game.Network.Connection.Crypto

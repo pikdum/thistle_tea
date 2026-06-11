@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Entity.Data.Component.Player do
+  @moduledoc false
   use ThistleTea.Game.Entity.UpdateMask,
     duel_arbiter: {0x00BC, 2, :guid},
     flags: {0x00BE, 1, :int},

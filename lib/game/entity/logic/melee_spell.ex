@@ -1,4 +1,9 @@
 defmodule ThistleTea.Game.Entity.Logic.MeleeSpell do
+  @moduledoc """
+  On-next-swing melee spells (e.g. Heroic Strike): queueing the spell on the
+  entity, consuming it when the swing lands, and folding its bonus damage into
+  the attack.
+  """
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Effect

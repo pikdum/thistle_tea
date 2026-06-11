@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.SmsgPong do
+  @moduledoc false
   use ThistleTea.Game.Network.ServerMessage, :SMSG_PONG
 
   defstruct [:sequence_id]

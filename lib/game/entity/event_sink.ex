@@ -1,4 +1,9 @@
 defmodule ThistleTea.Game.Entity.EventSink do
+  @moduledoc """
+  Boundary that drains the events queued on an entity by pure logic and
+  performs their side effects: building packets, broadcasting to nearby
+  players, and messaging other entity processes.
+  """
   alias ThistleTea.Character
   alias ThistleTea.DB.Mangos
   alias ThistleTea.Game.Entity

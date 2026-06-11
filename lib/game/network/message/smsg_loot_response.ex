@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.SmsgLootResponse do
+  @moduledoc false
   use ThistleTea.Game.Network.ServerMessage, :SMSG_LOOT_RESPONSE
 
   alias ThistleTea.Game.Entity.Logic.Loot

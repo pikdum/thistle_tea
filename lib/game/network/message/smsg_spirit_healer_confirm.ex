@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.SmsgSpiritHealerConfirm do
+  @moduledoc false
   use ThistleTea.Game.Network.ServerMessage, :SMSG_SPIRIT_HEALER_CONFIRM
 
   defstruct [:guid]

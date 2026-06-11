@@ -1,4 +1,8 @@
 defmodule ThistleTea.Game.Entity.Server.GameObject do
+  @moduledoc """
+  Owning GenServer for a game object; serves update-object requests and
+  reacts to game-event start/stop for event-gated spawns.
+  """
   use GenServer
 
   alias ThistleTea.Game.Entity.Data.GameObject

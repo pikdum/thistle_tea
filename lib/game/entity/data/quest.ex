@@ -1,4 +1,9 @@
 defmodule ThistleTea.Game.Entity.Data.Quest do
+  @moduledoc """
+  Internal quest struct translated from Mangos `quest_template` rows:
+  objectives, rewards, requirements, and helpers for delivery/auto-complete
+  classification.
+  """
   alias ThistleTea.DB.Mangos
 
   defstruct [

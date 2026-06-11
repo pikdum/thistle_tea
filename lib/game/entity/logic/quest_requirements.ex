@@ -1,4 +1,8 @@
 defmodule ThistleTea.Game.Entity.Logic.QuestRequirements do
+  @moduledoc """
+  Validates whether a player can accept a quest: not already active or
+  rewarded, race/class masks, minimum level, and prerequisite quest chains.
+  """
   import Bitwise
 
   alias ThistleTea.Game.Entity.Data.Quest

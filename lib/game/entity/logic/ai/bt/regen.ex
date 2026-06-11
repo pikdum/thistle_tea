@@ -1,4 +1,8 @@
 defmodule ThistleTea.Game.Entity.Logic.AI.BT.Regen do
+  @moduledoc """
+  Behavior-tree step that runs resource regeneration ticks while the entity
+  still needs them.
+  """
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.Regen, as: RegenLogic

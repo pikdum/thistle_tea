@@ -1,4 +1,8 @@
 defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
+  @moduledoc """
+  Spell-casting behavior-tree subtree: starting a cast (validation, cast time,
+  power cost) and ticking it through completion or channel ticks.
+  """
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard

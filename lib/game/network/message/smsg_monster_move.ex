@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.SmsgMonsterMove do
+  @moduledoc false
   use ThistleTea.Game.Network.ServerMessage, :SMSG_MONSTER_MOVE
 
   import Bitwise, only: [bnot: 1, band: 2, bor: 2]

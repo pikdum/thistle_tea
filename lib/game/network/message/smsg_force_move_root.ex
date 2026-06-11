@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.SmsgForceMoveRoot do
+  @moduledoc false
   use ThistleTea.Game.Network.ServerMessage, :SMSG_FORCE_MOVE_ROOT
 
   defstruct [:guid, move_event: 0]

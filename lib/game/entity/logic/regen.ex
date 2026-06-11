@@ -1,4 +1,10 @@
 defmodule ThistleTea.Game.Entity.Logic.Regen do
+  @moduledoc """
+  Blizzlike resource regeneration and decay ticks for players and creatures:
+  health/mana/rage regen with the five-second rule, regen-modifying auras, and
+  per-entity-type tick intervals. `needs_regen?/1` gates whether ticking
+  continues at all.
+  """
   import Bitwise, only: [&&&: 2]
 
   alias ThistleTea.Game.Aura

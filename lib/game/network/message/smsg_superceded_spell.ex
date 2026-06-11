@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.SmsgSupercededSpell do
+  @moduledoc false
   use ThistleTea.Game.Network.ServerMessage, :SMSG_SUPERCEDED_SPELL
 
   defstruct [:old_spell_id, :new_spell_id]

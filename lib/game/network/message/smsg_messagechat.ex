@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.SmsgMessagechat do
+  @moduledoc false
   use ThistleTea.Game.Network.ServerMessage, :SMSG_MESSAGECHAT
 
   @chat_type_say 0x0

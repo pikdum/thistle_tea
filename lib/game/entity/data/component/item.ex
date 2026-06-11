@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Entity.Data.Component.Item do
+  @moduledoc false
   use ThistleTea.Game.Entity.UpdateMask,
     owner: {0x0006, 2, :guid},
     contained: {0x0008, 2, :guid},

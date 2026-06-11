@@ -1,4 +1,9 @@
 defmodule ThistleTea.Game.Network.InventoryUpdate do
+  @moduledoc """
+  Applies the result of a pure inventory operation to the player session:
+  sends item create/values updates on success or the inventory-change-failure
+  packet on error.
+  """
   import Kernel, except: [apply: 2]
 
   alias ThistleTea.Game.Entity.Data.Component.Player

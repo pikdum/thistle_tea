@@ -1,4 +1,8 @@
 defmodule ThistleTea.Game.Network.Connection do
+  @moduledoc """
+  Per-connection TCP stream state: buffers incoming bytes, decrypts headers
+  once a session key is set, and frames complete packets into a queue.
+  """
   use ThistleTea.Game.Network.Opcodes, [:CMSG_AUTH_SESSION]
 
   alias ThistleTea.Game.Network.Connection.Crypto

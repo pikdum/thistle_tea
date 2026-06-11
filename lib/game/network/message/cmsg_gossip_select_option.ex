@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.CmsgGossipSelectOption do
+  @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_GOSSIP_SELECT_OPTION
 
   alias ThistleTea.Game.Entity.Logic.Death

@@ -1,4 +1,8 @@
 defmodule ThistleTeaWeb.Homography do
+  @moduledoc """
+  Maps world coordinates onto the web map's image space via per-map
+  homographies fitted from known reference points.
+  """
   require Logger
 
   def init do

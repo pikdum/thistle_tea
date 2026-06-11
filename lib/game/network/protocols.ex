@@ -1,4 +1,8 @@
 defprotocol ThistleTea.Game.Network.Message do
+  @moduledoc """
+  Protocol implemented by every network message struct: binary encoding,
+  packet building, opcode lookup, and handling.
+  """
   def to_binary(message)
   def to_packet(message)
   def opcode(message)
@@ -6,6 +10,11 @@ defprotocol ThistleTea.Game.Network.Message do
 end
 
 defmodule ThistleTea.Game.Network.ClientMessage do
+  @moduledoc """
+  `use` macro for CMSG_* message modules: wires up the opcode, common aliases,
+  and the `Message` protocol implementation around `from_binary/1` and
+  `handle/2`.
+  """
   alias ThistleTea.Game.Network.Opcodes
 
   @callback opcode() :: integer()
@@ -46,6 +55,10 @@ defmodule ThistleTea.Game.Network.ClientMessage do
 end
 
 defmodule ThistleTea.Game.Network.ServerMessage do
+  @moduledoc """
+  `use` macro for SMSG_* message modules: wires up the opcode, common aliases,
+  and the `Message` protocol implementation around `to_binary/1`.
+  """
   alias ThistleTea.Game.Network.Opcodes
   alias ThistleTea.Game.Network.Packet
 

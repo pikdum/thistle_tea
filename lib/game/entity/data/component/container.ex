@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Entity.Data.Component.Container do
+  @moduledoc false
   use ThistleTea.Game.Entity.UpdateMask,
     num_slots: {0x0030, 1, :int},
     slot_1: {0x0032, 2, :guid},

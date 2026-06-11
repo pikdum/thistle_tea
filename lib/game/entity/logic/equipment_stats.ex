@@ -1,4 +1,9 @@
 defmodule ThistleTea.Game.Entity.Logic.EquipmentStats do
+  @moduledoc """
+  Computes `unit.equipment_bonuses` from the equipped item templates — stats,
+  resistances, and passive equip-spell auras — as one of the canonical inputs
+  to the stat recompute pipeline.
+  """
   import Bitwise, only: [&&&: 2, <<<: 2]
 
   alias ThistleTea.Game.Entity.Data.Component.Player

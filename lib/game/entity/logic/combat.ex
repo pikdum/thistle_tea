@@ -1,4 +1,9 @@
 defmodule ThistleTea.Game.Entity.Logic.Combat do
+  @moduledoc """
+  Melee auto-attack logic shared by players and mobs: attack timing, damage
+  rolls from unit damage ranges, and applying an incoming attack to an entity
+  along with the events it produces.
+  """
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Core

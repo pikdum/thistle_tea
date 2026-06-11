@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.SmsgChannelNotify do
+  @moduledoc false
   use ThistleTea.Game.Network.ServerMessage, :SMSG_CHANNEL_NOTIFY
 
   @notice %{

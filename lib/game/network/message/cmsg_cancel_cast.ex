@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.CmsgCancelCast do
+  @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_CANCEL_CAST
 
   alias ThistleTea.Game.Entity.EventSink

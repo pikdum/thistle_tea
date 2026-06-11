@@ -1,4 +1,8 @@
 defmodule ThistleTea.Game.Entity.Server.Corpse do
+  @moduledoc """
+  Owning GenServer for a corpse entity; registers it in the world and serves
+  update-object requests from observers.
+  """
   use GenServer
 
   alias ThistleTea.Game.Entity.Data.Corpse

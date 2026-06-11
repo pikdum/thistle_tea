@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.SmsgGameobjectQueryResponse do
+  @moduledoc false
   use ThistleTea.Game.Network.ServerMessage, :SMSG_GAMEOBJECT_QUERY_RESPONSE
 
   defstruct [

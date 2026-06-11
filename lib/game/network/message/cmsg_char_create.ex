@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.CmsgCharCreate do
+  @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_CHAR_CREATE
 
   alias ThistleTea.Game.Network.Message

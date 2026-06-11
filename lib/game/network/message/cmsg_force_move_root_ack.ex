@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.CmsgForceMoveRootAck do
+  @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_FORCE_MOVE_ROOT_ACK
 
   defstruct [:guid, :counter, :movement_payload]

@@ -1,4 +1,9 @@
 defmodule ThistleTea.Game.Entity.UpdateMask do
+  @moduledoc """
+  `use` macro that turns a keyword list of update fields (offset, size,
+  encoder, visibility) into a component struct plus `to_list/2` for building
+  SMSG_UPDATE_OBJECT values blocks.
+  """
   defp build_struct(fields) do
     fields
     |> Keyword.reject(&fn_field?/1)

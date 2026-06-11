@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.SmsgQuestupdateComplete do
+  @moduledoc false
   use ThistleTea.Game.Network.ServerMessage, :SMSG_QUESTUPDATE_COMPLETE
 
   defstruct [:quest_id]

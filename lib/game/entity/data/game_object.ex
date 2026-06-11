@@ -1,4 +1,8 @@
 defmodule ThistleTea.Game.Entity.Data.GameObject do
+  @moduledoc """
+  Game object entity built from Mangos `gameobject` spawn rows and their
+  templates.
+  """
   import Bitwise, only: [|||: 2]
 
   alias ThistleTea.DB.Mangos

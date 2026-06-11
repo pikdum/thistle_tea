@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.SmsgQuestQueryResponse do
+  @moduledoc false
   use ThistleTea.Game.Network.ServerMessage, :SMSG_QUEST_QUERY_RESPONSE
 
   import Bitwise

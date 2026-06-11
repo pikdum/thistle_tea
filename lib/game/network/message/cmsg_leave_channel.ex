@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.CmsgLeaveChannel do
+  @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_LEAVE_CHANNEL
 
   require Logger

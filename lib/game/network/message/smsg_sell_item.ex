@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.SmsgSellItem do
+  @moduledoc false
   use ThistleTea.Game.Network.ServerMessage, :SMSG_SELL_ITEM
 
   @errors %{

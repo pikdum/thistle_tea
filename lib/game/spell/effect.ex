@@ -1,4 +1,8 @@
 defmodule ThistleTea.Game.Spell.Effect do
+  @moduledoc """
+  One of a spell's up-to-three effects from the DBC: type, points/dice,
+  aura info, targeting, and the damage roll helper.
+  """
   defstruct [
     :index,
     :type,

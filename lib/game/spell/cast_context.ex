@@ -1,4 +1,9 @@
 defmodule ThistleTea.Game.Spell.CastContext do
+  @moduledoc """
+  Snapshot of the caster taken at cast time — guid, level, and spell
+  damage/healing bonuses — so effects apply consistently even after the
+  caster's state changes.
+  """
   alias ThistleTea.Game.Entity.Data.Mob
 
   @schools [:physical, :holy, :fire, :nature, :frost, :shadow, :arcane]

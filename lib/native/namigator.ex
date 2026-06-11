@@ -1,4 +1,8 @@
 defmodule ThistleTea.Native.Namigator do
+  @moduledoc """
+  Rustler NIF bindings to namigator for nav-mesh building and pathfinding.
+  Note: hot-reloading the NIF resets its loaded-maps state.
+  """
   use Rustler, otp_app: :thistle_tea, crate: "namigator_ex"
 
   def build(_wow_dir, _out_dir), do: :erlang.nif_error(:nif_not_loaded)

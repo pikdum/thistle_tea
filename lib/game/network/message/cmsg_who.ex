@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.CmsgWho do
+  @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_WHO
 
   alias ThistleTea.Game.Entity

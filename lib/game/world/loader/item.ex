@@ -1,4 +1,8 @@
 defmodule ThistleTea.Game.World.Loader.Item do
+  @moduledoc """
+  ETS cache of item templates from Mangos, plus random-equipment picks for
+  generated characters.
+  """
   alias ThistleTea.DB.Mangos
   alias ThistleTea.Game.Entity.Data.ItemTemplate
 

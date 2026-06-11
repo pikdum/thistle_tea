@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.SmsgQuestupdateAddItem do
+  @moduledoc false
   use ThistleTea.Game.Network.ServerMessage, :SMSG_QUESTUPDATE_ADD_ITEM
 
   defstruct [:item_id, :count]

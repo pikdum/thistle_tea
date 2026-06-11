@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.CmsgQuestgiverAcceptQuest do
+  @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_QUESTGIVER_ACCEPT_QUEST
 
   alias ThistleTea.Game.Player.Quests

@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.CmsgJoinChannel do
+  @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_JOIN_CHANNEL
 
   require Logger

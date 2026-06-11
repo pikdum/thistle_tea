@@ -1,4 +1,7 @@
 defmodule ThistleTea.Game.World.Loader.GameObject do
+  @moduledoc """
+  Loads the game-object spawns for a cell from Mangos into entity structs.
+  """
   alias ThistleTea.DB.Mangos
   alias ThistleTea.Game.Entity.Data.GameObject
   alias ThistleTea.Game.World

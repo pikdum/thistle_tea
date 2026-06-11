@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.CmsgLoot do
+  @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_LOOT
 
   alias ThistleTea.Game.Entity

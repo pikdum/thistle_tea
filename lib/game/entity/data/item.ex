@@ -1,4 +1,9 @@
 defmodule ThistleTea.Game.Entity.Data.Item do
+  @moduledoc """
+  Item instance entity built from an `ItemTemplate`, optionally with a
+  container component for bags. Items live in the `ItemStore`, never in
+  visibility tracking.
+  """
   import Bitwise, only: [&&&: 2, <<<: 2, |||: 2]
 
   alias ThistleTea.Game.Entity.Data.Component.Container

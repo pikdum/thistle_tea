@@ -1,4 +1,7 @@
 defmodule ThistleTea.Game.Entity.Registry do
+  @moduledoc """
+  Process registry mapping entity guids to their owning processes.
+  """
   def child_spec(_opts) do
     Registry.child_spec(keys: :unique, name: __MODULE__)
   end

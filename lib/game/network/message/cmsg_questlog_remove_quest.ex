@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.CmsgQuestlogRemoveQuest do
+  @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_QUESTLOG_REMOVE_QUEST
 
   alias ThistleTea.Game.Player.Quests

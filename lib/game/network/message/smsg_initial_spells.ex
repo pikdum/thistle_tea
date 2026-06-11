@@ -1,11 +1,14 @@
 defmodule ThistleTea.Game.Network.Message.SmsgInitialSpells do
+  @moduledoc false
   use ThistleTea.Game.Network.ServerMessage, :SMSG_INITIAL_SPELLS
 
   defmodule InitialSpell do
+    @moduledoc false
     defstruct [:spell_id, :unknown1]
   end
 
   defmodule CooldownSpell do
+    @moduledoc false
     defstruct [:spell_id, :item_id, :spell_category, :cooldown, :category_cooldown]
   end
 

@@ -1,4 +1,9 @@
 defmodule ThistleTea.Game.Entity.Logic.Event do
+  @moduledoc """
+  Event structs produced by pure logic and queued on an entity's internal
+  state; the boundary later drains them via `EventSink` and turns them into
+  packets or process messages. Includes constructors for each event type.
+  """
   defstruct [
     :type,
     :source_guid,

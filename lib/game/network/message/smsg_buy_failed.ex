@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.SmsgBuyFailed do
+  @moduledoc false
   use ThistleTea.Game.Network.ServerMessage, :SMSG_BUY_FAILED
 
   @errors %{

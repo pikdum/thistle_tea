@@ -1,4 +1,8 @@
 defmodule ThistleTea.Game.Entity.Data.ItemTemplate do
+  @moduledoc """
+  Internal item template struct translated from Mangos `item_template` rows,
+  so domain code never touches the DB schema directly.
+  """
   alias ThistleTea.DB.Mangos
 
   defstruct [

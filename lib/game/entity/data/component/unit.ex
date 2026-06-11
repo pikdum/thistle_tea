@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Entity.Data.Component.Unit do
+  @moduledoc false
   use ThistleTea.Game.Entity.UpdateMask,
     charm: {0x0006, 2, :guid},
     summon: {0x0008, 2, :guid},

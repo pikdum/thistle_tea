@@ -1,4 +1,9 @@
 defmodule ThistleTea.Game.Entity.Server.DynamicObject do
+  @moduledoc """
+  Owning GenServer for an area-effect dynamic object: runs its periodic damage
+  ticks and despawns itself when the effect expires (`restart: :temporary` so
+  the supervisor doesn't resurrect it).
+  """
   use GenServer, restart: :temporary
 
   alias ThistleTea.Game.Entity

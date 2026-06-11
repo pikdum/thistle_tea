@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.SmsgSpellGo do
+  @moduledoc false
   use ThistleTea.Game.Network.ServerMessage, :SMSG_SPELL_GO
 
   @cast_flags_ammo 0x20

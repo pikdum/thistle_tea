@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.SmsgLogoutComplete do
+  @moduledoc false
   use ThistleTea.Game.Network.ServerMessage, :SMSG_LOGOUT_COMPLETE
 
   defstruct []

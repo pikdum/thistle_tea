@@ -1,4 +1,10 @@
 defmodule ThistleTea.Game.Entity.Logic.QuestLog do
+  @moduledoc """
+  Pure quest-log state: slot management, kill/item objective counting,
+  completion evaluation, and packing entries into the client's quest-slot
+  update fields.
+  """
+
   import Bitwise
 
   alias ThistleTea.Game.Entity.Data.Quest
@@ -9,6 +15,7 @@ defmodule ThistleTea.Game.Entity.Logic.QuestLog do
   @status_bytes %{incomplete: 0, complete: 1, failed: 2}
 
   defmodule Entry do
+    @moduledoc false
     defstruct [:quest_id, status: :incomplete, counts: %{}]
   end
 

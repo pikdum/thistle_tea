@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.SmsgMoveNormalFall do
+  @moduledoc false
   use ThistleTea.Game.Network.ServerMessage, :SMSG_MOVE_NORMAL_FALL
 
   defstruct [:guid, counter: 0]

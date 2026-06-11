@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.CmsgSetSelection do
+  @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_SET_SELECTION
 
   alias ThistleTea.Game.Entity.Data.Component.Unit

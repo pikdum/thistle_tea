@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.SmsgInventoryChangeFailure do
+  @moduledoc false
   use ThistleTea.Game.Network.ServerMessage, :SMSG_INVENTORY_CHANGE_FAILURE
 
   defstruct code: 0, required_level: 0, item1_guid: 0, item2_guid: 0

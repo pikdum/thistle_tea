@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.SmsgSpellFailure do
+  @moduledoc false
   use ThistleTea.Game.Network.ServerMessage, :SMSG_SPELL_FAILURE
 
   defstruct [
