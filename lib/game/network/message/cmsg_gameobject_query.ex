@@ -3,31 +3,46 @@ defmodule ThistleTea.Game.Network.Message.CmsgGameobjectQuery do
   use ThistleTea.Game.Network.ClientMessage, :CMSG_GAMEOBJECT_QUERY
 
   alias ThistleTea.DB.Mangos
-  alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.Message
 
   require Logger
 
   defstruct [:entry, :guid]
 
+  @go_type_spellcaster 22
+
   @impl ClientMessage
   def handle(%__MODULE__{entry: entry, guid: guid}, state) do
-    low_guid = Guid.low_guid(guid)
+    case Mangos.Repo.get(Mangos.GameObjectTemplate, entry) do
+      %Mangos.GameObjectTemplate{} = template ->
+        Logger.info("CMSG_GAMEOBJECT_QUERY: #{entry} - #{guid}",
+          target_name: template.name
+        )
 
-    game_object =
-      Mangos.Repo.get(Mangos.GameObject, low_guid)
-      |> Mangos.Repo.preload(:game_object_template)
+        Network.send_packet(query_response(template))
 
-    template = game_object.game_object_template
+      _ ->
+        Network.send_packet(%Message.SmsgGameobjectQueryResponse{entry_id: entry, info_type: nil})
+    end
 
-    Logger.info("CMSG_GAMEOBJECT_QUERY: #{entry} - #{guid}",
-      target_name: template.name
-    )
+    state
+  end
 
+  @impl ClientMessage
+  def from_binary(payload) do
+    <<entry::little-size(32), guid::little-size(64)>> = payload
+
+    %__MODULE__{
+      entry: entry,
+      guid: guid
+    }
+  end
+
+  defp query_response(%Mangos.GameObjectTemplate{} = template) do
     data = [
       template.data0,
       template.data1,
-      template.data2,
+      spellcaster_party_only(template),
       template.data3,
       template.data4,
       template.data5,
@@ -51,7 +66,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgGameobjectQuery do
       template.data23
     ]
 
-    Network.send_packet(%Message.SmsgGameobjectQueryResponse{
+    %Message.SmsgGameobjectQueryResponse{
       entry_id: template.entry,
       info_type: template.type,
       display_id: template.display_id,
@@ -61,18 +76,10 @@ defmodule ThistleTea.Game.Network.Message.CmsgGameobjectQuery do
       name4: "",
       name5: "",
       raw_data: data
-    })
-
-    state
-  end
-
-  @impl ClientMessage
-  def from_binary(payload) do
-    <<entry::little-size(32), guid::little-size(64)>> = payload
-
-    %__MODULE__{
-      entry: entry,
-      guid: guid
     }
   end
+
+  # TODO: stop forcing party-only off once parties exist
+  defp spellcaster_party_only(%Mangos.GameObjectTemplate{type: @go_type_spellcaster}), do: 0
+  defp spellcaster_party_only(%Mangos.GameObjectTemplate{data2: data2}), do: data2
 end
