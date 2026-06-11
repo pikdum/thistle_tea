@@ -26,7 +26,7 @@ defmodule ThistleTea.Game.Entity.Logic.MovementTest do
     %{internal: internal, movement_block: movement_block}
   end
 
-  test "is_moving? reflects movement window" do
+  test "moving? reflects movement window" do
     now = 5_000
 
     moving =
@@ -41,8 +41,8 @@ defmodule ThistleTea.Game.Entity.Logic.MovementTest do
         duration: 1_000
       )
 
-    assert Movement.is_moving?(moving, now)
-    refute Movement.is_moving?(not_moving, now)
+    assert Movement.moving?(moving, now)
+    refute Movement.moving?(not_moving, now)
   end
 
   test "remaining_move_duration/2 reflects explicit time" do

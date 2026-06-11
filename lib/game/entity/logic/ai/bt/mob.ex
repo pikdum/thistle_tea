@@ -1,4 +1,8 @@
 defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
+  @moduledoc """
+  The mob behavior tree: aggro checks, chasing and melee combat, tethering
+  back to spawn, and idle wandering or waypoint-route movement.
+  """
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Internal.WaypointRoute
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
@@ -318,7 +322,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
         now
       )
       when is_integer(now) do
-    Movement.is_moving?(state, now)
+    Movement.moving?(state, now)
   end
 
   def tethering_to_spawn?(_state, _blackboard, _now), do: false
@@ -434,7 +438,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
 
   defp maybe_repath_chase(%Mob{} = state, %Blackboard{} = blackboard, target_pos, target_guid, now) do
     target_moved = target_moved_enough?(blackboard, target_pos, target_guid)
-    should_repath = target_moved or not Movement.is_moving?(state, now)
+    should_repath = target_moved or not Movement.moving?(state, now)
 
     if should_repath do
       destination = chase_destination(state, target_pos, target_guid)
@@ -648,7 +652,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   end
 
   def wait_for_arrival(%Mob{} = state, %Blackboard{} = blackboard, now) when is_integer(now) do
-    if Movement.is_moving?(state, now) do
+    if Movement.moving?(state, now) do
       delay_ms = Movement.remaining_move_duration(state, now)
       {{:running, delay_ms}, state, blackboard}
     else

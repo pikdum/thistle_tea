@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.SmsgNpcTextUpdate do
+  @moduledoc false
   use ThistleTea.Game.Network.ServerMessage, :SMSG_NPC_TEXT_UPDATE
 
   defstruct [
@@ -7,10 +8,12 @@ defmodule ThistleTea.Game.Network.Message.SmsgNpcTextUpdate do
   ]
 
   defmodule NpcTextUpdateEmote do
+    @moduledoc false
     defstruct [:delay, :emote]
   end
 
   defmodule NpcTextUpdate do
+    @moduledoc false
     defstruct [:probability, :texts, :language, :emotes]
   end
 
@@ -20,6 +23,7 @@ defmodule ThistleTea.Game.Network.Message.SmsgNpcTextUpdate do
       Enum.map_join(texts, fn text ->
         <<text.probability::little-float-size(32)>> <>
           Enum.map_join(text.texts, fn t ->
+            # credo:disable-for-next-line Credo.Check.Refactor.Nesting
             if t, do: t <> <<0>>, else: <<0>>
           end) <>
           <<text.language::little-size(32)>> <>

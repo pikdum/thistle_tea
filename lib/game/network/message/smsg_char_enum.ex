@@ -1,11 +1,14 @@
 defmodule ThistleTea.Game.Network.Message.SmsgCharEnum do
+  @moduledoc false
   use ThistleTea.Game.Network.ServerMessage, :SMSG_CHAR_ENUM
 
   defmodule CharacterGear do
+    @moduledoc false
     defstruct [:equipment_display_id, :inventory_type]
   end
 
   defmodule Character do
+    @moduledoc false
     defstruct [
       :guid,
       :name,
@@ -38,14 +41,13 @@ defmodule ThistleTea.Game.Network.Message.SmsgCharEnum do
   @impl ServerMessage
   def to_binary(%__MODULE__{amount_of_characters: amount, characters: characters}) do
     characters_binary =
-      Enum.map(characters, fn char ->
+      Enum.map_join(characters, fn char ->
         {x, y, z} = char.position
 
         equipment_binary =
-          Enum.map(char.equipment, fn gear ->
+          Enum.map_join(char.equipment, fn gear ->
             <<gear.equipment_display_id::little-size(32), gear.inventory_type::little-size(8)>>
           end)
-          |> Enum.join()
 
         <<char.guid::little-size(64)>> <>
           char.name <>
@@ -74,7 +76,6 @@ defmodule ThistleTea.Game.Network.Message.SmsgCharEnum do
           <<char.first_bag_display_id::little-size(32)>> <>
           <<char.first_bag_inventory_type::little-size(8)>>
       end)
-      |> Enum.join()
 
     <<amount::little-size(8)>> <> characters_binary
   end

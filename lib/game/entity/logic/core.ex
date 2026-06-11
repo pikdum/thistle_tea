@@ -1,4 +1,9 @@
 defmodule ThistleTea.Game.Entity.Logic.Core do
+  @moduledoc """
+  Entity operations generic across all entity types: building update-object
+  payloads, taking damage and dying, healing, mana restoration, and combat
+  tether-range checks for mobs.
+  """
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Unit
@@ -90,7 +95,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
   end
 
   def out_of_tether_range?(
-        %{internal: %Internal{initial_position: {xi, yi, zi}}, movement_block: %MovementBlock{position: {x, y, z, _o}}} =
+        %{internal: %Internal{initial_position: {xi, yi, zi}}, movement_block: %MovementBlock{position: {x, y, z, _}}} =
           entity
       ) do
     case tether_range(entity) do

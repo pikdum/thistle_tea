@@ -1,4 +1,8 @@
 defmodule ThistleTea.Game.World.Loader.Spell do
+  @moduledoc """
+  Builds internal spell structs from the spell DBC and derives spellbook data:
+  learned spell ids and rank-supersession maps.
+  """
   import Bitwise, only: [&&&: 2]
   import Ecto.Query
 
@@ -151,6 +155,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
     |> Enum.reject(&is_nil/1)
   end
 
+  # credo:disable-for-next-line Credo.Check.Refactor.CyclomaticComplexity
   defp build_effect(row, index, radius_lookup) do
     type_int = Map.get(row, :"effect_#{index}") || 0
 

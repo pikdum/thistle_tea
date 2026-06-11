@@ -1,5 +1,12 @@
 defmodule ThistleTea.Game.Entity.Logic.Loot do
+  @moduledoc """
+  Loot state and loot-table rolling: rolls Mangos loot rows (groups, reference
+  entries, negative-chance quest drops) into a loot window, and tracks taking
+  or returning items and gold from it.
+  """
+
   defmodule Item do
+    @moduledoc false
     defstruct [:slot, :item_id, :display_id, count: 1, looted: false, quest_item: false]
   end
 
@@ -15,6 +22,7 @@ defmodule ThistleTea.Game.Entity.Logic.Loot do
   def take_item(%__MODULE__{items: items} = loot, slot) do
     case Enum.find(items, fn item -> item.slot == slot and not item.looted end) do
       %Item{} = item ->
+        # credo:disable-for-next-line Credo.Check.Refactor.Nesting
         items = Enum.map(items, fn i -> if i.slot == slot, do: %{i | looted: true}, else: i end)
         {:ok, item, %{loot | items: items}}
 

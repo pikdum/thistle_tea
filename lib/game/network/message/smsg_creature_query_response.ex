@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.SmsgCreatureQueryResponse do
+  @moduledoc false
   use ThistleTea.Game.Network.ServerMessage, :SMSG_CREATURE_QUERY_RESPONSE
 
   defstruct [
@@ -21,6 +22,7 @@ defmodule ThistleTea.Game.Network.Message.SmsgCreatureQueryResponse do
   ]
 
   @impl ServerMessage
+  # credo:disable-for-next-line Credo.Check.Refactor.CyclomaticComplexity
   def to_binary(%__MODULE__{
         creature_entry: creature_entry,
         found: found,

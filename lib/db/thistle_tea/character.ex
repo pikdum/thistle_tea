@@ -1,4 +1,5 @@
 defmodule ThistleTea.Character do
+  @moduledoc false
   use Memento.Table,
     attributes: [
       :id,
@@ -250,19 +251,9 @@ defmodule ThistleTea.Character do
     end
   end
 
-  def get_power(class) do
-    case class do
-      1 -> 1
-      2 -> 0
-      3 -> 0
-      4 -> 3
-      5 -> 0
-      7 -> 0
-      8 -> 0
-      9 -> 0
-      11 -> 0
-    end
-  end
+  def get_power(1), do: 1
+  def get_power(4), do: 3
+  def get_power(class) when class in [2, 3, 5, 7, 8, 9, 11], do: 0
 
   defp do_gain_xp(%__MODULE__{unit: %Unit{level: level}, player: %Player{} = player} = character, xp, events) do
     next_level_xp = player.next_level_xp || Stats.next_level_xp(level)

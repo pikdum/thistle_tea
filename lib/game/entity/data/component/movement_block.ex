@@ -1,4 +1,9 @@
 defmodule ThistleTea.Game.Entity.Data.Component.MovementBlock do
+  @moduledoc """
+  The movement block of an update-object packet: position, movement flags,
+  speeds (real yards/sec, not DB rates), and spline state, with the binary
+  encode/decode for the 1.12 wire format.
+  """
   import Bitwise, only: [&&&: 2, band: 2, bnot: 1, bor: 2]
 
   require Logger
@@ -149,6 +154,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.MovementBlock do
     %__MODULE__{} = movement_block
   end
 
+  # credo:disable-for-next-line Credo.Check.Refactor.CyclomaticComplexity
   def to_binary(%__MODULE__{} = m) do
     <<m.update_flag::little-size(8)>> <>
       cond do

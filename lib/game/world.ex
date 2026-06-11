@@ -1,4 +1,8 @@
 defmodule ThistleTea.Game.World do
+  @moduledoc """
+  World-level spatial queries and position upkeep: nearby players/mobs/units
+  by range, and updating an entity's place in the spatial hash tables.
+  """
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
@@ -47,6 +51,7 @@ defmodule ThistleTea.Game.World do
       case position(guid, now) do
         {^map, tx, ty, tz} ->
           distance = SpatialHash.distance(origin, {tx, ty, tz})
+          # credo:disable-for-next-line Credo.Check.Refactor.Nesting
           if distance <= range, do: [{guid, distance}], else: []
 
         _ ->

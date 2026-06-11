@@ -1,4 +1,8 @@
 defmodule ThistleTea.Game.Guid do
+  @moduledoc """
+  Guid construction and inspection: high-guid prefixes per entity type,
+  counter allocation, and mapping guids back to entity/type ids.
+  """
   import Bitwise, only: [&&&: 2, <<<: 2, >>>: 2, |||: 2]
 
   @high_guid_item 0x4000
@@ -98,19 +102,15 @@ defmodule ThistleTea.Game.Guid do
 
   def entity_type(_), do: nil
 
-  defp type_id_from_high(high_guid) do
-    case high_guid do
-      @high_guid_item -> :item
-      @high_guid_unit -> :unit
-      @high_guid_pet -> :unit
-      @high_guid_player -> :player
-      @high_guid_game_object -> :game_object
-      @high_guid_dynamic_object -> :dynamic_object
-      @high_guid_corpse -> :corpse
-      @high_guid_mo_transport -> :game_object
-      _ -> :object
-    end
-  end
+  defp type_id_from_high(@high_guid_item), do: :item
+  defp type_id_from_high(@high_guid_unit), do: :unit
+  defp type_id_from_high(@high_guid_pet), do: :unit
+  defp type_id_from_high(@high_guid_player), do: :player
+  defp type_id_from_high(@high_guid_game_object), do: :game_object
+  defp type_id_from_high(@high_guid_dynamic_object), do: :dynamic_object
+  defp type_id_from_high(@high_guid_corpse), do: :corpse
+  defp type_id_from_high(@high_guid_mo_transport), do: :game_object
+  defp type_id_from_high(_high_guid), do: :object
 
   defp has_entry?(high_guid) do
     high_guid not in @entryless_high_guids

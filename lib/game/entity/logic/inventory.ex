@@ -1,4 +1,10 @@
 defmodule ThistleTea.Game.Entity.Logic.Inventory do
+  @moduledoc """
+  Pure player inventory logic over player/unit update fields: equipping,
+  storing, swapping, splitting, and destroying items, stack merging, slot
+  classification, and equip-slot resolution with class/level/proficiency
+  checks. Item lookups are injected as functions so the core stays DB-free.
+  """
   import Bitwise, only: [&&&: 2, <<<: 2]
 
   alias ThistleTea.Game.Entity.Data.Component.Container
@@ -293,14 +299,15 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
           {:error, :item_cant_be_equipped}
 
         candidates ->
-          free =
-            Enum.find(candidates, fn slot ->
-              guid_at(ctx, {@bag_0, slot}) == nil and not blocked_offhand?(ctx, slot)
-            end)
-
-          {:ok, free || hd(candidates)}
+          {:ok, free_candidate_slot(ctx, candidates) || hd(candidates)}
       end
     end
+  end
+
+  defp free_candidate_slot(ctx, candidates) do
+    Enum.find(candidates, fn slot ->
+      guid_at(ctx, {@bag_0, slot}) == nil and not blocked_offhand?(ctx, slot)
+    end)
   end
 
   def can_use(%Unit{} = unit, %ItemTemplate{} = template) do
@@ -388,6 +395,7 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
             moved = min(max(space, 0), remaining)
             ctx = if moved > 0, do: mark_changed(ctx, add_stack(stack, moved)), else: ctx
             remaining = remaining - moved
+            # credo:disable-for-next-line Credo.Check.Refactor.Nesting
             if remaining == 0, do: {:halt, {ctx, 0}}, else: {:cont, {ctx, remaining}}
 
           _ ->
@@ -419,6 +427,7 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
       Enum.flat_map(@bag_slots, fn bag_slot ->
         case item_at(ctx, {@bag_0, bag_slot}) do
           %Item{container: %Container{}} = bag ->
+            # credo:disable-for-next-line Credo.Check.Refactor.Nesting
             Enum.map(0..(container_size(bag.container) - 1)//1, fn slot -> {bag_slot, slot} end)
 
           _ ->
@@ -463,6 +472,7 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
     %{item | item: %{item.item | stack_count: count}}
   end
 
+  # credo:disable-for-next-line Credo.Check.Refactor.CyclomaticComplexity
   defp candidate_slots(%ItemTemplate{inventory_type: inventory_type} = template, class) do
     case inventory_type do
       1 -> [slot_index(:head)]
@@ -523,6 +533,16 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
 
   defp validate_bag_cycle(_ctx, _item, _dst_pos), do: :ok
 
+  defp validate_equipment_placement(ctx, template, slot) do
+    with :ok <- can_use(ctx.unit, template) do
+      cond do
+        slot not in candidate_slots(template, ctx.unit.class) -> {:error, :item_doesnt_go_to_slot}
+        slot == @offhand_slot and two_hand_used?(ctx) -> {:error, :cant_equip_with_twohanded}
+        true -> :ok
+      end
+    end
+  end
+
   defp validate_placement(_ctx, nil, _pos), do: :ok
 
   defp validate_placement(ctx, %Item{} = item, {@bag_0, slot}) do
@@ -530,13 +550,7 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
 
     cond do
       equipment_slot?(slot) ->
-        with :ok <- can_use(ctx.unit, template) do
-          cond do
-            slot not in candidate_slots(template, ctx.unit.class) -> {:error, :item_doesnt_go_to_slot}
-            slot == @offhand_slot and two_hand_used?(ctx) -> {:error, :cant_equip_with_twohanded}
-            true -> :ok
-          end
-        end
+        validate_equipment_placement(ctx, template, slot)
 
       bag_slot?(slot) ->
         if template.inventory_type == @invtype_bag, do: :ok, else: {:error, :not_a_bag}
@@ -633,6 +647,7 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
       case item_at(ctx, {@bag_0, bag_slot}) do
         %Item{container: %Container{}} = bag ->
           Enum.find_value(0..(container_size(bag.container) - 1)//1, fn slot ->
+            # credo:disable-for-next-line Credo.Check.Refactor.Nesting
             if guid_at(ctx, {bag_slot, slot}) == nil, do: {bag_slot, slot}
           end)
 

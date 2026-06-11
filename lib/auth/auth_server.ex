@@ -1,4 +1,8 @@
 defmodule ThistleTea.Auth do
+  @moduledoc """
+  The auth/logon server: handles SRP6 logon challenge/proof and serves the
+  realm list, creating accounts on first login.
+  """
   use ThousandIsland.Handler
 
   import Binary, only: [reverse: 1]
@@ -24,7 +28,7 @@ defmodule ThistleTea.Auth do
     Map.put(state, :private_b, private_b)
   end
 
-  defp calculate_B(state) do
+  defp calculate_public_b(state) do
     {public_b, _} =
       :crypto.generate_key(
         :srp,
@@ -46,7 +50,7 @@ defmodule ThistleTea.Auth do
   defp logon_challenge_state(account) do
     account_state(account)
     |> calculate_b()
-    |> calculate_B()
+    |> calculate_public_b()
   end
 
   @impl ThousandIsland.Handler

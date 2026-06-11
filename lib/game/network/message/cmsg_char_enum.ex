@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.CmsgCharEnum do
+  @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_CHAR_ENUM
 
   alias ThistleTea.Game.Network.Message
@@ -49,6 +50,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgCharEnum do
             if is_integer(entry) and entry > 0 do
               item = ItemLoader.get_template(entry)
 
+              # credo:disable-for-next-line Credo.Check.Refactor.Nesting
               if item do
                 %CharacterGear{
                   equipment_display_id: item.display_id,

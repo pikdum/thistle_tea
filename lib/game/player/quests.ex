@@ -1,4 +1,8 @@
 defmodule ThistleTea.Game.Player.Quests do
+  @moduledoc """
+  Player-session quest flows: questgiver hello/details/accept/complete/reward
+  exchanges, quest-log changes, and the packets each step sends.
+  """
   alias ThistleTea.Character
   alias ThistleTea.Game.Entity.Data.Item, as: DataItem
   alias ThistleTea.Game.Entity.Data.ItemTemplate
@@ -293,6 +297,7 @@ defmodule ThistleTea.Game.Player.Quests do
       %Entry{quest_id: quest_id, status: :incomplete} ->
         case QuestLoader.get(quest_id) do
           %Quest{required_items: required_items} ->
+            # credo:disable-for-next-line Credo.Check.Refactor.Nesting
             Enum.any?(required_items, fn {_index, required_id, required_count} ->
               required_id == item_id and
                 Inventory.count_entry(player, item_id, &ItemStore.get/1) < required_count
@@ -383,6 +388,7 @@ defmodule ThistleTea.Game.Player.Quests do
 
       {quest_log, changed?} =
         Enum.reduce(quests, {player.quest_log, false}, fn quest, {quest_log, changed?} ->
+          # credo:disable-for-next-line Credo.Check.Refactor.Nesting
           case complete_check(quest_log, quest, player) do
             {quest_log, :unchanged} -> {quest_log, changed?}
             {quest_log, _event} -> {quest_log, true}

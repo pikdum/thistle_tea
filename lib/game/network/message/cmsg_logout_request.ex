@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.CmsgLogoutRequest do
+  @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_LOGOUT_REQUEST
 
   alias ThistleTea.Game.Entity
@@ -52,6 +53,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgLogoutRequest do
 
       # broadcast destroy object
       for guid <- Map.get(state, :player_guids, []) do
+        # credo:disable-for-next-line Credo.Check.Refactor.Nesting
         if guid != state.guid do
           Entity.destroy_object(guid, state.guid)
         end

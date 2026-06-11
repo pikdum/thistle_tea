@@ -1,4 +1,9 @@
 defmodule ThistleTea.Game.Network.Server do
+  @moduledoc """
+  The world-server connection handler (ThousandIsland): dispatches inbound
+  client messages, owns the logged-in character's state and behavior-tree
+  ticks, and batches/dedupes outbound update-object blocks per send.
+  """
   use ThousandIsland.Handler
   use ThistleTea.Game.Network.Opcodes, [:SMSG_AUTH_CHALLENGE, :SMSG_UPDATE_OBJECT]
 
@@ -109,6 +114,7 @@ defmodule ThistleTea.Game.Network.Server do
       |> Enum.reduce({[], MapSet.new()}, fn update, {acc, seen} ->
         case update do
           %UpdateObject{update_type: :values, object: %{guid: guid}} when is_integer(guid) ->
+            # credo:disable-for-next-line Credo.Check.Refactor.Nesting
             if MapSet.member?(seen, guid) do
               {acc, seen}
             else

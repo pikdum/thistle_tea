@@ -1,4 +1,5 @@
 defmodule ThistleTea.Game.Network.Message.CmsgMessagechat do
+  @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_MESSAGECHAT
 
   alias ThistleTea.Game.Entity
@@ -106,6 +107,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgMessagechat do
          %Quest{} = quest <- QuestLoader.get(quest_id) do
       case Quests.force_accept(state, quest_id) do
         %{character: %ThistleTea.Character{player: %{quest_log: quest_log}}} = state ->
+          # credo:disable-for-next-line Credo.Check.Refactor.Nesting
           if QuestLog.active?(quest_log, quest_id) do
             system_message(state, "Added quest: #{quest.title} (#{quest_id})")
           else
@@ -570,6 +572,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgMessagechat do
         ThistleTea.Character.save(character)
 
         for event <- events do
+          # credo:disable-for-next-line Credo.Check.Refactor.Nesting
           case event do
             {:learned, id} ->
               Network.send_packet(%Message.SmsgLearnedSpell{spell_id: id})

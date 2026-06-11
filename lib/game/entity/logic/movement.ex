@@ -1,4 +1,9 @@
 defmodule ThistleTea.Game.Entity.Logic.Movement do
+  @moduledoc """
+  Pure spline-movement state for server-driven entities: starting and halting
+  moves, interpolating the current position along the active path, remaining
+  move duration, and root/blocked checks.
+  """
   import Bitwise, only: [&&&: 2, bnot: 1, bor: 2]
 
   alias ThistleTea.Game.Entity.Data.Component.Internal
@@ -23,9 +28,9 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
     rem(id, @max_u32) + 1
   end
 
-  def is_moving?(%{internal: %Internal{movement_start_time: nil}}, _now), do: false
+  def moving?(%{internal: %Internal{movement_start_time: nil}}, _now), do: false
 
-  def is_moving?(
+  def moving?(
         %{movement_block: %MovementBlock{duration: duration}, internal: %Internal{movement_start_time: start_time}},
         now
       )
@@ -33,7 +38,7 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
     now <= start_time + duration
   end
 
-  def is_moving?(_entity, _now), do: false
+  def moving?(_entity, _now), do: false
 
   def remaining_move_duration(
         %{internal: %Internal{movement_start_time: start_time}, movement_block: %MovementBlock{duration: duration}},
@@ -51,7 +56,7 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
   end
 
   def sync_position(%{movement_block: %MovementBlock{}, internal: %Internal{}} = entity, now) when is_integer(now) do
-    if is_moving?(entity, now) do
+    if moving?(entity, now) do
       update_position_from_spline(entity, now)
     else
       finalize_movement(entity)
@@ -242,6 +247,7 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
     case Enum.reduce_while(rest, {start, distance}, fn node, {prev, remaining} ->
            segment_distance = segment_distance(prev, node)
 
+           # credo:disable-for-next-line Credo.Check.Refactor.Nesting
            if remaining <= segment_distance do
              {:halt, {:point, lerp_point(prev, node, segment_distance, remaining)}}
            else
@@ -274,6 +280,7 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
     case Enum.reduce_while(rest, {start, distance}, fn node, {prev, remaining} ->
            segment_distance = segment_distance(prev, node)
 
+           # credo:disable-for-next-line Credo.Check.Refactor.Nesting
            if remaining <= segment_distance do
              point = Pathfinding.find_point_between_points(map, prev, node, remaining) || node
              {:halt, {:point, point}}
