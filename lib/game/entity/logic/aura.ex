@@ -673,7 +673,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
 
   def sync_unit(%Unit{} = unit) do
     unit
-    |> Stats.sync_aura_mods()
+    |> Stats.recompute()
     |> sync_transform()
     |> sync_aura_fields()
   end

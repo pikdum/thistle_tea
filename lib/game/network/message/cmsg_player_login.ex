@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgPlayerLogin do
   alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Network.Message.SmsgInitialSpells.InitialSpell
   alias ThistleTea.Game.Network.UpdateObject
+  alias ThistleTea.Game.Player.Stats, as: PlayerStats
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Faction, as: FactionLoader
@@ -204,7 +205,10 @@ defmodule ThistleTea.Game.Network.Message.CmsgPlayerLogin do
   end
 
   defp normalize_combat_stats(%ThistleTea.Character{} = character) do
-    character = ThistleTea.Character.sync_equipment_stats(character)
+    character =
+      character
+      |> normalize_base_stats()
+      |> ThistleTea.Character.sync_equipment_stats()
 
     unit =
       character.unit
@@ -216,6 +220,13 @@ defmodule ThistleTea.Game.Network.Message.CmsgPlayerLogin do
 
     internal = %{character.internal | in_combat: false}
     %{character | unit: unit, internal: internal}
+  end
+
+  defp normalize_base_stats(%ThistleTea.Character{unit: %Unit{} = unit} = character) do
+    case PlayerStats.get(unit.race, unit.class, unit.level) do
+      {:ok, stats} -> PlayerStats.apply(character, stats)
+      _ -> character
+    end
   end
 
   defp normalize_faction_template(%ThistleTea.Character{unit: %Unit{race: race} = unit} = character)

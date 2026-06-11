@@ -96,8 +96,6 @@ defmodule ThistleTea.Game.Entity.Data.Component.Unit do
     base_stamina: :virtual,
     base_intellect: :virtual,
     base_spirit: :virtual,
-    base_max_health: :virtual,
-    base_max_power1: :virtual,
     base_normal_resistance: :virtual,
     base_holy_resistance: :virtual,
     base_fire_resistance: :virtual,
@@ -128,7 +126,8 @@ defmodule ThistleTea.Game.Entity.Data.Component.Unit do
     max_ranged_damage: {0x00AC, 1, :float, :private},
     power_cost_modifier: {0x00AD, 7, :int, :private},
     power_cost_multiplier: {0x00B4, 7, :float, :private},
-    auras: :virtual
+    auras: :virtual,
+    equipment_bonuses: :virtual
 
   alias ThistleTea.Game.Network.UpdateObject
 

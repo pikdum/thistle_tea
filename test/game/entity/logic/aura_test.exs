@@ -97,7 +97,7 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
     end
 
     test "layers mod_resistance on top of base resistance" do
-      entity = put_in(fixture_entity().unit.normal_resistance, 7)
+      entity = put_in(fixture_entity().unit.base_normal_resistance, 7)
       spell = frost_armor_fixture()
 
       {entity, _events} = apply_spell(entity, 1, 1, spell)
@@ -407,7 +407,7 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
     end
 
     test "removing expired holders preserves base resistance" do
-      entity = put_in(fixture_entity().unit.normal_resistance, 7)
+      entity = put_in(fixture_entity().unit.base_normal_resistance, 7)
       spell = frost_armor_fixture()
       {entity, _events} = apply_spell(entity, 1, 1, spell)
 
@@ -704,7 +704,7 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
   describe "mod_stat" do
     test "arcane intellect raises intellect and max mana" do
       entity = fixture_entity()
-      entity = %{entity | unit: %{entity.unit | intellect: 20, power1: 100, max_power1: 100}}
+      entity = %{entity | unit: %{entity.unit | base_intellect: 20, base_mana: 80, power1: 100, max_power1: 100}}
 
       {entity, _events} = apply_spell(entity, 1, 1, arcane_intellect_fixture())
 
@@ -714,7 +714,7 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
 
     test "stat and max mana revert when aura expires" do
       entity = fixture_entity()
-      entity = %{entity | unit: %{entity.unit | intellect: 20, power1: 100, max_power1: 100}}
+      entity = %{entity | unit: %{entity.unit | base_intellect: 20, base_mana: 80, power1: 100, max_power1: 100}}
 
       {entity, _events} = apply_spell(entity, 1, 1, arcane_intellect_fixture())
       {entity, _events} = Aura.expire_due(entity, 1_000 + 1_800_001)

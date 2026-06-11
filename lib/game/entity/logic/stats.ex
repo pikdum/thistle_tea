@@ -6,137 +6,103 @@ defmodule ThistleTea.Game.Entity.Logic.Stats do
   alias ThistleTea.Game.Entity.Data.Component.Unit
 
   @resistance_fields [
-    {0x01, :normal_resistance, :base_normal_resistance},
-    {0x02, :holy_resistance, :base_holy_resistance},
-    {0x04, :fire_resistance, :base_fire_resistance},
-    {0x08, :nature_resistance, :base_nature_resistance},
-    {0x10, :frost_resistance, :base_frost_resistance},
-    {0x20, :shadow_resistance, :base_shadow_resistance},
-    {0x40, :arcane_resistance, :base_arcane_resistance}
+    {0x01, :normal_resistance, :base_normal_resistance, :armor},
+    {0x02, :holy_resistance, :base_holy_resistance, :holy},
+    {0x04, :fire_resistance, :base_fire_resistance, :fire},
+    {0x08, :nature_resistance, :base_nature_resistance, :nature},
+    {0x10, :frost_resistance, :base_frost_resistance, :frost},
+    {0x20, :shadow_resistance, :base_shadow_resistance, :shadow},
+    {0x40, :arcane_resistance, :base_arcane_resistance, :arcane}
   ]
 
   @stat_fields [
-    {0, :strength, :base_strength},
-    {1, :agility, :base_agility},
-    {2, :stamina, :base_stamina},
-    {3, :intellect, :base_intellect},
-    {4, :spirit, :base_spirit}
+    {0, :strength, :base_strength, :strength},
+    {1, :agility, :base_agility, :agility},
+    {2, :stamina, :base_stamina, :stamina},
+    {3, :intellect, :base_intellect, :intellect},
+    {4, :spirit, :base_spirit, :spirit}
   ]
 
-  @health_per_stamina 10
-  @mana_per_intellect 15
-
-  def sync_aura_mods(%Unit{} = unit) do
+  def recompute(%Unit{} = unit) do
     unit
-    |> reset_resistances()
-    |> reset_stats()
-    |> apply_resistance_mods()
-    |> sync_derived_maxima()
+    |> derive_stats()
+    |> derive_resistances()
+    |> derive_max_health()
+    |> derive_max_mana()
   end
 
-  defp reset_stats(%Unit{} = unit) do
-    Enum.reduce(@stat_fields, unit, fn {_index, current_field, base_field}, acc ->
-      base = base_value(acc, current_field, base_field)
+  def stamina_health_bonus(stamina) when stamina < 20, do: stamina
+  def stamina_health_bonus(stamina), do: 20 + (stamina - 20) * 10
 
-      acc
-      |> Map.put(base_field, base)
-      |> Map.put(current_field, base)
+  def mana_bonus(intellect) when intellect < 20, do: intellect
+  def mana_bonus(intellect), do: 20 + (intellect - 20) * 15
+
+  defp derive_stats(%Unit{} = unit) do
+    Enum.reduce(@stat_fields, unit, fn {index, field, base_field, bonus_key}, acc ->
+      case Map.get(acc, base_field) do
+        base when is_integer(base) ->
+          Map.put(acc, field, base + equipment_bonus(acc, bonus_key) + aura_stat_bonus(acc, index))
+
+        _ ->
+          acc
+      end
     end)
   end
 
-  defp sync_derived_maxima(%Unit{} = unit) do
-    unit
-    |> sync_derived_max(:stamina, :base_stamina, :max_health, :base_max_health, :health, @health_per_stamina)
-    |> sync_derived_max(:intellect, :base_intellect, :max_power1, :base_max_power1, :power1, @mana_per_intellect)
-  end
-
-  defp sync_derived_max(
-         %Unit{} = unit,
-         stat_field,
-         stat_base_field,
-         max_field,
-         max_base_field,
-         current_field,
-         per_point
-       ) do
-    with stat when is_integer(stat) <- Map.get(unit, stat_field),
-         stat_base when is_integer(stat_base) <- Map.get(unit, stat_base_field),
-         max_base when is_integer(max_base) and max_base > 0 <- base_value(unit, max_field, max_base_field) do
-      new_max = max_base + (stat - stat_base) * per_point
-
-      unit
-      |> Map.put(max_base_field, max_base)
-      |> Map.put(max_field, new_max)
-      |> clamp_current(current_field, new_max)
-    else
-      _ -> unit
-    end
-  end
-
-  defp clamp_current(%Unit{} = unit, current_field, new_max) do
-    case Map.get(unit, current_field) do
-      current when is_number(current) and current > new_max -> Map.put(unit, current_field, new_max)
-      _ -> unit
-    end
-  end
-
-  defp reset_resistances(%Unit{} = unit) do
-    Enum.reduce(@resistance_fields, unit, fn {_mask, current_field, base_field}, acc ->
-      base = base_value(acc, current_field, base_field)
-
-      acc
-      |> Map.put(base_field, base)
-      |> Map.put(current_field, base)
+  defp derive_resistances(%Unit{} = unit) do
+    Enum.reduce(@resistance_fields, unit, fn {bit, field, base_field, bonus_key}, acc ->
+      base = Map.get(acc, base_field) || 0
+      Map.put(acc, field, base + equipment_bonus(acc, bonus_key) + aura_resistance_bonus(acc, bit))
     end)
   end
 
-  defp base_value(%Unit{} = unit, current_field, base_field) do
-    cond do
-      is_integer(Map.get(unit, base_field)) -> Map.get(unit, base_field)
-      is_integer(Map.get(unit, current_field)) -> Map.get(unit, current_field)
-      true -> 0
-    end
+  defp derive_max_health(%Unit{base_health: base_health} = unit) when is_integer(base_health) do
+    max_health = max(base_health + stamina_health_bonus(unit.stamina || 0) + equipment_bonus(unit, :health), 1)
+    %{unit | max_health: max_health, health: clamp(unit.health, max_health)}
   end
 
-  defp apply_resistance_mods(%Unit{auras: holders} = unit) when is_list(holders) do
-    Enum.reduce(holders, unit, fn %Holder{auras: auras}, acc ->
-      Enum.reduce(auras, acc, &apply_aura_mod/2)
+  defp derive_max_health(%Unit{} = unit), do: unit
+
+  defp derive_max_mana(%Unit{base_mana: base_mana} = unit) when is_integer(base_mana) and base_mana > 0 do
+    max_mana = max(base_mana + mana_bonus(unit.intellect || 0) + equipment_bonus(unit, :mana), 0)
+    %{unit | max_power1: max_mana, power1: clamp(unit.power1, max_mana)}
+  end
+
+  defp derive_max_mana(%Unit{} = unit), do: unit
+
+  defp clamp(current, max) when is_number(current) and current > max, do: max
+  defp clamp(current, _max), do: current
+
+  defp equipment_bonus(%Unit{equipment_bonuses: %{} = bonuses}, key), do: Map.get(bonuses, key, 0)
+  defp equipment_bonus(%Unit{}, _key), do: 0
+
+  defp aura_stat_bonus(%Unit{} = unit, index) do
+    sum_aura_amounts(unit, fn
+      %Aura{type: :mod_stat, amount: amount, misc_value: misc}
+      when is_integer(amount) and (misc == -1 or misc == index) ->
+        amount
+
+      _aura ->
+        0
     end)
   end
 
-  defp apply_resistance_mods(unit), do: unit
+  defp aura_resistance_bonus(%Unit{} = unit, bit) do
+    sum_aura_amounts(unit, fn
+      %Aura{type: :mod_resistance, amount: amount, misc_value: mask}
+      when is_integer(amount) and is_integer(mask) and (mask &&& bit) != 0 ->
+        amount
 
-  defp apply_aura_mod(%Aura{type: :mod_resistance, amount: amount, misc_value: mask}, %Unit{} = unit)
-       when is_integer(amount) do
-    Enum.reduce(resistance_fields_for_mask(mask), unit, fn field, acc ->
-      Map.update!(acc, field, &(&1 + amount))
+      _aura ->
+        0
     end)
   end
 
-  defp apply_aura_mod(%Aura{type: :mod_stat, amount: amount, misc_value: misc}, %Unit{} = unit)
-       when is_integer(amount) do
-    Enum.reduce(stat_fields_for_misc(misc), unit, fn field, acc ->
-      Map.update!(acc, field, &((&1 || 0) + amount))
+  defp sum_aura_amounts(%Unit{auras: holders}, fun) when is_list(holders) do
+    Enum.reduce(holders, 0, fn %Holder{auras: auras}, acc ->
+      Enum.reduce(auras, acc, &(fun.(&1) + &2))
     end)
   end
 
-  defp apply_aura_mod(_aura, unit), do: unit
-
-  defp stat_fields_for_misc(-1), do: Enum.map(@stat_fields, fn {_index, field, _base} -> field end)
-
-  defp stat_fields_for_misc(misc) when is_integer(misc) do
-    @stat_fields
-    |> Enum.filter(fn {index, _field, _base} -> index == misc end)
-    |> Enum.map(fn {_index, field, _base} -> field end)
-  end
-
-  defp stat_fields_for_misc(_misc), do: []
-
-  defp resistance_fields_for_mask(mask) when is_integer(mask) do
-    @resistance_fields
-    |> Enum.filter(fn {bit, _current_field, _base_field} -> (mask &&& bit) != 0 end)
-    |> Enum.map(fn {_bit, current_field, _base_field} -> current_field end)
-  end
-
-  defp resistance_fields_for_mask(_mask), do: []
+  defp sum_aura_amounts(%Unit{}, _fun), do: 0
 end

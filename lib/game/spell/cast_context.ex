@@ -49,6 +49,6 @@ defmodule ThistleTea.Game.Spell.CastContext do
     caster |> equipment_bonuses() |> Map.get(:healing, 0)
   end
 
-  defp equipment_bonuses(%{internal: %{equipment_bonuses: %{} = bonuses}}), do: bonuses
+  defp equipment_bonuses(%{unit: %{equipment_bonuses: %{} = bonuses}}), do: bonuses
   defp equipment_bonuses(_caster), do: %{}
 end

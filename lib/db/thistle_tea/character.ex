@@ -88,6 +88,11 @@ defmodule ThistleTea.Character do
         stamina: stats.stamina,
         intellect: stats.intellect,
         spirit: stats.spirit,
+        base_strength: stats.strength,
+        base_agility: stats.agility,
+        base_stamina: stats.stamina,
+        base_intellect: stats.intellect,
+        base_spirit: stats.spirit,
         base_mana: stats.base_mana,
         base_health: stats.base_health,
         sheath_state: 0,
@@ -178,8 +183,8 @@ defmodule ThistleTea.Character do
   @base_max_damage 2.0
   @item_class_weapon 2
 
-  def sync_attack_power(%__MODULE__{unit: %Unit{} = unit, internal: %Internal{} = internal} = character) do
-    bonus = (internal.equipment_bonuses || %{}) |> Map.get(:attack_power, 0)
+  def sync_attack_power(%__MODULE__{unit: %Unit{} = unit} = character) do
+    bonus = (unit.equipment_bonuses || %{}) |> Map.get(:attack_power, 0)
     attack_power = Stats.melee_attack_power(unit.class, unit.level, unit.strength || 0, unit.agility || 0) + bonus
     ranged_attack_power = Stats.ranged_attack_power(unit.class, unit.level, unit.agility || 0)
     %{character | unit: %{unit | attack_power: attack_power, ranged_attack_power: ranged_attack_power}}
@@ -286,7 +291,6 @@ defmodule ThistleTea.Character do
 
         character =
           character
-          |> EquipmentStats.remove()
           |> Stats.apply(new_stats)
           |> sync_equipment_stats()
           |> restore_health_and_mana()

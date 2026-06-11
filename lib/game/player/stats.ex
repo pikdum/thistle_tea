@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.Player.Stats do
   alias ThistleTea.DB.Mangos.PlayerXpForLevel
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Logic.Stats, as: LogicStats
 
   defstruct [
     :race,
@@ -57,19 +58,18 @@ defmodule ThistleTea.Game.Player.Stats do
   def apply(%Character{unit: %Unit{} = unit, player: %Player{} = player} = character, %__MODULE__{} = stats) do
     unit =
       unit
-      |> Map.merge(power_fields(unit.class, stats))
+      |> Map.merge(power_fields(unit.class))
       |> Map.merge(%{
-        health: stats.max_health,
-        max_health: stats.max_health,
         level: stats.level,
-        strength: stats.strength,
-        agility: stats.agility,
-        stamina: stats.stamina,
-        intellect: stats.intellect,
-        spirit: stats.spirit,
+        base_strength: stats.strength,
+        base_agility: stats.agility,
+        base_stamina: stats.stamina,
+        base_intellect: stats.intellect,
+        base_spirit: stats.spirit,
         base_mana: stats.base_mana,
         base_health: stats.base_health
       })
+      |> LogicStats.recompute()
 
     player = %{player | next_level_xp: stats.next_level_xp}
     %{character | unit: unit, player: player}
@@ -93,21 +93,21 @@ defmodule ThistleTea.Game.Player.Stats do
   end
 
   def from_character(%Character{unit: %Unit{} = unit, player: %Player{} = player}) do
-    %__MODULE__{
+    stats = %__MODULE__{
       race: unit.race,
       class: unit.class,
       level: unit.level,
-      strength: unit.strength,
-      agility: unit.agility,
-      stamina: unit.stamina,
-      intellect: unit.intellect,
-      spirit: unit.spirit,
+      strength: unit.base_strength || unit.strength,
+      agility: unit.base_agility || unit.agility,
+      stamina: unit.base_stamina || unit.stamina,
+      intellect: unit.base_intellect || unit.intellect,
+      spirit: unit.base_spirit || unit.spirit,
       base_health: unit.base_health,
       base_mana: unit.base_mana,
-      max_health: unit.max_health,
-      max_mana: unit.max_power1,
       next_level_xp: player.next_level_xp
     }
+
+    %{stats | max_health: max_health(stats), max_mana: max_mana(stats)}
   end
 
   defp build(%PlayerLevelStats{} = level_stats, %PlayerClassLevelStats{} = class_stats) do
@@ -176,20 +176,11 @@ defmodule ThistleTea.Game.Player.Stats do
     max(value, 0)
   end
 
-  def stamina_health_bonus(stamina) when stamina < 20, do: stamina
-  def stamina_health_bonus(stamina), do: 20 + (stamina - 20) * 10
+  defdelegate stamina_health_bonus(stamina), to: LogicStats
+  defdelegate mana_bonus(intellect), to: LogicStats
 
-  def mana_bonus(intellect) when intellect < 20, do: intellect
-  def mana_bonus(intellect), do: 20 + (intellect - 20) * 15
-
-  defp power_fields(class, %__MODULE__{} = stats) do
+  defp power_fields(class) do
     %{
-      power1: stats.max_mana,
-      power2: 0,
-      power3: 0,
-      power4: energy(class),
-      power5: 0,
-      max_power1: stats.max_mana,
       max_power2: rage(class),
       max_power3: 0,
       max_power4: energy(class),

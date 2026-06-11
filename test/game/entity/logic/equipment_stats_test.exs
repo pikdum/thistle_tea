@@ -24,6 +24,11 @@ defmodule ThistleTea.Game.Entity.Logic.EquipmentStatsTest do
         stamina: 25,
         intellect: 20,
         spirit: 21,
+        base_strength: 30,
+        base_agility: 21,
+        base_stamina: 25,
+        base_intellect: 20,
+        base_spirit: 21,
         base_health: 100,
         base_mana: 0,
         health: 170,
@@ -154,7 +159,7 @@ defmodule ThistleTea.Game.Entity.Logic.EquipmentStatsTest do
       player = Inventory.equip(character.player, :chest, robe)
       character = EquipmentStats.resync(%{character | player: player}, get_item_fn([robe]), get_spell)
 
-      bonuses = character.internal.equipment_bonuses
+      bonuses = character.unit.equipment_bonuses
       assert bonuses.spell_fire == 20
       assert bonuses.spell_shadow == 20
       assert bonuses.spell_physical == 0
@@ -164,20 +169,19 @@ defmodule ThistleTea.Game.Entity.Logic.EquipmentStatsTest do
       assert character.player.mod_damage_done_pos_physical == 0
     end
 
-    test "remove/1 strips all bonuses even with items equipped", %{character: character, chest: chest} do
+    test "base stat changes after resync keep gear bonuses", %{character: character, chest: chest} do
       player = Inventory.equip(character.player, :chest, chest)
       get_item = get_item_fn([chest])
 
       equipped = EquipmentStats.resync(%{character | player: player}, get_item)
-      assert equipped.internal.equipment_bonuses.armor == 120
+      assert equipped.unit.equipment_bonuses.armor == 120
 
-      removed = EquipmentStats.remove(equipped)
-      assert removed.unit.strength == 30
-      assert removed.unit.normal_resistance == 0
-      assert removed.internal.equipment_bonuses.armor == 0
+      leveled = %{equipped | unit: %{equipped.unit | base_stamina: 40, base_health: 200}}
+      resynced = EquipmentStats.resync(leveled, get_item)
 
-      reapplied = EquipmentStats.resync(removed, get_item)
-      assert reapplied.unit == equipped.unit
+      assert resynced.unit.stamina == 45
+      assert resynced.unit.normal_resistance == 120
+      assert resynced.unit.max_health == 200 + 20 + (45 - 20) * 10
     end
   end
 end
