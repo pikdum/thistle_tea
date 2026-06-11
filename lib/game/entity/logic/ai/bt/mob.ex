@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Aura, as: AuraBT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AI.BT.Combat, as: CombatBT
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Regen, as: RegenBT
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Hostility
@@ -33,6 +34,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   def tree do
     BT.selector([
       AuraBT.tick_step(),
+      RegenBT.tick_step(),
       BT.sequence([
         BT.condition(&tethering_to_spawn?/2),
         BT.action(&wait_for_arrival/2)
@@ -68,6 +70,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
             BT.condition(&should_tether?/2),
             BT.action(&set_tether_target/2),
             BT.action(&clear_combat/2),
+            BT.action(&heal_to_full/2),
             BT.action(&move_to_target/2)
           ]),
           BT.sequence([
@@ -329,12 +332,11 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   end
 
   defp clear_combat(
-         %Mob{unit: %Unit{max_health: max_health, target: target} = unit, internal: %Internal{} = internal} = state,
+         %Mob{unit: %Unit{target: target} = unit, internal: %Internal{} = internal} = state,
          %Blackboard{} = blackboard
        ) do
     decrement_attacker_count(target)
-    health = if is_number(max_health), do: max_health, else: unit.health
-    unit = %{unit | target: 0, health: health}
+    unit = %{unit | target: 0}
     internal = %{internal | in_combat: false}
 
     blackboard =
@@ -346,6 +348,22 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
 
     state = Core.mark_broadcast_update(state)
 
+    {:success, state, blackboard}
+  end
+
+  defp heal_to_full(
+         %Mob{unit: %Unit{health: health, max_health: max_health} = unit} = state,
+         %Blackboard{} = blackboard
+       )
+       when is_number(max_health) and is_number(health) and health < max_health do
+    state =
+      %{state | unit: %{unit | health: max_health}}
+      |> Core.mark_broadcast_update()
+
+    {:success, state, blackboard}
+  end
+
+  defp heal_to_full(state, %Blackboard{} = blackboard) do
     {:success, state, blackboard}
   end
 

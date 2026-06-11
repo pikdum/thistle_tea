@@ -34,6 +34,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal do
     :max_loot_gold,
     :loot,
     :creature_type_flags,
+    :regenerate_stats,
     action_buttons: %{},
     events: [],
     area_effect_guids: [],

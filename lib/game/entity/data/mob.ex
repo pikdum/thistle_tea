@@ -96,6 +96,7 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
         experience_multiplier: ct.experience_multiplier,
         extra_flags: ct.extra_flags,
         creature_type_flags: ct.creature_type_flags,
+        regenerate_stats: ct.regenerate_stats,
         rank: ct.rank,
         respawn_delay_ms: respawn_delay_ms(c.spawntimesecs),
         loot_id: ct.loot_id,

@@ -13,9 +13,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Regen do
   end
 
   def tick(entity, %Blackboard{} = blackboard, now) when is_integer(now) do
-    if Blackboard.ready_for?(blackboard, :next_regen_at, now) and RegenLogic.needs_regen?(entity) do
-      entity = RegenLogic.tick(entity, now)
-      blackboard = Blackboard.put_next_at(blackboard, :next_regen_at, RegenLogic.tick_ms(), now)
+    if Blackboard.ready_for?(blackboard, :next_regen_at, now) do
+      entity = if RegenLogic.needs_regen?(entity), do: RegenLogic.tick(entity, now), else: entity
+      blackboard = Blackboard.put_next_at(blackboard, :next_regen_at, RegenLogic.tick_ms(entity), now)
       {:failure, entity, blackboard}
     else
       {:failure, entity, blackboard}

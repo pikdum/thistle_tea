@@ -1,12 +1,18 @@
 defmodule ThistleTea.Game.Entity.Logic.Regen do
+  import Bitwise, only: [&&&: 2]
+
   alias ThistleTea.Game.Aura
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Death
 
   @tick_ms 2_000
+  @creature_tick_ms 5_000
+  @regen_flag_health 0x1
+  @regen_flag_power 0x2
   @five_second_rule_ms 5_000
   @energy_per_tick 20
   @rage_decay_per_tick 20
@@ -26,7 +32,18 @@ defmodule ThistleTea.Game.Entity.Logic.Regen do
   @class_warlock 9
   @class_druid 11
 
-  def tick_ms, do: @tick_ms
+  def tick_ms(%Mob{}), do: @creature_tick_ms
+  def tick_ms(_entity), do: @tick_ms
+
+  def tick(%Mob{} = entity, now) when is_integer(now) do
+    if Death.alive?(entity) do
+      entity
+      |> creature_regen_health()
+      |> creature_regen_mana()
+    else
+      entity
+    end
+  end
 
   def tick(entity, now) when is_integer(now) do
     if Death.alive?(entity) do
@@ -38,12 +55,60 @@ defmodule ThistleTea.Game.Entity.Logic.Regen do
     end
   end
 
+  def needs_regen?(%Mob{} = entity) do
+    Death.alive?(entity) and not in_combat?(entity) and
+      ((missing_health?(entity) and creature_regenerates?(entity, @regen_flag_health)) or
+         (creature_missing_mana?(entity) and creature_regenerates?(entity, @regen_flag_power)))
+  end
+
   def needs_regen?(%{unit: %Unit{}} = entity) do
     Death.alive?(entity) and
       (missing_health?(entity) or missing_power?(entity))
   end
 
   def needs_regen?(_entity), do: false
+
+  defp creature_regen_health(%{internal: %Internal{in_combat: true}} = entity), do: entity
+
+  defp creature_regen_health(%{unit: %Unit{health: health, max_health: max_health}} = entity)
+       when is_integer(health) and is_integer(max_health) and health < max_health do
+    if creature_regenerates?(entity, @regen_flag_health) do
+      Core.heal(entity, max(div(max_health, 3), 1))
+    else
+      entity
+    end
+  end
+
+  defp creature_regen_health(entity), do: entity
+
+  defp creature_regen_mana(%{internal: %Internal{in_combat: true}} = entity), do: entity
+
+  defp creature_regen_mana(%{unit: %Unit{power1: mana, max_power1: max_mana}} = entity)
+       when is_integer(mana) and is_integer(max_mana) and max_mana > 0 and mana < max_mana do
+    if creature_regenerates?(entity, @regen_flag_power) do
+      Core.restore_mana(entity, max(div(max_mana, 3), 1))
+    else
+      entity
+    end
+  end
+
+  defp creature_regen_mana(entity), do: entity
+
+  defp creature_missing_mana?(%{unit: %Unit{power1: mana, max_power1: max_mana}})
+       when is_integer(mana) and is_integer(max_mana) and max_mana > 0 do
+    mana < max_mana
+  end
+
+  defp creature_missing_mana?(_entity), do: false
+
+  defp creature_regenerates?(%{internal: %Internal{} = internal}, flag) do
+    case Map.get(internal, :regenerate_stats) do
+      stats when is_integer(stats) -> (stats &&& flag) != 0
+      _ -> true
+    end
+  end
+
+  defp creature_regenerates?(_entity, _flag), do: true
 
   def under_five_second_rule?(%{internal: %Internal{} = internal}, now) when is_integer(now) do
     case Map.get(internal, :last_mana_use_at) do

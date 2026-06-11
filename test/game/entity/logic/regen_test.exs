@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.Entity.Logic.RegenTest do
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.Regen
   alias ThistleTea.Game.Spell
 
@@ -235,6 +236,68 @@ defmodule ThistleTea.Game.Entity.Logic.RegenTest do
         |> with_aura(:interrupt_regen, 0)
 
       assert Regen.tick(entity, 10_000).unit.power2 == 30
+    end
+  end
+
+  describe "tick/2 for creatures" do
+    defp mob(unit_attrs, internal_attrs \\ []) do
+      %Mob{
+        unit: struct(%Unit{health: 300, max_health: 300}, unit_attrs),
+        internal: struct(%Internal{in_combat: false}, internal_attrs)
+      }
+    end
+
+    test "regenerates a third of max health out of combat" do
+      entity = mob(health: 50)
+
+      entity = Regen.tick(entity, 10_000)
+
+      assert entity.unit.health == 150
+      assert entity.internal.broadcast_update? == true
+      assert Regen.tick(entity, 15_000).unit.health == 250
+    end
+
+    test "does not regenerate in combat" do
+      entity = mob([health: 50], in_combat: true)
+
+      assert Regen.tick(entity, 10_000).unit.health == 50
+    end
+
+    test "regenerates a third of max mana out of combat" do
+      entity = mob(health: 300, power1: 0, max_power1: 90)
+
+      assert Regen.tick(entity, 10_000).unit.power1 == 30
+    end
+
+    test "does not regenerate when dead" do
+      entity = mob(health: 0)
+
+      assert Regen.tick(entity, 10_000) == entity
+    end
+
+    test "respects the regenerate_stats flags" do
+      no_regen = mob([health: 50, power1: 0, max_power1: 90], regenerate_stats: 0)
+      health_only = mob([health: 50, power1: 0, max_power1: 90], regenerate_stats: 1)
+
+      assert Regen.tick(no_regen, 10_000) == no_regen
+
+      health_only = Regen.tick(health_only, 10_000)
+      assert health_only.unit.health == 150
+      assert health_only.unit.power1 == 0
+    end
+
+    test "uses the 5 second creature tick interval" do
+      assert Regen.tick_ms(mob([])) == 5_000
+      assert Regen.tick_ms(character(class: @mage)) == 2_000
+    end
+
+    test "needs_regen?/1 for creatures" do
+      assert Regen.needs_regen?(mob(health: 50))
+      assert Regen.needs_regen?(mob(health: 300, power1: 0, max_power1: 90))
+      refute Regen.needs_regen?(mob(health: 300))
+      refute Regen.needs_regen?(mob([health: 50], in_combat: true))
+      refute Regen.needs_regen?(mob(health: 0))
+      refute Regen.needs_regen?(mob([health: 50], regenerate_stats: 0))
     end
   end
 
