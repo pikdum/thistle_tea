@@ -4,6 +4,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgCastSpell do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.Logic.AI.BT.Spell, as: SpellBT
+  alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Targets
@@ -45,6 +46,9 @@ defmodule ThistleTea.Game.Network.Message.CmsgCastSpell do
 
   def handle_spell_complete(state), do: state
 
+  @simple_spell_cast_result_failure 2
+  @cast_failure_reason_more_powerful_spell_active 0x07
+
   def cast_spell(state, %Spell{} = spell, spell_cast_targets, cast_item_guid \\ nil) do
     targets = Targets.parse(spell_cast_targets, state.guid)
 
@@ -53,6 +57,28 @@ defmodule ThistleTea.Game.Network.Message.CmsgCastSpell do
       target_name: targets.unit_guid
     )
 
+    if targets.unit_guid == state.guid and AuraLogic.blocked_by_stronger_rank?(state.character, spell) do
+      fail_cast(spell)
+      state
+    else
+      do_cast_spell(state, spell, spell_cast_targets, targets, cast_item_guid)
+    end
+  end
+
+  defp fail_cast(%Spell{id: spell_id}) do
+    Network.send_packet(%Message.SmsgCastResult{
+      spell: spell_id,
+      result: @simple_spell_cast_result_failure,
+      reason: @cast_failure_reason_more_powerful_spell_active,
+      required_spell_focus: nil,
+      area: nil,
+      equipped_item_class: nil,
+      equipped_item_subclass_mask: nil,
+      equipped_item_inventory_type_mask: nil
+    })
+  end
+
+  defp do_cast_spell(state, %Spell{} = spell, spell_cast_targets, targets, cast_item_guid) do
     state = Message.CmsgCancelCast.cancel_spell(state)
 
     cast_item =

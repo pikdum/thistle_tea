@@ -13,6 +13,9 @@ defmodule ThistleTea.Game.Spell do
     :mana_cost,
     :gcd_ms,
     :dispel_type,
+    :first_in_chain,
+    :rank,
+    :exclusive_category,
     speed: 0.0,
     aura_interrupt_flags: 0,
     attributes: MapSet.new(),
@@ -21,6 +24,21 @@ defmodule ThistleTea.Game.Spell do
   ]
 
   def attribute?(%__MODULE__{attributes: attrs}, attr), do: MapSet.member?(attrs, attr)
+
+  def same_chain?(%__MODULE__{id: id1, first_in_chain: first1}, %__MODULE__{id: id2, first_in_chain: first2}) do
+    id1 != id2 and is_integer(first1) and first1 == first2
+  end
+
+  def stronger_rank_of_same_chain?(%__MODULE__{rank: rank1} = spell1, %__MODULE__{rank: rank2} = spell2) do
+    same_chain?(spell1, spell2) and is_integer(rank1) and is_integer(rank2) and rank1 > rank2
+  end
+
+  def same_exclusive_category?(%__MODULE__{id: id1, exclusive_category: cat1}, %__MODULE__{
+        id: id2,
+        exclusive_category: cat2
+      }) do
+    id1 != id2 and not is_nil(cat1) and cat1 == cat2
+  end
 
   def school_mask(%__MODULE__{school: school}), do: school_mask(school)
   def school_mask(:physical), do: school_mask_index(0)

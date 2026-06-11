@@ -127,12 +127,13 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
       assert entity.internal.broadcast_update? == true
     end
 
-    test "applying twice fills two slots" do
+    test "applying two different spells fills two slots" do
       entity = fixture_entity()
       spell = frost_armor_fixture()
+      other_spell = %{spell | id: 7000}
 
       {entity, _events} = apply_spell(entity, 1, 1, spell)
-      {entity, _events} = apply_spell(entity, 2, 1, spell)
+      {entity, _events} = apply_spell(entity, 1, 1, other_spell)
 
       assert length(entity.unit.auras) == 2
       assert Enum.map(entity.unit.auras, & &1.slot) == [0, 1]
@@ -434,6 +435,99 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
 
       assert length(entity.unit.auras) == 1
       assert entity.unit.normal_resistance == 29
+    end
+  end
+
+  describe "rank and category stacking" do
+    defp buff_spell(id, opts) do
+      %Spell{
+        id: id,
+        name: Keyword.get(opts, :name, "Buff #{id}"),
+        school: :arcane,
+        duration_ms: 600_000,
+        first_in_chain: Keyword.get(opts, :first_in_chain),
+        rank: Keyword.get(opts, :rank),
+        exclusive_category: Keyword.get(opts, :exclusive_category),
+        effects: [
+          %Effect{
+            index: 0,
+            type: :apply_aura,
+            base_points: Keyword.get(opts, :amount, 9),
+            die_sides: 0,
+            aura: :mod_resistance,
+            amplitude_ms: 0,
+            misc_value: 1,
+            implicit_target_a: :caster
+          }
+        ]
+      }
+    end
+
+    test "higher rank replaces a lower rank of the same chain" do
+      rank1 = buff_spell(1459, first_in_chain: 1459, rank: 1, amount: 9)
+      rank2 = buff_spell(1460, first_in_chain: 1459, rank: 2, amount: 19)
+
+      entity = fixture_entity()
+      {entity, _events} = apply_spell(entity, 1, 1, rank1)
+      {entity, _events} = apply_spell(entity, 1, 1, rank2)
+
+      assert [%Holder{spell: %Spell{id: 1460}}] = entity.unit.auras
+      assert entity.unit.normal_resistance == 19
+    end
+
+    test "lower rank is not applied while a higher rank is active" do
+      rank1 = buff_spell(1459, first_in_chain: 1459, rank: 1, amount: 9)
+      rank2 = buff_spell(1460, first_in_chain: 1459, rank: 2, amount: 19)
+
+      entity = fixture_entity()
+      {entity, _events} = apply_spell(entity, 1, 1, rank2)
+      {entity, events} = apply_spell(entity, 1, 1, rank1)
+
+      assert [%Holder{spell: %Spell{id: 1460}}] = entity.unit.auras
+      assert events == []
+    end
+
+    test "blocked_by_stronger_rank?/2 detects a higher active rank" do
+      rank1 = buff_spell(1459, first_in_chain: 1459, rank: 1)
+      rank2 = buff_spell(1460, first_in_chain: 1459, rank: 2)
+
+      entity = fixture_entity()
+      {entity, _events} = apply_spell(entity, 1, 1, rank2)
+
+      assert Aura.blocked_by_stronger_rank?(entity, rank1)
+      refute Aura.blocked_by_stronger_rank?(entity, rank2)
+    end
+
+    test "same exclusive category replaces across chains" do
+      frost_armor = buff_spell(168, first_in_chain: 168, rank: 1, exclusive_category: :mage_armor)
+      mage_armor = buff_spell(6117, first_in_chain: 6117, rank: 1, exclusive_category: :mage_armor)
+
+      entity = fixture_entity()
+      {entity, _events} = apply_spell(entity, 1, 1, frost_armor)
+      {entity, _events} = apply_spell(entity, 1, 1, mage_armor)
+
+      assert [%Holder{spell: %Spell{id: 6117}}] = entity.unit.auras
+    end
+
+    test "same spell from a different caster replaces the existing holder" do
+      spell = buff_spell(1459, first_in_chain: 1459, rank: 1)
+
+      entity = fixture_entity()
+      {entity, _events} = apply_spell(entity, 10, 1, spell)
+      {entity, _events} = apply_spell(entity, 20, 1, spell)
+
+      assert [%Holder{caster_guid: 20}] = entity.unit.auras
+    end
+
+    test "spells without chain or category data still stack" do
+      buff_a = buff_spell(100, [])
+      buff_b = buff_spell(200, [])
+
+      entity = fixture_entity()
+      {entity, _events} = apply_spell(entity, 1, 1, buff_a)
+      {entity, _events} = apply_spell(entity, 1, 1, buff_b)
+
+      assert length(entity.unit.auras) == 2
     end
   end
 

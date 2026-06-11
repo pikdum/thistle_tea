@@ -12,7 +12,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   def load(spell_id) when is_integer(spell_id) and spell_id > 0 do
     case DBC.get(Spell, spell_id) do
       nil -> nil
-      row -> build(row)
+      row -> row |> build() |> put_chain(Mangos.Repo.get(Mangos.SpellChain, spell_id))
     end
   end
 
@@ -33,9 +33,11 @@ defmodule ThistleTea.Game.World.Loader.Spell do
 
     radius_map = load_radius_map(rows)
     radius_lookup = fn radius_id -> Map.get(radius_map, radius_id) end
+    chain_map = load_chain_map(spell_ids)
 
     rows
     |> Enum.map(&build_preloaded(&1, radius_lookup))
+    |> Enum.map(&put_chain(&1, Map.get(chain_map, &1.id)))
     |> Map.new(fn %SpellData{id: id} = spell -> {id, spell} end)
   end
 
@@ -98,9 +100,40 @@ defmodule ThistleTea.Game.World.Loader.Spell do
       speed: row.speed || 0.0,
       aura_interrupt_flags: row.aura_interrupt_flags || 0,
       attributes: attributes(row.attributes, row.attributes_ex1),
+      exclusive_category: exclusive_category(row),
       effects: build_effects(row, radius_lookup),
       reagents: build_reagents(row)
     }
+  end
+
+  defp load_chain_map(spell_ids) do
+    Mangos.Repo.all(from(c in Mangos.SpellChain, where: c.spell_id in ^spell_ids))
+    |> Map.new(&{&1.spell_id, &1})
+  end
+
+  defp put_chain(%SpellData{} = spell, %Mangos.SpellChain{first_spell: first_spell, rank: rank}) do
+    %{spell | first_in_chain: first_spell, rank: rank}
+  end
+
+  defp put_chain(spell, _chain), do: spell
+
+  @spell_family_mage 3
+  @mage_armor_family_flags 0x12000000
+  @warlock_armor_visual 130
+  @warlock_armor_icon 89
+
+  defp exclusive_category(row) do
+    cond do
+      row.spell_class_set == @spell_family_mage and
+          ((row.spell_class_mask_0 || 0) &&& @mage_armor_family_flags) != 0 ->
+        :mage_armor
+
+      row.spell_visual_0 == @warlock_armor_visual and row.spell_icon == @warlock_armor_icon ->
+        :warlock_armor
+
+      true ->
+        nil
+    end
   end
 
   defp build_reagents(row) do

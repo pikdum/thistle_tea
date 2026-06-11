@@ -87,7 +87,23 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
   end
 
   defp do_apply(%{unit: %Unit{auras: existing}} = entity, %Holder{} = holder, now) when is_list(existing) do
-    existing = remove_immune_mechanics(existing, holder)
+    if blocked_by_stronger_rank?(existing, holder.spell) do
+      {entity, []}
+    else
+      do_apply_unblocked(entity, existing, holder, now)
+    end
+  end
+
+  defp do_apply(entity, %Holder{} = holder, now) do
+    do_apply(%{entity | unit: %{entity.unit | auras: []}}, holder, now)
+  end
+
+  defp do_apply_unblocked(entity, existing, %Holder{} = holder, now) do
+    existing =
+      existing
+      |> remove_immune_mechanics(holder)
+      |> remove_non_stacking(holder)
+
     holders = upsert_holder(existing, holder)
     unit = sync_unit(%{entity.unit | auras: holders})
 
@@ -101,8 +117,22 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
     {Core.mark_broadcast_update(entity), sit_events ++ events}
   end
 
-  defp do_apply(entity, %Holder{} = holder, now) do
-    do_apply(%{entity | unit: %{entity.unit | auras: []}}, holder, now)
+  def blocked_by_stronger_rank?(%{unit: %Unit{auras: holders}}, %Spell{} = spell) when is_list(holders) do
+    blocked_by_stronger_rank?(holders, spell)
+  end
+
+  def blocked_by_stronger_rank?(holders, %Spell{} = spell) when is_list(holders) do
+    Enum.any?(holders, fn %Holder{spell: other} -> Spell.stronger_rank_of_same_chain?(other, spell) end)
+  end
+
+  def blocked_by_stronger_rank?(_entity, _spell), do: false
+
+  defp remove_non_stacking(holders, %Holder{spell: %Spell{} = spell, caster_guid: caster_guid}) do
+    Enum.reject(holders, fn %Holder{spell: %Spell{} = other} = existing ->
+      Spell.same_chain?(other, spell) or
+        Spell.same_exclusive_category?(other, spell) or
+        (other.id == spell.id and existing.caster_guid != caster_guid)
+    end)
   end
 
   defp remove_immune_mechanics(holders, %Holder{auras: auras}) do
