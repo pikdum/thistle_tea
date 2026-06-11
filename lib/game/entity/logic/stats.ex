@@ -184,8 +184,9 @@ defmodule ThistleTea.Game.Entity.Logic.Stats do
 
   defp aura_resistance_bonus(%Unit{} = unit, bit) do
     sum_aura_amounts(unit, fn
-      %Aura{type: :mod_resistance, amount: amount, misc_value: mask}
-      when is_integer(amount) and is_integer(mask) and (mask &&& bit) != 0 ->
+      %Aura{type: type, amount: amount, misc_value: mask}
+      when type in [:mod_resistance, :mod_resistance_exclusive] and
+             is_integer(amount) and is_integer(mask) and (mask &&& bit) != 0 ->
         amount
 
       _aura ->

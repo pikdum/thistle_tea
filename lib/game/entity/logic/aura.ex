@@ -24,6 +24,10 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
 
   @movement_flag_root 0x08000000
   @movement_flag_safe_fall 0x20000000
+  @movement_flag_water_walk 0x10000000
+  @movement_flag_hover 0x40000000
+
+  @unit_flag_stunned 0x00040000
 
   @max_slots 48
   @max_positive_slots 32
@@ -33,8 +37,19 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
   @aflag_eff_index_1 0x04
   @aflag_eff_index_0 0x08
 
-  @negative_auras [:periodic_damage, :mod_root, :mod_decrease_speed, :mod_stun, :mod_fear, :mod_confuse]
+  @negative_auras [
+    :periodic_damage,
+    :periodic_leech,
+    :mod_root,
+    :mod_decrease_speed,
+    :mod_stun,
+    :mod_fear,
+    :mod_confuse,
+    :mod_possess,
+    :mod_detect_range
+  ]
 
+  @aura_interrupt_damage 0x02
   @aura_interrupt_move 0x08
   @aura_interrupt_turning 0x10
   @aura_interrupt_not_seated 0x40000
@@ -65,8 +80,9 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
           caster_level: context.caster_level,
           applied_at: now,
           expires_at: expires_at(now, spell.duration_ms),
+          charges: holder_charges(spell),
           auras: auras,
-          negative?: negative?(auras, context.caster_guid, target_guid)
+          negative?: negative?(spell, auras, context.caster_guid, target_guid)
         }
 
         do_apply(entity, holder, now)
@@ -84,8 +100,9 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
     apply_spell(entity, context, spell, now)
   end
 
-  defp negative?(auras, caster_guid, target_guid) do
+  defp negative?(spell, auras, caster_guid, target_guid) do
     cond do
+      Spell.attribute?(spell, :negative) -> true
       caster_guid == target_guid -> false
       Enum.any?(auras, fn %Aura{type: type} -> type in @negative_auras end) -> true
       true -> false
@@ -93,10 +110,15 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
   end
 
   defp do_apply(%{unit: %Unit{auras: existing}} = entity, %Holder{} = holder, now) when is_list(existing) do
-    if blocked_by_stronger_rank?(existing, holder.spell) do
-      {entity, []}
-    else
-      do_apply_unblocked(entity, existing, holder, now)
+    cond do
+      blocked_by_stronger_rank?(existing, holder.spell) ->
+        {entity, []}
+
+      blocked_by_mechanic_immunity?(existing, holder.spell) ->
+        {consume_immunity_charge(entity, holder.spell), []}
+
+      true ->
+        do_apply_unblocked(entity, existing, holder, now)
     end
   end
 
@@ -139,6 +161,51 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
         Spell.same_exclusive_category?(other, spell) or
         (other.id == spell.id and existing.caster_guid != caster_guid)
     end)
+  end
+
+  defp holder_charges(%Spell{proc_charges: charges}) when is_integer(charges) and charges > 0, do: charges
+  defp holder_charges(_spell), do: nil
+
+  def mechanic_immune?(%{unit: %Unit{auras: holders}}, %Spell{} = spell) when is_list(holders) do
+    blocked_by_mechanic_immunity?(holders, spell)
+  end
+
+  def mechanic_immune?(_entity, _spell), do: false
+
+  defp blocked_by_mechanic_immunity?(holders, %Spell{mechanic: mechanic}) when is_integer(mechanic) and mechanic > 0 do
+    Enum.any?(holders, &immunity_holder_for_mechanic?(&1, mechanic))
+  end
+
+  defp blocked_by_mechanic_immunity?(_holders, _spell), do: false
+
+  defp immunity_holder_for_mechanic?(%Holder{auras: auras}, mechanic) do
+    Enum.any?(auras, &match?(%Aura{type: :mechanic_immunity, misc_value: ^mechanic}, &1))
+  end
+
+  defp consume_immunity_charge(%{unit: %Unit{auras: holders}} = entity, %Spell{mechanic: mechanic}) do
+    case Enum.find_index(holders, &(&1.charges != nil and immunity_holder_for_mechanic?(&1, mechanic))) do
+      nil ->
+        entity
+
+      index ->
+        holders = spend_holder_charge(holders, index)
+
+        %{entity | unit: sync_unit(%{entity.unit | auras: holders})}
+        |> Core.mark_broadcast_update()
+    end
+  end
+
+  defp spend_holder_charge(holders, index) do
+    case Enum.at(holders, index) do
+      %Holder{charges: charges} when is_integer(charges) and charges > 1 ->
+        List.update_at(holders, index, &%{&1 | charges: charges - 1})
+
+      %Holder{charges: charges} when is_integer(charges) ->
+        List.delete_at(holders, index)
+
+      _holder ->
+        holders
+    end
   end
 
   defp remove_immune_mechanics(holders, %Holder{auras: auras}) do
@@ -198,15 +265,45 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
 
   def self_duration_events(_entity, _now), do: []
 
-  def reactions(%{object: %{guid: owner_guid}, unit: %Unit{auras: holders}}, :hit_taken, %{attacker_guid: attacker_guid})
+  @charge_consuming_on_hit [:damage_shield, :proc_trigger_spell, :mod_resistance, :mod_resistance_exclusive]
+
+  def reactions(%{object: %{guid: owner_guid}, unit: %Unit{auras: holders}} = entity, :hit_taken, %{
+        attacker_guid: attacker_guid
+      })
       when is_list(holders) and is_integer(attacker_guid) do
-    holders
-    |> Enum.flat_map(fn %Holder{} = holder ->
-      Enum.flat_map(holder.auras, &reaction_event(&1, holder, owner_guid, attacker_guid))
-    end)
+    events =
+      Enum.flat_map(holders, fn %Holder{} = holder ->
+        Enum.flat_map(holder.auras, &reaction_event(&1, holder, owner_guid, attacker_guid))
+      end)
+
+    {spend_hit_charges(entity), events}
   end
 
-  def reactions(_entity, _event, _context), do: []
+  def reactions(entity, _event, _context), do: {entity, []}
+
+  defp spend_hit_charges(%{unit: %Unit{auras: holders}} = entity) do
+    new_holders =
+      holders
+      |> Enum.map(&spend_hit_charge/1)
+      |> Enum.reject(&is_nil/1)
+
+    if new_holders == holders do
+      entity
+    else
+      %{entity | unit: sync_unit(%{entity.unit | auras: new_holders})}
+      |> Core.mark_broadcast_update()
+    end
+  end
+
+  defp spend_hit_charge(%Holder{charges: charges} = holder) when is_integer(charges) do
+    cond do
+      not holder_has_any_type?(holder, @charge_consuming_on_hit) -> holder
+      charges > 1 -> %{holder | charges: charges - 1}
+      true -> nil
+    end
+  end
+
+  defp spend_hit_charge(holder), do: holder
 
   def expire_due(%{unit: %Unit{auras: holders}} = entity, now) when is_list(holders) do
     {kept, expired} = Enum.split_with(holders, &alive?(&1, now))
@@ -288,9 +385,11 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
 
   defp cancelable?(_holder), do: false
 
-  def dispel(%{unit: %Unit{auras: holders}} = entity, dispel_type, now)
+  def dispel(entity, dispel_type, now, polarity \\ nil)
+
+  def dispel(%{unit: %Unit{auras: holders}} = entity, dispel_type, now, polarity)
       when is_list(holders) and holders != [] and is_integer(dispel_type) do
-    case Enum.find_index(holders, fn %Holder{spell: %Spell{dispel_type: dt}} -> dt == dispel_type end) do
+    case dispel_index(holders, dispel_type, polarity) do
       nil ->
         {entity, []}
 
@@ -307,7 +406,17 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
     end
   end
 
-  def dispel(entity, _dispel_type, _now), do: {entity, []}
+  def dispel(entity, _dispel_type, _now, _polarity), do: {entity, []}
+
+  defp dispel_index(holders, dispel_type, polarity) do
+    matches_type? = fn %Holder{spell: %Spell{dispel_type: dt}} -> dt == dispel_type end
+
+    case polarity do
+      :negative -> Enum.find_index(holders, &(matches_type?.(&1) and &1.negative?))
+      :positive -> Enum.find_index(holders, &(matches_type?.(&1) and not &1.negative?))
+      _ -> Enum.find_index(holders, matches_type?)
+    end
+  end
 
   defp interruptible?(%Holder{spell: %Spell{aura_interrupt_flags: flags}}, mask) when is_integer(flags) do
     (flags &&& mask) != 0
@@ -432,8 +541,14 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
 
   def has_aura?(_entity, _type), do: false
 
+  def has_spell?(%{unit: %Unit{auras: holders}}, spell_id) when is_list(holders) and is_integer(spell_id) do
+    Enum.any?(holders, &match?(%Holder{spell: %Spell{id: ^spell_id}}, &1))
+  end
+
+  def has_spell?(_entity, _spell_id), do: false
+
   def confuse_anchor_key(%{unit: %Unit{auras: holders}}) when is_list(holders) do
-    case Enum.find(holders, &has_aura_type?(&1, :mod_confuse)) do
+    case Enum.find(holders, &(has_aura_type?(&1, :mod_confuse) or has_aura_type?(&1, :mod_fear))) do
       %Holder{applied_at: applied_at, spell: %Spell{id: spell_id}} -> {spell_id, applied_at}
       _ -> nil
     end
@@ -442,7 +557,10 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
   def confuse_anchor_key(_entity), do: nil
 
   def break_on_damage(%{unit: %Unit{auras: holders}} = entity, now) when is_list(holders) and holders != [] do
-    {removed, kept} = Enum.split_with(holders, &has_aura_type?(&1, :mod_confuse))
+    {removed, kept} =
+      Enum.split_with(holders, fn holder ->
+        has_aura_type?(holder, :mod_confuse) or interruptible?(holder, @aura_interrupt_damage)
+      end)
 
     if removed == [] do
       entity
@@ -469,7 +587,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
   defp sync_movement_flags(%{movement_block: %MovementBlock{} = mb, unit: %Unit{auras: holders}} = entity, now) do
     flags = mb.movement_flags || 0
     was_rooted? = (flags &&& @movement_flag_root) != 0
-    has_root? = Enum.any?(holders, &has_aura_type?(&1, :mod_root))
+    has_root? = Enum.any?(holders, &(has_aura_type?(&1, :mod_root) or has_aura_type?(&1, :mod_stun)))
 
     new_flags =
       if has_root?,
@@ -492,31 +610,57 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
     old_run_speed = run_speed(entity)
     entity = MovementStats.recompute(entity)
     {entity, events} = sync_movement_flags(entity, now)
-    {entity, feather_events} = sync_feather_fall(entity)
-    {entity, speed_change_events(entity, old_run_speed) ++ events ++ feather_events}
+    {entity, feather_events} = sync_movement_flag_aura(entity, :feather_fall, @movement_flag_safe_fall)
+    {entity, hover_events} = sync_movement_flag_aura(entity, :hover, @movement_flag_hover)
+    {entity, water_walk_events} = sync_movement_flag_aura(entity, :water_walk, @movement_flag_water_walk)
+    entity = sync_stunned_flag(entity)
+    flag_events = feather_events ++ hover_events ++ water_walk_events
+    {entity, speed_change_events(entity, old_run_speed) ++ events ++ flag_events}
   end
 
-  defp sync_feather_fall(%{movement_block: %MovementBlock{} = mb, unit: %Unit{auras: holders}} = entity)
+  defp sync_movement_flag_aura(
+         %{movement_block: %MovementBlock{} = mb, unit: %Unit{auras: holders}} = entity,
+         type,
+         bit
+       )
        when is_list(holders) do
     flags = mb.movement_flags || 0
-    was_on? = (flags &&& @movement_flag_safe_fall) != 0
-    has_ff? = Enum.any?(holders, &has_aura_type?(&1, :feather_fall))
+    was_on? = (flags &&& bit) != 0
+    has_aura? = Enum.any?(holders, &has_aura_type?(&1, type))
 
     new_flags =
-      if has_ff?,
-        do: flags ||| @movement_flag_safe_fall,
-        else: flags &&& bnot(@movement_flag_safe_fall)
+      if has_aura?,
+        do: flags ||| bit,
+        else: flags &&& bnot(bit)
 
     entity = %{entity | movement_block: %{mb | movement_flags: new_flags}}
 
-    if has_ff? == was_on? do
+    if has_aura? == was_on? do
       {entity, []}
     else
-      {entity, [Event.feather_fall_changed(has_ff?)]}
+      {entity, [movement_flag_event(type, has_aura?)]}
     end
   end
 
-  defp sync_feather_fall(entity), do: {entity, []}
+  defp sync_movement_flag_aura(entity, _type, _bit), do: {entity, []}
+
+  defp movement_flag_event(:feather_fall, enabled?), do: Event.feather_fall_changed(enabled?)
+  defp movement_flag_event(:hover, enabled?), do: Event.hover_changed(enabled?)
+  defp movement_flag_event(:water_walk, enabled?), do: Event.water_walk_changed(enabled?)
+
+  defp sync_stunned_flag(%{unit: %Unit{auras: holders} = unit} = entity) when is_list(holders) do
+    flags = unit.flags || 0
+    stunned? = Enum.any?(holders, &has_aura_type?(&1, :mod_stun))
+
+    new_flags =
+      if stunned?,
+        do: flags ||| @unit_flag_stunned,
+        else: flags &&& bnot(@unit_flag_stunned)
+
+    %{entity | unit: %{unit | flags: new_flags}}
+  end
+
+  defp sync_stunned_flag(entity), do: entity
 
   defp speed_change_events(entity, old_run_speed) do
     new_run_speed = run_speed(entity)
@@ -560,7 +704,10 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
         {entity, events}
 
       {entity, acc, events} ->
-        new_holders = Enum.reverse(acc)
+        new_holders =
+          acc
+          |> Enum.reverse()
+          |> Enum.filter(&holder_still_present?(entity, &1))
 
         entity =
           if new_holders == holders do
@@ -571,6 +718,10 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
 
         {entity, events}
     end
+  end
+
+  defp holder_still_present?(%{unit: %Unit{auras: current}}, %Holder{spell: %Spell{id: id}, caster_guid: caster}) do
+    Enum.any?(current, &same_source?(&1, id, caster))
   end
 
   defp tick_holder(entity, %Holder{auras: auras} = holder, now) do
@@ -600,7 +751,42 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
     {entity, %{aura | next_tick_at: advance_tick(at, aura.amplitude_ms, now)}, []}
   end
 
+  defp tick_aura(entity, %Holder{} = holder, %Aura{type: :periodic_leech, next_tick_at: at} = aura, now)
+       when is_integer(at) and now >= at do
+    damage = aura.amount
+    entity = Core.take_damage(entity, damage, now, school: holder.spell.school)
+
+    events = [
+      Event.spell_damage(holder.caster_guid, entity.object.guid, holder.spell, damage, periodic?: true)
+      | leech_heal_events(holder, entity, damage, aura)
+    ]
+
+    {entity, %{aura | next_tick_at: advance_tick(at, aura.amplitude_ms, now)}, events}
+  end
+
+  defp tick_aura(entity, %Holder{} = holder, %Aura{type: :periodic_trigger_spell, next_tick_at: at} = aura, now)
+       when is_integer(at) and now >= at do
+    events =
+      case aura.trigger_spell_id do
+        spell_id when is_integer(spell_id) and spell_id > 0 ->
+          [Event.trigger_spell(holder.caster_guid, holder.caster_level, entity.object.guid, spell_id)]
+
+        _ ->
+          []
+      end
+
+    {entity, %{aura | next_tick_at: advance_tick(at, aura.amplitude_ms, now)}, events}
+  end
+
   defp tick_aura(entity, _holder, aura, _now), do: {entity, aura, []}
+
+  defp leech_heal_events(%Holder{caster_guid: caster_guid}, %{object: %{guid: owner_guid}}, damage, %Aura{} = aura)
+       when is_integer(caster_guid) and caster_guid != owner_guid and damage > 0 do
+    multiplier = if is_number(aura.multiple_value) and aura.multiple_value > 0, do: aura.multiple_value, else: 1.0
+    [Event.heal_entity(caster_guid, trunc(damage * multiplier))]
+  end
+
+  defp leech_heal_events(_holder, _entity, _damage, _aura), do: []
 
   defp advance_tick(last_tick, amplitude_ms, now) when is_integer(amplitude_ms) and amplitude_ms > 0 do
     next = last_tick + amplitude_ms
@@ -667,6 +853,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
       type: effect.aura,
       amount: Effect.damage_roll(effect),
       misc_value: effect.misc_value,
+      multiple_value: effect.multiple_value,
       amplitude_ms: amplitude_ms,
       next_tick_at: next_tick(effect, amplitude_ms, now),
       trigger_spell_id: effect.trigger_spell_id
@@ -693,7 +880,8 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
   defp reaction_event(_aura, _holder, _owner_guid, _attacker_guid), do: []
 
   defp next_tick(%Effect{aura: aura}, amplitude_ms, now)
-       when aura in [:periodic_damage, :periodic_heal] and is_integer(amplitude_ms) and amplitude_ms > 0 do
+       when aura in [:periodic_damage, :periodic_heal, :periodic_leech, :periodic_trigger_spell] and
+              is_integer(amplitude_ms) and amplitude_ms > 0 do
     now + amplitude_ms
   end
 

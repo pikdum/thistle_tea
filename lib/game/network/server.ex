@@ -264,12 +264,19 @@ defmodule ThistleTea.Game.Network.Server do
     {:noreply, {socket, %{state | character: character}}, {:continue, :maybe_broadcast_update}}
   end
 
+  def handle_cast({:receive_heal, amount}, {socket, %{character: character} = state}) do
+    character = Core.heal(character, amount)
+    {:noreply, {socket, %{state | character: character}}, {:continue, :maybe_broadcast_update}}
+  end
+
   def handle_cast({:receive_spell, caster, spell}, {socket, %{character: character} = state}) do
-    {character, events} = SpellEffect.receive(character, caster, spell, Time.now())
+    now = Time.now()
+    {character, events} = SpellEffect.receive(character, caster, spell, now)
+    duration_events = Aura.self_duration_events(character, now)
 
     character =
       character
-      |> EventSink.emit(events)
+      |> EventSink.emit(events ++ duration_events)
 
     {:noreply, {socket, %{state | character: character}}, {:continue, :maybe_broadcast_update}}
   end

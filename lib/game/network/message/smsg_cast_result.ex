@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.Network.Message.SmsgCastResult do
     bad_targets: 0x0A,
     caster_dead: 0x13,
     equipped_item_class: @cast_failure_reason_equipped_item_class,
+    immune: 0x22,
     item_not_ready: 0x28,
     not_known: 0x38,
     not_ready: 0x3C,
@@ -25,7 +26,8 @@ defmodule ThistleTea.Game.Network.Message.SmsgCastResult do
     spell_in_progress: 0x61,
     targets_dead: 0x65,
     target_enemy: 0x69,
-    target_friendly: 0x6B
+    target_friendly: 0x6B,
+    target_not_dead: 0x6E
   }
 
   defstruct [

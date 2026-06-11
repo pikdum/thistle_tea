@@ -57,14 +57,19 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
     entity = Core.take_damage(entity, damage, now)
     event = attacker_state_update(Map.get(attack, :caster, 0), target_guid, damage, attack)
 
-    {entity, [event | attack_reaction_events(entity, attack)]}
+    {entity, reaction_events} = attack_reactions(entity, attack)
+    {entity, [event | reaction_events]}
   end
 
   def receive_attack(entity, _attack, _now), do: {entity, []}
 
-  defp attack_reaction_events(entity, %{caster: attacker_guid}) when is_integer(attacker_guid) do
-    if Core.dead?(entity), do: [], else: Aura.reactions(entity, :hit_taken, %{attacker_guid: attacker_guid})
+  defp attack_reactions(entity, %{caster: attacker_guid}) when is_integer(attacker_guid) do
+    if Core.dead?(entity) do
+      {entity, []}
+    else
+      Aura.reactions(entity, :hit_taken, %{attacker_guid: attacker_guid})
+    end
   end
 
-  defp attack_reaction_events(_entity, _attack), do: []
+  defp attack_reactions(entity, _attack), do: {entity, []}
 end

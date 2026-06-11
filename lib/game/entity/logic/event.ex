@@ -32,7 +32,8 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
     :spell,
     :effect,
     :attack,
-    :channel_time_ms
+    :channel_time_ms,
+    :entry
   ]
 
   def spell_damage(source_guid, target_guid, spell, damage, opts \\ []) do
@@ -69,6 +70,23 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
 
   def feather_fall_changed(enabled?) when is_boolean(enabled?) do
     %__MODULE__{type: :feather_fall_changed, enabled?: enabled?}
+  end
+
+  def hover_changed(enabled?) when is_boolean(enabled?) do
+    %__MODULE__{type: :hover_changed, enabled?: enabled?}
+  end
+
+  def water_walk_changed(enabled?) when is_boolean(enabled?) do
+    %__MODULE__{type: :water_walk_changed, enabled?: enabled?}
+  end
+
+  def heal_entity(target_guid, amount) when is_integer(target_guid) and is_integer(amount) do
+    %__MODULE__{type: :heal_entity, target_guid: target_guid, damage: amount}
+  end
+
+  def resurrect_request(source_guid, spell_id, health, mana)
+      when is_integer(source_guid) and is_integer(spell_id) and is_integer(health) and is_integer(mana) do
+    %__MODULE__{type: :resurrect_request, source_guid: source_guid, spell_id: spell_id, damage: health, count: mana}
   end
 
   def monster_move(opts \\ []) when is_list(opts) do
@@ -191,6 +209,10 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
 
   def despawn_area_effects(spell_id) when is_integer(spell_id) do
     %__MODULE__{type: :despawn_area_effects, spell_id: spell_id}
+  end
+
+  def summon_game_object(entry, duration_ms) when is_integer(entry) and is_integer(duration_ms) do
+    %__MODULE__{type: :summon_game_object, entry: entry, duration_ms: duration_ms}
   end
 
   def consume_reagents(reagents) when is_list(reagents) do

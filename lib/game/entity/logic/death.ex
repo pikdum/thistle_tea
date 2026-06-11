@@ -76,6 +76,30 @@ defmodule ThistleTea.Game.Entity.Logic.Death do
     {Core.mark_broadcast_update(character), events ++ [Event.movement_root_changed(false)]}
   end
 
+  def resurrect_with(%{unit: %Unit{}} = character, health, mana, now)
+      when is_integer(health) and health > 0 and is_integer(mana) do
+    {character, events} = Aura.remove_spells(character, [@ghost_spell_id, @wisp_spell_id], now)
+
+    %{unit: unit, player: player} = character
+
+    unit = %{
+      unit
+      | health: clamp_restore(health, unit.max_health),
+        power1: clamp_restore(mana, unit.max_power1),
+        power2: 0,
+        vis_flag: 0
+    }
+
+    player = %{player | flags: (player.flags || 0) &&& bnot(@player_flag_ghost)}
+
+    character = %{character | unit: unit, player: player}
+
+    {Core.mark_broadcast_update(character), events ++ [Event.movement_root_changed(false)]}
+  end
+
+  defp clamp_restore(value, max) when is_integer(max) and max > 0, do: value |> max(0) |> min(max)
+  defp clamp_restore(value, _max), do: max(value, 0)
+
   def resurrection_sickness_duration_ms(level) when is_integer(level) and level >= @resurrection_sickness_level do
     min((level - @resurrection_sickness_level + 1) * 60_000, @resurrection_sickness_max_ms)
   end

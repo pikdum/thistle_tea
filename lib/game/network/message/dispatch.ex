@@ -94,7 +94,9 @@ defmodule ThistleTea.Game.Network.Message.Dispatch do
               MSG_MOVE_TELEPORT_ACK: Message.CmsgMoveTeleportAck,
               MSG_CORPSE_QUERY: Message.MsgCorpseQuery,
               CMSG_RECLAIM_CORPSE: Message.CmsgReclaimCorpse,
-              CMSG_SPIRIT_HEALER_ACTIVATE: Message.CmsgSpiritHealerActivate
+              CMSG_SPIRIT_HEALER_ACTIVATE: Message.CmsgSpiritHealerActivate,
+              CMSG_RESURRECT_RESPONSE: Message.CmsgResurrectResponse,
+              CMSG_GAMEOBJ_USE: Message.CmsgGameobjUse
             }
             |> Map.merge(@movement_opcodes)
             |> Map.new(fn {opcode, module} -> {Opcodes.get(opcode), module} end)

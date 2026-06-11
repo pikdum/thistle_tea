@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.DynamicObject, as: DataDynamicObject
+  alias ThistleTea.Game.Entity.Data.GameObject
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Event
@@ -97,6 +98,50 @@ defmodule ThistleTea.Game.Entity.EventSink do
   end
 
   def emit(entity, %Event{type: :feather_fall_changed}), do: entity
+
+  def emit(%Character{object: %{guid: guid}} = entity, %Event{type: :hover_changed, enabled?: true}) do
+    Network.send_packet(%Message.SmsgMoveSetHover{guid: guid})
+    entity
+  end
+
+  def emit(%Character{object: %{guid: guid}} = entity, %Event{type: :hover_changed, enabled?: false}) do
+    Network.send_packet(%Message.SmsgMoveUnsetHover{guid: guid})
+    entity
+  end
+
+  def emit(entity, %Event{type: :hover_changed}), do: entity
+
+  def emit(%Character{object: %{guid: guid}} = entity, %Event{type: :water_walk_changed, enabled?: true}) do
+    Network.send_packet(%Message.SmsgMoveWaterWalk{guid: guid})
+    entity
+  end
+
+  def emit(%Character{object: %{guid: guid}} = entity, %Event{type: :water_walk_changed, enabled?: false}) do
+    Network.send_packet(%Message.SmsgMoveLandWalk{guid: guid})
+    entity
+  end
+
+  def emit(entity, %Event{type: :water_walk_changed}), do: entity
+
+  def emit(%Character{internal: %Internal{} = internal} = entity, %Event{type: :resurrect_request} = event) do
+    pending = %{
+      caster_guid: event.source_guid,
+      position: World.position(event.source_guid),
+      health: event.damage,
+      mana: event.count || 0
+    }
+
+    Network.send_packet(%Message.SmsgResurrectRequest{guid: event.source_guid})
+
+    %{entity | internal: Map.put(internal, :pending_resurrect, pending)}
+  end
+
+  def emit(entity, %Event{type: :resurrect_request}), do: entity
+
+  def emit(entity, %Event{type: :heal_entity} = event) do
+    Entity.receive_heal(event.target_guid, event.damage)
+    entity
+  end
 
   def emit(%Character{object: %{guid: guid}} = entity, %Event{type: :movement_speed_changed, speed: speed})
       when is_number(speed) do
@@ -343,6 +388,37 @@ defmodule ThistleTea.Game.Entity.EventSink do
   end
 
   def emit(entity, %Event{type: :despawn_area_effects}), do: entity
+
+  def emit(
+        %{
+          object: %{guid: owner_guid},
+          internal: %Internal{map: map},
+          movement_block: %{position: {_x, _y, _z, _o} = position}
+        } = entity,
+        %Event{type: :summon_game_object, entry: entry, duration_ms: duration_ms}
+      )
+      when is_integer(map) do
+    case Mangos.Repo.get(Mangos.GameObjectTemplate, entry) do
+      %Mangos.GameObjectTemplate{} = template ->
+        template
+        |> GameObject.build_summoned(map, position,
+          summoned_by: owner_guid,
+          level: owner_level(entity),
+          despawn_in_ms: duration_ms
+        )
+        |> World.start_entity()
+
+      _ ->
+        nil
+    end
+
+    entity
+  end
+
+  defp owner_level(%{unit: %{level: level}}) when is_integer(level), do: level
+  defp owner_level(_entity), do: 1
+
+  def emit(entity, %Event{type: :summon_game_object}), do: entity
 
   def emit(entity, %Event{type: :trigger_spell} = event) do
     case SpellLoader.load(event.spell_id) do

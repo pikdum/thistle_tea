@@ -126,6 +126,8 @@ defmodule ThistleTea.Game.World.Loader.Spell do
       dispel_type: row.dispel_type || 0,
       speed: row.speed || 0.0,
       aura_interrupt_flags: row.aura_interrupt_flags || 0,
+      mechanic: row.mechanic || 0,
+      proc_charges: row.proc_charges || 0,
       attributes: attributes(row.attributes, row.attributes_ex1),
       exclusive_category: exclusive_category(row),
       effects: build_effects(row, radius_lookup),
@@ -206,6 +208,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
           aura: aura,
           amplitude_ms: amplitude_ms(Map.get(row, :"effect_amplitude_#{index}")),
           misc_value: effect_misc_value(row, index, type, aura),
+          multiple_value: Map.get(row, :"effect_multiple_values_#{index}") || 0.0,
           radius_yards: radius_lookup.(Map.get(row, :"effect_radius_#{index}")),
           implicit_target_a: target_type(Map.get(row, :"implicit_target_a_#{index}") || 0),
           implicit_target_b: target_type(Map.get(row, :"implicit_target_b_#{index}") || 0),
@@ -309,21 +312,27 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp effect_type(5), do: :teleport_units
   defp effect_type(6), do: :apply_aura
   defp effect_type(10), do: :heal
+  defp effect_type(18), do: :resurrect
   defp effect_type(24), do: :create_item
   defp effect_type(29), do: :leap
   defp effect_type(38), do: :dispel
   defp effect_type(50), do: :trans_door
+  defp effect_type(62), do: :power_burn
   defp effect_type(68), do: :interrupt_cast
   defp effect_type(17), do: :weapon_damage_noschool
   defp effect_type(27), do: :persistent_area_aura
   defp effect_type(58), do: :weapon_damage
   defp effect_type(64), do: :trigger_spell
+  defp effect_type(113), do: :resurrect_new
   defp effect_type(other) when is_integer(other), do: other
 
   defp aura_type(0), do: nil
+  defp aura_type(1), do: :bind_sight
+  defp aura_type(2), do: :mod_possess
   defp aura_type(3), do: :periodic_damage
   defp aura_type(4), do: :dummy
   defp aura_type(5), do: :mod_confuse
+  defp aura_type(7), do: :mod_fear
   defp aura_type(8), do: :periodic_heal
   defp aura_type(12), do: :mod_stun
   defp aura_type(14), do: :mod_damage_taken
@@ -336,6 +345,8 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp aura_type(31), do: :mod_increase_speed
   defp aura_type(33), do: :mod_decrease_speed
   defp aura_type(42), do: :proc_trigger_spell
+  defp aura_type(49), do: :mod_dodge
+  defp aura_type(53), do: :periodic_leech
   defp aura_type(56), do: :transform
   defp aura_type(58), do: :mod_increase_swim_speed
   defp aura_type(69), do: :school_absorb
@@ -344,16 +355,23 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp aura_type(84), do: :mod_regen
   defp aura_type(85), do: :mod_power_regen
   defp aura_type(88), do: :mod_health_regen_percent
+  defp aura_type(91), do: :mod_detect_range
   defp aura_type(94), do: :interrupt_regen
   defp aura_type(95), do: :ghost
   defp aura_type(97), do: :mana_shield
   defp aura_type(99), do: :mod_attack_power
+  defp aura_type(103), do: :mod_total_threat
+  defp aura_type(104), do: :water_walk
   defp aura_type(105), do: :feather_fall
+  defp aura_type(106), do: :hover
   defp aura_type(110), do: :mod_power_regen_percent
+  defp aura_type(113), do: :mod_ranged_damage_taken
   defp aura_type(115), do: :mod_healing
   defp aura_type(116), do: :mod_regen_during_combat
+  defp aura_type(118), do: :mod_healing_pct
   defp aura_type(134), do: :mod_mana_regen_interrupt
   defp aura_type(135), do: :mod_healing_done
+  defp aura_type(143), do: :mod_resistance_exclusive
   defp aura_type(161), do: :mod_health_regen_in_combat
   defp aura_type(other) when is_integer(other), do: other
 
@@ -361,6 +379,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp target_type(1), do: :caster
   defp target_type(6), do: :target_enemy
   defp target_type(21), do: :target_ally
+  defp target_type(57), do: :target_ally
   defp target_type(15), do: :aoe_enemy_at_caster
   defp target_type(22), do: :aoe_enemy_at_caster
   defp target_type(24), do: :aoe_enemy_in_cone
@@ -373,6 +392,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   @passive 0x00000040
   @ability 0x00000010
   @hidden_in_combat_log 0x00000100
+  @aura_is_debuff 0x04000000
   @cant_cancel 0x80000000
   @channeled_ex_1 0x00000004
   @channeled_ex_2 0x00000040
@@ -385,6 +405,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
       |> add_if(attrs, @passive, :passive)
       |> add_if(attrs, @ability, :ability)
       |> add_if(attrs, @hidden_in_combat_log, :hidden_in_combat_log)
+      |> add_if(attrs, @aura_is_debuff, :negative)
       |> add_if(attrs, @cant_cancel, :cant_cancel)
 
     base

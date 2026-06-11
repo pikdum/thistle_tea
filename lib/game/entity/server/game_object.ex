@@ -5,11 +5,16 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
   """
   use GenServer
 
+  alias ThistleTea.Game.Entity
+  alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.GameObject
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Registry, as: EntityRegistry
   alias ThistleTea.Game.Network
+  alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.World
+  alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.System.GameEvent
   alias ThistleTea.Game.World.Visibility
@@ -24,6 +29,7 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
     Process.flag(:trap_exit, true)
     World.update_position(state)
     state = Visibility.join_entity(state)
+    schedule_despawn(state)
     {:ok, state}
   end
 
@@ -36,7 +42,50 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
   end
 
   @impl GenServer
+  def handle_cast({:gameobject_use, user_guid, user_level}, %GameObject{internal: %Internal{} = internal} = state) do
+    case {internal.use_spell_id, SpellLoader.load(internal.use_spell_id || 0)} do
+      {spell_id, %Spell{} = spell} when is_integer(spell_id) ->
+        context = %CastContext{
+          caster_guid: internal.summoned_by || user_guid,
+          caster_level: user_level,
+          target_guid: user_guid,
+          spell: spell
+        }
+
+        Entity.receive_spell(user_guid, context, spell)
+        {:noreply, spend_charge(state)}
+
+      _ ->
+        {:noreply, state}
+    end
+  end
+
+  @impl GenServer
+  def handle_cast(_message, state) do
+    {:noreply, state}
+  end
+
+  @impl GenServer
   def handle_info({:event_stop, _event}, state) do
+    despawn(state)
+  end
+
+  def handle_info({:event_start, _event}, state) do
+    {:noreply, state}
+  end
+
+  def handle_info(:despawn, state) do
+    despawn(state)
+  end
+
+  @impl GenServer
+  def terminate(_reason, state) do
+    World.remove_position(state)
+    Visibility.leave_entity(state)
+    Metadata.delete(state.object.guid)
+  end
+
+  defp despawn(state) do
     pid = self()
 
     Task.start(fn ->
@@ -46,14 +95,22 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
     {:noreply, state}
   end
 
-  def handle_info({:event_start, _event}, state) do
-    {:noreply, state}
+  defp schedule_despawn(%GameObject{internal: %Internal{despawn_in_ms: despawn_in_ms}})
+       when is_integer(despawn_in_ms) and despawn_in_ms > 0 do
+    Process.send_after(self(), :despawn, despawn_in_ms)
   end
 
-  @impl GenServer
-  def terminate(_reason, state) do
-    World.remove_position(state)
-    Visibility.leave_entity(state)
-    Metadata.delete(state.object.guid)
+  defp schedule_despawn(_state), do: nil
+
+  defp spend_charge(%GameObject{internal: %Internal{spell_charges: charges} = internal} = state)
+       when is_integer(charges) do
+    if charges > 1 do
+      %{state | internal: %{internal | spell_charges: charges - 1}}
+    else
+      send(self(), :despawn)
+      %{state | internal: %{internal | spell_charges: 0, use_spell_id: nil}}
+    end
   end
+
+  defp spend_charge(state), do: state
 end

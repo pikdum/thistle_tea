@@ -32,6 +32,14 @@ defmodule ThistleTea.Game.Entity do
     dispatch_cast(entity, {:receive_attack, attack})
   end
 
+  def receive_heal(entity, amount) do
+    dispatch_cast(entity, {:receive_heal, amount})
+  end
+
+  def use_game_object(entity, user_guid, user_level) do
+    dispatch_cast(entity, {:gameobject_use, user_guid, user_level})
+  end
+
   def reward_kill(entity, victim) do
     dispatch_cast(entity, {:reward_kill, victim})
   end

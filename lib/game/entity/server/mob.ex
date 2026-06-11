@@ -95,6 +95,12 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   end
 
   @impl GenServer
+  def handle_cast({:receive_heal, amount}, state) do
+    state = Core.heal(state, amount)
+    {:noreply, state, {:continue, :maybe_broadcast}}
+  end
+
+  @impl GenServer
   def handle_cast({:receive_attack, %{caster: caster} = attack}, state) do
     state =
       state

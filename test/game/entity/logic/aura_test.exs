@@ -312,15 +312,16 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
 
       {entity, _events} = apply_spell(entity, 1, 10, spell)
 
-      assert [
-               %{
-                 type: :trigger_spell,
-                 source_guid: 1,
-                 source_level: 10,
-                 target_guid: 999,
-                 spell_id: 6136
-               }
-             ] = Aura.reactions(entity, :hit_taken, %{attacker_guid: 999})
+      assert {_entity,
+              [
+                %{
+                  type: :trigger_spell,
+                  source_guid: 1,
+                  source_level: 10,
+                  target_guid: 999,
+                  spell_id: 6136
+                }
+              ]} = Aura.reactions(entity, :hit_taken, %{attacker_guid: 999})
     end
   end
 

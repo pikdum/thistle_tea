@@ -48,6 +48,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
         BT.action(&idle_dead/2)
       ]),
       BT.sequence([
+        BT.condition(&stunned?/2),
+        BT.action(&idle_stunned/2)
+      ]),
+      BT.sequence([
         BT.condition(&confused?/2),
         BT.action(&wait_until_confused_wander_ready/2),
         BT.action(&pick_confused_point/2),
@@ -143,10 +147,21 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   @confused_wander_radius 5.0
 
   defp confused?(%Mob{} = state, _blackboard) do
-    AuraLogic.has_aura?(state, :mod_confuse)
+    AuraLogic.has_aura?(state, :mod_confuse) or AuraLogic.has_aura?(state, :mod_fear)
   end
 
   defp confused?(_state, _blackboard), do: false
+
+  defp stunned?(%Mob{} = state, _blackboard) do
+    AuraLogic.has_aura?(state, :mod_stun)
+  end
+
+  defp stunned?(_state, _blackboard), do: false
+
+  defp idle_stunned(%Mob{} = state, %Blackboard{} = blackboard) do
+    state = set_running(state, false)
+    {:running, state, Blackboard.clear_move_target(blackboard)}
+  end
 
   defp wait_until_confused_wander_ready(%Mob{} = state, %Blackboard{} = blackboard) do
     now = Time.now()
@@ -259,13 +274,23 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
 
   defp aggro_candidate?(_state, _guid, _distance), do: false
 
-  defp aggro_radius(%Mob{unit: %Unit{level: level}}, target_guid) when is_integer(level) and is_integer(target_guid) do
+  defp aggro_radius(%Mob{unit: %Unit{level: level}} = state, target_guid)
+       when is_integer(level) and is_integer(target_guid) do
     target_level = target_level(target_guid)
     level_diff = max(target_level - level, -@max_level_aggro_bonus)
-    max(@base_aggro_radius - level_diff, @min_aggro_radius)
+    max(@base_aggro_radius - level_diff + detect_range_modifier(state), @min_aggro_radius)
   end
 
   defp aggro_radius(%Mob{}, _target_guid), do: @base_aggro_radius
+
+  defp detect_range_modifier(%Mob{} = state) do
+    state
+    |> AuraLogic.auras_of_type(:mod_detect_range)
+    |> Enum.reduce(0, fn
+      %{amount: amount}, acc when is_integer(amount) -> acc + amount
+      _aura, acc -> acc
+    end)
+  end
 
   defp target_level(guid) when is_integer(guid) do
     case Metadata.query(guid, [:level]) do

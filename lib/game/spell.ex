@@ -21,6 +21,8 @@ defmodule ThistleTea.Game.Spell do
     :first_in_chain,
     :rank,
     :exclusive_category,
+    mechanic: 0,
+    proc_charges: 0,
     speed: 0.0,
     category: 0,
     recovery_time_ms: 0,
@@ -83,6 +85,10 @@ defmodule ThistleTea.Game.Spell do
     Enum.any?(effects, fn %Effect{implicit_target_a: a, implicit_target_b: b} ->
       a == :target_ally or b == :target_ally
     end)
+  end
+
+  def resurrect_spell?(%__MODULE__{effects: effects}) do
+    Enum.any?(effects, &match?(%Effect{type: type} when type in [:resurrect, :resurrect_new], &1))
   end
 
   def aura_effects(%__MODULE__{effects: effects}) do

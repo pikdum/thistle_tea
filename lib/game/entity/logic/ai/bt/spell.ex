@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Event
+  alias ThistleTea.Game.Entity.Logic.Hostility
   alias ThistleTea.Game.Entity.Logic.MeleeSpell
   alias ThistleTea.Game.Entity.Logic.Resources
   alias ThistleTea.Game.Entity.Logic.SpellEffect
@@ -130,6 +131,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
     |> queue_cast_result(casting)
     |> queue_spell_go(casting, targets)
     |> queue_area_effects(casting)
+    |> queue_summon_objects(casting)
     |> queue_consume_reagents(casting)
     |> apply_spell_hit(casting, targets, now)
     |> clear_cast()
@@ -229,6 +231,16 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
     do: duration_ms
 
   defp area_duration(_casting, _spell), do: 8_000
+
+  defp queue_summon_objects(character, %Cast{spell: %Spell{} = spell} = casting) do
+    events =
+      for %Spell.Effect{type: :trans_door, misc_value: entry} <- spell.effects,
+          is_integer(entry) and entry > 0 do
+        Event.summon_game_object(entry, area_duration(casting, spell))
+      end
+
+    Event.enqueue(character, events)
+  end
 
   defp queue_consume_reagents(character, %Cast{spell: %Spell{reagents: [_ | _] = reagents}}) do
     Event.enqueue(character, Event.consume_reagents(reagents))
@@ -334,7 +346,11 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
   defp apply_spell_hit(%{object: %{guid: caster_guid}} = character, %Cast{spell: %Spell{} = spell}, targets, now)
        when is_integer(caster_guid) and is_list(targets) do
     Enum.reduce(targets, character, fn target_guid, caster ->
-      context = CastContext.from_caster(caster, spell, target_guid)
+      context = %{
+        CastContext.from_caster(caster, spell, target_guid)
+        | target_hostile?: target_guid != caster_guid and Hostility.valid_attack_target?(caster, target_guid)
+      }
+
       dispatch_to_target(caster, context, spell, target_guid, now)
     end)
   end

@@ -6,12 +6,14 @@ defmodule ThistleTea.Game.Spell.Targets do
   """
   import Bitwise, only: [&&&: 2]
 
+  alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.BinaryUtils
 
   @self 0x00000000
   @unit 0x00000002
   @source_location 0x00000020
   @destination_location 0x00000040
+  @corpse 0x00008000
 
   defstruct [
     :flags,
@@ -58,11 +60,15 @@ defmodule ThistleTea.Game.Spell.Targets do
       [
         {@unit, :unit_guid},
         {@source_location, :source_location},
-        {@destination_location, :destination_location}
+        {@destination_location, :destination_location},
+        {@corpse, :corpse}
       ]
       |> Enum.reduce({rest, targets}, fn
         {@unit, :unit_guid}, {rest, acc} when (flags &&& @unit) > 0 ->
           parse_unit(rest, acc)
+
+        {@corpse, :corpse}, {rest, acc} when (flags &&& @corpse) > 0 ->
+          parse_corpse(rest, acc)
 
         {mask, field}, {rest, acc} when (flags &&& mask) > 0 ->
           parse_location(rest, acc, field)
@@ -78,6 +84,16 @@ defmodule ThistleTea.Game.Spell.Targets do
     case unpack_guid(rest) do
       {guid, rest} -> {rest, %{targets | unit_guid: guid}}
       :error -> {rest, targets}
+    end
+  end
+
+  defp parse_corpse(rest, targets) do
+    case unpack_guid(rest) do
+      {corpse_guid, rest} ->
+        {rest, %{targets | unit_guid: Guid.from_low_guid(:player, Guid.low_guid(corpse_guid))}}
+
+      :error ->
+        {rest, targets}
     end
   end
 

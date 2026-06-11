@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
     :caster_level,
     :caster_type,
     :target_guid,
+    :target_hostile?,
     :spell,
     spell_damage_bonus: %{},
     healing_bonus: 0

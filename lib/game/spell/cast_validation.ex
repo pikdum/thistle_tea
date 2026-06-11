@@ -19,6 +19,7 @@ defmodule ThistleTea.Game.Spell.CastValidation do
   def validate(caster, %Spell{} = spell, %Targets{} = targets, target_info, now, opts \\ []) do
     with :ok <- check_caster_alive(caster),
          :ok <- check_stronger_rank(caster, spell, targets),
+         :ok <- check_mechanic_immunity(caster, spell, targets),
          :ok <- check_cooldown(caster, spell, now),
          :ok <- check_power(caster, spell),
          :ok <- check_reagents(caster, spell, Keyword.get(opts, :count_item)),
@@ -34,6 +35,14 @@ defmodule ThistleTea.Game.Spell.CastValidation do
   defp check_stronger_rank(caster, %Spell{} = spell, %Targets{unit_guid: unit_guid}) do
     if self_target?(caster, unit_guid) and AuraLogic.blocked_by_stronger_rank?(caster, spell) do
       {:error, :aura_bounced}
+    else
+      :ok
+    end
+  end
+
+  defp check_mechanic_immunity(caster, %Spell{} = spell, %Targets{unit_guid: unit_guid}) do
+    if self_target?(caster, unit_guid) and AuraLogic.mechanic_immune?(caster, spell) do
+      {:error, :immune}
     else
       :ok
     end
@@ -70,11 +79,22 @@ defmodule ThistleTea.Game.Spell.CastValidation do
 
   defp check_target(%Spell{} = spell, target_info) do
     cond do
+      Spell.resurrect_spell?(spell) -> check_resurrect_target(target_info)
       Spell.requires_hostile_target?(spell) -> check_hostile_target(target_info)
       Spell.requires_friendly_target?(spell) -> check_friendly_target(target_info)
       true -> check_incidental_target(target_info)
     end
   end
+
+  defp check_resurrect_target(%{} = target_info) do
+    cond do
+      Map.get(target_info, :alive?) == true -> {:error, :target_not_dead}
+      Map.get(target_info, :hostile?) == true -> {:error, :target_enemy}
+      true -> :ok
+    end
+  end
+
+  defp check_resurrect_target(_target_info), do: {:error, :bad_targets}
 
   defp check_hostile_target(nil), do: {:error, :bad_implicit_targets}
   defp check_hostile_target(:self), do: {:error, :bad_targets}

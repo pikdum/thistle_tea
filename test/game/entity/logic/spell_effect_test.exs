@@ -58,6 +58,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
         id: 5143,
         name: "Arcane Missiles",
         school: :arcane,
+        attributes: MapSet.new([:channeled]),
         effects: [
           %Effect{
             index: 0,

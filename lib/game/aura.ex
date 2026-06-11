@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Aura do
     :type,
     :amount,
     :misc_value,
+    :multiple_value,
     :amplitude_ms,
     :next_tick_at,
     :trigger_spell_id
