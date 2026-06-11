@@ -42,7 +42,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgSpiritHealerActivate do
 
     {character, events} = Death.resurrect(character, @restore_percent, now)
     {character, sickness_events} = apply_resurrection_sickness(character, now)
-    duration_events = AuraLogic.self_duration_events(character)
+    duration_events = AuraLogic.self_duration_events(character, now)
     character = EventSink.emit(character, events ++ sickness_events ++ duration_events)
 
     update = Core.update_object(character, :values)

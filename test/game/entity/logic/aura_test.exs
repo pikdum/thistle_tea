@@ -437,6 +437,49 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
     end
   end
 
+  describe "self_duration_events/2" do
+    defp character_with_auras(holders) do
+      %ThistleTea.Character{
+        object: %Object{guid: 1},
+        unit: %Unit{level: 1, health: 100, max_health: 100, auras: holders}
+      }
+    end
+
+    test "sends remaining duration, not original duration" do
+      holder = %Holder{slot: 3, applied_at: 1_000, expires_at: 31_000, auras: []}
+      character = character_with_auras([holder])
+
+      assert [event] = Aura.self_duration_events(character, 11_000)
+      assert event.aura_slot == 3
+      assert event.duration_ms == 20_000
+    end
+
+    test "clamps already-expired holders to zero" do
+      holder = %Holder{slot: 0, applied_at: 1_000, expires_at: 5_000, auras: []}
+      character = character_with_auras([holder])
+
+      assert [event] = Aura.self_duration_events(character, 9_000)
+      assert event.duration_ms == 0
+    end
+
+    test "skips holders without a finite expiry" do
+      holders = [
+        %Holder{slot: 0, applied_at: 1_000, expires_at: nil, auras: []},
+        %Holder{slot: 1, applied_at: 1_000, expires_at: -1, auras: []}
+      ]
+
+      assert Aura.self_duration_events(character_with_auras(holders), 2_000) == []
+    end
+
+    test "returns no events for non-character entities" do
+      entity = fixture_entity()
+      spell = frost_armor_fixture()
+      {entity, _events} = apply_spell(entity, 1, 1, spell)
+
+      assert Aura.self_duration_events(entity, 2_000) == []
+    end
+  end
+
   describe "regen auras and interrupts" do
     @not_seated 0x40000
 

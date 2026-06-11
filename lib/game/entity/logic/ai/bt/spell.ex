@@ -319,7 +319,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
   defp dispatch_to_target(character, %CastContext{caster_guid: caster_guid} = context, spell, target_guid, now)
        when target_guid == caster_guid do
     {character, events} = SpellEffect.receive(character, context, spell, now)
-    duration_events = AuraLogic.self_duration_events(character)
+    duration_events = AuraLogic.self_duration_events(character, now)
 
     character
     |> Event.enqueue(events ++ duration_events)

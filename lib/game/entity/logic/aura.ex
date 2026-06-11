@@ -155,11 +155,12 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
 
   defp same_source?(_holder, _spell_id, _caster_guid), do: false
 
-  def self_duration_events(%ThistleTea.Character{unit: %Unit{auras: holders}}) when is_list(holders) do
-    Enum.flat_map(holders, &duration_event/1)
+  def self_duration_events(%ThistleTea.Character{unit: %Unit{auras: holders}}, now)
+      when is_list(holders) and is_integer(now) do
+    Enum.flat_map(holders, &duration_event(&1, now))
   end
 
-  def self_duration_events(_entity), do: []
+  def self_duration_events(_entity, _now), do: []
 
   def reactions(%{object: %{guid: owner_guid}, unit: %Unit{auras: holders}}, :hit_taken, %{attacker_guid: attacker_guid})
       when is_list(holders) and is_integer(attacker_guid) do
@@ -574,12 +575,12 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
 
   defp advance_tick(_last_tick, _amplitude_ms, now), do: now + 1_000
 
-  defp duration_event(%Holder{slot: slot, applied_at: applied_at, expires_at: expires_at})
-       when is_integer(slot) and is_integer(applied_at) and is_integer(expires_at) and expires_at != -1 do
-    [Event.aura_duration(slot, max(expires_at - applied_at, 0))]
+  defp duration_event(%Holder{slot: slot, expires_at: expires_at}, now)
+       when is_integer(slot) and is_integer(expires_at) and expires_at != -1 do
+    [Event.aura_duration(slot, max(expires_at - now, 0))]
   end
 
-  defp duration_event(_holder), do: []
+  defp duration_event(_holder, _now), do: []
 
   def next_event_at(%{unit: %Unit{auras: holders}}) when is_list(holders) do
     holders

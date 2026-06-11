@@ -8,8 +8,10 @@ defmodule ThistleTea.Game.Network.Message.CmsgPlayerLogin do
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Corpse
+  alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Player, as: PlayerBT
+  alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
   alias ThistleTea.Game.Entity.Logic.Death
   alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Entity.Logic.MovementStats
@@ -86,14 +88,24 @@ defmodule ThistleTea.Game.Network.Message.CmsgPlayerLogin do
     # join
     SpatialHash.update(:players, character_guid, c.internal.map, x1, y1, z1)
 
-    Map.merge(state, %{
-      guid: character_guid,
-      packed_guid: BinaryUtils.pack_guid(character_guid),
-      character: c,
-      tracked_entities: MapSet.new(),
-      ready: false
-    })
+    state =
+      Map.merge(state, %{
+        guid: character_guid,
+        packed_guid: BinaryUtils.pack_guid(character_guid),
+        character: c,
+        tracked_entities: MapSet.new(),
+        ready: false
+      })
+
+    schedule_aura_tick(state)
   end
+
+  defp schedule_aura_tick(%{character: %{unit: %Unit{auras: [_ | _]}}} = state) do
+    ref = Process.send_after(self(), :player_tick, 0)
+    Map.put(state, :player_tick_ref, ref)
+  end
+
+  defp schedule_aura_tick(state), do: state
 
   @impl ClientMessage
   def from_binary(payload) do
@@ -191,6 +203,8 @@ defmodule ThistleTea.Game.Network.Message.CmsgPlayerLogin do
     |> struct(Map.from_struct(c))
     |> Map.put(:movement_block, movement_block)
     |> Network.send_packet()
+
+    EventSink.emit(c, AuraLogic.self_duration_events(c, Time.now()))
   end
 
   defp build_spellbook(%ThistleTea.Character{internal: internal} = character) do
