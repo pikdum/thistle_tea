@@ -79,6 +79,12 @@ defmodule ThistleTea.Game.Spell do
     end)
   end
 
+  def requires_friendly_target?(%__MODULE__{effects: effects}) do
+    Enum.any?(effects, fn %Effect{implicit_target_a: a, implicit_target_b: b} ->
+      a == :target_ally or b == :target_ally
+    end)
+  end
+
   def aura_effects(%__MODULE__{effects: effects}) do
     Enum.filter(effects, &match?(%Effect{type: :apply_aura}, &1))
   end

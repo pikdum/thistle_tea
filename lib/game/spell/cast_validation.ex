@@ -69,10 +69,10 @@ defmodule ThistleTea.Game.Spell.CastValidation do
   defp check_reagents(_caster, _spell, _count_item), do: :ok
 
   defp check_target(%Spell{} = spell, target_info) do
-    if Spell.requires_hostile_target?(spell) do
-      check_hostile_target(target_info)
-    else
-      check_friendly_target(target_info)
+    cond do
+      Spell.requires_hostile_target?(spell) -> check_hostile_target(target_info)
+      Spell.requires_friendly_target?(spell) -> check_friendly_target(target_info)
+      true -> check_incidental_target(target_info)
     end
   end
 
@@ -98,6 +98,12 @@ defmodule ThistleTea.Game.Spell.CastValidation do
   end
 
   defp check_friendly_target(_target_info), do: :ok
+
+  defp check_incidental_target(%{} = target_info) do
+    if Map.get(target_info, :alive?) == false, do: {:error, :targets_dead}, else: :ok
+  end
+
+  defp check_incidental_target(_target_info), do: :ok
 
   defp check_range(caster, %Spell{range_yards: range}, %{position: {map, x, y, z}})
        when is_number(range) and range > 0 do

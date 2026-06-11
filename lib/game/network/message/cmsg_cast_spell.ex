@@ -74,17 +74,31 @@ defmodule ThistleTea.Game.Network.Message.CmsgCastSpell do
       character,
       spell,
       targets,
-      build_target_info(state, targets),
+      build_target_info(state, spell, targets),
       Time.now(),
       count_item: fn item_id -> Inventory.count_entry(character.player, item_id, &ItemStore.get/1) end
     )
   end
 
-  defp build_target_info(%{guid: caster_guid}, %Targets{unit_guid: caster_guid}) when is_integer(caster_guid) do
-    :self
+  defp build_target_info(%{guid: caster_guid, character: character}, %Spell{} = spell, %Targets{unit_guid: unit_guid}) do
+    explicit_guid = nonself_guid(unit_guid, caster_guid)
+
+    fallback_guid =
+      if Spell.requires_hostile_target?(spell) do
+        nonself_guid(selected_target(character), caster_guid)
+      end
+
+    cond do
+      is_integer(explicit_guid) -> target_info(character, explicit_guid)
+      is_integer(fallback_guid) -> target_info(character, fallback_guid)
+      unit_guid == caster_guid -> :self
+      true -> nil
+    end
   end
 
-  defp build_target_info(%{character: character}, %Targets{unit_guid: guid}) when is_integer(guid) and guid > 0 do
+  defp build_target_info(_state, _spell, _targets), do: nil
+
+  defp target_info(character, guid) do
     case Metadata.query(guid, [:alive?, :faction_template, :unit_flags]) do
       nil ->
         :unknown
@@ -101,7 +115,11 @@ defmodule ThistleTea.Game.Network.Message.CmsgCastSpell do
     end
   end
 
-  defp build_target_info(_state, _targets), do: nil
+  defp nonself_guid(guid, caster_guid) when is_integer(guid) and guid > 0 and guid != caster_guid, do: guid
+  defp nonself_guid(_guid, _caster_guid), do: nil
+
+  defp selected_target(%{unit: %Unit{target: target}}), do: target
+  defp selected_target(_character), do: nil
 
   defp fail_cast(%Spell{id: spell_id}, reason) do
     Network.send_packet(Message.SmsgCastResult.failure(spell_id, reason))

@@ -43,7 +43,15 @@ defmodule ThistleTea.Game.Spell.CastValidationTest do
   end
 
   defp helpful_spell(overrides \\ []) do
-    struct!(%Spell{id: 1454, mana_cost: 0, range_yards: 40.0, effects: [%Effect{type: :heal}]}, overrides)
+    struct!(
+      %Spell{
+        id: 1454,
+        mana_cost: 0,
+        range_yards: 40.0,
+        effects: [%Effect{type: :heal, implicit_target_a: :target_ally}]
+      },
+      overrides
+    )
   end
 
   defp hostile_target(overrides \\ []) do
@@ -121,6 +129,29 @@ defmodule ThistleTea.Game.Spell.CastValidationTest do
     test "rejects a hostile target for a helpful spell" do
       assert {:error, :target_enemy} =
                CastValidation.validate(caster(), helpful_spell(), Targets.unit(7), hostile_target(), @now)
+    end
+
+    test "allows a self-targeting spell cast with an enemy selected" do
+      arcane_missiles = %Spell{
+        id: 5143,
+        mana_cost: 50,
+        power_type: 0,
+        range_yards: 30.0,
+        attributes: MapSet.new([:channeled]),
+        effects: [%Effect{type: :apply_aura, aura: :periodic_trigger_spell, implicit_target_a: :caster}]
+      }
+
+      assert :ok =
+               CastValidation.validate(caster(), arcane_missiles, Targets.unit(7), hostile_target(), @now)
+
+      assert {:error, :targets_dead} =
+               CastValidation.validate(
+                 caster(),
+                 arcane_missiles,
+                 Targets.unit(7),
+                 hostile_target(alive?: false),
+                 @now
+               )
     end
 
     test "requires a unit target for harmful spells" do

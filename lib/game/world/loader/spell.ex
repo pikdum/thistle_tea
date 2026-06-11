@@ -360,6 +360,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp target_type(0), do: nil
   defp target_type(1), do: :caster
   defp target_type(6), do: :target_enemy
+  defp target_type(21), do: :target_ally
   defp target_type(15), do: :aoe_enemy_at_caster
   defp target_type(22), do: :aoe_enemy_at_caster
   defp target_type(24), do: :aoe_enemy_in_cone
