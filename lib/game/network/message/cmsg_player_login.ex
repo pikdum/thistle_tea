@@ -137,7 +137,10 @@ defmodule ThistleTea.Game.Network.Message.CmsgPlayerLogin do
       cooldowns: []
     })
 
-    # send initial action buttons
+    Network.send_packet(%Message.SmsgActionButtons{
+      buttons: Map.get(c.internal, :action_buttons) || %{}
+    })
+
     # send initial repuations
 
     # SMSG_LOGIN_SETTIMESPEED

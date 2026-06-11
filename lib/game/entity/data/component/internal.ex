@@ -33,6 +33,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal do
     :loot,
     :equipment_bonuses,
     :creature_type_flags,
+    action_buttons: %{},
     events: [],
     area_effect_guids: [],
     broadcast_update?: false,

@@ -38,6 +38,7 @@ defmodule ThistleTea.Character do
   def build(%CmsgCharCreate{} = params, account_id) do
     info = Mangos.PlayerCreateInfo.get(params.race, params.class)
     spells = Mangos.PlayerCreateInfoSpell.get_all(params.race, params.class)
+    action_buttons = Mangos.PlayerCreateInfoAction.get_all(params.race, params.class)
     chr_race = DBC.get_by(ChrRaces, id: params.race)
     stats = Stats.get!(params.race, params.class, 1)
 
@@ -129,7 +130,8 @@ defmodule ThistleTea.Character do
         name: params.name,
         area: info.zone,
         map: info.map,
-        spells: spells
+        spells: spells,
+        action_buttons: action_buttons
       }
     }
   end
