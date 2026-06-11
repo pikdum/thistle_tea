@@ -167,10 +167,9 @@ defmodule ThistleTea.Character do
 
   def sync_equipment_stats(%__MODULE__{} = character) do
     character
+    |> sync_mainhand_inputs()
+    |> sync_offhand_inputs()
     |> EquipmentStats.resync(&ItemStore.get/1, &SpellLoader.load/1)
-    |> sync_attack_power()
-    |> sync_mainhand_stats()
-    |> sync_offhand_stats()
   end
 
   def restore_health_and_mana(%__MODULE__{unit: %Unit{} = unit} = character) do
@@ -182,14 +181,7 @@ defmodule ThistleTea.Character do
   @base_max_damage 2.0
   @item_class_weapon 2
 
-  def sync_attack_power(%__MODULE__{unit: %Unit{} = unit} = character) do
-    bonus = (unit.equipment_bonuses || %{}) |> Map.get(:attack_power, 0)
-    attack_power = Stats.melee_attack_power(unit.class, unit.level, unit.strength || 0, unit.agility || 0) + bonus
-    ranged_attack_power = Stats.ranged_attack_power(unit.class, unit.level, unit.agility || 0)
-    %{character | unit: %{unit | attack_power: attack_power, ranged_attack_power: ranged_attack_power}}
-  end
-
-  def sync_mainhand_stats(%__MODULE__{unit: %Unit{} = unit} = character) do
+  defp sync_mainhand_inputs(%__MODULE__{unit: %Unit{} = unit} = character) do
     {delay, weapon_min, weapon_max} =
       case mainhand_weapon(character) do
         %ItemTemplate{} = weapon ->
@@ -200,13 +192,13 @@ defmodule ThistleTea.Character do
           {@base_attack_time, @base_min_damage, @base_max_damage}
       end
 
-    bonus = attack_power_bonus(unit, delay)
+    unit =
+      Map.merge(unit, %{base_attack_time: delay, base_min_damage: weapon_min, base_max_damage: weapon_max})
 
-    unit = %{unit | base_attack_time: delay, min_damage: weapon_min + bonus, max_damage: weapon_max + bonus}
     %{character | unit: unit}
   end
 
-  def sync_offhand_stats(%__MODULE__{unit: %Unit{} = unit, player: %Player{visible_item_17_0: entry}} = character) do
+  defp sync_offhand_inputs(%__MODULE__{unit: %Unit{} = unit, player: %Player{visible_item_17_0: entry}} = character) do
     weapon =
       case is_integer(entry) and entry > 0 and ItemLoader.get_template(entry) do
         %ItemTemplate{class: @item_class_weapon} = template -> template
@@ -215,17 +207,19 @@ defmodule ThistleTea.Character do
 
     unit =
       if weapon do
-        delay = positive_or(weapon.delay, @base_attack_time)
-        bonus = attack_power_bonus(unit, delay)
-
-        %{
-          unit
-          | offhand_attack_time: delay,
-            min_offhand_damage: positive_or(weapon.dmg_min1, 0.0) + bonus,
-            max_offhand_damage: positive_or(weapon.dmg_max1, 0.0) + bonus
-        }
+        Map.merge(unit, %{
+          offhand_attack_time: positive_or(weapon.delay, @base_attack_time),
+          base_offhand_min_damage: positive_or(weapon.dmg_min1, 0.0),
+          base_offhand_max_damage: positive_or(weapon.dmg_max1, 0.0)
+        })
       else
-        %{unit | offhand_attack_time: @base_attack_time, min_offhand_damage: 0.0, max_offhand_damage: 0.0}
+        Map.merge(unit, %{
+          offhand_attack_time: @base_attack_time,
+          base_offhand_min_damage: nil,
+          base_offhand_max_damage: nil,
+          min_offhand_damage: 0.0,
+          max_offhand_damage: 0.0
+        })
       end
 
     %{character | unit: unit}
@@ -236,13 +230,6 @@ defmodule ThistleTea.Character do
   end
 
   defp mainhand_weapon(%__MODULE__{}), do: nil
-
-  defp attack_power_bonus(%Unit{attack_power: attack_power}, delay)
-       when is_integer(attack_power) and attack_power > 0 do
-    attack_power / 14 * (delay / 1000)
-  end
-
-  defp attack_power_bonus(%Unit{}, _delay), do: 0.0
 
   defp positive_or(value, default) do
     case value do

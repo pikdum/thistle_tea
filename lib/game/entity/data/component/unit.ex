@@ -127,7 +127,11 @@ defmodule ThistleTea.Game.Entity.Data.Component.Unit do
     power_cost_modifier: {0x00AD, 7, :int, :private},
     power_cost_multiplier: {0x00B4, 7, :float, :private},
     auras: :virtual,
-    equipment_bonuses: :virtual
+    equipment_bonuses: :virtual,
+    base_min_damage: :virtual,
+    base_max_damage: :virtual,
+    base_offhand_min_damage: :virtual,
+    base_offhand_max_damage: :virtual
 
   alias ThistleTea.Game.Network.UpdateObject
 

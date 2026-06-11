@@ -93,6 +93,57 @@ defmodule ThistleTea.Game.Entity.Logic.StatsTest do
       assert recomputed.stamina == nil
     end
 
+    test "derives attack power and weapon damage from stats, gear, and auras" do
+      battle_shout = %Aura{type: :mod_attack_power, amount: 60, misc_value: 0}
+
+      unit = %{
+        mage_unit()
+        | class: 1,
+          level: 60,
+          base_strength: 145,
+          base_attack_time: 3400,
+          base_min_damage: 100.0,
+          base_max_damage: 150.0,
+          equipment_bonuses: %{attack_power: 40},
+          auras: [holder([battle_shout])]
+      }
+
+      unit = Stats.recompute(unit)
+
+      expected_ap = 60 * 3 + 145 * 2 - 20 + 40 + 60
+      assert unit.attack_power == expected_ap
+      assert_in_delta unit.min_damage, 100.0 + expected_ap / 14 * 3.4, 0.000001
+      assert_in_delta unit.max_damage, 150.0 + expected_ap / 14 * 3.4, 0.000001
+    end
+
+    test "strength buffs raise attack power and weapon damage" do
+      unit = %{
+        mage_unit()
+        | class: 1,
+          base_strength: 100,
+          base_attack_time: 2000,
+          base_min_damage: 10.0,
+          base_max_damage: 20.0
+      }
+
+      unbuffed = Stats.recompute(unit)
+
+      strength_buff = %Aura{type: :mod_stat, amount: 30, misc_value: 0}
+      buffed = Stats.recompute(%{unit | auras: [holder([strength_buff])]})
+
+      assert buffed.attack_power == unbuffed.attack_power + 60
+      assert buffed.min_damage > unbuffed.min_damage
+    end
+
+    test "skips weapon damage without base inputs" do
+      mob = %Unit{level: 10, attack_power: 50, min_damage: 30.0, max_damage: 40.0, base_attack_time: 2000, auras: []}
+      recomputed = Stats.recompute(mob)
+
+      assert recomputed.min_damage == 30.0
+      assert recomputed.max_damage == 40.0
+      assert recomputed.attack_power == 50
+    end
+
     test "applies mod_stat with misc -1 to all stats" do
       aura = %Aura{type: :mod_stat, amount: 5, misc_value: -1}
       unit = Stats.recompute(%{mage_unit() | auras: [holder([aura])]})

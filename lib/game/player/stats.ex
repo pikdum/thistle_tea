@@ -142,40 +142,8 @@ defmodule ThistleTea.Game.Player.Stats do
 
   defp max_mana(%__MODULE__{}), do: 0
 
-  @warrior 1
-  @paladin 2
-  @hunter 3
-  @rogue 4
-  @shaman 7
-  @druid 11
-
-  def melee_attack_power(class, level, strength, agility) do
-    value =
-      case class do
-        @warrior -> level * 3 + strength * 2 - 20
-        @paladin -> level * 3 + strength * 2 - 20
-        @rogue -> level * 2 + strength + agility - 20
-        @hunter -> level * 2 + strength + agility - 20
-        @shaman -> level * 2 + strength * 2 - 20
-        @druid -> strength * 2 - 20
-        _ -> strength - 10
-      end
-
-    max(value, 0)
-  end
-
-  def ranged_attack_power(class, level, agility) do
-    value =
-      case class do
-        @hunter -> level * 2 + agility * 2 - 10
-        @rogue -> level + agility - 10
-        @warrior -> level + agility - 10
-        _ -> agility - 10
-      end
-
-    max(value, 0)
-  end
-
+  defdelegate melee_attack_power(class, level, strength, agility), to: LogicStats
+  defdelegate ranged_attack_power(class, level, agility), to: LogicStats
   defdelegate stamina_health_bonus(stamina), to: LogicStats
   defdelegate mana_bonus(intellect), to: LogicStats
 

@@ -29,6 +29,8 @@ defmodule ThistleTea.Game.Entity.Logic.Stats do
     |> derive_resistances()
     |> derive_max_health()
     |> derive_max_mana()
+    |> derive_attack_power()
+    |> derive_weapon_damage()
   end
 
   def stamina_health_bonus(stamina) when stamina < 20, do: stamina
@@ -36,6 +38,40 @@ defmodule ThistleTea.Game.Entity.Logic.Stats do
 
   def mana_bonus(intellect) when intellect < 20, do: intellect
   def mana_bonus(intellect), do: 20 + (intellect - 20) * 15
+
+  @warrior 1
+  @paladin 2
+  @hunter 3
+  @rogue 4
+  @shaman 7
+  @druid 11
+
+  def melee_attack_power(class, level, strength, agility) do
+    value =
+      case class do
+        @warrior -> level * 3 + strength * 2 - 20
+        @paladin -> level * 3 + strength * 2 - 20
+        @rogue -> level * 2 + strength + agility - 20
+        @hunter -> level * 2 + strength + agility - 20
+        @shaman -> level * 2 + strength * 2 - 20
+        @druid -> strength * 2 - 20
+        _ -> strength - 10
+      end
+
+    max(value, 0)
+  end
+
+  def ranged_attack_power(class, level, agility) do
+    value =
+      case class do
+        @hunter -> level * 2 + agility * 2 - 10
+        @rogue -> level + agility - 10
+        @warrior -> level + agility - 10
+        _ -> agility - 10
+      end
+
+    max(value, 0)
+  end
 
   defp derive_stats(%Unit{} = unit) do
     Enum.reduce(@stat_fields, unit, fn {index, field, base_field, bonus_key}, acc ->
@@ -69,6 +105,59 @@ defmodule ThistleTea.Game.Entity.Logic.Stats do
   end
 
   defp derive_max_mana(%Unit{} = unit), do: unit
+
+  defp derive_attack_power(%Unit{base_strength: base_strength} = unit) when is_integer(base_strength) do
+    attack_power =
+      melee_attack_power(unit.class, unit.level, unit.strength || 0, unit.agility || 0) +
+        equipment_bonus(unit, :attack_power) + aura_attack_power(unit)
+
+    %{
+      unit
+      | attack_power: attack_power,
+        ranged_attack_power: ranged_attack_power(unit.class, unit.level, unit.agility || 0)
+    }
+  end
+
+  defp derive_attack_power(%Unit{} = unit), do: unit
+
+  defp derive_weapon_damage(%Unit{} = unit) do
+    unit
+    |> derive_damage(:base_min_damage, :base_max_damage, :min_damage, :max_damage, unit.base_attack_time)
+    |> derive_damage(
+      :base_offhand_min_damage,
+      :base_offhand_max_damage,
+      :min_offhand_damage,
+      :max_offhand_damage,
+      unit.offhand_attack_time
+    )
+  end
+
+  defp derive_damage(%Unit{} = unit, base_min_field, base_max_field, min_field, max_field, attack_time) do
+    with base_min when is_number(base_min) <- Map.get(unit, base_min_field),
+         base_max when is_number(base_max) <- Map.get(unit, base_max_field) do
+      bonus = attack_power_bonus(unit.attack_power, attack_time)
+
+      unit
+      |> Map.put(min_field, base_min + bonus)
+      |> Map.put(max_field, base_max + bonus)
+    else
+      _ -> unit
+    end
+  end
+
+  defp attack_power_bonus(attack_power, attack_time)
+       when is_integer(attack_power) and attack_power > 0 and is_number(attack_time) and attack_time > 0 do
+    attack_power / 14 * (attack_time / 1000)
+  end
+
+  defp attack_power_bonus(_attack_power, _attack_time), do: 0.0
+
+  defp aura_attack_power(%Unit{} = unit) do
+    sum_aura_amounts(unit, fn
+      %Aura{type: :mod_attack_power, amount: amount} when is_integer(amount) -> amount
+      _aura -> 0
+    end)
+  end
 
   defp clamp(current, max) when is_number(current) and current > max, do: max
   defp clamp(current, _max), do: current
