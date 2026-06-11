@@ -298,6 +298,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   @passive 0x00000040
   @ability 0x00000010
   @hidden_in_combat_log 0x00000100
+  @cant_cancel 0x80000000
   @channeled_ex_1 0x00000004
   @channeled_ex_2 0x00000040
 
@@ -309,6 +310,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
       |> add_if(attrs, @passive, :passive)
       |> add_if(attrs, @ability, :ability)
       |> add_if(attrs, @hidden_in_combat_log, :hidden_in_combat_log)
+      |> add_if(attrs, @cant_cancel, :cant_cancel)
 
     base
     |> add_if(attrs_ex1, @channeled_ex_1, :channeled)

@@ -437,6 +437,64 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
     end
   end
 
+  describe "cancel_spell/3" do
+    test "removes a positive holder and reverses its mods" do
+      entity = fixture_entity()
+      spell = frost_armor_fixture()
+      {entity, _events} = apply_spell(entity, 1, 1, spell)
+
+      {entity, _events} = Aura.cancel_spell(entity, spell.id, 2_000)
+
+      assert entity.unit.auras == []
+      assert entity.unit.normal_resistance == 0
+    end
+
+    test "refuses to cancel a negative holder" do
+      entity = fixture_entity()
+      spell = root_spell()
+      {entity, _events} = apply_spell(entity, 2, 1, spell)
+      assert [%Holder{negative?: true}] = entity.unit.auras
+
+      {entity, events} = Aura.cancel_spell(entity, spell.id, 2_000)
+
+      assert [%Holder{}] = entity.unit.auras
+      assert events == []
+    end
+
+    test "refuses to cancel a cant_cancel spell" do
+      entity = fixture_entity()
+      spell = frost_armor_fixture()
+      spell = %{spell | attributes: MapSet.new([:cant_cancel])}
+      {entity, _events} = apply_spell(entity, 1, 1, spell)
+
+      {entity, _events} = Aura.cancel_spell(entity, spell.id, 2_000)
+
+      assert [%Holder{}] = entity.unit.auras
+    end
+
+    test "refuses to cancel a passive spell" do
+      entity = fixture_entity()
+      spell = frost_armor_fixture()
+      spell = %{spell | attributes: MapSet.new([:passive])}
+      {entity, _events} = apply_spell(entity, 1, 1, spell)
+
+      {entity, _events} = Aura.cancel_spell(entity, spell.id, 2_000)
+
+      assert [%Holder{}] = entity.unit.auras
+    end
+
+    test "ignores spell ids without a matching holder" do
+      entity = fixture_entity()
+      spell = frost_armor_fixture()
+      {entity, _events} = apply_spell(entity, 1, 1, spell)
+
+      {entity, events} = Aura.cancel_spell(entity, 99_999, 2_000)
+
+      assert [%Holder{}] = entity.unit.auras
+      assert events == []
+    end
+  end
+
   describe "self_duration_events/2" do
     defp character_with_auras(holders) do
       %ThistleTea.Character{

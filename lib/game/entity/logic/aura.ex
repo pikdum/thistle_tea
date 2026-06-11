@@ -231,6 +231,27 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
 
   def remove_spells(entity, _spell_ids, _now), do: {entity, []}
 
+  def cancel_spell(%{unit: %Unit{auras: holders}} = entity, spell_id, now)
+      when is_list(holders) and holders != [] and is_integer(spell_id) do
+    holder = Enum.find(holders, fn %Holder{spell: %Spell{id: id}} -> id == spell_id end)
+
+    if cancelable?(holder) do
+      remove_spells(entity, [spell_id], now)
+    else
+      {entity, []}
+    end
+  end
+
+  def cancel_spell(entity, _spell_id, _now), do: {entity, []}
+
+  defp cancelable?(%Holder{negative?: true}), do: false
+
+  defp cancelable?(%Holder{spell: %Spell{} = spell}) do
+    not Spell.attribute?(spell, :passive) and not Spell.attribute?(spell, :cant_cancel)
+  end
+
+  defp cancelable?(_holder), do: false
+
   def dispel(%{unit: %Unit{auras: holders}} = entity, dispel_type, now)
       when is_list(holders) and holders != [] and is_integer(dispel_type) do
     case Enum.find_index(holders, fn %Holder{spell: %Spell{dispel_type: dt}} -> dt == dispel_type end) do
