@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AI.BT.Spell, as: SpellBT
+  alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Cast
@@ -77,6 +78,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
       assert mob.unit.channel_spell == 0
 
       assert [
+               %Event{type: :despawn_area_effects, spell_id: 10},
                %Event{type: :channel_update, channel_time_ms: 0},
                %Event{type: :object_update, update_type: :values}
              ] = mob.internal.events
@@ -194,6 +196,110 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
                %Event{type: :spell_go, hit_guids: [2]},
                %Event{type: :deliver_spell, target_guid: 2, spell: ^spell}
              ] = mob.internal.events
+    end
+  end
+
+  describe "persistent area auras" do
+    test "ground-targeted cast queues a spawn_area_effect event" do
+      spell = %Spell{
+        id: 2120,
+        name: "Flamestrike",
+        school: :fire,
+        duration_ms: 8_000,
+        effects: [
+          %Effect{index: 0, type: :school_damage, base_points: 50, die_sides: 0, radius_yards: 5.0},
+          %Effect{
+            index: 1,
+            type: :persistent_area_aura,
+            aura: :periodic_damage,
+            base_points: 10,
+            die_sides: 0,
+            amplitude_ms: 2_000,
+            radius_yards: 5.0
+          }
+        ]
+      }
+
+      targets = %Targets{raw: <<0::little-size(16)>>, destination_location: {10.0, 20.0, 30.0}}
+      casting = Cast.new(spell, targets, 1_000)
+
+      mob = %Mob{
+        object: %Object{guid: 1},
+        unit: %Unit{},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+        internal: %Internal{map: 0, casting: casting}
+      }
+
+      mob = SpellBT.complete_cast(mob, casting, 1_000)
+
+      assert Enum.any?(mob.internal.events, fn
+               %Event{
+                 type: :spawn_area_effect,
+                 position: {10.0, 20.0, 30.0},
+                 duration_ms: 8_000,
+                 spell: %Spell{id: 2120}
+               } ->
+                 true
+
+               _ ->
+                 false
+             end)
+    end
+
+    test "cast without ground location does not queue area effects" do
+      spell = %Spell{
+        id: 2120,
+        name: "Flamestrike",
+        school: :fire,
+        duration_ms: 8_000,
+        effects: [
+          %Effect{index: 1, type: :persistent_area_aura, aura: :periodic_damage, base_points: 10, die_sides: 0}
+        ]
+      }
+
+      targets = %Targets{raw: <<0::little-size(16)>>}
+      casting = Cast.new(spell, targets, 1_000)
+
+      mob = %Mob{
+        object: %Object{guid: 1},
+        unit: %Unit{},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+        internal: %Internal{map: 0, casting: casting}
+      }
+
+      mob = SpellBT.complete_cast(mob, casting, 1_000)
+
+      refute Enum.any?(mob.internal.events, &(&1.type == :spawn_area_effect))
+    end
+  end
+
+  describe "channel auras" do
+    test "stopping a self channel removes the channel spell's auras" do
+      spell = %Spell{
+        id: 12_051,
+        name: "Evocation",
+        duration_ms: 8_000,
+        attributes: MapSet.new([:channeled]),
+        effects: [
+          %Effect{index: 0, type: :apply_aura, aura: :mod_power_regen_percent, base_points: 1499, die_sides: 1}
+        ]
+      }
+
+      now = 1_000
+
+      mob = %Mob{
+        object: %Object{guid: 1},
+        unit: %Unit{health: 100, max_health: 100, power1: 0, max_power1: 100},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+        internal: %Internal{map: 0}
+      }
+
+      mob = SpellBT.start_cast(mob, spell, %Targets{raw: <<0::little-size(16)>>}, now)
+      {mob, _events} = Aura.apply_spell(mob, 1, 1, spell, now)
+      assert length(mob.unit.auras) == 1
+
+      assert {:success, mob, _bb} = SpellBT.cast_tick(mob, Blackboard.new(), now + 8_001)
+      assert mob.unit.auras == []
     end
   end
 end

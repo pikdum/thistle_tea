@@ -21,6 +21,15 @@ defmodule ThistleTea.Game.World.Pathfinding do
     end
   end
 
+  def find_heights(map_id, {x, y}) do
+    load_adt_at(map_id, {x, y})
+
+    case Namigator.find_heights(map_id, x, y) do
+      heights when is_list(heights) -> heights
+      _ -> []
+    end
+  end
+
   def find_point_between_points(map_id, {start_x, start_y, start_z}, {stop_x, stop_y, stop_z}, distance) do
     Namigator.find_point_between_points(
       map_id,

@@ -16,4 +16,6 @@ defmodule ThistleTea.Native.Namigator do
 
   def find_point_between_points(_map_id, _start_x, _start_y, _start_z, _stop_x, _stop_y, _stop_z, _distance),
     do: :erlang.nif_error(:nif_not_loaded)
+
+  def find_heights(_map_id, _x, _y), do: :erlang.nif_error(:nif_not_loaded)
 end

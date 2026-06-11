@@ -39,18 +39,15 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   end
 
   defp apply_effect(state, %CastContext{} = context, spell, %Effect{type: :heal} = effect, _now) do
-    healing = Effect.damage_roll(effect) + bonus_amount(context.healing_bonus, spell)
-    {Core.heal(state, healing), []}
+    healing =
+      Effect.damage_roll(effect) + bonus_amount(context.healing_bonus, spell) +
+        Aura.flat_modifier(state, :mod_healing, Spell.school_mask(spell))
+
+    {Core.heal(state, max(healing, 0)), []}
   end
 
-  defp apply_effect(
-         state,
-         %CastContext{} = context,
-         spell,
-         %Effect{type: :persistent_area_aura, aura: :periodic_damage} = effect,
-         now
-       ) do
-    apply_damage_effect(state, context, spell, effect, now, periodic?: true)
+  defp apply_effect(state, %CastContext{}, _spell, %Effect{type: :persistent_area_aura}, _now) do
+    {state, []}
   end
 
   defp apply_effect(
@@ -81,13 +78,60 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
     {state, [event]}
   end
 
+  defp apply_effect(
+         %{movement_block: %{position: {x, y, z, o}}} = state,
+         %CastContext{},
+         _spell,
+         %Effect{type: :leap} = effect,
+         _now
+       ) do
+    distance = if is_number(effect.radius_yards) and effect.radius_yards > 0, do: effect.radius_yards, else: 20.0
+    destination = {x + :math.cos(o) * distance, y + :math.sin(o) * distance, z, o}
+    {state, [Event.leap(destination)]}
+  end
+
+  defp apply_effect(state, %CastContext{}, %Spell{id: spell_id}, %Effect{type: :teleport_units}, _now) do
+    {state, [Event.teleport_to_spell_target(spell_id)]}
+  end
+
+  defp apply_effect(state, %CastContext{}, _spell, %Effect{type: :create_item, misc_value: item_id} = effect, _now)
+       when is_integer(item_id) and item_id > 0 do
+    count = max(Effect.damage_roll(effect), 1)
+    {state, [Event.create_item(item_id, count)]}
+  end
+
+  defp apply_effect(state, %CastContext{}, _spell, %Effect{type: :interrupt_cast}, _now) do
+    case state do
+      %{internal: %{casting: casting} = internal, unit: unit} when not is_nil(casting) ->
+        state = %{
+          state
+          | internal: %{internal | casting: nil},
+            unit: %{unit | channel_spell: 0, channel_object: 0}
+        }
+
+        {Core.mark_broadcast_update(state), [Event.object_update(:values)]}
+
+      _ ->
+        {state, []}
+    end
+  end
+
+  defp apply_effect(state, %CastContext{}, _spell, %Effect{type: :dispel, misc_value: dispel_type}, now) do
+    Aura.dispel(state, dispel_type, now)
+  end
+
   defp apply_effect(state, _context, _spell, _effect, _now), do: {state, []}
 
   defp apply_damage_effect(state, %CastContext{} = context, spell, %Effect{} = effect, now, opts \\ [])
        when is_integer(now) do
-    damage = Effect.damage_roll(effect) + damage_bonus(context, spell, opts)
+    damage =
+      max(
+        Effect.damage_roll(effect) + damage_bonus(context, spell, opts) +
+          Aura.flat_modifier(state, :mod_damage_taken, Spell.school_mask(spell)),
+        0
+      )
 
-    state = Core.take_damage(state, damage, now)
+    state = Core.take_damage(state, damage, now, school: school_atom(spell))
     event = Event.spell_damage(context.caster_guid, state.object.guid, spell, damage, opts)
 
     {state, [event]}

@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Targets
   alias ThistleTea.Game.Time
+  alias ThistleTea.Game.World.Metadata
 
   def casting_sequence do
     BT.sequence([
@@ -63,6 +64,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
       character
       |> queue_cast_result(casting)
       |> queue_spell_go(casting, targets)
+      |> queue_area_effects(casting)
+      |> queue_consume_reagents(casting)
       |> start_channel(casting)
     else
       character
@@ -116,6 +119,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
     character
     |> queue_cast_result(casting)
     |> queue_spell_go(casting, targets)
+    |> queue_area_effects(casting)
+    |> queue_consume_reagents(casting)
     |> apply_spell_hit(casting, targets, now)
     |> clear_cast()
   end
@@ -158,8 +163,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
 
   defp channel_target_guid(_character, _targets), do: 0
 
-  defp stop_channel(%{internal: %Internal{} = internal, unit: unit} = character, %Cast{}) do
+  defp stop_channel(%{internal: %Internal{} = internal, unit: unit} = character, %Cast{} = casting) do
     character = %{character | internal: %{internal | casting: nil}, unit: %{unit | channel_object: 0, channel_spell: 0}}
+    {character, aura_events} = remove_channel_auras(character, casting)
 
     events =
       case character do
@@ -169,12 +175,56 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
 
     character
     |> Core.mark_broadcast_update()
-    |> Event.enqueue(events)
+    |> Event.enqueue(aura_events ++ events)
   end
 
   defp stop_channel(%{internal: %Internal{} = internal} = character, %Cast{}) do
     %{character | internal: %{internal | casting: nil}}
   end
+
+  defp remove_channel_auras(%{object: %{guid: guid}} = character, %Cast{spell: %Spell{id: spell_id}} = casting) do
+    {character, events} =
+      if channel_target_guid(character, casting.targets) in [0, guid] do
+        AuraLogic.remove_spells(character, [spell_id], Time.now())
+      else
+        {character, []}
+      end
+
+    {character, events ++ [Event.despawn_area_effects(spell_id)]}
+  end
+
+  defp remove_channel_auras(character, _casting), do: {character, []}
+
+  defp queue_area_effects(character, %Cast{spell: %Spell{} = spell} = casting) do
+    case Targets.ground_location(casting.targets) do
+      nil ->
+        character
+
+      position ->
+        events =
+          for %Spell.Effect{type: :persistent_area_aura} = effect <- spell.effects do
+            Event.spawn_area_effect(spell, effect, position, area_duration(casting, spell))
+          end
+
+        Event.enqueue(character, events)
+    end
+  end
+
+  defp queue_area_effects(character, _casting), do: character
+
+  defp area_duration(%Cast{channel_ms: channel_ms}, _spell) when is_integer(channel_ms) and channel_ms > 0,
+    do: channel_ms
+
+  defp area_duration(_casting, %Spell{duration_ms: duration_ms}) when is_integer(duration_ms) and duration_ms > 0,
+    do: duration_ms
+
+  defp area_duration(_casting, _spell), do: 8_000
+
+  defp queue_consume_reagents(character, %Cast{spell: %Spell{reagents: [_ | _] = reagents}}) do
+    Event.enqueue(character, Event.consume_reagents(reagents))
+  end
+
+  defp queue_consume_reagents(character, _casting), do: character
 
   defp queue_cast_result(character, %{spell: %Spell{id: spell_id}}) do
     Event.enqueue(character, Event.spell_cast_result(spell_id))
@@ -183,23 +233,37 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
   defp queue_cast_result(character, _casting), do: character
 
   defp channel_tick(%{internal: %Internal{}} = character, %Cast{} = casting, now) do
-    if is_integer(casting.next_channel_tick_at) and now >= casting.next_channel_tick_at do
-      targets = resolve_targets(character, casting)
+    cond do
+      unit_channel_target_dead?(casting) ->
+        {stop_channel(character, casting), 50}
 
-      character =
-        character
-        |> queue_trigger_spell_go(casting, targets)
-        |> apply_spell_hit(casting, targets, now)
+      is_integer(casting.next_channel_tick_at) and now >= casting.next_channel_tick_at ->
+        targets = resolve_targets(character, casting)
 
-      casting = Cast.advance_channel_tick(casting, now)
-      delay_ms = Cast.next_channel_delay(casting, now)
-      {%{character | internal: %{character.internal | casting: casting}}, delay_ms}
-    else
-      {character, Cast.next_channel_delay(casting, now)}
+        character =
+          character
+          |> queue_trigger_spell_go(casting, targets)
+          |> apply_spell_hit(casting, targets, now)
+
+        casting = Cast.advance_channel_tick(casting, now)
+        delay_ms = Cast.next_channel_delay(casting, now)
+        {%{character | internal: %{character.internal | casting: casting}}, delay_ms}
+
+      true ->
+        {character, Cast.next_channel_delay(casting, now)}
     end
   end
 
   defp channel_tick(character, casting, now), do: {character, Cast.next_channel_delay(casting, now)}
+
+  defp unit_channel_target_dead?(%Cast{targets: %Targets{unit_guid: guid}}) when is_integer(guid) and guid > 0 do
+    case Metadata.query(guid, [:alive?]) do
+      %{alive?: false} -> true
+      _ -> false
+    end
+  end
+
+  defp unit_channel_target_dead?(_casting), do: false
 
   defp queue_spell_go(%{object: %{guid: guid}} = character, %Cast{spell: %Spell{id: spell_id}} = casting, targets)
        when is_integer(guid) do

@@ -1,11 +1,16 @@
 defmodule ThistleTea.Game.Entity.EventSink do
   alias ThistleTea.Character
+  alias ThistleTea.DB.Mangos
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.Entity.Data.DynamicObject, as: DataDynamicObject
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Event
+  alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.Entity.Logic.SpellEffect
+  alias ThistleTea.Game.Entity.Server.DynamicObject, as: DynamicObjectServer
+  alias ThistleTea.Game.Math
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Opcodes
@@ -15,6 +20,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
+  alias ThistleTea.Game.World.Pathfinding
 
   def emit_pending(entity) do
     {entity, events} = Event.drain(entity)
@@ -74,6 +80,18 @@ defmodule ThistleTea.Game.Entity.EventSink do
   end
 
   def emit(entity, %Event{type: :movement_root_changed}), do: entity
+
+  def emit(%Character{object: %{guid: guid}} = entity, %Event{type: :feather_fall_changed, enabled?: true}) do
+    Network.send_packet(%Message.SmsgMoveFeatherFall{guid: guid})
+    entity
+  end
+
+  def emit(%Character{object: %{guid: guid}} = entity, %Event{type: :feather_fall_changed, enabled?: false}) do
+    Network.send_packet(%Message.SmsgMoveNormalFall{guid: guid})
+    entity
+  end
+
+  def emit(entity, %Event{type: :feather_fall_changed}), do: entity
 
   def emit(%Character{object: %{guid: guid}} = entity, %Event{type: :movement_speed_changed, speed: speed})
       when is_number(speed) do
@@ -224,6 +242,92 @@ defmodule ThistleTea.Game.Entity.EventSink do
     entity
   end
 
+  def emit(%Character{internal: %Internal{map: map}} = entity, %Event{type: :teleport, position: {x, y, z, _o}}) do
+    GenServer.cast(self(), {:start_teleport, x, y, z, map})
+    entity
+  end
+
+  def emit(entity, %Event{type: :teleport}), do: entity
+
+  def emit(%Character{internal: %Internal{map: map}} = entity, %Event{type: :leap, position: {x, y, z, _o}}) do
+    case clamp_leap_destination(entity, map, {x, y, z}) do
+      {nx, ny, nz} -> GenServer.cast(self(), {:start_teleport, nx, ny, nz, map})
+      nil -> nil
+    end
+
+    entity
+  end
+
+  def emit(entity, %Event{type: :leap}), do: entity
+
+  def emit(%Character{} = entity, %Event{type: :teleport_to_spell_target, spell_id: spell_id}) do
+    case Mangos.Repo.get(Mangos.SpellTargetPosition, spell_id) do
+      %Mangos.SpellTargetPosition{} = target ->
+        GenServer.cast(
+          self(),
+          {:start_teleport, target.target_position_x, target.target_position_y, target.target_position_z,
+           target.target_map}
+        )
+
+      _ ->
+        nil
+    end
+
+    entity
+  end
+
+  def emit(entity, %Event{type: :teleport_to_spell_target}), do: entity
+
+  def emit(%Character{} = entity, %Event{type: :create_item, item_id: item_id, count: count}) do
+    send(self(), {:create_item, item_id, count})
+    entity
+  end
+
+  def emit(entity, %Event{type: :create_item}), do: entity
+
+  def emit(%Character{} = entity, %Event{type: :consume_reagents, reagents: reagents}) when is_list(reagents) do
+    send(self(), {:consume_reagents, reagents})
+    entity
+  end
+
+  def emit(entity, %Event{type: :consume_reagents}), do: entity
+
+  def emit(
+        %{object: %{guid: caster_guid}, internal: %Internal{map: map}} = entity,
+        %Event{type: :spawn_area_effect} = event
+      )
+      when is_integer(map) do
+    radius =
+      case event.effect do
+        %{radius_yards: radius} when is_number(radius) and radius > 0 -> radius
+        _ -> 8.0
+      end
+
+    dynamic_object = DataDynamicObject.build(caster_guid, map, event.spell, event.position, radius)
+
+    World.start_entity(%{
+      entity: dynamic_object,
+      duration_ms: event.duration_ms,
+      tick: DynamicObjectServer.tick_config(entity, event.spell, event.effect)
+    })
+
+    track_area_effect(entity, event.spell.id, dynamic_object.object.guid)
+  end
+
+  def emit(entity, %Event{type: :spawn_area_effect}), do: entity
+
+  def emit(%{internal: %Internal{area_effect_guids: guids} = internal} = entity, %Event{
+        type: :despawn_area_effects,
+        spell_id: spell_id
+      })
+      when is_list(guids) and guids != [] do
+    {matching, kept} = Enum.split_with(guids, fn {id, _guid} -> id == spell_id end)
+    Enum.each(matching, fn {_id, guid} -> World.stop_entity(guid) end)
+    %{entity | internal: %{internal | area_effect_guids: kept}}
+  end
+
+  def emit(entity, %Event{type: :despawn_area_effects}), do: entity
+
   def emit(entity, %Event{type: :trigger_spell} = event) do
     case SpellLoader.load(event.spell_id) do
       nil ->
@@ -241,6 +345,37 @@ defmodule ThistleTea.Game.Entity.EventSink do
 
   def deliver_spell(%Event{type: :deliver_spell} = event) do
     Entity.receive_spell(event.target_guid, event.cast_context, event.spell)
+  end
+
+  defp track_area_effect(%{internal: %Internal{area_effect_guids: guids} = internal} = entity, spell_id, guid)
+       when is_list(guids) do
+    %{entity | internal: %{internal | area_effect_guids: [{spell_id, guid} | guids]}}
+  end
+
+  defp track_area_effect(entity, _spell_id, _guid), do: entity
+
+  defp clamp_leap_destination(%{movement_block: %{position: {cx, cy, cz, _o}}}, map, {x, y, z}) do
+    z = snap_to_terrain_height(map, {x, y}, z, cz)
+    requested = :math.sqrt(:math.pow(x - cx, 2) + :math.pow(y - cy, 2))
+
+    with path when is_list(path) and path != [] <- Pathfinding.find_path(map, {cx, cy, cz}, {x, y, z}),
+         total when total > 0 <- Math.movement_duration([{cx, cy, cz} | path], 1.0) do
+      walked = min(requested, total)
+      Movement.position_at({cx, cy, cz}, path, round(total * 1_000), round(walked * 1_000))
+    else
+      _ -> nil
+    end
+  rescue
+    _ -> nil
+  end
+
+  defp clamp_leap_destination(_entity, _map, _position), do: nil
+
+  defp snap_to_terrain_height(map, {x, y}, fallback_z, reference_z) do
+    case Pathfinding.find_heights(map, {x, y}) do
+      [] -> fallback_z
+      heights -> Enum.min_by(heights, &abs(&1 - reference_z))
+    end
   end
 
   defp redirect_enemy_trigger(%{object: %{guid: guid}, unit: unit}, %Event{target_guid: guid} = event, %Spell{

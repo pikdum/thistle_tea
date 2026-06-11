@@ -16,9 +16,12 @@ defmodule ThistleTea.Game.Network.Server do
   alias ThistleTea.Game.Entity.Logic.Death
   alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.Entity.Logic.Experience
+  alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Entity.Logic.SpellEffect
+  alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Connection
+  alias ThistleTea.Game.Network.InventoryUpdate
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Message.Dispatch
   alias ThistleTea.Game.Network.Opcodes
@@ -28,6 +31,7 @@ defmodule ThistleTea.Game.Network.Server do
   alias ThistleTea.Game.Spell.Cast
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
+  alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Pathfinding
   alias ThistleTea.Game.World.SpatialHash
@@ -128,7 +132,7 @@ defmodule ThistleTea.Game.Network.Server do
 
   defp create_update?(%UpdateObject{update_type: update_type, object: %{guid: guid}})
        when update_type in [:create_object, :create_object2] and is_integer(guid) do
-    true
+    Guid.entity_type(guid) != :item
   end
 
   defp create_update?(%UpdateObject{}), do: false
@@ -387,9 +391,13 @@ defmodule ThistleTea.Game.Network.Server do
   end
 
   @impl GenServer
-  def handle_info(:logout_complete, {socket, state}) do
+  def handle_info(:logout_complete, {socket, %{logout_timer: _timer} = state}) do
     Network.send_packet(%Message.SmsgLogoutComplete{})
     state = Message.CmsgLogoutRequest.handle_logout(state)
+    {:noreply, {socket, state}, socket.read_timeout}
+  end
+
+  def handle_info(:logout_complete, {socket, state}) do
     {:noreply, {socket, state}, socket.read_timeout}
   end
 
@@ -397,6 +405,29 @@ defmodule ThistleTea.Game.Network.Server do
   def handle_info(:spell_complete, {socket, state}) do
     state = Message.CmsgCastSpell.handle_spell_complete(state)
     {:noreply, {socket, state}, socket.read_timeout}
+  end
+
+  @impl GenServer
+  def handle_info({:create_item, item_id, count}, {socket, state}) do
+    state = Message.CmsgMessagechat.give_item(state, item_id, count)
+    {:noreply, {socket, state}, socket.read_timeout}
+  rescue
+    _ -> {:noreply, {socket, state}, socket.read_timeout}
+  end
+
+  @impl GenServer
+  def handle_info({:consume_reagents, reagents}, {socket, state}) do
+    state =
+      Enum.reduce(reagents, state, fn {item_id, count}, state ->
+        case Inventory.remove_count(state.character.player, item_id, count, &ItemStore.get/1) do
+          {:ok, result} -> InventoryUpdate.apply(state, {:ok, result})
+          _ -> state
+        end
+      end)
+
+    {:noreply, {socket, state}, socket.read_timeout}
+  rescue
+    _ -> {:noreply, {socket, state}, socket.read_timeout}
   end
 
   @impl GenServer

@@ -218,6 +218,17 @@ fn find_point_between_points(
     })
 }
 
+#[rustler::nif(schedule = "DirtyCpu")]
+fn find_heights(map_id: u32, x: f32, y: f32) -> NifResult<Option<Vec<f32>>> {
+    with_global_maps(|maps| {
+        maps.with_map(map_id, |map| {
+            map.find_heights(x, y)
+                .map(|heights| heights.to_vec())
+                .map_err(|e| e.to_string())
+        })
+    })
+}
+
 fn with_global_maps<F, R>(f: F) -> NifResult<Option<R>>
 where
     F: FnOnce(&mut PathfindingMaps) -> Result<R, String>,

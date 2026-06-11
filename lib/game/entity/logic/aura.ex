@@ -17,6 +17,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
   require Logger
 
   @movement_flag_root 0x08000000
+  @movement_flag_safe_fall 0x20000000
 
   @max_slots 48
   @max_positive_slots 32
@@ -26,14 +27,15 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
   @aflag_eff_index_1 0x04
   @aflag_eff_index_0 0x08
 
-  @negative_auras [:periodic_damage, :mod_root, :mod_decrease_speed, :mod_stun, :mod_fear]
+  @negative_auras [:periodic_damage, :mod_root, :mod_decrease_speed, :mod_stun, :mod_fear, :mod_confuse]
 
   @aura_interrupt_move 0x08
   @aura_interrupt_turning 0x10
   @aura_interrupt_not_seated 0x40000
 
   @regen_tick_ms 5000
-  @regen_auras [:mod_regen, :mod_power_regen]
+  @percent_regen_tick_ms 2000
+  @regen_auras [:mod_regen, :mod_power_regen, :mod_power_regen_percent]
 
   @stand_state_sit 1
 
@@ -85,6 +87,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
   end
 
   defp do_apply(%{unit: %Unit{auras: existing}} = entity, %Holder{} = holder, now) when is_list(existing) do
+    existing = remove_immune_mechanics(existing, holder)
     holders = upsert_holder(existing, holder)
     unit = sync_unit(%{entity.unit | auras: holders})
 
@@ -102,6 +105,28 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
     do_apply(%{entity | unit: %{entity.unit | auras: []}}, holder, now)
   end
 
+  defp remove_immune_mechanics(holders, %Holder{auras: auras}) do
+    immune_types =
+      auras
+      |> Enum.filter(&match?(%Aura{type: :mechanic_immunity}, &1))
+      |> Enum.flat_map(&mechanic_aura_types(&1.misc_value))
+
+    case immune_types do
+      [] -> holders
+      types -> Enum.reject(holders, &holder_has_any_type?(&1, types))
+    end
+  end
+
+  defp holder_has_any_type?(%Holder{auras: auras}, types) do
+    Enum.any?(auras, fn %Aura{type: type} -> type in types end)
+  end
+
+  defp mechanic_aura_types(5), do: [:mod_fear]
+  defp mechanic_aura_types(7), do: [:mod_root]
+  defp mechanic_aura_types(11), do: [:mod_decrease_speed]
+  defp mechanic_aura_types(12), do: [:mod_stun]
+  defp mechanic_aura_types(_), do: []
+
   defp upsert_holder(existing, %Holder{spell: %Spell{id: spell_id}, caster_guid: caster_guid} = incoming) do
     case Enum.find_index(existing, &same_source?(&1, spell_id, caster_guid)) do
       nil ->
@@ -110,9 +135,18 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
 
       index ->
         old = Enum.at(existing, index)
-        refreshed = %{incoming | slot: old.slot}
+        refreshed = %{incoming | slot: old.slot, auras: carry_tick_times(old.auras, incoming.auras)}
         List.replace_at(existing, index, refreshed)
     end
+  end
+
+  defp carry_tick_times(old_auras, new_auras) do
+    Enum.map(new_auras, fn %Aura{} = aura ->
+      case Enum.find(old_auras, &(&1.index == aura.index and &1.type == aura.type)) do
+        %Aura{next_tick_at: at} when is_integer(at) -> %{aura | next_tick_at: at}
+        _ -> aura
+      end
+    end)
   end
 
   defp same_source?(%Holder{spell: %Spell{id: id}, caster_guid: caster}, spell_id, caster_guid) do
@@ -196,6 +230,27 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
 
   def remove_spells(entity, _spell_ids, _now), do: {entity, []}
 
+  def dispel(%{unit: %Unit{auras: holders}} = entity, dispel_type, now)
+      when is_list(holders) and holders != [] and is_integer(dispel_type) do
+    case Enum.find_index(holders, fn %Holder{spell: %Spell{dispel_type: dt}} -> dt == dispel_type end) do
+      nil ->
+        {entity, []}
+
+      index ->
+        kept = List.delete_at(holders, index)
+        unit = sync_unit(%{entity.unit | auras: kept})
+
+        {entity, events} =
+          entity
+          |> Map.put(:unit, unit)
+          |> sync_movement_state(now)
+
+        {Core.mark_broadcast_update(entity), events}
+    end
+  end
+
+  def dispel(entity, _dispel_type, _now), do: {entity, []}
+
   defp interruptible?(%Holder{spell: %Spell{aura_interrupt_flags: flags}}, mask) when is_integer(flags) do
     (flags &&& mask) != 0
   end
@@ -212,11 +267,134 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
 
   defp maybe_sit(entity, _holder), do: {entity, []}
 
+  @mana_per_absorbed_damage 2
+  @absorb_auras [:school_absorb, :mana_shield]
+
+  def absorb_damage(%{unit: %Unit{auras: holders}} = entity, damage, school)
+      when is_list(holders) and holders != [] and is_integer(damage) and damage > 0 do
+    school_mask = Spell.school_mask(school)
+
+    {entity, remaining, new_holders} =
+      Enum.reduce(holders, {entity, damage, []}, fn holder, {ent, dmg, acc} ->
+        {ent, dmg, holder} = absorb_with_holder(ent, dmg, holder, school_mask)
+        {ent, dmg, [holder | acc]}
+      end)
+
+    kept = new_holders |> Enum.reverse() |> Enum.reject(&exhausted_absorb?/1)
+
+    entity =
+      if kept == holders do
+        entity
+      else
+        %{entity | unit: sync_unit(%{entity.unit | auras: kept})}
+        |> Core.mark_broadcast_update()
+      end
+
+    {entity, remaining}
+  end
+
+  def absorb_damage(entity, damage, _school), do: {entity, damage}
+
+  defp absorb_with_holder(entity, damage, %Holder{auras: auras} = holder, school_mask) do
+    {entity, damage, new_auras} =
+      Enum.reduce(auras, {entity, damage, []}, fn aura, {ent, dmg, acc} ->
+        {ent, dmg, aura} = absorb_with_aura(ent, dmg, aura, school_mask)
+        {ent, dmg, [aura | acc]}
+      end)
+
+    {entity, damage, %{holder | auras: Enum.reverse(new_auras)}}
+  end
+
+  defp absorb_with_aura(entity, damage, %Aura{type: :school_absorb, amount: amount} = aura, school_mask)
+       when damage > 0 and is_integer(amount) and amount > 0 do
+    if (aura.misc_value &&& school_mask) == 0 do
+      {entity, damage, aura}
+    else
+      absorbed = min(amount, damage)
+      {entity, damage - absorbed, %{aura | amount: amount - absorbed}}
+    end
+  end
+
+  defp absorb_with_aura(
+         %{unit: %Unit{power1: mana}} = entity,
+         damage,
+         %Aura{type: :mana_shield, amount: amount} = aura,
+         _school_mask
+       )
+       when damage > 0 and is_integer(amount) and amount > 0 and is_integer(mana) and mana > 0 do
+    absorbed = min(min(amount, damage), div(mana, @mana_per_absorbed_damage))
+
+    if absorbed > 0 do
+      entity = %{entity | unit: %{entity.unit | power1: mana - absorbed * @mana_per_absorbed_damage}}
+      {entity, damage - absorbed, %{aura | amount: amount - absorbed}}
+    else
+      {entity, damage, aura}
+    end
+  end
+
+  defp absorb_with_aura(entity, damage, aura, _school_mask), do: {entity, damage, aura}
+
+  defp exhausted_absorb?(%Holder{auras: auras}) do
+    absorbs = Enum.filter(auras, fn %Aura{type: type} -> type in @absorb_auras end)
+    absorbs != [] and Enum.all?(absorbs, fn %Aura{amount: amount} -> amount <= 0 end)
+  end
+
+  def flat_modifier(%{unit: %Unit{auras: holders}}, type, school_mask) when is_list(holders) do
+    holders
+    |> Enum.flat_map(fn %Holder{auras: auras} -> auras end)
+    |> Enum.reduce(0, fn
+      %Aura{type: ^type, amount: amount, misc_value: misc}, acc
+      when is_integer(amount) and is_integer(misc) ->
+        if (misc &&& school_mask) == 0, do: acc, else: acc + amount
+
+      _aura, acc ->
+        acc
+    end)
+  end
+
+  def flat_modifier(_entity, _type, _school_mask), do: 0
+
   def rooted?(%{unit: %Unit{auras: holders}}) when is_list(holders) do
     Enum.any?(holders, &has_aura_type?(&1, :mod_root))
   end
 
   def rooted?(_entity), do: false
+
+  def has_aura?(%{unit: %Unit{auras: holders}}, type) when is_list(holders) do
+    Enum.any?(holders, &has_aura_type?(&1, type))
+  end
+
+  def has_aura?(_entity, _type), do: false
+
+  def confuse_anchor_key(%{unit: %Unit{auras: holders}}) when is_list(holders) do
+    case Enum.find(holders, &has_aura_type?(&1, :mod_confuse)) do
+      %Holder{applied_at: applied_at, spell: %Spell{id: spell_id}} -> {spell_id, applied_at}
+      _ -> nil
+    end
+  end
+
+  def confuse_anchor_key(_entity), do: nil
+
+  def break_on_damage(%{unit: %Unit{auras: holders}} = entity, now) when is_list(holders) and holders != [] do
+    {removed, kept} = Enum.split_with(holders, &has_aura_type?(&1, :mod_confuse))
+
+    if removed == [] do
+      entity
+    else
+      unit = sync_unit(%{entity.unit | auras: kept})
+
+      {entity, events} =
+        entity
+        |> Map.put(:unit, unit)
+        |> sync_movement_state(now)
+
+      entity
+      |> Core.mark_broadcast_update()
+      |> Event.enqueue(events)
+    end
+  end
+
+  def break_on_damage(entity, _now), do: entity
 
   defp has_aura_type?(%Holder{auras: auras}, type) do
     Enum.any?(auras, fn %Aura{type: t} -> t == type end)
@@ -248,8 +426,31 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
     old_run_speed = run_speed(entity)
     entity = MovementStats.sync_aura_mods(entity)
     {entity, events} = sync_movement_flags(entity, now)
-    {entity, speed_change_events(entity, old_run_speed) ++ events}
+    {entity, feather_events} = sync_feather_fall(entity)
+    {entity, speed_change_events(entity, old_run_speed) ++ events ++ feather_events}
   end
+
+  defp sync_feather_fall(%{movement_block: %MovementBlock{} = mb, unit: %Unit{auras: holders}} = entity)
+       when is_list(holders) do
+    flags = mb.movement_flags || 0
+    was_on? = (flags &&& @movement_flag_safe_fall) != 0
+    has_ff? = Enum.any?(holders, &has_aura_type?(&1, :feather_fall))
+
+    new_flags =
+      if has_ff?,
+        do: flags ||| @movement_flag_safe_fall,
+        else: flags &&& bnot(@movement_flag_safe_fall)
+
+    entity = %{entity | movement_block: %{mb | movement_flags: new_flags}}
+
+    if has_ff? == was_on? do
+      {entity, []}
+    else
+      {entity, [Event.feather_fall_changed(has_ff?)]}
+    end
+  end
+
+  defp sync_feather_fall(entity), do: {entity, []}
 
   defp speed_change_events(entity, old_run_speed) do
     new_run_speed = run_speed(entity)
@@ -319,7 +520,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
   defp tick_aura(entity, %Holder{} = holder, %Aura{type: :periodic_damage, next_tick_at: at} = aura, now)
        when is_integer(at) and now >= at do
     damage = aura.amount
-    entity = Core.take_damage(entity, damage, now)
+    entity = Core.take_damage(entity, damage, now, school: holder.spell.school)
 
     event =
       Event.spell_damage(holder.caster_guid, entity.object.guid, holder.spell, damage, periodic?: true)
@@ -345,7 +546,26 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
     {entity, %{aura | next_tick_at: advance_tick(at, aura.amplitude_ms, now)}, []}
   end
 
+  defp tick_aura(entity, _holder, %Aura{type: :mod_power_regen_percent, next_tick_at: at} = aura, now)
+       when is_integer(at) and now >= at do
+    entity = Core.restore_mana(entity, regen_percent_amount(entity, aura.amount))
+    {entity, %{aura | next_tick_at: advance_tick(at, aura.amplitude_ms, now)}, []}
+  end
+
   defp tick_aura(entity, _holder, aura, _now), do: {entity, aura, []}
+
+  defp regen_percent_amount(%{unit: %Unit{} = unit}, percent) when is_integer(percent) and percent > 0 do
+    spirit =
+      case unit.spirit do
+        spirit when is_integer(spirit) and spirit > 0 -> spirit
+        _ -> unit.level || 1
+      end
+
+    base_regen_per_tick = spirit / 4 + 12.5
+    max(trunc(base_regen_per_tick * percent / 100), 1)
+  end
+
+  defp regen_percent_amount(_entity, _percent), do: 0
 
   defp advance_tick(last_tick, amplitude_ms, now) when is_integer(amplitude_ms) and amplitude_ms > 0 do
     next = last_tick + amplitude_ms
@@ -418,6 +638,10 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
     }
   end
 
+  defp effective_amplitude(%Effect{aura: :mod_power_regen_percent, amplitude_ms: amp}) do
+    if is_integer(amp) and amp > 0, do: amp, else: @percent_regen_tick_ms
+  end
+
   defp effective_amplitude(%Effect{aura: aura, amplitude_ms: amp}) when aura in @regen_auras do
     if is_integer(amp) and amp > 0, do: amp, else: @regen_tick_ms
   end
@@ -434,8 +658,8 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
   defp reaction_event(_aura, _holder, _owner_guid, _attacker_guid), do: []
 
   defp next_tick(%Effect{aura: aura}, amplitude_ms, now)
-       when aura in [:periodic_damage, :periodic_heal, :mod_regen, :mod_power_regen] and is_integer(amplitude_ms) and
-              amplitude_ms > 0 do
+       when aura in [:periodic_damage, :periodic_heal, :mod_regen, :mod_power_regen, :mod_power_regen_percent] and
+              is_integer(amplitude_ms) and amplitude_ms > 0 do
     now + amplitude_ms
   end
 

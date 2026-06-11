@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Aura, as: AuraBT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AI.BT.Combat, as: CombatBT
+  alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Hostility
   alias ThistleTea.Game.Entity.Logic.Movement
@@ -39,6 +40,14 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
       BT.sequence([
         BT.condition(&dead?/2),
         BT.action(&idle_dead/2)
+      ]),
+      BT.sequence([
+        BT.condition(&confused?/2),
+        BT.action(&wait_until_confused_wander_ready/2),
+        BT.action(&pick_confused_point/2),
+        BT.action(&move_to_target/2),
+        BT.action(&wait_for_arrival/2),
+        BT.action(&set_next_confused_wait/2)
       ]),
       BT.sequence([
         BT.condition(&aggro_check_ready?/2),
@@ -122,6 +131,69 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
 
   defp can_wander?(%Mob{}, _blackboard) do
     false
+  end
+
+  @confused_wander_radius 5.0
+
+  defp confused?(%Mob{} = state, _blackboard) do
+    AuraLogic.has_aura?(state, :mod_confuse)
+  end
+
+  defp confused?(_state, _blackboard), do: false
+
+  defp wait_until_confused_wander_ready(%Mob{} = state, %Blackboard{} = blackboard) do
+    now = Time.now()
+
+    if Blackboard.ready_for?(blackboard, :next_confused_at, now) do
+      {:success, state, blackboard}
+    else
+      delay_ms = Blackboard.delay_until(blackboard, :next_confused_at, now)
+      {{:running, delay_ms}, state, blackboard}
+    end
+  end
+
+  defp pick_confused_point(
+         %Mob{movement_block: %MovementBlock{position: {x, y, z, _o}}} = state,
+         %Blackboard{} = blackboard
+       ) do
+    state = set_running(state, false)
+    blackboard = ensure_confused_anchor(state, blackboard, {x, y, z})
+
+    if blackboard.target do
+      {:success, state, blackboard}
+    else
+      {_key, anchor} = blackboard.confused_anchor
+
+      case Pathfinding.find_random_point_around_circle(state.internal.map, anchor, @confused_wander_radius) do
+        nil ->
+          blackboard = Blackboard.put_next_at(blackboard, :next_confused_at, confused_wait_delay(), Time.now())
+          {:running, state, Blackboard.clear_move_target(blackboard)}
+
+        {wx, wy, wz} ->
+          {:success, state, %{blackboard | target: {wx, wy, wz}}}
+      end
+    end
+  end
+
+  defp ensure_confused_anchor(%Mob{} = state, %Blackboard{} = blackboard, current_position) do
+    key = AuraLogic.confuse_anchor_key(state)
+
+    case blackboard.confused_anchor do
+      {^key, _anchor} ->
+        blackboard
+
+      _ ->
+        %{Blackboard.clear_move_target(blackboard) | confused_anchor: {key, current_position}}
+    end
+  end
+
+  defp set_next_confused_wait(%Mob{} = state, %Blackboard{} = blackboard) do
+    blackboard = Blackboard.put_next_at(blackboard, :next_confused_at, confused_wait_delay(), Time.now())
+    {:success, state, Blackboard.clear_move_target(blackboard)}
+  end
+
+  defp confused_wait_delay do
+    :rand.uniform(1_000) + 500
   end
 
   defp in_combat?(%Mob{} = state, %Blackboard{} = blackboard) do

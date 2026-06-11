@@ -12,10 +12,12 @@ defmodule ThistleTea.Game.Spell do
     :range_yards,
     :mana_cost,
     :gcd_ms,
+    :dispel_type,
     speed: 0.0,
     aura_interrupt_flags: 0,
     attributes: MapSet.new(),
-    effects: []
+    effects: [],
+    reagents: []
   ]
 
   def attribute?(%__MODULE__{attributes: attrs}, attr), do: MapSet.member?(attrs, attr)

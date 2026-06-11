@@ -62,6 +62,7 @@ defmodule ThistleTea.Game.Network.Message.Dispatch do
               CMSG_LOGOUT_REQUEST: Message.CmsgLogoutRequest,
               CMSG_LOGOUT_CANCEL: Message.CmsgLogoutCancel,
               CMSG_CANCEL_CAST: Message.CmsgCancelCast,
+              CMSG_CANCEL_CHANNELLING: Message.CmsgCancelChannelling,
               CMSG_AUTOEQUIP_ITEM: Message.CmsgAutoequipItem,
               CMSG_SWAP_INV_ITEM: Message.CmsgSwapInvItem,
               CMSG_SWAP_ITEM: Message.CmsgSwapItem,

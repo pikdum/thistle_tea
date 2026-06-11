@@ -10,7 +10,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Blackboard do
             attack_started: false,
             next_wander_at: 0,
             next_waypoint_at: 0,
-            next_aggro_at: 0
+            next_aggro_at: 0,
+            next_confused_at: 0,
+            confused_anchor: nil
 
   def new do
     %__MODULE__{}

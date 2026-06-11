@@ -39,6 +39,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgPlayerLogin do
 
     c =
       c
+      |> normalize_movement_state()
       |> normalize_combat_stats()
       |> normalize_faction_template()
       |> normalize_death_state(character_guid)
@@ -189,6 +190,14 @@ defmodule ThistleTea.Game.Network.Message.CmsgPlayerLogin do
   defp build_spellbook(%ThistleTea.Character{internal: internal} = character) do
     spellbook = SpellLoader.build_spellbook(internal.spells || [])
     %{character | internal: %{internal | spellbook: spellbook}}
+  end
+
+  defp normalize_movement_state(%ThistleTea.Character{movement_block: movement_block, internal: internal} = character) do
+    %{
+      character
+      | movement_block: %{movement_block | movement_flags: 0, timestamp: 0, fall_time: 0},
+        internal: %{internal | visibility_cell: nil}
+    }
   end
 
   defp normalize_combat_stats(%ThistleTea.Character{} = character) do

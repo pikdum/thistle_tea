@@ -6,8 +6,10 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
+  alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.SpellEffect
   alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.Cast
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Effect
 
@@ -76,7 +78,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
       assert [%{type: :trigger_spell, source_guid: 999, target_guid: 1, spell_id: 7268}] = events
     end
 
-    test "persistent periodic area damage applies as spell damage for channel ticks" do
+    test "persistent area auras do not apply directly on hit (area effect process handles ticks)" do
       spell = %Spell{
         id: 10,
         name: "Blizzard",
@@ -96,8 +98,8 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
 
       {target, events} = SpellEffect.receive(target_fixture(), context, spell, 1_000)
 
-      assert target.unit.health == 0
-      assert [%{type: :spell_damage, damage: 24, periodic?: true, spell_id: 10}] = events
+      assert target.unit.health == 20
+      assert events == []
     end
 
     test "heal effects restore health without emitting damage events" do
@@ -217,6 +219,130 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
       {target, _events} = SpellEffect.receive(target, context, spell, 1_000)
 
       assert target.unit.health == 16
+    end
+
+    test "leap effect emits a teleport event ahead of the caster" do
+      spell = %Spell{
+        id: 1953,
+        name: "Blink",
+        school: :arcane,
+        effects: [%Effect{index: 0, type: :leap, radius_yards: 20.0}]
+      }
+
+      context = %CastContext{caster_guid: 1, caster_level: 10}
+      caster = target_fixture()
+
+      {_caster, events} = SpellEffect.receive(caster, context, spell, 1_000)
+
+      assert [%{type: :leap, position: {x, y, z, o}}] = events
+      assert_in_delta x, 20.0, 0.001
+      assert_in_delta y, 0.0, 0.001
+      assert z == 0.0
+      assert o == 0.0
+    end
+
+    test "teleport_units effect emits a spell target teleport event" do
+      spell = %Spell{
+        id: 3561,
+        name: "Teleport: Stormwind",
+        school: :arcane,
+        effects: [%Effect{index: 0, type: :teleport_units}]
+      }
+
+      context = %CastContext{caster_guid: 1, caster_level: 10}
+
+      {_caster, events} = SpellEffect.receive(target_fixture(), context, spell, 1_000)
+
+      assert [%{type: :teleport_to_spell_target, spell_id: 3561}] = events
+    end
+
+    test "create_item effect emits a create_item event" do
+      spell = %Spell{
+        id: 5504,
+        name: "Conjure Water",
+        school: :arcane,
+        effects: [%Effect{index: 0, type: :create_item, base_points: 1, die_sides: 1, misc_value: 5350}]
+      }
+
+      context = %CastContext{caster_guid: 1, caster_level: 10}
+
+      {_caster, events} = SpellEffect.receive(target_fixture(), context, spell, 1_000)
+
+      assert [%{type: :create_item, item_id: 5350, count: 2}] = events
+    end
+
+    test "interrupt_cast clears the target's cast" do
+      spell = %Spell{
+        id: 2139,
+        name: "Counterspell",
+        school: :arcane,
+        effects: [%Effect{index: 0, type: :interrupt_cast}]
+      }
+
+      context = %CastContext{caster_guid: 999, caster_level: 10}
+
+      target = target_fixture()
+      target = %{target | internal: %{target.internal | casting: %Cast{}}}
+
+      {target, _events} = SpellEffect.receive(target, context, spell, 1_000)
+
+      assert target.internal.casting == nil
+    end
+
+    test "mod_damage_taken reduces incoming spell damage" do
+      dampen = %Spell{
+        id: 604,
+        name: "Dampen Magic",
+        school: :arcane,
+        duration_ms: 600_000,
+        effects: [
+          %Effect{index: 0, type: :apply_aura, base_points: -11, die_sides: 1, aura: :mod_damage_taken, misc_value: 126}
+        ]
+      }
+
+      target = target_fixture()
+      {target, _} = Aura.apply_spell(target, 1, 10, dampen, 1_000)
+
+      fireball = %Spell{
+        id: 133,
+        name: "Fireball",
+        school: :fire,
+        effects: [%Effect{index: 0, type: :school_damage, base_points: 15, die_sides: 0}]
+      }
+
+      context = %CastContext{caster_guid: 999, caster_level: 10}
+      {target, events} = SpellEffect.receive(target, context, fireball, 1_000)
+
+      assert [%{type: :spell_damage, damage: 5}] = events
+      assert target.unit.health == 15
+    end
+
+    test "mod_healing modifies incoming heals" do
+      amplify = %Spell{
+        id: 1008,
+        name: "Amplify Magic",
+        school: :arcane,
+        duration_ms: 600_000,
+        effects: [
+          %Effect{index: 1, type: :apply_aura, base_points: 29, die_sides: 1, aura: :mod_healing, misc_value: 126}
+        ]
+      }
+
+      target = target_fixture()
+      target = %{target | unit: %{target.unit | health: 1, max_health: 100}}
+      {target, _} = Aura.apply_spell(target, 1, 10, amplify, 1_000)
+
+      heal = %Spell{
+        id: 2050,
+        name: "Lesser Heal",
+        school: :holy,
+        effects: [%Effect{index: 0, type: :heal, base_points: 5, die_sides: 0}]
+      }
+
+      context = %CastContext{caster_guid: 999, caster_level: 10}
+      {target, _events} = SpellEffect.receive(target, context, heal, 1_000)
+
+      assert target.unit.health == 1 + 5 + 30
     end
   end
 end

@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.Aura
+  alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Effect
 
@@ -512,6 +513,286 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
       {entity, _events} = Aura.remove_with_interrupt_flags(entity, Aura.interrupt_mask(:turn), 2_000)
 
       assert length(entity.unit.auras) == 1
+    end
+  end
+
+  defp fire_ward_fixture do
+    %Spell{
+      id: 543,
+      name: "Fire Ward",
+      school: :fire,
+      duration_ms: 30_000,
+      effects: [
+        %Effect{index: 0, type: :apply_aura, base_points: 164, die_sides: 0, aura: :school_absorb, misc_value: 0x4}
+      ]
+    }
+  end
+
+  defp mana_shield_fixture do
+    %Spell{
+      id: 1463,
+      name: "Mana Shield",
+      school: :arcane,
+      duration_ms: 60_000,
+      effects: [
+        %Effect{index: 0, type: :apply_aura, base_points: 119, die_sides: 0, aura: :mana_shield, misc_value: 1}
+      ]
+    }
+  end
+
+  defp polymorph_fixture do
+    %Spell{
+      id: 118,
+      name: "Polymorph",
+      school: :arcane,
+      duration_ms: 20_000,
+      effects: [
+        %Effect{index: 0, type: :apply_aura, base_points: -1, die_sides: 1, aura: :mod_confuse},
+        %Effect{index: 1, type: :apply_aura, base_points: 0, die_sides: 0, aura: :transform, misc_value: 16_372}
+      ]
+    }
+  end
+
+  defp arcane_intellect_fixture do
+    %Spell{
+      id: 1459,
+      name: "Arcane Intellect",
+      school: :arcane,
+      duration_ms: 1_800_000,
+      effects: [
+        %Effect{index: 0, type: :apply_aura, base_points: 1, die_sides: 1, aura: :mod_stat, misc_value: 3}
+      ]
+    }
+  end
+
+  defp blink_immunity_fixture do
+    %Spell{
+      id: 1953,
+      name: "Blink",
+      school: :arcane,
+      duration_ms: 0,
+      effects: [
+        %Effect{index: 1, type: :apply_aura, base_points: -1, die_sides: 1, aura: :mechanic_immunity, misc_value: 12},
+        %Effect{index: 2, type: :apply_aura, base_points: -1, die_sides: 1, aura: :mechanic_immunity, misc_value: 7}
+      ]
+    }
+  end
+
+  defp curse_fixture do
+    %Spell{
+      id: 702,
+      name: "Curse of Weakness",
+      school: :shadow,
+      dispel_type: 2,
+      duration_ms: 120_000,
+      effects: [
+        %Effect{index: 0, type: :apply_aura, base_points: -3, die_sides: 1, aura: :mod_damage_taken, misc_value: 1}
+      ]
+    }
+  end
+
+  defp slow_fall_fixture do
+    %Spell{
+      id: 130,
+      name: "Slow Fall",
+      school: :arcane,
+      duration_ms: 30_000,
+      effects: [
+        %Effect{index: 0, type: :apply_aura, base_points: 0, die_sides: 0, aura: :feather_fall}
+      ]
+    }
+  end
+
+  defp evocation_fixture do
+    %Spell{
+      id: 12_051,
+      name: "Evocation",
+      school: :arcane,
+      duration_ms: 8_000,
+      effects: [
+        %Effect{
+          index: 0,
+          type: :apply_aura,
+          base_points: 1499,
+          die_sides: 1,
+          aura: :mod_power_regen_percent,
+          amplitude_ms: 2_000
+        }
+      ]
+    }
+  end
+
+  describe "absorb_damage/3" do
+    test "fire ward absorbs fire damage and tracks remaining amount" do
+      {entity, _events} = apply_spell(fixture_entity(), 1, 1, fire_ward_fixture())
+
+      {entity, remaining} = Aura.absorb_damage(entity, 100, :fire)
+
+      assert remaining == 0
+      assert [%Holder{auras: [%{amount: 64}]}] = entity.unit.auras
+    end
+
+    test "fire ward does not absorb frost damage" do
+      {entity, _events} = apply_spell(fixture_entity(), 1, 1, fire_ward_fixture())
+
+      {_entity, remaining} = Aura.absorb_damage(entity, 100, :frost)
+
+      assert remaining == 100
+    end
+
+    test "fire ward is removed when exhausted" do
+      {entity, _events} = apply_spell(fixture_entity(), 1, 1, fire_ward_fixture())
+
+      {entity, remaining} = Aura.absorb_damage(entity, 200, :fire)
+
+      assert remaining == 200 - 164
+      assert entity.unit.auras == []
+    end
+
+    test "mana shield absorbs any school and drains mana" do
+      entity = fixture_entity()
+      entity = %{entity | unit: %{entity.unit | power1: 100, max_power1: 100}}
+      {entity, _events} = apply_spell(entity, 1, 1, mana_shield_fixture())
+
+      {entity, remaining} = Aura.absorb_damage(entity, 30, :physical)
+
+      assert remaining == 0
+      assert entity.unit.power1 == 40
+    end
+
+    test "mana shield absorb is limited by available mana" do
+      entity = fixture_entity()
+      entity = %{entity | unit: %{entity.unit | power1: 20, max_power1: 100}}
+      {entity, _events} = apply_spell(entity, 1, 1, mana_shield_fixture())
+
+      {entity, remaining} = Aura.absorb_damage(entity, 30, :fire)
+
+      assert remaining == 20
+      assert entity.unit.power1 == 0
+    end
+  end
+
+  describe "mod_confuse" do
+    test "is a negative aura" do
+      {entity, _events} = apply_spell(fixture_entity(), 2, 1, polymorph_fixture())
+
+      assert [%Holder{negative?: true}] = entity.unit.auras
+    end
+
+    test "transform changes display id and reverts on break" do
+      entity = fixture_entity()
+      entity = %{entity | unit: %{entity.unit | display_id: 49, native_display_id: 49}}
+      {entity, _events} = apply_spell(entity, 2, 1, polymorph_fixture())
+
+      assert entity.unit.display_id == 16_372
+
+      entity = Aura.break_on_damage(entity, 2_000)
+      assert entity.unit.auras == []
+      assert entity.unit.display_id == 49
+    end
+
+    test "take_damage breaks confuse auras" do
+      {entity, _events} = apply_spell(fixture_entity(), 2, 1, polymorph_fixture())
+
+      entity = Core.take_damage(entity, 10, 2_000)
+
+      assert entity.unit.auras == []
+      assert entity.unit.health == 90
+    end
+  end
+
+  describe "mod_stat" do
+    test "arcane intellect raises intellect and max mana" do
+      entity = fixture_entity()
+      entity = %{entity | unit: %{entity.unit | intellect: 20, power1: 100, max_power1: 100}}
+
+      {entity, _events} = apply_spell(entity, 1, 1, arcane_intellect_fixture())
+
+      assert entity.unit.intellect == 22
+      assert entity.unit.max_power1 == 100 + 2 * 15
+    end
+
+    test "stat and max mana revert when aura expires" do
+      entity = fixture_entity()
+      entity = %{entity | unit: %{entity.unit | intellect: 20, power1: 100, max_power1: 100}}
+
+      {entity, _events} = apply_spell(entity, 1, 1, arcane_intellect_fixture())
+      {entity, _events} = Aura.expire_due(entity, 1_000 + 1_800_001)
+
+      assert entity.unit.intellect == 20
+      assert entity.unit.max_power1 == 100
+      assert entity.unit.power1 == 100
+    end
+  end
+
+  describe "mechanic_immunity" do
+    test "blink removes roots and stuns" do
+      {entity, _events} = apply_spell(fixture_entity(), 2, 1, root_spell())
+      assert Aura.rooted?(entity)
+
+      {entity, _events} = apply_spell(entity, 1, 1, blink_immunity_fixture())
+
+      refute Aura.rooted?(entity)
+      spell_ids = Enum.map(entity.unit.auras, & &1.spell.id)
+      assert spell_ids == [1953]
+    end
+  end
+
+  describe "dispel/3" do
+    test "removes a holder matching the dispel type" do
+      {entity, _events} = apply_spell(fixture_entity(), 2, 1, curse_fixture())
+      {entity, _events} = apply_spell(entity, 1, 1, frost_armor_fixture())
+
+      {entity, _events} = Aura.dispel(entity, 2, 2_000)
+
+      spell_ids = Enum.map(entity.unit.auras, & &1.spell.id)
+      assert spell_ids == [168]
+    end
+
+    test "does nothing when no aura matches" do
+      {entity, _events} = apply_spell(fixture_entity(), 1, 1, frost_armor_fixture())
+
+      {entity, _events} = Aura.dispel(entity, 2, 2_000)
+
+      assert length(entity.unit.auras) == 1
+    end
+  end
+
+  describe "feather_fall" do
+    test "sets safe fall movement flag and emits events on gain and loss" do
+      {entity, events} = apply_spell(fixture_entity(), 1, 1, slow_fall_fixture())
+
+      assert (entity.movement_block.movement_flags &&& 0x20000000) != 0
+      assert Enum.any?(events, &(&1.type == :feather_fall_changed and &1.enabled? == true))
+
+      {entity, events} = Aura.expire_due(entity, 1_000 + 30_001)
+      assert (entity.movement_block.movement_flags &&& 0x20000000) == 0
+      assert Enum.any?(events, &(&1.type == :feather_fall_changed and &1.enabled? == false))
+    end
+  end
+
+  describe "mod_power_regen_percent" do
+    test "evocation restores mana on each tick" do
+      entity = fixture_entity()
+      entity = %{entity | unit: %{entity.unit | power1: 0, max_power1: 5_000, spirit: 100}}
+
+      {entity, _events} = apply_spell(entity, 1, 1, evocation_fixture())
+      {entity, _events} = Aura.tick(entity, 1_000 + 2_000)
+
+      assert entity.unit.power1 == trunc((100 / 4 + 12.5) * 1500 / 100)
+    end
+
+    test "reapplying the same spell keeps the periodic tick schedule" do
+      entity = fixture_entity()
+      entity = %{entity | unit: %{entity.unit | power1: 0, max_power1: 5_000, spirit: 100}}
+
+      {entity, _events} = apply_spell(entity, 1, 1, evocation_fixture())
+      [%Holder{auras: [%{next_tick_at: first_tick}]}] = entity.unit.auras
+
+      {entity, _events} = Aura.apply_spell(entity, 1, 1, evocation_fixture(), 2_000)
+      [%Holder{auras: [%{next_tick_at: tick_after_refresh}]}] = entity.unit.auras
+
+      assert tick_after_refresh == first_tick
     end
   end
 end

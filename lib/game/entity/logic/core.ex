@@ -3,6 +3,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Corpse
+  alias ThistleTea.Game.Entity.Data.DynamicObject, as: DataDynamicObject
   alias ThistleTea.Game.Entity.Data.GameObject
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.Aura
@@ -16,6 +17,8 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
   def update_object(%Mob{} = entity, update_type), do: update_object(entity, update_type, :unit)
   def update_object(%GameObject{} = entity, update_type), do: update_object(entity, update_type, :game_object)
   def update_object(%Corpse{} = entity, update_type), do: update_object(entity, update_type, :corpse)
+
+  def update_object(%DataDynamicObject{} = entity, update_type), do: update_object(entity, update_type, :dynamic_object)
   def update_object(%ThistleTea.Character{} = entity, update_type), do: update_object(entity, update_type, :player)
 
   def update_object(entity, update_type, object_type) do
@@ -26,12 +29,19 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
     |> struct(Map.from_struct(entity))
   end
 
-  def take_damage(%{internal: %Internal{godmode: true}} = entity, _damage, _now), do: entity
+  def take_damage(entity, damage, now, opts \\ [])
 
-  def take_damage(%{unit: %Unit{health: health} = unit} = entity, damage, now) when is_integer(now) do
+  def take_damage(%{internal: %Internal{godmode: true}} = entity, _damage, _now, _opts), do: entity
+
+  def take_damage(%{unit: %Unit{health: health}} = entity, damage, now, opts) when is_integer(now) do
+    {entity, damage} = Aura.absorb_damage(entity, damage, Keyword.get(opts, :school, :physical))
+    %{unit: unit} = entity
     new_health = max(health - damage, 0)
 
-    %{entity | unit: %{unit | health: new_health}}
+    entity = %{entity | unit: %{unit | health: new_health}}
+    entity = if damage > 0, do: Aura.break_on_damage(entity, now), else: entity
+
+    entity
     |> mark_broadcast_update()
     |> maybe_dead(now)
   end

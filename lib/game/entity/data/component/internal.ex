@@ -34,6 +34,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal do
     :equipment_bonuses,
     :creature_type_flags,
     events: [],
+    area_effect_guids: [],
     broadcast_update?: false,
     spline_id: 0,
     godmode: false

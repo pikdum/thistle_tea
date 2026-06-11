@@ -2,6 +2,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   import Bitwise, only: [&&&: 2]
   import Ecto.Query
 
+  alias ThistleTea.DB.Mangos
   alias ThistleTea.DBC
   alias ThistleTea.Game.Spell, as: SpellData
   alias ThistleTea.Game.Spell.Effect
@@ -79,11 +80,21 @@ defmodule ThistleTea.Game.World.Loader.Spell do
       range_yards: range_yards(row.spell_range),
       mana_cost: row.mana_cost || 0,
       gcd_ms: row.start_recovery_time || 0,
+      dispel_type: row.dispel_type || 0,
       speed: row.speed || 0.0,
       aura_interrupt_flags: row.aura_interrupt_flags || 0,
       attributes: attributes(row.attributes, row.attributes_ex1),
-      effects: build_effects(row, radius_lookup)
+      effects: build_effects(row, radius_lookup),
+      reagents: build_reagents(row)
     }
+  end
+
+  defp build_reagents(row) do
+    0..7
+    |> Enum.map(fn index ->
+      {Map.get(row, :"reagent_#{index}") || 0, Map.get(row, :"reagent_count_#{index}") || 0}
+    end)
+    |> Enum.filter(fn {item_id, count} -> item_id > 0 and count > 0 end)
   end
 
   defp build_effects(row, radius_lookup) do
@@ -100,15 +111,17 @@ defmodule ThistleTea.Game.World.Loader.Spell do
         nil
 
       type ->
+        aura = aura_type(Map.get(row, :"effect_aura_#{index}") || 0)
+
         %Effect{
           index: index,
           type: type,
           base_points: Map.get(row, :"effect_base_points_#{index}") || 0,
           die_sides: Map.get(row, :"effect_die_sides_#{index}") || 0,
           real_points_per_level: Map.get(row, :"effect_real_points_per_level_#{index}") || 0.0,
-          aura: aura_type(Map.get(row, :"effect_aura_#{index}") || 0),
+          aura: aura,
           amplitude_ms: amplitude_ms(Map.get(row, :"effect_amplitude_#{index}")),
-          misc_value: Map.get(row, :"effect_misc_value_#{index}") || 0,
+          misc_value: effect_misc_value(row, index, type, aura),
           radius_yards: radius_lookup.(Map.get(row, :"effect_radius_#{index}")),
           implicit_target_a: target_type(Map.get(row, :"implicit_target_a_#{index}") || 0),
           implicit_target_b: target_type(Map.get(row, :"implicit_target_b_#{index}") || 0),
@@ -117,6 +130,31 @@ defmodule ThistleTea.Game.World.Loader.Spell do
         }
     end
   end
+
+  defp effect_misc_value(row, index, :create_item, _aura) do
+    Map.get(row, :"effect_item_type_#{index}") || 0
+  end
+
+  defp effect_misc_value(row, index, _type, :transform) do
+    transform_display_id(Map.get(row, :"effect_misc_value_#{index}") || 0)
+  end
+
+  defp effect_misc_value(row, index, _type, _aura) do
+    Map.get(row, :"effect_misc_value_#{index}") || 0
+  end
+
+  defp transform_display_id(entry) when is_integer(entry) and entry > 0 do
+    case Mangos.Repo.get(Mangos.CreatureTemplate, entry) do
+      %Mangos.CreatureTemplate{} = template ->
+        [template.model_id1, template.model_id2, template.model_id3, template.model_id4]
+        |> Enum.find(0, &(is_integer(&1) and &1 > 0))
+
+      _ ->
+        0
+    end
+  end
+
+  defp transform_display_id(_entry), do: 0
 
   defp load_radius_map(rows) do
     radius_ids =
@@ -184,8 +222,14 @@ defmodule ThistleTea.Game.World.Loader.Spell do
 
   defp effect_type(0), do: :none
   defp effect_type(2), do: :school_damage
+  defp effect_type(5), do: :teleport_units
   defp effect_type(6), do: :apply_aura
   defp effect_type(10), do: :heal
+  defp effect_type(24), do: :create_item
+  defp effect_type(29), do: :leap
+  defp effect_type(38), do: :dispel
+  defp effect_type(50), do: :trans_door
+  defp effect_type(68), do: :interrupt_cast
   defp effect_type(17), do: :weapon_damage_noschool
   defp effect_type(27), do: :persistent_area_aura
   defp effect_type(58), do: :weapon_damage
@@ -194,8 +238,12 @@ defmodule ThistleTea.Game.World.Loader.Spell do
 
   defp aura_type(0), do: nil
   defp aura_type(3), do: :periodic_damage
+  defp aura_type(4), do: :dummy
+  defp aura_type(5), do: :mod_confuse
   defp aura_type(8), do: :periodic_heal
   defp aura_type(12), do: :mod_stun
+  defp aura_type(14), do: :mod_damage_taken
+  defp aura_type(29), do: :mod_stat
   defp aura_type(13), do: :mod_damage_done
   defp aura_type(15), do: :damage_shield
   defp aura_type(22), do: :mod_resistance
@@ -206,10 +254,18 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp aura_type(42), do: :proc_trigger_spell
   defp aura_type(56), do: :transform
   defp aura_type(58), do: :mod_increase_swim_speed
+  defp aura_type(69), do: :school_absorb
+  defp aura_type(74), do: :reflect_spells_school
+  defp aura_type(77), do: :mechanic_immunity
   defp aura_type(84), do: :mod_regen
   defp aura_type(85), do: :mod_power_regen
   defp aura_type(95), do: :ghost
+  defp aura_type(97), do: :mana_shield
   defp aura_type(99), do: :mod_attack_power
+  defp aura_type(105), do: :feather_fall
+  defp aura_type(110), do: :mod_power_regen_percent
+  defp aura_type(115), do: :mod_healing
+  defp aura_type(134), do: :mod_mana_regen_interrupt
   defp aura_type(135), do: :mod_healing_done
   defp aura_type(other) when is_integer(other), do: other
 
@@ -228,7 +284,8 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   @passive 0x00000040
   @ability 0x00000010
   @hidden_in_combat_log 0x00000100
-  @channeled_ex 0x00000004
+  @channeled_ex_1 0x00000004
+  @channeled_ex_2 0x00000040
 
   defp attributes(attrs, attrs_ex1) when is_integer(attrs) and is_integer(attrs_ex1) do
     base =
@@ -239,7 +296,9 @@ defmodule ThistleTea.Game.World.Loader.Spell do
       |> add_if(attrs, @ability, :ability)
       |> add_if(attrs, @hidden_in_combat_log, :hidden_in_combat_log)
 
-    add_if(base, attrs_ex1, @channeled_ex, :channeled)
+    base
+    |> add_if(attrs_ex1, @channeled_ex_1, :channeled)
+    |> add_if(attrs_ex1, @channeled_ex_2, :channeled)
   end
 
   defp attributes(_, _), do: MapSet.new()

@@ -12,6 +12,11 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
     :duration_ms,
     :speed,
     :rooted?,
+    :enabled?,
+    :position,
+    :item_id,
+    :count,
+    :reagents,
     :move_opts,
     :hit_guids,
     :raw_targets,
@@ -20,6 +25,7 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
     :update_type,
     :cast_context,
     :spell,
+    :effect,
     :attack,
     :channel_time_ms
   ]
@@ -54,6 +60,10 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
 
   def movement_root_changed(rooted?) when is_boolean(rooted?) do
     %__MODULE__{type: :movement_root_changed, rooted?: rooted?}
+  end
+
+  def feather_fall_changed(enabled?) when is_boolean(enabled?) do
+    %__MODULE__{type: :feather_fall_changed, enabled?: enabled?}
   end
 
   def monster_move(opts \\ []) when is_list(opts) do
@@ -142,6 +152,40 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
   end
 
   def enqueue(entity, _event), do: entity
+
+  def teleport({_x, _y, _z, _o} = position) do
+    %__MODULE__{type: :teleport, position: position}
+  end
+
+  def leap({_x, _y, _z, _o} = position) do
+    %__MODULE__{type: :leap, position: position}
+  end
+
+  def teleport_to_spell_target(spell_id) when is_integer(spell_id) do
+    %__MODULE__{type: :teleport_to_spell_target, spell_id: spell_id}
+  end
+
+  def create_item(item_id, count) when is_integer(item_id) and is_integer(count) do
+    %__MODULE__{type: :create_item, item_id: item_id, count: count}
+  end
+
+  def spawn_area_effect(spell, effect, {_x, _y, _z} = position, duration_ms) when is_integer(duration_ms) do
+    %__MODULE__{
+      type: :spawn_area_effect,
+      spell: spell,
+      effect: effect,
+      position: position,
+      duration_ms: duration_ms
+    }
+  end
+
+  def despawn_area_effects(spell_id) when is_integer(spell_id) do
+    %__MODULE__{type: :despawn_area_effects, spell_id: spell_id}
+  end
+
+  def consume_reagents(reagents) when is_list(reagents) do
+    %__MODULE__{type: :consume_reagents, reagents: reagents}
+  end
 
   def trigger_spell(source_guid, source_level, target_guid, spell_id)
       when is_integer(target_guid) and is_integer(spell_id) do

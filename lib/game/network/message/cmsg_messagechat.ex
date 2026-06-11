@@ -59,7 +59,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgMessagechat do
     end
   end
 
-  defp give_item(state, item_id, count) do
+  def give_item(state, item_id, count) do
     case ItemStore.create(item_id, owner: state.guid, stack_count: count) do
       %DataItem{} = item ->
         case Inventory.store(state.character.player, state.guid, item, &ItemStore.get/1) do
