@@ -1,6 +1,8 @@
 defmodule ThistleTea.Game.Entity.Logic.Regen do
+  alias ThistleTea.Game.Aura
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Death
 
@@ -8,6 +10,7 @@ defmodule ThistleTea.Game.Entity.Logic.Regen do
   @five_second_rule_ms 5_000
   @energy_per_tick 20
   @rage_decay_per_tick 20
+  @sitting_multiplier 1.5
 
   @mana_power_type 0
   @rage_power_type 1
@@ -74,14 +77,59 @@ defmodule ThistleTea.Game.Entity.Logic.Regen do
 
   defp missing_power?(_entity), do: false
 
-  defp regen_health(%{internal: %Internal{in_combat: true}} = entity), do: entity
+  defp regen_health(%{unit: %Unit{health: health, max_health: max_health}} = entity)
+       when is_integer(health) and is_integer(max_health) and health >= max_health do
+    entity
+  end
 
   defp regen_health(%{unit: %Unit{class: class, spirit: spirit}} = entity)
        when is_integer(class) and is_number(spirit) do
-    Core.heal(entity, trunc(health_per_tick(class, spirit)))
+    value = spirit_health_portion(entity, class, spirit) + food_health_per_tick(entity) + flat_combat_health(entity)
+    apply_health_regen(entity, value)
   end
 
   defp regen_health(entity), do: entity
+
+  defp spirit_health_portion(entity, class, spirit) do
+    base = health_per_tick(class, spirit)
+
+    portion =
+      cond do
+        not in_combat?(entity) -> base * multiplier(entity, :mod_health_regen_percent)
+        AuraLogic.has_aura?(entity, :mod_regen_during_combat) -> base * total(entity, :mod_regen_during_combat) / 100
+        true -> 0.0
+      end
+
+    if standing?(entity), do: portion, else: portion * @sitting_multiplier
+  end
+
+  defp food_health_per_tick(entity) do
+    if in_combat?(entity) do
+      0.0
+    else
+      entity
+      |> AuraLogic.auras_of_type(:mod_regen)
+      |> Enum.reduce(0.0, fn
+        %Aura{amount: amount, amplitude_ms: amplitude_ms}, acc
+        when is_integer(amount) and is_integer(amplitude_ms) and amplitude_ms > 0 ->
+          acc + amount * @tick_ms / amplitude_ms
+
+        _aura, acc ->
+          acc
+      end)
+    end
+  end
+
+  defp flat_combat_health(entity) do
+    2 * total(entity, :mod_health_regen_in_combat) / 5
+  end
+
+  defp apply_health_regen(%{internal: %Internal{} = internal} = entity, value) do
+    carried = value + (Map.get(internal, :health_regen_carry) || 0.0)
+    carry = carried - trunc(carried)
+    entity = %{entity | internal: Map.put(internal, :health_regen_carry, carry)}
+    Core.heal(entity, max(trunc(carried), 0))
+  end
 
   defp regen_power(%{unit: %Unit{power_type: @mana_power_type}} = entity, now), do: regen_mana(entity, now)
   defp regen_power(%{unit: %Unit{power_type: @rage_power_type}} = entity, _now), do: decay_rage(entity)
@@ -90,11 +138,19 @@ defmodule ThistleTea.Game.Entity.Logic.Regen do
 
   defp regen_mana(%{unit: %Unit{class: class, spirit: spirit}} = entity, now)
        when is_integer(class) and is_number(spirit) do
-    if under_five_second_rule?(entity, now) do
-      entity
-    else
-      Core.restore_mana(entity, trunc(mana_per_tick(class, spirit)))
-    end
+    mp5_per_tick = total_by_misc(entity, :mod_power_regen, @mana_power_type) / 5 * 2
+
+    spirit_regen =
+      mana_per_tick(class, spirit) * multiplier_by_misc(entity, :mod_power_regen_percent, @mana_power_type)
+
+    spirit_regen =
+      if under_five_second_rule?(entity, now) do
+        spirit_regen * min(total(entity, :mod_mana_regen_interrupt), 100) / 100
+      else
+        spirit_regen
+      end
+
+    Core.restore_mana(entity, trunc(mp5_per_tick + spirit_regen))
   end
 
   defp regen_mana(entity, _now), do: entity
@@ -102,19 +158,72 @@ defmodule ThistleTea.Game.Entity.Logic.Regen do
   defp decay_rage(%{internal: %Internal{in_combat: true}} = entity), do: entity
 
   defp decay_rage(%{unit: %Unit{power2: rage} = unit} = entity) when is_integer(rage) and rage > 0 do
-    %{entity | unit: %{unit | power2: max(rage - @rage_decay_per_tick, 0)}}
-    |> Core.mark_broadcast_update()
+    if AuraLogic.has_aura?(entity, :interrupt_regen) do
+      entity
+    else
+      decay = trunc(@rage_decay_per_tick * multiplier_by_misc(entity, :mod_power_regen_percent, @rage_power_type))
+
+      %{entity | unit: %{unit | power2: max(rage - decay, 0)}}
+      |> Core.mark_broadcast_update()
+    end
   end
 
   defp decay_rage(entity), do: entity
 
   defp regen_energy(%{unit: %Unit{power4: energy, max_power4: max_energy} = unit} = entity)
        when is_integer(energy) and is_integer(max_energy) and max_energy > 0 and energy < max_energy do
-    %{entity | unit: %{unit | power4: min(energy + @energy_per_tick, max_energy)}}
+    gain = trunc(@energy_per_tick * multiplier_by_misc(entity, :mod_power_regen_percent, @energy_power_type))
+
+    %{entity | unit: %{unit | power4: min(energy + gain, max_energy)}}
     |> Core.mark_broadcast_update()
   end
 
   defp regen_energy(entity), do: entity
+
+  defp in_combat?(%{internal: %Internal{in_combat: true}}), do: true
+  defp in_combat?(_entity), do: false
+
+  defp standing?(%{unit: %Unit{stand_state: stand_state}}) when is_integer(stand_state) and stand_state != 0 do
+    false
+  end
+
+  defp standing?(_entity), do: true
+
+  defp total(entity, type) do
+    entity
+    |> AuraLogic.auras_of_type(type)
+    |> Enum.reduce(0, &add_amount/2)
+  end
+
+  defp total_by_misc(entity, type, misc) do
+    entity
+    |> AuraLogic.auras_of_type(type)
+    |> Enum.filter(&(&1.misc_value == misc))
+    |> Enum.reduce(0, &add_amount/2)
+  end
+
+  defp add_amount(%Aura{amount: amount}, acc) when is_integer(amount), do: acc + amount
+  defp add_amount(_aura, acc), do: acc
+
+  defp multiplier(entity, type) do
+    entity
+    |> AuraLogic.auras_of_type(type)
+    |> product()
+  end
+
+  defp multiplier_by_misc(entity, type, misc) do
+    entity
+    |> AuraLogic.auras_of_type(type)
+    |> Enum.filter(&(&1.misc_value == misc))
+    |> product()
+  end
+
+  defp product(auras) do
+    Enum.reduce(auras, 1.0, fn
+      %Aura{amount: amount}, acc when is_integer(amount) -> acc * (100 + amount) / 100
+      _aura, acc -> acc
+    end)
+  end
 
   defp health_per_tick(@class_warrior, spirit), do: spirit * 1.26 - 22.6
   defp health_per_tick(@class_paladin, spirit), do: spirit * 0.25

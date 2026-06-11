@@ -660,15 +660,6 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
       }
     end
 
-    defp drink_fixture do
-      %{
-        food_fixture()
-        | id: 430,
-          name: "Drink",
-          effects: [%Effect{index: 0, type: :apply_aura, base_points: 41, die_sides: 0, aura: :mod_power_regen}]
-      }
-    end
-
     test "sits the target when applying a not-seated aura" do
       {entity, events} = apply_spell(fixture_entity(), 1, 1, food_fixture())
 
@@ -676,25 +667,13 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
       assert Enum.any?(events, &(&1.type == :stand_state and &1.stand_state == 1))
     end
 
-    test "food heals every regen tick" do
+    test "food auras do not tick directly" do
       entity = fixture_entity()
       entity = %{entity | unit: %{entity.unit | health: 50}}
       {entity, _events} = apply_spell(entity, 1, 1, food_fixture())
 
-      {entity, _events} = Aura.tick(entity, 1_000 + 4_999)
+      {entity, _events} = Aura.tick(entity, 1_000 + 5_000)
       assert entity.unit.health == 50
-
-      {entity, _events} = Aura.tick(entity, 1_000 + 5_000)
-      assert entity.unit.health == 66
-    end
-
-    test "drink restores mana every regen tick" do
-      entity = fixture_entity()
-      entity = %{entity | unit: %{entity.unit | power1: 10, max_power1: 100}}
-      {entity, _events} = apply_spell(entity, 1, 1, drink_fixture())
-
-      {entity, _events} = Aura.tick(entity, 1_000 + 5_000)
-      assert entity.unit.power1 == 51
     end
 
     test "remove_with_interrupt_flags removes matching auras only" do
@@ -803,20 +782,20 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
     }
   end
 
-  defp evocation_fixture do
+  defp renew_fixture do
     %Spell{
-      id: 12_051,
-      name: "Evocation",
-      school: :arcane,
-      duration_ms: 8_000,
+      id: 139,
+      name: "Renew",
+      school: :holy,
+      duration_ms: 15_000,
       effects: [
         %Effect{
           index: 0,
           type: :apply_aura,
-          base_points: 1499,
+          base_points: 14,
           die_sides: 1,
-          aura: :mod_power_regen_percent,
-          amplitude_ms: 2_000
+          aura: :periodic_heal,
+          amplitude_ms: 3_000
         }
       ]
     }
@@ -971,25 +950,15 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
     end
   end
 
-  describe "mod_power_regen_percent" do
-    test "evocation restores mana on each tick" do
-      entity = fixture_entity()
-      entity = %{entity | unit: %{entity.unit | power1: 0, max_power1: 5_000, spirit: 100}}
-
-      {entity, _events} = apply_spell(entity, 1, 1, evocation_fixture())
-      {entity, _events} = Aura.tick(entity, 1_000 + 2_000)
-
-      assert entity.unit.power1 == trunc((100 / 4 + 12.5) * 1500 / 100)
-    end
-
+  describe "periodic refresh" do
     test "reapplying the same spell keeps the periodic tick schedule" do
       entity = fixture_entity()
-      entity = %{entity | unit: %{entity.unit | power1: 0, max_power1: 5_000, spirit: 100}}
+      entity = %{entity | unit: %{entity.unit | health: 50}}
 
-      {entity, _events} = apply_spell(entity, 1, 1, evocation_fixture())
+      {entity, _events} = apply_spell(entity, 1, 1, renew_fixture())
       [%Holder{auras: [%{next_tick_at: first_tick}]}] = entity.unit.auras
 
-      {entity, _events} = Aura.apply_spell(entity, 1, 1, evocation_fixture(), 2_000)
+      {entity, _events} = Aura.apply_spell(entity, 1, 1, renew_fixture(), 2_000)
       [%Holder{auras: [%{next_tick_at: tick_after_refresh}]}] = entity.unit.auras
 
       assert tick_after_refresh == first_tick

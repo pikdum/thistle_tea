@@ -307,14 +307,18 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp aura_type(77), do: :mechanic_immunity
   defp aura_type(84), do: :mod_regen
   defp aura_type(85), do: :mod_power_regen
+  defp aura_type(88), do: :mod_health_regen_percent
+  defp aura_type(94), do: :interrupt_regen
   defp aura_type(95), do: :ghost
   defp aura_type(97), do: :mana_shield
   defp aura_type(99), do: :mod_attack_power
   defp aura_type(105), do: :feather_fall
   defp aura_type(110), do: :mod_power_regen_percent
   defp aura_type(115), do: :mod_healing
+  defp aura_type(116), do: :mod_regen_during_combat
   defp aura_type(134), do: :mod_mana_regen_interrupt
   defp aura_type(135), do: :mod_healing_done
+  defp aura_type(161), do: :mod_health_regen_in_combat
   defp aura_type(other) when is_integer(other), do: other
 
   defp target_type(0), do: nil

@@ -406,6 +406,14 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
 
   def flat_modifier(_entity, _type, _school_mask), do: 0
 
+  def auras_of_type(%{unit: %Unit{auras: holders}}, type) when is_list(holders) do
+    holders
+    |> Enum.flat_map(fn %Holder{auras: auras} -> auras end)
+    |> Enum.filter(&match?(%Aura{type: ^type}, &1))
+  end
+
+  def auras_of_type(_entity, _type), do: []
+
   def rooted?(%{unit: %Unit{auras: holders}}) when is_list(holders) do
     Enum.any?(holders, &has_aura_type?(&1, :mod_root))
   end
@@ -586,38 +594,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
     {entity, %{aura | next_tick_at: advance_tick(at, aura.amplitude_ms, now)}, []}
   end
 
-  defp tick_aura(entity, _holder, %Aura{type: :mod_regen, next_tick_at: at} = aura, now)
-       when is_integer(at) and now >= at do
-    entity = Core.heal(entity, aura.amount)
-    {entity, %{aura | next_tick_at: advance_tick(at, aura.amplitude_ms, now)}, []}
-  end
-
-  defp tick_aura(entity, _holder, %Aura{type: :mod_power_regen, next_tick_at: at} = aura, now)
-       when is_integer(at) and now >= at do
-    entity = Core.restore_mana(entity, aura.amount)
-    {entity, %{aura | next_tick_at: advance_tick(at, aura.amplitude_ms, now)}, []}
-  end
-
-  defp tick_aura(entity, _holder, %Aura{type: :mod_power_regen_percent, next_tick_at: at} = aura, now)
-       when is_integer(at) and now >= at do
-    entity = Core.restore_mana(entity, regen_percent_amount(entity, aura.amount))
-    {entity, %{aura | next_tick_at: advance_tick(at, aura.amplitude_ms, now)}, []}
-  end
-
   defp tick_aura(entity, _holder, aura, _now), do: {entity, aura, []}
-
-  defp regen_percent_amount(%{unit: %Unit{} = unit}, percent) when is_integer(percent) and percent > 0 do
-    spirit =
-      case unit.spirit do
-        spirit when is_integer(spirit) and spirit > 0 -> spirit
-        _ -> unit.level || 1
-      end
-
-    base_regen_per_tick = spirit / 4 + 12.5
-    max(trunc(base_regen_per_tick * percent / 100), 1)
-  end
-
-  defp regen_percent_amount(_entity, _percent), do: 0
 
   defp advance_tick(last_tick, amplitude_ms, now) when is_integer(amplitude_ms) and amplitude_ms > 0 do
     next = last_tick + amplitude_ms
@@ -710,8 +687,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
   defp reaction_event(_aura, _holder, _owner_guid, _attacker_guid), do: []
 
   defp next_tick(%Effect{aura: aura}, amplitude_ms, now)
-       when aura in [:periodic_damage, :periodic_heal, :mod_regen, :mod_power_regen, :mod_power_regen_percent] and
-              is_integer(amplitude_ms) and amplitude_ms > 0 do
+       when aura in [:periodic_damage, :periodic_heal] and is_integer(amplitude_ms) and amplitude_ms > 0 do
     now + amplitude_ms
   end
 

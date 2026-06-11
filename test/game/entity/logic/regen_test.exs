@@ -2,12 +2,16 @@ defmodule ThistleTea.Game.Entity.Logic.RegenTest do
   use ExUnit.Case, async: true
 
   alias ThistleTea.Character
+  alias ThistleTea.Game.Aura, as: AuraEffect
+  alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.Regen
+  alias ThistleTea.Game.Spell
 
   @warrior 1
+  @paladin 2
   @rogue 4
   @mage 8
 
@@ -23,6 +27,19 @@ defmodule ThistleTea.Game.Entity.Logic.RegenTest do
       player: %Player{flags: 0},
       internal: struct(%Internal{in_combat: false}, internal_attrs)
     }
+  end
+
+  defp with_aura(entity, type, amount, opts \\ []) do
+    aura = %AuraEffect{
+      index: 0,
+      type: type,
+      amount: amount,
+      misc_value: Keyword.get(opts, :misc_value),
+      amplitude_ms: Keyword.get(opts, :amplitude_ms)
+    }
+
+    holder = %Holder{spell: %Spell{id: Keyword.get(opts, :spell_id, 1)}, auras: [aura]}
+    %{entity | unit: %{entity.unit | auras: (entity.unit.auras || []) ++ [holder]}}
   end
 
   describe "tick/2" do
@@ -108,6 +125,114 @@ defmodule ThistleTea.Game.Entity.Logic.RegenTest do
 
     test "does not decay rage in combat" do
       entity = character([class: @warrior, power_type: 1, power2: 30, max_power2: 1_000], in_combat: true)
+
+      assert Regen.tick(entity, 10_000).unit.power2 == 30
+    end
+  end
+
+  describe "tick/2 with aura modifiers" do
+    test "carries health regen fractions to the next tick" do
+      entity = character(class: @paladin, spirit: 50, health: 10)
+
+      entity = Regen.tick(entity, 10_000)
+      assert entity.unit.health == 22
+      assert entity.internal.health_regen_carry == 0.5
+
+      entity = Regen.tick(entity, 12_000)
+      assert entity.unit.health == 35
+      assert entity.internal.health_regen_carry == 0.0
+    end
+
+    test "sitting multiplies spirit health regen by 1.5" do
+      entity = character(class: @warrior, spirit: 50, health: 10, stand_state: 1)
+
+      assert Regen.tick(entity, 10_000).unit.health == 10 + 60
+    end
+
+    test "mod_health_regen_percent scales health regen out of combat" do
+      entity =
+        character(class: @warrior, spirit: 50, health: 10)
+        |> with_aura(:mod_health_regen_percent, 10)
+
+      assert Regen.tick(entity, 10_000).unit.health == 10 + 44
+    end
+
+    test "mod_regen_during_combat allows a fraction of health regen in combat" do
+      entity =
+        character([class: @warrior, spirit: 50, health: 10], in_combat: true)
+        |> with_aura(:mod_regen_during_combat, 10)
+
+      assert Regen.tick(entity, 10_000).unit.health == 10 + 4
+    end
+
+    test "mod_health_regen_in_combat adds flat health regen even in combat" do
+      entity =
+        character([class: @warrior, spirit: 50, health: 10], in_combat: true)
+        |> with_aura(:mod_health_regen_in_combat, 50)
+
+      assert Regen.tick(entity, 10_000).unit.health == 10 + 20
+    end
+
+    test "food auras heal proportionally to their period out of combat only" do
+      entity =
+        character(class: @paladin, spirit: 0, health: 10)
+        |> with_aura(:mod_regen, 20, amplitude_ms: 5_000)
+
+      assert Regen.tick(entity, 10_000).unit.health == 18
+
+      in_combat =
+        character([class: @paladin, spirit: 0, health: 10], in_combat: true)
+        |> with_aura(:mod_regen, 20, amplitude_ms: 5_000)
+
+      assert Regen.tick(in_combat, 10_000).unit.health == 10
+    end
+
+    test "mod_power_regen adds mp5 that works during the five second rule" do
+      entity =
+        character(
+          [class: @mage, spirit: 40, power_type: 0, power1: 100, max_power1: 500],
+          last_mana_use_at: 9_000
+        )
+        |> with_aura(:mod_power_regen, 41, misc_value: 0)
+
+      assert Regen.tick(entity, 10_000).unit.power1 == 100 + 16
+    end
+
+    test "mod_mana_regen_interrupt allows a fraction of spirit regen while casting" do
+      entity =
+        character(
+          [class: @mage, spirit: 40, power_type: 0, power1: 100, max_power1: 500],
+          last_mana_use_at: 9_000
+        )
+        |> with_aura(:mod_mana_regen_interrupt, 30)
+
+      assert Regen.tick(entity, 10_000).unit.power1 == 100 + 6
+    end
+
+    test "evocation-style percent and interrupt auras give full boosted regen while casting" do
+      entity =
+        character(
+          [class: @mage, spirit: 40, power_type: 0, power1: 100, max_power1: 5_000],
+          last_mana_use_at: 9_000
+        )
+        |> with_aura(:mod_power_regen_percent, 1_500, misc_value: 0)
+        |> with_aura(:mod_mana_regen_interrupt, 100)
+
+      assert Regen.tick(entity, 10_000).unit.power1 == 100 + trunc(22.5 * 16)
+    end
+
+    test "mod_power_regen_percent scales energy regen" do
+      entity =
+        character(class: @rogue, power_type: 3, power4: 10, max_power4: 100)
+        |> with_aura(:mod_power_regen_percent, 100, misc_value: 3)
+
+      assert Regen.tick(entity, 10_000).unit.power4 == 50
+    end
+
+    test "interrupt_regen prevents rage decay out of combat" do
+      entity =
+        character(class: @warrior, power_type: 1, power2: 30, max_power2: 1_000)
+        |> with_aura(:interrupt_regen, 0)
 
       assert Regen.tick(entity, 10_000).unit.power2 == 30
     end
