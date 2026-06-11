@@ -100,20 +100,9 @@
             version = "gtker-${builtins.substring 0 7 wow-dbc-src.rev}";
             src = wow-dbc-src;
 
-            # Upstream wow_dbc doesn't ship a Cargo.lock; we vendor one alongside
-            # the flake. To refresh after `nix flake update`:
-            #   tmp=$(mktemp -d) && cp -r $(nix flake archive --json | jq -r .inputs[\"wow-dbc-src\"].path)/. "$tmp"/ \
-            #     && chmod -R u+w "$tmp" && (cd "$tmp" && cargo generate-lockfile) \
-            #     && cp "$tmp/Cargo.lock" nix/wow-dbc.Cargo.lock && rm -rf "$tmp"
             cargoLock = {
-              lockFile = ./nix/wow-dbc.Cargo.lock;
+              lockFile = "${wow-dbc-src}/Cargo.lock";
             };
-
-            # buildRustPackage also wants Cargo.lock present in the source tree
-            # (separate from the vendor dir), so drop it in.
-            postPatch = ''
-              cp ${./nix/wow-dbc.Cargo.lock} Cargo.lock
-            '';
 
             # The workspace has multiple crates; we only need the converter binary.
             cargoBuildFlags = [

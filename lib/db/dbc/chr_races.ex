@@ -27,7 +27,7 @@ defmodule ChrRaces do
     field(:name_en_tw, :string)
     field(:name_es_es, :string)
     field(:name_es_mx, :string)
-    field(:name_flags, :string)
+    field(:name_flags, :integer)
     field(:facial_hair_customisation_0, :string)
     field(:facial_hair_customisation_1, :string)
     field(:hair_customisation, :string)

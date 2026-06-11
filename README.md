@@ -80,10 +80,6 @@ nix build .#wow-dbc-converter      # wow_dbc_converter
 nix develop .#wow-tools            # shell with all of the above + sqlite + mariadb
 ```
 
-note: `nix/wow-dbc.Cargo.lock` is checked in because upstream gtker/wow_dbc
-doesn't ship one. if you `nix flake update` to a wow-dbc-src revision that
-changes dependencies, regenerate it (recipe is in a comment in `flake.nix`).
-
 ## what (somewhat) works
 
 - logging in
