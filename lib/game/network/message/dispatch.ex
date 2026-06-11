@@ -96,7 +96,17 @@ defmodule ThistleTea.Game.Network.Message.Dispatch do
               CMSG_RECLAIM_CORPSE: Message.CmsgReclaimCorpse,
               CMSG_SPIRIT_HEALER_ACTIVATE: Message.CmsgSpiritHealerActivate,
               CMSG_RESURRECT_RESPONSE: Message.CmsgResurrectResponse,
-              CMSG_GAMEOBJ_USE: Message.CmsgGameobjUse
+              CMSG_GAMEOBJ_USE: Message.CmsgGameobjUse,
+              CMSG_GROUP_INVITE: Message.CmsgGroupInvite,
+              CMSG_GROUP_ACCEPT: Message.CmsgGroupAccept,
+              CMSG_GROUP_DECLINE: Message.CmsgGroupDecline,
+              CMSG_GROUP_UNINVITE: Message.CmsgGroupUninvite,
+              CMSG_GROUP_UNINVITE_GUID: Message.CmsgGroupUninviteGuid,
+              CMSG_GROUP_SET_LEADER: Message.CmsgGroupSetLeader,
+              CMSG_GROUP_DISBAND: Message.CmsgGroupDisband,
+              CMSG_LOOT_METHOD: Message.CmsgLootMethod,
+              CMSG_REQUEST_PARTY_MEMBER_STATS: Message.CmsgRequestPartyMemberStats,
+              MSG_MINIMAP_PING: Message.MsgMinimapPing
             }
             |> Map.merge(@movement_opcodes)
             |> Map.new(fn {opcode, module} -> {Opcodes.get(opcode), module} end)

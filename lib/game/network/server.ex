@@ -36,6 +36,8 @@ defmodule ThistleTea.Game.Network.Server do
   alias ThistleTea.Game.Network.Packet
   alias ThistleTea.Game.Network.PlayerTick
   alias ThistleTea.Game.Network.UpdateObject
+  alias ThistleTea.Game.Party.MemberStats
+  alias ThistleTea.Game.Party.Notifier, as: PartyNotifier
   alias ThistleTea.Game.Player.Quests
   alias ThistleTea.Game.Spell.Cast
   alias ThistleTea.Game.Time
@@ -313,6 +315,15 @@ defmodule ThistleTea.Game.Network.Server do
   end
 
   @impl GenServer
+  def handle_cast({:request_party_stats, requester_guid}, {socket, %{character: %Character{} = character} = state}) do
+    Message.SmsgPartyMemberStatsFull
+    |> struct(MemberStats.from_character(character))
+    |> Network.send_packet(requester_guid)
+
+    {:noreply, {socket, state}, socket.read_timeout}
+  end
+
+  @impl GenServer
   def handle_cast({:destroy_object, guid}, {socket, state}) do
     Network.send_packet(%Message.SmsgDestroyObject{guid: guid})
     {:noreply, {socket, state}, socket.read_timeout}
@@ -501,6 +512,7 @@ defmodule ThistleTea.Game.Network.Server do
     |> World.broadcast_packet(character)
 
     Metadata.update(state.guid, %{alive?: Death.alive?(character), ghost?: Death.ghost?(character)})
+    PartyNotifier.broadcast_stats(state.guid, character)
     internal = %{character.internal | broadcast_update?: false}
     character = %{character | internal: internal}
     state = PlayerTick.ensure_scheduled(%{state | character: character})

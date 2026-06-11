@@ -18,6 +18,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.System.CellActivator
   alias ThistleTea.Game.World.System.GameEvent, as: GameEventSystem
+  alias ThistleTea.Game.World.System.Party, as: PartySystem
   alias ThistleTea.Native.Namigator
 
   require Logger
@@ -63,6 +64,7 @@ defmodule ThistleTea.Application do
         {Phoenix.PubSub, name: ThistleTea.PubSub},
         ThistleTea.Telemetry,
         GameEventSystem,
+        PartySystem,
         {Group, name: Groups, log: false},
         EntityRegistry,
         {Registry, keys: :duplicate, name: ThistleTea.ChatChannel},

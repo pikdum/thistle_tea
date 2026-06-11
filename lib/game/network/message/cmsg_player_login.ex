@@ -18,6 +18,8 @@ defmodule ThistleTea.Game.Network.Message.CmsgPlayerLogin do
   alias ThistleTea.Game.Entity.Logic.MovementStats
   alias ThistleTea.Game.Network.Message.SmsgInitialSpells.InitialSpell
   alias ThistleTea.Game.Network.UpdateObject
+  alias ThistleTea.Game.Party
+  alias ThistleTea.Game.Party.Notifier
   alias ThistleTea.Game.Player.Stats, as: PlayerStats
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.ItemStore
@@ -25,6 +27,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgPlayerLogin do
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
+  alias ThistleTea.Game.World.System.Party, as: PartySystem
 
   require Logger
 
@@ -83,6 +86,11 @@ defmodule ThistleTea.Game.Network.Message.CmsgPlayerLogin do
     })
 
     send_login_init_packets(c)
+
+    case PartySystem.group_of(character_guid) do
+      %Party.Group{} = group -> Notifier.send_group_list(group)
+      _ -> :ok
+    end
 
     {x1, y1, z1, _o1} = c.movement_block.position
 

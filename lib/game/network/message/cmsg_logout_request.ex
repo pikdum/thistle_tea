@@ -4,8 +4,11 @@ defmodule ThistleTea.Game.Network.Message.CmsgLogoutRequest do
 
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Network.Message
+  alias ThistleTea.Game.Party.Group
+  alias ThistleTea.Game.Party.Notifier
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
+  alias ThistleTea.Game.World.System.Party, as: PartySystem
   alias ThistleTea.Game.World.Visibility
 
   require Logger
@@ -50,6 +53,11 @@ defmodule ThistleTea.Game.Network.Message.CmsgLogoutRequest do
         ThistleTea.ChatChannel
         |> Registry.unregister(channel)
       end)
+
+      case PartySystem.group_of(state.guid) do
+        %Group{} = group -> Notifier.send_group_list(group)
+        _ -> :ok
+      end
 
       # broadcast destroy object
       for guid <- Map.get(state, :player_guids, []) do
