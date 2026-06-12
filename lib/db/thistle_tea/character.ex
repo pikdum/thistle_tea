@@ -330,6 +330,13 @@ defmodule ThistleTea.Character do
     end
   end
 
+  def get_character_by_id(character_id) do
+    case Memento.transaction!(fn -> Memento.Query.read(__MODULE__, character_id) end) do
+      %__MODULE__{} = character -> {:ok, character}
+      _ -> {:error, :character_not_found}
+    end
+  end
+
   def get_characters!(account_id) do
     Memento.transaction!(fn ->
       Memento.Query.select(ThistleTea.Character, {:==, :account_id, account_id})

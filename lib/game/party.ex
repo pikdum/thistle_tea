@@ -12,7 +12,7 @@ defmodule ThistleTea.Game.Party do
 
   defmodule Group do
     @moduledoc false
-    defstruct [:id, :leader, members: [], loot_method: 3, master_looter: 0, loot_threshold: 2]
+    defstruct [:id, :leader, members: [], loot_method: 3, master_looter: 0, loot_threshold: 2, looter: 0]
   end
 
   defstruct groups: %{}, member_index: %{}, invites: %{}, next_id: 1
@@ -128,6 +128,29 @@ defmodule ThistleTea.Game.Party do
         group = %{group | leader: new_leader_guid}
         {:ok, group, put_group(party, group)}
     end
+  end
+
+  def update_looter(%__MODULE__{} = party, group_id, eligible_guids) do
+    case Map.get(party.groups, group_id) do
+      %Group{} = group ->
+        next = next_looter(Enum.map(group.members, & &1.guid), Map.get(group, :looter), eligible_guids)
+        {next, put_group(party, Map.put(group, :looter, next || 0))}
+
+      _ ->
+        {nil, party}
+    end
+  end
+
+  defp next_looter([], _current, _eligible), do: nil
+
+  defp next_looter(order, current, eligible) do
+    eligible = MapSet.new(eligible)
+    index = Enum.find_index(order, &(&1 == current)) || -1
+    count = length(order)
+
+    0..(count - 1)
+    |> Enum.map(fn offset -> Enum.at(order, rem(index + 1 + offset, count)) end)
+    |> Enum.find(&MapSet.member?(eligible, &1))
   end
 
   def set_loot(%__MODULE__{} = party, requester_guid, method, master_looter, threshold) do

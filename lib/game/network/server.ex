@@ -47,6 +47,7 @@ defmodule ThistleTea.Game.Network.Server do
   alias ThistleTea.Game.World.Pathfinding
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.Visibility
+  alias ThistleTea.Game.World.Visibility.Tap
   alias ThousandIsland.Socket
 
   require Logger
@@ -179,22 +180,20 @@ defmodule ThistleTea.Game.Network.Server do
   defp entity_tracked?(_state, _guid), do: false
 
   @impl GenServer
+  def handle_cast({:send_packet, %UpdateObject{} = update, opts}, {socket, state}) do
+    if source_tracked?(state, Keyword.get(opts, :source_guid)) do
+      handle_cast({:send_packet, update}, {socket, state})
+    else
+      {:noreply, {socket, state}, socket.read_timeout}
+    end
+  end
+
   def handle_cast({:send_packet, %UpdateObject{} = update}, {socket, state}) do
+    update = Tap.personalize(update, Map.get(state, :guid))
     {packet, updates} = accumulate_updates_with_batch(update, Map.get(state, :guid))
     state = Network.Send.send_packet(packet, {socket, state})
     state = track_created_updates(state, updates)
     {:noreply, {socket, state}, socket.read_timeout}
-  end
-
-  def handle_cast({:send_packet, %UpdateObject{} = update, opts}, {socket, state}) do
-    if source_tracked?(state, Keyword.get(opts, :source_guid)) do
-      {packet, updates} = accumulate_updates_with_batch(update, Map.get(state, :guid))
-      state = Network.Send.send_packet(packet, {socket, state})
-      state = track_created_updates(state, updates)
-      {:noreply, {socket, state}, socket.read_timeout}
-    else
-      {:noreply, {socket, state}, socket.read_timeout}
-    end
   end
 
   def handle_cast({:send_packet, %Packet{opcode: @smsg_update_object}}, {_socket, _state}) do

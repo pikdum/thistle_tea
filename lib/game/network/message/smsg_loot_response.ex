@@ -10,13 +10,13 @@ defmodule ThistleTea.Game.Network.Message.SmsgLootResponse do
 
   @impl ServerMessage
   def to_binary(%__MODULE__{guid: guid, loot_type: loot_type, loot: %Loot{} = loot}) do
-    items = Enum.reject(loot.items, &(&1.looted or &1.blocked))
+    items = Enum.reject(loot.items, & &1.looted)
 
     items_binary =
       items
       |> Enum.map_join(fn item ->
         <<item.slot, item.item_id::little-size(32), item.count::little-size(32), item.display_id::little-size(32),
-          0::little-size(32), 0::little-size(32), 0>>
+          0::little-size(32), 0::little-size(32), item.slot_type>>
       end)
 
     <<guid::little-size(64), loot_type, loot.gold::little-size(32), Enum.count(items)>> <> items_binary

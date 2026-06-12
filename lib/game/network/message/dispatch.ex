@@ -106,6 +106,7 @@ defmodule ThistleTea.Game.Network.Message.Dispatch do
               CMSG_GROUP_DISBAND: Message.CmsgGroupDisband,
               CMSG_LOOT_METHOD: Message.CmsgLootMethod,
               CMSG_LOOT_ROLL: Message.CmsgLootRoll,
+              CMSG_LOOT_MASTER_GIVE: Message.CmsgLootMasterGive,
               CMSG_REQUEST_PARTY_MEMBER_STATS: Message.CmsgRequestPartyMemberStats,
               MSG_MINIMAP_PING: Message.MsgMinimapPing
             }

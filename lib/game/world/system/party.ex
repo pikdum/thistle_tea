@@ -36,6 +36,10 @@ defmodule ThistleTea.Game.World.System.Party do
     GenServer.call(__MODULE__, {:set_loot, requester_guid, method, master_looter, threshold})
   end
 
+  def update_looter(group_id, eligible_guids) do
+    GenServer.call(__MODULE__, {:update_looter, group_id, eligible_guids})
+  end
+
   def group_of(guid) when is_integer(guid) do
     with [{^guid, group_id}] <- :ets.lookup(__MODULE__, guid),
          [{_key, group}] <- :ets.lookup(__MODULE__, {:group, group_id}) do
@@ -113,6 +117,17 @@ defmodule ThistleTea.Game.World.System.Party do
       {:error, reason} ->
         {:reply, {:error, reason}, party}
     end
+  end
+
+  def handle_call({:update_looter, group_id, eligible_guids}, _from, party) do
+    {looter, party} = Party.update_looter(party, group_id, eligible_guids)
+
+    case Map.get(party.groups, group_id) do
+      %Party.Group{} = group -> index_group(group)
+      _ -> :ok
+    end
+
+    {:reply, looter, party}
   end
 
   def handle_call({:set_loot, requester_guid, method, master_looter, threshold}, _from, party) do

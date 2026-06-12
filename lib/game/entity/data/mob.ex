@@ -132,19 +132,21 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
     unit = respawn_unit(internal, mob.unit)
     movement_block = respawn_movement_block(internal, mob.movement_block)
 
-    internal = %{
-      internal
-      | in_combat: false,
-        last_hostile_time: nil,
-        running: false,
-        movement_start_time: nil,
-        movement_start_position: nil,
-        behavior_tree: nil,
-        blackboard: nil,
-        respawn_ref: nil,
-        broadcast_update?: false,
-        loot: nil
-    }
+    internal =
+      %{
+        internal
+        | in_combat: false,
+          last_hostile_time: nil,
+          running: false,
+          movement_start_time: nil,
+          movement_start_position: nil,
+          behavior_tree: nil,
+          blackboard: nil,
+          respawn_ref: nil,
+          broadcast_update?: false,
+          loot: nil
+      }
+      |> Map.merge(%{tapped_by: nil, assigned_looter: nil, loot_master: nil, loot_rolls: %{}, respawn_deferrals: 0})
 
     %{mob | unit: unit, movement_block: movement_block, internal: internal}
   end

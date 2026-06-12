@@ -39,11 +39,16 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   @ai_tick_max_ms 1_000
   @default_respawn_delay_ms 120_000
   @dynamic_flag_lootable 0x0001
+  @dynamic_flag_tapped 0x0004
+  @loot_method_round_robin 1
+  @loot_method_master_loot 2
   @loot_method_group_loot 3
   @loot_method_need_before_greed 4
   @loot_roll_countdown_ms 60_000
   @roll_type_need 1
   @roll_type_greed 2
+  @respawn_loot_grace_ms 30_000
+  @max_respawn_deferrals 4
 
   def start_link(%Mob{} = state) do
     GenServer.start_link(__MODULE__, state, name: EntityRegistry.via(state.object.guid))
@@ -148,15 +153,23 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   end
 
   @impl GenServer
-  def handle_call(:loot_view, _from, %Mob{internal: %Internal{loot: %Loot{} = loot}} = state) do
-    if Core.dead?(state) do
-      {:reply, {:ok, loot}, state}
-    else
-      {:reply, {:error, :no_loot}, state}
+  def handle_call({:loot_view, viewer}, _from, %Mob{internal: %Internal{loot: %Loot{} = loot}} = state) do
+    cond do
+      not Core.dead?(state) -> {:reply, {:error, :no_loot}, state}
+      not loot_allowed?(state, viewer) -> {:reply, {:error, :no_permission}, state}
+      true -> {:reply, {:ok, viewer_loot(state, loot, viewer)}, state}
     end
   end
 
-  def handle_call(:loot_view, _from, state), do: {:reply, {:error, :no_loot}, state}
+  def handle_call({:loot_view, _viewer}, _from, state), do: {:reply, {:error, :no_loot}, state}
+
+  def handle_call({:loot_master_give, giver, slot, target}, _from, %Mob{internal: %Internal{loot: %Loot{}}} = state) do
+    master_give(state, giver, slot, target)
+  end
+
+  def handle_call({:loot_master_give, _giver, _slot, _target}, _from, state) do
+    {:reply, {:error, :no_loot}, state}
+  end
 
   def handle_call({:loot_take_item, slot}, _from, %Mob{internal: %Internal{loot: %Loot{} = loot} = internal} = state) do
     case Loot.take_item(loot, slot) do
@@ -225,19 +238,20 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   end
 
   def handle_info(:respawn, %Mob{} = state) do
-    state =
-      if Core.dead?(state) do
-        state
-        |> Mob.respawn()
-        |> BT.init(MobBT.tree())
-        |> put_spawn_position()
-        |> broadcast_respawn()
-      else
-        clear_respawn_ref(state)
-      end
+    cond do
+      not Core.dead?(state) ->
+        state = clear_respawn_ref(state)
+        schedule_ai_tick(0)
+        {:noreply, state}
 
-    schedule_ai_tick(0)
-    {:noreply, state}
+      defer_respawn?(state) ->
+        deferrals = (Map.get(state.internal, :respawn_deferrals) || 0) + 1
+        Process.send_after(self(), :respawn, @respawn_loot_grace_ms)
+        {:noreply, %{state | internal: Map.put(state.internal, :respawn_deferrals, deferrals)}}
+
+      true ->
+        do_respawn(state)
+    end
   end
 
   def handle_info({:event_stop, _event}, state) do
@@ -307,10 +321,30 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
       | unit: %{unit | target: caster},
         internal: %{internal | in_combat: true, last_hostile_time: now}
     }
+    |> maybe_tap(caster)
   end
 
   defp engage_combat(%Mob{} = state, _caster) do
     state
+  end
+
+  defp maybe_tap(%Mob{unit: %Unit{} = unit, internal: %Internal{} = internal} = state, caster) do
+    if Map.get(internal, :tapped_by) == nil and not Core.dead?(state) and Guid.entity_type(caster) == :player do
+      group_id =
+        case PartySystem.group_of(caster) do
+          %Party.Group{id: id} -> id
+          _ -> nil
+        end
+
+      internal = Map.put(internal, :tapped_by, %{player: caster, group_id: group_id})
+      unit = %{unit | dynamic_flags: (unit.dynamic_flags || 0) ||| @dynamic_flag_tapped}
+      Metadata.update(state.object.guid, %{tapped_player: caster, tapped_group_id: group_id})
+
+      %{state | unit: unit, internal: internal}
+      |> Core.mark_broadcast_update()
+    else
+      state
+    end
   end
 
   defp maybe_reset_attack_started(%Mob{unit: %Unit{target: target}} = state, caster) when is_integer(caster) do
@@ -344,6 +378,8 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
       |> maybe_reward_kill(target)
       |> generate_loot()
       |> maybe_start_loot_rolls(target)
+      |> maybe_prepare_master_loot()
+      |> maybe_assign_round_robin()
       |> schedule_respawn()
     else
       state
@@ -472,6 +508,38 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     %{state | internal: internal}
   end
 
+  defp do_respawn(%Mob{} = state) do
+    Metadata.update(state.object.guid, %{tapped_player: nil, tapped_group_id: nil, assigned_looter: nil})
+
+    state =
+      state
+      |> resolve_pending_loot_rolls()
+      |> Mob.respawn()
+      |> BT.init(MobBT.tree())
+      |> put_spawn_position()
+      |> broadcast_respawn()
+
+    schedule_ai_tick(0)
+    {:noreply, state}
+  end
+
+  defp defer_respawn?(%Mob{internal: %Internal{} = internal} = state) do
+    (Map.get(internal, :respawn_deferrals) || 0) < @max_respawn_deferrals and loot_outstanding?(state)
+  end
+
+  defp loot_outstanding?(%Mob{internal: %Internal{loot: %Loot{} = loot} = internal}) do
+    not Loot.empty?(loot) or map_size(loot_rolls(internal)) > 0
+  end
+
+  defp loot_outstanding?(%Mob{}), do: false
+
+  defp resolve_pending_loot_rolls(%Mob{internal: %Internal{} = internal} = state) do
+    internal
+    |> loot_rolls()
+    |> Map.keys()
+    |> Enum.reduce(state, fn slot, state -> resolve_loot_roll(state, slot) end)
+  end
+
   defp resolve_loot_roll(%Mob{internal: %Internal{} = internal} = state, slot) do
     case Map.pop(loot_rolls(internal), slot) do
       {%LootRoll{} = roll, rolls} ->
@@ -577,6 +645,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
   defp maybe_finish_loot(%Mob{internal: %Internal{loot: %Loot{} = loot} = internal} = state) do
     if map_size(loot_rolls(internal)) == 0 and Loot.empty?(loot) do
+      Metadata.update(state.object.guid, %{assigned_looter: nil})
       state = %{state | internal: %{internal | loot: nil}}
       state = clear_lootable_flag(state)
       Core.update_object(state, :values) |> World.broadcast_packet(state)
@@ -587,6 +656,112 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   end
 
   defp maybe_finish_loot(%Mob{} = state), do: state
+
+  defp tap_group(%Mob{internal: %Internal{} = internal}) do
+    with %{player: player} <- Map.get(internal, :tapped_by),
+         %Party.Group{} = group <- PartySystem.group_of(player) do
+      group
+    else
+      _ -> nil
+    end
+  end
+
+  defp loot_allowed?(%Mob{internal: %Internal{} = internal}, viewer) do
+    case Map.get(internal, :tapped_by) do
+      nil -> true
+      %{group_id: group_id} when is_integer(group_id) -> group_loot_allowed?(internal, group_id, viewer)
+      %{player: ^viewer} -> true
+      _ -> false
+    end
+  end
+
+  defp group_loot_allowed?(internal, group_id, viewer) do
+    case PartySystem.group_of(viewer) do
+      %Party.Group{id: ^group_id, loot_method: @loot_method_round_robin} ->
+        Map.get(internal, :assigned_looter) in [nil, viewer]
+
+      %Party.Group{id: ^group_id} ->
+        true
+
+      _ ->
+        false
+    end
+  end
+
+  @loot_slot_type_master 2
+
+  defp viewer_loot(%Mob{internal: %Internal{} = internal}, %Loot{} = loot, viewer) do
+    master = Map.get(internal, :loot_master)
+
+    items =
+      loot.items
+      |> Enum.reject(fn item -> item.blocked and viewer != master end)
+      |> Enum.map(fn item ->
+        if item.blocked, do: %{item | slot_type: @loot_slot_type_master}, else: item
+      end)
+
+    %{loot | items: items}
+  end
+
+  defp maybe_prepare_master_loot(%Mob{internal: %Internal{loot: %Loot{} = loot} = internal} = state) do
+    case tap_group(state) do
+      %Party.Group{loot_method: @loot_method_master_loot, master_looter: master, loot_threshold: threshold}
+      when is_integer(master) and master > 0 ->
+        internal = Map.put(%{internal | loot: block_threshold_items(loot, threshold)}, :loot_master, master)
+        %{state | internal: internal}
+
+      _ ->
+        state
+    end
+  end
+
+  defp maybe_prepare_master_loot(%Mob{} = state), do: state
+
+  defp block_threshold_items(%Loot{} = loot, threshold) do
+    loot.items
+    |> Enum.filter(fn item -> not item.quest_item and not item.looted and item.quality >= threshold end)
+    |> Enum.reduce(loot, fn item, loot -> Loot.block_item(loot, item.slot) end)
+  end
+
+  defp maybe_assign_round_robin(%Mob{internal: %Internal{loot: %Loot{}} = internal} = state) do
+    with %Party.Group{loot_method: @loot_method_round_robin} = group <- tap_group(state),
+         looter when is_integer(looter) <- PartySystem.update_looter(group.id, eligible_rollers(state, group)) do
+      Metadata.update(state.object.guid, %{assigned_looter: looter})
+      %{state | internal: Map.put(internal, :assigned_looter, looter)}
+    else
+      _ -> state
+    end
+  end
+
+  defp maybe_assign_round_robin(%Mob{} = state), do: state
+
+  defp master_give(%Mob{internal: %Internal{loot: %Loot{} = loot} = internal} = state, giver, slot, target) do
+    with true <- Map.get(internal, :loot_master) == giver,
+         %Loot.Item{blocked: true, looted: false} <- Enum.find(loot.items, &(&1.slot == slot)),
+         true <- master_give_target_ok?(state, target),
+         pid when is_pid(pid) <- EntityRegistry.whereis(target) do
+      loot = Loot.unblock_item(loot, slot)
+
+      case Loot.take_item(loot, slot) do
+        {:ok, item, loot} ->
+          send(pid, {:create_item, item.item_id, item.count})
+          state = %{state | internal: %{internal | loot: loot}}
+          {:reply, :ok, maybe_finish_loot(state)}
+
+        _ ->
+          {:reply, {:error, :already_looted}, state}
+      end
+    else
+      _ -> {:reply, {:error, :invalid}, state}
+    end
+  end
+
+  defp master_give_target_ok?(%Mob{} = state, target) do
+    case tap_group(state) do
+      %Party.Group{} = group -> target in eligible_rollers(state, group)
+      _ -> false
+    end
+  end
 
   defp caster_guid(%{caster_guid: caster_guid}) when is_integer(caster_guid), do: caster_guid
   defp caster_guid(caster_guid) when is_integer(caster_guid), do: caster_guid

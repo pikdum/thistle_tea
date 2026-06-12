@@ -360,13 +360,16 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     {:failure, state, blackboard}
   end
 
+  @dynamic_flag_tapped 0x0004
+
   defp clear_combat(
          %Mob{unit: %Unit{target: target} = unit, internal: %Internal{} = internal} = state,
          %Blackboard{} = blackboard
        ) do
     decrement_attacker_count(target)
-    unit = %{unit | target: 0}
-    internal = %{internal | in_combat: false}
+    unit = %{unit | target: 0, dynamic_flags: Bitwise.band(unit.dynamic_flags || 0, Bitwise.bnot(@dynamic_flag_tapped))}
+    internal = Map.put(%{internal | in_combat: false}, :tapped_by, nil)
+    Metadata.update(state.object.guid, %{tapped_player: nil, tapped_group_id: nil})
 
     blackboard =
       blackboard

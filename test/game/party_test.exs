@@ -178,6 +178,44 @@ defmodule ThistleTea.Game.PartyTest do
     end
   end
 
+  describe "update_looter/3" do
+    setup do
+      {_group, party} = invite_and_accept(%Party{}, 1, "Leader", 2, "Second")
+      {group, party} = invite_and_accept(party, 1, "Leader", 3, "Third")
+      %{party: party, group_id: group.id}
+    end
+
+    test "rotates through eligible members in member order", %{party: party, group_id: group_id} do
+      {looter, party} = Party.update_looter(party, group_id, [1, 2, 3])
+      assert looter == 1
+
+      {looter, party} = Party.update_looter(party, group_id, [1, 2, 3])
+      assert looter == 2
+
+      {looter, party} = Party.update_looter(party, group_id, [1, 2, 3])
+      assert looter == 3
+
+      {looter, _party} = Party.update_looter(party, group_id, [1, 2, 3])
+      assert looter == 1
+    end
+
+    test "skips ineligible members", %{party: party, group_id: group_id} do
+      {looter, party} = Party.update_looter(party, group_id, [2])
+      assert looter == 2
+
+      {looter, _party} = Party.update_looter(party, group_id, [1, 3])
+      assert looter == 3
+    end
+
+    test "returns nil when nobody is eligible", %{party: party, group_id: group_id} do
+      assert {nil, _party} = Party.update_looter(party, group_id, [])
+    end
+
+    test "returns nil for an unknown group", %{party: party} do
+      assert {nil, _party} = Party.update_looter(party, 999, [1])
+    end
+  end
+
   describe "same_team?/2" do
     test "alliance races group together" do
       assert Party.same_team?(1, 7)

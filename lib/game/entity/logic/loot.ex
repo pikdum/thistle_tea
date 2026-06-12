@@ -7,7 +7,17 @@ defmodule ThistleTea.Game.Entity.Logic.Loot do
 
   defmodule Item do
     @moduledoc false
-    defstruct [:slot, :item_id, :display_id, count: 1, quality: 0, looted: false, blocked: false, quest_item: false]
+    defstruct [
+      :slot,
+      :item_id,
+      :display_id,
+      count: 1,
+      quality: 0,
+      slot_type: 0,
+      looted: false,
+      blocked: false,
+      quest_item: false
+    ]
   end
 
   defstruct gold: 0, items: []
