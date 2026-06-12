@@ -13,6 +13,15 @@ defmodule ThistleTea.Game.World.Loader.Graveyard do
   @alliance_races [1, 3, 4, 7]
   @horde_races [2, 5, 6, 8]
 
+  @table_options [:named_table, :public, read_concurrency: true, write_concurrency: :auto]
+
+  def init(table \\ __MODULE__) do
+    case :ets.whereis(table) do
+      :undefined -> :ets.new(table, @table_options)
+      _table_id -> table
+    end
+  end
+
   def team_for_race(race) when race in @alliance_races, do: @team_alliance
   def team_for_race(race) when race in @horde_races, do: @team_horde
   def team_for_race(_race), do: nil
@@ -41,6 +50,18 @@ defmodule ThistleTea.Game.World.Loader.Graveyard do
   end
 
   defp graveyards_for_zone(zone) do
+    case :ets.lookup(__MODULE__, zone) do
+      [{^zone, graveyards}] -> graveyards
+      _ -> cache(zone, load_graveyards_for_zone(zone))
+    end
+  end
+
+  defp cache(zone, graveyards) do
+    :ets.insert(__MODULE__, {zone, graveyards})
+    graveyards
+  end
+
+  defp load_graveyards_for_zone(zone) do
     links =
       Mangos.Repo.all(from(g in Mangos.GameGraveyardZone, where: g.ghost_zone == ^zone))
 

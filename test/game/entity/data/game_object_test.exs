@@ -3,10 +3,11 @@ defmodule ThistleTea.Game.Entity.Data.GameObjectTest do
 
   alias ThistleTea.DB.Mangos
   alias ThistleTea.Game.Entity.Data.GameObject
+  alias ThistleTea.Game.Entity.Data.GameObjectTemplate
   alias ThistleTea.Game.Guid
 
   defp lightwell_template do
-    %Mangos.GameObjectTemplate{
+    GameObjectTemplate.build(%Mangos.GameObjectTemplate{
       entry: 181_102,
       type: 22,
       display_id: 6671,
@@ -16,7 +17,7 @@ defmodule ThistleTea.Game.Entity.Data.GameObjectTest do
       size: 1.35,
       data0: 7001,
       data1: 5
-    }
+    })
   end
 
   describe "build_summoned/4" do
@@ -48,7 +49,7 @@ defmodule ThistleTea.Game.Entity.Data.GameObjectTest do
     end
 
     test "non-spellcaster templates carry no use spell" do
-      template = %{lightwell_template() | type: 5, data0: 7001}
+      template = %{lightwell_template() | type: 5}
       go = GameObject.build_summoned(template, 0, {0.0, 0.0, 0.0, 0.0}, [])
 
       assert go.internal.use_spell_id == nil

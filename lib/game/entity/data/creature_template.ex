@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Entity.Data.CreatureTemplate do
     :family,
     :rank,
     :display_id,
+    :display_ids,
     :civilian,
     :racial_leader
   ]
@@ -25,6 +26,7 @@ defmodule ThistleTea.Game.Entity.Data.CreatureTemplate do
       family: ct.family,
       rank: ct.rank,
       display_id: ct.model_id1,
+      display_ids: [ct.model_id1, ct.model_id2, ct.model_id3, ct.model_id4],
       civilian: ct.civilian,
       racial_leader: ct.racial_leader
     }

@@ -11,11 +11,17 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.World.EntitySupervisor
   alias ThistleTea.Game.World.Groups
   alias ThistleTea.Game.World.ItemStore
+  alias ThistleTea.Game.World.Loader.ClassSpell, as: ClassSpellLoader
   alias ThistleTea.Game.World.Loader.CreatureTemplate, as: CreatureTemplateLoader
   alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
   alias ThistleTea.Game.World.Loader.Gossip, as: GossipLoader
+  alias ThistleTea.Game.World.Loader.Graveyard, as: GraveyardLoader
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
+  alias ThistleTea.Game.World.Loader.Loot, as: LootLoader
+  alias ThistleTea.Game.World.Loader.NpcText, as: NpcTextLoader
   alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader
+  alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
+  alias ThistleTea.Game.World.Loader.Trainer, as: TrainerLoader
   alias ThistleTea.Game.World.Loader.Vendor, as: VendorLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
@@ -94,6 +100,12 @@ defmodule ThistleTea.Application do
     GossipLoader.init()
     CreatureTemplateLoader.init()
     GameObjectTemplateLoader.init()
+    SpellLoader.init()
+    TrainerLoader.init()
+    ClassSpellLoader.init()
+    LootLoader.init()
+    GraveyardLoader.init()
+    NpcTextLoader.init()
     :ets.new(:spline_counters, [:named_table, :public, write_concurrency: :auto])
     :ets.insert(:spline_counters, {:spline_id, 0})
     setup_database()

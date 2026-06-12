@@ -4,12 +4,12 @@ defmodule ThistleTea.Game.Entity.EventSink do
   performs their side effects: building packets, broadcasting to nearby
   players, and messaging other entity processes.
   """
-  alias ThistleTea.DB.Mangos
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.DynamicObject, as: DataDynamicObject
   alias ThistleTea.Game.Entity.Data.GameObject
+  alias ThistleTea.Game.Entity.Data.GameObjectTemplate, as: DataGameObjectTemplate
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Event
@@ -25,6 +25,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
+  alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Pathfinding
 
@@ -322,16 +323,9 @@ defmodule ThistleTea.Game.Entity.EventSink do
   def emit(entity, %Event{type: :leap}), do: entity
 
   def emit(%Character{} = entity, %Event{type: :teleport_to_spell_target, spell_id: spell_id}) do
-    case Mangos.Repo.get(Mangos.SpellTargetPosition, spell_id) do
-      %Mangos.SpellTargetPosition{} = target ->
-        GenServer.cast(
-          self(),
-          {:start_teleport, target.target_position_x, target.target_position_y, target.target_position_z,
-           target.target_map}
-        )
-
-      _ ->
-        nil
+    case SpellLoader.target_position(spell_id) do
+      %{map: map, x: x, y: y, z: z} -> GenServer.cast(self(), {:start_teleport, x, y, z, map})
+      _ -> nil
     end
 
     entity
@@ -398,8 +392,8 @@ defmodule ThistleTea.Game.Entity.EventSink do
         %Event{type: :summon_game_object, entry: entry, duration_ms: duration_ms}
       )
       when is_integer(map) do
-    case Mangos.Repo.get(Mangos.GameObjectTemplate, entry) do
-      %Mangos.GameObjectTemplate{} = template ->
+    case GameObjectTemplateLoader.get(entry) do
+      %DataGameObjectTemplate{} = template ->
         template
         |> GameObject.build_summoned(map, position,
           summoned_by: owner_guid,

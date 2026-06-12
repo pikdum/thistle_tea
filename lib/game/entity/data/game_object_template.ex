@@ -2,7 +2,7 @@ defmodule ThistleTea.Game.Entity.Data.GameObjectTemplate do
   @moduledoc false
   alias ThistleTea.DB.Mangos
 
-  defstruct [:entry, :type, :display_id, :name, data: []]
+  defstruct [:entry, :type, :display_id, :name, :size, :flags, :faction, data: []]
 
   def build(%Mangos.GameObjectTemplate{} = template) do
     %__MODULE__{
@@ -10,6 +10,9 @@ defmodule ThistleTea.Game.Entity.Data.GameObjectTemplate do
       type: template.type,
       display_id: template.display_id,
       name: template.name,
+      size: template.size,
+      flags: template.flags,
+      faction: template.faction,
       data:
         Enum.map(0..23, fn index ->
           Map.get(template, :"data#{index}") || 0

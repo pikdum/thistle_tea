@@ -8,19 +8,72 @@ defmodule ThistleTea.Game.World.Loader.Spell do
 
   alias ThistleTea.DB.Mangos
   alias ThistleTea.DBC
+  alias ThistleTea.Game.Entity.Data.CreatureTemplate
   alias ThistleTea.Game.Spell, as: SpellData
   alias ThistleTea.Game.Spell.Effect
+  alias ThistleTea.Game.World.Loader.CreatureTemplate, as: CreatureTemplateLoader
 
   @learn_spell_effect 36
+  @table_options [:named_table, :public, read_concurrency: true, write_concurrency: :auto]
+
+  def init(table \\ __MODULE__) do
+    case :ets.whereis(table) do
+      :undefined -> :ets.new(table, @table_options)
+      _table_id -> table
+    end
+  end
 
   def load(spell_id) when is_integer(spell_id) and spell_id > 0 do
     case DBC.get(Spell, spell_id) do
       nil -> nil
-      row -> row |> build() |> put_chain(Mangos.Repo.get(Mangos.SpellChain, spell_id))
+      row -> row |> build() |> put_chain(chain(spell_id))
     end
   end
 
   def load(_), do: nil
+
+  def chain(spell_id) when is_integer(spell_id) and spell_id > 0 do
+    case :ets.lookup(__MODULE__, {:chain, spell_id}) do
+      [{_key, chain}] -> chain
+      _ -> cache({:chain, spell_id}, load_chain(spell_id))
+    end
+  end
+
+  def chain(_spell_id), do: nil
+
+  defp load_chain(spell_id) do
+    case Mangos.Repo.get(Mangos.SpellChain, spell_id) do
+      %Mangos.SpellChain{} = row ->
+        %{first_spell: row.first_spell, rank: row.rank, prev_spell: row.prev_spell, req_spell: row.req_spell}
+
+      _ ->
+        nil
+    end
+  end
+
+  def target_position(spell_id) when is_integer(spell_id) and spell_id > 0 do
+    case :ets.lookup(__MODULE__, {:target_position, spell_id}) do
+      [{_key, position}] -> position
+      _ -> cache({:target_position, spell_id}, load_target_position(spell_id))
+    end
+  end
+
+  def target_position(_spell_id), do: nil
+
+  defp load_target_position(spell_id) do
+    case Mangos.Repo.get(Mangos.SpellTargetPosition, spell_id) do
+      %Mangos.SpellTargetPosition{} = row ->
+        %{map: row.target_map, x: row.target_position_x, y: row.target_position_y, z: row.target_position_z}
+
+      _ ->
+        nil
+    end
+  end
+
+  defp cache(key, value) do
+    :ets.insert(__MODULE__, {key, value})
+    value
+  end
 
   def build_spellbook([]), do: %{}
 
@@ -145,11 +198,13 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   end
 
   defp load_chain_map(spell_ids) do
-    Mangos.Repo.all(from(c in Mangos.SpellChain, where: c.spell_id in ^spell_ids))
-    |> Map.new(&{&1.spell_id, &1})
+    spell_ids
+    |> Enum.map(&{&1, chain(&1)})
+    |> Enum.reject(fn {_id, chain} -> is_nil(chain) end)
+    |> Map.new()
   end
 
-  defp put_chain(%SpellData{} = spell, %Mangos.SpellChain{first_spell: first_spell, rank: rank}) do
+  defp put_chain(%SpellData{} = spell, %{first_spell: first_spell, rank: rank}) do
     %{spell | first_in_chain: first_spell, rank: rank}
   end
 
@@ -231,10 +286,9 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   end
 
   defp transform_display_id(entry) when is_integer(entry) and entry > 0 do
-    case Mangos.Repo.get(Mangos.CreatureTemplate, entry) do
-      %Mangos.CreatureTemplate{} = template ->
-        [template.model_id1, template.model_id2, template.model_id3, template.model_id4]
-        |> Enum.find(0, &(is_integer(&1) and &1 > 0))
+    case CreatureTemplateLoader.get(entry) do
+      %CreatureTemplate{display_ids: display_ids} when is_list(display_ids) ->
+        Enum.find(display_ids, 0, &(is_integer(&1) and &1 > 0))
 
       _ ->
         0

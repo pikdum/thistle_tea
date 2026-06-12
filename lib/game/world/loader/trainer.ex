@@ -11,13 +11,34 @@ defmodule ThistleTea.Game.World.Loader.Trainer do
   alias ThistleTea.Game.Entity.Data.TrainerSpell
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
 
+  @table_options [:named_table, :public, read_concurrency: true, write_concurrency: :auto]
+
+  def init(table \\ __MODULE__) do
+    case :ets.whereis(table) do
+      :undefined -> :ets.new(table, @table_options)
+      _table_id -> table
+    end
+  end
+
   def trainer_info(creature_entry) do
+    case :ets.lookup(__MODULE__, creature_entry) do
+      [{^creature_entry, info}] -> info
+      _ -> cache(creature_entry, load_trainer_info(creature_entry))
+    end
+  end
+
+  defp load_trainer_info(creature_entry) do
     template = Mangos.Repo.get(Mangos.CreatureTemplate, creature_entry)
 
     %{
       trainer_type: trainer_type(template),
       spells: spells(creature_entry, template)
     }
+  end
+
+  defp cache(creature_entry, info) do
+    :ets.insert(__MODULE__, {creature_entry, info})
+    info
   end
 
   defp trainer_type(%Mangos.CreatureTemplate{trainer_type: type}), do: type || 0
@@ -91,8 +112,10 @@ defmodule ThistleTea.Game.World.Loader.Trainer do
   defp chain_map([]), do: %{}
 
   defp chain_map(learned_ids) do
-    Mangos.Repo.all(from(c in Mangos.SpellChain, where: c.spell_id in ^learned_ids))
-    |> Map.new(&{&1.spell_id, &1})
+    learned_ids
+    |> Enum.map(&{&1, SpellLoader.chain(&1)})
+    |> Enum.reject(fn {_id, chain} -> is_nil(chain) end)
+    |> Map.new()
   end
 
   defp class_race_masks_map([]), do: %{}

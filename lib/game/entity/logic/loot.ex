@@ -1,8 +1,8 @@
 defmodule ThistleTea.Game.Entity.Logic.Loot do
   @moduledoc """
-  Loot state and loot-table rolling: rolls Mangos loot rows (groups, reference
-  entries, negative-chance quest drops) into a loot window, and tracks taking
-  or returning items and gold from it.
+  Loot state and loot-table rolling: rolls loot-template rows (groups,
+  reference entries, negative-chance quest drops) into a loot window, and
+  tracks taking or returning items and gold from it.
   """
 
   defmodule Item do

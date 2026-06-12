@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Entity.Data.GameObject do
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Object
+  alias ThistleTea.Game.Entity.Data.GameObjectTemplate
   alias ThistleTea.Game.Guid
 
   @update_flag_all 0x10
@@ -22,7 +23,7 @@ defmodule ThistleTea.Game.Entity.Data.GameObject do
 
   @go_state_active 1
 
-  def build_summoned(%Mangos.GameObjectTemplate{} = ot, map, {x, y, z, o}, opts \\ []) do
+  def build_summoned(%GameObjectTemplate{} = ot, map, {x, y, z, o}, opts \\ []) do
     %__MODULE__{
       object: %Object{
         guid: Guid.from_low_guid(:game_object, ot.entry, :erlang.unique_integer([:positive, :monotonic])),
@@ -65,18 +66,29 @@ defmodule ThistleTea.Game.Entity.Data.GameObject do
 
   @go_type_spellcaster 22
 
-  defp spellcaster_spell(%Mangos.GameObjectTemplate{type: @go_type_spellcaster, data0: spell_id})
-       when is_integer(spell_id) and spell_id > 0, do: spell_id
+  defp spellcaster_spell(%GameObjectTemplate{type: @go_type_spellcaster, data: data}) do
+    case Enum.at(data, 0) do
+      spell_id when is_integer(spell_id) and spell_id > 0 -> spell_id
+      _ -> nil
+    end
+  end
 
   defp spellcaster_spell(_template), do: nil
 
-  defp spellcaster_charges(%Mangos.GameObjectTemplate{type: @go_type_spellcaster, data1: charges})
-       when is_integer(charges) and charges > 0, do: charges
+  defp spellcaster_charges(%GameObjectTemplate{type: @go_type_spellcaster, data: data}) do
+    case Enum.at(data, 1) do
+      charges when is_integer(charges) and charges > 0 -> charges
+      _ -> nil
+    end
+  end
 
   defp spellcaster_charges(_template), do: nil
 
-  defp spellcaster_party_only?(%Mangos.GameObjectTemplate{type: @go_type_spellcaster, data2: data2}) do
-    is_integer(data2) and data2 != 0
+  defp spellcaster_party_only?(%GameObjectTemplate{type: @go_type_spellcaster, data: data}) do
+    case Enum.at(data, 2) do
+      data2 when is_integer(data2) -> data2 != 0
+      _ -> false
+    end
   end
 
   defp spellcaster_party_only?(_template), do: false

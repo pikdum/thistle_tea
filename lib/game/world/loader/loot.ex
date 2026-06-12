@@ -8,6 +8,15 @@ defmodule ThistleTea.Game.World.Loader.Loot do
   alias ThistleTea.Game.Entity.Logic.Loot
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
 
+  @table_options [:named_table, :public, read_concurrency: true, write_concurrency: :auto]
+
+  def init(table \\ __MODULE__) do
+    case :ets.whereis(table) do
+      :undefined -> :ets.new(table, @table_options)
+      _table_id -> table
+    end
+  end
+
   def generate(loot_id, min_gold, max_gold) do
     %Loot{
       gold: roll_gold(min_gold, max_gold),
@@ -35,8 +44,8 @@ defmodule ThistleTea.Game.World.Loader.Loot do
   end
 
   defp roll_items(loot_id) when is_integer(loot_id) and loot_id > 0 do
-    Mangos.CreatureLootTemplate.query(loot_id)
-    |> Mangos.Repo.all()
+    loot_id
+    |> creature_rows()
     |> Loot.roll(&reference_rows/1)
     |> Enum.map(fn {item_id, count, quest_item} -> {ItemLoader.get_template(item_id), count, quest_item} end)
     |> Enum.reject(fn {template, _count, _quest_item} -> is_nil(template) end)
@@ -55,9 +64,41 @@ defmodule ThistleTea.Game.World.Loader.Loot do
 
   defp roll_items(_loot_id), do: []
 
+  defp creature_rows(loot_id) do
+    case :ets.lookup(__MODULE__, {:creature, loot_id}) do
+      [{_key, rows}] ->
+        rows
+
+      _ ->
+        rows = Mangos.CreatureLootTemplate.query(loot_id) |> Mangos.Repo.all() |> Enum.map(&row/1)
+        cache({:creature, loot_id}, rows)
+    end
+  end
+
   defp reference_rows(entry) do
-    Mangos.ReferenceLootTemplate.query(entry)
-    |> Mangos.Repo.all()
+    case :ets.lookup(__MODULE__, {:reference, entry}) do
+      [{_key, rows}] ->
+        rows
+
+      _ ->
+        rows = Mangos.ReferenceLootTemplate.query(entry) |> Mangos.Repo.all() |> Enum.map(&row/1)
+        cache({:reference, entry}, rows)
+    end
+  end
+
+  defp row(template_row) do
+    %{
+      item: template_row.item,
+      chance: template_row.chance,
+      groupid: template_row.groupid,
+      mincount_or_ref: template_row.mincount_or_ref,
+      maxcount: template_row.maxcount
+    }
+  end
+
+  defp cache(key, rows) do
+    :ets.insert(__MODULE__, {key, rows})
+    rows
   end
 
   defp roll_gold(min_gold, max_gold) when is_integer(min_gold) and is_integer(max_gold) and max_gold > 0 do
