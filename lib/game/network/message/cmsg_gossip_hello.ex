@@ -52,7 +52,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgGossipHello do
       quests: quests
     })
 
-    Map.put(state, :gossip_menu_options, options)
+    %{state | gossip_menu_options: options}
   end
 
   defp visible_options(options, npc_guid, %Character{unit: unit} = character) do

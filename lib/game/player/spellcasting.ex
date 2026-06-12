@@ -133,7 +133,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
     |> World.broadcast_packet(state.character)
 
     character = SpellBT.start_cast(state.character, spell, targets, Time.now(), cast_item_guid)
-    state = Map.put(state, :character, character)
+    state = %{state | character: character}
 
     cond do
       Spell.attribute?(spell, :on_next_swing) -> PlayerTick.schedule_now(state)

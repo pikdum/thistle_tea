@@ -35,7 +35,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgCancelAura do
         %{character | internal: %{character.internal | broadcast_update?: false}}
       end
 
-    Map.put(state, :character, character)
+    %{state | character: character}
   end
 
   def handle(%__MODULE__{}, state), do: state

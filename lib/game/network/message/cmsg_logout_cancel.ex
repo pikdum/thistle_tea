@@ -19,7 +19,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgLogoutCancel do
 
         timer ->
           Process.cancel_timer(timer)
-          Map.delete(state, :logout_timer)
+          %{state | logout_timer: nil}
       end
 
     Network.send_packet(%Message.SmsgLogoutCancelAck{})

@@ -1,5 +1,10 @@
 defmodule ThistleTea.Game.World.Visibility do
-  @moduledoc false
+  @moduledoc """
+  Cell-based visibility: keeps each player session's `visibility_cells` and
+  `tracked_entities` in sync with the world (sole owner of both keys),
+  exchanges join/leave events through cell groups, and sends create/destroy
+  packets as entities move in and out of view.
+  """
 
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Character
@@ -22,7 +27,7 @@ defmodule ThistleTea.Game.World.Visibility do
 
   def enter_player(%{visibility_cells: %MapSet{}} = state), do: state
 
-  def enter_player(%{character: character, guid: guid} = state) do
+  def enter_player(%{character: %{} = character, guid: guid} = state) when is_integer(guid) do
     character = join_entity(character)
     cells = visible_cells(character)
     activate_cells(state, cells)
@@ -36,7 +41,7 @@ defmodule ThistleTea.Game.World.Visibility do
 
   def enter_player(state), do: state
 
-  def refresh_player(%{character: character, guid: guid, visibility_cells: old_cells} = state) do
+  def refresh_player(%{character: character, guid: guid, visibility_cells: %MapSet{} = old_cells} = state) do
     old_cell = entity_cell(character)
     character = refresh_entity(character)
     new_cell = entity_cell(character)
@@ -61,13 +66,13 @@ defmodule ThistleTea.Game.World.Visibility do
 
   def refresh_player(state), do: state
 
-  def leave_player(%{character: character, visibility_cells: cells} = state) do
+  def leave_player(%{character: character, visibility_cells: %MapSet{} = cells} = state) do
     Enum.each(cells, &Group.demonitor(@group, cell_key(&1)))
     character = leave_entity(character)
 
     state
     |> Map.put(:character, character)
-    |> Map.delete(:visibility_cells)
+    |> Map.put(:visibility_cells, nil)
     |> Map.put(:player_guids, [])
     |> Map.put(:mob_guids, [])
     |> Map.put(:tracked_entities, MapSet.new())
@@ -79,7 +84,7 @@ defmodule ThistleTea.Game.World.Visibility do
 
   def leave_player(state), do: state
 
-  def handle_events(%{guid: guid, visibility_cells: cells} = state, events) do
+  def handle_events(%{guid: guid, visibility_cells: %MapSet{} = cells} = state, events) do
     Enum.reduce(events, state, fn
       %Group.Event{key: key, type: :joined, meta: %{guid: entity_guid} = meta}, state ->
         if cell_key?(cells, key) and entity_guid != guid do
@@ -173,6 +178,22 @@ defmodule ThistleTea.Game.World.Visibility do
   end
 
   def reevaluate_entity(state, _guid), do: state
+
+  def track_entities(state, %MapSet{} = guids) do
+    Map.update(state, :tracked_entities, guids, &MapSet.union(&1, guids))
+  end
+
+  def untrack_entity(state, guid) when is_integer(guid) do
+    Map.update(state, :tracked_entities, MapSet.new(), &MapSet.delete(&1, guid))
+  end
+
+  def tracked?(state, guid) when is_integer(guid) do
+    state
+    |> Map.get(:tracked_entities, MapSet.new())
+    |> MapSet.member?(guid)
+  end
+
+  def tracked?(_state, _guid), do: false
 
   def notify_visibility_changed(%{object: %{guid: guid}} = character) do
     character
@@ -270,7 +291,7 @@ defmodule ThistleTea.Game.World.Visibility do
 
     if tracked?(state, guid) and not currently_visible?(state, guid) do
       send_destroy(guid)
-      Map.update(state, :tracked_entities, MapSet.new(), &MapSet.delete(&1, guid))
+      untrack_entity(state, guid)
     else
       state
     end
@@ -288,12 +309,6 @@ defmodule ThistleTea.Game.World.Visibility do
   end
 
   defp currently_visible?(_state, _guid), do: false
-
-  defp tracked?(state, guid) do
-    state
-    |> Map.get(:tracked_entities, MapSet.new())
-    |> MapSet.member?(guid)
-  end
 
   defp put_entity_lists(state, visible) do
     state

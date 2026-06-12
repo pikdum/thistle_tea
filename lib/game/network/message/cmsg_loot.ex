@@ -21,7 +21,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgLoot do
          {:ok, %Loot{} = loot} <- Entity.call(guid, {:loot_view, state.guid}) do
       Network.send_packet(%Message.SmsgLootResponse{guid: guid, loot: Quests.filter_loot(loot, c)})
       maybe_send_master_list(state, guid)
-      Map.put(state, :loot_guid, guid)
+      %{state | loot_guid: guid}
     else
       {:error, :no_permission} ->
         Network.send_packet(%Message.SmsgLootResponse{guid: guid, loot: %Loot{}})

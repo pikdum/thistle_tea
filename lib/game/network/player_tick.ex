@@ -4,6 +4,7 @@ defmodule ThistleTea.Game.Network.PlayerTick do
   auras, regen) and schedules the next tick on the network handler only when
   needed.
   """
+  alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.Regen
@@ -20,7 +21,7 @@ defmodule ThistleTea.Game.Network.PlayerTick do
 
   def needs_tick?(character), do: Regen.needs_regen?(character)
 
-  def ensure_scheduled(%{character: character} = state) do
+  def ensure_scheduled(%{character: %Character{} = character} = state) do
     case Map.get(state, :player_tick_ref) do
       ref when is_reference(ref) ->
         state
@@ -28,7 +29,7 @@ defmodule ThistleTea.Game.Network.PlayerTick do
       _ ->
         if needs_tick?(character) do
           ref = Process.send_after(self(), :player_tick, 0)
-          Map.put(state, :player_tick_ref, ref)
+          %{state | player_tick_ref: ref}
         else
           state
         end
@@ -44,6 +45,6 @@ defmodule ThistleTea.Game.Network.PlayerTick do
     end
 
     ref = Process.send_after(self(), :player_tick, 0)
-    Map.put(state, :player_tick_ref, ref)
+    %{state | player_tick_ref: ref}
   end
 end

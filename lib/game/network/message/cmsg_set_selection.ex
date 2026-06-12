@@ -9,14 +9,11 @@ defmodule ThistleTea.Game.Network.Message.CmsgSetSelection do
   @impl ClientMessage
   def handle(%__MODULE__{guid: guid}, %{character: %{unit: %Unit{} = unit} = character} = state) do
     character = %{character | unit: %{unit | target: guid}}
-
-    state
-    |> Map.put(:character, character)
-    |> Map.put(:target, guid)
+    %{state | character: character, target: guid}
   end
 
   def handle(%__MODULE__{guid: guid}, state) do
-    Map.put(state, :target, guid)
+    %{state | target: guid}
   end
 
   @impl ClientMessage

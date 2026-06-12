@@ -11,7 +11,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgPing do
     Logger.info("CMSG_PING: #{latency}")
 
     Network.send_packet(%Message.SmsgPong{sequence_id: sequence_id})
-    Map.put(state, :latency, latency)
+    %{state | latency: latency}
   end
 
   @impl ClientMessage

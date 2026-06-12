@@ -13,9 +13,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgMoveWorldportAck do
   def handle(%__MODULE__{}, state) do
     Login.send_init_packets(state.character)
 
-    state
-    |> Map.put(:ready, true)
-    |> Visibility.enter_player()
+    Visibility.enter_player(%{state | ready: true})
   end
 
   @impl ClientMessage

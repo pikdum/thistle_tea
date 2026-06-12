@@ -19,7 +19,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgCancelChannelling do
           |> SpellBT.clear_cast()
           |> EventSink.emit_pending()
 
-        Map.put(state, :character, character)
+        %{state | character: character}
 
       _ ->
         state

@@ -1,8 +1,11 @@
-defmodule ThistleTea.Game.Player.Session do
+defmodule ThistleTea.Game.Network.Session do
   @moduledoc """
-  Player-session teardown on logout or disconnect: persists the character,
-  deregisters from world systems and chat channels, notifies the party, and
-  resets the connection state.
+  Connection-handler state for one client session: the network connection,
+  account, logged-in character, and world-presence bookkeeping (visibility
+  cells, tracked entities, timers). `leave_world/1` tears the session down on
+  logout or disconnect — persisting the character, deregistering from world
+  systems and chat channels, notifying the party — and resets to a bare
+  session keeping only the connection and account.
   """
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Party.Group
@@ -10,8 +13,29 @@ defmodule ThistleTea.Game.Player.Session do
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
+  alias ThistleTea.Game.World.System.CellActivator
   alias ThistleTea.Game.World.System.Party, as: PartySystem
   alias ThistleTea.Game.World.Visibility
+
+  defstruct [
+    :conn,
+    :account,
+    :guid,
+    :packed_guid,
+    :character,
+    :visibility_cells,
+    :player_tick_ref,
+    :logout_timer,
+    :target,
+    :latency,
+    :loot_guid,
+    ready: false,
+    tracked_entities: MapSet.new(),
+    player_guids: [],
+    mob_guids: [],
+    gossip_menu_options: [],
+    cell_activator: CellActivator
+  ]
 
   def leave_world(state) do
     case Map.get(state, :player_tick_ref) do
@@ -49,7 +73,7 @@ defmodule ThistleTea.Game.Player.Session do
       end
     end
 
-    %{
+    %__MODULE__{
       account: Map.get(state, :account),
       conn: Map.get(state, :conn)
     }

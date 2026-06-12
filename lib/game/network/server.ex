@@ -35,12 +35,12 @@ defmodule ThistleTea.Game.Network.Server do
   alias ThistleTea.Game.Network.Opcodes
   alias ThistleTea.Game.Network.Packet
   alias ThistleTea.Game.Network.PlayerTick
+  alias ThistleTea.Game.Network.Session
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.Party.MemberStats
   alias ThistleTea.Game.Party.Notifier, as: PartyNotifier
   alias ThistleTea.Game.Player.Items
   alias ThistleTea.Game.Player.Quests
-  alias ThistleTea.Game.Player.Session
   alias ThistleTea.Game.Player.Spellcasting
   alias ThistleTea.Game.Player.Stats, as: PlayerStats
   alias ThistleTea.Game.Spell.Cast
@@ -162,28 +162,16 @@ defmodule ThistleTea.Game.Network.Server do
       |> Enum.filter(&create_update?/1)
       |> MapSet.new(& &1.object.guid)
 
-    Map.update(state, :tracked_entities, created_guids, &MapSet.union(&1, created_guids))
-  end
-
-  defp untrack_entity(state, guid) when is_integer(guid) do
-    Map.update(state, :tracked_entities, MapSet.new(), &MapSet.delete(&1, guid))
+    Visibility.track_entities(state, created_guids)
   end
 
   defp source_tracked?(_state, nil), do: true
 
   defp source_tracked?(state, source_guid) when is_integer(source_guid) do
-    entity_tracked?(state, source_guid)
+    Visibility.tracked?(state, source_guid)
   end
 
   defp source_tracked?(_state, _source_guid), do: false
-
-  defp entity_tracked?(state, guid) when is_integer(guid) do
-    state
-    |> Map.get(:tracked_entities, MapSet.new())
-    |> MapSet.member?(guid)
-  end
-
-  defp entity_tracked?(_state, _guid), do: false
 
   @impl GenServer
   def handle_cast({:send_packet, %UpdateObject{} = update, opts}, {socket, state}) do
@@ -211,9 +199,9 @@ defmodule ThistleTea.Game.Network.Server do
   end
 
   def handle_cast({:send_packet, %Message.SmsgDestroyObject{guid: guid} = packet}, {socket, state}) do
-    if entity_tracked?(state, guid) do
+    if Visibility.tracked?(state, guid) do
       state = Network.Send.send_packet(packet, {socket, state})
-      state = untrack_entity(state, guid)
+      state = Visibility.untrack_entity(state, guid)
       {:noreply, {socket, state}, socket.read_timeout}
     else
       {:noreply, {socket, state}, socket.read_timeout}
@@ -223,7 +211,7 @@ defmodule ThistleTea.Game.Network.Server do
   def handle_cast({:send_packet, %Message.SmsgDestroyObject{guid: guid} = packet, opts}, {socket, state}) do
     if Keyword.get(opts, :force, false) or source_tracked?(state, Keyword.get(opts, :source_guid)) do
       state = Network.Send.send_packet(packet, {socket, state})
-      state = untrack_entity(state, guid)
+      state = Visibility.untrack_entity(state, guid)
       {:noreply, {socket, state}, socket.read_timeout}
     else
       {:noreply, {socket, state}, socket.read_timeout}
@@ -263,19 +251,19 @@ defmodule ThistleTea.Game.Network.Server do
     {:noreply, {socket, state}, socket.read_timeout}
   end
 
-  def handle_cast({:receive_attack, attack}, {socket, %{character: character} = state}) do
+  def handle_cast({:receive_attack, attack}, {socket, %{character: %Character{} = character} = state}) do
     {character, events} = Combat.receive_attack(character, attack, Time.now())
     character = EventSink.emit(character, events)
 
     {:noreply, {socket, %{state | character: character}}, {:continue, :maybe_broadcast_update}}
   end
 
-  def handle_cast({:receive_heal, amount}, {socket, %{character: character} = state}) do
+  def handle_cast({:receive_heal, amount}, {socket, %{character: %Character{} = character} = state}) do
     character = Core.heal(character, amount)
     {:noreply, {socket, %{state | character: character}}, {:continue, :maybe_broadcast_update}}
   end
 
-  def handle_cast({:receive_spell, caster, spell}, {socket, %{character: character} = state}) do
+  def handle_cast({:receive_spell, caster, spell}, {socket, %{character: %Character{} = character} = state}) do
     now = Time.now()
     {character, events} = SpellEffect.receive(character, caster, spell, now)
     duration_events = Aura.self_duration_events(character, now)
@@ -404,11 +392,7 @@ defmodule ThistleTea.Game.Network.Server do
     # Send player's client to loading screen to load the new map
     Network.send_packet(%Message.SmsgTransferPending{map: map, has_transport: false})
 
-    state =
-      Map.merge(state, %{
-        ready: false,
-        tracked_entities: MapSet.new()
-      })
+    state = %{state | ready: false}
 
     # Send player's client the new location
     orientation = 0
@@ -421,7 +405,7 @@ defmodule ThistleTea.Game.Network.Server do
   end
 
   @impl GenServer
-  def handle_info(:logout_complete, {socket, %{logout_timer: _timer} = state}) do
+  def handle_info(:logout_complete, {socket, %{logout_timer: timer} = state}) when is_reference(timer) do
     Network.send_packet(%Message.SmsgLogoutComplete{})
     state = Session.leave_world(state)
     {:noreply, {socket, state}, socket.read_timeout}
@@ -475,17 +459,17 @@ defmodule ThistleTea.Game.Network.Server do
   end
 
   @impl GenServer
-  def handle_info(:player_tick, {socket, %{character: character} = state}) do
+  def handle_info(:player_tick, {socket, %{character: %Character{} = character} = state}) do
     {status, character} = tick_player(character)
     character = EventSink.emit_pending(character)
-    state = Map.put(state, :character, character)
+    state = %{state | character: character}
     state = schedule_player_tick(state, character, status)
     {:noreply, {socket, state}, {:continue, :maybe_broadcast_update}}
   rescue
     error ->
       Logger.error("Player tick crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
       ref = Process.send_after(self(), :player_tick, @player_tick_retry_ms)
-      {:noreply, {socket, Map.put(state, :player_tick_ref, ref)}, socket.read_timeout}
+      {:noreply, {socket, %{state | player_tick_ref: ref}}, socket.read_timeout}
   end
 
   def handle_info(:player_tick, {socket, state}) do
@@ -542,9 +526,9 @@ defmodule ThistleTea.Game.Network.Server do
     if player_needs_tick?(character) do
       delay_ms = player_tick_delay(character, status)
       ref = Process.send_after(self(), :player_tick, delay_ms)
-      Map.put(state, :player_tick_ref, ref)
+      %{state | player_tick_ref: ref}
     else
-      Map.put(state, :player_tick_ref, nil)
+      %{state | player_tick_ref: nil}
     end
   end
 
@@ -654,7 +638,7 @@ defmodule ThistleTea.Game.Network.Server do
       <<6::big-size(16), @smsg_auth_challenge::little-size(16)>> <> conn.seed
     )
 
-    {:continue, %{conn: conn, account: nil}}
+    {:continue, %Session{conn: conn}}
   end
 
   @impl ThousandIsland.Handler

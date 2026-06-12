@@ -13,7 +13,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgLogoutRequest do
     Logger.info("CMSG_LOGOUT_REQUEST")
     Network.send_packet(%Message.SmsgLogoutResponse{result: 0, speed: 0})
     logout_timer = Process.send_after(self(), :logout_complete, 1_000)
-    Map.put(state, :logout_timer, logout_timer)
+    %{state | logout_timer: logout_timer}
   end
 
   @impl ClientMessage

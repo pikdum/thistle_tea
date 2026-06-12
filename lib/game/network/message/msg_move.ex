@@ -44,10 +44,10 @@ defmodule ThistleTea.Game.Network.Message.MsgMove do
         if position_changed? do
           SpatialHash.update(:players, state.guid, map, x1, y1, z1)
 
-          Map.put(state, :character, character)
+          %{state | character: character}
           |> Spellcasting.cancel(@spell_failed_moving)
         else
-          Map.put(state, :character, character)
+          %{state | character: character}
         end
 
       new_state

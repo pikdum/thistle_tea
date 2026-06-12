@@ -101,14 +101,14 @@ defmodule ThistleTea.Game.Player.Login do
 
     SpatialHash.update(:players, character_guid, c.internal.map, x1, y1, z1)
 
-    state =
-      Map.merge(state, %{
-        guid: character_guid,
+    state = %{
+      state
+      | guid: character_guid,
         packed_guid: BinaryUtils.pack_guid(character_guid),
         character: c,
         tracked_entities: MapSet.new(),
         ready: false
-      })
+    }
 
     schedule_aura_tick(state)
   end
@@ -206,7 +206,7 @@ defmodule ThistleTea.Game.Player.Login do
 
   defp schedule_aura_tick(%{character: %{unit: %Unit{auras: [_ | _]}}} = state) do
     ref = Process.send_after(self(), :player_tick, 0)
-    Map.put(state, :player_tick_ref, ref)
+    %{state | player_tick_ref: ref}
   end
 
   defp schedule_aura_tick(state), do: state

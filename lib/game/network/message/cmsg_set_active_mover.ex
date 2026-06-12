@@ -25,8 +25,6 @@ defmodule ThistleTea.Game.Network.Message.CmsgSetActiveMover do
   defp enter_world(%{ready: true} = state), do: state
 
   defp enter_world(state) do
-    state
-    |> Map.put(:ready, true)
-    |> Visibility.enter_player()
+    Visibility.enter_player(%{state | ready: true})
   end
 end
