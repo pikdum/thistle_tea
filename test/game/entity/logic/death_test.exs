@@ -4,6 +4,7 @@ defmodule ThistleTea.Game.Entity.Logic.DeathTest do
   import Bitwise, only: [&&&: 2]
 
   alias ThistleTea.Game.Aura.Holder
+  alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Object
@@ -18,7 +19,7 @@ defmodule ThistleTea.Game.Entity.Logic.DeathTest do
   @now 1_000
 
   defp fixture_character(opts \\ []) do
-    %ThistleTea.Character{
+    %Character{
       object: %Object{guid: 5},
       unit: %Unit{
         race: Keyword.get(opts, :race, 1),

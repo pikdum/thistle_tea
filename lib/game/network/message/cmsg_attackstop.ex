@@ -11,7 +11,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgAttackstop do
   defstruct []
 
   @impl ClientMessage
-  def handle(%__MODULE__{}, %{character: %ThistleTea.Character{unit: unit} = character} = state) do
+  def handle(%__MODULE__{}, %{character: %Character{unit: unit} = character} = state) do
     target_guid = unit.target
 
     if is_integer(target_guid) and target_guid > 0 do
@@ -50,7 +50,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgAttackstop do
     %__MODULE__{}
   end
 
-  defp clear_combat(%ThistleTea.Character{unit: unit, internal: internal} = character) do
+  defp clear_combat(%Character{unit: unit, internal: internal} = character) do
     unit = %{unit | target: 0}
     internal = %{internal | in_combat: false}
     %{character | unit: unit, internal: internal}

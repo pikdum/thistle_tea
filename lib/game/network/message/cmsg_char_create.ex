@@ -3,6 +3,8 @@ defmodule ThistleTea.Game.Network.Message.CmsgCharCreate do
   use ThistleTea.Game.Network.ClientMessage, :CMSG_CHAR_CREATE
 
   alias ThistleTea.Game.Network.Message
+  alias ThistleTea.Game.Player.Characters
+  alias ThistleTea.Game.World.Loader.Character, as: CharacterLoader
 
   require Logger
 
@@ -23,9 +25,9 @@ defmodule ThistleTea.Game.Network.Message.CmsgCharCreate do
   def handle(%__MODULE__{} = message, state) do
     Logger.info("CMSG_CHAR_CREATE: #{message.name}")
 
-    character = ThistleTea.Character.build(message, state.account.id)
+    character = CharacterLoader.build(message, state.account.id)
 
-    case ThistleTea.Character.create(character) do
+    case Characters.create(character) do
       {:error, :character_exists} ->
         Network.send_packet(%Message.SmsgCharCreate{result: 0x31})
 

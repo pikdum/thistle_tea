@@ -44,7 +44,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgAttackswing do
 
   def handle_attack_swing(state), do: state
 
-  defp maybe_reset_attack_started(%ThistleTea.Character{unit: %Unit{target: target}} = character, target_guid)
+  defp maybe_reset_attack_started(%Character{unit: %Unit{target: target}} = character, target_guid)
        when is_integer(target_guid) do
     if target == target_guid do
       character
@@ -55,10 +55,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgAttackswing do
 
   defp maybe_reset_attack_started(character, _target_guid), do: character
 
-  defp valid_attack_target?(
-         %{guid: guid, character: %ThistleTea.Character{internal: %{map: map}} = character},
-         target_guid
-       )
+  defp valid_attack_target?(%{guid: guid, character: %Character{internal: %{map: map}} = character}, target_guid)
        when is_integer(target_guid) and target_guid > 0 do
     target_guid != guid and
       match?({^target_guid, ^map, _x, _y, _z}, SpatialHash.get_entity(target_guid)) and
@@ -83,7 +80,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgAttackswing do
 
   defp send_attack_stop(state, _target_guid), do: state
 
-  defp engage_combat(%ThistleTea.Character{unit: unit, internal: internal} = character, target_guid)
+  defp engage_combat(%Character{unit: unit, internal: internal} = character, target_guid)
        when is_integer(target_guid) do
     now = Time.now()
     unit = %{unit | target: target_guid}

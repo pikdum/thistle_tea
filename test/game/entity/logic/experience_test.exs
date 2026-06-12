@@ -3,6 +3,77 @@ defmodule ThistleTea.Game.Entity.Logic.ExperienceTest do
 
   alias ThistleTea.Game.Entity.Logic.Experience
 
+  describe "gain_xp/3" do
+    defp character(level, xp, next_level_xp) do
+      %{unit: %{level: level}, player: %{xp: xp, next_level_xp: next_level_xp}}
+    end
+
+    defp gain_xp_opts(opts \\ []) do
+      level_up = fn %{unit: unit, player: player} = entity, new_level ->
+        entity = %{entity | unit: %{unit | level: new_level}, player: %{player | next_level_xp: new_level * 100}}
+        {entity, %{new_level: new_level}}
+      end
+
+      [max_level: 60, next_level_xp: fn level -> level * 100 end, level_up: level_up]
+      |> Keyword.merge(opts)
+    end
+
+    test "accumulates xp below the level threshold" do
+      {entity, events} = Experience.gain_xp(character(1, 10, 100), 50, gain_xp_opts())
+
+      assert entity.player.xp == 60
+      assert entity.unit.level == 1
+      assert events == []
+    end
+
+    test "levels up and carries the overflow" do
+      {entity, events} = Experience.gain_xp(character(1, 90, 100), 30, gain_xp_opts())
+
+      assert entity.unit.level == 2
+      assert entity.player.xp == 20
+      assert events == [%{new_level: 2}]
+    end
+
+    test "chains multiple level-ups from one grant" do
+      {entity, events} = Experience.gain_xp(character(1, 0, 100), 350, gain_xp_opts())
+
+      assert entity.unit.level == 3
+      assert entity.player.xp == 50
+      assert events == [%{new_level: 2}, %{new_level: 3}]
+    end
+
+    test "stops at max level and zeroes xp" do
+      {entity, events} = Experience.gain_xp(character(59, 0, 5900), 10_000, gain_xp_opts())
+
+      assert entity.unit.level == 60
+      assert entity.player.xp == 0
+      assert events == [%{new_level: 60}]
+    end
+
+    test "ignores grants at max level" do
+      assert {%{unit: %{level: 60}}, []} = Experience.gain_xp(character(60, 0, 0), 500, gain_xp_opts())
+    end
+
+    test "ignores non-positive amounts" do
+      entity = character(1, 10, 100)
+
+      assert Experience.gain_xp(entity, 0, gain_xp_opts()) == {entity, []}
+      assert Experience.gain_xp(entity, -5, gain_xp_opts()) == {entity, []}
+    end
+
+    test "falls back to the next_level_xp function when the player field is nil" do
+      {entity, events} = Experience.gain_xp(character(2, 0, nil), 250, gain_xp_opts())
+
+      assert entity.unit.level == 3
+      assert entity.player.xp == 50
+      assert events == [%{new_level: 3}]
+    end
+
+    test "zeroes xp when the threshold is non-positive" do
+      assert {%{player: %{xp: 0}}, []} = Experience.gain_xp(character(1, 10, 0), 50, gain_xp_opts())
+    end
+  end
+
   describe "quest_xp/3" do
     test "full xp at or below quest level plus five" do
       assert Experience.quest_xp(2, 540, 1) == 900

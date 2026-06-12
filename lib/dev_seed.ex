@@ -9,10 +9,13 @@ defmodule ThistleTea.DevSeed do
   import Ecto.Query
 
   alias ThistleTea.DB.Mangos
+  alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.SpellBook
   alias ThistleTea.Game.Network.Message.CmsgCharCreate
+  alias ThistleTea.Game.Player.Characters
   alias ThistleTea.Game.Player.Stats
+  alias ThistleTea.Game.World.Loader.Character, as: CharacterLoader
   alias ThistleTea.Game.World.Loader.ClassSpell
   alias ThistleTea.Game.World.Loader.Mob, as: MobLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
@@ -77,12 +80,12 @@ defmodule ThistleTea.DevSeed do
     }
 
     params
-    |> ThistleTea.Character.build(account_id)
+    |> CharacterLoader.build(account_id)
     |> set_level(@level)
     |> learn_class_spells()
     |> set_coinage(@coinage)
     |> move_to_isle()
-    |> ThistleTea.Character.create()
+    |> Characters.create()
   end
 
   defp set_level(character, level) do
@@ -90,15 +93,15 @@ defmodule ThistleTea.DevSeed do
       {:ok, stats} ->
         character
         |> Stats.apply(stats)
-        |> ThistleTea.Character.sync_equipment_stats()
-        |> ThistleTea.Character.restore_health_and_mana()
+        |> Character.sync_equipment_stats()
+        |> Character.restore_health_and_mana()
 
       _ ->
         character
     end
   end
 
-  defp learn_class_spells(%ThistleTea.Character{internal: internal, unit: unit} = character) do
+  defp learn_class_spells(%Character{internal: internal, unit: unit} = character) do
     existing = internal.spells || []
     new_ids = ClassSpell.trainable_spell_ids(unit.class, unit.level)
     superseded_by = SpellLoader.superseded_by_map(existing ++ new_ids)
@@ -107,11 +110,11 @@ defmodule ThistleTea.DevSeed do
     %{character | internal: %{internal | spells: all_ids}}
   end
 
-  defp set_coinage(%ThistleTea.Character{player: player} = character, coinage) do
+  defp set_coinage(%Character{player: player} = character, coinage) do
     %{character | player: %{player | coinage: coinage}}
   end
 
-  defp move_to_isle(%ThistleTea.Character{movement_block: movement_block, internal: internal} = character) do
+  defp move_to_isle(%Character{movement_block: movement_block, internal: internal} = character) do
     {x, y, z} = @spawn_point
 
     area =

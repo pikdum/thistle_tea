@@ -22,6 +22,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgPlayerLogin do
   alias ThistleTea.Game.Party.Notifier
   alias ThistleTea.Game.Player.Stats, as: PlayerStats
   alias ThistleTea.Game.Time
+  alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Faction, as: FactionLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
@@ -44,7 +45,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgPlayerLogin do
 
   @impl ClientMessage
   def handle(%__MODULE__{character_guid: character_guid}, state) do
-    {:ok, c} = ThistleTea.Character.get_character(state.account.id, character_guid)
+    {:ok, c} = CharacterStore.fetch(state.account.id, character_guid)
 
     c =
       c
@@ -216,12 +217,12 @@ defmodule ThistleTea.Game.Network.Message.CmsgPlayerLogin do
     EventSink.emit(c, AuraLogic.self_duration_events(c, Time.now()))
   end
 
-  defp build_spellbook(%ThistleTea.Character{internal: internal} = character) do
+  defp build_spellbook(%Character{internal: internal} = character) do
     spellbook = SpellLoader.build_spellbook(internal.spells || [])
     %{character | internal: %{internal | spellbook: spellbook}}
   end
 
-  defp normalize_movement_state(%ThistleTea.Character{movement_block: movement_block, internal: internal} = character) do
+  defp normalize_movement_state(%Character{movement_block: movement_block, internal: internal} = character) do
     movement_block =
       %{movement_block | movement_flags: 0, timestamp: 0, fall_time: 0}
       |> Map.merge(MovementBlock.player_speeds())
@@ -233,11 +234,11 @@ defmodule ThistleTea.Game.Network.Message.CmsgPlayerLogin do
     })
   end
 
-  defp normalize_combat_stats(%ThistleTea.Character{} = character) do
+  defp normalize_combat_stats(%Character{} = character) do
     character =
       character
       |> normalize_base_stats()
-      |> ThistleTea.Character.sync_equipment_stats()
+      |> Character.sync_equipment_stats()
 
     unit =
       character.unit
@@ -251,15 +252,14 @@ defmodule ThistleTea.Game.Network.Message.CmsgPlayerLogin do
     %{character | unit: unit, internal: internal}
   end
 
-  defp normalize_base_stats(%ThistleTea.Character{unit: %Unit{} = unit} = character) do
+  defp normalize_base_stats(%Character{unit: %Unit{} = unit} = character) do
     case PlayerStats.get(unit.race, unit.class, unit.level) do
       {:ok, stats} -> PlayerStats.apply(character, stats)
       _ -> character
     end
   end
 
-  defp normalize_faction_template(%ThistleTea.Character{unit: %Unit{race: race} = unit} = character)
-       when is_integer(race) do
+  defp normalize_faction_template(%Character{unit: %Unit{race: race} = unit} = character) when is_integer(race) do
     case DBC.get_by(ChrRaces, id: race) do
       %ChrRaces{faction: faction_template_id} when is_integer(faction_template_id) and faction_template_id > 0 ->
         %{character | unit: %{unit | faction_template: faction_template_id}}
@@ -271,7 +271,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgPlayerLogin do
 
   defp normalize_faction_template(character), do: character
 
-  defp normalize_death_state(%ThistleTea.Character{} = character, character_guid) do
+  defp normalize_death_state(%Character{} = character, character_guid) do
     if Death.ghost?(character) and is_nil(SpatialHash.get_entity(Corpse.guid_for(character_guid))) do
       {character, _events} = Death.resurrect(character, 0.5, Time.now())
       %{character | internal: %{character.internal | broadcast_update?: false}}

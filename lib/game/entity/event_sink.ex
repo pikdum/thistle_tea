@@ -4,9 +4,9 @@ defmodule ThistleTea.Game.Entity.EventSink do
   performs their side effects: building packets, broadcasting to nearby
   players, and messaging other entity processes.
   """
-  alias ThistleTea.Character
   alias ThistleTea.DB.Mangos
   alias ThistleTea.Game.Entity
+  alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.DynamicObject, as: DataDynamicObject
   alias ThistleTea.Game.Entity.Data.GameObject

@@ -4,6 +4,7 @@ defmodule ThistleTea.Game.World do
   by range, and updating an entity's place in the spatial hash tables.
   """
   alias ThistleTea.Game.Entity
+  alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Corpse
@@ -64,7 +65,7 @@ defmodule ThistleTea.Game.World do
     SpatialHash.query(:players, map, x, y, z, range)
   end
 
-  def update_position(%ThistleTea.Character{} = entity), do: update_position(entity, :players)
+  def update_position(%Character{} = entity), do: update_position(entity, :players)
   def update_position(%Mob{} = entity), do: update_position(entity, :mobs)
   def update_position(%GameObject{} = entity), do: update_position(entity, :game_objects)
   def update_position(%Corpse{} = entity), do: update_position(entity, :corpses)
@@ -83,7 +84,7 @@ defmodule ThistleTea.Game.World do
     SpatialHash.update(table, guid, map, x, y, z)
   end
 
-  def remove_position(%ThistleTea.Character{} = entity), do: remove_position(entity, :players)
+  def remove_position(%Character{} = entity), do: remove_position(entity, :players)
   def remove_position(%Mob{} = entity), do: remove_position(entity, :mobs)
   def remove_position(%GameObject{} = entity), do: remove_position(entity, :game_objects)
   def remove_position(%Corpse{} = entity), do: remove_position(entity, :corpses)

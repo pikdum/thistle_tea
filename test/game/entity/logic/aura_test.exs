@@ -4,6 +4,7 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
   import Bitwise, only: [&&&: 2]
 
   alias ThistleTea.Game.Aura.Holder
+  alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Object
@@ -592,7 +593,7 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
 
   describe "self_duration_events/2" do
     defp character_with_auras(holders) do
-      %ThistleTea.Character{
+      %Character{
         object: %Object{guid: 1},
         unit: %Unit{level: 1, health: 100, max_health: 100, auras: holders}
       }

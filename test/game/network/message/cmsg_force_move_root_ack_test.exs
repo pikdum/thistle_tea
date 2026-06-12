@@ -1,7 +1,7 @@
 defmodule ThistleTea.Game.Network.Message.CmsgForceMoveRootAckTest do
   use ExUnit.Case, async: true
 
-  alias ThistleTea.Character
+  alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Network.Message.CmsgForceMoveRootAck
   alias ThistleTea.Game.Network.Message.CmsgForceMoveUnrootAck

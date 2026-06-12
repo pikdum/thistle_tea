@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
 
   alias ThistleTea.Game.Aura
   alias ThistleTea.Game.Aura.Holder
+  alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.Core
@@ -258,8 +259,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
 
   defp same_source?(_holder, _spell_id, _caster_guid), do: false
 
-  def self_duration_events(%ThistleTea.Character{unit: %Unit{auras: holders}}, now)
-      when is_list(holders) and is_integer(now) do
+  def self_duration_events(%Character{unit: %Unit{auras: holders}}, now) when is_list(holders) and is_integer(now) do
     Enum.flat_map(holders, &duration_event(&1, now))
   end
 

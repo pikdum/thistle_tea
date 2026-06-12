@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgCharEnum do
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Message.SmsgCharEnum.Character
   alias ThistleTea.Game.Network.Message.SmsgCharEnum.CharacterGear
+  alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
 
   require Logger
@@ -15,7 +16,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgCharEnum do
   def handle(%__MODULE__{}, state) do
     Logger.info("CMSG_CHAR_ENUM")
 
-    characters = ThistleTea.Character.get_characters!(state.account.id)
+    characters = CharacterStore.for_account(state.account.id)
 
     characters_structs =
       characters

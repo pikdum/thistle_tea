@@ -5,13 +5,14 @@ defmodule ThistleTea.Game.Network.Message.CmsgWho do
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Message.SmsgWho.WhoPlayer
+  alias ThistleTea.Game.World.CharacterStore
 
   defstruct []
 
   @impl ClientMessage
   def handle(%__MODULE__{}, state) do
     characters =
-      ThistleTea.Character.get_all()
+      CharacterStore.all()
       |> Enum.filter(fn c -> Entity.online?(c.id) end)
 
     count = Enum.count(characters)
@@ -20,12 +21,12 @@ defmodule ThistleTea.Game.Network.Message.CmsgWho do
       characters
       |> Enum.map(fn c ->
         %WhoPlayer{
-          name: c.name,
+          name: c.internal.name,
           guild: "Test Guild",
-          level: c.level,
-          class: c.class,
-          race: c.race,
-          area: c.area
+          level: c.unit.level,
+          class: c.unit.class,
+          race: c.unit.race,
+          area: c.internal.area
         }
       end)
 

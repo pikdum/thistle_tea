@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgLogoutRequest do
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Party.Group
   alias ThistleTea.Game.Party.Notifier
+  alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.System.Party, as: PartySystem
@@ -36,7 +37,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgLogoutRequest do
 
     # save current character state
     if Map.get(state, :character) do
-      ThistleTea.Character.save(state.character)
+      CharacterStore.put(state.character)
     end
 
     if Map.get(state, :guid) do

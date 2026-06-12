@@ -17,6 +17,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgMessagechat do
   alias ThistleTea.Game.Player.Quests
   alias ThistleTea.Game.Player.Spells
   alias ThistleTea.Game.Player.Stats
+  alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.ClassSpell
   alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader
@@ -105,7 +106,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgMessagechat do
     with {quest_id, ""} <- Integer.parse(quest_id_str),
          %Quest{} = quest <- QuestLoader.get(quest_id) do
       case Quests.force_accept(state, quest_id) do
-        %{character: %ThistleTea.Character{player: %{quest_log: quest_log}}} = state ->
+        %{character: %Character{player: %{quest_log: quest_log}}} = state ->
           # credo:disable-for-next-line Credo.Check.Refactor.Nesting
           if QuestLog.active?(quest_log, quest_id) do
             system_message(state, "Added quest: #{quest.title} (#{quest_id})")
@@ -258,7 +259,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgMessagechat do
   end
 
   def handle_chat(state, _, _, ".die" <> _, _) do
-    %{character: %ThistleTea.Character{} = character} = state
+    %{character: %Character{} = character} = state
 
     cond do
       not Death.alive?(character) ->
@@ -277,7 +278,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgMessagechat do
   end
 
   def handle_chat(state, _, _, ".tgm" <> _, _) do
-    %{character: %ThistleTea.Character{internal: internal} = character} = state
+    %{character: %Character{internal: internal} = character} = state
     new_godmode = not (internal.godmode || false)
     character = %{character | internal: %{internal | godmode: new_godmode}}
 
@@ -457,7 +458,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgMessagechat do
     state
   end
 
-  defp handle_modify_hp(%{character: %ThistleTea.Character{unit: %Unit{} = unit} = character} = state, value) do
+  defp handle_modify_hp(%{character: %Character{unit: %Unit{} = unit} = character} = state, value) do
     case parse_positive_integer(value) do
       {:ok, hp} ->
         hp = min(hp, unit.max_health || hp)
@@ -474,7 +475,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgMessagechat do
 
   @max_coinage 0x7FFFFFFF
 
-  defp handle_modify_money(%{character: %ThistleTea.Character{player: player} = character} = state, value) do
+  defp handle_modify_money(%{character: %Character{player: player} = character} = state, value) do
     case Integer.parse(value) do
       {amount, ""} ->
         coinage = ((player.coinage || 0) + amount) |> max(0) |> min(@max_coinage)
@@ -493,7 +494,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgMessagechat do
     "#{div(copper, 10_000)}g #{div(rem(copper, 10_000), 100)}s #{rem(copper, 100)}c"
   end
 
-  defp handle_set_level(%{character: %ThistleTea.Character{}} = state, level) do
+  defp handle_set_level(%{character: %Character{}} = state, level) do
     with {:ok, level} <- parse_positive_integer(level),
          {:ok, character, level_up} <- set_character_level(state.character, level) do
       state
@@ -505,7 +506,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgMessagechat do
     end
   end
 
-  defp handle_levelup(%{character: %ThistleTea.Character{unit: %{level: level}}} = state, levels) do
+  defp handle_levelup(%{character: %Character{unit: %{level: level}}} = state, levels) do
     with {:ok, levels} <- parse_positive_integer(levels),
          {:ok, character, level_up} <- set_character_level(state.character, level + levels) do
       state
@@ -524,7 +525,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgMessagechat do
     end
   end
 
-  defp set_character_level(%ThistleTea.Character{} = character, level) do
+  defp set_character_level(%Character{} = character, level) do
     level = min(level, Stats.max_level())
     old_stats = Stats.from_character(character)
 
@@ -533,8 +534,8 @@ defmodule ThistleTea.Game.Network.Message.CmsgMessagechat do
         character =
           character
           |> Stats.apply(new_stats)
-          |> ThistleTea.Character.sync_equipment_stats()
-          |> ThistleTea.Character.restore_health_and_mana()
+          |> Character.sync_equipment_stats()
+          |> Character.restore_health_and_mana()
           |> put_player_xp(0)
 
         level_up =
@@ -549,12 +550,12 @@ defmodule ThistleTea.Game.Network.Message.CmsgMessagechat do
     end
   end
 
-  defp put_player_xp(%ThistleTea.Character{player: player} = character, xp) do
+  defp put_player_xp(%Character{player: player} = character, xp) do
     %{character | player: %{player | xp: xp}}
   end
 
-  defp put_character(%{guid: guid} = state, %ThistleTea.Character{} = character) do
-    ThistleTea.Character.save(character)
+  defp put_character(%{guid: guid} = state, %Character{} = character) do
+    CharacterStore.put(character)
 
     Metadata.update(guid, %{
       level: character.unit.level,
@@ -576,7 +577,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgMessagechat do
     state
   end
 
-  defp learn_spells(%{character: %ThistleTea.Character{} = character} = state, spell_ids, known_message) do
+  defp learn_spells(%{character: %Character{} = character} = state, spell_ids, known_message) do
     case Spells.learn(character, spell_ids) do
       :already_known ->
         system_message(state, known_message)
@@ -604,7 +605,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgMessagechat do
     end
   end
 
-  defp debug_spell_ids(%{character: %ThistleTea.Character{unit: %{class: class, level: level}}}) do
+  defp debug_spell_ids(%{character: %Character{unit: %{class: class, level: level}}}) do
     ClassSpell.trainable_spell_ids(class, level)
   end
 

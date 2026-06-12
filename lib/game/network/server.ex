@@ -9,7 +9,7 @@ defmodule ThistleTea.Game.Network.Server do
 
   import Bitwise, only: [|||: 2]
 
-  alias ThistleTea.Character
+  alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Unit
@@ -39,9 +39,11 @@ defmodule ThistleTea.Game.Network.Server do
   alias ThistleTea.Game.Party.MemberStats
   alias ThistleTea.Game.Party.Notifier, as: PartyNotifier
   alias ThistleTea.Game.Player.Quests
+  alias ThistleTea.Game.Player.Stats, as: PlayerStats
   alias ThistleTea.Game.Spell.Cast
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
+  alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Pathfinding
@@ -241,8 +243,7 @@ defmodule ThistleTea.Game.Network.Server do
   @impl GenServer
   def handle_cast(
         {:send_update_to, pid},
-        {socket,
-         %{character: %ThistleTea.Character{movement_block: %MovementBlock{} = movement_block} = character} = state}
+        {socket, %{character: %Character{movement_block: %MovementBlock{} = movement_block} = character} = state}
       ) do
     update_flag = @update_flag_high_guid ||| @update_flag_living ||| @update_flag_has_position
     movement_block = %{movement_block | update_flag: update_flag}
@@ -334,7 +335,7 @@ defmodule ThistleTea.Game.Network.Server do
   @impl GenServer
   def handle_cast(
         {:start_teleport, x, y, z, map},
-        {socket, %{character: %ThistleTea.Character{internal: %Internal{map: map}} = character} = state}
+        {socket, %{character: %Character{internal: %Internal{map: map}} = character} = state}
       ) do
     area =
       case Pathfinding.get_zone_and_area(map, {x, y, z}) do
@@ -492,7 +493,7 @@ defmodule ThistleTea.Game.Network.Server do
   @impl GenServer
   def handle_continue(
         :maybe_broadcast_update,
-        {socket, %{character: %ThistleTea.Character{internal: %Internal{broadcast_update?: true}} = character} = state}
+        {socket, %{character: %Character{internal: %Internal{broadcast_update?: true}} = character} = state}
       ) do
     character = maybe_handle_death_transition(state, character)
 
@@ -601,10 +602,10 @@ defmodule ThistleTea.Game.Network.Server do
           experience_without_rested: xp
         })
 
-        {character, level_ups} = Character.gain_xp(state.character, xp)
+        {character, level_ups} = PlayerStats.gain_xp(state.character, xp)
         send_level_ups(level_ups)
 
-        Character.save(character)
+        CharacterStore.put(character)
         Metadata.update(state.guid, %{level: character.unit.level})
 
         update = Core.update_object(character, :values)

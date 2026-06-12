@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.Network.InventoryUpdate do
   """
   import Kernel, except: [apply: 2]
 
+  alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Item
   alias ThistleTea.Game.Entity.Logic.Inventory
@@ -39,7 +40,7 @@ defmodule ThistleTea.Game.Network.InventoryUpdate do
 
     character =
       %{state.character | player: player}
-      |> ThistleTea.Character.sync_equipment_stats()
+      |> Character.sync_equipment_stats()
 
     %UpdateObject{
       update_type: :values,

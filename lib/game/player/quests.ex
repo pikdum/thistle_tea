@@ -3,7 +3,7 @@ defmodule ThistleTea.Game.Player.Quests do
   Player-session quest flows: questgiver hello/details/accept/complete/reward
   exchanges, quest-log changes, and the packets each step sends.
   """
-  alias ThistleTea.Character
+  alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Item, as: DataItem
   alias ThistleTea.Game.Entity.Data.ItemTemplate
   alias ThistleTea.Game.Entity.Data.Quest
@@ -20,7 +20,9 @@ defmodule ThistleTea.Game.Player.Quests do
   alias ThistleTea.Game.Network.InventoryUpdate
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.UpdateObject
+  alias ThistleTea.Game.Player.Stats, as: PlayerStats
   alias ThistleTea.Game.World
+  alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
   alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader
@@ -173,7 +175,7 @@ defmodule ThistleTea.Game.Player.Quests do
     rewarded = MapSet.put(character.player.rewarded_quests, quest.id)
 
     xp = Experience.quest_xp(quest.level, quest.reward_money_max_level, character.unit.level)
-    {character, level_ups} = Character.gain_xp(character, xp)
+    {character, level_ups} = PlayerStats.gain_xp(character, xp)
     Enum.each(level_ups, fn level_up -> Network.send_packet(struct(Message.SmsgLevelupInfo, level_up)) end)
 
     coinage = max(character.player.coinage + quest.reward_money, 0)
@@ -496,7 +498,7 @@ defmodule ThistleTea.Game.Player.Quests do
   end
 
   defp put_character(state, %Character{} = character) do
-    Character.save(character)
+    CharacterStore.put(character)
 
     update = Core.update_object(character, :values)
     Network.send_packet(update)

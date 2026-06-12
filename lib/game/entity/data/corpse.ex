@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.Entity.Data.Corpse do
   """
   import Bitwise, only: [|||: 2, <<<: 2]
 
+  alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Corpse, as: CorpseComponent
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
@@ -28,7 +29,7 @@ defmodule ThistleTea.Game.Entity.Data.Corpse do
     Guid.from_low_guid(:corpse, Guid.low_guid(player_guid))
   end
 
-  def build(%ThistleTea.Character{} = character, equipped_templates) do
+  def build(%Character{} = character, equipped_templates) do
     %{object: object, unit: unit, player: player, internal: internal, movement_block: movement_block} = character
     {x, y, z, o} = movement_block.position
 

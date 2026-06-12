@@ -7,6 +7,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.DB.Mangos.Repo
   alias ThistleTea.Game.Entity.Registry, as: EntityRegistry
   alias ThistleTea.Game.Network.Server, as: GameServer
+  alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.EntitySupervisor
   alias ThistleTea.Game.World.Groups
   alias ThistleTea.Game.World.ItemStore
@@ -53,8 +54,6 @@ defmodule ThistleTea.Application do
       name = "BOT" <> String.pad_leading(Integer.to_string(i), 4, "0")
       ThistleTea.Account.register(name, name)
     end)
-
-    Memento.Table.create!(ThistleTea.Character)
   end
 
   @impl true
@@ -89,6 +88,7 @@ defmodule ThistleTea.Application do
     Metadata.init()
     ItemLoader.init()
     ItemStore.init()
+    CharacterStore.init()
     VendorLoader.init()
     QuestLoader.init()
     GossipLoader.init()

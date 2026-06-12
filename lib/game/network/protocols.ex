@@ -26,7 +26,7 @@ defmodule ThistleTea.Game.Network.ClientMessage do
     quote do
       @behaviour ThistleTea.Game.Network.ClientMessage
 
-      alias ThistleTea.Character
+      alias ThistleTea.Game.Entity.Data.Character
       alias ThistleTea.Game.Entity.Data.Component.MovementBlock
       alias ThistleTea.Game.Entity.Data.Component.Unit
       alias ThistleTea.Game.Network
@@ -71,7 +71,7 @@ defmodule ThistleTea.Game.Network.ServerMessage do
     quote do
       @behaviour ThistleTea.Game.Network.ServerMessage
 
-      alias ThistleTea.Character
+      alias ThistleTea.Game.Entity.Data.Character
       alias ThistleTea.Game.Network.BinaryUtils
       alias ThistleTea.Game.Network.Message
       alias ThistleTea.Game.Network.Packet

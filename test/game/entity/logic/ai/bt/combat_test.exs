@@ -1,7 +1,7 @@
 defmodule ThistleTea.Game.Entity.Logic.AI.BT.CombatTest do
   use ExUnit.Case, async: false
 
-  alias ThistleTea.Character
+  alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Object

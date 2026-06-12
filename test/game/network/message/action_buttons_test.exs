@@ -1,12 +1,13 @@
 defmodule ThistleTea.Game.Network.Message.ActionButtonsTest do
   use ExUnit.Case, async: true
 
+  alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Network.Message.CmsgSetActionButton
   alias ThistleTea.Game.Network.Message.SmsgActionButtons
 
   defp state_with_buttons(action_buttons) do
-    %{character: %ThistleTea.Character{internal: %Internal{action_buttons: action_buttons}}}
+    %{character: %Character{internal: %Internal{action_buttons: action_buttons}}}
   end
 
   describe "SmsgActionButtons.to_binary/1" do

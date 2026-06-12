@@ -4,6 +4,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
   payloads, taking damage and dying, healing, mana restoration, and combat
   tether-range checks for mobs.
   """
+  alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Unit
@@ -24,7 +25,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
   def update_object(%Corpse{} = entity, update_type), do: update_object(entity, update_type, :corpse)
 
   def update_object(%DataDynamicObject{} = entity, update_type), do: update_object(entity, update_type, :dynamic_object)
-  def update_object(%ThistleTea.Character{} = entity, update_type), do: update_object(entity, update_type, :player)
+  def update_object(%Character{} = entity, update_type), do: update_object(entity, update_type, :player)
 
   def update_object(entity, update_type, object_type) do
     %UpdateObject{

@@ -1,12 +1,13 @@
 defmodule ThistleTea.Game.Player.Stats do
   @moduledoc false
 
-  alias ThistleTea.Character
   alias ThistleTea.DB.Mangos.PlayerClassLevelStats
   alias ThistleTea.DB.Mangos.PlayerLevelStats
   alias ThistleTea.DB.Mangos.PlayerXpForLevel
+  alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Logic.Experience
   alias ThistleTea.Game.Entity.Logic.Stats, as: LogicStats
 
   defstruct [
@@ -54,6 +55,27 @@ defmodule ThistleTea.Game.Player.Stats do
   end
 
   def max_level, do: PlayerXpForLevel.max_level()
+
+  def gain_xp(%Character{} = character, amount) do
+    Experience.gain_xp(character, amount,
+      max_level: max_level(),
+      next_level_xp: &next_level_xp/1,
+      level_up: &level_up/2
+    )
+  end
+
+  defp level_up(%Character{unit: %Unit{race: race, class: class}} = character, new_level) do
+    old_stats = from_character(character)
+    new_stats = get!(race, class, new_level)
+
+    character =
+      character
+      |> __MODULE__.apply(new_stats)
+      |> Character.sync_equipment_stats()
+      |> Character.restore_health_and_mana()
+
+    {character, level_delta(old_stats, new_stats)}
+  end
 
   def apply(%Character{unit: %Unit{} = unit, player: %Player{} = player} = character, %__MODULE__{} = stats) do
     unit =

@@ -10,6 +10,53 @@ defmodule ThistleTea.Game.Entity.Logic.Experience do
 
   def elite_rank?(rank), do: rank in [1, 2, 3]
 
+  def gain_xp(entity, amount, opts)
+
+  def gain_xp(%{unit: %{level: level}} = entity, amount, opts) when is_integer(amount) and amount > 0 do
+    opts = %{
+      max_level: Keyword.fetch!(opts, :max_level),
+      next_level_xp: Keyword.fetch!(opts, :next_level_xp),
+      level_up: Keyword.fetch!(opts, :level_up)
+    }
+
+    if level >= opts.max_level do
+      {entity, []}
+    else
+      do_gain_xp(entity, current_xp(entity) + amount, [], opts)
+    end
+  end
+
+  def gain_xp(entity, _amount, _opts), do: {entity, []}
+
+  defp do_gain_xp(%{unit: %{level: level}, player: player} = entity, xp, events, opts) do
+    next_level_xp = player.next_level_xp || opts.next_level_xp.(level)
+
+    cond do
+      next_level_xp <= 0 ->
+        {put_xp(entity, 0), Enum.reverse(events)}
+
+      xp >= next_level_xp and level < opts.max_level ->
+        {entity, event} = opts.level_up.(entity, level + 1)
+        entity = put_xp_after_level(entity, xp - next_level_xp, opts.max_level)
+        do_gain_xp(entity, entity.player.xp, [event | events], opts)
+
+      true ->
+        {put_xp(entity, xp), Enum.reverse(events)}
+    end
+  end
+
+  defp put_xp_after_level(%{unit: %{level: level}} = entity, xp, max_level) do
+    xp = if level >= max_level, do: 0, else: xp
+    put_xp(entity, xp)
+  end
+
+  defp put_xp(%{player: player} = entity, xp) do
+    %{entity | player: %{player | xp: xp}}
+  end
+
+  defp current_xp(%{player: %{xp: xp}}) when is_integer(xp), do: xp
+  defp current_xp(_entity), do: 0
+
   def group_rate(3), do: 1.166
   def group_rate(4), do: 1.3
   def group_rate(count) when is_integer(count) and count >= 5, do: 1.4

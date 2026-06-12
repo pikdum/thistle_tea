@@ -3,7 +3,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Player do
   The player behavior tree, ticked from the network handler: aura ticks,
   regen, spell casting, and melee auto-attack.
   """
-  alias ThistleTea.Character
+  alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Aura, as: AuraBT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard

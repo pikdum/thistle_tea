@@ -4,10 +4,11 @@ defmodule ThistleTea.Game.Player.Spells do
   the spellbook, persists the character, and notifies the client of each
   learned or superseded spell.
   """
-  alias ThistleTea.Character
+  alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Logic.SpellBook
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
+  alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
 
   def learn(%Character{internal: internal} = character, spell_ids) do
@@ -21,7 +22,7 @@ defmodule ThistleTea.Game.Player.Spells do
       {all_ids, events} ->
         spellbook = SpellLoader.build_spellbook(all_ids)
         character = %{character | internal: %{internal | spells: all_ids, spellbook: spellbook}}
-        Character.save(character)
+        CharacterStore.put(character)
         Enum.each(events, &send_event_packet/1)
         {:ok, character, events}
     end

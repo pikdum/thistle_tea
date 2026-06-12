@@ -4,6 +4,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
   damage/healing bonuses — so effects apply consistently even after the
   caster's state changes.
   """
+  alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Mob
 
   @schools [:physical, :holy, :fire, :nature, :frost, :shadow, :arcane]
@@ -42,7 +43,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
     }
   end
 
-  defp caster_type(%ThistleTea.Character{}), do: :player
+  defp caster_type(%Character{}), do: :player
   defp caster_type(%Mob{}), do: :mob
   defp caster_type(_), do: nil
 

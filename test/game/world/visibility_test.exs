@@ -2,6 +2,7 @@ defmodule ThistleTea.Game.World.VisibilityTest do
   use ExUnit.Case, async: false
 
   alias ThistleTea.Game.Entity
+  alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Object
@@ -247,7 +248,7 @@ defmodule ThistleTea.Game.World.VisibilityTest do
   defp character(guid, opts) do
     flags = if Keyword.get(opts, :ghost?, false), do: 0x10, else: 0
 
-    %ThistleTea.Character{
+    %Character{
       object: %Object{guid: guid},
       unit: %Unit{},
       player: %Player{flags: flags},

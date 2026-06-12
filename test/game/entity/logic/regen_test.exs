@@ -1,9 +1,9 @@
 defmodule ThistleTea.Game.Entity.Logic.RegenTest do
   use ExUnit.Case, async: true
 
-  alias ThistleTea.Character
   alias ThistleTea.Game.Aura, as: AuraEffect
   alias ThistleTea.Game.Aura.Holder
+  alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit

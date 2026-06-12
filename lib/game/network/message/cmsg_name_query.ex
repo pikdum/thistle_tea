@@ -4,6 +4,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgNameQuery do
 
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.Message
+  alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.Metadata
 
   require Logger
@@ -47,8 +48,8 @@ defmodule ThistleTea.Game.Network.Message.CmsgNameQuery do
   end
 
   defp offline_name_info(guid) do
-    case Character.get_character_by_id(Guid.low_guid(guid)) do
-      {:ok, %Character{} = c} ->
+    case CharacterStore.get(Guid.low_guid(guid)) do
+      %Character{} = c ->
         %{name: c.internal.name, realm: "", race: c.unit.race, gender: c.unit.gender, class: c.unit.class}
 
       _ ->

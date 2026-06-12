@@ -3,6 +3,7 @@ defmodule ThistleTea.Game.Entity.Data.CorpseTest do
 
   import Bitwise, only: [&&&: 2, <<<: 2, >>>: 2]
 
+  alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Object
@@ -16,7 +17,7 @@ defmodule ThistleTea.Game.Entity.Data.CorpseTest do
   alias ThistleTea.Game.Network.UpdateObject
 
   defp fixture_character do
-    %ThistleTea.Character{
+    %Character{
       object: %Object{guid: 42},
       unit: %Unit{race: 4, gender: 1, native_display_id: 50, display_id: 10_045},
       player: %Player{skin: 1, face: 2, hair_style: 3, hair_color: 4, facial_hair: 5},

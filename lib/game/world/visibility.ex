@@ -2,6 +2,7 @@ defmodule ThistleTea.Game.World.Visibility do
   @moduledoc false
 
   alias ThistleTea.Game.Entity
+  alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Corpse
@@ -187,7 +188,7 @@ defmodule ThistleTea.Game.World.Visibility do
 
   defp can_see?(state, guid) do
     case Map.get(state, :character) do
-      %ThistleTea.Character{} = character ->
+      %Character{} = character ->
         ghost? = Death.ghost?(character)
         type = Guid.entity_type(guid)
         distance = if ghost? and type == :mob, do: corpse_distance(character, guid)
