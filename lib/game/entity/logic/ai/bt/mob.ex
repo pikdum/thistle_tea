@@ -450,7 +450,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   end
 
   def combat_wait(%Mob{} = state, %Blackboard{} = blackboard, now) when is_integer(now) do
-    chase_delay = combat_wait_delay()
+    attack_delay = Blackboard.delay_until(blackboard, :next_attack_at, now)
+    chase_delay = combat_chase_delay(state, attack_delay, now)
 
     blackboard =
       blackboard
@@ -460,7 +461,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     delay_ms =
       [
         chase_delay,
-        Blackboard.delay_until(blackboard, :next_attack_at, now),
+        attack_delay,
         aura_delay(state, now),
         regen_delay(state, blackboard, now)
       ]
@@ -811,10 +812,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     :rand.uniform(6_000) + 4_000
   end
 
-  defp combat_wait_delay do
-    :rand.uniform(1_000) + 500
-  end
-
   defp set_running(%Mob{internal: %Internal{} = internal} = state, running) when is_boolean(running) do
     %{state | internal: %{internal | running: running}}
   end
@@ -850,6 +847,19 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
       min(Movement.remaining_move_duration(state, now), @chase_tick_delay)
     else
       @chase_tick_delay
+    end
+  end
+
+  defp combat_chase_delay(%Mob{} = state, attack_delay, now) do
+    cond do
+      Movement.moving?(state, now) ->
+        Movement.next_spatial_update_delay(state, now)
+
+      is_integer(attack_delay) and attack_delay > 0 ->
+        attack_delay
+
+      true ->
+        @chase_tick_delay
     end
   end
 

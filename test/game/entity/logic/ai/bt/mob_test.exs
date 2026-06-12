@@ -79,17 +79,23 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
   end
 
   describe "combat_wait/3" do
-    test "paces by the next swing or chase check" do
+    test "paces by the next swing when already stationary in range" do
       state = fixture_mob()
       blackboard = %Blackboard{next_attack_at: 1_750, chase_started: true, last_target_pos: {1.0, 2.0, 3.0}}
 
       assert {{:running, delay}, ^state, %Blackboard{next_chase_at: next_chase_at, chase_started: false}} =
                MobBT.combat_wait(state, blackboard, 1_000)
 
-      assert delay >= 1
-      assert delay <= 750
-      assert next_chase_at >= 1_501
-      assert next_chase_at <= 2_500
+      assert delay == 750
+      assert next_chase_at == 1_750
+    end
+
+    test "paces by movement boundary before the next swing while still moving" do
+      state = fixture_mob(start_time: 0, duration: 10_000, spline_nodes: [{250.0, 0.0, 0.0}])
+      blackboard = %Blackboard{next_attack_at: 5_000, chase_started: true, last_target_pos: {1.0, 2.0, 3.0}}
+
+      assert {{:running, 3_980}, ^state, %Blackboard{next_chase_at: 4_980, chase_started: false}} =
+               MobBT.combat_wait(state, blackboard, 1_000)
     end
   end
 
