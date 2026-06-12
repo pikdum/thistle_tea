@@ -12,6 +12,9 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
     :spell_id,
     :school,
     :damage,
+    :amount,
+    :health,
+    :mana,
     :periodic?,
     :aura_slot,
     :duration_ms,
@@ -81,12 +84,12 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
   end
 
   def heal_entity(target_guid, amount) when is_integer(target_guid) and is_integer(amount) do
-    %__MODULE__{type: :heal_entity, target_guid: target_guid, damage: amount}
+    %__MODULE__{type: :heal_entity, target_guid: target_guid, amount: amount}
   end
 
   def resurrect_request(source_guid, spell_id, health, mana)
       when is_integer(source_guid) and is_integer(spell_id) and is_integer(health) and is_integer(mana) do
-    %__MODULE__{type: :resurrect_request, source_guid: source_guid, spell_id: spell_id, damage: health, count: mana}
+    %__MODULE__{type: :resurrect_request, source_guid: source_guid, spell_id: spell_id, health: health, mana: mana}
   end
 
   def monster_move(opts \\ []) when is_list(opts) do

@@ -390,7 +390,7 @@ defmodule ThistleTea.Game.Entity.Logic.PriestSpellsTest do
       assert entity.unit.health == 100 - 18
 
       assert Enum.any?(events, &(&1.type == :spell_damage and &1.damage == 18 and &1.periodic?))
-      assert Enum.any?(events, &(&1.type == :heal_entity and &1.target_guid == 999 and &1.damage == 18))
+      assert Enum.any?(events, &(&1.type == :heal_entity and &1.target_guid == 999 and &1.amount == 18))
     end
   end
 
@@ -454,7 +454,7 @@ defmodule ThistleTea.Game.Entity.Logic.PriestSpellsTest do
 
       {_target, events} = SpellEffect.receive(dead_player_fixture(), context, resurrection_fixture(), 1_000)
 
-      assert [%{type: :resurrect_request, source_guid: 999, spell_id: 2006, damage: 70, count: 135}] = events
+      assert [%{type: :resurrect_request, source_guid: 999, spell_id: 2006, health: 70, mana: 135}] = events
     end
 
     test "queues a resurrect request on a released ghost" do

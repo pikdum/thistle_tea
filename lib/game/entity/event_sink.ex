@@ -128,8 +128,8 @@ defmodule ThistleTea.Game.Entity.EventSink do
     pending = %{
       caster_guid: event.source_guid,
       position: World.position(event.source_guid),
-      health: event.damage,
-      mana: event.count || 0
+      health: event.health,
+      mana: event.mana || 0
     }
 
     Network.send_packet(%Message.SmsgResurrectRequest{guid: event.source_guid})
@@ -140,7 +140,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
   def emit(entity, %Event{type: :resurrect_request}), do: entity
 
   def emit(entity, %Event{type: :heal_entity} = event) do
-    Entity.receive_heal(event.target_guid, event.damage)
+    Entity.receive_heal(event.target_guid, event.amount)
     entity
   end
 
