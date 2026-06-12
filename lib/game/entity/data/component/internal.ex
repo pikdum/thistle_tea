@@ -38,6 +38,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal do
     :min_loot_gold,
     :max_loot_gold,
     :loot,
+    :loot_override,
     :creature_type_flags,
     :regenerate_stats,
     :pending_resurrect,

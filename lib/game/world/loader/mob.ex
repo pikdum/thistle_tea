@@ -17,12 +17,17 @@ defmodule ThistleTea.Game.World.Loader.Mob do
 
     Mangos.Creature.query_cell(cell, events)
     |> Mangos.Repo.all()
-    |> Enum.map(&load_creature_movement/1)
-    |> Enum.map(&load_creature_model_info/1)
-    |> Enum.map(&load_display_scale/1)
-    |> Enum.map(&load_equip_items/1)
-    |> Enum.map(&load_spells/1)
+    |> Enum.map(&load_creature/1)
     |> Enum.each(&start/1)
+  end
+
+  def load_creature(%Mangos.Creature{} = creature) do
+    creature
+    |> load_creature_movement()
+    |> load_creature_model_info()
+    |> load_display_scale()
+    |> load_equip_items()
+    |> load_spells()
   end
 
   defp load_spells(%Mangos.Creature{creature_template: %Mangos.CreatureTemplate{entry: entry}} = creature) do
@@ -103,8 +108,12 @@ defmodule ThistleTea.Game.World.Loader.Mob do
   defp creature_item_template(_entry), do: nil
 
   defp start(%Mangos.Creature{} = creature) do
-    mob = Mob.build(creature)
+    creature
+    |> Mob.build()
+    |> start_mob()
+  end
 
+  def start_mob(%Mob{} = mob) do
     Metadata.put(
       mob.object.guid,
       %{
@@ -113,6 +122,7 @@ defmodule ThistleTea.Game.World.Loader.Mob do
         combat_reach: mob.unit.combat_reach,
         level: mob.unit.level,
         unit_flags: mob.unit.flags,
+        display_id: mob.unit.display_id,
         attacker_count: 0,
         alive?: mob.unit.health > 0
       }

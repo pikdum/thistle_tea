@@ -15,6 +15,25 @@ defmodule ThistleTea.Game.World.Loader.Loot do
     }
   end
 
+  def generate_fixed(items, gold) do
+    items =
+      items
+      |> Enum.map(fn {item_id, count} -> {ItemLoader.get_template(item_id), count} end)
+      |> Enum.reject(fn {template, _count} -> is_nil(template) end)
+      |> Enum.with_index()
+      |> Enum.map(fn {{%ItemTemplate{} = template, count}, index} ->
+        %Loot.Item{
+          slot: index,
+          item_id: template.entry,
+          display_id: template.display_id,
+          count: count,
+          quality: template.quality
+        }
+      end)
+
+    %Loot{gold: gold, items: items}
+  end
+
   defp roll_items(loot_id) when is_integer(loot_id) and loot_id > 0 do
     Mangos.CreatureLootTemplate.query(loot_id)
     |> Mangos.Repo.all()

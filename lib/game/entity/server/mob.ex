@@ -353,7 +353,11 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   defp handle_death_transition(%Mob{} = state, _target, _dead_before), do: state
 
   defp generate_loot(%Mob{internal: %Internal{} = internal, unit: %Unit{} = unit} = state) do
-    loot = LootLoader.generate(internal.loot_id, internal.min_loot_gold, internal.max_loot_gold)
+    loot =
+      case Map.get(internal, :loot_override) do
+        %{items: items, gold: gold} -> LootLoader.generate_fixed(items, gold)
+        _ -> LootLoader.generate(internal.loot_id, internal.min_loot_gold, internal.max_loot_gold)
+      end
 
     if Loot.empty?(loot) do
       state

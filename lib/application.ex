@@ -139,6 +139,8 @@ defmodule ThistleTea.Application do
         Logger.info("Loading templates...")
         CreatureTemplateLoader.load_all()
         GameObjectTemplateLoader.load_all()
+        Logger.info("Seeding debug data...")
+        ThistleTea.DevSeed.run()
       end
 
       {:ok, pid}
