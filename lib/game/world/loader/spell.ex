@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   alias ThistleTea.Game.Entity.Data.CreatureTemplate
   alias ThistleTea.Game.Spell, as: SpellData
   alias ThistleTea.Game.Spell.Effect
+  alias ThistleTea.Game.Spell.Scripts
   alias ThistleTea.Game.World.Loader.CreatureTemplate, as: CreatureTemplateLoader
 
   @learn_spell_effect 36
@@ -182,7 +183,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
       mechanic: row.mechanic || 0,
       proc_charges: row.proc_charges || 0,
       attributes: attributes(row.attributes, row.attributes_ex1),
-      exclusive_category: exclusive_category(row),
+      exclusive_category: Scripts.exclusive_category(row),
       effects: build_effects(row, radius_lookup),
       reagents: build_reagents(row)
     }
@@ -209,25 +210,6 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   end
 
   defp put_chain(spell, _chain), do: spell
-
-  @spell_family_mage 3
-  @mage_armor_family_flags 0x12000000
-  @warlock_armor_visual 130
-  @warlock_armor_icon 89
-
-  defp exclusive_category(row) do
-    cond do
-      row.spell_class_set == @spell_family_mage and
-          ((row.spell_class_mask_0 || 0) &&& @mage_armor_family_flags) != 0 ->
-        :mage_armor
-
-      row.spell_visual_0 == @warlock_armor_visual and row.spell_icon == @warlock_armor_icon ->
-        :warlock_armor
-
-      true ->
-        nil
-    end
-  end
 
   defp build_reagents(row) do
     0..7

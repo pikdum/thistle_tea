@@ -10,12 +10,11 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Effect
+  alias ThistleTea.Game.Spell.Scripts
 
   @schools [:physical, :holy, :fire, :nature, :frost, :shadow, :arcane]
 
   @resurrect_effects [:resurrect, :resurrect_new]
-  @power_word_shield_first_rank 17
-  @weakened_soul_spell_id 6788
 
   def receive(target, %CastContext{} = context, %Spell{} = spell, now) when is_integer(now) do
     context = %{context | target_guid: target.object.guid, spell: spell}
@@ -75,7 +74,16 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
 
   defp apply_auras(target, context, now) do
     {target, events} = Aura.apply_spell(target, context, context.spell, now)
-    {target, events ++ weakened_soul_events(target, context, context.spell)}
+    {target, events ++ script_trigger_events(target, context)}
+  end
+
+  defp script_trigger_events(target, %CastContext{spell: spell} = context) do
+    with trigger_id when is_integer(trigger_id) <- Scripts.apply_trigger(spell),
+         true <- Aura.has_spell?(target, spell.id) do
+      [Event.trigger_spell(context.caster_guid, context.caster_level, target.object.guid, trigger_id)]
+    else
+      _ -> []
+    end
   end
 
   defp channel_ticked_trigger?(spell, %Effect{type: :apply_aura, aura: :periodic_trigger_spell, trigger_spell_id: id})
@@ -222,17 +230,6 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   defp dispel_polarity(%CastContext{target_hostile?: true}), do: :positive
   defp dispel_polarity(%CastContext{target_hostile?: false}), do: :negative
   defp dispel_polarity(_context), do: nil
-
-  defp weakened_soul_events(state, %CastContext{} = context, %Spell{} = spell) do
-    power_word_shield? =
-      spell.id == @power_word_shield_first_rank or spell.first_in_chain == @power_word_shield_first_rank
-
-    if power_word_shield? and Aura.has_spell?(state, spell.id) do
-      [Event.trigger_spell(context.caster_guid, context.caster_level, state.object.guid, @weakened_soul_spell_id)]
-    else
-      []
-    end
-  end
 
   defp healing_taken_multiplier(state, spell) do
     percent = Aura.flat_modifier(state, :mod_healing_pct, Spell.school_mask(spell))

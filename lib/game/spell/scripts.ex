@@ -1,0 +1,46 @@
+defmodule ThistleTea.Game.Spell.Scripts do
+  @moduledoc """
+  Per-spell rules that 1.12 data cannot express, mirroring the reference
+  cores' spell scripts. Vanilla has no precast links — Power Word: Shield
+  applying Weakened Soul is hardcoded even in MaNGOS — so `apply_trigger/1`
+  carries those pairs, keyed by chain so every rank matches. (The re-shield
+  *block* needs no script: Weakened Soul is a mechanic-19 immunity in the DBC
+  and the shield is mechanic 19, so generic immunity handling covers it.)
+  `exclusive_category/1` classifies raw DBC rows whose mutual exclusivity the
+  data likewise never states.
+  """
+  import Bitwise, only: [&&&: 2]
+
+  alias ThistleTea.Game.Spell
+
+  @power_word_shield 17
+  @weakened_soul 6788
+
+  @apply_triggers %{@power_word_shield => @weakened_soul}
+
+  @spell_family_mage 3
+  @mage_armor_family_flags 0x12000000
+  @warlock_armor_visual 130
+  @warlock_armor_icon 89
+
+  def apply_trigger(%Spell{} = spell) do
+    Map.get(@apply_triggers, chain_id(spell))
+  end
+
+  def exclusive_category(row) do
+    cond do
+      row.spell_class_set == @spell_family_mage and
+          ((row.spell_class_mask_0 || 0) &&& @mage_armor_family_flags) != 0 ->
+        :mage_armor
+
+      row.spell_visual_0 == @warlock_armor_visual and row.spell_icon == @warlock_armor_icon ->
+        :warlock_armor
+
+      true ->
+        nil
+    end
+  end
+
+  defp chain_id(%Spell{first_in_chain: first}) when is_integer(first) and first > 0, do: first
+  defp chain_id(%Spell{id: id}), do: id
+end
