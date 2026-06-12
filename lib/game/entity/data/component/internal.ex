@@ -27,6 +27,8 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal do
     :running,
     :behavior_tree,
     :blackboard,
+    :ai_tick_ref,
+    :ai_tick_token,
     :visibility_cell,
     :movement_start_time,
     :movement_start_position,

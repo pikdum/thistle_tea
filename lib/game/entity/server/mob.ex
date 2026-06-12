@@ -54,7 +54,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     World.update_position(state)
     state = Visibility.join_entity(state)
 
-    schedule_ai_tick(0)
+    state = schedule_ai_tick(state, 0)
 
     {:ok, state}
   end
@@ -105,7 +105,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
       |> EventSink.emit(events)
       |> handle_death_transition(target, dead_before)
 
-    schedule_ai_tick(0)
+    state = wake_ai_tick(state)
     {:noreply, state, {:continue, :maybe_broadcast}}
   end
 
@@ -137,7 +137,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
       |> handle_death_transition(target, dead_before)
       |> EventSink.emit(events)
 
-    schedule_ai_tick(0)
+    state = wake_ai_tick(state)
     {:noreply, state, {:continue, :maybe_broadcast}}
   end
 
@@ -191,23 +191,20 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   end
 
   @impl GenServer
-  def handle_info(:ai_tick, %{internal: %Internal{behavior_tree: behavior_tree}} = state) do
-    if Corpse.removed?(state) do
-      {:noreply, state}
-    else
-      state = Movement.sync_position(state, Time.now())
-      World.update_position(state)
-      state = Visibility.refresh_entity(state)
-      {status, state} = BT.tick(behavior_tree, state)
-      state = EventSink.emit_pending(state)
-      schedule_ai_tick(Tick.mob_delay(status))
-      {:noreply, state, {:continue, :maybe_broadcast}}
-    end
-  rescue
-    error ->
-      Logger.error("Mob AI tick crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
-      schedule_ai_tick(@ai_tick_retry_ms)
-      {:noreply, state}
+  def handle_info({:ai_tick, token}, %{internal: %Internal{ai_tick_token: token}} = state) when is_reference(token) do
+    state
+    |> clear_ai_tick_ref()
+    |> run_ai_tick()
+  end
+
+  def handle_info({:ai_tick, _token}, state) do
+    {:noreply, state}
+  end
+
+  def handle_info(:ai_tick, state) do
+    state
+    |> cancel_ai_tick()
+    |> run_ai_tick()
   end
 
   def handle_info(:respawn, %Mob{} = state) do
@@ -226,6 +223,25 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
   def handle_info({:event_start, _event}, state) do
     {:noreply, state}
+  end
+
+  defp run_ai_tick(%{internal: %Internal{behavior_tree: behavior_tree}} = state) do
+    if Corpse.removed?(state) do
+      {:noreply, state}
+    else
+      state = Movement.sync_position(state, Time.now())
+      World.update_position(state)
+      state = Visibility.refresh_entity(state)
+      {status, state} = BT.tick(behavior_tree, state)
+      state = EventSink.emit_pending(state)
+      state = schedule_next_ai_tick(state, status)
+      {:noreply, state, {:continue, :maybe_broadcast}}
+    end
+  rescue
+    error ->
+      Logger.error("Mob AI tick crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      state = schedule_ai_tick(state, @ai_tick_retry_ms)
+      {:noreply, state}
   end
 
   @impl GenServer
@@ -251,8 +267,35 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     Metadata.delete(state.object.guid)
   end
 
-  defp schedule_ai_tick(delay) when is_integer(delay) and delay >= 0 do
-    Process.send_after(self(), :ai_tick, delay)
+  defp wake_ai_tick(%Mob{} = state) do
+    if Core.dead?(state), do: cancel_ai_tick(state), else: schedule_ai_tick(state, 0)
+  end
+
+  defp schedule_next_ai_tick(%Mob{} = state, status) do
+    if Core.dead?(state), do: cancel_ai_tick(state), else: schedule_ai_tick(state, Tick.mob_delay(status))
+  end
+
+  defp schedule_ai_tick(%Mob{} = state, delay) when is_integer(delay) and delay >= 0 do
+    state = cancel_ai_tick(state)
+    token = make_ref()
+    ref = Process.send_after(self(), {:ai_tick, token}, delay)
+    put_ai_tick_ref(state, ref, token)
+  end
+
+  defp cancel_ai_tick(%Mob{internal: %Internal{ai_tick_ref: ref}} = state) when is_reference(ref) do
+    Process.cancel_timer(ref)
+    clear_ai_tick_ref(state)
+  end
+
+  defp cancel_ai_tick(%Mob{} = state), do: clear_ai_tick_ref(state)
+
+  defp put_ai_tick_ref(%Mob{internal: %Internal{} = internal} = state, ref, token)
+       when is_reference(ref) and is_reference(token) do
+    %{state | internal: %{internal | ai_tick_ref: ref, ai_tick_token: token}}
+  end
+
+  defp clear_ai_tick_ref(%Mob{internal: %Internal{} = internal} = state) do
+    %{state | internal: %{internal | ai_tick_ref: nil, ai_tick_token: nil}}
   end
 
   defp engage_combat(%Mob{unit: %Unit{target: current_target} = unit, internal: internal} = state, caster)
