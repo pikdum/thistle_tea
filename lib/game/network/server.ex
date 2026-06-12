@@ -34,6 +34,7 @@ defmodule ThistleTea.Game.Network.Server do
   alias ThistleTea.Game.Network.Packet
   alias ThistleTea.Game.Network.PlayerTick
   alias ThistleTea.Game.Network.Session
+  alias ThistleTea.Game.Network.UpdateBatcher
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.Party.MemberStats
   alias ThistleTea.Game.Party.Notifier, as: PartyNotifier
@@ -58,7 +59,6 @@ defmodule ThistleTea.Game.Network.Server do
   @update_flag_living 0x20
   @update_flag_has_position 0x40
   @player_tick_retry_ms 1_000
-  @update_batch_max 100
 
   @impl ThousandIsland.Handler
   def handle_data(data, _socket, %{conn: %Connection{} = conn} = state) do
@@ -93,57 +93,6 @@ defmodule ThistleTea.Game.Network.Server do
     end
     |> handle_packets()
   end
-
-  def accumulate_updates(%UpdateObject{} = update, recipient_guid) do
-    update
-    |> accumulate_update_batch()
-    |> UpdateObject.to_packet(recipient_guid)
-  end
-
-  defp accumulate_updates_with_batch(%UpdateObject{} = update, recipient_guid) do
-    updates = accumulate_update_batch(update)
-    {UpdateObject.to_packet(updates, recipient_guid), updates}
-  end
-
-  defp accumulate_update_batch(%UpdateObject{} = update) do
-    [update]
-    |> drain_pending_updates(1)
-    |> Enum.reverse()
-    |> dedupe_values_updates()
-  end
-
-  defp dedupe_values_updates(updates) do
-    {kept, _seen} =
-      updates
-      |> Enum.reverse()
-      |> Enum.reduce({[], MapSet.new()}, fn update, {acc, seen} ->
-        case update do
-          %UpdateObject{update_type: :values, object: %{guid: guid}} when is_integer(guid) ->
-            # credo:disable-for-next-line Credo.Check.Refactor.Nesting
-            if MapSet.member?(seen, guid) do
-              {acc, seen}
-            else
-              {[update | acc], MapSet.put(seen, guid)}
-            end
-
-          _ ->
-            {[update | acc], seen}
-        end
-      end)
-
-    kept
-  end
-
-  defp drain_pending_updates(updates, count) when count < @update_batch_max do
-    receive do
-      {:"$gen_cast", {:send_packet, %UpdateObject{} = update}} ->
-        drain_pending_updates([update | updates], count + 1)
-    after
-      0 -> updates
-    end
-  end
-
-  defp drain_pending_updates(updates, _count), do: updates
 
   defp create_update?(%UpdateObject{update_type: update_type, object: %{guid: guid}})
        when update_type in [:create_object, :create_object2] and is_integer(guid) do
@@ -180,7 +129,7 @@ defmodule ThistleTea.Game.Network.Server do
 
   def handle_cast({:send_packet, %UpdateObject{} = update}, {socket, state}) do
     update = Tap.personalize(update, Map.get(state, :guid))
-    {packet, updates} = accumulate_updates_with_batch(update, Map.get(state, :guid))
+    {packet, updates} = UpdateBatcher.batch(update, Map.get(state, :guid))
     state = Network.Send.send_packet(packet, {socket, state})
     state = track_created_updates(state, updates)
     {:noreply, {socket, state}, socket.read_timeout}
@@ -482,34 +431,29 @@ defmodule ThistleTea.Game.Network.Server do
     {:noreply, {socket, maybe_broadcast_update(state)}, socket.read_timeout}
   end
 
-  def maybe_broadcast_update(%{character: %Character{internal: %Internal{broadcast_update?: true}} = character} = state) do
-    character = maybe_handle_death_transition(state, character)
+  def maybe_broadcast_update(%{character: %Character{} = character} = state) do
+    do_broadcast_update(%{state | character: EventSink.emit_pending(character)})
+  end
 
+  def maybe_broadcast_update(state), do: state
+
+  defp do_broadcast_update(%{character: %Character{internal: %Internal{broadcast_update?: true}} = character} = state) do
     Core.update_object(character, :values)
     |> World.broadcast_packet(character)
 
-    Metadata.update(state.guid, %{alive?: Death.alive?(character), ghost?: Death.ghost?(character)})
+    Metadata.update(state.guid, %{
+      level: character.unit.level,
+      alive?: Death.alive?(character),
+      ghost?: Death.ghost?(character)
+    })
+
     PartyNotifier.broadcast_stats(state.guid, character)
     internal = %{character.internal | broadcast_update?: false}
     character = %{character | internal: internal}
     PlayerTick.ensure_scheduled(%{state | character: character})
   end
 
-  def maybe_broadcast_update(state), do: state
-
-  defp maybe_handle_death_transition(state, character) do
-    was_alive? =
-      case Metadata.query(state.guid, [:alive?]) do
-        %{alive?: alive?} -> alive?
-        _ -> true
-      end
-
-    if was_alive? and Core.dead?(character) do
-      EventSink.emit(character, Event.movement_root_changed(true))
-    else
-      character
-    end
-  end
+  defp do_broadcast_update(state), do: state
 
   defp tick_player(%{internal: %Internal{behavior_tree: behavior_tree}} = character) when not is_nil(behavior_tree) do
     BT.tick(behavior_tree, character)
@@ -539,15 +483,9 @@ defmodule ThistleTea.Game.Network.Server do
 
         {character, level_ups} = PlayerStats.gain_xp(state.character, xp)
         send_level_ups(level_ups)
-
         CharacterStore.put(character)
-        Metadata.update(state.guid, %{level: character.unit.level})
 
-        update = Core.update_object(character, :values)
-        Network.send_packet(update)
-        World.broadcast_packet(update, character, include_self?: false)
-
-        %{state | character: character}
+        maybe_broadcast_update(%{state | character: Core.mark_broadcast_update(character)})
       else
         state
       end

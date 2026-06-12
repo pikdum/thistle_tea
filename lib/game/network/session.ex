@@ -37,45 +37,45 @@ defmodule ThistleTea.Game.Network.Session do
     cell_activator: CellActivator
   ]
 
-  def leave_world(state) do
-    case Map.get(state, :player_tick_ref) do
+  def leave_world(%__MODULE__{} = state) do
+    case state.player_tick_ref do
       ref when is_reference(ref) -> Process.cancel_timer(ref)
       _ -> :ok
     end
 
-    if Map.get(state, :character) do
+    if state.character do
       CharacterStore.put(state.character)
     end
 
-    if Map.get(state, :guid) do
-      Entity.unregister(state.guid)
-      Metadata.delete(state.guid)
-      SpatialHash.remove(:players, state.guid)
-      state = Visibility.leave_player(state)
-
-      ThistleTea.ChatChannel
-      |> Registry.keys(self())
-      |> Enum.each(fn channel ->
-        ThistleTea.ChatChannel
-        |> Registry.unregister(channel)
-      end)
-
-      case PartySystem.group_of(state.guid) do
-        %Group{} = group -> Notifier.send_group_list(group)
-        _ -> :ok
-      end
-
-      for guid <- Map.get(state, :player_guids, []) do
-        # credo:disable-for-next-line Credo.Check.Refactor.Nesting
-        if guid != state.guid do
-          Entity.destroy_object(guid, state.guid)
-        end
-      end
+    if state.guid do
+      leave_world_presence(state)
     end
 
-    %__MODULE__{
-      account: Map.get(state, :account),
-      conn: Map.get(state, :conn)
-    }
+    %__MODULE__{account: state.account, conn: state.conn}
+  end
+
+  defp leave_world_presence(%__MODULE__{} = state) do
+    Entity.unregister(state.guid)
+    Metadata.delete(state.guid)
+    SpatialHash.remove(:players, state.guid)
+    state = Visibility.leave_player(state)
+
+    ThistleTea.ChatChannel
+    |> Registry.keys(self())
+    |> Enum.each(fn channel ->
+      ThistleTea.ChatChannel
+      |> Registry.unregister(channel)
+    end)
+
+    case PartySystem.group_of(state.guid) do
+      %Group{} = group -> Notifier.send_group_list(group)
+      _ -> :ok
+    end
+
+    for guid <- state.player_guids, guid != state.guid do
+      Entity.destroy_object(guid, state.guid)
+    end
+
+    :ok
   end
 end

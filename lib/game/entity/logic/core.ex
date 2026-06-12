@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
   alias ThistleTea.Game.Entity.Data.GameObject
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.Aura
+  alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.Math
   alias ThistleTea.Game.Network.UpdateObject
@@ -49,6 +50,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
     entity = if damage > 0, do: Aura.break_on_damage(entity, now), else: entity
 
     entity
+    |> maybe_enqueue_death_root(health, new_health)
     |> mark_broadcast_update()
     |> maybe_dead(now)
   end
@@ -154,4 +156,11 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
   end
 
   defp maybe_dead(entity, _now), do: entity
+
+  defp maybe_enqueue_death_root(%{player: _player} = entity, health, new_health)
+       when is_number(health) and health > 0 and new_health <= 0 do
+    Event.enqueue(entity, Event.movement_root_changed(true))
+  end
+
+  defp maybe_enqueue_death_root(entity, _health, _new_health), do: entity
 end

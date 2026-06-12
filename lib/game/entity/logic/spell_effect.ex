@@ -28,9 +28,13 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
 
   def receive(target, _context, _spell, _now), do: {target, []}
 
-  defp apply_effects(target, _context, [], events, _now), do: {target, events}
-
   defp apply_effects(target, context, effects, events, now) do
+    apply_effects(target, context, effects, events, false, now)
+  end
+
+  defp apply_effects(target, _context, [], events, _aura_applied?, _now), do: {target, events}
+
+  defp apply_effects(target, context, effects, events, aura_applied?, now) do
     effects =
       if Core.dead?(target) do
         Enum.filter(effects, &match?(%Effect{type: type} when type in @resurrect_effects, &1))
@@ -38,15 +42,48 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
         effects
       end
 
-    do_apply_effects(target, context, effects, events, now)
+    do_apply_effects(target, context, effects, events, aura_applied?, now)
   end
 
-  defp do_apply_effects(target, _context, [], events, _now), do: {target, events}
+  defp do_apply_effects(target, _context, [], events, _aura_applied?, _now), do: {target, events}
 
-  defp do_apply_effects(target, context, [effect | rest], events, now) do
-    {target, effect_events} = apply_effect(target, context, context.spell, effect, now)
-    apply_effects(target, context, rest, events ++ effect_events, now)
+  defp do_apply_effects(target, context, [effect | rest], events, aura_applied?, now) do
+    {target, events, aura_applied?} = apply_one_effect(target, context, effect, events, aura_applied?, now)
+    apply_effects(target, context, rest, events, aura_applied?, now)
   end
+
+  defp apply_one_effect(target, context, effect, events, aura_applied?, now) do
+    cond do
+      channel_ticked_trigger?(context.spell, effect) ->
+        event =
+          Event.trigger_spell(context.caster_guid, context.caster_level, target.object.guid, effect.trigger_spell_id)
+
+        {target, events ++ [event], aura_applied?}
+
+      match?(%Effect{type: :apply_aura}, effect) and aura_applied? ->
+        {target, events, aura_applied?}
+
+      match?(%Effect{type: :apply_aura}, effect) ->
+        {target, aura_events} = apply_auras(target, context, now)
+        {target, events ++ aura_events, true}
+
+      true ->
+        {target, effect_events} = apply_effect(target, context, context.spell, effect, now)
+        {target, events ++ effect_events, aura_applied?}
+    end
+  end
+
+  defp apply_auras(target, context, now) do
+    {target, events} = Aura.apply_spell(target, context, context.spell, now)
+    {target, events ++ weakened_soul_events(target, context, context.spell)}
+  end
+
+  defp channel_ticked_trigger?(spell, %Effect{type: :apply_aura, aura: :periodic_trigger_spell, trigger_spell_id: id})
+       when is_integer(id) and id > 0 do
+    Spell.attribute?(spell, :channeled)
+  end
+
+  defp channel_ticked_trigger?(_spell, _effect), do: false
 
   defp apply_effect(state, %CastContext{} = context, spell, %Effect{type: :school_damage} = effect, now) do
     apply_damage_effect(state, context, spell, effect, now)
@@ -64,27 +101,6 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
 
   defp apply_effect(state, %CastContext{}, _spell, %Effect{type: :persistent_area_aura}, _now) do
     {state, []}
-  end
-
-  defp apply_effect(
-         state,
-         %CastContext{} = context,
-         spell,
-         %Effect{type: :apply_aura, aura: :periodic_trigger_spell, trigger_spell_id: spell_id},
-         now
-       )
-       when is_integer(spell_id) and spell_id > 0 do
-    if Spell.attribute?(spell, :channeled) do
-      event = Event.trigger_spell(context.caster_guid, context.caster_level, state.object.guid, spell_id)
-      {state, [event]}
-    else
-      Aura.apply_spell(state, context, spell, now)
-    end
-  end
-
-  defp apply_effect(state, %CastContext{} = context, spell, %Effect{type: :apply_aura}, now) do
-    {state, events} = Aura.apply_spell(state, context, spell, now)
-    {state, events ++ weakened_soul_events(state, context, spell)}
   end
 
   defp apply_effect(

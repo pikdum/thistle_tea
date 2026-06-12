@@ -10,9 +10,10 @@ defmodule ThistleTea.Game.Network.ServerTest do
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Packet
   alias ThistleTea.Game.Network.Server
+  alias ThistleTea.Game.Network.UpdateBatcher
   alias ThistleTea.Game.Network.UpdateObject
 
-  describe "accumulate_updates/2" do
+  describe "UpdateBatcher.batch/2" do
     test "drains pending update structs into a single packet" do
       player_update = update_object(:player, 1)
       mob_update = update_object(:unit, 2)
@@ -21,18 +22,31 @@ defmodule ThistleTea.Game.Network.ServerTest do
       send(self(), {:"$gen_cast", {:send_packet, mob_update}})
       send(self(), {:"$gen_cast", {:send_packet, next_player_update}})
 
-      packet = Server.accumulate_updates(player_update, nil)
+      {packet, updates} = UpdateBatcher.batch(player_update, nil)
 
       assert object_count(packet) == 3
+      assert length(updates) == 3
     end
 
     test "only drains UpdateObject casts; leaves other messages in the mailbox" do
       send(self(), {:"$gen_cast", {:send_packet, %Packet{opcode: 0x123, payload: <<>>}}})
 
-      packet = Server.accumulate_updates(update_object(:player, 1), nil)
+      {packet, _updates} = UpdateBatcher.batch(update_object(:player, 1), nil)
       assert object_count(packet) == 1
 
       assert_received {:"$gen_cast", {:send_packet, %Packet{opcode: 0x123}}}
+    end
+
+    test "dedupes values blocks for the same guid keeping the newest" do
+      stale = update_object(:player, 1, :values)
+      fresh = update_object(:player, 1, :values)
+
+      send(self(), {:"$gen_cast", {:send_packet, fresh}})
+
+      {packet, updates} = UpdateBatcher.batch(stale, nil)
+
+      assert object_count(packet) == 1
+      assert [%UpdateObject{update_type: :values}] = updates
     end
   end
 

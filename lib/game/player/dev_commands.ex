@@ -27,7 +27,6 @@ defmodule ThistleTea.Game.Player.DevCommands do
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.Loader.ClassSpell
   alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader
-  alias ThistleTea.Game.World.Metadata
 
   require Logger
 
@@ -434,9 +433,8 @@ defmodule ThistleTea.Game.Player.DevCommands do
     %{character | player: %{player | xp: xp}}
   end
 
-  defp put_character(%{guid: guid} = state, %Character{} = character) do
+  defp put_character(state, %Character{} = character) do
     CharacterStore.put(character)
-    Metadata.update(guid, %{level: character.unit.level})
     Server.maybe_broadcast_update(%{state | character: Core.mark_broadcast_update(character)})
   end
 

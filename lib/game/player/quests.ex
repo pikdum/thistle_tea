@@ -19,14 +19,13 @@ defmodule ThistleTea.Game.Player.Quests do
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.InventoryUpdate
   alias ThistleTea.Game.Network.Message
+  alias ThistleTea.Game.Network.Server
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.Player.Stats, as: PlayerStats
-  alias ThistleTea.Game.World
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
   alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader
-  alias ThistleTea.Game.World.Metadata
 
   def ctx(%Character{} = character) do
     %{
@@ -185,7 +184,6 @@ defmodule ThistleTea.Game.Player.Quests do
       | player: %{character.player | quest_log: quest_log, rewarded_quests: rewarded, coinage: coinage}
     }
 
-    Metadata.update(state.guid, %{level: character.unit.level})
     Network.send_packet(%Message.SmsgQuestgiverQuestComplete{quest: quest, xp: xp})
 
     state = put_character(state, character)
@@ -499,11 +497,6 @@ defmodule ThistleTea.Game.Player.Quests do
 
   defp put_character(state, %Character{} = character) do
     CharacterStore.put(character)
-
-    update = Core.update_object(character, :values)
-    Network.send_packet(update)
-    World.broadcast_packet(update, character, include_self?: false)
-
-    %{state | character: character}
+    Server.maybe_broadcast_update(%{state | character: Core.mark_broadcast_update(character)})
   end
 end
