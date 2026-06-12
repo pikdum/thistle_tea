@@ -23,6 +23,16 @@ defmodule ThistleTea.Telemetry do
     :ets.update_counter(:telemetry_counters, :active_mobs, -1)
   end
 
+  def handle_event(
+        [:thistle_tea, :mob, :ai_tick],
+        %{duration: duration, next_delay_ms: next_delay_ms},
+        metadata,
+        _config
+      ) do
+    reason = Map.get(metadata, :wake_reason, :unknown)
+    :ets.insert(:telemetry, {:mob_ai_tick, reason, duration, next_delay_ms})
+  end
+
   def handle_event(_event, _measurements, _metadata, _config), do: :ok
 
   @impl GenServer
@@ -52,6 +62,26 @@ defmodule ThistleTea.Telemetry do
       Logger.info("Packets: #{inspect(packet_data, pretty: true)}")
     end
 
+    mob_ai_data =
+      :ets.match_object(:telemetry, {:mob_ai_tick, :_, :_, :_})
+      |> Enum.group_by(&elem(&1, 1))
+      |> Enum.map(fn {reason, samples} ->
+        durations = Enum.map(samples, &elem(&1, 2))
+        delays = Enum.map(samples, &elem(&1, 3))
+
+        %{
+          reason: reason,
+          max_duration: durations |> Enum.max() |> System.convert_time_unit(:native, :microsecond),
+          max_next_delay: Enum.max(delays),
+          count: Enum.count(samples)
+        }
+      end)
+      |> Enum.sort(&(Map.get(&1, :count) > Map.get(&2, :count)))
+
+    if not Enum.empty?(mob_ai_data) do
+      Logger.info("Mob AI ticks: #{inspect(mob_ai_data, pretty: true)}")
+    end
+
     [:mobs, :game_objects, :players]
     |> Enum.map(fn table ->
       {table, :ets.tab2list(table) |> Enum.count()}
@@ -61,6 +91,7 @@ defmodule ThistleTea.Telemetry do
     end)
 
     :ets.match_delete(:telemetry, {:handle_packet, :_, :_})
+    :ets.match_delete(:telemetry, {:mob_ai_tick, :_, :_, :_})
     Process.send_after(self(), :summarize_data, @telemetry_interval)
     {:noreply, state}
   end

@@ -138,6 +138,13 @@ defmodule ThistleTea.Application do
       nil
     )
 
+    :telemetry.attach(
+      "mob-ai-tick-handler",
+      [:thistle_tea, :mob, :ai_tick],
+      &ThistleTea.Telemetry.handle_event/4,
+      nil
+    )
+
     Logger.info("Loading maps...")
     map_dir = Application.fetch_env!(:thistle_tea, :map_dir)
     Namigator.load(map_dir)

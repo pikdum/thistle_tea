@@ -258,9 +258,12 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
       state = Movement.sync_position(state, Time.now())
       World.update_position(state)
       state = Visibility.refresh_entity(state)
+      started_at = System.monotonic_time()
       {status, state} = BT.tick(behavior_tree, state)
+      duration = System.monotonic_time() - started_at
       state = EventSink.emit_pending(state)
       state = sync_chase_watch(state)
+      emit_ai_tick_telemetry(state, status, duration)
       state = schedule_next_ai_tick(state, status)
       {:noreply, state, {:continue, :maybe_broadcast}}
     end
@@ -302,6 +305,25 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   defp schedule_next_ai_tick(%Mob{} = state, status) do
     if Core.dead?(state), do: deactivate_ai(state), else: schedule_ai_tick(state, Tick.mob_delay(status))
   end
+
+  defp emit_ai_tick_telemetry(%Mob{object: %{guid: guid}}, status, duration) do
+    :telemetry.execute(
+      [:thistle_tea, :mob, :ai_tick],
+      %{duration: duration, next_delay_ms: Tick.mob_delay(status)},
+      %{guid: guid, status: tick_status(status), wake_reason: wake_reason(status)}
+    )
+  end
+
+  defp tick_status({:running, _delay}), do: :running
+  defp tick_status({:running, _delay, _reason}), do: :running
+  defp tick_status(status) when is_atom(status), do: status
+  defp tick_status(_status), do: :unknown
+
+  defp wake_reason({:running, _delay, reason}) when is_atom(reason), do: reason
+  defp wake_reason({:running, _delay}), do: :unspecified
+  defp wake_reason(:running), do: :unspecified
+  defp wake_reason(status) when is_atom(status), do: status
+  defp wake_reason(_status), do: :unknown
 
   defp deactivate_ai(%Mob{} = state) do
     state
