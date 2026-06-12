@@ -1,8 +1,9 @@
 defmodule ThistleTea.Game.Entity.Server.Mob do
   @moduledoc """
-  Owning GenServer for a mob: ticks its behavior tree, applies incoming
-  attacks and spells through the pure core, and delegates the post-death
-  corpse phase (loot, rolls, decay, removal) to `Mob.Corpse`.
+  Owning GenServer for a mob: ticks its behavior tree and applies incoming
+  attacks and spells through the pure core. The post-death lifecycle is
+  delegated — the corpse phase (loot, rolls, decay, removal) to `Mob.Corpse`
+  and the respawn state machine to `Mob.Respawn`.
   """
   use GenServer
 
@@ -15,6 +16,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Mob, as: MobBT
+  alias ThistleTea.Game.Entity.Logic.AI.Tick
   alias ThistleTea.Game.Entity.Logic.Combat
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Experience
@@ -22,13 +24,13 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Entity.Logic.SpellEffect
   alias ThistleTea.Game.Entity.Registry, as: EntityRegistry
   alias ThistleTea.Game.Entity.Server.Mob.Corpse
+  alias ThistleTea.Game.Entity.Server.Mob.Respawn
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Party
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
-  alias ThistleTea.Game.World.Loader.Faction, as: FactionLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.System.GameEvent
   alias ThistleTea.Game.World.System.Party, as: PartySystem
@@ -36,9 +38,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
   require Logger
 
-  @ai_tick_ms 100
-  @ai_tick_max_ms 1_000
-  @default_respawn_delay_ms 120_000
+  @ai_tick_retry_ms 1_000
   @dynamic_flag_tapped 0x0004
 
   def start_link(%Mob{} = state) do
@@ -199,29 +199,18 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
       state = Visibility.refresh_entity(state)
       {status, state} = BT.tick(behavior_tree, state)
       state = EventSink.emit_pending(state)
-      schedule_ai_tick(ai_tick_delay(status))
+      schedule_ai_tick(Tick.mob_delay(status))
       {:noreply, state, {:continue, :maybe_broadcast}}
     end
   rescue
     error ->
       Logger.error("Mob AI tick crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
-      schedule_ai_tick(@ai_tick_max_ms)
+      schedule_ai_tick(@ai_tick_retry_ms)
       {:noreply, state}
   end
 
   def handle_info(:respawn, %Mob{} = state) do
-    cond do
-      not Core.dead?(state) ->
-        state = clear_respawn_ref(state)
-        schedule_ai_tick(0)
-        {:noreply, state}
-
-      Corpse.rolls_pending?(state) ->
-        {:noreply, %{state | internal: Map.put(state.internal, :respawn_pending?, true)}}
-
-      true ->
-        do_respawn(state)
-    end
+    {:noreply, Respawn.handle(state)}
   end
 
   def handle_info({:event_stop, _event}, state) do
@@ -263,24 +252,6 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
   defp schedule_ai_tick(delay) when is_integer(delay) and delay >= 0 do
     Process.send_after(self(), :ai_tick, delay)
-  end
-
-  defp ai_tick_delay({:running, delay_ms}) when is_integer(delay_ms) and delay_ms >= 0 do
-    min(delay_ms, @ai_tick_max_ms)
-  end
-
-  defp ai_tick_delay(_status), do: @ai_tick_ms
-
-  defp put_spawn_position(%Mob{} = state) do
-    World.update_position(state)
-    state = Visibility.join_entity(state)
-    update_metadata(state)
-    state
-  end
-
-  defp broadcast_respawn(%Mob{} = state) do
-    Core.update_object(state, :create_object2) |> World.broadcast_packet(state)
-    state
   end
 
   defp engage_combat(%Mob{unit: %Unit{target: current_target} = unit, internal: internal} = state, caster)
@@ -350,7 +321,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
       |> maybe_decrement_on_death(target)
       |> maybe_reward_kill(target)
       |> Corpse.prepare(target)
-      |> schedule_respawn()
+      |> Respawn.schedule()
     else
       state
     end
@@ -403,50 +374,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     |> Enum.each(fn {guid, xp} -> Entity.reward_kill_share(guid, state, xp) end)
   end
 
-  defp do_respawn(%Mob{} = state) do
-    state =
-      state
-      |> Corpse.remove()
-      |> Mob.respawn()
-      |> BT.init(MobBT.tree())
-      |> put_spawn_position()
-      |> broadcast_respawn()
-
-    schedule_ai_tick(0)
-    {:noreply, state}
-  end
-
   defp caster_guid(%{caster_guid: caster_guid}) when is_integer(caster_guid), do: caster_guid
   defp caster_guid(caster_guid) when is_integer(caster_guid), do: caster_guid
   defp caster_guid(_caster), do: nil
-
-  defp schedule_respawn(%Mob{internal: %Internal{respawn_ref: ref}} = state) when is_reference(ref) do
-    state
-  end
-
-  defp schedule_respawn(%Mob{internal: %Internal{} = internal} = state) do
-    ref = Process.send_after(self(), :respawn, respawn_delay_ms(internal.respawn_delay_ms))
-    %{state | internal: %{internal | respawn_ref: ref}}
-  end
-
-  defp clear_respawn_ref(%Mob{internal: %Internal{} = internal} = state) do
-    %{state | internal: %{internal | respawn_ref: nil}}
-  end
-
-  defp respawn_delay_ms(delay) when is_integer(delay) and delay >= 0, do: delay
-  defp respawn_delay_ms(_delay), do: @default_respawn_delay_ms
-
-  defp update_metadata(%Mob{} = state) do
-    Metadata.update(state.object.guid, %{
-      bounding_radius: state.unit.bounding_radius,
-      combat_reach: state.unit.combat_reach,
-      level: state.unit.level,
-      unit_flags: state.unit.flags,
-      alive?: state.unit.health > 0
-    })
-
-    Metadata.update(state.object.guid, Mob.visibility_metadata(state))
-
-    Metadata.update(state.object.guid, FactionLoader.metadata(state.unit.faction_template))
-  end
 end

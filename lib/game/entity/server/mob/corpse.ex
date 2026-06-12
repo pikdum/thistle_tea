@@ -3,7 +3,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Corpse do
   Corpse phase of a mob's lifecycle: builds the loot session at death (group
   rolls, master loot, round-robin assignment), serves loot interactions, and
   removes the body — on decay, or forced when the respawn comes due. Respawn
-  itself stays in the mob server; this module only manages the corpse.
+  itself lives in `Mob.Respawn`; this module only manages the corpse.
   """
   import Bitwise, only: [|||: 2, &&&: 2, bnot: 1]
 
@@ -16,6 +16,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Corpse do
   alias ThistleTea.Game.Entity.Logic.LootRoll
   alias ThistleTea.Game.Entity.Logic.LootSession
   alias ThistleTea.Game.Entity.Registry, as: EntityRegistry
+  alias ThistleTea.Game.Entity.Server.Mob.Respawn
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Party
@@ -371,11 +372,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Corpse do
   end
 
   defp maybe_continue_respawn(%Mob{} = state) do
-    if Map.get(state.internal, :respawn_pending?) == true and not rolls_pending?(state) do
-      send(self(), :respawn)
-    end
-
-    :ok
+    Respawn.maybe_continue(state)
   end
 
   defp maybe_set_lootable_flag(%Mob{unit: %Unit{} = unit} = state) do

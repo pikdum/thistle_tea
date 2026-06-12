@@ -15,7 +15,7 @@ defmodule ThistleTea.Game.Network.Server do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.Logic.AI.BT
-  alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
+  alias ThistleTea.Game.Entity.Logic.AI.Tick
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Combat
   alias ThistleTea.Game.Entity.Logic.Core
@@ -24,7 +24,6 @@ defmodule ThistleTea.Game.Network.Server do
   alias ThistleTea.Game.Entity.Logic.Experience
   alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Entity.Logic.MovementStats
-  alias ThistleTea.Game.Entity.Logic.Regen
   alias ThistleTea.Game.Entity.Logic.SpellEffect
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network
@@ -43,7 +42,6 @@ defmodule ThistleTea.Game.Network.Server do
   alias ThistleTea.Game.Player.Quests
   alias ThistleTea.Game.Player.Spellcasting
   alias ThistleTea.Game.Player.Stats, as: PlayerStats
-  alias ThistleTea.Game.Spell.Cast
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.CharacterStore
@@ -60,7 +58,6 @@ defmodule ThistleTea.Game.Network.Server do
   @update_flag_high_guid 0x08
   @update_flag_living 0x20
   @update_flag_has_position 0x40
-  @player_tick_ms 100
   @player_tick_retry_ms 1_000
   @update_batch_max 100
 
@@ -523,63 +520,14 @@ defmodule ThistleTea.Game.Network.Server do
   defp tick_player(character), do: {:running, character}
 
   defp schedule_player_tick(state, character, status) do
-    if player_needs_tick?(character) do
-      delay_ms = player_tick_delay(character, status)
+    if Tick.needs_tick?(character) do
+      delay_ms = Tick.player_delay(character, status, Time.now())
       ref = Process.send_after(self(), :player_tick, delay_ms)
       %{state | player_tick_ref: ref}
     else
       %{state | player_tick_ref: nil}
     end
   end
-
-  defp player_tick_delay(character, {:running, delay_ms}) when is_integer(delay_ms) and delay_ms > 0 do
-    case regen_tick_delay(character, Time.now()) do
-      regen_delay when is_integer(regen_delay) -> min(delay_ms, regen_delay)
-      _ -> delay_ms
-    end
-  end
-
-  defp player_tick_delay(character, _status) do
-    if player_passive?(character) do
-      passive_tick_delay(character, Time.now())
-    else
-      @player_tick_ms
-    end
-  end
-
-  defp passive_tick_delay(character, now) do
-    [aura_tick_delay(character, now), regen_tick_delay(character, now)]
-    |> Enum.reject(&is_nil/1)
-    |> case do
-      [] -> @player_tick_ms
-      delays -> delays |> Enum.min() |> max(0)
-    end
-  end
-
-  defp aura_tick_delay(%{unit: %Unit{auras: [_ | _]}} = character, now) do
-    case Aura.next_event_at(character) do
-      at when is_integer(at) -> max(at - now, 0)
-      _ -> @player_tick_ms
-    end
-  end
-
-  defp aura_tick_delay(_character, _now), do: nil
-
-  defp regen_tick_delay(%{internal: %Internal{blackboard: blackboard}} = character, now) do
-    if Regen.needs_regen?(character) do
-      Blackboard.delay_until(Blackboard.from_any(blackboard), :next_regen_at, now)
-    end
-  end
-
-  defp regen_tick_delay(_character, _now), do: nil
-
-  defp player_needs_tick?(character), do: PlayerTick.needs_tick?(character)
-
-  defp player_passive?(%{internal: %Internal{casting: casting, in_combat: in_combat}, unit: %Unit{target: target}}) do
-    not is_struct(casting, Cast) and not (in_combat == true and is_integer(target) and target > 0)
-  end
-
-  defp player_passive?(_character), do: false
 
   defp apply_kill_reward(state, victim, xp) do
     state =
