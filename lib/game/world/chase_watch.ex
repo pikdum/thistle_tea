@@ -25,11 +25,15 @@ defmodule ThistleTea.Game.World.ChaseWatch do
     unwatch(chaser_pid, table)
   end
 
-  def unwatch(chaser_pid, table \\ __MODULE__) when is_pid(chaser_pid) do
+  def unwatch(chaser_pid, table \\ __MODULE__)
+
+  def unwatch(chaser_pid, table) when is_pid(chaser_pid) do
     init(table)
     :ets.match_delete(table, {:_, chaser_pid, :_, :_})
     :ok
   end
+
+  def unwatch(_chaser_pid, _table), do: :ok
 
   def notify_moved(target_guid, position, table \\ __MODULE__)
 
@@ -47,10 +51,17 @@ defmodule ThistleTea.Game.World.ChaseWatch do
 
   defp maybe_notify(table, target_guid, position, {target_guid, chaser_pid, last_position, threshold})
        when is_pid(chaser_pid) and is_number(threshold) do
-    if moved_enough?(last_position, position, threshold) do
-      :ets.delete_object(table, {target_guid, chaser_pid, last_position, threshold})
-      :ets.insert(table, {target_guid, chaser_pid, position, threshold})
-      send(chaser_pid, {:target_moved, target_guid})
+    cond do
+      not Process.alive?(chaser_pid) ->
+        :ets.delete_object(table, {target_guid, chaser_pid, last_position, threshold})
+
+      moved_enough?(last_position, position, threshold) ->
+        :ets.delete_object(table, {target_guid, chaser_pid, last_position, threshold})
+        :ets.insert(table, {target_guid, chaser_pid, position, threshold})
+        send(chaser_pid, {:target_moved, target_guid})
+
+      true ->
+        :ok
     end
   end
 

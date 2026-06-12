@@ -27,6 +27,21 @@ defmodule ThistleTea.Game.World.ChaseWatchTest do
       ChaseWatch.notify_moved(1, {1.6, 0.0, 0.0}, table)
       refute_receive {:target_moved, 1}
     end
+
+    test "removes dead chasers instead of keeping stale watchers" do
+      table = table()
+      ChaseWatch.init(table)
+      chaser = spawn(fn -> Process.sleep(:infinity) end)
+      ref = Process.monitor(chaser)
+
+      ChaseWatch.watch(1, chaser, {0.0, 0.0, 0.0}, 0.0, table)
+      Process.exit(chaser, :kill)
+      assert_receive {:DOWN, ^ref, :process, ^chaser, :killed}
+
+      ChaseWatch.notify_moved(1, {1.0, 0.0, 0.0}, table)
+
+      assert :ets.lookup(table, 1) == []
+    end
   end
 
   describe "unwatch/2" do
@@ -41,6 +56,13 @@ defmodule ThistleTea.Game.World.ChaseWatchTest do
       ChaseWatch.notify_moved(2, {1.0, 0.0, 0.0}, table)
 
       refute_receive {:target_moved, _target}
+    end
+
+    test "ignores invalid chasers" do
+      table = table()
+      ChaseWatch.init(table)
+
+      assert ChaseWatch.unwatch(nil, table) == :ok
     end
   end
 
