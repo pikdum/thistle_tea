@@ -4,8 +4,8 @@ defmodule ThistleTea.Game.Network.Message.CmsgReclaimCorpse do
 
   alias ThistleTea.Game.Entity.Data.Corpse
   alias ThistleTea.Game.Entity.EventSink
-  alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Death
+  alias ThistleTea.Game.Network.Server
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Visibility
@@ -43,14 +43,9 @@ defmodule ThistleTea.Game.Network.Message.CmsgReclaimCorpse do
     {character, events} = Death.resurrect(character, restore_percent, now)
     character = EventSink.emit(character, events)
 
-    update = Core.update_object(character, :values)
-    Network.send_packet(update)
-    World.broadcast_packet(update, character, include_self?: false)
-    Metadata.update(state.guid, %{alive?: true, ghost?: false})
+    state = Server.maybe_broadcast_update(%{state | character: character})
 
-    state = %{state | character: clear_broadcast_flag(character)}
-
-    Visibility.notify_visibility_changed(character)
+    Visibility.notify_visibility_changed(state.character)
     Visibility.resync_player(state)
   end
 
@@ -72,9 +67,5 @@ defmodule ThistleTea.Game.Network.Message.CmsgReclaimCorpse do
       %{ghost_time: ghost_time} when is_integer(ghost_time) -> now >= ghost_time + Death.reclaim_delay_ms()
       _ -> false
     end
-  end
-
-  defp clear_broadcast_flag(%Character{internal: internal} = character) do
-    %{character | internal: %{internal | broadcast_update?: false}}
   end
 end

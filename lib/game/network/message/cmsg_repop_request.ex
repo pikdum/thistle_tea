@@ -9,11 +9,11 @@ defmodule ThistleTea.Game.Network.Message.CmsgRepopRequest do
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Death
   alias ThistleTea.Game.Entity.Logic.Inventory
+  alias ThistleTea.Game.Network.Server
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Graveyard, as: GraveyardLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
-  alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Visibility
 
   defstruct []
@@ -47,20 +47,14 @@ defmodule ThistleTea.Game.Network.Message.CmsgRepopRequest do
     {character, events} = Death.release_spirit(character, ghost_spells, now)
     character = EventSink.emit(character, events)
 
-    update = Core.update_object(character, :values)
-    Network.send_packet(update)
-    World.broadcast_packet(update, character, include_self?: false)
-    Metadata.update(state.guid, %{alive?: false, ghost?: true})
+    state = Server.maybe_broadcast_update(%{state | character: character})
 
     Network.send_packet(%Message.SmsgCorpseReclaimDelay{delay_ms: Death.reclaim_delay_ms()})
 
-    character = clear_broadcast_flag(character)
-    state = %{state | character: character}
-
-    Visibility.notify_visibility_changed(character)
+    Visibility.notify_visibility_changed(state.character)
     state = Visibility.resync_player(state)
 
-    teleport_to_graveyard(character)
+    teleport_to_graveyard(state.character)
 
     state
   end
@@ -97,9 +91,5 @@ defmodule ThistleTea.Game.Network.Message.CmsgRepopRequest do
       _ ->
         :ok
     end
-  end
-
-  defp clear_broadcast_flag(%Character{internal: %Internal{} = internal} = character) do
-    %{character | internal: %{internal | broadcast_update?: false}}
   end
 end

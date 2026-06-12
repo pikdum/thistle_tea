@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AI.BT.Mob, as: MobBT
+  alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
@@ -102,7 +103,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
       assert state.unit.target == target_guid
       assert state.internal.in_combat == true
       assert state.internal.last_hostile_time == 1_000
-      assert Metadata.query(target_guid, [:attacker_count]) == %{attacker_count: 1}
+      assert [%Event{type: :attacker_gained, target_guid: ^target_guid}] = state.internal.events
+      assert Metadata.query(target_guid, [:attacker_count]) == %{attacker_count: 0}
     end
 
     test "does not aggro neutral or friendly nearby units" do

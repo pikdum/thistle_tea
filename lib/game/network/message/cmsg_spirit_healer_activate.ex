@@ -5,12 +5,11 @@ defmodule ThistleTea.Game.Network.Message.CmsgSpiritHealerActivate do
   alias ThistleTea.Game.Entity.Data.Corpse
   alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
-  alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Death
+  alias ThistleTea.Game.Network.Server
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
-  alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Visibility
 
   @restore_percent 0.5
@@ -46,15 +45,9 @@ defmodule ThistleTea.Game.Network.Message.CmsgSpiritHealerActivate do
     duration_events = AuraLogic.self_duration_events(character, now)
     character = EventSink.emit(character, events ++ sickness_events ++ duration_events)
 
-    update = Core.update_object(character, :values)
-    Network.send_packet(update)
-    World.broadcast_packet(update, character, include_self?: false)
-    Metadata.update(state.guid, %{alive?: true, ghost?: false})
+    state = Server.maybe_broadcast_update(%{state | character: character})
 
-    character = %{character | internal: %{character.internal | broadcast_update?: false}}
-    state = %{state | character: character}
-
-    Visibility.notify_visibility_changed(character)
+    Visibility.notify_visibility_changed(state.character)
     Visibility.resync_player(state)
   end
 

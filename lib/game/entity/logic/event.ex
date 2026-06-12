@@ -159,6 +159,18 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
     %__MODULE__{type: :attack_not_in_range}
   end
 
+  def attacker_gained(target_guid) when is_integer(target_guid) do
+    %__MODULE__{type: :attacker_gained, target_guid: target_guid}
+  end
+
+  def attacker_lost(target_guid) when is_integer(target_guid) do
+    %__MODULE__{type: :attacker_lost, target_guid: target_guid}
+  end
+
+  def tap_cleared do
+    %__MODULE__{type: :tap_cleared}
+  end
+
   def attacker_state_update(source_guid, target_guid, damage, attack \\ %{})
       when is_integer(source_guid) and is_integer(target_guid) do
     %__MODULE__{

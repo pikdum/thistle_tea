@@ -4,10 +4,9 @@ defmodule ThistleTea.Game.Network.Message.CmsgResurrectResponse do
 
   alias ThistleTea.Game.Entity.Data.Corpse
   alias ThistleTea.Game.Entity.EventSink
-  alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Death
+  alias ThistleTea.Game.Network.Server
   alias ThistleTea.Game.Time
-  alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Visibility
 
   defstruct [:guid, :status]
@@ -47,14 +46,9 @@ defmodule ThistleTea.Game.Network.Message.CmsgResurrectResponse do
     {character, events} = Death.resurrect_with(character, pending.health, pending.mana, now)
     character = EventSink.emit(character, events)
 
-    update = Core.update_object(character, :values)
-    Network.send_packet(update)
-    World.broadcast_packet(update, character, include_self?: false)
-    Metadata.update(state.guid, %{alive?: true, ghost?: false})
+    state = Server.maybe_broadcast_update(%{state | character: character})
 
-    state = %{state | character: clear_broadcast_flag(character)}
-
-    Visibility.notify_visibility_changed(character)
+    Visibility.notify_visibility_changed(state.character)
     state = Visibility.resync_player(state)
 
     teleport_to_caster(state, pending.position)
@@ -71,9 +65,5 @@ defmodule ThistleTea.Game.Network.Message.CmsgResurrectResponse do
 
   defp clear_pending(%Character{internal: internal} = character) do
     %{character | internal: Map.put(internal, :pending_resurrect, nil)}
-  end
-
-  defp clear_broadcast_flag(%Character{internal: internal} = character) do
-    %{character | internal: Map.put(internal, :broadcast_update?, false)}
   end
 end

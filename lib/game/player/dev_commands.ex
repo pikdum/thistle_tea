@@ -18,12 +18,12 @@ defmodule ThistleTea.Game.Player.DevCommands do
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
+  alias ThistleTea.Game.Network.Server
   alias ThistleTea.Game.Player.Items
   alias ThistleTea.Game.Player.Quests
   alias ThistleTea.Game.Player.Spells
   alias ThistleTea.Game.Player.Stats
   alias ThistleTea.Game.Time
-  alias ThistleTea.Game.World
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.Loader.ClassSpell
   alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader
@@ -436,18 +436,8 @@ defmodule ThistleTea.Game.Player.DevCommands do
 
   defp put_character(%{guid: guid} = state, %Character{} = character) do
     CharacterStore.put(character)
-
-    Metadata.update(guid, %{
-      level: character.unit.level,
-      alive?: Death.alive?(character),
-      ghost?: Death.ghost?(character)
-    })
-
-    update = Core.update_object(character, :values)
-    Network.send_packet(update)
-    World.broadcast_packet(update, character, include_self?: false)
-
-    %{state | character: character}
+    Metadata.update(guid, %{level: character.unit.level})
+    Server.maybe_broadcast_update(%{state | character: Core.mark_broadcast_update(character)})
   end
 
   defp maybe_send_level_up(state, nil), do: state

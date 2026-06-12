@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Regen, as: RegenBT
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
   alias ThistleTea.Game.Entity.Logic.Core
+  alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.Entity.Logic.Hostility
   alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.Time
@@ -300,11 +301,13 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   end
 
   defp apply_aggro(%Mob{unit: %Unit{} = unit, internal: %Internal{} = internal} = state, target_guid, now) do
-    Metadata.increment(target_guid, :attacker_count)
     unit = %{unit | target: target_guid}
     internal = %{internal | in_combat: true, last_hostile_time: now}
     state = %{state | unit: unit, internal: internal}
-    Core.mark_broadcast_update(state)
+
+    state
+    |> Event.enqueue(Event.attacker_gained(target_guid))
+    |> Core.mark_broadcast_update()
   end
 
   defp set_running_true(%Mob{} = state, %Blackboard{} = blackboard) do
@@ -366,10 +369,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
          %Mob{unit: %Unit{target: target} = unit, internal: %Internal{} = internal} = state,
          %Blackboard{} = blackboard
        ) do
-    decrement_attacker_count(target)
     unit = %{unit | target: 0, dynamic_flags: Bitwise.band(unit.dynamic_flags || 0, Bitwise.bnot(@dynamic_flag_tapped))}
     internal = Map.put(%{internal | in_combat: false}, :tapped_by, nil)
-    Metadata.update(state.object.guid, %{tapped_player: nil, tapped_group_id: nil})
 
     blackboard =
       blackboard
@@ -378,9 +379,20 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
 
     state = %{state | unit: unit, internal: internal}
 
-    state = Core.mark_broadcast_update(state)
+    state =
+      state
+      |> Event.enqueue(clear_combat_events(target))
+      |> Core.mark_broadcast_update()
 
     {:success, state, blackboard}
+  end
+
+  defp clear_combat_events(target) when is_integer(target) and target > 0 do
+    [Event.attacker_lost(target), Event.tap_cleared()]
+  end
+
+  defp clear_combat_events(_target) do
+    [Event.tap_cleared()]
   end
 
   defp heal_to_full(
@@ -522,12 +534,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   end
 
   defp attacker_count(_target_guid), do: 0
-
-  defp decrement_attacker_count(target) when is_integer(target) and target > 0 do
-    Metadata.decrement(target, :attacker_count, 0)
-  end
-
-  defp decrement_attacker_count(_target), do: :ok
 
   defp attack_angle_offset(attacker_count, size_factor) when attacker_count > 0 do
     spread = :math.pi() / 2.0 - :math.pi() * :rand.uniform()

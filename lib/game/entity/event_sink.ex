@@ -27,6 +27,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
+  alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Pathfinding
 
   def emit_pending(entity) do
@@ -301,6 +302,21 @@ defmodule ThistleTea.Game.Entity.EventSink do
     Packet.build(<<>>, Opcodes.get(:SMSG_ATTACKSWING_NOTINRANGE))
     |> Network.send_packet()
 
+    entity
+  end
+
+  def emit(entity, %Event{type: :attacker_gained, target_guid: target_guid}) do
+    Metadata.increment(target_guid, :attacker_count)
+    entity
+  end
+
+  def emit(entity, %Event{type: :attacker_lost, target_guid: target_guid}) do
+    Metadata.decrement(target_guid, :attacker_count, 0)
+    entity
+  end
+
+  def emit(%{object: %{guid: guid}} = entity, %Event{type: :tap_cleared}) do
+    Metadata.update(guid, %{tapped_player: nil, tapped_group_id: nil})
     entity
   end
 

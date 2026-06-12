@@ -499,10 +499,11 @@ defmodule ThistleTea.Game.Network.Server do
   end
 
   @impl GenServer
-  def handle_continue(
-        :maybe_broadcast_update,
-        {socket, %{character: %Character{internal: %Internal{broadcast_update?: true}} = character} = state}
-      ) do
+  def handle_continue(:maybe_broadcast_update, {socket, state}) do
+    {:noreply, {socket, maybe_broadcast_update(state)}, socket.read_timeout}
+  end
+
+  def maybe_broadcast_update(%{character: %Character{internal: %Internal{broadcast_update?: true}} = character} = state) do
     character = maybe_handle_death_transition(state, character)
 
     Core.update_object(character, :values)
@@ -512,14 +513,10 @@ defmodule ThistleTea.Game.Network.Server do
     PartyNotifier.broadcast_stats(state.guid, character)
     internal = %{character.internal | broadcast_update?: false}
     character = %{character | internal: internal}
-    state = PlayerTick.ensure_scheduled(%{state | character: character})
-
-    {:noreply, {socket, state}, socket.read_timeout}
+    PlayerTick.ensure_scheduled(%{state | character: character})
   end
 
-  def handle_continue(:maybe_broadcast_update, {socket, state}) do
-    {:noreply, {socket, state}, socket.read_timeout}
-  end
+  def maybe_broadcast_update(state), do: state
 
   defp maybe_handle_death_transition(state, character) do
     was_alive? =
