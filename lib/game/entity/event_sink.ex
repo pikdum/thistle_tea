@@ -415,9 +415,6 @@ defmodule ThistleTea.Game.Entity.EventSink do
     entity
   end
 
-  defp owner_level(%{unit: %{level: level}}) when is_integer(level), do: level
-  defp owner_level(_entity), do: 1
-
   def emit(entity, %Event{type: :summon_game_object}), do: entity
 
   def emit(entity, %Event{type: :trigger_spell} = event) do
@@ -438,6 +435,9 @@ defmodule ThistleTea.Game.Entity.EventSink do
   def deliver_spell(%Event{type: :deliver_spell} = event) do
     Entity.receive_spell(event.target_guid, event.cast_context, event.spell)
   end
+
+  defp owner_level(%{unit: %{level: level}}) when is_integer(level), do: level
+  defp owner_level(_entity), do: 1
 
   defp track_area_effect(%{internal: %Internal{area_effect_guids: guids} = internal} = entity, spell_id, guid)
        when is_list(guids) do

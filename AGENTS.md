@@ -3,6 +3,7 @@
 ## Commands
 
 ### Build/Test/Lint
+- `mix compile --warnings-as-errors` - Compile (warnings are not allowed)
 - `mix test` - Run all tests
 - `mix test test/path/to/file_test.exs` - Run specific test file
 - `mix test test/path/to/file_test.exs:123` - Run specific test at line 123
