@@ -36,4 +36,14 @@ defmodule ThistleTea.Game.Network.PlayerTick do
   end
 
   def ensure_scheduled(state), do: state
+
+  def schedule_now(state) do
+    case Map.get(state, :player_tick_ref) do
+      ref when is_reference(ref) -> Process.cancel_timer(ref)
+      _ -> :ok
+    end
+
+    ref = Process.send_after(self(), :player_tick, 0)
+    Map.put(state, :player_tick_ref, ref)
+  end
 end

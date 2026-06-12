@@ -39,6 +39,7 @@ defmodule ThistleTea.Game.Network.Server do
   alias ThistleTea.Game.Party.MemberStats
   alias ThistleTea.Game.Party.Notifier, as: PartyNotifier
   alias ThistleTea.Game.Player.Quests
+  alias ThistleTea.Game.Player.Spellcasting
   alias ThistleTea.Game.Player.Stats, as: PlayerStats
   alias ThistleTea.Game.Spell.Cast
   alias ThistleTea.Game.Time
@@ -428,7 +429,7 @@ defmodule ThistleTea.Game.Network.Server do
 
   @impl GenServer
   def handle_info(:spell_complete, {socket, state}) do
-    state = Message.CmsgCastSpell.handle_spell_complete(state)
+    state = Spellcasting.complete(state)
     {:noreply, {socket, state}, socket.read_timeout}
   end
 
@@ -453,12 +454,6 @@ defmodule ThistleTea.Game.Network.Server do
     {:noreply, {socket, state}, socket.read_timeout}
   rescue
     _ -> {:noreply, {socket, state}, socket.read_timeout}
-  end
-
-  @impl GenServer
-  def handle_info(:attack_swing, {socket, state}) do
-    state = Message.CmsgAttackswing.handle_attack_swing(state)
-    {:noreply, {socket, state}, socket.read_timeout}
   end
 
   @impl GenServer

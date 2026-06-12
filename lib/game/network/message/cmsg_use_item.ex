@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgUseItem do
   alias ThistleTea.Game.Entity.Data.ItemTemplate
   alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Network.InventoryUpdate
+  alias ThistleTea.Game.Player.Spellcasting
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
@@ -31,7 +32,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgUseItem do
       Logger.info("CMSG_USE_ITEM: #{template.name} casting #{spell.name}")
 
       state
-      |> Message.CmsgCastSpell.cast_spell(spell, message.targets, guid)
+      |> Spellcasting.cast(spell, message.targets, guid)
       |> maybe_consume(item, pos, consumable?)
     else
       {:error, error} ->

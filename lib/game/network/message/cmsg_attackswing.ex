@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgAttackswing do
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Hostility
+  alias ThistleTea.Game.Network.PlayerTick
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.SpatialHash
 
@@ -27,7 +28,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgAttackswing do
 
       state
       |> Map.put(:character, character)
-      |> ensure_player_tick()
+      |> PlayerTick.schedule_now()
     else
       send_attack_stop(state, target_guid)
     end
@@ -41,8 +42,6 @@ defmodule ThistleTea.Game.Network.Message.CmsgAttackswing do
       target_guid: target_guid
     }
   end
-
-  def handle_attack_swing(state), do: state
 
   defp maybe_reset_attack_started(%Character{unit: %Unit{target: target}} = character, target_guid)
        when is_integer(target_guid) do
@@ -89,17 +88,4 @@ defmodule ThistleTea.Game.Network.Message.CmsgAttackswing do
   end
 
   defp engage_combat(character, _target_guid), do: character
-
-  defp ensure_player_tick(state) do
-    case Map.get(state, :player_tick_ref) do
-      nil ->
-        ref = Process.send_after(self(), :player_tick, 0)
-        Map.put(state, :player_tick_ref, ref)
-
-      ref ->
-        Process.cancel_timer(ref)
-        new_ref = Process.send_after(self(), :player_tick, 0)
-        Map.put(state, :player_tick_ref, new_ref)
-    end
-  end
 end

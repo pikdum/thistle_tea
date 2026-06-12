@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Network.Message.MsgMove do
   alias ThistleTea.Game.Network.ClientMessage
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Packet
+  alias ThistleTea.Game.Player.Spellcasting
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.Visibility
@@ -44,7 +45,7 @@ defmodule ThistleTea.Game.Network.Message.MsgMove do
           SpatialHash.update(:players, state.guid, map, x1, y1, z1)
 
           Map.put(state, :character, character)
-          |> Message.CmsgCancelCast.cancel_spell(@spell_failed_moving)
+          |> Spellcasting.cancel(@spell_failed_moving)
         else
           Map.put(state, :character, character)
         end
