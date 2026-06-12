@@ -37,10 +37,12 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   @max_level_aggro_bonus 25
   @min_aggro_radius 5.0
   @max_aggro_radius @base_aggro_radius + @max_level_aggro_bonus
-  @aggro_check_delay 1_000
+  @aggro_check_delay 5_000
   @dead_idle_delay 1_000
   @blocked_retry_delay 1_000
   @movement_sync_delay 1_000
+
+  def max_aggro_radius, do: @max_aggro_radius
 
   def tree do
     BT.selector([

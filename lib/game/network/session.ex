@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Network.Session do
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Party.Group
   alias ThistleTea.Game.Party.Notifier
+  alias ThistleTea.Game.World.AggroProbe
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
@@ -56,6 +57,7 @@ defmodule ThistleTea.Game.Network.Session do
 
   defp leave_world_presence(%__MODULE__{} = state) do
     Entity.unregister(state.guid)
+    AggroProbe.forget(state.guid)
     Metadata.delete(state.guid)
     SpatialHash.remove(:players, state.guid)
     state = Visibility.leave_player(state)

@@ -85,6 +85,19 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   end
 
   @impl GenServer
+  def handle_cast({:aggro_probe, target}, %Mob{internal: %Internal{in_combat: false}} = state)
+      when is_integer(target) do
+    state
+    |> mark_aggro_ready()
+    |> cancel_ai_tick()
+    |> run_ai_tick()
+  end
+
+  def handle_cast({:aggro_probe, _target}, state) do
+    {:noreply, state}
+  end
+
+  @impl GenServer
   def handle_cast({:receive_spell, caster, spell}, state) do
     caster_guid = caster_guid(caster)
 
@@ -348,6 +361,11 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
   defp mark_chase_ready(%Mob{internal: %Internal{blackboard: blackboard} = internal} = state) do
     blackboard = %{Blackboard.from_any(blackboard) | next_chase_at: 0}
+    %{state | internal: %{internal | blackboard: blackboard}}
+  end
+
+  defp mark_aggro_ready(%Mob{internal: %Internal{blackboard: blackboard} = internal} = state) do
+    blackboard = %{Blackboard.from_any(blackboard) | next_aggro_at: 0}
     %{state | internal: %{internal | blackboard: blackboard}}
   end
 

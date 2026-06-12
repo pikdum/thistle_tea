@@ -24,6 +24,10 @@ defmodule ThistleTea.Game.Entity do
     dispatch_cast(entity, {:move_to, x, y, z})
   end
 
+  def aggro_probe(entity, target_guid) do
+    dispatch_cast(entity, {:aggro_probe, target_guid})
+  end
+
   def receive_spell(entity, caster, spell) do
     dispatch_cast(entity, {:receive_spell, caster, spell})
   end

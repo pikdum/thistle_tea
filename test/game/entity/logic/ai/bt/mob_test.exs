@@ -159,7 +159,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
       put_spatial_target(:players, target_guid, {10.0, 0.0, 0.0}, alliance(), 5)
       put_spatial_target(:players, other_guid, {12.0, 0.0, 0.0}, alliance(), 5)
 
-      assert {:failure, state, %Blackboard{next_aggro_at: 2_000}} = MobBT.try_aggro(state, blackboard, 1_000)
+      assert {:failure, state, %Blackboard{next_aggro_at: 6_000}} = MobBT.try_aggro(state, blackboard, 1_000)
       assert state.unit.target == target_guid
       assert state.internal.in_combat == true
       assert state.internal.last_hostile_time == 1_000
@@ -179,7 +179,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
       put_spatial_target(:mobs, friendly_guid, {10.0, 0.0, 0.0}, defias(), 5)
       put_spatial_target(:mobs, neutral_guid, {8.0, 0.0, 0.0}, wolf(), 5)
 
-      assert {:failure, ^state, %Blackboard{next_aggro_at: 2_000}} = MobBT.try_aggro(state, blackboard, 1_000)
+      assert {:failure, ^state, %Blackboard{next_aggro_at: 6_000}} = MobBT.try_aggro(state, blackboard, 1_000)
     end
 
     test "uses level-adjusted aggro range" do
@@ -192,7 +192,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
       put_metadata(source_guid, defias(), 5)
       put_spatial_target(:players, target_guid, {6.0, 0.0, 0.0}, alliance(), 30)
 
-      assert {:failure, ^state, %Blackboard{next_aggro_at: 2_000}} = MobBT.try_aggro(state, blackboard, 1_000)
+      assert {:failure, ^state, %Blackboard{next_aggro_at: 6_000}} = MobBT.try_aggro(state, blackboard, 1_000)
     end
   end
 
