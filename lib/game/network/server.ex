@@ -61,6 +61,7 @@ defmodule ThistleTea.Game.Network.Server do
   @update_flag_living 0x20
   @update_flag_has_position 0x40
   @player_tick_ms 100
+  @player_tick_retry_ms 1_000
   @update_batch_max 100
 
   @impl ThousandIsland.Handler
@@ -440,7 +441,9 @@ defmodule ThistleTea.Game.Network.Server do
     state = Items.give(state, item_id, count)
     {:noreply, {socket, state}, socket.read_timeout}
   rescue
-    _ -> {:noreply, {socket, state}, socket.read_timeout}
+    error ->
+      Logger.error("create_item crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:noreply, {socket, state}, socket.read_timeout}
   end
 
   @impl GenServer
@@ -455,7 +458,9 @@ defmodule ThistleTea.Game.Network.Server do
 
     {:noreply, {socket, state}, socket.read_timeout}
   rescue
-    _ -> {:noreply, {socket, state}, socket.read_timeout}
+    error ->
+      Logger.error("consume_reagents crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:noreply, {socket, state}, socket.read_timeout}
   end
 
   @impl GenServer
@@ -463,7 +468,9 @@ defmodule ThistleTea.Game.Network.Server do
     EventSink.deliver_spell(event)
     {:noreply, {socket, state}, socket.read_timeout}
   rescue
-    _ -> {:noreply, {socket, state}, socket.read_timeout}
+    error ->
+      Logger.error("deliver_spell crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:noreply, {socket, state}, socket.read_timeout}
   end
 
   @impl GenServer
@@ -474,7 +481,10 @@ defmodule ThistleTea.Game.Network.Server do
     state = schedule_player_tick(state, character, status)
     {:noreply, {socket, state}, {:continue, :maybe_broadcast_update}}
   rescue
-    _ -> {:noreply, {socket, state}, socket.read_timeout}
+    error ->
+      Logger.error("Player tick crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      ref = Process.send_after(self(), :player_tick, @player_tick_retry_ms)
+      {:noreply, {socket, Map.put(state, :player_tick_ref, ref)}, socket.read_timeout}
   end
 
   def handle_info(:player_tick, {socket, state}) do

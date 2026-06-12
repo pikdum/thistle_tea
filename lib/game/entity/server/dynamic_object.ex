@@ -66,7 +66,8 @@ defmodule ThistleTea.Game.Entity.Server.DynamicObject do
     {:noreply, state}
   rescue
     error ->
-      Logger.error("DynamicObject tick failed: #{inspect(error)}")
+      Logger.error("DynamicObject tick crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      Process.send_after(self(), :tick, tick.interval_ms)
       {:noreply, state}
   end
 

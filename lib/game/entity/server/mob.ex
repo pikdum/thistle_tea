@@ -33,6 +33,8 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.World.System.Party, as: PartySystem
   alias ThistleTea.Game.World.Visibility
 
+  require Logger
+
   @ai_tick_ms 100
   @ai_tick_max_ms 1_000
   @default_respawn_delay_ms 120_000
@@ -177,7 +179,9 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     EventSink.deliver_spell(event)
     {:noreply, state}
   rescue
-    _ -> {:noreply, state}
+    error ->
+      Logger.error("deliver_spell crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:noreply, state}
   end
 
   @impl GenServer
@@ -194,7 +198,10 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
       {:noreply, state, {:continue, :maybe_broadcast}}
     end
   rescue
-    _ -> {:noreply, state}
+    error ->
+      Logger.error("Mob AI tick crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      schedule_ai_tick(@ai_tick_max_ms)
+      {:noreply, state}
   end
 
   def handle_info(:respawn, %Mob{} = state) do
