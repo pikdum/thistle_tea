@@ -10,6 +10,8 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.World.EntitySupervisor
   alias ThistleTea.Game.World.Groups
   alias ThistleTea.Game.World.ItemStore
+  alias ThistleTea.Game.World.Loader.CreatureTemplate, as: CreatureTemplateLoader
+  alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
   alias ThistleTea.Game.World.Loader.Gossip, as: GossipLoader
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
   alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader
@@ -90,6 +92,8 @@ defmodule ThistleTea.Application do
     VendorLoader.init()
     QuestLoader.init()
     GossipLoader.init()
+    CreatureTemplateLoader.init()
+    GameObjectTemplateLoader.init()
     :ets.new(:spline_counters, [:named_table, :public, write_concurrency: :auto])
     :ets.insert(:spline_counters, {:spline_id, 0})
     setup_database()
@@ -132,6 +136,9 @@ defmodule ThistleTea.Application do
         QuestLoader.load_all()
         Logger.info("Loading gossip menus...")
         GossipLoader.load_all()
+        Logger.info("Loading templates...")
+        CreatureTemplateLoader.load_all()
+        GameObjectTemplateLoader.load_all()
       end
 
       {:ok, pid}
