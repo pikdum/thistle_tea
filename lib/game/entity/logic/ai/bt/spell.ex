@@ -248,17 +248,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
 
   defp queue_consume_reagents(character, _casting), do: character
 
-  defp start_cooldown(%{object: %{guid: guid}} = character, %Cast{spell: %Spell{} = spell}, now)
-       when is_integer(guid) do
-    case Cooldowns.client_cooldown_ms(spell) do
-      cooldown_ms when cooldown_ms > 0 ->
-        character
-        |> Cooldowns.start(spell, now)
-        |> Event.enqueue(Event.spell_cooldown(guid, spell.id, cooldown_ms))
-
-      _ ->
-        character
-    end
+  defp start_cooldown(character, %Cast{spell: %Spell{} = spell}, now) do
+    Cooldowns.start(character, spell, now)
   end
 
   defp start_cooldown(character, _casting, _now), do: character
@@ -360,10 +351,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
   defp dispatch_to_target(character, %CastContext{caster_guid: caster_guid} = context, spell, target_guid, now)
        when target_guid == caster_guid do
     {character, events} = SpellEffect.receive(character, context, spell, now)
-    duration_events = AuraLogic.self_duration_events(character, now)
 
     character
-    |> Event.enqueue(events ++ duration_events)
+    |> Event.enqueue(events)
     |> queue_self_update()
   end
 

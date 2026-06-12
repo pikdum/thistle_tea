@@ -1,10 +1,12 @@
 defmodule ThistleTea.Game.Spell.Cooldowns do
   @moduledoc """
   Pure spell and category cooldown state kept on `internal.cooldowns` as a map
-  of `spell_id` / `{:category, id}` keys to ready-at timestamps. Started when a
-  cast fires and checked before the next cast; expiry is just a timestamp
-  comparison, no timers.
+  of `spell_id` / `{:category, id}` keys to ready-at timestamps. `start/3`
+  owns the whole lifecycle when a cast fires: it records the ready-at entries
+  and enqueues the client cooldown event; `on_cooldown?/3` checks before the
+  next cast. Expiry is just a timestamp comparison, no timers.
   """
+  alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.Spell
 
   def start(%{internal: internal} = entity, %Spell{} = spell, now) when is_integer(now) do
@@ -19,10 +21,20 @@ defmodule ThistleTea.Game.Spell.Cooldowns do
           |> Map.merge(Map.new(entries))
 
         %{entity | internal: Map.put(internal, :cooldowns, cooldowns)}
+        |> queue_client_cooldown(spell)
     end
   end
 
   def start(entity, _spell, _now), do: entity
+
+  defp queue_client_cooldown(%{object: %{guid: guid}} = entity, %Spell{id: spell_id} = spell) when is_integer(guid) do
+    case client_cooldown_ms(spell) do
+      cooldown_ms when cooldown_ms > 0 -> Event.enqueue(entity, Event.spell_cooldown(guid, spell_id, cooldown_ms))
+      _ -> entity
+    end
+  end
+
+  defp queue_client_cooldown(entity, _spell), do: entity
 
   def on_cooldown?(%{internal: internal}, %Spell{} = spell, now) when is_integer(now) do
     cooldowns = stored(internal)

@@ -16,7 +16,6 @@ defmodule ThistleTea.Game.Network.Server do
   alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.AI.Tick
-  alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Combat
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Death
@@ -263,11 +262,10 @@ defmodule ThistleTea.Game.Network.Server do
   def handle_cast({:receive_spell, caster, spell}, {socket, %{character: %Character{} = character} = state}) do
     now = Time.now()
     {character, events} = SpellEffect.receive(character, caster, spell, now)
-    duration_events = Aura.self_duration_events(character, now)
 
     character =
       character
-      |> EventSink.emit(events ++ duration_events)
+      |> EventSink.emit(events)
 
     {:noreply, {socket, %{state | character: character}}, {:continue, :maybe_broadcast_update}}
   end

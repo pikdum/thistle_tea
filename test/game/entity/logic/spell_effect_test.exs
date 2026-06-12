@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
   use ExUnit.Case, async: true
 
+  alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
@@ -89,6 +90,33 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
       assert target.unit.auras == []
 
       assert [%{type: :trigger_spell, source_guid: 999, target_guid: 1, spell_id: 7268}] = events
+    end
+
+    test "channeled spells apply secondary auras without the channel-ticked trigger aura" do
+      spell = %Spell{
+        id: 15_407,
+        name: "Mind Flay",
+        school: :shadow,
+        duration_ms: 3_000,
+        attributes: MapSet.new([:negative, :channeled]),
+        effects: [
+          %Effect{
+            index: 0,
+            type: :apply_aura,
+            aura: :periodic_trigger_spell,
+            trigger_spell_id: 16_568,
+            amplitude_ms: 1_000
+          },
+          %Effect{index: 1, type: :apply_aura, aura: :mod_decrease_speed, base_points: -50, die_sides: 0}
+        ]
+      }
+
+      context = %CastContext{caster_guid: 999, caster_level: 20}
+
+      {target, events} = SpellEffect.receive(target_fixture(), context, spell, 1_000)
+
+      assert [%{type: :trigger_spell, spell_id: 16_568}] = Enum.filter(events, &(&1.type == :trigger_spell))
+      assert [%Holder{auras: [%{type: :mod_decrease_speed}]}] = target.unit.auras
     end
 
     test "resurrect stores a pending resurrect with the caster's cast position" do

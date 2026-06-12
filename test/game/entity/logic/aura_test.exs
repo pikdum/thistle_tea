@@ -87,6 +87,26 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
       assert [%Holder{spell: ^spell, caster_guid: 1, slot: 0}] = entity.unit.auras
     end
 
+    test "returns the applied holder's duration event for player targets" do
+      character = %Character{
+        object: %Object{guid: 1},
+        unit: %Unit{level: 1, health: 100, max_health: 100, auras: []},
+        internal: %Internal{map: 0},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
+      }
+
+      {_character, events} = apply_spell(character, 1, 1, frost_armor_fixture())
+
+      assert [%{type: :aura_duration, aura_slot: 0, duration_ms: 600_000}] =
+               Enum.filter(events, &(&1.type == :aura_duration))
+    end
+
+    test "returns no duration event for mob targets" do
+      {_entity, events} = apply_spell(fixture_entity(), 1, 1, frost_armor_fixture())
+
+      assert Enum.filter(events, &(&1.type == :aura_duration)) == []
+    end
+
     test "applies mod_resistance to the matching school field" do
       entity = fixture_entity()
       spell = frost_armor_fixture()
