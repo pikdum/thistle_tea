@@ -163,7 +163,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
     if resurrectable?(state) do
       health = max(Effect.damage_roll(effect), 1)
       mana = max(effect.misc_value || 0, 0)
-      {state, [Event.resurrect_request(context.caster_guid, spell.id, health, mana)]}
+      offer_resurrect(state, context, spell, health, mana)
     else
       {state, []}
     end
@@ -174,7 +174,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
       percent = max(Effect.damage_roll(effect), 0) / 100
       health = max(trunc((state.unit.max_health || 1) * percent), 1)
       mana = max(trunc((state.unit.max_power1 || 0) * percent), 0)
-      {state, [Event.resurrect_request(context.caster_guid, spell.id, health, mana)]}
+      offer_resurrect(state, context, spell, health, mana)
     else
       {state, []}
     end
@@ -187,6 +187,18 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   end
 
   defp resurrectable?(_state), do: false
+
+  defp offer_resurrect(%{internal: internal} = state, %CastContext{} = context, spell, health, mana) do
+    pending = %{
+      caster_guid: context.caster_guid,
+      position: context.caster_position,
+      health: health,
+      mana: mana
+    }
+
+    state = %{state | internal: Map.put(internal, :pending_resurrect, pending)}
+    {state, [Event.resurrect_request(context.caster_guid, spell.id, health, mana)]}
+  end
 
   defp burn_multiplier(%Effect{multiple_value: multiple}) when is_number(multiple) and multiple > 0, do: multiple
   defp burn_multiplier(_effect), do: 1.0

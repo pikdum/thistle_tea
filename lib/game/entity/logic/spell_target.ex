@@ -2,6 +2,8 @@ defmodule ThistleTea.Game.Entity.Logic.SpellTarget do
   @moduledoc """
   Classifies a spell + targets blob into a target query — caster AoE, cone,
   ground-targeted AoE, or a single unit — for the spatial target resolver.
+  Also redirects self-targeted enemy triggers (e.g. channeled damage procs)
+  onto the caster's channel object or current target.
   """
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Effect
@@ -30,6 +32,27 @@ defmodule ThistleTea.Game.Entity.Logic.SpellTarget do
   end
 
   def target_query(_spell, _targets), do: :none
+
+  def redirect_enemy_trigger(%{object: %{guid: guid}, unit: unit}, target_guid, %Spell{effects: effects})
+      when target_guid == guid do
+    cond do
+      not Enum.any?(effects, &(&1.implicit_target_a == :target_enemy)) -> target_guid
+      enemy_guid = preferred_enemy_guid(unit, guid) -> enemy_guid
+      true -> nil
+    end
+  end
+
+  def redirect_enemy_trigger(_entity, target_guid, _spell), do: target_guid
+
+  defp preferred_enemy_guid(%{channel_object: channel_object, target: target}, self_guid) do
+    cond do
+      is_integer(channel_object) and channel_object > 0 and channel_object != self_guid -> channel_object
+      is_integer(target) and target > 0 and target != self_guid -> target
+      true -> nil
+    end
+  end
+
+  defp preferred_enemy_guid(_unit, _self_guid), do: nil
 
   defp caster_aoe_spell?(%Spell{effects: effects}) do
     Enum.any?(effects, &effect_targets?(&1, [:aoe_enemy_at_caster]))

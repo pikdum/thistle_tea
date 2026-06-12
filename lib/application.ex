@@ -7,6 +7,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.DB.Mangos.Repo
   alias ThistleTea.Game.Entity.Registry, as: EntityRegistry
   alias ThistleTea.Game.Network.Server, as: GameServer
+  alias ThistleTea.Game.World.AreaEffects
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.EntitySupervisor
   alias ThistleTea.Game.World.Groups
@@ -74,6 +75,7 @@ defmodule ThistleTea.Application do
         PartySystem,
         {Group, name: Groups, log: false},
         EntityRegistry,
+        AreaEffects,
         {Registry, keys: :duplicate, name: ThistleTea.ChatChannel},
         ThistleTea.DBC,
         Repo,

@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
     :caster_guid,
     :caster_level,
     :caster_type,
+    :caster_position,
     :target_guid,
     :target_hostile?,
     :spell,
@@ -26,6 +27,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
       caster_guid: guid,
       caster_level: level,
       caster_type: caster_type(caster),
+      caster_position: caster_position(caster),
       target_guid: target_guid,
       spell: spell,
       spell_damage_bonus: spell_damage_bonus(caster),
@@ -38,6 +40,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
       caster_guid: guid,
       caster_level: 1,
       caster_type: caster_type(caster),
+      caster_position: caster_position(caster),
       target_guid: target_guid,
       spell: spell
     }
@@ -46,6 +49,12 @@ defmodule ThistleTea.Game.Spell.CastContext do
   defp caster_type(%Character{}), do: :player
   defp caster_type(%Mob{}), do: :mob
   defp caster_type(_), do: nil
+
+  defp caster_position(%{internal: %{map: map}, movement_block: %{position: {x, y, z, _o}}}) when is_integer(map) do
+    {map, x, y, z}
+  end
+
+  defp caster_position(_caster), do: nil
 
   defp spell_damage_bonus(caster) do
     bonuses = equipment_bonuses(caster)

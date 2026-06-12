@@ -51,6 +51,65 @@ defmodule ThistleTea.Game.Entity.Logic.SpellTargetTest do
     end
   end
 
+  describe "redirect_enemy_trigger/3" do
+    test "keeps a self target when the spell does not target enemies" do
+      entity = entity_fixture()
+      spell = trigger_spell(:target_friend)
+
+      assert SpellTarget.redirect_enemy_trigger(entity, 10, spell) == 10
+    end
+
+    test "keeps a non-self target unchanged" do
+      entity = entity_fixture(target: 55)
+      spell = trigger_spell(:target_enemy)
+
+      assert SpellTarget.redirect_enemy_trigger(entity, 99, spell) == 99
+    end
+
+    test "redirects a self-targeted enemy trigger to the channel object" do
+      entity = entity_fixture(channel_object: 42, target: 55)
+      spell = trigger_spell(:target_enemy)
+
+      assert SpellTarget.redirect_enemy_trigger(entity, 10, spell) == 42
+    end
+
+    test "falls back to the current target without a channel object" do
+      entity = entity_fixture(target: 55)
+      spell = trigger_spell(:target_enemy)
+
+      assert SpellTarget.redirect_enemy_trigger(entity, 10, spell) == 55
+    end
+
+    test "drops a self-targeted enemy trigger without any enemy" do
+      entity = entity_fixture()
+      spell = trigger_spell(:target_enemy)
+
+      assert SpellTarget.redirect_enemy_trigger(entity, 10, spell) == nil
+    end
+  end
+
+  defp entity_fixture(opts \\ []) do
+    %{
+      object: %{guid: 10},
+      unit: %{
+        channel_object: Keyword.get(opts, :channel_object, 0),
+        target: Keyword.get(opts, :target, 0)
+      }
+    }
+  end
+
+  defp trigger_spell(target) do
+    %Spell{
+      id: 7268,
+      effects: [
+        %Effect{
+          type: :school_damage,
+          implicit_target_a: target
+        }
+      ]
+    }
+  end
+
   defp aoe_spell(target) do
     %Spell{
       id: 122,

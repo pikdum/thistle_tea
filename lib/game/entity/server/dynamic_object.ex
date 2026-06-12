@@ -17,6 +17,7 @@ defmodule ThistleTea.Game.Entity.Server.DynamicObject do
   alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
+  alias ThistleTea.Game.World.AreaEffects
   alias ThistleTea.Game.World.Visibility
 
   require Logger
@@ -28,6 +29,7 @@ defmodule ThistleTea.Game.Entity.Server.DynamicObject do
   @impl GenServer
   def init(%{entity: %DynamicObject{} = entity} = opts) do
     Process.flag(:trap_exit, true)
+    AreaEffects.register(entity.dynamic_object.caster, entity.dynamic_object.spell_id)
 
     World.update_position(entity)
     entity = Visibility.join_entity(entity)

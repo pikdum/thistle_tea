@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
   alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.Entity.Logic.SpellEffect
+  alias ThistleTea.Game.Entity.Logic.SpellTarget
   alias ThistleTea.Game.Entity.Server.DynamicObject, as: DynamicObjectServer
   alias ThistleTea.Game.Math
   alias ThistleTea.Game.Network
@@ -25,6 +26,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
+  alias ThistleTea.Game.World.AreaEffects
   alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Metadata
@@ -125,17 +127,9 @@ defmodule ThistleTea.Game.Entity.EventSink do
 
   def emit(entity, %Event{type: :water_walk_changed}), do: entity
 
-  def emit(%Character{internal: %Internal{} = internal} = entity, %Event{type: :resurrect_request} = event) do
-    pending = %{
-      caster_guid: event.source_guid,
-      position: World.position(event.source_guid),
-      health: event.health,
-      mana: event.mana || 0
-    }
-
+  def emit(%Character{} = entity, %Event{type: :resurrect_request} = event) do
     Network.send_packet(%Message.SmsgResurrectRequest{guid: event.source_guid})
-
-    %{entity | internal: Map.put(internal, :pending_resurrect, pending)}
+    entity
   end
 
   def emit(entity, %Event{type: :resurrect_request}), do: entity
@@ -382,19 +376,18 @@ defmodule ThistleTea.Game.Entity.EventSink do
       tick: DynamicObjectServer.tick_config(entity, event.spell, event.effect)
     })
 
-    track_area_effect(entity, event.spell.id, dynamic_object.object.guid)
+    entity
   end
 
   def emit(entity, %Event{type: :spawn_area_effect}), do: entity
 
-  def emit(%{internal: %Internal{area_effect_guids: guids} = internal} = entity, %Event{
-        type: :despawn_area_effects,
-        spell_id: spell_id
-      })
-      when is_list(guids) and guids != [] do
-    {matching, kept} = Enum.split_with(guids, fn {id, _guid} -> id == spell_id end)
-    Enum.each(matching, fn {_id, guid} -> World.stop_entity(guid) end)
-    %{entity | internal: %{internal | area_effect_guids: kept}}
+  def emit(%{object: %{guid: caster_guid}} = entity, %Event{type: :despawn_area_effects, spell_id: spell_id})
+      when is_integer(caster_guid) do
+    caster_guid
+    |> AreaEffects.pids(spell_id)
+    |> Enum.each(&World.stop_entity/1)
+
+    entity
   end
 
   def emit(entity, %Event{type: :despawn_area_effects}), do: entity
@@ -433,9 +426,9 @@ defmodule ThistleTea.Game.Entity.EventSink do
         entity
 
       spell ->
-        case redirect_enemy_trigger(entity, event, spell) do
+        case SpellTarget.redirect_enemy_trigger(entity, event.target_guid, spell) do
           nil -> entity
-          event -> dispatch_triggered_spell(entity, event, spell)
+          target_guid -> dispatch_triggered_spell(entity, %{event | target_guid: target_guid}, spell)
         end
     end
   end
@@ -448,13 +441,6 @@ defmodule ThistleTea.Game.Entity.EventSink do
 
   defp owner_level(%{unit: %{level: level}}) when is_integer(level), do: level
   defp owner_level(_entity), do: 1
-
-  defp track_area_effect(%{internal: %Internal{area_effect_guids: guids} = internal} = entity, spell_id, guid)
-       when is_list(guids) do
-    %{entity | internal: %{internal | area_effect_guids: [{spell_id, guid} | guids]}}
-  end
-
-  defp track_area_effect(entity, _spell_id, _guid), do: entity
 
   defp clamp_leap_destination(%{movement_block: %{position: {cx, cy, cz, _o}}}, map, {x, y, z}) do
     z = snap_to_terrain_height(map, {x, y}, z, cz)
@@ -479,28 +465,6 @@ defmodule ThistleTea.Game.Entity.EventSink do
       heights -> Enum.min_by(heights, &abs(&1 - reference_z))
     end
   end
-
-  defp redirect_enemy_trigger(%{object: %{guid: guid}, unit: unit}, %Event{target_guid: guid} = event, %Spell{
-         effects: effects
-       }) do
-    cond do
-      not Enum.any?(effects, &(&1.implicit_target_a == :target_enemy)) -> event
-      enemy_guid = preferred_enemy_guid(unit, guid) -> %{event | target_guid: enemy_guid}
-      true -> nil
-    end
-  end
-
-  defp redirect_enemy_trigger(_entity, event, _spell), do: event
-
-  defp preferred_enemy_guid(%{channel_object: channel_object, target: target}, self_guid) do
-    cond do
-      is_integer(channel_object) and channel_object > 0 and channel_object != self_guid -> channel_object
-      is_integer(target) and target > 0 and target != self_guid -> target
-      true -> nil
-    end
-  end
-
-  defp preferred_enemy_guid(_unit, _self_guid), do: nil
 
   defp projectile_delay_ms(%{movement_block: %{position: {x, y, z, _o}}}, %Event{
          spell: %Spell{speed: speed},

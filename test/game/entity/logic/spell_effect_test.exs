@@ -1,9 +1,11 @@
 defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
   use ExUnit.Case, async: true
 
+  alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Object
+  alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.Aura
@@ -17,6 +19,16 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
     %Mob{
       object: %Object{guid: 1},
       unit: %Unit{health: 20, max_health: 20, level: 1, auras: []},
+      internal: %Internal{map: 0},
+      movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
+    }
+  end
+
+  defp dead_character_fixture do
+    %Character{
+      object: %Object{guid: 1},
+      unit: %Unit{health: 0, max_health: 100, max_power1: 50, level: 10, auras: []},
+      player: %Player{flags: 0},
       internal: %Internal{map: 0},
       movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
     }
@@ -77,6 +89,43 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
       assert target.unit.auras == []
 
       assert [%{type: :trigger_spell, source_guid: 999, target_guid: 1, spell_id: 7268}] = events
+    end
+
+    test "resurrect stores a pending resurrect with the caster's cast position" do
+      spell = %Spell{
+        id: 2006,
+        name: "Resurrection",
+        school: :holy,
+        effects: [%Effect{index: 0, type: :resurrect, base_points: 34, die_sides: 0}]
+      }
+
+      context = %CastContext{caster_guid: 999, caster_level: 40, caster_position: {0, 1.0, 2.0, 3.0}}
+
+      {target, events} = SpellEffect.receive(dead_character_fixture(), context, spell, 1_000)
+
+      assert target.internal.pending_resurrect == %{
+               caster_guid: 999,
+               position: {0, 1.0, 2.0, 3.0},
+               health: 34,
+               mana: 17
+             }
+
+      assert [%{type: :resurrect_request, source_guid: 999, spell_id: 2006, health: 34, mana: 17}] = events
+    end
+
+    test "resurrect does nothing for non-player targets" do
+      spell = %Spell{
+        id: 2006,
+        name: "Resurrection",
+        school: :holy,
+        effects: [%Effect{index: 0, type: :resurrect, base_points: 34, die_sides: 0}]
+      }
+
+      target = target_fixture()
+      dead_mob = %{target | unit: %{target.unit | health: 0}}
+
+      assert {%Mob{internal: %Internal{pending_resurrect: nil}}, []} =
+               SpellEffect.receive(dead_mob, %CastContext{caster_guid: 999, caster_level: 40}, spell, 1_000)
     end
 
     test "persistent area auras do not apply directly on hit (area effect process handles ticks)" do

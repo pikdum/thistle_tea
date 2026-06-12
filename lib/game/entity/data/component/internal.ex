@@ -54,7 +54,6 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal do
     action_buttons: %{},
     cooldowns: %{},
     events: [],
-    area_effect_guids: [],
     broadcast_update?: false,
     spline_id: 0,
     godmode: false
