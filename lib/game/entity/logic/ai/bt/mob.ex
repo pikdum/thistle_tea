@@ -40,7 +40,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   @aggro_check_delay 5_000
   @dead_idle_delay 1_000
   @blocked_retry_delay 1_000
-  @movement_sync_delay 1_000
 
   def max_aggro_radius, do: @max_aggro_radius
 
@@ -729,7 +728,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
 
   def wait_for_arrival(%Mob{} = state, %Blackboard{} = blackboard, now) when is_integer(now) do
     if Movement.moving?(state, now) do
-      delay_ms = min(Movement.remaining_move_duration(state, now), @movement_sync_delay)
+      delay_ms = Movement.next_spatial_update_delay(state, now)
       {{:running, delay_ms}, state, blackboard}
     else
       {:success, state, Blackboard.clear_move_target(blackboard)}

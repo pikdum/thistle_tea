@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
   alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.Math
   alias ThistleTea.Game.World.Pathfinding
+  alias ThistleTea.Game.World.SpatialHash
 
   @max_u32 0xFFFFFFFF
   @movement_flag_forward 0x00000001
@@ -49,6 +50,51 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
   end
 
   def remaining_move_duration(_entity, _now), do: 0
+
+  def next_spatial_update_delay(
+        %{
+          internal: %Internal{map: map, movement_start_time: start_time, movement_start_position: start_position},
+          movement_block: %MovementBlock{spline_nodes: spline_nodes, duration: duration}
+        } = entity,
+        now
+      )
+      when is_integer(map) and is_integer(start_time) and is_tuple(start_position) and is_list(spline_nodes) and
+             spline_nodes != [] and is_integer(duration) and duration > 0 and is_integer(now) do
+    if moving?(entity, now) do
+      remaining_delay = max(remaining_move_duration(entity, now), 1)
+      next_spatial_update_delay(map, start_position, spline_nodes, start_time, duration, now, remaining_delay)
+    else
+      0
+    end
+  end
+
+  def next_spatial_update_delay(_entity, _now), do: 0
+
+  defp next_spatial_update_delay(map, start_position, spline_nodes, start_time, duration, now, remaining_delay) do
+    path = [start_position | spline_nodes]
+    total_distance = path_length(path)
+
+    if total_distance <= 0 do
+      remaining_delay
+    else
+      elapsed = min(max(now - start_time, 0), duration)
+      current_cell = cell_at(map, start_position, spline_nodes, duration, elapsed)
+      travelled = total_distance * elapsed / duration
+      boundary_delay(path, travelled, map, current_cell, duration, total_distance, remaining_delay)
+    end
+  end
+
+  defp cell_at(map, start_position, spline_nodes, duration, elapsed) do
+    {x, y, z} = position_at(start_position, spline_nodes, duration, elapsed)
+    SpatialHash.cell(map, x, y, z)
+  end
+
+  defp boundary_delay(path, travelled, map, current_cell, duration, total_distance, remaining_delay) do
+    case distance_to_leave_cell(path, travelled, map, current_cell) do
+      nil -> remaining_delay
+      distance -> min(max(ceil(distance * duration / total_distance), 1), remaining_delay)
+    end
+  end
 
   def sync_position(%{movement_block: %MovementBlock{spline_nodes: spline_nodes}} = entity, _now)
       when spline_nodes in [nil, []] do
@@ -265,6 +311,76 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
   end
 
   defp lerp_point(_start, finish, _segment_distance, _remaining), do: finish
+
+  defp distance_to_leave_cell([start | rest], travelled, map, cell) do
+    rest
+    |> Enum.reduce_while({start, 0.0}, &reduce_cell_boundary_segment(&1, &2, travelled, map, cell))
+    |> case do
+      {_finish, _distance_acc} -> nil
+      distance -> distance
+    end
+  end
+
+  defp reduce_cell_boundary_segment(finish, {prev, distance_acc}, travelled, map, cell) do
+    segment_distance = segment_distance(prev, finish)
+    segment_end = distance_acc + segment_distance
+
+    cond do
+      segment_distance <= 0 ->
+        {:cont, {finish, distance_acc}}
+
+      travelled >= segment_end ->
+        {:cont, {finish, segment_end}}
+
+      true ->
+        offset = max(travelled - distance_acc, 0.0)
+        segment_start = lerp_point(prev, finish, segment_distance, offset)
+        remaining_segment_distance = segment_distance - offset
+        cell_boundary_reduce_result(map, cell, segment_start, finish, remaining_segment_distance, segment_end)
+    end
+  end
+
+  defp cell_boundary_reduce_result(map, cell, segment_start, finish, remaining_segment_distance, segment_end) do
+    case distance_to_leave_cell_segment(map, cell, segment_start, finish, remaining_segment_distance) do
+      nil -> {:cont, {finish, segment_end}}
+      distance -> {:halt, distance}
+    end
+  end
+
+  defp distance_to_leave_cell_segment(map, cell, {x1, y1, _z1}, {x2, y2, _z2}, distance) do
+    cond do
+      SpatialHash.cell(map, x1, y1, 0.0) != cell ->
+        0.0
+
+      SpatialHash.cell(map, x2, y2, 0.0) == cell ->
+        nil
+
+      true ->
+        cell_boundary_distance(cell, x1, y1, x2 - x1, y2 - y1, distance)
+    end
+  end
+
+  defp cell_boundary_distance(cell, x, y, dx, dy, distance) do
+    {{x_min, x_max}, {y_min, y_max}} = SpatialHash.cell_bounds(cell)
+
+    [boundary_fraction(x, dx, x_min, x_max), boundary_fraction(y, dy, y_min, y_max)]
+    |> Enum.reject(&is_nil/1)
+    |> Enum.filter(fn fraction -> fraction >= 0.0 and fraction <= 1.0 end)
+    |> case do
+      [] -> distance
+      fractions -> Enum.min(fractions) * distance
+    end
+  end
+
+  defp boundary_fraction(position, delta, _min_boundary, max_boundary) when delta > 0 do
+    (max_boundary - position) / delta
+  end
+
+  defp boundary_fraction(position, delta, min_boundary, _max_boundary) when delta < 0 do
+    (min_boundary - position) / delta
+  end
+
+  defp boundary_fraction(_position, _delta, _min_boundary, _max_boundary), do: nil
 
   defp path_length(points) when is_list(points) do
     points

@@ -38,6 +38,14 @@ defmodule ThistleTea.Game.World.WorldPositionTest do
       assert World.nearby_units_exact(:mobs, 0, {0.0, 0.0, 0.0}, 10.0, 2_000) == [{904, 0.0}]
     end
 
+    test "includes moving units whose stale position drifted within a spatial cell" do
+      SpatialHash.update(:mobs, 906, 0, 120.0, 0.0, 0.0)
+      SpatialHash.put_movement(906, {0, {120.0, 0.0, 0.0}, [{0.0, 0.0, 0.0}], 1_000, 1_000})
+      on_exit(fn -> SpatialHash.remove(:mobs, 906) end)
+
+      assert World.nearby_units_exact(:mobs, 0, {0.0, 0.0, 0.0}, 10.0, 2_000) == [{906, 0.0}]
+    end
+
     test "excludes units whose interpolated position left the radius" do
       SpatialHash.update(:mobs, 905, 0, 0.0, 0.0, 0.0)
       SpatialHash.put_movement(905, {0, {0.0, 0.0, 0.0}, [{100.0, 0.0, 0.0}], 1_000, 1_000})

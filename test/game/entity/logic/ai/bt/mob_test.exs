@@ -102,11 +102,19 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
                MobBT.wait_for_arrival(state, blackboard, 1_000)
     end
 
-    test "caps long movement waits for position freshness" do
+    test "waits until arrival when movement stays in the current spatial cell" do
       state = fixture_mob(start_time: 900, duration: 5_000)
       blackboard = %Blackboard{move_target: {1.0, 2.0, 3.0}}
 
-      assert {{:running, 1_000}, ^state, ^blackboard} =
+      assert {{:running, 4_900}, ^state, ^blackboard} =
+               MobBT.wait_for_arrival(state, blackboard, 1_000)
+    end
+
+    test "wakes at the next spatial cell boundary before arrival" do
+      state = fixture_mob(start_time: 0, duration: 10_000, spline_nodes: [{250.0, 0.0, 0.0}])
+      blackboard = %Blackboard{move_target: {250.0, 0.0, 0.0}}
+
+      assert {{:running, 3_980}, ^state, ^blackboard} =
                MobBT.wait_for_arrival(state, blackboard, 1_000)
     end
 
@@ -211,12 +219,12 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
         map: 0,
         in_combat: false,
         movement_start_time: Keyword.get(opts, :start_time),
-        movement_start_position: {0.0, 0.0, 0.0}
+        movement_start_position: Keyword.get(opts, :movement_start_position, {0.0, 0.0, 0.0})
       },
       movement_block: %MovementBlock{
         duration: Keyword.get(opts, :duration, 0),
         position: {0.0, 0.0, 0.0, 0.0},
-        spline_nodes: [{1.0, 0.0, 0.0}]
+        spline_nodes: Keyword.get(opts, :spline_nodes, [{1.0, 0.0, 0.0}])
       }
     }
   end

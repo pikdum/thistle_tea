@@ -36,15 +36,15 @@ defmodule ThistleTea.Game.World do
         },
         range \\ 30
       ) do
-    SpatialHash.query(:mobs, map, x, y, z, range)
+    nearby_units_exact(:mobs, map, {x, y, z}, range)
     |> Enum.reject(fn {guid, _distance} -> guid == self_guid end)
   end
 
   def nearby_mobs_at(map, {x, y, z}, range \\ 30) do
-    SpatialHash.query(:mobs, map, x, y, z, range)
+    nearby_units_exact(:mobs, map, {x, y, z}, range)
   end
 
-  @position_drift_margin 15.0
+  @position_drift_margin 180.0
 
   def nearby_units_exact(table, map, {x, y, z} = origin, range, now \\ Time.now()) do
     SpatialHash.query(table, map, x, y, z, range + @position_drift_margin)

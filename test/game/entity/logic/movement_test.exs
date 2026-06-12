@@ -57,6 +57,38 @@ defmodule ThistleTea.Game.Entity.Logic.MovementTest do
     assert Movement.remaining_move_duration(entity, now) == 750
   end
 
+  describe "next_spatial_update_delay/2" do
+    test "returns the delay to the next spatial cell boundary" do
+      entity =
+        build_entity(
+          start_time: 0,
+          start_position: {0.0, 0.0, 0.0},
+          duration: 10_000,
+          spline_nodes: [{250.0, 0.0, 0.0}]
+        )
+
+      assert Movement.next_spatial_update_delay(entity, 0) == 4_980
+    end
+
+    test "returns the remaining duration when movement stays in the current cell" do
+      entity =
+        build_entity(
+          start_time: 0,
+          start_position: {0.0, 0.0, 0.0},
+          duration: 10_000,
+          spline_nodes: [{10.0, 0.0, 0.0}]
+        )
+
+      assert Movement.next_spatial_update_delay(entity, 0) == 10_000
+    end
+
+    test "returns zero without active movement" do
+      entity = build_entity(start_time: nil, start_position: nil, spline_nodes: [])
+
+      assert Movement.next_spatial_update_delay(entity, 0) == 0
+    end
+  end
+
   test "sync_position updates time_passed while moving" do
     now = 5_000
 
