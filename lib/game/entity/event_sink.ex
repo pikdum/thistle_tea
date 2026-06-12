@@ -27,6 +27,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.AreaEffects
+  alias ThistleTea.Game.World.ChaseWatch
   alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Metadata
@@ -149,6 +150,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
 
   def emit(%Mob{} = entity, %Event{type: :monster_move, move_opts: opts}) do
     World.publish_movement(entity)
+    notify_chasers(entity)
 
     Message.SmsgMonsterMove.build(entity, opts || [])
     |> World.broadcast_packet(entity)
@@ -437,6 +439,10 @@ defmodule ThistleTea.Game.Entity.EventSink do
 
   def deliver_spell(%Event{type: :deliver_spell} = event) do
     Entity.receive_spell(event.target_guid, event.cast_context, event.spell)
+  end
+
+  defp notify_chasers(%{object: %{guid: guid}, movement_block: %{position: {x, y, z, _o}}}) do
+    ChaseWatch.notify_moved(guid, {x, y, z})
   end
 
   defp owner_level(%{unit: %{level: level}}) when is_integer(level), do: level

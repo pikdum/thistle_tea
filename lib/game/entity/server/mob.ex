@@ -16,6 +16,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.Logic.AI.BT
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AI.BT.Mob, as: MobBT
   alias ThistleTea.Game.Entity.Logic.AI.Tick
   alias ThistleTea.Game.Entity.Logic.Combat
@@ -32,6 +33,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
+  alias ThistleTea.Game.World.ChaseWatch
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.System.GameEvent
   alias ThistleTea.Game.World.System.Party, as: PartySystem
@@ -207,6 +209,17 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     |> run_ai_tick()
   end
 
+  def handle_info({:target_moved, target}, %Mob{unit: %Unit{target: target}} = state) when is_integer(target) do
+    state
+    |> mark_chase_ready()
+    |> cancel_ai_tick()
+    |> run_ai_tick()
+  end
+
+  def handle_info({:target_moved, _target}, state) do
+    {:noreply, sync_chase_watch(state)}
+  end
+
   def handle_info(:respawn, %Mob{} = state) do
     {:noreply, Respawn.handle(state)}
   end
@@ -227,13 +240,14 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
   defp run_ai_tick(%{internal: %Internal{behavior_tree: behavior_tree}} = state) do
     if Corpse.removed?(state) do
-      {:noreply, state}
+      {:noreply, unwatch_chase(state)}
     else
       state = Movement.sync_position(state, Time.now())
       World.update_position(state)
       state = Visibility.refresh_entity(state)
       {status, state} = BT.tick(behavior_tree, state)
       state = EventSink.emit_pending(state)
+      state = sync_chase_watch(state)
       state = schedule_next_ai_tick(state, status)
       {:noreply, state, {:continue, :maybe_broadcast}}
     end
@@ -262,17 +276,24 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
   @impl GenServer
   def terminate(_reason, state) do
+    unwatch_chase(state)
     World.remove_position(state)
     Visibility.leave_entity(state)
     Metadata.delete(state.object.guid)
   end
 
   defp wake_ai_tick(%Mob{} = state) do
-    if Core.dead?(state), do: cancel_ai_tick(state), else: schedule_ai_tick(state, 0)
+    if Core.dead?(state), do: deactivate_ai(state), else: schedule_ai_tick(state, 0)
   end
 
   defp schedule_next_ai_tick(%Mob{} = state, status) do
-    if Core.dead?(state), do: cancel_ai_tick(state), else: schedule_ai_tick(state, Tick.mob_delay(status))
+    if Core.dead?(state), do: deactivate_ai(state), else: schedule_ai_tick(state, Tick.mob_delay(status))
+  end
+
+  defp deactivate_ai(%Mob{} = state) do
+    state
+    |> cancel_ai_tick()
+    |> unwatch_chase()
   end
 
   defp schedule_ai_tick(%Mob{} = state, delay) when is_integer(delay) and delay >= 0 do
@@ -296,6 +317,38 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
   defp clear_ai_tick_ref(%Mob{internal: %Internal{} = internal} = state) do
     %{state | internal: %{internal | ai_tick_ref: nil, ai_tick_token: nil}}
+  end
+
+  defp sync_chase_watch(%Mob{} = state) do
+    case chase_watch(state) do
+      {target, last_position, threshold} ->
+        ChaseWatch.watch(target, self(), last_position, threshold)
+
+      nil ->
+        ChaseWatch.unwatch(self())
+    end
+
+    state
+  end
+
+  defp unwatch_chase(%Mob{} = state) do
+    ChaseWatch.unwatch(self())
+    state
+  end
+
+  defp chase_watch(%Mob{internal: %Internal{in_combat: true, blackboard: blackboard}, unit: %Unit{target: target}})
+       when is_integer(target) and target > 0 do
+    case Blackboard.from_any(blackboard) do
+      %Blackboard{last_target_pos: {x, y, z}} -> {target, {x, y, z}, MobBT.chase_repath_distance(target)}
+      _blackboard -> nil
+    end
+  end
+
+  defp chase_watch(%Mob{}), do: nil
+
+  defp mark_chase_ready(%Mob{internal: %Internal{blackboard: blackboard} = internal} = state) do
+    blackboard = %{Blackboard.from_any(blackboard) | next_chase_at: 0}
+    %{state | internal: %{internal | blackboard: blackboard}}
   end
 
   defp engage_combat(%Mob{unit: %Unit{target: current_target} = unit, internal: internal} = state, caster)

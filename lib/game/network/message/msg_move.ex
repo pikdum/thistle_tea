@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Network.Message.MsgMove do
   alias ThistleTea.Game.Network.Packet
   alias ThistleTea.Game.Player.Spellcasting
   alias ThistleTea.Game.Time
+  alias ThistleTea.Game.World.ChaseWatch
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.Visibility
 
@@ -43,6 +44,7 @@ defmodule ThistleTea.Game.Network.Message.MsgMove do
       new_state =
         if position_changed? do
           SpatialHash.update(:players, state.guid, map, x1, y1, z1)
+          ChaseWatch.notify_moved(state.guid, {x1, y1, z1})
 
           %{state | character: character}
           |> Spellcasting.cancel(@spell_failed_moving)

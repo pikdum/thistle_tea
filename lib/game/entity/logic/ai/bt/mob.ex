@@ -26,7 +26,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Pathfinding
 
-  @chase_tick_delay 100
+  @chase_tick_delay 1_000
 
   # TODO: a lot of these should be pulled from entity data
   @target_radius_guess 0.9
@@ -479,8 +479,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     case World.target_position(target) do
       {map, x, y, z} when map == state.internal.map ->
         {state, blackboard} = maybe_repath_chase(state, blackboard, {x, y, z}, target, now)
-        blackboard = Blackboard.put_next_at(blackboard, :next_chase_at, @chase_tick_delay, now)
-        {{:running, @chase_tick_delay}, state, blackboard}
+        delay_ms = chase_delay(state, now)
+        blackboard = Blackboard.put_next_at(blackboard, :next_chase_at, delay_ms, now)
+        {{:running, delay_ms}, state, blackboard}
 
       _ ->
         clear_chase_and_idle(state, blackboard)
@@ -592,7 +593,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     :math.sqrt(dx * dx + dy * dy)
   end
 
-  defp chase_repath_distance(target_guid) do
+  def chase_repath_distance(target_guid) do
     combat_reach = target_combat_reach(target_guid)
     bounding_radius = target_bounding_radius(target_guid)
     max(combat_reach * 0.75 - bounding_radius, 0.0)
@@ -841,6 +842,14 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
 
   defp blocked_delay(%Mob{} = state, now) do
     soonest_delay([aura_delay(state, now)], @blocked_retry_delay)
+  end
+
+  defp chase_delay(%Mob{} = state, now) do
+    if Movement.moving?(state, now) do
+      min(Movement.remaining_move_duration(state, now), @chase_tick_delay)
+    else
+      @chase_tick_delay
+    end
   end
 
   defp aura_delay(%Mob{} = state, now) do

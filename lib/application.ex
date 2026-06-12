@@ -9,6 +9,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.Network.Server, as: GameServer
   alias ThistleTea.Game.World.AreaEffects
   alias ThistleTea.Game.World.CharacterStore
+  alias ThistleTea.Game.World.ChaseWatch
   alias ThistleTea.Game.World.EntitySupervisor
   alias ThistleTea.Game.World.Groups
   alias ThistleTea.Game.World.ItemStore
@@ -112,6 +113,7 @@ defmodule ThistleTea.Application do
     :ets.insert(:spline_counters, {:spline_id, 0})
     setup_database()
     SpatialHash.setup_tables()
+    ChaseWatch.init()
 
     :telemetry.attach(
       "handle-packet-handler",

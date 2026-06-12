@@ -67,6 +67,17 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
     end
   end
 
+  describe "chase_repath_distance/1" do
+    test "uses target combat reach and bounding radius" do
+      target_guid = player_guid()
+      Metadata.put(target_guid, %{combat_reach: 4.0, bounding_radius: 1.0})
+
+      on_exit(fn -> Metadata.delete(target_guid) end)
+
+      assert MobBT.chase_repath_distance(target_guid) == 2.0
+    end
+  end
+
   describe "combat_wait/3" do
     test "paces by the next swing or chase check" do
       state = fixture_mob()
