@@ -7,6 +7,8 @@ defmodule ThistleTea.Auth do
 
   import Binary, only: [reverse: 1]
 
+  alias ThistleTea.Auth.SRP
+
   require Logger
 
   @cmd_auth_logon_challenge 0
@@ -19,9 +21,8 @@ defmodule ThistleTea.Auth do
   @reconnect_proof_size 58
   @realm_list_size 5
 
-  @n <<137, 75, 100, 94, 137, 225, 83, 91, 189, 173, 91, 139, 41, 6, 80, 83, 8, 1, 177, 142, 191, 191, 94, 143, 171, 60,
-       130, 135, 42, 62, 155, 183>>
-  @g <<7>>
+  @n SRP.n()
+  @g SRP.g()
 
   defp calculate_b(state) do
     private_b = :crypto.strong_rand_bytes(19)

@@ -23,8 +23,6 @@ config :logger, :default_formatter,
     :error_code
   ]
 
-config :mnesia, dir: ~c".mnesia/#{Mix.env()}/#{node()}"
-
 config :phoenix, :json_library, Jason
 
 config :tailwind,

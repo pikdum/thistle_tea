@@ -42,7 +42,7 @@ defmodule ThistleTea.Application do
 
   def setup_database do
     # in memory for now, so need to re-seed on startup
-    Memento.Table.create!(ThistleTea.Account)
+    ThistleTea.Account.init()
     ThistleTea.Account.register("pikdum", "pikdum")
     ThistleTea.Account.register("test", "test")
 
