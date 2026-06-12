@@ -4,6 +4,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   back to spawn, and idle wandering or waypoint-route movement.
   """
   alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Loot
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Spawn
   alias ThistleTea.Game.Entity.Data.Component.Internal.WaypointRoute
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Unit
@@ -129,7 +131,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     false
   end
 
-  defp has_waypoints?(%Mob{internal: %Internal{waypoint_route: %WaypointRoute{}}}, _blackboard) do
+  defp has_waypoints?(%Mob{internal: %Internal{spawn: %Spawn{waypoint_route: %WaypointRoute{}}}}, _blackboard) do
     true
   end
 
@@ -137,7 +139,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     false
   end
 
-  defp can_wander?(%Mob{internal: %Internal{movement_type: 1}}, _blackboard) do
+  defp can_wander?(%Mob{internal: %Internal{spawn: %Spawn{movement_type: 1}}}, _blackboard) do
     true
   end
 
@@ -334,7 +336,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   end
 
   defp tethering_to_spawn?(
-         %Mob{internal: %Internal{initial_position: {x, y, z}}} = state,
+         %Mob{internal: %Internal{spawn: %Spawn{position: {x, y, z}}}} = state,
          %Blackboard{move_target: {x, y, z}} = blackboard
        ) do
     tethering_to_spawn?(state, blackboard, Time.now())
@@ -345,7 +347,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   end
 
   def tethering_to_spawn?(
-        %Mob{internal: %Internal{initial_position: {x, y, z}}} = state,
+        %Mob{internal: %Internal{spawn: %Spawn{position: {x, y, z}}}} = state,
         %Blackboard{move_target: {x, y, z}},
         now
       )
@@ -355,7 +357,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
 
   def tethering_to_spawn?(_state, _blackboard, _now), do: false
 
-  defp set_tether_target(%Mob{internal: %Internal{initial_position: {x, y, z}}} = state, %Blackboard{} = blackboard) do
+  defp set_tether_target(
+         %Mob{internal: %Internal{spawn: %Spawn{position: {x, y, z}}}} = state,
+         %Blackboard{} = blackboard
+       ) do
     {:success, state, %{blackboard | target: {x, y, z}}}
   end
 
@@ -370,7 +375,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
          %Blackboard{} = blackboard
        ) do
     unit = %{unit | target: 0, dynamic_flags: Bitwise.band(unit.dynamic_flags || 0, Bitwise.bnot(@dynamic_flag_tapped))}
-    internal = Map.put(%{internal | in_combat: false}, :tapped_by, nil)
+    internal = %{internal | in_combat: false, loot: clear_tap(internal.loot)}
 
     blackboard =
       blackboard
@@ -394,6 +399,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   defp clear_combat_events(_target) do
     [Event.tap_cleared()]
   end
+
+  defp clear_tap(%Loot{} = loot), do: %{loot | tapped_by: nil}
+  defp clear_tap(loot), do: loot
 
   defp heal_to_full(
          %Mob{unit: %Unit{health: health, max_health: max_health} = unit} = state,
@@ -620,8 +628,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     else
       case Pathfinding.find_random_point_around_circle(
              state.internal.map,
-             state.internal.initial_position,
-             state.internal.spawn_distance
+             state.internal.spawn.position,
+             state.internal.spawn.distance
            ) do
         nil ->
           blackboard = Blackboard.put_next_at(blackboard, :next_wander_at, idle_delay(), Time.now())
@@ -734,7 +742,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     {:running, state, blackboard}
   end
 
-  defp waypoint_destination(%Mob{internal: %Internal{waypoint_route: %WaypointRoute{} = route}}) do
+  defp waypoint_destination(%Mob{internal: %Internal{spawn: %Spawn{waypoint_route: %WaypointRoute{} = route}}}) do
     WaypointRoute.destination_waypoint(route)
   end
 
@@ -742,9 +750,12 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     nil
   end
 
-  defp increment_waypoint(%Mob{internal: %Internal{waypoint_route: %WaypointRoute{} = route} = internal} = state) do
+  defp increment_waypoint(
+         %Mob{internal: %Internal{spawn: %Spawn{waypoint_route: %WaypointRoute{} = route} = spawn_state} = internal} =
+           state
+       ) do
     route = WaypointRoute.increment_waypoint(route)
-    %{state | internal: %{internal | waypoint_route: route}}
+    %{state | internal: %{internal | spawn: %{spawn_state | waypoint_route: route}}}
   end
 
   defp increment_waypoint(%Mob{} = state) do

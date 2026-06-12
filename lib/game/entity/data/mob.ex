@@ -7,6 +7,8 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
 
   alias ThistleTea.DB.Mangos
   alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Loot
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Spawn
   alias ThistleTea.Game.Entity.Data.Component.Internal.WaypointRoute
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Object
@@ -95,21 +97,25 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
       internal: %Internal{
         map: c.map,
         name: ct.name,
-        spawn_distance: c.spawndist,
-        movement_type: c.movement_type,
         experience_multiplier: ct.experience_multiplier,
         extra_flags: ct.extra_flags,
         creature_type_flags: ct.creature_type_flags,
         regenerate_stats: ct.regenerate_stats,
         rank: ct.rank,
-        respawn_delay_ms: respawn_delay_ms(c.spawntimesecs),
-        loot_id: ct.loot_id,
-        min_loot_gold: ct.min_loot_gold,
-        max_loot_gold: ct.max_loot_gold,
-        spawn_unit: unit,
-        spawn_movement_block: movement_block,
-        initial_position: {c.position_x, c.position_y, c.position_z},
-        waypoint_route: WaypointRoute.build(c),
+        spawn: %Spawn{
+          unit: unit,
+          movement_block: movement_block,
+          position: {c.position_x, c.position_y, c.position_z},
+          distance: c.spawndist,
+          movement_type: c.movement_type,
+          waypoint_route: WaypointRoute.build(c),
+          respawn_delay_ms: respawn_delay_ms(c.spawntimesecs)
+        },
+        loot: %Loot{
+          id: ct.loot_id,
+          min_gold: ct.min_loot_gold,
+          max_gold: ct.max_loot_gold
+        },
         event: event,
         in_combat: false,
         running: false,
@@ -129,23 +135,25 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
   end
 
   def respawn(%__MODULE__{internal: %Internal{} = internal} = mob) do
-    unit = respawn_unit(internal, mob.unit)
-    movement_block = respawn_movement_block(internal, mob.movement_block)
+    spawn_state = internal.spawn || %Spawn{}
+    loot = internal.loot || %Loot{}
 
-    internal =
-      %{
-        internal
-        | in_combat: false,
-          last_hostile_time: nil,
-          running: false,
-          movement_start_time: nil,
-          movement_start_position: nil,
-          behavior_tree: nil,
-          blackboard: nil,
-          respawn_ref: nil,
-          broadcast_update?: false
-      }
-      |> Map.merge(%{tapped_by: nil, loot_session: nil, corpse_removed?: false, respawn_pending?: false})
+    unit = respawn_unit(spawn_state, mob.unit)
+    movement_block = respawn_movement_block(spawn_state, mob.movement_block)
+
+    internal = %{
+      internal
+      | in_combat: false,
+        last_hostile_time: nil,
+        running: false,
+        movement_start_time: nil,
+        movement_start_position: nil,
+        behavior_tree: nil,
+        blackboard: nil,
+        broadcast_update?: false,
+        spawn: %{spawn_state | respawn_ref: nil, respawn_pending?: false},
+        loot: %{loot | session: nil, tapped_by: nil, corpse_removed?: false, corpse_token: nil}
+    }
 
     %{mob | unit: unit, movement_block: movement_block, internal: internal}
   end
@@ -167,9 +175,9 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
 
   defp respawn_delay_ms(_seconds), do: @default_respawn_delay_ms
 
-  defp respawn_unit(%Internal{spawn_unit: %Unit{} = unit}, _current_unit), do: unit
+  defp respawn_unit(%Spawn{unit: %Unit{} = unit}, _current_unit), do: unit
 
-  defp respawn_unit(%Internal{}, %Unit{} = unit) do
+  defp respawn_unit(%Spawn{}, %Unit{} = unit) do
     %{
       unit
       | health: unit.max_health,
@@ -182,18 +190,15 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
     }
   end
 
-  defp respawn_movement_block(
-         %Internal{spawn_movement_block: %MovementBlock{} = movement_block},
-         _current_movement_block
-       ) do
+  defp respawn_movement_block(%Spawn{movement_block: %MovementBlock{} = movement_block}, _current_movement_block) do
     movement_block
   end
 
-  defp respawn_movement_block(%Internal{initial_position: {x, y, z}}, %MovementBlock{} = movement_block) do
+  defp respawn_movement_block(%Spawn{position: {x, y, z}}, %MovementBlock{} = movement_block) do
     %{movement_block | position: {x, y, z, 0.0}, movement_flags: 0}
   end
 
-  defp respawn_movement_block(%Internal{}, %MovementBlock{} = movement_block) do
+  defp respawn_movement_block(%Spawn{}, %MovementBlock{} = movement_block) do
     %{movement_block | movement_flags: 0}
   end
 

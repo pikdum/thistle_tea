@@ -2,6 +2,7 @@ defmodule ThistleTea.Game.Entity.Logic.CoreTest do
   use ExUnit.Case, async: true
 
   alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Spawn
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.Core
@@ -51,7 +52,7 @@ defmodule ThistleTea.Game.Entity.Logic.CoreTest do
         level: 1
       },
       internal: %Internal{
-        initial_position: {0.0, 0.0, 0.0},
+        spawn: %Spawn{position: {0.0, 0.0, 0.0}},
         last_hostile_time: Keyword.get(opts, :last_hostile_time)
       },
       movement_block: %MovementBlock{position: Keyword.get(opts, :position)}

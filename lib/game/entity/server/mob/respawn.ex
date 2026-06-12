@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Respawn do
   its spawn point (fresh tree, position, metadata) when the timer fires.
   """
   alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Spawn
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Mob, as: MobBT
@@ -17,14 +18,16 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Respawn do
 
   @default_delay_ms 120_000
 
-  def schedule(%Mob{internal: %Internal{respawn_ref: ref}} = state) when is_reference(ref) do
+  def schedule(%Mob{internal: %Internal{spawn: %Spawn{respawn_ref: ref}}} = state) when is_reference(ref) do
     state
   end
 
-  def schedule(%Mob{internal: %Internal{} = internal} = state) do
-    ref = Process.send_after(self(), :respawn, delay_ms(internal.respawn_delay_ms))
-    %{state | internal: %{internal | respawn_ref: ref}}
+  def schedule(%Mob{internal: %Internal{spawn: %Spawn{} = spawn_state} = internal} = state) do
+    ref = Process.send_after(self(), :respawn, delay_ms(spawn_state.respawn_delay_ms))
+    %{state | internal: %{internal | spawn: %{spawn_state | respawn_ref: ref}}}
   end
+
+  def schedule(%Mob{} = state), do: state
 
   def handle(%Mob{} = state) do
     cond do
@@ -33,20 +36,22 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Respawn do
         clear_ref(state)
 
       Corpse.rolls_pending?(state) ->
-        %{state | internal: Map.put(state.internal, :respawn_pending?, true)}
+        put_spawn(state, %{state.internal.spawn | respawn_pending?: true})
 
       true ->
         respawn(state)
     end
   end
 
-  def maybe_continue(%Mob{} = state) do
-    if Map.get(state.internal, :respawn_pending?) == true and not Corpse.rolls_pending?(state) do
+  def maybe_continue(%Mob{internal: %Internal{spawn: %Spawn{respawn_pending?: true}}} = state) do
+    if not Corpse.rolls_pending?(state) do
       send(self(), :respawn)
     end
 
     :ok
   end
+
+  def maybe_continue(%Mob{} = _state), do: :ok
 
   defp respawn(%Mob{} = state) do
     state =
@@ -87,8 +92,14 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Respawn do
     Metadata.update(state.object.guid, FactionLoader.metadata(state.unit.faction_template))
   end
 
-  defp clear_ref(%Mob{internal: %Internal{} = internal} = state) do
-    %{state | internal: %{internal | respawn_ref: nil}}
+  defp clear_ref(%Mob{internal: %Internal{spawn: %Spawn{} = spawn_state}} = state) do
+    put_spawn(state, %{spawn_state | respawn_ref: nil})
+  end
+
+  defp clear_ref(%Mob{} = state), do: state
+
+  defp put_spawn(%Mob{internal: %Internal{} = internal} = state, %Spawn{} = spawn_state) do
+    %{state | internal: %{internal | spawn: spawn_state}}
   end
 
   defp delay_ms(delay) when is_integer(delay) and delay >= 0, do: delay

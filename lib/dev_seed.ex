@@ -167,7 +167,7 @@ defmodule ThistleTea.DevSeed do
           |> MobLoader.load_creature()
           |> Mob.build()
 
-        mob = %{mob | internal: Map.put(mob.internal, :loot_override, loot_override)}
+        mob = %{mob | internal: %{mob.internal | loot: %{mob.internal.loot | override: loot_override}}}
         MobLoader.start_mob(mob)
 
       _ ->

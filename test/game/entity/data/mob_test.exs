@@ -4,6 +4,8 @@ defmodule ThistleTea.Game.Entity.Data.MobTest do
   alias ThistleTea.DB.Mangos
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Loot
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Spawn
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Unit
@@ -74,9 +76,9 @@ defmodule ThistleTea.Game.Entity.Data.MobTest do
       assert mob.internal.experience_multiplier == 1.5
       assert mob.internal.extra_flags == 0x40
       assert mob.internal.rank == 1
-      assert mob.internal.respawn_delay_ms == 120_000
-      assert mob.internal.spawn_unit == mob.unit
-      assert mob.internal.spawn_movement_block == mob.movement_block
+      assert mob.internal.spawn.respawn_delay_ms == 120_000
+      assert mob.internal.spawn.unit == mob.unit
+      assert mob.internal.spawn.movement_block == mob.movement_block
     end
 
     test "stores respawn delay from creature spawn time" do
@@ -103,7 +105,7 @@ defmodule ThistleTea.Game.Entity.Data.MobTest do
 
       mob = Mob.build(creature)
 
-      assert mob.internal.respawn_delay_ms == 7_000
+      assert mob.internal.spawn.respawn_delay_ms == 7_000
     end
   end
 
@@ -121,9 +123,11 @@ defmodule ThistleTea.Game.Entity.Data.MobTest do
           running: true,
           movement_start_time: 456,
           movement_start_position: {9.0, 9.0, 9.0},
-          respawn_ref: make_ref(),
-          spawn_unit: spawn_unit,
-          spawn_movement_block: spawn_movement_block
+          spawn: %Spawn{
+            unit: spawn_unit,
+            movement_block: spawn_movement_block,
+            respawn_ref: make_ref()
+          }
         }
       }
 
@@ -136,7 +140,7 @@ defmodule ThistleTea.Game.Entity.Data.MobTest do
       assert mob.internal.last_hostile_time == nil
       assert mob.internal.movement_start_time == nil
       assert mob.internal.movement_start_position == nil
-      assert mob.internal.respawn_ref == nil
+      assert mob.internal.spawn.respawn_ref == nil
     end
   end
 
@@ -155,7 +159,14 @@ defmodule ThistleTea.Game.Entity.Data.MobTest do
         object: %Object{guid: mob_guid},
         unit: %Unit{health: 1, max_health: 1, level: 1},
         movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
-        internal: %Internal{map: 0, experience_multiplier: 1.0, extra_flags: 0, rank: 0}
+        internal: %Internal{
+          map: 0,
+          experience_multiplier: 1.0,
+          extra_flags: 0,
+          rank: 0,
+          spawn: %Spawn{},
+          loot: %Loot{}
+        }
       }
 
       assert {:noreply, %Mob{unit: %Unit{health: 0}}, {:continue, :maybe_broadcast}} =
@@ -178,10 +189,17 @@ defmodule ThistleTea.Game.Entity.Data.MobTest do
         object: %Object{guid: mob_guid},
         unit: %Unit{health: 1, max_health: 1, level: 1},
         movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
-        internal: %Internal{map: 0, experience_multiplier: 1.0, extra_flags: 0, rank: 0, respawn_delay_ms: 1}
+        internal: %Internal{
+          map: 0,
+          experience_multiplier: 1.0,
+          extra_flags: 0,
+          rank: 0,
+          spawn: %Spawn{respawn_delay_ms: 1},
+          loot: %Loot{}
+        }
       }
 
-      assert {:noreply, %Mob{internal: %Internal{respawn_ref: ref}}, {:continue, :maybe_broadcast}} =
+      assert {:noreply, %Mob{internal: %Internal{spawn: %Spawn{respawn_ref: ref}}}, {:continue, :maybe_broadcast}} =
                MobServer.handle_cast({:receive_attack, %{caster: player_guid, damage: 1}}, mob)
 
       assert is_reference(ref)
@@ -202,10 +220,13 @@ defmodule ThistleTea.Game.Entity.Data.MobTest do
         internal: %Internal{
           map: 0,
           name: "Test Creature",
-          spawn_unit: spawn_unit,
-          spawn_movement_block: spawn_movement_block,
           in_combat: true,
-          respawn_ref: make_ref()
+          spawn: %Spawn{
+            unit: spawn_unit,
+            movement_block: spawn_movement_block,
+            respawn_ref: make_ref()
+          },
+          loot: %Loot{}
         }
       }
 
@@ -219,7 +240,7 @@ defmodule ThistleTea.Game.Entity.Data.MobTest do
       assert respawned.object.guid == mob_guid
       assert respawned.unit == spawn_unit
       assert respawned.movement_block == spawn_movement_block
-      assert respawned.internal.respawn_ref == nil
+      assert respawned.internal.spawn.respawn_ref == nil
       assert SpatialHash.get_entity(mob_guid) == {mob_guid, 0, 1.0, 2.0, 3.0}
       assert %{alive?: true, level: 2} = Metadata.get(mob_guid)
     end

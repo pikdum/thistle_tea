@@ -34,10 +34,10 @@ defmodule ThistleTea.Game.Entity.Data.GameObjectTest do
       assert go.game_object.type_id == 22
       assert go.movement_block.position == {1.0, 2.0, 3.0, 0.5}
       assert go.internal.map == 0
-      assert go.internal.summoned_by == 99
-      assert go.internal.use_spell_id == 7001
-      assert go.internal.spell_charges == 5
-      assert go.internal.despawn_in_ms == 180_000
+      assert go.internal.summon.owner_guid == 99
+      assert go.internal.summon.spell_id == 7001
+      assert go.internal.summon.charges == 5
+      assert go.internal.summon.despawn_in_ms == 180_000
     end
 
     test "summoned guids are unique per call" do
@@ -52,8 +52,8 @@ defmodule ThistleTea.Game.Entity.Data.GameObjectTest do
       template = %{lightwell_template() | type: 5}
       go = GameObject.build_summoned(template, 0, {0.0, 0.0, 0.0, 0.0}, [])
 
-      assert go.internal.use_spell_id == nil
-      assert go.internal.spell_charges == nil
+      assert go.internal.summon.spell_id == nil
+      assert go.internal.summon.charges == nil
     end
   end
 end

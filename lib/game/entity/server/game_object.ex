@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
 
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Summon
   alias ThistleTea.Game.Entity.Data.GameObject
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Registry, as: EntityRegistry
@@ -44,12 +45,15 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
   end
 
   @impl GenServer
-  def handle_cast({:gameobject_use, user_guid, user_level}, %GameObject{internal: %Internal{} = internal} = state) do
+  def handle_cast(
+        {:gameobject_use, user_guid, user_level},
+        %GameObject{internal: %Internal{summon: %Summon{} = summon}} = state
+      ) do
     with {spell_id, %Spell{} = spell} when is_integer(spell_id) <-
-           {internal.use_spell_id, SpellLoader.load(internal.use_spell_id || 0)},
-         true <- allowed_user?(internal, user_guid) do
+           {summon.spell_id, SpellLoader.load(summon.spell_id || 0)},
+         true <- allowed_user?(summon, user_guid) do
       context = %CastContext{
-        caster_guid: internal.summoned_by || user_guid,
+        caster_guid: summon.owner_guid || user_guid,
         caster_level: user_level,
         target_guid: user_guid,
         spell: spell
@@ -98,31 +102,30 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
     {:noreply, state}
   end
 
-  defp schedule_despawn(%GameObject{internal: %Internal{despawn_in_ms: despawn_in_ms}})
+  defp schedule_despawn(%GameObject{internal: %Internal{summon: %Summon{despawn_in_ms: despawn_in_ms}}})
        when is_integer(despawn_in_ms) and despawn_in_ms > 0 do
     Process.send_after(self(), :despawn, despawn_in_ms)
   end
 
   defp schedule_despawn(_state), do: nil
 
-  defp spend_charge(%GameObject{internal: %Internal{spell_charges: charges} = internal} = state)
+  defp spend_charge(%GameObject{internal: %Internal{summon: %Summon{charges: charges} = summon} = internal} = state)
        when is_integer(charges) do
     if charges > 1 do
-      %{state | internal: %{internal | spell_charges: charges - 1}}
+      %{state | internal: %{internal | summon: %{summon | charges: charges - 1}}}
     else
       send(self(), :despawn)
-      %{state | internal: %{internal | spell_charges: 0, use_spell_id: nil}}
+      %{state | internal: %{internal | summon: %{summon | charges: 0, spell_id: nil}}}
     end
   end
 
   defp spend_charge(state), do: state
 
-  defp allowed_user?(%Internal{use_party_only?: true, summoned_by: summoned_by}, user_guid)
-       when is_integer(summoned_by) do
-    user_guid == summoned_by or same_group?(summoned_by, user_guid)
+  defp allowed_user?(%Summon{party_only?: true, owner_guid: owner_guid}, user_guid) when is_integer(owner_guid) do
+    user_guid == owner_guid or same_group?(owner_guid, user_guid)
   end
 
-  defp allowed_user?(_internal, _user_guid), do: true
+  defp allowed_user?(_summon, _user_guid), do: true
 
   defp same_group?(owner_guid, user_guid) do
     case {PartySystem.group_of(owner_guid), PartySystem.group_of(user_guid)} do

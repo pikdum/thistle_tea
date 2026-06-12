@@ -1,8 +1,10 @@
 defmodule ThistleTea.Game.Entity.Data.Component.Internal do
   @moduledoc """
   Server-only entity state that is never sent to the client: map/area, AI and
-  combat bookkeeping, pending events, loot, casting state, and similar
-  runtime-internal fields.
+  combat bookkeeping, pending events, and casting state. Entity-kind concerns
+  live in sub-structs — `Internal.Spawn` (mob spawn/respawn), `Internal.Loot`
+  (mob loot/corpse phase), and `Internal.Summon` (summoned game objects) —
+  which stay nil on entities they don't apply to.
   """
   defstruct [
     :map,
@@ -12,17 +14,12 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal do
     :spellbook,
     :casting,
     :next_swing_spell,
-    :spawn_distance,
-    :movement_type,
     :experience_multiplier,
     :extra_flags,
     :rank,
-    :respawn_delay_ms,
-    :respawn_ref,
-    :spawn_unit,
-    :spawn_movement_block,
-    :initial_position,
-    :waypoint_route,
+    :spawn,
+    :loot,
+    :summon,
     :event,
     :in_combat,
     :last_hostile_time,
@@ -34,23 +31,9 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal do
     :visibility_cell,
     :movement_start_time,
     :movement_start_position,
-    :loot_id,
-    :min_loot_gold,
-    :max_loot_gold,
-    :loot_override,
-    :loot_session,
-    :tapped_by,
-    :corpse_removed?,
-    :respawn_pending?,
-    :corpse_token,
     :creature_type_flags,
     :regenerate_stats,
     :pending_resurrect,
-    :summoned_by,
-    :use_spell_id,
-    :spell_charges,
-    :use_party_only?,
-    :despawn_in_ms,
     action_buttons: %{},
     cooldowns: %{},
     events: [],

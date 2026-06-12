@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Loot
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.EventSink
@@ -272,15 +273,18 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     state
   end
 
-  defp maybe_tap(%Mob{unit: %Unit{} = unit, internal: %Internal{} = internal} = state, caster) do
-    if Map.get(internal, :tapped_by) == nil and not Core.dead?(state) and Guid.entity_type(caster) == :player do
+  defp maybe_tap(
+         %Mob{unit: %Unit{} = unit, internal: %Internal{loot: %Loot{tapped_by: nil} = loot} = internal} = state,
+         caster
+       ) do
+    if not Core.dead?(state) and Guid.entity_type(caster) == :player do
       group_id =
         case PartySystem.group_of(caster) do
           %Party.Group{id: id} -> id
           _ -> nil
         end
 
-      internal = Map.put(internal, :tapped_by, %{player: caster, group_id: group_id})
+      internal = %{internal | loot: %{loot | tapped_by: %{player: caster, group_id: group_id}}}
       unit = %{unit | dynamic_flags: (unit.dynamic_flags || 0) ||| @dynamic_flag_tapped}
       Metadata.update(state.object.guid, %{tapped_player: caster, tapped_group_id: group_id})
 
@@ -290,6 +294,8 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
       state
     end
   end
+
+  defp maybe_tap(%Mob{} = state, _caster), do: state
 
   defp maybe_reset_attack_started(%Mob{unit: %Unit{target: target}} = state, caster) when is_integer(caster) do
     if target == caster do

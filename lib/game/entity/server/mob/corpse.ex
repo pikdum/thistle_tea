@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Corpse do
   import Bitwise, only: [|||: 2, &&&: 2, bnot: 1]
 
   alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Loot, as: InternalLoot
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.Core
@@ -37,10 +38,9 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Corpse do
   @corpse_decay_ms 300_000
   @corpse_decay_elite_ms 600_000
 
-  def prepare(%Mob{internal: %Internal{} = internal} = state, target) do
-    loot = generate_loot(internal)
-    tapped = Map.get(internal, :tapped_by)
-    session = LootSession.new(loot, tapped)
+  def prepare(%Mob{internal: %Internal{loot: %InternalLoot{} = internal_loot} = internal} = state, target) do
+    loot = generate_loot(internal_loot)
+    session = LootSession.new(loot, internal_loot.tapped_by)
 
     state =
       state
@@ -51,10 +51,11 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Corpse do
     token = corpse_token(state.internal) + 1
     Process.send_after(self(), {:remove_corpse, token}, decay_ms(internal))
 
-    %{state | internal: Map.put(state.internal, :corpse_token, token)}
+    put_internal_loot(state, %{state.internal.loot | corpse_token: token})
   end
 
-  def removed?(%Mob{internal: %Internal{} = internal}), do: Map.get(internal, :corpse_removed?) == true
+  def removed?(%Mob{internal: %Internal{loot: %InternalLoot{corpse_removed?: removed?}}}), do: removed? == true
+  def removed?(%Mob{}), do: false
 
   def rolls_pending?(%Mob{} = state) do
     case session(state) do
@@ -79,12 +80,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Corpse do
         state = Visibility.leave_entity(state)
         World.remove_position(state)
 
-        internal =
-          state.internal
-          |> Map.put(:loot_session, nil)
-          |> Map.put(:corpse_removed?, true)
-
-        %{state | internal: internal}
+        put_internal_loot(state, %{state.internal.loot | session: nil, corpse_removed?: true})
     end
   end
 
@@ -181,10 +177,10 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Corpse do
     end
   end
 
-  defp generate_loot(%Internal{} = internal) do
-    case Map.get(internal, :loot_override) do
+  defp generate_loot(%InternalLoot{} = internal_loot) do
+    case internal_loot.override do
       %{items: items, gold: gold} -> LootLoader.generate_fixed(items, gold)
-      _ -> LootLoader.generate(internal.loot_id, internal.min_loot_gold, internal.max_loot_gold)
+      _ -> LootLoader.generate(internal_loot.id, internal_loot.min_gold, internal_loot.max_gold)
     end
   end
 
@@ -393,8 +389,8 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Corpse do
     %{state | unit: %{unit | dynamic_flags: (unit.dynamic_flags || 0) &&& bnot(@dynamic_flag_lootable)}}
   end
 
-  defp tap_group(%Mob{internal: %Internal{} = internal}) do
-    with %{player: player} <- Map.get(internal, :tapped_by),
+  defp tap_group(%Mob{internal: %Internal{loot: %InternalLoot{} = internal_loot}}) do
+    with %{player: player} <- internal_loot.tapped_by,
          %Party.Group{} = group <- PartySystem.group_of(player) do
       group
     else
@@ -421,15 +417,19 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Corpse do
     end
   end
 
-  defp session(%Mob{internal: %Internal{} = internal}) do
-    Map.get(internal, :loot_session)
+  defp session(%Mob{internal: %Internal{loot: %InternalLoot{session: session}}}), do: session
+  defp session(%Mob{}), do: nil
+
+  defp put_session(%Mob{} = state, session) do
+    put_internal_loot(state, %{state.internal.loot | session: session})
   end
 
-  defp put_session(%Mob{internal: %Internal{} = internal} = state, session) do
-    %{state | internal: Map.put(internal, :loot_session, session)}
+  defp put_internal_loot(%Mob{internal: %Internal{} = internal} = state, %InternalLoot{} = internal_loot) do
+    %{state | internal: %{internal | loot: internal_loot}}
   end
 
-  defp corpse_token(%Internal{} = internal), do: Map.get(internal, :corpse_token) || 0
+  defp corpse_token(%Internal{loot: %InternalLoot{corpse_token: token}}) when is_integer(token), do: token
+  defp corpse_token(%Internal{}), do: 0
 
   defp decay_ms(%Internal{} = internal) do
     if Experience.elite_rank?(Map.get(internal, :rank)) do

@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
   """
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Spawn
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Corpse
@@ -96,8 +97,10 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
   end
 
   def out_of_tether_range?(
-        %{internal: %Internal{initial_position: {xi, yi, zi}}, movement_block: %MovementBlock{position: {x, y, z, _}}} =
-          entity
+        %{
+          internal: %Internal{spawn: %Spawn{position: {xi, yi, zi}}},
+          movement_block: %MovementBlock{position: {x, y, z, _}}
+        } = entity
       ) do
     case tether_range(entity) do
       range when is_number(range) ->

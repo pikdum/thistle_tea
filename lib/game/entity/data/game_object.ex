@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Entity.Data.GameObject do
   alias ThistleTea.DB.Mangos
   alias ThistleTea.Game.Entity.Data.Component.GameObject
   alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Summon
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.GameObjectTemplate
@@ -55,11 +56,13 @@ defmodule ThistleTea.Game.Entity.Data.GameObject do
       },
       internal: %Internal{
         map: map,
-        summoned_by: Keyword.get(opts, :summoned_by),
-        use_spell_id: spellcaster_spell(ot),
-        spell_charges: spellcaster_charges(ot),
-        use_party_only?: spellcaster_party_only?(ot),
-        despawn_in_ms: Keyword.get(opts, :despawn_in_ms)
+        summon: %Summon{
+          owner_guid: Keyword.get(opts, :summoned_by),
+          despawn_in_ms: Keyword.get(opts, :despawn_in_ms),
+          spell_id: spellcaster_spell(ot),
+          charges: spellcaster_charges(ot),
+          party_only?: spellcaster_party_only?(ot)
+        }
       }
     }
   end
