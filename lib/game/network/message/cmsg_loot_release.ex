@@ -7,8 +7,8 @@ defmodule ThistleTea.Game.Network.Message.CmsgLootRelease do
   defstruct [:guid]
 
   @impl ClientMessage
-  def handle(%__MODULE__{}, %{ready: true, loot_guid: loot_guid} = state) when is_integer(loot_guid) do
-    Entity.call(loot_guid, :loot_release)
+  def handle(%__MODULE__{}, %{ready: true, guid: guid, loot_guid: loot_guid} = state) when is_integer(loot_guid) do
+    Entity.call(loot_guid, {:loot_release, guid})
     Network.send_packet(%Message.SmsgLootReleaseResponse{guid: loot_guid})
     Map.delete(state, :loot_guid)
   end

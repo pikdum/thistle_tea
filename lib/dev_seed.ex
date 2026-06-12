@@ -41,6 +41,7 @@ defmodule ThistleTea.DevSeed do
   @hostile_entry 1783
   @hostile_offsets [{-45.0, 25.0}, {-50.0, 15.0}, {-55.0, 25.0}]
   @respawn_secs 5
+  @hostile_respawn_secs 30
   @base_low_guid 990_000
 
   def run do
@@ -132,17 +133,17 @@ defmodule ThistleTea.DevSeed do
     @pinata_offsets
     |> Enum.with_index()
     |> Enum.each(fn {{dx, dy}, index} ->
-      spawn_mob(@pinata_entry, @base_low_guid + index, {x + dx, y + dy, z}, @pinata_loot)
+      spawn_mob(@pinata_entry, @base_low_guid + index, {x + dx, y + dy, z}, @pinata_loot, @respawn_secs)
     end)
 
     @hostile_offsets
     |> Enum.with_index()
     |> Enum.each(fn {{dx, dy}, index} ->
-      spawn_mob(@hostile_entry, @base_low_guid + 100 + index, {x + dx, y + dy, z}, nil)
+      spawn_mob(@hostile_entry, @base_low_guid + 100 + index, {x + dx, y + dy, z}, nil, @hostile_respawn_secs)
     end)
   end
 
-  defp spawn_mob(entry, low_guid, {x, y, z}, loot_override) do
+  defp spawn_mob(entry, low_guid, {x, y, z}, loot_override, respawn_secs) do
     case Mangos.Repo.one(from(c in Mangos.Creature, where: c.id == ^entry, limit: 1, preload: [:creature_template])) do
       %Mangos.Creature{} = creature ->
         creature = %{
@@ -153,7 +154,7 @@ defmodule ThistleTea.DevSeed do
             position_y: y,
             position_z: z,
             orientation: 0.0,
-            spawntimesecs: @respawn_secs,
+            spawntimesecs: respawn_secs,
             spawndist: 0.0,
             movement_type: 0
         }

@@ -143,10 +143,9 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
           behavior_tree: nil,
           blackboard: nil,
           respawn_ref: nil,
-          broadcast_update?: false,
-          loot: nil
+          broadcast_update?: false
       }
-      |> Map.merge(%{tapped_by: nil, assigned_looter: nil, loot_master: nil, loot_rolls: %{}, respawn_deferrals: 0})
+      |> Map.merge(%{tapped_by: nil, loot_session: nil, corpse_removed?: false, respawn_pending?: false})
 
     %{mob | unit: unit, movement_block: movement_block, internal: internal}
   end
