@@ -38,7 +38,9 @@ defmodule ThistleTea.Game.Network.Server do
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.Party.MemberStats
   alias ThistleTea.Game.Party.Notifier, as: PartyNotifier
+  alias ThistleTea.Game.Player.Items
   alias ThistleTea.Game.Player.Quests
+  alias ThistleTea.Game.Player.Session
   alias ThistleTea.Game.Player.Spellcasting
   alias ThistleTea.Game.Player.Stats, as: PlayerStats
   alias ThistleTea.Game.Spell.Cast
@@ -419,7 +421,7 @@ defmodule ThistleTea.Game.Network.Server do
   @impl GenServer
   def handle_info(:logout_complete, {socket, %{logout_timer: _timer} = state}) do
     Network.send_packet(%Message.SmsgLogoutComplete{})
-    state = Message.CmsgLogoutRequest.handle_logout(state)
+    state = Session.leave_world(state)
     {:noreply, {socket, state}, socket.read_timeout}
   end
 
@@ -435,7 +437,7 @@ defmodule ThistleTea.Game.Network.Server do
 
   @impl GenServer
   def handle_info({:create_item, item_id, count}, {socket, state}) do
-    state = Message.CmsgMessagechat.give_item(state, item_id, count)
+    state = Items.give(state, item_id, count)
     {:noreply, {socket, state}, socket.read_timeout}
   rescue
     _ -> {:noreply, {socket, state}, socket.read_timeout}
@@ -650,6 +652,6 @@ defmodule ThistleTea.Game.Network.Server do
   @impl ThousandIsland.Handler
   def handle_close(_socket, state) do
     Logger.info("CLIENT DISCONNECTED")
-    Message.CmsgLogoutRequest.handle_logout(state)
+    Session.leave_world(state)
   end
 end

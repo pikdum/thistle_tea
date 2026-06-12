@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.Network.Message.SmsgMessagechat do
   @chat_type_party 0x1
   @chat_type_yell 0x5
   @chat_type_whisper 0x6
+  @chat_type_system 0x0A
   @chat_type_channel 0x0E
 
   @chat_type %{
@@ -28,6 +29,18 @@ defmodule ThistleTea.Game.Network.Message.SmsgMessagechat do
     :player_rank,
     :tag
   ]
+
+  def system(message, sender_guid) do
+    %__MODULE__{
+      chat_type: @chat_type_system,
+      language: 0,
+      sender_guid: sender_guid,
+      message: message,
+      channel_name: nil,
+      player_rank: 0,
+      tag: 0
+    }
+  end
 
   @impl ServerMessage
   def to_binary(%__MODULE__{
