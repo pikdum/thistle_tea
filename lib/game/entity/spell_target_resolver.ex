@@ -5,9 +5,12 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
   """
   alias ThistleTea.Game.Entity.Logic.Hostility
   alias ThistleTea.Game.Entity.Logic.SpellTarget
+  alias ThistleTea.Game.Party
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Targets
   alias ThistleTea.Game.World
+  alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.System.Party, as: PartySystem
 
   @cone_arc_radians :math.pi() / 3
 
@@ -33,6 +36,9 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
 
       {:targeted_aoe, position, radius} ->
         nearby_enemy_guids_at(caster, caster_guid, position, radius)
+
+      {:party_aoe, radius} ->
+        nearby_party_guids(caster, caster_guid, radius)
 
       {:unit, guid} ->
         [guid]
@@ -109,5 +115,32 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
     |> Enum.reject(fn {guid, _distance} -> guid == caster_guid end)
     |> Enum.filter(fn {guid, _distance} -> Hostility.valid_attack_target?(caster, guid) end)
     |> Enum.map(fn {guid, _distance} -> guid end)
+  end
+
+  defp nearby_party_guids(caster, caster_guid, radius) when is_number(radius) and radius > 0 do
+    members =
+      case PartySystem.group_of(caster_guid) do
+        %Party.Group{} = group ->
+          member_guids = MapSet.new(group.members, & &1.guid)
+
+          caster
+          |> nearby_units(radius)
+          |> Enum.map(fn {guid, _distance} -> guid end)
+          |> Enum.filter(fn guid -> MapSet.member?(member_guids, guid) and alive?(guid) end)
+
+        _ ->
+          []
+      end
+
+    [caster_guid | members]
+  end
+
+  defp nearby_party_guids(_caster, caster_guid, _radius), do: [caster_guid]
+
+  defp alive?(guid) do
+    case Metadata.query(guid, [:alive?]) do
+      %{alive?: alive?} -> alive? == true
+      _ -> false
+    end
   end
 end

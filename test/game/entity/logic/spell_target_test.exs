@@ -32,6 +32,18 @@ defmodule ThistleTea.Game.Entity.Logic.SpellTargetTest do
       assert SpellTarget.target_query(spell, %Targets{unit_guid: 2}) == {:unit, 2}
     end
 
+    test "returns party aoe query for party-around-caster spells" do
+      spell = aoe_spell(:party_around_caster)
+
+      assert SpellTarget.target_query(spell, %Targets{}) == {:party_aoe, 10.0}
+    end
+
+    test "party aoe takes precedence over a selected unit target" do
+      spell = aoe_spell(:party_around_caster)
+
+      assert SpellTarget.target_query(spell, %Targets{unit_guid: 2}) == {:party_aoe, 10.0}
+    end
+
     test "returns none without matching target data" do
       spell = aoe_spell(:aoe_enemy_at_dest)
 

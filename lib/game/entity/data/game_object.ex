@@ -57,6 +57,7 @@ defmodule ThistleTea.Game.Entity.Data.GameObject do
         summoned_by: Keyword.get(opts, :summoned_by),
         use_spell_id: spellcaster_spell(ot),
         spell_charges: spellcaster_charges(ot),
+        use_party_only?: spellcaster_party_only?(ot),
         despawn_in_ms: Keyword.get(opts, :despawn_in_ms)
       }
     }
@@ -73,6 +74,12 @@ defmodule ThistleTea.Game.Entity.Data.GameObject do
        when is_integer(charges) and charges > 0, do: charges
 
   defp spellcaster_charges(_template), do: nil
+
+  defp spellcaster_party_only?(%Mangos.GameObjectTemplate{type: @go_type_spellcaster, data2: data2}) do
+    is_integer(data2) and data2 != 0
+  end
+
+  defp spellcaster_party_only?(_template), do: false
 
   def build(%Mangos.GameObject{game_object_template: %Mangos.GameObjectTemplate{} = ot} = o) do
     event =

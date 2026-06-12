@@ -16,24 +16,34 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Mob, as: MobBT
   alias ThistleTea.Game.Entity.Logic.Combat
   alias ThistleTea.Game.Entity.Logic.Core
+  alias ThistleTea.Game.Entity.Logic.Experience
   alias ThistleTea.Game.Entity.Logic.Loot
+  alias ThistleTea.Game.Entity.Logic.LootRoll
   alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.Entity.Logic.SpellEffect
   alias ThistleTea.Game.Entity.Registry, as: EntityRegistry
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network
+  alias ThistleTea.Game.Network.Message
+  alias ThistleTea.Game.Party
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Loader.Faction, as: FactionLoader
   alias ThistleTea.Game.World.Loader.Loot, as: LootLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.System.GameEvent
+  alias ThistleTea.Game.World.System.Party, as: PartySystem
   alias ThistleTea.Game.World.Visibility
 
   @ai_tick_ms 100
   @ai_tick_max_ms 1_000
   @default_respawn_delay_ms 120_000
   @dynamic_flag_lootable 0x0001
+  @loot_method_group_loot 3
+  @loot_method_need_before_greed 4
+  @loot_roll_countdown_ms 60_000
+  @roll_type_need 1
+  @roll_type_greed 2
 
   def start_link(%Mob{} = state) do
     GenServer.start_link(__MODULE__, state, name: EntityRegistry.via(state.object.guid))
@@ -98,6 +108,22 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   def handle_cast({:receive_heal, amount}, state) do
     state = Core.heal(state, amount)
     {:noreply, state, {:continue, :maybe_broadcast}}
+  end
+
+  @impl GenServer
+  def handle_cast({:loot_roll_vote, voter_guid, slot, vote}, %Mob{internal: %Internal{} = internal} = state) do
+    with %LootRoll{} = roll <- Map.get(loot_rolls(internal), slot),
+         {:ok, roll} <- LootRoll.vote(roll, voter_guid, vote) do
+      send_vote_echo(state, roll, voter_guid, vote)
+
+      rolls = Map.put(loot_rolls(internal), slot, roll)
+      state = %{state | internal: Map.put(internal, :loot_rolls, rolls)}
+      state = if LootRoll.complete?(roll), do: resolve_loot_roll(state, slot), else: state
+
+      {:noreply, state}
+    else
+      _ -> {:noreply, state}
+    end
   end
 
   @impl GenServer
@@ -171,6 +197,11 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   end
 
   def handle_call(:loot_release, _from, state), do: {:reply, :ok, state}
+
+  @impl GenServer
+  def handle_info({:loot_roll_timeout, slot}, %Mob{} = state) do
+    {:noreply, resolve_loot_roll(state, slot)}
+  end
 
   @impl GenServer
   def handle_info({:deliver_spell, event}, state) do
@@ -312,6 +343,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
       |> maybe_decrement_on_death(target)
       |> maybe_reward_kill(target)
       |> generate_loot()
+      |> maybe_start_loot_rolls(target)
       |> schedule_respawn()
     else
       state
@@ -347,13 +379,210 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
   defp maybe_reward_kill(%Mob{} = state, target) when is_integer(target) and target > 0 do
     if Guid.entity_type(target) == :player do
-      Entity.reward_kill(target, state)
+      case PartySystem.group_of(target) do
+        %Party.Group{} = group -> reward_group_kill(state, group)
+        _ -> Entity.reward_kill(target, state)
+      end
     end
 
     state
   end
 
   defp maybe_reward_kill(%Mob{} = state, _target), do: state
+
+  defp reward_group_kill(%Mob{internal: %Internal{} = internal, unit: %Unit{} = unit} = state, group) do
+    member_guids = MapSet.new(group.members, & &1.guid)
+
+    eligible =
+      state
+      |> World.nearby_players(Experience.group_reward_distance())
+      |> Enum.filter(fn {guid, _distance} -> MapSet.member?(member_guids, guid) end)
+      |> Enum.flat_map(fn {guid, _distance} ->
+        case Metadata.query(guid, [:level, :alive?]) do
+          %{level: level, alive?: true} when is_integer(level) -> [%{guid: guid, level: level}]
+          _ -> []
+        end
+      end)
+
+    opts = [
+      experience_multiplier: internal.experience_multiplier,
+      extra_flags: internal.extra_flags,
+      elite?: Experience.elite_rank?(internal.rank)
+    ]
+
+    eligible
+    |> Experience.group_shares(unit.level, opts)
+    |> Enum.each(fn {guid, xp} -> Entity.reward_kill_share(guid, state, xp) end)
+  end
+
+  defp loot_rolls(%Internal{} = internal), do: Map.get(internal, :loot_rolls) || %{}
+
+  defp maybe_start_loot_rolls(%Mob{internal: %Internal{loot: %Loot{} = loot}} = state, target)
+       when is_integer(target) and target > 0 do
+    with :player <- Guid.entity_type(target),
+         %Party.Group{} = group <- PartySystem.group_of(target),
+         true <- group.loot_method in [@loot_method_group_loot, @loot_method_need_before_greed],
+         [_, _ | _] = eligible <- eligible_rollers(state, group) do
+      start_loot_rolls(state, loot, group, eligible)
+    else
+      _ -> state
+    end
+  end
+
+  defp maybe_start_loot_rolls(%Mob{} = state, _target), do: state
+
+  defp eligible_rollers(%Mob{} = state, group) do
+    member_guids = MapSet.new(group.members, & &1.guid)
+
+    state
+    |> World.nearby_players(Experience.group_reward_distance())
+    |> Enum.map(fn {guid, _distance} -> guid end)
+    |> Enum.filter(&MapSet.member?(member_guids, &1))
+  end
+
+  defp start_loot_rolls(%Mob{internal: %Internal{} = internal} = state, loot, group, eligible) do
+    rollable =
+      Enum.filter(loot.items, fn item ->
+        not item.quest_item and not item.looted and item.quality >= group.loot_threshold
+      end)
+
+    {loot, rolls} =
+      Enum.reduce(rollable, {loot, %{}}, fn item, {loot, rolls} ->
+        roll = LootRoll.new(item.slot, item.item_id, item.count, eligible)
+        {Loot.block_item(loot, item.slot), Map.put(rolls, item.slot, roll)}
+      end)
+
+    Enum.each(rolls, fn {slot, roll} ->
+      packet = %Message.SmsgLootStartRoll{
+        loot_guid: state.object.guid,
+        slot: slot,
+        item_id: roll.item_id,
+        countdown: @loot_roll_countdown_ms
+      }
+
+      broadcast_roll_packet(roll, packet)
+      Process.send_after(self(), {:loot_roll_timeout, slot}, @loot_roll_countdown_ms)
+    end)
+
+    internal = Map.put(%{internal | loot: loot}, :loot_rolls, rolls)
+    %{state | internal: internal}
+  end
+
+  defp resolve_loot_roll(%Mob{internal: %Internal{} = internal} = state, slot) do
+    case Map.pop(loot_rolls(internal), slot) do
+      {%LootRoll{} = roll, rolls} ->
+        state = %{state | internal: Map.put(internal, :loot_rolls, rolls)}
+
+        state =
+          case LootRoll.resolve(roll) do
+            {:won, winner, number, vote, rolled} -> award_roll(state, roll, winner, number, vote, rolled)
+            :all_passed -> pass_roll(state, roll)
+          end
+
+        maybe_finish_loot(state)
+
+      {nil, _rolls} ->
+        state
+    end
+  end
+
+  defp send_vote_echo(%Mob{} = state, roll, voter_guid, vote) do
+    {number, type} =
+      case vote do
+        :pass -> {128, 128}
+        :need -> {0, 0}
+        :greed -> {128, 2}
+      end
+
+    broadcast_roll_packet(roll, %Message.SmsgLootRoll{
+      loot_guid: state.object.guid,
+      slot: roll.slot,
+      player_guid: voter_guid,
+      item_id: roll.item_id,
+      roll_number: number,
+      roll_type: type
+    })
+  end
+
+  defp award_roll(%Mob{} = state, roll, winner, number, vote, rolled) do
+    type = if vote == :need, do: @roll_type_need, else: @roll_type_greed
+
+    Enum.each(rolled, fn {guid, rolled_number} ->
+      broadcast_roll_packet(roll, %Message.SmsgLootRoll{
+        loot_guid: state.object.guid,
+        slot: roll.slot,
+        player_guid: guid,
+        item_id: roll.item_id,
+        roll_number: rolled_number,
+        roll_type: type
+      })
+    end)
+
+    broadcast_roll_packet(roll, %Message.SmsgLootRollWon{
+      loot_guid: state.object.guid,
+      slot: roll.slot,
+      item_id: roll.item_id,
+      winner_guid: winner,
+      roll_number: number,
+      roll_type: type
+    })
+
+    case EntityRegistry.whereis(winner) do
+      pid when is_pid(pid) ->
+        send(pid, {:create_item, roll.item_id, roll.count})
+        take_rolled_item(state, roll.slot)
+
+      _ ->
+        unblock_slot(state, roll.slot)
+    end
+  end
+
+  defp pass_roll(%Mob{} = state, roll) do
+    broadcast_roll_packet(roll, %Message.SmsgLootAllPassed{
+      loot_guid: state.object.guid,
+      slot: roll.slot,
+      item_id: roll.item_id
+    })
+
+    unblock_slot(state, roll.slot)
+  end
+
+  defp broadcast_roll_packet(roll, packet) do
+    Enum.each(roll.eligible, &Network.send_packet(packet, &1))
+  end
+
+  defp take_rolled_item(%Mob{internal: %Internal{loot: %Loot{} = loot} = internal} = state, slot) do
+    loot = Loot.unblock_item(loot, slot)
+
+    loot =
+      case Loot.take_item(loot, slot) do
+        {:ok, _item, loot} -> loot
+        _ -> loot
+      end
+
+    %{state | internal: %{internal | loot: loot}}
+  end
+
+  defp take_rolled_item(%Mob{} = state, _slot), do: state
+
+  defp unblock_slot(%Mob{internal: %Internal{loot: %Loot{} = loot} = internal} = state, slot) do
+    %{state | internal: %{internal | loot: Loot.unblock_item(loot, slot)}}
+  end
+
+  defp unblock_slot(%Mob{} = state, _slot), do: state
+
+  defp maybe_finish_loot(%Mob{internal: %Internal{loot: %Loot{} = loot} = internal} = state) do
+    if map_size(loot_rolls(internal)) == 0 and Loot.empty?(loot) do
+      state = %{state | internal: %{internal | loot: nil}}
+      state = clear_lootable_flag(state)
+      Core.update_object(state, :values) |> World.broadcast_packet(state)
+      state
+    else
+      state
+    end
+  end
+
+  defp maybe_finish_loot(%Mob{} = state), do: state
 
   defp caster_guid(%{caster_guid: caster_guid}) when is_integer(caster_guid), do: caster_guid
   defp caster_guid(caster_guid) when is_integer(caster_guid), do: caster_guid

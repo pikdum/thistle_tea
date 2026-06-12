@@ -7,7 +7,7 @@ defmodule ThistleTea.Game.Entity.Logic.Loot do
 
   defmodule Item do
     @moduledoc false
-    defstruct [:slot, :item_id, :display_id, count: 1, looted: false, quest_item: false]
+    defstruct [:slot, :item_id, :display_id, count: 1, quality: 0, looted: false, blocked: false, quest_item: false]
   end
 
   defstruct gold: 0, items: []
@@ -20,7 +20,7 @@ defmodule ThistleTea.Game.Entity.Logic.Loot do
   end
 
   def take_item(%__MODULE__{items: items} = loot, slot) do
-    case Enum.find(items, fn item -> item.slot == slot and not item.looted end) do
+    case Enum.find(items, fn item -> item.slot == slot and not item.looted and not item.blocked end) do
       %Item{} = item ->
         # credo:disable-for-next-line Credo.Check.Refactor.Nesting
         items = Enum.map(items, fn i -> if i.slot == slot, do: %{i | looted: true}, else: i end)
@@ -29,6 +29,15 @@ defmodule ThistleTea.Game.Entity.Logic.Loot do
       _ ->
         {:error, :already_looted}
     end
+  end
+
+  def block_item(%__MODULE__{} = loot, slot), do: set_blocked(loot, slot, true)
+
+  def unblock_item(%__MODULE__{} = loot, slot), do: set_blocked(loot, slot, false)
+
+  defp set_blocked(%__MODULE__{items: items} = loot, slot, blocked?) do
+    items = Enum.map(items, fn i -> if i.slot == slot, do: %{i | blocked: blocked?}, else: i end)
+    %{loot | items: items}
   end
 
   def return_item(%__MODULE__{items: items} = loot, slot) do

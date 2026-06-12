@@ -381,7 +381,10 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp target_type(21), do: :target_ally
   defp target_type(57), do: :target_ally
   defp target_type(15), do: :aoe_enemy_at_caster
+  defp target_type(20), do: :party_around_caster
   defp target_type(22), do: :aoe_enemy_at_caster
+  defp target_type(33), do: :party_around_caster
+  defp target_type(34), do: :party_around_caster
   defp target_type(24), do: :aoe_enemy_in_cone
   defp target_type(28), do: :aoe_enemy_at_channel
   defp target_type(53), do: :aoe_enemy_at_dest

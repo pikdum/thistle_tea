@@ -9,8 +9,6 @@ defmodule ThistleTea.Game.Network.Message.CmsgGameobjectQuery do
 
   defstruct [:entry, :guid]
 
-  @go_type_spellcaster 22
-
   @impl ClientMessage
   def handle(%__MODULE__{entry: entry, guid: guid}, state) do
     case Mangos.Repo.get(Mangos.GameObjectTemplate, entry) do
@@ -79,7 +77,5 @@ defmodule ThistleTea.Game.Network.Message.CmsgGameobjectQuery do
     }
   end
 
-  # TODO: stop forcing party-only off once parties exist
-  defp spellcaster_party_only(%Mangos.GameObjectTemplate{type: @go_type_spellcaster}), do: 0
   defp spellcaster_party_only(%Mangos.GameObjectTemplate{data2: data2}), do: data2
 end

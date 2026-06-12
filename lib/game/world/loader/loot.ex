@@ -28,6 +28,7 @@ defmodule ThistleTea.Game.World.Loader.Loot do
         item_id: template.entry,
         display_id: template.display_id,
         count: count,
+        quality: template.quality,
         quest_item: quest_item
       }
     end)

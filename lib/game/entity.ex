@@ -44,6 +44,18 @@ defmodule ThistleTea.Game.Entity do
     dispatch_cast(entity, {:reward_kill, victim})
   end
 
+  def reward_kill_share(entity, victim, xp) do
+    dispatch_cast(entity, {:reward_kill_share, victim, xp})
+  end
+
+  def loot_roll_vote(entity, voter_guid, slot, vote) do
+    dispatch_cast(entity, {:loot_roll_vote, voter_guid, slot, vote})
+  end
+
+  def receive_money(entity, amount) do
+    dispatch_cast(entity, {:receive_money, amount})
+  end
+
   def destroy_object(entity, guid) do
     dispatch_cast(entity, {:destroy_object, guid})
   end

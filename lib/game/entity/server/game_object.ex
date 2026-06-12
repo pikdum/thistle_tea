@@ -11,12 +11,14 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Registry, as: EntityRegistry
   alias ThistleTea.Game.Network
+  alias ThistleTea.Game.Party
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.System.GameEvent
+  alias ThistleTea.Game.World.System.Party, as: PartySystem
   alias ThistleTea.Game.World.Visibility
 
   def start_link(%GameObject{} = state) do
@@ -43,18 +45,19 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
 
   @impl GenServer
   def handle_cast({:gameobject_use, user_guid, user_level}, %GameObject{internal: %Internal{} = internal} = state) do
-    case {internal.use_spell_id, SpellLoader.load(internal.use_spell_id || 0)} do
-      {spell_id, %Spell{} = spell} when is_integer(spell_id) ->
-        context = %CastContext{
-          caster_guid: internal.summoned_by || user_guid,
-          caster_level: user_level,
-          target_guid: user_guid,
-          spell: spell
-        }
+    with {spell_id, %Spell{} = spell} when is_integer(spell_id) <-
+           {internal.use_spell_id, SpellLoader.load(internal.use_spell_id || 0)},
+         true <- allowed_user?(internal, user_guid) do
+      context = %CastContext{
+        caster_guid: internal.summoned_by || user_guid,
+        caster_level: user_level,
+        target_guid: user_guid,
+        spell: spell
+      }
 
-        Entity.receive_spell(user_guid, context, spell)
-        {:noreply, spend_charge(state)}
-
+      Entity.receive_spell(user_guid, context, spell)
+      {:noreply, spend_charge(state)}
+    else
       _ ->
         {:noreply, state}
     end
@@ -113,4 +116,18 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
   end
 
   defp spend_charge(state), do: state
+
+  defp allowed_user?(%Internal{use_party_only?: true, summoned_by: summoned_by}, user_guid)
+       when is_integer(summoned_by) do
+    user_guid == summoned_by or same_group?(summoned_by, user_guid)
+  end
+
+  defp allowed_user?(_internal, _user_guid), do: true
+
+  defp same_group?(owner_guid, user_guid) do
+    case {PartySystem.group_of(owner_guid), PartySystem.group_of(user_guid)} do
+      {%Party.Group{id: id}, %Party.Group{id: id}} -> true
+      _ -> false
+    end
+  end
 end

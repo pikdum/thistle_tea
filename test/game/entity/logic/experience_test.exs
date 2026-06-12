@@ -22,6 +22,61 @@ defmodule ThistleTea.Game.Entity.Logic.ExperienceTest do
     end
   end
 
+  describe "group_rate/1" do
+    test "no bonus for one or two members" do
+      assert Experience.group_rate(1) == 1.0
+      assert Experience.group_rate(2) == 1.0
+    end
+
+    test "scales up to five members" do
+      assert Experience.group_rate(3) == 1.166
+      assert Experience.group_rate(4) == 1.3
+      assert Experience.group_rate(5) == 1.4
+      assert Experience.group_rate(6) == 1.4
+    end
+  end
+
+  describe "group_shares/3" do
+    test "splits XP by level weight" do
+      shares = Experience.group_shares([%{guid: 1, level: 10}, %{guid: 2, level: 10}], 10)
+      base = Experience.kill_xp(10, 10)
+
+      assert shares == [{1, trunc(base * 10 / 20)}, {2, trunc(base * 10 / 20)}]
+    end
+
+    test "applies the group bonus rate for three members" do
+      members = [%{guid: 1, level: 10}, %{guid: 2, level: 10}, %{guid: 3, level: 10}]
+      shares = Experience.group_shares(members, 10)
+      base = Experience.kill_xp(10, 10)
+
+      expected = trunc(base * 1.166 * 10 / 30)
+      assert shares == [{1, expected}, {2, expected}, {3, expected}]
+    end
+
+    test "weights shares toward higher-level members" do
+      shares = Experience.group_shares([%{guid: 1, level: 20}, %{guid: 2, level: 10}], 20)
+      base = Experience.kill_xp(20, 20)
+
+      assert shares == [{1, trunc(base * 20 / 30)}, {2, trunc(base * 10 / 30)}]
+    end
+
+    test "gray mob for everyone yields zero shares" do
+      shares = Experience.group_shares([%{guid: 1, level: 60}, %{guid: 2, level: 60}], 1)
+      assert shares == [{1, 0}, {2, 0}]
+    end
+
+    test "halves shares plus one when the top member is gray but a lower member is not" do
+      shares = Experience.group_shares([%{guid: 1, level: 60}, %{guid: 2, level: 20}], 21)
+
+      base = Experience.kill_xp(20, 21)
+      assert shares == [{1, 0}, {2, trunc(base * 1.0 * 20 / 80 / 2) + 1}]
+    end
+
+    test "empty member list yields no shares" do
+      assert Experience.group_shares([], 10) == []
+    end
+  end
+
   describe "kill_xp/3" do
     test "calculates same-level kill XP" do
       assert Experience.kill_xp(1, 1) == 50

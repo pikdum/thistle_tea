@@ -18,6 +18,9 @@ defmodule ThistleTea.Game.Entity.Logic.SpellTarget do
       targeted_aoe_spell?(spell) and is_tuple(Targets.ground_location(targets)) ->
         {:targeted_aoe, Targets.ground_location(targets), max_aoe_radius(spell)}
 
+      party_aoe_spell?(spell) ->
+        {:party_aoe, max_aoe_radius(spell)}
+
       is_integer(targets.unit_guid) ->
         {:unit, targets.unit_guid}
 
@@ -38,6 +41,10 @@ defmodule ThistleTea.Game.Entity.Logic.SpellTarget do
 
   defp targeted_aoe_spell?(%Spell{effects: effects}) do
     Enum.any?(effects, &effect_targets?(&1, [:aoe_enemy_at_dest, :aoe_enemy_at_channel]))
+  end
+
+  defp party_aoe_spell?(%Spell{effects: effects}) do
+    Enum.any?(effects, &effect_targets?(&1, [:party_around_caster]))
   end
 
   defp effect_targets?(%Effect{} = effect, targets) do
