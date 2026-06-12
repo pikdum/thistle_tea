@@ -12,6 +12,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.TickTest do
       assert Tick.mob_delay({:running, 250}) == 250
     end
 
+    test "uses reason-tagged running delays" do
+      assert Tick.mob_delay({:running, 250, :movement}) == 250
+    end
+
     test "honors long self-paced sleeps" do
       assert Tick.mob_delay({:running, 30_000}) == 30_000
     end
@@ -49,6 +53,12 @@ defmodule ThistleTea.Game.Entity.Logic.AI.TickTest do
       character = fixture(in_combat: true, target: 42)
 
       assert Tick.player_delay(character, {:running, 400}, 1_000) == 400
+    end
+
+    test "uses reason-tagged player running delays" do
+      character = fixture(in_combat: true, target: 42)
+
+      assert Tick.player_delay(character, {:running, 400, :attack}, 1_000) == 400
     end
 
     test "wakes for regen before a long running delay" do

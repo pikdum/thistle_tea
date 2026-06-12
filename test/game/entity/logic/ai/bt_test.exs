@@ -19,6 +19,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BTTest do
     {:running, state, %{blackboard | target: :running}}
   end
 
+  defp keep_running_with_reason(state, %Blackboard{} = blackboard) do
+    {BT.running(250, :test), state, %{blackboard | target: :running_with_reason}}
+  end
+
   test "selector falls through on failure and updates blackboard" do
     tree =
       BT.selector([
@@ -44,5 +48,15 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BTTest do
     {:running, state} = BT.tick(tree, state)
 
     assert state.internal.blackboard.target == :running
+  end
+
+  test "sequence preserves reason-tagged running status" do
+    tree = BT.sequence([BT.action(&keep_running_with_reason/2), BT.action(&set_target/2)])
+
+    state = build_state()
+
+    {{:running, 250, :test}, state} = BT.tick(tree, state)
+
+    assert state.internal.blackboard.target == :running_with_reason
   end
 end

@@ -3,7 +3,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Tick do
   Next-tick policy for behavior-tree entities: whether a player needs ticking
   at all, and how long to sleep before the next tick. Both variants honor
   `{:running, delay_ms}` self-pacing from the tree; the player variant adds
-  passive aura/regen wake-up heuristics.
+  passive aura/regen wake-up heuristics. A running status may include a wake
+  reason as its third tuple element.
   """
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Unit
@@ -29,6 +30,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Tick do
     delay_ms
   end
 
+  def mob_delay({:running, delay_ms, _reason}) when is_integer(delay_ms) and delay_ms >= 0 do
+    delay_ms
+  end
+
   def mob_delay(_status), do: @default_tick_ms
 
   def player_delay(character, {:running, delay_ms}, now) when is_integer(delay_ms) and delay_ms > 0 do
@@ -36,6 +41,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Tick do
       regen_delay when is_integer(regen_delay) -> min(delay_ms, regen_delay)
       _ -> delay_ms
     end
+  end
+
+  def player_delay(character, {:running, delay_ms, _reason}, now) when is_integer(delay_ms) and delay_ms > 0 do
+    player_delay(character, {:running, delay_ms}, now)
   end
 
   def player_delay(character, _status, now) do

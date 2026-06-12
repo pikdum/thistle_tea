@@ -2,9 +2,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT do
   @moduledoc """
   Behavior-tree primitives (`selector`, `sequence`, `condition`, `action`)
   used for all entity AI/action logic. Nodes return
-  `:success | :failure | :running | {:running, delay_ms}`; trees are ticked
-  from the entity's owning process, which honors the returned delay when
-  scheduling the next tick.
+  `:success | :failure | :running | {:running, delay_ms} | {:running, delay_ms, reason}`;
+  trees are ticked from the entity's owning process, which honors the returned
+  delay when scheduling the next tick.
   """
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
@@ -25,6 +25,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT do
 
   def action(fun) when is_function(fun, 2) do
     %__MODULE__{type: :action, fun: fun}
+  end
+
+  def running(delay_ms, reason) when is_integer(delay_ms) and delay_ms >= 0 and is_atom(reason) do
+    {:running, delay_ms, reason}
   end
 
   def tick(tree, state) do
@@ -61,6 +65,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT do
         {:failure, s, b} -> {:cont, {:failure, s, b}}
         {:success, s, b} -> {:halt, {:success, s, b}}
         {:running, s, b} -> {:halt, {:running, s, b}}
+        {{:running, _delay, _reason} = status, s, b} -> {:halt, {status, s, b}}
         {{:running, _delay} = status, s, b} -> {:halt, {status, s, b}}
       end
     end)
@@ -72,6 +77,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT do
         {:success, s, b} -> {:cont, {:success, s, b}}
         {:failure, s, b} -> {:halt, {:failure, s, b}}
         {:running, s, b} -> {:halt, {:running, s, b}}
+        {{:running, _delay, _reason} = status, s, b} -> {:halt, {status, s, b}}
         {{:running, _delay} = status, s, b} -> {:halt, {status, s, b}}
       end
     end)

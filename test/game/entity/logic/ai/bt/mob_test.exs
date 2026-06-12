@@ -18,7 +18,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
       state = fixture_mob()
       blackboard = %Blackboard{next_wander_at: 1_250}
 
-      assert {{:running, 250}, ^state, ^blackboard} =
+      assert {{:running, 250, :wander}, ^state, ^blackboard} =
                MobBT.wait_until_wander_ready(state, blackboard, 1_000)
     end
 
@@ -34,7 +34,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
       state = fixture_mob()
       blackboard = %Blackboard{next_wander_at: 5_000, next_aggro_at: 1_250}
 
-      assert {{:running, 250}, ^state, ^blackboard} =
+      assert {{:running, 250, :aggro}, ^state, ^blackboard} =
                MobBT.wait_until_wander_ready(state, blackboard, 1_000)
     end
   end
@@ -44,7 +44,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
       state = fixture_mob()
       blackboard = %Blackboard{next_waypoint_at: 1_250}
 
-      assert {{:running, 250}, ^state, ^blackboard} =
+      assert {{:running, 250, :waypoint}, ^state, ^blackboard} =
                MobBT.wait_until_waypoint_ready(state, blackboard, 1_000)
     end
 
@@ -52,7 +52,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
       state = fixture_mob()
       blackboard = %Blackboard{next_waypoint_at: 5_000, next_aggro_at: 1_250}
 
-      assert {{:running, 250}, ^state, ^blackboard} =
+      assert {{:running, 250, :aggro}, ^state, ^blackboard} =
                MobBT.wait_until_waypoint_ready(state, blackboard, 1_000)
     end
   end
@@ -62,7 +62,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
       state = fixture_mob()
       blackboard = %Blackboard{next_chase_at: 1_250}
 
-      assert {{:running, 250}, ^state, ^blackboard} =
+      assert {{:running, 250, :chase}, ^state, ^blackboard} =
                MobBT.wait_for_chase_tick(state, blackboard, 1_000)
     end
   end
@@ -83,7 +83,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
       state = fixture_mob()
       blackboard = %Blackboard{next_attack_at: 1_750, chase_started: true, last_target_pos: {1.0, 2.0, 3.0}}
 
-      assert {{:running, delay}, ^state, %Blackboard{next_chase_at: next_chase_at, chase_started: false}} =
+      assert {{:running, delay, :attack}, ^state, %Blackboard{next_chase_at: next_chase_at, chase_started: false}} =
                MobBT.combat_wait(state, blackboard, 1_000)
 
       assert delay == 750
@@ -94,7 +94,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
       state = fixture_mob(start_time: 0, duration: 10_000, spline_nodes: [{250.0, 0.0, 0.0}])
       blackboard = %Blackboard{next_attack_at: 5_000, chase_started: true, last_target_pos: {1.0, 2.0, 3.0}}
 
-      assert {{:running, 3_980}, ^state, %Blackboard{next_chase_at: 4_980, chase_started: false}} =
+      assert {{:running, 3_980, :chase}, ^state, %Blackboard{next_chase_at: 4_980, chase_started: false}} =
                MobBT.combat_wait(state, blackboard, 1_000)
     end
   end
@@ -104,7 +104,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
       state = fixture_mob(start_time: 900, duration: 500)
       blackboard = %Blackboard{move_target: {1.0, 2.0, 3.0}}
 
-      assert {{:running, 400}, ^state, ^blackboard} =
+      assert {{:running, 400, :movement}, ^state, ^blackboard} =
                MobBT.wait_for_arrival(state, blackboard, 1_000)
     end
 
@@ -112,7 +112,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
       state = fixture_mob(start_time: 900, duration: 5_000)
       blackboard = %Blackboard{move_target: {1.0, 2.0, 3.0}}
 
-      assert {{:running, 4_900}, ^state, ^blackboard} =
+      assert {{:running, 4_900, :movement}, ^state, ^blackboard} =
                MobBT.wait_for_arrival(state, blackboard, 1_000)
     end
 
@@ -120,7 +120,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
       state = fixture_mob(start_time: 0, duration: 10_000, spline_nodes: [{250.0, 0.0, 0.0}])
       blackboard = %Blackboard{move_target: {250.0, 0.0, 0.0}}
 
-      assert {{:running, 3_980}, ^state, ^blackboard} =
+      assert {{:running, 3_980, :movement}, ^state, ^blackboard} =
                MobBT.wait_for_arrival(state, blackboard, 1_000)
     end
 
