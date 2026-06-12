@@ -2,6 +2,27 @@ defmodule ThistleTea.Game.SpellTest do
   use ExUnit.Case, async: true
 
   alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.Effect
+
+  describe "harmful?/1" do
+    test "damage effects are harmful" do
+      spell = %Spell{effects: [%Effect{type: :school_damage, implicit_target_a: :target_enemy}]}
+      assert Spell.harmful?(spell)
+    end
+
+    test "enemy-targeted debuffs are harmful" do
+      spell = %Spell{effects: [%Effect{type: :apply_aura, implicit_target_a: :target_enemy}]}
+      assert Spell.harmful?(spell)
+    end
+
+    test "heals and ally buffs are not harmful" do
+      heal = %Spell{effects: [%Effect{type: :heal, implicit_target_a: :target_ally}]}
+      buff = %Spell{effects: [%Effect{type: :apply_aura, implicit_target_a: :target_ally}]}
+
+      refute Spell.harmful?(heal)
+      refute Spell.harmful?(buff)
+    end
+  end
 
   describe "school_mask/1" do
     test "returns bit masks for spell schools" do

@@ -87,6 +87,12 @@ defmodule ThistleTea.Game.Spell do
     end)
   end
 
+  def harmful?(%__MODULE__{} = spell) do
+    requires_hostile_target?(spell) or damage_effects(spell) != []
+  end
+
+  def harmful?(_spell), do: false
+
   def resurrect_spell?(%__MODULE__{effects: effects}) do
     Enum.any?(effects, &match?(%Effect{type: type} when type in [:resurrect, :resurrect_new], &1))
   end

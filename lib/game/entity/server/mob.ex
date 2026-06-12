@@ -25,6 +25,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Party
+  alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Loader.Faction, as: FactionLoader
@@ -85,9 +86,13 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     caster_guid = caster_guid(caster)
 
     state =
-      state
-      |> maybe_reset_attack_started(caster_guid)
-      |> engage_combat(caster_guid)
+      if Spell.harmful?(spell) do
+        state
+        |> maybe_reset_attack_started(caster_guid)
+        |> engage_combat(caster_guid)
+      else
+        state
+      end
 
     target = state.unit.target
     dead_before = Core.dead?(state)
