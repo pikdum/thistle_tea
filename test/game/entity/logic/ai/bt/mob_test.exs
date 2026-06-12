@@ -29,12 +29,28 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
       assert {:success, ^state, ^blackboard} =
                MobBT.wait_until_wander_ready(state, blackboard, 1_000)
     end
+
+    test "wakes for aggro before a long wander wait" do
+      state = fixture_mob()
+      blackboard = %Blackboard{next_wander_at: 5_000, next_aggro_at: 1_250}
+
+      assert {{:running, 250}, ^state, ^blackboard} =
+               MobBT.wait_until_wander_ready(state, blackboard, 1_000)
+    end
   end
 
   describe "wait_until_waypoint_ready/3" do
     test "returns a running delay from explicit time" do
       state = fixture_mob()
       blackboard = %Blackboard{next_waypoint_at: 1_250}
+
+      assert {{:running, 250}, ^state, ^blackboard} =
+               MobBT.wait_until_waypoint_ready(state, blackboard, 1_000)
+    end
+
+    test "wakes for aggro before a long waypoint wait" do
+      state = fixture_mob()
+      blackboard = %Blackboard{next_waypoint_at: 5_000, next_aggro_at: 1_250}
 
       assert {{:running, 250}, ^state, ^blackboard} =
                MobBT.wait_until_waypoint_ready(state, blackboard, 1_000)
@@ -72,6 +88,14 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
       blackboard = %Blackboard{move_target: {1.0, 2.0, 3.0}}
 
       assert {{:running, 400}, ^state, ^blackboard} =
+               MobBT.wait_for_arrival(state, blackboard, 1_000)
+    end
+
+    test "caps long movement waits for position freshness" do
+      state = fixture_mob(start_time: 900, duration: 5_000)
+      blackboard = %Blackboard{move_target: {1.0, 2.0, 3.0}}
+
+      assert {{:running, 1_000}, ^state, ^blackboard} =
                MobBT.wait_for_arrival(state, blackboard, 1_000)
     end
 

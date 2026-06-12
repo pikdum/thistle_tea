@@ -40,6 +40,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   @aggro_check_delay 1_000
   @dead_idle_delay 1_000
   @blocked_retry_delay 1_000
+  @movement_sync_delay 1_000
 
   def tree do
     BT.selector([
@@ -628,7 +629,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     if Blackboard.ready_for?(blackboard, :next_wander_at, now) do
       {:success, state, blackboard}
     else
-      delay_ms = Blackboard.delay_until(blackboard, :next_wander_at, now)
+      delay_ms = idle_delay(state, blackboard, :next_wander_at, now)
       {{:running, delay_ms}, state, blackboard}
     end
   end
@@ -641,7 +642,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     if Blackboard.ready_for?(blackboard, :next_waypoint_at, now) do
       {:success, state, blackboard}
     else
-      delay_ms = Blackboard.delay_until(blackboard, :next_waypoint_at, now)
+      delay_ms = idle_delay(state, blackboard, :next_waypoint_at, now)
       {{:running, delay_ms}, state, blackboard}
     end
   end
@@ -658,8 +659,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
              state.internal.spawn.distance
            ) do
         nil ->
-          blackboard = Blackboard.put_next_at(blackboard, :next_wander_at, idle_delay(), Time.now())
-          {:running, state, Blackboard.clear_move_target(blackboard)}
+          now = Time.now()
+          blackboard = Blackboard.put_next_at(blackboard, :next_wander_at, idle_delay(), now)
+          blackboard = Blackboard.clear_move_target(blackboard)
+          {{:running, idle_delay(state, blackboard, :next_wander_at, now)}, state, blackboard}
 
         {x, y, z} ->
           {:success, state, %{blackboard | target: {x, y, z}}}
@@ -675,8 +678,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     else
       case waypoint_destination(state) do
         nil ->
-          blackboard = Blackboard.put_next_at(blackboard, :next_waypoint_at, idle_delay(), Time.now())
-          {:running, state, Blackboard.clear_waypoint(blackboard)}
+          now = Time.now()
+          blackboard = Blackboard.put_next_at(blackboard, :next_waypoint_at, idle_delay(), now)
+          blackboard = Blackboard.clear_waypoint(blackboard)
+          {{:running, idle_delay(state, blackboard, :next_waypoint_at, now)}, state, blackboard}
 
         %{position: {x, y, z, o}, wait_time: wait_time} ->
           blackboard = %{
@@ -721,7 +726,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
 
   def wait_for_arrival(%Mob{} = state, %Blackboard{} = blackboard, now) when is_integer(now) do
     if Movement.moving?(state, now) do
-      delay_ms = Movement.remaining_move_duration(state, now)
+      delay_ms = min(Movement.remaining_move_duration(state, now), @movement_sync_delay)
       {{:running, delay_ms}, state, blackboard}
     else
       {:success, state, Blackboard.clear_move_target(blackboard)}
@@ -813,7 +818,12 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   end
 
   defp idle_delay(%Mob{} = state, %Blackboard{} = blackboard, now) do
+    idle_delay(state, blackboard, :next_aggro_at, now)
+  end
+
+  defp idle_delay(%Mob{} = state, %Blackboard{} = blackboard, key, now) do
     [
+      Blackboard.delay_until(blackboard, key, now),
       Blackboard.delay_until(blackboard, :next_aggro_at, now),
       aura_delay(state, now),
       regen_delay(state, blackboard, now)

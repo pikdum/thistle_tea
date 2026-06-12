@@ -12,8 +12,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.TickTest do
       assert Tick.mob_delay({:running, 250}) == 250
     end
 
-    test "caps long sleeps" do
-      assert Tick.mob_delay({:running, 30_000}) == 1_000
+    test "honors long self-paced sleeps" do
+      assert Tick.mob_delay({:running, 30_000}) == 30_000
     end
 
     test "defaults without a self-paced delay" do
