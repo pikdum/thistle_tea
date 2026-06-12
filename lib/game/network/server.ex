@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Network.Server do
 
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.EventSink
@@ -495,13 +496,13 @@ defmodule ThistleTea.Game.Network.Server do
 
   defp kill_xp(%Character{unit: %Unit{health: health, level: player_level}}, %{
          unit: %Unit{level: mob_level},
-         internal: %Internal{} = internal
+         internal: %Internal{creature: %Creature{} = creature}
        })
        when health > 0 do
     Experience.kill_xp(player_level, mob_level,
-      experience_multiplier: internal.experience_multiplier,
-      extra_flags: internal.extra_flags,
-      elite?: Experience.elite_rank?(internal.rank)
+      experience_multiplier: creature.experience_multiplier,
+      extra_flags: creature.extra_flags,
+      elite?: Experience.elite_rank?(creature.rank)
     )
   end
 

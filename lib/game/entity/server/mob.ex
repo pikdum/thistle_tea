@@ -370,9 +370,9 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
       end)
 
     opts = [
-      experience_multiplier: internal.experience_multiplier,
-      extra_flags: internal.extra_flags,
-      elite?: Experience.elite_rank?(internal.rank)
+      experience_multiplier: internal.creature.experience_multiplier,
+      extra_flags: internal.creature.extra_flags,
+      elite?: Experience.elite_rank?(internal.creature.rank)
     ]
 
     eligible

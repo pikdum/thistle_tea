@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
 
   alias ThistleTea.DB.Mangos
   alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
   alias ThistleTea.Game.Entity.Data.Component.Internal.Loot
   alias ThistleTea.Game.Entity.Data.Component.Internal.Spawn
   alias ThistleTea.Game.Entity.Data.Component.Internal.WaypointRoute
@@ -97,11 +98,13 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
       internal: %Internal{
         map: c.map,
         name: ct.name,
-        experience_multiplier: ct.experience_multiplier,
-        extra_flags: ct.extra_flags,
-        creature_type_flags: ct.creature_type_flags,
-        regenerate_stats: ct.regenerate_stats,
-        rank: ct.rank,
+        creature: %Creature{
+          experience_multiplier: ct.experience_multiplier,
+          extra_flags: ct.extra_flags,
+          rank: ct.rank,
+          type_flags: ct.creature_type_flags,
+          regenerate_stats: ct.regenerate_stats
+        },
         spawn: %Spawn{
           unit: unit,
           movement_block: movement_block,
@@ -127,10 +130,10 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
   @npc_flag_spirit_service 0x60
   @creature_type_flag_ghost_visible 0x02
 
-  def visibility_metadata(%__MODULE__{unit: %Unit{} = unit, internal: %Internal{} = internal}) do
+  def visibility_metadata(%__MODULE__{unit: %Unit{} = unit, internal: %Internal{creature: %Creature{} = creature}}) do
     %{
       spirit_service?: ((unit.npc_flags || 0) &&& @npc_flag_spirit_service) != 0,
-      ghost_visible?: ((internal.creature_type_flags || 0) &&& @creature_type_flag_ghost_visible) != 0
+      ghost_visible?: ((creature.type_flags || 0) &&& @creature_type_flag_ghost_visible) != 0
     }
   end
 

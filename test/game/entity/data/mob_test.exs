@@ -4,6 +4,7 @@ defmodule ThistleTea.Game.Entity.Data.MobTest do
   alias ThistleTea.DB.Mangos
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
   alias ThistleTea.Game.Entity.Data.Component.Internal.Loot
   alias ThistleTea.Game.Entity.Data.Component.Internal.Spawn
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
@@ -73,9 +74,9 @@ defmodule ThistleTea.Game.Entity.Data.MobTest do
 
       mob = Mob.build(creature)
 
-      assert mob.internal.experience_multiplier == 1.5
-      assert mob.internal.extra_flags == 0x40
-      assert mob.internal.rank == 1
+      assert mob.internal.creature.experience_multiplier == 1.5
+      assert mob.internal.creature.extra_flags == 0x40
+      assert mob.internal.creature.rank == 1
       assert mob.internal.spawn.respawn_delay_ms == 120_000
       assert mob.internal.spawn.unit == mob.unit
       assert mob.internal.spawn.movement_block == mob.movement_block
@@ -161,9 +162,7 @@ defmodule ThistleTea.Game.Entity.Data.MobTest do
         movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
         internal: %Internal{
           map: 0,
-          experience_multiplier: 1.0,
-          extra_flags: 0,
-          rank: 0,
+          creature: %Creature{experience_multiplier: 1.0, extra_flags: 0, rank: 0},
           spawn: %Spawn{},
           loot: %Loot{}
         }
@@ -191,9 +190,7 @@ defmodule ThistleTea.Game.Entity.Data.MobTest do
         movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
         internal: %Internal{
           map: 0,
-          experience_multiplier: 1.0,
-          extra_flags: 0,
-          rank: 0,
+          creature: %Creature{experience_multiplier: 1.0, extra_flags: 0, rank: 0},
           spawn: %Spawn{respawn_delay_ms: 1},
           loot: %Loot{}
         }
@@ -221,6 +218,7 @@ defmodule ThistleTea.Game.Entity.Data.MobTest do
           map: 0,
           name: "Test Creature",
           in_combat: true,
+          creature: %Creature{},
           spawn: %Spawn{
             unit: spawn_unit,
             movement_block: spawn_movement_block,

@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Entity.Logic.Regen do
 
   alias ThistleTea.Game.Aura
   alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
@@ -107,11 +108,9 @@ defmodule ThistleTea.Game.Entity.Logic.Regen do
 
   defp creature_missing_mana?(_entity), do: false
 
-  defp creature_regenerates?(%{internal: %Internal{} = internal}, flag) do
-    case Map.get(internal, :regenerate_stats) do
-      stats when is_integer(stats) -> (stats &&& flag) != 0
-      _ -> true
-    end
+  defp creature_regenerates?(%{internal: %Internal{creature: %Creature{regenerate_stats: stats}}}, flag)
+       when is_integer(stats) do
+    (stats &&& flag) != 0
   end
 
   defp creature_regenerates?(_entity, _flag), do: true

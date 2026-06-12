@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.Entity.Logic.RegenTest do
   alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
@@ -241,9 +242,17 @@ defmodule ThistleTea.Game.Entity.Logic.RegenTest do
 
   describe "tick/2 for creatures" do
     defp mob(unit_attrs, internal_attrs \\ []) do
+      {regenerate_stats, internal_attrs} = Keyword.pop(internal_attrs, :regenerate_stats)
+
+      internal =
+        struct(
+          %Internal{in_combat: false, creature: %Creature{regenerate_stats: regenerate_stats}},
+          internal_attrs
+        )
+
       %Mob{
         unit: struct(%Unit{health: 300, max_health: 300}, unit_attrs),
-        internal: struct(%Internal{in_combat: false}, internal_attrs)
+        internal: internal
       }
     end
 

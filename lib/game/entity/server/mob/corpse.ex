@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Corpse do
   import Bitwise, only: [|||: 2, &&&: 2, bnot: 1]
 
   alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
   alias ThistleTea.Game.Entity.Data.Component.Internal.Loot, as: InternalLoot
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
@@ -431,11 +432,13 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Corpse do
   defp corpse_token(%Internal{loot: %InternalLoot{corpse_token: token}}) when is_integer(token), do: token
   defp corpse_token(%Internal{}), do: 0
 
-  defp decay_ms(%Internal{} = internal) do
-    if Experience.elite_rank?(Map.get(internal, :rank)) do
+  defp decay_ms(%Internal{creature: %Creature{rank: rank}}) when not is_nil(rank) do
+    if Experience.elite_rank?(rank) do
       @corpse_decay_elite_ms
     else
       @corpse_decay_ms
     end
   end
+
+  defp decay_ms(%Internal{}), do: @corpse_decay_ms
 end
