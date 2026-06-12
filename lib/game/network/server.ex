@@ -373,11 +373,6 @@ defmodule ThistleTea.Game.Network.Server do
   end
 
   def handle_cast({:start_teleport, x, y, z, map}, {socket, state}) do
-    state = Visibility.leave_player(state)
-
-    # Send player's client to loading screen to load the new map
-    Network.send_packet(%Message.SmsgTransferPending{map: map, has_transport: false})
-
     # Update player's location
     area =
       case Pathfinding.get_zone_and_area(map, {x, y, z}) do
@@ -393,6 +388,8 @@ defmodule ThistleTea.Game.Network.Server do
         movement_block: %{character.movement_block | position: {x, y, z, 0.0}}
     }
 
+    # Move in the spatial hash before leaving visibility so old-map observers
+    # resolve the cell :left event as no-longer-visible and destroy us
     SpatialHash.update(
       :players,
       state.guid,
@@ -402,9 +399,13 @@ defmodule ThistleTea.Game.Network.Server do
       z
     )
 
+    state = Visibility.leave_player(%{state | character: character})
+
+    # Send player's client to loading screen to load the new map
+    Network.send_packet(%Message.SmsgTransferPending{map: map, has_transport: false})
+
     state =
       Map.merge(state, %{
-        character: character,
         ready: false,
         tracked_entities: MapSet.new()
       })
