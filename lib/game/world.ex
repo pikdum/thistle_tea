@@ -149,6 +149,18 @@ defmodule ThistleTea.Game.World do
     position(guid)
   end
 
+  def moving?(guid, now \\ Time.now()) when is_integer(guid) and is_integer(now) do
+    case SpatialHash.get_movement(guid) do
+      {_map, _start_position, spline_nodes, start_time, duration}
+      when is_list(spline_nodes) and spline_nodes != [] and is_integer(start_time) and is_integer(duration) and
+             duration > 0 ->
+        now <= start_time + duration
+
+      _ ->
+        false
+    end
+  end
+
   def position(guid, now \\ Time.now()) when is_integer(guid) do
     case SpatialHash.get_movement(guid) do
       {map, start_position, spline_nodes, start_time, duration} ->

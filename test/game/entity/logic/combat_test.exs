@@ -43,8 +43,8 @@ defmodule ThistleTea.Game.Entity.Logic.CombatTest do
   end
 
   describe "chase_target_distance/1" do
-    test "is half the melee reach" do
-      assert Combat.chase_target_distance(5.0) == 2.5
+    test "is the melee reach pulled just inside its outer edge" do
+      assert Combat.chase_target_distance(5.0) == 4.5
     end
   end
 

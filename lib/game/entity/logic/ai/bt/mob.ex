@@ -15,7 +15,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AI.BT.Combat, as: CombatBT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Regen, as: RegenBT
-  alias ThistleTea.Game.Entity.Logic.AI.Cluster
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
   alias ThistleTea.Game.Entity.Logic.Combat, as: CombatLogic
   alias ThistleTea.Game.Entity.Logic.Core
@@ -30,8 +29,17 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
 
   @chase_tick_delay 1_000
 
-  @cluster_query_margin 4.0
-  @cluster_min_distance 0.1
+  @approach_spread_scale 0.3
+  @spread_detect_radius 2.0
+  @spread_min_delay 2_500
+  @spread_max_delay 3_500
+  @spread_max_attempts 3
+  @spread_min_offset 0.4
+  @spread_max_offset 1.0
+  @spread_min_gap 0.8
+  @spread_gap 2.0
+  @spread_gap_crowded 4.0
+  @spread_crowd_threshold 5
 
   @base_aggro_radius 20.0
   @max_level_aggro_bonus 25
@@ -93,6 +101,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
             BT.condition(&target_valid_same_map?/2),
             BT.condition(&in_combat_range?/2),
             BT.action(&melee_attack/2),
+            BT.action(&maybe_spread/2),
             BT.action(&combat_wait/2)
           ]),
           BT.sequence([
@@ -391,6 +400,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
       blackboard
       |> Blackboard.clear_chase()
       |> Blackboard.clear_attack()
+      |> Blackboard.reset_spread()
 
     state = %{state | unit: unit, internal: internal}
 
@@ -474,6 +484,99 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     CombatBT.melee_attack(state, blackboard)
   end
 
+  defp maybe_spread(%Mob{} = state, %Blackboard{} = blackboard) do
+    maybe_spread(state, blackboard, Time.now())
+  end
+
+  def maybe_spread(%Mob{unit: %Unit{target: target}} = state, %Blackboard{} = blackboard, now)
+      when is_integer(target) and target > 0 and is_integer(now) do
+    cond do
+      Movement.moving?(state, now) ->
+        {:success, state, blackboard}
+
+      not Blackboard.ready_for?(blackboard, :next_spread_at, now) ->
+        {:success, state, blackboard}
+
+      true ->
+        blackboard = Blackboard.put_next_at(blackboard, :next_spread_at, spread_delay(), now)
+        do_spread(state, blackboard, target, now)
+    end
+  end
+
+  def maybe_spread(%Mob{} = state, %Blackboard{} = blackboard, _now), do: {:success, state, blackboard}
+
+  defp do_spread(%Mob{} = state, %Blackboard{} = blackboard, target_guid, now) do
+    cond do
+      World.moving?(target_guid, now) ->
+        {:success, state, Blackboard.reset_spread(blackboard)}
+
+      Blackboard.spread_attempts(blackboard) >= @spread_max_attempts ->
+        {:success, state, blackboard}
+
+      true ->
+        spread_from_neighbor(state, blackboard, target_guid, now)
+    end
+  end
+
+  defp spread_from_neighbor(%Mob{internal: %Internal{map: map}} = state, %Blackboard{} = blackboard, target_guid, now) do
+    with {neighbor_guid, _distance} <- stacked_neighbor(state, target_guid),
+         {^map, tx, ty, tz} <- World.target_position(target_guid),
+         {_nmap, nx, ny, _nz} <- World.position(neighbor_guid),
+         {dx, dy, dz} <- spread_destination(state, target_guid, {tx, ty, tz}, {nx, ny}) do
+      state = Movement.move_to(state, {dx, dy, dz}, [face_target: target_guid], now)
+      {:success, state, Blackboard.bump_spread(blackboard)}
+    else
+      _ -> {:success, state, blackboard}
+    end
+  end
+
+  defp stacked_neighbor(%Mob{} = state, target_guid) do
+    state
+    |> World.nearby_mobs(@spread_detect_radius)
+    |> Enum.filter(fn {other_guid, distance} ->
+      other_guid != target_guid and distance < stack_threshold(state, other_guid)
+    end)
+    |> Enum.min_by(fn {_guid, distance} -> distance end, fn -> nil end)
+  end
+
+  defp stack_threshold(%Mob{} = state, other_guid) do
+    :math.sqrt(min(max(own_bounding_radius(state), target_bounding_radius(other_guid)), 0.25))
+  end
+
+  defp spread_destination(
+         %Mob{movement_block: %MovementBlock{position: {mx, my, _mz, _o}}} = state,
+         target_guid,
+         {tx, ty, tz},
+         {nx, ny}
+       ) do
+    my_angle = :math.atan2(my - ty, mx - tx)
+    his_angle = :math.atan2(ny - ty, nx - tx)
+    new_angle = my_angle + spread_turn(my_angle, his_angle)
+    center_distance = own_bounding_radius(state) + target_bounding_radius(target_guid) + spread_gap(target_guid)
+
+    if center_distance < melee_reach_to(state, target_guid) do
+      {tx + :math.cos(new_angle) * center_distance, ty + :math.sin(new_angle) * center_distance, tz}
+    end
+  end
+
+  defp spread_turn(my_angle, his_angle) do
+    delta = @spread_min_offset + :rand.uniform() * (@spread_max_offset - @spread_min_offset)
+    if angular_diff(his_angle, my_angle) > 0.0, do: -delta, else: delta
+  end
+
+  defp angular_diff(a, b) do
+    :math.atan2(:math.sin(a - b), :math.cos(a - b))
+  end
+
+  defp spread_gap(target_guid) do
+    max_gap = if attacker_count(target_guid) > @spread_crowd_threshold, do: @spread_gap_crowded, else: @spread_gap
+    @spread_min_gap + :rand.uniform() * (max_gap - @spread_min_gap)
+  end
+
+  defp spread_delay do
+    @spread_min_delay + :rand.uniform(@spread_max_delay - @spread_min_delay)
+  end
+
   defp chase_repath_and_schedule(%Mob{} = state, %Blackboard{} = blackboard) do
     target = state.unit.target
     now = Time.now()
@@ -521,7 +624,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     if should_repath do
       destination = chase_destination(state, target_pos, target_guid)
       state = Movement.move_to(state, destination, [face_target: target_guid], now)
-      {state, %{blackboard | last_target_pos: target_pos}}
+      {state, %{Blackboard.reset_spread(blackboard) | last_target_pos: target_pos}}
     else
       {state, blackboard}
     end
@@ -529,12 +632,12 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
 
   defp chase_destination(
          %Mob{movement_block: %MovementBlock{position: {mx, my, _mz, _o}}} = state,
-         {tx, ty, tz} = target_pos,
+         {tx, ty, tz},
          target_guid
        ) do
     base_angle = base_chase_angle({mx, my}, {tx, ty})
     chase_distance = CombatLogic.chase_target_distance(melee_reach_to(state, target_guid))
-    angle = free_chase_angle(state, target_pos, target_guid, base_angle, chase_distance)
+    angle = base_angle + approach_angle_offset(state, target_guid)
 
     {
       tx + :math.cos(angle) * chase_distance,
@@ -554,60 +657,30 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     end
   end
 
-  defp free_chase_angle(%Mob{} = state, target_pos, target_guid, base_angle, chase_distance)
-       when is_number(chase_distance) and chase_distance > 0 do
-    footprint_self = angular_footprint(own_bounding_radius(state), chase_distance)
-    occupied = occupied_slots(state, target_pos, target_guid, footprint_self, chase_distance)
-    Cluster.free_angle(base_angle, occupied)
-  end
+  defp approach_angle_offset(%Mob{} = state, target_guid) do
+    count = max(attacker_count(target_guid) - 1, 0)
 
-  defp free_chase_angle(_state, _target_pos, _target_guid, base_angle, _chase_distance), do: base_angle
-
-  defp occupied_slots(
-         %Mob{object: %{guid: guid}, internal: %Internal{map: map}},
-         {tx, ty, _tz} = target_pos,
-         target_guid,
-         footprint_self,
-         chase_distance
-       ) do
-    map
-    |> World.nearby_mobs_at(target_pos, chase_distance + @cluster_query_margin)
-    |> Enum.flat_map(fn {other_guid, _distance} ->
-      occupied_slot(other_guid, guid, target_guid, {tx, ty}, footprint_self)
-    end)
-  end
-
-  defp occupied_slot(other_guid, self_guid, target_guid, _target_xy, _footprint_self)
-       when other_guid == self_guid or other_guid == target_guid, do: []
-
-  defp occupied_slot(other_guid, _self_guid, _target_guid, {tx, ty}, footprint_self) do
-    case World.position(other_guid) do
-      {_map, ox, oy, _oz} ->
-        dx = ox - tx
-        dy = oy - ty
-        distance = :math.sqrt(dx * dx + dy * dy)
-        occupied_slot_at(other_guid, dx, dy, distance, footprint_self)
-
-      _ ->
-        []
+    if count > 0 do
+      spread = :math.pi() / 2.0 - :math.pi() * :rand.uniform()
+      spread * count / approach_size_factor(state, target_guid) * @approach_spread_scale
+    else
+      0.0
     end
   end
 
-  defp occupied_slot_at(_other_guid, _dx, _dy, distance, _footprint_self) when distance < @cluster_min_distance do
-    []
+  defp approach_size_factor(%Mob{} = state, target_guid) do
+    factor = own_bounding_radius(state) + target_bounding_radius(target_guid)
+    if factor < 0.1, do: Unit.default_bounding_radius(), else: factor
   end
 
-  defp occupied_slot_at(other_guid, dx, dy, distance, footprint_self) do
-    angle = :math.atan2(dy, dx)
-    clearance = angular_footprint(target_bounding_radius(other_guid), distance) + footprint_self
-    [{angle, clearance}]
+  defp attacker_count(target_guid) when is_integer(target_guid) do
+    case Metadata.query(target_guid, [:attacker_count]) do
+      %{attacker_count: count} when is_number(count) and count > 0 -> count
+      _ -> 0
+    end
   end
 
-  defp angular_footprint(radius, distance) when is_number(radius) and is_number(distance) and distance > 0 do
-    :math.asin(min(radius / distance, 1.0))
-  end
-
-  defp angular_footprint(_radius, _distance), do: :math.pi() / 2.0
+  defp attacker_count(_target_guid), do: 0
 
   defp own_bounding_radius(%Mob{unit: %Unit{bounding_radius: radius}}) when is_number(radius) and radius > 0, do: radius
   defp own_bounding_radius(%Mob{}), do: Unit.default_bounding_radius()

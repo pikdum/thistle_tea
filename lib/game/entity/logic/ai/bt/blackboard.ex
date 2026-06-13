@@ -18,6 +18,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Blackboard do
             next_aggro_at: 0,
             next_confused_at: 0,
             next_regen_at: 0,
+            next_spread_at: 0,
+            spread_attempts: 0,
             confused_anchor: nil
 
   def new do
@@ -67,6 +69,18 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Blackboard do
 
   def clear_chase(%__MODULE__{} = blackboard) do
     %{blackboard | chase_started: false, last_target_pos: nil}
+  end
+
+  def spread_attempts(%__MODULE__{} = blackboard) do
+    Map.get(blackboard, :spread_attempts) || 0
+  end
+
+  def bump_spread(%__MODULE__{} = blackboard) do
+    Map.put(blackboard, :spread_attempts, spread_attempts(blackboard) + 1)
+  end
+
+  def reset_spread(%__MODULE__{} = blackboard) do
+    Map.put(blackboard, :spread_attempts, 0)
   end
 
   def clear_attack(%__MODULE__{} = blackboard) do

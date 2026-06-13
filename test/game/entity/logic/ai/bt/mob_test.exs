@@ -213,6 +213,57 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
     end
   end
 
+  describe "maybe_spread/3" do
+    test "skips while the mob is still moving" do
+      target_guid = player_guid()
+      state = put_in(fixture_mob(start_time: 0, duration: 5_000).unit.target, target_guid)
+      blackboard = %Blackboard{next_spread_at: 0}
+
+      assert {:success, ^state, ^blackboard} = MobBT.maybe_spread(state, blackboard, 1_000)
+    end
+
+    test "waits for the spread timer" do
+      target_guid = player_guid()
+      state = put_in(fixture_mob().unit.target, target_guid)
+      blackboard = %Blackboard{next_spread_at: 5_000}
+
+      assert {:success, ^state, ^blackboard} = MobBT.maybe_spread(state, blackboard, 1_000)
+    end
+
+    test "resets the spread budget when the target is moving" do
+      target_guid = player_guid()
+      SpatialHash.put_movement(target_guid, {0, {0.0, 0.0, 0.0}, [{10.0, 0.0, 0.0}], 0, 10_000})
+      on_exit(fn -> SpatialHash.clear_movement(target_guid) end)
+
+      state = put_in(fixture_mob().unit.target, target_guid)
+      blackboard = %Blackboard{next_spread_at: 0, spread_attempts: 2}
+
+      assert {:success, ^state, %Blackboard{spread_attempts: 0, next_spread_at: next}} =
+               MobBT.maybe_spread(state, blackboard, 1_000)
+
+      assert next >= 3_500 and next <= 4_500
+    end
+
+    test "stops nudging after the attempt cap" do
+      target_guid = player_guid()
+      state = put_in(fixture_mob().unit.target, target_guid)
+      blackboard = %Blackboard{next_spread_at: 0, spread_attempts: 3}
+
+      assert {:success, ^state, %Blackboard{spread_attempts: 3}} = MobBT.maybe_spread(state, blackboard, 1_000)
+    end
+
+    test "does nothing without a stacked neighbor" do
+      target_guid = player_guid()
+      state = put_in(fixture_mob().unit.target, target_guid)
+      blackboard = %Blackboard{next_spread_at: 0, spread_attempts: 0}
+
+      assert {:success, ^state, %Blackboard{spread_attempts: 0, next_spread_at: next}} =
+               MobBT.maybe_spread(state, blackboard, 1_000)
+
+      assert next >= 3_500 and next <= 4_500
+    end
+  end
+
   defp fixture_mob(opts \\ []) do
     %Mob{
       object: %Object{

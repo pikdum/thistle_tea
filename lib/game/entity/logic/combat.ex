@@ -17,7 +17,7 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
 
   @base_melee_range_offset 1.333
   @attack_distance 5.0
-  @chase_default_range_factor 0.5
+  @chase_distance_inset 0.5
   @chase_rechase_range_factor 0.75
 
   def attack_speed_ms(%{unit: %Unit{base_attack_time: attack_time}}) when is_integer(attack_time) and attack_time > 0 do
@@ -31,7 +31,7 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
   end
 
   def chase_target_distance(melee_reach) when is_number(melee_reach) do
-    melee_reach * @chase_default_range_factor
+    max(melee_reach - @chase_distance_inset, 0.0)
   end
 
   def chase_rechase_distance(melee_reach, target_bounding_radius)
