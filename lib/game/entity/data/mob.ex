@@ -103,6 +103,7 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
           extra_flags: ct.extra_flags,
           rank: ct.rank,
           type_flags: ct.creature_type_flags,
+          damage_multiplier: ct.damage_multiplier,
           regenerate_stats: ct.regenerate_stats
         },
         spawn: %Spawn{

@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal.Creature do
     :extra_flags,
     :rank,
     :type_flags,
+    :damage_multiplier,
     :regenerate_stats
   ]
 end

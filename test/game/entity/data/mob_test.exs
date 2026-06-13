@@ -66,7 +66,8 @@ defmodule ThistleTea.Game.Entity.Data.MobTest do
             speed_run: 1.0,
             experience_multiplier: 1.5,
             extra_flags: 0x40,
-            rank: 1
+            rank: 1,
+            damage_multiplier: 2.5
           }
         }
         |> Map.put(:creature_model_info, nil)
@@ -77,6 +78,7 @@ defmodule ThistleTea.Game.Entity.Data.MobTest do
       assert mob.internal.creature.experience_multiplier == 1.5
       assert mob.internal.creature.extra_flags == 0x40
       assert mob.internal.creature.rank == 1
+      assert mob.internal.creature.damage_multiplier == 2.5
       assert mob.internal.spawn.respawn_delay_ms == 120_000
       assert mob.internal.spawn.unit == mob.unit
       assert mob.internal.spawn.movement_block == mob.movement_block

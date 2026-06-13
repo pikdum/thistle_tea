@@ -2,6 +2,7 @@ defmodule ThistleTea.Game.Entity.Logic.CombatTest do
   use ExUnit.Case, async: true
 
   alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
@@ -28,6 +29,26 @@ defmodule ThistleTea.Game.Entity.Logic.CombatTest do
                damage: 12,
                attack: %{spell_id: 99}
              } = event
+    end
+  end
+
+  describe "damage_range/1" do
+    test "scales creature melee by damage multiplier and attack power" do
+      mob = %Mob{
+        unit: %Unit{min_damage: 10.0, max_damage: 20.0, attack_power: 70, base_attack_time: 2_000},
+        internal: %Internal{creature: %Creature{damage_multiplier: 1.5}}
+      }
+
+      {min_damage, max_damage} = Combat.damage_range(mob)
+
+      assert min_damage == 25.0
+      assert max_damage == 40.0
+    end
+
+    test "leaves non-creature damage ranges unchanged" do
+      entity = %{unit: %Unit{min_damage: 10.0, max_damage: 20.0, attack_power: 70, base_attack_time: 2_000}}
+
+      assert Combat.damage_range(entity) == {10.0, 20.0}
     end
   end
 

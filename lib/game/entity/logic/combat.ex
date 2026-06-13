@@ -4,6 +4,8 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
   rolls from unit damage ranges, and applying an incoming attack to an entity
   along with the events it produces.
   """
+  alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Core
@@ -18,6 +20,33 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
   end
 
   def attack_speed_ms(_entity), do: @default_attack_speed_ms
+
+  def damage_range(%{
+        unit: %Unit{
+          min_damage: min_damage,
+          max_damage: max_damage,
+          attack_power: attack_power,
+          base_attack_time: attack_time
+        },
+        internal: %Internal{creature: %Creature{damage_multiplier: damage_multiplier}}
+      })
+      when is_number(min_damage) and is_number(max_damage) do
+    multiplier = damage_multiplier(damage_multiplier)
+    bonus = attack_power_bonus(attack_power, attack_time)
+
+    {min_damage * multiplier + bonus, max_damage * multiplier + bonus}
+  end
+
+  def damage_range(%{
+        unit: %Unit{min_damage: min_damage, max_damage: max_damage, attack_power: attack_power},
+        internal: %Internal{creature: %Creature{damage_multiplier: damage_multiplier}}
+      })
+      when is_number(min_damage) and is_number(max_damage) do
+    multiplier = damage_multiplier(damage_multiplier)
+    bonus = attack_power_bonus(attack_power, @default_attack_speed_ms)
+
+    {min_damage * multiplier + bonus, max_damage * multiplier + bonus}
+  end
 
   def damage_range(%{unit: %Unit{min_damage: min_damage, max_damage: max_damage}})
       when is_number(min_damage) and is_number(max_damage) do
@@ -36,6 +65,16 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
   end
 
   def attack_damage(_attack), do: @default_damage
+
+  defp damage_multiplier(multiplier) when is_number(multiplier) and multiplier > 0, do: multiplier
+  defp damage_multiplier(_multiplier), do: 1.0
+
+  defp attack_power_bonus(attack_power, attack_time)
+       when is_integer(attack_power) and attack_power > 0 and is_integer(attack_time) and attack_time > 0 do
+    attack_power / 14 * (attack_time / 1000)
+  end
+
+  defp attack_power_bonus(_attack_power, _attack_time), do: 0.0
 
   def finalize_attack(attack) when is_map(attack) do
     Map.put_new(attack, :damage, attack_damage(attack))
