@@ -22,6 +22,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   alias ThistleTea.Game.Entity.Logic.Hostility
   alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.Entity.Logic.Regen, as: RegenLogic
+  alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Metadata
@@ -622,7 +623,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     should_repath = target_moved or not Movement.moving?(state, now)
 
     if should_repath do
-      destination = chase_destination(state, target_pos, target_guid)
+      destination = chase_destination(state, target_pos, target_guid, now)
       state = Movement.move_to(state, destination, [face_target: target_guid], now)
       {state, %{Blackboard.reset_spread(blackboard) | last_target_pos: target_pos}}
     else
@@ -633,11 +634,12 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   defp chase_destination(
          %Mob{movement_block: %MovementBlock{position: {mx, my, _mz, _o}}} = state,
          {tx, ty, tz},
-         target_guid
+         target_guid,
+         now
        ) do
     base_angle = base_chase_angle({mx, my}, {tx, ty})
     chase_distance = CombatLogic.chase_target_distance(melee_reach_to(state, target_guid))
-    angle = base_angle + approach_angle_offset(state, target_guid)
+    angle = base_angle + approach_angle_offset(state, target_guid, now)
 
     {
       tx + :math.cos(angle) * chase_distance,
@@ -657,8 +659,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     end
   end
 
-  defp approach_angle_offset(%Mob{} = state, target_guid) do
-    count = max(attacker_count(target_guid) - 1, 0)
+  defp approach_angle_offset(%Mob{} = state, target_guid, now) do
+    count = approach_spread_count(target_guid, now)
 
     if count > 0 do
       spread = :math.pi() / 2.0 - :math.pi() * :rand.uniform()
@@ -666,6 +668,14 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     else
       0.0
     end
+  end
+
+  defp approach_spread_count(target_guid, now) do
+    if moving_player?(target_guid, now), do: 0, else: max(attacker_count(target_guid) - 1, 0)
+  end
+
+  defp moving_player?(target_guid, now) do
+    Guid.type_id(target_guid) == :player and World.moving?(target_guid, now)
   end
 
   defp approach_size_factor(%Mob{} = state, target_guid) do

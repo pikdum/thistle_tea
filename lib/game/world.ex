@@ -19,6 +19,7 @@ defmodule ThistleTea.Game.World do
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.EntitySupervisor
+  alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
 
   def nearby_players(
@@ -150,6 +151,10 @@ defmodule ThistleTea.Game.World do
   end
 
   def moving?(guid, now \\ Time.now()) when is_integer(guid) and is_integer(now) do
+    spline_moving?(guid, now) or recently_moved?(guid, now)
+  end
+
+  defp spline_moving?(guid, now) do
     case SpatialHash.get_movement(guid) do
       {_map, _start_position, spline_nodes, start_time, duration}
       when is_list(spline_nodes) and spline_nodes != [] and is_integer(start_time) and is_integer(duration) and
@@ -158,6 +163,13 @@ defmodule ThistleTea.Game.World do
 
       _ ->
         false
+    end
+  end
+
+  defp recently_moved?(guid, now) do
+    case Metadata.query(guid, [:moving_until]) do
+      %{moving_until: moving_until} when is_integer(moving_until) -> now < moving_until
+      _ -> false
     end
   end
 

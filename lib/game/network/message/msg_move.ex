@@ -12,12 +12,14 @@ defmodule ThistleTea.Game.Network.Message.MsgMove do
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.AggroProbe
   alias ThistleTea.Game.World.ChaseWatch
+  alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.Visibility
 
   require Logger
 
   @spell_failed_moving 0x2E
+  @move_recency_ms 750
 
   defstruct [
     :opcode,
@@ -45,6 +47,7 @@ defmodule ThistleTea.Game.Network.Message.MsgMove do
       new_state =
         if position_changed? do
           SpatialHash.update(:players, state.guid, map, x1, y1, z1)
+          Metadata.update(state.guid, %{moving_until: Time.now() + @move_recency_ms})
           AggroProbe.notify_player_moved(state.guid, map, {x1, y1, z1})
           ChaseWatch.notify_moved(state.guid, {x1, y1, z1})
 

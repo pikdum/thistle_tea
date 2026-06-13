@@ -2,6 +2,7 @@ defmodule ThistleTea.Game.World.WorldPositionTest do
   use ExUnit.Case, async: false
 
   alias ThistleTea.Game.World
+  alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
 
   describe "position/2" do
@@ -52,6 +53,28 @@ defmodule ThistleTea.Game.World.WorldPositionTest do
       on_exit(fn -> SpatialHash.remove(:mobs, 905) end)
 
       assert World.nearby_units_exact(:mobs, 0, {0.0, 0.0, 0.0}, 10.0, 2_000) == []
+    end
+  end
+
+  describe "moving?/2" do
+    test "true while a published spline is still running, false once it expires" do
+      SpatialHash.put_movement(910, {0, {0.0, 0.0, 0.0}, [{10.0, 0.0, 0.0}], 1_000, 1_000})
+      on_exit(fn -> SpatialHash.clear_movement(910) end)
+
+      assert World.moving?(910, 1_500)
+      refute World.moving?(910, 2_500)
+    end
+
+    test "true within the recency window of a position update, false after it lapses" do
+      Metadata.put(911, %{moving_until: 5_000})
+      on_exit(fn -> Metadata.delete(911) end)
+
+      assert World.moving?(911, 4_999)
+      refute World.moving?(911, 5_000)
+    end
+
+    test "false for a unit that has neither a spline nor a recent position update" do
+      refute World.moving?(912, 1_000)
     end
   end
 end
