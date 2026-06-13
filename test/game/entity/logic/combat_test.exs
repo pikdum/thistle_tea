@@ -32,6 +32,32 @@ defmodule ThistleTea.Game.Entity.Logic.CombatTest do
     end
   end
 
+  describe "melee_reach/2" do
+    test "sums combat reaches plus the base melee offset" do
+      assert_in_delta Combat.melee_reach(2.0, 3.0), 6.333, 0.0001
+    end
+
+    test "floors at the attack distance for small combatants" do
+      assert Combat.melee_reach(1.5, 1.5) == 5.0
+    end
+  end
+
+  describe "chase_target_distance/1" do
+    test "is half the melee reach" do
+      assert Combat.chase_target_distance(5.0) == 2.5
+    end
+  end
+
+  describe "chase_rechase_distance/2" do
+    test "is three quarters of the melee reach minus the target bounding radius" do
+      assert_in_delta Combat.chase_rechase_distance(6.0, 1.0), 3.5, 0.0001
+    end
+
+    test "never goes negative" do
+      assert Combat.chase_rechase_distance(1.0, 5.0) == 0.0
+    end
+  end
+
   describe "damage_range/1" do
     test "scales creature melee by damage multiplier and attack power" do
       mob = %Mob{

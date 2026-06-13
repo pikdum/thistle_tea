@@ -16,6 +16,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Combat, as: CombatBT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Regen, as: RegenBT
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
+  alias ThistleTea.Game.Entity.Logic.Combat, as: CombatLogic
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.Entity.Logic.Hostility
@@ -515,7 +516,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   end
 
   defp maybe_repath_chase(%Mob{} = state, %Blackboard{} = blackboard, target_pos, target_guid, now) do
-    target_moved = target_moved_enough?(blackboard, target_pos, target_guid)
+    target_moved = target_moved_enough?(state, blackboard, target_pos, target_guid)
     should_repath = target_moved or not Movement.moving?(state, now)
 
     if should_repath do
@@ -528,13 +529,14 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   end
 
   defp chase_destination(
-         %Mob{movement_block: %MovementBlock{position: {mx, my, _mz, _o}}, unit: %Unit{bounding_radius: mob_radius}},
+         %Mob{movement_block: %MovementBlock{position: {mx, my, _mz, _o}}, unit: %Unit{bounding_radius: mob_radius}} =
+           state,
          {tx, ty, tz},
          target_guid
        ) do
     base_angle = base_chase_angle({mx, my}, {tx, ty})
     attacker_count = attacker_count(target_guid)
-    chase_distance = chase_stop_distance(target_guid)
+    chase_distance = CombatLogic.chase_target_distance(melee_reach_to(state, target_guid))
 
     mob_radius =
       case mob_radius do
@@ -580,12 +582,12 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
 
   defp attack_angle_offset(_attacker_count, _size_factor), do: 0.0
 
-  defp target_moved_enough?(%Blackboard{last_target_pos: {lx, ly, lz}}, {tx, ty, tz}, target_guid) do
-    threshold = chase_repath_distance(target_guid)
+  defp target_moved_enough?(%Mob{} = state, %Blackboard{last_target_pos: {lx, ly, lz}}, {tx, ty, tz}, target_guid) do
+    threshold = chase_repath_distance(state, target_guid)
     planar_distance({lx, ly, lz}, {tx, ty, tz}) > threshold
   end
 
-  defp target_moved_enough?(%Blackboard{}, {_x, _y, _z}, _target_guid) do
+  defp target_moved_enough?(%Mob{}, %Blackboard{}, {_x, _y, _z}, _target_guid) do
     true
   end
 
@@ -595,16 +597,16 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     :math.sqrt(dx * dx + dy * dy)
   end
 
-  def chase_repath_distance(target_guid) do
-    combat_reach = target_combat_reach(target_guid)
-    bounding_radius = target_bounding_radius(target_guid)
-    max(combat_reach * 0.75 - bounding_radius, 0.0)
+  def chase_repath_distance(%Mob{} = state, target_guid) do
+    CombatLogic.chase_rechase_distance(melee_reach_to(state, target_guid), target_bounding_radius(target_guid))
   end
 
-  defp chase_stop_distance(target_guid) do
-    combat_reach = target_combat_reach(target_guid)
-    max(combat_reach * 0.5, 0.0)
+  defp melee_reach_to(%Mob{} = state, target_guid) do
+    CombatLogic.melee_reach(own_combat_reach(state), target_combat_reach(target_guid))
   end
+
+  defp own_combat_reach(%Mob{unit: %Unit{combat_reach: reach}}) when is_number(reach) and reach > 0, do: reach
+  defp own_combat_reach(%Mob{}), do: Unit.default_combat_reach()
 
   defp target_combat_reach(target_guid) when is_integer(target_guid) do
     case Metadata.query(target_guid, [:combat_reach]) do

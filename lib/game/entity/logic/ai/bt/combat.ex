@@ -19,8 +19,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
   alias ThistleTea.Game.World.Metadata
 
   @attack_retry_delay_ms 100
-  @default_attack_range 2.0
-  @melee_range_offset 1.333
 
   def melee_sequence do
     BT.sequence([
@@ -190,8 +188,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
   defp queue_self_update(state), do: state
 
   defp combat_reach(%{unit: unit} = state, target) do
-    reach = combat_reach_value(unit) + target_combat_reach(state, target) + @melee_range_offset
-    max(reach, @default_attack_range)
+    CombatLogic.melee_reach(combat_reach_value(unit), target_combat_reach(state, target))
   end
 
   defp combat_reach_value(%Unit{combat_reach: combat_reach}) when is_number(combat_reach) and combat_reach > 0 do

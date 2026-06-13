@@ -371,10 +371,12 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     state
   end
 
-  defp chase_watch(%Mob{internal: %Internal{in_combat: true, blackboard: blackboard}, unit: %Unit{target: target}})
+  defp chase_watch(
+         %Mob{internal: %Internal{in_combat: true, blackboard: blackboard}, unit: %Unit{target: target}} = state
+       )
        when is_integer(target) and target > 0 do
     case Blackboard.from_any(blackboard) do
-      %Blackboard{last_target_pos: {x, y, z}} -> {target, {x, y, z}, MobBT.chase_repath_distance(target)}
+      %Blackboard{last_target_pos: {x, y, z}} -> {target, {x, y, z}, MobBT.chase_repath_distance(state, target)}
       _blackboard -> nil
     end
   end
