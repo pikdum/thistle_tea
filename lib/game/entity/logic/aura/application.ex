@@ -38,6 +38,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
   @regen_tick_ms 5000
   @percent_regen_tick_ms 2000
   @regen_auras [:mod_regen, :mod_power_regen, :mod_power_regen_percent]
+  @periodic_auras [:periodic_damage, :periodic_heal, :periodic_energize, :periodic_leech, :periodic_trigger_spell]
 
   @stand_state_sit 1
 
@@ -298,8 +299,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
   defp effective_amplitude(%Effect{amplitude_ms: amp}), do: amp
 
   defp next_tick(%Effect{aura: aura}, amplitude_ms, now)
-       when aura in [:periodic_damage, :periodic_heal, :periodic_leech, :periodic_trigger_spell] and
-              is_integer(amplitude_ms) and amplitude_ms > 0 do
+       when aura in @periodic_auras and is_integer(amplitude_ms) and amplitude_ms > 0 do
     now + amplitude_ms
   end
 

@@ -303,10 +303,67 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
       {entity, events} = Aura.tick(entity, first_tick_at)
 
       assert entity.unit.health == 65
-      assert events == []
+
+      assert [
+               %{
+                 type: :periodic_aura_log,
+                 source_guid: 999,
+                 target_guid: 1,
+                 spell_id: 139,
+                 aura_type: :periodic_heal,
+                 amount: 25
+               }
+             ] = events
+
       [updated] = entity.unit.auras
       [updated_aura] = updated.auras
       assert updated_aura.next_tick_at == first_tick_at + 3_000
+    end
+
+    test "restores mana and logs periodic energize ticks" do
+      entity = %{
+        fixture_entity()
+        | unit: %Unit{level: 1, health: 100, max_health: 100, power1: 10, max_power1: 100, auras: []}
+      }
+
+      spell = %Spell{
+        id: 430,
+        name: "Drink",
+        duration_ms: 18_000,
+        effects: [
+          %Effect{
+            index: 0,
+            type: :apply_aura,
+            base_points: 50,
+            die_sides: 0,
+            aura: :periodic_energize,
+            amplitude_ms: 3_000,
+            misc_value: 0
+          }
+        ]
+      }
+
+      {entity, _events} = apply_spell(entity, 999, 1, spell)
+
+      [holder] = entity.unit.auras
+      [aura] = holder.auras
+      first_tick_at = aura.next_tick_at
+
+      {entity, events} = Aura.tick(entity, first_tick_at)
+
+      assert entity.unit.power1 == 60
+
+      assert [
+               %{
+                 type: :periodic_aura_log,
+                 source_guid: 999,
+                 target_guid: 1,
+                 spell_id: 430,
+                 aura_type: :periodic_energize,
+                 amount: 50,
+                 misc_value: 0
+               }
+             ] = events
     end
   end
 

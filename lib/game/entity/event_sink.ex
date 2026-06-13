@@ -58,6 +58,24 @@ defmodule ThistleTea.Game.Entity.EventSink do
     entity
   end
 
+  def emit(entity, %Event{type: :periodic_aura_log} = event) do
+    %Message.SmsgPeriodicauralog{
+      target: event.target_guid,
+      caster: event.source_guid || event.target_guid,
+      spell_id: event.spell_id,
+      auras: [
+        %{
+          aura_type: event.aura_type,
+          amount: event.amount || 0,
+          misc_value: event.misc_value || 0
+        }
+      ]
+    }
+    |> World.broadcast_packet(entity)
+
+    entity
+  end
+
   def emit(entity, %Event{type: :aura_duration} = event) do
     Network.send_packet(%Message.SmsgUpdateAuraDuration{
       aura_slot: event.aura_slot,

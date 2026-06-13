@@ -70,6 +70,38 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
                          damage_state: 1
                        }, _opts}}
     end
+
+    test "periodic_aura_log broadcasts periodic aura log packets", %{target_guid: target_guid} do
+      player_guid = Guid.from_low_guid(:player, unique_guid())
+      mob_guid = Guid.from_low_guid(:mob, 1, unique_guid())
+
+      Entity.register(player_guid)
+      SpatialHash.update(:players, player_guid, 0, 0.0, 0.0, 0.0)
+
+      on_exit(fn ->
+        Entity.unregister(player_guid)
+        SpatialHash.remove(:players, player_guid)
+      end)
+
+      mob = %Mob{
+        object: %Object{guid: mob_guid},
+        internal: %Internal{map: 0},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
+      }
+
+      event = Event.periodic_aura_log(mob_guid, target_guid, %{id: 139}, :periodic_heal, 25)
+
+      EventSink.emit(mob, event)
+
+      assert_receive {:"$gen_cast",
+                      {:send_packet,
+                       %Message.SmsgPeriodicauralog{
+                         target: ^target_guid,
+                         caster: ^mob_guid,
+                         spell_id: 139,
+                         auras: [%{aura_type: :periodic_heal, amount: 25, misc_value: 0}]
+                       }, _opts}}
+    end
   end
 
   defp metadata_fixtures(_context) do

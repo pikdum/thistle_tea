@@ -16,6 +16,8 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
     :health,
     :mana,
     :periodic?,
+    :aura_type,
+    :misc_value,
     :aura_slot,
     :duration_ms,
     :speed,
@@ -56,6 +58,19 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
       type: :aura_duration,
       aura_slot: slot,
       duration_ms: duration_ms
+    }
+  end
+
+  def periodic_aura_log(source_guid, target_guid, spell, aura_type, amount, opts \\ [])
+      when is_integer(source_guid) and is_integer(target_guid) and is_atom(aura_type) and is_integer(amount) do
+    %__MODULE__{
+      type: :periodic_aura_log,
+      source_guid: source_guid,
+      target_guid: target_guid,
+      spell_id: spell.id,
+      aura_type: aura_type,
+      amount: amount,
+      misc_value: Keyword.get(opts, :misc_value, 0)
     }
   end
 

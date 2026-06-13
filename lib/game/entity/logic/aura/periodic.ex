@@ -90,10 +90,25 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
     {entity, %{aura | next_tick_at: advance_tick(at, aura.amplitude_ms, now)}, [event]}
   end
 
-  defp tick_aura(entity, _holder, %Aura{type: :periodic_heal, next_tick_at: at} = aura, now)
+  defp tick_aura(entity, %Holder{} = holder, %Aura{type: :periodic_heal, next_tick_at: at} = aura, now)
        when is_integer(at) and now >= at do
     entity = Core.heal(entity, aura.amount)
-    {entity, %{aura | next_tick_at: advance_tick(at, aura.amplitude_ms, now)}, []}
+    event = Event.periodic_aura_log(holder.caster_guid, entity.object.guid, holder.spell, :periodic_heal, aura.amount)
+
+    {entity, %{aura | next_tick_at: advance_tick(at, aura.amplitude_ms, now)}, [event]}
+  end
+
+  defp tick_aura(entity, %Holder{} = holder, %Aura{type: :periodic_energize, next_tick_at: at} = aura, now)
+       when is_integer(at) and now >= at do
+    misc_value = power_type(aura.misc_value)
+    entity = restore_power(entity, misc_value, aura.amount)
+
+    event =
+      Event.periodic_aura_log(holder.caster_guid, entity.object.guid, holder.spell, :periodic_energize, aura.amount,
+        misc_value: misc_value
+      )
+
+    {entity, %{aura | next_tick_at: advance_tick(at, aura.amplitude_ms, now)}, [event]}
   end
 
   defp tick_aura(entity, %Holder{} = holder, %Aura{type: :periodic_leech, next_tick_at: at} = aura, now)
@@ -132,6 +147,12 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
   end
 
   defp leech_heal_events(_holder, _entity, _damage, _aura), do: []
+
+  defp restore_power(entity, 0, amount), do: Core.restore_mana(entity, amount)
+  defp restore_power(entity, _power_type, _amount), do: entity
+
+  defp power_type(value) when is_integer(value) and value >= 0, do: value
+  defp power_type(_value), do: 0
 
   defp advance_tick(last_tick, amplitude_ms, now) when is_integer(amplitude_ms) and amplitude_ms > 0 do
     next = last_tick + amplitude_ms
