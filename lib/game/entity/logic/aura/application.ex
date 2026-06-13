@@ -38,7 +38,15 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
   @regen_tick_ms 5000
   @percent_regen_tick_ms 2000
   @regen_auras [:mod_regen, :mod_power_regen, :mod_power_regen_percent]
-  @periodic_auras [:periodic_damage, :periodic_heal, :periodic_energize, :periodic_leech, :periodic_trigger_spell]
+  @periodic_auras [
+    :periodic_damage,
+    :periodic_heal,
+    :periodic_energize,
+    :periodic_leech,
+    :periodic_trigger_spell,
+    :mod_regen,
+    :mod_power_regen
+  ]
 
   @stand_state_sit 1
 

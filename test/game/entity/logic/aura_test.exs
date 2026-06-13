@@ -746,13 +746,64 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
       assert Enum.any?(events, &(&1.type == :stand_state and &1.stand_state == 1))
     end
 
-    test "food auras do not tick directly" do
+    test "food auras log regen ticks without applying direct aura healing" do
       entity = fixture_entity()
       entity = %{entity | unit: %{entity.unit | health: 50}}
       {entity, _events} = apply_spell(entity, 1, 1, food_fixture())
 
-      {entity, _events} = Aura.tick(entity, 1_000 + 5_000)
+      {entity, events} = Aura.tick(entity, 1_000 + 5_000)
+
       assert entity.unit.health == 50
+
+      assert [
+               %{
+                 type: :periodic_aura_log,
+                 source_guid: 1,
+                 target_guid: 1,
+                 spell_id: 433,
+                 aura_type: :periodic_heal,
+                 amount: 16
+               }
+             ] = events
+    end
+
+    test "drink auras log mana regen ticks" do
+      entity = %{
+        fixture_entity()
+        | unit: %Unit{level: 1, health: 100, max_health: 100, power_type: 0, power1: 10, max_power1: 100, auras: []}
+      }
+
+      spell = %Spell{
+        id: 430,
+        name: "Drink",
+        duration_ms: 18_000,
+        effects: [
+          %Effect{
+            index: 0,
+            type: :apply_aura,
+            base_points: 41,
+            die_sides: 0,
+            aura: :mod_power_regen,
+            amplitude_ms: 0,
+            misc_value: 0
+          }
+        ]
+      }
+
+      {entity, _events} = apply_spell(entity, 1, 1, spell)
+      {_entity, events} = Aura.tick(entity, 1_000 + 5_000)
+
+      assert [
+               %{
+                 type: :periodic_aura_log,
+                 source_guid: 1,
+                 target_guid: 1,
+                 spell_id: 430,
+                 aura_type: :periodic_energize,
+                 amount: 41,
+                 misc_value: 0
+               }
+             ] = events
     end
 
     test "remove_with_interrupt_flags removes matching auras only" do
