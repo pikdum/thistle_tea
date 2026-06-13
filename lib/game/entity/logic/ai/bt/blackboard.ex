@@ -77,6 +77,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Blackboard do
     %{blackboard | attack_started: false}
   end
 
+  def clear_auto_attack(%__MODULE__{} = blackboard) do
+    %{blackboard | attack_started: false, auto_attacking: false}
+  end
+
   def enable_auto_attack(%__MODULE__{} = blackboard) do
     %{blackboard | auto_attacking: true}
   end
