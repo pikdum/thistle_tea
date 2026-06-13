@@ -26,7 +26,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgAttackstop do
 
     character =
       character
-      |> BT.reset_attack_started()
+      |> BT.clear_attack()
       |> clear_combat()
 
     Core.update_object(character, :values)

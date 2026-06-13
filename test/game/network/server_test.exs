@@ -2,10 +2,13 @@ defmodule ThistleTea.Game.Network.ServerTest do
   use ExUnit.Case, async: true
   use ThistleTea.Game.Network.Opcodes, [:SMSG_UPDATE_OBJECT]
 
+  alias ThistleTea.Game.Entity.Data.Character
+  alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Logic.Regen
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Packet
@@ -77,6 +80,19 @@ defmodule ThistleTea.Game.Network.ServerTest do
         Server.handle_cast({:send_packet, packet}, {socket, state})
       end
     end
+
+    test "marks player in combat when a mob attack lands" do
+      socket = %{read_timeout: 0}
+      state = %{character: character(1, health: 80, max_health: 100)}
+
+      assert {:noreply, {^socket, %{character: character}}, {:continue, :maybe_broadcast_update}} =
+               Server.handle_cast({:receive_attack, %{caster: 2, damage: 10}}, {socket, state})
+
+      assert character.unit.health == 70
+      assert character.internal.in_combat == true
+      assert is_integer(character.internal.last_hostile_time)
+      assert Regen.tick(character, 1_000).unit.health == 70
+    end
   end
 
   describe "Network.send_packet/3" do
@@ -125,6 +141,15 @@ defmodule ThistleTea.Game.Network.ServerTest do
     }
   end
 
+  defp character(guid, unit_attrs) do
+    %Character{
+      object: object(guid),
+      unit: struct(unit(), unit_attrs),
+      internal: %Internal{map: 0},
+      movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
+    }
+  end
+
   defp object(guid) do
     %Object{
       guid: guid,
@@ -138,11 +163,13 @@ defmodule ThistleTea.Game.Network.ServerTest do
     %Unit{
       health: 1000,
       power1: 100,
+      max_power1: 100,
       power_type: 0,
       level: 10,
       race: 1,
       class: 1,
-      gender: 1
+      gender: 1,
+      spirit: 50
     }
   end
 

@@ -24,6 +24,7 @@ defmodule ThistleTea.Game.Network.Server do
   alias ThistleTea.Game.Entity.Logic.Experience
   alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Entity.Logic.MovementStats
+  alias ThistleTea.Game.Entity.Logic.PlayerCombat
   alias ThistleTea.Game.Entity.Logic.SpellEffect
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network
@@ -198,7 +199,10 @@ defmodule ThistleTea.Game.Network.Server do
   end
 
   def handle_cast({:receive_attack, attack}, {socket, %{character: %Character{} = character} = state}) do
-    {character, events} = Combat.receive_attack(character, attack, Time.now())
+    now = Time.now()
+
+    character = PlayerCombat.mark_attacked(character, now)
+    {character, events} = Combat.receive_attack(character, attack, now)
     character = EventSink.emit(character, events)
 
     {:noreply, {socket, %{state | character: character}}, {:continue, :maybe_broadcast_update}}

@@ -51,6 +51,14 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT do
     update_blackboard(state, &Blackboard.clear_attack_started/1)
   end
 
+  def enable_auto_attack(state) do
+    update_blackboard(state, &Blackboard.enable_auto_attack/1)
+  end
+
+  def clear_attack(state) do
+    update_blackboard(state, &Blackboard.clear_attack/1)
+  end
+
   defp run(%__MODULE__{type: :condition, fun: fun}, state, blackboard) do
     if fun.(state, blackboard), do: {:success, state, blackboard}, else: {:failure, state, blackboard}
   end

@@ -31,6 +31,15 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
     ])
   end
 
+  def in_combat?(%Character{internal: %Internal{in_combat: true}, unit: %Unit{target: target}}, %Blackboard{
+        auto_attacking: true
+      })
+      when is_integer(target) and target > 0 do
+    true
+  end
+
+  def in_combat?(%Character{}, _blackboard), do: false
+
   def in_combat?(%{internal: %Internal{in_combat: true}, unit: %Unit{target: target}}, _blackboard)
       when is_integer(target) and target > 0 do
     true

@@ -22,6 +22,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgAttackswing do
         character
         |> maybe_reset_attack_started(target_guid)
         |> engage_combat(target_guid)
+        |> BT.enable_auto_attack()
 
       Core.update_object(character, :values)
       |> World.broadcast_packet(character)

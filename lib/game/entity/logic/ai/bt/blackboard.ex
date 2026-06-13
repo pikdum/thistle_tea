@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Blackboard do
             next_chase_at: 0,
             next_attack_at: 0,
             attack_started: false,
+            auto_attacking: false,
             next_wander_at: 0,
             next_waypoint_at: 0,
             next_aggro_at: 0,
@@ -69,10 +70,14 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Blackboard do
   end
 
   def clear_attack(%__MODULE__{} = blackboard) do
-    %{blackboard | next_attack_at: 0, attack_started: false}
+    %{blackboard | next_attack_at: 0, attack_started: false, auto_attacking: false}
   end
 
   def clear_attack_started(%__MODULE__{} = blackboard) do
     %{blackboard | attack_started: false}
+  end
+
+  def enable_auto_attack(%__MODULE__{} = blackboard) do
+    %{blackboard | auto_attacking: true}
   end
 end

@@ -10,9 +10,11 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Player do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Combat, as: CombatBT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Regen, as: RegenBT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Spell, as: SpellBT
+  alias ThistleTea.Game.Entity.Logic.PlayerCombat
 
   def tree do
     BT.selector([
+      BT.action(&sync_combat/2),
       AuraBT.tick_step(),
       RegenBT.tick_step(),
       SpellBT.casting_sequence(),
@@ -20,6 +22,13 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Player do
       BT.action(&idle/2)
     ])
   end
+
+  defp sync_combat(%Character{} = state, %Blackboard{} = blackboard) do
+    {state, blackboard} = PlayerCombat.sync(state, blackboard)
+    {:failure, state, blackboard}
+  end
+
+  defp sync_combat(state, blackboard), do: {:failure, state, blackboard}
 
   defp idle(%Character{} = state, %Blackboard{} = blackboard) do
     {:running, state, blackboard}

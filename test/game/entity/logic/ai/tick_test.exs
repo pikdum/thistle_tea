@@ -35,6 +35,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.TickTest do
       assert Tick.needs_tick?(fixture(in_combat: true, target: 42))
     end
 
+    test "ticks while in combat without a target" do
+      assert Tick.needs_tick?(fixture(in_combat: true))
+    end
+
     test "ticks with active auras" do
       assert Tick.needs_tick?(fixture(auras: [:aura]))
     end
