@@ -28,9 +28,37 @@ defmodule ThistleTea.Game.Network.Message.CmsgUseItemTest do
   end
 
   describe "handle/3" do
+    test "uses item cooldown overrides for on-use spells" do
+      player_guid = Guid.from_low_guid(:player, unique_id())
+      spell = %Spell{id: @spell_id, name: "Drink", cast_time_ms: 0, category: 59, category_recovery_time_ms: 60_000}
+      item = ItemStore.create(drink_template(), owner: player_guid, stack_count: 2)
+      started_at = Time.now()
+
+      on_exit(fn -> ItemStore.delete(item.object.guid) end)
+
+      state =
+        CmsgUseItem.handle(
+          %CmsgUseItem{bag: Inventory.bag_0(), slot: @backpack_start, spell_count: 1, targets: <<0::little-size(16)>>},
+          %{
+            ready: true,
+            guid: player_guid,
+            packed_guid: BinaryUtils.pack_guid(player_guid),
+            character: character(player_guid, item.object.guid),
+            player_tick_ref: nil
+          },
+          fn @spell_id -> spell end
+        )
+
+      ready_at = state.character.internal.cooldowns[{:category, 59}]
+
+      assert is_integer(ready_at)
+      assert ready_at - started_at <= 1_250
+      assert ItemStore.get(item.object.guid).item.stack_count == 1
+    end
+
     test "does not consume a charged item when its spell cast fails" do
       player_guid = Guid.from_low_guid(:player, unique_id())
-      spell = %Spell{id: @spell_id, name: "Drink", recovery_time_ms: 60_000}
+      spell = %Spell{id: @spell_id, name: "Drink", cast_time_ms: 0, category: 59, category_recovery_time_ms: 60_000}
       item = ItemStore.create(drink_template(), owner: player_guid, stack_count: 2)
 
       on_exit(fn -> ItemStore.delete(item.object.guid) end)
@@ -38,7 +66,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgUseItemTest do
       character =
         player_guid
         |> character(item.object.guid)
-        |> Cooldowns.start(spell, Time.now())
+        |> Cooldowns.start(%Spell{id: @spell_id, category: 59, category_recovery_time_ms: 1_000}, Time.now())
 
       state =
         CmsgUseItem.handle(
@@ -68,7 +96,10 @@ defmodule ThistleTea.Game.Network.Message.CmsgUseItemTest do
       stackable: 20,
       spellid_1: @spell_id,
       spelltrigger_1: 0,
-      spellcharges_1: -1
+      spellcharges_1: -1,
+      spellcooldown_1: 0,
+      spellcategory_1: 59,
+      spellcategorycooldown_1: 1_000
     }
   end
 

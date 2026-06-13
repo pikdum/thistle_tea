@@ -34,8 +34,10 @@ defmodule ThistleTea.Game.Network.Message.CmsgUseItem do
          %DataItem{} = item <- ItemStore.get(guid),
          template = DataItem.template(item),
          :ok <- validate_usable(c, template, pos),
-         {:ok, spell_id, consumable?} <- on_use_spell(template),
+         {:ok, spell_id, spell_index, consumable?} <- on_use_spell(template),
          %Spell{} = spell <- load_spell.(spell_id) do
+      spell = apply_item_cooldowns(spell, template, spell_index)
+
       Logger.info("CMSG_USE_ITEM: #{template.name} casting #{spell.name}")
 
       case Spellcasting.cast_result(state, spell, message.targets, guid) do
@@ -81,10 +83,29 @@ defmodule ThistleTea.Game.Network.Message.CmsgUseItem do
       charges = Map.get(template, :"spellcharges_#{i}")
 
       if is_integer(spell_id) and spell_id > 0 and trigger == @spelltrigger_on_use do
-        {:ok, spell_id, is_integer(charges) and charges < 0}
+        {:ok, spell_id, i, is_integer(charges) and charges < 0}
       end
     end)
   end
+
+  defp apply_item_cooldowns(%Spell{} = spell, %ItemTemplate{} = template, index) do
+    spell
+    |> maybe_put_positive(:category, Map.get(template, :"spellcategory_#{index}"))
+    |> maybe_put_non_negative(:recovery_time_ms, Map.get(template, :"spellcooldown_#{index}"))
+    |> maybe_put_non_negative(:category_recovery_time_ms, Map.get(template, :"spellcategorycooldown_#{index}"))
+  end
+
+  defp maybe_put_positive(%Spell{} = spell, field, value) when is_integer(value) and value > 0 do
+    Map.put(spell, field, value)
+  end
+
+  defp maybe_put_positive(%Spell{} = spell, _field, _value), do: spell
+
+  defp maybe_put_non_negative(%Spell{} = spell, field, value) when is_integer(value) and value >= 0 do
+    Map.put(spell, field, value)
+  end
+
+  defp maybe_put_non_negative(%Spell{} = spell, _field, _value), do: spell
 
   defp maybe_consume(state, _item, _pos, false), do: state
 
