@@ -34,7 +34,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   @default_bounding_radius 0.6
   @attack_angle_scale 0.3
 
-  @base_aggro_radius 18.0
+  @base_aggro_radius 20.0
   @max_level_aggro_bonus 25
   @min_aggro_radius 5.0
   @max_aggro_radius @base_aggro_radius + @max_level_aggro_bonus
