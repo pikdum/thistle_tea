@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AI.BT.Combat, as: CombatBT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Regen, as: RegenBT
+  alias ThistleTea.Game.Entity.Logic.AI.Cluster
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
   alias ThistleTea.Game.Entity.Logic.Combat, as: CombatLogic
   alias ThistleTea.Game.Entity.Logic.Core
@@ -29,10 +30,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
 
   @chase_tick_delay 1_000
 
-  # TODO: a lot of these should be pulled from entity data
-  @target_radius_guess 0.9
-  @default_bounding_radius 0.6
-  @attack_angle_scale 0.3
+  @cluster_query_margin 4.0
+  @cluster_min_distance 0.1
 
   @base_aggro_radius 20.0
   @max_level_aggro_bonus 25
@@ -529,24 +528,13 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   end
 
   defp chase_destination(
-         %Mob{movement_block: %MovementBlock{position: {mx, my, _mz, _o}}, unit: %Unit{bounding_radius: mob_radius}} =
-           state,
-         {tx, ty, tz},
+         %Mob{movement_block: %MovementBlock{position: {mx, my, _mz, _o}}} = state,
+         {tx, ty, tz} = target_pos,
          target_guid
        ) do
     base_angle = base_chase_angle({mx, my}, {tx, ty})
-    attacker_count = attacker_count(target_guid)
     chase_distance = CombatLogic.chase_target_distance(melee_reach_to(state, target_guid))
-
-    mob_radius =
-      case mob_radius do
-        value when is_number(value) -> value
-        _ -> @default_bounding_radius
-      end
-
-    size_factor = max(@target_radius_guess + mob_radius, @default_bounding_radius)
-    angle_offset = attack_angle_offset(attacker_count, size_factor)
-    angle = base_angle + angle_offset
+    angle = free_chase_angle(state, target_pos, target_guid, base_angle, chase_distance)
 
     {
       tx + :math.cos(angle) * chase_distance,
@@ -566,21 +554,63 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     end
   end
 
-  defp attacker_count(target_guid) when is_integer(target_guid) do
-    case Metadata.query(target_guid, [:attacker_count]) do
-      %{attacker_count: count} when is_number(count) and count > 0 -> count
-      _ -> 0
+  defp free_chase_angle(%Mob{} = state, target_pos, target_guid, base_angle, chase_distance)
+       when is_number(chase_distance) and chase_distance > 0 do
+    footprint_self = angular_footprint(own_bounding_radius(state), chase_distance)
+    occupied = occupied_slots(state, target_pos, target_guid, footprint_self, chase_distance)
+    Cluster.free_angle(base_angle, occupied)
+  end
+
+  defp free_chase_angle(_state, _target_pos, _target_guid, base_angle, _chase_distance), do: base_angle
+
+  defp occupied_slots(
+         %Mob{object: %{guid: guid}, internal: %Internal{map: map}},
+         {tx, ty, _tz} = target_pos,
+         target_guid,
+         footprint_self,
+         chase_distance
+       ) do
+    map
+    |> World.nearby_mobs_at(target_pos, chase_distance + @cluster_query_margin)
+    |> Enum.flat_map(fn {other_guid, _distance} ->
+      occupied_slot(other_guid, guid, target_guid, {tx, ty}, footprint_self)
+    end)
+  end
+
+  defp occupied_slot(other_guid, self_guid, target_guid, _target_xy, _footprint_self)
+       when other_guid == self_guid or other_guid == target_guid, do: []
+
+  defp occupied_slot(other_guid, _self_guid, _target_guid, {tx, ty}, footprint_self) do
+    case World.position(other_guid) do
+      {_map, ox, oy, _oz} ->
+        dx = ox - tx
+        dy = oy - ty
+        distance = :math.sqrt(dx * dx + dy * dy)
+        occupied_slot_at(other_guid, dx, dy, distance, footprint_self)
+
+      _ ->
+        []
     end
   end
 
-  defp attacker_count(_target_guid), do: 0
-
-  defp attack_angle_offset(attacker_count, size_factor) when attacker_count > 0 do
-    spread = :math.pi() / 2.0 - :math.pi() * :rand.uniform()
-    spread * (attacker_count / size_factor) * @attack_angle_scale
+  defp occupied_slot_at(_other_guid, _dx, _dy, distance, _footprint_self) when distance < @cluster_min_distance do
+    []
   end
 
-  defp attack_angle_offset(_attacker_count, _size_factor), do: 0.0
+  defp occupied_slot_at(other_guid, dx, dy, distance, footprint_self) do
+    angle = :math.atan2(dy, dx)
+    clearance = angular_footprint(target_bounding_radius(other_guid), distance) + footprint_self
+    [{angle, clearance}]
+  end
+
+  defp angular_footprint(radius, distance) when is_number(radius) and is_number(distance) and distance > 0 do
+    :math.asin(min(radius / distance, 1.0))
+  end
+
+  defp angular_footprint(_radius, _distance), do: :math.pi() / 2.0
+
+  defp own_bounding_radius(%Mob{unit: %Unit{bounding_radius: radius}}) when is_number(radius) and radius > 0, do: radius
+  defp own_bounding_radius(%Mob{}), do: Unit.default_bounding_radius()
 
   defp target_moved_enough?(%Mob{} = state, %Blackboard{last_target_pos: {lx, ly, lz}}, {tx, ty, tz}, target_guid) do
     threshold = chase_repath_distance(state, target_guid)
