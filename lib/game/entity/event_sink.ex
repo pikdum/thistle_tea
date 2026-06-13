@@ -33,6 +33,8 @@ defmodule ThistleTea.Game.Entity.EventSink do
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Pathfinding
 
+  @victimstate_normal 1
+
   def emit_pending(entity) do
     {entity, events} = Event.drain(entity)
     emit(entity, events)
@@ -284,7 +286,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
           resist: Map.get(attack, :resist, 0)
         }
       ],
-      damage_state: Map.get(attack, :damage_state, 0),
+      damage_state: Map.get(attack, :damage_state, @victimstate_normal),
       unknown1: Map.get(attack, :unknown1, 0),
       spell_id: Map.get(attack, :spell_id, 0),
       blocked_amount: Map.get(attack, :blocked_amount, 0)

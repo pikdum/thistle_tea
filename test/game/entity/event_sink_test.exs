@@ -1,11 +1,17 @@
 defmodule ThistleTea.Game.Entity.EventSinkTest do
   use ExUnit.Case, async: false
 
+  alias ThistleTea.Game.Entity
+  alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.Logic.Event
+  alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.SpatialHash
 
   describe "emit/2" do
     setup [:metadata_fixtures]
@@ -33,6 +39,36 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
 
       assert ^mob = EventSink.emit(mob, Event.tap_cleared())
       assert Metadata.query(guid, [:tapped_player, :tapped_group_id]) == %{tapped_player: nil, tapped_group_id: nil}
+    end
+
+    test "attacker_state_update broadcasts landed hits as normal victim state", %{target_guid: target_guid} do
+      player_guid = Guid.from_low_guid(:player, unique_guid())
+      mob_guid = Guid.from_low_guid(:mob, 1, unique_guid())
+
+      Entity.register(player_guid)
+      SpatialHash.update(:players, player_guid, 0, 0.0, 0.0, 0.0)
+
+      on_exit(fn ->
+        Entity.unregister(player_guid)
+        SpatialHash.remove(:players, player_guid)
+      end)
+
+      mob = %Mob{
+        object: %Object{guid: mob_guid},
+        internal: %Internal{map: 0},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
+      }
+
+      EventSink.emit(mob, Event.attacker_state_update(mob_guid, target_guid, 12, %{}))
+
+      assert_receive {:"$gen_cast",
+                      {:send_packet,
+                       %Message.SmsgAttackerstateupdate{
+                         attacker: ^mob_guid,
+                         target: ^target_guid,
+                         total_damage: 12,
+                         damage_state: 1
+                       }, _opts}}
     end
   end
 

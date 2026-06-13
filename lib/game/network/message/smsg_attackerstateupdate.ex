@@ -3,13 +3,14 @@ defmodule ThistleTea.Game.Network.Message.SmsgAttackerstateupdate do
   use ThistleTea.Game.Network.ServerMessage, :SMSG_ATTACKERSTATEUPDATE
 
   @default_hit_info 0x00000002
+  @default_damage_state 1
 
   defstruct hit_info: @default_hit_info,
             attacker: 0,
             target: 0,
             total_damage: 0,
             damages: [],
-            damage_state: 0,
+            damage_state: @default_damage_state,
             unknown1: 0,
             spell_id: 0,
             blocked_amount: 0
