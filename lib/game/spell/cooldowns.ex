@@ -84,11 +84,21 @@ defmodule ThistleTea.Game.Spell.Cooldowns do
     spell_entry ++ category_entry
   end
 
-  defp keys(%Spell{id: spell_id, category: category}) do
-    case positive(category) do
-      0 -> [spell_id]
-      category -> [spell_id, {:category, category}]
-    end
+  defp keys(%Spell{id: spell_id, category: category} = spell) do
+    spell_key =
+      case positive(spell.recovery_time_ms) do
+        0 -> []
+        _recovery -> [spell_id]
+      end
+
+    category_key =
+      case {positive(category), positive(spell.category_recovery_time_ms)} do
+        {0, _recovery} -> []
+        {_category, 0} -> []
+        {category, _recovery} -> [{:category, category}]
+      end
+
+    spell_key ++ category_key
   end
 
   defp active(internal, now) do

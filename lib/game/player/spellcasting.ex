@@ -28,15 +28,29 @@ defmodule ThistleTea.Game.Player.Spellcasting do
   @spell_failed_interrupted 0x23
 
   def cast(state, spell_id, spell_cast_targets) when is_integer(spell_id) do
-    case lookup_spell(state, spell_id) do
-      %Spell{} = spell -> cast(state, spell, spell_cast_targets)
-      nil -> unknown_spell(state, spell_id)
-    end
+    state
+    |> cast_result(spell_id, spell_cast_targets)
+    |> cast_state()
   end
 
   def cast(state, %Spell{} = spell, spell_cast_targets), do: cast(state, spell, spell_cast_targets, nil)
 
   def cast(state, %Spell{} = spell, spell_cast_targets, cast_item_guid) do
+    state
+    |> cast_result(spell, spell_cast_targets, cast_item_guid)
+    |> cast_state()
+  end
+
+  def cast_result(state, spell_id, spell_cast_targets) when is_integer(spell_id) do
+    case lookup_spell(state, spell_id) do
+      %Spell{} = spell -> cast_result(state, spell, spell_cast_targets)
+      nil -> {:error, unknown_spell(state, spell_id)}
+    end
+  end
+
+  def cast_result(state, %Spell{} = spell, spell_cast_targets), do: cast_result(state, spell, spell_cast_targets, nil)
+
+  def cast_result(state, %Spell{} = spell, spell_cast_targets, cast_item_guid) do
     targets = Targets.parse(spell_cast_targets, state.guid)
 
     Logger.info(
@@ -46,13 +60,15 @@ defmodule ThistleTea.Game.Player.Spellcasting do
 
     case validate_cast(state, spell, targets) do
       :ok ->
-        do_cast(state, spell, spell_cast_targets, targets, cast_item_guid)
+        {:ok, do_cast(state, spell, spell_cast_targets, targets, cast_item_guid)}
 
       {:error, reason} ->
         fail_cast(spell, reason)
-        state
+        {:error, state}
     end
   end
+
+  defp cast_state({_result, state}), do: state
 
   def complete(%{character: character} = state) do
     character =

@@ -19,7 +19,14 @@ defmodule ThistleTea.Game.Network.Message.CmsgUseItem do
   defstruct [:bag, :slot, :spell_count, :targets]
 
   @impl ClientMessage
-  def handle(%__MODULE__{} = message, %{ready: true, character: %Character{} = c} = state) do
+  def handle(%__MODULE__{} = message, %{ready: true, character: %Character{}} = state) do
+    handle(message, state, &SpellLoader.load/1)
+  end
+
+  def handle(_message, state), do: state
+
+  def handle(%__MODULE__{} = message, %{ready: true, character: %Character{} = c} = state, load_spell)
+      when is_function(load_spell, 1) do
     pos = {message.bag, message.slot}
     get_item = &ItemStore.get/1
 
@@ -28,12 +35,13 @@ defmodule ThistleTea.Game.Network.Message.CmsgUseItem do
          template = DataItem.template(item),
          :ok <- validate_usable(c, template, pos),
          {:ok, spell_id, consumable?} <- on_use_spell(template),
-         %Spell{} = spell <- SpellLoader.load(spell_id) do
+         %Spell{} = spell <- load_spell.(spell_id) do
       Logger.info("CMSG_USE_ITEM: #{template.name} casting #{spell.name}")
 
-      state
-      |> Spellcasting.cast(spell, message.targets, guid)
-      |> maybe_consume(item, pos, consumable?)
+      case Spellcasting.cast_result(state, spell, message.targets, guid) do
+        {:ok, state} -> maybe_consume(state, item, pos, consumable?)
+        {:error, state} -> state
+      end
     else
       {:error, error} ->
         InventoryUpdate.send_failure(error, Inventory.item_guid_at(c.player, pos, get_item) || 0, 0)
@@ -44,8 +52,6 @@ defmodule ThistleTea.Game.Network.Message.CmsgUseItem do
         state
     end
   end
-
-  def handle(_message, state), do: state
 
   @impl ClientMessage
   def from_binary(payload) do
