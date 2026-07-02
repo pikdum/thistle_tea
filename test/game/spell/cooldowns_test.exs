@@ -42,14 +42,15 @@ defmodule ThistleTea.Game.Spell.CooldownsTest do
       refute Cooldowns.on_cooldown?(entity, other_potion, 61_000)
     end
 
-    test "category-bearing spells without category cooldown ignore stored category entries" do
+    test "category cooldown blocks members without their own category cooldown" do
       potion = %Spell{id: 439, category: 4, category_recovery_time_ms: 60_000}
       drink = %Spell{id: 430, category: 4}
 
       entity = Cooldowns.start(entity(), potion, 1_000)
 
-      refute Cooldowns.on_cooldown?(entity, drink, 30_000)
-      assert Cooldowns.ready_at(entity, drink) == nil
+      assert Cooldowns.on_cooldown?(entity, drink, 30_000)
+      refute Cooldowns.on_cooldown?(entity, drink, 61_000)
+      assert Cooldowns.ready_at(entity, drink) == 61_000
     end
 
     test "prunes expired entries when a new cooldown starts" do
