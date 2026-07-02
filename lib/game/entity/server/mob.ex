@@ -292,11 +292,19 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
   @impl GenServer
   def terminate(_reason, state) do
+    release_victim(state)
     unwatch_chase(state)
     World.remove_position(state)
     Visibility.leave_entity(state)
     Metadata.delete(state.object.guid)
   end
+
+  defp release_victim(%Mob{internal: %Internal{in_combat: true}, unit: %Unit{target: target}})
+       when is_integer(target) and target > 0 do
+    Metadata.decrement(target, :attacker_count, 0)
+  end
+
+  defp release_victim(_state), do: :ok
 
   defp wake_ai_tick(%Mob{} = state) do
     if Core.dead?(state), do: deactivate_ai(state), else: schedule_ai_tick(state, 0)
