@@ -3,6 +3,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
   Spell-casting behavior-tree subtree: starting a cast (validation, cast time,
   power cost) and ticking it through completion or channel ticks.
   """
+  alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
@@ -11,6 +12,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
   alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.Entity.Logic.Hostility
   alias ThistleTea.Game.Entity.Logic.MeleeSpell
+  alias ThistleTea.Game.Entity.Logic.PlayerCombat
   alias ThistleTea.Game.Entity.Logic.Resources
   alias ThistleTea.Game.Entity.Logic.SpellEffect
   alias ThistleTea.Game.Entity.Logic.SpellTarget
@@ -75,6 +77,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
       |> queue_spell_go(casting, targets)
       |> queue_area_effects(casting)
       |> queue_consume_reagents(casting)
+      |> mark_hostile_cast(casting, targets, now)
       |> start_channel(casting)
     else
       character
@@ -134,6 +137,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
     |> queue_summon_objects(casting)
     |> queue_consume_reagents(casting)
     |> queue_consume_cast_item(casting)
+    |> mark_hostile_cast(casting, targets, now)
     |> apply_spell_hit(casting, targets, now)
     |> clear_cast()
   end
@@ -146,6 +150,16 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
   end
 
   defp queue_consume_cast_item(character, %Cast{}), do: character
+
+  defp mark_hostile_cast(%Character{object: %{guid: guid}} = character, %Cast{spell: spell}, targets, now) do
+    if Spell.harmful?(spell) and Enum.any?(targets, &(&1 != guid)) do
+      PlayerCombat.mark_initiated(character, now)
+    else
+      character
+    end
+  end
+
+  defp mark_hostile_cast(character, _casting, _targets, _now), do: character
 
   def clear_cast(%{internal: %Internal{} = internal} = character) do
     case internal.casting do

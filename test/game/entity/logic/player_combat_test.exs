@@ -11,6 +11,8 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombatTest do
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
 
+  @unit_flag_in_combat 0x00080000
+
   describe "mark_attacked/2" do
     test "sets the player combat flag and hostile timestamp" do
       character = character()
@@ -19,6 +21,48 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombatTest do
 
       assert character.internal.in_combat == true
       assert character.internal.last_hostile_time == 1_000
+      assert Bitwise.band(character.unit.flags, @unit_flag_in_combat) == @unit_flag_in_combat
+    end
+  end
+
+  describe "mark_initiated/2" do
+    test "sets the combat state and initiation timestamp" do
+      character = PlayerCombat.mark_initiated(character(), 1_000)
+
+      assert character.internal.in_combat == true
+      assert character.internal.hostile_initiated_at == 1_000
+      assert Bitwise.band(character.unit.flags, @unit_flag_in_combat) == @unit_flag_in_combat
+    end
+  end
+
+  describe "sync/3" do
+    test "keeps combat within the initiation grace window despite no attackers" do
+      character = PlayerCombat.mark_initiated(character(), 1_000)
+      Metadata.put(character.object.guid, %{attacker_count: 0})
+
+      on_exit(fn -> Metadata.delete(character.object.guid) end)
+
+      {character, _blackboard} = PlayerCombat.sync(character, %Blackboard{}, 3_000)
+      assert character.internal.in_combat == true
+
+      {character, _blackboard} = PlayerCombat.sync(character, %Blackboard{}, 7_000)
+      assert character.internal.in_combat == false
+    end
+
+    test "ends the grace once an attacker engages so combat drops with the kill" do
+      character = PlayerCombat.mark_initiated(character(), 1_000)
+      Metadata.put(character.object.guid, %{attacker_count: 1})
+
+      on_exit(fn -> Metadata.delete(character.object.guid) end)
+
+      {character, _blackboard} = PlayerCombat.sync(character, %Blackboard{}, 2_000)
+      assert character.internal.in_combat == true
+      assert character.internal.hostile_initiated_at == nil
+
+      Metadata.put(character.object.guid, %{attacker_count: 0})
+
+      {character, _blackboard} = PlayerCombat.sync(character, %Blackboard{}, 3_000)
+      assert character.internal.in_combat == false
     end
   end
 
@@ -45,6 +89,7 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombatTest do
       {character, blackboard} = PlayerCombat.sync(character, %Blackboard{attack_started: true, next_attack_at: 1_500})
 
       assert character.internal.in_combat == false
+      assert Bitwise.band(character.unit.flags, @unit_flag_in_combat) == 0
       assert blackboard.attack_started == false
       assert blackboard.auto_attacking == false
       assert blackboard.next_attack_at == 1_500
