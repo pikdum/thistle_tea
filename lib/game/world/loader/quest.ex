@@ -3,8 +3,6 @@ defmodule ThistleTea.Game.World.Loader.Quest do
   ETS cache of quest templates and questgiver/quest-ender relations from
   Mangos.
   """
-  import Ecto.Query
-
   alias ThistleTea.DB.Mangos
   alias ThistleTea.Game.Entity.Data.Quest
 
@@ -25,12 +23,8 @@ defmodule ThistleTea.Game.World.Loader.Quest do
       :ets.insert(__MODULE__, {{:quest, quest.id}, quest})
     end)
 
-    from(qr in Mangos.QuestRelation, where: qr.actor == ^Mangos.QuestRelation.actor_creature())
-    |> Mangos.Repo.all()
-    |> Enum.group_by(fn qr -> {relation_key(qr.role), qr.entry} end, fn qr -> qr.quest end)
-    |> Enum.each(fn {key, quest_ids} ->
-      :ets.insert(__MODULE__, {key, Enum.sort(quest_ids)})
-    end)
+    load_creature_relations(Mangos.CreatureQuestRelation, :giver)
+    load_creature_relations(Mangos.CreatureInvolvedRelation, :ender)
 
     :ok
   end
@@ -53,6 +47,12 @@ defmodule ThistleTea.Game.World.Loader.Quest do
     end
   end
 
-  defp relation_key(0), do: :giver
-  defp relation_key(_role), do: :ender
+  defp load_creature_relations(schema, role) do
+    schema
+    |> Mangos.Repo.all()
+    |> Enum.group_by(fn relation -> {role, relation.id} end, fn relation -> relation.quest end)
+    |> Enum.each(fn {key, quest_ids} ->
+      :ets.insert(__MODULE__, {key, Enum.sort(quest_ids)})
+    end)
+  end
 end

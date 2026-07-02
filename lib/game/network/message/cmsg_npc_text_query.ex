@@ -23,7 +23,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgNpcTextQuery do
             %NpcTextUpdate{
               probability: t.prob,
               texts: [Map.get(t, :text_0), Map.get(t, :text_1)],
-              language: 0,
+              language: t.lang,
               emotes: [
                 %NpcTextUpdateEmote{delay: t.em_0_delay, emote: t.em_0},
                 %NpcTextUpdateEmote{delay: t.em_1_delay, emote: t.em_1},

@@ -25,7 +25,7 @@ defmodule ThistleTea.Game.World.Loader.NpcText do
 
   defp load(text_id) do
     case Mangos.Repo.get(Mangos.NpcText, text_id) do
-      %Mangos.NpcText{} = row -> text_groups(row)
+      %Mangos.NpcText{} = row -> text_groups(row, broadcast_texts(row))
       _ -> nil
     end
   end
@@ -35,20 +35,47 @@ defmodule ThistleTea.Game.World.Loader.NpcText do
     groups
   end
 
-  defp text_groups(npc_text) do
+  defp broadcast_texts(npc_text) do
+    npc_text
+    |> broadcast_text_ids()
+    |> Enum.reject(&(&1 == 0))
+    |> then(fn ids ->
+      import Ecto.Query
+
+      Mangos.BroadcastText
+      |> where([bt], bt.entry in ^ids)
+      |> Mangos.Repo.all()
+      |> Map.new(fn row -> {row.entry, row} end)
+    end)
+  end
+
+  defp broadcast_text_ids(npc_text) do
+    Enum.map(0..7, fn i -> Map.get(npc_text, String.to_atom("broadcast_text_id#{i}")) || 0 end)
+  end
+
+  defp text_groups(npc_text, broadcast_texts) do
     Enum.map(0..7, fn i ->
+      broadcast_text_id = Map.get(npc_text, String.to_atom("broadcast_text_id#{i}")) || 0
+      broadcast_text = Map.get(broadcast_texts, broadcast_text_id)
+
       %{
-        text_0: Map.get(npc_text, String.to_atom("text#{i}_0")),
-        text_1: Map.get(npc_text, String.to_atom("text#{i}_1")),
-        lang: Map.get(npc_text, String.to_atom("lang#{i}")),
+        text_0: text(broadcast_text, :male_text),
+        text_1: text(broadcast_text, :female_text),
+        lang: integer(broadcast_text, :language_id),
         prob: Map.get(npc_text, String.to_atom("prob#{i}")),
-        em_0_delay: Map.get(npc_text, String.to_atom("em#{i}_0_delay")),
-        em_0: Map.get(npc_text, String.to_atom("em#{i}_0")),
-        em_1_delay: Map.get(npc_text, String.to_atom("em#{i}_1_delay")),
-        em_1: Map.get(npc_text, String.to_atom("em#{i}_1")),
-        em_2_delay: Map.get(npc_text, String.to_atom("em#{i}_2_delay")),
-        em_2: Map.get(npc_text, String.to_atom("em#{i}_2"))
+        em_0_delay: integer(broadcast_text, :emote_delay1),
+        em_0: integer(broadcast_text, :emote_id1),
+        em_1_delay: integer(broadcast_text, :emote_delay2),
+        em_1: integer(broadcast_text, :emote_id2),
+        em_2_delay: integer(broadcast_text, :emote_delay3),
+        em_2: integer(broadcast_text, :emote_id3)
       }
     end)
   end
+
+  defp text(nil, _field), do: ""
+  defp text(row, field), do: Map.get(row, field) || ""
+
+  defp integer(nil, _field), do: 0
+  defp integer(row, field), do: Map.get(row, field) || 0
 end

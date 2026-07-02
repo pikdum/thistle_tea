@@ -18,7 +18,9 @@ defmodule ThistleTea.DB.Mangos.GameObject do
     field(:rotation1, :float, default: 0.0)
     field(:rotation2, :float, default: 0.0)
     field(:rotation3, :float, default: 0.0)
-    field(:spawntimesecs, :integer, default: 0)
+    field(:spawntimesecsmin, :integer, default: 0)
+    field(:spawntimesecsmax, :integer, default: 0)
+    field(:spawntimesecs, :integer, virtual: true, default: 0)
     field(:animprogress, :integer, default: 0)
     field(:state, :integer, default: 0)
 
