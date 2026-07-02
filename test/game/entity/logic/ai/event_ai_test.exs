@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAITest do
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Data.Condition
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Data.ScriptStep
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
@@ -31,6 +32,48 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAITest do
       {mob, _blackboard} = EventAI.on_spawned(mob, Blackboard.new(), 0)
 
       assert mob.internal.events == []
+    end
+  end
+
+  describe "conditions" do
+    test "an event with a failing db_guid condition does not fire" do
+      condition = %Condition{type: :db_guid, value1: 12_345}
+      mob = mob(events: [event(:spawned, condition: condition)], db_guid: 99)
+
+      {mob, _blackboard} = EventAI.on_spawned(mob, Blackboard.new(), 0)
+
+      assert mob.internal.events == []
+    end
+
+    test "an event with a matching db_guid condition fires" do
+      condition = %Condition{type: :db_guid, value1: 99}
+      mob = mob(events: [event(:spawned, condition: condition)], db_guid: 99)
+
+      {mob, _blackboard} = EventAI.on_spawned(mob, Blackboard.new(), 0)
+
+      assert [%Event{type: :monster_talk}] = mob.internal.events
+    end
+
+    test "a failing condition leaves the repeat timer unconsumed" do
+      condition = %Condition{type: :db_guid, value1: 12_345}
+
+      ooc_event =
+        event(:timer_ooc,
+          param1: 1_000,
+          param2: 1_000,
+          param3: 60_000,
+          param4: 60_000,
+          repeatable?: true,
+          condition: condition
+        )
+
+      mob = mob(events: [ooc_event], db_guid: 99)
+
+      {mob, blackboard} = EventAI.tick(mob, Blackboard.new(), 0)
+      blackboard = %{blackboard | next_eventai_at: 0}
+      {mob, blackboard} = EventAI.tick(mob, blackboard, 1_100)
+      assert mob.internal.events == []
+      assert blackboard.eventai_timers == %{0 => 1_000}
     end
   end
 
@@ -220,6 +263,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAITest do
       param2: Keyword.get(opts, :param2, 0),
       param3: Keyword.get(opts, :param3, 0),
       param4: Keyword.get(opts, :param4, 0),
+      condition: Keyword.get(opts, :condition),
       actions: [[@talk_step]]
     }
   end
@@ -235,7 +279,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAITest do
         map: 0,
         name: "Defias Pillager",
         in_combat: Keyword.get(opts, :in_combat, false),
-        creature: %Creature{ai_events: Keyword.fetch!(opts, :events)},
+        creature: %Creature{ai_events: Keyword.fetch!(opts, :events), db_guid: Keyword.get(opts, :db_guid)},
         spellbook: %{}
       }
     }

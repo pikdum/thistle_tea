@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.ScriptTest do
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Data.Condition
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Data.ScriptStep
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
@@ -159,6 +160,29 @@ defmodule ThistleTea.Game.Entity.Logic.AI.ScriptTest do
 
       assert mob.unit.display_id == 11_354
       refute mob.internal.broadcast_update?
+    end
+
+    test "set_run flips the running flag and persists run mode on the blackboard", %{mob: mob} do
+      {mob, blackboard} =
+        Script.run(mob, Blackboard.new(), [%ScriptStep{command: :set_run, datalong: 1}], nil, 1_000)
+
+      assert mob.internal.running
+      assert Blackboard.run_mode?(blackboard)
+
+      {mob, blackboard} = Script.run(mob, blackboard, [%ScriptStep{command: :set_run, datalong: 0}], nil, 1_000)
+
+      refute mob.internal.running
+      refute Blackboard.run_mode?(blackboard)
+    end
+
+    test "steps with a failing condition are skipped", %{mob: mob} do
+      failing = %Condition{type: :db_guid, value1: 12_345}
+
+      step = %ScriptStep{command: :emote, datalong: 11, condition: failing}
+
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], nil, 1_000)
+
+      assert mob.internal.events == []
     end
 
     test "delayed steps are deferred through a script_steps event", %{mob: mob} do

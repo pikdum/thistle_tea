@@ -1030,7 +1030,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   end
 
   defp pick_wander_point(%Mob{} = state, %Blackboard{} = blackboard) do
-    state = set_running(state, false)
+    state = set_running(state, Blackboard.run_mode?(blackboard))
 
     if blackboard.target do
       {:success, state, blackboard}
@@ -1054,7 +1054,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   end
 
   defp pick_waypoint(%Mob{} = state, %Blackboard{} = blackboard) do
-    state = set_running(state, false)
+    state = set_running(state, Blackboard.run_mode?(blackboard))
 
     if blackboard.target do
       {:success, state, blackboard}

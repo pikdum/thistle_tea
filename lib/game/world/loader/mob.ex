@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.World.Loader.Mob do
   alias ThistleTea.Game.Entity.Data.ScriptStep
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.World
+  alias ThistleTea.Game.World.Loader.Condition, as: ConditionLoader
   alias ThistleTea.Game.World.Loader.Faction, as: FactionLoader
   alias ThistleTea.Game.World.Loader.Script, as: ScriptLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
@@ -37,6 +38,7 @@ defmodule ThistleTea.Game.World.Loader.Mob do
     |> load_creature_movement()
     |> load_movement_scripts()
     |> load_ai_events()
+    |> load_conditions()
     |> load_equip_items()
     |> load_spells()
     |> load_addon_auras()
@@ -166,6 +168,47 @@ defmodule ThistleTea.Game.World.Loader.Mob do
       |> Enum.reject(&(&1.actions == []))
 
     Map.put(creature, :ai_events, ai_events)
+  end
+
+  defp load_conditions(nil), do: nil
+
+  defp load_conditions(%Mangos.Creature{} = creature) do
+    ai_events = Map.get(creature, :ai_events, [])
+    movement_scripts = Map.get(creature, :movement_scripts, %{})
+
+    condition_ids =
+      Enum.map(ai_events, & &1.condition_id) ++
+        Enum.map(all_steps(ai_events, movement_scripts), & &1.condition_id)
+
+    case ConditionLoader.load_by_ids(condition_ids) do
+      conditions when map_size(conditions) == 0 ->
+        creature
+
+      conditions ->
+        creature
+        |> Map.put(:ai_events, Enum.map(ai_events, &attach_event_condition(&1, conditions)))
+        |> Map.put(:movement_scripts, attach_script_conditions(movement_scripts, conditions))
+    end
+  end
+
+  defp all_steps(ai_events, movement_scripts) do
+    Enum.flat_map(ai_events, fn event -> List.flatten(event.actions) end) ++
+      List.flatten(Map.values(movement_scripts))
+  end
+
+  defp attach_event_condition(%AIEvent{} = event, conditions) do
+    actions = Enum.map(event.actions, fn steps -> Enum.map(steps, &attach_step_condition(&1, conditions)) end)
+    %{event | condition: Map.get(conditions, event.condition_id), actions: actions}
+  end
+
+  defp attach_script_conditions(movement_scripts, conditions) do
+    Map.new(movement_scripts, fn {script_id, steps} ->
+      {script_id, Enum.map(steps, &attach_step_condition(&1, conditions))}
+    end)
+  end
+
+  defp attach_step_condition(%ScriptStep{} = step, conditions) do
+    %{step | condition: Map.get(conditions, step.condition_id)}
   end
 
   defp load_movement_scripts(nil), do: nil

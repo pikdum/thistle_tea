@@ -5,7 +5,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAI do
   events (timers, HP/mana thresholds, range, friendly HP) are evaluated from
   `tick/3` on the creature's behavior-tree ticks with a one-second cadence;
   edge events (aggro, spawned, death, evade, kill, spell hit, leave combat)
-  fire from the owning process at those moments. Per-event enable/cooldown
+  fire from the owning process at those moments. Events carrying a resolved
+  condition tree are gated through the condition evaluator before their
+  repeat timers are consumed, per vmangos ordering. Per-event enable/cooldown
   state and the script-controlled phase live on the blackboard: non-repeatable
   events disable until the next combat entry, event timers re-roll from their
   repeat params, and out-of-combat timers re-initialize on evade, matching
@@ -19,12 +21,11 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAI do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells, as: MobSpells
   alias ThistleTea.Game.Entity.Logic.AI.Script
+  alias ThistleTea.Game.Entity.Logic.Condition, as: ConditionLogic
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Metadata
-
-  require Logger
 
   @tick_ms 1_000
   @friendly_hp_default_radius 30.0
@@ -149,6 +150,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAI do
          true <- due?(blackboard, index, now),
          true <- AIEvent.phase_allows?(event, blackboard.eventai_phase),
          true <- casting_allows?(state, event),
+         true <- ConditionLogic.met?(state, event.condition),
          {:ok, invoker_guid} <- satisfy(state, event, invoker_guid) do
       blackboard =
         blackboard
@@ -166,10 +168,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAI do
   end
 
   defp run_actions(state, %Blackboard{} = blackboard, %AIEvent{} = event, invoker_guid, now) do
-    if event.condition_id > 0 do
-      Logger.debug("EventAI event #{event.id}: condition #{event.condition_id} unimplemented, firing unconditionally")
-    end
-
     actions = if event.random_action?, do: [Enum.random(event.actions)], else: event.actions
     target_guid = invoker_guid || victim(state)
 

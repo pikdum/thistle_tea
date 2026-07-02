@@ -2,6 +2,7 @@ defmodule ThistleTea.Game.World.Loader.MobVmangosTest do
   use ExUnit.Case, async: false
 
   alias ThistleTea.DB.Mangos
+  alias ThistleTea.Game.Entity.Data.Condition
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.World.Loader.Mob, as: MobLoader
 
@@ -61,6 +62,16 @@ defmodule ThistleTea.Game.World.Loader.MobVmangosTest do
       assert [%{command: :talk, texts: [%{text: text} | _] = texts}] = point.script_steps
       assert length(texts) == 4
       assert is_binary(text) and text != ""
+    end
+
+    test "resolves the Defias Thug guid-scoped emote condition tree" do
+      mob = mob(38)
+
+      emote_event = Enum.find(mob.internal.creature.ai_events, &(&1.condition_id == 3_804))
+
+      assert %Condition{type: :or, children: [left, right]} = emote_event.condition
+      assert %Condition{type: :db_guid, value1: 80_152} = left
+      assert %Condition{type: :db_guid, value1: 80_151} = right
     end
 
     test "loads template auras from creature_template" do

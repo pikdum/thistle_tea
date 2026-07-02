@@ -5,8 +5,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
   defers delayed steps back to the owning process through a `script_steps`
   event; `execute_steps/5` runs a batch whose delay already elapsed. Commands
   act on the pure entity state — enqueueing chat/emote/cast events, swapping
-  the unit display id for morphs, and mutating the blackboard phase or flee
-  state — and unsupported commands are logged and skipped. Casts honor the triggered cast flag: triggered and
+  the unit display id for morphs, and mutating the blackboard phase, gait, or
+  flee state — steps with a failing condition are skipped, and unsupported
+  commands are logged and skipped. Casts honor the triggered cast flag: triggered and
   out-of-combat casts go through the trigger-spell pipeline, in-combat casts
   through the mob casting machinery.
   """
@@ -16,6 +17,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells, as: MobSpells
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
+  alias ThistleTea.Game.Entity.Logic.Condition, as: ConditionLogic
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.Entity.Logic.Movement
@@ -36,7 +38,11 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
 
   def execute_steps(state, %Blackboard{} = blackboard, steps, target_guid, now) when is_list(steps) do
     Enum.reduce(steps, {state, blackboard}, fn %ScriptStep{} = step, {state, blackboard} ->
-      execute(state, blackboard, step, target_guid, now)
+      if ConditionLogic.met?(state, step.condition) do
+        execute(state, blackboard, step, target_guid, now)
+      else
+        {state, blackboard}
+      end
     end)
   end
 
@@ -92,6 +98,12 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
 
   defp execute(state, blackboard, %ScriptStep{command: :morph} = step, _target_guid, _now) do
     {morph(state, morph_display_id(state, step)), blackboard}
+  end
+
+  defp execute(state, blackboard, %ScriptStep{command: :set_run, datalong: datalong}, _target_guid, _now) do
+    run? = datalong != 0
+    state = %{state | internal: %{state.internal | running: run?}}
+    {state, Blackboard.set_run_mode(blackboard, run?)}
   end
 
   defp execute(state, blackboard, %ScriptStep{command: :set_phase} = step, _target_guid, _now) do

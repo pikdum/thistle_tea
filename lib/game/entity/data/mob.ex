@@ -127,6 +127,7 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
         map: c.map,
         name: ct.name,
         creature: %Creature{
+          db_guid: c.guid,
           experience_multiplier: ct.experience_multiplier,
           extra_flags: ct.extra_flags,
           rank: ct.rank,

@@ -28,6 +28,7 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStep do
             swap_targets?: false,
             position: nil,
             condition_id: 0,
+            condition: nil,
             texts: []
 
   @flag_swap_initial_targets 0x01
@@ -92,6 +93,7 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStep do
   defp command(14), do: :remove_aura
   defp command(15), do: :cast_spell
   defp command(23), do: :morph
+  defp command(25), do: :set_run
   defp command(44), do: :set_phase
   defp command(45), do: :set_phase_random
   defp command(46), do: :set_phase_range

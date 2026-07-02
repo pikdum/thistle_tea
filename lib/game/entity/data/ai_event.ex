@@ -17,6 +17,7 @@ defmodule ThistleTea.Game.Entity.Data.AIEvent do
             not_casting?: false,
             inverse_phase_mask: 0,
             condition_id: 0,
+            condition: nil,
             param1: 0,
             param2: 0,
             param3: 0,

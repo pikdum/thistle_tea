@@ -26,6 +26,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Blackboard do
             next_spell_list_at: 0,
             combat_movement: true,
             eventai_phase: 0,
+            run_mode: false,
             eventai_timers: nil,
             eventai_disabled: nil,
             next_eventai_at: 0,
@@ -122,6 +123,14 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Blackboard do
 
   def combat_movement?(%__MODULE__{} = blackboard) do
     Map.get(blackboard, :combat_movement) != false
+  end
+
+  def run_mode?(%__MODULE__{} = blackboard) do
+    Map.get(blackboard, :run_mode) == true
+  end
+
+  def set_run_mode(%__MODULE__{} = blackboard, enabled) when is_boolean(enabled) do
+    Map.put(blackboard, :run_mode, enabled)
   end
 
   def set_combat_movement(%__MODULE__{} = blackboard, enabled) when is_boolean(enabled) do
