@@ -41,6 +41,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   @spread_gap 2.0
   @spread_gap_crowded 4.0
   @spread_crowd_threshold 5
+  @back_movement_gap 1.0
+  @deep_bounds_factor 0.5
+  @distance_sqr_size_factor 1.0
 
   @base_aggro_radius 20.0
   @max_level_aggro_bonus 25
@@ -555,15 +558,62 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   def maybe_spread(%Mob{} = state, %Blackboard{} = blackboard, _now), do: {:success, state, blackboard}
 
   defp do_spread(%Mob{} = state, %Blackboard{} = blackboard, target_guid, now) do
-    cond do
-      World.moving?(target_guid, now) ->
-        {:success, state, Blackboard.reset_spread(blackboard)}
+    if World.moving?(target_guid, now) do
+      {:success, state, Blackboard.reset_spread(blackboard)}
+    else
+      back_or_spread(state, blackboard, target_guid, now)
+    end
+  end
 
-      Blackboard.spread_attempts(blackboard) >= @spread_max_attempts ->
+  defp back_or_spread(%Mob{} = state, %Blackboard{} = blackboard, target_guid, now) do
+    case back_movement(state, blackboard, target_guid, now) do
+      {:moved, state, blackboard} ->
         {:success, state, blackboard}
 
-      true ->
-        spread_from_neighbor(state, blackboard, target_guid, now)
+      :skip ->
+        if Blackboard.spread_attempts(blackboard) >= @spread_max_attempts do
+          {:success, state, blackboard}
+        else
+          spread_from_neighbor(state, blackboard, target_guid, now)
+        end
+    end
+  end
+
+  defp back_movement(
+         %Mob{internal: %Internal{map: map}, movement_block: %MovementBlock{position: {mx, my, _mz, _o}}} = state,
+         %Blackboard{} = blackboard,
+         target_guid,
+         now
+       ) do
+    with {^map, tx, ty, tz} <- World.target_position(target_guid),
+         true <- target_deep_in_bounds?(state, target_guid, {tx, ty}),
+         {dx, dy, dz} <- back_movement_destination(state, target_guid, {mx, my}, {tx, ty, tz}) do
+      state =
+        state
+        |> set_running(false)
+        |> Movement.move_to({dx, dy, dz}, [face_target: target_guid], now)
+
+      {:moved, state, Blackboard.mark_spreading(blackboard)}
+    else
+      _ -> :skip
+    end
+  end
+
+  defp target_deep_in_bounds?(
+         %Mob{movement_block: %MovementBlock{position: {mx, my, _mz, _o}}} = state,
+         target_guid,
+         {tx, ty}
+       ) do
+    bounds = @deep_bounds_factor * min(own_bounding_radius(state), target_bounding_radius(target_guid))
+    planar_distance({mx, my, 0.0}, {tx, ty, 0.0}) < :math.sqrt(bounds + @distance_sqr_size_factor)
+  end
+
+  defp back_movement_destination(%Mob{} = state, target_guid, {mx, my}, {tx, ty, tz}) do
+    angle = base_chase_angle({mx, my}, {tx, ty})
+    center_distance = @back_movement_gap + own_bounding_radius(state) + target_bounding_radius(target_guid)
+
+    if center_distance < melee_reach_to(state, target_guid) do
+      {tx + :math.cos(angle) * center_distance, ty + :math.sin(angle) * center_distance, tz}
     end
   end
 
@@ -572,7 +622,11 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
          {^map, tx, ty, tz} <- World.target_position(target_guid),
          {_nmap, nx, ny, _nz} <- World.position(neighbor_guid),
          {dx, dy, dz} <- spread_destination(state, target_guid, {tx, ty, tz}, {nx, ny}) do
-      state = Movement.move_to(state, {dx, dy, dz}, [face_target: target_guid], now)
+      state =
+        state
+        |> set_running(false)
+        |> Movement.move_to({dx, dy, dz}, [face_target: target_guid], now)
+
       {:success, state, Blackboard.bump_spread(blackboard)}
     else
       _ -> {:success, state, blackboard}
@@ -589,7 +643,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   end
 
   defp stack_threshold(%Mob{} = state, other_guid) do
-    :math.sqrt(min(max(own_bounding_radius(state), target_bounding_radius(other_guid)), 0.25))
+    bounds = min(max(own_bounding_radius(state), target_bounding_radius(other_guid)), 0.25)
+    :math.sqrt(bounds + @distance_sqr_size_factor)
   end
 
   defp spread_destination(
@@ -601,7 +656,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     my_angle = :math.atan2(my - ty, mx - tx)
     his_angle = :math.atan2(ny - ty, nx - tx)
     new_angle = my_angle + spread_turn(my_angle, his_angle)
-    center_distance = own_bounding_radius(state) + target_bounding_radius(target_guid) + spread_gap(target_guid)
+    center_distance = own_bounding_radius(state) + spread_gap(target_guid)
 
     if center_distance < melee_reach_to(state, target_guid) do
       {tx + :math.cos(new_angle) * center_distance, ty + :math.sin(new_angle) * center_distance, tz}

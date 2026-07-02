@@ -92,6 +92,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Blackboard do
     Map.get(blackboard, :spreading) || false
   end
 
+  def mark_spreading(%__MODULE__{} = blackboard) do
+    Map.put(blackboard, :spreading, true)
+  end
+
   def clear_spreading(%__MODULE__{} = blackboard) do
     Map.put(blackboard, :spreading, false)
   end
