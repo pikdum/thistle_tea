@@ -303,12 +303,16 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
 
   defp aggro_radius(%Mob{unit: %Unit{level: level}} = state, target_guid)
        when is_integer(level) and is_integer(target_guid) do
-    target_level = target_level(target_guid)
-    level_diff = max(target_level - level, -@max_level_aggro_bonus)
-    max(@base_aggro_radius - level_diff + detect_range_modifier(state), @min_aggro_radius)
+    aggro_radius_for(level, target_level(target_guid), detect_range_modifier(state))
   end
 
   defp aggro_radius(%Mob{}, _target_guid), do: @base_aggro_radius
+
+  def aggro_radius_for(level, target_level, modifier \\ 0)
+      when is_integer(level) and is_integer(target_level) and is_integer(modifier) do
+    level_diff = max(target_level - level, -@max_level_aggro_bonus)
+    max(@base_aggro_radius - level_diff + modifier, @min_aggro_radius)
+  end
 
   defp detect_range_modifier(%Mob{} = state) do
     state
