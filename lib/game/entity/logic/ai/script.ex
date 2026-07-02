@@ -4,9 +4,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
   actions and waypoint scripts. `run/5` executes the immediately-due steps and
   defers delayed steps back to the owning process through a `script_steps`
   event; `execute_steps/5` runs a batch whose delay already elapsed. Commands
-  act on the pure entity state — enqueueing chat/emote/cast events and
-  mutating the blackboard phase or flee state — and unsupported commands are
-  logged and skipped. Casts honor the triggered cast flag: triggered and
+  act on the pure entity state — enqueueing chat/emote/cast events, swapping
+  the unit display id for morphs, and mutating the blackboard phase or flee
+  state — and unsupported commands are logged and skipped. Casts honor the triggered cast flag: triggered and
   out-of-combat casts go through the trigger-spell pipeline, in-combat casts
   through the mob casting machinery.
   """
@@ -90,6 +90,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
     {state, blackboard}
   end
 
+  defp execute(state, blackboard, %ScriptStep{command: :morph} = step, _target_guid, _now) do
+    {morph(state, morph_display_id(state, step)), blackboard}
+  end
+
   defp execute(state, blackboard, %ScriptStep{command: :set_phase} = step, _target_guid, _now) do
     {state, put_phase(blackboard, set_phase_value(blackboard, step))}
   end
@@ -142,6 +146,29 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
         state
     end
   end
+
+  defp morph_display_id(%{unit: %Unit{native_display_id: native}}, %ScriptStep{datalong: 0}), do: native
+
+  defp morph_display_id(_state, %ScriptStep{datalong: display_id, datalong2: is_display_id}) when is_display_id != 0 do
+    display_id
+  end
+
+  defp morph_display_id(_state, %ScriptStep{} = step) do
+    Logger.debug("Script #{step.script_id}: morph by creature entry unsupported, skipping")
+    nil
+  end
+
+  defp morph(%{unit: %Unit{display_id: current}} = state, display_id)
+       when is_integer(display_id) and display_id > 0 and display_id != current do
+    if Core.dead?(state) do
+      state
+    else
+      %{state | unit: %{state.unit | display_id: display_id}}
+      |> Core.mark_broadcast_update()
+    end
+  end
+
+  defp morph(state, _display_id), do: state
 
   defp flee(%{unit: %Unit{target: target}} = state, %Blackboard{} = blackboard, now)
        when is_integer(target) and target > 0 do

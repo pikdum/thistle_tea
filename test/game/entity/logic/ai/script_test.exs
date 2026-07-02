@@ -114,6 +114,53 @@ defmodule ThistleTea.Game.Entity.Logic.AI.ScriptTest do
       assert mob.internal.events == []
     end
 
+    test "morph to a display id swaps the model and marks a broadcast", %{mob: mob} do
+      step = %ScriptStep{command: :morph, datalong: 89, datalong2: 1}
+
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], nil, 1_000)
+
+      assert mob.unit.display_id == 89
+      assert mob.internal.broadcast_update?
+    end
+
+    test "morph to zero restores the native display id", %{mob: mob} do
+      mob = %{mob | unit: %{mob.unit | display_id: 89}}
+      step = %ScriptStep{command: :morph, datalong: 0}
+
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], nil, 1_000)
+
+      assert mob.unit.display_id == 11_354
+      assert mob.internal.broadcast_update?
+    end
+
+    test "morph to the current display id is a no-op", %{mob: mob} do
+      step = %ScriptStep{command: :morph, datalong: 11_354, datalong2: 1}
+
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], nil, 1_000)
+
+      assert mob.unit.display_id == 11_354
+      refute mob.internal.broadcast_update?
+    end
+
+    test "morph by creature entry is skipped", %{mob: mob} do
+      step = %ScriptStep{command: :morph, datalong: 6_578, datalong2: 0}
+
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], nil, 1_000)
+
+      assert mob.unit.display_id == 11_354
+      refute mob.internal.broadcast_update?
+    end
+
+    test "morph is skipped while dead", %{mob: mob} do
+      mob = %{mob | unit: %{mob.unit | health: 0}}
+      step = %ScriptStep{command: :morph, datalong: 89, datalong2: 1}
+
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], nil, 1_000)
+
+      assert mob.unit.display_id == 11_354
+      refute mob.internal.broadcast_update?
+    end
+
     test "delayed steps are deferred through a script_steps event", %{mob: mob} do
       immediate = %ScriptStep{command: :emote, datalong: 11}
       delayed = %ScriptStep{command: :emote, datalong: 22, delay_ms: 4_000}
@@ -139,7 +186,15 @@ defmodule ThistleTea.Game.Entity.Logic.AI.ScriptTest do
   defp mob(_context) do
     mob = %Mob{
       object: %Object{guid: Guid.from_low_guid(:mob, 589, 1)},
-      unit: %Unit{health: 100, max_health: 100, level: 14, target: 0, auras: []},
+      unit: %Unit{
+        health: 100,
+        max_health: 100,
+        level: 14,
+        target: 0,
+        auras: [],
+        display_id: 11_354,
+        native_display_id: 11_354
+      },
       movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
       internal: %Internal{
         map: 0,
