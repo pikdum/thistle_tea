@@ -199,6 +199,11 @@
             meta.description = "AWK script that converts a mysql dump into a sqlite-importable file";
           };
 
+          vmangos-db-snapshot = pkgs.fetchurl {
+            url = "https://github.com/vmangos/core/releases/download/db_latest/db-sqlite-b40576b.zip";
+            hash = "sha256-W7dFk4TRX6piSYemNNrzxTBev31EQoQQHvvaWR/1B4k=";
+          };
+
           # `nix run .#dbc-db -- <WOW_DIR> [OUT_DIR]` — composes the two wow-tools
           # to produce dbc.sqlite. Kept as a runner (not a derivation) because the
           # WoW client install lives outside /nix/store and we don't want to slurp
@@ -240,6 +245,127 @@
 
               echo "Generated ''${out_dir}/dbc.sqlite"
             '';
+          };
+
+          vmangos-db = pkgs.stdenv.mkDerivation {
+            pname = "vmangos-db";
+            version = "b40576b";
+
+            src = vmangos-db-snapshot;
+            dontUnpack = true;
+
+            nativeBuildInputs = with pkgs; [
+              coreutils
+              sqlite
+              unzip
+            ];
+
+            buildPhase = ''
+              runHook preBuild
+
+              work=$(mktemp -d)
+              unzip -q "$src" -d "$work"
+              cp "$work/sqlite-dump/mangos.sqlite" vmangos.sqlite
+              chmod u+w vmangos.sqlite
+
+              sqlite_exec () {
+                sqlite3 vmangos.sqlite "$1"
+              }
+
+              column_exists () {
+                local table=$1 column=$2
+                sqlite_exec "SELECT COUNT(*) FROM pragma_table_info('$table') WHERE name = '$column';"
+              }
+
+              patch_tables=$(sqlite_exec "
+                SELECT DISTINCT m.name
+                FROM sqlite_master m
+                JOIN pragma_table_info(m.name) p
+                WHERE m.type = 'table' AND p.name = 'patch'
+                ORDER BY m.name;
+              ")
+
+              for table in $patch_tables; do
+                key_columns=$(sqlite_exec "
+                  SELECT group_concat(name, ' ')
+                  FROM pragma_table_info('$table')
+                  WHERE pk > 0 AND name != 'patch'
+                  ORDER BY pk;
+                ")
+
+                if [ -z "$key_columns" ]; then
+                  sqlite_exec "DELETE FROM \"$table\" WHERE patch > 10;"
+                  continue
+                fi
+
+                comparisons=
+                for column in $key_columns; do
+                  if [ -z "$comparisons" ]; then
+                    comparisons="newer.\"$column\" = t.\"$column\""
+                  else
+                    comparisons="$comparisons AND newer.\"$column\" = t.\"$column\""
+                  fi
+                done
+
+                sqlite_exec "
+                  DELETE FROM \"$table\" AS t
+                  WHERE t.patch > 10
+                     OR EXISTS (
+                       SELECT 1
+                       FROM \"$table\" AS newer
+                       WHERE $comparisons
+                         AND newer.patch <= 10
+                         AND newer.patch > t.patch
+                     );
+                "
+              done
+
+              range_tables=$(sqlite_exec "
+                SELECT DISTINCT m.name
+                FROM sqlite_master m
+                JOIN pragma_table_info(m.name) p
+                WHERE m.type = 'table' AND p.name IN ('patch_min', 'patch_max')
+                ORDER BY m.name;
+              ")
+
+              for table in $range_tables; do
+                has_min=$(column_exists "$table" patch_min)
+                has_max=$(column_exists "$table" patch_max)
+                clauses=
+
+                if [ "$has_min" = 1 ]; then
+                  clauses="patch_min > 10"
+                fi
+
+                if [ "$has_max" = 1 ]; then
+                  if [ -z "$clauses" ]; then
+                    clauses="patch_max < 10"
+                  else
+                    clauses="$clauses OR patch_max < 10"
+                  fi
+                fi
+
+                if [ -n "$clauses" ]; then
+                  sqlite_exec "DELETE FROM \"$table\" WHERE $clauses;"
+                fi
+              done
+
+              sqlite3 vmangos.sqlite "VACUUM;"
+
+              runHook postBuild
+            '';
+
+            installPhase = ''
+              runHook preInstall
+              mkdir -p "$out"
+              cp vmangos.sqlite "$out/vmangos.sqlite"
+              runHook postInstall
+            '';
+
+            meta = with pkgs.lib; {
+              description = "Current vmangos world database snapshot flattened to WoW 1.12 patch data";
+              platforms = platforms.unix;
+            };
           };
 
           mangos0-db = pkgs.stdenv.mkDerivation {
@@ -457,6 +583,7 @@
             wow-dbc-converter
             mysql2sqlite
             mangos0-db
+            vmangos-db
             dbc-db
             thistle-tea-nif
             thistle-tea-node-modules
@@ -470,7 +597,7 @@
         system:
         let
           pkgs = pkgsFor system;
-          inherit (self.packages.${system}) mangos0-db;
+          inherit (self.packages.${system}) mangos0-db vmangos-db;
           mangos0-db-runner = pkgs.writeShellApplication {
             name = "mangos0-db";
             runtimeInputs = [ pkgs.coreutils ];
@@ -485,6 +612,20 @@
               echo "Generated ''${out_dir}/mangos0.sqlite"
             '';
           };
+          vmangos-db-runner = pkgs.writeShellApplication {
+            name = "vmangos-db";
+            runtimeInputs = [ pkgs.coreutils ];
+            text = ''
+              out_dir=''${1:-./db}
+              mkdir -p "''${out_dir}"
+              out_dir=$(realpath "''${out_dir}")
+              rm -f "''${out_dir}/vmangos.sqlite" \
+                    "''${out_dir}/vmangos.sqlite-shm" \
+                    "''${out_dir}/vmangos.sqlite-wal"
+              install -m 644 ${vmangos-db}/vmangos.sqlite "''${out_dir}/vmangos.sqlite"
+              echo "Generated ''${out_dir}/vmangos.sqlite"
+            '';
+          };
         in
         {
           dbc-db = {
@@ -494,6 +635,10 @@
           mangos0-db = {
             type = "app";
             program = "${mangos0-db-runner}/bin/mangos0-db";
+          };
+          vmangos-db = {
+            type = "app";
+            program = "${vmangos-db-runner}/bin/vmangos-db";
           };
           thistle-tea = {
             type = "app";
