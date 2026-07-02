@@ -29,7 +29,8 @@ defmodule ThistleTea.Game.Entity.Data.CreatureSpellTest do
       assert CreatureSpell.build(slot(cast_target: 0)).cast_target == :self
       assert CreatureSpell.build(slot(cast_target: 1)).cast_target == :victim
       assert CreatureSpell.build(slot(cast_target: 4)).cast_target == :hostile_random
-      assert CreatureSpell.build(slot(cast_target: 17)).cast_target == :friendly_injured
+      assert CreatureSpell.build(slot(cast_target: 15)).cast_target == :friendly_injured
+      assert CreatureSpell.build(slot(cast_target: 17)).cast_target == :friendly_missing_buff
       assert CreatureSpell.build(slot(cast_target: 22)).cast_target == 22
     end
 

@@ -283,7 +283,12 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     if !Corpse.removed?(state) do
       update_type = if Core.dead?(state), do: :create_object2, else: :values
       Core.update_object(state, update_type) |> World.broadcast_packet(state)
-      Metadata.update(state.object.guid, %{alive?: not Core.dead?(state)})
+
+      Metadata.update(state.object.guid, %{
+        alive?: not Core.dead?(state),
+        health_pct: Core.health_pct(state),
+        unit_flags: state.unit.flags
+      })
     end
 
     internal = %{state.internal | broadcast_update?: false}

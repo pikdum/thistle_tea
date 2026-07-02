@@ -463,7 +463,9 @@ defmodule ThistleTea.Game.Network.Server do
     Metadata.update(state.guid, %{
       level: character.unit.level,
       alive?: Death.alive?(character),
-      ghost?: Death.ghost?(character)
+      ghost?: Death.ghost?(character),
+      health_pct: Core.health_pct(character),
+      unit_flags: character.unit.flags
     })
 
     PartyNotifier.broadcast_stats(state.guid, character)

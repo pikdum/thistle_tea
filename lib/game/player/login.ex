@@ -18,6 +18,7 @@ defmodule ThistleTea.Game.Player.Login do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Player, as: PlayerBT
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
   alias ThistleTea.Game.Entity.Logic.Combat, as: CombatLogic
+  alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Death
   alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Entity.Logic.MovementStats
@@ -75,7 +76,8 @@ defmodule ThistleTea.Game.Player.Login do
         unit_flags: c.unit.flags,
         attacker_count: 0,
         alive?: Death.alive?(c),
-        ghost?: Death.ghost?(c)
+        ghost?: Death.ghost?(c),
+        health_pct: Core.health_pct(c)
       }
       |> Map.merge(FactionLoader.metadata(c.unit.faction_template))
     )

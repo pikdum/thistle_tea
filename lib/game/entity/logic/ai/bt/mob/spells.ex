@@ -6,6 +6,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells do
   main-ranged stance that holds a caster at range while its primary spell
   keeps succeeding.
   """
+  import Bitwise, only: [&&&: 2]
+
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
@@ -17,6 +19,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Spell, as: SpellBT
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
   alias ThistleTea.Game.Entity.Logic.Combat, as: CombatLogic
+  alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.Entity.Logic.Hostility
   alias ThistleTea.Game.Entity.Logic.Movement
@@ -29,6 +32,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells do
 
   @list_tick_ms 1_200
   @channel_wake_ms 50
+  @unit_flag_in_combat 0x00080000
+  @unit_flag_not_selectable 0x02000000
+  @injured_default_radius 30.0
+  @injured_default_threshold 50
 
   def list_tick_ms, do: @list_tick_ms
 
@@ -126,7 +133,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells do
 
   defp attempt_cast(%Mob{} = state, %Blackboard{} = blackboard, %CreatureSpell{} = entry, index, now) do
     spell = lookup_spell(state, entry.spell_id)
-    target_guid = resolve_target(state, entry)
+    target_guid = resolve_target(state, entry, spell)
 
     cond do
       is_nil(spell) or is_nil(target_guid) ->
@@ -240,40 +247,119 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells do
 
   defp lookup_spell(_state, _spell_id), do: nil
 
-  defp resolve_target(%Mob{object: %{guid: guid}}, %CreatureSpell{cast_target: :self}) do
+  defp resolve_target(%Mob{object: %{guid: guid}}, %CreatureSpell{cast_target: :self}, _spell) do
     guid
   end
 
-  defp resolve_target(%Mob{unit: %Unit{target: target}}, %CreatureSpell{cast_target: cast_target})
+  defp resolve_target(%Mob{unit: %Unit{target: target}}, %CreatureSpell{cast_target: cast_target}, _spell)
        when cast_target in [
               :victim,
               :hostile_second_aggro,
               :hostile_last_aggro,
               :hostile_random,
-              :hostile_random_not_top,
-              :hostile_nearest,
-              :hostile_farthest
+              :hostile_random_not_top
             ] and is_integer(target) and target > 0 do
     target
   end
 
-  defp resolve_target(%Mob{object: %{guid: guid}} = state, %CreatureSpell{cast_target: cast_target})
-       when cast_target in [:friendly_injured, :friendly_injured_except] do
-    if injured?(state), do: guid
+  defp resolve_target(%Mob{} = state, %CreatureSpell{cast_target: :friendly_injured} = entry, spell) do
+    find_injured_friendly(state, entry, spell, nil)
   end
 
-  defp resolve_target(%Mob{object: %{guid: guid}} = state, %CreatureSpell{cast_target: :friendly_missing_buff} = entry) do
-    if !AuraLogic.has_spell?(state, entry.spell_id), do: guid
+  defp resolve_target(
+         %Mob{object: %{guid: guid}} = state,
+         %CreatureSpell{cast_target: :friendly_injured_except} = entry,
+         spell
+       ) do
+    find_injured_friendly(state, entry, spell, guid)
   end
 
-  defp resolve_target(_state, _entry), do: nil
-
-  defp injured?(%Mob{unit: %Unit{health: health, max_health: max_health}})
-       when is_number(health) and is_number(max_health) do
-    health < max_health
+  defp resolve_target(
+         %Mob{object: %{guid: guid}} = state,
+         %CreatureSpell{cast_target: :friendly_missing_buff} = entry,
+         _spell
+       ) do
+    if !AuraLogic.has_spell?(state, missing_buff_spell_id(entry)), do: guid
   end
 
-  defp injured?(_state), do: false
+  defp resolve_target(_state, _entry, _spell), do: nil
+
+  defp find_injured_friendly(%Mob{object: %{guid: guid}} = state, %CreatureSpell{} = entry, spell, except_guid) do
+    radius = injured_search_radius(entry, spell)
+    threshold = injured_threshold(entry)
+
+    candidates =
+      self_injured_candidate(state, threshold, except_guid) ++
+        nearby_injured_candidates(state, radius, threshold, except_guid || guid)
+
+    case Enum.max_by(candidates, fn {_guid, missing_pct} -> missing_pct end, fn -> nil end) do
+      {target_guid, _missing_pct} -> target_guid
+      nil -> nil
+    end
+  end
+
+  defp self_injured_candidate(%Mob{object: %{guid: guid}} = state, threshold, except_guid) do
+    missing_pct = 100 - Core.health_pct(state)
+
+    if guid != except_guid and missing_pct > threshold and not Core.dead?(state) do
+      [{guid, missing_pct}]
+    else
+      []
+    end
+  end
+
+  defp nearby_injured_candidates(%Mob{} = state, radius, threshold, self_guid) do
+    (World.nearby_mobs(state, radius) ++ World.nearby_players(state, radius))
+    |> Enum.flat_map(fn {candidate_guid, _distance} ->
+      case injured_friendly_missing_pct(state, candidate_guid, threshold) do
+        missing_pct when is_number(missing_pct) and candidate_guid != self_guid -> [{candidate_guid, missing_pct}]
+        _ -> []
+      end
+    end)
+  end
+
+  defp injured_friendly_missing_pct(%Mob{} = state, candidate_guid, threshold) do
+    with %{alive?: true} = metadata <-
+           Metadata.query(candidate_guid, [:alive?, :faction_template, :unit_flags, :health_pct]),
+         true <- injured_candidate_flags_allow?(metadata),
+         true <- Hostility.friendly?(state, metadata),
+         missing_pct when is_number(missing_pct) and missing_pct > threshold <- missing_health_pct(metadata) do
+      missing_pct
+    else
+      _ -> nil
+    end
+  end
+
+  defp injured_candidate_flags_allow?(%{unit_flags: flags}) when is_integer(flags) do
+    (flags &&& @unit_flag_in_combat) != 0 and (flags &&& @unit_flag_not_selectable) == 0
+  end
+
+  defp injured_candidate_flags_allow?(_metadata), do: false
+
+  defp missing_health_pct(%{health_pct: health_pct}) when is_number(health_pct), do: 100 - health_pct
+  defp missing_health_pct(_metadata), do: nil
+
+  defp injured_search_radius(%CreatureSpell{target_param1: param1}, _spell) when is_number(param1) and param1 > 0 do
+    param1 * 1.0
+  end
+
+  defp injured_search_radius(_entry, %Spell{range_yards: range}) when is_number(range) and range > 0 do
+    range
+  end
+
+  defp injured_search_radius(_entry, _spell), do: @injured_default_radius
+
+  defp injured_threshold(%CreatureSpell{target_param2: param2}) when is_integer(param2) and param2 in 1..100 do
+    param2
+  end
+
+  defp injured_threshold(_entry), do: @injured_default_threshold
+
+  defp missing_buff_spell_id(%CreatureSpell{target_param2: param2}) when is_integer(param2) and param2 > 0 do
+    param2
+  end
+
+  defp missing_buff_spell_id(%CreatureSpell{spell_id: spell_id}), do: spell_id
 
   defp flags_allow?(%Mob{object: %{guid: guid}} = state, %CreatureSpell{} = entry, target_guid) do
     cond do

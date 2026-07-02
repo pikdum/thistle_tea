@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.World.Loader.Mob do
   alias ThistleTea.DBC
   alias ThistleTea.Game.Entity.Data.CreatureSpell
   alias ThistleTea.Game.Entity.Data.Mob
+  alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Loader.Faction, as: FactionLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
@@ -168,7 +169,8 @@ defmodule ThistleTea.Game.World.Loader.Mob do
         unit_flags: mob.unit.flags,
         display_id: mob.unit.display_id,
         attacker_count: 0,
-        alive?: mob.unit.health > 0
+        alive?: mob.unit.health > 0,
+        health_pct: Core.health_pct(mob)
       }
       |> Map.merge(Mob.visibility_metadata(mob))
       |> Map.merge(FactionLoader.metadata(mob.unit.faction_template))

@@ -86,7 +86,8 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Respawn do
       combat_reach: state.unit.combat_reach,
       level: state.unit.level,
       unit_flags: state.unit.flags,
-      alive?: state.unit.health > 0
+      alive?: state.unit.health > 0,
+      health_pct: Core.health_pct(state)
     })
 
     Metadata.update(state.object.guid, Mob.visibility_metadata(state))

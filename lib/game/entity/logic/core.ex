@@ -85,6 +85,17 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
 
   def dead?(_entity), do: false
 
+  def health_pct(%{unit: %Unit{health: health, max_health: max_health}})
+      when is_number(health) and is_number(max_health) and max_health > 0 do
+    health
+    |> max(0)
+    |> Kernel./(max_health)
+    |> Kernel.*(100)
+    |> trunc()
+  end
+
+  def health_pct(_entity), do: 100
+
   def mark_broadcast_update(%{internal: %Internal{} = internal} = entity) do
     %{entity | internal: %{internal | broadcast_update?: true}}
   end

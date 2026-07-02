@@ -188,6 +188,92 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.SpellsTest do
     end
   end
 
+  describe "friendly-injured heal targeting" do
+    test "casts the heal at the most injured nearby in-combat friendly" do
+      _mild = injured_ally(10.0, 40)
+      worst = injured_ally(12.0, 20)
+      spell = quick_heal()
+      entry = entry(spell.id, cast_target: :friendly_injured)
+      state = fixture_mob(spells: [entry], spellbook: %{spell.id => spell})
+
+      assert {{:running, 2_000, :casting}, state, _blackboard} = MobSpells.try_cast(state, %Blackboard{}, 1_000)
+      assert state.internal.casting.targets.unit_guid == worst
+    end
+
+    test "ignores allies above the injury threshold" do
+      _healthy = injured_ally(10.0, 60)
+      spell = quick_heal()
+      entry = entry(spell.id, cast_target: :friendly_injured)
+      state = fixture_mob(spells: [entry], spellbook: %{spell.id => spell})
+
+      assert {:failure, state, _blackboard} = MobSpells.try_cast(state, %Blackboard{}, 1_000)
+      assert state.internal.casting == nil
+    end
+
+    test "clamps out-of-range param2 to the default threshold" do
+      ally = injured_ally(10.0, 40)
+      spell = quick_heal()
+      entry = entry(spell.id, cast_target: :friendly_injured, target_param2: 4_979)
+      state = fixture_mob(spells: [entry], spellbook: %{spell.id => spell})
+
+      assert {{:running, 2_000, :casting}, state, _blackboard} = MobSpells.try_cast(state, %Blackboard{}, 1_000)
+      assert state.internal.casting.targets.unit_guid == ally
+    end
+
+    test "heals itself when it is the most injured candidate" do
+      spell = quick_heal()
+      entry = entry(spell.id, cast_target: :friendly_injured)
+      state = fixture_mob(spells: [entry], spellbook: %{spell.id => spell}, health: 20)
+
+      assert {{:running, 2_000, :casting}, state, _blackboard} = MobSpells.try_cast(state, %Blackboard{}, 1_000)
+      assert state.internal.casting.targets.unit_guid == state.object.guid
+    end
+
+    test "friendly_injured_except never targets the caster" do
+      spell = quick_heal()
+      entry = entry(spell.id, cast_target: :friendly_injured_except)
+      state = fixture_mob(spells: [entry], spellbook: %{spell.id => spell}, health: 20)
+
+      assert {:failure, state, _blackboard} = MobSpells.try_cast(state, %Blackboard{}, 1_000)
+      assert state.internal.casting == nil
+
+      ally = injured_ally(10.0, 30)
+
+      assert {{:running, 2_000, :casting}, state, _blackboard} = MobSpells.try_cast(state, %Blackboard{}, 1_000)
+      assert state.internal.casting.targets.unit_guid == ally
+    end
+
+    test "ignores out-of-combat friendlies" do
+      _idle = injured_ally(10.0, 20, unit_flags: 0)
+      spell = quick_heal()
+      entry = entry(spell.id, cast_target: :friendly_injured)
+      state = fixture_mob(spells: [entry], spellbook: %{spell.id => spell})
+
+      assert {:failure, state, _blackboard} = MobSpells.try_cast(state, %Blackboard{}, 1_000)
+      assert state.internal.casting == nil
+    end
+
+    test "ignores injured hostiles" do
+      _enemy = injured_ally(10.0, 20, faction_template: alliance())
+      spell = quick_heal()
+      entry = entry(spell.id, cast_target: :friendly_injured)
+      state = fixture_mob(spells: [entry], spellbook: %{spell.id => spell})
+
+      assert {:failure, state, _blackboard} = MobSpells.try_cast(state, %Blackboard{}, 1_000)
+      assert state.internal.casting == nil
+    end
+
+    test "search radius comes from target_param1 when set" do
+      _far = injured_ally(25.0, 20)
+      spell = quick_heal()
+      entry = entry(spell.id, cast_target: :friendly_injured, target_param1: 10)
+      state = fixture_mob(spells: [entry], spellbook: %{spell.id => spell})
+
+      assert {:failure, state, _blackboard} = MobSpells.try_cast(state, %Blackboard{}, 1_000)
+      assert state.internal.casting == nil
+    end
+  end
+
   describe "hold_ranged_wait/3" do
     test "waits for the next list tick" do
       state = fixture_mob(spells: [entry(1)], spellbook: %{})
@@ -211,6 +297,50 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.SpellsTest do
 
       assert MobSpells.next_spell_delay(state, %Blackboard{}, 1_000) == nil
     end
+  end
+
+  defp quick_heal do
+    %Spell{
+      id: 4_979,
+      name: "Quick Heal",
+      school: :holy,
+      cast_time_ms: 2_000,
+      range_yards: 40.0,
+      mana_cost: 0,
+      power_type: 0,
+      attributes: MapSet.new(),
+      effects: [
+        %Effect{
+          index: 0,
+          type: :heal,
+          base_points: 50,
+          die_sides: 1,
+          implicit_target_a: :target_ally
+        }
+      ]
+    }
+  end
+
+  defp injured_ally(distance, health_pct, opts \\ []) do
+    guid = Guid.from_low_guid(:mob, 590, rem(System.unique_integer([:positive]), 0x00FFFFFF) + 1)
+    SpatialHash.update(:mobs, guid, 0, distance, 0.0, 0.0)
+
+    Metadata.put(guid, %{
+      alive?: Keyword.get(opts, :alive?, true),
+      faction_template: Keyword.get(opts, :faction_template, defias()),
+      unit_flags: Keyword.get(opts, :unit_flags, 0x00080000),
+      level: 5,
+      health_pct: health_pct,
+      combat_reach: 1.5,
+      attacker_count: 0
+    })
+
+    on_exit(fn ->
+      SpatialHash.remove(:mobs, guid)
+      Metadata.delete(guid)
+    end)
+
+    guid
   end
 
   defp fireball do
@@ -273,7 +403,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.SpellsTest do
         faction_template: 17,
         flags: 0,
         target: 0,
-        health: 100,
+        health: Keyword.get(opts, :health, 100),
         max_health: 100,
         power1: 100,
         max_power1: 100
