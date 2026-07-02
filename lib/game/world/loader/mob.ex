@@ -29,6 +29,7 @@ defmodule ThistleTea.Game.World.Loader.Mob do
     |> load_display_scale()
     |> load_equip_items()
     |> load_spells()
+    |> load_addon_auras()
   end
 
   defp load_spells(%Mangos.Creature{creature_template: %Mangos.CreatureTemplate{} = template} = creature) do
@@ -66,6 +67,26 @@ defmodule ThistleTea.Game.World.Loader.Mob do
   end
 
   defp load_spell_list(_list_id), do: []
+
+  defp load_addon_auras(%Mangos.Creature{} = creature) do
+    spells =
+      creature
+      |> addon_aura_ids()
+      |> SpellLoader.build_spellbook()
+      |> Map.values()
+
+    Map.put(creature, :addon_auras, spells)
+  end
+
+  defp addon_aura_ids(%Mangos.Creature{guid: guid, id: entry}) do
+    case Mangos.Repo.get(Mangos.CreatureAddon, guid) do
+      %Mangos.CreatureAddon{auras: auras} = row when is_binary(auras) and auras != "" ->
+        Mangos.CreatureAddon.aura_ids(row)
+
+      _ ->
+        Mangos.CreatureTemplateAddon.aura_ids(Mangos.Repo.get(Mangos.CreatureTemplateAddon, entry))
+    end
+  end
 
   defp load_creature_movement(%Mangos.Creature{} = creature) do
     creature_movement =

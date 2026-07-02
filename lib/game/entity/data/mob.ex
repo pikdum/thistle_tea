@@ -14,7 +14,9 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
   alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.Time
 
   @update_flag_all 0x10
   @update_flag_living 0x20
@@ -105,7 +107,8 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
           type_flags: ct.creature_type_flags,
           damage_multiplier: ct.damage_multiplier,
           regenerate_stats: ct.regenerate_stats,
-          spells: Map.get(c, :spell_list, [])
+          spells: Map.get(c, :spell_list, []),
+          addon_auras: Map.get(c, :addon_auras, [])
         },
         spawn: %Spawn{
           unit: unit,
@@ -127,7 +130,18 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
         spellbook: Map.get(c, :spellbook, %{})
       }
     }
+    |> apply_addon_auras(Time.now())
   end
+
+  def apply_addon_auras(%__MODULE__{internal: %Internal{creature: %Creature{addon_auras: [_ | _] = spells}}} = mob, now)
+      when is_integer(now) do
+    Enum.reduce(spells, mob, fn spell, acc ->
+      {acc, _events} = AuraLogic.apply_spell(acc, acc.object.guid, acc.unit.level, spell, now)
+      acc
+    end)
+  end
+
+  def apply_addon_auras(%__MODULE__{} = mob, _now), do: mob
 
   @npc_flag_spirit_service 0x60
   @creature_type_flag_ghost_visible 0x02
@@ -151,6 +165,7 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
       | in_combat: false,
         last_hostile_time: nil,
         casting: nil,
+        rooted?: false,
         running: false,
         movement_start_time: nil,
         movement_start_position: nil,

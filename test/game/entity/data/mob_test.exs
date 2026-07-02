@@ -13,6 +13,8 @@ defmodule ThistleTea.Game.Entity.Data.MobTest do
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Server.Mob, as: MobServer
   alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
 
@@ -110,6 +112,75 @@ defmodule ThistleTea.Game.Entity.Data.MobTest do
 
       assert mob.internal.spawn.respawn_delay_ms == 7_000
     end
+  end
+
+  describe "apply_addon_auras/2" do
+    test "build applies addon auras to the unit but not the spawn snapshot" do
+      creature =
+        %Mangos.Creature{
+          guid: 1,
+          id: 2,
+          modelid: 3,
+          curhealth: 10,
+          creature_movement: [],
+          creature_template: %Mangos.CreatureTemplate{
+            entry: 2,
+            name: "Test Creature",
+            speed_walk: 1.0,
+            speed_run: 1.0,
+            min_level: 5,
+            max_level: 5,
+            scale: 1.0
+          }
+        }
+        |> Map.put(:creature_model_info, nil)
+        |> Map.put(:equip_items, [nil, nil, nil])
+        |> Map.put(:addon_auras, [frost_armor()])
+
+      mob = Mob.build(creature)
+
+      assert [%{spell: %{id: 12_544}}] = mob.unit.auras
+      assert mob.internal.creature.addon_auras == [frost_armor()]
+      assert mob.internal.spawn.unit.auras == []
+    end
+
+    test "reapplies addon auras with fresh timestamps" do
+      spawn_unit = %Unit{health: 10, max_health: 10, level: 2, auras: []}
+
+      mob = %Mob{
+        object: %Object{guid: Guid.from_low_guid(:mob, 2, 1)},
+        unit: spawn_unit,
+        internal: %Internal{
+          creature: %Creature{addon_auras: [frost_armor()]},
+          spawn: %Spawn{unit: spawn_unit}
+        }
+      }
+
+      mob = mob |> Mob.respawn() |> Mob.apply_addon_auras(999_000)
+
+      assert [%{spell: %{id: 12_544}, applied_at: 999_000}] = mob.unit.auras
+    end
+  end
+
+  defp frost_armor do
+    %Spell{
+      id: 12_544,
+      name: "Frost Armor",
+      school: :frost,
+      cast_time_ms: 0,
+      duration_ms: 1_800_000,
+      attributes: MapSet.new(),
+      effects: [
+        %Effect{
+          index: 0,
+          type: :apply_aura,
+          aura: :mod_resistance,
+          base_points: 29,
+          die_sides: 1,
+          misc_value: 16
+        }
+      ]
+    }
   end
 
   describe "respawn/1" do

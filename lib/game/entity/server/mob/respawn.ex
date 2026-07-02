@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Respawn do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Mob, as: MobBT
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Server.Mob.Corpse
+  alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Loader.Faction, as: FactionLoader
   alias ThistleTea.Game.World.Metadata
@@ -58,6 +59,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Respawn do
       state
       |> Corpse.remove()
       |> Mob.respawn()
+      |> Mob.apply_addon_auras(Time.now())
       |> BT.init(MobBT.tree())
       |> put_spawn_position()
       |> broadcast_respawn()
