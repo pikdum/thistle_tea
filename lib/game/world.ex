@@ -103,17 +103,20 @@ defmodule ThistleTea.Game.World do
   end
 
   def broadcast_packet(packet, entity, opts) do
-    range = Keyword.get(opts, :range, 250)
     include_self? = Keyword.get(opts, :include_self?, true)
     source_guid = entity_guid(entity)
 
     opts
-    |> broadcast_recipients(entity, range)
+    |> broadcast_recipients(entity, Keyword.get(opts, :range))
     |> Enum.each(fn guid ->
       if include_self? or guid != source_guid do
         Network.send_packet(packet, guid, source_guid: source_guid)
       end
     end)
+  end
+
+  def tracking_players(%{internal: %Internal{map: map}, movement_block: %MovementBlock{position: {x, y, z, _o}}}) do
+    SpatialHash.query_cells(:players, map, x, y, z, 250)
   end
 
   def start_entity(%GameObject{} = entity), do: start_entity(entity, GameObjectServer)
@@ -228,6 +231,8 @@ defmodule ThistleTea.Game.World do
 
   defp normalize_recipients(recipients, _entity, _range) when is_list(recipients), do: recipients
   defp normalize_recipients(%MapSet{} = recipients, _entity, _range), do: MapSet.to_list(recipients)
+
+  defp normalize_recipients(_recipients, entity, nil), do: tracking_players(entity)
 
   defp normalize_recipients(_recipients, entity, range) do
     entity

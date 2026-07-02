@@ -70,6 +70,12 @@ defmodule ThistleTea.Game.World.SpatialHash do
     end
   end
 
+  def query_cells(table, map, x, y, z, range) do
+    cells_in_range(map, x, y, z, range)
+    |> Enum.flat_map(fn cell -> :ets.lookup(table, cell) end)
+    |> Enum.map(fn {_hash, guid} -> guid end)
+  end
+
   def query(table, map, x1, y1, z1, range) do
     cells_in_range(map, x1, y1, z1, range)
     |> Stream.flat_map(fn cell ->
