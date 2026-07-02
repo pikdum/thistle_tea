@@ -38,7 +38,7 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
         _ -> nil
       end
 
-    model_info = Map.get(c, :creature_model_info)
+    display_info_addon = Map.get(c, :creature_display_info_addon)
     effective_scale = effective_scale(ct, Map.get(c, :display_scale))
     {virtual_item_slot_display, virtual_item_info} = virtual_items(Map.get(c, :equip_items))
     level = level(c)
@@ -58,8 +58,8 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
       npc_flags: ct.npc_flags,
       dynamic_flags: ct.dynamic_flags || 0,
       misc_flags: ct.extra_flags,
-      bounding_radius: mob_bounding_radius(model_info, effective_scale),
-      combat_reach: mob_combat_reach(model_info, effective_scale),
+      bounding_radius: mob_bounding_radius(display_info_addon, effective_scale),
+      combat_reach: mob_combat_reach(display_info_addon, effective_scale),
       display_id: c.modelid,
       native_display_id: c.modelid,
       min_damage: min_damage,
@@ -408,7 +408,7 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
   defp item_display_id(%Mangos.ItemTemplate{display_id: id}), do: id
   defp item_display_id(nil), do: 0
 
-  defp normalize_model_value(%Mangos.CreatureModelInfo{} = model_info, key, default) do
+  defp normalize_model_value(model_info, key, default) when is_map(model_info) do
     case Map.get(model_info, key) do
       value when is_number(value) and value > 0 -> value
       _ -> default

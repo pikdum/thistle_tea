@@ -37,7 +37,6 @@ defmodule ThistleTea.Game.Entity.Data.MobTest do
             scale: 1.0
           }
         }
-        |> Map.put(:creature_model_info, nil)
         |> Map.put(:equip_items, [nil, nil, nil])
 
       mob = Mob.build(creature)
@@ -72,7 +71,6 @@ defmodule ThistleTea.Game.Entity.Data.MobTest do
             damage_multiplier: 2.5
           }
         }
-        |> Map.put(:creature_model_info, nil)
         |> Map.put(:equip_items, [nil, nil, nil])
 
       mob = Mob.build(creature)
@@ -105,7 +103,6 @@ defmodule ThistleTea.Game.Entity.Data.MobTest do
             scale: 1.0
           }
         }
-        |> Map.put(:creature_model_info, nil)
         |> Map.put(:equip_items, [nil, nil, nil])
 
       mob = Mob.build(creature)
@@ -133,7 +130,6 @@ defmodule ThistleTea.Game.Entity.Data.MobTest do
             scale: 1.0
           }
         }
-        |> Map.put(:creature_model_info, nil)
         |> Map.put(:equip_items, [nil, nil, nil])
         |> Map.put(:addon_auras, [frost_armor()])
 

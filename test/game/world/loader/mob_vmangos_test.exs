@@ -16,6 +16,8 @@ defmodule ThistleTea.Game.World.Loader.MobVmangosTest do
       assert mob.unit.max_health in 220..320
       assert mob.unit.min_damage > 0
       assert mob.unit.max_damage > mob.unit.min_damage
+      assert mob.unit.bounding_radius in [0.208, 0.306]
+      assert mob.unit.combat_reach == 1.5
       assert Enum.map(mob.internal.creature.addon_auras, & &1.id) == [12_544]
     end
 

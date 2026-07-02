@@ -1,7 +1,6 @@
 defmodule ThistleTea.DB.Mangos.AddonAuras do
   @moduledoc """
-  Parses the space-separated spell-id list stored in the `auras` column of
-  `creature_addon` and `creature_template_addon`.
+  Parses space-separated spell-id lists stored in VMangos aura columns.
   """
 
   def parse(auras) when is_binary(auras) do

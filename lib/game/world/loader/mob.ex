@@ -32,7 +32,6 @@ defmodule ThistleTea.Game.World.Loader.Mob do
     |> load_creature_class_level_stats()
     |> load_display()
     |> load_creature_movement()
-    |> load_creature_model_info()
     |> load_equip_items()
     |> load_spells()
     |> load_addon_auras()
@@ -75,6 +74,7 @@ defmodule ThistleTea.Game.World.Loader.Mob do
     creature
     |> Map.put(:modelid, display_id)
     |> Map.put(:display_scale, display_scale || display_scale(display_id))
+    |> Map.put(:creature_display_info_addon, Mangos.CreatureDisplayInfoAddon.get(display_id))
   end
 
   defp load_spells(%Mangos.Creature{creature_template: %Mangos.CreatureTemplate{} = template} = creature) do
@@ -159,12 +159,6 @@ defmodule ThistleTea.Game.World.Loader.Mob do
     Map.put(creature, :creature_movement, creature_movement)
   end
 
-  defp load_creature_model_info(nil), do: nil
-
-  defp load_creature_model_info(%Mangos.Creature{} = creature) do
-    Map.put(creature, :creature_model_info, nil)
-  end
-
   defp display_scale(display_id) do
     with %CreatureDisplayInfo{model: model_id, creature_model_scale: display_scale}
          when is_integer(model_id) and is_number(display_scale) <-
@@ -190,7 +184,7 @@ defmodule ThistleTea.Game.World.Loader.Mob do
       |> select_equipment()
       |> case do
         %Mangos.CreatureEquipTemplate{item1: i1, item2: i2, item3: i3} ->
-          Enum.map([i1, i2, i3], &creature_item_template/1)
+          Enum.map([i1, i2, i3], &item_template/1)
 
         nil ->
           [nil, nil, nil]
@@ -203,11 +197,11 @@ defmodule ThistleTea.Game.World.Loader.Mob do
     Map.put(creature, :equip_items, [nil, nil, nil])
   end
 
-  defp creature_item_template(entry) when is_integer(entry) and entry > 0 do
+  defp item_template(entry) when is_integer(entry) and entry > 0 do
     Mangos.Repo.get(Mangos.ItemTemplate, entry)
   end
 
-  defp creature_item_template(_entry), do: nil
+  defp item_template(_entry), do: nil
 
   defp template_pool(%Mangos.Creature{} = creature) do
     [creature.id, creature.id2, creature.id3, creature.id4, creature.id5]
