@@ -27,7 +27,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgAttackstop do
     character =
       character
       |> BT.clear_auto_attack()
-      |> clear_combat()
+      |> clear_target()
 
     Core.update_object(character, :values)
     |> World.broadcast_packet(character)
@@ -50,11 +50,9 @@ defmodule ThistleTea.Game.Network.Message.CmsgAttackstop do
     %__MODULE__{}
   end
 
-  defp clear_combat(%Character{unit: unit, internal: internal} = character) do
-    unit = %{unit | target: 0}
-    internal = %{internal | in_combat: false}
-    %{character | unit: unit, internal: internal}
+  defp clear_target(%Character{unit: unit} = character) do
+    %{character | unit: %{unit | target: 0}}
   end
 
-  defp clear_combat(character), do: character
+  defp clear_target(character), do: character
 end
