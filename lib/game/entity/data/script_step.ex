@@ -135,10 +135,14 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStep do
   defp command(10), do: :summon_creature
   defp command(14), do: :remove_aura
   defp command(15), do: :cast_spell
+  defp command(16), do: :play_sound
   defp command(18), do: :despawn
   defp command(23), do: :morph
+  defp command(24), do: :mount
   defp command(25), do: :set_run
   defp command(26), do: :attack_start
+  defp command(28), do: :stand_state
+  defp command(35), do: :turn_to
   defp command(39), do: :start_script
   defp command(44), do: :set_phase
   defp command(45), do: :set_phase_random

@@ -271,6 +271,68 @@ defmodule ThistleTea.Game.Entity.Logic.AI.ScriptTest do
       assert [%Event{type: :emote, emote_id: 11}] = mob.internal.events
     end
 
+    test "stand_state updates the unit and marks a broadcast", %{mob: mob} do
+      step = %ScriptStep{command: :stand_state, datalong: 1}
+
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], nil, 1_000)
+
+      assert mob.unit.stand_state == 1
+      assert mob.internal.broadcast_update?
+    end
+
+    test "mount sets and clears the mount display id", %{mob: mob} do
+      step = %ScriptStep{command: :mount, datalong: 2_404, datalong2: 1}
+
+      {mob, blackboard} = Script.run(mob, Blackboard.new(), [step], nil, 1_000)
+      assert mob.unit.mount_display_id == 2_404
+
+      {mob, _blackboard} = Script.run(mob, blackboard, [%ScriptStep{command: :mount, datalong: 0}], nil, 1_000)
+      assert mob.unit.mount_display_id == 0
+    end
+
+    test "mount by unresolved creature entry is skipped", %{mob: mob} do
+      step = %ScriptStep{command: :mount, datalong: 14, datalong2: 0}
+
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], nil, 1_000)
+
+      assert mob.unit.mount_display_id == nil
+      refute mob.internal.broadcast_update?
+    end
+
+    test "turn_to an orientation faces in place and enqueues a facing event", %{mob: mob} do
+      step = %ScriptStep{command: :turn_to, datalong: 1, position: {0.0, 0.0, 0.0, 2.5}}
+
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], nil, 1_000)
+
+      assert {_x, _y, _z, 2.5} = mob.movement_block.position
+      assert [%Event{type: :set_facing, facing: {:angle, 2.5}}] = mob.internal.events
+    end
+
+    test "turn_to the victim enqueues a facing-target event", %{mob: mob} do
+      victim = Guid.from_low_guid(:player, 9)
+      mob = %{mob | unit: %{mob.unit | target: victim}}
+
+      step = %ScriptStep{command: :turn_to, datalong: 0, target_type: :victim}
+
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], nil, 1_000)
+
+      assert [%Event{type: :set_facing, facing: {:target, ^victim}}] = mob.internal.events
+    end
+
+    test "play_sound picks the object-sound variant for distance-dependent flags", %{mob: mob} do
+      steps = [
+        %ScriptStep{command: :play_sound, datalong: 6_943},
+        %ScriptStep{command: :play_sound, datalong: 6_944, datalong2: 0x2}
+      ]
+
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), steps, nil, 1_000)
+
+      assert [
+               %Event{type: :play_sound, sound_id: 6_943},
+               %Event{type: :play_object_sound, sound_id: 6_944}
+             ] = mob.internal.events
+    end
+
     test "delayed steps are deferred through a script_steps event", %{mob: mob} do
       immediate = %ScriptStep{command: :emote, datalong: 11}
       delayed = %ScriptStep{command: :emote, datalong: 22, delay_ms: 4_000}

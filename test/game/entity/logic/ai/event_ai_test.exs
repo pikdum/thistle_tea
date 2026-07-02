@@ -35,6 +35,16 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAITest do
     end
   end
 
+  describe "on_reached_home/3" do
+    test "fires reached_home events" do
+      mob = mob(events: [event(:reached_home)])
+
+      {mob, _blackboard} = EventAI.on_reached_home(mob, Blackboard.new(), 0)
+
+      assert [%Event{type: :monster_talk}] = mob.internal.events
+    end
+  end
+
   describe "conditions" do
     test "an event with a failing db_guid condition does not fire" do
       condition = %Condition{type: :db_guid, value1: 12_345}

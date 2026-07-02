@@ -3,9 +3,9 @@ defmodule ThistleTea.Game.World.Loader.Script do
   Loads generic script-command rows (`creature_ai_scripts`,
   `creature_movement_scripts`, `generic_scripts`, …) into `ScriptStep`
   structs grouped by script id, resolving the broadcast texts referenced by
-  talk steps and recursively resolving the `generic_scripts` referenced by
-  start-script and summon steps (cycle-guarded), so the runtime interpreter
-  never touches the database.
+  talk steps, mount-by-entry steps into display ids, and recursively the
+  `generic_scripts` referenced by start-script and summon steps
+  (cycle-guarded), so the runtime interpreter never touches the database.
   """
   import Ecto.Query, only: [from: 2]
 
@@ -22,10 +22,26 @@ defmodule ThistleTea.Game.World.Loader.Script do
     |> schema.query()
     |> Mangos.Repo.all()
     |> Enum.map(&ScriptStep.build/1)
+    |> Enum.map(&resolve_mount_display/1)
     |> resolve_texts()
     |> resolve_nested_scripts(visited)
     |> Enum.group_by(& &1.script_id)
   end
+
+  defp resolve_mount_display(%ScriptStep{command: :mount, datalong2: 0, datalong: entry} = step) when entry > 0 do
+    with %Mangos.CreatureTemplate{} = template <- Mangos.Repo.get(Mangos.CreatureTemplate, entry),
+         display_id when is_integer(display_id) <-
+           Enum.find(
+             [template.model_id1, template.model_id2, template.model_id3, template.model_id4],
+             &(is_integer(&1) and &1 > 0)
+           ) do
+      %{step | datalong: display_id, datalong2: 1}
+    else
+      _ -> step
+    end
+  end
+
+  defp resolve_mount_display(%ScriptStep{} = step), do: step
 
   defp resolve_nested_scripts(steps, visited) do
     nested_ids =

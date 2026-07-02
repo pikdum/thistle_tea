@@ -44,7 +44,9 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
     :emote_id,
     :steps,
     :summon,
-    :respawn_delay_ms
+    :respawn_delay_ms,
+    :sound_id,
+    :facing
   ]
 
   def spell_damage(source_guid, target_guid, spell, damage, opts \\ []) do
@@ -308,6 +310,22 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
 
   def attack_start(target_guid) when is_integer(target_guid) do
     %__MODULE__{type: :attack_start, target_guid: target_guid}
+  end
+
+  def play_sound(sound_id) when is_integer(sound_id) do
+    %__MODULE__{type: :play_sound, sound_id: sound_id}
+  end
+
+  def play_object_sound(sound_id) when is_integer(sound_id) do
+    %__MODULE__{type: :play_object_sound, sound_id: sound_id}
+  end
+
+  def set_facing({:angle, angle} = facing) when is_number(angle) do
+    %__MODULE__{type: :set_facing, facing: facing}
+  end
+
+  def set_facing({:target, target_guid} = facing) when is_integer(target_guid) do
+    %__MODULE__{type: :set_facing, facing: facing}
   end
 
   def drain(%{internal: %{events: events} = internal} = entity) when is_list(events) do

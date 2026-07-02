@@ -12,6 +12,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
   out-of-combat casts go through the trigger-spell pipeline, in-combat casts
   through the mob casting machinery.
   """
+  import Bitwise, only: [&&&: 2]
+
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.CreatureSpell
   alias ThistleTea.Game.Entity.Data.ScriptStep
@@ -139,6 +141,51 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
     end
   end
 
+  @sound_flag_distance_dependent 0x2
+
+  defp execute(state, blackboard, %ScriptStep{command: :play_sound} = step, _target_guid, _now)
+       when step.datalong > 0 do
+    event =
+      if (step.datalong2 &&& @sound_flag_distance_dependent) == 0 do
+        Event.play_sound(step.datalong)
+      else
+        Event.play_object_sound(step.datalong)
+      end
+
+    {Event.enqueue(state, event), blackboard}
+  end
+
+  defp execute(state, blackboard, %ScriptStep{command: :play_sound}, _target_guid, _now) do
+    {state, blackboard}
+  end
+
+  defp execute(state, blackboard, %ScriptStep{command: :mount} = step, _target_guid, _now) do
+    {set_mount(state, mount_display_id(step)), blackboard}
+  end
+
+  defp execute(state, blackboard, %ScriptStep{command: :stand_state} = step, _target_guid, _now) do
+    {set_stand_state(state, step.datalong), blackboard}
+  end
+
+  defp execute(state, blackboard, %ScriptStep{command: :turn_to, datalong: 0} = step, target_guid, _now) do
+    case resolve_target(state, step, target_guid) do
+      guid when is_integer(guid) and guid > 0 and guid != state.object.guid ->
+        {Event.enqueue(state, Event.set_facing({:target, guid})), blackboard}
+
+      _ ->
+        {state, blackboard}
+    end
+  end
+
+  defp execute(state, blackboard, %ScriptStep{command: :turn_to, position: {_x, _y, _z, o}}, _target_guid, _now) do
+    state =
+      state
+      |> set_facing_angle(o)
+      |> Event.enqueue(Event.set_facing({:angle, o}))
+
+    {state, blackboard}
+  end
+
   defp execute(state, blackboard, %ScriptStep{command: :set_phase} = step, _target_guid, _now) do
     {state, put_phase(blackboard, set_phase_value(blackboard, step))}
   end
@@ -250,6 +297,40 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
   end
 
   defp morph(state, _display_id), do: state
+
+  defp mount_display_id(%ScriptStep{datalong: 0}), do: 0
+
+  defp mount_display_id(%ScriptStep{datalong: display_id, datalong2: is_display_id}) when is_display_id != 0 do
+    display_id
+  end
+
+  defp mount_display_id(%ScriptStep{} = step) do
+    Logger.debug("Script #{step.script_id}: mount by creature entry unresolved, skipping")
+    nil
+  end
+
+  defp set_mount(%{unit: %Unit{mount_display_id: current} = unit} = state, display_id)
+       when is_integer(display_id) and display_id != current do
+    %{state | unit: %{unit | mount_display_id: display_id}}
+    |> Core.mark_broadcast_update()
+  end
+
+  defp set_mount(state, _display_id), do: state
+
+  defp set_stand_state(%{unit: %Unit{stand_state: current} = unit} = state, stand_state)
+       when is_integer(stand_state) and stand_state != current do
+    %{state | unit: %{unit | stand_state: stand_state}}
+    |> Core.mark_broadcast_update()
+  end
+
+  defp set_stand_state(state, _stand_state), do: state
+
+  defp set_facing_angle(%{movement_block: %{position: {x, y, z, _o}} = movement_block} = state, angle)
+       when is_number(angle) do
+    %{state | movement_block: %{movement_block | position: {x, y, z, angle}}}
+  end
+
+  defp set_facing_angle(state, _angle), do: state
 
   defp flee(%{unit: %Unit{target: target}} = state, %Blackboard{} = blackboard, now)
        when is_integer(target) and target > 0 do

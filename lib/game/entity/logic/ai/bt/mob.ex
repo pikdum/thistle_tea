@@ -68,8 +68,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
       AuraBT.tick_step(),
       RegenBT.tick_step(),
       BT.sequence([
-        BT.condition(&tethering_to_spawn?/2),
-        BT.action(&wait_for_arrival/2)
+        BT.condition(&tether_target_set?/2),
+        BT.action(&wait_for_tether_arrival/2)
       ]),
       BT.sequence([
         BT.condition(&dead?/2),
@@ -508,27 +508,25 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     false
   end
 
-  defp tethering_to_spawn?(
-         %Mob{internal: %Internal{spawn: %Spawn{position: {x, y, z}}}} = state,
-         %Blackboard{move_target: {x, y, z}} = blackboard
-       ) do
-    tethering_to_spawn?(state, blackboard, Time.now())
+  defp tether_target_set?(%Mob{internal: %Internal{spawn: %Spawn{position: {x, y, z}}}}, %Blackboard{
+         move_target: {x, y, z}
+       }) do
+    true
   end
 
-  defp tethering_to_spawn?(_state, _blackboard) do
-    false
-  end
+  defp tether_target_set?(_state, _blackboard), do: false
 
-  def tethering_to_spawn?(
-        %Mob{internal: %Internal{spawn: %Spawn{position: {x, y, z}}}} = state,
-        %Blackboard{move_target: {x, y, z}},
-        now
-      )
-      when is_integer(now) do
-    Movement.moving?(state, now)
-  end
+  defp wait_for_tether_arrival(%Mob{} = state, %Blackboard{} = blackboard) do
+    now = Time.now()
 
-  def tethering_to_spawn?(_state, _blackboard, _now), do: false
+    if Movement.moving?(state, now) do
+      delay_ms = Movement.next_spatial_update_delay(state, now)
+      {BT.running(delay_ms, :movement), state, blackboard}
+    else
+      {state, blackboard} = EventAI.on_reached_home(state, blackboard, now)
+      {:success, state, Blackboard.clear_move_target(blackboard)}
+    end
+  end
 
   defp set_tether_target(
          %Mob{internal: %Internal{spawn: %Spawn{position: {x, y, z}}}} = state,

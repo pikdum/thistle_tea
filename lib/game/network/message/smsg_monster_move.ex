@@ -72,6 +72,31 @@ defmodule ThistleTea.Game.Network.Message.SmsgMonsterMove do
     |> band(bnot(@spline_flag_final_facing))
   end
 
+  @face_duration_ms 100
+
+  def build_face(
+        %{
+          object: %Object{guid: guid},
+          movement_block: %MovementBlock{position: {x, y, z, _o}},
+          internal: %Internal{spline_id: spline_id}
+        },
+        facing
+      ) do
+    base = %__MODULE__{
+      guid: guid,
+      spline_point: {x, y, z},
+      spline_id: spline_id || 0,
+      spline_flags: 0,
+      duration: @face_duration_ms,
+      splines: [{x, y, z}]
+    }
+
+    case facing do
+      {:target, target} -> %{base | move_type: @move_type_facing_target, target: target}
+      {:angle, angle} -> %{base | move_type: @move_type_facing_angle, angle: angle}
+    end
+  end
+
   def build_stop(%{
         object: %Object{guid: guid},
         movement_block: %MovementBlock{position: {x, y, z, _o}},

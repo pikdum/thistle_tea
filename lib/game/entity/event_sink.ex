@@ -544,6 +544,27 @@ defmodule ThistleTea.Game.Entity.EventSink do
 
   def emit(entity, %Event{type: :attack_start}), do: entity
 
+  def emit(entity, %Event{type: :play_sound, sound_id: sound_id}) do
+    %Message.SmsgPlaySound{sound_id: sound_id}
+    |> World.broadcast_packet(entity)
+
+    entity
+  end
+
+  def emit(%{object: %{guid: guid}} = entity, %Event{type: :play_object_sound, sound_id: sound_id}) do
+    %Message.SmsgPlayObjectSound{sound_id: sound_id, guid: guid}
+    |> World.broadcast_packet(entity)
+
+    entity
+  end
+
+  def emit(entity, %Event{type: :set_facing, facing: facing}) do
+    Message.SmsgMonsterMove.build_face(entity, facing)
+    |> World.broadcast_packet(entity)
+
+    entity
+  end
+
   def emit(entity, %Event{type: :trigger_spell} = event) do
     case SpellLoader.load(event.spell_id) do
       nil ->

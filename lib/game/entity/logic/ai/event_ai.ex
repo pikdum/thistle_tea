@@ -4,8 +4,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAI do
   the firing events' action scripts through the script interpreter. Timed
   events (timers, HP/mana thresholds, range, friendly HP) are evaluated from
   `tick/3` on the creature's behavior-tree ticks with a one-second cadence;
-  edge events (aggro, spawned, death, evade, kill, spell hit, leave combat)
-  fire from the owning process at those moments. Events carrying a resolved
+  edge events (aggro, spawned, death, evade, kill, spell hit, leave combat,
+  reached home) fire from the owning process at those moments. Events carrying a resolved
   condition tree are gated through the condition evaluator before their
   repeat timers are consumed, per vmangos ordering. Per-event enable/cooldown
   state and the script-controlled phase live on the blackboard: non-repeatable
@@ -92,6 +92,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAI do
   def on_evade(state, %Blackboard{} = blackboard, now) do
     {state, blackboard} = fire_edges(state, blackboard, :evade, nil, now)
     {state, reset_ooc(blackboard, events(state), now)}
+  end
+
+  def on_reached_home(state, %Blackboard{} = blackboard, now) do
+    fire_edges(state, blackboard, :reached_home, nil, now)
   end
 
   def on_spell_hit(state, %Blackboard{} = blackboard, caster_guid, spell_id, now) do
@@ -240,7 +244,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAI do
   end
 
   defp satisfy(_state, %AIEvent{event_type: event_type}, invoker_guid)
-       when event_type in [:aggro, :spawned, :death, :evade, :leave_combat, :hit_by_spell] do
+       when event_type in [:aggro, :spawned, :death, :evade, :leave_combat, :hit_by_spell, :reached_home] do
     {:ok, invoker_guid}
   end
 
