@@ -2,6 +2,7 @@ defmodule ThistleTea.Game.Entity.Logic.CoreTest do
   use ExUnit.Case, async: true
 
   alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
   alias ThistleTea.Game.Entity.Data.Component.Internal.Spawn
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Unit
@@ -42,6 +43,28 @@ defmodule ThistleTea.Game.Entity.Logic.CoreTest do
 
       refute Core.should_tether?(entity, 6_999)
     end
+
+    test "tethers immediately when outside an explicit leash range" do
+      entity = entity(position: {60.0, 0.0, 0.0, 0.0}, last_hostile_time: 1_000, leash_range: 50.0)
+
+      assert Core.should_tether?(entity, 1_500)
+    end
+
+    test "stays inside an explicit leash range even beyond the level formula" do
+      entity = entity(position: {100.0, 0.0, 0.0, 0.0}, last_hostile_time: 1_000, leash_range: 120.0)
+
+      refute Core.should_tether?(entity, 7_000)
+    end
+  end
+
+  describe "tether_range/1" do
+    test "uses the explicit leash range when set" do
+      assert Core.tether_range(entity(leash_range: 120.0)) == 120.0
+    end
+
+    test "falls back to the level formula when the leash range is unset" do
+      assert Core.tether_range(entity([])) == 42
+    end
   end
 
   defp entity(opts) do
@@ -53,7 +76,8 @@ defmodule ThistleTea.Game.Entity.Logic.CoreTest do
       },
       internal: %Internal{
         spawn: %Spawn{position: {0.0, 0.0, 0.0}},
-        last_hostile_time: Keyword.get(opts, :last_hostile_time)
+        last_hostile_time: Keyword.get(opts, :last_hostile_time),
+        creature: %Creature{leash_range: Keyword.get(opts, :leash_range, 0.0)}
       },
       movement_block: %MovementBlock{position: Keyword.get(opts, :position)}
     }

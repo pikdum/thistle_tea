@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
   """
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
   alias ThistleTea.Game.Entity.Data.Component.Internal.Spawn
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Unit
@@ -102,6 +103,11 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
 
   def mark_broadcast_update(entity), do: entity
 
+  def tether_range(%{internal: %Internal{creature: %Creature{leash_range: leash_range}}})
+      when is_number(leash_range) and leash_range > 0 do
+    leash_range
+  end
+
   def tether_range(%{unit: %Unit{level: level}}) when is_number(level) do
     40 + 2 * level
   end
@@ -131,12 +137,19 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
 
   def should_tether?(%{internal: %Internal{last_hostile_time: last_hostile_time}} = entity, now)
       when is_integer(last_hostile_time) and is_integer(now) do
-    out_of_tether_range?(entity) and now - last_hostile_time >= @leash_timeout_ms
+    out_of_tether_range?(entity) and (hard_leash?(entity) or now - last_hostile_time >= @leash_timeout_ms)
   end
 
   def should_tether?(_entity, _now) do
     false
   end
+
+  defp hard_leash?(%{internal: %Internal{creature: %Creature{leash_range: leash_range}}})
+       when is_number(leash_range) and leash_range > 0 do
+    true
+  end
+
+  defp hard_leash?(_entity), do: false
 
   defp maybe_dead(%{internal: %Internal{}, unit: %Unit{health: 0}, movement_block: %MovementBlock{}} = entity, now) do
     entity = Movement.sync_position(entity, now)

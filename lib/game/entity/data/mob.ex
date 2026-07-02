@@ -133,6 +133,9 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
           type_flags: type_flags(ct),
           damage_multiplier: ct.damage_multiplier,
           regenerate_stats: regenerate_stats(ct),
+          detection_range: detection_range(ct),
+          call_for_help_range: call_for_help_range(ct),
+          leash_range: leash_range(ct),
           spells: Map.get(c, :spell_list, []),
           addon_auras: Map.get(c, :addon_auras, [])
         },
@@ -317,6 +320,21 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
   end
 
   defp regenerate_stats(_template), do: 0x3
+
+  defp detection_range(%Mangos.CreatureTemplate{detection_range: range}) when is_number(range) and range >= 0, do: range
+  defp detection_range(_template), do: 20.0
+
+  defp call_for_help_range(%Mangos.CreatureTemplate{call_for_help_range: range}) when is_number(range) and range >= 0 do
+    range
+  end
+
+  defp call_for_help_range(_template), do: 5.0
+
+  defp leash_range(%Mangos.CreatureTemplate{leash_range: range} = template) when is_number(range) and range > 0 do
+    if range >= detection_range(template), do: range, else: 0.0
+  end
+
+  defp leash_range(_template), do: 0.0
 
   defp respawn_delay_ms(%Mangos.Creature{spawntimesecsmin: min, spawntimesecsmax: max})
        when is_integer(min) and is_integer(max) and min >= 0 and max > min do

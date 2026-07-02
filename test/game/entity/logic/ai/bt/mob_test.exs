@@ -2,6 +2,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
   use ExUnit.Case, async: false
 
   alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Unit
@@ -317,6 +318,44 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
 
       assert {:failure, ^state, %Blackboard{next_aggro_at: 6_000}} = MobBT.try_aggro(state, blackboard, 1_000)
     end
+
+    test "uses the creature detection range for aggro distance" do
+      source_guid = mob_guid(17)
+      target_guid = player_guid()
+
+      state = fixture_mob(guid: source_guid, level: 5, faction_template: 17, detection_range: 10.0)
+      blackboard = %Blackboard{}
+
+      put_metadata(source_guid, defias(), 5)
+      put_spatial_target(:players, target_guid, {12.0, 0.0, 0.0}, alliance(), 5)
+
+      assert {:failure, ^state, %Blackboard{next_aggro_at: 6_000}} = MobBT.try_aggro(state, blackboard, 1_000)
+      assert state.unit.target == 0
+    end
+  end
+
+  describe "aggro_radius_for/4" do
+    test "uses the creature detection range as the base radius" do
+      assert MobBT.aggro_radius_for(18.0, 10, 10) == 18.0
+    end
+
+    test "shrinks against higher-level targets and grows against lower-level ones" do
+      assert MobBT.aggro_radius_for(18.0, 10, 15) == 13.0
+      assert MobBT.aggro_radius_for(18.0, 40, 20) == 38.0
+    end
+
+    test "caps the low-level bonus at 25 levels" do
+      assert MobBT.aggro_radius_for(18.0, 60, 1) == 43.0
+    end
+
+    test "clamps to the minimum radius" do
+      assert MobBT.aggro_radius_for(18.0, 5, 40) == 5.0
+      assert MobBT.aggro_radius_for(4.0, 5, 40) == 4.0
+    end
+
+    test "never aggros when the detection range is under a yard" do
+      assert MobBT.aggro_radius_for(0.0, 10, 10) == 0.0
+    end
   end
 
   describe "maybe_spread/3" do
@@ -385,7 +424,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
         map: 0,
         in_combat: false,
         movement_start_time: Keyword.get(opts, :start_time),
-        movement_start_position: Keyword.get(opts, :movement_start_position, {0.0, 0.0, 0.0})
+        movement_start_position: Keyword.get(opts, :movement_start_position, {0.0, 0.0, 0.0}),
+        creature: %Creature{detection_range: Keyword.get(opts, :detection_range)}
       },
       movement_block: %MovementBlock{
         duration: Keyword.get(opts, :duration, 0),

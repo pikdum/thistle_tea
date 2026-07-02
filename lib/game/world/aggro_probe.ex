@@ -74,7 +74,7 @@ defmodule ThistleTea.Game.World.AggroProbe do
   end
 
   defp maybe_probe(mob_guid, distance, player_guid, player) do
-    mob = Metadata.query(mob_guid, [:alive?, :faction_template, :unit_flags, :level])
+    mob = Metadata.query(mob_guid, [:alive?, :faction_template, :unit_flags, :level, :detection_range])
 
     if eligible?(mob, player, distance) do
       Entity.aggro_probe(mob_guid, player_guid)
@@ -85,7 +85,7 @@ defmodule ThistleTea.Game.World.AggroProbe do
        when is_integer(level) and is_integer(player_level) do
     Hostility.can_initiate_attack?(mob) and
       Hostility.valid_hostile_target?(mob, player) and
-      distance <= MobBT.aggro_radius_for(level, player_level)
+      distance <= MobBT.aggro_radius_for(MobBT.detection_range(mob), level, player_level)
   end
 
   defp eligible?(_mob, _player, _distance), do: false

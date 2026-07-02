@@ -265,6 +265,7 @@ defmodule ThistleTea.Game.World.Loader.Mob do
         combat_reach: mob.unit.combat_reach,
         level: mob.unit.level,
         unit_flags: mob.unit.flags,
+        detection_range: mob.internal.creature.detection_range,
         display_id: mob.unit.display_id,
         attacker_count: 0,
         alive?: mob.unit.health > 0,

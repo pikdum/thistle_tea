@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   movement.
   """
   alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
   alias ThistleTea.Game.Entity.Data.Component.Internal.Loot
   alias ThistleTea.Game.Entity.Data.Component.Internal.Spawn
   alias ThistleTea.Game.Entity.Data.Component.Internal.WaypointRoute
@@ -48,10 +49,11 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   @deep_bounds_factor 0.5
   @distance_sqr_size_factor 1.0
 
-  @base_aggro_radius 20.0
+  @default_detection_range 20.0
+  @max_db_detection_range 45.0
   @max_level_aggro_bonus 25
   @min_aggro_radius 5.0
-  @max_aggro_radius @base_aggro_radius + @max_level_aggro_bonus
+  @max_aggro_radius @max_db_detection_range + @max_level_aggro_bonus
   @aggro_check_delay 5_000
   @dead_idle_delay 1_000
   @blocked_retry_delay 1_000
@@ -301,7 +303,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   end
 
   defp nearby_aggro_candidates(%Mob{} = state) do
-    World.nearby_players(state, @max_aggro_radius) ++ World.nearby_mobs(state, @max_aggro_radius)
+    radius = detection_range(state) + @max_level_aggro_bonus
+    World.nearby_players(state, radius) ++ World.nearby_mobs(state, radius)
   end
 
   defp aggro_candidate?(%Mob{} = state, guid, distance) when is_integer(guid) and is_number(distance) do
@@ -312,16 +315,31 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
 
   defp aggro_radius(%Mob{unit: %Unit{level: level}} = state, target_guid)
        when is_integer(level) and is_integer(target_guid) do
-    aggro_radius_for(level, target_level(target_guid), detect_range_modifier(state))
+    aggro_radius_for(detection_range(state), level, target_level(target_guid), detect_range_modifier(state))
   end
 
-  defp aggro_radius(%Mob{}, _target_guid), do: @base_aggro_radius
+  defp aggro_radius(%Mob{} = state, _target_guid), do: detection_range(state)
 
-  def aggro_radius_for(level, target_level, modifier \\ 0)
-      when is_integer(level) and is_integer(target_level) and is_integer(modifier) do
+  def aggro_radius_for(detection_range, level, target_level, modifier \\ 0)
+
+  def aggro_radius_for(detection_range, _level, _target_level, _modifier)
+      when is_number(detection_range) and detection_range < 1 do
+    0.0
+  end
+
+  def aggro_radius_for(detection_range, level, target_level, modifier)
+      when is_number(detection_range) and is_integer(level) and is_integer(target_level) and is_integer(modifier) do
     level_diff = max(target_level - level, -@max_level_aggro_bonus)
-    max(@base_aggro_radius - level_diff + modifier, @min_aggro_radius)
+    max(detection_range - level_diff + modifier, min(detection_range, @min_aggro_radius))
   end
+
+  def detection_range(%Mob{internal: %Internal{creature: %Creature{detection_range: range}}}) when is_number(range) do
+    range
+  end
+
+  def detection_range(%{detection_range: range}) when is_number(range), do: range
+
+  def detection_range(_state), do: @default_detection_range
 
   defp detect_range_modifier(%Mob{} = state) do
     state
