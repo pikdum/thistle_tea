@@ -124,6 +124,17 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
     %__MODULE__{type: :stand_state, stand_state: stand_state}
   end
 
+  def spell_start(source_guid, spell_id, cast_time_ms, raw_targets)
+      when is_integer(source_guid) and is_integer(spell_id) and is_integer(cast_time_ms) and is_binary(raw_targets) do
+    %__MODULE__{
+      type: :spell_start,
+      source_guid: source_guid,
+      spell_id: spell_id,
+      duration_ms: cast_time_ms,
+      raw_targets: raw_targets
+    }
+  end
+
   def spell_go(source_guid, spell_id, hit_guids, raw_targets, cast_item_guid \\ nil)
       when is_integer(source_guid) and is_integer(spell_id) and is_list(hit_guids) and is_binary(raw_targets) do
     %__MODULE__{

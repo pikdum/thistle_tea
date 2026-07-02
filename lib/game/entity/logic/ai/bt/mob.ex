@@ -1,7 +1,8 @@
 defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   @moduledoc """
-  The mob behavior tree: aggro checks, chasing and melee combat, tethering
-  back to spawn, and idle wandering or waypoint-route movement.
+  The mob behavior tree: aggro checks, chasing and melee combat, spell-list
+  casting, tethering back to spawn, and idle wandering or waypoint-route
+  movement.
   """
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Internal.Loot
@@ -14,7 +15,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Aura, as: AuraBT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AI.BT.Combat, as: CombatBT
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells, as: MobSpells
   alias ThistleTea.Game.Entity.Logic.AI.BT.Regen, as: RegenBT
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Spell, as: SpellBT
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
   alias ThistleTea.Game.Entity.Logic.Combat, as: CombatLogic
   alias ThistleTea.Game.Entity.Logic.Core
@@ -100,6 +103,12 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
             BT.action(&clear_combat/2),
             BT.action(&heal_to_full/2),
             BT.action(&move_to_target/2)
+          ]),
+          SpellBT.casting_sequence(),
+          MobSpells.step(),
+          BT.sequence([
+            BT.condition(&target_valid_same_map?/2),
+            MobSpells.hold_ranged_step()
           ]),
           BT.sequence([
             BT.condition(&target_valid_same_map?/2),
@@ -411,11 +420,13 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
       |> Blackboard.clear_chase()
       |> Blackboard.clear_attack()
       |> Blackboard.reset_spread()
+      |> Blackboard.reset_spells()
 
     state = %{state | unit: unit, internal: internal}
 
     state =
       state
+      |> SpellBT.clear_cast()
       |> CombatLogic.sync_combat_flag()
       |> Event.enqueue(clear_combat_events(state.object.guid, target))
       |> Core.mark_broadcast_update()
@@ -483,6 +494,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
       [
         {:attack, attack_delay},
         {:chase, chase_delay},
+        {:spell, MobSpells.next_spell_delay(state, blackboard, now)},
         {:aura, aura_delay(state, now)},
         {:regen, regen_delay(state, blackboard, now)}
       ]

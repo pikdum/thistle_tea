@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.World.Loader.Mob do
   """
   alias ThistleTea.DB.Mangos
   alias ThistleTea.DBC
+  alias ThistleTea.Game.Entity.Data.CreatureSpell
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Loader.Faction, as: FactionLoader
@@ -30,19 +31,41 @@ defmodule ThistleTea.Game.World.Loader.Mob do
     |> load_spells()
   end
 
-  defp load_spells(%Mangos.Creature{creature_template: %Mangos.CreatureTemplate{entry: entry}} = creature) do
-    spell_ids =
-      case Mangos.Repo.get(Mangos.CreatureTemplateSpells, entry) do
+  defp load_spells(%Mangos.Creature{creature_template: %Mangos.CreatureTemplate{} = template} = creature) do
+    template_spell_ids =
+      case Mangos.Repo.get(Mangos.CreatureTemplateSpells, template.entry) do
         %Mangos.CreatureTemplateSpells{} = row -> Mangos.CreatureTemplateSpells.spell_ids(row)
         _ -> []
       end
 
-    Map.put(creature, :spellbook, SpellLoader.build_spellbook(spell_ids))
+    spell_list = load_spell_list(template.spell_list_id)
+    spellbook = SpellLoader.build_spellbook(template_spell_ids ++ Enum.map(spell_list, & &1.spell_id))
+
+    creature
+    |> Map.put(:spellbook, spellbook)
+    |> Map.put(:spell_list, Enum.filter(spell_list, &Map.has_key?(spellbook, &1.spell_id)))
   end
 
   defp load_spells(%Mangos.Creature{} = creature) do
-    Map.put(creature, :spellbook, %{})
+    creature
+    |> Map.put(:spellbook, %{})
+    |> Map.put(:spell_list, [])
   end
+
+  defp load_spell_list(list_id) when is_integer(list_id) and list_id > 0 do
+    case Mangos.Repo.get(Mangos.CreatureSpells, list_id) do
+      %Mangos.CreatureSpells{} = row ->
+        row
+        |> Mangos.CreatureSpells.slots()
+        |> Enum.map(&CreatureSpell.build/1)
+        |> Enum.reject(&is_nil/1)
+
+      _ ->
+        []
+    end
+  end
+
+  defp load_spell_list(_list_id), do: []
 
   defp load_creature_movement(%Mangos.Creature{} = creature) do
     creature_movement =

@@ -21,7 +21,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Blackboard do
             next_spread_at: 0,
             spread_attempts: 0,
             spreading: false,
-            confused_anchor: nil
+            confused_anchor: nil,
+            spell_timers: nil,
+            next_spell_list_at: 0,
+            combat_movement: true
 
   def new do
     %__MODULE__{}
@@ -102,6 +105,34 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Blackboard do
 
   def clear_attack(%__MODULE__{} = blackboard) do
     %{blackboard | next_attack_at: 0, attack_started: false, auto_attacking: false}
+  end
+
+  def reset_spells(%__MODULE__{} = blackboard) do
+    blackboard
+    |> Map.put(:spell_timers, nil)
+    |> Map.put(:next_spell_list_at, 0)
+    |> Map.put(:combat_movement, true)
+  end
+
+  def combat_movement?(%__MODULE__{} = blackboard) do
+    Map.get(blackboard, :combat_movement) != false
+  end
+
+  def set_combat_movement(%__MODULE__{} = blackboard, enabled) when is_boolean(enabled) do
+    Map.put(blackboard, :combat_movement, enabled)
+  end
+
+  def spell_timer_ready?(%__MODULE__{} = blackboard, index, now) when is_integer(index) and is_integer(now) do
+    case Map.get(blackboard, :spell_timers) do
+      %{^index => ready_at} when is_integer(ready_at) -> now >= ready_at
+      _ -> false
+    end
+  end
+
+  def put_spell_timer(%__MODULE__{} = blackboard, index, delay_ms, now)
+      when is_integer(index) and is_integer(delay_ms) and is_integer(now) do
+    timers = Map.get(blackboard, :spell_timers) || %{}
+    Map.put(blackboard, :spell_timers, Map.put(timers, index, now + delay_ms))
   end
 
   def clear_attack_started(%__MODULE__{} = blackboard) do

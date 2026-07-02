@@ -104,7 +104,8 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
           rank: ct.rank,
           type_flags: ct.creature_type_flags,
           damage_multiplier: ct.damage_multiplier,
-          regenerate_stats: ct.regenerate_stats
+          regenerate_stats: ct.regenerate_stats,
+          spells: Map.get(c, :spell_list, [])
         },
         spawn: %Spawn{
           unit: unit,
@@ -149,6 +150,7 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
       internal
       | in_combat: false,
         last_hostile_time: nil,
+        casting: nil,
         running: false,
         movement_start_time: nil,
         movement_start_position: nil,

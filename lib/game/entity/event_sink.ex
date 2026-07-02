@@ -19,6 +19,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
   alias ThistleTea.Game.Entity.Server.DynamicObject, as: DynamicObjectServer
   alias ThistleTea.Game.Math
   alias ThistleTea.Game.Network
+  alias ThistleTea.Game.Network.BinaryUtils
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Opcodes
   alias ThistleTea.Game.Network.Packet
@@ -180,7 +181,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
 
   def emit(entity, %Event{type: :monster_move}), do: entity
 
-  def emit(entity, %Event{type: :spell_cast_result, spell_id: spell_id}) do
+  def emit(%Character{} = entity, %Event{type: :spell_cast_result, spell_id: spell_id}) do
     Network.send_packet(%Message.SmsgCastResult{
       spell: spell_id,
       result: 0,
@@ -194,6 +195,28 @@ defmodule ThistleTea.Game.Entity.EventSink do
 
     entity
   end
+
+  def emit(entity, %Event{type: :spell_cast_result}), do: entity
+
+  def emit(%{object: %{guid: guid}} = entity, %Event{type: :spell_start} = event) when is_integer(guid) do
+    packed_caster = BinaryUtils.pack_guid(event.source_guid || guid)
+
+    %Message.SmsgSpellStart{
+      cast_item: packed_caster,
+      caster: packed_caster,
+      spell: event.spell_id,
+      flags: 0x2,
+      timer: event.duration_ms || 0,
+      targets: event.raw_targets || <<>>,
+      ammo_display_id: nil,
+      ammo_inventory_type: nil
+    }
+    |> World.broadcast_packet(entity)
+
+    entity
+  end
+
+  def emit(entity, %Event{type: :spell_start}), do: entity
 
   def emit(%Character{} = entity, %Event{type: :spell_cooldown} = event) do
     Network.send_packet(%Message.SmsgSpellCooldown{
