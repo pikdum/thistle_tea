@@ -29,7 +29,8 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStep do
             position: nil,
             condition_id: 0,
             condition: nil,
-            texts: []
+            texts: [],
+            sub_scripts: %{}
 
   @flag_swap_initial_targets 0x01
   @flag_swap_final_targets 0x02
@@ -87,18 +88,66 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStep do
   defp flag?(flags, bit) when is_integer(flags), do: (flags &&& bit) != 0
   defp flag?(_flags, _bit), do: false
 
+  def nested_script_ids(%__MODULE__{command: :summon_creature, dataint2: script_id}) when script_id > 0 do
+    [script_id]
+  end
+
+  def nested_script_ids(%__MODULE__{command: :start_script} = step) do
+    Enum.filter([step.datalong, step.datalong2, step.datalong3, step.datalong4], &(is_integer(&1) and &1 > 0))
+  end
+
+  def nested_script_ids(%__MODULE__{}), do: []
+
+  def start_script_options(%__MODULE__{command: :start_script} = step) do
+    [
+      {step.datalong, step.dataint},
+      {step.datalong2, step.dataint2},
+      {step.datalong3, step.dataint3},
+      {step.datalong4, step.dataint4}
+    ]
+    |> Enum.filter(fn {script_id, _chance} -> is_integer(script_id) and script_id > 0 end)
+  end
+
+  def start_script_options(%__MODULE__{}), do: []
+
+  @summon_flag_set_run 0x01
+  @summon_flag_unique 0x04
+  @summon_flag_unique_temp 0x08
+
+  def summon(%__MODULE__{command: :summon_creature} = step) do
+    %{
+      entry: step.datalong,
+      despawn_delay_ms: step.datalong2,
+      unique_limit: step.datalong3,
+      unique_distance: step.datalong4,
+      run?: flag?(step.dataint, @summon_flag_set_run),
+      unique?: flag?(step.dataint, @summon_flag_unique) or flag?(step.dataint, @summon_flag_unique_temp),
+      script_id: step.dataint2,
+      attack_target: decode_target_type(step.dataint3),
+      despawn_type: step.dataint4,
+      position: step.position
+    }
+  end
+
   defp command(0), do: :talk
   defp command(1), do: :emote
   defp command(3), do: :move_to
+  defp command(10), do: :summon_creature
   defp command(14), do: :remove_aura
   defp command(15), do: :cast_spell
+  defp command(18), do: :despawn
   defp command(23), do: :morph
   defp command(25), do: :set_run
+  defp command(26), do: :attack_start
+  defp command(39), do: :start_script
   defp command(44), do: :set_phase
   defp command(45), do: :set_phase_random
   defp command(46), do: :set_phase_range
   defp command(47), do: :flee
   defp command(other), do: {:unsupported, other}
+
+  def decode_target_type(value) when is_integer(value) and value < 0, do: nil
+  def decode_target_type(value), do: target_type(value)
 
   defp target_type(0), do: :provided
   defp target_type(1), do: :victim

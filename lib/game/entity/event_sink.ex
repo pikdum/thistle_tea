@@ -17,6 +17,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
   alias ThistleTea.Game.Entity.Logic.SpellEffect
   alias ThistleTea.Game.Entity.Logic.SpellTarget
   alias ThistleTea.Game.Entity.Server.DynamicObject, as: DynamicObjectServer
+  alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Math
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.BinaryUtils
@@ -30,7 +31,9 @@ defmodule ThistleTea.Game.Entity.EventSink do
   alias ThistleTea.Game.World.AreaEffects
   alias ThistleTea.Game.World.ChaseWatch
   alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
+  alias ThistleTea.Game.World.Loader.Mob, as: MobLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
+  alias ThistleTea.Game.World.Loader.Summon, as: SummonLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Pathfinding
 
@@ -504,6 +507,43 @@ defmodule ThistleTea.Game.Entity.EventSink do
     entity
   end
 
+  def emit(%{internal: %Internal{map: map}} = entity, %Event{type: :summon_creature, summon: summon} = event)
+      when is_integer(map) do
+    with true <- summon_allowed?(map, summon),
+         %Mob{} = mob <-
+           SummonLoader.build(summon.entry, map, summon.position,
+             despawn_type: summon.despawn_type,
+             despawn_delay_ms: summon.despawn_delay_ms,
+             run?: summon.run?
+           ),
+         {:ok, pid} <- MobLoader.start_mob(mob) do
+      if is_integer(event.target_guid) and event.target_guid > 0 and summon.attack_target != nil do
+        send(pid, {:force_attack, event.target_guid})
+      end
+
+      if event.steps != [] do
+        send(pid, {:ai_script_steps, event.steps, event.target_guid})
+      end
+    end
+
+    entity
+  end
+
+  def emit(entity, %Event{type: :summon_creature}), do: entity
+
+  def emit(entity, %Event{type: :despawn_self} = event) do
+    Process.send_after(self(), {:despawn_creature, event.respawn_delay_ms}, event.duration_ms || 0)
+    entity
+  end
+
+  def emit(entity, %Event{type: :attack_start, target_guid: target_guid})
+      when is_integer(target_guid) and target_guid > 0 do
+    send(self(), {:force_attack, target_guid})
+    entity
+  end
+
+  def emit(entity, %Event{type: :attack_start}), do: entity
+
   def emit(entity, %Event{type: :trigger_spell} = event) do
     case SpellLoader.load(event.spell_id) do
       nil ->
@@ -539,6 +579,22 @@ defmodule ThistleTea.Game.Entity.EventSink do
 
   defp owner_level(%{unit: %{level: level}}) when is_integer(level), do: level
   defp owner_level(_entity), do: 1
+
+  @summon_unique_default_range 50.0
+
+  defp summon_allowed?(map, %{unique?: true, entry: entry, position: {x, y, z, _o}} = summon) do
+    limit = max(summon.unique_limit, 1)
+    range = if summon.unique_distance > 0, do: summon.unique_distance, else: @summon_unique_default_range
+
+    existing =
+      map
+      |> World.nearby_mobs_at({x, y, z}, range)
+      |> Enum.count(fn {guid, _distance} -> Guid.entry(guid) == entry end)
+
+    existing < limit
+  end
+
+  defp summon_allowed?(_map, _summon), do: true
 
   defp clamp_leap_destination(%{movement_block: %{position: {cx, cy, cz, _o}}}, map, {x, y, z}) do
     z = snap_to_terrain_height(map, {x, y}, z, cz)

@@ -174,6 +174,29 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
 
   def apply_addon_auras(%__MODULE__{} = mob, _now), do: mob
 
+  def prepare_summon(%__MODULE__{internal: %Internal{spawn: %Spawn{} = spawn_state} = internal} = mob, opts)
+      when is_list(opts) do
+    spawn_state = %{
+      spawn_state
+      | temporary?: true,
+        despawn_type: Keyword.get(opts, :despawn_type),
+        despawn_delay_ms: Keyword.get(opts, :despawn_delay_ms),
+        movement_type: 0,
+        waypoint_route: nil
+    }
+
+    creature = %{internal.creature | db_guid: nil}
+
+    internal = %{
+      internal
+      | spawn: spawn_state,
+        creature: creature,
+        running: Keyword.get(opts, :run?, false) == true
+    }
+
+    %{mob | internal: internal}
+  end
+
   @npc_flag_spirit_service 0x60
 
   def visibility_metadata(%__MODULE__{unit: %Unit{} = unit, internal: %Internal{creature: %Creature{} = creature}}) do

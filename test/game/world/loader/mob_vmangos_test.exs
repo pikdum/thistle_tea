@@ -4,6 +4,7 @@ defmodule ThistleTea.Game.World.Loader.MobVmangosTest do
   alias ThistleTea.DB.Mangos
   alias ThistleTea.Game.Entity.Data.Condition
   alias ThistleTea.Game.Entity.Data.Mob
+  alias ThistleTea.Game.Entity.Data.ScriptStep
   alias ThistleTea.Game.World.Loader.Mob, as: MobLoader
 
   @moduletag :vmangos_db
@@ -72,6 +73,20 @@ defmodule ThistleTea.Game.World.Loader.MobVmangosTest do
       assert %Condition{type: :or, children: [left, right]} = emote_event.condition
       assert %Condition{type: :db_guid, value1: 80_152} = left
       assert %Condition{type: :db_guid, value1: 80_151} = right
+    end
+
+    test "resolves start_script generic sub-scripts with texts" do
+      mob = mob(550)
+
+      aggro = Enum.find(mob.internal.creature.ai_events, &(&1.event_type == :aggro))
+
+      assert [[%ScriptStep{command: :start_script} = step]] = aggro.actions
+      assert ScriptStep.start_script_options(step) == [{55_001, 50}, {55_002, 50}]
+
+      assert [%ScriptStep{command: :talk, texts: [%{text: text} | _] = texts}] = step.sub_scripts[55_001]
+      assert length(texts) == 4
+      assert is_binary(text) and text != ""
+      assert [%ScriptStep{command: :talk, texts: [_ | _]}] = step.sub_scripts[55_002]
     end
 
     test "loads template auras from creature_template" do

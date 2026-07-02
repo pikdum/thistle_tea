@@ -4,10 +4,11 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
   actions and waypoint scripts. `run/5` executes the immediately-due steps and
   defers delayed steps back to the owning process through a `script_steps`
   event; `execute_steps/5` runs a batch whose delay already elapsed. Commands
-  act on the pure entity state — enqueueing chat/emote/cast events, swapping
-  the unit display id for morphs, and mutating the blackboard phase, gait, or
-  flee state — steps with a failing condition are skipped, and unsupported
-  commands are logged and skipped. Casts honor the triggered cast flag: triggered and
+  act on the pure entity state — enqueueing chat/emote/cast/summon/despawn
+  events, swapping the unit display id for morphs, recursing into resolved
+  generic scripts for start-script steps, and mutating the blackboard phase,
+  gait, or flee state — steps with a failing condition are skipped, and
+  unsupported commands are logged and skipped. Casts honor the triggered cast flag: triggered and
   out-of-combat casts go through the trigger-spell pipeline, in-combat casts
   through the mob casting machinery.
   """
@@ -106,6 +107,38 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
     {state, Blackboard.set_run_mode(blackboard, run?)}
   end
 
+  defp execute(state, blackboard, %ScriptStep{command: :summon_creature} = step, target_guid, _now) do
+    summon =
+      step
+      |> ScriptStep.summon()
+      |> resolve_summon_position(state)
+      |> Map.put(:attack_guid, resolve_summon_attack(state, step, target_guid))
+
+    steps = Map.get(step.sub_scripts, summon.script_id, [])
+    {Event.enqueue(state, Event.summon_creature(summon, steps, target_guid)), blackboard}
+  end
+
+  defp execute(state, blackboard, %ScriptStep{command: :despawn} = step, _target_guid, _now) do
+    {Event.enqueue(state, Event.despawn_self(step.datalong, step.datalong2 * 1_000)), blackboard}
+  end
+
+  defp execute(state, blackboard, %ScriptStep{command: :attack_start} = step, target_guid, _now) do
+    case resolve_target(state, step, target_guid) do
+      guid when is_integer(guid) and guid > 0 and guid != state.object.guid ->
+        {Event.enqueue(state, Event.attack_start(guid)), blackboard}
+
+      _ ->
+        {state, blackboard}
+    end
+  end
+
+  defp execute(state, blackboard, %ScriptStep{command: :start_script} = step, target_guid, now) do
+    case choose_start_script(step) do
+      nil -> {state, blackboard}
+      script_id -> run(state, blackboard, Map.get(step.sub_scripts, script_id, []), target_guid, now)
+    end
+  end
+
   defp execute(state, blackboard, %ScriptStep{command: :set_phase} = step, _target_guid, _now) do
     {state, put_phase(blackboard, set_phase_value(blackboard, step))}
   end
@@ -156,6 +189,42 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
 
       _ ->
         state
+    end
+  end
+
+  defp resolve_summon_position(%{position: {x, y, z, _o}} = summon, _state) when x != 0.0 or y != 0.0 or z != 0.0 do
+    summon
+  end
+
+  defp resolve_summon_position(summon, %{movement_block: %{position: position}}) do
+    %{summon | position: position}
+  end
+
+  defp resolve_summon_attack(_state, %ScriptStep{} = step, _target_guid)
+       when is_nil(step.dataint3) or step.dataint3 < 0 do
+    nil
+  end
+
+  defp resolve_summon_attack(state, %ScriptStep{} = step, target_guid) do
+    attack_step = %{step | target_type: ScriptStep.decode_target_type(step.dataint3), target_self?: false}
+    resolve_target(state, attack_step, target_guid)
+  end
+
+  defp choose_start_script(%ScriptStep{} = step) do
+    roll = :rand.uniform(100)
+
+    step
+    |> ScriptStep.start_script_options()
+    |> choose_start_script(roll, 0)
+  end
+
+  defp choose_start_script([], _roll, _sum), do: nil
+
+  defp choose_start_script([{script_id, chance} | rest], roll, sum) do
+    if roll > sum and roll <= sum + chance do
+      script_id
+    else
+      choose_start_script(rest, roll, sum + chance)
     end
   end
 

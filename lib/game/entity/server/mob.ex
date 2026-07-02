@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Internal.Loot
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Spawn
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.EventSink
@@ -46,6 +47,8 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
   @ai_tick_retry_ms 1_000
   @dynamic_flag_tapped 0x0004
+  @summon_despawn_retry_ms 10_000
+  @ooc_gated_despawn_types [1, 2, 4]
 
   def start_link(%Mob{} = state) do
     GenServer.start_link(__MODULE__, state, name: EntityRegistry.via(state.object.guid))
@@ -64,7 +67,10 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
       |> EventAI.with_blackboard(&EventAI.on_spawned(&1, &2, Time.now()))
       |> EventSink.emit_pending()
 
-    state = schedule_ai_tick(state, 0)
+    state =
+      state
+      |> schedule_summon_despawn()
+      |> schedule_ai_tick(0)
 
     {:ok, state}
   end
@@ -266,6 +272,32 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
       {:noreply, state}
   end
 
+  def handle_info({:force_attack, target_guid}, %Mob{} = state) when is_integer(target_guid) do
+    if Core.dead?(state) or Corpse.removed?(state) do
+      {:noreply, state}
+    else
+      state =
+        state
+        |> engage_combat(target_guid)
+        |> wake_ai_tick()
+
+      {:noreply, state, {:continue, :maybe_broadcast}}
+    end
+  end
+
+  def handle_info(:summon_despawn, %Mob{} = state) do
+    if state.internal.in_combat and ooc_gated_despawn?(state) do
+      Process.send_after(self(), :summon_despawn, @summon_despawn_retry_ms)
+      {:noreply, state}
+    else
+      {:noreply, Respawn.despawn(state, nil)}
+    end
+  end
+
+  def handle_info({:despawn_creature, respawn_delay_ms}, %Mob{} = state) do
+    {:noreply, Respawn.despawn(state, respawn_delay_ms)}
+  end
+
   def handle_info({:event_stop, _event}, state) do
     pid = self()
 
@@ -332,6 +364,22 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     Visibility.leave_entity(state)
     Metadata.delete(state.object.guid)
   end
+
+  defp schedule_summon_despawn(
+         %Mob{internal: %Internal{spawn: %Spawn{temporary?: true, despawn_delay_ms: delay}}} = state
+       )
+       when is_integer(delay) and delay > 0 do
+    Process.send_after(self(), :summon_despawn, delay)
+    state
+  end
+
+  defp schedule_summon_despawn(%Mob{} = state), do: state
+
+  defp ooc_gated_despawn?(%Mob{internal: %Internal{spawn: %Spawn{despawn_type: despawn_type}}}) do
+    despawn_type in @ooc_gated_despawn_types
+  end
+
+  defp ooc_gated_despawn?(%Mob{}), do: false
 
   defp release_victim(%Mob{internal: %Internal{in_combat: true}, unit: %Unit{target: target}})
        when is_integer(target) and target > 0 do

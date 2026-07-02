@@ -42,7 +42,9 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
     :text,
     :chat_type,
     :emote_id,
-    :steps
+    :steps,
+    :summon,
+    :respawn_delay_ms
   ]
 
   def spell_damage(source_guid, target_guid, spell, damage, opts \\ []) do
@@ -293,6 +295,19 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
 
   def script_steps(steps, target_guid, delay_ms) when is_list(steps) and is_integer(delay_ms) do
     %__MODULE__{type: :script_steps, steps: steps, target_guid: target_guid, duration_ms: delay_ms}
+  end
+
+  def summon_creature(summon, steps, target_guid) when is_map(summon) and is_list(steps) do
+    %__MODULE__{type: :summon_creature, summon: summon, steps: steps, target_guid: target_guid}
+  end
+
+  def despawn_self(despawn_delay_ms, respawn_delay_ms)
+      when is_integer(despawn_delay_ms) and is_integer(respawn_delay_ms) do
+    %__MODULE__{type: :despawn_self, duration_ms: despawn_delay_ms, respawn_delay_ms: respawn_delay_ms}
+  end
+
+  def attack_start(target_guid) when is_integer(target_guid) do
+    %__MODULE__{type: :attack_start, target_guid: target_guid}
   end
 
   def drain(%{internal: %{events: events} = internal} = entity) when is_list(events) do

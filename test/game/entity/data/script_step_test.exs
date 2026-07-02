@@ -45,7 +45,7 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStepTest do
           id: 5,
           delay: 0,
           priority: 0,
-          command: 10,
+          command: 30,
           datalong: 0,
           datalong2: 0,
           datalong3: 0,
@@ -65,7 +65,7 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStepTest do
           condition_id: 0
         })
 
-      assert step.command == {:unsupported, 10}
+      assert step.command == {:unsupported, 30}
       assert step.target_type == {:unsupported, 25}
     end
   end

@@ -185,6 +185,92 @@ defmodule ThistleTea.Game.Entity.Logic.AI.ScriptTest do
       assert mob.internal.events == []
     end
 
+    test "summon_creature enqueues a summon event with explicit coordinates", %{mob: mob} do
+      step = %ScriptStep{
+        command: :summon_creature,
+        datalong: 1_500,
+        datalong2: 30_000,
+        dataint: 0x01,
+        dataint3: -1,
+        dataint4: 3,
+        position: {10.0, 20.0, 30.0, 1.5}
+      }
+
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], nil, 1_000)
+
+      assert [%Event{type: :summon_creature, summon: summon, steps: []}] = mob.internal.events
+      assert summon.entry == 1_500
+      assert summon.despawn_delay_ms == 30_000
+      assert summon.despawn_type == 3
+      assert summon.run?
+      refute summon.unique?
+      assert summon.position == {10.0, 20.0, 30.0, 1.5}
+      assert summon.attack_guid == nil
+    end
+
+    test "summon_creature falls back to the summoner position and resolves the attack target", %{mob: mob} do
+      victim = Guid.from_low_guid(:player, 9)
+
+      mob = %{
+        mob
+        | unit: %{mob.unit | target: victim},
+          movement_block: %{mob.movement_block | position: {5.0, 6.0, 7.0, 0.5}}
+      }
+
+      sub_steps = [%ScriptStep{command: :emote, datalong: 11}]
+
+      step = %ScriptStep{
+        command: :summon_creature,
+        datalong: 1_500,
+        dataint2: 777,
+        dataint3: 1,
+        position: {0.0, 0.0, 0.0, 0.0},
+        sub_scripts: %{777 => sub_steps}
+      }
+
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], nil, 1_000)
+
+      assert [%Event{type: :summon_creature, summon: summon, steps: ^sub_steps}] = mob.internal.events
+      assert summon.position == {5.0, 6.0, 7.0, 0.5}
+      assert summon.attack_guid == victim
+    end
+
+    test "despawn enqueues a despawn_self event with seconds-scaled respawn delay", %{mob: mob} do
+      step = %ScriptStep{command: :despawn, datalong: 2_000, datalong2: 30}
+
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], nil, 1_000)
+
+      assert [%Event{type: :despawn_self, duration_ms: 2_000, respawn_delay_ms: 30_000}] = mob.internal.events
+    end
+
+    test "attack_start targets the victim and skips without one", %{mob: mob} do
+      step = %ScriptStep{command: :attack_start, target_type: :victim}
+
+      {idle, _blackboard} = Script.run(mob, Blackboard.new(), [step], nil, 1_000)
+      assert idle.internal.events == []
+
+      victim = Guid.from_low_guid(:player, 9)
+      mob = %{mob | unit: %{mob.unit | target: victim}}
+
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], nil, 1_000)
+      assert [%Event{type: :attack_start, target_guid: ^victim}] = mob.internal.events
+    end
+
+    test "start_script runs the chosen resolved sub-script", %{mob: mob} do
+      sub_steps = [%ScriptStep{command: :emote, datalong: 11}]
+
+      step = %ScriptStep{
+        command: :start_script,
+        datalong: 555,
+        dataint: 100,
+        sub_scripts: %{555 => sub_steps}
+      }
+
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], nil, 1_000)
+
+      assert [%Event{type: :emote, emote_id: 11}] = mob.internal.events
+    end
+
     test "delayed steps are deferred through a script_steps event", %{mob: mob} do
       immediate = %ScriptStep{command: :emote, datalong: 11}
       delayed = %ScriptStep{command: :emote, datalong: 22, delay_ms: 4_000}

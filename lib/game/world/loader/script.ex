@@ -1,25 +1,53 @@
 defmodule ThistleTea.Game.World.Loader.Script do
   @moduledoc """
   Loads generic script-command rows (`creature_ai_scripts`,
-  `creature_movement_scripts`, …) into `ScriptStep` structs grouped by script
-  id, resolving the broadcast texts referenced by talk steps so the runtime
-  interpreter never touches the database.
+  `creature_movement_scripts`, `generic_scripts`, …) into `ScriptStep`
+  structs grouped by script id, resolving the broadcast texts referenced by
+  talk steps and recursively resolving the `generic_scripts` referenced by
+  start-script and summon steps (cycle-guarded), so the runtime interpreter
+  never touches the database.
   """
   import Ecto.Query, only: [from: 2]
 
   alias ThistleTea.DB.Mangos
   alias ThistleTea.Game.Entity.Data.ScriptStep
 
-  def load_by_ids(_schema, []), do: %{}
+  def load_by_ids(schema, script_ids), do: load_by_ids(schema, script_ids, MapSet.new())
 
-  def load_by_ids(schema, script_ids) when is_list(script_ids) do
+  defp load_by_ids(_schema, [], _visited), do: %{}
+
+  defp load_by_ids(schema, script_ids, visited) when is_list(script_ids) do
     script_ids
     |> Enum.uniq()
     |> schema.query()
     |> Mangos.Repo.all()
     |> Enum.map(&ScriptStep.build/1)
     |> resolve_texts()
+    |> resolve_nested_scripts(visited)
     |> Enum.group_by(& &1.script_id)
+  end
+
+  defp resolve_nested_scripts(steps, visited) do
+    nested_ids =
+      steps
+      |> Enum.flat_map(&ScriptStep.nested_script_ids/1)
+      |> Enum.uniq()
+      |> Enum.reject(&MapSet.member?(visited, &1))
+
+    if nested_ids == [] do
+      steps
+    else
+      visited = Enum.into(nested_ids, visited)
+      sub_scripts = load_by_ids(Mangos.GenericScript, nested_ids, visited)
+      Enum.map(steps, &attach_sub_scripts(&1, sub_scripts))
+    end
+  end
+
+  defp attach_sub_scripts(%ScriptStep{} = step, sub_scripts) do
+    case ScriptStep.nested_script_ids(step) do
+      [] -> step
+      script_ids -> %{step | sub_scripts: Map.new(script_ids, &{&1, Map.get(sub_scripts, &1, [])})}
+    end
   end
 
   defp resolve_texts(steps) do

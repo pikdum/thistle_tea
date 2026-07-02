@@ -192,8 +192,15 @@ defmodule ThistleTea.Game.World.Loader.Mob do
   end
 
   defp all_steps(ai_events, movement_scripts) do
-    Enum.flat_map(ai_events, fn event -> List.flatten(event.actions) end) ++
-      List.flatten(Map.values(movement_scripts))
+    direct =
+      Enum.flat_map(ai_events, fn event -> List.flatten(event.actions) end) ++
+        List.flatten(Map.values(movement_scripts))
+
+    Enum.flat_map(direct, &with_sub_steps/1)
+  end
+
+  defp with_sub_steps(%ScriptStep{} = step) do
+    [step | step.sub_scripts |> Map.values() |> List.flatten() |> Enum.flat_map(&with_sub_steps/1)]
   end
 
   defp attach_event_condition(%AIEvent{} = event, conditions) do
@@ -208,7 +215,12 @@ defmodule ThistleTea.Game.World.Loader.Mob do
   end
 
   defp attach_step_condition(%ScriptStep{} = step, conditions) do
-    %{step | condition: Map.get(conditions, step.condition_id)}
+    sub_scripts =
+      Map.new(step.sub_scripts, fn {script_id, steps} ->
+        {script_id, Enum.map(steps, &attach_step_condition(&1, conditions))}
+      end)
+
+    %{step | condition: Map.get(conditions, step.condition_id), sub_scripts: sub_scripts}
   end
 
   defp load_movement_scripts(nil), do: nil
@@ -232,10 +244,17 @@ defmodule ThistleTea.Game.World.Loader.Mob do
     movement_steps = creature |> Map.get(:movement_scripts, %{}) |> Map.values()
 
     (event_steps ++ movement_steps)
-    |> Enum.flat_map(fn steps -> Enum.map(steps, &ScriptStep.cast_spell_id/1) end)
+    |> Enum.flat_map(fn steps -> Enum.flat_map(steps, &locally_run_steps/1) end)
+    |> Enum.map(&ScriptStep.cast_spell_id/1)
     |> Enum.filter(&positive?/1)
     |> Enum.uniq()
   end
+
+  defp locally_run_steps(%ScriptStep{command: :start_script} = step) do
+    [step | step.sub_scripts |> Map.values() |> List.flatten() |> Enum.flat_map(&locally_run_steps/1)]
+  end
+
+  defp locally_run_steps(%ScriptStep{} = step), do: [step]
 
   defp load_creature_movement(nil), do: nil
 
