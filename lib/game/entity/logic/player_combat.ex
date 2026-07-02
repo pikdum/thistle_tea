@@ -21,7 +21,7 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombat do
     if active?(character, blackboard) do
       {character, blackboard}
     else
-      {clear(character), Blackboard.clear_attack(blackboard)}
+      {clear(character), Blackboard.clear_auto_attack(blackboard)}
     end
   end
 

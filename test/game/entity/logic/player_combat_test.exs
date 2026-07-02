@@ -36,7 +36,7 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombatTest do
       assert blackboard.next_attack_at == 1_500
     end
 
-    test "clears combat and attack timing once nothing is fighting the player" do
+    test "clears combat but preserves the swing timer once nothing is fighting the player" do
       character = character(in_combat: true)
       Metadata.put(character.object.guid, %{attacker_count: 0})
 
@@ -46,7 +46,8 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombatTest do
 
       assert character.internal.in_combat == false
       assert blackboard.attack_started == false
-      assert blackboard.next_attack_at == 0
+      assert blackboard.auto_attacking == false
+      assert blackboard.next_attack_at == 1_500
     end
 
     test "does not keep combat for a selected target without auto attack" do
