@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.World.Loader.Script do
 
   alias ThistleTea.DB.Mangos
   alias ThistleTea.Game.Entity.Data.ScriptStep
+  alias ThistleTea.Game.Guid
 
   def load_by_ids(schema, script_ids), do: load_by_ids(schema, script_ids, MapSet.new())
 
@@ -23,6 +24,7 @@ defmodule ThistleTea.Game.World.Loader.Script do
     |> Mangos.Repo.all()
     |> Enum.map(&ScriptStep.build/1)
     |> Enum.map(&resolve_mount_display/1)
+    |> Enum.map(&resolve_buddy_guid/1)
     |> resolve_texts()
     |> resolve_nested_scripts(visited)
     |> Enum.group_by(& &1.script_id)
@@ -42,6 +44,16 @@ defmodule ThistleTea.Game.World.Loader.Script do
   end
 
   defp resolve_mount_display(%ScriptStep{} = step), do: step
+
+  defp resolve_buddy_guid(%ScriptStep{target_type: :creature_with_guid, target_param1: db_guid} = step)
+       when is_integer(db_guid) and db_guid > 0 do
+    case Mangos.Repo.get(Mangos.Creature, db_guid) do
+      %Mangos.Creature{id: entry} -> %{step | buddy_guid: Guid.from_low_guid(:mob, entry, db_guid)}
+      _ -> step
+    end
+  end
+
+  defp resolve_buddy_guid(%ScriptStep{} = step), do: step
 
   defp resolve_nested_scripts(steps, visited) do
     nested_ids =

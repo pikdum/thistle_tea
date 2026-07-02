@@ -8,7 +8,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
   events, swapping the unit display id for morphs, recursing into resolved
   generic scripts for start-script steps, and mutating the blackboard phase,
   gait, or flee state — steps with a failing condition are skipped, and
-  unsupported commands are logged and skipped. Casts honor the triggered cast flag: triggered and
+  unsupported commands are logged and skipped. Steps flagged to swap final
+  targets run on the resolved buddy creature instead: they are rewritten to
+  provided-target form and forwarded to the buddy's owning process, matching
+  vmangos source/target swap semantics. Casts honor the triggered cast flag: triggered and
   out-of-combat casts go through the trigger-spell pipeline, in-combat casts
   through the mob casting machinery.
   """
@@ -24,6 +27,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.Entity.Logic.Movement
+  alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.World
 
   require Logger
 
@@ -41,12 +46,65 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
 
   def execute_steps(state, %Blackboard{} = blackboard, steps, target_guid, now) when is_list(steps) do
     Enum.reduce(steps, {state, blackboard}, fn %ScriptStep{} = step, {state, blackboard} ->
-      if ConditionLogic.met?(state, step.condition) do
-        execute(state, blackboard, step, target_guid, now)
-      else
-        {state, blackboard}
-      end
+      dispatch(state, blackboard, step, target_guid, now)
     end)
+  end
+
+  defp dispatch(
+         %{object: %{guid: self_guid}} = state,
+         blackboard,
+         %ScriptStep{swap_final?: true} = step,
+         target_guid,
+         now
+       ) do
+    case resolve_target(state, step, target_guid) do
+      ^self_guid ->
+        dispatch(state, blackboard, %{step | swap_final?: false}, target_guid, now)
+
+      buddy_guid when is_integer(buddy_guid) and buddy_guid > 0 ->
+        forward_to_buddy(state, blackboard, step, buddy_guid, target_guid)
+
+      _ ->
+        {state, blackboard}
+    end
+  end
+
+  defp dispatch(state, blackboard, %ScriptStep{swap_initial?: true} = step, _target_guid, _now) do
+    Logger.debug("Script #{step.script_id}: swap-initial-targets unsupported, skipping")
+    {state, blackboard}
+  end
+
+  defp dispatch(state, blackboard, %ScriptStep{} = step, target_guid, now) do
+    if ConditionLogic.met?(state, step.condition) do
+      execute(state, blackboard, step, target_guid, now)
+    else
+      {state, blackboard}
+    end
+  end
+
+  defp forward_to_buddy(
+         %{object: %{guid: self_guid}} = state,
+         blackboard,
+         %ScriptStep{} = step,
+         buddy_guid,
+         target_guid
+       ) do
+    if Guid.entity_type(buddy_guid) == :mob do
+      forwarded = %{
+        step
+        | swap_initial?: false,
+          swap_final?: false,
+          target_self?: false,
+          target_type: :provided,
+          delay_ms: 0
+      }
+
+      provided = if step.swap_initial?, do: target_guid, else: self_guid
+      {Event.enqueue(state, Event.forward_script_steps(buddy_guid, [forwarded], provided)), blackboard}
+    else
+      Logger.debug("Script #{step.script_id}: swap-final target is not a creature, skipping")
+      {state, blackboard}
+    end
   end
 
   defp schedule_delayed(state, [], _target_guid), do: state
@@ -370,7 +428,16 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
   end
 
   defp resolve_target(%{object: %{guid: guid}}, %ScriptStep{target_self?: true}, _provided), do: guid
-  defp resolve_target(%{object: %{guid: guid}}, %ScriptStep{target_type: :self}, _provided), do: guid
+  defp resolve_target(%{object: %{guid: guid}}, %ScriptStep{target_type: :owner_or_self}, _provided), do: guid
+
+  defp resolve_target(_state, %ScriptStep{target_type: :creature_with_guid, buddy_guid: buddy_guid}, _provided) do
+    buddy_guid
+  end
+
+  defp resolve_target(state, %ScriptStep{target_type: target_type} = step, _provided)
+       when target_type in [:nearest_creature_with_entry, :random_creature_with_entry] do
+    find_creature_with_entry(state, step, target_type)
+  end
 
   defp resolve_target(state, %ScriptStep{target_type: :provided}, provided) do
     provided || victim(state)
@@ -413,4 +480,27 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
 
   defp victim(%{unit: %Unit{target: target}}) when is_integer(target) and target > 0, do: target
   defp victim(_state), do: nil
+
+  @default_buddy_radius 30.0
+
+  defp find_creature_with_entry(
+         %{object: %{guid: self_guid}, internal: %{map: map}, movement_block: %{position: {x, y, z, _o}}},
+         %ScriptStep{target_param1: entry, target_param2: radius},
+         target_type
+       ) do
+    range = if is_number(radius) and radius > 0, do: radius, else: @default_buddy_radius
+
+    candidates =
+      map
+      |> World.nearby_mobs_at({x, y, z}, range)
+      |> Enum.filter(fn {guid, _distance} -> guid != self_guid and Guid.entry(guid) == entry end)
+
+    case {target_type, candidates} do
+      {_target_type, []} -> nil
+      {:nearest_creature_with_entry, candidates} -> candidates |> Enum.min_by(&elem(&1, 1)) |> elem(0)
+      {:random_creature_with_entry, candidates} -> candidates |> Enum.random() |> elem(0)
+    end
+  end
+
+  defp find_creature_with_entry(_state, %ScriptStep{}, _target_type), do: nil
 end

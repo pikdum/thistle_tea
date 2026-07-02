@@ -34,7 +34,8 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStepTest do
       assert step.delay_ms == 3_000
       assert step.target_type == :provided
       assert step.target_self?
-      refute step.swap_targets?
+      refute step.swap_initial?
+      refute step.swap_final?
       assert step.position == {1.0, 2.0, 3.0, 4.0}
       assert ScriptStep.cast_spell_id(step) == 12_544
     end

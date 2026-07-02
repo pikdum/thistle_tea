@@ -25,7 +25,9 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStep do
             target_param1: 0,
             target_param2: 0,
             target_self?: false,
-            swap_targets?: false,
+            swap_initial?: false,
+            swap_final?: false,
+            buddy_guid: nil,
             position: nil,
             condition_id: 0,
             condition: nil,
@@ -54,8 +56,8 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStep do
       target_param1: int(row.target_param1),
       target_param2: int(row.target_param2),
       target_self?: flag?(row.data_flags, @flag_target_self),
-      swap_targets?:
-        flag?(row.data_flags, @flag_swap_initial_targets) or flag?(row.data_flags, @flag_swap_final_targets),
+      swap_initial?: flag?(row.data_flags, @flag_swap_initial_targets),
+      swap_final?: flag?(row.data_flags, @flag_swap_final_targets),
       position: {num(row.x), num(row.y), num(row.z), num(row.o)},
       condition_id: int(row.condition_id)
     }
@@ -159,11 +161,14 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStep do
   defp target_type(3), do: :hostile_last_aggro
   defp target_type(4), do: :hostile_random
   defp target_type(5), do: :hostile_random_not_top
-  defp target_type(8), do: :self
+  defp target_type(8), do: :owner_or_self
+  defp target_type(10), do: :nearest_creature_with_entry
+  defp target_type(11), do: :creature_with_guid
   defp target_type(16), do: :friendly
   defp target_type(17), do: :friendly_injured
   defp target_type(18), do: :friendly_injured_except
   defp target_type(19), do: :friendly_missing_buff
   defp target_type(20), do: :friendly_missing_buff_except
+  defp target_type(28), do: :random_creature_with_entry
   defp target_type(other), do: {:unsupported, other}
 end

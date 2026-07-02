@@ -333,6 +333,87 @@ defmodule ThistleTea.Game.Entity.Logic.AI.ScriptTest do
              ] = mob.internal.events
     end
 
+    test "swap-final steps are forwarded to the resolved buddy", %{mob: mob} do
+      buddy = Guid.from_low_guid(:mob, 10_616, 81_251)
+
+      step = %ScriptStep{
+        command: :talk,
+        target_type: :creature_with_guid,
+        target_param1: 81_251,
+        buddy_guid: buddy,
+        swap_final?: true,
+        texts: [%{text: "Back to work!", chat_type: :say, language: 0, emote_id: 0}]
+      }
+
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], nil, 1_000)
+
+      self_guid = mob.object.guid
+
+      assert [
+               %Event{
+                 type: :forward_script_steps,
+                 target_guid: ^buddy,
+                 source_guid: ^self_guid,
+                 steps: [forwarded]
+               }
+             ] = mob.internal.events
+
+      assert forwarded.command == :talk
+      assert forwarded.target_type == :provided
+      refute forwarded.swap_final?
+    end
+
+    test "swap-final steps with an unresolved buddy are skipped", %{mob: mob} do
+      step = %ScriptStep{
+        command: :talk,
+        target_type: :creature_with_guid,
+        target_param1: 81_251,
+        swap_final?: true,
+        texts: [%{text: "Back to work!", chat_type: :say, language: 0, emote_id: 0}]
+      }
+
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], nil, 1_000)
+
+      assert mob.internal.events == []
+    end
+
+    test "swap-final steps resolving to self execute locally", %{mob: mob} do
+      step = %ScriptStep{
+        command: :emote,
+        datalong: 11,
+        target_type: :creature_with_guid,
+        buddy_guid: mob.object.guid,
+        swap_final?: true
+      }
+
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], nil, 1_000)
+
+      assert [%Event{type: :emote, emote_id: 11}] = mob.internal.events
+    end
+
+    test "swap-initial steps are skipped", %{mob: mob} do
+      step = %ScriptStep{command: :emote, datalong: 11, swap_initial?: true}
+
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], nil, 1_000)
+
+      assert mob.internal.events == []
+    end
+
+    test "turn_to faces a guid-selected buddy", %{mob: mob} do
+      buddy = Guid.from_low_guid(:mob, 10_616, 81_251)
+
+      step = %ScriptStep{
+        command: :turn_to,
+        datalong: 0,
+        target_type: :creature_with_guid,
+        buddy_guid: buddy
+      }
+
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], nil, 1_000)
+
+      assert [%Event{type: :set_facing, facing: {:target, ^buddy}}] = mob.internal.events
+    end
+
     test "delayed steps are deferred through a script_steps event", %{mob: mob} do
       immediate = %ScriptStep{command: :emote, datalong: 11}
       delayed = %ScriptStep{command: :emote, datalong: 22, delay_ms: 4_000}

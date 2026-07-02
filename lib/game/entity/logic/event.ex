@@ -312,6 +312,10 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
     %__MODULE__{type: :attack_start, target_guid: target_guid}
   end
 
+  def forward_script_steps(target_guid, steps, source_guid) when is_integer(target_guid) and is_list(steps) do
+    %__MODULE__{type: :forward_script_steps, target_guid: target_guid, steps: steps, source_guid: source_guid}
+  end
+
   def play_sound(sound_id) when is_integer(sound_id) do
     %__MODULE__{type: :play_sound, sound_id: sound_id}
   end

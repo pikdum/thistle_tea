@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.World.Loader.MobVmangosTest do
   alias ThistleTea.Game.Entity.Data.Condition
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Data.ScriptStep
+  alias ThistleTea.Game.Guid
   alias ThistleTea.Game.World.Loader.Mob, as: MobLoader
 
   @moduletag :vmangos_db
@@ -87,6 +88,38 @@ defmodule ThistleTea.Game.World.Loader.MobVmangosTest do
       assert length(texts) == 4
       assert is_binary(text) and text != ""
       assert [%ScriptStep{command: :talk, texts: [_ | _]}] = step.sub_scripts[55_002]
+    end
+
+    test "resolves the Eastvale peasant supervisor buddy by spawn guid" do
+      mob =
+        %Mangos.Creature{
+          guid: 81_249,
+          id: 11_328,
+          map: 0,
+          position_x: 0.0,
+          position_y: 0.0,
+          position_z: 0.0,
+          orientation: 0.0
+        }
+        |> MobLoader.load_creature()
+        |> Mob.build()
+
+      supervisor_guid = Guid.from_low_guid(:mob, 10_616, 81_251)
+
+      steps =
+        mob.internal.spawn.waypoint_route.points
+        |> Map.values()
+        |> Enum.flat_map(& &1.script_steps)
+
+      start_script = Enum.find(steps, &(&1.command == :start_script and &1.target_type == :creature_with_guid))
+
+      assert start_script.buddy_guid == supervisor_guid
+      assert start_script.swap_final?
+
+      assert [%ScriptStep{command: :talk, texts: texts}, %ScriptStep{command: :emote}] =
+               start_script.sub_scripts[1_061_601]
+
+      assert Enum.any?(texts, &String.starts_with?(&1.text, "Daylight is still upon us"))
     end
 
     test "loads template auras from creature_template" do

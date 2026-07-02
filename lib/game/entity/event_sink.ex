@@ -507,6 +507,15 @@ defmodule ThistleTea.Game.Entity.EventSink do
     entity
   end
 
+  def emit(entity, %Event{type: :forward_script_steps} = event) do
+    case Entity.pid(event.target_guid) do
+      pid when is_pid(pid) -> send(pid, {:ai_script_steps, event.steps, event.source_guid})
+      _ -> nil
+    end
+
+    entity
+  end
+
   def emit(%{internal: %Internal{map: map}} = entity, %Event{type: :summon_creature, summon: summon} = event)
       when is_integer(map) do
     with true <- summon_allowed?(map, summon),
