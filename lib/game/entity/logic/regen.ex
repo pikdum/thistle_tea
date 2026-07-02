@@ -110,12 +110,12 @@ defmodule ThistleTea.Game.Entity.Logic.Regen do
     Core.restore_mana(entity, max(div(max_mana, 3), 1))
   end
 
-  defp creature_combat_mana_per_tick(%{unit: %Unit{spirit: spirit, intellect: intellect}}) do
+  defp creature_combat_mana_per_tick(%{unit: %Unit{class: class, spirit: spirit, intellect: intellect}}) do
     spirit = max(spirit || 0, 0)
     intellect = max(intellect || 1, 1)
 
-    spirit_regen = spirit / 10 + 8.5
-    max(trunc((spirit_regen + 0.6 * :math.sqrt(intellect) / 5) * 5), 1)
+    spirit_regen = mana_per_tick(class, spirit) / 2
+    max(trunc((spirit_regen + 0.6 * :math.sqrt(intellect) / 5) * 5), 0)
   end
 
   defp creature_needs_health_regen?(entity) do

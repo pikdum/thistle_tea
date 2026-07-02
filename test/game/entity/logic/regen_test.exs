@@ -278,20 +278,30 @@ defmodule ThistleTea.Game.Entity.Logic.RegenTest do
       assert Regen.tick(entity, 10_000).unit.power1 == 30
     end
 
-    test "regenerates mana in combat at the creature trickle rate" do
-      entity = mob([health: 300, power1: 0, max_power1: 185], in_combat: true)
+    test "regenerates combat mana from class, spirit, and intellect" do
+      entity = mob([health: 300, power1: 0, max_power1: 185, class: 8, spirit: 40, intellect: 25], in_combat: true)
 
       entity = Regen.tick(entity, 10_000)
 
-      assert entity.unit.power1 == 43
+      assert entity.unit.power1 == 59
       assert entity.internal.broadcast_update? == true
     end
 
+    test "non-caster classes only regenerate combat mana from intellect" do
+      entity = mob([health: 300, power1: 0, max_power1: 185, class: 1, spirit: 40, intellect: 25], in_combat: true)
+
+      assert Regen.tick(entity, 10_000).unit.power1 == 3
+    end
+
     test "combat mana regen respects the five second rule" do
-      entity = mob([health: 300, power1: 0, max_power1: 185], in_combat: true, last_mana_use_at: 8_000)
+      entity =
+        mob([health: 300, power1: 0, max_power1: 185, class: 8, spirit: 40, intellect: 25],
+          in_combat: true,
+          last_mana_use_at: 8_000
+        )
 
       assert Regen.tick(entity, 10_000).unit.power1 == 0
-      assert Regen.tick(entity, 13_001).unit.power1 == 43
+      assert Regen.tick(entity, 13_001).unit.power1 == 59
     end
 
     test "does not regenerate combat mana without the power flag" do
@@ -301,12 +311,12 @@ defmodule ThistleTea.Game.Entity.Logic.RegenTest do
     end
 
     test "does not regenerate health in combat while mana trickles" do
-      entity = mob([health: 50, power1: 0, max_power1: 185], in_combat: true)
+      entity = mob([health: 50, power1: 0, max_power1: 185, class: 8, spirit: 40, intellect: 25], in_combat: true)
 
       entity = Regen.tick(entity, 10_000)
 
       assert entity.unit.health == 50
-      assert entity.unit.power1 == 43
+      assert entity.unit.power1 == 59
     end
 
     test "does not regenerate when dead" do

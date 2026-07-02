@@ -53,6 +53,7 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
       max_health: max_health,
       max_power1: max_mana,
       level: level,
+      class: ct.unit_class,
       faction_template: ct.faction_alliance,
       flags: unit_flags(ct),
       npc_flags: ct.npc_flags,
