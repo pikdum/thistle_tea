@@ -1,11 +1,11 @@
-defmodule ThistleTea.DB.Mangos.CreatureAiScript do
+defmodule ThistleTea.DB.Mangos.CreatureMovementScript do
   @moduledoc false
   use Ecto.Schema
 
   import Ecto.Query
 
   @primary_key false
-  schema "creature_ai_scripts" do
+  schema "creature_movement_scripts" do
     field(:id, :integer)
     field(:delay, :integer, default: 0)
     field(:priority, :integer, default: 0)

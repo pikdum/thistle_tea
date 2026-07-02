@@ -6,11 +6,14 @@ defmodule ThistleTea.Game.World.Loader.Mob do
   alias ThistleTea.DB.Mangos
   alias ThistleTea.DB.Mangos.AddonAuras
   alias ThistleTea.DBC
+  alias ThistleTea.Game.Entity.Data.AIEvent
   alias ThistleTea.Game.Entity.Data.CreatureSpell
   alias ThistleTea.Game.Entity.Data.Mob
+  alias ThistleTea.Game.Entity.Data.ScriptStep
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Loader.Faction, as: FactionLoader
+  alias ThistleTea.Game.World.Loader.Script, as: ScriptLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.System.GameEvent
@@ -32,6 +35,8 @@ defmodule ThistleTea.Game.World.Loader.Mob do
     |> load_creature_class_level_stats()
     |> load_display()
     |> load_creature_movement()
+    |> load_movement_scripts()
+    |> load_ai_events()
     |> load_equip_items()
     |> load_spells()
     |> load_addon_auras()
@@ -82,7 +87,11 @@ defmodule ThistleTea.Game.World.Loader.Mob do
       Enum.filter([template.spell_id1, template.spell_id2, template.spell_id3, template.spell_id4], &positive?/1)
 
     spell_list = load_spell_list(template.spell_list_id)
-    spellbook = SpellLoader.build_spellbook(template_spell_ids ++ Enum.map(spell_list, & &1.spell_id))
+
+    spellbook =
+      SpellLoader.build_spellbook(
+        template_spell_ids ++ Enum.map(spell_list, & &1.spell_id) ++ script_cast_spell_ids(creature)
+      )
 
     creature
     |> Map.put(:spellbook, spellbook)
@@ -122,14 +131,9 @@ defmodule ThistleTea.Game.World.Loader.Mob do
     Map.put(creature, :addon_auras, spells)
   end
 
-  defp addon_aura_ids(%Mangos.Creature{
-         guid: guid,
-         id: entry,
-         creature_template: %Mangos.CreatureTemplate{auras: template_auras}
-       }) do
+  defp addon_aura_ids(%Mangos.Creature{guid: guid, creature_template: %Mangos.CreatureTemplate{auras: template_auras}}) do
     guid
     |> addon_or_template_aura_ids(template_auras)
-    |> Kernel.++(event_ai_spawn_aura_ids(entry))
     |> Enum.uniq()
   end
 
@@ -143,10 +147,51 @@ defmodule ThistleTea.Game.World.Loader.Mob do
     end
   end
 
-  defp event_ai_spawn_aura_ids(entry) do
-    entry
-    |> Mangos.CreatureAiEvent.spawn_aura_script_ids()
-    |> Mangos.CreatureAiScript.spawn_self_aura_spell_ids()
+  defp load_ai_events(nil), do: nil
+
+  defp load_ai_events(%Mangos.Creature{id: entry} = creature) do
+    event_rows =
+      entry
+      |> Mangos.CreatureAiEvent.query()
+      |> Mangos.Repo.all()
+
+    scripts_by_id =
+      event_rows
+      |> Enum.flat_map(&Mangos.CreatureAiEvent.action_script_ids/1)
+      |> then(&ScriptLoader.load_by_ids(Mangos.CreatureAiScript, &1))
+
+    ai_events =
+      event_rows
+      |> Enum.map(&AIEvent.build(&1, scripts_by_id))
+      |> Enum.reject(&(&1.actions == []))
+
+    Map.put(creature, :ai_events, ai_events)
+  end
+
+  defp load_movement_scripts(nil), do: nil
+
+  defp load_movement_scripts(%Mangos.Creature{creature_movement: movement} = creature) when is_list(movement) do
+    scripts_by_id =
+      movement
+      |> Enum.map(& &1.script_id)
+      |> Enum.filter(&positive?/1)
+      |> then(&ScriptLoader.load_by_ids(Mangos.CreatureMovementScript, &1))
+
+    Map.put(creature, :movement_scripts, scripts_by_id)
+  end
+
+  defp load_movement_scripts(%Mangos.Creature{} = creature) do
+    Map.put(creature, :movement_scripts, %{})
+  end
+
+  defp script_cast_spell_ids(%Mangos.Creature{} = creature) do
+    event_steps = creature |> Map.get(:ai_events, []) |> Enum.flat_map(& &1.actions)
+    movement_steps = creature |> Map.get(:movement_scripts, %{}) |> Map.values()
+
+    (event_steps ++ movement_steps)
+    |> Enum.flat_map(fn steps -> Enum.map(steps, &ScriptStep.cast_spell_id/1) end)
+    |> Enum.filter(&positive?/1)
+    |> Enum.uniq()
   end
 
   defp load_creature_movement(nil), do: nil

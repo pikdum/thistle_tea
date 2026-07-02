@@ -131,6 +131,51 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells do
     end
   end
 
+  def attempt_scripted_cast(%Mob{} = state, %Blackboard{} = blackboard, %CreatureSpell{} = entry, target_guid, now)
+      when is_integer(now) do
+    spell = lookup_spell(state, entry.spell_id)
+
+    with true <- is_integer(target_guid) and not is_nil(spell),
+         true <- flags_allow?(state, entry, target_guid),
+         {:ok, state} <- release_previous_cast(state, entry),
+         targets = Targets.unit(target_guid),
+         :ok <- CastValidation.validate(state, spell, targets, build_target_info(state, target_guid), now) do
+      {scripted_cast(state, spell, targets, target_guid, now), blackboard}
+    else
+      _ -> {state, blackboard}
+    end
+  end
+
+  defp release_previous_cast(%Mob{internal: %Internal{casting: nil}} = state, _entry), do: {:ok, state}
+
+  defp release_previous_cast(%Mob{} = state, %CreatureSpell{} = entry) do
+    if CreatureSpell.flag?(entry, :interrupt_previous) do
+      {:ok, SpellBT.clear_cast(state)}
+    else
+      :busy
+    end
+  end
+
+  defp scripted_cast(%Mob{} = state, %Spell{} = spell, targets, target_guid, now) do
+    state =
+      state
+      |> prepare_to_cast(spell, target_guid, now)
+      |> Event.enqueue(Event.spell_start(state.object.guid, spell.id, spell.cast_time_ms || 0, targets.raw))
+      |> SpellBT.start_cast(spell, targets, now)
+
+    finish_if_instant(state, spell, now)
+  end
+
+  defp finish_if_instant(%Mob{internal: %Internal{casting: nil}} = state, _spell, _now), do: state
+
+  defp finish_if_instant(%Mob{} = state, %Spell{} = spell, now) do
+    if (spell.cast_time_ms || 0) == 0 and not Spell.attribute?(spell, :channeled) do
+      SpellBT.complete_cast(state, now)
+    else
+      state
+    end
+  end
+
   defp attempt_cast(%Mob{} = state, %Blackboard{} = blackboard, %CreatureSpell{} = entry, index, now) do
     spell = lookup_spell(state, entry.spell_id)
     target_guid = resolve_target(state, entry, spell)
@@ -247,42 +292,42 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells do
 
   defp lookup_spell(_state, _spell_id), do: nil
 
-  defp resolve_target(%Mob{object: %{guid: guid}}, %CreatureSpell{cast_target: :self}, _spell) do
+  def resolve_target(%Mob{object: %{guid: guid}}, %CreatureSpell{cast_target: :self}, _spell) do
     guid
   end
 
-  defp resolve_target(%Mob{unit: %Unit{target: target}}, %CreatureSpell{cast_target: cast_target}, _spell)
-       when cast_target in [
-              :victim,
-              :hostile_second_aggro,
-              :hostile_last_aggro,
-              :hostile_random,
-              :hostile_random_not_top
-            ] and is_integer(target) and target > 0 do
+  def resolve_target(%Mob{unit: %Unit{target: target}}, %CreatureSpell{cast_target: cast_target}, _spell)
+      when cast_target in [
+             :victim,
+             :hostile_second_aggro,
+             :hostile_last_aggro,
+             :hostile_random,
+             :hostile_random_not_top
+           ] and is_integer(target) and target > 0 do
     target
   end
 
-  defp resolve_target(%Mob{} = state, %CreatureSpell{cast_target: :friendly_injured} = entry, spell) do
+  def resolve_target(%Mob{} = state, %CreatureSpell{cast_target: :friendly_injured} = entry, spell) do
     find_injured_friendly(state, entry, spell, nil)
   end
 
-  defp resolve_target(
-         %Mob{object: %{guid: guid}} = state,
-         %CreatureSpell{cast_target: :friendly_injured_except} = entry,
-         spell
-       ) do
+  def resolve_target(
+        %Mob{object: %{guid: guid}} = state,
+        %CreatureSpell{cast_target: :friendly_injured_except} = entry,
+        spell
+      ) do
     find_injured_friendly(state, entry, spell, guid)
   end
 
-  defp resolve_target(
-         %Mob{object: %{guid: guid}} = state,
-         %CreatureSpell{cast_target: :friendly_missing_buff} = entry,
-         _spell
-       ) do
+  def resolve_target(
+        %Mob{object: %{guid: guid}} = state,
+        %CreatureSpell{cast_target: :friendly_missing_buff} = entry,
+        _spell
+      ) do
     if !AuraLogic.has_spell?(state, missing_buff_spell_id(entry)), do: guid
   end
 
-  defp resolve_target(_state, _entry, _spell), do: nil
+  def resolve_target(_state, _entry, _spell), do: nil
 
   defp find_injured_friendly(%Mob{object: %{guid: guid}} = state, %CreatureSpell{} = entry, spell, except_guid) do
     radius = injured_search_radius(entry, spell)
@@ -361,7 +406,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells do
 
   defp missing_buff_spell_id(%CreatureSpell{spell_id: spell_id}), do: spell_id
 
-  defp flags_allow?(%Mob{object: %{guid: guid}} = state, %CreatureSpell{} = entry, target_guid) do
+  def flags_allow?(%Mob{object: %{guid: guid}} = state, %CreatureSpell{} = entry, target_guid) do
     cond do
       CreatureSpell.flag?(entry, :target_unreachable) ->
         false

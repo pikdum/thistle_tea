@@ -46,6 +46,16 @@ defmodule ThistleTea.Game.Entity.Data.CreatureSpell do
 
   def build(_slot), do: nil
 
+  def from_script_step(%{command: :cast_spell} = step) do
+    %__MODULE__{
+      spell_id: step.datalong,
+      probability: 100,
+      target_param1: step.target_param1 || 0,
+      target_param2: step.target_param2 || 0,
+      cast_flags: cast_flags(step.datalong2)
+    }
+  end
+
   def flag?(%__MODULE__{cast_flags: cast_flags}, flag) when is_atom(flag) do
     MapSet.member?(cast_flags, flag)
   end

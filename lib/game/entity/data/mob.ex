@@ -137,7 +137,8 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
           call_for_help_range: call_for_help_range(ct),
           leash_range: leash_range(ct),
           spells: Map.get(c, :spell_list, []),
-          addon_auras: Map.get(c, :addon_auras, [])
+          addon_auras: Map.get(c, :addon_auras, []),
+          ai_events: Map.get(c, :ai_events, [])
         },
         spawn: %Spawn{
           unit: unit,

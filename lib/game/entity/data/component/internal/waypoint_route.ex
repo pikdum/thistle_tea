@@ -14,14 +14,17 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal.WaypointRoute do
   def build(%Creature{creature_movement: []}), do: nil
   def build(%Creature{creature_movement: nil}), do: nil
 
-  def build(%Creature{position_x: x, position_y: y, position_z: z, creature_movement: creature_movement}) do
+  def build(%Creature{position_x: x, position_y: y, position_z: z, creature_movement: creature_movement} = creature) do
+    scripts_by_id = Map.get(creature, :movement_scripts) || %{}
+
     points =
       creature_movement
       |> Map.new(fn %CreatureMovement{} = cm ->
         {cm.point,
          %Waypoint{
            position: {cm.position_x, cm.position_y, cm.position_z, cm.orientation},
-           wait_time: cm.waittime
+           wait_time: cm.waittime,
+           script_steps: Map.get(scripts_by_id, cm.script_id, [])
          }}
       end)
 

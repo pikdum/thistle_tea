@@ -483,6 +483,27 @@ defmodule ThistleTea.Game.Entity.EventSink do
 
   def emit(entity, %Event{type: :summon_game_object}), do: entity
 
+  def emit(%{object: %{guid: guid}, internal: %Internal{name: name}} = entity, %Event{type: :monster_talk} = event) do
+    event.chat_type
+    |> monster_chat_type()
+    |> Message.SmsgMessagechat.monster(event.text, guid, name, event.target_guid)
+    |> World.broadcast_packet(entity, range: listen_range(event.chat_type))
+
+    entity
+  end
+
+  def emit(%{object: %{guid: guid}} = entity, %Event{type: :emote, emote_id: emote_id}) do
+    %Message.SmsgEmote{emote: emote_id, guid: guid}
+    |> World.broadcast_packet(entity)
+
+    entity
+  end
+
+  def emit(entity, %Event{type: :script_steps} = event) do
+    Process.send_after(self(), {:ai_script_steps, event.steps, event.target_guid}, event.duration_ms || 0)
+    entity
+  end
+
   def emit(entity, %Event{type: :trigger_spell} = event) do
     case SpellLoader.load(event.spell_id) do
       nil ->
@@ -501,6 +522,16 @@ defmodule ThistleTea.Game.Entity.EventSink do
   def deliver_spell(%Event{type: :deliver_spell} = event) do
     Entity.receive_spell(event.target_guid, event.cast_context, event.spell)
   end
+
+  defp monster_chat_type(chat_type) when chat_type in [:yell, :zone_yell], do: :monster_yell
+  defp monster_chat_type(chat_type) when chat_type in [:text_emote, :boss_emote, :zone_emote], do: :monster_emote
+  defp monster_chat_type(_chat_type), do: :monster_say
+
+  @listen_range_say 25.0
+  @listen_range_yell 300.0
+
+  defp listen_range(chat_type) when chat_type in [:yell, :zone_yell], do: @listen_range_yell
+  defp listen_range(_chat_type), do: @listen_range_say
 
   defp notify_chasers(%{object: %{guid: guid}, movement_block: %{position: {x, y, z, _o}}}) do
     ChaseWatch.notify_moved(guid, {x, y, z})

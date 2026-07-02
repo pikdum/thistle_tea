@@ -24,7 +24,13 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Blackboard do
             confused_anchor: nil,
             spell_timers: nil,
             next_spell_list_at: 0,
-            combat_movement: true
+            combat_movement: true,
+            eventai_phase: 0,
+            eventai_timers: nil,
+            eventai_disabled: nil,
+            next_eventai_at: 0,
+            flee_until: nil,
+            flee_from: nil
 
   def new do
     %__MODULE__{}
@@ -133,6 +139,19 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Blackboard do
       when is_integer(index) and is_integer(delay_ms) and is_integer(now) do
     timers = Map.get(blackboard, :spell_timers) || %{}
     Map.put(blackboard, :spell_timers, Map.put(timers, index, now + delay_ms))
+  end
+
+  def fleeing?(%__MODULE__{} = blackboard) do
+    is_integer(Map.get(blackboard, :flee_until))
+  end
+
+  def start_flee(%__MODULE__{} = blackboard, from_guid, duration_ms, now)
+      when is_integer(duration_ms) and is_integer(now) do
+    %{blackboard | flee_until: now + duration_ms, flee_from: from_guid}
+  end
+
+  def clear_flee(%__MODULE__{} = blackboard) do
+    %{blackboard | flee_until: nil, flee_from: nil}
   end
 
   def clear_attack_started(%__MODULE__{} = blackboard) do

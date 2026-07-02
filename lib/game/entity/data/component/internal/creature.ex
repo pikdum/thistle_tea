@@ -16,6 +16,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal.Creature do
     :call_for_help_range,
     :leash_range,
     spells: [],
-    addon_auras: []
+    addon_auras: [],
+    ai_events: []
   ]
 end

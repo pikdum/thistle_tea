@@ -18,7 +18,49 @@ defmodule ThistleTea.Game.World.Loader.MobVmangosTest do
       assert mob.unit.max_damage > mob.unit.min_damage
       assert mob.unit.bounding_radius in [0.208, 0.306]
       assert mob.unit.combat_reach == 1.5
-      assert Enum.map(mob.internal.creature.addon_auras, & &1.id) == [12_544]
+      assert mob.internal.creature.addon_auras == []
+    end
+
+    test "loads Defias Pillager EventAI events with resolved scripts" do
+      mob = mob(589)
+      events = mob.internal.creature.ai_events
+
+      assert [timer_ooc, aggro, hp] = events
+
+      assert timer_ooc.event_type == :timer_ooc
+      assert timer_ooc.repeatable?
+      assert [[%{command: :cast_spell, datalong: 12_544, target_self?: true}]] = timer_ooc.actions
+
+      assert aggro.event_type == :aggro
+      assert aggro.chance == 15
+      assert [[%{command: :talk, texts: [_, _]}]] = aggro.actions
+
+      assert hp.event_type == :hp
+      assert hp.param1 == 15
+      assert [[%{command: :flee}]] = hp.actions
+
+      assert Map.has_key?(mob.internal.spellbook, 12_544)
+    end
+
+    test "attaches waypoint movement scripts with resolved texts" do
+      mob =
+        %Mangos.Creature{
+          guid: 108,
+          id: 6_175,
+          map: 0,
+          position_x: 0.0,
+          position_y: 0.0,
+          position_z: 0.0,
+          orientation: 0.0
+        }
+        |> MobLoader.load_creature()
+        |> Mob.build()
+
+      point = mob.internal.spawn.waypoint_route.points[7]
+
+      assert [%{command: :talk, texts: [%{text: text} | _] = texts}] = point.script_steps
+      assert length(texts) == 4
+      assert is_binary(text) and text != ""
     end
 
     test "loads template auras from creature_template" do

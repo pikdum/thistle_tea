@@ -38,7 +38,11 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
     :effect,
     :attack,
     :channel_time_ms,
-    :entry
+    :entry,
+    :text,
+    :chat_type,
+    :emote_id,
+    :steps
   ]
 
   def spell_damage(source_guid, target_guid, spell, damage, opts \\ []) do
@@ -277,6 +281,18 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
       target_guid: target_guid,
       spell_id: spell_id
     }
+  end
+
+  def monster_talk(text, chat_type, target_guid) when is_binary(text) and is_atom(chat_type) do
+    %__MODULE__{type: :monster_talk, text: text, chat_type: chat_type, target_guid: target_guid}
+  end
+
+  def emote(emote_id) when is_integer(emote_id) do
+    %__MODULE__{type: :emote, emote_id: emote_id}
+  end
+
+  def script_steps(steps, target_guid, delay_ms) when is_list(steps) and is_integer(delay_ms) do
+    %__MODULE__{type: :script_steps, steps: steps, target_guid: target_guid, duration_ms: delay_ms}
   end
 
   def drain(%{internal: %{events: events} = internal} = entity) when is_list(events) do
