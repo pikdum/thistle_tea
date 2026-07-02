@@ -22,10 +22,8 @@ mix deps.compile
 # need npm or bun or similar
 cd assets && npm install && cd ../
 
-# need docker + no mariadb port 3306 conflict
-./scripts/generate-mangos0-db.sh
-# or, just download it
-# wget https://pomf2.lain.la/f/jxcam7ob.sqlite -O ./db/mangos0.sqlite
+# with nix, no docker
+nix run .#vmangos-db -- ./db
 
 # path to vanilla client, the directory with WoW.exe
 # you'll want version 1.12.1 build 5875
@@ -51,8 +49,8 @@ More documentation, like platform-specific setup guides, can be found in the [Wi
 
 ## databases
 
-- **mangos0.sqlite** `./scripts/generate-mangos0-db.sh`
-  - can generate or download
+- **vmangos.sqlite** `nix run .#vmangos-db -- ./db`
+  - generated from the pinned VMangos SQLite snapshot in `flake.nix`
   - this has mobs, items, etc.
 - **dbc.sqlite** `./scripts/generate-dbc-db.sh`
   - need to generate from wow client, since this can't be distributed
@@ -61,12 +59,12 @@ More documentation, like platform-specific setup guides, can be found in the [Wi
 ### nix (no docker)
 
 alternative to the scripts above. needs nix with flakes enabled. all upstreams
-(mangoszero/server, mangoszero/database, gtker/wow_dbc, vdechef/mysql2sqlite)
+(VMangos/core, mangoszero/server, gtker/wow_dbc, vdechef/mysql2sqlite)
 are pinned in `flake.lock`; bump them with `nix flake update`.
 
 ```bash
-# generates db/mangos0.sqlite (runs mariadb inside the nix sandbox, no docker)
-nix run .#mangos0-db -- ./db
+# generates db/vmangos.sqlite
+nix run .#vmangos-db -- ./db
 
 # generates db/dbc.sqlite from your local wow 1.12 client
 nix run .#dbc-db -- "/path/to/vanilla/client" ./db
@@ -96,7 +94,7 @@ nix develop .#wow-tools            # shell with all of the above + sqlite + mari
 
 - [idewave](https://github.com/idewave/idewave-core) - reference implementation
 - [mangos](https://github.com/mangoszero/server/) - reference implementation
-- [mangos database](https://github.com/mangoszero/database) - world database
+- [VMangos](https://github.com/vmangos/core) - world database
 - [mysql2sqlite](https://github.com/vdechef/mysql2sqlite) - convert world database to sqlite
 - [shadowburn](https://shadowburn-project.org/) - auth crypto + reference implementation
 - [wow_dbc_converter](https://github.com/gtker/wow_dbc/tree/main/wow_dbc_converter) - convert dbc to sqlite

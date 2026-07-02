@@ -1,23 +1,5 @@
 {
   "nodes": {
-    "mangoszero-database": {
-      "flake": false,
-      "locked": {
-        "lastModified": 1778822823,
-        "narHash": "sha256-vybBkGMZ+lZzwK8NcqE3Ai0u6kVtwKD0ql1fWSQOQL0=",
-        "ref": "refs/heads/master",
-        "rev": "e6df4ee1cc3f7a2eee6473cf09326e4b3654ddab",
-        "revCount": 795,
-        "submodules": true,
-        "type": "git",
-        "url": "https://github.com/mangoszero/database.git"
-      },
-      "original": {
-        "submodules": true,
-        "type": "git",
-        "url": "https://github.com/mangoszero/database.git"
-      }
-    },
     "mangoszero-server": {
       "flake": false,
       "locked": {
@@ -70,7 +52,6 @@
     },
     "root": {
       "inputs": {
-        "mangoszero-database": "mangoszero-database",
         "mangoszero-server": "mangoszero-server",
         "mysql2sqlite-src": "mysql2sqlite-src",
         "nixpkgs": "nixpkgs",

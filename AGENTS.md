@@ -21,7 +21,7 @@
 - Use `describe "function/arity" do ... end` to group tests by function
 - Use `setup [:named_setup]` for reusable test data
 - Keep test names concise and descriptive
-- Do not query `db/mangos0.sqlite` or `db/dbc.sqlite` in tests; these sqlite databases are not available in CI
+- Do not query generated sqlite databases in default tests; `db/vmangos.sqlite` loader smoke tests must be tagged `:vmangos_db` so normal `mix test` excludes them, and `db/dbc.sqlite` is not available in CI
 
 ### Imports & Structs
 - Use `use ThistleTea.Game.Network.Opcodes, [:SMSG_FOO, :CMSG_BAR]` macro to define opcode attributes

@@ -16,12 +16,6 @@
       flake = false;
     };
 
-    mangoszero-database = {
-      # Realm/ is a submodule (mangos/Realm_DB) so use git+https.
-      url = "git+https://github.com/mangoszero/database.git?submodules=1";
-      flake = false;
-    };
-
     mysql2sqlite-src = {
       url = "github:vdechef/mysql2sqlite";
       flake = false;
@@ -34,7 +28,6 @@
       nixpkgs,
       mangoszero-server,
       wow-dbc-src,
-      mangoszero-database,
       mysql2sqlite-src,
     }:
     let
@@ -368,117 +361,6 @@
             };
           };
 
-          mangos0-db = pkgs.stdenv.mkDerivation {
-            pname = "mangos0-db";
-            version = "mangoszero-${builtins.substring 0 7 mangoszero-database.rev}";
-
-            src = mangoszero-database;
-
-            nativeBuildInputs = with pkgs; [
-              mariadb
-              sqlite
-              gawk
-              mysql2sqlite
-              coreutils
-            ];
-
-            # The mangoszero installer is interactive (./InstallDatabases.sh prompts
-            # for host/user/port/pass/db-names). We replicate its non-interactive
-            # path here: load the three Setup .sql bundles plus all Rel21/Rel22
-            # updates into a unix-socket mariadb, then dump mangos0 to sqlite.
-            buildPhase = ''
-              runHook preBuild
-
-              export TMPDIR=$(mktemp -d)
-              export MYSQL_HOME="$TMPDIR"
-              datadir="$TMPDIR/mysql"
-              socket="$TMPDIR/mysql.sock"
-
-              mkdir -p "$datadir"
-              mariadb-install-db --auth-root-authentication-method=normal \
-                --datadir="$datadir" --user="$(id -u)" >/dev/null
-
-              mariadbd \
-                --datadir="$datadir" \
-                --socket="$socket" \
-                --skip-networking \
-                --pid-file="$TMPDIR/mariadb.pid" &
-              MYSQL_PID=$!
-              trap 'kill $MYSQL_PID 2>/dev/null || true' EXIT
-
-              # wait for server to come up
-              for i in $(seq 1 60); do
-                if mariadb -u root --socket="$socket" -e "SELECT 1" >/dev/null 2>&1; then
-                  break
-                fi
-                sleep 1
-              done
-
-              # Skip the mangosdCreateDB.sql / characterCreateDB.sql / realmdCreateDB.sql
-              # files — they only CREATE DATABASE + GRANT to a 'mangos'@'%' user we
-              # don't need. We do the CREATE DATABASEs ourselves and connect as root.
-              mariadb -u root --socket="$socket" -e "
-                CREATE DATABASE mangos0   CHARACTER SET utf8 COLLATE utf8_general_ci;
-                CREATE DATABASE character0 CHARACTER SET utf8 COLLATE utf8_general_ci;
-                CREATE DATABASE realmd    CHARACTER SET utf8 COLLATE utf8_general_ci;
-              "
-
-              load () {
-                local db=$1 path=$2
-                if [ ! -e "$path" ]; then return; fi
-                echo "  $path -> $db"
-                mariadb -u root --socket="$socket" "$db" <"$path"
-              }
-
-              load_dir () {
-                local db=$1 dir=$2
-                if [ ! -d "$dir" ]; then return; fi
-                find "$dir" -maxdepth 1 -name '*.sql' | sort | while read -r f; do
-                  load "$db" "$f"
-                done
-              }
-
-              echo "Loading mangos0 (world)..."
-              load mangos0 World/Setup/mangosdLoadDB.sql
-              load_dir mangos0 World/Setup/FullDB/Rel21
-              load_dir mangos0 World/Setup/FullDB
-              load_dir mangos0 World/Updates/Rel21
-              load_dir mangos0 World/Updates/Rel22
-
-              echo "Loading character0..."
-              load character0 Character/Setup/characterLoadDB.sql
-              load_dir character0 Character/Updates/Rel21
-              load_dir character0 Character/Updates/Rel22
-
-              echo "Loading realmd..."
-              load realmd Realm/Setup/realmdLoadDB.sql
-              load_dir realmd Realm/Updates/Rel21
-              load_dir realmd Realm/Updates/Rel22
-              load realmd Tools/updateRealm.sql
-
-              echo "Dumping mangos0 -> sqlite..."
-              mariadb-dump -u root --socket="$socket" --skip-extended-insert --compact mangos0 >"$TMPDIR/dump.sql"
-              mysql2sqlite "$TMPDIR/dump.sql" | sqlite3 "$TMPDIR/mangos0.sqlite"
-
-              kill $MYSQL_PID 2>/dev/null || true
-              wait $MYSQL_PID 2>/dev/null || true
-
-              runHook postBuild
-            '';
-
-            installPhase = ''
-              runHook preInstall
-              mkdir -p "$out"
-              cp "$TMPDIR/mangos0.sqlite" "$out/mangos0.sqlite"
-              runHook postInstall
-            '';
-
-            meta = with pkgs.lib; {
-              description = "mangoszero world+characters+realmd databases, rolled into a sqlite file";
-              platforms = platforms.linux;
-            };
-          };
-
           beam = pkgs.beam.packagesWith pkgs.erlang;
 
           # evision (used by lib/web/utils/homography.ex) downloads a precompiled
@@ -582,7 +464,6 @@
             mangos-map-extractor
             wow-dbc-converter
             mysql2sqlite
-            mangos0-db
             vmangos-db
             dbc-db
             thistle-tea-nif
@@ -597,21 +478,7 @@
         system:
         let
           pkgs = pkgsFor system;
-          inherit (self.packages.${system}) mangos0-db vmangos-db;
-          mangos0-db-runner = pkgs.writeShellApplication {
-            name = "mangos0-db";
-            runtimeInputs = [ pkgs.coreutils ];
-            text = ''
-              out_dir=''${1:-./db}
-              mkdir -p "''${out_dir}"
-              out_dir=$(realpath "''${out_dir}")
-              rm -f "''${out_dir}/mangos0.sqlite" \
-                    "''${out_dir}/mangos0.sqlite-shm" \
-                    "''${out_dir}/mangos0.sqlite-wal"
-              install -m 644 ${mangos0-db}/mangos0.sqlite "''${out_dir}/mangos0.sqlite"
-              echo "Generated ''${out_dir}/mangos0.sqlite"
-            '';
-          };
+          inherit (self.packages.${system}) vmangos-db;
           vmangos-db-runner = pkgs.writeShellApplication {
             name = "vmangos-db";
             runtimeInputs = [ pkgs.coreutils ];
@@ -631,10 +498,6 @@
           dbc-db = {
             type = "app";
             program = "${self.packages.${system}.dbc-db}/bin/dbc-db";
-          };
-          mangos0-db = {
-            type = "app";
-            program = "${mangos0-db-runner}/bin/mangos0-db";
           };
           vmangos-db = {
             type = "app";
