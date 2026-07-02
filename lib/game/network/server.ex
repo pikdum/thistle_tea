@@ -44,6 +44,7 @@ defmodule ThistleTea.Game.Network.Server do
   alias ThistleTea.Game.Player.Quests
   alias ThistleTea.Game.Player.Spellcasting
   alias ThistleTea.Game.Player.Stats, as: PlayerStats
+  alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.CharacterStore
@@ -215,13 +216,16 @@ defmodule ThistleTea.Game.Network.Server do
 
   def handle_cast({:receive_spell, caster, spell}, {socket, %{character: %Character{} = character} = state}) do
     now = Time.now()
+    harmful? = Spell.harmful?(spell)
+    character = if harmful?, do: PlayerCombat.mark_attacked(character, now), else: character
+
     {character, events} = SpellEffect.receive(character, caster, spell, now)
+    character = EventSink.emit(character, events)
 
-    character =
-      character
-      |> EventSink.emit(events)
+    state = %{state | character: character}
+    state = if harmful?, do: PlayerTick.ensure_scheduled(state), else: state
 
-    {:noreply, {socket, %{state | character: character}}, {:continue, :maybe_broadcast_update}}
+    {:noreply, {socket, state}, {:continue, :maybe_broadcast_update}}
   end
 
   def handle_cast({:reward_kill, victim}, {socket, %{character: %Character{} = character} = state}) do
