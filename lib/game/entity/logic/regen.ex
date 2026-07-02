@@ -21,6 +21,8 @@ defmodule ThistleTea.Game.Entity.Logic.Regen do
   @regen_flag_health 0x1
   @regen_flag_power 0x2
   @five_second_rule_ms 5_000
+  @creature_combat_mana_spirit_base 17.0
+  @creature_combat_mana_tick_scale 2.5
   @energy_per_tick 20
   @rage_decay_per_tick 20
   @sitting_multiplier 1.5
@@ -46,7 +48,7 @@ defmodule ThistleTea.Game.Entity.Logic.Regen do
     if Death.alive?(entity) do
       entity
       |> creature_regen_health()
-      |> creature_regen_mana()
+      |> creature_regen_mana(now)
     else
       entity
     end
@@ -63,9 +65,8 @@ defmodule ThistleTea.Game.Entity.Logic.Regen do
   end
 
   def needs_regen?(%Mob{} = entity) do
-    Death.alive?(entity) and not in_combat?(entity) and
-      ((missing_health?(entity) and creature_regenerates?(entity, @regen_flag_health)) or
-         (creature_missing_mana?(entity) and creature_regenerates?(entity, @regen_flag_power)))
+    Death.alive?(entity) and
+      (creature_needs_health_regen?(entity) or creature_needs_mana_regen?(entity))
   end
 
   def needs_regen?(%{unit: %Unit{}} = entity) do
@@ -88,18 +89,41 @@ defmodule ThistleTea.Game.Entity.Logic.Regen do
 
   defp creature_regen_health(entity), do: entity
 
-  defp creature_regen_mana(%{internal: %Internal{in_combat: true}} = entity), do: entity
-
-  defp creature_regen_mana(%{unit: %Unit{power1: mana, max_power1: max_mana}} = entity)
+  defp creature_regen_mana(%{unit: %Unit{power1: mana, max_power1: max_mana}} = entity, now)
        when is_integer(mana) and is_integer(max_mana) and max_mana > 0 and mana < max_mana do
     if creature_regenerates?(entity, @regen_flag_power) do
-      Core.restore_mana(entity, max(div(max_mana, 3), 1))
+      restore_creature_mana(entity, now)
     else
       entity
     end
   end
 
-  defp creature_regen_mana(entity), do: entity
+  defp creature_regen_mana(entity, _now), do: entity
+
+  defp restore_creature_mana(%{internal: %Internal{in_combat: true}} = entity, now) do
+    if under_five_second_rule?(entity, now) do
+      entity
+    else
+      Core.restore_mana(entity, creature_combat_mana_per_tick(entity))
+    end
+  end
+
+  defp restore_creature_mana(%{unit: %Unit{max_power1: max_mana}} = entity, _now) do
+    Core.restore_mana(entity, max(div(max_mana, 3), 1))
+  end
+
+  # TODO: feed creature spirit into the formula once a stat source exists
+  defp creature_combat_mana_per_tick(_entity) do
+    max(trunc(@creature_combat_mana_spirit_base * @creature_combat_mana_tick_scale), 1)
+  end
+
+  defp creature_needs_health_regen?(entity) do
+    not in_combat?(entity) and missing_health?(entity) and creature_regenerates?(entity, @regen_flag_health)
+  end
+
+  defp creature_needs_mana_regen?(entity) do
+    creature_missing_mana?(entity) and creature_regenerates?(entity, @regen_flag_power)
+  end
 
   defp creature_missing_mana?(%{unit: %Unit{power1: mana, max_power1: max_mana}})
        when is_integer(mana) and is_integer(max_mana) and max_mana > 0 do

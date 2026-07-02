@@ -278,6 +278,37 @@ defmodule ThistleTea.Game.Entity.Logic.RegenTest do
       assert Regen.tick(entity, 10_000).unit.power1 == 30
     end
 
+    test "regenerates mana in combat at the creature trickle rate" do
+      entity = mob([health: 300, power1: 0, max_power1: 185], in_combat: true)
+
+      entity = Regen.tick(entity, 10_000)
+
+      assert entity.unit.power1 == 42
+      assert entity.internal.broadcast_update? == true
+    end
+
+    test "combat mana regen respects the five second rule" do
+      entity = mob([health: 300, power1: 0, max_power1: 185], in_combat: true, last_mana_use_at: 8_000)
+
+      assert Regen.tick(entity, 10_000).unit.power1 == 0
+      assert Regen.tick(entity, 13_001).unit.power1 == 42
+    end
+
+    test "does not regenerate combat mana without the power flag" do
+      entity = mob([health: 300, power1: 0, max_power1: 185], in_combat: true, regenerate_stats: 1)
+
+      assert Regen.tick(entity, 10_000).unit.power1 == 0
+    end
+
+    test "does not regenerate health in combat while mana trickles" do
+      entity = mob([health: 50, power1: 0, max_power1: 185], in_combat: true)
+
+      entity = Regen.tick(entity, 10_000)
+
+      assert entity.unit.health == 50
+      assert entity.unit.power1 == 42
+    end
+
     test "does not regenerate when dead" do
       entity = mob(health: 0)
 
@@ -303,10 +334,12 @@ defmodule ThistleTea.Game.Entity.Logic.RegenTest do
     test "needs_regen?/1 for creatures" do
       assert Regen.needs_regen?(mob(health: 50))
       assert Regen.needs_regen?(mob(health: 300, power1: 0, max_power1: 90))
+      assert Regen.needs_regen?(mob([health: 300, power1: 0, max_power1: 90], in_combat: true))
       refute Regen.needs_regen?(mob(health: 300))
       refute Regen.needs_regen?(mob([health: 50], in_combat: true))
       refute Regen.needs_regen?(mob(health: 0))
       refute Regen.needs_regen?(mob([health: 50], regenerate_stats: 0))
+      refute Regen.needs_regen?(mob([power1: 0, max_power1: 90], in_combat: true, regenerate_stats: 1))
     end
   end
 
