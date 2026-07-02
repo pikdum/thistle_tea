@@ -2,12 +2,15 @@ defmodule ThistleTea.Game.Network.Message.CmsgUseItem do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_USE_ITEM
 
+  alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Item, as: DataItem
   alias ThistleTea.Game.Entity.Data.ItemTemplate
   alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Network.InventoryUpdate
+  alias ThistleTea.Game.Player.Items
   alias ThistleTea.Game.Player.Spellcasting
   alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.Cast
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
 
@@ -41,7 +44,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgUseItem do
       Logger.info("CMSG_USE_ITEM: #{template.name} casting #{spell.name}")
 
       case Spellcasting.cast_result(state, spell, message.targets, guid) do
-        {:ok, state} -> maybe_consume(state, item, pos, consumable?)
+        {:ok, state} -> handle_consumption(state, guid, consumable?)
         {:error, state} -> state
       end
     else
@@ -107,26 +110,27 @@ defmodule ThistleTea.Game.Network.Message.CmsgUseItem do
 
   defp maybe_put_non_negative(%Spell{} = spell, _field, _value), do: spell
 
-  defp maybe_consume(state, _item, _pos, false), do: state
+  defp handle_consumption(state, _item_guid, false), do: state
 
-  defp maybe_consume(%{character: c} = state, %DataItem{} = item, pos, true) do
-    get_item = &ItemStore.get/1
-
-    if (item.item.stack_count || 1) > 1 do
-      case Inventory.reduce_stack(c.player, pos, 1, get_item) do
-        {:ok, result} -> InventoryUpdate.apply(state, {:ok, result})
-        _ -> state
-      end
+  defp handle_consumption(
+         %{
+           character:
+             %Character{internal: %Internal{casting: %Cast{cast_item_guid: item_guid} = casting} = internal} = c
+         } = state,
+         item_guid,
+         true
+       ) do
+    if defer_consumption?(casting) do
+      casting = %{casting | consume_item: true}
+      %{state | character: %{c | internal: %{internal | casting: casting}}}
     else
-      case Inventory.destroy(c.player, pos, get_item) do
-        {:ok, result, _item} ->
-          ItemStore.delete(item.object.guid)
-          Network.send_packet(%Message.SmsgDestroyObject{guid: item.object.guid})
-          InventoryUpdate.apply(state, {:ok, result})
-
-        _ ->
-          state
-      end
+      Items.consume(state, item_guid)
     end
+  end
+
+  defp handle_consumption(state, item_guid, true), do: Items.consume(state, item_guid)
+
+  defp defer_consumption?(%Cast{cast_time_ms: cast_time_ms} = casting) do
+    is_integer(cast_time_ms) and cast_time_ms > 0 and not Cast.channeled?(casting)
   end
 end

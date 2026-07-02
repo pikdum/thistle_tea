@@ -227,6 +227,10 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
     %__MODULE__{type: :teleport_to_spell_target, spell_id: spell_id}
   end
 
+  def consume_cast_item(item_guid) when is_integer(item_guid) do
+    %__MODULE__{type: :consume_cast_item, cast_item_guid: item_guid}
+  end
+
   def create_item(item_id, count) when is_integer(item_id) and is_integer(count) do
     %__MODULE__{type: :create_item, item_id: item_id, count: count}
   end

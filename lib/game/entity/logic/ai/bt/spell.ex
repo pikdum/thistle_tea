@@ -133,11 +133,19 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
     |> queue_area_effects(casting)
     |> queue_summon_objects(casting)
     |> queue_consume_reagents(casting)
+    |> queue_consume_cast_item(casting)
     |> apply_spell_hit(casting, targets, now)
     |> clear_cast()
   end
 
   def complete_cast(character, _casting, _now), do: character
+
+  defp queue_consume_cast_item(character, %Cast{consume_item: true, cast_item_guid: item_guid})
+       when is_integer(item_guid) do
+    Event.enqueue(character, Event.consume_cast_item(item_guid))
+  end
+
+  defp queue_consume_cast_item(character, %Cast{}), do: character
 
   def clear_cast(%{internal: %Internal{} = internal} = character) do
     case internal.casting do

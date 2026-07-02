@@ -385,6 +385,16 @@ defmodule ThistleTea.Game.Network.Server do
   end
 
   @impl GenServer
+  def handle_info({:consume_cast_item, item_guid}, {socket, state}) do
+    state = Items.consume(state, item_guid)
+    {:noreply, {socket, state}, socket.read_timeout}
+  rescue
+    error ->
+      Logger.error("consume_cast_item crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:noreply, {socket, state}, socket.read_timeout}
+  end
+
+  @impl GenServer
   def handle_info({:consume_reagents, reagents}, {socket, state}) do
     state =
       Enum.reduce(reagents, state, fn {item_id, count}, state ->

@@ -8,12 +8,14 @@ defmodule ThistleTea.Game.Network.Message.CmsgUseItemTest do
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.ItemTemplate
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Spell, as: SpellBT
   alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.BinaryUtils
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Message.CmsgUseItem
   alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.Cast
   alias ThistleTea.Game.Spell.Cooldowns
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.ItemStore
@@ -54,6 +56,38 @@ defmodule ThistleTea.Game.Network.Message.CmsgUseItemTest do
       assert is_integer(ready_at)
       assert ready_at - started_at <= 1_250
       assert ItemStore.get(item.object.guid).item.stack_count == 1
+    end
+
+    test "defers consumption for cast-time spells until the cast completes" do
+      player_guid = Guid.from_low_guid(:player, unique_id())
+      spell = %Spell{id: @spell_id, name: "Symbol of Life", cast_time_ms: 10_000}
+      item = ItemStore.create(drink_template(), owner: player_guid, stack_count: 2)
+
+      on_exit(fn -> ItemStore.delete(item.object.guid) end)
+
+      state =
+        CmsgUseItem.handle(
+          %CmsgUseItem{bag: Inventory.bag_0(), slot: @backpack_start, spell_count: 1, targets: <<0::little-size(16)>>},
+          %{
+            ready: true,
+            guid: player_guid,
+            packed_guid: BinaryUtils.pack_guid(player_guid),
+            character: character(player_guid, item.object.guid),
+            player_tick_ref: nil
+          },
+          fn @spell_id -> spell end
+        )
+
+      item_guid = item.object.guid
+
+      assert ItemStore.get(item_guid).item.stack_count == 2
+      assert %Cast{cast_item_guid: ^item_guid, consume_item: true} = state.character.internal.casting
+
+      character = SpellBT.complete_cast(state.character, Time.now() + 11_000)
+
+      assert Enum.any?(character.internal.events, fn event ->
+               event.type == :consume_cast_item and event.cast_item_guid == item_guid
+             end)
     end
 
     test "does not consume a charged item when its spell cast fails" do

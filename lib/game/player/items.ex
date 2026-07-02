@@ -1,8 +1,9 @@
 defmodule ThistleTea.Game.Player.Items do
   @moduledoc """
-  Grants items to a player session: creates the item instance, stores it in
-  the inventory, and sends the push-result packet or chat feedback. Used by
-  item-creating spells and the `.additem` dev command.
+  Grants and consumes items for a player session: creates or removes the item
+  instance, updates the inventory, and sends the client packets. Used by
+  item-creating spells, consumable on-use items, and the `.additem` dev
+  command.
   """
   alias ThistleTea.Game.Entity.Data.Item, as: DataItem
   alias ThistleTea.Game.Entity.Logic.Inventory
@@ -16,6 +17,38 @@ defmodule ThistleTea.Game.Player.Items do
     case ItemStore.create(item_id, owner: state.guid, stack_count: count) do
       %DataItem{} = item -> store_item(state, item, item_id, count)
       _ -> system_message(state, "Item #{item_id} not found.")
+    end
+  end
+
+  def consume(state, item_guid) when is_integer(item_guid) do
+    with %DataItem{} = item <- ItemStore.get(item_guid),
+         {_bag, _slot} = pos <- Inventory.find_position(state.character.player, item_guid, &ItemStore.get/1) do
+      consume_at(state, item, pos)
+    else
+      _ -> state
+    end
+  end
+
+  def consume(state, _item_guid), do: state
+
+  defp consume_at(state, %DataItem{} = item, pos) do
+    get_item = &ItemStore.get/1
+
+    if (item.item.stack_count || 1) > 1 do
+      case Inventory.reduce_stack(state.character.player, pos, 1, get_item) do
+        {:ok, result} -> InventoryUpdate.apply(state, {:ok, result})
+        _ -> state
+      end
+    else
+      case Inventory.destroy(state.character.player, pos, get_item) do
+        {:ok, result, _item} ->
+          ItemStore.delete(item.object.guid)
+          Network.send_packet(%Message.SmsgDestroyObject{guid: item.object.guid})
+          InventoryUpdate.apply(state, {:ok, result})
+
+        _ ->
+          state
+      end
     end
   end
 
