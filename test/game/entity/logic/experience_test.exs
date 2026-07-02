@@ -76,19 +76,19 @@ defmodule ThistleTea.Game.Entity.Logic.ExperienceTest do
 
   describe "quest_xp/3" do
     test "full xp at or below quest level plus five" do
-      assert Experience.quest_xp(2, 540, 1) == 900
-      assert Experience.quest_xp(2, 540, 7) == 900
+      assert Experience.quest_xp(2, 900, 1) == 900
+      assert Experience.quest_xp(2, 900, 7) == 900
     end
 
     test "scales down as the player outlevels the quest" do
-      assert Experience.quest_xp(2, 540, 8) == 720
-      assert Experience.quest_xp(2, 540, 9) == 540
-      assert Experience.quest_xp(2, 540, 10) == 360
-      assert Experience.quest_xp(2, 540, 11) == 180
-      assert Experience.quest_xp(2, 540, 12) == 90
+      assert Experience.quest_xp(2, 900, 8) == 720
+      assert Experience.quest_xp(2, 900, 9) == 540
+      assert Experience.quest_xp(2, 900, 10) == 360
+      assert Experience.quest_xp(2, 900, 11) == 180
+      assert Experience.quest_xp(2, 900, 12) == 90
     end
 
-    test "no money max level means no xp" do
+    test "no reward xp means no xp" do
       assert Experience.quest_xp(10, 0, 10) == 0
     end
   end

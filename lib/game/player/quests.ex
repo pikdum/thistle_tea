@@ -173,22 +173,30 @@ defmodule ThistleTea.Game.Player.Quests do
     {:ok, quest_log} = QuestLog.remove(character.player.quest_log, quest.id)
     rewarded = MapSet.put(character.player.rewarded_quests, quest.id)
 
-    xp = Experience.quest_xp(quest.level, quest.reward_money_max_level, character.unit.level)
+    {xp, money} = quest_reward(quest, character.unit.level)
     {character, level_ups} = PlayerStats.gain_xp(character, xp)
     Enum.each(level_ups, fn level_up -> Network.send_packet(struct(Message.SmsgLevelupInfo, level_up)) end)
 
-    coinage = max(character.player.coinage + quest.reward_money, 0)
+    coinage = max(character.player.coinage + money, 0)
 
     character = %{
       character
       | player: %{character.player | quest_log: quest_log, rewarded_quests: rewarded, coinage: coinage}
     }
 
-    Network.send_packet(%Message.SmsgQuestgiverQuestComplete{quest: quest, xp: xp})
+    Network.send_packet(%Message.SmsgQuestgiverQuestComplete{quest: quest, xp: xp, money: money})
 
     state = put_character(state, character)
     send_next_quest(state, npc_guid, quest)
     state
+  end
+
+  defp quest_reward(%Quest{} = quest, player_level) do
+    if player_level >= PlayerStats.max_level() do
+      {0, quest.reward_money + quest.reward_money_max_level}
+    else
+      {Experience.quest_xp(quest.level, quest.reward_xp, player_level), quest.reward_money}
+    end
   end
 
   defp send_next_quest(state, npc_guid, %Quest{next_quest_in_chain: next_id}) when next_id > 0 do

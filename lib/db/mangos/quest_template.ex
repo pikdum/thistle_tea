@@ -90,6 +90,7 @@ defmodule ThistleTea.DB.Mangos.QuestTemplate do
     field(:rew_item_count4, :integer, default: 0, source: :RewItemCount4)
     field(:rew_or_req_money, :integer, default: 0, source: :RewOrReqMoney)
     field(:rew_money_max_level, :integer, default: 0, source: :RewMoneyMaxLevel)
+    field(:rew_xp, :integer, default: 0, source: :RewXP)
     field(:rew_spell, :integer, default: 0, source: :RewSpell)
     field(:rew_spell_cast, :integer, default: 0, source: :RewSpellCast)
     field(:point_map_id, :integer, default: 0, source: :PointMapId)
