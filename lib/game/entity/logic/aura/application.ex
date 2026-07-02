@@ -43,9 +43,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
     :periodic_heal,
     :periodic_energize,
     :periodic_leech,
-    :periodic_trigger_spell,
-    :mod_regen,
-    :mod_power_regen
+    :periodic_trigger_spell
   ]
 
   @stand_state_sit 1

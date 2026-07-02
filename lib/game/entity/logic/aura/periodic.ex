@@ -100,58 +100,9 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
 
   defp tick_aura(entity, %Holder{} = holder, %Aura{type: :periodic_energize, next_tick_at: at} = aura, now)
        when is_integer(at) and now >= at do
-    misc_value = power_type(aura.misc_value)
-    entity = restore_power(entity, misc_value, aura.amount)
+    {entity, events} = apply_energize(entity, holder, power_type(aura.misc_value), aura.amount)
 
-    event =
-      Event.periodic_aura_log(holder.caster_guid, entity.object.guid, holder.spell, :periodic_energize, aura.amount,
-        misc_value: misc_value
-      )
-
-    {entity, %{aura | next_tick_at: advance_tick(at, aura.amplitude_ms, now)}, [event]}
-  end
-
-  defp tick_aura(entity, %Holder{} = holder, %Aura{type: :mod_regen, next_tick_at: at} = aura, now)
-       when is_integer(at) and now >= at do
-    event =
-      case missing_health(entity) do
-        missing when missing > 0 ->
-          Event.periodic_aura_log(
-            holder.caster_guid,
-            entity.object.guid,
-            holder.spell,
-            :periodic_heal,
-            min(aura.amount, missing)
-          )
-
-        _missing ->
-          nil
-      end
-
-    {entity, %{aura | next_tick_at: advance_tick(at, aura.amplitude_ms, now)}, compact_events([event])}
-  end
-
-  defp tick_aura(entity, %Holder{} = holder, %Aura{type: :mod_power_regen, next_tick_at: at} = aura, now)
-       when is_integer(at) and now >= at do
-    misc_value = power_type(aura.misc_value)
-
-    event =
-      case missing_power(entity, misc_value) do
-        missing when missing > 0 ->
-          Event.periodic_aura_log(
-            holder.caster_guid,
-            entity.object.guid,
-            holder.spell,
-            :periodic_energize,
-            min(aura.amount, missing),
-            misc_value: misc_value
-          )
-
-        _missing ->
-          nil
-      end
-
-    {entity, %{aura | next_tick_at: advance_tick(at, aura.amplitude_ms, now)}, compact_events([event])}
+    {entity, %{aura | next_tick_at: advance_tick(at, aura.amplitude_ms, now)}, events}
   end
 
   defp tick_aura(entity, %Holder{} = holder, %Aura{type: :periodic_leech, next_tick_at: at} = aura, now)
@@ -191,24 +142,18 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
 
   defp leech_heal_events(_holder, _entity, _damage, _aura), do: []
 
-  defp restore_power(entity, 0, amount), do: Core.restore_mana(entity, amount)
-  defp restore_power(entity, _power_type, _amount), do: entity
+  defp apply_energize(entity, %Holder{} = holder, 0, amount) do
+    entity = Core.restore_mana(entity, amount)
 
-  defp missing_health(%{unit: %Unit{health: health, max_health: max_health}})
-       when is_integer(health) and is_integer(max_health) do
-    max(max_health - health, 0)
+    event =
+      Event.periodic_aura_log(holder.caster_guid, entity.object.guid, holder.spell, :periodic_energize, amount,
+        misc_value: 0
+      )
+
+    {entity, [event]}
   end
 
-  defp missing_health(_entity), do: 0
-
-  defp missing_power(%{unit: %Unit{power_type: power_type, power1: power, max_power1: max_power}}, 0)
-       when power_type == 0 and is_integer(power) and is_integer(max_power) do
-    max(max_power - power, 0)
-  end
-
-  defp missing_power(_entity, _power_type), do: 0
-
-  defp compact_events(events), do: Enum.reject(events, &is_nil/1)
+  defp apply_energize(entity, _holder, _power_type, _amount), do: {entity, []}
 
   defp power_type(value) when is_integer(value) and value >= 0, do: value
   defp power_type(_value), do: 0

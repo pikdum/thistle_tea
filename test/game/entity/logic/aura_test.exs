@@ -365,6 +365,40 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
                }
              ] = events
     end
+
+    test "does not grant or log energize ticks for unhandled power types" do
+      entity = %{
+        fixture_entity()
+        | unit: %Unit{level: 1, health: 100, max_health: 100, power1: 10, max_power1: 100, auras: []}
+      }
+
+      spell = %Spell{
+        id: 29_131,
+        name: "Bloodrage",
+        duration_ms: 10_000,
+        effects: [
+          %Effect{
+            index: 0,
+            type: :apply_aura,
+            base_points: 1,
+            die_sides: 0,
+            aura: :periodic_energize,
+            amplitude_ms: 1_000,
+            misc_value: 1
+          }
+        ]
+      }
+
+      {entity, _events} = apply_spell(entity, 999, 1, spell)
+
+      [holder] = entity.unit.auras
+      [aura] = holder.auras
+
+      {entity, events} = Aura.tick(entity, aura.next_tick_at)
+
+      assert entity.unit.power1 == 10
+      assert events == []
+    end
   end
 
   describe "reactions/3" do
@@ -746,7 +780,7 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
       assert Enum.any?(events, &(&1.type == :stand_state and &1.stand_state == 1))
     end
 
-    test "food auras log regen ticks without applying direct aura healing" do
+    test "food auras tick silently without applying direct aura healing" do
       entity = fixture_entity()
       entity = %{entity | unit: %{entity.unit | health: 50}}
       {entity, _events} = apply_spell(entity, 1, 1, food_fixture())
@@ -754,20 +788,10 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
       {entity, events} = Aura.tick(entity, 1_000 + 5_000)
 
       assert entity.unit.health == 50
-
-      assert [
-               %{
-                 type: :periodic_aura_log,
-                 source_guid: 1,
-                 target_guid: 1,
-                 spell_id: 433,
-                 aura_type: :periodic_heal,
-                 amount: 16
-               }
-             ] = events
+      assert events == []
     end
 
-    test "drink auras log mana regen ticks" do
+    test "drink auras tick silently without granting direct mana" do
       entity = %{
         fixture_entity()
         | unit: %Unit{level: 1, health: 100, max_health: 100, power_type: 0, power1: 10, max_power1: 100, auras: []}
@@ -791,19 +815,10 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
       }
 
       {entity, _events} = apply_spell(entity, 1, 1, spell)
-      {_entity, events} = Aura.tick(entity, 1_000 + 5_000)
+      {entity, events} = Aura.tick(entity, 1_000 + 5_000)
 
-      assert [
-               %{
-                 type: :periodic_aura_log,
-                 source_guid: 1,
-                 target_guid: 1,
-                 spell_id: 430,
-                 aura_type: :periodic_energize,
-                 amount: 41,
-                 misc_value: 0
-               }
-             ] = events
+      assert entity.unit.power1 == 10
+      assert events == []
     end
 
     test "remove_with_interrupt_flags removes matching auras only" do
