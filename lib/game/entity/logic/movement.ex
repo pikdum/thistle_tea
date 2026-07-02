@@ -202,6 +202,61 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
     %{entity | movement_block: movement_block, internal: internal}
   end
 
+  def resume_spline(
+        %{
+          internal: %Internal{movement_start_time: start_time, movement_start_position: start_position},
+          movement_block: %MovementBlock{spline_nodes: spline_nodes, duration: duration}
+        } = entity,
+        now
+      )
+      when is_integer(start_time) and is_tuple(start_position) and is_list(spline_nodes) and spline_nodes != [] and
+             is_integer(duration) and duration > 0 and is_integer(now) do
+    if moving?(entity, now) do
+      remaining_spline_entity(entity, now)
+    end
+  end
+
+  def resume_spline(_entity, _now), do: nil
+
+  defp remaining_spline_entity(
+         %{
+           internal: %Internal{movement_start_time: start_time, movement_start_position: start_position},
+           movement_block: %MovementBlock{spline_nodes: spline_nodes, duration: duration, position: {_, _, _, o}} = mb
+         } = entity,
+         now
+       ) do
+    elapsed = min(max(now - start_time, 0), duration)
+    path = [start_position | spline_nodes]
+    travelled = path_length(path) * elapsed / duration
+    {x, y, z} = position_at(start_position, spline_nodes, duration, elapsed)
+
+    case nodes_after(path, travelled) do
+      [] ->
+        nil
+
+      remaining_nodes ->
+        movement_block = %{
+          mb
+          | position: {x, y, z, o},
+            spline_nodes: remaining_nodes,
+            duration: max(remaining_move_duration(entity, now), 1)
+        }
+
+        %{entity | movement_block: movement_block}
+    end
+  end
+
+  defp nodes_after([start | rest], travelled) do
+    rest
+    |> Enum.reduce({start, 0.0, []}, fn node, {prev, distance_acc, kept} ->
+      segment_end = distance_acc + segment_distance(prev, node)
+      kept = if segment_end > travelled, do: [node | kept], else: kept
+      {node, segment_end, kept}
+    end)
+    |> elem(2)
+    |> Enum.reverse()
+  end
+
   def move_to(%{movement_block: %MovementBlock{movement_flags: flags}} = state, _destination, _opts, _now)
       when is_integer(flags) and (flags &&& @movement_flag_root) > 0 do
     state

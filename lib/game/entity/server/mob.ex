@@ -29,6 +29,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Entity.Server.Mob.Respawn
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network
+  alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Party
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Time
@@ -66,12 +67,15 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     if Corpse.removed?(state) do
       {:noreply, state}
     else
-      state = Movement.sync_position(state, Time.now())
+      now = Time.now()
+      state = Movement.sync_position(state, now)
       World.update_position(state)
       state = Visibility.refresh_entity(state)
 
       Core.update_object(state)
       |> Network.send_packet(pid)
+
+      send_resume_move(state, pid, now)
 
       {:noreply, state}
     end
@@ -332,6 +336,18 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   defp wake_reason(:running), do: :unspecified
   defp wake_reason(status) when is_atom(status), do: status
   defp wake_reason(_status), do: :unknown
+
+  defp send_resume_move(%Mob{} = state, pid, now) do
+    case Movement.resume_spline(state, now) do
+      nil ->
+        :ok
+
+      resumed ->
+        resumed
+        |> Message.SmsgMonsterMove.build()
+        |> Network.send_packet(pid)
+    end
+  end
 
   defp deactivate_ai(%Mob{} = state) do
     state

@@ -57,6 +57,58 @@ defmodule ThistleTea.Game.Entity.Logic.MovementTest do
     assert Movement.remaining_move_duration(entity, now) == 750
   end
 
+  describe "resume_spline/2" do
+    test "returns the remaining path from the current position" do
+      entity =
+        build_entity(
+          start_time: 0,
+          start_position: {0.0, 0.0, 0.0},
+          duration: 10_000,
+          spline_nodes: [{10.0, 0.0, 0.0}, {20.0, 0.0, 0.0}]
+        )
+
+      resumed = Movement.resume_spline(entity, 2_500)
+
+      assert resumed.movement_block.position == {5.0, 0.0, 0.0, 0.0}
+      assert resumed.movement_block.spline_nodes == [{10.0, 0.0, 0.0}, {20.0, 0.0, 0.0}]
+      assert resumed.movement_block.duration == 7_500
+    end
+
+    test "drops nodes already passed" do
+      entity =
+        build_entity(
+          start_time: 0,
+          start_position: {0.0, 0.0, 0.0},
+          duration: 10_000,
+          spline_nodes: [{10.0, 0.0, 0.0}, {20.0, 0.0, 0.0}]
+        )
+
+      resumed = Movement.resume_spline(entity, 7_500)
+
+      assert resumed.movement_block.position == {15.0, 0.0, 0.0, 0.0}
+      assert resumed.movement_block.spline_nodes == [{20.0, 0.0, 0.0}]
+      assert resumed.movement_block.duration == 2_500
+    end
+
+    test "returns nil once the movement window has ended" do
+      entity =
+        build_entity(
+          start_time: 0,
+          start_position: {0.0, 0.0, 0.0},
+          duration: 1_000,
+          spline_nodes: [{10.0, 0.0, 0.0}]
+        )
+
+      assert Movement.resume_spline(entity, 2_000) == nil
+    end
+
+    test "returns nil without an active spline" do
+      entity = build_entity(start_time: nil, start_position: nil, spline_nodes: [])
+
+      assert Movement.resume_spline(entity, 1_000) == nil
+    end
+  end
+
   describe "next_spatial_update_delay/2" do
     test "returns the delay to the next spatial cell boundary" do
       entity =
