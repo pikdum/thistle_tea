@@ -154,6 +154,17 @@ defmodule ThistleTea.Game.Entity.Data.Component.MovementBlock do
     %__MODULE__{} = movement_block
   end
 
+  def refresh_timestamp(%__MODULE__{update_flag: update_flag, timestamp: timestamp} = m, now)
+      when is_integer(update_flag) and is_integer(now) do
+    if (update_flag &&& @update_flag_living) > 0 and timestamp in [nil, 0] do
+      %{m | timestamp: now + 1000}
+    else
+      m
+    end
+  end
+
+  def refresh_timestamp(%__MODULE__{} = m, _now), do: m
+
   # credo:disable-for-next-line Credo.Check.Refactor.CyclomaticComplexity
   def to_binary(%__MODULE__{} = m) do
     <<m.update_flag::little-size(8)>> <>

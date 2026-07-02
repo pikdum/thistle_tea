@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Network.UpdateObject do
   alias ThistleTea.Game.Entity.Data.Item, as: DataItem
   alias ThistleTea.Game.Network.BinaryUtils
   alias ThistleTea.Game.Network.Packet
+  alias ThistleTea.Game.Time
 
   defstruct [
     :update_type,
@@ -177,7 +178,11 @@ defmodule ThistleTea.Game.Network.UpdateObject do
     mask_count = mask_blocks_count(fields)
     mask = generate_mask(fields)
     objects = generate_objects(fields)
-    movement_block = MovementBlock.to_binary(obj.movement_block)
+
+    movement_block =
+      obj.movement_block
+      |> MovementBlock.refresh_timestamp(Time.now())
+      |> MovementBlock.to_binary()
 
     <<update_type(update_type)>> <>
       packed_guid <>

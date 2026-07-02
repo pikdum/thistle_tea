@@ -203,6 +203,32 @@ defmodule ThistleTea.Game.Entity.Data.Component.MovementBlockTest do
     end
   end
 
+  describe "refresh_timestamp/2" do
+    test "stamps living blocks without a client timestamp", context do
+      movement_block = %{context.base_movement_block | update_flag: 0x70, timestamp: 0}
+
+      assert MovementBlock.refresh_timestamp(movement_block, 5000).timestamp == 6000
+    end
+
+    test "stamps living blocks with a nil timestamp", context do
+      movement_block = %{context.base_movement_block | update_flag: 0x20, timestamp: nil}
+
+      assert MovementBlock.refresh_timestamp(movement_block, 5000).timestamp == 6000
+    end
+
+    test "keeps client-provided timestamps", context do
+      movement_block = %{context.base_movement_block | update_flag: 0x70, timestamp: 1234}
+
+      assert MovementBlock.refresh_timestamp(movement_block, 5000).timestamp == 1234
+    end
+
+    test "ignores non-living blocks", context do
+      movement_block = %{context.base_movement_block | update_flag: 0x40, timestamp: 0}
+
+      assert MovementBlock.refresh_timestamp(movement_block, 5000).timestamp == 0
+    end
+  end
+
   defp vector({x, y, z}) do
     <<x::little-float-size(32), y::little-float-size(32), z::little-float-size(32)>>
   end
