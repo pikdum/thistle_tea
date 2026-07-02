@@ -101,6 +101,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
           BT.sequence([
             BT.condition(&target_valid_same_map?/2),
             BT.condition(&in_combat_range?/2),
+            BT.action(&halt_at_contact/2),
             BT.action(&melee_attack/2),
             BT.action(&maybe_spread/2),
             BT.action(&combat_wait/2)
@@ -462,7 +463,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
 
   def combat_wait(%Mob{} = state, %Blackboard{} = blackboard, now) when is_integer(now) do
     attack_delay = Blackboard.delay_until(blackboard, :next_attack_at, now)
-    chase_delay = combat_chase_delay(state, attack_delay, now)
+    chase_delay = combat_chase_delay(state, blackboard, attack_delay, now)
 
     blackboard =
       blackboard
@@ -483,6 +484,53 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
 
   defp melee_attack(%Mob{} = state, %Blackboard{} = blackboard) do
     CombatBT.melee_attack(state, blackboard)
+  end
+
+  defp halt_at_contact(%Mob{} = state, %Blackboard{} = blackboard) do
+    halt_at_contact(state, blackboard, Time.now())
+  end
+
+  def halt_at_contact(%Mob{unit: %Unit{target: target}} = state, %Blackboard{} = blackboard, now)
+      when is_integer(target) and target > 0 and is_integer(now) do
+    cond do
+      not Movement.moving?(state, now) ->
+        {:success, state, Blackboard.clear_spreading(blackboard)}
+
+      Blackboard.spreading?(blackboard) ->
+        {:success, state, blackboard}
+
+      true ->
+        maybe_halt_at_contact(state, blackboard, target, now)
+    end
+  end
+
+  def halt_at_contact(%Mob{} = state, %Blackboard{} = blackboard, _now), do: {:success, state, blackboard}
+
+  defp maybe_halt_at_contact(%Mob{} = state, %Blackboard{} = blackboard, target, now) do
+    with {map, tx, ty, _tz} when map == state.internal.map <- World.target_position(target),
+         true <- within_contact?(state, target, {tx, ty}) do
+      state =
+        state
+        |> Movement.halt(now)
+        |> face_position({tx, ty})
+        |> Event.enqueue(Event.movement_stopped())
+
+      {:success, state, blackboard}
+    else
+      _ -> {:success, state, blackboard}
+    end
+  end
+
+  defp within_contact?(%Mob{movement_block: %MovementBlock{position: {mx, my, _mz, _o}}} = state, target_guid, {tx, ty}) do
+    planar_distance({mx, my, 0.0}, {tx, ty, 0.0}) <= contact_distance(state, target_guid)
+  end
+
+  defp contact_distance(%Mob{} = state, target_guid) do
+    own_combat_reach(state) + target_combat_reach(target_guid)
+  end
+
+  defp face_position(%Mob{movement_block: %MovementBlock{position: {mx, my, _mz, _o}}} = state, {tx, ty}) do
+    set_orientation(state, :math.atan2(ty - my, tx - mx))
   end
 
   defp maybe_spread(%Mob{} = state, %Blackboard{} = blackboard) do
@@ -585,7 +633,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     case World.target_position(target) do
       {map, x, y, z} when map == state.internal.map ->
         {state, blackboard} = maybe_repath_chase(state, blackboard, {x, y, z}, target, now)
-        delay_ms = chase_delay(state, now)
+        delay_ms = chase_delay(state, target, {x, y}, now)
         blackboard = Blackboard.put_next_at(blackboard, :next_chase_at, delay_ms, now)
         {BT.running(delay_ms, :chase), state, blackboard}
 
@@ -712,6 +760,12 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
 
   def chase_repath_distance(%Mob{} = state, target_guid) do
     CombatLogic.chase_rechase_distance(melee_reach_to(state, target_guid), target_bounding_radius(target_guid))
+  end
+
+  @melee_escape_min_threshold 0.5
+
+  def melee_escape_distance(%Mob{} = state, target_guid, distance) when is_number(distance) do
+    max(melee_reach_to(state, target_guid) - distance, @melee_escape_min_threshold)
   end
 
   defp melee_reach_to(%Mob{} = state, target_guid) do
@@ -960,18 +1014,24 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     soonest_delay([aura_delay(state, now)], @blocked_retry_delay)
   end
 
-  defp chase_delay(%Mob{} = state, now) do
+  defp chase_delay(%Mob{} = state, target_guid, {tx, ty}, now) do
     if Movement.moving?(state, now) do
-      min(Movement.remaining_move_duration(state, now), @chase_tick_delay)
+      [
+        Movement.remaining_move_duration(state, now),
+        Movement.time_to_within(state, {tx, ty}, contact_distance(state, target_guid), now)
+      ]
+      |> soonest_delay(@chase_tick_delay)
+      |> min(@chase_tick_delay)
     else
       @chase_tick_delay
     end
   end
 
-  defp combat_chase_delay(%Mob{} = state, attack_delay, now) do
+  defp combat_chase_delay(%Mob{} = state, %Blackboard{} = blackboard, attack_delay, now) do
     cond do
       Movement.moving?(state, now) ->
-        Movement.next_spatial_update_delay(state, now)
+        [Movement.next_spatial_update_delay(state, now), combat_contact_delay(state, blackboard, now)]
+        |> soonest_delay(@chase_tick_delay)
 
       is_integer(attack_delay) and attack_delay > 0 ->
         attack_delay
@@ -980,6 +1040,21 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
         @chase_tick_delay
     end
   end
+
+  defp combat_contact_delay(%Mob{unit: %Unit{target: target}} = state, %Blackboard{} = blackboard, now)
+       when is_integer(target) and target > 0 do
+    if not Blackboard.spreading?(blackboard) do
+      case World.target_position(target) do
+        {map, tx, ty, _tz} when map == state.internal.map ->
+          Movement.time_to_within(state, {tx, ty}, contact_distance(state, target), now)
+
+        _ ->
+          nil
+      end
+    end
+  end
+
+  defp combat_contact_delay(%Mob{}, %Blackboard{}, _now), do: nil
 
   defp aura_delay(%Mob{} = state, now) do
     case AuraLogic.next_event_at(state) do

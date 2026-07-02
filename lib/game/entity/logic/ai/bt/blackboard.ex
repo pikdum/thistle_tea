@@ -20,6 +20,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Blackboard do
             next_regen_at: 0,
             next_spread_at: 0,
             spread_attempts: 0,
+            spreading: false,
             confused_anchor: nil
 
   def new do
@@ -76,11 +77,23 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Blackboard do
   end
 
   def bump_spread(%__MODULE__{} = blackboard) do
-    Map.put(blackboard, :spread_attempts, spread_attempts(blackboard) + 1)
+    blackboard
+    |> Map.put(:spread_attempts, spread_attempts(blackboard) + 1)
+    |> Map.put(:spreading, true)
   end
 
   def reset_spread(%__MODULE__{} = blackboard) do
-    Map.put(blackboard, :spread_attempts, 0)
+    blackboard
+    |> Map.put(:spread_attempts, 0)
+    |> Map.put(:spreading, false)
+  end
+
+  def spreading?(%__MODULE__{} = blackboard) do
+    Map.get(blackboard, :spreading) || false
+  end
+
+  def clear_spreading(%__MODULE__{} = blackboard) do
+    Map.put(blackboard, :spreading, false)
   end
 
   def clear_attack(%__MODULE__{} = blackboard) do

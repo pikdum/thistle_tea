@@ -385,11 +385,20 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
        when is_integer(target) and target > 0 do
     case Blackboard.from_any(blackboard) do
       %Blackboard{last_target_pos: {x, y, z}} -> {target, {x, y, z}, MobBT.chase_repath_distance(state, target)}
-      _blackboard -> nil
+      %Blackboard{} -> melee_hold_watch(state, target)
     end
   end
 
   defp chase_watch(%Mob{}), do: nil
+
+  defp melee_hold_watch(%Mob{internal: %Internal{map: map}} = state, target) do
+    with {^map, x, y, z} <- World.target_position(target),
+         distance when is_number(distance) <- World.distance_to_guid(state, target) do
+      {target, {x, y, z}, MobBT.melee_escape_distance(state, target, distance)}
+    else
+      _ -> nil
+    end
+  end
 
   defp mark_chase_ready(%Mob{internal: %Internal{blackboard: blackboard} = internal} = state) do
     blackboard = %{Blackboard.from_any(blackboard) | next_chase_at: 0}

@@ -89,6 +89,74 @@ defmodule ThistleTea.Game.Entity.Logic.MovementTest do
     end
   end
 
+  describe "time_to_within/4" do
+    test "returns the delay until the path enters the radius" do
+      entity =
+        build_entity(
+          start_time: 0,
+          start_position: {0.0, 0.0, 0.0},
+          duration: 10_000,
+          spline_nodes: [{100.0, 0.0, 0.0}]
+        )
+
+      assert Movement.time_to_within(entity, {50.0, 0.0}, 3.0, 0) == 4_700
+    end
+
+    test "measures from the current position mid-move" do
+      entity =
+        build_entity(
+          start_time: 0,
+          start_position: {0.0, 0.0, 0.0},
+          duration: 10_000,
+          spline_nodes: [{100.0, 0.0, 0.0}]
+        )
+
+      assert Movement.time_to_within(entity, {80.0, 0.0}, 3.0, 5_000) == 2_700
+    end
+
+    test "returns the minimum delay when already within the radius" do
+      entity =
+        build_entity(
+          start_time: 0,
+          start_position: {0.0, 0.0, 0.0},
+          duration: 10_000,
+          spline_nodes: [{100.0, 0.0, 0.0}]
+        )
+
+      assert Movement.time_to_within(entity, {1.0, 0.0}, 3.0, 0) == 1
+    end
+
+    test "returns nil when the path never enters the radius" do
+      entity =
+        build_entity(
+          start_time: 0,
+          start_position: {0.0, 0.0, 0.0},
+          duration: 10_000,
+          spline_nodes: [{100.0, 0.0, 0.0}]
+        )
+
+      assert Movement.time_to_within(entity, {50.0, 10.0}, 3.0, 0) == nil
+    end
+
+    test "walks across segments to find the contact point" do
+      entity =
+        build_entity(
+          start_time: 0,
+          start_position: {0.0, 0.0, 0.0},
+          duration: 2_000,
+          spline_nodes: [{10.0, 0.0, 0.0}, {10.0, 10.0, 0.0}]
+        )
+
+      assert Movement.time_to_within(entity, {10.0, 8.0}, 3.0, 0) == 1_500
+    end
+
+    test "returns nil without active movement" do
+      entity = build_entity(start_time: nil, start_position: nil, spline_nodes: [])
+
+      assert Movement.time_to_within(entity, {5.0, 0.0}, 3.0, 0) == nil
+    end
+  end
+
   test "sync_position updates time_passed while moving" do
     now = 5_000
 

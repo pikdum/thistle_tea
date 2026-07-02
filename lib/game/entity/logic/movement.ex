@@ -96,6 +96,58 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
     end
   end
 
+  def time_to_within(
+        %{
+          internal: %Internal{movement_start_time: start_time, movement_start_position: start_position},
+          movement_block: %MovementBlock{spline_nodes: spline_nodes, duration: duration}
+        } = entity,
+        {tx, ty},
+        radius,
+        now
+      )
+      when is_integer(start_time) and is_tuple(start_position) and is_list(spline_nodes) and spline_nodes != [] and
+             is_integer(duration) and duration > 0 and is_number(radius) and is_integer(now) do
+    if moving?(entity, now) do
+      contact_delay(entity, {tx, ty}, radius, now)
+    end
+  end
+
+  def time_to_within(_entity, _point, _radius, _now), do: nil
+
+  defp contact_delay(
+         %{
+           internal: %Internal{movement_start_time: start_time, movement_start_position: start_position},
+           movement_block: %MovementBlock{spline_nodes: spline_nodes, duration: duration}
+         } = entity,
+         center,
+         radius,
+         now
+       ) do
+    path = [start_position | spline_nodes]
+    total_distance = path_length(path)
+
+    if total_distance > 0 do
+      elapsed = min(max(now - start_time, 0), duration)
+      travelled = total_distance * elapsed / duration
+      contact_delay_at(entity, path, travelled, center, radius, total_distance, now)
+    end
+  end
+
+  defp contact_delay_at(
+         %{movement_block: %MovementBlock{duration: duration}} = entity,
+         path,
+         travelled,
+         center,
+         radius,
+         total_distance,
+         now
+       ) do
+    case distance_to_within(path, travelled, center, radius) do
+      nil -> nil
+      distance -> min(max(ceil(distance * duration / total_distance), 1), remaining_move_duration(entity, now))
+    end
+  end
+
   def sync_position(%{movement_block: %MovementBlock{spline_nodes: spline_nodes}} = entity, _now)
       when spline_nodes in [nil, []] do
     entity
@@ -311,6 +363,64 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
   end
 
   defp lerp_point(_start, finish, _segment_distance, _remaining), do: finish
+
+  defp distance_to_within([start | rest], travelled, center, radius) do
+    rest
+    |> Enum.reduce_while({start, 0.0}, &reduce_contact_segment(&1, &2, travelled, center, radius))
+    |> case do
+      {_finish, _distance_acc} -> nil
+      distance -> distance
+    end
+  end
+
+  defp reduce_contact_segment(finish, {prev, distance_acc}, travelled, center, radius) do
+    segment_distance = segment_distance(prev, finish)
+    segment_end = distance_acc + segment_distance
+
+    cond do
+      segment_distance <= 0 ->
+        {:cont, {finish, distance_acc}}
+
+      travelled >= segment_end ->
+        {:cont, {finish, segment_end}}
+
+      true ->
+        offset = max(travelled - distance_acc, 0.0)
+        segment_start = lerp_point(prev, finish, segment_distance, offset)
+        remaining_segment_distance = segment_distance - offset
+        contact_reduce_result(segment_start, finish, remaining_segment_distance, segment_end, travelled, center, radius)
+    end
+  end
+
+  defp contact_reduce_result(segment_start, finish, remaining_segment_distance, segment_end, travelled, center, radius) do
+    case contact_distance_on_segment(segment_start, finish, remaining_segment_distance, center, radius) do
+      nil -> {:cont, {finish, segment_end}}
+      distance -> {:halt, max(segment_end - remaining_segment_distance - travelled, 0.0) + distance}
+    end
+  end
+
+  defp contact_distance_on_segment({x1, y1, _z1}, {x2, y2, _z2}, segment_length, {cx, cy}, radius) do
+    fx = x1 - cx
+    fy = y1 - cy
+
+    if fx * fx + fy * fy <= radius * radius do
+      0.0
+    else
+      contact_entry_distance(x2 - x1, y2 - y1, fx, fy, segment_length, radius)
+    end
+  end
+
+  defp contact_entry_distance(dx, dy, fx, fy, segment_length, radius) do
+    a = dx * dx + dy * dy
+    b = 2.0 * (fx * dx + fy * dy)
+    c = fx * fx + fy * fy - radius * radius
+    discriminant = b * b - 4.0 * a * c
+
+    if a > 0 and discriminant >= 0 do
+      t = (-b - :math.sqrt(discriminant)) / (2.0 * a)
+      if t >= 0.0 and t <= 1.0, do: t * segment_length
+    end
+  end
 
   defp distance_to_leave_cell([start | rest], travelled, map, cell) do
     rest

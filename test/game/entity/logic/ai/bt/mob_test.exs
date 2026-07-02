@@ -81,6 +81,99 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
     end
   end
 
+  describe "halt_at_contact/3" do
+    test "halts, faces the target, and emits a stop when riding a spline into contact" do
+      target_guid = player_guid()
+      SpatialHash.update(:players, target_guid, 0, 4.0, 0.0, 0.0)
+      on_exit(fn -> SpatialHash.remove(:players, target_guid) end)
+
+      state =
+        fixture_mob(
+          start_time: 0,
+          duration: 10_000,
+          position: {2.0, 0.0, 0.0, 1.0},
+          movement_start_position: {2.0, 0.0, 0.0},
+          spline_nodes: [{2.0, 0.0, 0.0}]
+        )
+
+      state = put_in(state.unit.target, target_guid)
+
+      assert {:success, state, %Blackboard{}} = MobBT.halt_at_contact(state, %Blackboard{}, 2_000)
+      assert state.movement_block.spline_nodes == []
+      assert state.movement_block.position == {2.0, 0.0, 0.0, 0.0}
+      assert is_nil(state.internal.movement_start_time)
+      assert [%Event{type: :movement_stopped}] = state.internal.events
+    end
+
+    test "keeps moving outside the contact ring" do
+      target_guid = player_guid()
+      SpatialHash.update(:players, target_guid, 0, 9.0, 0.0, 0.0)
+      on_exit(fn -> SpatialHash.remove(:players, target_guid) end)
+
+      state =
+        fixture_mob(
+          start_time: 0,
+          duration: 10_000,
+          position: {2.0, 0.0, 0.0, 0.0},
+          movement_start_position: {2.0, 0.0, 0.0},
+          spline_nodes: [{2.0, 0.0, 0.0}]
+        )
+
+      state = put_in(state.unit.target, target_guid)
+
+      assert {:success, ^state, %Blackboard{}} = MobBT.halt_at_contact(state, %Blackboard{}, 2_000)
+      assert state.movement_block.spline_nodes == [{2.0, 0.0, 0.0}]
+      assert state.internal.events == []
+    end
+
+    test "does not interrupt a spread move" do
+      target_guid = player_guid()
+      SpatialHash.update(:players, target_guid, 0, 4.0, 0.0, 0.0)
+      on_exit(fn -> SpatialHash.remove(:players, target_guid) end)
+
+      state =
+        fixture_mob(
+          start_time: 0,
+          duration: 10_000,
+          position: {2.0, 0.0, 0.0, 0.0},
+          movement_start_position: {2.0, 0.0, 0.0},
+          spline_nodes: [{2.0, 0.0, 0.0}]
+        )
+
+      state = put_in(state.unit.target, target_guid)
+      blackboard = %Blackboard{spreading: true}
+
+      assert {:success, ^state, ^blackboard} = MobBT.halt_at_contact(state, blackboard, 2_000)
+      assert state.movement_block.spline_nodes == [{2.0, 0.0, 0.0}]
+    end
+
+    test "clears the spreading flag once stationary" do
+      target_guid = player_guid()
+      state = put_in(fixture_mob().unit.target, target_guid)
+
+      assert {:success, ^state, %Blackboard{spreading: false}} =
+               MobBT.halt_at_contact(state, %Blackboard{spreading: true}, 2_000)
+    end
+  end
+
+  describe "melee_escape_distance/3" do
+    test "is the remaining distance to the melee reach edge" do
+      target_guid = player_guid()
+      Metadata.put(target_guid, %{combat_reach: 1.5})
+      on_exit(fn -> Metadata.delete(target_guid) end)
+
+      state = fixture_mob()
+
+      assert_in_delta MobBT.melee_escape_distance(state, target_guid, 4.0), 1.0, 0.0001
+    end
+
+    test "floors at a minimum threshold near the reach edge" do
+      state = fixture_mob()
+
+      assert MobBT.melee_escape_distance(state, player_guid(), 4.9) == 0.5
+    end
+  end
+
   describe "combat_wait/3" do
     test "paces by the next swing when already stationary in range" do
       state = fixture_mob()
@@ -98,6 +191,19 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
       blackboard = %Blackboard{next_attack_at: 5_000, chase_started: true, last_target_pos: {1.0, 2.0, 3.0}}
 
       assert {{:running, 3_980, :chase}, ^state, %Blackboard{next_chase_at: 4_980, chase_started: false}} =
+               MobBT.combat_wait(state, blackboard, 1_000)
+    end
+
+    test "wakes at the contact ring before the spatial boundary while closing in" do
+      target_guid = player_guid()
+      SpatialHash.update(:players, target_guid, 0, 50.0, 0.0, 0.0)
+      on_exit(fn -> SpatialHash.remove(:players, target_guid) end)
+
+      state = fixture_mob(start_time: 0, duration: 10_000, spline_nodes: [{250.0, 0.0, 0.0}])
+      state = put_in(state.unit.target, target_guid)
+      blackboard = %Blackboard{next_attack_at: 5_000}
+
+      assert {{:running, 880, :chase}, _state, %Blackboard{next_chase_at: 1_880}} =
                MobBT.combat_wait(state, blackboard, 1_000)
     end
   end
@@ -283,7 +389,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
       },
       movement_block: %MovementBlock{
         duration: Keyword.get(opts, :duration, 0),
-        position: {0.0, 0.0, 0.0, 0.0},
+        position: Keyword.get(opts, :position, {0.0, 0.0, 0.0, 0.0}),
         spline_nodes: Keyword.get(opts, :spline_nodes, [{1.0, 0.0, 0.0}])
       }
     }
