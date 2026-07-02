@@ -411,17 +411,17 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
 
     state =
       state
-      |> Event.enqueue(clear_combat_events(target))
+      |> Event.enqueue(clear_combat_events(state.object.guid, target))
       |> Core.mark_broadcast_update()
 
     {:success, state, blackboard}
   end
 
-  defp clear_combat_events(target) when is_integer(target) and target > 0 do
-    [Event.attacker_lost(target), Event.tap_cleared()]
+  defp clear_combat_events(source_guid, target) when is_integer(target) and target > 0 do
+    [Event.attack_stop(source_guid, target), Event.attacker_lost(target), Event.tap_cleared()]
   end
 
-  defp clear_combat_events(_target) do
+  defp clear_combat_events(_source_guid, _target) do
     [Event.tap_cleared()]
   end
 

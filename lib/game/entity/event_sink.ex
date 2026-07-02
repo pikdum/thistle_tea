@@ -286,6 +286,16 @@ defmodule ThistleTea.Game.Entity.EventSink do
     entity
   end
 
+  def emit(entity, %Event{type: :attack_stop} = event) do
+    %Message.SmsgAttackstop{
+      player: event.source_guid,
+      enemy: event.target_guid
+    }
+    |> World.broadcast_packet(entity)
+
+    entity
+  end
+
   def emit(entity, %Event{type: :attacker_state_update} = event) do
     attack = event.attack || %{}
     damage = event.damage || 0
