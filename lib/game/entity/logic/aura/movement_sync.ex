@@ -35,7 +35,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.MovementSync do
 
   defp sync_movement_flags(%{movement_block: %MovementBlock{} = mb, unit: %Unit{auras: holders}} = entity, now) do
     flags = mb.movement_flags || 0
-    was_rooted? = (flags &&& @movement_flag_root) != 0
+    was_rooted? = rooted?(entity)
     has_root? = Enum.any?(holders, &(Holder.has_aura_type?(&1, :mod_root) or Holder.has_aura_type?(&1, :mod_stun)))
 
     new_flags =
@@ -44,6 +44,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.MovementSync do
         else: flags &&& bnot(@movement_flag_root)
 
     entity = %{entity | movement_block: %{mb | movement_flags: new_flags}}
+    entity = put_rooted(entity, has_root?)
     root_events = if has_root? == was_rooted?, do: [], else: [Event.movement_root_changed(has_root?)]
 
     if has_root? and not was_rooted? do
@@ -54,6 +55,15 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.MovementSync do
   end
 
   defp sync_movement_flags(entity, _now), do: {entity, []}
+
+  defp rooted?(%{internal: internal}) when is_struct(internal), do: Map.get(internal, :rooted?) == true
+  defp rooted?(_entity), do: false
+
+  defp put_rooted(%{internal: internal} = entity, rooted?) when is_struct(internal) do
+    %{entity | internal: Map.put(internal, :rooted?, rooted?)}
+  end
+
+  defp put_rooted(entity, _rooted?), do: entity
 
   defp sync_movement_flag_aura(
          %{movement_block: %MovementBlock{} = mb, unit: %Unit{auras: holders}} = entity,

@@ -38,6 +38,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal do
     cooldowns: %{},
     events: [],
     broadcast_update?: false,
+    rooted?: false,
     spline_id: 0,
     godmode: false
   ]

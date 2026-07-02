@@ -193,6 +193,20 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
       assert [%{type: :movement_root_changed, rooted?: false}] = events
       assert (entity.movement_block.movement_flags &&& 0x08000000) == 0
     end
+
+    test "expiring root aura still unroots after client movement packets clobber the flags" do
+      entity = fixture_entity()
+      spell = root_spell()
+
+      {entity, _events} = apply_spell(entity, 999, 1, spell)
+      entity = put_in(entity, [Access.key!(:movement_block), Access.key!(:movement_flags)], 0x1000)
+
+      future = entity.unit.auras |> hd() |> Map.fetch!(:expires_at)
+      {entity, events} = Aura.expire_due(entity, future + 1)
+
+      assert [%{type: :movement_root_changed, rooted?: false}] = events
+      refute entity.internal.rooted?
+    end
   end
 
   describe "tick/2 with periodic_damage" do
