@@ -37,7 +37,7 @@ config :tailwind,
   ]
 
 config :thistle_tea, Repo,
-  database: "db/mangos0.sqlite",
+  database: "db/vmangos.sqlite",
   log: false,
   pool_size: 10,
   queue_target: 1_000,

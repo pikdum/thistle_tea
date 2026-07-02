@@ -283,7 +283,7 @@ defmodule ThistleTea.Game.Entity.Logic.RegenTest do
 
       entity = Regen.tick(entity, 10_000)
 
-      assert entity.unit.power1 == 42
+      assert entity.unit.power1 == 43
       assert entity.internal.broadcast_update? == true
     end
 
@@ -291,7 +291,7 @@ defmodule ThistleTea.Game.Entity.Logic.RegenTest do
       entity = mob([health: 300, power1: 0, max_power1: 185], in_combat: true, last_mana_use_at: 8_000)
 
       assert Regen.tick(entity, 10_000).unit.power1 == 0
-      assert Regen.tick(entity, 13_001).unit.power1 == 42
+      assert Regen.tick(entity, 13_001).unit.power1 == 43
     end
 
     test "does not regenerate combat mana without the power flag" do
@@ -306,7 +306,7 @@ defmodule ThistleTea.Game.Entity.Logic.RegenTest do
       entity = Regen.tick(entity, 10_000)
 
       assert entity.unit.health == 50
-      assert entity.unit.power1 == 42
+      assert entity.unit.power1 == 43
     end
 
     test "does not regenerate when dead" do

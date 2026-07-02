@@ -21,8 +21,6 @@ defmodule ThistleTea.Game.Entity.Logic.Regen do
   @regen_flag_health 0x1
   @regen_flag_power 0x2
   @five_second_rule_ms 5_000
-  @creature_combat_mana_spirit_base 17.0
-  @creature_combat_mana_tick_scale 2.5
   @energy_per_tick 20
   @rage_decay_per_tick 20
   @sitting_multiplier 1.5
@@ -112,9 +110,12 @@ defmodule ThistleTea.Game.Entity.Logic.Regen do
     Core.restore_mana(entity, max(div(max_mana, 3), 1))
   end
 
-  # TODO: feed creature spirit into the formula once a stat source exists
-  defp creature_combat_mana_per_tick(_entity) do
-    max(trunc(@creature_combat_mana_spirit_base * @creature_combat_mana_tick_scale), 1)
+  defp creature_combat_mana_per_tick(%{unit: %Unit{spirit: spirit, intellect: intellect}}) do
+    spirit = max(spirit || 0, 0)
+    intellect = max(intellect || 1, 1)
+
+    spirit_regen = spirit / 10 + 8.5
+    max(trunc((spirit_regen + 0.6 * :math.sqrt(intellect) / 5) * 5), 1)
   end
 
   defp creature_needs_health_regen?(entity) do

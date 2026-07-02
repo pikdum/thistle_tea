@@ -10,20 +10,26 @@ defmodule ThistleTea.DB.Mangos.Creature do
 
   schema "creature" do
     field(:id, :integer, default: 0)
+    field(:id2, :integer, default: 0)
+    field(:id3, :integer, default: 0)
+    field(:id4, :integer, default: 0)
+    field(:id5, :integer, default: 0)
     field(:map, :integer, default: 0)
-    field(:modelid, :integer, default: 0)
-    field(:equipment_id, :integer, default: 0)
     field(:position_x, :float, default: 0.0)
     field(:position_y, :float, default: 0.0)
     field(:position_z, :float, default: 0.0)
     field(:orientation, :float, default: 0.0)
-    field(:spawntimesecs, :integer, default: 120)
-    field(:spawndist, :float, default: 5.0)
-    field(:currentwaypoint, :integer, default: 0)
-    field(:curhealth, :integer, default: 1)
-    field(:curmana, :integer, default: 0)
-    field(:death_state, :integer, source: :DeathState, default: 0)
-    field(:movement_type, :integer, source: :MovementType, default: 0)
+    field(:spawntimesecsmin, :integer, default: 120)
+    field(:spawntimesecsmax, :integer, default: 120)
+    field(:wander_distance, :float, default: 5.0)
+    field(:health_percent, :float, default: 100.0)
+    field(:mana_percent, :float, default: 100.0)
+    field(:movement_type, :integer, default: 0)
+    field(:modelid, :integer, virtual: true, default: 0)
+    field(:spawntimesecs, :integer, virtual: true)
+    field(:spawndist, :float, virtual: true)
+    field(:curhealth, :integer, virtual: true)
+    field(:curmana, :integer, virtual: true)
 
     belongs_to(:creature_template, Mangos.CreatureTemplate,
       foreign_key: :id,
@@ -46,11 +52,9 @@ defmodule ThistleTea.DB.Mangos.Creature do
       where:
         c.map == ^map and c.position_x >= ^x1 and c.position_x < ^x2 and c.position_y >= ^y1 and
           c.position_y < ^y2,
-      join: ct in assoc(c, :creature_template),
       left_join: ce in assoc(c, :game_event_creature),
       where: ce.event in ^events or is_nil(ce.event),
-      where: c.modelid != 0,
-      preload: [creature_template: ct, game_event_creature: ce],
+      preload: [game_event_creature: ce],
       select: c
     )
   end

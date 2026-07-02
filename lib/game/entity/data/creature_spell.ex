@@ -84,19 +84,19 @@ defmodule ThistleTea.Game.Entity.Data.CreatureSpell do
 
   defp cast_flags(_flags), do: MapSet.new()
 
-  # values follow mangos-zero's CreatureSpellTarget enum (CreatureAI.cpp),
-  # not current vmangos ScriptCommands.h — upstream froze an older revision
   defp cast_target(0), do: :self
   defp cast_target(1), do: :victim
   defp cast_target(2), do: :hostile_second_aggro
   defp cast_target(3), do: :hostile_last_aggro
   defp cast_target(4), do: :hostile_random
   defp cast_target(5), do: :hostile_random_not_top
-  defp cast_target(14), do: :friendly
-  defp cast_target(15), do: :friendly_injured
-  defp cast_target(16), do: :friendly_injured_except
-  defp cast_target(17), do: :friendly_missing_buff
-  defp cast_target(18), do: :friendly_missing_buff_except
+  defp cast_target(6), do: :victim
+  defp cast_target(7), do: :victim
+  defp cast_target(16), do: :friendly
+  defp cast_target(17), do: :friendly_injured
+  defp cast_target(18), do: :friendly_injured_except
+  defp cast_target(19), do: :friendly_missing_buff
+  defp cast_target(20), do: :friendly_missing_buff_except
   defp cast_target(other) when is_integer(other), do: other
   defp cast_target(_other), do: :victim
 end

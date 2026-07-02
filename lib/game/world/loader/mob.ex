@@ -4,6 +4,7 @@ defmodule ThistleTea.Game.World.Loader.Mob do
   and display info) into mob entity structs.
   """
   alias ThistleTea.DB.Mangos
+  alias ThistleTea.DB.Mangos.AddonAuras
   alias ThistleTea.DBC
   alias ThistleTea.Game.Entity.Data.CreatureSpell
   alias ThistleTea.Game.Entity.Data.Mob
@@ -20,25 +21,65 @@ defmodule ThistleTea.Game.World.Loader.Mob do
     Mangos.Creature.query_cell(cell, events)
     |> Mangos.Repo.all()
     |> Enum.map(&load_creature/1)
+    |> Enum.reject(&is_nil/1)
     |> Enum.each(&start/1)
   end
 
   def load_creature(%Mangos.Creature{} = creature) do
     creature
+    |> load_creature_template()
+    |> load_creature_level()
+    |> load_creature_class_level_stats()
+    |> load_display()
     |> load_creature_movement()
     |> load_creature_model_info()
-    |> load_display_scale()
     |> load_equip_items()
     |> load_spells()
     |> load_addon_auras()
   end
 
+  defp load_creature_template(%Mangos.Creature{} = creature) do
+    entry = creature |> template_pool() |> Enum.random()
+
+    case Mangos.Repo.get(Mangos.CreatureTemplate, entry) do
+      %Mangos.CreatureTemplate{} = template ->
+        creature
+        |> Map.put(:id, entry)
+        |> Map.put(:creature_template, template)
+
+      _ ->
+        nil
+    end
+  end
+
+  defp load_creature_level(nil), do: nil
+
+  defp load_creature_level(%Mangos.Creature{creature_template: %Mangos.CreatureTemplate{} = template} = creature) do
+    Map.put(creature, :selected_level, Enum.random(template.min_level..template.max_level))
+  end
+
+  defp load_creature_class_level_stats(nil), do: nil
+
+  defp load_creature_class_level_stats(
+         %Mangos.Creature{creature_template: %Mangos.CreatureTemplate{unit_class: unit_class}} = creature
+       ) do
+    level = Map.get(creature, :selected_level)
+    Map.put(creature, :creature_class_level_stats, Mangos.CreatureClassLevelStats.get(unit_class, level))
+  end
+
+  defp load_display(nil), do: nil
+
+  defp load_display(%Mangos.Creature{creature_template: %Mangos.CreatureTemplate{} = template} = creature) do
+    {display_id, display_scale} = select_display(template)
+
+    creature
+    |> Map.put(:modelid, display_id)
+    |> Map.put(:display_scale, display_scale || display_scale(display_id))
+  end
+
   defp load_spells(%Mangos.Creature{creature_template: %Mangos.CreatureTemplate{} = template} = creature) do
     template_spell_ids =
-      case Mangos.Repo.get(Mangos.CreatureTemplateSpells, template.entry) do
-        %Mangos.CreatureTemplateSpells{} = row -> Mangos.CreatureTemplateSpells.spell_ids(row)
-        _ -> []
-      end
+      Enum.filter([template.spell_id1, template.spell_id2, template.spell_id3, template.spell_id4], &positive?/1)
 
     spell_list = load_spell_list(template.spell_list_id)
     spellbook = SpellLoader.build_spellbook(template_spell_ids ++ Enum.map(spell_list, & &1.spell_id))
@@ -69,6 +110,8 @@ defmodule ThistleTea.Game.World.Loader.Mob do
 
   defp load_spell_list(_list_id), do: []
 
+  defp load_addon_auras(nil), do: nil
+
   defp load_addon_auras(%Mangos.Creature{} = creature) do
     spells =
       creature
@@ -79,15 +122,34 @@ defmodule ThistleTea.Game.World.Loader.Mob do
     Map.put(creature, :addon_auras, spells)
   end
 
-  defp addon_aura_ids(%Mangos.Creature{guid: guid, id: entry}) do
+  defp addon_aura_ids(%Mangos.Creature{
+         guid: guid,
+         id: entry,
+         creature_template: %Mangos.CreatureTemplate{auras: template_auras}
+       }) do
+    guid
+    |> addon_or_template_aura_ids(template_auras)
+    |> Kernel.++(event_ai_spawn_aura_ids(entry))
+    |> Enum.uniq()
+  end
+
+  defp addon_or_template_aura_ids(guid, template_auras) do
     case Mangos.Repo.get(Mangos.CreatureAddon, guid) do
       %Mangos.CreatureAddon{auras: auras} = row when is_binary(auras) and auras != "" ->
         Mangos.CreatureAddon.aura_ids(row)
 
       _ ->
-        Mangos.CreatureTemplateAddon.aura_ids(Mangos.Repo.get(Mangos.CreatureTemplateAddon, entry))
+        AddonAuras.parse(template_auras)
     end
   end
+
+  defp event_ai_spawn_aura_ids(entry) do
+    entry
+    |> Mangos.CreatureAiEvent.spawn_aura_script_ids()
+    |> Mangos.CreatureAiScript.spawn_self_aura_spell_ids()
+  end
+
+  defp load_creature_movement(nil), do: nil
 
   defp load_creature_movement(%Mangos.Creature{} = creature) do
     creature_movement =
@@ -97,21 +159,10 @@ defmodule ThistleTea.Game.World.Loader.Mob do
     Map.put(creature, :creature_movement, creature_movement)
   end
 
-  defp load_creature_model_info(%Mangos.Creature{modelid: modelid} = creature)
-       when is_integer(modelid) and modelid > 0 do
-    Map.put(creature, :creature_model_info, Mangos.Repo.get(Mangos.CreatureModelInfo, modelid))
-  end
+  defp load_creature_model_info(nil), do: nil
 
   defp load_creature_model_info(%Mangos.Creature{} = creature) do
     Map.put(creature, :creature_model_info, nil)
-  end
-
-  defp load_display_scale(%Mangos.Creature{modelid: modelid} = creature) when is_integer(modelid) and modelid > 0 do
-    Map.put(creature, :display_scale, display_scale(modelid))
-  end
-
-  defp load_display_scale(%Mangos.Creature{} = creature) do
-    Map.put(creature, :display_scale, nil)
   end
 
   defp display_scale(display_id) do
@@ -126,14 +177,20 @@ defmodule ThistleTea.Game.World.Loader.Mob do
     end
   end
 
+  defp load_equip_items(nil), do: nil
+
   defp load_equip_items(
          %Mangos.Creature{creature_template: %Mangos.CreatureTemplate{equipment_template_id: id}} = creature
        )
        when is_integer(id) and id > 0 do
     items =
-      case Mangos.Repo.get(Mangos.CreatureEquipTemplate, id) do
-        %Mangos.CreatureEquipTemplate{equipentry1: e1, equipentry2: e2, equipentry3: e3} ->
-          Enum.map([e1, e2, e3], &creature_item_template/1)
+      id
+      |> Mangos.CreatureEquipTemplate.query()
+      |> Mangos.Repo.all()
+      |> select_equipment()
+      |> case do
+        %Mangos.CreatureEquipTemplate{item1: i1, item2: i2, item3: i3} ->
+          Enum.map([i1, i2, i3], &creature_item_template/1)
 
         nil ->
           [nil, nil, nil]
@@ -147,10 +204,57 @@ defmodule ThistleTea.Game.World.Loader.Mob do
   end
 
   defp creature_item_template(entry) when is_integer(entry) and entry > 0 do
-    Mangos.Repo.get(Mangos.CreatureItemTemplate, entry)
+    Mangos.Repo.get(Mangos.ItemTemplate, entry)
   end
 
   defp creature_item_template(_entry), do: nil
+
+  defp template_pool(%Mangos.Creature{} = creature) do
+    [creature.id, creature.id2, creature.id3, creature.id4, creature.id5]
+    |> Enum.filter(&positive?/1)
+  end
+
+  defp select_display(%Mangos.CreatureTemplate{} = template) do
+    entries =
+      [
+        {template.model_id1, template.display_scale1, template.display_probability1},
+        {template.model_id2, template.display_scale2, template.display_probability2},
+        {template.model_id3, template.display_scale3, template.display_probability3},
+        {template.model_id4, template.display_scale4, template.display_probability4}
+      ]
+      |> Enum.filter(fn {display_id, _scale, _probability} -> positive?(display_id) end)
+
+    case weighted_pick(entries, fn {_display_id, _scale, probability} -> probability end) do
+      {display_id, scale, _probability} -> {display_id, positive_scale(scale)}
+      nil -> {0, nil}
+    end
+  end
+
+  defp select_equipment([]), do: nil
+  defp select_equipment(rows), do: weighted_pick(rows, & &1.probability)
+
+  defp weighted_pick([], _weight_fun), do: nil
+
+  defp weighted_pick(entries, weight_fun) do
+    total = Enum.reduce(entries, 0, fn entry, acc -> acc + max(weight_fun.(entry) || 0, 0) end)
+    pick_weighted(entries, weight_fun, total)
+  end
+
+  defp pick_weighted(entries, weight_fun, total) when total > 0 do
+    roll = :rand.uniform(total)
+
+    Enum.reduce_while(entries, 0, fn entry, acc ->
+      acc = acc + max(weight_fun.(entry) || 0, 0)
+      if roll <= acc, do: {:halt, entry}, else: {:cont, acc}
+    end)
+  end
+
+  defp pick_weighted(entries, _weight_fun, _total), do: Enum.random(entries)
+
+  defp positive?(value), do: is_integer(value) and value > 0
+
+  defp positive_scale(scale) when is_number(scale) and scale > 0, do: scale
+  defp positive_scale(_scale), do: nil
 
   defp start(%Mangos.Creature{} = creature) do
     creature
