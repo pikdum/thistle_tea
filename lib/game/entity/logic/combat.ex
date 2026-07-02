@@ -4,6 +4,8 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
   rolls from unit damage ranges, and applying an incoming attack to an entity
   along with the events it produces.
   """
+  import Bitwise, only: [band: 2, bnot: 1, bor: 2]
+
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
   alias ThistleTea.Game.Entity.Data.Component.Unit
@@ -14,6 +16,7 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
 
   @default_attack_speed_ms 2000
   @default_damage 2
+  @unit_flag_in_combat 0x00080000
 
   @base_melee_range_offset 1.333
   @attack_distance 5.0
@@ -25,6 +28,22 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
   end
 
   def attack_speed_ms(_entity), do: @default_attack_speed_ms
+
+  def sync_combat_flag(%{unit: %Unit{} = unit, internal: %Internal{in_combat: in_combat}} = entity) do
+    updated = combat_flags(unit.flags || 0, in_combat)
+
+    if updated == unit.flags do
+      entity
+    else
+      %{entity | unit: %{unit | flags: updated}}
+      |> Core.mark_broadcast_update()
+    end
+  end
+
+  def sync_combat_flag(entity), do: entity
+
+  defp combat_flags(flags, true), do: bor(flags, @unit_flag_in_combat)
+  defp combat_flags(flags, in_combat) when in_combat in [false, nil], do: band(flags, bnot(@unit_flag_in_combat))
 
   def melee_reach(attacker_reach, target_reach) when is_number(attacker_reach) and is_number(target_reach) do
     max(attacker_reach + target_reach + @base_melee_range_offset, @attack_distance)

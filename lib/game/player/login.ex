@@ -17,6 +17,7 @@ defmodule ThistleTea.Game.Player.Login do
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Player, as: PlayerBT
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
+  alias ThistleTea.Game.Entity.Logic.Combat, as: CombatLogic
   alias ThistleTea.Game.Entity.Logic.Death
   alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Entity.Logic.MovementStats
@@ -243,7 +244,9 @@ defmodule ThistleTea.Game.Player.Login do
       |> normalize_unit_value(:max_damage, 2)
 
     internal = %{character.internal | in_combat: false}
+
     %{character | unit: unit, internal: internal}
+    |> CombatLogic.sync_combat_flag()
   end
 
   defp normalize_base_stats(%Character{unit: %Unit{} = unit} = character) do

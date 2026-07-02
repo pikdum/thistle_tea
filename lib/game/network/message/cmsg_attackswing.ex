@@ -3,6 +3,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgAttackswing do
   use ThistleTea.Game.Network.ClientMessage, :CMSG_ATTACKSWING
 
   alias ThistleTea.Game.Entity.Logic.AI.BT
+  alias ThistleTea.Game.Entity.Logic.Combat, as: CombatLogic
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Hostility
   alias ThistleTea.Game.Network.PlayerTick
@@ -85,7 +86,9 @@ defmodule ThistleTea.Game.Network.Message.CmsgAttackswing do
     now = Time.now()
     unit = %{unit | target: target_guid}
     internal = %{internal | in_combat: true, last_hostile_time: now}
+
     %{character | unit: unit, internal: internal}
+    |> CombatLogic.sync_combat_flag()
   end
 
   defp engage_combat(character, _target_guid), do: character

@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
   alias ThistleTea.Game.Entity.Data.GameObject
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.Aura
+  alias ThistleTea.Game.Entity.Logic.Combat
   alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.Math
@@ -153,6 +154,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
     }
 
     %{entity | unit: unit, internal: internal, movement_block: movement_block}
+    |> Combat.sync_combat_flag()
   end
 
   defp maybe_dead(entity, _now), do: entity

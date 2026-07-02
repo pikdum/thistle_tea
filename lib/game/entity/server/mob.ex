@@ -421,6 +421,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
       | unit: %{unit | target: caster},
         internal: %{internal | in_combat: true, last_hostile_time: now}
     }
+    |> Combat.sync_combat_flag()
     |> maybe_tap(caster)
   end
 

@@ -336,6 +336,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     state = %{state | unit: unit, internal: internal}
 
     state
+    |> CombatLogic.sync_combat_flag()
     |> Event.enqueue(Event.attacker_gained(target_guid))
     |> Core.mark_broadcast_update()
   end
@@ -415,6 +416,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
 
     state =
       state
+      |> CombatLogic.sync_combat_flag()
       |> Event.enqueue(clear_combat_events(state.object.guid, target))
       |> Core.mark_broadcast_update()
 

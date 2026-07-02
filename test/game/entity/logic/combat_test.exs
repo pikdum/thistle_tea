@@ -78,6 +78,42 @@ defmodule ThistleTea.Game.Entity.Logic.CombatTest do
     end
   end
 
+  describe "sync_combat_flag/1" do
+    @unit_flag_in_combat 0x00080000
+
+    test "sets the combat flag and marks a broadcast when entering combat" do
+      mob = %Mob{object: %Object{guid: 1}, unit: %Unit{flags: 0}, internal: %Internal{in_combat: true}}
+
+      mob = Combat.sync_combat_flag(mob)
+
+      assert Bitwise.band(mob.unit.flags, @unit_flag_in_combat) == @unit_flag_in_combat
+      assert mob.internal.broadcast_update? == true
+    end
+
+    test "clears the combat flag when combat drops" do
+      mob = %Mob{
+        object: %Object{guid: 1},
+        unit: %Unit{flags: @unit_flag_in_combat},
+        internal: %Internal{in_combat: false}
+      }
+
+      mob = Combat.sync_combat_flag(mob)
+
+      assert Bitwise.band(mob.unit.flags, @unit_flag_in_combat) == 0
+      assert mob.internal.broadcast_update? == true
+    end
+
+    test "leaves consistent flags untouched" do
+      mob = %Mob{
+        object: %Object{guid: 1},
+        unit: %Unit{flags: @unit_flag_in_combat},
+        internal: %Internal{in_combat: true}
+      }
+
+      assert Combat.sync_combat_flag(mob) == mob
+    end
+  end
+
   describe "receive_attack/3" do
     test "applies damage and returns attacker update events" do
       mob = mob(2, 100)
