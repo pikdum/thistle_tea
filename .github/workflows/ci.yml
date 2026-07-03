@@ -27,6 +27,12 @@ jobs:
           elixir-version: ${{ matrix.elixir }}
           otp-version: ${{ matrix.otp }}
       - run: mix deps.get
+      - name: fetch namigator (C++ NIF source)
+        run: |
+          git clone https://github.com/pikdum/namigator "$RUNNER_TEMP/namigator"
+          git -C "$RUNNER_TEMP/namigator" checkout 54eae6957753c3ca47b73402df9f8d1d52a2721e
+          git -C "$RUNNER_TEMP/namigator" submodule update --init recastnavigation
+          echo "NAMIGATOR_SRC=$RUNNER_TEMP/namigator" >> "$GITHUB_ENV"
       - run: mix compile
       - run: mix format --check-formatted
       - run: mix test
