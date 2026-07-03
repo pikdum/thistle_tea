@@ -278,9 +278,12 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
   end
 
   def move_to(state, {x, y, z}, opts, now) when is_integer(now) do
-    state
-    |> start_move_to({x, y, z}, now)
-    |> Event.enqueue(Event.monster_move(opts))
+    moved = start_move_to(state, {x, y, z}, now)
+
+    case moved.movement_block.spline_nodes do
+      [_ | _] -> Event.enqueue(moved, Event.monster_move(opts))
+      _ -> moved
+    end
   end
 
   def halt(%{movement_block: %MovementBlock{} = mb, internal: %Internal{} = internal} = entity, now)

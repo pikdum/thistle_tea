@@ -276,4 +276,15 @@ defmodule ThistleTea.Game.Entity.Logic.MovementTest do
       assert Movement.position_at({1.0, 2.0, 3.0}, [], 1_000, 500) == {1.0, 2.0, 3.0}
     end
   end
+
+  describe "move_to/4" do
+    test "does not emit a monster-move when already at the destination" do
+      entity = build_entity(position: {5.0, 5.0, 5.0, 0.0}, spline_nodes: nil)
+
+      result = Movement.move_to(entity, {5.0, 5.0, 5.0}, [], 5_000)
+
+      assert result.internal.events == []
+      assert is_nil(result.movement_block.spline_nodes)
+    end
+  end
 end
