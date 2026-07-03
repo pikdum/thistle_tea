@@ -72,7 +72,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
 
   def melee_attack(%{unit: %Unit{target: target}} = state, %Blackboard{} = blackboard, now)
       when is_integer(target) and target > 0 and is_integer(now) do
-    {state, blackboard} = maybe_start_melee_attack(state, target, blackboard, now)
+    {state, blackboard} = maybe_start_melee_attack(state, target, blackboard)
     in_range = in_combat_range?(state, blackboard)
     attack_ready = Blackboard.ready_for?(blackboard, :next_attack_at, now)
 
@@ -117,27 +117,16 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
 
   def wait_for_next_attack(state, blackboard, _now), do: {:running, state, blackboard}
 
-  defp maybe_start_melee_attack(state, target, %Blackboard{attack_started: true} = blackboard, _now)
+  defp maybe_start_melee_attack(state, target, %Blackboard{attack_started: true} = blackboard)
        when is_integer(target) do
     {state, blackboard}
   end
 
-  defp maybe_start_melee_attack(%{object: %{guid: guid}} = state, target, %Blackboard{} = blackboard, now)
+  defp maybe_start_melee_attack(%{object: %{guid: guid}} = state, target, %Blackboard{} = blackboard)
        when is_integer(target) do
     state = Event.enqueue(state, CombatLogic.attack_start(guid, target))
-
-    blackboard
-    |> Map.put(:attack_started, true)
-    |> maybe_start_attack_timer(state, now)
-    |> then(&{state, &1})
+    {state, Map.put(blackboard, :attack_started, true)}
   end
-
-  defp maybe_start_attack_timer(%Blackboard{next_attack_at: 0} = blackboard, state, now) do
-    attack_speed = CombatLogic.attack_speed_ms(state)
-    Blackboard.put_next_at(blackboard, :next_attack_at, attack_speed, now)
-  end
-
-  defp maybe_start_attack_timer(blackboard, _state, _now), do: blackboard
 
   defp handle_out_of_range(%Character{} = state, blackboard, now) do
     blackboard = Blackboard.put_next_at(blackboard, :next_attack_at, @attack_retry_delay_ms, now)

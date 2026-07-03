@@ -76,6 +76,58 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.CombatTest do
              ] = mob.internal.events
     end
 
+    test "swings immediately on fresh aggro when already in reach" do
+      target_guid = 2
+      SpatialHash.update(:players, target_guid, 0, 1.0, 0.0, 0.0)
+      on_exit(fn -> SpatialHash.remove(:players, target_guid) end)
+
+      mob = %Mob{
+        object: %Object{guid: 1},
+        unit: %Unit{
+          target: target_guid,
+          min_damage: 3,
+          max_damage: 3,
+          combat_reach: 1.0,
+          base_attack_time: 2_000
+        },
+        internal: %Internal{map: 0, in_combat: true},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
+      }
+
+      blackboard = %Blackboard{attack_started: false, next_attack_at: 0}
+
+      assert {:success, mob, %Blackboard{attack_started: true, next_attack_at: 3_000}} =
+               Combat.melee_attack(mob, blackboard, 1_000)
+
+      assert Enum.any?(mob.internal.events, &(&1.type == :deliver_attack))
+    end
+
+    test "retries shortly instead of arming a full swing timer when out of reach on fresh aggro" do
+      target_guid = 2
+      SpatialHash.update(:players, target_guid, 0, 50.0, 0.0, 0.0)
+      on_exit(fn -> SpatialHash.remove(:players, target_guid) end)
+
+      mob = %Mob{
+        object: %Object{guid: 1},
+        unit: %Unit{
+          target: target_guid,
+          min_damage: 3,
+          max_damage: 3,
+          combat_reach: 1.0,
+          base_attack_time: 2_000
+        },
+        internal: %Internal{map: 0, in_combat: true},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
+      }
+
+      blackboard = %Blackboard{attack_started: false, next_attack_at: 0}
+
+      assert {:success, mob, %Blackboard{attack_started: true, next_attack_at: 1_100}} =
+               Combat.melee_attack(mob, blackboard, 1_000)
+
+      refute Enum.any?(mob.internal.events, &(&1.type == :deliver_attack))
+    end
+
     test "generates rage for player auto attacks" do
       player_guid = Guid.from_low_guid(:player, 1)
       target_guid = Guid.from_low_guid(:mob, 1, 1)
