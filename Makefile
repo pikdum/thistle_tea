@@ -26,7 +26,10 @@ endif
 ifdef DEBUG
 CPPFLAGS += -g
 else
-CPPFLAGS += -O3
+# -DNDEBUG matches namigator's supported Release build: its runtime queries
+# guard invariants with assert(), which would abort the whole BEAM if they
+# tripped on a reachable off-mesh/edge position inside this NIF.
+CPPFLAGS += -O3 -DNDEBUG
 endif
 
 NAMIGATOR_SOURCES := \
