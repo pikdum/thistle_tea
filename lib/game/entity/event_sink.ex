@@ -302,10 +302,11 @@ defmodule ThistleTea.Game.Entity.EventSink do
     entity
   end
 
-  def emit(entity, %Event{type: :attack_start} = event) do
+  def emit(entity, %Event{type: :attack_start, source_guid: source_guid, target_guid: target_guid})
+      when is_integer(source_guid) and is_integer(target_guid) do
     %Message.SmsgAttackstart{
-      attacker: event.source_guid,
-      victim: event.target_guid
+      attacker: source_guid,
+      victim: target_guid
     }
     |> World.broadcast_packet(entity)
 

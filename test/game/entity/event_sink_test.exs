@@ -41,6 +41,11 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
       assert Metadata.query(guid, [:tapped_player, :tapped_group_id]) == %{tapped_player: nil, tapped_group_id: nil}
     end
 
+    test "script attack_start schedules a forced attack", %{mob: mob, target_guid: target_guid} do
+      assert ^mob = EventSink.emit(mob, Event.attack_start(target_guid))
+      assert_receive {:force_attack, ^target_guid}
+    end
+
     test "attacker_state_update broadcasts landed hits as normal victim state", %{target_guid: target_guid} do
       player_guid = Guid.from_low_guid(:player, unique_guid())
       mob_guid = Guid.from_low_guid(:mob, 1, unique_guid())
