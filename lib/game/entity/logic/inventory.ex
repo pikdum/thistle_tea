@@ -105,8 +105,10 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
   def visible_entry_field(slot) when is_integer(slot), do: :"visible_item_#{slot + 1}_0"
 
   def equip(%Player{} = player, slot, %Item{} = item) when is_atom(slot) do
-    index = slot_index(slot)
+    equip(player, slot_index(slot), item)
+  end
 
+  def equip(%Player{} = player, index, %Item{} = item) when is_integer(index) do
     player
     |> Map.put(Map.fetch!(@field_by_slot, index), item.object.guid)
     |> Map.put(visible_entry_field(index), item.object.entry)

@@ -23,6 +23,7 @@ defmodule ThistleTea.Game.World.Loader.Character do
     info = Mangos.PlayerCreateInfo.get(params.race, params.class)
     spells = Mangos.PlayerCreateInfoSpell.get_all(params.race, params.class)
     action_buttons = Mangos.PlayerCreateInfoAction.get_all(params.race, params.class)
+    starting_items = Mangos.PlayerCreateInfoItem.get_all(params.race, params.class)
     chr_race = DBC.get_by(ChrRaces, id: params.race)
     stats = Stats.get!(params.race, params.class, 1)
 
@@ -119,6 +120,7 @@ defmodule ThistleTea.Game.World.Loader.Character do
         area: info.zone,
         map: info.map,
         spells: spells,
+        starting_items: starting_items,
         action_buttons: action_buttons
       }
     }

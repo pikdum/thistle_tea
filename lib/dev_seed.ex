@@ -15,6 +15,7 @@ defmodule ThistleTea.DevSeed do
   alias ThistleTea.Game.Network.Message.CmsgCharCreate
   alias ThistleTea.Game.Player.Characters
   alias ThistleTea.Game.Player.Stats
+  alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.Loader.Character, as: CharacterLoader
   alias ThistleTea.Game.World.Loader.ClassSpell
   alias ThistleTea.Game.World.Loader.Mob, as: MobLoader
@@ -46,6 +47,13 @@ defmodule ThistleTea.DevSeed do
   @respawn_secs 5
   @hostile_respawn_secs 30
   @base_low_guid 990_000
+  @debug_equipment %{
+    1 => [22_223, 11_722, 10_845, 11_703, 14_928, 12_555, 14_974, 10_165, 11_677, 12_774, 10_195, 13_022],
+    2 => [22_223, 11_722, 10_845, 11_703, 14_928, 12_555, 14_974, 10_165, 11_677, 1721, 1203],
+    4 => [10_187, 10_189, 12_793, 14_674, 15_057, 15_071, 13_120, 10_110, 8297, 12_791, 6660, 13_022],
+    5 => [11_839, 10_172, 10_806, 14_304, 10_807, 18_697, 14_311, 10_808, 12_552, 1607],
+    8 => [17_715, 10_172, 14_141, 11_662, 14_132, 18_697, 12_546, 11_634, 14_134, 19_567]
+  }
 
   def run do
     seed_account_and_characters()
@@ -86,7 +94,20 @@ defmodule ThistleTea.DevSeed do
     |> set_coinage(@coinage)
     |> move_to_isle()
     |> Characters.create()
+    |> equip_debug_gear()
   end
+
+  defp equip_debug_gear({:ok, %Character{unit: %{class: class}} = character}) do
+    character =
+      character
+      |> Characters.clear_equipment()
+      |> Characters.assign_items(Map.get(@debug_equipment, class, []))
+      |> Character.restore_health_and_mana()
+
+    {:ok, CharacterStore.put(character)}
+  end
+
+  defp equip_debug_gear(result), do: result
 
   defp set_level(character, level) do
     case Stats.get(character.unit.race, character.unit.class, level) do

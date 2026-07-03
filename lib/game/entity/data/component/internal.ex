@@ -34,6 +34,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal do
     :movement_start_time,
     :movement_start_position,
     :pending_resurrect,
+    starting_items: [],
     action_buttons: %{},
     cooldowns: %{},
     events: [],

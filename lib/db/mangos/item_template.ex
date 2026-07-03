@@ -147,6 +147,7 @@ defmodule ThistleTea.DB.Mangos.ItemTemplate do
         where: it.required_level <= ^level,
         where: fragment("? & ?", it.allowable_race, ^race_mask) != 0,
         where: fragment("? & ?", it.allowable_class, ^class_mask) != 0,
+        where: fragment("(? & 4) = 0", it.extra_flags),
         order_by: fragment("RANDOM()"),
         limit: 1
       )

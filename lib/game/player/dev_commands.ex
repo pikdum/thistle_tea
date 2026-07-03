@@ -8,24 +8,30 @@ defmodule ThistleTea.Game.Player.DevCommands do
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Data.ItemTemplate
   alias ThistleTea.Game.Entity.Data.Quest
   alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Death
   alias ThistleTea.Game.Entity.Logic.Event
+  alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Entity.Logic.MovementStats
   alias ThistleTea.Game.Entity.Logic.QuestLog
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Server
+  alias ThistleTea.Game.Network.UpdateObject
+  alias ThistleTea.Game.Player.Characters
   alias ThistleTea.Game.Player.Items
   alias ThistleTea.Game.Player.Quests
   alias ThistleTea.Game.Player.Spells
   alias ThistleTea.Game.Player.Stats
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.CharacterStore
+  alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.ClassSpell
+  alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
   alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader
 
   require Logger
@@ -59,6 +65,7 @@ defmodule ThistleTea.Game.Player.DevCommands do
     commands = [
       ".additem <item_id> [count] - add an item to your inventory",
       ".addquest <quest_id> - add a quest to your quest log",
+      ".debug random equipment - add a random player-obtainable equipment set",
       ".debug spells - learn class trainer spells up to your level",
       ".character level <level> - set player level",
       ".die - kill your character",
@@ -148,6 +155,12 @@ defmodule ThistleTea.Game.Player.DevCommands do
     state
     |> debug_spell_ids()
     |> then(&learn_spells(state, &1, "Already know all debug spells."))
+    |> handled()
+  end
+
+  def run(state, ".debug random equipment" <> _) do
+    state
+    |> add_random_equipment()
     |> handled()
   end
 
@@ -478,6 +491,49 @@ defmodule ThistleTea.Game.Player.DevCommands do
   end
 
   defp debug_spell_ids(_state), do: []
+
+  defp add_random_equipment(%{character: %Character{unit: unit} = character} = state) do
+    existing_item_guids = owned_item_guids(character)
+
+    item_ids =
+      unit.race
+      |> ItemLoader.random_equipment(unit.class, unit.level)
+      |> Map.values()
+      |> Enum.flat_map(fn
+        %ItemTemplate{entry: entry} -> [entry]
+        _ -> []
+      end)
+
+    character =
+      character
+      |> Characters.clear_equipment()
+      |> Characters.assign_items(item_ids)
+      |> Character.restore_health_and_mana()
+
+    character
+    |> new_owned_items(existing_item_guids)
+    |> Enum.each(fn item ->
+      item
+      |> UpdateObject.from_item()
+      |> Network.send_packet()
+    end)
+
+    state
+    |> put_character(character)
+    |> system_message("Random equipment added.")
+  end
+
+  defp owned_item_guids(%Character{player: player}) do
+    player
+    |> Inventory.owned_items(&ItemStore.get/1)
+    |> MapSet.new(& &1.object.guid)
+  end
+
+  defp new_owned_items(%Character{player: player}, existing_item_guids) do
+    player
+    |> Inventory.owned_items(&ItemStore.get/1)
+    |> Enum.reject(fn item -> MapSet.member?(existing_item_guids, item.object.guid) end)
+  end
 
   defp parse_positive_integer(value) do
     case Integer.parse(value) do
