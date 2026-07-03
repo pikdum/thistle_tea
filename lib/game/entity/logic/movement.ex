@@ -19,6 +19,7 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
   @movement_flag_spline_enabled 0x00400000
   @movement_flag_root 0x08000000
   @spline_flag_runmode 0x00000100
+  @move_epsilon 0.1
 
   def increment_spline_id(%{internal: %Internal{spline_id: spline_id} = internal} = entity) do
     new_spline_id = increment_spline_id(spline_id)
@@ -163,6 +164,16 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
 
   def start_move_to(entity, {x, y, z}, now) when is_integer(now) do
     entity = sync_position(entity, now)
+    %{movement_block: %MovementBlock{position: {x0, y0, z0, _o}}} = entity
+
+    if at_destination?({x0, y0, z0}, {x, y, z}) do
+      entity
+    else
+      move_along_path(entity, {x, y, z}, now)
+    end
+  end
+
+  defp move_along_path(entity, {x, y, z}, now) do
     entity = increment_spline_id(entity)
 
     %{
@@ -200,6 +211,10 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
     }
 
     %{entity | movement_block: movement_block, internal: internal}
+  end
+
+  defp at_destination?({x0, y0, z0}, {x, y, z}) do
+    abs(x0 - x) <= @move_epsilon and abs(y0 - y) <= @move_epsilon and abs(z0 - z) <= @move_epsilon
   end
 
   def resume_spline(
