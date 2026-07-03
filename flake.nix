@@ -156,6 +156,45 @@
             hash = "sha256-W7dFk4TRX6piSYemNNrzxTBev31EQoQQHvvaWR/1B4k=";
           };
 
+          # namigator's MapBuilder CLI, built from the pinned fork via CMake.
+          # The `maps` runner below drives it to generate navigation meshes.
+          # namigator's CMake forces -DDT_POLYREF64 globally (CMakeLists.txt),
+          # matching the runtime NIF, so the produced maps load. MapViewer is
+          # WIN32-only, so on Linux only the MapBuilder executable is built.
+          namigator-mapbuilder = pkgs.stdenv.mkDerivation {
+            pname = "namigator-mapbuilder";
+            version = "pikdum-${builtins.substring 0 7 namigator-src.rev}";
+            src = namigator-src;
+
+            nativeBuildInputs = [ pkgs.cmake ];
+            buildInputs = [
+              pkgs.zlib
+              pkgs.bzip2
+            ];
+
+            cmakeFlags = [
+              "-DNAMIGATOR_BUILD_PYTHON=OFF"
+              "-DNAMIGATOR_INSTALL_TESTS=OFF"
+              "-DNAMIGATOR_BUILD_C_API=OFF"
+              # the bundled recastnavigation/stormlib submodules still declare
+              # cmake_minimum_required < 3.5, which modern CMake rejects.
+              "-DCMAKE_POLICY_VERSION_MINIMUM=3.5"
+            ];
+
+            installPhase = ''
+              runHook preInstall
+              mkdir -p "$out/bin"
+              cp "$(find . -name MapBuilder -type f -perm -u+x | head -1)" "$out/bin/MapBuilder"
+              runHook postInstall
+            '';
+
+            meta = with pkgs.lib; {
+              description = "namigator MapBuilder CLI (navmesh generation from WoW client data)";
+              platforms = platforms.linux;
+              mainProgram = "MapBuilder";
+            };
+          };
+
           # `nix run .#dbc-db -- <WOW_DIR> [OUT_DIR]` — composes the two wow-tools
           # to produce dbc.sqlite. Kept as a runner (not a derivation) because the
           # WoW client install lives outside /nix/store and we don't want to slurp
@@ -196,6 +235,45 @@
               wow_dbc_converter vanilla -i "''${tmp}/out/dbc" -o "''${out_dir}/dbc.sqlite"
 
               echo "Generated ''${out_dir}/dbc.sqlite"
+            '';
+          };
+
+          # `nix run .#maps -- <WOW_DIR> [OUT_DIR]` — generate navigation meshes
+          # from the WoW client. A runner (like dbc-db) because the client MPQs
+          # live outside /nix/store. Map names must match @maps_to_process in
+          # lib/native/namigator.ex.
+          maps = pkgs.writeShellApplication {
+            name = "maps";
+            runtimeInputs = [
+              namigator-mapbuilder
+              pkgs.coreutils
+            ];
+            text = ''
+              wow_dir=''${1:-''${WOW_DIR:-}}
+              out_dir=''${2:-./maps}
+              if [ -z "''${wow_dir}" ]; then
+                echo "usage: maps <WOW_DIR> [OUT_DIR]  (or set WOW_DIR env)" >&2
+                exit 1
+              fi
+              data_dir="''${wow_dir}/Data"
+              if [ ! -d "''${data_dir}" ]; then
+                echo "maps: no Data/ under WOW_DIR: ''${wow_dir}" >&2
+                exit 1
+              fi
+              mkdir -p "''${out_dir}"
+              out_dir=$(realpath "''${out_dir}")
+
+              threads=''${THREADS:-$(nproc)}
+
+              echo "Building BVH from: ''${data_dir}"
+              MapBuilder --data "''${data_dir}" --output "''${out_dir}" --bvh --threads "''${threads}" --logLevel 1
+
+              for map in Azeroth Kalimdor development OrgrimmarInstance Stratholme; do
+                echo "Building ''${map}..."
+                MapBuilder --data "''${data_dir}" --output "''${out_dir}" --map "''${map}" --threads "''${threads}" --logLevel 1
+              done
+
+              echo "Maps written to ''${out_dir}"
             '';
           };
 
@@ -418,6 +496,8 @@
             mysql2sqlite
             vmangos-db
             dbc-db
+            namigator-mapbuilder
+            maps
             thistle-tea-node-modules
             thistle-tea
             ;
@@ -449,6 +529,10 @@
           dbc-db = {
             type = "app";
             program = "${self.packages.${system}.dbc-db}/bin/dbc-db";
+          };
+          maps = {
+            type = "app";
+            program = "${self.packages.${system}.maps}/bin/maps";
           };
           vmangos-db = {
             type = "app";
