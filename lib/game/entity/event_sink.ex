@@ -611,20 +611,31 @@ defmodule ThistleTea.Game.Entity.EventSink do
   defp owner_level(_entity), do: 1
 
   @summon_unique_default_range 50.0
+  @corpse_counting_despawn_types [3, 4, 8]
 
   defp summon_allowed?(map, %{unique?: true, entry: entry, position: {x, y, z, _o}} = summon) do
     limit = max(summon.unique_limit, 1)
     range = if summon.unique_distance > 0, do: summon.unique_distance, else: @summon_unique_default_range
+    count_dead? = summon.despawn_type in @corpse_counting_despawn_types
 
     existing =
       map
       |> World.nearby_mobs_at({x, y, z}, range)
-      |> Enum.count(fn {guid, _distance} -> Guid.entry(guid) == entry end)
+      |> Enum.count(fn {guid, _distance} ->
+        Guid.entry(guid) == entry and (count_dead? or summon_alive?(guid))
+      end)
 
     existing < limit
   end
 
   defp summon_allowed?(_map, _summon), do: true
+
+  defp summon_alive?(guid) do
+    case Metadata.query(guid, [:alive?]) do
+      %{alive?: false} -> false
+      _ -> true
+    end
+  end
 
   defp clamp_leap_destination(%{movement_block: %{position: {cx, cy, cz, _o}}}, map, {x, y, z}) do
     z = snap_to_terrain_height(map, {x, y}, z, cz)
