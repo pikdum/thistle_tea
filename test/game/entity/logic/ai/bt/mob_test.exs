@@ -1,18 +1,127 @@
 defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
   use ExUnit.Case, async: false
 
+  alias ThistleTea.Game.Entity.Data.AIEvent
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Spawn
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
+  alias ThistleTea.Game.Entity.Data.ScriptStep
+  alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AI.BT.Mob, as: MobBT
   alias ThistleTea.Game.Entity.Logic.Event
+  alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
+
+  describe "reached_home" do
+    test "casts a reached_home self spell like Wastewander stealth" do
+      victim = Guid.from_low_guid(:player, 998)
+      Metadata.put(victim, %{alive?: false})
+      on_exit(fn -> Metadata.delete(victim) end)
+
+      stealth = %Spell{
+        id: 22_766,
+        name: "Stealth",
+        school: :physical,
+        cast_time_ms: 0,
+        range_yards: 0.0,
+        mana_cost: 0,
+        power_type: 0,
+        attributes: MapSet.new(),
+        effects: []
+      }
+
+      cast = %ScriptStep{command: :cast_spell, datalong: 22_766, datalong2: 0, target_self?: true}
+      event = %AIEvent{id: 1, event_type: :reached_home, chance: 100, actions: [[cast]]}
+
+      mob = %Mob{
+        object: %Object{guid: mob_guid(78)},
+        unit: %Unit{health: 100, max_health: 100, level: 10, target: victim, auras: [], flags: 0},
+        movement_block: %MovementBlock{
+          position: {0.0, 0.0, 0.0, 0.0},
+          walk_speed: 2.5,
+          run_speed: 7.0
+        },
+        internal: %Internal{
+          map: 0,
+          in_combat: true,
+          creature: %Creature{ai_events: [event]},
+          spawn: %Spawn{position: {0.0, 0.0, 0.0}, movement_type: 1, distance: 5.0},
+          spellbook: %{22_766 => stealth}
+        }
+      }
+
+      mob = BT.init(mob, MobBT.tree())
+
+      mob =
+        Enum.reduce_while(1..10, mob, fn _i, mob ->
+          mob = Movement.sync_position(mob, Time.now())
+          {_status, mob} = BT.tick(mob.internal.behavior_tree, mob)
+
+          if Enum.any?(mob.internal.events, &(&1.type == :spell_start)) do
+            {:halt, mob}
+          else
+            {:cont, finish_current_move(mob)}
+          end
+        end)
+
+      assert Enum.any?(mob.internal.events, &(&1.type == :spell_start and &1.spell_id == 22_766))
+    end
+
+    test "fires the reached_home event after combat ends with a dead target" do
+      victim = Guid.from_low_guid(:player, 999)
+      Metadata.put(victim, %{alive?: false})
+      on_exit(fn -> Metadata.delete(victim) end)
+
+      talk = %ScriptStep{
+        command: :talk,
+        texts: [%{text: "Home again.", chat_type: :say, language: 0, emote_id: 0}]
+      }
+
+      event = %AIEvent{id: 1, event_type: :reached_home, chance: 100, actions: [[talk]]}
+
+      mob = %Mob{
+        object: %Object{guid: mob_guid(77)},
+        unit: %Unit{health: 100, max_health: 100, level: 10, target: victim, auras: [], flags: 0},
+        movement_block: %MovementBlock{
+          position: {0.0, 0.0, 0.0, 0.0},
+          walk_speed: 2.5,
+          run_speed: 7.0
+        },
+        internal: %Internal{
+          map: 0,
+          in_combat: true,
+          creature: %Creature{ai_events: [event]},
+          spawn: %Spawn{position: {0.0, 0.0, 0.0}, movement_type: 1, distance: 5.0},
+          spellbook: %{}
+        }
+      }
+
+      mob = BT.init(mob, MobBT.tree())
+
+      mob =
+        Enum.reduce_while(1..10, mob, fn _i, mob ->
+          mob = Movement.sync_position(mob, Time.now())
+          {_status, mob} = BT.tick(mob.internal.behavior_tree, mob)
+
+          if Enum.any?(mob.internal.events, &(&1.type == :monster_talk)) do
+            {:halt, mob}
+          else
+            {:cont, finish_current_move(mob)}
+          end
+        end)
+
+      assert Enum.any?(mob.internal.events, &(&1.type == :monster_talk and &1.text == "Home again."))
+    end
+  end
 
   describe "wait_until_wander_ready/3" do
     test "returns a running delay from explicit time" do
@@ -408,6 +517,14 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
       assert next >= 3_500 and next <= 4_500
     end
   end
+
+  defp finish_current_move(%Mob{internal: %Internal{movement_start_time: start_time} = internal} = mob)
+       when is_integer(start_time) do
+    duration = mob.movement_block.duration || 0
+    %{mob | internal: %{internal | movement_start_time: start_time - duration - 1}}
+  end
+
+  defp finish_current_move(%Mob{} = mob), do: mob
 
   defp fixture_mob(opts \\ []) do
     %Mob{
