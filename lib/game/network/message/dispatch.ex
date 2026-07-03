@@ -54,6 +54,7 @@ defmodule ThistleTea.Game.Network.Message.Dispatch do
               CMSG_SET_SELECTION: Message.CmsgSetSelection,
               CMSG_SET_ACTION_BUTTON: Message.CmsgSetActionButton,
               CMSG_STANDSTATECHANGE: Message.CmsgStandstatechange,
+              CMSG_ZONEUPDATE: Message.CmsgZoneupdate,
               CMSG_CAST_SPELL: Message.CmsgCastSpell,
               CMSG_PLAYER_LOGIN: Message.CmsgPlayerLogin,
               CMSG_SET_ACTIVE_MOVER: Message.CmsgSetActiveMover,
