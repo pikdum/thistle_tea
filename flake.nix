@@ -16,6 +16,11 @@
       flake = false;
     };
 
+    namigator-src = {
+      url = "git+https://github.com/pikdum/namigator.git?submodules=1";
+      flake = false;
+    };
+
     mysql2sqlite-src = {
       url = "github:vdechef/mysql2sqlite";
       flake = false;
@@ -28,6 +33,7 @@
       nixpkgs,
       mangoszero-server,
       wow-dbc-src,
+      namigator-src,
       mysql2sqlite-src,
     }:
     let
@@ -109,53 +115,6 @@
               description = "Convert WoW client DBC files to sqlite (gtker/wow_dbc)";
               platforms = platforms.unix;
               mainProgram = "wow_dbc_converter";
-            };
-          };
-
-          # The Rustler NIF that lib/native/namigator.ex loads. Built separately
-          # so the mix release doesn't need cargo + network in its sandbox; the
-          # .so is dropped into priv/native/ before `mix release` runs and the
-          # `use Rustler` macro is patched to `skip_compilation?: true`.
-          #
-          # The project's root Cargo.toml is a workspace ({ members = ["native/namigator_ex"] })
-          # so we have to feed the build the workspace root, not just the crate
-          # dir — otherwise cargo can't see the workspace Cargo.lock. We scope
-          # the source tightly with fileset so unrelated edits don't bust the
-          # cache.
-          thistle-tea-nif = pkgs.rustPlatform.buildRustPackage {
-            pname = "thistle-tea-nif";
-            version = "0.1.0";
-            src = pkgs.lib.fileset.toSource {
-              root = ./.;
-              fileset = pkgs.lib.fileset.unions [
-                ./Cargo.toml
-                ./Cargo.lock
-                ./native/namigator_ex
-              ];
-            };
-
-            cargoLock.lockFile = ./Cargo.lock;
-
-            cargoBuildFlags = [
-              "-p"
-              "namigator_ex"
-            ];
-
-            doCheck = false;
-            # cdylib, not a bin — buildRustPackage's default cargo install won't
-            # do the right thing. We also drop the `lib` prefix to match what
-            # Rustler expects when it loads via `crate: "namigator_ex"`
-            # (default load path is priv/native/<crate>.so, no lib prefix).
-            installPhase = ''
-              runHook preInstall
-              mkdir -p "$out/lib"
-              cp target/${pkgs.stdenv.hostPlatform.rust.rustcTarget}/release/libnamigator_ex.so "$out/lib/namigator_ex.so"
-              runHook postInstall
-            '';
-
-            meta = with pkgs.lib; {
-              description = "Rustler NIF for ThistleTea (namigator pathfinding bindings)";
-              platforms = platforms.linux;
             };
           };
 
@@ -373,8 +332,9 @@
             hash = "sha256-j2kZYKTi2ASJDRIo9N8EcnltM3YlFyjRc5QvhCPqAfk=";
           };
 
-          # The mix release. Composes the pre-built NIF + pre-built assets so
-          # the build sandbox doesn't need cargo or npm/esbuild/tailwind.
+          # The mix release. Builds the Fine C++ NIF with elixir_make against
+          # namigator-src and composes pre-built assets so the build sandbox
+          # doesn't need npm/esbuild/tailwind downloads.
           thistle-tea = beam.mixRelease {
             pname = "thistle_tea";
             version = "0.1.0";
@@ -388,28 +348,20 @@
               pname = "mix-deps-thistle-tea";
               version = "0.1.0";
               src = ./.;
-              hash = "sha256-5biusF/eL1FYrCOwOhoh+h6IztPDqG4tEN6BVv37CLU=";
+              hash = "sha256-in4N+W8xvq4PQkR6xXKyF1/2iUXmUYL7rUGZZo+TV+o=";
             };
 
             nativeBuildInputs = [
               pkgs.esbuild
+              pkgs.gnumake
               pkgs.tailwindcss_3
             ];
 
-            # 1. Drop the prebuilt NIF where `use Rustler` expects it.
-            # 2. Inject `skip_compilation?: true` so mix compile doesn't shell out
-            #    to cargo (the build sandbox has no network).
-            # 3. Pull in the vendored node_modules so esbuild can resolve `ol/*`.
             postPatch = ''
-              mkdir -p priv/native
-              cp ${thistle-tea-nif}/lib/namigator_ex.so priv/native/
-
-              sed -i \
-                's|use Rustler, otp_app: :thistle_tea, crate: "namigator_ex"|use Rustler, otp_app: :thistle_tea, crate: "namigator_ex", skip_compilation?: true|' \
-                lib/native/namigator.ex
-
               cp -r ${thistle-tea-node-modules}/node_modules assets/node_modules
             '';
+
+            NAMIGATOR_SRC = namigator-src;
 
             # evision's downloader checks $ELIXIR_MAKE_CACHE_DIR first; if the
             # tarball is already there it skips network. Build sandbox $HOME is
@@ -466,7 +418,6 @@
             mysql2sqlite
             vmangos-db
             dbc-db
-            thistle-tea-nif
             thistle-tea-node-modules
             thistle-tea
             ;

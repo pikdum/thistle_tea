@@ -34,6 +34,24 @@
         "type": "github"
       }
     },
+    "namigator-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1721956523,
+        "narHash": "sha256-qdml7AMzSVoTYA2eESbU/CaUpQNVNWGulHcRWwpCz4I=",
+        "ref": "refs/heads/master",
+        "rev": "54eae6957753c3ca47b73402df9f8d1d52a2721e",
+        "revCount": 519,
+        "submodules": true,
+        "type": "git",
+        "url": "https://github.com/pikdum/namigator.git"
+      },
+      "original": {
+        "submodules": true,
+        "type": "git",
+        "url": "https://github.com/pikdum/namigator.git"
+      }
+    },
     "nixpkgs": {
       "locked": {
         "lastModified": 1778443072,
@@ -54,6 +72,7 @@
       "inputs": {
         "mangoszero-server": "mangoszero-server",
         "mysql2sqlite-src": "mysql2sqlite-src",
+        "namigator-src": "namigator-src",
         "nixpkgs": "nixpkgs",
         "wow-dbc-src": "wow-dbc-src"
       }

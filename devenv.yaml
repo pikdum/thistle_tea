@@ -6,3 +6,6 @@ inputs:
         follows: nixpkgs
   nixpkgs:
     url: github:cachix/devenv-nixpkgs/rolling
+  namigator:
+    url: git+https://github.com/pikdum/namigator.git?submodules=1
+    flake: false

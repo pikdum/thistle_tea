@@ -8,6 +8,7 @@
 
 {
   env.MIX_OS_DEPS_COMPILE_PARTITION_COUNT = 4;
+  env.NAMIGATOR_SRC = inputs.namigator.outPath;
 
   # https://devenv.sh/packages/
   packages = [

@@ -10,7 +10,6 @@
 - `mix test.watch` - Run tests in watch mode
 - `mix credo --strict` - Run linting (must stay at zero issues; enforced as a pre-commit hook via devenv)
 - `mix format` - Format code
-- `mix build_maps` - Generate navigation meshes from map files
 
 ## Code Style
 

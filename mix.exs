@@ -7,6 +7,17 @@ defmodule ThistleTea.MixProject do
       version: "0.1.0",
       elixir: "~> 1.16",
       start_permanent: Mix.env() == :prod,
+      compilers: [:elixir_make] ++ Mix.compilers(),
+      make_env: fn ->
+        fine_include_dir =
+          if Code.ensure_loaded?(Fine) do
+            Fine.include_dir()
+          else
+            Path.expand("deps/fine/c_include", __DIR__)
+          end
+
+        %{"FINE_INCLUDE_DIR" => fine_include_dir}
+      end,
       aliases: aliases(),
       deps: deps(),
       listeners: [Phoenix.CodeReloader]
@@ -36,9 +47,10 @@ defmodule ThistleTea.MixProject do
       {:thousand_island, "~> 1.0"},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:quokka, "~> 2.11", only: [:dev, :test], runtime: false},
+      {:elixir_make, "~> 0.9", runtime: false},
+      {:fine, "~> 0.1.0", runtime: false},
       {:telemetry, "~> 1.0"},
       {:bitmap, "~> 1.0"},
-      {:rustler, "~> 0.36"},
       {:phoenix, "~> 1.8"},
       {:phoenix_html, "~> 4.1"},
       {:phoenix_live_reload, "~> 1.2", only: :dev},

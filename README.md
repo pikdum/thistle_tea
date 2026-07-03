@@ -13,7 +13,7 @@ hop in the [discord](https://discord.gg/dSYsRXHDhb) if you're interested in help
 ## running
 
 ```bash
-# need elixir + cargo
+# need elixir, a C++ compiler, and ~/code/namigator checked out
 git clone https://github.com/pikdum/thistle_tea.git
 cd thistle_tea
 mix deps.get
@@ -27,15 +27,11 @@ nix run .#vmangos-db -- ./db
 
 # path to vanilla client, the directory with WoW.exe
 # you'll want version 1.12.1 build 5875
-# this is only for generating dbc.sqlite + maps
+# this is only for generating dbc.sqlite
 export WOW_DIR="/path/to/vanilla/client"
 
 # need docker
 ./scripts/generate-dbc-db.sh
-
-# this takes a very long time
-# probably 30+ minutes
-mix build_maps
 
 # if not localhost, set GAME_SERVER:
 # GAME_SERVER=192.168.1.110 iex -S mix
