@@ -16,13 +16,22 @@ defmodule ThistleTea.Game.World.Loader.Item do
   end
 
   def get_template(entry) when is_integer(entry) and entry > 0 do
-    case :ets.lookup(__MODULE__, entry) do
-      [{^entry, %ItemTemplate{} = template}] -> template
+    case get_cached_template(entry) do
+      %ItemTemplate{} = template -> template
       _ -> load_template(entry)
     end
   end
 
   def get_template(_entry), do: nil
+
+  def get_cached_template(entry) when is_integer(entry) and entry > 0 do
+    case :ets.lookup(__MODULE__, entry) do
+      [{^entry, %ItemTemplate{} = template}] -> template
+      _ -> nil
+    end
+  end
+
+  def get_cached_template(_entry), do: nil
 
   def random_usable_template(inventory_type, race, class, level) do
     case Mangos.ItemTemplate.random_usable_by_type(inventory_type, race, class, level) do

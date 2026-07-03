@@ -31,7 +31,9 @@ defmodule ThistleTea.Game.World.ItemStore do
   end
 
   def create(entry, opts) when is_integer(entry) do
-    case ItemLoader.get_template(entry) do
+    {get_template, opts} = Keyword.pop(opts, :get_template, &ItemLoader.get_template/1)
+
+    case get_template.(entry) do
       %ItemTemplate{} = template -> create(template, opts)
       _ -> nil
     end

@@ -76,7 +76,8 @@ defmodule ThistleTea.Game.Player.CharactersTest do
                  character("Missingitem", [
                    %{item_id: 999_999, amount: 1},
                    %{item_id: 6948, amount: 1}
-                 ])
+                 ]),
+                 &ItemLoader.get_cached_template/1
                )
 
       assert Inventory.count_entry(character.player, 6948, &ItemStore.get/1) == 1

@@ -9,16 +9,17 @@ defmodule ThistleTea.Game.Player.Characters do
   alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.ItemStore
+  alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
 
   @character_limit 10
 
-  def create(%Character{} = character) do
+  def create(%Character{} = character, get_template \\ &ItemLoader.get_template/1) do
     with {:exists, nil} <- {:exists, CharacterStore.get_by_name(character.internal.name)},
          {:limit, false} <- {:limit, at_character_limit?(character.account_id)} do
       character =
         character
         |> CharacterStore.create()
-        |> assign_starting_items()
+        |> assign_starting_items(get_template)
         |> Character.restore_health_and_mana()
         |> CharacterStore.put()
 
@@ -29,17 +30,24 @@ defmodule ThistleTea.Game.Player.Characters do
     end
   end
 
-  def assign_starting_items(%Character{object: %{guid: owner_guid}} = character)
+  def assign_starting_items(
+        %Character{object: %{guid: owner_guid}} = character,
+        get_template \\ &ItemLoader.get_template/1
+      )
       when is_integer(owner_guid) and owner_guid > 0 do
     character.internal
     |> Map.get(:starting_items, [])
-    |> then(&assign_items(character, &1))
+    |> then(&assign_items(character, &1, get_template))
   end
 
-  def assign_items(%Character{object: %{guid: owner_guid}} = character, items)
+  def assign_items(
+        %Character{object: %{guid: owner_guid}} = character,
+        items,
+        get_template \\ &ItemLoader.get_template/1
+      )
       when is_integer(owner_guid) and owner_guid > 0 and is_list(items) do
     items
-    |> Enum.reduce(character, &assign_item/2)
+    |> Enum.reduce(character, fn item, char -> assign_item(item, char, get_template) end)
     |> equip_stored_items()
     |> Character.sync_equipment_stats()
   end
@@ -70,23 +78,23 @@ defmodule ThistleTea.Game.Player.Characters do
     player
   end
 
-  defp assign_item(%{item_id: item_id, amount: amount}, character) do
-    assign_item({item_id, amount}, character)
+  defp assign_item(%{item_id: item_id, amount: amount}, character, get_template) do
+    assign_item({item_id, amount}, character, get_template)
   end
 
-  defp assign_item(item_id, character) when is_integer(item_id) do
-    assign_item({item_id, 1}, character)
+  defp assign_item(item_id, character, get_template) when is_integer(item_id) do
+    assign_item({item_id, 1}, character, get_template)
   end
 
-  defp assign_item({item_id, amount}, %Character{object: %{guid: owner_guid}} = character)
+  defp assign_item({item_id, amount}, %Character{object: %{guid: owner_guid}} = character, get_template)
        when is_integer(amount) and amount > 0 do
-    case ItemStore.create(item_id, owner: owner_guid, stack_count: amount) do
+    case ItemStore.create(item_id, owner: owner_guid, stack_count: amount, get_template: get_template) do
       %Item{} = item -> equip_or_store_starting_item(character, item)
       _ -> character
     end
   end
 
-  defp assign_item(_item, character), do: character
+  defp assign_item(_item, character, _get_template), do: character
 
   defp equip_or_store_starting_item(%Character{} = character, %Item{} = item) do
     case equip_starting_item(character, item) do
