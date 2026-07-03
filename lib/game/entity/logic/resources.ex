@@ -15,6 +15,9 @@ defmodule ThistleTea.Game.Entity.Logic.Resources do
 
   @power_fields %{0 => :power1, 1 => :power2, 2 => :power3, 3 => :power4, 4 => :power5}
 
+  def spend_power(%{internal: %Internal{godmode: true}} = entity, %Spell{power_type: @mana_power_type}, _now),
+    do: entity
+
   def spend_power(entity, %Spell{mana_cost: cost, power_type: power_type}, now)
       when is_integer(cost) and cost > 0 and is_integer(now) do
     entity

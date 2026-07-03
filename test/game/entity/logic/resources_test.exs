@@ -67,6 +67,19 @@ defmodule ThistleTea.Game.Entity.Logic.ResourcesTest do
       assert entity.internal.broadcast_update? == true
     end
 
+    test "god mode skips mana costs" do
+      entity = %Mob{
+        unit: %Unit{power_type: 0, power1: 10, max_power1: 100},
+        internal: %Internal{godmode: true}
+      }
+
+      entity = Resources.spend_power(entity, %Spell{mana_cost: 30, power_type: 0}, 5_000)
+
+      assert entity.unit.power1 == 10
+      assert entity.internal.last_mana_use_at == nil
+      assert entity.internal.broadcast_update? == false
+    end
+
     test "clamps power at zero" do
       entity = %Mob{
         unit: %Unit{power_type: 0, power1: 10, max_power1: 100},
