@@ -1,11 +1,13 @@
 FROM docker.io/library/elixir:1.20 AS build
 ENV MIX_ENV=prod
-COPY --from=docker.io/library/rust:slim /usr/local/cargo /usr/local/cargo
-COPY --from=docker.io/library/rust:slim /usr/local/rustup /usr/local/rustup
 COPY --from=docker.io/oven/bun:1 /usr/local/bin/bun /usr/local/bin/bun
-ENV RUSTUP_HOME=/usr/local/rustup
-ENV CARGO_HOME=/usr/local/cargo
-ENV PATH=/usr/local/cargo/bin:$PATH
+RUN apt-get update && apt-get install -y --no-install-recommends g++ make git \
+    && rm -rf /var/lib/apt/lists/*
+# the Fine C++ NIF compiles against namigator (rev matches flake.nix namigator-src)
+RUN git clone https://github.com/pikdum/namigator /opt/namigator \
+    && git -C /opt/namigator checkout 54eae6957753c3ca47b73402df9f8d1d52a2721e \
+    && git -C /opt/namigator submodule update --init recastnavigation
+ENV NAMIGATOR_SRC=/opt/namigator
 WORKDIR /app
 RUN mix local.hex --force && mix local.rebar --force
 COPY mix.exs mix.lock ./
