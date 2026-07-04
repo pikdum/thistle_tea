@@ -4,11 +4,12 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
   rolls from unit damage ranges, and applying an incoming attack to an entity
   along with the events it produces.
   """
-  import Bitwise, only: [band: 2, bnot: 1, bor: 2]
+  import Bitwise, only: [band: 2, bnot: 1, bor: 2, &&&: 2, >>>: 2]
 
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Logic.AttackTable
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Event
@@ -17,6 +18,8 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
   @default_attack_speed_ms 2000
   @default_damage 2
   @unit_flag_in_combat 0x00080000
+  @hitinfo_absorb 0x20
+  @schools [:physical, :holy, :fire, :nature, :frost, :shadow, :arcane]
 
   @base_melee_range_offset 1.333
   @attack_distance 5.0
@@ -103,17 +106,52 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
     Event.attacker_state_update(attacker, target, damage, attack)
   end
 
-  def receive_attack(%{object: %{guid: target_guid}} = entity, attack, now)
-      when is_map(attack) and is_integer(target_guid) and is_integer(now) do
-    damage = attack_damage(attack)
-    entity = Core.take_damage(entity, damage, now)
-    event = attacker_state_update(Map.get(attack, :caster, 0), target_guid, damage, attack)
+  def receive_attack(entity, attack, now, opts \\ [])
 
-    {entity, reaction_events} = attack_reactions(entity, attack)
+  def receive_attack(%{object: %{guid: target_guid}} = entity, attack, now, opts)
+      when is_map(attack) and is_integer(target_guid) and is_integer(now) do
+    result = AttackTable.resolve(entity, attack, attack_damage(attack), opts)
+
+    {entity, absorbed} =
+      if result.damage > 0 do
+        Core.take_damage_with_absorb(entity, result.damage, now, school: attack_school(attack))
+      else
+        {entity, 0}
+      end
+
+    attack =
+      attack
+      |> Map.put(:hit_info, with_absorb_flag(result.hit_info, absorbed))
+      |> Map.put(:damage_state, result.victim_state)
+      |> Map.put(:blocked_amount, result.blocked_amount)
+      |> Map.put(:absorb, absorbed)
+
+    event = attacker_state_update(Map.get(attack, :caster, 0), target_guid, result.damage, attack)
+
+    {entity, reaction_events} =
+      if result.damage > 0 do
+        attack_reactions(entity, attack)
+      else
+        {entity, []}
+      end
+
     {entity, [event | reaction_events]}
   end
 
-  def receive_attack(entity, _attack, _now), do: {entity, []}
+  def receive_attack(entity, _attack, _now, _opts), do: {entity, []}
+
+  defp attack_school(%{spell_school_mask: mask}) when is_integer(mask) and mask > 1 do
+    index = Enum.find(1..6, 0, fn i -> (mask >>> i &&& 1) == 1 end)
+    Enum.at(@schools, index, :physical)
+  end
+
+  defp attack_school(_attack), do: :physical
+
+  defp with_absorb_flag(hit_info, absorbed) when is_integer(absorbed) and absorbed > 0 do
+    bor(hit_info, @hitinfo_absorb)
+  end
+
+  defp with_absorb_flag(hit_info, _absorbed), do: hit_info
 
   defp attack_reactions(entity, %{caster: attacker_guid}) when is_integer(attacker_guid) do
     if Core.dead?(entity) do

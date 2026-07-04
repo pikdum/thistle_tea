@@ -28,6 +28,22 @@ defmodule ThistleTea.Game.Math do
     :math.sqrt(:math.pow(x1 - x0, 2) + :math.pow(y1 - y0, 2) + :math.pow(z1 - z0, 2))
   end
 
+  def behind?({x, y, orientation}, {other_x, other_y}) do
+    angle = :math.atan2(other_y - y, other_x - x)
+    abs(normalize_angle(angle - orientation)) > :math.pi() / 2
+  end
+
+  defp normalize_angle(angle) do
+    two_pi = 2 * :math.pi()
+    angle = :math.fmod(angle, two_pi)
+
+    cond do
+      angle > :math.pi() -> angle - two_pi
+      angle < -:math.pi() -> angle + two_pi
+      true -> angle
+    end
+  end
+
   def movement_duration({x0, y0, z0}, {x1, y1, z1}, speed) when is_float(speed) and speed > 0 do
     distance({x0, y0, z0}, {x1, y1, z1}) / speed
   end

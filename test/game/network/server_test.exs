@@ -83,15 +83,16 @@ defmodule ThistleTea.Game.Network.ServerTest do
 
     test "marks player in combat when a mob attack lands" do
       socket = %{read_timeout: 0}
-      state = %{character: character(1, health: 80, max_health: 100)}
+      sitting = %{character(1, health: 80, max_health: 100, stand_state: 1) | player: %Player{}}
+      state = %{character: sitting}
 
       assert {:noreply, {^socket, %{character: character}}, {:continue, :maybe_broadcast_update}} =
                Server.handle_cast({:receive_attack, %{caster: 2, damage: 10}}, {socket, state})
 
-      assert character.unit.health == 70
+      assert character.unit.health == 60
       assert character.internal.in_combat == true
       assert is_integer(character.internal.last_hostile_time)
-      assert Regen.tick(character, 1_000).unit.health == 70
+      assert Regen.tick(character, 1_000).unit.health == 60
     end
   end
 

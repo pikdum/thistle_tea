@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
   alias ThistleTea.Game.Entity.Logic.Aura.Lifecycle
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Event
+  alias ThistleTea.Game.Entity.Logic.SpellResist
   alias ThistleTea.Game.Spell
 
   def tick(%{unit: %Unit{auras: holders}} = entity, now) when is_list(holders) and holders != [] do
@@ -81,11 +82,10 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
 
   defp tick_aura(entity, %Holder{} = holder, %Aura{type: :periodic_damage, next_tick_at: at} = aura, now)
        when is_integer(at) and now >= at do
-    damage = aura.amount
-    entity = Core.take_damage(entity, damage, now, school: holder.spell.school)
+    {entity, damage, log_opts} = apply_periodic_damage(entity, holder, aura.amount, now)
 
     event =
-      Event.spell_damage(holder.caster_guid, entity.object.guid, holder.spell, damage, periodic?: true)
+      Event.spell_damage(holder.caster_guid, entity.object.guid, holder.spell, damage, log_opts)
 
     {entity, %{aura | next_tick_at: advance_tick(at, aura.amplitude_ms, now)}, [event]}
   end
@@ -107,11 +107,10 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
 
   defp tick_aura(entity, %Holder{} = holder, %Aura{type: :periodic_leech, next_tick_at: at} = aura, now)
        when is_integer(at) and now >= at do
-    damage = aura.amount
-    entity = Core.take_damage(entity, damage, now, school: holder.spell.school)
+    {entity, damage, log_opts} = apply_periodic_damage(entity, holder, aura.amount, now)
 
     events = [
-      Event.spell_damage(holder.caster_guid, entity.object.guid, holder.spell, damage, periodic?: true)
+      Event.spell_damage(holder.caster_guid, entity.object.guid, holder.spell, damage, log_opts)
       | leech_heal_events(holder, entity, damage, aura)
     ]
 
@@ -133,6 +132,38 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
   end
 
   defp tick_aura(entity, _holder, aura, _now), do: {entity, aura, []}
+
+  @schools [:physical, :holy, :fire, :nature, :frost, :shadow, :arcane]
+
+  defp apply_periodic_damage(entity, %Holder{} = holder, amount, now) do
+    school = school_atom(holder.spell)
+    caster_level = if is_integer(holder.caster_level) and holder.caster_level > 0, do: holder.caster_level, else: 1
+    resisted = periodic_resisted_amount(entity, amount, school, caster_level)
+    damage = amount - resisted
+
+    {entity, absorbed} = Core.take_damage_with_absorb(entity, damage, now, school: school)
+
+    {entity, damage, [periodic?: true, resisted: resisted, absorbed: absorbed]}
+  end
+
+  defp periodic_resisted_amount(_entity, damage, _school, _caster_level) when damage <= 0, do: 0
+  defp periodic_resisted_amount(_entity, _damage, :physical, _caster_level), do: 0
+
+  defp periodic_resisted_amount(%{unit: %Unit{} = unit} = entity, damage, school, caster_level) do
+    resistance = Map.get(unit, :"#{school}_resistance") || 0
+    target_creature? = not is_map(Map.get(entity, :player))
+    level_diff = (unit.level || 1) - caster_level
+
+    SpellResist.resisted_amount(damage, resistance, caster_level,
+      target_creature?: target_creature?,
+      level_diff: level_diff,
+      dot?: true
+    )
+  end
+
+  defp school_atom(%Spell{school: school}) when is_atom(school) and not is_nil(school), do: school
+  defp school_atom(%Spell{} = spell), do: Enum.at(@schools, Spell.school_index(spell), :physical)
+  defp school_atom(_spell), do: :physical
 
   defp leech_heal_events(%Holder{caster_guid: caster_guid}, %{object: %{guid: owner_guid}}, damage, %Aura{} = aura)
        when is_integer(caster_guid) and caster_guid != owner_guid and damage > 0 do

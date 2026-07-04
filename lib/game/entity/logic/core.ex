@@ -39,23 +39,34 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
     |> struct(Map.from_struct(entity))
   end
 
-  def take_damage(entity, damage, now, opts \\ [])
+  def take_damage(entity, damage, now, opts \\ []) do
+    {entity, _absorbed} = take_damage_with_absorb(entity, damage, now, opts)
+    entity
+  end
 
-  def take_damage(%{internal: %Internal{godmode: true}} = entity, _damage, _now, _opts), do: entity
+  def take_damage_with_absorb(entity, damage, now, opts \\ [])
 
-  def take_damage(%{unit: %Unit{health: health}} = entity, damage, now, opts) when is_integer(now) do
-    {entity, damage} = Aura.absorb_damage(entity, damage, Keyword.get(opts, :school, :physical))
+  def take_damage_with_absorb(%{internal: %Internal{godmode: true}} = entity, _damage, _now, _opts), do: {entity, 0}
+
+  def take_damage_with_absorb(%{unit: %Unit{health: health}} = entity, damage, now, opts) when is_integer(now) do
+    {entity, remaining} = Aura.absorb_damage(entity, damage, Keyword.get(opts, :school, :physical))
+    absorbed = damage - remaining
     %{unit: unit} = entity
-    new_health = max(health - damage, 0)
+    new_health = max(health - remaining, 0)
 
     entity = %{entity | unit: %{unit | health: new_health}}
-    entity = if damage > 0, do: Aura.break_on_damage(entity, now), else: entity
+    entity = if remaining > 0, do: Aura.break_on_damage(entity, now), else: entity
 
-    entity
-    |> maybe_enqueue_death_root(health, new_health)
-    |> mark_broadcast_update()
-    |> maybe_dead(now)
+    entity =
+      entity
+      |> maybe_enqueue_death_root(health, new_health)
+      |> mark_broadcast_update()
+      |> maybe_dead(now)
+
+    {entity, absorbed}
   end
+
+  def take_damage_with_absorb(entity, _damage, _now, _opts), do: {entity, 0}
 
   def heal(%{unit: %Unit{health: health, max_health: max_health} = unit} = entity, amount)
       when is_number(health) and is_number(amount) and amount > 0 do

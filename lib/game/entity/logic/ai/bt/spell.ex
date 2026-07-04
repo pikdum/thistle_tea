@@ -15,8 +15,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
   alias ThistleTea.Game.Entity.Logic.PlayerCombat
   alias ThistleTea.Game.Entity.Logic.Resources
   alias ThistleTea.Game.Entity.Logic.SpellEffect
+  alias ThistleTea.Game.Entity.Logic.SpellResist
   alias ThistleTea.Game.Entity.Logic.SpellTarget
   alias ThistleTea.Game.Entity.SpellTargetResolver
+  alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Cast
   alias ThistleTea.Game.Spell.CastContext
@@ -127,18 +129,19 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
 
   def complete_cast(%{internal: %Internal{}} = character, %Cast{} = casting, now) when is_integer(now) do
     targets = resolve_targets(character, casting)
+    {hits, misses} = roll_spell_hits(character, casting.spell, targets)
 
     character
     |> Resources.spend_power(casting.spell, now)
     |> start_cooldown(casting, now)
     |> queue_cast_result(casting)
-    |> queue_spell_go(casting, targets)
+    |> queue_spell_go(casting, hits, misses)
     |> queue_area_effects(casting)
     |> queue_summon_objects(casting)
     |> queue_consume_reagents(casting)
     |> queue_consume_cast_item(casting)
     |> mark_hostile_cast(casting, targets, now)
-    |> apply_spell_hit(casting, targets, now)
+    |> apply_spell_hit(casting, hits, now)
     |> clear_cast()
   end
 
@@ -315,14 +318,62 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
 
   defp unit_channel_target_dead?(_casting), do: false
 
-  defp queue_spell_go(%{object: %{guid: guid}} = character, %Cast{spell: %Spell{id: spell_id}} = casting, targets)
+  defp queue_spell_go(character, casting, targets, misses \\ [])
+
+  defp queue_spell_go(
+         %{object: %{guid: guid}} = character,
+         %Cast{spell: %Spell{id: spell_id}} = casting,
+         targets,
+         misses
+       )
        when is_integer(guid) do
     raw_targets = if is_binary(casting.targets.raw), do: casting.targets.raw, else: <<>>
 
-    Event.enqueue(character, Event.spell_go(guid, spell_id, targets, raw_targets, casting.cast_item_guid))
+    Event.enqueue(character, Event.spell_go(guid, spell_id, targets, raw_targets, casting.cast_item_guid, misses))
   end
 
-  defp queue_spell_go(character, _casting, _targets), do: character
+  defp queue_spell_go(character, _casting, _targets, _misses), do: character
+
+  @spell_miss_reason_miss 1
+  @spell_miss_reason_resist 2
+
+  defp roll_spell_hits(%{object: %{guid: caster_guid}} = caster, %Spell{} = spell, targets) do
+    if Spell.harmful?(spell) do
+      caster_level = caster_level(caster)
+
+      {hits, missed} =
+        Enum.split_with(targets, fn target_guid ->
+          target_guid == caster_guid or
+            not Hostility.valid_attack_target?(caster, target_guid) or
+            spell_hits_target?(caster_level, target_guid)
+        end)
+
+      {hits, Enum.map(missed, &%{guid: &1, reason: spell_miss_reason(spell)})}
+    else
+      {targets, []}
+    end
+  end
+
+  defp roll_spell_hits(_caster, _spell, targets), do: {targets, []}
+
+  defp spell_hits_target?(caster_level, target_guid) do
+    target_player? = Guid.type_id(target_guid) == :player
+
+    target_level =
+      case Metadata.query(target_guid, [:level]) do
+        %{level: level} when is_integer(level) and level > 0 -> level
+        _ -> caster_level
+      end
+
+    SpellResist.magic_hit?(caster_level, target_level, target_player?)
+  end
+
+  defp spell_miss_reason(%Spell{school: :physical}), do: @spell_miss_reason_miss
+  defp spell_miss_reason(%Spell{school: 0}), do: @spell_miss_reason_miss
+  defp spell_miss_reason(_spell), do: @spell_miss_reason_resist
+
+  defp caster_level(%{unit: %{level: level}}) when is_integer(level) and level > 0, do: level
+  defp caster_level(_caster), do: 1
 
   defp queue_trigger_spell_go(
          %{object: %{guid: guid}} = character,

@@ -537,7 +537,7 @@ defmodule ThistleTea.Game.Entity.Logic.PriestSpellsTest do
       entity = mob_fixture()
       {entity, _events} = Aura.apply_spell(entity, 1, 10, shadowguard_fixture(), 1_000)
 
-      {entity, events} = Combat.receive_attack(entity, %{caster: 999, damage: 5}, 2_000)
+      {entity, events} = Combat.receive_attack(entity, %{caster: 999, damage: 5}, 2_000, roll: 9_999)
 
       assert Enum.any?(events, &(&1.type == :trigger_spell and &1.spell_id == 28_376))
       assert [%Holder{charges: 2}] = entity.unit.auras

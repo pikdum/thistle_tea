@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
+  alias ThistleTea.Game.Entity.Logic.AttackTable
   alias ThistleTea.Game.Entity.Logic.Combat, as: CombatLogic
   alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.Entity.Logic.MeleeSpell
@@ -155,7 +156,11 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
   defp melee_attack_payload(%{object: %{guid: guid}} = state) do
     {state, queued_spell} = MeleeSpell.consume_next_swing(state)
     {min_damage, max_damage} = CombatLogic.damage_range(state)
-    attack = %{caster: guid, min_damage: min_damage, max_damage: max_damage}
+
+    attack =
+      %{caster: guid, min_damage: min_damage, max_damage: max_damage}
+      |> Map.merge(AttackTable.attacker_context(state))
+
     {state, MeleeSpell.apply_to_attack(attack, queued_spell), queued_spell}
   end
 

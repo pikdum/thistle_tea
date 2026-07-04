@@ -114,11 +114,11 @@ defmodule ThistleTea.Game.Entity.Logic.CombatTest do
     end
   end
 
-  describe "receive_attack/3" do
+  describe "receive_attack/4" do
     test "applies damage and returns attacker update events" do
       mob = mob(2, 100)
 
-      {mob, events} = Combat.receive_attack(mob, %{caster: 1, damage: 12}, 1_000)
+      {mob, events} = Combat.receive_attack(mob, %{caster: 1, damage: 12}, 1_000, roll: 9_999)
 
       assert mob.unit.health == 88
       assert mob.internal.broadcast_update? == true
@@ -128,7 +128,8 @@ defmodule ThistleTea.Game.Entity.Logic.CombatTest do
                  type: :attacker_state_update,
                  source_guid: 1,
                  target_guid: 2,
-                 damage: 12
+                 damage: 12,
+                 attack: %{hit_info: 0x2, damage_state: 1, blocked_amount: 0, absorb: 0}
                }
              ] = events
     end
@@ -137,7 +138,7 @@ defmodule ThistleTea.Game.Entity.Logic.CombatTest do
       spell = damage_shield_spell()
       {mob, _events} = Aura.apply_spell(mob(2, 100), 2, 10, spell, 1_000)
 
-      {_mob, events} = Combat.receive_attack(mob, %{caster: 1, damage: 12}, 1_000)
+      {_mob, events} = Combat.receive_attack(mob, %{caster: 1, damage: 12}, 1_000, roll: 9_999)
 
       assert [
                %Event{type: :attacker_state_update},
@@ -155,9 +156,36 @@ defmodule ThistleTea.Game.Entity.Logic.CombatTest do
       spell = damage_shield_spell()
       {mob, _events} = Aura.apply_spell(mob(2, 10), 2, 10, spell, 1_000)
 
-      {_mob, events} = Combat.receive_attack(mob, %{caster: 1, damage: 12}, 1_000)
+      {_mob, events} = Combat.receive_attack(mob, %{caster: 1, damage: 12}, 1_000, roll: 9_999)
 
       assert [%Event{type: :attacker_state_update}] = events
+    end
+
+    test "dodged attacks deal no damage and skip hit reactions" do
+      spell = damage_shield_spell()
+      {mob, _events} = Aura.apply_spell(mob(2, 100, 10), 2, 10, spell, 1_000)
+      attack = %{caster: 1, damage: 12, caster_level: 10}
+
+      {mob, events} = Combat.receive_attack(mob, attack, 1_000, roll: 500)
+
+      assert mob.unit.health == 100
+
+      assert [
+               %Event{
+                 type: :attacker_state_update,
+                 damage: 0,
+                 attack: %{damage_state: 2, hit_info: 0x2}
+               }
+             ] = events
+    end
+
+    test "missed attacks report the miss hit info" do
+      mob = mob(2, 100, 10)
+
+      {mob, events} = Combat.receive_attack(mob, %{caster: 1, damage: 12, caster_level: 10}, 1_000, roll: 0)
+
+      assert mob.unit.health == 100
+      assert [%Event{type: :attacker_state_update, damage: 0, attack: %{hit_info: 0x12, damage_state: 0}}] = events
     end
   end
 
@@ -172,10 +200,10 @@ defmodule ThistleTea.Game.Entity.Logic.CombatTest do
     end
   end
 
-  defp mob(guid, health) do
+  defp mob(guid, health, level \\ nil) do
     %Mob{
       object: %Object{guid: guid},
-      unit: %Unit{health: health, auras: []},
+      unit: %Unit{health: health, level: level, auras: []},
       internal: %Internal{}
     }
   end

@@ -280,7 +280,7 @@ defmodule ThistleTea.Game.Entity.Data.MobTest do
       }
 
       assert {:noreply, %Mob{unit: %Unit{health: 0}}, {:continue, :maybe_broadcast}} =
-               MobServer.handle_cast({:receive_attack, %{caster: player_guid, damage: 1}}, mob)
+               MobServer.handle_cast({:receive_attack, %{caster: player_guid, damage: 1, caster_level: 99}}, mob)
 
       assert_receive {:"$gen_cast", {:reward_kill, %Mob{object: %Object{guid: ^mob_guid}}}}
     end
@@ -308,7 +308,7 @@ defmodule ThistleTea.Game.Entity.Data.MobTest do
       }
 
       assert {:noreply, %Mob{internal: %Internal{spawn: %Spawn{respawn_ref: ref}}}, {:continue, :maybe_broadcast}} =
-               MobServer.handle_cast({:receive_attack, %{caster: player_guid, damage: 1}}, mob)
+               MobServer.handle_cast({:receive_attack, %{caster: player_guid, damage: 1, caster_level: 99}}, mob)
 
       assert is_reference(ref)
       assert_receive :respawn

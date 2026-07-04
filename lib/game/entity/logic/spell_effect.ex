@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Death
   alias ThistleTea.Game.Entity.Logic.Event
+  alias ThistleTea.Game.Entity.Logic.SpellResist
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Effect
@@ -245,10 +246,38 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
         0
       )
 
-    state = Core.take_damage(state, damage, now, school: school_atom(spell))
-    event = Event.spell_damage(context.caster_guid, state.object.guid, spell, damage, opts)
+    school = school_atom(spell)
+    resisted = school_resisted_amount(state, damage, school, context.caster_level, opts)
+    damage = damage - resisted
+
+    {state, absorbed} = Core.take_damage_with_absorb(state, damage, now, school: school)
+
+    event =
+      Event.spell_damage(
+        context.caster_guid,
+        state.object.guid,
+        spell,
+        damage,
+        opts ++ [resisted: resisted, absorbed: absorbed]
+      )
 
     {state, [event]}
+  end
+
+  defp school_resisted_amount(_state, damage, _school, _caster_level, _opts) when damage <= 0, do: 0
+  defp school_resisted_amount(_state, _damage, :physical, _caster_level, _opts), do: 0
+
+  defp school_resisted_amount(%{unit: unit} = state, damage, school, caster_level, opts) do
+    caster_level = if is_integer(caster_level) and caster_level > 0, do: caster_level, else: 1
+    resistance = Map.get(unit, :"#{school}_resistance") || 0
+    target_creature? = not is_map(Map.get(state, :player))
+    level_diff = (unit.level || 1) - caster_level
+
+    SpellResist.resisted_amount(damage, resistance, caster_level,
+      target_creature?: target_creature?,
+      level_diff: level_diff,
+      dot?: Keyword.get(opts, :periodic?, false)
+    )
   end
 
   defp damage_bonus(%CastContext{} = context, %Spell{} = spell, opts) do

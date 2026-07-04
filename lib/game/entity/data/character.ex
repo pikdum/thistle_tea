@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Entity.Data.Character do
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.ItemTemplate
+  alias ThistleTea.Game.Entity.Logic.CombatRatings
   alias ThistleTea.Game.Entity.Logic.EquipmentStats
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
@@ -25,6 +26,7 @@ defmodule ThistleTea.Game.Entity.Data.Character do
     |> sync_mainhand_inputs()
     |> sync_offhand_inputs()
     |> EquipmentStats.resync(&ItemStore.get/1, &SpellLoader.load/1)
+    |> CombatRatings.sync()
   end
 
   def restore_health_and_mana(%__MODULE__{unit: %Unit{} = unit} = character) do

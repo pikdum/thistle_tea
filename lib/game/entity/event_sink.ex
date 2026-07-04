@@ -55,7 +55,9 @@ defmodule ThistleTea.Game.Entity.EventSink do
       spell_id: event.spell_id,
       damage: event.damage,
       school: Spell.school_index(event.school),
-      periodic?: event.periodic?
+      periodic?: event.periodic?,
+      absorbed: event.absorbed || 0,
+      resisted: event.resisted || 0
     }
     |> World.broadcast_packet(entity)
 
@@ -239,7 +241,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
       spell: event.spell_id,
       flags: 0x100,
       hits: event.hit_guids || [],
-      misses: [],
+      misses: event.misses || [],
       targets: event.raw_targets || <<>>,
       ammo_display_id: nil,
       ammo_inventory_type: nil

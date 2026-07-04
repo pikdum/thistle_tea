@@ -29,6 +29,9 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
     :reagents,
     :move_opts,
     :hit_guids,
+    :misses,
+    :resisted,
+    :absorbed,
     :raw_targets,
     :cast_item_guid,
     :stand_state,
@@ -57,7 +60,9 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
       spell_id: spell.id,
       school: spell.school,
       damage: damage,
-      periodic?: Keyword.get(opts, :periodic?, false)
+      periodic?: Keyword.get(opts, :periodic?, false),
+      resisted: Keyword.get(opts, :resisted, 0),
+      absorbed: Keyword.get(opts, :absorbed, 0)
     }
   end
 
@@ -143,13 +148,15 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
     }
   end
 
-  def spell_go(source_guid, spell_id, hit_guids, raw_targets, cast_item_guid \\ nil)
-      when is_integer(source_guid) and is_integer(spell_id) and is_list(hit_guids) and is_binary(raw_targets) do
+  def spell_go(source_guid, spell_id, hit_guids, raw_targets, cast_item_guid \\ nil, misses \\ [])
+      when is_integer(source_guid) and is_integer(spell_id) and is_list(hit_guids) and is_binary(raw_targets) and
+             is_list(misses) do
     %__MODULE__{
       type: :spell_go,
       source_guid: source_guid,
       spell_id: spell_id,
       hit_guids: hit_guids,
+      misses: misses,
       raw_targets: raw_targets,
       cast_item_guid: cast_item_guid
     }

@@ -33,7 +33,9 @@ defmodule ThistleTea.Game.Entity.Logic.EquipmentStats do
                 :shadow,
                 :arcane,
                 :healing,
-                :attack_power
+                :attack_power,
+                :shields,
+                :shield_block
               ] ++ @spell_damage_keys
 
   @zero Map.new(@bonus_keys, fn key -> {key, 0} end)
@@ -66,6 +68,7 @@ defmodule ThistleTea.Game.Entity.Logic.EquipmentStats do
       |> add(:frost, template.frost_res)
       |> add(:shadow, template.shadow_res)
       |> add(:arcane, template.arcane_res)
+      |> add_shield(template)
       |> add_equip_spells(template, get_spell)
 
     Enum.reduce(1..10, acc, fn i, acc ->
@@ -75,6 +78,16 @@ defmodule ThistleTea.Game.Entity.Logic.EquipmentStats do
       end
     end)
   end
+
+  @inventory_type_shield 14
+
+  defp add_shield(acc, %ItemTemplate{inventory_type: @inventory_type_shield} = template) do
+    acc
+    |> add(:shields, 1)
+    |> add(:shield_block, template.block || 0)
+  end
+
+  defp add_shield(acc, _template), do: acc
 
   defp add_equip_spells(acc, %ItemTemplate{} = template, get_spell) do
     Enum.reduce(1..5, acc, fn i, acc ->
