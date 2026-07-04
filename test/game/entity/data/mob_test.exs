@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Entity.Data.MobTest do
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
+  alias ThistleTea.Game.Entity.Logic.Stats
   alias ThistleTea.Game.Entity.Server.Mob, as: MobServer
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Spell
@@ -82,6 +83,47 @@ defmodule ThistleTea.Game.Entity.Data.MobTest do
       assert mob.internal.spawn.respawn_delay_ms == 120_000
       assert mob.internal.spawn.unit == mob.unit
       assert mob.internal.spawn.movement_block == mob.movement_block
+    end
+
+    test "keeps class-level max health untouched by a later stat recompute" do
+      creature =
+        %Mangos.Creature{
+          guid: 1,
+          id: 2,
+          modelid: 3,
+          creature_movement: [],
+          creature_template: %Mangos.CreatureTemplate{
+            entry: 2,
+            name: "Test Creature",
+            speed_walk: 1.0,
+            speed_run: 1.0,
+            min_level: 60,
+            max_level: 60,
+            scale: 1.0,
+            health_multiplier: 1.0,
+            mana_multiplier: 1.0
+          }
+        }
+        |> Map.put(:equip_items, [nil, nil, nil])
+        |> Map.put(:creature_class_level_stats, %Mangos.CreatureClassLevelStats{
+          class: 1,
+          level: 60,
+          health: 3052,
+          base_health: 1689,
+          mana: 0,
+          base_mana: 0,
+          melee_damage: 100.0,
+          ranged_damage: 0.0,
+          stamina: 256
+        })
+
+      mob = Mob.build(creature)
+
+      assert mob.unit.max_health == 3052
+      assert mob.unit.health == 3052
+      assert mob.unit.base_health == nil
+
+      assert Stats.recompute(mob.unit) == mob.unit
     end
 
     test "stores respawn delay from creature spawn time" do

@@ -82,8 +82,6 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
       frost_resistance: ct.resistance_frost,
       shadow_resistance: ct.resistance_shadow,
       arcane_resistance: ct.resistance_arcane,
-      base_health: stat_value(stats, :base_health, max_health),
-      base_mana: stat_value(stats, :base_mana, max_mana),
       virtual_item_slot_display: virtual_item_slot_display,
       virtual_item_info: virtual_item_info,
       auras: []
