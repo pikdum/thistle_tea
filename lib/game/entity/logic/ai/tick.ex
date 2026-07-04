@@ -24,6 +24,11 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Tick do
 
   def needs_tick?(%{internal: %Internal{in_combat: true}}), do: true
 
+  def needs_tick?(%{internal: %Internal{blackboard: %Blackboard{auto_attacking: true}}, unit: %Unit{target: target}})
+      when is_integer(target) and target > 0 do
+    true
+  end
+
   def needs_tick?(%{unit: %Unit{auras: [_ | _]}}), do: true
 
   def needs_tick?(character), do: Regen.needs_regen?(character)

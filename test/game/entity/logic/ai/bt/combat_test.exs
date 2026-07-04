@@ -172,4 +172,26 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.CombatTest do
       assert {{:running, 250}, ^state, ^blackboard} = Combat.wait_for_next_attack(state, blackboard, 1_000)
     end
   end
+
+  describe "in_combat?/2" do
+    test "a player qualifies on auto-attack intent even before the combat flag is set" do
+      character = %Character{unit: %Unit{target: 2}, internal: %Internal{in_combat: false}}
+
+      assert Combat.in_combat?(character, %Blackboard{auto_attacking: true})
+    end
+
+    test "a player without auto-attack intent does not qualify even while flagged in combat" do
+      character = %Character{unit: %Unit{target: 2}, internal: %Internal{in_combat: true}}
+
+      refute Combat.in_combat?(character, %Blackboard{auto_attacking: false})
+    end
+
+    test "a mob still requires the in-combat flag, not just intent" do
+      not_engaged = %Mob{unit: %Unit{target: 2}, internal: %Internal{in_combat: false}}
+      engaged = %Mob{unit: %Unit{target: 2}, internal: %Internal{in_combat: true}}
+
+      refute Combat.in_combat?(not_engaged, %Blackboard{auto_attacking: true})
+      assert Combat.in_combat?(engaged, %Blackboard{})
+    end
+  end
 end

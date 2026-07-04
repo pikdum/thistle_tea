@@ -3,11 +3,9 @@ defmodule ThistleTea.Game.Network.Message.CmsgAttackswing do
   use ThistleTea.Game.Network.ClientMessage, :CMSG_ATTACKSWING
 
   alias ThistleTea.Game.Entity.Logic.AI.BT
-  alias ThistleTea.Game.Entity.Logic.Combat, as: CombatLogic
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Hostility
   alias ThistleTea.Game.Network.PlayerTick
-  alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.SpatialHash
 
   require Logger
@@ -22,7 +20,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgAttackswing do
       character =
         character
         |> maybe_reset_attack_started(target_guid)
-        |> engage_combat(target_guid)
+        |> set_attack_target(target_guid)
         |> BT.enable_auto_attack()
 
       Core.update_object(character, :values)
@@ -81,15 +79,9 @@ defmodule ThistleTea.Game.Network.Message.CmsgAttackswing do
 
   defp send_attack_stop(state, _target_guid), do: state
 
-  defp engage_combat(%Character{unit: unit, internal: internal} = character, target_guid)
-       when is_integer(target_guid) do
-    now = Time.now()
-    unit = %{unit | target: target_guid}
-    internal = %{internal | in_combat: true, last_hostile_time: now}
-
-    %{character | unit: unit, internal: internal}
-    |> CombatLogic.sync_combat_flag()
+  defp set_attack_target(%Character{unit: unit} = character, target_guid) when is_integer(target_guid) do
+    %{character | unit: %{unit | target: target_guid}}
   end
 
-  defp engage_combat(character, _target_guid), do: character
+  defp set_attack_target(character, _target_guid), do: character
 end

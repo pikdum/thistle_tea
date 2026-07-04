@@ -12,7 +12,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgAttackswingTest do
   alias ThistleTea.Game.World.SpatialHash
 
   describe "handle/2" do
-    test "enables player auto attack for a valid attack target" do
+    test "sets attack intent but does not enter combat until a swing lands" do
       player_guid = Guid.from_low_guid(:player, unique_guid())
       target_guid = Guid.from_low_guid(:mob, 1, unique_guid())
 
@@ -40,7 +40,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgAttackswingTest do
           player_tick_ref: nil
         })
 
-      assert state.character.internal.in_combat == true
+      refute state.character.internal.in_combat
       assert state.character.unit.target == target_guid
       assert state.character.internal.blackboard.auto_attacking == true
     end

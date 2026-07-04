@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
   alias ThistleTea.Game.Entity.Logic.Combat, as: CombatLogic
   alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.Entity.Logic.MeleeSpell
+  alias ThistleTea.Game.Entity.Logic.PlayerCombat
   alias ThistleTea.Game.Entity.Logic.Resources
   alias ThistleTea.Game.Network.BinaryUtils
   alias ThistleTea.Game.Time
@@ -30,9 +31,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
     ])
   end
 
-  def in_combat?(%Character{internal: %Internal{in_combat: true}, unit: %Unit{target: target}}, %Blackboard{
-        auto_attacking: true
-      })
+  def in_combat?(%Character{unit: %Unit{target: target}}, %Blackboard{auto_attacking: true})
       when is_integer(target) and target > 0 do
     true
   end
@@ -81,7 +80,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
       cond do
         in_range and attack_ready ->
           attack_speed = CombatLogic.attack_speed_ms(state)
-          state = send_melee_attack(state, target)
+          state = state |> PlayerCombat.mark_initiated(now) |> send_melee_attack(target)
           {state, Blackboard.put_next_at(blackboard, :next_attack_at, attack_speed, now)}
 
         in_range ->

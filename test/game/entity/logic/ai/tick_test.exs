@@ -4,6 +4,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.TickTest do
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AI.Tick
   alias ThistleTea.Game.Spell.Cast
 
@@ -37,6 +38,12 @@ defmodule ThistleTea.Game.Entity.Logic.AI.TickTest do
 
     test "ticks while in combat without a target" do
       assert Tick.needs_tick?(fixture(in_combat: true))
+    end
+
+    test "ticks while auto-attacking a target before the combat flag is set" do
+      character = fixture(blackboard: %Blackboard{auto_attacking: true}, target: 42)
+
+      assert Tick.needs_tick?(character)
     end
 
     test "ticks with active auras" do
