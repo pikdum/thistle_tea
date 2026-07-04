@@ -53,7 +53,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgAuthSession do
 
   defp get_session_key(%Connection{} = conn, %__MODULE__{username: username}) do
     case :ets.lookup(:session, username) do
-      [{^username, session_key}] -> {:ok, Map.put(conn, :session_key, session_key)}
+      [{^username, session_key}] -> {:ok, %{conn | session_key: session_key}}
       _ -> {:error, conn}
     end
   end

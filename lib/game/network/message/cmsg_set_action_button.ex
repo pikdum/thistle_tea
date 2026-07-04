@@ -14,7 +14,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgSetActionButton do
   def handle(%__MODULE__{button: button, packed_data: packed_data}, state) do
     internal = state.character.internal
 
-    action_buttons = Map.get(internal, :action_buttons) || %{}
+    action_buttons = internal.action_buttons || %{}
 
     action_buttons =
       case packed_data do
@@ -22,7 +22,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgSetActionButton do
         _ -> Map.put(action_buttons, button, packed_data)
       end
 
-    put_in(state.character.internal, Map.put(internal, :action_buttons, action_buttons))
+    put_in(state.character.internal, %{internal | action_buttons: action_buttons})
   end
 
   @impl ClientMessage

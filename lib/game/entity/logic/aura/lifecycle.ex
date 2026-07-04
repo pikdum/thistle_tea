@@ -117,8 +117,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Lifecycle do
     unit = UnitSync.sync_unit(%{entity.unit | auras: kept})
 
     {entity, events} =
-      entity
-      |> Map.put(:unit, unit)
+      %{entity | unit: unit}
       |> MovementSync.sync_movement_state(now)
 
     {Core.mark_broadcast_update(entity), events}

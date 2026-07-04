@@ -20,7 +20,7 @@ defmodule ThistleTea.Game.Spell.Cooldowns do
           |> active(now)
           |> Map.merge(Map.new(entries))
 
-        %{entity | internal: Map.put(internal, :cooldowns, cooldowns)}
+        %{entity | internal: %{internal | cooldowns: cooldowns}}
         |> queue_client_cooldown(spell)
     end
   end
@@ -98,7 +98,7 @@ defmodule ThistleTea.Game.Spell.Cooldowns do
   end
 
   defp stored(internal) do
-    case Map.get(internal, :cooldowns) do
+    case internal.cooldowns do
       cooldowns when is_map(cooldowns) -> cooldowns
       _ -> %{}
     end

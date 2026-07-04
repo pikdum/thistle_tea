@@ -93,15 +93,12 @@ defmodule ThistleTea.Game.Entity.Data.Component.MovementBlock do
       rest::binary
     >> = m
 
-    movement_block =
-      Map.merge(
-        acc,
-        %{
-          movement_flags: movement_flags,
-          timestamp: timestamp,
-          position: {x, y, z, orientation}
-        }
-      )
+    movement_block = %{
+      acc
+      | movement_flags: movement_flags,
+        timestamp: timestamp,
+        position: {x, y, z, orientation}
+    }
 
     # on_transport
     if (movement_flags &&& @movement_flag_on_transport) > 0 do
@@ -113,14 +110,14 @@ defmodule ThistleTea.Game.Entity.Data.Component.MovementBlock do
       case (movement_flags &&& @movement_flag_swimming) > 1 do
         true ->
           <<pitch::little-float-size(32), rest::binary>> = rest
-          {Map.put(movement_block, :pitch, pitch), rest}
+          {%{movement_block | pitch: pitch}, rest}
 
         false ->
           {movement_block, rest}
       end
 
     <<fall_time::little-size(32), rest::binary>> = rest
-    movement_block = Map.put(movement_block, :fall_time, fall_time)
+    movement_block = %{movement_block | fall_time: fall_time}
 
     # jumping
     {movement_block, rest} =
@@ -129,12 +126,13 @@ defmodule ThistleTea.Game.Entity.Data.Component.MovementBlock do
           <<z_speed::little-float-size(32), cos_angle::little-float-size(32), sin_angle::little-float-size(32),
             xy_speed::little-float-size(32), rest::binary>> = rest
 
-          {Map.merge(movement_block, %{
-             z_speed: z_speed,
-             cos_angle: cos_angle,
-             sin_angle: sin_angle,
-             xy_speed: xy_speed
-           }), rest}
+          {%{
+             movement_block
+             | z_speed: z_speed,
+               cos_angle: cos_angle,
+               sin_angle: sin_angle,
+               xy_speed: xy_speed
+           }, rest}
 
         false ->
           {movement_block, rest}
@@ -145,7 +143,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.MovementBlock do
       case (movement_flags &&& @movement_flag_spline_elevation) > 0 do
         true ->
           <<spline_elevation::little-float-size(32), rest::binary>> = rest
-          {Map.put(movement_block, :spline_elevation, spline_elevation), rest}
+          {%{movement_block | spline_elevation: spline_elevation}, rest}
 
         false ->
           {movement_block, rest}

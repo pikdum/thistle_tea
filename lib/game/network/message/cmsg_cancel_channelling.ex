@@ -12,7 +12,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgCancelChannelling do
 
   @impl ClientMessage
   def handle(%__MODULE__{}, %{character: character} = state) do
-    case Map.get(character.internal, :casting) do
+    case character.internal.casting do
       %Cast{} ->
         character =
           character

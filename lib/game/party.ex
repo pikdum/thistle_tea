@@ -133,8 +133,8 @@ defmodule ThistleTea.Game.Party do
   def update_looter(%__MODULE__{} = party, group_id, eligible_guids) do
     case Map.get(party.groups, group_id) do
       %Group{} = group ->
-        next = next_looter(Enum.map(group.members, & &1.guid), Map.get(group, :looter), eligible_guids)
-        {next, put_group(party, Map.put(group, :looter, next || 0))}
+        next = next_looter(Enum.map(group.members, & &1.guid), group.looter, eligible_guids)
+        {next, put_group(party, %{group | looter: next || 0})}
 
       _ ->
         {nil, party}

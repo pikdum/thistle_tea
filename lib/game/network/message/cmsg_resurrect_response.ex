@@ -61,9 +61,9 @@ defmodule ThistleTea.Game.Network.Message.CmsgResurrectResponse do
 
   defp teleport_to_caster(state, _position), do: state
 
-  defp pending_resurrect(%Character{internal: internal}), do: Map.get(internal, :pending_resurrect)
+  defp pending_resurrect(%Character{internal: internal}), do: internal.pending_resurrect
 
   defp clear_pending(%Character{internal: internal} = character) do
-    %{character | internal: Map.put(internal, :pending_resurrect, nil)}
+    %{character | internal: %{internal | pending_resurrect: nil}}
   end
 end

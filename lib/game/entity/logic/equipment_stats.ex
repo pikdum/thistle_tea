@@ -48,7 +48,7 @@ defmodule ThistleTea.Game.Entity.Logic.EquipmentStats do
 
   def resync(%{unit: %Unit{} = unit, player: %Player{} = player} = character, get_item, get_spell) do
     bonuses = player |> Inventory.equipped_templates(get_item) |> bonuses(get_spell)
-    unit = unit |> Map.put(:equipment_bonuses, bonuses) |> Stats.recompute()
+    unit = %{unit | equipment_bonuses: bonuses} |> Stats.recompute()
     player = apply_spell_damage_fields(player, bonuses)
 
     %{character | unit: unit, player: player}

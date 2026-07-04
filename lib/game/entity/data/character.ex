@@ -45,7 +45,7 @@ defmodule ThistleTea.Game.Entity.Data.Character do
       end
 
     unit =
-      Map.merge(unit, %{base_attack_time: delay, base_min_damage: weapon_min, base_max_damage: weapon_max})
+      %{unit | base_attack_time: delay, base_min_damage: weapon_min, base_max_damage: weapon_max}
 
     %{character | unit: unit}
   end
@@ -59,19 +59,21 @@ defmodule ThistleTea.Game.Entity.Data.Character do
 
     unit =
       if weapon do
-        Map.merge(unit, %{
-          offhand_attack_time: positive_or(weapon.delay, @base_attack_time),
-          base_offhand_min_damage: positive_or(weapon.dmg_min1, 0.0),
-          base_offhand_max_damage: positive_or(weapon.dmg_max1, 0.0)
-        })
+        %{
+          unit
+          | offhand_attack_time: positive_or(weapon.delay, @base_attack_time),
+            base_offhand_min_damage: positive_or(weapon.dmg_min1, 0.0),
+            base_offhand_max_damage: positive_or(weapon.dmg_max1, 0.0)
+        }
       else
-        Map.merge(unit, %{
-          offhand_attack_time: @base_attack_time,
-          base_offhand_min_damage: nil,
-          base_offhand_max_damage: nil,
-          min_offhand_damage: 0.0,
-          max_offhand_damage: 0.0
-        })
+        %{
+          unit
+          | offhand_attack_time: @base_attack_time,
+            base_offhand_min_damage: nil,
+            base_offhand_max_damage: nil,
+            min_offhand_damage: 0.0,
+            max_offhand_damage: 0.0
+        }
       end
 
     %{character | unit: unit}

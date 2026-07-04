@@ -141,7 +141,7 @@ defmodule ThistleTea.Game.Entity.Logic.Regen do
   defp creature_regenerates?(_entity, _flag), do: true
 
   def under_five_second_rule?(%{internal: %Internal{} = internal}, now) when is_integer(now) do
-    case Map.get(internal, :last_mana_use_at) do
+    case internal.last_mana_use_at do
       at when is_integer(at) -> now - at < @five_second_rule_ms
       _ -> false
     end
@@ -220,9 +220,9 @@ defmodule ThistleTea.Game.Entity.Logic.Regen do
   end
 
   defp apply_health_regen(%{internal: %Internal{} = internal} = entity, value) do
-    carried = value + (Map.get(internal, :health_regen_carry) || 0.0)
+    carried = value + (internal.health_regen_carry || 0.0)
     carry = carried - trunc(carried)
-    entity = %{entity | internal: Map.put(internal, :health_regen_carry, carry)}
+    entity = %{entity | internal: %{internal | health_regen_carry: carry}}
     Core.heal(entity, max(trunc(carried), 0))
   end
 

@@ -22,7 +22,7 @@ defmodule ThistleTea.Game.Network.Connection do
   ]
 
   def receive_data(%__MODULE__{} = conn, data) do
-    Map.put(conn, :binary_stream, conn.binary_stream <> data)
+    %{conn | binary_stream: conn.binary_stream <> data}
   end
 
   # full header is 6 bytes, so any less is incomplete
@@ -43,10 +43,7 @@ defmodule ThistleTea.Game.Network.Connection do
       payload: payload
     }
 
-    Map.merge(conn, %{
-      binary_stream: rest,
-      packet_queue: conn.packet_queue ++ [packet]
-    })
+    %{conn | binary_stream: rest, packet_queue: conn.packet_queue ++ [packet]}
     |> enqueue_packets()
   end
 
@@ -64,10 +61,7 @@ defmodule ThistleTea.Game.Network.Connection do
           payload: payload
         }
 
-        Map.merge(conn, %{
-          binary_stream: rest,
-          packet_queue: conn.packet_queue ++ [packet]
-        })
+        %{conn | binary_stream: rest, packet_queue: conn.packet_queue ++ [packet]}
         |> enqueue_packets()
 
       {:error, conn, _} ->

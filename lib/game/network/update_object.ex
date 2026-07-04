@@ -171,7 +171,7 @@ defmodule ThistleTea.Game.Network.UpdateObject do
          recipient_guid
        )
        when update_type in [:create_object, :create_object2] do
-    obj = %{obj | object: Map.put(object, :type, object_type_flags(obj))}
+    obj = %{obj | object: %{object | type: object_type_flags(obj)}}
     target = visibility_target(object.guid, recipient_guid)
     fields = flatten_field_structs(obj, target)
     packed_guid = BinaryUtils.pack_guid(object.guid)

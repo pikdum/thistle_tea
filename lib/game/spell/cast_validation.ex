@@ -158,6 +158,6 @@ defmodule ThistleTea.Game.Spell.CastValidation do
   defp self_target?(%{object: %{guid: guid}}, unit_guid), do: unit_guid == guid
   defp self_target?(_caster, _unit_guid), do: false
 
-  defp godmode?(%{internal: internal}), do: Map.get(internal, :godmode) == true
+  defp godmode?(%{internal: internal}), do: internal.godmode == true
   defp godmode?(_caster), do: false
 end

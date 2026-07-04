@@ -221,7 +221,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
       mana: mana
     }
 
-    state = %{state | internal: Map.put(internal, :pending_resurrect, pending)}
+    state = %{state | internal: %{internal | pending_resurrect: pending}}
     {state, [Event.resurrect_request(context.caster_guid, spell.id, health, mana)]}
   end
 

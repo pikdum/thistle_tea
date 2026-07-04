@@ -87,7 +87,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
   def cancel(state, reason \\ @spell_failed_interrupted)
 
   def cancel(%{character: character} = state, reason) do
-    case Map.get(character.internal, :casting) do
+    case character.internal.casting do
       nil ->
         state
 

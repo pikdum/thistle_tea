@@ -56,11 +56,11 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.MovementSync do
 
   defp sync_movement_flags(entity, _now), do: {entity, []}
 
-  defp rooted?(%{internal: internal}) when is_struct(internal), do: Map.get(internal, :rooted?) == true
+  defp rooted?(%{internal: internal}) when is_struct(internal), do: internal.rooted? == true
   defp rooted?(_entity), do: false
 
   defp put_rooted(%{internal: internal} = entity, rooted?) when is_struct(internal) do
-    %{entity | internal: Map.put(internal, :rooted?, rooted?)}
+    %{entity | internal: %{internal | rooted?: rooted?}}
   end
 
   defp put_rooted(entity, _rooted?), do: entity

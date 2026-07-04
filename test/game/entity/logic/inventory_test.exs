@@ -228,7 +228,7 @@ defmodule ThistleTea.Game.Entity.Logic.InventoryTest do
     test "moves an item back out of a bag", %{unit: unit, chest: chest, bag: bag} do
       bag = %{bag | container: %{bag.container | slot_1: chest.object.guid}}
       chest = %{chest | item: %{chest.item | contained: bag.object.guid}}
-      player = Map.put(%Player{}, :bag1, bag.object.guid)
+      player = %Player{bag1: bag.object.guid}
 
       assert {:ok, %{player: player, items: items}} =
                Inventory.swap(
@@ -247,7 +247,7 @@ defmodule ThistleTea.Game.Entity.Logic.InventoryTest do
 
     test "rejects moving a non-empty bag off the bag bar", %{unit: unit, chest: chest, bag: bag} do
       bag = %{bag | container: %{bag.container | slot_1: chest.object.guid}}
-      player = Map.put(%Player{}, :bag1, bag.object.guid)
+      player = %Player{bag1: bag.object.guid}
 
       assert {:error, :can_only_do_with_empty_bags, _, _} =
                Inventory.swap(
@@ -261,7 +261,7 @@ defmodule ThistleTea.Game.Entity.Logic.InventoryTest do
     end
 
     test "rejects putting a bag inside itself", %{unit: unit, bag: bag} do
-      player = Map.put(%Player{}, :bag1, bag.object.guid)
+      player = %Player{bag1: bag.object.guid}
 
       assert {:error, :items_cant_be_swapped, _, _} =
                Inventory.swap(player, unit, @owner, {@bag_0, @first_bag_slot}, {@first_bag_slot, 0}, get_item_fn([bag]))
@@ -355,7 +355,7 @@ defmodule ThistleTea.Game.Entity.Logic.InventoryTest do
       filler = build_item(10, %ItemTemplate{entry: 1000})
 
       player =
-        Enum.reduce(0..15, Map.put(%Player{}, :bag1, bag.object.guid), fn i, p ->
+        Enum.reduce(0..15, %Player{bag1: bag.object.guid}, fn i, p ->
           store(p, @backpack_start + i, filler)
         end)
 
@@ -541,7 +541,7 @@ defmodule ThistleTea.Game.Entity.Logic.InventoryTest do
 
     test "destroys items inside bags", %{chest: chest, bag: bag} do
       bag = %{bag | container: %{bag.container | slot_1: chest.object.guid}}
-      player = Map.put(%Player{}, :bag1, bag.object.guid)
+      player = %Player{bag1: bag.object.guid}
 
       assert {:ok, %{items: items}, item} =
                Inventory.destroy(player, {@first_bag_slot, 0}, get_item_fn([chest, bag]))
@@ -552,7 +552,7 @@ defmodule ThistleTea.Game.Entity.Logic.InventoryTest do
 
     test "rejects destroying a non-empty bag", %{chest: chest, bag: bag} do
       bag = %{bag | container: %{bag.container | slot_1: chest.object.guid}}
-      player = Map.put(%Player{}, :bag1, bag.object.guid)
+      player = %Player{bag1: bag.object.guid}
 
       assert {:error, :can_only_do_with_empty_bags, _, 0} =
                Inventory.destroy(player, {@bag_0, @first_bag_slot}, get_item_fn([chest, bag]))

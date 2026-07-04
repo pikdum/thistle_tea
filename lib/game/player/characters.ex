@@ -35,8 +35,7 @@ defmodule ThistleTea.Game.Player.Characters do
         get_template \\ &ItemLoader.get_template/1
       )
       when is_integer(owner_guid) and owner_guid > 0 do
-    character.internal
-    |> Map.get(:starting_items, [])
+    character.internal.starting_items
     |> then(&assign_items(character, &1, get_template))
   end
 

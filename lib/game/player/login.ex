@@ -153,7 +153,7 @@ defmodule ThistleTea.Game.Player.Login do
     })
 
     Network.send_packet(%Message.SmsgActionButtons{
-      buttons: Map.get(c.internal, :action_buttons) || %{}
+      buttons: c.internal.action_buttons || %{}
     })
 
     # send initial repuations
@@ -196,12 +196,14 @@ defmodule ThistleTea.Game.Player.Login do
 
     movement_block = %{c.movement_block | update_flag: update_flag}
 
-    %UpdateObject{
-      update_type: :create_object2,
-      object_type: :player
-    }
-    |> struct(Map.from_struct(c))
-    |> Map.put(:movement_block, movement_block)
+    update =
+      %UpdateObject{
+        update_type: :create_object2,
+        object_type: :player
+      }
+      |> struct(Map.from_struct(c))
+
+    %{update | movement_block: movement_block}
     |> Network.send_packet()
 
     EventSink.emit(c, AuraLogic.self_duration_events(c, Time.now()))

@@ -134,8 +134,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
     unit = UnitSync.sync_unit(%{entity.unit | auras: holders})
 
     {entity, sit_events} =
-      entity
-      |> Map.put(:unit, unit)
+      %{entity | unit: unit}
       |> maybe_sit(holder)
 
     {entity, events} = MovementSync.sync_movement_state(entity, now)

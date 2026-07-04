@@ -41,7 +41,7 @@ defmodule ThistleTea.Game.Entity.Logic.Resources do
   defp deduct_power(entity, _field, _cost), do: entity
 
   defp track_mana_use(%{internal: %Internal{} = internal} = entity, @mana_power_type, now) do
-    %{entity | internal: Map.put(internal, :last_mana_use_at, now)}
+    %{entity | internal: %{internal | last_mana_use_at: now}}
   end
 
   defp track_mana_use(entity, _power_type, _now), do: entity
