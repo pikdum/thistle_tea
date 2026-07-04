@@ -141,7 +141,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
     resisted = periodic_resisted_amount(entity, amount, school, caster_level)
     damage = amount - resisted
 
-    {entity, absorbed} = Core.take_damage_with_absorb(entity, damage, now, school: school)
+    {entity, absorbed} = Core.take_damage_with_absorb(entity, damage, now, school: school, source: holder.caster_guid)
 
     {entity, damage, [periodic?: true, resisted: resisted, absorbed: absorbed]}
   end

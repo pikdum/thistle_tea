@@ -225,6 +225,8 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
         casting: nil,
         rooted?: false,
         running: false,
+        killed_by: nil,
+        death_finalized?: false,
         movement_start_time: nil,
         movement_start_position: nil,
         behavior_tree: nil,

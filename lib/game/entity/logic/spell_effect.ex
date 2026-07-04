@@ -175,7 +175,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
         |> Core.mark_broadcast_update()
 
       damage = trunc(drained * burn_multiplier(effect))
-      state = Core.take_damage(state, damage, now, school: school_atom(spell))
+      state = Core.take_damage(state, damage, now, school: school_atom(spell), source: context.caster_guid)
       event = Event.spell_damage(context.caster_guid, state.object.guid, spell, damage)
 
       {state, [event]}
@@ -250,7 +250,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
     resisted = school_resisted_amount(state, damage, school, context.caster_level, opts)
     damage = damage - resisted
 
-    {state, absorbed} = Core.take_damage_with_absorb(state, damage, now, school: school)
+    {state, absorbed} = Core.take_damage_with_absorb(state, damage, now, school: school, source: context.caster_guid)
 
     event =
       Event.spell_damage(

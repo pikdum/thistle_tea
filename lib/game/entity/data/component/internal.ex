@@ -34,11 +34,13 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal do
     :movement_start_time,
     :movement_start_position,
     :pending_resurrect,
+    :killed_by,
     starting_items: [],
     action_buttons: %{},
     cooldowns: %{},
     events: [],
     broadcast_update?: false,
+    death_finalized?: false,
     rooted?: false,
     spline_id: 0,
     godmode: false

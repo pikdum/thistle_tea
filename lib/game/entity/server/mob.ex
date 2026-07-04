@@ -128,17 +128,13 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
         state
       end
 
-    target = state.unit.target
-    dead_before = Core.dead?(state)
-
     {state, events} = SpellEffect.receive(state, caster, spell, Time.now())
 
     state =
       state
       |> EventSink.emit(events)
-      |> handle_death_transition(target, dead_before)
+      |> wake_ai_tick()
 
-    state = wake_ai_tick(state)
     {:noreply, state, {:continue, :maybe_broadcast}}
   end
 
@@ -160,17 +156,13 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
       |> maybe_reset_attack_started(caster)
       |> engage_combat(caster)
 
-    target = state.unit.target
-    dead_before = Core.dead?(state)
-
     {state, events} = Combat.receive_attack(state, attack, Time.now())
 
     state =
       state
-      |> handle_death_transition(target, dead_before)
       |> EventSink.emit(events)
+      |> wake_ai_tick()
 
-    state = wake_ai_tick(state)
     {:noreply, state, {:continue, :maybe_broadcast}}
   end
 
@@ -336,7 +328,16 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   end
 
   @impl GenServer
-  def handle_continue(:maybe_broadcast, %{internal: %Internal{broadcast_update?: true}} = state) do
+  def handle_continue(:maybe_broadcast, %Mob{} = state) do
+    state =
+      state
+      |> maybe_finalize_death()
+      |> broadcast_if_pending()
+
+    {:noreply, state}
+  end
+
+  defp broadcast_if_pending(%Mob{internal: %Internal{broadcast_update?: true}} = state) do
     if !Corpse.removed?(state) do
       update_type = if Core.dead?(state), do: :create_object2, else: :values
       Core.update_object(state, update_type) |> World.broadcast_packet(state)
@@ -348,13 +349,10 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
       })
     end
 
-    internal = %{state.internal | broadcast_update?: false}
-    {:noreply, %{state | internal: internal}}
+    %{state | internal: %{state.internal | broadcast_update?: false}}
   end
 
-  def handle_continue(:maybe_broadcast, state) do
-    {:noreply, state}
-  end
+  defp broadcast_if_pending(%Mob{} = state), do: state
 
   @impl GenServer
   def terminate(_reason, state) do
@@ -585,21 +583,29 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
   defp update_attacker_count(state, _current_target, _caster), do: state
 
-  defp handle_death_transition(%Mob{} = state, target, false) do
+  defp maybe_finalize_death(%Mob{internal: %Internal{death_finalized?: true}} = state), do: state
+
+  defp maybe_finalize_death(%Mob{} = state) do
     if Core.dead?(state) do
+      killer = state.internal.killed_by
+
       state
-      |> EventAI.with_blackboard(&EventAI.on_death(&1, &2, target, Time.now()))
+      |> mark_death_finalized()
+      |> EventAI.with_blackboard(&EventAI.on_death(&1, &2, killer, Time.now()))
       |> EventSink.emit_pending()
-      |> maybe_decrement_on_death(target)
-      |> maybe_reward_kill(target)
-      |> Corpse.prepare(target)
+      |> maybe_decrement_on_death(killer)
+      |> maybe_reward_kill(killer)
+      |> Corpse.prepare(killer)
       |> Respawn.schedule()
+      |> Core.mark_broadcast_update()
     else
       state
     end
   end
 
-  defp handle_death_transition(%Mob{} = state, _target, _dead_before), do: state
+  defp mark_death_finalized(%Mob{internal: internal} = state) do
+    %{state | internal: %{internal | death_finalized?: true}}
+  end
 
   defp maybe_decrement_on_death(%Mob{} = state, target) when is_integer(target) and target > 0 do
     Metadata.decrement(target, :attacker_count, 0)

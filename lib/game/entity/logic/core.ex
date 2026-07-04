@@ -60,6 +60,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
     entity =
       entity
       |> maybe_enqueue_death_root(health, new_health)
+      |> maybe_record_killer(health, new_health, Keyword.get(opts, :source))
       |> mark_broadcast_update()
       |> maybe_dead(now)
 
@@ -200,4 +201,11 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
   end
 
   defp maybe_enqueue_death_root(entity, _health, _new_health), do: entity
+
+  defp maybe_record_killer(%{internal: %Internal{} = internal} = entity, health, new_health, source)
+       when is_number(health) and health > 0 and new_health <= 0 and is_integer(source) and source > 0 do
+    %{entity | internal: %{internal | killed_by: source}}
+  end
+
+  defp maybe_record_killer(entity, _health, _new_health, _source), do: entity
 end

@@ -279,8 +279,10 @@ defmodule ThistleTea.Game.Entity.Data.MobTest do
         }
       }
 
-      assert {:noreply, %Mob{unit: %Unit{health: 0}}, {:continue, :maybe_broadcast}} =
+      assert {:noreply, %Mob{unit: %Unit{health: 0}} = mob, {:continue, :maybe_broadcast}} =
                MobServer.handle_cast({:receive_attack, %{caster: player_guid, damage: 1, caster_level: 99}}, mob)
+
+      assert {:noreply, %Mob{}} = MobServer.handle_continue(:maybe_broadcast, mob)
 
       assert_receive {:"$gen_cast", {:reward_kill, %Mob{object: %Object{guid: ^mob_guid}}}}
     end
@@ -307,12 +309,65 @@ defmodule ThistleTea.Game.Entity.Data.MobTest do
         }
       }
 
-      assert {:noreply, %Mob{internal: %Internal{spawn: %Spawn{respawn_ref: ref}}}, {:continue, :maybe_broadcast}} =
+      assert {:noreply, %Mob{} = mob, {:continue, :maybe_broadcast}} =
                MobServer.handle_cast({:receive_attack, %{caster: player_guid, damage: 1, caster_level: 99}}, mob)
+
+      assert {:noreply, %Mob{internal: %Internal{spawn: %Spawn{respawn_ref: ref}}}} =
+               MobServer.handle_continue(:maybe_broadcast, mob)
 
       assert is_reference(ref)
       assert_receive :respawn
     end
+  end
+
+  describe "handle_continue/2" do
+    test "finalizes a death that did not arrive through an attack" do
+      player_guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
+      mob_guid = Guid.from_low_guid(:mob, 2, System.unique_integer([:positive]))
+
+      Entity.register(player_guid)
+      on_exit(fn -> Entity.unregister(player_guid) end)
+
+      dead_mob = dead_mob(mob_guid, killed_by: player_guid, death_finalized?: false)
+
+      assert {:noreply, %Mob{internal: %Internal{spawn: %Spawn{respawn_ref: ref}, death_finalized?: true}}} =
+               MobServer.handle_continue(:maybe_broadcast, dead_mob)
+
+      assert is_reference(ref)
+      assert_receive {:"$gen_cast", {:reward_kill, %Mob{object: %Object{guid: ^mob_guid}}}}
+      assert_receive :respawn
+    end
+
+    test "does not finalize an already-finalized death again" do
+      player_guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
+      mob_guid = Guid.from_low_guid(:mob, 2, System.unique_integer([:positive]))
+
+      Entity.register(player_guid)
+      on_exit(fn -> Entity.unregister(player_guid) end)
+
+      dead_mob = dead_mob(mob_guid, killed_by: player_guid, death_finalized?: true)
+
+      assert {:noreply, %Mob{}} = MobServer.handle_continue(:maybe_broadcast, dead_mob)
+
+      refute_receive {:"$gen_cast", {:reward_kill, _}}
+    end
+  end
+
+  defp dead_mob(mob_guid, opts) do
+    %Mob{
+      object: %Object{guid: mob_guid},
+      unit: %Unit{health: 0, max_health: 1, level: 1},
+      movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+      internal: %Internal{
+        map: 0,
+        creature: %Creature{experience_multiplier: 1.0, extra_flags: 0, rank: 0},
+        spawn: %Spawn{respawn_delay_ms: 1},
+        loot: %Loot{},
+        broadcast_update?: true,
+        killed_by: Keyword.get(opts, :killed_by),
+        death_finalized?: Keyword.get(opts, :death_finalized?, false)
+      }
+    }
   end
 
   describe "handle_info/2" do

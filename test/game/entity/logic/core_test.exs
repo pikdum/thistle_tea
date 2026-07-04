@@ -25,6 +25,43 @@ defmodule ThistleTea.Game.Entity.Logic.CoreTest do
     end
   end
 
+  describe "take_damage_with_absorb/4 killer recording" do
+    test "records the source on the killing blow" do
+      entity = damageable(health: 30)
+
+      {entity, _absorbed} = Core.take_damage_with_absorb(entity, 30, 1_000, source: 777)
+
+      assert Core.dead?(entity)
+      assert entity.internal.killed_by == 777
+    end
+
+    test "does not record a killer when the damage is not lethal" do
+      entity = damageable(health: 30)
+
+      {entity, _absorbed} = Core.take_damage_with_absorb(entity, 10, 1_000, source: 777)
+
+      refute Core.dead?(entity)
+      assert entity.internal.killed_by == nil
+    end
+
+    test "records nothing on a kill when no source is given" do
+      entity = damageable(health: 30)
+
+      {entity, _absorbed} = Core.take_damage_with_absorb(entity, 30, 1_000)
+
+      assert Core.dead?(entity)
+      assert entity.internal.killed_by == nil
+    end
+
+    test "ignores a zero source guid" do
+      entity = damageable(health: 30)
+
+      {entity, _absorbed} = Core.take_damage_with_absorb(entity, 30, 1_000, source: 0)
+
+      assert entity.internal.killed_by == nil
+    end
+  end
+
   describe "should_tether?/2" do
     test "returns true when outside tether range after timeout" do
       entity = entity(position: {100.0, 0.0, 0.0, 0.0}, last_hostile_time: 1_000)
@@ -80,6 +117,14 @@ defmodule ThistleTea.Game.Entity.Logic.CoreTest do
         creature: %Creature{leash_range: Keyword.get(opts, :leash_range, 0.0)}
       },
       movement_block: %MovementBlock{position: Keyword.get(opts, :position)}
+    }
+  end
+
+  defp damageable(opts) do
+    %{
+      unit: %Unit{health: Keyword.get(opts, :health), max_health: 100, level: 1, auras: []},
+      internal: %Internal{},
+      movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}, spline_nodes: []}
     }
   end
 end
