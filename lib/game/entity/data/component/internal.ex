@@ -22,7 +22,6 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal do
     :event,
     :in_combat,
     :last_hostile_time,
-    :hostile_initiated_at,
     :last_mana_use_at,
     :health_regen_carry,
     :running,
