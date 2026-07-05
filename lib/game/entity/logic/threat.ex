@@ -44,8 +44,15 @@ defmodule ThistleTea.Game.Entity.Logic.Threat do
   def add(%Mob{object: %{guid: self_guid}, internal: %Internal{} = internal} = entity, source_guid, amount)
       when is_integer(source_guid) and source_guid > 0 and source_guid != self_guid and is_number(amount) and
              amount >= 0 do
-    table = Map.update(internal.threat || %{}, source_guid, amount / 1, &(&1 + amount))
-    %{entity | internal: %{internal | threat: table}}
+    existing = internal.threat || %{}
+    table = Map.update(existing, source_guid, amount / 1, &(&1 + amount))
+    entity = %{entity | internal: %{internal | threat: table}}
+
+    if Map.has_key?(existing, source_guid) do
+      entity
+    else
+      Event.enqueue(entity, Event.threat_ref_gained(source_guid))
+    end
   end
 
   def add(entity, _source_guid, _amount), do: entity
@@ -56,14 +63,29 @@ defmodule ThistleTea.Game.Entity.Logic.Threat do
 
   def add_damage(entity, _source_guid, _damage), do: entity
 
-  def taunt(%Mob{internal: %Internal{threat: table} = internal} = entity, taunter_guid)
+  def taunt(%Mob{internal: %Internal{threat: table}} = entity, taunter_guid)
       when is_map(table) and is_integer(taunter_guid) do
     top = table |> Map.values() |> Enum.max(fn -> 0.0 end)
-    current = Map.get(table, taunter_guid, 0.0)
-    %{entity | internal: %{internal | threat: Map.put(table, taunter_guid, max(current, top))}}
+    entity = add(entity, taunter_guid, 0)
+
+    case entity.internal.threat do
+      %{^taunter_guid => current} = table ->
+        %{entity | internal: %{entity.internal | threat: Map.put(table, taunter_guid, max(current, top))}}
+
+      _rejected ->
+        entity
+    end
   end
 
   def taunt(entity, _taunter_guid), do: entity
+
+  def wipe(%Mob{internal: %Internal{threat: table} = internal} = entity) when is_map(table) do
+    entity = %{entity | internal: %{internal | threat: %{}}}
+
+    table
+    |> Map.keys()
+    |> Enum.reduce(entity, &Event.enqueue(&2, Event.threat_ref_lost(&1)))
+  end
 
   def wipe(%Mob{internal: %Internal{} = internal} = entity) do
     %{entity | internal: %{internal | threat: %{}}}
@@ -90,8 +112,15 @@ defmodule ThistleTea.Game.Entity.Logic.Threat do
     valid? = Keyword.get_lazy(opts, :valid?, fn -> &Hostility.valid_hostile_target?(entity, &1) end)
     in_melee? = Keyword.get_lazy(opts, :in_melee?, fn -> &in_melee_range?(entity, &1) end)
 
-    pruned = table |> Enum.filter(fn {guid, _threat} -> valid?.(guid) end) |> Map.new()
-    entity = %{entity | internal: %{entity.internal | threat: pruned}}
+    {kept, dropped} = Enum.split_with(table, fn {guid, _threat} -> valid?.(guid) end)
+    pruned = Map.new(kept)
+
+    entity =
+      dropped
+      |> Enum.reduce(%{entity | internal: %{entity.internal | threat: pruned}}, fn {guid, _threat}, acc ->
+        Event.enqueue(acc, Event.threat_ref_lost(guid))
+      end)
+
     sorted = Enum.sort_by(pruned, fn {_guid, threat} -> threat end, :desc)
 
     current_threat =

@@ -262,7 +262,7 @@ defmodule ThistleTea.Game.Player.Login do
       |> normalize_unit_value(:min_damage, 2)
       |> normalize_unit_value(:max_damage, 2)
 
-    internal = %{character.internal | in_combat: false}
+    internal = %{character.internal | in_combat: false, threat_refs: nil}
 
     %{character | unit: unit, internal: internal}
     |> CombatLogic.sync_combat_flag()

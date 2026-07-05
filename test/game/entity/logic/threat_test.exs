@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.Entity.Logic.ThreatTest do
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
+  alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.Entity.Logic.Threat
 
   @mob_guid 100
@@ -100,6 +101,41 @@ defmodule ThistleTea.Game.Entity.Logic.ThreatTest do
     test "entries are sorted by threat descending" do
       entity = mob(threat: %{@player_a => 10.0, @player_b => 30.0, @player_c => 20.0})
       assert Threat.entries(entity) == [{@player_b, 30.0}, {@player_c, 20.0}, {@player_a, 10.0}]
+    end
+  end
+
+  describe "threat ref events" do
+    test "add enqueues threat_ref_gained only for new entries" do
+      entity = mob() |> Threat.add(@player_a, 10) |> Threat.add(@player_a, 10)
+
+      assert [%Event{type: :threat_ref_gained, target_guid: @player_a}] = entity.internal.events
+    end
+
+    test "wipe enqueues threat_ref_lost for each entry" do
+      entity = Threat.wipe(mob(threat: %{@player_a => 1.0, @player_b => 2.0}))
+
+      lost =
+        entity.internal.events
+        |> Enum.filter(&(&1.type == :threat_ref_lost))
+        |> Enum.map(& &1.target_guid)
+        |> Enum.sort()
+
+      assert lost == [@player_a, @player_b]
+      assert entity.internal.threat == %{}
+    end
+
+    test "reselect enqueues threat_ref_lost for pruned entries" do
+      entity = mob(target: @player_a, threat: %{@player_a => 100.0, @player_b => 10.0})
+      {entity, _decision} = reselect(entity, valid?: fn guid -> guid != @player_a end)
+
+      assert [%Event{type: :threat_ref_lost, target_guid: @player_a}] = entity.internal.events
+    end
+
+    test "taunt seeds a missing taunter at top threat with a gained event" do
+      entity = Threat.taunt(mob(threat: %{@player_a => 200.0}), @player_b)
+
+      assert entity.internal.threat == %{@player_a => 200.0, @player_b => 200.0}
+      assert [%Event{type: :threat_ref_gained, target_guid: @player_b}] = entity.internal.events
     end
   end
 

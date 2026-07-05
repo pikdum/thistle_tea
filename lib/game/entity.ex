@@ -44,6 +44,14 @@ defmodule ThistleTea.Game.Entity do
     dispatch_cast(entity, {:heal_threat, healer_guid, healed_guid, amount})
   end
 
+  def threat_ref_gained(entity, mob_guid) do
+    dispatch_cast(entity, {:threat_ref_gained, mob_guid})
+  end
+
+  def threat_ref_lost(entity, mob_guid) do
+    dispatch_cast(entity, {:threat_ref_lost, mob_guid})
+  end
+
   def use_game_object(entity, user_guid, user_level) do
     dispatch_cast(entity, {:gameobject_use, user_guid, user_level})
   end

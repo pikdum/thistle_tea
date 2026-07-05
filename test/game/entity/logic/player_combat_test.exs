@@ -33,6 +33,26 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombatTest do
     end
   end
 
+  describe "gain_threat_ref/2 and lose_threat_ref/2" do
+    test "gaining a ref enters combat and records the mob" do
+      character = PlayerCombat.gain_threat_ref(character(), 100)
+
+      assert character.internal.in_combat == true
+      assert MapSet.member?(character.internal.threat_refs, 100)
+      assert Bitwise.band(character.unit.flags, @unit_flag_in_combat) == @unit_flag_in_combat
+    end
+
+    test "losing a ref removes it and is idempotent" do
+      character =
+        character()
+        |> PlayerCombat.gain_threat_ref(100)
+        |> PlayerCombat.lose_threat_ref(100)
+        |> PlayerCombat.lose_threat_ref(100)
+
+      assert MapSet.size(character.internal.threat_refs) == 0
+    end
+  end
+
   describe "sync/3" do
     test "stays in combat within the drop window of the last hostile event" do
       character = character(in_combat: true, last_hostile_time: 1_000)
@@ -103,6 +123,39 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombatTest do
       {character, _blackboard} = PlayerCombat.sync(character, %Blackboard{auto_attacking: false}, 7_000)
 
       assert character.internal.in_combat == false
+    end
+
+    test "stays in combat past the drop window while a live mob references the player" do
+      mob_guid = Guid.from_low_guid(:mob, 1, unique_guid())
+      Metadata.put(mob_guid, %{alive?: true})
+
+      on_exit(fn -> Metadata.delete(mob_guid) end)
+
+      character =
+        character(in_combat: true, last_hostile_time: 1_000)
+        |> PlayerCombat.gain_threat_ref(mob_guid)
+
+      {character, _blackboard} = PlayerCombat.sync(character, %Blackboard{}, 100_000)
+
+      assert character.internal.in_combat == true
+    end
+
+    test "prunes refs to dead or missing mobs and drops combat after the window" do
+      dead_guid = Guid.from_low_guid(:mob, 1, unique_guid())
+      missing_guid = Guid.from_low_guid(:mob, 1, unique_guid())
+      Metadata.put(dead_guid, %{alive?: false})
+
+      on_exit(fn -> Metadata.delete(dead_guid) end)
+
+      character =
+        character(in_combat: true, last_hostile_time: 1_000)
+        |> PlayerCombat.gain_threat_ref(dead_guid)
+        |> PlayerCombat.gain_threat_ref(missing_guid)
+
+      {character, _blackboard} = PlayerCombat.sync(character, %Blackboard{}, 7_000)
+
+      assert character.internal.in_combat == false
+      assert MapSet.size(character.internal.threat_refs) == 0
     end
 
     test "does not keep combat for a selected but un-engaged target once the window lapses" do

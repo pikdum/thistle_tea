@@ -376,6 +376,22 @@ defmodule ThistleTea.Game.Entity.EventSink do
     entity
   end
 
+  def emit(%{object: %{guid: mob_guid}} = entity, %Event{type: :threat_ref_gained, target_guid: target_guid}) do
+    if Guid.entity_type(target_guid) == :player do
+      Entity.threat_ref_gained(target_guid, mob_guid)
+    end
+
+    entity
+  end
+
+  def emit(%{object: %{guid: mob_guid}} = entity, %Event{type: :threat_ref_lost, target_guid: target_guid}) do
+    if Guid.entity_type(target_guid) == :player do
+      Entity.threat_ref_lost(target_guid, mob_guid)
+    end
+
+    entity
+  end
+
   def emit(entity, %Event{type: :attacker_lost, target_guid: target_guid}) do
     Metadata.decrement(target_guid, :attacker_count, 0)
     entity

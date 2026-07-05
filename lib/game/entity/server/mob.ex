@@ -583,6 +583,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
       state
       |> mark_death_finalized()
+      |> Threat.wipe()
       |> EventAI.with_blackboard(&EventAI.on_death(&1, &2, killer, Time.now()))
       |> EventSink.emit_pending()
       |> maybe_decrement_on_death(killer)

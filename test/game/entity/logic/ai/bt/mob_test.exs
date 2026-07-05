@@ -396,7 +396,12 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
       assert state.unit.target == target_guid
       assert state.internal.in_combat == true
       assert state.internal.last_hostile_time == 1_000
-      assert [%Event{type: :attacker_gained, target_guid: ^target_guid}] = state.internal.events
+
+      assert [
+               %Event{type: :threat_ref_gained, target_guid: ^target_guid},
+               %Event{type: :attacker_gained, target_guid: ^target_guid}
+             ] = state.internal.events
+
       assert Metadata.query(target_guid, [:attacker_count]) == %{attacker_count: 0}
     end
 

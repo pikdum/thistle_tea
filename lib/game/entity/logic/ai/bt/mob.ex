@@ -588,12 +588,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
 
   @dynamic_flag_tapped 0x0004
 
-  defp clear_combat(
-         %Mob{unit: %Unit{target: target} = unit, internal: %Internal{} = internal} = state,
-         %Blackboard{} = blackboard
-       ) do
+  defp clear_combat(%Mob{} = state, %Blackboard{} = blackboard) do
+    %Mob{unit: %Unit{target: target} = unit, internal: %Internal{} = internal} = state = Threat.wipe(state)
     unit = %{unit | target: 0, dynamic_flags: Bitwise.band(unit.dynamic_flags || 0, Bitwise.bnot(@dynamic_flag_tapped))}
-    internal = %{internal | in_combat: false, threat: %{}, loot: clear_tap(internal.loot)}
+    internal = %{internal | in_combat: false, loot: clear_tap(internal.loot)}
 
     blackboard =
       blackboard
