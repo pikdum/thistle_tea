@@ -42,6 +42,8 @@ defmodule ThistleTea.Game.Network.Message.Dispatch do
               CMSG_NAME_QUERY: Message.CmsgNameQuery,
               CMSG_ITEM_QUERY_SINGLE: Message.CmsgItemQuerySingle,
               CMSG_ITEM_NAME_QUERY: Message.CmsgItemNameQuery,
+              CMSG_READ_ITEM: Message.CmsgReadItem,
+              CMSG_PAGE_TEXT_QUERY: Message.CmsgPageTextQuery,
               CMSG_GAMEOBJECT_QUERY: Message.CmsgGameobjectQuery,
               CMSG_CREATURE_QUERY: Message.CmsgCreatureQuery,
               CMSG_WHO: Message.CmsgWho,

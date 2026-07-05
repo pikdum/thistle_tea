@@ -22,6 +22,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
   alias ThistleTea.Game.World.Loader.Loot, as: LootLoader
   alias ThistleTea.Game.World.Loader.NpcText, as: NpcTextLoader
+  alias ThistleTea.Game.World.Loader.PageText, as: PageTextLoader
   alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Loader.Summon, as: SummonLoader
@@ -111,6 +112,7 @@ defmodule ThistleTea.Application do
     LootLoader.init()
     GraveyardLoader.init()
     NpcTextLoader.init()
+    PageTextLoader.init()
     SummonLoader.init()
     :ets.new(:spline_counters, [:named_table, :public, write_concurrency: :auto])
     :ets.insert(:spline_counters, {:spline_id, 0})
