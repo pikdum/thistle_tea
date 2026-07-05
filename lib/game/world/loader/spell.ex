@@ -359,6 +359,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp effect_type(18), do: :resurrect
   defp effect_type(24), do: :create_item
   defp effect_type(29), do: :leap
+  defp effect_type(33), do: :open_lock
   defp effect_type(38), do: :dispel
   defp effect_type(40), do: :dual_wield
   defp effect_type(60), do: :proficiency

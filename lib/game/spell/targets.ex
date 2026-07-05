@@ -4,13 +4,15 @@ defmodule ThistleTea.Game.Spell.Targets do
   unit guid and source/destination locations, and keeps the raw binary for
   echoing back in SMSG_SPELL_GO.
   """
-  import Bitwise, only: [&&&: 2]
+  import Bitwise, only: [&&&: 2, |||: 2]
 
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.BinaryUtils
 
   @self 0x00000000
   @unit 0x00000002
+  @object 0x00000800
+  @object_locked 0x00004000
   @source_location 0x00000020
   @destination_location 0x00000040
   @corpse 0x00008000
@@ -19,6 +21,7 @@ defmodule ThistleTea.Game.Spell.Targets do
     :flags,
     :raw,
     :unit_guid,
+    :object_guid,
     :source_location,
     :destination_location
   ]
@@ -59,13 +62,17 @@ defmodule ThistleTea.Game.Spell.Targets do
     {_rest, targets} =
       [
         {@unit, :unit_guid},
+        {@object ||| @object_locked, :object_guid},
         {@source_location, :source_location},
         {@destination_location, :destination_location},
         {@corpse, :corpse}
       ]
       |> Enum.reduce({rest, targets}, fn
         {@unit, :unit_guid}, {rest, acc} when (flags &&& @unit) > 0 ->
-          parse_unit(rest, acc)
+          parse_guid_field(rest, acc, :unit_guid)
+
+        {mask, :object_guid}, {rest, acc} when (flags &&& mask) > 0 ->
+          parse_guid_field(rest, acc, :object_guid)
 
         {@corpse, :corpse}, {rest, acc} when (flags &&& @corpse) > 0 ->
           parse_corpse(rest, acc)
@@ -80,9 +87,9 @@ defmodule ThistleTea.Game.Spell.Targets do
     targets
   end
 
-  defp parse_unit(rest, targets) do
+  defp parse_guid_field(rest, targets, field) do
     case unpack_guid(rest) do
-      {guid, rest} -> {rest, %{targets | unit_guid: guid}}
+      {guid, rest} -> {rest, Map.replace!(targets, field, guid)}
       :error -> {rest, targets}
     end
   end

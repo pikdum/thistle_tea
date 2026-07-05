@@ -40,6 +40,23 @@ defmodule ThistleTea.Game.Spell.TargetsTest do
       assert targets.unit_guid == nil
     end
 
+    test "object target unpacks the object guid" do
+      payload = <<0x0800::little-size(16)>> <> BinaryUtils.pack_guid(0xF110_0001)
+
+      targets = Targets.parse(payload, 123)
+
+      assert targets.object_guid == 0xF110_0001
+      assert targets.unit_guid == nil
+    end
+
+    test "locked object target unpacks the object guid" do
+      payload = <<0x4000::little-size(16)>> <> BinaryUtils.pack_guid(0xF110_0002)
+
+      targets = Targets.parse(payload, 123)
+
+      assert targets.object_guid == 0xF110_0002
+    end
+
     test "destination location parses ground-target coordinates" do
       payload =
         <<0x40::little-size(16)>> <>

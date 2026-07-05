@@ -140,12 +140,24 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
     |> queue_summon_objects(casting)
     |> queue_consume_reagents(casting)
     |> queue_consume_cast_item(casting)
+    |> queue_open_object(casting)
     |> mark_hostile_cast(casting, targets, now)
     |> apply_spell_hit(casting, hits, now)
     |> clear_cast()
   end
 
   def complete_cast(character, _casting, _now), do: character
+
+  defp queue_open_object(character, %Cast{spell: %Spell{} = spell, targets: %Targets{object_guid: object_guid}})
+       when is_integer(object_guid) do
+    if Enum.any?(spell.effects, &(&1.type == :open_lock)) do
+      Event.enqueue(character, Event.open_gameobject(object_guid))
+    else
+      character
+    end
+  end
+
+  defp queue_open_object(character, %Cast{}), do: character
 
   defp queue_consume_cast_item(character, %Cast{consume_item: true, cast_item_guid: item_guid})
        when is_integer(item_guid) do

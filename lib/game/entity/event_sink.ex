@@ -412,6 +412,14 @@ defmodule ThistleTea.Game.Entity.EventSink do
 
   def emit(entity, %Event{type: :consume_cast_item}), do: entity
 
+  def emit(%Character{} = entity, %Event{type: :open_gameobject, target_guid: object_guid})
+      when is_integer(object_guid) do
+    send(self(), {:open_gameobject_loot, object_guid})
+    entity
+  end
+
+  def emit(entity, %Event{type: :open_gameobject}), do: entity
+
   def emit(%Character{} = entity, %Event{type: :create_item, item_id: item_id, count: count}) do
     send(self(), {:create_item, item_id, count})
     entity

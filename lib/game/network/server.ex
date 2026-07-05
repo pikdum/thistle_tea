@@ -41,6 +41,7 @@ defmodule ThistleTea.Game.Network.Server do
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.Party.MemberStats
   alias ThistleTea.Game.Party.Notifier, as: PartyNotifier
+  alias ThistleTea.Game.Player.GameObjects, as: PlayerGameObjects
   alias ThistleTea.Game.Player.Items
   alias ThistleTea.Game.Player.Quests
   alias ThistleTea.Game.Player.Spellcasting
@@ -382,6 +383,16 @@ defmodule ThistleTea.Game.Network.Server do
   rescue
     error ->
       Logger.error("create_item crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:noreply, {socket, state}, socket.read_timeout}
+  end
+
+  @impl GenServer
+  def handle_info({:open_gameobject_loot, object_guid}, {socket, state}) do
+    state = PlayerGameObjects.open_chest(state, object_guid)
+    {:noreply, {socket, state}, socket.read_timeout}
+  rescue
+    error ->
+      Logger.error("open_gameobject_loot crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
       {:noreply, {socket, state}, socket.read_timeout}
   end
 

@@ -145,6 +145,29 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
              ] = mob.internal.events
     end
 
+    test "queues an open-gameobject event for open-lock casts at objects" do
+      spell = %Spell{id: 6478, effects: [%Effect{index: 0, type: :open_lock}]}
+
+      casting = %Cast{
+        spell: spell,
+        targets: %Targets{raw: <<0x4000::little-size(16)>>, object_guid: 0xF110_0001},
+        ends_at: Time.now()
+      }
+
+      mob = %Mob{
+        object: %Object{guid: 1},
+        unit: %Unit{health: 100, max_health: 100},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+        internal: %Internal{map: 0, casting: casting}
+      }
+
+      mob = SpellBT.complete_cast(mob, casting, 1_000)
+
+      assert Enum.any?(mob.internal.events, fn event ->
+               event.type == :open_gameobject and event.target_guid == 0xF110_0001
+             end)
+    end
+
     test "queues self spell hit events after spell go" do
       spell = %Spell{id: 133, school: :fire, effects: [%Effect{type: :school_damage, base_points: 5, die_sides: 0}]}
 
