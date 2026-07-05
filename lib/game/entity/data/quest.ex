@@ -103,6 +103,12 @@ defmodule ThistleTea.Game.Entity.Data.Quest do
   def auto_complete?(%__MODULE__{method: 0}), do: true
   def auto_complete?(%__MODULE__{}), do: false
 
+  @special_flag_exploration_or_event 0x2
+
+  def exploration?(%__MODULE__{special_flags: special_flags}) do
+    Bitwise.band(special_flags || 0, @special_flag_exploration_or_event) != 0
+  end
+
   defp id_count_pairs(row, id_prefix, count_prefix, slots) do
     Enum.flat_map(1..slots, fn i ->
       id = Map.get(row, :"#{id_prefix}#{i}") || 0

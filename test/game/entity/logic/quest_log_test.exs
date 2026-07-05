@@ -131,6 +131,39 @@ defmodule ThistleTea.Game.Entity.Logic.QuestLogTest do
 
       assert {_quest_log, :completed} = QuestLog.evaluate(quest_log, quest, fn _id -> 0 end)
     end
+
+    test "exploration quests stay incomplete until explored" do
+      quest = %Quest{id: 62, special_flags: 2}
+      {:ok, quest_log} = QuestLog.add(%{}, 62)
+
+      assert {^quest_log, :unchanged} = QuestLog.evaluate(quest_log, quest, fn _id -> 0 end)
+      assert %Entry{status: :incomplete} = QuestLog.get(quest_log, 62)
+
+      {:ok, quest_log} = QuestLog.mark_explored(quest_log, 62)
+
+      assert {quest_log, :completed} = QuestLog.evaluate(quest_log, quest, fn _id -> 0 end)
+      assert %Entry{status: :complete, explored?: true} = QuestLog.get(quest_log, 62)
+    end
+
+    test "exploration quests with item objectives need both" do
+      quest = %Quest{id: 62, special_flags: 2, required_items: [{0, 750, 2}]}
+      {:ok, quest_log} = QuestLog.add(%{}, 62)
+      {:ok, quest_log} = QuestLog.mark_explored(quest_log, 62)
+
+      assert {^quest_log, :unchanged} = QuestLog.evaluate(quest_log, quest, fn 750 -> 1 end)
+      assert {_quest_log, :completed} = QuestLog.evaluate(quest_log, quest, fn 750 -> 2 end)
+    end
+  end
+
+  describe "mark_explored/2" do
+    test "errors for missing or already-explored quests" do
+      assert QuestLog.mark_explored(%{}, 62) == {:error, :not_active}
+
+      {:ok, quest_log} = QuestLog.add(%{}, 62)
+      {:ok, quest_log} = QuestLog.mark_explored(quest_log, 62)
+
+      assert QuestLog.mark_explored(quest_log, 62) == {:error, :no_change}
+    end
   end
 
   describe "slot_binary/1" do

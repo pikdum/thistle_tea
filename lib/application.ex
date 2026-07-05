@@ -14,6 +14,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.World.EntitySupervisor
   alias ThistleTea.Game.World.Groups
   alias ThistleTea.Game.World.ItemStore
+  alias ThistleTea.Game.World.Loader.AreaTrigger, as: AreaTriggerLoader
   alias ThistleTea.Game.World.Loader.ClassSpell, as: ClassSpellLoader
   alias ThistleTea.Game.World.Loader.CreatureTemplate, as: CreatureTemplateLoader
   alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
@@ -113,6 +114,7 @@ defmodule ThistleTea.Application do
     GraveyardLoader.init()
     NpcTextLoader.init()
     PageTextLoader.init()
+    AreaTriggerLoader.init()
     SummonLoader.init()
     :ets.new(:spline_counters, [:named_table, :public, write_concurrency: :auto])
     :ets.insert(:spline_counters, {:spline_id, 0})

@@ -350,6 +350,19 @@ defmodule ThistleTea.Game.Player.Quests do
     })
   end
 
+  def explore_area(%{character: %Character{} = character} = state, quest_id) do
+    player = character.player
+
+    with %Quest{} = quest <- QuestLoader.get(quest_id),
+         true <- Quest.exploration?(quest),
+         {:ok, quest_log} <- QuestLog.mark_explored(player.quest_log, quest_id) do
+      {quest_log, _event} = complete_check(quest_log, quest, player)
+      put_character(state, %{character | player: %{player | quest_log: quest_log}})
+    else
+      _other -> state
+    end
+  end
+
   def credit_kill(%{character: %Character{} = character} = state, victim_guid) do
     creature_entry = Guid.entry(victim_guid)
     player = character.player

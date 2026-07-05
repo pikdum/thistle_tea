@@ -16,7 +16,7 @@ defmodule ThistleTea.Game.Entity.Logic.QuestLog do
 
   defmodule Entry do
     @moduledoc false
-    defstruct [:quest_id, status: :incomplete, counts: %{}]
+    defstruct [:quest_id, status: :incomplete, counts: %{}, explored?: false]
   end
 
   def max_slots, do: @max_slots
@@ -57,7 +57,7 @@ defmodule ThistleTea.Game.Entity.Logic.QuestLog do
     end
   end
 
-  def objectives_satisfied?(%Quest{} = quest, %Entry{counts: counts}, item_count_fn) do
+  def objectives_satisfied?(%Quest{} = quest, %Entry{counts: counts} = entry, item_count_fn) do
     kills_satisfied =
       Enum.all?(quest.required_kills, fn {index, _entry, required} ->
         Map.get(counts, index, 0) >= required
@@ -68,7 +68,22 @@ defmodule ThistleTea.Game.Entity.Logic.QuestLog do
         item_count_fn.(item_id) >= required
       end)
 
-    kills_satisfied and items_satisfied
+    exploration_satisfied = not Quest.exploration?(quest) or entry.explored?
+
+    kills_satisfied and items_satisfied and exploration_satisfied
+  end
+
+  def mark_explored(quest_log, quest_id) do
+    case get(quest_log, quest_id) do
+      %Entry{status: :incomplete, explored?: false} ->
+        update(quest_log, quest_id, fn entry -> %{entry | explored?: true} end)
+
+      %Entry{} ->
+        {:error, :no_change}
+
+      nil ->
+        {:error, :not_active}
+    end
   end
 
   defp transition(quest_log, %Quest{} = quest, status) do
