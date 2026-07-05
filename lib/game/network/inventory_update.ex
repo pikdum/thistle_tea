@@ -23,35 +23,39 @@ defmodule ThistleTea.Game.Network.InventoryUpdate do
   end
 
   def apply(state, {:ok, %{player: %Player{} = player, items: items} = result}) do
-    old_player = state.character.player
+    old_counts = Quests.quest_item_counts(state.character)
+    destroyed = Map.get(result, :destroyed, [])
 
-    Enum.each(Map.get(result, :destroyed, []), fn item ->
-      ItemStore.delete(item.object.guid)
-      Network.send_packet(%Message.SmsgDestroyObject{guid: item.object.guid})
-    end)
-
-    Enum.each(items, fn item ->
-      ItemStore.put(item)
-
-      item
-      |> UpdateObject.item_values_update()
-      |> Network.send_packet()
-    end)
+    Enum.each(destroyed, fn item -> ItemStore.delete(item.object.guid) end)
+    Enum.each(items, fn item -> ItemStore.put(item) end)
 
     character =
       %{state.character | player: player}
       |> Character.sync_equipment_stats()
 
+    state =
+      state
+      |> Map.put(:character, character)
+      |> Quests.on_inventory_changed(old_counts)
+
+    Enum.each(destroyed, fn item ->
+      Network.send_packet(%Message.SmsgDestroyObject{guid: item.object.guid})
+    end)
+
+    Enum.each(items, fn item ->
+      item
+      |> UpdateObject.item_values_update()
+      |> Network.send_packet()
+    end)
+
     %UpdateObject{
       update_type: :values,
       object_type: :player
     }
-    |> struct(Map.from_struct(character))
-    |> World.broadcast_packet(character)
+    |> struct(Map.from_struct(state.character))
+    |> World.broadcast_packet(state.character)
 
     state
-    |> Map.put(:character, character)
-    |> Quests.on_inventory_changed(old_player)
   end
 
   def apply(state, {:error, error, item1_guid, item2_guid}) do

@@ -394,7 +394,16 @@ defmodule ThistleTea.Game.Player.Quests do
     end
   end
 
-  def on_inventory_changed(%{character: %Character{} = character} = state, old_player) do
+  def quest_item_counts(%Character{player: player}) do
+    player
+    |> active_quests()
+    |> Enum.flat_map(fn quest -> quest.required_items end)
+    |> Enum.map(fn {_index, item_id, _required} -> item_id end)
+    |> Enum.uniq()
+    |> Map.new(fn item_id -> {item_id, Inventory.count_entry(player, item_id, &ItemStore.get/1)} end)
+  end
+
+  def on_inventory_changed(%{character: %Character{} = character} = state, old_counts) do
     player = character.player
 
     quests =
@@ -405,7 +414,7 @@ defmodule ThistleTea.Game.Player.Quests do
     if quests == [] do
       state
     else
-      send_item_progress(quests, player, old_player)
+      send_item_progress(quests, player, old_counts)
 
       {quest_log, changed?} =
         Enum.reduce(quests, {player.quest_log, false}, fn quest, {quest_log, changed?} ->
@@ -426,15 +435,13 @@ defmodule ThistleTea.Game.Player.Quests do
 
   defp send_item_progress(_quests, _player, nil), do: :ok
 
-  defp send_item_progress(quests, player, old_player) do
+  defp send_item_progress(quests, player, old_counts) do
     quests
     |> Enum.flat_map(fn quest -> quest.required_items end)
     |> Enum.map(fn {_index, item_id, _required} -> item_id end)
     |> Enum.uniq()
     |> Enum.each(fn item_id ->
-      delta =
-        Inventory.count_entry(player, item_id, &ItemStore.get/1) -
-          Inventory.count_entry(old_player, item_id, &ItemStore.get/1)
+      delta = Inventory.count_entry(player, item_id, &ItemStore.get/1) - Map.get(old_counts, item_id, 0)
 
       if delta > 0 do
         Network.send_packet(%Message.SmsgQuestupdateAddItem{item_id: item_id, count: delta})
