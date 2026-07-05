@@ -30,7 +30,7 @@ jobs:
       - name: fetch namigator (C++ NIF source)
         run: |
           git clone https://github.com/pikdum/namigator "$RUNNER_TEMP/namigator"
-          git -C "$RUNNER_TEMP/namigator" checkout 814aff664c1b1059bff141efe7185ed5115886e2
+          git -C "$RUNNER_TEMP/namigator" checkout 3ffc08cdbb0266f00c4d79a705d20e8e7c5ba8a5
           git -C "$RUNNER_TEMP/namigator" submodule update --init recastnavigation
           echo "NAMIGATOR_SRC=$RUNNER_TEMP/namigator" >> "$GITHUB_ENV"
       - run: mix compile

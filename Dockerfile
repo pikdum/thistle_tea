@@ -5,7 +5,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends g++ make git \
     && rm -rf /var/lib/apt/lists/*
 # the Fine C++ NIF compiles against namigator (rev matches flake.nix namigator-src)
 RUN git clone https://github.com/pikdum/namigator /opt/namigator \
-    && git -C /opt/namigator checkout 814aff664c1b1059bff141efe7185ed5115886e2 \
+    && git -C /opt/namigator checkout 3ffc08cdbb0266f00c4d79a705d20e8e7c5ba8a5 \
     && git -C /opt/namigator submodule update --init recastnavigation
 ENV NAMIGATOR_SRC=/opt/namigator
 WORKDIR /app
