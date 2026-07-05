@@ -1,7 +1,59 @@
 defmodule ThistleTea.Game.Player.StatsTest do
   use ExUnit.Case, async: true
 
+  alias ThistleTea.Game.Entity.Data.Character
+  alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.Entity.Data.Component.Player
+  alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Logic.Skills
   alias ThistleTea.Game.Player.Stats
+
+  describe "apply/2" do
+    test "raises level-ranged skill caps to the new level" do
+      character = %Character{
+        unit: %Unit{
+          race: 1,
+          class: 1,
+          level: 1,
+          health: 50,
+          max_health: 50,
+          base_strength: 10,
+          base_agility: 10,
+          base_stamina: 10,
+          base_intellect: 10,
+          base_spirit: 10,
+          base_health: 50,
+          base_mana: 0,
+          min_damage: 1.0,
+          max_damage: 2.0,
+          base_attack_time: 2000,
+          offhand_attack_time: 2000
+        },
+        player: %Player{skills: %{43 => Skills.new_entry(:level, false, 1), 415 => Skills.new_entry(:mono, false, 1)}},
+        internal: %Internal{}
+      }
+
+      stats = %Stats{
+        race: 1,
+        class: 1,
+        level: 6,
+        strength: 12,
+        agility: 12,
+        stamina: 12,
+        intellect: 12,
+        spirit: 12,
+        base_health: 100,
+        base_mana: 0,
+        next_level_xp: 100
+      }
+
+      character = Stats.apply(character, stats)
+
+      assert character.player.skills[43].max == 30
+      assert character.player.skills[43].value == 1
+      assert character.player.skills[415] == Skills.new_entry(:mono, false, 1)
+    end
+  end
 
   describe "melee_attack_power/4" do
     test "warrior scales with level and strength" do

@@ -73,15 +73,10 @@ defmodule ThistleTea.Game.Player.Stats do
     character =
       character
       |> __MODULE__.apply(new_stats)
-      |> level_up_skills(new_level)
       |> Character.sync_equipment_stats()
       |> Character.restore_health_and_mana()
 
     {character, level_delta(old_stats, new_stats)}
-  end
-
-  defp level_up_skills(%Character{player: player} = character, new_level) do
-    %{character | player: %{player | skills: Skills.on_level_up(player.skills, new_level)}}
   end
 
   def apply(%Character{unit: %Unit{} = unit, player: %Player{} = player} = character, %__MODULE__{} = stats) do
@@ -100,7 +95,11 @@ defmodule ThistleTea.Game.Player.Stats do
       })
       |> LogicStats.recompute()
 
-    player = %{player | next_level_xp: stats.next_level_xp}
+    player = %{
+      player
+      | next_level_xp: stats.next_level_xp,
+        skills: Skills.on_level_up(player.skills, stats.level)
+    }
 
     %{character | unit: unit, player: player}
     |> CombatRatings.sync()
