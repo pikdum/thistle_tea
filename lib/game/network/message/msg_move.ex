@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Network.Message.MsgMove do
   alias ThistleTea.Game.Network.ClientMessage
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Packet
+  alias ThistleTea.Game.Player.Rest, as: PlayerRest
   alias ThistleTea.Game.Player.Spellcasting
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.AggroProbe
@@ -53,6 +54,7 @@ defmodule ThistleTea.Game.Network.Message.MsgMove do
 
           %{state | character: character}
           |> Spellcasting.cancel(@spell_failed_moving)
+          |> PlayerRest.check_tavern_exit()
         else
           %{state | character: character}
         end

@@ -25,6 +25,7 @@ defmodule ThistleTea.Game.Network.Server do
   alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Entity.Logic.MovementStats
   alias ThistleTea.Game.Entity.Logic.PlayerCombat
+  alias ThistleTea.Game.Entity.Logic.Rest
   alias ThistleTea.Game.Entity.Logic.SpellEffect
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network
@@ -495,14 +496,17 @@ defmodule ThistleTea.Game.Network.Server do
   defp apply_kill_reward(state, victim, xp) do
     state =
       if xp > 0 do
+        {character, rested_bonus} = Rest.spend(state.character, xp, Time.now())
+        total_xp = xp + rested_bonus
+
         Network.send_packet(%Message.SmsgLogXpgain{
           target: victim.object.guid,
-          total_exp: xp,
+          total_exp: total_xp,
           exp_type: :kill,
           experience_without_rested: xp
         })
 
-        {character, level_ups} = PlayerStats.gain_xp(state.character, xp)
+        {character, level_ups} = PlayerStats.gain_xp(character, total_xp)
         send_level_ups(level_ups)
         CharacterStore.put(character)
 

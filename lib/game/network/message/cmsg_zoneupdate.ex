@@ -3,6 +3,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgZoneupdate do
   use ThistleTea.Game.Network.ClientMessage, :CMSG_ZONEUPDATE
 
   alias ThistleTea.Game.Party.Notifier, as: PartyNotifier
+  alias ThistleTea.Game.Player.Rest, as: PlayerRest
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.Pathfinding
 
@@ -14,11 +15,11 @@ defmodule ThistleTea.Game.Network.Message.CmsgZoneupdate do
     {x, y, z, _o} = character.movement_block.position
 
     case Pathfinding.get_zone_and_area(map, {x, y, z}) do
-      {_zone, area} when area != current_area ->
+      {zone, area} when area != current_area ->
         character = %{character | internal: %{character.internal | area: area}}
         CharacterStore.put(character)
         PartyNotifier.broadcast_stats(state.guid, character)
-        %{state | character: character}
+        PlayerRest.update_zone(%{state | character: character}, zone)
 
       _ ->
         state

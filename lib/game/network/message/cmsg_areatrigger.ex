@@ -4,6 +4,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgAreatrigger do
 
   alias ThistleTea.Game.Entity.Logic.Death
   alias ThistleTea.Game.Player.Quests
+  alias ThistleTea.Game.Player.Rest, as: PlayerRest
   alias ThistleTea.Game.World.Loader.AreaTrigger, as: AreaTriggerLoader
 
   @trigger_range_delta 5.0
@@ -25,6 +26,16 @@ defmodule ThistleTea.Game.Network.Message.CmsgAreatrigger do
   def handle(_message, state), do: state
 
   defp handle_trigger(state, c, trigger_id) do
+    state = maybe_explore_quest(state, c, trigger_id)
+
+    if AreaTriggerLoader.tavern?(trigger_id) do
+      PlayerRest.enter_tavern(state, trigger_id)
+    else
+      state
+    end
+  end
+
+  defp maybe_explore_quest(state, c, trigger_id) do
     quest_id = AreaTriggerLoader.quest_for(trigger_id)
 
     if is_integer(quest_id) and Death.alive?(c) do

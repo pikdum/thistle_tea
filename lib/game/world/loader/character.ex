@@ -99,7 +99,7 @@ defmodule ThistleTea.Game.World.Loader.Character do
         hair_style: params.hair_style,
         hair_color: params.hair_color,
         facial_hair: params.facial_hair,
-        rest_state: 1,
+        rest_state: 2,
         xp: 0,
         next_level_xp: stats.next_level_xp,
         rest_state_experience: 0,
