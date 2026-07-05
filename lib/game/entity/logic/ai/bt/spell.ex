@@ -135,7 +135,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
     |> Resources.spend_power(casting.spell, now)
     |> start_cooldown(casting, now)
     |> queue_cast_result(casting)
-    |> queue_spell_go(casting, hits, misses)
+    |> queue_spell_go(casting, hits ++ object_hits(casting), misses)
     |> queue_area_effects(casting)
     |> queue_summon_objects(casting)
     |> queue_consume_reagents(casting)
@@ -158,6 +158,12 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
   end
 
   defp queue_open_object(character, %Cast{}), do: character
+
+  defp object_hits(%Cast{targets: %Targets{object_guid: object_guid}}) when is_integer(object_guid) do
+    [object_guid]
+  end
+
+  defp object_hits(%Cast{}), do: []
 
   defp queue_consume_cast_item(character, %Cast{consume_item: true, cast_item_guid: item_guid})
        when is_integer(item_guid) do

@@ -166,6 +166,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
       assert Enum.any?(mob.internal.events, fn event ->
                event.type == :open_gameobject and event.target_guid == 0xF110_0001
              end)
+
+      assert Enum.any?(mob.internal.events, fn event ->
+               event.type == :spell_go and event.hit_guids == [0xF110_0001]
+             end)
     end
 
     test "queues self spell hit events after spell go" do
