@@ -11,6 +11,7 @@ defmodule ThistleTea.DevSeed do
   alias ThistleTea.DB.Mangos
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Mob
+  alias ThistleTea.Game.Entity.Logic.Skills
   alias ThistleTea.Game.Entity.Logic.SpellBook
   alias ThistleTea.Game.Network.Message.CmsgCharCreate
   alias ThistleTea.Game.Player.Characters
@@ -19,6 +20,7 @@ defmodule ThistleTea.DevSeed do
   alias ThistleTea.Game.World.Loader.Character, as: CharacterLoader
   alias ThistleTea.Game.World.Loader.ClassSpell
   alias ThistleTea.Game.World.Loader.Mob, as: MobLoader
+  alias ThistleTea.Game.World.Loader.Skill, as: SkillLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Pathfinding
 
@@ -91,6 +93,7 @@ defmodule ThistleTea.DevSeed do
     |> CharacterLoader.build(account_id)
     |> set_level(@level)
     |> learn_class_spells()
+    |> max_skills()
     |> set_coinage(@coinage)
     |> move_to_isle()
     |> Characters.create()
@@ -129,6 +132,17 @@ defmodule ThistleTea.DevSeed do
     {all_ids, _events} = SpellBook.learn(existing, new_ids, superseded_by)
 
     %{character | internal: %{internal | spells: all_ids}}
+  end
+
+  defp max_skills(%Character{unit: unit, player: player, internal: internal} = character) do
+    derived = SkillLoader.initial_skills(internal.spells, unit.race, unit.class, unit.level)
+
+    skills =
+      derived
+      |> Map.merge(player.skills || %{})
+      |> Skills.max_out()
+
+    %{character | player: %{player | skills: skills}}
   end
 
   defp set_coinage(%Character{player: player} = character, coinage) do

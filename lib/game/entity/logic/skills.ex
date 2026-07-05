@@ -62,6 +62,15 @@ defmodule ThistleTea.Game.Entity.Logic.Skills do
 
   def on_level_up(skills, _level), do: skills
 
+  def max_out(skills) when is_map(skills) do
+    Map.new(skills, fn
+      {id, %{range: :level} = entry} -> {id, %{entry | value: entry.max}}
+      {id, entry} -> {id, entry}
+    end)
+  end
+
+  def max_out(skills), do: skills
+
   defp level_up_entry(entry, level) do
     max = max_for_level(level)
     value = if entry.always_max?, do: max, else: min(entry.value, max)

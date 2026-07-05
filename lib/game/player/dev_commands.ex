@@ -19,6 +19,7 @@ defmodule ThistleTea.Game.Player.DevCommands do
   alias ThistleTea.Game.Entity.Logic.Proficiency
   alias ThistleTea.Game.Entity.Logic.QuestLog
   alias ThistleTea.Game.Entity.Logic.Rest
+  alias ThistleTea.Game.Entity.Logic.Skills
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
@@ -35,6 +36,7 @@ defmodule ThistleTea.Game.Player.DevCommands do
   alias ThistleTea.Game.World.Loader.ClassSpell
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
   alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader
+  alias ThistleTea.Game.World.Loader.Skill, as: SkillLoader
   alias ThistleTea.Game.World.Metadata
 
   require Logger
@@ -69,6 +71,7 @@ defmodule ThistleTea.Game.Player.DevCommands do
       ".additem <item_id> [count] - add an item to your inventory",
       ".addquest <quest_id> - add a quest to your quest log",
       ".debug random equipment - add a random player-obtainable equipment set",
+      ".debug skills - max out known skills for your level",
       ".debug spells - learn class trainer spells up to your level",
       ".character level <level> - set player level",
       ".die - kill your character",
@@ -171,6 +174,12 @@ defmodule ThistleTea.Game.Player.DevCommands do
     state
     |> debug_spell_ids()
     |> then(&learn_spells(state, &1, "Already know all debug spells."))
+    |> handled()
+  end
+
+  def run(state, ".debug skills" <> _) do
+    state
+    |> max_skills()
     |> handled()
   end
 
@@ -523,6 +532,21 @@ defmodule ThistleTea.Game.Player.DevCommands do
   defp put_character(state, %Character{} = character) do
     CharacterStore.put(character)
     Server.maybe_broadcast_update(%{state | character: Core.mark_broadcast_update(character)})
+  end
+
+  defp max_skills(%{character: %Character{unit: unit, player: player, internal: internal} = character} = state) do
+    derived = SkillLoader.initial_skills(internal.spells, unit.race, unit.class, unit.level)
+
+    skills =
+      derived
+      |> Map.merge(player.skills || %{})
+      |> Skills.max_out()
+
+    character = %{character | player: %{player | skills: skills}}
+
+    state
+    |> put_character(character)
+    |> system_message("Skills maxed for level #{unit.level}.")
   end
 
   defp maybe_send_level_up(state, nil), do: state
