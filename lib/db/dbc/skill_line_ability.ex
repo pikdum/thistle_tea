@@ -9,5 +9,6 @@ defmodule SkillLineAbility do
     field(:class_mask, :integer)
     field(:min_skill_line_rank, :integer)
     field(:superseded_by, :integer)
+    field(:acquire_method, :integer)
   end
 end

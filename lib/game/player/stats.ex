@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Player.Stats do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.CombatRatings
   alias ThistleTea.Game.Entity.Logic.Experience
+  alias ThistleTea.Game.Entity.Logic.Skills
   alias ThistleTea.Game.Entity.Logic.Stats, as: LogicStats
 
   defstruct [
@@ -72,10 +73,15 @@ defmodule ThistleTea.Game.Player.Stats do
     character =
       character
       |> __MODULE__.apply(new_stats)
+      |> level_up_skills(new_level)
       |> Character.sync_equipment_stats()
       |> Character.restore_health_and_mana()
 
     {character, level_delta(old_stats, new_stats)}
+  end
+
+  defp level_up_skills(%Character{player: player} = character, new_level) do
+    %{character | player: %{player | skills: Skills.on_level_up(player.skills, new_level)}}
   end
 
   def apply(%Character{unit: %Unit{} = unit, player: %Player{} = player} = character, %__MODULE__{} = stats) do

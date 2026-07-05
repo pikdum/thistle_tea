@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
   """
   import Bitwise, only: [band: 2, bnot: 1, bor: 2, &&&: 2, >>>: 2]
 
+  alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
   alias ThistleTea.Game.Entity.Data.Component.Unit
@@ -13,6 +14,7 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Event
+  alias ThistleTea.Game.Entity.Logic.Skills
   alias ThistleTea.Game.Math
 
   @default_attack_speed_ms 2000
@@ -138,10 +140,30 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
         {entity, []}
       end
 
+    entity = maybe_defense_skill_up(entity, attack, opts)
+
     {entity, [event | reaction_events]}
   end
 
   def receive_attack(entity, _attack, _now, _opts), do: {entity, []}
+
+  defp maybe_defense_skill_up(%Character{unit: unit, player: player} = entity, attack, opts) do
+    skill_up_opts = [
+      player_level: unit.level || 1,
+      mob_level: Map.get(attack, :caster_level) || unit.level || 1,
+      defense?: true,
+      roll: Keyword.get(opts, :skill_roll, fn chance -> :rand.uniform() * 100.0 < chance end)
+    ]
+
+    with false <- Map.get(attack, :caster_player?, false),
+         {:gained, skills} <- Skills.combat_skill_up(player.skills, Skills.defense_skill(), skill_up_opts) do
+      Core.mark_broadcast_update(%{entity | player: %{player | skills: skills}})
+    else
+      _no_gain -> entity
+    end
+  end
+
+  defp maybe_defense_skill_up(entity, _attack, _opts), do: entity
 
   defp attack_school(%{spell_school_mask: mask}) when is_integer(mask) and mask > 1 do
     index = Enum.find(1..6, 0, fn i -> (mask >>> i &&& 1) == 1 end)

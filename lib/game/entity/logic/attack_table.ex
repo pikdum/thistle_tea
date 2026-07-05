@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
   alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.CombatRatings
+  alias ThistleTea.Game.Entity.Logic.Skills
   alias ThistleTea.Game.Math
 
   @hitinfo_affects_victim 0x2
@@ -78,7 +79,8 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
     defender_level = unit.level || 1
     defender_player? = player?(defender)
     caster_level = positive_or(Map.get(attack, :caster_level), defender_level)
-    skill_diff = (caster_level - defender_level) * 5
+    attack_skill = positive_or(Map.get(attack, :caster_attack_skill), caster_level * 5)
+    skill_diff = attack_skill - defense_skill(defender, defender_level)
 
     %{
       caster_level: caster_level,
@@ -400,6 +402,16 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
   defp defender_unit(_defender), do: %Unit{}
 
   defp player?(entity), do: is_map(Map.get(entity, :player))
+
+  defp defense_skill(entity, level) do
+    case Map.get(entity, :player) do
+      %{skills: skills} when is_map(skills) and map_size(skills) > 0 ->
+        Skills.value(skills, Skills.defense_skill(), level * 5)
+
+      _not_player ->
+        level * 5
+    end
+  end
 
   defp physical_school?(mask) when is_integer(mask) and mask > 0, do: (mask &&& 0x1) != 0
   defp physical_school?(_mask), do: true

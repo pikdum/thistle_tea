@@ -7,17 +7,22 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Data.ItemTemplate
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AttackTable
   alias ThistleTea.Game.Entity.Logic.Combat, as: CombatLogic
+  alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.Entity.Logic.MeleeSpell
   alias ThistleTea.Game.Entity.Logic.PlayerCombat
   alias ThistleTea.Game.Entity.Logic.Resources
+  alias ThistleTea.Game.Entity.Logic.Skills
+  alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.BinaryUtils
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
+  alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
   alias ThistleTea.Game.World.Metadata
 
   @attack_retry_delay_ms 100
@@ -144,6 +149,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
 
     state =
       state
+      |> maybe_weapon_skill_up(target)
       |> Resources.spend_power(queued_spell, Time.now())
       |> Resources.gain_outgoing_auto_attack_rage(attack)
       |> queue_self_update()
@@ -159,9 +165,40 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
     attack =
       %{caster: guid, min_damage: min_damage, max_damage: max_damage}
       |> Map.merge(AttackTable.attacker_context(state))
+      |> Map.merge(attack_skill_context(state))
 
     {state, MeleeSpell.apply_to_attack(attack, queued_spell), queued_spell}
   end
+
+  defp attack_skill_context(%Character{unit: unit, player: player}) when is_struct(player) do
+    default = Skills.max_for_level(unit.level || 1)
+    %{caster_attack_skill: Skills.value(player.skills, weapon_skill_id(player), default)}
+  end
+
+  defp attack_skill_context(_state), do: %{}
+
+  defp weapon_skill_id(player) do
+    with entry when is_integer(entry) and entry > 0 <- player.visible_item_16_0,
+         %ItemTemplate{class: 2, subclass: subclass} <- ItemLoader.get_template(entry),
+         skill when is_integer(skill) <- Skills.weapon_skill_for_subclass(subclass) do
+      skill
+    else
+      _unarmed -> Skills.unarmed_skill()
+    end
+  end
+
+  defp maybe_weapon_skill_up(%Character{unit: unit, player: player} = state, target) when is_struct(player) do
+    opts = [player_level: unit.level || 1, intellect: unit.intellect || 0]
+
+    with false <- Guid.entity_type(target) == :player,
+         {:gained, skills} <- Skills.combat_skill_up(player.skills, weapon_skill_id(player), opts) do
+      Core.mark_broadcast_update(%{state | player: %{player | skills: skills}})
+    else
+      _no_gain -> state
+    end
+  end
+
+  defp maybe_weapon_skill_up(state, _target), do: state
 
   defp queue_queued_spell_go(%{object: %{guid: guid}} = state, %{id: spell_id}, target)
        when is_integer(guid) and is_integer(spell_id) and is_integer(target) do

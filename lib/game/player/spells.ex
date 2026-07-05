@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Player.Spells do
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World.CharacterStore
+  alias ThistleTea.Game.World.Loader.Skill, as: SkillLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
 
   def learn(%Character{internal: internal} = character, spell_ids) do
@@ -22,12 +23,22 @@ defmodule ThistleTea.Game.Player.Spells do
 
       {all_ids, events} ->
         spellbook = SpellLoader.build_spellbook(all_ids)
-        character = %{character | internal: %{internal | spells: all_ids, spellbook: spellbook}}
+
+        character =
+          %{character | internal: %{internal | spells: all_ids, spellbook: spellbook}}
+          |> learn_skills()
+
         CharacterStore.put(character)
         Enum.each(events, &send_event_packet/1)
         send_proficiencies(character)
         {:ok, character, events}
     end
+  end
+
+  defp learn_skills(%Character{unit: unit, player: player, internal: internal} = character) do
+    new_skills = SkillLoader.initial_skills(internal.spells, unit.race, unit.class, unit.level)
+    skills = Map.merge(new_skills, player.skills || %{})
+    %{character | player: %{player | skills: skills}}
   end
 
   def send_proficiencies(%Character{internal: internal}) do

@@ -234,7 +234,8 @@ defmodule ThistleTea.Game.Entity.Data.Component.Player do
     xp: {0x02CC, 1, :int, :private},
     # 32? 16? keyrings after buyback?
     next_level_xp: {0x02CD, 1, :int, :private},
-    skill_info: {0x02CE, 384, :custom, :private},
+    skill_info: {0x02CE, 384, {:fn, [:skills], &__MODULE__.skill_info/1}, :private},
+    skills: {:virtual, %{}},
     character_points1: {0x044E, 1, :int, :private},
     character_points2: {0x044F, 1, :int, :private},
     track_creatures: {0x0450, 1, :int, :private},
@@ -307,6 +308,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.Player do
     combat_rating: {0x04EE, 20, :int, :private}
 
   alias ThistleTea.Game.Entity.Logic.QuestLog
+  alias ThistleTea.Game.Entity.Logic.Skills
   alias ThistleTea.Game.Network.UpdateObject
 
   for n <- 1..20 do
@@ -332,6 +334,8 @@ defmodule ThistleTea.Game.Entity.Data.Component.Player do
       {8, rest_state}
     ])
   end
+
+  def skill_info(%{skills: skills}), do: Skills.encode(skills)
 
   def bytes_3(%{
         gender: gender,

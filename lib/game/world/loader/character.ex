@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.World.Loader.Character do
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Player.Stats
+  alias ThistleTea.Game.World.Loader.Skill, as: SkillLoader
 
   @unit_flag_player_controlled 0x00000008
   @unit_flag_use_swim_animation 0x00008000
@@ -102,7 +103,8 @@ defmodule ThistleTea.Game.World.Loader.Character do
         xp: 0,
         next_level_xp: stats.next_level_xp,
         rest_state_experience: 0,
-        coinage: 0
+        coinage: 0,
+        skills: SkillLoader.initial_skills(spells, params.race, params.class, stats.level)
       },
       movement_block:
         Map.merge(
