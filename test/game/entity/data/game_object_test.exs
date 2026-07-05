@@ -56,4 +56,59 @@ defmodule ThistleTea.Game.Entity.Data.GameObjectTest do
       assert go.internal.summon.charges == nil
     end
   end
+
+  describe "build/1 chests" do
+    defp bucket_row do
+      %Mangos.GameObject{
+        guid: 5000,
+        id: 161_557,
+        map: 0,
+        position_x: 1.0,
+        position_y: 2.0,
+        position_z: 3.0,
+        orientation: 0.0,
+        rotation0: 0.0,
+        rotation1: 0.0,
+        rotation2: 0.0,
+        rotation3: 1.0,
+        state: 1,
+        animprogress: 100,
+        spawntimesecsmin: 180,
+        spawntimesecsmax: 180,
+        game_object_template: %Mangos.GameObjectTemplate{
+          entry: 161_557,
+          type: 3,
+          display_id: 3012,
+          name: "Milly's Harvest",
+          faction: 0,
+          flags: 4,
+          size: 1.0,
+          data0: 43,
+          data1: 10_119,
+          mingold: 0,
+          maxgold: 0
+        },
+        game_event_game_object: nil
+      }
+    end
+
+    test "carries loot config, respawn delay, and the activate dynamic flag" do
+      go = GameObject.build(bucket_row())
+
+      assert go.internal.loot.id == 10_119
+      assert go.internal.loot.min_gold == 0
+      assert go.internal.spawn.respawn_delay_ms == 180_000
+      assert go.game_object.dyn_flags == 1
+    end
+
+    test "non-chest game objects carry no loot" do
+      row = bucket_row()
+      row = %{row | game_object_template: %{row.game_object_template | type: 5}}
+      go = GameObject.build(row)
+
+      assert go.internal.loot == nil
+      assert go.internal.spawn == nil
+      assert go.game_object.dyn_flags == 0
+    end
+  end
 end

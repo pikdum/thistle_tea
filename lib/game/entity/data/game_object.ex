@@ -3,7 +3,7 @@ defmodule ThistleTea.Game.Entity.Data.GameObject do
   Game object entity built from Mangos `gameobject` spawn rows and their
   templates.
   """
-  import Bitwise, only: [|||: 2]
+  import Bitwise, only: [|||: 2, &&&: 2]
 
   alias ThistleTea.DB.Mangos
   alias ThistleTea.Game.Entity.Data.Component.GameObject
@@ -121,6 +121,7 @@ defmodule ThistleTea.Game.Entity.Data.GameObject do
         pos_y: o.position_y,
         pos_z: o.position_z,
         facing: o.orientation,
+        dyn_flags: chest_dyn_flags(ot),
         faction: ot.faction,
         type_id: ot.type,
         anim_progress: o.animprogress
@@ -129,7 +130,39 @@ defmodule ThistleTea.Game.Entity.Data.GameObject do
         update_flag: @update_flag_all ||| @update_flag_has_position,
         position: {o.position_x, o.position_y, o.position_z, o.orientation}
       },
-      internal: %Internal{map: o.map, event: event}
+      internal: %Internal{map: o.map, event: event, loot: chest_loot(ot), spawn: chest_spawn(ot, o)}
     }
   end
+
+  @go_type_chest 3
+  @go_flag_interact_cond 0x4
+  @go_dyn_flag_activate 0x1
+
+  defp chest_dyn_flags(%Mangos.GameObjectTemplate{type: @go_type_chest, flags: flags})
+       when is_integer(flags) and (flags &&& @go_flag_interact_cond) != 0 do
+    @go_dyn_flag_activate
+  end
+
+  defp chest_dyn_flags(_template), do: 0
+
+  defp chest_loot(%Mangos.GameObjectTemplate{type: @go_type_chest} = ot) do
+    case ot.data1 do
+      loot_id when is_integer(loot_id) and loot_id > 0 ->
+        %Internal.Loot{id: loot_id, min_gold: ot.mingold || 0, max_gold: ot.maxgold || 0}
+
+      _no_loot ->
+        nil
+    end
+  end
+
+  defp chest_loot(_template), do: nil
+
+  defp chest_spawn(%Mangos.GameObjectTemplate{type: @go_type_chest}, %Mangos.GameObject{} = o) do
+    case o.spawntimesecsmin do
+      seconds when is_integer(seconds) and seconds > 0 -> %Internal.Spawn{respawn_delay_ms: seconds * 1000}
+      _instant -> nil
+    end
+  end
+
+  defp chest_spawn(_template, _row), do: nil
 end

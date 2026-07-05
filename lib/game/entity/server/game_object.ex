@@ -1,7 +1,8 @@
 defmodule ThistleTea.Game.Entity.Server.GameObject do
   @moduledoc """
-  Owning GenServer for a game object; serves update-object requests and
-  reacts to game-event start/stop for event-gated spawns.
+  Owning GenServer for a game object; serves update-object requests, chest
+  loot interactions, and reacts to game-event start/stop for event-gated
+  spawns.
   """
   use GenServer
 
@@ -11,6 +12,7 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
   alias ThistleTea.Game.Entity.Data.GameObject
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Registry, as: EntityRegistry
+  alias ThistleTea.Game.Entity.Server.GameObject.Chest
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Party
   alias ThistleTea.Game.Spell
@@ -73,6 +75,30 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
   end
 
   @impl GenServer
+  def handle_call({:loot_view, viewer}, _from, %GameObject{} = state) do
+    {result, state} = Chest.view(state, viewer)
+    {:reply, result, state}
+  end
+
+  def handle_call({:loot_take_item, slot}, _from, %GameObject{} = state) do
+    {result, state} = Chest.take_item(state, slot)
+    {:reply, result, state}
+  end
+
+  def handle_call({:loot_return_item, slot}, _from, %GameObject{} = state) do
+    {:reply, :ok, Chest.return_item(state, slot)}
+  end
+
+  def handle_call(:loot_take_gold, _from, %GameObject{} = state) do
+    {result, state} = Chest.take_gold(state)
+    {:reply, result, state}
+  end
+
+  def handle_call({:loot_release, viewer}, _from, %GameObject{} = state) do
+    {:reply, :ok, Chest.release(state, viewer)}
+  end
+
+  @impl GenServer
   def handle_info({:event_stop, _event}, state) do
     despawn(state)
   end
@@ -83,6 +109,10 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
 
   def handle_info(:despawn, state) do
     despawn(state)
+  end
+
+  def handle_info(:chest_respawn, %GameObject{} = state) do
+    {:noreply, Chest.respawn(state)}
   end
 
   @impl GenServer

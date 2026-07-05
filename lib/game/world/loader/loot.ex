@@ -20,7 +20,14 @@ defmodule ThistleTea.Game.World.Loader.Loot do
   def generate(loot_id, min_gold, max_gold) do
     %Loot{
       gold: roll_gold(min_gold, max_gold),
-      items: roll_items(loot_id)
+      items: roll_items(loot_id, &creature_rows/1)
+    }
+  end
+
+  def generate_gameobject(loot_id, min_gold, max_gold) do
+    %Loot{
+      gold: roll_gold(min_gold, max_gold),
+      items: roll_items(loot_id, &gameobject_rows/1)
     }
   end
 
@@ -43,9 +50,9 @@ defmodule ThistleTea.Game.World.Loader.Loot do
     %Loot{gold: gold, items: items}
   end
 
-  defp roll_items(loot_id) when is_integer(loot_id) and loot_id > 0 do
+  defp roll_items(loot_id, rows_fn) when is_integer(loot_id) and loot_id > 0 do
     loot_id
-    |> creature_rows()
+    |> rows_fn.()
     |> Loot.roll(&reference_rows/1)
     |> Enum.map(fn {item_id, count, quest_item} -> {ItemLoader.get_template(item_id), count, quest_item} end)
     |> Enum.reject(fn {template, _count, _quest_item} -> is_nil(template) end)
@@ -62,7 +69,7 @@ defmodule ThistleTea.Game.World.Loader.Loot do
     end)
   end
 
-  defp roll_items(_loot_id), do: []
+  defp roll_items(_loot_id, _rows_fn), do: []
 
   defp creature_rows(loot_id) do
     case :ets.lookup(__MODULE__, {:creature, loot_id}) do
@@ -72,6 +79,17 @@ defmodule ThistleTea.Game.World.Loader.Loot do
       _ ->
         rows = Mangos.CreatureLootTemplate.query(loot_id) |> Mangos.Repo.all() |> Enum.map(&row/1)
         cache({:creature, loot_id}, rows)
+    end
+  end
+
+  defp gameobject_rows(loot_id) do
+    case :ets.lookup(__MODULE__, {:gameobject, loot_id}) do
+      [{_key, rows}] ->
+        rows
+
+      _ ->
+        rows = Mangos.GameObjectLootTemplate.query(loot_id) |> Mangos.Repo.all() |> Enum.map(&row/1)
+        cache({:gameobject, loot_id}, rows)
     end
   end
 
