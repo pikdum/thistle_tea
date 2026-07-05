@@ -3,6 +3,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgAutoequipItem do
   use ThistleTea.Game.Network.ClientMessage, :CMSG_AUTOEQUIP_ITEM
 
   alias ThistleTea.Game.Entity.Logic.Inventory
+  alias ThistleTea.Game.Entity.Logic.Proficiency
   alias ThistleTea.Game.Network.InventoryUpdate
   alias ThistleTea.Game.World.ItemStore
 
@@ -10,7 +11,9 @@ defmodule ThistleTea.Game.Network.Message.CmsgAutoequipItem do
 
   @impl ClientMessage
   def handle(%__MODULE__{src_bag: src_bag, src_slot: src_slot}, %{ready: true, character: %Character{} = c} = state) do
-    Inventory.auto_equip(c.player, c.unit, state.guid, {src_bag, src_slot}, &ItemStore.get/1)
+    prof = Proficiency.from_spellbook(c.internal.spellbook)
+
+    Inventory.auto_equip(c.player, c.unit, prof, state.guid, {src_bag, src_slot}, &ItemStore.get/1)
     |> then(&InventoryUpdate.apply(state, &1))
   end
 

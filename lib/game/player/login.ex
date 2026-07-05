@@ -29,6 +29,7 @@ defmodule ThistleTea.Game.Player.Login do
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.Party
   alias ThistleTea.Game.Party.Notifier
+  alias ThistleTea.Game.Player.Spells, as: PlayerSpells
   alias ThistleTea.Game.Player.Stats, as: PlayerStats
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.CharacterStore
@@ -155,6 +156,8 @@ defmodule ThistleTea.Game.Player.Login do
     Network.send_packet(%Message.SmsgActionButtons{
       buttons: c.internal.action_buttons || %{}
     })
+
+    PlayerSpells.send_proficiencies(c)
 
     # send initial repuations
 

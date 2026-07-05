@@ -1,11 +1,14 @@
 defmodule ThistleTea.Game.Entity.Logic.InventoryTest do
   use ExUnit.Case, async: true
 
+  import Bitwise, only: [<<<: 2]
+
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Item
   alias ThistleTea.Game.Entity.Data.ItemTemplate
   alias ThistleTea.Game.Entity.Logic.Inventory
+  alias ThistleTea.Game.Entity.Logic.Proficiency
 
   @bag_0 255
   @mainhand_slot 15
@@ -13,6 +16,7 @@ defmodule ThistleTea.Game.Entity.Logic.InventoryTest do
   @first_bag_slot 19
   @backpack_start 23
   @owner 1
+  @prof Proficiency.all()
 
   setup [:build_fixtures]
 
@@ -129,12 +133,12 @@ defmodule ThistleTea.Game.Entity.Logic.InventoryTest do
     end
   end
 
-  describe "auto_equip/5" do
+  describe "auto_equip/6" do
     test "equips into the matching empty slot", %{unit: unit, chest: chest} do
       player = store(%Player{}, @backpack_start, chest)
 
       assert {:ok, %{player: player}} =
-               Inventory.auto_equip(player, unit, @owner, {@bag_0, @backpack_start}, get_item_fn([chest]))
+               Inventory.auto_equip(player, unit, @prof, @owner, {@bag_0, @backpack_start}, get_item_fn([chest]))
 
       assert player.chest == chest.object.guid
       assert player.visible_item_5_0 == 100
@@ -149,8 +153,10 @@ defmodule ThistleTea.Game.Entity.Logic.InventoryTest do
         |> Inventory.equip(:chest, other_chest)
         |> store(@backpack_start, chest)
 
+      get_item = get_item_fn([chest, other_chest])
+
       assert {:ok, %{player: player}} =
-               Inventory.auto_equip(player, unit, @owner, {@bag_0, @backpack_start}, get_item_fn([chest, other_chest]))
+               Inventory.auto_equip(player, unit, @prof, @owner, {@bag_0, @backpack_start}, get_item)
 
       assert player.chest == chest.object.guid
       assert player.inv1 == other_chest.object.guid
@@ -160,7 +166,7 @@ defmodule ThistleTea.Game.Entity.Logic.InventoryTest do
       player = store(%Player{}, @backpack_start, bag)
 
       assert {:ok, %{player: player}} =
-               Inventory.auto_equip(player, unit, @owner, {@bag_0, @backpack_start}, get_item_fn([bag]))
+               Inventory.auto_equip(player, unit, @prof, @owner, {@bag_0, @backpack_start}, get_item_fn([bag]))
 
       assert player.bag1 == bag.object.guid
       assert player.inv1 == 0
@@ -170,7 +176,7 @@ defmodule ThistleTea.Game.Entity.Logic.InventoryTest do
       player = store(%Player{}, @backpack_start, high_level)
 
       assert {:error, :cant_equip_level_i, guid, 0} =
-               Inventory.auto_equip(player, unit, @owner, {@bag_0, @backpack_start}, get_item_fn([high_level]))
+               Inventory.auto_equip(player, unit, @prof, @owner, {@bag_0, @backpack_start}, get_item_fn([high_level]))
 
       assert guid == high_level.object.guid
     end
@@ -179,11 +185,76 @@ defmodule ThistleTea.Game.Entity.Logic.InventoryTest do
       player = store(%Player{}, @backpack_start, priest_only)
 
       assert {:error, :you_can_never_use_that_item, _, 0} =
-               Inventory.auto_equip(player, unit, @owner, {@bag_0, @backpack_start}, get_item_fn([priest_only]))
+               Inventory.auto_equip(player, unit, @prof, @owner, {@bag_0, @backpack_start}, get_item_fn([priest_only]))
+    end
+
+    test "rejects weapons without the matching proficiency", %{unit: unit} do
+      dagger = build_item(11, %ItemTemplate{entry: 1100, inventory_type: 13, class: 2, subclass: 15})
+      player = store(%Player{}, @backpack_start, dagger)
+      staves_only = %Proficiency{weapon_mask: 1 <<< 10}
+
+      assert {:error, :no_required_proficiency, _, 0} =
+               Inventory.auto_equip(player, unit, staves_only, @owner, {@bag_0, @backpack_start}, get_item_fn([dagger]))
+    end
+
+    test "rejects armor without the matching proficiency", %{unit: unit} do
+      leather_chest = build_item(12, %ItemTemplate{entry: 1200, inventory_type: 5, class: 4, subclass: 2})
+      player = store(%Player{}, @backpack_start, leather_chest)
+      cloth_only = %Proficiency{armor_mask: 1 <<< 1}
+
+      assert {:error, :no_required_proficiency, _, 0} =
+               Inventory.auto_equip(
+                 player,
+                 unit,
+                 cloth_only,
+                 @owner,
+                 {@bag_0, @backpack_start},
+                 get_item_fn([leather_chest])
+               )
+    end
+
+    test "equips weapons and armor with the matching proficiency", %{unit: unit} do
+      staff = build_item(13, %ItemTemplate{entry: 1300, inventory_type: 17, class: 2, subclass: 10})
+      player = store(%Player{}, @backpack_start, staff)
+      prof = %Proficiency{weapon_mask: 1 <<< 10}
+
+      assert {:ok, %{player: player}} =
+               Inventory.auto_equip(player, unit, prof, @owner, {@bag_0, @backpack_start}, get_item_fn([staff]))
+
+      assert player.mainhand == staff.object.guid
+    end
+
+    test "auto-equips a second one-hander into the offhand only with dual wield", %{unit: unit, sword: sword} do
+      second = build_item(14, %ItemTemplate{entry: 1400, inventory_type: 13})
+
+      player =
+        %Player{}
+        |> Inventory.equip(:mainhand, sword)
+        |> store(@backpack_start, second)
+
+      get_item = get_item_fn([sword, second])
+
+      assert {:ok, %{player: with_dw}} =
+               Inventory.auto_equip(player, unit, @prof, @owner, {@bag_0, @backpack_start}, get_item)
+
+      assert with_dw.offhand == second.object.guid
+
+      assert {:ok, %{player: without_dw}} =
+               Inventory.auto_equip(
+                 player,
+                 unit,
+                 %Proficiency{},
+                 @owner,
+                 {@bag_0, @backpack_start},
+                 get_item
+               )
+
+      assert without_dw.mainhand == second.object.guid
+      assert without_dw.offhand in [nil, 0]
     end
   end
 
-  describe "swap/6" do
+  describe "swap/7" do
     test "swaps two backpack slots", %{unit: unit, chest: chest, sword: sword} do
       player =
         %Player{}
@@ -194,6 +265,7 @@ defmodule ThistleTea.Game.Entity.Logic.InventoryTest do
                Inventory.swap(
                  player,
                  unit,
+                 @prof,
                  @owner,
                  {@bag_0, @backpack_start},
                  {@bag_0, @backpack_start + 1},
@@ -214,6 +286,7 @@ defmodule ThistleTea.Game.Entity.Logic.InventoryTest do
                Inventory.swap(
                  player,
                  unit,
+                 @prof,
                  @owner,
                  {@bag_0, @backpack_start},
                  {@first_bag_slot, 0},
@@ -234,6 +307,7 @@ defmodule ThistleTea.Game.Entity.Logic.InventoryTest do
                Inventory.swap(
                  player,
                  unit,
+                 @prof,
                  @owner,
                  {@first_bag_slot, 0},
                  {@bag_0, @backpack_start},
@@ -253,6 +327,7 @@ defmodule ThistleTea.Game.Entity.Logic.InventoryTest do
                Inventory.swap(
                  player,
                  unit,
+                 @prof,
                  @owner,
                  {@bag_0, @first_bag_slot},
                  {@bag_0, @backpack_start},
@@ -264,7 +339,15 @@ defmodule ThistleTea.Game.Entity.Logic.InventoryTest do
       player = %Player{bag1: bag.object.guid}
 
       assert {:error, :items_cant_be_swapped, _, _} =
-               Inventory.swap(player, unit, @owner, {@bag_0, @first_bag_slot}, {@first_bag_slot, 0}, get_item_fn([bag]))
+               Inventory.swap(
+                 player,
+                 unit,
+                 @prof,
+                 @owner,
+                 {@bag_0, @first_bag_slot},
+                 {@first_bag_slot, 0},
+                 get_item_fn([bag])
+               )
     end
 
     test "rejects non-bags in bag slots", %{unit: unit, chest: chest} do
@@ -274,6 +357,7 @@ defmodule ThistleTea.Game.Entity.Logic.InventoryTest do
                Inventory.swap(
                  player,
                  unit,
+                 @prof,
                  @owner,
                  {@bag_0, @backpack_start},
                  {@bag_0, @first_bag_slot},
@@ -288,10 +372,26 @@ defmodule ThistleTea.Game.Entity.Logic.InventoryTest do
                Inventory.swap(
                  player,
                  unit,
+                 @prof,
                  @owner,
                  {@bag_0, @backpack_start},
                  {@bag_0, @mainhand_slot},
                  get_item_fn([chest])
+               )
+    end
+
+    test "rejects placing a one-hander into the offhand without dual wield", %{unit: unit, sword: sword} do
+      player = store(%Player{}, @backpack_start, sword)
+
+      assert {:error, :cant_dual_wield, _, _} =
+               Inventory.swap(
+                 player,
+                 unit,
+                 %Proficiency{},
+                 @owner,
+                 {@bag_0, @backpack_start},
+                 {@bag_0, @offhand_slot},
+                 get_item_fn([sword])
                )
     end
 
@@ -305,6 +405,7 @@ defmodule ThistleTea.Game.Entity.Logic.InventoryTest do
                Inventory.swap(
                  player,
                  unit,
+                 @prof,
                  @owner,
                  {@bag_0, @backpack_start},
                  {@bag_0, @offhand_slot},
@@ -328,6 +429,7 @@ defmodule ThistleTea.Game.Entity.Logic.InventoryTest do
                Inventory.swap(
                  player,
                  unit,
+                 @prof,
                  @owner,
                  {@bag_0, @backpack_start},
                  {@bag_0, @mainhand_slot},
@@ -398,7 +500,7 @@ defmodule ThistleTea.Game.Entity.Logic.InventoryTest do
     end
   end
 
-  describe "swap/6 stacking" do
+  describe "swap/7 stacking" do
     test "merges a stack dropped onto a matching stack", %{unit: unit} do
       src = build_item(20, %ItemTemplate{entry: 2000, stackable: 10}, stack_count: 3)
       dst = build_item(21, %ItemTemplate{entry: 2000, stackable: 10}, stack_count: 4)
@@ -412,6 +514,7 @@ defmodule ThistleTea.Game.Entity.Logic.InventoryTest do
                Inventory.swap(
                  player,
                  unit,
+                 @prof,
                  @owner,
                  {@bag_0, @backpack_start},
                  {@bag_0, @backpack_start + 1},
@@ -436,6 +539,7 @@ defmodule ThistleTea.Game.Entity.Logic.InventoryTest do
                Inventory.swap(
                  player,
                  unit,
+                 @prof,
                  @owner,
                  {@bag_0, @backpack_start},
                  {@bag_0, @backpack_start + 1},
@@ -460,6 +564,7 @@ defmodule ThistleTea.Game.Entity.Logic.InventoryTest do
                Inventory.swap(
                  player,
                  unit,
+                 @prof,
                  @owner,
                  {@bag_0, @backpack_start},
                  {@bag_0, @backpack_start + 1},

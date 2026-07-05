@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgUseItem do
   alias ThistleTea.Game.Entity.Data.Item, as: DataItem
   alias ThistleTea.Game.Entity.Data.ItemTemplate
   alias ThistleTea.Game.Entity.Logic.Inventory
+  alias ThistleTea.Game.Entity.Logic.Proficiency
   alias ThistleTea.Game.Network.InventoryUpdate
   alias ThistleTea.Game.Player.Items
   alias ThistleTea.Game.Player.Spellcasting
@@ -70,12 +71,12 @@ defmodule ThistleTea.Game.Network.Message.CmsgUseItem do
     }
   end
 
-  defp validate_usable(%Character{unit: unit}, %ItemTemplate{} = template, {bag, slot}) do
+  defp validate_usable(%Character{unit: unit, internal: internal}, %ItemTemplate{} = template, {bag, slot}) do
     if template.inventory_type != @invtype_non_equip and
          not (bag == Inventory.bag_0() and Inventory.equipment_slot?(slot)) do
       {:error, :item_not_found}
     else
-      Inventory.can_use(unit, template)
+      Inventory.can_use(unit, Proficiency.from_spellbook(internal.spellbook), template)
     end
   end
 

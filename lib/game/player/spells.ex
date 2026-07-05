@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.Player.Spells do
   learned or superseded spell.
   """
   alias ThistleTea.Game.Entity.Data.Character
+  alias ThistleTea.Game.Entity.Logic.Proficiency
   alias ThistleTea.Game.Entity.Logic.SpellBook
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
@@ -24,8 +25,23 @@ defmodule ThistleTea.Game.Player.Spells do
         character = %{character | internal: %{internal | spells: all_ids, spellbook: spellbook}}
         CharacterStore.put(character)
         Enum.each(events, &send_event_packet/1)
+        send_proficiencies(character)
         {:ok, character, events}
     end
+  end
+
+  def send_proficiencies(%Character{internal: internal}) do
+    prof = Proficiency.from_spellbook(internal.spellbook)
+
+    Network.send_packet(%Message.SmsgSetProficiency{
+      item_class: Proficiency.item_class_weapon(),
+      subclass_mask: prof.weapon_mask
+    })
+
+    Network.send_packet(%Message.SmsgSetProficiency{
+      item_class: Proficiency.item_class_armor(),
+      subclass_mask: prof.armor_mask
+    })
   end
 
   defp send_event_packet({:learned, spell_id}) do

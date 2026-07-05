@@ -3,6 +3,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgSwapItem do
   use ThistleTea.Game.Network.ClientMessage, :CMSG_SWAP_ITEM
 
   alias ThistleTea.Game.Entity.Logic.Inventory
+  alias ThistleTea.Game.Entity.Logic.Proficiency
   alias ThistleTea.Game.Network.InventoryUpdate
   alias ThistleTea.Game.World.ItemStore
 
@@ -13,6 +14,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgSwapItem do
     Inventory.swap(
       c.player,
       c.unit,
+      Proficiency.from_spellbook(c.internal.spellbook),
       state.guid,
       {message.src_bag, message.src_slot},
       {message.dst_bag, message.dst_slot},

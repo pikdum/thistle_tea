@@ -28,6 +28,8 @@ defmodule ThistleTea.Game.Spell do
     recovery_time_ms: 0,
     category_recovery_time_ms: 0,
     aura_interrupt_flags: 0,
+    equipped_item_class: -1,
+    equipped_item_subclass_mask: 0,
     attributes: MapSet.new(),
     effects: [],
     reagents: []

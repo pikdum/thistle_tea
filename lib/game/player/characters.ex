@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.Player.Characters do
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Item
   alias ThistleTea.Game.Entity.Logic.Inventory
+  alias ThistleTea.Game.Entity.Logic.Proficiency
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
@@ -105,7 +106,7 @@ defmodule ThistleTea.Game.Player.Characters do
   defp equip_starting_item(%Character{player: player, unit: unit} = character, %Item{} = item) do
     get_item = &ItemStore.get/1
 
-    with {:ok, slot} <- Inventory.find_equip_slot(player, unit, item, get_item),
+    with {:ok, slot} <- Inventory.find_equip_slot(player, unit, Proficiency.all(), item, get_item),
          nil <- Inventory.item_guid_at(player, {Inventory.bag_0(), slot}, get_item) do
       {:ok, %{character | player: Inventory.equip(player, slot, item)}}
     else
@@ -147,7 +148,7 @@ defmodule ThistleTea.Game.Player.Characters do
   end
 
   defp auto_equip_starting_item(%Character{object: %{guid: owner_guid}, player: player, unit: unit} = character, pos) do
-    case Inventory.auto_equip(player, unit, owner_guid, pos, &ItemStore.get/1) do
+    case Inventory.auto_equip(player, unit, Proficiency.all(), owner_guid, pos, &ItemStore.get/1) do
       {:ok, result} ->
         persist_inventory_result(result)
         %{character | player: result.player}

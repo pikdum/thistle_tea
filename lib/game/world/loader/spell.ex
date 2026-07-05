@@ -188,6 +188,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
       reagents: build_reagents(row)
     }
     |> struct!(cooldown_fields(row))
+    |> struct!(equipped_item_fields(row))
   end
 
   defp cooldown_fields(row) do
@@ -195,6 +196,13 @@ defmodule ThistleTea.Game.World.Loader.Spell do
       category: row.category || 0,
       recovery_time_ms: row.recovery_time || 0,
       category_recovery_time_ms: row.category_recovery_time || 0
+    }
+  end
+
+  defp equipped_item_fields(row) do
+    %{
+      equipped_item_class: row.equipped_item_class || -1,
+      equipped_item_subclass_mask: row.equipped_item_subclass || 0
     }
   end
 
@@ -352,6 +360,8 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp effect_type(24), do: :create_item
   defp effect_type(29), do: :leap
   defp effect_type(38), do: :dispel
+  defp effect_type(40), do: :dual_wield
+  defp effect_type(60), do: :proficiency
   defp effect_type(50), do: :trans_door
   defp effect_type(62), do: :power_burn
   defp effect_type(68), do: :interrupt_cast
