@@ -137,7 +137,7 @@ defmodule ThistleTea.DB.Mangos.ItemTemplate do
     field(:extra_flags, :integer, default: 0)
   end
 
-  def random_usable_by_type(inventory_type, race, class, level) do
+  def random_usable_by_type(inventory_type, race, class, level, limit \\ 1) do
     race_mask = 1 <<< (race - 1)
     class_mask = 1 <<< (class - 1)
 
@@ -149,9 +149,9 @@ defmodule ThistleTea.DB.Mangos.ItemTemplate do
         where: fragment("? & ?", it.allowable_class, ^class_mask) != 0,
         where: fragment("(? & 4) = 0", it.extra_flags),
         order_by: fragment("RANDOM()"),
-        limit: 1
+        limit: ^limit
       )
 
-    Mangos.Repo.one(query)
+    Mangos.Repo.all(query)
   end
 end

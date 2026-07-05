@@ -16,7 +16,9 @@ defmodule ThistleTea.Game.Player.DevCommands do
   alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Entity.Logic.MovementStats
+  alias ThistleTea.Game.Entity.Logic.Proficiency
   alias ThistleTea.Game.Entity.Logic.QuestLog
+  alias ThistleTea.Game.Entity.Logic.Rest
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
@@ -80,6 +82,7 @@ defmodule ThistleTea.Game.Player.DevCommands do
       ".move - move target to you",
       ".pid - show target pid",
       ".pos - show current position",
+      ".rested [amount] - add rested xp",
       ".speed <rate> - modify player speed from 0.1 to 10",
       ".tgm - toggle god mode (no damage taken)"
     ]
@@ -96,6 +99,17 @@ defmodule ThistleTea.Game.Player.DevCommands do
 
   def run(state, ".speed" <> rest) do
     run(state, ".modify speed" <> rest)
+  end
+
+  def run(state, ".rested" <> params) do
+    params
+    |> String.split()
+    |> case do
+      [] -> add_rested(state, "1000")
+      [amount] -> add_rested(state, amount)
+      _ -> system_message(state, "Invalid command. Use: .rested [amount]")
+    end
+    |> handled()
   end
 
   def run(state, ".character level" <> params) do
@@ -442,6 +456,20 @@ defmodule ThistleTea.Game.Player.DevCommands do
     end
   end
 
+  defp add_rested(%{character: %Character{} = character} = state, amount) do
+    case parse_positive_integer(amount) do
+      {:ok, amount} ->
+        character = Rest.set_bonus(character, (character.internal.rest_bonus || 0.0) + amount)
+
+        state
+        |> put_character(character)
+        |> system_message("Rested bonus set to #{character.player.rest_state_experience}.")
+
+      :error ->
+        system_message(state, "Invalid amount.")
+    end
+  end
+
   defp put_player_xp(%Character{player: player} = character, xp) do
     %{character | player: %{player | xp: xp}}
   end
@@ -494,10 +522,11 @@ defmodule ThistleTea.Game.Player.DevCommands do
 
   defp add_random_equipment(%{character: %Character{unit: unit} = character} = state) do
     existing_item_guids = owned_item_guids(character)
+    prof = Proficiency.from_spellbook(character.internal.spellbook)
 
     item_ids =
       unit.race
-      |> ItemLoader.random_equipment(unit.class, unit.level)
+      |> ItemLoader.random_equipment(unit.class, unit.level, prof)
       |> Map.values()
       |> Enum.flat_map(fn
         %ItemTemplate{entry: entry} -> [entry]

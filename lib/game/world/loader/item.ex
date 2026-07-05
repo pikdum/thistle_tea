@@ -5,8 +5,10 @@ defmodule ThistleTea.Game.World.Loader.Item do
   """
   alias ThistleTea.DB.Mangos
   alias ThistleTea.Game.Entity.Data.ItemTemplate
+  alias ThistleTea.Game.Entity.Logic.Proficiency
 
   @table_options [:named_table, :public, read_concurrency: true, write_concurrency: :auto]
+  @random_candidates 50
 
   def init(table \\ __MODULE__) do
     case :ets.whereis(table) do
@@ -33,15 +35,19 @@ defmodule ThistleTea.Game.World.Loader.Item do
 
   def get_cached_template(_entry), do: nil
 
-  def random_usable_template(inventory_type, race, class, level) do
-    case Mangos.ItemTemplate.random_usable_by_type(inventory_type, race, class, level) do
-      %Mangos.ItemTemplate{} = row -> cache(ItemTemplate.build(row))
-      _ -> nil
+  def random_usable_template(inventory_type, race, class, level, prof \\ Proficiency.all()) do
+    inventory_type
+    |> Mangos.ItemTemplate.random_usable_by_type(race, class, level, @random_candidates)
+    |> Enum.map(&ItemTemplate.build/1)
+    |> Enum.find(&(Proficiency.can_equip?(prof, &1) == :ok))
+    |> case do
+      %ItemTemplate{} = template -> cache(template)
+      _none -> nil
     end
   end
 
-  def random_equipment(race, class, level) do
-    random = fn inventory_type -> random_usable_template(inventory_type, race, class, level) end
+  def random_equipment(race, class, level, prof \\ Proficiency.all()) do
+    random = fn inventory_type -> random_usable_template(inventory_type, race, class, level, prof) end
 
     %{
       head: random.(1),
@@ -59,11 +65,14 @@ defmodule ThistleTea.Game.World.Loader.Item do
       trinket1: random.(12),
       trinket2: random.(12),
       back: random.(16),
-      mainhand: random.(13),
-      offhand: random.(13),
+      mainhand: random.(13) || random.(17),
+      offhand: random_offhand(random, prof),
       tabard: random.(19)
     }
   end
+
+  defp random_offhand(random, %Proficiency{dual_wield?: true}), do: random.(13)
+  defp random_offhand(random, %Proficiency{}), do: random.(14) || random.(23)
 
   defp load_template(entry) do
     case Mangos.Repo.get(Mangos.ItemTemplate, entry) do
