@@ -15,9 +15,13 @@ defmodule ThistleTea.Game.Player.GameObjects do
   alias ThistleTea.Game.Player.Quests
   alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
 
+  require Logger
+
   @go_type_chest 3
 
   def use_object(%{character: %Character{} = character} = state, guid) do
+    Logger.info("CMSG_GAMEOBJ_USE: entry #{Guid.entry(guid)} chest?=#{chest?(guid)}")
+
     if chest?(guid) do
       open_chest(state, guid)
     else
@@ -30,10 +34,13 @@ defmodule ThistleTea.Game.Player.GameObjects do
     with true <- chest?(guid),
          false <- Core.dead?(c),
          {:ok, %Loot{} = loot} <- Entity.call(guid, {:loot_view, state.guid}) do
-      Network.send_packet(%Message.SmsgLootResponse{guid: guid, loot: Quests.filter_loot(loot, c)})
+      loot = Quests.filter_loot(loot, c)
+      Logger.info("Chest loot: entry #{Guid.entry(guid)} items=#{length(loot.items)} gold=#{loot.gold}")
+      Network.send_packet(%Message.SmsgLootResponse{guid: guid, loot: loot})
       %{state | loot_guid: guid}
     else
-      _no_loot ->
+      other ->
+        Logger.info("Chest open failed: entry #{Guid.entry(guid)} reason=#{inspect(other)}")
         Network.send_packet(%Message.SmsgLootReleaseResponse{guid: guid})
         state
     end

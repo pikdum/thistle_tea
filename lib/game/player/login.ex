@@ -29,6 +29,7 @@ defmodule ThistleTea.Game.Player.Login do
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.Party
   alias ThistleTea.Game.Party.Notifier
+  alias ThistleTea.Game.Player.Rest, as: PlayerRest
   alias ThistleTea.Game.Player.Spells, as: PlayerSpells
   alias ThistleTea.Game.Player.Stats, as: PlayerStats
   alias ThistleTea.Game.Time
@@ -37,6 +38,7 @@ defmodule ThistleTea.Game.Player.Login do
   alias ThistleTea.Game.World.Loader.Faction, as: FactionLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.Pathfinding
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.System.Party, as: PartySystem
 
@@ -61,6 +63,7 @@ defmodule ThistleTea.Game.Player.Login do
       |> normalize_faction_template()
       |> normalize_death_state(character_guid)
       |> build_spellbook()
+      |> evaluate_login_rest()
       |> BT.init(PlayerBT.tree())
 
     Metadata.put(
@@ -222,6 +225,15 @@ defmodule ThistleTea.Game.Player.Login do
   defp build_spellbook(%Character{internal: internal} = character) do
     spellbook = SpellLoader.build_spellbook(internal.spells || [])
     %{character | internal: %{internal | spellbook: spellbook}}
+  end
+
+  defp evaluate_login_rest(%Character{} = character) do
+    {x, y, z, _o} = character.movement_block.position
+
+    case Pathfinding.get_zone_and_area(character.internal.map, {x, y, z}) do
+      {zone, _area} -> PlayerRest.evaluate_zone(character, zone)
+      _unknown -> character
+    end
   end
 
   defp normalize_movement_state(%Character{movement_block: movement_block, internal: internal} = character) do

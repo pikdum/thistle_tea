@@ -10,26 +10,26 @@ defmodule ThistleTea.Game.Network.Message.CmsgZoneupdate do
   defstruct [:area]
 
   @impl ClientMessage
-  def handle(%__MODULE__{}, %{ready: true, character: %Character{} = character} = state) do
+  def handle(%__MODULE__{area: client_zone}, %{ready: true, character: %Character{} = character} = state) do
     %{internal: %{map: map, area: current_area}} = character
     {x, y, z, _o} = character.movement_block.position
 
-    case Pathfinding.get_zone_and_area(map, {x, y, z}) do
-      {zone, area} ->
-        state =
-          if area == current_area do
-            state
-          else
-            character = %{character | internal: %{character.internal | area: area}}
-            CharacterStore.put(character)
-            PartyNotifier.broadcast_stats(state.guid, character)
-            %{state | character: character}
-          end
+    state =
+      case Pathfinding.get_zone_and_area(map, {x, y, z}) do
+        {_zone, area} when area != current_area ->
+          character = %{character | internal: %{character.internal | area: area}}
+          CharacterStore.put(character)
+          PartyNotifier.broadcast_stats(state.guid, character)
+          %{state | character: character}
 
-        PlayerRest.update_zone(state, zone)
+        _ ->
+          state
+      end
 
-      _ ->
-        state
+    if is_integer(client_zone) and client_zone > 0 do
+      PlayerRest.update_zone(state, client_zone)
+    else
+      state
     end
   end
 

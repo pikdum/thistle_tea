@@ -27,17 +27,24 @@ defmodule ThistleTea.Game.Player.Rest do
   end
 
   def update_zone(%{character: %Character{} = character} = state, zone_id) do
+    case evaluate_zone(character, zone_id) do
+      ^character -> state
+      changed -> apply_transition(state, changed)
+    end
+  end
+
+  def evaluate_zone(%Character{} = character, zone_id) do
     capital? = capital?(zone_id)
 
     cond do
       capital? and RestLogic.rest_type(character) != :city ->
-        apply_transition(state, RestLogic.start(character, :city, Time.now()))
+        RestLogic.start(character, :city, Time.now())
 
       not capital? and RestLogic.rest_type(character) == :city ->
-        apply_transition(state, RestLogic.stop(character, Time.now()))
+        RestLogic.stop(character, Time.now())
 
       true ->
-        state
+        character
     end
   end
 
