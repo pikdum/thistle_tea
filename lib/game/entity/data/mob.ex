@@ -221,6 +221,7 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
     internal = %{
       internal
       | in_combat: false,
+        threat: %{},
         last_hostile_time: nil,
         casting: nil,
         rooted?: false,

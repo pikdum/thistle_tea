@@ -38,6 +38,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
   alias ThistleTea.Game.World.Pathfinding
 
   @victimstate_normal 1
+  @heal_threat_radius 100.0
 
   def emit_pending(entity) do
     {entity, events} = Event.drain(entity)
@@ -163,6 +164,16 @@ defmodule ThistleTea.Game.Entity.EventSink do
 
   def emit(entity, %Event{type: :heal_entity} = event) do
     Entity.receive_heal(event.target_guid, event.amount)
+    entity
+  end
+
+  def emit(entity, %Event{type: :heal_threat} = event) do
+    entity
+    |> World.nearby_mobs(@heal_threat_radius)
+    |> Enum.each(fn {guid, _distance} ->
+      Entity.heal_threat(guid, event.source_guid, event.target_guid, event.amount)
+    end)
+
     entity
   end
 

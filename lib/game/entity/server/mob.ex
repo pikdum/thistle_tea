@@ -25,8 +25,10 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Entity.Logic.Combat
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Experience
+  alias ThistleTea.Game.Entity.Logic.Hostility
   alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.Entity.Logic.SpellEffect
+  alias ThistleTea.Game.Entity.Logic.Threat
   alias ThistleTea.Game.Entity.Registry, as: EntityRegistry
   alias ThistleTea.Game.Entity.Server.Mob.Corpse
   alias ThistleTea.Game.Entity.Server.Mob.Respawn
@@ -121,7 +123,6 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     state =
       if Spell.harmful?(spell) do
         state
-        |> maybe_reset_attack_started(caster_guid)
         |> engage_combat(caster_guid)
         |> eventai_spell_hit(caster_guid, spell)
       else
@@ -145,16 +146,32 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   end
 
   @impl GenServer
+  def handle_cast({:heal_threat, healer_guid, healed_guid, amount}, %Mob{internal: %Internal{in_combat: true}} = state)
+      when is_integer(healer_guid) and is_number(amount) and amount > 0 do
+    if Threat.tracking?(state, healed_guid) and Hostility.valid_hostile_target?(state, healer_guid) do
+      state =
+        state
+        |> Threat.add(healer_guid, amount / attacker_count(healed_guid))
+        |> wake_ai_tick()
+
+      {:noreply, state}
+    else
+      {:noreply, state}
+    end
+  end
+
+  def handle_cast({:heal_threat, _healer_guid, _healed_guid, _amount}, state) do
+    {:noreply, state}
+  end
+
+  @impl GenServer
   def handle_cast({:loot_roll_vote, voter_guid, slot, vote}, %Mob{} = state) do
     {:noreply, Corpse.roll_vote(state, voter_guid, slot, vote)}
   end
 
   @impl GenServer
   def handle_cast({:receive_attack, %{caster: caster} = attack}, state) do
-    state =
-      state
-      |> maybe_reset_attack_started(caster)
-      |> engage_combat(caster)
+    state = engage_combat(state, caster)
 
     {state, events} = Combat.receive_attack(state, attack, Time.now())
 
@@ -167,6 +184,10 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   end
 
   @impl GenServer
+  def handle_call(:threat_table, _from, %Mob{} = state) do
+    {:reply, {:ok, %{victim: state.unit.target, entries: Threat.entries(state)}}, state}
+  end
+
   def handle_call({:loot_view, viewer}, _from, %Mob{} = state) do
     {result, state} = Corpse.view(state, viewer)
     {:reply, result, state}
@@ -502,18 +523,13 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     %{state | internal: %{internal | blackboard: blackboard}}
   end
 
-  defp engage_combat(%Mob{unit: %Unit{target: current_target} = unit, internal: internal} = state, caster)
-       when is_integer(caster) do
+  defp engage_combat(%Mob{internal: internal} = state, caster) when is_integer(caster) do
     now = Time.now()
     was_in_combat = internal.in_combat == true
 
-    state = update_attacker_count(state, current_target, caster)
-
-    %{
-      state
-      | unit: %{unit | target: caster},
-        internal: %{internal | in_combat: true, last_hostile_time: now}
-    }
+    %{state | internal: %{internal | in_combat: true, last_hostile_time: now}}
+    |> Threat.add(caster, 0)
+    |> MobBT.reselect_victim()
     |> Combat.sync_combat_flag()
     |> maybe_tap(caster)
     |> maybe_eventai_enter_combat(was_in_combat, caster, now)
@@ -558,30 +574,6 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   end
 
   defp maybe_tap(%Mob{} = state, _caster), do: state
-
-  defp maybe_reset_attack_started(%Mob{unit: %Unit{target: target}} = state, caster) when is_integer(caster) do
-    if target == caster do
-      state
-    else
-      BT.reset_attack_started(state)
-    end
-  end
-
-  defp maybe_reset_attack_started(state, _caster), do: state
-
-  defp update_attacker_count(%Mob{} = state, current_target, caster) do
-    if is_integer(current_target) and current_target > 0 and current_target != caster do
-      Metadata.decrement(current_target, :attacker_count, 0)
-    end
-
-    if is_integer(caster) and caster > 0 and current_target != caster do
-      Metadata.increment(caster, :attacker_count)
-    end
-
-    state
-  end
-
-  defp update_attacker_count(state, _current_target, _caster), do: state
 
   defp maybe_finalize_death(%Mob{internal: %Internal{death_finalized?: true}} = state), do: state
 
@@ -650,6 +642,13 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     eligible
     |> Experience.group_shares(unit.level, opts)
     |> Enum.each(fn {guid, xp} -> Entity.reward_kill_share(guid, state, xp) end)
+  end
+
+  defp attacker_count(guid) do
+    case Metadata.query(guid, [:attacker_count]) do
+      %{attacker_count: count} when is_integer(count) and count > 0 -> count
+      _ -> 1
+    end
   end
 
   defp caster_guid(%{caster_guid: caster_guid}) when is_integer(caster_guid), do: caster_guid

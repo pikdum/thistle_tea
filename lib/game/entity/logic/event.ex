@@ -115,6 +115,11 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
     %__MODULE__{type: :heal_entity, target_guid: target_guid, amount: amount}
   end
 
+  def heal_threat(source_guid, target_guid, amount)
+      when is_integer(source_guid) and is_integer(target_guid) and is_number(amount) do
+    %__MODULE__{type: :heal_threat, source_guid: source_guid, target_guid: target_guid, amount: amount}
+  end
+
   def resurrect_request(source_guid, spell_id, health, mana)
       when is_integer(source_guid) and is_integer(spell_id) and is_integer(health) and is_integer(mana) do
     %__MODULE__{type: :resurrect_request, source_guid: source_guid, spell_id: spell_id, health: health, mana: mana}

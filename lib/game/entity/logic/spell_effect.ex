@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   alias ThistleTea.Game.Entity.Logic.Death
   alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.Entity.Logic.SpellResist
+  alias ThistleTea.Game.Entity.Logic.Threat
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Effect
@@ -103,9 +104,10 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
       Effect.damage_roll(effect) + bonus_amount(context.healing_bonus, spell) +
         Aura.flat_modifier(state, :mod_healing, Spell.school_mask(spell))
 
-    healing = trunc(healing * healing_taken_multiplier(state, spell))
+    healing = max(trunc(healing * healing_taken_multiplier(state, spell)), 0)
+    events = Threat.heal_threat_events(state, context.caster_guid, healing)
 
-    {Core.heal(state, max(healing, 0)), []}
+    {Core.heal(state, healing), events}
   end
 
   defp apply_effect(state, %CastContext{}, _spell, %Effect{type: :persistent_area_aura}, _now) do

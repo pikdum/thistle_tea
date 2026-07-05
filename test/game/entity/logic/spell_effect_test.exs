@@ -180,7 +180,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
       assert events == []
     end
 
-    test "heal effects restore health without emitting damage events" do
+    test "heal effects restore health and emit heal threat for the effective gain" do
       spell = %Spell{
         id: 2050,
         name: "Lesser Heal",
@@ -202,7 +202,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
 
       assert target.unit.health == 20
       assert target.internal.broadcast_update? == true
-      assert events == []
+      assert [%{type: :heal_threat, source_guid: 999, target_guid: 1, amount: 5.0}] = events
     end
 
     test "trigger spell effects return trigger events" do

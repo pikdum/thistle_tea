@@ -18,6 +18,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
   alias ThistleTea.Game.Entity.Logic.Combat
   alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.Entity.Logic.Movement
+  alias ThistleTea.Game.Entity.Logic.Threat
   alias ThistleTea.Game.Math
   alias ThistleTea.Game.Network.UpdateObject
 
@@ -59,6 +60,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
 
     entity =
       entity
+      |> Threat.add_damage(Keyword.get(opts, :source), damage)
       |> maybe_enqueue_death_root(health, new_health)
       |> maybe_record_killer(health, new_health, Keyword.get(opts, :source))
       |> mark_broadcast_update()

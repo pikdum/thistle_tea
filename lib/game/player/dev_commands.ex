@@ -35,6 +35,7 @@ defmodule ThistleTea.Game.Player.DevCommands do
   alias ThistleTea.Game.World.Loader.ClassSpell
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
   alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader
+  alias ThistleTea.Game.World.Metadata
 
   require Logger
 
@@ -84,7 +85,8 @@ defmodule ThistleTea.Game.Player.DevCommands do
       ".pos - show current position",
       ".rested [amount] - add rested xp",
       ".speed <rate> - modify player speed from 0.1 to 10",
-      ".tgm - toggle god mode (no damage taken)"
+      ".tgm - toggle god mode (no damage taken)",
+      ".threat - show the targeted mob's threat table"
     ]
 
     system_message(state, "Commands:")
@@ -224,6 +226,12 @@ defmodule ThistleTea.Game.Player.DevCommands do
     |> handled()
   end
 
+  def run(state, ".threat" <> _) do
+    state
+    |> show_threat()
+    |> handled()
+  end
+
   def run(state, ".pid" <> _) do
     case Entity.pid(state.target) do
       pid when is_pid(pid) ->
@@ -266,6 +274,44 @@ defmodule ThistleTea.Game.Player.DevCommands do
   def run(_state, _message), do: :unhandled
 
   defp handled(state), do: {:handled, state}
+
+  defp show_threat(%{target: target} = state) when is_integer(target) and target > 0 do
+    with :mob <- Guid.entity_type(target),
+         {:ok, %{victim: victim, entries: entries}} <- Entity.call(target, :threat_table) do
+      print_threat_table(state, target, victim, entries)
+    else
+      {:error, _reason} -> system_message(state, "Target is not an active mob.")
+      _other -> system_message(state, "Target is not a mob.")
+    end
+  end
+
+  defp show_threat(state), do: system_message(state, "No target selected.")
+
+  defp print_threat_table(state, target, victim, entries) do
+    state = system_message(state, "Threat table for #{entity_name(target)}:")
+
+    case entries do
+      [] ->
+        system_message(state, "  (empty)")
+
+      entries ->
+        Enum.reduce(entries, state, fn entry, acc ->
+          system_message(acc, threat_line(entry, victim))
+        end)
+    end
+  end
+
+  defp threat_line({guid, threat}, victim) do
+    marker = if guid == victim, do: " <- victim", else: ""
+    "  #{entity_name(guid)}: #{Float.round(threat / 1, 1)}#{marker}"
+  end
+
+  defp entity_name(guid) do
+    case Metadata.query(guid, [:name]) do
+      %{name: name} when is_binary(name) -> name
+      _ -> "guid #{guid}"
+    end
+  end
 
   defp additem(state, item_id_str, count_str) do
     with {item_id, ""} <- Integer.parse(item_id_str),

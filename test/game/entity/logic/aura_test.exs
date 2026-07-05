@@ -326,7 +326,8 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
                  spell_id: 139,
                  aura_type: :periodic_heal,
                  amount: 25
-               }
+               },
+               %{type: :heal_threat, source_guid: 999, target_guid: 1, amount: 12.5}
              ] = events
 
       [updated] = entity.unit.auras

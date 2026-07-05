@@ -1,0 +1,164 @@
+defmodule ThistleTea.Game.Entity.Logic.ThreatTest do
+  use ExUnit.Case, async: true
+
+  alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.Entity.Data.Component.Object
+  alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Data.Mob
+  alias ThistleTea.Game.Entity.Logic.Threat
+
+  @mob_guid 100
+  @player_a 1
+  @player_b 2
+  @player_c 3
+
+  defp mob(attrs \\ []) do
+    %Mob{
+      object: %Object{guid: @mob_guid},
+      unit: %Unit{target: Keyword.get(attrs, :target, 0)},
+      internal: %Internal{
+        in_combat: Keyword.get(attrs, :in_combat, true),
+        threat: Keyword.get(attrs, :threat, %{})
+      }
+    }
+  end
+
+  defp reselect(entity, opts \\ []) do
+    opts =
+      opts
+      |> Keyword.put_new(:valid?, fn _guid -> true end)
+      |> Keyword.put_new(:in_melee?, fn _guid -> false end)
+
+    Threat.reselect(entity, opts)
+  end
+
+  describe "add/3" do
+    test "creates and accumulates entries" do
+      entity = mob() |> Threat.add(@player_a, 50) |> Threat.add(@player_a, 25)
+      assert entity.internal.threat == %{@player_a => 75.0}
+    end
+
+    test "ignores self, invalid guids, and negative amounts" do
+      entity =
+        mob()
+        |> Threat.add(@mob_guid, 50)
+        |> Threat.add(nil, 50)
+        |> Threat.add(0, 50)
+        |> Threat.add(@player_a, -10)
+
+      assert entity.internal.threat == %{}
+    end
+
+    test "seeds a zero-threat entry" do
+      entity = Threat.add(mob(), @player_a, 0)
+      assert entity.internal.threat == %{@player_a => 0.0}
+    end
+  end
+
+  describe "add_damage/3" do
+    test "accrues threat while in combat" do
+      entity = Threat.add_damage(mob(), @player_a, 40)
+      assert entity.internal.threat == %{@player_a => 40.0}
+    end
+
+    test "ignores damage while out of combat" do
+      entity = Threat.add_damage(mob(in_combat: false), @player_a, 40)
+      assert entity.internal.threat == %{}
+    end
+  end
+
+  describe "taunt/2" do
+    test "raises the taunter to the top threat" do
+      entity =
+        mob(threat: %{@player_a => 200.0, @player_b => 50.0})
+        |> Threat.taunt(@player_b)
+
+      assert entity.internal.threat == %{@player_a => 200.0, @player_b => 200.0}
+    end
+
+    test "keeps a higher taunter threat unchanged" do
+      entity =
+        mob(threat: %{@player_a => 300.0, @player_b => 50.0})
+        |> Threat.taunt(@player_a)
+
+      assert entity.internal.threat == %{@player_a => 300.0, @player_b => 50.0}
+    end
+  end
+
+  describe "wipe/1 and tracking?/2 and entries/1" do
+    test "wipe empties the table" do
+      entity = mob(threat: %{@player_a => 10.0}) |> Threat.wipe()
+      assert entity.internal.threat == %{}
+    end
+
+    test "tracking? reflects table membership" do
+      entity = mob(threat: %{@player_a => 10.0})
+      assert Threat.tracking?(entity, @player_a)
+      refute Threat.tracking?(entity, @player_b)
+    end
+
+    test "entries are sorted by threat descending" do
+      entity = mob(threat: %{@player_a => 10.0, @player_b => 30.0, @player_c => 20.0})
+      assert Threat.entries(entity) == [{@player_b, 30.0}, {@player_c, 20.0}, {@player_a, 10.0}]
+    end
+  end
+
+  describe "reselect/2" do
+    test "keeps an empty decision on an empty table" do
+      assert {_entity, :keep} = reselect(mob())
+    end
+
+    test "picks the highest threat when there is no current victim" do
+      entity = mob(threat: %{@player_a => 10.0, @player_b => 30.0})
+      assert {_entity, {:switch, @player_b}} = reselect(entity)
+    end
+
+    test "switches away from an invalid victim" do
+      entity = mob(target: @player_a, threat: %{@player_a => 100.0, @player_b => 10.0})
+      {entity, decision} = reselect(entity, valid?: fn guid -> guid != @player_a end)
+
+      assert decision == {:switch, @player_b}
+      assert entity.internal.threat == %{@player_b => 10.0}
+    end
+
+    test "keeps the current victim below the 110% threshold" do
+      entity = mob(target: @player_a, threat: %{@player_a => 100.0, @player_b => 109.0})
+      assert {_entity, :keep} = reselect(entity, in_melee?: fn _guid -> true end)
+    end
+
+    test "switches above 110% in melee range" do
+      entity = mob(target: @player_a, threat: %{@player_a => 100.0, @player_b => 115.0})
+      assert {_entity, {:switch, @player_b}} = reselect(entity, in_melee?: fn _guid -> true end)
+    end
+
+    test "keeps the current victim between 110% and 130% at range" do
+      entity = mob(target: @player_a, threat: %{@player_a => 100.0, @player_b => 115.0})
+      assert {_entity, :keep} = reselect(entity)
+    end
+
+    test "switches above 130% regardless of range" do
+      entity = mob(target: @player_a, threat: %{@player_a => 100.0, @player_b => 131.0})
+      assert {_entity, {:switch, @player_b}} = reselect(entity)
+    end
+
+    test "skips a ranged mid-threshold candidate but takes a melee one further down" do
+      entity =
+        mob(
+          target: @player_a,
+          threat: %{@player_a => 100.0, @player_b => 125.0, @player_c => 115.0}
+        )
+
+      assert {_entity, {:switch, @player_c}} = reselect(entity, in_melee?: fn guid -> guid == @player_c end)
+    end
+
+    test "keeps the current victim when it tops the table" do
+      entity = mob(target: @player_a, threat: %{@player_a => 100.0, @player_b => 50.0})
+      assert {_entity, :keep} = reselect(entity, in_melee?: fn _guid -> true end)
+    end
+
+    test "no-ops for entities without a threat table" do
+      entity = %Mob{object: %Object{guid: @mob_guid}, unit: %Unit{}, internal: %Internal{}}
+      assert {^entity, :keep} = Threat.reselect(entity, valid?: fn _ -> true end, in_melee?: fn _ -> false end)
+    end
+  end
+end
