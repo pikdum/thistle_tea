@@ -3,11 +3,11 @@
     "mangoszero-server": {
       "flake": false,
       "locked": {
-        "lastModified": 1778828263,
-        "narHash": "sha256-F52uWIlGqMi3RJIdNkWH0nZYm6nsyE9i42rhmX0g5yE=",
+        "lastModified": 1783285705,
+        "narHash": "sha256-HZJ3JXFpyPijlQJw8J7/XKyX+HsXvCXEdr5JIaCV02s=",
         "ref": "refs/heads/master",
-        "rev": "1df821fad9a12fc742c5e70549273e653b379a60",
-        "revCount": 1489,
+        "rev": "266496d61e09fea5b2d4cfae332f8b9214a425ea",
+        "revCount": 1811,
         "submodules": true,
         "type": "git",
         "url": "https://github.com/mangoszero/server.git"
@@ -37,11 +37,11 @@
     "namigator-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1783213901,
-        "narHash": "sha256-uJmAIUo3qLkl/xq3NaJXfKKVGQWrVqomvTaFf3arMms=",
+        "lastModified": 1783385597,
+        "narHash": "sha256-6Uh6dlSDs1+i5vp1hEQ3a8df/THi8VWG1tn6K+cyL9w=",
         "ref": "refs/heads/master",
-        "rev": "3ffc08cdbb0266f00c4d79a705d20e8e7c5ba8a5",
-        "revCount": 533,
+        "rev": "fd2718f00ae7437403f886b97263dac5cda9c4c6",
+        "revCount": 537,
         "submodules": true,
         "type": "git",
         "url": "https://github.com/pikdum/namigator.git"
@@ -54,11 +54,11 @@
     },
     "nixpkgs": {
       "locked": {
-        "lastModified": 1778443072,
-        "narHash": "sha256-zi7/fsqM/kFdNuED//4WOCUtezGtKKqRNORjMvfwjnA=",
+        "lastModified": 1783224372,
+        "narHash": "sha256-8i/87eeoqiGE4yOTjwSA3Eh/ziJRQEmd/unYU+K27sk=",
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "da5ad661ba4e5ef59ba743f0d112cbc30e474f32",
+        "rev": "d407951447dcd00442e97087bf374aad70c04cea",
         "type": "github"
       },
       "original": {
