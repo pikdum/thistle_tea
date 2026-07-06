@@ -153,6 +153,14 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTableTest do
       assert result.outcome in [:crit, :normal]
     end
 
+    test "mobs cannot parry or block from behind but still dodge" do
+      # defender at origin facing +x, attacker behind at -x
+      swing = attack(caster_position: {-5.0, 0.0, 0.0})
+
+      assert AttackTable.resolve(mob(), swing, 100, roll: 700).outcome == :dodge
+      refute AttackTable.resolve(mob(), swing, 100, roll: 1_200).outcome in [:parry, :block]
+    end
+
     test "a casting defender cannot dodge, parry, or block" do
       target = character(internal: [casting: %Cast{}])
 

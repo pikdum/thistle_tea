@@ -466,7 +466,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells do
           hostile?: Hostility.hostile?(state, metadata),
           friendly?: Hostility.friendly?(state, metadata),
           attackable?: Hostility.attackable?(state, target_guid),
-          position: World.position(target_guid)
+          position: World.position(target_guid),
+          los?: World.line_of_sight?(state, target_guid)
         }
     end
   end

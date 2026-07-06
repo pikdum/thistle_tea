@@ -199,7 +199,8 @@ defmodule ThistleTea.Game.Player.Spellcasting do
           hostile?: Hostility.hostile?(character, metadata),
           friendly?: Hostility.friendly?(character, metadata),
           attackable?: Hostility.attackable?(character, guid),
-          position: World.position(guid)
+          position: World.position(guid),
+          los?: World.line_of_sight?(character, guid)
         }
     end
   end

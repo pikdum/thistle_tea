@@ -16,6 +16,7 @@ defmodule ThistleTea.Game.Network.Message.SmsgCastResult do
     equipped_item_class: @cast_failure_reason_equipped_item_class,
     immune: 0x22,
     item_not_ready: 0x28,
+    line_of_sight: 0x2A,
     not_known: 0x38,
     not_ready: 0x3C,
     no_power: 0x4D,
@@ -45,9 +46,11 @@ defmodule ThistleTea.Game.Network.Message.SmsgCastResult do
     %__MODULE__{
       spell: spell_id,
       result: @simple_spell_cast_result_failure,
-      reason: Map.fetch!(@cast_failure_reasons, reason)
+      reason: reason_code(reason)
     }
   end
+
+  def reason_code(reason) when is_atom(reason), do: Map.fetch!(@cast_failure_reasons, reason)
 
   @impl ServerMessage
   def to_binary(%__MODULE__{

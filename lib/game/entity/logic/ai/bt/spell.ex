@@ -25,6 +25,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
   alias ThistleTea.Game.Spell.Cooldowns
   alias ThistleTea.Game.Spell.Targets
   alias ThistleTea.Game.Time
+  alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Metadata
 
   def casting_sequence do
@@ -128,6 +129,18 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
   def complete_cast(character, now) when is_integer(now), do: character
 
   def complete_cast(%{internal: %Internal{}} = character, %Cast{} = casting, now) when is_integer(now) do
+    if cast_target_visible?(character, casting) do
+      do_complete_cast(character, casting, now)
+    else
+      character
+      |> Event.enqueue(Event.spell_cast_failed(Cast.spell_id(casting), :line_of_sight))
+      |> clear_cast()
+    end
+  end
+
+  def complete_cast(character, _casting, _now), do: character
+
+  defp do_complete_cast(character, %Cast{} = casting, now) do
     targets = resolve_targets(character, casting)
     {hits, misses} = roll_spell_hits(character, casting.spell, targets)
 
@@ -145,8 +158,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
     |> apply_spell_hit(casting, hits, now)
     |> clear_cast()
   end
-
-  def complete_cast(character, _casting, _now), do: character
 
   defp queue_open_object(character, %Cast{spell: %Spell{} = spell, targets: %Targets{object_guid: object_guid}})
        when is_integer(object_guid) do
@@ -308,6 +319,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
       unit_channel_target_dead?(casting) ->
         {stop_channel(character, casting), 50}
 
+      not cast_target_visible?(character, casting) ->
+        {stop_channel(character, casting), 50}
+
       is_integer(casting.next_channel_tick_at) and now >= casting.next_channel_tick_at ->
         targets = resolve_targets(character, casting)
 
@@ -335,6 +349,16 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
   end
 
   defp unit_channel_target_dead?(_casting), do: false
+
+  defp cast_target_visible?(%{object: %{guid: self_guid}} = character, %Cast{
+         spell: %Spell{} = spell,
+         targets: %Targets{unit_guid: unit_guid}
+       })
+       when is_integer(unit_guid) and unit_guid > 0 and unit_guid != self_guid do
+    Spell.attribute?(spell, :ignore_line_of_sight) or World.line_of_sight?(character, unit_guid)
+  end
+
+  defp cast_target_visible?(_character, _casting), do: true
 
   defp queue_spell_go(character, casting, targets, misses \\ [])
 

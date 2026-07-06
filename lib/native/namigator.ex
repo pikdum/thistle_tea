@@ -79,6 +79,10 @@ defmodule ThistleTea.Native.Namigator do
     with_map(map_id, &find_heights_native(&1, x, y))
   end
 
+  def line_of_sight(map_id, start_x, start_y, start_z, stop_x, stop_y, stop_z) do
+    with_map(map_id, &line_of_sight_native(&1, start_x, start_y, start_z, stop_x, stop_y, stop_z))
+  end
+
   defp load_maps(out_dir) do
     Enum.reduce(@maps_to_process, {%{}, []}, fn {map_id, map_name}, {maps, failures} ->
       case load_map_native(out_dir, map_name) do
@@ -112,4 +116,7 @@ defmodule ThistleTea.Native.Namigator do
     do: :erlang.nif_error(:nif_not_loaded)
 
   defp find_heights_native(_map, _x, _y), do: :erlang.nif_error(:nif_not_loaded)
+
+  defp line_of_sight_native(_map, _start_x, _start_y, _start_z, _stop_x, _stop_y, _stop_z),
+    do: :erlang.nif_error(:nif_not_loaded)
 end

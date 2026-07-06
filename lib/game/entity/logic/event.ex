@@ -49,7 +49,8 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
     :summon,
     :respawn_delay_ms,
     :sound_id,
-    :facing
+    :facing,
+    :reason
   ]
 
   def spell_damage(source_guid, target_guid, spell, damage, opts \\ []) do
@@ -131,6 +132,10 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
 
   def spell_cast_result(spell_id) when is_integer(spell_id) do
     %__MODULE__{type: :spell_cast_result, spell_id: spell_id}
+  end
+
+  def spell_cast_failed(spell_id, reason) when is_integer(spell_id) and is_atom(reason) do
+    %__MODULE__{type: :spell_cast_failed, spell_id: spell_id, reason: reason}
   end
 
   def spell_cooldown(source_guid, spell_id, cooldown_ms)

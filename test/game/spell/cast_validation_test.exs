@@ -165,6 +165,21 @@ defmodule ThistleTea.Game.Spell.CastValidationTest do
                CastValidation.validate(caster(), harmful_spell(), Targets.unit(7), :unknown, @now)
     end
 
+    test "rejects targets out of line of sight" do
+      assert {:error, :line_of_sight} =
+               CastValidation.validate(caster(), harmful_spell(), Targets.unit(7), hostile_target(los?: false), @now)
+    end
+
+    test "allows ignore_line_of_sight spells to bypass the LoS check" do
+      spell = harmful_spell(attributes: MapSet.new([:ignore_line_of_sight]))
+
+      assert :ok = CastValidation.validate(caster(), spell, Targets.unit(7), hostile_target(los?: false), @now)
+    end
+
+    test "skips the LoS check when target info has no visibility fact" do
+      assert :ok = CastValidation.validate(caster(), harmful_spell(), Targets.unit(7), hostile_target(), @now)
+    end
+
     test "rejects targets out of range or on another map" do
       out_of_range = hostile_target(position: {0, 100.0, 0.0, 0.0})
       other_map = hostile_target(position: {1, 10.0, 0.0, 0.0})

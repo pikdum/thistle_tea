@@ -214,6 +214,28 @@ defmodule ThistleTea.Game.Entity.EventSink do
 
   def emit(entity, %Event{type: :spell_cast_result}), do: entity
 
+  def emit(%Character{object: %{guid: guid}} = entity, %Event{type: :spell_cast_failed} = event) do
+    Network.send_packet(Message.SmsgCastResult.failure(event.spell_id, event.reason))
+
+    Network.send_packet(%Message.SmsgSpellFailure{
+      guid: guid,
+      spell: event.spell_id,
+      result: Message.SmsgCastResult.reason_code(event.reason)
+    })
+
+    %Message.SmsgSpellFailedOther{caster: guid, id: event.spell_id}
+    |> World.broadcast_packet(entity, exclude_self?: true)
+
+    entity
+  end
+
+  def emit(%{object: %{guid: guid}} = entity, %Event{type: :spell_cast_failed} = event) do
+    %Message.SmsgSpellFailedOther{caster: guid, id: event.spell_id}
+    |> World.broadcast_packet(entity)
+
+    entity
+  end
+
   def emit(%{object: %{guid: guid}} = entity, %Event{type: :spell_start} = event) when is_integer(guid) do
     packed_caster = BinaryUtils.pack_guid(event.source_guid || guid)
 

@@ -427,7 +427,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   end
 
   defp aggro_candidate?(%Mob{} = state, guid, distance) when is_integer(guid) and is_number(distance) do
-    Hostility.valid_hostile_target?(state, guid) and distance <= aggro_radius(state, guid)
+    Hostility.valid_hostile_target?(state, guid) and distance <= aggro_radius(state, guid) and
+      World.line_of_sight?(state, guid)
   end
 
   defp aggro_candidate?(_state, _guid, _distance), do: false

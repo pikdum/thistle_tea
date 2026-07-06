@@ -23,8 +23,9 @@ defmodule ThistleTea.Game.Spell.CastValidation do
          :ok <- check_cooldown(caster, spell, now),
          :ok <- check_power(caster, spell),
          :ok <- check_reagents(caster, spell, Keyword.get(opts, :count_item)),
-         :ok <- check_target(spell, target_info) do
-      check_range(caster, spell, target_info)
+         :ok <- check_target(spell, target_info),
+         :ok <- check_range(caster, spell, target_info) do
+      check_line_of_sight(spell, target_info)
     end
   end
 
@@ -144,6 +145,16 @@ defmodule ThistleTea.Game.Spell.CastValidation do
   end
 
   defp check_range(_caster, _spell, _target_info), do: :ok
+
+  defp check_line_of_sight(%Spell{} = spell, %{los?: false}) do
+    if Spell.attribute?(spell, :ignore_line_of_sight) do
+      :ok
+    else
+      {:error, :line_of_sight}
+    end
+  end
+
+  defp check_line_of_sight(_spell, _target_info), do: :ok
 
   defp caster_position(%{internal: %{map: map}, movement_block: %{position: {x, y, z, _o}}}) do
     {map, x, y, z}

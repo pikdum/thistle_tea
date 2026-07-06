@@ -21,6 +21,7 @@
 - Use `setup [:named_setup]` for reusable test data
 - Keep test names concise and descriptive
 - Do not query generated sqlite databases in default tests; `db/vmangos.sqlite` loader smoke tests must be tagged `:vmangos_db` so normal `mix test` excludes them, and `db/dbc.sqlite` is not available in CI
+- Tests that need namigator map geometry (line of sight, terrain heights) must be tagged `:namigator_maps` (excluded by default; map data is not in CI); run with `mix test --include namigator_maps`
 
 ### Imports & Structs
 - Use `use ThistleTea.Game.Network.Opcodes, [:SMSG_FOO, :CMSG_BAR]` macro to define opcode attributes

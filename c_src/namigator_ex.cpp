@@ -250,4 +250,22 @@ find_heights_native(ErlNifEnv *, MapResource map, double x, double y) {
 }
 FINE_NIF(find_heights_native, ERL_NIF_DIRTY_JOB_CPU_BOUND);
 
+std::optional<bool> line_of_sight_native(ErlNifEnv *, MapResource map,
+                                         double start_x, double start_y,
+                                         double start_z, double stop_x,
+                                         double stop_y, double stop_z) {
+  auto lock = map->acquire();
+  uint8_t los = 0;
+  auto result =
+      pathfind_line_of_sight(map->get(), f(start_x), f(start_y), f(start_z),
+                             f(stop_x), f(stop_y), f(stop_z), &los, 0);
+
+  if (!ok(result)) {
+    return std::nullopt;
+  }
+
+  return los != 0;
+}
+FINE_NIF(line_of_sight_native, ERL_NIF_DIRTY_JOB_CPU_BOUND);
+
 FINE_INIT("Elixir.ThistleTea.Native.Namigator");

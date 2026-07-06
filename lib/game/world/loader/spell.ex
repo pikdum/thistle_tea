@@ -182,7 +182,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
       aura_interrupt_flags: row.aura_interrupt_flags || 0,
       mechanic: row.mechanic || 0,
       proc_charges: row.proc_charges || 0,
-      attributes: attributes(row.attributes, row.attributes_ex1),
+      attributes: attributes(row.attributes, row.attributes_ex1, row.attributes_ex2),
       exclusive_category: Scripts.exclusive_category(row),
       effects: build_effects(row, radius_lookup),
       reagents: build_reagents(row)
@@ -447,8 +447,11 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   @cant_cancel 0x80000000
   @channeled_ex_1 0x00000004
   @channeled_ex_2 0x00000040
+  @ignore_line_of_sight_ex2 0x00000004
 
-  defp attributes(attrs, attrs_ex1) when is_integer(attrs) and is_integer(attrs_ex1) do
+  defp attributes(attrs, attrs_ex1, attrs_ex2) when is_integer(attrs) and is_integer(attrs_ex1) do
+    attrs_ex2 = if is_integer(attrs_ex2), do: attrs_ex2, else: 0
+
     base =
       MapSet.new()
       |> add_if(attrs, @on_next_swing_1, :on_next_swing)
@@ -462,9 +465,10 @@ defmodule ThistleTea.Game.World.Loader.Spell do
     base
     |> add_if(attrs_ex1, @channeled_ex_1, :channeled)
     |> add_if(attrs_ex1, @channeled_ex_2, :channeled)
+    |> add_if(attrs_ex2, @ignore_line_of_sight_ex2, :ignore_line_of_sight)
   end
 
-  defp attributes(_, _), do: MapSet.new()
+  defp attributes(_, _, _), do: MapSet.new()
 
   defp add_if(set, mask, bit, atom) do
     if (mask &&& bit) == 0, do: set, else: MapSet.put(set, atom)

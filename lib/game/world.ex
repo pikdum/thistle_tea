@@ -20,6 +20,7 @@ defmodule ThistleTea.Game.World do
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.EntitySupervisor
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.Pathfinding
   alias ThistleTea.Game.World.SpatialHash
 
   def nearby_players(
@@ -218,6 +219,16 @@ defmodule ThistleTea.Game.World do
       _ -> nil
     end
   end
+
+  def line_of_sight?(%{internal: %Internal{map: map}, movement_block: %MovementBlock{position: {x1, y1, z1, _o}}}, guid)
+      when is_integer(guid) do
+    case target_position(guid) do
+      {^map, x2, y2, z2} -> Pathfinding.line_of_sight?(map, {x1, y1, z1}, {x2, y2, z2})
+      _ -> true
+    end
+  end
+
+  def line_of_sight?(_entity, _guid), do: true
 
   defp entity_guid(%{object: %{guid: guid}}) when is_integer(guid), do: guid
   defp entity_guid(%{guid: guid}) when is_integer(guid), do: guid

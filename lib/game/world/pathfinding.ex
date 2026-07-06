@@ -34,6 +34,27 @@ defmodule ThistleTea.Game.World.Pathfinding do
     end
   end
 
+  @los_source_eye_height 2.0
+  @los_target_eye_height 1.0
+
+  def line_of_sight?(map_id, {start_x, start_y, start_z}, {stop_x, stop_y, stop_z}) do
+    load_adt_at(map_id, {start_x, start_y})
+    load_adt_at(map_id, {stop_x, stop_y})
+
+    case Namigator.line_of_sight(
+           map_id,
+           start_x,
+           start_y,
+           start_z + @los_source_eye_height,
+           stop_x,
+           stop_y,
+           stop_z + @los_target_eye_height
+         ) do
+      visible? when is_boolean(visible?) -> visible?
+      _unknown -> true
+    end
+  end
+
   def find_point_between_points(map_id, {start_x, start_y, start_z}, {stop_x, stop_y, stop_z}, distance) do
     Namigator.find_point_between_points(
       map_id,
