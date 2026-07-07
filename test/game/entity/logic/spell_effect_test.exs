@@ -205,6 +205,38 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
       assert [%{type: :heal_threat, source_guid: 999, target_guid: 1, amount: 5.0}] = events
     end
 
+    test "energize effects restore the matching power" do
+      spell = %Spell{
+        id: 2687,
+        name: "Bloodrage",
+        school: :physical,
+        effects: [
+          %Effect{
+            index: 0,
+            type: :energize,
+            base_points: 99,
+            die_sides: 1,
+            misc_value: 1
+          }
+        ]
+      }
+
+      target = %Mob{
+        object: %Object{guid: 1},
+        unit: %Unit{health: 20, max_health: 20, level: 10, power_type: 1, power2: 0, max_power2: 1_000, auras: []},
+        internal: %Internal{map: 0},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
+      }
+
+      context = %CastContext{caster_guid: 1, caster_level: 10}
+
+      {target, events} = SpellEffect.receive(target, context, spell, 1_000)
+
+      assert target.unit.power2 == 100
+      assert target.internal.broadcast_update? == true
+      assert events == []
+    end
+
     test "trigger spell effects return trigger events" do
       spell = %Spell{
         id: 168,

@@ -24,6 +24,8 @@ defmodule ThistleTea.Game.Spell do
     mechanic: 0,
     proc_charges: 0,
     speed: 0.0,
+    mana_cost_percent: 0,
+    dmg_class: 0,
     category: 0,
     recovery_time_ms: 0,
     category_recovery_time_ms: 0,

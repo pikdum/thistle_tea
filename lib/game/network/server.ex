@@ -17,6 +17,7 @@ defmodule ThistleTea.Game.Network.Server do
   alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.AI.Tick
+  alias ThistleTea.Game.Entity.Logic.AttackFeedback
   alias ThistleTea.Game.Entity.Logic.Combat
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Death
@@ -213,6 +214,11 @@ defmodule ThistleTea.Game.Network.Server do
 
   def handle_cast({:receive_heal, amount}, {socket, %{character: %Character{} = character} = state}) do
     character = Core.heal(character, amount)
+    {:noreply, {socket, %{state | character: character}}, {:continue, :maybe_broadcast_update}}
+  end
+
+  def handle_cast({:attack_outcome, payload}, {socket, %{character: %Character{} = character} = state}) do
+    character = AttackFeedback.receive(character, payload, Time.now())
     {:noreply, {socket, %{state | character: character}}, {:continue, :maybe_broadcast_update}}
   end
 

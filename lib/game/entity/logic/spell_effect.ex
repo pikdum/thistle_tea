@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Death
   alias ThistleTea.Game.Entity.Logic.Event
+  alias ThistleTea.Game.Entity.Logic.Resources
   alias ThistleTea.Game.Entity.Logic.SpellResist
   alias ThistleTea.Game.Entity.Logic.Threat
   alias ThistleTea.Game.Spell
@@ -140,6 +141,11 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
 
   defp apply_effect(state, %CastContext{}, %Spell{id: spell_id}, %Effect{type: :teleport_units}, _now) do
     {state, [Event.teleport_to_spell_target(spell_id)]}
+  end
+
+  defp apply_effect(state, %CastContext{}, _spell, %Effect{type: :energize, misc_value: power_type} = effect, _now)
+       when is_integer(power_type) and power_type >= 0 do
+    {Resources.gain_power(state, power_type, Effect.damage_roll(effect)), []}
   end
 
   defp apply_effect(state, %CastContext{}, _spell, %Effect{type: :create_item, misc_value: item_id} = effect, _now)

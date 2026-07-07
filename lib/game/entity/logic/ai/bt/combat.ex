@@ -151,7 +151,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
       state
       |> maybe_weapon_skill_up(target)
       |> Resources.spend_power(queued_spell, Time.now())
-      |> Resources.gain_outgoing_auto_attack_rage(attack)
       |> queue_self_update()
       |> queue_queued_spell_go(queued_spell, target)
 

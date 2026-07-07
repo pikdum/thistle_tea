@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.Entity.Logic.Skills
+  alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Math
 
   @default_attack_speed_ms 2000
@@ -132,6 +133,7 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
       |> Map.put(:absorb, absorbed)
 
     event = attacker_state_update(Map.get(attack, :caster, 0), target_guid, result.damage, attack)
+    feedback_events = attack_outcome_events(entity, attack, result, absorbed)
 
     {entity, reaction_events} =
       if result.damage > 0 do
@@ -142,7 +144,7 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
 
     entity = maybe_defense_skill_up(entity, attack, opts)
 
-    {entity, [event | reaction_events]}
+    {entity, [event | reaction_events] ++ feedback_events}
   end
 
   def receive_attack(entity, _attack, _now, _opts), do: {entity, []}
@@ -164,6 +166,30 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
   end
 
   defp maybe_defense_skill_up(entity, _attack, _opts), do: entity
+
+  defp attack_outcome_events(%{object: %{guid: victim_guid}}, %{caster: caster} = attack, result, absorbed)
+       when is_integer(caster) do
+    if Guid.entity_type(caster) == :player do
+      damage = outcome_damage_basis(attack, result, absorbed)
+      [Event.attack_outcome(caster, victim_guid, result.outcome, damage, Map.get(attack, :queued_spell_id))]
+    else
+      []
+    end
+  end
+
+  defp attack_outcome_events(_entity, _attack, _result, _absorbed), do: []
+
+  defp outcome_damage_basis(attack, %{outcome: outcome}, _absorbed) when outcome in [:dodge, :parry] do
+    attack_damage(attack)
+  end
+
+  defp outcome_damage_basis(_attack, %{outcome: :miss}, _absorbed), do: 0
+
+  defp outcome_damage_basis(_attack, %{damage: damage}, absorbed) when is_integer(damage) do
+    max(damage - (absorbed || 0), 0)
+  end
+
+  defp outcome_damage_basis(_attack, _result, _absorbed), do: 0
 
   defp attack_school(%{spell_school_mask: mask}) when is_integer(mask) and mask > 1 do
     index = Enum.find(1..6, 0, fn i -> (mask >>> i &&& 1) == 1 end)

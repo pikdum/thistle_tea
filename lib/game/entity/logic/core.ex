@@ -18,6 +18,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
   alias ThistleTea.Game.Entity.Logic.Combat
   alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.Entity.Logic.Movement
+  alias ThistleTea.Game.Entity.Logic.Resources
   alias ThistleTea.Game.Entity.Logic.Threat
   alias ThistleTea.Game.Math
   alias ThistleTea.Game.Network.UpdateObject
@@ -60,6 +61,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
 
     entity =
       entity
+      |> gain_taken_rage(remaining, Keyword.get(opts, :source))
       |> Threat.add_damage(Keyword.get(opts, :source), damage)
       |> maybe_enqueue_death_root(health, new_health)
       |> maybe_record_killer(health, new_health, Keyword.get(opts, :source))
@@ -70,6 +72,13 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
   end
 
   def take_damage_with_absorb(entity, _damage, _now, _opts), do: {entity, 0}
+
+  defp gain_taken_rage(%Character{object: %{guid: guid}} = entity, damage, source)
+       when is_integer(source) and source > 0 and source != guid do
+    Resources.gain_attack_rage(entity, damage, :taken)
+  end
+
+  defp gain_taken_rage(entity, _damage, _source), do: entity
 
   def heal(%{unit: %Unit{health: health, max_health: max_health} = unit} = entity, amount)
       when is_number(health) and is_number(amount) and amount > 0 do

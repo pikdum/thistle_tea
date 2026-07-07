@@ -189,6 +189,14 @@ defmodule ThistleTea.Game.World.Loader.Spell do
     }
     |> struct!(cooldown_fields(row))
     |> struct!(equipped_item_fields(row))
+    |> struct!(power_fields(row))
+  end
+
+  defp power_fields(row) do
+    %{
+      mana_cost_percent: row.mana_cost_percent || 0,
+      dmg_class: row.defence_type || 0
+    }
   end
 
   defp cooldown_fields(row) do
@@ -359,6 +367,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp effect_type(18), do: :resurrect
   defp effect_type(24), do: :create_item
   defp effect_type(29), do: :leap
+  defp effect_type(30), do: :energize
   defp effect_type(33), do: :open_lock
   defp effect_type(38), do: :dispel
   defp effect_type(40), do: :dual_wield
@@ -447,6 +456,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   @cant_cancel 0x80000000
   @channeled_ex_1 0x00000004
   @channeled_ex_2 0x00000040
+  @discount_power_on_miss_ex_1 0x08000000
   @ignore_line_of_sight_ex2 0x00000004
 
   defp attributes(attrs, attrs_ex1, attrs_ex2) when is_integer(attrs) and is_integer(attrs_ex1) do
@@ -465,6 +475,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
     base
     |> add_if(attrs_ex1, @channeled_ex_1, :channeled)
     |> add_if(attrs_ex1, @channeled_ex_2, :channeled)
+    |> add_if(attrs_ex1, @discount_power_on_miss_ex_1, :discount_power_on_miss)
     |> add_if(attrs_ex2, @ignore_line_of_sight_ex2, :ignore_line_of_sight)
   end
 

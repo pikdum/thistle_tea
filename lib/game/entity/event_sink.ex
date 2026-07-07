@@ -393,6 +393,17 @@ defmodule ThistleTea.Game.Entity.EventSink do
     entity
   end
 
+  def emit(entity, %Event{type: :attack_outcome} = event) do
+    Entity.attack_outcome(event.target_guid, %{
+      victim_guid: event.source_guid,
+      outcome: event.outcome,
+      damage: event.damage,
+      spell_id: event.spell_id
+    })
+
+    entity
+  end
+
   def emit(entity, %Event{type: :attacker_gained, target_guid: target_guid}) do
     Metadata.increment(target_guid, :attacker_count)
     entity

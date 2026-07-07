@@ -50,7 +50,8 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
     :respawn_delay_ms,
     :sound_id,
     :facing,
-    :reason
+    :reason,
+    :outcome
   ]
 
   def spell_damage(source_guid, target_guid, spell, damage, opts \\ []) do
@@ -232,6 +233,18 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
 
   def tap_cleared do
     %__MODULE__{type: :tap_cleared}
+  end
+
+  def attack_outcome(attacker_guid, victim_guid, outcome, damage, spell_id)
+      when is_integer(attacker_guid) and is_integer(victim_guid) and is_atom(outcome) do
+    %__MODULE__{
+      type: :attack_outcome,
+      target_guid: attacker_guid,
+      source_guid: victim_guid,
+      outcome: outcome,
+      damage: damage,
+      spell_id: spell_id
+    }
   end
 
   def attacker_state_update(source_guid, target_guid, damage, attack \\ %{})

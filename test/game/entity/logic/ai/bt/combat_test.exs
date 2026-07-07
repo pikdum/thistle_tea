@@ -128,7 +128,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.CombatTest do
       refute Enum.any?(mob.internal.events, &(&1.type == :deliver_attack))
     end
 
-    test "generates rage for player auto attacks" do
+    test "grants no rage at swing time since rage flows from resolved outcomes" do
       player_guid = Guid.from_low_guid(:player, 1)
       target_guid = Guid.from_low_guid(:mob, 1, 1)
 
@@ -155,12 +155,11 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.CombatTest do
 
       assert {:success, character, %Blackboard{}} = Combat.melee_attack(character, blackboard, 1_000)
 
-      assert character.unit.power2 == 100
+      assert character.unit.power2 == 0
 
       assert [
-               %Event{type: :object_update, update_type: :values},
                %Event{type: :deliver_attack, target_guid: ^target_guid, attack: %{damage: 10}}
-             ] = character.internal.events
+             ] = Enum.filter(character.internal.events, &(&1.type == :deliver_attack))
     end
   end
 

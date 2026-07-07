@@ -381,10 +381,18 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
              ] = events
     end
 
-    test "does not grant or log energize ticks for unhandled power types" do
+    test "grants and logs rage energize ticks" do
       entity = %{
         fixture_entity()
-        | unit: %Unit{level: 1, health: 100, max_health: 100, power1: 10, max_power1: 100, auras: []}
+        | unit: %Unit{
+            level: 1,
+            health: 100,
+            max_health: 100,
+            power_type: 1,
+            power2: 100,
+            max_power2: 1_000,
+            auras: []
+          }
       }
 
       spell = %Spell{
@@ -395,8 +403,8 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
           %Effect{
             index: 0,
             type: :apply_aura,
-            base_points: 1,
-            die_sides: 0,
+            base_points: 9,
+            die_sides: 1,
             aura: :periodic_energize,
             amplitude_ms: 1_000,
             misc_value: 1
@@ -411,8 +419,17 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
 
       {entity, events} = Aura.tick(entity, aura.next_tick_at)
 
-      assert entity.unit.power1 == 10
-      assert events == []
+      assert entity.unit.power2 == 110
+
+      assert [
+               %{
+                 type: :periodic_aura_log,
+                 spell_id: 29_131,
+                 aura_type: :periodic_energize,
+                 amount: 10,
+                 misc_value: 1
+               }
+             ] = events
     end
   end
 

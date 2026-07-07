@@ -36,6 +36,10 @@ defmodule ThistleTea.Game.Entity do
     dispatch_cast(entity, {:receive_attack, attack})
   end
 
+  def attack_outcome(entity, payload) do
+    dispatch_cast(entity, {:attack_outcome, payload})
+  end
+
   def receive_heal(entity, amount) do
     dispatch_cast(entity, {:receive_heal, amount})
   end

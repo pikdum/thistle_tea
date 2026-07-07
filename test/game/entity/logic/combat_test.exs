@@ -1,9 +1,12 @@
 defmodule ThistleTea.Game.Entity.Logic.CombatTest do
   use ExUnit.Case, async: true
 
+  alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
+  alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Object
+  alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.Aura
@@ -130,6 +133,14 @@ defmodule ThistleTea.Game.Entity.Logic.CombatTest do
                  target_guid: 2,
                  damage: 12,
                  attack: %{hit_info: 0x2, damage_state: 1, blocked_amount: 0, absorb: 0}
+               },
+               %Event{
+                 type: :attack_outcome,
+                 target_guid: 1,
+                 source_guid: 2,
+                 outcome: :normal,
+                 damage: 12,
+                 spell_id: nil
                }
              ] = events
     end
@@ -148,7 +159,8 @@ defmodule ThistleTea.Game.Entity.Logic.CombatTest do
                  source_level: 10,
                  target_guid: 1,
                  spell_id: 6136
-               }
+               },
+               %Event{type: :attack_outcome}
              ] = events
     end
 
@@ -158,7 +170,7 @@ defmodule ThistleTea.Game.Entity.Logic.CombatTest do
 
       {_mob, events} = Combat.receive_attack(mob, %{caster: 1, damage: 12}, 1_000, roll: 9_999)
 
-      assert [%Event{type: :attacker_state_update}] = events
+      assert [%Event{type: :attacker_state_update}, %Event{type: :attack_outcome}] = events
     end
 
     test "dodged attacks deal no damage and skip hit reactions" do
@@ -175,8 +187,35 @@ defmodule ThistleTea.Game.Entity.Logic.CombatTest do
                  type: :attacker_state_update,
                  damage: 0,
                  attack: %{damage_state: 2, hit_info: 0x2}
-               }
+               },
+               %Event{type: :attack_outcome, outcome: :dodge, damage: 12}
              ] = events
+    end
+
+    test "rage-using players gain rage from damage taken" do
+      character = %Character{
+        object: %Object{guid: 5},
+        unit: %Unit{
+          health: 500,
+          max_health: 500,
+          level: 60,
+          power_type: 1,
+          power2: 0,
+          max_power2: 1_000,
+          auras: []
+        },
+        player: %Player{},
+        internal: %Internal{},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
+      }
+
+      attack = %{caster: 1, damage: 200, caster_level: 60}
+      opts = [roll: 9_999, skill_roll: fn _chance -> false end]
+
+      {character, _events} = Combat.receive_attack(character, attack, 1_000, opts)
+
+      assert character.unit.health == 300
+      assert character.unit.power2 == 21
     end
 
     test "missed attacks report the miss hit info" do
@@ -185,7 +224,11 @@ defmodule ThistleTea.Game.Entity.Logic.CombatTest do
       {mob, events} = Combat.receive_attack(mob, %{caster: 1, damage: 12, caster_level: 10}, 1_000, roll: 0)
 
       assert mob.unit.health == 100
-      assert [%Event{type: :attacker_state_update, damage: 0, attack: %{hit_info: 0x12, damage_state: 0}}] = events
+
+      assert [
+               %Event{type: :attacker_state_update, damage: 0, attack: %{hit_info: 0x12, damage_state: 0}},
+               %Event{type: :attack_outcome, outcome: :miss, damage: 0}
+             ] = events
     end
   end
 

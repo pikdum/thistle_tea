@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
   alias ThistleTea.Game.Entity.Logic.Aura.Lifecycle
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Event
+  alias ThistleTea.Game.Entity.Logic.Resources
   alias ThistleTea.Game.Entity.Logic.SpellResist
   alias ThistleTea.Game.Entity.Logic.Threat
   alias ThistleTea.Game.Spell
@@ -181,6 +182,17 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
     event =
       Event.periodic_aura_log(holder.caster_guid, entity.object.guid, holder.spell, :periodic_energize, amount,
         misc_value: 0
+      )
+
+    {entity, [event]}
+  end
+
+  defp apply_energize(entity, %Holder{} = holder, power_type, amount) when is_integer(power_type) and power_type > 0 do
+    entity = Resources.gain_power(entity, power_type, amount)
+
+    event =
+      Event.periodic_aura_log(holder.caster_guid, entity.object.guid, holder.spell, :periodic_energize, amount,
+        misc_value: power_type
       )
 
     {entity, [event]}
