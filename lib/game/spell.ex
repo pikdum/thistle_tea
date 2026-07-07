@@ -29,6 +29,7 @@ defmodule ThistleTea.Game.Spell do
     stances: 0,
     caster_aura_state: 0,
     target_aura_state: 0,
+    stack_amount: 0,
     category: 0,
     recovery_time_ms: 0,
     category_recovery_time_ms: 0,

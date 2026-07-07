@@ -120,7 +120,12 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.UnitSync do
 
   defp pack_aura_applications(holders) do
     for slot <- 0..(@max_slots - 1), into: <<>> do
-      apps = if Enum.any?(holders, &(&1.slot == slot)), do: 0, else: 0
+      apps =
+        case Enum.find(holders, &(&1.slot == slot)) do
+          %Holder{stacks: stacks} when is_integer(stacks) and stacks > 1 -> stacks - 1
+          _ -> 0
+        end
+
       <<apps::8>>
     end
   end

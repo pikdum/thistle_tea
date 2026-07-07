@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.Entity.Logic.Threat do
   threat in melee range or 130% at range. The table lives on
   `internal.threat` and is wiped when the mob leaves combat.
   """
+  alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
@@ -128,7 +129,19 @@ defmodule ThistleTea.Game.Entity.Logic.Threat do
         Map.fetch!(pruned, current)
       end
 
-    {entity, decide(sorted, current, current_threat, in_melee?)}
+    decision =
+      case taunt_caster(entity) do
+        taunter when is_integer(taunter) and taunter != current ->
+          if valid?.(taunter), do: {:switch, taunter}, else: decide(sorted, current, current_threat, in_melee?)
+
+        taunter when is_integer(taunter) ->
+          :keep
+
+        _no_taunt ->
+          decide(sorted, current, current_threat, in_melee?)
+      end
+
+    {entity, decision}
   end
 
   def reselect(entity, _opts), do: {entity, :keep}
@@ -151,6 +164,17 @@ defmodule ThistleTea.Game.Entity.Logic.Threat do
       decide(rest, current, current_threat, in_melee?)
     end
   end
+
+  defp taunt_caster(%Mob{unit: %Unit{auras: holders}}) when is_list(holders) do
+    holders
+    |> Enum.find(&Holder.has_aura_type?(&1, :mod_taunt))
+    |> case do
+      %Holder{caster_guid: caster_guid} -> caster_guid
+      _no_taunt -> nil
+    end
+  end
+
+  defp taunt_caster(_entity), do: nil
 
   defp in_melee_range?(%Mob{} = entity, guid) do
     case World.distance_to_guid(entity, guid) do

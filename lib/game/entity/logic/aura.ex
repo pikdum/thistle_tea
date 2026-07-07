@@ -43,11 +43,11 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
 
   def flat_modifier(%{unit: %Unit{auras: holders}}, type, school_mask) when is_list(holders) do
     holders
-    |> Enum.flat_map(fn %Holder{auras: auras} -> auras end)
+    |> Enum.flat_map(fn %Holder{auras: auras} = holder -> Enum.map(auras, &{&1, holder_stacks(holder)}) end)
     |> Enum.reduce(0, fn
-      %Aura{type: ^type, amount: amount, misc_value: misc}, acc
+      {%Aura{type: ^type, amount: amount, misc_value: misc}, stacks}, acc
       when is_integer(amount) and is_integer(misc) ->
-        if Bitwise.band(misc, school_mask) == 0, do: acc, else: acc + amount
+        if Bitwise.band(misc, school_mask) == 0, do: acc, else: acc + amount * stacks
 
       _aura, acc ->
         acc
@@ -55,6 +55,24 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
   end
 
   def flat_modifier(_entity, _type, _school_mask), do: 0
+
+  def percent_multiplier(%{unit: %Unit{auras: holders}}, type, school_mask) when is_list(holders) do
+    holders
+    |> Enum.flat_map(fn %Holder{auras: auras} -> auras end)
+    |> Enum.reduce(1.0, fn
+      %Aura{type: ^type, amount: amount, misc_value: misc}, acc
+      when is_integer(amount) and is_integer(misc) ->
+        if Bitwise.band(misc, school_mask) == 0, do: acc, else: acc * max(100 + amount, 0) / 100
+
+      _aura, acc ->
+        acc
+    end)
+  end
+
+  def percent_multiplier(_entity, _type, _school_mask), do: 1.0
+
+  defp holder_stacks(%Holder{stacks: stacks}) when is_integer(stacks) and stacks > 1, do: stacks
+  defp holder_stacks(_holder), do: 1
 
   def auras_of_type(%{unit: %Unit{auras: holders}}, type) when is_list(holders) do
     holders

@@ -63,13 +63,19 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
     |> apply_outcome(ctx, damage, opts)
   end
 
-  def resolve_special(defender, attack, damage, opts \\ []) when is_map(attack) do
+  def roll_special(defender, attack, opts \\ []) when is_map(attack) do
     ctx = context(defender, attack)
     roll = Keyword.get_lazy(opts, :roll, fn -> Math.random_int(0, 9_999) end)
 
-    ctx
-    |> roll_special_outcome(roll)
-    |> apply_special_outcome(ctx, damage, opts)
+    case roll_special_outcome(ctx, roll) do
+      :normal ->
+        crit_roll = Keyword.get_lazy(opts, :crit_roll, fn -> Math.random_int(0, 9_999) end)
+        crit? = crit_roll < crit_bp(ctx)
+        %{outcome: if(crit?, do: :crit, else: :normal), crit?: crit?}
+
+      outcome ->
+        %{outcome: outcome, crit?: false}
+    end
   end
 
   def armor_reduced_damage(damage, armor, attacker_level)
@@ -346,38 +352,6 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
       hit_info: @hitinfo_affects_victim,
       victim_state: @victimstate_normal
     }
-  end
-
-  defp apply_special_outcome(outcome, ctx, damage, opts) do
-    case outcome do
-      :miss ->
-        special_avoided(:miss)
-
-      :dodge ->
-        special_avoided(:dodge)
-
-      :parry ->
-        special_avoided(:parry)
-
-      :block ->
-        %{outcome: :block, damage: 0, blocked_amount: mitigated_damage(ctx, damage), crit?: false}
-
-      :normal ->
-        crit_roll = Keyword.get_lazy(opts, :crit_roll, fn -> Math.random_int(0, 9_999) end)
-        crit? = crit_roll < crit_bp(ctx)
-        multiplier = if crit?, do: @crit_multiplier, else: 1.0
-
-        %{
-          outcome: if(crit?, do: :crit, else: :normal),
-          damage: trunc(mitigated_damage(ctx, damage) * multiplier),
-          blocked_amount: 0,
-          crit?: crit?
-        }
-    end
-  end
-
-  defp special_avoided(outcome) do
-    %{outcome: outcome, damage: 0, blocked_amount: 0, crit?: false}
   end
 
   defp avoided(outcome, victim_state) do

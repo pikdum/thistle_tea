@@ -19,6 +19,7 @@ defmodule ThistleTea.Game.Aura.Holder do
     :expires_at,
     :charges,
     auras: [],
+    stacks: 1,
     negative?: false
   ]
 

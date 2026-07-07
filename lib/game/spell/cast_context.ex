@@ -7,10 +7,12 @@ defmodule ThistleTea.Game.Spell.CastContext do
   """
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Mob
+  alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.CombatRatings
   alias ThistleTea.Game.Entity.Logic.Skills
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
+  alias ThistleTea.Game.World.Loader.SpellThreat, as: SpellThreatLoader
 
   @schools [:physical, :holy, :fire, :nature, :frost, :shadow, :arcane]
 
@@ -39,8 +41,11 @@ defmodule ThistleTea.Game.Spell.CastContext do
     :attack_skill,
     :melee_crit_chance,
     :caster_power,
+    :spell_threat,
     spell_damage_bonus: %{},
-    healing_bonus: 0
+    healing_bonus: 0,
+    threat_multiplier: 1.0,
+    melee_crit?: false
   ]
 
   def from_caster(%{object: %{guid: guid}, unit: %{level: level}} = caster, spell, target_guid)
@@ -53,7 +58,9 @@ defmodule ThistleTea.Game.Spell.CastContext do
       target_guid: target_guid,
       spell: spell,
       spell_damage_bonus: spell_damage_bonus(caster),
-      healing_bonus: healing_bonus(caster)
+      healing_bonus: healing_bonus(caster),
+      spell_threat: SpellThreatLoader.get(spell_id(spell)),
+      threat_multiplier: Aura.percent_multiplier(caster, :mod_threat, Spell.school_mask(spell))
     }
     |> put_melee_snapshot(caster, spell)
   end
@@ -73,6 +80,9 @@ defmodule ThistleTea.Game.Spell.CastContext do
   defp caster_type(%Character{}), do: :player
   defp caster_type(%Mob{}), do: :mob
   defp caster_type(_), do: nil
+
+  defp spell_id(%Spell{id: id}), do: id
+  defp spell_id(_spell), do: nil
 
   defp caster_position(%{internal: %{map: map}, movement_block: %{position: {x, y, z, _o}}}) when is_integer(map) do
     {map, x, y, z}

@@ -190,53 +190,36 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTableTest do
     end
   end
 
-  describe "resolve_special/4" do
+  describe "roll_special/3" do
     test "walks miss, dodge, parry, block in order against a mob" do
       # even level: miss 500, dodge 500, parry 500, block 500
-      assert AttackTable.resolve_special(mob(), attack(), 100, roll: 499).outcome == :miss
-      assert AttackTable.resolve_special(mob(), attack(), 100, roll: 500).outcome == :dodge
-      assert AttackTable.resolve_special(mob(), attack(), 100, roll: 1_000).outcome == :parry
-      assert AttackTable.resolve_special(mob(), attack(), 100, roll: 1_500).outcome == :block
-      assert AttackTable.resolve_special(mob(), attack(), 100, roll: 2_000, crit_roll: 9_999).outcome == :normal
+      assert AttackTable.roll_special(mob(), attack(), roll: 499).outcome == :miss
+      assert AttackTable.roll_special(mob(), attack(), roll: 500).outcome == :dodge
+      assert AttackTable.roll_special(mob(), attack(), roll: 1_000).outcome == :parry
+      assert AttackTable.roll_special(mob(), attack(), roll: 1_500).outcome == :block
+      assert AttackTable.roll_special(mob(), attack(), roll: 2_000, crit_roll: 9_999).outcome == :normal
     end
 
-    test "avoided specials deal no damage" do
-      result = AttackTable.resolve_special(mob(), attack(), 100, roll: 500)
+    test "avoided specials never crit" do
+      result = AttackTable.roll_special(mob(), attack(), roll: 500)
 
-      assert result.damage == 0
+      assert result.outcome == :dodge
       assert result.crit? == false
-    end
-
-    test "blocked specials are fully blocked" do
-      result = AttackTable.resolve_special(mob(), attack(), 100, roll: 1_500)
-
-      assert result.outcome == :block
-      assert result.damage == 0
-      assert result.blocked_amount == 100
     end
 
     test "specials never glance or crush" do
       # a glancing-range roll for a white swing lands as a plain hit for a special
-      result = AttackTable.resolve_special(mob(), attack(), 100, roll: 2_000, crit_roll: 9_999)
+      result = AttackTable.roll_special(mob(), attack(), roll: 2_000, crit_roll: 9_999)
 
       assert result.outcome == :normal
-      assert result.damage == 100
+      assert result.crit? == false
     end
 
-    test "specials crit for double damage on the crit roll" do
-      result = AttackTable.resolve_special(mob(), attack(), 100, roll: 9_999, crit_roll: 0)
+    test "specials crit on the independent crit roll" do
+      result = AttackTable.roll_special(mob(), attack(), roll: 9_999, crit_roll: 0)
 
       assert result.outcome == :crit
       assert result.crit? == true
-      assert result.damage == 200
-    end
-
-    test "special damage takes armor mitigation" do
-      target = mob(unit: [normal_resistance: 1_000])
-
-      result = AttackTable.resolve_special(target, attack(), 100, roll: 9_999, crit_roll: 9_999)
-
-      assert result.damage == 68
     end
   end
 

@@ -24,7 +24,14 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
 
   def receive(target, %CastContext{} = context, %Spell{} = spell, now) when is_integer(now) do
     context = %{context | target_guid: target.object.guid, spell: spell}
-    apply_effects(target, context, spell.effects, [], now)
+
+    if melee_roll_required?(target, context, spell) do
+      receive_melee_ability(target, context, spell, now)
+    else
+      target
+      |> apply_effects(context, spell.effects, [], now)
+      |> with_bonus_threat(context)
+    end
   end
 
   def receive(target, caster_guid, %Spell{} = spell, now) when is_integer(caster_guid) and is_integer(now) do
@@ -32,6 +39,37 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   end
 
   def receive(target, _context, _spell, _now), do: {target, []}
+
+  defp melee_roll_required?(%{object: %{guid: target_guid}}, %CastContext{caster_guid: caster_guid}, spell) do
+    Spell.melee_ability?(spell) and target_guid != caster_guid
+  end
+
+  defp receive_melee_ability(target, %CastContext{} = context, spell, now) do
+    result = AttackTable.roll_special(target, special_attack(context, spell))
+
+    case result.outcome do
+      outcome when outcome in [:miss, :dodge, :parry, :block] ->
+        target = maybe_mark_defense(target, outcome, now)
+        {target, melee_avoid_events(target, context, spell, outcome)}
+
+      _hit ->
+        context = %{context | melee_crit?: result.crit?}
+
+        target
+        |> apply_effects(context, spell.effects, [], now)
+        |> with_bonus_threat(context)
+    end
+  end
+
+  defp with_bonus_threat({target, events}, %CastContext{} = context) do
+    case context.spell_threat do
+      %{threat: flat} when is_number(flat) and flat > 0 ->
+        {Threat.add(target, context.caster_guid, flat * (context.threat_multiplier || 1.0)), events}
+
+      _no_bonus ->
+        {target, events}
+    end
+  end
 
   defp apply_effects(target, context, effects, events, now) do
     apply_effects(target, context, effects, events, false, now)
@@ -101,7 +139,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
 
   defp apply_effect(state, %CastContext{} = context, spell, %Effect{type: :school_damage} = effect, now) do
     if Spell.melee_ability?(spell) do
-      resolve_melee_special(state, context, spell, Effect.damage_roll(effect), now)
+      melee_ability_damage(state, context, spell, Effect.damage_roll(effect), now)
     else
       apply_damage_effect(state, context, spell, effect, now)
     end
@@ -109,7 +147,11 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
 
   defp apply_effect(state, %CastContext{} = context, spell, %Effect{type: type} = effect, now)
        when type in [:weapon_damage, :weapon_damage_noschool, :normalized_weapon_damage, :weapon_percent_damage] do
-    resolve_melee_special(state, context, spell, weapon_ability_damage(context, effect), now)
+    melee_ability_damage(state, context, spell, weapon_ability_damage(context, effect), now)
+  end
+
+  defp apply_effect(state, %CastContext{} = context, _spell, %Effect{type: :attack_me}, _now) do
+    {Threat.taunt(state, context.caster_guid), []}
   end
 
   defp apply_effect(state, %CastContext{} = context, spell, %Effect{type: :heal} = effect, _now) do
@@ -281,7 +323,12 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
     resisted = school_resisted_amount(state, damage, school, context.caster_level, opts)
     damage = damage - resisted
 
-    {state, absorbed} = Core.take_damage_with_absorb(state, damage, now, school: school, source: context.caster_guid)
+    {state, absorbed} =
+      Core.take_damage_with_absorb(state, damage, now,
+        school: school,
+        source: context.caster_guid,
+        threat_multiplier: damage_threat_multiplier(context)
+      )
 
     event =
       Event.spell_damage(
@@ -373,28 +420,6 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
 
   defp attack_power_bonus(_context, _speed_seconds), do: 0
 
-  defp resolve_melee_special(state, %CastContext{} = context, spell, damage, now) do
-    {state, events, _outcome} = do_resolve_melee_special(state, context, spell, damage, now)
-    {state, events}
-  end
-
-  defp do_resolve_melee_special(state, %CastContext{} = context, spell, damage, now) do
-    damage =
-      max(trunc(damage) + Aura.flat_modifier(state, :mod_damage_taken, Spell.school_mask(spell)), 0)
-
-    result = AttackTable.resolve_special(state, special_attack(context, spell), damage)
-
-    case result.outcome do
-      outcome when outcome in [:miss, :dodge, :parry, :block] ->
-        state = maybe_mark_defense(state, outcome, now)
-        {state, melee_avoid_events(state, context, spell, outcome), outcome}
-
-      outcome ->
-        {state, events} = apply_melee_special_damage(state, context, spell, result, now)
-        {state, events, outcome}
-    end
-  end
-
   defp maybe_mark_defense(state, outcome, now) when outcome in [:dodge, :parry, :block] do
     Reactive.mark_defense(state, now)
   end
@@ -406,28 +431,50 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
     damage = Effect.damage_roll(effect) + trunc(rage * effect.damage_multiplier)
     damage_spell = %{spell | id: Scripts.execute_damage_spell_id()}
 
-    {state, events, outcome} = do_resolve_melee_special(state, context, damage_spell, damage, now)
+    {state, events} = melee_ability_damage(state, context, damage_spell, damage, now)
 
-    if outcome in [:miss, :dodge, :parry, :block] do
-      {state, events}
-    else
-      {state, events ++ [Event.drain_rage(context.caster_guid)]}
-    end
+    {state, events ++ [Event.drain_rage(context.caster_guid)]}
   end
 
-  defp apply_melee_special_damage(state, %CastContext{} = context, spell, result, now) do
+  defp melee_ability_damage(state, %CastContext{} = context, spell, damage, now) do
     school = school_atom(spell)
 
+    damage =
+      max(trunc(damage) + Aura.flat_modifier(state, :mod_damage_taken, Spell.school_mask(spell)), 0)
+
+    damage = mitigate_physical(state, context, school, damage)
+    damage = if context.melee_crit?, do: damage * 2, else: damage
+
     {state, absorbed} =
-      Core.take_damage_with_absorb(state, result.damage, now, school: school, source: context.caster_guid)
+      Core.take_damage_with_absorb(state, damage, now,
+        school: school,
+        source: context.caster_guid,
+        threat_multiplier: damage_threat_multiplier(context)
+      )
 
     event =
-      Event.spell_damage(context.caster_guid, state.object.guid, spell, result.damage,
+      Event.spell_damage(context.caster_guid, state.object.guid, spell, damage,
         absorbed: absorbed,
-        crit?: result.crit?
+        crit?: context.melee_crit? || false
       )
 
     {state, [event]}
+  end
+
+  defp mitigate_physical(%{unit: %{normal_resistance: armor}}, %CastContext{} = context, :physical, damage)
+       when damage > 0 do
+    AttackTable.armor_reduced_damage(damage, armor || 0, context.caster_level)
+  end
+
+  defp mitigate_physical(_state, _context, _school, damage), do: damage
+
+  defp damage_threat_multiplier(%CastContext{} = context) do
+    base = context.threat_multiplier || 1.0
+
+    case context.spell_threat do
+      %{multiplier: multiplier} when is_number(multiplier) -> base * multiplier
+      _no_entry -> base
+    end
   end
 
   defp melee_avoid_events(%{object: %{guid: target_guid}}, %CastContext{} = context, spell, outcome) do

@@ -199,7 +199,8 @@ defmodule ThistleTea.Game.World.Loader.Spell do
       dmg_class: row.defence_type || 0,
       stances: row.shapeshift_mask || 0,
       caster_aura_state: row.caster_aura_state || 0,
-      target_aura_state: row.target_aura_state || 0
+      target_aura_state: row.target_aura_state || 0,
+      stack_amount: row.stack_amount || 0
     }
   end
 
@@ -423,6 +424,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp effect_type(58), do: :weapon_damage
   defp effect_type(64), do: :trigger_spell
   defp effect_type(113), do: :resurrect_new
+  defp effect_type(114), do: :attack_me
   defp effect_type(other) when is_integer(other), do: other
 
   defp aura_type(0), do: nil

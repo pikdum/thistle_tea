@@ -64,7 +64,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
       entity
       |> gain_taken_rage(remaining, Keyword.get(opts, :source))
       |> Reactive.sync_health()
-      |> Threat.add_damage(Keyword.get(opts, :source), damage)
+      |> Threat.add_damage(Keyword.get(opts, :source), damage * Keyword.get(opts, :threat_multiplier, 1.0))
       |> maybe_enqueue_death_root(health, new_health)
       |> maybe_record_killer(health, new_health, Keyword.get(opts, :source))
       |> mark_broadcast_update()

@@ -4,6 +4,7 @@ defmodule ThistleTea.Game.World.Loader.SpellVmangosTest do
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
+  alias ThistleTea.Game.World.Loader.SpellThreat
 
   @moduletag :vmangos_db
 
@@ -44,6 +45,30 @@ defmodule ThistleTea.Game.World.Loader.SpellVmangosTest do
       spell = SpellLoader.load(1680)
 
       assert spell.stances == 0x40000
+    end
+  end
+
+  describe "spell threat" do
+    alias SpellThreat, as: SpellThreatLoader
+
+    test "heroic strike carries flat bonus threat" do
+      assert %{threat: 20.0, multiplier: 1.0} = SpellThreatLoader.get(78)
+    end
+
+    test "revenge carries a threat multiplier" do
+      assert %{threat: 63.0, multiplier: 2.25} = SpellThreatLoader.get(6572)
+    end
+
+    test "spells without entries return nil" do
+      assert SpellThreatLoader.get(133) == nil
+    end
+  end
+
+  describe "sunder armor" do
+    test "loads its stack cap" do
+      spell = SpellLoader.load(7386)
+
+      assert spell.stack_amount == 5
     end
   end
 

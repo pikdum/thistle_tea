@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.Entity.Logic.WarriorSpellsTest do
   alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.Entity.Logic.Reactive
   alias ThistleTea.Game.Entity.Logic.SpellEffect
+  alias ThistleTea.Game.Entity.Logic.Threat
   alias ThistleTea.Game.Player.Spellcasting
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
@@ -396,6 +397,168 @@ defmodule ThistleTea.Game.Entity.Logic.WarriorSpellsTest do
       {_target, events} = SpellEffect.receive(target, context, spell, 1_000)
 
       refute Enum.any?(events, &(&1.type == :drain_rage))
+      assert Enum.any?(events, &(&1.type == :spell_log_miss))
+    end
+  end
+
+  describe "sunder armor stacking" do
+    defp sunder_spell do
+      %Spell{
+        id: 7386,
+        name: "Sunder Armor",
+        school: :physical,
+        duration_ms: 30_000,
+        stack_amount: 5,
+        effects: [
+          %Effect{index: 0, type: :apply_aura, aura: :mod_resistance, base_points: -91, die_sides: 1, misc_value: 1}
+        ]
+      }
+    end
+
+    defp armored_mob do
+      %Mob{
+        object: %Object{guid: 9},
+        unit: %Unit{
+          health: 200,
+          max_health: 200,
+          level: 10,
+          base_normal_resistance: 1_000,
+          normal_resistance: 1_000,
+          auras: []
+        },
+        internal: %Internal{map: 0, in_combat: true},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
+      }
+    end
+
+    test "reapplying sunder stacks up to the cap and scales the armor reduction" do
+      mob = armored_mob()
+
+      {mob, _events} = Aura.apply_spell(mob, 5, 10, sunder_spell(), 1_000)
+      assert [%Holder{stacks: 1}] = mob.unit.auras
+      assert mob.unit.normal_resistance == 910
+
+      {mob, _events} = Aura.apply_spell(mob, 5, 10, sunder_spell(), 2_000)
+      assert [%Holder{stacks: 2}] = mob.unit.auras
+      assert mob.unit.normal_resistance == 820
+
+      mob =
+        Enum.reduce(1..6, mob, fn i, acc ->
+          {acc, _events} = Aura.apply_spell(acc, 5, 10, sunder_spell(), 2_000 + i)
+          acc
+        end)
+
+      assert [%Holder{stacks: 5}] = mob.unit.auras
+      assert mob.unit.normal_resistance == 550
+    end
+  end
+
+  describe "taunt" do
+    defp threatened_mob(threat_table, target) do
+      %Mob{
+        object: %Object{guid: 9},
+        unit: %Unit{health: 200, max_health: 200, level: 10, target: target, auras: []},
+        internal: %Internal{map: 0, in_combat: true, threat: threat_table},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
+      }
+    end
+
+    test "attack_me raises the taunter to the top of the threat table" do
+      mob = threatened_mob(%{100 => 500.0}, 100)
+
+      spell = %Spell{
+        id: 355,
+        name: "Taunt",
+        school: :physical,
+        effects: [%Effect{index: 0, type: :attack_me, base_points: 0}]
+      }
+
+      context = %CastContext{caster_guid: 5, caster_level: 10, target_hostile?: true}
+
+      {mob, _events} = SpellEffect.receive(mob, context, spell, 1_000)
+
+      assert mob.internal.threat[5] == 500.0
+    end
+
+    test "an active taunt aura forces victim selection onto the taunter" do
+      mob = threatened_mob(%{100 => 500.0, 5 => 500.0}, 100)
+
+      taunt_aura = %Spell{
+        id: 355,
+        name: "Taunt",
+        school: :physical,
+        duration_ms: 3_000,
+        effects: [%Effect{index: 0, type: :apply_aura, aura: :mod_taunt, base_points: 0}]
+      }
+
+      {mob, _events} = Aura.apply_spell(mob, 5, 10, taunt_aura, 1_000)
+
+      {_mob, decision} = Threat.reselect(mob, valid?: fn _guid -> true end, in_melee?: fn _guid -> true end)
+
+      assert decision == {:switch, 5}
+    end
+
+    test "without the taunt aura equal threat keeps the current victim" do
+      mob = threatened_mob(%{100 => 500.0, 5 => 500.0}, 100)
+
+      {_mob, decision} = Threat.reselect(mob, valid?: fn _guid -> true end, in_melee?: fn _guid -> true end)
+
+      assert decision == :keep
+    end
+  end
+
+  describe "bonus spell threat" do
+    test "flat spell threat lands on the mob scaled by the stance multiplier" do
+      mob = %Mob{
+        object: %Object{guid: 9},
+        unit: %Unit{health: 200, max_health: 200, level: 10, auras: []},
+        internal: %Internal{map: 0, in_combat: true, threat: %{}},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
+      }
+
+      spell = %Spell{
+        id: 7386,
+        name: "Sunder Armor",
+        school: :physical,
+        duration_ms: 30_000,
+        stack_amount: 5,
+        effects: [%Effect{index: 0, type: :apply_aura, aura: :mod_resistance, base_points: -91, misc_value: 1}]
+      }
+
+      context = %CastContext{
+        caster_guid: 5,
+        caster_level: 10,
+        target_hostile?: true,
+        spell_threat: %{threat: 45.0, multiplier: 1.0},
+        threat_multiplier: 1.3
+      }
+
+      {mob, _events} = SpellEffect.receive(mob, context, spell, 1_000)
+
+      assert_in_delta mob.internal.threat[5], 58.5, 0.001
+    end
+  end
+
+  describe "dodged melee abilities" do
+    test "a dodged ability applies none of its effects" do
+      spell = %Spell{
+        id: 1715,
+        name: "Hamstring",
+        school: :physical,
+        dmg_class: 2,
+        duration_ms: 15_000,
+        effects: [
+          %Effect{index: 0, type: :school_damage, base_points: 4, die_sides: 1},
+          %Effect{index: 1, type: :apply_aura, aura: :mod_decrease_speed, base_points: -41}
+        ]
+      }
+
+      target = melee_target(level: 60, helpless?: false)
+
+      {target, events} = SpellEffect.receive(target, melee_context(spell), spell, 1_000)
+
+      assert target.unit.health == 200
+      assert target.unit.auras == []
       assert Enum.any?(events, &(&1.type == :spell_log_miss))
     end
   end

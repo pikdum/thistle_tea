@@ -195,8 +195,9 @@ defmodule ThistleTea.Game.Entity.Logic.Stats do
   end
 
   defp sum_aura_amounts(%Unit{auras: holders}, fun) when is_list(holders) do
-    Enum.reduce(holders, 0, fn %Holder{auras: auras}, acc ->
-      Enum.reduce(auras, acc, &(fun.(&1) + &2))
+    Enum.reduce(holders, 0, fn %Holder{auras: auras} = holder, acc ->
+      stacks = if is_integer(holder.stacks) and holder.stacks > 1, do: holder.stacks, else: 1
+      Enum.reduce(auras, acc, &(fun.(&1) * stacks + &2))
     end)
   end
 

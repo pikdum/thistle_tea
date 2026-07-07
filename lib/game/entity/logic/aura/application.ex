@@ -30,7 +30,8 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
     :mod_fear,
     :mod_confuse,
     :mod_possess,
-    :mod_detect_range
+    :mod_detect_range,
+    :mod_taunt
   ]
 
   @aura_interrupt_not_seated 0x40000
@@ -232,10 +233,24 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
 
       index ->
         old = Enum.at(existing, index)
-        refreshed = %{incoming | slot: old.slot, auras: carry_tick_times(old.auras, incoming.auras)}
+
+        refreshed = %{
+          incoming
+          | slot: old.slot,
+            stacks: next_stacks(old, incoming),
+            auras: carry_tick_times(old.auras, incoming.auras)
+        }
+
         List.replace_at(existing, index, refreshed)
     end
   end
+
+  defp next_stacks(%Holder{stacks: stacks}, %Holder{spell: %Spell{stack_amount: cap}})
+       when is_integer(cap) and cap > 1 do
+    min((stacks || 1) + 1, cap)
+  end
+
+  defp next_stacks(_old, _incoming), do: 1
 
   defp carry_tick_times(old_auras, new_auras) do
     Enum.map(new_auras, fn %Aura{} = aura ->

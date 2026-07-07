@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AttackTable
+  alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Combat, as: CombatLogic
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Event
@@ -180,7 +181,12 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
   defp melee_attack_payload(%{object: %{guid: guid}} = state) do
     {min_damage, max_damage} = CombatLogic.damage_range(state)
 
-    %{caster: guid, min_damage: min_damage, max_damage: max_damage}
+    %{
+      caster: guid,
+      min_damage: min_damage,
+      max_damage: max_damage,
+      threat_multiplier: Aura.percent_multiplier(state, :mod_threat, Spell.school_mask(:physical))
+    }
     |> Map.merge(AttackTable.attacker_context(state))
     |> Map.merge(attack_skill_context(state))
   end

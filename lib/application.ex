@@ -26,6 +26,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.World.Loader.PageText, as: PageTextLoader
   alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
+  alias ThistleTea.Game.World.Loader.SpellThreat, as: SpellThreatLoader
   alias ThistleTea.Game.World.Loader.Summon, as: SummonLoader
   alias ThistleTea.Game.World.Loader.Trainer, as: TrainerLoader
   alias ThistleTea.Game.World.Loader.Vendor, as: VendorLoader
@@ -108,6 +109,7 @@ defmodule ThistleTea.Application do
     CreatureTemplateLoader.init()
     GameObjectTemplateLoader.init()
     SpellLoader.init()
+    SpellThreatLoader.init()
     TrainerLoader.init()
     ClassSpellLoader.init()
     LootLoader.init()
