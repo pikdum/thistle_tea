@@ -218,7 +218,8 @@ defmodule ThistleTea.Game.Network.Server do
   end
 
   def handle_cast({:attack_outcome, payload}, {socket, %{character: %Character{} = character} = state}) do
-    character = AttackFeedback.receive(character, payload, Time.now())
+    spell = spellbook_spell(character, Map.get(payload, :spell_id))
+    character = AttackFeedback.receive(character, payload, spell, Time.now())
     {:noreply, {socket, %{state | character: character}}, {:continue, :maybe_broadcast_update}}
   end
 
@@ -521,6 +522,13 @@ defmodule ThistleTea.Game.Network.Server do
       %{state | player_tick_ref: nil}
     end
   end
+
+  defp spellbook_spell(%Character{internal: %Internal{spellbook: spellbook}}, spell_id)
+       when is_map(spellbook) and is_integer(spell_id) do
+    Map.get(spellbook, spell_id)
+  end
+
+  defp spellbook_spell(_character, _spell_id), do: nil
 
   defp apply_kill_reward(state, victim, xp) do
     state =

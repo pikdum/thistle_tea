@@ -71,9 +71,12 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.CombatTest do
       assert {:success, mob, %Blackboard{}} = Combat.melee_attack(mob, blackboard, 1_000)
 
       assert [
+               %Event{type: :spell_cast_result, spell_id: 78},
                %Event{type: :spell_go, spell_id: 78, hit_guids: [^target_guid]},
-               %Event{type: :deliver_attack, attack: %{spell_id: 78, queued_spell_id: 78}}
+               %Event{type: :deliver_spell, target_guid: ^target_guid, spell: %Spell{id: 78}}
              ] = mob.internal.events
+
+      assert mob.internal.next_swing_spell == nil
     end
 
     test "swings immediately on fresh aggro when already in reach" do

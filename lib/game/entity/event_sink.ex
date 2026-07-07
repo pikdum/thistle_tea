@@ -39,6 +39,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
 
   @victimstate_normal 1
   @heal_threat_radius 100.0
+  @spell_hit_type_crit 0x2
 
   def emit_pending(entity) do
     {entity, events} = Event.drain(entity)
@@ -58,7 +59,20 @@ defmodule ThistleTea.Game.Entity.EventSink do
       school: Spell.school_index(event.school),
       periodic?: event.periodic?,
       absorbed: event.absorbed || 0,
-      resisted: event.resisted || 0
+      resisted: event.resisted || 0,
+      blocked: event.blocked || 0,
+      hit_info: if(event.crit?, do: @spell_hit_type_crit, else: 0)
+    }
+    |> World.broadcast_packet(entity)
+
+    entity
+  end
+
+  def emit(entity, %Event{type: :spell_log_miss} = event) do
+    %Message.SmsgSpellLogMiss{
+      spell_id: event.spell_id,
+      caster: event.source_guid,
+      targets: [{event.target_guid, event.reason}]
     }
     |> World.broadcast_packet(entity)
 

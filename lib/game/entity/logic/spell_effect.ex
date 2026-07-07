@@ -3,6 +3,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   Applies a cast spell's effects (damage, healing, auras, item creation, …) to
   a target entity, returning the updated entity and the events to emit.
   """
+  alias ThistleTea.Game.Entity.Logic.AttackTable
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Death
@@ -10,6 +11,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   alias ThistleTea.Game.Entity.Logic.Resources
   alias ThistleTea.Game.Entity.Logic.SpellResist
   alias ThistleTea.Game.Entity.Logic.Threat
+  alias ThistleTea.Game.Math
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Effect
@@ -97,7 +99,16 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   defp channel_ticked_trigger?(_spell, _effect), do: false
 
   defp apply_effect(state, %CastContext{} = context, spell, %Effect{type: :school_damage} = effect, now) do
-    apply_damage_effect(state, context, spell, effect, now)
+    if Spell.melee_ability?(spell) do
+      resolve_melee_special(state, context, spell, Effect.damage_roll(effect), now)
+    else
+      apply_damage_effect(state, context, spell, effect, now)
+    end
+  end
+
+  defp apply_effect(state, %CastContext{} = context, spell, %Effect{type: type} = effect, now)
+       when type in [:weapon_damage, :weapon_damage_noschool, :normalized_weapon_damage, :weapon_percent_damage] do
+    resolve_melee_special(state, context, spell, weapon_ability_damage(context, effect), now)
   end
 
   defp apply_effect(state, %CastContext{} = context, spell, %Effect{type: :heal} = effect, _now) do
@@ -310,4 +321,95 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
 
   defp school_atom(%Spell{school: school}) when is_atom(school), do: school
   defp school_atom(%Spell{} = spell), do: Enum.at(@schools, Spell.school_index(spell), :physical)
+
+  defp weapon_ability_damage(%CastContext{} = context, %Effect{type: :normalized_weapon_damage} = effect) do
+    normalized_weapon_roll(context) + Effect.damage_roll(effect)
+  end
+
+  defp weapon_ability_damage(%CastContext{} = context, %Effect{type: :weapon_percent_damage} = effect) do
+    trunc(weapon_roll(context) * Effect.damage_roll(effect) / 100)
+  end
+
+  defp weapon_ability_damage(%CastContext{} = context, %Effect{} = effect) do
+    weapon_roll(context) + Effect.damage_roll(effect)
+  end
+
+  defp weapon_roll(%CastContext{attack_time_ms: attack_time_ms} = context)
+       when is_number(attack_time_ms) and attack_time_ms > 0 do
+    weapon_base_roll(context) + attack_power_bonus(context, attack_time_ms / 1000)
+  end
+
+  defp weapon_roll(%CastContext{} = context), do: weapon_base_roll(context)
+
+  defp normalized_weapon_roll(%CastContext{normalized_speed: speed} = context) when is_number(speed) and speed > 0 do
+    weapon_base_roll(context) + attack_power_bonus(context, speed)
+  end
+
+  defp normalized_weapon_roll(%CastContext{} = context), do: weapon_roll(context)
+
+  defp weapon_base_roll(%CastContext{weapon_base_min: min, weapon_base_max: max})
+       when is_number(min) and is_number(max) do
+    Math.random_int(trunc(min), max(trunc(max), trunc(min)))
+  end
+
+  defp weapon_base_roll(_context), do: 0
+
+  defp attack_power_bonus(%CastContext{attack_power: attack_power}, speed_seconds)
+       when is_integer(attack_power) and attack_power > 0 do
+    trunc(attack_power / 14 * speed_seconds)
+  end
+
+  defp attack_power_bonus(_context, _speed_seconds), do: 0
+
+  defp resolve_melee_special(state, %CastContext{} = context, spell, damage, now) do
+    damage =
+      max(trunc(damage) + Aura.flat_modifier(state, :mod_damage_taken, Spell.school_mask(spell)), 0)
+
+    result = AttackTable.resolve_special(state, special_attack(context, spell), damage)
+
+    case result.outcome do
+      outcome when outcome in [:miss, :dodge, :parry, :block] ->
+        {state, melee_avoid_events(state, context, spell, outcome)}
+
+      _hit ->
+        apply_melee_special_damage(state, context, spell, result, now)
+    end
+  end
+
+  defp apply_melee_special_damage(state, %CastContext{} = context, spell, result, now) do
+    school = school_atom(spell)
+
+    {state, absorbed} =
+      Core.take_damage_with_absorb(state, result.damage, now, school: school, source: context.caster_guid)
+
+    event =
+      Event.spell_damage(context.caster_guid, state.object.guid, spell, result.damage,
+        absorbed: absorbed,
+        crit?: result.crit?
+      )
+
+    {state, [event]}
+  end
+
+  defp melee_avoid_events(%{object: %{guid: target_guid}}, %CastContext{} = context, spell, outcome) do
+    [
+      Event.spell_log_miss(context.caster_guid, target_guid, spell.id, outcome),
+      Event.attack_outcome(context.caster_guid, target_guid, outcome, 0, spell.id)
+    ]
+  end
+
+  defp special_attack(%CastContext{} = context, spell) do
+    %{
+      caster: context.caster_guid,
+      caster_level: context.caster_level,
+      caster_player?: context.caster_type == :player,
+      caster_attack_skill: context.attack_skill,
+      crit_chance: context.melee_crit_chance,
+      caster_position: attack_position(context.caster_position),
+      spell_school_mask: Spell.school_mask(spell)
+    }
+  end
+
+  defp attack_position({_map, x, y, z}), do: {x, y, z}
+  defp attack_position(_position), do: nil
 end

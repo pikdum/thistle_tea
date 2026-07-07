@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackFeedbackTest do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.AttackFeedback
+  alias ThistleTea.Game.Spell
 
   defp warrior(level \\ 60) do
     %Mob{
@@ -42,6 +43,41 @@ defmodule ThistleTea.Game.Entity.Logic.AttackFeedbackTest do
       entity = warrior()
 
       assert AttackFeedback.receive(entity, %{outcome: :normal, damage: 200, spell_id: 78}, 1_000) == entity
+    end
+
+    test "dodged rage abilities refund 82 percent of the cost" do
+      entity = warrior()
+
+      spell = %Spell{
+        id: 78,
+        mana_cost: 150,
+        power_type: 1,
+        attributes: MapSet.new([:discount_power_on_miss])
+      }
+
+      entity = AttackFeedback.receive(entity, %{outcome: :dodge, damage: 0, spell_id: 78}, spell, 1_000)
+
+      assert entity.unit.power2 == 123
+    end
+
+    test "abilities without the refund attribute get nothing back on dodge" do
+      entity = warrior()
+      spell = %Spell{id: 78, mana_cost: 150, power_type: 1}
+
+      assert AttackFeedback.receive(entity, %{outcome: :dodge, damage: 0, spell_id: 78}, spell, 1_000) == entity
+    end
+
+    test "abilities that land grant no rage even with the spell known" do
+      entity = warrior()
+
+      spell = %Spell{
+        id: 78,
+        mana_cost: 150,
+        power_type: 1,
+        attributes: MapSet.new([:discount_power_on_miss])
+      }
+
+      assert AttackFeedback.receive(entity, %{outcome: :normal, damage: 200, spell_id: 78}, spell, 1_000) == entity
     end
 
     test "ignores non-rage users" do

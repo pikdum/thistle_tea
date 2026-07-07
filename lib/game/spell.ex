@@ -114,12 +114,29 @@ defmodule ThistleTea.Game.Spell do
     Enum.filter(effects, &match?(%Effect{type: :apply_aura}, &1))
   end
 
+  @damage_effect_types [
+    :school_damage,
+    :weapon_damage,
+    :weapon_damage_noschool,
+    :normalized_weapon_damage,
+    :weapon_percent_damage
+  ]
+
+  @weapon_damage_effect_types [
+    :weapon_damage,
+    :weapon_damage_noschool,
+    :normalized_weapon_damage,
+    :weapon_percent_damage
+  ]
+
   def damage_effects(%__MODULE__{effects: effects}) do
-    Enum.filter(
-      effects,
-      &match?(%Effect{type: type} when type in [:school_damage, :weapon_damage, :weapon_damage_noschool], &1)
-    )
+    Enum.filter(effects, &match?(%Effect{type: type} when type in @damage_effect_types, &1))
   end
+
+  def weapon_damage_effect_types, do: @weapon_damage_effect_types
+
+  def melee_ability?(%__MODULE__{dmg_class: 2}), do: true
+  def melee_ability?(_spell), do: false
 
   def channel_tick_ms(%__MODULE__{effects: effects}) do
     effects

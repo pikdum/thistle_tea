@@ -7,19 +7,21 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Unit
-  alias ThistleTea.Game.Entity.Data.ItemTemplate
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AttackTable
   alias ThistleTea.Game.Entity.Logic.Combat, as: CombatLogic
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Event
+  alias ThistleTea.Game.Entity.Logic.Hostility
   alias ThistleTea.Game.Entity.Logic.MeleeSpell
   alias ThistleTea.Game.Entity.Logic.PlayerCombat
   alias ThistleTea.Game.Entity.Logic.Resources
   alias ThistleTea.Game.Entity.Logic.Skills
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.BinaryUtils
+  alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
@@ -144,29 +146,43 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
   end
 
   defp send_melee_attack(state, target) when is_integer(target) do
-    {state, attack, queued_spell} = melee_attack_payload(state)
-    attack = CombatLogic.finalize_attack(attack)
+    {state, queued_spell} = MeleeSpell.consume_next_swing(state)
 
-    state =
-      state
-      |> maybe_weapon_skill_up(target)
-      |> Resources.spend_power(queued_spell, Time.now())
-      |> queue_self_update()
-      |> queue_queued_spell_go(queued_spell, target)
+    case queued_spell do
+      %Spell{} = spell -> send_queued_spell_swing(state, spell, target)
+      _no_queued_spell -> send_white_swing(state, target)
+    end
+  end
 
-    Event.enqueue(state, Event.deliver_attack(target, attack))
+  defp send_white_swing(state, target) do
+    attack = CombatLogic.finalize_attack(melee_attack_payload(state))
+
+    state
+    |> maybe_weapon_skill_up(target)
+    |> queue_self_update()
+    |> Event.enqueue(Event.deliver_attack(target, attack))
+  end
+
+  defp send_queued_spell_swing(state, %Spell{} = spell, target) do
+    context = %{
+      CastContext.from_caster(state, spell, target)
+      | target_hostile?: Hostility.valid_attack_target?(state, target)
+    }
+
+    state
+    |> maybe_weapon_skill_up(target)
+    |> Resources.spend_power(spell, Time.now())
+    |> queue_self_update()
+    |> queue_queued_spell_go(spell, target)
+    |> Event.enqueue(Event.deliver_spell(target, context, spell))
   end
 
   defp melee_attack_payload(%{object: %{guid: guid}} = state) do
-    {state, queued_spell} = MeleeSpell.consume_next_swing(state)
     {min_damage, max_damage} = CombatLogic.damage_range(state)
 
-    attack =
-      %{caster: guid, min_damage: min_damage, max_damage: max_damage}
-      |> Map.merge(AttackTable.attacker_context(state))
-      |> Map.merge(attack_skill_context(state))
-
-    {state, MeleeSpell.apply_to_attack(attack, queued_spell), queued_spell}
+    %{caster: guid, min_damage: min_damage, max_damage: max_damage}
+    |> Map.merge(AttackTable.attacker_context(state))
+    |> Map.merge(attack_skill_context(state))
   end
 
   defp attack_skill_context(%Character{unit: unit, player: player}) when is_struct(player) do
@@ -177,13 +193,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
   defp attack_skill_context(_state), do: %{}
 
   defp weapon_skill_id(player) do
-    with entry when is_integer(entry) and entry > 0 <- player.visible_item_16_0,
-         %ItemTemplate{class: 2, subclass: subclass} <- ItemLoader.get_template(entry),
-         skill when is_integer(skill) <- Skills.weapon_skill_for_subclass(subclass) do
-      skill
-    else
-      _unarmed -> Skills.unarmed_skill()
-    end
+    Skills.main_hand_weapon_skill(player, &ItemLoader.get_template/1)
   end
 
   defp maybe_weapon_skill_up(%Character{unit: unit, player: player} = state, target) when is_struct(player) do
@@ -201,7 +211,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
 
   defp queue_queued_spell_go(%{object: %{guid: guid}} = state, %{id: spell_id}, target)
        when is_integer(guid) and is_integer(spell_id) and is_integer(target) do
-    Event.enqueue(state, Event.spell_go(guid, spell_id, [target], unit_target_raw(target)))
+    Event.enqueue(state, [
+      Event.spell_cast_result(spell_id),
+      Event.spell_go(guid, spell_id, [target], unit_target_raw(target))
+    ])
   end
 
   defp queue_queued_spell_go(state, _queued_spell, _target), do: state

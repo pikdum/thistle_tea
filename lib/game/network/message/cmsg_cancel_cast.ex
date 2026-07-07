@@ -11,7 +11,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgCancelCast do
   @impl ClientMessage
   def handle(%__MODULE__{}, state) do
     Logger.info("CMSG_CANCEL_CAST")
-    Spellcasting.cancel(state)
+    Spellcasting.cancel_cast_request(state)
   end
 
   @impl ClientMessage

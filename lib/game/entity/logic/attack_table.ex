@@ -63,6 +63,15 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
     |> apply_outcome(ctx, damage, opts)
   end
 
+  def resolve_special(defender, attack, damage, opts \\ []) when is_map(attack) do
+    ctx = context(defender, attack)
+    roll = Keyword.get_lazy(opts, :roll, fn -> Math.random_int(0, 9_999) end)
+
+    ctx
+    |> roll_special_outcome(roll)
+    |> apply_special_outcome(ctx, damage, opts)
+  end
+
   def armor_reduced_damage(damage, armor, attacker_level)
       when is_integer(damage) and is_integer(attacker_level) and attacker_level > 0 do
     armor = max(armor || 0, 0)
@@ -105,19 +114,33 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
   end
 
   defp roll_outcome(ctx, roll) do
-    steps =
+    [
+      {:miss, miss_bp(ctx)},
+      sitting_crit_step(ctx),
+      {:dodge, dodge_bp(ctx)},
+      {:parry, parry_bp(ctx)},
+      {:glancing, glancing_bp(ctx)},
+      {:block, block_bp(ctx)},
+      {:crit, crit_bp(ctx)},
+      {:crushing, crushing_bp(ctx)}
+    ]
+    |> Enum.reject(&is_nil/1)
+    |> walk_steps(roll)
+  end
+
+  defp roll_special_outcome(ctx, roll) do
+    walk_steps(
       [
         {:miss, miss_bp(ctx)},
-        sitting_crit_step(ctx),
         {:dodge, dodge_bp(ctx)},
         {:parry, parry_bp(ctx)},
-        {:glancing, glancing_bp(ctx)},
-        {:block, block_bp(ctx)},
-        {:crit, crit_bp(ctx)},
-        {:crushing, crushing_bp(ctx)}
-      ]
-      |> Enum.reject(&is_nil/1)
+        {:block, block_bp(ctx)}
+      ],
+      roll
+    )
+  end
 
+  defp walk_steps(steps, roll) do
     steps
     |> Enum.reduce_while(0, fn {outcome, chance_bp}, acc ->
       cond do
@@ -323,6 +346,38 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
       hit_info: @hitinfo_affects_victim,
       victim_state: @victimstate_normal
     }
+  end
+
+  defp apply_special_outcome(outcome, ctx, damage, opts) do
+    case outcome do
+      :miss ->
+        special_avoided(:miss)
+
+      :dodge ->
+        special_avoided(:dodge)
+
+      :parry ->
+        special_avoided(:parry)
+
+      :block ->
+        %{outcome: :block, damage: 0, blocked_amount: mitigated_damage(ctx, damage), crit?: false}
+
+      :normal ->
+        crit_roll = Keyword.get_lazy(opts, :crit_roll, fn -> Math.random_int(0, 9_999) end)
+        crit? = crit_roll < crit_bp(ctx)
+        multiplier = if crit?, do: @crit_multiplier, else: 1.0
+
+        %{
+          outcome: if(crit?, do: :crit, else: :normal),
+          damage: trunc(mitigated_damage(ctx, damage) * multiplier),
+          blocked_amount: 0,
+          crit?: crit?
+        }
+    end
+  end
+
+  defp special_avoided(outcome) do
+    %{outcome: outcome, damage: 0, blocked_amount: 0, crit?: false}
   end
 
   defp avoided(outcome, victim_state) do

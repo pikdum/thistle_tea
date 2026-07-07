@@ -7,6 +7,8 @@ defmodule ThistleTea.Game.Spell.CastValidation do
   the database. Returns `:ok` or `{:error, reason}` where the reason maps to a
   1.12 `SMSG_CAST_RESULT` code.
   """
+  import Bitwise, only: [&&&: 2, <<<: 2]
+
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Spell
@@ -23,6 +25,7 @@ defmodule ThistleTea.Game.Spell.CastValidation do
          :ok <- check_mechanic_immunity(caster, spell, targets),
          :ok <- check_cooldown(caster, spell, now),
          :ok <- check_power(caster, spell),
+         :ok <- check_equipped_item(caster, spell, Keyword.get(opts, :equipped_items, [])),
          :ok <- check_reagents(caster, spell, Keyword.get(opts, :count_item)),
          :ok <- check_target(spell, target_info),
          :ok <- check_range(caster, spell, target_info) do
@@ -78,6 +81,27 @@ defmodule ThistleTea.Game.Spell.CastValidation do
   end
 
   defp check_power(_caster, _spell), do: :ok
+
+  defp check_equipped_item(caster, %Spell{equipped_item_class: class} = spell, equipped_items)
+       when is_integer(class) and class >= 0 and is_list(equipped_items) do
+    if godmode?(caster) or Enum.any?(equipped_items, &item_fits_requirement?(&1, spell)) do
+      :ok
+    else
+      {:error, :equipped_item_class}
+    end
+  end
+
+  defp check_equipped_item(_caster, _spell, _equipped_items), do: :ok
+
+  defp item_fits_requirement?(%{class: item_class, subclass: subclass}, %Spell{
+         equipped_item_class: class,
+         equipped_item_subclass_mask: mask
+       })
+       when is_integer(item_class) and is_integer(subclass) do
+    item_class == class and (mask == 0 or (mask &&& 1 <<< subclass) != 0)
+  end
+
+  defp item_fits_requirement?(_item, _spell), do: false
 
   defp check_reagents(caster, %Spell{reagents: [_ | _] = reagents}, count_item) when is_function(count_item, 1) do
     enough? =

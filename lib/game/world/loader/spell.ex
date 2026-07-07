@@ -211,10 +211,17 @@ defmodule ThistleTea.Game.World.Loader.Spell do
 
   defp equipped_item_fields(row) do
     %{
-      equipped_item_class: row.equipped_item_class || -1,
-      equipped_item_subclass_mask: row.equipped_item_subclass || 0
+      equipped_item_class: signed32(row.equipped_item_class, -1),
+      equipped_item_subclass_mask: signed32(row.equipped_item_subclass, 0)
     }
   end
+
+  defp signed32(value, _default) when is_integer(value) do
+    <<signed::little-signed-size(32)>> = <<value::little-size(32)>>
+    signed
+  end
+
+  defp signed32(_value, default), do: default
 
   defp append_shapeshift_passives(%SpellData{effects: effects} = spell, radius_lookup) do
     with form when is_integer(form) <- shapeshift_form_value(effects),
@@ -293,7 +300,8 @@ defmodule ThistleTea.Game.World.Loader.Spell do
           implicit_target_a: target_type(Map.get(row, :"implicit_target_a_#{index}") || 0),
           implicit_target_b: target_type(Map.get(row, :"implicit_target_b_#{index}") || 0),
           chain_targets: Map.get(row, :"effect_chain_target_#{index}") || 0,
-          trigger_spell_id: nonzero(Map.get(row, :"effect_trigger_spell_#{index}"))
+          trigger_spell_id: nonzero(Map.get(row, :"effect_trigger_spell_#{index}")),
+          damage_multiplier: damage_multiplier(Map.get(row, :"damage_multiplier_#{index}"))
         }
     end
   end
@@ -364,6 +372,9 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp nonzero(value) when is_integer(value) and value > 0, do: value
   defp nonzero(_), do: nil
 
+  defp damage_multiplier(value) when is_number(value) and value > 0, do: value
+  defp damage_multiplier(_value), do: 1.0
+
   defp learned_spell_ids_from_row(row) do
     learned_ids =
       0..2
@@ -389,6 +400,8 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp effect_type(0), do: :none
   defp effect_type(2), do: :school_damage
   defp effect_type(5), do: :teleport_units
+  defp effect_type(31), do: :weapon_percent_damage
+  defp effect_type(121), do: :normalized_weapon_damage
   defp effect_type(6), do: :apply_aura
   defp effect_type(10), do: :heal
   defp effect_type(18), do: :resurrect

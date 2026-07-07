@@ -37,6 +37,16 @@ defmodule ThistleTea.Game.Entity.Logic.Skills do
 
   def weapon_skill_for_subclass(subclass), do: Map.get(@weapon_subclass_skills, subclass)
 
+  def main_hand_weapon_skill(player, get_template) when is_function(get_template, 1) do
+    with entry when is_integer(entry) and entry > 0 <- player.visible_item_16_0,
+         %{class: 2, subclass: subclass} <- get_template.(entry),
+         skill when is_integer(skill) <- weapon_skill_for_subclass(subclass) do
+      skill
+    else
+      _unarmed -> @unarmed_skill
+    end
+  end
+
   def max_for_level(level), do: max(level, 1) * 5
 
   def new_entry(range, always_max?, level) do

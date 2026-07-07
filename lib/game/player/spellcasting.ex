@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Spell, as: SpellBT
   alias ThistleTea.Game.Entity.Logic.Hostility
   alias ThistleTea.Game.Entity.Logic.Inventory
+  alias ThistleTea.Game.Entity.Logic.MeleeSpell
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.BinaryUtils
   alias ThistleTea.Game.Network.Message
@@ -21,6 +22,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.ItemStore
+  alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
   alias ThistleTea.Game.World.Metadata
 
   require Logger
@@ -84,6 +86,12 @@ defmodule ThistleTea.Game.Player.Spellcasting do
 
   def complete(state), do: state
 
+  def cancel_cast_request(state) do
+    state
+    |> cancel()
+    |> clear_next_swing_spell()
+  end
+
   def cancel(state, reason \\ @spell_failed_interrupted)
 
   def cancel(%{character: character} = state, reason) do
@@ -130,6 +138,19 @@ defmodule ThistleTea.Game.Player.Spellcasting do
 
   def cancel(state, _reason), do: state
 
+  defp clear_next_swing_spell(%{character: character} = state) do
+    case character.internal.next_swing_spell do
+      %Spell{} ->
+        {character, _spell} = MeleeSpell.consume_next_swing(character)
+        %{state | character: character}
+
+      _ ->
+        state
+    end
+  end
+
+  defp clear_next_swing_spell(state), do: state
+
   defp do_cast(state, %Spell{} = spell, spell_cast_targets, targets, cast_item_guid) do
     state = cancel(state)
 
@@ -165,9 +186,19 @@ defmodule ThistleTea.Game.Player.Spellcasting do
       targets,
       build_target_info(state, spell, targets),
       Time.now(),
-      count_item: fn item_id -> Inventory.count_entry(character.player, item_id, &ItemStore.get/1) end
+      count_item: fn item_id -> Inventory.count_entry(character.player, item_id, &ItemStore.get/1) end,
+      equipped_items: equipped_weapon_templates(character)
     )
   end
+
+  defp equipped_weapon_templates(%{player: player}) when is_struct(player) do
+    [player.visible_item_16_0, player.visible_item_17_0, player.visible_item_18_0]
+    |> Enum.filter(&(is_integer(&1) and &1 > 0))
+    |> Enum.map(&ItemLoader.get_template/1)
+    |> Enum.reject(&is_nil/1)
+  end
+
+  defp equipped_weapon_templates(_character), do: []
 
   defp build_target_info(%{guid: caster_guid, character: character}, %Spell{} = spell, %Targets{unit_guid: unit_guid}) do
     explicit_guid = nonself_guid(unit_guid, caster_guid)
@@ -210,6 +241,17 @@ defmodule ThistleTea.Game.Player.Spellcasting do
 
   defp selected_target(%{unit: %Unit{target: target}}), do: target
   defp selected_target(_character), do: nil
+
+  defp fail_cast(%Spell{id: spell_id} = spell, :equipped_item_class) do
+    failure = %{
+      Message.SmsgCastResult.failure(spell_id, :equipped_item_class)
+      | equipped_item_class: spell.equipped_item_class,
+        equipped_item_subclass_mask: spell.equipped_item_subclass_mask,
+        equipped_item_inventory_type_mask: 0
+    }
+
+    Network.send_packet(failure)
+  end
 
   defp fail_cast(%Spell{id: spell_id}, reason) do
     Network.send_packet(Message.SmsgCastResult.failure(spell_id, reason))

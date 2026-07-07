@@ -25,7 +25,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
 
       assert mob.internal.next_swing_spell == spell
       assert mob.internal.casting == nil
-      assert [%Event{type: :spell_cast_result, spell_id: 78}] = mob.internal.events
+      assert mob.internal.events in [nil, []]
     end
 
     test "initializes channel tick scheduling and visuals for channeled spells" do

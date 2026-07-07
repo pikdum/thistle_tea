@@ -46,9 +46,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
       )
       when is_integer(now) do
     if Spell.attribute?(spell, :on_next_swing) do
-      character
-      |> MeleeSpell.queue_next_swing(spell)
-      |> queue_cast_result(%{spell: spell})
+      MeleeSpell.queue_next_swing(character, spell)
     else
       do_start_cast(character, internal, spell, targets, now, cast_item_guid)
     end
@@ -378,6 +376,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
 
   @spell_miss_reason_miss 1
   @spell_miss_reason_resist 2
+
+  defp roll_spell_hits(_caster, %Spell{dmg_class: 2}, targets), do: {targets, []}
 
   defp roll_spell_hits(%{object: %{guid: caster_guid}} = caster, %Spell{} = spell, targets) do
     if Spell.harmful?(spell) do

@@ -51,7 +51,9 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
     :sound_id,
     :facing,
     :reason,
-    :outcome
+    :outcome,
+    :crit?,
+    :blocked
   ]
 
   def spell_damage(source_guid, target_guid, spell, damage, opts \\ []) do
@@ -64,7 +66,20 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
       damage: damage,
       periodic?: Keyword.get(opts, :periodic?, false),
       resisted: Keyword.get(opts, :resisted, 0),
-      absorbed: Keyword.get(opts, :absorbed, 0)
+      absorbed: Keyword.get(opts, :absorbed, 0),
+      crit?: Keyword.get(opts, :crit?, false),
+      blocked: Keyword.get(opts, :blocked, 0)
+    }
+  end
+
+  def spell_log_miss(source_guid, target_guid, spell_id, reason)
+      when is_integer(source_guid) and is_integer(target_guid) and is_integer(spell_id) and is_atom(reason) do
+    %__MODULE__{
+      type: :spell_log_miss,
+      source_guid: source_guid,
+      target_guid: target_guid,
+      spell_id: spell_id,
+      reason: reason
     }
   end
 

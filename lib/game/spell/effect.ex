@@ -17,7 +17,8 @@ defmodule ThistleTea.Game.Spell.Effect do
     :implicit_target_a,
     :implicit_target_b,
     :chain_targets,
-    :trigger_spell_id
+    :trigger_spell_id,
+    damage_multiplier: 1.0
   ]
 
   def damage_roll(%__MODULE__{base_points: base, die_sides: sides})
