@@ -25,6 +25,7 @@ defmodule ThistleTea.Game.Entity.Logic.WarriorSpellsTest do
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.CastValidation
   alias ThistleTea.Game.Spell.Effect
+  alias ThistleTea.Game.Spell.Scripts
   alias ThistleTea.Game.Spell.Targets
 
   @battle_form 17
@@ -692,6 +693,70 @@ defmodule ThistleTea.Game.Entity.Logic.WarriorSpellsTest do
       character = SpellBT.complete_cast(character, 1_000)
 
       assert Enum.any?(character.internal.events, &(&1.type == :charge and &1.target_guid == 9))
+    end
+  end
+
+  describe "talent actives" do
+    test "bloodthirst scales its damage from attack power" do
+      spell = %Spell{
+        id: 23_881,
+        name: "Bloodthirst",
+        school: :physical,
+        dmg_class: 2,
+        effects: [%Effect{index: 0, type: :school_damage, base_points: 44, die_sides: 1}]
+      }
+
+      target = melee_target()
+      context = %{melee_context(spell) | attack_power: 140}
+
+      {_target, events} = SpellEffect.receive(target, context, spell, 1_000)
+
+      assert [%Event{type: :spell_damage, damage: 63}] = events
+    end
+
+    test "last stand triggers its health buff on the caster" do
+      spell = %Spell{
+        id: 12_975,
+        name: "Last Stand",
+        school: :physical,
+        effects: [%Effect{index: 0, type: :dummy, base_points: 0}]
+      }
+
+      caster = warrior_fixture()
+      context = %CastContext{caster_guid: 5, caster_level: 10}
+
+      {_caster, events} = SpellEffect.receive(caster, context, spell, 1_000)
+
+      buff_id = Scripts.last_stand_health_buff_id()
+
+      assert [%Event{type: :trigger_spell, target_guid: 5, spell_id: ^buff_id}] = events
+    end
+
+    test "the last stand buff raises max health by thirty percent and heals it" do
+      buff = %Spell{
+        id: Scripts.last_stand_health_buff_id(),
+        name: "Last Stand",
+        school: :physical,
+        duration_ms: 20_000,
+        effects: [%Effect{index: 0, type: :apply_aura, aura: :mod_increase_health, base_points: 0}]
+      }
+
+      entity = warrior_fixture()
+
+      entity = %{
+        entity
+        | unit: %{entity.unit | base_health: 100, health: 50, max_health: 100}
+      }
+
+      {entity, _events} = Aura.apply_spell(entity, 5, 10, buff, 1_000)
+
+      assert entity.unit.max_health == 130
+      assert entity.unit.health == 80
+
+      {entity, _events} = Aura.remove_spells(entity, [buff.id], 5_000)
+
+      assert entity.unit.max_health == 100
+      assert entity.unit.health == 80
     end
   end
 

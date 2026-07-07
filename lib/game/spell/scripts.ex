@@ -42,14 +42,31 @@ defmodule ThistleTea.Game.Spell.Scripts do
   @overpower_ranks [7384, 7887, 11_584, 11_585]
   @execute_ranks [5308, 20_658, 20_660, 20_661, 20_662]
   @execute_damage_spell 20_647
+  @bloodthirst_ranks [23_881, 23_892, 23_893, 23_894]
+  @last_stand 12_975
+  @last_stand_health_buff 12_976
+  @last_stand_health_fraction 0.3
 
   def requires_combo_target?(%Spell{id: id}), do: id in @overpower_ranks
   def requires_combo_target?(_spell), do: false
 
   def dummy_effect(%Spell{id: id}) when id in @execute_ranks, do: :execute
+  def dummy_effect(%Spell{id: @last_stand}), do: :last_stand
   def dummy_effect(_spell), do: nil
 
   def execute_damage_spell_id, do: @execute_damage_spell
+
+  def last_stand_health_buff_id, do: @last_stand_health_buff
+
+  def ap_percent_damage?(%Spell{id: id}), do: id in @bloodthirst_ranks
+  def ap_percent_damage?(_spell), do: false
+
+  def aura_amount_override(%Spell{id: @last_stand_health_buff}, %{unit: %{max_health: max_health}})
+      when is_integer(max_health) do
+    trunc(max_health * @last_stand_health_fraction)
+  end
+
+  def aura_amount_override(_spell, _entity), do: nil
 
   def exclusive_category(row) do
     cond do

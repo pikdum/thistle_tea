@@ -20,6 +20,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Effect
+  alias ThistleTea.Game.Spell.Scripts
 
   @negative_auras [
     :periodic_damage,
@@ -50,7 +51,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
   @stand_state_sit 1
 
   def apply_spell(entity, %CastContext{} = context, %Spell{} = spell, now) when is_integer(now) do
-    case build_auras(spell, now) do
+    case build_auras(entity, spell, now) do
       [] ->
         {entity, []}
 
@@ -137,6 +138,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
     {entity, sit_events} =
       %{entity | unit: unit}
       |> maybe_reset_shapeshift_rage(holder)
+      |> maybe_heal_increased_health(holder)
       |> maybe_sit(holder)
 
     {entity, events} = MovementSync.sync_movement_state(entity, now)
@@ -271,6 +273,18 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
 
   defp maybe_reset_shapeshift_rage(entity, _holder), do: entity
 
+  defp maybe_heal_increased_health(entity, %Holder{auras: auras}) do
+    auras
+    |> Enum.reduce(0, fn
+      %Aura{type: :mod_increase_health, amount: amount}, acc when is_integer(amount) and amount > 0 -> acc + amount
+      _aura, acc -> acc
+    end)
+    |> case do
+      0 -> entity
+      amount -> Core.heal(entity, amount)
+    end
+  end
+
   defp maybe_sit(%{unit: %Unit{stand_state: stand_state} = unit} = entity, %Holder{spell: %Spell{} = spell}) do
     if (spell.aura_interrupt_flags &&& @aura_interrupt_not_seated) != 0 and stand_state != @stand_state_sit do
       {%{entity | unit: %{unit | stand_state: @stand_state_sit}}, [Event.stand_state(@stand_state_sit)]}
@@ -286,12 +300,14 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
   defp expires_at(_now, -1), do: -1
   defp expires_at(now, duration_ms) when is_integer(duration_ms), do: now + duration_ms
 
-  defp build_auras(%Spell{} = spell, now) do
+  defp build_auras(entity, %Spell{} = spell, now) do
+    amount_override = Scripts.aura_amount_override(spell, entity)
+
     spell
     |> Spell.aura_effects()
     |> Enum.reject(&channel_ticked?(spell, &1))
     |> Enum.reduce([], fn effect, acc ->
-      case build_aura(effect, now) do
+      case build_aura(effect, amount_override, now) do
         nil -> acc
         aura -> [aura | acc]
       end
@@ -305,15 +321,15 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
 
   defp channel_ticked?(_spell, _effect), do: false
 
-  defp build_aura(%Effect{aura: nil}, _now), do: nil
+  defp build_aura(%Effect{aura: nil}, _amount_override, _now), do: nil
 
-  defp build_aura(%Effect{} = effect, now) do
+  defp build_aura(%Effect{} = effect, amount_override, now) do
     amplitude_ms = effective_amplitude(effect)
 
     %Aura{
       index: effect.index,
       type: effect.aura,
-      amount: Effect.damage_roll(effect),
+      amount: amount_override || Effect.damage_roll(effect),
       misc_value: effect.misc_value,
       multiple_value: effect.multiple_value,
       amplitude_ms: amplitude_ms,

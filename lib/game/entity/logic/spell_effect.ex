@@ -139,7 +139,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
 
   defp apply_effect(state, %CastContext{} = context, spell, %Effect{type: :school_damage} = effect, now) do
     if Spell.melee_ability?(spell) do
-      melee_ability_damage(state, context, spell, Effect.damage_roll(effect), now)
+      melee_ability_damage(state, context, spell, school_damage_roll(context, spell, effect), now)
     else
       apply_damage_effect(state, context, spell, effect, now)
     end
@@ -187,8 +187,22 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
 
   defp apply_effect(state, %CastContext{} = context, spell, %Effect{type: :dummy} = effect, now) do
     case Scripts.dummy_effect(spell) do
-      :execute -> apply_execute(state, context, spell, effect, now)
-      _unscripted -> {state, []}
+      :execute ->
+        apply_execute(state, context, spell, effect, now)
+
+      :last_stand ->
+        event =
+          Event.trigger_spell(
+            context.caster_guid,
+            context.caster_level,
+            state.object.guid,
+            Scripts.last_stand_health_buff_id()
+          )
+
+        {state, [event]}
+
+      _unscripted ->
+        {state, []}
     end
   end
 
@@ -388,6 +402,16 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
 
   defp school_atom(%Spell{school: school}) when is_atom(school), do: school
   defp school_atom(%Spell{} = spell), do: Enum.at(@schools, Spell.school_index(spell), :physical)
+
+  defp school_damage_roll(%CastContext{} = context, spell, %Effect{} = effect) do
+    roll = Effect.damage_roll(effect)
+
+    if Scripts.ap_percent_damage?(spell) do
+      trunc(roll * (context.attack_power || 0) / 100)
+    else
+      roll
+    end
+  end
 
   defp weapon_ability_damage(%CastContext{} = context, %Effect{type: :normalized_weapon_damage} = effect) do
     normalized_weapon_roll(context) + Effect.damage_roll(effect)

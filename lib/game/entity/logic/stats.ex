@@ -99,7 +99,13 @@ defmodule ThistleTea.Game.Entity.Logic.Stats do
   end
 
   defp derive_max_health(%Unit{base_health: base_health} = unit) when is_integer(base_health) do
-    max_health = max(base_health + stamina_health_bonus(unit.stamina || 0) + equipment_bonus(unit, :health), 1)
+    max_health =
+      max(
+        base_health + stamina_health_bonus(unit.stamina || 0) + equipment_bonus(unit, :health) +
+          aura_max_health(unit),
+        1
+      )
+
     %{unit | max_health: max_health, health: clamp(unit.health, max_health)}
   end
 
@@ -170,6 +176,13 @@ defmodule ThistleTea.Game.Entity.Logic.Stats do
 
   defp equipment_bonus(%Unit{equipment_bonuses: %{} = bonuses}, key), do: Map.get(bonuses, key, 0)
   defp equipment_bonus(%Unit{}, _key), do: 0
+
+  defp aura_max_health(%Unit{} = unit) do
+    sum_aura_amounts(unit, fn
+      %Aura{type: :mod_increase_health, amount: amount} when is_integer(amount) -> amount
+      _aura -> 0
+    end)
+  end
 
   defp aura_stat_bonus(%Unit{} = unit, index) do
     sum_aura_amounts(unit, fn

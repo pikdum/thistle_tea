@@ -3,6 +3,7 @@ defmodule ThistleTea.Game.World.Loader.SpellVmangosTest do
 
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Effect
+  alias ThistleTea.Game.World.Loader.ClassSpell
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Loader.SpellThreat
 
@@ -69,6 +70,25 @@ defmodule ThistleTea.Game.World.Loader.SpellVmangosTest do
       spell = SpellLoader.load(7386)
 
       assert spell.stack_amount == 5
+    end
+  end
+
+  describe "talent grants" do
+    alias ClassSpell, as: ClassSpellLoader
+
+    test "warrior debug spells include non-passive talent actives" do
+      spell_ids = ClassSpellLoader.trainable_spell_ids(1, 60)
+
+      assert 12_294 in spell_ids
+      assert 23_881 in spell_ids
+      assert 12_975 in spell_ids
+      assert 12_323 in spell_ids
+    end
+
+    test "passive talents stay out of the grant list" do
+      spell_ids = ClassSpellLoader.trainable_spell_ids(1, 60)
+
+      refute 12_320 in spell_ids
     end
   end
 

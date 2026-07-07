@@ -449,6 +449,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp aura_type(26), do: :mod_root
   defp aura_type(31), do: :mod_increase_speed
   defp aura_type(33), do: :mod_decrease_speed
+  defp aura_type(34), do: :mod_increase_health
   defp aura_type(36), do: :mod_shapeshift
   defp aura_type(42), do: :proc_trigger_spell
   defp aura_type(49), do: :mod_dodge
