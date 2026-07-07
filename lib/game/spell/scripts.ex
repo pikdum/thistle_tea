@@ -39,6 +39,18 @@ defmodule ThistleTea.Game.Spell.Scripts do
 
   def shapeshift_passive(form), do: Map.get(@shapeshift_passives, form)
 
+  @overpower_ranks [7384, 7887, 11_584, 11_585]
+  @execute_ranks [5308, 20_658, 20_660, 20_661, 20_662]
+  @execute_damage_spell 20_647
+
+  def requires_combo_target?(%Spell{id: id}), do: id in @overpower_ranks
+  def requires_combo_target?(_spell), do: false
+
+  def dummy_effect(%Spell{id: id}) when id in @execute_ranks, do: :execute
+  def dummy_effect(_spell), do: nil
+
+  def execute_damage_spell_id, do: @execute_damage_spell
+
   def exclusive_category(row) do
     cond do
       row.spell_class_set == @spell_family_mage and

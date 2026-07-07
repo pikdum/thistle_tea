@@ -72,6 +72,10 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
     }
   end
 
+  def drain_rage(target_guid) when is_integer(target_guid) do
+    %__MODULE__{type: :drain_rage, target_guid: target_guid}
+  end
+
   def spell_log_miss(source_guid, target_guid, spell_id, reason)
       when is_integer(source_guid) and is_integer(target_guid) and is_integer(spell_id) and is_atom(reason) do
     %__MODULE__{

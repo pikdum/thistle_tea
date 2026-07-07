@@ -197,7 +197,9 @@ defmodule ThistleTea.Game.World.Loader.Spell do
     %{
       mana_cost_percent: row.mana_cost_percent || 0,
       dmg_class: row.defence_type || 0,
-      stances: row.shapeshift_mask || 0
+      stances: row.shapeshift_mask || 0,
+      caster_aura_state: row.caster_aura_state || 0,
+      target_aura_state: row.target_aura_state || 0
     }
   end
 
@@ -399,6 +401,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
 
   defp effect_type(0), do: :none
   defp effect_type(2), do: :school_damage
+  defp effect_type(3), do: :dummy
   defp effect_type(5), do: :teleport_units
   defp effect_type(31), do: :weapon_percent_damage
   defp effect_type(121), do: :normalized_weapon_damage

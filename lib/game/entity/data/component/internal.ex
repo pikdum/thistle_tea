@@ -38,6 +38,8 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal do
     :killed_by,
     :rest_type,
     :rest_started_at,
+    :defense_state_until,
+    :combo_expires_at,
     rest_bonus: 0.0,
     starting_items: [],
     action_buttons: %{},

@@ -11,8 +11,10 @@ defmodule ThistleTea.Game.Spell.CastValidation do
 
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
   alias ThistleTea.Game.Entity.Logic.Core
+  alias ThistleTea.Game.Entity.Logic.Reactive
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Cooldowns
+  alias ThistleTea.Game.Spell.Scripts
   alias ThistleTea.Game.Spell.Targets
 
   @power_fields %{0 => :power1, 1 => :power2, 2 => :power3, 3 => :power4, 4 => :power5}
@@ -21,6 +23,8 @@ defmodule ThistleTea.Game.Spell.CastValidation do
   def validate(caster, %Spell{} = spell, %Targets{} = targets, target_info, now, opts \\ []) do
     with :ok <- check_caster_alive(caster),
          :ok <- check_stance(caster, spell),
+         :ok <- check_caster_aura_state(caster, spell, now),
+         :ok <- check_combo_target(caster, spell, targets, now),
          :ok <- check_stronger_rank(caster, spell, targets),
          :ok <- check_mechanic_immunity(caster, spell, targets),
          :ok <- check_cooldown(caster, spell, now),
@@ -28,6 +32,7 @@ defmodule ThistleTea.Game.Spell.CastValidation do
          :ok <- check_equipped_item(caster, spell, Keyword.get(opts, :equipped_items, [])),
          :ok <- check_reagents(caster, spell, Keyword.get(opts, :count_item)),
          :ok <- check_target(spell, target_info),
+         :ok <- check_target_aura_state(spell, target_info),
          :ok <- check_range(caster, spell, target_info) do
       check_line_of_sight(spell, target_info)
     end
@@ -46,6 +51,35 @@ defmodule ThistleTea.Game.Spell.CastValidation do
   end
 
   defp check_stance(_caster, _spell), do: :ok
+
+  @aura_state_defense 1
+  @aura_state_healthless_20 2
+  @healthless_pct 20
+
+  defp check_caster_aura_state(caster, %Spell{caster_aura_state: @aura_state_defense}, now) do
+    if Reactive.defense_active?(caster, now), do: :ok, else: {:error, :cant_do_that_yet}
+  end
+
+  defp check_caster_aura_state(_caster, _spell, _now), do: :ok
+
+  defp check_combo_target(caster, %Spell{} = spell, %Targets{unit_guid: unit_guid}, now) do
+    if Scripts.requires_combo_target?(spell) and not Reactive.combo_active?(caster, unit_guid, now) do
+      {:error, :cant_do_that_yet}
+    else
+      :ok
+    end
+  end
+
+  defp check_combo_target(_caster, _spell, _targets, _now), do: :ok
+
+  defp check_target_aura_state(%Spell{target_aura_state: @aura_state_healthless_20}, target_info) do
+    case target_info do
+      %{health_pct: pct} when is_number(pct) and pct < @healthless_pct -> :ok
+      _ -> {:error, :target_aurastate}
+    end
+  end
+
+  defp check_target_aura_state(_spell, _target_info), do: :ok
 
   defp check_stronger_rank(caster, %Spell{} = spell, %Targets{unit_guid: unit_guid}) do
     if self_target?(caster, unit_guid) and AuraLogic.blocked_by_stronger_rank?(caster, spell) do

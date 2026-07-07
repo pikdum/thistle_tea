@@ -26,6 +26,7 @@ defmodule ThistleTea.Game.Network.Server do
   alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Entity.Logic.MovementStats
   alias ThistleTea.Game.Entity.Logic.PlayerCombat
+  alias ThistleTea.Game.Entity.Logic.Resources
   alias ThistleTea.Game.Entity.Logic.Rest
   alias ThistleTea.Game.Entity.Logic.SpellEffect
   alias ThistleTea.Game.Guid
@@ -214,6 +215,11 @@ defmodule ThistleTea.Game.Network.Server do
 
   def handle_cast({:receive_heal, amount}, {socket, %{character: %Character{} = character} = state}) do
     character = Core.heal(character, amount)
+    {:noreply, {socket, %{state | character: character}}, {:continue, :maybe_broadcast_update}}
+  end
+
+  def handle_cast(:drain_rage, {socket, %{character: %Character{} = character} = state}) do
+    character = Resources.drain_rage(character)
     {:noreply, {socket, %{state | character: character}}, {:continue, :maybe_broadcast_update}}
   end
 

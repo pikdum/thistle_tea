@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
   alias ThistleTea.Game.Entity.Logic.Hostility
   alias ThistleTea.Game.Entity.Logic.MeleeSpell
   alias ThistleTea.Game.Entity.Logic.PlayerCombat
+  alias ThistleTea.Game.Entity.Logic.Reactive
   alias ThistleTea.Game.Entity.Logic.Resources
   alias ThistleTea.Game.Entity.Logic.SpellEffect
   alias ThistleTea.Game.Entity.Logic.SpellResist
@@ -23,6 +24,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
   alias ThistleTea.Game.Spell.Cast
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Cooldowns
+  alias ThistleTea.Game.Spell.Scripts
   alias ThistleTea.Game.Spell.Targets
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
@@ -154,8 +156,19 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
     |> queue_open_object(casting)
     |> mark_hostile_cast(casting, targets, now)
     |> apply_spell_hit(casting, hits, now)
+    |> consume_combo_points(casting)
     |> clear_cast()
   end
+
+  defp consume_combo_points(character, %Cast{spell: %Spell{} = spell}) do
+    if Scripts.requires_combo_target?(spell) do
+      Reactive.consume_combo(character)
+    else
+      character
+    end
+  end
+
+  defp consume_combo_points(character, _casting), do: character
 
   defp queue_open_object(character, %Cast{spell: %Spell{} = spell, targets: %Targets{object_guid: object_guid}})
        when is_integer(object_guid) do

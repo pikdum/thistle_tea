@@ -82,6 +82,7 @@ defmodule ThistleTea.Game.Player.DevCommands do
       ".levelup [levels] - increase player level",
       ".modify hp <value> - set current health (clamped to max)",
       ".modify money <copper> - add money (negative to remove)",
+      ".modify rage <value> - set current rage (clamped to max)",
       ".modify speed <rate> - modify player speed from 0.1 to 10",
       ".move - move target to you",
       ".pid - show target pid",
@@ -157,6 +158,9 @@ defmodule ThistleTea.Game.Player.DevCommands do
 
       ["hp", value] ->
         modify_hp(state, value)
+
+      ["rage", value] ->
+        modify_rage(state, value)
 
       ["money", value] ->
         modify_money(state, value)
@@ -433,6 +437,21 @@ defmodule ThistleTea.Game.Player.DevCommands do
 
       _ ->
         system_message(state, "Invalid command. Use: .modify hp <value>")
+    end
+  end
+
+  defp modify_rage(%{character: %Character{unit: %Unit{} = unit} = character} = state, value) do
+    case parse_positive_integer(value) do
+      {:ok, rage} ->
+        rage = (rage * 10) |> min(unit.max_power2 || 0)
+        character = %{character | unit: %{unit | power2: rage}}
+
+        state
+        |> put_character(character)
+        |> system_message("Rage set to #{div(rage, 10)}.")
+
+      _ ->
+        system_message(state, "Invalid command. Use: .modify rage <value>")
     end
   end
 

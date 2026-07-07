@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Entity.Logic.WarriorSpellsTest do
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Event
+  alias ThistleTea.Game.Entity.Logic.Reactive
   alias ThistleTea.Game.Entity.Logic.SpellEffect
   alias ThistleTea.Game.Player.Spellcasting
   alias ThistleTea.Game.Spell
@@ -31,6 +32,7 @@ defmodule ThistleTea.Game.Entity.Logic.WarriorSpellsTest do
     %Character{
       object: %Object{guid: 5},
       unit: %Unit{
+        class: 1,
         level: 10,
         health: 100,
         max_health: 100,
@@ -129,10 +131,10 @@ defmodule ThistleTea.Game.Entity.Logic.WarriorSpellsTest do
   end
 
   describe "stance cast validation" do
-    defp overpower_like do
+    defp mocking_blow_like do
       %Spell{
-        id: 7384,
-        name: "Overpower",
+        id: 694,
+        name: "Mocking Blow",
         school: :physical,
         stances: @battle_stance_mask,
         mana_cost: 0,
@@ -144,13 +146,13 @@ defmodule ThistleTea.Game.Entity.Logic.WarriorSpellsTest do
       caster = warrior_fixture(form: @defensive_form)
 
       assert {:error, :only_shapeshift} =
-               CastValidation.validate(caster, overpower_like(), %Targets{}, nil, 1_000)
+               CastValidation.validate(caster, mocking_blow_like(), %Targets{}, nil, 1_000)
     end
 
     test "accepts stance-locked spells in the required stance" do
       caster = warrior_fixture(form: @battle_form)
 
-      assert :ok = CastValidation.validate(caster, overpower_like(), %Targets{}, nil, 1_000)
+      assert :ok = CastValidation.validate(caster, mocking_blow_like(), %Targets{}, nil, 1_000)
     end
   end
 
@@ -295,6 +297,106 @@ defmodule ThistleTea.Game.Entity.Logic.WarriorSpellsTest do
                %Event{type: :spell_log_miss, source_guid: 5, target_guid: 9, spell_id: 1715},
                %Event{type: :attack_outcome, target_guid: 5, source_guid: 9, spell_id: 1715}
              ] = events
+    end
+  end
+
+  describe "reactive ability validation" do
+    defp revenge_like do
+      %Spell{id: 6572, name: "Revenge", school: :physical, caster_aura_state: 1, mana_cost: 0, power_type: 1}
+    end
+
+    defp execute_like do
+      %Spell{id: 5308, name: "Execute", school: :physical, target_aura_state: 2, mana_cost: 0, power_type: 1}
+    end
+
+    test "revenge requires a recent dodge, parry, or block" do
+      caster = warrior_fixture()
+
+      assert {:error, :cant_do_that_yet} =
+               CastValidation.validate(caster, revenge_like(), %Targets{}, nil, 1_000)
+
+      caster = Reactive.mark_defense(caster, 1_000)
+
+      assert :ok = CastValidation.validate(caster, revenge_like(), %Targets{}, nil, 2_000)
+      assert {:error, :cant_do_that_yet} = CastValidation.validate(caster, revenge_like(), %Targets{}, nil, 9_000)
+    end
+
+    test "overpower requires a fresh combo point on the target" do
+      caster = warrior_fixture(form: @battle_form)
+
+      spell = %Spell{
+        id: 7384,
+        name: "Overpower",
+        school: :physical,
+        stances: @battle_stance_mask,
+        first_in_chain: 7384,
+        mana_cost: 0,
+        power_type: 1
+      }
+
+      targets = %Targets{unit_guid: 77}
+
+      assert {:error, :cant_do_that_yet} = CastValidation.validate(caster, spell, targets, nil, 1_000)
+
+      caster = Reactive.mark_dodging_target(caster, 77, 1_000)
+
+      assert :ok = CastValidation.validate(caster, spell, targets, nil, 2_000)
+      assert {:error, :cant_do_that_yet} = CastValidation.validate(caster, spell, targets, nil, 9_000)
+    end
+
+    test "execute requires the target under twenty percent health" do
+      caster = warrior_fixture()
+
+      assert {:error, :target_aurastate} =
+               CastValidation.validate(caster, execute_like(), %Targets{}, %{alive?: true, health_pct: 50}, 1_000)
+
+      assert :ok =
+               CastValidation.validate(caster, execute_like(), %Targets{}, %{alive?: true, health_pct: 15}, 1_000)
+    end
+  end
+
+  describe "execute damage" do
+    test "converts remaining rage into damage and drains it on a hit" do
+      spell = %Spell{
+        id: 5308,
+        name: "Execute",
+        school: :physical,
+        dmg_class: 2,
+        effects: [
+          %Effect{index: 0, type: :dummy, base_points: 124, die_sides: 1, damage_multiplier: 0.3},
+          %Effect{index: 1, type: :trigger_spell, trigger_spell_id: 20_647}
+        ]
+      }
+
+      context = %{melee_context(spell) | caster_power: 200}
+      target = melee_target()
+
+      {target, events} = SpellEffect.receive(target, context, spell, 1_000)
+
+      assert [
+               %Event{type: :spell_damage, spell_id: 20_647, damage: 185},
+               %Event{type: :drain_rage, target_guid: 5}
+             ] = events
+
+      assert target.unit.health == 15
+    end
+
+    test "avoided executes do not drain rage" do
+      spell = %Spell{
+        id: 5308,
+        name: "Execute",
+        school: :physical,
+        dmg_class: 2,
+        effects: [%Effect{index: 0, type: :dummy, base_points: 124, die_sides: 1, damage_multiplier: 0.3}]
+      }
+
+      context = %{melee_context(spell) | caster_power: 200}
+      target = melee_target(level: 60, helpless?: false)
+
+      {_target, events} = SpellEffect.receive(target, context, spell, 1_000)
+
+      refute Enum.any?(events, &(&1.type == :drain_rage))
+      assert Enum.any?(events, &(&1.type == :spell_log_miss))
     end
   end
 

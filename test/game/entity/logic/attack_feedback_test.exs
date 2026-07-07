@@ -1,7 +1,10 @@
 defmodule ThistleTea.Game.Entity.Logic.AttackFeedbackTest do
   use ExUnit.Case, async: true
 
+  alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.Entity.Data.Component.Object
+  alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.AttackFeedback
@@ -87,6 +90,21 @@ defmodule ThistleTea.Game.Entity.Logic.AttackFeedbackTest do
       }
 
       assert AttackFeedback.receive(entity, %{outcome: :normal, damage: 200, spell_id: nil}, 1_000) == entity
+    end
+
+    test "a dodging target earns the warrior a combo point for overpower" do
+      entity = %Character{
+        object: %Object{guid: 5},
+        unit: %Unit{class: 1, power_type: 1, level: 60, power2: 0, max_power2: 1_000, auras: []},
+        player: %Player{},
+        internal: %Internal{}
+      }
+
+      payload = %{outcome: :dodge, damage: 100, spell_id: nil, victim_guid: 77}
+      entity = AttackFeedback.receive(entity, payload, nil, 1_000)
+
+      assert entity.player.field_combo_target == 77
+      assert entity.player.combo_points == 1
     end
   end
 end

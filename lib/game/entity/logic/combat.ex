@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Event
+  alias ThistleTea.Game.Entity.Logic.Reactive
   alias ThistleTea.Game.Entity.Logic.Skills
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Math
@@ -132,6 +133,7 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
       |> Map.put(:blocked_amount, result.blocked_amount)
       |> Map.put(:absorb, absorbed)
 
+    entity = maybe_mark_defense(entity, result.outcome, now)
     event = attacker_state_update(Map.get(attack, :caster, 0), target_guid, result.damage, attack)
     feedback_events = attack_outcome_events(entity, attack, result, absorbed)
 
@@ -166,6 +168,12 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
   end
 
   defp maybe_defense_skill_up(entity, _attack, _opts), do: entity
+
+  defp maybe_mark_defense(entity, outcome, now) when outcome in [:dodge, :parry, :block] do
+    Reactive.mark_defense(entity, now)
+  end
+
+  defp maybe_mark_defense(entity, _outcome, _now), do: entity
 
   defp attack_outcome_events(%{object: %{guid: victim_guid}}, %{caster: caster} = attack, result, absorbed)
        when is_integer(caster) do

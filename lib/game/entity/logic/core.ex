@@ -18,6 +18,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
   alias ThistleTea.Game.Entity.Logic.Combat
   alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.Entity.Logic.Movement
+  alias ThistleTea.Game.Entity.Logic.Reactive
   alias ThistleTea.Game.Entity.Logic.Resources
   alias ThistleTea.Game.Entity.Logic.Threat
   alias ThistleTea.Game.Math
@@ -62,6 +63,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
     entity =
       entity
       |> gain_taken_rage(remaining, Keyword.get(opts, :source))
+      |> Reactive.sync_health()
       |> Threat.add_damage(Keyword.get(opts, :source), damage)
       |> maybe_enqueue_death_root(health, new_health)
       |> maybe_record_killer(health, new_health, Keyword.get(opts, :source))
@@ -90,6 +92,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
       end
 
     %{entity | unit: %{unit | health: new_health}}
+    |> Reactive.sync_health()
     |> mark_broadcast_update()
   end
 

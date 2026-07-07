@@ -407,6 +407,14 @@ defmodule ThistleTea.Game.Entity.EventSink do
     entity
   end
 
+  def emit(entity, %Event{type: :drain_rage, target_guid: target_guid}) do
+    if Guid.entity_type(target_guid) == :player do
+      Entity.drain_rage(target_guid)
+    end
+
+    entity
+  end
+
   def emit(entity, %Event{type: :attack_outcome} = event) do
     Entity.attack_outcome(event.target_guid, %{
       victim_guid: event.source_guid,

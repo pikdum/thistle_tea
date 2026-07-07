@@ -40,6 +40,10 @@ defmodule ThistleTea.Game.Entity do
     dispatch_cast(entity, {:attack_outcome, payload})
   end
 
+  def drain_rage(entity) do
+    dispatch_cast(entity, :drain_rage)
+  end
+
   def receive_heal(entity, amount) do
     dispatch_cast(entity, {:receive_heal, amount})
   end

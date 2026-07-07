@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Death
   alias ThistleTea.Game.Entity.Logic.Event
+  alias ThistleTea.Game.Entity.Logic.Reactive
   alias ThistleTea.Game.Entity.Logic.Resources
   alias ThistleTea.Game.Entity.Logic.SpellResist
   alias ThistleTea.Game.Entity.Logic.Threat
@@ -129,13 +130,24 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   defp apply_effect(
          state,
          %CastContext{} = context,
-         _spell,
+         spell,
          %Effect{type: :trigger_spell, trigger_spell_id: spell_id},
          _now
        )
        when is_integer(spell_id) and spell_id > 0 do
-    event = Event.trigger_spell(context.caster_guid, context.caster_level, state.object.guid, spell_id)
-    {state, [event]}
+    if Scripts.dummy_effect(spell) == :execute do
+      {state, []}
+    else
+      event = Event.trigger_spell(context.caster_guid, context.caster_level, state.object.guid, spell_id)
+      {state, [event]}
+    end
+  end
+
+  defp apply_effect(state, %CastContext{} = context, spell, %Effect{type: :dummy} = effect, now) do
+    case Scripts.dummy_effect(spell) do
+      :execute -> apply_execute(state, context, spell, effect, now)
+      _unscripted -> {state, []}
+    end
   end
 
   defp apply_effect(
@@ -362,6 +374,11 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   defp attack_power_bonus(_context, _speed_seconds), do: 0
 
   defp resolve_melee_special(state, %CastContext{} = context, spell, damage, now) do
+    {state, events, _outcome} = do_resolve_melee_special(state, context, spell, damage, now)
+    {state, events}
+  end
+
+  defp do_resolve_melee_special(state, %CastContext{} = context, spell, damage, now) do
     damage =
       max(trunc(damage) + Aura.flat_modifier(state, :mod_damage_taken, Spell.school_mask(spell)), 0)
 
@@ -369,10 +386,32 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
 
     case result.outcome do
       outcome when outcome in [:miss, :dodge, :parry, :block] ->
-        {state, melee_avoid_events(state, context, spell, outcome)}
+        state = maybe_mark_defense(state, outcome, now)
+        {state, melee_avoid_events(state, context, spell, outcome), outcome}
 
-      _hit ->
-        apply_melee_special_damage(state, context, spell, result, now)
+      outcome ->
+        {state, events} = apply_melee_special_damage(state, context, spell, result, now)
+        {state, events, outcome}
+    end
+  end
+
+  defp maybe_mark_defense(state, outcome, now) when outcome in [:dodge, :parry, :block] do
+    Reactive.mark_defense(state, now)
+  end
+
+  defp maybe_mark_defense(state, _outcome, _now), do: state
+
+  defp apply_execute(state, %CastContext{} = context, spell, %Effect{} = effect, now) do
+    rage = context.caster_power || 0
+    damage = Effect.damage_roll(effect) + trunc(rage * effect.damage_multiplier)
+    damage_spell = %{spell | id: Scripts.execute_damage_spell_id()}
+
+    {state, events, outcome} = do_resolve_melee_special(state, context, damage_spell, damage, now)
+
+    if outcome in [:miss, :dodge, :parry, :block] do
+      {state, events}
+    else
+      {state, events ++ [Event.drain_rage(context.caster_guid)]}
     end
   end
 
