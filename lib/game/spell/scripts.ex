@@ -18,6 +18,16 @@ defmodule ThistleTea.Game.Spell.Scripts do
 
   @apply_triggers %{@power_word_shield => @weakened_soul}
 
+  @battle_stance_form 17
+  @defensive_stance_form 18
+  @berserker_stance_form 19
+
+  @shapeshift_passives %{
+    @battle_stance_form => 21_156,
+    @defensive_stance_form => 7_376,
+    @berserker_stance_form => 7_381
+  }
+
   @spell_family_mage 3
   @mage_armor_family_flags 0x12000000
   @warlock_armor_visual 130
@@ -26,6 +36,8 @@ defmodule ThistleTea.Game.Spell.Scripts do
   def apply_trigger(%Spell{} = spell) do
     Map.get(@apply_triggers, chain_id(spell))
   end
+
+  def shapeshift_passive(form), do: Map.get(@shapeshift_passives, form)
 
   def exclusive_category(row) do
     cond do

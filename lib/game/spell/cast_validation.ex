@@ -18,6 +18,7 @@ defmodule ThistleTea.Game.Spell.CastValidation do
 
   def validate(caster, %Spell{} = spell, %Targets{} = targets, target_info, now, opts \\ []) do
     with :ok <- check_caster_alive(caster),
+         :ok <- check_stance(caster, spell),
          :ok <- check_stronger_rank(caster, spell, targets),
          :ok <- check_mechanic_immunity(caster, spell, targets),
          :ok <- check_cooldown(caster, spell, now),
@@ -32,6 +33,16 @@ defmodule ThistleTea.Game.Spell.CastValidation do
   defp check_caster_alive(caster) do
     if Core.dead?(caster), do: {:error, :caster_dead}, else: :ok
   end
+
+  defp check_stance(%{unit: unit}, %Spell{stances: stances} = spell) when is_integer(stances) and stances > 0 do
+    if Spell.usable_in_stance?(spell, unit.shapeshift_form || 0) do
+      :ok
+    else
+      {:error, :only_shapeshift}
+    end
+  end
+
+  defp check_stance(_caster, _spell), do: :ok
 
   defp check_stronger_rank(caster, %Spell{} = spell, %Targets{unit_guid: unit_guid}) do
     if self_target?(caster, unit_guid) and AuraLogic.blocked_by_stronger_rank?(caster, spell) do

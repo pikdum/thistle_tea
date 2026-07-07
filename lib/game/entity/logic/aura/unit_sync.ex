@@ -24,6 +24,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.UnitSync do
     unit
     |> Stats.recompute()
     |> sync_transform()
+    |> sync_shapeshift()
     |> sync_aura_fields()
   end
 
@@ -47,6 +48,20 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.UnitSync do
   end
 
   defp sync_transform(unit), do: unit
+
+  defp sync_shapeshift(%Unit{auras: holders} = unit) when is_list(holders) do
+    form =
+      holders
+      |> Enum.flat_map(fn %Holder{auras: auras} -> auras end)
+      |> Enum.find_value(0, fn
+        %Aura{type: :mod_shapeshift, misc_value: misc} when is_integer(misc) and misc > 0 -> misc
+        _ -> nil
+      end)
+
+    %{unit | shapeshift_form: form}
+  end
+
+  defp sync_shapeshift(unit), do: unit
 
   defp sync_aura_fields(%Unit{auras: holders} = unit) when is_list(holders) and holders != [] do
     %{

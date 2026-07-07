@@ -190,12 +190,14 @@ defmodule ThistleTea.Game.World.Loader.Spell do
     |> struct!(cooldown_fields(row))
     |> struct!(equipped_item_fields(row))
     |> struct!(power_fields(row))
+    |> append_shapeshift_passives(radius_lookup)
   end
 
   defp power_fields(row) do
     %{
       mana_cost_percent: row.mana_cost_percent || 0,
-      dmg_class: row.defence_type || 0
+      dmg_class: row.defence_type || 0,
+      stances: row.shapeshift_mask || 0
     }
   end
 
@@ -212,6 +214,31 @@ defmodule ThistleTea.Game.World.Loader.Spell do
       equipped_item_class: row.equipped_item_class || -1,
       equipped_item_subclass_mask: row.equipped_item_subclass || 0
     }
+  end
+
+  defp append_shapeshift_passives(%SpellData{effects: effects} = spell, radius_lookup) do
+    with form when is_integer(form) <- shapeshift_form_value(effects),
+         passive_id when is_integer(passive_id) <- Scripts.shapeshift_passive(form),
+         passive_row when not is_nil(passive_row) <- DBC.get(Spell, passive_id) do
+      %{spell | effects: effects ++ passive_aura_effects(passive_row, radius_lookup, length(effects))}
+    else
+      _ -> spell
+    end
+  end
+
+  defp shapeshift_form_value(effects) do
+    Enum.find_value(effects, fn
+      %Effect{type: :apply_aura, aura: :mod_shapeshift, misc_value: misc} -> misc
+      _ -> nil
+    end)
+  end
+
+  defp passive_aura_effects(row, radius_lookup, index_offset) do
+    row
+    |> build_effects(radius_lookup)
+    |> Enum.filter(&match?(%Effect{type: :apply_aura}, &1))
+    |> Enum.with_index(index_offset)
+    |> Enum.map(fn {effect, index} -> %{effect | index: index} end)
   end
 
   defp load_chain_map(spell_ids) do
@@ -390,6 +417,8 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp aura_type(5), do: :mod_confuse
   defp aura_type(7), do: :mod_fear
   defp aura_type(8), do: :periodic_heal
+  defp aura_type(10), do: :mod_threat
+  defp aura_type(11), do: :mod_taunt
   defp aura_type(12), do: :mod_stun
   defp aura_type(14), do: :mod_damage_taken
   defp aura_type(29), do: :mod_stat
@@ -401,6 +430,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp aura_type(26), do: :mod_root
   defp aura_type(31), do: :mod_increase_speed
   defp aura_type(33), do: :mod_decrease_speed
+  defp aura_type(36), do: :mod_shapeshift
   defp aura_type(42), do: :proc_trigger_spell
   defp aura_type(49), do: :mod_dodge
   defp aura_type(53), do: :periodic_leech

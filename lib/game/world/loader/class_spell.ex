@@ -12,6 +12,11 @@ defmodule ThistleTea.Game.World.Loader.ClassSpell do
 
   @table_options [:named_table, :public, read_concurrency: true, write_concurrency: :auto]
 
+  @warrior 1
+  @defensive_stance {71, 10}
+  @berserker_stance {2458, 30}
+  @quest_reward_spells %{@warrior => [@defensive_stance, @berserker_stance]}
+
   def init(table \\ __MODULE__) do
     case :ets.whereis(table) do
       :undefined -> :ets.new(table, @table_options)
@@ -22,6 +27,7 @@ defmodule ThistleTea.Game.World.Loader.ClassSpell do
   def trainable_spell_ids(class, level) when is_integer(class) and is_integer(level) do
     class
     |> class_spells()
+    |> Kernel.++(Map.get(@quest_reward_spells, class, []))
     |> Enum.filter(fn {_spell, req_level} -> is_integer(req_level) and req_level <= level end)
     |> Enum.map(fn {spell, _req_level} -> spell end)
     |> Enum.uniq()

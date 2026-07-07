@@ -3,7 +3,7 @@ defmodule ThistleTea.Game.Spell do
   Internal spell struct translated from the spell DBC: attributes, effects,
   rank-chain and exclusive-category info, plus school-mask helpers.
   """
-  import Bitwise, only: [<<<: 2]
+  import Bitwise, only: [<<<: 2, &&&: 2]
 
   alias ThistleTea.Game.Spell.Effect
 
@@ -26,6 +26,7 @@ defmodule ThistleTea.Game.Spell do
     speed: 0.0,
     mana_cost_percent: 0,
     dmg_class: 0,
+    stances: 0,
     category: 0,
     recovery_time_ms: 0,
     category_recovery_time_ms: 0,
@@ -38,6 +39,14 @@ defmodule ThistleTea.Game.Spell do
   ]
 
   def attribute?(%__MODULE__{attributes: attrs}, attr), do: MapSet.member?(attrs, attr)
+
+  def usable_in_stance?(%__MODULE__{stances: stances}, _form) when stances in [0, nil], do: true
+
+  def usable_in_stance?(%__MODULE__{stances: stances}, form) when is_integer(form) and form > 0 do
+    (stances &&& 1 <<< (form - 1)) != 0
+  end
+
+  def usable_in_stance?(_spell, _form), do: false
 
   def same_chain?(%__MODULE__{id: id1, first_in_chain: first1}, %__MODULE__{id: id2, first_in_chain: first2}) do
     id1 != id2 and is_integer(first1) and first1 == first2

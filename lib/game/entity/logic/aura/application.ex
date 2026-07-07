@@ -135,6 +135,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
 
     {entity, sit_events} =
       %{entity | unit: unit}
+      |> maybe_reset_shapeshift_rage(holder)
       |> maybe_sit(holder)
 
     {entity, events} = MovementSync.sync_movement_state(entity, now)
@@ -155,11 +156,14 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
 
   defp applied_duration_events(_entity, _holder, _now), do: []
 
-  defp remove_non_stacking(holders, %Holder{spell: %Spell{} = spell, caster_guid: caster_guid}) do
+  defp remove_non_stacking(holders, %Holder{spell: %Spell{} = spell, caster_guid: caster_guid} = incoming) do
+    shapeshift? = Holder.has_aura_type?(incoming, :mod_shapeshift)
+
     Enum.reject(holders, fn %Holder{spell: %Spell{} = other} = existing ->
       Spell.same_chain?(other, spell) or
         Spell.same_exclusive_category?(other, spell) or
-        (other.id == spell.id and existing.caster_guid != caster_guid)
+        (other.id == spell.id and existing.caster_guid != caster_guid) or
+        (shapeshift? and Holder.has_aura_type?(existing, :mod_shapeshift))
     end)
   end
 
@@ -241,6 +245,16 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
       end
     end)
   end
+
+  defp maybe_reset_shapeshift_rage(%{unit: %Unit{power_type: 1, power2: rage} = unit} = entity, %Holder{} = holder) do
+    if Holder.has_aura_type?(holder, :mod_shapeshift) and is_integer(rage) and rage > 0 do
+      %{entity | unit: %{unit | power2: 0}}
+    else
+      entity
+    end
+  end
+
+  defp maybe_reset_shapeshift_rage(entity, _holder), do: entity
 
   defp maybe_sit(%{unit: %Unit{stand_state: stand_state} = unit} = entity, %Holder{spell: %Spell{} = spell}) do
     if (spell.aura_interrupt_flags &&& @aura_interrupt_not_seated) != 0 and stand_state != @stand_state_sit do
