@@ -44,6 +44,10 @@ defmodule ThistleTea.Game.Entity do
     dispatch_cast(entity, :drain_rage)
   end
 
+  def grant_power(entity, power_type, amount) do
+    dispatch_cast(entity, {:grant_power, power_type, amount})
+  end
+
   def receive_heal(entity, amount) do
     dispatch_cast(entity, {:receive_heal, amount})
   end

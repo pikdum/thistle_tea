@@ -23,6 +23,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
   alias ThistleTea.Game.Entity.Logic.Threat
   alias ThistleTea.Game.Math
   alias ThistleTea.Game.Network.UpdateObject
+  alias ThistleTea.Game.Spell
 
   @leash_timeout_ms 6_000
 
@@ -52,6 +53,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
   def take_damage_with_absorb(%{internal: %Internal{godmode: true}} = entity, _damage, _now, _opts), do: {entity, 0}
 
   def take_damage_with_absorb(%{unit: %Unit{health: health}} = entity, damage, now, opts) when is_integer(now) do
+    damage = scale_damage_taken(entity, damage, Keyword.get(opts, :school, :physical))
     {entity, remaining} = Aura.absorb_damage(entity, damage, Keyword.get(opts, :school, :physical))
     absorbed = damage - remaining
     %{unit: unit} = entity
@@ -74,6 +76,15 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
   end
 
   def take_damage_with_absorb(entity, _damage, _now, _opts), do: {entity, 0}
+
+  defp scale_damage_taken(entity, damage, school) when is_integer(damage) and damage > 0 do
+    case Aura.percent_multiplier(entity, :mod_damage_percent_taken, Spell.school_mask(school)) do
+      multiplier when multiplier != 1.0 -> max(trunc(damage * multiplier), 0)
+      _unchanged -> damage
+    end
+  end
+
+  defp scale_damage_taken(_entity, damage, _school), do: damage
 
   defp gain_taken_rage(%Character{object: %{guid: guid}} = entity, damage, source)
        when is_integer(source) and source > 0 and source != guid do

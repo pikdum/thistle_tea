@@ -11,13 +11,17 @@ defmodule ThistleTea.Game.Entity.Logic.WarriorSpellsTest do
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
+  alias ThistleTea.Game.Entity.Logic.AttackTable
   alias ThistleTea.Game.Entity.Logic.Aura
+  alias ThistleTea.Game.Entity.Logic.Combat
+  alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.Entity.Logic.Reactive
   alias ThistleTea.Game.Entity.Logic.SpellEffect
   alias ThistleTea.Game.Entity.Logic.Threat
   alias ThistleTea.Game.Player.Spellcasting
   alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.Cast
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.CastValidation
   alias ThistleTea.Game.Spell.Effect
@@ -560,6 +564,134 @@ defmodule ThistleTea.Game.Entity.Logic.WarriorSpellsTest do
       assert target.unit.health == 200
       assert target.unit.auras == []
       assert Enum.any?(events, &(&1.type == :spell_log_miss))
+    end
+  end
+
+  describe "defensive and utility auras" do
+    defp buffed(entity, id, aura, base_points, opts \\ []) do
+      spell = %Spell{
+        id: id,
+        name: "Buff #{id}",
+        school: :physical,
+        duration_ms: 10_000,
+        effects: [
+          %Effect{
+            index: 0,
+            type: :apply_aura,
+            aura: aura,
+            base_points: base_points,
+            die_sides: 1,
+            misc_value: Keyword.get(opts, :misc_value, 0)
+          }
+        ]
+      }
+
+      {entity, _events} = Aura.apply_spell(entity, entity.object.guid, 10, spell, 1_000)
+      entity
+    end
+
+    test "melee haste slows attack speed when negative" do
+      entity = warrior_fixture()
+      entity = %{entity | unit: %{entity.unit | base_attack_time: 2_000}}
+
+      assert Combat.attack_speed_ms(entity) == 2_000
+
+      entity = buffed(entity, 6343, :mod_melee_haste, -11)
+
+      assert Combat.attack_speed_ms(entity) == 2_222
+    end
+
+    test "shield wall cuts damage taken" do
+      entity = %{warrior_fixture() | unit: %{warrior_fixture().unit | health: 500, max_health: 500}}
+      entity = buffed(entity, 871, :mod_damage_percent_taken, -76, misc_value: 127)
+
+      {entity, _absorbed} = Core.take_damage_with_absorb(entity, 100, 1_000, school: :physical, source: 99)
+
+      assert entity.unit.health == 475
+    end
+
+    test "recklessness raises the attacker crit chance" do
+      entity = warrior_fixture()
+
+      base = AttackTable.attacker_context(entity).crit_chance
+
+      entity = buffed(entity, 1719, :mod_crit_percent, 99)
+
+      assert AttackTable.attacker_context(entity).crit_chance == base + 100
+    end
+
+    test "shield block forces blocks" do
+      defender = warrior_fixture()
+      attack = %{caster: 99, caster_level: 10, caster_player?: false, crit_chance: 5.0}
+
+      without_block = AttackTable.resolve(defender, attack, 100, roll: 4_000)
+      refute without_block.outcome == :block
+
+      defender = buffed(defender, 2565, :mod_block_percent, 74)
+      with_block = AttackTable.resolve(defender, attack, 100, roll: 4_000)
+
+      assert with_block.outcome == :block
+    end
+
+    test "disarm halves weapon damage and sets the unit flag" do
+      entity = warrior_fixture()
+      entity = %{entity | unit: %{entity.unit | min_damage: 40.0, max_damage: 60.0}}
+
+      assert Combat.damage_range(entity) == {40.0, 60.0}
+
+      entity = buffed(entity, 676, :mod_disarm, -1)
+
+      assert Combat.damage_range(entity) == {20.0, 30.0}
+      assert Bitwise.band(entity.unit.flags, 0x00200000) == 0x00200000
+    end
+
+    test "death wish scales physical damage done" do
+      entity = warrior_fixture()
+      entity = %{entity | unit: %{entity.unit | min_damage: 40.0, max_damage: 60.0}}
+      entity = buffed(entity, 12_328, :mod_damage_percent_done, 19, misc_value: 127)
+
+      assert Combat.damage_range(entity) == {48.0, 72.0}
+    end
+  end
+
+  describe "charge" do
+    test "caster-targeted energize routes rage back to the caster" do
+      spell = %Spell{
+        id: 100,
+        name: "Charge",
+        school: :physical,
+        effects: [
+          %Effect{index: 1, type: :energize, base_points: 89, die_sides: 1, misc_value: 1, implicit_target_a: :caster}
+        ]
+      }
+
+      target = melee_target()
+      context = %CastContext{caster_guid: 5, caster_level: 10, target_hostile?: true}
+
+      {target, events} = SpellEffect.receive(target, context, spell, 1_000)
+
+      assert [%Event{type: :grant_power, target_guid: 5, misc_value: 1, amount: 90}] = events
+      assert target.unit.power2 in [nil, 0]
+    end
+
+    test "completing a charge cast queues the charge movement event" do
+      alias ThistleTea.Game.Entity.Logic.AI.BT.Spell, as: SpellBT
+
+      spell = %Spell{
+        id: 100,
+        name: "Charge",
+        school: :physical,
+        cast_time_ms: 0,
+        effects: [%Effect{index: 0, type: :charge, implicit_target_a: :target_enemy}]
+      }
+
+      character = warrior_fixture()
+      casting = Cast.new(spell, %Targets{unit_guid: 9, raw: <<0::16>>}, 1_000)
+      character = %{character | internal: %{character.internal | casting: casting}}
+
+      character = SpellBT.complete_cast(character, 1_000)
+
+      assert Enum.any?(character.internal.events, &(&1.type == :charge and &1.target_guid == 9))
     end
   end
 

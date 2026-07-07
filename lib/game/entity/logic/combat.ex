@@ -30,8 +30,15 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
   @chase_distance_inset 0.5
   @chase_rechase_range_factor 0.75
 
-  def attack_speed_ms(%{unit: %Unit{base_attack_time: attack_time}}) when is_integer(attack_time) and attack_time > 0 do
-    attack_time
+  def attack_speed_ms(%{unit: %Unit{base_attack_time: attack_time}} = entity)
+      when is_integer(attack_time) and attack_time > 0 do
+    haste = Aura.flat_amount(entity, :mod_melee_haste)
+
+    if haste == 0 do
+      attack_time
+    else
+      trunc(attack_time * 100 / max(100 + haste, 1))
+    end
   end
 
   def attack_speed_ms(_entity), do: @default_attack_speed_ms
@@ -65,22 +72,40 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
     max(melee_reach * @chase_rechase_range_factor - target_bounding_radius, 0.0)
   end
 
-  def damage_range(%{
-        unit: %Unit{min_damage: min_damage, max_damage: max_damage},
-        internal: %Internal{creature: %Creature{damage_multiplier: damage_multiplier}}
-      })
+  def damage_range(
+        %{
+          unit: %Unit{min_damage: min_damage, max_damage: max_damage},
+          internal: %Internal{creature: %Creature{damage_multiplier: damage_multiplier}}
+        } = entity
+      )
       when is_number(min_damage) and is_number(max_damage) do
     multiplier = damage_multiplier(damage_multiplier)
 
-    {min_damage * multiplier, max_damage * multiplier}
+    scale_damage_range({min_damage * multiplier, max_damage * multiplier}, outgoing_damage_multiplier(entity))
   end
 
-  def damage_range(%{unit: %Unit{min_damage: min_damage, max_damage: max_damage}})
+  def damage_range(%{unit: %Unit{min_damage: min_damage, max_damage: max_damage}} = entity)
       when is_number(min_damage) and is_number(max_damage) do
-    {min_damage, max_damage}
+    scale_damage_range({min_damage, max_damage}, outgoing_damage_multiplier(entity))
   end
 
   def damage_range(_entity), do: {@default_damage, @default_damage}
+
+  @physical_school_mask 0x1
+  @disarmed_damage_factor 0.5
+
+  defp scale_damage_range(range, 1.0), do: range
+  defp scale_damage_range({min_damage, max_damage}, multiplier), do: {min_damage * multiplier, max_damage * multiplier}
+
+  defp outgoing_damage_multiplier(entity) do
+    base = Aura.percent_multiplier(entity, :mod_damage_percent_done, @physical_school_mask)
+
+    if Aura.has_aura?(entity, :mod_disarm) do
+      base * @disarmed_damage_factor
+    else
+      base
+    end
+  end
 
   def attack_damage(%{damage: damage}) when is_number(damage), do: trunc(damage)
 

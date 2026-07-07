@@ -76,6 +76,15 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
     %__MODULE__{type: :drain_rage, target_guid: target_guid}
   end
 
+  def grant_power(target_guid, power_type, amount)
+      when is_integer(target_guid) and is_integer(power_type) and is_integer(amount) do
+    %__MODULE__{type: :grant_power, target_guid: target_guid, misc_value: power_type, amount: amount}
+  end
+
+  def charge(target_guid) when is_integer(target_guid) do
+    %__MODULE__{type: :charge, target_guid: target_guid}
+  end
+
   def spell_log_miss(source_guid, target_guid, spell_id, reason)
       when is_integer(source_guid) and is_integer(target_guid) and is_integer(spell_id) and is_atom(reason) do
     %__MODULE__{

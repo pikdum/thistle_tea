@@ -71,6 +71,20 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
 
   def percent_multiplier(_entity, _type, _school_mask), do: 1.0
 
+  def flat_amount(%{unit: %Unit{auras: holders}}, type) when is_list(holders) do
+    holders
+    |> Enum.reduce(0, fn %Holder{auras: auras} = holder, acc ->
+      stacks = holder_stacks(holder)
+
+      Enum.reduce(auras, acc, fn
+        %Aura{type: ^type, amount: amount}, inner when is_integer(amount) -> inner + amount * stacks
+        _aura, inner -> inner
+      end)
+    end)
+  end
+
+  def flat_amount(_entity, _type), do: 0
+
   defp holder_stacks(%Holder{stacks: stacks}) when is_integer(stacks) and stacks > 1, do: stacks
   defp holder_stacks(_holder), do: 1
 

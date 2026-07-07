@@ -208,9 +208,19 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
     {state, [Event.teleport_to_spell_target(spell_id)]}
   end
 
-  defp apply_effect(state, %CastContext{}, _spell, %Effect{type: :energize, misc_value: power_type} = effect, _now)
+  defp apply_effect(
+         state,
+         %CastContext{caster_guid: caster_guid},
+         _spell,
+         %Effect{type: :energize, misc_value: power_type} = effect,
+         _now
+       )
        when is_integer(power_type) and power_type >= 0 do
-    {Resources.gain_power(state, power_type, Effect.damage_roll(effect)), []}
+    if effect.implicit_target_a == :caster and state.object.guid != caster_guid do
+      {state, [Event.grant_power(caster_guid, power_type, Effect.damage_roll(effect))]}
+    else
+      {Resources.gain_power(state, power_type, Effect.damage_roll(effect)), []}
+    end
   end
 
   defp apply_effect(state, %CastContext{}, _spell, %Effect{type: :create_item, misc_value: item_id} = effect, _now)
@@ -312,12 +322,10 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
 
   defp apply_damage_effect(state, %CastContext{} = context, spell, %Effect{} = effect, now, opts \\ [])
        when is_integer(now) do
-    damage =
-      max(
-        Effect.damage_roll(effect) + damage_bonus(context, spell, opts) +
-          Aura.flat_modifier(state, :mod_damage_taken, Spell.school_mask(spell)),
-        0
-      )
+    rolled = Effect.damage_roll(effect) + damage_bonus(context, spell, opts)
+    rolled = trunc(rolled * (context.damage_done_multiplier || 1.0))
+
+    damage = max(rolled + Aura.flat_modifier(state, :mod_damage_taken, Spell.school_mask(spell)), 0)
 
     school = school_atom(spell)
     resisted = school_resisted_amount(state, damage, school, context.caster_level, opts)
@@ -438,9 +446,10 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
 
   defp melee_ability_damage(state, %CastContext{} = context, spell, damage, now) do
     school = school_atom(spell)
+    damage = trunc(damage * (context.damage_done_multiplier || 1.0))
 
     damage =
-      max(trunc(damage) + Aura.flat_modifier(state, :mod_damage_taken, Spell.school_mask(spell)), 0)
+      max(damage + Aura.flat_modifier(state, :mod_damage_taken, Spell.school_mask(spell)), 0)
 
     damage = mitigate_physical(state, context, school, damage)
     damage = if context.melee_crit?, do: damage * 2, else: damage

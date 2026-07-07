@@ -45,6 +45,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
     spell_damage_bonus: %{},
     healing_bonus: 0,
     threat_multiplier: 1.0,
+    damage_done_multiplier: 1.0,
     melee_crit?: false
   ]
 
@@ -60,7 +61,8 @@ defmodule ThistleTea.Game.Spell.CastContext do
       spell_damage_bonus: spell_damage_bonus(caster),
       healing_bonus: healing_bonus(caster),
       spell_threat: SpellThreatLoader.get(spell_id(spell)),
-      threat_multiplier: Aura.percent_multiplier(caster, :mod_threat, Spell.school_mask(spell))
+      threat_multiplier: Aura.percent_multiplier(caster, :mod_threat, Spell.school_mask(spell)),
+      damage_done_multiplier: Aura.percent_multiplier(caster, :mod_damage_percent_done, Spell.school_mask(spell))
     }
     |> put_melee_snapshot(caster, spell)
   end
@@ -147,8 +149,9 @@ defmodule ThistleTea.Game.Spell.CastContext do
 
   defp attack_skill(_caster), do: nil
 
-  defp melee_crit_chance(%Character{unit: unit}) do
-    CombatRatings.melee_crit_chance(unit.class, unit.level || 1, unit.agility || 0)
+  defp melee_crit_chance(%Character{unit: unit} = caster) do
+    CombatRatings.melee_crit_chance(unit.class, unit.level || 1, unit.agility || 0) +
+      Aura.flat_amount(caster, :mod_crit_percent)
   end
 
   defp melee_crit_chance(_caster), do: nil

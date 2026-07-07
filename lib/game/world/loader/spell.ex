@@ -419,6 +419,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp effect_type(50), do: :trans_door
   defp effect_type(62), do: :power_burn
   defp effect_type(68), do: :interrupt_cast
+  defp effect_type(96), do: :charge
   defp effect_type(17), do: :weapon_damage_noschool
   defp effect_type(27), do: :persistent_area_aura
   defp effect_type(58), do: :weapon_damage
@@ -451,10 +452,15 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp aura_type(36), do: :mod_shapeshift
   defp aura_type(42), do: :proc_trigger_spell
   defp aura_type(49), do: :mod_dodge
+  defp aura_type(51), do: :mod_block_percent
+  defp aura_type(52), do: :mod_crit_percent
   defp aura_type(53), do: :periodic_leech
   defp aura_type(56), do: :transform
   defp aura_type(58), do: :mod_increase_swim_speed
+  defp aura_type(67), do: :mod_disarm
   defp aura_type(69), do: :school_absorb
+  defp aura_type(79), do: :mod_damage_percent_done
+  defp aura_type(87), do: :mod_damage_percent_taken
   defp aura_type(74), do: :reflect_spells_school
   defp aura_type(77), do: :mechanic_immunity
   defp aura_type(84), do: :mod_regen
@@ -476,6 +482,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp aura_type(118), do: :mod_healing_pct
   defp aura_type(134), do: :mod_mana_regen_interrupt
   defp aura_type(135), do: :mod_healing_done
+  defp aura_type(138), do: :mod_melee_haste
   defp aura_type(143), do: :mod_resistance_exclusive
   defp aura_type(161), do: :mod_health_regen_in_combat
   defp aura_type(other) when is_integer(other), do: other

@@ -4,7 +4,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.UnitSync do
   transform display id, the packed aura id/flag/level blocks the client
   renders, and display-slot allocation (positive 0-31, negative 32-47).
   """
-  import Bitwise, only: [|||: 2, <<<: 2]
+  import Bitwise, only: [|||: 2, <<<: 2, &&&: 2, bnot: 1]
 
   alias ThistleTea.Game.Aura
   alias ThistleTea.Game.Aura.Holder
@@ -20,11 +20,14 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.UnitSync do
   @aflag_eff_index_1 0x04
   @aflag_eff_index_0 0x08
 
+  @unit_flag_disarmed 0x00200000
+
   def sync_unit(%Unit{} = unit) do
     unit
     |> Stats.recompute()
     |> sync_transform()
     |> sync_shapeshift()
+    |> sync_disarm()
     |> sync_aura_fields()
   end
 
@@ -62,6 +65,22 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.UnitSync do
   end
 
   defp sync_shapeshift(unit), do: unit
+
+  defp sync_disarm(%Unit{auras: holders} = unit) when is_list(holders) do
+    disarmed? = Enum.any?(holders, &Holder.has_aura_type?(&1, :mod_disarm))
+    flags = unit.flags || 0
+
+    flags =
+      if disarmed? do
+        flags ||| @unit_flag_disarmed
+      else
+        flags &&& bnot(@unit_flag_disarmed)
+      end
+
+    %{unit | flags: flags}
+  end
+
+  defp sync_disarm(unit), do: unit
 
   defp sync_aura_fields(%Unit{auras: holders} = unit) when is_list(holders) and holders != [] do
     %{

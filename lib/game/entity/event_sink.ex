@@ -415,6 +415,53 @@ defmodule ThistleTea.Game.Entity.EventSink do
     entity
   end
 
+  def emit(entity, %Event{type: :grant_power} = event) do
+    if Guid.entity_type(event.target_guid) == :player do
+      Entity.grant_power(event.target_guid, event.misc_value, event.amount)
+    end
+
+    entity
+  end
+
+  @charge_speed 25.0
+
+  def emit(%Character{internal: %Internal{map: map}, movement_block: %{position: {x, y, z, _o}}} = entity, %Event{
+        type: :charge,
+        target_guid: target_guid
+      }) do
+    with {^map, tx, ty, tz} <- World.position(target_guid),
+         path when is_list(path) and path != [] <- charge_path(map, {x, y, z}, {tx, ty, tz}) do
+      duration =
+        [{x, y, z} | path]
+        |> Math.movement_duration(@charge_speed)
+        |> Kernel.*(1_000)
+        |> trunc()
+        |> max(1)
+
+      movement_block = %{
+        entity.movement_block
+        | spline_nodes: path,
+          duration: duration,
+          spline_flags: 0x100
+      }
+
+      %{entity | movement_block: movement_block}
+      |> Message.SmsgMonsterMove.build()
+      |> World.broadcast_packet(entity)
+
+      {dx, dy, dz} = List.last(path)
+      destination = {dx, dy, dz, charge_facing({x, y}, {dx, dy})}
+      entity = %{entity | movement_block: %{entity.movement_block | position: destination}}
+      World.update_position(entity)
+
+      entity
+    else
+      _no_path -> entity
+    end
+  end
+
+  def emit(entity, %Event{type: :charge}), do: entity
+
   def emit(entity, %Event{type: :attack_outcome} = event) do
     Entity.attack_outcome(event.target_guid, %{
       victim_guid: event.source_guid,
@@ -729,6 +776,18 @@ defmodule ThistleTea.Game.Entity.EventSink do
       _ -> true
     end
   end
+
+  defp charge_path(map, from, to) do
+    Pathfinding.find_path(map, from, to)
+  rescue
+    _ -> nil
+  end
+
+  defp charge_facing({x, y}, {dx, dy}) when dx != x or dy != y do
+    :math.atan2(dy - y, dx - x)
+  end
+
+  defp charge_facing(_from, _to), do: 0.0
 
   defp clamp_leap_destination(%{movement_block: %{position: {cx, cy, cz, _o}}}, map, {x, y, z}) do
     z = snap_to_terrain_height(map, {x, y}, z, cz)

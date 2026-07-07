@@ -155,10 +155,22 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
     |> queue_consume_cast_item(casting)
     |> queue_open_object(casting)
     |> mark_hostile_cast(casting, targets, now)
+    |> queue_charge(casting)
     |> apply_spell_hit(casting, hits, now)
     |> consume_combo_points(casting)
     |> clear_cast()
   end
+
+  defp queue_charge(character, %Cast{spell: %Spell{} = spell, targets: %Targets{unit_guid: unit_guid}})
+       when is_integer(unit_guid) and unit_guid > 0 do
+    if Enum.any?(spell.effects, &(&1.type == :charge)) do
+      Event.enqueue(character, Event.charge(unit_guid))
+    else
+      character
+    end
+  end
+
+  defp queue_charge(character, _casting), do: character
 
   defp consume_combo_points(character, %Cast{spell: %Spell{} = spell}) do
     if Scripts.requires_combo_target?(spell) do

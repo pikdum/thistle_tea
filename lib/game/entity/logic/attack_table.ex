@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.CombatRatings
   alias ThistleTea.Game.Entity.Logic.Skills
   alias ThistleTea.Game.Math
@@ -46,7 +47,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
     %{
       caster_level: unit.level || 1,
       caster_player?: player?(attacker),
-      crit_chance: attacker_crit_chance(attacker),
+      crit_chance: attacker_crit_chance(attacker) + Aura.flat_amount(attacker, :mod_crit_percent),
       always_crush?: always_crush?(attacker),
       caster_position: attacker_position(attacker)
     }
@@ -111,6 +112,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
       defender_agility: unit.agility || 0,
       defender_strength: unit.strength || 0,
       defender_armor: unit.normal_resistance || 0,
+      defender_block_bonus: Aura.flat_amount(defender, :mod_block_percent),
       defender_bonuses: unit.equipment_bonuses || %{},
       defender_extra_flags: extra_flags(defender),
       standing?: (unit.stand_state || 0) == 0,
@@ -236,7 +238,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
   defp block_bp(%{from_behind?: true}), do: 0
 
   defp block_bp(%{defender_player?: true} = ctx) do
-    (CombatRatings.block_chance(ctx.defender_bonuses) - ctx.skill_diff * 0.04)
+    (CombatRatings.block_chance(ctx.defender_bonuses) + ctx.defender_block_bonus - ctx.skill_diff * 0.04)
     |> max(0.0)
     |> bp()
   end

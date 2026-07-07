@@ -223,6 +223,11 @@ defmodule ThistleTea.Game.Network.Server do
     {:noreply, {socket, %{state | character: character}}, {:continue, :maybe_broadcast_update}}
   end
 
+  def handle_cast({:grant_power, power_type, amount}, {socket, %{character: %Character{} = character} = state}) do
+    character = Resources.gain_power(character, power_type, amount)
+    {:noreply, {socket, %{state | character: character}}, {:continue, :maybe_broadcast_update}}
+  end
+
   def handle_cast({:attack_outcome, payload}, {socket, %{character: %Character{} = character} = state}) do
     spell = spellbook_spell(character, Map.get(payload, :spell_id))
     character = AttackFeedback.receive(character, payload, spell, Time.now())
