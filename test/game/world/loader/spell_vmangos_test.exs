@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.World.Loader.SpellVmangosTest do
   use ExUnit.Case, async: false
 
+  alias ThistleTea.Game.Entity.Logic.SpellBook
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.World.Loader.ClassSpell
@@ -107,6 +108,22 @@ defmodule ThistleTea.Game.World.Loader.SpellVmangosTest do
       assert spell.power_type == -2
       assert spell.mana_cost_percent == 20
       assert Enum.any?(spell.effects, &(&1.type == :energize))
+    end
+  end
+
+  describe "warrior spell acquisition" do
+    test "keeps only the highest superseding rank regardless of spell id order" do
+      initial_ids = [6673, 7386]
+      trainable_ids = ClassSpell.trainable_spell_ids(1, 60)
+      superseded_by = SpellLoader.superseded_by_map(initial_ids ++ trainable_ids)
+
+      {known_ids, _events} = SpellBook.learn(initial_ids, trainable_ids, superseded_by)
+
+      refute Enum.any?(superseded_by, fn {old_id, new_id} -> old_id in known_ids and new_id in known_ids end)
+      assert 11_551 in known_ids
+      assert 11_597 in known_ids
+      refute 6673 in known_ids
+      refute 7386 in known_ids
     end
   end
 end

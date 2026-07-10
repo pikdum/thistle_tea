@@ -28,6 +28,16 @@ defmodule ThistleTea.Game.Entity.Logic.SpellBookTest do
                SpellBook.learn([], [78, 284, 285], @heroic_strike_chain)
     end
 
+    test "orders a batch by supersession instead of numeric spell id" do
+      assert {[285], [{:learned, 78}, {:superseded, 78, 284}, {:superseded, 284, 285}]} =
+               SpellBook.learn([], [285, 78, 284], @heroic_strike_chain)
+    end
+
+    test "repairs lower ranks left beside an already-known higher rank" do
+      assert {[285], [{:superseded, 78, 284}, {:removed, 284}]} =
+               SpellBook.learn([78, 285], [284, 285], @heroic_strike_chain)
+    end
+
     test "learns stacking ranks side by side" do
       assert {[133, 143], [{:learned, 143}]} = SpellBook.learn([133], [143], %{})
     end

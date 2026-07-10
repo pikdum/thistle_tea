@@ -62,4 +62,8 @@ defmodule ThistleTea.Game.Player.Spells do
   defp send_event_packet({:superseded, old_id, new_id}) do
     Network.send_packet(%Message.SmsgSupercededSpell{old_spell_id: old_id, new_spell_id: new_id})
   end
+
+  defp send_event_packet({:removed, spell_id}) do
+    Network.send_packet(%Message.SmsgRemovedSpell{spell_id: spell_id})
+  end
 end

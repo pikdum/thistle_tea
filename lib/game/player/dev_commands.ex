@@ -585,16 +585,21 @@ defmodule ThistleTea.Game.Player.DevCommands do
 
         names =
           events
-          |> Enum.map_join(", ", fn
-            {:learned, id} -> spell_name(spellbook, id)
-            {:superseded, _old_id, id} -> spell_name(spellbook, id)
+          |> Enum.flat_map(fn
+            {:learned, id} -> [spell_name(spellbook, id)]
+            {:superseded, _old_id, id} -> [spell_name(spellbook, id)]
+            {:removed, _id} -> []
           end)
+          |> Enum.join(", ")
 
         state
         |> Map.put(:character, character)
-        |> system_message("Learned: #{names}")
+        |> spell_learning_message(names)
     end
   end
+
+  defp spell_learning_message(state, ""), do: system_message(state, "Repaired duplicate spell ranks.")
+  defp spell_learning_message(state, names), do: system_message(state, "Learned: #{names}")
 
   defp spell_name(spellbook, spell_id) do
     case Map.get(spellbook, spell_id) do
