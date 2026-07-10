@@ -8,13 +8,13 @@ defmodule ThistleTea.Game.World.Loader.SpellVmangosTest do
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Loader.SpellThreat
 
-  @moduletag :vmangos_db
-
   setup_all do
     :ok = SpellThreat.load_all()
   end
 
   describe "stance spells" do
+    @describetag :dbc_db
+
     test "battle stance loads the form aura with its baked threat passive" do
       spell = SpellLoader.load(2457)
 
@@ -39,6 +39,8 @@ defmodule ThistleTea.Game.World.Loader.SpellVmangosTest do
   end
 
   describe "stance-locked abilities" do
+    @describetag :dbc_db
+
     test "overpower requires battle stance" do
       spell = SpellLoader.load(7384)
 
@@ -57,6 +59,8 @@ defmodule ThistleTea.Game.World.Loader.SpellVmangosTest do
   describe "spell threat" do
     alias SpellThreat, as: SpellThreatLoader
 
+    @describetag :vmangos_db
+
     test "heroic strike carries flat bonus threat" do
       assert %{threat: 20.0, multiplier: 1.0} = SpellThreatLoader.get(78)
     end
@@ -71,6 +75,8 @@ defmodule ThistleTea.Game.World.Loader.SpellVmangosTest do
   end
 
   describe "sunder armor" do
+    @describetag :dbc_db
+
     test "loads its stack cap" do
       spell = SpellLoader.load(7386)
 
@@ -80,6 +86,8 @@ defmodule ThistleTea.Game.World.Loader.SpellVmangosTest do
 
   describe "talent grants" do
     alias ClassSpell, as: ClassSpellLoader
+
+    @describetag :dbc_db
 
     test "warrior debug spells include non-passive talent actives" do
       spell_ids = ClassSpellLoader.trainable_spell_ids(1, 60)
@@ -98,6 +106,8 @@ defmodule ThistleTea.Game.World.Loader.SpellVmangosTest do
   end
 
   describe "warrior spell parsing" do
+    @describetag :dbc_db
+
     test "heroic strike is an on-next-swing melee ability with a rage refund on avoid" do
       spell = SpellLoader.load(78)
 
@@ -116,6 +126,8 @@ defmodule ThistleTea.Game.World.Loader.SpellVmangosTest do
   end
 
   describe "warrior spell acquisition" do
+    @describetag :dbc_db
+
     test "keeps only the highest superseding rank regardless of spell id order" do
       initial_ids = [6673, 7386]
       trainable_ids = ClassSpell.trainable_spell_ids(1, 60)
