@@ -23,6 +23,10 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: cachix/install-nix-action@v31
+      - uses: cachix/cachix-action@v17
+        with:
+          name: thistle-tea
+          authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
       - uses: erlef/setup-beam@v1
         with:
           elixir-version: ${{ matrix.elixir }}
