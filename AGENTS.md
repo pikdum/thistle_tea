@@ -21,6 +21,7 @@
 - Use `setup [:named_setup]` for reusable test data
 - Keep test names concise and descriptive
 - Do not query generated sqlite databases in default tests; `db/vmangos.sqlite` loader smoke tests must be tagged `:vmangos_db` so normal `mix test` excludes them, and `db/dbc.sqlite` is not available in CI
+- CI runs `mix test` without VMangos first, then generates the database and runs `mix test --only vmangos_db`; keep default tests independent of VMangos
 - Tests that need namigator map geometry (line of sight, terrain heights) must be tagged `:namigator_maps` (excluded by default; map data is not in CI); run with `mix test --include namigator_maps`
 
 ### Imports & Structs

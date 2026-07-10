@@ -10,6 +10,10 @@ defmodule ThistleTea.Game.World.Loader.SpellVmangosTest do
 
   @moduletag :vmangos_db
 
+  setup_all do
+    :ok = SpellThreat.load_all()
+  end
+
   describe "stance spells" do
     test "battle stance loads the form aura with its baked threat passive" do
       spell = SpellLoader.load(2457)

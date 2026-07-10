@@ -152,8 +152,8 @@
           };
 
           vmangos-db-snapshot = pkgs.fetchurl {
-            url = "https://github.com/vmangos/core/releases/download/db_latest/db-sqlite-b40576b.zip";
-            hash = "sha256-W7dFk4TRX6piSYemNNrzxTBev31EQoQQHvvaWR/1B4k=";
+            url = "https://github.com/vmangos/core/releases/download/db_latest/db-sqlite-467fc53.zip";
+            hash = "sha256-M9u7I9syKk37hvpRlA/6h215iPGZvIr488+YR+9ec1Y=";
           };
 
           # namigator's MapBuilder CLI, built from the pinned fork via CMake.
@@ -279,7 +279,7 @@
 
           vmangos-db = pkgs.stdenv.mkDerivation {
             pname = "vmangos-db";
-            version = "b40576b";
+            version = "467fc53";
 
             src = vmangos-db-snapshot;
             dontUnpack = true;
