@@ -24,6 +24,7 @@ mix deps.compile
 cd assets && npm install && cd ../
 
 # generate db/vmangos.sqlite (mobs, items, etc.)
+cachix use thistle-tea
 nix run .#vmangos-db -- ./db
 
 # path to vanilla client, the directory with WoW.exe
