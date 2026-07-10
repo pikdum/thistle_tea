@@ -1,6 +1,6 @@
 PRIV_DIR := $(MIX_APP_PATH)/priv
 NIF_PATH := $(PRIV_DIR)/native/namigator_ex.so
-STAMP := $(PRIV_DIR)/native/.namigator_src
+STAMP := $(PRIV_DIR)/native/.namigator_src.$(notdir $(NAMIGATOR_SRC))
 C_SRC := $(shell pwd)/c_src
 NAMIGATOR_SRC ?=
 
@@ -57,13 +57,11 @@ SOURCES := $(C_SRC)/namigator_ex.cpp $(NAMIGATOR_SOURCES) $(RECAST_SOURCES)
 all: $(NIF_PATH)
 	@ echo > /dev/null
 
-# Files under a nix store path (NAMIGATOR_SRC) carry normalized 1970 mtimes, so
-# make's timestamp check never notices a namigator bump and would keep a stale
-# .so. Record the resolved source path in a stamp the NIF depends on, rewritten
-# only when NAMIGATOR_SRC changes, which forces a rebuild on every bump.
-$(STAMP): FORCE
+# Nix store sources have normalized mtimes, so encode the store path in a stamp
+# name to make input changes visible without invalidating every invocation.
+$(STAMP):
 	@ mkdir -p $(PRIV_DIR)/native
-	@ [ "$$(cat $(STAMP) 2>/dev/null)" = "$(NAMIGATOR_SRC)" ] || echo "$(NAMIGATOR_SRC)" > $(STAMP)
+	@ touch $(STAMP)
 
 $(NIF_PATH): $(SOURCES) $(STAMP)
 	@test -d "$(NAMIGATOR_SRC)/recastnavigation/Detour/Source" || (echo "missing namigator recastnavigation submodule under $(NAMIGATOR_SRC)" >&2; exit 1)
@@ -71,7 +69,6 @@ $(NIF_PATH): $(SOURCES) $(STAMP)
 	$(CXX) $(CPPFLAGS) $(SOURCES) -o $(NIF_PATH) $(LDFLAGS)
 
 clean:
-	rm -f $(NIF_PATH) $(STAMP)
+	rm -f $(NIF_PATH) $(PRIV_DIR)/native/.namigator_src*
 
-.PHONY: all clean FORCE
-FORCE:
+.PHONY: all clean
