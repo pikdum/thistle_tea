@@ -456,6 +456,43 @@ defmodule ThistleTea.Game.Entity.Logic.WarriorSpellsTest do
       assert [%Holder{stacks: 5}] = mob.unit.auras
       assert mob.unit.normal_resistance == 550
     end
+
+    test "uses a visible debuff slot" do
+      {mob, _events} = Aura.apply_spell(armored_mob(), 5, 10, sunder_spell(), 1_000)
+
+      assert [%Holder{negative?: true, slot: 32}] = mob.unit.auras
+
+      assert <<spell_id::little-size(32), _rest::binary>> =
+               <<mob.unit.aura::little-size(48 * 32)>> |> binary_part(32 * 4, 16 * 4)
+
+      assert spell_id == 7386
+    end
+  end
+
+  describe "intimidating shout" do
+    test "does not apply enemy fear effects to the caster" do
+      spell = %Spell{
+        id: 5246,
+        name: "Intimidating Shout",
+        school: :physical,
+        duration_ms: 8_000,
+        effects: [
+          %Effect{
+            index: 0,
+            type: :apply_aura,
+            aura: :mod_fear,
+            implicit_target_a: :aoe_enemy_at_caster
+          }
+        ]
+      }
+
+      caster = warrior_fixture()
+      context = %CastContext{caster_guid: caster.object.guid, caster_level: 10}
+
+      {caster, _events} = SpellEffect.receive(caster, context, spell, 1_000)
+
+      refute Aura.has_aura?(caster, :mod_fear)
+    end
   end
 
   describe "taunt" do

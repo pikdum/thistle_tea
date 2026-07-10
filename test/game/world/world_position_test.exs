@@ -1,9 +1,24 @@
 defmodule ThistleTea.Game.World.WorldPositionTest do
   use ExUnit.Case, async: false
 
+  alias ThistleTea.Game.Entity
+  alias ThistleTea.Game.Network.Packet
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
+
+  describe "broadcast_packet/3" do
+    test "sends a source entity's packet to itself without visibility filtering" do
+      guid = System.unique_integer([:positive, :monotonic])
+      Entity.register(guid)
+      on_exit(fn -> Entity.unregister(guid) end)
+
+      packet = %Packet{opcode: 1, payload: <<>>}
+      World.broadcast_packet(packet, %{object: %{guid: guid}}, recipients: [guid])
+
+      assert_receive {:"$gen_cast", {:send_packet, ^packet}}
+    end
+  end
 
   describe "position/2" do
     test "falls back to the spatial hash entry without published movement" do

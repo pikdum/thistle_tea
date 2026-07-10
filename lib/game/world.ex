@@ -111,9 +111,17 @@ defmodule ThistleTea.Game.World do
     |> broadcast_recipients(entity, Keyword.get(opts, :range))
     |> Enum.each(fn guid ->
       if include_self? or guid != source_guid do
-        Network.send_packet(packet, guid, source_guid: source_guid)
+        send_broadcast_packet(packet, guid, source_guid)
       end
     end)
+  end
+
+  defp send_broadcast_packet(packet, source_guid, source_guid) do
+    Network.send_packet(packet, source_guid)
+  end
+
+  defp send_broadcast_packet(packet, guid, source_guid) do
+    Network.send_packet(packet, guid, source_guid: source_guid)
   end
 
   def tracking_players(%{internal: %Internal{map: map}, movement_block: %MovementBlock{position: {x, y, z, _o}}}) do

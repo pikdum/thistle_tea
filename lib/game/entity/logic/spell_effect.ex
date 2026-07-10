@@ -23,13 +23,15 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   @resurrect_effects [:resurrect, :resurrect_new]
 
   def receive(target, %CastContext{} = context, %Spell{} = spell, now) when is_integer(now) do
+    effects = applicable_effects(target, context, spell.effects)
+    spell = %{spell | effects: effects}
     context = %{context | target_guid: target.object.guid, spell: spell}
 
     if melee_roll_required?(target, context, spell) do
       receive_melee_ability(target, context, spell, now)
     else
       target
-      |> apply_effects(context, spell.effects, [], now)
+      |> apply_effects(context, effects, [], now)
       |> with_bonus_threat(context)
     end
   end
@@ -39,6 +41,29 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   end
 
   def receive(target, _context, _spell, _now), do: {target, []}
+
+  defp applicable_effects(%{object: %{guid: guid}}, %CastContext{caster_guid: guid}, effects) do
+    Enum.reject(effects, &hostile_target_effect?/1)
+  end
+
+  defp applicable_effects(_target, _context, effects), do: effects
+
+  defp hostile_target_effect?(%Effect{} = effect) do
+    effect.implicit_target_a in [
+      :target_enemy,
+      :aoe_enemy_at_caster,
+      :aoe_enemy_in_cone,
+      :aoe_enemy_at_channel,
+      :aoe_enemy_at_dest
+    ] or
+      effect.implicit_target_b in [
+        :target_enemy,
+        :aoe_enemy_at_caster,
+        :aoe_enemy_in_cone,
+        :aoe_enemy_at_channel,
+        :aoe_enemy_at_dest
+      ]
+  end
 
   defp melee_roll_required?(%{object: %{guid: target_guid}}, %CastContext{caster_guid: caster_guid}, spell) do
     Spell.melee_ability?(spell) and target_guid != caster_guid

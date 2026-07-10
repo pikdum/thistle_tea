@@ -105,8 +105,13 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
       Spell.attribute?(spell, :negative) -> true
       caster_guid == target_guid -> false
       Enum.any?(auras, fn %Aura{type: type} -> type in @negative_auras end) -> true
+      Enum.any?(auras, &negative_resistance_modifier?/1) -> true
       true -> false
     end
+  end
+
+  defp negative_resistance_modifier?(%Aura{type: type, amount: amount}) do
+    type in [:mod_resistance, :mod_resistance_exclusive] and is_number(amount) and amount < 0
   end
 
   defp do_apply(%{unit: %Unit{auras: existing}} = entity, %Holder{} = holder, now) when is_list(existing) do
