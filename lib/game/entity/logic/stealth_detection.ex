@@ -3,10 +3,23 @@ defmodule ThistleTea.Game.Entity.Logic.StealthDetection do
   Pure creature detection rules for stealthed targets.
   """
 
+  alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Logic.Aura
+
   @collision_distance 1.5
   @yards_per_skill_point 1.0 / 6.0
   @base_creature_distance 5.0 / 6.0
   @max_distance 30.0
+
+  def target_metadata(%{unit: %Unit{level: level}} = entity) when is_integer(level) do
+    stealthed? = Aura.has_aura?(entity, :mod_stealth)
+
+    %{
+      stealthed?: stealthed?,
+      stealth_skill: stealth_skill(entity, stealthed?, level),
+      undetectable_until: entity.internal.undetectable_until
+    }
+  end
 
   def detectable?(detector, target, distance, now)
 
@@ -28,4 +41,10 @@ defmodule ThistleTea.Game.Entity.Logic.StealthDetection do
     |> max(0.0)
     |> min(@max_distance)
   end
+
+  defp stealth_skill(entity, true, level) do
+    max(Aura.flat_amount(entity, :mod_stealth), level * 5) + Aura.flat_amount(entity, :mod_stealth_level)
+  end
+
+  defp stealth_skill(_entity, false, _level), do: 0
 end

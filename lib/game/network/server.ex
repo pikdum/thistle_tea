@@ -18,7 +18,6 @@ defmodule ThistleTea.Game.Network.Server do
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.AI.Tick
   alias ThistleTea.Game.Entity.Logic.AttackFeedback
-  alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Combat
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Death
@@ -31,6 +30,7 @@ defmodule ThistleTea.Game.Network.Server do
   alias ThistleTea.Game.Entity.Logic.Resources
   alias ThistleTea.Game.Entity.Logic.Rest
   alias ThistleTea.Game.Entity.Logic.SpellEffect
+  alias ThistleTea.Game.Entity.Logic.StealthDetection
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Connection
@@ -257,10 +257,15 @@ defmodule ThistleTea.Game.Network.Server do
   def handle_cast({:receive_spell, caster, spell}, {socket, %{character: %Character{} = character} = state}) do
     now = Time.now()
     harmful? = Spell.harmful?(spell)
-    character = if harmful?, do: PlayerCombat.mark_attacked(character, now), else: character
 
-    {character, events} = SpellEffect.receive(character, caster, spell, now)
-    character = EventSink.emit(character, events)
+    character =
+      if harmful? and PlayerCombat.undetectable?(character, now) do
+        character
+      else
+        character = if harmful?, do: PlayerCombat.mark_attacked(character, now), else: character
+        {character, events} = SpellEffect.receive(character, caster, spell, now)
+        EventSink.emit(character, events)
+      end
 
     state = %{state | character: character}
     state = if harmful?, do: PlayerTick.ensure_scheduled(state), else: state
@@ -520,8 +525,11 @@ defmodule ThistleTea.Game.Network.Server do
     {:noreply, {socket, maybe_broadcast_update(state)}, socket.read_timeout}
   end
 
-  def maybe_broadcast_update(%{character: %Character{} = character} = state) do
-    do_broadcast_update(%{state | character: EventSink.emit_pending(character)})
+  def maybe_broadcast_update(%{character: %Character{}} = state) do
+    state
+    |> sync_character_metadata()
+    |> then(fn state -> %{state | character: EventSink.emit_pending(state.character)} end)
+    |> do_broadcast_update()
   end
 
   def maybe_broadcast_update(state), do: state
@@ -530,18 +538,6 @@ defmodule ThistleTea.Game.Network.Server do
     Core.update_object(character, :values)
     |> World.broadcast_packet(character)
 
-    Metadata.update(state.guid, %{
-      level: character.unit.level,
-      alive?: Death.alive?(character),
-      ghost?: Death.ghost?(character),
-      health_pct: Core.health_pct(character),
-      unit_flags: character.unit.flags,
-      shapeshift_form: character.unit.shapeshift_form,
-      stealthed?: Aura.has_aura?(character, :mod_stealth),
-      stealth_skill: Aura.flat_amount(character, :mod_stealth),
-      undetectable_until: character.internal.undetectable_until
-    })
-
     PartyNotifier.broadcast_stats(state.guid, character)
     internal = %{character.internal | broadcast_update?: false}
     character = %{character | internal: internal}
@@ -549,6 +545,27 @@ defmodule ThistleTea.Game.Network.Server do
   end
 
   defp do_broadcast_update(state), do: state
+
+  defp sync_character_metadata(%{guid: guid, character: %Character{} = character} = state) when is_integer(guid) do
+    detection = StealthDetection.target_metadata(character)
+
+    Metadata.update(
+      guid,
+      %{
+        level: character.unit.level,
+        alive?: Death.alive?(character),
+        ghost?: Death.ghost?(character),
+        health_pct: Core.health_pct(character),
+        unit_flags: character.unit.flags,
+        shapeshift_form: character.unit.shapeshift_form
+      }
+      |> Map.merge(detection)
+    )
+
+    state
+  end
+
+  defp sync_character_metadata(state), do: state
 
   defp tick_player(%{internal: %Internal{behavior_tree: behavior_tree}} = character) when not is_nil(behavior_tree) do
     BT.tick(behavior_tree, character)

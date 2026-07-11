@@ -22,6 +22,7 @@ defmodule ThistleTea.Game.Player.Login do
   alias ThistleTea.Game.Entity.Logic.Death
   alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Entity.Logic.MovementStats
+  alias ThistleTea.Game.Entity.Logic.StealthDetection
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.BinaryUtils
   alias ThistleTea.Game.Network.Message
@@ -87,11 +88,9 @@ defmodule ThistleTea.Game.Player.Login do
         ghost?: Death.ghost?(c),
         health_pct: Core.health_pct(c),
         shapeshift_form: c.unit.shapeshift_form,
-        stealthed?: AuraLogic.has_aura?(c, :mod_stealth),
-        stealth_skill: AuraLogic.flat_amount(c, :mod_stealth),
-        undetectable_until: c.internal.undetectable_until,
         orientation: elem(c.movement_block.position, 3)
       }
+      |> Map.merge(StealthDetection.target_metadata(c))
       |> Map.merge(FactionLoader.metadata(c.unit.faction_template))
     )
 

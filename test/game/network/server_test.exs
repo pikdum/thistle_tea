@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Network.ServerTest do
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.Entity.Logic.Regen
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
@@ -16,6 +17,7 @@ defmodule ThistleTea.Game.Network.ServerTest do
   alias ThistleTea.Game.Network.UpdateBatcher
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.Time
+  alias ThistleTea.Game.World.Metadata
 
   describe "UpdateBatcher.batch/2" do
     test "drains pending update structs into a single packet" do
@@ -107,6 +109,28 @@ defmodule ThistleTea.Game.Network.ServerTest do
 
       assert character.unit.health == 80
       refute character.internal.in_combat
+    end
+
+    test "syncs detection metadata before aura object events clear the broadcast flag" do
+      guid = System.unique_integer([:positive])
+      character = character(guid, health: 80, max_health: 100)
+
+      internal = %{
+        character.internal
+        | broadcast_update?: true,
+          undetectable_until: Time.now() + 1_000,
+          events: [Event.object_update(:values)]
+      }
+
+      Metadata.put(guid, %{})
+      on_exit(fn -> Metadata.delete(guid) end)
+
+      Server.maybe_broadcast_update(%{guid: guid, character: %{character | internal: internal}})
+
+      assert %{undetectable_until: expires_at, stealthed?: false} =
+               Metadata.query(guid, [:undetectable_until, :stealthed?])
+
+      assert expires_at > Time.now()
     end
   end
 

@@ -1,6 +1,11 @@
 defmodule ThistleTea.Game.Entity.Logic.StealthDetectionTest do
   use ExUnit.Case, async: true
 
+  alias ThistleTea.Game.Aura
+  alias ThistleTea.Game.Aura.Holder
+  alias ThistleTea.Game.Entity.Data.Character
+  alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.StealthDetection
 
   describe "detectable?/4" do
@@ -21,6 +26,18 @@ defmodule ThistleTea.Game.Entity.Logic.StealthDetectionTest do
 
       refute StealthDetection.detectable?(%{level: 60}, target, 0.1, 1_999)
       assert StealthDetection.detectable?(%{level: 60}, target, 0.1, 2_000)
+    end
+
+    test "publishes level-scaled skill when the flattened rank amount is stale" do
+      character = %Character{
+        unit: %Unit{
+          level: 30,
+          auras: [%Holder{auras: [%Aura{type: :mod_stealth, amount: 5}]}]
+        },
+        internal: %Internal{}
+      }
+
+      assert %{stealthed?: true, stealth_skill: 150} = StealthDetection.target_metadata(character)
     end
   end
 end
