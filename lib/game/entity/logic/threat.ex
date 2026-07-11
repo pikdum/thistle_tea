@@ -110,7 +110,7 @@ defmodule ThistleTea.Game.Entity.Logic.Threat do
 
   def reselect(%Mob{unit: %Unit{target: current}, internal: %Internal{threat: table}} = entity, opts)
       when is_map(table) do
-    valid? = Keyword.get_lazy(opts, :valid?, fn -> &Hostility.valid_hostile_target?(entity, &1) end)
+    valid? = Keyword.get_lazy(opts, :valid?, fn -> &Hostility.valid_attack_target?(entity, &1) end)
     in_melee? = Keyword.get_lazy(opts, :in_melee?, fn -> &in_melee_range?(entity, &1) end)
 
     {kept, dropped} = Enum.split_with(table, fn {guid, _threat} -> valid?.(guid) end)

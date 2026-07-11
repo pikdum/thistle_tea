@@ -105,6 +105,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
       BT.sequence([
         BT.condition(&in_combat?/2),
         BT.action(&select_victim/2),
+        BT.action(&interrupt_idle_movement/2),
         BT.action(&set_running_true/2),
         BT.selector([
           BT.sequence([
@@ -535,6 +536,29 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
 
   defp set_running_true(%Mob{} = state, %Blackboard{} = blackboard) do
     {:success, set_running(state, true), blackboard}
+  end
+
+  defp interrupt_idle_movement(%Mob{} = state, %Blackboard{} = blackboard) do
+    interrupt_idle_movement(state, blackboard, Time.now())
+  end
+
+  def interrupt_idle_movement(%Mob{} = state, %Blackboard{move_target: move_target} = blackboard, now)
+      when is_tuple(move_target) and is_integer(now) do
+    state =
+      if Movement.moving?(state, now) do
+        state
+        |> Movement.halt(now)
+        |> Event.enqueue(Event.movement_stopped())
+      else
+        state
+      end
+
+    blackboard = %{Blackboard.clear_waypoint(blackboard) | next_chase_at: 0}
+    {:success, state, blackboard}
+  end
+
+  def interrupt_idle_movement(%Mob{} = state, %Blackboard{} = blackboard, _now) do
+    {:success, state, blackboard}
   end
 
   defp should_tether?(%Mob{} = state, blackboard) do
@@ -1154,8 +1178,14 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
 
   def wait_for_arrival(%Mob{} = state, %Blackboard{} = blackboard, now) when is_integer(now) do
     if Movement.moving?(state, now) do
-      delay_ms = Movement.next_spatial_update_delay(state, now)
-      {BT.running(delay_ms, :movement), state, blackboard}
+      movement_delay = Movement.next_spatial_update_delay(state, now)
+      {idle_reason, idle_delay} = idle_wake(state, blackboard, now)
+
+      {reason, delay_ms} =
+        [{:movement, movement_delay}, {idle_reason, idle_delay}]
+        |> soonest_wake(:movement, movement_delay)
+
+      {BT.running(delay_ms, reason), state, blackboard}
     else
       {:success, state, Blackboard.clear_move_target(blackboard)}
     end

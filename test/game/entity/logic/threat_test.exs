@@ -7,6 +7,8 @@ defmodule ThistleTea.Game.Entity.Logic.ThreatTest do
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.Entity.Logic.Threat
+  alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.World.Metadata
 
   @mob_guid 100
   @player_a 1
@@ -15,7 +17,7 @@ defmodule ThistleTea.Game.Entity.Logic.ThreatTest do
 
   defp mob(attrs \\ []) do
     %Mob{
-      object: %Object{guid: @mob_guid},
+      object: %Object{guid: Keyword.get(attrs, :guid, @mob_guid)},
       unit: %Unit{target: Keyword.get(attrs, :target, 0)},
       internal: %Internal{
         in_combat: Keyword.get(attrs, :in_combat, true),
@@ -149,6 +151,29 @@ defmodule ThistleTea.Game.Entity.Logic.ThreatTest do
       assert {_entity, {:switch, @player_b}} = reselect(entity)
     end
 
+    test "selects a player who attacked a neutral mob" do
+      mob_guid = Guid.from_low_guid(:mob, 7, unique_guid())
+      player_guid = Guid.from_low_guid(:player, unique_guid())
+
+      Metadata.put(mob_guid, %{faction_template: neutral_creature()})
+
+      Metadata.put(player_guid, %{
+        alive?: true,
+        faction_template: alliance(),
+        unit_flags: 0
+      })
+
+      on_exit(fn ->
+        Metadata.delete(mob_guid)
+        Metadata.delete(player_guid)
+      end)
+
+      entity = mob(guid: mob_guid, threat: %{player_guid => 10.0})
+
+      assert {_entity, {:switch, ^player_guid}} =
+               Threat.reselect(entity, in_melee?: fn _guid -> false end)
+    end
+
     test "switches away from an invalid victim" do
       entity = mob(target: @player_a, threat: %{@player_a => 100.0, @player_b => 10.0})
       {entity, decision} = reselect(entity, valid?: fn guid -> guid != @player_a end)
@@ -196,5 +221,17 @@ defmodule ThistleTea.Game.Entity.Logic.ThreatTest do
       entity = %Mob{object: %Object{guid: @mob_guid}, unit: %Unit{}, internal: %Internal{}}
       assert {^entity, :keep} = Threat.reselect(entity, valid?: fn _ -> true end, in_melee?: fn _ -> false end)
     end
+  end
+
+  defp alliance do
+    %FactionTemplate{id: 1, faction: 1, flags: 72, faction_group: 3, friend_group: 2, enemy_group: 12}
+  end
+
+  defp neutral_creature do
+    %FactionTemplate{id: 7, faction: 7, flags: 0, faction_group: 0, friend_group: 0, enemy_group: 0}
+  end
+
+  defp unique_guid do
+    System.unique_integer([:positive, :monotonic])
   end
 end

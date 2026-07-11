@@ -123,6 +123,51 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
     end
   end
 
+  describe "tree/0" do
+    test "interrupts a wander spline before attacking an in-range target" do
+      target_guid = player_guid()
+      SpatialHash.clear_movement(target_guid)
+      SpatialHash.update(:players, target_guid, 0, 4.0, 0.0, 0.0)
+
+      on_exit(fn ->
+        SpatialHash.clear_movement(target_guid)
+        SpatialHash.remove(:players, target_guid)
+      end)
+
+      now = Time.now()
+
+      state =
+        fixture_mob(
+          start_time: now,
+          duration: 10_000,
+          spline_nodes: [{1.0, 0.0, 0.0}]
+        )
+
+      state = %{
+        state
+        | unit: %{
+            state.unit
+            | target: target_guid,
+              health: 100,
+              max_health: 100,
+              min_damage: 3,
+              max_damage: 3,
+              base_attack_time: 2_000
+          },
+          internal: %{state.internal | in_combat: true}
+      }
+
+      blackboard = %Blackboard{target: {1.0, 0.0, 0.0}, move_target: {1.0, 0.0, 0.0}}
+      state = BT.init(state, MobBT.tree(), blackboard)
+
+      {_status, state} = BT.tick(state.internal.behavior_tree, state)
+
+      assert state.movement_block.spline_nodes == []
+      assert state.internal.blackboard.move_target == nil
+      assert Enum.any?(state.internal.events, &match?(%Event{type: :movement_stopped}, &1))
+    end
+  end
+
   describe "wait_until_wander_ready/3" do
     test "returns a running delay from explicit time" do
       state = fixture_mob()
@@ -174,6 +219,37 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
 
       assert {{:running, 250, :chase}, ^state, ^blackboard} =
                MobBT.wait_for_chase_tick(state, blackboard, 1_000)
+    end
+  end
+
+  describe "interrupt_idle_movement/3" do
+    test "halts a wander spline when combat starts within melee range" do
+      state =
+        fixture_mob(
+          start_time: 0,
+          duration: 10_000,
+          spline_nodes: [{100.0, 0.0, 0.0}]
+        )
+
+      blackboard = %Blackboard{
+        target: {100.0, 0.0, 0.0},
+        move_target: {100.0, 0.0, 0.0},
+        next_chase_at: 5_000
+      }
+
+      assert {:success, state, blackboard} = MobBT.interrupt_idle_movement(state, blackboard, 1_000)
+      assert state.movement_block.spline_nodes == []
+      assert Enum.any?(state.internal.events, &match?(%Event{type: :movement_stopped}, &1))
+      assert blackboard.target == nil
+      assert blackboard.move_target == nil
+      assert blackboard.next_chase_at == 0
+    end
+
+    test "leaves combat movement untouched" do
+      state = fixture_mob(start_time: 0, duration: 10_000, spline_nodes: [{100.0, 0.0, 0.0}])
+      blackboard = %Blackboard{last_target_pos: {100.0, 0.0, 0.0}}
+
+      assert {:success, ^state, ^blackboard} = MobBT.interrupt_idle_movement(state, blackboard, 1_000)
     end
   end
 
@@ -340,6 +416,14 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
       blackboard = %Blackboard{move_target: {250.0, 0.0, 0.0}}
 
       assert {{:running, 3_980, :movement}, ^state, ^blackboard} =
+               MobBT.wait_for_arrival(state, blackboard, 1_000)
+    end
+
+    test "wakes for aggro before the next spatial cell boundary" do
+      state = fixture_mob(start_time: 0, duration: 10_000, spline_nodes: [{250.0, 0.0, 0.0}])
+      blackboard = %Blackboard{move_target: {250.0, 0.0, 0.0}, next_aggro_at: 1_250}
+
+      assert {{:running, 250, :aggro}, ^state, ^blackboard} =
                MobBT.wait_for_arrival(state, blackboard, 1_000)
     end
 
