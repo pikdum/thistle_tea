@@ -25,7 +25,7 @@ defmodule ThistleTea.MixProject do
   end
 
   def cli do
-    [preferred_envs: ["test.watch": :test]]
+    [preferred_envs: ["test.all": :test, "test.watch": :test]]
   end
 
   # Run "mix help compile.app" to learn about applications.
@@ -79,6 +79,7 @@ defmodule ThistleTea.MixProject do
   defp aliases do
     [
       setup: ["deps.get", "assets.setup", "assets.build"],
+      "test.all": ["test --include dbc_db --include vmangos_db --include namigator_maps"],
       "assets.setup": ["tailwind.install --if-missing", "esbuild.install --if-missing"],
       "assets.build": ["tailwind thistle_tea", "esbuild thistle_tea"],
       "assets.deploy": [

@@ -5,9 +5,9 @@
 ### Build/Test/Lint
 - `mix compile --warnings-as-errors` - Compile (warnings are not allowed)
 - `mix test` - Run all tests
+- `mix test.all` - Run all tests, including DBC, VMangos, and Namigator map integration tests
 - `mix test test/path/to/file_test.exs` - Run specific test file
 - `mix test test/path/to/file_test.exs:123` - Run specific test at line 123
-- `mix test.watch` - Run tests in watch mode
 - `mix credo --strict` - Run linting (must stay at zero issues; enforced as a pre-commit hook via devenv)
 - `mix format` - Format code
 
