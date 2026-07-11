@@ -4,9 +4,11 @@ defmodule ThistleTea.Game.Network.Message.CmsgTrainerBuySpell do
 
   alias ThistleTea.Game.Entity.Data.TrainerSpell
   alias ThistleTea.Game.Entity.Logic.Core
+  alias ThistleTea.Game.Entity.Logic.Skills
   alias ThistleTea.Game.Entity.Logic.Trainer
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Player.Spells
+  alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.Loader.Gossip, as: GossipLoader
   alias ThistleTea.Game.World.Loader.Trainer, as: TrainerLoader
 
@@ -22,7 +24,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgTrainerBuySpell do
     with true <- GossipLoader.trainer_of?(entry, c.unit.class, c.unit.race),
          %TrainerSpell{} = spell <- find_spell(entry, spell_id),
          true <- Trainer.fits_class_race?(spell, c.unit.class, c.unit.race),
-         :green <- Trainer.state(spell, c.internal.spells, c.unit.level),
+         :green <- Trainer.state(spell, c.internal.spells, c.unit.level, c.player.skills),
          true <- spell.cost <= c.player.coinage do
       buy(state, c, trainer_guid, spell)
     else
@@ -52,6 +54,10 @@ defmodule ThistleTea.Game.Network.Message.CmsgTrainerBuySpell do
 
     case Spells.learn(character, [spell.learned_spell_id]) do
       {:ok, character, _events} ->
+        skills = Skills.learn_rank(character.player.skills, spell.skill_id, spell.skill_max)
+        character = %{character | player: %{character.player | skills: skills}}
+        CharacterStore.put(character)
+
         Network.send_packet(%Message.SmsgTrainerBuySucceeded{
           trainer_guid: trainer_guid,
           spell_id: spell.teach_spell_id

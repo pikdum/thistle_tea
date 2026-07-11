@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
   alias ThistleTea.Game.Network.BinaryUtils
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.PlayerTick
+  alias ThistleTea.Game.Player.Fishing
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Cast
   alias ThistleTea.Game.Spell.CastValidation
@@ -60,9 +61,13 @@ defmodule ThistleTea.Game.Player.Spellcasting do
       target_name: targets.unit_guid
     )
 
-    case validate_cast(state, spell, targets) do
-      :ok ->
-        {:ok, do_cast(state, spell, spell_cast_targets, targets, cast_item_guid)}
+    with :ok <- validate_cast(state, spell, targets),
+         {:ok, state} <- Fishing.prepare_cast(state, spell) do
+      {:ok, do_cast(state, spell, spell_cast_targets, targets, cast_item_guid)}
+    else
+      {:error, reason, state} ->
+        fail_cast(spell, reason)
+        {:error, state}
 
       {:error, reason} ->
         fail_cast(spell, reason)
@@ -127,6 +132,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
 
         character =
           character
+          |> Fishing.cancel_bobber()
           |> SpellBT.clear_cast()
           |> EventSink.emit_pending()
 
@@ -170,7 +176,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
     |> World.broadcast_packet(state.character)
 
     character = SpellBT.start_cast(state.character, spell, targets, Time.now(), cast_item_guid)
-    state = %{state | character: character}
+    state = %{state | character: character} |> Fishing.start_cast(spell)
 
     cond do
       Spell.attribute?(spell, :on_next_swing) -> PlayerTick.schedule_now(state)

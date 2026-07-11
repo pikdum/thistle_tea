@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Entity.Data.GameObject do
   alias ThistleTea.DB.Mangos
   alias ThistleTea.Game.Entity.Data.Component.GameObject
   alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Fishing
   alias ThistleTea.Game.Entity.Data.Component.Internal.Summon
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Object
@@ -56,6 +57,7 @@ defmodule ThistleTea.Game.Entity.Data.GameObject do
       },
       internal: %Internal{
         map: map,
+        fishing: Keyword.get(opts, :fishing),
         summon: %Summon{
           owner_guid: Keyword.get(opts, :summoned_by),
           despawn_in_ms: Keyword.get(opts, :despawn_in_ms),
@@ -130,7 +132,13 @@ defmodule ThistleTea.Game.Entity.Data.GameObject do
         update_flag: @update_flag_all ||| @update_flag_has_position,
         position: {o.position_x, o.position_y, o.position_z, o.orientation}
       },
-      internal: %Internal{map: o.map, event: event, loot: chest_loot(ot), spawn: chest_spawn(ot, o)}
+      internal: %Internal{
+        map: o.map,
+        event: event,
+        fishing: fishing_hole(ot),
+        loot: chest_loot(ot),
+        spawn: chest_spawn(ot, o)
+      }
     }
   end
 
@@ -157,7 +165,19 @@ defmodule ThistleTea.Game.Entity.Data.GameObject do
 
   defp chest_loot(_template), do: nil
 
-  defp chest_spawn(%Mangos.GameObjectTemplate{type: @go_type_chest}, %Mangos.GameObject{} = o) do
+  @go_type_fishing_hole 25
+
+  defp fishing_hole(%Mangos.GameObjectTemplate{type: @go_type_fishing_hole} = ot) do
+    min_uses = max(ot.data2 || 1, 1)
+    max_uses = max(ot.data3 || min_uses, min_uses)
+
+    %Fishing{loot_id: ot.data1, uses_left: Enum.random(min_uses..max_uses), ready?: true}
+  end
+
+  defp fishing_hole(_template), do: nil
+
+  defp chest_spawn(%Mangos.GameObjectTemplate{type: type}, %Mangos.GameObject{} = o)
+       when type in [@go_type_chest, @go_type_fishing_hole] do
     case o.spawntimesecsmin do
       seconds when is_integer(seconds) and seconds > 0 -> %Internal.Spawn{respawn_delay_ms: seconds * 1000}
       _instant -> nil

@@ -113,6 +113,35 @@ defmodule ThistleTea.Game.Entity.Logic.SkillsTest do
     end
   end
 
+  describe "learn_rank/3" do
+    test "learns apprentice fishing and raises later rank caps without resetting progress" do
+      skills = Skills.learn_rank(%{}, Skills.fishing_skill(), 75)
+      assert skills[356] == %{value: 1, max: 75, range: :tier, always_max?: false}
+
+      skills = Map.update!(skills, 356, &%{&1 | value: 50})
+      assert Skills.learn_rank(skills, 356, 150)[356].value == 50
+      assert Skills.learn_rank(skills, 356, 150)[356].max == 150
+    end
+  end
+
+  describe "fishing_skill_up/2" do
+    test "uses the VMangos fishing curve and respects the trained cap" do
+      skills = %{356 => %{value: 75, max: 150, range: :level, always_max?: false}}
+
+      probe = fn chance ->
+        send(self(), {:chance, chance})
+        true
+      end
+
+      assert {:gained, gained} = Skills.fishing_skill_up(skills, roll: probe)
+      assert gained[356].value == 76
+      assert_received {:chance, 100.0}
+
+      capped = %{356 => %{value: 150, max: 150, range: :level, always_max?: false}}
+      assert Skills.fishing_skill_up(capped, roll: &always_gain/1) == :unchanged
+    end
+  end
+
   describe "weapon_skill_for_subclass/1" do
     test "maps weapon subclasses to skill lines" do
       assert Skills.weapon_skill_for_subclass(7) == 43

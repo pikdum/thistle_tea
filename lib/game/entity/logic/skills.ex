@@ -3,7 +3,8 @@ defmodule ThistleTea.Game.Entity.Logic.Skills do
   Player skill lines as data: a map of skill id to `%{value, max, range,
   always_max?}` entries, encoded into the PLAYER_SKILL_INFO update field.
   Ranges follow vmangos: `:level` skills cap at 5 x level and gain points
-  from combat use, `:mono` skills stay 1/1, `:language` skills stay 300/300.
+  from combat use, `:tier` skills use their trained profession cap, `:mono`
+  skills stay 1/1, and `:language` skills stay 300/300.
   """
   alias ThistleTea.Game.Entity.Logic.Experience
 
@@ -11,6 +12,7 @@ defmodule ThistleTea.Game.Entity.Logic.Skills do
 
   @defense_skill 95
   @unarmed_skill 162
+  @fishing_skill 356
 
   @weapon_subclass_skills %{
     0 => 44,
@@ -34,6 +36,7 @@ defmodule ThistleTea.Game.Entity.Logic.Skills do
 
   def defense_skill, do: @defense_skill
   def unarmed_skill, do: @unarmed_skill
+  def fishing_skill, do: @fishing_skill
 
   def weapon_skill_for_subclass(subclass), do: Map.get(@weapon_subclass_skills, subclass)
 
@@ -74,7 +77,7 @@ defmodule ThistleTea.Game.Entity.Logic.Skills do
 
   def max_out(skills) when is_map(skills) do
     Map.new(skills, fn
-      {id, %{range: :level} = entry} -> {id, %{entry | value: entry.max}}
+      {id, %{range: range} = entry} when range in [:level, :tier] -> {id, %{entry | value: entry.max}}
       {id, entry} -> {id, entry}
     end)
   end
@@ -100,6 +103,13 @@ defmodule ThistleTea.Game.Entity.Logic.Skills do
 
   def known?(skills, skill_id) when is_map(skills), do: Map.has_key?(skills, skill_id)
   def known?(_skills, _skill_id), do: false
+
+  def learn_rank(skills, skill_id, skill_max) when is_map(skills) and is_integer(skill_id) and skill_id > 0 do
+    entry = Map.get(skills, skill_id, %{value: 1, max: skill_max, range: :tier, always_max?: false})
+    Map.put(skills, skill_id, %{entry | max: max(entry.max, skill_max), range: :tier})
+  end
+
+  def learn_rank(skills, _skill_id, _skill_max), do: skills
 
   def encode(skills) when is_map(skills) and map_size(skills) > 0 do
     entries =
@@ -131,6 +141,20 @@ defmodule ThistleTea.Game.Entity.Logic.Skills do
   end
 
   def combat_skill_up(_skills, _skill_id, _opts), do: :unchanged
+
+  def fishing_skill_up(skills, opts \\ [])
+
+  def fishing_skill_up(skills, opts) when is_map(skills) do
+    with %{value: value, max: max} = entry when value < max <- Map.get(skills, @fishing_skill),
+         chance = if(value < 75, do: 100.0, else: div(2500, value - 50) * 1.0),
+         true <- roll(opts).(chance) do
+      {:gained, Map.put(skills, @fishing_skill, %{entry | value: value + 1})}
+    else
+      _no_gain -> :unchanged
+    end
+  end
+
+  def fishing_skill_up(_skills, _opts), do: :unchanged
 
   defp skill_up_chance(value, cap, player_level, opts) do
     if Keyword.get(opts, :defense?, false) do

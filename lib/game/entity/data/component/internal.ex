@@ -19,6 +19,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal do
     :spawn,
     :loot,
     :summon,
+    :fishing,
     :event,
     :in_combat,
     :threat,

@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.Player.GameObjects do
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
+  alias ThistleTea.Game.Player.Fishing
   alias ThistleTea.Game.Player.Quests
   alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
 
@@ -22,12 +23,22 @@ defmodule ThistleTea.Game.Player.GameObjects do
   def use_object(%{character: %Character{} = character} = state, guid) do
     Logger.info("CMSG_GAMEOBJ_USE: entry #{Guid.entry(guid)} chest?=#{chest?(guid)}")
 
-    if chest?(guid) do
-      open_chest(state, guid)
-    else
-      Entity.use_game_object(guid, state.guid, character.unit.level)
-      state
+    cond do
+      fishing_bobber?(guid) ->
+        Fishing.catch_fish(state, guid)
+
+      chest?(guid) ->
+        open_chest(state, guid)
+
+      true ->
+        Entity.use_game_object(guid, state.guid, character.unit.level)
+        state
     end
+  end
+
+  defp fishing_bobber?(guid) do
+    Guid.entity_type(guid) == :game_object and
+      match?(%GameObjectTemplate{type: 17}, GameObjectTemplateLoader.get(Guid.entry(guid)))
   end
 
   def open_chest(%{character: %Character{} = c} = state, guid) do

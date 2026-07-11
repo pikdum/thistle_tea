@@ -19,6 +19,7 @@ defmodule ThistleTea.Game.Network.Message.SmsgCastResult do
     item_not_ready: 0x28,
     line_of_sight: 0x2A,
     not_known: 0x38,
+    not_fishable: 0x34,
     not_ready: 0x3C,
     not_shapeshift: 0x3D,
     no_power: 0x4D,

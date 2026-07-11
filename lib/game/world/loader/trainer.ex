@@ -54,15 +54,17 @@ defmodule ThistleTea.Game.World.Loader.Trainer do
     level_map = spell_level_map(learned_ids)
     chain_map = chain_map(learned_ids)
     masks_map = class_race_masks_map(learned_ids)
+    skill_steps = skill_step_map(Enum.map(rows, & &1.spell))
 
     rows
-    |> Enum.map(&build_spell(&1, learned_map, level_map, chain_map, masks_map))
+    |> Enum.map(&build_spell(&1, learned_map, level_map, chain_map, masks_map, skill_steps))
     |> Enum.reject(&is_nil(&1.learned_spell_id))
   end
 
-  defp build_spell(row, learned_map, level_map, chain_map, masks_map) do
+  defp build_spell(row, learned_map, level_map, chain_map, masks_map, skill_steps) do
     learned_id = Map.get(learned_map, row.spell)
     chain = Map.get(chain_map, learned_id)
+    {skill_id, skill_max} = Map.get(skill_steps, row.spell, {nil, nil})
 
     %TrainerSpell{
       teach_spell_id: row.spell,
@@ -73,8 +75,33 @@ defmodule ThistleTea.Game.World.Loader.Trainer do
       req_skill_value: row.req_skill_value || 0,
       prev_spell_id: chain && nonzero(chain.prev_spell),
       req_spell_id: chain && nonzero(chain.req_spell),
+      skill_id: skill_id,
+      skill_max: skill_max,
       class_race_masks: Map.get(masks_map, learned_id, [])
     }
+  end
+
+  defp skill_step_map(teach_spell_ids) do
+    DBC.all(
+      from(s in Spell,
+        where: s.id in ^teach_spell_ids,
+        select: %{
+          id: s.id,
+          effects: [
+            {s.effect_0, s.effect_misc_value_0, s.effect_base_points_0},
+            {s.effect_1, s.effect_misc_value_1, s.effect_base_points_1},
+            {s.effect_2, s.effect_misc_value_2, s.effect_base_points_2}
+          ]
+        }
+      )
+    )
+    |> Enum.flat_map(fn row ->
+      Enum.flat_map(row.effects, fn
+        {44, skill_id, tier} when skill_id > 0 -> [{row.id, {skill_id, (tier + 1) * 75}}]
+        _ -> []
+      end)
+    end)
+    |> Map.new()
   end
 
   defp trainer_rows(creature_entry, trainer_template_id) do

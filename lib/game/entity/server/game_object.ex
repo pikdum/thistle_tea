@@ -13,7 +13,11 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Registry, as: EntityRegistry
   alias ThistleTea.Game.Entity.Server.GameObject.Chest
+  alias ThistleTea.Game.Entity.Server.GameObject.Fishing
   alias ThistleTea.Game.Network
+  alias ThistleTea.Game.Network.Message.SmsgFishNotHooked
+  alias ThistleTea.Game.Network.Message.SmsgGameobjectCustomAnim
+  alias ThistleTea.Game.Network.Message.SmsgPlayObjectSound
   alias ThistleTea.Game.Party
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
@@ -36,6 +40,7 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
     World.update_position(state)
     state = Visibility.join_entity(state)
     schedule_despawn(state)
+    schedule_fishing_bite(state)
     {:ok, state}
   end
 
@@ -76,8 +81,34 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
   end
 
   @impl GenServer
+  def handle_call(
+        {:loot_view, viewer},
+        _from,
+        %GameObject{internal: %Internal{fishing: %{owner_guid: owner_guid}}} = state
+      )
+      when is_integer(owner_guid) and viewer != owner_guid do
+    {:reply, {:error, :not_owner}, state}
+  end
+
   def handle_call({:loot_view, viewer}, _from, %GameObject{} = state) do
     {result, state} = Chest.view(state, viewer)
+    {:reply, result, state}
+  end
+
+  def handle_call({:fishing_use, owner_guid, skill}, _from, %GameObject{} = state) do
+    {result, state} = Fishing.use(state, owner_guid, skill)
+    if match?({:error, reason} when reason in [:not_hooked, :escaped], result), do: send(self(), :despawn)
+    {:reply, result, state}
+  end
+
+  def handle_call(:fishing_hole_loot, _from, %GameObject{} = state) do
+    {result, state} = Fishing.hole_loot(state)
+
+    case result do
+      {:ok, _loot, 0} -> send(self(), :fishing_hole_depleted)
+      _ -> :ok
+    end
+
     {:reply, result, state}
   end
 
@@ -93,6 +124,17 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
   def handle_call(:loot_take_gold, _from, %GameObject{} = state) do
     {result, state} = Chest.take_gold(state)
     {:reply, result, state}
+  end
+
+  def handle_call(
+        {:loot_release, viewer},
+        _from,
+        %GameObject{internal: %Internal{fishing: %{owner_guid: owner_guid}}} = state
+      )
+      when is_integer(owner_guid) and viewer == owner_guid do
+    state = Chest.release(state, viewer)
+    send(self(), :despawn)
+    {:reply, :ok, state}
   end
 
   def handle_call({:loot_release, viewer}, _from, %GameObject{} = state) do
@@ -113,6 +155,38 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
 
   def handle_info(:despawn, state) do
     despawn(state)
+  end
+
+  def handle_info(:fishing_bite, %GameObject{} = state) do
+    state = Fishing.bite(state)
+    Core.update_object(state, :values) |> World.broadcast_packet(state)
+
+    %SmsgGameobjectCustomAnim{guid: state.object.guid}
+    |> World.broadcast_packet(state)
+
+    %SmsgPlayObjectSound{sound_id: 3355, guid: state.object.guid}
+    |> World.broadcast_packet(state)
+
+    {:noreply, state}
+  end
+
+  def handle_info(:fishing_expire, %GameObject{internal: %Internal{fishing: fishing}} = state) do
+    if fishing && not fishing.consumed? do
+      Network.send_packet(%SmsgFishNotHooked{}, fishing.owner_guid)
+    end
+
+    despawn(state)
+  end
+
+  def handle_info(:fishing_hole_depleted, %GameObject{} = state) do
+    case SpawnPool.recycle(state) do
+      :pooled -> {:noreply, state}
+      :unpooled -> {:noreply, Fishing.deplete(state)}
+    end
+  end
+
+  def handle_info(:fishing_hole_respawn, %GameObject{} = state) do
+    {:noreply, Fishing.respawn(state)}
   end
 
   def handle_info(:chest_respawn, %GameObject{} = state) do
@@ -139,12 +213,25 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
     {:noreply, state}
   end
 
+  defp schedule_despawn(%GameObject{internal: %Internal{fishing: %{bite_delay_ms: delay}}})
+       when is_integer(delay) and delay > 0 do
+    nil
+  end
+
   defp schedule_despawn(%GameObject{internal: %Internal{summon: %Summon{despawn_in_ms: despawn_in_ms}}})
        when is_integer(despawn_in_ms) and despawn_in_ms > 0 do
     Process.send_after(self(), :despawn, despawn_in_ms)
   end
 
   defp schedule_despawn(_state), do: nil
+
+  defp schedule_fishing_bite(%GameObject{internal: %Internal{fishing: %{bite_delay_ms: delay}}})
+       when is_integer(delay) and delay > 0 do
+    Process.send_after(self(), :fishing_bite, delay)
+    Process.send_after(self(), :fishing_expire, delay + 5_000)
+  end
+
+  defp schedule_fishing_bite(_state), do: nil
 
   defp spend_charge(%GameObject{internal: %Internal{summon: %Summon{charges: charges} = summon} = internal} = state)
        when is_integer(charges) do

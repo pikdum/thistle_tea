@@ -250,6 +250,23 @@ find_heights_native(ErlNifEnv *, MapResource map, double x, double y) {
 }
 FINE_NIF(find_heights_native, ERL_NIF_DIRTY_JOB_CPU_BOUND);
 
+std::optional<double>
+query_liquid_surface_native(ErlNifEnv *, MapResource map, double x, double y,
+                            double z) {
+  auto lock = map->acquire();
+  uint8_t has_liquid = 0;
+  float surface_z = 0.0f;
+  auto result = pathfind_query_liquid(map->get(), f(x), f(y), f(z),
+                                      &has_liquid, &surface_z);
+
+  if (!ok(result) || has_liquid == 0) {
+    return std::nullopt;
+  }
+
+  return surface_z;
+}
+FINE_NIF(query_liquid_surface_native, ERL_NIF_DIRTY_JOB_CPU_BOUND);
+
 std::optional<bool> line_of_sight_native(ErlNifEnv *, MapResource map,
                                          double start_x, double start_y,
                                          double start_z, double stop_x,

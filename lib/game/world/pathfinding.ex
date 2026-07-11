@@ -1,7 +1,7 @@
 defmodule ThistleTea.Game.World.Pathfinding do
   @moduledoc """
   Navigation-mesh queries over the namigator NIF: pathfinding, random points,
-  terrain heights, and zone/area lookup.
+  terrain and liquid heights, and zone/area lookup.
   """
   alias ThistleTea.Native.Namigator
 
@@ -32,6 +32,11 @@ defmodule ThistleTea.Game.World.Pathfinding do
       heights when is_list(heights) -> heights
       _ -> []
     end
+  end
+
+  def query_liquid_surface(map_id, {x, y, z}) do
+    load_adt_at(map_id, {x, y})
+    Namigator.query_liquid_surface(map_id, x, y, z)
   end
 
   @los_source_eye_height 2.0

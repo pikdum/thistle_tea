@@ -10,7 +10,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgTrainerList do
 
   defstruct [:guid]
 
-  def send_list(%{character: %Character{unit: unit, internal: internal}} = state, trainer_guid) do
+  def send_list(%{character: %Character{unit: unit, player: player, internal: internal}} = state, trainer_guid) do
     entry = Guid.entry(trainer_guid)
 
     if GossipLoader.trainer_of?(entry, unit.class, unit.race) do
@@ -19,20 +19,20 @@ defmodule ThistleTea.Game.Network.Message.CmsgTrainerList do
       Network.send_packet(%Message.SmsgTrainerList{
         guid: trainer_guid,
         trainer_type: trainer_type,
-        spells: list_spells(spells, unit, internal.spells)
+        spells: list_spells(spells, unit, player.skills, internal.spells)
       })
     end
 
     state
   end
 
-  defp list_spells(spells, unit, known_ids) do
+  defp list_spells(spells, unit, skills, known_ids) do
     spells
     |> Enum.filter(&Trainer.fits_class_race?(&1, unit.class, unit.race))
     |> Enum.map(fn spell ->
       %SmsgTrainerList.Spell{
         spell_id: spell.teach_spell_id,
-        state: Trainer.state(spell, known_ids, unit.level),
+        state: Trainer.state(spell, known_ids, unit.level, skills),
         cost: spell.cost,
         req_level: spell.req_level,
         req_skill: spell.req_skill,

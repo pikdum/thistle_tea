@@ -9,6 +9,8 @@ defmodule ThistleTea.Game.Entity.Data.TrainerSpell do
     :learned_spell_id,
     :prev_spell_id,
     :req_spell_id,
+    :skill_id,
+    :skill_max,
     cost: 0,
     req_level: 0,
     req_skill: 0,

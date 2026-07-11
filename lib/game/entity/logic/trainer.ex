@@ -20,17 +20,26 @@ defmodule ThistleTea.Game.Entity.Logic.Trainer do
     end)
   end
 
-  def state(%TrainerSpell{} = spell, known_ids, level) do
+  def state(%TrainerSpell{} = spell, known_ids, level, skills \\ %{}) do
     known_ids = known_ids || []
 
     cond do
       spell.learned_spell_id in known_ids -> :gray
       spell.req_level > level -> :red
       missing_prerequisite?(spell, known_ids) -> :red
-      spell.req_skill > 0 -> :red
+      spell.req_skill > 0 and skill_value(skills, spell.req_skill) < spell.req_skill_value -> :red
       true -> :green
     end
   end
+
+  defp skill_value(skills, skill_id) when is_map(skills) do
+    case Map.get(skills, skill_id) do
+      %{value: value} -> value
+      _ -> 0
+    end
+  end
+
+  defp skill_value(_skills, _skill_id), do: 0
 
   defp missing_prerequisite?(%TrainerSpell{prev_spell_id: prev, req_spell_id: req}, known_ids) do
     missing?(prev, known_ids) or missing?(req, known_ids)

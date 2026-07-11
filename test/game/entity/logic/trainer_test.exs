@@ -35,6 +35,12 @@ defmodule ThistleTea.Game.Entity.Logic.TrainerTest do
       assert Trainer.state(spell, [133], 6) == :red
     end
 
+    test "green when the required skill rank is met" do
+      spell = %{@fireball_rank_2 | req_skill: 356, req_skill_value: 50}
+      skills = %{356 => %{value: 50, max: 75, range: :level, always_max?: false}}
+      assert Trainer.state(spell, [133], 6, skills) == :green
+    end
+
     test "green when all requirements are met" do
       assert Trainer.state(@fireball_rank_2, [133], 6) == :green
     end
