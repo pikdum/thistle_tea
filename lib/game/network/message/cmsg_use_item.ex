@@ -71,12 +71,12 @@ defmodule ThistleTea.Game.Network.Message.CmsgUseItem do
     }
   end
 
-  defp validate_usable(%Character{unit: unit, internal: internal}, %ItemTemplate{} = template, {bag, slot}) do
+  defp validate_usable(%Character{unit: unit} = character, %ItemTemplate{} = template, {bag, slot}) do
     if template.inventory_type != @invtype_non_equip and
          not (bag == Inventory.bag_0() and Inventory.equipment_slot?(slot)) do
       {:error, :item_not_found}
     else
-      Inventory.can_use(unit, Proficiency.from_spellbook(internal.spellbook), template)
+      Inventory.can_use(unit, Proficiency.from_character(character), template)
     end
   end
 

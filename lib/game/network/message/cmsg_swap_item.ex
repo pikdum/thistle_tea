@@ -14,7 +14,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgSwapItem do
     Inventory.swap(
       c.player,
       c.unit,
-      Proficiency.from_spellbook(c.internal.spellbook),
+      Proficiency.from_character(c),
       state.guid,
       {message.src_bag, message.src_slot},
       {message.dst_bag, message.dst_slot},

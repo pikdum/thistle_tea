@@ -1,8 +1,11 @@
 defmodule ThistleTea.Game.Entity.Logic.ProficiencyTest do
   use ExUnit.Case, async: true
 
-  import Bitwise, only: [<<<: 2, |||: 2]
+  import Bitwise, only: [&&&: 2, <<<: 2, |||: 2]
 
+  alias ThistleTea.Game.Entity.Data.Character
+  alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.ItemTemplate
   alias ThistleTea.Game.Entity.Logic.Proficiency
   alias ThistleTea.Game.Spell, as: SpellData
@@ -52,6 +55,29 @@ defmodule ThistleTea.Game.Entity.Logic.ProficiencyTest do
     end
   end
 
+  describe "from_character/1" do
+    @fishing_skill 356
+
+    test "adds the fishing-pole weapon bit when Fishing is known" do
+      skills = %{@fishing_skill => %{value: 1, max: 75, range: :tier, always_max?: false}}
+      character = character(%{}, skills)
+
+      assert Proficiency.from_character(character).weapon_mask == 1 <<< 20
+    end
+
+    test "leaves the fishing-pole bit unset without Fishing" do
+      assert (Proficiency.from_character(character(%{}, %{})).weapon_mask &&& 1 <<< 20) == 0
+    end
+
+    test "combines spell proficiencies with skill-derived capabilities" do
+      skills = %{@fishing_skill => %{value: 50, max: 75, range: :tier, always_max?: false}}
+      prof = Proficiency.from_character(character(spellbook([proficiency_spell(227, 2, @staves)]), skills))
+
+      assert prof.weapon_mask == (@staves ||| 1 <<< 20)
+      assert prof.skill_values == %{@fishing_skill => 50}
+    end
+  end
+
   describe "can_equip?/2" do
     test "checks weapon subclass bits" do
       prof = %Proficiency{weapon_mask: @staves}
@@ -77,5 +103,26 @@ defmodule ThistleTea.Game.Entity.Logic.ProficiencyTest do
     test "skips non-weapon non-armor items" do
       assert Proficiency.can_equip?(%Proficiency{}, %ItemTemplate{class: 0, subclass: 0}) == :ok
     end
+
+    test "gates fishing poles through the derived weapon mask" do
+      pole = %ItemTemplate{class: 2, subclass: 20}
+
+      assert Proficiency.can_equip?(%Proficiency{}, pole) == {:error, :no_required_proficiency}
+      assert Proficiency.can_equip?(%Proficiency{weapon_mask: 1 <<< 20}, pole) == :ok
+    end
+
+    test "enforces required skill ranks" do
+      pole = %ItemTemplate{class: 2, subclass: 20, required_skill: 356, required_skill_rank: 50}
+
+      assert Proficiency.can_equip?(%Proficiency{weapon_mask: 1 <<< 20, skill_values: %{356 => 49}}, pole) ==
+               {:error, :no_required_proficiency}
+
+      assert Proficiency.can_equip?(%Proficiency{weapon_mask: 1 <<< 20, skill_values: %{356 => 50}}, pole) == :ok
+      assert Proficiency.can_equip?(Proficiency.all(), pole) == :ok
+    end
+  end
+
+  defp character(spellbook, skills) do
+    %Character{player: %Player{skills: skills}, internal: %Internal{spellbook: spellbook}}
   end
 end

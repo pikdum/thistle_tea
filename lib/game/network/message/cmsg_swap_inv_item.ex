@@ -12,7 +12,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgSwapInvItem do
   @impl ClientMessage
   def handle(%__MODULE__{src_slot: src_slot, dst_slot: dst_slot}, %{ready: true, character: %Character{} = c} = state) do
     bag_0 = Inventory.bag_0()
-    prof = Proficiency.from_spellbook(c.internal.spellbook)
+    prof = Proficiency.from_character(c)
 
     Inventory.swap(c.player, c.unit, prof, state.guid, {bag_0, src_slot}, {bag_0, dst_slot}, &ItemStore.get/1)
     |> then(&InventoryUpdate.apply(state, &1))

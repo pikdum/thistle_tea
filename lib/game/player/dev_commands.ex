@@ -616,7 +616,7 @@ defmodule ThistleTea.Game.Player.DevCommands do
 
   defp add_random_equipment(%{character: %Character{unit: unit} = character} = state) do
     existing_item_guids = owned_item_guids(character)
-    prof = Proficiency.from_spellbook(character.internal.spellbook)
+    prof = Proficiency.from_character(character)
 
     item_ids =
       unit.race

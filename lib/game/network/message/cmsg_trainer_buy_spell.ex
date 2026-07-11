@@ -57,6 +57,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgTrainerBuySpell do
         skills = Skills.learn_rank(character.player.skills, spell.skill_id, spell.skill_max)
         character = %{character | player: %{character.player | skills: skills}}
         CharacterStore.put(character)
+        Spells.send_proficiencies(character)
 
         Network.send_packet(%Message.SmsgTrainerBuySucceeded{
           trainer_guid: trainer_guid,

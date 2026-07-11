@@ -41,8 +41,8 @@ defmodule ThistleTea.Game.Player.Spells do
     %{character | player: %{player | skills: skills}}
   end
 
-  def send_proficiencies(%Character{internal: internal}) do
-    prof = Proficiency.from_spellbook(internal.spellbook)
+  def send_proficiencies(%Character{} = character) do
+    prof = Proficiency.from_character(character)
 
     Network.send_packet(%Message.SmsgSetProficiency{
       item_class: Proficiency.item_class_weapon(),
