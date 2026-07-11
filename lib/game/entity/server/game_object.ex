@@ -170,11 +170,12 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
     {:noreply, state}
   end
 
-  def handle_info(:fishing_expire, %GameObject{internal: %Internal{fishing: fishing}} = state) do
-    if fishing && not fishing.consumed? do
-      Network.send_packet(%SmsgFishNotHooked{}, fishing.owner_guid)
-    end
+  def handle_info(:fishing_expire, %GameObject{internal: %Internal{fishing: %{consumed?: true}}} = state) do
+    {:noreply, state}
+  end
 
+  def handle_info(:fishing_expire, %GameObject{internal: %Internal{fishing: fishing}} = state) do
+    Network.send_packet(%SmsgFishNotHooked{}, fishing.owner_guid)
     despawn(state)
   end
 
