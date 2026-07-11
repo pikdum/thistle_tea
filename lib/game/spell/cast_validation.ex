@@ -33,6 +33,7 @@ defmodule ThistleTea.Game.Spell.CastValidation do
          :ok <- check_equipped_item(caster, spell, Keyword.get(opts, :equipped_items, [])),
          :ok <- check_reagents(caster, spell, Keyword.get(opts, :count_item)),
          :ok <- check_target(spell, target_info),
+         :ok <- check_position(caster, spell, target_info),
          :ok <- check_target_aura_state(spell, target_info),
          :ok <- check_range(caster, spell, target_info) do
       check_line_of_sight(spell, target_info)
@@ -84,6 +85,36 @@ defmodule ThistleTea.Game.Spell.CastValidation do
   end
 
   defp check_target_aura_state(_spell, _target_info), do: :ok
+
+  defp check_position(caster, %Spell{} = spell, target_info) do
+    cond do
+      Spell.attribute?(spell, :from_behind) and not behind_target?(caster, target_info) -> {:error, :not_behind}
+      Spell.attribute?(spell, :target_facing_caster) and behind_target?(caster, target_info) -> {:error, :not_infront}
+      true -> :ok
+    end
+  end
+
+  defp behind_target?(%{movement_block: %{position: {caster_x, caster_y, _caster_z, _caster_o}}}, %{
+         position: {_map, target_x, target_y, _target_z},
+         orientation: target_o
+       })
+       when is_number(target_o) do
+    angle = :math.atan2(caster_y - target_y, caster_x - target_x)
+    abs(normalize_angle(angle - target_o)) > :math.pi() / 2
+  end
+
+  defp behind_target?(_caster, _target_info), do: false
+
+  defp normalize_angle(angle) do
+    two_pi = 2 * :math.pi()
+    angle = :math.fmod(angle, two_pi)
+
+    cond do
+      angle > :math.pi() -> angle - two_pi
+      angle < -:math.pi() -> angle + two_pi
+      true -> angle
+    end
+  end
 
   defp check_stronger_rank(caster, %Spell{} = spell, %Targets{unit_guid: unit_guid}) do
     if self_target?(caster, unit_guid) and AuraLogic.blocked_by_stronger_rank?(caster, spell) do

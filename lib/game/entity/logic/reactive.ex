@@ -34,7 +34,7 @@ defmodule ThistleTea.Game.Entity.Logic.Reactive do
     %{
       entity
       | player: %{player | field_combo_target: victim_guid, combo_points: 1},
-        internal: %{internal | combo_expires_at: now + @window_ms}
+        internal: %{internal | combo_expires_at: now + @window_ms, combo_target_guid: victim_guid}
     }
     |> Core.mark_broadcast_update()
   end
@@ -43,12 +43,12 @@ defmodule ThistleTea.Game.Entity.Logic.Reactive do
 
   def add_combo_points(%Character{player: player, internal: %Internal{} = internal} = entity, target_guid, amount)
       when is_integer(target_guid) and target_guid > 0 and is_integer(amount) and amount > 0 do
-    current = if player.field_combo_target == target_guid, do: player.combo_points || 0, else: 0
+    current = if internal.combo_target_guid == target_guid, do: player.combo_points || 0, else: 0
 
     %{
       entity
       | player: %{player | field_combo_target: target_guid, combo_points: min(current + amount, 5)},
-        internal: %{internal | combo_expires_at: nil}
+        internal: %{internal | combo_expires_at: nil, combo_target_guid: target_guid}
     }
     |> Core.mark_broadcast_update()
   end
@@ -82,9 +82,13 @@ defmodule ThistleTea.Game.Entity.Logic.Reactive do
 
   def defense_active?(_entity, _now), do: false
 
-  def combo_active?(%Character{player: player, internal: %Internal{combo_expires_at: expires_at}}, target_guid, now) do
+  def combo_active?(
+        %Character{player: player, internal: %Internal{combo_expires_at: expires_at} = internal},
+        target_guid,
+        now
+      ) do
     is_integer(player.combo_points) and player.combo_points > 0 and
-      player.field_combo_target == target_guid and
+      internal.combo_target_guid == target_guid and
       (is_nil(expires_at) or now < expires_at)
   end
 
@@ -94,8 +98,8 @@ defmodule ThistleTea.Game.Entity.Logic.Reactive do
     if is_integer(player.combo_points) and player.combo_points > 0 do
       %{
         entity
-        | player: %{player | field_combo_target: 0, combo_points: 0},
-          internal: %{internal | combo_expires_at: nil}
+        | player: %{player | combo_points: 0},
+          internal: %{internal | combo_expires_at: nil, combo_target_guid: nil}
       }
       |> Core.mark_broadcast_update()
     else
@@ -105,8 +109,8 @@ defmodule ThistleTea.Game.Entity.Logic.Reactive do
 
   def consume_combo(entity), do: entity
 
-  def clear_combo_target(%Character{player: player} = entity, target_guid)
-      when is_integer(target_guid) and player.field_combo_target == target_guid do
+  def clear_combo_target(%Character{internal: %Internal{combo_target_guid: target_guid}} = entity, target_guid)
+      when is_integer(target_guid) do
     consume_combo(entity)
   end
 

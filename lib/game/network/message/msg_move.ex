@@ -41,7 +41,8 @@ defmodule ThistleTea.Game.Network.Message.MsgMove do
       character = %{character | movement_block: movement_block, unit: %{unit | stand_state: 0}}
       %{internal: %{map: map}} = character
       %MovementBlock{position: {x0, y0, z0, _}} = state.character.movement_block
-      %MovementBlock{position: {x1, y1, z1, _}} = movement_block
+      %MovementBlock{position: {x1, y1, z1, orientation}} = movement_block
+      Metadata.update(state.guid, %{orientation: orientation})
       position_changed? = x0 != x1 or y0 != y1 or z0 != z1
       character = interrupt_auras(character, position_changed?)
 

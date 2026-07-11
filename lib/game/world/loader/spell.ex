@@ -525,6 +525,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   @channeled_ex_2 0x00000040
   @discount_power_on_miss_ex_1 0x08000000
   @ignore_line_of_sight_ex2 0x00000004
+  @from_behind_ex2 0x00100000
 
   defp attributes(attrs, attrs_ex1, attrs_ex2) when is_integer(attrs) and is_integer(attrs_ex1) do
     attrs_ex2 = if is_integer(attrs_ex2), do: attrs_ex2, else: 0
@@ -539,11 +540,14 @@ defmodule ThistleTea.Game.World.Loader.Spell do
       |> add_if(attrs, @aura_is_debuff, :negative)
       |> add_if(attrs, @cant_cancel, :cant_cancel)
 
+    base = if attrs == 0x150010, do: MapSet.put(base, :target_facing_caster), else: base
+
     base
     |> add_if(attrs_ex1, @channeled_ex_1, :channeled)
     |> add_if(attrs_ex1, @channeled_ex_2, :channeled)
     |> add_if(attrs_ex1, @discount_power_on_miss_ex_1, :discount_power_on_miss)
     |> add_if(attrs_ex2, @ignore_line_of_sight_ex2, :ignore_line_of_sight)
+    |> add_if(attrs_ex2, @from_behind_ex2, :from_behind)
   end
 
   defp attributes(_, _, _), do: MapSet.new()

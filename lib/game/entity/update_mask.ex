@@ -46,9 +46,7 @@ defmodule ThistleTea.Game.Entity.UpdateMask do
           {field, metadata} ->
             {field, Map.get(struct, field), metadata}
         end)
-        |> Enum.reject(fn {_field, value, _metadata} ->
-          is_nil(value) or value == <<0, 0, 0, 0>>
-        end)
+        |> Enum.reject(fn {_field, value, _metadata} -> is_nil(value) end)
       end
 
       defp filter_visibility(entries, :self), do: entries

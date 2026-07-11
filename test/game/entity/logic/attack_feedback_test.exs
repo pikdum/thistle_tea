@@ -130,7 +130,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackFeedbackTest do
       avoided = AttackFeedback.receive(entity, %{outcome: :parry, damage: 0, victim_guid: 77}, spell, 1_000)
 
       assert landed.player.combo_points == 0
-      assert landed.player.field_combo_target == 0
+      assert landed.player.field_combo_target == 77
       assert avoided.player.combo_points == 5
     end
 

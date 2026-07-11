@@ -164,6 +164,12 @@ defmodule ThistleTea.Game.World.Loader.SpellVmangosTest do
       assert Enum.find(SpellLoader.load(11_198).effects, &(&1.aura == :mod_resistance)).points_per_combo == -340.0
     end
 
+    test "backstab and ambush load their behind-target requirement" do
+      assert Spell.attribute?(SpellLoader.load(53), :from_behind)
+      assert Spell.attribute?(SpellLoader.load(8676), :from_behind)
+      assert Spell.attribute?(SpellLoader.load(1776), :target_facing_caster)
+    end
+
     test "vanish triggers stealth and movement-impairing purge spells" do
       vanish = SpellLoader.load(1856)
 

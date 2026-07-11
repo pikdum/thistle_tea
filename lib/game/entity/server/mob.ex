@@ -167,7 +167,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
   @impl GenServer
   def handle_cast({:drop_threat, source_guid}, %Mob{} = state) do
-    state = state |> Threat.remove(source_guid) |> wake_ai_tick()
+    state = state |> MobBT.drop_threat(source_guid) |> EventSink.emit_pending() |> wake_ai_tick()
     {:noreply, state}
   end
 
@@ -376,7 +376,8 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
       Metadata.update(state.object.guid, %{
         alive?: not Core.dead?(state),
         health_pct: Core.health_pct(state),
-        unit_flags: state.unit.flags
+        unit_flags: state.unit.flags,
+        orientation: elem(state.movement_block.position, 3)
       })
     end
 

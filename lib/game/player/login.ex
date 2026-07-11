@@ -84,7 +84,8 @@ defmodule ThistleTea.Game.Player.Login do
         alive?: Death.alive?(c),
         ghost?: Death.ghost?(c),
         health_pct: Core.health_pct(c),
-        shapeshift_form: c.unit.shapeshift_form
+        shapeshift_form: c.unit.shapeshift_form,
+        orientation: elem(c.movement_block.position, 3)
       }
       |> Map.merge(FactionLoader.metadata(c.unit.faction_template))
     )

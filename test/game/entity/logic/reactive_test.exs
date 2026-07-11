@@ -103,7 +103,7 @@ defmodule ThistleTea.Game.Entity.Logic.ReactiveTest do
       entity = warrior() |> Reactive.mark_dodging_target(77, 1_000) |> Reactive.tick(5_000)
 
       assert entity.player.combo_points == 0
-      assert entity.player.field_combo_target == 0
+      assert entity.player.field_combo_target == 77
       assert entity.internal.combo_expires_at == nil
     end
 

@@ -638,6 +638,20 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     {:success, state, blackboard}
   end
 
+  def drop_threat(%Mob{} = state, source_guid) when is_integer(source_guid) do
+    state = Threat.remove(state, source_guid)
+
+    if Threat.entries(state) == [] do
+      blackboard = Blackboard.from_any(state.internal.blackboard)
+      {:success, state, blackboard} = clear_combat(state, blackboard)
+      %{state | internal: %{state.internal | blackboard: blackboard}}
+    else
+      state
+    end
+  end
+
+  def drop_threat(state, _source_guid), do: state
+
   defp clear_combat_events(source_guid, target) when is_integer(target) and target > 0 do
     [Event.attack_stop(source_guid, target), Event.attacker_lost(target), Event.tap_cleared()]
   end

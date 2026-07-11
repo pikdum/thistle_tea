@@ -35,9 +35,19 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombat do
 
   def vanish(%Character{internal: %Internal{} = internal} = character) do
     refs = internal.threat_refs || MapSet.new()
+    blackboard = internal.blackboard |> Blackboard.from_any() |> Blackboard.clear_auto_attack()
 
     character =
-      %{character | internal: %{internal | threat_refs: MapSet.new(), in_combat: false, last_hostile_time: nil}}
+      %{
+        character
+        | internal: %{
+            internal
+            | threat_refs: MapSet.new(),
+              in_combat: false,
+              last_hostile_time: nil,
+              blackboard: blackboard
+          }
+      }
       |> CombatLogic.sync_combat_flag()
 
     {character, MapSet.to_list(refs)}

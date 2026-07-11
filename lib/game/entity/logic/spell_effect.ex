@@ -204,7 +204,12 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
          _now
        ) do
     {state, mob_guids} = PlayerCombat.vanish(state)
-    {state, Enum.map(mob_guids, &Event.drop_threat/1)}
+
+    events =
+      Enum.map(mob_guids, &Event.drop_threat/1) ++
+        vanish_attack_stop_events(state) ++ vanish_stealth_events(state)
+
+    {state, events}
   end
 
   defp apply_effect(state, %CastContext{} = context, spell, %Effect{type: type} = effect, now)
@@ -372,6 +377,30 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   end
 
   defp apply_effect(state, _context, _spell, _effect, _now), do: {state, []}
+
+  defp vanish_stealth_events(%{object: %{guid: guid}, unit: %{level: level}, internal: %{spellbook: spellbook}})
+       when is_map(spellbook) do
+    spell_id =
+      spellbook
+      |> Map.values()
+      |> Enum.filter(&match?(%Spell{name: "Stealth"}, &1))
+      |> Enum.max_by(&(&1.rank || 0), fn -> nil end)
+      |> case do
+        %Spell{id: id} -> id
+        _ -> nil
+      end
+
+    if is_integer(spell_id), do: [Event.trigger_spell(guid, level || 1, guid, spell_id)], else: []
+  end
+
+  defp vanish_stealth_events(_state), do: []
+
+  defp vanish_attack_stop_events(%{object: %{guid: guid}, unit: %{target: target}})
+       when is_integer(target) and target > 0 do
+    [Event.attack_stop(guid, target)]
+  end
+
+  defp vanish_attack_stop_events(_state), do: []
 
   defp resurrectable?(%{player: _player} = state) do
     Core.dead?(state) or Death.ghost?(state)

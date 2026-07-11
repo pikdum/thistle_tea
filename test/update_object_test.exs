@@ -52,6 +52,16 @@ defmodule ThistleTea.UpdateObjectTest do
       assert :strength in field_names, "expected private :strength to be included for :self"
     end
 
+    test "zero combo points are encoded against the previous combo target" do
+      player = %Player{field_combo_target: 77, combo_points: 0}
+      fields = UpdateObject.flatten_field_structs([player], :self)
+
+      assert {:field_combo_target, 77, _metadata} = Enum.find(fields, &match?({:field_combo_target, _, _}, &1))
+
+      assert {:field_bytes, <<_flags, 0, _action_bars, _rank>>, _metadata} =
+               Enum.find(fields, &match?({:field_bytes, _, _}, &1))
+    end
+
     test "to_list/2 :other strips private fields", %{player: player, unit: unit} do
       fields = UpdateObject.flatten_field_structs([player, unit], :other)
       field_names = Enum.map(fields, fn {f, _v, _m} -> f end)

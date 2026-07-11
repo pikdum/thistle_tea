@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.Aura.Lifecycle
   alias ThistleTea.Game.Entity.Logic.Aura.MovementSync
+  alias ThistleTea.Game.Entity.Logic.Aura.StealthSync
   alias ThistleTea.Game.Entity.Logic.Aura.UnitSync
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Event
@@ -142,6 +143,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
 
     {entity, sit_events} =
       %{entity | unit: unit}
+      |> StealthSync.sync()
       |> maybe_reset_shapeshift_rage(holder)
       |> maybe_heal_increased_health(holder)
       |> maybe_sit(holder)

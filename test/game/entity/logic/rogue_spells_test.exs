@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.Entity.Logic.RogueSpellsTest do
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AttackTable
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Combat
@@ -37,6 +38,7 @@ defmodule ThistleTea.Game.Entity.Logic.RogueSpellsTest do
       player: %Player{flags: 0},
       internal: %Internal{in_combat: Keyword.get(opts, :in_combat, false)},
       movement_block: %MovementBlock{
+        position: {0.0, 0.0, 0.0, 0.0},
         base_walk_speed: 2.5,
         base_run_speed: 7.0,
         base_run_back_speed: 4.5,
@@ -142,6 +144,34 @@ defmodule ThistleTea.Game.Entity.Logic.RogueSpellsTest do
     end
   end
 
+  describe "positional requirements" do
+    test "backstab requires the rogue to be behind the target" do
+      backstab = %Spell{
+        id: 53,
+        name: "Backstab",
+        attributes: MapSet.new([:from_behind]),
+        power_type: 3,
+        mana_cost: 60
+      }
+
+      target_info = %{
+        alive?: true,
+        hostile?: true,
+        attackable?: true,
+        position: {0, 0.0, 0.0, 0.0},
+        orientation: 0.0
+      }
+
+      front = rogue()
+      front = %{front | movement_block: %{front.movement_block | position: {1.0, 0.0, 0.0, 0.0}}}
+      behind = rogue()
+      behind = %{behind | movement_block: %{behind.movement_block | position: {-1.0, 0.0, 0.0, 0.0}}}
+
+      assert {:error, :not_behind} = CastValidation.validate(front, backstab, Targets.unit(9), target_info, 1_000)
+      assert :ok = CastValidation.validate(behind, backstab, Targets.unit(9), target_info, 1_000)
+    end
+  end
+
   describe "stealth and vanish" do
     test "stealth sets the rogue form and breaks on a hostile cast" do
       stealth = %Spell{
@@ -154,10 +184,14 @@ defmodule ThistleTea.Game.Entity.Logic.RogueSpellsTest do
 
       {entity, _events} = Aura.apply_spell(rogue(), 5, 60, stealth, 1_000)
       assert entity.unit.shapeshift_form == 30
+      assert Bitwise.band(entity.unit.vis_flag, 0x02) != 0
+      assert Bitwise.band(entity.player.field_bytes2_flags, 0x20) != 0
 
       entity = Aura.break_on_damage(entity, 2_000)
       assert entity.unit.shapeshift_form == 0
       assert entity.unit.auras == []
+      assert Bitwise.band(entity.unit.vis_flag, 0x02) == 0
+      assert Bitwise.band(entity.player.field_bytes2_flags, 0x20) == 0
     end
 
     test "ordinary stealth is unavailable in combat but vanish remains available" do
@@ -227,16 +261,29 @@ defmodule ThistleTea.Game.Entity.Logic.RogueSpellsTest do
 
     test "vanish drops combat and asks every threatening mob to forget the rogue" do
       entity = rogue(in_combat: true)
-      internal = %{entity.internal | threat_refs: MapSet.new([101, 102]), last_hostile_time: 900}
+      stealth = %Spell{id: 1787, name: "Stealth", rank: 4}
+
+      internal = %{
+        entity.internal
+        | threat_refs: MapSet.new([101, 102]),
+          last_hostile_time: 900,
+          spellbook: %{1787 => stealth},
+          blackboard: %Blackboard{auto_attacking: true}
+      }
+
       entity = %{entity | internal: internal}
+      entity = %{entity | unit: %{entity.unit | target: 9}}
       vanish = %Spell{id: 1856, name: "Vanish", effects: [%Effect{index: 0, type: :clear_threat}]}
       context = %CastContext{caster_guid: 5, caster_level: 60, spell: vanish}
 
       {entity, events} = SpellEffect.receive(entity, context, vanish, 1_000)
 
       refute entity.internal.in_combat
+      refute entity.internal.blackboard.auto_attacking
       assert entity.internal.threat_refs == MapSet.new()
-      assert Enum.sort(Enum.map(events, &{&1.type, &1.target_guid})) == [drop_threat: 101, drop_threat: 102]
+      assert Enum.count(events, &(&1.type == :drop_threat)) == 2
+      assert Enum.any?(events, &(&1.type == :attack_stop and &1.target_guid == 9))
+      assert Enum.any?(events, &(&1.type == :trigger_spell and &1.spell_id == 1787))
     end
   end
 

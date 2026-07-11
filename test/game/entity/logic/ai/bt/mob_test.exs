@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Mob, as: MobBT
   alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.Entity.Logic.Movement
+  alias ThistleTea.Game.Entity.Logic.Threat
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Time
@@ -120,6 +121,30 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
         end)
 
       assert Enum.any?(mob.internal.events, &(&1.type == :monster_talk and &1.text == "Home again."))
+    end
+  end
+
+  describe "drop_threat/2" do
+    test "fully leaves combat when vanish removes the last hostile reference" do
+      target = Guid.from_low_guid(:player, 50)
+
+      mob = %Mob{
+        object: %Object{guid: mob_guid(50)},
+        unit: %Unit{target: target, flags: 0x00080000, dynamic_flags: 0, auras: []},
+        internal: %Internal{
+          in_combat: true,
+          threat: %{target => 100.0},
+          blackboard: %Blackboard{auto_attacking: true, attack_started: true}
+        }
+      }
+
+      mob = MobBT.drop_threat(mob, target)
+
+      refute mob.internal.in_combat
+      assert Threat.entries(mob) == []
+      assert mob.unit.target == 0
+      refute mob.internal.blackboard.auto_attacking
+      assert Enum.any?(mob.internal.events, &(&1.type == :attack_stop))
     end
   end
 

@@ -225,7 +225,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
   defp build_target_info(_state, _spell, _targets), do: nil
 
   defp target_info(character, guid) do
-    case Metadata.query(guid, [:alive?, :faction_template, :unit_flags, :health_pct]) do
+    case Metadata.query(guid, [:alive?, :faction_template, :unit_flags, :health_pct, :orientation]) do
       nil ->
         :unknown
 
@@ -238,6 +238,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
           attackable?: Hostility.attackable?(character, guid),
           health_pct: Map.get(metadata, :health_pct),
           position: World.position(guid),
+          orientation: Map.get(metadata, :orientation),
           los?: World.line_of_sight?(character, guid)
         }
     end

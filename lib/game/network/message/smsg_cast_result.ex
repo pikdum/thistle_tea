@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Network.Message.SmsgCastResult do
   @cast_failure_reason_equipped_item_class 0x19
 
   @cast_failure_reasons %{
+    affecting_combat: 0x00,
     aura_bounced: 0x07,
     bad_implicit_targets: 0x09,
     bad_targets: 0x0A,
@@ -19,6 +20,8 @@ defmodule ThistleTea.Game.Network.Message.SmsgCastResult do
     item_not_ready: 0x28,
     line_of_sight: 0x2A,
     not_known: 0x38,
+    not_behind: 0x33,
+    not_infront: 0x36,
     not_fishable: 0x34,
     not_ready: 0x3C,
     not_shapeshift: 0x3D,

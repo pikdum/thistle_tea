@@ -697,11 +697,14 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
 
       {entity, _events} = apply_spell(entity, 1, 1, stealth)
       {entity, _events} = apply_spell(entity, 1, 1, vanish)
+      assert Bitwise.band(entity.unit.vis_flag, 0x02) != 0
+
       {entity, _events} = Aura.cancel_spell(entity, 1784, 2_000)
 
       assert entity.unit.auras == []
       assert entity.unit.shapeshift_form == 0
       assert entity.unit.aura == 0
+      assert Bitwise.band(entity.unit.vis_flag, 0x02) == 0
     end
 
     test "removes a positive holder and reverses its mods" do

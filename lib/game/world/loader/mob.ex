@@ -401,7 +401,8 @@ defmodule ThistleTea.Game.World.Loader.Mob do
         display_id: mob.unit.display_id,
         attacker_count: 0,
         alive?: mob.unit.health > 0,
-        health_pct: Core.health_pct(mob)
+        health_pct: Core.health_pct(mob),
+        orientation: elem(mob.movement_block.position, 3)
       }
       |> Map.merge(Mob.visibility_metadata(mob))
       |> Map.merge(FactionLoader.metadata(mob.unit.faction_template))
