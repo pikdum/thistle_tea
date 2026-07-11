@@ -84,6 +84,17 @@ defmodule ThistleTea.Game.Entity.Logic.Skills do
 
   def max_out(skills), do: skills
 
+  def max_professions(skills, cap \\ 300)
+
+  def max_professions(skills, cap) when is_map(skills) and is_integer(cap) and cap > 0 do
+    Map.new(skills, fn
+      {id, %{range: :tier} = entry} -> {id, %{entry | value: cap, max: cap}}
+      {id, entry} -> {id, entry}
+    end)
+  end
+
+  def max_professions(skills, _cap), do: skills
+
   defp level_up_entry(entry, level) do
     max = max_for_level(level)
     value = if entry.always_max?, do: max, else: min(entry.value, max)

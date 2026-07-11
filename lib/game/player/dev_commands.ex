@@ -71,6 +71,7 @@ defmodule ThistleTea.Game.Player.DevCommands do
       ".additem <item_id> [count] - add an item to your inventory",
       ".addquest <quest_id> - add a quest to your quest log",
       ".debug random equipment - add a random player-obtainable equipment set",
+      ".debug professions - set known professions to 300/300",
       ".debug skills - max out known skills for your level",
       ".debug spells - learn class trainer spells up to your level",
       ".character level <level> - set player level",
@@ -184,6 +185,12 @@ defmodule ThistleTea.Game.Player.DevCommands do
   def run(state, ".debug skills" <> _) do
     state
     |> max_skills()
+    |> handled()
+  end
+
+  def run(state, ".debug professions" <> _) do
+    state
+    |> max_professions()
     |> handled()
   end
 
@@ -566,6 +573,14 @@ defmodule ThistleTea.Game.Player.DevCommands do
     state
     |> put_character(character)
     |> system_message("Skills maxed for level #{unit.level}.")
+  end
+
+  defp max_professions(%{character: %Character{player: player} = character} = state) do
+    character = %{character | player: %{player | skills: Skills.max_professions(player.skills || %{})}}
+
+    state
+    |> put_character(character)
+    |> system_message("Known professions set to 300/300.")
   end
 
   defp maybe_send_level_up(state, nil), do: state

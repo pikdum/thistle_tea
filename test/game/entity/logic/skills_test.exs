@@ -47,6 +47,20 @@ defmodule ThistleTea.Game.Entity.Logic.SkillsTest do
     end
   end
 
+  describe "max_professions/2" do
+    test "raises known tier skills to the requested cap only" do
+      skills = %{
+        356 => %{value: 75, max: 150, range: :tier, always_max?: false},
+        43 => Skills.new_entry(:level, false, 60)
+      }
+
+      maxed = Skills.max_professions(skills)
+
+      assert maxed[356] == %{value: 300, max: 300, range: :tier, always_max?: false}
+      assert maxed[43] == skills[43]
+    end
+  end
+
   describe "encode/1" do
     test "packs id, value, and max into 128 twelve-byte slots" do
       skills = %{43 => Skills.new_entry(:level, false, 2)}
