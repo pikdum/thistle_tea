@@ -3,10 +3,13 @@ defmodule ThistleTea.Game.Entity.Logic.RogueSpellsTest do
 
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Logic.AttackTable
   alias ThistleTea.Game.Entity.Logic.Aura
+  alias ThistleTea.Game.Entity.Logic.Combat
   alias ThistleTea.Game.Entity.Logic.Reactive
   alias ThistleTea.Game.Entity.Logic.SpellEffect
   alias ThistleTea.Game.Spell
@@ -32,7 +35,15 @@ defmodule ThistleTea.Game.Entity.Logic.RogueSpellsTest do
         flags: 0
       },
       player: %Player{flags: 0},
-      internal: %Internal{in_combat: Keyword.get(opts, :in_combat, false)}
+      internal: %Internal{in_combat: Keyword.get(opts, :in_combat, false)},
+      movement_block: %MovementBlock{
+        base_walk_speed: 2.5,
+        base_run_speed: 7.0,
+        base_run_back_speed: 4.5,
+        walk_speed: 2.5,
+        run_speed: 7.0,
+        run_back_speed: 4.5
+      }
     }
   end
 
@@ -73,13 +84,61 @@ defmodule ThistleTea.Game.Entity.Logic.RogueSpellsTest do
         id: 6760,
         name: "Eviscerate",
         school: :physical,
-        effects: [%Effect{index: 0, type: :school_damage, base_points: 10, die_sides: 0}]
+        effects: [
+          %Effect{index: 0, type: :school_damage, base_points: 10, die_sides: 0, points_per_combo: 10.0}
+        ]
       }
 
       context = %CastContext{caster_guid: 5, caster_level: 60, combo_points: 4, spell: spell}
       {victim, _events} = SpellEffect.receive(target(), context, spell, 1_000)
 
-      assert victim.unit.health == 960
+      assert victim.unit.health == 950
+    end
+
+    test "expose armor applies its combo-scaled debuff" do
+      spell = %Spell{
+        id: 8647,
+        name: "Expose Armor",
+        duration_ms: 30_000,
+        effects: [
+          %Effect{
+            index: 0,
+            type: :apply_aura,
+            aura: :mod_resistance,
+            base_points: -1,
+            points_per_combo: -80.0,
+            misc_value: 1,
+            implicit_target_a: :target_enemy
+          }
+        ]
+      }
+
+      context = %CastContext{caster_guid: 5, caster_level: 60, combo_points: 5, spell: spell}
+      victim = %{target() | unit: %{target().unit | base_normal_resistance: 500, normal_resistance: 500}}
+      {victim, _events} = SpellEffect.receive(victim, context, spell, 1_000)
+
+      assert victim.unit.normal_resistance == 99
+      assert Aura.has_spell?(victim, 8647)
+    end
+
+    test "mixed rogue abilities apply caster buffs only to the rogue" do
+      ghostly_strike = %Spell{
+        id: 14_278,
+        name: "Ghostly Strike",
+        duration_ms: 7_000,
+        effects: [
+          %Effect{index: 0, type: :weapon_percent_damage, base_points: 125, implicit_target_a: :target_enemy},
+          %Effect{index: 1, type: :apply_aura, aura: :mod_dodge, base_points: 15, implicit_target_a: :caster}
+        ]
+      }
+
+      context = %CastContext{caster_guid: 5, caster_level: 60, spell: ghostly_strike}
+      {victim, _events} = SpellEffect.receive(target(), context, ghostly_strike, 1_000)
+      {caster, _events} = SpellEffect.receive(rogue(), context, ghostly_strike, 1_000)
+
+      refute Aura.has_spell?(victim, 14_278)
+      assert Aura.has_spell?(caster, 14_278)
+      assert Aura.flat_amount(caster, :mod_dodge) == 15
     end
   end
 
@@ -178,6 +237,45 @@ defmodule ThistleTea.Game.Entity.Logic.RogueSpellsTest do
       refute entity.internal.in_combat
       assert entity.internal.threat_refs == MapSet.new()
       assert Enum.sort(Enum.map(events, &{&1.type, &1.target_guid})) == [drop_threat: 101, drop_threat: 102]
+    end
+  end
+
+  describe "combat buffs" do
+    test "evasion and ghostly strike increase actual dodge resolution" do
+      evasion = %Spell{
+        id: 5277,
+        duration_ms: 15_000,
+        effects: [%Effect{index: 0, type: :apply_aura, aura: :mod_dodge, base_points: 50}]
+      }
+
+      attack = %{caster_level: 60, caster_player?: true, caster_attack_skill: 300, crit_chance: 0.0}
+      assert AttackTable.resolve(rogue(), attack, 10, roll: 2_000).outcome == :normal
+
+      {entity, _events} = Aura.apply_spell(rogue(), 5, 60, evasion, 1_000)
+      assert AttackTable.resolve(entity, attack, 10, roll: 2_000).outcome == :dodge
+    end
+
+    test "sprint changes the authoritative movement speed" do
+      sprint = %Spell{
+        id: 2983,
+        duration_ms: 15_000,
+        effects: [%Effect{index: 0, type: :apply_aura, aura: :mod_increase_speed, base_points: 50}]
+      }
+
+      {entity, _events} = Aura.apply_spell(rogue(), 5, 60, sprint, 1_000)
+      assert entity.movement_block.run_speed == 10.5
+    end
+
+    test "slice and dice changes the authoritative swing timer" do
+      slice_and_dice = %Spell{
+        id: 5171,
+        duration_ms: 9_000,
+        effects: [%Effect{index: 0, type: :apply_aura, aura: :mod_melee_haste, base_points: 20}]
+      }
+
+      entity = %{rogue() | unit: %{rogue().unit | base_attack_time: 2_000}}
+      {entity, _events} = Aura.apply_spell(entity, 5, 60, slice_and_dice, 1_000)
+      assert Combat.attack_speed_ms(entity) == 1_666
     end
   end
 end

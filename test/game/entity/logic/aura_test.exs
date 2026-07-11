@@ -677,6 +677,33 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
   end
 
   describe "cancel_spell/3" do
+    test "canceling stealth removes overlapping stealth holders and clears the form" do
+      entity = fixture_entity()
+
+      stealth = %Spell{
+        id: 1784,
+        duration_ms: -1,
+        effects: [
+          %Effect{index: 0, type: :apply_aura, aura: :mod_shapeshift, misc_value: 30},
+          %Effect{index: 1, type: :apply_aura, aura: :mod_stealth}
+        ]
+      }
+
+      vanish = %Spell{
+        id: 11_327,
+        duration_ms: 10_000,
+        effects: [%Effect{index: 0, type: :apply_aura, aura: :mod_stealth}]
+      }
+
+      {entity, _events} = apply_spell(entity, 1, 1, stealth)
+      {entity, _events} = apply_spell(entity, 1, 1, vanish)
+      {entity, _events} = Aura.cancel_spell(entity, 1784, 2_000)
+
+      assert entity.unit.auras == []
+      assert entity.unit.shapeshift_form == 0
+      assert entity.unit.aura == 0
+    end
+
     test "removes a positive holder and reverses its mods" do
       entity = fixture_entity()
       spell = frost_armor_fixture()

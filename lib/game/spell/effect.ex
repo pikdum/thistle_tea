@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Spell.Effect do
     :base_points,
     :die_sides,
     :real_points_per_level,
+    :points_per_combo,
     :aura,
     :amplitude_ms,
     :misc_value,
@@ -28,4 +29,10 @@ defmodule ThistleTea.Game.Spell.Effect do
 
   def damage_roll(%__MODULE__{base_points: base}) when is_integer(base), do: base
   def damage_roll(%__MODULE__{}), do: 0
+
+  def amount(%__MODULE__{} = effect, combo_points) when is_integer(combo_points) and combo_points > 0 do
+    damage_roll(effect) + trunc((effect.points_per_combo || 0.0) * combo_points)
+  end
+
+  def amount(%__MODULE__{} = effect, _combo_points), do: damage_roll(effect)
 end

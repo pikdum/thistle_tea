@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Blackboard do
             chase_started: false,
             next_chase_at: 0,
             next_attack_at: 0,
+            next_offhand_attack_at: 0,
             attack_started: false,
             auto_attacking: false,
             next_wander_at: 0,

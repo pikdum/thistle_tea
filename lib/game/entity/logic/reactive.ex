@@ -105,6 +105,13 @@ defmodule ThistleTea.Game.Entity.Logic.Reactive do
 
   def consume_combo(entity), do: entity
 
+  def clear_combo_target(%Character{player: player} = entity, target_guid)
+      when is_integer(target_guid) and player.field_combo_target == target_guid do
+    consume_combo(entity)
+  end
+
+  def clear_combo_target(entity, _target_guid), do: entity
+
   defp expire_combo(%Character{internal: %Internal{combo_expires_at: expires_at}} = entity, now)
        when is_integer(expires_at) and now >= expires_at do
     consume_combo(entity)

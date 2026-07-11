@@ -26,6 +26,7 @@ defmodule ThistleTea.Game.Network.Server do
   alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Entity.Logic.MovementStats
   alias ThistleTea.Game.Entity.Logic.PlayerCombat
+  alias ThistleTea.Game.Entity.Logic.Reactive
   alias ThistleTea.Game.Entity.Logic.Resources
   alias ThistleTea.Game.Entity.Logic.Rest
   alias ThistleTea.Game.Entity.Logic.SpellEffect
@@ -564,6 +565,9 @@ defmodule ThistleTea.Game.Network.Server do
   defp spellbook_spell(_character, _spell_id), do: nil
 
   defp apply_kill_reward(state, victim, xp) do
+    character = Reactive.clear_combo_target(state.character, victim.object.guid)
+    state = %{state | character: character}
+
     state =
       if xp > 0 do
         {character, rested_bonus} = Rest.spend(state.character, xp, Time.now())
@@ -585,7 +589,9 @@ defmodule ThistleTea.Game.Network.Server do
         state
       end
 
-    Quests.credit_kill(state, victim.object.guid)
+    state
+    |> Quests.credit_kill(victim.object.guid)
+    |> maybe_broadcast_update()
   end
 
   defp kill_xp(%Character{unit: %Unit{health: health, level: player_level}}, %{

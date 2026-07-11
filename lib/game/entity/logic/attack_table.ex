@@ -112,6 +112,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
       defender_agility: unit.agility || 0,
       defender_strength: unit.strength || 0,
       defender_armor: unit.normal_resistance || 0,
+      defender_dodge_bonus: Aura.flat_amount(defender, :mod_dodge),
       defender_block_bonus: Aura.flat_amount(defender, :mod_block_percent),
       defender_bonuses: unit.equipment_bonuses || %{},
       defender_extra_flags: extra_flags(defender),
@@ -191,7 +192,8 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
   defp dodge_bp(ctx) do
     base =
       if ctx.defender_player? do
-        CombatRatings.dodge_chance(ctx.defender_class, ctx.defender_level, ctx.defender_agility)
+        CombatRatings.dodge_chance(ctx.defender_class, ctx.defender_level, ctx.defender_agility) +
+          ctx.defender_dodge_bonus
       else
         @mob_avoidance_chance
       end

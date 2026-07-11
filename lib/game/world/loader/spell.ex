@@ -295,6 +295,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
           base_points: Map.get(row, :"effect_base_points_#{index}") || 0,
           die_sides: Map.get(row, :"effect_die_sides_#{index}") || 0,
           real_points_per_level: Map.get(row, :"effect_real_points_per_level_#{index}") || 0.0,
+          points_per_combo: Map.get(row, :"effect_points_per_combo_#{index}") || 0.0,
           aura: aura,
           amplitude_ms: amplitude_ms(Map.get(row, :"effect_amplitude_#{index}")),
           misc_value: effect_misc_value(row, index, type, aura),

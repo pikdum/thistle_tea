@@ -360,7 +360,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
   end
 
   defp aura_amount(%Effect{} = effect, {:finisher, spell, points}) do
-    Scripts.finisher_amount(spell, Effect.damage_roll(effect), points)
+    if Scripts.finisher?(spell), do: Effect.amount(effect, points), else: Effect.damage_roll(effect)
   end
 
   defp aura_amount(%Effect{} = effect, amount_override), do: amount_override || Effect.damage_roll(effect)

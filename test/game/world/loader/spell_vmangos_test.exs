@@ -159,6 +159,11 @@ defmodule ThistleTea.Game.World.Loader.SpellVmangosTest do
       assert Enum.any?(SpellLoader.load(1856).effects, &(&1.type == :clear_threat))
     end
 
+    test "finishers load their per-combo-point scaling" do
+      assert Enum.find(SpellLoader.load(11_300).effects, &(&1.type == :school_damage)).points_per_combo == 151.0
+      assert Enum.find(SpellLoader.load(11_198).effects, &(&1.aura == :mod_resistance)).points_per_combo == -340.0
+    end
+
     test "vanish triggers stealth and movement-impairing purge spells" do
       vanish = SpellLoader.load(1856)
 

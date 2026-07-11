@@ -17,6 +17,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
   alias ThistleTea.Game.Entity.Logic.SpellEffect
   alias ThistleTea.Game.Entity.Logic.SpellTarget
   alias ThistleTea.Game.Entity.Server.DynamicObject, as: DynamicObjectServer
+  alias ThistleTea.Game.Entity.SpellTargetResolver
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Math
   alias ThistleTea.Game.Network
@@ -501,6 +502,30 @@ defmodule ThistleTea.Game.Entity.EventSink do
   end
 
   def emit(entity, %Event{type: :drop_threat}), do: entity
+
+  def emit(%Character{} = entity, %Event{type: :blade_flurry, target_guid: primary, damage: damage}) do
+    secondary =
+      entity
+      |> SpellTargetResolver.resolve_query({:caster_aoe, 8.0})
+      |> Enum.find(&(&1 != primary))
+
+    if is_integer(secondary) do
+      spell = %Spell{
+        id: 22_482,
+        name: "Blade Flurry",
+        school: :physical,
+        dmg_class: 2,
+        effects: [%Spell.Effect{index: 0, type: :school_damage, base_points: damage}]
+      }
+
+      context = CastContext.from_caster(entity, spell, secondary)
+      Entity.receive_spell(secondary, context, spell)
+    end
+
+    entity
+  end
+
+  def emit(entity, %Event{type: :blade_flurry}), do: entity
 
   def emit(entity, %Event{type: :attacker_lost, target_guid: target_guid}) do
     Metadata.decrement(target_guid, :attacker_count, 0)

@@ -95,12 +95,6 @@ defmodule ThistleTea.Game.Spell.Scripts do
   def finisher_duration_ms(%Spell{name: "Kidney Shot"}, points), do: points * 1_000
   def finisher_duration_ms(_spell, _points), do: nil
 
-  def finisher_amount(%Spell{name: name}, amount, points) when name in ["Eviscerate", "Expose Armor", "Rupture"] do
-    amount * points
-  end
-
-  def finisher_amount(_spell, amount, _points), do: amount
-
   def aura_amount_override(%Spell{id: @last_stand_health_buff}, %{unit: %{max_health: max_health}})
       when is_integer(max_health) do
     trunc(max_health * @last_stand_health_fraction)

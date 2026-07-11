@@ -159,9 +159,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
     |> mark_hostile_cast(casting, targets, now)
     |> queue_charge(casting)
     |> apply_spell_hit(casting, hits, now)
-    |> add_combo_points(casting, hits)
+    |> consume_unavoidable_finisher(casting)
     |> consume_forced_crit(casting, now)
-    |> consume_combo_points(casting)
     |> clear_cast()
   end
 
@@ -176,36 +175,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
 
   defp queue_charge(character, _casting), do: character
 
-  defp consume_combo_points(character, %Cast{spell: %Spell{} = spell}) do
-    if Scripts.requires_combo_target?(spell) do
-      Reactive.consume_combo(character)
-    else
-      character
-    end
-  end
-
-  defp consume_combo_points(character, _casting), do: character
-
-  defp add_combo_points(
-         character,
-         %Cast{spell: %Spell{effects: effects}, targets: %Targets{unit_guid: target_guid}},
-         hits
-       ) do
-    amount =
-      Enum.reduce(effects, 0, fn
-        %Spell.Effect{type: :add_combo_points} = effect, acc -> acc + max(Spell.Effect.damage_roll(effect), 0)
-        _effect, acc -> acc
-      end)
-
-    if amount > 0 and target_guid in hits do
-      Reactive.add_combo_points(character, target_guid, amount)
-    else
-      character
-    end
-  end
-
-  defp add_combo_points(character, _casting, _hits), do: character
-
   defp consume_forced_crit(character, %Cast{spell: %Spell{} = spell}, now) do
     if Spell.melee_ability?(spell) or Spell.damage_effects(spell) != [] do
       spell_ids = if AuraLogic.has_aura?(character, :force_crit), do: [14_177], else: []
@@ -218,6 +187,16 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
   end
 
   defp consume_forced_crit(character, _casting, _now), do: character
+
+  defp consume_unavoidable_finisher(character, %Cast{spell: %Spell{} = spell}) do
+    if Scripts.finisher?(spell) and not Spell.melee_ability?(spell) do
+      Reactive.consume_combo(character)
+    else
+      character
+    end
+  end
+
+  defp consume_unavoidable_finisher(character, _casting), do: character
 
   defp queue_open_object(character, %Cast{spell: %Spell{} = spell, targets: %Targets{object_guid: object_guid}})
        when is_integer(object_guid) do
@@ -565,7 +544,13 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
 
   defp resolve_targets(caster, %Cast{spell: %Spell{} = spell, targets: %Targets{} = targets}) do
     query = SpellTarget.target_query(spell, targets)
-    SpellTargetResolver.resolve_query(caster, query)
+    resolved = SpellTargetResolver.resolve_query(caster, query)
+
+    if Enum.any?(spell.effects, &(&1.implicit_target_a == :caster or &1.implicit_target_b == :caster)) do
+      Enum.uniq([caster.object.guid | resolved])
+    else
+      resolved
+    end
   end
 
   defp resolve_targets(_caster, _casting), do: []

@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Lifecycle do
   """
   import Bitwise, only: [|||: 2]
 
+  alias ThistleTea.Game.Aura
   alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Unit
@@ -76,7 +77,8 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Lifecycle do
     holder = Enum.find(holders, fn %Holder{spell: %Spell{id: id}} -> id == spell_id end)
 
     if cancelable?(holder) do
-      remove_spells(entity, [spell_id], now)
+      spell_ids = if stealth_holder?(holder), do: stealth_spell_ids(holders), else: [spell_id]
+      remove_spells(entity, spell_ids, now)
     else
       {entity, []}
     end
@@ -132,6 +134,17 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Lifecycle do
   end
 
   defp cancelable?(_holder), do: false
+
+  defp stealth_holder?(%Holder{} = holder) do
+    Holder.has_aura_type?(holder, :mod_stealth) or
+      Enum.any?(holder.auras, &match?(%Aura{type: :mod_shapeshift, misc_value: 30}, &1))
+  end
+
+  defp stealth_holder?(_holder), do: false
+
+  defp stealth_spell_ids(holders) do
+    for %Holder{spell: %Spell{id: id}} = holder <- holders, stealth_holder?(holder), do: id
+  end
 
   defp dispel_index(holders, dispel_type, polarity) do
     matches_type? = fn %Holder{spell: %Spell{dispel_type: dt}} -> dt == dispel_type end

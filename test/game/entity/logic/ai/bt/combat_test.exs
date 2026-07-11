@@ -46,6 +46,37 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.CombatTest do
              ] = mob.internal.events
     end
 
+    test "queues independent main-hand and off-hand swings for dual wielders" do
+      target_guid = 2
+      SpatialHash.update(:players, target_guid, 0, 1.0, 0.0, 0.0)
+      on_exit(fn -> SpatialHash.remove(:players, target_guid) end)
+
+      mob = %Mob{
+        object: %Object{guid: 1},
+        unit: %Unit{
+          target: target_guid,
+          min_damage: 10,
+          max_damage: 10,
+          min_offhand_damage: 8,
+          max_offhand_damage: 8,
+          combat_reach: 1.0,
+          base_attack_time: 2_000,
+          offhand_attack_time: 1_500
+        },
+        internal: %Internal{map: 0, in_combat: true},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
+      }
+
+      blackboard = %Blackboard{attack_started: true, next_attack_at: 0, next_offhand_attack_at: 0}
+      assert {:success, mob, blackboard} = Combat.melee_attack(mob, blackboard, 1_000)
+
+      attacks = Enum.filter(mob.internal.events, &(&1.type == :deliver_attack))
+      assert length(attacks) == 2
+      assert Enum.any?(attacks, &(Map.get(&1.attack, :offhand?) == true and &1.attack.damage == 4))
+      assert blackboard.next_attack_at == 3_000
+      assert blackboard.next_offhand_attack_at == 2_500
+    end
+
     test "sends queued melee spell go before delivering the attack" do
       target_guid = 2
       SpatialHash.update(:players, target_guid, 0, 1.0, 0.0, 0.0)

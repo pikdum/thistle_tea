@@ -56,6 +56,11 @@ defmodule ThistleTea.DevSeed do
     5 => [11_839, 10_172, 10_806, 14_304, 10_807, 18_697, 14_311, 10_808, 12_552, 1607],
     8 => [17_715, 10_172, 14_141, 11_662, 14_132, 18_697, 12_546, 11_634, 14_134, 19_567]
   }
+  @debug_reagents %{
+    4 => [{5140, 20}],
+    5 => [{17_056, 20}],
+    8 => [{17_056, 20}, {17_031, 20}, {17_032, 20}]
+  }
 
   def run do
     seed_account_and_characters()
@@ -105,6 +110,7 @@ defmodule ThistleTea.DevSeed do
       character
       |> Characters.clear_equipment()
       |> Characters.assign_items(Map.get(@debug_equipment, class, []))
+      |> Characters.assign_items(Map.get(@debug_reagents, class, []))
       |> Character.restore_health_and_mana()
 
     {:ok, CharacterStore.put(character)}

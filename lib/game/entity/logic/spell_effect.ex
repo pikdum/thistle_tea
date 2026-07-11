@@ -48,7 +48,13 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
     Enum.reject(effects, &hostile_target_effect?/1)
   end
 
-  defp applicable_effects(_target, _context, effects), do: effects
+  defp applicable_effects(_target, _context, effects), do: Enum.reject(effects, &caster_target_effect?/1)
+
+  defp caster_target_effect?(%Effect{type: :apply_aura} = effect) do
+    effect.implicit_target_a == :caster or effect.implicit_target_b == :caster
+  end
+
+  defp caster_target_effect?(_effect), do: false
 
   defp hostile_target_effect?(%Effect{} = effect) do
     effect.implicit_target_a in [
@@ -82,9 +88,25 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
       _hit ->
         context = %{context | melee_crit?: result.crit?}
 
-        target
-        |> apply_effects(context, spell.effects, [], now)
-        |> with_bonus_threat(context)
+        {target, events} = apply_effects(target, context, spell.effects, [], now)
+
+        events =
+          if rogue_feedback_spell?(spell) do
+            events ++
+              [
+                Event.attack_outcome(
+                  context.caster_guid,
+                  target.object.guid,
+                  result.outcome,
+                  dealt_damage(events),
+                  spell.id
+                )
+              ]
+          else
+            events
+          end
+
+        with_bonus_threat({target, events}, context)
     end
   end
 
@@ -383,7 +405,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
 
   defp apply_damage_effect(state, %CastContext{} = context, spell, %Effect{} = effect, now, opts \\ [])
        when is_integer(now) do
-    base = Scripts.finisher_amount(spell, Effect.damage_roll(effect), context.combo_points || 0)
+    base = effect_amount(spell, effect, context.combo_points)
     rolled = base + damage_bonus(context, spell, opts)
     rolled = trunc(rolled * (context.damage_done_multiplier || 1.0))
 
@@ -452,7 +474,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   defp school_atom(%Spell{} = spell), do: Enum.at(@schools, Spell.school_index(spell), :physical)
 
   defp school_damage_roll(%CastContext{} = context, spell, %Effect{} = effect) do
-    roll = Scripts.finisher_amount(spell, Effect.damage_roll(effect), context.combo_points || 0)
+    roll = effect_amount(spell, effect, context.combo_points) + eviscerate_attack_power(spell, context)
 
     if Scripts.ap_percent_damage?(spell) do
       trunc(roll * (context.attack_power || 0) / 100)
@@ -460,6 +482,16 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
       roll
     end
   end
+
+  defp effect_amount(%Spell{} = spell, %Effect{} = effect, points) do
+    if Scripts.finisher?(spell), do: Effect.amount(effect, points || 0), else: Effect.damage_roll(effect)
+  end
+
+  defp eviscerate_attack_power(%Spell{name: "Eviscerate"}, %CastContext{} = context) do
+    trunc((context.attack_power || 0) * (context.combo_points || 0) * 0.03)
+  end
+
+  defp eviscerate_attack_power(_spell, _context), do: 0
 
   defp weapon_ability_damage(%CastContext{} = context, %Effect{type: :normalized_weapon_damage} = effect) do
     normalized_weapon_roll(context) + Effect.damage_roll(effect)
@@ -563,6 +595,18 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
       Event.spell_log_miss(context.caster_guid, target_guid, spell.id, outcome),
       Event.attack_outcome(context.caster_guid, target_guid, outcome, 0, spell.id)
     ]
+  end
+
+  defp dealt_damage(events) do
+    Enum.reduce(events, 0, fn
+      %Event{type: :spell_damage, damage: damage}, acc when is_integer(damage) -> acc + damage
+      _event, acc -> acc
+    end)
+  end
+
+  defp rogue_feedback_spell?(%Spell{} = spell) do
+    Scripts.finisher?(spell) or spell.name == "Gouge" or
+      Enum.any?(spell.effects, &match?(%Effect{type: :add_combo_points}, &1))
   end
 
   defp special_attack(%CastContext{} = context, spell) do

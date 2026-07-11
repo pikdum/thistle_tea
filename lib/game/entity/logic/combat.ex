@@ -43,6 +43,21 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
 
   def attack_speed_ms(_entity), do: @default_attack_speed_ms
 
+  def offhand_attack_speed_ms(%{unit: %Unit{offhand_attack_time: attack_time}} = entity)
+      when is_integer(attack_time) and attack_time > 0 do
+    haste = Aura.flat_amount(entity, :mod_melee_haste)
+    trunc(attack_time * 100 / max(100 + haste, 1))
+  end
+
+  def offhand_attack_speed_ms(_entity), do: nil
+
+  def offhand_damage_range(%{unit: %Unit{min_offhand_damage: min, max_offhand_damage: max}} = entity)
+      when is_number(min) and is_number(max) and max > 0 do
+    scale_damage_range({min * 0.5, max * 0.5}, outgoing_damage_multiplier(entity))
+  end
+
+  def offhand_damage_range(_entity), do: nil
+
   def sync_combat_flag(%{unit: %Unit{} = unit, internal: %Internal{in_combat: in_combat}} = entity) do
     updated = combat_flags(unit.flags || 0, in_combat)
 
