@@ -29,6 +29,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   alias ThistleTea.Game.Entity.Logic.Hostility
   alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.Entity.Logic.Regen, as: RegenLogic
+  alias ThistleTea.Game.Entity.Logic.StealthDetection
   alias ThistleTea.Game.Entity.Logic.Threat
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Time
@@ -429,10 +430,16 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
 
   defp aggro_candidate?(%Mob{} = state, guid, distance) when is_integer(guid) and is_number(distance) do
     Hostility.valid_hostile_target?(state, guid) and distance <= aggro_radius(state, guid) and
+      detectable_target?(state, guid, distance) and
       World.line_of_sight?(state, guid)
   end
 
   defp aggro_candidate?(_state, _guid, _distance), do: false
+
+  defp detectable_target?(%Mob{unit: %Unit{level: level}}, guid, distance) do
+    target = Metadata.query(guid, [:stealthed?, :stealth_skill, :undetectable_until])
+    StealthDetection.detectable?(%{level: level}, target, distance, Time.now())
+  end
 
   defp aggro_radius(%Mob{unit: %Unit{level: level}} = state, target_guid)
        when is_integer(level) and is_integer(target_guid) do

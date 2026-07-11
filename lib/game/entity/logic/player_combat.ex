@@ -33,7 +33,7 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombat do
 
   def mark_initiated(character, now), do: mark_attacked(character, now)
 
-  def vanish(%Character{internal: %Internal{} = internal} = character) do
+  def vanish(%Character{internal: %Internal{} = internal} = character, now) when is_integer(now) do
     refs = internal.threat_refs || MapSet.new()
     blackboard = internal.blackboard |> Blackboard.from_any() |> Blackboard.clear_auto_attack()
 
@@ -45,6 +45,7 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombat do
             | threat_refs: MapSet.new(),
               in_combat: false,
               last_hostile_time: nil,
+              undetectable_until: now + 1_000,
               blackboard: blackboard
           }
       }
@@ -53,7 +54,12 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombat do
     {character, MapSet.to_list(refs)}
   end
 
-  def vanish(character), do: {character, []}
+  def vanish(character, _now), do: {character, []}
+
+  def undetectable?(%Character{internal: %Internal{undetectable_until: expires_at}}, now)
+      when is_integer(expires_at) and is_integer(now), do: expires_at > now
+
+  def undetectable?(_character, _now), do: false
 
   def gain_threat_ref(%Character{internal: %Internal{} = internal} = character, mob_guid)
       when is_integer(mob_guid) and mob_guid > 0 do

@@ -201,9 +201,9 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
          %CastContext{caster_guid: guid},
          _spell,
          %Effect{type: :clear_threat},
-         _now
+         now
        ) do
-    {state, mob_guids} = PlayerCombat.vanish(state)
+    {state, mob_guids} = PlayerCombat.vanish(state, now)
 
     events =
       Enum.map(mob_guids, &Event.drop_threat/1) ++

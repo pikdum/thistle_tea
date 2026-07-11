@@ -18,6 +18,7 @@ defmodule ThistleTea.Game.Network.Server do
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.AI.Tick
   alias ThistleTea.Game.Entity.Logic.AttackFeedback
+  alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Combat
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Death
@@ -208,9 +209,14 @@ defmodule ThistleTea.Game.Network.Server do
   def handle_cast({:receive_attack, attack}, {socket, %{character: %Character{} = character} = state}) do
     now = Time.now()
 
-    character = PlayerCombat.mark_attacked(character, now)
-    {character, events} = Combat.receive_attack(character, attack, now)
-    character = EventSink.emit(character, events)
+    character =
+      if PlayerCombat.undetectable?(character, now) do
+        character
+      else
+        character = PlayerCombat.mark_attacked(character, now)
+        {character, events} = Combat.receive_attack(character, attack, now)
+        EventSink.emit(character, events)
+      end
 
     {:noreply, {socket, %{state | character: character}}, {:continue, :maybe_broadcast_update}}
   end
@@ -530,7 +536,10 @@ defmodule ThistleTea.Game.Network.Server do
       ghost?: Death.ghost?(character),
       health_pct: Core.health_pct(character),
       unit_flags: character.unit.flags,
-      shapeshift_form: character.unit.shapeshift_form
+      shapeshift_form: character.unit.shapeshift_form,
+      stealthed?: Aura.has_aura?(character, :mod_stealth),
+      stealth_skill: Aura.flat_amount(character, :mod_stealth),
+      undetectable_until: character.internal.undetectable_until
     })
 
     PartyNotifier.broadcast_stats(state.guid, character)

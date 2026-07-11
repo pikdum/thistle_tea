@@ -87,6 +87,9 @@ defmodule ThistleTea.Game.Player.Login do
         ghost?: Death.ghost?(c),
         health_pct: Core.health_pct(c),
         shapeshift_form: c.unit.shapeshift_form,
+        stealthed?: AuraLogic.has_aura?(c, :mod_stealth),
+        stealth_skill: AuraLogic.flat_amount(c, :mod_stealth),
+        undetectable_until: c.internal.undetectable_until,
         orientation: elem(c.movement_block.position, 3)
       }
       |> Map.merge(FactionLoader.metadata(c.unit.faction_template))

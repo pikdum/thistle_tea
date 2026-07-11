@@ -76,6 +76,32 @@ defmodule ThistleTea.Game.World.AggroProbeTest do
       refute_receive {:"$gen_cast", {:aggro_probe, ^player_guid}}
     end
 
+    test "uses stealth detection instead of the normal aggro radius" do
+      table = table()
+      player_guid = player_guid()
+      mob_guid = mob_guid()
+
+      put_player(player_guid, stealthed?: true, stealth_skill: 25)
+      put_mob(mob_guid, {5.0, 0.0, 0.0})
+
+      AggroProbe.notify_player_moved(player_guid, 0, {0.0, 0.0, 0.0}, table)
+
+      refute_receive {:"$gen_cast", {:aggro_probe, ^player_guid}}
+    end
+
+    test "does not probe a vanished player during detection immunity" do
+      table = table()
+      player_guid = player_guid()
+      mob_guid = mob_guid()
+
+      put_player(player_guid, undetectable_until: System.monotonic_time(:millisecond) + 1_000)
+      put_mob(mob_guid, {0.5, 0.0, 0.0})
+
+      AggroProbe.notify_player_moved(player_guid, 0, {0.0, 0.0, 0.0}, table)
+
+      refute_receive {:"$gen_cast", {:aggro_probe, ^player_guid}}
+    end
+
     test "does not probe dead mobs or on behalf of dead players" do
       table = table()
       player_guid = player_guid()
@@ -107,7 +133,10 @@ defmodule ThistleTea.Game.World.AggroProbeTest do
       alive?: Keyword.get(opts, :alive?, true),
       faction_template: alliance(),
       unit_flags: 0,
-      level: 5
+      level: 5,
+      stealthed?: Keyword.get(opts, :stealthed?, false),
+      stealth_skill: Keyword.get(opts, :stealth_skill, 0),
+      undetectable_until: Keyword.get(opts, :undetectable_until)
     })
 
     on_exit(fn -> Metadata.delete(player_guid) end)

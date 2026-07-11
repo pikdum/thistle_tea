@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.Network.ServerTest do
   alias ThistleTea.Game.Network.Server
   alias ThistleTea.Game.Network.UpdateBatcher
   alias ThistleTea.Game.Network.UpdateObject
+  alias ThistleTea.Game.Time
 
   describe "UpdateBatcher.batch/2" do
     test "drains pending update structs into a single packet" do
@@ -93,6 +94,19 @@ defmodule ThistleTea.Game.Network.ServerTest do
       assert character.internal.in_combat == true
       assert is_integer(character.internal.last_hostile_time)
       assert Regen.tick(character, 1_000).unit.health == 60
+    end
+
+    test "ignores an attack already in flight during vanish immunity" do
+      socket = %{read_timeout: 0}
+      character = character(1, health: 80, max_health: 100)
+      internal = %{character.internal | undetectable_until: Time.now() + 1_000}
+      state = %{character: %{character | internal: internal}}
+
+      assert {:noreply, {^socket, %{character: character}}, {:continue, :maybe_broadcast_update}} =
+               Server.handle_cast({:receive_attack, %{caster: 2, damage: 10}}, {socket, state})
+
+      assert character.unit.health == 80
+      refute character.internal.in_combat
     end
   end
 

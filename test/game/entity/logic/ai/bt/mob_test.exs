@@ -543,6 +543,19 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
       assert {:failure, ^state, %Blackboard{next_aggro_at: 6_000}} = MobBT.try_aggro(state, blackboard, 1_000)
       assert state.unit.target == 0
     end
+
+    test "does not acquire a stealthed player outside detection distance" do
+      source_guid = mob_guid(17)
+      target_guid = player_guid()
+      state = fixture_mob(guid: source_guid, level: 5, faction_template: 17)
+
+      put_metadata(source_guid, defias(), 5)
+      put_spatial_target(:players, target_guid, {5.0, 0.0, 0.0}, alliance(), 5)
+      Metadata.update(target_guid, %{stealthed?: true, stealth_skill: 25})
+
+      assert {:failure, state, %Blackboard{next_aggro_at: 6_000}} = MobBT.try_aggro(state, %Blackboard{}, 1_000)
+      assert state.unit.target == 0
+    end
   end
 
   describe "aggro_radius_for/4" do

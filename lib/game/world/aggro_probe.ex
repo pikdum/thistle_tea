@@ -5,6 +5,8 @@ defmodule ThistleTea.Game.World.AggroProbe do
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Logic.AI.BT.Mob, as: MobBT
   alias ThistleTea.Game.Entity.Logic.Hostility
+  alias ThistleTea.Game.Entity.Logic.StealthDetection
+  alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
@@ -73,7 +75,9 @@ defmodule ThistleTea.Game.World.AggroProbe do
            :faction_can_have_reputation?,
            :unit_flags,
            :level,
-           :shapeshift_form
+           :stealthed?,
+           :stealth_skill,
+           :undetectable_until
          ]) do
       %{alive?: true} = player -> player
       _ -> nil
@@ -92,12 +96,9 @@ defmodule ThistleTea.Game.World.AggroProbe do
        when is_integer(level) and is_integer(player_level) do
     Hostility.can_initiate_attack?(mob) and
       Hostility.valid_hostile_target?(mob, player) and
-      distance <=
-        stealth_adjusted_radius(player, MobBT.aggro_radius_for(MobBT.detection_range(mob), level, player_level))
+      distance <= MobBT.aggro_radius_for(MobBT.detection_range(mob), level, player_level) and
+      StealthDetection.detectable?(mob, player, distance, Time.now())
   end
 
   defp eligible?(_mob, _player, _distance), do: false
-
-  defp stealth_adjusted_radius(%{shapeshift_form: 30}, radius), do: min(radius, 5.0)
-  defp stealth_adjusted_radius(_player, radius), do: radius
 end
