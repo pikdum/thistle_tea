@@ -653,7 +653,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
       {:success, state, blackboard} = clear_combat(state, blackboard)
       %{state | internal: %{state.internal | blackboard: blackboard}}
     else
-      state
+      reselect_victim(state)
     end
   end
 

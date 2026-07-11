@@ -16,6 +16,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
   alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.Entity.Logic.SpellEffect
   alias ThistleTea.Game.Entity.Logic.SpellTarget
+  alias ThistleTea.Game.Entity.Logic.StealthDetection
   alias ThistleTea.Game.Entity.Server.DynamicObject, as: DynamicObjectServer
   alias ThistleTea.Game.Entity.SpellTargetResolver
   alias ThistleTea.Game.Guid
@@ -509,6 +510,18 @@ defmodule ThistleTea.Game.Entity.EventSink do
   end
 
   def emit(entity, %Event{type: :drop_threat}), do: entity
+
+  def emit(%Character{} = entity, %Event{type: :drop_nearby_threat}) do
+    Metadata.update(entity.object.guid, StealthDetection.target_metadata(entity))
+
+    entity
+    |> World.nearby_mobs(250)
+    |> Enum.each(fn {mob_guid, _distance} -> Entity.drop_threat(mob_guid, entity.object.guid) end)
+
+    entity
+  end
+
+  def emit(entity, %Event{type: :drop_nearby_threat}), do: entity
 
   def emit(%Character{} = entity, %Event{type: :blade_flurry, target_guid: primary, damage: damage}) do
     secondary =

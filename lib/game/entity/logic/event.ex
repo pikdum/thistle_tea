@@ -263,6 +263,10 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
     %__MODULE__{type: :drop_threat, target_guid: target_guid}
   end
 
+  def drop_nearby_threat do
+    %__MODULE__{type: :drop_nearby_threat}
+  end
+
   def blade_flurry(target_guid, damage) when is_integer(target_guid) and is_integer(damage) and damage > 0 do
     %__MODULE__{type: :blade_flurry, target_guid: target_guid, damage: damage}
   end

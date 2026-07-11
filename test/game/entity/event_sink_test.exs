@@ -2,9 +2,11 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
   use ExUnit.Case, async: false
 
   alias ThistleTea.Game.Entity
+  alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Object
+  alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.Logic.Event
@@ -44,6 +46,28 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
     test "script attack_start schedules a forced attack", %{mob: mob, target_guid: target_guid} do
       assert ^mob = EventSink.emit(mob, Event.attack_start(target_guid))
       assert_receive {:force_attack, ^target_guid}
+    end
+
+    test "drop_nearby_threat reconciles mobs missing from player threat refs" do
+      player_guid = Guid.from_low_guid(:player, unique_guid())
+      mob_guid = Guid.from_low_guid(:mob, 1, unique_guid())
+      Entity.register(mob_guid)
+      SpatialHash.update(:mobs, mob_guid, 0, 10.0, 0.0, 0.0)
+
+      on_exit(fn ->
+        Entity.unregister(mob_guid)
+        SpatialHash.remove(:mobs, mob_guid)
+      end)
+
+      character = %Character{
+        object: %Object{guid: player_guid},
+        unit: %Unit{level: 60, auras: []},
+        internal: %Internal{map: 0},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
+      }
+
+      assert ^character = EventSink.emit(character, Event.drop_nearby_threat())
+      assert_receive {:"$gen_cast", {:drop_threat, ^player_guid}}
     end
 
     test "attacker_state_update broadcasts landed hits as normal victim state", %{target_guid: target_guid} do

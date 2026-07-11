@@ -146,6 +146,23 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
       refute mob.internal.blackboard.auto_attacking
       assert Enum.any?(mob.internal.events, &(&1.type == :attack_stop))
     end
+
+    test "reselects from the remaining threat table when the current victim vanishes" do
+      vanished = player_guid()
+      replacement = player_guid()
+      mob = fixture_mob(level: 5, faction_template: 17)
+      unit = %{mob.unit | target: vanished}
+      internal = %{mob.internal | in_combat: true, threat: %{vanished => 100.0, replacement => 50.0}}
+      mob = %{mob | unit: unit, internal: internal}
+
+      put_metadata(replacement, alliance(), 5)
+
+      mob = MobBT.drop_threat(mob, vanished)
+
+      assert mob.internal.in_combat
+      assert mob.unit.target == replacement
+      refute Threat.tracking?(mob, vanished)
+    end
   end
 
   describe "tree/0" do

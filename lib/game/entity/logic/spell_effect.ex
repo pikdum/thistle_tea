@@ -206,8 +206,8 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
     {state, mob_guids} = PlayerCombat.vanish(state, now)
 
     events =
-      Enum.map(mob_guids, &Event.drop_threat/1) ++
-        vanish_attack_stop_events(state) ++ vanish_stealth_events(state)
+      [Event.drop_nearby_threat()] ++
+        Enum.map(mob_guids, &Event.drop_threat/1) ++ vanish_attack_stop_events(state) ++ vanish_stealth_events(state)
 
     {state, events}
   end

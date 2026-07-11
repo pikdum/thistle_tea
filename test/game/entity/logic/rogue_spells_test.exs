@@ -283,6 +283,7 @@ defmodule ThistleTea.Game.Entity.Logic.RogueSpellsTest do
       assert entity.internal.threat_refs == MapSet.new()
       assert entity.internal.undetectable_until == 2_000
       assert Enum.count(events, &(&1.type == :drop_threat)) == 2
+      assert Enum.any?(events, &(&1.type == :drop_nearby_threat))
       assert Enum.any?(events, &(&1.type == :attack_stop and &1.target_guid == 9))
       assert Enum.any?(events, &(&1.type == :trigger_spell and &1.spell_id == 1787))
     end
