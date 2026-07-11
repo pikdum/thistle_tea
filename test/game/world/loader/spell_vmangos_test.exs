@@ -8,6 +8,8 @@ defmodule ThistleTea.Game.World.Loader.SpellVmangosTest do
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Loader.SpellThreat
 
+  @moduletag :dbc_db
+
   setup_all do
     :ok = SpellThreat.load_all()
   end
