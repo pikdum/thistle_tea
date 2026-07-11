@@ -172,6 +172,31 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
              end)
     end
 
+    test "queues temporary item enchantments for the targeted item" do
+      effect = %Effect{index: 0, type: :enchant_item_temporary, misc_value: 263}
+      spell = %Spell{id: 8087, effects: [effect]}
+
+      casting = %Cast{
+        spell: spell,
+        targets: %Targets{raw: <<0x10::little-size(16)>>, item_guid: 0x4000_002A},
+        ends_at: Time.now()
+      }
+
+      mob = %Mob{
+        object: %Object{guid: 1},
+        unit: %Unit{health: 100, max_health: 100},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+        internal: %Internal{map: 0, casting: casting}
+      }
+
+      mob = SpellBT.complete_cast(mob, casting, 1_000)
+
+      assert Enum.any?(mob.internal.events, fn event ->
+               event.type == :enchant_item and event.target_guid == 0x4000_002A and event.spell == spell and
+                 event.effect == effect
+             end)
+    end
+
     test "queues self spell hit events after spell go" do
       spell = %Spell{id: 133, school: :fire, effects: [%Effect{type: :school_damage, base_points: 5, die_sides: 0}]}
 

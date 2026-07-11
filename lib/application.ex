@@ -22,6 +22,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.World.Loader.Gossip, as: GossipLoader
   alias ThistleTea.Game.World.Loader.Graveyard, as: GraveyardLoader
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
+  alias ThistleTea.Game.World.Loader.ItemEnchantment, as: ItemEnchantmentLoader
   alias ThistleTea.Game.World.Loader.Loot, as: LootLoader
   alias ThistleTea.Game.World.Loader.NpcText, as: NpcTextLoader
   alias ThistleTea.Game.World.Loader.PageText, as: PageTextLoader
@@ -107,6 +108,7 @@ defmodule ThistleTea.Application do
     :ets.new(:session, [:named_table, :public, read_concurrency: true, write_concurrency: :auto])
     Metadata.init()
     ItemLoader.init()
+    ItemEnchantmentLoader.init()
     ItemStore.init()
     CharacterStore.init()
     VendorLoader.init()
@@ -179,6 +181,7 @@ defmodule ThistleTea.Application do
         Logger.info("Loading templates...")
         CreatureTemplateLoader.load_all()
         GameObjectTemplateLoader.load_all()
+        ItemEnchantmentLoader.load_all()
         FishingLoader.load_all()
         LootLoader.load_fishing()
         SpellThreatLoader.load_all()

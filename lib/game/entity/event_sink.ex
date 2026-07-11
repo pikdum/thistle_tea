@@ -31,6 +31,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
   alias ThistleTea.Game.World.AreaEffects
   alias ThistleTea.Game.World.ChaseWatch
   alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
+  alias ThistleTea.Game.World.Loader.ItemEnchantment, as: ItemEnchantmentLoader
   alias ThistleTea.Game.World.Loader.Mob, as: MobLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Loader.Summon, as: SummonLoader
@@ -540,6 +541,14 @@ defmodule ThistleTea.Game.Entity.EventSink do
   end
 
   def emit(entity, %Event{type: :consume_cast_item}), do: entity
+
+  def emit(%Character{} = entity, %Event{type: :enchant_item} = event) do
+    duration_ms = ItemEnchantmentLoader.duration_ms(event.spell.id, event.effect)
+    send(self(), {:enchant_item, event.target_guid, event.spell, event.effect.misc_value, duration_ms})
+    entity
+  end
+
+  def emit(entity, %Event{type: :enchant_item}), do: entity
 
   def emit(%Character{} = entity, %Event{type: :open_gameobject, target_guid: object_guid})
       when is_integer(object_guid) do

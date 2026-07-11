@@ -29,6 +29,7 @@ defmodule ThistleTea.Game.Player.Login do
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.Party
   alias ThistleTea.Game.Party.Notifier
+  alias ThistleTea.Game.Player.Enchantments
   alias ThistleTea.Game.Player.Rest, as: PlayerRest
   alias ThistleTea.Game.Player.Spells, as: PlayerSpells
   alias ThistleTea.Game.Player.Stats, as: PlayerStats
@@ -63,6 +64,7 @@ defmodule ThistleTea.Game.Player.Login do
       |> normalize_faction_template()
       |> normalize_death_state(character_guid)
       |> build_spellbook()
+      |> Enchantments.restore()
       |> evaluate_login_rest()
       |> BT.init(PlayerBT.tree())
 
@@ -98,6 +100,7 @@ defmodule ThistleTea.Game.Player.Login do
     })
 
     send_init_packets(c)
+    Enchantments.send_active_timers(c)
 
     case PartySystem.group_of(character_guid) do
       %Party.Group{} = group -> Notifier.send_group_list(group)

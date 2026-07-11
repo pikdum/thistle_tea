@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Player.Fishing do
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
+  alias ThistleTea.Game.Player.Enchantments
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Cast
   alias ThistleTea.Game.World
@@ -51,7 +52,8 @@ defmodule ThistleTea.Game.Player.Fishing do
   end
 
   def catch_fish(%{character: character} = state, bobber_guid) do
-    skill = Skills.value(character.player.skills, Skills.fishing_skill())
+    skill_id = Skills.fishing_skill()
+    skill = Skills.value(character.player.skills, skill_id) + Enchantments.skill_bonus(character, skill_id)
 
     case Entity.call(bobber_guid, {:fishing_use, state.guid, skill}) do
       {:ok, loot, _catch} ->

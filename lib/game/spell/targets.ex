@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Spell.Targets do
 
   @self 0x00000000
   @unit 0x00000002
+  @item 0x00000010
   @object 0x00000800
   @object_locked 0x00004000
   @source_location 0x00000020
@@ -21,6 +22,7 @@ defmodule ThistleTea.Game.Spell.Targets do
     :flags,
     :raw,
     :unit_guid,
+    :item_guid,
     :object_guid,
     :source_location,
     :destination_location
@@ -62,6 +64,7 @@ defmodule ThistleTea.Game.Spell.Targets do
     {_rest, targets} =
       [
         {@unit, :unit_guid},
+        {@item, :item_guid},
         {@object ||| @object_locked, :object_guid},
         {@source_location, :source_location},
         {@destination_location, :destination_location},
@@ -70,6 +73,9 @@ defmodule ThistleTea.Game.Spell.Targets do
       |> Enum.reduce({rest, targets}, fn
         {@unit, :unit_guid}, {rest, acc} when (flags &&& @unit) > 0 ->
           parse_guid_field(rest, acc, :unit_guid)
+
+        {@item, :item_guid}, {rest, acc} when (flags &&& @item) > 0 ->
+          parse_guid_field(rest, acc, :item_guid)
 
         {mask, :object_guid}, {rest, acc} when (flags &&& mask) > 0 ->
           parse_guid_field(rest, acc, :object_guid)

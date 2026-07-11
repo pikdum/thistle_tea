@@ -30,6 +30,15 @@ defmodule ThistleTea.Game.Spell.TargetsTest do
       assert targets.raw == payload
     end
 
+    test "item target unpacks the target guid" do
+      payload = <<0x10::little-size(16)>> <> BinaryUtils.pack_guid(0x4000_00AA)
+
+      targets = Targets.parse(payload, 123)
+
+      assert targets.item_guid == 0x4000_00AA
+      assert targets.unit_guid == nil
+    end
+
     test "truncated unit target leaves target unset" do
       payload = <<0x02::little-size(16), 0xFF::8, 0xAA::8>>
 

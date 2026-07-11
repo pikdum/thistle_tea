@@ -316,6 +316,10 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
     %__MODULE__{type: :consume_cast_item, cast_item_guid: item_guid}
   end
 
+  def enchant_item(item_guid, spell, effect) when is_integer(item_guid) do
+    %__MODULE__{type: :enchant_item, target_guid: item_guid, spell: spell, effect: effect}
+  end
+
   def open_gameobject(object_guid) when is_integer(object_guid) do
     %__MODULE__{type: :open_gameobject, target_guid: object_guid}
   end

@@ -151,6 +151,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
     |> queue_spell_go(casting, hits ++ object_hits(casting), misses)
     |> queue_area_effects(casting)
     |> queue_summon_objects(casting)
+    |> queue_item_enchantments(casting)
     |> queue_consume_reagents(casting)
     |> queue_consume_cast_item(casting)
     |> queue_open_object(casting)
@@ -205,6 +206,18 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
   end
 
   defp queue_consume_cast_item(character, %Cast{}), do: character
+
+  defp queue_item_enchantments(character, %Cast{spell: %Spell{} = spell, targets: %Targets{item_guid: item_guid}})
+       when is_integer(item_guid) do
+    events =
+      for %Spell.Effect{type: :enchant_item_temporary} = effect <- spell.effects do
+        Event.enchant_item(item_guid, spell, effect)
+      end
+
+    Event.enqueue(character, events)
+  end
+
+  defp queue_item_enchantments(character, _casting), do: character
 
   defp mark_hostile_cast(%Character{object: %{guid: guid}} = character, %Cast{spell: spell}, targets, now) do
     if Spell.harmful?(spell) and Enum.any?(targets, &(&1 != guid)) do

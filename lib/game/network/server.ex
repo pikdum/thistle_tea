@@ -43,6 +43,7 @@ defmodule ThistleTea.Game.Network.Server do
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.Party.MemberStats
   alias ThistleTea.Game.Party.Notifier, as: PartyNotifier
+  alias ThistleTea.Game.Player.Enchantments
   alias ThistleTea.Game.Player.GameObjects, as: PlayerGameObjects
   alias ThistleTea.Game.Player.Items
   alias ThistleTea.Game.Player.Quests
@@ -433,6 +434,26 @@ defmodule ThistleTea.Game.Network.Server do
   rescue
     error ->
       Logger.error("consume_cast_item crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:noreply, {socket, state}, socket.read_timeout}
+  end
+
+  @impl GenServer
+  def handle_info({:enchant_item, item_guid, spell, enchantment_id, duration_ms}, {socket, state}) do
+    state = Enchantments.apply_temporary(state, item_guid, spell, enchantment_id, duration_ms)
+    {:noreply, {socket, state}, socket.read_timeout}
+  rescue
+    error ->
+      Logger.error("enchant_item crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:noreply, {socket, state}, socket.read_timeout}
+  end
+
+  @impl GenServer
+  def handle_info({:expire_item_enchantment, item_guid, token}, {socket, state}) do
+    state = Enchantments.expire(state, item_guid, token)
+    {:noreply, {socket, state}, socket.read_timeout}
+  rescue
+    error ->
+      Logger.error("expire_item_enchantment crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
       {:noreply, {socket, state}, socket.read_timeout}
   end
 

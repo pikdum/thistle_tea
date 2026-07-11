@@ -417,9 +417,12 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp effect_type(40), do: :dual_wield
   defp effect_type(60), do: :proficiency
   defp effect_type(50), do: :trans_door
+  defp effect_type(53), do: :enchant_item
+  defp effect_type(54), do: :enchant_item_temporary
   defp effect_type(62), do: :power_burn
   defp effect_type(68), do: :interrupt_cast
   defp effect_type(96), do: :charge
+  defp effect_type(92), do: :enchant_held_item
   defp effect_type(17), do: :weapon_damage_noschool
   defp effect_type(27), do: :persistent_area_aura
   defp effect_type(58), do: :weapon_damage
@@ -441,6 +444,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp aura_type(12), do: :mod_stun
   defp aura_type(14), do: :mod_damage_taken
   defp aura_type(29), do: :mod_stat
+  defp aura_type(30), do: :mod_skill
   defp aura_type(13), do: :mod_damage_done
   defp aura_type(15), do: :damage_shield
   defp aura_type(22), do: :mod_resistance

@@ -112,7 +112,7 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
   def equip(%Player{} = player, index, %Item{} = item) when is_integer(index) do
     player
     |> Map.put(Map.fetch!(@field_by_slot, index), item.object.guid)
-    |> Map.put(visible_entry_field(index), item.object.entry)
+    |> Map.put(visible_entry_field(index), Item.visible_value(item))
   end
 
   def equipped_templates(%Player{} = player, get_item) do
@@ -764,12 +764,14 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
   defp item_guid_or_zero(nil), do: 0
   defp item_guid_or_zero(%Item{object: %Object{guid: guid}}), do: guid
 
-  defp put_visible_entry(%Player{} = player, slot, item) do
+  def sync_visible_item(%Player{} = player, slot, item) do
     if equipment_slot?(slot) do
-      entry = if item, do: item.object.entry, else: 0
-      Map.put(player, visible_entry_field(slot), entry)
+      value = if item, do: Item.visible_value(item), else: 0
+      Map.put(player, visible_entry_field(slot), value)
     else
       player
     end
   end
+
+  defp put_visible_entry(player, slot, item), do: sync_visible_item(player, slot, item)
 end
