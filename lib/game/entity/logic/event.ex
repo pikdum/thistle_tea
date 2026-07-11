@@ -172,6 +172,10 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
     %__MODULE__{type: :spell_cooldown, source_guid: source_guid, spell_id: spell_id, duration_ms: cooldown_ms}
   end
 
+  def cooldown_event(source_guid, spell_id) when is_integer(source_guid) and is_integer(spell_id) do
+    %__MODULE__{type: :cooldown_event, source_guid: source_guid, spell_id: spell_id}
+  end
+
   def stand_state(stand_state) when is_integer(stand_state) do
     %__MODULE__{type: :stand_state, stand_state: stand_state}
   end

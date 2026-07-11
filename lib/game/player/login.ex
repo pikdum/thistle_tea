@@ -25,6 +25,7 @@ defmodule ThistleTea.Game.Player.Login do
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.BinaryUtils
   alias ThistleTea.Game.Network.Message
+  alias ThistleTea.Game.Network.Message.SmsgInitialSpells.CooldownSpell
   alias ThistleTea.Game.Network.Message.SmsgInitialSpells.InitialSpell
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.Party
@@ -33,6 +34,7 @@ defmodule ThistleTea.Game.Player.Login do
   alias ThistleTea.Game.Player.Rest, as: PlayerRest
   alias ThistleTea.Game.Player.Spells, as: PlayerSpells
   alias ThistleTea.Game.Player.Stats, as: PlayerStats
+  alias ThistleTea.Game.Spell.Cooldowns
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.ItemStore
@@ -155,10 +157,23 @@ defmodule ThistleTea.Game.Player.Login do
         %InitialSpell{spell_id: spell_id, unknown1: 0}
       end)
 
+    cooldowns =
+      c
+      |> Cooldowns.initial(c.internal.spellbook, Time.now())
+      |> Enum.map(fn cooldown ->
+        %CooldownSpell{
+          spell_id: cooldown.spell_id,
+          item_id: 0,
+          spell_category: cooldown.category,
+          cooldown: cooldown.spell_ms,
+          category_cooldown: cooldown.category_ms
+        }
+      end)
+
     Network.send_packet(%Message.SmsgInitialSpells{
       unknown1: 0,
       initial_spells: spells,
-      cooldowns: []
+      cooldowns: cooldowns
     })
 
     Network.send_packet(%Message.SmsgActionButtons{

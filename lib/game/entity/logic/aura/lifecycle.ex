@@ -17,6 +17,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Lifecycle do
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.Cooldowns
 
   @aura_interrupt_damage 0x02
   @aura_interrupt_cast 0x01
@@ -119,6 +120,8 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Lifecycle do
   def break_on_damage(entity, _now), do: entity
 
   defp remove_and_sync(entity, kept, now) do
+    removed = entity.unit.auras -- kept
+    {entity, cooldown_events} = Cooldowns.activate_on_event(entity, removed, now)
     unit = UnitSync.sync_unit(%{entity.unit | auras: kept})
 
     {entity, events} =
@@ -126,7 +129,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Lifecycle do
       |> StealthSync.sync()
       |> MovementSync.sync_movement_state(now)
 
-    {Core.mark_broadcast_update(entity), events}
+    {Core.mark_broadcast_update(entity), cooldown_events ++ events}
   end
 
   defp cancelable?(%Holder{negative?: true}), do: false

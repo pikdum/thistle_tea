@@ -170,6 +170,11 @@ defmodule ThistleTea.Game.World.Loader.SpellVmangosTest do
       assert Spell.attribute?(SpellLoader.load(1776), :target_facing_caster)
     end
 
+    test "stealth and cold blood start cooldowns when their auras end" do
+      assert Spell.attribute?(SpellLoader.load(1784), :cooldown_on_event)
+      assert Spell.attribute?(SpellLoader.load(14_177), :cooldown_on_event)
+    end
+
     test "vanish triggers stealth and movement-impairing purge spells" do
       vanish = SpellLoader.load(1856)
 

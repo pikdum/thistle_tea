@@ -521,6 +521,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   @hidden_in_combat_log 0x00000100
   @aura_is_debuff 0x04000000
   @cant_cancel 0x80000000
+  @cooldown_on_event 0x02000000
   @channeled_ex_1 0x00000004
   @channeled_ex_2 0x00000040
   @discount_power_on_miss_ex_1 0x08000000
@@ -539,6 +540,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
       |> add_if(attrs, @hidden_in_combat_log, :hidden_in_combat_log)
       |> add_if(attrs, @aura_is_debuff, :negative)
       |> add_if(attrs, @cant_cancel, :cant_cancel)
+      |> add_if(attrs, @cooldown_on_event, :cooldown_on_event)
 
     base = if attrs == 0x150010, do: MapSet.put(base, :target_facing_caster), else: base
 

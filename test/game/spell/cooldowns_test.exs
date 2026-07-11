@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.Spell.CooldownsTest do
   use ExUnit.Case, async: true
 
+  alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Mob
@@ -63,6 +64,43 @@ defmodule ThistleTea.Game.Spell.CooldownsTest do
         |> Cooldowns.start(second, 5_000)
 
       assert entity.internal.cooldowns == %{2 => 6_000}
+    end
+
+    test "event cooldown waits for aura removal before starting its timer" do
+      spell = %Spell{
+        id: 1784,
+        category: 38,
+        category_recovery_time_ms: 10_000,
+        attributes: MapSet.new([:cooldown_on_event])
+      }
+
+      entity = Cooldowns.start(entity(), spell, 1_000)
+
+      assert entity.internal.cooldowns == %{{:category, 38} => {:on_event, 1784}, 1784 => {:on_event, 1784}}
+      assert Cooldowns.on_cooldown?(entity, spell, 50_000)
+      assert entity.internal.events == []
+
+      holder = %Holder{spell: spell}
+      {entity, [event]} = Cooldowns.activate_on_event(entity, [holder], 5_000)
+
+      assert event.type == :cooldown_event
+      assert event.spell_id == 1784
+      assert Cooldowns.ready_at(entity, spell) == 15_000
+      assert Cooldowns.on_cooldown?(entity, spell, 14_999)
+      refute Cooldowns.on_cooldown?(entity, spell, 15_000)
+    end
+  end
+
+  describe "initial/3" do
+    test "restores active cooldowns but not pending event cooldowns" do
+      spell = %Spell{id: 14_177, recovery_time_ms: 180_000}
+      entity = Cooldowns.start(entity(), spell, 1_000)
+
+      assert [%{spell_id: 14_177, spell_ms: 179_000}] = Cooldowns.initial(entity, %{14_177 => spell}, 2_000)
+
+      pending = %{spell | attributes: MapSet.new([:cooldown_on_event])}
+      entity = Cooldowns.start(entity(), pending, 2_000)
+      assert Cooldowns.initial(entity, %{14_177 => pending}, 3_000) == []
     end
   end
 
