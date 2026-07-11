@@ -59,8 +59,6 @@ defmodule ThistleTea.Game.World.Loader.SpellVmangosTest do
   describe "spell threat" do
     alias SpellThreat, as: SpellThreatLoader
 
-    @describetag :vmangos_db
-
     test "heroic strike carries flat bonus threat" do
       assert %{threat: 20.0, multiplier: 1.0} = SpellThreatLoader.get(78)
     end

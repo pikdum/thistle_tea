@@ -5,7 +5,6 @@ defmodule ThistleTea.Game.World.Loader.ItemEnchantmentIntegrationTest do
   alias ThistleTea.Game.World.Loader.ItemEnchantment
 
   @moduletag :dbc_db
-  @moduletag :vmangos_db
 
   setup do
     ItemEnchantment.load_all()

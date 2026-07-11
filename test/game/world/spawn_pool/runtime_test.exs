@@ -10,7 +10,6 @@ defmodule ThistleTea.Game.World.SpawnPool.RuntimeTest do
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.SpawnPool
 
-  @moduletag :vmangos_db
   @moduletag :dbc_db
 
   describe "real pool lifecycle" do

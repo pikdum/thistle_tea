@@ -7,7 +7,6 @@ defmodule ThistleTea.Game.World.Loader.FishingIntegrationTest do
   alias ThistleTea.Game.World.Loader.Trainer, as: TrainerLoader
 
   @moduletag :dbc_db
-  @moduletag :vmangos_db
 
   setup do
     Fishing.load_all()

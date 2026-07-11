@@ -7,6 +7,8 @@ defmodule ThistleTea.Game.Entity.Server.GameObject.FishingTest do
   alias ThistleTea.Game.Entity.Logic.Loot
   alias ThistleTea.Game.Entity.Server.GameObject.Fishing
 
+  @moduletag :vmangos_db
+
   describe "use/3" do
     test "only the owner can use a bobber" do
       state = bobber(%FishingState{owner_guid: 42, ready?: true})
