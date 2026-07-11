@@ -83,7 +83,8 @@ defmodule ThistleTea.Game.Player.Login do
         attacker_count: 0,
         alive?: Death.alive?(c),
         ghost?: Death.ghost?(c),
-        health_pct: Core.health_pct(c)
+        health_pct: Core.health_pct(c),
+        shapeshift_form: c.unit.shapeshift_form
       }
       |> Map.merge(FactionLoader.metadata(c.unit.faction_template))
     )

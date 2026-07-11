@@ -67,7 +67,14 @@ defmodule ThistleTea.Game.World.AggroProbe do
   end
 
   defp probe_player(player_guid) do
-    case Metadata.query(player_guid, [:alive?, :faction_template, :faction_can_have_reputation?, :unit_flags, :level]) do
+    case Metadata.query(player_guid, [
+           :alive?,
+           :faction_template,
+           :faction_can_have_reputation?,
+           :unit_flags,
+           :level,
+           :shapeshift_form
+         ]) do
       %{alive?: true} = player -> player
       _ -> nil
     end
@@ -85,8 +92,12 @@ defmodule ThistleTea.Game.World.AggroProbe do
        when is_integer(level) and is_integer(player_level) do
     Hostility.can_initiate_attack?(mob) and
       Hostility.valid_hostile_target?(mob, player) and
-      distance <= MobBT.aggro_radius_for(MobBT.detection_range(mob), level, player_level)
+      distance <=
+        stealth_adjusted_radius(player, MobBT.aggro_radius_for(MobBT.detection_range(mob), level, player_level))
   end
 
   defp eligible?(_mob, _player, _distance), do: false
+
+  defp stealth_adjusted_radius(%{shapeshift_form: 30}, radius), do: min(radius, 5.0)
+  defp stealth_adjusted_radius(_player, radius), do: radius
 end

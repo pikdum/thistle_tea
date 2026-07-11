@@ -100,6 +100,31 @@ defmodule ThistleTea.Game.Entity.Logic.Threat do
 
   def tracking?(_entity, _guid), do: false
 
+  def remove(%Mob{internal: %Internal{threat: table} = internal} = entity, guid)
+      when is_map(table) and is_integer(guid) do
+    if Map.has_key?(table, guid) do
+      %{entity | internal: %{internal | threat: Map.delete(table, guid)}}
+      |> Event.enqueue(Event.threat_ref_lost(guid))
+    else
+      entity
+    end
+  end
+
+  def remove(entity, _guid), do: entity
+
+  def modify(%Mob{internal: %Internal{threat: table} = internal} = entity, guid, amount)
+      when is_map(table) and is_integer(guid) and is_number(amount) do
+    case table do
+      %{^guid => current} ->
+        %{entity | internal: %{internal | threat: Map.put(table, guid, max(current + amount, 0.0))}}
+
+      _ ->
+        entity
+    end
+  end
+
+  def modify(entity, _guid, _amount), do: entity
+
   def entries(%Mob{internal: %Internal{threat: table}}) when is_map(table) do
     Enum.sort_by(table, fn {_guid, threat} -> threat end, :desc)
   end

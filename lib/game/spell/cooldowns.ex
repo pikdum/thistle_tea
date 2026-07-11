@@ -61,6 +61,12 @@ defmodule ThistleTea.Game.Spell.Cooldowns do
 
   def ready_at(_entity, _spell), do: nil
 
+  def reset(%{internal: internal} = entity, keys) when is_list(keys) do
+    %{entity | internal: %{internal | cooldowns: Map.drop(stored(internal), keys)}}
+  end
+
+  def reset(entity, _keys), do: entity
+
   def client_cooldown_ms(%Spell{recovery_time_ms: recovery, category_recovery_time_ms: category_recovery}) do
     max(positive(recovery), positive(category_recovery))
   end

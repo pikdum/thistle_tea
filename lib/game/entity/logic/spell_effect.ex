@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Death
   alias ThistleTea.Game.Entity.Logic.Event
+  alias ThistleTea.Game.Entity.Logic.PlayerCombat
   alias ThistleTea.Game.Entity.Logic.Reactive
   alias ThistleTea.Game.Entity.Logic.Resources
   alias ThistleTea.Game.Entity.Logic.SpellResist
@@ -15,6 +16,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   alias ThistleTea.Game.Math
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
+  alias ThistleTea.Game.Spell.Cooldowns
   alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.Spell.Scripts
 
@@ -170,6 +172,19 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
     end
   end
 
+  defp apply_effect(state, %CastContext{}, _spell, %Effect{type: :add_combo_points}, _now), do: {state, []}
+
+  defp apply_effect(
+         %{object: %{guid: guid}} = state,
+         %CastContext{caster_guid: guid},
+         _spell,
+         %Effect{type: :clear_threat},
+         _now
+       ) do
+    {state, mob_guids} = PlayerCombat.vanish(state)
+    {state, Enum.map(mob_guids, &Event.drop_threat/1)}
+  end
+
   defp apply_effect(state, %CastContext{} = context, spell, %Effect{type: type} = effect, now)
        when type in [:weapon_damage, :weapon_damage_noschool, :normalized_weapon_damage, :weapon_percent_damage] do
     melee_ability_damage(state, context, spell, weapon_ability_damage(context, effect), now)
@@ -177,6 +192,10 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
 
   defp apply_effect(state, %CastContext{} = context, _spell, %Effect{type: :attack_me}, _now) do
     {Threat.taunt(state, context.caster_guid), []}
+  end
+
+  defp apply_effect(state, %CastContext{} = context, _spell, %Effect{type: :modify_threat} = effect, _now) do
+    {Threat.modify(state, context.caster_guid, Effect.damage_roll(effect)), []}
   end
 
   defp apply_effect(state, %CastContext{} = context, spell, %Effect{type: :heal} = effect, _now) do
@@ -225,6 +244,9 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
           )
 
         {state, [event]}
+
+      :preparation ->
+        {Cooldowns.reset(state, [14_177, {:category, 39}, {:category, 44}, {:category, 66}]), []}
 
       _unscripted ->
         {state, []}
@@ -361,7 +383,8 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
 
   defp apply_damage_effect(state, %CastContext{} = context, spell, %Effect{} = effect, now, opts \\ [])
        when is_integer(now) do
-    rolled = Effect.damage_roll(effect) + damage_bonus(context, spell, opts)
+    base = Scripts.finisher_amount(spell, Effect.damage_roll(effect), context.combo_points || 0)
+    rolled = base + damage_bonus(context, spell, opts)
     rolled = trunc(rolled * (context.damage_done_multiplier || 1.0))
 
     damage = max(rolled + Aura.flat_modifier(state, :mod_damage_taken, Spell.school_mask(spell)), 0)
@@ -429,7 +452,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   defp school_atom(%Spell{} = spell), do: Enum.at(@schools, Spell.school_index(spell), :physical)
 
   defp school_damage_roll(%CastContext{} = context, spell, %Effect{} = effect) do
-    roll = Effect.damage_roll(effect)
+    roll = Scripts.finisher_amount(spell, Effect.damage_roll(effect), context.combo_points || 0)
 
     if Scripts.ap_percent_damage?(spell) do
       trunc(roll * (context.attack_power || 0) / 100)

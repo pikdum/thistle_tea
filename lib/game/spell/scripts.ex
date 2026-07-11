@@ -44,14 +44,40 @@ defmodule ThistleTea.Game.Spell.Scripts do
   @execute_damage_spell 20_647
   @bloodthirst_ranks [23_881, 23_892, 23_893, 23_894]
   @last_stand 12_975
+  @preparation 14_185
   @last_stand_health_buff 12_976
   @last_stand_health_fraction 0.3
+  @rogue_finishers [
+    408,
+    8643,
+    6760,
+    6761,
+    6762,
+    8623,
+    8624,
+    11_299,
+    11_300,
+    8647,
+    8649,
+    8650,
+    11_197,
+    11_198,
+    1943,
+    8639,
+    8640,
+    11_273,
+    11_274,
+    11_275,
+    5171,
+    6774
+  ]
 
-  def requires_combo_target?(%Spell{id: id}), do: id in @overpower_ranks
+  def requires_combo_target?(%Spell{id: id}), do: id in @overpower_ranks or id in @rogue_finishers
   def requires_combo_target?(_spell), do: false
 
   def dummy_effect(%Spell{id: id}) when id in @execute_ranks, do: :execute
   def dummy_effect(%Spell{id: @last_stand}), do: :last_stand
+  def dummy_effect(%Spell{id: @preparation}), do: :preparation
   def dummy_effect(_spell), do: nil
 
   def execute_damage_spell_id, do: @execute_damage_spell
@@ -60,6 +86,20 @@ defmodule ThistleTea.Game.Spell.Scripts do
 
   def ap_percent_damage?(%Spell{id: id}), do: id in @bloodthirst_ranks
   def ap_percent_damage?(_spell), do: false
+
+  def finisher?(%Spell{id: id}), do: id in @rogue_finishers
+  def finisher?(_spell), do: false
+
+  def finisher_duration_ms(%Spell{name: "Slice and Dice"}, points), do: 6_000 + points * 3_000
+  def finisher_duration_ms(%Spell{name: "Rupture"}, points), do: 4_000 + points * 2_000
+  def finisher_duration_ms(%Spell{name: "Kidney Shot"}, points), do: points * 1_000
+  def finisher_duration_ms(_spell, _points), do: nil
+
+  def finisher_amount(%Spell{name: name}, amount, points) when name in ["Eviscerate", "Expose Armor", "Rupture"] do
+    amount * points
+  end
+
+  def finisher_amount(_spell, amount, _points), do: amount
 
   def aura_amount_override(%Spell{id: @last_stand_health_buff}, %{unit: %{max_health: max_health}})
       when is_integer(max_health) do

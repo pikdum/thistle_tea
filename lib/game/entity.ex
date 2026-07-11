@@ -64,6 +64,10 @@ defmodule ThistleTea.Game.Entity do
     dispatch_cast(entity, {:threat_ref_lost, mob_guid})
   end
 
+  def drop_threat(entity, source_guid) do
+    dispatch_cast(entity, {:drop_threat, source_guid})
+  end
+
   def use_game_object(entity, user_guid, user_level) do
     dispatch_cast(entity, {:gameobject_use, user_guid, user_level})
   end

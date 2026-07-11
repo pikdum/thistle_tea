@@ -528,7 +528,8 @@ defmodule ThistleTea.Game.Network.Server do
       alive?: Death.alive?(character),
       ghost?: Death.ghost?(character),
       health_pct: Core.health_pct(character),
-      unit_flags: character.unit.flags
+      unit_flags: character.unit.flags,
+      shapeshift_form: character.unit.shapeshift_form
     })
 
     PartyNotifier.broadcast_stats(state.guid, character)

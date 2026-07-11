@@ -255,6 +255,10 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
     %__MODULE__{type: :threat_ref_lost, target_guid: target_guid}
   end
 
+  def drop_threat(target_guid) when is_integer(target_guid) do
+    %__MODULE__{type: :drop_threat, target_guid: target_guid}
+  end
+
   def attacker_lost(target_guid) when is_integer(target_guid) do
     %__MODULE__{type: :attacker_lost, target_guid: target_guid}
   end

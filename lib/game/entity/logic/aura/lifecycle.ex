@@ -17,11 +17,13 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Lifecycle do
   alias ThistleTea.Game.Spell
 
   @aura_interrupt_damage 0x02
+  @aura_interrupt_cast 0x01
   @aura_interrupt_move 0x08
   @aura_interrupt_turning 0x10
   @aura_interrupt_not_seated 0x40000
 
   def interrupt_mask(:move), do: @aura_interrupt_move ||| @aura_interrupt_turning ||| @aura_interrupt_not_seated
+  def interrupt_mask(:cast), do: @aura_interrupt_cast
   def interrupt_mask(:turn), do: @aura_interrupt_turning
   def interrupt_mask(:stand), do: @aura_interrupt_not_seated
 

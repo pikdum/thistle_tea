@@ -22,6 +22,7 @@ defmodule ThistleTea.Game.Spell.CastValidation do
 
   def validate(caster, %Spell{} = spell, %Targets{} = targets, target_info, now, opts \\ []) do
     with :ok <- check_caster_alive(caster),
+         :ok <- check_combat_state(caster, spell),
          :ok <- check_stance(caster, spell),
          :ok <- check_caster_aura_state(caster, spell, now),
          :ok <- check_combo_target(caster, spell, targets, now),
@@ -41,6 +42,9 @@ defmodule ThistleTea.Game.Spell.CastValidation do
   defp check_caster_alive(caster) do
     if Core.dead?(caster), do: {:error, :caster_dead}, else: :ok
   end
+
+  defp check_combat_state(%{internal: %{in_combat: true}}, %Spell{name: "Stealth"}), do: {:error, :affecting_combat}
+  defp check_combat_state(_caster, _spell), do: :ok
 
   defp check_stance(%{unit: unit}, %Spell{stances: stances} = spell) when is_integer(stances) and stances > 0 do
     if Spell.usable_in_stance?(spell, unit.shapeshift_form || 0) do

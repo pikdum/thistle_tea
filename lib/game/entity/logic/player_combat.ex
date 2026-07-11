@@ -33,6 +33,18 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombat do
 
   def mark_initiated(character, now), do: mark_attacked(character, now)
 
+  def vanish(%Character{internal: %Internal{} = internal} = character) do
+    refs = internal.threat_refs || MapSet.new()
+
+    character =
+      %{character | internal: %{internal | threat_refs: MapSet.new(), in_combat: false, last_hostile_time: nil}}
+      |> CombatLogic.sync_combat_flag()
+
+    {character, MapSet.to_list(refs)}
+  end
+
+  def vanish(character), do: {character, []}
+
   def gain_threat_ref(%Character{internal: %Internal{} = internal} = character, mob_guid)
       when is_integer(mob_guid) and mob_guid > 0 do
     refs = MapSet.put(internal.threat_refs || MapSet.new(), mob_guid)

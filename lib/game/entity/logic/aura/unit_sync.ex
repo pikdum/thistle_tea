@@ -53,11 +53,12 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.UnitSync do
   defp sync_transform(unit), do: unit
 
   defp sync_shapeshift(%Unit{auras: holders} = unit) when is_list(holders) do
+    auras = Enum.flat_map(holders, fn %Holder{auras: auras} -> auras end)
+
     form =
-      holders
-      |> Enum.flat_map(fn %Holder{auras: auras} -> auras end)
-      |> Enum.find_value(0, fn
+      Enum.find_value(auras, 0, fn
         %Aura{type: :mod_shapeshift, misc_value: misc} when is_integer(misc) and misc > 0 -> misc
+        %Aura{type: :mod_stealth} -> 30
         _ -> nil
       end)
 

@@ -166,6 +166,12 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   end
 
   @impl GenServer
+  def handle_cast({:drop_threat, source_guid}, %Mob{} = state) do
+    state = state |> Threat.remove(source_guid) |> wake_ai_tick()
+    {:noreply, state}
+  end
+
+  @impl GenServer
   def handle_cast({:loot_roll_vote, voter_guid, slot, vote}, %Mob{} = state) do
     {:noreply, Corpse.roll_vote(state, voter_guid, slot, vote)}
   end

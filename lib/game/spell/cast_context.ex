@@ -41,6 +41,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
     :attack_skill,
     :melee_crit_chance,
     :caster_power,
+    :combo_points,
     :spell_threat,
     spell_damage_bonus: %{},
     healing_bonus: 0,
@@ -65,6 +66,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
       damage_done_multiplier: Aura.percent_multiplier(caster, :mod_damage_percent_done, Spell.school_mask(spell))
     }
     |> put_melee_snapshot(caster, spell)
+    |> put_combo_points(caster)
   end
 
   def from_caster(%{object: %{guid: guid}} = caster, spell, target_guid) when is_integer(guid) do
@@ -77,6 +79,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
       spell: spell
     }
     |> put_melee_snapshot(caster, spell)
+    |> put_combo_points(caster)
   end
 
   defp caster_type(%Character{}), do: :player
@@ -111,6 +114,12 @@ defmodule ThistleTea.Game.Spell.CastContext do
   end
 
   defp put_melee_snapshot(context, _caster, _spell), do: context
+
+  defp put_combo_points(%__MODULE__{} = context, %Character{player: player}) do
+    %{context | combo_points: max(player.combo_points || 0, 0)}
+  end
+
+  defp put_combo_points(context, _caster), do: context
 
   defp melee_snapshot?(%Spell{effects: effects} = spell) do
     Spell.melee_ability?(spell) or
@@ -150,8 +159,12 @@ defmodule ThistleTea.Game.Spell.CastContext do
   defp attack_skill(_caster), do: nil
 
   defp melee_crit_chance(%Character{unit: unit} = caster) do
-    CombatRatings.melee_crit_chance(unit.class, unit.level || 1, unit.agility || 0) +
-      Aura.flat_amount(caster, :mod_crit_percent)
+    if Aura.auras_of_type(caster, :force_crit) == [] do
+      CombatRatings.melee_crit_chance(unit.class, unit.level || 1, unit.agility || 0) +
+        Aura.flat_amount(caster, :mod_crit_percent)
+    else
+      100.0
+    end
   end
 
   defp melee_crit_chance(_caster), do: nil

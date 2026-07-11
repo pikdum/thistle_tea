@@ -88,6 +88,13 @@ defmodule ThistleTea.Game.Entity.Logic.ThreatTest do
     end
   end
 
+  describe "modify/3" do
+    test "feint-style reductions cannot make threat negative" do
+      entity = mob(threat: %{@player_a => 100.0}) |> Threat.modify(@player_a, -150)
+      assert entity.internal.threat == %{@player_a => 0.0}
+    end
+  end
+
   describe "wipe/1 and tracking?/2 and entries/1" do
     test "wipe empties the table" do
       entity = mob(threat: %{@player_a => 10.0}) |> Threat.wipe()

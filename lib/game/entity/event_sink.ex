@@ -495,6 +495,13 @@ defmodule ThistleTea.Game.Entity.EventSink do
     entity
   end
 
+  def emit(%Character{object: %{guid: guid}} = entity, %Event{type: :drop_threat, target_guid: mob_guid}) do
+    Entity.drop_threat(mob_guid, guid)
+    entity
+  end
+
+  def emit(entity, %Event{type: :drop_threat}), do: entity
+
   def emit(entity, %Event{type: :attacker_lost, target_guid: target_guid}) do
     Metadata.decrement(target_guid, :attacker_count, 0)
     entity

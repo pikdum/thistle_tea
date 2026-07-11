@@ -41,6 +41,20 @@ defmodule ThistleTea.Game.Entity.Logic.Reactive do
 
   def mark_dodging_target(entity, _victim_guid, _now), do: entity
 
+  def add_combo_points(%Character{player: player, internal: %Internal{} = internal} = entity, target_guid, amount)
+      when is_integer(target_guid) and target_guid > 0 and is_integer(amount) and amount > 0 do
+    current = if player.field_combo_target == target_guid, do: player.combo_points || 0, else: 0
+
+    %{
+      entity
+      | player: %{player | field_combo_target: target_guid, combo_points: min(current + amount, 5)},
+        internal: %{internal | combo_expires_at: nil}
+    }
+    |> Core.mark_broadcast_update()
+  end
+
+  def add_combo_points(entity, _target_guid, _amount), do: entity
+
   def tick(entity, now) when is_integer(now) do
     entity
     |> expire_combo(now)
@@ -71,7 +85,7 @@ defmodule ThistleTea.Game.Entity.Logic.Reactive do
   def combo_active?(%Character{player: player, internal: %Internal{combo_expires_at: expires_at}}, target_guid, now) do
     is_integer(player.combo_points) and player.combo_points > 0 and
       player.field_combo_target == target_guid and
-      is_integer(expires_at) and now < expires_at
+      (is_nil(expires_at) or now < expires_at)
   end
 
   def combo_active?(_entity, _target_guid, _now), do: false

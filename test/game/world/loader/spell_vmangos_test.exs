@@ -142,4 +142,38 @@ defmodule ThistleTea.Game.World.Loader.SpellVmangosTest do
       refute 7386 in known_ids
     end
   end
+
+  describe "rogue spell parsing" do
+    test "combo builders and stealth use semantic effect names" do
+      sinister_strike = SpellLoader.load(1757)
+      stealth = SpellLoader.load(1784)
+
+      assert Enum.any?(sinister_strike.effects, &(&1.type == :add_combo_points))
+      assert Enum.any?(stealth.effects, &(&1.aura == :mod_stealth))
+      assert stealth.stances == 0
+    end
+
+    test "feint, cold blood, and vanish load their rogue mechanics" do
+      assert Enum.any?(SpellLoader.load(1966).effects, &(&1.type == :modify_threat))
+      assert Enum.any?(SpellLoader.load(14_177).effects, &(&1.aura == :force_crit))
+      assert Enum.any?(SpellLoader.load(1856).effects, &(&1.type == :clear_threat))
+    end
+
+    test "vanish triggers stealth and movement-impairing purge spells" do
+      vanish = SpellLoader.load(1856)
+
+      assert Enum.any?(vanish.effects, &(&1.type == :trigger_spell and &1.trigger_spell_id == 11_327))
+      assert Enum.any?(vanish.effects, &(&1.type == :trigger_spell and &1.trigger_spell_id == 18_461))
+    end
+
+    test "debug rogue spells include active talents but exclude passives" do
+      spell_ids = ClassSpell.trainable_spell_ids(4, 60)
+
+      assert 13_750 in spell_ids
+      assert 13_877 in spell_ids
+      assert 14_177 in spell_ids
+      assert 14_185 in spell_ids
+      refute 14_056 in spell_ids
+    end
+  end
 end

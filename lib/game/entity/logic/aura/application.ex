@@ -51,7 +51,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
   @stand_state_sit 1
 
   def apply_spell(entity, %CastContext{} = context, %Spell{} = spell, now) when is_integer(now) do
-    case build_auras(entity, spell, now) do
+    case build_auras(entity, context, spell, now) do
       [] ->
         {entity, []}
 
@@ -63,7 +63,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
           caster_guid: context.caster_guid,
           caster_level: context.caster_level,
           applied_at: now,
-          expires_at: expires_at(now, spell.duration_ms),
+          expires_at: expires_at(now, effective_duration(spell, context)),
           charges: holder_charges(spell),
           auras: auras,
           negative?: negative?(spell, auras, context.caster_guid, target_guid)
@@ -305,20 +305,36 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
   defp expires_at(_now, -1), do: -1
   defp expires_at(now, duration_ms) when is_integer(duration_ms), do: now + duration_ms
 
-  defp build_auras(entity, %Spell{} = spell, now) do
+  defp effective_duration(%Spell{} = spell, %CastContext{combo_points: points})
+       when is_integer(points) and points > 0 do
+    Scripts.finisher_duration_ms(spell, points) || spell.duration_ms
+  end
+
+  defp effective_duration(%Spell{duration_ms: duration_ms}, _context), do: duration_ms
+
+  defp build_auras(entity, %CastContext{} = context, %Spell{} = spell, now) do
     amount_override = Scripts.aura_amount_override(spell, entity)
 
     spell
     |> Spell.aura_effects()
     |> Enum.reject(&channel_ticked?(spell, &1))
     |> Enum.reduce([], fn effect, acc ->
-      case build_aura(effect, amount_override, now) do
+      case build_aura(effect, finisher_amount(spell, context, amount_override), now) do
         nil -> acc
         aura -> [aura | acc]
       end
     end)
     |> Enum.reverse()
   end
+
+  defp finisher_amount(_spell, _context, amount) when is_integer(amount), do: amount
+
+  defp finisher_amount(%Spell{} = spell, %CastContext{combo_points: points}, nil)
+       when is_integer(points) and points > 0 do
+    {:finisher, spell, points}
+  end
+
+  defp finisher_amount(_spell, _context, amount), do: amount
 
   defp channel_ticked?(%Spell{} = spell, %Effect{aura: :periodic_trigger_spell}) do
     Spell.attribute?(spell, :channeled)
@@ -334,7 +350,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
     %Aura{
       index: effect.index,
       type: effect.aura,
-      amount: amount_override || Effect.damage_roll(effect),
+      amount: aura_amount(effect, amount_override),
       misc_value: effect.misc_value,
       multiple_value: effect.multiple_value,
       amplitude_ms: amplitude_ms,
@@ -342,6 +358,12 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
       trigger_spell_id: effect.trigger_spell_id
     }
   end
+
+  defp aura_amount(%Effect{} = effect, {:finisher, spell, points}) do
+    Scripts.finisher_amount(spell, Effect.damage_roll(effect), points)
+  end
+
+  defp aura_amount(%Effect{} = effect, amount_override), do: amount_override || Effect.damage_roll(effect)
 
   defp effective_amplitude(%Effect{aura: :mod_power_regen_percent, amplitude_ms: amp}) do
     if is_integer(amp) and amp > 0, do: amp, else: @percent_regen_tick_ms
