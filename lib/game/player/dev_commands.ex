@@ -38,6 +38,7 @@ defmodule ThistleTea.Game.Player.DevCommands do
   alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader
   alias ThistleTea.Game.World.Loader.Skill, as: SkillLoader
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.System.GameEvent
 
   require Logger
 
@@ -74,6 +75,7 @@ defmodule ThistleTea.Game.Player.DevCommands do
       ".debug professions - set known professions to 300/300",
       ".debug skills - max out known skills for your level",
       ".debug spells - learn class trainer spells up to your level",
+      ".debug events - show active events and the next scheduled change",
       ".character level <level> - set player level",
       ".die - kill your character",
       ".go xyz <x> <y> <z> [map] - teleport",
@@ -179,6 +181,15 @@ defmodule ThistleTea.Game.Player.DevCommands do
     state
     |> debug_spell_ids()
     |> then(&learn_spells(state, &1, "Already know all debug spells."))
+    |> handled()
+  end
+
+  def run(state, ".debug events" <> _) do
+    %{active: active, next: next} = GameEvent.status()
+
+    state
+    |> system_message("Active events: #{event_labels(active)}")
+    |> system_message(next_event_message(next))
     |> handled()
   end
 
@@ -628,6 +639,26 @@ defmodule ThistleTea.Game.Player.DevCommands do
   end
 
   defp debug_spell_ids(_state), do: []
+
+  defp next_event_message(nil), do: "No more scheduled event changes."
+
+  defp next_event_message(%{at: at, starts: starts, stops: stops}) do
+    changes =
+      [event_change("starts", starts), event_change("stops", stops)]
+      |> Enum.reject(&is_nil/1)
+      |> Enum.join("; ")
+
+    "Next event change at #{Calendar.strftime(at, "%Y-%m-%d %H:%M:%S UTC")}: #{changes}"
+  end
+
+  defp event_change(_action, []), do: nil
+  defp event_change(action, entries), do: "#{action} #{event_labels(entries)}"
+
+  defp event_labels([]), do: "none"
+
+  defp event_labels(entries) do
+    Enum.map_join(entries, ", ", fn entry -> "#{entry.id}: #{entry.description}" end)
+  end
 
   defp add_random_equipment(%{character: %Character{unit: unit} = character} = state) do
     existing_item_guids = owned_item_guids(character)

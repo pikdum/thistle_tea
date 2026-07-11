@@ -81,7 +81,6 @@ defmodule ThistleTea.Application do
       [
         {Phoenix.PubSub, name: ThistleTea.PubSub},
         ThistleTea.Telemetry,
-        GameEventSystem,
         PartySystem,
         {Group, name: Groups, log: false},
         EntityRegistry,
@@ -99,7 +98,8 @@ defmodule ThistleTea.Application do
         {Registry, keys: :unique, name: SpawnPool.Registry},
         SpawnPoolCatalog,
         {DynamicSupervisor, strategy: :one_for_one, name: SpawnPool.Supervisor},
-        CellActivator
+        CellActivator,
+        {GameEventSystem, load_schedule: !test}
       ]
       |> Enum.filter(& &1)
 
