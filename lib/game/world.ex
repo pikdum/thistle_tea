@@ -147,6 +147,20 @@ defmodule ThistleTea.Game.World do
     end
   end
 
+  def start_incarnation(%GameObject{} = entity), do: start_incarnation(entity, GameObjectServer)
+  def start_incarnation(%Mob{} = entity), do: start_incarnation(entity, MobServer)
+
+  defp start_incarnation(entity, server) do
+    case Entity.pid(entity.object.guid) do
+      nil ->
+        child_spec = Supervisor.child_spec({server, entity}, restart: :temporary)
+        DynamicSupervisor.start_child(EntitySupervisor, child_spec)
+
+      pid when is_pid(pid) ->
+        {:error, {:already_started, pid}}
+    end
+  end
+
   def stop_entity(pid) when is_pid(pid) do
     DynamicSupervisor.terminate_child(EntitySupervisor, pid)
   end

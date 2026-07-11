@@ -20,6 +20,7 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.SpawnPool
   alias ThistleTea.Game.World.System.GameEvent
   alias ThistleTea.Game.World.System.Party, as: PartySystem
   alias ThistleTea.Game.World.Visibility
@@ -100,7 +101,10 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
 
   @impl GenServer
   def handle_info({:event_stop, _event}, state) do
-    despawn(state)
+    case SpawnPool.deactivate(state) do
+      :pooled -> {:noreply, state}
+      :unpooled -> despawn(state)
+    end
   end
 
   def handle_info({:event_start, _event}, state) do
@@ -112,7 +116,10 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
   end
 
   def handle_info(:chest_respawn, %GameObject{} = state) do
-    {:noreply, Chest.respawn(state)}
+    case SpawnPool.recycle(state) do
+      :pooled -> {:noreply, state}
+      :unpooled -> {:noreply, Chest.respawn(state)}
+    end
   end
 
   @impl GenServer

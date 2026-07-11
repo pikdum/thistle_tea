@@ -16,6 +16,8 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal.Spawn do
     :respawn_ref,
     :despawn_type,
     :despawn_delay_ms,
+    :pool_group,
+    :pool_member,
     temporary?: false,
     respawn_pending?: false
   ]

@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.World.System.GameEvent do
   use GenServer
 
   alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.World.SpawnPool
   alias ThistleTea.Game.World.System.CellActivator
 
   @events MapSet.new([2])
@@ -45,6 +46,7 @@ defmodule ThistleTea.Game.World.System.GameEvent do
   @impl GenServer
   def handle_call({:set_events, new_events}, _from, %{events: old_events} = state) do
     notify(new_events, old_events)
+    SpawnPool.refresh_all(MapSet.to_list(new_events))
     {:reply, :ok, %{state | events: new_events}}
   end
 

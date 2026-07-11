@@ -32,6 +32,8 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.World.Loader.Vendor, as: VendorLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
+  alias ThistleTea.Game.World.SpawnPool
+  alias ThistleTea.Game.World.SpawnPool.Catalog, as: SpawnPoolCatalog
   alias ThistleTea.Game.World.System.CellActivator
   alias ThistleTea.Game.World.System.GameEvent, as: GameEventSystem
   alias ThistleTea.Game.World.System.Party, as: PartySystem
@@ -92,6 +94,9 @@ defmodule ThistleTea.Application do
         ThistleTeaWeb.Telemetry,
         !test && ThistleTeaWeb.Endpoint,
         {DynamicSupervisor, strategy: :one_for_one, name: EntitySupervisor, max_restarts: 1_000_000, max_seconds: 1},
+        {Registry, keys: :unique, name: SpawnPool.Registry},
+        SpawnPoolCatalog,
+        {DynamicSupervisor, strategy: :one_for_one, name: SpawnPool.Supervisor},
         CellActivator
       ]
       |> Enum.filter(& &1)

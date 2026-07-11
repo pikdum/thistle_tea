@@ -41,6 +41,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.ChaseWatch
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.SpawnPool
   alias ThistleTea.Game.World.System.GameEvent
   alias ThistleTea.Game.World.System.Party, as: PartySystem
   alias ThistleTea.Game.World.Visibility
@@ -312,16 +313,19 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   end
 
   def handle_info({:event_stop, _event}, state) do
-    pid = self()
-
-    Task.start(fn ->
-      World.stop_entity(pid)
-    end)
-
-    {:noreply, state}
+    case SpawnPool.deactivate(state) do
+      :pooled -> {:noreply, state}
+      :unpooled -> stop_after_event(state)
+    end
   end
 
   def handle_info({:event_start, _event}, state) do
+    {:noreply, state}
+  end
+
+  defp stop_after_event(state) do
+    pid = self()
+    Task.start(fn -> World.stop_entity(pid) end)
     {:noreply, state}
   end
 

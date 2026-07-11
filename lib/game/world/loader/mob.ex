@@ -17,6 +17,8 @@ defmodule ThistleTea.Game.World.Loader.Mob do
   alias ThistleTea.Game.World.Loader.Script, as: ScriptLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.SpawnPool
+  alias ThistleTea.Game.World.SpawnPool.Catalog
   alias ThistleTea.Game.World.System.GameEvent
 
   def load(cell) do
@@ -24,9 +26,15 @@ defmodule ThistleTea.Game.World.Loader.Mob do
 
     Mangos.Creature.query_cell(cell, events)
     |> Mangos.Repo.all()
+    |> Enum.each(&activate(&1, cell))
+  end
+
+  def blueprints(guids, events \\ GameEvent.get_events()) when is_list(guids) do
+    Mangos.Creature.query_guids(guids, events)
+    |> Mangos.Repo.all()
     |> Enum.map(&load_creature/1)
     |> Enum.reject(&is_nil/1)
-    |> Enum.each(&start/1)
+    |> Map.new(fn creature -> {{:creature, creature.guid}, creature |> Mob.build()} end)
   end
 
   def load_creature(%Mangos.Creature{} = creature) do
@@ -357,13 +365,30 @@ defmodule ThistleTea.Game.World.Loader.Mob do
   defp positive_scale(scale) when is_number(scale) and scale > 0, do: scale
   defp positive_scale(_scale), do: nil
 
-  defp start(%Mangos.Creature{} = creature) do
-    creature
-    |> Mob.build()
-    |> start_mob()
+  defp activate(%Mangos.Creature{} = creature, cell) do
+    case Catalog.group_for(:creature, creature.guid) do
+      {:pool, _pool_id} = group ->
+        SpawnPool.activate(group, cell)
+
+      {:singleton, :creature, _guid} = group ->
+        case load_creature(creature) do
+          %Mangos.Creature{} = loaded -> SpawnPool.activate(group, cell, Mob.build(loaded))
+          nil -> :ok
+        end
+    end
   end
 
   def start_mob(%Mob{} = mob) do
+    put_metadata(mob)
+    World.start_entity(mob)
+  end
+
+  def start_pool_mob(%Mob{} = mob) do
+    put_metadata(mob)
+    World.start_incarnation(mob)
+  end
+
+  defp put_metadata(%Mob{} = mob) do
     Metadata.put(
       mob.object.guid,
       %{
@@ -381,7 +406,5 @@ defmodule ThistleTea.Game.World.Loader.Mob do
       |> Map.merge(Mob.visibility_metadata(mob))
       |> Map.merge(FactionLoader.metadata(mob.unit.faction_template))
     )
-
-    World.start_entity(mob)
   end
 end

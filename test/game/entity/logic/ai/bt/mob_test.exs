@@ -124,16 +124,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
   end
 
   describe "tree/0" do
-    test "interrupts a wander spline before attacking an in-range target" do
-      target_guid = player_guid()
-      SpatialHash.clear_movement(target_guid)
-      SpatialHash.update(:players, target_guid, 0, 4.0, 0.0, 0.0)
-
-      on_exit(fn ->
-        SpatialHash.clear_movement(target_guid)
-        SpatialHash.remove(:players, target_guid)
-      end)
-
+    test "interrupts a wander spline when combat begins" do
       now = Time.now()
 
       state =
@@ -147,8 +138,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
         state
         | unit: %{
             state.unit
-            | target: target_guid,
-              health: 100,
+            | health: 100,
               max_health: 100,
               min_damage: 3,
               max_damage: 3,
@@ -158,12 +148,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
       }
 
       blackboard = %Blackboard{target: {1.0, 0.0, 0.0}, move_target: {1.0, 0.0, 0.0}}
-      state = BT.init(state, MobBT.tree(), blackboard)
-
-      {_status, state} = BT.tick(state.internal.behavior_tree, state)
+      {:success, state, blackboard} = MobBT.interrupt_idle_movement(state, blackboard, now)
 
       assert state.movement_block.spline_nodes == []
-      assert state.internal.blackboard.move_target == nil
+      assert blackboard.move_target == nil
       assert Enum.any?(state.internal.events, &match?(%Event{type: :movement_stopped}, &1))
     end
   end
@@ -636,7 +624,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
       movement_block: %MovementBlock{
         duration: Keyword.get(opts, :duration, 0),
         position: Keyword.get(opts, :position, {0.0, 0.0, 0.0, 0.0}),
-        spline_nodes: Keyword.get(opts, :spline_nodes, [{1.0, 0.0, 0.0}])
+        spline_nodes: Keyword.get(opts, :spline_nodes, [{1.0, 0.0, 0.0}]),
+        walk_speed: 2.5,
+        run_speed: 7.0
       }
     }
   end

@@ -58,4 +58,14 @@ defmodule ThistleTea.DB.Mangos.Creature do
       select: c
     )
   end
+
+  def query_guids(guids, events \\ []) when is_list(guids) do
+    from(c in __MODULE__,
+      where: c.guid in ^guids,
+      left_join: ce in assoc(c, :game_event_creature),
+      where: ce.event in ^events or is_nil(ce.event),
+      preload: [game_event_creature: ce],
+      select: c
+    )
+  end
 end

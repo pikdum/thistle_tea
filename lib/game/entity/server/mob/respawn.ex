@@ -18,6 +18,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Respawn do
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Loader.Faction, as: FactionLoader
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.SpawnPool
   alias ThistleTea.Game.World.Visibility
 
   @default_delay_ms 120_000
@@ -46,7 +47,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Respawn do
         remove_and_stop(state)
 
       true ->
-        respawn(state)
+        recycle_or_respawn(state)
     end
   end
 
@@ -115,6 +116,13 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Respawn do
 
     kick_ai_tick()
     state
+  end
+
+  defp recycle_or_respawn(%Mob{} = state) do
+    case SpawnPool.recycle(state) do
+      :pooled -> state
+      :unpooled -> respawn(state)
+    end
   end
 
   defp put_spawn_position(%Mob{} = state) do
