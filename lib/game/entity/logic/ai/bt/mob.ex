@@ -649,15 +649,32 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     state = Threat.remove(state, source_guid)
 
     if Threat.entries(state) == [] do
-      blackboard = Blackboard.from_any(state.internal.blackboard)
-      {:success, state, blackboard} = clear_combat(state, blackboard)
-      %{state | internal: %{state.internal | blackboard: blackboard}}
+      reset_after_combat(state)
     else
       reselect_victim(state)
     end
   end
 
   def drop_threat(state, _source_guid), do: state
+
+  defp reset_after_combat(%Mob{} = state) do
+    now = Time.now()
+    blackboard = Blackboard.from_any(state.internal.blackboard)
+    {state, blackboard} = EventAI.on_leave_combat(state, blackboard, now)
+    {state, blackboard} = EventAI.on_evade(state, blackboard, now)
+
+    case set_tether_target(state, blackboard) do
+      {:success, state, blackboard} ->
+        {:success, state, blackboard} = clear_combat(state, blackboard)
+        {:success, state, blackboard} = heal_to_full(state, blackboard)
+        {_status, state, blackboard} = move_to_target(state, blackboard, now)
+        %{state | internal: %{state.internal | blackboard: blackboard}}
+
+      {:failure, state, blackboard} ->
+        {:success, state, blackboard} = clear_combat(state, blackboard)
+        %{state | internal: %{state.internal | blackboard: blackboard}}
+    end
+  end
 
   defp clear_combat_events(source_guid, target) when is_integer(target) and target > 0 do
     [Event.attack_stop(source_guid, target), Event.attacker_lost(target), Event.tap_cleared()]

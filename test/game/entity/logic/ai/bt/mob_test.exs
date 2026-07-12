@@ -147,6 +147,29 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
       assert Enum.any?(mob.internal.events, &(&1.type == :attack_stop))
     end
 
+    test "evades to its spawn after vanish removes the last hostile reference" do
+      target = player_guid()
+      spawn = {0.0, 0.0, 0.0}
+      mob = fixture_mob(position: {20.0, 0.0, 0.0, 0.0})
+      unit = %{mob.unit | target: target, health: 40, max_health: 100, auras: []}
+
+      internal = %{
+        mob.internal
+        | in_combat: true,
+          running: true,
+          threat: %{target => 100.0},
+          spawn: %Spawn{position: spawn},
+          blackboard: %Blackboard{auto_attacking: true}
+      }
+
+      mob = MobBT.drop_threat(%{mob | unit: unit, internal: internal}, target)
+
+      refute mob.internal.in_combat
+      assert mob.unit.health == 100
+      assert mob.internal.blackboard.move_target == spawn
+      assert Movement.moving?(mob, Time.now())
+    end
+
     test "reselects from the remaining threat table when the current victim vanishes" do
       vanished = player_guid()
       replacement = player_guid()
