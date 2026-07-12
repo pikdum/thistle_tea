@@ -39,7 +39,7 @@ defmodule ThistleTea.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      {:tidewave, "~> 0.5", only: [:dev]},
+      {:tidewave, "~> 0.6", only: [:dev]},
       {:mix_test_watch, "~> 1.0", only: [:dev, :test], runtime: false},
       {:binary, "~> 0.0.5"},
       {:ecto_sqlite3, "~> 0.19"},
