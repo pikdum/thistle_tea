@@ -362,6 +362,11 @@ defmodule ThistleTea.Game.Entity.EventSink do
     entity
   end
 
+  def emit(entity, %Event{type: :remove_aura} = event) do
+    Entity.remove_aura(event.target_guid, event.spell_id, event.source_guid)
+    entity
+  end
+
   def emit(entity, %Event{type: :attack_start, source_guid: source_guid, target_guid: target_guid})
       when is_integer(source_guid) and is_integer(target_guid) do
     %Message.SmsgAttackstart{
@@ -812,7 +817,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
         World.stop_entity(old_pet_guid)
       end
 
-      send(self(), {:pet_attached, pet.object.guid, spell_id, pet.internal.creature.spells})
+      send(self(), {:pet_attached, pet.object.guid, spell_id, Map.values(pet.internal.spellbook)})
     end
 
     entity
@@ -1004,7 +1009,8 @@ defmodule ThistleTea.Game.Entity.EventSink do
   defp trigger_context(%{object: %{guid: guid}} = entity, %Event{source_guid: guid} = event, spell) do
     %{
       CastContext.from_caster(entity, spell, event.target_guid)
-      | target_hostile?: Spell.requires_hostile_target?(spell)
+      | target_hostile?: Spell.requires_hostile_target?(spell),
+        target_role: event.target_role
     }
   end
 
@@ -1013,6 +1019,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
       caster_guid: event.source_guid,
       caster_level: event.source_level || 1,
       target_guid: event.target_guid,
+      target_role: event.target_role,
       target_hostile?: Spell.requires_hostile_target?(spell),
       spell: spell
     }

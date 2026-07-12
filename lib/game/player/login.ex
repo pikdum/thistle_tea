@@ -20,6 +20,7 @@ defmodule ThistleTea.Game.Player.Login do
   alias ThistleTea.Game.Entity.Logic.Combat, as: CombatLogic
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Death
+  alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Entity.Logic.MovementStats
   alias ThistleTea.Game.Entity.Logic.StealthDetection
@@ -126,7 +127,20 @@ defmodule ThistleTea.Game.Player.Login do
         ready: false
     }
 
-    schedule_aura_tick(state)
+    state
+    |> restore_active_pet()
+    |> schedule_aura_tick()
+  end
+
+  defp restore_active_pet(%{character: %Character{internal: internal} = character} = state) do
+    case {internal.active_pet_entry, internal.active_pet_spell_id} do
+      {entry, spell_id} when is_integer(entry) and entry > 0 and is_integer(spell_id) and spell_id > 0 ->
+        EventSink.emit(character, Event.summon_pet(character.object.guid, entry, spell_id))
+        state
+
+      _ ->
+        state
+    end
   end
 
   def send_init_packets(c) do

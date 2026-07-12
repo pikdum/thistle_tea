@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Entity.Logic.WarlockSpellsTest do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.AI.BT.Pet, as: PetBT
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Spell, as: SpellBT
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
   alias ThistleTea.Game.Entity.Logic.Combat
   alias ThistleTea.Game.Entity.Logic.SpellEffect
@@ -203,6 +204,69 @@ defmodule ThistleTea.Game.Entity.Logic.WarlockSpellsTest do
 
       assert AuraLogic.damage_redirect(linked, 100, :shadow) == {70, {2, 30}}
     end
+
+    test "applies the pet-cast link aura to its owner" do
+      spell = %Spell{
+        id: 25_228,
+        effects: [
+          %Effect{
+            type: :apply_area_aura,
+            aura: :split_damage_percent,
+            base_points: 30,
+            misc_value: 127,
+            implicit_target_a: :caster
+          }
+        ]
+      }
+
+      context = %CastContext{caster_guid: 2, caster_level: 40, target_role: :caster}
+      {owner, _events} = SpellEffect.receive(character(), context, spell, 1_000)
+
+      assert AuraLogic.damage_redirect(owner, 100, :shadow) == {70, {2, 30}}
+    end
+  end
+
+  describe "Health Funnel" do
+    test "routes the heal aura only to the pet and the caster aura only to the warlock" do
+      spell = %Spell{
+        id: 755,
+        name: "Health Funnel",
+        effects: [
+          %Effect{type: :apply_aura, aura: :periodic_heal, base_points: 11, implicit_target_a: :pet},
+          %Effect{type: :apply_aura, aura: :mod_health_regen_percent, base_points: -101, implicit_target_a: :caster}
+        ]
+      }
+
+      caster_context = %CastContext{caster_guid: 1, caster_level: 40, target_role: :caster}
+      pet_context = %CastContext{caster_guid: 1, caster_level: 40, target_role: :pet}
+
+      {caster, _events} = SpellEffect.receive(character(), caster_context, spell, 1_000)
+      {pet, _events} = SpellEffect.receive(pet(), pet_context, spell, 1_000)
+
+      assert AuraLogic.has_aura?(caster, :mod_health_regen_percent)
+      refute AuraLogic.has_aura?(caster, :periodic_heal)
+      assert AuraLogic.has_aura?(pet, :periodic_heal)
+      refute AuraLogic.has_aura?(pet, :mod_health_regen_percent)
+    end
+
+    test "cancelling the channel removes its aura from the remote pet" do
+      spell = %Spell{
+        id: 755,
+        name: "Health Funnel",
+        duration_ms: 10_000,
+        attributes: MapSet.new([:channeled]),
+        effects: [%Effect{type: :apply_aura, aura: :periodic_heal, implicit_target_a: :pet}]
+      }
+
+      caster = character(summon: 2)
+      caster = SpellBT.start_cast(caster, spell, %Targets{}, 1_000)
+      caster = SpellBT.clear_cast(caster)
+
+      assert Enum.any?(caster.internal.events, fn event ->
+               event.type == :remove_aura and event.source_guid == 1 and event.target_guid == 2 and
+                 event.spell_id == 755
+             end)
+    end
   end
 
   describe "pet commands" do
@@ -222,6 +286,15 @@ defmodule ThistleTea.Game.Entity.Logic.WarlockSpellsTest do
       assert result.unit.target == 0
       refute result.internal.in_combat
       assert result.internal.pet.command_state == :follow
+    end
+
+    test "passive immediately stops combat" do
+      pet = PetBT.command(pet(), :attack, 99)
+      result = PetBT.reaction(pet, :passive)
+
+      assert result.unit.target == 0
+      refute result.internal.in_combat
+      assert result.internal.pet.reaction_state == :passive
     end
   end
 

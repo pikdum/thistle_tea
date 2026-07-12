@@ -11,7 +11,7 @@ defmodule ThistleTea.Game.Network.Message.SmsgPetSpells do
   defstruct [:pet_guid, :duration, :reaction_state, :command_state, action_bars: [], spells: [], cooldowns: []]
 
   def for_pet(pet_guid, spells) when is_integer(pet_guid) and is_list(spells) do
-    spell_ids = spells |> Enum.map(& &1.spell_id) |> Enum.filter(&(&1 > 0)) |> Enum.take(4)
+    spell_ids = spells |> Enum.map(&spell_id/1) |> Enum.filter(&(&1 > 0)) |> Enum.take(4)
     spell_buttons = Enum.map(spell_ids, &button(&1, @act_disabled))
     empty_buttons = List.duplicate(button(0, @act_disabled), 4 - length(spell_buttons))
 
@@ -46,4 +46,9 @@ defmodule ThistleTea.Game.Network.Message.SmsgPetSpells do
   end
 
   defp button(action, type), do: action ||| type <<< 24
+
+  defp spell_id(%{spell_id: spell_id}) when is_integer(spell_id), do: spell_id
+  defp spell_id(%{id: spell_id}) when is_integer(spell_id), do: spell_id
+  defp spell_id(spell_id) when is_integer(spell_id), do: spell_id
+  defp spell_id(_spell), do: 0
 end

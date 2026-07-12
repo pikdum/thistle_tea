@@ -33,7 +33,23 @@ defmodule ThistleTea.Game.World.Loader.SummonTest do
       assert pet.unit.faction_template == owner.unit.faction_template
       assert pet.internal.pet.owner_guid == owner_guid
       assert pet.internal.pet.profile == :combat
-      assert Enum.any?(pet.internal.creature.spells, &(&1.spell_id == 3110))
+      assert pet.internal.running
+      assert Enum.any?(pet.internal.creature.spells, &(&1.spell_id == 11_762))
+      assert Map.has_key?(pet.internal.spellbook, 11_762)
+      assert Map.has_key?(pet.internal.spellbook, 11_767)
+    end
+
+    test "loads every level-appropriate Succubus ability at its highest rank" do
+      owner = %Character{
+        object: %Object{guid: Guid.from_low_guid(:player, 1)},
+        unit: %Unit{level: 50, faction_template: 1},
+        internal: %Internal{map: 0},
+        movement_block: %MovementBlock{position: {1.0, 2.0, 3.0, 0.0}}
+      }
+
+      pet = Summon.build_pet(1863, owner)
+
+      assert Map.keys(pet.internal.spellbook) |> Enum.sort() == [6358, 7870, 11_778, 11_784]
     end
   end
 end

@@ -170,7 +170,7 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
       assert ^caster = EventSink.emit(caster, event)
       assert_receive {:pet_attached, pet_guid, 688, pet_spells}
       assert is_pid(Entity.pid(pet_guid))
-      assert Enum.any?(pet_spells, &(&1.spell_id == 3110))
+      assert Enum.any?(pet_spells, &(&1.id == 11_762))
 
       on_exit(fn -> World.stop_entity(pet_guid) end)
     end

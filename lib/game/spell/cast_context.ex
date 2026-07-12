@@ -31,6 +31,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
     :caster_type,
     :caster_position,
     :target_guid,
+    :target_role,
     :target_hostile?,
     :spell,
     :attack_power,

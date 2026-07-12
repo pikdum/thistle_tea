@@ -6,14 +6,20 @@ defmodule ThistleTea.Game.World.Loader.Summon do
   later summons build without touching the database. Summoned mob guids get
   a session-unique low guid offset far above the seed data's spawn guids.
   """
+  import Bitwise, only: [&&&: 2]
+  import Ecto.Query
+
   alias ThistleTea.DB.Mangos
+  alias ThistleTea.DBC
   alias ThistleTea.Game.Entity.Data.Component.Internal.Pet
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.World.Loader.Mob, as: MobLoader
+  alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
 
   @table_options [:named_table, :public, read_concurrency: true, write_concurrency: :auto]
   @low_guid_base 0x400000
+  @spell_attr_passive 0x40
 
   def init(table \\ __MODULE__) do
     case :ets.whereis(table) do
@@ -45,6 +51,8 @@ defmodule ThistleTea.Game.World.Loader.Summon do
          level when is_integer(level) <- owner_unit.level do
       stats = pet_stats(entry, level)
       guid = Guid.from_low_guid(:pet, entry, next_low_guid())
+      spellbook = pet_spellbook(entry, level)
+      creature = %{mob.internal.creature | spells: upgrade_ai_spell_ranks(mob.internal.creature.spells, spellbook)}
 
       unit =
         mob.unit
@@ -68,7 +76,10 @@ defmodule ThistleTea.Game.World.Loader.Summon do
         | pet: %Pet{owner_guid: owner_guid, profile: :combat},
           spawn: %{mob.internal.spawn | temporary?: true, respawn_delay_ms: nil},
           loot: nil,
-          in_combat: false
+          in_combat: false,
+          running: true,
+          spellbook: spellbook,
+          creature: creature
       }
 
       %{mob | object: %{mob.object | guid: guid}, unit: unit, internal: internal}
@@ -78,6 +89,106 @@ defmodule ThistleTea.Game.World.Loader.Summon do
   end
 
   def build_pet(_entry, _owner), do: nil
+
+  def pet_spellbook(entry, level) when is_integer(entry) and is_integer(level) do
+    key = {:pet_spellbook, entry, level}
+
+    case :ets.lookup(__MODULE__, key) do
+      [{^key, spellbook}] ->
+        spellbook
+
+      _ ->
+        spellbook = entry |> pet_spell_profile() |> highest_active_spell_ids(level) |> SpellLoader.build_spellbook()
+        :ets.insert(__MODULE__, {key, spellbook})
+        spellbook
+    end
+  end
+
+  def pet_spellbook(_entry, _level), do: %{}
+
+  defp pet_spell_profile(entry) do
+    case Mangos.Repo.get(Mangos.PetCreateInfoSpell, entry) do
+      %Mangos.PetCreateInfoSpell{} = row ->
+        spell_ids = Mangos.PetCreateInfoSpell.spell_ids(row)
+
+        skill_lines =
+          DBC.all(
+            from(ability in SkillLineAbility,
+              where: ability.spell in ^spell_ids,
+              select: ability.skill_line,
+              distinct: true
+            )
+          )
+
+        {skill_lines, spell_ids ++ grimoire_pet_spell_ids()}
+
+      _ ->
+        {[], []}
+    end
+  end
+
+  defp grimoire_pet_spell_ids do
+    key = :grimoire_pet_spell_ids
+
+    case :ets.lookup(__MODULE__, key) do
+      [{^key, spell_ids}] ->
+        spell_ids
+
+      _ ->
+        spell_ids =
+          Mangos.Repo.all(
+            from(item in Mangos.ItemTemplate,
+              where: like(item.name, "Grimoire of %") and item.spellid_1 > 0,
+              select: item.spellid_1
+            )
+          )
+          |> SpellLoader.learned_spell_ids()
+
+        :ets.insert(__MODULE__, {key, spell_ids})
+        spell_ids
+    end
+  end
+
+  defp highest_active_spell_ids({[], _spell_ids}, _level), do: []
+
+  defp highest_active_spell_ids({skill_lines, spell_ids}, level) do
+    DBC.all(
+      from(ability in SkillLineAbility,
+        join: spell in Spell,
+        on: spell.id == ability.spell,
+        where: ability.skill_line in ^skill_lines and ability.spell in ^spell_ids and spell.base_level <= ^level,
+        select: %{id: spell.id, name: spell.name_en_gb, level: spell.base_level, attributes: spell.attributes}
+      )
+    )
+    |> Enum.reject(&passive_spell?/1)
+    |> Enum.group_by(& &1.name)
+    |> Enum.map(fn {_name, ranks} -> Enum.max_by(ranks, & &1.level).id end)
+    |> Enum.sort()
+  end
+
+  defp passive_spell?(%{attributes: attributes}) when is_integer(attributes),
+    do: (attributes &&& @spell_attr_passive) != 0
+
+  defp passive_spell?(_spell), do: false
+
+  defp upgrade_ai_spell_ranks(spells, spellbook) when is_list(spells) and is_map(spellbook) do
+    Enum.map(spells, &upgrade_ai_spell_rank(&1, spellbook))
+  end
+
+  defp upgrade_ai_spell_ranks(spells, _spellbook), do: spells
+
+  defp upgrade_ai_spell_rank(creature_spell, spellbook) do
+    with %{name: name} <- SpellLoader.load(creature_spell.spell_id),
+         replacement when is_integer(replacement) <- spell_id_named(spellbook, name) do
+      %{creature_spell | spell_id: replacement}
+    else
+      _ -> creature_spell
+    end
+  end
+
+  defp spell_id_named(spellbook, name) do
+    Enum.find_value(spellbook, fn {id, spell} -> if spell.name == name, do: id end)
+  end
 
   defp template(entry) do
     case :ets.lookup(__MODULE__, entry) do

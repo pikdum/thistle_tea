@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Network.Message.PetMessagesTest do
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Message.Dispatch
   alias ThistleTea.Game.Network.Opcodes
+  alias ThistleTea.Game.Spell
 
   test "pet client messages are registered for dispatch" do
     assert Dispatch.implemented?(Opcodes.get(:CMSG_PET_ACTION))
@@ -46,6 +47,12 @@ defmodule ThistleTea.Game.Network.Message.PetMessagesTest do
 
     test "encodes the clear-pet form as a zero guid" do
       assert Message.SmsgPetSpells.clear() |> Message.SmsgPetSpells.to_binary() == <<0::little-size(64)>>
+    end
+
+    test "accepts loaded spellbook entries" do
+      message = Message.SmsgPetSpells.for_pet(123, [%Spell{id: 11_778}])
+
+      assert length(message.spells) == 1
     end
   end
 

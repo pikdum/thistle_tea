@@ -24,7 +24,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet do
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Metadata
 
-  @follow_distance 3.0
+  @follow_distance 2.0
+  @follow_angle :math.pi() / 2
+  @follow_repath_distance 1.0
   @idle_delay_ms 500
 
   def tree do
@@ -38,7 +40,11 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet do
         BT.selector([
           BT.sequence([BT.condition(&target_invalid?/2), BT.action(&clear_combat/2)]),
           MobSpells.step(),
-          CombatBT.melee_sequence(),
+          BT.sequence([
+            BT.condition(&CombatBT.in_combat_range?/2),
+            BT.action(&halt_for_melee/2),
+            CombatBT.melee_sequence()
+          ]),
           BT.action(&chase_target/2)
         ])
       ]),
@@ -80,7 +86,15 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet do
 
   def reaction(%Mob{internal: %Internal{pet: %Pet{} = pet} = internal} = state, reaction)
       when reaction in [:passive, :defensive, :aggressive] do
-    %{state | internal: %{internal | pet: %{pet | reaction_state: reaction}}}
+    state = %{state | internal: %{internal | pet: %{pet | reaction_state: reaction}}}
+
+    if reaction == :passive do
+      state
+      |> clear_combat_state()
+      |> Movement.halt(Time.now())
+    else
+      state
+    end
   end
 
   def reaction(%Mob{} = state, _reaction), do: state
@@ -136,28 +150,31 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet do
   end
 
   defp follow_owner(%Mob{internal: %Internal{pet: %Pet{owner_guid: owner_guid}, map: map}} = state, blackboard) do
-    case World.position(owner_guid) do
-      {^map, x, y, z} ->
-        state =
-          case World.distance_to_guid(state, owner_guid) do
-            distance when is_number(distance) and distance > @follow_distance ->
-              Movement.move_to(state, {x, y, z}, [run?: true], Time.now())
+    with {^map, x, y, z} <- World.position(owner_guid),
+         %{orientation: orientation} when is_number(orientation) <- Metadata.query(owner_guid, [:orientation]) do
+      destination = follow_position({x, y, z}, orientation)
 
-            _ ->
-              state
-          end
+      state =
+        case distance_to(state, destination) do
+          distance when distance > @follow_repath_distance ->
+            state
+            |> run()
+            |> Movement.move_to(destination, [], Time.now())
 
-        {{:running, @idle_delay_ms}, state, blackboard}
+          _ ->
+            state
+        end
 
-      _ ->
-        {:success, Event.enqueue(state, Event.despawn_self(0, 0)), blackboard}
+      {{:running, @idle_delay_ms}, state, blackboard}
+    else
+      _ -> {:success, Event.enqueue(state, Event.despawn_self(0, 0)), blackboard}
     end
   end
 
   defp chase_target(%Mob{internal: %Internal{map: map}, unit: %Unit{target: target}} = state, blackboard) do
     state =
       case World.target_position(target) do
-        {^map, x, y, z} -> Movement.move_to(state, {x, y, z}, [run?: true], Time.now())
+        {^map, x, y, z} -> state |> run() |> Movement.move_to({x, y, z}, [face_target: target], Time.now())
         _ -> state
       end
 
@@ -165,6 +182,19 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet do
   end
 
   defp idle(state, blackboard), do: {{:running, @idle_delay_ms}, state, blackboard}
+
+  defp halt_for_melee(state, blackboard), do: {:success, Movement.halt(state, Time.now()), blackboard}
+
+  defp follow_position({x, y, z}, orientation) do
+    angle = orientation + @follow_angle
+    {x + :math.cos(angle) * @follow_distance, y + :math.sin(angle) * @follow_distance, z}
+  end
+
+  defp distance_to(%Mob{movement_block: %{position: {x, y, z, _o}}}, {tx, ty, tz}) do
+    :math.sqrt(:math.pow(tx - x, 2) + :math.pow(ty - y, 2) + :math.pow(tz - z, 2))
+  end
+
+  defp run(%Mob{internal: %Internal{} = internal} = state), do: %{state | internal: %{internal | running: true}}
 
   defp xyz({x, y, z, _o}), do: {x, y, z}
 end

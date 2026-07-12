@@ -146,6 +146,12 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     {:noreply, state, {:continue, :maybe_broadcast}}
   end
 
+  def handle_cast({:remove_aura, spell_id, caster_guid}, state) do
+    {state, events} = Aura.remove_source_spell(state, spell_id, caster_guid, Time.now())
+    state = EventSink.emit(state, events)
+    {:noreply, wake_ai_tick(state), {:continue, :maybe_broadcast}}
+  end
+
   @impl GenServer
   def handle_cast({:receive_heal, amount}, state) do
     state = Core.heal(state, amount)
@@ -333,10 +339,10 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
   def handle_info(
         {:pet_cast, spell_id, target_guid},
-        %Mob{internal: %Internal{pet: %Pet{}, creature: creature}} = state
+        %Mob{internal: %Internal{pet: %Pet{}, spellbook: spellbook}} = state
       )
       when is_integer(spell_id) do
-    known? = Enum.any?(creature.spells, &(&1.spell_id == spell_id))
+    known? = Map.has_key?(spellbook, spell_id)
 
     state =
       with true <- known?,

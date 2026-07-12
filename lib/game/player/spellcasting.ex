@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
   in-progress ones — sending the corresponding cast-result packets and
   (re)scheduling the player tick.
   """
+  alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.Logic.AI.BT.Spell, as: SpellBT
@@ -208,6 +209,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
 
   defp build_target_info(%{guid: caster_guid, character: character}, %Spell{} = spell, %Targets{unit_guid: unit_guid}) do
     explicit_guid = nonself_guid(unit_guid, caster_guid)
+    pet_guid = implicit_pet_guid(character, spell)
 
     fallback_guid =
       if Spell.requires_hostile_target?(spell) do
@@ -215,6 +217,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
       end
 
     cond do
+      is_integer(pet_guid) -> target_info(character, pet_guid)
       is_integer(explicit_guid) -> target_info(character, explicit_guid)
       is_integer(fallback_guid) -> target_info(character, fallback_guid)
       unit_guid == caster_guid -> :self
@@ -223,6 +226,13 @@ defmodule ThistleTea.Game.Player.Spellcasting do
   end
 
   defp build_target_info(_state, _spell, _targets), do: nil
+
+  defp implicit_pet_guid(%Character{unit: %Unit{summon: pet_guid}}, %Spell{effects: effects})
+       when is_integer(pet_guid) and pet_guid > 0 do
+    if Enum.any?(effects, &(&1.implicit_target_a == :pet or &1.implicit_target_b == :pet)), do: pet_guid
+  end
+
+  defp implicit_pet_guid(_character, _spell), do: nil
 
   defp target_info(character, guid) do
     case Metadata.query(guid, [

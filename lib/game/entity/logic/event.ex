@@ -37,6 +37,7 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
     :stand_state,
     :update_type,
     :cast_context,
+    :target_role,
     :spell,
     :effect,
     :attack,
@@ -102,6 +103,11 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
       aura_slot: slot,
       duration_ms: duration_ms
     }
+  end
+
+  def remove_aura(source_guid, target_guid, spell_id)
+      when is_integer(source_guid) and is_integer(target_guid) and is_integer(spell_id) do
+    %__MODULE__{type: :remove_aura, source_guid: source_guid, target_guid: target_guid, spell_id: spell_id}
   end
 
   def periodic_aura_log(source_guid, target_guid, spell, aura_type, amount, opts \\ [])
@@ -381,14 +387,15 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
     %__MODULE__{type: :consume_reagents, reagents: reagents}
   end
 
-  def trigger_spell(source_guid, source_level, target_guid, spell_id)
+  def trigger_spell(source_guid, source_level, target_guid, spell_id, opts \\ [])
       when is_integer(target_guid) and is_integer(spell_id) do
     %__MODULE__{
       type: :trigger_spell,
       source_guid: source_guid,
       source_level: source_level,
       target_guid: target_guid,
-      spell_id: spell_id
+      spell_id: spell_id,
+      target_role: Keyword.get(opts, :target_role)
     }
   end
 

@@ -338,14 +338,17 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
   end
 
   defp remove_channel_auras(%{object: %{guid: guid}} = character, %Cast{spell: %Spell{id: spell_id}} = casting) do
-    {character, events} =
-      if channel_target_guid(character, casting) in [0, guid] do
-        AuraLogic.remove_spells(character, [spell_id], Time.now())
+    target_guid = channel_target_guid(character, casting)
+    {character, events} = AuraLogic.remove_source_spell(character, spell_id, guid, Time.now())
+
+    remote_events =
+      if is_integer(target_guid) and target_guid > 0 and target_guid != guid do
+        [Event.remove_aura(guid, target_guid, spell_id)]
       else
-        {character, []}
+        []
       end
 
-    {character, events ++ [Event.despawn_area_effects(spell_id)]}
+    {character, events ++ remote_events ++ [Event.despawn_area_effects(spell_id)]}
   end
 
   defp remove_channel_auras(character, _casting), do: {character, []}
@@ -559,7 +562,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
     Enum.reduce(targets, character, fn target_guid, caster ->
       context = %{
         CastContext.from_caster(caster, spell, target_guid)
-        | target_hostile?: target_guid != caster_guid and Hostility.valid_attack_target?(caster, target_guid)
+        | target_hostile?: target_guid != caster_guid and Hostility.valid_attack_target?(caster, target_guid),
+          target_role: target_role(caster, target_guid)
       }
 
       dispatch_to_target(caster, context, spell, target_guid, now)
@@ -567,6 +571,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
   end
 
   defp apply_spell_hit(character, _casting, _targets, _now), do: character
+
+  defp target_role(%{object: %{guid: guid}}, guid), do: :caster
+  defp target_role(%{unit: %{summon: pet_guid}}, pet_guid) when is_integer(pet_guid) and pet_guid > 0, do: :pet
+  defp target_role(_caster, _target_guid), do: :other
 
   defp dispatch_to_target(character, %CastContext{caster_guid: caster_guid} = context, spell, target_guid, now)
        when target_guid == caster_guid do

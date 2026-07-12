@@ -55,6 +55,18 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
     target.object.guid != caster_guid and Spell.harmful?(spell) and Aura.school_immune?(target, spell.school)
   end
 
+  defp applicable_effects(_target, %CastContext{target_role: :caster}, effects) do
+    Enum.reject(effects, &(hostile_target_effect?(&1) or pet_target_effect?(&1)))
+  end
+
+  defp applicable_effects(_target, %CastContext{target_role: :pet}, effects) do
+    Enum.reject(effects, &(caster_target_effect?(&1) or hostile_target_effect?(&1)))
+  end
+
+  defp applicable_effects(_target, %CastContext{target_role: :other}, effects) do
+    Enum.reject(effects, &(caster_target_effect?(&1) or pet_target_effect?(&1)))
+  end
+
   defp applicable_effects(%{object: %{guid: guid}}, %CastContext{caster_guid: guid}, effects) do
     Enum.reject(effects, &hostile_target_effect?/1)
   end
@@ -66,6 +78,10 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   end
 
   defp caster_target_effect?(_effect), do: false
+
+  defp pet_target_effect?(%Effect{} = effect) do
+    effect.implicit_target_a == :pet or effect.implicit_target_b == :pet
+  end
 
   defp hostile_target_effect?(%Effect{} = effect) do
     effect.implicit_target_a in [
@@ -314,7 +330,12 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
         Warlock.life_tap(state, context, spell, effect, now)
 
       :soul_link ->
-        {state, [Event.trigger_spell(state.object.guid, state.unit.level || 1, context.caster_guid, 25_228)]}
+        event =
+          Event.trigger_spell(state.object.guid, state.unit.level || 1, context.caster_guid, 25_228,
+            target_role: :caster
+          )
+
+        {state, [event]}
 
       dummy_effect ->
         apply_class_dummy(state, context, spell, effect, dummy_effect, now)

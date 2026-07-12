@@ -278,6 +278,12 @@ defmodule ThistleTea.Game.Network.Server do
     {:noreply, {socket, state}, {:continue, :maybe_broadcast_update}}
   end
 
+  def handle_cast({:remove_aura, spell_id, caster_guid}, {socket, %{character: %Character{} = character} = state}) do
+    {character, events} = Aura.remove_source_spell(character, spell_id, caster_guid, Time.now())
+    character = EventSink.emit(character, events)
+    {:noreply, {socket, %{state | character: character}}, {:continue, :maybe_broadcast_update}}
+  end
+
   def handle_cast({:reward_kill, victim}, {socket, %{character: %Character{} = character} = state}) do
     state = apply_kill_reward(state, victim, kill_xp(character, victim))
     {:noreply, {socket, state}, socket.read_timeout}
@@ -502,14 +508,24 @@ defmodule ThistleTea.Game.Network.Server do
   end
 
   def handle_info(
-        {:pet_attached, pet_guid, _spell_id, pet_spells},
+        {:pet_attached, pet_guid, spell_id, pet_spells},
         {socket, %{character: %Character{unit: %Unit{}} = character} = state}
       ) do
     {character, aura_events} = Aura.remove_spells(character, [18_789, 18_790, 18_791, 18_792, 25_228], Time.now())
 
     character =
       character
-      |> then(fn character -> %{character | unit: %{character.unit | summon: pet_guid}} end)
+      |> then(fn character ->
+        %{
+          character
+          | unit: %{character.unit | summon: pet_guid},
+            internal: %{
+              character.internal
+              | active_pet_entry: Guid.entry(pet_guid),
+                active_pet_spell_id: spell_id
+            }
+        }
+      end)
       |> EventSink.emit(aura_events)
       |> Core.mark_broadcast_update()
 
@@ -525,7 +541,13 @@ defmodule ThistleTea.Game.Network.Server do
 
     character =
       character
-      |> then(fn character -> %{character | unit: %{character.unit | summon: 0}} end)
+      |> then(fn character ->
+        %{
+          character
+          | unit: %{character.unit | summon: 0},
+            internal: %{character.internal | active_pet_entry: nil, active_pet_spell_id: nil}
+        }
+      end)
       |> EventSink.emit(aura_events)
       |> Core.mark_broadcast_update()
 
