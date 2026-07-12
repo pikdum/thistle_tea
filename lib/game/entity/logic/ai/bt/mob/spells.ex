@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells do
 
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Pet
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.CreatureSpell
@@ -92,6 +93,11 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells do
     state = halt_movement(state, now)
     delay_ms = max(Blackboard.delay_until(blackboard, :next_spell_list_at, now), 1)
     {BT.running(min(delay_ms, @list_tick_ms), :spell_list), state, blackboard}
+  end
+
+  defp spell_entries(%Mob{internal: %Internal{pet: %Pet{autocast: autocast}, creature: %Creature{spells: spells}}})
+       when is_list(spells) do
+    Enum.filter(spells, &MapSet.member?(autocast, &1.spell_id))
   end
 
   defp spell_entries(%Mob{internal: %Internal{creature: %Creature{spells: spells}}}) when is_list(spells) do
@@ -455,7 +461,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells do
   defp build_target_info(%Mob{object: %{guid: guid}}, target_guid) when target_guid == guid, do: :self
 
   defp build_target_info(%Mob{} = state, target_guid) do
-    case Metadata.query(target_guid, [:alive?, :faction_template, :unit_flags]) do
+    case Metadata.query(target_guid, [:alive?, :faction_template, :unit_flags, :creature_type]) do
       nil ->
         :unknown
 
@@ -466,6 +472,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells do
           hostile?: Hostility.hostile?(state, metadata),
           friendly?: Hostility.friendly?(state, metadata),
           attackable?: Hostility.attackable?(state, target_guid),
+          creature_type: Map.get(metadata, :creature_type),
           position: World.position(target_guid),
           los?: World.line_of_sight?(state, target_guid)
         }

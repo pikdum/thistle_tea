@@ -21,6 +21,7 @@ defmodule ThistleTea.Game.Network.Message.MsgMove do
 
   @spell_failed_moving 0x2E
   @move_recency_ms 750
+  @max_projection_speed 20.0
 
   defstruct [
     :opcode,
@@ -42,14 +43,16 @@ defmodule ThistleTea.Game.Network.Message.MsgMove do
       %{internal: %{map: map}} = character
       %MovementBlock{position: {x0, y0, z0, _}} = state.character.movement_block
       %MovementBlock{position: {x1, y1, z1, orientation}} = movement_block
-      Metadata.update(state.guid, %{orientation: orientation})
+      now = Time.now()
+      movement_velocity = movement_velocity(state.guid, {x0, y0, z0}, {x1, y1, z1}, now)
+      Metadata.update(state.guid, %{orientation: orientation, movement_velocity: movement_velocity, last_move_at: now})
       position_changed? = x0 != x1 or y0 != y1 or z0 != z1
       character = interrupt_auras(character, position_changed?)
 
       new_state =
         if position_changed? do
           SpatialHash.update(:players, state.guid, map, x1, y1, z1)
-          Metadata.update(state.guid, %{moving_until: Time.now() + @move_recency_ms})
+          Metadata.update(state.guid, %{moving_until: now + @move_recency_ms})
           AggroProbe.notify_player_moved(state.guid, map, {x1, y1, z1})
           ChaseWatch.notify_moved(state.guid, {x1, y1, z1})
 
@@ -101,5 +104,27 @@ defmodule ThistleTea.Game.Network.Message.MsgMove do
     end
 
     character
+  end
+
+  defp movement_velocity(guid, {x0, y0, z0}, {x1, y1, z1}, now) do
+    case Metadata.query(guid, [:last_move_at]) do
+      %{last_move_at: previous} when is_integer(previous) and now > previous and now - previous <= @move_recency_ms ->
+        seconds = (now - previous) / 1_000
+        clamp_velocity({(x1 - x0) / seconds, (y1 - y0) / seconds, (z1 - z0) / seconds})
+
+      _ ->
+        {0.0, 0.0, 0.0}
+    end
+  end
+
+  defp clamp_velocity({vx, vy, vz}) do
+    speed = :math.sqrt(vx * vx + vy * vy + vz * vz)
+
+    if speed > @max_projection_speed do
+      scale = @max_projection_speed / speed
+      {vx * scale, vy * scale, vz * scale}
+    else
+      {vx, vy, vz}
+    end
   end
 end

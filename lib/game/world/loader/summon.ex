@@ -12,8 +12,10 @@ defmodule ThistleTea.Game.World.Loader.Summon do
   alias ThistleTea.DB.Mangos
   alias ThistleTea.DBC
   alias ThistleTea.Game.Entity.Data.Component.Internal.Pet
+  alias ThistleTea.Game.Entity.Data.CreatureSpell
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.Spell, as: SpellData
   alias ThistleTea.Game.World.Loader.Mob, as: MobLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
 
@@ -52,7 +54,7 @@ defmodule ThistleTea.Game.World.Loader.Summon do
       stats = pet_stats(entry, level)
       guid = Guid.from_low_guid(:pet, entry, next_low_guid())
       spellbook = pet_spellbook(entry, level)
-      creature = %{mob.internal.creature | spells: upgrade_ai_spell_ranks(mob.internal.creature.spells, spellbook)}
+      creature = %{mob.internal.creature | spells: pet_action_spells(spellbook)}
 
       unit =
         mob.unit
@@ -171,23 +173,14 @@ defmodule ThistleTea.Game.World.Loader.Summon do
 
   defp passive_spell?(_spell), do: false
 
-  defp upgrade_ai_spell_ranks(spells, spellbook) when is_list(spells) and is_map(spellbook) do
-    Enum.map(spells, &upgrade_ai_spell_rank(&1, spellbook))
-  end
-
-  defp upgrade_ai_spell_ranks(spells, _spellbook), do: spells
-
-  defp upgrade_ai_spell_rank(creature_spell, spellbook) do
-    with %{name: name} <- SpellLoader.load(creature_spell.spell_id),
-         replacement when is_integer(replacement) <- spell_id_named(spellbook, name) do
-      %{creature_spell | spell_id: replacement}
-    else
-      _ -> creature_spell
-    end
-  end
-
-  defp spell_id_named(spellbook, name) do
-    Enum.find_value(spellbook, fn {id, spell} -> if spell.name == name, do: id end)
+  defp pet_action_spells(spellbook) when is_map(spellbook) do
+    spellbook
+    |> Map.values()
+    |> Enum.sort_by(& &1.id)
+    |> Enum.map(fn spell ->
+      cast_target = if SpellData.harmful?(spell), do: :victim, else: :self
+      %CreatureSpell{spell_id: spell.id, cast_target: cast_target}
+    end)
   end
 
   defp template(entry) do

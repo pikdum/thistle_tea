@@ -213,6 +213,20 @@ defmodule ThistleTea.Game.World do
     end
   end
 
+  def projected_position(guid, horizon_ms, now \\ Time.now())
+      when is_integer(guid) and is_integer(horizon_ms) and horizon_ms >= 0 and is_integer(now) do
+    position = position(guid, now)
+    project_position(position, Metadata.query(guid, [:movement_velocity, :moving_until]), horizon_ms, now)
+  end
+
+  defp project_position({map, x, y, z}, %{movement_velocity: {vx, vy, vz}, moving_until: moving_until}, horizon_ms, now)
+       when is_number(vx) and is_number(vy) and is_number(vz) and is_integer(moving_until) and moving_until > now do
+    seconds = horizon_ms / 1_000
+    {map, x + vx * seconds, y + vy * seconds, z + vz * seconds}
+  end
+
+  defp project_position(position, _metadata, _horizon_ms, _now), do: position
+
   def publish_movement(%{
         object: %{guid: guid},
         internal: %Internal{map: map, movement_start_time: start_time, movement_start_position: start_position},

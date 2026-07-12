@@ -15,11 +15,13 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Entity.Data.Component.Internal.Pet
   alias ThistleTea.Game.Entity.Data.Component.Internal.Spawn
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Data.CreatureSpell
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AI.BT.Mob, as: MobBT
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells, as: MobSpells
   alias ThistleTea.Game.Entity.Logic.AI.BT.Pet, as: PetBT
   alias ThistleTea.Game.Entity.Logic.AI.EventAI
   alias ThistleTea.Game.Entity.Logic.AI.Script
@@ -27,7 +29,6 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Combat
   alias ThistleTea.Game.Entity.Logic.Core
-  alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.Entity.Logic.Experience
   alias ThistleTea.Game.Entity.Logic.Hostility
   alias ThistleTea.Game.Entity.Logic.Movement
@@ -41,7 +42,6 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Party
   alias ThistleTea.Game.Spell
-  alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.ChaseWatch
@@ -331,6 +331,13 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     {:noreply, state}
   end
 
+  def handle_info({:pet_set_actions, actions}, %Mob{internal: %Internal{pet: %Pet{}}} = state) do
+    state = PetBT.set_actions(state, actions)
+    blackboard = %{Blackboard.from_any(state.internal.blackboard) | spell_timers: nil, next_spell_list_at: 0}
+    state = %{state | internal: %{state.internal | blackboard: blackboard}} |> wake_ai_tick()
+    {:noreply, state}
+  end
+
   def handle_info({:owner_attacked, attacker_guid}, %Mob{internal: %Internal{pet: %Pet{}}} = state)
       when is_integer(attacker_guid) do
     state = state |> engage_combat(attacker_guid) |> wake_ai_tick()
@@ -349,20 +356,10 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
            %Spell{} = spell <- SpellLoader.load(spell_id),
            true <- valid_pet_spell_target?(state, spell, target_guid) do
         target_guid = if is_integer(target_guid) and target_guid > 0, do: target_guid, else: state.object.guid
-
-        context = %{
-          CastContext.from_caster(state, spell, target_guid)
-          | target_hostile?: Hostility.valid_attack_target?(state, target_guid)
-        }
-
-        if target_guid == state.object.guid do
-          {state, events} = SpellEffect.receive(state, context, spell, Time.now())
-          EventSink.emit(state, events)
-        else
-          state
-          |> EventSink.emit(Event.spell_go(state.object.guid, spell_id, [target_guid], <<>>))
-          |> EventSink.emit(Event.deliver_spell(target_guid, context, spell))
-        end
+        blackboard = Blackboard.from_any(state.internal.blackboard)
+        entry = %CreatureSpell{spell_id: spell_id, cast_target: if(Spell.harmful?(spell), do: :victim, else: :self)}
+        {state, blackboard} = MobSpells.attempt_scripted_cast(state, blackboard, entry, target_guid, Time.now())
+        %{state | internal: %{state.internal | blackboard: blackboard}}
       else
         _ -> state
       end

@@ -78,6 +78,13 @@ defmodule ThistleTea.Game.Spell.CastValidationTest do
                CastValidation.validate(caster(), harmful_spell(), Targets.unit(7), hostile_target(), @now)
     end
 
+    test "uses current health for health-powered spells" do
+      spell = helpful_spell(mana_cost: 30, power_type: -2)
+
+      assert :ok = CastValidation.validate(caster(health: 31), spell, %Targets{}, nil, @now)
+      assert {:error, :no_power} = CastValidation.validate(caster(health: 30), spell, %Targets{}, nil, @now)
+    end
+
     test "restricts Exorcism and Holy Wrath to undead or demons" do
       exorcism = harmful_spell(name: "Exorcism", target_creature_type_mask: 36)
       holy_wrath = harmful_spell(name: "Holy Wrath", target_creature_type_mask: 36)

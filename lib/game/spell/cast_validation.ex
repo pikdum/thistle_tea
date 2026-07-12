@@ -20,6 +20,7 @@ defmodule ThistleTea.Game.Spell.CastValidation do
   alias ThistleTea.Game.Spell.Targets
 
   @power_fields %{0 => :power1, 1 => :power2, 2 => :power3, 3 => :power4, 4 => :power5}
+  @health_power_type -2
   @range_leeway_yards 5.0
 
   def validate(caster, %Spell{} = spell, %Targets{} = targets, target_info, now, opts \\ []) do
@@ -178,6 +179,11 @@ defmodule ThistleTea.Game.Spell.CastValidation do
     else
       :ok
     end
+  end
+
+  defp check_power(%{unit: unit} = caster, %Spell{mana_cost: cost, power_type: @health_power_type})
+       when is_integer(cost) and cost > 0 do
+    if godmode?(caster) or (unit.health || 0) > cost, do: :ok, else: {:error, :no_power}
   end
 
   defp check_power(%{unit: unit} = caster, %Spell{mana_cost: cost, power_type: power_type})

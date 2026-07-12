@@ -163,17 +163,21 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
   end
 
   def start_move_to(entity, {x, y, z}, now) when is_integer(now) do
+    start_move_to(entity, {x, y, z}, now, nil)
+  end
+
+  defp start_move_to(entity, {x, y, z}, now, velocity) when is_integer(now) do
     entity = sync_position(entity, now)
     %{movement_block: %MovementBlock{position: {x0, y0, z0, _o}}} = entity
 
     if at_destination?({x0, y0, z0}, {x, y, z}) do
       entity
     else
-      move_along_path(entity, {x, y, z}, now)
+      move_along_path(entity, {x, y, z}, now, velocity)
     end
   end
 
-  defp move_along_path(entity, {x, y, z}, now) do
+  defp move_along_path(entity, {x, y, z}, now, velocity) do
     entity = increment_spline_id(entity)
 
     %{
@@ -188,7 +192,7 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
       raise "No path found from #{inspect({x0, y0, z0})} to #{inspect({x, y, z})}"
     end
 
-    speed = if running, do: mb.run_speed, else: walk_speed
+    speed = movement_speed(velocity, running, mb.run_speed, walk_speed)
 
     duration =
       [{x0, y0, z0} | path]
@@ -278,13 +282,19 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
   end
 
   def move_to(state, {x, y, z}, opts, now) when is_integer(now) do
-    moved = start_move_to(state, {x, y, z}, now)
+    moved = start_move_to(state, {x, y, z}, now, Keyword.get(opts, :velocity))
 
     case moved.movement_block.spline_nodes do
       [_ | _] -> Event.enqueue(moved, Event.monster_move(opts))
       _ -> moved
     end
   end
+
+  defp movement_speed(velocity, _running, _run_speed, _walk_speed) when is_number(velocity) and velocity > 0,
+    do: velocity
+
+  defp movement_speed(_velocity, true, run_speed, _walk_speed), do: run_speed
+  defp movement_speed(_velocity, false, _run_speed, walk_speed), do: walk_speed
 
   def halt(%{movement_block: %MovementBlock{} = mb, internal: %Internal{} = internal} = entity, now)
       when is_integer(now) do

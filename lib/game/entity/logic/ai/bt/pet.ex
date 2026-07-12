@@ -26,8 +26,13 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet do
 
   @follow_distance 2.0
   @follow_angle :math.pi() / 2
-  @follow_repath_distance 1.0
+  @follow_start_distance 0.25
+  @follow_repath_distance 0.5
+  @follow_prediction_ms 500
+  @follow_tick_ms 100
   @idle_delay_ms 500
+  @act_enabled 0xC1
+  @act_disabled 0x81
 
   def tree do
     BT.selector([
@@ -99,6 +104,12 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet do
 
   def reaction(%Mob{} = state, _reaction), do: state
 
+  def set_actions(%Mob{} = state, actions) when is_list(actions) do
+    Enum.reduce(actions, state, &set_action/2)
+  end
+
+  def set_actions(%Mob{} = state, _actions), do: state
+
   defp dead?(state, _blackboard), do: Core.dead?(state)
 
   defp in_combat?(%Mob{internal: %Internal{in_combat: true}, unit: %Unit{target: target}}, _blackboard)
@@ -150,22 +161,25 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet do
   end
 
   defp follow_owner(%Mob{internal: %Internal{pet: %Pet{owner_guid: owner_guid}, map: map}} = state, blackboard) do
-    with {^map, x, y, z} <- World.position(owner_guid),
+    now = Time.now()
+
+    with {^map, x, y, z} <- World.projected_position(owner_guid, @follow_prediction_ms, now),
          %{orientation: orientation} when is_number(orientation) <- Metadata.query(owner_guid, [:orientation]) do
       destination = follow_position({x, y, z}, orientation)
+      state = Movement.sync_position(state, now)
 
       state =
-        case distance_to(state, destination) do
-          distance when distance > @follow_repath_distance ->
-            state
-            |> run()
-            |> Movement.move_to(destination, [], Time.now())
+        if should_repath?(state, destination) do
+          velocity = catchup_velocity(state, destination)
 
-          _ ->
-            state
+          state
+          |> run()
+          |> Movement.move_to(destination, [velocity: velocity], now)
+        else
+          state
         end
 
-      {{:running, @idle_delay_ms}, state, blackboard}
+      {{:running, @follow_tick_ms}, state, blackboard}
     else
       _ -> {:success, Event.enqueue(state, Event.despawn_self(0, 0)), blackboard}
     end
@@ -195,6 +209,50 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet do
   end
 
   defp run(%Mob{internal: %Internal{} = internal} = state), do: %{state | internal: %{internal | running: true}}
+
+  defp should_repath?(state, destination) do
+    distance_to(state, destination) > @follow_start_distance and
+      destination_changed?(state.movement_block.spline_nodes, destination)
+  end
+
+  defp destination_changed?([_ | _] = nodes, destination) do
+    point_distance(List.last(nodes), destination) > @follow_repath_distance
+  end
+
+  defp destination_changed?(_nodes, _destination), do: true
+
+  defp catchup_velocity(%Mob{movement_block: %{run_speed: speed}} = state, destination)
+       when is_number(speed) and speed > 0 do
+    distance = distance_to(state, destination)
+    factor = if distance > speed, do: min(1.0 + 0.04 * (distance - speed), 2.1), else: 1.0
+    speed * factor
+  end
+
+  defp catchup_velocity(_state, _destination), do: nil
+
+  defp point_distance({x, y, z}, {tx, ty, tz}) do
+    :math.sqrt(:math.pow(tx - x, 2) + :math.pow(ty - y, 2) + :math.pow(tz - z, 2))
+  end
+
+  defp set_action(
+         %{position: position, action: spell_id, action_type: action_type},
+         %Mob{internal: %Internal{pet: %Pet{} = pet, spellbook: spellbook} = internal} = state
+       )
+       when position in 0..9 and is_integer(spell_id) and is_integer(action_type) do
+    if spell_id == 0 or Map.has_key?(spellbook, spell_id) do
+      autocast = update_autocast(pet.autocast, spell_id, action_type)
+      pet = %{pet | action_bar: Map.put(pet.action_bar, position, {spell_id, action_type}), autocast: autocast}
+      %{state | internal: %{internal | pet: pet}}
+    else
+      state
+    end
+  end
+
+  defp set_action(_action, state), do: state
+
+  defp update_autocast(autocast, spell_id, @act_enabled) when spell_id > 0, do: MapSet.put(autocast, spell_id)
+  defp update_autocast(autocast, spell_id, @act_disabled) when spell_id > 0, do: MapSet.delete(autocast, spell_id)
+  defp update_autocast(autocast, _spell_id, _action_type), do: autocast
 
   defp xyz({x, y, z, _o}), do: {x, y, z}
 end

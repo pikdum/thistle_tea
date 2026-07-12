@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal.Pet do
     :owner_guid,
     :profile,
     :stay_position,
+    action_bar: %{},
     command_state: :follow,
     reaction_state: :defensive,
     autocast: MapSet.new()

@@ -40,7 +40,13 @@ defmodule ThistleTea.Game.Network.Message.CmsgNameQuery do
   defp name_info(guid) do
     case Metadata.query(guid, [:name, :realm, :race, :gender, :class]) do
       %{name: name} = info when is_binary(name) ->
-        %{name: name, realm: info.realm || "", race: info.race, gender: info.gender, class: info.class}
+        %{
+          name: name,
+          realm: Map.get(info, :realm, ""),
+          race: Map.get(info, :race, 0),
+          gender: Map.get(info, :gender, 0),
+          class: Map.get(info, :class, 0)
+        }
 
       _ ->
         offline_name_info(guid)

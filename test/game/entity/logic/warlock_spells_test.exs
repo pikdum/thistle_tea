@@ -296,6 +296,17 @@ defmodule ThistleTea.Game.Entity.Logic.WarlockSpellsTest do
       refute result.internal.in_combat
       assert result.internal.pet.reaction_state == :passive
     end
+
+    test "action toggles update pet autocast state" do
+      pet = pet()
+      pet = %{pet | internal: %{pet.internal | spellbook: %{11_778 => %Spell{id: 11_778}}}}
+
+      enabled = PetBT.set_actions(pet, [%{position: 3, action: 11_778, action_type: 0xC1}])
+      disabled = PetBT.set_actions(enabled, [%{position: 3, action: 11_778, action_type: 0x81}])
+
+      assert MapSet.member?(enabled.internal.pet.autocast, 11_778)
+      refute MapSet.member?(disabled.internal.pet.autocast, 11_778)
+    end
   end
 
   defp character(overrides \\ []) do
