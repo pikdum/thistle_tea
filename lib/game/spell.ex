@@ -21,14 +21,20 @@ defmodule ThistleTea.Game.Spell do
     :first_in_chain,
     :rank,
     :exclusive_category,
+    spell_family: 0,
+    family_flags_0: 0,
+    family_flags_1: 0,
     mechanic: 0,
+    proc_chance: 0,
     proc_charges: 0,
+    proc_type_mask: 0,
     speed: 0.0,
     mana_cost_percent: 0,
     dmg_class: 0,
     stances: 0,
     caster_aura_state: 0,
     target_aura_state: 0,
+    target_creature_type_mask: 0,
     stack_amount: 0,
     category: 0,
     recovery_time_ms: 0,
@@ -114,7 +120,7 @@ defmodule ThistleTea.Game.Spell do
   end
 
   def aura_effects(%__MODULE__{effects: effects}) do
-    Enum.filter(effects, &match?(%Effect{type: :apply_aura}, &1))
+    Enum.filter(effects, &match?(%Effect{type: type} when type in [:apply_aura, :apply_area_aura], &1))
   end
 
   @damage_effect_types [
@@ -140,6 +146,16 @@ defmodule ThistleTea.Game.Spell do
 
   def melee_ability?(%__MODULE__{dmg_class: 2}), do: true
   def melee_ability?(_spell), do: false
+
+  def creature_type_allowed?(%__MODULE__{target_creature_type_mask: mask}, creature_type)
+      when is_integer(mask) and mask > 0 and is_integer(creature_type) and creature_type > 0 do
+    (mask &&& 1 <<< (creature_type - 1)) != 0
+  end
+
+  def creature_type_allowed?(%__MODULE__{target_creature_type_mask: mask}, _creature_type) when mask in [0, nil],
+    do: true
+
+  def creature_type_allowed?(_spell, _creature_type), do: false
 
   def channel_tick_ms(%__MODULE__{effects: effects}) do
     effects

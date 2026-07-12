@@ -72,6 +72,7 @@ defmodule ThistleTea.Game.Entity.Logic.PriestSpellsTest do
       school: Keyword.get(opts, :school, :holy),
       duration_ms: Keyword.get(opts, :duration_ms, 30_000),
       mechanic: Keyword.get(opts, :mechanic, 0),
+      proc_type_mask: Keyword.get(opts, :proc_type_mask, 0),
       proc_charges: Keyword.get(opts, :proc_charges, 0),
       aura_interrupt_flags: Keyword.get(opts, :aura_interrupt_flags, 0),
       attributes: Keyword.get(opts, :attributes, MapSet.new()),
@@ -508,6 +509,7 @@ defmodule ThistleTea.Game.Entity.Logic.PriestSpellsTest do
         name: "Shadowguard",
         school: :shadow,
         duration_ms: 600_000,
+        proc_type_mask: 0x8,
         proc_charges: 3,
         trigger_spell_id: 28_376
       )

@@ -328,6 +328,21 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
     %__MODULE__{type: :teleport_to_spell_target, spell_id: spell_id}
   end
 
+  def refresh_party_aura(spell, radius) when is_number(radius) do
+    %__MODULE__{type: :refresh_party_aura, spell: spell, amount: radius}
+  end
+
+  def redirect_damage(source_guid, target_guid, school, amount)
+      when is_integer(target_guid) and is_integer(amount) and amount > 0 do
+    %__MODULE__{
+      type: :redirect_damage,
+      source_guid: source_guid,
+      target_guid: target_guid,
+      school: school,
+      amount: amount
+    }
+  end
+
   def consume_cast_item(item_guid) when is_integer(item_guid) do
     %__MODULE__{type: :consume_cast_item, cast_item_guid: item_guid}
   end

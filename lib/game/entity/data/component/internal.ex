@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal do
   """
   defstruct [
     :map,
+    :home_bind,
     :name,
     :area,
     :spells,

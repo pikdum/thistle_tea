@@ -323,6 +323,41 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
 
       refute Enum.any?(mob.internal.events, &(&1.type == :spawn_area_effect))
     end
+
+    test "caster-centered persistent aura uses the caster position without a ground target" do
+      spell = %Spell{
+        id: 26_573,
+        name: "Consecration",
+        school: :holy,
+        duration_ms: 8_000,
+        effects: [
+          %Effect{
+            index: 0,
+            type: :persistent_area_aura,
+            aura: :periodic_damage,
+            base_points: 8,
+            amplitude_ms: 1_000,
+            radius_yards: 8.0,
+            implicit_target_a: :caster_destination,
+            implicit_target_b: :aoe_enemy_at_dest
+          }
+        ]
+      }
+
+      targets = %Targets{raw: <<0::little-size(16)>>}
+      casting = Cast.new(spell, targets, 1_000)
+
+      mob = %Mob{
+        object: %Object{guid: 1},
+        unit: %Unit{},
+        movement_block: %MovementBlock{position: {4.0, 5.0, 6.0, 0.0}},
+        internal: %Internal{map: 0, casting: casting}
+      }
+
+      mob = SpellBT.complete_cast(mob, casting, 1_000)
+
+      assert Enum.any?(mob.internal.events, &match?(%Event{type: :spawn_area_effect, position: {4.0, 5.0, 6.0}}, &1))
+    end
   end
 
   describe "channel auras" do

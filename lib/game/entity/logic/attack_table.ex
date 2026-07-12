@@ -104,6 +104,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
       crit_chance: Map.get(attack, :crit_chance) || @default_crit_chance,
       always_crush?: Map.get(attack, :always_crush?, false),
       spell_swing?: is_integer(Map.get(attack, :queued_spell_id)),
+      block_allowed?: Map.get(attack, :block_allowed?, true),
       physical?: physical_school?(Map.get(attack, :spell_school_mask)),
       skill_diff: skill_diff,
       defender_level: defender_level,
@@ -238,6 +239,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
 
   defp block_bp(%{avoidance_disabled?: true}), do: 0
   defp block_bp(%{from_behind?: true}), do: 0
+  defp block_bp(%{block_allowed?: false}), do: 0
 
   defp block_bp(%{defender_player?: true} = ctx) do
     (CombatRatings.block_chance(ctx.defender_bonuses) + ctx.defender_block_bonus - ctx.skill_diff * 0.04)

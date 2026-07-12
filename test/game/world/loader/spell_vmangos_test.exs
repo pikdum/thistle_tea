@@ -192,4 +192,51 @@ defmodule ThistleTea.Game.World.Loader.SpellVmangosTest do
       refute 14_056 in spell_ids
     end
   end
+
+  describe "melee spell avoidance parsing" do
+    test "only spells marked completely blockable load the block attribute" do
+      assert Spell.attribute?(SpellLoader.load(72), :completely_blocked)
+      refute Spell.attribute?(SpellLoader.load(20_467), :completely_blocked)
+      refute Spell.attribute?(SpellLoader.load(20_424), :completely_blocked)
+    end
+  end
+
+  describe "paladin spell parsing" do
+    test "seals encode exclusive ownership and their judgement spell" do
+      seal = SpellLoader.load(20_287)
+
+      assert seal.exclusive_category == :paladin_seal
+      assert %Effect{index: 2, aura: :dummy, base_points: 20_279} = Enum.find(seal.effects, &(&1.index == 2))
+      refute Spell.attribute?(SpellLoader.load(20_271), :from_behind)
+    end
+
+    test "blessings and auras load their exclusive categories" do
+      assert SpellLoader.load(19_740).exclusive_category == :paladin_blessing
+      assert SpellLoader.load(465).exclusive_category == :paladin_aura
+      assert Enum.any?(SpellLoader.load(465).effects, &(&1.type == :apply_area_aura))
+    end
+
+    test "defensive and stat blessings load semantic aura types" do
+      assert Enum.any?(SpellLoader.load(642).effects, &(&1.aura == :school_immunity))
+      assert Enum.any?(SpellLoader.load(20_217).effects, &(&1.aura == :mod_total_stat_percent))
+      assert Enum.any?(SpellLoader.load(20_911).effects, &(&1.aura == :damage_shield))
+    end
+
+    test "creature-family restrictions come from the DBC mask" do
+      assert SpellLoader.load(879).target_creature_type_mask == 36
+      assert SpellLoader.load(2812).target_creature_type_mask == 36
+      assert SpellLoader.load(2878).target_creature_type_mask == 32
+    end
+
+    test "Lay on Hands loads heal-to-full and paladin debug spells include active talents" do
+      assert Enum.any?(SpellLoader.load(633).effects, &(&1.type == :heal_max_health))
+      assert Enum.any?(SpellLoader.load(639).effects, &(&1.type == :heal))
+      assert Enum.any?(SpellLoader.load(19_750).effects, &(&1.type == :heal))
+
+      spell_ids = ClassSpell.trainable_spell_ids(2, 60)
+      assert 20_066 in spell_ids
+      assert 20_473 in spell_ids
+      assert 20_375 in spell_ids
+    end
+  end
 end

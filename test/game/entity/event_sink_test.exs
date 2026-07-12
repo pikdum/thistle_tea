@@ -6,12 +6,15 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Object
+  alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.Message
+  alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
 
@@ -41,6 +44,108 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
 
       assert ^mob = EventSink.emit(mob, Event.tap_cleared())
       assert Metadata.query(guid, [:tapped_player, :tapped_group_id]) == %{tapped_player: nil, tapped_group_id: nil}
+    end
+
+    test "hearthstone teleports a character to their home bind" do
+      character = %Character{internal: %Internal{map: 1, home_bind: {0, -8_946.0, -132.0, 84.0}}}
+
+      assert ^character = EventSink.emit(character, Event.teleport_to_spell_target(8690))
+      assert_receive {:"$gen_cast", {:start_teleport, -8_946.0, -132.0, 84.0, 0}}
+    end
+
+    @tag :dbc_db
+    test "a released judgement trigger delivers its encoded spell to the victim" do
+      caster_guid = Guid.from_low_guid(:player, unique_guid())
+      target_guid = Guid.from_low_guid(:mob, 1, unique_guid())
+      Entity.register(target_guid)
+
+      on_exit(fn -> Entity.unregister(target_guid) end)
+
+      caster = %Character{
+        object: %Object{guid: caster_guid},
+        unit: %Unit{level: 60},
+        player: %Player{},
+        internal: %Internal{map: 0},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
+      }
+
+      event = Event.trigger_spell(caster_guid, 60, target_guid, 20_187)
+
+      assert ^caster = EventSink.emit(caster, event)
+
+      assert_receive {:"$gen_cast",
+                      {:receive_spell,
+                       %CastContext{
+                         caster_guid: ^caster_guid,
+                         target_guid: ^target_guid
+                       }, %Spell{id: 20_187}}}
+    end
+
+    @tag :dbc_db
+    test "a remote command trigger stays targeted on the victim" do
+      caster_guid = Guid.from_low_guid(:player, unique_guid())
+      target_guid = Guid.from_low_guid(:mob, 1, unique_guid())
+      Entity.register(target_guid)
+
+      on_exit(fn -> Entity.unregister(target_guid) end)
+
+      victim = %Mob{
+        object: %Object{guid: target_guid},
+        unit: %Unit{
+          level: 60,
+          target: caster_guid,
+          health: 1_000,
+          max_health: 1_000,
+          normal_resistance: 0
+        },
+        internal: %Internal{map: 0},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
+      }
+
+      event = Event.trigger_spell(caster_guid, 60, target_guid, 20_467)
+
+      result = EventSink.emit(victim, event)
+
+      assert result.unit.health < victim.unit.health
+    end
+
+    @tag :dbc_db
+    test "a local command proc snapshots weapon damage" do
+      caster_guid = Guid.from_low_guid(:player, unique_guid())
+      target_guid = Guid.from_low_guid(:mob, 1, unique_guid())
+      Entity.register(target_guid)
+
+      on_exit(fn -> Entity.unregister(target_guid) end)
+
+      caster = %Character{
+        object: %Object{guid: caster_guid},
+        unit: %Unit{
+          level: 60,
+          attack_power: 140,
+          base_attack_time: 2_000,
+          base_min_damage: 20.0,
+          base_max_damage: 30.0,
+          min_damage: 30.0,
+          max_damage: 40.0
+        },
+        player: %Player{},
+        internal: %Internal{map: 0},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
+      }
+
+      event = Event.trigger_spell(caster_guid, 60, target_guid, 20_424)
+
+      assert ^caster = EventSink.emit(caster, event)
+
+      assert_receive {:"$gen_cast",
+                      {:receive_spell,
+                       %CastContext{
+                         caster_guid: ^caster_guid,
+                         target_guid: ^target_guid,
+                         weapon_base_min: 20.0,
+                         weapon_base_max: 30.0,
+                         attack_time_ms: 2_000
+                       }, %Spell{id: 20_424}}}
     end
 
     test "script attack_start schedules a forced attack", %{mob: mob, target_guid: target_guid} do

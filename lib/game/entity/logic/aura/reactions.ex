@@ -9,6 +9,9 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
   alias ThistleTea.Game.Entity.Logic.Aura.UnitSync
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Event
+  alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.CastContext
+  alias ThistleTea.Game.Spell.Effect
 
   @charge_consuming_on_hit [:damage_shield, :proc_trigger_spell, :mod_resistance, :mod_resistance_exclusive]
 
@@ -52,10 +55,32 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
 
   defp reaction_event(%Aura{type: type, trigger_spell_id: spell_id}, %Holder{} = holder, owner_guid, attacker_guid)
        when type in [:damage_shield, :proc_trigger_spell] and is_integer(spell_id) and spell_id > 0 do
-    source_guid = holder.caster_guid || owner_guid
-    source_level = holder.caster_level || 1
-    [Event.trigger_spell(source_guid, source_level, attacker_guid, spell_id)]
+    if type == :damage_shield or incoming_melee_proc?(holder.spell) do
+      source_guid = holder.caster_guid || owner_guid
+      source_level = holder.caster_level || 1
+      [Event.trigger_spell(source_guid, source_level, attacker_guid, spell_id)]
+    else
+      []
+    end
+  end
+
+  defp reaction_event(%Aura{type: :damage_shield, amount: amount}, %Holder{} = holder, _owner_guid, attacker_guid)
+       when is_integer(amount) and amount > 0 do
+    spell = %{
+      holder.spell
+      | school: :holy,
+        effects: [%Effect{index: 0, type: :school_damage, base_points: amount, implicit_target_a: :target_enemy}]
+    }
+
+    context = %CastContext{caster_guid: holder.caster_guid, caster_level: holder.caster_level || 1, spell: spell}
+    [Event.deliver_spell(attacker_guid, context, spell)]
   end
 
   defp reaction_event(_aura, _holder, _owner_guid, _attacker_guid), do: []
+
+  defp incoming_melee_proc?(%Spell{proc_type_mask: mask}) when is_integer(mask) do
+    Bitwise.band(mask, 0x00100028) != 0
+  end
+
+  defp incoming_melee_proc?(_spell), do: false
 end

@@ -12,12 +12,12 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
   alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.Entity.Logic.Hostility
   alias ThistleTea.Game.Entity.Logic.MeleeSpell
+  alias ThistleTea.Game.Entity.Logic.Paladin
   alias ThistleTea.Game.Entity.Logic.PlayerCombat
   alias ThistleTea.Game.Entity.Logic.Reactive
   alias ThistleTea.Game.Entity.Logic.Resources
   alias ThistleTea.Game.Entity.Logic.SpellEffect
   alias ThistleTea.Game.Entity.Logic.SpellResist
-  alias ThistleTea.Game.Entity.Logic.SpellTarget
   alias ThistleTea.Game.Entity.SpellTargetResolver
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Spell
@@ -158,11 +158,18 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
     |> break_stealth(casting, now)
     |> mark_hostile_cast(casting, targets, now)
     |> queue_charge(casting)
+    |> release_paladin_seal(casting, hits, now)
     |> apply_spell_hit(casting, hits, now)
     |> consume_unavoidable_finisher(casting)
     |> consume_forced_crit(casting, now)
     |> clear_cast()
   end
+
+  defp release_paladin_seal(character, %Cast{spell: %Spell{} = spell}, [target_guid | _rest], now) do
+    Paladin.release_seal(character, spell, target_guid, now)
+  end
+
+  defp release_paladin_seal(character, _casting, _hits, _now), do: character
 
   defp queue_charge(character, %Cast{spell: %Spell{} = spell, targets: %Targets{unit_guid: unit_guid}})
        when is_integer(unit_guid) and unit_guid > 0 do
@@ -324,7 +331,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
   defp remove_channel_auras(character, _casting), do: {character, []}
 
   defp queue_area_effects(character, %Cast{spell: %Spell{} = spell} = casting) do
-    case Targets.ground_location(casting.targets) do
+    case area_effect_position(character, spell, casting.targets) do
       nil ->
         character
 
@@ -339,6 +346,20 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
   end
 
   defp queue_area_effects(character, _casting), do: character
+
+  defp area_effect_position(character, %Spell{} = spell, %Targets{} = targets) do
+    Targets.ground_location(targets) || caster_area_position(character, spell)
+  end
+
+  defp area_effect_position(_character, _spell, _targets), do: nil
+
+  defp caster_area_position(%{movement_block: %{position: {x, y, z, _o}}}, %Spell{effects: effects}) do
+    if Enum.any?(effects, &(&1.implicit_target_a == :caster_destination or &1.implicit_target_b == :caster_destination)) do
+      {x, y, z}
+    end
+  end
+
+  defp caster_area_position(_character, _spell), do: nil
 
   defp area_duration(%Cast{channel_ms: channel_ms}, _spell) when is_integer(channel_ms) and channel_ms > 0,
     do: channel_ms
@@ -543,8 +564,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
   defp dispatch_to_target(character, _context, _spell, _target_guid, _now), do: character
 
   defp resolve_targets(caster, %Cast{spell: %Spell{} = spell, targets: %Targets{} = targets}) do
-    query = SpellTarget.target_query(spell, targets)
-    resolved = SpellTargetResolver.resolve_query(caster, query)
+    resolved = SpellTargetResolver.resolve(caster, spell, targets)
 
     if Enum.any?(spell.effects, &(&1.implicit_target_a == :caster or &1.implicit_target_b == :caster)) do
       Enum.uniq([caster.object.guid | resolved])

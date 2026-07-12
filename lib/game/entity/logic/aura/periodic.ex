@@ -79,8 +79,16 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
         {ent, [new_aura | acc], events ++ aura_events}
       end)
 
-    {entity, %{holder | auras: Enum.reverse(new_auras)}, events}
+    {holder, area_events} = tick_area_refresh(%{holder | auras: Enum.reverse(new_auras)}, now)
+    {entity, holder, events ++ area_events}
   end
+
+  defp tick_area_refresh(%Holder{next_area_refresh_at: at, area_radius: radius, spell: spell} = holder, now)
+       when is_integer(at) and now >= at and is_number(radius) do
+    {%{holder | next_area_refresh_at: advance_tick(at, 1_000, now)}, [Event.refresh_party_aura(spell, radius)]}
+  end
+
+  defp tick_area_refresh(holder, _now), do: {holder, []}
 
   defp tick_aura(entity, %Holder{} = holder, %Aura{type: :periodic_damage, next_tick_at: at} = aura, now)
        when is_integer(at) and now >= at do
@@ -212,6 +220,9 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
 
   defp holder_event_times(%Holder{} = holder) do
     tick_times = Enum.flat_map(holder.auras, &aura_tick_time/1)
+
+    tick_times =
+      if is_integer(holder.next_area_refresh_at), do: [holder.next_area_refresh_at | tick_times], else: tick_times
 
     if is_integer(holder.expires_at) and holder.expires_at != -1 do
       [holder.expires_at | tick_times]

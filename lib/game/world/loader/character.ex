@@ -121,6 +121,7 @@ defmodule ThistleTea.Game.World.Loader.Character do
         name: params.name,
         area: info.zone,
         map: info.map,
+        home_bind: {info.map, info.position_x, info.position_y, info.position_z},
         spells: spells,
         starting_items: starting_items,
         action_buttons: action_buttons

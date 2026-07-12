@@ -11,12 +11,19 @@ defmodule ThistleTea.Game.Spell.Scripts do
   """
   import Bitwise, only: [&&&: 2]
 
+  alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Spell
 
   @power_word_shield 17
   @weakened_soul 6788
+  @forbearance 25_771
 
-  @apply_triggers %{@power_word_shield => @weakened_soul}
+  @apply_triggers %{
+    @power_word_shield => @weakened_soul,
+    498 => @forbearance,
+    642 => @forbearance,
+    1022 => @forbearance
+  }
 
   @battle_stance_form 17
   @defensive_stance_form 18
@@ -29,7 +36,10 @@ defmodule ThistleTea.Game.Spell.Scripts do
   }
 
   @spell_family_mage 3
+  @spell_family_paladin 10
   @mage_armor_family_flags 0x12000000
+  @paladin_seal_family_flags 0x0A000200
+  @paladin_blessing_family_flags 0x10000100
   @warlock_armor_visual 130
   @warlock_armor_icon 89
 
@@ -45,6 +55,11 @@ defmodule ThistleTea.Game.Spell.Scripts do
   @bloodthirst_ranks [23_881, 23_892, 23_893, 23_894]
   @last_stand 12_975
   @preparation 14_185
+  @holy_shock %{
+    20_473 => %{damage: 25_912, heal: 25_914},
+    20_929 => %{damage: 25_911, heal: 25_913},
+    20_930 => %{damage: 25_902, heal: 25_903}
+  }
   @last_stand_health_buff 12_976
   @last_stand_health_fraction 0.3
   @rogue_finishers [
@@ -78,9 +93,22 @@ defmodule ThistleTea.Game.Spell.Scripts do
   def dummy_effect(%Spell{id: id}) when id in @execute_ranks, do: :execute
   def dummy_effect(%Spell{id: @last_stand}), do: :last_stand
   def dummy_effect(%Spell{id: @preparation}), do: :preparation
+  def dummy_effect(%Spell{id: id}) when is_map_key(@holy_shock, id), do: {:holy_shock, Map.fetch!(@holy_shock, id)}
+  def dummy_effect(%Spell{name: "Judgement of Command"}), do: :judgement_of_command
   def dummy_effect(_spell), do: nil
 
   def execute_damage_spell_id, do: @execute_damage_spell
+
+  def blocked_by_aura?(%Spell{id: id}, entity) when id in [498, 5573, 642, 1020, 1022, 5599, 10_278] do
+    Aura.has_spell?(entity, @forbearance)
+  end
+
+  def blocked_by_aura?(_spell, _entity), do: false
+
+  def paladin_judgement?(%Spell{spell_family: @spell_family_paladin, family_flags_0: flags}) when is_integer(flags),
+    do: (flags &&& 0x00800000) != 0
+
+  def paladin_judgement?(_spell), do: false
 
   def last_stand_health_buff_id, do: @last_stand_health_buff
 
@@ -103,6 +131,13 @@ defmodule ThistleTea.Game.Spell.Scripts do
   def aura_amount_override(_spell, _entity), do: nil
 
   def exclusive_category(row) do
+    case paladin_exclusive_category(row) do
+      nil -> non_paladin_exclusive_category(row)
+      category -> category
+    end
+  end
+
+  defp non_paladin_exclusive_category(row) do
     cond do
       row.spell_class_set == @spell_family_mage and
           ((row.spell_class_mask_0 || 0) &&& @mage_armor_family_flags) != 0 ->
@@ -114,6 +149,24 @@ defmodule ThistleTea.Game.Spell.Scripts do
       true ->
         nil
     end
+  end
+
+  defp paladin_exclusive_category(row) do
+    cond do
+      paladin_family_flag?(row, @paladin_seal_family_flags) -> :paladin_seal
+      paladin_family_flag?(row, @paladin_blessing_family_flags) -> :paladin_blessing
+      paladin_area_aura?(row) -> :paladin_aura
+      true -> nil
+    end
+  end
+
+  defp paladin_family_flag?(row, mask) do
+    row.spell_class_set == @spell_family_paladin and ((row.spell_class_mask_0 || 0) &&& mask) != 0
+  end
+
+  defp paladin_area_aura?(row) do
+    row.spell_class_set == @spell_family_paladin and
+      Enum.any?(0..2, &(Map.get(row, :"effect_#{&1}") == 35))
   end
 
   defp chain_id(%Spell{first_in_chain: first}) when is_integer(first) and first > 0, do: first

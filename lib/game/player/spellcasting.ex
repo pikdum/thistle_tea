@@ -225,7 +225,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
   defp build_target_info(_state, _spell, _targets), do: nil
 
   defp target_info(character, guid) do
-    case Metadata.query(guid, [:alive?, :faction_template, :unit_flags, :health_pct, :orientation]) do
+    case Metadata.query(guid, [:alive?, :faction_template, :unit_flags, :health_pct, :orientation, :creature_type]) do
       nil ->
         :unknown
 
@@ -237,6 +237,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
           friendly?: Hostility.friendly?(character, metadata),
           attackable?: Hostility.attackable?(character, guid),
           health_pct: Map.get(metadata, :health_pct),
+          creature_type: Map.get(metadata, :creature_type),
           position: World.position(guid),
           orientation: Map.get(metadata, :orientation),
           los?: World.line_of_sight?(character, guid)
@@ -262,6 +263,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
   end
 
   defp fail_cast(%Spell{id: spell_id}, reason) do
+    Logger.warning("Spell #{spell_id} failed validation: #{reason}")
     Network.send_packet(Message.SmsgCastResult.failure(spell_id, reason))
   end
 

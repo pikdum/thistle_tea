@@ -52,9 +52,22 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
 
   def take_damage_with_absorb(%{internal: %Internal{godmode: true}} = entity, _damage, _now, _opts), do: {entity, 0}
 
-  def take_damage_with_absorb(%{unit: %Unit{health: health}} = entity, damage, now, opts) when is_integer(now) do
-    damage = scale_damage_taken(entity, damage, Keyword.get(opts, :school, :physical))
-    {entity, remaining} = Aura.absorb_damage(entity, damage, Keyword.get(opts, :school, :physical))
+  def take_damage_with_absorb(entity, damage, now, opts) when is_number(damage) and damage > 0 and is_integer(now) do
+    if Aura.school_immune?(entity, Keyword.get(opts, :school, :physical)) do
+      {entity, damage}
+    else
+      take_unblocked_damage(entity, damage, now, opts)
+    end
+  end
+
+  def take_damage_with_absorb(entity, _damage, _now, _opts), do: {entity, 0}
+
+  defp take_unblocked_damage(%{unit: %Unit{health: health}} = entity, damage, now, opts) do
+    school = Keyword.get(opts, :school, :physical)
+    damage = scale_damage_taken(entity, damage, school)
+    {damage, redirect} = Aura.damage_redirect(entity, damage, school)
+    entity = enqueue_redirect(entity, redirect, Keyword.get(opts, :source), school)
+    {entity, remaining} = Aura.absorb_damage(entity, damage, school)
     absorbed = damage - remaining
     %{unit: unit} = entity
     new_health = max(health - remaining, 0)
@@ -75,7 +88,13 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
     {entity, absorbed}
   end
 
-  def take_damage_with_absorb(entity, _damage, _now, _opts), do: {entity, 0}
+  defp take_unblocked_damage(entity, _damage, _now, _opts), do: {entity, 0}
+
+  defp enqueue_redirect(entity, {target_guid, amount}, source_guid, school) do
+    Event.enqueue(entity, Event.redirect_damage(source_guid, target_guid, school, amount))
+  end
+
+  defp enqueue_redirect(entity, _redirect, _source_guid, _school), do: entity
 
   defp scale_damage_taken(entity, damage, school) when is_integer(damage) and damage > 0 do
     case Aura.percent_multiplier(entity, :mod_damage_percent_taken, Spell.school_mask(school)) do

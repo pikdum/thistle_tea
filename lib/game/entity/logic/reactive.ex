@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.Entity.Logic.Reactive do
 
   @defense_bit 1 <<< 0
   @healthless_20_bit 1 <<< 1
+  @reactive_mask @defense_bit ||| @healthless_20_bit
   @window_ms 4_000
   @warrior 1
   @healthless_threshold 0.2
@@ -64,7 +65,8 @@ defmodule ThistleTea.Game.Entity.Logic.Reactive do
   def tick(entity, _now), do: entity
 
   def sync(%{unit: %Unit{} = unit} = entity, now) do
-    put_aura_state(entity, healthless_bit(unit) ||| defense_bit(entity, now))
+    preserved = (unit.aura_state || 0) &&& bnot(@reactive_mask)
+    put_aura_state(entity, preserved ||| healthless_bit(unit) ||| defense_bit(entity, now))
   end
 
   def sync(entity, _now), do: entity

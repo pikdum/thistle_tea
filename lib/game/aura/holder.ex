@@ -18,6 +18,8 @@ defmodule ThistleTea.Game.Aura.Holder do
     :applied_at,
     :expires_at,
     :charges,
+    :area_radius,
+    :next_area_refresh_at,
     auras: [],
     stacks: 1,
     negative?: false

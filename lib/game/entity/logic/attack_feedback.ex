@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackFeedback do
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Event
+  alias ThistleTea.Game.Entity.Logic.Paladin
   alias ThistleTea.Game.Entity.Logic.Reactive
   alias ThistleTea.Game.Entity.Logic.Resources
   alias ThistleTea.Game.Spell
@@ -25,6 +26,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackFeedback do
     |> apply_rogue_combo_feedback(payload, spell)
     |> stop_gouge_auto_attack(payload, spell)
     |> trigger_blade_flurry(payload)
+    |> Paladin.trigger_seal(payload)
     |> mark_reactives(payload, now)
   end
 

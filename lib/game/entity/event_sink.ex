@@ -28,6 +28,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
   alias ThistleTea.Game.Network.Packet
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
+  alias ThistleTea.Game.Spell.Targets
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.AreaEffects
@@ -547,6 +548,42 @@ defmodule ThistleTea.Game.Entity.EventSink do
 
   def emit(entity, %Event{type: :blade_flurry}), do: entity
 
+  def emit(%Character{} = entity, %Event{type: :refresh_party_aura, spell: %Spell{} = spell, amount: radius})
+      when is_number(radius) do
+    entity
+    |> SpellTargetResolver.resolve_query({:party_aoe, radius})
+    |> Enum.reject(&(&1 == entity.object.guid))
+    |> Enum.each(fn target_guid ->
+      context = CastContext.from_caster(entity, spell, target_guid)
+      Entity.receive_spell(target_guid, context, spell)
+    end)
+
+    entity
+  end
+
+  def emit(entity, %Event{type: :refresh_party_aura}), do: entity
+
+  def emit(entity, %Event{type: :redirect_damage} = event) do
+    spell = %Spell{
+      id: 6940,
+      name: "Blessing of Sacrifice",
+      school: event.school,
+      effects: [
+        %Spell.Effect{index: 0, type: :school_damage, base_points: event.amount, implicit_target_a: :target_enemy}
+      ]
+    }
+
+    context = %CastContext{
+      caster_guid: event.source_guid,
+      caster_level: 1,
+      target_guid: event.target_guid,
+      spell: spell
+    }
+
+    Entity.receive_spell(event.target_guid, context, spell)
+    entity
+  end
+
   def emit(entity, %Event{type: :attacker_lost, target_guid: target_guid}) do
     Metadata.decrement(target_guid, :attacker_count, 0)
     entity
@@ -574,6 +611,14 @@ defmodule ThistleTea.Game.Entity.EventSink do
   end
 
   def emit(entity, %Event{type: :leap}), do: entity
+
+  def emit(%Character{internal: %Internal{home_bind: {map, x, y, z}}} = entity, %Event{
+        type: :teleport_to_spell_target,
+        spell_id: 8690
+      }) do
+    GenServer.cast(self(), {:start_teleport, x, y, z, map})
+    entity
+  end
 
   def emit(%Character{} = entity, %Event{type: :teleport_to_spell_target, spell_id: spell_id}) do
     case SpellLoader.target_position(spell_id) do
@@ -781,9 +826,23 @@ defmodule ThistleTea.Game.Entity.EventSink do
         entity
 
       spell ->
-        case SpellTarget.redirect_enemy_trigger(entity, event.target_guid, spell) do
-          nil -> entity
-          target_guid -> dispatch_triggered_spell(entity, %{event | target_guid: target_guid}, spell)
+        case triggered_target(entity, event, spell) do
+          nil ->
+            entity
+
+          target_guid ->
+            event = %{event | target_guid: target_guid}
+
+            entity
+            |> emit(
+              Event.spell_go(
+                event.source_guid || entity.object.guid,
+                event.spell_id,
+                [target_guid],
+                Targets.unit(target_guid).raw
+              )
+            )
+            |> dispatch_triggered_spell(event, spell)
         end
     end
   end
@@ -892,21 +951,35 @@ defmodule ThistleTea.Game.Entity.EventSink do
   defp projectile_delay_ms(_entity, _event), do: 0
 
   defp dispatch_triggered_spell(%{object: %{guid: guid}} = entity, %Event{target_guid: guid} = event, spell) do
-    context = trigger_context(event, spell)
+    context = trigger_context(entity, event, spell)
     {entity, events} = SpellEffect.receive(entity, context, spell, Time.now())
     emit(entity, events)
   end
 
   defp dispatch_triggered_spell(entity, %Event{} = event, spell) do
-    context = trigger_context(event, spell)
+    context = trigger_context(entity, event, spell)
     emit(entity, Event.deliver_spell(event.target_guid, context, spell))
   end
 
-  defp trigger_context(%Event{} = event, spell) do
+  defp triggered_target(%{object: %{guid: guid}} = entity, %Event{source_guid: guid} = event, spell) do
+    SpellTarget.redirect_enemy_trigger(entity, event.target_guid, spell)
+  end
+
+  defp triggered_target(_entity, %Event{} = event, _spell), do: event.target_guid
+
+  defp trigger_context(%{object: %{guid: guid}} = entity, %Event{source_guid: guid} = event, spell) do
+    %{
+      CastContext.from_caster(entity, spell, event.target_guid)
+      | target_hostile?: Spell.requires_hostile_target?(spell)
+    }
+  end
+
+  defp trigger_context(_entity, %Event{} = event, spell) do
     %CastContext{
       caster_guid: event.source_guid,
       caster_level: event.source_level || 1,
       target_guid: event.target_guid,
+      target_hostile?: Spell.requires_hostile_target?(spell),
       spell: spell
     }
   end

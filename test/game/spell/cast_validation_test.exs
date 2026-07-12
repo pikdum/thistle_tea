@@ -78,6 +78,40 @@ defmodule ThistleTea.Game.Spell.CastValidationTest do
                CastValidation.validate(caster(), harmful_spell(), Targets.unit(7), hostile_target(), @now)
     end
 
+    test "restricts Exorcism and Holy Wrath to undead or demons" do
+      exorcism = harmful_spell(name: "Exorcism", target_creature_type_mask: 36)
+      holy_wrath = harmful_spell(name: "Holy Wrath", target_creature_type_mask: 36)
+
+      assert :ok =
+               CastValidation.validate(caster(), exorcism, Targets.unit(7), hostile_target(creature_type: 6), @now)
+
+      assert :ok =
+               CastValidation.validate(caster(), holy_wrath, Targets.unit(7), hostile_target(creature_type: 3), @now)
+
+      assert {:error, :bad_targets} =
+               CastValidation.validate(caster(), exorcism, Targets.unit(7), hostile_target(creature_type: 7), @now)
+
+      holy_wrath = %{
+        holy_wrath
+        | effects: [%Effect{type: :school_damage, implicit_target_a: :aoe_enemy_at_caster}]
+      }
+
+      assert :ok = CastValidation.validate(caster(), holy_wrath, %Targets{}, nil, @now)
+    end
+
+    test "restricts Turn Undead to undead targets" do
+      turn_undead = %{
+        harmful_spell(name: "Turn Undead", target_creature_type_mask: 32)
+        | effects: [%Effect{type: :apply_aura, aura: :mod_fear, implicit_target_a: :target_enemy}]
+      }
+
+      assert :ok =
+               CastValidation.validate(caster(), turn_undead, Targets.unit(7), hostile_target(creature_type: 6), @now)
+
+      assert {:error, :bad_targets} =
+               CastValidation.validate(caster(), turn_undead, Targets.unit(7), hostile_target(creature_type: 3), @now)
+    end
+
     test "rejects a dead caster" do
       assert {:error, :caster_dead} =
                CastValidation.validate(caster(health: 0), harmful_spell(), Targets.unit(7), hostile_target(), @now)

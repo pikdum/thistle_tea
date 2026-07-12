@@ -3,11 +3,13 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   Applies a cast spell's effects (damage, healing, auras, item creation, …) to
   a target entity, returning the updated entity and the events to emit.
   """
+  alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Logic.AttackTable
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Death
   alias ThistleTea.Game.Entity.Logic.Event
+  alias ThistleTea.Game.Entity.Logic.Paladin
   alias ThistleTea.Game.Entity.Logic.PlayerCombat
   alias ThistleTea.Game.Entity.Logic.Reactive
   alias ThistleTea.Game.Entity.Logic.Resources
@@ -25,16 +27,20 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   @resurrect_effects [:resurrect, :resurrect_new]
 
   def receive(target, %CastContext{} = context, %Spell{} = spell, now) when is_integer(now) do
-    effects = applicable_effects(target, context, spell.effects)
-    spell = %{spell | effects: effects}
-    context = %{context | target_guid: target.object.guid, spell: spell}
-
-    if melee_roll_required?(target, context, spell) do
-      receive_melee_ability(target, context, spell, now)
+    if immune_to_harmful_spell?(target, context, spell) do
+      {target, [Event.spell_log_miss(context.caster_guid, target.object.guid, spell.id, :immune)]}
     else
-      target
-      |> apply_effects(context, effects, [], now)
-      |> with_bonus_threat(context)
+      effects = applicable_effects(target, context, spell.effects)
+      spell = %{spell | effects: effects}
+      context = %{context | target_guid: target.object.guid, spell: spell}
+
+      if melee_roll_required?(target, context, spell) do
+        receive_melee_ability(target, context, spell, now)
+      else
+        target
+        |> apply_effects(context, effects, [], now)
+        |> with_bonus_threat(context)
+      end
     end
   end
 
@@ -44,13 +50,17 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
 
   def receive(target, _context, _spell, _now), do: {target, []}
 
+  defp immune_to_harmful_spell?(target, %CastContext{caster_guid: caster_guid}, %Spell{} = spell) do
+    target.object.guid != caster_guid and Spell.harmful?(spell) and Aura.school_immune?(target, spell.school)
+  end
+
   defp applicable_effects(%{object: %{guid: guid}}, %CastContext{caster_guid: guid}, effects) do
     Enum.reject(effects, &hostile_target_effect?/1)
   end
 
   defp applicable_effects(_target, _context, effects), do: Enum.reject(effects, &caster_target_effect?/1)
 
-  defp caster_target_effect?(%Effect{type: :apply_aura} = effect) do
+  defp caster_target_effect?(%Effect{type: type} = effect) when type in [:apply_aura, :apply_area_aura, :instakill] do
     effect.implicit_target_a == :caster or effect.implicit_target_b == :caster
   end
 
@@ -152,10 +162,10 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
 
         {target, events ++ [event], aura_applied?}
 
-      match?(%Effect{type: :apply_aura}, effect) and aura_applied? ->
+      match?(%Effect{type: type} when type in [:apply_aura, :apply_area_aura], effect) and aura_applied? ->
         {target, events, aura_applied?}
 
-      match?(%Effect{type: :apply_aura}, effect) ->
+      match?(%Effect{type: type} when type in [:apply_aura, :apply_area_aura], effect) ->
         {target, aura_events} = apply_auras(target, context, now)
         {target, events ++ aura_events, true}
 
@@ -194,20 +204,19 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
     end
   end
 
+  defp apply_effect(state, %CastContext{}, _spell, %Effect{type: :instakill}, now) do
+    {Core.take_damage(state, state.unit.health || 0, now, source: state.object.guid), []}
+  end
+
   defp apply_effect(state, %CastContext{}, _spell, %Effect{type: :add_combo_points}, _now), do: {state, []}
 
-  defp apply_effect(
-         %{object: %{guid: guid}} = state,
-         %CastContext{caster_guid: guid},
-         _spell,
-         %Effect{type: :clear_threat},
-         now
-       ) do
+  defp apply_effect(%Character{} = state, %CastContext{}, spell, %Effect{type: :clear_threat}, now) do
     {state, mob_guids} = PlayerCombat.vanish(state, now)
 
     events =
       [Event.drop_nearby_threat()] ++
-        Enum.map(mob_guids, &Event.drop_threat/1) ++ vanish_attack_stop_events(state) ++ vanish_stealth_events(state)
+        Enum.map(mob_guids, &Event.drop_threat/1) ++
+        vanish_attack_stop_events(state) ++ maybe_vanish_stealth_events(state, spell)
 
     {state, events}
   end
@@ -228,11 +237,18 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   defp apply_effect(state, %CastContext{} = context, spell, %Effect{type: :heal} = effect, _now) do
     healing =
       Effect.damage_roll(effect) + bonus_amount(context.healing_bonus, spell) +
-        Aura.flat_modifier(state, :mod_healing, Spell.school_mask(spell))
+        Aura.flat_modifier(state, :mod_healing, Spell.school_mask(spell)) +
+        Paladin.blessing_of_light_bonus(state, spell)
 
     healing = max(trunc(healing * healing_taken_multiplier(state, spell)), 0)
     events = Threat.heal_threat_events(state, context.caster_guid, healing)
 
+    {Core.heal(state, healing), events}
+  end
+
+  defp apply_effect(state, %CastContext{} = context, _spell, %Effect{type: :heal_max_health}, _now) do
+    healing = max((state.unit.max_health || 0) - (state.unit.health || 0), 0)
+    events = Threat.heal_threat_events(state, context.caster_guid, healing)
     {Core.heal(state, healing), events}
   end
 
@@ -274,6 +290,19 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
 
       :preparation ->
         {Cooldowns.reset(state, [14_177, {:category, 39}, {:category, 44}, {:category, 66}]), []}
+
+      {:holy_shock, spell_ids} ->
+        spell_id = if context.target_hostile?, do: spell_ids.damage, else: spell_ids.heal
+        {state, [Event.trigger_spell(context.caster_guid, context.caster_level, state.object.guid, spell_id)]}
+
+      :judgement_of_command ->
+        spell_id = Effect.damage_roll(effect)
+
+        if spell_id > 1 do
+          {state, [Event.trigger_spell(context.caster_guid, context.caster_level, state.object.guid, spell_id)]}
+        else
+          {state, []}
+        end
 
       _unscripted ->
         {state, []}
@@ -378,6 +407,9 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
 
   defp apply_effect(state, _context, _spell, _effect, _now), do: {state, []}
 
+  defp maybe_vanish_stealth_events(state, %Spell{name: "Vanish"}), do: vanish_stealth_events(state)
+  defp maybe_vanish_stealth_events(_state, _spell), do: []
+
   defp vanish_stealth_events(%{object: %{guid: guid}, unit: %{level: level}, internal: %{spellbook: spellbook}})
        when is_map(spellbook) do
     spell_id =
@@ -436,7 +468,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
        when is_integer(now) do
     base = effect_amount(spell, effect, context.combo_points)
     rolled = base + damage_bonus(context, spell, opts)
-    rolled = trunc(rolled * (context.damage_done_multiplier || 1.0))
+    rolled = trunc(rolled * (context.damage_done_multiplier || 1.0) * scripted_damage_multiplier(state, spell))
 
     damage = max(rolled + Aura.flat_modifier(state, :mod_damage_taken, Spell.school_mask(spell)), 0)
 
@@ -462,6 +494,12 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
 
     {state, [event]}
   end
+
+  defp scripted_damage_multiplier(state, %Spell{name: "Judgement of Command"}) do
+    if Aura.has_aura?(state, :mod_stun), do: 1.0, else: 0.5
+  end
+
+  defp scripted_damage_multiplier(_state, _spell), do: 1.0
 
   defp school_resisted_amount(_state, damage, _school, _caster_level, _opts) when damage <= 0, do: 0
   defp school_resisted_amount(_state, _damage, :physical, _caster_level, _opts), do: 0
@@ -646,7 +684,8 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
       caster_attack_skill: context.attack_skill,
       crit_chance: context.melee_crit_chance,
       caster_position: attack_position(context.caster_position),
-      spell_school_mask: Spell.school_mask(spell)
+      spell_school_mask: Spell.school_mask(spell),
+      block_allowed?: Spell.attribute?(spell, :completely_blocked)
     }
   end
 

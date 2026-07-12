@@ -83,7 +83,8 @@ defmodule ThistleTea.Game.Entity.Logic.Stats do
     Enum.reduce(@stat_fields, unit, fn {index, field, base_field, bonus_key}, acc ->
       case Map.get(acc, base_field) do
         base when is_integer(base) ->
-          Map.put(acc, field, base + equipment_bonus(acc, bonus_key) + aura_stat_bonus(acc, index))
+          value = base + equipment_bonus(acc, bonus_key) + aura_stat_bonus(acc, index)
+          Map.put(acc, field, trunc(value * aura_stat_multiplier(acc, index)))
 
         _ ->
           acc
@@ -193,6 +194,20 @@ defmodule ThistleTea.Game.Entity.Logic.Stats do
       _aura ->
         0
     end)
+  end
+
+  defp aura_stat_multiplier(%Unit{} = unit, index) do
+    percent =
+      sum_aura_amounts(unit, fn
+        %Aura{type: :mod_total_stat_percent, amount: amount, misc_value: misc}
+        when is_integer(amount) and (misc == -1 or misc == index) ->
+          amount
+
+        _aura ->
+          0
+      end)
+
+    max(100 + percent, 0) / 100
   end
 
   defp aura_resistance_bonus(%Unit{} = unit, bit) do

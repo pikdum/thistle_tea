@@ -15,7 +15,9 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
   @cone_arc_radians :math.pi() / 3
 
   def resolve(%{object: %{guid: caster_guid}} = caster, %Spell{} = spell, %Targets{} = targets) do
-    resolve_query(caster, caster_guid, SpellTarget.target_query(spell, targets))
+    caster
+    |> resolve_query(caster_guid, SpellTarget.target_query(spell, targets))
+    |> Enum.filter(&creature_type_allowed?(spell, &1))
   end
 
   def resolve(_caster, _spell, _targets), do: []
@@ -140,6 +142,15 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
   defp alive?(guid) do
     case Metadata.query(guid, [:alive?]) do
       %{alive?: alive?} -> alive? == true
+      _ -> false
+    end
+  end
+
+  defp creature_type_allowed?(%Spell{target_creature_type_mask: mask}, _guid) when mask in [0, nil], do: true
+
+  defp creature_type_allowed?(%Spell{} = spell, guid) do
+    case Metadata.query(guid, [:creature_type]) do
+      %{creature_type: creature_type} -> Spell.creature_type_allowed?(spell, creature_type)
       _ -> false
     end
   end

@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Spell.CastValidation do
 
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
   alias ThistleTea.Game.Entity.Logic.Core
+  alias ThistleTea.Game.Entity.Logic.Paladin
   alias ThistleTea.Game.Entity.Logic.Reactive
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Cooldowns
@@ -28,11 +29,13 @@ defmodule ThistleTea.Game.Spell.CastValidation do
          :ok <- check_combo_target(caster, spell, targets, now),
          :ok <- check_stronger_rank(caster, spell, targets),
          :ok <- check_mechanic_immunity(caster, spell, targets),
+         :ok <- check_special_aura_requirements(caster, spell),
          :ok <- check_cooldown(caster, spell, now),
          :ok <- check_power(caster, spell),
          :ok <- check_equipped_item(caster, spell, Keyword.get(opts, :equipped_items, [])),
          :ok <- check_reagents(caster, spell, Keyword.get(opts, :count_item)),
          :ok <- check_target(spell, target_info),
+         :ok <- check_creature_type(spell, target_info),
          :ok <- check_position(caster, spell, target_info),
          :ok <- check_target_aura_state(spell, target_info),
          :ok <- check_range(caster, spell, target_info) do
@@ -132,6 +135,19 @@ defmodule ThistleTea.Game.Spell.CastValidation do
     end
   end
 
+  defp check_special_aura_requirements(caster, %Spell{} = spell) do
+    requirement_met? = not Scripts.paladin_judgement?(spell) or Paladin.active_seal?(caster)
+    check_blocking_aura(caster, spell, requirement_met?)
+  end
+
+  defp check_blocking_aura(caster, spell, requirement_met?) do
+    cond do
+      not requirement_met? -> {:error, :cant_do_that_yet}
+      Scripts.blocked_by_aura?(spell, caster) -> {:error, :immune}
+      true -> :ok
+    end
+  end
+
   defp check_cooldown(caster, spell, now) do
     if not godmode?(caster) and Cooldowns.on_cooldown?(caster, spell, now) do
       {:error, :not_ready}
@@ -223,6 +239,25 @@ defmodule ThistleTea.Game.Spell.CastValidation do
   end
 
   defp check_friendly_target(_target_info), do: :ok
+
+  defp check_creature_type(%Spell{target_creature_type_mask: mask}, _target_info) when mask in [0, nil], do: :ok
+
+  defp check_creature_type(%Spell{} = spell, target_info) when target_info in [nil, :self] do
+    if area_target_spell?(spell), do: :ok, else: {:error, :bad_targets}
+  end
+
+  defp check_creature_type(%Spell{} = spell, %{creature_type: creature_type}) do
+    if Spell.creature_type_allowed?(spell, creature_type), do: :ok, else: {:error, :bad_targets}
+  end
+
+  defp check_creature_type(%Spell{}, _target_info), do: {:error, :bad_targets}
+
+  defp area_target_spell?(%Spell{effects: effects}) do
+    Enum.any?(effects, fn effect ->
+      effect.implicit_target_a in [:aoe_enemy_at_caster, :aoe_enemy_in_cone, :aoe_enemy_at_dest] or
+        effect.implicit_target_b in [:aoe_enemy_at_caster, :aoe_enemy_in_cone, :aoe_enemy_at_dest]
+    end)
+  end
 
   defp check_incidental_target(%{} = target_info) do
     if Map.get(target_info, :alive?) == false, do: {:error, :targets_dead}, else: :ok

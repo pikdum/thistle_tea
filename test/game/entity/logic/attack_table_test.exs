@@ -207,6 +207,12 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTableTest do
       assert result.crit? == false
     end
 
+    test "specials without the completely-blocked attribute skip block" do
+      result = AttackTable.roll_special(mob(), attack(block_allowed?: false), roll: 1_500, crit_roll: 9_999)
+
+      assert result.outcome == :normal
+    end
+
     test "specials never glance or crush" do
       # a glancing-range roll for a white swing lands as a plain hit for a special
       result = AttackTable.roll_special(mob(), attack(), roll: 2_000, crit_roll: 9_999)

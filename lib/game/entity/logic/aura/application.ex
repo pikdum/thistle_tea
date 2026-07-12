@@ -66,8 +66,10 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
           applied_at: now,
           expires_at: expires_at(now, effective_duration(spell, context)),
           charges: holder_charges(spell),
+          area_radius: area_radius(spell),
+          next_area_refresh_at: next_area_refresh_at(spell, context, target_guid, now),
           auras: auras,
-          negative?: negative?(spell, auras, context.caster_guid, target_guid)
+          negative?: negative?(spell, auras, context, target_guid)
         }
 
         do_apply(entity, holder, now)
@@ -101,10 +103,11 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
 
   def mechanic_immune?(_entity, _spell), do: false
 
-  defp negative?(spell, auras, caster_guid, target_guid) do
+  defp negative?(spell, auras, %CastContext{} = context, target_guid) do
     cond do
       Spell.attribute?(spell, :negative) -> true
-      caster_guid == target_guid -> false
+      context.caster_guid == target_guid -> false
+      context.target_hostile? == true and Spell.requires_hostile_target?(spell) -> true
       Enum.any?(auras, fn %Aura{type: type} -> type in @negative_auras end) -> true
       Enum.any?(auras, &negative_resistance_modifier?/1) -> true
       true -> false
@@ -171,10 +174,21 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
 
     Enum.reject(holders, fn %Holder{spell: %Spell{} = other} = existing ->
       Spell.same_chain?(other, spell) or
-        Spell.same_exclusive_category?(other, spell) or
+        exclusive_category_conflict?(existing, incoming) or
         (other.id == spell.id and existing.caster_guid != caster_guid) or
         (shapeshift? and Holder.has_aura_type?(existing, :mod_shapeshift))
     end)
+  end
+
+  defp exclusive_category_conflict?(
+         %Holder{spell: %Spell{exclusive_category: :paladin_blessing}, caster_guid: existing_caster},
+         %Holder{spell: %Spell{exclusive_category: :paladin_blessing}, caster_guid: incoming_caster}
+       ) do
+    existing_caster == incoming_caster
+  end
+
+  defp exclusive_category_conflict?(%Holder{spell: existing}, %Holder{spell: incoming}) do
+    Spell.same_exclusive_category?(existing, incoming)
   end
 
   defp holder_charges(%Spell{proc_charges: charges}) when is_integer(charges) and charges > 0, do: charges
@@ -307,12 +321,31 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
   defp expires_at(_now, -1), do: -1
   defp expires_at(now, duration_ms) when is_integer(duration_ms), do: now + duration_ms
 
+  defp effective_duration(%Spell{} = spell, %CastContext{caster_guid: caster, target_guid: target})
+       when caster != target do
+    if area_radius(spell), do: 2_500, else: spell.duration_ms
+  end
+
   defp effective_duration(%Spell{} = spell, %CastContext{combo_points: points})
        when is_integer(points) and points > 0 do
     Scripts.finisher_duration_ms(spell, points) || spell.duration_ms
   end
 
   defp effective_duration(%Spell{duration_ms: duration_ms}, _context), do: duration_ms
+
+  defp area_radius(%Spell{effects: effects}) do
+    effects
+    |> Enum.filter(&match?(%Effect{type: :apply_area_aura}, &1))
+    |> Enum.map(& &1.radius_yards)
+    |> Enum.filter(&is_number/1)
+    |> Enum.max(fn -> nil end)
+  end
+
+  defp next_area_refresh_at(%Spell{} = spell, %CastContext{caster_guid: caster_guid}, caster_guid, now) do
+    if area_radius(spell), do: now + 1_000
+  end
+
+  defp next_area_refresh_at(_spell, _context, _target_guid, _now), do: nil
 
   defp build_auras(entity, %CastContext{} = context, %Spell{} = spell, now) do
     amount_override = Scripts.aura_amount_override(spell, entity)

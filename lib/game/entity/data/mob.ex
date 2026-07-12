@@ -137,6 +137,7 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
           extra_flags: ct.extra_flags,
           rank: ct.rank,
           type_flags: type_flags(ct),
+          creature_type: ct.creature_type,
           damage_multiplier: ct.damage_multiplier,
           regenerate_stats: regenerate_stats(ct),
           detection_range: detection_range(ct),
@@ -207,7 +208,8 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
   def visibility_metadata(%__MODULE__{unit: %Unit{} = unit, internal: %Internal{creature: %Creature{} = creature}}) do
     %{
       spirit_service?: ((unit.npc_flags || 0) &&& @npc_flag_spirit_service) != 0,
-      ghost_visible?: ((creature.type_flags || 0) &&& @creature_type_flag_ghost_visible) != 0
+      ghost_visible?: ((creature.type_flags || 0) &&& @creature_type_flag_ghost_visible) != 0,
+      creature_type: creature.creature_type
     }
   end
 

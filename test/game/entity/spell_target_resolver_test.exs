@@ -33,6 +33,23 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolverTest do
       assert SpellTargetResolver.resolve(caster, spell, %Targets{}) == [mob_guid]
     end
 
+    test "DBC creature mask filters caster AoE targets" do
+      player_guid = player_guid()
+      undead_guid = mob_guid()
+      humanoid_guid = mob_guid()
+
+      put_spatial_target(:players, player_guid, {0.0, 0.0, 0.0})
+      put_spatial_target(:mobs, undead_guid, {3.0, 0.0, 0.0})
+      put_spatial_target(:mobs, humanoid_guid, {4.0, 0.0, 0.0})
+      Metadata.update(undead_guid, %{creature_type: 6})
+      Metadata.update(humanoid_guid, %{creature_type: 7})
+
+      caster = caster(player_guid, {0.0, 0.0, 0.0})
+      spell = %{aoe_spell(:aoe_enemy_at_caster) | target_creature_type_mask: 36}
+
+      assert SpellTargetResolver.resolve(caster, spell, %Targets{}) == [undead_guid]
+    end
+
     test "returns nearby attackable neutral mobs for player-cast caster aoe" do
       player_guid = player_guid()
       mob_guid = mob_guid()

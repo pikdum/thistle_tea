@@ -114,6 +114,50 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
 
   def has_spell?(_entity, _spell_id), do: false
 
+  def school_immune?(%{unit: %Unit{auras: holders}}, school) when is_list(holders) do
+    school_mask = Spell.school_mask(school)
+
+    Enum.any?(holders, fn %Holder{auras: auras} ->
+      Enum.any?(auras, fn
+        %Aura{type: :school_immunity, misc_value: immune_mask} when is_integer(immune_mask) ->
+          Bitwise.band(immune_mask, school_mask) != 0
+
+        _aura ->
+          false
+      end)
+    end)
+  end
+
+  def school_immune?(_entity, _school), do: false
+
+  def damage_redirect(%{object: %{guid: owner_guid}, unit: %Unit{auras: holders}}, damage, school)
+      when is_list(holders) and damage > 0 do
+    school_mask = Spell.school_mask(school)
+
+    Enum.find_value(holders, {damage, nil}, &holder_redirect(&1, owner_guid, damage, school_mask))
+  end
+
+  def damage_redirect(_entity, damage, _school), do: {damage, nil}
+
+  defp holder_redirect(%Holder{caster_guid: owner_guid}, owner_guid, _damage, _school_mask), do: nil
+
+  defp holder_redirect(%Holder{caster_guid: caster_guid, auras: auras}, _owner_guid, damage, school_mask) do
+    case Enum.find(auras, &split_damage_aura?(&1, school_mask)) do
+      %Aura{amount: amount} when is_integer(amount) and amount >= 0 ->
+        redirected = min(damage, amount + 1)
+        {damage - redirected, {caster_guid, redirected}}
+
+      _aura ->
+        nil
+    end
+  end
+
+  defp split_damage_aura?(%Aura{type: :split_damage_flat, misc_value: mask}, school_mask) when is_integer(mask) do
+    Bitwise.band(mask, school_mask) != 0
+  end
+
+  defp split_damage_aura?(_aura, _school_mask), do: false
+
   def confuse_anchor_key(%{unit: %Unit{auras: holders}}) when is_list(holders) do
     case Enum.find(holders, &(Holder.has_aura_type?(&1, :mod_confuse) or Holder.has_aura_type?(&1, :mod_fear))) do
       %Holder{applied_at: applied_at, spell: %Spell{id: spell_id}} -> {spell_id, applied_at}

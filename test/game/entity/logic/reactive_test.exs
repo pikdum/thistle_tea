@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Entity.Logic.ReactiveTest do
 
   @defense_bit 0x1
   @healthless_bit 0x2
+  @judgement_bit 0x10
 
   defp warrior(opts \\ []) do
     %Character{
@@ -79,6 +80,13 @@ defmodule ThistleTea.Game.Entity.Logic.ReactiveTest do
       entity = %{entity | unit: %{entity.unit | health: 10}}
 
       assert Reactive.sync_health(entity).unit.aura_state == @defense_bit + @healthless_bit
+    end
+
+    test "reactive sync preserves aura-owned state bits" do
+      entity = warrior()
+      entity = %{entity | unit: %{entity.unit | aura_state: @judgement_bit}}
+
+      assert Reactive.sync(entity, 1_000).unit.aura_state == @judgement_bit
     end
   end
 

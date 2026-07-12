@@ -43,12 +43,31 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   def chain(_spell_id), do: nil
 
   defp load_chain(spell_id) do
-    case Mangos.Repo.get(Mangos.SpellChain, spell_id) do
+    row =
+      Mangos.Repo.all(from(chain in Mangos.SpellChain, where: chain.spell_id == ^spell_id))
+      |> select_matching_chain(spell_id)
+
+    case row do
       %Mangos.SpellChain{} = row ->
         %{first_spell: row.first_spell, rank: row.rank, prev_spell: row.prev_spell, req_spell: row.req_spell}
 
       _ ->
         nil
+    end
+  end
+
+  defp select_matching_chain(rows, spell_id) do
+    current_name = spell_name(spell_id)
+
+    rows
+    |> Enum.filter(&(spell_name(&1.first_spell) == current_name))
+    |> Enum.max_by(&(&1.rank || 0), fn -> List.first(rows) end)
+  end
+
+  defp spell_name(spell_id) do
+    case DBC.get(Spell, spell_id) do
+      %Spell{name_en_gb: name} -> name
+      _ -> nil
     end
   end
 
@@ -166,6 +185,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
     build_preloaded(row, &lookup_radius/1)
   end
 
+  # credo:disable-for-next-line Credo.Check.Refactor.CyclomaticComplexity
   defp build_preloaded(row, radius_lookup) do
     %SpellData{
       id: row.id,
@@ -181,9 +201,14 @@ defmodule ThistleTea.Game.World.Loader.Spell do
       speed: row.speed || 0.0,
       aura_interrupt_flags: row.aura_interrupt_flags || 0,
       mechanic: row.mechanic || 0,
+      proc_chance: row.proc_chance || 0,
       proc_charges: row.proc_charges || 0,
-      attributes: attributes(row.attributes, row.attributes_ex1, row.attributes_ex2),
+      proc_type_mask: row.proc_type_mask || 0,
+      attributes: attributes(row.attributes, row.attributes_ex1, row.attributes_ex2, row.attributes_ex3),
       exclusive_category: Scripts.exclusive_category(row),
+      spell_family: row.spell_class_set || 0,
+      family_flags_0: row.spell_class_mask_0 || 0,
+      family_flags_1: row.spell_class_mask_1 || 0,
       effects: build_effects(row, radius_lookup),
       reagents: build_reagents(row)
     }
@@ -200,6 +225,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
       stances: row.shapeshift_mask || 0,
       caster_aura_state: row.caster_aura_state || 0,
       target_aura_state: row.target_aura_state || 0,
+      target_creature_type_mask: row.target_creature_type || 0,
       stack_amount: row.stack_amount || 0
     }
   end
@@ -282,7 +308,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp build_effect(row, index, radius_lookup) do
     type_int = Map.get(row, :"effect_#{index}") || 0
 
-    case effect_type(type_int) do
+    case effect_type(row, type_int) do
       :none ->
         nil
 
@@ -309,6 +335,11 @@ defmodule ThistleTea.Game.World.Loader.Spell do
         }
     end
   end
+
+  defp effect_type(%Spell{spell_class_set: 10, spell_class_mask_0: mask}, 77)
+       when is_integer(mask) and (mask &&& 0xC0000000) != 0, do: :heal
+
+  defp effect_type(_row, type_int), do: effect_type(type_int)
 
   defp effect_misc_value(row, index, :create_item, _aura) do
     Map.get(row, :"effect_item_type_#{index}") || 0
@@ -402,6 +433,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp school(other) when is_integer(other), do: other
 
   defp effect_type(0), do: :none
+  defp effect_type(1), do: :instakill
   defp effect_type(2), do: :school_damage
   defp effect_type(3), do: :dummy
   defp effect_type(5), do: :teleport_units
@@ -410,10 +442,12 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp effect_type(6), do: :apply_aura
   defp effect_type(10), do: :heal
   defp effect_type(18), do: :resurrect
+  defp effect_type(22), do: :parry
   defp effect_type(24), do: :create_item
   defp effect_type(29), do: :leap
   defp effect_type(30), do: :energize
   defp effect_type(33), do: :open_lock
+  defp effect_type(35), do: :apply_area_aura
   defp effect_type(38), do: :dispel
   defp effect_type(40), do: :dual_wield
   defp effect_type(60), do: :proficiency
@@ -423,6 +457,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp effect_type(62), do: :power_burn
   defp effect_type(63), do: :modify_threat
   defp effect_type(68), do: :interrupt_cast
+  defp effect_type(77), do: :script_effect
   defp effect_type(79), do: :clear_threat
   defp effect_type(80), do: :add_combo_points
   defp effect_type(96), do: :charge
@@ -431,6 +466,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp effect_type(27), do: :persistent_area_aura
   defp effect_type(58), do: :weapon_damage
   defp effect_type(64), do: :trigger_spell
+  defp effect_type(67), do: :heal_max_health
   defp effect_type(113), do: :resurrect_new
   defp effect_type(114), do: :attack_me
   defp effect_type(other) when is_integer(other), do: other
@@ -443,6 +479,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp aura_type(5), do: :mod_confuse
   defp aura_type(7), do: :mod_fear
   defp aura_type(8), do: :periodic_heal
+  defp aura_type(9), do: :mod_melee_haste
   defp aura_type(10), do: :mod_threat
   defp aura_type(11), do: :mod_taunt
   defp aura_type(12), do: :mod_stun
@@ -455,12 +492,15 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp aura_type(22), do: :mod_resistance
   defp aura_type(23), do: :periodic_trigger_spell
   defp aura_type(24), do: :periodic_energize
+  defp aura_type(25), do: :state_immunity
   defp aura_type(26), do: :mod_root
   defp aura_type(31), do: :mod_increase_speed
   defp aura_type(33), do: :mod_decrease_speed
   defp aura_type(34), do: :mod_increase_health
   defp aura_type(36), do: :mod_shapeshift
+  defp aura_type(39), do: :school_immunity
   defp aura_type(42), do: :proc_trigger_spell
+  defp aura_type(43), do: :damage_shield
   defp aura_type(49), do: :mod_dodge
   defp aura_type(51), do: :mod_block_percent
   defp aura_type(52), do: :mod_crit_percent
@@ -490,11 +530,15 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp aura_type(113), do: :mod_ranged_damage_taken
   defp aura_type(115), do: :mod_healing
   defp aura_type(116), do: :mod_regen_during_combat
+  defp aura_type(117), do: :mechanic_resistance
   defp aura_type(118), do: :mod_healing_pct
   defp aura_type(134), do: :mod_mana_regen_interrupt
   defp aura_type(135), do: :mod_healing_done
+  defp aura_type(137), do: :mod_total_stat_percent
   defp aura_type(138), do: :mod_melee_haste
   defp aura_type(143), do: :mod_resistance_exclusive
+  defp aura_type(149), do: :reduce_pushback
+  defp aura_type(153), do: :split_damage_flat
   defp aura_type(161), do: :mod_health_regen_in_combat
   defp aura_type(other) when is_integer(other), do: other
 
@@ -504,6 +548,8 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp target_type(21), do: :target_ally
   defp target_type(57), do: :target_ally
   defp target_type(15), do: :aoe_enemy_at_caster
+  defp target_type(16), do: :aoe_enemy_at_dest
+  defp target_type(18), do: :caster_destination
   defp target_type(20), do: :party_around_caster
   defp target_type(22), do: :aoe_enemy_at_caster
   defp target_type(33), do: :party_around_caster
@@ -527,9 +573,12 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   @discount_power_on_miss_ex_1 0x08000000
   @ignore_line_of_sight_ex2 0x00000004
   @from_behind_ex2 0x00100000
+  @from_behind_ex1 0x00000200
+  @completely_blocked_ex3 0x00000008
 
-  defp attributes(attrs, attrs_ex1, attrs_ex2) when is_integer(attrs) and is_integer(attrs_ex1) do
+  defp attributes(attrs, attrs_ex1, attrs_ex2, attrs_ex3) when is_integer(attrs) and is_integer(attrs_ex1) do
     attrs_ex2 = if is_integer(attrs_ex2), do: attrs_ex2, else: 0
+    attrs_ex3 = if is_integer(attrs_ex3), do: attrs_ex3, else: 0
 
     base =
       MapSet.new()
@@ -543,16 +592,21 @@ defmodule ThistleTea.Game.World.Loader.Spell do
       |> add_if(attrs, @cooldown_on_event, :cooldown_on_event)
 
     base = if attrs == 0x150010, do: MapSet.put(base, :target_facing_caster), else: base
+    base = if from_behind?(attrs_ex1, attrs_ex2), do: MapSet.put(base, :from_behind), else: base
 
     base
     |> add_if(attrs_ex1, @channeled_ex_1, :channeled)
     |> add_if(attrs_ex1, @channeled_ex_2, :channeled)
     |> add_if(attrs_ex1, @discount_power_on_miss_ex_1, :discount_power_on_miss)
     |> add_if(attrs_ex2, @ignore_line_of_sight_ex2, :ignore_line_of_sight)
-    |> add_if(attrs_ex2, @from_behind_ex2, :from_behind)
+    |> add_if(attrs_ex3, @completely_blocked_ex3, :completely_blocked)
   end
 
-  defp attributes(_, _, _), do: MapSet.new()
+  defp attributes(_, _, _, _), do: MapSet.new()
+
+  defp from_behind?(attrs_ex1, attrs_ex2) do
+    attrs_ex2 == @from_behind_ex2 and (attrs_ex1 &&& @from_behind_ex1) != 0
+  end
 
   defp add_if(set, mask, bit, atom) do
     if (mask &&& bit) == 0, do: set, else: MapSet.put(set, atom)

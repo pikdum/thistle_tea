@@ -21,6 +21,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.UnitSync do
   @aflag_eff_index_0 0x08
 
   @unit_flag_disarmed 0x00200000
+  @judgement_aura_state_bit 1 <<< 4
 
   def sync_unit(%Unit{} = unit) do
     unit
@@ -28,6 +29,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.UnitSync do
     |> sync_transform()
     |> sync_shapeshift()
     |> sync_disarm()
+    |> sync_aura_state()
     |> sync_aura_fields()
   end
 
@@ -82,6 +84,19 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.UnitSync do
   end
 
   defp sync_disarm(unit), do: unit
+
+  defp sync_aura_state(%Unit{auras: holders, aura_state: aura_state} = unit) when is_list(holders) do
+    active? = Enum.any?(holders, &match?(%Holder{spell: %Spell{exclusive_category: :paladin_seal}}, &1))
+    aura_state = aura_state || 0
+
+    if active? do
+      %{unit | aura_state: aura_state ||| @judgement_aura_state_bit}
+    else
+      %{unit | aura_state: aura_state &&& bnot(@judgement_aura_state_bit)}
+    end
+  end
+
+  defp sync_aura_state(unit), do: unit
 
   defp sync_aura_fields(%Unit{auras: holders} = unit) when is_list(holders) and holders != [] do
     %{
