@@ -810,14 +810,14 @@ defmodule ThistleTea.Game.Entity.EventSink do
   def emit(%Character{} = entity, %Event{type: :summon_pet, entry: entry, spell_id: spell_id}) do
     with %Mob{} = built_pet <- SummonLoader.build_pet(entry, entity),
          pet = %{built_pet | unit: %{built_pet.unit | created_by_spell: spell_id}},
-         {:ok, _pid} <- MobLoader.start_mob(pet) do
+         {:ok, pid} <- MobLoader.start_mob(pet) do
       old_pet_guid = entity.unit.summon
 
       if is_integer(old_pet_guid) and old_pet_guid > 0 and old_pet_guid != pet.object.guid do
         World.stop_entity(old_pet_guid)
       end
 
-      send(self(), {:pet_attached, pet.object.guid, spell_id, Map.values(pet.internal.spellbook)})
+      send(pid, {:attach_pet, self(), spell_id, Map.values(pet.internal.spellbook)})
     end
 
     entity

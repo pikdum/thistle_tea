@@ -114,6 +114,10 @@ defmodule ThistleTea.Game.Network.Server do
 
   defp create_update?(%UpdateObject{}), do: false
 
+  defp duplicate_create?(state, %UpdateObject{object: %{guid: guid}} = update) do
+    create_update?(update) and Visibility.tracked?(state, guid)
+  end
+
   defp track_created_updates(state, updates) do
     created_guids =
       updates
@@ -141,11 +145,15 @@ defmodule ThistleTea.Game.Network.Server do
   end
 
   def handle_cast({:send_packet, %UpdateObject{} = update}, {socket, state}) do
-    update = Tap.personalize(update, Map.get(state, :guid))
-    {packet, updates} = UpdateBatcher.batch(update, Map.get(state, :guid))
-    state = Network.Send.send_packet(packet, {socket, state})
-    state = track_created_updates(state, updates)
-    {:noreply, {socket, state}, socket.read_timeout}
+    if duplicate_create?(state, update) do
+      {:noreply, {socket, state}, socket.read_timeout}
+    else
+      update = Tap.personalize(update, Map.get(state, :guid))
+      {packet, updates} = UpdateBatcher.batch(update, Map.get(state, :guid))
+      state = Network.Send.send_packet(packet, {socket, state})
+      state = track_created_updates(state, updates)
+      {:noreply, {socket, state}, socket.read_timeout}
+    end
   end
 
   def handle_cast({:send_packet, %Packet{opcode: @smsg_update_object}}, {_socket, _state}) do
@@ -541,8 +549,7 @@ defmodule ThistleTea.Game.Network.Server do
       |> EventSink.emit(aura_events)
       |> Core.mark_broadcast_update()
 
-    Network.send_packet(Message.SmsgPetSpells.for_pet(pet_guid, pet_spells))
-    {:noreply, {socket, %{state | character: character}}, {:continue, :maybe_broadcast_update}}
+    {:noreply, {socket, %{state | character: character}}, {:continue, {:finish_pet_attach, pet_guid, pet_spells}}}
   end
 
   def handle_info(
@@ -596,6 +603,12 @@ defmodule ThistleTea.Game.Network.Server do
   end
 
   @impl GenServer
+  def handle_continue({:finish_pet_attach, pet_guid, pet_spells}, {socket, state}) do
+    state = maybe_broadcast_update(state)
+    Network.send_packet(Message.SmsgPetSpells.for_pet(pet_guid, pet_spells))
+    {:noreply, {socket, state}, socket.read_timeout}
+  end
+
   def handle_continue(:maybe_broadcast_update, {socket, state}) do
     {:noreply, {socket, maybe_broadcast_update(state)}, socket.read_timeout}
   end

@@ -338,6 +338,19 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     {:noreply, state}
   end
 
+  def handle_info(
+        {:attach_pet, owner_pid, spell_id, pet_spells},
+        %Mob{object: %{guid: pet_guid}, internal: %Internal{pet: %Pet{}}} = state
+      )
+      when is_pid(owner_pid) do
+    state
+    |> Core.update_object()
+    |> Network.send_packet(owner_pid)
+
+    send(owner_pid, {:pet_attached, pet_guid, spell_id, pet_spells})
+    {:noreply, state}
+  end
+
   def handle_info({:owner_attacked, attacker_guid}, %Mob{internal: %Internal{pet: %Pet{}}} = state)
       when is_integer(attacker_guid) do
     state = state |> engage_combat(attacker_guid) |> wake_ai_tick()
