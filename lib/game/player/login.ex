@@ -127,12 +127,11 @@ defmodule ThistleTea.Game.Player.Login do
         ready: false
     }
 
-    state
-    |> restore_active_pet()
-    |> schedule_aura_tick()
+    schedule_aura_tick(state)
   end
 
-  defp restore_active_pet(%{character: %Character{internal: internal} = character} = state) do
+  def restore_active_pet(%{character: %Character{unit: %Unit{summon: summon}, internal: internal} = character} = state)
+      when summon in [0, nil] do
     case {internal.active_pet_entry, internal.active_pet_spell_id} do
       {entry, spell_id} when is_integer(entry) and entry > 0 and is_integer(spell_id) and spell_id > 0 ->
         EventSink.emit(character, Event.summon_pet(character.object.guid, entry, spell_id))
@@ -142,6 +141,8 @@ defmodule ThistleTea.Game.Player.Login do
         state
     end
   end
+
+  def restore_active_pet(state), do: state
 
   def send_init_packets(c) do
     # needed for no white chatbox + keybinds

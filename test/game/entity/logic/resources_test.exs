@@ -184,6 +184,20 @@ defmodule ThistleTea.Game.Entity.Logic.ResourcesTest do
       assert Resources.spend_power(entity, spell, 5_000) == entity
     end
 
+    test "spends health-based channel costs each tick" do
+      entity = %Mob{
+        unit: %Unit{level: 50, health: 100, max_health: 100},
+        internal: %Internal{}
+      }
+
+      spell = %Spell{mana_cost_per_second: 33, mana_cost_per_second_per_level: 0, power_type: -2}
+
+      assert Resources.can_pay_channel_cost?(entity, spell, 1_000)
+      assert Resources.spend_channel_cost(entity, spell, 1_000, 5_000).unit.health == 67
+
+      refute Resources.can_pay_channel_cost?(%{entity | unit: %{entity.unit | health: 33}}, spell, 1_000)
+    end
+
     test "percent costs of a power draw from the maximum" do
       entity = %Mob{
         unit: %Unit{power_type: 0, power1: 100, max_power1: 100, base_mana: 80},

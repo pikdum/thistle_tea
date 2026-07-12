@@ -50,6 +50,7 @@ defmodule ThistleTea.Game.Network.Server do
   alias ThistleTea.Game.Player.Enchantments
   alias ThistleTea.Game.Player.GameObjects, as: PlayerGameObjects
   alias ThistleTea.Game.Player.Items
+  alias ThistleTea.Game.Player.Login
   alias ThistleTea.Game.Player.Quests
   alias ThistleTea.Game.Player.Spellcasting
   alias ThistleTea.Game.Player.Stats, as: PlayerStats
@@ -336,8 +337,11 @@ defmodule ThistleTea.Game.Network.Server do
   @impl GenServer
   def handle_cast(
         {:start_teleport, x, y, z, map},
-        {socket, %{character: %Character{internal: %Internal{map: map}} = character} = state}
+        {socket, %{character: %Character{internal: %Internal{map: map}}} = state}
       ) do
+    state = suspend_pet_for_teleport(state)
+    character = state.character
+
     area =
       case Pathfinding.get_zone_and_area(map, {x, y, z}) do
         {_zone, area} -> area
@@ -366,10 +370,14 @@ defmodule ThistleTea.Game.Network.Server do
       |> Visibility.refresh_player()
       |> Visibility.resync_player()
 
+    send(self(), :restore_active_pet)
+
     {:noreply, {socket, state}, socket.read_timeout}
   end
 
   def handle_cast({:start_teleport, x, y, z, map}, {socket, state}) do
+    state = suspend_pet_for_teleport(state)
+
     # Update player's location
     area =
       case Pathfinding.get_zone_and_area(map, {x, y, z}) do
@@ -411,6 +419,10 @@ defmodule ThistleTea.Game.Network.Server do
     # The client responds with a MSG_MOVE_WORLDPORT_ACK message which
     # is handled in the login handler as they share the same init process
     {:noreply, {socket, state}, socket.read_timeout}
+  end
+
+  def handle_info(:restore_active_pet, {socket, state}) do
+    {:noreply, {socket, Login.restore_active_pet(state)}, socket.read_timeout}
   end
 
   @impl GenServer
@@ -717,6 +729,14 @@ defmodule ThistleTea.Game.Network.Server do
   defp spell_caster_guid(%{caster_guid: guid}) when is_integer(guid), do: guid
   defp spell_caster_guid(guid) when is_integer(guid), do: guid
   defp spell_caster_guid(_caster), do: nil
+
+  defp suspend_pet_for_teleport(%Session{character: %Character{unit: %Unit{summon: pet_guid}}} = state)
+       when is_integer(pet_guid) and pet_guid > 0 do
+    Network.send_packet(Message.SmsgPetSpells.clear())
+    Session.suspend_active_pet(state)
+  end
+
+  defp suspend_pet_for_teleport(%Session{} = state), do: state
 
   @impl ThousandIsland.Handler
   def handle_connection(socket, _) do

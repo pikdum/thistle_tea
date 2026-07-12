@@ -429,16 +429,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
         {stop_channel(character, casting), 50}
 
       is_integer(casting.next_channel_tick_at) and now >= casting.next_channel_tick_at ->
-        targets = resolve_targets(character, casting)
-
-        character =
-          character
-          |> queue_trigger_spell_go(casting, targets)
-          |> apply_spell_hit(casting, targets, now)
-
-        casting = Cast.advance_channel_tick(casting, now)
-        delay_ms = Cast.next_channel_delay(casting, now)
-        {%{character | internal: %{character.internal | casting: casting}}, delay_ms}
+        pay_and_apply_channel_tick(character, casting, now)
 
       true ->
         {character, Cast.next_channel_delay(casting, now)}
@@ -446,6 +437,24 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
   end
 
   defp channel_tick(character, casting, now), do: {character, Cast.next_channel_delay(casting, now)}
+
+  defp pay_and_apply_channel_tick(character, %Cast{} = casting, now) do
+    if Resources.can_pay_channel_cost?(character, casting.spell, casting.channel_tick_ms) do
+      targets = resolve_targets(character, casting)
+
+      character =
+        character
+        |> Resources.spend_channel_cost(casting.spell, casting.channel_tick_ms, now)
+        |> queue_trigger_spell_go(casting, targets)
+        |> apply_spell_hit(casting, targets, now)
+
+      casting = Cast.advance_channel_tick(casting, now)
+      delay_ms = Cast.next_channel_delay(casting, now)
+      {%{character | internal: %{character.internal | casting: casting}}, delay_ms}
+    else
+      {stop_channel(character, casting), 50}
+    end
+  end
 
   defp unit_channel_target_dead?(%Cast{targets: %Targets{unit_guid: guid}}) when is_integer(guid) and guid > 0 do
     case Metadata.query(guid, [:alive?]) do

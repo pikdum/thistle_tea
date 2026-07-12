@@ -45,7 +45,7 @@ defmodule ThistleTea.Game.Network.Session do
       _ -> :ok
     end
 
-    state = dismiss_active_pet(state)
+    state = suspend_active_pet(state)
 
     if state.character, do: CharacterStore.put(state.character)
 
@@ -56,13 +56,13 @@ defmodule ThistleTea.Game.Network.Session do
     %__MODULE__{account: state.account, conn: state.conn}
   end
 
-  defp dismiss_active_pet(%__MODULE__{character: %{unit: %{summon: pet_guid} = unit} = character} = state)
-       when is_integer(pet_guid) and pet_guid > 0 do
+  def suspend_active_pet(%__MODULE__{character: %{unit: %{summon: pet_guid} = unit} = character} = state)
+      when is_integer(pet_guid) and pet_guid > 0 do
     World.stop_entity(pet_guid)
     %{state | character: %{character | unit: %{unit | summon: 0}}}
   end
 
-  defp dismiss_active_pet(%__MODULE__{} = state), do: state
+  def suspend_active_pet(%__MODULE__{} = state), do: state
 
   defp leave_world_presence(%__MODULE__{} = state) do
     Entity.unregister(state.guid)

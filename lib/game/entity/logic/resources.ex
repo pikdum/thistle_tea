@@ -32,6 +32,38 @@ defmodule ThistleTea.Game.Entity.Logic.Resources do
 
   def spend_power(entity, _spell, _now), do: entity
 
+  def can_pay_channel_cost?(%{internal: %Internal{godmode: true}}, %Spell{}, _tick_ms), do: true
+
+  def can_pay_channel_cost?(
+        %{unit: %Unit{health: health}} = entity,
+        %Spell{power_type: @health_power_type} = spell,
+        tick_ms
+      ) do
+    cost = channel_cost(entity, spell, tick_ms)
+    cost == 0 or (is_integer(health) and health > cost)
+  end
+
+  def can_pay_channel_cost?(%{unit: %Unit{} = unit} = entity, %Spell{power_type: power_type} = spell, tick_ms) do
+    cost = channel_cost(entity, spell, tick_ms)
+    power = Map.get(unit, Map.get(@power_fields, power_type))
+    cost == 0 or (is_integer(power) and power >= cost)
+  end
+
+  def can_pay_channel_cost?(_entity, _spell, _tick_ms), do: true
+
+  def spend_channel_cost(entity, %Spell{power_type: power_type} = spell, tick_ms, now) when is_integer(now) do
+    do_spend(entity, power_type, channel_cost(entity, spell, tick_ms), now)
+  end
+
+  def spend_channel_cost(entity, _spell, _tick_ms, _now), do: entity
+
+  def channel_cost(%{unit: %Unit{level: level}}, %Spell{} = spell, tick_ms) when is_integer(tick_ms) and tick_ms > 0 do
+    per_second = (spell.mana_cost_per_second || 0) + (spell.mana_cost_per_second_per_level || 0) * max(level || 1, 1)
+    max(round(per_second * tick_ms / 1_000), 0)
+  end
+
+  def channel_cost(_entity, _spell, _tick_ms), do: 0
+
   def power_cost(entity, %Spell{mana_cost: cost, mana_cost_percent: percent, power_type: power_type}) do
     (cost || 0) + percent_cost(entity, power_type, percent)
   end

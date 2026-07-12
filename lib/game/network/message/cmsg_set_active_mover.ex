@@ -25,6 +25,8 @@ defmodule ThistleTea.Game.Network.Message.CmsgSetActiveMover do
   defp enter_world(%{ready: true} = state), do: state
 
   defp enter_world(state) do
-    Visibility.enter_player(%{state | ready: true})
+    state = Visibility.enter_player(%{state | ready: true})
+    send(self(), :restore_active_pet)
+    state
   end
 end

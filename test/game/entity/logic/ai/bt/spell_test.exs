@@ -110,6 +110,38 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
       assert mob.internal.casting.next_channel_tick_at > now
       assert mob.internal.events == []
     end
+
+    test "channel tick spends the spell's per-second health cost" do
+      now = 1_000
+
+      spell = %Spell{
+        id: 11_693,
+        power_type: -2,
+        mana_cost_per_second: 33,
+        attributes: MapSet.new([:channeled]),
+        effects: []
+      }
+
+      mob = %Mob{
+        object: %Object{guid: 1},
+        unit: %Unit{level: 50, health: 100, max_health: 100},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+        internal: %Internal{
+          map: 0,
+          casting: %Cast{
+            spell: spell,
+            targets: %Targets{raw: <<0::little-size(16)>>, unit_guid: 1},
+            channel_ms: 10_000,
+            channel_tick_ms: 1_000,
+            next_channel_tick_at: now - 1,
+            ends_at: now + 10_000
+          }
+        }
+      }
+
+      assert {{:running, _delay_ms}, mob, %Blackboard{}} = SpellBT.cast_tick(mob, Blackboard.new(), now)
+      assert mob.unit.health == 67
+    end
   end
 
   describe "complete_cast/3" do

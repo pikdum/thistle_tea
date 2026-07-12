@@ -255,6 +255,14 @@ defmodule ThistleTea.Game.World.Loader.SpellVmangosTest do
       assert Enum.any?(SpellLoader.load(18_220).effects, &(&1.type == :power_drain and &1.implicit_target_a == :pet))
     end
 
+    test "Health Funnel loads its initial and per-second health costs" do
+      spell = SpellLoader.load(11_693)
+
+      assert spell.power_type == -2
+      assert spell.mana_cost == 45
+      assert spell.mana_cost_per_second == 33
+    end
+
     test "curses share per-caster exclusive ownership" do
       assert SpellLoader.load(702).exclusive_category == :warlock_curse
       assert SpellLoader.load(980).exclusive_category == :warlock_curse
