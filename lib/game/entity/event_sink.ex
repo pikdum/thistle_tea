@@ -561,6 +561,22 @@ defmodule ThistleTea.Game.Entity.EventSink do
     entity
   end
 
+  def emit(%Mob{object: %{guid: guid}, internal: %{pet: %{owner_guid: owner_guid}}} = entity, %Event{
+        type: :refresh_party_aura,
+        spell: %Spell{} = spell
+      }) do
+    context = %CastContext{
+      caster_guid: guid,
+      caster_level: entity.unit.level || 1,
+      target_guid: owner_guid,
+      target_hostile?: false,
+      spell: spell
+    }
+
+    Entity.receive_spell(owner_guid, context, spell)
+    entity
+  end
+
   def emit(entity, %Event{type: :refresh_party_aura}), do: entity
 
   def emit(entity, %Event{type: :redirect_damage} = event) do
@@ -785,6 +801,24 @@ defmodule ThistleTea.Game.Entity.EventSink do
   end
 
   def emit(entity, %Event{type: :summon_creature}), do: entity
+
+  def emit(%Character{} = entity, %Event{type: :summon_pet, entry: entry, spell_id: spell_id}) do
+    with %Mob{} = built_pet <- SummonLoader.build_pet(entry, entity),
+         pet = %{built_pet | unit: %{built_pet.unit | created_by_spell: spell_id}},
+         {:ok, _pid} <- MobLoader.start_mob(pet) do
+      old_pet_guid = entity.unit.summon
+
+      if is_integer(old_pet_guid) and old_pet_guid > 0 and old_pet_guid != pet.object.guid do
+        World.stop_entity(old_pet_guid)
+      end
+
+      send(self(), {:pet_attached, pet.object.guid, spell_id, pet.internal.creature.spells})
+    end
+
+    entity
+  end
+
+  def emit(entity, %Event{type: :summon_pet}), do: entity
 
   def emit(entity, %Event{type: :despawn_self} = event) do
     Process.send_after(self(), {:despawn_creature, event.respawn_delay_ms}, event.duration_ms || 0)

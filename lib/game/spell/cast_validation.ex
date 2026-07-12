@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Spell.CastValidation do
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Paladin
   alias ThistleTea.Game.Entity.Logic.Reactive
+  alias ThistleTea.Game.Entity.Logic.Warlock
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Cooldowns
   alias ThistleTea.Game.Spell.Scripts
@@ -30,6 +31,7 @@ defmodule ThistleTea.Game.Spell.CastValidation do
          :ok <- check_stronger_rank(caster, spell, targets),
          :ok <- check_mechanic_immunity(caster, spell, targets),
          :ok <- check_special_aura_requirements(caster, spell),
+         :ok <- check_warlock_resources(caster, spell),
          :ok <- check_cooldown(caster, spell, now),
          :ok <- check_power(caster, spell),
          :ok <- check_equipped_item(caster, spell, Keyword.get(opts, :equipped_items, [])),
@@ -38,6 +40,7 @@ defmodule ThistleTea.Game.Spell.CastValidation do
          :ok <- check_creature_type(spell, target_info),
          :ok <- check_position(caster, spell, target_info),
          :ok <- check_target_aura_state(spell, target_info),
+         :ok <- check_warlock_target(caster, spell, target_info),
          :ok <- check_range(caster, spell, target_info) do
       check_line_of_sight(spell, target_info)
     end
@@ -89,6 +92,19 @@ defmodule ThistleTea.Game.Spell.CastValidation do
 
   defp check_target_aura_state(_spell, _target_info), do: :ok
 
+  defp check_warlock_target(%{object: %{guid: caster_guid}}, %Spell{} = spell, %{aura_sources: sources}) do
+    if Warlock.conflagrate?(spell) and
+         not Enum.any?(sources, fn {_id, name, source_guid} -> name == "Immolate" and source_guid == caster_guid end) do
+      {:error, :target_aurastate}
+    else
+      :ok
+    end
+  end
+
+  defp check_warlock_target(_caster, %Spell{} = spell, _target_info) do
+    if Warlock.conflagrate?(spell), do: {:error, :target_aurastate}, else: :ok
+  end
+
   defp check_position(caster, %Spell{} = spell, target_info) do
     cond do
       Spell.attribute?(spell, :from_behind) and not behind_target?(caster, target_info) -> {:error, :not_behind}
@@ -138,6 +154,14 @@ defmodule ThistleTea.Game.Spell.CastValidation do
   defp check_special_aura_requirements(caster, %Spell{} = spell) do
     requirement_met? = not Scripts.paladin_judgement?(spell) or Paladin.active_seal?(caster)
     check_blocking_aura(caster, spell, requirement_met?)
+  end
+
+  defp check_warlock_resources(caster, %Spell{} = spell) do
+    if Warlock.life_tap?(spell) and (caster.unit.health || 0) <= Warlock.life_tap_cost(spell) do
+      {:error, :fizzle}
+    else
+      :ok
+    end
   end
 
   defp check_blocking_aura(caster, spell, requirement_met?) do

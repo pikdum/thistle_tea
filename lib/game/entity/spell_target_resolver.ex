@@ -15,12 +15,23 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
   @cone_arc_radians :math.pi() / 3
 
   def resolve(%{object: %{guid: caster_guid}} = caster, %Spell{} = spell, %Targets{} = targets) do
+    query = pet_target_query(caster, spell) || SpellTarget.target_query(spell, targets)
+
     caster
-    |> resolve_query(caster_guid, SpellTarget.target_query(spell, targets))
+    |> resolve_query(caster_guid, query)
     |> Enum.filter(&creature_type_allowed?(spell, &1))
   end
 
   def resolve(_caster, _spell, _targets), do: []
+
+  defp pet_target_query(%{unit: %{summon: pet_guid}}, %Spell{effects: effects})
+       when is_integer(pet_guid) and pet_guid > 0 do
+    if Enum.any?(effects, &(&1.implicit_target_a == :pet or &1.implicit_target_b == :pet)) do
+      {:unit, pet_guid}
+    end
+  end
+
+  defp pet_target_query(_caster, _spell), do: nil
 
   def resolve_query(%{object: %{guid: caster_guid}} = caster, query) do
     resolve_query(caster, caster_guid, query)

@@ -16,6 +16,7 @@ defmodule ThistleTea.Game.Network.Message.SmsgCastResult do
     cant_do_that_yet: 0x12,
     caster_dead: 0x13,
     equipped_item_class: @cast_failure_reason_equipped_item_class,
+    fizzle: 0x1D,
     immune: 0x22,
     item_not_ready: 0x28,
     line_of_sight: 0x2A,

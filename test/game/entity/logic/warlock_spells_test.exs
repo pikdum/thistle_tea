@@ -1,0 +1,275 @@
+defmodule ThistleTea.Game.Entity.Logic.WarlockSpellsTest do
+  use ExUnit.Case, async: true
+
+  alias ThistleTea.Game.Aura
+  alias ThistleTea.Game.Aura.Holder
+  alias ThistleTea.Game.Entity.Data.Character
+  alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Pet
+  alias ThistleTea.Game.Entity.Data.Component.MovementBlock
+  alias ThistleTea.Game.Entity.Data.Component.Object
+  alias ThistleTea.Game.Entity.Data.Component.Player
+  alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Data.Mob
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Pet, as: PetBT
+  alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
+  alias ThistleTea.Game.Entity.Logic.Combat
+  alias ThistleTea.Game.Entity.Logic.SpellEffect
+  alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.Cast
+  alias ThistleTea.Game.Spell.CastContext
+  alias ThistleTea.Game.Spell.CastValidation
+  alias ThistleTea.Game.Spell.Effect
+  alias ThistleTea.Game.Spell.Targets
+
+  describe "Life Tap" do
+    test "converts health into mana without killing the caster" do
+      caster = character(health: 100, power1: 0, max_power1: 200)
+      spell = %Spell{id: 1454, name: "Life Tap", school: :shadow, effects: [%Effect{type: :dummy, base_points: 39}]}
+      context = %CastContext{caster_guid: 1, caster_level: 20, spell_damage_bonus: %{}}
+
+      {result, _events} = SpellEffect.receive(caster, context, spell, 1_000)
+
+      assert result.unit.health == 61
+      assert result.unit.power1 == 39
+    end
+  end
+
+  describe "Healthstone creation" do
+    test "turns the rank script effect into the matching item event" do
+      spell = %Spell{id: 6201, name: "Create Healthstone (Minor)", effects: [%Effect{type: :script_effect}]}
+      context = %CastContext{caster_guid: 1, caster_level: 20}
+
+      {_result, events} = SpellEffect.receive(character(), context, spell, 1_000)
+
+      assert Enum.any?(events, &(&1.type == :create_item and &1.item_id == 5512))
+    end
+  end
+
+  describe "Death Coil" do
+    test "damages the target and heals the caster" do
+      spell = %Spell{
+        id: 6789,
+        name: "Death Coil",
+        school: :shadow,
+        effects: [%Effect{type: :health_leech, base_points: 49}]
+      }
+
+      context = %CastContext{caster_guid: 1, caster_level: 40, spell_damage_bonus: %{}}
+
+      {target, events} = SpellEffect.receive(mob(), context, spell, 1_000)
+
+      assert target.unit.health == 151
+      assert Enum.any?(events, &(&1.type == :heal_entity and &1.target_guid == 1 and &1.amount == 49))
+    end
+  end
+
+  describe "Conflagrate" do
+    test "validation requires the caster's Immolate metadata" do
+      caster = character()
+      spell = %Spell{id: 17_962, name: "Conflagrate", school: :fire}
+      target_info = %{alive?: true, hostile?: true, attackable?: true, aura_sources: MapSet.new()}
+
+      assert CastValidation.validate(caster, spell, %Targets{unit_guid: 2}, target_info, 1_000) ==
+               {:error, :target_aurastate}
+
+      target_info = %{target_info | aura_sources: MapSet.new([{348, "Immolate", 1}])}
+      assert CastValidation.validate(caster, spell, %Targets{unit_guid: 2}, target_info, 1_000) == :ok
+    end
+
+    test "requires and consumes the caster's Immolate" do
+      immolate = %Spell{id: 348, name: "Immolate", school: :fire}
+
+      target =
+        mob([
+          %Holder{
+            spell: immolate,
+            caster_guid: 1,
+            auras: [%Aura{type: :periodic_damage, amount: 10}]
+          }
+        ])
+
+      spell = %Spell{
+        id: 17_962,
+        name: "Conflagrate",
+        school: :fire,
+        effects: [%Effect{type: :school_damage, base_points: 99}]
+      }
+
+      context = %CastContext{caster_guid: 1, caster_level: 40, spell_damage_bonus: %{}}
+
+      {result, _events} = SpellEffect.receive(target, context, spell, 1_000)
+
+      assert result.unit.health == 101
+      assert result.unit.auras == []
+    end
+
+    test "does no damage without the caster's Immolate" do
+      spell = %Spell{
+        id: 17_962,
+        name: "Conflagrate",
+        school: :fire,
+        effects: [%Effect{type: :school_damage, base_points: 99}]
+      }
+
+      context = %CastContext{caster_guid: 1, caster_level: 40, spell_damage_bonus: %{}}
+
+      {result, events} = SpellEffect.receive(mob(), context, spell, 1_000)
+
+      assert result.unit.health == 200
+      assert events == []
+    end
+  end
+
+  describe "Curse of Agony" do
+    test "ramps from half damage to normal and then one-and-a-half damage" do
+      spell = %Spell{id: 980, name: "Curse of Agony", school: :shadow}
+
+      early = agony_target(spell, 3_000)
+      {early, _events} = AuraLogic.tick(early, 3_000)
+      assert early.unit.health == 195
+
+      late = agony_target(spell, 19_000)
+      {late, _events} = AuraLogic.tick(late, 19_000)
+      assert late.unit.health == 185
+    end
+  end
+
+  describe "Curse of Weakness" do
+    test "reduces the target's physical weapon damage" do
+      curse = %Holder{
+        spell: %Spell{id: 702},
+        caster_guid: 1,
+        auras: [%Aura{type: :mod_damage_done, amount: -5, misc_value: 1}]
+      }
+
+      target = mob([curse])
+      target = %{target | unit: %{target.unit | min_damage: 20.0, max_damage: 30.0}}
+
+      assert Combat.damage_range(target) == {15.0, 25.0}
+    end
+  end
+
+  describe "Curse of Tongues" do
+    test "negative casting speed increases cast duration" do
+      spell = %Spell{id: 686, cast_time_ms: 2_000}
+      cast = spell |> Cast.new(%Targets{}, 1_000) |> Cast.apply_speed_modifier(-50)
+
+      assert cast.cast_time_ms == 4_000
+      assert cast.ends_at == 5_000
+    end
+  end
+
+  describe "Demonic Sacrifice" do
+    test "kills the pet and triggers the demon-specific owner buff" do
+      spell = %Spell{id: 18_788, name: "Demonic Sacrifice", effects: [%Effect{type: :instakill}]}
+      context = %CastContext{caster_guid: 1, caster_level: 40}
+      pet = mob()
+      pet = %{pet | object: %Object{guid: 2, entry: 416}}
+
+      {result, events} = SpellEffect.receive(pet, context, spell, 1_000)
+
+      assert result.unit.health == 0
+      assert Enum.any?(events, &(&1.type == :trigger_spell and &1.target_guid == 1 and &1.spell_id == 18_789))
+    end
+  end
+
+  describe "Soul Link" do
+    test "casts the link aura back from the pet to its owner" do
+      spell = %Spell{id: 19_028, name: "Soul Link", effects: [%Effect{type: :dummy}]}
+      context = %CastContext{caster_guid: 1, caster_level: 40, target_guid: 2}
+
+      {_pet, events} = SpellEffect.receive(pet(), context, spell, 1_000)
+
+      assert Enum.any?(events, fn event ->
+               event.type == :trigger_spell and event.source_guid == 2 and event.target_guid == 1 and
+                 event.spell_id == 25_228
+             end)
+    end
+
+    test "redirects thirty percent of linked owner damage to the pet" do
+      linked =
+        character()
+        |> then(fn character ->
+          holder = %Holder{
+            spell: %Spell{id: 25_228},
+            caster_guid: 2,
+            auras: [%Aura{type: :split_damage_percent, amount: 30, misc_value: 127}]
+          }
+
+          %{character | unit: %{character.unit | auras: [holder]}}
+        end)
+
+      assert AuraLogic.damage_redirect(linked, 100, :shadow) == {70, {2, 30}}
+    end
+  end
+
+  describe "pet commands" do
+    test "attack assigns the commanded target and enters combat" do
+      pet = pet()
+      result = PetBT.command(pet, :attack, 99)
+
+      assert result.unit.target == 99
+      assert result.internal.in_combat
+      assert result.internal.pet.command_state == :attack
+    end
+
+    test "follow clears combat and returns ownership to follow mode" do
+      pet = PetBT.command(pet(), :attack, 99)
+      result = PetBT.command(pet, :follow, 0)
+
+      assert result.unit.target == 0
+      refute result.internal.in_combat
+      assert result.internal.pet.command_state == :follow
+    end
+  end
+
+  defp character(overrides \\ []) do
+    unit = struct(%Unit{health: 100, max_health: 100, power1: 100, max_power1: 100, level: 40, auras: []}, overrides)
+
+    %Character{
+      object: %Object{guid: 1},
+      unit: unit,
+      player: %Player{},
+      internal: %Internal{map: 0, events: []},
+      movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
+    }
+  end
+
+  defp mob(auras \\ []) do
+    %Mob{
+      object: %Object{guid: 2, entry: 100},
+      unit: %Unit{health: 200, max_health: 200, power1: 100, max_power1: 100, level: 20, auras: auras},
+      internal: %Internal{map: 0, creature: %Creature{}, events: []},
+      movement_block: %MovementBlock{position: {1.0, 0.0, 0.0, 0.0}}
+    }
+  end
+
+  defp pet do
+    mob()
+    |> then(fn mob ->
+      %{mob | internal: %{mob.internal | pet: %Pet{owner_guid: 1, profile: :combat}, in_combat: false}}
+    end)
+  end
+
+  defp agony_target(spell, next_tick_at) do
+    holder = %Holder{
+      spell: spell,
+      caster_guid: 1,
+      caster_level: 40,
+      applied_at: 1_000,
+      expires_at: 30_000,
+      auras: [
+        %Aura{
+          type: :periodic_damage,
+          amount: 10,
+          amplitude_ms: 2_000,
+          next_tick_at: next_tick_at
+        }
+      ]
+    }
+
+    mob([holder])
+  end
+end

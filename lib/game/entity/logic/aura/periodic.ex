@@ -92,7 +92,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
 
   defp tick_aura(entity, %Holder{} = holder, %Aura{type: :periodic_damage, next_tick_at: at} = aura, now)
        when is_integer(at) and now >= at do
-    {entity, damage, log_opts} = apply_periodic_damage(entity, holder, aura.amount, now)
+    {entity, damage, log_opts} = apply_periodic_damage(entity, holder, periodic_damage_amount(holder, aura), now)
 
     event =
       Event.spell_damage(holder.caster_guid, entity.object.guid, holder.spell, damage, log_opts)
@@ -128,6 +128,27 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
     {entity, %{aura | next_tick_at: advance_tick(at, aura.amplitude_ms, now)}, events}
   end
 
+  defp tick_aura(entity, %Holder{} = holder, %Aura{type: :periodic_mana_leech, next_tick_at: at} = aura, now)
+       when is_integer(at) and now >= at do
+    available = max(entity.unit.power1 || 0, 0)
+    drained = min(max(aura.amount, 0), available)
+    entity = %{entity | unit: %{entity.unit | power1: available - drained}}
+
+    events =
+      if drained > 0 do
+        [
+          Event.grant_power(holder.caster_guid, 0, drained),
+          Event.periodic_aura_log(holder.caster_guid, entity.object.guid, holder.spell, :periodic_energize, drained,
+            misc_value: 0
+          )
+        ]
+      else
+        []
+      end
+
+    {entity, %{aura | next_tick_at: advance_tick(at, aura.amplitude_ms, now)}, events}
+  end
+
   defp tick_aura(entity, %Holder{} = holder, %Aura{type: :periodic_trigger_spell, next_tick_at: at} = aura, now)
        when is_integer(at) and now >= at do
     events =
@@ -143,6 +164,23 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
   end
 
   defp tick_aura(entity, _holder, aura, _now), do: {entity, aura, []}
+
+  defp periodic_damage_amount(%Holder{spell: %Spell{name: "Curse of Agony"}, applied_at: applied_at}, %Aura{
+         amount: amount,
+         amplitude_ms: amplitude,
+         next_tick_at: next_tick_at
+       })
+       when is_integer(applied_at) and is_integer(amplitude) and amplitude > 0 and is_integer(next_tick_at) do
+    tick = div(next_tick_at - applied_at, amplitude)
+
+    cond do
+      tick <= 4 -> div(amount, 2)
+      tick >= 9 -> amount + div(amount, 2)
+      true -> amount
+    end
+  end
+
+  defp periodic_damage_amount(_holder, %Aura{amount: amount}), do: amount
 
   @schools [:physical, :holy, :fire, :nature, :frost, :shadow, :arcane]
 

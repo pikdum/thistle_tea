@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   alias ThistleTea.Game.Entity.Logic.Resources
   alias ThistleTea.Game.Entity.Logic.SpellResist
   alias ThistleTea.Game.Entity.Logic.Threat
+  alias ThistleTea.Game.Entity.Logic.Warlock
   alias ThistleTea.Game.Math
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
@@ -60,7 +61,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
 
   defp applicable_effects(_target, _context, effects), do: Enum.reject(effects, &caster_target_effect?/1)
 
-  defp caster_target_effect?(%Effect{type: type} = effect) when type in [:apply_aura, :apply_area_aura, :instakill] do
+  defp caster_target_effect?(%Effect{type: type} = effect) when type in [:apply_aura, :instakill] do
     effect.implicit_target_a == :caster or effect.implicit_target_b == :caster
   end
 
@@ -197,18 +198,53 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   defp channel_ticked_trigger?(_spell, _effect), do: false
 
   defp apply_effect(state, %CastContext{} = context, spell, %Effect{type: :school_damage} = effect, now) do
-    if Spell.melee_ability?(spell) do
-      melee_ability_damage(state, context, spell, school_damage_roll(context, spell, effect), now)
-    else
-      apply_damage_effect(state, context, spell, effect, now)
-    end
+    result =
+      cond do
+        Warlock.conflagrate?(spell) and not Warlock.has_immolate_from?(state, context.caster_guid) ->
+          {state, []}
+
+        Spell.melee_ability?(spell) ->
+          melee_ability_damage(state, context, spell, school_damage_roll(context, spell, effect), now)
+
+        true ->
+          apply_damage_effect(state, context, spell, effect, now)
+      end
+
+    consume_conflagrate_immolate(result, context, spell, now)
   end
 
-  defp apply_effect(state, %CastContext{}, _spell, %Effect{type: :instakill}, now) do
-    {Core.take_damage(state, state.unit.health || 0, now, source: state.object.guid), []}
+  defp apply_effect(state, %CastContext{} = context, spell, %Effect{type: :health_leech} = effect, now) do
+    {state, events} = apply_damage_effect(state, context, spell, effect, now)
+    damage = dealt_damage(events)
+    {state, events ++ if(damage > 0, do: [Event.heal_entity(context.caster_guid, damage)], else: [])}
+  end
+
+  defp apply_effect(state, %CastContext{} = context, %Spell{name: "Demonic Sacrifice"}, %Effect{type: :instakill}, now) do
+    events =
+      case Warlock.sacrifice_event(state, context) do
+        nil -> []
+        event -> [event]
+      end
+
+    {Core.take_damage(state, state.unit.health || 0, now, source: context.caster_guid), events}
+  end
+
+  defp apply_effect(state, %CastContext{} = context, _spell, %Effect{type: :instakill}, now) do
+    {Core.take_damage(state, state.unit.health || 0, now, source: context.caster_guid), []}
   end
 
   defp apply_effect(state, %CastContext{}, _spell, %Effect{type: :add_combo_points}, _now), do: {state, []}
+
+  defp apply_effect(
+         state,
+         %CastContext{caster_guid: caster_guid},
+         %Spell{id: spell_id},
+         %Effect{type: :summon_pet, misc_value: entry},
+         _now
+       )
+       when state.object.guid == caster_guid and is_integer(entry) and entry > 0 do
+    {state, [Event.summon_pet(caster_guid, entry, spell_id)]}
+  end
 
   defp apply_effect(%Character{} = state, %CastContext{}, spell, %Effect{type: :clear_threat}, now) do
     {state, mob_guids} = PlayerCombat.vanish(state, now)
@@ -274,38 +310,14 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
 
   defp apply_effect(state, %CastContext{} = context, spell, %Effect{type: :dummy} = effect, now) do
     case Scripts.dummy_effect(spell) do
-      :execute ->
-        apply_execute(state, context, spell, effect, now)
+      :life_tap ->
+        Warlock.life_tap(state, context, spell, effect, now)
 
-      :last_stand ->
-        event =
-          Event.trigger_spell(
-            context.caster_guid,
-            context.caster_level,
-            state.object.guid,
-            Scripts.last_stand_health_buff_id()
-          )
+      :soul_link ->
+        {state, [Event.trigger_spell(state.object.guid, state.unit.level || 1, context.caster_guid, 25_228)]}
 
-        {state, [event]}
-
-      :preparation ->
-        {Cooldowns.reset(state, [14_177, {:category, 39}, {:category, 44}, {:category, 66}]), []}
-
-      {:holy_shock, spell_ids} ->
-        spell_id = if context.target_hostile?, do: spell_ids.damage, else: spell_ids.heal
-        {state, [Event.trigger_spell(context.caster_guid, context.caster_level, state.object.guid, spell_id)]}
-
-      :judgement_of_command ->
-        spell_id = Effect.damage_roll(effect)
-
-        if spell_id > 1 do
-          {state, [Event.trigger_spell(context.caster_guid, context.caster_level, state.object.guid, spell_id)]}
-        else
-          {state, []}
-        end
-
-      _unscripted ->
-        {state, []}
+      dummy_effect ->
+        apply_class_dummy(state, context, spell, effect, dummy_effect, now)
     end
   end
 
@@ -344,6 +356,20 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
        when is_integer(item_id) and item_id > 0 do
     count = max(Effect.damage_roll(effect), 1)
     {state, [Event.create_item(item_id, count)]}
+  end
+
+  defp apply_effect(state, %CastContext{}, spell, %Effect{type: :script_effect}, _now) do
+    case Warlock.healthstone_item(state, spell) do
+      item_id when is_integer(item_id) and item_id > 0 -> {state, [Event.create_item(item_id, 1)]}
+      _ -> {state, []}
+    end
+  end
+
+  defp apply_effect(state, %CastContext{caster_guid: caster_guid}, _spell, %Effect{type: :power_drain} = effect, _now) do
+    available = max(state.unit.power1 || 0, 0)
+    drained = min(Effect.damage_roll(effect), available)
+    unit = %{state.unit | power1: available - drained}
+    {%{state | unit: unit}, [Event.grant_power(caster_guid, 0, drained)]}
   end
 
   defp apply_effect(state, %CastContext{}, _spell, %Effect{type: :interrupt_cast}, _now) do
@@ -406,6 +432,43 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   end
 
   defp apply_effect(state, _context, _spell, _effect, _now), do: {state, []}
+
+  defp apply_class_dummy(state, context, spell, effect, dummy_effect, now) do
+    case dummy_effect do
+      :execute ->
+        apply_execute(state, context, spell, effect, now)
+
+      :last_stand ->
+        event =
+          Event.trigger_spell(
+            context.caster_guid,
+            context.caster_level,
+            state.object.guid,
+            Scripts.last_stand_health_buff_id()
+          )
+
+        {state, [event]}
+
+      :preparation ->
+        {Cooldowns.reset(state, [14_177, {:category, 39}, {:category, 44}, {:category, 66}]), []}
+
+      {:holy_shock, spell_ids} ->
+        spell_id = if context.target_hostile?, do: spell_ids.damage, else: spell_ids.heal
+        {state, [Event.trigger_spell(context.caster_guid, context.caster_level, state.object.guid, spell_id)]}
+
+      :judgement_of_command ->
+        spell_id = Effect.damage_roll(effect)
+
+        if spell_id > 1 do
+          {state, [Event.trigger_spell(context.caster_guid, context.caster_level, state.object.guid, spell_id)]}
+        else
+          {state, []}
+        end
+
+      _unscripted ->
+        {state, []}
+    end
+  end
 
   defp maybe_vanish_stealth_events(state, %Spell{name: "Vanish"}), do: vanish_stealth_events(state)
   defp maybe_vanish_stealth_events(_state, _spell), do: []
@@ -691,4 +754,13 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
 
   defp attack_position({_map, x, y, z}), do: {x, y, z}
   defp attack_position(_position), do: nil
+
+  defp consume_conflagrate_immolate({state, events}, %CastContext{caster_guid: caster_guid}, spell, now) do
+    if Warlock.conflagrate?(spell) do
+      {state, aura_events} = Warlock.consume_immolate(state, caster_guid, now)
+      {state, events ++ aura_events}
+    else
+      {state, events}
+    end
+  end
 end

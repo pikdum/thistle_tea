@@ -42,6 +42,20 @@ defmodule ThistleTea.Game.Spell.Cast do
   def channeled?(%__MODULE__{channel_ms: channel_ms}) when is_integer(channel_ms) and channel_ms > 0, do: true
   def channeled?(_cast), do: false
 
+  def apply_speed_modifier(%__MODULE__{} = cast, modifier) when is_number(modifier) and modifier != 0 do
+    cast_time_ms = trunc(cast.cast_time_ms * 100 / max(100 + modifier, 1))
+    delta = cast_time_ms - cast.cast_time_ms
+
+    %{
+      cast
+      | cast_time_ms: cast_time_ms,
+        ends_at: cast.ends_at + delta,
+        next_channel_tick_at: shift_time(cast.next_channel_tick_at, delta)
+    }
+  end
+
+  def apply_speed_modifier(%__MODULE__{} = cast, _modifier), do: cast
+
   def advance_channel_tick(%__MODULE__{channel_tick_ms: tick_ms, next_channel_tick_at: next_tick_at} = cast, now)
       when is_integer(tick_ms) and tick_ms > 0 and is_integer(next_tick_at) do
     %{cast | next_channel_tick_at: advance_tick(next_tick_at, tick_ms, now)}
@@ -67,4 +81,7 @@ defmodule ThistleTea.Game.Spell.Cast do
 
   defp next_channel_tick_at(_now, _cast_time_ms, nil), do: nil
   defp next_channel_tick_at(now, cast_time_ms, tick_ms), do: now + cast_time_ms + tick_ms
+
+  defp shift_time(value, delta) when is_integer(value), do: value + delta
+  defp shift_time(value, _delta), do: value
 end

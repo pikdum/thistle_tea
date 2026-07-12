@@ -440,6 +440,8 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp effect_type(31), do: :weapon_percent_damage
   defp effect_type(121), do: :normalized_weapon_damage
   defp effect_type(6), do: :apply_aura
+  defp effect_type(8), do: :power_drain
+  defp effect_type(9), do: :health_leech
   defp effect_type(10), do: :heal
   defp effect_type(18), do: :resurrect
   defp effect_type(22), do: :parry
@@ -454,6 +456,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp effect_type(50), do: :trans_door
   defp effect_type(53), do: :enchant_item
   defp effect_type(54), do: :enchant_item_temporary
+  defp effect_type(56), do: :summon_pet
   defp effect_type(62), do: :power_burn
   defp effect_type(63), do: :modify_threat
   defp effect_type(68), do: :interrupt_cast
@@ -469,6 +472,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp effect_type(67), do: :heal_max_health
   defp effect_type(113), do: :resurrect_new
   defp effect_type(114), do: :attack_me
+  defp effect_type(119), do: :apply_area_aura
   defp effect_type(other) when is_integer(other), do: other
 
   defp aura_type(0), do: nil
@@ -507,9 +511,12 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp aura_type(53), do: :periodic_leech
   defp aura_type(56), do: :transform
   defp aura_type(58), do: :mod_increase_swim_speed
+  defp aura_type(64), do: :periodic_mana_leech
+  defp aura_type(65), do: :mod_casting_speed
   defp aura_type(67), do: :mod_disarm
   defp aura_type(69), do: :school_absorb
   defp aura_type(79), do: :mod_damage_percent_done
+  defp aura_type(81), do: :split_damage_percent
   defp aura_type(87), do: :mod_damage_percent_taken
   defp aura_type(74), do: :reflect_spells_school
   defp aura_type(77), do: :mechanic_immunity
@@ -517,6 +524,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp aura_type(85), do: :mod_power_regen
   defp aura_type(88), do: :mod_health_regen_percent
   defp aura_type(91), do: :mod_detect_range
+  defp aura_type(92), do: :prevent_fleeing
   defp aura_type(94), do: :interrupt_regen
   defp aura_type(95), do: :ghost
   defp aura_type(97), do: :mana_shield
@@ -557,6 +565,8 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp target_type(39), do: :caster_fishing_spot
   defp target_type(24), do: :aoe_enemy_in_cone
   defp target_type(28), do: :aoe_enemy_at_channel
+  defp target_type(32), do: :caster
+  defp target_type(5), do: :pet
   defp target_type(53), do: :aoe_enemy_at_dest
   defp target_type(other) when is_integer(other), do: other
 

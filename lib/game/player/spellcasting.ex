@@ -225,7 +225,15 @@ defmodule ThistleTea.Game.Player.Spellcasting do
   defp build_target_info(_state, _spell, _targets), do: nil
 
   defp target_info(character, guid) do
-    case Metadata.query(guid, [:alive?, :faction_template, :unit_flags, :health_pct, :orientation, :creature_type]) do
+    case Metadata.query(guid, [
+           :alive?,
+           :faction_template,
+           :unit_flags,
+           :health_pct,
+           :orientation,
+           :creature_type,
+           :aura_sources
+         ]) do
       nil ->
         :unknown
 
@@ -240,6 +248,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
           creature_type: Map.get(metadata, :creature_type),
           position: World.position(guid),
           orientation: Map.get(metadata, :orientation),
+          aura_sources: Map.get(metadata, :aura_sources, MapSet.new()),
           los?: World.line_of_sight?(character, guid)
         }
     end

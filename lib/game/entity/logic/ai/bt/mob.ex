@@ -306,8 +306,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   @flee_max_distance 20.0
   @flee_repath_ms 1_500
 
-  defp fleeing?(%Mob{}, %Blackboard{} = blackboard) do
-    Blackboard.fleeing?(blackboard)
+  defp fleeing?(%Mob{} = state, %Blackboard{} = blackboard) do
+    not AuraLogic.has_aura?(state, :prevent_fleeing) and Blackboard.fleeing?(blackboard)
   end
 
   defp fleeing?(_state, _blackboard), do: false

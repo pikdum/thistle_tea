@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.Spell.Scripts do
   import Bitwise, only: [&&&: 2]
 
   alias ThistleTea.Game.Entity.Logic.Aura
+  alias ThistleTea.Game.Entity.Logic.Warlock
   alias ThistleTea.Game.Spell
 
   @power_word_shield 17
@@ -36,6 +37,7 @@ defmodule ThistleTea.Game.Spell.Scripts do
   }
 
   @spell_family_mage 3
+  @spell_family_warlock 5
   @spell_family_paladin 10
   @mage_armor_family_flags 0x12000000
   @paladin_seal_family_flags 0x0A000200
@@ -62,6 +64,7 @@ defmodule ThistleTea.Game.Spell.Scripts do
   }
   @last_stand_health_buff 12_976
   @last_stand_health_fraction 0.3
+  @soul_link 19_028
   @rogue_finishers [
     408,
     8643,
@@ -95,6 +98,12 @@ defmodule ThistleTea.Game.Spell.Scripts do
   def dummy_effect(%Spell{id: @preparation}), do: :preparation
   def dummy_effect(%Spell{id: id}) when is_map_key(@holy_shock, id), do: {:holy_shock, Map.fetch!(@holy_shock, id)}
   def dummy_effect(%Spell{name: "Judgement of Command"}), do: :judgement_of_command
+  def dummy_effect(%Spell{id: @soul_link}), do: :soul_link
+
+  def dummy_effect(%Spell{} = spell) do
+    if Warlock.life_tap?(spell), do: :life_tap
+  end
+
   def dummy_effect(_spell), do: nil
 
   def execute_damage_spell_id, do: @execute_damage_spell
@@ -146,9 +155,16 @@ defmodule ThistleTea.Game.Spell.Scripts do
       row.spell_visual_0 == @warlock_armor_visual and row.spell_icon == @warlock_armor_icon ->
         :warlock_armor
 
+      warlock_curse?(row) ->
+        :warlock_curse
+
       true ->
         nil
     end
+  end
+
+  defp warlock_curse?(row) do
+    row.spell_class_set == @spell_family_warlock and String.starts_with?(row.name_en_gb || "", "Curse of")
   end
 
   defp paladin_exclusive_category(row) do

@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Network.Server do
 
   import Bitwise, only: [|||: 2]
 
+  alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
@@ -18,6 +19,7 @@ defmodule ThistleTea.Game.Network.Server do
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.AI.Tick
   alias ThistleTea.Game.Entity.Logic.AttackFeedback
+  alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Combat
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Death
@@ -218,6 +220,8 @@ defmodule ThistleTea.Game.Network.Server do
         EventSink.emit(character, events)
       end
 
+    notify_defensive_pet(character, attack.caster)
+
     {:noreply, {socket, %{state | character: character}}, {:continue, :maybe_broadcast_update}}
   end
 
@@ -269,6 +273,7 @@ defmodule ThistleTea.Game.Network.Server do
 
     state = %{state | character: character}
     state = if harmful?, do: PlayerTick.ensure_scheduled(state), else: state
+    if harmful?, do: notify_defensive_pet(character, spell_caster_guid(caster))
 
     {:noreply, {socket, state}, {:continue, :maybe_broadcast_update}}
   end
@@ -496,6 +501,42 @@ defmodule ThistleTea.Game.Network.Server do
       {:noreply, {socket, state}, socket.read_timeout}
   end
 
+  def handle_info(
+        {:pet_attached, pet_guid, _spell_id, pet_spells},
+        {socket, %{character: %Character{unit: %Unit{}} = character} = state}
+      ) do
+    {character, aura_events} = Aura.remove_spells(character, [18_789, 18_790, 18_791, 18_792, 25_228], Time.now())
+
+    character =
+      character
+      |> then(fn character -> %{character | unit: %{character.unit | summon: pet_guid}} end)
+      |> EventSink.emit(aura_events)
+      |> Core.mark_broadcast_update()
+
+    Network.send_packet(Message.SmsgPetSpells.for_pet(pet_guid, pet_spells))
+    {:noreply, {socket, %{state | character: character}}, {:continue, :maybe_broadcast_update}}
+  end
+
+  def handle_info(
+        {:pet_removed, pet_guid},
+        {socket, %{character: %Character{unit: %Unit{summon: pet_guid}} = character} = state}
+      ) do
+    {character, aura_events} = Aura.remove_spells(character, [25_228], Time.now())
+
+    character =
+      character
+      |> then(fn character -> %{character | unit: %{character.unit | summon: 0}} end)
+      |> EventSink.emit(aura_events)
+      |> Core.mark_broadcast_update()
+
+    Network.send_packet(Message.SmsgPetSpells.clear())
+    {:noreply, {socket, %{state | character: character}}, {:continue, :maybe_broadcast_update}}
+  end
+
+  def handle_info({:pet_removed, _pet_guid}, {socket, state}) do
+    {:noreply, {socket, state}, socket.read_timeout}
+  end
+
   @impl GenServer
   def handle_info(:player_tick, {socket, %{character: %Character{} = character} = state}) do
     {status, character} = tick_player(character)
@@ -557,7 +598,8 @@ defmodule ThistleTea.Game.Network.Server do
         ghost?: Death.ghost?(character),
         health_pct: Core.health_pct(character),
         unit_flags: character.unit.flags,
-        shapeshift_form: character.unit.shapeshift_form
+        shapeshift_form: character.unit.shapeshift_form,
+        aura_sources: Aura.source_spells(character)
       }
       |> Map.merge(detection)
     )
@@ -639,6 +681,20 @@ defmodule ThistleTea.Game.Network.Server do
       Network.send_packet(struct(Message.SmsgLevelupInfo, level_up))
     end)
   end
+
+  defp notify_defensive_pet(%Character{unit: %Unit{summon: pet_guid}}, attacker_guid)
+       when is_integer(pet_guid) and pet_guid > 0 and is_integer(attacker_guid) do
+    case Entity.pid(pet_guid) do
+      pid when is_pid(pid) -> send(pid, {:owner_attacked, attacker_guid})
+      _ -> :ok
+    end
+  end
+
+  defp notify_defensive_pet(%Character{}, _attacker_guid), do: :ok
+
+  defp spell_caster_guid(%{caster_guid: guid}) when is_integer(guid), do: guid
+  defp spell_caster_guid(guid) when is_integer(guid), do: guid
+  defp spell_caster_guid(_caster), do: nil
 
   @impl ThousandIsland.Handler
   def handle_connection(socket, _) do

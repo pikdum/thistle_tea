@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Internal.Loot
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Pet
   alias ThistleTea.Game.Entity.Data.Component.Internal.Spawn
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
@@ -19,11 +20,14 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AI.BT.Mob, as: MobBT
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Pet, as: PetBT
   alias ThistleTea.Game.Entity.Logic.AI.EventAI
   alias ThistleTea.Game.Entity.Logic.AI.Script
   alias ThistleTea.Game.Entity.Logic.AI.Tick
+  alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Combat
   alias ThistleTea.Game.Entity.Logic.Core
+  alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.Entity.Logic.Experience
   alias ThistleTea.Game.Entity.Logic.Hostility
   alias ThistleTea.Game.Entity.Logic.Movement
@@ -37,9 +41,11 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Party
   alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.ChaseWatch
+  alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpawnPool
   alias ThistleTea.Game.World.System.GameEvent
@@ -61,7 +67,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   def init(%Mob{} = state) do
     GameEvent.subscribe(state)
     Process.flag(:trap_exit, true)
-    state = BT.init(state, MobBT.tree())
+    state = BT.init(state, behavior_tree(state))
     World.update_position(state)
     state = Visibility.join_entity(state)
 
@@ -305,6 +311,59 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     end
   end
 
+  def handle_info({:pet_command, :dismiss, _target_guid}, %Mob{internal: %Internal{pet: %Pet{}}} = state) do
+    {:noreply, Respawn.despawn(state, nil)}
+  end
+
+  def handle_info({:pet_command, command, target_guid}, %Mob{internal: %Internal{pet: %Pet{}}} = state) do
+    state = state |> PetBT.command(command, target_guid) |> wake_ai_tick()
+    {:noreply, state, {:continue, :maybe_broadcast}}
+  end
+
+  def handle_info({:pet_reaction, reaction}, %Mob{internal: %Internal{pet: %Pet{}}} = state) do
+    state = state |> PetBT.reaction(reaction) |> wake_ai_tick()
+    {:noreply, state}
+  end
+
+  def handle_info({:owner_attacked, attacker_guid}, %Mob{internal: %Internal{pet: %Pet{}}} = state)
+      when is_integer(attacker_guid) do
+    state = state |> engage_combat(attacker_guid) |> wake_ai_tick()
+    {:noreply, state, {:continue, :maybe_broadcast}}
+  end
+
+  def handle_info(
+        {:pet_cast, spell_id, target_guid},
+        %Mob{internal: %Internal{pet: %Pet{}, creature: creature}} = state
+      )
+      when is_integer(spell_id) do
+    known? = Enum.any?(creature.spells, &(&1.spell_id == spell_id))
+
+    state =
+      with true <- known?,
+           %Spell{} = spell <- SpellLoader.load(spell_id),
+           true <- valid_pet_spell_target?(state, spell, target_guid) do
+        target_guid = if is_integer(target_guid) and target_guid > 0, do: target_guid, else: state.object.guid
+
+        context = %{
+          CastContext.from_caster(state, spell, target_guid)
+          | target_hostile?: Hostility.valid_attack_target?(state, target_guid)
+        }
+
+        if target_guid == state.object.guid do
+          {state, events} = SpellEffect.receive(state, context, spell, Time.now())
+          EventSink.emit(state, events)
+        else
+          state
+          |> EventSink.emit(Event.spell_go(state.object.guid, spell_id, [target_guid], <<>>))
+          |> EventSink.emit(Event.deliver_spell(target_guid, context, spell))
+        end
+      else
+        _ -> state
+      end
+
+    {:noreply, wake_ai_tick(state), {:continue, :maybe_broadcast}}
+  end
+
   def handle_info(:summon_despawn, %Mob{} = state) do
     if state.internal.in_combat and ooc_gated_despawn?(state) do
       Process.send_after(self(), :summon_despawn, @summon_despawn_retry_ms)
@@ -316,6 +375,12 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
   def handle_info({:despawn_creature, respawn_delay_ms}, %Mob{} = state) do
     {:noreply, Respawn.despawn(state, respawn_delay_ms)}
+  end
+
+  def handle_info(:pet_stop, %Mob{internal: %Internal{pet: %Pet{}}} = state) do
+    pid = self()
+    Task.start(fn -> World.stop_entity(pid) end)
+    {:noreply, state}
   end
 
   def handle_info({:event_stop, _event}, state) do
@@ -377,7 +442,8 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
         alive?: not Core.dead?(state),
         health_pct: Core.health_pct(state),
         unit_flags: state.unit.flags,
-        orientation: elem(state.movement_block.position, 3)
+        orientation: elem(state.movement_block.position, 3),
+        aura_sources: Aura.source_spells(state)
       })
     end
 
@@ -388,12 +454,25 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
   @impl GenServer
   def terminate(_reason, state) do
+    notify_pet_owner_removed(state)
     release_victim(state)
     unwatch_chase(state)
     World.remove_position(state)
     Visibility.leave_entity(state)
     Metadata.delete(state.object.guid)
   end
+
+  defp behavior_tree(%Mob{internal: %Internal{pet: %Pet{}}}), do: PetBT.tree()
+  defp behavior_tree(%Mob{}), do: MobBT.tree()
+
+  defp notify_pet_owner_removed(%Mob{object: %{guid: guid}, internal: %Internal{pet: %Pet{owner_guid: owner_guid}}}) do
+    case Entity.pid(owner_guid) do
+      pid when is_pid(pid) -> send(pid, {:pet_removed, guid})
+      _ -> :ok
+    end
+  end
+
+  defp notify_pet_owner_removed(%Mob{}), do: :ok
 
   defp schedule_summon_despawn(
          %Mob{internal: %Internal{spawn: %Spawn{temporary?: true, despawn_delay_ms: delay}}} = state
@@ -534,6 +613,10 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     %{state | internal: %{internal | blackboard: blackboard}}
   end
 
+  defp engage_combat(%Mob{internal: %Internal{pet: %Pet{reaction_state: :passive}}} = state, _caster) do
+    state
+  end
+
   defp engage_combat(%Mob{internal: internal} = state, caster) when is_integer(caster) do
     now = Time.now()
     was_in_combat = internal.in_combat == true
@@ -566,6 +649,8 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
          %Mob{unit: %Unit{} = unit, internal: %Internal{loot: %Loot{tapped_by: nil} = loot} = internal} = state,
          caster
        ) do
+    caster = controlling_player(caster)
+
     if not Core.dead?(state) and Guid.entity_type(caster) == :player do
       group_id =
         case PartySystem.group_of(caster) do
@@ -587,6 +672,19 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   defp maybe_tap(%Mob{} = state, _caster), do: state
 
   defp maybe_finalize_death(%Mob{internal: %Internal{death_finalized?: true}} = state), do: state
+
+  defp maybe_finalize_death(%Mob{internal: %Internal{pet: %Pet{}}} = state) do
+    if Core.dead?(state) do
+      Process.send_after(self(), :pet_stop, 100)
+
+      state
+      |> mark_death_finalized()
+      |> Threat.wipe()
+      |> Core.mark_broadcast_update()
+    else
+      state
+    end
+  end
 
   defp maybe_finalize_death(%Mob{} = state) do
     if Core.dead?(state) do
@@ -619,6 +717,8 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   defp maybe_decrement_on_death(%Mob{} = state, _target), do: state
 
   defp maybe_reward_kill(%Mob{} = state, target) when is_integer(target) and target > 0 do
+    target = controlling_player(target)
+
     if Guid.entity_type(target) == :player do
       case PartySystem.group_of(target) do
         %Party.Group{} = group -> reward_group_kill(state, group)
@@ -666,4 +766,18 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   defp caster_guid(%{caster_guid: caster_guid}) when is_integer(caster_guid), do: caster_guid
   defp caster_guid(caster_guid) when is_integer(caster_guid), do: caster_guid
   defp caster_guid(_caster), do: nil
+
+  defp controlling_player(guid) when is_integer(guid) do
+    case Metadata.query(guid, [:owner_guid]) do
+      %{owner_guid: owner_guid} when is_integer(owner_guid) and owner_guid > 0 -> owner_guid
+      _ -> guid
+    end
+  end
+
+  defp valid_pet_spell_target?(_state, %Spell{} = spell, target_guid) when target_guid in [0, nil],
+    do: not Spell.requires_hostile_target?(spell)
+
+  defp valid_pet_spell_target?(state, %Spell{} = spell, target_guid) do
+    not Spell.requires_hostile_target?(spell) or Hostility.valid_attack_target?(state, target_guid)
+  end
 end

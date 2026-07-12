@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Network.Session do
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Party.Group
   alias ThistleTea.Game.Party.Notifier
+  alias ThistleTea.Game.World
   alias ThistleTea.Game.World.AggroProbe
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.Metadata
@@ -44,9 +45,9 @@ defmodule ThistleTea.Game.Network.Session do
       _ -> :ok
     end
 
-    if state.character do
-      CharacterStore.put(state.character)
-    end
+    state = dismiss_active_pet(state)
+
+    if state.character, do: CharacterStore.put(state.character)
 
     if state.guid do
       leave_world_presence(state)
@@ -54,6 +55,14 @@ defmodule ThistleTea.Game.Network.Session do
 
     %__MODULE__{account: state.account, conn: state.conn}
   end
+
+  defp dismiss_active_pet(%__MODULE__{character: %{unit: %{summon: pet_guid} = unit} = character} = state)
+       when is_integer(pet_guid) and pet_guid > 0 do
+    World.stop_entity(pet_guid)
+    %{state | character: %{character | unit: %{unit | summon: 0}}}
+  end
+
+  defp dismiss_active_pet(%__MODULE__{} = state), do: state
 
   defp leave_world_presence(%__MODULE__{} = state) do
     Entity.unregister(state.guid)

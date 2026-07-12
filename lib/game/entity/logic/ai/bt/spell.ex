@@ -66,7 +66,11 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
          now,
          cast_item_guid
        ) do
-    casting = %{Cast.new(spell, targets, now) | cast_item_guid: cast_item_guid}
+    casting =
+      spell
+      |> Cast.new(targets, now)
+      |> Cast.apply_speed_modifier(AuraLogic.flat_amount(character, :mod_casting_speed))
+      |> then(&%{&1 | cast_item_guid: cast_item_guid})
 
     character = %{character | internal: %{internal | casting: casting}}
 
@@ -279,7 +283,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
          %Cast{spell: %Spell{id: spell_id}, channel_ms: duration_ms} = casting
        )
        when is_integer(guid) and is_integer(duration_ms) and duration_ms > 0 do
-    channel_object = channel_target_guid(character, casting.targets)
+    channel_object = channel_target_guid(character, casting)
 
     %{character | unit: %{unit | channel_spell: spell_id, channel_object: channel_object}}
     |> Core.mark_broadcast_update()
@@ -288,15 +292,31 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
 
   defp start_channel(character, _casting), do: character
 
-  defp channel_target_guid(%{object: %{guid: guid}, unit: %{target: target}}, %Targets{unit_guid: unit_guid}) do
-    cond do
-      is_integer(unit_guid) and unit_guid > 0 and unit_guid != guid -> unit_guid
-      is_integer(target) and target > 0 and target != guid -> target
-      true -> 0
+  defp channel_target_guid(%{object: %{guid: guid}, unit: %{target: target, summon: pet_guid}}, %Cast{
+         spell: %Spell{effects: effects},
+         targets: %Targets{unit_guid: unit_guid}
+       }) do
+    case pet_channel_target(pet_guid, effects) do
+      nil -> preferred_channel_target(guid, unit_guid, target)
+      pet_guid -> pet_guid
     end
   end
 
-  defp channel_target_guid(_character, _targets), do: 0
+  defp channel_target_guid(_character, _casting), do: 0
+
+  defp pet_channel_target(pet_guid, effects) when is_integer(pet_guid) and pet_guid > 0 do
+    if Enum.any?(effects, &(&1.implicit_target_a == :pet or &1.implicit_target_b == :pet)), do: pet_guid
+  end
+
+  defp pet_channel_target(_pet_guid, _effects), do: nil
+
+  defp preferred_channel_target(self_guid, unit_guid, target) do
+    cond do
+      is_integer(unit_guid) and unit_guid > 0 and unit_guid != self_guid -> unit_guid
+      is_integer(target) and target > 0 and target != self_guid -> target
+      true -> 0
+    end
+  end
 
   defp stop_channel(%{internal: %Internal{} = internal, unit: unit} = character, %Cast{} = casting) do
     character = %{character | internal: %{internal | casting: nil}, unit: %{unit | channel_object: 0, channel_spell: 0}}
@@ -319,7 +339,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
 
   defp remove_channel_auras(%{object: %{guid: guid}} = character, %Cast{spell: %Spell{id: spell_id}} = casting) do
     {character, events} =
-      if channel_target_guid(character, casting.targets) in [0, guid] do
+      if channel_target_guid(character, casting) in [0, guid] do
         AuraLogic.remove_spells(character, [spell_id], Time.now())
       else
         {character, []}

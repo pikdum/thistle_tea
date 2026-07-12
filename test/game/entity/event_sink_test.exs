@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
+  alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
 
@@ -92,7 +93,7 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
       victim = %Mob{
         object: %Object{guid: target_guid},
         unit: %Unit{
-          level: 60,
+          level: 1,
           target: caster_guid,
           health: 1_000,
           max_health: 1_000,
@@ -146,6 +147,32 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
                          weapon_base_max: 30.0,
                          attack_time_ms: 2_000
                        }, %Spell{id: 20_424}}}
+    end
+
+    @tag :dbc_db
+    @tag :vmangos_db
+    test "a summon-pet event starts an owned pet entity" do
+      caster_guid = Guid.from_low_guid(:player, unique_guid())
+      Entity.register(caster_guid)
+
+      on_exit(fn -> Entity.unregister(caster_guid) end)
+
+      caster = %Character{
+        object: %Object{guid: caster_guid},
+        unit: %Unit{level: 50, faction_template: 1, summon: 0},
+        player: %Player{},
+        internal: %Internal{map: 0},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
+      }
+
+      event = Event.summon_pet(caster_guid, 416, 688)
+
+      assert ^caster = EventSink.emit(caster, event)
+      assert_receive {:pet_attached, pet_guid, 688, pet_spells}
+      assert is_pid(Entity.pid(pet_guid))
+      assert Enum.any?(pet_spells, &(&1.spell_id == 3110))
+
+      on_exit(fn -> World.stop_entity(pet_guid) end)
     end
 
     test "script attack_start schedules a forced attack", %{mob: mob, target_guid: target_guid} do

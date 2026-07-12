@@ -239,4 +239,48 @@ defmodule ThistleTea.Game.World.Loader.SpellVmangosTest do
       assert 20_375 in spell_ids
     end
   end
+
+  describe "warlock spell parsing" do
+    test "demon summons load as caster-targeted pet effects" do
+      assert %Effect{type: :summon_pet, misc_value: 416, implicit_target_a: :caster} =
+               Enum.find(SpellLoader.load(688).effects, &(&1.type == :summon_pet))
+
+      assert %Effect{type: :summon_pet, misc_value: 1860} =
+               Enum.find(SpellLoader.load(697).effects, &(&1.type == :summon_pet))
+    end
+
+    test "drains load their distinct health and mana semantics" do
+      assert Enum.any?(SpellLoader.load(6789).effects, &(&1.type == :health_leech))
+      assert Enum.any?(SpellLoader.load(5138).effects, &(&1.aura == :periodic_mana_leech))
+      assert Enum.any?(SpellLoader.load(18_220).effects, &(&1.type == :power_drain and &1.implicit_target_a == :pet))
+    end
+
+    test "curses share per-caster exclusive ownership" do
+      assert SpellLoader.load(702).exclusive_category == :warlock_curse
+      assert SpellLoader.load(980).exclusive_category == :warlock_curse
+      assert SpellLoader.load(1490).exclusive_category == :warlock_curse
+      assert SpellLoader.load(18_223).exclusive_category == :warlock_curse
+      assert Enum.any?(SpellLoader.load(1714).effects, &(&1.aura == :mod_casting_speed))
+    end
+
+    test "Soul Link loads its pet target and percentage redirect aura" do
+      assert Enum.any?(SpellLoader.load(19_028).effects, &(&1.type == :dummy and &1.implicit_target_a == :pet))
+
+      assert Enum.any?(SpellLoader.load(25_228).effects, fn effect ->
+               effect.type == :apply_area_aura and effect.aura == :split_damage_percent
+             end)
+    end
+
+    test "debug Warlocks learn quest demons alongside trainer and talent spells" do
+      spell_ids = ClassSpell.trainable_spell_ids(9, 60)
+
+      assert 688 in spell_ids
+      assert 697 in spell_ids
+      assert 712 in spell_ids
+      assert 691 in spell_ids
+      assert 1122 in spell_ids
+      assert 18_540 in spell_ids
+      assert 18_288 in spell_ids
+    end
+  end
 end

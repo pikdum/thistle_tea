@@ -408,6 +408,11 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
     %__MODULE__{type: :summon_creature, summon: summon, steps: steps, target_guid: target_guid}
   end
 
+  def summon_pet(owner_guid, entry, spell_id)
+      when is_integer(owner_guid) and is_integer(entry) and entry > 0 and is_integer(spell_id) do
+    %__MODULE__{type: :summon_pet, source_guid: owner_guid, entry: entry, spell_id: spell_id}
+  end
+
   def despawn_self(despawn_delay_ms, respawn_delay_ms)
       when is_integer(despawn_delay_ms) and is_integer(respawn_delay_ms) do
     %__MODULE__{type: :despawn_self, duration_ms: despawn_delay_ms, respawn_delay_ms: respawn_delay_ms}

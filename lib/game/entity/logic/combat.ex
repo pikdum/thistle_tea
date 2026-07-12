@@ -53,7 +53,7 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
 
   def offhand_damage_range(%{unit: %Unit{min_offhand_damage: min, max_offhand_damage: max}} = entity)
       when is_number(min) and is_number(max) and max > 0 do
-    scale_damage_range({min * 0.5, max * 0.5}, outgoing_damage_multiplier(entity))
+    outgoing_damage_range(entity, {min * 0.5, max * 0.5})
   end
 
   def offhand_damage_range(_entity), do: nil
@@ -96,12 +96,12 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
       when is_number(min_damage) and is_number(max_damage) do
     multiplier = damage_multiplier(damage_multiplier)
 
-    scale_damage_range({min_damage * multiplier, max_damage * multiplier}, outgoing_damage_multiplier(entity))
+    outgoing_damage_range(entity, {min_damage * multiplier, max_damage * multiplier})
   end
 
   def damage_range(%{unit: %Unit{min_damage: min_damage, max_damage: max_damage}} = entity)
       when is_number(min_damage) and is_number(max_damage) do
-    scale_damage_range({min_damage, max_damage}, outgoing_damage_multiplier(entity))
+    outgoing_damage_range(entity, {min_damage, max_damage})
   end
 
   def damage_range(_entity), do: {@default_damage, @default_damage}
@@ -111,6 +111,13 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
 
   defp scale_damage_range(range, 1.0), do: range
   defp scale_damage_range({min_damage, max_damage}, multiplier), do: {min_damage * multiplier, max_damage * multiplier}
+
+  defp outgoing_damage_range(entity, {min_damage, max_damage}) do
+    flat = Aura.flat_modifier(entity, :mod_damage_done, @physical_school_mask)
+
+    {max(min_damage + flat, 0), max(max_damage + flat, 0)}
+    |> scale_damage_range(outgoing_damage_multiplier(entity))
+  end
 
   defp outgoing_damage_multiplier(entity) do
     base = Aura.percent_multiplier(entity, :mod_damage_percent_done, @physical_school_mask)

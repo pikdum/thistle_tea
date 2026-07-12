@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.World.Loader.Mob do
   alias ThistleTea.Game.Entity.Data.CreatureSpell
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Data.ScriptStep
+  alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Loader.Condition, as: ConditionLoader
@@ -402,10 +403,18 @@ defmodule ThistleTea.Game.World.Loader.Mob do
         attacker_count: 0,
         alive?: mob.unit.health > 0,
         health_pct: Core.health_pct(mob),
-        orientation: elem(mob.movement_block.position, 3)
+        orientation: elem(mob.movement_block.position, 3),
+        aura_sources: Aura.source_spells(mob)
       }
       |> Map.merge(Mob.visibility_metadata(mob))
+      |> Map.merge(pet_metadata(mob))
       |> Map.merge(FactionLoader.metadata(mob.unit.faction_template))
     )
   end
+
+  defp pet_metadata(%Mob{internal: %{pet: %{owner_guid: owner_guid, profile: profile}}}) do
+    %{owner_guid: owner_guid, pet_profile: profile}
+  end
+
+  defp pet_metadata(%Mob{}), do: %{}
 end
