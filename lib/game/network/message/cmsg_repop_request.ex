@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgRepopRequest do
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Death
   alias ThistleTea.Game.Entity.Logic.Inventory
+  alias ThistleTea.Game.Network.MovementControl
   alias ThistleTea.Game.Network.Server
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.ItemStore
@@ -54,9 +55,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgRepopRequest do
     Visibility.notify_visibility_changed(state.character)
     state = Visibility.resync_player(state)
 
-    teleport_to_graveyard(state.character)
-
-    state
+    defer_graveyard_teleport(state, state.character)
   end
 
   def spawn_corpse(character) do
@@ -80,16 +79,16 @@ defmodule ThistleTea.Game.Network.Message.CmsgRepopRequest do
     end)
   end
 
-  defp teleport_to_graveyard(character) do
+  defp defer_graveyard_teleport(state, character) do
     %{internal: %Internal{map: map}, movement_block: %MovementBlock{position: {x, y, z, _o}}} = character
     team = GraveyardLoader.team_for_race(character.unit.race)
 
     case GraveyardLoader.closest(map, {x, y, z}, team) do
       %{map: graveyard_map, position: {gx, gy, gz}} ->
-        GenServer.cast(self(), {:start_teleport, gx, gy, gz, graveyard_map})
+        MovementControl.defer_repop(state, {gx, gy, gz, graveyard_map})
 
       _ ->
-        :ok
+        state
     end
   end
 end

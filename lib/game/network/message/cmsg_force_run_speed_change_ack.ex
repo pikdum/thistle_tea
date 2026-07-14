@@ -2,16 +2,25 @@ defmodule ThistleTea.Game.Network.Message.CmsgForceRunSpeedChangeAck do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_FORCE_RUN_SPEED_CHANGE_ACK
 
+  alias ThistleTea.Game.Network.MovementControl
+  alias ThistleTea.Game.Network.Session
+
   defstruct [:guid, :counter, :new_speed]
 
   @impl ClientMessage
   def handle(
-        %__MODULE__{new_speed: new_speed},
-        %{character: %Character{movement_block: %MovementBlock{} = movement_block} = character} = state
+        %__MODULE__{guid: guid, counter: counter, new_speed: new_speed},
+        %Session{character: %Character{movement_block: %MovementBlock{} = movement_block} = character} = state
       ) do
-    movement_block = %{movement_block | run_speed: new_speed}
-    character = %{character | movement_block: movement_block}
-    %{state | character: character}
+    case MovementControl.acknowledge(state, guid, counter, {:run_speed, new_speed}) do
+      {:ok, state} ->
+        movement_block = %{movement_block | run_speed: new_speed}
+
+        MovementControl.maybe_finish_repop(%{state | character: %{character | movement_block: movement_block}})
+
+      {:error, state} ->
+        state
+    end
   end
 
   @impl ClientMessage

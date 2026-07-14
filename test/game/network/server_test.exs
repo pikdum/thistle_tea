@@ -16,6 +16,7 @@ defmodule ThistleTea.Game.Network.ServerTest do
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Packet
   alias ThistleTea.Game.Network.Server
+  alias ThistleTea.Game.Network.Session
   alias ThistleTea.Game.Network.UpdateBatcher
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.Time
@@ -123,6 +124,17 @@ defmodule ThistleTea.Game.Network.ServerTest do
       assert_raise RuntimeError, "SMSG_UPDATE_OBJECT packets must be sent as UpdateObject structs", fn ->
         Server.handle_cast({:send_packet, packet}, {socket, state})
       end
+    end
+
+    test "sequences acknowledged movement packets at the send boundary" do
+      socket = test_socket()
+      state = %Session{conn: %Connection{session_key: <<0>>}, guid: 1}
+      packet = %Message.SmsgForceMoveUnroot{guid: 1}
+
+      assert {:noreply, {^socket, %Session{movement_counter: 1, pending_movement_acks: %{0 => :unroot}}}, 0} =
+               Server.handle_cast({:send_packet, packet}, {socket, state})
+
+      assert_receive {:socket_send, _data}
     end
 
     test "marks player in combat when a mob attack lands" do

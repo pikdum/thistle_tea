@@ -39,6 +39,7 @@ defmodule ThistleTea.Game.Network.Server do
   alias ThistleTea.Game.Network.InventoryUpdate
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Message.Dispatch
+  alias ThistleTea.Game.Network.MovementControl
   alias ThistleTea.Game.Network.Opcodes
   alias ThistleTea.Game.Network.Packet
   alias ThistleTea.Game.Network.PlayerTick
@@ -432,6 +433,11 @@ defmodule ThistleTea.Game.Network.Server do
     {:noreply, {socket, state}, socket.read_timeout}
   end
 
+  def handle_cast({:finish_repop, token}, {socket, state}) do
+    state = MovementControl.finish_repop(state, token)
+    {:noreply, {socket, state}, socket.read_timeout}
+  end
+
   defp send_update_object(%UpdateObject{} = update, socket, state) do
     update = Tap.personalize(update, Map.get(state, :guid))
     {packet, updates} = UpdateBatcher.batch(update, Map.get(state, :guid))
@@ -442,6 +448,11 @@ defmodule ThistleTea.Game.Network.Server do
 
   def handle_info(:restore_active_pet, {socket, state}) do
     {:noreply, {socket, Login.restore_active_pet(state)}, socket.read_timeout}
+  end
+
+  def handle_info({:finish_repop_timeout, token}, {socket, state}) do
+    state = MovementControl.finish_repop(state, token, true)
+    {:noreply, {socket, state}, socket.read_timeout}
   end
 
   @impl GenServer

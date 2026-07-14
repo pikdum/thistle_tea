@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.Network.Send do
 
   alias ThistleTea.Game.Network.Connection.Crypto
   alias ThistleTea.Game.Network.Message
+  alias ThistleTea.Game.Network.MovementControl
   alias ThistleTea.Game.Network.Packet
   alias ThousandIsland.Socket
 
@@ -30,6 +31,7 @@ defmodule ThistleTea.Game.Network.Send do
   end
 
   def send_packet(message, {socket, state}) do
+    {message, state} = MovementControl.prepare(message, state)
     packet = Message.to_packet(message)
     send_packet(packet, {socket, state})
   end

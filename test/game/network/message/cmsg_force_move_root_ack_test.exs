@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgForceMoveRootAckTest do
   alias ThistleTea.Game.Network.Message.CmsgForceMoveUnrootAck
   alias ThistleTea.Game.Network.Message.Dispatch
   alias ThistleTea.Game.Network.Opcodes
+  alias ThistleTea.Game.Network.Session
 
   describe "from_binary/1" do
     test "parses force root acknowledgements" do
@@ -28,21 +29,44 @@ defmodule ThistleTea.Game.Network.Message.CmsgForceMoveRootAckTest do
 
   describe "handle/2" do
     test "updates movement state from force root acknowledgements" do
-      state = ack_state()
+      state = ack_state(%{2 => :root})
 
-      state = CmsgForceMoveRootAck.handle(%CmsgForceMoveRootAck{movement_payload: movement_payload()}, state)
+      state =
+        CmsgForceMoveRootAck.handle(
+          %CmsgForceMoveRootAck{guid: 1, counter: 2, movement_payload: movement_payload()},
+          state
+        )
 
       assert state.character.movement_block.position == {1.0, 2.0, 3.0, 4.0}
       assert state.character.movement_block.run_speed == 7.0
+      assert state.pending_movement_acks == %{}
     end
 
     test "updates movement state from force unroot acknowledgements" do
-      state = ack_state()
+      state = ack_state(%{3 => :unroot})
 
-      state = CmsgForceMoveUnrootAck.handle(%CmsgForceMoveUnrootAck{movement_payload: movement_payload()}, state)
+      state =
+        CmsgForceMoveUnrootAck.handle(
+          %CmsgForceMoveUnrootAck{guid: 1, counter: 3, movement_payload: movement_payload()},
+          state
+        )
 
       assert state.character.movement_block.position == {1.0, 2.0, 3.0, 4.0}
       assert state.character.movement_block.run_speed == 7.0
+      assert state.pending_movement_acks == %{}
+    end
+
+    test "ignores stale acknowledgements" do
+      state = ack_state(%{3 => :unroot})
+
+      state =
+        CmsgForceMoveRootAck.handle(
+          %CmsgForceMoveRootAck{guid: 1, counter: 3, movement_payload: movement_payload()},
+          state
+        )
+
+      assert state.character.movement_block.position == nil
+      assert state.pending_movement_acks == %{3 => :unroot}
     end
   end
 
@@ -62,7 +86,11 @@ defmodule ThistleTea.Game.Network.Message.CmsgForceMoveRootAckTest do
       3.0::little-float-size(32), 4.0::little-float-size(32), 0::little-size(32)>>
   end
 
-  defp ack_state do
-    %{character: %Character{movement_block: %MovementBlock{run_speed: 7.0}}}
+  defp ack_state(pending) do
+    %Session{
+      guid: 1,
+      character: %Character{movement_block: %MovementBlock{run_speed: 7.0}},
+      pending_movement_acks: pending
+    }
   end
 end
