@@ -7,11 +7,24 @@ on:
 permissions:
   contents: read
 jobs:
-  docker:
-    runs-on: ubuntu-latest
+  nix:
+    strategy:
+      matrix:
+        include:
+          - system: x86_64-linux
+            runner: ubuntu-latest
+          - system: aarch64-linux
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v6
-      - run: docker build .
+      - uses: cachix/install-nix-action@v31
+      - uses: cachix/cachix-action@v17
+        with:
+          name: thistle-tea
+          authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
+      - run: nix flake check --system "${{ matrix.system }}"
+      - run: nix build .#thistle-tea --system "${{ matrix.system }}" --print-build-logs
   elixir:
     runs-on: ubuntu-latest
     strategy:

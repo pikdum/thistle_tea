@@ -223,7 +223,7 @@
               tmp=$(mktemp -d)
               trap 'rm -rf "$tmp"' EXIT
               # map-extractor reads MPQs under the cwd "input/" layout; we mirror
-              # the existing scripts/generate-dbc-db.sh behaviour.
+              # the existing DBC database generation workflow.
               ln -s "''${wow_dir}"/* "''${tmp}/"
               mkdir -p "''${tmp}/out"
 
