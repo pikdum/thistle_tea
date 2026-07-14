@@ -9,7 +9,6 @@
   overrides ? (x: y: { }),
   overrideFenixOverlay ? null,
   rustlerPrecompiledOverrides ? { },
-  stdenv,
   pkg-config,
   vips,
   writeText,
@@ -468,20 +467,6 @@ let
           };
         in
         drv;
-
-      heroicons = stdenv.mkDerivation {
-        name = "heroicons";
-        src = fetchFromGitHub {
-          owner = "tailwindlabs";
-          repo = "heroicons";
-          rev = "0435d4ca364a608cc75e2f8683d374e55abbae26";
-          hash = "sha256-Jcxr1fSbmXO9bZKeg39Z/zVN0YJp17TX3LH5Us4lsZU=";
-        };
-        buildPhase = ''
-          mkdir $out
-          ln -sv $src $out/src
-        '';
-      };
 
       hpax =
         let

@@ -436,12 +436,6 @@
             # tasks, which would try to download their own binaries). Args mirror
             # config/config.exs plus --minify from the assets.deploy alias.
             #
-            # Note: we deliberately skip `mix phx.digest`. It triggers Mix's git
-            # lock check, which fails because Nix sources do not include git
-            # objects. The release still serves assets correctly,
-            # it just lacks the cache_manifest.json fingerprinting. If/when we
-            # need cache busting we can either re-fetch git deps with their
-            # objects intact or run phx.digest as a post-install step.
             preBuild = ''
               mkdir -p priv/static/assets
               (cd assets && NODE_PATH="../deps" esbuild \
@@ -456,6 +450,10 @@
                 --input=css/app.css \
                 --output=../priv/static/assets/app.css \
                 --minify)
+            '';
+
+            postBuild = ''
+              mix phx.digest --no-compile
             '';
 
             meta = with pkgs.lib; {

@@ -4,7 +4,6 @@
 @source "../../lib/web";
 
 @plugin "@tailwindcss/forms";
-@plugin "../vendor/heroicons";
 
 @theme {
     --color-brand: #FD4F00;

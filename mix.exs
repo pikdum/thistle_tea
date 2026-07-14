@@ -31,8 +31,7 @@ defmodule ThistleTea.MixProject do
   defp deps do
     [
       {:tidewave, "~> 0.6", only: [:dev]},
-      {:deps_nix,
-       github: "code-supply/deps_nix", ref: "e0b8b0b0e8e541ec3ef824fe6a07e60739fdb50c", only: :dev, runtime: false},
+      {:deps_nix, "~> 3.0", only: :dev, runtime: false},
       {:mix_test_watch, "~> 1.0", only: [:dev, :test], runtime: false},
       {:binary, "~> 0.0.5"},
       {:ecto_sqlite3, "~> 0.24"},
@@ -51,8 +50,6 @@ defmodule ThistleTea.MixProject do
       {:phoenix_live_dashboard, "~> 0.8"},
       {:esbuild, "~> 0.10", runtime: Mix.env() == :dev},
       {:tailwind, "~> 0.5", runtime: Mix.env() == :dev},
-      {:heroicons,
-       github: "tailwindlabs/heroicons", tag: "v2.2.0", sparse: "optimized", app: false, compile: false, depth: 1},
       {:telemetry_metrics, "~> 1.0"},
       {:telemetry_poller, "~> 1.0"},
       {:jason, "~> 1.2"},
