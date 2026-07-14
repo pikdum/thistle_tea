@@ -398,23 +398,23 @@
             };
           };
 
-          beam = pkgs.beam.packagesWith pkgs.erlang;
+          beam = pkgs.beam_minimal.packages.erlang_29;
 
           # evision (used by lib/web/utils/homography.ex) downloads a precompiled
           # NIF tarball during `mix compile`. The build sandbox has no network,
           # so we fetch it as a FOD and drop it into ELIXIR_MAKE_CACHE_DIR so
           # evision's downloader finds it cached.
           # Bump version + sha256 in lockstep with the :evision hex pin.
-          evision-version = "0.2.15";
+          evision-version = "1.0.0";
           evision-precompiled =
             {
               x86_64-linux = {
                 target = "x86_64-linux-gnu";
-                hash = "sha256-j2kZYKTi2ASJDRIo9N8EcnltM3YlFyjRc5QvhCPqAfk=";
+                hash = "sha256-dX9DksLxvPewMvB4Jt0AGhBZROAszBsMEA7DgSr51Io=";
               };
               aarch64-linux = {
                 target = "aarch64-linux-gnu";
-                hash = "sha256-8cdWhfK6Q/eiIyEHWCzfKWbbJMhjoCG7DZ66uGwWJF8=";
+                hash = "sha256-f9JunsW1m9krtlTteXDThqYD5LakAAMWFBXG+/T2IC4=";
               };
             }
             .${system};
@@ -431,6 +431,7 @@
             pname = "thistle_tea";
             version = "0.1.0";
             src = ./.;
+            elixir = beam.elixir_1_20;
             removeCookie = false;
 
             # Hex/git deps as a single fixed-output derivation. To refresh after
@@ -440,7 +441,7 @@
               pname = "mix-deps-thistle-tea";
               version = "0.1.0";
               src = ./.;
-              hash = "sha256-in4N+W8xvq4PQkR6xXKyF1/2iUXmUYL7rUGZZo+TV+o=";
+              hash = "sha256-H/JeepVopcvrNNlpteVnPo2YGN4lDc7Gw1lgJaMXiZQ=";
             };
 
             nativeBuildInputs = [

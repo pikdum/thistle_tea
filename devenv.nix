@@ -24,7 +24,7 @@
   languages.rust.enable = true;
   languages.elixir = {
     enable = true;
-    package = pkgs.elixir_1_19;
+    package = pkgs.beam29Packages.elixir_1_20;
   };
   languages.nix.enable = true;
 
