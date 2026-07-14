@@ -65,11 +65,7 @@ defmodule ThistleTea.MixProject do
       {:telemetry_poller, "~> 1.0"},
       {:jason, "~> 1.2"},
       {:bandit, "~> 1.5"},
-      {:tailwind_formatter,
-       github: "100phlecs/tailwind_formatter",
-       ref: "002b45269e69036b3a028cfd94d77b78c8a8a0ad",
-       only: [:dev, :test],
-       runtime: false},
+      {:canonical_tailwind, "~> 0.3.0", only: [:dev, :test], runtime: false},
       {:nx, "~> 0.12"},
       {:evision, "~> 1.0"}
       # {:dep_from_hexpm, "~> 0.3.0"},

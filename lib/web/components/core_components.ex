@@ -53,14 +53,14 @@ defmodule ThistleTeaWeb.CoreComponents do
       ]}
       {@rest}
     >
-      <p :if={@title} class="flex items-center gap-1.5 text-sm font-semibold leading-6">
-        <.icon :if={@kind == :info} name="hero-information-circle-mini" class="h-4 w-4" />
-        <.icon :if={@kind == :error} name="hero-exclamation-circle-mini" class="h-4 w-4" />
+      <p :if={@title} class="flex items-center gap-1.5 text-sm/6 font-semibold">
+        <.icon :if={@kind == :info} name="hero-information-circle-mini" class="size-4" />
+        <.icon :if={@kind == :error} name="hero-exclamation-circle-mini" class="size-4" />
         {@title}
       </p>
-      <p class="mt-2 text-sm leading-5">{msg}</p>
+      <p class="mt-2 text-sm/5">{msg}</p>
       <button type="button" class="group absolute top-1 right-1 p-2" aria-label="close">
-        <.icon name="hero-x-mark-solid" class="h-5 w-5 opacity-40 group-hover:opacity-70" />
+        <.icon name="hero-x-mark-solid" class="size-5 opacity-40 group-hover:opacity-70" />
       </button>
     </div>
     """
@@ -90,7 +90,7 @@ defmodule ThistleTeaWeb.CoreComponents do
         hidden
       >
         Attempting to reconnect
-        <.icon name="hero-arrow-path" class="ml-1 h-3 w-3 motion-safe:animate-spin" />
+        <.icon name="hero-arrow-path" class="ml-1 size-3 motion-safe:animate-spin" />
       </.flash>
 
       <.flash
@@ -102,7 +102,7 @@ defmodule ThistleTeaWeb.CoreComponents do
         hidden
       >
         Hang in there while we get back on track
-        <.icon name="hero-arrow-path" class="ml-1 h-3 w-3 motion-safe:animate-spin" />
+        <.icon name="hero-arrow-path" class="ml-1 size-3 motion-safe:animate-spin" />
       </.flash>
     </div>
     """
@@ -163,8 +163,8 @@ defmodule ThistleTeaWeb.CoreComponents do
     <button
       type={@type}
       class={[
-        "rounded-lg bg-zinc-900 px-3 py-2 hover:bg-zinc-700 phx-submit-loading:opacity-75",
-        "text-sm font-semibold leading-6 text-white active:text-white/80",
+        "phx-submit-loading:opacity-75 rounded-lg bg-zinc-900 px-3 py-2 hover:bg-zinc-700",
+        "text-sm/6 font-semibold text-white active:text-white/80",
         @class
       ]}
       {@rest}
@@ -240,7 +240,7 @@ defmodule ThistleTeaWeb.CoreComponents do
 
     ~H"""
     <div>
-      <label class="flex items-center gap-4 text-sm leading-6 text-zinc-600">
+      <label class="flex items-center gap-4 text-sm/6 text-zinc-600">
         <input type="hidden" name={@name} value="false" disabled={@rest[:disabled]} />
         <input
           type="checkbox"
@@ -285,7 +285,7 @@ defmodule ThistleTeaWeb.CoreComponents do
         id={@id}
         name={@name}
         class={[
-          "min-h-[6rem] mt-2 block w-full rounded-lg text-zinc-900 focus:ring-0 sm:text-sm sm:leading-6",
+          "mt-2 block min-h-24 w-full rounded-lg text-zinc-900 focus:ring-0 sm:text-sm/6",
           @errors == [] && "border-zinc-300 focus:border-zinc-400",
           @errors != [] && "border-rose-400 focus:border-rose-400"
         ]}
@@ -307,7 +307,7 @@ defmodule ThistleTeaWeb.CoreComponents do
         id={@id}
         value={Phoenix.HTML.Form.normalize_value(@type, @value)}
         class={[
-          "mt-2 block w-full rounded-lg text-zinc-900 focus:ring-0 sm:text-sm sm:leading-6",
+          "mt-2 block w-full rounded-lg text-zinc-900 focus:ring-0 sm:text-sm/6",
           @errors == [] && "border-zinc-300 focus:border-zinc-400",
           @errors != [] && "border-rose-400 focus:border-rose-400"
         ]}
@@ -326,7 +326,7 @@ defmodule ThistleTeaWeb.CoreComponents do
 
   def label(assigns) do
     ~H"""
-    <label for={@for} class="block text-sm font-semibold leading-6 text-zinc-800">
+    <label for={@for} class="block text-sm/6 font-semibold text-zinc-800">
       {render_slot(@inner_block)}
     </label>
     """
@@ -339,8 +339,8 @@ defmodule ThistleTeaWeb.CoreComponents do
 
   def error(assigns) do
     ~H"""
-    <p class="mt-3 flex gap-3 text-sm leading-6 text-rose-600">
-      <.icon name="hero-exclamation-circle-mini" class="mt-0.5 h-5 w-5 flex-none" />
+    <p class="mt-3 flex gap-3 text-sm/6 text-rose-600">
+      <.icon name="hero-exclamation-circle-mini" class="mt-0.5 size-5 flex-none" />
       {render_slot(@inner_block)}
     </p>
     """
@@ -359,10 +359,10 @@ defmodule ThistleTeaWeb.CoreComponents do
     ~H"""
     <header class={[@actions != [] && "flex items-center justify-between gap-6", @class]}>
       <div>
-        <h1 class="text-lg font-semibold leading-8 text-zinc-800">
+        <h1 class="text-lg/8 font-semibold text-zinc-800">
           {render_slot(@inner_block)}
         </h1>
-        <p :if={@subtitle != []} class="mt-2 text-sm leading-6 text-zinc-600">
+        <p :if={@subtitle != []} class="mt-2 text-sm/6 text-zinc-600">
           {render_slot(@subtitle)}
         </p>
       </div>
@@ -404,8 +404,8 @@ defmodule ThistleTeaWeb.CoreComponents do
 
     ~H"""
     <div class="overflow-y-auto px-4 sm:overflow-visible sm:px-0">
-      <table class="w-[40rem] mt-11 sm:w-full">
-        <thead class="text-left text-sm leading-6 text-zinc-500">
+      <table class="mt-11 w-160 sm:w-full">
+        <thead class="text-left text-sm/6 text-zinc-500">
           <tr>
             <th :for={col <- @col} class="p-0 pr-6 pb-4 font-normal">{col[:label]}</th>
             <th :if={@action != []} class="relative p-0 pb-4">
@@ -416,7 +416,7 @@ defmodule ThistleTeaWeb.CoreComponents do
         <tbody
           id={@id}
           phx-update={match?(%Phoenix.LiveView.LiveStream{}, @rows) && "stream"}
-          class="relative divide-y divide-zinc-100 border-t border-zinc-200 text-sm leading-6 text-zinc-700"
+          class="relative divide-y divide-zinc-100 border-t border-zinc-200 text-sm/6 text-zinc-700"
         >
           <tr :for={row <- @rows} id={@row_id && @row_id.(row)} class="group hover:bg-zinc-50">
             <td
@@ -433,10 +433,10 @@ defmodule ThistleTeaWeb.CoreComponents do
             </td>
             <td :if={@action != []} class="relative w-14 p-0">
               <span class="absolute -inset-y-px -right-4 left-0 group-hover:bg-zinc-50 sm:rounded-r-xl" />
-              <div class="relative whitespace-nowrap py-4 text-right text-sm font-medium">
+              <div class="relative py-4 text-right text-sm font-medium whitespace-nowrap">
                 <span
                   :for={action <- @action}
-                  class="relative ml-4 font-semibold leading-6 text-zinc-900 hover:text-zinc-700"
+                  class="relative ml-4 leading-6 font-semibold text-zinc-900 hover:text-zinc-700"
                 >
                   {render_slot(action, @row_item.(row))}
                 </span>
@@ -467,7 +467,7 @@ defmodule ThistleTeaWeb.CoreComponents do
     ~H"""
     <div class="mt-14">
       <dl class="-my-4 divide-y divide-zinc-100">
-        <div :for={item <- @item} class="flex gap-4 py-4 text-sm leading-6 sm:gap-8">
+        <div :for={item <- @item} class="flex gap-4 py-4 text-sm/6 sm:gap-8">
           <dt class="w-1/4 flex-none text-zinc-500">{item.title}</dt>
           <dd class="text-zinc-700">{render_slot(item)}</dd>
         </div>
@@ -491,9 +491,9 @@ defmodule ThistleTeaWeb.CoreComponents do
     <div class="mt-16">
       <.link
         navigate={@navigate}
-        class="text-sm font-semibold leading-6 text-zinc-900 hover:text-zinc-700"
+        class="text-sm/6 font-semibold text-zinc-900 hover:text-zinc-700"
       >
-        <.icon name="hero-arrow-left-solid" class="h-3 w-3" />
+        <.icon name="hero-arrow-left-solid" class="size-3" />
         {render_slot(@inner_block)}
       </.link>
     </div>
@@ -511,7 +511,7 @@ defmodule ThistleTeaWeb.CoreComponents do
   width, height, and background color classes.
 
   Icons are extracted from the `deps/heroicons` directory and bundled within
-  your compiled app.css by the plugin in your `assets/tailwind.config.js`.
+  your compiled app.css by the plugin in your `assets/css/app.css`.
 
   ## Examples
 

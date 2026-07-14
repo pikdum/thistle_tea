@@ -447,7 +447,7 @@
             nativeBuildInputs = [
               pkgs.esbuild
               pkgs.gnumake
-              pkgs.tailwindcss_3
+              pkgs.tailwindcss_4
             ];
 
             postPatch = ''
@@ -491,7 +491,6 @@
                 --external:/images/* \
                 --minify)
               (cd assets && tailwindcss \
-                --config=tailwind.config.js \
                 --input=css/app.css \
                 --output=../priv/static/assets/app.css \
                 --minify)

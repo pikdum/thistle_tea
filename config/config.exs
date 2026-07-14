@@ -26,10 +26,9 @@ config :logger, :default_formatter,
 config :phoenix, :json_library, Jason
 
 config :tailwind,
-  version: "3.4.3",
+  version: "4.3.2",
   thistle_tea: [
     args: ~w(
-      --config=tailwind.config.js
       --input=css/app.css
       --output=../priv/static/assets/app.css
     ),

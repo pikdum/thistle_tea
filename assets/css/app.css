@@ -1,6 +1,18 @@
-@import "tailwindcss/base";
-@import "tailwindcss/components";
-@import "tailwindcss/utilities";
+@import "tailwindcss" source(none);
+@source "../css";
+@source "../js";
+@source "../../lib/web";
+
+@plugin "@tailwindcss/forms";
+@plugin "../vendor/heroicons";
+
+@theme {
+    --color-brand: #FD4F00;
+}
+
+@custom-variant phx-click-loading (.phx-click-loading&, .phx-click-loading &);
+@custom-variant phx-submit-loading (.phx-submit-loading&, .phx-submit-loading &);
+@custom-variant phx-change-loading (.phx-change-loading&, .phx-change-loading &);
 
 /* This file is for your main application CSS */
 @import "../node_modules/ol/ol.css";

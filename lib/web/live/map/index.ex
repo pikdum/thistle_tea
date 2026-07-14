@@ -11,14 +11,14 @@ defmodule ThistleTeaWeb.MapLive.Index do
   def render(assigns) do
     ~H"""
     <div
-      class="relative h-full w-full cursor-grab active:cursor-grabbing"
+      class="relative size-full cursor-grab active:cursor-grabbing"
       id="map-wrapper"
       style="background: #f0e9d4;"
     >
-      <div class="h-full w-full" id="map" phx-hook="Map" phx-update="ignore" />
+      <div class="size-full" id="map" phx-hook="Map" phx-update="ignore" />
       <%= if @map_ready do %>
         <div
-          class="text-[#e8dcb4] absolute top-2 right-2 cursor-text rounded-md p-2 px-4"
+          class="absolute top-2 right-2 cursor-text rounded-md p-2 px-4 text-[#e8dcb4]"
           style="background: #3a2e14;"
         >
           Online: {length(assigns.entities)}
