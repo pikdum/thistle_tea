@@ -24,7 +24,7 @@ ifeq ($(TARGET_ABI),darwin)
 CPPFLAGS += -undefined dynamic_lookup -flat_namespace
 endif
 
-ifdef DEBUG
+ifeq ($(DEBUG),1)
 CPPFLAGS += -g
 else
 # -DNDEBUG matches namigator's supported Release build: its runtime queries
