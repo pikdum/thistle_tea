@@ -137,10 +137,17 @@ defmodule ThistleTea.Game.Network.Server do
 
   @impl GenServer
   def handle_cast({:send_packet, %UpdateObject{} = update, opts}, {socket, state}) do
-    if source_tracked?(state, Keyword.get(opts, :source_guid)) do
-      handle_cast({:send_packet, update}, {socket, state})
-    else
-      {:noreply, {socket, state}, socket.read_timeout}
+    source_guid = Keyword.get(opts, :source_guid)
+
+    cond do
+      not source_tracked?(state, source_guid) ->
+        {:noreply, {socket, state}, socket.read_timeout}
+
+      is_integer(source_guid) ->
+        send_update_object(update, socket, state)
+
+      true ->
+        handle_cast({:send_packet, update}, {socket, state})
     end
   end
 
@@ -148,11 +155,7 @@ defmodule ThistleTea.Game.Network.Server do
     if duplicate_create?(state, update) do
       {:noreply, {socket, state}, socket.read_timeout}
     else
-      update = Tap.personalize(update, Map.get(state, :guid))
-      {packet, updates} = UpdateBatcher.batch(update, Map.get(state, :guid))
-      state = Network.Send.send_packet(packet, {socket, state})
-      state = track_created_updates(state, updates)
-      {:noreply, {socket, state}, socket.read_timeout}
+      send_update_object(update, socket, state)
     end
   end
 
@@ -426,6 +429,14 @@ defmodule ThistleTea.Game.Network.Server do
 
     # The client responds with a MSG_MOVE_WORLDPORT_ACK message which
     # is handled in the login handler as they share the same init process
+    {:noreply, {socket, state}, socket.read_timeout}
+  end
+
+  defp send_update_object(%UpdateObject{} = update, socket, state) do
+    update = Tap.personalize(update, Map.get(state, :guid))
+    {packet, updates} = UpdateBatcher.batch(update, Map.get(state, :guid))
+    state = Network.Send.send_packet(packet, {socket, state})
+    state = track_created_updates(state, updates)
     {:noreply, {socket, state}, socket.read_timeout}
   end
 

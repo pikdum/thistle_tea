@@ -10,7 +10,9 @@ defmodule ThistleTea.Game.Network.ServerTest do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.Entity.Logic.Regen
+  alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network
+  alias ThistleTea.Game.Network.Connection
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Packet
   alias ThistleTea.Game.Network.Server
@@ -18,6 +20,18 @@ defmodule ThistleTea.Game.Network.ServerTest do
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.Metadata
+  alias ThousandIsland.Socket
+  alias ThousandIsland.Telemetry
+
+  defmodule TestTransport do
+    @moduledoc false
+    import Kernel, except: [send: 2]
+
+    def send(pid, data) do
+      Kernel.send(pid, {:socket_send, data})
+      :ok
+    end
+  end
 
   describe "UpdateBatcher.batch/2" do
     test "drains pending update structs into a single packet" do
@@ -72,6 +86,33 @@ defmodule ThistleTea.Game.Network.ServerTest do
       packet = %Message.SmsgDestroyObject{guid: 1}
 
       assert {:noreply, {^socket, ^state}, 0} = Server.handle_cast({:send_packet, packet}, {socket, state})
+    end
+
+    test "drops duplicate unscoped create updates" do
+      guid = Guid.from_low_guid(:mob, 1, 1)
+      socket = test_socket()
+      state = connection_state(guid)
+
+      assert {:noreply, {^socket, ^state}, 0} =
+               Server.handle_cast({:send_packet, update_object(:unit, guid)}, {socket, state})
+
+      refute_receive {:socket_send, _data}
+    end
+
+    test "sends source-scoped create refreshes for tracked entities" do
+      guid = Guid.from_low_guid(:mob, 1, 1)
+      socket = test_socket()
+      state = connection_state(guid)
+
+      assert {:noreply, {^socket, %{tracked_entities: tracked}}, 0} =
+               Server.handle_cast(
+                 {:send_packet, update_object(:unit, guid), source_guid: guid},
+                 {socket, state}
+               )
+
+      assert_receive {:socket_send, data}
+      assert is_binary(data)
+      assert MapSet.member?(tracked, guid)
     end
 
     test "raises when a serialized update object packet reaches the server" do
@@ -209,6 +250,33 @@ defmodule ThistleTea.Game.Network.ServerTest do
       class: 1,
       gender: 1,
       spirit: 50
+    }
+  end
+
+  defp connection_state(tracked_guid) do
+    %{
+      conn: %Connection{session_key: <<0>>},
+      guid: Guid.from_low_guid(:player, 1),
+      tracked_entities: MapSet.new([tracked_guid])
+    }
+  end
+
+  defp test_socket do
+    span = %Telemetry{
+      span_name: :connection,
+      telemetry_span_context: make_ref(),
+      start_time: 0,
+      start_metadata: %{},
+      handler: Server,
+      span_metadata: %{}
+    }
+
+    %Socket{
+      socket: self(),
+      transport_module: TestTransport,
+      read_timeout: 0,
+      silent_terminate_on_error: false,
+      span: span
     }
   end
 
