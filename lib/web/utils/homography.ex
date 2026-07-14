@@ -3,8 +3,6 @@ defmodule ThistleTeaWeb.Homography do
   Maps world coordinates onto the web map's image space via per-map
   homographies fitted from known reference points.
   """
-  require Logger
-
   def init do
     # TODO: getting worse results the more points
     # there has to be a better way

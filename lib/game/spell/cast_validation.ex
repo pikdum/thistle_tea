@@ -189,7 +189,7 @@ defmodule ThistleTea.Game.Spell.CastValidation do
   defp check_power(%{unit: unit} = caster, %Spell{mana_cost: cost, power_type: power_type})
        when is_integer(cost) and cost > 0 do
     field = Map.get(@power_fields, power_type)
-    power = if is_atom(field), do: Map.get(unit, field)
+    power = if field, do: Map.get(unit, field)
     power = if is_integer(power), do: power, else: 0
 
     if godmode?(caster) or power >= cost, do: :ok, else: {:error, :no_power}

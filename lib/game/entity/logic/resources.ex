@@ -189,7 +189,7 @@ defmodule ThistleTea.Game.Entity.Logic.Resources do
     field = Map.get(@power_fields, power_type)
     max_field = Map.get(@max_power_fields, power_type)
 
-    with true <- is_atom(field) and is_atom(max_field),
+    with true <- not is_nil(field) and not is_nil(max_field),
          max_power when is_integer(max_power) and max_power > 0 <- Map.get(unit, max_field) do
       power = Map.get(unit, field)
       power = if is_integer(power), do: power, else: 0

@@ -7,8 +7,6 @@ defmodule ThistleTea.Game.Network.Message.CmsgNpcTextQuery do
   alias ThistleTea.Game.Network.Message.SmsgNpcTextUpdate.NpcTextUpdateEmote
   alias ThistleTea.Game.World.Loader.NpcText, as: NpcTextLoader
 
-  require Logger
-
   defstruct [:text_id, :guid]
 
   @impl ClientMessage

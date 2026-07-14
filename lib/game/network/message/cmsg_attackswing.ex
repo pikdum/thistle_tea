@@ -69,8 +69,6 @@ defmodule ThistleTea.Game.Network.Message.CmsgAttackswing do
       :ets.match(:mobs, {:"$1", target_guid}) != []
   end
 
-  defp unit_target?(_target_guid), do: false
-
   defp send_attack_stop(%{guid: guid} = state, target_guid) when is_integer(guid) do
     enemy = if is_integer(target_guid) and target_guid > 0, do: target_guid, else: 0
     Network.send_packet(%Message.SmsgAttackstop{player: guid, enemy: enemy})

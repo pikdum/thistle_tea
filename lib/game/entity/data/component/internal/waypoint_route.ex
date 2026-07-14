@@ -15,7 +15,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal.WaypointRoute do
   def build(%Creature{creature_movement: nil}), do: nil
 
   def build(%Creature{position_x: x, position_y: y, position_z: z, creature_movement: creature_movement} = creature) do
-    scripts_by_id = Map.get(creature, :movement_scripts) || %{}
+    scripts_by_id = creature.movement_scripts
 
     points =
       creature_movement

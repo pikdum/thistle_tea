@@ -74,7 +74,7 @@ defmodule ThistleTea.Auth do
         {:close, state}
 
       {:ok, len} ->
-        <<packet::binary-size(len), rest::binary>> = buf
+        <<packet::binary-size(^len), rest::binary>> = buf
         state = %{state | buffer: rest}
 
         case handle_packet(packet, socket, state) do

@@ -58,9 +58,7 @@ defmodule ThistleTea.Game.World.Loader.Mob do
 
     case Mangos.Repo.get(Mangos.CreatureTemplate, entry) do
       %Mangos.CreatureTemplate{} = template ->
-        creature
-        |> Map.put(:id, entry)
-        |> Map.put(:creature_template, template)
+        %{creature | id: entry, creature_template: template}
 
       _ ->
         nil
@@ -70,7 +68,7 @@ defmodule ThistleTea.Game.World.Loader.Mob do
   defp load_creature_level(nil), do: nil
 
   defp load_creature_level(%Mangos.Creature{creature_template: %Mangos.CreatureTemplate{} = template} = creature) do
-    Map.put(creature, :selected_level, Enum.random(template.min_level..template.max_level))
+    %{creature | selected_level: Enum.random(template.min_level..template.max_level)}
   end
 
   defp load_creature_class_level_stats(nil), do: nil
@@ -78,8 +76,7 @@ defmodule ThistleTea.Game.World.Loader.Mob do
   defp load_creature_class_level_stats(
          %Mangos.Creature{creature_template: %Mangos.CreatureTemplate{unit_class: unit_class}} = creature
        ) do
-    level = Map.get(creature, :selected_level)
-    Map.put(creature, :creature_class_level_stats, Mangos.CreatureClassLevelStats.get(unit_class, level))
+    %{creature | creature_class_level_stats: Mangos.CreatureClassLevelStats.get(unit_class, creature.selected_level)}
   end
 
   defp load_display(nil), do: nil
@@ -87,10 +84,12 @@ defmodule ThistleTea.Game.World.Loader.Mob do
   defp load_display(%Mangos.Creature{creature_template: %Mangos.CreatureTemplate{} = template} = creature) do
     {display_id, display_scale} = select_display(template)
 
-    creature
-    |> Map.put(:modelid, display_id)
-    |> Map.put(:display_scale, display_scale || display_scale(display_id))
-    |> Map.put(:creature_display_info_addon, Mangos.CreatureDisplayInfoAddon.get(display_id))
+    %{
+      creature
+      | modelid: display_id,
+        display_scale: display_scale || display_scale(display_id),
+        creature_display_info_addon: Mangos.CreatureDisplayInfoAddon.get(display_id)
+    }
   end
 
   defp load_spells(%Mangos.Creature{creature_template: %Mangos.CreatureTemplate{} = template} = creature) do
@@ -104,15 +103,11 @@ defmodule ThistleTea.Game.World.Loader.Mob do
         template_spell_ids ++ Enum.map(spell_list, & &1.spell_id) ++ script_cast_spell_ids(creature)
       )
 
-    creature
-    |> Map.put(:spellbook, spellbook)
-    |> Map.put(:spell_list, Enum.filter(spell_list, &Map.has_key?(spellbook, &1.spell_id)))
+    %{creature | spellbook: spellbook, spell_list: Enum.filter(spell_list, &Map.has_key?(spellbook, &1.spell_id))}
   end
 
   defp load_spells(%Mangos.Creature{} = creature) do
-    creature
-    |> Map.put(:spellbook, %{})
-    |> Map.put(:spell_list, [])
+    %{creature | spellbook: %{}, spell_list: []}
   end
 
   defp load_spell_list(list_id) when is_integer(list_id) and list_id > 0 do
@@ -130,8 +125,6 @@ defmodule ThistleTea.Game.World.Loader.Mob do
 
   defp load_spell_list(_list_id), do: []
 
-  defp load_addon_auras(nil), do: nil
-
   defp load_addon_auras(%Mangos.Creature{} = creature) do
     spells =
       creature
@@ -139,7 +132,7 @@ defmodule ThistleTea.Game.World.Loader.Mob do
       |> SpellLoader.build_spellbook()
       |> Map.values()
 
-    Map.put(creature, :addon_auras, spells)
+    %{creature | addon_auras: spells}
   end
 
   defp addon_aura_ids(%Mangos.Creature{guid: guid, creature_template: %Mangos.CreatureTemplate{auras: template_auras}}) do
@@ -176,14 +169,14 @@ defmodule ThistleTea.Game.World.Loader.Mob do
       |> Enum.map(&AIEvent.build(&1, scripts_by_id))
       |> Enum.reject(&(&1.actions == []))
 
-    Map.put(creature, :ai_events, ai_events)
+    %{creature | ai_events: ai_events}
   end
 
   defp load_conditions(nil), do: nil
 
   defp load_conditions(%Mangos.Creature{} = creature) do
-    ai_events = Map.get(creature, :ai_events, [])
-    movement_scripts = Map.get(creature, :movement_scripts, %{})
+    ai_events = creature.ai_events
+    movement_scripts = creature.movement_scripts
 
     condition_ids =
       Enum.map(ai_events, & &1.condition_id) ++
@@ -194,9 +187,11 @@ defmodule ThistleTea.Game.World.Loader.Mob do
         creature
 
       conditions ->
-        creature
-        |> Map.put(:ai_events, Enum.map(ai_events, &attach_event_condition(&1, conditions)))
-        |> Map.put(:movement_scripts, attach_script_conditions(movement_scripts, conditions))
+        %{
+          creature
+          | ai_events: Enum.map(ai_events, &attach_event_condition(&1, conditions)),
+            movement_scripts: attach_script_conditions(movement_scripts, conditions)
+        }
     end
   end
 
@@ -241,16 +236,16 @@ defmodule ThistleTea.Game.World.Loader.Mob do
       |> Enum.filter(&positive?/1)
       |> then(&ScriptLoader.load_by_ids(Mangos.CreatureMovementScript, &1))
 
-    Map.put(creature, :movement_scripts, scripts_by_id)
+    %{creature | movement_scripts: scripts_by_id}
   end
 
   defp load_movement_scripts(%Mangos.Creature{} = creature) do
-    Map.put(creature, :movement_scripts, %{})
+    %{creature | movement_scripts: %{}}
   end
 
   defp script_cast_spell_ids(%Mangos.Creature{} = creature) do
-    event_steps = creature |> Map.get(:ai_events, []) |> Enum.flat_map(& &1.actions)
-    movement_steps = creature |> Map.get(:movement_scripts, %{}) |> Map.values()
+    event_steps = Enum.flat_map(creature.ai_events, & &1.actions)
+    movement_steps = Map.values(creature.movement_scripts)
 
     (event_steps ++ movement_steps)
     |> Enum.flat_map(fn steps -> Enum.flat_map(steps, &locally_run_steps/1) end)
@@ -272,7 +267,7 @@ defmodule ThistleTea.Game.World.Loader.Mob do
       Mangos.CreatureMovement.query(creature.guid)
       |> Mangos.Repo.all()
 
-    Map.put(creature, :creature_movement, creature_movement)
+    %{creature | creature_movement: creature_movement}
   end
 
   defp display_scale(display_id) do
@@ -306,11 +301,11 @@ defmodule ThistleTea.Game.World.Loader.Mob do
           [nil, nil, nil]
       end
 
-    Map.put(creature, :equip_items, items)
+    %{creature | equip_items: items}
   end
 
   defp load_equip_items(%Mangos.Creature{} = creature) do
-    Map.put(creature, :equip_items, [nil, nil, nil])
+    %{creature | equip_items: [nil, nil, nil]}
   end
 
   defp item_template(entry) when is_integer(entry) and entry > 0 do
@@ -372,10 +367,8 @@ defmodule ThistleTea.Game.World.Loader.Mob do
         SpawnPool.activate(group, cell)
 
       {:singleton, :creature, _guid} = group ->
-        case load_creature(creature) do
-          %Mangos.Creature{} = loaded -> SpawnPool.activate(group, cell, Mob.build(loaded))
-          nil -> :ok
-        end
+        loaded = load_creature(creature)
+        SpawnPool.activate(group, cell, Mob.build(loaded))
     end
   end
 

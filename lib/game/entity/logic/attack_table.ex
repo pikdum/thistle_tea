@@ -409,8 +409,6 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
     end
   end
 
-  defp attacker_crit_chance(_attacker), do: @default_crit_chance
-
   defp always_crush?(entity) do
     (extra_flags(entity) &&& @extra_flag_always_crush) != 0
   end

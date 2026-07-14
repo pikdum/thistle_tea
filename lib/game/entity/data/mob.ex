@@ -38,11 +38,11 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
         _ -> nil
       end
 
-    display_info_addon = Map.get(c, :creature_display_info_addon)
-    effective_scale = effective_scale(ct, Map.get(c, :display_scale))
-    {virtual_item_slot_display, virtual_item_info} = virtual_items(Map.get(c, :equip_items))
+    display_info_addon = c.creature_display_info_addon
+    effective_scale = effective_scale(ct, c.display_scale)
+    {virtual_item_slot_display, virtual_item_info} = virtual_items(c.equip_items)
     level = level(c)
-    stats = Map.get(c, :creature_class_level_stats)
+    stats = c.creature_class_level_stats
     {health, max_health} = health_values(c, ct, stats)
     {mana, max_mana} = mana_values(c, ct, stats)
     {min_damage, max_damage} = melee_damage_values(ct, stats)
@@ -143,9 +143,9 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
           detection_range: detection_range(ct),
           call_for_help_range: call_for_help_range(ct),
           leash_range: leash_range(ct),
-          spells: Map.get(c, :spell_list, []),
-          addon_auras: Map.get(c, :addon_auras, []),
-          ai_events: Map.get(c, :ai_events, [])
+          spells: c.spell_list,
+          addon_auras: c.addon_auras,
+          ai_events: c.ai_events
         },
         spawn: %Spawn{
           unit: unit,
@@ -164,7 +164,7 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
         event: event,
         in_combat: false,
         running: false,
-        spellbook: Map.get(c, :spellbook, %{})
+        spellbook: c.spellbook
       }
     }
     |> apply_addon_auras(Time.now())
@@ -250,7 +250,7 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
   defp effective_scale(_template, _display_scale), do: 1.0
 
   defp level(%Mangos.Creature{} = creature) do
-    case Map.get(creature, :selected_level) do
+    case creature.selected_level do
       level when is_integer(level) and level > 0 -> level
       _ -> random_template_level(creature)
     end
@@ -353,8 +353,6 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
   defp regenerate_stats(%Mangos.CreatureTemplate{creature_type_flags: flags}) when is_integer(flags) do
     if (flags &&& @static_flag_no_automatic_regen) == 0, do: 0x3, else: 0x0
   end
-
-  defp regenerate_stats(_template), do: 0x3
 
   defp detection_range(%Mangos.CreatureTemplate{detection_range: range}) when is_number(range) and range >= 0, do: range
   defp detection_range(_template), do: 20.0

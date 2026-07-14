@@ -4,8 +4,6 @@ defmodule ThistleTea.Game.Network.Message.CmsgCancelChannelling do
 
   alias ThistleTea.Game.Player.Spellcasting
 
-  require Logger
-
   defstruct [:spell_id]
 
   @impl ClientMessage

@@ -34,9 +34,6 @@ defmodule ThistleTea.Game.Network.Message.CmsgCharCreate do
       {:error, :character_limit} ->
         Network.send_packet(%Message.SmsgCharCreate{result: 0x35})
 
-      {:error, _} ->
-        Network.send_packet(%Message.SmsgCharCreate{result: 0x30})
-
       {:ok, _} ->
         Network.send_packet(%Message.SmsgCharCreate{result: 0x2E})
     end

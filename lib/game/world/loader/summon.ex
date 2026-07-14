@@ -31,15 +31,11 @@ defmodule ThistleTea.Game.World.Loader.Summon do
   end
 
   def build(entry, map, {x, y, z, o}, opts \\ []) when is_integer(entry) and is_list(opts) do
-    case template(entry) do
-      %Mangos.Creature{} = creature ->
-        %{creature | guid: next_low_guid(), map: map, position_x: x, position_y: y, position_z: z, orientation: o}
-        |> Mob.build()
-        |> Mob.prepare_summon(opts)
+    creature = template(entry)
 
-      _ ->
-        nil
-    end
+    %{creature | guid: next_low_guid(), map: map, position_x: x, position_y: y, position_z: z, orientation: o}
+    |> Mob.build()
+    |> Mob.prepare_summon(opts)
   end
 
   def build_pet(entry, %{
@@ -204,10 +200,7 @@ defmodule ThistleTea.Game.World.Loader.Summon do
       }
       |> MobLoader.load_creature()
 
-    case creature do
-      %Mangos.Creature{} -> :ets.insert(__MODULE__, {entry, creature})
-      _ -> nil
-    end
+    :ets.insert(__MODULE__, {entry, creature})
 
     creature
   end

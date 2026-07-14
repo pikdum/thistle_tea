@@ -197,8 +197,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
     end
   end
 
-  defp consume_forced_crit(character, _casting, _now), do: character
-
   defp consume_unavoidable_finisher(character, %Cast{spell: %Spell{} = spell}) do
     if Scripts.finisher?(spell) and not Spell.melee_ability?(spell) do
       Reactive.consume_combo(character)
@@ -206,8 +204,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
       character
     end
   end
-
-  defp consume_unavoidable_finisher(character, _casting), do: character
 
   defp queue_open_object(character, %Cast{spell: %Spell{} = spell, targets: %Targets{object_guid: object_guid}})
        when is_integer(object_guid) do
@@ -263,8 +259,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
       character
     end
   end
-
-  defp break_stealth(character, _casting, _now), do: character
 
   def clear_cast(%{internal: %Internal{} = internal} = character) do
     case internal.casting do
@@ -342,7 +336,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
     {character, events} = AuraLogic.remove_source_spell(character, spell_id, guid, Time.now())
 
     remote_events =
-      if is_integer(target_guid) and target_guid > 0 and target_guid != guid do
+      if target_guid > 0 and target_guid != guid do
         [Event.remove_aura(guid, target_guid, spell_id)]
       else
         []

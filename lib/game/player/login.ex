@@ -47,8 +47,6 @@ defmodule ThistleTea.Game.Player.Login do
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.System.Party, as: PartySystem
 
-  require Logger
-
   # @update_flag_none 0x00
   @update_flag_self 0x01
   # @update_flag_transport 0x02

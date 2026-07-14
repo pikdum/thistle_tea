@@ -5,8 +5,6 @@ defmodule ThistleTea.Game.Network.Message.CmsgMoveWorldportAck do
   alias ThistleTea.Game.Player.Login
   alias ThistleTea.Game.World.Visibility
 
-  require Logger
-
   defstruct []
 
   @impl ClientMessage

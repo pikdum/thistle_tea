@@ -30,6 +30,16 @@ defmodule ThistleTea.DB.Mangos.Creature do
     field(:spawndist, :float, virtual: true)
     field(:curhealth, :integer, virtual: true)
     field(:curmana, :integer, virtual: true)
+    field(:selected_level, :integer, virtual: true)
+    field(:display_scale, :float, virtual: true)
+    field(:creature_display_info_addon, :any, virtual: true)
+    field(:creature_class_level_stats, :any, virtual: true)
+    field(:equip_items, :any, virtual: true, default: [nil, nil, nil])
+    field(:movement_scripts, :map, virtual: true, default: %{})
+    field(:ai_events, :any, virtual: true, default: [])
+    field(:spellbook, :map, virtual: true, default: %{})
+    field(:spell_list, :any, virtual: true, default: [])
+    field(:addon_auras, :any, virtual: true, default: [])
 
     belongs_to(:creature_template, Mangos.CreatureTemplate,
       foreign_key: :id,

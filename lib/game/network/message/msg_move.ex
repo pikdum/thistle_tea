@@ -17,8 +17,6 @@ defmodule ThistleTea.Game.Network.Message.MsgMove do
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.Visibility
 
-  require Logger
-
   @spell_failed_moving 0x2E
   @move_recency_ms 750
   @max_projection_speed 20.0
@@ -38,37 +36,33 @@ defmodule ThistleTea.Game.Network.Message.MsgMove do
       ) do
     movement_block = MovementBlock.from_binary(payload, movement_block)
 
-    if movement_block do
-      character = %{character | movement_block: movement_block, unit: %{unit | stand_state: 0}}
-      %{internal: %{map: map}} = character
-      %MovementBlock{position: {x0, y0, z0, _}} = state.character.movement_block
-      %MovementBlock{position: {x1, y1, z1, orientation}} = movement_block
-      now = Time.now()
-      movement_velocity = movement_velocity(state.guid, {x0, y0, z0}, {x1, y1, z1}, now)
-      Metadata.update(state.guid, %{orientation: orientation, movement_velocity: movement_velocity, last_move_at: now})
-      position_changed? = x0 != x1 or y0 != y1 or z0 != z1
-      character = interrupt_auras(character, position_changed?)
+    character = %{character | movement_block: movement_block, unit: %{unit | stand_state: 0}}
+    %{internal: %{map: map}} = character
+    %MovementBlock{position: {x0, y0, z0, _}} = state.character.movement_block
+    %MovementBlock{position: {x1, y1, z1, orientation}} = movement_block
+    now = Time.now()
+    movement_velocity = movement_velocity(state.guid, {x0, y0, z0}, {x1, y1, z1}, now)
+    Metadata.update(state.guid, %{orientation: orientation, movement_velocity: movement_velocity, last_move_at: now})
+    position_changed? = x0 != x1 or y0 != y1 or z0 != z1
+    character = interrupt_auras(character, position_changed?)
 
-      new_state =
-        if position_changed? do
-          SpatialHash.update(:players, state.guid, map, x1, y1, z1)
-          Metadata.update(state.guid, %{moving_until: now + @move_recency_ms})
-          AggroProbe.notify_player_moved(state.guid, map, {x1, y1, z1})
-          ChaseWatch.notify_moved(state.guid, {x1, y1, z1})
+    new_state =
+      if position_changed? do
+        SpatialHash.update(:players, state.guid, map, x1, y1, z1)
+        Metadata.update(state.guid, %{moving_until: now + @move_recency_ms})
+        AggroProbe.notify_player_moved(state.guid, map, {x1, y1, z1})
+        ChaseWatch.notify_moved(state.guid, {x1, y1, z1})
 
-          %{state | character: character}
-          |> Spellcasting.cancel(@spell_failed_moving)
-          |> PlayerRest.check_tavern_exit()
-        else
-          %{state | character: character}
-        end
+        %{state | character: character}
+        |> Spellcasting.cancel(@spell_failed_moving)
+        |> PlayerRest.check_tavern_exit()
+      else
+        %{state | character: character}
+      end
 
-      new_state
-      |> Visibility.refresh_player()
-      |> broadcast(message)
-    else
-      state
-    end
+    new_state
+    |> Visibility.refresh_player()
+    |> broadcast(message)
   end
 
   def handle(_message, state), do: state

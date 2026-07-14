@@ -8,8 +8,6 @@ defmodule ThistleTea.Game.Network.Connection do
   alias ThistleTea.Game.Network.Connection.Crypto
   alias ThistleTea.Game.Network.Packet
 
-  require Logger
-
   defstruct [
     :session_key,
     binary_stream: <<>>,
@@ -52,7 +50,7 @@ defmodule ThistleTea.Game.Network.Connection do
       {:ok, conn, decrypted_header} ->
         <<size::big-size(16), opcode::little-size(32)>> = decrypted_header
 
-        <<_encrypted_header::bytes-size(6), payload::binary-size(size - 4), rest::binary>> =
+        <<_encrypted_header::bytes-size(6), payload::binary-size(^size - 4), rest::binary>> =
           conn.binary_stream
 
         packet = %Packet{

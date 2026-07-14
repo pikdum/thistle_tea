@@ -5,8 +5,6 @@ defmodule ThistleTeaWeb.MapLive.Index do
   alias ThistleTea.Game.World.Metadata
   alias ThistleTeaWeb.Homography
 
-  require Logger
-
   @update_interval 1_000
 
   @impl true

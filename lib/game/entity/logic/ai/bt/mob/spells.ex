@@ -456,8 +456,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells do
     end
   end
 
-  defp target_combat_reach(_target_guid), do: Unit.default_combat_reach()
-
   defp build_target_info(%Mob{object: %{guid: guid}}, target_guid) when target_guid == guid, do: :self
 
   defp build_target_info(%Mob{} = state, target_guid) do

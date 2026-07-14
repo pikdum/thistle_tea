@@ -131,11 +131,11 @@ defmodule ThistleTea.UpdateObjectTest do
       <<1::little-32, 0, _update_type, rest::binary>> = packet.payload
       <<header, rest::binary>> = rest
       packed_size = Enum.reduce(0..7, 0, fn i, acc -> acc + (bsr(header, i) |> band(1)) end)
-      <<_packed::binary-size(packed_size), _obj_type, rest::binary>> = rest
+      <<_packed::binary-size(^packed_size), _obj_type, rest::binary>> = rest
       # update_flag=0 means no movement body
       <<_update_flag, mask_count, rest::binary>> = rest
       mask_bytes = mask_count * 4
-      <<mask::binary-size(mask_bytes), data::binary>> = rest
+      <<mask::binary-size(^mask_bytes), data::binary>> = rest
       set_bits = for(<<b::1 <- mask>>, do: b) |> Enum.sum()
 
       assert byte_size(data) == set_bits * 4

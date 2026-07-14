@@ -157,8 +157,6 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Lifecycle do
       Enum.any?(holder.auras, &match?(%Aura{type: :mod_shapeshift, misc_value: 30}, &1))
   end
 
-  defp stealth_holder?(_holder), do: false
-
   defp stealth_spell_ids(holders) do
     for %Holder{spell: %Spell{id: id}} = holder <- holders, stealth_holder?(holder), do: id
   end

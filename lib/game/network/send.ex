@@ -10,8 +10,6 @@ defmodule ThistleTea.Game.Network.Send do
   alias ThistleTea.Game.Network.Packet
   alias ThousandIsland.Socket
 
-  require Logger
-
   def send_packet(%Packet{opcode: @smsg_update_object, payload: payload}, {socket, state}) do
     compressed_payload = :zlib.compress(payload)
     original_size = byte_size(payload)

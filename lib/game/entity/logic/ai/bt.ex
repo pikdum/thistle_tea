@@ -108,8 +108,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT do
     put_blackboard(state, fun.(blackboard))
   end
 
-  defp update_blackboard(state, _fun), do: state
-
   defp put_behavior_tree(%{internal: %Internal{} = internal} = state, behavior_tree) do
     %{state | internal: %{internal | behavior_tree: behavior_tree}}
   end

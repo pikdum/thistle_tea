@@ -18,7 +18,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgForceRunSpeedChangeAck do
   def from_binary(payload) do
     <<guid::little-size(64), counter::little-size(32), rest::binary>> = payload
     info_size = byte_size(rest) - 4
-    <<_info::binary-size(info_size), new_speed::little-float-size(32)>> = rest
+    <<_info::binary-size(^info_size), new_speed::little-float-size(32)>> = rest
 
     %__MODULE__{
       guid: guid,

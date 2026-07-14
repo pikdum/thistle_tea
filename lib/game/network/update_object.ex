@@ -29,18 +29,11 @@ defmodule ThistleTea.Game.Network.UpdateObject do
   # or one module per enum/flag set?
 
   @update_type_values 0
-  @update_type_movement 1
   @update_type_create_object 2
   @update_type_create_object2 3
-  @update_type_out_of_range_objects 4
-  @update_type_near_objects 5
 
-  defp update_type(:values), do: @update_type_values
-  defp update_type(:movement), do: @update_type_movement
   defp update_type(:create_object), do: @update_type_create_object
   defp update_type(:create_object2), do: @update_type_create_object2
-  defp update_type(:out_of_range_objects), do: @update_type_out_of_range_objects
-  defp update_type(:near_objects), do: @update_type_near_objects
 
   @object_type_object 0x00
   @object_type_item 0x01
