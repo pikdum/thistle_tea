@@ -405,9 +405,23 @@
           # so we fetch it as a FOD and drop it into ELIXIR_MAKE_CACHE_DIR so
           # evision's downloader finds it cached.
           # Bump version + sha256 in lockstep with the :evision hex pin.
+          evision-version = "0.2.15";
+          evision-precompiled =
+            {
+              x86_64-linux = {
+                target = "x86_64-linux-gnu";
+                hash = "sha256-j2kZYKTi2ASJDRIo9N8EcnltM3YlFyjRc5QvhCPqAfk=";
+              };
+              aarch64-linux = {
+                target = "aarch64-linux-gnu";
+                hash = "sha256-8cdWhfK6Q/eiIyEHWCzfKWbbJMhjoCG7DZ66uGwWJF8=";
+              };
+            }
+            .${system};
+          evision-precompiled-name = "evision-nif_2.16-${evision-precompiled.target}-contrib-${evision-version}.tar.gz";
           evision-precompiled-tarball = pkgs.fetchurl {
-            url = "https://github.com/cocoa-xu/evision/releases/download/v0.2.15/evision-nif_2.16-x86_64-linux-gnu-contrib-0.2.15.tar.gz";
-            hash = "sha256-j2kZYKTi2ASJDRIo9N8EcnltM3YlFyjRc5QvhCPqAfk=";
+            url = "https://github.com/cocoa-xu/evision/releases/download/v${evision-version}/${evision-precompiled-name}";
+            inherit (evision-precompiled) hash;
           };
 
           # The mix release. Builds the Fine C++ NIF with elixir_make against
@@ -452,7 +466,7 @@
             preConfigure = ''
               export HOME=$TMPDIR
               mkdir -p "$ELIXIR_MAKE_CACHE_DIR"
-              cp ${evision-precompiled-tarball} "$ELIXIR_MAKE_CACHE_DIR/evision-nif_2.16-x86_64-linux-gnu-contrib-0.2.15.tar.gz"
+              cp ${evision-precompiled-tarball} "$ELIXIR_MAKE_CACHE_DIR/${evision-precompiled-name}"
             '';
 
             # Run esbuild + tailwind directly (skipping the mix esbuild/tailwind
