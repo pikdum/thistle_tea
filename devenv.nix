@@ -16,6 +16,8 @@
     pkgs.git
     pkgs.bun
     pkgs.inotify-tools
+    pkgs.just
+    pkgs.rsync
   ];
 
   # https://devenv.sh/languages/
