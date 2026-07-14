@@ -20,9 +20,11 @@
 - Use `describe "function/arity" do ... end` to group tests by function
 - Use `setup [:named_setup]` for reusable test data
 - Keep test names concise and descriptive
-- Do not query generated sqlite databases in default tests; `db/vmangos.sqlite` loader smoke tests must be tagged `:vmangos_db` so normal `mix test` excludes them, and `db/dbc.sqlite` is not available in CI
-- CI runs `mix test` without VMangos first, then generates the database and runs `mix test --only vmangos_db`; keep default tests independent of VMangos, and tag integration tests that also require the unavailable DBC database with `:dbc_db` instead
-- Tests that need namigator map geometry (line of sight, terrain heights) must be tagged `:namigator_maps` (excluded by default; map data is not in CI); run with `mix test --include namigator_maps`
+- Do not query generated sqlite databases in default tests; `db/vmangos.sqlite` tests must be tagged `:vmangos_db`, and tests that query `db/dbc.sqlite` must be tagged `:dbc_db`
+- Database and map tags are mutually exclusive: a test must never have more than one of `:vmangos_db`, `:dbc_db`, and `:namigator_maps`. Split a test or use fixtures when it needs data from more than one unavailable source
+- `:vmangos_db` tests require generated VMangos data and run with `mix test --only vmangos_db`; `:dbc_db` tests require the DBC database and are not run by CI; `:namigator_maps` tests require Namigator map data and are not run by CI
+- CI runs `mix test` first, then generates `db/vmangos.sqlite` and runs only `:vmangos_db` tests; the mutually exclusive tags keep DBC and map tests out of that run
+- Tests that need Namigator map geometry (line of sight, terrain heights, or pathfinding) must be tagged `:namigator_maps`; run them with `mix test --include namigator_maps`
 
 ### Imports & Structs
 - Use `use ThistleTea.Game.Network.Opcodes, [:SMSG_FOO, :CMSG_BAR]` macro to define opcode attributes

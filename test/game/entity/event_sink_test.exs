@@ -151,7 +151,6 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
     end
 
     @tag :dbc_db
-    @tag :vmangos_db
     test "a summon-pet event starts an owned pet entity" do
       caster_guid = Guid.from_low_guid(:player, unique_guid())
       Entity.register(caster_guid)

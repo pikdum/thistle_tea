@@ -147,6 +147,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
       assert Enum.any?(mob.internal.events, &(&1.type == :attack_stop))
     end
 
+    @tag :namigator_maps
     test "evades to its spawn after vanish removes the last hostile reference" do
       target = player_guid()
       spawn = {0.0, 0.0, 0.0}

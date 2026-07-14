@@ -9,7 +9,6 @@ defmodule ThistleTea.Game.World.Loader.SummonTest do
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.World.Loader.Summon
 
-  @moduletag :vmangos_db
   @moduletag :dbc_db
 
   describe "build_pet/2" do
