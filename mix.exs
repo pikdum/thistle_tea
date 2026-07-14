@@ -9,16 +9,6 @@ defmodule ThistleTea.MixProject do
       start_permanent: Mix.env() == :prod,
       consolidate_protocols: Mix.env() != :dev,
       compilers: [:elixir_make] ++ Mix.compilers(),
-      make_env: fn ->
-        fine_include_dir =
-          if Code.ensure_loaded?(Fine) do
-            Fine.include_dir()
-          else
-            Path.expand("deps/fine/c_include", __DIR__)
-          end
-
-        %{"FINE_INCLUDE_DIR" => fine_include_dir}
-      end,
       aliases: aliases(),
       deps: deps(),
       listeners: [Phoenix.CodeReloader]
@@ -41,6 +31,8 @@ defmodule ThistleTea.MixProject do
   defp deps do
     [
       {:tidewave, "~> 0.6", only: [:dev]},
+      {:deps_nix,
+       github: "code-supply/deps_nix", ref: "e0b8b0b0e8e541ec3ef824fe6a07e60739fdb50c", only: :dev, runtime: false},
       {:mix_test_watch, "~> 1.0", only: [:dev, :test], runtime: false},
       {:binary, "~> 0.0.5"},
       {:ecto_sqlite3, "~> 0.24"},
@@ -65,9 +57,7 @@ defmodule ThistleTea.MixProject do
       {:telemetry_poller, "~> 1.0"},
       {:jason, "~> 1.2"},
       {:bandit, "~> 1.5"},
-      {:canonical_tailwind, "~> 0.3.0", only: [:dev, :test], runtime: false},
-      {:nx, "~> 0.12"},
-      {:evision, "~> 1.0"}
+      {:canonical_tailwind, "~> 0.3.0", only: [:dev, :test], runtime: false}
       # {:dep_from_hexpm, "~> 0.3.0"},
       # {:dep_from_git, git: "https://github.com/elixir-lang/my_dep.git", tag: "0.1.0"}
     ]

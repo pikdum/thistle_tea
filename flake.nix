@@ -398,51 +398,23 @@
             };
           };
 
-          beam = pkgs.beam_minimal.packages.erlang_29;
-
-          # evision (used by lib/web/utils/homography.ex) downloads a precompiled
-          # NIF tarball during `mix compile`. The build sandbox has no network,
-          # so we fetch it as a FOD and drop it into ELIXIR_MAKE_CACHE_DIR so
-          # evision's downloader finds it cached.
-          # Bump version + sha256 in lockstep with the :evision hex pin.
-          evision-version = "1.0.0";
-          evision-precompiled =
-            {
-              x86_64-linux = {
-                target = "x86_64-linux-gnu";
-                hash = "sha256-dX9DksLxvPewMvB4Jt0AGhBZROAszBsMEA7DgSr51Io=";
-              };
-              aarch64-linux = {
-                target = "aarch64-linux-gnu";
-                hash = "sha256-f9JunsW1m9krtlTteXDThqYD5LakAAMWFBXG+/T2IC4=";
-              };
+          beam = pkgs.beam_minimal.packages.erlang_29.extend (
+            _: previous: {
+              elixir = previous.elixir_1_20;
             }
-            .${system};
-          evision-precompiled-name = "evision-nif_2.16-${evision-precompiled.target}-contrib-${evision-version}.tar.gz";
-          evision-precompiled-tarball = pkgs.fetchurl {
-            url = "https://github.com/cocoa-xu/evision/releases/download/v${evision-version}/${evision-precompiled-name}";
-            inherit (evision-precompiled) hash;
-          };
+          );
+
+          mixNixDeps = pkgs.callPackages ./deps.nix { beamPackages = beam; };
 
           # The mix release. Builds the Fine C++ NIF with elixir_make against
           # namigator-src and composes pre-built assets so the build sandbox
           # doesn't need npm/esbuild/tailwind downloads.
           thistle-tea = beam.mixRelease {
+            inherit mixNixDeps;
             pname = "thistle_tea";
             version = "0.1.0";
             src = ./.;
-            elixir = beam.elixir_1_20;
             removeCookie = false;
-
-            # Hex/git deps as a single fixed-output derivation. To refresh after
-            # changing mix.lock: set this to an empty/wrong hash, run the build,
-            # and copy the "got:" hash from the error.
-            mixFodDeps = beam.fetchMixDeps {
-              pname = "mix-deps-thistle-tea";
-              version = "0.1.0";
-              src = ./.;
-              hash = "sha256-H/JeepVopcvrNNlpteVnPo2YGN4lDc7Gw1lgJaMXiZQ=";
-            };
 
             nativeBuildInputs = [
               pkgs.esbuild
@@ -456,18 +428,8 @@
 
             NAMIGATOR_SRC = namigator-src;
 
-            # evision's downloader checks $ELIXIR_MAKE_CACHE_DIR first; if the
-            # tarball is already there it skips network. Build sandbox $HOME is
-            # /homeless-shelter (deps try to mkdir in there), so redirect both.
-            ELIXIR_MAKE_CACHE_DIR = "/build/elixir-make-cache";
-
-            # mixRelease's configurePhase runs `mix deps.compile` (which triggers
-            # evision's downloader), so the cache has to be seeded BEFORE that —
-            # preBuild runs too late.
             preConfigure = ''
               export HOME=$TMPDIR
-              mkdir -p "$ELIXIR_MAKE_CACHE_DIR"
-              cp ${evision-precompiled-tarball} "$ELIXIR_MAKE_CACHE_DIR/${evision-precompiled-name}"
             '';
 
             # Run esbuild + tailwind directly (skipping the mix esbuild/tailwind
@@ -475,8 +437,8 @@
             # config/config.exs plus --minify from the assets.deploy alias.
             #
             # Note: we deliberately skip `mix phx.digest`. It triggers Mix's git
-            # lock check, which fails because fetchMixDeps strips git objects
-            # from /nix/store deps. The release still serves assets correctly,
+            # lock check, which fails because Nix sources do not include git
+            # objects. The release still serves assets correctly,
             # it just lacks the cache_manifest.json fingerprinting. If/when we
             # need cache busting we can either re-fetch git deps with their
             # objects intact or run phx.digest as a post-install step.

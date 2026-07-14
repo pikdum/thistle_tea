@@ -103,8 +103,6 @@ defmodule ThistleTea.Application do
       ]
       |> Enum.filter(& &1)
 
-    :ok = ThistleTeaWeb.Homography.init()
-
     :ets.new(:session, [:named_table, :public, read_concurrency: true, write_concurrency: :auto])
     Metadata.init()
     ItemLoader.init()

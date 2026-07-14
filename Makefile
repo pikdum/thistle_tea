@@ -12,6 +12,7 @@ CXX ?= c++
 TARGET_ABI ?= $(shell uname -s | tr '[:upper:]' '[:lower:]')
 
 CPPFLAGS := -shared -fPIC -fvisibility=hidden -std=c++17 -Wno-multichar -DDT_POLYREF64
+FINE_INCLUDE_DIR ?= deps/fine/c_include
 CPPFLAGS += -I$(ERTS_INCLUDE_DIR) -I$(FINE_INCLUDE_DIR)
 CPPFLAGS += -I$(NAMIGATOR_SRC)
 CPPFLAGS += -I$(NAMIGATOR_SRC)/pathfind
