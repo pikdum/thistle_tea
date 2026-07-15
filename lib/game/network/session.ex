@@ -16,6 +16,7 @@ defmodule ThistleTea.Game.Network.Session do
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.System.CellActivator
+  alias ThistleTea.Game.World.System.ChatChannels
   alias ThistleTea.Game.World.System.Party, as: PartySystem
   alias ThistleTea.Game.World.Visibility
 
@@ -69,18 +70,12 @@ defmodule ThistleTea.Game.Network.Session do
   def suspend_active_pet(%__MODULE__{} = state), do: state
 
   defp leave_world_presence(%__MODULE__{} = state) do
+    ChatChannels.leave_all(state.guid)
     Entity.unregister(state.guid)
     AggroProbe.forget(state.guid)
     Metadata.delete(state.guid)
     SpatialHash.remove(:players, state.guid)
     state = Visibility.leave_player(state)
-
-    ThistleTea.ChatChannel
-    |> Registry.keys(self())
-    |> Enum.each(fn channel ->
-      ThistleTea.ChatChannel
-      |> Registry.unregister(channel)
-    end)
 
     case PartySystem.group_of(state.guid) do
       %Group{} = group -> Notifier.send_group_list(group)

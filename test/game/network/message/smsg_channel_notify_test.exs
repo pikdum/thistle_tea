@@ -34,5 +34,30 @@ defmodule ThistleTea.Game.Network.Message.SmsgChannelNotifyTest do
 
       assert SmsgChannelNotify.to_binary(message) == <<0x03, "Custom", 0>>
     end
+
+    test "serializes mode changes" do
+      message = %SmsgChannelNotify{
+        notify_type: SmsgChannelNotify.notice(:mode_change),
+        channel_name: "Custom",
+        guid: 42,
+        old_flags: 0x00,
+        new_flags: 0x03
+      }
+
+      assert SmsgChannelNotify.to_binary(message) ==
+               <<0x0C, "Custom", 0, 42::little-size(64), 0x00, 0x03>>
+    end
+
+    test "serializes player ban notices" do
+      message = %SmsgChannelNotify{
+        notify_type: SmsgChannelNotify.notice(:player_banned),
+        channel_name: "Custom",
+        target_guid: 42,
+        source_guid: 84
+      }
+
+      assert SmsgChannelNotify.to_binary(message) ==
+               <<0x14, "Custom", 0, 42::little-size(64), 84::little-size(64)>>
+    end
   end
 end

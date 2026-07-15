@@ -38,9 +38,21 @@ defmodule ThistleTea.Game.Network.Message.SmsgChannelNotify do
   }
 
   def notice, do: @notice
-  def noitce(key), do: Map.fetch!(@notice, key)
+  def notice(key), do: Map.fetch!(@notice, key)
 
-  defstruct [:notify_type, :channel_name, channel_flags: 0, channel_index: 0]
+  defstruct [
+    :notify_type,
+    :channel_name,
+    :guid,
+    :target_guid,
+    :source_guid,
+    :player_name,
+    :owner_name,
+    channel_flags: 0,
+    channel_index: 0,
+    old_flags: 0,
+    new_flags: 0
+  ]
 
   @impl ServerMessage
   def to_binary(%__MODULE__{} = msg) do
@@ -53,6 +65,25 @@ defmodule ThistleTea.Game.Network.Message.SmsgChannelNotify do
   defp notice_body(%__MODULE__{notify_type: 0x02} = msg) do
     <<msg.channel_flags::little-size(32), msg.channel_index::little-size(32)>>
   end
+
+  defp notice_body(%__MODULE__{notify_type: notify_type, guid: guid})
+       when notify_type in [0x00, 0x01, 0x07, 0x08, 0x0D, 0x0E, 0x0F, 0x10, 0x17, 0x18] do
+    <<guid::little-size(64)>>
+  end
+
+  defp notice_body(%__MODULE__{notify_type: 0x09, player_name: player_name}), do: player_name <> <<0>>
+  defp notice_body(%__MODULE__{notify_type: 0x0B, owner_name: owner_name}), do: owner_name <> <<0>>
+
+  defp notice_body(%__MODULE__{notify_type: 0x0C} = msg) do
+    <<msg.guid::little-size(64), msg.old_flags::little-size(8), msg.new_flags::little-size(8)>>
+  end
+
+  defp notice_body(%__MODULE__{notify_type: notify_type} = msg) when notify_type in [0x12, 0x14, 0x15] do
+    <<msg.target_guid::little-size(64), msg.source_guid::little-size(64)>>
+  end
+
+  defp notice_body(%__MODULE__{notify_type: notify_type, player_name: player_name})
+       when notify_type in [0x16, 0x1D, 0x1E], do: player_name <> <<0>>
 
   defp notice_body(%__MODULE__{}), do: <<>>
 end

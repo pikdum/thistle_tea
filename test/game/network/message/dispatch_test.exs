@@ -14,6 +14,27 @@ defmodule ThistleTea.Game.Network.Message.DispatchTest do
     test "returns false for unknown opcodes" do
       refute Dispatch.implemented?(0x123)
     end
+
+    test "returns true for every Vanilla channel command" do
+      opcodes = [
+        :CMSG_CHANNEL_LIST,
+        :CMSG_CHANNEL_PASSWORD,
+        :CMSG_CHANNEL_SET_OWNER,
+        :CMSG_CHANNEL_OWNER,
+        :CMSG_CHANNEL_MODERATOR,
+        :CMSG_CHANNEL_UNMODERATOR,
+        :CMSG_CHANNEL_MUTE,
+        :CMSG_CHANNEL_UNMUTE,
+        :CMSG_CHANNEL_INVITE,
+        :CMSG_CHANNEL_KICK,
+        :CMSG_CHANNEL_BAN,
+        :CMSG_CHANNEL_UNBAN,
+        :CMSG_CHANNEL_ANNOUNCEMENTS,
+        :CMSG_CHANNEL_MODERATE
+      ]
+
+      assert Enum.all?(opcodes, &(Opcodes.get(&1) |> Dispatch.implemented?()))
+    end
   end
 
   describe "to_message/1" do

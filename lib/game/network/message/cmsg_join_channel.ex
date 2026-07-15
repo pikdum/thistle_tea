@@ -2,23 +2,18 @@ defmodule ThistleTea.Game.Network.Message.CmsgJoinChannel do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_JOIN_CHANNEL
 
+  alias ThistleTea.Game.Chat
+  alias ThistleTea.Game.World.System.ChatChannels
+
   require Logger
 
   defstruct [:channel_name, :password]
 
   @impl ClientMessage
-  def handle(%__MODULE__{channel_name: channel_name, password: _password}, state) do
+  def handle(%__MODULE__{channel_name: channel_name, password: password}, state) do
     Logger.info("CMSG_JOIN_CHANNEL: #{channel_name}")
 
-    with [] <- ThistleTea.ChatChannel |> Registry.values(channel_name, self()) do
-      ThistleTea.ChatChannel
-      |> Registry.register(channel_name, state.guid)
-
-      Network.send_packet(%Message.SmsgChannelNotify{
-        notify_type: 0x02,
-        channel_name: channel_name
-      })
-    end
+    ChatChannels.join(Chat.actor(state), channel_name, password)
 
     state
   end

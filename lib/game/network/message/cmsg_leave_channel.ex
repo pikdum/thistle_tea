@@ -2,6 +2,9 @@ defmodule ThistleTea.Game.Network.Message.CmsgLeaveChannel do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_LEAVE_CHANNEL
 
+  alias ThistleTea.Game.Chat
+  alias ThistleTea.Game.World.System.ChatChannels
+
   require Logger
 
   defstruct [:channel_name]
@@ -10,13 +13,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgLeaveChannel do
   def handle(%__MODULE__{channel_name: channel_name}, state) do
     Logger.info("CMSG_LEAVE_CHANNEL: #{channel_name}")
 
-    ThistleTea.ChatChannel
-    |> Registry.unregister(channel_name)
-
-    Network.send_packet(%Message.SmsgChannelNotify{
-      notify_type: 0x03,
-      channel_name: channel_name
-    })
+    ChatChannels.leave(Chat.actor(state), channel_name)
 
     state
   end

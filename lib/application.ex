@@ -38,6 +38,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.World.SpawnPool
   alias ThistleTea.Game.World.SpawnPool.Catalog, as: SpawnPoolCatalog
   alias ThistleTea.Game.World.System.CellActivator
+  alias ThistleTea.Game.World.System.ChatChannels
   alias ThistleTea.Game.World.System.GameEvent, as: GameEventSystem
   alias ThistleTea.Game.World.System.Party, as: PartySystem
   alias ThistleTea.Native.Namigator
@@ -86,9 +87,9 @@ defmodule ThistleTea.Application do
         {Group, name: Groups, log: false},
         EntityRegistry,
         AreaEffects,
-        {Registry, keys: :duplicate, name: ThistleTea.ChatChannel},
         ThistleTea.DBC,
         Repo,
+        {ChatChannels, load_catalog: !test},
         !test &&
           {ThousandIsland, port: @auth_port, handler_module: ThistleTea.Auth, handler_options: @handler_options},
         !test &&
