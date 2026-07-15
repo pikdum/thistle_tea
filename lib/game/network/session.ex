@@ -32,6 +32,7 @@ defmodule ThistleTea.Game.Network.Session do
     :latency,
     :loot_guid,
     :pending_repop,
+    :next_exploration_check_at,
     ready: false,
     movement_counter: 0,
     pending_movement_acks: %{},

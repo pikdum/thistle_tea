@@ -26,6 +26,7 @@ defmodule ThistleTea.Game.Player.DevCommands do
   alias ThistleTea.Game.Network.Server
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.Player.Characters
+  alias ThistleTea.Game.Player.Exploration, as: PlayerExploration
   alias ThistleTea.Game.Player.Items
   alias ThistleTea.Game.Player.Quests
   alias ThistleTea.Game.Player.Spells
@@ -76,6 +77,7 @@ defmodule ThistleTea.Game.Player.DevCommands do
       ".debug skills - max out known skills for your level",
       ".debug spells - learn class trainer spells up to your level",
       ".debug events - show active events and the next scheduled change",
+      ".debug explore - unlock every world-map area",
       ".character level <level> - set player level",
       ".die - kill your character",
       ".go xyz <x> <y> <z> [map] - teleport",
@@ -190,6 +192,13 @@ defmodule ThistleTea.Game.Player.DevCommands do
     state
     |> system_message("Active events: #{event_labels(active)}")
     |> system_message(next_event_message(next))
+    |> handled()
+  end
+
+  def run(state, ".debug explore" <> _) do
+    state
+    |> PlayerExploration.unlock_all()
+    |> system_message("World map fully explored.")
     |> handled()
   end
 

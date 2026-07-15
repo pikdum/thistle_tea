@@ -2,6 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgSetActiveMover do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_SET_ACTIVE_MOVER
 
+  alias ThistleTea.Game.Player.Exploration, as: PlayerExploration
   alias ThistleTea.Game.World.Visibility
 
   defstruct [:guid]
@@ -27,6 +28,6 @@ defmodule ThistleTea.Game.Network.Message.CmsgSetActiveMover do
   defp enter_world(state) do
     state = Visibility.enter_player(%{state | ready: true})
     send(self(), :restore_active_pet)
-    state
+    PlayerExploration.check_current(state)
   end
 end

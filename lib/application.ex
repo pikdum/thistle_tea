@@ -17,6 +17,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.World.Loader.AreaTrigger, as: AreaTriggerLoader
   alias ThistleTea.Game.World.Loader.ClassSpell, as: ClassSpellLoader
   alias ThistleTea.Game.World.Loader.CreatureTemplate, as: CreatureTemplateLoader
+  alias ThistleTea.Game.World.Loader.Exploration, as: ExplorationLoader
   alias ThistleTea.Game.World.Loader.Fishing, as: FishingLoader
   alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
   alias ThistleTea.Game.World.Loader.Gossip, as: GossipLoader
@@ -113,6 +114,7 @@ defmodule ThistleTea.Application do
     QuestLoader.init()
     GossipLoader.init()
     CreatureTemplateLoader.init()
+    ExplorationLoader.init()
     GameObjectTemplateLoader.init()
     FishingLoader.init()
     SpellLoader.init()
@@ -178,6 +180,7 @@ defmodule ThistleTea.Application do
         GossipLoader.load_all()
         Logger.info("Loading templates...")
         CreatureTemplateLoader.load_all()
+        ExplorationLoader.load_all()
         GameObjectTemplateLoader.load_all()
         ItemEnchantmentLoader.load_all()
         FishingLoader.load_all()

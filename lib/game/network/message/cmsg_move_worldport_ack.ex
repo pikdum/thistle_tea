@@ -2,6 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgMoveWorldportAck do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :MSG_MOVE_WORLDPORT_ACK
 
+  alias ThistleTea.Game.Player.Exploration, as: PlayerExploration
   alias ThistleTea.Game.Player.Login
   alias ThistleTea.Game.World.Visibility
 
@@ -13,7 +14,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgMoveWorldportAck do
 
     state = Visibility.enter_player(%{state | ready: true})
     send(self(), :restore_active_pet)
-    state
+    PlayerExploration.check_current(state)
   end
 
   @impl ClientMessage

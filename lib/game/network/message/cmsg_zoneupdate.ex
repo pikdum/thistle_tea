@@ -3,6 +3,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgZoneupdate do
   use ThistleTea.Game.Network.ClientMessage, :CMSG_ZONEUPDATE
 
   alias ThistleTea.Game.Party.Notifier, as: PartyNotifier
+  alias ThistleTea.Game.Player.Exploration, as: PlayerExploration
   alias ThistleTea.Game.Player.Rest, as: PlayerRest
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.Pathfinding
@@ -26,11 +27,14 @@ defmodule ThistleTea.Game.Network.Message.CmsgZoneupdate do
           state
       end
 
-    if is_integer(client_zone) and client_zone > 0 do
-      PlayerRest.update_zone(state, client_zone)
-    else
-      state
-    end
+    state =
+      if is_integer(client_zone) and client_zone > 0 do
+        PlayerRest.update_zone(state, client_zone)
+      else
+        state
+      end
+
+    PlayerExploration.check_current(state)
   end
 
   def handle(_message, state), do: state
