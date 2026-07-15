@@ -40,13 +40,19 @@ defmodule ThistleTea.Game.Network.Message.SmsgChannelNotify do
   def notice, do: @notice
   def noitce(key), do: Map.fetch!(@notice, key)
 
-  defstruct [
-    :notify_type,
-    :channel_name
-  ]
+  defstruct [:notify_type, :channel_name, channel_flags: 0, channel_index: 0]
 
   @impl ServerMessage
-  def to_binary(%__MODULE__{notify_type: notify_type, channel_name: channel_name}) do
-    <<notify_type::little-size(8)>> <> channel_name <> <<0>>
+  def to_binary(%__MODULE__{} = msg) do
+    <<msg.notify_type::little-size(8)>> <>
+      msg.channel_name <>
+      <<0>> <>
+      notice_body(msg)
   end
+
+  defp notice_body(%__MODULE__{notify_type: 0x02} = msg) do
+    <<msg.channel_flags::little-size(32), msg.channel_index::little-size(32)>>
+  end
+
+  defp notice_body(%__MODULE__{}), do: <<>>
 end
