@@ -25,6 +25,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
   alias ThistleTea.Game.World.Loader.ItemEnchantment, as: ItemEnchantmentLoader
   alias ThistleTea.Game.World.Loader.Loot, as: LootLoader
+  alias ThistleTea.Game.World.Loader.Mail, as: MailLoader
   alias ThistleTea.Game.World.Loader.NpcText, as: NpcTextLoader
   alias ThistleTea.Game.World.Loader.PageText, as: PageTextLoader
   alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader
@@ -34,6 +35,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.World.Loader.Trainer, as: TrainerLoader
   alias ThistleTea.Game.World.Loader.Vendor, as: VendorLoader
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.PostOffice
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.SpawnPool
   alias ThistleTea.Game.World.SpawnPool.Catalog, as: SpawnPoolCatalog
@@ -86,6 +88,7 @@ defmodule ThistleTea.Application do
         PartySystem,
         {Group, name: Groups, log: false},
         EntityRegistry,
+        PostOffice,
         AreaEffects,
         ThistleTea.DBC,
         Repo,
@@ -123,6 +126,7 @@ defmodule ThistleTea.Application do
     TrainerLoader.init()
     ClassSpellLoader.init()
     LootLoader.init()
+    MailLoader.init()
     GraveyardLoader.init()
     NpcTextLoader.init()
     PageTextLoader.init()
@@ -186,6 +190,7 @@ defmodule ThistleTea.Application do
         ItemEnchantmentLoader.load_all()
         FishingLoader.load_all()
         LootLoader.load_fishing()
+        MailLoader.load_all()
         SpellThreatLoader.load_all()
         Logger.info("Seeding debug data...")
         ThistleTea.DevSeed.run()

@@ -39,6 +39,7 @@ defmodule ThistleTea.Game.Player.DevCommands do
   alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader
   alias ThistleTea.Game.World.Loader.Skill, as: SkillLoader
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.PostOffice
   alias ThistleTea.Game.World.System.GameEvent
 
   require Logger
@@ -68,6 +69,16 @@ defmodule ThistleTea.Game.Player.DevCommands do
     |> handled()
   end
 
+  def run(state, ".mail" <> params) do
+    params
+    |> String.split(~r/\s+/, parts: 2, trim: true)
+    |> case do
+      [recipient, body] when byte_size(body) <= 500 -> send_mail(state, recipient, body)
+      _ -> system_message(state, "Invalid command. Use: .mail <recipient> <message>")
+    end
+    |> handled()
+  end
+
   def run(state, ".help" <> _) do
     commands = [
       ".additem <item_id> [count] - add an item to your inventory",
@@ -85,6 +96,7 @@ defmodule ThistleTea.Game.Player.DevCommands do
       ".help - show help",
       ".learn <spell_id> - learn a spell",
       ".levelup [levels] - increase player level",
+      ".mail <recipient> <message> - send an immediate debug letter",
       ".modify hp <value> - set current health (clamped to max)",
       ".modify money <copper> - add money (negative to remove)",
       ".modify rage <value> - set current rage (clamped to max)",
@@ -377,6 +389,30 @@ defmodule ThistleTea.Game.Player.DevCommands do
     else
       nil -> system_message(state, "Quest #{quest_id_str} not found.")
       _ -> system_message(state, "Invalid command. Use: .addquest <quest_id>")
+    end
+  end
+
+  defp send_mail(state, recipient_name, body) do
+    recipient_name = String.capitalize(String.downcase(recipient_name))
+
+    case CharacterStore.get_by_name(recipient_name) do
+      %Character{} = recipient -> post_debug_mail(state, recipient, body)
+      nil -> system_message(state, "Character #{recipient_name} not found.")
+    end
+  end
+
+  defp post_debug_mail(state, %Character{} = recipient, body) do
+    attrs = %{
+      sender: state.guid,
+      sender_type: :normal,
+      receiver: recipient.object.guid,
+      subject: "Debug mail",
+      body: body
+    }
+
+    case PostOffice.post(attrs) do
+      {:ok, _mail} -> system_message(state, "Mail sent to #{recipient.internal.name}.")
+      {:error, _reason} -> system_message(state, "Could not send mail.")
     end
   end
 

@@ -668,6 +668,26 @@ defmodule ThistleTea.Game.Entity.Logic.InventoryTest do
     end
   end
 
+  describe "detach/3" do
+    test "removes an item without destroying it", %{chest: chest} do
+      player = store(%Player{}, @backpack_start, chest)
+
+      assert {:ok, %{player: player, destroyed: []}, item} =
+               Inventory.detach(player, {@bag_0, @backpack_start}, get_item_fn([chest]))
+
+      assert player.inv1 == 0
+      assert item == chest
+    end
+
+    test "rejects a non-empty bag", %{chest: chest, bag: bag} do
+      bag = %{bag | container: %{bag.container | slot_1: chest.object.guid}}
+      player = %Player{bag1: bag.object.guid}
+
+      assert {:error, :can_only_do_with_empty_bags, _, 0} =
+               Inventory.detach(player, {@bag_0, @first_bag_slot}, get_item_fn([chest, bag]))
+    end
+  end
+
   describe "find_position/3" do
     test "finds items in equipment, backpack, and bags", %{chest: chest, sword: sword, bag: bag} do
       bag = %{bag | container: %{bag.container | slot_3: sword.object.guid}}

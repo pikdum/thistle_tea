@@ -33,6 +33,7 @@ defmodule ThistleTea.Game.Player.Login do
   alias ThistleTea.Game.Party
   alias ThistleTea.Game.Party.Notifier
   alias ThistleTea.Game.Player.Enchantments
+  alias ThistleTea.Game.Player.Mail
   alias ThistleTea.Game.Player.Rest, as: PlayerRest
   alias ThistleTea.Game.Player.Spells, as: PlayerSpells
   alias ThistleTea.Game.Player.Stats, as: PlayerStats
@@ -95,6 +96,7 @@ defmodule ThistleTea.Game.Player.Login do
 
     Logger.metadata(character_name: c.internal.name)
     Entity.register(character_guid)
+    {c, mail_session_token} = Mail.open_session(c, character_guid)
 
     {x, y, z, o} = c.movement_block.position
 
@@ -121,11 +123,14 @@ defmodule ThistleTea.Game.Player.Login do
       | guid: character_guid,
         packed_guid: BinaryUtils.pack_guid(character_guid),
         character: c,
+        mail_session_token: mail_session_token,
         tracked_entities: MapSet.new(),
         ready: false
     }
 
-    schedule_aura_tick(state)
+    state
+    |> schedule_aura_tick()
+    |> Mail.schedule_delivery()
   end
 
   def restore_active_pet(%{character: %Character{unit: %Unit{summon: summon}, internal: internal} = character} = state)

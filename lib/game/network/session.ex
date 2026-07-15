@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.Network.Session do
   alias ThistleTea.Game.World.AggroProbe
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.PostOffice
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.System.CellActivator
   alias ThistleTea.Game.World.System.ChatChannels
@@ -34,6 +35,8 @@ defmodule ThistleTea.Game.Network.Session do
     :loot_guid,
     :pending_repop,
     :next_exploration_check_at,
+    :mail_session_token,
+    :mail_delivery_ref,
     ready: false,
     movement_counter: 0,
     pending_movement_acks: %{},
@@ -52,6 +55,8 @@ defmodule ThistleTea.Game.Network.Session do
 
     state = suspend_active_pet(state)
 
+    state = close_mailbox(state)
+
     if state.character, do: CharacterStore.put(state.character)
 
     if state.guid do
@@ -68,6 +73,24 @@ defmodule ThistleTea.Game.Network.Session do
   end
 
   def suspend_active_pet(%__MODULE__{} = state), do: state
+
+  defp close_mailbox(
+         %__MODULE__{
+           guid: guid,
+           mail_session_token: token,
+           character: %{internal: %{mailbox: mailbox} = internal} = character
+         } = state
+       )
+       when is_integer(guid) and is_reference(token) do
+    if is_reference(state.mail_delivery_ref), do: Process.cancel_timer(state.mail_delivery_ref)
+
+    case PostOffice.close(guid, token, mailbox) do
+      :ok -> %{state | character: %{character | internal: %{internal | mailbox: []}}, mail_delivery_ref: nil}
+      {:error, _reason} -> %{state | mail_delivery_ref: nil}
+    end
+  end
+
+  defp close_mailbox(%__MODULE__{} = state), do: state
 
   defp leave_world_presence(%__MODULE__{} = state) do
     ChatChannels.leave_all(state.guid)

@@ -30,6 +30,21 @@ defmodule ThistleTea.Game.Entity.Data.QuestTest do
       assert quest.objective_texts == ["", "", "", ""]
     end
 
+    test "translates delayed mail rewards" do
+      row = %Mangos.QuestTemplate{
+        entry: 1141,
+        rew_mail_template_id: 87,
+        rew_mail_delay_secs: 86_400,
+        rew_mail_money: 50
+      }
+
+      quest = Quest.build(row)
+
+      assert quest.reward_mail_template_id == 87
+      assert quest.reward_mail_delay_secs == 86_400
+      assert quest.reward_mail_money == 50
+    end
+
     test "normalizes kill objectives with slot indexes, skipping empty and gameobject slots" do
       row = %Mangos.QuestTemplate{
         entry: 1,

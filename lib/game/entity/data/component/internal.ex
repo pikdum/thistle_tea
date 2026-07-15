@@ -48,6 +48,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal do
     :combo_target_guid,
     :undetectable_until,
     rest_bonus: 0.0,
+    mailbox: [],
     starting_items: [],
     action_buttons: %{},
     cooldowns: %{},

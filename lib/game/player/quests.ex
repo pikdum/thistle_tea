@@ -21,6 +21,7 @@ defmodule ThistleTea.Game.Player.Quests do
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Server
   alias ThistleTea.Game.Network.UpdateObject
+  alias ThistleTea.Game.Player.Mail
   alias ThistleTea.Game.Player.Stats, as: PlayerStats
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.ItemStore
@@ -187,6 +188,7 @@ defmodule ThistleTea.Game.Player.Quests do
     Network.send_packet(%Message.SmsgQuestgiverQuestComplete{quest: quest, xp: xp, money: money})
 
     state = put_character(state, character)
+    state = Mail.send_quest_reward(state, npc_guid, quest)
     send_next_quest(state, npc_guid, quest)
     state
   end

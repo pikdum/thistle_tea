@@ -288,6 +288,17 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
     end
   end
 
+  def detach(%Player{} = player, pos, get_item) do
+    ctx = ctx(player, nil, nil, nil, get_item)
+
+    with {:ok, item} <- fetch_item(ctx, pos),
+         :ok <- validate_bag_empty_if_bag(ctx, item) do
+      {:ok, ctx |> put_pos(pos, nil) |> result(), item}
+    else
+      {:error, error} -> {:error, error, guid_at(ctx, pos) || 0, 0}
+    end
+  end
+
   def free_position(%Player{} = player, get_item) do
     free_position(ctx(player, nil, nil, nil, get_item))
   end

@@ -129,6 +129,16 @@ defmodule ThistleTea.Game.Network.Message.Dispatch do
               CMSG_LOOT_ROLL: Message.CmsgLootRoll,
               CMSG_LOOT_MASTER_GIVE: Message.CmsgLootMasterGive,
               CMSG_REQUEST_PARTY_MEMBER_STATS: Message.CmsgRequestPartyMemberStats,
+              CMSG_SEND_MAIL: Message.CmsgSendMail,
+              CMSG_GET_MAIL_LIST: Message.CmsgGetMailList,
+              CMSG_MAIL_TAKE_MONEY: Message.CmsgMailTakeMoney,
+              CMSG_MAIL_TAKE_ITEM: Message.CmsgMailTakeItem,
+              CMSG_MAIL_MARK_AS_READ: Message.CmsgMailMarkAsRead,
+              CMSG_MAIL_RETURN_TO_SENDER: Message.CmsgMailReturnToSender,
+              CMSG_MAIL_DELETE: Message.CmsgMailDelete,
+              CMSG_ITEM_TEXT_QUERY: Message.CmsgItemTextQuery,
+              CMSG_MAIL_CREATE_TEXT_ITEM: Message.CmsgMailCreateTextItem,
+              MSG_QUERY_NEXT_MAIL_TIME: Message.MsgQueryNextMailTimeClient,
               MSG_MINIMAP_PING: Message.MsgMinimapPing
             }
             |> Map.merge(@movement_opcodes)

@@ -52,6 +52,7 @@ defmodule ThistleTea.Game.Network.Server do
   alias ThistleTea.Game.Player.GameObjects, as: PlayerGameObjects
   alias ThistleTea.Game.Player.Items
   alias ThistleTea.Game.Player.Login
+  alias ThistleTea.Game.Player.Mail
   alias ThistleTea.Game.Player.Quests
   alias ThistleTea.Game.Player.Spellcasting
   alias ThistleTea.Game.Player.Stats, as: PlayerStats
@@ -200,6 +201,16 @@ defmodule ThistleTea.Game.Network.Server do
   def handle_cast({:send_packet, packet}, {socket, state}) do
     state = Network.Send.send_packet(packet, {socket, state})
     {:noreply, {socket, state}, socket.read_timeout}
+  end
+
+  @impl GenServer
+  def handle_cast({:mail_delivery, token, mail}, {socket, state}) do
+    state = Mail.receive_delivery(state, token, mail)
+    {:noreply, {socket, state}, socket.read_timeout}
+  rescue
+    error ->
+      Logger.error("mail delivery crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:noreply, {socket, state}, socket.read_timeout}
   end
 
   @impl GenServer
@@ -448,6 +459,14 @@ defmodule ThistleTea.Game.Network.Server do
 
   def handle_info(:restore_active_pet, {socket, state}) do
     {:noreply, {socket, Login.restore_active_pet(state)}, socket.read_timeout}
+  end
+
+  def handle_info({:mail_delivery_ready, deliver_at}, {socket, state}) do
+    {:noreply, {socket, Mail.delivery_ready(state, deliver_at)}, socket.read_timeout}
+  rescue
+    error ->
+      Logger.error("mail delivery timer crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:noreply, {socket, state}, socket.read_timeout}
   end
 
   def handle_info({:finish_repop_timeout, token}, {socket, state}) do
