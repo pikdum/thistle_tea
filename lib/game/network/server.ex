@@ -454,6 +454,7 @@ defmodule ThistleTea.Game.Network.Server do
     })
 
     Network.send_packet(%Message.SmsgUpdateInstanceOwnership{player_is_saved_to_a_raid: false})
+    send_last_instance(world)
 
     # The client responds with a MSG_MOVE_WORLDPORT_ACK message which
     # is handled in the login handler as they share the same init process
@@ -807,6 +808,12 @@ defmodule ThistleTea.Game.Network.Server do
   end
 
   defp suspend_pet_for_teleport(%Session{} = state), do: state
+
+  defp send_last_instance(%WorldRef{map_id: map_id, instance_id: instance_id}) when is_integer(instance_id) do
+    Network.send_packet(%Message.SmsgUpdateLastInstance{map: map_id})
+  end
+
+  defp send_last_instance(%WorldRef{}), do: :ok
 
   @impl ThousandIsland.Handler
   def handle_connection(socket, _) do

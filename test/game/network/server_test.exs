@@ -21,6 +21,7 @@ defmodule ThistleTea.Game.Network.ServerTest do
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.WorldRef
   alias ThousandIsland.Socket
   alias ThousandIsland.Telemetry
@@ -136,6 +137,26 @@ defmodule ThistleTea.Game.Network.ServerTest do
                Server.handle_cast({:send_packet, packet}, {socket, state})
 
       assert_receive {:socket_send, _data}
+    end
+
+    test "records an instanced destination for the client" do
+      guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
+      socket = %{read_timeout: 0}
+      state = %Session{guid: guid, character: character(guid, health: 100, max_health: 100), ready: true}
+      destination = WorldRef.instance(389, 12)
+
+      on_exit(fn -> SpatialHash.remove(:players, guid) end)
+
+      assert {:noreply, {^socket, %Session{ready: false}}, 0} =
+               Server.handle_cast({:start_teleport, -8.23, -43.26, -21.81, 0.0, destination}, {socket, state})
+
+      assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgTransferPending{map: 389}}}
+      assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgNewWorld{map: 389}}}
+
+      assert_receive {:"$gen_cast",
+                      {:send_packet, %Message.SmsgUpdateInstanceOwnership{player_is_saved_to_a_raid: false}}}
+
+      assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgUpdateLastInstance{map: 389}}}
     end
 
     test "marks player in combat when a mob attack lands" do
