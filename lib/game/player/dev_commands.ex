@@ -41,6 +41,8 @@ defmodule ThistleTea.Game.Player.DevCommands do
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.PostOffice
   alias ThistleTea.Game.World.System.GameEvent
+  alias ThistleTea.Game.World.System.Instance, as: InstanceSystem
+  alias ThistleTea.Game.WorldRef
 
   require Logger
 
@@ -94,6 +96,9 @@ defmodule ThistleTea.Game.Player.DevCommands do
       ".go xyz <x> <y> <z> [map] - teleport",
       ".guid - show target guid",
       ".help - show help",
+      ".instance info - show instance ownership and membership",
+      ".instance reset - reset empty owned instances",
+      ".instance switch <id> - join a copy of the current map",
       ".learn <spell_id> - learn a spell",
       ".levelup [levels] - increase player level",
       ".mail <recipient> <message> - send an immediate debug letter",
@@ -309,6 +314,30 @@ defmodule ThistleTea.Game.Player.DevCommands do
     |> handled()
   end
 
+  def run(state, ".instance info" <> _) do
+    info = InstanceSystem.info(state.guid)
+    world = state.character.internal.world
+
+    state
+    |> system_message("World: #{world_label(world)}")
+    |> system_message("Owner: #{owner_label(info.owner)}")
+    |> system_message("Tracked copy: #{world_label(info.current)}")
+    |> system_message("Owned copies: #{copies_label(info.copies)}")
+    |> handled()
+  end
+
+  def run(state, ".instance reset" <> _) do
+    state
+    |> reset_instances()
+    |> handled()
+  end
+
+  def run(state, ".instance switch " <> instance_id) do
+    state
+    |> switch_instance(instance_id)
+    |> handled()
+  end
+
   def run(state, ".move" <> _) do
     target = Map.get(state, :target)
 
@@ -423,6 +452,52 @@ defmodule ThistleTea.Game.Player.DevCommands do
 
     state
   end
+
+  defp reset_instances(state) do
+    case InstanceSystem.reset(state.guid) do
+      {:ok, %{reset: reset, failed: failed}} ->
+        state
+        |> system_message("Reset copies: #{worlds_label(reset)}")
+        |> system_message("Occupied copies: #{worlds_label(failed)}")
+
+      {:error, :not_leader} ->
+        system_message(state, "Only the party leader can reset instances.")
+    end
+  end
+
+  defp switch_instance(state, instance_id) do
+    with {:ok, instance_id} <- parse_positive_integer(String.trim(instance_id)),
+         world = WorldRef.instance(state.character.internal.world.map_id, instance_id),
+         :ok <- InstanceSystem.switch(state.guid, world) do
+      {x, y, z, orientation} = state.character.movement_block.position
+      GenServer.cast(self(), {:start_teleport, x, y, z, orientation, world})
+      system_message(state, "Switching to #{world_label(world)}.")
+    else
+      {:error, :not_found} -> system_message(state, "Instance copy not found.")
+      _invalid -> system_message(state, "Invalid command. Use: .instance switch <id>")
+    end
+  end
+
+  defp copies_label([]), do: "none"
+
+  defp copies_label(copies) do
+    Enum.map_join(copies, ", ", fn copy ->
+      "#{world_label(copy.world)} (#{length(copy.members)} inside)"
+    end)
+  end
+
+  defp worlds_label([]), do: "none"
+  defp worlds_label(worlds), do: Enum.map_join(worlds, ", ", &world_label/1)
+
+  defp world_label(nil), do: "none"
+  defp world_label(%WorldRef{map_id: map_id, instance_id: nil}), do: "map #{map_id} / open"
+
+  defp world_label(%WorldRef{map_id: map_id, instance_id: instance_id}) do
+    "map #{map_id} / instance #{instance_id}"
+  end
+
+  defp owner_label({:party, id}), do: "party #{id}"
+  defp owner_label({:player, guid}), do: "player #{guid}"
 
   defp parse_coords([x, y, z, map]) do
     with {x, _} <- Float.parse(x),

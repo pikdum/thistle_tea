@@ -366,7 +366,8 @@ defmodule ThistleTea.Game.Network.Server do
   end
 
   def handle_cast({:start_teleport, x, y, z, orientation, map_id}, {socket, state}) when is_integer(map_id) do
-    handle_cast({:start_teleport, x, y, z, orientation, WorldRef.open(map_id)}, {socket, state})
+    {:ok, world} = InstanceSystem.destination(map_id, state.guid)
+    handle_cast({:start_teleport, x, y, z, orientation, world}, {socket, state})
   end
 
   def handle_cast(

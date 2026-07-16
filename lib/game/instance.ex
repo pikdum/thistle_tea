@@ -44,6 +44,34 @@ defmodule ThistleTea.Game.Instance do
     Map.get(instances.member_index, guid)
   end
 
+  def copies_for_owner(%__MODULE__{copies: copies}, owner) do
+    copies
+    |> Map.values()
+    |> Enum.filter(&(&1.owner == owner))
+    |> Enum.sort_by(& &1.world.instance_id)
+  end
+
+  def join_copy(%__MODULE__{} = instances, guid, %WorldRef{} = world) when is_integer(guid) do
+    case Map.get(instances.copies, world) do
+      %Copy{} ->
+        {instances, emptied} = remove_member(instances, guid)
+        copy = Map.fetch!(instances.copies, world)
+        copy = %{copy | members: MapSet.put(copy.members, guid)}
+
+        instances = %{
+          instances
+          | copies: Map.put(instances.copies, world, copy),
+            member_index: Map.put(instances.member_index, guid, world)
+        }
+
+        emptied = if emptied != world, do: emptied
+        {:ok, emptied, instances}
+
+      nil ->
+        {:error, :not_found}
+    end
+  end
+
   def empty?(%__MODULE__{copies: copies}, %WorldRef{} = world) do
     case Map.get(copies, world) do
       %Copy{members: members} -> MapSet.size(members) == 0

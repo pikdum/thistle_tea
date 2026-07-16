@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.World.System.Instance do
   alias ThistleTea.Game.Instance
   alias ThistleTea.Game.Party
   alias ThistleTea.Game.World
+  alias ThistleTea.Game.World.Loader.AreaTrigger, as: AreaTriggerLoader
   alias ThistleTea.Game.World.SpawnPool
   alias ThistleTea.Game.World.System.CellActivator
   alias ThistleTea.Game.World.System.Party, as: PartySystem
@@ -36,6 +37,30 @@ defmodule ThistleTea.Game.World.System.Instance do
   end
 
   def count(server \\ __MODULE__), do: GenServer.call(server, :count)
+
+  def destination(map_id, guid) when is_integer(map_id) and is_integer(guid) do
+    if AreaTriggerLoader.instance_map?(map_id) do
+      enter(map_id, guid)
+    else
+      {:ok, WorldRef.open(map_id)}
+    end
+  end
+
+  def info(guid, server \\ __MODULE__) when is_integer(guid) do
+    owner = owner(guid)
+    GenServer.call(server, {:info, owner, guid})
+  end
+
+  def reset(guid, server \\ __MODULE__) when is_integer(guid) do
+    case reset_owner(guid) do
+      {:ok, owner} -> GenServer.call(server, {:reset, owner})
+      error -> error
+    end
+  end
+
+  def switch(guid, %WorldRef{} = world, server \\ __MODULE__) when is_integer(guid) do
+    GenServer.call(server, {:switch, guid, world})
+  end
 
   @impl GenServer
   def init(opts) do
@@ -68,6 +93,42 @@ defmodule ThistleTea.Game.World.System.Instance do
     {:reply, map_size(state.instances.copies), state}
   end
 
+  def handle_call({:info, owner, guid}, _from, state) do
+    copies =
+      state.instances
+      |> Instance.copies_for_owner(owner)
+      |> Enum.map(fn copy ->
+        %{world: copy.world, owner: copy.owner, members: MapSet.to_list(copy.members)}
+      end)
+
+    info = %{owner: owner, current: Instance.member_world(state.instances, guid), copies: copies}
+    {:reply, info, state}
+  end
+
+  def handle_call({:reset, owner}, _from, state) do
+    copies = Instance.copies_for_owner(state.instances, owner)
+    {empty, occupied} = Enum.split_with(copies, &(MapSet.size(&1.members) == 0))
+
+    state = Enum.reduce(empty, state, &reset_copy/2)
+    result = %{reset: Enum.map(empty, & &1.world), failed: Enum.map(occupied, & &1.world)}
+    {:reply, {:ok, result}, state}
+  end
+
+  def handle_call({:switch, guid, world}, _from, state) do
+    case Instance.join_copy(state.instances, guid, world) do
+      {:ok, emptied, instances} ->
+        state =
+          %{state | instances: instances}
+          |> cancel_cleanup(world)
+          |> schedule_cleanup(emptied)
+
+        {:reply, :ok, state}
+
+      {:error, _reason} = error ->
+        {:reply, error, state}
+    end
+  end
+
   @impl GenServer
   def handle_cast({:leave, guid, world}, state) do
     {instances, emptied} = Instance.leave(state.instances, guid, world)
@@ -87,6 +148,21 @@ defmodule ThistleTea.Game.World.System.Instance do
       %Party.Group{id: id} -> {:party, id}
       _solo -> {:player, guid}
     end
+  end
+
+  defp reset_owner(guid) do
+    case PartySystem.group_of(guid) do
+      %Party.Group{leader: ^guid, id: id} -> {:ok, {:party, id}}
+      %Party.Group{} -> {:error, :not_leader}
+      _solo -> {:ok, {:player, guid}}
+    end
+  end
+
+  defp reset_copy(copy, state) do
+    state.cleanup.(copy.world)
+    instances = Instance.destroy_empty(state.instances, copy.world)
+    state = cancel_cleanup(state, copy.world)
+    %{state | instances: instances}
   end
 
   defp schedule_cleanup(state, nil), do: state

@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.World.Loader.AreaTrigger do
   import Ecto.Query
 
   alias ThistleTea.DB.Mangos
+  alias ThistleTea.Game.WorldRef
 
   @supported_build 5875
   @supported_patch 10
@@ -50,6 +51,15 @@ defmodule ThistleTea.Game.World.Loader.AreaTrigger do
   end
 
   def instance_map?(_map_id), do: false
+
+  def spawnable_world?(%WorldRef{instance_id: nil, map_id: map_id}) do
+    case :ets.lookup(__MODULE__, {:instance_map, map_id}) do
+      [{{:instance_map, ^map_id}, true}] -> false
+      _unknown_or_open_world -> true
+    end
+  end
+
+  def spawnable_world?(%WorldRef{}), do: true
 
   def inside?(trigger, map, position, delta \\ 0.0)
 

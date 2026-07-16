@@ -2,6 +2,7 @@ defmodule ThistleTea.Game.InstanceTest do
   use ExUnit.Case, async: true
 
   alias ThistleTea.Game.Instance
+  alias ThistleTea.Game.WorldRef
 
   describe "enter/4" do
     test "gives party members the same copy" do
@@ -39,6 +40,22 @@ defmodule ThistleTea.Game.InstanceTest do
 
       instances = Instance.destroy_empty(instances, world)
       assert Instance.world_for(instances, 389, owner) == nil
+    end
+  end
+
+  describe "join_copy/3" do
+    test "moves a member into an existing copy" do
+      {first, nil, instances} = Instance.enter(%Instance{}, 389, {:player, 100}, 100)
+      {second, nil, instances} = Instance.enter(instances, 389, {:player, 200}, 200)
+
+      assert {:ok, ^first, instances} = Instance.join_copy(instances, 100, second)
+      assert Instance.empty?(instances, first)
+      assert Instance.member_world(instances, 100) == second
+    end
+
+    test "rejects an unknown copy" do
+      world = WorldRef.instance(389, 99)
+      assert Instance.join_copy(%Instance{}, 100, world) == {:error, :not_found}
     end
   end
 end

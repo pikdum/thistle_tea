@@ -3,6 +3,7 @@ defmodule ThistleTea.Game.World.InstanceSpawnRuntimeTest do
 
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Loader
+  alias ThistleTea.Game.World.Loader.AreaTrigger, as: AreaTriggerLoader
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.SpawnPool
   alias ThistleTea.Game.WorldRef
@@ -10,6 +11,18 @@ defmodule ThistleTea.Game.World.InstanceSpawnRuntimeTest do
   @moduletag :vmangos_db
 
   describe "instance cell activation" do
+    test "does not spawn an open copy of an instance map" do
+      world = WorldRef.open(389)
+      position = {-45.0298, -27.7645, -21.2917}
+      cell = SpatialHash.cell(world, elem(position, 0), elem(position, 1), elem(position, 2))
+
+      assert AreaTriggerLoader.instance_map?(389)
+      Loader.Mob.load(cell)
+
+      assert SpatialHash.guids(world) == []
+      assert Registry.lookup(SpawnPool.Registry, {world, {:singleton, :creature, 38_041}}) == []
+    end
+
     test "materializes disjoint RFC spawns in copies of the same cell" do
       first_world = WorldRef.instance(389, System.unique_integer([:positive]))
       second_world = WorldRef.instance(389, System.unique_integer([:positive]))

@@ -2,6 +2,7 @@ defmodule ThistleTea.Game.World.Loader.AreaTriggerTest do
   use ExUnit.Case, async: true
 
   alias ThistleTea.Game.World.Loader.AreaTrigger
+  alias ThistleTea.Game.WorldRef
 
   describe "inside?/4" do
     test "checks distance against radius triggers" do
@@ -73,6 +74,8 @@ defmodule ThistleTea.Game.World.Loader.AreaTriggerTest do
     test "identifies Ragefire Chasm as an instance map" do
       assert AreaTrigger.instance_map?(389)
       refute AreaTrigger.instance_map?(1)
+      refute AreaTrigger.spawnable_world?(WorldRef.open(389))
+      assert AreaTrigger.spawnable_world?(WorldRef.instance(389, 1))
     end
   end
 end

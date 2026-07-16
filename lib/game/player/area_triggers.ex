@@ -12,7 +12,6 @@ defmodule ThistleTea.Game.Player.AreaTriggers do
   alias ThistleTea.Game.Player.Rest, as: PlayerRest
   alias ThistleTea.Game.World.Loader.AreaTrigger, as: AreaTriggerLoader
   alias ThistleTea.Game.World.System.Instance, as: InstanceSystem
-  alias ThistleTea.Game.WorldRef
 
   @trigger_range_delta 5.0
 
@@ -93,10 +92,6 @@ defmodule ThistleTea.Game.Player.AreaTriggers do
   end
 
   defp destination_world(map_id, guid) do
-    if AreaTriggerLoader.instance_map?(map_id) do
-      InstanceSystem.enter(map_id, guid)
-    else
-      {:ok, WorldRef.open(map_id)}
-    end
+    InstanceSystem.destination(map_id, guid)
   end
 end

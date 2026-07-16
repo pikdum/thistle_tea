@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.World.SpawnPool do
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.InstanceSpawn
   alias ThistleTea.Game.World.Loader
+  alias ThistleTea.Game.World.Loader.AreaTrigger, as: AreaTriggerLoader
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.SpawnPool.Catalog
   alias ThistleTea.Game.World.SpawnPool.Selection
@@ -33,10 +34,15 @@ defmodule ThistleTea.Game.World.SpawnPool do
   def activate(group, {world, _x, _y} = cell, blueprint \\ nil) do
     world = WorldRef.coerce(world)
     cell = put_elem(cell, 0, world)
-    key = {world, group}
 
-    with {:ok, pid} <- ensure_started(key, blueprint) do
-      GenServer.cast(pid, {:activate, cell, blueprint})
+    if AreaTriggerLoader.spawnable_world?(world) do
+      key = {world, group}
+
+      with {:ok, pid} <- ensure_started(key, blueprint) do
+        GenServer.cast(pid, {:activate, cell, blueprint})
+      end
+    else
+      :ok
     end
   end
 
