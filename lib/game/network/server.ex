@@ -444,7 +444,7 @@ defmodule ThistleTea.Game.Network.Server do
     # Send player's client to loading screen to load the new map
     Network.send_packet(%Message.SmsgTransferPending{map: world.map_id, has_transport: false})
 
-    state = %{state | ready: false}
+    state = Session.prepare_worldport(%{state | ready: false}, previous_world, world)
 
     # Send player's client the new location
     Network.send_packet(%Message.SmsgNewWorld{

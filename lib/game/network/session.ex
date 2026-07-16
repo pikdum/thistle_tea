@@ -8,6 +8,8 @@ defmodule ThistleTea.Game.Network.Session do
   session keeping only the connection and account.
   """
   alias ThistleTea.Game.Entity
+  alias ThistleTea.Game.Network
+  alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Party.Group
   alias ThistleTea.Game.Party.Notifier
   alias ThistleTea.Game.World
@@ -21,6 +23,7 @@ defmodule ThistleTea.Game.Network.Session do
   alias ThistleTea.Game.World.System.Instance, as: InstanceSystem
   alias ThistleTea.Game.World.System.Party, as: PartySystem
   alias ThistleTea.Game.World.Visibility
+  alias ThistleTea.Game.WorldRef
 
   defstruct [
     :conn,
@@ -38,6 +41,7 @@ defmodule ThistleTea.Game.Network.Session do
     :next_exploration_check_at,
     :mail_session_token,
     :mail_delivery_ref,
+    :pending_last_instance_map,
     ready: false,
     movement_counter: 0,
     pending_movement_acks: %{},
@@ -47,6 +51,24 @@ defmodule ThistleTea.Game.Network.Session do
     gossip_menu_options: [],
     cell_activator: CellActivator
   ]
+
+  def prepare_worldport(%__MODULE__{} = state, %WorldRef{map_id: map_id, instance_id: instance_id}, %WorldRef{
+        instance_id: nil
+      })
+      when is_integer(instance_id) do
+    %{state | pending_last_instance_map: map_id}
+  end
+
+  def prepare_worldport(%__MODULE__{} = state, %WorldRef{}, %WorldRef{}) do
+    %{state | pending_last_instance_map: nil}
+  end
+
+  def complete_worldport(%__MODULE__{pending_last_instance_map: map_id} = state) when is_integer(map_id) do
+    Network.send_packet(%Message.SmsgUpdateLastInstance{map: map_id})
+    %{state | pending_last_instance_map: nil}
+  end
+
+  def complete_worldport(%__MODULE__{} = state), do: state
 
   def leave_world(%__MODULE__{} = state) do
     case state.player_tick_ref do

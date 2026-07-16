@@ -5,8 +5,10 @@ defmodule ThistleTea.Game.Network.SessionTest do
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Network.Connection
+  alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Session
   alias ThistleTea.Game.World.System.CellActivator
+  alias ThistleTea.Game.WorldRef
 
   describe "struct defaults" do
     test "starts not ready with empty world-presence bookkeeping" do
@@ -35,6 +37,32 @@ defmodule ThistleTea.Game.Network.SessionTest do
       }
 
       assert Session.leave_world(session) == %Session{conn: conn, account: %{username: "test"}}
+    end
+  end
+
+  describe "worldport bookkeeping" do
+    test "emits the previous instance after worldport completion" do
+      state =
+        Session.prepare_worldport(
+          %Session{},
+          WorldRef.instance(389, 12),
+          WorldRef.open(1)
+        )
+
+      assert state.pending_last_instance_map == 389
+      assert %Session{pending_last_instance_map: nil} = Session.complete_worldport(state)
+      assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgUpdateLastInstance{map: 389}}}
+    end
+
+    test "does not record an instance on entry" do
+      state =
+        Session.prepare_worldport(
+          %Session{},
+          WorldRef.open(1),
+          WorldRef.instance(389, 12)
+        )
+
+      assert state.pending_last_instance_map == nil
     end
   end
 
