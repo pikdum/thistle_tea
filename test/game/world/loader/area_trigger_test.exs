@@ -55,4 +55,24 @@ defmodule ThistleTea.Game.World.Loader.AreaTriggerTest do
       refute AreaTrigger.inside?(trigger, 0, {4.0, 0.0, 0.0})
     end
   end
+
+  describe "teleport/1" do
+    @tag :vmangos_db
+    test "loads Ragefire Chasm's patch-appropriate entrance" do
+      assert %{
+               required_level: 8,
+               target_map: 389,
+               x: 0.797643,
+               y: -8.23429,
+               z: -15.5288,
+               orientation: 4.71239
+             } = AreaTrigger.teleport(2230)
+    end
+
+    @tag :vmangos_db
+    test "identifies Ragefire Chasm as an instance map" do
+      assert AreaTrigger.instance_map?(389)
+      refute AreaTrigger.instance_map?(1)
+    end
+  end
 end

@@ -1,9 +1,9 @@
 defmodule ThistleTea.Game.World.Loader.AreaTrigger do
   @moduledoc """
   ETS-cached area trigger data from vmangos: trigger geometry (highest build
-  at or below the supported client), quest involvement, and tavern triggers.
-  `inside?/4` ports the vmangos point-in-trigger check (sphere radius or
-  oriented box).
+  at or below the supported client), quest involvement, taverns, teleport
+  destinations, and instance map metadata. `inside?/4` ports the vmangos
+  point-in-trigger check (sphere radius or oriented box).
   """
   import Ecto.Query
 
@@ -38,6 +38,18 @@ defmodule ThistleTea.Game.World.Loader.AreaTrigger do
   end
 
   def tavern?(_id), do: false
+
+  def teleport(id) when is_integer(id) and id > 0 do
+    lookup({:teleport, id}, fn -> load_teleport(id) end)
+  end
+
+  def teleport(_id), do: nil
+
+  def instance_map?(map_id) when is_integer(map_id) and map_id >= 0 do
+    lookup({:instance_map, map_id}, fn -> load_instance_map?(map_id) end)
+  end
+
+  def instance_map?(_map_id), do: false
 
   def inside?(trigger, map, position, delta \\ 0.0)
 
@@ -119,5 +131,48 @@ defmodule ThistleTea.Game.World.Loader.AreaTrigger do
       %Mangos.AreaTriggerTavern{patch_min: patch_min} -> (patch_min || 0) <= @supported_patch
       _missing -> false
     end
+  end
+
+  defp load_teleport(id) do
+    row =
+      Mangos.Repo.one(
+        from(t in Mangos.AreaTriggerTeleport,
+          where: t.id == ^id and t.patch <= @supported_patch,
+          order_by: [desc: t.patch],
+          limit: 1
+        )
+      )
+
+    case row do
+      %Mangos.AreaTriggerTeleport{} = teleport ->
+        %{
+          id: teleport.id,
+          name: teleport.name,
+          message: teleport.message,
+          required_level: teleport.required_level,
+          required_condition: teleport.required_condition,
+          target_map: teleport.target_map,
+          x: teleport.target_position_x,
+          y: teleport.target_position_y,
+          z: teleport.target_position_z,
+          orientation: teleport.target_orientation
+        }
+
+      _missing ->
+        nil
+    end
+  end
+
+  defp load_instance_map?(map_id) do
+    row =
+      Mangos.Repo.one(
+        from(m in Mangos.MapTemplate,
+          where: m.entry == ^map_id and m.patch <= @supported_patch,
+          order_by: [desc: m.patch],
+          limit: 1
+        )
+      )
+
+    match?(%Mangos.MapTemplate{map_type: 1}, row)
   end
 end

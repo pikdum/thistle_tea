@@ -81,6 +81,7 @@ nix develop .#wow-tools            # shell with all of the above + sqlite + mari
 - looting + group loot
 - quests
 - xp, leveling, and exploration
+- isolated dungeon instances (Ragefire Chasm)
 - dying + resurrecting
 - gossip + trainers
 - chests, fishing, and chairs
