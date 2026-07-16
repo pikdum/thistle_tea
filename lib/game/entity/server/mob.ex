@@ -26,6 +26,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Entity.Logic.AI.EventAI
   alias ThistleTea.Game.Entity.Logic.AI.Script
   alias ThistleTea.Game.Entity.Logic.AI.Tick
+  alias ThistleTea.Game.Entity.Logic.AttackFeedback
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Combat
   alias ThistleTea.Game.Entity.Logic.Core
@@ -197,6 +198,19 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     state =
       state
       |> EventSink.emit(events)
+      |> wake_ai_tick()
+
+    {:noreply, state, {:continue, :maybe_broadcast}}
+  end
+
+  @impl GenServer
+  def handle_cast({:attack_outcome, payload}, %Mob{} = state) do
+    spell = spellbook_spell(state, Map.get(payload, :spell_id))
+
+    state =
+      state
+      |> AttackFeedback.receive(payload, spell, Time.now())
+      |> EventSink.emit_pending()
       |> wake_ai_tick()
 
     {:noreply, state, {:continue, :maybe_broadcast}}
@@ -516,6 +530,13 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   defp wake_ai_tick(%Mob{} = state) do
     if Core.dead?(state), do: deactivate_ai(state), else: schedule_ai_tick(state, 0)
   end
+
+  defp spellbook_spell(%Mob{internal: %Internal{spellbook: spellbook}}, spell_id)
+       when is_map(spellbook) and is_integer(spell_id) do
+    Map.get(spellbook, spell_id)
+  end
+
+  defp spellbook_spell(%Mob{}, _spell_id), do: nil
 
   defp schedule_next_ai_tick(%Mob{} = state, status) do
     if Core.dead?(state), do: deactivate_ai(state), else: schedule_ai_tick(state, Tick.mob_delay(status))

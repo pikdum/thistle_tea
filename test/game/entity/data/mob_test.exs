@@ -258,6 +258,23 @@ defmodule ThistleTea.Game.Entity.Data.MobTest do
   end
 
   describe "handle_cast/2" do
+    test "handles an avoided spell outcome" do
+      spell = %Spell{id: 18_070, name: "Earthborer Acid"}
+
+      mob = %Mob{
+        object: %Object{guid: Guid.from_low_guid(:mob, 11_320, 1)},
+        unit: %Unit{health: 900, max_health: 900},
+        internal: %Internal{spellbook: %{spell.id => spell}}
+      }
+
+      payload = %{spell_id: spell.id, damage: 0, outcome: :miss, victim_guid: 1}
+
+      assert {:noreply, %Mob{} = updated, {:continue, :maybe_broadcast}} =
+               MobServer.handle_cast({:attack_outcome, payload}, mob)
+
+      assert updated.internal.spellbook[spell.id] == spell
+    end
+
     test "rewards a player when their attack kills the mob" do
       player_guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
       mob_guid = Guid.from_low_guid(:mob, 2, System.unique_integer([:positive]))
