@@ -26,6 +26,8 @@ defmodule ThistleTea.Game.Guid do
 
   @entryless_types [:item, :container, :player, :dynamic_object, :corpse, :mo_transport]
   @entry_types [:game_object, :transport, :unit, :pet, :mob, :creature]
+  @runtime_low_guid_base 0xC00000
+  @runtime_low_guid_count 0x3FFFFF
 
   def high_guid(:mob), do: @high_guid_unit
   def high_guid(:unit), do: @high_guid_unit
@@ -59,6 +61,11 @@ defmodule ThistleTea.Game.Guid do
     else
       high <<< 48 ||| entry <<< 24 ||| low_guid
     end
+  end
+
+  def runtime(type, entry) when type in @entry_types and is_integer(entry) do
+    low_guid = @runtime_low_guid_base + rem(:erlang.unique_integer([:positive, :monotonic]), @runtime_low_guid_count)
+    from_low_guid(type, entry, low_guid)
   end
 
   def split(guid) when is_integer(guid) do

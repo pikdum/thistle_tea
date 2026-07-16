@@ -16,6 +16,7 @@ defmodule ThistleTea.Game.World.SpawnPoolTest do
       low_guid = System.unique_integer([:positive])
       guid = Guid.from_low_guid(:game_object, 1, low_guid)
       group = {:singleton, :game_object, low_guid}
+      key = {WorldRef.open(0), group}
       blueprint = game_object(guid)
 
       :ok = SpawnPool.activate(group, {WorldRef.open(0), 0, 0}, blueprint)
@@ -31,12 +32,12 @@ defmodule ThistleTea.Game.World.SpawnPoolTest do
 
       refute second_pid == third_pid
 
-      assert SpawnPool.status(group) == %{
+      assert SpawnPool.status(key) == %{
                selected: MapSet.new([{:game_object, low_guid}]),
                running: [game_object: low_guid]
              }
 
-      [{pool_pid, _value}] = Registry.lookup(SpawnPool.Registry, group)
+      [{pool_pid, _value}] = Registry.lookup(SpawnPool.Registry, key)
       DynamicSupervisor.terminate_child(SpawnPool.Supervisor, pool_pid)
     end
 
@@ -44,6 +45,7 @@ defmodule ThistleTea.Game.World.SpawnPoolTest do
       low_guid = System.unique_integer([:positive])
       guid = Guid.from_low_guid(:game_object, 1, low_guid)
       group = {:singleton, :game_object, low_guid}
+      key = {WorldRef.open(0), group}
       blueprint = put_in(game_object(guid).internal.event, 42)
 
       :ok = SpawnPool.activate(group, {WorldRef.open(0), 0, 0}, blueprint)
@@ -57,8 +59,33 @@ defmodule ThistleTea.Game.World.SpawnPoolTest do
 
       refute first_pid == second_pid
 
-      [{pool_pid, _value}] = Registry.lookup(SpawnPool.Registry, group)
+      [{pool_pid, _value}] = Registry.lookup(SpawnPool.Registry, key)
       DynamicSupervisor.terminate_child(SpawnPool.Supervisor, pool_pid)
+    end
+
+    test "isolates and stops pools by world copy" do
+      low_guid = System.unique_integer([:positive])
+      guid = Guid.from_low_guid(:game_object, 1, low_guid)
+      group = {:singleton, :game_object, low_guid}
+      first_world = WorldRef.instance(389, System.unique_integer([:positive]))
+      second_world = WorldRef.instance(389, System.unique_integer([:positive]))
+      first_key = {first_world, group}
+      second_key = {second_world, group}
+      blueprint = game_object(guid)
+
+      :ok = SpawnPool.activate(group, {first_world, 0, 0}, blueprint)
+      :ok = SpawnPool.activate(group, {second_world, 0, 0}, blueprint)
+
+      assert [{first_pid, _value}] = Registry.lookup(SpawnPool.Registry, first_key)
+      assert [{second_pid, _value}] = Registry.lookup(SpawnPool.Registry, second_key)
+      refute first_pid == second_pid
+
+      SpawnPool.stop_world(first_world)
+
+      await_pool_absent(first_key)
+      assert [{^second_pid, _value}] = Registry.lookup(SpawnPool.Registry, second_key)
+
+      DynamicSupervisor.terminate_child(SpawnPool.Supervisor, second_pid)
     end
   end
 
@@ -98,6 +125,16 @@ defmodule ThistleTea.Game.World.SpawnPoolTest do
     case EntityRegistry.whereis(guid) do
       nil -> :ok
       _pid -> Process.sleep(10) && await_absent(guid, attempts - 1)
+    end
+  end
+
+  defp await_pool_absent(key, attempts \\ 50)
+  defp await_pool_absent(_key, 0), do: flunk("spawn pool did not stop")
+
+  defp await_pool_absent(key, attempts) do
+    case Registry.lookup(SpawnPool.Registry, key) do
+      [] -> :ok
+      _present -> Process.sleep(10) && await_pool_absent(key, attempts - 1)
     end
   end
 end

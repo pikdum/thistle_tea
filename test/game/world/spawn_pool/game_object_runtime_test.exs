@@ -9,6 +9,9 @@ defmodule ThistleTea.Game.World.SpawnPool.GameObjectRuntimeTest do
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.SpawnPool
   alias ThistleTea.Game.World.SpawnPool.Catalog
+  alias ThistleTea.Game.WorldRef
+
+  @pool_key {WorldRef.open(1), {:pool, 4303}}
 
   @moduletag :vmangos_db
 
@@ -30,7 +33,7 @@ defmodule ThistleTea.Game.World.SpawnPool.GameObjectRuntimeTest do
       running = await_replacement(first_member, first_pid, rows)
       assert length(running) == 37
 
-      [{pool_pid, _value}] = Registry.lookup(SpawnPool.Registry, {:pool, 4303})
+      [{pool_pid, _value}] = Registry.lookup(SpawnPool.Registry, @pool_key)
       DynamicSupervisor.terminate_child(SpawnPool.Supervisor, pool_pid)
     end
   end
@@ -52,10 +55,16 @@ defmodule ThistleTea.Game.World.SpawnPool.GameObjectRuntimeTest do
   defp await_running(_expected, 0), do: flunk("resource pool did not reach its configured limit")
 
   defp await_running(expected, attempts) do
-    case SpawnPool.status({:pool, 4303}).running do
+    case pool_status() do
       running when length(running) == expected -> running
       _running -> Process.sleep(10) && await_running(expected, attempts - 1)
     end
+  end
+
+  defp pool_status do
+    SpawnPool.status(@pool_key).running
+  catch
+    :exit, _reason -> nil
   end
 
   defp first_incarnation([{:game_object, db_guid} = member | _rest], rows) do

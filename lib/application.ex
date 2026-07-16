@@ -42,6 +42,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.World.System.CellActivator
   alias ThistleTea.Game.World.System.ChatChannels
   alias ThistleTea.Game.World.System.GameEvent, as: GameEventSystem
+  alias ThistleTea.Game.World.System.Instance, as: InstanceSystem
   alias ThistleTea.Game.World.System.Party, as: PartySystem
   alias ThistleTea.Native.Namigator
 
@@ -86,6 +87,7 @@ defmodule ThistleTea.Application do
         {Phoenix.PubSub, name: ThistleTea.PubSub},
         ThistleTea.Telemetry,
         PartySystem,
+        InstanceSystem,
         {Group, name: Groups, log: false},
         EntityRegistry,
         PostOffice,

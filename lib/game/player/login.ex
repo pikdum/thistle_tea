@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Player.Login do
   alias ThistleTea.DBC
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Character
+  alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Corpse
@@ -46,7 +47,9 @@ defmodule ThistleTea.Game.Player.Login do
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Pathfinding
   alias ThistleTea.Game.World.SpatialHash
+  alias ThistleTea.Game.World.System.Instance, as: InstanceSystem
   alias ThistleTea.Game.World.System.Party, as: PartySystem
+  alias ThistleTea.Game.WorldRef
 
   # @update_flag_none 0x00
   @update_flag_self 0x01
@@ -62,6 +65,7 @@ defmodule ThistleTea.Game.Player.Login do
 
     c =
       c
+      |> restore_instance_world(character_guid)
       |> normalize_movement_state()
       |> normalize_combat_stats()
       |> normalize_faction_template()
@@ -146,6 +150,20 @@ defmodule ThistleTea.Game.Player.Login do
   end
 
   def restore_active_pet(state), do: state
+
+  defp restore_instance_world(
+         %Character{internal: %Internal{world: %WorldRef{map_id: map_id, instance_id: instance_id}} = internal} =
+           character,
+         guid
+       )
+       when is_integer(instance_id) do
+    case InstanceSystem.enter(map_id, guid) do
+      {:ok, world} -> %{character | internal: %{internal | world: world}}
+      _error -> character
+    end
+  end
+
+  defp restore_instance_world(%Character{} = character, _guid), do: character
 
   def send_init_packets(c) do
     # needed for no white chatbox + keybinds

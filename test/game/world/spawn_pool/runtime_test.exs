@@ -9,6 +9,9 @@ defmodule ThistleTea.Game.World.SpawnPool.RuntimeTest do
   alias ThistleTea.Game.World.Loader
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.SpawnPool
+  alias ThistleTea.Game.WorldRef
+
+  @pool_key {WorldRef.open(0), {:pool, 1270}}
 
   @moduletag :dbc_db
 
@@ -30,7 +33,7 @@ defmodule ThistleTea.Game.World.SpawnPool.RuntimeTest do
       refute first_pid == second_pid
       assert running_hogger_count(rows) == 1
 
-      [{pool_pid, _value}] = Registry.lookup(SpawnPool.Registry, {:pool, 1270})
+      [{pool_pid, _value}] = Registry.lookup(SpawnPool.Registry, @pool_key)
       DynamicSupervisor.terminate_child(SpawnPool.Supervisor, pool_pid)
     end
   end
@@ -50,7 +53,7 @@ defmodule ThistleTea.Game.World.SpawnPool.RuntimeTest do
   defp await_running_hogger(0), do: flunk("Hogger pool did not start")
 
   defp await_running_hogger(attempts) do
-    case SpawnPool.status({:pool, 1270}) do
+    case SpawnPool.status(@pool_key) do
       %{running: [{:creature, db_guid} = member]} ->
         case EntityRegistry.whereis(Guid.from_low_guid(:mob, 448, db_guid)) do
           pid when is_pid(pid) -> {member, pid}

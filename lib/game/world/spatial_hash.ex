@@ -156,6 +156,10 @@ defmodule ThistleTea.Game.World.SpatialHash do
     end
   end
 
+  def guids(%WorldRef{} = world) do
+    :ets.select(:entities, [{{:"$1", world, :_, :_, :_}, [], [:"$1"]}])
+  end
+
   def entities(table, cell) do
     :ets.lookup(table, cell)
   end

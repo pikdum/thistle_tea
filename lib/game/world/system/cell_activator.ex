@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.World.System.CellActivator do
   use GenServer
 
   alias ThistleTea.Game.World.Loader
+  alias ThistleTea.Game.WorldRef
 
   require Logger
 
@@ -22,6 +23,10 @@ defmodule ThistleTea.Game.World.System.CellActivator do
     GenServer.cast(server, :invalidate)
   end
 
+  def deactivate_world(%WorldRef{} = world, server \\ __MODULE__) do
+    GenServer.cast(server, {:deactivate_world, world})
+  end
+
   @impl GenServer
   def init(opts) do
     {:ok, %__MODULE__{loader: Keyword.get(opts, :loader, &load_cell/1)}}
@@ -30,6 +35,11 @@ defmodule ThistleTea.Game.World.System.CellActivator do
   @impl GenServer
   def handle_cast(:invalidate, state) do
     {:noreply, %{state | cells: MapSet.new()}}
+  end
+
+  def handle_cast({:deactivate_world, world}, state) do
+    cells = Enum.reject(state.cells, fn {cell_world, _x, _y} -> cell_world == world end)
+    {:noreply, %{state | cells: MapSet.new(cells)}}
   end
 
   def handle_cast({:activate, cells}, %__MODULE__{cells: old_cells} = state) do

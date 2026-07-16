@@ -64,6 +64,7 @@ defmodule ThistleTea.Game.Network.Server do
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Pathfinding
   alias ThistleTea.Game.World.SpatialHash
+  alias ThistleTea.Game.World.System.Instance, as: InstanceSystem
   alias ThistleTea.Game.World.Visibility
   alias ThistleTea.Game.World.Visibility.Tap
   alias ThistleTea.Game.WorldRef
@@ -408,6 +409,7 @@ defmodule ThistleTea.Game.Network.Server do
 
   def handle_cast({:start_teleport, x, y, z, orientation, %WorldRef{} = world}, {socket, state}) do
     state = suspend_pet_for_teleport(state)
+    previous_world = state.character.internal.world
 
     # Update player's location
     area =
@@ -436,6 +438,7 @@ defmodule ThistleTea.Game.Network.Server do
     )
 
     state = Visibility.leave_player(%{state | character: character})
+    InstanceSystem.leave(state.guid, previous_world)
 
     # Send player's client to loading screen to load the new map
     Network.send_packet(%Message.SmsgTransferPending{map: world.map_id, has_transport: false})

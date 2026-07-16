@@ -9,27 +9,33 @@ defmodule ThistleTea.Game.World.SpawnPool do
   alias ThistleTea.Game.Entity.Data.GameObject
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.World
+  alias ThistleTea.Game.World.InstanceSpawn
   alias ThistleTea.Game.World.Loader
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.SpawnPool.Catalog
   alias ThistleTea.Game.World.SpawnPool.Selection
   alias ThistleTea.Game.World.System.GameEvent
+  alias ThistleTea.Game.WorldRef
 
   @registry ThistleTea.Game.World.SpawnPool.Registry
   @supervisor ThistleTea.Game.World.SpawnPool.Supervisor
 
   def start_link(opts) do
-    group = Keyword.fetch!(opts, :group)
-    GenServer.start_link(__MODULE__, opts, name: via(group))
+    key = Keyword.fetch!(opts, :key)
+    GenServer.start_link(__MODULE__, opts, name: via(key))
   end
 
   def child_spec(opts) do
-    group = Keyword.fetch!(opts, :group)
-    %{id: {__MODULE__, group}, start: {__MODULE__, :start_link, [opts]}, restart: :permanent}
+    key = Keyword.fetch!(opts, :key)
+    %{id: {__MODULE__, key}, start: {__MODULE__, :start_link, [opts]}, restart: :permanent}
   end
 
-  def activate(group, cell, blueprint \\ nil) do
-    with {:ok, pid} <- ensure_started(group, blueprint) do
+  def activate(group, {world, _x, _y} = cell, blueprint \\ nil) do
+    world = WorldRef.coerce(world)
+    cell = put_elem(cell, 0, world)
+    key = {world, group}
+
+    with {:ok, pid} <- ensure_started(key, blueprint) do
       GenServer.cast(pid, {:activate, cell, blueprint})
     end
   end
@@ -60,39 +66,50 @@ defmodule ThistleTea.Game.World.SpawnPool do
     GenServer.call(via(group), :status)
   end
 
-  defp ensure_started(group, blueprint) do
-    case GenServer.whereis(via(group)) do
+  def stop_world(%WorldRef{} = world) do
+    @registry
+    |> Registry.select([{{:"$1", :"$2", :"$3"}, [], [{{:"$1", :"$2"}}]}])
+    |> Enum.each(fn
+      {{^world, _group}, pid} -> DynamicSupervisor.terminate_child(@supervisor, pid)
+      {_other_key, _pid} -> :ok
+    end)
+  end
+
+  defp ensure_started(key, blueprint) do
+    case GenServer.whereis(via(key)) do
       pid when is_pid(pid) -> {:ok, pid}
-      nil -> start_pool(group, blueprint)
+      nil -> start_pool(key, blueprint)
     end
   end
 
-  defp start_pool(group, blueprint) do
-    case DynamicSupervisor.start_child(@supervisor, {__MODULE__, group: group, blueprint: blueprint}) do
+  defp start_pool(key, blueprint) do
+    case DynamicSupervisor.start_child(@supervisor, {__MODULE__, key: key, blueprint: blueprint}) do
       {:ok, pid} -> {:ok, pid}
       {:error, {:already_started, pid}} -> {:ok, pid}
-      {:error, :already_present} -> wait_for_pool(group)
+      {:error, :already_present} -> wait_for_pool(key)
       other -> other
     end
   end
 
-  defp wait_for_pool(group) do
-    case GenServer.whereis(via(group)) do
+  defp wait_for_pool(key) do
+    case GenServer.whereis(via(key)) do
       pid when is_pid(pid) -> {:ok, pid}
       nil -> {:error, :pool_starting}
     end
   end
 
-  defp via(group), do: {:via, Registry, {@registry, group}}
+  defp via(key), do: {:via, Registry, {@registry, key}}
 
   @impl GenServer
   def init(opts) do
-    group = Keyword.fetch!(opts, :group)
+    {world, group} = key = Keyword.fetch!(opts, :key)
     blueprint = Keyword.get(opts, :blueprint)
-    {catalog, blueprints, selection} = initialize(group, blueprint)
+    {catalog, blueprints, selection} = initialize(world, group, blueprint)
 
     {:ok,
      %{
+       key: key,
+       world: world,
        group: group,
        catalog: catalog,
        blueprints: blueprints,
@@ -142,8 +159,8 @@ defmodule ThistleTea.Game.World.SpawnPool do
     {:noreply, stop_running_member(state, member, pid)}
   end
 
-  def handle_cast({:refresh, events}, %{group: {:pool, root_id} = group} = state) do
-    blueprints = load_blueprints(root_id, events) |> attach_all(group)
+  def handle_cast({:refresh, events}, %{group: {:pool, root_id}} = state) do
+    blueprints = load_blueprints(root_id, events) |> attach_all(state.key)
 
     if MapSet.new(Map.keys(blueprints)) == MapSet.new(Map.keys(state.blueprints)) do
       {:noreply, %{state | blueprints: blueprints}}
@@ -182,17 +199,17 @@ defmodule ThistleTea.Game.World.SpawnPool do
     end
   end
 
-  defp initialize({:singleton, kind, guid}, blueprint) do
+  defp initialize(world, {:singleton, kind, guid} = group, blueprint) do
     member = {kind, guid}
     catalog = %{pools: %{}, parent: %{}, member_pool: %{member => nil}}
-    blueprints = if is_nil(blueprint), do: %{}, else: %{member => attach(blueprint, {:singleton, kind, guid}, member)}
+    blueprints = if is_nil(blueprint), do: %{}, else: %{member => attach(blueprint, {world, group}, member)}
     selection = %Selection{leaves: MapSet.new([member])}
     {catalog, blueprints, selection}
   end
 
-  defp initialize({:pool, root_id} = group, _blueprint) do
+  defp initialize(world, {:pool, root_id} = group, _blueprint) do
     catalog = Catalog.data()
-    blueprints = load_blueprints(root_id) |> attach_all(group)
+    blueprints = load_blueprints(root_id) |> attach_all({world, group})
     available = blueprints |> Map.keys() |> MapSet.new()
     {catalog, blueprints, Selection.initialize(root_id, catalog, available)}
   end
@@ -208,22 +225,26 @@ defmodule ThistleTea.Game.World.SpawnPool do
     Map.new(blueprints, fn {member, blueprint} -> {member, attach(blueprint, group, member)} end)
   end
 
-  defp attach(%Mob{internal: internal} = mob, group, member) do
-    spawn = %{internal.spawn | pool_group: group, pool_member: member}
+  defp attach(%Mob{internal: internal} = mob, {world, _group} = key, member) do
+    spawn = %{internal.spawn | pool_group: key, pool_member: member}
+
     %{mob | internal: %{internal | spawn: spawn}}
+    |> InstanceSpawn.materialize(world)
   end
 
-  defp attach(%GameObject{internal: internal} = game_object, group, member) do
+  defp attach(%GameObject{internal: internal} = game_object, {world, _group} = key, member) do
     spawn = internal.spawn || %Spawn{}
-    spawn = %{spawn | pool_group: group, pool_member: member}
+    spawn = %{spawn | pool_group: key, pool_member: member}
+
     %{game_object | internal: %{internal | spawn: spawn}}
+    |> InstanceSpawn.materialize(world)
   end
 
   defp maybe_put_blueprint(state, nil), do: state
 
-  defp maybe_put_blueprint(%{group: group} = state, blueprint) do
+  defp maybe_put_blueprint(%{key: key} = state, blueprint) do
     member = member_key(blueprint)
-    %{state | blueprints: Map.put(state.blueprints, member, attach(blueprint, group, member))}
+    %{state | blueprints: Map.put(state.blueprints, member, attach(blueprint, key, member))}
   end
 
   defp replace_selection(%{group: {:pool, root_id}, selection: selection, catalog: catalog}, member, available) do

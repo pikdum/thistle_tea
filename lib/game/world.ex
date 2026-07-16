@@ -16,6 +16,7 @@ defmodule ThistleTea.Game.World do
   alias ThistleTea.Game.Entity.Server.DynamicObject, as: DynamicObjectServer
   alias ThistleTea.Game.Entity.Server.GameObject, as: GameObjectServer
   alias ThistleTea.Game.Entity.Server.Mob, as: MobServer
+  alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.EntitySupervisor
@@ -173,6 +174,13 @@ defmodule ThistleTea.Game.World do
       pid when is_pid(pid) -> DynamicSupervisor.terminate_child(EntitySupervisor, pid)
       _ -> :ok
     end
+  end
+
+  def stop_world_entities(%WorldRef{} = world) do
+    world
+    |> SpatialHash.guids()
+    |> Enum.reject(&(Guid.entity_type(&1) == :player))
+    |> Enum.each(&stop_entity/1)
   end
 
   def target_position(guid) when is_integer(guid) do

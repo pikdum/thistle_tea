@@ -18,6 +18,7 @@ defmodule ThistleTea.Game.Network.Session do
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.System.CellActivator
   alias ThistleTea.Game.World.System.ChatChannels
+  alias ThistleTea.Game.World.System.Instance, as: InstanceSystem
   alias ThistleTea.Game.World.System.Party, as: PartySystem
   alias ThistleTea.Game.World.Visibility
 
@@ -93,6 +94,7 @@ defmodule ThistleTea.Game.Network.Session do
   defp close_mailbox(%__MODULE__{} = state), do: state
 
   defp leave_world_presence(%__MODULE__{} = state) do
+    InstanceSystem.leave(state.guid, state.character.internal.world)
     ChatChannels.leave_all(state.guid)
     Entity.unregister(state.guid)
     AggroProbe.forget(state.guid)
