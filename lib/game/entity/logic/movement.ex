@@ -54,16 +54,16 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
 
   def next_spatial_update_delay(
         %{
-          internal: %Internal{map: map, movement_start_time: start_time, movement_start_position: start_position},
+          internal: %Internal{world: world, movement_start_time: start_time, movement_start_position: start_position},
           movement_block: %MovementBlock{spline_nodes: spline_nodes, duration: duration}
         } = entity,
         now
       )
-      when is_integer(map) and is_integer(start_time) and is_tuple(start_position) and is_list(spline_nodes) and
-             spline_nodes != [] and is_integer(duration) and duration > 0 and is_integer(now) do
+      when is_integer(start_time) and is_tuple(start_position) and is_list(spline_nodes) and spline_nodes != [] and
+             is_integer(duration) and duration > 0 and is_integer(now) do
     if moving?(entity, now) do
       remaining_delay = max(remaining_move_duration(entity, now), 1)
-      next_spatial_update_delay(map, start_position, spline_nodes, start_time, duration, now, remaining_delay)
+      next_spatial_update_delay(world, start_position, spline_nodes, start_time, duration, now, remaining_delay)
     else
       0
     end
@@ -182,10 +182,10 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
 
     %{
       movement_block: %MovementBlock{walk_speed: walk_speed, position: {x0, y0, z0, _o}} = mb,
-      internal: %Internal{map: map, running: running, spline_id: spline_id} = internal
+      internal: %Internal{world: world, running: running, spline_id: spline_id} = internal
     } = entity
 
-    path = Pathfinding.find_path(map, {x0, y0, z0}, {x, y, z})
+    path = Pathfinding.find_path(world.map_id, {x0, y0, z0}, {x, y, z})
 
     if is_nil(path) do
       # handles maps that haven't been built yet
@@ -331,7 +331,7 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
   defp update_position_from_spline(
          %{
            movement_block: %MovementBlock{duration: duration, spline_nodes: spline_nodes, position: {_, _, _, o}} = mb,
-           internal: %Internal{map: map, movement_start_time: start_time, movement_start_position: start_position}
+           internal: %Internal{world: world, movement_start_time: start_time, movement_start_position: start_position}
          } = entity,
          now
        )
@@ -347,7 +347,7 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
         List.last(path)
       else
         distance_travelled = total_distance * elapsed / duration
-        point_along_path(map, path, distance_travelled)
+        point_along_path(world.map_id, path, distance_travelled)
       end
 
     movement_block = %{mb | position: {x, y, z, o}, time_passed: elapsed}

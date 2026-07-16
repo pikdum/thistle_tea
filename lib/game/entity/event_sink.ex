@@ -441,12 +441,12 @@ defmodule ThistleTea.Game.Entity.EventSink do
 
   @charge_speed 25.0
 
-  def emit(%Character{internal: %Internal{map: map}, movement_block: %{position: {x, y, z, _o}}} = entity, %Event{
+  def emit(%Character{internal: %Internal{world: world}, movement_block: %{position: {x, y, z, _o}}} = entity, %Event{
         type: :charge,
         target_guid: target_guid
       }) do
-    with {^map, tx, ty, tz} <- World.position(target_guid),
-         path when is_list(path) and path != [] <- charge_path(map, {x, y, z}, {tx, ty, tz}) do
+    with {^world, tx, ty, tz} <- World.position(target_guid),
+         path when is_list(path) and path != [] <- charge_path(world.map_id, {x, y, z}, {tx, ty, tz}) do
       duration =
         [{x, y, z} | path]
         |> Math.movement_duration(@charge_speed)
@@ -615,16 +615,16 @@ defmodule ThistleTea.Game.Entity.EventSink do
     entity
   end
 
-  def emit(%Character{internal: %Internal{map: map}} = entity, %Event{type: :teleport, position: {x, y, z, o}}) do
-    GenServer.cast(self(), {:start_teleport, x, y, z, o, map})
+  def emit(%Character{internal: %Internal{world: world}} = entity, %Event{type: :teleport, position: {x, y, z, o}}) do
+    GenServer.cast(self(), {:start_teleport, x, y, z, o, world})
     entity
   end
 
   def emit(entity, %Event{type: :teleport}), do: entity
 
-  def emit(%Character{internal: %Internal{map: map}} = entity, %Event{type: :leap, position: {x, y, z, _o}}) do
-    case clamp_leap_destination(entity, map, {x, y, z}) do
-      {nx, ny, nz} -> GenServer.cast(self(), {:start_teleport, nx, ny, nz, map})
+  def emit(%Character{internal: %Internal{world: world}} = entity, %Event{type: :leap, position: {x, y, z, _o}}) do
+    case clamp_leap_destination(entity, world.map_id, {x, y, z}) do
+      {nx, ny, nz} -> GenServer.cast(self(), {:start_teleport, nx, ny, nz, world})
       nil -> nil
     end
 
@@ -691,17 +691,16 @@ defmodule ThistleTea.Game.Entity.EventSink do
   def emit(entity, %Event{type: :consume_reagents}), do: entity
 
   def emit(
-        %{object: %{guid: caster_guid}, internal: %Internal{map: map}} = entity,
+        %{object: %{guid: caster_guid}, internal: %Internal{world: world}} = entity,
         %Event{type: :spawn_area_effect} = event
-      )
-      when is_integer(map) do
+      ) do
     radius =
       case event.effect do
         %{radius_yards: radius} when is_number(radius) and radius > 0 -> radius
         _ -> 8.0
       end
 
-    dynamic_object = DataDynamicObject.build(caster_guid, map, event.spell, event.position, radius)
+    dynamic_object = DataDynamicObject.build(caster_guid, world, event.spell, event.position, radius)
 
     World.start_entity(%{
       entity: dynamic_object,
@@ -728,16 +727,15 @@ defmodule ThistleTea.Game.Entity.EventSink do
   def emit(
         %{
           object: %{guid: owner_guid},
-          internal: %Internal{map: map},
+          internal: %Internal{world: world},
           movement_block: %{position: {_x, _y, _z, _o} = position}
         } = entity,
         %Event{type: :summon_game_object, entry: entry, duration_ms: duration_ms}
-      )
-      when is_integer(map) do
+      ) do
     case GameObjectTemplateLoader.get(entry) do
       %DataGameObjectTemplate{} = template ->
         template
-        |> GameObject.build_summoned(map, position,
+        |> GameObject.build_summoned(world, position,
           summoned_by: owner_guid,
           level: owner_level(entity),
           despawn_in_ms: duration_ms
@@ -783,11 +781,10 @@ defmodule ThistleTea.Game.Entity.EventSink do
     entity
   end
 
-  def emit(%{internal: %Internal{map: map}} = entity, %Event{type: :summon_creature, summon: summon} = event)
-      when is_integer(map) do
-    with true <- summon_allowed?(map, summon),
+  def emit(%{internal: %Internal{world: world}} = entity, %Event{type: :summon_creature, summon: summon} = event) do
+    with true <- summon_allowed?(world, summon),
          %Mob{} = mob <-
-           SummonLoader.build(summon.entry, map, summon.position,
+           SummonLoader.build(summon.entry, world, summon.position,
              despawn_type: summon.despawn_type,
              despawn_delay_ms: summon.despawn_delay_ms,
              run?: summon.run?

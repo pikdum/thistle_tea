@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.World.WorldPositionTest do
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
+  alias ThistleTea.Game.WorldRef
 
   describe "broadcast_packet/3" do
     test "sends a source entity's packet to itself without visibility filtering" do
@@ -25,7 +26,7 @@ defmodule ThistleTea.Game.World.WorldPositionTest do
       SpatialHash.update(:mobs, 901, 0, 1.0, 2.0, 3.0)
       on_exit(fn -> SpatialHash.remove(:mobs, 901) end)
 
-      assert World.position(901) == {0, 1.0, 2.0, 3.0}
+      assert World.position(901) == {WorldRef.open(0), 1.0, 2.0, 3.0}
     end
 
     test "interpolates along published movement at the given time" do
@@ -33,7 +34,7 @@ defmodule ThistleTea.Game.World.WorldPositionTest do
       SpatialHash.put_movement(902, {0, {0.0, 0.0, 0.0}, [{10.0, 0.0, 0.0}], 1_000, 1_000})
       on_exit(fn -> SpatialHash.remove(:mobs, 902) end)
 
-      assert World.position(902, 1_500) == {0, 5.0, 0.0, 0.0}
+      assert World.position(902, 1_500) == {WorldRef.open(0), 5.0, 0.0, 0.0}
     end
 
     test "returns the destination once the published movement has expired" do
@@ -41,7 +42,7 @@ defmodule ThistleTea.Game.World.WorldPositionTest do
       SpatialHash.put_movement(903, {0, {0.0, 0.0, 0.0}, [{10.0, 0.0, 0.0}], 1_000, 1_000})
       on_exit(fn -> SpatialHash.remove(:mobs, 903) end)
 
-      assert World.position(903, 99_000) == {0, 10.0, 0.0, 0.0}
+      assert World.position(903, 99_000) == {WorldRef.open(0), 10.0, 0.0, 0.0}
     end
   end
 

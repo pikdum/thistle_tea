@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Entity.Data.DynamicObject do
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.WorldRef
 
   @update_flag_all 0x10
   @update_flag_has_position 0x40
@@ -22,7 +23,7 @@ defmodule ThistleTea.Game.Entity.Data.DynamicObject do
             movement_block: %MovementBlock{},
             internal: %Internal{}
 
-  def build(caster_guid, map, %Spell{} = spell, {x, y, z}, radius_yards, facing \\ 0.0) do
+  def build(caster_guid, world, %Spell{} = spell, {x, y, z}, radius_yards, facing \\ 0.0) do
     %__MODULE__{
       object: %Object{
         guid: next_guid(),
@@ -43,7 +44,7 @@ defmodule ThistleTea.Game.Entity.Data.DynamicObject do
         position: {x, y, z, facing}
       },
       internal: %Internal{
-        map: map,
+        world: WorldRef.coerce(world),
         name: spell.name
       }
     }

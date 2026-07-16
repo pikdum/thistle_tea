@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgReadItemTest do
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Message.CmsgReadItem
   alias ThistleTea.Game.World.ItemStore
+  alias ThistleTea.Game.WorldRef
 
   @backpack_start 23
 
@@ -76,7 +77,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgReadItemTest do
       object: %Object{guid: player_guid},
       unit: %Unit{health: 100, max_health: 100, class: 8, race: 1, level: 1},
       player: %Player{inv1: item_guid},
-      internal: %Internal{map: 0}
+      internal: %Internal{world: %WorldRef{map_id: 0}}
     }
   end
 end

@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Effect
+  alias ThistleTea.Game.WorldRef
 
   defp fixture_entity(opts \\ []) do
     %Mob{
@@ -24,7 +25,7 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
         max_health: 100,
         auras: []
       },
-      internal: %Internal{map: 0},
+      internal: %Internal{world: %WorldRef{map_id: 0}},
       movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
     }
   end
@@ -91,7 +92,7 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
       character = %Character{
         object: %Object{guid: 1},
         unit: %Unit{level: 1, health: 100, max_health: 100, auras: []},
-        internal: %Internal{map: 0},
+        internal: %Internal{world: %WorldRef{map_id: 0}},
         movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
       }
 

@@ -325,8 +325,8 @@ defmodule ThistleTea.Game.Spell.CastValidation do
 
   defp check_line_of_sight(_spell, _target_info), do: :ok
 
-  defp caster_position(%{internal: %{map: map}, movement_block: %{position: {x, y, z, _o}}}) do
-    {map, x, y, z}
+  defp caster_position(%{internal: %{world: world}, movement_block: %{position: {x, y, z, _o}}}) do
+    {world, x, y, z}
   end
 
   defp caster_position(_caster), do: nil

@@ -38,7 +38,7 @@ defmodule ThistleTea.Game.Network.Message.MsgMove do
     movement_block = MovementBlock.from_binary(payload, movement_block)
 
     character = %{character | movement_block: movement_block, unit: %{unit | stand_state: 0}}
-    %{internal: %{map: map}} = character
+    %{internal: %{world: world}} = character
     %MovementBlock{position: {x0, y0, z0, _}} = state.character.movement_block
     %MovementBlock{position: {x1, y1, z1, orientation}} = movement_block
     now = Time.now()
@@ -49,9 +49,9 @@ defmodule ThistleTea.Game.Network.Message.MsgMove do
 
     new_state =
       if position_changed? do
-        SpatialHash.update(:players, state.guid, map, x1, y1, z1)
+        SpatialHash.update(:players, state.guid, world, x1, y1, z1)
         Metadata.update(state.guid, %{moving_until: now + @move_recency_ms})
-        AggroProbe.notify_player_moved(state.guid, map, {x1, y1, z1})
+        AggroProbe.notify_player_moved(state.guid, world, {x1, y1, z1})
         ChaseWatch.notify_moved(state.guid, {x1, y1, z1})
 
         %{state | character: character}

@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAITest do
   alias ThistleTea.Game.Entity.Logic.AI.EventAI
   alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.WorldRef
 
   @talk_step %ScriptStep{command: :talk, texts: [%{text: "!", chat_type: :say, language: 0, emote_id: 0}]}
 
@@ -286,7 +287,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAITest do
       unit: %Unit{health: health, max_health: 100, level: 14, target: 0, auras: []},
       movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
       internal: %Internal{
-        map: 0,
+        world: %WorldRef{map_id: 0},
         name: "Defias Pillager",
         in_combat: Keyword.get(opts, :in_combat, false),
         creature: %Creature{ai_events: Keyword.fetch!(opts, :events), db_guid: Keyword.get(opts, :db_guid)},

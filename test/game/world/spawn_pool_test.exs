@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.World.SpawnPoolTest do
   alias ThistleTea.Game.Entity.Registry, as: EntityRegistry
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.World.SpawnPool
+  alias ThistleTea.Game.WorldRef
 
   describe "singleton lifecycle" do
     test "recycles a persistent entity into a fresh process" do
@@ -17,7 +18,7 @@ defmodule ThistleTea.Game.World.SpawnPoolTest do
       group = {:singleton, :game_object, low_guid}
       blueprint = game_object(guid)
 
-      :ok = SpawnPool.activate(group, {0, 0, 0}, blueprint)
+      :ok = SpawnPool.activate(group, {WorldRef.open(0), 0, 0}, blueprint)
       first_pid = await_entity(guid)
 
       send(first_pid, :chest_respawn)
@@ -45,7 +46,7 @@ defmodule ThistleTea.Game.World.SpawnPoolTest do
       group = {:singleton, :game_object, low_guid}
       blueprint = put_in(game_object(guid).internal.event, 42)
 
-      :ok = SpawnPool.activate(group, {0, 0, 0}, blueprint)
+      :ok = SpawnPool.activate(group, {WorldRef.open(0), 0, 0}, blueprint)
       first_pid = await_entity(guid)
 
       SpawnPool.refresh_all([])
@@ -66,7 +67,7 @@ defmodule ThistleTea.Game.World.SpawnPoolTest do
       object: %Object{guid: guid, entry: 1},
       game_object: %GameObjectComponent{},
       movement_block: %MovementBlock{position: {1.0, 1.0, 1.0, 0.0}},
-      internal: %Internal{map: 0}
+      internal: %Internal{world: %WorldRef{map_id: 0}}
     }
   end
 

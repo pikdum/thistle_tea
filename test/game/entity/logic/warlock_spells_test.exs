@@ -23,6 +23,7 @@ defmodule ThistleTea.Game.Entity.Logic.WarlockSpellsTest do
   alias ThistleTea.Game.Spell.CastValidation
   alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.Spell.Targets
+  alias ThistleTea.Game.WorldRef
 
   describe "Life Tap" do
     test "converts health into mana without killing the caster" do
@@ -316,7 +317,7 @@ defmodule ThistleTea.Game.Entity.Logic.WarlockSpellsTest do
       object: %Object{guid: 1},
       unit: unit,
       player: %Player{},
-      internal: %Internal{map: 0, events: []},
+      internal: %Internal{world: %WorldRef{map_id: 0}, events: []},
       movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
     }
   end
@@ -325,7 +326,7 @@ defmodule ThistleTea.Game.Entity.Logic.WarlockSpellsTest do
     %Mob{
       object: %Object{guid: 2, entry: 100},
       unit: %Unit{health: 200, max_health: 200, power1: 100, max_power1: 100, level: 20, auras: auras},
-      internal: %Internal{map: 0, creature: %Creature{}, events: []},
+      internal: %Internal{world: %WorldRef{map_id: 0}, creature: %Creature{}, events: []},
       movement_block: %MovementBlock{position: {1.0, 0.0, 0.0, 0.0}}
     }
   end

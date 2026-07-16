@@ -242,7 +242,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     else
       {_key, anchor} = blackboard.confused_anchor
 
-      case Pathfinding.find_random_point_around_circle(state.internal.map, anchor, @confused_wander_radius) do
+      case Pathfinding.find_random_point_around_circle(state.internal.world.map_id, anchor, @confused_wander_radius) do
         nil ->
           blackboard = Blackboard.put_next_at(blackboard, :next_confused_at, confused_wait_delay(), Time.now())
           {:running, state, Blackboard.clear_move_target(blackboard)}
@@ -343,7 +343,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
 
     destination =
       case World.target_position(from_guid) do
-        {map, tx, ty, _tz} when map == state.internal.map -> flee_destination({mx, my, mz}, {tx, ty})
+        {world, tx, ty, _tz} when world == state.internal.world -> flee_destination({mx, my, mz}, {tx, ty})
         _ -> flee_destination({mx, my, mz}, nil)
       end
 
@@ -771,7 +771,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   def halt_at_contact(%Mob{} = state, %Blackboard{} = blackboard, _now), do: {:success, state, blackboard}
 
   defp maybe_halt_at_contact(%Mob{} = state, %Blackboard{} = blackboard, target, now) do
-    with {map, tx, ty, _tz} when map == state.internal.map <- World.target_position(target),
+    with {world, tx, ty, _tz} when world == state.internal.world <- World.target_position(target),
          true <- within_contact?(state, target, {tx, ty}) do
       state =
         state
@@ -841,12 +841,12 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   end
 
   defp back_movement(
-         %Mob{internal: %Internal{map: map}, movement_block: %MovementBlock{position: {mx, my, _mz, _o}}} = state,
+         %Mob{internal: %Internal{world: world}, movement_block: %MovementBlock{position: {mx, my, _mz, _o}}} = state,
          %Blackboard{} = blackboard,
          target_guid,
          now
        ) do
-    with {^map, tx, ty, tz} <- World.target_position(target_guid),
+    with {^world, tx, ty, tz} <- World.target_position(target_guid),
          true <- target_deep_in_bounds?(state, target_guid, {tx, ty}),
          {dx, dy, dz} <- back_movement_destination(state, target_guid, {mx, my}, {tx, ty, tz}) do
       state =
@@ -878,10 +878,15 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     end
   end
 
-  defp spread_from_neighbor(%Mob{internal: %Internal{map: map}} = state, %Blackboard{} = blackboard, target_guid, now) do
+  defp spread_from_neighbor(
+         %Mob{internal: %Internal{world: world}} = state,
+         %Blackboard{} = blackboard,
+         target_guid,
+         now
+       ) do
     with {neighbor_guid, _distance} <- stacked_neighbor(state, target_guid),
-         {^map, tx, ty, tz} <- World.target_position(target_guid),
-         {_nmap, nx, ny, _nz} <- World.position(neighbor_guid),
+         {^world, tx, ty, tz} <- World.target_position(target_guid),
+         {^world, nx, ny, _nz} <- World.position(neighbor_guid),
          {dx, dy, dz} <- spread_destination(state, target_guid, {tx, ty, tz}, {nx, ny}) do
       state =
         state
@@ -947,7 +952,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     now = Time.now()
 
     case World.target_position(target) do
-      {map, x, y, z} when map == state.internal.map ->
+      {world, x, y, z} when world == state.internal.world ->
         {state, blackboard} = maybe_repath_chase(state, blackboard, {x, y, z}, target, now)
         delay_ms = chase_delay(state, target, {x, y}, now)
         blackboard = Blackboard.put_next_at(blackboard, :next_chase_at, delay_ms, now)
@@ -1142,7 +1147,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
       {:success, state, blackboard}
     else
       case Pathfinding.find_random_point_around_circle(
-             state.internal.map,
+             state.internal.world.map_id,
              state.internal.spawn.position,
              state.internal.spawn.distance
            ) do
@@ -1382,7 +1387,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
        when is_integer(target) and target > 0 do
     if not Blackboard.spreading?(blackboard) do
       case World.target_position(target) do
-        {map, tx, ty, _tz} when map == state.internal.map ->
+        {world, tx, ty, _tz} when world == state.internal.world ->
           Movement.time_to_within(state, {tx, ty}, contact_distance(state, target), now)
 
         _ ->

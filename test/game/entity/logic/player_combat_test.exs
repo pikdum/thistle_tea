@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombatTest do
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
+  alias ThistleTea.Game.WorldRef
 
   @unit_flag_in_combat 0x00080000
 
@@ -181,7 +182,7 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombatTest do
       object: %Object{guid: Guid.from_low_guid(:player, unique_guid())},
       unit: %Unit{target: Keyword.get(opts, :target, 0)},
       internal: %Internal{
-        map: 0,
+        world: %WorldRef{map_id: 0},
         in_combat: Keyword.get(opts, :in_combat, false),
         last_hostile_time: Keyword.get(opts, :last_hostile_time)
       }

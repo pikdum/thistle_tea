@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
   alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.Spell.Targets
   alias ThistleTea.Game.Time
+  alias ThistleTea.Game.WorldRef
 
   describe "start_cast/4" do
     test "queues on-next-swing spells instead of starting a cast" do
@@ -93,7 +94,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
         unit: %Unit{health: 100, max_health: 100},
         movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
         internal: %Internal{
-          map: 0,
+          world: %WorldRef{map_id: 0},
           casting: %Cast{
             spell: spell,
             targets: %Targets{raw: <<0::little-size(16)>>, unit_guid: 1},
@@ -127,7 +128,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
         unit: %Unit{level: 50, health: 100, max_health: 100},
         movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
         internal: %Internal{
-          map: 0,
+          world: %WorldRef{map_id: 0},
           casting: %Cast{
             spell: spell,
             targets: %Targets{raw: <<0::little-size(16)>>, unit_guid: 1},
@@ -158,7 +159,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
         object: %Object{guid: 1},
         unit: %Unit{health: 100, max_health: 100},
         movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
-        internal: %Internal{map: 0, casting: casting}
+        internal: %Internal{world: %WorldRef{map_id: 0}, casting: casting}
       }
 
       mob = SpellBT.complete_cast(mob, casting, 1_000)
@@ -190,7 +191,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
         object: %Object{guid: 1},
         unit: %Unit{health: 100, max_health: 100},
         movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
-        internal: %Internal{map: 0, casting: casting}
+        internal: %Internal{world: %WorldRef{map_id: 0}, casting: casting}
       }
 
       mob = SpellBT.complete_cast(mob, casting, 1_000)
@@ -218,7 +219,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
         object: %Object{guid: 1},
         unit: %Unit{health: 100, max_health: 100},
         movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
-        internal: %Internal{map: 0, casting: casting}
+        internal: %Internal{world: %WorldRef{map_id: 0}, casting: casting}
       }
 
       mob = SpellBT.complete_cast(mob, casting, 1_000)
@@ -242,7 +243,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
         object: %Object{guid: 1},
         unit: %Unit{health: 20, max_health: 20},
         movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
-        internal: %Internal{map: 0, casting: casting}
+        internal: %Internal{world: %WorldRef{map_id: 0}, casting: casting}
       }
 
       mob = SpellBT.complete_cast(mob, casting, 1_000)
@@ -270,7 +271,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
         object: %Object{guid: 1},
         unit: %Unit{health: 20, max_health: 20},
         movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
-        internal: %Internal{map: 0, casting: casting}
+        internal: %Internal{world: %WorldRef{map_id: 0}, casting: casting}
       }
 
       mob = SpellBT.complete_cast(mob, casting, 1_000)
@@ -311,7 +312,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
         object: %Object{guid: 1},
         unit: %Unit{},
         movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
-        internal: %Internal{map: 0, casting: casting}
+        internal: %Internal{world: %WorldRef{map_id: 0}, casting: casting}
       }
 
       mob = SpellBT.complete_cast(mob, casting, 1_000)
@@ -348,7 +349,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
         object: %Object{guid: 1},
         unit: %Unit{},
         movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
-        internal: %Internal{map: 0, casting: casting}
+        internal: %Internal{world: %WorldRef{map_id: 0}, casting: casting}
       }
 
       mob = SpellBT.complete_cast(mob, casting, 1_000)
@@ -383,7 +384,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
         object: %Object{guid: 1},
         unit: %Unit{},
         movement_block: %MovementBlock{position: {4.0, 5.0, 6.0, 0.0}},
-        internal: %Internal{map: 0, casting: casting}
+        internal: %Internal{world: %WorldRef{map_id: 0}, casting: casting}
       }
 
       mob = SpellBT.complete_cast(mob, casting, 1_000)
@@ -410,7 +411,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
         object: %Object{guid: 1},
         unit: %Unit{health: 100, max_health: 100, power1: 0, max_power1: 100},
         movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
-        internal: %Internal{map: 0}
+        internal: %Internal{world: %WorldRef{map_id: 0}}
       }
 
       mob = SpellBT.start_cast(mob, spell, %Targets{raw: <<0::little-size(16)>>}, now)

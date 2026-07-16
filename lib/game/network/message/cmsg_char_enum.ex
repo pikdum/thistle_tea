@@ -78,7 +78,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgCharEnum do
           facial_hair: c.player.facial_hair,
           level: c.unit.level,
           area: c.internal.area,
-          map: c.internal.map,
+          map: c.internal.world.map_id,
           position: {x, y, z},
           guild_id: 0,
           flags: 0,

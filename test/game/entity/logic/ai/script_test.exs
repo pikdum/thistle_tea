@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.ScriptTest do
   alias ThistleTea.Game.Entity.Logic.AI.Script
   alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.WorldRef
 
   setup [:mob]
 
@@ -450,7 +451,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.ScriptTest do
       },
       movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
       internal: %Internal{
-        map: 0,
+        world: %WorldRef{map_id: 0},
         name: "Defias Pillager",
         in_combat: false,
         creature: %Creature{},

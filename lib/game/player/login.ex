@@ -101,7 +101,7 @@ defmodule ThistleTea.Game.Player.Login do
     {x, y, z, o} = c.movement_block.position
 
     Network.send_packet(%Message.SmsgLoginVerifyWorld{
-      map: c.internal.map,
+      map: c.internal.world.map_id,
       position: {x, y, z},
       orientation: o
     })
@@ -116,7 +116,7 @@ defmodule ThistleTea.Game.Player.Login do
 
     {x1, y1, z1, _o1} = c.movement_block.position
 
-    SpatialHash.update(:players, character_guid, c.internal.map, x1, y1, z1)
+    SpatialHash.update(:players, character_guid, c.internal.world, x1, y1, z1)
 
     state = %{
       state
@@ -162,7 +162,7 @@ defmodule ThistleTea.Game.Player.Login do
       x: x,
       y: y,
       z: z,
-      map: c.internal.map,
+      map: c.internal.world.map_id,
       area: c.internal.area
     })
 
@@ -270,7 +270,7 @@ defmodule ThistleTea.Game.Player.Login do
   defp evaluate_login_rest(%Character{} = character) do
     {x, y, z, _o} = character.movement_block.position
 
-    case Pathfinding.get_zone_and_area(character.internal.map, {x, y, z}) do
+    case Pathfinding.get_zone_and_area(character.internal.world.map_id, {x, y, z}) do
       {zone, _area} -> PlayerRest.evaluate_zone(character, zone)
       _unknown -> character
     end

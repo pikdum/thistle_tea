@@ -19,6 +19,7 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
+  alias ThistleTea.Game.WorldRef
 
   describe "emit/2" do
     setup [:metadata_fixtures]
@@ -49,17 +50,17 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
     end
 
     test "hearthstone teleports a character to their home bind" do
-      character = %Character{internal: %Internal{map: 1, home_bind: {0, -8_946.0, -132.0, 84.0}}}
+      character = %Character{internal: %Internal{world: %WorldRef{map_id: 1}, home_bind: {0, -8_946.0, -132.0, 84.0}}}
 
       assert ^character = EventSink.emit(character, Event.teleport_to_spell_target(8690))
       assert_receive {:"$gen_cast", {:start_teleport, -8_946.0, -132.0, 84.0, 0}}
     end
 
     test "teleport events preserve their orientation" do
-      character = %Character{internal: %Internal{map: 0}}
+      character = %Character{internal: %Internal{world: %WorldRef{map_id: 0}}}
 
       assert ^character = EventSink.emit(character, Event.teleport({1.0, 2.0, 3.0, 1.5}))
-      assert_receive {:"$gen_cast", {:start_teleport, 1.0, 2.0, 3.0, 1.5, 0}}
+      assert_receive {:"$gen_cast", {:start_teleport, 1.0, 2.0, 3.0, 1.5, %WorldRef{map_id: 0}}}
     end
 
     @tag :dbc_db
@@ -74,7 +75,7 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
         object: %Object{guid: caster_guid},
         unit: %Unit{level: 60},
         player: %Player{},
-        internal: %Internal{map: 0},
+        internal: %Internal{world: %WorldRef{map_id: 0}},
         movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
       }
 
@@ -107,7 +108,7 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
           max_health: 1_000,
           normal_resistance: 0
         },
-        internal: %Internal{map: 0},
+        internal: %Internal{world: %WorldRef{map_id: 0}},
         movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
       }
 
@@ -138,7 +139,7 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
           max_damage: 40.0
         },
         player: %Player{},
-        internal: %Internal{map: 0},
+        internal: %Internal{world: %WorldRef{map_id: 0}},
         movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
       }
 
@@ -168,7 +169,7 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
         object: %Object{guid: caster_guid},
         unit: %Unit{level: 50, faction_template: 1, summon: 0},
         player: %Player{},
-        internal: %Internal{map: 0},
+        internal: %Internal{world: %WorldRef{map_id: 0}},
         movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
       }
 
@@ -202,7 +203,7 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
       character = %Character{
         object: %Object{guid: player_guid},
         unit: %Unit{level: 60, auras: []},
-        internal: %Internal{map: 0},
+        internal: %Internal{world: %WorldRef{map_id: 0}},
         movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
       }
 
@@ -224,7 +225,7 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
 
       mob = %Mob{
         object: %Object{guid: mob_guid},
-        internal: %Internal{map: 0},
+        internal: %Internal{world: %WorldRef{map_id: 0}},
         movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
       }
 
@@ -254,7 +255,7 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
 
       mob = %Mob{
         object: %Object{guid: mob_guid},
-        internal: %Internal{map: 0},
+        internal: %Internal{world: %WorldRef{map_id: 0}},
         movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
       }
 

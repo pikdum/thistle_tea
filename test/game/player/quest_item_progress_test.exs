@@ -16,6 +16,7 @@ defmodule ThistleTea.Game.Player.QuestItemProgressTest do
   alias ThistleTea.Game.Player.Quests
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader
+  alias ThistleTea.Game.WorldRef
 
   @quest_id 3904
   @item_id 11_119
@@ -36,7 +37,7 @@ defmodule ThistleTea.Game.Player.QuestItemProgressTest do
       unit: %Unit{race: 1, class: 8, level: 1, health: 50, max_health: 50},
       player: %Player{quest_log: quest_log},
       movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
-      internal: %Internal{map: 0}
+      internal: %Internal{world: %WorldRef{map_id: 0}}
     }
 
     {:ok, character: character, player_guid: player_guid}

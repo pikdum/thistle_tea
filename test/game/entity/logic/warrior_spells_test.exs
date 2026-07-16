@@ -27,6 +27,7 @@ defmodule ThistleTea.Game.Entity.Logic.WarriorSpellsTest do
   alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.Spell.Scripts
   alias ThistleTea.Game.Spell.Targets
+  alias ThistleTea.Game.WorldRef
 
   @battle_form 17
   @defensive_form 18
@@ -50,7 +51,7 @@ defmodule ThistleTea.Game.Entity.Logic.WarriorSpellsTest do
         flags: 0
       },
       player: %Player{flags: 0},
-      internal: %Internal{map: 0},
+      internal: %Internal{world: %WorldRef{map_id: 0}},
       movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
     }
   end
@@ -228,7 +229,7 @@ defmodule ThistleTea.Game.Entity.Logic.WarriorSpellsTest do
           stand_state: if(helpless?, do: 1, else: 0),
           auras: []
         },
-        internal: %Internal{map: 0},
+        internal: %Internal{world: %WorldRef{map_id: 0}},
         movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
       }
     end
@@ -431,7 +432,7 @@ defmodule ThistleTea.Game.Entity.Logic.WarriorSpellsTest do
           normal_resistance: 1_000,
           auras: []
         },
-        internal: %Internal{map: 0, in_combat: true},
+        internal: %Internal{world: %WorldRef{map_id: 0}, in_combat: true},
         movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
       }
     end
@@ -500,7 +501,7 @@ defmodule ThistleTea.Game.Entity.Logic.WarriorSpellsTest do
       %Mob{
         object: %Object{guid: 9},
         unit: %Unit{health: 200, max_health: 200, level: 10, target: target, auras: []},
-        internal: %Internal{map: 0, in_combat: true, threat: threat_table},
+        internal: %Internal{world: %WorldRef{map_id: 0}, in_combat: true, threat: threat_table},
         movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
       }
     end
@@ -554,7 +555,7 @@ defmodule ThistleTea.Game.Entity.Logic.WarriorSpellsTest do
       mob = %Mob{
         object: %Object{guid: 9},
         unit: %Unit{health: 200, max_health: 200, level: 10, auras: []},
-        internal: %Internal{map: 0, in_combat: true, threat: %{}},
+        internal: %Internal{world: %WorldRef{map_id: 0}, in_combat: true, threat: %{}},
         movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
       }
 

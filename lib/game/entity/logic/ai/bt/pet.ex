@@ -117,9 +117,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet do
 
   defp in_combat?(_state, _blackboard), do: false
 
-  defp target_invalid?(%Mob{internal: %Internal{map: map}, unit: %Unit{target: target}}, _blackboard) do
+  defp target_invalid?(%Mob{internal: %Internal{world: world}, unit: %Unit{target: target}}, _blackboard) do
     case World.target_position(target) do
-      {^map, _x, _y, _z} -> target_dead?(target)
+      {^world, _x, _y, _z} -> target_dead?(target)
       _ -> true
     end
   end
@@ -160,10 +160,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet do
     end
   end
 
-  defp follow_owner(%Mob{internal: %Internal{pet: %Pet{owner_guid: owner_guid}, map: map}} = state, blackboard) do
+  defp follow_owner(%Mob{internal: %Internal{pet: %Pet{owner_guid: owner_guid}, world: world}} = state, blackboard) do
     now = Time.now()
 
-    with {^map, x, y, z} <- World.projected_position(owner_guid, @follow_prediction_ms, now),
+    with {^world, x, y, z} <- World.projected_position(owner_guid, @follow_prediction_ms, now),
          %{orientation: orientation} when is_number(orientation) <- Metadata.query(owner_guid, [:orientation]) do
       destination = follow_position({x, y, z}, orientation)
       state = Movement.sync_position(state, now)
@@ -185,10 +185,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet do
     end
   end
 
-  defp chase_target(%Mob{internal: %Internal{map: map}, unit: %Unit{target: target}} = state, blackboard) do
+  defp chase_target(%Mob{internal: %Internal{world: world}, unit: %Unit{target: target}} = state, blackboard) do
     state =
       case World.target_position(target) do
-        {^map, x, y, z} -> state |> run() |> Movement.move_to({x, y, z}, [face_target: target], Time.now())
+        {^world, x, y, z} -> state |> run() |> Movement.move_to({x, y, z}, [face_target: target], Time.now())
         _ -> state
       end
 

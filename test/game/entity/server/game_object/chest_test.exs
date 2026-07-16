@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.Entity.Server.GameObject.ChestTest do
   alias ThistleTea.Game.Entity.Logic.Loot
   alias ThistleTea.Game.Entity.Logic.LootSession
   alias ThistleTea.Game.Entity.Server.GameObject.Chest
+  alias ThistleTea.Game.WorldRef
 
   defp chest_with_session do
     loot = %Loot{
@@ -16,7 +17,7 @@ defmodule ThistleTea.Game.Entity.Server.GameObject.ChestTest do
 
     %GameObject{
       internal: %Internal{
-        map: 0,
+        world: %WorldRef{map_id: 0},
         loot: %InternalLoot{id: 10_119, min_gold: 0, max_gold: 0, session: LootSession.new(loot, nil)}
       }
     }
@@ -25,7 +26,7 @@ defmodule ThistleTea.Game.Entity.Server.GameObject.ChestTest do
   describe "lootable?/1" do
     test "true only with loot config" do
       assert Chest.lootable?(chest_with_session())
-      refute Chest.lootable?(%GameObject{internal: %Internal{map: 0}})
+      refute Chest.lootable?(%GameObject{internal: %Internal{world: %WorldRef{map_id: 0}}})
     end
   end
 
@@ -45,7 +46,8 @@ defmodule ThistleTea.Game.Entity.Server.GameObject.ChestTest do
     end
 
     test "returns no loot without loot config" do
-      assert {{:error, :no_loot}, _state} = Chest.view(%GameObject{internal: %Internal{map: 0}}, 42)
+      assert {{:error, :no_loot}, _state} =
+               Chest.view(%GameObject{internal: %Internal{world: %WorldRef{map_id: 0}}}, 42)
     end
   end
 

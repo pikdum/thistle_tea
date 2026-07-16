@@ -57,11 +57,11 @@ defmodule ThistleTea.Game.Player.GameObjects do
   defp sit_on_chair(
          %{
            character:
-             %Character{internal: %{map: map}, movement_block: %{position: {x, y, z, _orientation}}} = character
+             %Character{internal: %{world: world}, movement_block: %{position: {x, y, z, _orientation}}} = character
          } = state,
          guid
        ) do
-    case Entity.call(guid, {:chair_seat, map, {x, y, z}}) do
+    case Entity.call(guid, {:chair_seat, world, {x, y, z}}) do
       {:ok, position, stand_state} ->
         character =
           character

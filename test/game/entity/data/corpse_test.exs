@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.Entity.Data.CorpseTest do
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.Packet
   alias ThistleTea.Game.Network.UpdateObject
+  alias ThistleTea.Game.WorldRef
 
   defp fixture_character do
     %Character{
@@ -22,7 +23,7 @@ defmodule ThistleTea.Game.Entity.Data.CorpseTest do
       unit: %Unit{race: 4, gender: 1, native_display_id: 50, display_id: 10_045},
       player: %Player{skin: 1, face: 2, hair_style: 3, hair_color: 4, facial_hair: 5},
       movement_block: %MovementBlock{position: {1.0, 2.0, 3.0, 0.5}},
-      internal: %Internal{map: 1, area: 141, name: "Tester"}
+      internal: %Internal{world: %WorldRef{map_id: 1}, area: 141, name: "Tester"}
     }
   end
 
@@ -46,7 +47,7 @@ defmodule ThistleTea.Game.Entity.Data.CorpseTest do
       assert corpse.corpse.pos_z == 3.0
       assert corpse.corpse.facing == 0.5
       assert corpse.movement_block.position == {1.0, 2.0, 3.0, 0.5}
-      assert corpse.internal.map == 1
+      assert corpse.internal.world.map_id == 1
     end
 
     test "uses the native display id and appearance bytes" do

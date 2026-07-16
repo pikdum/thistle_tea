@@ -5,6 +5,7 @@ defmodule ThistleTea.DB.Mangos.Creature do
 
   alias ThistleTea.DB.Mangos
   alias ThistleTea.Game.World.SpatialHash
+  alias ThistleTea.Game.WorldRef
 
   @primary_key {:guid, :integer, autogenerate: false}
 
@@ -55,7 +56,8 @@ defmodule ThistleTea.DB.Mangos.Creature do
     )
   end
 
-  def query_cell({map, _x, _y} = cell, events \\ []) do
+  def query_cell({world, _x, _y} = cell, events \\ []) do
+    map = WorldRef.map_id(world)
     {{x1, x2}, {y1, y2}} = SpatialHash.cell_bounds(cell)
 
     from(c in __MODULE__,

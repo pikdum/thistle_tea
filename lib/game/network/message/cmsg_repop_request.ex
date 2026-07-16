@@ -80,10 +80,10 @@ defmodule ThistleTea.Game.Network.Message.CmsgRepopRequest do
   end
 
   defp defer_graveyard_teleport(state, character) do
-    %{internal: %Internal{map: map}, movement_block: %MovementBlock{position: {x, y, z, _o}}} = character
+    %{internal: %Internal{world: world}, movement_block: %MovementBlock{position: {x, y, z, _o}}} = character
     team = GraveyardLoader.team_for_race(character.unit.race)
 
-    case GraveyardLoader.closest(map, {x, y, z}, team) do
+    case GraveyardLoader.closest(world.map_id, {x, y, z}, team) do
       %{map: graveyard_map, position: {gx, gy, gz}} ->
         MovementControl.defer_repop(state, {gx, gy, gz, graveyard_map})
 

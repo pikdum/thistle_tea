@@ -33,7 +33,7 @@ defmodule ThistleTea.Game.Entity.Data.GameObjectTest do
       assert go.game_object.display_id == 6671
       assert go.game_object.type_id == 22
       assert go.movement_block.position == {1.0, 2.0, 3.0, 0.5}
-      assert go.internal.map == 0
+      assert go.internal.world.map_id == 0
       assert go.internal.summon.owner_guid == 99
       assert go.internal.summon.spell_id == 7001
       assert go.internal.summon.charges == 5

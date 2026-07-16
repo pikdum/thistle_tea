@@ -15,12 +15,13 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
   alias ThistleTea.Game.Spell.Cast
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Effect
+  alias ThistleTea.Game.WorldRef
 
   defp target_fixture do
     %Mob{
       object: %Object{guid: 1},
       unit: %Unit{health: 20, max_health: 20, level: 1, auras: []},
-      internal: %Internal{map: 0},
+      internal: %Internal{world: %WorldRef{map_id: 0}},
       movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
     }
   end
@@ -30,7 +31,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
       object: %Object{guid: 1},
       unit: %Unit{health: 0, max_health: 100, max_power1: 50, level: 10, auras: []},
       player: %Player{flags: 0},
-      internal: %Internal{map: 0},
+      internal: %Internal{world: %WorldRef{map_id: 0}},
       movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
     }
   end
@@ -224,7 +225,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
       target = %Mob{
         object: %Object{guid: 1},
         unit: %Unit{health: 20, max_health: 20, level: 10, power_type: 1, power2: 0, max_power2: 1_000, auras: []},
-        internal: %Internal{map: 0},
+        internal: %Internal{world: %WorldRef{map_id: 0}},
         movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
       }
 

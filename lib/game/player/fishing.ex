@@ -88,7 +88,7 @@ defmodule ThistleTea.Game.Player.Fishing do
 
   def cancel_bobber(character), do: character
 
-  def cast_position(%{internal: %{map: map}, movement_block: %{position: {x, y, z, o}}} = character, random)
+  def cast_position(%{internal: %{world: world}, movement_block: %{position: {x, y, z, o}}} = character, random)
       when is_function(random, 0) do
     distance = 10.0 + random.() * 10.0
     max_angle = 10.0 / (20.0 + bounding_radius(character))
@@ -96,9 +96,10 @@ defmodule ThistleTea.Game.Player.Fishing do
     target_x = x + distance * :math.cos(angle)
     target_y = y + distance * :math.sin(angle)
 
-    with surface_z when is_number(surface_z) <- Pathfinding.query_liquid_surface(map, {target_x, target_y, z + 1.0}),
-         true <- fishable_depth?(Pathfinding.find_heights(map, {target_x, target_y}), surface_z),
-         true <- Pathfinding.line_of_sight?(map, {x, y, z}, {target_x, target_y, surface_z}) do
+    with surface_z when is_number(surface_z) <-
+           Pathfinding.query_liquid_surface(world.map_id, {target_x, target_y, z + 1.0}),
+         true <- fishable_depth?(Pathfinding.find_heights(world.map_id, {target_x, target_y}), surface_z),
+         true <- Pathfinding.line_of_sight?(world.map_id, {x, y, z}, {target_x, target_y, surface_z}) do
       {target_x, target_y, surface_z, o}
     else
       _ -> nil
@@ -120,12 +121,12 @@ defmodule ThistleTea.Game.Player.Fishing do
 
     with position when is_tuple(position) <- position,
          {px, py, pz, _o} = position,
-         {zone, area} <- Pathfinding.get_zone_and_area(character.internal.map, {px, py, pz}),
+         {zone, area} <- Pathfinding.get_zone_and_area(character.internal.world.map_id, {px, py, pz}),
          template when not is_nil(template) <- GameObjectTemplateLoader.get(@bobber_entry) do
       bite_delay_ms = Enum.random(@bite_delays_ms)
 
       bobber =
-        GameObject.build_summoned(template, character.internal.map, position,
+        GameObject.build_summoned(template, character.internal.world, position,
           summoned_by: state.guid,
           despawn_in_ms: bite_delay_ms + @catch_window_ms,
           fishing: %FishingState{

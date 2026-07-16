@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.AuraTest do
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Effect
+  alias ThistleTea.Game.WorldRef
 
   describe "tick/3" do
     test "queues periodic aura events on the entity" do
@@ -54,7 +55,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.AuraTest do
     %Mob{
       object: %Object{guid: 1},
       unit: %Unit{level: 1, health: 100, max_health: 100, auras: []},
-      internal: %Internal{map: 0}
+      internal: %Internal{world: %WorldRef{map_id: 0}}
     }
   end
 

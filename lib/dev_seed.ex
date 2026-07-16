@@ -23,6 +23,7 @@ defmodule ThistleTea.DevSeed do
   alias ThistleTea.Game.World.Loader.Skill, as: SkillLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Pathfinding
+  alias ThistleTea.Game.WorldRef
 
   require Logger
 
@@ -170,7 +171,7 @@ defmodule ThistleTea.DevSeed do
     %{
       character
       | movement_block: %{movement_block | position: {x, y, z, 0.0}},
-        internal: %{internal | map: @map, area: area}
+        internal: %{internal | world: WorldRef.open(@map), area: area}
     }
   end
 

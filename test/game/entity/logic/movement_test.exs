@@ -4,10 +4,11 @@ defmodule ThistleTea.Game.Entity.Logic.MovementTest do
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Logic.Movement
+  alias ThistleTea.Game.WorldRef
 
   defp build_entity(opts) do
     internal = %Internal{
-      map: 0,
+      world: %WorldRef{map_id: 0},
       movement_start_time: Keyword.get(opts, :start_time),
       movement_start_position: Keyword.get(opts, :start_position)
     }

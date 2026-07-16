@@ -3,6 +3,7 @@ defmodule ThistleTea.Game.World.PathfindingTest do
 
   alias ThistleTea.Game.Player.Fishing
   alias ThistleTea.Game.World.Pathfinding
+  alias ThistleTea.Game.WorldRef
 
   @moduletag :namigator_maps
 
@@ -33,7 +34,7 @@ defmodule ThistleTea.Game.World.PathfindingTest do
 
     test "places a fishing cast on the queried liquid surface" do
       character = %{
-        internal: %{map: 0},
+        internal: %{world: %WorldRef{map_id: 0}},
         movement_block: %{position: {-2198.26, -1867.59, 0.0, 0.0}}
       }
 

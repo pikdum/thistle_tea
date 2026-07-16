@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.World.Loader.SummonTest do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.World.Loader.Summon
+  alias ThistleTea.Game.WorldRef
 
   @moduletag :dbc_db
 
@@ -18,7 +19,7 @@ defmodule ThistleTea.Game.World.Loader.SummonTest do
       owner = %Character{
         object: %Object{guid: owner_guid},
         unit: %Unit{level: 50, faction_template: 1},
-        internal: %Internal{map: 0},
+        internal: %Internal{world: %WorldRef{map_id: 0}},
         movement_block: %MovementBlock{position: {1.0, 2.0, 3.0, 0.0}}
       }
 
@@ -42,7 +43,7 @@ defmodule ThistleTea.Game.World.Loader.SummonTest do
       owner = %Character{
         object: %Object{guid: Guid.from_low_guid(:player, 1)},
         unit: %Unit{level: 50, faction_template: 1},
-        internal: %Internal{map: 0},
+        internal: %Internal{world: %WorldRef{map_id: 0}},
         movement_block: %MovementBlock{position: {1.0, 2.0, 3.0, 0.0}}
       }
 

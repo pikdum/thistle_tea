@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.Entity.Logic.DeathTest do
   alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Effect
+  alias ThistleTea.Game.WorldRef
 
   @player_flag_ghost 0x10
   @now 1_000
@@ -37,7 +38,7 @@ defmodule ThistleTea.Game.Entity.Logic.DeathTest do
       },
       player: %Player{flags: Keyword.get(opts, :player_flags, 0)},
       movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}, run_speed: 7.0, base_run_speed: 7.0},
-      internal: %Internal{map: 0}
+      internal: %Internal{world: %WorldRef{map_id: 0}}
     }
   end
 

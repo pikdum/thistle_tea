@@ -36,13 +36,13 @@ defmodule ThistleTea.Game.Player.Exploration do
           ready: true,
           character: %Character{
             unit: %Unit{health: health},
-            internal: %{map: map},
+            internal: %{world: world},
             movement_block: %MovementBlock{position: {x, y, z, _orientation}}
           }
         } = state
       )
       when health > 0 do
-    case Pathfinding.get_zone_and_area(map, {x, y, z}) do
+    case Pathfinding.get_zone_and_area(world.map_id, {x, y, z}) do
       {_zone_id, area_id} -> discover_area(state, area_id)
       _unknown -> state
     end

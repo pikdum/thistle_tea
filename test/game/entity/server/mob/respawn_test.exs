@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob.RespawnTest do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Server.Mob.Respawn
+  alias ThistleTea.Game.WorldRef
 
   describe "schedule/1" do
     test "starts the respawn timer and stores the ref" do
@@ -66,7 +67,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob.RespawnTest do
       },
       movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
       internal: %Internal{
-        map: 0,
+        world: %WorldRef{map_id: 0},
         spawn: %Spawn{
           respawn_delay_ms: Keyword.get(opts, :respawn_delay_ms, 1_000),
           respawn_ref: Keyword.get(opts, :respawn_ref),

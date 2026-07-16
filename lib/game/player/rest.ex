@@ -61,7 +61,7 @@ defmodule ThistleTea.Game.Player.Rest do
     {x, y, z, _o} = character.movement_block.position
 
     case AreaTriggerLoader.get(trigger_id) do
-      %{} = trigger -> AreaTriggerLoader.inside?(trigger, character.internal.map, {x, y, z})
+      %{} = trigger -> AreaTriggerLoader.inside?(trigger, character.internal.world.map_id, {x, y, z})
       nil -> false
     end
   end

@@ -16,6 +16,7 @@ defmodule ThistleTea.Game.World.Loader.Character do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Player.Stats
   alias ThistleTea.Game.World.Loader.Skill, as: SkillLoader
+  alias ThistleTea.Game.WorldRef
 
   @unit_flag_player_controlled 0x00000008
   @unit_flag_use_swim_animation 0x00008000
@@ -120,7 +121,7 @@ defmodule ThistleTea.Game.World.Loader.Character do
       internal: %Internal{
         name: params.name,
         area: info.zone,
-        map: info.map,
+        world: WorldRef.open(info.map),
         home_bind: {info.map, info.position_x, info.position_y, info.position_z},
         spells: spells,
         starting_items: starting_items,

@@ -15,10 +15,10 @@ defmodule ThistleTea.Game.Entity.Server.GameObject.Chair do
   def seat(
         %GameObject{
           object: %{scale_x: size},
-          internal: %Internal{map: map, chair: %ChairConfig{} = chair},
+          internal: %Internal{world: world, chair: %ChairConfig{} = chair},
           movement_block: %MovementBlock{position: {x, y, z, orientation}}
         },
-        map,
+        world,
         {user_x, user_y, user_z}
       )
       when is_number(size) do

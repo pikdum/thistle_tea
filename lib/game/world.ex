@@ -22,37 +22,40 @@ defmodule ThistleTea.Game.World do
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Pathfinding
   alias ThistleTea.Game.World.SpatialHash
+  alias ThistleTea.Game.WorldRef
 
   def nearby_players(
-        %{internal: %Internal{map: map}, movement_block: %MovementBlock{position: {x, y, z, _o}}},
+        %{internal: %Internal{world: world}, movement_block: %MovementBlock{position: {x, y, z, _o}}},
         range \\ 250
       ) do
-    SpatialHash.query(:players, map, x, y, z, range)
+    SpatialHash.query(:players, world, x, y, z, range)
   end
 
   def nearby_mobs(
         %{
           object: %{guid: self_guid},
-          internal: %Internal{map: map},
+          internal: %Internal{world: world},
           movement_block: %MovementBlock{position: {x, y, z, _o}}
         },
         range \\ 30
       ) do
-    nearby_units_exact(:mobs, map, {x, y, z}, range)
+    nearby_units_exact(:mobs, world, {x, y, z}, range)
     |> Enum.reject(fn {guid, _distance} -> guid == self_guid end)
   end
 
-  def nearby_mobs_at(map, {x, y, z}, range \\ 30) do
-    nearby_units_exact(:mobs, map, {x, y, z}, range)
+  def nearby_mobs_at(world, {x, y, z}, range \\ 30) do
+    nearby_units_exact(:mobs, world, {x, y, z}, range)
   end
 
   @position_drift_margin 180.0
 
-  def nearby_units_exact(table, map, {x, y, z} = origin, range, now \\ Time.now()) do
-    SpatialHash.query(table, map, x, y, z, range + @position_drift_margin)
+  def nearby_units_exact(table, world, {x, y, z} = origin, range, now \\ Time.now()) do
+    world = WorldRef.coerce(world)
+
+    SpatialHash.query(table, world, x, y, z, range + @position_drift_margin)
     |> Enum.flat_map(fn {guid, _stale_distance} ->
       case position(guid, now) do
-        {^map, tx, ty, tz} ->
+        {^world, tx, ty, tz} ->
           distance = SpatialHash.distance(origin, {tx, ty, tz})
           # credo:disable-for-next-line Credo.Check.Refactor.Nesting
           if distance <= range, do: [{guid, distance}], else: []
@@ -63,8 +66,8 @@ defmodule ThistleTea.Game.World do
     end)
   end
 
-  def nearby_players_at(map, {x, y, z}, range \\ 30) do
-    SpatialHash.query(:players, map, x, y, z, range)
+  def nearby_players_at(world, {x, y, z}, range \\ 30) do
+    SpatialHash.query(:players, world, x, y, z, range)
   end
 
   def update_position(%Character{} = entity), do: update_position(entity, :players)
@@ -77,13 +80,13 @@ defmodule ThistleTea.Game.World do
   def update_position(
         %{
           object: %{guid: guid},
-          internal: %Internal{map: map},
+          internal: %Internal{world: world},
           movement_block: %MovementBlock{position: {x, y, z, _o}, spline_nodes: spline_nodes}
         },
         table
       ) do
     if spline_nodes in [nil, []], do: SpatialHash.clear_movement(guid)
-    SpatialHash.update(table, guid, map, x, y, z)
+    SpatialHash.update(table, guid, world, x, y, z)
   end
 
   def remove_position(%Character{} = entity), do: remove_position(entity, :players)
@@ -124,8 +127,8 @@ defmodule ThistleTea.Game.World do
     Network.send_packet(packet, guid, source_guid: source_guid)
   end
 
-  def tracking_players(%{internal: %Internal{map: map}, movement_block: %MovementBlock{position: {x, y, z, _o}}}) do
-    SpatialHash.query_cells(:players, map, x, y, z, 250)
+  def tracking_players(%{internal: %Internal{world: world}, movement_block: %MovementBlock{position: {x, y, z, _o}}}) do
+    SpatialHash.query_cells(:players, world, x, y, z, 250)
   end
 
   def start_entity(%GameObject{} = entity), do: start_entity(entity, GameObjectServer)
@@ -182,7 +185,7 @@ defmodule ThistleTea.Game.World do
 
   defp spline_moving?(guid, now) do
     case SpatialHash.get_movement(guid) do
-      {_map, _start_position, spline_nodes, start_time, duration}
+      {_world, _start_position, spline_nodes, start_time, duration}
       when is_list(spline_nodes) and spline_nodes != [] and is_integer(start_time) and is_integer(duration) and
              duration > 0 ->
         now <= start_time + duration
@@ -201,13 +204,13 @@ defmodule ThistleTea.Game.World do
 
   def position(guid, now \\ Time.now()) when is_integer(guid) do
     case SpatialHash.get_movement(guid) do
-      {map, start_position, spline_nodes, start_time, duration} ->
+      {world, start_position, spline_nodes, start_time, duration} ->
         {x, y, z} = Movement.position_at(start_position, spline_nodes, duration, now - start_time)
-        {map, x, y, z}
+        {world, x, y, z}
 
       nil ->
         case SpatialHash.get_entity(guid) do
-          {^guid, map, x, y, z} -> {map, x, y, z}
+          {^guid, world, x, y, z} -> {world, x, y, z}
           nil -> nil
         end
     end
@@ -229,12 +232,12 @@ defmodule ThistleTea.Game.World do
 
   def publish_movement(%{
         object: %{guid: guid},
-        internal: %Internal{map: map, movement_start_time: start_time, movement_start_position: start_position},
+        internal: %Internal{world: world, movement_start_time: start_time, movement_start_position: start_position},
         movement_block: %MovementBlock{spline_nodes: spline_nodes, duration: duration}
       })
       when is_integer(start_time) and is_tuple(start_position) and is_list(spline_nodes) and spline_nodes != [] and
              is_integer(duration) and duration > 0 do
-    SpatialHash.put_movement(guid, {map, start_position, spline_nodes, start_time, duration})
+    SpatialHash.put_movement(guid, {world, start_position, spline_nodes, start_time, duration})
   end
 
   def publish_movement(_entity), do: :ok
@@ -246,20 +249,23 @@ defmodule ThistleTea.Game.World do
   def clear_movement(_entity), do: :ok
 
   def distance_to_guid(
-        %{internal: %Internal{map: map}, movement_block: %MovementBlock{position: {x1, y1, z1, _o}}},
+        %{internal: %Internal{world: world}, movement_block: %MovementBlock{position: {x1, y1, z1, _o}}},
         guid
       )
       when is_integer(guid) do
     case target_position(guid) do
-      {^map, x2, y2, z2} -> SpatialHash.distance({x1, y1, z1}, {x2, y2, z2})
+      {^world, x2, y2, z2} -> SpatialHash.distance({x1, y1, z1}, {x2, y2, z2})
       _ -> nil
     end
   end
 
-  def line_of_sight?(%{internal: %Internal{map: map}, movement_block: %MovementBlock{position: {x1, y1, z1, _o}}}, guid)
+  def line_of_sight?(
+        %{internal: %Internal{world: world}, movement_block: %MovementBlock{position: {x1, y1, z1, _o}}},
+        guid
+      )
       when is_integer(guid) do
     case target_position(guid) do
-      {^map, x2, y2, z2} -> Pathfinding.line_of_sight?(map, {x1, y1, z1}, {x2, y2, z2})
+      {^world, x2, y2, z2} -> Pathfinding.line_of_sight?(world.map_id, {x1, y1, z1}, {x2, y2, z2})
       _ -> true
     end
   end

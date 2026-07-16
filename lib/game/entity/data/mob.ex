@@ -17,6 +17,7 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Time
+  alias ThistleTea.Game.WorldRef
 
   @update_flag_all 0x10
   @update_flag_living 0x20
@@ -129,7 +130,7 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
       unit: unit,
       movement_block: movement_block,
       internal: %Internal{
-        map: c.map,
+        world: WorldRef.open(c.map),
         name: ct.name,
         creature: %Creature{
           db_guid: c.guid,

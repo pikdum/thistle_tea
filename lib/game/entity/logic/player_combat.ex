@@ -136,10 +136,10 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombat do
 
   defp auto_attacking_target?(_character, _blackboard), do: false
 
-  defp active_target?(%Character{internal: %Internal{map: map}, unit: %Unit{target: target}})
+  defp active_target?(%Character{internal: %Internal{world: world}, unit: %Unit{target: target}})
        when is_integer(target) and target > 0 do
     case World.target_position(target) do
-      {^map, _x, _y, _z} -> target_alive?(target)
+      {^world, _x, _y, _z} -> target_alive?(target)
       _ -> false
     end
   end

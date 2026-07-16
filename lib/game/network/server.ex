@@ -66,6 +66,7 @@ defmodule ThistleTea.Game.Network.Server do
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.Visibility
   alias ThistleTea.Game.World.Visibility.Tap
+  alias ThistleTea.Game.WorldRef
   alias ThousandIsland.Socket
 
   require Logger
@@ -363,15 +364,19 @@ defmodule ThistleTea.Game.Network.Server do
     handle_cast({:start_teleport, x, y, z, orientation, map}, {socket, state})
   end
 
+  def handle_cast({:start_teleport, x, y, z, orientation, map_id}, {socket, state}) when is_integer(map_id) do
+    handle_cast({:start_teleport, x, y, z, orientation, WorldRef.open(map_id)}, {socket, state})
+  end
+
   def handle_cast(
-        {:start_teleport, x, y, z, orientation, map},
-        {socket, %{character: %Character{internal: %Internal{map: map}}} = state}
+        {:start_teleport, x, y, z, orientation, world},
+        {socket, %{character: %Character{internal: %Internal{world: world}}} = state}
       ) do
     state = suspend_pet_for_teleport(state)
     character = state.character
 
     area =
-      case Pathfinding.get_zone_and_area(map, {x, y, z}) do
+      case Pathfinding.get_zone_and_area(world.map_id, {x, y, z}) do
         {_zone, area} -> area
         nil -> character.internal.area
       end
@@ -382,7 +387,7 @@ defmodule ThistleTea.Game.Network.Server do
         movement_block: %{character.movement_block | position: {x, y, z, orientation}, movement_flags: 0}
     }
 
-    SpatialHash.update(:players, state.guid, map, x, y, z)
+    SpatialHash.update(:players, state.guid, world, x, y, z)
 
     Network.send_packet(%Message.MsgMoveTeleportAck{
       guid: state.guid,
@@ -401,12 +406,12 @@ defmodule ThistleTea.Game.Network.Server do
     {:noreply, {socket, state}, socket.read_timeout}
   end
 
-  def handle_cast({:start_teleport, x, y, z, orientation, map}, {socket, state}) do
+  def handle_cast({:start_teleport, x, y, z, orientation, %WorldRef{} = world}, {socket, state}) do
     state = suspend_pet_for_teleport(state)
 
     # Update player's location
     area =
-      case Pathfinding.get_zone_and_area(map, {x, y, z}) do
+      case Pathfinding.get_zone_and_area(world.map_id, {x, y, z}) do
         {_zone, area} -> area
         nil -> state.character.internal.area
       end
@@ -415,7 +420,7 @@ defmodule ThistleTea.Game.Network.Server do
 
     character = %{
       character
-      | internal: %{character.internal | area: area, map: map},
+      | internal: %{character.internal | area: area, world: world},
         movement_block: %{character.movement_block | position: {x, y, z, orientation}}
     }
 
@@ -424,7 +429,7 @@ defmodule ThistleTea.Game.Network.Server do
     SpatialHash.update(
       :players,
       state.guid,
-      character.internal.map,
+      character.internal.world,
       x,
       y,
       z
@@ -433,12 +438,16 @@ defmodule ThistleTea.Game.Network.Server do
     state = Visibility.leave_player(%{state | character: character})
 
     # Send player's client to loading screen to load the new map
-    Network.send_packet(%Message.SmsgTransferPending{map: map, has_transport: false})
+    Network.send_packet(%Message.SmsgTransferPending{map: world.map_id, has_transport: false})
 
     state = %{state | ready: false}
 
     # Send player's client the new location
-    Network.send_packet(%Message.SmsgNewWorld{map: map, position: %{x: x, y: y, z: z}, orientation: orientation})
+    Network.send_packet(%Message.SmsgNewWorld{
+      map: world.map_id,
+      position: %{x: x, y: y, z: z},
+      orientation: orientation
+    })
 
     # The client responds with a MSG_MOVE_WORLDPORT_ACK message which
     # is handled in the login handler as they share the same init process

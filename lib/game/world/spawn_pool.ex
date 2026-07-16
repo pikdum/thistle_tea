@@ -276,8 +276,8 @@ defmodule ThistleTea.Game.World.SpawnPool do
   defp member_key(%Mob{internal: %Internal{creature: creature}}), do: {:creature, creature.db_guid}
   defp member_key(%GameObject{object: object}), do: {:game_object, Bitwise.band(object.guid, 0x00FFFFFF)}
 
-  defp cell(%{internal: %Internal{map: map}, movement_block: %{position: {x, y, z, _o}}}) do
-    SpatialHash.cell(map, x, y, z)
+  defp cell(%{internal: %Internal{world: world}, movement_block: %{position: {x, y, z, _o}}}) do
+    SpatialHash.cell(world, x, y, z)
   end
 
   defp stop_running_member(state, member, pid) do

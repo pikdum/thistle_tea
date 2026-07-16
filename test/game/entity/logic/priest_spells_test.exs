@@ -20,6 +20,7 @@ defmodule ThistleTea.Game.Entity.Logic.PriestSpellsTest do
   alias ThistleTea.Game.Spell.CastValidation
   alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.Spell.Targets
+  alias ThistleTea.Game.WorldRef
 
   @movement_flag_root 0x08000000
   @movement_flag_water_walk 0x10000000
@@ -41,7 +42,7 @@ defmodule ThistleTea.Game.Entity.Logic.PriestSpellsTest do
         flags: 0,
         auras: []
       },
-      internal: %Internal{map: 0},
+      internal: %Internal{world: %WorldRef{map_id: 0}},
       movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}, movement_flags: 0}
     }
   end
@@ -60,7 +61,7 @@ defmodule ThistleTea.Game.Entity.Logic.PriestSpellsTest do
         auras: []
       },
       player: %Player{flags: if(ghost?, do: 0x10, else: 0)},
-      internal: %Internal{map: 0},
+      internal: %Internal{world: %WorldRef{map_id: 0}},
       movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}, movement_flags: 0}
     }
   end

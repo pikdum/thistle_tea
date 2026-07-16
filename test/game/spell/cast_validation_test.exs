@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Spell.CastValidationTest do
   alias ThistleTea.Game.Spell.Cooldowns
   alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.Spell.Targets
+  alias ThistleTea.Game.WorldRef
 
   @now 10_000
 
@@ -25,7 +26,7 @@ defmodule ThistleTea.Game.Spell.CastValidationTest do
       object: %Object{guid: 100},
       unit: unit,
       movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
-      internal: %Internal{map: 0}
+      internal: %Internal{world: %WorldRef{map_id: 0}}
     }
   end
 
@@ -62,7 +63,7 @@ defmodule ThistleTea.Game.Spell.CastValidationTest do
         hostile?: true,
         friendly?: false,
         attackable?: true,
-        position: {0, 10.0, 0.0, 0.0}
+        position: {WorldRef.open(0), 10.0, 0.0, 0.0}
       },
       Map.new(overrides)
     )
@@ -222,8 +223,8 @@ defmodule ThistleTea.Game.Spell.CastValidationTest do
     end
 
     test "rejects targets out of range or on another map" do
-      out_of_range = hostile_target(position: {0, 100.0, 0.0, 0.0})
-      other_map = hostile_target(position: {1, 10.0, 0.0, 0.0})
+      out_of_range = hostile_target(position: {WorldRef.open(0), 100.0, 0.0, 0.0})
+      other_map = hostile_target(position: {WorldRef.open(1), 10.0, 0.0, 0.0})
 
       assert {:error, :out_of_range} =
                CastValidation.validate(caster(), harmful_spell(), Targets.unit(7), out_of_range, @now)

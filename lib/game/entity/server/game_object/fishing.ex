@@ -104,8 +104,8 @@ defmodule ThistleTea.Game.Entity.Server.GameObject.Fishing do
     end
   end
 
-  defp pool_loot(%GameObject{internal: %{map: map}, movement_block: %{position: {x, y, z, _o}}}) do
-    World.nearby_units_exact(:game_objects, map, {x, y, z}, @fishing_hole_search_range)
+  defp pool_loot(%GameObject{internal: %{world: world}, movement_block: %{position: {x, y, z, _o}}}) do
+    World.nearby_units_exact(:game_objects, world, {x, y, z}, @fishing_hole_search_range)
     |> Enum.find_value(fn {guid, distance} ->
       with %{type: @fishing_hole_type, data: data} <- GameObjectTemplateLoader.get(Guid.entry(guid)),
            radius when is_integer(radius) and radius > 0 <- Enum.at(data, 0),

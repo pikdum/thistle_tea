@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgAttackswingTest do
   alias ThistleTea.Game.Network.Message.CmsgAttackswing
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
+  alias ThistleTea.Game.WorldRef
 
   describe "handle/2" do
     test "sets attack intent but does not enter combat until a swing lands" do
@@ -50,7 +51,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgAttackswingTest do
     %Character{
       object: %Object{guid: guid},
       unit: %Unit{health: 100, max_health: 100},
-      internal: %Internal{map: 0},
+      internal: %Internal{world: %WorldRef{map_id: 0}},
       movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
     }
   end

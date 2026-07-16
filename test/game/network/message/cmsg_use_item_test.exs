@@ -19,6 +19,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgUseItemTest do
   alias ThistleTea.Game.Spell.Cooldowns
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.ItemStore
+  alias ThistleTea.Game.WorldRef
 
   @backpack_start 23
   @not_ready 0x3C
@@ -143,7 +144,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgUseItemTest do
       unit: %Unit{health: 100, max_health: 100, power1: 100, max_power1: 100, class: 1, race: 1, level: 10},
       player: %Player{inv1: item_guid},
       movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
-      internal: %Internal{map: 0}
+      internal: %Internal{world: %WorldRef{map_id: 0}}
     }
   end
 

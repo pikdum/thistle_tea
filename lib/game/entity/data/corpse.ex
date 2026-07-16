@@ -57,7 +57,7 @@ defmodule ThistleTea.Game.Entity.Data.Corpse do
         position: {x, y, z, o}
       },
       internal: %Internal{
-        map: internal.map,
+        world: internal.world,
         area: internal.area,
         name: internal.name
       }

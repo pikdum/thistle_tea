@@ -17,6 +17,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.SpellsTest do
   alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
+  alias ThistleTea.Game.WorldRef
 
   describe "try_cast/3" do
     test "initializes spell timers from initial delays without casting" do
@@ -409,7 +410,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.SpellsTest do
         max_power1: 100
       },
       internal: %Internal{
-        map: 0,
+        world: %WorldRef{map_id: 0},
         in_combat: true,
         spellbook: Keyword.get(opts, :spellbook, %{}),
         creature: %Creature{spells: Keyword.get(opts, :spells, [])},

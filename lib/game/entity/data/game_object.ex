@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.Entity.Data.GameObject do
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.GameObjectTemplate
   alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.WorldRef
 
   @update_flag_all 0x10
   @update_flag_has_position 0x40
@@ -26,7 +27,7 @@ defmodule ThistleTea.Game.Entity.Data.GameObject do
 
   @go_state_active 1
 
-  def build_summoned(%GameObjectTemplate{} = ot, map, {x, y, z, o}, opts \\ []) do
+  def build_summoned(%GameObjectTemplate{} = ot, world, {x, y, z, o}, opts \\ []) do
     %__MODULE__{
       object: %Object{
         guid: Guid.from_low_guid(:game_object, ot.entry, :erlang.unique_integer([:positive, :monotonic])),
@@ -57,7 +58,7 @@ defmodule ThistleTea.Game.Entity.Data.GameObject do
         position: {x, y, z, o}
       },
       internal: %Internal{
-        map: map,
+        world: WorldRef.coerce(world),
         chair: chair(ot),
         fishing: Keyword.get(opts, :fishing),
         summon: %Summon{
@@ -135,7 +136,7 @@ defmodule ThistleTea.Game.Entity.Data.GameObject do
         position: {o.position_x, o.position_y, o.position_z, o.orientation}
       },
       internal: %Internal{
-        map: o.map,
+        world: WorldRef.open(o.map),
         chair: chair(ot),
         event: event,
         fishing: fishing_hole(ot),

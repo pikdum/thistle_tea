@@ -484,14 +484,14 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
   @default_buddy_radius 30.0
 
   defp find_creature_with_entry(
-         %{object: %{guid: self_guid}, internal: %{map: map}, movement_block: %{position: {x, y, z, _o}}},
+         %{object: %{guid: self_guid}, internal: %{world: world}, movement_block: %{position: {x, y, z, _o}}},
          %ScriptStep{target_param1: entry, target_param2: radius},
          target_type
        ) do
     range = if is_number(radius) and radius > 0, do: radius, else: @default_buddy_radius
 
     candidates =
-      map
+      world
       |> World.nearby_mobs_at({x, y, z}, range)
       |> Enum.filter(fn {guid, _distance} -> guid != self_guid and Guid.entry(guid) == entry end)
 

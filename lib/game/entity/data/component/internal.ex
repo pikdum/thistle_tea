@@ -1,14 +1,15 @@
 defmodule ThistleTea.Game.Entity.Data.Component.Internal do
   @moduledoc """
-  Server-only entity state that is never sent to the client: map/area, AI and
+  Server-only entity state that is never sent to the client: world/area, AI and
   combat bookkeeping, pending events, and casting state. Entity-kind concerns
   live in sub-structs — `Internal.Creature` (creature-template config),
   `Internal.Spawn` (mob spawn/respawn), `Internal.Loot` (mob loot/corpse
   phase), and `Internal.Summon` (summoned game objects) — which stay nil on
   entities they don't apply to.
   """
+  alias ThistleTea.Game.WorldRef
+
   defstruct [
-    :map,
     :home_bind,
     :name,
     :area,
@@ -48,6 +49,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal do
     :combo_expires_at,
     :combo_target_guid,
     :undetectable_until,
+    world: WorldRef.open(0),
     rest_bonus: 0.0,
     mailbox: [],
     starting_items: [],

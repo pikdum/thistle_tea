@@ -90,8 +90,8 @@ defmodule ThistleTea.Game.Spell.CastContext do
   defp spell_id(%Spell{id: id}), do: id
   defp spell_id(_spell), do: nil
 
-  defp caster_position(%{internal: %{map: map}, movement_block: %{position: {x, y, z, _o}}}) when is_integer(map) do
-    {map, x, y, z}
+  defp caster_position(%{internal: %{world: world}, movement_block: %{position: {x, y, z, _o}}}) do
+    {world, x, y, z}
   end
 
   defp caster_position(_caster), do: nil

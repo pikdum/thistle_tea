@@ -21,6 +21,7 @@ defmodule ThistleTea.Game.World.Visibility do
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.System.CellActivator
   alias ThistleTea.Game.World.Visibility.Filter
+  alias ThistleTea.Game.WorldRef
 
   @group Groups
   @range 250
@@ -140,19 +141,25 @@ defmodule ThistleTea.Game.World.Visibility do
 
   def leave_entity(entity), do: entity
 
-  def visible_cells(%{internal: %Internal{map: map}, movement_block: %MovementBlock{position: {x, y, z, _o}}}) do
-    map
+  def visible_cells(%{internal: %Internal{world: world}, movement_block: %MovementBlock{position: {x, y, z, _o}}}) do
+    world
     |> SpatialHash.cells_in_range(x, y, z, @range)
     |> MapSet.new()
   end
 
-  def current_cell(%{internal: %Internal{map: map}, movement_block: %MovementBlock{position: {x, y, z, _o}}}) do
-    SpatialHash.cell(map, x, y, z)
+  def current_cell(%{internal: %Internal{world: world}, movement_block: %MovementBlock{position: {x, y, z, _o}}}) do
+    SpatialHash.cell(world, x, y, z)
   end
 
   def group_name, do: @group
 
-  def cell_key({map, x, y}), do: "cell/#{map}/#{x}/#{y}"
+  def cell_key({%WorldRef{map_id: map_id, instance_id: instance_id}, x, y}) do
+    "cell/#{map_id}/#{instance_id || "world"}/#{x}/#{y}"
+  end
+
+  def cell_key({map_id, x, y}) when is_integer(map_id) do
+    cell_key({WorldRef.open(map_id), x, y})
+  end
 
   def resync_player(%{guid: guid, visibility_cells: %MapSet{} = cells} = state) do
     sync_visible_entities(state, guid, cells)
@@ -223,8 +230,8 @@ defmodule ThistleTea.Game.World.Visibility do
   defp corpse_distance(%{object: %{guid: viewer_guid}}, target_guid) do
     corpse_guid = Corpse.guid_for(viewer_guid)
 
-    with {_, map, cx, cy, cz} <- SpatialHash.get_entity(corpse_guid),
-         {_, ^map, tx, ty, tz} <- SpatialHash.get_entity(target_guid) do
+    with {_, world, cx, cy, cz} <- SpatialHash.get_entity(corpse_guid),
+         {_, ^world, tx, ty, tz} <- SpatialHash.get_entity(target_guid) do
       SpatialHash.distance({cx, cy, cz}, {tx, ty, tz})
     else
       _ -> nil
@@ -303,7 +310,7 @@ defmodule ThistleTea.Game.World.Visibility do
 
   defp currently_visible?(%{visibility_cells: cells}, guid) do
     case SpatialHash.get_entity(guid) do
-      {^guid, map, x, y, z} -> MapSet.member?(cells, SpatialHash.cell(map, x, y, z))
+      {^guid, world, x, y, z} -> MapSet.member?(cells, SpatialHash.cell(world, x, y, z))
       _ -> false
     end
   end

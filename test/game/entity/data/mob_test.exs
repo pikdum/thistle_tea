@@ -18,6 +18,7 @@ defmodule ThistleTea.Game.Entity.Data.MobTest do
   alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
+  alias ThistleTea.Game.WorldRef
 
   describe "build/1" do
     test "stores creature movement speeds as actual speeds" do
@@ -272,7 +273,7 @@ defmodule ThistleTea.Game.Entity.Data.MobTest do
         unit: %Unit{health: 1, max_health: 1, level: 1},
         movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
         internal: %Internal{
-          map: 0,
+          world: %WorldRef{map_id: 0},
           creature: %Creature{experience_multiplier: 1.0, extra_flags: 0, rank: 0},
           spawn: %Spawn{},
           loot: %Loot{}
@@ -302,7 +303,7 @@ defmodule ThistleTea.Game.Entity.Data.MobTest do
         unit: %Unit{health: 1, max_health: 1, level: 1},
         movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
         internal: %Internal{
-          map: 0,
+          world: %WorldRef{map_id: 0},
           creature: %Creature{experience_multiplier: 1.0, extra_flags: 0, rank: 0},
           spawn: %Spawn{respawn_delay_ms: 1},
           loot: %Loot{}
@@ -359,7 +360,7 @@ defmodule ThistleTea.Game.Entity.Data.MobTest do
       unit: %Unit{health: 0, max_health: 1, level: 1},
       movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
       internal: %Internal{
-        map: 0,
+        world: %WorldRef{map_id: 0},
         creature: %Creature{experience_multiplier: 1.0, extra_flags: 0, rank: 0},
         spawn: %Spawn{respawn_delay_ms: 1},
         loot: %Loot{},
@@ -381,7 +382,7 @@ defmodule ThistleTea.Game.Entity.Data.MobTest do
         unit: %{spawn_unit | health: 0, power1: 0},
         movement_block: %{spawn_movement_block | position: {9.0, 9.0, 9.0, 0.0}, movement_flags: 1},
         internal: %Internal{
-          map: 0,
+          world: %WorldRef{map_id: 0},
           name: "Test Creature",
           in_combat: true,
           creature: %Creature{},
@@ -405,7 +406,10 @@ defmodule ThistleTea.Game.Entity.Data.MobTest do
       assert respawned.unit == spawn_unit
       assert respawned.movement_block == spawn_movement_block
       assert respawned.internal.spawn.respawn_ref == nil
-      assert SpatialHash.get_entity(mob_guid) == {mob_guid, 0, 1.0, 2.0, 3.0}
+
+      assert SpatialHash.get_entity(mob_guid) ==
+               {mob_guid, WorldRef.open(0), 1.0, 2.0, 3.0}
+
       assert %{alive?: true, level: 2} = Metadata.get(mob_guid)
     end
   end

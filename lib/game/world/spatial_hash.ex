@@ -3,6 +3,8 @@ defmodule ThistleTea.Game.World.SpatialHash do
   ETS-backed spatial hash with 125-yard cells per entity table, plus active
   spline-movement records, powering range queries and visibility cells.
   """
+  alias ThistleTea.Game.WorldRef
+
   @cell_size 125
   @cell_table_options [:named_table, :public, :duplicate_bag, read_concurrency: true, write_concurrency: :auto]
   @entity_table_options [:named_table, :public, :set, read_concurrency: true, write_concurrency: :auto]
@@ -17,7 +19,8 @@ defmodule ThistleTea.Game.World.SpatialHash do
     :ets.new(:entity_movement, @entity_table_options)
   end
 
-  def put_movement(guid, {_map, _start_position, _spline_nodes, _start_time, _duration} = movement) do
+  def put_movement(guid, {world, start_position, spline_nodes, start_time, duration}) do
+    movement = {WorldRef.coerce(world), start_position, spline_nodes, start_time, duration}
     :ets.insert(:entity_movement, {guid, movement})
   end
 
@@ -32,19 +35,22 @@ defmodule ThistleTea.Game.World.SpatialHash do
     end
   end
 
-  def insert(table, guid, map, x, y, z) do
-    hash = cell(map, x, y, z)
+  def insert(table, guid, world, x, y, z) do
+    world = WorldRef.coerce(world)
+    hash = cell(world, x, y, z)
     :ets.insert(table, {hash, guid})
-    :ets.insert(:entities, {guid, map, x, y, z})
+    :ets.insert(:entities, {guid, world, x, y, z})
   end
 
-  def update(table, guid, new_map, new_x, new_y, new_z) do
-    case :ets.lookup(:entities, guid) do
-      [{^guid, old_map, old_x, old_y, old_z}] ->
-        old_hash = cell(old_map, old_x, old_y, old_z)
-        new_hash = cell(new_map, new_x, new_y, new_z)
+  def update(table, guid, new_world, new_x, new_y, new_z) do
+    new_world = WorldRef.coerce(new_world)
 
-        :ets.insert(:entities, {guid, new_map, new_x, new_y, new_z})
+    case :ets.lookup(:entities, guid) do
+      [{^guid, old_world, old_x, old_y, old_z}] ->
+        old_hash = cell(old_world, old_x, old_y, old_z)
+        new_hash = cell(new_world, new_x, new_y, new_z)
+
+        :ets.insert(:entities, {guid, new_world, new_x, new_y, new_z})
 
         if old_hash != new_hash do
           :ets.delete_object(table, {old_hash, guid})
@@ -52,14 +58,14 @@ defmodule ThistleTea.Game.World.SpatialHash do
         end
 
       [] ->
-        insert(table, guid, new_map, new_x, new_y, new_z)
+        insert(table, guid, new_world, new_x, new_y, new_z)
     end
   end
 
   def remove(table, guid) do
     case :ets.lookup(:entities, guid) do
-      [{^guid, map, x, y, z}] ->
-        hash = cell(map, x, y, z)
+      [{^guid, world, x, y, z}] ->
+        hash = cell(world, x, y, z)
         :ets.delete_object(table, {hash, guid})
         :ets.delete(:entities, guid)
         :ets.delete(:entity_movement, guid)
@@ -70,19 +76,21 @@ defmodule ThistleTea.Game.World.SpatialHash do
     end
   end
 
-  def query_cells(table, map, x, y, z, range) do
-    cells_in_range(map, x, y, z, range)
+  def query_cells(table, world, x, y, z, range) do
+    cells_in_range(world, x, y, z, range)
     |> Enum.flat_map(fn cell -> :ets.lookup(table, cell) end)
     |> Enum.map(fn {_hash, guid} -> guid end)
   end
 
-  def query(table, map, x1, y1, z1, range) do
-    cells_in_range(map, x1, y1, z1, range)
+  def query(table, world, x1, y1, z1, range) do
+    world = WorldRef.coerce(world)
+
+    cells_in_range(world, x1, y1, z1, range)
     |> Stream.flat_map(fn cell ->
       :ets.lookup(table, cell)
     end)
     |> Stream.map(fn {_hash, guid} ->
-      [{^guid, ^map, x2, y2, z2}] = :ets.lookup(:entities, guid)
+      [{^guid, ^world, x2, y2, z2}] = :ets.lookup(:entities, guid)
       distance = distance({x1, y1, z1}, {x2, y2, z2})
       {guid, distance}
     end)
@@ -101,11 +109,11 @@ defmodule ThistleTea.Game.World.SpatialHash do
 
   ## Example
 
-      iex> SpatialHash.cell_bounds({0, 1, 2})
+      iex> SpatialHash.cell_bounds({ThistleTea.Game.WorldRef.open(0), 1, 2})
       {{124.5, 249.5}, {249.5, 374.5}}
 
   """
-  def cell_bounds({_map, cx, cy}) do
+  def cell_bounds({_world, cx, cy}) do
     x1 = cx * @cell_size - 0.5
     x2 = (cx + 1) * @cell_size - 0.5
     y1 = cy * @cell_size - 0.5
@@ -113,11 +121,12 @@ defmodule ThistleTea.Game.World.SpatialHash do
     {{x1, x2}, {y1, y2}}
   end
 
-  def cell(map, x, y, _z) do
-    {map, Integer.floor_div(round(x), @cell_size), Integer.floor_div(round(y), @cell_size)}
+  def cell(world, x, y, _z) do
+    {WorldRef.coerce(world), Integer.floor_div(round(x), @cell_size), Integer.floor_div(round(y), @cell_size)}
   end
 
-  def cells_in_range(map, x, y, _z, range) do
+  def cells_in_range(world, x, y, _z, range) do
+    world = WorldRef.coerce(world)
     cell_range = div(round(range), @cell_size) + 1
     rounded_x = round(x)
     rounded_y = round(y)
@@ -125,7 +134,7 @@ defmodule ThistleTea.Game.World.SpatialHash do
     for dx <- -cell_range..cell_range,
         dy <- -cell_range..cell_range do
       {
-        map,
+        world,
         Integer.floor_div(rounded_x + dx * @cell_size, @cell_size),
         Integer.floor_div(rounded_y + dy * @cell_size, @cell_size)
       }

@@ -272,7 +272,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells do
 
   defp face_target(%Mob{object: %{guid: guid}} = state, target_guid) when target_guid != guid do
     case World.target_position(target_guid) do
-      {map, tx, ty, _tz} when map == state.internal.map ->
+      {world, tx, ty, _tz} when world == state.internal.world ->
         set_orientation_towards(state, {tx, ty})
 
       _ ->

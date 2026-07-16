@@ -265,7 +265,7 @@ defmodule ThistleTea.Game.Player.DevCommands do
 
   def run(state, ".pos" <> _) do
     {x, y, z, _o} = state.character.movement_block.position
-    map = state.character.internal.map
+    map = state.character.internal.world.map_id
 
     state
     |> system_message("#{x} #{y} #{z} #{map}")
@@ -303,7 +303,7 @@ defmodule ThistleTea.Game.Player.DevCommands do
     |> parse_coords()
     |> case do
       {:ok, x, y, z, map} -> teleport_player(state, x, y, z, map)
-      {:ok, x, y, z} -> teleport_player(state, x, y, z, state.character.internal.map)
+      {:ok, x, y, z} -> teleport_player(state, x, y, z, state.character.internal.world)
       :error -> system_message(state, "Invalid command. Use: .go xyz <x> <y> <z> [map]")
     end
     |> handled()

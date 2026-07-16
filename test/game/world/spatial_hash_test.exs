@@ -2,6 +2,7 @@ defmodule ThistleTea.Game.World.SpatialHashTest do
   use ExUnit.Case, async: true
 
   alias ThistleTea.Game.World.SpatialHash
+  alias ThistleTea.Game.WorldRef
 
   describe "setup_tables/0" do
     test "creates read and write concurrent lookup tables" do
@@ -49,11 +50,35 @@ defmodule ThistleTea.Game.World.SpatialHashTest do
         :ets.delete(table)
       end
     end
+
+    test "isolates copies of the same physical map" do
+      table = :spatial_hash_world_isolation_test
+      :ets.new(table, [:named_table, :public, :duplicate_bag])
+
+      first_guid = System.unique_integer([:positive])
+      second_guid = System.unique_integer([:positive])
+      first_world = WorldRef.instance(389, 1)
+      second_world = WorldRef.instance(389, 2)
+
+      try do
+        SpatialHash.insert(table, first_guid, first_world, 0, 0, 0)
+        SpatialHash.insert(table, second_guid, second_world, 0, 0, 0)
+
+        assert [{^first_guid, first_distance}] = SpatialHash.query(table, first_world, 0, 0, 0, 10)
+        assert [{^second_guid, second_distance}] = SpatialHash.query(table, second_world, 0, 0, 0, 10)
+        assert first_distance == 0.0
+        assert second_distance == 0.0
+      after
+        SpatialHash.remove(table, first_guid)
+        SpatialHash.remove(table, second_guid)
+        :ets.delete(table)
+      end
+    end
   end
 
   describe "cell/4" do
     test "assigns negative coordinates to the previous cell" do
-      assert SpatialHash.cell(0, -1, -1, 0) == {0, -1, -1}
+      assert SpatialHash.cell(0, -1, -1, 0) == {WorldRef.open(0), -1, -1}
     end
   end
 

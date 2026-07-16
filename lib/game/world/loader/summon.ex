@@ -18,6 +18,7 @@ defmodule ThistleTea.Game.World.Loader.Summon do
   alias ThistleTea.Game.Spell, as: SpellData
   alias ThistleTea.Game.World.Loader.Mob, as: MobLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
+  alias ThistleTea.Game.WorldRef
 
   @table_options [:named_table, :public, read_concurrency: true, write_concurrency: :auto]
   @low_guid_base 0x400000
@@ -30,22 +31,24 @@ defmodule ThistleTea.Game.World.Loader.Summon do
     end
   end
 
-  def build(entry, map, {x, y, z, o}, opts \\ []) when is_integer(entry) and is_list(opts) do
+  def build(entry, world, {x, y, z, o}, opts \\ []) when is_integer(entry) and is_list(opts) do
     creature = template(entry)
+    world = WorldRef.coerce(world)
 
-    %{creature | guid: next_low_guid(), map: map, position_x: x, position_y: y, position_z: z, orientation: o}
+    %{creature | guid: next_low_guid(), map: world.map_id, position_x: x, position_y: y, position_z: z, orientation: o}
     |> Mob.build()
+    |> then(&%{&1 | internal: %{&1.internal | world: world}})
     |> Mob.prepare_summon(opts)
   end
 
   def build_pet(entry, %{
         object: %{guid: owner_guid},
         unit: owner_unit,
-        internal: %{map: map},
+        internal: %{world: world},
         movement_block: %{position: position}
       })
-      when is_integer(entry) and is_integer(owner_guid) and is_integer(map) do
-    with %Mob{} = mob <- build(entry, map, position),
+      when is_integer(entry) and is_integer(owner_guid) do
+    with %Mob{} = mob <- build(entry, world, position),
          level when is_integer(level) <- owner_unit.level do
       stats = pet_stats(entry, level)
       guid = Guid.from_low_guid(:pet, entry, next_low_guid())

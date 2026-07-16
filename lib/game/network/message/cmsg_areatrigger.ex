@@ -16,7 +16,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgAreatrigger do
     {x, y, z, _o} = c.movement_block.position
 
     with %{} = trigger <- AreaTriggerLoader.get(trigger_id),
-         true <- AreaTriggerLoader.inside?(trigger, c.internal.map, {x, y, z}, @trigger_range_delta) do
+         true <- AreaTriggerLoader.inside?(trigger, c.internal.world.map_id, {x, y, z}, @trigger_range_delta) do
       handle_trigger(state, c, trigger_id)
     else
       _out_of_range -> state

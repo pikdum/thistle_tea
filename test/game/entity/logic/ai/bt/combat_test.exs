@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.CombatTest do
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.World.SpatialHash
+  alias ThistleTea.Game.WorldRef
 
   describe "melee_attack/3" do
     test "queues attack delivery events instead of dispatching directly" do
@@ -29,7 +30,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.CombatTest do
           combat_reach: 1.0,
           base_attack_time: 1_000
         },
-        internal: %Internal{map: 0, in_combat: true},
+        internal: %Internal{world: %WorldRef{map_id: 0}, in_combat: true},
         movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
       }
 
@@ -63,7 +64,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.CombatTest do
           base_attack_time: 2_000,
           offhand_attack_time: 1_500
         },
-        internal: %Internal{map: 0, in_combat: true},
+        internal: %Internal{world: %WorldRef{map_id: 0}, in_combat: true},
         movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
       }
 
@@ -93,7 +94,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.CombatTest do
           combat_reach: 1.0,
           base_attack_time: 1_000
         },
-        internal: %Internal{map: 0, in_combat: true, next_swing_spell: spell},
+        internal: %Internal{world: %WorldRef{map_id: 0}, in_combat: true, next_swing_spell: spell},
         movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
       }
 
@@ -124,7 +125,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.CombatTest do
           combat_reach: 1.0,
           base_attack_time: 2_000
         },
-        internal: %Internal{map: 0, in_combat: true},
+        internal: %Internal{world: %WorldRef{map_id: 0}, in_combat: true},
         movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
       }
 
@@ -150,7 +151,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.CombatTest do
           combat_reach: 1.0,
           base_attack_time: 2_000
         },
-        internal: %Internal{map: 0, in_combat: true},
+        internal: %Internal{world: %WorldRef{map_id: 0}, in_combat: true},
         movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
       }
 
@@ -181,7 +182,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.CombatTest do
           power2: 0,
           max_power2: 1_000
         },
-        internal: %Internal{map: 0, in_combat: true},
+        internal: %Internal{world: %WorldRef{map_id: 0}, in_combat: true},
         movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
       }
 

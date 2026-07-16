@@ -53,9 +53,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
 
   def in_combat?(_state, _blackboard), do: false
 
-  def target_valid_same_map?(%{internal: %Internal{map: map}, unit: %Unit{target: target}}, _blackboard) do
+  def target_valid_same_map?(%{internal: %Internal{world: world}, unit: %Unit{target: target}}, _blackboard) do
     case World.target_position(target) do
-      {^map, _x, _y, _z} -> true
+      {^world, _x, _y, _z} -> true
       _ -> false
     end
   end

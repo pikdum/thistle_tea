@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.Player.GameObjectsTest do
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Player.GameObjects
   alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
+  alias ThistleTea.Game.WorldRef
 
   describe "use_object/2" do
     test "sits the player in the seat returned by a chair game object" do
@@ -30,14 +31,14 @@ defmodule ThistleTea.Game.Player.GameObjectsTest do
       character = %Character{
         object: %Object{guid: 1},
         unit: %Unit{level: 10, stand_state: 0},
-        internal: %Internal{map: 0},
+        internal: %Internal{world: %WorldRef{map_id: 0}},
         movement_block: %MovementBlock{position: {1.0, 1.0, 3.0, 0.0}}
       }
 
       state = GameObjects.use_object(%{guid: 1, character: character}, guid)
 
       assert state.character.unit.stand_state == 5
-      assert_receive {:"$gen_cast", {:start_teleport, 1.0, 2.0, 3.0, 1.5, 0}}
+      assert_receive {:"$gen_cast", {:start_teleport, 1.0, 2.0, 3.0, 1.5, %WorldRef{map_id: 0}}}
       assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgStandstateUpdate{stand_state: 5}}}
     end
   end
@@ -55,7 +56,7 @@ defmodule ThistleTea.Game.Player.GameObjectsTest do
 
   defp serve_chair(result) do
     receive do
-      {:"$gen_call", from, {:chair_seat, 0, {1.0, 1.0, 3.0}}} -> GenServer.reply(from, result)
+      {:"$gen_call", from, {:chair_seat, %WorldRef{map_id: 0}, {1.0, 1.0, 3.0}}} -> GenServer.reply(from, result)
     end
   end
 end

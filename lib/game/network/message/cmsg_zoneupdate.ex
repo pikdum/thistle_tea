@@ -12,11 +12,11 @@ defmodule ThistleTea.Game.Network.Message.CmsgZoneupdate do
 
   @impl ClientMessage
   def handle(%__MODULE__{area: client_zone}, %{ready: true, character: %Character{} = character} = state) do
-    %{internal: %{map: map, area: current_area}} = character
+    %{internal: %{world: world, area: current_area}} = character
     {x, y, z, _o} = character.movement_block.position
 
     state =
-      case Pathfinding.get_zone_and_area(map, {x, y, z}) do
+      case Pathfinding.get_zone_and_area(world.map_id, {x, y, z}) do
         {_zone, area} when area != current_area ->
           character = %{character | internal: %{character.internal | area: area}}
           CharacterStore.put(character)

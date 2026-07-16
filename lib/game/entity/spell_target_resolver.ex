@@ -101,9 +101,9 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
     end
   end
 
-  defp nearby_enemy_guids_at(%{internal: %{map: map}} = caster, caster_guid, {x, y, z}, radius)
+  defp nearby_enemy_guids_at(%{internal: %{world: world}} = caster, caster_guid, {x, y, z}, radius)
        when is_number(radius) and radius > 0 do
-    map
+    world
     |> nearby_units_at({x, y, z}, radius)
     |> hostile_living_guids(caster, caster_guid)
   end
@@ -111,10 +111,10 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
   defp nearby_enemy_guids_at(_caster, _caster_guid, _position, _radius), do: []
 
   defp nearby_units(
-         %{object: %{guid: self_guid}, internal: %{map: map}, movement_block: %{position: {x, y, z, _o}}},
+         %{object: %{guid: self_guid}, internal: %{world: world}, movement_block: %{position: {x, y, z, _o}}},
          radius
        ) do
-    nearby_units_at(map, {x, y, z}, radius)
+    nearby_units_at(world, {x, y, z}, radius)
     |> Enum.reject(fn {guid, _distance} -> guid == self_guid end)
   end
 

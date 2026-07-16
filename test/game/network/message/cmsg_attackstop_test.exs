@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgAttackstopTest do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.Message.CmsgAttackstop
+  alias ThistleTea.Game.WorldRef
 
   describe "handle/2" do
     test "stops auto attack without resetting the swing timer" do
@@ -23,7 +24,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgAttackstopTest do
             unit: %Unit{target: target_guid},
             movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
             internal: %Internal{
-              map: 0,
+              world: %WorldRef{map_id: 0},
               in_combat: true,
               blackboard: %Blackboard{next_attack_at: 12_345, attack_started: true, auto_attacking: true}
             }

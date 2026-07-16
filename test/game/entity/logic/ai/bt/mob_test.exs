@@ -21,6 +21,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
+  alias ThistleTea.Game.WorldRef
 
   describe "reached_home" do
     test "casts a reached_home self spell like Wastewander stealth" do
@@ -52,7 +53,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
           run_speed: 7.0
         },
         internal: %Internal{
-          map: 0,
+          world: %WorldRef{map_id: 0},
           in_combat: true,
           creature: %Creature{ai_events: [event]},
           spawn: %Spawn{position: {0.0, 0.0, 0.0}, movement_type: 1, distance: 5.0},
@@ -98,7 +99,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
           run_speed: 7.0
         },
         internal: %Internal{
-          map: 0,
+          world: %WorldRef{map_id: 0},
           in_combat: true,
           creature: %Creature{ai_events: [event]},
           spawn: %Spawn{position: {0.0, 0.0, 0.0}, movement_type: 1, distance: 5.0},
@@ -694,7 +695,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
         target: 0
       },
       internal: %Internal{
-        map: 0,
+        world: %WorldRef{map_id: 0},
         in_combat: false,
         movement_start_time: Keyword.get(opts, :start_time),
         movement_start_position: Keyword.get(opts, :movement_start_position, {0.0, 0.0, 0.0}),

@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolverTest do
   alias ThistleTea.Game.Spell.Targets
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
+  alias ThistleTea.Game.WorldRef
 
   describe "resolve/3" do
     test "returns direct unit targets without world lookup" do
@@ -155,7 +156,7 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolverTest do
   defp caster(guid, {x, y, z}) do
     %{
       object: %{guid: guid},
-      internal: %Internal{map: 0},
+      internal: %Internal{world: %WorldRef{map_id: 0}},
       movement_block: %MovementBlock{position: {x, y, z, 0.0}}
     }
   end

@@ -21,6 +21,7 @@ defmodule ThistleTea.Game.Network.ServerTest do
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.WorldRef
   alias ThousandIsland.Socket
   alias ThousandIsland.Telemetry
 
@@ -237,7 +238,7 @@ defmodule ThistleTea.Game.Network.ServerTest do
     %Character{
       object: object(guid),
       unit: struct(unit(), unit_attrs),
-      internal: %Internal{map: 0},
+      internal: %Internal{world: %WorldRef{map_id: 0}},
       movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
     }
   end

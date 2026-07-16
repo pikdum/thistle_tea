@@ -14,13 +14,14 @@ defmodule ThistleTea.Game.World.VisibilityTest do
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.System.CellActivator
   alias ThistleTea.Game.World.Visibility
+  alias ThistleTea.Game.WorldRef
 
   describe "enter_player/1" do
     test "joins current cell and initializes visible entity lists" do
       self_guid = Guid.from_low_guid(:player, unique_low())
       other_guid = Guid.from_low_guid(:player, unique_low())
       mob_guid = Guid.from_low_guid(:mob, unique_low(), unique_low())
-      cell = {0, 0, 0}
+      cell = {WorldRef.open(0), 0, 0}
 
       other_pid = start_member(cell, %{guid: other_guid, type: :player})
       mob_pid = start_member(cell, %{guid: mob_guid, type: :mob})
@@ -57,7 +58,7 @@ defmodule ThistleTea.Game.World.VisibilityTest do
         }
         |> Visibility.enter_player()
 
-      assert_receive {:activated, {0, 0, 0}}
+      assert_receive {:activated, {%WorldRef{map_id: 0}, 0, 0}}
       Visibility.leave_player(state)
     end
   end
@@ -65,11 +66,15 @@ defmodule ThistleTea.Game.World.VisibilityTest do
   describe "handle_events/2" do
     test "tracks joined players in visible cells" do
       guid = Guid.from_low_guid(:player, unique_low())
-      state = %{guid: Guid.from_low_guid(:player, unique_low()), visibility_cells: MapSet.new([{0, 0, 0}])}
+
+      state = %{
+        guid: Guid.from_low_guid(:player, unique_low()),
+        visibility_cells: MapSet.new([{WorldRef.open(0), 0, 0}])
+      }
 
       event = %Group.Event{
         type: :joined,
-        key: Visibility.cell_key({0, 0, 0}),
+        key: Visibility.cell_key({WorldRef.open(0), 0, 0}),
         meta: %{guid: guid, type: :player}
       }
 
@@ -83,14 +88,14 @@ defmodule ThistleTea.Game.World.VisibilityTest do
 
       state = %{
         guid: Guid.from_low_guid(:player, unique_low()),
-        visibility_cells: MapSet.new([{0, 0, 0}]),
+        visibility_cells: MapSet.new([{WorldRef.open(0), 0, 0}]),
         tracked_entities: MapSet.new([guid]),
         player_guids: [guid]
       }
 
       event = %Group.Event{
         type: :left,
-        key: Visibility.cell_key({0, 0, 0}),
+        key: Visibility.cell_key({WorldRef.open(0), 0, 0}),
         meta: %{guid: guid, type: :player}
       }
 
@@ -107,14 +112,14 @@ defmodule ThistleTea.Game.World.VisibilityTest do
 
       state = %{
         guid: Guid.from_low_guid(:player, unique_low()),
-        visibility_cells: MapSet.new([{0, 0, 0}, {0, 1, 0}]),
+        visibility_cells: MapSet.new([{WorldRef.open(0), 0, 0}, {WorldRef.open(0), 1, 0}]),
         tracked_entities: MapSet.new([guid]),
         player_guids: [guid]
       }
 
       event = %Group.Event{
         type: :left,
-        key: Visibility.cell_key({0, 0, 0}),
+        key: Visibility.cell_key({WorldRef.open(0), 0, 0}),
         meta: %{guid: guid, type: :player}
       }
 
@@ -132,7 +137,7 @@ defmodule ThistleTea.Game.World.VisibilityTest do
       self_guid = Guid.from_low_guid(:player, unique_low())
       mob_guid = Guid.from_low_guid(:mob, unique_low(), unique_low())
       healer_guid = Guid.from_low_guid(:mob, unique_low(), unique_low())
-      cell = {0, 0, 0}
+      cell = {WorldRef.open(0), 0, 0}
 
       mob_pid = start_member(cell, %{guid: mob_guid, type: :mob})
       healer_pid = start_member(cell, %{guid: healer_guid, type: :mob})
@@ -168,7 +173,7 @@ defmodule ThistleTea.Game.World.VisibilityTest do
       self_guid = Guid.from_low_guid(:player, unique_low())
       healer_guid = Guid.from_low_guid(:mob, unique_low(), unique_low())
       ghost_guid = Guid.from_low_guid(:player, unique_low())
-      cell = {0, 0, 0}
+      cell = {WorldRef.open(0), 0, 0}
 
       healer_pid = start_member(cell, %{guid: healer_guid, type: :mob})
       ghost_pid = start_member(cell, %{guid: ghost_guid, type: :player})
@@ -208,7 +213,7 @@ defmodule ThistleTea.Game.World.VisibilityTest do
       state = %{
         guid: self_guid,
         character: character(self_guid, ghost?: false),
-        visibility_cells: MapSet.new([{0, 0, 0}]),
+        visibility_cells: MapSet.new([{WorldRef.open(0), 0, 0}]),
         tracked_entities: MapSet.new([ghost_guid])
       }
 
@@ -231,7 +236,7 @@ defmodule ThistleTea.Game.World.VisibilityTest do
       state = %{
         guid: self_guid,
         character: character(self_guid, ghost?: false),
-        visibility_cells: MapSet.new([{0, 0, 0}]),
+        visibility_cells: MapSet.new([{WorldRef.open(0), 0, 0}]),
         tracked_entities: MapSet.new()
       }
 
@@ -252,7 +257,7 @@ defmodule ThistleTea.Game.World.VisibilityTest do
       object: %Object{guid: guid},
       unit: %Unit{},
       player: %Player{flags: flags},
-      internal: %Internal{map: 0},
+      internal: %Internal{world: %WorldRef{map_id: 0}},
       movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
     }
   end
@@ -281,7 +286,7 @@ defmodule ThistleTea.Game.World.VisibilityTest do
   defp entity(guid) do
     %{
       object: %Object{guid: guid},
-      internal: %Internal{map: 0},
+      internal: %Internal{world: %WorldRef{map_id: 0}},
       movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
     }
   end
