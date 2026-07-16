@@ -10,7 +10,8 @@ defmodule ThistleTea.Game.Network.Message.SmsgGroupList do
             leader: 0,
             loot_method: 0,
             master_looter: 0,
-            loot_threshold: 0
+            loot_threshold: 0,
+            dungeon_difficulty: 0
 
   @impl ServerMessage
   def to_binary(%__MODULE__{} = msg) do
@@ -22,10 +23,18 @@ defmodule ThistleTea.Game.Network.Message.SmsgGroupList do
 
     looter = if msg.loot_method == @master_loot, do: msg.master_looter, else: 0
 
-    <<msg.group_type::little-size(8), msg.own_flags::little-size(8), length(msg.members)::little-size(32)>> <>
-      members <>
-      <<msg.leader::little-size(64), msg.loot_method::little-size(8), looter::little-size(64),
-        msg.loot_threshold::little-size(8)>>
+    roster =
+      <<msg.group_type::little-size(8), msg.own_flags::little-size(8), length(msg.members)::little-size(32)>> <>
+        members <>
+        <<msg.leader::little-size(64)>>
+
+    if msg.members == [] do
+      roster
+    else
+      roster <>
+        <<msg.loot_method::little-size(8), looter::little-size(64), msg.loot_threshold::little-size(8),
+          msg.dungeon_difficulty::little-size(8)>>
+    end
   end
 
   defp online_byte(%{online?: true}), do: 1
