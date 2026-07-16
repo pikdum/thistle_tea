@@ -71,15 +71,20 @@ nix develop .#wow-tools            # shell with all of the above + sqlite + mari
 
 ## what (somewhat) works
 
-- logging in
-- creating characters
-- entering world
-- seeing other players
-- chatting
-- mob spawns/respawns
-- casting spells
-- auto-attacks
-- mob navigation
+- logging in + creating characters
+- entering world + seeing other players
+- chatting, channels, and parties
+- mob spawns, combat, navigation, and respawns
+- auto-attacks + class abilities
+- pets
+- items, bags, equipment, and vendors
+- looting + group loot
+- quests
+- xp, leveling, and exploration
+- dying + resurrecting
+- gossip + trainers
+- chests, fishing, and chairs
+- mail
 
 ## helpful resources
 
