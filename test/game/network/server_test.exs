@@ -159,6 +159,31 @@ defmodule ThistleTea.Game.Network.ServerTest do
       refute_receive {:"$gen_cast", {:send_packet, %Message.SmsgUpdateLastInstance{}}}
     end
 
+    test "updates the public group leader player flag" do
+      socket = %{read_timeout: 0}
+      character = %{character(1, health: 100, max_health: 100) | player: %Player{flags: 0x20}}
+      state = %{character: character}
+
+      assert {:noreply, {^socket, %{character: leader}}, {:continue, :maybe_broadcast_update}} =
+               Server.handle_cast({:party_leader_changed, true}, {socket, state})
+
+      assert leader.player.flags == 0x21
+
+      assert {:noreply, {^socket, %{character: member}}, {:continue, :maybe_broadcast_update}} =
+               Server.handle_cast({:party_leader_changed, false}, {socket, %{state | character: leader}})
+
+      assert member.player.flags == 0x20
+    end
+
+    test "does not broadcast an unchanged group leader player flag" do
+      socket = %{read_timeout: 0}
+      character = %{character(1, health: 100, max_health: 100) | player: %Player{flags: 0x1}}
+      state = %{character: character}
+
+      assert {:noreply, {^socket, ^state}, 0} =
+               Server.handle_cast({:party_leader_changed, true}, {socket, state})
+    end
+
     test "records the previous instance when returning to the open world" do
       guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
       socket = %{read_timeout: 0}

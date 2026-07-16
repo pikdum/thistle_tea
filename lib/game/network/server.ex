@@ -28,6 +28,7 @@ defmodule ThistleTea.Game.Network.Server do
   alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Entity.Logic.MovementStats
   alias ThistleTea.Game.Entity.Logic.PlayerCombat
+  alias ThistleTea.Game.Entity.Logic.PlayerFlags
   alias ThistleTea.Game.Entity.Logic.Reactive
   alias ThistleTea.Game.Entity.Logic.Resources
   alias ThistleTea.Game.Entity.Logic.Rest
@@ -336,6 +337,25 @@ defmodule ThistleTea.Game.Network.Server do
     |> struct(MemberStats.from_character(character))
     |> Network.send_packet(requester_guid)
 
+    {:noreply, {socket, state}, socket.read_timeout}
+  end
+
+  @impl GenServer
+  def handle_cast({:party_leader_changed, leader?}, {socket, %{character: %Character{} = character} = state})
+      when is_boolean(leader?) do
+    character = PlayerFlags.set_group_leader(character, leader?)
+
+    if PlayerFlags.group_leader?(character) == PlayerFlags.group_leader?(state.character) do
+      {:noreply, {socket, state}, socket.read_timeout}
+    else
+      character = Core.mark_broadcast_update(character)
+      {:noreply, {socket, %{state | character: character}}, {:continue, :maybe_broadcast_update}}
+    end
+  rescue
+    _error -> {:noreply, {socket, state}, socket.read_timeout}
+  end
+
+  def handle_cast({:party_leader_changed, _leader?}, {socket, state}) do
     {:noreply, {socket, state}, socket.read_timeout}
   end
 

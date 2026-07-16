@@ -24,6 +24,7 @@ defmodule ThistleTea.Game.Player.Login do
   alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Entity.Logic.MovementStats
+  alias ThistleTea.Game.Entity.Logic.PlayerFlags
   alias ThistleTea.Game.Entity.Logic.StealthDetection
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.BinaryUtils
@@ -75,6 +76,8 @@ defmodule ThistleTea.Game.Player.Login do
       |> Enchantments.restore()
       |> evaluate_login_rest()
       |> BT.init(PlayerBT.tree())
+
+    c = PlayerFlags.set_group_leader(c, party_leader?(character_guid))
 
     Metadata.put(
       character_guid,
@@ -354,6 +357,13 @@ defmodule ThistleTea.Game.Player.Login do
       %{character | internal: %{character.internal | broadcast_update?: false}}
     else
       character
+    end
+  end
+
+  defp party_leader?(guid) do
+    case PartySystem.group_of(guid) do
+      %Party.Group{leader: ^guid} -> true
+      _ -> false
     end
   end
 

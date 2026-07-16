@@ -16,6 +16,8 @@ defmodule ThistleTea.Game.Party.Notifier do
   end
 
   def send_group_list(%Group{} = group, guid) do
+    notify_leader_status(guid, group.leader == guid)
+
     members =
       for member <- group.members, member.guid != guid do
         %{name: member.name, guid: member.guid, online?: online?(member.guid), flags: member.flags}
@@ -34,6 +36,7 @@ defmodule ThistleTea.Game.Party.Notifier do
   end
 
   def send_empty_group_list(guid) do
+    notify_leader_status(guid, false)
     Network.send_packet(%Message.SmsgGroupList{}, guid)
   end
 
@@ -87,4 +90,11 @@ defmodule ThistleTea.Game.Party.Notifier do
   end
 
   defp online?(guid), do: is_pid(EntityRegistry.whereis(guid))
+
+  defp notify_leader_status(guid, leader?) do
+    case EntityRegistry.whereis(guid) do
+      pid when is_pid(pid) -> GenServer.cast(pid, {:party_leader_changed, leader?})
+      _ -> :ok
+    end
+  end
 end
