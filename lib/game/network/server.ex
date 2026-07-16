@@ -453,6 +453,8 @@ defmodule ThistleTea.Game.Network.Server do
       orientation: orientation
     })
 
+    Network.send_packet(%Message.SmsgUpdateInstanceOwnership{player_is_saved_to_a_raid: false})
+
     # The client responds with a MSG_MOVE_WORLDPORT_ACK message which
     # is handled in the login handler as they share the same init process
     {:noreply, {socket, state}, socket.read_timeout}
