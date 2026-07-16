@@ -38,6 +38,7 @@ defmodule ThistleTea.Game.Player.Login do
   alias ThistleTea.Game.Player.Rest, as: PlayerRest
   alias ThistleTea.Game.Player.Spells, as: PlayerSpells
   alias ThistleTea.Game.Player.Stats, as: PlayerStats
+  alias ThistleTea.Game.Player.WorldStates
   alias ThistleTea.Game.Spell.Cooldowns
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.CharacterStore
@@ -166,6 +167,8 @@ defmodule ThistleTea.Game.Player.Login do
   defp restore_instance_world(%Character{} = character, _guid), do: character
 
   def send_init_packets(c) do
+    WorldStates.initialize(c)
+
     # needed for no white chatbox + keybinds
     Network.send_packet(%Message.SmsgAccountDataTimes{})
 

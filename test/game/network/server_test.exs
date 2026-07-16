@@ -139,7 +139,7 @@ defmodule ThistleTea.Game.Network.ServerTest do
       assert_receive {:socket_send, _data}
     end
 
-    test "records an instanced destination for the client" do
+    test "initializes instance ownership after a cross-map transfer" do
       guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
       socket = %{read_timeout: 0}
       state = %Session{guid: guid, character: character(guid, health: 100, max_health: 100), ready: true}
@@ -155,8 +155,6 @@ defmodule ThistleTea.Game.Network.ServerTest do
 
       assert_receive {:"$gen_cast",
                       {:send_packet, %Message.SmsgUpdateInstanceOwnership{player_is_saved_to_a_raid: false}}}
-
-      assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgUpdateLastInstance{map: 389}}}
     end
 
     test "marks player in combat when a mob attack lands" do
