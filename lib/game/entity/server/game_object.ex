@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
   alias ThistleTea.Game.Entity.Data.GameObject
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Registry, as: EntityRegistry
+  alias ThistleTea.Game.Entity.Server.GameObject.Chair
   alias ThistleTea.Game.Entity.Server.GameObject.Chest
   alias ThistleTea.Game.Entity.Server.GameObject.Fishing
   alias ThistleTea.Game.Network
@@ -24,6 +25,7 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.Pathfinding
   alias ThistleTea.Game.World.SpawnPool
   alias ThistleTea.Game.World.System.GameEvent
   alias ThistleTea.Game.World.System.Party, as: PartySystem
@@ -92,6 +94,20 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
 
   def handle_call({:loot_view, viewer}, _from, %GameObject{} = state) do
     {result, state} = Chest.view(state, viewer)
+    {:reply, result, state}
+  end
+
+  def handle_call({:chair_seat, user_map, {user_x, user_y, user_z} = user_position}, _from, %GameObject{} = state) do
+    result =
+      with {:ok, {seat_x, seat_y, seat_z, _orientation} = position, stand_state} <-
+             Chair.seat(state, user_map, user_position),
+           true <- Pathfinding.line_of_sight?(user_map, {user_x, user_y, user_z}, {seat_x, seat_y, seat_z}) do
+        {:ok, position, stand_state}
+      else
+        false -> {:error, :line_of_sight}
+        error -> error
+      end
+
     {:reply, result, state}
   end
 

@@ -110,5 +110,24 @@ defmodule ThistleTea.Game.Entity.Data.GameObjectTest do
       assert go.internal.spawn == nil
       assert go.game_object.dyn_flags == 0
     end
+
+    test "chair game objects carry their slot count and height" do
+      row = bucket_row()
+
+      row = %{
+        row
+        | game_object_template: %{
+            row.game_object_template
+            | type: 7,
+              data0: 3,
+              data1: 2
+          }
+      }
+
+      go = GameObject.build(row)
+
+      assert go.internal.chair.slots == 3
+      assert go.internal.chair.height == 2
+    end
   end
 end

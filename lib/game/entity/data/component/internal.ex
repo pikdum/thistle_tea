@@ -21,6 +21,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal do
     :loot,
     :summon,
     :pet,
+    :chair,
     :active_pet_entry,
     :active_pet_spell_id,
     :fishing,

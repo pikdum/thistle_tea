@@ -358,8 +358,13 @@ defmodule ThistleTea.Game.Network.Server do
   end
 
   @impl GenServer
+  def handle_cast({:start_teleport, x, y, z, map}, {socket, %{character: %Character{} = character} = state}) do
+    {_current_x, _current_y, _current_z, orientation} = character.movement_block.position
+    handle_cast({:start_teleport, x, y, z, orientation, map}, {socket, state})
+  end
+
   def handle_cast(
-        {:start_teleport, x, y, z, map},
+        {:start_teleport, x, y, z, orientation, map},
         {socket, %{character: %Character{internal: %Internal{map: map}}} = state}
       ) do
     state = suspend_pet_for_teleport(state)
@@ -371,19 +376,17 @@ defmodule ThistleTea.Game.Network.Server do
         nil -> character.internal.area
       end
 
-    {_x, _y, _z, o} = character.movement_block.position
-
     character = %{
       character
       | internal: %{character.internal | area: area},
-        movement_block: %{character.movement_block | position: {x, y, z, o}, movement_flags: 0}
+        movement_block: %{character.movement_block | position: {x, y, z, orientation}, movement_flags: 0}
     }
 
     SpatialHash.update(:players, state.guid, map, x, y, z)
 
     Network.send_packet(%Message.MsgMoveTeleportAck{
       guid: state.guid,
-      position: {x, y, z, o},
+      position: {x, y, z, orientation},
       timestamp: character.movement_block.timestamp || 0,
       fall_time: character.movement_block.fall_time || 0
     })
@@ -398,7 +401,7 @@ defmodule ThistleTea.Game.Network.Server do
     {:noreply, {socket, state}, socket.read_timeout}
   end
 
-  def handle_cast({:start_teleport, x, y, z, map}, {socket, state}) do
+  def handle_cast({:start_teleport, x, y, z, orientation, map}, {socket, state}) do
     state = suspend_pet_for_teleport(state)
 
     # Update player's location
@@ -413,7 +416,7 @@ defmodule ThistleTea.Game.Network.Server do
     character = %{
       character
       | internal: %{character.internal | area: area, map: map},
-        movement_block: %{character.movement_block | position: {x, y, z, 0.0}}
+        movement_block: %{character.movement_block | position: {x, y, z, orientation}}
     }
 
     # Move in the spatial hash before leaving visibility so old-map observers
@@ -435,8 +438,6 @@ defmodule ThistleTea.Game.Network.Server do
     state = %{state | ready: false}
 
     # Send player's client the new location
-    orientation = 0
-
     Network.send_packet(%Message.SmsgNewWorld{map: map, position: %{x: x, y: y, z: z}, orientation: orientation})
 
     # The client responds with a MSG_MOVE_WORLDPORT_ACK message which

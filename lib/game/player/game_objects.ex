@@ -7,18 +7,23 @@ defmodule ThistleTea.Game.Player.GameObjects do
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.GameObjectTemplate
+  alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.Logic.Core
+  alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.Entity.Logic.Loot
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
+  alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.Player.Fishing
   alias ThistleTea.Game.Player.Quests
+  alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
 
   require Logger
 
   @go_type_chest 3
+  @go_type_chair 7
 
   def use_object(%{character: %Character{} = character} = state, guid) do
     Logger.info("CMSG_GAMEOBJ_USE: entry #{Guid.entry(guid)} chest?=#{chest?(guid)}")
@@ -30,6 +35,9 @@ defmodule ThistleTea.Game.Player.GameObjects do
       chest?(guid) ->
         open_chest(state, guid)
 
+      chair?(guid) ->
+        sit_on_chair(state, guid)
+
       true ->
         Entity.use_game_object(guid, state.guid, character.unit.level)
         state
@@ -39,6 +47,37 @@ defmodule ThistleTea.Game.Player.GameObjects do
   defp fishing_bobber?(guid) do
     Guid.entity_type(guid) == :game_object and
       match?(%GameObjectTemplate{type: 17}, GameObjectTemplateLoader.get(Guid.entry(guid)))
+  end
+
+  defp chair?(guid) do
+    Guid.entity_type(guid) == :game_object and
+      match?(%GameObjectTemplate{type: @go_type_chair}, GameObjectTemplateLoader.get(Guid.entry(guid)))
+  end
+
+  defp sit_on_chair(
+         %{
+           character:
+             %Character{internal: %{map: map}, movement_block: %{position: {x, y, z, _orientation}}} = character
+         } = state,
+         guid
+       ) do
+    case Entity.call(guid, {:chair_seat, map, {x, y, z}}) do
+      {:ok, position, stand_state} ->
+        character =
+          character
+          |> then(fn character -> %{character | unit: %{character.unit | stand_state: stand_state}} end)
+          |> Event.enqueue([Event.teleport(position), Event.stand_state(stand_state)])
+          |> EventSink.emit_pending()
+
+        %UpdateObject{update_type: :values, object_type: :player}
+        |> struct(Map.from_struct(character))
+        |> World.broadcast_packet(character, include_self?: false)
+
+        %{state | character: character}
+
+      _error ->
+        state
+    end
   end
 
   def open_chest(%{character: %Character{} = c} = state, guid) do

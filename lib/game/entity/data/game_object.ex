@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Entity.Data.GameObject do
   alias ThistleTea.DB.Mangos
   alias ThistleTea.Game.Entity.Data.Component.GameObject
   alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Chair
   alias ThistleTea.Game.Entity.Data.Component.Internal.Fishing
   alias ThistleTea.Game.Entity.Data.Component.Internal.Summon
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
@@ -57,6 +58,7 @@ defmodule ThistleTea.Game.Entity.Data.GameObject do
       },
       internal: %Internal{
         map: map,
+        chair: chair(ot),
         fishing: Keyword.get(opts, :fishing),
         summon: %Summon{
           owner_guid: Keyword.get(opts, :summoned_by),
@@ -134,6 +136,7 @@ defmodule ThistleTea.Game.Entity.Data.GameObject do
       },
       internal: %Internal{
         map: o.map,
+        chair: chair(ot),
         event: event,
         fishing: fishing_hole(ot),
         loot: chest_loot(ot),
@@ -143,6 +146,7 @@ defmodule ThistleTea.Game.Entity.Data.GameObject do
   end
 
   @go_type_chest 3
+  @go_type_chair 7
   @go_flag_interact_cond 0x4
   @go_dyn_flag_activate 0x1
 
@@ -152,6 +156,22 @@ defmodule ThistleTea.Game.Entity.Data.GameObject do
   end
 
   defp chest_dyn_flags(_template), do: 0
+
+  defp chair(%Mangos.GameObjectTemplate{type: @go_type_chair, data0: slots, data1: height}) do
+    %Chair{slots: positive_or_zero(slots), height: chair_height(height)}
+  end
+
+  defp chair(%GameObjectTemplate{type: @go_type_chair, data: [slots, height | _rest]}) do
+    %Chair{slots: positive_or_zero(slots), height: chair_height(height)}
+  end
+
+  defp chair(_template), do: nil
+
+  defp positive_or_zero(value) when is_integer(value), do: max(value, 0)
+  defp positive_or_zero(_value), do: 0
+
+  defp chair_height(value) when value in 0..2, do: value
+  defp chair_height(_value), do: 0
 
   defp chest_loot(%Mangos.GameObjectTemplate{type: @go_type_chest} = ot) do
     case ot.data1 do

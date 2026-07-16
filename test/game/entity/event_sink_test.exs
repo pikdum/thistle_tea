@@ -55,6 +55,13 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
       assert_receive {:"$gen_cast", {:start_teleport, -8_946.0, -132.0, 84.0, 0}}
     end
 
+    test "teleport events preserve their orientation" do
+      character = %Character{internal: %Internal{map: 0}}
+
+      assert ^character = EventSink.emit(character, Event.teleport({1.0, 2.0, 3.0, 1.5}))
+      assert_receive {:"$gen_cast", {:start_teleport, 1.0, 2.0, 3.0, 1.5, 0}}
+    end
+
     @tag :dbc_db
     test "a released judgement trigger delivers its encoded spell to the victim" do
       caster_guid = Guid.from_low_guid(:player, unique_guid())

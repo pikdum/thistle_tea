@@ -615,8 +615,8 @@ defmodule ThistleTea.Game.Entity.EventSink do
     entity
   end
 
-  def emit(%Character{internal: %Internal{map: map}} = entity, %Event{type: :teleport, position: {x, y, z, _o}}) do
-    GenServer.cast(self(), {:start_teleport, x, y, z, map})
+  def emit(%Character{internal: %Internal{map: map}} = entity, %Event{type: :teleport, position: {x, y, z, o}}) do
+    GenServer.cast(self(), {:start_teleport, x, y, z, o, map})
     entity
   end
 
