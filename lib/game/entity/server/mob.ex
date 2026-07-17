@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Entity.Data.Component.Internal.Pet
   alias ThistleTea.Game.Entity.Data.Component.Internal.Spawn
   alias ThistleTea.Game.Entity.Data.Component.Internal.Totem
+  alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.CreatureSpell
   alias ThistleTea.Game.Entity.Data.Mob
@@ -45,7 +46,9 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Entity.Server.Mob.Respawn
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network
+  alias ThistleTea.Game.Network.BinaryUtils
   alias ThistleTea.Game.Network.Message
+  alias ThistleTea.Game.Network.Packet
   alias ThistleTea.Game.Party
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Time
@@ -341,6 +344,51 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     {:noreply, sync_chase_watch(state)}
   end
 
+  def handle_info(
+        {:controlled_move, payload, opcode},
+        %Mob{
+          internal: %Internal{pet: %Pet{possessed?: true, owner_guid: owner_guid}},
+          movement_block: %MovementBlock{} = movement_block
+        } = state
+      ) do
+    movement_block = MovementBlock.from_binary(payload, movement_block)
+    {x, y, z, orientation} = movement_block.position
+    state = %{state | movement_block: movement_block, unit: %{state.unit | stand_state: 0}}
+
+    World.update_position(state)
+    Metadata.update(state.object.guid, %{orientation: orientation})
+    state = Visibility.refresh_entity(state)
+
+    BinaryUtils.pack_guid(state.object.guid)
+    |> Kernel.<>(payload)
+    |> Packet.build(opcode)
+    |> World.broadcast_packet(state, recipients: Enum.uniq([owner_guid | World.tracking_players(state)]))
+
+    ChaseWatch.notify_moved(state.object.guid, {x, y, z})
+    {:noreply, state}
+  end
+
+  def handle_info({:controlled_move, _payload, _opcode}, state), do: {:noreply, state}
+
+  def handle_info(
+        {:release_control, owner_guid, spell_id},
+        %Mob{internal: %Internal{pet: %Pet{kind: :possessed, owner_guid: owner_guid, control_spell_id: spell_id}}} =
+          state
+      ) do
+    {:noreply, Respawn.despawn(state, nil)}
+  end
+
+  def handle_info(
+        {:release_control, owner_guid, spell_id},
+        %Mob{internal: %Internal{pet: %Pet{possessed?: true, owner_guid: owner_guid, control_spell_id: spell_id}}} =
+          state
+      ) do
+    {state, events} = Aura.remove_source_spell(state, spell_id, owner_guid, Time.now())
+    {:noreply, EventSink.emit(state, events), {:continue, :maybe_broadcast}}
+  end
+
+  def handle_info({:release_control, _owner_guid, _spell_id}, state), do: {:noreply, state}
+
   def handle_info(:respawn, %Mob{} = state) do
     {:noreply, Respawn.handle(state)}
   end
@@ -567,22 +615,26 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
   defp notify_pet_owner_removed(%Mob{
          object: %{guid: guid},
-         internal: %Internal{pet: %Pet{kind: :charmed, owner_guid: owner_guid}}
+         internal: %Internal{pet: %Pet{kind: kind, owner_guid: owner_guid, possessed?: possessed?}}
        }) do
-    case Entity.pid(owner_guid) do
-      pid when is_pid(pid) -> send(pid, {:control_released, guid})
-      _ -> :ok
+    if kind == :charmed or possessed? do
+      case Entity.pid(owner_guid) do
+        pid when is_pid(pid) -> send(pid, {:control_released, guid})
+        _ -> :ok
+      end
+    else
+      notify_pet_owner_removed_as_pet(owner_guid, guid)
     end
   end
 
-  defp notify_pet_owner_removed(%Mob{object: %{guid: guid}, internal: %Internal{pet: %Pet{owner_guid: owner_guid}}}) do
+  defp notify_pet_owner_removed(%Mob{}), do: :ok
+
+  defp notify_pet_owner_removed_as_pet(owner_guid, guid) do
     case Entity.pid(owner_guid) do
       pid when is_pid(pid) -> send(pid, {:pet_removed, guid})
       _ -> :ok
     end
   end
-
-  defp notify_pet_owner_removed(%Mob{}), do: :ok
 
   defp schedule_summon_despawn(
          %Mob{internal: %Internal{spawn: %Spawn{temporary?: true, despawn_delay_ms: delay}}} = state

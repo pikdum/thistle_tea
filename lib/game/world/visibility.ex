@@ -16,6 +16,7 @@ defmodule ThistleTea.Game.World.Visibility do
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World
+  alias ThistleTea.Game.World.ChaseWatch
   alias ThistleTea.Game.World.Groups
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
@@ -43,31 +44,49 @@ defmodule ThistleTea.Game.World.Visibility do
   def enter_player(state), do: state
 
   def refresh_player(%{character: character, guid: guid, visibility_cells: %MapSet{} = old_cells} = state) do
-    old_cell = entity_cell(character)
     character = refresh_entity(character)
-    new_cell = entity_cell(character)
+    new_cells = viewpoint_cells(character) || visible_cells(character)
 
-    if old_cell == new_cell do
-      %{state | character: character}
-    else
-      new_cells = visible_cells(character)
-      removed_cells = MapSet.difference(old_cells, new_cells)
-      added_cells = MapSet.difference(new_cells, old_cells)
-
-      activate_cells(state, added_cells)
-      Enum.each(removed_cells, &Group.demonitor(@group, cell_key(&1)))
-      Enum.each(added_cells, &Group.monitor(@group, cell_key(&1)))
-
-      state
-      |> Map.put(:character, character)
-      |> Map.put(:visibility_cells, new_cells)
-      |> sync_visible_entities(guid, new_cells)
-    end
+    state
+    |> Map.put(:character, character)
+    |> sync_visibility_cells(guid, old_cells, new_cells)
   end
 
   def refresh_player(state), do: state
 
+  def set_viewpoint(%{guid: viewer_guid, visibility_cells: %MapSet{} = old_cells} = state, viewpoint_guid)
+      when is_integer(viewpoint_guid) and viewpoint_guid > 0 do
+    case viewpoint_location(viewpoint_guid) do
+      {world, x, y, z} ->
+        new_cells = visible_cells_at(world, x, y, z)
+        ChaseWatch.watch(viewpoint_guid, self(), {x, y, z}, 50.0)
+        sync_visibility_cells(state, viewer_guid, old_cells, new_cells)
+
+      nil ->
+        state
+    end
+  end
+
+  def set_viewpoint(state, _viewpoint_guid), do: state
+
+  def refresh_viewpoint(%{character: %Character{player: %{farsight: guid}}} = state, guid)
+      when is_integer(guid) and guid > 0 do
+    set_viewpoint(state, guid)
+  end
+
+  def refresh_viewpoint(state, _guid), do: state
+
+  def reset_viewpoint(
+        %{guid: viewer_guid, character: %Character{} = character, visibility_cells: %MapSet{} = old_cells} = state
+      ) do
+    ChaseWatch.unwatch(self())
+    sync_visibility_cells(state, viewer_guid, old_cells, visible_cells(character))
+  end
+
+  def reset_viewpoint(state), do: state
+
   def leave_player(%{character: character, visibility_cells: %MapSet{} = cells} = state) do
+    ChaseWatch.unwatch(self())
     Enum.each(cells, &Group.demonitor(@group, cell_key(&1)))
     character = leave_entity(character)
 
@@ -80,6 +99,7 @@ defmodule ThistleTea.Game.World.Visibility do
   end
 
   def leave_player(%{character: character} = state) do
+    ChaseWatch.unwatch(self())
     %{state | character: leave_entity(character)}
   end
 
@@ -142,9 +162,7 @@ defmodule ThistleTea.Game.World.Visibility do
   def leave_entity(entity), do: entity
 
   def visible_cells(%{internal: %Internal{world: world}, movement_block: %MovementBlock{position: {x, y, z, _o}}}) do
-    world
-    |> SpatialHash.cells_in_range(x, y, z, @range)
-    |> MapSet.new()
+    visible_cells_at(world, x, y, z)
   end
 
   def current_cell(%{internal: %Internal{world: world}, movement_block: %MovementBlock{position: {x, y, z, _o}}}) do
@@ -271,6 +289,43 @@ defmodule ThistleTea.Game.World.Visibility do
     sync_visible_entities(Map.put(state, :tracked_entities, MapSet.new()), self_guid, cells)
   end
 
+  defp sync_visibility_cells(state, _viewer_guid, old_cells, new_cells) when old_cells == new_cells, do: state
+
+  defp sync_visibility_cells(state, viewer_guid, old_cells, new_cells) do
+    removed_cells = MapSet.difference(old_cells, new_cells)
+    added_cells = MapSet.difference(new_cells, old_cells)
+
+    activate_cells(state, added_cells)
+    Enum.each(removed_cells, &Group.demonitor(@group, cell_key(&1)))
+    Enum.each(added_cells, &Group.monitor(@group, cell_key(&1)))
+
+    state
+    |> Map.put(:visibility_cells, new_cells)
+    |> sync_visible_entities(viewer_guid, new_cells)
+  end
+
+  defp viewpoint_cells(%Character{player: %{farsight: guid}}) when is_integer(guid) and guid > 0 do
+    case viewpoint_location(guid) do
+      {world, x, y, z} -> visible_cells_at(world, x, y, z)
+      nil -> nil
+    end
+  end
+
+  defp viewpoint_cells(_character), do: nil
+
+  defp viewpoint_location(guid) do
+    case SpatialHash.get_entity(guid) do
+      {^guid, world, x, y, z} -> {world, x, y, z}
+      _ -> nil
+    end
+  end
+
+  defp visible_cells_at(world, x, y, z) do
+    world
+    |> SpatialHash.cells_in_range(x, y, z, @range)
+    |> MapSet.new()
+  end
+
   defp visible_members(cells) do
     cells
     |> Enum.flat_map(fn cell ->
@@ -356,8 +411,6 @@ defmodule ThistleTea.Game.World.Visibility do
   defp entity_meta(%{object: %{guid: guid}} = entity) do
     %{guid: guid, type: Guid.entity_type(guid), cell: current_cell(entity)}
   end
-
-  defp entity_cell(%{internal: %Internal{visibility_cell: cell}}), do: cell
 
   defp put_visibility_cell(%{internal: %Internal{} = internal} = entity, cell) do
     %{entity | internal: %{internal | visibility_cell: cell}}

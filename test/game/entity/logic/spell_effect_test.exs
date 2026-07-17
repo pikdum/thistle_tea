@@ -37,6 +37,41 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
   end
 
   describe "receive/4" do
+    test "ranged weapon damage uses target attacker-power auras" do
+      spell = %Spell{
+        id: 75,
+        school: :physical,
+        dmg_class: 3,
+        effects: [%Effect{type: :weapon_damage, base_points: 0}]
+      }
+
+      context = %CastContext{
+        caster_guid: 999,
+        caster_level: 60,
+        attack_power: 0,
+        attack_time_ms: 1_400,
+        attack_skill: 300,
+        weapon_base_min: 10,
+        weapon_base_max: 10,
+        melee_crit_chance: 0.0,
+        spell_crit_chance: 0.0
+      }
+
+      mark = %Holder{
+        spell: %Spell{id: 14_325},
+        caster_guid: 999,
+        auras: [%ThistleTea.Game.Aura{type: :ranged_attack_power_attacker_bonus, amount: 110}]
+      }
+
+      unmarked = %{target_fixture() | unit: %Unit{health: 500, max_health: 500, level: 1, auras: []}}
+      marked = %{unmarked | unit: %{unmarked.unit | auras: [mark]}}
+
+      {_unmarked, [unmarked_event]} = SpellEffect.receive(unmarked, context, spell, 1_000)
+      {_marked, [marked_event]} = SpellEffect.receive(marked, context, spell, 1_000)
+
+      assert marked_event.damage - unmarked_event.damage == 11
+    end
+
     test "direct magic damage uses the snapshotted spell crit chance" do
       spell = %Spell{id: 133, school: :fire, dmg_class: 1, effects: [%Effect{type: :school_damage, base_points: 100}]}
       context = %CastContext{caster_guid: 999, caster_level: 10, spell_crit_chance: 100.0}

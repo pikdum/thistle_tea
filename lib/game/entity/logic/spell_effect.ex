@@ -344,6 +344,40 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
 
   defp apply_effect(
          state,
+         %CastContext{
+           caster_guid: owner_guid,
+           caster_position: {_world, caster_x, caster_y, caster_z},
+           caster_orientation: orientation,
+           destination_position: destination
+         },
+         %Spell{id: spell_id} = spell,
+         %Effect{type: :summon_possessed, misc_value: entry} = effect,
+         _now
+       )
+       when is_integer(entry) and entry > 0 do
+    orientation = orientation || 0.0
+    {x, y, z} = summon_effect_position(effect, destination, {caster_x, caster_y, caster_z}, orientation)
+
+    summon = %{
+      entry: entry,
+      owner_guid: owner_guid,
+      position: {x, y, z, orientation},
+      despawn_delay_ms: summon_duration(spell),
+      despawn_type: 1,
+      run?: false,
+      unique?: true,
+      attack_target: nil,
+      script_id: 0,
+      post_spawn_spells: [],
+      control: :possessed,
+      control_spell_id: spell_id
+    }
+
+    {state, [Event.summon_creature(summon, [], nil)]}
+  end
+
+  defp apply_effect(
+         state,
          %CastContext{},
          spell,
          %Effect{type: :summon_totem, summon_slot: slot, misc_value: entry},
@@ -379,6 +413,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
 
   defp apply_effect(state, %CastContext{} = context, spell, %Effect{type: type} = effect, now)
        when type in [:weapon_damage, :weapon_damage_noschool, :normalized_weapon_damage, :weapon_percent_damage] do
+    context = apply_target_attack_power_bonus(state, context, spell)
     melee_ability_damage(state, context, spell, weapon_ability_damage(context, effect), now)
   end
 
@@ -569,10 +604,26 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
 
   defp apply_effect(state, _context, _spell, _effect, _now), do: {state, []}
 
+  defp apply_target_attack_power_bonus(state, %CastContext{} = context, %Spell{} = spell) do
+    if Spell.ranged_ability?(spell) do
+      bonus = Aura.flat_amount(state, :ranged_attack_power_attacker_bonus)
+      %{context | attack_power: (context.attack_power || 0) + bonus}
+    else
+      context
+    end
+  end
+
   defp summon_duration(%Spell{duration_ms: duration_ms}) when is_integer(duration_ms) and duration_ms > 0,
     do: duration_ms
 
   defp summon_duration(%Spell{}), do: 3_600_000
+
+  defp summon_effect_position(%Effect{implicit_target_a: :minion_position}, _destination, {x, y, z}, orientation) do
+    {x + 0.5 * :math.cos(orientation), y + 0.5 * :math.sin(orientation), z}
+  end
+
+  defp summon_effect_position(%Effect{}, {x, y, z}, _caster_position, _orientation), do: {x, y, z}
+  defp summon_effect_position(%Effect{}, nil, caster_position, _orientation), do: caster_position
 
   defp apply_class_dummy(state, context, spell, effect, :execute, now) do
     apply_execute(state, context, spell, effect, now)
@@ -868,7 +919,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
 
   defp weapon_roll(%CastContext{attack_time_ms: attack_time_ms} = context)
        when is_number(attack_time_ms) and attack_time_ms > 0 do
-    weapon_base_roll(context) + attack_power_bonus(context, attack_time_ms / 1000)
+    weapon_base_roll(context) + attack_power_bonus_ms(context, attack_time_ms)
   end
 
   defp weapon_roll(%CastContext{} = context), do: weapon_base_roll(context)
@@ -892,6 +943,13 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   end
 
   defp attack_power_bonus(_context, _speed_seconds), do: 0
+
+  defp attack_power_bonus_ms(%CastContext{attack_power: attack_power}, attack_time_ms)
+       when is_integer(attack_power) and attack_power > 0 and is_integer(attack_time_ms) do
+    div(attack_power * attack_time_ms, 14_000)
+  end
+
+  defp attack_power_bonus_ms(context, attack_time_ms), do: attack_power_bonus(context, attack_time_ms / 1_000)
 
   defp maybe_mark_defense(state, attacker_guid, outcome, now) when outcome in [:dodge, :parry, :block] do
     Reactive.mark_defense(state, attacker_guid, outcome, now)

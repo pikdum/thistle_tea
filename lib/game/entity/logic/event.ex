@@ -476,19 +476,38 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
     %__MODULE__{type: :summon_creature, summon: summon, steps: steps, target_guid: target_guid}
   end
 
-  def control_granted(owner_guid, controlled_guid, spell_id, spells)
+  def control_granted(owner_guid, controlled_guid, spell_id, spells, opts \\ [])
       when is_integer(owner_guid) and is_integer(controlled_guid) and is_integer(spell_id) and is_list(spells) do
     %__MODULE__{
       type: :control_granted,
       source_guid: owner_guid,
       target_guid: controlled_guid,
       spell_id: spell_id,
-      spells: spells
+      spells: spells,
+      enabled?: Keyword.get(opts, :possess?, false)
     }
   end
 
   def control_released(owner_guid, controlled_guid) when is_integer(owner_guid) and is_integer(controlled_guid) do
     %__MODULE__{type: :control_released, source_guid: owner_guid, target_guid: controlled_guid}
+  end
+
+  def release_controlled(owner_guid, controlled_guid, spell_id)
+      when is_integer(owner_guid) and is_integer(controlled_guid) and is_integer(spell_id) do
+    %__MODULE__{
+      type: :release_controlled,
+      source_guid: owner_guid,
+      target_guid: controlled_guid,
+      spell_id: spell_id
+    }
+  end
+
+  def viewpoint_granted(owner_guid, viewpoint_guid) when is_integer(owner_guid) and is_integer(viewpoint_guid) do
+    %__MODULE__{type: :viewpoint_granted, source_guid: owner_guid, target_guid: viewpoint_guid}
+  end
+
+  def viewpoint_released(owner_guid, viewpoint_guid) when is_integer(owner_guid) and is_integer(viewpoint_guid) do
+    %__MODULE__{type: :viewpoint_released, source_guid: owner_guid, target_guid: viewpoint_guid}
   end
 
   def summon_pet(owner_guid, entry, spell_id)

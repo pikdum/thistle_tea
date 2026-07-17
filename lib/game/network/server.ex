@@ -645,15 +645,51 @@ defmodule ThistleTea.Game.Network.Server do
   end
 
   def handle_info({:farsight_removed, guid}, {socket, %{character: %Character{} = character} = state}) do
-    character =
+    {character, removed?} =
       if character.player.farsight == guid do
-        %{character | player: %{character.player | farsight: 0}}
-        |> Core.mark_broadcast_update()
+        character =
+          %{character | player: %{character.player | farsight: 0}}
+          |> Core.mark_broadcast_update()
+
+        {character, true}
       else
-        character
+        {character, false}
       end
 
-    {:noreply, {socket, maybe_broadcast_update(%{state | character: character})}, socket.read_timeout}
+    state = %{state | character: character}
+    state = if removed?, do: Visibility.reset_viewpoint(state), else: state
+    state = maybe_broadcast_update(state)
+    {:noreply, {socket, state}, socket.read_timeout}
+  end
+
+  def handle_info({:viewpoint_granted, guid}, {socket, %{character: %Character{} = character} = state}) do
+    character =
+      %{character | player: %{character.player | farsight: guid}}
+      |> Core.mark_broadcast_update()
+
+    state = %{state | character: character} |> Visibility.set_viewpoint(guid)
+    {:noreply, {socket, state}, {:continue, :maybe_broadcast_update}}
+  end
+
+  def handle_info({:viewpoint_released, guid}, {socket, %{character: %Character{} = character} = state}) do
+    {character, released?} =
+      if character.player.farsight == guid do
+        character =
+          %{character | player: %{character.player | farsight: 0}}
+          |> Core.mark_broadcast_update()
+
+        {character, true}
+      else
+        {character, false}
+      end
+
+    state = %{state | character: character}
+    state = if released?, do: Visibility.reset_viewpoint(state), else: state
+    {:noreply, {socket, state}, {:continue, :maybe_broadcast_update}}
+  end
+
+  def handle_info({:target_moved, guid}, {socket, state}) do
+    {:noreply, {socket, Visibility.refresh_viewpoint(state, guid)}, socket.read_timeout}
   end
 
   @impl GenServer
@@ -740,23 +776,60 @@ defmodule ThistleTea.Game.Network.Server do
   end
 
   def handle_info(
-        {:control_granted, controlled_guid, _spell_id, spells},
+        {:control_granted, controlled_guid, spell_id, spells, possess?},
         {socket, %{character: %Character{unit: %Unit{}} = character} = state}
       ) do
     character =
       %{character | unit: %{character.unit | charm: controlled_guid}}
       |> Core.mark_broadcast_update()
 
-    {:noreply, {socket, %{state | character: character}}, {:continue, {:finish_pet_attach, controlled_guid, spells}}}
+    {character, state} =
+      if possess? do
+        character = %{character | player: %{character.player | farsight: controlled_guid}}
+        Network.send_packet(%Message.SmsgClientControlUpdate{guid: controlled_guid, allow_movement?: true})
+        {character, %{state | active_mover_guid: controlled_guid, active_control_spell_id: spell_id}}
+      else
+        {character, %{state | active_control_spell_id: spell_id}}
+      end
+
+    state =
+      %{state | character: character}
+      |> then(fn state -> if possess?, do: Visibility.set_viewpoint(state, controlled_guid), else: state end)
+
+    {:noreply, {socket, state}, {:continue, {:finish_pet_attach, controlled_guid, spells}}}
   end
 
   def handle_info(
         {:control_released, controlled_guid},
         {socket, %{character: %Character{unit: %Unit{charm: controlled_guid}} = character} = state}
       ) do
-    character = %{character | unit: %{character.unit | charm: 0}} |> Core.mark_broadcast_update()
+    possessed? = state.active_mover_guid == controlled_guid
+
+    {character, state} =
+      if possessed? do
+        Network.send_packet(%Message.SmsgClientControlUpdate{guid: controlled_guid, allow_movement?: false})
+
+        character = %{character | player: %{character.player | farsight: 0}}
+        {character, %{state | active_mover_guid: state.guid}}
+      else
+        {character, state}
+      end
+
+    {character, aura_events} =
+      case state.active_control_spell_id do
+        spell_id when is_integer(spell_id) -> Aura.remove_spells(character, [spell_id], Time.now())
+        _ -> {character, []}
+      end
+
+    character =
+      %{character | unit: %{character.unit | charm: 0}}
+      |> EventSink.emit(aura_events)
+      |> Core.mark_broadcast_update()
+
+    state = %{state | character: character, active_control_spell_id: nil}
+    state = if possessed?, do: Visibility.reset_viewpoint(state), else: state
     Network.send_packet(Message.SmsgPetSpells.clear())
-    {:noreply, {socket, %{state | character: character}}, {:continue, :maybe_broadcast_update}}
+    {:noreply, {socket, state}, {:continue, :maybe_broadcast_update}}
   end
 
   def handle_info({:control_released, _controlled_guid}, {socket, state}) do

@@ -750,6 +750,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
       context = %{
         CastContext.from_caster(caster, spell, target_guid)
         | selected_target_guid: casting.targets.unit_guid,
+          destination_position: Targets.ground_location(casting.targets),
           target_hostile?: target_guid != caster_guid and Hostility.valid_attack_target?(caster, target_guid),
           target_role: target_role(caster, target_guid)
       }

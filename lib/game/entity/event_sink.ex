@@ -774,6 +774,9 @@ defmodule ThistleTea.Game.Entity.EventSink do
       farsight_owner_guid: caster_guid
     })
 
+    Entity.request_update_from(dynamic_object.object.guid, caster_guid)
+    send(self(), {:viewpoint_granted, dynamic_object.object.guid})
+
     %{entity | player: %{player | farsight: dynamic_object.object.guid}}
     |> Core.mark_broadcast_update()
   end
@@ -885,6 +888,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
              run?: summon.run?
            ),
          mob = put_summon_owner(mob, summon),
+         mob = maybe_possess_summon(mob, entity, summon),
          {:ok, pid} <- MobLoader.start_mob(mob) do
       if is_integer(event.target_guid) and event.target_guid > 0 and summon.attack_target != nil do
         send(pid, {:force_attack, event.target_guid})
@@ -895,6 +899,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
       end
 
       cast_post_spawn_spells(entity, mob.object.guid, summon)
+      notify_possession_granted(entity, mob, summon)
     end
 
     entity
@@ -904,8 +909,11 @@ defmodule ThistleTea.Game.Entity.EventSink do
 
   def emit(entity, %Event{type: :control_granted} = event) do
     case Entity.pid(event.source_guid) do
-      pid when is_pid(pid) -> send(pid, {:control_granted, event.target_guid, event.spell_id, event.spells})
-      _ -> nil
+      pid when is_pid(pid) ->
+        send(pid, {:control_granted, event.target_guid, event.spell_id, event.spells, event.enabled?})
+
+      _ ->
+        nil
     end
 
     entity
@@ -914,6 +922,33 @@ defmodule ThistleTea.Game.Entity.EventSink do
   def emit(entity, %Event{type: :control_released} = event) do
     case Entity.pid(event.source_guid) do
       pid when is_pid(pid) -> send(pid, {:control_released, event.target_guid})
+      _ -> nil
+    end
+
+    entity
+  end
+
+  def emit(entity, %Event{type: :release_controlled} = event) do
+    case Entity.pid(event.target_guid) do
+      pid when is_pid(pid) -> send(pid, {:release_control, event.source_guid, event.spell_id})
+      _ -> nil
+    end
+
+    entity
+  end
+
+  def emit(entity, %Event{type: :viewpoint_granted} = event) do
+    case Entity.pid(event.source_guid) do
+      pid when is_pid(pid) -> send(pid, {:viewpoint_granted, event.target_guid})
+      _ -> nil
+    end
+
+    entity
+  end
+
+  def emit(entity, %Event{type: :viewpoint_released} = event) do
+    case Entity.pid(event.source_guid) do
+      pid when is_pid(pid) -> send(pid, {:viewpoint_released, event.target_guid})
       _ -> nil
     end
 
@@ -1195,6 +1230,25 @@ defmodule ThistleTea.Game.Entity.EventSink do
   end
 
   defp put_summon_owner(%Mob{} = mob, _summon), do: mob
+
+  defp maybe_possess_summon(%Mob{} = mob, entity, %{control: :possessed, control_spell_id: spell_id}) do
+    SummonLoader.possess(mob, entity, spell_id)
+  end
+
+  defp maybe_possess_summon(%Mob{} = mob, _entity, _summon), do: mob
+
+  defp notify_possession_granted(entity, %Mob{object: %{guid: guid}, internal: %Internal{spellbook: spellbook}}, %{
+         control: :possessed,
+         control_spell_id: spell_id
+       }) do
+    spells = (spellbook || %{}) |> Map.values() |> Enum.reject(&Spell.attribute?(&1, :passive))
+
+    emit(entity, Event.control_granted(entity.object.guid, guid, spell_id, spells, possess?: true))
+
+    :ok
+  end
+
+  defp notify_possession_granted(_entity, _mob, _summon), do: :ok
 
   defp cast_post_spawn_spells(entity, summon_guid, %{post_spawn_spells: spells}) when is_list(spells) do
     Enum.each(spells, fn

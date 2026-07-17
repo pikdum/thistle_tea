@@ -76,6 +76,35 @@ defmodule ThistleTea.Game.Entity.Logic.WarlockSpellsTest do
   end
 
   describe "Inferno and demon control" do
+    test "summon possessed uses the effect data and selected destination" do
+      eye = %Spell{
+        id: 126,
+        duration_ms: 60_000,
+        effects: [%Effect{type: :summon_possessed, misc_value: 4277, implicit_target_a: :minion_position}]
+      }
+
+      context = %CastContext{
+        caster_guid: 1,
+        caster_level: 22,
+        caster_position: {%WorldRef{map_id: 0}, 1.0, 2.0, 3.0},
+        caster_orientation: 0.5,
+        target_role: :caster
+      }
+
+      {_result, [%{type: :summon_creature, summon: summon}]} =
+        SpellEffect.receive(character(), context, eye, 1_000)
+
+      assert summon.entry == 4277
+      {x, y, z, orientation} = summon.position
+      assert_in_delta x, 1.0 + 0.5 * :math.cos(0.5), 0.0001
+      assert_in_delta y, 2.0 + 0.5 * :math.sin(0.5), 0.0001
+      assert z == 3.0
+      assert orientation == 0.5
+      assert summon.control == :possessed
+      assert summon.control_spell_id == 126
+      assert summon.despawn_delay_ms == 60_000
+    end
+
     test "Inferno carries only the VMangos post-summon spell script" do
       inferno = %Spell{
         id: 1122,

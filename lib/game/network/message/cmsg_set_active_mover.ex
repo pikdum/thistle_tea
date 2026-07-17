@@ -2,6 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgSetActiveMover do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_SET_ACTIVE_MOVER
 
+  alias ThistleTea.Game.Network.Session
   alias ThistleTea.Game.Player.Exploration, as: PlayerExploration
   alias ThistleTea.Game.World.Visibility
 
@@ -9,11 +10,16 @@ defmodule ThistleTea.Game.Network.Message.CmsgSetActiveMover do
 
   @impl ClientMessage
   def handle(%__MODULE__{guid: guid}, %{guid: guid} = state) do
-    enter_world(state)
+    state |> set_active_mover(guid) |> enter_world()
   end
 
   def handle(%__MODULE__{guid: guid}, %{character: %Character{object: %{guid: guid}}} = state) do
-    enter_world(state)
+    state |> set_active_mover(guid) |> enter_world()
+  end
+
+  def handle(%__MODULE__{guid: guid}, %{ready: true, character: %Character{unit: %{charm: guid}}} = state)
+      when is_integer(guid) and guid > 0 do
+    set_active_mover(state, guid)
   end
 
   def handle(%__MODULE__{}, state), do: state
@@ -30,4 +36,6 @@ defmodule ThistleTea.Game.Network.Message.CmsgSetActiveMover do
     send(self(), :restore_active_pet)
     PlayerExploration.check_current(state)
   end
+
+  defp set_active_mover(%Session{} = state, guid), do: %{state | active_mover_guid: guid}
 end

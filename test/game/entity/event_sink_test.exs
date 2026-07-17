@@ -255,7 +255,7 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
       spell = %Spell{id: 3110}
 
       assert ^mob = EventSink.emit(mob, Event.control_granted(owner_guid, mob.object.guid, 20_882, [spell]))
-      assert_receive {:control_granted, controlled_guid, 20_882, [^spell]}
+      assert_receive {:control_granted, controlled_guid, 20_882, [^spell], false}
       assert controlled_guid == mob.object.guid
 
       assert ^mob = EventSink.emit(mob, Event.control_released(owner_guid, mob.object.guid))

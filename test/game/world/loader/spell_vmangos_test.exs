@@ -289,8 +289,8 @@ defmodule ThistleTea.Game.World.Loader.SpellVmangosTest do
   end
 
   describe "warlock spell parsing" do
-    test "demon summons load as caster-targeted pet effects" do
-      assert %Effect{type: :summon_pet, misc_value: 416, implicit_target_a: :caster} =
+    test "demon summons load at the DBC minion position" do
+      assert %Effect{type: :summon_pet, misc_value: 416, implicit_target_a: :minion_position} =
                Enum.find(SpellLoader.load(688).effects, &(&1.type == :summon_pet))
 
       assert %Effect{type: :summon_pet, misc_value: 1860} =
@@ -319,6 +319,11 @@ defmodule ThistleTea.Game.World.Loader.SpellVmangosTest do
              end)
 
       assert Enum.any?(SpellLoader.load(22_707).effects, &(&1.aura == :mod_root))
+    end
+
+    test "Eye of Kilrogg loads DBC summon-possession semantics" do
+      assert %Effect{type: :summon_possessed, misc_value: 4277, implicit_target_a: :minion_position} =
+               Enum.find(SpellLoader.load(126).effects, &(&1.type == :summon_possessed))
     end
 
     test "scripted warlock ranks share DBC family flags" do

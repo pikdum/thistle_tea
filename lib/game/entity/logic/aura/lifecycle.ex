@@ -17,6 +17,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Lifecycle do
   alias ThistleTea.Game.Entity.Logic.Aura.Script
   alias ThistleTea.Game.Entity.Logic.Aura.StealthSync
   alias ThistleTea.Game.Entity.Logic.Aura.UnitSync
+  alias ThistleTea.Game.Entity.Logic.Aura.ViewpointSync
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.Spell
@@ -188,6 +189,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Lifecycle do
   end
 
   defp remove_and_sync(entity, kept, removed, now) do
+    previous_holders = entity.unit.auras
     script_events = Script.after_remove(entity, removed)
     {entity, cooldown_events} = Cooldowns.activate_on_event(entity, removed, now)
     unit = UnitSync.sync_unit(%{entity.unit | auras: kept})
@@ -199,9 +201,25 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Lifecycle do
 
     {entity, control_events} = ControlSync.sync(entity)
     {entity, events} = MovementSync.sync_movement_state(entity, now)
+    viewpoint_events = ViewpointSync.events(previous_holders, kept, entity_guid(entity))
+    release_events = release_controlled_events(entity, removed)
 
-    {Core.mark_broadcast_update(entity), cooldown_events ++ script_events ++ control_events ++ events}
+    {Core.mark_broadcast_update(entity),
+     cooldown_events ++ script_events ++ control_events ++ viewpoint_events ++ release_events ++ events}
   end
+
+  defp release_controlled_events(%{object: %{guid: owner_guid}, unit: %Unit{charm: controlled_guid}}, removed)
+       when is_integer(owner_guid) and is_integer(controlled_guid) and controlled_guid > 0 do
+    for %Holder{caster_guid: ^owner_guid, spell: %Spell{id: spell_id, effects: effects}} <- removed,
+        Enum.any?(effects, &(&1.type == :summon_possessed)) do
+      Event.release_controlled(owner_guid, controlled_guid, spell_id)
+    end
+  end
+
+  defp release_controlled_events(_entity, _removed), do: []
+
+  defp entity_guid(%{object: %{guid: guid}}), do: guid
+  defp entity_guid(_entity), do: nil
 
   defp sync_holders(entity, holders) do
     %{entity | unit: UnitSync.sync_unit(%{entity.unit | auras: holders})}

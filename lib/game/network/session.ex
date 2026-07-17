@@ -42,6 +42,8 @@ defmodule ThistleTea.Game.Network.Session do
     :mail_session_token,
     :mail_delivery_ref,
     :pending_last_instance_map,
+    :active_mover_guid,
+    :active_control_spell_id,
     ready: false,
     movement_counter: 0,
     pending_movement_acks: %{},

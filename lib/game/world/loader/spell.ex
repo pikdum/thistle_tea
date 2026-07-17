@@ -499,6 +499,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp effect_type(63), do: :modify_threat
   defp effect_type(68), do: :interrupt_cast
   defp effect_type(72), do: :add_farsight
+  defp effect_type(73), do: :summon_possessed
   defp effect_type(77), do: :script_effect
   defp effect_type(79), do: :clear_threat
   defp effect_type(80), do: :add_combo_points
@@ -637,7 +638,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp target_type(39), do: :caster_fishing_spot
   defp target_type(24), do: :aoe_enemy_in_cone
   defp target_type(28), do: :aoe_enemy_at_channel
-  defp target_type(32), do: :caster
+  defp target_type(32), do: :minion_position
   defp target_type(5), do: :pet
   defp target_type(53), do: :aoe_enemy_at_dest
   defp target_type(other) when is_integer(other), do: other

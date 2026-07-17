@@ -99,6 +99,48 @@ defmodule ThistleTea.Game.World.Loader.Summon do
 
   def build_pet(_entry, _owner), do: nil
 
+  def possess(%Mob{} = mob, %{object: %{guid: owner_guid}, unit: owner_unit}, spell_id)
+      when is_integer(owner_guid) and is_integer(spell_id) do
+    original_flags = mob.unit.flags || 0
+
+    pet = %Pet{
+      owner_guid: owner_guid,
+      profile: :combat,
+      kind: :possessed,
+      food_mask: 0,
+      control_spell_id: spell_id,
+      original_faction_template: mob.unit.faction_template,
+      original_npc_flags: mob.unit.npc_flags,
+      possession_original_unit_flags: original_flags,
+      possessed?: true,
+      command_state: :stay,
+      reaction_state: :passive
+    }
+
+    unit = %{
+      mob.unit
+      | charmed_by: owner_guid,
+        summoned_by: owner_guid,
+        created_by: owner_guid,
+        created_by_spell: spell_id,
+        faction_template: owner_unit.faction_template,
+        npc_flags: 0,
+        flags: Bitwise.bor(original_flags, 0x01000000),
+        level: owner_unit.level,
+        target: 0
+    }
+
+    internal = %{
+      mob.internal
+      | pet: pet,
+        in_combat: false,
+        threat: %{},
+        running: true
+    }
+
+    %{mob | unit: unit, internal: internal}
+  end
+
   def pet_spellbook(entry, level) when is_integer(entry) and is_integer(level) do
     key = {:pet_spellbook, entry, level}
 

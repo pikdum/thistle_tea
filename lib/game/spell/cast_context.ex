@@ -34,6 +34,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
     :caster_faction_template,
     :caster_position,
     :caster_orientation,
+    :destination_position,
     :caster_zone,
     :target_guid,
     :selected_target_guid,

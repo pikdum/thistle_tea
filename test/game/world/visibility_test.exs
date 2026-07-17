@@ -132,6 +132,35 @@ defmodule ThistleTea.Game.World.VisibilityTest do
     end
   end
 
+  describe "viewpoints" do
+    test "moves visibility to the camera source and restores the player view" do
+      self_guid = Guid.from_low_guid(:player, unique_low())
+      viewpoint_guid = Guid.from_low_guid(:mob, unique_low(), unique_low())
+      character = character(self_guid, ghost?: false)
+      local_cells = Visibility.visible_cells(character)
+      SpatialHash.insert(:mobs, viewpoint_guid, 0, 1_000.0, 1_000.0, 0.0)
+
+      state = %{
+        guid: self_guid,
+        character: character,
+        visibility_cells: local_cells,
+        tracked_entities: MapSet.new(),
+        cell_activator: nil
+      }
+
+      remote = Visibility.set_viewpoint(state, viewpoint_guid)
+      remote_cell = SpatialHash.cell(WorldRef.open(0), 1_000.0, 1_000.0, 0.0)
+
+      assert MapSet.member?(remote.visibility_cells, remote_cell)
+      refute remote.visibility_cells == local_cells
+
+      restored = Visibility.reset_viewpoint(remote)
+      assert restored.visibility_cells == local_cells
+
+      SpatialHash.remove(:mobs, viewpoint_guid)
+    end
+  end
+
   describe "ghost visibility" do
     test "resync hides living mobs from ghosts and reveals spirit healers" do
       self_guid = Guid.from_low_guid(:player, unique_low())

@@ -2,6 +2,7 @@ defmodule ThistleTea.Game.Network.Message.MsgMove do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :MSG_MOVE_JUMP
 
+  alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
   alias ThistleTea.Game.Entity.Logic.Event
@@ -29,12 +30,33 @@ defmodule ThistleTea.Game.Network.Message.MsgMove do
 
   @impl ClientMessage
   def handle(
+        %__MODULE__{payload: payload, opcode: opcode},
+        %{
+          ready: true,
+          guid: player_guid,
+          active_mover_guid: mover_guid,
+          character: %Character{unit: %Unit{charm: mover_guid}}
+        } = state
+      )
+      when is_integer(mover_guid) and mover_guid > 0 and mover_guid != player_guid do
+    case Entity.pid(mover_guid) do
+      pid when is_pid(pid) -> send(pid, {:controlled_move, payload, opcode})
+      _ -> nil
+    end
+
+    state
+  end
+
+  def handle(
         %__MODULE__{payload: payload} = message,
         %{
           ready: true,
+          guid: player_guid,
+          active_mover_guid: mover_guid,
           character: %Character{movement_block: %MovementBlock{} = movement_block, unit: %Unit{} = unit} = character
         } = state
-      ) do
+      )
+      when mover_guid in [nil, player_guid] do
     movement_block = MovementBlock.from_binary(payload, movement_block)
 
     character = %{character | movement_block: movement_block, unit: %{unit | stand_state: 0}}

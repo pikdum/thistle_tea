@@ -18,6 +18,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
   alias ThistleTea.Game.Entity.Logic.Aura.PlayerSync
   alias ThistleTea.Game.Entity.Logic.Aura.StealthSync
   alias ThistleTea.Game.Entity.Logic.Aura.UnitSync
+  alias ThistleTea.Game.Entity.Logic.Aura.ViewpointSync
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.Spell
@@ -141,6 +142,8 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
   end
 
   defp do_apply_unblocked(entity, existing, %Holder{} = holder, now) do
+    previous_holders = existing
+
     existing =
       existing
       |> remove_immune_mechanics(holder)
@@ -159,9 +162,10 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
 
     {entity, control_events} = ControlSync.sync(entity)
     {entity, events} = MovementSync.sync_movement_state(entity, now)
+    viewpoint_events = ViewpointSync.events(previous_holders, holders, entity_guid(entity))
     duration_events = applied_duration_events(entity, holder, now)
 
-    {Core.mark_broadcast_update(entity), sit_events ++ control_events ++ events ++ duration_events}
+    {Core.mark_broadcast_update(entity), sit_events ++ control_events ++ viewpoint_events ++ events ++ duration_events}
   end
 
   defp applied_duration_events(
@@ -175,6 +179,9 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
   end
 
   defp applied_duration_events(_entity, _holder, _now), do: []
+
+  defp entity_guid(%{object: %{guid: guid}}), do: guid
+  defp entity_guid(_entity), do: nil
 
   defp remove_non_stacking(holders, %Holder{spell: %Spell{} = spell, caster_guid: caster_guid} = incoming) do
     shapeshift? = Holder.has_aura_type?(incoming, :mod_shapeshift)
