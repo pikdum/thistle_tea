@@ -87,7 +87,11 @@ defmodule ThistleTea.Game.Player.Enchantments do
          true <- expires_at > Time.now(),
          %{effects: effects} <- ItemEnchantmentLoader.get(enchantment_id),
          effect when is_map(effect) <- Enum.find(effects, &(&1.type == 1)) do
-      %{effect: effect, attack_time_ms: Item.template(item).delay || 2_000}
+      %{
+        effect: effect,
+        proc_spell: SpellLoader.load(effect.spell_id),
+        attack_time_ms: Item.template(item).delay || 2_000
+      }
     else
       _ -> nil
     end

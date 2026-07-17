@@ -376,6 +376,10 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
     }
   end
 
+  def spawn_farsight(spell, {_x, _y, _z} = position, duration_ms) when is_integer(duration_ms) do
+    %__MODULE__{type: :spawn_farsight, spell: spell, position: position, duration_ms: duration_ms}
+  end
+
   def despawn_area_effects(spell_id) when is_integer(spell_id) do
     %__MODULE__{type: :despawn_area_effects, spell_id: spell_id}
   end

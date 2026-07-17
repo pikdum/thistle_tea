@@ -34,4 +34,11 @@ defmodule ThistleTea.Game.Entity.Logic.ShamanTest do
       assert Shaman.trigger_weapon_enchant(shaman(), payload, proc, 0.0, fn -> 0.0 end).internal.events == []
     end
   end
+
+  describe "flametongue_damage/3" do
+    test "matches the VMangos weapon-speed and fire-power coefficient" do
+      assert Shaman.flametongue_damage(325, 100, 2_000) == 14
+      assert Shaman.flametongue_damage(325, 0, 4_000) == 13
+    end
+  end
 end

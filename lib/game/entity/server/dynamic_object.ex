@@ -80,10 +80,25 @@ defmodule ThistleTea.Game.Entity.Server.DynamicObject do
   def handle_info(_message, state), do: {:noreply, state}
 
   @impl GenServer
+  def terminate(_reason, %{entity: entity, farsight_owner_guid: owner_guid}) do
+    notify_farsight_owner(entity, owner_guid)
+    World.remove_position(entity)
+    Visibility.leave_entity(entity)
+  end
+
   def terminate(_reason, %{entity: entity}) do
     World.remove_position(entity)
     Visibility.leave_entity(entity)
   end
+
+  defp notify_farsight_owner(%DynamicObject{object: %{guid: guid}}, owner_guid) when is_integer(owner_guid) do
+    case Entity.pid(owner_guid) do
+      pid when is_pid(pid) -> send(pid, {:farsight_removed, guid})
+      _ -> nil
+    end
+  end
+
+  defp notify_farsight_owner(_entity, _owner_guid), do: nil
 
   defp apply_tick(%DynamicObject{} = entity, tick) do
     %{caster: caster, spell: spell, effect: effect} = tick

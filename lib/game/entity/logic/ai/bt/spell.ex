@@ -156,6 +156,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
     |> queue_cast_result(casting)
     |> queue_spell_go(casting, hits ++ object_hits(casting), misses)
     |> queue_area_effects(casting)
+    |> queue_farsight(casting)
     |> queue_summon_objects(casting)
     |> queue_item_enchantments(casting)
     |> queue_consume_reagents(casting)
@@ -414,6 +415,19 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
   end
 
   defp queue_area_effects(character, _casting), do: character
+
+  defp queue_farsight(character, %Cast{spell: %Spell{} = spell, targets: %Targets{} = targets}) do
+    if Enum.any?(spell.effects, &(&1.type == :add_farsight)) do
+      case Targets.ground_location(targets) do
+        {x, y, z} -> Event.enqueue(character, Event.spawn_farsight(spell, {x, y, z}, spell.duration_ms || 0))
+        _ -> character
+      end
+    else
+      character
+    end
+  end
+
+  defp queue_farsight(character, _casting), do: character
 
   defp area_effect_position(character, %Spell{} = spell, %Targets{} = targets) do
     Targets.ground_location(targets) || caster_area_position(character, spell)

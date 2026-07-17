@@ -739,6 +739,26 @@ defmodule ThistleTea.Game.Entity.EventSink do
 
   def emit(entity, %Event{type: :spawn_area_effect}), do: entity
 
+  def emit(%Character{object: %{guid: caster_guid}, player: player, internal: %Internal{world: world}} = entity, %Event{
+        type: :spawn_farsight,
+        spell: %Spell{} = spell,
+        position: position,
+        duration_ms: duration_ms
+      }) do
+    dynamic_object = DataDynamicObject.build(caster_guid, world, spell, position, 0.0)
+
+    World.start_entity(%{
+      entity: dynamic_object,
+      duration_ms: duration_ms,
+      farsight_owner_guid: caster_guid
+    })
+
+    %{entity | player: %{player | farsight: dynamic_object.object.guid}}
+    |> Core.mark_broadcast_update()
+  end
+
+  def emit(entity, %Event{type: :spawn_farsight}), do: entity
+
   def emit(%{object: %{guid: caster_guid}} = entity, %Event{type: :despawn_area_effects, spell_id: spell_id})
       when is_integer(caster_guid) do
     caster_guid

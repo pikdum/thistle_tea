@@ -577,6 +577,18 @@ defmodule ThistleTea.Game.Network.Server do
       {:noreply, {socket, state}, socket.read_timeout}
   end
 
+  def handle_info({:farsight_removed, guid}, {socket, %{character: %Character{} = character} = state}) do
+    character =
+      if character.player.farsight == guid do
+        %{character | player: %{character.player | farsight: 0}}
+        |> Core.mark_broadcast_update()
+      else
+        character
+      end
+
+    {:noreply, {socket, maybe_broadcast_update(%{state | character: character})}, socket.read_timeout}
+  end
+
   @impl GenServer
   def handle_info({:enchant_item, item_guid, spell, enchantment_id, duration_ms}, {socket, state}) do
     state = Enchantments.apply_temporary(state, item_guid, spell, enchantment_id, duration_ms)

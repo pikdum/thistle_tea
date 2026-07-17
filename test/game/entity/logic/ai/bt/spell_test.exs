@@ -393,6 +393,34 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
     end
   end
 
+  describe "farsight" do
+    test "DBC farsight effects queue a remote viewpoint at the destination" do
+      spell = %Spell{
+        id: 6196,
+        name: "Far Sight",
+        duration_ms: 60_000,
+        effects: [%Effect{index: 0, type: :add_farsight}]
+      }
+
+      targets = %Targets{raw: <<0::little-size(16)>>, destination_location: {10.0, 20.0, 30.0}}
+      casting = Cast.new(spell, targets, 1_000)
+
+      mob = %Mob{
+        object: %Object{guid: 1},
+        unit: %Unit{},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+        internal: %Internal{world: %WorldRef{map_id: 0}, casting: casting}
+      }
+
+      mob = SpellBT.complete_cast(mob, casting, 1_000)
+
+      assert Enum.any?(mob.internal.events, fn
+               %Event{type: :spawn_farsight, position: {10.0, 20.0, 30.0}, duration_ms: 60_000} -> true
+               _ -> false
+             end)
+    end
+  end
+
   describe "channel auras" do
     test "stopping a self channel removes the channel spell's auras" do
       spell = %Spell{
