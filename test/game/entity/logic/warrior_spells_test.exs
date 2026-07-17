@@ -274,6 +274,8 @@ defmodule ThistleTea.Game.Entity.Logic.WarriorSpellsTest do
         id: 7384,
         name: "Overpower",
         school: :physical,
+        spell_family: 4,
+        family_flags_0: 0x00000004,
         dmg_class: 2,
         effects: [%Effect{index: 0, type: :normalized_weapon_damage, base_points: 4, die_sides: 1}]
       }
@@ -335,6 +337,8 @@ defmodule ThistleTea.Game.Entity.Logic.WarriorSpellsTest do
         id: 7384,
         name: "Overpower",
         school: :physical,
+        spell_family: 4,
+        family_flags_0: 0x00000004,
         stances: @battle_stance_mask,
         first_in_chain: 7384,
         mana_cost: 0,
@@ -368,6 +372,8 @@ defmodule ThistleTea.Game.Entity.Logic.WarriorSpellsTest do
         id: 5308,
         name: "Execute",
         school: :physical,
+        spell_family: 4,
+        family_flags_0: 0x20000000,
         dmg_class: 2,
         effects: [
           %Effect{index: 0, type: :dummy, base_points: 124, die_sides: 1, damage_multiplier: 0.3},
@@ -740,6 +746,8 @@ defmodule ThistleTea.Game.Entity.Logic.WarriorSpellsTest do
         id: 23_881,
         name: "Bloodthirst",
         school: :physical,
+        spell_family: 4,
+        family_flags_0: 0x02000000,
         dmg_class: 2,
         effects: [%Effect{index: 0, type: :school_damage, base_points: 44, die_sides: 1}]
       }

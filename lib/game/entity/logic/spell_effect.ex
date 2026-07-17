@@ -809,8 +809,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   end
 
   defp rogue_feedback_spell?(%Spell{} = spell) do
-    Scripts.finisher?(spell) or spell.name == "Gouge" or
-      Enum.any?(spell.effects, &match?(%Effect{type: :add_combo_points}, &1))
+    Scripts.finisher?(spell) or Enum.any?(spell.effects, &match?(%Effect{type: :add_combo_points}, &1))
   end
 
   defp special_attack(%CastContext{} = context, spell) do

@@ -43,6 +43,7 @@ defmodule ThistleTea.Game.Spell.Scripts do
   }
 
   @spell_family_mage 3
+  @spell_family_warrior 4
   @spell_family_warlock 5
   @spell_family_paladin 10
   @mage_armor_family_flags 0x12000000
@@ -57,10 +58,10 @@ defmodule ThistleTea.Game.Spell.Scripts do
 
   def shapeshift_passives(form), do: Map.get(@shapeshift_passives, form, [])
 
-  @overpower_ranks [7384, 7887, 11_584, 11_585]
-  @execute_ranks [5308, 20_658, 20_660, 20_661, 20_662]
+  @overpower_family_mask 0x00000004
+  @bloodthirst_family_mask 0x02000000
+  @execute_family_mask 0x20000000
   @execute_damage_spell 20_647
-  @bloodthirst_ranks [23_881, 23_892, 23_893, 23_894]
   @last_stand 12_975
   @preparation 14_185
   @holy_shock %{
@@ -71,11 +72,11 @@ defmodule ThistleTea.Game.Spell.Scripts do
   @last_stand_health_buff 12_976
   @last_stand_health_fraction 0.3
   @soul_link 19_028
-  def requires_combo_target?(%Spell{id: id} = spell), do: id in @overpower_ranks or finisher?(spell)
+  def requires_combo_target?(%Spell{} = spell),
+    do: warrior_family_flag?(spell, @overpower_family_mask) or finisher?(spell)
 
   def requires_combo_target?(_spell), do: false
 
-  def dummy_effect(%Spell{id: id}) when id in @execute_ranks, do: :execute
   def dummy_effect(%Spell{id: @last_stand}), do: :last_stand
   def dummy_effect(%Spell{id: @preparation}), do: :preparation
   def dummy_effect(%Spell{id: id}) when is_map_key(@holy_shock, id), do: {:holy_shock, Map.fetch!(@holy_shock, id)}
@@ -83,7 +84,11 @@ defmodule ThistleTea.Game.Spell.Scripts do
   def dummy_effect(%Spell{id: @soul_link}), do: :soul_link
 
   def dummy_effect(%Spell{} = spell) do
-    if Warlock.life_tap?(spell), do: :life_tap
+    cond do
+      warrior_family_flag?(spell, @execute_family_mask) -> :execute
+      Warlock.life_tap?(spell) -> :life_tap
+      true -> nil
+    end
   end
 
   def dummy_effect(_spell), do: nil
@@ -103,7 +108,7 @@ defmodule ThistleTea.Game.Spell.Scripts do
 
   def last_stand_health_buff_id, do: @last_stand_health_buff
 
-  def ap_percent_damage?(%Spell{id: id}), do: id in @bloodthirst_ranks
+  def ap_percent_damage?(%Spell{} = spell), do: warrior_family_flag?(spell, @bloodthirst_family_mask)
   def ap_percent_damage?(_spell), do: false
 
   def finisher?(%Spell{} = spell), do: Spell.attribute?(spell, :finishing_move)
@@ -179,6 +184,11 @@ defmodule ThistleTea.Game.Spell.Scripts do
     row.spell_class_set == @spell_family_paladin and
       Enum.any?(0..2, &(Map.get(row, :"effect_#{&1}") == 35))
   end
+
+  defp warrior_family_flag?(%Spell{spell_family: @spell_family_warrior, family_flags_0: flags}, mask)
+       when is_integer(flags), do: (flags &&& mask) != 0
+
+  defp warrior_family_flag?(_spell, _mask), do: false
 
   defp chain_id(%Spell{first_in_chain: first}) when is_integer(first) and first > 0, do: first
   defp chain_id(%Spell{id: id}), do: id
