@@ -203,6 +203,102 @@ defmodule ThistleTea.Game.Entity.Logic.AttackFeedbackTest do
       refute Enum.any?(entity.internal.events, &(&1.type == :blade_flurry))
     end
 
+    test "sweeping strikes spends a charge and queues VMangos secondary damage" do
+      sweeping_strikes = %Spell{
+        id: 12_292,
+        proc_type_mask: 0x14,
+        proc_chance: 100,
+        proc_charges: 5,
+        effects: [%Effect{index: 0, type: :apply_aura, aura: :dummy}]
+      }
+
+      entity = %Mob{object: %Object{guid: 5}, unit: %Unit{auras: []}, internal: %Internal{}}
+      {entity, _events} = Aura.apply_spell(entity, 5, 60, sweeping_strikes, 1_000)
+
+      entity =
+        AttackFeedback.receive(
+          entity,
+          %{outcome: :normal, damage: 91, proc_damage: 123, victim_guid: 77, spell_id: nil},
+          nil,
+          1_000
+        )
+
+      assert [%Holder{charges: 4}] = entity.unit.auras
+
+      assert Enum.any?(
+               entity.internal.events,
+               &match?(
+                 %{type: :secondary_melee, target_guid: 77, damage: 123, spell_id: 12_723, range_yards: 5.0},
+                 &1
+               )
+             )
+    end
+
+    test "sweeping strikes does not chain from its triggered damage spell" do
+      holder = %Holder{
+        spell: %Spell{id: 12_292, proc_type_mask: 0x14, proc_chance: 100},
+        caster_guid: 5,
+        caster_level: 60,
+        charges: 4,
+        auras: [%AuraData{type: :dummy}]
+      }
+
+      entity = %Mob{object: %Object{guid: 5}, unit: %Unit{auras: [holder]}, internal: %Internal{}}
+
+      entity =
+        AttackFeedback.receive(
+          entity,
+          %{outcome: :normal, damage: 123, proc_damage: 123, victim_guid: 77, spell_id: 12_723},
+          nil,
+          1_000
+        )
+
+      assert [%Holder{charges: 4}] = entity.unit.auras
+      refute Enum.any?(entity.internal.events || [], &(&1.type == :secondary_melee))
+    end
+
+    test "landed bloodthirst applies the DBC-referenced healing proc aura" do
+      spell = %Spell{
+        id: 23_881,
+        script_name: "spell_warrior_bloodthirst",
+        description_spell_refs: [{23_885, "n"}, {23_880, "s1"}, {23_885, "d"}]
+      }
+
+      entity =
+        AttackFeedback.receive(
+          rogue(),
+          %{outcome: :normal, damage: 100, victim_guid: 77, spell_id: 23_881},
+          spell,
+          1_000
+        )
+
+      assert Enum.any?(
+               entity.internal.events,
+               &match?(
+                 %{type: :trigger_spell, source_guid: 5, target_guid: 5, spell_id: 23_885},
+                 &1
+               )
+             )
+    end
+
+    test "avoided bloodthirst does not apply its healing proc aura" do
+      spell = %Spell{
+        id: 23_881,
+        script_name: "spell_warrior_bloodthirst",
+        description_spell_refs: [{23_885, "n"}, {23_885, "d"}]
+      }
+
+      entity =
+        AttackFeedback.receive(
+          rogue(),
+          %{outcome: :dodge, damage: 0, victim_guid: 77, spell_id: 23_881},
+          spell,
+          1_000
+        )
+
+      refute Enum.any?(entity.internal.events || [], &(&1.type == :trigger_spell))
+    end
+
     test "DBC melee proc auras trigger their encoded spell and spend charges" do
       proc_spell = %Spell{id: 19_577, proc_type_mask: 0x14, proc_chance: 100}
 

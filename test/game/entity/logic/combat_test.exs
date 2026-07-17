@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.Entity.Logic.CombatTest do
   use ExUnit.Case, async: true
 
+  alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
@@ -162,6 +163,58 @@ defmodule ThistleTea.Game.Entity.Logic.CombatTest do
                },
                %Event{type: :attack_outcome}
              ] = events
+    end
+
+    test "retaliation counterattacks attackers in front and spends a charge" do
+      retaliation = %Spell{
+        id: 20_230,
+        proc_type_mask: 0x28,
+        proc_chance: 100,
+        proc_charges: 30,
+        effects: [%Effect{type: :apply_aura, aura: :dummy}]
+      }
+
+      target = %{mob(2, 100) | movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}}
+      {target, _events} = Aura.apply_spell(target, 2, 60, retaliation, 1_000)
+
+      {target, events} =
+        Combat.receive_attack(
+          target,
+          %{caster: 1, caster_position: {1.0, 0.0, 0.0}, damage: 12},
+          1_000,
+          roll: 9_999
+        )
+
+      assert [%Holder{charges: 29}] = target.unit.auras
+
+      assert Enum.any?(
+               events,
+               &match?(%Event{type: :trigger_spell, source_guid: 2, target_guid: 1, spell_id: 22_858}, &1)
+             )
+    end
+
+    test "retaliation does not counterattack from behind" do
+      retaliation = %Spell{
+        id: 20_230,
+        proc_type_mask: 0x28,
+        proc_chance: 100,
+        proc_charges: 30,
+        effects: [%Effect{type: :apply_aura, aura: :dummy}]
+      }
+
+      target = %{mob(2, 100) | movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}}
+      {target, _events} = Aura.apply_spell(target, 2, 60, retaliation, 1_000)
+
+      {target, events} =
+        Combat.receive_attack(
+          target,
+          %{caster: 1, caster_position: {-1.0, 0.0, 0.0}, damage: 12},
+          1_000,
+          roll: 9_999
+        )
+
+      assert [%Holder{charges: 30}] = target.unit.auras
+      refute Enum.any?(events, &(&1.type == :trigger_spell and &1.spell_id == 22_858))
     end
 
     test "does not include hit reaction events when target dies" do

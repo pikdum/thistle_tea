@@ -219,6 +219,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
       spell_family: row.spell_class_set || 0,
       family_flags_0: row.spell_class_mask_0 || 0,
       family_flags_1: row.spell_class_mask_1 || 0,
+      description_spell_refs: description_spell_refs(row.description_en_gb),
       effects: build_effects(row, radius_lookup),
       script_steps: SpellScriptLoader.get(row.id),
       reagents: build_reagents(row)
@@ -228,6 +229,14 @@ defmodule ThistleTea.Game.World.Loader.Spell do
     |> struct!(power_fields(row))
     |> append_shapeshift_passives(radius_lookup)
   end
+
+  defp description_spell_refs(description) when is_binary(description) do
+    ~r/\$(\d+)([a-zA-Z]\d*)/
+    |> Regex.scan(description, capture: :all_but_first)
+    |> Enum.map(fn [spell_id, variable] -> {String.to_integer(spell_id), variable} end)
+  end
+
+  defp description_spell_refs(_description), do: []
 
   defp power_fields(row) do
     %{

@@ -16,6 +16,11 @@ defmodule ThistleTea.Game.SpellTest do
       assert Spell.harmful?(spell)
     end
 
+    test "enemy area debuffs are harmful" do
+      spell = %Spell{effects: [%Effect{type: :apply_aura, implicit_target_a: :aoe_enemy_at_caster}]}
+      assert Spell.harmful?(spell)
+    end
+
     test "heals and ally buffs are not harmful" do
       heal = %Spell{effects: [%Effect{type: :heal, implicit_target_a: :target_ally}]}
       buff = %Spell{effects: [%Effect{type: :apply_aura, implicit_target_a: :target_ally}]}

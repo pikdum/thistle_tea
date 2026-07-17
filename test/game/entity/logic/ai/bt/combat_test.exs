@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.CombatTest do
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Object
+  alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
@@ -12,6 +13,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.CombatTest do
   alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.WorldRef
 
@@ -109,6 +111,72 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.CombatTest do
              ] = mob.internal.events
 
       assert mob.internal.next_swing_spell == nil
+    end
+
+    test "resolves queued chain weapon attacks against nearby enemies" do
+      player_guid = Guid.from_low_guid(:player, 10)
+      primary_guid = Guid.from_low_guid(:mob, 1, 10)
+      secondary_guid = Guid.from_low_guid(:mob, 1, 11)
+
+      player_faction = %FactionTemplate{
+        id: 1,
+        faction: 1,
+        flags: 72,
+        faction_group: 3,
+        friend_group: 2,
+        enemy_group: 12
+      }
+
+      mob_faction = %FactionTemplate{id: 17, faction: 15, flags: 1, faction_group: 8, enemy_group: 1}
+
+      Enum.each([{player_guid, :players, 0.0}, {primary_guid, :mobs, 1.0}, {secondary_guid, :mobs, 2.0}], fn
+        {guid, table, x} -> SpatialHash.update(table, guid, 0, x, 0.0, 0.0)
+      end)
+
+      Metadata.put(player_guid, %{alive?: true, faction_template: player_faction, unit_flags: 0})
+
+      Enum.each([primary_guid, secondary_guid], fn guid ->
+        Metadata.put(guid, %{
+          alive?: true,
+          faction_template: mob_faction,
+          faction_can_have_reputation?: false,
+          unit_flags: 0
+        })
+      end)
+
+      on_exit(fn ->
+        SpatialHash.remove(:players, player_guid)
+        SpatialHash.remove(:mobs, primary_guid)
+        SpatialHash.remove(:mobs, secondary_guid)
+        Enum.each([player_guid, primary_guid, secondary_guid], &Metadata.delete/1)
+      end)
+
+      cleave = %Spell{
+        id: 845,
+        attributes: MapSet.new([:on_next_swing]),
+        effects: [%Spell.Effect{type: :weapon_damage_noschool, implicit_target_a: :target_enemy, chain_targets: 2}]
+      }
+
+      character = %Character{
+        object: %Object{guid: player_guid},
+        player: %Player{},
+        unit: %Unit{target: primary_guid, min_damage: 3, max_damage: 3, combat_reach: 1.0, base_attack_time: 1_000},
+        internal: %Internal{
+          world: %WorldRef{map_id: 0},
+          in_combat: true,
+          next_swing_spell: cleave
+        },
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
+      }
+
+      assert {:success, character, %Blackboard{}} =
+               Combat.melee_attack(character, %Blackboard{attack_started: true, next_attack_at: 0}, 1_000)
+
+      assert %Event{type: :spell_go, hit_guids: [^primary_guid, ^secondary_guid]} =
+               Enum.find(character.internal.events, &(&1.type == :spell_go))
+
+      assert [^primary_guid, ^secondary_guid] =
+               for(%Event{type: :deliver_spell, target_guid: guid} <- character.internal.events, do: guid)
     end
 
     test "swings immediately on fresh aggro when already in reach" do

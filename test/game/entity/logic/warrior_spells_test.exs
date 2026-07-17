@@ -804,6 +804,29 @@ defmodule ThistleTea.Game.Entity.Logic.WarriorSpellsTest do
   end
 
   describe "talent actives" do
+    test "demoralizing shout uses a visible debuff slot on hostile targets" do
+      spell = %Spell{
+        id: 1160,
+        name: "Demoralizing Shout",
+        school: :physical,
+        effects: [
+          %Effect{
+            index: 0,
+            type: :apply_aura,
+            aura: :mod_attack_power,
+            base_points: -37,
+            die_sides: 1,
+            implicit_target_a: :aoe_enemy_at_caster
+          }
+        ]
+      }
+
+      context = %CastContext{caster_guid: 5, caster_level: 10, target_hostile?: true}
+      {mob, _events} = Aura.apply_spell(melee_target(), context, spell, 1_000)
+
+      assert [%Holder{negative?: true, slot: 32}] = mob.unit.auras
+    end
+
     test "bloodthirst scales its damage from attack power" do
       spell = %Spell{
         id: 23_881,

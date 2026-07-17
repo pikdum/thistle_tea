@@ -73,6 +73,33 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
       assert mob.internal.casting.ends_at == 3_500
     end
 
+    test "remembers a charged casting-time modifier after it makes the cast instant" do
+      modifier = %Holder{
+        spell: %Spell{id: 12_043, spell_family: 3},
+        charges: 1,
+        slot: 0,
+        auras: [%AuraData{type: :add_pct_modifier, amount: -100, misc_value: 10, class_mask: 0x40000000}]
+      }
+
+      spell = %Spell{id: 11_360, spell_family: 3, family_flags_0: 0x40000000, cast_time_ms: 6_000}
+
+      mob = %Mob{
+        object: %Object{guid: 1},
+        unit: %Unit{auras: [modifier]},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+        internal: %Internal{world: %WorldRef{map_id: 0}}
+      }
+
+      mob = SpellBT.start_cast(mob, spell, %Targets{raw: <<0::little-size(16)>>, unit_guid: 1}, 1_000)
+
+      assert mob.internal.casting.cast_time_ms == 0
+      assert mob.internal.casting.modifier_holder_ids == [12_043]
+
+      mob = SpellBT.complete_cast(mob, 1_000)
+
+      assert mob.unit.auras == []
+    end
+
     test "spends charged modifiers when an affected channel starts" do
       modifier = %Holder{
         spell: %Spell{id: 14_751, spell_family: 6},

@@ -282,7 +282,15 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
       {entity, []}
     else
       proc_type = if is_integer(Map.get(attack, :spell_id)), do: :take_melee_ability, else: :take_melee_swing
-      Aura.reactions(entity, :hit_taken, %{attacker_guid: attacker_guid, proc_type: proc_type, outcome: outcome})
+
+      Aura.reactions(entity, :hit_taken, %{
+        attacker_guid: attacker_guid,
+        attacker_position: Map.get(attack, :caster_position),
+        proc_type: proc_type,
+        outcome: outcome,
+        spell: Map.get(attack, :spell),
+        triggering_spell_id: Map.get(attack, :spell_id)
+      })
     end
   end
 

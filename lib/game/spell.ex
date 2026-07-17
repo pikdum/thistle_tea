@@ -28,6 +28,7 @@ defmodule ThistleTea.Game.Spell do
     :first_in_chain,
     :rank,
     :exclusive_category,
+    description_spell_refs: [],
     spell_family: 0,
     family_flags_0: 0,
     family_flags_1: 0,
@@ -114,6 +115,22 @@ defmodule ThistleTea.Game.Spell do
     end)
   end
 
+  def targets_hostile_units?(%__MODULE__{effects: effects}) do
+    Enum.any?(effects, fn %Effect{implicit_target_a: a, implicit_target_b: b} ->
+      hostile_implicit_target?(a) or hostile_implicit_target?(b)
+    end)
+  end
+
+  defp hostile_implicit_target?(target) do
+    target in [
+      :target_enemy,
+      :aoe_enemy_at_caster,
+      :aoe_enemy_at_dest,
+      :aoe_enemy_in_cone,
+      :aoe_enemy_at_channel
+    ]
+  end
+
   def requires_friendly_target?(%__MODULE__{effects: effects}) do
     Enum.any?(effects, fn %Effect{implicit_target_a: a, implicit_target_b: b} ->
       a == :target_ally or b == :target_ally
@@ -121,7 +138,7 @@ defmodule ThistleTea.Game.Spell do
   end
 
   def harmful?(%__MODULE__{} = spell) do
-    requires_hostile_target?(spell) or damage_effects(spell) != []
+    targets_hostile_units?(spell) or damage_effects(spell) != []
   end
 
   def harmful?(_spell), do: false

@@ -68,13 +68,14 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
          now,
          cast_item_guid
        ) do
+    modifier_holder_ids = Modifiers.consumable_holder_ids(character, spell)
     spell = %{spell | cast_time_ms: Modifiers.integer_value(character, spell, :casting_time, spell.cast_time_ms || 0)}
 
     casting =
       spell
       |> Cast.new(targets, now)
       |> Cast.apply_speed_modifier(AuraLogic.flat_amount(character, :mod_casting_speed))
-      |> then(&%{&1 | cast_item_guid: cast_item_guid})
+      |> then(&%{&1 | cast_item_guid: cast_item_guid, modifier_holder_ids: modifier_holder_ids})
 
     character = %{character | internal: %{internal | casting: casting}}
 
@@ -247,6 +248,11 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
   end
 
   defp queue_charge(character, _casting), do: character
+
+  defp consume_spell_modifiers(character, %Cast{modifier_holder_ids: [_ | _] = spell_ids}, now) do
+    {character, events} = AuraLogic.spend_spell_charges(character, spell_ids, now)
+    Event.enqueue(character, events)
+  end
 
   defp consume_spell_modifiers(character, %Cast{spell: %Spell{} = spell}, now) do
     spell_ids = Modifiers.consumable_holder_ids(character, spell)

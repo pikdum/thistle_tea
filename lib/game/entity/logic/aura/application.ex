@@ -130,7 +130,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
     cond do
       Spell.attribute?(spell, :negative) -> true
       context.caster_guid == target_guid -> false
-      context.target_hostile? == true and Spell.requires_hostile_target?(spell) -> true
+      context.target_hostile? == true and Spell.harmful?(spell) -> true
       Enum.any?(auras, fn %Aura{type: type} -> type in @negative_auras end) -> true
       Enum.any?(auras, &negative_resistance_modifier?/1) -> true
       true -> false

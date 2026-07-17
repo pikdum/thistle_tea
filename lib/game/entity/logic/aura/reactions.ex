@@ -35,7 +35,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
     {holders, events} =
       Enum.map_reduce(holders, [], fn %Holder{} = holder, events ->
         {holder, holder_events} =
-          incoming_reaction(holder, owner_guid, attacker_guid, triggering_spell, proc_type, outcome)
+          incoming_reaction(entity, holder, owner_guid, attacker_guid, triggering_spell, proc_type, outcome, context)
 
         {holder, events ++ holder_events}
       end)
@@ -74,9 +74,6 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
       )
       when is_list(holders) and is_integer(victim_guid) and outcome in [:normal, :crit] and
              proc_type in [:deal_melee_swing, :deal_melee_ability] and is_integer(now) do
-    triggering_spell = Map.get(context, :spell)
-    attack_time_ms = Map.get(context, :attack_time_ms)
-
     {holders, events} =
       Enum.map_reduce(holders, [], fn %Holder{} = holder, events ->
         {holder, holder_events} =
@@ -84,11 +81,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
             holder,
             owner_guid,
             victim_guid,
-            triggering_spell,
-            proc_type,
-            outcome,
-            attack_time_ms,
-            now
+            context
           )
 
         {holder, events ++ holder_events}
@@ -131,7 +124,28 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
 
   defp spend_hit_charge(holder), do: holder
 
-  defp incoming_reaction(%Holder{} = holder, owner_guid, attacker_guid, triggering_spell, proc_type, outcome) do
+  defp incoming_reaction(
+         entity,
+         %Holder{} = holder,
+         owner_guid,
+         attacker_guid,
+         triggering_spell,
+         proc_type,
+         outcome,
+         context
+       ) do
+    context = Map.merge(context, %{spell: triggering_spell, proc_type: proc_type, outcome: outcome})
+
+    case Script.incoming_melee(entity, holder, owner_guid, attacker_guid, context) do
+      {:handled, updated_holder, events} ->
+        {updated_holder, events}
+
+      :unhandled ->
+        generic_incoming_reaction(holder, owner_guid, attacker_guid, triggering_spell, proc_type, outcome)
+    end
+  end
+
+  defp generic_incoming_reaction(%Holder{} = holder, owner_guid, attacker_guid, triggering_spell, proc_type, outcome) do
     proc? =
       Holder.has_any_type?(holder, @charge_consuming_on_hit) and
         Proc.eligible?(holder.spell, triggering_spell, proc_type, outcome) and Proc.roll?(holder.spell)
@@ -140,7 +154,37 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
     {if(proc?, do: spend_hit_charge(holder), else: holder), events}
   end
 
-  defp outgoing_melee_reaction(
+  defp outgoing_melee_reaction(%Holder{} = holder, owner_guid, victim_guid, context) do
+    triggering_spell = Map.get(context, :spell)
+    proc_type = Map.fetch!(context, :proc_type)
+    outcome = Map.fetch!(context, :outcome)
+    attack_time_ms = Map.get(context, :attack_time_ms)
+    now = Map.fetch!(context, :now)
+
+    case Script.outgoing_melee(
+           holder,
+           owner_guid,
+           victim_guid,
+           context
+         ) do
+      {:handled, updated_holder, events} ->
+        {updated_holder, events}
+
+      :unhandled ->
+        generic_outgoing_melee_reaction(
+          holder,
+          owner_guid,
+          victim_guid,
+          triggering_spell,
+          proc_type,
+          outcome,
+          attack_time_ms,
+          now
+        )
+    end
+  end
+
+  defp generic_outgoing_melee_reaction(
          %Holder{} = holder,
          owner_guid,
          victim_guid,

@@ -181,8 +181,14 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.UnitSync do
     for slot <- 0..(@max_slots - 1), into: <<>> do
       apps =
         case Enum.find(holders, &(&1.slot == slot)) do
-          %Holder{stacks: stacks} when is_integer(stacks) and stacks > 1 -> stacks - 1
-          _ -> 0
+          %Holder{charges: charges, stacks: stacks} when is_integer(charges) and charges > 0 ->
+            min(charges * max(stacks || 1, 1), 255) - 1
+
+          %Holder{stacks: stacks} when is_integer(stacks) and stacks > 0 ->
+            min(stacks, 255) - 1
+
+          _ ->
+            0
         end
 
       <<apps::8>>

@@ -1,15 +1,25 @@
 defmodule ThistleTea.Game.Entity.Logic.Aura.Script do
   @moduledoc """
-  Interprets aura lifecycle behavior that VMangos marks with an explicit
-  `spell_template.script_name` because the spell data cannot express it.
+  Interprets aura behavior that VMangos handles in spell scripts or explicit
+  core spell-id branches because the spell data cannot express it.
   """
 
   alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Logic.Event
+  alias ThistleTea.Game.Math
   alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.Proc
 
   @wyvern_sting_poison_by_rank %{19_386 => 24_131, 24_132 => 24_134, 24_133 => 24_135}
   @combustion_proc_aura 11_129
+  @sweeping_strikes [12_292, 18_765]
+  @sweeping_strikes_damage 12_723
+  @sweeping_strikes_loop_spells [12_723, 26_654]
+  @retaliation 20_230
+  @retaliation_strike 22_858
+  @whirlwind 1680
+  @melee_radius 5.0
+  @whirlwind_radius 8.0
 
   def after_remove(entity, holders) when is_list(holders) do
     Enum.flat_map(holders, &after_remove_holder(entity, &1))
@@ -25,6 +35,49 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Script do
   end
 
   def outgoing_proc(_holders, _holder, _owner_guid, _context), do: :unhandled
+
+  def outgoing_melee(%Holder{spell: %Spell{id: id}} = holder, owner_guid, victim_guid, context)
+      when id in @sweeping_strikes and is_integer(owner_guid) and is_integer(victim_guid) do
+    damage = Map.get(context, :proc_damage, Map.get(context, :damage, 0))
+    triggering_spell_id = Map.get(context, :triggering_spell_id)
+    triggering_spell = Map.get(context, :spell)
+    proc_type = Map.get(context, :proc_type)
+    outcome = Map.get(context, :outcome)
+
+    proc? =
+      is_integer(damage) and damage > 1 and triggering_spell_id not in @sweeping_strikes_loop_spells and
+        Proc.eligible?(holder.spell, triggering_spell, proc_type, outcome) and Proc.roll?(holder.spell)
+
+    if proc? do
+      radius = if triggering_spell_id == @whirlwind, do: @whirlwind_radius, else: @melee_radius
+      event = Event.secondary_melee(victim_guid, damage, @sweeping_strikes_damage, radius)
+      {:handled, spend_charge(holder), [event]}
+    else
+      {:handled, holder, []}
+    end
+  end
+
+  def outgoing_melee(_holder, _owner_guid, _victim_guid, _context), do: :unhandled
+
+  def incoming_melee(entity, %Holder{spell: %Spell{id: @retaliation}} = holder, owner_guid, attacker_guid, context)
+      when is_integer(owner_guid) and is_integer(attacker_guid) do
+    triggering_spell = Map.get(context, :spell)
+    proc_type = Map.get(context, :proc_type)
+    outcome = Map.get(context, :outcome)
+
+    proc? =
+      attacker_in_front?(entity, Map.get(context, :attacker_position)) and not stunned?(entity) and
+        Proc.eligible?(holder.spell, triggering_spell, proc_type, outcome) and Proc.roll?(holder.spell)
+
+    if proc? do
+      event = Event.trigger_spell(owner_guid, holder.caster_level || 1, attacker_guid, @retaliation_strike)
+      {:handled, spend_charge(holder), [event]}
+    else
+      {:handled, holder, []}
+    end
+  end
+
+  def incoming_melee(_entity, _holder, _owner_guid, _attacker_guid, _context), do: :unhandled
 
   def cancel_linked_spell_ids(%Holder{spell: %Spell{} = spell}) do
     if Spell.vmangos_script?(spell, "spell_mage_combustion_buff"), do: [@combustion_proc_aura], else: []
@@ -78,4 +131,20 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Script do
     event = Event.trigger_spell(owner_guid, holder.caster_level || 1, owner_guid, visible_id)
     {:handled, updated_holders, [event]}
   end
+
+  defp spend_charge(%Holder{charges: charges}) when is_integer(charges) and charges <= 1, do: nil
+  defp spend_charge(%Holder{charges: charges} = holder) when is_integer(charges), do: %{holder | charges: charges - 1}
+  defp spend_charge(%Holder{} = holder), do: holder
+
+  defp attacker_in_front?(%{movement_block: %{position: {x, y, _z, orientation}}}, {ax, ay, _az}) do
+    not Math.behind?({x, y, orientation}, {ax, ay})
+  end
+
+  defp attacker_in_front?(_entity, _attacker_position), do: true
+
+  defp stunned?(%{unit: %{auras: holders}}) when is_list(holders) do
+    Enum.any?(holders, &Holder.has_aura_type?(&1, :mod_stun))
+  end
+
+  defp stunned?(_entity), do: false
 end

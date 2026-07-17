@@ -529,6 +529,7 @@ defmodule ThistleTea.Game.Entity.Logic.PriestSpellsTest do
       {entity, _events} = Aura.reactions(entity, :hit_taken, %{attacker_guid: 999})
 
       assert [%Holder{charges: 19}] = entity.unit.auras
+      assert <<18, _rest::binary>> = entity.unit.aura_applications
     end
 
     test "the holder is removed when the last charge is spent" do

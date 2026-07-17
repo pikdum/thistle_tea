@@ -19,10 +19,12 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
   alias ThistleTea.Game.Entity.Logic.PlayerCombat
   alias ThistleTea.Game.Entity.Logic.Resources
   alias ThistleTea.Game.Entity.Logic.Skills
+  alias ThistleTea.Game.Entity.SpellTargetResolver
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.BinaryUtils
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
+  alias ThistleTea.Game.Spell.Targets
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
@@ -211,17 +213,33 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
   end
 
   defp send_queued_spell_swing(state, %Spell{} = spell, target) do
-    context = %{
-      CastContext.from_caster(state, spell, target)
-      | target_hostile?: Hostility.valid_attack_target?(state, target)
-    }
+    targets = queued_spell_targets(state, spell, target)
 
     state
     |> maybe_weapon_skill_up(target)
     |> Resources.spend_power(spell, Time.now())
     |> queue_self_update()
-    |> queue_queued_spell_go(spell, target)
-    |> Event.enqueue(Event.deliver_spell(target, context, spell))
+    |> queue_queued_spell_go(spell, target, targets)
+    |> deliver_queued_spell(spell, targets)
+  end
+
+  defp queued_spell_targets(state, %Spell{} = spell, target) do
+    case SpellTargetResolver.resolve(state, spell, Targets.unit(target)) do
+      [] -> [target]
+      targets -> targets
+    end
+  end
+
+  defp deliver_queued_spell(state, %Spell{} = spell, targets) do
+    Enum.reduce(targets, state, fn target, entity ->
+      context = %{
+        CastContext.from_caster(entity, spell, target)
+        | selected_target_guid: List.first(targets),
+          target_hostile?: Hostility.valid_attack_target?(entity, target)
+      }
+
+      Event.enqueue(entity, Event.deliver_spell(target, context, spell))
+    end)
   end
 
   defp melee_attack_payload(%{object: %{guid: guid}} = state) do
@@ -261,15 +279,15 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
 
   defp maybe_weapon_skill_up(state, _target), do: state
 
-  defp queue_queued_spell_go(%{object: %{guid: guid}} = state, %{id: spell_id}, target)
-       when is_integer(guid) and is_integer(spell_id) and is_integer(target) do
+  defp queue_queued_spell_go(%{object: %{guid: guid}} = state, %{id: spell_id}, target, targets)
+       when is_integer(guid) and is_integer(spell_id) and is_integer(target) and is_list(targets) do
     Event.enqueue(state, [
       Event.spell_cast_result(spell_id),
-      Event.spell_go(guid, spell_id, [target], unit_target_raw(target))
+      Event.spell_go(guid, spell_id, targets, unit_target_raw(target))
     ])
   end
 
-  defp queue_queued_spell_go(state, _queued_spell, _target), do: state
+  defp queue_queued_spell_go(state, _queued_spell, _target, _targets), do: state
 
   defp unit_target_raw(target) do
     <<0x0002::little-size(16)>> <> BinaryUtils.pack_guid(target)

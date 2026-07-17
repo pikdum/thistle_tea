@@ -187,6 +187,19 @@ defmodule ThistleTea.Game.Spell.Scripts do
   def ap_percent_damage?(%Spell{} = spell), do: Spell.vmangos_script?(spell, "spell_warrior_bloodthirst")
   def ap_percent_damage?(_spell), do: false
 
+  def successful_melee_aura_spell_id(%Spell{description_spell_refs: refs} = spell) when is_list(refs) do
+    if ap_percent_damage?(spell) do
+      count_refs = refs |> Enum.filter(&(elem(&1, 1) == "n")) |> MapSet.new(&elem(&1, 0))
+      duration_refs = refs |> Enum.filter(&(elem(&1, 1) == "d")) |> MapSet.new(&elem(&1, 0))
+
+      count_refs
+      |> MapSet.intersection(duration_refs)
+      |> Enum.at(0)
+    end
+  end
+
+  def successful_melee_aura_spell_id(_spell), do: nil
+
   def finisher?(%Spell{} = spell), do: Spell.attribute?(spell, :finishing_move)
   def finisher?(_spell), do: false
 

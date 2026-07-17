@@ -294,6 +294,21 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
     %__MODULE__{type: :blade_flurry, target_guid: target_guid, damage: damage}
   end
 
+  defguardp valid_secondary_melee?(target_guid, damage, spell_id, radius)
+            when is_integer(target_guid) and is_integer(damage) and damage > 0 and is_integer(spell_id) and
+                   is_number(radius) and radius > 0
+
+  def secondary_melee(target_guid, damage, spell_id, radius)
+      when valid_secondary_melee?(target_guid, damage, spell_id, radius) do
+    %__MODULE__{
+      type: :secondary_melee,
+      target_guid: target_guid,
+      damage: damage,
+      spell_id: spell_id,
+      range_yards: radius
+    }
+  end
+
   def attacker_lost(target_guid) when is_integer(target_guid) do
     %__MODULE__{type: :attacker_lost, target_guid: target_guid}
   end

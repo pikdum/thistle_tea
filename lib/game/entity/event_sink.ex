@@ -549,26 +549,25 @@ defmodule ThistleTea.Game.Entity.EventSink do
   def emit(entity, %Event{type: :drop_nearby_threat}), do: entity
 
   def emit(%Character{} = entity, %Event{type: :blade_flurry, target_guid: primary, damage: damage}) do
-    secondary =
-      entity
-      |> SpellTargetResolver.resolve_query({:caster_aoe, Scripts.blade_flurry_radius_yards()})
-      |> Enum.reject(&(&1 == primary))
-      |> random_target()
-
-    with secondary when is_integer(secondary) <- secondary,
-         %Spell{} = spell <- SpellLoader.load(Scripts.blade_flurry_damage_spell_id()),
-         %Spell.Effect{} = effect <- List.first(Spell.damage_effects(spell)) do
-      spell = %{spell | effects: [%{effect | base_points: damage, die_sides: 0}]}
-      context = CastContext.from_caster(entity, spell, secondary)
-      Entity.receive_spell(secondary, context, spell)
-    else
-      _ -> nil
-    end
+    deliver_secondary_melee(
+      entity,
+      primary,
+      damage,
+      Scripts.blade_flurry_damage_spell_id(),
+      Scripts.blade_flurry_radius_yards()
+    )
 
     entity
   end
 
   def emit(entity, %Event{type: :blade_flurry}), do: entity
+
+  def emit(%Character{} = entity, %Event{type: :secondary_melee} = event) do
+    deliver_secondary_melee(entity, event.target_guid, event.damage, event.spell_id, event.range_yards)
+    entity
+  end
+
+  def emit(entity, %Event{type: :secondary_melee}), do: entity
 
   def emit(%Character{} = entity, %Event{type: :refresh_party_aura, spell: %Spell{} = spell, amount: radius})
       when is_number(radius) do
@@ -1322,6 +1321,24 @@ defmodule ThistleTea.Game.Entity.EventSink do
 
   defp random_target([]), do: nil
   defp random_target(targets), do: Enum.random(targets)
+
+  defp deliver_secondary_melee(entity, primary, damage, spell_id, radius) do
+    secondary =
+      entity
+      |> SpellTargetResolver.resolve_query({:caster_aoe, radius})
+      |> Enum.reject(&(&1 == primary))
+      |> random_target()
+
+    with secondary when is_integer(secondary) <- secondary,
+         %Spell{} = spell <- SpellLoader.load(spell_id),
+         %Spell.Effect{} = effect <- List.first(Spell.damage_effects(spell)) do
+      spell = %{spell | effects: [%{effect | base_points: damage, die_sides: 0}]}
+      context = CastContext.from_caster(entity, spell, secondary)
+      Entity.receive_spell(secondary, context, spell)
+    else
+      _ -> nil
+    end
+  end
 
   defp dispatch_triggered_spell(%{object: %{guid: guid}} = entity, %Event{target_guid: guid} = event, spell) do
     context = trigger_context(entity, event, spell)

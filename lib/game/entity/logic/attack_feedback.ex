@@ -24,6 +24,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackFeedback do
     entity
     |> apply_power_feedback(payload, spell)
     |> apply_rogue_combo_feedback(payload, spell)
+    |> trigger_successful_melee_aura(payload, spell)
     |> trigger_blade_flurry(payload, spell)
     |> Paladin.trigger_seal(payload)
     |> trigger_melee_procs(payload, spell, now)
@@ -76,6 +77,23 @@ defmodule ThistleTea.Game.Entity.Logic.AttackFeedback do
 
   defp apply_rogue_combo_feedback(entity, _payload, _spell), do: entity
 
+  defp trigger_successful_melee_aura(
+         %{object: %{guid: guid}, unit: %{level: level}} = entity,
+         %{outcome: outcome},
+         %Spell{} = spell
+       )
+       when outcome in [:normal, :crit] and is_integer(guid) do
+    case Scripts.successful_melee_aura_spell_id(spell) do
+      spell_id when is_integer(spell_id) ->
+        Event.enqueue(entity, Event.trigger_spell(guid, level || 1, guid, spell_id, triggered_by_spell_id: spell.id))
+
+      _ ->
+        entity
+    end
+  end
+
+  defp trigger_successful_melee_aura(entity, _payload, _spell), do: entity
+
   defp trigger_blade_flurry(entity, %{victim_guid: victim_guid, damage: damage} = payload, spell)
        when is_integer(damage) do
     proc_damage = Map.get(payload, :proc_damage, damage)
@@ -98,7 +116,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackFeedback do
 
   defp blade_flurry_active?(_entity, _proc_type), do: false
 
-  defp trigger_melee_procs(entity, %{outcome: outcome, victim_guid: victim_guid}, spell, now)
+  defp trigger_melee_procs(entity, %{outcome: outcome, victim_guid: victim_guid} = payload, spell, now)
        when outcome in [:normal, :crit] and is_integer(victim_guid) and is_integer(now) do
     proc_type = if match?(%Spell{}, spell), do: :deal_melee_ability, else: :deal_melee_swing
 
@@ -108,6 +126,9 @@ defmodule ThistleTea.Game.Entity.Logic.AttackFeedback do
         outcome: outcome,
         proc_type: proc_type,
         spell: spell,
+        triggering_spell_id: Map.get(payload, :spell_id),
+        damage: Map.get(payload, :damage, 0),
+        proc_damage: Map.get(payload, :proc_damage, Map.get(payload, :damage, 0)),
         attack_time_ms: entity.unit.base_attack_time,
         now: now
       })
