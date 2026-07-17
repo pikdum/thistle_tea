@@ -17,6 +17,7 @@
     pkgs.inotify-tools
     pkgs.just
     pkgs.rsync
+    pkgs.sqlite
   ];
 
   # https://devenv.sh/languages/
