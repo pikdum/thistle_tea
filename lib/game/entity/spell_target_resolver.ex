@@ -13,16 +13,70 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
   alias ThistleTea.Game.World.System.Party, as: PartySystem
 
   @cone_arc_radians :math.pi() / 3
+  @chain_jump_radius 10.0
 
   def resolve(%{object: %{guid: caster_guid}} = caster, %Spell{} = spell, %Targets{} = targets) do
     query = pet_target_query(caster, spell) || SpellTarget.target_query(spell, targets)
 
-    caster
-    |> resolve_query(caster_guid, query)
-    |> Enum.filter(&creature_type_allowed?(spell, &1))
+    initial =
+      caster
+      |> resolve_query(caster_guid, query)
+      |> Enum.filter(&creature_type_allowed?(spell, &1))
+
+    expand_chain(caster, spell, initial)
   end
 
   def resolve(_caster, _spell, _targets), do: []
+
+  defp expand_chain(caster, %Spell{} = spell, [first | _] = initial) do
+    count = spell.effects |> Enum.map(&(&1.chain_targets || 0)) |> Enum.max(fn -> 0 end)
+
+    if count > 1 do
+      chain_targets(caster, spell, first, Enum.uniq(initial), count - length(initial))
+    else
+      initial
+    end
+  end
+
+  defp expand_chain(_caster, _spell, initial), do: initial
+
+  defp chain_targets(_caster, _spell, _previous, selected, remaining) when remaining <= 0, do: selected
+
+  defp chain_targets(caster, spell, previous, selected, remaining) do
+    case next_chain_target(caster, spell, previous, selected) do
+      nil -> selected
+      guid -> chain_targets(caster, spell, guid, selected ++ [guid], remaining - 1)
+    end
+  end
+
+  defp next_chain_target(caster, spell, previous, selected) do
+    case World.position(previous) do
+      {map, x, y, z} ->
+        ((:players |> World.nearby_units_exact(map, {x, y, z}, @chain_jump_radius)) ++
+           (:mobs |> World.nearby_units_exact(map, {x, y, z}, @chain_jump_radius)))
+        |> Enum.reject(fn {guid, _distance} -> guid in selected end)
+        |> Enum.filter(fn {guid, _distance} -> valid_chain_target?(caster, spell, guid) end)
+        |> Enum.min_by(&elem(&1, 1), fn -> nil end)
+        |> case do
+          {guid, _distance} -> guid
+          nil -> nil
+        end
+
+      _ ->
+        nil
+    end
+  end
+
+  defp valid_chain_target?(caster, %Spell{} = spell, guid) do
+    if Spell.requires_hostile_target?(spell) do
+      Hostility.valid_attack_target?(caster, guid)
+    else
+      case Metadata.query(guid, [:alive?]) do
+        %{alive?: true} -> Hostility.friendly?(caster, Metadata.query(guid, [:faction_template]))
+        _ -> false
+      end
+    end
+  end
 
   defp pet_target_query(%{unit: %{summon: pet_guid}}, %Spell{effects: effects})
        when is_integer(pet_guid) and pet_guid > 0 do

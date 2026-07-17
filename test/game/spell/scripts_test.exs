@@ -4,9 +4,9 @@ defmodule ThistleTea.Game.Spell.ScriptsTest do
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Scripts
 
-  test "druid finishers are derived from family flags" do
-    assert Scripts.finisher?(%Spell{spell_family: 7, family_flags_0: 0x00800000})
-    refute Scripts.finisher?(%Spell{spell_family: 7, family_flags_0: 0x00400000})
+  test "finishers are derived from DBC spell attributes" do
+    assert Scripts.finisher?(%Spell{attributes: MapSet.new([:finishing_move])})
+    refute Scripts.finisher?(%Spell{attributes: MapSet.new()})
   end
 
   describe "apply_trigger/1" do

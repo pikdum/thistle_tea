@@ -631,6 +631,8 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   @channeled_ex_1 0x00000004
   @channeled_ex_2 0x00000040
   @discount_power_on_miss_ex_1 0x08000000
+  @finishing_move_damage_ex_1 0x00100000
+  @finishing_move_duration_ex_1 0x00400000
   @ignore_line_of_sight_ex2 0x00000004
   @from_behind_ex2 0x00100000
   @from_behind_ex1 0x00000200
@@ -658,6 +660,8 @@ defmodule ThistleTea.Game.World.Loader.Spell do
     |> add_if(attrs_ex1, @channeled_ex_1, :channeled)
     |> add_if(attrs_ex1, @channeled_ex_2, :channeled)
     |> add_if(attrs_ex1, @discount_power_on_miss_ex_1, :discount_power_on_miss)
+    |> add_if(attrs_ex1, @finishing_move_damage_ex_1, :finishing_move)
+    |> add_if(attrs_ex1, @finishing_move_duration_ex_1, :finishing_move)
     |> add_if(attrs_ex2, @ignore_line_of_sight_ex2, :ignore_line_of_sight)
     |> add_if(attrs_ex3, @completely_blocked_ex3, :completely_blocked)
   end

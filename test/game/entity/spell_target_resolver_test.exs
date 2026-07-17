@@ -21,6 +21,26 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolverTest do
       assert SpellTargetResolver.resolve(caster, spell, targets) == [2]
     end
 
+    test "chains through nearest valid targets using DBC chain count" do
+      player_guid = player_guid()
+      first = mob_guid()
+      second = mob_guid()
+      third = mob_guid()
+
+      put_spatial_target(:players, player_guid, {0.0, 0.0, 0.0})
+      put_spatial_target(:mobs, first, {5.0, 0.0, 0.0})
+      put_spatial_target(:mobs, second, {14.0, 0.0, 0.0})
+      put_spatial_target(:mobs, third, {23.0, 0.0, 0.0})
+
+      caster = caster(player_guid, {0.0, 0.0, 0.0})
+
+      spell = %Spell{
+        effects: [%Effect{type: :school_damage, implicit_target_a: :target_enemy, chain_targets: 3}]
+      }
+
+      assert SpellTargetResolver.resolve(caster, spell, %Targets{unit_guid: first}) == [first, second, third]
+    end
+
     test "returns nearby mobs for player-cast caster aoe" do
       player_guid = player_guid()
       mob_guid = mob_guid()

@@ -44,7 +44,6 @@ defmodule ThistleTea.Game.Spell.Scripts do
 
   @spell_family_mage 3
   @spell_family_warlock 5
-  @spell_family_druid 7
   @spell_family_paladin 10
   @mage_armor_family_flags 0x12000000
   @paladin_seal_family_flags 0x0A000200
@@ -72,33 +71,7 @@ defmodule ThistleTea.Game.Spell.Scripts do
   @last_stand_health_buff 12_976
   @last_stand_health_fraction 0.3
   @soul_link 19_028
-  @rogue_finishers [
-    408,
-    8643,
-    6760,
-    6761,
-    6762,
-    8623,
-    8624,
-    11_299,
-    11_300,
-    8647,
-    8649,
-    8650,
-    11_197,
-    11_198,
-    1943,
-    8639,
-    8640,
-    11_273,
-    11_274,
-    11_275,
-    5171,
-    6774
-  ]
-
-  def requires_combo_target?(%Spell{id: id} = spell),
-    do: id in @overpower_ranks or id in @rogue_finishers or druid_finisher?(spell)
+  def requires_combo_target?(%Spell{id: id} = spell), do: id in @overpower_ranks or finisher?(spell)
 
   def requires_combo_target?(_spell), do: false
 
@@ -133,14 +106,8 @@ defmodule ThistleTea.Game.Spell.Scripts do
   def ap_percent_damage?(%Spell{id: id}), do: id in @bloodthirst_ranks
   def ap_percent_damage?(_spell), do: false
 
-  def finisher?(%Spell{id: id}) when id in @rogue_finishers, do: true
-  def finisher?(%Spell{} = spell), do: druid_finisher?(spell)
+  def finisher?(%Spell{} = spell), do: Spell.attribute?(spell, :finishing_move)
   def finisher?(_spell), do: false
-
-  defp druid_finisher?(%Spell{spell_family: @spell_family_druid, family_flags_0: flags}) when is_integer(flags),
-    do: (flags &&& 0x00800000) != 0
-
-  defp druid_finisher?(_spell), do: false
 
   def finisher_duration_ms(%Spell{name: "Slice and Dice"}, points), do: 6_000 + points * 3_000
   def finisher_duration_ms(%Spell{name: "Rupture"}, points), do: 4_000 + points * 2_000
