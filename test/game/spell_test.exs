@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.SpellTest do
   use ExUnit.Case, async: true
 
+  alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Effect
 
@@ -72,6 +73,25 @@ defmodule ThistleTea.Game.SpellTest do
       assert Spell.family_flag?(spell, 5, 0x1, 1)
       refute Spell.family_flag?(spell, 8, 0x4)
       refute Spell.family_flag?(spell, 5, 0x2)
+    end
+  end
+
+  describe "vmangos_script?/2" do
+    test "matches only the script label carried by the spell" do
+      spell = %Spell{script_name: "spell_rogue_vanish"}
+
+      assert Spell.vmangos_script?(spell, "spell_rogue_vanish")
+      refute Spell.vmangos_script?(spell, "spell_rogue_eviscerate")
+      refute Spell.vmangos_script?(%Spell{}, "spell_rogue_vanish")
+    end
+  end
+
+  describe "Event.trigger_spell/5" do
+    test "carries data-driven custom effect points" do
+      event = Event.trigger_spell(1, 60, 2, 25_503, effect_index: 0, base_points: -27)
+
+      assert event.slot == 0
+      assert event.amount == -27
     end
   end
 

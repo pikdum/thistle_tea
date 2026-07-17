@@ -3,16 +3,12 @@ defmodule ThistleTea.Game.Entity.Logic.Shaman do
   Pure Shaman weapon-imbue proc decisions. Enchantment and VMangos PPM data
   are supplied by the player boundary.
   """
-  import Bitwise, only: [&&&: 2]
-
   alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
 
-  @shaman_family 11
-  @flametongue_attack_mask 0x00200000
   @flametongue_damage_spell 10_444
 
   def trigger_weapon_enchant(entity, payload, proc, ppm, roll \\ &:rand.uniform/0)
@@ -45,10 +41,7 @@ defmodule ThistleTea.Game.Entity.Logic.Shaman do
     )
   end
 
-  defp flametongue_proc?(%Spell{spell_family: @shaman_family, family_flags_0: flags}) when is_integer(flags),
-    do: (flags &&& @flametongue_attack_mask) != 0
-
-  defp flametongue_proc?(_spell), do: false
+  defp flametongue_proc?(%Spell{} = spell), do: Spell.vmangos_script?(spell, "spell_shaman_flametongue_proc_dummy")
 
   defp trigger_flametongue(entity, victim_guid, proc_spell, attack_time_ms) do
     with %Spell{} = damage_spell <- SpellLoader.load(@flametongue_damage_spell),

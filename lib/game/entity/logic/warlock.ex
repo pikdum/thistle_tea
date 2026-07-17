@@ -17,10 +17,7 @@ defmodule ThistleTea.Game.Entity.Logic.Warlock do
 
   @spell_family 5
   @immolate_family_mask 0x00000004
-  @conflagrate_family_mask 0x00000200
   @agony_family_mask 0x00000400
-  @life_tap_family_mask 0x00040000
-  @demonic_sacrifice 18_788
   @healthstone_items %{
     6201 => {5512, 19_004, 19_005},
     6202 => {5511, 19_006, 19_007},
@@ -30,7 +27,7 @@ defmodule ThistleTea.Game.Entity.Logic.Warlock do
   }
   @sacrifice_buffs %{416 => 18_789, 1860 => 18_790, 1863 => 18_791, 417 => 18_792}
 
-  def life_tap?(%Spell{} = spell), do: Spell.family_flag?(spell, @spell_family, @life_tap_family_mask)
+  def life_tap?(%Spell{} = spell), do: Spell.vmangos_script?(spell, "spell_warlock_life_tap")
   def life_tap?(_spell), do: false
 
   def life_tap_cost(%Spell{} = spell) do
@@ -51,7 +48,7 @@ defmodule ThistleTea.Game.Entity.Logic.Warlock do
     end
   end
 
-  def conflagrate?(%Spell{} = spell), do: Spell.family_flag?(spell, @spell_family, @conflagrate_family_mask)
+  def conflagrate?(%Spell{} = spell), do: Spell.vmangos_script?(spell, "spell_warlock_conflagrate")
   def conflagrate?(_spell), do: false
 
   def immolate?(%Spell{} = spell), do: Spell.family_flag?(spell, @spell_family, @immolate_family_mask)
@@ -60,7 +57,7 @@ defmodule ThistleTea.Game.Entity.Logic.Warlock do
   def curse_of_agony?(%Spell{} = spell), do: Spell.family_flag?(spell, @spell_family, @agony_family_mask)
   def curse_of_agony?(_spell), do: false
 
-  def demonic_sacrifice?(%Spell{id: @demonic_sacrifice}), do: true
+  def demonic_sacrifice?(%Spell{} = spell), do: Spell.vmangos_script?(spell, "spell_warlock_demonic_sacrifice")
   def demonic_sacrifice?(_spell), do: false
 
   def immolate_source?(sources, caster_guid) do

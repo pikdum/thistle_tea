@@ -191,18 +191,22 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
 
   defp activate_auto_shot(
          %Character{internal: %Internal{} = internal} = character,
-         %Cast{spell: %Spell{name: "Auto Shot"} = spell, targets: %Targets{unit_guid: target_guid, raw: raw}},
+         %Cast{spell: %Spell{} = spell, targets: %Targets{unit_guid: target_guid, raw: raw}},
          now
        )
        when is_integer(target_guid) and target_guid > 0 do
-    auto_shot = %{
-      spell: spell,
-      target_guid: target_guid,
-      raw_targets: raw,
-      next_at: now + character.unit.ranged_attack_time
-    }
+    if Hunter.auto_shot?(spell) do
+      auto_shot = %{
+        spell: spell,
+        target_guid: target_guid,
+        raw_targets: raw,
+        next_at: now + character.unit.ranged_attack_time
+      }
 
-    %{character | internal: %{internal | auto_shot: auto_shot}}
+      %{character | internal: %{internal | auto_shot: auto_shot}}
+    else
+      character
+    end
   end
 
   defp activate_auto_shot(character, _casting, _now), do: character

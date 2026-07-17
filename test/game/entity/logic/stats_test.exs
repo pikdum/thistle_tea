@@ -197,11 +197,12 @@ defmodule ThistleTea.Game.Entity.Logic.StatsTest do
 
       assert bear.normal_resistance == 840
       assert bear.attack_power == 170
-      assert bear.base_attack_time == 1_000
-      assert_in_delta bear.min_damage, 40 * 0.85 + 170 / 14, 0.01
+      assert bear.base_attack_time == 2_500
+      assert_in_delta bear.min_damage, 40 * 0.85 * 2.5 + 170 / 14 * 2.5, 0.01
 
       cat = recompute(%{bear | shapeshift_form: 1, auras: []})
       assert cat.attack_power == 80 * 2 + 70 - 20
+      assert cat.base_attack_time == 1_000
     end
 
     test "skips weapon damage without base inputs" do

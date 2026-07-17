@@ -208,6 +208,42 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
       assert [%{type: :movement_root_changed, rooted?: false}] = events
       refute entity.internal.rooted?
     end
+
+    test "runs VMangos aura removal scripts after expiration" do
+      entity = fixture_entity()
+
+      spell = %Spell{
+        id: 19_386,
+        script_name: "spell_hunter_wyvern_sting",
+        duration_ms: 12_000,
+        effects: [%Effect{index: 0, type: :apply_aura, aura: :mod_stun}]
+      }
+
+      {entity, _events} = apply_spell(entity, 999, 60, spell)
+      expires_at = entity.unit.auras |> hd() |> Map.fetch!(:expires_at)
+      {_entity, events} = Aura.expire_due(entity, expires_at)
+
+      assert Enum.any?(events, fn event ->
+               event.type == :trigger_spell and event.source_guid == 999 and event.target_guid == 1 and
+                 event.spell_id == 24_131
+             end)
+    end
+
+    test "ignores spell IDs without the VMangos aura script label" do
+      entity = fixture_entity()
+
+      spell = %Spell{
+        id: 19_386,
+        duration_ms: 12_000,
+        effects: [%Effect{index: 0, type: :apply_aura, aura: :mod_stun}]
+      }
+
+      {entity, _events} = apply_spell(entity, 999, 60, spell)
+      expires_at = entity.unit.auras |> hd() |> Map.fetch!(:expires_at)
+      {_entity, events} = Aura.expire_due(entity, expires_at)
+
+      refute Enum.any?(events, &(&1.type == :trigger_spell))
+    end
   end
 
   describe "tick/2 with periodic_damage" do

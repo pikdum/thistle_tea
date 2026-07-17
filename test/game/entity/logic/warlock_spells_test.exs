@@ -33,6 +33,7 @@ defmodule ThistleTea.Game.Entity.Logic.WarlockSpellsTest do
       spell = %Spell{
         id: 1454,
         name: "Life Tap",
+        script_name: "spell_warlock_life_tap",
         school: :shadow,
         spell_family: 5,
         family_flags_0: 0x00040000,
@@ -80,7 +81,16 @@ defmodule ThistleTea.Game.Entity.Logic.WarlockSpellsTest do
   describe "Conflagrate" do
     test "validation requires the caster's Immolate metadata" do
       caster = character()
-      spell = %Spell{id: 17_962, name: "Conflagrate", school: :fire, spell_family: 5, family_flags_0: 0x00000200}
+
+      spell = %Spell{
+        id: 17_962,
+        name: "Conflagrate",
+        script_name: "spell_warlock_conflagrate",
+        school: :fire,
+        spell_family: 5,
+        family_flags_0: 0x00000200
+      }
+
       target_info = %{alive?: true, hostile?: true, attackable?: true, aura_sources: MapSet.new()}
 
       assert CastValidation.validate(caster, spell, %Targets{unit_guid: 2}, target_info, 1_000) ==
@@ -105,6 +115,7 @@ defmodule ThistleTea.Game.Entity.Logic.WarlockSpellsTest do
       spell = %Spell{
         id: 17_962,
         name: "Conflagrate",
+        script_name: "spell_warlock_conflagrate",
         school: :fire,
         spell_family: 5,
         family_flags_0: 0x00000200,
@@ -123,6 +134,7 @@ defmodule ThistleTea.Game.Entity.Logic.WarlockSpellsTest do
       spell = %Spell{
         id: 17_962,
         name: "Conflagrate",
+        script_name: "spell_warlock_conflagrate",
         school: :fire,
         spell_family: 5,
         family_flags_0: 0x00000200,
@@ -179,7 +191,13 @@ defmodule ThistleTea.Game.Entity.Logic.WarlockSpellsTest do
 
   describe "Demonic Sacrifice" do
     test "kills the pet and triggers the demon-specific owner buff" do
-      spell = %Spell{id: 18_788, name: "Demonic Sacrifice", effects: [%Effect{type: :instakill}]}
+      spell = %Spell{
+        id: 18_788,
+        name: "Demonic Sacrifice",
+        script_name: "spell_warlock_demonic_sacrifice",
+        effects: [%Effect{type: :instakill}]
+      }
+
       context = %CastContext{caster_guid: 1, caster_level: 40}
       pet = mob()
       pet = %{pet | object: %Object{guid: 2, entry: 416}}

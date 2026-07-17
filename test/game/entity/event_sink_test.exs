@@ -114,6 +114,25 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
     end
 
     @tag :dbc_db
+    test "a custom trigger overrides the selected DBC effect points" do
+      caster_guid = Guid.from_low_guid(:player, unique_guid())
+
+      caster = %Character{
+        object: %Object{guid: caster_guid},
+        unit: %Unit{level: 60, auras: []},
+        player: %Player{},
+        internal: %Internal{world: %WorldRef{map_id: 0}},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
+      }
+
+      event = Event.trigger_spell(caster_guid, 60, caster_guid, 25_503, effect_index: 1, base_points: -16)
+
+      result = EventSink.emit(caster, event)
+
+      assert [%{spell: %Spell{id: 25_503}, auras: [%{amount: -16}]}] = result.unit.auras
+    end
+
+    @tag :dbc_db
     test "a remote command trigger stays targeted on the victim" do
       caster_guid = Guid.from_low_guid(:player, unique_guid())
       target_guid = Guid.from_low_guid(:mob, 1, unique_guid())

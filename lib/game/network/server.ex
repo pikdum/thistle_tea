@@ -263,8 +263,8 @@ defmodule ThistleTea.Game.Network.Server do
     {:noreply, {socket, %{state | character: character}}, {:continue, :maybe_broadcast_update}}
   end
 
-  def handle_cast(:drain_rage, {socket, %{character: %Character{} = character} = state}) do
-    character = Resources.drain_rage(character)
+  def handle_cast({:drain_power, power_type}, {socket, %{character: %Character{} = character} = state}) do
+    character = Resources.drain_power(character, power_type)
     {:noreply, {socket, %{state | character: character}}, {:continue, :maybe_broadcast_update}}
   end
 

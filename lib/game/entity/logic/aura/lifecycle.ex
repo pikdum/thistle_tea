@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Lifecycle do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.Aura.MovementSync
   alias ThistleTea.Game.Entity.Logic.Aura.PlayerSync
+  alias ThistleTea.Game.Entity.Logic.Aura.Script
   alias ThistleTea.Game.Entity.Logic.Aura.StealthSync
   alias ThistleTea.Game.Entity.Logic.Aura.UnitSync
   alias ThistleTea.Game.Entity.Logic.Core
@@ -146,6 +147,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Lifecycle do
 
   defp remove_and_sync(entity, kept, now) do
     removed = entity.unit.auras -- kept
+    script_events = Script.after_remove(entity, removed)
     {entity, cooldown_events} = Cooldowns.activate_on_event(entity, removed, now)
     unit = UnitSync.sync_unit(%{entity.unit | auras: kept})
 
@@ -155,7 +157,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Lifecycle do
       |> StealthSync.sync()
       |> MovementSync.sync_movement_state(now)
 
-    {Core.mark_broadcast_update(entity), cooldown_events ++ events}
+    {Core.mark_broadcast_update(entity), cooldown_events ++ script_events ++ events}
   end
 
   defp cancelable?(%Holder{negative?: true}), do: false

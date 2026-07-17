@@ -9,9 +9,14 @@ defmodule ThistleTea.Game.Entity.Logic.Hunter do
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.Entity.Logic.PlayerCombat
+  alias ThistleTea.Game.Entity.Logic.Reactive
   alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.Cooldowns
 
   @item_class_projectile 6
+  @hunter_family 9
+  @auto_shot_family_mask 0x00000001
+  @refocus_family_mask 0x00023800
 
   def validate_ammo(%Spell{} = spell, ammo_id, ammo_template, equipped_items, count_item)
       when is_list(equipped_items) do
@@ -34,6 +39,21 @@ defmodule ThistleTea.Game.Entity.Logic.Hunter do
 
   def validate_feed(%Spell{} = spell, feed_context) do
     if feed_pet?(spell), do: validate_feed_context(feed_context), else: :ok
+  end
+
+  def validate_reactive(caster, %Spell{} = spell, target_guid, now) do
+    outcome =
+      cond do
+        Spell.vmangos_script?(spell, "spell_hunter_mongoose_bite") -> :dodge
+        Spell.vmangos_script?(spell, "spell_hunter_counterattack") -> :parry
+        true -> nil
+      end
+
+    if is_nil(outcome) or Reactive.defense_target_active?(caster, target_guid, outcome, now) do
+      :ok
+    else
+      {:error, :bad_targets}
+    end
   end
 
   def feed_benefit(%{item: %{item_level: item_level}, pet: %{level: pet_level}} = feed_context) do
@@ -81,6 +101,28 @@ defmodule ThistleTea.Game.Entity.Logic.Hunter do
   end
 
   def after_aura(entity, _spell, _now), do: {entity, []}
+
+  def auto_shot?(%Spell{} = spell) do
+    Spell.family_flag?(spell, @hunter_family, @auto_shot_family_mask) and
+      Enum.any?(spell.effects, &(&1.type == :weapon_damage))
+  end
+
+  def auto_shot?(_spell), do: false
+
+  def reset_cooldowns(entity, %Spell{} = spell) do
+    cond do
+      Spell.vmangos_script?(spell, "spell_hunter_readiness") ->
+        Cooldowns.reset_matching(entity, &(&1.spell_family == @hunter_family and &1.id != spell.id))
+
+      Spell.vmangos_script?(spell, "spell_hunter_refocus") ->
+        Cooldowns.reset_matching(entity, &Spell.family_flag?(&1, @hunter_family, @refocus_family_mask))
+
+      true ->
+        entity
+    end
+  end
+
+  def reset_cooldowns(entity, _spell), do: entity
 
   defp apply_feign_death(character, now) do
     {character, mob_guids} = PlayerCombat.vanish(character, now)

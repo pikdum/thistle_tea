@@ -184,6 +184,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
   defp melee_crit_chance(_caster), do: nil
 
   defp caster_power(%{unit: %{power_type: 1, power2: rage}}) when is_integer(rage), do: rage
+  defp caster_power(%{unit: %{power_type: 3, power4: energy}}) when is_integer(energy), do: energy
   defp caster_power(_caster), do: nil
 
   defp main_hand_template(%Character{player: player}) when is_struct(player) do

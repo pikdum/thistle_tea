@@ -296,6 +296,17 @@ defmodule ThistleTea.Game.Entity.EventSink do
 
   def emit(entity, %Event{type: :cooldown_event}), do: entity
 
+  def emit(%Character{} = entity, %Event{type: :clear_cooldown} = event) do
+    Network.send_packet(%Message.SmsgClearCooldown{
+      spell_id: event.spell_id,
+      target_guid: event.target_guid
+    })
+
+    entity
+  end
+
+  def emit(entity, %Event{type: :clear_cooldown}), do: entity
+
   def emit(%{object: %{guid: guid}} = entity, %Event{type: :spell_go} = event) when is_integer(guid) do
     %Message.SmsgSpellGo{
       cast_item: event.cast_item_guid || event.source_guid || guid,
@@ -427,9 +438,9 @@ defmodule ThistleTea.Game.Entity.EventSink do
     entity
   end
 
-  def emit(entity, %Event{type: :drain_rage, target_guid: target_guid}) do
+  def emit(entity, %Event{type: :drain_power, target_guid: target_guid, misc_value: power_type}) do
     if Guid.entity_type(target_guid) == :player do
-      Entity.drain_rage(target_guid)
+      Entity.drain_power(target_guid, power_type)
     end
 
     entity
@@ -979,6 +990,8 @@ defmodule ThistleTea.Game.Entity.EventSink do
         entity
 
       spell ->
+        spell = apply_trigger_override(spell, event)
+
         case triggered_target(entity, event, spell) do
           nil ->
             entity
@@ -1116,6 +1129,19 @@ defmodule ThistleTea.Game.Entity.EventSink do
     context = trigger_context(entity, event, spell)
     emit(entity, Event.deliver_spell(event.target_guid, context, spell))
   end
+
+  defp apply_trigger_override(%Spell{effects: effects} = spell, %Event{slot: index, amount: amount})
+       when is_integer(index) and is_integer(amount) do
+    effects =
+      Enum.map(effects, fn
+        %Spell.Effect{index: ^index} = effect -> %{effect | base_points: amount, die_sides: 0}
+        effect -> effect
+      end)
+
+    %{spell | effects: effects}
+  end
+
+  defp apply_trigger_override(spell, _event), do: spell
 
   defp triggered_target(%{object: %{guid: guid}} = entity, %Event{source_guid: guid} = event, spell) do
     SpellTarget.redirect_trigger_target(entity, event.target_guid, spell)

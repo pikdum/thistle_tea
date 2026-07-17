@@ -31,6 +31,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Loader.SpellScript, as: SpellScriptLoader
+  alias ThistleTea.Game.World.Loader.SpellScriptName, as: SpellScriptNameLoader
   alias ThistleTea.Game.World.Loader.SpellThreat, as: SpellThreatLoader
   alias ThistleTea.Game.World.Loader.Summon, as: SummonLoader
   alias ThistleTea.Game.World.Loader.Trainer, as: TrainerLoader
@@ -126,6 +127,7 @@ defmodule ThistleTea.Application do
     FishingLoader.init()
     SpellLoader.init()
     SpellScriptLoader.init()
+    SpellScriptNameLoader.init()
     SpellThreatLoader.init()
     TrainerLoader.init()
     ClassSpellLoader.init()
@@ -196,6 +198,7 @@ defmodule ThistleTea.Application do
         LootLoader.load_fishing()
         MailLoader.load_all()
         SpellScriptLoader.load_all()
+        SpellScriptNameLoader.load_all()
         SpellThreatLoader.load_all()
         Logger.info("Seeding debug data...")
         ThistleTea.DevSeed.run()

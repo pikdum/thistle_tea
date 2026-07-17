@@ -112,7 +112,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
 
     case result.outcome do
       outcome when outcome in [:miss, :dodge, :parry, :block] ->
-        target = maybe_mark_defense(target, outcome, now)
+        target = maybe_mark_defense(target, context.caster_guid, outcome, now)
         {target, melee_avoid_events(target, context, spell, outcome)}
 
       _hit ->
@@ -231,7 +231,9 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
           apply_damage_effect(state, context, spell, effect, now)
       end
 
-    consume_conflagrate_immolate(result, context, spell, now)
+    result
+    |> consume_conflagrate_immolate(context, spell, now)
+    |> consume_ferocious_bite_energy(context, spell)
   end
 
   defp apply_effect(state, %CastContext{} = context, spell, %Effect{type: :health_leech} = effect, now) do
@@ -506,42 +508,50 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
 
   defp apply_effect(state, _context, _spell, _effect, _now), do: {state, []}
 
-  defp apply_class_dummy(state, context, spell, effect, dummy_effect, now) do
-    case dummy_effect do
-      :execute ->
-        apply_execute(state, context, spell, effect, now)
+  defp apply_class_dummy(state, context, spell, effect, :execute, now) do
+    apply_execute(state, context, spell, effect, now)
+  end
 
-      :last_stand ->
-        event =
-          Event.trigger_spell(
-            context.caster_guid,
-            context.caster_level,
-            state.object.guid,
-            Scripts.last_stand_health_buff_id()
-          )
+  defp apply_class_dummy(state, context, _spell, _effect, :last_stand, _now) do
+    event =
+      Event.trigger_spell(
+        context.caster_guid,
+        context.caster_level,
+        state.object.guid,
+        Scripts.last_stand_health_buff_id()
+      )
 
-        {state, [event]}
+    {state, [event]}
+  end
 
-      :preparation ->
-        {Cooldowns.reset_family(state, Scripts.rogue_spell_family()), []}
+  defp apply_class_dummy(state, _context, _spell, _effect, :preparation, _now) do
+    {Cooldowns.reset_family(state, Scripts.rogue_spell_family()), []}
+  end
 
-      {:holy_shock, spell_ids} ->
-        spell_id = if context.target_hostile?, do: spell_ids.damage, else: spell_ids.heal
-        {state, [Event.trigger_spell(context.caster_guid, context.caster_level, state.object.guid, spell_id)]}
+  defp apply_class_dummy(state, _context, spell, _effect, :hunter_cooldowns, _now) do
+    {Hunter.reset_cooldowns(state, spell), []}
+  end
 
-      :judgement_of_command ->
-        spell_id = Effect.damage_roll(effect)
+  defp apply_class_dummy(state, _context, spell, _effect, :druid_enrage, _now) do
+    {state, List.wrap(Druid.enrage_event(state, spell))}
+  end
 
-        if spell_id > 1 do
-          {state, [Event.trigger_spell(context.caster_guid, context.caster_level, state.object.guid, spell_id)]}
-        else
-          {state, []}
-        end
+  defp apply_class_dummy(state, context, _spell, _effect, {:holy_shock, spell_ids}, _now) do
+    spell_id = if context.target_hostile?, do: spell_ids.damage, else: spell_ids.heal
+    {state, [Event.trigger_spell(context.caster_guid, context.caster_level, state.object.guid, spell_id)]}
+  end
 
-      _unscripted ->
-        {state, []}
+  defp apply_class_dummy(state, context, _spell, effect, :judgement_of_command, _now) do
+    spell_id = Effect.damage_roll(effect)
+
+    if spell_id > 1 do
+      {state, [Event.trigger_spell(context.caster_guid, context.caster_level, state.object.guid, spell_id)]}
+    else
+      {state, []}
     end
   end
+
+  defp apply_class_dummy(state, _context, _spell, _effect, _unscripted, _now), do: {state, []}
 
   defp vmangos_script_events(state, %CastContext{} = context, %Spell{script_steps: steps}) when is_list(steps) do
     Enum.flat_map(steps, fn
@@ -718,7 +728,16 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   defp school_atom(%Spell{} = spell), do: Enum.at(@schools, Spell.school_index(spell), :physical)
 
   defp school_damage_roll(%CastContext{} = context, spell, %Effect{} = effect) do
-    roll = effect_amount(spell, effect, context.combo_points) + eviscerate_attack_power(spell, context)
+    roll =
+      effect_amount(spell, effect, context.combo_points) +
+        eviscerate_attack_power(spell, context) +
+        Druid.ferocious_bite_bonus(
+          spell,
+          context.attack_power,
+          context.combo_points,
+          context.caster_power,
+          effect.damage_multiplier
+        )
 
     if Scripts.ap_percent_damage?(spell) do
       trunc(roll * (context.attack_power || 0) / 100)
@@ -778,11 +797,11 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
 
   defp attack_power_bonus(_context, _speed_seconds), do: 0
 
-  defp maybe_mark_defense(state, outcome, now) when outcome in [:dodge, :parry, :block] do
-    Reactive.mark_defense(state, now)
+  defp maybe_mark_defense(state, attacker_guid, outcome, now) when outcome in [:dodge, :parry, :block] do
+    Reactive.mark_defense(state, attacker_guid, outcome, now)
   end
 
-  defp maybe_mark_defense(state, _outcome, _now), do: state
+  defp maybe_mark_defense(state, _attacker_guid, _outcome, _now), do: state
 
   defp apply_execute(state, %CastContext{} = context, spell, %Effect{} = effect, now) do
     rage = context.caster_power || 0
@@ -791,7 +810,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
 
     {state, events} = melee_ability_damage(state, context, damage_spell, damage, now)
 
-    {state, events ++ [Event.drain_rage(context.caster_guid)]}
+    {state, events ++ [Event.drain_power(context.caster_guid, 1)]}
   end
 
   defp melee_ability_damage(state, %CastContext{} = context, spell, damage, now) do
@@ -893,6 +912,14 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
     if Warlock.conflagrate?(spell) do
       {state, aura_events} = Warlock.consume_immolate(state, caster_guid, now)
       {state, events ++ aura_events}
+    else
+      {state, events}
+    end
+  end
+
+  defp consume_ferocious_bite_energy({state, events}, %CastContext{} = context, %Spell{} = spell) do
+    if Druid.ferocious_bite?(spell) do
+      {state, events ++ [Event.drain_power(context.caster_guid, 3)]}
     else
       {state, events}
     end

@@ -77,8 +77,8 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
     }
   end
 
-  def drain_rage(target_guid) when is_integer(target_guid) do
-    %__MODULE__{type: :drain_rage, target_guid: target_guid}
+  def drain_power(target_guid, power_type) when is_integer(target_guid) and is_integer(power_type) do
+    %__MODULE__{type: :drain_power, target_guid: target_guid, misc_value: power_type}
   end
 
   def grant_power(target_guid, power_type, amount)
@@ -184,6 +184,10 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
 
   def cooldown_event(source_guid, spell_id) when is_integer(source_guid) and is_integer(spell_id) do
     %__MODULE__{type: :cooldown_event, source_guid: source_guid, spell_id: spell_id}
+  end
+
+  def clear_cooldown(target_guid, spell_id) when is_integer(target_guid) and is_integer(spell_id) do
+    %__MODULE__{type: :clear_cooldown, target_guid: target_guid, spell_id: spell_id}
   end
 
   def stand_state(stand_state) when is_integer(stand_state) do
@@ -415,7 +419,9 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
       source_level: source_level,
       target_guid: target_guid,
       spell_id: spell_id,
-      target_role: Keyword.get(opts, :target_role)
+      target_role: Keyword.get(opts, :target_role),
+      slot: Keyword.get(opts, :effect_index),
+      amount: Keyword.get(opts, :base_points)
     }
   end
 

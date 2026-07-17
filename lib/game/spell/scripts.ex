@@ -51,7 +51,6 @@ defmodule ThistleTea.Game.Spell.Scripts do
   @mage_armor_family_flags 0x12000000
   @paladin_seal_family_flags 0x0A000200
   @paladin_blessing_family_flags 0x10000100
-  @judgement_of_command_icon 561
   @warlock_armor_visual 130
   @warlock_armor_icon 89
   @hunter_aspect_active_icon 122
@@ -71,11 +70,7 @@ defmodule ThistleTea.Game.Spell.Scripts do
   def shapeshift_passives(form), do: Map.get(@shapeshift_passives, form, [])
 
   @overpower_family_mask 0x00000004
-  @bloodthirst_family_mask 0x02000000
-  @execute_family_mask 0x20000000
   @execute_damage_spell 20_647
-  @rogue_vanish_family_mask 0x00000800
-  @rogue_eviscerate_family_mask 0x00020000
   @rogue_stealth_family_mask 0x00400000
   @rogue_misc_family_mask 0x40000000
   @blade_flurry_damage_spell 22_482
@@ -96,12 +91,18 @@ defmodule ThistleTea.Game.Spell.Scripts do
 
   def dummy_effect(%Spell{id: @last_stand}), do: :last_stand
   def dummy_effect(%Spell{id: @preparation}), do: :preparation
-  def dummy_effect(%Spell{id: id}) when is_map_key(@holy_shock, id), do: {:holy_shock, Map.fetch!(@holy_shock, id)}
+
+  def dummy_effect(%Spell{id: id} = spell) when is_map_key(@holy_shock, id) do
+    if Spell.vmangos_script?(spell, "spell_paladin_holy_shock"), do: {:holy_shock, Map.fetch!(@holy_shock, id)}
+  end
 
   def dummy_effect(%Spell{} = spell) do
     cond do
-      judgement_of_command_dummy?(spell) -> :judgement_of_command
-      warrior_family_flag?(spell, @execute_family_mask) -> :execute
+      Spell.vmangos_script?(spell, "spell_paladin_judgement_of_command_dummy") -> :judgement_of_command
+      Spell.vmangos_script?(spell, "spell_warrior_execute_dummy") -> :execute
+      Spell.vmangos_script?(spell, "spell_hunter_readiness") -> :hunter_cooldowns
+      Spell.vmangos_script?(spell, "spell_hunter_refocus") -> :hunter_cooldowns
+      Spell.vmangos_script?(spell, "spell_druid_enrage") -> :druid_enrage
       Warlock.life_tap?(spell) -> :life_tap
       true -> nil
     end
@@ -109,9 +110,8 @@ defmodule ThistleTea.Game.Spell.Scripts do
 
   def dummy_effect(_spell), do: nil
 
-  def judgement_of_command_damage?(%Spell{spell_family: 0, spell_icon: @judgement_of_command_icon} = spell) do
-    Enum.any?(spell.effects, &(&1.type == :school_damage))
-  end
+  def judgement_of_command_damage?(%Spell{} = spell),
+    do: Spell.vmangos_script?(spell, "spell_paladin_judgement_of_command_damage")
 
   def judgement_of_command_damage?(_spell), do: false
 
@@ -130,19 +130,19 @@ defmodule ThistleTea.Game.Spell.Scripts do
 
   def last_stand_health_buff_id, do: @last_stand_health_buff
 
-  def ap_percent_damage?(%Spell{} = spell), do: warrior_family_flag?(spell, @bloodthirst_family_mask)
+  def ap_percent_damage?(%Spell{} = spell), do: Spell.vmangos_script?(spell, "spell_warrior_bloodthirst")
   def ap_percent_damage?(_spell), do: false
 
   def finisher?(%Spell{} = spell), do: Spell.attribute?(spell, :finishing_move)
   def finisher?(_spell), do: false
 
-  def rogue_vanish?(%Spell{} = spell), do: rogue_family_flag?(spell, @rogue_vanish_family_mask)
+  def rogue_vanish?(%Spell{} = spell), do: Spell.vmangos_script?(spell, "spell_rogue_vanish")
   def rogue_vanish?(_spell), do: false
 
   def rogue_stealth?(%Spell{} = spell), do: rogue_family_flag?(spell, @rogue_stealth_family_mask)
   def rogue_stealth?(_spell), do: false
 
-  def rogue_eviscerate?(%Spell{} = spell), do: rogue_family_flag?(spell, @rogue_eviscerate_family_mask)
+  def rogue_eviscerate?(%Spell{} = spell), do: Spell.vmangos_script?(spell, "spell_rogue_eviscerate")
   def rogue_eviscerate?(_spell), do: false
 
   def rogue_blade_flurry?(%Spell{effects: effects} = spell) do
@@ -234,14 +234,6 @@ defmodule ThistleTea.Game.Spell.Scripts do
     row.spell_class_set == @spell_family_paladin and
       Enum.any?(0..2, &(Map.get(row, :"effect_#{&1}") == 35))
   end
-
-  defp judgement_of_command_dummy?(
-         %Spell{spell_family: @spell_family_paladin, spell_icon: @judgement_of_command_icon} = spell
-       ) do
-    Enum.any?(spell.effects, &(&1.type == :dummy))
-  end
-
-  defp judgement_of_command_dummy?(_spell), do: false
 
   defp warrior_family_flag?(%Spell{spell_family: @spell_family_warrior, family_flags_0: flags}, mask)
        when is_integer(flags), do: (flags &&& mask) != 0

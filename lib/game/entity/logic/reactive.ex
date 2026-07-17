@@ -20,11 +20,25 @@ defmodule ThistleTea.Game.Entity.Logic.Reactive do
   @warrior 1
   @healthless_threshold 0.2
 
-  def mark_defense(%Character{internal: %Internal{} = internal} = entity, now) when is_integer(now) do
-    sync(%{entity | internal: %{internal | defense_state_until: now + @window_ms}}, now)
+  def mark_defense(%Character{internal: %Internal{}} = entity, now) when is_integer(now) do
+    mark_defense(entity, nil, nil, now)
   end
 
   def mark_defense(entity, _now), do: entity
+
+  def mark_defense(%Character{internal: %Internal{} = internal} = entity, target_guid, outcome, now)
+      when outcome in [:dodge, :parry, :block, nil] and is_integer(now) do
+    internal = %{
+      internal
+      | defense_state_until: now + @window_ms,
+        defense_target_guid: target_guid,
+        defense_outcome: outcome
+    }
+
+    sync(%{entity | internal: internal}, now)
+  end
+
+  def mark_defense(entity, _target_guid, _outcome, _now), do: entity
 
   def mark_dodging_target(
         %Character{unit: %Unit{class: @warrior}, player: player, internal: %Internal{} = internal} = entity,
@@ -59,6 +73,7 @@ defmodule ThistleTea.Game.Entity.Logic.Reactive do
   def tick(entity, now) when is_integer(now) do
     entity
     |> expire_combo(now)
+    |> expire_defense(now)
     |> sync(now)
   end
 
@@ -83,6 +98,20 @@ defmodule ThistleTea.Game.Entity.Logic.Reactive do
   end
 
   def defense_active?(_entity, _now), do: false
+
+  def defense_target_active?(
+        %Character{
+          internal: %Internal{defense_state_until: until, defense_target_guid: target_guid, defense_outcome: outcome}
+        },
+        target_guid,
+        outcome,
+        now
+      )
+      when is_integer(target_guid) and is_integer(now) do
+    is_integer(until) and now < until
+  end
+
+  def defense_target_active?(_entity, _target_guid, _outcome, _now), do: false
 
   def combo_active?(
         %Character{player: player, internal: %Internal{combo_expires_at: expires_at} = internal},
@@ -124,6 +153,21 @@ defmodule ThistleTea.Game.Entity.Logic.Reactive do
   end
 
   defp expire_combo(entity, _now), do: entity
+
+  defp expire_defense(%Character{internal: %Internal{defense_state_until: expires_at} = internal} = entity, now)
+       when is_integer(expires_at) and now >= expires_at do
+    %{
+      entity
+      | internal: %{
+          internal
+          | defense_state_until: nil,
+            defense_target_guid: nil,
+            defense_outcome: nil
+        }
+    }
+  end
+
+  defp expire_defense(entity, _now), do: entity
 
   defp put_aura_state(%{unit: %Unit{aura_state: current} = unit} = entity, bits) do
     if (current || 0) == bits do

@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.Spell do
     :name,
     :spell_icon,
     :spell_visual,
+    :script_name,
     :school,
     :cast_time_ms,
     :duration_ms,
@@ -182,6 +183,9 @@ defmodule ThistleTea.Game.Spell do
   def family_flag?(_spell, _family, _mask, _word), do: false
 
   def family_flag?(%__MODULE__{} = spell, family, mask), do: family_flag?(spell, family, mask, 0)
+
+  def vmangos_script?(%__MODULE__{script_name: script_name}, script_name) when is_binary(script_name), do: true
+  def vmangos_script?(_spell, _script_name), do: false
 
   def creature_type_allowed?(%__MODULE__{target_creature_type_mask: mask}, creature_type)
       when is_integer(mask) and mask > 0 and is_integer(creature_type) and creature_type > 0 do

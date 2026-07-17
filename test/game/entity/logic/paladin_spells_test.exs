@@ -261,7 +261,13 @@ defmodule ThistleTea.Game.Entity.Logic.PaladinSpellsTest do
 
   describe "scripted spell effects" do
     test "Holy Shock selects its healing spell for a friendly target" do
-      spell = %Spell{id: 20_473, name: "Holy Shock", effects: [%Spell.Effect{index: 0, type: :dummy}]}
+      spell = %Spell{
+        id: 20_473,
+        name: "Holy Shock",
+        script_name: "spell_paladin_holy_shock",
+        effects: [%Spell.Effect{index: 0, type: :dummy}]
+      }
+
       context = %CastContext{caster_guid: 5, caster_level: 60, target_hostile?: false}
       target = character([])
       target = %{target | object: %Object{guid: 9}}
@@ -286,6 +292,7 @@ defmodule ThistleTea.Game.Entity.Logic.PaladinSpellsTest do
       spell = %Spell{
         id: 20_425,
         name: "Judgement of Command",
+        script_name: "spell_paladin_judgement_of_command_dummy",
         spell_family: 10,
         spell_icon: 561,
         effects: [%Spell.Effect{index: 0, type: :dummy, base_points: 20_466}]

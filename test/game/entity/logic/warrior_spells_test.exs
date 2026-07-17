@@ -371,6 +371,7 @@ defmodule ThistleTea.Game.Entity.Logic.WarriorSpellsTest do
       spell = %Spell{
         id: 5308,
         name: "Execute",
+        script_name: "spell_warrior_execute_dummy",
         school: :physical,
         spell_family: 4,
         family_flags_0: 0x20000000,
@@ -388,7 +389,7 @@ defmodule ThistleTea.Game.Entity.Logic.WarriorSpellsTest do
 
       assert [
                %Event{type: :spell_damage, spell_id: 20_647, damage: 185},
-               %Event{type: :drain_rage, target_guid: 5}
+               %Event{type: :drain_power, target_guid: 5, misc_value: 1}
              ] = events
 
       assert target.unit.health == 15
@@ -408,7 +409,7 @@ defmodule ThistleTea.Game.Entity.Logic.WarriorSpellsTest do
 
       {_target, events} = SpellEffect.receive(target, context, spell, 1_000)
 
-      refute Enum.any?(events, &(&1.type == :drain_rage))
+      refute Enum.any?(events, &(&1.type == :drain_power))
       assert Enum.any?(events, &(&1.type == :spell_log_miss))
     end
   end
@@ -745,6 +746,7 @@ defmodule ThistleTea.Game.Entity.Logic.WarriorSpellsTest do
       spell = %Spell{
         id: 23_881,
         name: "Bloodthirst",
+        script_name: "spell_warrior_bloodthirst",
         school: :physical,
         spell_family: 4,
         family_flags_0: 0x02000000,

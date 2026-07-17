@@ -160,8 +160,10 @@ defmodule ThistleTea.Game.Entity.Logic.Stats do
     |> derive_ranged_damage()
   end
 
-  defp derive_melee_attack_time(%Unit{class: @druid, shapeshift_form: form} = unit) when form in [1, 5, 8],
-    do: %{unit | base_attack_time: 1_000}
+  defp derive_melee_attack_time(%Unit{class: @druid, shapeshift_form: 1} = unit), do: %{unit | base_attack_time: 1_000}
+
+  defp derive_melee_attack_time(%Unit{class: @druid, shapeshift_form: form} = unit) when form in [5, 8],
+    do: %{unit | base_attack_time: 2_500}
 
   defp derive_melee_attack_time(%Unit{base_melee_attack_time: base} = unit) when is_number(base) and base > 0,
     do: %{unit | base_attack_time: base}

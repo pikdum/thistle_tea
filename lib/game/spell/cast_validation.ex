@@ -29,6 +29,7 @@ defmodule ThistleTea.Game.Spell.CastValidation do
          :ok <- check_combat_state(caster, spell),
          :ok <- check_stance(caster, spell),
          :ok <- check_caster_aura_state(caster, spell, now),
+         :ok <- Hunter.validate_reactive(caster, spell, targets.unit_guid, now),
          :ok <- check_combo_target(caster, spell, targets, now),
          :ok <- check_stronger_rank(caster, spell, targets),
          :ok <- check_mechanic_immunity(caster, spell, targets),

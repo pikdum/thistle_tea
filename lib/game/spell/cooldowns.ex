@@ -113,16 +113,29 @@ defmodule ThistleTea.Game.Spell.Cooldowns do
   def reset(entity, _keys), do: entity
 
   def reset_family(%{internal: %{spellbook: spellbook}} = entity, spell_family) when is_map(spellbook) do
-    keys =
-      spellbook
-      |> Map.values()
-      |> Enum.filter(&(&1.spell_family == spell_family and client_cooldown_ms(&1) > 0))
-      |> Enum.flat_map(&keys/1)
-
-    reset(entity, keys)
+    reset_matching(entity, &(&1.spell_family == spell_family))
   end
 
   def reset_family(entity, _spell_family), do: entity
+
+  def reset_matching(%{object: %{guid: guid}, internal: %{spellbook: spellbook} = internal} = entity, predicate)
+      when is_integer(guid) and is_map(spellbook) and is_function(predicate, 1) do
+    cooldowns = stored(internal)
+
+    spells =
+      spellbook
+      |> Map.values()
+      |> Enum.filter(
+        &(predicate.(&1) and client_cooldown_ms(&1) > 0 and
+            Enum.any?(keys(&1), fn key -> Map.has_key?(cooldowns, key) end))
+      )
+
+    entity
+    |> reset(Enum.flat_map(spells, &keys/1))
+    |> Event.enqueue(Enum.map(spells, &Event.clear_cooldown(guid, &1.id)))
+  end
+
+  def reset_matching(entity, _predicate), do: entity
 
   def client_cooldown_ms(%Spell{recovery_time_ms: recovery, category_recovery_time_ms: category_recovery}) do
     max(positive(recovery), positive(category_recovery))

@@ -105,9 +105,10 @@ defmodule ThistleTea.Game.Entity.Logic.RogueSpellsTest do
       assert victim.unit.health == 950
     end
 
-    test "eviscerate's VMangos-scripted attack-power bonus uses its DBC family flag" do
+    test "eviscerate's attack-power bonus requires its VMangos script label" do
       eviscerate = %Spell{
         id: 6760,
+        script_name: "spell_rogue_eviscerate",
         school: :physical,
         dmg_class: 2,
         spell_family: 8,
@@ -339,6 +340,7 @@ defmodule ThistleTea.Game.Entity.Logic.RogueSpellsTest do
       vanish = %Spell{
         id: 1856,
         name: "Vanish",
+        script_name: "spell_rogue_vanish",
         spell_family: 8,
         family_flags_0: 0x00000800,
         effects: [%Effect{index: 0, type: :clear_threat}]
@@ -367,6 +369,7 @@ defmodule ThistleTea.Game.Entity.Logic.RogueSpellsTest do
 
       vanish = %Spell{
         id: 1856,
+        script_name: "spell_rogue_vanish",
         spell_family: 8,
         family_flags_0: 0x00000800,
         effects: [%Effect{index: 0, type: :clear_threat}]

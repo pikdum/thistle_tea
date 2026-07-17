@@ -44,8 +44,8 @@ defmodule ThistleTea.Game.Entity do
     dispatch_cast(entity, {:attack_outcome, payload})
   end
 
-  def drain_rage(entity) do
-    dispatch_cast(entity, :drain_rage)
+  def drain_power(entity, power_type) do
+    dispatch_cast(entity, {:drain_power, power_type})
   end
 
   def grant_power(entity, power_type, amount) do

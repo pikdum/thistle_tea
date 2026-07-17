@@ -49,6 +49,8 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal do
     :rest_type,
     :rest_started_at,
     :defense_state_until,
+    :defense_target_guid,
+    :defense_outcome,
     :combo_expires_at,
     :combo_target_guid,
     :undetectable_until,

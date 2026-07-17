@@ -176,13 +176,17 @@ defmodule ThistleTea.Game.Entity.Logic.Resources do
 
   def gain_rage(entity, _amount), do: entity
 
-  def drain_rage(%{unit: %Unit{power_type: @rage_power_type, power2: rage} = unit} = entity)
-      when is_integer(rage) and rage > 0 do
+  def drain_power(%{unit: %Unit{power2: rage} = unit} = entity, @rage_power_type) when is_integer(rage) and rage > 0 do
     %{entity | unit: %{unit | power2: 0}}
     |> Core.mark_broadcast_update()
   end
 
-  def drain_rage(entity), do: entity
+  def drain_power(%{unit: %Unit{power4: energy} = unit} = entity, 3) when is_integer(energy) and energy > 0 do
+    %{entity | unit: %{unit | power4: 0}}
+    |> Core.mark_broadcast_update()
+  end
+
+  def drain_power(entity, _power_type), do: entity
 
   def gain_power(%{unit: %Unit{} = unit} = entity, power_type, amount)
       when is_integer(power_type) and is_number(amount) and amount > 0 do

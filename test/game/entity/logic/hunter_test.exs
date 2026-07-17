@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.Entity.Logic.HunterTest do
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.Hunter
+  alias ThistleTea.Game.Entity.Logic.Reactive
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Effect
 
@@ -123,6 +124,87 @@ defmodule ThistleTea.Game.Entity.Logic.HunterTest do
       assert Enum.any?(events, &(&1.type == :drop_nearby_threat))
       assert Enum.any?(events, &(&1.type == :attack_stop and &1.target_guid == 2))
       assert Enum.any?(events, &(&1.type == :stand_state and &1.stand_state == 7))
+    end
+  end
+
+  describe "auto_shot?/1" do
+    test "identifies auto shot from its DBC family and weapon effect" do
+      auto_shot = %Spell{
+        spell_family: 9,
+        family_flags_0: 0x1,
+        effects: [%Effect{type: :weapon_damage}]
+      }
+
+      assert Hunter.auto_shot?(auto_shot)
+      refute Hunter.auto_shot?(%{auto_shot | family_flags_0: 0x800})
+      refute Hunter.auto_shot?(%{auto_shot | effects: [%Effect{type: :school_damage}]})
+    end
+  end
+
+  describe "reset_cooldowns/2" do
+    test "readiness clears active hunter cooldowns and queues client updates" do
+      readiness = %Spell{id: 23_989, script_name: "spell_hunter_readiness"}
+      arcane = %Spell{id: 3044, spell_family: 9, category: 76, category_recovery_time_ms: 6_000}
+      immolation_trap = %Spell{id: 13_795, spell_family: 9, recovery_time_ms: 15_000}
+      fireball = %Spell{id: 133, spell_family: 3, recovery_time_ms: 8_000}
+
+      character = %Character{
+        object: %Object{guid: 1},
+        internal: %Internal{
+          cooldowns: %{{:category, 76} => 7_000, 13_795 => 16_000, 133 => 9_000},
+          spellbook: %{3044 => arcane, 13_795 => immolation_trap, 133 => fireball}
+        }
+      }
+
+      character = Hunter.reset_cooldowns(character, readiness)
+
+      assert character.internal.cooldowns == %{133 => 9_000}
+
+      assert Enum.map(character.internal.events, &{&1.type, &1.spell_id}) == [
+               {:clear_cooldown, 3044},
+               {:clear_cooldown, 13_795}
+             ]
+    end
+
+    test "refocus uses hunter family masks instead of spell IDs" do
+      refocus = %Spell{id: 24_531, script_name: "spell_hunter_refocus"}
+      aimed = %Spell{id: 19_434, spell_family: 9, family_flags_0: 0x00020000, recovery_time_ms: 6_000}
+      trap = %Spell{id: 13_795, spell_family: 9, family_flags_0: 0x4, recovery_time_ms: 15_000}
+
+      character = %Character{
+        object: %Object{guid: 1},
+        internal: %Internal{
+          cooldowns: %{19_434 => 7_000, 13_795 => 16_000},
+          spellbook: %{19_434 => aimed, 13_795 => trap}
+        }
+      }
+
+      character = Hunter.reset_cooldowns(character, refocus)
+
+      assert character.internal.cooldowns == %{13_795 => 16_000}
+      assert [%{type: :clear_cooldown, spell_id: 19_434}] = character.internal.events
+    end
+  end
+
+  describe "validate_reactive/4" do
+    test "mongoose bite requires a dodge against the selected target" do
+      mongoose = %Spell{script_name: "spell_hunter_mongoose_bite"}
+      hunter = %Character{unit: %Unit{}, internal: %Internal{}}
+      hunter = Reactive.mark_defense(hunter, 7, :dodge, 1_000)
+
+      assert Hunter.validate_reactive(hunter, mongoose, 7, 2_000) == :ok
+      assert Hunter.validate_reactive(hunter, mongoose, 8, 2_000) == {:error, :bad_targets}
+      assert Hunter.validate_reactive(hunter, mongoose, 7, 5_000) == {:error, :bad_targets}
+    end
+
+    test "counterattack requires a parry rather than any defense event" do
+      counterattack = %Spell{script_name: "spell_hunter_counterattack"}
+      hunter = %Character{unit: %Unit{}, internal: %Internal{}}
+      dodged = Reactive.mark_defense(hunter, 7, :dodge, 1_000)
+      parried = Reactive.mark_defense(hunter, 7, :parry, 1_000)
+
+      assert Hunter.validate_reactive(dodged, counterattack, 7, 2_000) == {:error, :bad_targets}
+      assert Hunter.validate_reactive(parried, counterattack, 7, 2_000) == :ok
     end
   end
 end
