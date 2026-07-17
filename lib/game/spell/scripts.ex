@@ -150,6 +150,7 @@ defmodule ThistleTea.Game.Spell.Scripts do
       shapeshift_spell?(row) -> :shapeshift
       hunter_aspect?(row) -> :hunter_aspect
       shaman_shield?(row) -> :shaman_shield
+      tracking_spell?(row) -> :tracking
       true -> paladin_exclusive_category(row) || non_paladin_exclusive_category(row)
     end
   end
@@ -161,6 +162,8 @@ defmodule ThistleTea.Game.Spell.Scripts do
   defp hunter_aspect?(row), do: String.starts_with?(Map.get(row, :name_en_gb) || "", "Aspect of the ")
 
   defp shaman_shield?(row), do: (Map.get(row, :name_en_gb) || "") in ["Lightning Shield", "Water Shield"]
+
+  defp tracking_spell?(row), do: String.starts_with?(Map.get(row, :name_en_gb) || "", "Track ")
 
   defp non_paladin_exclusive_category(row) do
     cond do

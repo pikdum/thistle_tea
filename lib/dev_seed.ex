@@ -60,7 +60,7 @@ defmodule ThistleTea.DevSeed do
   @debug_equipment %{
     1 => [22_223, 11_722, 10_845, 11_703, 14_928, 12_555, 14_974, 10_165, 11_677, 12_774, 10_195, 13_022],
     2 => [22_223, 11_722, 10_845, 11_703, 14_928, 12_555, 14_974, 10_165, 11_677, 1721, 1203],
-    3 => [10_187, 10_189, 12_793, 14_674, 15_057, 15_071, 13_120, 10_110, 8297, 12_791, 6660, 2825],
+    3 => [10_187, 10_189, 12_793, 14_674, 15_057, 15_071, 13_120, 10_110, 8297, 12_791, 6660, 2825, 18_714],
     4 => [10_187, 10_189, 12_793, 14_674, 15_057, 15_071, 13_120, 10_110, 8297, 12_791, 6660, 13_022],
     5 => [11_839, 10_172, 10_806, 14_304, 10_807, 18_697, 14_311, 10_808, 12_552, 1607],
     8 => [17_715, 10_172, 14_141, 11_662, 14_132, 18_697, 12_546, 11_634, 14_134, 19_567],
@@ -69,7 +69,7 @@ defmodule ThistleTea.DevSeed do
     11 => [10_187, 10_189, 12_793, 14_674, 15_057, 15_071, 13_120, 10_110, 8297, 12_791, 13_022]
   }
   @debug_reagents %{
-    3 => [{2519, 200}, {5175, 1}],
+    3 => [{11_285, 200}],
     4 => [{5140, 20}],
     5 => [{17_056, 20}],
     8 => [{17_056, 20}, {17_031, 20}, {17_032, 20}],
@@ -127,12 +127,17 @@ defmodule ThistleTea.DevSeed do
       |> Characters.clear_equipment()
       |> Characters.assign_items(Map.get(@debug_equipment, class, []))
       |> Characters.assign_items(Map.get(@debug_reagents, class, []))
+      |> set_debug_ammo(class)
       |> Character.restore_health_and_mana()
 
     {:ok, CharacterStore.put(character)}
   end
 
   defp equip_debug_gear(result), do: result
+
+  defp set_debug_ammo(%Character{player: player} = character, 3), do: %{character | player: %{player | ammo_id: 11_285}}
+
+  defp set_debug_ammo(character, _class), do: character
 
   defp set_level(character, level) do
     case Stats.get(character.unit.race, character.unit.class, level) do

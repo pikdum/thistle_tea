@@ -3,6 +3,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgAttackstop do
   use ThistleTea.Game.Network.ClientMessage, :CMSG_ATTACKSTOP
 
   alias ThistleTea.Game.Entity.Logic.AI.BT
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Ranged
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Network.PlayerTick
 
@@ -27,6 +28,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgAttackstop do
     character =
       character
       |> BT.clear_auto_attack()
+      |> Ranged.stop()
       |> clear_target()
 
     Core.update_object(character, :values)
@@ -53,6 +55,4 @@ defmodule ThistleTea.Game.Network.Message.CmsgAttackstop do
   defp clear_target(%Character{unit: unit} = character) do
     %{character | unit: %{unit | target: 0}}
   end
-
-  defp clear_target(character), do: character
 end

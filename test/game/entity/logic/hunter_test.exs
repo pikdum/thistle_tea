@@ -1,6 +1,10 @@
 defmodule ThistleTea.Game.Entity.Logic.HunterTest do
   use ExUnit.Case, async: true
 
+  alias ThistleTea.Game.Entity.Data.Character
+  alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.Entity.Data.Component.Object
+  alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.Hunter
   alias ThistleTea.Game.Spell
 
@@ -44,6 +48,24 @@ defmodule ThistleTea.Game.Entity.Logic.HunterTest do
 
       assert Hunter.validate_tame(%{unit: %{level: 20, summon: 99}}, spell, %{tameable?: true, level: 10}) ==
                {:error, :already_have_summon}
+    end
+  end
+
+  describe "after_aura/3" do
+    test "feign death clears combat and drops every threat reference" do
+      character = %Character{
+        object: %Object{guid: 1},
+        unit: %Unit{target: 2, flags: 0},
+        internal: %Internal{in_combat: true, threat_refs: MapSet.new([2, 3])}
+      }
+
+      {character, events} = Hunter.after_aura(character, %Spell{name: "Feign Death"}, 1_000)
+
+      refute character.internal.in_combat
+      assert character.internal.threat_refs == MapSet.new()
+      assert Enum.count(events, &(&1.type == :drop_threat)) == 2
+      assert Enum.any?(events, &(&1.type == :drop_nearby_threat))
+      assert Enum.any?(events, &(&1.type == :attack_stop and &1.target_guid == 2))
     end
   end
 end

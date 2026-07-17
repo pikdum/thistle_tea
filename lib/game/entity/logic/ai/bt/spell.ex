@@ -169,8 +169,27 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
     |> apply_spell_hit(casting, hits, now)
     |> consume_unavoidable_finisher(casting)
     |> consume_forced_crit(casting, now)
+    |> activate_auto_shot(casting, now)
     |> clear_cast()
   end
+
+  defp activate_auto_shot(
+         %Character{internal: %Internal{} = internal} = character,
+         %Cast{spell: %Spell{name: "Auto Shot"} = spell, targets: %Targets{unit_guid: target_guid, raw: raw}},
+         now
+       )
+       when is_integer(target_guid) and target_guid > 0 do
+    auto_shot = %{
+      spell: spell,
+      target_guid: target_guid,
+      raw_targets: raw,
+      next_at: now + character.unit.ranged_attack_time
+    }
+
+    %{character | internal: %{internal | auto_shot: auto_shot}}
+  end
+
+  defp activate_auto_shot(character, _casting, _now), do: character
 
   defp release_paladin_seal(character, %Cast{spell: %Spell{} = spell}, [target_guid | _rest], now) do
     Paladin.release_seal(character, spell, target_guid, now)

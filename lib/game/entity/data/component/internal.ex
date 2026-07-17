@@ -25,6 +25,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal do
     :chair,
     :active_pet_entry,
     :active_pet_spell_id,
+    :auto_shot,
     :fishing,
     :event,
     :in_combat,

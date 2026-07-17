@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Death
   alias ThistleTea.Game.Entity.Logic.Event
+  alias ThistleTea.Game.Entity.Logic.Hunter
   alias ThistleTea.Game.Entity.Logic.Paladin
   alias ThistleTea.Game.Entity.Logic.PlayerCombat
   alias ThistleTea.Game.Entity.Logic.Reactive
@@ -194,7 +195,8 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
 
   defp apply_auras(target, context, now) do
     {target, events} = Aura.apply_spell(target, context, context.spell, now)
-    {target, events ++ script_trigger_events(target, context)}
+    {target, class_events} = Hunter.after_aura(target, context.spell, now)
+    {target, events ++ script_trigger_events(target, context) ++ class_events}
   end
 
   defp script_trigger_events(target, %CastContext{spell: spell} = context) do

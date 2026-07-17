@@ -3,6 +3,9 @@ defmodule ThistleTea.Game.Entity.Logic.Hunter do
   Pure Hunter ranged-ammunition rules derived from the equipped weapon and
   selected projectile item.
   """
+  alias ThistleTea.Game.Entity.Data.Character
+  alias ThistleTea.Game.Entity.Logic.Event
+  alias ThistleTea.Game.Entity.Logic.PlayerCombat
   alias ThistleTea.Game.Spell
 
   @item_class_projectile 6
@@ -31,6 +34,18 @@ defmodule ThistleTea.Game.Entity.Logic.Hunter do
   def validate_tame(_caster, %Spell{name: "Tame Beast"}, _target), do: {:error, :bad_targets}
   def validate_tame(_caster, _spell, _target), do: :ok
 
+  def after_aura(%Character{} = character, %Spell{name: "Feign Death"}, now) do
+    {character, mob_guids} = PlayerCombat.vanish(character, now)
+
+    events =
+      [Event.drop_nearby_threat()] ++
+        Enum.map(mob_guids, &Event.drop_threat/1) ++ attack_stop_events(character)
+
+    {character, events}
+  end
+
+  def after_aura(entity, _spell, _now), do: {entity, []}
+
   defp validate_projectile(_ammo_id, _ammo, %{ammo_type: 0}, _count_item), do: :ok
 
   defp validate_projectile(
@@ -47,4 +62,9 @@ defmodule ThistleTea.Game.Entity.Logic.Hunter do
 
   defp ranged_weapon(items),
     do: Enum.find(items, &match?(%{class: 2, inventory_type: type} when type in [15, 25, 26], &1))
+
+  defp attack_stop_events(%Character{object: %{guid: guid}, unit: %{target: target}})
+       when is_integer(target) and target > 0, do: [Event.attack_stop(guid, target)]
+
+  defp attack_stop_events(_character), do: []
 end

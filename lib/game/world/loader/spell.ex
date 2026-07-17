@@ -464,10 +464,12 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp effect_type(18), do: :resurrect
   defp effect_type(22), do: :parry
   defp effect_type(24), do: :create_item
+  defp effect_type(25), do: :weapon
   defp effect_type(29), do: :leap
   defp effect_type(30), do: :energize
   defp effect_type(33), do: :open_lock
   defp effect_type(35), do: :apply_area_aura
+  defp effect_type(36), do: :learn_spell
   defp effect_type(38), do: :dispel
   defp effect_type(40), do: :dual_wield
   defp effect_type(60), do: :proficiency
@@ -479,6 +481,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp effect_type(62), do: :power_burn
   defp effect_type(63), do: :modify_threat
   defp effect_type(68), do: :interrupt_cast
+  defp effect_type(72), do: :add_farsight
   defp effect_type(77), do: :script_effect
   defp effect_type(79), do: :clear_threat
   defp effect_type(80), do: :add_combo_points
@@ -519,6 +522,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp aura_type(13), do: :mod_damage_done
   defp aura_type(15), do: :damage_shield
   defp aura_type(16), do: :mod_stealth
+  defp aura_type(17), do: :mod_stealth_detect
   defp aura_type(22), do: :mod_resistance
   defp aura_type(23), do: :periodic_trigger_spell
   defp aura_type(24), do: :periodic_energize
@@ -529,20 +533,28 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp aura_type(34), do: :mod_increase_health
   defp aura_type(36), do: :mod_shapeshift
   defp aura_type(39), do: :school_immunity
+  defp aura_type(41), do: :dispel_immunity
   defp aura_type(42), do: :proc_trigger_spell
   defp aura_type(43), do: :damage_shield
+  defp aura_type(44), do: :track_creatures
+  defp aura_type(47), do: :mod_parry_percent
   defp aura_type(49), do: :mod_dodge
   defp aura_type(51), do: :mod_block_percent
   defp aura_type(52), do: :mod_crit_percent
   defp aura_type(53), do: :periodic_leech
+  defp aura_type(54), do: :mod_hit_chance
   defp aura_type(56), do: :transform
   defp aura_type(58), do: :mod_increase_swim_speed
+  defp aura_type(61), do: :mod_scale
   defp aura_type(64), do: :periodic_mana_leech
   defp aura_type(65), do: :mod_casting_speed
+  defp aura_type(66), do: :feign_death
   defp aura_type(67), do: :mod_disarm
+  defp aura_type(68), do: :mod_stalked
   defp aura_type(69), do: :school_absorb
   defp aura_type(79), do: :mod_damage_percent_done
   defp aura_type(81), do: :split_damage_percent
+  defp aura_type(82), do: :water_breathing
   defp aura_type(87), do: :mod_damage_percent_taken
   defp aura_type(74), do: :reflect_spells_school
   defp aura_type(77), do: :mechanic_immunity
@@ -555,25 +567,35 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp aura_type(95), do: :ghost
   defp aura_type(97), do: :mana_shield
   defp aura_type(99), do: :mod_attack_power
+  defp aura_type(101), do: :mod_resistance_percent
   defp aura_type(103), do: :mod_total_threat
   defp aura_type(104), do: :water_walk
   defp aura_type(105), do: :feather_fall
   defp aura_type(106), do: :hover
   defp aura_type(107), do: :force_crit
+  defp aura_type(108), do: :add_pct_modifier
   defp aura_type(110), do: :mod_power_regen_percent
   defp aura_type(113), do: :mod_ranged_damage_taken
   defp aura_type(115), do: :mod_healing
   defp aura_type(116), do: :mod_regen_during_combat
   defp aura_type(117), do: :mechanic_resistance
   defp aura_type(118), do: :mod_healing_pct
+  defp aura_type(120), do: :untrackable
+  defp aura_type(121), do: :empathy
+  defp aura_type(124), do: :mod_ranged_attack_power
+  defp aura_type(127), do: :ranged_attack_power_attacker_bonus
+  defp aura_type(128), do: :mod_possess_pet
   defp aura_type(134), do: :mod_mana_regen_interrupt
   defp aura_type(135), do: :mod_healing_done
   defp aura_type(137), do: :mod_total_stat_percent
   defp aura_type(138), do: :mod_melee_haste
+  defp aura_type(140), do: :mod_ranged_haste
   defp aura_type(141), do: :mod_ranged_haste
   defp aura_type(142), do: :mod_base_resistance_percent
   defp aura_type(143), do: :mod_resistance_exclusive
+  defp aura_type(144), do: :safe_fall
   defp aura_type(149), do: :reduce_pushback
+  defp aura_type(151), do: :track_stealthed
   defp aura_type(153), do: :split_damage_flat
   defp aura_type(161), do: :mod_health_regen_in_combat
   defp aura_type(other) when is_integer(other), do: other

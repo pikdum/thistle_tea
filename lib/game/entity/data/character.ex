@@ -46,7 +46,13 @@ defmodule ThistleTea.Game.Entity.Data.Character do
       end
 
     unit =
-      %{unit | base_attack_time: delay, base_min_damage: weapon_min, base_max_damage: weapon_max}
+      %{
+        unit
+        | base_melee_attack_time: delay,
+          base_attack_time: delay,
+          base_min_damage: weapon_min,
+          base_max_damage: weapon_max
+      }
 
     %{character | unit: unit}
   end
@@ -86,21 +92,27 @@ defmodule ThistleTea.Game.Entity.Data.Character do
 
   defp mainhand_weapon(%__MODULE__{}), do: nil
 
-  defp sync_ranged_inputs(%__MODULE__{unit: %Unit{} = unit, player: %Player{visible_item_18_0: entry}} = character) do
+  defp sync_ranged_inputs(
+         %__MODULE__{unit: %Unit{} = unit, player: %Player{visible_item_18_0: entry, ammo_id: ammo_id}} = character
+       ) do
     weapon =
       case is_integer(entry) and entry > 0 and ItemLoader.get_template(entry) do
         %ItemTemplate{class: @item_class_weapon} = template -> template
         _ -> nil
       end
 
+    ammo_dps = ammo_dps(ammo_id, weapon)
+
     unit =
       if weapon do
+        speed = positive_or(weapon.delay, @base_attack_time) / 1_000
+
         %{
           unit
           | base_ranged_attack_time: positive_or(weapon.delay, @base_attack_time),
             ranged_attack_time: positive_or(weapon.delay, @base_attack_time),
-            base_ranged_min_damage: positive_or(weapon.dmg_min1, 0.0),
-            base_ranged_max_damage: positive_or(weapon.dmg_max1, 0.0)
+            base_ranged_min_damage: positive_or(weapon.dmg_min1, 0.0) + ammo_dps * speed,
+            base_ranged_max_damage: positive_or(weapon.dmg_max1, 0.0) + ammo_dps * speed
         }
       else
         %{
@@ -116,6 +128,19 @@ defmodule ThistleTea.Game.Entity.Data.Character do
 
     %{character | unit: unit}
   end
+
+  defp ammo_dps(ammo_id, %ItemTemplate{ammo_type: ammo_type}) when is_integer(ammo_id) and ammo_id > 0 do
+    case ItemLoader.get_template(ammo_id) do
+      %ItemTemplate{class: 6, subclass: ^ammo_type, dmg_min1: min, dmg_max1: max}
+      when is_number(min) and is_number(max) ->
+        (min + max) / 2
+
+      _ ->
+        0.0
+    end
+  end
+
+  defp ammo_dps(_ammo_id, _weapon), do: 0.0
 
   defp positive_or(value, default) do
     case value do

@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Player do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Aura, as: AuraBT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AI.BT.Combat, as: CombatBT
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Ranged, as: RangedBT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Regen, as: RegenBT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Spell, as: SpellBT
   alias ThistleTea.Game.Entity.Logic.PlayerCombat
@@ -21,6 +22,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Player do
       AuraBT.tick_step(),
       RegenBT.tick_step(),
       SpellBT.casting_sequence(),
+      RangedBT.sequence(),
       CombatBT.melee_sequence(),
       BT.action(&idle/2)
     ])

@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Lifecycle do
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.Aura.MovementSync
+  alias ThistleTea.Game.Entity.Logic.Aura.PlayerSync
   alias ThistleTea.Game.Entity.Logic.Aura.StealthSync
   alias ThistleTea.Game.Entity.Logic.Aura.UnitSync
   alias ThistleTea.Game.Entity.Logic.Core
@@ -138,6 +139,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Lifecycle do
 
     {entity, events} =
       %{entity | unit: unit}
+      |> PlayerSync.sync()
       |> StealthSync.sync()
       |> MovementSync.sync_movement_state(now)
 

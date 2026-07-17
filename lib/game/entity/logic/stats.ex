@@ -97,7 +97,8 @@ defmodule ThistleTea.Game.Entity.Logic.Stats do
       base = Map.get(acc, base_field) || 0
       base_and_equipment = base + equipment_bonus(acc, bonus_key)
       scaled = trunc(base_and_equipment * aura_base_resistance_multiplier(acc, bit))
-      Map.put(acc, field, scaled + aura_resistance_bonus(acc, bit))
+      total = scaled + aura_resistance_bonus(acc, bit)
+      Map.put(acc, field, trunc(total * aura_resistance_multiplier(acc, bit)))
     end)
   end
 
@@ -129,7 +130,8 @@ defmodule ThistleTea.Game.Entity.Logic.Stats do
     %{
       unit
       | attack_power: attack_power,
-        ranged_attack_power: ranged_attack_power(unit.class, unit.level, unit.agility || 0)
+        ranged_attack_power:
+          ranged_attack_power(unit.class, unit.level, unit.agility || 0) + aura_ranged_attack_power(unit)
     }
   end
 
@@ -145,6 +147,7 @@ defmodule ThistleTea.Game.Entity.Logic.Stats do
 
   defp derive_weapon_damage(%Unit{} = unit) do
     unit
+    |> derive_melee_attack_time()
     |> derive_ranged_attack_time()
     |> derive_mainhand_damage()
     |> derive_damage(
@@ -157,12 +160,27 @@ defmodule ThistleTea.Game.Entity.Logic.Stats do
     |> derive_ranged_damage()
   end
 
+  defp derive_melee_attack_time(%Unit{class: @druid, shapeshift_form: form} = unit) when form in [1, 5, 8],
+    do: %{unit | base_attack_time: 1_000}
+
+  defp derive_melee_attack_time(%Unit{base_melee_attack_time: base} = unit) when is_number(base) and base > 0,
+    do: %{unit | base_attack_time: base}
+
+  defp derive_melee_attack_time(%Unit{} = unit), do: unit
+
   defp derive_ranged_attack_time(%Unit{base_ranged_attack_time: base} = unit) when is_number(base) and base > 0 do
-    haste = unit |> equipment_bonus(:ranged_haste) |> max(0)
+    haste = max(equipment_bonus(unit, :ranged_haste) + aura_ranged_haste(unit), 0)
     %{unit | ranged_attack_time: trunc(base * 100 / (100 + haste))}
   end
 
   defp derive_ranged_attack_time(%Unit{} = unit), do: unit
+
+  defp aura_ranged_haste(%Unit{} = unit) do
+    sum_aura_amounts(unit, fn
+      %Aura{type: :mod_ranged_haste, amount: amount} when is_integer(amount) -> amount
+      _aura -> 0
+    end)
+  end
 
   defp derive_ranged_damage(%Unit{} = unit) do
     with base_min when is_number(base_min) <- unit.base_ranged_min_damage,
@@ -208,6 +226,13 @@ defmodule ThistleTea.Game.Entity.Logic.Stats do
   defp aura_attack_power(%Unit{} = unit) do
     sum_aura_amounts(unit, fn
       %Aura{type: :mod_attack_power, amount: amount} when is_integer(amount) -> amount
+      _aura -> 0
+    end)
+  end
+
+  defp aura_ranged_attack_power(%Unit{} = unit) do
+    sum_aura_amounts(unit, fn
+      %Aura{type: :mod_ranged_attack_power, amount: amount} when is_integer(amount) -> amount
       _aura -> 0
     end)
   end
@@ -266,6 +291,20 @@ defmodule ThistleTea.Game.Entity.Logic.Stats do
     percent =
       sum_aura_amounts(unit, fn
         %Aura{type: :mod_base_resistance_percent, amount: amount, misc_value: mask}
+        when is_integer(amount) and is_integer(mask) and (mask &&& bit) != 0 ->
+          amount
+
+        _aura ->
+          0
+      end)
+
+    max(100 + percent, 0) / 100
+  end
+
+  defp aura_resistance_multiplier(%Unit{} = unit, bit) do
+    percent =
+      sum_aura_amounts(unit, fn
+        %Aura{type: :mod_resistance_percent, amount: amount, misc_value: mask}
         when is_integer(amount) and is_integer(mask) and (mask &&& bit) != 0 ->
           amount
 
