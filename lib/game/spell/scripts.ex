@@ -88,12 +88,30 @@ defmodule ThistleTea.Game.Spell.Scripts do
     27_800 => 27_804,
     27_801 => 27_805
   }
+  @touch_of_weakness_damage %{
+    2652 => 2943,
+    19_261 => 19_249,
+    19_262 => 19_251,
+    19_264 => 19_252,
+    19_265 => 19_253,
+    19_266 => 19_254
+  }
 
   def successful_finish_trigger(%Spell{id: id} = spell) do
     if Spell.vmangos_script?(spell, "spell_priest_holy_nova"), do: Map.get(@holy_nova_heals, id)
   end
 
   def successful_finish_trigger(_spell), do: nil
+
+  def proc_trigger_spell_id(%Spell{} = spell, triggering_spell_id) do
+    if Spell.vmangos_script?(spell, "spell_priest_touch_of_weakness") do
+      Map.get(@touch_of_weakness_damage, triggering_spell_id)
+    else
+      spell.id
+    end
+  end
+
+  def proc_trigger_spell_id(_spell, _triggering_spell_id), do: nil
 
   def requires_combo_target?(%Spell{} = spell),
     do: warrior_family_flag?(spell, @overpower_family_mask) or finisher?(spell)

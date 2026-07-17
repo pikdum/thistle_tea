@@ -58,7 +58,10 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
     if type == :damage_shield or incoming_melee_proc?(holder.spell) do
       source_guid = holder.caster_guid || owner_guid
       source_level = holder.caster_level || 1
-      [Event.trigger_spell(source_guid, source_level, attacker_guid, spell_id)]
+
+      [
+        Event.trigger_spell(source_guid, source_level, attacker_guid, spell_id, triggered_by_spell_id: holder.spell.id)
+      ]
     else
       []
     end

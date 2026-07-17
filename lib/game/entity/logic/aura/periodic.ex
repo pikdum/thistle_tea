@@ -153,8 +153,11 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
   defp tick_aura(entity, %Holder{} = holder, %Aura{type: :periodic_trigger_spell, next_tick_at: at} = aura, now)
        when is_integer(at) and now >= at do
     events =
-      case aura.trigger_spell_id do
-        spell_id when is_integer(spell_id) and spell_id > 0 ->
+      case {Warlock.allow_periodic_trigger?(entity, holder), aura.trigger_spell_id} do
+        {false, _spell_id} ->
+          []
+
+        {true, spell_id} when is_integer(spell_id) and spell_id > 0 ->
           [Event.trigger_spell(holder.caster_guid, holder.caster_level, entity.object.guid, spell_id)]
 
         _ ->

@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.Entity.Logic.Warlock do
 
   import Bitwise, only: [&&&: 2]
 
+  alias ThistleTea.Game.Aura, as: AuraData
   alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Core
@@ -73,6 +74,20 @@ defmodule ThistleTea.Game.Entity.Logic.Warlock do
 
   def ritual_of_summoning?(_spell), do: false
 
+  def allow_periodic_trigger?(%{object: %{guid: target_guid}, unit: %{auras: holders}}, %Holder{
+        spell: %Spell{} = spell,
+        caster_guid: caster_guid
+      })
+      when is_list(holders) do
+    if Spell.vmangos_script?(spell, "spell_warlock_curse_of_idiocy") do
+      caster_guid != target_guid and not idiocy_stat_cap_reached?(holders, spell.id)
+    else
+      true
+    end
+  end
+
+  def allow_periodic_trigger?(_entity, _holder), do: true
+
   def validate_ritual(%Spell{} = spell, context) do
     if ritual_of_summoning?(spell) do
       validate_ritual_context(context)
@@ -110,6 +125,27 @@ defmodule ThistleTea.Game.Entity.Logic.Warlock do
 
   defp validate_ritual_context(%{target_in_combat?: true}), do: {:error, :target_in_combat}
   defp validate_ritual_context(_invalid), do: {:error, :bad_targets}
+
+  defp idiocy_stat_cap_reached?(holders, spell_id) do
+    losses =
+      Enum.reduce(holders, %{3 => 0, 4 => 0}, fn
+        %Holder{spell: %Spell{id: ^spell_id}, stacks: stacks, auras: auras}, acc ->
+          multiplier = max(stacks || 1, 1)
+
+          Enum.reduce(auras, acc, fn
+            %AuraData{type: :mod_stat, misc_value: stat, amount: amount}, inner when stat in [3, 4] ->
+              Map.update!(inner, stat, &(&1 + amount * multiplier))
+
+            _aura, inner ->
+              inner
+          end)
+
+        _holder, acc ->
+          acc
+      end)
+
+    losses[3] <= -90 and losses[4] <= -90
+  end
 
   def immolate_source?(sources, caster_guid) do
     Enum.any?(sources, fn

@@ -19,6 +19,7 @@ defmodule ThistleTea.Game.Entity.Logic.PriestSpellsTest do
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.CastValidation
   alias ThistleTea.Game.Spell.Effect
+  alias ThistleTea.Game.Spell.Scripts
   alias ThistleTea.Game.Spell.Targets
   alias ThistleTea.Game.WorldRef
 
@@ -555,6 +556,27 @@ defmodule ThistleTea.Game.Entity.Logic.PriestSpellsTest do
       {entity, _events} = Aura.reactions(entity, :hit_taken, %{attacker_guid: 999})
 
       assert [%Holder{charges: nil}] = entity.unit.auras
+    end
+
+    test "Touch of Weakness carries its rank into the VMangos trigger script" do
+      touch =
+        aura_spell(19_264, :proc_trigger_spell,
+          name: "Touch of Weakness",
+          proc_type_mask: 0x28,
+          proc_charges: 1,
+          trigger_spell_id: 28_598
+        )
+
+      entity = mob_fixture()
+      {entity, _events} = Aura.apply_spell(entity, 1, 10, touch, 1_000)
+
+      {_entity, [event]} = Aura.reactions(entity, :hit_taken, %{attacker_guid: 999})
+
+      assert event.spell_id == 28_598
+      assert event.triggering_spell_id == 19_264
+
+      trigger = %Spell{id: 28_598, script_name: "spell_priest_touch_of_weakness"}
+      assert Scripts.proc_trigger_spell_id(trigger, event.triggering_spell_id) == 19_252
     end
   end
 

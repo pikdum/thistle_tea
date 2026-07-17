@@ -311,6 +311,24 @@ defmodule ThistleTea.Game.Entity.Logic.WarlockSpellsTest do
     end
   end
 
+  describe "Curse of Idiocy" do
+    test "periodic stacking stops after both encoded stat losses reach the VMangos cap" do
+      below_cap = idiocy_target(12, 1)
+      {_target, events} = AuraLogic.tick(below_cap, 2_000)
+      assert Enum.any?(events, &(&1.type == :trigger_spell and &1.spell_id == 1010))
+
+      capped = idiocy_target(13, 1)
+      {_target, events} = AuraLogic.tick(capped, 2_000)
+      refute Enum.any?(events, &(&1.type == :trigger_spell))
+    end
+
+    test "does not recursively trigger when self-cast" do
+      target = idiocy_target(1, 2)
+      {_target, events} = AuraLogic.tick(target, 2_000)
+      refute Enum.any?(events, &(&1.type == :trigger_spell))
+    end
+  end
+
   describe "Curse of Weakness" do
     test "reduces the target's physical weapon damage" do
       curse = %Holder{
@@ -544,6 +562,31 @@ defmodule ThistleTea.Game.Entity.Logic.WarlockSpellsTest do
           amount: 10,
           amplitude_ms: 2_000,
           next_tick_at: next_tick_at
+        }
+      ]
+    }
+
+    mob([holder])
+  end
+
+  defp idiocy_target(stacks, caster_guid) do
+    spell = %Spell{id: 1010, script_name: "spell_warlock_curse_of_idiocy", stack_amount: 15}
+
+    holder = %Holder{
+      spell: spell,
+      caster_guid: caster_guid,
+      caster_level: 40,
+      stacks: stacks,
+      applied_at: 1_000,
+      expires_at: 60_000,
+      auras: [
+        %Aura{type: :mod_stat, amount: -7, misc_value: 3},
+        %Aura{type: :mod_stat, amount: -7, misc_value: 4},
+        %Aura{
+          type: :periodic_trigger_spell,
+          trigger_spell_id: 1010,
+          amplitude_ms: 1_000,
+          next_tick_at: 2_000
         }
       ]
     }

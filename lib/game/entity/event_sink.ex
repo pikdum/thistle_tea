@@ -1020,13 +1020,9 @@ defmodule ThistleTea.Game.Entity.EventSink do
         entity
 
       spell ->
+        spell = scripted_proc_spell(spell, event)
         spell = apply_trigger_override(spell, event)
-
-        if event.resolve_targets? do
-          dispatch_resolved_trigger(entity, event, spell)
-        else
-          dispatch_single_trigger(entity, event, spell)
-        end
+        dispatch_trigger_event(entity, event, spell)
     end
   end
 
@@ -1045,6 +1041,24 @@ defmodule ThistleTea.Game.Entity.EventSink do
   end
 
   defp track_channel_game_object(entity, %GameObject{}), do: entity
+
+  defp scripted_proc_spell(%Spell{} = spell, %Event{triggering_spell_id: triggering_spell_id}) do
+    case Scripts.proc_trigger_spell_id(spell, triggering_spell_id) do
+      spell_id when spell_id == spell.id -> spell
+      spell_id when is_integer(spell_id) -> SpellLoader.load(spell_id)
+      _missing -> nil
+    end
+  end
+
+  defp dispatch_trigger_event(entity, event, %Spell{} = spell) do
+    if event.resolve_targets? do
+      dispatch_resolved_trigger(entity, event, spell)
+    else
+      dispatch_single_trigger(entity, event, spell)
+    end
+  end
+
+  defp dispatch_trigger_event(entity, _event, _spell), do: entity
 
   defp dispatch_single_trigger(entity, event, spell) do
     case triggered_target(entity, event, spell) do

@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
     :source_level,
     :target_guid,
     :spell_id,
+    :triggering_spell_id,
     :school,
     :damage,
     :proc_damage,
@@ -445,6 +446,7 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
       target_guid: target_guid,
       spell_id: spell_id,
       target_role: Keyword.get(opts, :target_role),
+      triggering_spell_id: Keyword.get(opts, :triggered_by_spell_id),
       slot: Keyword.get(opts, :effect_index),
       amount: Keyword.get(opts, :base_points),
       resolve_targets?: Keyword.get(opts, :resolve_targets?, false)
