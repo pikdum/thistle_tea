@@ -335,7 +335,8 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
       run?: false,
       unique?: false,
       attack_target: nil,
-      script_id: 0
+      script_id: 0,
+      post_spawn_spells: Warlock.summon_spells(spell)
     }
 
     {state, [Event.summon_creature(summon, [], nil)]}

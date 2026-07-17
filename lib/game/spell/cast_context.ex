@@ -30,6 +30,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
     :caster_guid,
     :caster_level,
     :caster_type,
+    :caster_faction_template,
     :caster_position,
     :caster_orientation,
     :caster_zone,
@@ -63,6 +64,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
       caster_guid: guid,
       caster_level: level,
       caster_type: caster_type(caster),
+      caster_faction_template: caster_faction_template(caster),
       caster_position: caster_position(caster),
       caster_orientation: caster_orientation(caster),
       target_guid: target_guid,
@@ -83,6 +85,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
       caster_guid: guid,
       caster_level: 1,
       caster_type: caster_type(caster),
+      caster_faction_template: caster_faction_template(caster),
       caster_position: caster_position(caster),
       caster_orientation: caster_orientation(caster),
       target_guid: target_guid,
@@ -95,6 +98,9 @@ defmodule ThistleTea.Game.Spell.CastContext do
   defp caster_type(%Character{}), do: :player
   defp caster_type(%Mob{}), do: :mob
   defp caster_type(_), do: nil
+
+  defp caster_faction_template(%{unit: %{faction_template: faction_template}}), do: faction_template
+  defp caster_faction_template(_caster), do: nil
 
   defp spell_id(%Spell{id: id}), do: id
   defp spell_id(_spell), do: nil

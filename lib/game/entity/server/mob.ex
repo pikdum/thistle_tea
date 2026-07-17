@@ -32,6 +32,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Combat
   alias ThistleTea.Game.Entity.Logic.Core
+  alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.Entity.Logic.Experience
   alias ThistleTea.Game.Entity.Logic.Hostility
   alias ThistleTea.Game.Entity.Logic.Movement
@@ -50,6 +51,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.ChaseWatch
+  alias ThistleTea.Game.World.Loader.Faction, as: FactionLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpawnPool
@@ -132,6 +134,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
   @impl GenServer
   def handle_cast({:receive_spell, caster, spell}, state) do
+    previous = state
     caster_guid = caster_guid(caster)
 
     state =
@@ -148,14 +151,23 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     state =
       state
       |> EventSink.emit(events)
+      |> sync_behavior_tree(previous)
       |> wake_ai_tick()
 
     {:noreply, state, {:continue, :maybe_broadcast}}
   end
 
+  def handle_cast({:trigger_spell, spell_id, target_guid, opts}, %Mob{} = state)
+      when is_integer(spell_id) and is_integer(target_guid) and is_list(opts) do
+    event = Event.trigger_spell(state.object.guid, state.unit.level || 1, target_guid, spell_id, opts)
+    state = state |> EventSink.emit(event) |> wake_ai_tick()
+    {:noreply, state, {:continue, :maybe_broadcast}}
+  end
+
   def handle_cast({:remove_aura, spell_id, caster_guid}, state) do
+    previous = state
     {state, events} = Aura.remove_source_spell(state, spell_id, caster_guid, Time.now())
-    state = EventSink.emit(state, events)
+    state = state |> EventSink.emit(events) |> sync_behavior_tree(previous)
     {:noreply, wake_ai_tick(state), {:continue, :maybe_broadcast}}
   end
 
@@ -470,7 +482,9 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
       World.update_position(state)
       state = Visibility.refresh_entity(state)
       started_at = System.monotonic_time()
+      previous = state
       {status, state} = BT.tick(behavior_tree, state)
+      state = sync_behavior_tree(state, previous)
       duration = System.monotonic_time() - started_at
       state = EventSink.emit_pending(state)
       state = sync_chase_watch(state)
@@ -500,13 +514,18 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
       update_type = if Core.dead?(state), do: :create_object2, else: :values
       Core.update_object(state, update_type) |> World.broadcast_packet(state)
 
-      Metadata.update(state.object.guid, %{
-        alive?: not Core.dead?(state),
-        health_pct: Core.health_pct(state),
-        unit_flags: state.unit.flags,
-        orientation: elem(state.movement_block.position, 3),
-        aura_sources: Aura.source_spells(state)
-      })
+      metadata =
+        %{
+          alive?: not Core.dead?(state),
+          health_pct: Core.health_pct(state),
+          unit_flags: state.unit.flags,
+          orientation: elem(state.movement_block.position, 3),
+          aura_sources: Aura.source_spells(state)
+        }
+        |> Map.merge(FactionLoader.metadata(state.unit.faction_template))
+        |> Map.merge(control_metadata(state))
+
+      Metadata.update(state.object.guid, metadata)
     end
 
     %{state | internal: %{state.internal | broadcast_update?: false}}
@@ -528,6 +547,33 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
   defp behavior_tree(%Mob{internal: %Internal{pet: %Pet{}}}), do: PetBT.tree()
   defp behavior_tree(%Mob{}), do: MobBT.tree()
+
+  defp sync_behavior_tree(%Mob{} = state, %Mob{} = previous) do
+    if control_mode(state) == control_mode(previous) do
+      state
+    else
+      BT.init(state, behavior_tree(state))
+    end
+  end
+
+  defp control_mode(%Mob{internal: %Internal{pet: %Pet{kind: kind}}}), do: {:pet, kind}
+  defp control_mode(%Mob{}), do: :mob
+
+  defp control_metadata(%Mob{internal: %Internal{pet: %Pet{} = pet}}) do
+    %{owner_guid: pet.owner_guid, pet_profile: pet.profile}
+  end
+
+  defp control_metadata(%Mob{}), do: %{owner_guid: nil, pet_profile: nil}
+
+  defp notify_pet_owner_removed(%Mob{
+         object: %{guid: guid},
+         internal: %Internal{pet: %Pet{kind: :charmed, owner_guid: owner_guid}}
+       }) do
+    case Entity.pid(owner_guid) do
+      pid when is_pid(pid) -> send(pid, {:control_released, guid})
+      _ -> :ok
+    end
+  end
 
   defp notify_pet_owner_removed(%Mob{object: %{guid: guid}, internal: %Internal{pet: %Pet{owner_guid: owner_guid}}}) do
     case Entity.pid(owner_guid) do

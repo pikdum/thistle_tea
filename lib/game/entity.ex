@@ -32,6 +32,10 @@ defmodule ThistleTea.Game.Entity do
     dispatch_cast(entity, {:receive_spell, caster, spell})
   end
 
+  def trigger_spell(entity, spell_id, target_guid, opts \\ []) do
+    dispatch_cast(entity, {:trigger_spell, spell_id, target_guid, opts})
+  end
+
   def remove_aura(entity, spell_id, caster_guid) do
     dispatch_cast(entity, {:remove_aura, spell_id, caster_guid})
   end

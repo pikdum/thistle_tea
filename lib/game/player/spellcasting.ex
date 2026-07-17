@@ -297,13 +297,22 @@ defmodule ThistleTea.Game.Player.Spellcasting do
 
   defp build_target_info(_state, _spell, _targets), do: nil
 
-  defp implicit_pet_guid(%Character{unit: %Unit{summon: pet_guid}}, %Spell{effects: effects})
-       when is_integer(pet_guid) and pet_guid > 0 do
+  defp implicit_pet_guid(%Character{} = character, %Spell{effects: effects}) do
+    pet_guid =
+      if Enum.any?(effects, &(&1.type == :feed_pet)) do
+        character.unit.summon
+      else
+        Character.controlled_guid(character)
+      end
+
     if Enum.any?(effects, &(&1.type == :feed_pet or &1.implicit_target_a == :pet or &1.implicit_target_b == :pet)),
-      do: pet_guid
+      do: positive_guid(pet_guid)
   end
 
   defp implicit_pet_guid(_character, _spell), do: nil
+
+  defp positive_guid(guid) when is_integer(guid) and guid > 0, do: guid
+  defp positive_guid(_guid), do: nil
 
   defp target_info(character, guid) do
     case Metadata.query(guid, [

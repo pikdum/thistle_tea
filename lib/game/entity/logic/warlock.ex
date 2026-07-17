@@ -28,6 +28,11 @@ defmodule ThistleTea.Game.Entity.Logic.Warlock do
   }
   @sacrifice_buffs %{416 => 18_789, 1860 => 18_790, 1863 => 18_791, 417 => 18_792}
   @devour_magic_heals %{19_505 => 19_658, 19_731 => 19_732, 19_734 => 19_733, 19_736 => 19_735}
+  @inferno_summon_spells [
+    %{caster: :owner, spell_id: 20_882, resolve_targets?: false},
+    %{caster: :summon, spell_id: 22_707, resolve_targets?: false},
+    %{caster: :summon, spell_id: 22_703, resolve_targets?: true}
+  ]
 
   def life_tap?(%Spell{} = spell), do: Spell.vmangos_script?(spell, "spell_warlock_life_tap")
   def life_tap?(_spell), do: false
@@ -67,6 +72,12 @@ defmodule ThistleTea.Game.Entity.Logic.Warlock do
   end
 
   def devour_magic_heal(_spell), do: nil
+
+  def summon_spells(%Spell{} = spell) do
+    if Spell.vmangos_script?(spell, "spell_warlock_inferno"), do: @inferno_summon_spells, else: []
+  end
+
+  def summon_spells(_spell), do: []
 
   def ritual_of_summoning?(%Spell{} = spell) do
     Spell.vmangos_script?(spell, "spell_warlock_ritual_of_summoning")
@@ -180,7 +191,15 @@ defmodule ThistleTea.Game.Entity.Logic.Warlock do
 
   def has_immolate_from?(_state, _caster_guid), do: false
 
-  def healthstone_item(%{unit: unit}, %Spell{id: spell_id}) do
+  def healthstone_item(%{unit: unit}, %Spell{id: spell_id} = spell) do
+    if Spell.vmangos_script?(spell, "spell_warlock_create_healthstone") do
+      healthstone_item_for_rank(unit, spell_id)
+    end
+  end
+
+  def healthstone_item(_state, _spell), do: nil
+
+  defp healthstone_item_for_rank(unit, spell_id) do
     rank =
       cond do
         Aura.has_spell?(%{unit: unit}, 18_693) -> 2

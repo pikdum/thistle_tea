@@ -32,6 +32,22 @@ defmodule ThistleTea.Game.Network.Message.PetMessagesTest do
       assert Message.CmsgPetSetAction.handle(message, state) == state
       assert_receive {:pet_set_actions, [%{position: 3, action: 11_778, action_type: 0xC1}]}
     end
+
+    test "dispatches action-bar changes to a charmed unit" do
+      controlled_guid = 124
+      Entity.register(controlled_guid)
+      on_exit(fn -> Entity.unregister(controlled_guid) end)
+
+      message = %Message.CmsgPetSetAction{
+        pet_guid: controlled_guid,
+        actions: [%{position: 3, action: 3110, action_type: 0xC1}]
+      }
+
+      state = %{character: %Character{unit: %Unit{charm: controlled_guid}}}
+
+      assert Message.CmsgPetSetAction.handle(message, state) == state
+      assert_receive {:pet_set_actions, [%{action: 3110}]}
+    end
   end
 
   describe "CMSG_PET_ACTION" do
@@ -52,6 +68,24 @@ defmodule ThistleTea.Game.Network.Message.PetMessagesTest do
 
       assert Message.CmsgPetAction.handle(message, state) == state
       assert_receive {:pet_command, :follow, ^target_guid}
+    end
+
+    test "dispatches commands to a charmed unit" do
+      controlled_guid = 124
+      Entity.register(controlled_guid)
+      on_exit(fn -> Entity.unregister(controlled_guid) end)
+
+      message = %Message.CmsgPetAction{
+        pet_guid: controlled_guid,
+        action: 1,
+        action_type: 0x07,
+        target_guid: 0
+      }
+
+      state = %{character: %Character{unit: %Unit{charm: controlled_guid}}}
+
+      assert Message.CmsgPetAction.handle(message, state) == state
+      assert_receive {:pet_command, :follow, 0}
     end
   end
 

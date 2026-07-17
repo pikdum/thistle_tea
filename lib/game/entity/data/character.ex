@@ -34,6 +34,15 @@ defmodule ThistleTea.Game.Entity.Data.Character do
     %{character | unit: %{unit | health: unit.max_health, power1: unit.max_power1}}
   end
 
+  def controlled_guid(%__MODULE__{unit: %Unit{charm: charm}}) when is_integer(charm) and charm > 0, do: charm
+
+  def controlled_guid(%__MODULE__{unit: %Unit{summon: summon}}) when is_integer(summon) and summon > 0, do: summon
+
+  def controlled_guid(%__MODULE__{}), do: nil
+
+  def controls?(%__MODULE__{} = character, guid) when is_integer(guid), do: controlled_guid(character) == guid
+  def controls?(%__MODULE__{}, _guid), do: false
+
   defp sync_mainhand_inputs(%__MODULE__{unit: %Unit{} = unit} = character) do
     {delay, weapon_min, weapon_max} =
       case mainhand_weapon(character) do

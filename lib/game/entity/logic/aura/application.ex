@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
   alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Logic.Aura.ControlSync
   alias ThistleTea.Game.Entity.Logic.Aura.Lifecycle
   alias ThistleTea.Game.Entity.Logic.Aura.MovementSync
   alias ThistleTea.Game.Entity.Logic.Aura.PlayerSync
@@ -33,6 +34,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
     :mod_fear,
     :mod_confuse,
     :mod_possess,
+    :mod_charm,
     :mod_detect_range,
     :mod_taunt
   ]
@@ -64,6 +66,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
           spell: spell,
           caster_guid: context.caster_guid,
           caster_level: context.caster_level,
+          caster_faction_template: context.caster_faction_template,
           applied_at: now,
           expires_at: expires_at(now, effective_duration(spell, context)),
           charges: holder_charges(spell),
@@ -153,10 +156,11 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
       |> maybe_heal_increased_health(holder)
       |> maybe_sit(holder)
 
+    {entity, control_events} = ControlSync.sync(entity)
     {entity, events} = MovementSync.sync_movement_state(entity, now)
     duration_events = applied_duration_events(entity, holder, now)
 
-    {Core.mark_broadcast_update(entity), sit_events ++ events ++ duration_events}
+    {Core.mark_broadcast_update(entity), sit_events ++ control_events ++ events ++ duration_events}
   end
 
   defp applied_duration_events(

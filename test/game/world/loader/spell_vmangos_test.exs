@@ -293,6 +293,16 @@ defmodule ThistleTea.Game.World.Loader.SpellVmangosTest do
       assert spell.mana_cost_per_second == 33
     end
 
+    test "Inferno support spells load their generic control and area semantics" do
+      assert Enum.any?(SpellLoader.load(20_882).effects, &(&1.aura == :mod_charm))
+
+      assert Enum.any?(SpellLoader.load(22_703).effects, fn effect ->
+               effect.type == :school_damage and effect.implicit_target_a == :aoe_enemy_at_caster
+             end)
+
+      assert Enum.any?(SpellLoader.load(22_707).effects, &(&1.aura == :mod_root))
+    end
+
     test "scripted warlock ranks share DBC family flags" do
       assert Spell.family_flag?(SpellLoader.load(1454), 5, 0x00040000)
       assert Spell.family_flag?(SpellLoader.load(11_689), 5, 0x00040000)

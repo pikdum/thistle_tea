@@ -893,12 +893,32 @@ defmodule ThistleTea.Game.Entity.EventSink do
       if event.steps != [] do
         send(pid, {:ai_script_steps, event.steps, event.target_guid})
       end
+
+      cast_post_spawn_spells(entity, mob.object.guid, summon)
     end
 
     entity
   end
 
   def emit(entity, %Event{type: :summon_creature}), do: entity
+
+  def emit(entity, %Event{type: :control_granted} = event) do
+    case Entity.pid(event.source_guid) do
+      pid when is_pid(pid) -> send(pid, {:control_granted, event.target_guid, event.spell_id, event.spells})
+      _ -> nil
+    end
+
+    entity
+  end
+
+  def emit(entity, %Event{type: :control_released} = event) do
+    case Entity.pid(event.source_guid) do
+      pid when is_pid(pid) -> send(pid, {:control_released, event.target_guid})
+      _ -> nil
+    end
+
+    entity
+  end
 
   def emit(%Character{} = entity, %Event{type: :summon_pet, entry: entry, spell_id: spell_id}) do
     with %Mob{} = built_pet <- SummonLoader.build_pet(entry, entity),
@@ -1175,6 +1195,23 @@ defmodule ThistleTea.Game.Entity.EventSink do
   end
 
   defp put_summon_owner(%Mob{} = mob, _summon), do: mob
+
+  defp cast_post_spawn_spells(entity, summon_guid, %{post_spawn_spells: spells}) when is_list(spells) do
+    Enum.each(spells, fn
+      %{caster: :owner, spell_id: spell_id} ->
+        with %Spell{} = spell <- SpellLoader.load(spell_id) do
+          Entity.receive_spell(summon_guid, CastContext.from_caster(entity, spell, summon_guid), spell)
+        end
+
+      %{caster: :summon, spell_id: spell_id, resolve_targets?: resolve_targets?} ->
+        Entity.trigger_spell(summon_guid, spell_id, summon_guid, resolve_targets?: resolve_targets?)
+
+      _ ->
+        nil
+    end)
+  end
+
+  defp cast_post_spawn_spells(_entity, _summon_guid, _summon), do: :ok
 
   defp charge_path(map, from, to) do
     Pathfinding.find_path(map, from, to)

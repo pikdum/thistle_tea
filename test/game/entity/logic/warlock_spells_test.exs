@@ -51,12 +51,93 @@ defmodule ThistleTea.Game.Entity.Logic.WarlockSpellsTest do
 
   describe "Healthstone creation" do
     test "turns the rank script effect into the matching item event" do
-      spell = %Spell{id: 6201, name: "Create Healthstone (Minor)", effects: [%Effect{type: :script_effect}]}
+      spell = %Spell{
+        id: 6201,
+        name: "Create Healthstone (Minor)",
+        script_name: "spell_warlock_create_healthstone",
+        effects: [%Effect{type: :script_effect}]
+      }
+
       context = %CastContext{caster_guid: 1, caster_level: 20}
 
       {_result, events} = SpellEffect.receive(character(), context, spell, 1_000)
 
       assert Enum.any?(events, &(&1.type == :create_item and &1.item_id == 5512))
+    end
+
+    test "does not apply the VMangos item table without its script label" do
+      spell = %Spell{id: 6201, effects: [%Effect{type: :script_effect}]}
+      context = %CastContext{caster_guid: 1, caster_level: 20}
+
+      {_result, events} = SpellEffect.receive(character(), context, spell, 1_000)
+
+      refute Enum.any?(events, &(&1.type == :create_item))
+    end
+  end
+
+  describe "Inferno and demon control" do
+    test "Inferno carries only the VMangos post-summon spell script" do
+      inferno = %Spell{
+        id: 1122,
+        script_name: "spell_warlock_inferno",
+        duration_ms: 300_000,
+        effects: [%Effect{type: :summon_demon, misc_value: 89}]
+      }
+
+      context = %CastContext{
+        caster_guid: 1,
+        caster_level: 60,
+        caster_position: {%WorldRef{map_id: 0}, 1.0, 2.0, 3.0},
+        caster_orientation: 0.5
+      }
+
+      {_result, [%{type: :summon_creature, summon: summon}]} =
+        SpellEffect.receive(character(), context, inferno, 1_000)
+
+      assert summon.post_spawn_spells == [
+               %{caster: :owner, spell_id: 20_882, resolve_targets?: false},
+               %{caster: :summon, spell_id: 22_707, resolve_targets?: false},
+               %{caster: :summon, spell_id: 22_703, resolve_targets?: true}
+             ]
+
+      ordinary = %{inferno | script_name: nil}
+      {_result, [%{summon: ordinary_summon}]} = SpellEffect.receive(character(), context, ordinary, 1_000)
+      assert ordinary_summon.post_spawn_spells == []
+    end
+
+    test "a possess aura drives mob control and restores the original state on removal" do
+      enslave = %Spell{
+        id: 20_882,
+        duration_ms: 300_000,
+        effects: [%Effect{type: :apply_aura, aura: :mod_charm, base_points: 60}]
+      }
+
+      context = %CastContext{
+        caster_guid: 1,
+        caster_level: 60,
+        caster_faction_template: 35,
+        target_guid: 2,
+        spell: enslave
+      }
+
+      original = mob()
+      original = %{original | unit: %{original.unit | faction_template: 14, npc_flags: 7}}
+      {controlled, events} = SpellEffect.receive(original, context, enslave, 1_000)
+
+      assert controlled.unit.charmed_by == 1
+      assert controlled.unit.faction_template == 35
+      assert controlled.unit.npc_flags == 0
+      assert controlled.internal.pet.owner_guid == 1
+      assert controlled.internal.pet.kind == :charmed
+      assert Enum.any?(events, &(&1.type == :control_granted and &1.spell_id == 20_882))
+
+      {released, events} = AuraLogic.remove_spells(controlled, [20_882], 2_000)
+
+      assert released.unit.charmed_by == 0
+      assert released.unit.faction_template == 14
+      assert released.unit.npc_flags == 7
+      assert released.internal.pet == nil
+      assert Enum.any?(events, &(&1.type == :control_released and &1.target_guid == 2))
     end
   end
 

@@ -121,6 +121,8 @@ defmodule ThistleTea.Game.Entity.Logic.RogueSpellsTest do
         caster_guid: 5,
         caster_level: 60,
         attack_power: 100,
+        attack_skill: 600,
+        melee_crit_chance: -100,
         combo_points: 5,
         spell: eviscerate
       }

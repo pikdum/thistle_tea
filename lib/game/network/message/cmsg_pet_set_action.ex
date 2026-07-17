@@ -7,13 +7,12 @@ defmodule ThistleTea.Game.Network.Message.CmsgPetSetAction do
   defstruct [:pet_guid, actions: []]
 
   @impl ClientMessage
-  def handle(
-        %__MODULE__{pet_guid: pet_guid, actions: actions},
-        %{character: %Character{unit: %Unit{summon: pet_guid}}} = state
-      ) do
-    case Entity.pid(pet_guid) do
-      pid when is_pid(pid) -> send(pid, {:pet_set_actions, actions})
-      _ -> :ok
+  def handle(%__MODULE__{pet_guid: pet_guid, actions: actions}, %{character: %Character{} = character} = state) do
+    if Character.controls?(character, pet_guid) do
+      case Entity.pid(pet_guid) do
+        pid when is_pid(pid) -> send(pid, {:pet_set_actions, actions})
+        _ -> :ok
+      end
     end
 
     state

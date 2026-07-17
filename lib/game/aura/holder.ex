@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.Aura.Holder do
     :spell,
     :caster_guid,
     :caster_level,
+    :caster_faction_template,
     :slot,
     :applied_at,
     :expires_at,

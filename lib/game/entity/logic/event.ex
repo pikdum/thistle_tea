@@ -42,6 +42,7 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
     :cast_context,
     :target_role,
     :spell,
+    :spells,
     :effect,
     :attack,
     :channel_time_ms,
@@ -473,6 +474,21 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
 
   def summon_creature(summon, steps, target_guid) when is_map(summon) and is_list(steps) do
     %__MODULE__{type: :summon_creature, summon: summon, steps: steps, target_guid: target_guid}
+  end
+
+  def control_granted(owner_guid, controlled_guid, spell_id, spells)
+      when is_integer(owner_guid) and is_integer(controlled_guid) and is_integer(spell_id) and is_list(spells) do
+    %__MODULE__{
+      type: :control_granted,
+      source_guid: owner_guid,
+      target_guid: controlled_guid,
+      spell_id: spell_id,
+      spells: spells
+    }
+  end
+
+  def control_released(owner_guid, controlled_guid) when is_integer(owner_guid) and is_integer(controlled_guid) do
+    %__MODULE__{type: :control_released, source_guid: owner_guid, target_guid: controlled_guid}
   end
 
   def summon_pet(owner_guid, entry, spell_id)

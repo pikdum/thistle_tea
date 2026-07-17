@@ -740,6 +740,30 @@ defmodule ThistleTea.Game.Network.Server do
   end
 
   def handle_info(
+        {:control_granted, controlled_guid, _spell_id, spells},
+        {socket, %{character: %Character{unit: %Unit{}} = character} = state}
+      ) do
+    character =
+      %{character | unit: %{character.unit | charm: controlled_guid}}
+      |> Core.mark_broadcast_update()
+
+    {:noreply, {socket, %{state | character: character}}, {:continue, {:finish_pet_attach, controlled_guid, spells}}}
+  end
+
+  def handle_info(
+        {:control_released, controlled_guid},
+        {socket, %{character: %Character{unit: %Unit{charm: controlled_guid}} = character} = state}
+      ) do
+    character = %{character | unit: %{character.unit | charm: 0}} |> Core.mark_broadcast_update()
+    Network.send_packet(Message.SmsgPetSpells.clear())
+    {:noreply, {socket, %{state | character: character}}, {:continue, :maybe_broadcast_update}}
+  end
+
+  def handle_info({:control_released, _controlled_guid}, {socket, state}) do
+    {:noreply, {socket, state}, socket.read_timeout}
+  end
+
+  def handle_info(
         {:pet_removed, pet_guid},
         {socket, %{character: %Character{unit: %Unit{summon: pet_guid}} = character} = state}
       ) do
@@ -960,9 +984,8 @@ defmodule ThistleTea.Game.Network.Server do
     end)
   end
 
-  defp notify_defensive_pet(%Character{unit: %Unit{summon: pet_guid}}, attacker_guid)
-       when is_integer(pet_guid) and pet_guid > 0 and is_integer(attacker_guid) do
-    case Entity.pid(pet_guid) do
+  defp notify_defensive_pet(%Character{} = character, attacker_guid) when is_integer(attacker_guid) do
+    case Entity.pid(Character.controlled_guid(character)) do
       pid when is_pid(pid) -> send(pid, {:owner_attacked, attacker_guid})
       _ -> :ok
     end

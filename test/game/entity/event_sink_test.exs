@@ -248,6 +248,20 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
       assert_receive {:force_attack, ^target_guid}
     end
 
+    test "control transitions notify the controlling entity", %{mob: mob} do
+      owner_guid = Guid.from_low_guid(:player, unique_guid())
+      Entity.register(owner_guid)
+      on_exit(fn -> Entity.unregister(owner_guid) end)
+      spell = %Spell{id: 3110}
+
+      assert ^mob = EventSink.emit(mob, Event.control_granted(owner_guid, mob.object.guid, 20_882, [spell]))
+      assert_receive {:control_granted, controlled_guid, 20_882, [^spell]}
+      assert controlled_guid == mob.object.guid
+
+      assert ^mob = EventSink.emit(mob, Event.control_released(owner_guid, mob.object.guid))
+      assert_receive {:control_released, ^controlled_guid}
+    end
+
     test "drop_nearby_threat reconciles mobs missing from player threat refs" do
       player_guid = Guid.from_low_guid(:player, unique_guid())
       mob_guid = Guid.from_low_guid(:mob, 1, unique_guid())

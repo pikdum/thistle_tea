@@ -524,6 +524,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp aura_type(3), do: :periodic_damage
   defp aura_type(4), do: :dummy
   defp aura_type(5), do: :mod_confuse
+  defp aura_type(6), do: :mod_charm
   defp aura_type(7), do: :mod_fear
   defp aura_type(8), do: :periodic_heal
   defp aura_type(9), do: :mod_melee_haste

@@ -3,6 +3,7 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
   Boundary that resolves a spell's target query into concrete guids using
   spatial lookups and hostility checks.
   """
+  alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Logic.Hostility
   alias ThistleTea.Game.Entity.Logic.SpellTarget
   alias ThistleTea.Game.Party
@@ -78,10 +79,11 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
     end
   end
 
-  defp pet_target_query(%{unit: %{summon: pet_guid}}, %Spell{effects: effects})
-       when is_integer(pet_guid) and pet_guid > 0 do
+  defp pet_target_query(%Character{} = caster, %Spell{effects: effects}) do
+    pet_guid = Character.controlled_guid(caster)
+
     if Enum.any?(effects, &(&1.implicit_target_a == :pet or &1.implicit_target_b == :pet)) do
-      {:unit, pet_guid}
+      if is_integer(pet_guid), do: {:unit, pet_guid}
     end
   end
 
