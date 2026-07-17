@@ -124,7 +124,14 @@ defmodule ThistleTea.Game.Entity.Logic.AttackFeedbackTest do
 
     test "finishers consume points on hit but retain them on avoidance" do
       entity = Reactive.add_combo_points(rogue(), 77, 5)
-      spell = %Spell{id: 6760, name: "Eviscerate", power_type: 3, mana_cost: 35}
+
+      spell = %Spell{
+        id: 6760,
+        name: "Eviscerate",
+        power_type: 3,
+        mana_cost: 35,
+        attributes: MapSet.new([:finishing_move])
+      }
 
       landed = AttackFeedback.receive(entity, %{outcome: :normal, damage: 500, victim_guid: 77}, spell, 1_000)
       avoided = AttackFeedback.receive(entity, %{outcome: :parry, damage: 0, victim_guid: 77}, spell, 1_000)
@@ -138,7 +145,14 @@ defmodule ThistleTea.Game.Entity.Logic.AttackFeedbackTest do
       entity = rogue()
       entity = %{entity | unit: %{entity.unit | power4: 65}}
       entity = Reactive.add_combo_points(entity, 77, 5)
-      spell = %Spell{id: 6760, name: "Eviscerate", power_type: 3, mana_cost: 35}
+
+      spell = %Spell{
+        id: 6760,
+        name: "Eviscerate",
+        power_type: 3,
+        mana_cost: 35,
+        attributes: MapSet.new([:finishing_move])
+      }
 
       entity = AttackFeedback.receive(entity, %{outcome: :miss, damage: 0, victim_guid: 77}, spell, 1_000)
 

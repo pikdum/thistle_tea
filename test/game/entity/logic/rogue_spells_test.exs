@@ -72,7 +72,14 @@ defmodule ThistleTea.Game.Entity.Logic.RogueSpellsTest do
     end
 
     test "finishers require points on their selected target" do
-      eviscerate = %Spell{id: 6760, name: "Eviscerate", power_type: 3, mana_cost: 35}
+      eviscerate = %Spell{
+        id: 6760,
+        name: "Eviscerate",
+        power_type: 3,
+        mana_cost: 35,
+        attributes: MapSet.new([:finishing_move])
+      }
+
       entity = Reactive.add_combo_points(rogue(), 9, 2)
 
       assert :ok = CastValidation.validate(entity, eviscerate, Targets.unit(9), nil, 1_000)
@@ -86,6 +93,7 @@ defmodule ThistleTea.Game.Entity.Logic.RogueSpellsTest do
         id: 6760,
         name: "Eviscerate",
         school: :physical,
+        attributes: MapSet.new([:finishing_move]),
         effects: [
           %Effect{index: 0, type: :school_damage, base_points: 10, die_sides: 0, points_per_combo: 10.0}
         ]
@@ -102,6 +110,7 @@ defmodule ThistleTea.Game.Entity.Logic.RogueSpellsTest do
         id: 8647,
         name: "Expose Armor",
         duration_ms: 30_000,
+        attributes: MapSet.new([:finishing_move]),
         effects: [
           %Effect{
             index: 0,

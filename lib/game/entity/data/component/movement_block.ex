@@ -79,6 +79,9 @@ defmodule ThistleTea.Game.Entity.Data.Component.MovementBlock do
   @spline_flag_final_target 0x00020000
   @spline_flag_final_angle 0x00040000
 
+  def swimming?(%__MODULE__{movement_flags: flags}) when is_integer(flags), do: (flags &&& @movement_flag_swimming) != 0
+  def swimming?(_movement_block), do: false
+
   def from_binary(m, acc \\ %__MODULE__{}) do
     <<
       # movement flags

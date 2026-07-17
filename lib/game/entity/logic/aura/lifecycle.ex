@@ -25,11 +25,13 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Lifecycle do
   @aura_interrupt_move 0x08
   @aura_interrupt_turning 0x10
   @aura_interrupt_not_seated 0x40000
+  @aura_interrupt_above_water 0x100
 
   def interrupt_mask(:move), do: @aura_interrupt_move ||| @aura_interrupt_turning ||| @aura_interrupt_not_seated
   def interrupt_mask(:cast), do: @aura_interrupt_cast
   def interrupt_mask(:turn), do: @aura_interrupt_turning
   def interrupt_mask(:stand), do: @aura_interrupt_not_seated
+  def interrupt_mask(:above_water), do: @aura_interrupt_above_water
 
   def self_duration_events(%Character{unit: %Unit{auras: holders}}, now) when is_list(holders) and is_integer(now) do
     Enum.flat_map(holders, &duration_event(&1, now))

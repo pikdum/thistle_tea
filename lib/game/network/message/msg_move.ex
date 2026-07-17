@@ -46,6 +46,7 @@ defmodule ThistleTea.Game.Network.Message.MsgMove do
     Metadata.update(state.guid, %{orientation: orientation, movement_velocity: movement_velocity, last_move_at: now})
     position_changed? = x0 != x1 or y0 != y1 or z0 != z1
     character = interrupt_auras(character, position_changed?)
+    character = interrupt_water_auras(character, movement_block, state.character.movement_block)
 
     new_state =
       if position_changed? do
@@ -100,6 +101,17 @@ defmodule ThistleTea.Game.Network.Message.MsgMove do
     end
 
     character
+  end
+
+  defp interrupt_water_auras(character, current, previous) do
+    if MovementBlock.swimming?(previous) and not MovementBlock.swimming?(current) do
+      {character, events} =
+        AuraLogic.remove_with_interrupt_flags(character, AuraLogic.interrupt_mask(:above_water), Time.now())
+
+      character |> Event.enqueue(events) |> EventSink.emit_pending()
+    else
+      character
+    end
   end
 
   defp movement_velocity(guid, {x0, y0, z0}, {x1, y1, z1}, now) do
