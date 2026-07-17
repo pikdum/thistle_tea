@@ -44,4 +44,11 @@ defmodule ThistleTea.Game.Spell.ProcTest do
       refute Proc.eligible?(proc_spell, %Spell{school: :fire}, :deal_harmful_spell, :normal)
     end
   end
+
+  describe "roll?/1" do
+    test "always accepts one hundred percent and rejects zero percent" do
+      assert Proc.roll?(%Spell{proc_chance: 100})
+      refute Proc.roll?(%Spell{proc_chance: 0})
+    end
+  end
 end

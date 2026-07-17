@@ -96,6 +96,15 @@ defmodule ThistleTea.Game.Spell.Scripts do
     19_265 => 19_253,
     19_266 => 19_254
   }
+  @paladin_judgement_procs %{
+    20_185 => 20_267,
+    20_344 => 20_341,
+    20_345 => 20_342,
+    20_346 => 20_343,
+    20_186 => 20_268,
+    20_354 => 20_352,
+    20_355 => 20_353
+  }
 
   def successful_finish_trigger(%Spell{id: id} = spell) do
     if Spell.vmangos_script?(spell, "spell_priest_holy_nova"), do: Map.get(@holy_nova_heals, id)
@@ -112,6 +121,17 @@ defmodule ThistleTea.Game.Spell.Scripts do
   end
 
   def proc_trigger_spell_id(_spell, _triggering_spell_id), do: nil
+
+  def incoming_proc_trigger(%Spell{id: id} = spell, default_spell_id, owner_guid, attacker_guid) do
+    if Spell.family_flag?(spell, @spell_family_paladin, 0x00080000) do
+      {attacker_guid, attacker_guid, Map.get(@paladin_judgement_procs, id)}
+    else
+      {owner_guid, attacker_guid, default_spell_id}
+    end
+  end
+
+  def incoming_proc_trigger(_spell, default_spell_id, owner_guid, attacker_guid),
+    do: {owner_guid, attacker_guid, default_spell_id}
 
   def requires_combo_target?(%Spell{} = spell),
     do: warrior_family_flag?(spell, @overpower_family_mask) or finisher?(spell)

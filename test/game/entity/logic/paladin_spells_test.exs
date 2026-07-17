@@ -60,6 +60,51 @@ defmodule ThistleTea.Game.Entity.Logic.PaladinSpellsTest do
     end
   end
 
+  describe "Judgement procs" do
+    test "Judgement of Light heals the attacker with its VMangos rank spell" do
+      judgement = %Holder{
+        spell: %Spell{
+          id: 20_345,
+          script_name: "spell_paladin_judgement_of_light_proc_aura",
+          spell_family: 10,
+          family_flags_0: 0x00080000,
+          proc_type_mask: 0x28,
+          proc_chance: 100
+        },
+        caster_guid: 5,
+        caster_level: 60,
+        auras: [%Aura{type: :proc_trigger_spell, trigger_spell_id: 5373}]
+      }
+
+      {_target, [event]} = AuraLogic.reactions(character([judgement]), :hit_taken, %{attacker_guid: 9})
+
+      assert event.source_guid == 9
+      assert event.target_guid == 9
+      assert event.spell_id == 20_342
+    end
+
+    test "Judgement of Wisdom energizes the attacker with its VMangos rank spell" do
+      judgement = %Holder{
+        spell: %Spell{
+          id: 20_354,
+          spell_family: 10,
+          family_flags_0: 0x00080000,
+          proc_type_mask: 0x28,
+          proc_chance: 100
+        },
+        caster_guid: 5,
+        caster_level: 60,
+        auras: [%Aura{type: :proc_trigger_spell, trigger_spell_id: 5373}]
+      }
+
+      {_target, [event]} = AuraLogic.reactions(character([judgement]), :hit_taken, %{attacker_guid: 9})
+
+      assert event.source_guid == 9
+      assert event.target_guid == 9
+      assert event.spell_id == 20_352
+    end
+  end
+
   describe "Judgement validation" do
     @describetag :dbc_db
 

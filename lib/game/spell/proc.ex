@@ -18,6 +18,11 @@ defmodule ThistleTea.Game.Spell.Proc do
       outcome_allowed?(proc_spell.proc_rule, outcome)
   end
 
+  def eligible?(%Spell{} = proc_spell, nil, proc_type, outcome) do
+    proc_flag?(proc_spell, proc_type) and unrestricted_trigger?(proc_spell.proc_rule) and
+      outcome_allowed?(proc_spell.proc_rule, outcome)
+  end
+
   def eligible?(_proc_spell, _triggering_spell, _proc_type, _outcome), do: false
 
   def roll?(%Spell{} = spell) do
@@ -41,6 +46,8 @@ defmodule ThistleTea.Game.Spell.Proc do
 
   defp proc_mask(:deal_harmful_spell), do: 0x00010000
   defp proc_mask(:deal_harmful_periodic), do: 0x00040000
+  defp proc_mask(:take_melee_swing), do: 0x00000008
+  defp proc_mask(:take_melee_ability), do: 0x00000020
   defp proc_mask(_proc_type), do: 0
 
   defp school_allowed?(%ProcRule{school_mask: 0}, _spell), do: true
@@ -76,6 +83,11 @@ defmodule ThistleTea.Game.Spell.Proc do
   defp outcome_mask(:normal), do: @normal_hit
   defp outcome_mask(:crit), do: @critical_hit
   defp outcome_mask(_outcome), do: 0
+
+  defp unrestricted_trigger?(%ProcRule{school_mask: 0, spell_family: 0, family_mask_0: 0, family_mask_1: 0}), do: true
+
+  defp unrestricted_trigger?(nil), do: true
+  defp unrestricted_trigger?(_rule), do: false
 
   defp proc_chance(%Spell{proc_rule: %ProcRule{custom_chance: chance}}) when chance > 0, do: chance
   defp proc_chance(%Spell{proc_chance: chance}) when is_number(chance), do: chance

@@ -75,6 +75,7 @@ defmodule ThistleTea.Game.Entity.Logic.PriestSpellsTest do
       duration_ms: Keyword.get(opts, :duration_ms, 30_000),
       mechanic: Keyword.get(opts, :mechanic, 0),
       proc_type_mask: Keyword.get(opts, :proc_type_mask, 0),
+      proc_chance: Keyword.get(opts, :proc_chance, 0),
       proc_charges: Keyword.get(opts, :proc_charges, 0),
       aura_interrupt_flags: Keyword.get(opts, :aura_interrupt_flags, 0),
       attributes: Keyword.get(opts, :attributes, MapSet.new()),
@@ -503,6 +504,8 @@ defmodule ThistleTea.Game.Entity.Logic.PriestSpellsTest do
         duration_ms: 600_000,
         base_points: 314,
         misc_value: 1,
+        proc_type_mask: 0x8,
+        proc_chance: 100,
         proc_charges: 20
       )
     end
@@ -513,6 +516,7 @@ defmodule ThistleTea.Game.Entity.Logic.PriestSpellsTest do
         school: :shadow,
         duration_ms: 600_000,
         proc_type_mask: 0x8,
+        proc_chance: 100,
         proc_charges: 3,
         trigger_spell_id: 28_376
       )
@@ -563,6 +567,7 @@ defmodule ThistleTea.Game.Entity.Logic.PriestSpellsTest do
         aura_spell(19_264, :proc_trigger_spell,
           name: "Touch of Weakness",
           proc_type_mask: 0x28,
+          proc_chance: 100,
           proc_charges: 1,
           trigger_spell_id: 28_598
         )

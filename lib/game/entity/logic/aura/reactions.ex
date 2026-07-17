@@ -14,19 +14,33 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.Spell.Proc
+  alias ThistleTea.Game.Spell.Scripts
 
   @charge_consuming_on_hit [:damage_shield, :proc_trigger_spell, :mod_resistance, :mod_resistance_exclusive]
 
-  def reactions(%{object: %{guid: owner_guid}, unit: %Unit{auras: holders}} = entity, :hit_taken, %{
-        attacker_guid: attacker_guid
-      })
-      when is_list(holders) and is_integer(attacker_guid) do
-    events =
-      Enum.flat_map(holders, fn %Holder{} = holder ->
-        Enum.flat_map(holder.auras, &reaction_event(&1, holder, owner_guid, attacker_guid))
+  def reactions(entity, :hit_taken, %{attacker_guid: attacker_guid} = context)
+      when is_integer(attacker_guid) and not is_map_key(context, :proc_type) do
+    reactions(entity, :hit_taken, Map.merge(context, %{proc_type: :take_melee_swing, outcome: :normal}))
+  end
+
+  def reactions(
+        %{object: %{guid: owner_guid}, unit: %Unit{auras: holders}} = entity,
+        :hit_taken,
+        %{attacker_guid: attacker_guid, proc_type: proc_type, outcome: outcome} = context
+      )
+      when is_list(holders) and is_integer(attacker_guid) and proc_type in [:take_melee_swing, :take_melee_ability] and
+             outcome in [:normal, :crit] do
+    triggering_spell = Map.get(context, :spell)
+
+    {holders, events} =
+      Enum.map_reduce(holders, [], fn %Holder{} = holder, events ->
+        {holder, holder_events} =
+          incoming_reaction(holder, owner_guid, attacker_guid, triggering_spell, proc_type, outcome)
+
+        {holder, events ++ holder_events}
       end)
 
-    {spend_hit_charges(entity), events}
+    {sync_holders(entity, Enum.reject(holders, &is_nil/1)), events}
   end
 
   def reactions(
@@ -70,20 +84,6 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
     end
   end
 
-  defp spend_hit_charges(%{unit: %Unit{auras: holders}} = entity) do
-    new_holders =
-      holders
-      |> Enum.map(&spend_hit_charge/1)
-      |> Enum.reject(&is_nil/1)
-
-    if new_holders == holders do
-      entity
-    else
-      %{entity | unit: UnitSync.sync_unit(%{entity.unit | auras: new_holders})}
-      |> Core.mark_broadcast_update()
-    end
-  end
-
   defp sync_holders(%{unit: %Unit{auras: current}} = entity, current), do: entity
 
   defp sync_holders(%{unit: %Unit{} = unit} = entity, holders) do
@@ -101,21 +101,51 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
 
   defp spend_hit_charge(holder), do: holder
 
-  defp reaction_event(%Aura{type: type, trigger_spell_id: spell_id}, %Holder{} = holder, owner_guid, attacker_guid)
+  defp incoming_reaction(%Holder{} = holder, owner_guid, attacker_guid, triggering_spell, proc_type, outcome) do
+    proc? =
+      Holder.has_any_type?(holder, @charge_consuming_on_hit) and
+        Proc.eligible?(holder.spell, triggering_spell, proc_type, outcome) and Proc.roll?(holder.spell)
+
+    events = Enum.flat_map(holder.auras, &reaction_event(&1, holder, owner_guid, attacker_guid, proc?))
+    {if(proc?, do: spend_hit_charge(holder), else: holder), events}
+  end
+
+  defp reaction_event(
+         %Aura{type: type, trigger_spell_id: spell_id},
+         %Holder{} = holder,
+         owner_guid,
+         attacker_guid,
+         proc?
+       )
        when type in [:damage_shield, :proc_trigger_spell] and is_integer(spell_id) and spell_id > 0 do
-    if type == :damage_shield or incoming_melee_proc?(holder.spell) do
-      source_guid = holder.caster_guid || owner_guid
+    if type == :damage_shield or proc? do
+      aura_owner_guid = holder.caster_guid || owner_guid
       source_level = holder.caster_level || 1
 
-      [
-        Event.trigger_spell(source_guid, source_level, attacker_guid, spell_id, triggered_by_spell_id: holder.spell.id)
-      ]
+      {source_guid, target_guid, trigger_spell_id} =
+        Scripts.incoming_proc_trigger(holder.spell, spell_id, aura_owner_guid, attacker_guid)
+
+      if is_integer(trigger_spell_id) do
+        [
+          Event.trigger_spell(source_guid, source_level, target_guid, trigger_spell_id,
+            triggered_by_spell_id: holder.spell.id
+          )
+        ]
+      else
+        []
+      end
     else
       []
     end
   end
 
-  defp reaction_event(%Aura{type: :damage_shield, amount: amount}, %Holder{} = holder, _owner_guid, attacker_guid)
+  defp reaction_event(
+         %Aura{type: :damage_shield, amount: amount},
+         %Holder{} = holder,
+         _owner_guid,
+         attacker_guid,
+         _proc?
+       )
        when is_integer(amount) and amount > 0 do
     spell = %{
       holder.spell
@@ -127,11 +157,5 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
     [Event.deliver_spell(attacker_guid, context, spell)]
   end
 
-  defp reaction_event(_aura, _holder, _owner_guid, _attacker_guid), do: []
-
-  defp incoming_melee_proc?(%Spell{proc_type_mask: mask}) when is_integer(mask) do
-    Bitwise.band(mask, 0x00100028) != 0
-  end
-
-  defp incoming_melee_proc?(_spell), do: false
+  defp reaction_event(_aura, _holder, _owner_guid, _attacker_guid, _proc?), do: []
 end
