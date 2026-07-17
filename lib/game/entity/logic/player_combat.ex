@@ -7,11 +7,11 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombat do
   auto-attacking a live target, or within a short drop window of the last
   hostile event — the timer covers PvP and hostile actions that created no
   threat entry. Mobs announce table membership with `threat_ref_gained`/
-  `threat_ref_lost` casts and the player keeps the referencing mob guids in
+  `threat_ref_lost` casts and the player keeps the referencing mob incarnations in
   `internal.threat_refs`; because it is a set owned by the player process,
   release messages are idempotent, and the per-tick `sync/3` prunes refs
-  whose mob is dead or gone, a missed release can never pin a player in
-  combat — the state always converges.
+  whose mob is dead, gone, or has respawned, so a missed release can never
+  pin a player in combat — the state always converges.
   """
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
@@ -51,7 +51,7 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombat do
       }
       |> CombatLogic.sync_combat_flag()
 
-    {character, MapSet.to_list(refs)}
+    {character, threat_ref_guids(refs)}
   end
 
   def vanish(character, _now), do: {character, []}
@@ -61,21 +61,25 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombat do
 
   def undetectable?(_character, _now), do: false
 
-  def gain_threat_ref(%Character{internal: %Internal{} = internal} = character, mob_guid)
-      when is_integer(mob_guid) and mob_guid > 0 do
-    refs = MapSet.put(internal.threat_refs || MapSet.new(), mob_guid)
+  def gain_threat_ref(%Character{internal: %Internal{} = internal} = character, mob_guid, incarnation_id)
+      when is_integer(mob_guid) and mob_guid > 0 and is_integer(incarnation_id) and incarnation_id > 0 do
+    refs = MapSet.put(internal.threat_refs || MapSet.new(), {mob_guid, incarnation_id})
 
     %{character | internal: %{internal | threat_refs: refs, in_combat: true}}
     |> CombatLogic.sync_combat_flag()
   end
 
-  def gain_threat_ref(character, _mob_guid), do: character
+  def gain_threat_ref(character, _mob_guid, _incarnation_id), do: character
 
-  def lose_threat_ref(%Character{internal: %Internal{threat_refs: %MapSet{} = refs} = internal} = character, mob_guid) do
-    %{character | internal: %{internal | threat_refs: MapSet.delete(refs, mob_guid)}}
+  def lose_threat_ref(
+        %Character{internal: %Internal{threat_refs: %MapSet{} = refs} = internal} = character,
+        mob_guid,
+        incarnation_id
+      ) do
+    %{character | internal: %{internal | threat_refs: MapSet.delete(refs, {mob_guid, incarnation_id})}}
   end
 
-  def lose_threat_ref(character, _mob_guid), do: character
+  def lose_threat_ref(character, _mob_guid, _incarnation_id), do: character
 
   def sync(character, %Blackboard{} = blackboard) do
     sync(character, blackboard, Time.now())
@@ -107,11 +111,19 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombat do
   defp threat_refs?(%Character{internal: %Internal{threat_refs: %MapSet{} = refs}}), do: MapSet.size(refs) > 0
   defp threat_refs?(_character), do: false
 
-  defp referencing_mob_active?(mob_guid) do
-    case Metadata.query(mob_guid, [:alive?]) do
-      %{alive?: true} -> true
+  defp referencing_mob_active?({mob_guid, incarnation_id}) do
+    case Metadata.query(mob_guid, [:alive?, :incarnation_id]) do
+      %{alive?: true, incarnation_id: ^incarnation_id} -> true
       _ -> false
     end
+  end
+
+  defp referencing_mob_active?(_ref), do: false
+
+  defp threat_ref_guids(refs) do
+    refs
+    |> Enum.map(fn {mob_guid, _incarnation_id} -> mob_guid end)
+    |> Enum.uniq()
   end
 
   defp touch_hostile(%Character{internal: %Internal{} = internal} = character, now) do

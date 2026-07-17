@@ -4,6 +4,7 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Spawn
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Player
@@ -39,6 +40,19 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
     test "attacker_lost does not decrement below zero", %{mob: mob, target_guid: target_guid} do
       assert ^mob = EventSink.emit(mob, Event.attacker_lost(target_guid))
       assert Metadata.query(target_guid, [:attacker_count]) == %{attacker_count: 0}
+    end
+
+    test "threat ref messages carry the mob incarnation" do
+      player_guid = Guid.from_low_guid(:player, unique_guid())
+      mob_guid = Guid.from_low_guid(:mob, 1, unique_guid())
+      Entity.register(player_guid)
+
+      on_exit(fn -> Entity.unregister(player_guid) end)
+
+      mob = %Mob{object: %Object{guid: mob_guid}, internal: %Internal{spawn: %Spawn{incarnation_id: 7}}}
+
+      assert ^mob = EventSink.emit(mob, Event.threat_ref_gained(player_guid))
+      assert_receive {:"$gen_cast", {:threat_ref_gained, ^mob_guid, 7}}
     end
 
     test "tap_cleared clears the entity's own tap metadata", %{mob: mob} do

@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.World.Loader.Mob do
   alias ThistleTea.Game.Entity.Data.ScriptStep
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Core
+  alias ThistleTea.Game.Entity.Server.Mob.Incarnation
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Loader.Condition, as: ConditionLoader
@@ -407,11 +408,13 @@ defmodule ThistleTea.Game.World.Loader.Mob do
   end
 
   def start_mob(%Mob{} = mob) do
+    mob = Incarnation.ensure(mob)
     put_metadata(mob)
     World.start_entity(mob)
   end
 
   def start_pool_mob(%Mob{} = mob) do
+    mob = Incarnation.ensure(mob)
     put_metadata(mob)
     World.start_incarnation(mob)
   end
@@ -429,6 +432,7 @@ defmodule ThistleTea.Game.World.Loader.Mob do
         detection_range: mob.internal.creature.detection_range,
         display_id: mob.unit.display_id,
         attacker_count: 0,
+        incarnation_id: Incarnation.id(mob),
         alive?: mob.unit.health > 0,
         health_pct: Core.health_pct(mob),
         orientation: elem(mob.movement_block.position, 3),

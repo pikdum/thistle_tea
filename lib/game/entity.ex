@@ -60,12 +60,12 @@ defmodule ThistleTea.Game.Entity do
     dispatch_cast(entity, {:heal_threat, healer_guid, healed_guid, amount})
   end
 
-  def threat_ref_gained(entity, mob_guid) do
-    dispatch_cast(entity, {:threat_ref_gained, mob_guid})
+  def threat_ref_gained(entity, mob_guid, incarnation_id) do
+    dispatch_cast(entity, {:threat_ref_gained, mob_guid, incarnation_id})
   end
 
-  def threat_ref_lost(entity, mob_guid) do
-    dispatch_cast(entity, {:threat_ref_lost, mob_guid})
+  def threat_ref_lost(entity, mob_guid, incarnation_id) do
+    dispatch_cast(entity, {:threat_ref_lost, mob_guid, incarnation_id})
   end
 
   def drop_threat(entity, source_guid) do

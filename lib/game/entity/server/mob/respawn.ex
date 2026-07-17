@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Respawn do
   alias ThistleTea.Game.Entity.Logic.AI.EventAI
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Server.Mob.Corpse
+  alias ThistleTea.Game.Entity.Server.Mob.Incarnation
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Loader.Faction, as: FactionLoader
@@ -107,6 +108,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Respawn do
     state =
       state
       |> Corpse.remove()
+      |> Incarnation.renew()
       |> Mob.respawn()
       |> Mob.apply_addon_auras(Time.now())
       |> BT.init(MobBT.tree())
@@ -143,6 +145,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Respawn do
       combat_reach: state.unit.combat_reach,
       level: state.unit.level,
       unit_flags: state.unit.flags,
+      incarnation_id: Incarnation.id(state),
       alive?: state.unit.health > 0,
       health_pct: Core.health_pct(state)
     })

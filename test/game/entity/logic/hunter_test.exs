@@ -56,7 +56,7 @@ defmodule ThistleTea.Game.Entity.Logic.HunterTest do
       character = %Character{
         object: %Object{guid: 1},
         unit: %Unit{target: 2, flags: 0},
-        internal: %Internal{in_combat: true, threat_refs: MapSet.new([2, 3])}
+        internal: %Internal{in_combat: true, threat_refs: MapSet.new([{2, 1}, {3, 1}])}
       }
 
       {character, events} = Hunter.after_aura(character, %Spell{name: "Feign Death"}, 1_000)

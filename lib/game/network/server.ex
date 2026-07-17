@@ -287,14 +287,20 @@ defmodule ThistleTea.Game.Network.Server do
     {:noreply, {socket, %{state | character: character}}, {:continue, :maybe_broadcast_update}}
   end
 
-  def handle_cast({:threat_ref_gained, mob_guid}, {socket, %{character: %Character{} = character} = state}) do
-    character = PlayerCombat.gain_threat_ref(character, mob_guid)
+  def handle_cast(
+        {:threat_ref_gained, mob_guid, incarnation_id},
+        {socket, %{character: %Character{} = character} = state}
+      ) do
+    character = PlayerCombat.gain_threat_ref(character, mob_guid, incarnation_id)
     state = PlayerTick.ensure_scheduled(%{state | character: character})
     {:noreply, {socket, state}, {:continue, :maybe_broadcast_update}}
   end
 
-  def handle_cast({:threat_ref_lost, mob_guid}, {socket, %{character: %Character{} = character} = state}) do
-    character = PlayerCombat.lose_threat_ref(character, mob_guid)
+  def handle_cast(
+        {:threat_ref_lost, mob_guid, incarnation_id},
+        {socket, %{character: %Character{} = character} = state}
+      ) do
+    character = PlayerCombat.lose_threat_ref(character, mob_guid, incarnation_id)
     state = PlayerTick.ensure_scheduled(%{state | character: character})
     {:noreply, {socket, state}, socket.read_timeout}
   end

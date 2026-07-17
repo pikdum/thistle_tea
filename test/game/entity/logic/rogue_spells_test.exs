@@ -265,7 +265,7 @@ defmodule ThistleTea.Game.Entity.Logic.RogueSpellsTest do
 
       internal = %{
         entity.internal
-        | threat_refs: MapSet.new([101, 102]),
+        | threat_refs: MapSet.new([{101, 1}, {102, 1}]),
           last_hostile_time: 900,
           spellbook: %{1787 => stealth},
           blackboard: %Blackboard{auto_attacking: true}

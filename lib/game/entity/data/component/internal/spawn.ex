@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal.Spawn do
     :waypoint_route,
     :respawn_delay_ms,
     :respawn_ref,
+    :incarnation_id,
     :despawn_type,
     :despawn_delay_ms,
     :pool_group,

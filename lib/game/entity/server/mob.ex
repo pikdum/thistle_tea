@@ -37,6 +37,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Entity.Logic.Threat
   alias ThistleTea.Game.Entity.Registry, as: EntityRegistry
   alias ThistleTea.Game.Entity.Server.Mob.Corpse
+  alias ThistleTea.Game.Entity.Server.Mob.Incarnation
   alias ThistleTea.Game.Entity.Server.Mob.Respawn
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network
@@ -68,7 +69,9 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   def init(%Mob{} = state) do
     GameEvent.subscribe(state)
     Process.flag(:trap_exit, true)
+    state = Incarnation.ensure(state)
     state = BT.init(state, behavior_tree(state))
+    Metadata.update(state.object.guid, %{incarnation_id: Incarnation.id(state)})
     World.update_position(state)
     state = Visibility.join_entity(state)
 

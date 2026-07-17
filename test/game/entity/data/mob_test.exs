@@ -239,6 +239,7 @@ defmodule ThistleTea.Game.Entity.Data.MobTest do
           spawn: %Spawn{
             unit: spawn_unit,
             movement_block: spawn_movement_block,
+            incarnation_id: 1,
             respawn_ref: make_ref()
           }
         }
@@ -391,6 +392,7 @@ defmodule ThistleTea.Game.Entity.Data.MobTest do
   describe "handle_info/2" do
     test "respawns a dead mob in place" do
       mob_guid = Guid.from_low_guid(:mob, 2, System.unique_integer([:positive]))
+      previous_incarnation_id = System.unique_integer([:positive, :monotonic])
       spawn_unit = %Unit{health: 10, max_health: 10, power1: 4, max_power1: 4, level: 2}
       spawn_movement_block = %MovementBlock{position: {1.0, 2.0, 3.0, 4.0}, movement_flags: 0}
 
@@ -406,6 +408,7 @@ defmodule ThistleTea.Game.Entity.Data.MobTest do
           spawn: %Spawn{
             unit: spawn_unit,
             movement_block: spawn_movement_block,
+            incarnation_id: previous_incarnation_id,
             respawn_ref: make_ref()
           },
           loot: %Loot{}
@@ -423,11 +426,13 @@ defmodule ThistleTea.Game.Entity.Data.MobTest do
       assert respawned.unit == spawn_unit
       assert respawned.movement_block == spawn_movement_block
       assert respawned.internal.spawn.respawn_ref == nil
+      assert respawned.internal.spawn.incarnation_id != previous_incarnation_id
 
       assert SpatialHash.get_entity(mob_guid) ==
                {mob_guid, WorldRef.open(0), 1.0, 2.0, 3.0}
 
-      assert %{alive?: true, level: 2} = Metadata.get(mob_guid)
+      assert %{alive?: true, level: 2, incarnation_id: incarnation_id} = Metadata.get(mob_guid)
+      assert incarnation_id == respawned.internal.spawn.incarnation_id
     end
   end
 end

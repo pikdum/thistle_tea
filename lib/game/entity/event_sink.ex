@@ -19,6 +19,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
   alias ThistleTea.Game.Entity.Logic.SpellTarget
   alias ThistleTea.Game.Entity.Logic.StealthDetection
   alias ThistleTea.Game.Entity.Server.DynamicObject, as: DynamicObjectServer
+  alias ThistleTea.Game.Entity.Server.Mob.Incarnation
   alias ThistleTea.Game.Entity.SpellTargetResolver
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Math
@@ -497,7 +498,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
 
   def emit(%{object: %{guid: mob_guid}} = entity, %Event{type: :threat_ref_gained, target_guid: target_guid}) do
     if Guid.entity_type(target_guid) == :player do
-      Entity.threat_ref_gained(target_guid, mob_guid)
+      Entity.threat_ref_gained(target_guid, mob_guid, Incarnation.id(entity))
     end
 
     entity
@@ -505,7 +506,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
 
   def emit(%{object: %{guid: mob_guid}} = entity, %Event{type: :threat_ref_lost, target_guid: target_guid}) do
     if Guid.entity_type(target_guid) == :player do
-      Entity.threat_ref_lost(target_guid, mob_guid)
+      Entity.threat_ref_lost(target_guid, mob_guid, Incarnation.id(entity))
     end
 
     entity
