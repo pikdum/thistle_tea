@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.Aura.Absorption
   alias ThistleTea.Game.Entity.Logic.Aura.Application, as: AuraApplication
+  alias ThistleTea.Game.Entity.Logic.Aura.DeathItem
   alias ThistleTea.Game.Entity.Logic.Aura.Lifecycle
   alias ThistleTea.Game.Entity.Logic.Aura.Periodic
   alias ThistleTea.Game.Entity.Logic.Aura.Reactions
@@ -35,6 +36,8 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
   defdelegate cancel_spell(entity, spell_id, now), to: Lifecycle
   defdelegate dispel(entity, dispel_type, now, polarity \\ nil), to: Lifecycle
   defdelegate break_on_damage(entity, now), to: Lifecycle
+
+  defdelegate enqueue_death_item_rewards(entity, old_health, new_health), to: DeathItem, as: :enqueue_rewards
 
   defdelegate tick(entity, now), to: Periodic
   defdelegate next_event_at(entity), to: Periodic
@@ -125,6 +128,20 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
   end
 
   def source_spells(_entity), do: MapSet.new()
+
+  def dispel_options(%{unit: %Unit{auras: holders}}) when is_list(holders) do
+    holders
+    |> Enum.flat_map(fn
+      %Holder{spell: %Spell{dispel_type: type}, negative?: negative?} when is_integer(type) and type > 0 ->
+        [{type, if(negative?, do: :negative, else: :positive)}]
+
+      _holder ->
+        []
+    end)
+    |> MapSet.new()
+  end
+
+  def dispel_options(_entity), do: MapSet.new()
 
   def school_immune?(%{unit: %Unit{auras: holders}}, school) when is_list(holders) do
     school_mask = Spell.school_mask(school)

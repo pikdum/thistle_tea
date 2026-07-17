@@ -7,40 +7,50 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.ControlSync do
   alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Internal.Pet
+  alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Event
+  alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.Spell
 
   @unit_flag_possessed 0x01000000
 
-  def sync(%Mob{object: %{guid: guid}, unit: %Unit{} = unit, internal: %Internal{} = internal} = mob) do
+  def sync(entity), do: sync(entity, 0)
+
+  def sync(%Mob{object: %{guid: guid}, unit: %Unit{} = unit, internal: %Internal{} = internal} = mob, now)
+      when is_integer(now) do
     possession = possession_holder(unit.auras)
     charm = charm_holder(unit.auras)
 
     cond do
-      match?(%Holder{}, possession) -> sync_possession(mob, possession, internal.pet, guid)
+      match?(%Holder{}, possession) -> sync_possession(mob, possession, internal.pet, guid, now)
       match?(%Pet{possessed?: true}, internal.pet) -> release_possession(mob, internal.pet)
-      match?(%Holder{}, charm) -> sync_charm(mob, charm, internal.pet, guid)
+      match?(%Holder{}, charm) -> sync_charm(mob, charm, internal.pet, guid, now)
       match?(%Pet{kind: :charmed}, internal.pet) -> release_charm(mob, internal.pet)
       true -> {mob, []}
     end
   end
 
-  def sync(entity), do: {entity, []}
+  def sync(entity, _now), do: {entity, []}
 
-  defp sync_charm(%Mob{} = mob, %Holder{caster_guid: owner_guid}, %Pet{kind: :charmed, owner_guid: owner_guid}, _guid),
-    do: {mob, []}
+  defp sync_charm(
+         %Mob{} = mob,
+         %Holder{caster_guid: owner_guid},
+         %Pet{kind: :charmed, owner_guid: owner_guid},
+         _guid,
+         _now
+       ), do: {mob, []}
 
-  defp sync_charm(%Mob{} = mob, %Holder{} = holder, %Pet{kind: :charmed} = previous, guid) do
-    grant_charm(mob, holder, previous, [Event.control_released(previous.owner_guid, guid)])
+  defp sync_charm(%Mob{} = mob, %Holder{} = holder, %Pet{kind: :charmed} = previous, guid, now) do
+    grant_charm(mob, holder, previous, [Event.control_released(previous.owner_guid, guid)], now)
   end
 
-  defp sync_charm(%Mob{} = mob, %Holder{} = holder, nil, _guid), do: grant_charm(mob, holder, nil, [])
-  defp sync_charm(%Mob{} = mob, _holder, _pet, _guid), do: {mob, []}
+  defp sync_charm(%Mob{} = mob, %Holder{} = holder, nil, _guid, now), do: grant_charm(mob, holder, nil, [], now)
+  defp sync_charm(%Mob{} = mob, _holder, _pet, _guid, _now), do: {mob, []}
 
-  defp grant_charm(%Mob{} = mob, %Holder{} = holder, previous, events) do
+  defp grant_charm(%Mob{} = mob, %Holder{} = holder, previous, events, now) do
     original_faction = original_value(previous, :original_faction_template, mob.unit.faction_template)
     original_npc_flags = original_value(previous, :original_npc_flags, mob.unit.npc_flags)
 
@@ -76,6 +86,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.ControlSync do
 
     spells = (mob.internal.spellbook || %{}) |> Map.values() |> Enum.reject(&Spell.attribute?(&1, :passive))
     event = Event.control_granted(holder.caster_guid, mob.object.guid, holder.spell.id, spells)
+    {mob, events} = halt_for_control(mob, now, events)
     {Core.mark_broadcast_update(mob), events ++ [event]}
   end
 
@@ -98,20 +109,21 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.ControlSync do
          %Mob{} = mob,
          %Holder{caster_guid: owner_guid},
          %Pet{possessed?: true, owner_guid: owner_guid},
-         _guid
+         _guid,
+         _now
        ), do: {mob, []}
 
-  defp sync_possession(%Mob{} = mob, %Holder{} = holder, previous, guid) do
+  defp sync_possession(%Mob{} = mob, %Holder{} = holder, previous, guid, now) do
     events =
       case previous do
         %Pet{kind: :charmed, owner_guid: owner_guid} -> [Event.control_released(owner_guid, guid)]
         _pet -> []
       end
 
-    grant_possession(mob, holder, previous, events)
+    grant_possession(mob, holder, previous, events, now)
   end
 
-  defp grant_possession(%Mob{} = mob, %Holder{} = holder, previous, events) do
+  defp grant_possession(%Mob{} = mob, %Holder{} = holder, previous, events, now) do
     original_faction = original_value(previous, :original_faction_template, mob.unit.faction_template)
     original_npc_flags = original_value(previous, :original_npc_flags, mob.unit.npc_flags)
 
@@ -139,8 +151,19 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.ControlSync do
 
     spells = controlled_spells(mob)
     event = Event.control_granted(holder.caster_guid, mob.object.guid, holder.spell.id, spells, possess?: true)
+    {mob, events} = halt_for_control(mob, now, events)
     {Core.mark_broadcast_update(mob), events ++ [event]}
   end
+
+  defp halt_for_control(%Mob{movement_block: %MovementBlock{} = movement} = mob, now, events) do
+    if movement.spline_nodes not in [nil, []] or is_integer(mob.internal.movement_start_time) do
+      {Movement.halt(mob, now), events ++ [Event.movement_stopped()]}
+    else
+      {mob, events}
+    end
+  end
+
+  defp halt_for_control(mob, _now, events), do: {mob, events}
 
   defp possession_pet(%Pet{} = pet, %Holder{} = holder, original_faction, original_npc_flags, original_unit_flags) do
     %{

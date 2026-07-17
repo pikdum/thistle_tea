@@ -212,6 +212,46 @@ defmodule ThistleTea.Game.Spell.CastValidationTest do
                CastValidation.validate(caster(), harmful_spell(), Targets.unit(7), hostile_target(los?: false), @now)
     end
 
+    test "requires a matching removable aura for non-periodic dispels" do
+      cleanse =
+        helpful_spell(
+          name: "Cleanse",
+          effects: [
+            %Effect{type: :dispel, misc_value: 4, implicit_target_a: :target_ally},
+            %Effect{type: :dispel, misc_value: 3, implicit_target_a: :target_ally},
+            %Effect{type: :dispel, misc_value: 1, implicit_target_a: :target_ally}
+          ]
+        )
+
+      assert {:error, :nothing_to_dispel} =
+               CastValidation.validate(caster(), cleanse, Targets.unit(7), friendly_target(), @now)
+
+      assert :ok =
+               CastValidation.validate(
+                 caster(),
+                 cleanse,
+                 Targets.unit(7),
+                 friendly_target(dispel_options: MapSet.new([{3, :negative}])),
+                 @now
+               )
+
+      assert {:error, :nothing_to_dispel} =
+               CastValidation.validate(
+                 caster(),
+                 cleanse,
+                 Targets.unit(7),
+                 friendly_target(dispel_options: MapSet.new([{3, :positive}])),
+                 @now
+               )
+    end
+
+    test "offensive dispels require a matching positive aura" do
+      purge = harmful_spell(effects: [%Effect{type: :dispel, misc_value: 1, implicit_target_a: :target_enemy}])
+      target = hostile_target(dispel_options: MapSet.new([{1, :positive}]))
+
+      assert :ok = CastValidation.validate(caster(), purge, Targets.unit(7), target, @now)
+    end
+
     test "allows ignore_line_of_sight spells to bypass the LoS check" do
       spell = harmful_spell(attributes: MapSet.new([:ignore_line_of_sight]))
 

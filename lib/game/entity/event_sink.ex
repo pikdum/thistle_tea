@@ -722,6 +722,16 @@ defmodule ThistleTea.Game.Entity.EventSink do
 
   def emit(entity, %Event{type: :open_gameobject}), do: entity
 
+  def emit(entity, %Event{type: :create_item, target_guid: target_guid, item_id: item_id, count: count})
+      when is_integer(target_guid) do
+    case Entity.pid(target_guid) do
+      pid when is_pid(pid) -> send(pid, {:create_item, item_id, count})
+      _pid -> :ok
+    end
+
+    entity
+  end
+
   def emit(%Character{} = entity, %Event{type: :create_item, item_id: item_id, count: count}) do
     send(self(), {:create_item, item_id, count})
     entity
@@ -1120,7 +1130,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
   end
 
   defp dispatch_trigger_event(entity, event, %Spell{} = spell) do
-    if event.resolve_targets? do
+    if event.resolve_targets? or SpellTarget.area_targeted?(spell) do
       dispatch_resolved_trigger(entity, event, spell)
     else
       dispatch_single_trigger(entity, event, spell)

@@ -181,7 +181,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
       |> maybe_heal_increased_health(holder)
       |> maybe_sit(holder)
 
-    {entity, control_events} = ControlSync.sync(entity)
+    {entity, control_events} = ControlSync.sync(entity, now)
     {entity, events} = MovementSync.sync_movement_state(entity, now)
     viewpoint_events = ViewpointSync.events(previous_holders, holders, entity_guid(entity))
     duration_events = applied_duration_events(entity, holder, now)
@@ -433,6 +433,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
       misc_value: effect.misc_value,
       multiple_value: effect.multiple_value,
       class_mask: effect.class_mask,
+      item_type: effect.item_type,
       amplitude_ms: amplitude_ms,
       next_tick_at: next_tick(effect, amplitude_ms, now),
       trigger_spell_id: effect.trigger_spell_id

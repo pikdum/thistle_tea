@@ -24,7 +24,9 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
       |> resolve_query(caster_guid, query)
       |> Enum.filter(&creature_type_allowed?(spell, &1))
 
-    expand_chain(caster, spell, initial)
+    caster
+    |> expand_chain(spell, initial)
+    |> append_caster_execution_target(spell, caster_guid)
   end
 
   def resolve(_caster, _spell, _targets), do: []
@@ -40,6 +42,19 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
   end
 
   defp expand_chain(_caster, _spell, initial), do: initial
+
+  defp append_caster_execution_target(targets, %Spell{effects: effects}, caster_guid) do
+    if Enum.any?(effects, &caster_execution_effect?/1) do
+      Enum.uniq(targets ++ [caster_guid])
+    else
+      targets
+    end
+  end
+
+  defp caster_execution_effect?(%{implicit_target_a: :caster}), do: true
+  defp caster_execution_effect?(%{implicit_target_b: :caster}), do: true
+  defp caster_execution_effect?(%{type: :summon_demon, implicit_target_a: nil, implicit_target_b: nil}), do: true
+  defp caster_execution_effect?(_effect), do: false
 
   defp chain_targets(_caster, _spell, _previous, selected, remaining) when remaining <= 0, do: selected
 

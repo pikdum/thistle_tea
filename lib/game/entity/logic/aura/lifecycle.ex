@@ -201,7 +201,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Lifecycle do
       |> PlayerSync.sync()
       |> StealthSync.sync()
 
-    {entity, control_events} = ControlSync.sync(entity)
+    {entity, control_events} = ControlSync.sync(entity, now)
     {entity, events} = MovementSync.sync_movement_state(entity, now)
     viewpoint_events = ViewpointSync.events(previous_holders, kept, entity_guid(entity))
     release_events = release_controlled_events(entity, removed)

@@ -151,6 +151,57 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
     end
 
     @tag :dbc_db
+    test "a DBC area trigger resolves hostile targets around its source" do
+      caster_guid = Guid.from_low_guid(:mob, 5879, unique_guid())
+      target_guid = Guid.from_low_guid(:player, unique_guid())
+      Entity.register(target_guid)
+      SpatialHash.update(:players, target_guid, 0, 3.0, 0.0, 0.0)
+
+      player_faction = %FactionTemplate{
+        id: 1,
+        faction: 1,
+        flags: 72,
+        faction_group: 3,
+        friend_group: 2,
+        enemy_group: 12
+      }
+
+      Metadata.put(target_guid, %{
+        alive?: true,
+        faction_template: player_faction,
+        faction_can_have_reputation?: false,
+        unit_flags: 0
+      })
+
+      on_exit(fn ->
+        Entity.unregister(target_guid)
+        SpatialHash.remove(:players, target_guid)
+        Metadata.delete(target_guid)
+      end)
+
+      hostile_faction = %FactionTemplate{
+        id: 17,
+        faction: 15,
+        flags: 1,
+        faction_group: 8,
+        friend_group: 0,
+        enemy_group: 1,
+        friends_0: 15
+      }
+
+      totem = %Mob{
+        object: %Object{guid: caster_guid},
+        unit: %Unit{level: 60, faction_template: hostile_faction},
+        internal: %Internal{world: %WorldRef{map_id: 0}},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
+      }
+
+      assert ^totem = EventSink.emit(totem, Event.trigger_spell(caster_guid, 60, caster_guid, 8349))
+
+      assert_receive {:"$gen_cast", {:receive_spell, %CastContext{caster_guid: ^caster_guid}, %Spell{id: 8349}}}
+    end
+
+    @tag :dbc_db
     test "a remote command trigger stays targeted on the victim" do
       caster_guid = Guid.from_low_guid(:player, unique_guid())
       target_guid = Guid.from_low_guid(:mob, 1, unique_guid())

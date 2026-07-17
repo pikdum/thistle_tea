@@ -1,8 +1,11 @@
 defmodule ThistleTea.Game.Entity.Logic.CoreTest do
   use ExUnit.Case, async: true
 
+  alias ThistleTea.Game.Aura
+  alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Loot
   alias ThistleTea.Game.Entity.Data.Component.Internal.Spawn
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Player
@@ -61,6 +64,45 @@ defmodule ThistleTea.Game.Entity.Logic.CoreTest do
       {entity, _absorbed} = Core.take_damage_with_absorb(entity, 30, 1_000, source: 0)
 
       assert entity.internal.killed_by == nil
+    end
+  end
+
+  describe "take_damage_with_absorb/4 death items" do
+    test "rewards one DBC-defined item to an eligible tapped caster" do
+      holder = %Holder{
+        caster_guid: 777,
+        caster_level: 10,
+        auras: [%Aura{type: :channel_death_item, item_type: 6265, amount: 0}]
+      }
+
+      duplicate = %{holder | spell: %Spell{id: 17_877}}
+      entity = damageable(health: 30)
+      unit = %{entity.unit | level: 10, auras: [holder, duplicate]}
+      internal = %{entity.internal | loot: %Loot{tapped_by: %{player: 777}}}
+
+      {entity, _absorbed} =
+        Core.take_damage_with_absorb(%{entity | unit: unit, internal: internal}, 30, 1_000, source: 777)
+
+      assert [%{type: :create_item, target_guid: 777, item_id: 6265, count: 1}] = entity.internal.events
+    end
+
+    test "does not reward death items for gray or differently tapped creatures" do
+      holder = %Holder{
+        caster_guid: 777,
+        caster_level: 60,
+        auras: [%Aura{type: :channel_death_item, item_type: 6265, amount: 1}]
+      }
+
+      for {victim_level, tapped_player} <- [{50, 777}, {60, 778}] do
+        entity = damageable(health: 30)
+        unit = %{entity.unit | level: victim_level, auras: [holder]}
+        internal = %{entity.internal | loot: %Loot{tapped_by: %{player: tapped_player}}}
+
+        {entity, _absorbed} =
+          Core.take_damage_with_absorb(%{entity | unit: unit, internal: internal}, 30, 1_000, source: 777)
+
+        assert entity.internal.events in [nil, []]
+      end
     end
   end
 

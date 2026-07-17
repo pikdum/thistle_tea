@@ -763,7 +763,7 @@ defmodule ThistleTea.Game.Entity.Logic.WarriorSpellsTest do
   end
 
   describe "charge" do
-    test "caster-targeted energize routes rage back to the caster" do
+    test "caster-targeted energize applies rage only to the caster target" do
       spell = %Spell{
         id: 100,
         name: "Charge",
@@ -773,13 +773,14 @@ defmodule ThistleTea.Game.Entity.Logic.WarriorSpellsTest do
         ]
       }
 
-      target = melee_target()
-      context = %CastContext{caster_guid: 5, caster_level: 10, target_hostile?: true}
+      caster = warrior_fixture()
+      caster = %{caster | object: %{caster.object | guid: 5}, unit: %{caster.unit | power2: 0}}
+      context = %CastContext{caster_guid: 5, caster_level: 10, target_role: :caster}
 
-      {target, events} = SpellEffect.receive(target, context, spell, 1_000)
+      {caster, events} = SpellEffect.receive(caster, context, spell, 1_000)
 
-      assert [%Event{type: :grant_power, target_guid: 5, misc_value: 1, amount: 90}] = events
-      assert target.unit.power2 in [nil, 0]
+      assert events == []
+      assert caster.unit.power2 == 90
     end
 
     test "completing a charge cast queues the charge movement event" do

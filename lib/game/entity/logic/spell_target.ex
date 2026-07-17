@@ -33,6 +33,12 @@ defmodule ThistleTea.Game.Entity.Logic.SpellTarget do
 
   def target_query(_spell, _targets), do: :none
 
+  def area_targeted?(%Spell{} = spell) do
+    caster_aoe_spell?(spell) or cone_aoe_spell?(spell) or targeted_aoe_spell?(spell) or party_aoe_spell?(spell)
+  end
+
+  def area_targeted?(_spell), do: false
+
   def redirect_trigger_target(%{object: %{guid: guid}, unit: unit}, target_guid, %Spell{effects: effects})
       when target_guid == guid do
     cond do

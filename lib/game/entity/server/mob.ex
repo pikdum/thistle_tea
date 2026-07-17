@@ -568,7 +568,8 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
           health_pct: Core.health_pct(state),
           unit_flags: state.unit.flags,
           orientation: elem(state.movement_block.position, 3),
-          aura_sources: Aura.source_spells(state)
+          aura_sources: Aura.source_spells(state),
+          dispel_options: Aura.dispel_options(state)
         }
         |> Map.merge(FactionLoader.metadata(state.unit.faction_template))
         |> Map.merge(control_metadata(state))

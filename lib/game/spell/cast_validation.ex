@@ -45,6 +45,7 @@ defmodule ThistleTea.Game.Spell.CastValidation do
          :ok <- Warlock.validate_ritual(spell, Keyword.get(opts, :ritual_context)),
          :ok <- check_reagents(caster, spell, Keyword.get(opts, :count_item)),
          :ok <- check_target(spell, target_info),
+         :ok <- check_dispel_target(caster, spell, targets, target_info),
          :ok <- check_creature_type(spell, target_info),
          :ok <- check_position(caster, spell, target_info),
          :ok <- check_target_aura_state(spell, target_info),
@@ -263,6 +264,37 @@ defmodule ThistleTea.Game.Spell.CastValidation do
       true -> check_incidental_target(target_info)
     end
   end
+
+  defp check_dispel_target(caster, %Spell{} = spell, %Targets{unit_guid: unit_guid}, target_info) do
+    dispel_types =
+      spell.effects
+      |> Enum.filter(&match?(%{type: :dispel}, &1))
+      |> MapSet.new(& &1.misc_value)
+
+    if MapSet.size(dispel_types) == 0 do
+      :ok
+    else
+      options = target_dispel_options(caster, unit_guid, target_info)
+      polarity = if match?(%{friendly?: false}, target_info), do: :positive, else: :negative
+      check_dispel_options(options, dispel_types, polarity)
+    end
+  end
+
+  defp target_dispel_options(caster, unit_guid, target_info) do
+    if self_target?(caster, unit_guid), do: AuraLogic.dispel_options(caster), else: dispel_options(target_info)
+  end
+
+  defp check_dispel_options(options, dispel_types, polarity) do
+    matching? =
+      Enum.any?(options, fn {type, option_polarity} ->
+        MapSet.member?(dispel_types, type) and option_polarity == polarity
+      end)
+
+    if matching?, do: :ok, else: {:error, :nothing_to_dispel}
+  end
+
+  defp dispel_options(%{dispel_options: %MapSet{} = options}), do: options
+  defp dispel_options(_target_info), do: MapSet.new()
 
   defp check_resurrect_target(%{} = target_info) do
     cond do

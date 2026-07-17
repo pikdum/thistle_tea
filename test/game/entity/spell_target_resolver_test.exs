@@ -21,6 +21,26 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolverTest do
       assert SpellTargetResolver.resolve(caster, spell, targets) == [2]
     end
 
+    test "executes untargeted summon effects on the caster" do
+      caster = %{object: %{guid: 1}}
+      spell = %Spell{id: 1122, effects: [%Effect{type: :summon_demon}]}
+
+      assert SpellTargetResolver.resolve(caster, spell, %Targets{destination_location: {1.0, 2.0, 3.0}}) == [1]
+    end
+
+    test "resolves mixed enemy and caster effects to both owners" do
+      caster = %{object: %{guid: 1}}
+
+      spell = %Spell{
+        effects: [
+          %Effect{type: :modify_threat, implicit_target_a: :target_enemy},
+          %Effect{type: :apply_aura, implicit_target_a: :caster}
+        ]
+      }
+
+      assert SpellTargetResolver.resolve(caster, spell, %Targets{unit_guid: 2}) == [2, 1]
+    end
+
     test "chains through nearest valid targets using DBC chain count" do
       player_guid = player_guid()
       first = mob_guid()

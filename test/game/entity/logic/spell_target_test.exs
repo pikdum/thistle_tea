@@ -51,6 +51,16 @@ defmodule ThistleTea.Game.Entity.Logic.SpellTargetTest do
     end
   end
 
+  describe "area_targeted?/1" do
+    test "recognizes DBC area targets independently of packet targets" do
+      area = %Spell{effects: [%Effect{implicit_target_a: :aoe_enemy_at_caster}]}
+      direct = %Spell{effects: [%Effect{implicit_target_a: :target_enemy}]}
+
+      assert SpellTarget.area_targeted?(area)
+      refute SpellTarget.area_targeted?(direct)
+    end
+  end
+
   describe "redirect_trigger_target/3" do
     test "keeps a self target when the spell does not target enemies" do
       entity = entity_fixture()

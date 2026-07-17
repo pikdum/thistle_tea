@@ -73,6 +73,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
     new_health = max(health - remaining, 0)
 
     entity = %{entity | unit: %{unit | health: new_health}}
+    entity = Aura.enqueue_death_item_rewards(entity, health, new_health)
     entity = if remaining > 0, do: Aura.break_on_damage(entity, now), else: entity
 
     entity =

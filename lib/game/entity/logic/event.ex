@@ -409,6 +409,11 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
     %__MODULE__{type: :create_item, item_id: item_id, count: count}
   end
 
+  def create_item(target_guid, item_id, count)
+      when is_integer(target_guid) and is_integer(item_id) and is_integer(count) do
+    %__MODULE__{type: :create_item, target_guid: target_guid, item_id: item_id, count: count}
+  end
+
   def spawn_area_effect(spell, effect, {_x, _y, _z} = position, duration_ms) when is_integer(duration_ms) do
     %__MODULE__{
       type: :spawn_area_effect,

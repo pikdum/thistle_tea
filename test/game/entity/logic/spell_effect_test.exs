@@ -503,14 +503,15 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
              ] = events
     end
 
-    test "summon-demon effects create a temporary owned summon at the caster snapshot" do
+    test "summon-demon effects create a temporary owned summon at the destination" do
       spell = %Spell{id: 18_541, effects: [%Effect{index: 0, type: :summon_demon, misc_value: 11_859}]}
 
       context = %CastContext{
         caster_guid: 1,
         caster_level: 60,
         caster_position: {%WorldRef{map_id: 0}, 1.0, 2.0, 3.0},
-        caster_orientation: 1.5
+        caster_orientation: 1.5,
+        destination_position: {4.0, 5.0, 6.0}
       }
 
       {_caster, events} = SpellEffect.receive(target_fixture(), context, spell, 1_000)
@@ -521,7 +522,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
                  summon: %{
                    entry: 11_859,
                    owner_guid: 1,
-                   position: {1.0, 2.0, 3.0, 1.5},
+                   position: {4.0, 5.0, 6.0, 1.5},
                    despawn_delay_ms: 3_600_000
                  }
                }

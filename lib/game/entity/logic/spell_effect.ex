@@ -83,11 +83,9 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
 
   defp applicable_effects(_target, _context, effects), do: Enum.reject(effects, &caster_target_effect?/1)
 
-  defp caster_target_effect?(%Effect{type: type} = effect) when type in [:apply_aura, :instakill] do
+  defp caster_target_effect?(%Effect{} = effect) do
     effect.implicit_target_a == :caster or effect.implicit_target_b == :caster
   end
-
-  defp caster_target_effect?(_effect), do: false
 
   defp pet_target_effect?(%Effect{} = effect) do
     effect.implicit_target_a == :pet or effect.implicit_target_b == :pet
@@ -320,16 +318,24 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
 
   defp apply_effect(
          state,
-         %CastContext{caster_guid: owner_guid, caster_position: {_world, x, y, z}, caster_orientation: orientation},
+         %CastContext{
+           caster_guid: owner_guid,
+           caster_position: {_world, caster_x, caster_y, caster_z},
+           caster_orientation: orientation,
+           destination_position: destination
+         },
          spell,
-         %Effect{type: :summon_demon, misc_value: entry},
+         %Effect{type: :summon_demon, misc_value: entry} = effect,
          _now
        )
        when is_integer(entry) and entry > 0 do
+    orientation = orientation || 0.0
+    {x, y, z} = summon_effect_position(effect, destination, {caster_x, caster_y, caster_z}, orientation)
+
     summon = %{
       entry: entry,
       owner_guid: owner_guid,
-      position: {x, y, z, orientation || 0.0},
+      position: {x, y, z, orientation},
       despawn_delay_ms: summon_duration(spell),
       despawn_type: 1,
       run?: false,
@@ -421,7 +427,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
     {Threat.taunt(state, context.caster_guid), []}
   end
 
-  defp apply_effect(state, %CastContext{} = context, _spell, %Effect{type: :threat} = effect, _now) do
+  defp apply_effect(state, %CastContext{} = context, _spell, %Effect{type: :modify_threat} = effect, _now) do
     {Threat.change(state, context.caster_guid, Effect.damage_roll(effect)), []}
   end
 

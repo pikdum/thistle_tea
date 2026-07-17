@@ -32,6 +32,7 @@ defmodule ThistleTea.Game.Network.Message.SmsgCastResult do
     no_pet: 0x4C,
     not_shapeshift: 0x3D,
     no_power: 0x4D,
+    nothing_to_dispel: 0x4E,
     only_shapeshift: 0x56,
     out_of_range: 0x59,
     reagents: 0x5C,

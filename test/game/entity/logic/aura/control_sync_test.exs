@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.ControlSyncTest do
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Internal.Pet
+  alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
@@ -70,6 +71,26 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.ControlSyncTest do
       assert restored.internal.pet == nil
       assert restored.unit.faction_template == 14
       assert restored.unit.npc_flags == 3
+    end
+
+    test "new control stops the mob's current movement path" do
+      mob = %Mob{
+        object: %Object{guid: 20},
+        unit: %Unit{auras: [holder(:mod_possess)], faction_template: 14},
+        internal: %Internal{movement_start_time: 500, movement_start_position: {0.0, 0.0, 0.0}},
+        movement_block: %MovementBlock{
+          position: {0.0, 0.0, 0.0, 0.0},
+          spline_nodes: [{10.0, 0.0, 0.0}],
+          duration: 2_000,
+          movement_flags: 0
+        }
+      }
+
+      {possessed, events} = ControlSync.sync(mob, 1_000)
+
+      assert possessed.movement_block.spline_nodes == []
+      assert Enum.any?(events, &(&1.type == :movement_stopped))
+      assert Enum.any?(events, &(&1.type == :control_granted))
     end
   end
 

@@ -326,7 +326,8 @@ defmodule ThistleTea.Game.Player.Spellcasting do
            :tameable?,
            :orientation,
            :creature_type,
-           :aura_sources
+           :aura_sources,
+           :dispel_options
          ]) do
       nil ->
         :unknown
@@ -345,6 +346,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
           position: World.position(guid),
           orientation: Map.get(metadata, :orientation),
           aura_sources: Map.get(metadata, :aura_sources, MapSet.new()),
+          dispel_options: Map.get(metadata, :dispel_options, MapSet.new()),
           los?: World.line_of_sight?(character, guid)
         }
     end

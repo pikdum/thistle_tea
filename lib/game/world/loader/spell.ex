@@ -365,6 +365,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
           misc_value: effect_misc_value(row, index, type, aura),
           multiple_value: Map.get(row, :"effect_multiple_values_#{index}") || 0.0,
           class_mask: unsigned32(Map.get(row, :"effect_item_type_#{index}")),
+          item_type: unsigned32(Map.get(row, :"effect_item_type_#{index}")),
           radius_yards: radius_lookup.(Map.get(row, :"effect_radius_#{index}")),
           implicit_target_a: target_type(Map.get(row, :"implicit_target_a_#{index}") || 0),
           implicit_target_b: target_type(Map.get(row, :"implicit_target_b_#{index}") || 0),
@@ -505,7 +506,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp effect_type(55), do: :tame_creature
   defp effect_type(56), do: :summon_pet
   defp effect_type(62), do: :power_burn
-  defp effect_type(63), do: :threat
+  defp effect_type(63), do: :modify_threat
   defp effect_type(68), do: :interrupt_cast
   defp effect_type(72), do: :add_farsight
   defp effect_type(73), do: :summon_possessed
@@ -592,6 +593,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp aura_type(77), do: :mechanic_immunity
   defp aura_type(84), do: :mod_regen
   defp aura_type(85), do: :mod_power_regen
+  defp aura_type(86), do: :channel_death_item
   defp aura_type(88), do: :mod_health_regen_percent
   defp aura_type(91), do: :mod_detect_range
   defp aura_type(92), do: :prevent_fleeing

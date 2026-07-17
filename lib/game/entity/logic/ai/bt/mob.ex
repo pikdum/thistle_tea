@@ -195,7 +195,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     false
   end
 
-  @confused_wander_radius 5.0
+  @confused_wander_radius 4.0
 
   defp confused?(%Mob{} = state, _blackboard) do
     AuraLogic.has_aura?(state, :mod_confuse) or AuraLogic.has_aura?(state, :mod_fear)
