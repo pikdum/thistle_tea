@@ -25,6 +25,7 @@ defmodule ThistleTea.Game.Entity.Data.Character do
     character
     |> sync_mainhand_inputs()
     |> sync_offhand_inputs()
+    |> sync_ranged_inputs()
     |> EquipmentStats.resync(&ItemStore.get/1, &SpellLoader.load/1)
     |> CombatRatings.sync()
   end
@@ -84,6 +85,35 @@ defmodule ThistleTea.Game.Entity.Data.Character do
   end
 
   defp mainhand_weapon(%__MODULE__{}), do: nil
+
+  defp sync_ranged_inputs(%__MODULE__{unit: %Unit{} = unit, player: %Player{visible_item_18_0: entry}} = character) do
+    weapon =
+      case is_integer(entry) and entry > 0 and ItemLoader.get_template(entry) do
+        %ItemTemplate{class: @item_class_weapon} = template -> template
+        _ -> nil
+      end
+
+    unit =
+      if weapon do
+        %{
+          unit
+          | ranged_attack_time: positive_or(weapon.delay, @base_attack_time),
+            base_ranged_min_damage: positive_or(weapon.dmg_min1, 0.0),
+            base_ranged_max_damage: positive_or(weapon.dmg_max1, 0.0)
+        }
+      else
+        %{
+          unit
+          | ranged_attack_time: @base_attack_time,
+            base_ranged_min_damage: nil,
+            base_ranged_max_damage: nil,
+            min_ranged_damage: 0.0,
+            max_ranged_damage: 0.0
+        }
+      end
+
+    %{character | unit: unit}
+  end
 
   defp positive_or(value, default) do
     case value do

@@ -765,6 +765,40 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
     end
   end
 
+  describe "druid shapeshifting" do
+    test "switches resources with cat and bear forms and restores mana" do
+      entity = fixture_entity()
+      entity = %{entity | unit: %{entity.unit | class: 11, power_type: 0, power2: 30, power4: 50}}
+
+      cat = %Spell{
+        id: 768,
+        duration_ms: -1,
+        effects: [%Effect{index: 0, type: :apply_aura, aura: :mod_shapeshift, misc_value: 1}]
+      }
+
+      bear = %Spell{
+        id: 5487,
+        duration_ms: -1,
+        effects: [%Effect{index: 0, type: :apply_aura, aura: :mod_shapeshift, misc_value: 5}]
+      }
+
+      {entity, _events} = apply_spell(entity, 1, 1, cat)
+      assert entity.unit.shapeshift_form == 1
+      assert entity.unit.power_type == 3
+      assert entity.unit.power4 == 0
+      assert entity.unit.max_power4 == 100
+
+      {entity, _events} = apply_spell(entity, 1, 1, bear)
+      assert entity.unit.shapeshift_form == 5
+      assert entity.unit.power_type == 1
+
+      {entity, _events} = Aura.cancel_spell(entity, bear.id, 2_000)
+      assert entity.unit.shapeshift_form == 0
+      assert entity.unit.power_type == 0
+      assert entity.unit.power2 == 0
+    end
+  end
+
   describe "self_duration_events/2" do
     defp character_with_auras(holders) do
       %Character{

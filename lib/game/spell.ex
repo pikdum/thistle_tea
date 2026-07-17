@@ -149,6 +149,9 @@ defmodule ThistleTea.Game.Spell do
   def melee_ability?(%__MODULE__{dmg_class: 2}), do: true
   def melee_ability?(_spell), do: false
 
+  def ranged_ability?(%__MODULE__{dmg_class: 3}), do: true
+  def ranged_ability?(_spell), do: false
+
   def creature_type_allowed?(%__MODULE__{target_creature_type_mask: mask}, creature_type)
       when is_integer(mask) and mask > 0 and is_integer(creature_type) and creature_type > 0 do
     (mask &&& 1 <<< (creature_type - 1)) != 0

@@ -138,6 +138,25 @@ defmodule ThistleTea.Game.Entity.Logic.StatsTest do
       assert buffed.min_damage > unbuffed.min_damage
     end
 
+    test "agility raises hunter ranged weapon damage" do
+      unit = %{
+        mage_unit()
+        | class: 3,
+          level: 50,
+          base_agility: 100,
+          ranged_attack_time: 2500,
+          base_ranged_min_damage: 20.0,
+          base_ranged_max_damage: 30.0
+      }
+
+      unbuffed = recompute(unit)
+      buffed = recompute(%{unit | auras: [holder([%Aura{type: :mod_stat, amount: 20, misc_value: 1}])]})
+
+      assert buffed.ranged_attack_power == unbuffed.ranged_attack_power + 40
+      assert buffed.min_ranged_damage > unbuffed.min_ranged_damage
+      assert buffed.max_ranged_damage > unbuffed.max_ranged_damage
+    end
+
     test "skips weapon damage without base inputs" do
       mob = %Unit{level: 10, attack_power: 50, min_damage: 30.0, max_damage: 40.0, base_attack_time: 2000, auras: []}
       recomputed = recompute(mob)

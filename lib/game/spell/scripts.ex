@@ -140,11 +140,21 @@ defmodule ThistleTea.Game.Spell.Scripts do
   def aura_amount_override(_spell, _entity), do: nil
 
   def exclusive_category(row) do
-    case paladin_exclusive_category(row) do
-      nil -> non_paladin_exclusive_category(row)
-      category -> category
+    cond do
+      shapeshift_spell?(row) -> :shapeshift
+      hunter_aspect?(row) -> :hunter_aspect
+      shaman_shield?(row) -> :shaman_shield
+      true -> paladin_exclusive_category(row) || non_paladin_exclusive_category(row)
     end
   end
+
+  defp shapeshift_spell?(row) do
+    Enum.any?(0..2, &(Map.get(row, :"effect_aura_#{&1}") == 36))
+  end
+
+  defp hunter_aspect?(row), do: String.starts_with?(Map.get(row, :name_en_gb) || "", "Aspect of the ")
+
+  defp shaman_shield?(row), do: (Map.get(row, :name_en_gb) || "") in ["Lightning Shield", "Water Shield"]
 
   defp non_paladin_exclusive_category(row) do
     cond do

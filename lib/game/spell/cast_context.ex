@@ -97,20 +97,33 @@ defmodule ThistleTea.Game.Spell.CastContext do
   defp caster_position(_caster), do: nil
 
   defp put_melee_snapshot(%__MODULE__{} = context, caster, %Spell{} = spell) do
-    if melee_snapshot?(spell) do
-      %{
+    cond do
+      Spell.ranged_ability?(spell) ->
+        %{
+          context
+          | attack_power: caster.unit.ranged_attack_power || 0,
+            weapon_base_min: caster.unit.base_ranged_min_damage || caster.unit.min_ranged_damage || 0,
+            weapon_base_max: caster.unit.base_ranged_max_damage || caster.unit.max_ranged_damage || 0,
+            attack_time_ms: caster.unit.ranged_attack_time,
+            attack_skill: ranged_attack_skill(caster),
+            melee_crit_chance: ranged_crit_chance(caster)
+        }
+
+      melee_snapshot?(spell) ->
+        %{
+          context
+          | attack_power: melee_attack_power(caster),
+            weapon_base_min: weapon_base(caster, :base_min_damage, :min_damage),
+            weapon_base_max: weapon_base(caster, :base_max_damage, :max_damage),
+            attack_time_ms: caster.unit.base_attack_time,
+            normalized_speed: normalized_speed(caster),
+            attack_skill: attack_skill(caster),
+            melee_crit_chance: melee_crit_chance(caster),
+            caster_power: caster_power(caster)
+        }
+
+      true ->
         context
-        | attack_power: melee_attack_power(caster),
-          weapon_base_min: weapon_base(caster, :base_min_damage, :min_damage),
-          weapon_base_max: weapon_base(caster, :base_max_damage, :max_damage),
-          attack_time_ms: caster.unit.base_attack_time,
-          normalized_speed: normalized_speed(caster),
-          attack_skill: attack_skill(caster),
-          melee_crit_chance: melee_crit_chance(caster),
-          caster_power: caster_power(caster)
-      }
-    else
-      context
     end
   end
 
@@ -181,6 +194,19 @@ defmodule ThistleTea.Game.Spell.CastContext do
   end
 
   defp main_hand_template(_caster), do: nil
+
+  defp ranged_attack_skill(%Character{unit: unit, player: player}) when is_struct(player) do
+    skill_id = Skills.ranged_weapon_skill(player, &ItemLoader.get_template/1)
+    Skills.value(player.skills, skill_id, Skills.max_for_level(unit.level || 1))
+  end
+
+  defp ranged_attack_skill(_caster), do: nil
+
+  defp ranged_crit_chance(%Character{player: player, unit: unit}) when is_struct(player) do
+    player.ranged_crit_percentage || CombatRatings.melee_crit_chance(unit.class, unit.level || 1, unit.agility || 0)
+  end
+
+  defp ranged_crit_chance(_caster), do: nil
 
   defp spell_damage_bonus(caster) do
     bonuses = equipment_bonuses(caster)

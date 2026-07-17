@@ -19,12 +19,18 @@ defmodule ThistleTea.Game.World.Loader.ClassSpell do
   @table_options [:named_table, :public, read_concurrency: true, write_concurrency: :auto]
 
   @warrior 1
+  @hunter 3
+  @shaman 7
   @warlock 9
+  @druid 11
   @defensive_stance {71, 10}
   @berserker_stance {2458, 30}
   @quest_reward_spells %{
     @warrior => [@defensive_stance, @berserker_stance],
-    @warlock => [{688, 1}, {697, 10}, {712, 20}, {691, 30}, {1122, 50}, {18_540, 60}]
+    @hunter => [{1515, 10}, {883, 10}, {2641, 10}, {6991, 10}, {982, 10}, {136, 12}],
+    @shaman => [{8071, 4}, {3599, 10}, {5394, 20}, {8512, 30}],
+    @warlock => [{688, 1}, {697, 10}, {712, 20}, {691, 30}, {1122, 50}, {18_540, 60}],
+    @druid => [{5487, 10}, {1066, 16}, {768, 20}]
   }
 
   def init(table \\ __MODULE__) do

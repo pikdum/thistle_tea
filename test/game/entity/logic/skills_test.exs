@@ -15,6 +15,19 @@ defmodule ThistleTea.Game.Entity.Logic.SkillsTest do
     end
   end
 
+  describe "ranged_weapon_skill/2" do
+    test "uses the equipped ranged weapon subclass" do
+      player = %{visible_item_18_0: 100}
+      get_template = fn 100 -> %{class: 2, subclass: 2} end
+
+      assert Skills.ranged_weapon_skill(player, get_template) == 45
+    end
+
+    test "returns nil without a ranged weapon" do
+      assert Skills.ranged_weapon_skill(%{visible_item_18_0: 0}, fn _ -> nil end) == nil
+    end
+  end
+
   describe "on_level_up/2" do
     test "raises maxes for level skills and keeps values" do
       skills = %{
