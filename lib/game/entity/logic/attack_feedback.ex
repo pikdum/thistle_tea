@@ -7,7 +7,6 @@ defmodule ThistleTea.Game.Entity.Logic.AttackFeedback do
   point that marks a dodging target for Overpower. Swings that carried a
   queued on-next-swing spell generate no rage.
   """
-  alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.Entity.Logic.Paladin
@@ -24,7 +23,6 @@ defmodule ThistleTea.Game.Entity.Logic.AttackFeedback do
     entity
     |> apply_power_feedback(payload, spell)
     |> apply_rogue_combo_feedback(payload, spell)
-    |> stop_incapacitate_auto_attack(payload, spell)
     |> trigger_blade_flurry(payload)
     |> Paladin.trigger_seal(payload)
     |> mark_reactives(payload, now)
@@ -75,15 +73,6 @@ defmodule ThistleTea.Game.Entity.Logic.AttackFeedback do
   end
 
   defp apply_rogue_combo_feedback(entity, _payload, _spell), do: entity
-
-  defp stop_incapacitate_auto_attack(entity, %{outcome: outcome, victim_guid: victim_guid}, %Spell{name: name})
-       when name in ["Gouge", "Scatter Shot"] and outcome in [:normal, :crit] do
-    entity
-    |> BT.clear_auto_attack()
-    |> Event.enqueue(Event.attack_stop(entity.object.guid, victim_guid))
-  end
-
-  defp stop_incapacitate_auto_attack(entity, _payload, _spell), do: entity
 
   defp trigger_blade_flurry(entity, %{victim_guid: victim_guid, damage: damage})
        when is_integer(damage) and damage > 0 do

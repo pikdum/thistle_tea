@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Totem
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.DynamicObject, as: DataDynamicObject
   alias ThistleTea.Game.Entity.Data.GameObject
@@ -892,7 +893,15 @@ defmodule ThistleTea.Game.Entity.EventSink do
              faction_template: entity.unit.faction_template,
              level: entity.unit.level
          },
-         totem = %{built | unit: unit, internal: %{built.internal | rooted?: true}},
+         totem = %{
+           built
+           | unit: unit,
+             internal: %{
+               built.internal
+               | rooted?: true,
+                 totem: %Totem{owner_guid: owner_guid}
+             }
+         },
          {:ok, _pid} <- MobLoader.start_mob(totem) do
       totem_guids = Map.put(entity.internal.totem_guids, slot, totem.object.guid)
       %{entity | internal: %{entity.internal | totem_guids: totem_guids}}

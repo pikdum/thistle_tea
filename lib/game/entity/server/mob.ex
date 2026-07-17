@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Entity.Data.Component.Internal.Loot
   alias ThistleTea.Game.Entity.Data.Component.Internal.Pet
   alias ThistleTea.Game.Entity.Data.Component.Internal.Spawn
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Totem
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.CreatureSpell
   alias ThistleTea.Game.Entity.Data.Mob
@@ -23,6 +24,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Mob, as: MobBT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells, as: MobSpells
   alias ThistleTea.Game.Entity.Logic.AI.BT.Pet, as: PetBT
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Totem, as: TotemBT
   alias ThistleTea.Game.Entity.Logic.AI.EventAI
   alias ThistleTea.Game.Entity.Logic.AI.Script
   alias ThistleTea.Game.Entity.Logic.AI.Tick
@@ -494,6 +496,8 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     Visibility.leave_entity(state)
     Metadata.delete(state.object.guid)
   end
+
+  defp behavior_tree(%Mob{internal: %Internal{totem: %Totem{}}}), do: TotemBT.tree()
 
   defp behavior_tree(%Mob{internal: %Internal{pet: %Pet{}}}), do: PetBT.tree()
   defp behavior_tree(%Mob{}), do: MobBT.tree()

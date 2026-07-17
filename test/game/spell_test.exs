@@ -36,6 +36,13 @@ defmodule ThistleTea.Game.SpellTest do
     end
   end
 
+  describe "breaks_on_damage?/1" do
+    test "derives breakable control from DBC aura interrupt flags" do
+      assert Spell.breaks_on_damage?(%Spell{aura_interrupt_flags: 0x2})
+      refute Spell.breaks_on_damage?(%Spell{aura_interrupt_flags: 0x4})
+    end
+  end
+
   describe "school_index/1" do
     test "returns packet indexes for spell schools" do
       assert Spell.school_index(:physical) == 0

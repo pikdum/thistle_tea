@@ -137,28 +137,38 @@ defmodule ThistleTea.Game.World.Loader.Mob do
   end
 
   defp intrinsic_totem_spell(spell_id) when is_integer(spell_id) and spell_id > 0 do
-    cast_target =
+    {cast_target, cast_flags} =
       case SpellLoader.load(spell_id) do
-        %Spell{} = spell -> if Spell.requires_hostile_target?(spell), do: :victim, else: :self
-        _ -> :self
+        %Spell{} = spell ->
+          if Spell.requires_hostile_target?(spell) do
+            {:victim, MapSet.new([:triggered])}
+          else
+            {:self, MapSet.new([:triggered, :aura_not_present])}
+          end
+
+        _ ->
+          {:self, MapSet.new([:triggered, :aura_not_present])}
       end
 
-    intrinsic_spell(spell_id, cast_target)
+    intrinsic_spell(spell_id, cast_target, cast_flags)
   end
 
   defp intrinsic_totem_spell(_spell_id), do: nil
 
-  defp intrinsic_spell(spell_id, cast_target) when is_integer(spell_id) and spell_id > 0 do
+  defp intrinsic_spell(spell_id, cast_target) when is_integer(spell_id) and spell_id > 0,
+    do: intrinsic_spell(spell_id, cast_target, MapSet.new([:triggered]))
+
+  defp intrinsic_spell(_spell_id, _cast_target), do: nil
+
+  defp intrinsic_spell(spell_id, cast_target, cast_flags) when is_integer(spell_id) and spell_id > 0 do
     %CreatureSpell{
       spell_id: spell_id,
       cast_target: cast_target,
-      cast_flags: MapSet.new([:triggered]),
+      cast_flags: cast_flags,
       delay_repeat_min_ms: 2_000,
       delay_repeat_max_ms: 2_000
     }
   end
-
-  defp intrinsic_spell(_spell_id, _cast_target), do: nil
 
   defp load_addon_auras(%Mangos.Creature{} = creature) do
     spells =

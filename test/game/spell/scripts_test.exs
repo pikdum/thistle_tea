@@ -4,6 +4,11 @@ defmodule ThistleTea.Game.Spell.ScriptsTest do
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Scripts
 
+  test "druid finishers are derived from family flags" do
+    assert Scripts.finisher?(%Spell{spell_family: 7, family_flags_0: 0x00800000})
+    refute Scripts.finisher?(%Spell{spell_family: 7, family_flags_0: 0x00400000})
+  end
+
   describe "apply_trigger/1" do
     test "Power Word: Shield triggers Weakened Soul for every rank" do
       assert Scripts.apply_trigger(%Spell{id: 17}) == 6788

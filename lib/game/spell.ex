@@ -51,6 +51,9 @@ defmodule ThistleTea.Game.Spell do
 
   def attribute?(%__MODULE__{attributes: attrs}, attr), do: MapSet.member?(attrs, attr)
 
+  def breaks_on_damage?(%__MODULE__{aura_interrupt_flags: flags}) when is_integer(flags), do: (flags &&& 0x2) != 0
+  def breaks_on_damage?(_spell), do: false
+
   def usable_in_stance?(%__MODULE__{stances: stances}, _form) when stances in [0, nil], do: true
 
   def usable_in_stance?(%__MODULE__{stances: stances}, form) when is_integer(form) and form > 0 do
