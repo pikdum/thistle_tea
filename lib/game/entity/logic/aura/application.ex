@@ -275,6 +275,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
           incoming
           | slot: old.slot,
             stacks: next_stacks(old, incoming),
+            next_proc_at: old.next_proc_at,
             auras: carry_tick_times(old.auras, incoming.auras)
         }
 

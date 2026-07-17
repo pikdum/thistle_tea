@@ -25,10 +25,14 @@ defmodule ThistleTea.Game.Spell.Proc do
 
   def eligible?(_proc_spell, _triggering_spell, _proc_type, _outcome), do: false
 
-  def roll?(%Spell{} = spell) do
-    chance = proc_chance(spell)
-    chance >= 100 or (chance > 0 and :rand.uniform() * 100 <= chance)
+  def roll?(spell, attack_time_ms \\ nil, roll \\ &:rand.uniform/0)
+
+  def roll?(%Spell{} = spell, attack_time_ms, roll) when is_function(roll, 0) do
+    chance = proc_chance(spell, attack_time_ms)
+    chance >= 100 or (chance > 0 and roll.() * 100 <= chance)
   end
+
+  def roll?(_spell, _attack_time_ms, _roll), do: false
 
   defp proc_flag?(%Spell{proc_rule: %ProcRule{proc_flags: flags}}, proc_type) when flags > 0,
     do: proc_flag?(flags, proc_type)
@@ -46,6 +50,8 @@ defmodule ThistleTea.Game.Spell.Proc do
 
   defp proc_mask(:deal_harmful_spell), do: 0x00010000
   defp proc_mask(:deal_harmful_periodic), do: 0x00040000
+  defp proc_mask(:deal_melee_swing), do: 0x00000004
+  defp proc_mask(:deal_melee_ability), do: 0x00000010
   defp proc_mask(:take_melee_swing), do: 0x00000008
   defp proc_mask(:take_melee_ability), do: 0x00000020
   defp proc_mask(_proc_type), do: 0
@@ -89,7 +95,13 @@ defmodule ThistleTea.Game.Spell.Proc do
   defp unrestricted_trigger?(nil), do: true
   defp unrestricted_trigger?(_rule), do: false
 
-  defp proc_chance(%Spell{proc_rule: %ProcRule{custom_chance: chance}}) when chance > 0, do: chance
-  defp proc_chance(%Spell{proc_chance: chance}) when is_number(chance), do: chance
-  defp proc_chance(_spell), do: 0
+  defp proc_chance(%Spell{proc_rule: %ProcRule{ppm_rate: ppm}}, attack_time_ms)
+       when ppm > 0 and is_number(attack_time_ms) and attack_time_ms > 0 do
+    min(ppm * attack_time_ms / 600, 100.0)
+  end
+
+  defp proc_chance(%Spell{proc_rule: %ProcRule{ppm_rate: ppm}}, _attack_time_ms) when ppm > 0, do: 0
+  defp proc_chance(%Spell{proc_rule: %ProcRule{custom_chance: chance}}, _attack_time_ms) when chance > 0, do: chance
+  defp proc_chance(%Spell{proc_chance: chance}, _attack_time_ms) when is_number(chance), do: chance
+  defp proc_chance(_spell, _attack_time_ms), do: 0
 end

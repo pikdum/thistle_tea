@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Entity.Logic.PaladinSpellsTest do
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Logic.AttackFeedback
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Paladin
@@ -301,7 +302,8 @@ defmodule ThistleTea.Game.Entity.Logic.PaladinSpellsTest do
         spell_family: 10,
         family_flags_0: 0x08000000,
         exclusive_category: :paladin_seal,
-        proc_type_mask: 20
+        proc_type_mask: 20,
+        proc_chance: 100
       }
 
       character =
@@ -309,7 +311,7 @@ defmodule ThistleTea.Game.Entity.Logic.PaladinSpellsTest do
           %Holder{spell: seal, auras: [%Aura{index: 0, type: :proc_trigger_spell, trigger_spell_id: 20_167}]}
         ])
 
-      result = Paladin.trigger_seal(character, %{outcome: :normal, victim_guid: 9})
+      result = AttackFeedback.receive(character, %{outcome: :normal, damage: 1, victim_guid: 9}, nil, 1_000)
 
       assert [%{type: :trigger_spell, source_guid: 5, target_guid: 9, spell_id: 20_167}] = result.internal.events
 

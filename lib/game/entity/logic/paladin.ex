@@ -27,7 +27,6 @@ defmodule ThistleTea.Game.Entity.Logic.Paladin do
   @blessing_of_light_family_mask 0x10000000
   @holy_light_family_mask 0x80000000
   @flash_of_light_family_mask 0x40000000
-  @seal_of_command_family_mask 0x02000000
 
   def release_seal(
         %{object: %{guid: caster_guid}, unit: %Unit{auras: holders}} = entity,
@@ -68,10 +67,10 @@ defmodule ThistleTea.Game.Entity.Logic.Paladin do
 
   def trigger_seal(entity, %{outcome: outcome, victim_guid: victim_guid}) when outcome in [:normal, :crit] do
     case active_seal(entity) do
-      %Holder{spell: %Spell{id: seal_id}, auras: auras} = holder ->
+      %Holder{spell: %Spell{id: seal_id}} = holder ->
         case Map.get(@righteousness_damage_spells, seal_id) do
           spell_id when is_integer(spell_id) -> trigger_righteousness(entity, holder, victim_guid, spell_id)
-          _other_seal -> trigger_proc_aura(entity, holder, auras, victim_guid)
+          _other_seal -> entity
         end
 
       _no_seal ->
@@ -149,32 +148,4 @@ defmodule ThistleTea.Game.Entity.Logic.Paladin do
         entity
     end
   end
-
-  defp trigger_proc_aura(entity, %Holder{} = holder, auras, victim_guid) do
-    case Enum.find(auras, &match?(%Aura{type: :proc_trigger_spell, trigger_spell_id: id} when is_integer(id), &1)) do
-      %Aura{trigger_spell_id: spell_id} ->
-        maybe_trigger_proc(entity, holder.spell, victim_guid, spell_id)
-
-      _no_proc ->
-        entity
-    end
-  end
-
-  defp maybe_trigger_proc(entity, spell, victim_guid, spell_id) do
-    if seal_proc?(entity, spell) do
-      Event.enqueue(entity, Event.trigger_spell(entity.object.guid, entity.unit.level || 1, victim_guid, spell_id))
-    else
-      entity
-    end
-  end
-
-  defp seal_proc?(entity, %Spell{} = spell) do
-    if Spell.family_flag?(spell, @spell_family, @seal_of_command_family_mask) do
-      :rand.uniform() <= min((entity.unit.base_attack_time || 2_000) * 7 / 60_000, 1.0)
-    else
-      true
-    end
-  end
-
-  defp seal_proc?(_entity, _spell), do: true
 end

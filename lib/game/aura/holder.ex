@@ -21,6 +21,7 @@ defmodule ThistleTea.Game.Aura.Holder do
     :charges,
     :area_radius,
     :next_area_refresh_at,
+    :next_proc_at,
     auras: [],
     stacks: 1,
     negative?: false

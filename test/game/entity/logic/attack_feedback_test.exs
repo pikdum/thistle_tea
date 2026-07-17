@@ -1,6 +1,8 @@
 defmodule ThistleTea.Game.Entity.Logic.AttackFeedbackTest do
   use ExUnit.Case, async: true
 
+  alias ThistleTea.Game.Aura, as: AuraData
+  alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Object
@@ -13,6 +15,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackFeedbackTest do
   alias ThistleTea.Game.Entity.Logic.Reactive
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Effect
+  alias ThistleTea.Game.Spell.ProcRule
 
   defp warrior(level \\ 60) do
     %Mob{
@@ -199,12 +202,74 @@ defmodule ThistleTea.Game.Entity.Logic.AttackFeedbackTest do
 
       refute Enum.any?(entity.internal.events, &(&1.type == :blade_flurry))
     end
+
+    test "DBC melee proc auras trigger their encoded spell and spend charges" do
+      proc_spell = %Spell{id: 19_577, proc_type_mask: 0x14, proc_chance: 100}
+
+      holder = %Holder{
+        spell: proc_spell,
+        caster_guid: 5,
+        caster_level: 60,
+        charges: 1,
+        auras: [%AuraData{type: :proc_trigger_spell, trigger_spell_id: 24_394}]
+      }
+
+      entity = rogue_with_auras([holder])
+      result = AttackFeedback.receive(entity, %{outcome: :normal, damage: 20, victim_guid: 77}, nil, 1_000)
+
+      assert result.unit.auras == []
+
+      assert [%{type: :trigger_spell, source_guid: 5, target_guid: 77, spell_id: 24_394}] =
+               result.internal.events
+    end
+
+    test "VMangos proc cooldown prevents another melee trigger until it expires" do
+      proc_spell = %Spell{
+        id: 16_864,
+        proc_type_mask: 0x14,
+        proc_chance: 100,
+        proc_rule: %ProcRule{cooldown_ms: 10_000}
+      }
+
+      holder = %Holder{
+        spell: proc_spell,
+        caster_guid: 5,
+        caster_level: 60,
+        slot: 0,
+        auras: [%AuraData{type: :proc_trigger_spell, trigger_spell_id: 16_870}]
+      }
+
+      entity = rogue_with_auras([holder])
+      first = AttackFeedback.receive(entity, %{outcome: :normal, damage: 20, victim_guid: 77}, nil, 1_000)
+      [updated_holder] = first.unit.auras
+
+      assert updated_holder.next_proc_at == 11_000
+      assert [%{spell_id: 16_870}] = first.internal.events
+
+      first = %{first | internal: %{first.internal | events: []}}
+      second = AttackFeedback.receive(first, %{outcome: :normal, damage: 20, victim_guid: 77}, nil, 2_000)
+
+      assert second.internal.events == []
+      assert [^updated_holder] = second.unit.auras
+    end
   end
 
   defp rogue do
+    rogue_with_auras([])
+  end
+
+  defp rogue_with_auras(auras) do
     %Character{
       object: %Object{guid: 5},
-      unit: %Unit{class: 4, level: 60, power_type: 3, power4: 100, max_power4: 100, auras: []},
+      unit: %Unit{
+        class: 4,
+        level: 60,
+        power_type: 3,
+        power4: 100,
+        max_power4: 100,
+        base_attack_time: 2_000,
+        auras: auras
+      },
       player: %Player{},
       internal: %Internal{blackboard: %Blackboard{auto_attacking: true, attack_started: true}}
     }

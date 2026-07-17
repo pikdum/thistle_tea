@@ -67,6 +67,36 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
     {sync_holders(entity, holders), events}
   end
 
+  def reactions(
+        %{object: %{guid: owner_guid}, unit: %Unit{auras: holders}} = entity,
+        :melee_hit_dealt,
+        %{victim_guid: victim_guid, outcome: outcome, proc_type: proc_type, now: now} = context
+      )
+      when is_list(holders) and is_integer(victim_guid) and outcome in [:normal, :crit] and
+             proc_type in [:deal_melee_swing, :deal_melee_ability] and is_integer(now) do
+    triggering_spell = Map.get(context, :spell)
+    attack_time_ms = Map.get(context, :attack_time_ms)
+
+    {holders, events} =
+      Enum.map_reduce(holders, [], fn %Holder{} = holder, events ->
+        {holder, holder_events} =
+          outgoing_melee_reaction(
+            holder,
+            owner_guid,
+            victim_guid,
+            triggering_spell,
+            proc_type,
+            outcome,
+            attack_time_ms,
+            now
+          )
+
+        {holder, events ++ holder_events}
+      end)
+
+    {sync_holders(entity, Enum.reject(holders, &is_nil/1)), events}
+  end
+
   def reactions(entity, _event, _context), do: {entity, []}
 
   defp outgoing_proc_transition(holders, events, holder, owner_guid, triggering_spell, proc_type, outcome, context) do
@@ -108,6 +138,58 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
 
     events = Enum.flat_map(holder.auras, &reaction_event(&1, holder, owner_guid, attacker_guid, proc?))
     {if(proc?, do: spend_hit_charge(holder), else: holder), events}
+  end
+
+  defp outgoing_melee_reaction(
+         %Holder{} = holder,
+         owner_guid,
+         victim_guid,
+         triggering_spell,
+         proc_type,
+         outcome,
+         attack_time_ms,
+         now
+       ) do
+    proc_auras =
+      Enum.filter(holder.auras, fn
+        %Aura{type: :proc_trigger_spell, trigger_spell_id: spell_id} when is_integer(spell_id) and spell_id > 0 -> true
+        _aura -> false
+      end)
+
+    proc? =
+      proc_auras != [] and proc_ready?(holder, now) and
+        Proc.eligible?(holder.spell, triggering_spell, proc_type, outcome) and
+        Proc.roll?(holder.spell, attack_time_ms)
+
+    if proc? do
+      events =
+        Enum.map(proc_auras, fn %Aura{trigger_spell_id: spell_id} ->
+          Event.trigger_spell(owner_guid, holder.caster_level || 1, victim_guid, spell_id,
+            triggered_by_spell_id: holder.spell.id
+          )
+        end)
+
+      {mark_proc(holder, now), events}
+    else
+      {holder, []}
+    end
+  end
+
+  defp proc_ready?(%Holder{next_proc_at: next_proc_at}, now) when is_integer(next_proc_at), do: now >= next_proc_at
+  defp proc_ready?(%Holder{}, _now), do: true
+
+  defp mark_proc(%Holder{charges: charges}, _now) when is_integer(charges) and charges <= 1, do: nil
+
+  defp mark_proc(%Holder{} = holder, now) do
+    cooldown_ms =
+      case holder.spell.proc_rule do
+        %{cooldown_ms: cooldown_ms} when is_integer(cooldown_ms) and cooldown_ms > 0 -> cooldown_ms
+        _rule -> 0
+      end
+
+    charges = if is_integer(holder.charges), do: holder.charges - 1, else: holder.charges
+    next_proc_at = if cooldown_ms > 0, do: now + cooldown_ms
+    %{holder | charges: charges, next_proc_at: next_proc_at}
   end
 
   defp reaction_event(

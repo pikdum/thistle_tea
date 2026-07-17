@@ -43,12 +43,35 @@ defmodule ThistleTea.Game.Spell.ProcTest do
       assert Proc.eligible?(proc_spell, %Spell{school: :fire}, :deal_harmful_spell, :crit)
       refute Proc.eligible?(proc_spell, %Spell{school: :fire}, :deal_harmful_spell, :normal)
     end
+
+    test "maps DBC outgoing melee proc flags" do
+      proc_spell = %Spell{proc_type_mask: 0x14}
+
+      assert Proc.eligible?(proc_spell, nil, :deal_melee_swing, :normal)
+      assert Proc.eligible?(proc_spell, %Spell{}, :deal_melee_ability, :crit)
+      refute Proc.eligible?(proc_spell, nil, :take_melee_swing, :normal)
+    end
   end
 
-  describe "roll?/1" do
+  describe "roll?/3" do
     test "always accepts one hundred percent and rejects zero percent" do
       assert Proc.roll?(%Spell{proc_chance: 100})
       refute Proc.roll?(%Spell{proc_chance: 0})
+    end
+
+    test "converts VMangos PPM rates using weapon speed" do
+      spell = %Spell{proc_chance: 100, proc_rule: %ProcRule{ppm_rate: 5.0}}
+
+      assert Proc.roll?(spell, 2_000, fn -> 0.1 end)
+      refute Proc.roll?(spell, 2_000, fn -> 0.2 end)
+      refute Proc.roll?(spell, nil, fn -> 0.0 end)
+    end
+
+    test "prefers VMangos custom chance over DBC chance" do
+      spell = %Spell{proc_chance: 100, proc_rule: %ProcRule{custom_chance: 10.0}}
+
+      assert Proc.roll?(spell, nil, fn -> 0.05 end)
+      refute Proc.roll?(spell, nil, fn -> 0.2 end)
     end
   end
 end

@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackFeedback do
   queued on-next-swing spell generate no rage.
   """
   alias ThistleTea.Game.Aura.Holder
+  alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.Entity.Logic.Paladin
   alias ThistleTea.Game.Entity.Logic.Reactive
@@ -25,6 +26,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackFeedback do
     |> apply_rogue_combo_feedback(payload, spell)
     |> trigger_blade_flurry(payload, spell)
     |> Paladin.trigger_seal(payload)
+    |> trigger_melee_procs(payload, spell, now)
     |> mark_reactives(payload, now)
   end
 
@@ -95,6 +97,25 @@ defmodule ThistleTea.Game.Entity.Logic.AttackFeedback do
   end
 
   defp blade_flurry_active?(_entity, _proc_type), do: false
+
+  defp trigger_melee_procs(entity, %{outcome: outcome, victim_guid: victim_guid}, spell, now)
+       when outcome in [:normal, :crit] and is_integer(victim_guid) and is_integer(now) do
+    proc_type = if match?(%Spell{}, spell), do: :deal_melee_ability, else: :deal_melee_swing
+
+    {entity, events} =
+      Aura.reactions(entity, :melee_hit_dealt, %{
+        victim_guid: victim_guid,
+        outcome: outcome,
+        proc_type: proc_type,
+        spell: spell,
+        attack_time_ms: entity.unit.base_attack_time,
+        now: now
+      })
+
+    Event.enqueue(entity, events)
+  end
+
+  defp trigger_melee_procs(entity, _payload, _spell, _now), do: entity
 
   defp mark_reactives(entity, %{outcome: :dodge, victim_guid: victim_guid}, now) do
     Reactive.mark_dodging_target(entity, victim_guid, now)
