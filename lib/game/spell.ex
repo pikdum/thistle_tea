@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Spell do
     :spell_icon,
     :spell_visual,
     :script_name,
+    :proc_rule,
     :school,
     :cast_time_ms,
     :duration_ms,

@@ -125,6 +125,17 @@ defmodule ThistleTea.Game.World.Loader.SpellVmangosTest do
     end
   end
 
+  describe "spell critical parsing" do
+    test "loads flat and school-specific spell crit auras" do
+      assert Enum.any?(SpellLoader.load(2916).effects, &(&1.aura == :mod_spell_crit_chance))
+      assert Enum.any?(SpellLoader.load(5835).effects, &(&1.aura == :mod_spell_crit_chance_school))
+    end
+
+    test "loads the cannot-crit attribute" do
+      assert Spell.attribute?(SpellLoader.load(5857), :cant_crit)
+    end
+  end
+
   describe "warrior spell acquisition" do
     @describetag :dbc_db
 

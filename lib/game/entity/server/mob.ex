@@ -36,6 +36,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Entity.Logic.Hostility
   alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.Entity.Logic.SpellEffect
+  alias ThistleTea.Game.Entity.Logic.SpellFeedback
   alias ThistleTea.Game.Entity.Logic.Threat
   alias ThistleTea.Game.Entity.Registry, as: EntityRegistry
   alias ThistleTea.Game.Entity.Server.Mob.Corpse
@@ -215,6 +216,19 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     state =
       state
       |> AttackFeedback.receive(payload, spell, Time.now())
+      |> EventSink.emit_pending()
+      |> wake_ai_tick()
+
+    {:noreply, state, {:continue, :maybe_broadcast}}
+  end
+
+  @impl GenServer
+  def handle_cast({:spell_outcome, payload}, %Mob{} = state) do
+    spell = spellbook_spell(state, Map.get(payload, :spell_id))
+
+    state =
+      state
+      |> SpellFeedback.receive(payload, spell, Time.now())
       |> EventSink.emit_pending()
       |> wake_ai_tick()
 

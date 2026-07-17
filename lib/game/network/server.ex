@@ -37,6 +37,7 @@ defmodule ThistleTea.Game.Network.Server do
   alias ThistleTea.Game.Entity.Logic.Rest
   alias ThistleTea.Game.Entity.Logic.Shaman
   alias ThistleTea.Game.Entity.Logic.SpellEffect
+  alias ThistleTea.Game.Entity.Logic.SpellFeedback
   alias ThistleTea.Game.Entity.Logic.StealthDetection
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network
@@ -329,6 +330,13 @@ defmodule ThistleTea.Game.Network.Server do
       character
       |> AttackFeedback.receive(payload, spell, Time.now())
       |> Shaman.trigger_weapon_enchant(payload, weapon_proc, ppm)
+
+    {:noreply, {socket, %{state | character: character}}, {:continue, :maybe_broadcast_update}}
+  end
+
+  def handle_cast({:spell_outcome, payload}, {socket, %{character: %Character{} = character} = state}) do
+    spell = spellbook_spell(character, Map.get(payload, :spell_id))
+    character = SpellFeedback.receive(character, payload, spell, Time.now())
 
     {:noreply, {socket, %{state | character: character}}, {:continue, :maybe_broadcast_update}}
   end

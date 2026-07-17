@@ -105,7 +105,11 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Lifecycle do
     holder = Enum.find(holders, fn %Holder{spell: %Spell{id: id}} -> id == spell_id end)
 
     if cancelable?(holder) do
-      spell_ids = if stealth_holder?(holder), do: stealth_spell_ids(holders), else: [spell_id]
+      spell_ids =
+        if stealth_holder?(holder),
+          do: stealth_spell_ids(holders),
+          else: [spell_id | Script.cancel_linked_spell_ids(holder)]
+
       remove_spells(entity, spell_ids, now)
     else
       {entity, []}

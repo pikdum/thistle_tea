@@ -54,6 +54,15 @@ defmodule ThistleTea.Game.Entity.Logic.CombatRatings do
     @druid => 0.9
   }
 
+  @spell_crit_rates %{
+    @paladin => {3.70, 14.77, 0.65},
+    @priest => {2.97, 10.03, 0.82},
+    @shaman => {3.54, 11.51, 0.80},
+    @mage => {3.70, 14.77, 0.65},
+    @warlock => {3.18, 11.30, 0.82},
+    @druid => {3.33, 12.41, 0.79}
+  }
+
   @base_avoidance_chance 5.0
 
   def melee_crit_chance(class, level, agility) do
@@ -62,6 +71,13 @@ defmodule ThistleTea.Game.Entity.Logic.CombatRatings do
 
   def dodge_chance(class, level, agility) do
     class_base_bonus(class) + agility_chance(@dodge_agility_rates, class, level, agility)
+  end
+
+  def spell_crit_chance(class, level, intellect) do
+    case Map.get(@spell_crit_rates, class) do
+      {base, rate0, rate1} -> max(base + intellect / (rate0 + rate1 * max(level, 1)), 0.0)
+      nil -> 0.0
+    end
   end
 
   def parry_chance(class) when class in @parry_classes, do: @base_avoidance_chance

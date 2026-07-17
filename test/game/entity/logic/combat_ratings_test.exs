@@ -34,6 +34,16 @@ defmodule ThistleTea.Game.Entity.Logic.CombatRatingsTest do
     end
   end
 
+  describe "spell_crit_chance/3" do
+    test "uses the VMangos class intellect formula" do
+      assert_in_delta CombatRatings.spell_crit_chance(@mage, 60, 100), 5.559, 0.001
+    end
+
+    test "non-caster classes do not gain spell crit from intellect" do
+      assert CombatRatings.spell_crit_chance(@warrior, 60, 100) == 0.0
+    end
+  end
+
   describe "parry_chance/1" do
     test "parry classes parry at five percent" do
       assert CombatRatings.parry_chance(@warrior) == 5.0

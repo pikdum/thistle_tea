@@ -727,6 +727,8 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
     base = effect_amount(spell, effect, context.combo_points)
     rolled = base + damage_bonus(context, spell, opts)
     rolled = trunc(rolled * (context.damage_done_multiplier || 1.0) * scripted_damage_multiplier(state, spell))
+    crit? = direct_spell_crit?(context, spell, opts)
+    rolled = if crit?, do: trunc(rolled * spell_crit_multiplier(spell)), else: rolled
 
     damage = max(rolled + Aura.flat_modifier(state, :mod_damage_taken, Spell.school_mask(spell)), 0)
 
@@ -747,7 +749,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
         state.object.guid,
         spell,
         damage,
-        opts ++ [resisted: resisted, absorbed: absorbed]
+        opts ++ [resisted: resisted, absorbed: absorbed, crit?: crit?]
       )
 
     {state, [event]}
@@ -760,6 +762,17 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
       1.0
     end
   end
+
+  defp direct_spell_crit?(%CastContext{spell_crit_chance: chance}, %Spell{} = spell, opts)
+       when is_number(chance) and chance > 0 do
+    not Keyword.get(opts, :periodic?, false) and not Spell.attribute?(spell, :cant_crit) and
+      spell.dmg_class in [1, 3] and (chance >= 100 or :rand.uniform() * 100 <= chance)
+  end
+
+  defp direct_spell_crit?(_context, _spell, _opts), do: false
+
+  defp spell_crit_multiplier(%Spell{dmg_class: 3}), do: 2.0
+  defp spell_crit_multiplier(%Spell{}), do: 1.5
 
   defp school_resisted_amount(_state, damage, _school, _caster_level, _opts) when damage <= 0, do: 0
   defp school_resisted_amount(_state, _damage, :physical, _caster_level, _opts), do: 0

@@ -47,6 +47,19 @@ defmodule ThistleTea.Game.Entity.Logic.PaladinSpellsTest do
     end
   end
 
+  describe "Hammer of Wrath" do
+    test "uses melee crit because the VMangos script overrides its ranged damage class" do
+      caster = character([])
+      caster = %{caster | unit: %{caster.unit | class: 2}}
+      caster = %{caster | player: %{caster.player | ranged_crit_percentage: 40.0}}
+      spell = %Spell{id: 24_239, script_name: "spell_paladin_hammer_of_wrath", school: :holy, dmg_class: 3}
+
+      context = CastContext.from_caster(caster, spell, 9)
+
+      assert_in_delta context.spell_crit_chance, 0.7, 0.001
+    end
+  end
+
   describe "Judgement validation" do
     @describetag :dbc_db
 

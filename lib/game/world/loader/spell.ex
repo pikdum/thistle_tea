@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.Spell.Scripts
   alias ThistleTea.Game.World.Loader.CreatureTemplate, as: CreatureTemplateLoader
+  alias ThistleTea.Game.World.Loader.SpellProcEvent, as: SpellProcEventLoader
   alias ThistleTea.Game.World.Loader.SpellScript, as: SpellScriptLoader
   alias ThistleTea.Game.World.Loader.SpellScriptName, as: SpellScriptNameLoader
 
@@ -195,6 +196,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
       spell_icon: row.spell_icon,
       spell_visual: row.spell_visual_0,
       script_name: SpellScriptNameLoader.get(row.id),
+      proc_rule: SpellProcEventLoader.get(row.id),
       school: school(row.school),
       cast_time_ms: cast_time_ms(row.spell_cast_time),
       duration_ms: duration_ms(row.spell_duration),
@@ -556,6 +558,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp aura_type(53), do: :periodic_leech
   defp aura_type(54), do: :mod_hit_chance
   defp aura_type(56), do: :transform
+  defp aura_type(57), do: :mod_spell_crit_chance
   defp aura_type(58), do: :mod_increase_swim_speed
   defp aura_type(61), do: :mod_scale
   defp aura_type(64), do: :periodic_mana_leech
@@ -564,6 +567,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp aura_type(67), do: :mod_disarm
   defp aura_type(68), do: :mod_stalked
   defp aura_type(69), do: :school_absorb
+  defp aura_type(71), do: :mod_spell_crit_chance_school
   defp aura_type(79), do: :mod_damage_percent_done
   defp aura_type(81), do: :split_damage_percent
   defp aura_type(82), do: :water_breathing
@@ -647,6 +651,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   @finishing_move_damage_ex_1 0x00100000
   @finishing_move_duration_ex_1 0x00400000
   @ignore_line_of_sight_ex2 0x00000004
+  @cant_crit_ex2 0x20000000
   @from_behind_ex2 0x00100000
   @from_behind_ex1 0x00000200
   @completely_blocked_ex3 0x00000008
@@ -677,6 +682,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
     |> add_if(attrs_ex1, @finishing_move_damage_ex_1, :finishing_move)
     |> add_if(attrs_ex1, @finishing_move_duration_ex_1, :finishing_move)
     |> add_if(attrs_ex2, @ignore_line_of_sight_ex2, :ignore_line_of_sight)
+    |> add_if(attrs_ex2, @cant_crit_ex2, :cant_crit)
     |> add_if(attrs_ex3, @completely_blocked_ex3, :completely_blocked)
   end
 

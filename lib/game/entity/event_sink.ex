@@ -74,6 +74,8 @@ defmodule ThistleTea.Game.Entity.EventSink do
     }
     |> World.broadcast_packet(entity)
 
+    notify_spell_outcome(event)
+
     entity
   end
 
@@ -1027,6 +1029,19 @@ defmodule ThistleTea.Game.Entity.EventSink do
   end
 
   def emit(entity, _event), do: entity
+
+  defp notify_spell_outcome(%Event{source_guid: source_guid, target_guid: target_guid, proc_type: proc_type} = event)
+       when is_integer(source_guid) and is_atom(proc_type) do
+    Entity.spell_outcome(source_guid, %{
+      victim_guid: target_guid,
+      outcome: if(event.crit?, do: :crit, else: :normal),
+      damage: max((event.damage || 0) - (event.absorbed || 0), 0),
+      proc_type: proc_type,
+      spell_id: event.spell_id
+    })
+  end
+
+  defp notify_spell_outcome(_event), do: :ok
 
   defp track_channel_game_object(%{internal: %Internal{} = internal, unit: %Unit{} = unit} = entity, %GameObject{
          object: %{guid: guid},

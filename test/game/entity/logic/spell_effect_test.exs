@@ -37,6 +37,36 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
   end
 
   describe "receive/4" do
+    test "direct magic damage uses the snapshotted spell crit chance" do
+      spell = %Spell{id: 133, school: :fire, dmg_class: 1, effects: [%Effect{type: :school_damage, base_points: 100}]}
+      context = %CastContext{caster_guid: 999, caster_level: 10, spell_crit_chance: 100.0}
+      target = %{target_fixture() | unit: %Unit{health: 500, max_health: 500, level: 10, auras: []}}
+
+      {target, [event]} = SpellEffect.receive(target, context, spell, 1_000)
+
+      assert target.unit.health == 350
+      assert event.damage == 150
+      assert event.crit?
+    end
+
+    test "the DBC cannot-crit attribute suppresses direct spell crits" do
+      spell = %Spell{
+        id: 133,
+        school: :fire,
+        dmg_class: 1,
+        attributes: MapSet.new([:cant_crit]),
+        effects: [%Effect{type: :school_damage, base_points: 100}]
+      }
+
+      context = %CastContext{caster_guid: 999, caster_level: 10, spell_crit_chance: 100.0}
+      target = %{target_fixture() | unit: %Unit{health: 500, max_health: 500, level: 10, auras: []}}
+
+      {target, [event]} = SpellEffect.receive(target, context, spell, 1_000)
+
+      assert target.unit.health == 400
+      refute event.crit?
+    end
+
     test "lethal damage prevents later aura effects from being applied" do
       spell = %Spell{
         id: 133,

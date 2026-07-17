@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
   alias ThistleTea.Game.Entity.Logic.CombatRatings
   alias ThistleTea.Game.Entity.Logic.Skills
   alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.Scripts
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
   alias ThistleTea.Game.World.Loader.SpellThreat, as: SpellThreatLoader
 
@@ -44,6 +45,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
     :normalized_speed,
     :attack_skill,
     :melee_crit_chance,
+    :spell_crit_chance,
     :shield_block_value,
     :caster_power,
     :combo_points,
@@ -69,7 +71,8 @@ defmodule ThistleTea.Game.Spell.CastContext do
       healing_bonus: healing_bonus(caster),
       spell_threat: SpellThreatLoader.get(spell_id(spell)),
       threat_multiplier: Aura.percent_multiplier(caster, :mod_threat, Spell.school_mask(spell)),
-      damage_done_multiplier: Aura.percent_multiplier(caster, :mod_damage_percent_done, Spell.school_mask(spell))
+      damage_done_multiplier: Aura.percent_multiplier(caster, :mod_damage_percent_done, Spell.school_mask(spell)),
+      spell_crit_chance: spell_crit_chance(caster, spell)
     }
     |> put_melee_snapshot(caster, spell)
     |> put_combo_points(caster)
@@ -106,6 +109,16 @@ defmodule ThistleTea.Game.Spell.CastContext do
   defp caster_orientation(_caster), do: nil
 
   defp put_melee_snapshot(%__MODULE__{} = context, caster, %Spell{} = spell) do
+    if Scripts.uses_melee_spell_crit?(spell) do
+      %{context | spell_crit_chance: melee_crit_chance(caster)}
+    else
+      put_attack_snapshot(context, caster, spell)
+    end
+  end
+
+  defp put_melee_snapshot(context, _caster, _spell), do: context
+
+  defp put_attack_snapshot(%__MODULE__{} = context, caster, %Spell{} = spell) do
     cond do
       Spell.ranged_ability?(spell) ->
         %{
@@ -115,7 +128,8 @@ defmodule ThistleTea.Game.Spell.CastContext do
             weapon_base_max: caster.unit.base_ranged_max_damage || caster.unit.max_ranged_damage || 0,
             attack_time_ms: caster.unit.ranged_attack_time,
             attack_skill: ranged_attack_skill(caster),
-            melee_crit_chance: ranged_crit_chance(caster)
+            melee_crit_chance: ranged_crit_chance(caster),
+            spell_crit_chance: ranged_crit_chance(caster)
         }
 
       melee_snapshot?(spell) ->
@@ -136,8 +150,6 @@ defmodule ThistleTea.Game.Spell.CastContext do
         context
     end
   end
-
-  defp put_melee_snapshot(context, _caster, _spell), do: context
 
   defp put_combo_points(%__MODULE__{} = context, %Character{player: player}) do
     %{context | combo_points: max(player.combo_points || 0, 0)}
@@ -222,6 +234,16 @@ defmodule ThistleTea.Game.Spell.CastContext do
   end
 
   defp ranged_crit_chance(_caster), do: nil
+
+  defp spell_crit_chance(%Character{unit: unit} = caster, %Spell{} = spell) do
+    base = CombatRatings.spell_crit_chance(unit.class, unit.level || 1, unit.intellect || 0)
+
+    base +
+      Aura.flat_amount(caster, :mod_spell_crit_chance) +
+      Aura.flat_modifier(caster, :mod_spell_crit_chance_school, Spell.school_mask(spell))
+  end
+
+  defp spell_crit_chance(_caster, _spell), do: 0.0
 
   defp spell_damage_bonus(caster) do
     bonuses = equipment_bonuses(caster)

@@ -145,6 +145,10 @@ defmodule ThistleTea.Game.Spell.Scripts do
 
   def judgement_of_command_damage?(_spell), do: false
 
+  def uses_melee_spell_crit?(%Spell{} = spell), do: Spell.vmangos_script?(spell, "spell_paladin_hammer_of_wrath")
+
+  def uses_melee_spell_crit?(_spell), do: false
+
   def execute_damage_spell_id, do: @execute_damage_spell
   def blade_flurry_damage_spell_id, do: @blade_flurry_damage_spell
   def blade_flurry_radius_yards, do: @blade_flurry_radius_yards

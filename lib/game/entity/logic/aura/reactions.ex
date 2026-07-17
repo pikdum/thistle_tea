@@ -6,12 +6,14 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
   alias ThistleTea.Game.Aura
   alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Logic.Aura.Script
   alias ThistleTea.Game.Entity.Logic.Aura.UnitSync
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Effect
+  alias ThistleTea.Game.Spell.Proc
 
   @charge_consuming_on_hit [:damage_shield, :proc_trigger_spell, :mod_resistance, :mod_resistance_exclusive]
 
@@ -27,7 +29,46 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
     {spend_hit_charges(entity), events}
   end
 
+  def reactions(
+        %{object: %{guid: owner_guid}, unit: %Unit{auras: holders}} = entity,
+        :spell_hit_dealt,
+        %{spell: %Spell{} = triggering_spell, outcome: outcome, proc_type: proc_type} = context
+      )
+      when is_list(holders) and outcome in [:normal, :crit] and
+             proc_type in [:deal_harmful_spell, :deal_harmful_periodic] do
+    {holders, events} =
+      Enum.reduce(holders, {holders, []}, fn %Holder{} = holder, {current_holders, events} ->
+        outgoing_proc_transition(
+          current_holders,
+          events,
+          holder,
+          owner_guid,
+          triggering_spell,
+          proc_type,
+          outcome,
+          context
+        )
+      end)
+
+    {sync_holders(entity, holders), events}
+  end
+
   def reactions(entity, _event, _context), do: {entity, []}
+
+  defp outgoing_proc_transition(holders, events, holder, owner_guid, triggering_spell, proc_type, outcome, context) do
+    if Proc.eligible?(holder.spell, triggering_spell, proc_type, outcome) and Proc.roll?(holder.spell) do
+      apply_outgoing_proc(holders, events, holder, owner_guid, context)
+    else
+      {holders, events}
+    end
+  end
+
+  defp apply_outgoing_proc(holders, events, holder, owner_guid, context) do
+    case Script.outgoing_proc(holders, holder, owner_guid, context) do
+      {:handled, updated_holders, proc_events} -> {updated_holders, events ++ proc_events}
+      :unhandled -> {holders, events}
+    end
+  end
 
   defp spend_hit_charges(%{unit: %Unit{auras: holders}} = entity) do
     new_holders =
@@ -41,6 +82,13 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
       %{entity | unit: UnitSync.sync_unit(%{entity.unit | auras: new_holders})}
       |> Core.mark_broadcast_update()
     end
+  end
+
+  defp sync_holders(%{unit: %Unit{auras: current}} = entity, current), do: entity
+
+  defp sync_holders(%{unit: %Unit{} = unit} = entity, holders) do
+    %{entity | unit: UnitSync.sync_unit(%{unit | auras: holders})}
+    |> Core.mark_broadcast_update()
   end
 
   defp spend_hit_charge(%Holder{charges: charges} = holder) when is_integer(charges) do

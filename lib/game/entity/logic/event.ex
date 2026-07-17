@@ -18,6 +18,7 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
     :health,
     :mana,
     :periodic?,
+    :proc_type,
     :aura_type,
     :misc_value,
     :aura_slot,
@@ -72,11 +73,16 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
       damage: damage,
       proc_damage: Keyword.get(opts, :proc_damage),
       periodic?: Keyword.get(opts, :periodic?, false),
+      proc_type: Keyword.get(opts, :proc_type, spell_damage_proc_type(opts)),
       resisted: Keyword.get(opts, :resisted, 0),
       absorbed: Keyword.get(opts, :absorbed, 0),
       crit?: Keyword.get(opts, :crit?, false),
       blocked: Keyword.get(opts, :blocked, 0)
     }
+  end
+
+  defp spell_damage_proc_type(opts) do
+    if Keyword.get(opts, :periodic?, false), do: :deal_harmful_periodic, else: :deal_harmful_spell
   end
 
   def drain_power(target_guid, power_type) when is_integer(target_guid) and is_integer(power_type) do
