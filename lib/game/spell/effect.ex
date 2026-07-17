@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.Spell.Effect do
     :amplitude_ms,
     :misc_value,
     :multiple_value,
+    :class_mask,
     :radius_yards,
     :implicit_target_a,
     :implicit_target_b,

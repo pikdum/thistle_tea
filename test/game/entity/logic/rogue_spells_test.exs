@@ -259,11 +259,30 @@ defmodule ThistleTea.Game.Entity.Logic.RogueSpellsTest do
       cold_blood = %Spell{
         id: 14_177,
         duration_ms: -1,
-        effects: [%Effect{index: 0, type: :apply_aura, aura: :force_crit}]
+        spell_family: 8,
+        proc_charges: 1,
+        effects: [
+          %Effect{
+            index: 0,
+            type: :apply_aura,
+            aura: :add_flat_modifier,
+            base_points: 100,
+            misc_value: 7,
+            class_mask: 0x20206
+          }
+        ]
       }
 
       {entity, _events} = Aura.apply_spell(rogue(), 5, 60, cold_blood, 1_000)
-      context = CastContext.from_caster(entity, %Spell{dmg_class: 2}, 9)
+
+      ability = %Spell{
+        spell_family: 8,
+        family_flags_0: 0x20000,
+        dmg_class: 2,
+        effects: [%Effect{type: :school_damage}]
+      }
+
+      context = CastContext.from_caster(entity, ability, 9)
 
       assert context.melee_crit_chance == 100.0
     end

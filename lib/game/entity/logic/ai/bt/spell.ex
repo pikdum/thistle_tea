@@ -25,6 +25,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
   alias ThistleTea.Game.Spell.Cast
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Cooldowns
+  alias ThistleTea.Game.Spell.Modifiers
   alias ThistleTea.Game.Spell.Scripts
   alias ThistleTea.Game.Spell.Targets
   alias ThistleTea.Game.Time
@@ -67,6 +68,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
          now,
          cast_item_guid
        ) do
+    spell = %{spell | cast_time_ms: Modifiers.integer_value(character, spell, :casting_time, spell.cast_time_ms || 0)}
+
     casting =
       spell
       |> Cast.new(targets, now)
@@ -88,6 +91,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
       |> queue_consume_reagents(casting)
       |> queue_consume_ammo(casting)
       |> mark_hostile_cast(casting, targets, now)
+      |> consume_spell_modifiers(casting, now)
       |> start_channel(casting)
     else
       character
@@ -173,7 +177,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
     |> queue_successful_finish_trigger(casting)
     |> stop_breakable_control_attack(casting, hits)
     |> consume_unavoidable_finisher(casting)
-    |> consume_forced_crit(casting, now)
+    |> consume_spell_modifiers(casting, now)
     |> activate_auto_shot(casting, now)
     |> clear_cast()
   end
@@ -244,13 +248,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
 
   defp queue_charge(character, _casting), do: character
 
-  defp consume_forced_crit(character, %Cast{spell: %Spell{} = spell}, now) do
-    if Spell.melee_ability?(spell) or Spell.damage_effects(spell) != [] do
-      {character, events} = AuraLogic.remove_aura_types(character, [:force_crit], now)
-      Event.enqueue(character, events)
-    else
-      character
-    end
+  defp consume_spell_modifiers(character, %Cast{spell: %Spell{} = spell}, now) do
+    spell_ids = Modifiers.consumable_holder_ids(character, spell)
+    {character, events} = AuraLogic.spend_spell_charges(character, spell_ids, now)
+    Event.enqueue(character, events)
   end
 
   defp consume_unavoidable_finisher(character, %Cast{spell: %Spell{} = spell}) do

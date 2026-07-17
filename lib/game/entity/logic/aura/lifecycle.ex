@@ -79,6 +79,38 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Lifecycle do
 
   def remove_spells(entity, _spell_ids, _now), do: {entity, []}
 
+  def spend_spell_charges(%{unit: %Unit{auras: holders}} = entity, spell_ids, now)
+      when is_list(holders) and holders != [] and is_list(spell_ids) do
+    {holders, removed} =
+      Enum.map_reduce(holders, [], &spend_holder_charge(&1, spell_ids, &2))
+
+    holders = Enum.reject(holders, &is_nil/1)
+
+    cond do
+      holders == entity.unit.auras -> {entity, []}
+      removed != [] -> remove_and_sync(entity, holders, removed, now)
+      true -> {sync_holders(entity, holders), []}
+    end
+  end
+
+  def spend_spell_charges(entity, _spell_ids, _now), do: {entity, []}
+
+  defp spend_holder_charge(%Holder{spell: %Spell{id: id}} = holder, spell_ids, removed) do
+    if id in spell_ids, do: spend_holder_charge(holder, removed), else: {holder, removed}
+  end
+
+  defp spend_holder_charge(holder, _spell_ids, removed), do: {holder, removed}
+
+  defp spend_holder_charge(%Holder{charges: charges} = holder, removed) when is_integer(charges) and charges > 1 do
+    {%{holder | charges: charges - 1}, removed}
+  end
+
+  defp spend_holder_charge(%Holder{charges: charges} = holder, removed) when is_integer(charges) do
+    {nil, [holder | removed]}
+  end
+
+  defp spend_holder_charge(holder, removed), do: {holder, removed}
+
   def remove_aura_types(%{unit: %Unit{auras: holders}} = entity, aura_types, now)
       when is_list(holders) and holders != [] and is_list(aura_types) do
     {removed, kept} =
@@ -152,6 +184,10 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Lifecycle do
 
   defp remove_and_sync(entity, kept, now) do
     removed = entity.unit.auras -- kept
+    remove_and_sync(entity, kept, removed, now)
+  end
+
+  defp remove_and_sync(entity, kept, removed, now) do
     script_events = Script.after_remove(entity, removed)
     {entity, cooldown_events} = Cooldowns.activate_on_event(entity, removed, now)
     unit = UnitSync.sync_unit(%{entity.unit | auras: kept})
@@ -165,6 +201,11 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Lifecycle do
     {entity, events} = MovementSync.sync_movement_state(entity, now)
 
     {Core.mark_broadcast_update(entity), cooldown_events ++ script_events ++ control_events ++ events}
+  end
+
+  defp sync_holders(entity, holders) do
+    %{entity | unit: UnitSync.sync_unit(%{entity.unit | auras: holders})}
+    |> Core.mark_broadcast_update()
   end
 
   defp cancelable?(%Holder{negative?: true}), do: false

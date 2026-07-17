@@ -393,8 +393,10 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   defp apply_effect(state, %CastContext{} = context, spell, %Effect{type: :heal} = effect, now) do
     {state, swiftmend_healing, swiftmend_events} = Druid.consume_swiftmend_hot(state, spell, now)
 
+    base_healing = trunc((Effect.damage_roll(effect) + swiftmend_healing) * (context.effect_healing_multiplier || 1.0))
+
     healing =
-      Effect.damage_roll(effect) + swiftmend_healing + bonus_amount(context.healing_bonus, spell) +
+      base_healing + bonus_amount(context.healing_bonus, spell) +
         Aura.flat_modifier(state, :mod_healing, Spell.school_mask(spell)) +
         Paladin.blessing_of_light_bonus(state, spell)
 
@@ -727,7 +729,13 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
        when is_integer(now) do
     base = effect_amount(spell, effect, context.combo_points)
     rolled = base + damage_bonus(context, spell, opts)
-    rolled = trunc(rolled * (context.damage_done_multiplier || 1.0) * scripted_damage_multiplier(state, spell))
+
+    rolled =
+      trunc(
+        rolled * (context.effect_damage_multiplier || 1.0) * (context.damage_done_multiplier || 1.0) *
+          scripted_damage_multiplier(state, spell)
+      )
+
     crit? = direct_spell_crit?(context, spell, opts)
     rolled = if crit?, do: trunc(rolled * spell_crit_multiplier(spell)), else: rolled
 
@@ -903,7 +911,9 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
 
   defp melee_ability_damage(state, %CastContext{} = context, spell, damage, now) do
     school = school_atom(spell)
-    damage = trunc(damage * (context.damage_done_multiplier || 1.0))
+
+    damage =
+      trunc(damage * (context.effect_damage_multiplier || 1.0) * (context.damage_done_multiplier || 1.0))
 
     unmitigated_damage =
       max(damage + Aura.flat_modifier(state, :mod_damage_taken, Spell.school_mask(spell)), 0)

@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Entity.Logic.Resources do
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.Modifiers
 
   @mana_power_type 0
   @rage_power_type 1
@@ -64,8 +65,9 @@ defmodule ThistleTea.Game.Entity.Logic.Resources do
 
   def channel_cost(_entity, _spell, _tick_ms), do: 0
 
-  def power_cost(entity, %Spell{mana_cost: cost, mana_cost_percent: percent, power_type: power_type}) do
-    (cost || 0) + percent_cost(entity, power_type, percent)
+  def power_cost(entity, %Spell{mana_cost: cost, mana_cost_percent: percent, power_type: power_type} = spell) do
+    base = (cost || 0) + percent_cost(entity, power_type, percent)
+    Modifiers.integer_value(entity, spell, :cost, base)
   end
 
   def power_cost(_entity, _spell), do: 0

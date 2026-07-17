@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.Spell.CastValidation do
   alias ThistleTea.Game.Entity.Logic.Hunter
   alias ThistleTea.Game.Entity.Logic.Paladin
   alias ThistleTea.Game.Entity.Logic.Reactive
+  alias ThistleTea.Game.Entity.Logic.Resources
   alias ThistleTea.Game.Entity.Logic.Warlock
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Cooldowns
@@ -198,13 +199,13 @@ defmodule ThistleTea.Game.Spell.CastValidation do
     end
   end
 
-  defp check_power(%{unit: unit} = caster, %Spell{mana_cost: cost, power_type: @health_power_type})
-       when is_integer(cost) and cost > 0 do
+  defp check_power(%{unit: unit} = caster, %Spell{power_type: @health_power_type} = spell) do
+    cost = Resources.power_cost(caster, spell)
     if godmode?(caster) or (unit.health || 0) > cost, do: :ok, else: {:error, :no_power}
   end
 
-  defp check_power(%{unit: unit} = caster, %Spell{mana_cost: cost, power_type: power_type})
-       when is_integer(cost) and cost > 0 do
+  defp check_power(%{unit: unit} = caster, %Spell{power_type: power_type} = spell) do
+    cost = Resources.power_cost(caster, spell)
     field = Map.get(@power_fields, power_type)
     power = if field, do: Map.get(unit, field)
     power = if is_integer(power), do: power, else: 0

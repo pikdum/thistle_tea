@@ -263,6 +263,10 @@ defmodule ThistleTea.Game.World.Loader.Spell do
 
   defp signed32(_value, default), do: default
 
+  defp unsigned32(value) when is_integer(value) and value < 0, do: value + 4_294_967_296
+  defp unsigned32(value) when is_integer(value), do: value
+  defp unsigned32(_value), do: 0
+
   defp append_shapeshift_passives(%SpellData{effects: effects} = spell, radius_lookup) do
     case shapeshift_form_value(effects) do
       form when is_integer(form) ->
@@ -351,6 +355,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
           amplitude_ms: amplitude_ms(Map.get(row, :"effect_amplitude_#{index}")),
           misc_value: effect_misc_value(row, index, type, aura),
           multiple_value: Map.get(row, :"effect_multiple_values_#{index}") || 0.0,
+          class_mask: unsigned32(Map.get(row, :"effect_item_type_#{index}")),
           radius_yards: radius_lookup.(Map.get(row, :"effect_radius_#{index}")),
           implicit_target_a: target_type(Map.get(row, :"implicit_target_a_#{index}") || 0),
           implicit_target_b: target_type(Map.get(row, :"implicit_target_b_#{index}") || 0),
@@ -589,7 +594,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp aura_type(104), do: :water_walk
   defp aura_type(105), do: :feather_fall
   defp aura_type(106), do: :hover
-  defp aura_type(107), do: :force_crit
+  defp aura_type(107), do: :add_flat_modifier
   defp aura_type(108), do: :add_pct_modifier
   defp aura_type(110), do: :mod_power_regen_percent
   defp aura_type(113), do: :mod_ranged_damage_taken

@@ -134,6 +134,20 @@ defmodule ThistleTea.Game.World.Loader.SpellVmangosTest do
     test "loads the cannot-crit attribute" do
       assert Spell.attribute?(SpellLoader.load(5857), :cant_crit)
     end
+
+    test "preserves DBC spell-modifier operations and affect masks" do
+      inner_focus = SpellLoader.load(14_751)
+
+      assert Enum.any?(inner_focus.effects, fn effect ->
+               effect.aura == :add_pct_modifier and effect.misc_value == 14 and
+                 effect.class_mask == 3_338_141_659
+             end)
+
+      assert Enum.any?(inner_focus.effects, fn effect ->
+               effect.aura == :add_flat_modifier and effect.misc_value == 7 and
+                 effect.class_mask == 3_377_741_456
+             end)
+    end
   end
 
   describe "warrior spell acquisition" do
@@ -167,7 +181,11 @@ defmodule ThistleTea.Game.World.Loader.SpellVmangosTest do
 
     test "feint, cold blood, and vanish load their rogue mechanics" do
       assert Enum.any?(SpellLoader.load(1966).effects, &(&1.type == :modify_threat))
-      assert Enum.any?(SpellLoader.load(14_177).effects, &(&1.aura == :force_crit))
+
+      assert Enum.any?(SpellLoader.load(14_177).effects, fn effect ->
+               effect.aura == :add_flat_modifier and effect.misc_value == 7 and effect.class_mask == 0x20206
+             end)
+
       assert Enum.any?(SpellLoader.load(1856).effects, &(&1.type == :clear_threat))
     end
 

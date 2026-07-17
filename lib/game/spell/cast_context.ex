@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
   alias ThistleTea.Game.Entity.Logic.CombatRatings
   alias ThistleTea.Game.Entity.Logic.Skills
   alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.Modifiers
   alias ThistleTea.Game.Spell.Scripts
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
   alias ThistleTea.Game.World.Loader.SpellThreat, as: SpellThreatLoader
@@ -51,10 +52,13 @@ defmodule ThistleTea.Game.Spell.CastContext do
     :caster_power,
     :combo_points,
     :spell_threat,
+    spell_modifiers: [],
     spell_damage_bonus: %{},
     healing_bonus: 0,
     threat_multiplier: 1.0,
     damage_done_multiplier: 1.0,
+    effect_damage_multiplier: 1.0,
+    effect_healing_multiplier: 1.0,
     melee_crit?: false
   ]
 
@@ -72,8 +76,11 @@ defmodule ThistleTea.Game.Spell.CastContext do
       spell_damage_bonus: spell_damage_bonus(caster),
       healing_bonus: healing_bonus(caster),
       spell_threat: SpellThreatLoader.get(spell_id(spell)),
+      spell_modifiers: Modifiers.snapshot(caster, spell),
       threat_multiplier: Aura.percent_multiplier(caster, :mod_threat, Spell.school_mask(spell)),
       damage_done_multiplier: Aura.percent_multiplier(caster, :mod_damage_percent_done, Spell.school_mask(spell)),
+      effect_damage_multiplier: effect_multiplier(caster, spell, [:all_effects, :damage]),
+      effect_healing_multiplier: effect_multiplier(caster, spell, [:all_effects]),
       spell_crit_chance: spell_crit_chance(caster, spell)
     }
     |> put_melee_snapshot(caster, spell)
@@ -116,7 +123,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
 
   defp put_melee_snapshot(%__MODULE__{} = context, caster, %Spell{} = spell) do
     if Scripts.uses_melee_spell_crit?(spell) do
-      %{context | spell_crit_chance: melee_crit_chance(caster)}
+      %{context | spell_crit_chance: melee_crit_chance(caster, spell)}
     else
       put_attack_snapshot(context, caster, spell)
     end
@@ -134,8 +141,8 @@ defmodule ThistleTea.Game.Spell.CastContext do
             weapon_base_max: caster.unit.base_ranged_max_damage || caster.unit.max_ranged_damage || 0,
             attack_time_ms: caster.unit.ranged_attack_time,
             attack_skill: ranged_attack_skill(caster),
-            melee_crit_chance: ranged_crit_chance(caster),
-            spell_crit_chance: ranged_crit_chance(caster)
+            melee_crit_chance: ranged_crit_chance(caster, spell),
+            spell_crit_chance: ranged_crit_chance(caster, spell)
         }
 
       melee_snapshot?(spell) ->
@@ -147,7 +154,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
             attack_time_ms: caster.unit.base_attack_time,
             normalized_speed: normalized_speed(caster),
             attack_skill: attack_skill(caster),
-            melee_crit_chance: melee_crit_chance(caster),
+            melee_crit_chance: melee_crit_chance(caster, spell),
             shield_block_value: shield_block_value(caster),
             caster_power: caster_power(caster)
         }
@@ -200,16 +207,15 @@ defmodule ThistleTea.Game.Spell.CastContext do
 
   defp attack_skill(_caster), do: nil
 
-  defp melee_crit_chance(%Character{unit: unit} = caster) do
-    if Aura.auras_of_type(caster, :force_crit) == [] do
+  defp melee_crit_chance(%Character{unit: unit} = caster, %Spell{} = spell) do
+    base =
       CombatRatings.melee_crit_chance(unit.class, unit.level || 1, unit.agility || 0) +
         Aura.flat_amount(caster, :mod_crit_percent)
-    else
-      100.0
-    end
+
+    Modifiers.value(caster, spell, :critical_chance, base)
   end
 
-  defp melee_crit_chance(_caster), do: nil
+  defp melee_crit_chance(_caster, _spell), do: nil
 
   defp caster_power(%{unit: %{power_type: 1, power2: rage}}) when is_integer(rage), do: rage
   defp caster_power(%{unit: %{power_type: 3, power4: energy}}) when is_integer(energy), do: energy
@@ -235,21 +241,33 @@ defmodule ThistleTea.Game.Spell.CastContext do
 
   defp ranged_attack_skill(_caster), do: nil
 
-  defp ranged_crit_chance(%Character{player: player, unit: unit}) when is_struct(player) do
-    player.ranged_crit_percentage || CombatRatings.melee_crit_chance(unit.class, unit.level || 1, unit.agility || 0)
+  defp ranged_crit_chance(%Character{player: player, unit: unit} = caster, %Spell{} = spell) when is_struct(player) do
+    base =
+      player.ranged_crit_percentage || CombatRatings.melee_crit_chance(unit.class, unit.level || 1, unit.agility || 0)
+
+    Modifiers.value(caster, spell, :critical_chance, base)
   end
 
-  defp ranged_crit_chance(_caster), do: nil
+  defp ranged_crit_chance(_caster, _spell), do: nil
 
   defp spell_crit_chance(%Character{unit: unit} = caster, %Spell{} = spell) do
     base = CombatRatings.spell_crit_chance(unit.class, unit.level || 1, unit.intellect || 0)
 
-    base +
-      Aura.flat_amount(caster, :mod_spell_crit_chance) +
-      Aura.flat_modifier(caster, :mod_spell_crit_chance_school, Spell.school_mask(spell))
+    chance =
+      base +
+        Aura.flat_amount(caster, :mod_spell_crit_chance) +
+        Aura.flat_modifier(caster, :mod_spell_crit_chance_school, Spell.school_mask(spell))
+
+    Modifiers.value(caster, spell, :critical_chance, chance)
   end
 
   defp spell_crit_chance(_caster, _spell), do: 0.0
+
+  defp effect_multiplier(caster, %Spell{} = spell, operations) do
+    Enum.reduce(operations, 1.0, fn operation, multiplier ->
+      multiplier * Modifiers.value(caster, spell, operation, 100) / 100
+    end)
+  end
 
   defp spell_damage_bonus(caster) do
     bonuses = equipment_bonuses(caster)

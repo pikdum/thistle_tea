@@ -1,6 +1,8 @@
 defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
   use ExUnit.Case, async: true
 
+  alias ThistleTea.Game.Aura, as: AuraData
+  alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
@@ -55,6 +57,50 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
                %Event{type: :channel_start, spell_id: 10, channel_time_ms: 8_000},
                %Event{type: :object_update, update_type: :values}
              ] = mob.internal.events
+    end
+
+    test "applies DBC casting-time modifiers selected by effect class mask" do
+      modifier = %Holder{
+        spell: %Spell{id: 22_812, spell_family: 7},
+        auras: [%AuraData{type: :add_flat_modifier, amount: 1_000, misc_value: 10, class_mask: 0x4}]
+      }
+
+      spell = %Spell{id: 5185, spell_family: 7, family_flags_0: 0x4, cast_time_ms: 1_500}
+      mob = %Mob{object: %Object{guid: 1}, unit: %Unit{auras: [modifier]}, internal: %Internal{}}
+      mob = SpellBT.start_cast(mob, spell, %Targets{raw: <<0::little-size(16)>>}, 1_000)
+
+      assert mob.internal.casting.cast_time_ms == 2_500
+      assert mob.internal.casting.ends_at == 3_500
+    end
+
+    test "spends charged modifiers when an affected channel starts" do
+      modifier = %Holder{
+        spell: %Spell{id: 14_751, spell_family: 6},
+        charges: 1,
+        slot: 0,
+        auras: [%AuraData{type: :add_pct_modifier, amount: -100, misc_value: 14, class_mask: 0}]
+      }
+
+      spell = %Spell{
+        id: 15_407,
+        spell_family: 6,
+        mana_cost: 45,
+        power_type: 0,
+        duration_ms: 3_000,
+        attributes: MapSet.new([:channeled]),
+        effects: [%Effect{amplitude_ms: 1_000}]
+      }
+
+      mob = %Mob{
+        object: %Object{guid: 1},
+        unit: %Unit{power1: 100, max_power1: 100, auras: [modifier]},
+        internal: %Internal{}
+      }
+
+      mob = SpellBT.start_cast(mob, spell, %Targets{raw: <<0::little-size(16)>>}, 1_000)
+
+      assert mob.unit.power1 == 100
+      assert mob.unit.auras == []
     end
   end
 
@@ -177,6 +223,31 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
                  raw_targets: <<0::little-size(16)>>
                }
              ] = mob.internal.events
+    end
+
+    test "spends charged spell modifiers after an affected successful cast" do
+      modifier = %Holder{
+        spell: %Spell{id: 14_751, spell_family: 6},
+        charges: 1,
+        slot: 0,
+        auras: [%AuraData{type: :add_pct_modifier, amount: -100, misc_value: 14, class_mask: 0}]
+      }
+
+      spell = %Spell{id: 2061, spell_family: 6, mana_cost: 10, power_type: 0}
+      targets = %Targets{raw: <<0::little-size(16)>>, unit_guid: 1}
+
+      mob = %Mob{
+        object: %Object{guid: 1},
+        unit: %Unit{level: 60, health: 100, max_health: 100, power1: 100, max_power1: 100, auras: [modifier]},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+        internal: %Internal{world: %WorldRef{map_id: 0}}
+      }
+
+      casting = %Cast{spell: spell, targets: targets, started_at: 1_000, ends_at: 1_000}
+      mob = SpellBT.complete_cast(mob, casting, 1_000)
+
+      assert mob.unit.power1 == 100
+      assert mob.unit.auras == []
     end
 
     test "queues an open-gameobject event for open-lock casts at objects" do

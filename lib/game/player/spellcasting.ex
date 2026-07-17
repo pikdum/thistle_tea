@@ -24,6 +24,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Cast
   alias ThistleTea.Game.Spell.CastValidation
+  alias ThistleTea.Game.Spell.Modifiers
   alias ThistleTea.Game.Spell.Targets
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
@@ -166,6 +167,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
 
   defp do_cast(state, %Spell{} = spell, spell_cast_targets, targets, cast_item_guid) do
     state = cancel(state)
+    cast_time_ms = Modifiers.integer_value(state.character, spell, :casting_time, spell.cast_time_ms || 0)
 
     cast_item =
       if cast_item_guid, do: BinaryUtils.pack_guid(cast_item_guid), else: state.packed_guid
@@ -175,7 +177,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
       caster: state.packed_guid,
       spell: spell.id,
       flags: 0x2,
-      timer: spell.cast_time_ms,
+      timer: cast_time_ms,
       targets: spell_cast_targets,
       ammo_display_id: nil,
       ammo_inventory_type: nil
@@ -187,7 +189,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
 
     cond do
       Spell.attribute?(spell, :on_next_swing) -> PlayerTick.schedule_now(state)
-      spell.cast_time_ms == 0 and not Spell.attribute?(spell, :channeled) -> complete(state)
+      cast_time_ms == 0 and not Spell.attribute?(spell, :channeled) -> complete(state)
       true -> PlayerTick.schedule_now(state)
     end
   end

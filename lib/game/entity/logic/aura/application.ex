@@ -23,6 +23,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Effect
+  alias ThistleTea.Game.Spell.Modifiers
   alias ThistleTea.Game.Spell.Scripts
 
   @negative_auras [
@@ -369,7 +370,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
     |> Spell.aura_effects()
     |> Enum.reject(&channel_ticked?(spell, &1))
     |> Enum.reduce([], fn effect, acc ->
-      case build_aura(effect, finisher_amount(spell, context, amount_override), now) do
+      case build_aura(effect, finisher_amount(spell, context, amount_override), context, now) do
         nil -> acc
         aura -> [aura | acc]
       end
@@ -392,17 +393,18 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
 
   defp channel_ticked?(_spell, _effect), do: false
 
-  defp build_aura(%Effect{aura: nil}, _amount_override, _now), do: nil
+  defp build_aura(%Effect{aura: nil}, _amount_override, _context, _now), do: nil
 
-  defp build_aura(%Effect{} = effect, amount_override, now) do
+  defp build_aura(%Effect{} = effect, amount_override, %CastContext{} = context, now) do
     amplitude_ms = effective_amplitude(effect)
 
     %Aura{
       index: effect.index,
       type: effect.aura,
-      amount: aura_amount(effect, amount_override),
+      amount: modified_aura_amount(effect, amount_override, context),
       misc_value: effect.misc_value,
       multiple_value: effect.multiple_value,
+      class_mask: effect.class_mask,
       amplitude_ms: amplitude_ms,
       next_tick_at: next_tick(effect, amplitude_ms, now),
       trigger_spell_id: effect.trigger_spell_id
@@ -414,6 +416,31 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
   end
 
   defp aura_amount(%Effect{} = effect, amount_override), do: amount_override || Effect.damage_roll(effect)
+
+  defp modified_aura_amount(%Effect{} = effect, amount_override, %CastContext{} = context) do
+    amount = aura_amount(effect, amount_override)
+
+    amount =
+      if effect.aura in [:mod_increase_speed, :mod_decrease_speed, :mod_increase_swim_speed] do
+        Modifiers.value(context.spell_modifiers, :speed, amount)
+      else
+        amount
+      end
+
+    multiplier =
+      case effect.aura do
+        aura when aura in [:periodic_damage, :periodic_leech, :periodic_mana_leech] ->
+          context.effect_damage_multiplier
+
+        :periodic_heal ->
+          context.effect_healing_multiplier
+
+        _aura ->
+          1.0
+      end
+
+    trunc(amount * (multiplier || 1.0))
+  end
 
   defp effective_amplitude(%Effect{aura: :mod_power_regen_percent, amplitude_ms: amp}) do
     if is_integer(amp) and amp > 0, do: amp, else: @percent_regen_tick_ms
