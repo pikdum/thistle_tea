@@ -11,7 +11,6 @@ defmodule ThistleTea.Game.Spell.Scripts do
   """
   import Bitwise, only: [&&&: 2]
 
-  alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Warlock
   alias ThistleTea.Game.Spell
 
@@ -46,12 +45,24 @@ defmodule ThistleTea.Game.Spell.Scripts do
   @spell_family_rogue 8
   @spell_family_warrior 4
   @spell_family_warlock 5
+  @spell_family_hunter 9
   @spell_family_paladin 10
+  @spell_family_shaman 11
   @mage_armor_family_flags 0x12000000
   @paladin_seal_family_flags 0x0A000200
   @paladin_blessing_family_flags 0x10000100
+  @judgement_of_command_icon 561
   @warlock_armor_visual 130
   @warlock_armor_icon 89
+  @hunter_aspect_active_icon 122
+  @aspect_of_the_beast 13_161
+  @auto_shot 75
+  @shaman_lightning_shield_family_mask 0x00000400
+  @shaman_item_set_lightning_shield 23_552
+  @dispel_curse 2
+  @tracking_aura_types [44, 45, 151]
+  @allow_while_mounted 0x01000000
+  @no_autocast_ai 0x00020000
 
   def apply_trigger(%Spell{} = spell) do
     Map.get(@apply_triggers, chain_id(spell))
@@ -78,7 +89,6 @@ defmodule ThistleTea.Game.Spell.Scripts do
   }
   @last_stand_health_buff 12_976
   @last_stand_health_fraction 0.3
-  @soul_link 19_028
   def requires_combo_target?(%Spell{} = spell),
     do: warrior_family_flag?(spell, @overpower_family_mask) or finisher?(spell)
 
@@ -87,11 +97,10 @@ defmodule ThistleTea.Game.Spell.Scripts do
   def dummy_effect(%Spell{id: @last_stand}), do: :last_stand
   def dummy_effect(%Spell{id: @preparation}), do: :preparation
   def dummy_effect(%Spell{id: id}) when is_map_key(@holy_shock, id), do: {:holy_shock, Map.fetch!(@holy_shock, id)}
-  def dummy_effect(%Spell{name: "Judgement of Command"}), do: :judgement_of_command
-  def dummy_effect(%Spell{id: @soul_link}), do: :soul_link
 
   def dummy_effect(%Spell{} = spell) do
     cond do
+      judgement_of_command_dummy?(spell) -> :judgement_of_command
       warrior_family_flag?(spell, @execute_family_mask) -> :execute
       Warlock.life_tap?(spell) -> :life_tap
       true -> nil
@@ -100,6 +109,12 @@ defmodule ThistleTea.Game.Spell.Scripts do
 
   def dummy_effect(_spell), do: nil
 
+  def judgement_of_command_damage?(%Spell{spell_family: 0, spell_icon: @judgement_of_command_icon} = spell) do
+    Enum.any?(spell.effects, &(&1.type == :school_damage))
+  end
+
+  def judgement_of_command_damage?(_spell), do: false
+
   def execute_damage_spell_id, do: @execute_damage_spell
   def blade_flurry_damage_spell_id, do: @blade_flurry_damage_spell
   def blade_flurry_radius_yards, do: @blade_flurry_radius_yards
@@ -107,12 +122,6 @@ defmodule ThistleTea.Game.Spell.Scripts do
 
   def rogue_spell?(%Spell{spell_family: @spell_family_rogue}), do: true
   def rogue_spell?(_spell), do: false
-
-  def blocked_by_aura?(%Spell{id: id}, entity) when id in [498, 5573, 642, 1020, 1022, 5599, 10_278] do
-    Aura.has_spell?(entity, @forbearance)
-  end
-
-  def blocked_by_aura?(_spell, _entity), do: false
 
   def paladin_judgement?(%Spell{spell_family: @spell_family_paladin, family_flags_0: flags}) when is_integer(flags),
     do: (flags &&& 0x00800000) != 0
@@ -164,11 +173,28 @@ defmodule ThistleTea.Game.Spell.Scripts do
     Enum.any?(0..2, &(Map.get(row, :"effect_aura_#{&1}") == 36))
   end
 
-  defp hunter_aspect?(row), do: String.starts_with?(Map.get(row, :name_en_gb) || "", "Aspect of the ")
+  defp hunter_aspect?(%{id: @aspect_of_the_beast}), do: true
 
-  defp shaman_shield?(row), do: (Map.get(row, :name_en_gb) || "") in ["Lightning Shield", "Water Shield"]
+  defp hunter_aspect?(row) do
+    row.spell_class_set == @spell_family_hunter and row.active_icon == @hunter_aspect_active_icon and
+      row.id != @auto_shot
+  end
 
-  defp tracking_spell?(row), do: String.starts_with?(Map.get(row, :name_en_gb) || "", "Track ")
+  defp shaman_shield?(%{id: @shaman_item_set_lightning_shield}), do: true
+
+  defp shaman_shield?(row) do
+    row.spell_class_set == @spell_family_shaman and
+      ((row.spell_class_mask_0 || 0) &&& @shaman_lightning_shield_family_mask) != 0
+  end
+
+  defp tracking_spell?(row) do
+    tracking_aura? = Enum.any?(0..2, &(Map.get(row, :"effect_aura_#{&1}") in @tracking_aura_types))
+    attributes = Map.get(row, :attributes) || 0
+    attributes_ex1 = Map.get(row, :attributes_ex1) || 0
+
+    tracking_aura? and
+      ((attributes &&& @allow_while_mounted) != 0 or (attributes_ex1 &&& @no_autocast_ai) != 0)
+  end
 
   defp non_paladin_exclusive_category(row) do
     cond do
@@ -188,7 +214,7 @@ defmodule ThistleTea.Game.Spell.Scripts do
   end
 
   defp warlock_curse?(row) do
-    row.spell_class_set == @spell_family_warlock and String.starts_with?(row.name_en_gb || "", "Curse of")
+    row.spell_class_set == @spell_family_warlock and row.dispel_type == @dispel_curse
   end
 
   defp paladin_exclusive_category(row) do
@@ -208,6 +234,14 @@ defmodule ThistleTea.Game.Spell.Scripts do
     row.spell_class_set == @spell_family_paladin and
       Enum.any?(0..2, &(Map.get(row, :"effect_#{&1}") == 35))
   end
+
+  defp judgement_of_command_dummy?(
+         %Spell{spell_family: @spell_family_paladin, spell_icon: @judgement_of_command_icon} = spell
+       ) do
+    Enum.any?(spell.effects, &(&1.type == :dummy))
+  end
+
+  defp judgement_of_command_dummy?(_spell), do: false
 
   defp warrior_family_flag?(%Spell{spell_family: @spell_family_warrior, family_flags_0: flags}, mask)
        when is_integer(flags), do: (flags &&& mask) != 0

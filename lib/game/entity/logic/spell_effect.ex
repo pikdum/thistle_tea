@@ -4,6 +4,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   a target entity, returning the updated entity and the events to emit.
   """
   alias ThistleTea.Game.Entity.Data.Character
+  alias ThistleTea.Game.Entity.Data.ScriptStep
   alias ThistleTea.Game.Entity.Logic.AttackTable
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Core
@@ -239,18 +240,18 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
     {state, events ++ if(damage > 0, do: [Event.heal_entity(context.caster_guid, damage)], else: [])}
   end
 
-  defp apply_effect(state, %CastContext{} = context, %Spell{name: "Demonic Sacrifice"}, %Effect{type: :instakill}, now) do
+  defp apply_effect(state, %CastContext{} = context, spell, %Effect{type: :instakill}, now) do
     events =
-      case Warlock.sacrifice_event(state, context) do
-        nil -> []
-        event -> [event]
+      if Warlock.demonic_sacrifice?(spell) do
+        case Warlock.sacrifice_event(state, context) do
+          nil -> []
+          event -> [event]
+        end
+      else
+        []
       end
 
     {Core.take_damage(state, state.unit.health || 0, now, source: context.caster_guid), events}
-  end
-
-  defp apply_effect(state, %CastContext{} = context, _spell, %Effect{type: :instakill}, now) do
-    {Core.take_damage(state, state.unit.health || 0, now, source: context.caster_guid), []}
   end
 
   defp apply_effect(state, %CastContext{}, _spell, %Effect{type: :add_combo_points}, _now), do: {state, []}
@@ -381,20 +382,15 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   end
 
   defp apply_effect(state, %CastContext{} = context, spell, %Effect{type: :dummy} = effect, now) do
-    case Scripts.dummy_effect(spell) do
-      :life_tap ->
-        Warlock.life_tap(state, context, spell, effect, now)
+    case vmangos_script_events(state, context, spell) do
+      [] ->
+        case Scripts.dummy_effect(spell) do
+          :life_tap -> Warlock.life_tap(state, context, spell, effect, now)
+          dummy_effect -> apply_class_dummy(state, context, spell, effect, dummy_effect, now)
+        end
 
-      :soul_link ->
-        event =
-          Event.trigger_spell(state.object.guid, state.unit.level || 1, context.caster_guid, 25_228,
-            target_role: :caster
-          )
-
-        {state, [event]}
-
-      dummy_effect ->
-        apply_class_dummy(state, context, spell, effect, dummy_effect, now)
+      events ->
+        {state, events}
     end
   end
 
@@ -547,6 +543,40 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
     end
   end
 
+  defp vmangos_script_events(state, %CastContext{} = context, %Spell{script_steps: steps}) when is_list(steps) do
+    Enum.flat_map(steps, fn
+      %ScriptStep{command: :cast_spell, delay_ms: 0} = step -> vmangos_cast_event(state, context, step)
+      _step -> []
+    end)
+  end
+
+  defp vmangos_script_events(_state, _context, _spell), do: []
+
+  defp vmangos_cast_event(state, %CastContext{} = context, %ScriptStep{} = step) do
+    with spell_id when is_integer(spell_id) <- ScriptStep.cast_spell_id(step),
+         {source_guid, target_guid} when is_integer(source_guid) and is_integer(target_guid) <-
+           script_guids(state.object.guid, context.caster_guid, step) do
+      source_level = if source_guid == state.object.guid, do: state.unit.level || 1, else: context.caster_level
+      [Event.trigger_spell(source_guid, source_level, target_guid, spell_id)]
+    else
+      _ -> []
+    end
+  end
+
+  defp script_guids(target_guid, caster_guid, %ScriptStep{swap_initial?: true} = step) do
+    script_target(step, target_guid, caster_guid)
+  end
+
+  defp script_guids(target_guid, caster_guid, %ScriptStep{} = step) do
+    script_target(step, caster_guid, target_guid)
+  end
+
+  defp script_target(%ScriptStep{target_type: :provided, target_self?: true}, source_guid, _target_guid),
+    do: {source_guid, source_guid}
+
+  defp script_target(%ScriptStep{target_type: :provided}, source_guid, target_guid), do: {source_guid, target_guid}
+  defp script_target(_step, _source_guid, _target_guid), do: nil
+
   defp maybe_vanish_stealth_events(state, %Spell{} = spell) do
     if Scripts.rogue_vanish?(spell), do: vanish_stealth_events(state), else: []
   end
@@ -640,11 +670,13 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
     {state, [event]}
   end
 
-  defp scripted_damage_multiplier(state, %Spell{name: "Judgement of Command"}) do
-    if Aura.has_aura?(state, :mod_stun), do: 1.0, else: 0.5
+  defp scripted_damage_multiplier(state, %Spell{} = spell) do
+    if Scripts.judgement_of_command_damage?(spell) do
+      if Aura.has_aura?(state, :mod_stun), do: 1.0, else: 0.5
+    else
+      1.0
+    end
   end
-
-  defp scripted_damage_multiplier(_state, _spell), do: 1.0
 
   defp school_resisted_amount(_state, damage, _school, _caster_level, _opts) when damage <= 0, do: 0
   defp school_resisted_amount(_state, _damage, :physical, _caster_level, _opts), do: 0

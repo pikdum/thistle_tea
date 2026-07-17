@@ -51,40 +51,47 @@ defmodule ThistleTea.Game.Entity.Logic.SpellTargetTest do
     end
   end
 
-  describe "redirect_enemy_trigger/3" do
+  describe "redirect_trigger_target/3" do
     test "keeps a self target when the spell does not target enemies" do
       entity = entity_fixture()
       spell = trigger_spell(:target_friend)
 
-      assert SpellTarget.redirect_enemy_trigger(entity, 10, spell) == 10
+      assert SpellTarget.redirect_trigger_target(entity, 10, spell) == 10
     end
 
     test "keeps a non-self target unchanged" do
       entity = entity_fixture(target: 55)
       spell = trigger_spell(:target_enemy)
 
-      assert SpellTarget.redirect_enemy_trigger(entity, 99, spell) == 99
+      assert SpellTarget.redirect_trigger_target(entity, 99, spell) == 99
+    end
+
+    test "redirects a victim-proposed proc to its DBC caster target" do
+      entity = entity_fixture(target: 55)
+      spell = trigger_spell(:caster)
+
+      assert SpellTarget.redirect_trigger_target(entity, 99, spell) == 10
     end
 
     test "redirects a self-targeted enemy trigger to the channel object" do
       entity = entity_fixture(channel_object: 42, target: 55)
       spell = trigger_spell(:target_enemy)
 
-      assert SpellTarget.redirect_enemy_trigger(entity, 10, spell) == 42
+      assert SpellTarget.redirect_trigger_target(entity, 10, spell) == 42
     end
 
     test "falls back to the current target without a channel object" do
       entity = entity_fixture(target: 55)
       spell = trigger_spell(:target_enemy)
 
-      assert SpellTarget.redirect_enemy_trigger(entity, 10, spell) == 55
+      assert SpellTarget.redirect_trigger_target(entity, 10, spell) == 55
     end
 
     test "drops a self-targeted enemy trigger without any enemy" do
       entity = entity_fixture()
       spell = trigger_spell(:target_enemy)
 
-      assert SpellTarget.redirect_enemy_trigger(entity, 10, spell) == nil
+      assert SpellTarget.redirect_trigger_target(entity, 10, spell) == nil
     end
   end
 

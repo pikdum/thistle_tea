@@ -4,6 +4,8 @@ defmodule ThistleTea.Game.Entity.Logic.Warlock do
   generic DBC effects.
   """
 
+  import Bitwise, only: [&&&: 2]
+
   alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Core
@@ -13,8 +15,12 @@ defmodule ThistleTea.Game.Entity.Logic.Warlock do
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Effect
 
-  @life_tap_ids [1454, 1455, 1456, 11_687, 11_688, 11_689]
-  @conflagrate_ids [17_962, 18_930, 18_931, 18_932]
+  @spell_family 5
+  @immolate_family_mask 0x00000004
+  @conflagrate_family_mask 0x00000200
+  @agony_family_mask 0x00000400
+  @life_tap_family_mask 0x00040000
+  @demonic_sacrifice 18_788
   @healthstone_items %{
     6201 => {5512, 19_004, 19_005},
     6202 => {5511, 19_006, 19_007},
@@ -24,7 +30,7 @@ defmodule ThistleTea.Game.Entity.Logic.Warlock do
   }
   @sacrifice_buffs %{416 => 18_789, 1860 => 18_790, 1863 => 18_791, 417 => 18_792}
 
-  def life_tap?(%Spell{id: id}), do: id in @life_tap_ids
+  def life_tap?(%Spell{} = spell), do: Spell.family_flag?(spell, @spell_family, @life_tap_family_mask)
   def life_tap?(_spell), do: false
 
   def life_tap_cost(%Spell{} = spell) do
@@ -45,15 +51,37 @@ defmodule ThistleTea.Game.Entity.Logic.Warlock do
     end
   end
 
-  def conflagrate?(%Spell{id: id}), do: id in @conflagrate_ids
+  def conflagrate?(%Spell{} = spell), do: Spell.family_flag?(spell, @spell_family, @conflagrate_family_mask)
   def conflagrate?(_spell), do: false
+
+  def immolate?(%Spell{} = spell), do: Spell.family_flag?(spell, @spell_family, @immolate_family_mask)
+  def immolate?(_spell), do: false
+
+  def curse_of_agony?(%Spell{} = spell), do: Spell.family_flag?(spell, @spell_family, @agony_family_mask)
+  def curse_of_agony?(_spell), do: false
+
+  def demonic_sacrifice?(%Spell{id: @demonic_sacrifice}), do: true
+  def demonic_sacrifice?(_spell), do: false
+
+  def immolate_source?(sources, caster_guid) do
+    Enum.any?(sources, fn
+      {_id, @spell_family, flags_0, _flags_1, ^caster_guid} when is_integer(flags_0) ->
+        (flags_0 &&& @immolate_family_mask) != 0
+
+      _source ->
+        false
+    end)
+  end
 
   def consume_immolate(state, caster_guid, now) do
     spell_ids =
       state.unit.auras
       |> Enum.find_value([], fn
-        %Holder{caster_guid: ^caster_guid, spell: %Spell{id: id, name: "Immolate"}} -> [id]
-        _ -> nil
+        %Holder{caster_guid: ^caster_guid, spell: %Spell{id: id} = spell} ->
+          if immolate?(spell), do: [id]
+
+        _ ->
+          nil
       end)
 
     Aura.remove_spells(state, spell_ids, now)
@@ -61,7 +89,7 @@ defmodule ThistleTea.Game.Entity.Logic.Warlock do
 
   def has_immolate_from?(%{unit: %{auras: holders}}, caster_guid) when is_list(holders) do
     Enum.any?(holders, fn
-      %Holder{caster_guid: ^caster_guid, spell: %Spell{name: "Immolate"}} -> true
+      %Holder{caster_guid: ^caster_guid, spell: %Spell{} = spell} -> immolate?(spell)
       _ -> false
     end)
   end

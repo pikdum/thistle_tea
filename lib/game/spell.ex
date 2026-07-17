@@ -10,6 +10,8 @@ defmodule ThistleTea.Game.Spell do
   defstruct [
     :id,
     :name,
+    :spell_icon,
+    :spell_visual,
     :school,
     :cast_time_ms,
     :duration_ms,
@@ -47,6 +49,7 @@ defmodule ThistleTea.Game.Spell do
     equipped_item_subclass_mask: 0,
     attributes: MapSet.new(),
     effects: [],
+    script_steps: [],
     reagents: []
   ]
 
@@ -169,6 +172,16 @@ defmodule ThistleTea.Game.Spell do
   end
 
   def procs_on?(_spell, _proc_type), do: false
+
+  def family_flag?(%__MODULE__{spell_family: family, family_flags_0: flags}, family, mask, 0)
+      when is_integer(flags) and is_integer(mask), do: (flags &&& mask) != 0
+
+  def family_flag?(%__MODULE__{spell_family: family, family_flags_1: flags}, family, mask, 1)
+      when is_integer(flags) and is_integer(mask), do: (flags &&& mask) != 0
+
+  def family_flag?(_spell, _family, _mask, _word), do: false
+
+  def family_flag?(%__MODULE__{} = spell, family, mask), do: family_flag?(spell, family, mask, 0)
 
   def creature_type_allowed?(%__MODULE__{target_creature_type_mask: mask}, creature_type)
       when is_integer(mask) and mask > 0 and is_integer(creature_type) and creature_type > 0 do

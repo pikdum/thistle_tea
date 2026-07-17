@@ -226,6 +226,15 @@ defmodule ThistleTea.Game.World.Loader.SpellVmangosTest do
       assert Enum.any?(SpellLoader.load(465).effects, &(&1.type == :apply_area_aura))
     end
 
+    test "scripted Paladin mechanics retain their identifying DBC data" do
+      assert %Spell{spell_family: 10, spell_icon: 561} = SpellLoader.load(20_425)
+      assert %Spell{spell_family: 0, spell_icon: 561} = SpellLoader.load(20_424)
+      assert Spell.family_flag?(SpellLoader.load(19_977), 10, 0x10000000)
+      assert Spell.family_flag?(SpellLoader.load(639), 10, 0x80000000)
+      assert Spell.family_flag?(SpellLoader.load(19_750), 10, 0x40000000)
+      assert Spell.family_flag?(SpellLoader.load(20_375), 10, 0x02000000)
+    end
+
     test "defensive and stat blessings load semantic aura types" do
       assert Enum.any?(SpellLoader.load(642).effects, &(&1.aura == :school_immunity))
       assert Enum.any?(SpellLoader.load(20_217).effects, &(&1.aura == :mod_total_stat_percent))
@@ -273,6 +282,14 @@ defmodule ThistleTea.Game.World.Loader.SpellVmangosTest do
       assert spell.mana_cost_per_second == 33
     end
 
+    test "scripted warlock ranks share DBC family flags" do
+      assert Spell.family_flag?(SpellLoader.load(1454), 5, 0x00040000)
+      assert Spell.family_flag?(SpellLoader.load(11_689), 5, 0x00040000)
+      assert Spell.family_flag?(SpellLoader.load(17_962), 5, 0x00000200)
+      assert Spell.family_flag?(SpellLoader.load(348), 5, 0x00000004)
+      assert Spell.family_flag?(SpellLoader.load(980), 5, 0x00000400)
+    end
+
     test "curses share per-caster exclusive ownership" do
       assert SpellLoader.load(702).exclusive_category == :warlock_curse
       assert SpellLoader.load(980).exclusive_category == :warlock_curse
@@ -312,6 +329,9 @@ defmodule ThistleTea.Game.World.Loader.SpellVmangosTest do
       assert Enum.any?(SpellLoader.load(29_414).effects, &(&1.aura == :mod_ranged_haste))
       assert SpellLoader.load(768).exclusive_category == :shapeshift
       assert SpellLoader.load(13_163).exclusive_category == :hunter_aspect
+      assert SpellLoader.load(13_161).exclusive_category == :hunter_aspect
+      assert SpellLoader.load(1494).exclusive_category == :tracking
+      assert SpellLoader.load(324).exclusive_category == :shaman_shield
     end
 
     test "debug spellbooks include quest and talent actives" do

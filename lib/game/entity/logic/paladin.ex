@@ -23,6 +23,11 @@ defmodule ThistleTea.Game.Entity.Logic.Paladin do
     20_292 => 25_735,
     20_293 => 25_713
   }
+  @spell_family 10
+  @blessing_of_light_family_mask 0x10000000
+  @holy_light_family_mask 0x80000000
+  @flash_of_light_family_mask 0x40000000
+  @seal_of_command_family_mask 0x02000000
 
   def release_seal(
         %{object: %{guid: caster_guid}, unit: %Unit{auras: holders}} = entity,
@@ -78,15 +83,12 @@ defmodule ThistleTea.Game.Entity.Logic.Paladin do
 
   def active_seal?(entity), do: not is_nil(active_seal(entity))
 
-  def blessing_of_light_bonus(%{unit: %Unit{auras: holders}}, %Spell{name: spell_name}) when is_list(holders) do
-    aura_index = if spell_name == "Holy Light", do: 0, else: if(spell_name == "Flash of Light", do: 1)
+  def blessing_of_light_bonus(%{unit: %Unit{auras: holders}}, %Spell{} = spell) when is_list(holders) do
+    aura_index = healing_bonus_index(spell)
 
     Enum.find_value(holders, 0, fn
-      %Holder{spell: %Spell{name: "Blessing of Light"}, auras: auras} when is_integer(aura_index) ->
-        case Enum.find(auras, &match?(%Aura{index: ^aura_index, type: :dummy}, &1)) do
-          %Aura{amount: amount} when is_integer(amount) -> amount
-          _ -> nil
-        end
+      %Holder{spell: %Spell{} = blessing, auras: auras} when is_integer(aura_index) ->
+        blessing_of_light_bonus(blessing, auras, aura_index)
 
       _holder ->
         nil
@@ -94,6 +96,23 @@ defmodule ThistleTea.Game.Entity.Logic.Paladin do
   end
 
   def blessing_of_light_bonus(_entity, _spell), do: 0
+
+  defp blessing_of_light_bonus(blessing, auras, aura_index) do
+    if Spell.family_flag?(blessing, @spell_family, @blessing_of_light_family_mask) do
+      case Enum.find(auras, &match?(%Aura{index: ^aura_index, type: :dummy}, &1)) do
+        %Aura{amount: amount} when is_integer(amount) -> amount
+        _ -> nil
+      end
+    end
+  end
+
+  defp healing_bonus_index(spell) do
+    cond do
+      Spell.family_flag?(spell, @spell_family, @holy_light_family_mask) -> 0
+      Spell.family_flag?(spell, @spell_family, @flash_of_light_family_mask) -> 1
+      true -> nil
+    end
+  end
 
   defp seal?(%Holder{spell: %Spell{exclusive_category: :paladin_seal}}), do: true
   defp seal?(_holder), do: false
@@ -143,15 +162,18 @@ defmodule ThistleTea.Game.Entity.Logic.Paladin do
 
   defp maybe_trigger_proc(entity, spell, victim_guid, spell_id) do
     if seal_proc?(entity, spell) do
-      target_guid = if spell.name in ["Seal of Light", "Seal of Wisdom"], do: entity.object.guid, else: victim_guid
-      Event.enqueue(entity, Event.trigger_spell(entity.object.guid, entity.unit.level || 1, target_guid, spell_id))
+      Event.enqueue(entity, Event.trigger_spell(entity.object.guid, entity.unit.level || 1, victim_guid, spell_id))
     else
       entity
     end
   end
 
-  defp seal_proc?(entity, %Spell{name: "Seal of Command"}) do
-    :rand.uniform() <= min((entity.unit.base_attack_time || 2_000) * 7 / 60_000, 1.0)
+  defp seal_proc?(entity, %Spell{} = spell) do
+    if Spell.family_flag?(spell, @spell_family, @seal_of_command_family_mask) do
+      :rand.uniform() <= min((entity.unit.base_attack_time || 2_000) * 7 / 60_000, 1.0)
+    else
+      true
+    end
   end
 
   defp seal_proc?(_entity, _spell), do: true

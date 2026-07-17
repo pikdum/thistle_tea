@@ -117,8 +117,8 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
   def has_spell?(_entity, _spell_id), do: false
 
   def source_spells(%{unit: %Unit{auras: holders}}) when is_list(holders) do
-    MapSet.new(holders, fn %Holder{spell: %Spell{id: id, name: name}, caster_guid: caster_guid} ->
-      {id, name, caster_guid}
+    MapSet.new(holders, fn %Holder{spell: %Spell{} = spell, caster_guid: caster_guid} ->
+      {spell.id, spell.spell_family, spell.family_flags_0, spell.family_flags_1, caster_guid}
     end)
   end
 

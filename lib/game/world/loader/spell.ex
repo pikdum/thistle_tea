@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.Spell.Scripts
   alias ThistleTea.Game.World.Loader.CreatureTemplate, as: CreatureTemplateLoader
+  alias ThistleTea.Game.World.Loader.SpellScript, as: SpellScriptLoader
 
   @learn_spell_effect 36
   @table_options [:named_table, :public, read_concurrency: true, write_concurrency: :auto]
@@ -190,6 +191,8 @@ defmodule ThistleTea.Game.World.Loader.Spell do
     %SpellData{
       id: row.id,
       name: row.name_en_gb,
+      spell_icon: row.spell_icon,
+      spell_visual: row.spell_visual_0,
       school: school(row.school),
       cast_time_ms: cast_time_ms(row.spell_cast_time),
       duration_ms: duration_ms(row.spell_duration),
@@ -213,6 +216,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
       family_flags_0: row.spell_class_mask_0 || 0,
       family_flags_1: row.spell_class_mask_1 || 0,
       effects: build_effects(row, radius_lookup),
+      script_steps: SpellScriptLoader.get(row.id),
       reagents: build_reagents(row)
     }
     |> struct!(cooldown_fields(row))

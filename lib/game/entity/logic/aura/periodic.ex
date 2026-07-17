@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
   alias ThistleTea.Game.Entity.Logic.Resources
   alias ThistleTea.Game.Entity.Logic.SpellResist
   alias ThistleTea.Game.Entity.Logic.Threat
+  alias ThistleTea.Game.Entity.Logic.Warlock
   alias ThistleTea.Game.Spell
 
   def tick(%{unit: %Unit{auras: holders}} = entity, now) when is_list(holders) and holders != [] do
@@ -165,18 +166,22 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
 
   defp tick_aura(entity, _holder, aura, _now), do: {entity, aura, []}
 
-  defp periodic_damage_amount(%Holder{spell: %Spell{name: "Curse of Agony"}, applied_at: applied_at}, %Aura{
+  defp periodic_damage_amount(%Holder{spell: %Spell{} = spell, applied_at: applied_at}, %Aura{
          amount: amount,
          amplitude_ms: amplitude,
          next_tick_at: next_tick_at
        })
        when is_integer(applied_at) and is_integer(amplitude) and amplitude > 0 and is_integer(next_tick_at) do
-    tick = div(next_tick_at - applied_at, amplitude)
+    if Warlock.curse_of_agony?(spell) do
+      tick = div(next_tick_at - applied_at, amplitude)
 
-    cond do
-      tick <= 4 -> div(amount, 2)
-      tick >= 9 -> amount + div(amount, 2)
-      true -> amount
+      cond do
+        tick <= 4 -> div(amount, 2)
+        tick >= 9 -> amount + div(amount, 2)
+        true -> amount
+      end
+    else
+      amount
     end
   end
 

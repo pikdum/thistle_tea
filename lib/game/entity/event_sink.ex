@@ -1118,7 +1118,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
   end
 
   defp triggered_target(%{object: %{guid: guid}} = entity, %Event{source_guid: guid} = event, spell) do
-    SpellTarget.redirect_enemy_trigger(entity, event.target_guid, spell)
+    SpellTarget.redirect_trigger_target(entity, event.target_guid, spell)
   end
 
   defp triggered_target(_entity, %Event{} = event, _spell), do: event.target_guid

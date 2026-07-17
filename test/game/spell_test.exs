@@ -64,6 +64,17 @@ defmodule ThistleTea.Game.SpellTest do
     end
   end
 
+  describe "family_flag?/4" do
+    test "matches the requested DBC family-mask word" do
+      spell = %Spell{spell_family: 5, family_flags_0: 0x4, family_flags_1: 0x1}
+
+      assert Spell.family_flag?(spell, 5, 0x4)
+      assert Spell.family_flag?(spell, 5, 0x1, 1)
+      refute Spell.family_flag?(spell, 8, 0x4)
+      refute Spell.family_flag?(spell, 5, 0x2)
+    end
+  end
+
   describe "school_index/1" do
     test "returns packet indexes for spell schools" do
       assert Spell.school_index(:physical) == 0

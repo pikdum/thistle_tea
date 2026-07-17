@@ -115,8 +115,7 @@ defmodule ThistleTea.Game.Spell.CastValidation do
   defp check_target_aura_state(_spell, _target_info), do: :ok
 
   defp check_warlock_target(%{object: %{guid: caster_guid}}, %Spell{} = spell, %{aura_sources: sources}) do
-    if Warlock.conflagrate?(spell) and
-         not Enum.any?(sources, fn {_id, name, source_guid} -> name == "Immolate" and source_guid == caster_guid end) do
+    if Warlock.conflagrate?(spell) and not Warlock.immolate_source?(sources, caster_guid) do
       {:error, :target_aurastate}
     else
       :ok
@@ -174,8 +173,11 @@ defmodule ThistleTea.Game.Spell.CastValidation do
   end
 
   defp check_special_aura_requirements(caster, %Spell{} = spell) do
-    requirement_met? = not Scripts.paladin_judgement?(spell) or Paladin.active_seal?(caster)
-    check_blocking_aura(caster, spell, requirement_met?)
+    if Scripts.paladin_judgement?(spell) and not Paladin.active_seal?(caster) do
+      {:error, :cant_do_that_yet}
+    else
+      :ok
+    end
   end
 
   defp check_warlock_resources(caster, %Spell{} = spell) do
@@ -183,14 +185,6 @@ defmodule ThistleTea.Game.Spell.CastValidation do
       {:error, :fizzle}
     else
       :ok
-    end
-  end
-
-  defp check_blocking_aura(caster, spell, requirement_met?) do
-    cond do
-      not requirement_met? -> {:error, :cant_do_that_yet}
-      Scripts.blocked_by_aura?(spell, caster) -> {:error, :immune}
-      true -> :ok
     end
   end
 

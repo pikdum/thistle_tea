@@ -237,7 +237,14 @@ defmodule ThistleTea.Game.Entity.Logic.PaladinSpellsTest do
     end
 
     test "Seal of Light heals only the paladin wielding the seal" do
-      seal = %Spell{id: 20_165, name: "Seal of Light", exclusive_category: :paladin_seal, proc_type_mask: 20}
+      seal = %Spell{
+        id: 20_165,
+        name: "Seal of Light",
+        spell_family: 10,
+        family_flags_0: 0x08000000,
+        exclusive_category: :paladin_seal,
+        proc_type_mask: 20
+      }
 
       character =
         character([
@@ -246,7 +253,7 @@ defmodule ThistleTea.Game.Entity.Logic.PaladinSpellsTest do
 
       result = Paladin.trigger_seal(character, %{outcome: :normal, victim_guid: 9})
 
-      assert [%{type: :trigger_spell, source_guid: 5, target_guid: 5, spell_id: 20_167}] = result.internal.events
+      assert [%{type: :trigger_spell, source_guid: 5, target_guid: 9, spell_id: 20_167}] = result.internal.events
 
       assert {_character, []} = AuraLogic.reactions(character, :hit_taken, %{attacker_guid: 9})
     end
@@ -279,6 +286,8 @@ defmodule ThistleTea.Game.Entity.Logic.PaladinSpellsTest do
       spell = %Spell{
         id: 20_425,
         name: "Judgement of Command",
+        spell_family: 10,
+        spell_icon: 561,
         effects: [%Spell.Effect{index: 0, type: :dummy, base_points: 20_466}]
       }
 
@@ -292,7 +301,7 @@ defmodule ThistleTea.Game.Entity.Logic.PaladinSpellsTest do
 
     test "Blessing of Light increases Holy Light by its first dummy amount" do
       blessing = %Holder{
-        spell: %Spell{id: 19_977, name: "Blessing of Light"},
+        spell: %Spell{id: 19_977, name: "Blessing of Light", spell_family: 10, family_flags_0: 0x10000000},
         auras: [%Aura{index: 0, type: :dummy, amount: 210}, %Aura{index: 1, type: :dummy, amount: 60}]
       }
 
@@ -302,6 +311,8 @@ defmodule ThistleTea.Game.Entity.Logic.PaladinSpellsTest do
       spell = %Spell{
         id: 639,
         name: "Holy Light",
+        spell_family: 10,
+        family_flags_0: 0x80000000,
         school: :holy,
         effects: [%Spell.Effect{type: :heal, base_points: 100}]
       }

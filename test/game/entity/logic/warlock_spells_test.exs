@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.Entity.Logic.WarlockSpellsTest do
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
+  alias ThistleTea.Game.Entity.Data.ScriptStep
   alias ThistleTea.Game.Entity.Logic.AI.BT.Pet, as: PetBT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Spell, as: SpellBT
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
@@ -28,7 +29,16 @@ defmodule ThistleTea.Game.Entity.Logic.WarlockSpellsTest do
   describe "Life Tap" do
     test "converts health into mana without killing the caster" do
       caster = character(health: 100, power1: 0, max_power1: 200)
-      spell = %Spell{id: 1454, name: "Life Tap", school: :shadow, effects: [%Effect{type: :dummy, base_points: 39}]}
+
+      spell = %Spell{
+        id: 1454,
+        name: "Life Tap",
+        school: :shadow,
+        spell_family: 5,
+        family_flags_0: 0x00040000,
+        effects: [%Effect{type: :dummy, base_points: 39}]
+      }
+
       context = %CastContext{caster_guid: 1, caster_level: 20, spell_damage_bonus: %{}}
 
       {result, _events} = SpellEffect.receive(caster, context, spell, 1_000)
@@ -70,18 +80,18 @@ defmodule ThistleTea.Game.Entity.Logic.WarlockSpellsTest do
   describe "Conflagrate" do
     test "validation requires the caster's Immolate metadata" do
       caster = character()
-      spell = %Spell{id: 17_962, name: "Conflagrate", school: :fire}
+      spell = %Spell{id: 17_962, name: "Conflagrate", school: :fire, spell_family: 5, family_flags_0: 0x00000200}
       target_info = %{alive?: true, hostile?: true, attackable?: true, aura_sources: MapSet.new()}
 
       assert CastValidation.validate(caster, spell, %Targets{unit_guid: 2}, target_info, 1_000) ==
                {:error, :target_aurastate}
 
-      target_info = %{target_info | aura_sources: MapSet.new([{348, "Immolate", 1}])}
+      target_info = %{target_info | aura_sources: MapSet.new([{348, 5, 0x00000004, 0, 1}])}
       assert CastValidation.validate(caster, spell, %Targets{unit_guid: 2}, target_info, 1_000) == :ok
     end
 
     test "requires and consumes the caster's Immolate" do
-      immolate = %Spell{id: 348, name: "Immolate", school: :fire}
+      immolate = %Spell{id: 348, name: "Immolate", school: :fire, spell_family: 5, family_flags_0: 0x00000004}
 
       target =
         mob([
@@ -96,6 +106,8 @@ defmodule ThistleTea.Game.Entity.Logic.WarlockSpellsTest do
         id: 17_962,
         name: "Conflagrate",
         school: :fire,
+        spell_family: 5,
+        family_flags_0: 0x00000200,
         effects: [%Effect{type: :school_damage, base_points: 99}]
       }
 
@@ -112,6 +124,8 @@ defmodule ThistleTea.Game.Entity.Logic.WarlockSpellsTest do
         id: 17_962,
         name: "Conflagrate",
         school: :fire,
+        spell_family: 5,
+        family_flags_0: 0x00000200,
         effects: [%Effect{type: :school_damage, base_points: 99}]
       }
 
@@ -126,7 +140,7 @@ defmodule ThistleTea.Game.Entity.Logic.WarlockSpellsTest do
 
   describe "Curse of Agony" do
     test "ramps from half damage to normal and then one-and-a-half damage" do
-      spell = %Spell{id: 980, name: "Curse of Agony", school: :shadow}
+      spell = %Spell{id: 980, name: "Curse of Agony", school: :shadow, spell_family: 5, family_flags_0: 0x00000400}
 
       early = agony_target(spell, 3_000)
       {early, _events} = AuraLogic.tick(early, 3_000)
@@ -179,14 +193,28 @@ defmodule ThistleTea.Game.Entity.Logic.WarlockSpellsTest do
 
   describe "Soul Link" do
     test "casts the link aura back from the pet to its owner" do
-      spell = %Spell{id: 19_028, name: "Soul Link", effects: [%Effect{type: :dummy}]}
+      spell = %Spell{
+        id: 19_028,
+        name: "Soul Link",
+        effects: [%Effect{type: :dummy}],
+        script_steps: [
+          %ScriptStep{
+            script_id: 19_028,
+            command: :cast_spell,
+            datalong: 18_814,
+            target_type: :provided,
+            swap_initial?: true
+          }
+        ]
+      }
+
       context = %CastContext{caster_guid: 1, caster_level: 40, target_guid: 2}
 
       {_pet, events} = SpellEffect.receive(pet(), context, spell, 1_000)
 
       assert Enum.any?(events, fn event ->
                event.type == :trigger_spell and event.source_guid == 2 and event.target_guid == 1 and
-                 event.spell_id == 25_228
+                 event.spell_id == 18_814
              end)
     end
 
