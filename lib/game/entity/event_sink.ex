@@ -686,6 +686,13 @@ defmodule ThistleTea.Game.Entity.EventSink do
 
   def emit(entity, %Event{type: :consume_cast_item}), do: entity
 
+  def emit(%Character{} = entity, %Event{type: :feed_pet} = event) do
+    send(self(), {:feed_pet, event.cast_item_guid, event.target_guid, event.spell_id, event.range_yards})
+    entity
+  end
+
+  def emit(entity, %Event{type: :feed_pet}), do: entity
+
   def emit(%Character{} = entity, %Event{type: :enchant_item} = event) do
     duration_ms = ItemEnchantmentLoader.duration_ms(event.spell.id, event.effect)
     send(self(), {:enchant_item, event.target_guid, event.spell, event.effect.misc_value, duration_ms})

@@ -7,6 +7,8 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal.Pet do
   defstruct [
     :owner_guid,
     :profile,
+    :kind,
+    :food_mask,
     :stay_position,
     action_bar: %{},
     command_state: :follow,

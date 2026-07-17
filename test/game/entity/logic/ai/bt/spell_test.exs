@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
   use ExUnit.Case, async: true
 
+  alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Object
@@ -281,6 +282,42 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
                %Event{type: :spell_go, hit_guids: [2]},
                %Event{type: :deliver_spell, target_guid: 2, spell: ^spell}
              ] = mob.internal.events
+    end
+  end
+
+  describe "Feed Pet" do
+    test "queues the DBC trigger spell for the selected food item and active pet" do
+      spell = %Spell{
+        id: 6991,
+        range_yards: 10.0,
+        effects: [%Effect{index: 0, type: :feed_pet, trigger_spell_id: 1539}]
+      }
+
+      targets = %Targets{raw: <<0::little-size(16)>>, item_guid: 22}
+      casting = Cast.new(spell, targets, 1_000)
+
+      character = %Character{
+        object: %Object{guid: 1},
+        unit: %Unit{summon: 33},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+        internal: %Internal{world: %WorldRef{map_id: 0}, casting: casting}
+      }
+
+      character = SpellBT.complete_cast(character, casting, 1_000)
+
+      assert Enum.any?(character.internal.events, fn
+               %Event{
+                 type: :feed_pet,
+                 cast_item_guid: 22,
+                 target_guid: 33,
+                 spell_id: 1539,
+                 range_yards: 10.0
+               } ->
+                 true
+
+               _ ->
+                 false
+             end)
     end
   end
 

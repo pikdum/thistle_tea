@@ -24,7 +24,9 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
   @update_flag_has_position 0x40
   @default_respawn_delay_ms 120_000
   @static_flag_no_automatic_regen 0x00000400
+  @static_flag_tameable 0x00000010
   @static_flag_visible_to_ghosts 0x00200000
+  @creature_type_flag_tameable 0x01
   @creature_type_flag_ghost_visible 0x02
 
   defstruct object: %Object{},
@@ -137,6 +139,7 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
           experience_multiplier: ct.experience_multiplier,
           extra_flags: ct.extra_flags,
           rank: ct.rank,
+          family: ct.family,
           type_flags: type_flags(ct),
           creature_type: ct.creature_type,
           damage_multiplier: ct.damage_multiplier,
@@ -342,11 +345,13 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
   defp unit_flags(_template), do: 0
 
   defp type_flags(%Mangos.CreatureTemplate{creature_type_flags: flags}) when is_integer(flags) do
-    if (flags &&& @static_flag_visible_to_ghosts) == 0 do
-      flags &&& @creature_type_flag_ghost_visible
-    else
-      @creature_type_flag_ghost_visible
-    end
+    0
+    |> put_type_flag(flags, @static_flag_tameable, @creature_type_flag_tameable)
+    |> put_type_flag(flags, @static_flag_visible_to_ghosts, @creature_type_flag_ghost_visible)
+  end
+
+  defp put_type_flag(type_flags, static_flags, static_flag, type_flag) do
+    if (static_flags &&& static_flag) == 0, do: type_flags, else: type_flags ||| type_flag
   end
 
   defp regenerate_stats(%Mangos.CreatureTemplate{regenerate_stats: stats}) when is_integer(stats), do: stats

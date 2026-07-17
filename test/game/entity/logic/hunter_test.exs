@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.Entity.Logic.HunterTest do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.Hunter
   alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.Effect
 
   describe "validate_ammo/5" do
     test "accepts matching arrows and rejects missing or mismatched projectiles" do
@@ -40,7 +41,7 @@ defmodule ThistleTea.Game.Entity.Logic.HunterTest do
   describe "validate_tame/3" do
     test "requires a tameable beast at or below the hunter level and no active pet" do
       hunter = %{unit: %{level: 20, summon: 0}}
-      spell = %Spell{name: "Tame Beast"}
+      spell = %Spell{effects: [%Effect{type: :tame_creature}]}
 
       assert Hunter.validate_tame(hunter, spell, %{tameable?: true, level: 20}) == :ok
       assert Hunter.validate_tame(hunter, spell, %{tameable?: false, level: 20}) == {:error, :bad_targets}
@@ -48,6 +49,54 @@ defmodule ThistleTea.Game.Entity.Logic.HunterTest do
 
       assert Hunter.validate_tame(%{unit: %{level: 20, summon: 99}}, spell, %{tameable?: true, level: 10}) ==
                {:error, :already_have_summon}
+    end
+  end
+
+  describe "validate_feed/2" do
+    test "uses the pet family diet mask and VMangos food level tiers" do
+      spell = %Spell{effects: [%Effect{type: :feed_pet, trigger_spell_id: 1539}]}
+      pet = %{alive?: true, in_combat: false, food_mask: 0b1, level: 30}
+
+      assert Hunter.validate_feed(spell, %{pet: pet, item: %{food_type: 1, item_level: 25}}) == :ok
+
+      assert Hunter.feed_benefit(%{pet: pet, item: %{food_type: 1, item_level: 25}}) ==
+               {:ok, 35_000}
+
+      assert Hunter.food_benefit(30, 20) == 17_000
+      assert Hunter.food_benefit(30, 16) == 8_000
+      assert Hunter.food_benefit(30, 15) == 0
+
+      assert Hunter.validate_feed(spell, %{pet: pet, item: %{food_type: 2, item_level: 30}}) ==
+               {:error, :wrong_pet_food}
+
+      assert Hunter.validate_feed(spell, %{pet: pet, item: %{food_type: 1, item_level: 15}}) ==
+               {:error, :food_lowlevel}
+    end
+
+    test "rejects missing, dead, and fighting pets" do
+      spell = %Spell{effects: [%Effect{type: :feed_pet, trigger_spell_id: 1539}]}
+      item = %{food_type: 1, item_level: 20}
+
+      assert Hunter.validate_feed(spell, %{item: item, pet: nil}) == {:error, :no_pet}
+
+      assert Hunter.validate_feed(spell, %{
+               item: item,
+               pet: %{alive?: false, in_combat: false, food_mask: 1, level: 20}
+             }) == {:error, :targets_dead}
+
+      assert Hunter.validate_feed(spell, %{
+               item: item,
+               pet: %{alive?: true, in_combat: true, food_mask: 1, level: 20}
+             }) == {:error, :affecting_combat}
+    end
+
+    test "overrides the DBC trigger aura amount without changing unrelated effects" do
+      energize = %Effect{index: 0, type: :apply_aura, aura: :periodic_energize, base_points: 9_999, die_sides: 1}
+      other = %Effect{index: 1, type: :dummy, base_points: 10}
+
+      spell = Hunter.apply_food_benefit(%Spell{effects: [energize, other]}, 35_000)
+
+      assert [%Effect{base_points: 35_000, die_sides: 0}, ^other] = spell.effects
     end
   end
 
@@ -63,7 +112,8 @@ defmodule ThistleTea.Game.Entity.Logic.HunterTest do
         }
       }
 
-      {character, events} = Hunter.after_aura(character, %Spell{name: "Feign Death"}, 1_000)
+      spell = %Spell{effects: [%Effect{type: :apply_aura, aura: :feign_death}]}
+      {character, events} = Hunter.after_aura(character, spell, 1_000)
 
       refute character.internal.in_combat
       assert character.internal.threat_refs == MapSet.new()

@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.World.Loader.Summon do
 
   alias ThistleTea.DB.Mangos
   alias ThistleTea.DBC
+  alias ThistleTea.DBC.CreatureFamily
   alias ThistleTea.Game.Entity.Data.Component.Internal.Pet
   alias ThistleTea.Game.Entity.Data.CreatureSpell
   alias ThistleTea.Game.Entity.Data.Mob
@@ -50,14 +51,16 @@ defmodule ThistleTea.Game.World.Loader.Summon do
       when is_integer(entry) and is_integer(owner_guid) do
     with %Mob{} = mob <- build(entry, world, position),
          level when is_integer(level) <- owner_unit.level do
-      stats = pet_stats(entry, level)
       guid = Guid.from_low_guid(:pet, entry, next_low_guid())
       spellbook = pet_spellbook(entry, level)
       creature = %{mob.internal.creature | spells: pet_action_spells(spellbook)}
+      hunter_pet? = hunter_pet?(creature)
+      stats = pet_stats(if(hunter_pet?, do: 1, else: entry), level)
 
       unit =
         mob.unit
         |> apply_pet_stats(stats, level)
+        |> apply_pet_resources(hunter_pet?)
         |> then(fn unit ->
           %{
             unit
@@ -74,7 +77,12 @@ defmodule ThistleTea.Game.World.Loader.Summon do
 
       internal = %{
         mob.internal
-        | pet: %Pet{owner_guid: owner_guid, profile: :combat},
+        | pet: %Pet{
+            owner_guid: owner_guid,
+            profile: :combat,
+            kind: if(hunter_pet?, do: :hunter, else: :summon),
+            food_mask: if(hunter_pet?, do: pet_food_mask(creature.family), else: 0)
+          },
           spawn: %{mob.internal.spawn | temporary?: true, respawn_delay_ms: nil},
           loot: nil,
           in_combat: false,
@@ -226,6 +234,18 @@ defmodule ThistleTea.Game.World.Loader.Summon do
     @low_guid_base + :erlang.unique_integer([:positive, :monotonic])
   end
 
+  defp hunter_pet?(%{type_flags: type_flags}) when is_integer(type_flags), do: (type_flags &&& 0x1) != 0
+  defp hunter_pet?(_creature), do: false
+
+  defp pet_food_mask(family) when is_integer(family) and family > 0 do
+    case DBC.get(CreatureFamily, family) do
+      %CreatureFamily{pet_food_mask: food_mask} -> food_mask
+      _ -> 0
+    end
+  end
+
+  defp pet_food_mask(_family), do: 0
+
   defp apply_pet_stats(unit, %Mangos.PetLevelStats{} = stats, level) do
     %{
       unit
@@ -249,4 +269,10 @@ defmodule ThistleTea.Game.World.Loader.Summon do
   end
 
   defp apply_pet_stats(unit, _stats, level), do: %{unit | level: level}
+
+  defp apply_pet_resources(unit, true) do
+    %{unit | power_type: 2, power3: 100, max_power3: 100, power5: 166_500, max_power5: 1_050_000}
+  end
+
+  defp apply_pet_resources(unit, false), do: unit
 end

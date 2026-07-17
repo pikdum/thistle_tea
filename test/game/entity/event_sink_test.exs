@@ -77,6 +77,14 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
       assert_receive {:"$gen_cast", {:start_teleport, 1.0, 2.0, 3.0, 1.5, %WorldRef{map_id: 0}}}
     end
 
+    test "feed-pet events preserve the DBC trigger and item target for the player boundary" do
+      character = %Character{}
+      event = Event.feed_pet(22, 33, 1539, 10.0)
+
+      assert ^character = EventSink.emit(character, event)
+      assert_receive {:feed_pet, 22, 33, 1539, 10.0}
+    end
+
     @tag :dbc_db
     test "a released judgement trigger delivers its encoded spell to the victim" do
       caster_guid = Guid.from_low_guid(:player, unique_guid())

@@ -5,8 +5,10 @@ defmodule ThistleTea.Game.Player.Spellcasting do
   in-progress ones — sending the corresponding cast-result packets and
   (re)scheduling the player tick.
   """
+  alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Data.Item, as: DataItem
   alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.Logic.AI.BT.Spell, as: SpellBT
   alias ThistleTea.Game.Entity.Logic.Hostility
@@ -196,9 +198,42 @@ defmodule ThistleTea.Game.Player.Spellcasting do
       count_item: fn item_id -> Inventory.count_entry(character.player, item_id, &ItemStore.get/1) end,
       equipped_items: equipped_weapon_templates(character),
       ammo_id: character.player.ammo_id,
-      ammo_template: ItemLoader.get_template(character.player.ammo_id)
+      ammo_template: ItemLoader.get_template(character.player.ammo_id),
+      feed_context: feed_context(character, spell, targets)
     )
   end
+
+  defp feed_context(%Character{unit: %Unit{summon: pet_guid}} = character, %Spell{effects: effects}, %Targets{
+         item_guid: item_guid
+       }) do
+    feed_pet? = Enum.any?(effects, &(&1.type == :feed_pet))
+
+    if feed_pet? do
+      %{item: owned_item_template(character, item_guid), pet: pet_feed_info(pet_guid)}
+    end
+  end
+
+  defp feed_context(_character, _spell, _targets), do: nil
+
+  defp owned_item_template(%Character{player: player}, item_guid) when is_integer(item_guid) do
+    with {_bag, _slot} <- Inventory.find_position(player, item_guid, &ItemStore.get/1),
+         %DataItem{} = item <- ItemStore.get(item_guid) do
+      DataItem.template(item)
+    else
+      _ -> nil
+    end
+  end
+
+  defp owned_item_template(_character, _item_guid), do: nil
+
+  defp pet_feed_info(pet_guid) when is_integer(pet_guid) and pet_guid > 0 do
+    case Entity.call(pet_guid, :feed_info) do
+      {:ok, info} -> info
+      _ -> nil
+    end
+  end
+
+  defp pet_feed_info(_pet_guid), do: nil
 
   defp equipped_weapon_templates(%{player: player}) when is_struct(player) do
     [player.visible_item_16_0, player.visible_item_17_0, player.visible_item_18_0]
@@ -231,7 +266,8 @@ defmodule ThistleTea.Game.Player.Spellcasting do
 
   defp implicit_pet_guid(%Character{unit: %Unit{summon: pet_guid}}, %Spell{effects: effects})
        when is_integer(pet_guid) and pet_guid > 0 do
-    if Enum.any?(effects, &(&1.implicit_target_a == :pet or &1.implicit_target_b == :pet)), do: pet_guid
+    if Enum.any?(effects, &(&1.type == :feed_pet or &1.implicit_target_a == :pet or &1.implicit_target_b == :pet)),
+      do: pet_guid
   end
 
   defp implicit_pet_guid(_character, _spell), do: nil

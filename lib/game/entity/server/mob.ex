@@ -226,6 +226,19 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     {:reply, {:ok, %{victim: state.unit.target, entries: Threat.entries(state)}}, state}
   end
 
+  def handle_call(:feed_info, _from, %Mob{internal: %Internal{pet: %Pet{} = pet}} = state) do
+    info = %{
+      alive?: not Core.dead?(state),
+      food_mask: pet.food_mask || 0,
+      in_combat: state.internal.in_combat,
+      level: state.unit.level
+    }
+
+    {:reply, {:ok, info}, state}
+  end
+
+  def handle_call(:feed_info, _from, %Mob{} = state), do: {:reply, {:error, :not_pet}, state}
+
   def handle_call({:loot_view, viewer}, _from, %Mob{} = state) do
     {result, state} = Corpse.view(state, viewer)
     {:reply, result, state}

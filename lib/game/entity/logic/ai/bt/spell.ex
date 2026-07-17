@@ -161,6 +161,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
     |> queue_item_enchantments(casting)
     |> queue_consume_reagents(casting)
     |> queue_consume_ammo(casting)
+    |> queue_feed_pet(casting)
     |> queue_consume_cast_item(casting)
     |> queue_open_object(casting)
     |> break_stealth(casting, now)
@@ -265,6 +266,22 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
   end
 
   defp queue_consume_cast_item(character, %Cast{}), do: character
+
+  defp queue_feed_pet(%Character{unit: %{summon: pet_guid}} = character, %Cast{
+         spell: %Spell{range_yards: range_yards, effects: effects},
+         targets: %Targets{item_guid: item_guid}
+       })
+       when is_integer(pet_guid) and pet_guid > 0 and is_integer(item_guid) do
+    case Enum.find(effects, &(&1.type == :feed_pet and is_integer(&1.trigger_spell_id))) do
+      %Spell.Effect{trigger_spell_id: trigger_spell_id} ->
+        Event.enqueue(character, Event.feed_pet(item_guid, pet_guid, trigger_spell_id, range_yards))
+
+      _ ->
+        character
+    end
+  end
+
+  defp queue_feed_pet(character, _casting), do: character
 
   defp queue_item_enchantments(%Character{player: player} = character, %Cast{
          spell: %Spell{} = spell,

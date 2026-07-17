@@ -55,7 +55,8 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
     :outcome,
     :crit?,
     :blocked,
-    :slot
+    :slot,
+    :range_yards
   ]
 
   def spell_damage(source_guid, target_guid, spell, damage, opts \\ []) do
@@ -352,6 +353,17 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
 
   def consume_cast_item(item_guid) when is_integer(item_guid) do
     %__MODULE__{type: :consume_cast_item, cast_item_guid: item_guid}
+  end
+
+  def feed_pet(item_guid, pet_guid, trigger_spell_id, range_yards)
+      when is_integer(item_guid) and is_integer(pet_guid) and is_integer(trigger_spell_id) do
+    %__MODULE__{
+      type: :feed_pet,
+      cast_item_guid: item_guid,
+      target_guid: pet_guid,
+      spell_id: trigger_spell_id,
+      range_yards: range_yards
+    }
   end
 
   def enchant_item(item_guid, spell, effect) when is_integer(item_guid) do

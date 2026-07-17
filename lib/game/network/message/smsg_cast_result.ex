@@ -18,6 +18,7 @@ defmodule ThistleTea.Game.Network.Message.SmsgCastResult do
     caster_dead: 0x13,
     equipped_item_class: @cast_failure_reason_equipped_item_class,
     fizzle: 0x1D,
+    food_lowlevel: 0x1F,
     immune: 0x22,
     item_not_ready: 0x28,
     line_of_sight: 0x2A,
@@ -26,7 +27,8 @@ defmodule ThistleTea.Game.Network.Message.SmsgCastResult do
     not_infront: 0x36,
     not_fishable: 0x34,
     not_ready: 0x3C,
-    no_ammo: 0x48,
+    no_ammo: 0x43,
+    no_pet: 0x4C,
     not_shapeshift: 0x3D,
     no_power: 0x4D,
     only_shapeshift: 0x56,
@@ -39,7 +41,8 @@ defmodule ThistleTea.Game.Network.Message.SmsgCastResult do
     targets_dead: 0x65,
     target_enemy: 0x69,
     target_friendly: 0x6B,
-    target_not_dead: 0x6E
+    target_not_dead: 0x6E,
+    wrong_pet_food: 0x7D
   }
 
   defstruct [

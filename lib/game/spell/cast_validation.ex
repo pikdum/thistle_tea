@@ -38,6 +38,7 @@ defmodule ThistleTea.Game.Spell.CastValidation do
          :ok <- check_power(caster, spell),
          :ok <- check_equipped_item(caster, spell, Keyword.get(opts, :equipped_items, [])),
          :ok <- check_ammo(caster, spell, opts),
+         :ok <- Hunter.validate_feed(spell, Keyword.get(opts, :feed_context)),
          :ok <- check_reagents(caster, spell, Keyword.get(opts, :count_item)),
          :ok <- check_target(spell, target_info),
          :ok <- check_creature_type(spell, target_info),

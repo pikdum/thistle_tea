@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.Network.Server do
   alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Data.Item, as: DataItem
   alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.AI.Tick
@@ -25,6 +26,7 @@ defmodule ThistleTea.Game.Network.Server do
   alias ThistleTea.Game.Entity.Logic.Death
   alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.Entity.Logic.Experience
+  alias ThistleTea.Game.Entity.Logic.Hunter
   alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Entity.Logic.MovementStats
   alias ThistleTea.Game.Entity.Logic.PlayerCombat
@@ -59,11 +61,13 @@ defmodule ThistleTea.Game.Network.Server do
   alias ThistleTea.Game.Player.Spellcasting
   alias ThistleTea.Game.Player.Stats, as: PlayerStats
   alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.ItemEnchantment, as: ItemEnchantmentLoader
+  alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Pathfinding
   alias ThistleTea.Game.World.SpatialHash
@@ -577,6 +581,19 @@ defmodule ThistleTea.Game.Network.Server do
       {:noreply, {socket, state}, socket.read_timeout}
   end
 
+  @impl GenServer
+  def handle_info(
+        {:feed_pet, item_guid, pet_guid, trigger_spell_id, range_yards},
+        {socket, %{character: %Character{} = character} = state}
+      ) do
+    state = feed_pet(state, character, item_guid, pet_guid, trigger_spell_id, range_yards)
+    {:noreply, {socket, state}, socket.read_timeout}
+  rescue
+    error ->
+      Logger.error("feed_pet crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:noreply, {socket, state}, socket.read_timeout}
+  end
+
   def handle_info({:farsight_removed, guid}, {socket, %{character: %Character{} = character} = state}) do
     character =
       if character.player.farsight == guid do
@@ -804,6 +821,43 @@ defmodule ThistleTea.Game.Network.Server do
   end
 
   defp spellbook_spell(_character, _spell_id), do: nil
+
+  defp feed_pet(state, character, item_guid, pet_guid, trigger_spell_id, range_yards) do
+    with %DataItem{} = item <- owned_item(character, item_guid),
+         {:ok, pet} <- Entity.call(pet_guid, :feed_info),
+         :ok <- feed_pet_in_range(character, pet_guid, range_yards),
+         {:ok, benefit} <- Hunter.feed_benefit(%{item: DataItem.template(item), pet: pet}),
+         %Spell{} = spell <- SpellLoader.load(trigger_spell_id) do
+      state = Items.consume(state, item_guid)
+      spell = Hunter.apply_food_benefit(spell, benefit)
+      context = CastContext.from_caster(state.character, spell, pet_guid)
+      Entity.receive_spell(pet_guid, context, spell)
+      state
+    else
+      _ -> state
+    end
+  end
+
+  defp owned_item(%Character{player: player}, item_guid) when is_integer(item_guid) do
+    case Inventory.find_position(player, item_guid, &ItemStore.get/1) do
+      {_bag, _slot} -> ItemStore.get(item_guid)
+      _ -> nil
+    end
+  end
+
+  defp owned_item(_character, _item_guid), do: nil
+
+  defp feed_pet_in_range(character, pet_guid, range_yards) when is_number(range_yards) and range_yards > 0 do
+    case World.distance_to_guid(character, pet_guid) do
+      distance when is_number(distance) and distance <= range_yards ->
+        if World.line_of_sight?(character, pet_guid), do: :ok, else: {:error, :line_of_sight}
+
+      _ ->
+        {:error, :out_of_range}
+    end
+  end
+
+  defp feed_pet_in_range(_character, _pet_guid, _range_yards), do: :ok
 
   defp apply_kill_reward(state, victim, xp) do
     character = Reactive.clear_combo_target(state.character, victim.object.guid)
