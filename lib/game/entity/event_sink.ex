@@ -992,28 +992,55 @@ defmodule ThistleTea.Game.Entity.EventSink do
       spell ->
         spell = apply_trigger_override(spell, event)
 
-        case triggered_target(entity, event, spell) do
-          nil ->
-            entity
-
-          target_guid ->
-            event = %{event | target_guid: target_guid}
-
-            entity
-            |> emit(
-              Event.spell_go(
-                event.source_guid || entity.object.guid,
-                event.spell_id,
-                [target_guid],
-                Targets.unit(target_guid).raw
-              )
-            )
-            |> dispatch_triggered_spell(event, spell)
+        if event.resolve_targets? do
+          dispatch_resolved_trigger(entity, event, spell)
+        else
+          dispatch_single_trigger(entity, event, spell)
         end
     end
   end
 
   def emit(entity, _event), do: entity
+
+  defp dispatch_single_trigger(entity, event, spell) do
+    case triggered_target(entity, event, spell) do
+      nil ->
+        entity
+
+      target_guid ->
+        event = %{event | target_guid: target_guid}
+
+        entity
+        |> emit(
+          Event.spell_go(
+            event.source_guid || entity.object.guid,
+            event.spell_id,
+            [target_guid],
+            Targets.unit(target_guid).raw
+          )
+        )
+        |> dispatch_triggered_spell(event, spell)
+    end
+  end
+
+  defp dispatch_resolved_trigger(entity, event, spell) do
+    targets = SpellTargetResolver.resolve(entity, spell, Targets.unit(event.target_guid))
+
+    entity =
+      emit(
+        entity,
+        Event.spell_go(
+          event.source_guid || entity.object.guid,
+          event.spell_id,
+          targets,
+          Targets.unit(event.target_guid).raw
+        )
+      )
+
+    Enum.reduce(targets, entity, fn target_guid, current ->
+      dispatch_triggered_spell(current, %{event | target_guid: target_guid}, spell)
+    end)
+  end
 
   def deliver_spell(%Event{type: :deliver_spell} = event) do
     Entity.receive_spell(event.target_guid, event.cast_context, event.spell)

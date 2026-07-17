@@ -3,6 +3,8 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   Applies a cast spell's effects (damage, healing, auras, item creation, …) to
   a target entity, returning the updated entity and the events to emit.
   """
+  import Bitwise, only: [&&&: 2]
+
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.ScriptStep
   alias ThistleTea.Game.Entity.Logic.AttackTable
@@ -19,6 +21,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   alias ThistleTea.Game.Entity.Logic.SpellResist
   alias ThistleTea.Game.Entity.Logic.Threat
   alias ThistleTea.Game.Entity.Logic.Warlock
+  alias ThistleTea.Game.Entity.Logic.Warrior
   alias ThistleTea.Game.Math
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
@@ -34,7 +37,11 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
     if immune_to_harmful_spell?(target, context, spell) do
       {target, [Event.spell_log_miss(context.caster_guid, target.object.guid, spell.id, :immune)]}
     else
-      effects = applicable_effects(target, context, spell.effects)
+      effects =
+        target
+        |> applicable_effects(context, spell.effects)
+        |> Warrior.filter_target_effects(target.object.guid, context, spell)
+
       spell = %{spell | effects: effects}
       context = %{context | target_guid: target.object.guid, spell: spell}
 
@@ -415,15 +422,16 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   defp apply_effect(
          state,
          %CastContext{caster_guid: caster_guid},
-         _spell,
+         spell,
          %Effect{type: :energize, misc_value: power_type} = effect,
-         _now
+         now
        )
        when is_integer(power_type) and power_type >= 0 do
     if effect.implicit_target_a == :caster and state.object.guid != caster_guid do
       {state, [Event.grant_power(caster_guid, power_type, Effect.damage_roll(effect))]}
     else
-      {Resources.gain_power(state, power_type, Effect.damage_roll(effect)), []}
+      state = Resources.gain_power(state, power_type, Effect.damage_roll(effect))
+      {Warrior.after_energize(state, spell, now), []}
     end
   end
 
@@ -463,8 +471,19 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
     end
   end
 
-  defp apply_effect(state, %CastContext{} = context, _spell, %Effect{type: :dispel, misc_value: dispel_type}, now) do
-    Aura.dispel(state, dispel_type, now, dispel_polarity(context))
+  defp apply_effect(state, %CastContext{} = context, spell, %Effect{type: :dispel, misc_value: dispel_type}, now) do
+    aura_count = length(state.unit.auras || [])
+    {state, events} = Aura.dispel(state, dispel_type, now, dispel_polarity(context))
+
+    case {length(state.unit.auras || []) < aura_count, Warlock.devour_magic_heal(spell)} do
+      {true, heal_spell_id} when is_integer(heal_spell_id) ->
+        {state,
+         events ++
+           [Event.trigger_spell(context.caster_guid, context.caster_level, context.caster_guid, heal_spell_id)]}
+
+      _other ->
+        {state, events}
+    end
   end
 
   defp apply_effect(state, %CastContext{} = context, spell, %Effect{type: :power_burn} = effect, now) do
@@ -536,6 +555,10 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
     {state, List.wrap(Druid.enrage_event(state, spell))}
   end
 
+  defp apply_class_dummy(state, _context, _spell, _effect, :mage_cold_snap, _now) do
+    {Cooldowns.reset_matching(state, &mage_frost_cooldown?/1), []}
+  end
+
   defp apply_class_dummy(state, context, _spell, _effect, {:holy_shock, spell_ids}, _now) do
     spell_id = if context.target_hostile?, do: spell_ids.damage, else: spell_ids.heal
     {state, [Event.trigger_spell(context.caster_guid, context.caster_level, state.object.guid, spell_id)]}
@@ -552,6 +575,12 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   end
 
   defp apply_class_dummy(state, _context, _spell, _effect, _unscripted, _now), do: {state, []}
+
+  defp mage_frost_cooldown?(%Spell{spell_family: 3} = spell) do
+    (Spell.school_mask(spell) &&& Spell.school_mask(:frost)) != 0
+  end
+
+  defp mage_frost_cooldown?(_spell), do: false
 
   defp vmangos_script_events(state, %CastContext{} = context, %Spell{script_steps: steps}) when is_list(steps) do
     Enum.flat_map(steps, fn
@@ -737,7 +766,8 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
           context.combo_points,
           context.caster_power,
           effect.damage_multiplier
-        )
+        ) +
+        Warrior.shield_slam_bonus(spell, effect, context.shield_block_value)
 
     if Scripts.ap_percent_damage?(spell) do
       trunc(roll * (context.attack_power || 0) / 100)

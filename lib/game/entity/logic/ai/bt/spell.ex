@@ -169,6 +169,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
     |> queue_charge(casting)
     |> release_paladin_seal(casting, hits, now)
     |> apply_spell_hit(casting, hits, now)
+    |> queue_successful_finish_trigger(casting)
     |> stop_breakable_control_attack(casting, hits)
     |> consume_unavoidable_finisher(casting)
     |> consume_forced_crit(casting, now)
@@ -188,6 +189,20 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
   end
 
   defp stop_breakable_control_attack(character, _casting, _hits), do: character
+
+  defp queue_successful_finish_trigger(%{object: %{guid: guid}, unit: %{level: level}} = character, %Cast{
+         spell: %Spell{} = spell
+       }) do
+    case Scripts.successful_finish_trigger(spell) do
+      spell_id when is_integer(spell_id) ->
+        Event.enqueue(character, Event.trigger_spell(guid, level || 1, guid, spell_id, resolve_targets?: true))
+
+      _none ->
+        character
+    end
+  end
+
+  defp queue_successful_finish_trigger(character, _casting), do: character
 
   defp activate_auto_shot(
          %Character{internal: %Internal{} = internal} = character,
@@ -653,12 +668,18 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
 
   defp redirect_self_hits(_character, targets), do: targets
 
-  defp apply_spell_hit(%{object: %{guid: caster_guid}} = character, %Cast{spell: %Spell{} = spell}, targets, now)
+  defp apply_spell_hit(
+         %{object: %{guid: caster_guid}} = character,
+         %Cast{spell: %Spell{} = spell} = casting,
+         targets,
+         now
+       )
        when is_integer(caster_guid) and is_list(targets) do
     Enum.reduce(targets, character, fn target_guid, caster ->
       context = %{
         CastContext.from_caster(caster, spell, target_guid)
-        | target_hostile?: target_guid != caster_guid and Hostility.valid_attack_target?(caster, target_guid),
+        | selected_target_guid: casting.targets.unit_guid,
+          target_hostile?: target_guid != caster_guid and Hostility.valid_attack_target?(caster, target_guid),
           target_role: target_role(caster, target_guid)
       }
 

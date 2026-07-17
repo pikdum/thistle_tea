@@ -14,16 +14,8 @@ defmodule ThistleTea.Game.Spell.Scripts do
   alias ThistleTea.Game.Entity.Logic.Warlock
   alias ThistleTea.Game.Spell
 
-  @power_word_shield 17
   @weakened_soul 6788
   @forbearance 25_771
-
-  @apply_triggers %{
-    @power_word_shield => @weakened_soul,
-    498 => @forbearance,
-    642 => @forbearance,
-    1022 => @forbearance
-  }
 
   @battle_stance_form 17
   @defensive_stance_form 18
@@ -64,7 +56,11 @@ defmodule ThistleTea.Game.Spell.Scripts do
   @no_autocast_ai 0x00020000
 
   def apply_trigger(%Spell{} = spell) do
-    Map.get(@apply_triggers, chain_id(spell))
+    cond do
+      Spell.vmangos_script?(spell, "spell_priest_power_word_shield") -> @weakened_soul
+      Spell.vmangos_script?(spell, "spell_paladin_bubble") -> @forbearance
+      true -> nil
+    end
   end
 
   def shapeshift_passives(form), do: Map.get(@shapeshift_passives, form, [])
@@ -84,6 +80,21 @@ defmodule ThistleTea.Game.Spell.Scripts do
   }
   @last_stand_health_buff 12_976
   @last_stand_health_fraction 0.3
+  @holy_nova_heals %{
+    15_237 => 23_455,
+    15_430 => 23_458,
+    15_431 => 23_459,
+    27_799 => 27_803,
+    27_800 => 27_804,
+    27_801 => 27_805
+  }
+
+  def successful_finish_trigger(%Spell{id: id} = spell) do
+    if Spell.vmangos_script?(spell, "spell_priest_holy_nova"), do: Map.get(@holy_nova_heals, id)
+  end
+
+  def successful_finish_trigger(_spell), do: nil
+
   def requires_combo_target?(%Spell{} = spell),
     do: warrior_family_flag?(spell, @overpower_family_mask) or finisher?(spell)
 
@@ -103,6 +114,7 @@ defmodule ThistleTea.Game.Spell.Scripts do
       Spell.vmangos_script?(spell, "spell_hunter_readiness") -> :hunter_cooldowns
       Spell.vmangos_script?(spell, "spell_hunter_refocus") -> :hunter_cooldowns
       Spell.vmangos_script?(spell, "spell_druid_enrage") -> :druid_enrage
+      Spell.vmangos_script?(spell, "spell_mage_cold_snap") -> :mage_cold_snap
       Warlock.life_tap?(spell) -> :life_tap
       true -> nil
     end
@@ -244,7 +256,4 @@ defmodule ThistleTea.Game.Spell.Scripts do
        when is_integer(flags), do: (flags &&& mask) != 0
 
   defp rogue_family_flag?(_spell, _mask), do: false
-
-  defp chain_id(%Spell{first_in_chain: first}) when is_integer(first) and first > 0, do: first
-  defp chain_id(%Spell{id: id}), do: id
 end

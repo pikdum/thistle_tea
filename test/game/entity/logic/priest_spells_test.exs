@@ -97,6 +97,7 @@ defmodule ThistleTea.Game.Entity.Logic.PriestSpellsTest do
     %Spell{
       id: 17,
       name: "Power Word: Shield",
+      script_name: "spell_priest_power_word_shield",
       school: :holy,
       duration_ms: 30_000,
       mechanic: 19,

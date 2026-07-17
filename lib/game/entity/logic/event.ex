@@ -57,7 +57,8 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
     :crit?,
     :blocked,
     :slot,
-    :range_yards
+    :range_yards,
+    :resolve_targets?
   ]
 
   def spell_damage(source_guid, target_guid, spell, damage, opts \\ []) do
@@ -421,7 +422,8 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
       spell_id: spell_id,
       target_role: Keyword.get(opts, :target_role),
       slot: Keyword.get(opts, :effect_index),
-      amount: Keyword.get(opts, :base_points)
+      amount: Keyword.get(opts, :base_points),
+      resolve_targets?: Keyword.get(opts, :resolve_targets?, false)
     }
   end
 

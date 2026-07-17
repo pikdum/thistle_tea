@@ -414,6 +414,54 @@ defmodule ThistleTea.Game.Entity.Logic.WarriorSpellsTest do
     end
   end
 
+  describe "Shield Slam" do
+    test "adds the caster's derived shield block value to damage" do
+      spell = %Spell{
+        id: 23_922,
+        script_name: "spell_warrior_shield_slam",
+        school: :physical,
+        dmg_class: 2,
+        effects: [%Effect{index: 1, type: :school_damage, base_points: 100, die_sides: 0}]
+      }
+
+      context = %{melee_context(spell) | shield_block_value: 20}
+      {target, _events} = SpellEffect.receive(melee_target(), context, spell, 1_000)
+
+      assert target.unit.health == 80
+    end
+
+    test "requires the VMangos script label" do
+      spell = %Spell{
+        id: 23_922,
+        school: :physical,
+        dmg_class: 2,
+        effects: [%Effect{index: 1, type: :school_damage, base_points: 100, die_sides: 0}]
+      }
+
+      context = %{melee_context(spell) | shield_block_value: 20}
+      {target, _events} = SpellEffect.receive(melee_target(), context, spell, 1_000)
+
+      assert target.unit.health == 100
+    end
+  end
+
+  describe "Bloodrage" do
+    test "enters combat when its energize effect lands" do
+      spell = %Spell{
+        id: 2687,
+        script_name: "spell_warrior_bloodrage",
+        effects: [%Effect{index: 0, type: :energize, base_points: 100, misc_value: 1, implicit_target_a: :caster}]
+      }
+
+      caster = warrior_fixture(rage: 0)
+      context = %CastContext{caster_guid: 5, caster_level: 10, target_role: :caster}
+      {caster, _events} = SpellEffect.receive(caster, context, spell, 1_000)
+
+      assert caster.unit.power2 == 100
+      assert caster.internal.in_combat
+    end
+  end
+
   describe "sunder armor stacking" do
     defp sunder_spell do
       %Spell{
@@ -478,28 +526,42 @@ defmodule ThistleTea.Game.Entity.Logic.WarriorSpellsTest do
   end
 
   describe "intimidating shout" do
-    test "does not apply enemy fear effects to the caster" do
+    test "applies only the stun trigger to the selected target" do
       spell = %Spell{
         id: 5246,
         name: "Intimidating Shout",
+        script_name: "spell_warrior_intimidating_shout",
         school: :physical,
         duration_ms: 8_000,
         effects: [
+          %Effect{index: 0, type: :trigger_spell, trigger_spell_id: 20_511},
           %Effect{
-            index: 0,
+            index: 1,
             type: :apply_aura,
             aura: :mod_fear,
+            implicit_target_a: :aoe_enemy_at_caster
+          },
+          %Effect{
+            index: 2,
+            type: :apply_aura,
+            aura: :mod_confuse,
             implicit_target_a: :aoe_enemy_at_caster
           }
         ]
       }
 
-      caster = warrior_fixture()
-      context = %CastContext{caster_guid: caster.object.guid, caster_level: 10}
+      context = %CastContext{caster_guid: 5, caster_level: 10, selected_target_guid: 9}
+      {primary, primary_events} = SpellEffect.receive(melee_target(), context, spell, 1_000)
 
-      {caster, _events} = SpellEffect.receive(caster, context, spell, 1_000)
+      refute Aura.has_aura?(primary, :mod_fear)
+      refute Aura.has_aura?(primary, :mod_confuse)
+      assert Enum.any?(primary_events, &(&1.type == :trigger_spell and &1.spell_id == 20_511))
 
-      refute Aura.has_aura?(caster, :mod_fear)
+      secondary = put_in(melee_target().object.guid, 10)
+      {secondary, _events} = SpellEffect.receive(secondary, context, spell, 1_000)
+
+      assert Aura.has_aura?(secondary, :mod_fear)
+      assert Aura.has_aura?(secondary, :mod_confuse)
     end
   end
 

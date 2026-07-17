@@ -78,6 +78,46 @@ defmodule ThistleTea.Game.Entity.Logic.WarlockSpellsTest do
     end
   end
 
+  describe "Devour Magic" do
+    test "heals the felhunter after a successful dispel" do
+      buff = %Holder{
+        spell: %Spell{id: 100, dispel_type: 1},
+        caster_guid: 2,
+        slot: 0,
+        auras: [%Aura{type: :mod_stat, amount: 10}]
+      }
+
+      devour = %Spell{
+        id: 19_505,
+        script_name: "spell_warlock_devour_magic",
+        effects: [%Effect{index: 0, type: :dispel, misc_value: 1}]
+      }
+
+      context = %CastContext{caster_guid: 1, caster_level: 40, target_hostile?: true}
+      {target, events} = SpellEffect.receive(mob([buff]), context, devour, 1_000)
+
+      assert target.unit.auras == []
+
+      assert Enum.any?(events, fn event ->
+               event.type == :trigger_spell and event.source_guid == 1 and event.target_guid == 1 and
+                 event.spell_id == 19_658
+             end)
+    end
+
+    test "does not heal when nothing was dispelled" do
+      devour = %Spell{
+        id: 19_505,
+        script_name: "spell_warlock_devour_magic",
+        effects: [%Effect{index: 0, type: :dispel, misc_value: 1}]
+      }
+
+      context = %CastContext{caster_guid: 1, caster_level: 40, target_hostile?: true}
+      {_target, events} = SpellEffect.receive(mob(), context, devour, 1_000)
+
+      refute Enum.any?(events, &(&1.type == :trigger_spell))
+    end
+  end
+
   describe "Conflagrate" do
     test "validation requires the caster's Immolate metadata" do
       caster = character()

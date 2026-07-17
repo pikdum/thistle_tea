@@ -133,6 +133,24 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
     end
 
     @tag :dbc_db
+    test "a resolved party trigger applies to the caster" do
+      caster_guid = Guid.from_low_guid(:player, unique_guid())
+
+      caster = %Character{
+        object: %Object{guid: caster_guid},
+        unit: %Unit{level: 60, health: 10, max_health: 1_000, auras: []},
+        player: %Player{},
+        internal: %Internal{world: %WorldRef{map_id: 0}},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
+      }
+
+      event = Event.trigger_spell(caster_guid, 60, caster_guid, 23_455, resolve_targets?: true)
+      result = EventSink.emit(caster, event)
+
+      assert result.unit.health > caster.unit.health
+    end
+
+    @tag :dbc_db
     test "a remote command trigger stays targeted on the victim" do
       caster_guid = Guid.from_low_guid(:player, unique_guid())
       target_guid = Guid.from_low_guid(:mob, 1, unique_guid())

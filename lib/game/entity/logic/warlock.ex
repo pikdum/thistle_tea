@@ -26,6 +26,7 @@ defmodule ThistleTea.Game.Entity.Logic.Warlock do
     11_730 => {9421, 19_012, 19_013}
   }
   @sacrifice_buffs %{416 => 18_789, 1860 => 18_790, 1863 => 18_791, 417 => 18_792}
+  @devour_magic_heals %{19_505 => 19_658, 19_731 => 19_732, 19_734 => 19_733, 19_736 => 19_735}
 
   def life_tap?(%Spell{} = spell), do: Spell.vmangos_script?(spell, "spell_warlock_life_tap")
   def life_tap?(_spell), do: false
@@ -59,6 +60,12 @@ defmodule ThistleTea.Game.Entity.Logic.Warlock do
 
   def demonic_sacrifice?(%Spell{} = spell), do: Spell.vmangos_script?(spell, "spell_warlock_demonic_sacrifice")
   def demonic_sacrifice?(_spell), do: false
+
+  def devour_magic_heal(%Spell{id: id} = spell) do
+    if Spell.vmangos_script?(spell, "spell_warlock_devour_magic"), do: Map.get(@devour_magic_heals, id)
+  end
+
+  def devour_magic_heal(_spell), do: nil
 
   def immolate_source?(sources, caster_guid) do
     Enum.any?(sources, fn
