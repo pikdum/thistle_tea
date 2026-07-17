@@ -55,17 +55,24 @@ defmodule ThistleTea.Game.Entity.Logic.HunterTest do
     test "feign death clears combat and drops every threat reference" do
       character = %Character{
         object: %Object{guid: 1},
-        unit: %Unit{target: 2, flags: 0},
-        internal: %Internal{in_combat: true, threat_refs: MapSet.new([{2, 1}, {3, 1}])}
+        unit: %Unit{target: 2, flags: 0, stand_state: 0},
+        internal: %Internal{
+          in_combat: true,
+          threat_refs: MapSet.new([{2, 1}, {3, 1}]),
+          auto_shot: %{target_guid: 2}
+        }
       }
 
       {character, events} = Hunter.after_aura(character, %Spell{name: "Feign Death"}, 1_000)
 
       refute character.internal.in_combat
       assert character.internal.threat_refs == MapSet.new()
+      assert character.internal.auto_shot == nil
+      assert character.unit.stand_state == 7
       assert Enum.count(events, &(&1.type == :drop_threat)) == 2
       assert Enum.any?(events, &(&1.type == :drop_nearby_threat))
       assert Enum.any?(events, &(&1.type == :attack_stop and &1.target_guid == 2))
+      assert Enum.any?(events, &(&1.type == :stand_state and &1.stand_state == 7))
     end
   end
 end

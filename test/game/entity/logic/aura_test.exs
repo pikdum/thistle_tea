@@ -798,7 +798,7 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
       {entity, _events} = apply_spell(entity, 1, 1, cat)
       assert entity.unit.shapeshift_form == 1
       assert entity.unit.power_type == 3
-      assert entity.unit.power4 == 0
+      assert entity.unit.power4 == 100
       assert entity.unit.max_power4 == 100
       assert entity.unit.display_id == 892
 

@@ -156,6 +156,16 @@ defmodule ThistleTea.Game.Entity.Logic.AttackFeedbackTest do
       assert Enum.any?(entity.internal.events, &(&1.type == :attack_stop))
     end
 
+    test "scatter shot stops auto attack when it lands" do
+      entity = rogue()
+      spell = %Spell{id: 19_503, name: "Scatter Shot"}
+
+      entity = AttackFeedback.receive(entity, %{outcome: :normal, damage: 10, victim_guid: 77}, spell, 1_000)
+
+      refute entity.internal.blackboard.auto_attacking
+      assert Enum.any?(entity.internal.events, &(&1.type == :attack_stop))
+    end
+
     test "blade flurry queues a secondary strike from landed damage" do
       blade_flurry = %Spell{
         id: 13_877,

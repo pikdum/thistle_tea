@@ -892,7 +892,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
              faction_template: entity.unit.faction_template,
              level: entity.unit.level
          },
-         totem = %{built | unit: unit},
+         totem = %{built | unit: unit, internal: %{built.internal | rooted?: true}},
          {:ok, _pid} <- MobLoader.start_mob(totem) do
       totem_guids = Map.put(entity.internal.totem_guids, slot, totem.object.guid)
       %{entity | internal: %{entity.internal | totem_guids: totem_guids}}

@@ -167,11 +167,21 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
     |> queue_charge(casting)
     |> release_paladin_seal(casting, hits, now)
     |> apply_spell_hit(casting, hits, now)
+    |> stop_incapacitate_attack(casting, hits)
     |> consume_unavoidable_finisher(casting)
     |> consume_forced_crit(casting, now)
     |> activate_auto_shot(casting, now)
     |> clear_cast()
   end
+
+  defp stop_incapacitate_attack(%Character{} = character, %Cast{spell: %Spell{name: "Scatter Shot"}}, [target_guid | _]) do
+    character
+    |> BT.clear_auto_attack()
+    |> then(&%{&1 | internal: %{&1.internal | auto_shot: nil}})
+    |> Event.enqueue(Event.attack_stop(character.object.guid, target_guid))
+  end
+
+  defp stop_incapacitate_attack(character, _casting, _hits), do: character
 
   defp activate_auto_shot(
          %Character{internal: %Internal{} = internal} = character,

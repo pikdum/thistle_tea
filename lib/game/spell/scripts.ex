@@ -96,7 +96,9 @@ defmodule ThistleTea.Game.Spell.Scripts do
     6774
   ]
 
-  def requires_combo_target?(%Spell{id: id}), do: id in @overpower_ranks or id in @rogue_finishers
+  def requires_combo_target?(%Spell{id: id, name: name}),
+    do: id in @overpower_ranks or id in @rogue_finishers or name in ["Rip", "Ferocious Bite"]
+
   def requires_combo_target?(_spell), do: false
 
   def dummy_effect(%Spell{id: id}) when id in @execute_ranks, do: :execute
@@ -130,7 +132,8 @@ defmodule ThistleTea.Game.Spell.Scripts do
   def ap_percent_damage?(%Spell{id: id}), do: id in @bloodthirst_ranks
   def ap_percent_damage?(_spell), do: false
 
-  def finisher?(%Spell{id: id}), do: id in @rogue_finishers
+  def finisher?(%Spell{id: id}) when id in @rogue_finishers, do: true
+  def finisher?(%Spell{name: name}) when name in ["Rip", "Ferocious Bite"], do: true
   def finisher?(_spell), do: false
 
   def finisher_duration_ms(%Spell{name: "Slice and Dice"}, points), do: 6_000 + points * 3_000

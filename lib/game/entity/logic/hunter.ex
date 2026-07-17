@@ -4,6 +4,7 @@ defmodule ThistleTea.Game.Entity.Logic.Hunter do
   selected projectile item.
   """
   alias ThistleTea.Game.Entity.Data.Character
+  alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.Entity.Logic.PlayerCombat
   alias ThistleTea.Game.Spell
@@ -41,7 +42,13 @@ defmodule ThistleTea.Game.Entity.Logic.Hunter do
       [Event.drop_nearby_threat()] ++
         Enum.map(mob_guids, &Event.drop_threat/1) ++ attack_stop_events(character)
 
-    {character, events}
+    character =
+      character
+      |> BT.clear_auto_attack()
+      |> then(&%{&1 | internal: %{&1.internal | auto_shot: nil}})
+      |> then(&%{&1 | unit: %{&1.unit | stand_state: 7}})
+
+    {character, events ++ [Event.stand_state(7)]}
   end
 
   def after_aura(entity, _spell, _now), do: {entity, []}
