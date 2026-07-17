@@ -445,6 +445,7 @@ defmodule ThistleTea.Game.World.Loader.Mob do
         incarnation_id: Incarnation.id(mob),
         alive?: mob.unit.health > 0,
         health_pct: Core.health_pct(mob),
+        power_type: mob.unit.power_type,
         orientation: elem(mob.movement_block.position, 3),
         aura_sources: Aura.source_spells(mob),
         dispel_options: Aura.dispel_options(mob)

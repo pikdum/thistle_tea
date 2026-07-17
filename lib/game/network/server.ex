@@ -934,6 +934,7 @@ defmodule ThistleTea.Game.Network.Server do
         alive?: Death.alive?(character),
         ghost?: Death.ghost?(character),
         health_pct: Core.health_pct(character),
+        power_type: character.unit.power_type,
         unit_flags: character.unit.flags,
         shapeshift_form: character.unit.shapeshift_form,
         world: character.internal.world,

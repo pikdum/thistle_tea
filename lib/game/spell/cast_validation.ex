@@ -45,6 +45,7 @@ defmodule ThistleTea.Game.Spell.CastValidation do
          :ok <- Warlock.validate_ritual(spell, Keyword.get(opts, :ritual_context)),
          :ok <- check_reagents(caster, spell, Keyword.get(opts, :count_item)),
          :ok <- check_target(spell, target_info),
+         :ok <- check_target_power_type(spell, target_info),
          :ok <- check_dispel_target(caster, spell, targets, target_info),
          :ok <- check_creature_type(spell, target_info),
          :ok <- check_position(caster, spell, target_info),
@@ -279,6 +280,18 @@ defmodule ThistleTea.Game.Spell.CastValidation do
       check_dispel_options(options, dispel_types, polarity)
     end
   end
+
+  defp check_target_power_type(%Spell{effects: effects}, %{power_type: target_power_type})
+       when is_integer(target_power_type) do
+    required_types =
+      effects
+      |> Enum.filter(&(&1.type in [:power_burn, :power_drain]))
+      |> Enum.map(& &1.misc_value)
+
+    if required_types == [] or target_power_type in required_types, do: :ok, else: {:error, :bad_targets}
+  end
+
+  defp check_target_power_type(_spell, _target_info), do: :ok
 
   defp target_dispel_options(caster, unit_guid, target_info) do
     if self_target?(caster, unit_guid), do: AuraLogic.dispel_options(caster), else: dispel_options(target_info)

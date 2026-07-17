@@ -252,6 +252,29 @@ defmodule ThistleTea.Game.Spell.CastValidationTest do
       assert :ok = CastValidation.validate(caster(), purge, Targets.unit(7), target, @now)
     end
 
+    test "rejects power burn against a different target resource" do
+      mana_burn =
+        harmful_spell(effects: [%Effect{type: :power_burn, misc_value: 0, implicit_target_a: :target_enemy}])
+
+      assert :ok =
+               CastValidation.validate(
+                 caster(),
+                 mana_burn,
+                 Targets.unit(7),
+                 hostile_target(power_type: 0),
+                 @now
+               )
+
+      assert {:error, :bad_targets} =
+               CastValidation.validate(
+                 caster(),
+                 mana_burn,
+                 Targets.unit(7),
+                 hostile_target(power_type: 1),
+                 @now
+               )
+    end
+
     test "allows ignore_line_of_sight spells to bypass the LoS check" do
       spell = harmful_spell(attributes: MapSet.new([:ignore_line_of_sight]))
 

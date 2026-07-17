@@ -150,6 +150,7 @@ defmodule ThistleTea.Game.Entity.Data.MobTest do
 
       assert mob.unit.max_health == 3052
       assert mob.unit.health == 3052
+      assert mob.unit.power_type == 1
       assert mob.unit.base_health == nil
 
       assert Stats.recompute(mob.unit) == mob.unit

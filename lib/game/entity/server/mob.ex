@@ -566,6 +566,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
         %{
           alive?: not Core.dead?(state),
           health_pct: Core.health_pct(state),
+          power_type: state.unit.power_type,
           unit_flags: state.unit.flags,
           orientation: elem(state.movement_block.position, 3),
           aura_sources: Aura.source_spells(state),

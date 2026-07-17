@@ -53,6 +53,7 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
     unit = %Unit{
       health: health,
       power1: mana,
+      power_type: creature_power_type(max_mana, ct.unit_class),
       max_health: max_health,
       max_power1: max_mana,
       level: level,
@@ -296,6 +297,10 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
   end
 
   defp mana_values(_creature, _template, _stats), do: {0, 0}
+
+  defp creature_power_type(max_mana, _unit_class) when is_integer(max_mana) and max_mana > 0, do: 0
+  defp creature_power_type(_max_mana, 4), do: 3
+  defp creature_power_type(_max_mana, _unit_class), do: 1
 
   defp melee_damage_values(%Mangos.CreatureTemplate{} = template, %Mangos.CreatureClassLevelStats{} = stats) do
     average = stats.melee_damage * (template.damage_multiplier || 1.0)
