@@ -29,9 +29,11 @@ defmodule ThistleTea.Game.Entity.Logic.StatsTest do
     %Holder{spell: %Spell{id: 1, name: "Test"}, slot: 0, caster_guid: 1, auras: auras}
   end
 
+  defp recompute(unit), do: apply(&Stats.recompute/1, [unit])
+
   describe "recompute/1" do
     test "derives stats and maxima from base values" do
-      unit = Stats.recompute(mage_unit())
+      unit = recompute(mage_unit())
 
       assert unit.stamina == 45
       assert unit.intellect == 125
@@ -40,8 +42,8 @@ defmodule ThistleTea.Game.Entity.Logic.StatsTest do
     end
 
     test "is idempotent" do
-      once = Stats.recompute(mage_unit())
-      assert Stats.recompute(once) == once
+      once = recompute(mage_unit())
+      assert recompute(once) == once
     end
 
     test "adds equipment and aura bonuses on top of base" do
@@ -54,7 +56,7 @@ defmodule ThistleTea.Game.Entity.Logic.StatsTest do
           auras: [holder([arcane_intellect, frost_armor])]
       }
 
-      unit = Stats.recompute(unit)
+      unit = recompute(unit)
 
       assert unit.stamina == 55
       assert unit.intellect == 176
@@ -65,10 +67,11 @@ defmodule ThistleTea.Game.Entity.Logic.StatsTest do
 
     test "base changes survive repeated aura recomputes" do
       aura = %Aura{type: :mod_stat, amount: 31, misc_value: 3}
-      unit = Stats.recompute(%{mage_unit() | auras: [holder([aura])]})
+      unit = recompute(%{mage_unit() | auras: [holder([aura])]})
 
-      leveled = Stats.recompute(%{unit | base_stamina: 51, base_intellect: 133, base_health: 1397, base_mana: 1420})
-      recomputed = Stats.recompute(leveled)
+      leveled = recompute(%{unit | base_stamina: 51, base_intellect: 133, base_health: 1397, base_mana: 1420})
+
+      recomputed = recompute(leveled)
 
       assert recomputed.max_health == leveled.max_health
       assert recomputed.max_power1 == leveled.max_power1
@@ -78,7 +81,7 @@ defmodule ThistleTea.Game.Entity.Logic.StatsTest do
 
     test "clamps current health and mana to new maxima" do
       unit = %{mage_unit() | health: 99_999, power1: 99_999}
-      unit = Stats.recompute(unit)
+      unit = recompute(unit)
 
       assert unit.health == unit.max_health
       assert unit.power1 == unit.max_power1
@@ -86,7 +89,7 @@ defmodule ThistleTea.Game.Entity.Logic.StatsTest do
 
     test "leaves units without base pools untouched" do
       mob = %Unit{level: 10, health: 500, max_health: 500, power1: 0, max_power1: 0, auras: []}
-      recomputed = Stats.recompute(mob)
+      recomputed = recompute(mob)
 
       assert recomputed.max_health == 500
       assert recomputed.health == 500
@@ -108,7 +111,7 @@ defmodule ThistleTea.Game.Entity.Logic.StatsTest do
           auras: [holder([battle_shout])]
       }
 
-      unit = Stats.recompute(unit)
+      unit = recompute(unit)
 
       expected_ap = 60 * 3 + 145 * 2 - 20 + 40 + 60
       assert unit.attack_power == expected_ap
@@ -126,10 +129,10 @@ defmodule ThistleTea.Game.Entity.Logic.StatsTest do
           base_max_damage: 20.0
       }
 
-      unbuffed = Stats.recompute(unit)
+      unbuffed = recompute(unit)
 
       strength_buff = %Aura{type: :mod_stat, amount: 30, misc_value: 0}
-      buffed = Stats.recompute(%{unit | auras: [holder([strength_buff])]})
+      buffed = recompute(%{unit | auras: [holder([strength_buff])]})
 
       assert buffed.attack_power == unbuffed.attack_power + 60
       assert buffed.min_damage > unbuffed.min_damage
@@ -137,7 +140,7 @@ defmodule ThistleTea.Game.Entity.Logic.StatsTest do
 
     test "skips weapon damage without base inputs" do
       mob = %Unit{level: 10, attack_power: 50, min_damage: 30.0, max_damage: 40.0, base_attack_time: 2000, auras: []}
-      recomputed = Stats.recompute(mob)
+      recomputed = recompute(mob)
 
       assert recomputed.min_damage == 30.0
       assert recomputed.max_damage == 40.0
@@ -146,7 +149,7 @@ defmodule ThistleTea.Game.Entity.Logic.StatsTest do
 
     test "applies mod_stat with misc -1 to all stats" do
       aura = %Aura{type: :mod_stat, amount: 5, misc_value: -1}
-      unit = Stats.recompute(%{mage_unit() | auras: [holder([aura])]})
+      unit = recompute(%{mage_unit() | auras: [holder([aura])]})
 
       assert unit.strength == 40
       assert unit.agility == 46
