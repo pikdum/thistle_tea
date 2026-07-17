@@ -1,6 +1,8 @@
 defmodule ThistleTea.Game.Entity.Logic.AttackTableTest do
   use ExUnit.Case, async: true
 
+  alias ThistleTea.Game.Aura
+  alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
@@ -151,6 +153,21 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTableTest do
       result = AttackTable.resolve(target, swing, 100, roll: 700)
 
       assert result.outcome in [:crit, :normal]
+    end
+
+    test "parry auras extend the player's parry range" do
+      holder = %Holder{auras: [%Aura{type: :mod_parry_percent, amount: 25}]}
+      target = character(unit: [class: @warrior, agility: 0, auras: [holder]])
+
+      assert AttackTable.resolve(target, attack(), 100, roll: 2_000).outcome == :parry
+    end
+
+    test "negative hit auras increase outgoing miss chance" do
+      holder = %Holder{auras: [%Aura{type: :mod_hit_chance, amount: -2}]}
+      attacker = character(unit: [auras: [holder]])
+      attack = attack() |> Map.merge(AttackTable.attacker_context(attacker))
+
+      assert AttackTable.resolve(mob(), attack, 100, roll: 600).outcome == :miss
     end
 
     test "mobs cannot parry or block from behind but still dodge" do

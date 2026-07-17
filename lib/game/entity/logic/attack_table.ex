@@ -48,6 +48,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
       caster_level: unit.level || 1,
       caster_player?: player?(attacker),
       crit_chance: attacker_crit_chance(attacker) + Aura.flat_amount(attacker, :mod_crit_percent),
+      hit_chance_bonus: Aura.flat_amount(attacker, :mod_hit_chance),
       always_crush?: always_crush?(attacker),
       caster_position: attacker_position(attacker)
     }
@@ -114,9 +115,11 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
       defender_strength: unit.strength || 0,
       defender_armor: unit.normal_resistance || 0,
       defender_dodge_bonus: Aura.flat_amount(defender, :mod_dodge),
+      defender_parry_bonus: Aura.flat_amount(defender, :mod_parry_percent),
       defender_block_bonus: Aura.flat_amount(defender, :mod_block_percent),
       defender_bonuses: unit.equipment_bonuses || %{},
       defender_extra_flags: extra_flags(defender),
+      hit_chance_bonus: hit_chance_bonus(attack),
       standing?: (unit.stand_state || 0) == 0,
       from_behind?: from_behind?(defender, Map.get(attack, :caster_position)),
       avoidance_disabled?: casting?(defender) or stunned?(unit)
@@ -137,6 +140,9 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
     |> Enum.reject(&is_nil/1)
     |> walk_steps(roll)
   end
+
+  defp hit_chance_bonus(%{hit_chance_bonus: bonus}) when is_number(bonus), do: bonus
+  defp hit_chance_bonus(_attack), do: 0
 
   defp roll_special_outcome(ctx, roll) do
     walk_steps(
@@ -181,7 +187,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
         true -> ctx.skill_diff * 0.1
       end
 
-    (@base_miss_chance - skill_bonus)
+    (@base_miss_chance - skill_bonus - ctx.hit_chance_bonus)
     |> low_level_scale(ctx)
     |> clamp(0.0, 60.0)
     |> bp()
@@ -209,7 +215,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
   defp parry_bp(%{from_behind?: true}), do: 0
 
   defp parry_bp(%{defender_player?: true} = ctx) do
-    (CombatRatings.parry_chance(ctx.defender_class) - ctx.skill_diff * 0.04)
+    (CombatRatings.parry_chance(ctx.defender_class) + ctx.defender_parry_bonus - ctx.skill_diff * 0.04)
     |> max(0.0)
     |> bp()
   end

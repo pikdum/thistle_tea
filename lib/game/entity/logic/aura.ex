@@ -22,6 +22,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
   defdelegate apply_spell(entity, caster_guid, caster_level, spell, now), to: AuraApplication
   defdelegate blocked_by_stronger_rank?(entity_or_holders, spell), to: AuraApplication
   defdelegate mechanic_immune?(entity, spell), to: AuraApplication
+  defdelegate dispel_immune?(entity, spell), to: AuraApplication
 
   defdelegate interrupt_mask(action), to: Lifecycle
   defdelegate self_duration_events(entity, now), to: Lifecycle

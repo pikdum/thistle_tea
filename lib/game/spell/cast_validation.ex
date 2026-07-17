@@ -34,6 +34,7 @@ defmodule ThistleTea.Game.Spell.CastValidation do
          :ok <- check_combo_target(caster, spell, targets, now),
          :ok <- check_stronger_rank(caster, spell, targets),
          :ok <- check_mechanic_immunity(caster, spell, targets),
+         :ok <- check_dispel_immunity(caster, spell, targets),
          :ok <- check_special_aura_requirements(caster, spell),
          :ok <- check_warlock_resources(caster, spell),
          :ok <- check_cooldown(caster, spell, now),
@@ -169,6 +170,14 @@ defmodule ThistleTea.Game.Spell.CastValidation do
 
   defp check_mechanic_immunity(caster, %Spell{} = spell, %Targets{unit_guid: unit_guid}) do
     if self_target?(caster, unit_guid) and AuraLogic.mechanic_immune?(caster, spell) do
+      {:error, :immune}
+    else
+      :ok
+    end
+  end
+
+  defp check_dispel_immunity(caster, %Spell{} = spell, %Targets{unit_guid: unit_guid}) do
+    if self_target?(caster, unit_guid) and AuraLogic.dispel_immune?(caster, spell) do
       {:error, :immune}
     else
       :ok

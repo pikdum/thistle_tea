@@ -127,7 +127,8 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
       object: %Object{
         guid: Guid.from_low_guid(:mob, c.id, c.guid),
         entry: c.id,
-        scale_x: effective_scale
+        scale_x: effective_scale,
+        base_scale_x: effective_scale
       },
       unit: unit,
       movement_block: movement_block,

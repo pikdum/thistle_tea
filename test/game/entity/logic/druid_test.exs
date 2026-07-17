@@ -29,6 +29,34 @@ defmodule ThistleTea.Game.Entity.Logic.DruidTest do
     end
   end
 
+  describe "Faerie Fire" do
+    test "its DBC dispel immunity prevents stealth auras" do
+      faerie_fire = %Holder{
+        spell: %Spell{id: 770},
+        caster_guid: 9,
+        auras: [%Aura{type: :dispel_immunity, misc_value: 5}]
+      }
+
+      prowl = %Spell{
+        id: 5215,
+        dispel_type: 5,
+        effects: [%Effect{type: :apply_aura, aura: :mod_stealth}]
+      }
+
+      character = %Character{
+        object: %Object{guid: 5},
+        unit: %Unit{auras: [faerie_fire]},
+        internal: %Internal{}
+      }
+
+      {character, events} =
+        SpellEffect.receive(character, %CastContext{caster_guid: 5, target_role: :caster}, prowl, 1_000)
+
+      assert character.unit.auras == [faerie_fire]
+      assert events == []
+    end
+  end
+
   describe "Ferocious Bite" do
     test "converts attack power and remaining energy into damage before draining energy" do
       spell = ferocious_bite()

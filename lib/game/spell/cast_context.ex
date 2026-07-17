@@ -48,6 +48,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
     :normalized_speed,
     :attack_skill,
     :melee_crit_chance,
+    :hit_chance_bonus,
     :spell_crit_chance,
     :shield_block_value,
     :caster_power,
@@ -82,7 +83,8 @@ defmodule ThistleTea.Game.Spell.CastContext do
       damage_done_multiplier: Aura.percent_multiplier(caster, :mod_damage_percent_done, Spell.school_mask(spell)),
       effect_damage_multiplier: effect_multiplier(caster, spell, [:all_effects, :damage]),
       effect_healing_multiplier: effect_multiplier(caster, spell, [:all_effects]),
-      spell_crit_chance: spell_crit_chance(caster, spell)
+      spell_crit_chance: spell_crit_chance(caster, spell),
+      hit_chance_bonus: Aura.flat_amount(caster, :mod_hit_chance)
     }
     |> put_melee_snapshot(caster, spell)
     |> put_combo_points(caster)
@@ -97,7 +99,8 @@ defmodule ThistleTea.Game.Spell.CastContext do
       caster_position: caster_position(caster),
       caster_orientation: caster_orientation(caster),
       target_guid: target_guid,
-      spell: spell
+      spell: spell,
+      hit_chance_bonus: Aura.flat_amount(caster, :mod_hit_chance)
     }
     |> put_melee_snapshot(caster, spell)
     |> put_combo_points(caster)

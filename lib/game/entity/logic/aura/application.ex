@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
   alias ThistleTea.Game.Entity.Logic.Aura.ControlSync
   alias ThistleTea.Game.Entity.Logic.Aura.Lifecycle
   alias ThistleTea.Game.Entity.Logic.Aura.MovementSync
+  alias ThistleTea.Game.Entity.Logic.Aura.ObjectSync
   alias ThistleTea.Game.Entity.Logic.Aura.PlayerSync
   alias ThistleTea.Game.Entity.Logic.Aura.StealthSync
   alias ThistleTea.Game.Entity.Logic.Aura.UnitSync
@@ -109,6 +110,22 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
 
   def mechanic_immune?(_entity, _spell), do: false
 
+  def dispel_immune?(%{unit: %Unit{auras: holders}}, %Spell{dispel_type: dispel_type})
+      when is_list(holders) and is_integer(dispel_type) and dispel_type > 0 do
+    blocked_by_dispel_immunity?(holders, dispel_type)
+  end
+
+  def dispel_immune?(_entity, _spell), do: false
+
+  defp blocked_by_dispel_immunity?(holders, dispel_type)
+       when is_list(holders) and is_integer(dispel_type) and dispel_type > 0 do
+    Enum.any?(holders, fn %Holder{auras: auras} ->
+      Enum.any?(auras, &match?(%Aura{type: :dispel_immunity, misc_value: ^dispel_type}, &1))
+    end)
+  end
+
+  defp blocked_by_dispel_immunity?(_holders, _dispel_type), do: false
+
   defp negative?(spell, auras, %CastContext{} = context, target_guid) do
     cond do
       Spell.attribute?(spell, :negative) -> true
@@ -132,6 +149,9 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
       blocked_by_mechanic_immunity?(existing, holder.spell) ->
         {consume_immunity_charge(entity, holder.spell), []}
 
+      blocked_by_dispel_immunity?(existing, holder.spell.dispel_type) ->
+        {entity, []}
+
       true ->
         do_apply_unblocked(entity, existing, holder, now)
     end
@@ -154,6 +174,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
 
     {entity, sit_events} =
       %{entity | unit: unit}
+      |> ObjectSync.sync()
       |> PlayerSync.sync()
       |> StealthSync.sync()
       |> maybe_reset_shapeshift_rage(holder)

@@ -1070,6 +1070,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
       caster_level: context.caster_level,
       caster_player?: context.caster_type == :player,
       caster_attack_skill: context.attack_skill,
+      hit_chance_bonus: context.hit_chance_bonus,
       crit_chance: context.melee_crit_chance,
       caster_position: attack_position(context.caster_position),
       spell_school_mask: Spell.school_mask(spell),
