@@ -96,6 +96,7 @@ defmodule ThistleTea.Game.Player.Login do
         ghost?: Death.ghost?(c),
         health_pct: Core.health_pct(c),
         shapeshift_form: c.unit.shapeshift_form,
+        world: c.internal.world,
         orientation: elem(c.movement_block.position, 3)
       }
       |> Map.merge(StealthDetection.target_metadata(c))

@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Entity.Data.GameObject do
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Internal.Chair
   alias ThistleTea.Game.Entity.Data.Component.Internal.Fishing
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Ritual
   alias ThistleTea.Game.Entity.Data.Component.Internal.Summon
   alias ThistleTea.Game.Entity.Data.Component.Internal.Trap
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
@@ -63,6 +64,13 @@ defmodule ThistleTea.Game.Entity.Data.GameObject do
         chair: chair(ot),
         fishing: Keyword.get(opts, :fishing),
         trap: trap(ot, Keyword.get(opts, :summoned_by)),
+        ritual:
+          ritual(
+            ot,
+            Keyword.get(opts, :summoned_by),
+            Keyword.get(opts, :ritual_target_guid),
+            Keyword.get(opts, :ritual_zone_id)
+          ),
         summon: %Summon{
           owner_guid: Keyword.get(opts, :summoned_by),
           despawn_in_ms: Keyword.get(opts, :despawn_in_ms),
@@ -76,6 +84,31 @@ defmodule ThistleTea.Game.Entity.Data.GameObject do
 
   @go_type_spellcaster 22
   @go_type_trap 6
+  @go_type_summoning_ritual 18
+
+  defp ritual(%GameObjectTemplate{type: @go_type_summoning_ritual, data: data}, owner_guid, target_guid, zone_id) do
+    %Ritual{
+      owner_guid: owner_guid,
+      target_guid: target_guid,
+      zone_id: zone_id,
+      required_participants: max(Enum.at(data, 0) || 1, 1),
+      completion_spell_id: positive(Enum.at(data, 1)),
+      animation_spell_id: positive(Enum.at(data, 2)),
+      persistent?: enabled?(Enum.at(data, 3)),
+      caster_target_spell_id: positive(Enum.at(data, 4)),
+      caster_target_spell_targets: Enum.at(data, 5) || 0,
+      casters_grouped?: enabled?(Enum.at(data, 6)),
+      no_target_check?: enabled?(Enum.at(data, 7)),
+      users: MapSet.new([owner_guid])
+    }
+  end
+
+  defp ritual(_template, _owner_guid, _target_guid, _zone_id), do: nil
+
+  defp positive(value) when is_integer(value) and value > 0, do: value
+  defp positive(_value), do: nil
+
+  defp enabled?(value), do: value == 1
 
   defp trap(%GameObjectTemplate{type: @go_type_trap, data: data}, owner_guid) do
     %Trap{

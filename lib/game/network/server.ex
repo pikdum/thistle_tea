@@ -18,6 +18,7 @@ defmodule ThistleTea.Game.Network.Server do
   alias ThistleTea.Game.Entity.Data.Item, as: DataItem
   alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.Logic.AI.BT
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Spell, as: SpellBT
   alias ThistleTea.Game.Entity.Logic.AI.Tick
   alias ThistleTea.Game.Entity.Logic.AttackFeedback
   alias ThistleTea.Game.Entity.Logic.Aura
@@ -270,6 +271,47 @@ defmodule ThistleTea.Game.Network.Server do
 
   def handle_cast({:grant_power, power_type, amount}, {socket, %{character: %Character{} = character} = state}) do
     character = Resources.gain_power(character, power_type, amount)
+    {:noreply, {socket, %{state | character: character}}, {:continue, :maybe_broadcast_update}}
+  end
+
+  def handle_cast(
+        {:summon_request, summoner_guid, zone_id, world, {x, y, z}},
+        {socket, %{character: %Character{internal: internal} = character} = state}
+      ) do
+    auto_decline_ms = 120_000
+
+    pending = %{
+      summoner_guid: summoner_guid,
+      world: world,
+      position: {x, y, z},
+      expires_at: Time.now() + auto_decline_ms
+    }
+
+    Network.send_packet(%Message.SmsgSummonRequest{
+      summoner_guid: summoner_guid,
+      zone_id: zone_id || 0,
+      auto_decline_ms: auto_decline_ms
+    })
+
+    character = %{character | internal: %{internal | pending_summon: pending}}
+    {:noreply, {socket, %{state | character: character}}}
+  end
+
+  def handle_cast(
+        {:start_game_object_channel, game_object_guid, %Spell{} = spell, duration_ms},
+        {socket, %{character: %Character{} = character} = state}
+      ) do
+    character = SpellBT.start_game_object_channel(character, game_object_guid, spell, duration_ms, Time.now())
+    character = EventSink.emit_pending(character)
+    {:noreply, {socket, %{state | character: character}}, {:continue, :maybe_broadcast_update}}
+  end
+
+  def handle_cast(
+        {:finish_game_object_channel, game_object_guid},
+        {socket, %{character: %Character{} = character} = state}
+      ) do
+    character = SpellBT.finish_game_object_channel(character, game_object_guid)
+    character = EventSink.emit_pending(character)
     {:noreply, {socket, %{state | character: character}}, {:continue, :maybe_broadcast_update}}
   end
 
@@ -789,6 +831,7 @@ defmodule ThistleTea.Game.Network.Server do
         health_pct: Core.health_pct(character),
         unit_flags: character.unit.flags,
         shapeshift_form: character.unit.shapeshift_form,
+        world: character.internal.world,
         aura_sources: Aura.source_spells(character)
       }
       |> Map.merge(detection)

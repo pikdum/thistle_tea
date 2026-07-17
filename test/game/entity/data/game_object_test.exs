@@ -77,6 +77,58 @@ defmodule ThistleTea.Game.Entity.Data.GameObjectTest do
       assert trap.internal.trap.radius == 2.5
       assert trap.internal.trap.charges == 1
     end
+
+    test "summoning ritual templates retain target and participant data" do
+      template = %GameObjectTemplate{
+        entry: 36_727,
+        type: 18,
+        display_id: 1327,
+        name: "Summoning Portal",
+        size: 1.0,
+        flags: 0,
+        faction: 0,
+        data: [3, 7720, 698, 0, 0, 0, 1, 0] ++ List.duplicate(0, 16)
+      }
+
+      portal =
+        GameObject.build_summoned(template, 0, {0.0, 0.0, 0.0, 0.0},
+          summoned_by: 99,
+          ritual_target_guid: 123,
+          ritual_zone_id: 12
+        )
+
+      assert portal.internal.ritual.owner_guid == 99
+      assert portal.internal.ritual.target_guid == 123
+      assert portal.internal.ritual.required_participants == 3
+      assert portal.internal.ritual.completion_spell_id == 7720
+      assert portal.internal.ritual.animation_spell_id == 698
+      assert portal.internal.ritual.casters_grouped?
+      refute portal.internal.ritual.persistent?
+      assert portal.internal.ritual.zone_id == 12
+      assert portal.internal.ritual.users == MapSet.new([99])
+    end
+
+    test "ritual templates retain their data-driven completion behavior" do
+      template = %GameObjectTemplate{
+        entry: 177_193,
+        type: 18,
+        display_id: 1327,
+        name: "Doom Portal",
+        size: 1.0,
+        flags: 0,
+        faction: 0,
+        data: [5, 18_541, 18_540, 0, 20_625, 1, 1, 0] ++ List.duplicate(0, 16)
+      }
+
+      portal = GameObject.build_summoned(template, 0, {0.0, 0.0, 0.0, 0.0}, summoned_by: 99)
+
+      assert portal.internal.ritual.required_participants == 5
+      assert portal.internal.ritual.completion_spell_id == 18_541
+      assert portal.internal.ritual.animation_spell_id == 18_540
+      assert portal.internal.ritual.caster_target_spell_id == 20_625
+      assert portal.internal.ritual.caster_target_spell_targets == 1
+      assert portal.internal.ritual.casters_grouped?
+    end
   end
 
   describe "build/1 chests" do

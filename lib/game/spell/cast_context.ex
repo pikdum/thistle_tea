@@ -30,6 +30,8 @@ defmodule ThistleTea.Game.Spell.CastContext do
     :caster_level,
     :caster_type,
     :caster_position,
+    :caster_orientation,
+    :caster_zone,
     :target_guid,
     :selected_target_guid,
     :target_role,
@@ -60,6 +62,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
       caster_level: level,
       caster_type: caster_type(caster),
       caster_position: caster_position(caster),
+      caster_orientation: caster_orientation(caster),
       target_guid: target_guid,
       spell: spell,
       spell_damage_bonus: spell_damage_bonus(caster),
@@ -78,6 +81,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
       caster_level: 1,
       caster_type: caster_type(caster),
       caster_position: caster_position(caster),
+      caster_orientation: caster_orientation(caster),
       target_guid: target_guid,
       spell: spell
     }
@@ -97,6 +101,9 @@ defmodule ThistleTea.Game.Spell.CastContext do
   end
 
   defp caster_position(_caster), do: nil
+
+  defp caster_orientation(%{movement_block: %{position: {_x, _y, _z, orientation}}}), do: orientation
+  defp caster_orientation(_caster), do: nil
 
   defp put_melee_snapshot(%__MODULE__{} = context, caster, %Spell{} = spell) do
     cond do

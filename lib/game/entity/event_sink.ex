@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Ritual
   alias ThistleTea.Game.Entity.Data.Component.Internal.Totem
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.DynamicObject, as: DataDynamicObject
@@ -788,32 +789,60 @@ defmodule ThistleTea.Game.Entity.EventSink do
 
   def emit(entity, %Event{type: :despawn_area_effects}), do: entity
 
+  def emit(entity, %Event{type: :despawn_entity, target_guid: guid}) when is_integer(guid) do
+    World.stop_entity(guid)
+    entity
+  end
+
+  def emit(entity, %Event{type: :despawn_entity}), do: entity
+
+  def emit(entity, %Event{type: :leave_ritual, target_guid: game_object_guid, source_guid: user_guid}) do
+    Entity.leave_ritual(game_object_guid, user_guid)
+    entity
+  end
+
   def emit(
         %{
           object: %{guid: owner_guid},
           internal: %Internal{world: world},
           movement_block: %{position: {_x, _y, _z, _o} = position}
         } = entity,
-        %Event{type: :summon_game_object, entry: entry, duration_ms: duration_ms}
+        %Event{type: :summon_game_object, entry: entry, duration_ms: duration_ms} = event
       ) do
     case GameObjectTemplateLoader.get(entry) do
       %DataGameObjectTemplate{} = template ->
-        template
-        |> GameObject.build_summoned(world, position,
-          summoned_by: owner_guid,
-          level: owner_level(entity),
-          despawn_in_ms: duration_ms
-        )
-        |> World.start_entity()
+        game_object =
+          GameObject.build_summoned(template, world, position,
+            summoned_by: owner_guid,
+            level: owner_level(entity),
+            despawn_in_ms: duration_ms,
+            ritual_target_guid: event.target_guid,
+            ritual_zone_id: zone_id(world, position)
+          )
+
+        World.start_entity(game_object)
+
+        track_channel_game_object(entity, game_object)
 
       _ ->
-        nil
+        entity
     end
-
-    entity
   end
 
   def emit(entity, %Event{type: :summon_game_object}), do: entity
+
+  def emit(entity, %Event{
+        type: :summon_request,
+        source_guid: summoner_guid,
+        target_guid: target_guid,
+        amount: zone_id,
+        position: {world, x, y, z}
+      }) do
+    Entity.request_summon(target_guid, summoner_guid, zone_id, world, {x, y, z})
+    entity
+  end
+
+  def emit(entity, %Event{type: :summon_request}), do: entity
 
   def emit(%{object: %{guid: guid}, internal: %Internal{name: name}} = entity, %Event{type: :monster_talk} = event) do
     event.chat_type
@@ -853,6 +882,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
              despawn_delay_ms: summon.despawn_delay_ms,
              run?: summon.run?
            ),
+         mob = put_summon_owner(mob, summon),
          {:ok, pid} <- MobLoader.start_mob(mob) do
       if is_integer(event.target_guid) and event.target_guid > 0 and summon.attack_target != nil do
         send(pid, {:force_attack, event.target_guid})
@@ -1002,6 +1032,20 @@ defmodule ThistleTea.Game.Entity.EventSink do
 
   def emit(entity, _event), do: entity
 
+  defp track_channel_game_object(%{internal: %Internal{} = internal, unit: %Unit{} = unit} = entity, %GameObject{
+         object: %{guid: guid},
+         internal: %Internal{ritual: %Ritual{}}
+       }) do
+    %{
+      entity
+      | internal: %{internal | channel_game_object_guid: guid, channel_game_object_owned?: true},
+        unit: %{unit | channel_object: guid}
+    }
+    |> Core.mark_broadcast_update()
+  end
+
+  defp track_channel_game_object(entity, %GameObject{}), do: entity
+
   defp dispatch_single_trigger(entity, event, spell) do
     case triggered_target(entity, event, spell) do
       nil ->
@@ -1063,6 +1107,13 @@ defmodule ThistleTea.Game.Entity.EventSink do
   defp owner_level(%{unit: %{level: level}}) when is_integer(level), do: level
   defp owner_level(_entity), do: 1
 
+  defp zone_id(%{map_id: map_id}, {x, y, z, _orientation}) do
+    case Pathfinding.get_zone_and_area(map_id, {x, y, z}) do
+      {zone_id, _area_id} -> zone_id
+      _missing -> 0
+    end
+  end
+
   @summon_unique_default_range 50.0
   @corpse_counting_despawn_types [3, 4, 8]
 
@@ -1089,6 +1140,12 @@ defmodule ThistleTea.Game.Entity.EventSink do
       _ -> true
     end
   end
+
+  defp put_summon_owner(%Mob{} = mob, %{owner_guid: owner_guid}) when is_integer(owner_guid) do
+    %{mob | unit: %{mob.unit | summoned_by: owner_guid, created_by: owner_guid}}
+  end
+
+  defp put_summon_owner(%Mob{} = mob, _summon), do: mob
 
   defp charge_path(map, from, to) do
     Pathfinding.find_path(map, from, to)

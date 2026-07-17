@@ -87,6 +87,7 @@ defmodule ThistleTea.Game.Network.Message.Dispatch do
               CMSG_CANCEL_CAST: Message.CmsgCancelCast,
               CMSG_CANCEL_CHANNELLING: Message.CmsgCancelChannelling,
               CMSG_CANCEL_AURA: Message.CmsgCancelAura,
+              CMSG_SUMMON_RESPONSE: Message.CmsgSummonResponse,
               CMSG_AUTOEQUIP_ITEM: Message.CmsgAutoequipItem,
               CMSG_SWAP_INV_ITEM: Message.CmsgSwapInvItem,
               CMSG_SWAP_ITEM: Message.CmsgSwapItem,

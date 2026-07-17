@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
 
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Ritual
   alias ThistleTea.Game.Entity.Data.Component.Internal.Summon
   alias ThistleTea.Game.Entity.Data.Component.Internal.Trap
   alias ThistleTea.Game.Entity.Data.GameObject
@@ -18,6 +19,7 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
   alias ThistleTea.Game.Entity.Server.GameObject.Chair
   alias ThistleTea.Game.Entity.Server.GameObject.Chest
   alias ThistleTea.Game.Entity.Server.GameObject.Fishing
+  alias ThistleTea.Game.Entity.Server.GameObject.Ritual, as: RitualServer
   alias ThistleTea.Game.Entity.Server.GameObject.Trap, as: TrapServer
   alias ThistleTea.Game.Entity.SpellTargetResolver
   alias ThistleTea.Game.Network
@@ -62,6 +64,37 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
   end
 
   @impl GenServer
+  def handle_cast(
+        {:gameobject_use, user_guid, _user_level},
+        %GameObject{
+          internal: %Internal{ritual: %Ritual{} = ritual, world: world} = internal,
+          movement_block: %{position: position}
+        } = state
+      ) do
+    {ritual, result} = RitualServer.use(ritual, user_guid, same_group?(ritual.owner_guid, user_guid))
+    state = %{state | internal: %{internal | ritual: ritual}}
+
+    if result in [:waiting, :complete] do
+      start_ritual_channel(state, ritual, user_guid)
+    end
+
+    if result == :complete do
+      cast_ritual_completion(state, ritual, world, position)
+      cast_ritual_participant_spell(state, ritual)
+      Entity.finish_game_object_channel(ritual.owner_guid, state.object.guid)
+      if not ritual.persistent?, do: send(self(), :despawn)
+    end
+
+    {:noreply, state}
+  end
+
+  def handle_cast(
+        {:ritual_user_left, user_guid},
+        %GameObject{internal: %Internal{ritual: %Ritual{} = ritual} = internal} = state
+      ) do
+    {:noreply, %{state | internal: %{internal | ritual: RitualServer.leave(ritual, user_guid)}}}
+  end
+
   def handle_cast(
         {:gameobject_use, user_guid, user_level},
         %GameObject{internal: %Internal{summon: %Summon{} = summon}} = state
@@ -234,6 +267,7 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
 
   @impl GenServer
   def terminate(_reason, state) do
+    finish_ritual_channels(state)
     World.remove_position(state)
     Visibility.leave_entity(state)
     Metadata.delete(state.object.guid)
@@ -274,6 +308,54 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
   end
 
   defp schedule_trap(_state), do: nil
+
+  defp cast_ritual_completion(state, %Ritual{} = ritual, world, {x, y, z, orientation}) do
+    with spell_id when is_integer(spell_id) <- ritual.completion_spell_id,
+         %Spell{} = spell <- SpellLoader.load(spell_id) do
+      context = %CastContext{
+        caster_guid: ritual.owner_guid,
+        caster_level: state.game_object.level || 1,
+        caster_position: {world, x, y, z},
+        caster_orientation: orientation,
+        caster_zone: ritual.zone_id,
+        target_guid: ritual.target_guid,
+        selected_target_guid: ritual.target_guid,
+        spell: spell
+      }
+
+      Entity.receive_spell(ritual.owner_guid, context, spell)
+    end
+  end
+
+  defp cast_ritual_participant_spell(state, %Ritual{} = ritual) do
+    with spell_id when is_integer(spell_id) <- ritual.caster_target_spell_id,
+         target_guid when is_integer(target_guid) <- Enum.random(ritual.users),
+         %Spell{} = spell <- SpellLoader.load(spell_id) do
+      context = %CastContext{
+        caster_guid: target_guid,
+        caster_level: state.game_object.level || 1,
+        target_guid: target_guid,
+        selected_target_guid: target_guid,
+        spell: spell
+      }
+
+      Entity.receive_spell(target_guid, context, spell)
+    end
+  end
+
+  defp start_ritual_channel(state, %Ritual{} = ritual, user_guid) do
+    with spell_id when is_integer(spell_id) <- ritual.animation_spell_id,
+         %Spell{} = spell <- SpellLoader.load(spell_id) do
+      duration_ms = state.internal.summon.despawn_in_ms || spell.duration_ms || 0
+      Entity.start_game_object_channel(user_guid, state.object.guid, spell, duration_ms)
+    end
+  end
+
+  defp finish_ritual_channels(%GameObject{object: %{guid: guid}, internal: %Internal{ritual: %Ritual{} = ritual}}) do
+    Enum.each(ritual.users, &Entity.finish_game_object_channel(&1, guid))
+  end
+
+  defp finish_ritual_channels(%GameObject{}), do: nil
 
   defp trigger_trap(state, %Trap{owner_guid: owner_guid, spell_id: spell_id}, target_guid) do
     case SpellLoader.load(spell_id) do

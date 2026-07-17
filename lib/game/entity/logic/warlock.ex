@@ -67,6 +67,50 @@ defmodule ThistleTea.Game.Entity.Logic.Warlock do
 
   def devour_magic_heal(_spell), do: nil
 
+  def ritual_of_summoning?(%Spell{} = spell) do
+    Spell.vmangos_script?(spell, "spell_warlock_ritual_of_summoning")
+  end
+
+  def ritual_of_summoning?(_spell), do: false
+
+  def validate_ritual(%Spell{} = spell, context) do
+    if ritual_of_summoning?(spell) do
+      validate_ritual_context(context)
+    else
+      :ok
+    end
+  end
+
+  defp validate_ritual_context(%{
+         target_player?: true,
+         target_online?: true,
+         self?: false,
+         same_group?: true,
+         target_in_combat?: false,
+         caster_dungeon?: true,
+         same_world?: false
+       }), do: {:error, :target_not_in_instance}
+
+  defp validate_ritual_context(%{
+         target_player?: true,
+         target_online?: true,
+         self?: false,
+         same_group?: true,
+         target_in_combat?: false,
+         caster_battleground?: true
+       }), do: {:error, :not_here}
+
+  defp validate_ritual_context(%{
+         target_player?: true,
+         target_online?: true,
+         self?: false,
+         same_group?: true,
+         target_in_combat?: false
+       }), do: :ok
+
+  defp validate_ritual_context(%{target_in_combat?: true}), do: {:error, :target_in_combat}
+  defp validate_ritual_context(_invalid), do: {:error, :bad_targets}
+
   def immolate_source?(sources, caster_guid) do
     Enum.any?(sources, fn
       {_id, @spell_family, flags_0, _flags_1, ^caster_guid} when is_integer(flags_0) ->

@@ -76,6 +76,22 @@ defmodule ThistleTea.Game.Entity do
     dispatch_cast(entity, {:gameobject_use, user_guid, user_level})
   end
 
+  def request_summon(entity, summoner_guid, area, world, position) do
+    dispatch_cast(entity, {:summon_request, summoner_guid, area, world, position})
+  end
+
+  def start_game_object_channel(entity, game_object_guid, spell, duration_ms) do
+    dispatch_cast(entity, {:start_game_object_channel, game_object_guid, spell, duration_ms})
+  end
+
+  def finish_game_object_channel(entity, game_object_guid) do
+    dispatch_cast(entity, {:finish_game_object_channel, game_object_guid})
+  end
+
+  def leave_ritual(entity, user_guid) do
+    dispatch_cast(entity, {:ritual_user_left, user_guid})
+  end
+
   def reward_kill(entity, victim) do
     dispatch_cast(entity, {:reward_kill, victim})
   end

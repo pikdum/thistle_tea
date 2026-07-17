@@ -495,11 +495,13 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp effect_type(77), do: :script_effect
   defp effect_type(79), do: :clear_threat
   defp effect_type(80), do: :add_combo_points
+  defp effect_type(85), do: :summon_player
   defp effect_type(type) when type in 87..90, do: :summon_totem
   defp effect_type(96), do: :charge
   defp effect_type(101), do: :feed_pet
   defp effect_type(102), do: :dismiss_pet
   defp effect_type(109), do: :revive_pet
+  defp effect_type(112), do: :summon_demon
   defp effect_type(92), do: :enchant_held_item
   defp effect_type(17), do: :weapon_damage_noschool
   defp effect_type(27), do: :persistent_area_aura

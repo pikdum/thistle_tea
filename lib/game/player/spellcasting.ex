@@ -14,6 +14,8 @@ defmodule ThistleTea.Game.Player.Spellcasting do
   alias ThistleTea.Game.Entity.Logic.Hostility
   alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Entity.Logic.MeleeSpell
+  alias ThistleTea.Game.Entity.Logic.Warlock
+  alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.BinaryUtils
   alias ThistleTea.Game.Network.Message
@@ -27,7 +29,9 @@ defmodule ThistleTea.Game.Player.Spellcasting do
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
+  alias ThistleTea.Game.World.Loader.MapTemplate, as: MapTemplateLoader
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.System.Party, as: PartySystem
 
   require Logger
 
@@ -199,8 +203,37 @@ defmodule ThistleTea.Game.Player.Spellcasting do
       equipped_items: equipped_weapon_templates(character),
       ammo_id: character.player.ammo_id,
       ammo_template: ItemLoader.get_template(character.player.ammo_id),
-      feed_context: feed_context(character, spell, targets)
+      feed_context: feed_context(character, spell, targets),
+      ritual_context: ritual_context(character, spell)
     )
+  end
+
+  defp ritual_context(
+         %Character{object: %{guid: caster_guid}, unit: unit, internal: %{world: caster_world}},
+         %Spell{} = spell
+       ) do
+    if Warlock.ritual_of_summoning?(spell) do
+      target_guid = unit.target
+      target = Metadata.get(target_guid) || %{}
+
+      %{
+        target_player?: Guid.entity_type(target_guid) == :player,
+        target_online?: target != %{},
+        self?: target_guid == caster_guid,
+        same_group?: same_group?(caster_guid, target_guid),
+        target_in_combat?: Bitwise.band(Map.get(target, :unit_flags, 0), 0x00080000) != 0,
+        caster_dungeon?: MapTemplateLoader.dungeon?(caster_world.map_id),
+        caster_battleground?: MapTemplateLoader.battleground?(caster_world.map_id),
+        same_world?: Map.get(target, :world) == caster_world
+      }
+    end
+  end
+
+  defp same_group?(caster_guid, target_guid) do
+    case {PartySystem.group_of(caster_guid), PartySystem.group_of(target_guid)} do
+      {%{id: id}, %{id: id}} -> true
+      _other -> false
+    end
   end
 
   defp feed_context(%Character{unit: %Unit{summon: pet_guid}} = character, %Spell{effects: effects}, %Targets{

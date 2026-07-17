@@ -304,6 +304,45 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
 
   defp apply_effect(
          state,
+         %CastContext{
+           caster_guid: summoner_guid,
+           selected_target_guid: target_guid,
+           caster_zone: zone_id,
+           caster_position: {_world, _x, _y, _z} = position
+         },
+         _spell,
+         %Effect{type: :summon_player},
+         _now
+       )
+       when is_integer(target_guid) do
+    {state, [Event.summon_request(summoner_guid, target_guid, zone_id, position)]}
+  end
+
+  defp apply_effect(
+         state,
+         %CastContext{caster_guid: owner_guid, caster_position: {_world, x, y, z}, caster_orientation: orientation},
+         spell,
+         %Effect{type: :summon_demon, misc_value: entry},
+         _now
+       )
+       when is_integer(entry) and entry > 0 do
+    summon = %{
+      entry: entry,
+      owner_guid: owner_guid,
+      position: {x, y, z, orientation || 0.0},
+      despawn_delay_ms: summon_duration(spell),
+      despawn_type: 1,
+      run?: false,
+      unique?: false,
+      attack_target: nil,
+      script_id: 0
+    }
+
+    {state, [Event.summon_creature(summon, [], nil)]}
+  end
+
+  defp apply_effect(
+         state,
          %CastContext{},
          spell,
          %Effect{type: :summon_totem, summon_slot: slot, misc_value: entry},
@@ -526,6 +565,11 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   end
 
   defp apply_effect(state, _context, _spell, _effect, _now), do: {state, []}
+
+  defp summon_duration(%Spell{duration_ms: duration_ms}) when is_integer(duration_ms) and duration_ms > 0,
+    do: duration_ms
+
+  defp summon_duration(%Spell{}), do: 3_600_000
 
   defp apply_class_dummy(state, context, spell, effect, :execute, now) do
     apply_execute(state, context, spell, effect, now)

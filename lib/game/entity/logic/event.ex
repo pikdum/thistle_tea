@@ -404,8 +404,32 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
     %__MODULE__{type: :despawn_area_effects, spell_id: spell_id}
   end
 
-  def summon_game_object(entry, duration_ms) when is_integer(entry) and is_integer(duration_ms) do
-    %__MODULE__{type: :summon_game_object, entry: entry, duration_ms: duration_ms}
+  def despawn_entity(guid) when is_integer(guid) do
+    %__MODULE__{type: :despawn_entity, target_guid: guid}
+  end
+
+  def leave_ritual(game_object_guid, user_guid) when is_integer(game_object_guid) and is_integer(user_guid) do
+    %__MODULE__{type: :leave_ritual, target_guid: game_object_guid, source_guid: user_guid}
+  end
+
+  def summon_game_object(entry, duration_ms, opts \\ []) when is_integer(entry) and is_integer(duration_ms) do
+    %__MODULE__{
+      type: :summon_game_object,
+      entry: entry,
+      duration_ms: duration_ms,
+      target_guid: Keyword.get(opts, :ritual_target_guid)
+    }
+  end
+
+  def summon_request(summoner_guid, target_guid, zone_id, {world, x, y, z})
+      when is_integer(summoner_guid) and is_integer(target_guid) do
+    %__MODULE__{
+      type: :summon_request,
+      source_guid: summoner_guid,
+      target_guid: target_guid,
+      amount: zone_id,
+      position: {world, x, y, z}
+    }
   end
 
   def consume_reagents(reagents) when is_list(reagents) do

@@ -414,6 +414,55 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
       assert [%{type: :summon_game_object, entry: 2561, duration_ms: 60_000}] = events
     end
 
+    test "summon-player effects preserve the DBC-selected target and caster destination" do
+      spell = %Spell{id: 7720, effects: [%Effect{index: 0, type: :summon_player}]}
+
+      context = %CastContext{
+        caster_guid: 1,
+        caster_level: 10,
+        caster_zone: 12,
+        caster_position: {%WorldRef{map_id: 0}, 1.0, 2.0, 3.0},
+        selected_target_guid: 99
+      }
+
+      {_caster, events} = SpellEffect.receive(target_fixture(), context, spell, 1_000)
+
+      assert [
+               %{
+                 type: :summon_request,
+                 source_guid: 1,
+                 target_guid: 99,
+                 amount: 12,
+                 position: {%WorldRef{map_id: 0}, 1.0, 2.0, 3.0}
+               }
+             ] = events
+    end
+
+    test "summon-demon effects create a temporary owned summon at the caster snapshot" do
+      spell = %Spell{id: 18_541, effects: [%Effect{index: 0, type: :summon_demon, misc_value: 11_859}]}
+
+      context = %CastContext{
+        caster_guid: 1,
+        caster_level: 60,
+        caster_position: {%WorldRef{map_id: 0}, 1.0, 2.0, 3.0},
+        caster_orientation: 1.5
+      }
+
+      {_caster, events} = SpellEffect.receive(target_fixture(), context, spell, 1_000)
+
+      assert [
+               %{
+                 type: :summon_creature,
+                 summon: %{
+                   entry: 11_859,
+                   owner_guid: 1,
+                   position: {1.0, 2.0, 3.0, 1.5},
+                   despawn_delay_ms: 3_600_000
+                 }
+               }
+             ] = events
+    end
+
     test "tame creature emits ownership data from the target entry" do
       spell = %Spell{id: 1515, effects: [%Effect{index: 0, type: :tame_creature}]}
       target = target_fixture()

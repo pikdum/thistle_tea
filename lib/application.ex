@@ -26,6 +26,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.World.Loader.ItemEnchantment, as: ItemEnchantmentLoader
   alias ThistleTea.Game.World.Loader.Loot, as: LootLoader
   alias ThistleTea.Game.World.Loader.Mail, as: MailLoader
+  alias ThistleTea.Game.World.Loader.MapTemplate, as: MapTemplateLoader
   alias ThistleTea.Game.World.Loader.NpcText, as: NpcTextLoader
   alias ThistleTea.Game.World.Loader.PageText, as: PageTextLoader
   alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader
@@ -133,6 +134,7 @@ defmodule ThistleTea.Application do
     ClassSpellLoader.init()
     LootLoader.init()
     MailLoader.init()
+    MapTemplateLoader.init()
     GraveyardLoader.init()
     NpcTextLoader.init()
     PageTextLoader.init()
@@ -197,6 +199,7 @@ defmodule ThistleTea.Application do
         FishingLoader.load_all()
         LootLoader.load_fishing()
         MailLoader.load_all()
+        MapTemplateLoader.load_all()
         SpellScriptLoader.load_all()
         SpellScriptNameLoader.load_all()
         SpellThreatLoader.load_all()

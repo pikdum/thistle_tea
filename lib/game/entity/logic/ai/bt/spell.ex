@@ -84,6 +84,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
       |> queue_cast_result(casting)
       |> queue_spell_go(casting, targets)
       |> queue_area_effects(casting)
+      |> queue_summon_objects(casting)
       |> queue_consume_reagents(casting)
       |> queue_consume_ammo(casting)
       |> mark_hostile_cast(casting, targets, now)
@@ -358,6 +359,42 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
 
   def clear_cast(character), do: character
 
+  def start_game_object_channel(
+        %{internal: %Internal{} = internal, unit: unit, object: %{guid: guid}} = character,
+        game_object_guid,
+        %Spell{id: spell_id} = spell,
+        duration_ms,
+        now
+      )
+      when is_integer(game_object_guid) and is_integer(duration_ms) and duration_ms > 0 and is_integer(now) do
+    spell = %{spell | duration_ms: duration_ms, attributes: MapSet.put(spell.attributes, :channeled)}
+    casting = Cast.new(spell, %Targets{object_guid: game_object_guid}, now)
+
+    %{
+      character
+      | internal: %{
+          internal
+          | casting: casting,
+            channel_game_object_guid: game_object_guid,
+            channel_game_object_owned?: false
+        },
+        unit: %{unit | channel_spell: spell_id, channel_object: game_object_guid}
+    }
+    |> Core.mark_broadcast_update()
+    |> Event.enqueue([Event.channel_start(guid, spell_id, duration_ms), Event.object_update(:values)])
+  end
+
+  def start_game_object_channel(character, _game_object_guid, _spell, _duration_ms, _now), do: character
+
+  def finish_game_object_channel(
+        %{internal: %Internal{channel_game_object_guid: game_object_guid, casting: %Cast{} = casting}} = character,
+        game_object_guid
+      ) do
+    stop_channel(character, casting, :completed)
+  end
+
+  def finish_game_object_channel(character, _game_object_guid), do: character
+
   defp start_channel(
          %{object: %{guid: guid}, unit: unit} = character,
          %Cast{spell: %Spell{id: spell_id}, channel_ms: duration_ms} = casting
@@ -398,9 +435,30 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
     end
   end
 
-  defp stop_channel(%{internal: %Internal{} = internal, unit: unit} = character, %Cast{} = casting) do
-    character = %{character | internal: %{internal | casting: nil}, unit: %{unit | channel_object: 0, channel_spell: 0}}
+  defp stop_channel(character, casting), do: stop_channel(character, casting, :cancelled)
+
+  defp stop_channel(
+         %{object: %{guid: user_guid}, internal: %Internal{} = internal, unit: unit} = character,
+         %Cast{} = casting,
+         reason
+       ) do
+    channel_game_object_guid = internal.channel_game_object_guid
+    channel_game_object_owned? = internal.channel_game_object_owned?
+
+    character = %{
+      character
+      | internal: %{
+          internal
+          | casting: nil,
+            channel_game_object_guid: nil,
+            channel_game_object_owned?: nil
+        },
+        unit: %{unit | channel_object: 0, channel_spell: 0}
+    }
+
     {character, aura_events} = remove_channel_auras(character, casting)
+
+    object_events = channel_object_events(channel_game_object_guid, channel_game_object_owned?, user_guid, reason)
 
     events =
       case character do
@@ -410,12 +468,24 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
 
     character
     |> Core.mark_broadcast_update()
-    |> Event.enqueue(aura_events ++ events)
+    |> Event.enqueue(aura_events ++ object_events ++ events)
   end
 
-  defp stop_channel(%{internal: %Internal{} = internal} = character, %Cast{}) do
+  defp stop_channel(%{internal: %Internal{} = internal} = character, %Cast{}, _reason) do
     %{character | internal: %{internal | casting: nil}}
   end
+
+  defp channel_object_events(_guid, _owned?, _user_guid, :completed), do: []
+
+  defp channel_object_events(guid, true, _user_guid, :cancelled) when is_integer(guid) do
+    [Event.despawn_entity(guid)]
+  end
+
+  defp channel_object_events(guid, false, user_guid, :cancelled) when is_integer(guid) do
+    [Event.leave_ritual(guid, user_guid)]
+  end
+
+  defp channel_object_events(_guid, _owned?, _user_guid, _reason), do: []
 
   defp remove_channel_auras(%{object: %{guid: guid}} = character, %Cast{spell: %Spell{id: spell_id}} = casting) do
     target_guid = channel_target_guid(character, casting)
@@ -486,10 +556,12 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
   defp area_duration(_casting, _spell), do: 8_000
 
   defp queue_summon_objects(character, %Cast{spell: %Spell{} = spell} = casting) do
+    target_guid = casting.targets.unit_guid || character.unit.target
+
     events =
       for %Spell.Effect{type: :trans_door, misc_value: entry} <- spell.effects,
           is_integer(entry) and entry > 0 do
-        Event.summon_game_object(entry, area_duration(casting, spell))
+        Event.summon_game_object(entry, area_duration(casting, spell), ritual_target_guid: target_guid)
       end
 
     Event.enqueue(character, events)
@@ -507,8 +579,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
       reagents -> Event.enqueue(character, Event.consume_reagents(reagents))
     end
   end
-
-  defp queue_consume_ammo(character, _casting), do: character
 
   defp start_cooldown(character, %Cast{spell: %Spell{} = spell}, now) do
     Cooldowns.start(character, spell, now)

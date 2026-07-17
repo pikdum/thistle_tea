@@ -25,6 +25,7 @@ defmodule ThistleTea.Game.Network.Message.SmsgCastResult do
     not_known: 0x38,
     not_behind: 0x33,
     not_infront: 0x36,
+    not_here: 0x35,
     not_fishable: 0x34,
     not_ready: 0x3C,
     no_ammo: 0x43,
@@ -41,7 +42,9 @@ defmodule ThistleTea.Game.Network.Message.SmsgCastResult do
     targets_dead: 0x65,
     target_enemy: 0x69,
     target_friendly: 0x6B,
+    target_in_combat: 0x6C,
     target_not_dead: 0x6E,
+    target_not_in_instance: 0x7F,
     wrong_pet_food: 0x7D
   }
 

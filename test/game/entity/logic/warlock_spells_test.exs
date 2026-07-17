@@ -118,6 +118,113 @@ defmodule ThistleTea.Game.Entity.Logic.WarlockSpellsTest do
     end
   end
 
+  describe "Ritual of Summoning" do
+    test "requires a grouped player target outside combat" do
+      ritual = %Spell{id: 698, script_name: "spell_warlock_ritual_of_summoning"}
+
+      valid = %{
+        target_player?: true,
+        target_online?: true,
+        self?: false,
+        same_group?: true,
+        target_in_combat?: false,
+        caster_dungeon?: false,
+        caster_battleground?: false,
+        same_world?: false
+      }
+
+      assert :ok = CastValidation.validate(character(), ritual, %Targets{}, nil, 1_000, ritual_context: valid)
+
+      assert {:error, :target_in_combat} =
+               CastValidation.validate(character(), ritual, %Targets{}, nil, 1_000,
+                 ritual_context: %{valid | target_in_combat?: true}
+               )
+
+      assert {:error, :target_not_in_instance} =
+               CastValidation.validate(character(), ritual, %Targets{}, nil, 1_000,
+                 ritual_context: %{valid | caster_dungeon?: true}
+               )
+
+      assert {:error, :not_here} =
+               CastValidation.validate(character(), ritual, %Targets{}, nil, 1_000,
+                 ritual_context: %{valid | caster_battleground?: true}
+               )
+
+      assert {:error, :bad_targets} =
+               CastValidation.validate(character(), ritual, %Targets{}, nil, 1_000,
+                 ritual_context: %{valid | same_group?: false}
+               )
+    end
+
+    test "spawns a data-driven ritual object when channeling begins" do
+      ritual = %Spell{
+        id: 698,
+        script_name: "spell_warlock_ritual_of_summoning",
+        duration_ms: 120_000,
+        attributes: MapSet.new([:channeled]),
+        effects: [%Effect{index: 0, type: :trans_door, misc_value: 36_727}]
+      }
+
+      caster = character()
+      caster = %{caster | unit: %{caster.unit | target: 9}}
+      caster = SpellBT.start_cast(caster, ritual, %Targets{}, 1_000)
+
+      assert Enum.any?(caster.internal.events, fn event ->
+               event.type == :summon_game_object and event.entry == 36_727 and event.target_guid == 9 and
+                 event.duration_ms == 120_000
+             end)
+    end
+
+    test "cancelling a channel despawns its tracked game object" do
+      ritual = %Spell{
+        id: 698,
+        duration_ms: 120_000,
+        attributes: MapSet.new([:channeled]),
+        effects: []
+      }
+
+      caster = SpellBT.start_cast(character(), ritual, %Targets{}, 1_000)
+
+      caster = %{
+        caster
+        | internal: %{
+            caster.internal
+            | channel_game_object_guid: 77,
+              channel_game_object_owned?: true
+          }
+      }
+
+      caster = SpellBT.clear_cast(caster)
+
+      assert caster.internal.channel_game_object_guid == nil
+      assert Enum.any?(caster.internal.events, &(&1.type == :despawn_entity and &1.target_guid == 77))
+    end
+
+    test "helper channel cancellation releases the participant without despawning the portal" do
+      visual = %Spell{id: 698, duration_ms: 120_000, attributes: MapSet.new([:channeled])}
+
+      helper = SpellBT.start_game_object_channel(character(), 77, visual, 120_000, 1_000)
+      helper = SpellBT.clear_cast(helper)
+
+      assert Enum.any?(helper.internal.events, fn event ->
+               event.type == :leave_ritual and event.target_guid == 77 and event.source_guid == 1
+             end)
+
+      refute Enum.any?(helper.internal.events, &(&1.type == :despawn_entity))
+    end
+
+    test "portal completion clears a helper channel without releasing it again" do
+      visual = %Spell{id: 698, duration_ms: 120_000, attributes: MapSet.new([:channeled])}
+
+      helper = SpellBT.start_game_object_channel(character(), 77, visual, 120_000, 1_000)
+      helper = SpellBT.finish_game_object_channel(helper, 77)
+
+      assert helper.internal.casting == nil
+      assert helper.unit.channel_object == 0
+      refute Enum.any?(helper.internal.events, &(&1.type in [:leave_ritual, :despawn_entity]))
+    end
+  end
+
   describe "Conflagrate" do
     test "validation requires the caster's Immolate metadata" do
       caster = character()
