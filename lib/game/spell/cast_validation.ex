@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Spell.CastValidation do
 
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
   alias ThistleTea.Game.Entity.Logic.Core
+  alias ThistleTea.Game.Entity.Logic.Hunter
   alias ThistleTea.Game.Entity.Logic.Paladin
   alias ThistleTea.Game.Entity.Logic.Reactive
   alias ThistleTea.Game.Entity.Logic.Warlock
@@ -36,14 +37,30 @@ defmodule ThistleTea.Game.Spell.CastValidation do
          :ok <- check_cooldown(caster, spell, now),
          :ok <- check_power(caster, spell),
          :ok <- check_equipped_item(caster, spell, Keyword.get(opts, :equipped_items, [])),
+         :ok <- check_ammo(caster, spell, opts),
          :ok <- check_reagents(caster, spell, Keyword.get(opts, :count_item)),
          :ok <- check_target(spell, target_info),
          :ok <- check_creature_type(spell, target_info),
          :ok <- check_position(caster, spell, target_info),
          :ok <- check_target_aura_state(spell, target_info),
          :ok <- check_warlock_target(caster, spell, target_info),
+         :ok <- Hunter.validate_tame(caster, spell, target_info),
          :ok <- check_range(caster, spell, target_info) do
       check_line_of_sight(spell, target_info)
+    end
+  end
+
+  defp check_ammo(caster, spell, opts) do
+    if godmode?(caster) do
+      :ok
+    else
+      Hunter.validate_ammo(
+        spell,
+        Keyword.get(opts, :ammo_id),
+        Keyword.get(opts, :ammo_template),
+        Keyword.get(opts, :equipped_items, []),
+        Keyword.get(opts, :count_item)
+      )
     end
   end
 

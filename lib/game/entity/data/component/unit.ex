@@ -134,7 +134,8 @@ defmodule ThistleTea.Game.Entity.Data.Component.Unit do
     base_offhand_min_damage: :virtual,
     base_offhand_max_damage: :virtual,
     base_ranged_min_damage: :virtual,
-    base_ranged_max_damage: :virtual
+    base_ranged_max_damage: :virtual,
+    base_ranged_attack_time: :virtual
 
   alias ThistleTea.Game.Network.UpdateObject
 

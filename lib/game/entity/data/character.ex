@@ -97,14 +97,16 @@ defmodule ThistleTea.Game.Entity.Data.Character do
       if weapon do
         %{
           unit
-          | ranged_attack_time: positive_or(weapon.delay, @base_attack_time),
+          | base_ranged_attack_time: positive_or(weapon.delay, @base_attack_time),
+            ranged_attack_time: positive_or(weapon.delay, @base_attack_time),
             base_ranged_min_damage: positive_or(weapon.dmg_min1, 0.0),
             base_ranged_max_damage: positive_or(weapon.dmg_max1, 0.0)
         }
       else
         %{
           unit
-          | ranged_attack_time: @base_attack_time,
+          | base_ranged_attack_time: nil,
+            ranged_attack_time: @base_attack_time,
             base_ranged_min_damage: nil,
             base_ranged_max_damage: nil,
             min_ranged_damage: 0.0,

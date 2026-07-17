@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.DynamicObject, as: DataDynamicObject
   alias ThistleTea.Game.Entity.Data.GameObject
   alias ThistleTea.Game.Entity.Data.GameObjectTemplate, as: DataGameObjectTemplate
@@ -821,6 +822,31 @@ defmodule ThistleTea.Game.Entity.EventSink do
   end
 
   def emit(entity, %Event{type: :summon_pet}), do: entity
+
+  def emit(%Mob{object: %{guid: guid}} = entity, %Event{type: :tame_creature, source_guid: owner_guid, entry: entry}) do
+    case Entity.pid(owner_guid) do
+      pid when is_pid(pid) -> send(pid, {:tame_pet, entry})
+      _ -> nil
+    end
+
+    World.stop_entity(guid)
+    entity
+  end
+
+  def emit(entity, %Event{type: :tame_creature}), do: entity
+
+  def emit(%Character{unit: %Unit{summon: pet_guid}} = entity, %Event{type: :dismiss_pet})
+      when is_integer(pet_guid) and pet_guid > 0 do
+    World.stop_entity(pet_guid)
+
+    %{
+      entity
+      | unit: %{entity.unit | summon: 0},
+        internal: %{entity.internal | active_pet_entry: nil, active_pet_spell_id: nil}
+    }
+  end
+
+  def emit(entity, %Event{type: :dismiss_pet}), do: entity
 
   def emit(entity, %Event{type: :despawn_self} = event) do
     Process.send_after(self(), {:despawn_creature, event.respawn_delay_ms}, event.duration_ms || 0)

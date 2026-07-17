@@ -390,6 +390,7 @@ defmodule ThistleTea.Game.World.Loader.Mob do
         bounding_radius: mob.unit.bounding_radius,
         combat_reach: mob.unit.combat_reach,
         level: mob.unit.level,
+        tameable?: Bitwise.band(mob.internal.creature.type_flags || 0, 0x1) != 0,
         unit_flags: mob.unit.flags,
         detection_range: mob.internal.creature.detection_range,
         display_id: mob.unit.display_id,

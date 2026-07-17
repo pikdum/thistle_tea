@@ -116,7 +116,7 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
   end
 
   def equipped_templates(%Player{} = player, get_item) do
-    @equipment_fields
+    (@equipment_fields ++ @bag_fields)
     |> Enum.map(fn field -> Map.get(player, field) end)
     |> Enum.filter(fn guid -> is_integer(guid) and guid > 0 end)
     |> Enum.map(get_item)

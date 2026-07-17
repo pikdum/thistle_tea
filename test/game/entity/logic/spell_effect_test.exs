@@ -400,6 +400,54 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
       assert target.internal.casting == nil
     end
 
+    test "trap effects enqueue a timed game object summon" do
+      spell = %Spell{
+        id: 1499,
+        name: "Freezing Trap",
+        duration_ms: 60_000,
+        effects: [%Effect{index: 0, type: :summon_game_object, misc_value: 2561}]
+      }
+
+      context = %CastContext{caster_guid: 1, caster_level: 10}
+      {_caster, events} = SpellEffect.receive(target_fixture(), context, spell, 1_000)
+
+      assert [%{type: :summon_game_object, entry: 2561, duration_ms: 60_000}] = events
+    end
+
+    test "tame creature emits ownership data from the target entry" do
+      spell = %Spell{id: 1515, effects: [%Effect{index: 0, type: :tame_creature}]}
+      target = target_fixture()
+      target = %{target | object: %{target.object | entry: 1234}}
+
+      {_target, events} = SpellEffect.receive(target, %CastContext{caster_guid: 99, caster_level: 10}, spell, 1_000)
+
+      assert [%{type: :tame_creature, source_guid: 99, entry: 1234}] = events
+    end
+
+    test "call, revive, and dismiss use the stable hunter pet entry" do
+      character = dead_character_fixture()
+
+      character = %{
+        character
+        | unit: %{character.unit | health: 100},
+          internal: %{character.internal | active_pet_entry: 1234}
+      }
+
+      context = %CastContext{caster_guid: 1, caster_level: 10}
+
+      call_pet = %Spell{id: 883, effects: [%Effect{index: 0, type: :summon_pet, misc_value: 0}]}
+      {_character, events} = SpellEffect.receive(character, context, call_pet, 1_000)
+      assert [%{type: :summon_pet, entry: 1234, spell_id: 883}] = events
+
+      revive_pet = %Spell{id: 982, effects: [%Effect{index: 0, type: :revive_pet, misc_value: 0}]}
+      {_character, events} = SpellEffect.receive(character, context, revive_pet, 1_000)
+      assert [%{type: :summon_pet, entry: 1234, spell_id: 982}] = events
+
+      dismiss_pet = %Spell{id: 2641, effects: [%Effect{index: 0, type: :dismiss_pet}]}
+      {_character, events} = SpellEffect.receive(character, context, dismiss_pet, 1_000)
+      assert [%{type: :dismiss_pet, source_guid: 1}] = events
+    end
+
     test "mod_damage_taken reduces incoming spell damage" do
       dampen = %Spell{
         id: 604,

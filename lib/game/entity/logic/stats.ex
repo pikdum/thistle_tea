@@ -135,6 +135,7 @@ defmodule ThistleTea.Game.Entity.Logic.Stats do
 
   defp derive_weapon_damage(%Unit{} = unit) do
     unit
+    |> derive_ranged_attack_time()
     |> derive_damage(:base_min_damage, :base_max_damage, :min_damage, :max_damage, unit.base_attack_time)
     |> derive_damage(
       :base_offhand_min_damage,
@@ -145,6 +146,13 @@ defmodule ThistleTea.Game.Entity.Logic.Stats do
     )
     |> derive_ranged_damage()
   end
+
+  defp derive_ranged_attack_time(%Unit{base_ranged_attack_time: base} = unit) when is_number(base) and base > 0 do
+    haste = unit |> equipment_bonus(:ranged_haste) |> max(0)
+    %{unit | ranged_attack_time: trunc(base * 100 / (100 + haste))}
+  end
+
+  defp derive_ranged_attack_time(%Unit{} = unit), do: unit
 
   defp derive_ranged_damage(%Unit{} = unit) do
     with base_min when is_number(base_min) <- unit.base_ranged_min_damage,

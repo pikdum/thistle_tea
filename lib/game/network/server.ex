@@ -595,6 +595,17 @@ defmodule ThistleTea.Game.Network.Server do
   end
 
   @impl GenServer
+  def handle_info({:tame_pet, entry}, {socket, %{character: %Character{} = character} = state})
+      when is_integer(entry) and entry > 0 do
+    character = EventSink.emit(character, Event.summon_pet(character.object.guid, entry, 1515))
+    {:noreply, {socket, %{state | character: character}}, socket.read_timeout}
+  rescue
+    error ->
+      Logger.error("tame_pet crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:noreply, {socket, state}, socket.read_timeout}
+  end
+
+  @impl GenServer
   def handle_info({:deliver_spell, event}, {socket, state}) do
     EventSink.deliver_spell(event)
     {:noreply, {socket, state}, socket.read_timeout}
@@ -635,13 +646,19 @@ defmodule ThistleTea.Game.Network.Server do
       ) do
     {character, aura_events} = Aura.remove_spells(character, [25_228], Time.now())
 
+    hunter_pet? = character.internal.active_pet_spell_id == 1515
+
     character =
       character
       |> then(fn character ->
         %{
           character
           | unit: %{character.unit | summon: 0},
-            internal: %{character.internal | active_pet_entry: nil, active_pet_spell_id: nil}
+            internal: %{
+              character.internal
+              | active_pet_entry: if(hunter_pet?, do: character.internal.active_pet_entry),
+                active_pet_spell_id: if(hunter_pet?, do: 1515)
+            }
         }
       end)
       |> EventSink.emit(aura_events)

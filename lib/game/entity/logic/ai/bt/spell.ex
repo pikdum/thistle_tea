@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.Entity.Logic.Hostility
+  alias ThistleTea.Game.Entity.Logic.Hunter
   alias ThistleTea.Game.Entity.Logic.MeleeSpell
   alias ThistleTea.Game.Entity.Logic.Paladin
   alias ThistleTea.Game.Entity.Logic.PlayerCombat
@@ -84,6 +85,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
       |> queue_spell_go(casting, targets)
       |> queue_area_effects(casting)
       |> queue_consume_reagents(casting)
+      |> queue_consume_ammo(casting)
       |> mark_hostile_cast(casting, targets, now)
       |> start_channel(casting)
     else
@@ -157,6 +159,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
     |> queue_summon_objects(casting)
     |> queue_item_enchantments(casting)
     |> queue_consume_reagents(casting)
+    |> queue_consume_ammo(casting)
     |> queue_consume_cast_item(casting)
     |> queue_open_object(casting)
     |> break_stealth(casting, now)
@@ -401,6 +404,15 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
   end
 
   defp queue_consume_reagents(character, _casting), do: character
+
+  defp queue_consume_ammo(character, %Cast{spell: %Spell{} = spell}) do
+    case Hunter.ammo_reagents(character, spell) do
+      [] -> character
+      reagents -> Event.enqueue(character, Event.consume_reagents(reagents))
+    end
+  end
+
+  defp queue_consume_ammo(character, _casting), do: character
 
   defp start_cooldown(character, %Cast{spell: %Spell{} = spell}, now) do
     Cooldowns.start(character, spell, now)

@@ -441,6 +441,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp effect_type(5), do: :teleport_units
   defp effect_type(31), do: :weapon_percent_damage
   defp effect_type(121), do: :normalized_weapon_damage
+  defp effect_type(104), do: :summon_game_object
   defp effect_type(6), do: :apply_aura
   defp effect_type(8), do: :power_drain
   defp effect_type(9), do: :health_leech
@@ -458,6 +459,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp effect_type(50), do: :trans_door
   defp effect_type(53), do: :enchant_item
   defp effect_type(54), do: :enchant_item_temporary
+  defp effect_type(55), do: :tame_creature
   defp effect_type(56), do: :summon_pet
   defp effect_type(62), do: :power_burn
   defp effect_type(63), do: :modify_threat
@@ -466,6 +468,9 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp effect_type(79), do: :clear_threat
   defp effect_type(80), do: :add_combo_points
   defp effect_type(96), do: :charge
+  defp effect_type(101), do: :feed_pet
+  defp effect_type(102), do: :dismiss_pet
+  defp effect_type(109), do: :revive_pet
   defp effect_type(92), do: :enchant_held_item
   defp effect_type(17), do: :weapon_damage_noschool
   defp effect_type(27), do: :persistent_area_aura
@@ -546,6 +551,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp aura_type(135), do: :mod_healing_done
   defp aura_type(137), do: :mod_total_stat_percent
   defp aura_type(138), do: :mod_melee_haste
+  defp aura_type(141), do: :mod_ranged_haste
   defp aura_type(143), do: :mod_resistance_exclusive
   defp aura_type(149), do: :reduce_pushback
   defp aura_type(153), do: :split_damage_flat

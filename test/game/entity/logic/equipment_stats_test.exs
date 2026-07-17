@@ -74,6 +74,23 @@ defmodule ThistleTea.Game.Entity.Logic.EquipmentStatsTest do
       assert bonuses.strength == 6
       assert bonuses.agility == 0
     end
+
+    test "derives quiver haste from its on-equip DBC spell" do
+      quiver = %ItemTemplate{
+        entry: 18_714,
+        class: 11,
+        subclass: 2,
+        inventory_type: 18,
+        spellid_1: 29_414,
+        spelltrigger_1: 1
+      }
+
+      get_spell = fn 29_414 ->
+        %Spell{effects: [%Effect{type: :apply_aura, aura: :mod_ranged_haste, base_points: 14}]}
+      end
+
+      assert EquipmentStats.bonuses([quiver], get_spell).ranged_haste == 14
+    end
   end
 
   describe "resync/2" do

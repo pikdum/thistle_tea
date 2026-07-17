@@ -262,6 +262,43 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
     {state, [Event.summon_pet(caster_guid, entry, spell_id)]}
   end
 
+  defp apply_effect(
+         %Character{internal: %{active_pet_entry: entry}} = state,
+         %CastContext{caster_guid: caster_guid},
+         %Spell{id: spell_id},
+         %Effect{type: type, misc_value: 0},
+         _now
+       )
+       when type in [:summon_pet, :revive_pet] and is_integer(entry) and entry > 0 do
+    {state, [Event.summon_pet(caster_guid, entry, spell_id)]}
+  end
+
+  defp apply_effect(
+         %Character{} = state,
+         %CastContext{caster_guid: caster_guid},
+         _spell,
+         %Effect{type: :dismiss_pet},
+         _now
+       ) do
+    {state, [Event.dismiss_pet(caster_guid)]}
+  end
+
+  defp apply_effect(state, %CastContext{}, spell, %Effect{type: :summon_game_object, misc_value: entry}, _now)
+       when is_integer(entry) and entry > 0 do
+    {state, [Event.summon_game_object(entry, max(spell.duration_ms || 0, 0))]}
+  end
+
+  defp apply_effect(
+         %{object: %{entry: entry}} = state,
+         %CastContext{caster_guid: owner_guid},
+         _spell,
+         %Effect{type: :tame_creature},
+         _now
+       )
+       when is_integer(entry) and entry > 0 do
+    {state, [Event.tame_creature(owner_guid, entry)]}
+  end
+
   defp apply_effect(%Character{} = state, %CastContext{}, spell, %Effect{type: :clear_threat}, now) do
     {state, mob_guids} = PlayerCombat.vanish(state, now)
 

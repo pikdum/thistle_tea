@@ -194,7 +194,9 @@ defmodule ThistleTea.Game.Player.Spellcasting do
       build_target_info(state, spell, targets),
       Time.now(),
       count_item: fn item_id -> Inventory.count_entry(character.player, item_id, &ItemStore.get/1) end,
-      equipped_items: equipped_weapon_templates(character)
+      equipped_items: equipped_weapon_templates(character),
+      ammo_id: character.player.ammo_id,
+      ammo_template: ItemLoader.get_template(character.player.ammo_id)
     )
   end
 
@@ -240,6 +242,8 @@ defmodule ThistleTea.Game.Player.Spellcasting do
            :faction_template,
            :unit_flags,
            :health_pct,
+           :level,
+           :tameable?,
            :orientation,
            :creature_type,
            :aura_sources
@@ -255,6 +259,8 @@ defmodule ThistleTea.Game.Player.Spellcasting do
           friendly?: Hostility.friendly?(character, metadata),
           attackable?: Hostility.attackable?(character, guid),
           health_pct: Map.get(metadata, :health_pct),
+          level: Map.get(metadata, :level),
+          tameable?: Map.get(metadata, :tameable?, false),
           creature_type: Map.get(metadata, :creature_type),
           position: World.position(guid),
           orientation: Map.get(metadata, :orientation),

@@ -157,6 +157,24 @@ defmodule ThistleTea.Game.Entity.Logic.StatsTest do
       assert buffed.max_ranged_damage > unbuffed.max_ranged_damage
     end
 
+    test "quiver haste derives ranged attack time without mutating its base" do
+      unit = %{
+        mage_unit()
+        | class: 3,
+          base_ranged_attack_time: 2800,
+          ranged_attack_time: 2800,
+          base_ranged_min_damage: 20.0,
+          base_ranged_max_damage: 30.0,
+          equipment_bonuses: %{ranged_haste: 14}
+      }
+
+      recomputed = recompute(unit)
+
+      assert recomputed.ranged_attack_time == trunc(2800 * 100 / 114)
+      assert recomputed.base_ranged_attack_time == 2800
+      assert recompute(recomputed) == recomputed
+    end
+
     test "skips weapon damage without base inputs" do
       mob = %Unit{level: 10, attack_power: 50, min_damage: 30.0, max_damage: 40.0, base_attack_time: 2000, auras: []}
       recomputed = recompute(mob)

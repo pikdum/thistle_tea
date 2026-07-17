@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Network.Message.SmsgCastResult do
 
   @cast_failure_reasons %{
     affecting_combat: 0x00,
+    already_have_summon: 0x05,
     aura_bounced: 0x07,
     bad_implicit_targets: 0x09,
     bad_targets: 0x0A,
@@ -25,6 +26,7 @@ defmodule ThistleTea.Game.Network.Message.SmsgCastResult do
     not_infront: 0x36,
     not_fishable: 0x34,
     not_ready: 0x3C,
+    no_ammo: 0x48,
     not_shapeshift: 0x3D,
     no_power: 0x4D,
     only_shapeshift: 0x56,
