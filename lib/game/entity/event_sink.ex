@@ -583,6 +583,29 @@ defmodule ThistleTea.Game.Entity.EventSink do
     entity
   end
 
+  def emit(%Mob{object: %{guid: guid}, unit: %{created_by: owner_guid}} = entity, %Event{
+        type: :refresh_party_aura,
+        spell: %Spell{} = spell,
+        amount: radius
+      })
+      when is_integer(owner_guid) and owner_guid > 0 and is_number(radius) do
+    entity
+    |> SpellTargetResolver.resolve_query({:party_aoe, radius})
+    |> Enum.each(fn target_guid ->
+      context = %CastContext{
+        caster_guid: guid,
+        caster_level: entity.unit.level || 1,
+        target_guid: target_guid,
+        target_hostile?: false,
+        spell: spell
+      }
+
+      Entity.receive_spell(target_guid, context, spell)
+    end)
+
+    entity
+  end
+
   def emit(entity, %Event{type: :refresh_party_aura}), do: entity
 
   def emit(entity, %Event{type: :redirect_damage} = event) do

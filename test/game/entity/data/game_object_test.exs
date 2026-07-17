@@ -55,6 +55,28 @@ defmodule ThistleTea.Game.Entity.Data.GameObjectTest do
       assert go.internal.summon.spell_id == nil
       assert go.internal.summon.charges == nil
     end
+
+    test "hunter trap templates retain their trigger definition" do
+      data = [12, 0, 5, 13_797, 1, 0, 0, 0] ++ List.duplicate(0, 16)
+
+      template = %GameObjectTemplate{
+        entry: 164_638,
+        type: 6,
+        display_id: 3074,
+        name: "Immolation Trap",
+        size: 1.0,
+        flags: 0,
+        faction: 0,
+        data: data
+      }
+
+      trap = GameObject.build_summoned(template, 0, {0.0, 0.0, 0.0, 0.0}, summoned_by: 99)
+
+      assert trap.internal.trap.owner_guid == 99
+      assert trap.internal.trap.spell_id == 13_797
+      assert trap.internal.trap.radius == 2.5
+      assert trap.internal.trap.charges == 1
+    end
   end
 
   describe "build/1 chests" do

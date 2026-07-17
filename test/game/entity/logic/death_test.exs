@@ -127,6 +127,7 @@ defmodule ThistleTea.Game.Entity.Logic.DeathTest do
       assert character.unit.power1 == 40
       assert character.unit.power2 == 0
       assert character.unit.power4 == 50
+      assert character.player.self_res_spell == 0
     end
 
     test "removes ghost auras and flag", %{ghost: ghost} do

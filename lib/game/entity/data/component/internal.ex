@@ -23,6 +23,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal do
     :summon,
     :pet,
     :chair,
+    :trap,
     :active_pet_entry,
     :active_pet_spell_id,
     :auto_shot,

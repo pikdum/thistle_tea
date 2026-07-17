@@ -69,7 +69,7 @@ defmodule ThistleTea.Game.Entity.Logic.Death do
         vis_flag: 0
     }
 
-    player = %{player | flags: (player.flags || 0) &&& bnot(@player_flag_ghost)}
+    player = %{player | flags: (player.flags || 0) &&& bnot(@player_flag_ghost), self_res_spell: 0}
 
     character = %{character | unit: unit, player: player}
 
@@ -90,7 +90,7 @@ defmodule ThistleTea.Game.Entity.Logic.Death do
         vis_flag: 0
     }
 
-    player = %{player | flags: (player.flags || 0) &&& bnot(@player_flag_ghost)}
+    player = %{player | flags: (player.flags || 0) &&& bnot(@player_flag_ghost), self_res_spell: 0}
 
     character = %{character | unit: unit, player: player}
 

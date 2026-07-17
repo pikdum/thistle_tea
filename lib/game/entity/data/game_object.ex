@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Entity.Data.GameObject do
   alias ThistleTea.Game.Entity.Data.Component.Internal.Chair
   alias ThistleTea.Game.Entity.Data.Component.Internal.Fishing
   alias ThistleTea.Game.Entity.Data.Component.Internal.Summon
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Trap
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.GameObjectTemplate
@@ -61,6 +62,7 @@ defmodule ThistleTea.Game.Entity.Data.GameObject do
         world: WorldRef.coerce(world),
         chair: chair(ot),
         fishing: Keyword.get(opts, :fishing),
+        trap: trap(ot, Keyword.get(opts, :summoned_by)),
         summon: %Summon{
           owner_guid: Keyword.get(opts, :summoned_by),
           despawn_in_ms: Keyword.get(opts, :despawn_in_ms),
@@ -73,6 +75,22 @@ defmodule ThistleTea.Game.Entity.Data.GameObject do
   end
 
   @go_type_spellcaster 22
+  @go_type_trap 6
+
+  defp trap(%GameObjectTemplate{type: @go_type_trap, data: data}, owner_guid) do
+    %Trap{
+      owner_guid: owner_guid,
+      radius: trap_radius(Enum.at(data, 2)),
+      spell_id: Enum.at(data, 3),
+      charges: max(Enum.at(data, 4) || 1, 1),
+      start_delay_ms: max(Enum.at(data, 7) || 0, 0) * 1_000
+    }
+  end
+
+  defp trap(_template, _owner_guid), do: nil
+
+  defp trap_radius(radius) when is_number(radius) and radius > 0, do: min(radius * 1.0, 2.5)
+  defp trap_radius(_radius), do: 2.5
 
   defp spellcaster_spell(%GameObjectTemplate{type: @go_type_spellcaster, data: data}) do
     case Enum.at(data, 0) do

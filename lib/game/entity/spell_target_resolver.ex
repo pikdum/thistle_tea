@@ -131,24 +131,30 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
   end
 
   defp nearby_party_guids(caster, caster_guid, radius) when is_number(radius) and radius > 0 do
+    party_guid = party_owner_guid(caster, caster_guid)
+    nearby_guids = caster |> nearby_units(radius) |> Enum.map(fn {guid, _distance} -> guid end)
+
     members =
-      case PartySystem.group_of(caster_guid) do
+      case PartySystem.group_of(party_guid) do
         %Party.Group{} = group ->
           member_guids = MapSet.new(group.members, & &1.guid)
 
-          caster
-          |> nearby_units(radius)
-          |> Enum.map(fn {guid, _distance} -> guid end)
+          nearby_guids
           |> Enum.filter(fn guid -> MapSet.member?(member_guids, guid) and alive?(guid) end)
 
         _ ->
-          []
+          Enum.filter(nearby_guids, &(&1 == party_guid and alive?(&1)))
       end
 
-    [caster_guid | members]
+    if party_guid == caster_guid, do: Enum.uniq([caster_guid | members]), else: Enum.uniq(members)
   end
 
   defp nearby_party_guids(_caster, caster_guid, _radius), do: [caster_guid]
+
+  defp party_owner_guid(%{unit: %{created_by: owner_guid}}, _caster_guid)
+       when is_integer(owner_guid) and owner_guid > 0, do: owner_guid
+
+  defp party_owner_guid(_caster, caster_guid), do: caster_guid
 
   defp alive?(guid) do
     case Metadata.query(guid, [:alive?]) do

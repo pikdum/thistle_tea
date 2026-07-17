@@ -9,12 +9,14 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Internal.Summon
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Trap
   alias ThistleTea.Game.Entity.Data.GameObject
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Registry, as: EntityRegistry
   alias ThistleTea.Game.Entity.Server.GameObject.Chair
   alias ThistleTea.Game.Entity.Server.GameObject.Chest
   alias ThistleTea.Game.Entity.Server.GameObject.Fishing
+  alias ThistleTea.Game.Entity.Server.GameObject.Trap, as: TrapServer
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message.SmsgFishNotHooked
   alias ThistleTea.Game.Network.Message.SmsgGameobjectCustomAnim
@@ -43,6 +45,7 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
     state = Visibility.join_entity(state)
     schedule_despawn(state)
     schedule_fishing_bite(state)
+    schedule_trap(state)
     {:ok, state}
   end
 
@@ -173,6 +176,18 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
     despawn(state)
   end
 
+  def handle_info(:trap_tick, %GameObject{internal: %Internal{trap: %Trap{} = trap}} = state) do
+    case TrapServer.target(state) do
+      target_guid when is_integer(target_guid) ->
+        trigger_trap(state, trap, target_guid)
+        despawn(state)
+
+      _ ->
+        Process.send_after(self(), :trap_tick, 200)
+        {:noreply, state}
+    end
+  end
+
   def handle_info(:fishing_bite, %GameObject{} = state) do
     state = Fishing.bite(state)
     Core.update_object(state, :values) |> World.broadcast_packet(state)
@@ -249,6 +264,24 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
   end
 
   defp schedule_fishing_bite(_state), do: nil
+
+  defp schedule_trap(%GameObject{internal: %Internal{trap: %Trap{start_delay_ms: delay}}}) do
+    Process.send_after(self(), :trap_tick, max(delay, 200))
+  end
+
+  defp schedule_trap(_state), do: nil
+
+  defp trigger_trap(state, %Trap{owner_guid: owner_guid, spell_id: spell_id}, target_guid) do
+    case SpellLoader.load(spell_id) do
+      %Spell{} = spell ->
+        level = state.game_object.level || 1
+        context = %CastContext{caster_guid: owner_guid, caster_level: level, target_guid: target_guid, spell: spell}
+        Entity.receive_spell(target_guid, context, spell)
+
+      _ ->
+        nil
+    end
+  end
 
   defp spend_charge(%GameObject{internal: %Internal{summon: %Summon{charges: charges} = summon} = internal} = state)
        when is_integer(charges) do

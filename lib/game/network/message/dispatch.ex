@@ -117,6 +117,7 @@ defmodule ThistleTea.Game.Network.Message.Dispatch do
               CMSG_RECLAIM_CORPSE: Message.CmsgReclaimCorpse,
               CMSG_SPIRIT_HEALER_ACTIVATE: Message.CmsgSpiritHealerActivate,
               CMSG_RESURRECT_RESPONSE: Message.CmsgResurrectResponse,
+              CMSG_SELF_RES: Message.CmsgSelfRes,
               CMSG_GAMEOBJ_USE: Message.CmsgGameobjUse,
               CMSG_GROUP_INVITE: Message.CmsgGroupInvite,
               CMSG_GROUP_ACCEPT: Message.CmsgGroupAccept,

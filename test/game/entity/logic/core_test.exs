@@ -5,8 +5,10 @@ defmodule ThistleTea.Game.Entity.Logic.CoreTest do
   alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
   alias ThistleTea.Game.Entity.Data.Component.Internal.Spawn
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
+  alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.Core
+  alias ThistleTea.Game.Spell
 
   describe "heal/2" do
     test "restores health up to max health" do
@@ -59,6 +61,18 @@ defmodule ThistleTea.Game.Entity.Logic.CoreTest do
       {entity, _absorbed} = Core.take_damage_with_absorb(entity, 30, 1_000, source: 0)
 
       assert entity.internal.killed_by == nil
+    end
+  end
+
+  describe "take_damage_with_absorb/4 self resurrection" do
+    test "offers Reincarnation after lethal damage when learned" do
+      entity = damageable(health: 30)
+      entity = %{entity | internal: %{entity.internal | spellbook: %{20_608 => %Spell{id: 20_608}}}}
+      entity = Map.put(entity, :player, %Player{})
+
+      {entity, _absorbed} = Core.take_damage_with_absorb(entity, 30, 1_000)
+
+      assert entity.player.self_res_spell == 21_169
     end
   end
 

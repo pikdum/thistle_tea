@@ -138,6 +138,11 @@ defmodule ThistleTea.Game.World.Loader.MobVmangosTest do
       assert targets[11_986] == :friendly_injured
       assert targets[4_979] == :friendly_missing_buff
     end
+
+    test "loads hostile and friendly totem spells from creature templates" do
+      assert [%{spell_id: 22_048, cast_target: :victim}] = mob(2_523).internal.creature.spells
+      assert [%{spell_id: 5_672, cast_target: :self}] = mob(3_527).internal.creature.spells
+    end
   end
 
   defp mob(entry) do

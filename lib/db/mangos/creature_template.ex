@@ -83,6 +83,8 @@ defmodule ThistleTea.DB.Mangos.CreatureTemplate do
     field(:spell_id3, :integer, virtual: true, default: 0)
     field(:spell_id4, :integer, virtual: true, default: 0)
     field(:spell_list_id, :integer, default: 0)
+    field(:spawn_spell_id, :integer, default: 0)
+    field(:totem_spell_id, :integer, default: 0)
     field(:pet_spell_data_id, :integer, source: :pet_spell_list_id, default: 0)
     field(:movement_type, :integer, default: 0)
     field(:trainer_type, :integer, default: 0)
