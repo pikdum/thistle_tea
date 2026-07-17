@@ -227,7 +227,17 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
        when is_integer(caster) do
     if Guid.entity_type(caster) == :player do
       damage = outcome_damage_basis(attack, result, absorbed)
-      [Event.attack_outcome(caster, victim_guid, result.outcome, damage, Map.get(attack, :queued_spell_id))]
+
+      [
+        Event.attack_outcome(
+          caster,
+          victim_guid,
+          result.outcome,
+          damage,
+          Map.get(attack, :queued_spell_id),
+          outcome_proc_damage(result, absorbed)
+        )
+      ]
     else
       []
     end
@@ -246,6 +256,13 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
   end
 
   defp outcome_damage_basis(_attack, _result, _absorbed), do: 0
+
+  defp outcome_proc_damage(%{damage: damage, pre_armor_damage: pre_armor_damage}, absorbed)
+       when is_integer(damage) and damage > 0 and is_integer(pre_armor_damage) do
+    round(pre_armor_damage * max(damage - (absorbed || 0), 0) / damage)
+  end
+
+  defp outcome_proc_damage(_result, _absorbed), do: 0
 
   defp attack_school(%{spell_school_mask: mask}) when is_integer(mask) and mask > 1 do
     index = Enum.find(1..6, 0, fn i -> (mask >>> i &&& 1) == 1 end)

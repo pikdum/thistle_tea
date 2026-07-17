@@ -226,9 +226,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
 
   defp consume_forced_crit(character, %Cast{spell: %Spell{} = spell}, now) do
     if Spell.melee_ability?(spell) or Spell.damage_effects(spell) != [] do
-      spell_ids = if AuraLogic.has_aura?(character, :force_crit), do: [14_177], else: []
-
-      {character, events} = AuraLogic.remove_spells(character, spell_ids, now)
+      {character, events} = AuraLogic.remove_aura_types(character, [:force_crit], now)
       Event.enqueue(character, events)
     else
       character

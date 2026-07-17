@@ -7,7 +7,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackFeedback do
   point that marks a dodging target for Overpower. Swings that carried a
   queued on-next-swing spell generate no rage.
   """
-  alias ThistleTea.Game.Entity.Logic.Aura
+  alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.Entity.Logic.Paladin
   alias ThistleTea.Game.Entity.Logic.Reactive
@@ -23,7 +23,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackFeedback do
     entity
     |> apply_power_feedback(payload, spell)
     |> apply_rogue_combo_feedback(payload, spell)
-    |> trigger_blade_flurry(payload)
+    |> trigger_blade_flurry(payload, spell)
     |> Paladin.trigger_seal(payload)
     |> mark_reactives(payload, now)
   end
@@ -74,16 +74,27 @@ defmodule ThistleTea.Game.Entity.Logic.AttackFeedback do
 
   defp apply_rogue_combo_feedback(entity, _payload, _spell), do: entity
 
-  defp trigger_blade_flurry(entity, %{victim_guid: victim_guid, damage: damage})
-       when is_integer(damage) and damage > 0 do
-    if Aura.has_spell?(entity, 13_877) do
-      Event.enqueue(entity, Event.blade_flurry(victim_guid, damage))
+  defp trigger_blade_flurry(entity, %{victim_guid: victim_guid, damage: damage} = payload, spell)
+       when is_integer(damage) do
+    proc_damage = Map.get(payload, :proc_damage, damage)
+    proc_type = if match?(%Spell{}, spell), do: :deal_melee_ability, else: :deal_melee_swing
+
+    if is_integer(proc_damage) and proc_damage > 0 and blade_flurry_active?(entity, proc_type) do
+      Event.enqueue(entity, Event.blade_flurry(victim_guid, proc_damage))
     else
       entity
     end
   end
 
-  defp trigger_blade_flurry(entity, _payload), do: entity
+  defp trigger_blade_flurry(entity, _payload, _spell), do: entity
+
+  defp blade_flurry_active?(%{unit: %{auras: holders}}, proc_type) when is_list(holders) do
+    Enum.any?(holders, fn %Holder{spell: spell} ->
+      Scripts.rogue_blade_flurry?(spell) and Spell.procs_on?(spell, proc_type)
+    end)
+  end
+
+  defp blade_flurry_active?(_entity, _proc_type), do: false
 
   defp mark_reactives(entity, %{outcome: :dodge, victim_guid: victim_guid}, now) do
     Reactive.mark_dodging_target(entity, victim_guid, now)

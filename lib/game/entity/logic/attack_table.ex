@@ -58,10 +58,10 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
   def resolve(defender, attack, damage, opts \\ []) when is_map(attack) do
     ctx = context(defender, attack)
     roll = Keyword.get_lazy(opts, :roll, fn -> Math.random_int(0, 9_999) end)
+    outcome = roll_outcome(ctx, roll)
+    result = apply_outcome(outcome, ctx, damage, opts)
 
-    ctx
-    |> roll_outcome(roll)
-    |> apply_outcome(ctx, damage, opts)
+    Map.put(result, :pre_armor_damage, reconstruct_pre_armor_damage(ctx, damage, result.damage))
   end
 
   def roll_special(defender, attack, opts \\ []) when is_map(attack) do
@@ -374,6 +374,15 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
 
   defp mitigated_damage(ctx, damage) do
     armor_reduced_damage(damage, ctx.defender_armor, ctx.caster_level)
+  end
+
+  defp reconstruct_pre_armor_damage(_ctx, _base_damage, result_damage) when result_damage <= 0, do: 0
+
+  defp reconstruct_pre_armor_damage(ctx, base_damage, result_damage) do
+    case mitigated_damage(ctx, base_damage) do
+      mitigated when mitigated > 0 -> round(result_damage * base_damage / mitigated)
+      _ -> result_damage
+    end
   end
 
   defp glancing_factor(ctx, factor_roll) do

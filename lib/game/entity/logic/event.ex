@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
     :spell_id,
     :school,
     :damage,
+    :proc_damage,
     :amount,
     :health,
     :mana,
@@ -67,6 +68,7 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
       spell_id: spell.id,
       school: spell.school,
       damage: damage,
+      proc_damage: Keyword.get(opts, :proc_damage),
       periodic?: Keyword.get(opts, :periodic?, false),
       resisted: Keyword.get(opts, :resisted, 0),
       absorbed: Keyword.get(opts, :absorbed, 0),
@@ -287,7 +289,7 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
     %__MODULE__{type: :tap_cleared}
   end
 
-  def attack_outcome(attacker_guid, victim_guid, outcome, damage, spell_id)
+  def attack_outcome(attacker_guid, victim_guid, outcome, damage, spell_id, proc_damage \\ nil)
       when is_integer(attacker_guid) and is_integer(victim_guid) and is_atom(outcome) do
     %__MODULE__{
       type: :attack_outcome,
@@ -295,6 +297,7 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
       source_guid: victim_guid,
       outcome: outcome,
       damage: damage,
+      proc_damage: proc_damage || damage,
       spell_id: spell_id
     }
   end

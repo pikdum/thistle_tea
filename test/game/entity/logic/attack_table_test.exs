@@ -237,6 +237,17 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTableTest do
       result = AttackTable.resolve(target, attack(), 100, roll: 9_999)
 
       assert result.damage == 68
+      assert result.pre_armor_damage == 100
+    end
+
+    test "preserves the pre-armor basis for critical proc damage" do
+      target = mob(unit: [normal_resistance: 1_000])
+
+      result = AttackTable.resolve(target, attack(), 100, roll: 3_000)
+
+      assert result.outcome == :crit
+      assert result.damage == 136
+      assert result.pre_armor_damage == 200
     end
 
     test "does not reduce non-physical melee damage" do

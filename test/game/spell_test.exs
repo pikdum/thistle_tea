@@ -43,6 +43,27 @@ defmodule ThistleTea.Game.SpellTest do
     end
   end
 
+  describe "duration_for_combo_points/2" do
+    test "interpolates the DBC base and maximum durations across five points" do
+      spell = %Spell{duration_ms: 6_000, max_duration_ms: 16_000}
+
+      assert Spell.duration_for_combo_points(spell, 1) == 8_000
+      assert Spell.duration_for_combo_points(spell, 3) == 12_000
+      assert Spell.duration_for_combo_points(spell, 5) == 16_000
+      assert Spell.duration_for_combo_points(spell, 8) == 16_000
+    end
+  end
+
+  describe "procs_on?/2" do
+    test "matches DBC proc-type flags" do
+      blade_flurry = %Spell{proc_type_mask: 0x14}
+
+      assert Spell.procs_on?(blade_flurry, :deal_melee_swing)
+      assert Spell.procs_on?(blade_flurry, :deal_melee_ability)
+      refute Spell.procs_on?(%Spell{}, :deal_melee_swing)
+    end
+  end
+
   describe "school_index/1" do
     test "returns packet indexes for spell schools" do
       assert Spell.school_index(:physical) == 0

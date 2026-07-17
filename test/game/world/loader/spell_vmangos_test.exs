@@ -151,6 +151,7 @@ defmodule ThistleTea.Game.World.Loader.SpellVmangosTest do
       assert Enum.any?(sinister_strike.effects, &(&1.type == :add_combo_points))
       assert Enum.any?(stealth.effects, &(&1.aura == :mod_stealth))
       assert stealth.stances == 0
+      assert Spell.attribute?(stealth, :not_in_combat)
     end
 
     test "feint, cold blood, and vanish load their rogue mechanics" do
@@ -159,9 +160,18 @@ defmodule ThistleTea.Game.World.Loader.SpellVmangosTest do
       assert Enum.any?(SpellLoader.load(1856).effects, &(&1.type == :clear_threat))
     end
 
+    test "blade flurry loads its melee proc mask" do
+      blade_flurry = SpellLoader.load(13_877)
+
+      assert Spell.procs_on?(blade_flurry, :deal_melee_swing)
+      assert Spell.procs_on?(blade_flurry, :deal_melee_ability)
+    end
+
     test "finishers load their per-combo-point scaling" do
       assert Enum.find(SpellLoader.load(11_300).effects, &(&1.type == :school_damage)).points_per_combo == 151.0
       assert Enum.find(SpellLoader.load(11_198).effects, &(&1.aura == :mod_resistance)).points_per_combo == -340.0
+      assert %Spell{duration_ms: 6_000, max_duration_ms: 16_000} = SpellLoader.load(1943)
+      assert %Spell{duration_ms: 0, max_duration_ms: 5_000} = SpellLoader.load(408)
     end
 
     test "backstab and ambush load their behind-target requirement" do

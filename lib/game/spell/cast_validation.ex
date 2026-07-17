@@ -69,7 +69,10 @@ defmodule ThistleTea.Game.Spell.CastValidation do
     if Core.dead?(caster), do: {:error, :caster_dead}, else: :ok
   end
 
-  defp check_combat_state(%{internal: %{in_combat: true}}, %Spell{name: "Stealth"}), do: {:error, :affecting_combat}
+  defp check_combat_state(%{internal: %{in_combat: true}}, %Spell{} = spell) do
+    if Spell.attribute?(spell, :not_in_combat), do: {:error, :affecting_combat}, else: :ok
+  end
+
   defp check_combat_state(_caster, _spell), do: :ok
 
   defp check_stance(%{unit: unit}, %Spell{stances: stances} = spell) when is_integer(stances) and stances > 0 do

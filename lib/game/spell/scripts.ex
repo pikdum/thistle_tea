@@ -43,6 +43,7 @@ defmodule ThistleTea.Game.Spell.Scripts do
   }
 
   @spell_family_mage 3
+  @spell_family_rogue 8
   @spell_family_warrior 4
   @spell_family_warlock 5
   @spell_family_paladin 10
@@ -62,6 +63,12 @@ defmodule ThistleTea.Game.Spell.Scripts do
   @bloodthirst_family_mask 0x02000000
   @execute_family_mask 0x20000000
   @execute_damage_spell 20_647
+  @rogue_vanish_family_mask 0x00000800
+  @rogue_eviscerate_family_mask 0x00020000
+  @rogue_stealth_family_mask 0x00400000
+  @rogue_misc_family_mask 0x40000000
+  @blade_flurry_damage_spell 22_482
+  @blade_flurry_radius_yards 5.0
   @last_stand 12_975
   @preparation 14_185
   @holy_shock %{
@@ -94,6 +101,12 @@ defmodule ThistleTea.Game.Spell.Scripts do
   def dummy_effect(_spell), do: nil
 
   def execute_damage_spell_id, do: @execute_damage_spell
+  def blade_flurry_damage_spell_id, do: @blade_flurry_damage_spell
+  def blade_flurry_radius_yards, do: @blade_flurry_radius_yards
+  def rogue_spell_family, do: @spell_family_rogue
+
+  def rogue_spell?(%Spell{spell_family: @spell_family_rogue}), do: true
+  def rogue_spell?(_spell), do: false
 
   def blocked_by_aura?(%Spell{id: id}, entity) when id in [498, 5573, 642, 1020, 1022, 5599, 10_278] do
     Aura.has_spell?(entity, @forbearance)
@@ -114,10 +127,21 @@ defmodule ThistleTea.Game.Spell.Scripts do
   def finisher?(%Spell{} = spell), do: Spell.attribute?(spell, :finishing_move)
   def finisher?(_spell), do: false
 
-  def finisher_duration_ms(%Spell{name: "Slice and Dice"}, points), do: 6_000 + points * 3_000
-  def finisher_duration_ms(%Spell{name: "Rupture"}, points), do: 4_000 + points * 2_000
-  def finisher_duration_ms(%Spell{name: "Kidney Shot"}, points), do: points * 1_000
-  def finisher_duration_ms(_spell, _points), do: nil
+  def rogue_vanish?(%Spell{} = spell), do: rogue_family_flag?(spell, @rogue_vanish_family_mask)
+  def rogue_vanish?(_spell), do: false
+
+  def rogue_stealth?(%Spell{} = spell), do: rogue_family_flag?(spell, @rogue_stealth_family_mask)
+  def rogue_stealth?(_spell), do: false
+
+  def rogue_eviscerate?(%Spell{} = spell), do: rogue_family_flag?(spell, @rogue_eviscerate_family_mask)
+  def rogue_eviscerate?(_spell), do: false
+
+  def rogue_blade_flurry?(%Spell{effects: effects} = spell) do
+    rogue_family_flag?(spell, @rogue_misc_family_mask) and
+      Enum.any?(effects, &(&1.type in [:apply_aura, :apply_area_aura] and &1.aura == :mod_melee_haste))
+  end
+
+  def rogue_blade_flurry?(_spell), do: false
 
   def aura_amount_override(%Spell{id: @last_stand_health_buff}, %{unit: %{max_health: max_health}})
       when is_integer(max_health) do
@@ -189,6 +213,11 @@ defmodule ThistleTea.Game.Spell.Scripts do
        when is_integer(flags), do: (flags &&& mask) != 0
 
   defp warrior_family_flag?(_spell, _mask), do: false
+
+  defp rogue_family_flag?(%Spell{spell_family: @spell_family_rogue, family_flags_0: flags}, mask)
+       when is_integer(flags), do: (flags &&& mask) != 0
+
+  defp rogue_family_flag?(_spell, _mask), do: false
 
   defp chain_id(%Spell{first_in_chain: first}) when is_integer(first) and first > 0, do: first
   defp chain_id(%Spell{id: id}), do: id

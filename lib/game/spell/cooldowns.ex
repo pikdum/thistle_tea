@@ -112,6 +112,18 @@ defmodule ThistleTea.Game.Spell.Cooldowns do
 
   def reset(entity, _keys), do: entity
 
+  def reset_family(%{internal: %{spellbook: spellbook}} = entity, spell_family) when is_map(spellbook) do
+    keys =
+      spellbook
+      |> Map.values()
+      |> Enum.filter(&(&1.spell_family == spell_family and client_cooldown_ms(&1) > 0))
+      |> Enum.flat_map(&keys/1)
+
+    reset(entity, keys)
+  end
+
+  def reset_family(entity, _spell_family), do: entity
+
   def client_cooldown_ms(%Spell{recovery_time_ms: recovery, category_recovery_time_ms: category_recovery}) do
     max(positive(recovery), positive(category_recovery))
   end

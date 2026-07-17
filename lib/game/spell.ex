@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Spell do
     :school,
     :cast_time_ms,
     :duration_ms,
+    :max_duration_ms,
     :range_yards,
     :mana_cost,
     :mana_cost_per_second,
@@ -143,6 +144,11 @@ defmodule ThistleTea.Game.Spell do
     :weapon_percent_damage
   ]
 
+  @proc_type_masks %{
+    deal_melee_swing: 0x00000004,
+    deal_melee_ability: 0x00000010
+  }
+
   def damage_effects(%__MODULE__{effects: effects}) do
     Enum.filter(effects, &match?(%Effect{type: type} when type in @damage_effect_types, &1))
   end
@@ -154,6 +160,15 @@ defmodule ThistleTea.Game.Spell do
 
   def ranged_ability?(%__MODULE__{dmg_class: 3}), do: true
   def ranged_ability?(_spell), do: false
+
+  def procs_on?(%__MODULE__{proc_type_mask: mask}, proc_type) when is_integer(mask) do
+    case Map.fetch(@proc_type_masks, proc_type) do
+      {:ok, proc_mask} -> (mask &&& proc_mask) != 0
+      :error -> false
+    end
+  end
+
+  def procs_on?(_spell, _proc_type), do: false
 
   def creature_type_allowed?(%__MODULE__{target_creature_type_mask: mask}, creature_type)
       when is_integer(mask) and mask > 0 and is_integer(creature_type) and creature_type > 0 do
@@ -171,4 +186,11 @@ defmodule ThistleTea.Game.Spell do
     |> Enum.filter(&(is_integer(&1) and &1 > 0))
     |> Enum.min(fn -> 1_000 end)
   end
+
+  def duration_for_combo_points(%__MODULE__{duration_ms: duration, max_duration_ms: max_duration}, combo_points)
+      when is_integer(duration) and is_integer(max_duration) and is_integer(combo_points) and combo_points > 0 do
+    duration + div((max_duration - duration) * min(combo_points, 5), 5)
+  end
+
+  def duration_for_combo_points(%__MODULE__{duration_ms: duration}, _combo_points), do: duration
 end

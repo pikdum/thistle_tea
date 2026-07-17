@@ -193,6 +193,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
       school: school(row.school),
       cast_time_ms: cast_time_ms(row.spell_cast_time),
       duration_ms: duration_ms(row.spell_duration),
+      max_duration_ms: max_duration_ms(row.spell_duration),
       range_yards: range_yards(row.spell_range),
       mana_cost: row.mana_cost || 0,
       mana_cost_per_second: row.mana_cost_per_second || 0,
@@ -418,6 +419,9 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp duration_ms(%SpellDuration{duration: duration}) when is_integer(duration), do: duration
   defp duration_ms(_), do: 0
 
+  defp max_duration_ms(%SpellDuration{max_duration: duration}) when is_integer(duration), do: duration
+  defp max_duration_ms(_), do: 0
+
   defp range_yards(%SpellRange{range_max: range}) when is_number(range), do: range
   defp range_yards(_), do: 0.0
 
@@ -625,6 +629,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   @passive 0x00000040
   @ability 0x00000010
   @hidden_in_combat_log 0x00000100
+  @not_in_combat 0x10000000
   @aura_is_debuff 0x04000000
   @cant_cancel 0x80000000
   @cooldown_on_event 0x02000000
@@ -649,6 +654,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
       |> add_if(attrs, @passive, :passive)
       |> add_if(attrs, @ability, :ability)
       |> add_if(attrs, @hidden_in_combat_log, :hidden_in_combat_log)
+      |> add_if(attrs, @not_in_combat, :not_in_combat)
       |> add_if(attrs, @aura_is_debuff, :negative)
       |> add_if(attrs, @cant_cancel, :cant_cancel)
       |> add_if(attrs, @cooldown_on_event, :cooldown_on_event)

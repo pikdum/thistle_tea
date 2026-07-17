@@ -331,14 +331,14 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
   defp expires_at(_now, -1), do: -1
   defp expires_at(now, duration_ms) when is_integer(duration_ms), do: now + duration_ms
 
+  defp effective_duration(%Spell{} = spell, %CastContext{combo_points: points})
+       when is_integer(points) and points > 0 do
+    Spell.duration_for_combo_points(spell, points)
+  end
+
   defp effective_duration(%Spell{} = spell, %CastContext{caster_guid: caster, target_guid: target})
        when caster != target do
     if area_radius(spell), do: 2_500, else: spell.duration_ms
-  end
-
-  defp effective_duration(%Spell{} = spell, %CastContext{combo_points: points})
-       when is_integer(points) and points > 0 do
-    Scripts.finisher_duration_ms(spell, points) || spell.duration_ms
   end
 
   defp effective_duration(%Spell{duration_ms: duration_ms}, _context), do: duration_ms

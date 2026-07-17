@@ -77,6 +77,16 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Lifecycle do
 
   def remove_spells(entity, _spell_ids, _now), do: {entity, []}
 
+  def remove_aura_types(%{unit: %Unit{auras: holders}} = entity, aura_types, now)
+      when is_list(holders) and holders != [] and is_list(aura_types) do
+    {removed, kept} =
+      Enum.split_with(holders, fn holder -> Enum.any?(aura_types, &Holder.has_aura_type?(holder, &1)) end)
+
+    if removed == [], do: {entity, []}, else: remove_and_sync(entity, kept, now)
+  end
+
+  def remove_aura_types(entity, _aura_types, _now), do: {entity, []}
+
   def remove_source_spell(%{unit: %Unit{auras: holders}} = entity, spell_id, caster_guid, now)
       when is_list(holders) and holders != [] and is_integer(spell_id) and is_integer(caster_guid) do
     {removed, kept} =

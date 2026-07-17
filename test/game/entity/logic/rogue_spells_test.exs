@@ -105,6 +105,30 @@ defmodule ThistleTea.Game.Entity.Logic.RogueSpellsTest do
       assert victim.unit.health == 950
     end
 
+    test "eviscerate's VMangos-scripted attack-power bonus uses its DBC family flag" do
+      eviscerate = %Spell{
+        id: 6760,
+        school: :physical,
+        dmg_class: 2,
+        spell_family: 8,
+        family_flags_0: 0x00020000,
+        attributes: MapSet.new([:ability, :finishing_move]),
+        effects: [%Effect{index: 0, type: :school_damage, base_points: 0, die_sides: 0}]
+      }
+
+      context = %CastContext{
+        caster_guid: 5,
+        caster_level: 60,
+        attack_power: 100,
+        combo_points: 5,
+        spell: eviscerate
+      }
+
+      {victim, _events} = SpellEffect.receive(target(), context, eviscerate, 1_000)
+
+      assert victim.unit.health == 985
+    end
+
     test "expose armor applies its combo-scaled debuff" do
       spell = %Spell{
         id: 8647,
@@ -130,6 +154,21 @@ defmodule ThistleTea.Game.Entity.Logic.RogueSpellsTest do
 
       assert victim.unit.normal_resistance == 99
       assert Aura.has_spell?(victim, 8647)
+    end
+
+    test "offensive finisher duration interpolates DBC base and maximum duration" do
+      rupture = %Spell{
+        id: 1943,
+        duration_ms: 6_000,
+        max_duration_ms: 16_000,
+        attributes: MapSet.new([:finishing_move]),
+        effects: [%Effect{index: 0, type: :apply_aura, aura: :periodic_damage, implicit_target_a: :target_enemy}]
+      }
+
+      context = %CastContext{caster_guid: 5, caster_level: 60, target_guid: 9, combo_points: 3, spell: rupture}
+      {victim, _events} = Aura.apply_spell(target(), context, rupture, 1_000)
+
+      assert [%{expires_at: 13_000}] = victim.unit.auras
     end
 
     test "mixed rogue abilities apply caster buffs only to the rogue" do
@@ -204,7 +243,7 @@ defmodule ThistleTea.Game.Entity.Logic.RogueSpellsTest do
     end
 
     test "ordinary stealth is unavailable in combat but vanish remains available" do
-      stealth = %Spell{id: 1784, name: "Stealth"}
+      stealth = %Spell{id: 1784, name: "Stealth", attributes: MapSet.new([:not_in_combat])}
       vanish = %Spell{id: 1856, name: "Vanish"}
 
       assert {:error, :affecting_combat} =
@@ -231,7 +270,20 @@ defmodule ThistleTea.Game.Entity.Logic.RogueSpellsTest do
 
       internal = %{
         entity.internal
-        | cooldowns: %{14_177 => 10_000, {:category, 39} => 10_000, {:category, 44} => 10_000, 14_185 => 20_000}
+        | cooldowns: %{
+            2094 => 10_000,
+            14_177 => 10_000,
+            {:category, 39} => 10_000,
+            {:category, 44} => 10_000,
+            14_185 => 20_000
+          },
+          spellbook: %{
+            2094 => %Spell{id: 2094, spell_family: 8, recovery_time_ms: 300_000},
+            14_177 => %Spell{id: 14_177, spell_family: 8, recovery_time_ms: 180_000},
+            1856 => %Spell{id: 1856, spell_family: 8, category: 39, category_recovery_time_ms: 300_000},
+            2983 => %Spell{id: 2983, spell_family: 8, category: 44, category_recovery_time_ms: 300_000},
+            14_185 => %Spell{id: 14_185, spell_family: 0, recovery_time_ms: 600_000}
+          }
       }
 
       preparation = %Spell{id: 14_185, name: "Preparation", effects: [%Effect{index: 0, type: :dummy}]}
@@ -239,6 +291,7 @@ defmodule ThistleTea.Game.Entity.Logic.RogueSpellsTest do
       {entity, _events} = SpellEffect.receive(%{entity | internal: internal}, context, preparation, 1_000)
 
       refute Cooldowns.on_cooldown?(entity, %Spell{id: 14_177}, 1_000)
+      refute Cooldowns.on_cooldown?(entity, %Spell{id: 2094}, 1_000)
       refute Cooldowns.on_cooldown?(entity, %Spell{id: 1856, category: 39}, 1_000)
       assert Cooldowns.on_cooldown?(entity, preparation, 1_000)
     end
@@ -270,7 +323,7 @@ defmodule ThistleTea.Game.Entity.Logic.RogueSpellsTest do
 
     test "vanish drops combat and asks every threatening mob to forget the rogue" do
       entity = rogue(in_combat: true)
-      stealth = %Spell{id: 1787, name: "Stealth", rank: 4}
+      stealth = %Spell{id: 1787, name: "Stealth", rank: 4, spell_family: 8, family_flags_0: 0x00400000}
 
       internal = %{
         entity.internal
@@ -282,7 +335,15 @@ defmodule ThistleTea.Game.Entity.Logic.RogueSpellsTest do
 
       entity = %{entity | internal: internal}
       entity = %{entity | unit: %{entity.unit | target: 9}}
-      vanish = %Spell{id: 1856, name: "Vanish", effects: [%Effect{index: 0, type: :clear_threat}]}
+
+      vanish = %Spell{
+        id: 1856,
+        name: "Vanish",
+        spell_family: 8,
+        family_flags_0: 0x00000800,
+        effects: [%Effect{index: 0, type: :clear_threat}]
+      }
+
       context = %CastContext{caster_guid: 5, caster_level: 60, spell: vanish}
 
       {entity, events} = SpellEffect.receive(entity, context, vanish, 1_000)
@@ -295,6 +356,27 @@ defmodule ThistleTea.Game.Entity.Logic.RogueSpellsTest do
       assert Enum.any?(events, &(&1.type == :drop_nearby_threat))
       assert Enum.any?(events, &(&1.type == :attack_stop and &1.target_guid == 9))
       assert Enum.any?(events, &(&1.type == :trigger_spell and &1.spell_id == 1787))
+    end
+
+    test "vanish removes stalked auras as required by the VMangos spell script" do
+      marked = %Spell{
+        id: 1130,
+        duration_ms: 120_000,
+        effects: [%Effect{index: 0, type: :apply_aura, aura: :mod_stalked}]
+      }
+
+      vanish = %Spell{
+        id: 1856,
+        spell_family: 8,
+        family_flags_0: 0x00000800,
+        effects: [%Effect{index: 0, type: :clear_threat}]
+      }
+
+      {entity, _events} = Aura.apply_spell(rogue(), 9, 60, marked, 1_000)
+      context = %CastContext{caster_guid: 5, caster_level: 60, spell: vanish}
+      {entity, _events} = SpellEffect.receive(entity, context, vanish, 2_000)
+
+      refute Aura.has_aura?(entity, :mod_stalked)
     end
   end
 

@@ -128,7 +128,8 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
                   target.object.guid,
                   result.outcome,
                   dealt_damage(events),
-                  spell.id
+                  spell.id,
+                  dealt_proc_damage(events)
                 )
               ]
           else
@@ -314,10 +315,12 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   end
 
   defp apply_effect(%Character{} = state, %CastContext{}, spell, %Effect{type: :clear_threat}, now) do
+    {state, aura_events} = remove_vanish_stalked(state, spell, now)
     {state, mob_guids} = PlayerCombat.vanish(state, now)
 
     events =
-      [Event.drop_nearby_threat()] ++
+      aura_events ++
+        [Event.drop_nearby_threat()] ++
         Enum.map(mob_guids, &Event.drop_threat/1) ++
         vanish_attack_stop_events(state) ++ maybe_vanish_stealth_events(state, spell)
 
@@ -524,7 +527,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
         {state, [event]}
 
       :preparation ->
-        {Cooldowns.reset(state, [14_177, {:category, 39}, {:category, 44}, {:category, 66}]), []}
+        {Cooldowns.reset_family(state, Scripts.rogue_spell_family()), []}
 
       {:holy_shock, spell_ids} ->
         spell_id = if context.target_hostile?, do: spell_ids.damage, else: spell_ids.heal
@@ -544,15 +547,20 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
     end
   end
 
-  defp maybe_vanish_stealth_events(state, %Spell{name: "Vanish"}), do: vanish_stealth_events(state)
-  defp maybe_vanish_stealth_events(_state, _spell), do: []
+  defp maybe_vanish_stealth_events(state, %Spell{} = spell) do
+    if Scripts.rogue_vanish?(spell), do: vanish_stealth_events(state), else: []
+  end
+
+  defp remove_vanish_stalked(state, %Spell{} = spell, now) do
+    if Scripts.rogue_vanish?(spell), do: Aura.remove_aura_types(state, [:mod_stalked], now), else: {state, []}
+  end
 
   defp vanish_stealth_events(%{object: %{guid: guid}, unit: %{level: level}, internal: %{spellbook: spellbook}})
        when is_map(spellbook) do
     spell_id =
       spellbook
       |> Map.values()
-      |> Enum.filter(&match?(%Spell{name: "Stealth"}, &1))
+      |> Enum.filter(&Scripts.rogue_stealth?/1)
       |> Enum.max_by(&(&1.rank || 0), fn -> nil end)
       |> case do
         %Spell{id: id} -> id
@@ -691,11 +699,13 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
     if Scripts.finisher?(spell), do: Effect.amount(effect, points || 0), else: Effect.damage_roll(effect)
   end
 
-  defp eviscerate_attack_power(%Spell{name: "Eviscerate"}, %CastContext{} = context) do
-    trunc((context.attack_power || 0) * (context.combo_points || 0) * 0.03)
+  defp eviscerate_attack_power(%Spell{} = spell, %CastContext{} = context) do
+    if Scripts.rogue_eviscerate?(spell) do
+      trunc((context.attack_power || 0) * (context.combo_points || 0) * 0.03)
+    else
+      0
+    end
   end
-
-  defp eviscerate_attack_power(_spell, _context), do: 0
 
   defp weapon_ability_damage(%CastContext{} = context, %Effect{type: :normalized_weapon_damage} = effect) do
     normalized_weapon_roll(context) + Effect.damage_roll(effect)
@@ -756,11 +766,12 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
     school = school_atom(spell)
     damage = trunc(damage * (context.damage_done_multiplier || 1.0))
 
-    damage =
+    unmitigated_damage =
       max(damage + Aura.flat_modifier(state, :mod_damage_taken, Spell.school_mask(spell)), 0)
 
-    damage = mitigate_physical(state, context, school, damage)
+    damage = mitigate_physical(state, context, school, unmitigated_damage)
     damage = if context.melee_crit?, do: damage * 2, else: damage
+    proc_damage = if context.melee_crit?, do: unmitigated_damage * 2, else: unmitigated_damage
 
     {state, absorbed} =
       Core.take_damage_with_absorb(state, damage, now,
@@ -772,7 +783,8 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
     event =
       Event.spell_damage(context.caster_guid, state.object.guid, spell, damage,
         absorbed: absorbed,
-        crit?: context.melee_crit? || false
+        crit?: context.melee_crit? || false,
+        proc_damage: proc_damage
       )
 
     {state, [event]}
@@ -803,13 +815,30 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
 
   defp dealt_damage(events) do
     Enum.reduce(events, 0, fn
-      %Event{type: :spell_damage, damage: damage}, acc when is_integer(damage) -> acc + damage
-      _event, acc -> acc
+      %Event{type: :spell_damage, damage: damage, absorbed: absorbed}, acc when is_integer(damage) ->
+        acc + max(damage - (absorbed || 0), 0)
+
+      _event, acc ->
+        acc
+    end)
+  end
+
+  defp dealt_proc_damage(events) do
+    Enum.reduce(events, 0, fn
+      %Event{type: :spell_damage, proc_damage: proc_damage, damage: damage, absorbed: absorbed}, acc
+      when is_integer(proc_damage) and is_integer(damage) and damage > 0 ->
+        acc + round(proc_damage * max(damage - (absorbed || 0), 0) / damage)
+
+      %Event{type: :spell_damage, damage: damage, absorbed: absorbed}, acc when is_integer(damage) ->
+        acc + max(damage - (absorbed || 0), 0)
+
+      _event, acc ->
+        acc
     end)
   end
 
   defp rogue_feedback_spell?(%Spell{} = spell) do
-    Scripts.finisher?(spell) or Enum.any?(spell.effects, &match?(%Effect{type: :add_combo_points}, &1))
+    Scripts.rogue_spell?(spell)
   end
 
   defp special_attack(%CastContext{} = context, spell) do

@@ -31,6 +31,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
   alias ThistleTea.Game.Network.Packet
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
+  alias ThistleTea.Game.Spell.Scripts
   alias ThistleTea.Game.Spell.Targets
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
@@ -486,6 +487,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
       victim_guid: event.source_guid,
       outcome: event.outcome,
       damage: event.damage,
+      proc_damage: event.proc_damage,
       spell_id: event.spell_id
     })
 
@@ -535,20 +537,18 @@ defmodule ThistleTea.Game.Entity.EventSink do
   def emit(%Character{} = entity, %Event{type: :blade_flurry, target_guid: primary, damage: damage}) do
     secondary =
       entity
-      |> SpellTargetResolver.resolve_query({:caster_aoe, 8.0})
-      |> Enum.find(&(&1 != primary))
+      |> SpellTargetResolver.resolve_query({:caster_aoe, Scripts.blade_flurry_radius_yards()})
+      |> Enum.reject(&(&1 == primary))
+      |> random_target()
 
-    if is_integer(secondary) do
-      spell = %Spell{
-        id: 22_482,
-        name: "Blade Flurry",
-        school: :physical,
-        dmg_class: 2,
-        effects: [%Spell.Effect{index: 0, type: :school_damage, base_points: damage}]
-      }
-
+    with secondary when is_integer(secondary) <- secondary,
+         %Spell{} = spell <- SpellLoader.load(Scripts.blade_flurry_damage_spell_id()),
+         %Spell.Effect{} = effect <- List.first(Spell.damage_effects(spell)) do
+      spell = %{spell | effects: [%{effect | base_points: damage, die_sides: 0}]}
       context = CastContext.from_caster(entity, spell, secondary)
       Entity.receive_spell(secondary, context, spell)
+    else
+      _ -> nil
     end
 
     entity
@@ -1102,6 +1102,9 @@ defmodule ThistleTea.Game.Entity.EventSink do
   end
 
   defp projectile_delay_ms(_entity, _event), do: 0
+
+  defp random_target([]), do: nil
+  defp random_target(targets), do: Enum.random(targets)
 
   defp dispatch_triggered_spell(%{object: %{guid: guid}} = entity, %Event{target_guid: guid} = event, spell) do
     context = trigger_context(entity, event, spell)

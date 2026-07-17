@@ -164,13 +164,40 @@ defmodule ThistleTea.Game.Entity.Logic.AttackFeedbackTest do
       blade_flurry = %Spell{
         id: 13_877,
         duration_ms: 15_000,
+        spell_family: 8,
+        family_flags_0: 0x40000000,
+        proc_type_mask: 0x14,
         effects: [%Effect{index: 0, type: :apply_aura, aura: :mod_melee_haste, base_points: 20}]
       }
 
       {entity, _events} = Aura.apply_spell(rogue(), 5, 60, blade_flurry, 1_000)
-      entity = AttackFeedback.receive(entity, %{outcome: :normal, damage: 123, victim_guid: 77}, nil, 1_000)
+
+      entity =
+        AttackFeedback.receive(
+          entity,
+          %{outcome: :normal, damage: 91, proc_damage: 123, victim_guid: 77},
+          nil,
+          1_000
+        )
 
       assert Enum.any?(entity.internal.events, &match?(%{type: :blade_flurry, target_guid: 77, damage: 123}, &1))
+    end
+
+    test "blade flurry does not trigger from avoided attacks" do
+      blade_flurry = %Spell{
+        id: 13_877,
+        spell_family: 8,
+        family_flags_0: 0x40000000,
+        proc_type_mask: 0x14,
+        effects: [%Effect{index: 0, type: :apply_aura, aura: :mod_melee_haste}]
+      }
+
+      {entity, _events} = Aura.apply_spell(rogue(), 5, 60, blade_flurry, 1_000)
+
+      entity =
+        AttackFeedback.receive(entity, %{outcome: :dodge, damage: 123, proc_damage: 0, victim_guid: 77}, nil, 1_000)
+
+      refute Enum.any?(entity.internal.events, &(&1.type == :blade_flurry))
     end
   end
 
