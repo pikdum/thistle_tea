@@ -42,6 +42,14 @@ defmodule ThistleTea.Game.Entity.Logic.HostilityTest do
     test "does not allow neutral creature versus creature attacks" do
       refute Hostility.valid_attack_target?(mob(wolf()), mob(neutral_creature()))
     end
+
+    test "allows player-controlled pets to attack neutral creatures" do
+      owner_guid = Guid.from_low_guid(:player, 1)
+      pet = mob(alliance()) |> Map.put(:owner_guid, owner_guid)
+      target = mob(wolf(), faction_can_have_reputation?: false)
+
+      assert Hostility.valid_attack_target?(pet, target)
+    end
   end
 
   describe "can_initiate_attack?/1" do

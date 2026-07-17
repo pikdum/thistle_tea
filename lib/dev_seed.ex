@@ -128,6 +128,7 @@ defmodule ThistleTea.DevSeed do
       |> Characters.assign_items(Map.get(@debug_equipment, class, []))
       |> Characters.assign_items(Map.get(@debug_reagents, class, []))
       |> set_debug_ammo(class)
+      |> set_debug_pet(class)
       |> Character.restore_health_and_mana()
 
     {:ok, CharacterStore.put(character)}
@@ -138,6 +139,12 @@ defmodule ThistleTea.DevSeed do
   defp set_debug_ammo(%Character{player: player} = character, 3), do: %{character | player: %{player | ammo_id: 11_285}}
 
   defp set_debug_ammo(character, _class), do: character
+
+  defp set_debug_pet(%Character{internal: internal} = character, 3) do
+    %{character | internal: %{internal | active_pet_entry: 2960, active_pet_spell_id: 1515}}
+  end
+
+  defp set_debug_pet(character, _class), do: character
 
   defp set_level(character, level) do
     case Stats.get(character.unit.race, character.unit.class, level) do

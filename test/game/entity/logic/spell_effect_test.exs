@@ -538,6 +538,17 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
       assert [%{type: :tame_creature, source_guid: 99, entry: 1234}] = events
     end
 
+    test "tame beast completion triggers VMangos' ownership spell" do
+      spell = %Spell{id: 13_535, effects: [%Effect{index: 0, type: :dummy}]}
+      target = target_fixture()
+      context = %CastContext{caster_guid: 99, caster_level: 10}
+
+      {_target, events} = SpellEffect.receive(target, context, spell, 1_000)
+
+      assert [%{type: :trigger_spell, source_guid: 99, target_guid: target_guid, spell_id: 13_481}] = events
+      assert target_guid == target.object.guid
+    end
+
     test "call, revive, and dismiss use the stable hunter pet entry" do
       character = dead_character_fixture()
 

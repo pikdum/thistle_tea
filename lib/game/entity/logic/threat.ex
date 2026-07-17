@@ -58,6 +58,16 @@ defmodule ThistleTea.Game.Entity.Logic.Threat do
 
   def add(entity, _source_guid, _amount), do: entity
 
+  def change(entity, source_guid, amount) when is_number(amount) and amount >= 0 do
+    add(entity, source_guid, amount)
+  end
+
+  def change(entity, source_guid, amount) when is_number(amount) do
+    modify(entity, source_guid, amount)
+  end
+
+  def change(entity, _source_guid, _amount), do: entity
+
   def add_damage(%Mob{internal: %Internal{in_combat: true}} = entity, source_guid, damage) do
     add(entity, source_guid, damage)
   end

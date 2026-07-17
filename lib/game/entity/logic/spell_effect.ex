@@ -421,8 +421,8 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
     {Threat.taunt(state, context.caster_guid), []}
   end
 
-  defp apply_effect(state, %CastContext{} = context, _spell, %Effect{type: :modify_threat} = effect, _now) do
-    {Threat.modify(state, context.caster_guid, Effect.damage_roll(effect)), []}
+  defp apply_effect(state, %CastContext{} = context, _spell, %Effect{type: :threat} = effect, _now) do
+    {Threat.change(state, context.caster_guid, Effect.damage_roll(effect)), []}
   end
 
   defp apply_effect(state, %CastContext{} = context, spell, %Effect{type: :heal} = effect, now) do
@@ -636,6 +636,18 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
         context.caster_level,
         state.object.guid,
         Scripts.last_stand_health_buff_id()
+      )
+
+    {state, [event]}
+  end
+
+  defp apply_class_dummy(state, context, _spell, _effect, :tame_beast_completion, _now) do
+    event =
+      Event.trigger_spell(
+        context.caster_guid,
+        context.caster_level,
+        state.object.guid,
+        Scripts.tame_beast_ownership_spell_id()
       )
 
     {state, [event]}

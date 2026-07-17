@@ -45,6 +45,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
       mob = SpellBT.start_cast(mob, spell, %Targets{raw: <<0::little-size(16)>>}, 1_000)
 
       assert mob.internal.casting.channel_ms == 8_000
+      assert mob.internal.casting.channel_started?
       assert mob.internal.casting.channel_tick_ms == 2_000
       assert mob.internal.casting.next_channel_tick_at == 3_000
       assert mob.unit.channel_spell == 10
@@ -129,6 +130,28 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
       assert mob.unit.power1 == 100
       assert mob.unit.auras == []
     end
+
+    test "waits for a channel's cast time before starting the channel" do
+      spell = %Spell{
+        id: 605,
+        cast_time_ms: 3_000,
+        duration_ms: 60_000,
+        attributes: MapSet.new([:channeled]),
+        effects: [%Effect{implicit_target_a: :caster}]
+      }
+
+      mob = %Mob{object: %Object{guid: 1}, unit: %Unit{}, internal: %Internal{}}
+      mob = SpellBT.start_cast(mob, spell, %Targets{raw: <<0::little-size(16)>>}, 1_000)
+
+      refute mob.internal.casting.channel_started?
+      assert mob.unit.channel_spell in [nil, 0]
+      assert mob.internal.events in [nil, []]
+
+      assert {{:running, 1_000}, mob, %Blackboard{}} = SpellBT.cast_tick(mob, Blackboard.new(), 4_000)
+      assert mob.internal.casting.channel_started?
+      assert mob.unit.channel_spell == 605
+      assert Enum.any?(mob.internal.events, &(&1.type == :channel_start))
+    end
   end
 
   describe "cast_tick/3" do
@@ -143,6 +166,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
             spell: spell,
             targets: %Targets{raw: <<0::little-size(16)>>},
             channel_ms: 8_000,
+            channel_started?: true,
             ends_at: now - 1
           }
         }
@@ -153,7 +177,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
       assert mob.unit.channel_spell == 0
 
       assert [
-               %Event{type: :despawn_area_effects, spell_id: 10},
                %Event{type: :channel_update, channel_time_ms: 0},
                %Event{type: :object_update, update_type: :values}
              ] = mob.internal.events
@@ -173,6 +196,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
             spell: spell,
             targets: %Targets{raw: <<0::little-size(16)>>, unit_guid: 1},
             channel_ms: 8_000,
+            channel_started?: true,
             channel_tick_ms: 1_000,
             next_channel_tick_at: now - 1,
             ends_at: now + 8_000
@@ -207,6 +231,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
             spell: spell,
             targets: %Targets{raw: <<0::little-size(16)>>, unit_guid: 1},
             channel_ms: 10_000,
+            channel_started?: true,
             channel_tick_ms: 1_000,
             next_channel_tick_at: now - 1,
             ends_at: now + 10_000
@@ -557,7 +582,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
   end
 
   describe "channel auras" do
-    test "stopping a self channel removes the channel spell's auras" do
+    test "a completed self channel leaves its aura to expire after the final tick" do
       spell = %Spell{
         id: 12_051,
         name: "Evocation",
@@ -582,6 +607,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
       assert length(mob.unit.auras) == 1
 
       assert {:success, mob, _bb} = SpellBT.cast_tick(mob, Blackboard.new(), now + 8_001)
+      {mob, _events} = Aura.tick(mob, now + 8_001)
       assert mob.unit.auras == []
     end
   end

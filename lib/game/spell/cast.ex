@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.Spell.Cast do
     :next_channel_tick_at,
     :cast_item_guid,
     modifier_holder_ids: [],
+    channel_started?: false,
     consume_item: false,
     started_at: 0,
     ends_at: 0

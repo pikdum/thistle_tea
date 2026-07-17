@@ -79,21 +79,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
 
     character = %{character | internal: %{internal | casting: casting}}
 
-    if Cast.channeled?(casting) do
-      targets = resolve_targets(character, casting)
-
-      character
-      |> Resources.spend_power(casting.spell, now)
-      |> start_cooldown(casting, now)
-      |> queue_cast_result(casting)
-      |> queue_spell_go(casting, targets)
-      |> queue_area_effects(casting)
-      |> queue_summon_objects(casting)
-      |> queue_consume_reagents(casting)
-      |> queue_consume_ammo(casting)
-      |> mark_hostile_cast(casting, targets, now)
-      |> consume_spell_modifiers(casting, now)
-      |> start_channel(casting)
+    if Cast.channeled?(casting) and casting.cast_time_ms == 0 do
+      begin_channel(character, casting, now)
     else
       character
     end
@@ -114,25 +101,44 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
 
   def cast_tick(%{internal: %Internal{casting: casting}} = character, %Blackboard{} = blackboard, now)
       when is_struct(casting, Cast) and is_integer(now) do
-    cond do
-      Cast.channeled?(casting) and now >= casting.ends_at ->
-        {:success, stop_channel(character, casting), blackboard}
-
-      Cast.channeled?(casting) ->
-        {character, delay_ms} = channel_tick(character, casting, now)
-        {{:running, delay_ms}, character, blackboard}
-
-      now >= casting.ends_at ->
-        character = complete_cast(character, casting, now)
-        {:success, character, blackboard}
-
-      true ->
-        delay_ms = max(casting.ends_at - now, 0)
-        {{:running, delay_ms}, character, blackboard}
+    if Cast.channeled?(casting) do
+      channeled_cast_tick(character, casting, blackboard, now)
+    else
+      regular_cast_tick(character, casting, blackboard, now)
     end
   end
 
   def cast_tick(character, blackboard, _now), do: {:failure, character, blackboard}
+
+  defp channeled_cast_tick(character, casting, blackboard, now) do
+    cond do
+      not casting.channel_started? and now >= casting.started_at + casting.cast_time_ms ->
+        character = begin_channel(character, casting, now)
+        delay_ms = Cast.next_channel_delay(character.internal.casting, now)
+        {{:running, delay_ms}, character, blackboard}
+
+      not casting.channel_started? ->
+        delay_ms = max(casting.started_at + casting.cast_time_ms - now, 0)
+        {{:running, delay_ms}, character, blackboard}
+
+      now >= casting.ends_at ->
+        {:success, stop_channel(character, casting, :completed), blackboard}
+
+      true ->
+        {character, delay_ms} = channel_tick(character, casting, now)
+        {{:running, delay_ms}, character, blackboard}
+    end
+  end
+
+  defp regular_cast_tick(character, casting, blackboard, now) do
+    if now >= casting.ends_at do
+      character = complete_cast(character, casting, now)
+      {:success, character, blackboard}
+    else
+      delay_ms = max(casting.ends_at - now, 0)
+      {{:running, delay_ms}, character, blackboard}
+    end
+  end
 
   def complete_cast(%{internal: %Internal{casting: %Cast{} = casting}} = character, now) when is_integer(now) do
     complete_cast(character, casting, now)
@@ -463,7 +469,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
         unit: %{unit | channel_object: 0, channel_spell: 0}
     }
 
-    {character, aura_events} = remove_channel_auras(character, casting)
+    {character, aura_events} = channel_aura_events(character, casting, reason)
 
     object_events = channel_object_events(channel_game_object_guid, channel_game_object_owned?, user_guid, reason)
 
@@ -493,6 +499,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
   end
 
   defp channel_object_events(_guid, _owned?, _user_guid, _reason), do: []
+
+  defp channel_aura_events(character, _casting, :completed), do: {character, []}
+  defp channel_aura_events(character, casting, :cancelled), do: remove_channel_auras(character, casting)
 
   defp remove_channel_auras(%{object: %{guid: guid}} = character, %Cast{spell: %Spell{id: spell_id}} = casting) do
     target_guid = channel_target_guid(character, casting)
@@ -599,6 +608,27 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
 
   defp queue_cast_result(character, _casting), do: character
 
+  defp begin_channel(%{internal: %Internal{} = internal} = character, %Cast{} = casting, now) do
+    casting = %{casting | channel_started?: true}
+    character = %{character | internal: %{internal | casting: casting}}
+    targets = resolve_targets(character, casting)
+    {hits, misses} = roll_spell_hits(character, casting.spell, targets)
+
+    character
+    |> Resources.spend_power(casting.spell, now)
+    |> start_cooldown(casting, now)
+    |> queue_cast_result(casting)
+    |> queue_spell_go(casting, hits ++ object_hits(casting), misses)
+    |> queue_area_effects(casting)
+    |> queue_summon_objects(casting)
+    |> queue_consume_reagents(casting)
+    |> queue_consume_ammo(casting)
+    |> mark_hostile_cast(casting, hits, now)
+    |> apply_spell_hit(casting, hits, now)
+    |> consume_spell_modifiers(casting, now)
+    |> start_channel(casting)
+  end
+
   defp channel_tick(%{internal: %Internal{}} = character, %Cast{} = casting, now) do
     cond do
       unit_channel_target_dead?(casting) ->
@@ -619,13 +649,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
 
   defp pay_and_apply_channel_tick(character, %Cast{} = casting, now) do
     if Resources.can_pay_channel_cost?(character, casting.spell, casting.channel_tick_ms) do
-      targets = resolve_targets(character, casting)
-
       character =
         character
         |> Resources.spend_channel_cost(casting.spell, casting.channel_tick_ms, now)
-        |> queue_trigger_spell_go(casting, targets)
-        |> apply_spell_hit(casting, targets, now)
 
       casting = Cast.advance_channel_tick(casting, now)
       delay_ms = Cast.next_channel_delay(casting, now)
@@ -654,7 +680,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
 
   defp cast_target_visible?(_character, _casting), do: true
 
-  defp queue_spell_go(character, casting, targets, misses \\ [])
+  defp queue_spell_go(character, casting, targets, misses)
 
   defp queue_spell_go(
          %{object: %{guid: guid}} = character,
@@ -712,38 +738,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
 
   defp caster_level(%{unit: %{level: level}}) when is_integer(level) and level > 0, do: level
   defp caster_level(_caster), do: 1
-
-  defp queue_trigger_spell_go(
-         %{object: %{guid: guid}} = character,
-         %Cast{spell: %Spell{effects: effects}} = casting,
-         targets
-       )
-       when is_integer(guid) do
-    hits = redirect_self_hits(character, targets)
-
-    raw_targets =
-      case hits do
-        [hit] when hit != guid -> Targets.unit(hit).raw
-        _ -> if is_binary(casting.targets.raw), do: casting.targets.raw, else: <<>>
-      end
-
-    events =
-      for %Spell.Effect{type: :apply_aura, aura: :periodic_trigger_spell, trigger_spell_id: spell_id} <- effects,
-          is_integer(spell_id) and spell_id > 0 do
-        Event.spell_go(guid, spell_id, hits, raw_targets)
-      end
-
-    Event.enqueue(character, events)
-  end
-
-  defp queue_trigger_spell_go(character, _casting, _targets), do: character
-
-  defp redirect_self_hits(%{object: %{guid: guid}, unit: %{channel_object: channel_object}}, [guid])
-       when is_integer(channel_object) and channel_object > 0 and channel_object != guid do
-    [channel_object]
-  end
-
-  defp redirect_self_hits(_character, targets), do: targets
 
   defp apply_spell_hit(
          %{object: %{guid: caster_guid}} = character,

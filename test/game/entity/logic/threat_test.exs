@@ -95,6 +95,21 @@ defmodule ThistleTea.Game.Entity.Logic.ThreatTest do
     end
   end
 
+  describe "change/3" do
+    test "positive spell threat creates an entry" do
+      entity = Threat.change(mob(), @player_a, 10)
+      assert entity.internal.threat == %{@player_a => 10.0}
+    end
+
+    test "negative spell threat only reduces an existing entry" do
+      empty = Threat.change(mob(), @player_a, -10)
+      reduced = mob(threat: %{@player_a => 30.0}) |> Threat.change(@player_a, -10)
+
+      assert empty.internal.threat == %{}
+      assert reduced.internal.threat == %{@player_a => 20.0}
+    end
+  end
+
   describe "wipe/1 and tracking?/2 and entries/1" do
     test "wipe empties the table" do
       entity = mob(threat: %{@player_a => 10.0}) |> Threat.wipe()

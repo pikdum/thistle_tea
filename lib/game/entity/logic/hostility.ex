@@ -107,11 +107,15 @@ defmodule ThistleTea.Game.Entity.Logic.Hostility do
   end
 
   defp player_controlled?(entity) do
-    entity
-    |> guid()
-    |> Guid.entity_type()
-    |> Kernel.==(:player)
+    player_guid?(guid(entity)) or player_guid?(owner_guid(entity))
   end
+
+  defp owner_guid(%{owner_guid: owner_guid}) when is_integer(owner_guid), do: owner_guid
+  defp owner_guid(%{internal: %{pet: %{owner_guid: owner_guid}}}) when is_integer(owner_guid), do: owner_guid
+  defp owner_guid(_entity), do: nil
+
+  defp player_guid?(guid) when is_integer(guid), do: Guid.entity_type(guid) == :player
+  defp player_guid?(_guid), do: false
 
   defp guid(%{guid: guid}) when is_integer(guid), do: guid
   defp guid(%{object: %{guid: guid}}) when is_integer(guid), do: guid

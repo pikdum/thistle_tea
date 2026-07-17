@@ -80,6 +80,8 @@ defmodule ThistleTea.Game.Spell.Scripts do
   }
   @last_stand_health_buff 12_976
   @last_stand_health_fraction 0.3
+  @tame_beast_completion 13_535
+  @tame_beast_ownership 13_481
   @holy_nova_heals %{
     15_237 => 23_455,
     15_430 => 23_458,
@@ -139,6 +141,7 @@ defmodule ThistleTea.Game.Spell.Scripts do
   def requires_combo_target?(_spell), do: false
 
   def dummy_effect(%Spell{id: @last_stand}), do: :last_stand
+  def dummy_effect(%Spell{id: @tame_beast_completion}), do: :tame_beast_completion
   def dummy_effect(%Spell{id: @preparation}), do: :preparation
 
   def dummy_effect(%Spell{id: id} = spell) when is_map_key(@holy_shock, id) do
@@ -159,6 +162,8 @@ defmodule ThistleTea.Game.Spell.Scripts do
   end
 
   def dummy_effect(_spell), do: nil
+
+  def tame_beast_ownership_spell_id, do: @tame_beast_ownership
 
   def judgement_of_command_damage?(%Spell{} = spell),
     do: Spell.vmangos_script?(spell, "spell_paladin_judgement_of_command_damage")
