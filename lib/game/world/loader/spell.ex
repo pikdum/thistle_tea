@@ -255,12 +255,26 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp signed32(_value, default), do: default
 
   defp append_shapeshift_passives(%SpellData{effects: effects} = spell, radius_lookup) do
-    with form when is_integer(form) <- shapeshift_form_value(effects),
-         passive_id when is_integer(passive_id) <- Scripts.shapeshift_passive(form),
-         passive_row when not is_nil(passive_row) <- DBC.get(Spell, passive_id) do
-      %{spell | effects: effects ++ passive_aura_effects(passive_row, radius_lookup, length(effects))}
-    else
-      _ -> spell
+    case shapeshift_form_value(effects) do
+      form when is_integer(form) ->
+        passive_effects =
+          form
+          |> Scripts.shapeshift_passives()
+          |> Enum.flat_map(&load_passive_aura_effects(&1, radius_lookup))
+          |> Enum.with_index(length(effects))
+          |> Enum.map(fn {effect, index} -> %{effect | index: index} end)
+
+        %{spell | effects: effects ++ passive_effects}
+
+      _ ->
+        spell
+    end
+  end
+
+  defp load_passive_aura_effects(passive_id, radius_lookup) do
+    case DBC.get(Spell, passive_id) do
+      nil -> []
+      row -> passive_aura_effects(row, radius_lookup, 0)
     end
   end
 
@@ -333,6 +347,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
           implicit_target_b: target_type(Map.get(row, :"implicit_target_b_#{index}") || 0),
           chain_targets: Map.get(row, :"effect_chain_target_#{index}") || 0,
           trigger_spell_id: nonzero(Map.get(row, :"effect_trigger_spell_#{index}")),
+          summon_slot: summon_slot(type_int),
           damage_multiplier: damage_multiplier(Map.get(row, :"damage_multiplier_#{index}"))
         }
     end
@@ -467,6 +482,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp effect_type(77), do: :script_effect
   defp effect_type(79), do: :clear_threat
   defp effect_type(80), do: :add_combo_points
+  defp effect_type(type) when type in 87..90, do: :summon_totem
   defp effect_type(96), do: :charge
   defp effect_type(101), do: :feed_pet
   defp effect_type(102), do: :dismiss_pet
@@ -481,6 +497,9 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp effect_type(114), do: :attack_me
   defp effect_type(119), do: :apply_area_aura
   defp effect_type(other) when is_integer(other), do: other
+
+  defp summon_slot(type) when type in 87..90, do: type - 86
+  defp summon_slot(_type), do: nil
 
   defp aura_type(0), do: nil
   defp aura_type(1), do: :bind_sight
@@ -552,6 +571,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp aura_type(137), do: :mod_total_stat_percent
   defp aura_type(138), do: :mod_melee_haste
   defp aura_type(141), do: :mod_ranged_haste
+  defp aura_type(142), do: :mod_base_resistance_percent
   defp aura_type(143), do: :mod_resistance_exclusive
   defp aura_type(149), do: :reduce_pushback
   defp aura_type(153), do: :split_damage_flat

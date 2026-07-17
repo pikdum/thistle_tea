@@ -291,4 +291,27 @@ defmodule ThistleTea.Game.World.Loader.SpellVmangosTest do
       assert 18_288 in spell_ids
     end
   end
+
+  describe "hunter, shaman, and druid spell parsing" do
+    test "loads trap, totem, ranged haste, and form semantics" do
+      assert Enum.any?(SpellLoader.load(1499).effects, &(&1.type == :summon_game_object and &1.misc_value == 2561))
+
+      assert %Effect{type: :summon_totem, summon_slot: 1, misc_value: 2523} =
+               Enum.find(SpellLoader.load(3599).effects, &(&1.type == :summon_totem))
+
+      assert Enum.any?(SpellLoader.load(29_414).effects, &(&1.aura == :mod_ranged_haste))
+      assert SpellLoader.load(768).exclusive_category == :shapeshift
+      assert SpellLoader.load(13_163).exclusive_category == :hunter_aspect
+    end
+
+    test "debug spellbooks include quest and talent actives" do
+      hunter = ClassSpell.trainable_spell_ids(3, 60)
+      shaman = ClassSpell.trainable_spell_ids(7, 60)
+      druid = ClassSpell.trainable_spell_ids(11, 60)
+
+      assert Enum.all?([1515, 883, 982, 136], &(&1 in hunter))
+      assert Enum.all?([8071, 3599, 5394, 8512], &(&1 in shaman))
+      assert Enum.all?([5487, 1066, 768], &(&1 in druid))
+    end
+  end
 end

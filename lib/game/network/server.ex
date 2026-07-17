@@ -32,6 +32,7 @@ defmodule ThistleTea.Game.Network.Server do
   alias ThistleTea.Game.Entity.Logic.Reactive
   alias ThistleTea.Game.Entity.Logic.Resources
   alias ThistleTea.Game.Entity.Logic.Rest
+  alias ThistleTea.Game.Entity.Logic.Shaman
   alias ThistleTea.Game.Entity.Logic.SpellEffect
   alias ThistleTea.Game.Entity.Logic.StealthDetection
   alias ThistleTea.Game.Guid
@@ -62,6 +63,7 @@ defmodule ThistleTea.Game.Network.Server do
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.ItemStore
+  alias ThistleTea.Game.World.Loader.ItemEnchantment, as: ItemEnchantmentLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Pathfinding
   alias ThistleTea.Game.World.SpatialHash
@@ -269,7 +271,19 @@ defmodule ThistleTea.Game.Network.Server do
 
   def handle_cast({:attack_outcome, payload}, {socket, %{character: %Character{} = character} = state}) do
     spell = spellbook_spell(character, Map.get(payload, :spell_id))
-    character = AttackFeedback.receive(character, payload, spell, Time.now())
+    weapon_proc = Enchantments.weapon_proc(character)
+
+    ppm =
+      case weapon_proc do
+        %{effect: %{spell_id: spell_id}} -> ItemEnchantmentLoader.proc_ppm(spell_id)
+        _ -> 0.0
+      end
+
+    character =
+      character
+      |> AttackFeedback.receive(payload, spell, Time.now())
+      |> Shaman.trigger_weapon_enchant(payload, weapon_proc, ppm)
+
     {:noreply, {socket, %{state | character: character}}, {:continue, :maybe_broadcast_update}}
   end
 

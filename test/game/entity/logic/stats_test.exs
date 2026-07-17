@@ -175,6 +175,34 @@ defmodule ThistleTea.Game.Entity.Logic.StatsTest do
       assert recompute(recomputed) == recomputed
     end
 
+    test "druid forms derive armor, attack power, and feral weapon damage" do
+      bear_armor = %Aura{type: :mod_base_resistance_percent, amount: 180, misc_value: 1}
+      bear_ap = %Aura{type: :mod_attack_power, amount: 30}
+
+      bear =
+        recompute(%{
+          mage_unit()
+          | class: 11,
+            level: 40,
+            shapeshift_form: 5,
+            base_strength: 80,
+            base_agility: 70,
+            base_normal_resistance: 100,
+            base_attack_time: 2500,
+            base_min_damage: 10.0,
+            base_max_damage: 20.0,
+            equipment_bonuses: %{armor: 200},
+            auras: [holder([bear_armor, bear_ap])]
+        })
+
+      assert bear.normal_resistance == 840
+      assert bear.attack_power == 170
+      assert_in_delta bear.min_damage, 40 * 0.85 * 2.5 + 170 / 14 * 2.5, 0.01
+
+      cat = recompute(%{bear | shapeshift_form: 1, auras: []})
+      assert cat.attack_power == 80 * 2 + 70 - 20
+    end
+
     test "skips weapon damage without base inputs" do
       mob = %Unit{level: 10, attack_power: 50, min_damage: 30.0, max_damage: 40.0, base_attack_time: 2000, auras: []}
       recomputed = recompute(mob)

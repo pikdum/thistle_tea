@@ -848,6 +848,37 @@ defmodule ThistleTea.Game.Entity.EventSink do
 
   def emit(entity, %Event{type: :dismiss_pet}), do: entity
 
+  def emit(
+        %Character{
+          object: %{guid: owner_guid},
+          internal: %Internal{world: world},
+          movement_block: %{position: position}
+        } = entity,
+        %Event{type: :summon_totem, entry: entry, slot: slot, duration_ms: duration_ms}
+      ) do
+    old_guid = Map.get(entity.internal.totem_guids, slot)
+    if is_integer(old_guid), do: World.stop_entity(old_guid)
+
+    with %Mob{} = built <-
+           SummonLoader.build(entry, world, position, despawn_type: 1, despawn_delay_ms: duration_ms),
+         unit = %{
+           built.unit
+           | summoned_by: owner_guid,
+             created_by: owner_guid,
+             faction_template: entity.unit.faction_template,
+             level: entity.unit.level
+         },
+         totem = %{built | unit: unit},
+         {:ok, _pid} <- MobLoader.start_mob(totem) do
+      totem_guids = Map.put(entity.internal.totem_guids, slot, totem.object.guid)
+      %{entity | internal: %{entity.internal | totem_guids: totem_guids}}
+    else
+      _ -> entity
+    end
+  end
+
+  def emit(entity, %Event{type: :summon_totem}), do: entity
+
   def emit(entity, %Event{type: :despawn_self} = event) do
     Process.send_after(self(), {:despawn_creature, event.respawn_delay_ms}, event.duration_ms || 0)
     entity

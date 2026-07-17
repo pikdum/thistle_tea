@@ -289,6 +289,17 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   end
 
   defp apply_effect(
+         state,
+         %CastContext{},
+         spell,
+         %Effect{type: :summon_totem, summon_slot: slot, misc_value: entry},
+         _now
+       )
+       when slot in 1..4 and is_integer(entry) and entry > 0 do
+    {state, [Event.summon_totem(entry, slot, max(spell.duration_ms || 0, 0))]}
+  end
+
+  defp apply_effect(
          %{object: %{entry: entry}} = state,
          %CastContext{caster_guid: owner_guid},
          _spell,

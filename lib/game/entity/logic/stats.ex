@@ -95,7 +95,9 @@ defmodule ThistleTea.Game.Entity.Logic.Stats do
   defp derive_resistances(%Unit{} = unit) do
     Enum.reduce(@resistance_fields, unit, fn {bit, field, base_field, bonus_key}, acc ->
       base = Map.get(acc, base_field) || 0
-      Map.put(acc, field, base + equipment_bonus(acc, bonus_key) + aura_resistance_bonus(acc, bit))
+      base_and_equipment = base + equipment_bonus(acc, bonus_key)
+      scaled = trunc(base_and_equipment * aura_base_resistance_multiplier(acc, bit))
+      Map.put(acc, field, scaled + aura_resistance_bonus(acc, bit))
     end)
   end
 
@@ -121,7 +123,7 @@ defmodule ThistleTea.Game.Entity.Logic.Stats do
 
   defp derive_attack_power(%Unit{base_strength: base_strength} = unit) when is_integer(base_strength) do
     attack_power =
-      melee_attack_power(unit.class, unit.level, unit.strength || 0, unit.agility || 0) +
+      unit_attack_power(unit) +
         equipment_bonus(unit, :attack_power) + aura_attack_power(unit)
 
     %{
@@ -133,10 +135,18 @@ defmodule ThistleTea.Game.Entity.Logic.Stats do
 
   defp derive_attack_power(%Unit{} = unit), do: unit
 
+  defp unit_attack_power(%Unit{class: @druid, shapeshift_form: 1} = unit) do
+    max((unit.strength || 0) * 2 + (unit.agility || 0) - 20, 0)
+  end
+
+  defp unit_attack_power(%Unit{} = unit) do
+    melee_attack_power(unit.class, unit.level, unit.strength || 0, unit.agility || 0)
+  end
+
   defp derive_weapon_damage(%Unit{} = unit) do
     unit
     |> derive_ranged_attack_time()
-    |> derive_damage(:base_min_damage, :base_max_damage, :min_damage, :max_damage, unit.base_attack_time)
+    |> derive_mainhand_damage()
     |> derive_damage(
       :base_offhand_min_damage,
       :base_offhand_max_damage,
@@ -162,6 +172,17 @@ defmodule ThistleTea.Game.Entity.Logic.Stats do
     else
       _ -> unit
     end
+  end
+
+  defp derive_mainhand_damage(%Unit{class: @druid, shapeshift_form: form} = unit) when form in [1, 5, 8] do
+    speed = (unit.base_attack_time || 2000) / 1000
+    level = min(unit.level || 1, 60)
+    bonus = attack_power_bonus(unit.attack_power, unit.base_attack_time)
+    %{unit | min_damage: level * 0.85 * speed + bonus, max_damage: level * 1.25 * speed + bonus}
+  end
+
+  defp derive_mainhand_damage(%Unit{} = unit) do
+    derive_damage(unit, :base_min_damage, :base_max_damage, :min_damage, :max_damage, unit.base_attack_time)
   end
 
   defp derive_damage(%Unit{} = unit, base_min_field, base_max_field, min_field, max_field, attack_time) do
@@ -239,6 +260,20 @@ defmodule ThistleTea.Game.Entity.Logic.Stats do
       _aura ->
         0
     end)
+  end
+
+  defp aura_base_resistance_multiplier(%Unit{} = unit, bit) do
+    percent =
+      sum_aura_amounts(unit, fn
+        %Aura{type: :mod_base_resistance_percent, amount: amount, misc_value: mask}
+        when is_integer(amount) and is_integer(mask) and (mask &&& bit) != 0 ->
+          amount
+
+        _aura ->
+          0
+      end)
+
+    max(100 + percent, 0) / 100
   end
 
   defp sum_aura_amounts(%Unit{auras: holders}, fun) when is_list(holders) do

@@ -33,6 +33,9 @@ defmodule ThistleTea.Game.World.Loader.ItemEnchantment do
     Mangos.Repo.all(Mangos.SpellEffectMod)
     |> Enum.each(&:ets.insert(__MODULE__, {{:duration_seconds, &1.id}, &1.effect_base_points + 1}))
 
+    Mangos.Repo.all(Mangos.SpellProcItemEnchant)
+    |> Enum.each(&:ets.insert(__MODULE__, {{:proc_ppm, &1.entry}, &1.ppm_rate}))
+
     :ok
   end
 
@@ -57,6 +60,13 @@ defmodule ThistleTea.Game.World.Loader.ItemEnchantment do
     case get(enchantment_id) do
       %ItemEnchantment{skill_bonuses: bonuses} -> Map.get(bonuses, skill_id, 0)
       nil -> 0
+    end
+  end
+
+  def proc_ppm(spell_id) when is_integer(spell_id) do
+    case :ets.lookup(__MODULE__, {:proc_ppm, spell_id}) do
+      [{_key, ppm}] -> ppm
+      [] -> 0.0
     end
   end
 

@@ -31,9 +31,15 @@ defmodule ThistleTea.Game.Spell.Scripts do
   @berserker_stance_form 19
 
   @shapeshift_passives %{
-    @battle_stance_form => 21_156,
-    @defensive_stance_form => 7_376,
-    @berserker_stance_form => 7_381
+    1 => [3025],
+    3 => [5419],
+    4 => [5421],
+    5 => [1178, 21_178],
+    8 => [9635, 21_178],
+    @battle_stance_form => [21_156],
+    @defensive_stance_form => [7376],
+    @berserker_stance_form => [7381],
+    31 => [24_905]
   }
 
   @spell_family_mage 3
@@ -49,7 +55,7 @@ defmodule ThistleTea.Game.Spell.Scripts do
     Map.get(@apply_triggers, chain_id(spell))
   end
 
-  def shapeshift_passive(form), do: Map.get(@shapeshift_passives, form)
+  def shapeshift_passives(form), do: Map.get(@shapeshift_passives, form, [])
 
   @overpower_ranks [7384, 7887, 11_584, 11_585]
   @execute_ranks [5308, 20_658, 20_660, 20_661, 20_662]

@@ -6,6 +6,8 @@ defmodule ThistleTea.Game.Player.Enchantments do
 
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Item
+  alias ThistleTea.Game.Entity.EventSink
+  alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
@@ -15,6 +17,7 @@ defmodule ThistleTea.Game.Player.Enchantments do
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.ItemEnchantment, as: ItemEnchantmentLoader
+  alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
 
   def apply_temporary(
         %{character: %Character{} = character} = state,
@@ -28,11 +31,14 @@ defmodule ThistleTea.Game.Player.Enchantments do
          true <- valid_target?(item, spell),
          true <- not is_nil(ItemEnchantmentLoader.get(enchantment_id)) do
       token = make_ref()
+      old_enchantment_id = active_enchantment_id(item)
       item = Item.put_temporary_enchantment(item, enchantment_id, duration_ms, 0, Time.now() + duration_ms, token)
       ItemStore.put(item)
       Process.send_after(self(), {:expire_item_enchantment, item_guid, token}, duration_ms)
 
-      character = sync_equipped_item(character, position, item)
+      character =
+        character |> sync_equipped_item(position, item) |> sync_enchantment_auras(old_enchantment_id, enchantment_id)
+
       send_updates(character, item, duration_ms)
       %{state | character: character}
     else
@@ -42,12 +48,12 @@ defmodule ThistleTea.Game.Player.Enchantments do
 
   def expire(%{character: %Character{} = character} = state, item_guid, token) do
     with %Item{} = item <- ItemStore.get(item_guid),
-         %{token: ^token, expires_at: expires_at} <- Item.temporary_enchantment(item),
+         %{id: id, token: ^token, expires_at: expires_at} <- Item.temporary_enchantment(item),
          true <- expires_at <= Time.now() do
       position = Inventory.find_position(character.player, item_guid, &ItemStore.get/1)
       item = Item.clear_temporary_enchantment(item)
       ItemStore.put(item)
-      character = sync_equipped_item(character, position, item)
+      character = character |> sync_equipped_item(position, item) |> sync_enchantment_auras(id, nil)
       send_updates(character, item, 0)
       %{state | character: character}
     else
@@ -74,6 +80,21 @@ defmodule ThistleTea.Game.Player.Enchantments do
     end)
   end
 
+  def weapon_proc(%Character{player: player}) do
+    with guid when is_integer(guid) and guid > 0 <- player.mainhand,
+         %Item{} = item <- ItemStore.get(guid),
+         %{id: enchantment_id, expires_at: expires_at} <- Item.temporary_enchantment(item),
+         true <- expires_at > Time.now(),
+         %{effects: effects} <- ItemEnchantmentLoader.get(enchantment_id),
+         effect when is_map(effect) <- Enum.find(effects, &(&1.type == 1)) do
+      %{effect: effect, attack_time_ms: Item.template(item).delay || 2_000}
+    else
+      _ -> nil
+    end
+  end
+
+  def weapon_proc(_character), do: nil
+
   def send_active_timers(%Character{} = character) do
     now = Time.now()
 
@@ -96,7 +117,7 @@ defmodule ThistleTea.Game.Player.Enchantments do
       %{expires_at: expires_at, token: token} ->
         remaining_ms = expires_at - now
         Process.send_after(self(), {:expire_item_enchantment, item.object.guid, token}, remaining_ms)
-        character
+        sync_enchantment_auras(character, nil, active_enchantment_id(item))
 
       nil ->
         character
@@ -109,6 +130,45 @@ defmodule ThistleTea.Game.Player.Enchantments do
       _ -> 0
     end
   end
+
+  defp active_enchantment_id(%Item{} = item) do
+    now = Time.now()
+
+    case Item.temporary_enchantment(item) do
+      %{id: id, expires_at: expires_at} when expires_at > now -> id
+      _ -> nil
+    end
+  end
+
+  defp sync_enchantment_auras(character, removed_enchantment_id, added_enchantment_id) do
+    now = Time.now()
+    {character, remove_events} = Aura.remove_spells(character, enchantment_spell_ids(removed_enchantment_id), now)
+
+    {character, apply_events} =
+      Enum.reduce(enchantment_spell_ids(added_enchantment_id), {character, []}, fn spell_id, {character, events} ->
+        case SpellLoader.load(spell_id) do
+          %Spell{} = spell ->
+            {character, aura_events} =
+              Aura.apply_spell(character, character.object.guid, character.unit.level || 1, spell, now)
+
+            {character, events ++ aura_events}
+
+          _ ->
+            {character, events}
+        end
+      end)
+
+    EventSink.emit(character, remove_events ++ apply_events)
+  end
+
+  defp enchantment_spell_ids(enchantment_id) when is_integer(enchantment_id) do
+    case ItemEnchantmentLoader.get(enchantment_id) do
+      %{effects: effects} -> for %{type: 3, spell_id: spell_id} <- effects, is_integer(spell_id), do: spell_id
+      _ -> []
+    end
+  end
+
+  defp enchantment_spell_ids(_enchantment_id), do: []
 
   defp valid_target?(item, %Spell{equipped_item_class: class, equipped_item_subclass_mask: mask}) do
     template = Item.template(item)

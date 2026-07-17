@@ -448,6 +448,18 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
       assert [%{type: :dismiss_pet, source_guid: 1}] = events
     end
 
+    test "totem effects preserve their elemental summon slot" do
+      spell = %Spell{
+        id: 3599,
+        duration_ms: 30_000,
+        effects: [%Effect{index: 0, type: :summon_totem, summon_slot: 1, misc_value: 2523}]
+      }
+
+      {_caster, events} = SpellEffect.receive(target_fixture(), %CastContext{caster_guid: 1}, spell, 1_000)
+
+      assert [%{type: :summon_totem, entry: 2523, slot: 1, duration_ms: 30_000}] = events
+    end
+
     test "mod_damage_taken reduces incoming spell damage" do
       dampen = %Spell{
         id: 604,

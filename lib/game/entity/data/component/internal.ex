@@ -54,6 +54,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal do
     mailbox: [],
     starting_items: [],
     action_buttons: %{},
+    totem_guids: %{},
     cooldowns: %{},
     events: [],
     broadcast_update?: false,

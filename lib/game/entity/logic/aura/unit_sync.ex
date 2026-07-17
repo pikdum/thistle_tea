@@ -25,9 +25,10 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.UnitSync do
 
   def sync_unit(%Unit{} = unit) do
     unit
+    |> sync_shapeshift()
     |> Stats.recompute()
     |> sync_transform()
-    |> sync_shapeshift()
+    |> sync_shapeshift_display()
     |> sync_disarm()
     |> sync_aura_state()
     |> sync_aura_fields()
@@ -73,6 +74,21 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.UnitSync do
   defp sync_druid_power(%Unit{class: 11} = unit, form) when form in [5, 8], do: %{unit | power_type: 1}
   defp sync_druid_power(%Unit{class: 11} = unit, _form), do: %{unit | power_type: 0, power2: 0}
   defp sync_druid_power(unit, _form), do: unit
+
+  defp sync_shapeshift_display(%Unit{shapeshift_form: form, race: race} = unit) do
+    %{unit | display_id: shapeshift_display_id(form, race, unit.display_id)}
+  end
+
+  defp shapeshift_display_id(1, 6, _current), do: 8571
+  defp shapeshift_display_id(1, _race, _current), do: 892
+  defp shapeshift_display_id(3, _race, _current), do: 632
+  defp shapeshift_display_id(4, _race, _current), do: 2428
+  defp shapeshift_display_id(form, 6, _current) when form in [5, 8], do: 2289
+  defp shapeshift_display_id(form, _race, _current) when form in [5, 8], do: 2281
+  defp shapeshift_display_id(16, _race, _current), do: 4613
+  defp shapeshift_display_id(31, 6, _current), do: 15_375
+  defp shapeshift_display_id(31, _race, _current), do: 15_374
+  defp shapeshift_display_id(_form, _race, current), do: current
 
   defp sync_disarm(%Unit{auras: holders} = unit) when is_list(holders) do
     disarmed? = Enum.any?(holders, &Holder.has_aura_type?(&1, :mod_disarm))

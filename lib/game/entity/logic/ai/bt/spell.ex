@@ -232,6 +232,21 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
 
   defp queue_consume_cast_item(character, %Cast{}), do: character
 
+  defp queue_item_enchantments(%Character{player: player} = character, %Cast{
+         spell: %Spell{} = spell,
+         targets: %Targets{item_guid: target_item_guid}
+       }) do
+    item_guid = if is_integer(target_item_guid), do: target_item_guid, else: player.mainhand
+
+    events =
+      for %Spell.Effect{type: :enchant_item_temporary} = effect <- spell.effects,
+          is_integer(item_guid) do
+        Event.enchant_item(item_guid, spell, effect)
+      end
+
+    Event.enqueue(character, events)
+  end
+
   defp queue_item_enchantments(character, %Cast{spell: %Spell{} = spell, targets: %Targets{item_guid: item_guid}})
        when is_integer(item_guid) do
     events =

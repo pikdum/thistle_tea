@@ -54,7 +54,8 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
     :reason,
     :outcome,
     :crit?,
-    :blocked
+    :blocked,
+    :slot
   ]
 
   def spell_damage(source_guid, target_guid, spell, damage, opts \\ []) do
@@ -426,6 +427,11 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
 
   def dismiss_pet(owner_guid) when is_integer(owner_guid) do
     %__MODULE__{type: :dismiss_pet, source_guid: owner_guid}
+  end
+
+  def summon_totem(entry, slot, duration_ms)
+      when is_integer(entry) and entry > 0 and slot in 1..4 and is_integer(duration_ms) do
+    %__MODULE__{type: :summon_totem, entry: entry, slot: slot, duration_ms: duration_ms}
   end
 
   def despawn_self(despawn_delay_ms, respawn_delay_ms)

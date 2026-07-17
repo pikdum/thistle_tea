@@ -19,6 +19,7 @@ defmodule ThistleTea.Game.Spell.Effect do
     :implicit_target_b,
     :chain_targets,
     :trigger_spell_id,
+    :summon_slot,
     damage_multiplier: 1.0
   ]
 
