@@ -90,7 +90,7 @@ defmodule ThistleTea.Game.Entity.Server.DynamicObject do
     {x, y, z, _o} = entity.movement_block.position
     radius = entity.dynamic_object.radius
 
-    tick_spell = %{spell | cast_time_ms: 0, effects: [%{effect | type: :school_damage, aura: nil}]}
+    tick_spell = %{spell | cast_time_ms: 0, effects: [%{effect | type: :apply_aura}]}
 
     caster
     |> SpellTargetResolver.resolve_query({:targeted_aoe, {x, y, z}, radius})

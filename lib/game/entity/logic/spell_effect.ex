@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Death
+  alias ThistleTea.Game.Entity.Logic.Druid
   alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.Entity.Logic.Hunter
   alias ThistleTea.Game.Entity.Logic.Paladin
@@ -336,16 +337,18 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
     {Threat.modify(state, context.caster_guid, Effect.damage_roll(effect)), []}
   end
 
-  defp apply_effect(state, %CastContext{} = context, spell, %Effect{type: :heal} = effect, _now) do
+  defp apply_effect(state, %CastContext{} = context, spell, %Effect{type: :heal} = effect, now) do
+    {state, swiftmend_healing, swiftmend_events} = Druid.consume_swiftmend_hot(state, spell, now)
+
     healing =
-      Effect.damage_roll(effect) + bonus_amount(context.healing_bonus, spell) +
+      Effect.damage_roll(effect) + swiftmend_healing + bonus_amount(context.healing_bonus, spell) +
         Aura.flat_modifier(state, :mod_healing, Spell.school_mask(spell)) +
         Paladin.blessing_of_light_bonus(state, spell)
 
     healing = max(trunc(healing * healing_taken_multiplier(state, spell)), 0)
     events = Threat.heal_threat_events(state, context.caster_guid, healing)
 
-    {Core.heal(state, healing), events}
+    {Core.heal(state, healing), swiftmend_events ++ events}
   end
 
   defp apply_effect(state, %CastContext{} = context, _spell, %Effect{type: :heal_max_health}, _now) do

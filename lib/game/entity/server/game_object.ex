@@ -11,12 +11,15 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
   alias ThistleTea.Game.Entity.Data.Component.Internal.Summon
   alias ThistleTea.Game.Entity.Data.Component.Internal.Trap
   alias ThistleTea.Game.Entity.Data.GameObject
+  alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.Logic.Core
+  alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.Entity.Registry, as: EntityRegistry
   alias ThistleTea.Game.Entity.Server.GameObject.Chair
   alias ThistleTea.Game.Entity.Server.GameObject.Chest
   alias ThistleTea.Game.Entity.Server.GameObject.Fishing
   alias ThistleTea.Game.Entity.Server.GameObject.Trap, as: TrapServer
+  alias ThistleTea.Game.Entity.SpellTargetResolver
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message.SmsgFishNotHooked
   alias ThistleTea.Game.Network.Message.SmsgGameobjectCustomAnim
@@ -24,6 +27,7 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
   alias ThistleTea.Game.Party
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
+  alias ThistleTea.Game.Spell.Targets
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Metadata
@@ -275,12 +279,54 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
     case SpellLoader.load(spell_id) do
       %Spell{} = spell ->
         level = state.game_object.level || 1
-        context = %CastContext{caster_guid: owner_guid, caster_level: level, target_guid: target_guid, spell: spell}
-        Entity.receive_spell(target_guid, context, spell)
+        caster = trap_caster(state, owner_guid, level)
+
+        spell
+        |> immediate_trap_spell()
+        |> deliver_trap_spell(caster, target_guid, level)
+
+        spawn_trap_areas(caster, spell)
 
       _ ->
         nil
     end
+  end
+
+  defp trap_caster(state, owner_guid, level) do
+    %{
+      object: %{guid: owner_guid},
+      unit: %{level: level},
+      internal: %{world: state.internal.world},
+      movement_block: state.movement_block
+    }
+  end
+
+  defp immediate_trap_spell(%Spell{} = spell) do
+    %{spell | effects: Enum.reject(spell.effects, &(&1.type == :persistent_area_aura))}
+  end
+
+  defp deliver_trap_spell(%Spell{effects: []}, _caster, _target_guid, _level), do: nil
+
+  defp deliver_trap_spell(%Spell{} = spell, caster, target_guid, level) do
+    caster
+    |> SpellTargetResolver.resolve(spell, Targets.unit(target_guid))
+    |> Enum.each(fn guid ->
+      context = %CastContext{caster_guid: caster.object.guid, caster_level: level, target_guid: guid, spell: spell}
+      Entity.receive_spell(guid, context, spell)
+    end)
+  end
+
+  defp spawn_trap_areas(caster, %Spell{} = spell) do
+    {x, y, z, _o} = caster.movement_block.position
+
+    Enum.each(spell.effects, fn
+      %{type: :persistent_area_aura} = effect ->
+        event = Event.spawn_area_effect(spell, effect, {x, y, z}, spell.duration_ms || 0)
+        EventSink.emit(caster, event)
+
+      _effect ->
+        nil
+    end)
   end
 
   defp spend_charge(%GameObject{internal: %Internal{summon: %Summon{charges: charges} = summon} = internal} = state)
