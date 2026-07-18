@@ -837,7 +837,7 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
       {entity, _events} = apply_spell(entity, 1, 1, cat)
       assert entity.unit.shapeshift_form == 1
       assert entity.unit.power_type == 3
-      assert entity.unit.power4 == 100
+      assert entity.unit.power4 == 0
       assert entity.unit.max_power4 == 100
       assert entity.unit.display_id == 892
 
@@ -1284,6 +1284,90 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
       [%Holder{auras: [%{next_tick_at: tick_after_refresh}]}] = entity.unit.auras
 
       assert tick_after_refresh == first_tick
+    end
+  end
+
+  describe "cross-caster stacking" do
+    defp shadow_word_pain_fixture do
+      %Spell{
+        id: 589,
+        name: "Shadow Word: Pain",
+        school: :shadow,
+        duration_ms: 18_000,
+        effects: [
+          %Effect{index: 0, type: :apply_aura, aura: :periodic_damage, base_points: 10, amplitude_ms: 3_000}
+        ]
+      }
+    end
+
+    defp plain_buff_fixture do
+      %Spell{
+        id: 1243,
+        name: "Power Word: Fortitude",
+        duration_ms: 1_800_000,
+        effects: [%Effect{index: 0, type: :apply_aura, aura: :mod_stat, base_points: 3, misc_value: 2}]
+      }
+    end
+
+    defp sunder_fixture do
+      %Spell{
+        id: 7386,
+        name: "Sunder Armor",
+        stack_amount: 5,
+        custom_flags: 0x81,
+        duration_ms: 30_000,
+        effects: [%Effect{index: 0, type: :apply_aura, aura: :mod_resistance, base_points: -100, misc_value: 1}]
+      }
+    end
+
+    test "DoTs from different casters coexist" do
+      entity = fixture_entity()
+
+      {entity, _events} = apply_spell(entity, 100, 60, shadow_word_pain_fixture())
+      {entity, _events} = apply_spell(entity, 200, 60, shadow_word_pain_fixture())
+
+      assert [%Holder{caster_guid: 100}, %Holder{caster_guid: 200}] = entity.unit.auras
+    end
+
+    test "plain buffs from a second caster replace the first" do
+      entity = fixture_entity()
+
+      {entity, _events} = apply_spell(entity, 100, 60, plain_buff_fixture())
+      {entity, _events} = apply_spell(entity, 200, 60, plain_buff_fixture())
+
+      assert [%Holder{caster_guid: 200}] = entity.unit.auras
+    end
+
+    test "sunder-style debuffs share one stack across casters" do
+      entity = fixture_entity()
+
+      {entity, _events} = apply_spell(entity, 100, 60, sunder_fixture())
+      {entity, _events} = apply_spell(entity, 100, 60, sunder_fixture())
+      {entity, _events} = apply_spell(entity, 200, 60, sunder_fixture())
+
+      assert [%Holder{stacks: 3}] = entity.unit.auras
+    end
+  end
+
+  describe "cat form energy" do
+    test "entering cat form zeroes energy and later auras do not refill it" do
+      entity = fixture_entity()
+      entity = %{entity | unit: %{entity.unit | class: 11, power4: 50, max_power4: 0}}
+
+      cat = %Spell{
+        id: 768,
+        duration_ms: -1,
+        effects: [%Effect{index: 0, type: :apply_aura, aura: :mod_shapeshift, misc_value: 1}]
+      }
+
+      {entity, _events} = apply_spell(entity, 1, 1, cat)
+      assert entity.unit.power4 == 0
+      assert entity.unit.max_power4 == 100
+
+      entity = %{entity | unit: %{entity.unit | power4: 42}}
+      {entity, _events} = apply_spell(entity, 100, 60, plain_buff_fixture())
+
+      assert entity.unit.power4 == 42
     end
   end
 end

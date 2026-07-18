@@ -32,9 +32,11 @@ defmodule ThistleTea.Game.Spell do
     spell_level: 0,
     base_level: 0,
     max_level: 0,
+    custom_flags: 0,
     family_flags_0: 0,
     family_flags_1: 0,
     mechanic: 0,
+    stances_not: 0,
     proc_chance: 0,
     proc_charges: 0,
     proc_type_mask: 0,
@@ -82,6 +84,63 @@ defmodule ThistleTea.Game.Spell do
   end
 
   def usable_in_stance?(_spell, _form), do: false
+
+  @custom_flags %{
+    allow_stack_between_caster: 0x001,
+    negative: 0x002,
+    positive: 0x004,
+    chan_no_dist_limit: 0x008,
+    fixed_damage: 0x010,
+    ignore_armor: 0x020,
+    behind_target: 0x040,
+    face_target: 0x080,
+    single_target_aura: 0x100,
+    aura_apply_breaks_stealth: 0x200,
+    not_removed_on_evade: 0x400,
+    send_channel_visual: 0x800,
+    separate_aura_per_caster: 0x1000,
+    trigger_weapon_procs: 0x2000
+  }
+
+  def custom?(%__MODULE__{custom_flags: flags}, flag) when is_integer(flags) do
+    (flags &&& Map.fetch!(@custom_flags, flag)) != 0
+  end
+
+  def custom?(_spell, _flag), do: false
+
+  @stance_like_forms [17, 18, 19, 28, 30, 31]
+
+  def shapeshift_cast_error(%__MODULE__{} = spell, form) do
+    form = if is_integer(form), do: form, else: 0
+    stance_mask = if form > 0, do: 1 <<< (form - 1), else: 0
+    stances = spell.stances || 0
+
+    cond do
+      (stance_mask &&& (spell.stances_not || 0)) != 0 -> {:error, :not_shapeshift}
+      (stance_mask &&& stances) != 0 -> :ok
+      true -> shapeshifted_cast_error(spell, stances, acts_as_shifted?(form))
+    end
+  end
+
+  defp shapeshifted_cast_error(spell, stances, true) do
+    cond do
+      attribute?(spell, :not_while_shapeshifted) -> {:error, :not_shapeshift}
+      stances != 0 -> {:error, :only_shapeshift}
+      true -> :ok
+    end
+  end
+
+  defp shapeshifted_cast_error(spell, stances, false) do
+    if stances != 0 and not attribute?(spell, :allow_while_not_shapeshifted) do
+      {:error, :only_shapeshift}
+    else
+      :ok
+    end
+  end
+
+  defp acts_as_shifted?(form), do: form > 0 and form not in @stance_like_forms
+
+  def stance_like_forms, do: @stance_like_forms
 
   def same_chain?(%__MODULE__{id: id1, first_in_chain: first1}, %__MODULE__{id: id2, first_in_chain: first2}) do
     id1 != id2 and is_integer(first1) and first1 == first2

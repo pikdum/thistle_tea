@@ -10,5 +10,6 @@ defmodule ThistleTea.DB.Mangos.SpellTemplate do
     field(:effect_bonus_coefficient_0, :float, source: :effectBonusCoefficient1)
     field(:effect_bonus_coefficient_1, :float, source: :effectBonusCoefficient2)
     field(:effect_bonus_coefficient_2, :float, source: :effectBonusCoefficient3)
+    field(:custom_flags, :integer, source: :customFlags)
   end
 end

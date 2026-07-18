@@ -58,19 +58,21 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.UnitSync do
   defp sync_shapeshift(%Unit{auras: holders} = unit) when is_list(holders) do
     auras = Enum.flat_map(holders, fn %Holder{auras: auras} -> auras end)
 
-    form =
-      Enum.find_value(auras, 0, fn
+    shapeshift =
+      Enum.find_value(auras, fn
         %Aura{type: :mod_shapeshift, misc_value: misc} when is_integer(misc) and misc > 0 -> misc
-        %Aura{type: :mod_stealth} -> 30
         _ -> nil
       end)
+
+    stealth = Enum.any?(auras, &(&1.type == :mod_stealth))
+    form = shapeshift || if(stealth, do: 30, else: 0)
 
     sync_druid_power(%{unit | shapeshift_form: form}, form)
   end
 
   defp sync_shapeshift(unit), do: unit
 
-  defp sync_druid_power(%Unit{class: 11} = unit, 1), do: %{unit | power_type: 3, power4: 100, max_power4: 100}
+  defp sync_druid_power(%Unit{class: 11} = unit, 1), do: %{unit | power_type: 3, max_power4: 100}
 
   defp sync_druid_power(%Unit{class: 11} = unit, form) when form in [5, 8],
     do: %{unit | power_type: 1, max_power2: 1_000}

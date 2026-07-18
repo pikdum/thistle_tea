@@ -97,6 +97,32 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
       refute Enum.any?(events, &(&1.type == :heal_entity))
     end
 
+    test "multiple weapon-damage effects fold into a single strike" do
+      spell = %Spell{
+        id: 53,
+        school: :physical,
+        effects: [
+          %Effect{index: 0, type: :weapon_percent_damage, base_points: 150},
+          %Effect{index: 1, type: :normalized_weapon_damage, base_points: 15}
+        ]
+      }
+
+      context = %CastContext{
+        caster_guid: 999,
+        caster_level: 60,
+        attack_power: 0,
+        weapon_base_min: 100,
+        weapon_base_max: 100,
+        normalized_speed: 1.7
+      }
+
+      target = %{target_fixture() | unit: %Unit{health: 500, max_health: 500, level: 60, auras: []}}
+
+      {_target, events} = SpellEffect.receive(target, context, spell, 1_000)
+
+      assert [%{type: :spell_damage, damage: 172}] = Enum.filter(events, &(&1.type == :spell_damage))
+    end
+
     test "direct magic damage uses the snapshotted spell crit chance" do
       spell = %Spell{id: 133, school: :fire, dmg_class: 1, effects: [%Effect{type: :school_damage, base_points: 100}]}
       context = %CastContext{caster_guid: 999, caster_level: 10, spell_crit_chance: 100.0}

@@ -178,7 +178,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
       |> ObjectSync.sync()
       |> PlayerSync.sync()
       |> StealthSync.sync()
-      |> maybe_reset_shapeshift_rage(holder)
+      |> maybe_reset_shapeshift_power(holder)
       |> maybe_heal_increased_health(holder)
       |> maybe_sit(holder)
 
@@ -205,15 +205,57 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
   defp entity_guid(%{object: %{guid: guid}}), do: guid
   defp entity_guid(_entity), do: nil
 
-  defp remove_non_stacking(holders, %Holder{spell: %Spell{} = spell, caster_guid: caster_guid} = incoming) do
+  defp remove_non_stacking(holders, %Holder{} = incoming) do
     shapeshift? = Holder.has_aura_type?(incoming, :mod_shapeshift)
+    Enum.reject(holders, &non_stacking?(&1, incoming, shapeshift?))
+  end
 
-    Enum.reject(holders, fn %Holder{spell: %Spell{} = other} = existing ->
-      Spell.same_chain?(other, spell) or
-        exclusive_category_conflict?(existing, incoming) or
-        (other.id == spell.id and existing.caster_guid != caster_guid) or
-        (shapeshift? and Holder.has_aura_type?(existing, :mod_shapeshift))
-    end)
+  defp non_stacking?(
+         %Holder{spell: %Spell{} = other} = existing,
+         %Holder{spell: %Spell{} = spell} = incoming,
+         shapeshift?
+       ) do
+    cond do
+      exclusive_category_conflict?(existing, incoming) -> true
+      shapeshift? and Holder.has_aura_type?(existing, :mod_shapeshift) -> true
+      other.id == spell.id and existing.caster_guid != incoming.caster_guid -> replaces_same_spell?(existing, incoming)
+      Spell.same_chain?(other, spell) -> replaces_chain_rank?(existing, incoming)
+      true -> false
+    end
+  end
+
+  defp replaces_same_spell?(existing, %Holder{spell: spell} = incoming) do
+    not Spell.custom?(spell, :allow_stack_between_caster) and not cross_caster_coexist?(existing, incoming)
+  end
+
+  defp replaces_chain_rank?(existing, %Holder{spell: spell} = incoming) do
+    existing.caster_guid == incoming.caster_guid or
+      Spell.custom?(spell, :allow_stack_between_caster) or
+      not cross_caster_coexist?(existing, incoming)
+  end
+
+  @personal_stack_auras [
+    :dummy,
+    :periodic_damage,
+    :periodic_leech,
+    :periodic_heal,
+    :periodic_mana_leech,
+    :channel_death_item
+  ]
+
+  defp cross_caster_coexist?(%Holder{} = existing, %Holder{spell: %Spell{} = spell} = incoming) do
+    Spell.attribute?(spell, :channeled) or
+      Spell.custom?(spell, :separate_aura_per_caster) or
+      Spell.attribute?(spell, :dot_stacking_rule) or
+      personal_overlap_only?(existing, incoming)
+  end
+
+  defp personal_overlap_only?(%Holder{auras: existing_auras}, %Holder{auras: incoming_auras}) do
+    existing_indexes = MapSet.new(existing_auras, & &1.index)
+
+    incoming_auras
+    |> Enum.filter(&MapSet.member?(existing_indexes, &1.index))
+    |> Enum.all?(&(&1.type in @personal_stack_auras))
   end
 
   defp exclusive_category_conflict?(
@@ -292,8 +334,12 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
   defp mechanic_aura_types(12), do: [:mod_stun]
   defp mechanic_aura_types(_), do: []
 
-  defp upsert_holder(existing, %Holder{spell: %Spell{id: spell_id}, caster_guid: caster_guid} = incoming) do
-    case Enum.find_index(existing, &Holder.same_source?(&1, spell_id, caster_guid)) do
+  defp upsert_holder(existing, %Holder{spell: %Spell{id: spell_id} = spell, caster_guid: caster_guid} = incoming) do
+    index =
+      Enum.find_index(existing, &Holder.same_source?(&1, spell_id, caster_guid)) ||
+        shared_stack_index(existing, spell)
+
+    case index do
       nil ->
         slot = UnitSync.next_free_slot(existing, incoming.negative?)
         existing ++ [%{incoming | slot: slot}]
@@ -313,6 +359,12 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
     end
   end
 
+  defp shared_stack_index(existing, %Spell{id: spell_id} = spell) do
+    if Spell.custom?(spell, :allow_stack_between_caster) do
+      Enum.find_index(existing, &(&1.spell.id == spell_id))
+    end
+  end
+
   defp next_stacks(%Holder{stacks: stacks}, %Holder{spell: %Spell{stack_amount: cap}})
        when is_integer(cap) and cap > 1 do
     min((stacks || 1) + 1, cap)
@@ -329,15 +381,27 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
     end)
   end
 
-  defp maybe_reset_shapeshift_rage(%{unit: %Unit{power_type: 1, power2: rage} = unit} = entity, %Holder{} = holder) do
-    if Holder.has_aura_type?(holder, :mod_shapeshift) and is_integer(rage) and rage > 0 do
-      %{entity | unit: %{unit | power2: 0}}
-    else
-      entity
+  defp maybe_reset_shapeshift_power(%{unit: %Unit{} = unit} = entity, %Holder{} = holder) do
+    cond do
+      not Holder.has_aura_type?(holder, :mod_shapeshift) ->
+        entity
+
+      cat_form?(holder) and unit.class == 11 ->
+        %{entity | unit: %{unit | power4: 0}}
+
+      unit.power_type == 1 and is_integer(unit.power2) and unit.power2 > 0 ->
+        %{entity | unit: %{unit | power2: 0}}
+
+      true ->
+        entity
     end
   end
 
-  defp maybe_reset_shapeshift_rage(entity, _holder), do: entity
+  defp maybe_reset_shapeshift_power(entity, _holder), do: entity
+
+  defp cat_form?(%Holder{auras: auras}) do
+    Enum.any?(auras, &match?(%Aura{type: :mod_shapeshift, misc_value: 1}, &1))
+  end
 
   defp maybe_heal_increased_health(entity, %Holder{auras: auras}) do
     auras

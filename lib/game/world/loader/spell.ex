@@ -224,6 +224,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
       spell_level: row.spell_level || 0,
       base_level: row.base_level || 0,
       max_level: row.max_level || 0,
+      custom_flags: SpellEffectOverrideLoader.custom_flags(row.id),
       effects: build_effects(row, radius_lookup),
       script_steps: SpellScriptLoader.get(row.id),
       reagents: build_reagents(row)
@@ -239,6 +240,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
       mana_cost_percent: row.mana_cost_percent || 0,
       dmg_class: row.defence_type || 0,
       stances: row.shapeshift_mask || 0,
+      stances_not: row.shapeshift_exclude || 0,
       caster_aura_state: row.caster_aura_state || 0,
       target_aura_state: row.target_aura_state || 0,
       target_creature_type_mask: row.target_creature_type || 0,
@@ -694,10 +696,13 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   @passive 0x00000040
   @ability 0x00000010
   @hidden_in_combat_log 0x00000100
+  @not_while_shapeshifted 0x00010000
   @not_in_combat 0x10000000
   @aura_is_debuff 0x04000000
   @cant_cancel 0x80000000
   @cooldown_on_event 0x02000000
+  @allow_while_not_shapeshifted_ex2 0x00080000
+  @dot_stacking_rule_ex3 0x00000080
   @channeled_ex_1 0x00000004
   @channeled_ex_2 0x00000040
   @discount_power_on_miss_ex_1 0x08000000
@@ -720,6 +725,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
       |> add_if(attrs, @passive, :passive)
       |> add_if(attrs, @ability, :ability)
       |> add_if(attrs, @hidden_in_combat_log, :hidden_in_combat_log)
+      |> add_if(attrs, @not_while_shapeshifted, :not_while_shapeshifted)
       |> add_if(attrs, @not_in_combat, :not_in_combat)
       |> add_if(attrs, @aura_is_debuff, :negative)
       |> add_if(attrs, @cant_cancel, :cant_cancel)
@@ -736,7 +742,9 @@ defmodule ThistleTea.Game.World.Loader.Spell do
     |> add_if(attrs_ex1, @finishing_move_duration_ex_1, :finishing_move)
     |> add_if(attrs_ex2, @ignore_line_of_sight_ex2, :ignore_line_of_sight)
     |> add_if(attrs_ex2, @cant_crit_ex2, :cant_crit)
+    |> add_if(attrs_ex2, @allow_while_not_shapeshifted_ex2, :allow_while_not_shapeshifted)
     |> add_if(attrs_ex3, @completely_blocked_ex3, :completely_blocked)
+    |> add_if(attrs_ex3, @dot_stacking_rule_ex3, :dot_stacking_rule)
   end
 
   defp attributes(_, _, _, _), do: MapSet.new()

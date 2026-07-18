@@ -13,7 +13,11 @@ defmodule ThistleTea.Game.Spell.Coefficient do
 
   def bonus(benefit, %Spell{} = spell, %Effect{} = effect, damage_type)
       when is_integer(benefit) and benefit > 0 and damage_type in [:direct, :dot] do
-    trunc(benefit * value(spell, effect, damage_type))
+    if Spell.custom?(spell, :fixed_damage) do
+      0
+    else
+      trunc(benefit * value(spell, effect, damage_type))
+    end
   end
 
   def bonus(_benefit, _spell, _effect, _damage_type), do: 0

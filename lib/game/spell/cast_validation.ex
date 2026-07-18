@@ -81,12 +81,8 @@ defmodule ThistleTea.Game.Spell.CastValidation do
 
   defp check_combat_state(_caster, _spell), do: :ok
 
-  defp check_stance(%{unit: unit}, %Spell{stances: stances} = spell) when is_integer(stances) and stances > 0 do
-    if (unit.shapeshift_form || 0) == 0 or Spell.usable_in_stance?(spell, unit.shapeshift_form || 0) do
-      :ok
-    else
-      {:error, :only_shapeshift}
-    end
+  defp check_stance(%{unit: unit}, %Spell{} = spell) do
+    Spell.shapeshift_cast_error(spell, unit.shapeshift_form || 0)
   end
 
   defp check_stance(_caster, _spell), do: :ok

@@ -335,6 +335,7 @@ defmodule ThistleTea.Game.Entity.Logic.PriestSpellsTest do
             type: :power_burn,
             base_points: 190,
             die_sides: 13,
+            base_dice: 1,
             multiple_value: 0.5,
             implicit_target_a: :target_enemy
           }

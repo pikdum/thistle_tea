@@ -34,6 +34,8 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
 
   @resurrect_effects [:resurrect, :resurrect_new]
 
+  @weapon_effect_types [:weapon_damage, :weapon_damage_noschool, :normalized_weapon_damage, :weapon_percent_damage]
+
   def receive(target, %CastContext{} = context, %Spell{} = spell, now) when is_integer(now) do
     if immune_to_harmful_spell?(target, context, spell) do
       {target, [Event.spell_log_miss(context.caster_guid, target.object.guid, spell.id, :immune)]}
@@ -162,12 +164,12 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   end
 
   defp apply_effects(target, context, effects, events, now) do
-    apply_effects(target, context, effects, events, false, now)
+    apply_effects(target, context, effects, events, MapSet.new(), now)
   end
 
-  defp apply_effects(target, _context, [], events, _aura_applied?, _now), do: {target, events}
+  defp apply_effects(target, _context, [], events, _applied, _now), do: {target, events}
 
-  defp apply_effects(target, context, effects, events, aura_applied?, now) do
+  defp apply_effects(target, context, effects, events, applied, now) do
     effects =
       if Core.dead?(target) do
         Enum.filter(effects, &match?(%Effect{type: type} when type in @resurrect_effects, &1))
@@ -175,35 +177,71 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
         effects
       end
 
-    do_apply_effects(target, context, effects, events, aura_applied?, now)
+    do_apply_effects(target, context, effects, events, applied, now)
   end
 
-  defp do_apply_effects(target, _context, [], events, _aura_applied?, _now), do: {target, events}
+  defp do_apply_effects(target, _context, [], events, _applied, _now), do: {target, events}
 
-  defp do_apply_effects(target, context, [effect | rest], events, aura_applied?, now) do
-    {target, events, aura_applied?} = apply_one_effect(target, context, effect, events, aura_applied?, now)
-    apply_effects(target, context, rest, events, aura_applied?, now)
+  defp do_apply_effects(target, context, [effect | rest], events, applied, now) do
+    {target, events, applied} = apply_one_effect(target, context, effect, events, applied, now)
+    apply_effects(target, context, rest, events, applied, now)
   end
 
-  defp apply_one_effect(target, context, effect, events, aura_applied?, now) do
+  defp apply_one_effect(target, context, effect, events, applied, now) do
     cond do
       channel_ticked_trigger?(context.spell, effect) ->
         event =
           Event.trigger_spell(context.caster_guid, context.caster_level, target.object.guid, effect.trigger_spell_id)
 
-        {target, events ++ [event], aura_applied?}
+        {target, events ++ [event], applied}
 
-      match?(%Effect{type: type} when type in [:apply_aura, :apply_area_aura], effect) and aura_applied? ->
-        {target, events, aura_applied?}
+      aura_effect?(effect) ->
+        if MapSet.member?(applied, :aura) do
+          {target, events, applied}
+        else
+          {target, aura_events} = apply_auras(target, context, now)
+          {target, events ++ aura_events, MapSet.put(applied, :aura)}
+        end
 
-      match?(%Effect{type: type} when type in [:apply_aura, :apply_area_aura], effect) ->
-        {target, aura_events} = apply_auras(target, context, now)
-        {target, events ++ aura_events, true}
+      weapon_effect?(effect) ->
+        if MapSet.member?(applied, :weapon) do
+          {target, events, applied}
+        else
+          {target, weapon_events} = apply_weapon_group(target, context, context.spell, now)
+          {target, events ++ weapon_events, MapSet.put(applied, :weapon)}
+        end
 
       true ->
         {target, effect_events} = apply_effect(target, context, context.spell, effect, now)
-        {target, events ++ effect_events, aura_applied?}
+        {target, events ++ effect_events, applied}
     end
+  end
+
+  defp aura_effect?(%Effect{type: type}), do: type in [:apply_aura, :apply_area_aura]
+
+  defp weapon_effect?(%Effect{type: type}), do: type in @weapon_effect_types
+
+  defp apply_weapon_group(state, %CastContext{} = context, spell, now) do
+    effects = Enum.filter(context.spell.effects, &weapon_effect?/1)
+    context = apply_target_attack_power_bonus(state, context, spell)
+
+    base =
+      if Enum.any?(effects, &(&1.type == :normalized_weapon_damage)),
+        do: normalized_weapon_roll(context),
+        else: weapon_roll(context)
+
+    flat =
+      effects
+      |> Enum.reject(&(&1.type == :weapon_percent_damage))
+      |> Enum.map(&rolled_amount(spell, &1, context))
+      |> Enum.sum()
+
+    percent =
+      effects
+      |> Enum.filter(&(&1.type == :weapon_percent_damage))
+      |> Enum.reduce(1.0, fn effect, acc -> acc * rolled_amount(spell, effect, context) / 100 end)
+
+    melee_ability_damage(state, context, spell, trunc((base + flat) * percent), now)
   end
 
   defp apply_auras(target, context, now) do
@@ -420,12 +458,6 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
         vanish_attack_stop_events(state) ++ maybe_vanish_stealth_events(state, spell)
 
     {state, events}
-  end
-
-  defp apply_effect(state, %CastContext{} = context, spell, %Effect{type: type} = effect, now)
-       when type in [:weapon_damage, :weapon_damage_noschool, :normalized_weapon_damage, :weapon_percent_damage] do
-    context = apply_target_attack_power_bonus(state, context, spell)
-    melee_ability_damage(state, context, spell, weapon_ability_damage(context, spell, effect), now)
   end
 
   defp apply_effect(state, %CastContext{} = context, _spell, %Effect{type: :attack_me}, _now) do
@@ -948,18 +980,6 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
     else
       0
     end
-  end
-
-  defp weapon_ability_damage(%CastContext{} = context, spell, %Effect{type: :normalized_weapon_damage} = effect) do
-    normalized_weapon_roll(context) + rolled_amount(spell, effect, context)
-  end
-
-  defp weapon_ability_damage(%CastContext{} = context, spell, %Effect{type: :weapon_percent_damage} = effect) do
-    trunc(weapon_roll(context) * rolled_amount(spell, effect, context) / 100)
-  end
-
-  defp weapon_ability_damage(%CastContext{} = context, spell, %Effect{} = effect) do
-    weapon_roll(context) + rolled_amount(spell, effect, context)
   end
 
   defp weapon_roll(%CastContext{attack_time_ms: attack_time_ms} = context)

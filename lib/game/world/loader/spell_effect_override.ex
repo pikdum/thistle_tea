@@ -23,7 +23,7 @@ defmodule ThistleTea.Game.World.Loader.SpellEffectOverride do
 
   def load_all do
     load_effect_mods()
-    load_bonus_coefficients()
+    load_spell_template_fixes()
     :ok
   end
 
@@ -36,7 +36,7 @@ defmodule ThistleTea.Game.World.Loader.SpellEffectOverride do
     end)
   end
 
-  defp load_bonus_coefficients do
+  defp load_spell_template_fixes do
     latest_builds =
       from(s in SpellTemplate,
         where: s.build <= @client_build,
@@ -48,12 +48,17 @@ defmodule ThistleTea.Game.World.Loader.SpellEffectOverride do
     |> join(:inner, [s], latest in subquery(latest_builds), on: latest.entry == s.entry and latest.build == s.build)
     |> select(
       [s],
-      {s.entry, {s.effect_bonus_coefficient_0, s.effect_bonus_coefficient_1, s.effect_bonus_coefficient_2}}
+      {s.entry, {s.effect_bonus_coefficient_0, s.effect_bonus_coefficient_1, s.effect_bonus_coefficient_2},
+       s.custom_flags}
     )
     |> Mangos.Repo.all()
-    |> Enum.each(fn {entry, coefficients} ->
+    |> Enum.each(fn {entry, coefficients, custom_flags} ->
       if coefficients != {-1.0, -1.0, -1.0} do
         :ets.insert(__MODULE__, {{:coefficients, entry}, coefficients})
+      end
+
+      if is_integer(custom_flags) and custom_flags != 0 do
+        :ets.insert(__MODULE__, {{:custom_flags, entry}, custom_flags})
       end
     end)
   end
@@ -79,4 +84,15 @@ defmodule ThistleTea.Game.World.Loader.SpellEffectOverride do
   end
 
   def bonus_coefficient(_spell_id, _effect_index), do: nil
+
+  def custom_flags(spell_id) when is_integer(spell_id) and spell_id > 0 do
+    case :ets.lookup(__MODULE__, {:custom_flags, spell_id}) do
+      [{_key, flags}] -> flags
+      _ -> 0
+    end
+  rescue
+    ArgumentError -> 0
+  end
+
+  def custom_flags(_spell_id), do: 0
 end

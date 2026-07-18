@@ -73,6 +73,41 @@ defmodule ThistleTea.Game.Spell.CastValidationTest do
     hostile_target([hostile?: false, friendly?: true, attackable?: false] ++ overrides)
   end
 
+  describe "stance gating" do
+    test "stance-locked abilities fail outside their form, including no form at all" do
+      claw = harmful_spell(id: 1082, stances: 0x1)
+
+      assert {:error, :only_shapeshift} =
+               CastValidation.validate(caster(), claw, Targets.unit(7), hostile_target(), @now)
+
+      assert {:error, :only_shapeshift} =
+               CastValidation.validate(caster(shapeshift_form: 5), claw, Targets.unit(7), hostile_target(), @now)
+
+      assert :ok = CastValidation.validate(caster(shapeshift_form: 1), claw, Targets.unit(7), hostile_target(), @now)
+    end
+
+    test "normal spells fail in true forms but cast fine in warrior-style stances" do
+      fireball = harmful_spell(attributes: MapSet.new([:not_while_shapeshifted]))
+
+      assert {:error, :not_shapeshift} =
+               CastValidation.validate(caster(shapeshift_form: 1), fireball, Targets.unit(7), hostile_target(), @now)
+
+      assert :ok =
+               CastValidation.validate(caster(shapeshift_form: 17), fireball, Targets.unit(7), hostile_target(), @now)
+
+      assert :ok = CastValidation.validate(caster(), fireball, Targets.unit(7), hostile_target(), @now)
+    end
+
+    test "stance-excluded spells fail in the excluded form" do
+      renew = helpful_spell(stances_not: 0x08000000)
+
+      assert {:error, :not_shapeshift} =
+               CastValidation.validate(caster(shapeshift_form: 28), renew, %Targets{}, nil, @now)
+
+      assert :ok = CastValidation.validate(caster(), renew, %Targets{}, nil, @now)
+    end
+  end
+
   describe "validate/6" do
     test "passes a valid hostile cast" do
       assert :ok =
