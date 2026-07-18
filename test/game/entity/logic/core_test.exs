@@ -67,6 +67,19 @@ defmodule ThistleTea.Game.Entity.Logic.CoreTest do
     end
   end
 
+  describe "take_damage_with_absorb/4 aura cleanup" do
+    test "keeps passive auras and removes temporary auras on death" do
+      passive = %Holder{slot: 0, spell: %Spell{id: 1, attributes: MapSet.new([:passive])}}
+      temporary = %Holder{slot: 1, spell: %Spell{id: 2, attributes: MapSet.new()}}
+      entity = damageable(health: 30)
+      entity = %{entity | unit: %{entity.unit | auras: [passive, temporary]}}
+
+      {entity, _absorbed} = Core.take_damage_with_absorb(entity, 30, 1_000)
+
+      assert entity.unit.auras == [passive]
+    end
+  end
+
   describe "take_damage_with_absorb/4 death items" do
     test "rewards one DBC-defined item to an eligible tapped caster" do
       holder = %Holder{

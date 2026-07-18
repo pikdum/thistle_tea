@@ -214,7 +214,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
     %{internal: internal, unit: unit, movement_block: mb} = entity
 
     unit =
-      %{unit | target: 0, auras: []}
+      %{unit | target: 0, auras: death_auras(unit.auras)}
       |> Aura.sync_unit()
 
     internal = %{
@@ -240,6 +240,15 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
   end
 
   defp maybe_dead(entity, _now), do: entity
+
+  defp death_auras(holders) when is_list(holders) do
+    Enum.filter(holders, fn
+      %{spell: %Spell{} = spell} -> Spell.attribute?(spell, :passive)
+      _holder -> false
+    end)
+  end
+
+  defp death_auras(_holders), do: []
 
   defp maybe_enqueue_death_root(%{player: _player} = entity, health, new_health)
        when is_number(health) and health > 0 and new_health <= 0 do
