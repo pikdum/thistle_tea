@@ -11,10 +11,11 @@ defmodule ThistleTea.Game.Player.Talents do
   alias ThistleTea.Game.Player.Spells
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.CharacterStore
+  alias ThistleTea.Game.World.Loader.Talent, as: TalentLoader
 
   def learn(%{character: %Character{} = character} = state, talent_id, requested_rank) do
-    with {:ok, spell_ids} <- LogicTalents.validate(character, talent_id, requested_rank),
-         {:ok, character, _events} <- Spells.learn(character, spell_ids) do
+    with {:ok, talent_spell_ids} <- LogicTalents.validate(character, talent_id, requested_rank),
+         {:ok, character, _events} <- Spells.learn(character, with_dependent_spells(talent_spell_ids)) do
       commit(state, character)
     else
       _invalid -> state
@@ -28,8 +29,8 @@ defmodule ThistleTea.Game.Player.Talents do
       [] ->
         state
 
-      spell_ids ->
-        commit(state, Spells.unlearn(character, spell_ids, Time.now()))
+      talent_spell_ids ->
+        commit(state, Spells.unlearn(character, with_dependent_spells(talent_spell_ids), Time.now()))
     end
   end
 
@@ -44,5 +45,9 @@ defmodule ThistleTea.Game.Player.Talents do
     CharacterStore.put(character)
     Network.send_packet(Core.update_object(character, :values))
     %{state | character: character}
+  end
+
+  defp with_dependent_spells(spell_ids) do
+    Enum.flat_map(spell_ids, &[&1 | TalentLoader.dependent_spell_ids(&1)])
   end
 end

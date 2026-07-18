@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.World.Loader.Talent do
   alias ThistleTea.Game.Entity.Data.Talent, as: TalentData
 
   @classes 1..11
+  @learn_spell_effect 36
   @table_options [:named_table, :public, read_concurrency: true, write_concurrency: :auto]
 
   def init(table \\ __MODULE__) do
@@ -22,6 +23,12 @@ defmodule ThistleTea.Game.World.Loader.Talent do
 
   def load_all do
     tabs = DBC.all(TalentTab)
+    talent_rows = DBC.all(Talent)
+
+    learned_spell_ids_by_parent =
+      talent_rows
+      |> Enum.flat_map(&rank_spell_ids/1)
+      |> learned_spell_ids_by_parent()
 
     successor_by_spell =
       DBC.all(
@@ -44,15 +51,20 @@ defmodule ThistleTea.Game.World.Loader.Talent do
       :ets.insert(__MODULE__, {{:tabs, class}, tab_ids})
     end)
 
-    Talent
-    |> DBC.all()
-    |> Enum.each(fn row ->
+    Enum.each(talent_rows, fn row ->
       talent = build(row)
       :ets.insert(__MODULE__, {{:talent, talent.id}, talent})
 
       talent
       |> rank_spell_variants(successor_by_spell)
       |> cache_spell_lineage(talent)
+
+      Enum.each(talent.rank_spell_ids, fn spell_id ->
+        :ets.insert(
+          __MODULE__,
+          {{:dependent_spells, spell_id}, Map.get(learned_spell_ids_by_parent, spell_id, [])}
+        )
+      end)
     end)
 
     :ok
@@ -117,11 +129,18 @@ defmodule ThistleTea.Game.World.Loader.Talent do
 
   def superseded_by_map(_spell_ids), do: %{}
 
-  defp build(row) do
-    rank_spell_ids =
-      [row.spell_rank_0, row.spell_rank_1, row.spell_rank_2, row.spell_rank_3, row.spell_rank_4]
-      |> Enum.take_while(&(is_integer(&1) and &1 > 0))
+  def dependent_spell_ids(spell_id) when is_integer(spell_id) and spell_id > 0 do
+    case :ets.lookup(__MODULE__, {:dependent_spells, spell_id}) do
+      [{_key, spell_ids}] -> spell_ids
+      _ -> []
+    end
+  rescue
+    ArgumentError -> []
+  end
 
+  def dependent_spell_ids(_spell_id), do: []
+
+  defp build(row) do
     %TalentData{
       id: row.id,
       tab_id: row.tab,
@@ -130,12 +149,43 @@ defmodule ThistleTea.Game.World.Loader.Talent do
       depends_on: positive(row.prereq_talents_0),
       depends_on_rank: row.prereq_ranks_0 || 0,
       required_spell_id: positive(row.required_spell),
-      rank_spell_ids: rank_spell_ids
+      rank_spell_ids: rank_spell_ids(row)
     }
   end
 
   defp positive(value) when is_integer(value) and value > 0, do: value
   defp positive(_value), do: nil
+
+  defp rank_spell_ids(row) do
+    [row.spell_rank_0, row.spell_rank_1, row.spell_rank_2, row.spell_rank_3, row.spell_rank_4]
+    |> Enum.take_while(&(is_integer(&1) and &1 > 0))
+  end
+
+  defp learned_spell_ids_by_parent([]), do: %{}
+
+  defp learned_spell_ids_by_parent(spell_ids) do
+    DBC.all(
+      from(s in Spell,
+        where: s.id in ^spell_ids,
+        select: %{
+          id: s.id,
+          effects: [
+            {s.effect_0, s.effect_trigger_spell_0},
+            {s.effect_1, s.effect_trigger_spell_1},
+            {s.effect_2, s.effect_trigger_spell_2}
+          ]
+        }
+      )
+    )
+    |> Map.new(fn row ->
+      learned_spell_ids =
+        for {@learn_spell_effect, spell_id} <- row.effects,
+            is_integer(spell_id) and spell_id > 0,
+            do: spell_id
+
+      {row.id, learned_spell_ids}
+    end)
+  end
 
   defp rank_spell_variants(%TalentData{rank_spell_ids: rank_spell_ids}, successor_by_spell) do
     canonical_ids = MapSet.new(rank_spell_ids)

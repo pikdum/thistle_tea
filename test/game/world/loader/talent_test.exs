@@ -48,6 +48,11 @@ defmodule ThistleTea.Game.World.Loader.TalentTest do
            }
   end
 
+  test "talent learn-spell effects expose their dependent abilities" do
+    assert TalentLoader.dependent_spell_ids(16_268) == [18_848]
+    assert TalentLoader.dependent_spell_ids(16_269) == [197, 199]
+  end
+
   test "multi-rank talents list every rank in order" do
     assert %TalentData{rank_spell_ids: [12_285, 12_697]} = TalentLoader.get(126)
   end
