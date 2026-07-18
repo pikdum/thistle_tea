@@ -11,8 +11,11 @@ defmodule ThistleTea.Game.Spell.Cooldowns do
   alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.Modifiers
 
   def start(%{internal: internal} = entity, %Spell{} = spell, now) when is_integer(now) do
+    spell = with_cooldown_modifiers(entity, spell)
+
     case initial_entries(spell, now) do
       [] ->
         entity
@@ -192,6 +195,20 @@ defmodule ThistleTea.Game.Spell.Cooldowns do
   end
 
   def client_cooldown_ms(_spell), do: 0
+
+  defp with_cooldown_modifiers(entity, %Spell{} = spell) do
+    %{
+      spell
+      | recovery_time_ms: modified_recovery(entity, spell, spell.recovery_time_ms),
+        category_recovery_time_ms: modified_recovery(entity, spell, spell.category_recovery_time_ms)
+    }
+  end
+
+  defp modified_recovery(entity, spell, recovery) when is_integer(recovery) and recovery > 0 do
+    Modifiers.integer_value(entity, spell, :cooldown, recovery)
+  end
+
+  defp modified_recovery(_entity, _spell, recovery), do: recovery
 
   defp entries(%Spell{id: spell_id, category: category} = spell, now) do
     spell_entry =

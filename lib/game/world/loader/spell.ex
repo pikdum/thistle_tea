@@ -596,6 +596,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp aura_type(15), do: :damage_shield
   defp aura_type(16), do: :mod_stealth
   defp aura_type(17), do: :mod_stealth_detect
+  defp aura_type(20), do: :obs_mod_health
   defp aura_type(22), do: :mod_resistance
   defp aura_type(23), do: :periodic_trigger_spell
   defp aura_type(24), do: :periodic_energize
@@ -605,18 +606,21 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp aura_type(31), do: :mod_increase_speed
   defp aura_type(33), do: :mod_decrease_speed
   defp aura_type(34), do: :mod_increase_health
+  defp aura_type(35), do: :mod_increase_energy
   defp aura_type(36), do: :mod_shapeshift
   defp aura_type(39), do: :school_immunity
   defp aura_type(41), do: :dispel_immunity
   defp aura_type(42), do: :proc_trigger_spell
   defp aura_type(43), do: :damage_shield
   defp aura_type(44), do: :track_creatures
+  defp aura_type(45), do: :track_resources
   defp aura_type(47), do: :mod_parry_percent
   defp aura_type(49), do: :mod_dodge
   defp aura_type(51), do: :mod_block_percent
   defp aura_type(52), do: :mod_crit_percent
   defp aura_type(53), do: :periodic_leech
   defp aura_type(54), do: :mod_hit_chance
+  defp aura_type(55), do: :mod_spell_hit_chance
   defp aura_type(56), do: :transform
   defp aura_type(57), do: :mod_spell_crit_chance
   defp aura_type(58), do: :mod_increase_swim_speed
@@ -643,6 +647,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp aura_type(94), do: :interrupt_regen
   defp aura_type(95), do: :ghost
   defp aura_type(97), do: :mana_shield
+  defp aura_type(98), do: :mod_skill_talent
   defp aura_type(99), do: :mod_attack_power
   defp aura_type(101), do: :mod_resistance_percent
   defp aura_type(103), do: :mod_total_threat
@@ -651,7 +656,9 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp aura_type(106), do: :hover
   defp aura_type(107), do: :add_flat_modifier
   defp aura_type(108), do: :add_pct_modifier
+  defp aura_type(109), do: :add_target_trigger
   defp aura_type(110), do: :mod_power_regen_percent
+  defp aura_type(112), do: :override_class_scripts
   defp aura_type(113), do: :mod_ranged_damage_taken
   defp aura_type(115), do: :mod_healing
   defp aura_type(116), do: :mod_regen_during_combat
@@ -659,11 +666,16 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp aura_type(118), do: :mod_healing_pct
   defp aura_type(120), do: :untrackable
   defp aura_type(121), do: :empathy
+  defp aura_type(122), do: :mod_offhand_damage_pct
+  defp aura_type(123), do: :mod_target_resistance
   defp aura_type(124), do: :mod_ranged_attack_power
   defp aura_type(127), do: :ranged_attack_power_attacker_bonus
   defp aura_type(128), do: :mod_possess_pet
+  defp aura_type(132), do: :mod_increase_energy_percent
+  defp aura_type(133), do: :mod_increase_health_percent
   defp aura_type(134), do: :mod_mana_regen_interrupt
   defp aura_type(135), do: :mod_healing_done
+  defp aura_type(136), do: :mod_healing_done_percent
   defp aura_type(137), do: :mod_total_stat_percent
   defp aura_type(138), do: :mod_melee_haste
   defp aura_type(140), do: :mod_ranged_haste
@@ -671,10 +683,19 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp aura_type(142), do: :mod_base_resistance_percent
   defp aura_type(143), do: :mod_resistance_exclusive
   defp aura_type(144), do: :safe_fall
+  defp aura_type(148), do: :retain_combo_points
   defp aura_type(149), do: :reduce_pushback
+  defp aura_type(150), do: :mod_shield_block_value
   defp aura_type(151), do: :track_stealthed
   defp aura_type(153), do: :split_damage_flat
+  defp aura_type(154), do: :mod_stealth_level
   defp aura_type(161), do: :mod_health_regen_in_combat
+  defp aura_type(166), do: :mod_attack_power_pct
+  defp aura_type(174), do: :mod_spell_damage_of_stat_percent
+  defp aura_type(175), do: :mod_spell_healing_of_stat_percent
+  defp aura_type(179), do: :mod_attacker_spell_crit_chance
+  defp aura_type(187), do: :mod_attacker_melee_crit_chance
+  defp aura_type(188), do: :mod_attacker_ranged_crit_chance
   defp aura_type(other) when is_integer(other), do: other
 
   defp target_type(0), do: nil

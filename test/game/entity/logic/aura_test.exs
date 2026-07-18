@@ -816,6 +816,7 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
               race: 4,
               native_display_id: 55,
               display_id: 55,
+              base_health: 100,
               power_type: 0,
               power2: 30,
               power4: 50
@@ -1349,10 +1350,105 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
     end
   end
 
+  describe "talent effect plumbing" do
+    test "max pool auras scale health and energy" do
+      entity = fixture_entity()
+      entity = %{entity | unit: %{entity.unit | class: 4, base_health: 80, power_type: 3, power4: 0, max_power4: 100}}
+
+      vigor = aura_fixture(21_369, :mod_increase_energy, base_points: 10, misc_value: 3)
+      survivalist = aura_fixture(20_579, :mod_increase_health_percent, base_points: 10)
+
+      {entity, _events} = apply_spell(entity, 1, 60, vigor)
+      {entity, _events} = apply_spell(entity, 1, 60, survivalist)
+
+      assert entity.unit.max_power4 == 110
+      assert entity.unit.max_health == 88
+    end
+
+    test "tactical mastery retains rage when switching stances" do
+      entity = fixture_entity()
+      entity = %{entity | unit: %{entity.unit | class: 1, power_type: 1, power2: 400, max_power2: 1_000}}
+
+      tactical_mastery = aura_fixture(12_678, :override_class_scripts, misc_value: 833)
+      {entity, _events} = apply_spell(entity, 1, 60, tactical_mastery)
+
+      stance = %Spell{
+        id: 71,
+        duration_ms: -1,
+        effects: [%Effect{index: 0, type: :apply_aura, aura: :mod_shapeshift, misc_value: 18}]
+      }
+
+      {entity, _events} = apply_spell(entity, 1, 60, stance)
+
+      assert entity.unit.power2 == 150
+    end
+
+    test "add_target_trigger auras fire their trigger at cast targets" do
+      caster = fixture_entity()
+
+      relentless = %Spell{
+        id: 14_179,
+        spell_family: 8,
+        duration_ms: -1,
+        effects: [
+          %Effect{
+            index: 0,
+            type: :apply_aura,
+            aura: :add_target_trigger,
+            base_points: 99,
+            base_dice: 1,
+            class_mask: 0x20000,
+            trigger_spell_id: 14_181
+          }
+        ]
+      }
+
+      {caster, _events} = apply_spell(caster, 1, 60, relentless)
+
+      matching = %Spell{id: 8647, spell_family: 8, family_flags_0: 0x20000}
+      other = %Spell{id: 133, spell_family: 3, family_flags_0: 0x1}
+
+      assert [%{type: :trigger_spell, target_guid: 77, spell_id: 14_181}] =
+               Aura.target_trigger_events(caster, matching, [77])
+
+      assert Aura.target_trigger_events(caster, other, [77]) == []
+    end
+
+    test "obs_mod_health auras tick percent-of-max healing" do
+      entity = fixture_entity()
+      entity = %{entity | unit: %{entity.unit | health: 50}}
+
+      blood_craze = aura_fixture(16_488, :obs_mod_health, base_points: 2, amplitude_ms: 3_000, duration_ms: 6_000)
+      {entity, _events} = apply_spell(entity, 1, 60, blood_craze)
+
+      {entity, events} = Aura.tick(entity, 4_001)
+
+      assert entity.unit.health == 52
+      assert Enum.any?(events, &(&1.type == :periodic_aura_log and &1.amount == 2))
+    end
+  end
+
+  defp aura_fixture(id, aura, opts) do
+    %Spell{
+      id: id,
+      duration_ms: Keyword.get(opts, :duration_ms, -1),
+      effects: [
+        %Effect{
+          index: 0,
+          type: :apply_aura,
+          aura: aura,
+          base_points: Keyword.get(opts, :base_points, 0),
+          misc_value: Keyword.get(opts, :misc_value, 0),
+          amplitude_ms: Keyword.get(opts, :amplitude_ms, 0)
+        }
+      ]
+    }
+  end
+
   describe "cat form energy" do
     test "entering cat form zeroes energy and later auras do not refill it" do
       entity = fixture_entity()
-      entity = %{entity | unit: %{entity.unit | class: 11, power4: 50, max_power4: 0}}
+      entity = %{entity | unit: %{entity.unit | class: 11, base_health: 100, power4: 50, max_power4: 0}}
 
       cat = %Spell{
         id: 768,

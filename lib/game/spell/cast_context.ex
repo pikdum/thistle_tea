@@ -57,6 +57,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
     spell_modifiers: [],
     spell_damage_bonus: %{},
     healing_bonus: 0,
+    spell_penetration: 0,
     threat_multiplier: 1.0,
     damage_done_multiplier: 1.0,
     effect_damage_multiplier: 1.0,
@@ -77,12 +78,13 @@ defmodule ThistleTea.Game.Spell.CastContext do
       spell: spell,
       spell_damage_bonus: spell_damage_bonus(caster),
       healing_bonus: healing_bonus(caster),
+      spell_penetration: Aura.flat_amount(caster, :mod_target_resistance),
       spell_threat: SpellThreatLoader.get(spell_id(spell)),
       spell_modifiers: Modifiers.snapshot(caster, spell),
-      threat_multiplier: Aura.percent_multiplier(caster, :mod_threat, Spell.school_mask(spell)),
+      threat_multiplier: threat_multiplier(caster, spell),
       damage_done_multiplier: Aura.percent_multiplier(caster, :mod_damage_percent_done, Spell.school_mask(spell)),
       effect_damage_multiplier: effect_multiplier(caster, spell, [:all_effects, :damage]),
-      effect_healing_multiplier: effect_multiplier(caster, spell, [:all_effects]),
+      effect_healing_multiplier: healing_done_multiplier(caster, spell),
       spell_crit_chance: spell_crit_chance(caster, spell),
       hit_chance_bonus: Aura.flat_amount(caster, :mod_hit_chance)
     }
@@ -204,12 +206,20 @@ defmodule ThistleTea.Game.Spell.CastContext do
 
   defp normalized_speed(_caster), do: @normalized_unarmed
 
-  defp attack_skill(%Character{unit: unit, player: player}) when is_struct(player) do
+  defp attack_skill(%Character{unit: unit, player: player} = caster) when is_struct(player) do
     skill_id = Skills.main_hand_weapon_skill(player, &ItemLoader.get_template/1)
-    Skills.value(player.skills, skill_id, Skills.max_for_level(unit.level || 1))
+    Skills.value(player.skills, skill_id, Skills.max_for_level(unit.level || 1)) + skill_aura_bonus(caster, skill_id)
   end
 
   defp attack_skill(_caster), do: nil
+
+  defp skill_aura_bonus(caster, skill_id) do
+    [:mod_skill, :mod_skill_talent]
+    |> Enum.flat_map(&Aura.auras_of_type(caster, &1))
+    |> Enum.filter(&(&1.misc_value == skill_id and is_integer(&1.amount)))
+    |> Enum.map(& &1.amount)
+    |> Enum.sum()
+  end
 
   defp melee_crit_chance(%Character{unit: unit} = caster, %Spell{} = spell) do
     base =
@@ -225,8 +235,9 @@ defmodule ThistleTea.Game.Spell.CastContext do
   defp caster_power(%{unit: %{power_type: 3, power4: energy}}) when is_integer(energy), do: energy
   defp caster_power(_caster), do: nil
 
-  defp shield_block_value(%{unit: unit}) do
-    CombatRatings.block_value(unit.equipment_bonuses || %{}, unit.strength || 0)
+  defp shield_block_value(%{unit: unit} = caster) do
+    CombatRatings.block_value(unit.equipment_bonuses || %{}, unit.strength || 0) +
+      Aura.flat_amount(caster, :mod_shield_block_value)
   end
 
   defp main_hand_template(%Character{player: player}) when is_struct(player) do
@@ -238,9 +249,9 @@ defmodule ThistleTea.Game.Spell.CastContext do
 
   defp main_hand_template(_caster), do: nil
 
-  defp ranged_attack_skill(%Character{unit: unit, player: player}) when is_struct(player) do
+  defp ranged_attack_skill(%Character{unit: unit, player: player} = caster) when is_struct(player) do
     skill_id = Skills.ranged_weapon_skill(player, &ItemLoader.get_template/1)
-    Skills.value(player.skills, skill_id, Skills.max_for_level(unit.level || 1))
+    Skills.value(player.skills, skill_id, Skills.max_for_level(unit.level || 1)) + skill_aura_bonus(caster, skill_id)
   end
 
   defp ranged_attack_skill(_caster), do: nil
@@ -275,11 +286,36 @@ defmodule ThistleTea.Game.Spell.CastContext do
 
   defp spell_damage_bonus(caster) do
     bonuses = equipment_bonuses(caster)
-    Map.new(@schools, fn school -> {school, Map.get(bonuses, :"spell_#{school}", 0)} end)
+
+    Map.new(@schools, fn school ->
+      {school, Map.get(bonuses, :"spell_#{school}", 0) + stat_scaled_spell_damage(caster, school)}
+    end)
   end
 
   defp healing_bonus(caster) do
-    caster |> equipment_bonuses() |> Map.get(:healing, 0)
+    equipment = caster |> equipment_bonuses() |> Map.get(:healing, 0)
+    equipment + stat_scaled_amount(caster, :mod_spell_healing_of_stat_percent, 1)
+  end
+
+  defp stat_scaled_spell_damage(caster, school) do
+    stat_scaled_amount(caster, :mod_spell_damage_of_stat_percent, Spell.school_mask(school))
+  end
+
+  defp stat_scaled_amount(%{unit: unit} = caster, aura_type, school_mask) do
+    percent = Aura.flat_modifier(caster, aura_type, school_mask)
+    spirit = unit.spirit || 0
+
+    if percent > 0, do: trunc(spirit * percent / 100), else: 0
+  end
+
+  defp threat_multiplier(caster, %Spell{} = spell) do
+    base = Aura.percent_multiplier(caster, :mod_threat, Spell.school_mask(spell))
+    base * Modifiers.value(caster, spell, :threat, 100) / 100
+  end
+
+  defp healing_done_multiplier(caster, %Spell{} = spell) do
+    effect_multiplier(caster, spell, [:all_effects]) *
+      Aura.percent_multiplier(caster, :mod_healing_done_percent, Spell.school_mask(spell))
   end
 
   defp equipment_bonuses(%{unit: %{equipment_bonuses: %{} = bonuses}}), do: bonuses

@@ -53,7 +53,8 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
     :periodic_heal,
     :periodic_energize,
     :periodic_leech,
-    :periodic_trigger_spell
+    :periodic_trigger_spell,
+    :obs_mod_health
   ]
 
   @stand_state_sit 1
@@ -391,7 +392,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
         %{entity | unit: %{unit | power4: 0}}
 
       unit.power_type == 1 and is_integer(unit.power2) and unit.power2 > 0 ->
-        %{entity | unit: %{unit | power2: 0}}
+        %{entity | unit: %{unit | power2: min(unit.power2, retained_stance_rage(entity))}}
 
       true ->
         entity
@@ -399,6 +400,17 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
   end
 
   defp maybe_reset_shapeshift_power(entity, _holder), do: entity
+
+  @tactical_mastery_scripts 831..835
+
+  defp retained_stance_rage(entity) do
+    entity
+    |> ThistleTea.Game.Entity.Logic.Aura.auras_of_type(:override_class_scripts)
+    |> Enum.reduce(0, fn
+      %Aura{misc_value: misc}, best when misc in @tactical_mastery_scripts -> max(best, (misc - 830) * 50)
+      _aura, best -> best
+    end)
+  end
 
   defp cat_form?(%Holder{auras: auras}) do
     Enum.any?(auras, &match?(%Aura{type: :mod_shapeshift, misc_value: 1}, &1))
@@ -451,17 +463,27 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
   defp expires_at(_now, -1), do: -1
   defp expires_at(now, duration_ms) when is_integer(duration_ms), do: now + duration_ms
 
-  defp effective_duration(%Spell{} = spell, %CastContext{combo_points: points})
-       when is_integer(points) and points > 0 do
+  defp effective_duration(%Spell{} = spell, %CastContext{} = context) do
+    spell
+    |> base_duration(context)
+    |> modified_duration(context)
+  end
+
+  defp base_duration(%Spell{} = spell, %CastContext{combo_points: points}) when is_integer(points) and points > 0 do
     Spell.duration_for_combo_points(spell, points)
   end
 
-  defp effective_duration(%Spell{} = spell, %CastContext{caster_guid: caster, target_guid: target})
-       when caster != target do
+  defp base_duration(%Spell{} = spell, %CastContext{caster_guid: caster, target_guid: target}) when caster != target do
     if area_radius(spell), do: 2_500, else: spell.duration_ms
   end
 
-  defp effective_duration(%Spell{duration_ms: duration_ms}, _context), do: duration_ms
+  defp base_duration(%Spell{duration_ms: duration_ms}, _context), do: duration_ms
+
+  defp modified_duration(duration, %CastContext{} = context) when is_integer(duration) and duration > 0 do
+    round(Modifiers.value(context.spell_modifiers, :duration, duration))
+  end
+
+  defp modified_duration(duration, _context), do: duration
 
   defp area_radius(%Spell{effects: effects}) do
     effects
@@ -556,6 +578,13 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
 
         _aura ->
           1.0
+      end
+
+    amount =
+      if effect.aura in [:periodic_damage, :periodic_leech, :periodic_mana_leech, :periodic_heal] do
+        Modifiers.value(context.spell_modifiers, :dot, amount * 1.0)
+      else
+        amount
       end
 
     trunc(amount * (multiplier || 1.0))

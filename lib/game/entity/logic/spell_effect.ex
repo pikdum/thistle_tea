@@ -28,6 +28,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   alias ThistleTea.Game.Spell.Coefficient
   alias ThistleTea.Game.Spell.Cooldowns
   alias ThistleTea.Game.Spell.Effect
+  alias ThistleTea.Game.Spell.Modifiers
   alias ThistleTea.Game.Spell.Scripts
 
   @schools [:physical, :holy, :fire, :nature, :frost, :shadow, :arcane]
@@ -889,13 +890,13 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
           scripted_damage_multiplier(state, spell)
       )
 
-    crit? = direct_spell_crit?(context, spell, opts)
-    rolled = if crit?, do: trunc(rolled * spell_crit_multiplier(spell)), else: rolled
+    crit? = direct_spell_crit?(state, context, spell, opts)
+    rolled = if crit?, do: rolled + crit_bonus(context, spell, rolled), else: rolled
 
     damage = max(rolled + Aura.flat_modifier(state, :mod_damage_taken, Spell.school_mask(spell)), 0)
 
     school = school_atom(spell)
-    resisted = school_resisted_amount(state, damage, school, context.caster_level, opts)
+    resisted = school_resisted_amount(state, damage, school, context, opts)
     damage = damage - resisted
 
     {state, absorbed} =
@@ -925,23 +926,32 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
     end
   end
 
-  defp direct_spell_crit?(%CastContext{spell_crit_chance: chance}, %Spell{} = spell, opts)
-       when is_number(chance) and chance > 0 do
-    not Keyword.get(opts, :periodic?, false) and not Spell.attribute?(spell, :cant_crit) and
+  defp direct_spell_crit?(state, %CastContext{spell_crit_chance: chance}, %Spell{} = spell, opts)
+       when is_number(chance) do
+    chance = chance + Aura.flat_amount(state, :mod_attacker_spell_crit_chance)
+
+    chance > 0 and not Keyword.get(opts, :periodic?, false) and not Spell.attribute?(spell, :cant_crit) and
       spell.dmg_class in [1, 3] and (chance >= 100 or :rand.uniform() * 100 <= chance)
   end
 
-  defp direct_spell_crit?(_context, _spell, _opts), do: false
+  defp direct_spell_crit?(_state, _context, _spell, _opts), do: false
+
+  defp crit_bonus(%CastContext{} = context, %Spell{} = spell, damage) do
+    base_bonus = damage * (spell_crit_multiplier(spell) - 1.0)
+    trunc(Modifiers.value(context.spell_modifiers, :crit_damage_bonus, base_bonus))
+  end
 
   defp spell_crit_multiplier(%Spell{dmg_class: 3}), do: 2.0
   defp spell_crit_multiplier(%Spell{}), do: 1.5
 
-  defp school_resisted_amount(_state, damage, _school, _caster_level, _opts) when damage <= 0, do: 0
-  defp school_resisted_amount(_state, _damage, :physical, _caster_level, _opts), do: 0
+  defp school_resisted_amount(_state, damage, _school, _context, _opts) when damage <= 0, do: 0
+  defp school_resisted_amount(_state, _damage, :physical, _context, _opts), do: 0
 
-  defp school_resisted_amount(%{unit: unit} = state, damage, school, caster_level, opts) do
-    caster_level = if is_integer(caster_level) and caster_level > 0, do: caster_level, else: 1
-    resistance = Map.get(unit, :"#{school}_resistance") || 0
+  defp school_resisted_amount(%{unit: unit} = state, damage, school, %CastContext{} = context, opts) do
+    caster_level =
+      if is_integer(context.caster_level) and context.caster_level > 0, do: context.caster_level, else: 1
+
+    resistance = max((Map.get(unit, :"#{school}_resistance") || 0) + (context.spell_penetration || 0), 0)
     target_creature? = not is_map(Map.get(state, :player))
     level_diff = (unit.level || 1) - caster_level
 
@@ -1066,7 +1076,14 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
       max(damage + Aura.flat_modifier(state, :mod_damage_taken, Spell.school_mask(spell)), 0)
 
     damage = mitigate_physical(state, context, school, unmitigated_damage)
-    damage = if context.melee_crit?, do: damage * 2, else: damage
+
+    damage =
+      if context.melee_crit? do
+        damage + trunc(Modifiers.value(context.spell_modifiers, :crit_damage_bonus, damage * 1.0))
+      else
+        damage
+      end
+
     proc_damage = if context.melee_crit?, do: unmitigated_damage * 2, else: unmitigated_damage
 
     {state, absorbed} =

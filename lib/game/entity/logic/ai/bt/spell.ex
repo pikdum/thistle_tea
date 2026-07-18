@@ -168,6 +168,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
     |> start_cooldown(casting, now)
     |> queue_cast_result(casting)
     |> queue_spell_go(casting, hits ++ object_hits(casting), misses)
+    |> queue_target_triggers(casting, hits)
     |> queue_area_effects(casting)
     |> queue_farsight(casting)
     |> queue_summon_objects(casting)
@@ -572,6 +573,12 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
 
   defp area_duration(_casting, _spell), do: 8_000
 
+  defp queue_target_triggers(character, %Cast{spell: %Spell{} = spell}, hits) when is_list(hits) do
+    Event.enqueue(character, AuraLogic.target_trigger_events(character, spell, hits))
+  end
+
+  defp queue_target_triggers(character, _casting, _hits), do: character
+
   defp queue_summon_objects(character, %Cast{spell: %Spell{} = spell} = casting) do
     target_guid = casting.targets.unit_guid || character.unit.target
 
@@ -620,6 +627,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
     |> start_cooldown(casting, now)
     |> queue_cast_result(casting)
     |> queue_spell_go(casting, hits ++ object_hits(casting), misses)
+    |> queue_target_triggers(casting, hits)
     |> queue_area_effects(casting)
     |> queue_summon_objects(casting)
     |> queue_consume_reagents(casting)
@@ -705,12 +713,13 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
   defp roll_spell_hits(%{object: %{guid: caster_guid}} = caster, %Spell{} = spell, targets) do
     if Spell.harmful?(spell) do
       caster_level = caster_level(caster)
+      hit_bonus = spell_hit_bonus(caster, spell)
 
       {hits, missed} =
         Enum.split_with(targets, fn target_guid ->
           target_guid == caster_guid or
             not Hostility.valid_attack_target?(caster, target_guid) or
-            spell_hits_target?(caster_level, target_guid)
+            spell_hits_target?(caster_level, target_guid, hit_bonus)
         end)
 
       {hits, Enum.map(missed, &%{guid: &1, reason: spell_miss_reason(spell)})}
@@ -721,7 +730,12 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
 
   defp roll_spell_hits(_caster, _spell, targets), do: {targets, []}
 
-  defp spell_hits_target?(caster_level, target_guid) do
+  defp spell_hit_bonus(caster, %Spell{} = spell) do
+    AuraLogic.flat_amount(caster, :mod_spell_hit_chance) +
+      Modifiers.value(caster, spell, :resist_miss_chance, 0)
+  end
+
+  defp spell_hits_target?(caster_level, target_guid, hit_bonus) do
     target_player? = Guid.type_id(target_guid) == :player
 
     target_level =
@@ -730,7 +744,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
         _ -> caster_level
       end
 
-    SpellResist.magic_hit?(caster_level, target_level, target_player?)
+    SpellResist.magic_hit?(caster_level, target_level, target_player?, hit_bonus: hit_bonus)
   end
 
   defp spell_miss_reason(%Spell{school: :physical}), do: @spell_miss_reason_miss

@@ -35,6 +35,7 @@ defmodule ThistleTea.Game.Entity.Logic.Stats do
     |> derive_resistances()
     |> derive_max_health()
     |> derive_max_mana()
+    |> derive_max_energy()
     |> derive_attack_power()
     |> derive_weapon_damage()
   end
@@ -103,24 +104,60 @@ defmodule ThistleTea.Game.Entity.Logic.Stats do
   end
 
   defp derive_max_health(%Unit{base_health: base_health} = unit) when is_integer(base_health) do
-    max_health =
-      max(
-        base_health + stamina_health_bonus(unit.stamina || 0) + equipment_bonus(unit, :health) +
-          aura_max_health(unit),
-        1
-      )
+    flat =
+      base_health + stamina_health_bonus(unit.stamina || 0) + equipment_bonus(unit, :health) +
+        aura_max_health(unit)
+
+    max_health = max(trunc(flat * aura_power_multiplier(unit, :mod_increase_health_percent, -1)), 1)
 
     %{unit | max_health: max_health, health: clamp(unit.health, max_health)}
   end
 
   defp derive_max_health(%Unit{} = unit), do: unit
 
+  @power_type_mana 0
+  @power_type_energy 3
+
   defp derive_max_mana(%Unit{base_mana: base_mana} = unit) when is_integer(base_mana) and base_mana > 0 do
-    max_mana = max(base_mana + mana_bonus(unit.intellect || 0) + equipment_bonus(unit, :mana), 0)
+    flat =
+      base_mana + mana_bonus(unit.intellect || 0) + equipment_bonus(unit, :mana) +
+        aura_power_bonus(unit, @power_type_mana)
+
+    max_mana = max(trunc(flat * aura_power_multiplier(unit, :mod_increase_energy_percent, @power_type_mana)), 0)
     %{unit | max_power1: max_mana, power1: clamp(unit.power1, max_mana)}
   end
 
   defp derive_max_mana(%Unit{} = unit), do: unit
+
+  @base_max_energy 100
+
+  defp derive_max_energy(%Unit{base_health: base_health, power_type: @power_type_energy} = unit)
+       when is_integer(base_health) do
+    flat = @base_max_energy + aura_power_bonus(unit, @power_type_energy)
+    max_energy = max(trunc(flat * aura_power_multiplier(unit, :mod_increase_energy_percent, @power_type_energy)), 0)
+    %{unit | max_power4: max_energy, power4: clamp(unit.power4, max_energy)}
+  end
+
+  defp derive_max_energy(%Unit{} = unit), do: unit
+
+  defp aura_power_bonus(%Unit{} = unit, power_type) do
+    sum_aura_amounts(unit, fn
+      %Aura{type: :mod_increase_energy, amount: amount, misc_value: ^power_type} when is_integer(amount) -> amount
+      _aura -> 0
+    end)
+  end
+
+  defp aura_power_multiplier(%Unit{auras: holders}, type, power_type) when is_list(holders) do
+    for %Holder{auras: auras} <- holders,
+        %Aura{type: ^type, amount: amount, misc_value: misc} <- auras,
+        is_number(amount),
+        power_type == -1 or misc == power_type,
+        reduce: 1.0 do
+      acc -> acc * (100 + amount) / 100
+    end
+  end
+
+  defp aura_power_multiplier(_unit, _type, _power_type), do: 1.0
 
   defp derive_attack_power(%Unit{base_strength: base_strength} = unit) when is_integer(base_strength) do
     attack_power =

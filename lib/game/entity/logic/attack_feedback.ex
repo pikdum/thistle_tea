@@ -68,7 +68,8 @@ defmodule ThistleTea.Game.Entity.Logic.AttackFeedback do
       end)
 
     cond do
-      Scripts.finisher?(spell) -> Reactive.consume_combo(entity)
+      Scripts.finisher?(spell) and not Aura.has_aura?(entity, :retain_combo_points) -> Reactive.consume_combo(entity)
+      Scripts.finisher?(spell) -> entity
       amount > 0 -> Reactive.add_combo_points(entity, victim_guid, amount)
       true -> entity
     end

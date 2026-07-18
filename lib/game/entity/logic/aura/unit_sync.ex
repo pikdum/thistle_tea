@@ -72,7 +72,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.UnitSync do
 
   defp sync_shapeshift(unit), do: unit
 
-  defp sync_druid_power(%Unit{class: 11} = unit, 1), do: %{unit | power_type: 3, max_power4: 100}
+  defp sync_druid_power(%Unit{class: 11} = unit, 1), do: %{unit | power_type: 3}
 
   defp sync_druid_power(%Unit{class: 11} = unit, form) when form in [5, 8],
     do: %{unit | power_type: 1, max_power2: 1_000}

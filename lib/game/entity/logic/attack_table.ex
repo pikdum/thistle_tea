@@ -102,7 +102,9 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
     %{
       caster_level: caster_level,
       caster_player?: Map.get(attack, :caster_player?, false),
-      crit_chance: Map.get(attack, :crit_chance) || @default_crit_chance,
+      crit_chance:
+        (Map.get(attack, :crit_chance) || @default_crit_chance) +
+          Aura.flat_amount(defender, :mod_attacker_melee_crit_chance),
       always_crush?: Map.get(attack, :always_crush?, false),
       spell_swing?: is_integer(Map.get(attack, :queued_spell_id)),
       block_allowed?: Map.get(attack, :block_allowed?, true),

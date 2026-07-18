@@ -137,6 +137,19 @@ defmodule ThistleTea.Game.Spell.Modifiers do
     Enum.any?(effects, &(&1.aura in [:mod_increase_speed, :mod_decrease_speed, :mod_increase_swim_speed]))
   end
 
+  defp operation_used_by_spell?(:duration, %Spell{duration_ms: duration}), do: is_integer(duration) and duration > 0
+
+  defp operation_used_by_spell?(:cooldown, %Spell{} = spell) do
+    (spell.recovery_time_ms || 0) > 0 or (spell.category_recovery_time_ms || 0) > 0
+  end
+
+  defp operation_used_by_spell?(:dot, %Spell{effects: effects}) do
+    Enum.any?(effects, &(&1.aura in [:periodic_damage, :periodic_heal, :periodic_leech, :periodic_mana_leech]))
+  end
+
+  defp operation_used_by_spell?(:crit_damage_bonus, %Spell{} = spell), do: critical_spell?(spell)
+  defp operation_used_by_spell?(:resist_miss_chance, %Spell{} = spell), do: Spell.harmful?(spell)
+
   defp operation_used_by_spell?(_operation, _spell), do: false
 
   defp critical_spell?(%Spell{effects: effects} = spell) do

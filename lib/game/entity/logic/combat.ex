@@ -53,7 +53,8 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
 
   def offhand_damage_range(%{unit: %Unit{min_offhand_damage: min, max_offhand_damage: max}} = entity)
       when is_number(min) and is_number(max) and max > 0 do
-    outgoing_damage_range(entity, {min * 0.5, max * 0.5})
+    factor = 0.5 * max(100 + Aura.flat_amount(entity, :mod_offhand_damage_pct), 0) / 100
+    outgoing_damage_range(entity, {min * factor, max * factor})
   end
 
   def offhand_damage_range(_entity), do: nil

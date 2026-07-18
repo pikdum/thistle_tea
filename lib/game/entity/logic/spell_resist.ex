@@ -66,7 +66,14 @@ defmodule ThistleTea.Game.Entity.Logic.SpellResist do
 
   def magic_hit?(caster_level, target_level, target_player?, opts \\ []) do
     roll = Keyword.get_lazy(opts, :roll, fn -> Math.random_int(0, 9_999) end)
-    roll < magic_hit_chance_bp(caster_level, target_level, target_player?)
+    hit_bonus_bp = trunc(Keyword.get(opts, :hit_bonus, 0) * 100)
+
+    chance_bp =
+      (magic_hit_chance_bp(caster_level, target_level, target_player?) + hit_bonus_bp)
+      |> max(100)
+      |> min(9_900)
+
+    roll < chance_bp
   end
 
   def resist_chance(resistance, caster_level, target_creature?, level_diff) do
