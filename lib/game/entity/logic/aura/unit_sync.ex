@@ -34,7 +34,15 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.UnitSync do
     |> sync_aura_fields()
   end
 
-  def next_free_slot(holders, negative?) do
+  def display_slot(holders, %Holder{spell: %Spell{} = spell, negative?: negative?}) do
+    if visible?(spell), do: next_free_slot(holders, negative?)
+  end
+
+  defp visible?(%Spell{spell_visual: visual} = spell) do
+    not Spell.attribute?(spell, :passive) or (is_integer(visual) and visual > 0)
+  end
+
+  defp next_free_slot(holders, negative?) do
     used = MapSet.new(holders, & &1.slot)
     range = if negative?, do: @max_positive_slots..(@max_slots - 1), else: 0..(@max_positive_slots - 1)
     Enum.find(range, &(not MapSet.member?(used, &1)))

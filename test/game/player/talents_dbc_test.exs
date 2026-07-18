@@ -32,7 +32,7 @@ defmodule ThistleTea.Game.Player.TalentsDbcTest do
         %{character | internal: %{character.internal | spellbook: %{rank_five.id => rank_five}}}
         |> Spells.apply_passives(2_000)
 
-      assert Enum.map(character.unit.auras, & &1.spell.id) == [rank_five.id]
+      assert Enum.map(character.unit.auras, &{&1.spell.id, &1.slot}) == [{rank_five.id, nil}]
       assert ModifierSync.totals(character.unit.auras) == %{{:flat, 5, 10} => -500}
     end
   end

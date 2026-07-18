@@ -362,7 +362,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
 
     case index do
       nil ->
-        slot = UnitSync.next_free_slot(existing, incoming.negative?)
+        slot = UnitSync.display_slot(existing, incoming)
         existing ++ [%{incoming | slot: slot}]
 
       index ->

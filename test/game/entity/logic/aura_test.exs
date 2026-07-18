@@ -192,6 +192,28 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
              )
     end
 
+    test "keeps nonvisual passive effects off the client aura fields" do
+      passive = casting_time_modifier_fixture()
+      {entity, _events} = apply_spell(fixture_entity(), 1, 1, passive)
+      {entity, _events} = apply_spell(entity, 1, 1, frost_armor_fixture())
+
+      assert [%Holder{spell: ^passive, slot: nil}, %Holder{spell: visible, slot: 0}] = entity.unit.auras
+      assert visible.id == 168
+
+      assert <<spell_at_slot_0::little-size(32), _rest::binary>> =
+               <<entity.unit.aura::little-size(48 * 32)>>
+
+      assert spell_at_slot_0 == visible.id
+    end
+
+    test "displays passive spells that have a visual" do
+      spell = %{casting_time_modifier_fixture() | spell_visual: 1}
+
+      {entity, _events} = apply_spell(fixture_entity(), 1, 1, spell)
+
+      assert [%Holder{spell: ^spell, slot: 0}] = entity.unit.auras
+    end
+
     test "applying two different spells fills two slots" do
       entity = fixture_entity()
       spell = frost_armor_fixture()
