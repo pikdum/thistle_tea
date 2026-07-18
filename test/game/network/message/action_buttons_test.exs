@@ -3,8 +3,12 @@ defmodule ThistleTea.Game.Network.Message.ActionButtonsTest do
 
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.Entity.Data.Component.Player
+  alias ThistleTea.Game.Network.Message.CmsgSetActionbarToggles
   alias ThistleTea.Game.Network.Message.CmsgSetActionButton
+  alias ThistleTea.Game.Network.Message.Dispatch
   alias ThistleTea.Game.Network.Message.SmsgActionButtons
+  alias ThistleTea.Game.Network.Opcodes
 
   defp state_with_buttons(action_buttons) do
     %{character: %Character{internal: %Internal{action_buttons: action_buttons}}}
@@ -63,6 +67,52 @@ defmodule ThistleTea.Game.Network.Message.ActionButtonsTest do
         )
 
       assert state.character.internal.action_buttons == %{}
+    end
+  end
+
+  describe "CmsgSetActionbarToggles.from_binary/1" do
+    test "parses the action bar toggle mask" do
+      assert %CmsgSetActionbarToggles{action_bar: 0x0F} =
+               CmsgSetActionbarToggles.from_binary(<<0x0F>>)
+    end
+
+    test "is registered for dispatch" do
+      assert Dispatch.implemented?(Opcodes.get(:CMSG_SET_ACTIONBAR_TOGGLES))
+    end
+  end
+
+  describe "CmsgSetActionbarToggles.handle/2" do
+    test "sets the action bar toggle mask" do
+      state = %{character: %Character{player: %Player{}}}
+
+      state =
+        CmsgSetActionbarToggles.handle(
+          %CmsgSetActionbarToggles{action_bar: 0x0F},
+          state
+        )
+
+      assert state.character.player.action_bars == 0x0F
+    end
+
+    test "clears the action bar toggle mask" do
+      state = %{character: %Character{player: %Player{action_bars: 0x0F}}}
+
+      state =
+        CmsgSetActionbarToggles.handle(
+          %CmsgSetActionbarToggles{action_bar: 0},
+          state
+        )
+
+      assert state.character.player.action_bars == 0
+    end
+
+    test "ignores toggles before character login" do
+      state = %{character: nil}
+
+      assert CmsgSetActionbarToggles.handle(
+               %CmsgSetActionbarToggles{action_bar: 0x0F},
+               state
+             ) == state
     end
   end
 end

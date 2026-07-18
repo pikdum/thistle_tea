@@ -72,6 +72,7 @@ defmodule ThistleTea.Game.Network.Message.Dispatch do
               CMSG_SETSHEATHED: Message.CmsgSetsheathed,
               CMSG_SET_SELECTION: Message.CmsgSetSelection,
               CMSG_SET_ACTION_BUTTON: Message.CmsgSetActionButton,
+              CMSG_SET_ACTIONBAR_TOGGLES: Message.CmsgSetActionbarToggles,
               CMSG_STANDSTATECHANGE: Message.CmsgStandstatechange,
               CMSG_ZONEUPDATE: Message.CmsgZoneupdate,
               CMSG_AREATRIGGER: Message.CmsgAreatrigger,

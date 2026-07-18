@@ -278,7 +278,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.Player do
         ], &__MODULE__.field_bytes/1}, :private},
     field_bytes_flags: :virtual,
     combo_points: :virtual,
-    action_bars: :virtual,
+    action_bars: {:virtual, 0},
     highest_honor_rank: :virtual,
     ammo_id: {0x04C7, 1, :int, :private},
     self_res_spell: {0x04C8, 1, :int, :private},
