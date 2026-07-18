@@ -15,7 +15,7 @@ defmodule ThistleTea.Game.World.Loader.ItemEnchantmentIntegrationTest do
     assert ItemEnchantment.skill_bonus(263, 356) == 25
     assert ItemEnchantment.skill_bonus(265, 356) == 75
 
-    effect = %Effect{base_points: 0, die_sides: 1}
+    effect = %Effect{base_points: 0, die_sides: 1, base_dice: 1}
     assert ItemEnchantment.duration_ms(8087, effect) == 600_000
     assert ItemEnchantment.duration_ms(8089, effect) == 300_000
   end

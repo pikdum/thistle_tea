@@ -548,14 +548,9 @@ defmodule ThistleTea.Game.Entity.EventSink do
 
   def emit(entity, %Event{type: :drop_nearby_threat}), do: entity
 
-  def emit(%Character{} = entity, %Event{type: :blade_flurry, target_guid: primary, damage: damage}) do
-    deliver_secondary_melee(
-      entity,
-      primary,
-      damage,
-      Scripts.blade_flurry_damage_spell_id(),
-      Scripts.blade_flurry_radius_yards()
-    )
+  def emit(%Character{} = entity, %Event{type: :blade_flurry, target_guid: primary, damage: damage} = event)
+      when is_integer(event.spell_id) do
+    deliver_secondary_melee(entity, primary, damage, event.spell_id, Scripts.blade_flurry_radius_yards())
 
     entity
   end
@@ -1342,7 +1337,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
     with secondary when is_integer(secondary) <- secondary,
          %Spell{} = spell <- SpellLoader.load(spell_id),
          %Spell.Effect{} = effect <- List.first(Spell.damage_effects(spell)) do
-      spell = %{spell | effects: [%{effect | base_points: damage, die_sides: 0}]}
+      spell = %{spell | effects: [%{effect | base_points: damage, die_sides: 0, base_dice: 0}]}
       context = CastContext.from_caster(entity, spell, secondary)
       Entity.receive_spell(secondary, context, spell)
     else
@@ -1365,7 +1360,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
        when is_integer(index) and is_integer(amount) do
     effects =
       Enum.map(effects, fn
-        %Spell.Effect{index: ^index} = effect -> %{effect | base_points: amount, die_sides: 0}
+        %Spell.Effect{index: ^index} = effect -> %{effect | base_points: amount, die_sides: 0, base_dice: 0}
         effect -> effect
       end)
 

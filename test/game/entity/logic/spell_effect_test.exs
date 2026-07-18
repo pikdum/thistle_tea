@@ -72,6 +72,31 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
       assert marked_event.damage - unmarked_event.damage == 11
     end
 
+    test "caster-targeted trigger effects fire at the caster, other caster effects stay filtered" do
+      spell = %Spell{
+        id: 23_881,
+        school: :physical,
+        effects: [
+          %Effect{index: 0, type: :school_damage, base_points: 10, implicit_target_a: :target_enemy},
+          %Effect{index: 1, type: :trigger_spell, trigger_spell_id: 23_885, implicit_target_a: :caster},
+          %Effect{index: 2, type: :heal, base_points: 50, implicit_target_a: :caster}
+        ]
+      }
+
+      context = %CastContext{caster_guid: 999, caster_level: 60, target_role: :other, spell: spell}
+      target = %{target_fixture() | unit: %Unit{health: 500, max_health: 500, level: 60, auras: []}}
+
+      {target, events} = SpellEffect.receive(target, context, spell, 1_000)
+
+      assert Enum.any?(
+               events,
+               &match?(%{type: :trigger_spell, source_guid: 999, target_guid: 999, spell_id: 23_885}, &1)
+             )
+
+      assert target.unit.health < 500
+      refute Enum.any?(events, &(&1.type == :heal_entity))
+    end
+
     test "direct magic damage uses the snapshotted spell crit chance" do
       spell = %Spell{id: 133, school: :fire, dmg_class: 1, effects: [%Effect{type: :school_damage, base_points: 100}]}
       context = %CastContext{caster_guid: 999, caster_level: 10, spell_crit_chance: 100.0}
@@ -282,6 +307,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
             type: :energize,
             base_points: 99,
             die_sides: 1,
+            base_dice: 1,
             misc_value: 1
           }
         ]
@@ -437,7 +463,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
         id: 5504,
         name: "Conjure Water",
         school: :arcane,
-        effects: [%Effect{index: 0, type: :create_item, base_points: 1, die_sides: 1, misc_value: 5350}]
+        effects: [%Effect{index: 0, type: :create_item, base_points: 1, die_sides: 1, base_dice: 1, misc_value: 5350}]
       }
 
       context = %CastContext{caster_guid: 1, caster_level: 10}
@@ -593,7 +619,15 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
         school: :arcane,
         duration_ms: 600_000,
         effects: [
-          %Effect{index: 0, type: :apply_aura, base_points: -11, die_sides: 1, aura: :mod_damage_taken, misc_value: 126}
+          %Effect{
+            index: 0,
+            type: :apply_aura,
+            base_points: -11,
+            die_sides: 1,
+            base_dice: 1,
+            aura: :mod_damage_taken,
+            misc_value: 126
+          }
         ]
       }
 
@@ -621,7 +655,15 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
         school: :arcane,
         duration_ms: 600_000,
         effects: [
-          %Effect{index: 1, type: :apply_aura, base_points: 29, die_sides: 1, aura: :mod_healing, misc_value: 126}
+          %Effect{
+            index: 1,
+            type: :apply_aura,
+            base_points: 29,
+            die_sides: 1,
+            base_dice: 1,
+            aura: :mod_healing,
+            misc_value: 126
+          }
         ]
       }
 

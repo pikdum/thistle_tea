@@ -245,6 +245,7 @@ defmodule ThistleTea.Game.Entity.Data.MobTest do
           aura: :mod_resistance,
           base_points: 29,
           die_sides: 1,
+          base_dice: 1,
           misc_value: 16
         }
       ]

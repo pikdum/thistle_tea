@@ -316,6 +316,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.SpellsTest do
           type: :heal,
           base_points: 50,
           die_sides: 1,
+          base_dice: 1,
           implicit_target_a: :target_ally
         }
       ]
@@ -360,6 +361,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.SpellsTest do
           type: :school_damage,
           base_points: 20,
           die_sides: 1,
+          base_dice: 1,
           implicit_target_a: :target_enemy
         }
       ]

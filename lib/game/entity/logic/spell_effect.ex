@@ -25,6 +25,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   alias ThistleTea.Game.Math
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
+  alias ThistleTea.Game.Spell.Coefficient
   alias ThistleTea.Game.Spell.Cooldowns
   alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.Spell.Scripts
@@ -84,8 +85,12 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   defp applicable_effects(_target, _context, effects), do: Enum.reject(effects, &caster_target_effect?/1)
 
   defp caster_target_effect?(%Effect{} = effect) do
-    effect.implicit_target_a == :caster or effect.implicit_target_b == :caster
+    (effect.implicit_target_a == :caster or effect.implicit_target_b == :caster) and
+      not caster_trigger_effect?(effect)
   end
+
+  defp caster_trigger_effect?(%Effect{type: :trigger_spell, implicit_target_a: :caster}), do: true
+  defp caster_trigger_effect?(_effect), do: false
 
   defp pet_target_effect?(%Effect{} = effect) do
     effect.implicit_target_a == :pet or effect.implicit_target_b == :pet
@@ -420,24 +425,25 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   defp apply_effect(state, %CastContext{} = context, spell, %Effect{type: type} = effect, now)
        when type in [:weapon_damage, :weapon_damage_noschool, :normalized_weapon_damage, :weapon_percent_damage] do
     context = apply_target_attack_power_bonus(state, context, spell)
-    melee_ability_damage(state, context, spell, weapon_ability_damage(context, effect), now)
+    melee_ability_damage(state, context, spell, weapon_ability_damage(context, spell, effect), now)
   end
 
   defp apply_effect(state, %CastContext{} = context, _spell, %Effect{type: :attack_me}, _now) do
     {Threat.taunt(state, context.caster_guid), []}
   end
 
-  defp apply_effect(state, %CastContext{} = context, _spell, %Effect{type: :modify_threat} = effect, _now) do
-    {Threat.change(state, context.caster_guid, Effect.damage_roll(effect)), []}
+  defp apply_effect(state, %CastContext{} = context, spell, %Effect{type: :modify_threat} = effect, _now) do
+    {Threat.change(state, context.caster_guid, rolled_amount(spell, effect, context)), []}
   end
 
   defp apply_effect(state, %CastContext{} = context, spell, %Effect{type: :heal} = effect, now) do
     {state, swiftmend_healing, swiftmend_events} = Druid.consume_swiftmend_hot(state, spell, now)
 
-    base_healing = trunc((Effect.damage_roll(effect) + swiftmend_healing) * (context.effect_healing_multiplier || 1.0))
+    base_healing =
+      trunc((rolled_amount(spell, effect, context) + swiftmend_healing) * (context.effect_healing_multiplier || 1.0))
 
     healing =
-      base_healing + bonus_amount(context.healing_bonus, spell) +
+      base_healing + Coefficient.bonus(context.healing_bonus || 0, spell, effect, :direct) +
         Aura.flat_modifier(state, :mod_healing, Spell.school_mask(spell)) +
         Paladin.blessing_of_light_bonus(state, spell)
 
@@ -461,14 +467,15 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
          state,
          %CastContext{} = context,
          spell,
-         %Effect{type: :trigger_spell, trigger_spell_id: spell_id},
+         %Effect{type: :trigger_spell, trigger_spell_id: spell_id} = effect,
          _now
        )
        when is_integer(spell_id) and spell_id > 0 do
     if Scripts.dummy_effect(spell) == :execute do
       {state, []}
     else
-      event = Event.trigger_spell(context.caster_guid, context.caster_level, state.object.guid, spell_id)
+      target_guid = trigger_target_guid(state, context, effect)
+      event = Event.trigger_spell(context.caster_guid, context.caster_level, target_guid, spell_id)
       {state, [event]}
     end
   end
@@ -504,23 +511,31 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
 
   defp apply_effect(
          state,
-         %CastContext{caster_guid: caster_guid},
+         %CastContext{caster_guid: caster_guid} = context,
          spell,
          %Effect{type: :energize, misc_value: power_type} = effect,
          now
        )
        when is_integer(power_type) and power_type >= 0 do
+    amount = rolled_amount(spell, effect, context)
+
     if effect.implicit_target_a == :caster and state.object.guid != caster_guid do
-      {state, [Event.grant_power(caster_guid, power_type, Effect.damage_roll(effect))]}
+      {state, [Event.grant_power(caster_guid, power_type, amount)]}
     else
-      state = Resources.gain_power(state, power_type, Effect.damage_roll(effect))
+      state = Resources.gain_power(state, power_type, amount)
       {Warrior.after_energize(state, spell, now), []}
     end
   end
 
-  defp apply_effect(state, %CastContext{}, _spell, %Effect{type: :create_item, misc_value: item_id} = effect, _now)
+  defp apply_effect(
+         state,
+         %CastContext{} = context,
+         spell,
+         %Effect{type: :create_item, misc_value: item_id} = effect,
+         _now
+       )
        when is_integer(item_id) and item_id > 0 do
-    count = max(Effect.damage_roll(effect), 1)
+    count = max(rolled_amount(spell, effect, context), 1)
     {state, [Event.create_item(item_id, count)]}
   end
 
@@ -531,9 +546,15 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
     end
   end
 
-  defp apply_effect(state, %CastContext{caster_guid: caster_guid}, _spell, %Effect{type: :power_drain} = effect, _now) do
+  defp apply_effect(
+         state,
+         %CastContext{caster_guid: caster_guid} = context,
+         spell,
+         %Effect{type: :power_drain} = effect,
+         _now
+       ) do
     available = max(state.unit.power1 || 0, 0)
-    drained = min(Effect.damage_roll(effect), available)
+    drained = min(rolled_amount(spell, effect, context), available)
     unit = %{state.unit | power1: available - drained}
     {%{state | unit: unit}, [Event.grant_power(caster_guid, 0, drained)]}
   end
@@ -570,7 +591,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   end
 
   defp apply_effect(state, %CastContext{} = context, spell, %Effect{type: :power_burn} = effect, now) do
-    drained = min(Effect.damage_roll(effect), max(state.unit.power1 || 0, 0))
+    drained = min(rolled_amount(spell, effect, context), max(state.unit.power1 || 0, 0))
 
     if drained > 0 do
       state =
@@ -589,7 +610,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
 
   defp apply_effect(state, %CastContext{} = context, spell, %Effect{type: :resurrect_new} = effect, _now) do
     if resurrectable?(state) do
-      health = max(Effect.damage_roll(effect), 1)
+      health = max(rolled_amount(spell, effect, context), 1)
       mana = max(effect.misc_value || 0, 0)
       offer_resurrect(state, context, spell, health, mana)
     else
@@ -599,7 +620,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
 
   defp apply_effect(state, %CastContext{} = context, spell, %Effect{type: :resurrect} = effect, _now) do
     if resurrectable?(state) do
-      percent = max(Effect.damage_roll(effect), 0) / 100
+      percent = max(rolled_amount(spell, effect, context), 0) / 100
       health = max(trunc((state.unit.max_health || 1) * percent), 1)
       mana = max(trunc((state.unit.max_power1 || 0) * percent), 0)
       offer_resurrect(state, context, spell, health, mana)
@@ -609,6 +630,13 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   end
 
   defp apply_effect(state, _context, _spell, _effect, _now), do: {state, []}
+
+  defp trigger_target_guid(state, %CastContext{} = context, %Effect{implicit_target_a: :caster})
+       when state.object.guid != context.caster_guid do
+    context.caster_guid
+  end
+
+  defp trigger_target_guid(state, _context, _effect), do: state.object.guid
 
   defp apply_target_attack_power_bonus(state, %CastContext{} = context, %Spell{} = spell) do
     if Spell.ranged_ability?(spell) do
@@ -796,8 +824,8 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
 
   defp apply_damage_effect(state, %CastContext{} = context, spell, %Effect{} = effect, now, opts \\ [])
        when is_integer(now) do
-    base = effect_amount(spell, effect, context.combo_points)
-    rolled = base + damage_bonus(context, spell, opts)
+    base = effect_amount(spell, effect, context)
+    rolled = base + damage_bonus(context, spell, effect, opts)
 
     rolled =
       trunc(
@@ -868,24 +896,13 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
     )
   end
 
-  defp damage_bonus(%CastContext{} = context, %Spell{} = spell, opts) do
+  defp damage_bonus(%CastContext{} = context, %Spell{} = spell, %Effect{} = effect, opts) do
     if Keyword.get(opts, :periodic?, false) do
       0
     else
       school_bonus = Map.get(context.spell_damage_bonus, school_atom(spell), 0)
-      bonus_amount(school_bonus, spell)
+      Coefficient.bonus(school_bonus, spell, effect, :direct)
     end
-  end
-
-  defp bonus_amount(bonus, %Spell{} = spell) when is_integer(bonus) and bonus > 0 do
-    trunc(bonus * coefficient(spell))
-  end
-
-  defp bonus_amount(_bonus, _spell), do: 0
-
-  defp coefficient(%Spell{cast_time_ms: cast_time_ms}) do
-    cast_time_ms = if is_integer(cast_time_ms), do: cast_time_ms, else: 0
-    min(max(cast_time_ms, 1500), 7000) / 3500
   end
 
   defp school_atom(%Spell{school: school}) when is_atom(school), do: school
@@ -893,7 +910,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
 
   defp school_damage_roll(%CastContext{} = context, spell, %Effect{} = effect) do
     roll =
-      effect_amount(spell, effect, context.combo_points) +
+      effect_amount(spell, effect, context) +
         eviscerate_attack_power(spell, context) +
         Druid.ferocious_bite_bonus(
           spell,
@@ -911,8 +928,18 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
     end
   end
 
-  defp effect_amount(%Spell{} = spell, %Effect{} = effect, points) do
-    if Scripts.finisher?(spell), do: Effect.amount(effect, points || 0), else: Effect.damage_roll(effect)
+  defp effect_amount(%Spell{} = spell, %Effect{} = effect, %CastContext{} = context) do
+    level_units = Spell.level_units(spell, context.caster_level)
+
+    if Scripts.finisher?(spell) do
+      Effect.amount(effect, level_units, context.combo_points || 0)
+    else
+      Effect.roll(effect, level_units)
+    end
+  end
+
+  defp rolled_amount(%Spell{} = spell, %Effect{} = effect, %CastContext{} = context) do
+    Effect.roll(effect, Spell.level_units(spell, context.caster_level))
   end
 
   defp eviscerate_attack_power(%Spell{} = spell, %CastContext{} = context) do
@@ -923,16 +950,16 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
     end
   end
 
-  defp weapon_ability_damage(%CastContext{} = context, %Effect{type: :normalized_weapon_damage} = effect) do
-    normalized_weapon_roll(context) + Effect.damage_roll(effect)
+  defp weapon_ability_damage(%CastContext{} = context, spell, %Effect{type: :normalized_weapon_damage} = effect) do
+    normalized_weapon_roll(context) + rolled_amount(spell, effect, context)
   end
 
-  defp weapon_ability_damage(%CastContext{} = context, %Effect{type: :weapon_percent_damage} = effect) do
-    trunc(weapon_roll(context) * Effect.damage_roll(effect) / 100)
+  defp weapon_ability_damage(%CastContext{} = context, spell, %Effect{type: :weapon_percent_damage} = effect) do
+    trunc(weapon_roll(context) * rolled_amount(spell, effect, context) / 100)
   end
 
-  defp weapon_ability_damage(%CastContext{} = context, %Effect{} = effect) do
-    weapon_roll(context) + Effect.damage_roll(effect)
+  defp weapon_ability_damage(%CastContext{} = context, spell, %Effect{} = effect) do
+    weapon_roll(context) + rolled_amount(spell, effect, context)
   end
 
   defp weapon_roll(%CastContext{attack_time_ms: attack_time_ms} = context)
@@ -977,7 +1004,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
 
   defp apply_execute(state, %CastContext{} = context, spell, %Effect{} = effect, now) do
     rage = context.caster_power || 0
-    damage = Effect.damage_roll(effect) + trunc(rage * effect.damage_multiplier)
+    damage = rolled_amount(spell, effect, context) + trunc(rage * effect.damage_multiplier)
     damage_spell = %{spell | id: Scripts.execute_damage_spell_id()}
 
     {state, events} = melee_ability_damage(state, context, damage_spell, damage, now)

@@ -85,6 +85,7 @@ defmodule ThistleTea.Game.Entity.Logic.PriestSpellsTest do
           type: :apply_aura,
           base_points: Keyword.get(opts, :base_points, 0),
           die_sides: Keyword.get(opts, :die_sides, 0),
+          base_dice: Keyword.get(opts, :base_dice, 0),
           aura: aura,
           amplitude_ms: Keyword.get(opts, :amplitude_ms, 0),
           misc_value: Keyword.get(opts, :misc_value, 0),
@@ -111,6 +112,7 @@ defmodule ThistleTea.Game.Entity.Logic.PriestSpellsTest do
           type: :apply_aura,
           base_points: 43,
           die_sides: 1,
+          base_dice: 1,
           aura: :school_absorb,
           misc_value: 127
         }
@@ -297,6 +299,7 @@ defmodule ThistleTea.Game.Entity.Logic.PriestSpellsTest do
           duration_ms: 18_000,
           base_points: 4,
           die_sides: 1,
+          base_dice: 1,
           amplitude_ms: 3_000
         )
 
@@ -381,6 +384,7 @@ defmodule ThistleTea.Game.Entity.Logic.PriestSpellsTest do
         duration_ms: 24_000,
         base_points: 17,
         die_sides: 1,
+        base_dice: 1,
         amplitude_ms: 3_000,
         multiple_value: 1.0
       )
@@ -449,7 +453,7 @@ defmodule ThistleTea.Game.Entity.Logic.PriestSpellsTest do
         name: "Resurrection",
         school: :holy,
         effects: [
-          %Effect{index: 0, type: :resurrect_new, base_points: 69, die_sides: 1, misc_value: 135}
+          %Effect{index: 0, type: :resurrect_new, base_points: 69, die_sides: 1, base_dice: 1, misc_value: 135}
         ]
       }
     end
@@ -594,7 +598,7 @@ defmodule ThistleTea.Game.Entity.Logic.PriestSpellsTest do
         school: :holy,
         cast_time_ms: 1_500,
         effects: [
-          %Effect{index: 0, type: :heal, base_points: 46, die_sides: 1, implicit_target_a: :target_ally}
+          %Effect{index: 0, type: :heal, base_points: 46, die_sides: 1, base_dice: 1, implicit_target_a: :target_ally}
         ]
       }
     end
@@ -628,6 +632,7 @@ defmodule ThistleTea.Game.Entity.Logic.PriestSpellsTest do
           duration_ms: 600_000,
           base_points: 29,
           die_sides: 1,
+          base_dice: 1,
           misc_value: 32
         )
 
@@ -724,7 +729,8 @@ defmodule ThistleTea.Game.Entity.Logic.PriestSpellsTest do
           name: "Mind Soothe",
           duration_ms: 15_000,
           base_points: -11,
-          die_sides: 1
+          die_sides: 1,
+          base_dice: 1
         )
 
       {entity, _events} = Aura.apply_spell(entity, 999, 10, mind_soothe, 1_000)

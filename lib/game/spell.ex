@@ -28,8 +28,10 @@ defmodule ThistleTea.Game.Spell do
     :first_in_chain,
     :rank,
     :exclusive_category,
-    description_spell_refs: [],
     spell_family: 0,
+    spell_level: 0,
+    base_level: 0,
+    max_level: 0,
     family_flags_0: 0,
     family_flags_1: 0,
     mechanic: 0,
@@ -57,6 +59,18 @@ defmodule ThistleTea.Game.Spell do
   ]
 
   def attribute?(%__MODULE__{attributes: attrs}, attr), do: MapSet.member?(attrs, attr)
+
+  def level_units(%__MODULE__{} = spell, caster_level) when is_integer(caster_level) and caster_level > 0 do
+    caster_level
+    |> min_level_cap(spell.max_level)
+    |> max(spell.base_level || 0)
+    |> Kernel.-(spell.spell_level || 0)
+  end
+
+  def level_units(_spell, _caster_level), do: 0
+
+  defp min_level_cap(level, max_level) when is_integer(max_level) and max_level > 0, do: min(level, max_level)
+  defp min_level_cap(level, _max_level), do: level
 
   def breaks_on_damage?(%__MODULE__{aura_interrupt_flags: flags}) when is_integer(flags), do: (flags &&& 0x2) != 0
   def breaks_on_damage?(_spell), do: false

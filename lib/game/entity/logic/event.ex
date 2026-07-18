@@ -290,8 +290,9 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
     %__MODULE__{type: :drop_nearby_threat}
   end
 
-  def blade_flurry(target_guid, damage) when is_integer(target_guid) and is_integer(damage) and damage > 0 do
-    %__MODULE__{type: :blade_flurry, target_guid: target_guid, damage: damage}
+  def blade_flurry(target_guid, damage, spell_id)
+      when is_integer(target_guid) and is_integer(damage) and damage > 0 and is_integer(spell_id) do
+    %__MODULE__{type: :blade_flurry, target_guid: target_guid, damage: damage, spell_id: spell_id}
   end
 
   defguardp valid_secondary_melee?(target_guid, damage, spell_id, radius)

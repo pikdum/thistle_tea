@@ -51,7 +51,15 @@ defmodule ThistleTea.Game.Entity.Logic.DeathTest do
       attributes: MapSet.new(),
       effects: [
         %Effect{index: 0, type: :apply_aura, aura: :ghost, base_points: -21, die_sides: 0, misc_value: 0},
-        %Effect{index: 1, type: :apply_aura, aura: :mod_increase_speed, base_points: 24, die_sides: 1, misc_value: 0}
+        %Effect{
+          index: 1,
+          type: :apply_aura,
+          aura: :mod_increase_speed,
+          base_points: 24,
+          die_sides: 1,
+          base_dice: 1,
+          misc_value: 0
+        }
       ]
     }
   end

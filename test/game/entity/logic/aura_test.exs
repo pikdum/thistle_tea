@@ -442,6 +442,7 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
             type: :apply_aura,
             base_points: 9,
             die_sides: 1,
+            base_dice: 1,
             aura: :periodic_energize,
             amplitude_ms: 1_000,
             misc_value: 1
@@ -536,6 +537,7 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
             type: :apply_aura,
             base_points: -31,
             die_sides: 1,
+            base_dice: 1,
             aura: :mod_decrease_speed
           }
         ]
@@ -566,6 +568,7 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
             type: :apply_aura,
             base_points: -31,
             die_sides: 1,
+            base_dice: 1,
             aura: :mod_decrease_speed
           }
         ]
@@ -1020,7 +1023,7 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
       school: :arcane,
       duration_ms: 20_000,
       effects: [
-        %Effect{index: 0, type: :apply_aura, base_points: -1, die_sides: 1, aura: :mod_confuse},
+        %Effect{index: 0, type: :apply_aura, base_points: -1, die_sides: 1, base_dice: 1, aura: :mod_confuse},
         %Effect{index: 1, type: :apply_aura, base_points: 0, die_sides: 0, aura: :transform, misc_value: 16_372}
       ]
     }
@@ -1033,7 +1036,7 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
       school: :arcane,
       duration_ms: 1_800_000,
       effects: [
-        %Effect{index: 0, type: :apply_aura, base_points: 1, die_sides: 1, aura: :mod_stat, misc_value: 3}
+        %Effect{index: 0, type: :apply_aura, base_points: 1, die_sides: 1, base_dice: 1, aura: :mod_stat, misc_value: 3}
       ]
     }
   end
@@ -1045,8 +1048,24 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
       school: :arcane,
       duration_ms: 0,
       effects: [
-        %Effect{index: 1, type: :apply_aura, base_points: -1, die_sides: 1, aura: :mechanic_immunity, misc_value: 12},
-        %Effect{index: 2, type: :apply_aura, base_points: -1, die_sides: 1, aura: :mechanic_immunity, misc_value: 7}
+        %Effect{
+          index: 1,
+          type: :apply_aura,
+          base_points: -1,
+          die_sides: 1,
+          base_dice: 1,
+          aura: :mechanic_immunity,
+          misc_value: 12
+        },
+        %Effect{
+          index: 2,
+          type: :apply_aura,
+          base_points: -1,
+          die_sides: 1,
+          base_dice: 1,
+          aura: :mechanic_immunity,
+          misc_value: 7
+        }
       ]
     }
   end
@@ -1059,7 +1078,15 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
       dispel_type: 2,
       duration_ms: 120_000,
       effects: [
-        %Effect{index: 0, type: :apply_aura, base_points: -3, die_sides: 1, aura: :mod_damage_taken, misc_value: 1}
+        %Effect{
+          index: 0,
+          type: :apply_aura,
+          base_points: -3,
+          die_sides: 1,
+          base_dice: 1,
+          aura: :mod_damage_taken,
+          misc_value: 1
+        }
       ]
     }
   end
@@ -1088,6 +1115,7 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
           type: :apply_aura,
           base_points: 14,
           die_sides: 1,
+          base_dice: 1,
           aura: :periodic_heal,
           amplitude_ms: 3_000
         }

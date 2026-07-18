@@ -92,7 +92,15 @@ defmodule ThistleTea.Game.Entity.Logic.HunterTest do
     end
 
     test "overrides the DBC trigger aura amount without changing unrelated effects" do
-      energize = %Effect{index: 0, type: :apply_aura, aura: :periodic_energize, base_points: 9_999, die_sides: 1}
+      energize = %Effect{
+        index: 0,
+        type: :apply_aura,
+        aura: :periodic_energize,
+        base_points: 9_999,
+        die_sides: 1,
+        base_dice: 1
+      }
+
       other = %Effect{index: 1, type: :dummy, base_points: 10}
 
       spell = Hunter.apply_food_benefit(%Spell{effects: [energize, other]}, 35_000)

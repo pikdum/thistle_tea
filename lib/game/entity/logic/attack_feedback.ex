@@ -24,7 +24,6 @@ defmodule ThistleTea.Game.Entity.Logic.AttackFeedback do
     entity
     |> apply_power_feedback(payload, spell)
     |> apply_rogue_combo_feedback(payload, spell)
-    |> trigger_successful_melee_aura(payload, spell)
     |> trigger_blade_flurry(payload, spell)
     |> Paladin.trigger_seal(payload)
     |> trigger_melee_procs(payload, spell, now)
@@ -77,30 +76,14 @@ defmodule ThistleTea.Game.Entity.Logic.AttackFeedback do
 
   defp apply_rogue_combo_feedback(entity, _payload, _spell), do: entity
 
-  defp trigger_successful_melee_aura(
-         %{object: %{guid: guid}, unit: %{level: level}} = entity,
-         %{outcome: outcome},
-         %Spell{} = spell
-       )
-       when outcome in [:normal, :crit] and is_integer(guid) do
-    case Scripts.successful_melee_aura_spell_id(spell) do
-      spell_id when is_integer(spell_id) ->
-        Event.enqueue(entity, Event.trigger_spell(guid, level || 1, guid, spell_id, triggered_by_spell_id: spell.id))
-
-      _ ->
-        entity
-    end
-  end
-
-  defp trigger_successful_melee_aura(entity, _payload, _spell), do: entity
-
   defp trigger_blade_flurry(entity, %{victim_guid: victim_guid, damage: damage} = payload, spell)
        when is_integer(damage) do
     proc_damage = Map.get(payload, :proc_damage, damage)
     proc_type = if match?(%Spell{}, spell), do: :deal_melee_ability, else: :deal_melee_swing
+    damage_spell_id = blade_flurry_damage_spell(entity, proc_type)
 
-    if is_integer(proc_damage) and proc_damage > 0 and blade_flurry_active?(entity, proc_type) do
-      Event.enqueue(entity, Event.blade_flurry(victim_guid, proc_damage))
+    if is_integer(proc_damage) and proc_damage > 0 and is_integer(damage_spell_id) do
+      Event.enqueue(entity, Event.blade_flurry(victim_guid, proc_damage, damage_spell_id))
     else
       entity
     end
@@ -108,13 +91,22 @@ defmodule ThistleTea.Game.Entity.Logic.AttackFeedback do
 
   defp trigger_blade_flurry(entity, _payload, _spell), do: entity
 
-  defp blade_flurry_active?(%{unit: %{auras: holders}}, proc_type) when is_list(holders) do
-    Enum.any?(holders, fn %Holder{spell: spell} ->
-      Scripts.rogue_blade_flurry?(spell) and Spell.procs_on?(spell, proc_type)
+  defp blade_flurry_damage_spell(%{unit: %{auras: holders}}, proc_type) when is_list(holders) do
+    Enum.find_value(holders, fn %Holder{spell: spell} ->
+      if Scripts.rogue_blade_flurry?(spell) and Spell.procs_on?(spell, proc_type) do
+        blade_flurry_trigger_id(spell)
+      end
     end)
   end
 
-  defp blade_flurry_active?(_entity, _proc_type), do: false
+  defp blade_flurry_damage_spell(_entity, _proc_type), do: nil
+
+  defp blade_flurry_trigger_id(%Spell{effects: effects}) do
+    Enum.find_value(effects, fn
+      %Effect{type: :apply_aura, aura: :dummy, trigger_spell_id: id} when is_integer(id) and id > 0 -> id
+      _effect -> nil
+    end)
+  end
 
   defp trigger_melee_procs(entity, %{outcome: outcome, victim_guid: victim_guid} = payload, spell, now)
        when outcome in [:normal, :crit] and is_integer(victim_guid) and is_integer(now) do

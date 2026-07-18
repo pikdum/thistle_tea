@@ -24,6 +24,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
   alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
+  alias ThistleTea.Game.Spell.Coefficient
   alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.Spell.Modifiers
   alias ThistleTea.Game.Spell.Scripts
@@ -398,7 +399,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
     |> Spell.aura_effects()
     |> Enum.reject(&channel_ticked?(spell, &1))
     |> Enum.reduce([], fn effect, acc ->
-      case build_aura(effect, finisher_amount(spell, context, amount_override), context, now) do
+      case build_aura(spell, effect, amount_override, context, now) do
         nil -> acc
         aura -> [aura | acc]
       end
@@ -406,30 +407,21 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
     |> Enum.reverse()
   end
 
-  defp finisher_amount(_spell, _context, amount) when is_integer(amount), do: amount
-
-  defp finisher_amount(%Spell{} = spell, %CastContext{combo_points: points}, nil)
-       when is_integer(points) and points > 0 do
-    {:finisher, spell, points}
-  end
-
-  defp finisher_amount(_spell, _context, amount), do: amount
-
   defp channel_ticked?(%Spell{} = spell, %Effect{aura: :periodic_trigger_spell}) do
     Spell.attribute?(spell, :channeled)
   end
 
   defp channel_ticked?(_spell, _effect), do: false
 
-  defp build_aura(%Effect{aura: nil}, _amount_override, _context, _now), do: nil
+  defp build_aura(_spell, %Effect{aura: nil}, _amount_override, _context, _now), do: nil
 
-  defp build_aura(%Effect{} = effect, amount_override, %CastContext{} = context, now) do
+  defp build_aura(%Spell{} = spell, %Effect{} = effect, amount_override, %CastContext{} = context, now) do
     amplitude_ms = effective_amplitude(effect)
 
     %Aura{
       index: effect.index,
       type: effect.aura,
-      amount: modified_aura_amount(effect, amount_override, context),
+      amount: modified_aura_amount(spell, effect, amount_override, context),
       misc_value: effect.misc_value,
       multiple_value: effect.multiple_value,
       class_mask: effect.class_mask,
@@ -440,14 +432,25 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
     }
   end
 
-  defp aura_amount(%Effect{} = effect, {:finisher, spell, points}) do
-    if Scripts.finisher?(spell), do: Effect.amount(effect, points), else: Effect.damage_roll(effect)
+  defp aura_amount(%Spell{}, %Effect{}, amount_override, _context) when is_integer(amount_override), do: amount_override
+
+  defp aura_amount(%Spell{} = spell, %Effect{} = effect, _amount_override, %CastContext{} = context) do
+    level_units = Spell.level_units(spell, context.caster_level)
+    combo_points = finisher_combo_points(spell, context)
+
+    if combo_points > 0 do
+      Effect.amount(effect, level_units, combo_points)
+    else
+      Effect.roll(effect, level_units)
+    end
   end
 
-  defp aura_amount(%Effect{} = effect, amount_override), do: amount_override || Effect.damage_roll(effect)
+  defp finisher_combo_points(%Spell{} = spell, %CastContext{combo_points: points}) do
+    if Scripts.finisher?(spell) and is_integer(points), do: max(points, 0), else: 0
+  end
 
-  defp modified_aura_amount(%Effect{} = effect, amount_override, %CastContext{} = context) do
-    amount = aura_amount(effect, amount_override)
+  defp modified_aura_amount(%Spell{} = spell, %Effect{} = effect, amount_override, %CastContext{} = context) do
+    amount = aura_amount(spell, effect, amount_override, context)
 
     amount =
       if effect.aura in [:mod_increase_speed, :mod_decrease_speed, :mod_increase_swim_speed] do
@@ -455,6 +458,8 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
       else
         amount
       end
+
+    amount = amount + periodic_benefit(spell, effect, context)
 
     multiplier =
       case effect.aura do
@@ -470,6 +475,24 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
 
     trunc(amount * (multiplier || 1.0))
   end
+
+  defp periodic_benefit(%Spell{} = spell, %Effect{aura: aura} = effect, %CastContext{} = context)
+       when aura in [:periodic_damage, :periodic_leech] do
+    Coefficient.bonus(school_benefit(context, spell), spell, effect, :dot)
+  end
+
+  defp periodic_benefit(%Spell{} = spell, %Effect{aura: :periodic_heal} = effect, %CastContext{} = context) do
+    Coefficient.bonus(context.healing_bonus || 0, spell, effect, :dot)
+  end
+
+  defp periodic_benefit(_spell, _effect, _context), do: 0
+
+  defp school_benefit(%CastContext{spell_damage_bonus: bonuses}, %Spell{school: school})
+       when is_map(bonuses) and is_atom(school) do
+    Map.get(bonuses, school, 0)
+  end
+
+  defp school_benefit(_context, _spell), do: 0
 
   defp effective_amplitude(%Effect{aura: :mod_power_regen_percent, amplitude_ms: amp}) do
     if is_integer(amp) and amp > 0, do: amp, else: @percent_regen_tick_ms

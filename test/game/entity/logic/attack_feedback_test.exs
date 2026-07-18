@@ -116,7 +116,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackFeedbackTest do
 
     test "rogue builders grant points only after landing" do
       entity = rogue()
-      spell = %Spell{id: 1757, effects: [%Effect{type: :add_combo_points, base_points: 0, die_sides: 1}]}
+      spell = %Spell{id: 1757, effects: [%Effect{type: :add_combo_points, base_points: 0, die_sides: 1, base_dice: 1}]}
 
       landed = AttackFeedback.receive(entity, %{outcome: :normal, damage: 20, victim_guid: 77}, spell, 1_000)
       avoided = AttackFeedback.receive(entity, %{outcome: :dodge, damage: 0, victim_guid: 77}, spell, 1_000)
@@ -170,7 +170,10 @@ defmodule ThistleTea.Game.Entity.Logic.AttackFeedbackTest do
         spell_family: 8,
         family_flags_0: 0x40000000,
         proc_type_mask: 0x14,
-        effects: [%Effect{index: 0, type: :apply_aura, aura: :mod_melee_haste, base_points: 20}]
+        effects: [
+          %Effect{index: 0, type: :apply_aura, aura: :mod_melee_haste, base_points: 20},
+          %Effect{index: 1, type: :apply_aura, aura: :dummy, trigger_spell_id: 22_482}
+        ]
       }
 
       {entity, _events} = Aura.apply_spell(rogue(), 5, 60, blade_flurry, 1_000)
@@ -183,7 +186,10 @@ defmodule ThistleTea.Game.Entity.Logic.AttackFeedbackTest do
           1_000
         )
 
-      assert Enum.any?(entity.internal.events, &match?(%{type: :blade_flurry, target_guid: 77, damage: 123}, &1))
+      assert Enum.any?(
+               entity.internal.events,
+               &match?(%{type: :blade_flurry, target_guid: 77, damage: 123, spell_id: 22_482}, &1)
+             )
     end
 
     test "blade flurry does not trigger from avoided attacks" do
@@ -255,48 +261,6 @@ defmodule ThistleTea.Game.Entity.Logic.AttackFeedbackTest do
 
       assert [%Holder{charges: 4}] = entity.unit.auras
       refute Enum.any?(entity.internal.events || [], &(&1.type == :secondary_melee))
-    end
-
-    test "landed bloodthirst applies the DBC-referenced healing proc aura" do
-      spell = %Spell{
-        id: 23_881,
-        script_name: "spell_warrior_bloodthirst",
-        description_spell_refs: [{23_885, "n"}, {23_880, "s1"}, {23_885, "d"}]
-      }
-
-      entity =
-        AttackFeedback.receive(
-          rogue(),
-          %{outcome: :normal, damage: 100, victim_guid: 77, spell_id: 23_881},
-          spell,
-          1_000
-        )
-
-      assert Enum.any?(
-               entity.internal.events,
-               &match?(
-                 %{type: :trigger_spell, source_guid: 5, target_guid: 5, spell_id: 23_885},
-                 &1
-               )
-             )
-    end
-
-    test "avoided bloodthirst does not apply its healing proc aura" do
-      spell = %Spell{
-        id: 23_881,
-        script_name: "spell_warrior_bloodthirst",
-        description_spell_refs: [{23_885, "n"}, {23_885, "d"}]
-      }
-
-      entity =
-        AttackFeedback.receive(
-          rogue(),
-          %{outcome: :dodge, damage: 0, victim_guid: 77, spell_id: 23_881},
-          spell,
-          1_000
-        )
-
-      refute Enum.any?(entity.internal.events || [], &(&1.type == :trigger_spell))
     end
 
     test "DBC melee proc auras trigger their encoded spell and spend charges" do

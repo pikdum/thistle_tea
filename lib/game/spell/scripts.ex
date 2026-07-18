@@ -69,7 +69,6 @@ defmodule ThistleTea.Game.Spell.Scripts do
   @execute_damage_spell 20_647
   @rogue_stealth_family_mask 0x00400000
   @rogue_misc_family_mask 0x40000000
-  @blade_flurry_damage_spell 22_482
   @blade_flurry_radius_yards 5.0
   @last_stand 12_975
   @preparation 14_185
@@ -175,7 +174,6 @@ defmodule ThistleTea.Game.Spell.Scripts do
   def uses_melee_spell_crit?(_spell), do: false
 
   def execute_damage_spell_id, do: @execute_damage_spell
-  def blade_flurry_damage_spell_id, do: @blade_flurry_damage_spell
   def blade_flurry_radius_yards, do: @blade_flurry_radius_yards
   def rogue_spell_family, do: @spell_family_rogue
 
@@ -191,19 +189,6 @@ defmodule ThistleTea.Game.Spell.Scripts do
 
   def ap_percent_damage?(%Spell{} = spell), do: Spell.vmangos_script?(spell, "spell_warrior_bloodthirst")
   def ap_percent_damage?(_spell), do: false
-
-  def successful_melee_aura_spell_id(%Spell{description_spell_refs: refs} = spell) when is_list(refs) do
-    if ap_percent_damage?(spell) do
-      count_refs = refs |> Enum.filter(&(elem(&1, 1) == "n")) |> MapSet.new(&elem(&1, 0))
-      duration_refs = refs |> Enum.filter(&(elem(&1, 1) == "d")) |> MapSet.new(&elem(&1, 0))
-
-      count_refs
-      |> MapSet.intersection(duration_refs)
-      |> Enum.at(0)
-    end
-  end
-
-  def successful_melee_aura_spell_id(_spell), do: nil
 
   def finisher?(%Spell{} = spell), do: Spell.attribute?(spell, :finishing_move)
   def finisher?(_spell), do: false

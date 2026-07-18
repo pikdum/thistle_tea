@@ -589,7 +589,14 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
         duration_ms: 8_000,
         attributes: MapSet.new([:channeled]),
         effects: [
-          %Effect{index: 0, type: :apply_aura, aura: :mod_power_regen_percent, base_points: 1499, die_sides: 1}
+          %Effect{
+            index: 0,
+            type: :apply_aura,
+            aura: :mod_power_regen_percent,
+            base_points: 1499,
+            die_sides: 1,
+            base_dice: 1
+          }
         ]
       }
 

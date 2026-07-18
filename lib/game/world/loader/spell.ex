@@ -7,12 +7,14 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   import Ecto.Query
 
   alias ThistleTea.DB.Mangos
+  alias ThistleTea.DB.Mangos.SpellEffectMod
   alias ThistleTea.DBC
   alias ThistleTea.Game.Entity.Data.CreatureTemplate
   alias ThistleTea.Game.Spell, as: SpellData
   alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.Spell.Scripts
   alias ThistleTea.Game.World.Loader.CreatureTemplate, as: CreatureTemplateLoader
+  alias ThistleTea.Game.World.Loader.SpellEffectOverride, as: SpellEffectOverrideLoader
   alias ThistleTea.Game.World.Loader.SpellProcEvent, as: SpellProcEventLoader
   alias ThistleTea.Game.World.Loader.SpellScript, as: SpellScriptLoader
   alias ThistleTea.Game.World.Loader.SpellScriptName, as: SpellScriptNameLoader
@@ -219,7 +221,9 @@ defmodule ThistleTea.Game.World.Loader.Spell do
       spell_family: row.spell_class_set || 0,
       family_flags_0: row.spell_class_mask_0 || 0,
       family_flags_1: row.spell_class_mask_1 || 0,
-      description_spell_refs: description_spell_refs(row.description_en_gb),
+      spell_level: row.spell_level || 0,
+      base_level: row.base_level || 0,
+      max_level: row.max_level || 0,
       effects: build_effects(row, radius_lookup),
       script_steps: SpellScriptLoader.get(row.id),
       reagents: build_reagents(row)
@@ -229,14 +233,6 @@ defmodule ThistleTea.Game.World.Loader.Spell do
     |> struct!(power_fields(row))
     |> append_shapeshift_passives(radius_lookup)
   end
-
-  defp description_spell_refs(description) when is_binary(description) do
-    ~r/\$(\d+)([a-zA-Z]\d*)/
-    |> Regex.scan(description, capture: :all_but_first)
-    |> Enum.map(fn [spell_id, variable] -> {String.to_integer(spell_id), variable} end)
-  end
-
-  defp description_spell_refs(_description), do: []
 
   defp power_fields(row) do
     %{
@@ -337,61 +333,100 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   end
 
   defp build_effects(row, radius_lookup) do
+    mods = SpellEffectOverrideLoader.mods(row.id)
+
     0..2
-    |> Enum.map(&build_effect(row, &1, radius_lookup))
+    |> Enum.map(&build_effect(row, &1, radius_lookup, Map.get(mods, &1)))
     |> Enum.reject(&is_nil/1)
   end
 
   # credo:disable-for-next-line Credo.Check.Refactor.CyclomaticComplexity
-  defp build_effect(row, index, radius_lookup) do
-    type_int = Map.get(row, :"effect_#{index}") || 0
+  defp build_effect(row, index, radius_lookup, mod) do
+    type_int = int_field(mod, :effect, row, :"effect_#{index}") || 0
 
     case effect_type(row, type_int) do
       :none ->
         nil
 
       type ->
-        aura = aura_type(Map.get(row, :"effect_aura_#{index}") || 0)
+        aura = aura_type(int_field(mod, :effect_apply_aura_name, row, :"effect_aura_#{index}") || 0)
+        target_a_int = int_field(mod, :effect_implicit_target_a, row, :"implicit_target_a_#{index}") || 0
+        target_b_int = int_field(mod, :effect_implicit_target_b, row, :"implicit_target_b_#{index}") || 0
+        item_type = unsigned32(int_field(mod, :effect_item_type, row, :"effect_item_type_#{index}"))
 
         %Effect{
           index: index,
           type: type,
-          base_points: Map.get(row, :"effect_base_points_#{index}") || 0,
-          die_sides: Map.get(row, :"effect_die_sides_#{index}") || 0,
-          real_points_per_level: Map.get(row, :"effect_real_points_per_level_#{index}") || 0.0,
-          points_per_combo: Map.get(row, :"effect_points_per_combo_#{index}") || 0.0,
+          base_points: int_field(mod, :effect_base_points, row, :"effect_base_points_#{index}") || 0,
+          die_sides: int_field(mod, :effect_die_sides, row, :"effect_die_sides_#{index}") || 0,
+          base_dice: int_field(mod, :effect_base_dice, row, :"effect_base_dice_#{index}") || 0,
+          dice_per_level: float_field(mod, :effect_dice_per_level, row, :"effect_dice_per_level_#{index}") || 0.0,
+          real_points_per_level:
+            float_field(mod, :effect_real_points_per_level, row, :"effect_real_points_per_level_#{index}") || 0.0,
+          points_per_combo: float_field(mod, :effect_points_per_combo, row, :"effect_points_per_combo_#{index}") || 0.0,
           aura: aura,
-          amplitude_ms: amplitude_ms(Map.get(row, :"effect_amplitude_#{index}")),
-          misc_value: effect_misc_value(row, index, type, aura),
-          multiple_value: Map.get(row, :"effect_multiple_values_#{index}") || 0.0,
-          class_mask: unsigned32(Map.get(row, :"effect_item_type_#{index}")),
-          item_type: unsigned32(Map.get(row, :"effect_item_type_#{index}")),
-          radius_yards: radius_lookup.(Map.get(row, :"effect_radius_#{index}")),
-          implicit_target_a: target_type(Map.get(row, :"implicit_target_a_#{index}") || 0),
-          implicit_target_b: target_type(Map.get(row, :"implicit_target_b_#{index}") || 0),
-          chain_targets: Map.get(row, :"effect_chain_target_#{index}") || 0,
-          trigger_spell_id: nonzero(Map.get(row, :"effect_trigger_spell_#{index}")),
+          amplitude_ms: effect_amplitude(mod, row, index),
+          misc_value: effect_misc_value(mod, row, index, type, aura),
+          multiple_value: float_field(mod, :effect_multiple_value, row, :"effect_multiple_values_#{index}") || 0.0,
+          class_mask: item_type,
+          item_type: item_type,
+          radius_yards: radius_lookup.(int_field(mod, :effect_radius_index, row, :"effect_radius_#{index}")),
+          implicit_target_a: target_type(target_a_int),
+          implicit_target_b: target_type(target_b_int),
+          area_target?: area_target?(target_a_int) or area_target?(target_b_int),
+          chain_targets: int_field(mod, :effect_chain_target, row, :"effect_chain_target_#{index}") || 0,
+          trigger_spell_id: nonzero(int_field(mod, :effect_trigger_spell, row, :"effect_trigger_spell_#{index}")),
           summon_slot: summon_slot(type_int),
-          damage_multiplier: damage_multiplier(Map.get(row, :"damage_multiplier_#{index}"))
+          damage_multiplier: damage_multiplier(Map.get(row, :"damage_multiplier_#{index}")),
+          bonus_coefficient: SpellEffectOverrideLoader.bonus_coefficient(row.id, index)
         }
     end
   end
 
+  defp int_field(%SpellEffectMod{} = mod, mod_key, row, row_key) do
+    case Map.get(mod, mod_key) do
+      value when is_integer(value) and value != -1 -> value
+      _ -> Map.get(row, row_key)
+    end
+  end
+
+  defp int_field(nil, _mod_key, row, row_key), do: Map.get(row, row_key)
+
+  defp float_field(%SpellEffectMod{} = mod, mod_key, row, row_key) do
+    case Map.get(mod, mod_key) do
+      value when is_float(value) and value != -1.0 -> value
+      _ -> Map.get(row, row_key)
+    end
+  end
+
+  defp float_field(nil, _mod_key, row, row_key), do: Map.get(row, row_key)
+
+  @area_target_ints [7, 8, 15, 16, 20, 24, 28, 30, 31, 33, 34, 37, 52, 56, 61]
+
+  defp area_target?(target_int), do: target_int in @area_target_ints
+
+  defp effect_amplitude(mod, row, index) do
+    case mod do
+      %SpellEffectMod{effect_amplitude: value} when is_integer(value) and value != -1 -> max(value, 0)
+      _ -> amplitude_ms(Map.get(row, :"effect_amplitude_#{index}"))
+    end
+  end
+
   defp effect_type(%Spell{spell_class_set: 10, spell_class_mask_0: mask}, 77)
-       when is_integer(mask) and (mask &&& 0xC0000000) != 0, do: :heal
+       when is_integer(mask) and (mask &&& 0x40000000) != 0, do: :heal
 
   defp effect_type(_row, type_int), do: effect_type(type_int)
 
-  defp effect_misc_value(row, index, :create_item, _aura) do
-    Map.get(row, :"effect_item_type_#{index}") || 0
+  defp effect_misc_value(mod, row, index, :create_item, _aura) do
+    int_field(mod, :effect_item_type, row, :"effect_item_type_#{index}") || 0
   end
 
-  defp effect_misc_value(row, index, _type, :transform) do
-    transform_display_id(Map.get(row, :"effect_misc_value_#{index}") || 0)
+  defp effect_misc_value(mod, row, index, _type, :transform) do
+    transform_display_id(int_field(mod, :effect_misc_value, row, :"effect_misc_value_#{index}") || 0)
   end
 
-  defp effect_misc_value(row, index, _type, _aura) do
-    Map.get(row, :"effect_misc_value_#{index}") || 0
+  defp effect_misc_value(mod, row, index, _type, _aura) do
+    int_field(mod, :effect_misc_value, row, :"effect_misc_value_#{index}") || 0
   end
 
   defp transform_display_id(entry) when is_integer(entry) and entry > 0 do

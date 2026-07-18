@@ -258,7 +258,7 @@ defmodule ThistleTea.Game.Entity.Logic.WarriorSpellsTest do
         name: "Heroic Strike",
         school: :physical,
         dmg_class: 2,
-        effects: [%Effect{index: 0, type: :weapon_damage_noschool, base_points: 10, die_sides: 1}]
+        effects: [%Effect{index: 0, type: :weapon_damage_noschool, base_points: 10, die_sides: 1, base_dice: 1}]
       }
 
       target = melee_target()
@@ -277,7 +277,7 @@ defmodule ThistleTea.Game.Entity.Logic.WarriorSpellsTest do
         spell_family: 4,
         family_flags_0: 0x00000004,
         dmg_class: 2,
-        effects: [%Effect{index: 0, type: :normalized_weapon_damage, base_points: 4, die_sides: 1}]
+        effects: [%Effect{index: 0, type: :normalized_weapon_damage, base_points: 4, die_sides: 1, base_dice: 1}]
       }
 
       target = melee_target()
@@ -293,7 +293,7 @@ defmodule ThistleTea.Game.Entity.Logic.WarriorSpellsTest do
         name: "Hamstring",
         school: :physical,
         dmg_class: 2,
-        effects: [%Effect{index: 0, type: :school_damage, base_points: 4, die_sides: 1}]
+        effects: [%Effect{index: 0, type: :school_damage, base_points: 4, die_sides: 1, base_dice: 1}]
       }
 
       target = melee_target(level: 60, helpless?: false)
@@ -377,7 +377,7 @@ defmodule ThistleTea.Game.Entity.Logic.WarriorSpellsTest do
         family_flags_0: 0x20000000,
         dmg_class: 2,
         effects: [
-          %Effect{index: 0, type: :dummy, base_points: 124, die_sides: 1, damage_multiplier: 0.3},
+          %Effect{index: 0, type: :dummy, base_points: 124, die_sides: 1, base_dice: 1, damage_multiplier: 0.3},
           %Effect{index: 1, type: :trigger_spell, trigger_spell_id: 20_647}
         ]
       }
@@ -401,7 +401,7 @@ defmodule ThistleTea.Game.Entity.Logic.WarriorSpellsTest do
         name: "Execute",
         school: :physical,
         dmg_class: 2,
-        effects: [%Effect{index: 0, type: :dummy, base_points: 124, die_sides: 1, damage_multiplier: 0.3}]
+        effects: [%Effect{index: 0, type: :dummy, base_points: 124, die_sides: 1, base_dice: 1, damage_multiplier: 0.3}]
       }
 
       context = %{melee_context(spell) | caster_power: 200}
@@ -471,7 +471,15 @@ defmodule ThistleTea.Game.Entity.Logic.WarriorSpellsTest do
         duration_ms: 30_000,
         stack_amount: 5,
         effects: [
-          %Effect{index: 0, type: :apply_aura, aura: :mod_resistance, base_points: -91, die_sides: 1, misc_value: 1}
+          %Effect{
+            index: 0,
+            type: :apply_aura,
+            aura: :mod_resistance,
+            base_points: -91,
+            die_sides: 1,
+            base_dice: 1,
+            misc_value: 1
+          }
         ]
       }
     end
@@ -660,7 +668,7 @@ defmodule ThistleTea.Game.Entity.Logic.WarriorSpellsTest do
         dmg_class: 2,
         duration_ms: 15_000,
         effects: [
-          %Effect{index: 0, type: :school_damage, base_points: 4, die_sides: 1},
+          %Effect{index: 0, type: :school_damage, base_points: 4, die_sides: 1, base_dice: 1},
           %Effect{index: 1, type: :apply_aura, aura: :mod_decrease_speed, base_points: -41}
         ]
       }
@@ -689,6 +697,7 @@ defmodule ThistleTea.Game.Entity.Logic.WarriorSpellsTest do
             aura: aura,
             base_points: base_points,
             die_sides: 1,
+            base_dice: 1,
             misc_value: Keyword.get(opts, :misc_value, 0)
           }
         ]
@@ -769,7 +778,15 @@ defmodule ThistleTea.Game.Entity.Logic.WarriorSpellsTest do
         name: "Charge",
         school: :physical,
         effects: [
-          %Effect{index: 1, type: :energize, base_points: 89, die_sides: 1, misc_value: 1, implicit_target_a: :caster}
+          %Effect{
+            index: 1,
+            type: :energize,
+            base_points: 89,
+            die_sides: 1,
+            base_dice: 1,
+            misc_value: 1,
+            implicit_target_a: :caster
+          }
         ]
       }
 
@@ -817,6 +834,7 @@ defmodule ThistleTea.Game.Entity.Logic.WarriorSpellsTest do
             aura: :mod_attack_power,
             base_points: -37,
             die_sides: 1,
+            base_dice: 1,
             implicit_target_a: :aoe_enemy_at_caster
           }
         ]
@@ -837,7 +855,7 @@ defmodule ThistleTea.Game.Entity.Logic.WarriorSpellsTest do
         spell_family: 4,
         family_flags_0: 0x02000000,
         dmg_class: 2,
-        effects: [%Effect{index: 0, type: :school_damage, base_points: 44, die_sides: 1}]
+        effects: [%Effect{index: 0, type: :school_damage, base_points: 44, die_sides: 1, base_dice: 1}]
       }
 
       target = melee_target()

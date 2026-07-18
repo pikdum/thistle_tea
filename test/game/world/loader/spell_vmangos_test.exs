@@ -6,12 +6,50 @@ defmodule ThistleTea.Game.World.Loader.SpellVmangosTest do
   alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.World.Loader.ClassSpell
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
+  alias ThistleTea.Game.World.Loader.SpellEffectOverride
   alias ThistleTea.Game.World.Loader.SpellThreat
 
   @moduletag :dbc_db
 
   setup_all do
     :ok = SpellThreat.load_all()
+    :ok = SpellEffectOverride.load_all()
+  end
+
+  describe "vmangos effect overrides" do
+    test "bloodthirst gains its caster-targeted heal-buff trigger from spell_effect_mod" do
+      spell = SpellLoader.load(23_881)
+
+      assert %Effect{type: :trigger_spell, trigger_spell_id: 23_885, implicit_target_a: :caster} =
+               Enum.find(spell.effects, &(&1.index == 1))
+    end
+
+    test "blade flurry gains its extra-strike dummy aura from spell_effect_mod" do
+      spell = SpellLoader.load(13_877)
+
+      assert %Effect{type: :apply_aura, aura: :dummy, trigger_spell_id: 22_482} =
+               Enum.find(spell.effects, &(&1.index == 1))
+    end
+
+    test "holy light rank 1 becomes a heal through spell_effect_mod, not a loader fingerprint" do
+      assert Enum.any?(SpellLoader.load(635).effects, &(&1.type == :heal))
+    end
+
+    test "thorns retaliation loads the damage-shield aura fix" do
+      assert Enum.any?(SpellLoader.load(25_777).effects, &(&1.aura == :damage_shield))
+    end
+
+    test "spell_template bonus coefficients attach to effects" do
+      assert [%Effect{bonus_coefficient: 0.8}] = SpellLoader.load(1454).effects
+      assert %Effect{bonus_coefficient: 0.123} = Enum.find(SpellLoader.load(133).effects, &(&1.index == 0))
+    end
+
+    test "spells load their level fields for per-level scaling" do
+      fireball = SpellLoader.load(133)
+
+      assert fireball.spell_level == 1
+      assert Enum.any?(fireball.effects, &(&1.real_points_per_level > 0))
+    end
   end
 
   describe "stance spells" do
