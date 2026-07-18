@@ -70,13 +70,24 @@ defmodule ThistleTea.Game.Entity.Logic.CoreTest do
   describe "take_damage_with_absorb/4 aura cleanup" do
     test "keeps passive auras and removes temporary auras on death" do
       passive = %Holder{slot: 0, spell: %Spell{id: 1, attributes: MapSet.new([:passive])}}
-      temporary = %Holder{slot: 1, spell: %Spell{id: 2, attributes: MapSet.new()}}
+
+      temporary = %Holder{
+        slot: 1,
+        spell: %Spell{id: 2, attributes: MapSet.new()},
+        auras: [%Aura{type: :add_pct_modifier, amount: -100, misc_value: 10, class_mask: 1}]
+      }
+
       entity = damageable(health: 30)
       entity = %{entity | unit: %{entity.unit | auras: [passive, temporary]}}
 
       {entity, _absorbed} = Core.take_damage_with_absorb(entity, 30, 1_000)
 
       assert entity.unit.auras == [passive]
+
+      assert Enum.any?(
+               entity.internal.events,
+               &match?(%{type: :spell_modifier, modifier_type: :pct, effect_index: 0, amount: 0}, &1)
+             )
     end
   end
 

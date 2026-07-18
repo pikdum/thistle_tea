@@ -1,7 +1,7 @@
 defmodule ThistleTea.Game.Entity.Logic.AuraTest do
   use ExUnit.Case, async: true
 
-  import Bitwise, only: [&&&: 2]
+  import Bitwise, only: [&&&: 2, <<<: 2]
 
   alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.Character
@@ -78,6 +78,26 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
     }
   end
 
+  defp casting_time_modifier_fixture do
+    %Spell{
+      id: 11_070,
+      spell_family: 3,
+      attributes: MapSet.new([:passive]),
+      effects: [
+        %Effect{
+          index: 0,
+          type: :apply_aura,
+          base_points: -101,
+          base_dice: 1,
+          die_sides: 1,
+          aura: :add_flat_modifier,
+          misc_value: 10,
+          class_mask: 1 <<< 5
+        }
+      ]
+    }
+  end
+
   describe "apply_spell/5" do
     test "appends a holder with the spell to the unit" do
       entity = fixture_entity()
@@ -147,6 +167,29 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
       {entity, _events} = apply_spell(entity, 1, 1, spell)
 
       assert entity.internal.broadcast_update? == true
+    end
+
+    test "emits client spell-modifier updates on apply and removal" do
+      spell = casting_time_modifier_fixture()
+      {entity, apply_events} = apply_spell(fixture_entity(), 1, 1, spell)
+
+      assert Enum.any?(
+               apply_events,
+               &match?(
+                 %{type: :spell_modifier, modifier_type: :flat, effect_index: 5, operation: 10, amount: -100},
+                 &1
+               )
+             )
+
+      {_entity, remove_events} = Aura.remove_spells(entity, [spell.id], 2_000)
+
+      assert Enum.any?(
+               remove_events,
+               &match?(
+                 %{type: :spell_modifier, modifier_type: :flat, effect_index: 5, operation: 10, amount: 0},
+                 &1
+               )
+             )
     end
 
     test "applying two different spells fills two slots" do

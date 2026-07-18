@@ -6,8 +6,8 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
   alias ThistleTea.Game.Aura
   alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Logic.Aura.HolderSync
   alias ThistleTea.Game.Entity.Logic.Aura.Script
-  alias ThistleTea.Game.Entity.Logic.Aura.UnitSync
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.Spell
@@ -111,28 +111,28 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
     end
   end
 
-  defp sync_holders(%{unit: %Unit{auras: current}} = entity, current), do: entity
+  defp sync_holders(%{unit: %Unit{auras: current}} = entity, current), do: {entity, []}
 
-  defp sync_holders(%{unit: %Unit{} = unit} = entity, holders) do
-    %{entity | unit: UnitSync.sync_unit(%{unit | auras: holders})}
-    |> Core.mark_broadcast_update()
+  defp sync_holders(%{unit: %Unit{}} = entity, holders) do
+    {entity, events} = HolderSync.sync(entity, holders)
+    {Core.mark_broadcast_update(entity), events}
   end
 
   defp sync_removals(%{unit: %Unit{auras: previous}} = entity, holders, context) do
     removed = previous -- holders
-    entity = sync_holders(entity, holders)
+    {entity, modifier_events} = sync_holders(entity, holders)
 
     case {removed, Map.get(context, :now)} do
       {[], _now} ->
-        {entity, []}
+        {entity, modifier_events}
 
       {removed, now} when is_integer(now) ->
         script_events = Script.after_remove(entity, removed)
         {entity, cooldown_events} = Cooldowns.activate_on_event(entity, removed, now)
-        {entity, script_events ++ cooldown_events}
+        {entity, modifier_events ++ script_events ++ cooldown_events}
 
       {removed, _now} ->
-        {entity, Script.after_remove(entity, removed)}
+        {entity, modifier_events ++ Script.after_remove(entity, removed)}
     end
   end
 

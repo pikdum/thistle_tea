@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
   alias ThistleTea.Game.Entity.Data.GameObject
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.Aura
+  alias ThistleTea.Game.Entity.Logic.Aura.HolderSync
   alias ThistleTea.Game.Entity.Logic.Combat
   alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.Entity.Logic.Movement
@@ -211,11 +212,14 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
 
   defp maybe_dead(%{internal: %Internal{}, unit: %Unit{health: 0}, movement_block: %MovementBlock{}} = entity, now) do
     entity = Movement.sync_position(entity, now)
-    %{internal: internal, unit: unit, movement_block: mb} = entity
+    %{unit: unit, movement_block: mb} = entity
 
-    unit =
-      %{unit | target: 0, auras: death_auras(unit.auras)}
-      |> Aura.sync_unit()
+    {entity, modifier_events} =
+      HolderSync.sync(%{entity | unit: %{unit | target: 0}}, death_auras(unit.auras))
+
+    entity = Event.enqueue(entity, modifier_events)
+    internal = entity.internal
+    unit = entity.unit
 
     internal = %{
       internal

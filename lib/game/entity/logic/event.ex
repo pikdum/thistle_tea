@@ -44,6 +44,9 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
     :spell,
     :spells,
     :effect,
+    :modifier_type,
+    :effect_index,
+    :operation,
     :attack,
     :channel_time_ms,
     :entry,
@@ -189,6 +192,17 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
   def spell_cooldown(source_guid, spell_id, cooldown_ms)
       when is_integer(source_guid) and is_integer(spell_id) and is_integer(cooldown_ms) do
     %__MODULE__{type: :spell_cooldown, source_guid: source_guid, spell_id: spell_id, duration_ms: cooldown_ms}
+  end
+
+  def spell_modifier(type, index, operation, amount)
+      when type in [:flat, :pct] and is_integer(index) and is_integer(operation) and is_integer(amount) do
+    %__MODULE__{
+      type: :spell_modifier,
+      modifier_type: type,
+      effect_index: index,
+      operation: operation,
+      amount: amount
+    }
   end
 
   def cooldown_event(source_guid, spell_id) when is_integer(source_guid) and is_integer(spell_id) do

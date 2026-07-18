@@ -145,15 +145,23 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.UnitSync do
   end
 
   defp pack_aura_ids(holders) do
-    Enum.reduce(holders, 0, fn %Holder{slot: slot, spell: %Spell{id: id}}, acc ->
-      acc ||| id <<< (32 * slot)
+    Enum.reduce(holders, 0, fn
+      %Holder{slot: slot, spell: %Spell{id: id}}, acc when is_integer(slot) and slot >= 0 and slot < @max_slots ->
+        acc ||| id <<< (32 * slot)
+
+      _holder, acc ->
+        acc
     end)
   end
 
   defp pack_aura_flags(holders) do
     int =
-      Enum.reduce(holders, 0, fn %Holder{} = holder, acc ->
-        acc ||| holder_flag_bits(holder) <<< (4 * holder.slot)
+      Enum.reduce(holders, 0, fn
+        %Holder{slot: slot} = holder, acc when is_integer(slot) and slot >= 0 and slot < @max_slots ->
+          acc ||| holder_flag_bits(holder) <<< (4 * slot)
+
+        _holder, acc ->
+          acc
       end)
 
     <<int::little-size(24 * 8)>>

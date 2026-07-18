@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.Aura.ControlSync
+  alias ThistleTea.Game.Entity.Logic.Aura.HolderSync
   alias ThistleTea.Game.Entity.Logic.Aura.Lifecycle
   alias ThistleTea.Game.Entity.Logic.Aura.MovementSync
   alias ThistleTea.Game.Entity.Logic.Aura.ObjectSync
@@ -172,10 +173,10 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
       |> remove_non_stacking(holder)
 
     holders = upsert_holder(existing, holder)
-    unit = UnitSync.sync_unit(%{entity.unit | auras: holders})
+    {entity, modifier_events} = HolderSync.sync(entity, holders)
 
     {entity, sit_events} =
-      %{entity | unit: unit}
+      entity
       |> ObjectSync.sync()
       |> PlayerSync.sync()
       |> StealthSync.sync()
@@ -189,7 +190,8 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
     viewpoint_events = ViewpointSync.events(previous_holders, holders, entity_guid(entity))
     duration_events = applied_duration_events(entity, holder, now)
 
-    {Core.mark_broadcast_update(entity), sit_events ++ control_events ++ viewpoint_events ++ events ++ duration_events}
+    {Core.mark_broadcast_update(entity),
+     modifier_events ++ sit_events ++ control_events ++ viewpoint_events ++ events ++ duration_events}
   end
 
   defp applied_duration_events(
@@ -313,8 +315,11 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
       index ->
         holders = spend_holder_charge(holders, index)
 
-        %{entity | unit: UnitSync.sync_unit(%{entity.unit | auras: holders})}
+        {entity, modifier_events} = HolderSync.sync(entity, holders)
+
+        entity
         |> PlayerSync.sync()
+        |> Event.enqueue(modifier_events)
         |> Core.mark_broadcast_update()
     end
   end

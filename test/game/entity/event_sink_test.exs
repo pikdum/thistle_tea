@@ -85,6 +85,20 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
       assert_receive {:feed_pet, 22, 33, 1539, 10.0}
     end
 
+    test "spell modifier events send the matching client packet" do
+      character = %Character{}
+
+      assert ^character = EventSink.emit(character, Event.spell_modifier(:flat, 5, 10, -500))
+
+      assert_receive {:"$gen_cast",
+                      {:send_packet, %Message.SmsgSetFlatSpellModifier{effect_index: 5, operation: 10, value: -500}}}
+
+      assert ^character = EventSink.emit(character, Event.spell_modifier(:pct, 30, 10, 0))
+
+      assert_receive {:"$gen_cast",
+                      {:send_packet, %Message.SmsgSetPctSpellModifier{effect_index: 30, operation: 10, value: 0}}}
+    end
+
     @tag :dbc_db
     test "a released judgement trigger delivers its encoded spell to the victim" do
       caster_guid = Guid.from_low_guid(:player, unique_guid())

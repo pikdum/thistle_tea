@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
   alias ThistleTea.Game.Aura
   alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Logic.Aura.HolderSync
   alias ThistleTea.Game.Entity.Logic.Aura.Lifecycle
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Event
@@ -62,7 +63,8 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
           if new_holders == holders do
             entity
           else
-            %{entity | unit: %{entity.unit | auras: new_holders}}
+            {entity, modifier_events} = HolderSync.sync(entity, new_holders)
+            Event.enqueue(entity, modifier_events)
           end
 
         {entity, events}

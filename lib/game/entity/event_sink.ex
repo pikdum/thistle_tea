@@ -292,6 +292,28 @@ defmodule ThistleTea.Game.Entity.EventSink do
 
   def emit(entity, %Event{type: :spell_cooldown}), do: entity
 
+  def emit(%Character{} = entity, %Event{type: :spell_modifier, modifier_type: :flat} = event) do
+    Network.send_packet(%Message.SmsgSetFlatSpellModifier{
+      effect_index: event.effect_index,
+      operation: event.operation,
+      value: event.amount
+    })
+
+    entity
+  end
+
+  def emit(%Character{} = entity, %Event{type: :spell_modifier, modifier_type: :pct} = event) do
+    Network.send_packet(%Message.SmsgSetPctSpellModifier{
+      effect_index: event.effect_index,
+      operation: event.operation,
+      value: event.amount
+    })
+
+    entity
+  end
+
+  def emit(entity, %Event{type: :spell_modifier}), do: entity
+
   def emit(%Character{} = entity, %Event{type: :cooldown_event} = event) do
     Network.send_packet(%Message.SmsgCooldownEvent{spell_id: event.spell_id, guid: event.source_guid})
     entity

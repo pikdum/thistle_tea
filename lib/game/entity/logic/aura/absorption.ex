@@ -8,8 +8,9 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Absorption do
   alias ThistleTea.Game.Aura
   alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.Component.Unit
-  alias ThistleTea.Game.Entity.Logic.Aura.UnitSync
+  alias ThistleTea.Game.Entity.Logic.Aura.HolderSync
   alias ThistleTea.Game.Entity.Logic.Core
+  alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.Spell
 
   @mana_per_absorbed_damage 2
@@ -31,7 +32,10 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Absorption do
       if kept == holders do
         entity
       else
-        %{entity | unit: UnitSync.sync_unit(%{entity.unit | auras: kept})}
+        {entity, modifier_events} = HolderSync.sync(entity, kept)
+
+        entity
+        |> Event.enqueue(modifier_events)
         |> Core.mark_broadcast_update()
       end
 

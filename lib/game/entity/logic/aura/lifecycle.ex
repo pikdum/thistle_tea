@@ -12,12 +12,12 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Lifecycle do
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.Aura.ControlSync
+  alias ThistleTea.Game.Entity.Logic.Aura.HolderSync
   alias ThistleTea.Game.Entity.Logic.Aura.MovementSync
   alias ThistleTea.Game.Entity.Logic.Aura.ObjectSync
   alias ThistleTea.Game.Entity.Logic.Aura.PlayerSync
   alias ThistleTea.Game.Entity.Logic.Aura.Script
   alias ThistleTea.Game.Entity.Logic.Aura.StealthSync
-  alias ThistleTea.Game.Entity.Logic.Aura.UnitSync
   alias ThistleTea.Game.Entity.Logic.Aura.ViewpointSync
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Event
@@ -202,10 +202,10 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Lifecycle do
     previous_holders = entity.unit.auras
     script_events = Script.after_remove(entity, removed)
     {entity, cooldown_events} = Cooldowns.activate_on_event(entity, removed, now)
-    unit = UnitSync.sync_unit(%{entity.unit | auras: kept})
+    {entity, modifier_events} = HolderSync.sync(entity, kept)
 
     entity =
-      %{entity | unit: unit}
+      entity
       |> ObjectSync.sync()
       |> PlayerSync.sync()
       |> StealthSync.sync()
@@ -216,7 +216,8 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Lifecycle do
     release_events = release_controlled_events(entity, removed)
 
     {Core.mark_broadcast_update(entity),
-     cooldown_events ++ script_events ++ control_events ++ viewpoint_events ++ release_events ++ events}
+     modifier_events ++
+       cooldown_events ++ script_events ++ control_events ++ viewpoint_events ++ release_events ++ events}
   end
 
   defp release_controlled_events(%{object: %{guid: owner_guid}, unit: %Unit{charm: controlled_guid}}, removed)
@@ -233,7 +234,10 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Lifecycle do
   defp entity_guid(_entity), do: nil
 
   defp sync_holders(entity, holders) do
-    %{entity | unit: UnitSync.sync_unit(%{entity.unit | auras: holders})}
+    {entity, modifier_events} = HolderSync.sync(entity, holders)
+
+    entity
+    |> Event.enqueue(modifier_events)
     |> Core.mark_broadcast_update()
   end
 

@@ -1,6 +1,9 @@
 defmodule ThistleTea.Game.World.Loader.SpellVmangosTest do
   use ExUnit.Case, async: false
 
+  alias ThistleTea.Game.Aura
+  alias ThistleTea.Game.Aura.Holder
+  alias ThistleTea.Game.Entity.Logic.Aura.ModifierSync
   alias ThistleTea.Game.Entity.Logic.SpellBook
   alias ThistleTea.Game.Entity.Logic.Trainer
   alias ThistleTea.Game.Spell
@@ -163,6 +166,18 @@ defmodule ThistleTea.Game.World.Loader.SpellVmangosTest do
       assert {[16_766], events} = SpellBook.learn([], talent_ranks, superseded_by)
       assert length(events) == 5
       assert %Spell{first_in_chain: 11_070, rank: 5} = SpellLoader.load(16_766)
+    end
+
+    test "cast-time talents expose the client modifier mask and total" do
+      improved_frostbolt = SpellLoader.load(16_766)
+      presence_of_mind = SpellLoader.load(12_043)
+
+      holders = [modifier_holder(improved_frostbolt), modifier_holder(presence_of_mind)]
+
+      assert ModifierSync.totals(holders) == %{
+               {:flat, 5, 10} => -500,
+               {:pct, 30, 10} => -100
+             }
     end
   end
 
@@ -448,5 +463,21 @@ defmodule ThistleTea.Game.World.Loader.SpellVmangosTest do
       assert Enum.all?([8071, 3599, 5394, 8512], &(&1 in shaman))
       assert Enum.all?([5487, 1066, 768], &(&1 in druid))
     end
+  end
+
+  defp modifier_holder(%Spell{} = spell) do
+    effect = Enum.find(spell.effects, &(&1.aura in [:add_flat_modifier, :add_pct_modifier]))
+
+    %Holder{
+      spell: spell,
+      auras: [
+        %Aura{
+          type: effect.aura,
+          amount: Effect.roll(effect, 0),
+          misc_value: effect.misc_value,
+          class_mask: effect.class_mask
+        }
+      ]
+    }
   end
 end
