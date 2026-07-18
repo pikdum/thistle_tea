@@ -66,11 +66,21 @@ defmodule ThistleTea.Game.Entity.Logic.Resources do
   def channel_cost(_entity, _spell, _tick_ms), do: 0
 
   def power_cost(entity, %Spell{mana_cost: cost, mana_cost_percent: percent, power_type: power_type} = spell) do
-    base = (cost || 0) + percent_cost(entity, power_type, percent)
-    Modifiers.integer_value(entity, spell, :cost, base)
+    if Spell.attribute?(spell, :use_all_mana) do
+      all_current_power(entity, power_type)
+    else
+      base = (cost || 0) + percent_cost(entity, power_type, percent)
+      Modifiers.integer_value(entity, spell, :cost, base)
+    end
   end
 
   def power_cost(_entity, _spell), do: 0
+
+  defp all_current_power(%{unit: %Unit{} = unit}, power_type) do
+    max(Map.get(unit, Map.get(@power_fields, power_type, :power1)) || 0, 0)
+  end
+
+  defp all_current_power(_entity, _power_type), do: 0
 
   defp percent_cost(entity, power_type, percent) when is_integer(percent) and percent > 0 do
     div(percent_cost_base(entity, power_type) * percent, 100)

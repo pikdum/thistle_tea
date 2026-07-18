@@ -216,14 +216,45 @@ defmodule ThistleTea.Game.Spell.Scripts do
 
   def aura_amount_override(_spell, _entity), do: nil
 
+  @dispel_poison 4
+  @mod_confuse_aura 5
+  @prevention_silence 1
+  @judgement_family_flags 0x20180400
+  @judgement_of_command_icon 561
+  @judgement_of_command_visual 5652
+  @positive_shout_flags_0 0x00010000
+  @positive_shout_flags_1 0x00008000
+
   def exclusive_category(row) do
+    generic_exclusive_category(row) || paladin_exclusive_category(row) || non_paladin_exclusive_category(row)
+  end
+
+  defp generic_exclusive_category(row) do
     cond do
       shapeshift_spell?(row) -> :shapeshift
       hunter_aspect?(row) -> :hunter_aspect
+      hunter_sting?(row) -> :hunter_sting
       shaman_shield?(row) -> :shaman_shield
       tracking_spell?(row) -> :tracking
-      true -> paladin_exclusive_category(row) || non_paladin_exclusive_category(row)
+      mage_polymorph?(row) -> :mage_polymorph
+      positive_shout?(row) -> :positive_shout
+      true -> nil
     end
+  end
+
+  defp hunter_sting?(row) do
+    row.spell_class_set == @spell_family_hunter and row.dispel_type == @dispel_poison
+  end
+
+  defp mage_polymorph?(row) do
+    row.spell_class_set == @spell_family_mage and Map.get(row, :effect_aura_0) == @mod_confuse_aura and
+      Map.get(row, :prevention_type) == @prevention_silence
+  end
+
+  defp positive_shout?(row) do
+    row.spell_class_set == @spell_family_warrior and
+      (((row.spell_class_mask_0 || 0) &&& @positive_shout_flags_0) != 0 or
+         ((row.spell_class_mask_1 || 0) &&& @positive_shout_flags_1) != 0)
   end
 
   defp shapeshift_spell?(row) do
@@ -278,9 +309,15 @@ defmodule ThistleTea.Game.Spell.Scripts do
     cond do
       paladin_family_flag?(row, @paladin_seal_family_flags) -> :paladin_seal
       paladin_family_flag?(row, @paladin_blessing_family_flags) -> :paladin_blessing
+      paladin_judgement_debuff?(row) -> :paladin_judgement
       paladin_area_aura?(row) -> :paladin_aura
       true -> nil
     end
+  end
+
+  defp paladin_judgement_debuff?(row) do
+    (paladin_family_flag?(row, @judgement_family_flags) and (Map.get(row, :base_level) || 0) != 0) or
+      (row.spell_icon == @judgement_of_command_icon and row.spell_visual_0 == @judgement_of_command_visual)
   end
 
   defp paladin_family_flag?(row, mask) do

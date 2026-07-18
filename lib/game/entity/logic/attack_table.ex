@@ -108,6 +108,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
       always_crush?: Map.get(attack, :always_crush?, false),
       spell_swing?: is_integer(Map.get(attack, :queued_spell_id)),
       block_allowed?: Map.get(attack, :block_allowed?, true),
+      ranged?: Map.get(attack, :ranged?, false),
       physical?: physical_school?(Map.get(attack, :spell_school_mask)),
       skill_diff: skill_diff,
       defender_level: defender_level,
@@ -195,6 +196,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
     |> bp()
   end
 
+  defp dodge_bp(%{ranged?: true}), do: 0
   defp dodge_bp(%{avoidance_disabled?: true}), do: 0
   defp dodge_bp(%{defender_player?: true, from_behind?: true}), do: 0
 
@@ -213,6 +215,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
     |> bp()
   end
 
+  defp parry_bp(%{ranged?: true}), do: 0
   defp parry_bp(%{avoidance_disabled?: true}), do: 0
   defp parry_bp(%{from_behind?: true}), do: 0
 

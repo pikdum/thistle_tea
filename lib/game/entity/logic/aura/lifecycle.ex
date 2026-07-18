@@ -153,20 +153,29 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Lifecycle do
 
   def cancel_spell(entity, _spell_id, _now), do: {entity, []}
 
-  def dispel(entity, dispel_type, now, polarity \\ nil)
+  def dispel(entity, dispel_type, now, polarity \\ nil, count \\ 1)
 
-  def dispel(%{unit: %Unit{auras: holders}} = entity, dispel_type, now, polarity)
-      when is_list(holders) and holders != [] and is_integer(dispel_type) do
-    case dispel_index(holders, dispel_type, polarity) do
-      nil ->
+  def dispel(%{unit: %Unit{auras: holders}} = entity, dispel_type, now, polarity, count)
+      when is_list(holders) and holders != [] and is_integer(dispel_type) and is_integer(count) and count > 0 do
+    holders
+    |> dispel_indexes(dispel_type, polarity)
+    |> Enum.take_random(count)
+    |> case do
+      [] ->
         {entity, []}
 
-      index ->
-        remove_and_sync(entity, List.delete_at(holders, index), now)
+      indexes ->
+        kept =
+          holders
+          |> Enum.with_index()
+          |> Enum.reject(fn {_holder, index} -> index in indexes end)
+          |> Enum.map(&elem(&1, 0))
+
+        remove_and_sync(entity, kept, now)
     end
   end
 
-  def dispel(entity, _dispel_type, _now, _polarity), do: {entity, []}
+  def dispel(entity, _dispel_type, _now, _polarity, _count), do: {entity, []}
 
   def break_on_damage(%{unit: %Unit{auras: holders}} = entity, now) when is_list(holders) and holders != [] do
     {removed, kept} =
@@ -245,14 +254,17 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Lifecycle do
     for %Holder{spell: %Spell{id: id}} = holder <- holders, stealth_holder?(holder), do: id
   end
 
-  defp dispel_index(holders, dispel_type, polarity) do
+  defp dispel_indexes(holders, dispel_type, polarity) do
     matches_type? = fn %Holder{spell: %Spell{dispel_type: dt}} -> dt == dispel_type end
 
-    case polarity do
-      :negative -> Enum.find_index(holders, &(matches_type?.(&1) and &1.negative?))
-      :positive -> Enum.find_index(holders, &(matches_type?.(&1) and not &1.negative?))
-      _ -> Enum.find_index(holders, matches_type?)
-    end
+    matcher =
+      case polarity do
+        :negative -> &(matches_type?.(&1) and &1.negative?)
+        :positive -> &(matches_type?.(&1) and not &1.negative?)
+        _ -> matches_type?
+      end
+
+    for {holder, index} <- Enum.with_index(holders), matcher.(holder), do: index
   end
 
   def duration_event(%Holder{slot: slot, expires_at: expires_at}, now)

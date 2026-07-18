@@ -1445,6 +1445,49 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
     }
   end
 
+  describe "sting and dispel mechanics" do
+    defp sting_fixture(id) do
+      %Spell{
+        id: id,
+        exclusive_category: :hunter_sting,
+        duration_ms: 15_000,
+        dispel_type: 4,
+        attributes: MapSet.new([:negative]),
+        effects: [%Effect{index: 0, type: :apply_aura, aura: :periodic_damage, base_points: 10, amplitude_ms: 3_000}]
+      }
+    end
+
+    test "hunter stings are exclusive per caster" do
+      entity = fixture_entity()
+
+      {entity, _events} = apply_spell(entity, 100, 60, sting_fixture(1978))
+      {entity, _events} = apply_spell(entity, 100, 60, sting_fixture(3034))
+      {entity, _events} = apply_spell(entity, 200, 60, sting_fixture(1978))
+
+      assert [%Holder{caster_guid: 100, spell: %Spell{id: 3034}}, %Holder{caster_guid: 200}] = entity.unit.auras
+    end
+
+    test "dispel removes as many auras as the effect's base points" do
+      entity = fixture_entity()
+
+      magic_buff = fn id ->
+        %Spell{
+          id: id,
+          duration_ms: 30_000,
+          dispel_type: 1,
+          effects: [%Effect{index: 0, type: :apply_aura, aura: :mod_stat, base_points: 3}]
+        }
+      end
+
+      {entity, _events} = apply_spell(entity, 1, 60, magic_buff.(1243))
+      {entity, _events} = apply_spell(entity, 1, 60, magic_buff.(14_752))
+
+      {entity, _events} = Aura.dispel(entity, 1, 2_000, nil, 2)
+
+      assert entity.unit.auras == []
+    end
+  end
+
   describe "cat form energy" do
     test "entering cat form zeroes energy and later auras do not refill it" do
       entity = fixture_entity()

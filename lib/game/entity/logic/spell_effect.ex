@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   """
   import Bitwise, only: [&&&: 2]
 
+  alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.ScriptStep
   alias ThistleTea.Game.Entity.Logic.AttackTable
@@ -117,7 +118,11 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   end
 
   defp melee_roll_required?(%{object: %{guid: target_guid}}, %CastContext{caster_guid: caster_guid}, spell) do
-    Spell.melee_ability?(spell) and target_guid != caster_guid
+    (Spell.melee_ability?(spell) or ranged_weapon_ability?(spell)) and target_guid != caster_guid
+  end
+
+  defp ranged_weapon_ability?(%Spell{effects: effects} = spell) do
+    Spell.ranged_ability?(spell) and Enum.any?(effects, &(&1.type in @weapon_effect_types))
   end
 
   defp receive_melee_ability(target, %CastContext{} = context, spell, now) do
@@ -286,9 +291,11 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   end
 
   defp apply_effect(state, %CastContext{} = context, spell, %Effect{type: :health_leech} = effect, now) do
+    health_before = max(state.unit.health || 0, 0)
     {state, events} = apply_damage_effect(state, context, spell, effect, now)
-    damage = dealt_damage(events)
-    {state, events ++ if(damage > 0, do: [Event.heal_entity(context.caster_guid, damage)], else: [])}
+    damage = min(dealt_damage(events), health_before)
+    healed = trunc(damage * leech_multiplier(effect))
+    {state, events ++ if(healed > 0, do: [Event.heal_entity(context.caster_guid, healed)], else: [])}
   end
 
   defp apply_effect(state, %CastContext{} = context, spell, %Effect{type: :instakill}, now) do
@@ -481,13 +488,14 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
         Paladin.blessing_of_light_bonus(state, spell)
 
     healing = max(trunc(healing * healing_taken_multiplier(state, spell)), 0)
+    healing = if heal_crit?(context, spell), do: healing + div(healing, 2), else: healing
     events = Threat.heal_threat_events(state, context.caster_guid, healing)
 
     {Core.heal(state, healing), swiftmend_events ++ events}
   end
 
   defp apply_effect(state, %CastContext{} = context, _spell, %Effect{type: :heal_max_health}, _now) do
-    healing = max((state.unit.max_health || 0) - (state.unit.health || 0), 0)
+    healing = max(context.caster_max_health || state.unit.max_health || 0, 0)
     events = Threat.heal_threat_events(state, context.caster_guid, healing)
     {Core.heal(state, healing), events}
   end
@@ -583,13 +591,18 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
          state,
          %CastContext{caster_guid: caster_guid} = context,
          spell,
-         %Effect{type: :power_drain} = effect,
+         %Effect{type: :power_drain, misc_value: power_type} = effect,
          _now
        ) do
-    available = max(state.unit.power1 || 0, 0)
-    drained = min(rolled_amount(spell, effect, context), available)
-    unit = %{state.unit | power1: available - drained}
-    {%{state | unit: unit}, [Event.grant_power(caster_guid, 0, drained)]}
+    if state.unit.power_type == power_type do
+      available = max(current_power(state.unit, power_type) || 0, 0)
+      drained = min(rolled_amount(spell, effect, context), available)
+      unit = put_power(state.unit, power_type, available - drained)
+      gained = trunc(drained * leech_multiplier(effect))
+      {%{state | unit: unit}, [Event.grant_power(caster_guid, 0, gained)]}
+    else
+      {state, []}
+    end
   end
 
   defp apply_effect(state, %CastContext{}, spell, %Effect{type: :interrupt_cast}, now) do
@@ -613,9 +626,27 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
     end
   end
 
-  defp apply_effect(state, %CastContext{} = context, spell, %Effect{type: :dispel, misc_value: dispel_type}, now) do
+  defp apply_effect(state, %CastContext{}, _spell, %Effect{type: :dispel_mechanic, misc_value: mechanic}, now)
+       when is_integer(mechanic) and mechanic > 0 do
+    spell_ids =
+      for %Holder{spell: %Spell{id: id, mechanic: ^mechanic}} <- state.unit.auras || [], do: id
+
+    case spell_ids do
+      [] -> {state, []}
+      ids -> Aura.remove_spells(state, ids, now)
+    end
+  end
+
+  defp apply_effect(
+         state,
+         %CastContext{} = context,
+         spell,
+         %Effect{type: :dispel, misc_value: dispel_type} = effect,
+         now
+       ) do
     aura_count = length(state.unit.auras || [])
-    {state, events} = Aura.dispel(state, dispel_type, now, dispel_polarity(context))
+    count = max(rolled_amount(spell, effect, context), 1)
+    {state, events} = Aura.dispel(state, dispel_type, now, dispel_polarity(context), count)
 
     case {length(state.unit.auras || []) < aura_count, Warlock.devour_magic_heal(spell)} do
       {true, heal_spell_id} when is_integer(heal_spell_id) ->
@@ -626,6 +657,11 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
       _other ->
         {state, events}
     end
+  end
+
+  defp apply_effect(state, %CastContext{}, _spell, %Effect{type: :power_burn, misc_value: power_type}, _now)
+       when state.unit.power_type != power_type do
+    {state, []}
   end
 
   defp apply_effect(state, %CastContext{} = context, spell, %Effect{type: :power_burn} = effect, now) do
@@ -822,7 +858,11 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   end
 
   defp remove_vanish_stalked(state, %Spell{} = spell, now) do
-    if Scripts.rogue_vanish?(spell), do: Aura.remove_aura_types(state, [:mod_stalked], now), else: {state, []}
+    if Scripts.rogue_vanish?(spell) do
+      Aura.remove_aura_types(state, [:mod_stalked, :mod_root, :mod_decrease_speed], now)
+    else
+      {state, []}
+    end
   end
 
   defp vanish_stealth_events(%{object: %{guid: guid}, unit: %{level: level}, internal: %{spellbook: spellbook}})
@@ -869,6 +909,31 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
 
   defp burn_multiplier(%Effect{multiple_value: multiple}) when is_number(multiple) and multiple > 0, do: multiple
   defp burn_multiplier(_effect), do: 1.0
+
+  defp leech_multiplier(%Effect{multiple_value: multiple}) when is_number(multiple) and multiple > 0, do: multiple
+  defp leech_multiplier(_effect), do: 1.0
+
+  defp heal_crit?(%CastContext{spell_crit_chance: chance}, %Spell{} = spell) when is_number(chance) and chance > 0 do
+    not Spell.attribute?(spell, :cant_crit) and (chance >= 100 or :rand.uniform() * 100 <= chance)
+  end
+
+  defp heal_crit?(_context, _spell), do: false
+
+  @power_fields %{0 => :power1, 1 => :power2, 2 => :power3, 3 => :power4, 4 => :power5}
+
+  defp current_power(unit, power_type) do
+    case Map.fetch(@power_fields, power_type) do
+      {:ok, field} -> Map.get(unit, field)
+      :error -> nil
+    end
+  end
+
+  defp put_power(unit, 0, value), do: %{unit | power1: value}
+  defp put_power(unit, 1, value), do: %{unit | power2: value}
+  defp put_power(unit, 2, value), do: %{unit | power3: value}
+  defp put_power(unit, 3, value), do: %{unit | power4: value}
+  defp put_power(unit, 4, value), do: %{unit | power5: value}
+  defp put_power(unit, _power_type, _value), do: unit
 
   defp dispel_polarity(%CastContext{target_hostile?: true}), do: :positive
   defp dispel_polarity(%CastContext{target_hostile?: false}), do: :negative
@@ -1180,7 +1245,8 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
       crit_chance: context.melee_crit_chance,
       caster_position: attack_position(context.caster_position),
       spell_school_mask: Spell.school_mask(spell),
-      block_allowed?: Spell.attribute?(spell, :completely_blocked)
+      block_allowed?: Spell.attribute?(spell, :completely_blocked),
+      ranged?: Spell.ranged_ability?(spell)
     }
   end
 

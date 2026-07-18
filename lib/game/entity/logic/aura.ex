@@ -35,7 +35,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
   defdelegate remove_aura_types(entity, aura_types, now), to: Lifecycle
   defdelegate remove_source_spell(entity, spell_id, caster_guid, now), to: Lifecycle
   defdelegate cancel_spell(entity, spell_id, now), to: Lifecycle
-  defdelegate dispel(entity, dispel_type, now, polarity \\ nil), to: Lifecycle
+  defdelegate dispel(entity, dispel_type, now, polarity \\ nil, count \\ 1), to: Lifecycle
   defdelegate break_on_damage(entity, now), to: Lifecycle
 
   defdelegate enqueue_death_item_rewards(entity, old_health, new_health), to: DeathItem, as: :enqueue_rewards

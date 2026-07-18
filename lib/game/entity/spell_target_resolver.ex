@@ -72,14 +72,31 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
            (:mobs |> World.nearby_units_exact(map, {x, y, z}, @chain_jump_radius)))
         |> Enum.reject(fn {guid, _distance} -> guid in selected end)
         |> Enum.filter(fn {guid, _distance} -> valid_chain_target?(caster, spell, guid) end)
-        |> Enum.min_by(&elem(&1, 1), fn -> nil end)
-        |> case do
-          {guid, _distance} -> guid
-          nil -> nil
-        end
+        |> pick_chain_target(spell)
 
       _ ->
         nil
+    end
+  end
+
+  defp pick_chain_target(candidates, %Spell{} = spell) do
+    picked =
+      if Spell.requires_hostile_target?(spell) do
+        Enum.min_by(candidates, &elem(&1, 1), fn -> nil end)
+      else
+        Enum.min_by(candidates, &health_pct(elem(&1, 0)), fn -> nil end)
+      end
+
+    case picked do
+      {guid, _distance} -> guid
+      nil -> nil
+    end
+  end
+
+  defp health_pct(guid) do
+    case Metadata.query(guid, [:health_pct]) do
+      %{health_pct: pct} when is_number(pct) -> pct
+      _ -> 100.0
     end
   end
 
@@ -123,6 +140,9 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
 
       {:party_aoe, radius} ->
         nearby_party_guids(caster, caster_guid, radius)
+
+      {:party_class_aoe, class_guid, radius} ->
+        party_class_guids(caster, caster_guid, class_guid, radius)
 
       {:unit, guid} ->
         [guid]
@@ -231,6 +251,21 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
     case Metadata.query(guid, [:alive?]) do
       %{alive?: alive?} -> alive? == true
       _ -> false
+    end
+  end
+
+  defp party_class_guids(caster, caster_guid, class_guid, radius) do
+    reference_class = metadata_class(class_guid || caster_guid)
+
+    caster
+    |> nearby_party_guids(caster_guid, radius)
+    |> Enum.filter(&(reference_class != nil and metadata_class(&1) == reference_class))
+  end
+
+  defp metadata_class(guid) do
+    case Metadata.query(guid, [:class]) do
+      %{class: class} when is_integer(class) -> class
+      _ -> nil
     end
   end
 

@@ -709,6 +709,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
   @spell_miss_reason_resist 2
 
   defp roll_spell_hits(_caster, %Spell{dmg_class: 2}, targets), do: {targets, []}
+  defp roll_spell_hits(_caster, %Spell{dmg_class: 3}, targets), do: {targets, []}
 
   defp roll_spell_hits(%{object: %{guid: caster_guid}} = caster, %Spell{} = spell, targets) do
     if Spell.harmful?(spell) do

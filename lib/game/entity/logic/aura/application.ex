@@ -274,6 +274,20 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
     existing_caster == incoming_caster
   end
 
+  defp exclusive_category_conflict?(
+         %Holder{spell: %Spell{exclusive_category: :hunter_sting}, caster_guid: existing_caster},
+         %Holder{spell: %Spell{exclusive_category: :hunter_sting}, caster_guid: incoming_caster}
+       ) do
+    existing_caster == incoming_caster
+  end
+
+  defp exclusive_category_conflict?(
+         %Holder{spell: %Spell{exclusive_category: :paladin_judgement}, caster_guid: existing_caster},
+         %Holder{spell: %Spell{exclusive_category: :paladin_judgement}, caster_guid: incoming_caster}
+       ) do
+    existing_caster == incoming_caster
+  end
+
   defp exclusive_category_conflict?(%Holder{spell: existing}, %Holder{spell: incoming}) do
     Spell.same_exclusive_category?(existing, incoming)
   end

@@ -26,6 +26,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
   @normalized_dagger 1.7
   @normalized_one_hand 2.4
   @normalized_unarmed 2.0
+  @normalized_ranged 2.8
 
   defstruct [
     :caster_guid,
@@ -52,6 +53,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
     :spell_crit_chance,
     :shield_block_value,
     :caster_power,
+    :caster_max_health,
     :combo_points,
     :spell_threat,
     spell_modifiers: [],
@@ -86,6 +88,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
       effect_damage_multiplier: effect_multiplier(caster, spell, [:all_effects, :damage]),
       effect_healing_multiplier: healing_done_multiplier(caster, spell),
       spell_crit_chance: spell_crit_chance(caster, spell),
+      caster_max_health: caster.unit.max_health,
       hit_chance_bonus: Aura.flat_amount(caster, :mod_hit_chance)
     }
     |> put_melee_snapshot(caster, spell)
@@ -146,6 +149,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
             weapon_base_min: caster.unit.base_ranged_min_damage || caster.unit.min_ranged_damage || 0,
             weapon_base_max: caster.unit.base_ranged_max_damage || caster.unit.max_ranged_damage || 0,
             attack_time_ms: caster.unit.ranged_attack_time,
+            normalized_speed: @normalized_ranged,
             attack_skill: ranged_attack_skill(caster),
             melee_crit_chance: ranged_crit_chance(caster, spell),
             spell_crit_chance: ranged_crit_chance(caster, spell)

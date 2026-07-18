@@ -560,6 +560,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp effect_type(96), do: :charge
   defp effect_type(101), do: :feed_pet
   defp effect_type(102), do: :dismiss_pet
+  defp effect_type(108), do: :dispel_mechanic
   defp effect_type(109), do: :revive_pet
   defp effect_type(112), do: :summon_demon
   defp effect_type(92), do: :enchant_held_item
@@ -715,7 +716,9 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp target_type(28), do: :aoe_enemy_at_channel
   defp target_type(32), do: :minion_position
   defp target_type(5), do: :pet
+  defp target_type(45), do: :target_ally
   defp target_type(53), do: :aoe_enemy_at_dest
+  defp target_type(61), do: :raid_and_class
   defp target_type(other) when is_integer(other), do: other
 
   @on_next_swing_1 0x00000004
@@ -730,6 +733,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   @cooldown_on_event 0x02000000
   @allow_while_not_shapeshifted_ex2 0x00080000
   @dot_stacking_rule_ex3 0x00000080
+  @use_all_mana_ex_1 0x00000002
   @channeled_ex_1 0x00000004
   @channeled_ex_2 0x00000040
   @immunity_purges_effect_ex_1 0x00008000
@@ -763,6 +767,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
     base = if from_behind?(attrs_ex1, attrs_ex2), do: MapSet.put(base, :from_behind), else: base
 
     base
+    |> add_if(attrs_ex1, @use_all_mana_ex_1, :use_all_mana)
     |> add_if(attrs_ex1, @channeled_ex_1, :channeled)
     |> add_if(attrs_ex1, @channeled_ex_2, :channeled)
     |> add_if(attrs_ex1, @immunity_purges_effect_ex_1, :immunity_purges_effect)

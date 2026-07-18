@@ -55,7 +55,8 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
         weapon_base_min: 10,
         weapon_base_max: 10,
         melee_crit_chance: 0.0,
-        spell_crit_chance: 0.0
+        spell_crit_chance: 0.0,
+        hit_chance_bonus: 100
       }
 
       mark = %Holder{
@@ -122,6 +123,30 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
       {_target, events} = SpellEffect.receive(target, context, spell, 1_000)
 
       assert [%{type: :spell_damage, damage: 172}] = Enum.filter(events, &(&1.type == :spell_damage))
+    end
+
+    test "heals can crit for one and a half times the amount" do
+      spell = %Spell{id: 635, school: :holy, effects: [%Effect{index: 0, type: :heal, base_points: 100}]}
+      target = %{target_fixture() | unit: %Unit{health: 100, max_health: 500, level: 10, auras: []}}
+
+      context = %CastContext{caster_guid: 999, caster_level: 10, spell_crit_chance: 100.0}
+      {crit_target, _events} = SpellEffect.receive(target, context, spell, 1_000)
+
+      context = %CastContext{caster_guid: 999, caster_level: 10, spell_crit_chance: 0.0}
+      {plain_target, _events} = SpellEffect.receive(target, context, spell, 1_000)
+
+      assert plain_target.unit.health == 200
+      assert crit_target.unit.health == 250
+    end
+
+    test "heal_max_health heals by the caster's maximum health" do
+      spell = %Spell{id: 633, school: :holy, effects: [%Effect{index: 0, type: :heal_max_health}]}
+      target = %{target_fixture() | unit: %Unit{health: 100, max_health: 4_000, level: 60, auras: []}}
+
+      context = %CastContext{caster_guid: 999, caster_level: 60, caster_max_health: 1_500}
+      {target, _events} = SpellEffect.receive(target, context, spell, 1_000)
+
+      assert target.unit.health == 1_600
     end
 
     test "direct magic damage uses the snapshotted spell crit chance" do

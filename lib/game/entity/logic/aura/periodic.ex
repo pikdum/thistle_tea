@@ -140,20 +140,30 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
 
   defp tick_aura(entity, %Holder{} = holder, %Aura{type: :periodic_mana_leech, next_tick_at: at} = aura, now)
        when is_integer(at) and now >= at do
-    available = max(entity.unit.power1 || 0, 0)
-    drained = min(max(aura.amount, 0), available)
-    entity = %{entity | unit: %{entity.unit | power1: available - drained}}
+    {entity, events} =
+      if entity.unit.power_type == (aura.misc_value || 0) do
+        available = max(entity.unit.power1 || 0, 0)
+        drained = min(max(aura.amount, 0), available)
+        entity = %{entity | unit: %{entity.unit | power1: available - drained}}
 
-    events =
-      if drained > 0 do
-        [
-          Event.grant_power(holder.caster_guid, 0, drained),
-          Event.periodic_aura_log(holder.caster_guid, entity.object.guid, holder.spell, :periodic_energize, drained,
-            misc_value: 0
-          )
-        ]
+        multiplier = if is_number(aura.multiple_value) and aura.multiple_value > 0, do: aura.multiple_value, else: 1.0
+        gained = trunc(drained * multiplier)
+
+        events =
+          if drained > 0 do
+            [
+              Event.grant_power(holder.caster_guid, 0, gained),
+              Event.periodic_aura_log(holder.caster_guid, entity.object.guid, holder.spell, :periodic_energize, drained,
+                misc_value: 0
+              )
+            ]
+          else
+            []
+          end
+
+        {entity, events}
       else
-        []
+        {entity, []}
       end
 
     {entity, %{aura | next_tick_at: advance_tick(at, aura.amplitude_ms, now)}, events}

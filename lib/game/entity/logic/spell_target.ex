@@ -23,6 +23,9 @@ defmodule ThistleTea.Game.Entity.Logic.SpellTarget do
       party_aoe_spell?(spell) ->
         {:party_aoe, max_aoe_radius(spell)}
 
+      raid_class_aoe_spell?(spell) ->
+        {:party_class_aoe, targets.unit_guid, raid_class_radius(spell)}
+
       is_integer(targets.unit_guid) ->
         {:unit, targets.unit_guid}
 
@@ -79,6 +82,17 @@ defmodule ThistleTea.Game.Entity.Logic.SpellTarget do
 
   defp party_aoe_spell?(%Spell{effects: effects}) do
     Enum.any?(effects, &effect_targets?(&1, [:party_around_caster]))
+  end
+
+  defp raid_class_aoe_spell?(%Spell{effects: effects}) do
+    Enum.any?(effects, &effect_targets?(&1, [:raid_and_class]))
+  end
+
+  defp raid_class_radius(%Spell{} = spell) do
+    case max_aoe_radius(spell) do
+      radius when is_number(radius) and radius > 0 -> radius
+      _ -> spell.range_yards || 40.0
+    end
   end
 
   defp effect_targets?(%Effect{} = effect, targets) do
