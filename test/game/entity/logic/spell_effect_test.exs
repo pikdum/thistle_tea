@@ -48,10 +48,10 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
 
       context = %CastContext{
         caster_guid: 999,
-        caster_level: 60,
+        caster_level: 1,
         attack_power: 0,
         attack_time_ms: 1_400,
-        attack_skill: 300,
+        attack_skill: 5,
         weapon_base_min: 10,
         weapon_base_max: 10,
         melee_crit_chance: 0.0,

@@ -551,6 +551,59 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
       assert_in_delta speed, 4.9, 0.000001
     end
 
+    test "overlapping slows apply only the strongest one" do
+      entity = %{
+        fixture_entity()
+        | movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}, run_speed: 7.0, base_run_speed: 7.0}
+      }
+
+      slow = fn id, amount ->
+        %Spell{
+          id: id,
+          school: :frost,
+          duration_ms: 8_000,
+          effects: [%Effect{index: 0, type: :apply_aura, base_points: amount, aura: :mod_decrease_speed}]
+        }
+      end
+
+      {entity, _events} = apply_spell(entity, 1, 1, slow.(120, -50))
+      {entity, _events} = apply_spell(entity, 1, 1, slow.(11_113, -70))
+
+      assert_in_delta entity.movement_block.run_speed, 7.0 * 0.3, 0.000001
+    end
+
+    test "the strongest speed buff multiplies with the strongest slow" do
+      entity = %{
+        fixture_entity()
+        | movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}, run_speed: 7.0, base_run_speed: 7.0}
+      }
+
+      sprint = %Spell{
+        id: 2983,
+        duration_ms: 15_000,
+        effects: [%Effect{index: 0, type: :apply_aura, base_points: 50, aura: :mod_increase_speed}]
+      }
+
+      cheetah = %Spell{
+        id: 5118,
+        duration_ms: -1,
+        effects: [%Effect{index: 0, type: :apply_aura, base_points: 30, aura: :mod_increase_speed}]
+      }
+
+      chill = %Spell{
+        id: 120,
+        school: :frost,
+        duration_ms: 8_000,
+        effects: [%Effect{index: 0, type: :apply_aura, base_points: -50, aura: :mod_decrease_speed}]
+      }
+
+      {entity, _events} = apply_spell(entity, 1, 1, sprint)
+      {entity, _events} = apply_spell(entity, 1, 1, cheetah)
+      {entity, _events} = apply_spell(entity, 1, 1, chill)
+
+      assert_in_delta entity.movement_block.run_speed, 7.0 * 1.5 * 0.5, 0.000001
+    end
+
     test "expiring mod_decrease_speed restores base movement speeds" do
       entity = %{
         fixture_entity()
