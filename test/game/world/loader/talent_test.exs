@@ -2,6 +2,7 @@ defmodule ThistleTea.Game.World.Loader.TalentTest do
   use ExUnit.Case, async: false
 
   alias ThistleTea.Game.Entity.Data.Talent, as: TalentData
+  alias ThistleTea.Game.Entity.Logic.Talents
   alias ThistleTea.Game.World.Loader.Talent, as: TalentLoader
 
   @moduletag :dbc_db
@@ -39,6 +40,8 @@ defmodule ThistleTea.Game.World.Loader.TalentTest do
              rank: 2,
              req_spell: nil
            }
+
+    assert Talents.known_talent_spell_ids([21_553]) == [21_553]
   end
 
   test "talent ranks form a replacement chain" do
