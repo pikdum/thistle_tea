@@ -36,6 +36,16 @@ defmodule ThistleTea.Game.Player.Talents do
 
   def reset(state), do: state
 
+  def reset_if_overbudget(%{character: %Character{internal: internal}} = state, level) when is_integer(level) do
+    if LogicTalents.spent_points(internal.spells || []) > LogicTalents.total_points(level) do
+      reset(state)
+    else
+      state
+    end
+  end
+
+  def reset_if_overbudget(state, _level), do: state
+
   defp commit(state, %Character{} = character) do
     character =
       character

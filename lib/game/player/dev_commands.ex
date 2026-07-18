@@ -623,14 +623,25 @@ defmodule ThistleTea.Game.Player.DevCommands do
   end
 
   defp set_level(%{character: %Character{}} = state, level) do
-    with {:ok, level} <- parse_positive_integer(level),
-         {:ok, character, level_up} <- set_character_level(state.character, level) do
-      state
-      |> maybe_send_level_up(level_up)
-      |> put_character(character)
-      |> system_message("Level set to #{character.unit.level}.")
-    else
-      _ -> system_message(state, "Invalid level.")
+    case parse_positive_integer(level) do
+      {:ok, level} ->
+        level = min(level, Stats.max_level())
+
+        case set_character_level(state.character, level) do
+          {:ok, character, level_up} ->
+            state = Talents.reset_if_overbudget(%{state | character: character}, level)
+
+            state
+            |> maybe_send_level_up(level_up)
+            |> put_character(state.character)
+            |> system_message("Level set to #{state.character.unit.level}.")
+
+          _ ->
+            system_message(state, "Invalid level.")
+        end
+
+      _ ->
+        system_message(state, "Invalid level.")
     end
   end
 
