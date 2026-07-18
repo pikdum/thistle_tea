@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackFeedback do
   alias ThistleTea.Game.Entity.Logic.Paladin
   alias ThistleTea.Game.Entity.Logic.Reactive
   alias ThistleTea.Game.Entity.Logic.Resources
+  alias ThistleTea.Game.Entity.Logic.Rogue
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.Spell.Scripts
@@ -94,7 +95,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackFeedback do
 
   defp blade_flurry_damage_spell(%{unit: %{auras: holders}}, proc_type) when is_list(holders) do
     Enum.find_value(holders, fn %Holder{spell: spell} ->
-      if Scripts.rogue_blade_flurry?(spell) and Spell.procs_on?(spell, proc_type) do
+      if Rogue.blade_flurry?(spell) and Spell.procs_on?(spell, proc_type) do
         blade_flurry_trigger_id(spell)
       end
     end)

@@ -262,11 +262,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
     Event.enqueue(character, events)
   end
 
-  defp consume_spell_modifiers(character, %Cast{spell: %Spell{} = spell}, now) do
-    spell_ids = Modifiers.consumable_holder_ids(character, spell)
-    {character, events} = AuraLogic.spend_spell_charges(character, spell_ids, now)
-    Event.enqueue(character, events)
-  end
+  defp consume_spell_modifiers(character, %Cast{}, _now), do: character
 
   defp consume_unavoidable_finisher(character, %Cast{spell: %Spell{} = spell}) do
     if Scripts.finisher?(spell) and not Spell.melee_ability?(spell) do

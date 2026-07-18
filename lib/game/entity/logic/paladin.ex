@@ -27,6 +27,32 @@ defmodule ThistleTea.Game.Entity.Logic.Paladin do
   @blessing_of_light_family_mask 0x10000000
   @holy_light_family_mask 0x80000000
   @flash_of_light_family_mask 0x40000000
+  @judgement_aura_family_mask 0x00080000
+  @forbearance 25_771
+
+  @holy_shock %{
+    20_473 => %{damage: 25_912, heal: 25_914},
+    20_929 => %{damage: 25_911, heal: 25_913},
+    20_930 => %{damage: 25_902, heal: 25_903}
+  }
+
+  @judgement_procs %{
+    20_185 => 20_267,
+    20_344 => 20_341,
+    20_345 => 20_342,
+    20_346 => 20_343,
+    20_186 => 20_268,
+    20_354 => 20_352,
+    20_355 => 20_353
+  }
+
+  def forbearance_id, do: @forbearance
+
+  def holy_shock_ids(spell_id), do: Map.get(@holy_shock, spell_id)
+
+  def judgement_proc_aura?(%Spell{} = spell), do: Spell.family_flag?(spell, @spell_family, @judgement_aura_family_mask)
+
+  def judgement_proc_id(spell_id), do: Map.get(@judgement_procs, spell_id)
 
   def release_seal(
         %{object: %{guid: caster_guid}, unit: %Unit{auras: holders}} = entity,

@@ -3,8 +3,6 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   Applies a cast spell's effects (damage, healing, auras, item creation, …) to
   a target entity, returning the updated entity and the events to emit.
   """
-  import Bitwise, only: [&&&: 2]
-
   alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.ScriptStep
@@ -15,10 +13,12 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   alias ThistleTea.Game.Entity.Logic.Druid
   alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.Entity.Logic.Hunter
+  alias ThistleTea.Game.Entity.Logic.Mage
   alias ThistleTea.Game.Entity.Logic.Paladin
   alias ThistleTea.Game.Entity.Logic.PlayerCombat
   alias ThistleTea.Game.Entity.Logic.Reactive
   alias ThistleTea.Game.Entity.Logic.Resources
+  alias ThistleTea.Game.Entity.Logic.Rogue
   alias ThistleTea.Game.Entity.Logic.SpellResist
   alias ThistleTea.Game.Entity.Logic.Threat
   alias ThistleTea.Game.Entity.Logic.Warlock
@@ -781,7 +781,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   end
 
   defp apply_class_dummy(state, _context, _spell, _effect, :preparation, _now) do
-    {Cooldowns.reset_family(state, Scripts.rogue_spell_family()), []}
+    {Cooldowns.reset_family(state, Rogue.spell_family()), []}
   end
 
   defp apply_class_dummy(state, _context, spell, _effect, :hunter_cooldowns, _now) do
@@ -793,7 +793,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   end
 
   defp apply_class_dummy(state, _context, _spell, _effect, :mage_cold_snap, _now) do
-    {Cooldowns.reset_matching(state, &mage_frost_cooldown?/1), []}
+    {Cooldowns.reset_matching(state, &Mage.frost_cooldown?/1), []}
   end
 
   defp apply_class_dummy(state, context, _spell, _effect, {:holy_shock, spell_ids}, _now) do
@@ -812,12 +812,6 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   end
 
   defp apply_class_dummy(state, _context, _spell, _effect, _unscripted, _now), do: {state, []}
-
-  defp mage_frost_cooldown?(%Spell{spell_family: 3} = spell) do
-    (Spell.school_mask(spell) &&& Spell.school_mask(:frost)) != 0
-  end
-
-  defp mage_frost_cooldown?(_spell), do: false
 
   defp vmangos_script_events(state, %CastContext{} = context, %Spell{script_steps: steps}) when is_list(steps) do
     Enum.flat_map(steps, fn
@@ -854,11 +848,11 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   defp script_target(_step, _source_guid, _target_guid), do: nil
 
   defp maybe_vanish_stealth_events(state, %Spell{} = spell) do
-    if Scripts.rogue_vanish?(spell), do: vanish_stealth_events(state), else: []
+    if Rogue.vanish?(spell), do: vanish_stealth_events(state), else: []
   end
 
   defp remove_vanish_stalked(state, %Spell{} = spell, now) do
-    if Scripts.rogue_vanish?(spell) do
+    if Rogue.vanish?(spell) do
       Aura.remove_aura_types(state, [:mod_stalked, :mod_root, :mod_decrease_speed], now)
     else
       {state, []}
@@ -870,7 +864,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
     spell_id =
       spellbook
       |> Map.values()
-      |> Enum.filter(&Scripts.rogue_stealth?/1)
+      |> Enum.filter(&Rogue.stealth?/1)
       |> Enum.max_by(&(&1.rank || 0), fn -> nil end)
       |> case do
         %Spell{id: id} -> id
@@ -1074,7 +1068,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   end
 
   defp eviscerate_attack_power(%Spell{} = spell, %CastContext{} = context) do
-    if Scripts.rogue_eviscerate?(spell) do
+    if Rogue.eviscerate?(spell) do
       trunc((context.attack_power || 0) * (context.combo_points || 0) * 0.03)
     else
       0
@@ -1232,7 +1226,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   end
 
   defp rogue_feedback_spell?(%Spell{} = spell) do
-    Scripts.rogue_spell?(spell)
+    Rogue.rogue_spell?(spell)
   end
 
   defp special_attack(%CastContext{} = context, spell) do

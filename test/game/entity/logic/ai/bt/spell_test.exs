@@ -295,7 +295,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
         internal: %Internal{world: %WorldRef{map_id: 0}}
       }
 
-      casting = %Cast{spell: spell, targets: targets, started_at: 1_000, ends_at: 1_000}
+      casting = %Cast{spell: spell, targets: targets, started_at: 1_000, ends_at: 1_000, modifier_holder_ids: [14_751]}
       mob = SpellBT.complete_cast(mob, casting, 1_000)
 
       assert mob.unit.power1 == 100

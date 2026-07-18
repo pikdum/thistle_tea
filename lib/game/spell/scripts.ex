@@ -11,11 +11,10 @@ defmodule ThistleTea.Game.Spell.Scripts do
   """
   import Bitwise, only: [&&&: 2]
 
+  alias ThistleTea.Game.Entity.Logic.Paladin
+  alias ThistleTea.Game.Entity.Logic.Priest
   alias ThistleTea.Game.Entity.Logic.Warlock
   alias ThistleTea.Game.Spell
-
-  @weakened_soul 6788
-  @forbearance 25_771
 
   @battle_stance_form 17
   @defensive_stance_form 18
@@ -34,7 +33,6 @@ defmodule ThistleTea.Game.Spell.Scripts do
   }
 
   @spell_family_mage 3
-  @spell_family_rogue 8
   @spell_family_warrior 4
   @spell_family_warlock 5
   @spell_family_hunter 9
@@ -57,8 +55,8 @@ defmodule ThistleTea.Game.Spell.Scripts do
 
   def apply_trigger(%Spell{} = spell) do
     cond do
-      Spell.vmangos_script?(spell, "spell_priest_power_word_shield") -> @weakened_soul
-      Spell.vmangos_script?(spell, "spell_paladin_bubble") -> @forbearance
+      trigger_id = Priest.shield_trigger_id(spell) -> trigger_id
+      Spell.vmangos_script?(spell, "spell_paladin_bubble") -> Paladin.forbearance_id()
       true -> nil
     end
   end
@@ -67,55 +65,20 @@ defmodule ThistleTea.Game.Spell.Scripts do
 
   @overpower_family_mask 0x00000004
   @execute_damage_spell 20_647
-  @rogue_stealth_family_mask 0x00400000
-  @rogue_misc_family_mask 0x40000000
   @blade_flurry_radius_yards 5.0
   @last_stand 12_975
   @preparation 14_185
-  @holy_shock %{
-    20_473 => %{damage: 25_912, heal: 25_914},
-    20_929 => %{damage: 25_911, heal: 25_913},
-    20_930 => %{damage: 25_902, heal: 25_903}
-  }
   @last_stand_health_buff 12_976
   @last_stand_health_fraction 0.3
   @tame_beast_completion 13_535
   @tame_beast_ownership 13_481
-  @holy_nova_heals %{
-    15_237 => 23_455,
-    15_430 => 23_458,
-    15_431 => 23_459,
-    27_799 => 27_803,
-    27_800 => 27_804,
-    27_801 => 27_805
-  }
-  @touch_of_weakness_damage %{
-    2652 => 2943,
-    19_261 => 19_249,
-    19_262 => 19_251,
-    19_264 => 19_252,
-    19_265 => 19_253,
-    19_266 => 19_254
-  }
-  @paladin_judgement_procs %{
-    20_185 => 20_267,
-    20_344 => 20_341,
-    20_345 => 20_342,
-    20_346 => 20_343,
-    20_186 => 20_268,
-    20_354 => 20_352,
-    20_355 => 20_353
-  }
 
-  def successful_finish_trigger(%Spell{id: id} = spell) do
-    if Spell.vmangos_script?(spell, "spell_priest_holy_nova"), do: Map.get(@holy_nova_heals, id)
-  end
-
+  def successful_finish_trigger(%Spell{} = spell), do: Priest.holy_nova_heal_id(spell)
   def successful_finish_trigger(_spell), do: nil
 
   def proc_trigger_spell_id(%Spell{} = spell, triggering_spell_id) do
-    if Spell.vmangos_script?(spell, "spell_priest_touch_of_weakness") do
-      Map.get(@touch_of_weakness_damage, triggering_spell_id)
+    if Priest.touch_of_weakness?(spell) do
+      Priest.touch_of_weakness_damage_id(triggering_spell_id)
     else
       spell.id
     end
@@ -124,8 +87,8 @@ defmodule ThistleTea.Game.Spell.Scripts do
   def proc_trigger_spell_id(_spell, _triggering_spell_id), do: nil
 
   def incoming_proc_trigger(%Spell{id: id} = spell, default_spell_id, owner_guid, attacker_guid) do
-    if Spell.family_flag?(spell, @spell_family_paladin, 0x00080000) do
-      {attacker_guid, attacker_guid, Map.get(@paladin_judgement_procs, id)}
+    if Paladin.judgement_proc_aura?(spell) do
+      {attacker_guid, attacker_guid, Paladin.judgement_proc_id(id)}
     else
       {owner_guid, attacker_guid, default_spell_id}
     end
@@ -143,20 +106,28 @@ defmodule ThistleTea.Game.Spell.Scripts do
   def dummy_effect(%Spell{id: @tame_beast_completion}), do: :tame_beast_completion
   def dummy_effect(%Spell{id: @preparation}), do: :preparation
 
-  def dummy_effect(%Spell{id: id} = spell) when is_map_key(@holy_shock, id) do
-    if Spell.vmangos_script?(spell, "spell_paladin_holy_shock"), do: {:holy_shock, Map.fetch!(@holy_shock, id)}
-  end
+  @script_dummy_effects %{
+    "spell_paladin_judgement_of_command_dummy" => :judgement_of_command,
+    "spell_warrior_execute_dummy" => :execute,
+    "spell_hunter_readiness" => :hunter_cooldowns,
+    "spell_hunter_refocus" => :hunter_cooldowns,
+    "spell_druid_enrage" => :druid_enrage,
+    "spell_mage_cold_snap" => :mage_cold_snap
+  }
 
-  def dummy_effect(%Spell{} = spell) do
+  def dummy_effect(%Spell{id: id, script_name: script_name} = spell) do
     cond do
-      Spell.vmangos_script?(spell, "spell_paladin_judgement_of_command_dummy") -> :judgement_of_command
-      Spell.vmangos_script?(spell, "spell_warrior_execute_dummy") -> :execute
-      Spell.vmangos_script?(spell, "spell_hunter_readiness") -> :hunter_cooldowns
-      Spell.vmangos_script?(spell, "spell_hunter_refocus") -> :hunter_cooldowns
-      Spell.vmangos_script?(spell, "spell_druid_enrage") -> :druid_enrage
-      Spell.vmangos_script?(spell, "spell_mage_cold_snap") -> :mage_cold_snap
-      Warlock.life_tap?(spell) -> :life_tap
-      true -> nil
+      Spell.vmangos_script?(spell, "spell_paladin_holy_shock") and is_map(Paladin.holy_shock_ids(id)) ->
+        {:holy_shock, Paladin.holy_shock_ids(id)}
+
+      is_binary(script_name) and is_map_key(@script_dummy_effects, script_name) ->
+        Map.fetch!(@script_dummy_effects, script_name)
+
+      Warlock.life_tap?(spell) ->
+        :life_tap
+
+      true ->
+        nil
     end
   end
 
@@ -175,10 +146,6 @@ defmodule ThistleTea.Game.Spell.Scripts do
 
   def execute_damage_spell_id, do: @execute_damage_spell
   def blade_flurry_radius_yards, do: @blade_flurry_radius_yards
-  def rogue_spell_family, do: @spell_family_rogue
-
-  def rogue_spell?(%Spell{spell_family: @spell_family_rogue}), do: true
-  def rogue_spell?(_spell), do: false
 
   def paladin_judgement?(%Spell{spell_family: @spell_family_paladin, family_flags_0: flags}) when is_integer(flags),
     do: (flags &&& 0x00800000) != 0
@@ -192,22 +159,6 @@ defmodule ThistleTea.Game.Spell.Scripts do
 
   def finisher?(%Spell{} = spell), do: Spell.attribute?(spell, :finishing_move)
   def finisher?(_spell), do: false
-
-  def rogue_vanish?(%Spell{} = spell), do: Spell.vmangos_script?(spell, "spell_rogue_vanish")
-  def rogue_vanish?(_spell), do: false
-
-  def rogue_stealth?(%Spell{} = spell), do: rogue_family_flag?(spell, @rogue_stealth_family_mask)
-  def rogue_stealth?(_spell), do: false
-
-  def rogue_eviscerate?(%Spell{} = spell), do: Spell.vmangos_script?(spell, "spell_rogue_eviscerate")
-  def rogue_eviscerate?(_spell), do: false
-
-  def rogue_blade_flurry?(%Spell{effects: effects} = spell) do
-    rogue_family_flag?(spell, @rogue_misc_family_mask) and
-      Enum.any?(effects, &(&1.type in [:apply_aura, :apply_area_aura] and &1.aura == :mod_melee_haste))
-  end
-
-  def rogue_blade_flurry?(_spell), do: false
 
   def aura_amount_override(%Spell{id: @last_stand_health_buff}, %{unit: %{max_health: max_health}})
       when is_integer(max_health) do
@@ -333,9 +284,4 @@ defmodule ThistleTea.Game.Spell.Scripts do
        when is_integer(flags), do: (flags &&& mask) != 0
 
   defp warrior_family_flag?(_spell, _mask), do: false
-
-  defp rogue_family_flag?(%Spell{spell_family: @spell_family_rogue, family_flags_0: flags}, mask)
-       when is_integer(flags), do: (flags &&& mask) != 0
-
-  defp rogue_family_flag?(_spell, _mask), do: false
 end
