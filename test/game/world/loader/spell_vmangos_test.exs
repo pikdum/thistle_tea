@@ -2,18 +2,22 @@ defmodule ThistleTea.Game.World.Loader.SpellVmangosTest do
   use ExUnit.Case, async: false
 
   alias ThistleTea.Game.Entity.Logic.SpellBook
+  alias ThistleTea.Game.Entity.Logic.Trainer
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.World.Loader.ClassSpell
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Loader.SpellEffectOverride
   alias ThistleTea.Game.World.Loader.SpellThreat
+  alias ThistleTea.Game.World.Loader.Talent
+  alias ThistleTea.Game.World.Loader.Trainer, as: TrainerLoader
 
   @moduletag :dbc_db
 
   setup_all do
     :ok = SpellThreat.load_all()
     :ok = SpellEffectOverride.load_all()
+    :ok = Talent.load_all()
   end
 
   describe "vmangos effect overrides" do
@@ -131,9 +135,34 @@ defmodule ThistleTea.Game.World.Loader.SpellVmangosTest do
       spell_ids = ClassSpellLoader.trainable_spell_ids(1, 60)
 
       refute 12_294 in spell_ids
+      refute 21_551 in spell_ids
+      refute 21_553 in spell_ids
       refute 23_881 in spell_ids
+      refute 23_892 in spell_ids
+      refute 23_894 in spell_ids
       refute 12_975 in spell_ids
       refute 12_320 in spell_ids
+    end
+
+    test "trained talent ranks require the talent spell" do
+      mortal_strike_rank_2 =
+        913
+        |> TrainerLoader.trainer_info()
+        |> Map.fetch!(:spells)
+        |> Enum.find(&(&1.learned_spell_id == 21_551))
+
+      assert mortal_strike_rank_2.prev_spell_id == 12_294
+      assert Trainer.state(mortal_strike_rank_2, [], 60) == :red
+      assert Trainer.state(mortal_strike_rank_2, [12_294], 60) == :green
+    end
+
+    test "multi-rank talents supersede lower ranks" do
+      talent_ranks = [11_070, 12_473, 16_763, 16_765, 16_766]
+      superseded_by = SpellLoader.superseded_by_map(talent_ranks)
+
+      assert {[16_766], events} = SpellBook.learn([], talent_ranks, superseded_by)
+      assert length(events) == 5
+      assert %Spell{first_in_chain: 11_070, rank: 5} = SpellLoader.load(16_766)
     end
   end
 

@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.World.Loader.ClassSpell do
   alias ThistleTea.DB.Mangos.NpcTrainer
   alias ThistleTea.DB.Mangos.NpcTrainerTemplate
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
+  alias ThistleTea.Game.World.Loader.Talent, as: TalentLoader
 
   @table_options [:named_table, :public, read_concurrency: true, write_concurrency: :auto]
 
@@ -45,6 +46,7 @@ defmodule ThistleTea.Game.World.Loader.ClassSpell do
     |> Enum.uniq()
     |> Enum.sort()
     |> SpellLoader.learned_spell_ids()
+    |> Enum.reject(&TalentLoader.by_spell/1)
   end
 
   def trainable_spell_ids(_class, _level), do: []

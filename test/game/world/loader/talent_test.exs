@@ -27,6 +27,27 @@ defmodule ThistleTea.Game.World.Loader.TalentTest do
     assert TalentLoader.by_spell(12_294) == {135, tab_id, 0}
   end
 
+  test "trained successors retain their talent identity and lineage" do
+    %TalentData{tab_id: tab_id} = TalentLoader.get(135)
+
+    assert TalentLoader.by_spell(21_551) == {135, tab_id, 0}
+    assert TalentLoader.by_spell(21_553) == {135, tab_id, 0}
+
+    assert TalentLoader.chain(21_551) == %{
+             first_spell: 12_294,
+             prev_spell: 12_294,
+             rank: 2,
+             req_spell: nil
+           }
+  end
+
+  test "talent ranks form a replacement chain" do
+    assert TalentLoader.superseded_by_map([12_282, 12_663, 12_664]) == %{
+             12_282 => 12_663,
+             12_663 => 12_664
+           }
+  end
+
   test "multi-rank talents list every rank in order" do
     assert %TalentData{rank_spell_ids: [12_285, 12_697]} = TalentLoader.get(126)
   end

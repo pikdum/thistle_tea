@@ -13,8 +13,8 @@ defmodule ThistleTea.Game.Player.Talents do
   alias ThistleTea.Game.World.CharacterStore
 
   def learn(%{character: %Character{} = character} = state, talent_id, requested_rank) do
-    with {:ok, spell_id} <- LogicTalents.validate(character, talent_id, requested_rank),
-         {:ok, character, _events} <- Spells.learn(character, [spell_id]) do
+    with {:ok, spell_ids} <- LogicTalents.validate(character, talent_id, requested_rank),
+         {:ok, character, _events} <- Spells.learn(character, spell_ids) do
       commit(state, character)
     else
       _invalid -> state

@@ -68,7 +68,7 @@ defmodule ThistleTea.Game.Entity.Logic.Talents do
          true <- spent_in_tab(spell_ids, talent.tab_id) >= talent.tier * @points_per_tier,
          true <- prerequisite_met?(spell_ids, talent),
          true <- required_spell_known?(spell_ids, talent) do
-      {:ok, spell_id}
+      {:ok, Enum.slice(talent.rank_spell_ids, current..requested_rank)}
     else
       _failed -> :error
     end
@@ -76,21 +76,20 @@ defmodule ThistleTea.Game.Entity.Logic.Talents do
 
   def validate(_character, _talent_id, _requested_rank), do: :error
 
-  defp known_rank(spell_ids, %TalentData{rank_spell_ids: ranks}) do
-    ranks
-    |> Enum.with_index()
-    |> Enum.reduce(0, fn {spell_id, index}, known ->
-      if spell_id in spell_ids, do: max(known, index + 1), else: known
+  defp known_rank(spell_ids, %TalentData{id: talent_id}) do
+    Enum.reduce(spell_ids, 0, fn spell_id, known ->
+      case TalentLoader.by_spell(spell_id) do
+        {^talent_id, _tab_id, rank_index} -> max(known, rank_index + 1)
+        _other -> known
+      end
     end)
   end
 
   defp prerequisite_met?(spell_ids, %TalentData{depends_on: depends_on, depends_on_rank: depends_on_rank})
        when is_integer(depends_on) do
     case TalentLoader.get(depends_on) do
-      %TalentData{rank_spell_ids: ranks} ->
-        ranks
-        |> Enum.drop(depends_on_rank)
-        |> Enum.any?(&(&1 in spell_ids))
+      %TalentData{} = prerequisite ->
+        known_rank(spell_ids, prerequisite) > depends_on_rank
 
       _missing ->
         true

@@ -79,13 +79,13 @@ defmodule ThistleTea.Game.Entity.Logic.TalentsTest do
 
   describe "validate/3" do
     test "learns the next rank when a point is available" do
-      assert {:ok, 1_001} = Talents.validate(warrior(10, []), 100, 0)
-      assert {:ok, 1_002} = Talents.validate(warrior(12, [1_001]), 100, 1)
+      assert {:ok, [1_001]} = Talents.validate(warrior(10, []), 100, 0)
+      assert {:ok, [1_002]} = Talents.validate(warrior(12, [1_001]), 100, 1)
     end
 
     test "rejects skipping ranks without enough points and allows paid jumps" do
       assert :error = Talents.validate(warrior(10, []), 100, 1)
-      assert {:ok, 1_002} = Talents.validate(warrior(11, []), 100, 1)
+      assert {:ok, [1_001, 1_002]} = Talents.validate(warrior(11, []), 100, 1)
     end
 
     test "rejects already-known ranks, other classes' talents, and no points" do
@@ -96,12 +96,13 @@ defmodule ThistleTea.Game.Entity.Logic.TalentsTest do
 
     test "enforces the five-points-per-tier gate" do
       assert :error = Talents.validate(warrior(20, [1_003]), 101, 0)
-      assert {:ok, 2_001} = Talents.validate(warrior(20, [1_003, 5_002]), 101, 0)
+      assert :error = Talents.validate(warrior(20, [1_003, 5_001]), 101, 0)
+      assert {:ok, [2_001]} = Talents.validate(warrior(20, [1_003, 5_002]), 101, 0)
     end
 
     test "enforces talent prerequisites at the required rank" do
       assert :error = Talents.validate(warrior(20, [1_002, 5_003]), 102, 0)
-      assert {:ok, 3_001} = Talents.validate(warrior(20, [1_003, 5_002]), 102, 0)
+      assert {:ok, [3_001]} = Talents.validate(warrior(20, [1_003, 5_002]), 102, 0)
     end
   end
 end

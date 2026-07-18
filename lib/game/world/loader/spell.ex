@@ -18,6 +18,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   alias ThistleTea.Game.World.Loader.SpellProcEvent, as: SpellProcEventLoader
   alias ThistleTea.Game.World.Loader.SpellScript, as: SpellScriptLoader
   alias ThistleTea.Game.World.Loader.SpellScriptName, as: SpellScriptNameLoader
+  alias ThistleTea.Game.World.Loader.Talent, as: TalentLoader
 
   @learn_spell_effect 36
   @table_options [:named_table, :public, read_concurrency: true, write_concurrency: :auto]
@@ -40,8 +41,9 @@ defmodule ThistleTea.Game.World.Loader.Spell do
 
   def chain(spell_id) when is_integer(spell_id) and spell_id > 0 do
     case :ets.lookup(__MODULE__, {:chain, spell_id}) do
+      [{_key, nil}] -> TalentLoader.chain(spell_id)
       [{_key, chain}] -> chain
-      _ -> cache({:chain, spell_id}, load_chain(spell_id))
+      _ -> cache({:chain, spell_id}, load_chain(spell_id)) || TalentLoader.chain(spell_id)
     end
   end
 
@@ -174,13 +176,16 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   def superseded_by_map(spell_ids) when is_list(spell_ids) do
     spell_ids = Enum.uniq(spell_ids)
 
-    DBC.all(
-      from(s in SkillLineAbility,
-        where: s.spell in ^spell_ids and s.superseded_by > 0,
-        select: {s.spell, s.superseded_by}
+    dbc_map =
+      DBC.all(
+        from(s in SkillLineAbility,
+          where: s.spell in ^spell_ids and s.superseded_by > 0,
+          select: {s.spell, s.superseded_by}
+        )
       )
-    )
-    |> Map.new()
+      |> Map.new()
+
+    Map.merge(dbc_map, TalentLoader.superseded_by_map(spell_ids))
   end
 
   def superseded_by_map(_spell_ids), do: %{}
