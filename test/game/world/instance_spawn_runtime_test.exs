@@ -8,7 +8,7 @@ defmodule ThistleTea.Game.World.InstanceSpawnRuntimeTest do
   alias ThistleTea.Game.World.SpawnPool
   alias ThistleTea.Game.WorldRef
 
-  @moduletag :vmangos_db
+  @moduletag :dbc_db
 
   describe "instance cell activation" do
     test "does not spawn an open copy of an instance map" do
