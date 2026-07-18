@@ -52,6 +52,9 @@ defmodule ThistleTea.Game.Player.StatsTest do
       assert character.player.skills[43].max == 30
       assert character.player.skills[43].value == 1
       assert character.player.skills[415] == Skills.new_entry(:mono, false, 1)
+
+      character = Stats.apply(character, %{stats | level: 12})
+      assert character.player.character_points1 == 3
     end
   end
 
