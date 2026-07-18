@@ -591,16 +591,21 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
     {%{state | unit: unit}, [Event.grant_power(caster_guid, 0, drained)]}
   end
 
-  defp apply_effect(state, %CastContext{}, _spell, %Effect{type: :interrupt_cast}, _now) do
+  defp apply_effect(state, %CastContext{}, spell, %Effect{type: :interrupt_cast}, now) do
     case state do
       %{internal: %{casting: casting} = internal, unit: unit} when not is_nil(casting) ->
-        state = %{
-          state
-          | internal: %{internal | casting: nil},
-            unit: %{unit | channel_spell: 0, channel_object: 0}
-        }
+        if interruptible_cast?(casting) do
+          state = %{
+            state
+            | internal: %{internal | casting: nil},
+              unit: %{unit | channel_spell: 0, channel_object: 0}
+          }
 
-        {Core.mark_broadcast_update(state), [Event.object_update(:values)]}
+          state = lock_interrupted_school(state, casting, spell, now)
+          {Core.mark_broadcast_update(state), [Event.object_update(:values)]}
+        else
+          {state, []}
+        end
 
       _ ->
         {state, []}
@@ -669,6 +674,25 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   end
 
   defp trigger_target_guid(state, _context, _effect), do: state.object.guid
+
+  defp interruptible_cast?(casting) do
+    case casting do
+      %{spell: %Spell{prevention_type: 1}} -> true
+      _ -> false
+    end
+  end
+
+  defp lock_interrupted_school(state, %{spell: %Spell{} = interrupted}, %Spell{} = interrupt, now) do
+    duration = max(interrupt.duration_ms || 0, 0)
+
+    if duration > 0 do
+      Cooldowns.lock_schools(state, Spell.school_mask(interrupted), now + duration)
+    else
+      state
+    end
+  end
+
+  defp lock_interrupted_school(state, _casting, _interrupt, _now), do: state
 
   defp apply_target_attack_power_bonus(state, %CastContext{} = context, %Spell{} = spell) do
     if Spell.ranged_ability?(spell) do

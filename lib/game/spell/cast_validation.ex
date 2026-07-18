@@ -18,6 +18,7 @@ defmodule ThistleTea.Game.Spell.CastValidation do
   alias ThistleTea.Game.Entity.Logic.Warlock
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Cooldowns
+  alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.Spell.Scripts
   alias ThistleTea.Game.Spell.Targets
 
@@ -27,6 +28,7 @@ defmodule ThistleTea.Game.Spell.CastValidation do
 
   def validate(caster, %Spell{} = spell, %Targets{} = targets, target_info, now, opts \\ []) do
     with :ok <- check_caster_alive(caster),
+         :ok <- check_caster_state(caster, spell, now),
          :ok <- check_combat_state(caster, spell),
          :ok <- check_stance(caster, spell),
          :ok <- check_caster_aura_state(caster, spell, now),
@@ -199,10 +201,71 @@ defmodule ThistleTea.Game.Spell.CastValidation do
   end
 
   defp check_cooldown(caster, spell, now) do
-    if not godmode?(caster) and Cooldowns.on_cooldown?(caster, spell, now) do
-      {:error, :not_ready}
+    cond do
+      godmode?(caster) -> :ok
+      Cooldowns.on_cooldown?(caster, spell, now) -> {:error, :not_ready}
+      Cooldowns.on_gcd?(caster, spell, now) -> {:error, :not_ready}
+      true -> :ok
+    end
+  end
+
+  @mechanic_fear 5
+  @mechanic_stun 12
+  @confuse_mechanics [17, 30]
+
+  defp check_caster_state(caster, %Spell{} = spell, now) do
+    stunned? = AuraLogic.has_aura?(caster, :mod_stun)
+
+    case control_state_error(caster, spell, stunned?) do
+      :ok -> prevention_error(caster, spell, stunned?, now)
+      error -> error
+    end
+  end
+
+  defp control_state_error(caster, spell, stunned?) do
+    immune = immunity_purge_mechanics(spell)
+
+    cond do
+      stunned? and @mechanic_stun not in immune ->
+        {:error, :stunned}
+
+      AuraLogic.has_aura?(caster, :mod_confuse) and Enum.all?(@confuse_mechanics, &(&1 not in immune)) ->
+        {:error, :confused}
+
+      AuraLogic.has_aura?(caster, :mod_fear) and @mechanic_fear not in immune ->
+        {:error, :fleeing}
+
+      true ->
+        :ok
+    end
+  end
+
+  defp prevention_error(caster, spell, stunned?, now) do
+    cond do
+      spell.prevention_type == 1 and not stunned? and silenced_for?(caster, spell, now) ->
+        {:error, :silenced}
+
+      spell.prevention_type == 2 and AuraLogic.has_aura?(caster, :mod_pacify) ->
+        {:error, :pacified}
+
+      true ->
+        :ok
+    end
+  end
+
+  defp silenced_for?(caster, %Spell{} = spell, now) do
+    AuraLogic.has_aura?(caster, :mod_silence) or
+      Cooldowns.school_locked?(caster, Spell.school_mask(spell), now)
+  end
+
+  defp immunity_purge_mechanics(%Spell{effects: effects} = spell) do
+    if Spell.attribute?(spell, :immunity_purges_effect) do
+      for %Effect{type: type, aura: :mechanic_immunity, misc_value: misc} <- effects,
+          type in [:apply_aura, :apply_area_aura],
+          is_integer(misc),
+          do: misc
     else
-      :ok
+      []
     end
   end
 
@@ -363,18 +426,14 @@ defmodule ThistleTea.Game.Spell.CastValidation do
 
   defp check_incidental_target(_target_info), do: :ok
 
-  defp check_range(caster, %Spell{range_yards: range}, %{position: {map, x, y, z}})
+  defp check_range(caster, %Spell{range_yards: range} = spell, %{position: {map, x, y, z}})
        when is_number(range) and range > 0 do
     case caster_position(caster) do
       {caster_map, _cx, _cy, _cz} when caster_map != map ->
         {:error, :out_of_range}
 
       {_map, cx, cy, cz} ->
-        if distance({cx, cy, cz}, {x, y, z}) > range + @range_leeway_yards do
-          {:error, :out_of_range}
-        else
-          :ok
-        end
+        check_distance(distance({cx, cy, cz}, {x, y, z}), spell)
 
       nil ->
         :ok
@@ -382,6 +441,14 @@ defmodule ThistleTea.Game.Spell.CastValidation do
   end
 
   defp check_range(_caster, _spell, _target_info), do: :ok
+
+  defp check_distance(distance, %Spell{range_yards: range, min_range_yards: min_range}) do
+    cond do
+      distance > range + @range_leeway_yards -> {:error, :out_of_range}
+      is_number(min_range) and min_range > 0 and distance < min_range -> {:error, :too_close}
+      true -> :ok
+    end
+  end
 
   defp check_line_of_sight(%Spell{} = spell, %{los?: false}) do
     if Spell.attribute?(spell, :ignore_line_of_sight) do

@@ -6,6 +6,8 @@ defmodule ThistleTea.Game.Spell.Cooldowns do
   and enqueues the client cooldown event; `on_cooldown?/3` checks before the
   next cast. Expiry is just a timestamp comparison, no timers.
   """
+  import Bitwise, only: [&&&: 2, <<<: 2]
+
   alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.Spell
@@ -40,6 +42,54 @@ defmodule ThistleTea.Game.Spell.Cooldowns do
   end
 
   defp queue_client_cooldown(entity, _spell), do: entity
+
+  def trigger_gcd(%{internal: internal} = entity, %Spell{gcd_ms: gcd_ms}, now)
+      when is_integer(gcd_ms) and gcd_ms > 0 and is_integer(now) do
+    cooldowns = internal |> active(now) |> Map.put(:gcd, now + gcd_ms)
+    %{entity | internal: %{internal | cooldowns: cooldowns}}
+  end
+
+  def trigger_gcd(entity, _spell, _now), do: entity
+
+  def on_gcd?(%{internal: internal}, %Spell{gcd_ms: gcd_ms}, now)
+      when is_integer(gcd_ms) and gcd_ms > 0 and is_integer(now) do
+    case Map.get(stored(internal), :gcd) do
+      ready_at when is_integer(ready_at) -> ready_at > now
+      _ -> false
+    end
+  end
+
+  def on_gcd?(_entity, _spell, _now), do: false
+
+  def lock_schools(%{internal: internal} = entity, school_mask, until_ms)
+      when is_integer(school_mask) and school_mask > 0 and is_integer(until_ms) do
+    cooldowns =
+      Enum.reduce(0..6, stored(internal), fn index, acc ->
+        if (school_mask &&& 1 <<< index) == 0 do
+          acc
+        else
+          Map.update(acc, {:school, index}, until_ms, &max(&1, until_ms))
+        end
+      end)
+
+    %{entity | internal: %{internal | cooldowns: cooldowns}}
+  end
+
+  def lock_schools(entity, _school_mask, _until_ms), do: entity
+
+  def school_locked?(%{internal: internal}, school_mask, now)
+      when is_integer(school_mask) and school_mask > 0 and is_integer(now) do
+    cooldowns = stored(internal)
+
+    Enum.any?(0..6, fn index ->
+      (school_mask &&& 1 <<< index) != 0 and locked_until?(Map.get(cooldowns, {:school, index}), now)
+    end)
+  end
+
+  def school_locked?(_entity, _school_mask, _now), do: false
+
+  defp locked_until?(until_ms, now) when is_integer(until_ms), do: until_ms > now
+  defp locked_until?(_entry, _now), do: false
 
   def on_cooldown?(%{internal: internal}, %Spell{} = spell, now) when is_integer(now) do
     cooldowns = stored(internal)

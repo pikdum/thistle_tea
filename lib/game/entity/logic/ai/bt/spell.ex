@@ -78,6 +78,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
       |> then(&%{&1 | cast_item_guid: cast_item_guid, modifier_holder_ids: modifier_holder_ids})
 
     character = %{character | internal: %{internal | casting: casting}}
+    character = Cooldowns.trigger_gcd(character, spell, now)
 
     if Cast.channeled?(casting) and casting.cast_time_ms == 0 do
       begin_channel(character, casting, now)

@@ -1,6 +1,8 @@
 defmodule ThistleTea.Game.Spell.CastValidationTest do
   use ExUnit.Case, async: true
 
+  alias ThistleTea.Game.Aura, as: AuraData
+  alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Object
@@ -71,6 +73,127 @@ defmodule ThistleTea.Game.Spell.CastValidationTest do
 
   defp friendly_target(overrides \\ []) do
     hostile_target([hostile?: false, friendly?: true, attackable?: false] ++ overrides)
+  end
+
+  defp control_holder(type) do
+    %Holder{
+      spell: %Spell{id: 5_000},
+      caster_guid: 9,
+      auras: [%AuraData{index: 0, type: type}]
+    }
+  end
+
+  describe "caster state gating" do
+    test "stunned casters cannot cast, except stun-immunity-purging spells" do
+      stunned = caster(auras: [control_holder(:mod_stun)])
+
+      assert {:error, :stunned} =
+               CastValidation.validate(stunned, harmful_spell(), Targets.unit(7), hostile_target(), @now)
+
+      blink =
+        helpful_spell(
+          attributes: MapSet.new([:immunity_purges_effect]),
+          effects: [%Effect{type: :apply_aura, aura: :mechanic_immunity, misc_value: 12, implicit_target_a: :caster}]
+        )
+
+      assert :ok = CastValidation.validate(stunned, blink, %Targets{}, nil, @now)
+    end
+
+    test "fear and confusion prevent casting" do
+      feared = caster(auras: [control_holder(:mod_fear)])
+      confused = caster(auras: [control_holder(:mod_confuse)])
+
+      assert {:error, :fleeing} =
+               CastValidation.validate(feared, harmful_spell(), Targets.unit(7), hostile_target(), @now)
+
+      assert {:error, :confused} =
+               CastValidation.validate(confused, harmful_spell(), Targets.unit(7), hostile_target(), @now)
+    end
+
+    test "silence blocks magic but not physical abilities" do
+      silenced = caster(auras: [control_holder(:mod_silence)])
+
+      assert {:error, :silenced} =
+               CastValidation.validate(
+                 silenced,
+                 harmful_spell(prevention_type: 1),
+                 Targets.unit(7),
+                 hostile_target(),
+                 @now
+               )
+
+      assert :ok =
+               CastValidation.validate(
+                 silenced,
+                 harmful_spell(prevention_type: 0),
+                 Targets.unit(7),
+                 hostile_target(),
+                 @now
+               )
+    end
+
+    test "pacify blocks physical-prevention abilities only" do
+      pacified = caster(auras: [control_holder(:mod_pacify)])
+
+      assert {:error, :pacified} =
+               CastValidation.validate(
+                 pacified,
+                 harmful_spell(prevention_type: 2),
+                 Targets.unit(7),
+                 hostile_target(),
+                 @now
+               )
+
+      assert :ok =
+               CastValidation.validate(
+                 pacified,
+                 harmful_spell(prevention_type: 1),
+                 Targets.unit(7),
+                 hostile_target(),
+                 @now
+               )
+    end
+
+    test "an interrupt school lockout blocks same-school casts until it expires" do
+      locked = Cooldowns.lock_schools(caster(), Spell.school_mask(:fire), @now + 5_000)
+      fire = harmful_spell(school: :fire, prevention_type: 1)
+      frost = harmful_spell(id: 116, school: :frost, prevention_type: 1)
+
+      assert {:error, :silenced} = CastValidation.validate(locked, fire, Targets.unit(7), hostile_target(), @now)
+      assert :ok = CastValidation.validate(locked, frost, Targets.unit(7), hostile_target(), @now)
+      assert :ok = CastValidation.validate(locked, fire, Targets.unit(7), hostile_target(), @now + 5_001)
+    end
+  end
+
+  describe "minimum range and global cooldown" do
+    test "casts inside the minimum range fail as too close" do
+      charge = harmful_spell(min_range_yards: 8.0, range_yards: 25.0)
+
+      assert {:error, :too_close} =
+               CastValidation.validate(
+                 caster(),
+                 charge,
+                 Targets.unit(7),
+                 hostile_target(position: {WorldRef.open(0), 3.0, 0.0, 0.0}),
+                 @now
+               )
+
+      assert :ok = CastValidation.validate(caster(), charge, Targets.unit(7), hostile_target(), @now)
+    end
+
+    test "the global cooldown blocks new casts until it lapses" do
+      spell = harmful_spell(gcd_ms: 1_500)
+      on_gcd = Cooldowns.trigger_gcd(caster(), spell, @now)
+
+      assert {:error, :not_ready} =
+               CastValidation.validate(on_gcd, spell, Targets.unit(7), hostile_target(), @now + 100)
+
+      assert :ok = CastValidation.validate(on_gcd, spell, Targets.unit(7), hostile_target(), @now + 1_500)
+
+      gcd_free = harmful_spell(id: 2764, gcd_ms: 0)
+
+      assert :ok = CastValidation.validate(on_gcd, gcd_free, Targets.unit(7), hostile_target(), @now + 100)
+    end
   end
 
   describe "stance gating" do

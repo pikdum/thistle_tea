@@ -180,6 +180,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
       |> StealthSync.sync()
       |> maybe_reset_shapeshift_power(holder)
       |> maybe_heal_increased_health(holder)
+      |> maybe_interrupt_casting(holder)
       |> maybe_sit(holder)
 
     {entity, control_events} = ControlSync.sync(entity, now)
@@ -401,6 +402,26 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
 
   defp cat_form?(%Holder{auras: auras}) do
     Enum.any?(auras, &match?(%Aura{type: :mod_shapeshift, misc_value: 1}, &1))
+  end
+
+  @cast_breaking_controls [:mod_stun, :mod_fear, :mod_confuse]
+
+  defp maybe_interrupt_casting(%{internal: %{casting: casting}} = entity, %Holder{} = holder)
+       when not is_nil(casting) do
+    cond do
+      Holder.has_any_type?(holder, @cast_breaking_controls) -> clear_casting(entity)
+      Holder.has_aura_type?(holder, :mod_silence) and silenceable_cast?(casting) -> clear_casting(entity)
+      true -> entity
+    end
+  end
+
+  defp maybe_interrupt_casting(entity, _holder), do: entity
+
+  defp silenceable_cast?(%{spell: %Spell{prevention_type: 1}}), do: true
+  defp silenceable_cast?(_casting), do: false
+
+  defp clear_casting(%{internal: internal, unit: unit} = entity) do
+    %{entity | internal: %{internal | casting: nil}, unit: %{unit | channel_spell: 0, channel_object: 0}}
   end
 
   defp maybe_heal_increased_health(entity, %Holder{auras: auras}) do

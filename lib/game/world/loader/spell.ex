@@ -204,6 +204,8 @@ defmodule ThistleTea.Game.World.Loader.Spell do
       duration_ms: duration_ms(row.spell_duration),
       max_duration_ms: max_duration_ms(row.spell_duration),
       range_yards: range_yards(row.spell_range),
+      min_range_yards: min_range_yards(row.spell_range),
+      prevention_type: row.prevention_type || 0,
       mana_cost: row.mana_cost || 0,
       mana_cost_per_second: row.mana_cost_per_second || 0,
       mana_cost_per_second_per_level: row.mana_cost_per_second_per_level || 0,
@@ -485,6 +487,9 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp range_yards(%SpellRange{range_max: range}) when is_number(range), do: range
   defp range_yards(_), do: 0.0
 
+  defp min_range_yards(%SpellRange{range_min: range}) when is_number(range), do: range
+  defp min_range_yards(_), do: 0.0
+
   defp nonzero(value) when is_integer(value) and value > 0, do: value
   defp nonzero(_), do: nil
 
@@ -594,8 +599,9 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp aura_type(22), do: :mod_resistance
   defp aura_type(23), do: :periodic_trigger_spell
   defp aura_type(24), do: :periodic_energize
-  defp aura_type(25), do: :state_immunity
+  defp aura_type(25), do: :mod_pacify
   defp aura_type(26), do: :mod_root
+  defp aura_type(27), do: :mod_silence
   defp aura_type(31), do: :mod_increase_speed
   defp aura_type(33), do: :mod_decrease_speed
   defp aura_type(34), do: :mod_increase_health
@@ -705,6 +711,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   @dot_stacking_rule_ex3 0x00000080
   @channeled_ex_1 0x00000004
   @channeled_ex_2 0x00000040
+  @immunity_purges_effect_ex_1 0x00008000
   @discount_power_on_miss_ex_1 0x08000000
   @finishing_move_damage_ex_1 0x00100000
   @finishing_move_duration_ex_1 0x00400000
@@ -737,6 +744,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
     base
     |> add_if(attrs_ex1, @channeled_ex_1, :channeled)
     |> add_if(attrs_ex1, @channeled_ex_2, :channeled)
+    |> add_if(attrs_ex1, @immunity_purges_effect_ex_1, :immunity_purges_effect)
     |> add_if(attrs_ex1, @discount_power_on_miss_ex_1, :discount_power_on_miss)
     |> add_if(attrs_ex1, @finishing_move_damage_ex_1, :finishing_move)
     |> add_if(attrs_ex1, @finishing_move_duration_ex_1, :finishing_move)

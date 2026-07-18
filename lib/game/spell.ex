@@ -37,6 +37,8 @@ defmodule ThistleTea.Game.Spell do
     family_flags_1: 0,
     mechanic: 0,
     stances_not: 0,
+    min_range_yards: 0.0,
+    prevention_type: 0,
     proc_chance: 0,
     proc_charges: 0,
     proc_type_mask: 0,

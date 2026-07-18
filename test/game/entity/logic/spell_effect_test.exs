@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Cast
   alias ThistleTea.Game.Spell.CastContext
+  alias ThistleTea.Game.Spell.Cooldowns
   alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.WorldRef
 
@@ -499,22 +500,46 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
       assert [%{type: :create_item, item_id: 5350, count: 2}] = events
     end
 
-    test "interrupt_cast clears the target's cast" do
+    test "interrupt_cast clears the target's cast and locks out the school" do
       spell = %Spell{
         id: 2139,
         name: "Counterspell",
         school: :arcane,
+        duration_ms: 10_000,
+        effects: [%Effect{index: 0, type: :interrupt_cast}]
+      }
+
+      context = %CastContext{caster_guid: 999, caster_level: 10}
+
+      fireball = %Spell{id: 133, school: :fire, prevention_type: 1}
+      target = target_fixture()
+      target = %{target | internal: %{target.internal | casting: %Cast{spell: fireball}}}
+
+      {target, _events} = SpellEffect.receive(target, context, spell, 1_000)
+
+      assert target.internal.casting == nil
+      assert Cooldowns.school_locked?(target, Spell.school_mask(:fire), 10_999)
+      refute Cooldowns.school_locked?(target, Spell.school_mask(:fire), 11_001)
+      refute Cooldowns.school_locked?(target, Spell.school_mask(:frost), 10_999)
+    end
+
+    test "interrupt_cast leaves uninterruptible casts alone" do
+      spell = %Spell{
+        id: 2139,
+        name: "Counterspell",
+        school: :arcane,
+        duration_ms: 10_000,
         effects: [%Effect{index: 0, type: :interrupt_cast}]
       }
 
       context = %CastContext{caster_guid: 999, caster_level: 10}
 
       target = target_fixture()
-      target = %{target | internal: %{target.internal | casting: %Cast{}}}
+      target = %{target | internal: %{target.internal | casting: %Cast{spell: %Spell{id: 1, prevention_type: 0}}}}
 
       {target, _events} = SpellEffect.receive(target, context, spell, 1_000)
 
-      assert target.internal.casting == nil
+      assert %Cast{} = target.internal.casting
     end
 
     test "trap effects enqueue a timed game object summon" do
