@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.Entity.Logic.CoreTest do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.WorldRef
 
   describe "heal/2" do
     test "restores health up to max health" do
@@ -172,6 +173,36 @@ defmodule ThistleTea.Game.Entity.Logic.CoreTest do
 
       refute Core.should_tether?(entity, 7_000)
     end
+
+    test "does not tether instance mobs outside the default range" do
+      entity =
+        entity(
+          position: {100.0, 0.0, 0.0, 0.0},
+          last_hostile_time: 1_000,
+          world: WorldRef.instance(389, 1)
+        )
+
+      refute Core.should_tether?(entity, 7_000)
+    end
+
+    test "does not tether mobs with the no-leash evade flag outside the default range" do
+      entity = entity(position: {100.0, 0.0, 0.0, 0.0}, last_hostile_time: 1_000, extra_flags: 0x1)
+
+      refute Core.should_tether?(entity, 7_000)
+    end
+
+    test "explicit leash ranges still tether instance mobs" do
+      entity =
+        entity(
+          position: {60.0, 0.0, 0.0, 0.0},
+          last_hostile_time: 1_000,
+          leash_range: 50.0,
+          extra_flags: 0x1,
+          world: WorldRef.instance(389, 1)
+        )
+
+      assert Core.should_tether?(entity, 1_500)
+    end
   end
 
   describe "tether_range/1" do
@@ -192,9 +223,13 @@ defmodule ThistleTea.Game.Entity.Logic.CoreTest do
         level: 1
       },
       internal: %Internal{
+        world: Keyword.get(opts, :world, WorldRef.open(0)),
         spawn: %Spawn{position: {0.0, 0.0, 0.0}},
         last_hostile_time: Keyword.get(opts, :last_hostile_time),
-        creature: %Creature{leash_range: Keyword.get(opts, :leash_range, 0.0)}
+        creature: %Creature{
+          extra_flags: Keyword.get(opts, :extra_flags, 0),
+          leash_range: Keyword.get(opts, :leash_range, 0.0)
+        }
       },
       movement_block: %MovementBlock{position: Keyword.get(opts, :position)}
     }

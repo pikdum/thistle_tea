@@ -4,6 +4,8 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
   payloads, taking damage and dying, healing, mana restoration, and combat
   tether-range checks for mobs.
   """
+  import Bitwise, only: [&&&: 2]
+
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
@@ -25,7 +27,9 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
   alias ThistleTea.Game.Math
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.WorldRef
 
+  @extra_flag_no_leash_evade 0x00000001
   @leash_timeout_ms 6_000
 
   def update_object(entity, update_type \\ :create_object2)
@@ -196,7 +200,9 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
 
   def should_tether?(%{internal: %Internal{last_hostile_time: last_hostile_time}} = entity, now)
       when is_integer(last_hostile_time) and is_integer(now) do
-    out_of_tether_range?(entity) and (hard_leash?(entity) or now - last_hostile_time >= @leash_timeout_ms)
+    out_of_tether_range?(entity) and
+      (hard_leash?(entity) or
+         (threat_area_limited?(entity) and now - last_hostile_time >= @leash_timeout_ms))
   end
 
   def should_tether?(_entity, _now) do
@@ -209,6 +215,19 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
   end
 
   defp hard_leash?(_entity), do: false
+
+  defp threat_area_limited?(%{internal: %Internal{world: %WorldRef{} = world}} = entity) do
+    WorldRef.open?(world) and not no_leash_evade?(entity)
+  end
+
+  defp threat_area_limited?(entity), do: not no_leash_evade?(entity)
+
+  defp no_leash_evade?(%{internal: %Internal{creature: %Creature{extra_flags: extra_flags}}})
+       when is_integer(extra_flags) do
+    (extra_flags &&& @extra_flag_no_leash_evade) != 0
+  end
+
+  defp no_leash_evade?(_entity), do: false
 
   defp maybe_dead(%{internal: %Internal{}, unit: %Unit{health: 0}, movement_block: %MovementBlock{}} = entity, now) do
     entity = Movement.sync_position(entity, now)
