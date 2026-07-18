@@ -5,10 +5,13 @@ defmodule ThistleTea.Game.Player.Spells do
   learned or superseded spell.
   """
   alias ThistleTea.Game.Entity.Data.Character
+  alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
+  alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.Entity.Logic.Proficiency
   alias ThistleTea.Game.Entity.Logic.SpellBook
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
+  alias ThistleTea.Game.Spell
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.Loader.Skill, as: SkillLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
@@ -39,6 +42,48 @@ defmodule ThistleTea.Game.Player.Spells do
     new_skills = SkillLoader.initial_skills(internal.spells, unit.race, unit.class, unit.level)
     skills = Map.merge(new_skills, player.skills || %{})
     %{character | player: %{player | skills: skills}}
+  end
+
+  def unlearn(%Character{} = character, spell_ids, now) when is_list(spell_ids) and is_integer(now) do
+    {character, aura_events} = AuraLogic.remove_spells(character, spell_ids, now)
+    character = Event.enqueue(character, aura_events)
+    internal = character.internal
+
+    character = %{
+      character
+      | internal: %{
+          internal
+          | spells: (internal.spells || []) -- spell_ids,
+            spellbook: Map.drop(internal.spellbook || %{}, spell_ids)
+        }
+    }
+
+    CharacterStore.put(character)
+    Enum.each(spell_ids, &Network.send_packet(%Message.SmsgRemovedSpell{spell_id: &1}))
+    character
+  end
+
+  def apply_passives(%Character{internal: %{spellbook: spellbook}} = character, now)
+      when is_map(spellbook) and is_integer(now) do
+    spellbook
+    |> Map.values()
+    |> Enum.filter(&passive_aura_spell?/1)
+    |> Enum.reduce(character, fn spell, character ->
+      if AuraLogic.has_spell?(character, spell.id) do
+        character
+      else
+        {character, events} =
+          AuraLogic.apply_spell(character, character.object.guid, character.unit.level || 1, spell, now)
+
+        Event.enqueue(character, events)
+      end
+    end)
+  end
+
+  def apply_passives(character, _now), do: character
+
+  defp passive_aura_spell?(%Spell{} = spell) do
+    Spell.attribute?(spell, :passive) and (spell.stances || 0) == 0 and Spell.aura_effects(spell) != []
   end
 
   def send_proficiencies(%Character{} = character) do

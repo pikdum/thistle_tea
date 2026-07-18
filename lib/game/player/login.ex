@@ -26,6 +26,7 @@ defmodule ThistleTea.Game.Player.Login do
   alias ThistleTea.Game.Entity.Logic.MovementStats
   alias ThistleTea.Game.Entity.Logic.PlayerFlags
   alias ThistleTea.Game.Entity.Logic.StealthDetection
+  alias ThistleTea.Game.Entity.Logic.Talents, as: LogicTalents
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.BinaryUtils
   alias ThistleTea.Game.Network.Message
@@ -73,6 +74,8 @@ defmodule ThistleTea.Game.Player.Login do
       |> normalize_faction_template()
       |> normalize_death_state(character_guid)
       |> build_spellbook()
+      |> PlayerSpells.apply_passives(Time.now())
+      |> LogicTalents.sync_points()
       |> Enchantments.restore()
       |> evaluate_login_rest()
       |> BT.init(PlayerBT.tree())

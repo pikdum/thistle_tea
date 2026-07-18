@@ -12,5 +12,8 @@ defmodule Talent do
     field(:spell_rank_2, :integer)
     field(:spell_rank_3, :integer)
     field(:spell_rank_4, :integer)
+    field(:prereq_talents_0, :integer)
+    field(:prereq_ranks_0, :integer)
+    field(:required_spell, :integer)
   end
 end

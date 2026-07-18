@@ -31,6 +31,7 @@ defmodule ThistleTea.Game.Player.DevCommands do
   alias ThistleTea.Game.Player.Quests
   alias ThistleTea.Game.Player.Spells
   alias ThistleTea.Game.Player.Stats
+  alias ThistleTea.Game.Player.Talents
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.ItemStore
@@ -58,6 +59,14 @@ defmodule ThistleTea.Game.Player.DevCommands do
       [item_id, count] -> additem(state, item_id, count)
       _ -> system_message(state, "Invalid command. Use: .additem <item_id> [count]")
     end
+    |> handled()
+  end
+
+  def run(state, ".talents reset" <> _) do
+    state = Talents.reset(state)
+
+    state
+    |> system_message("Talents reset.")
     |> handled()
   end
 
@@ -109,6 +118,7 @@ defmodule ThistleTea.Game.Player.DevCommands do
       ".move - move target to you",
       ".pid - show target pid",
       ".pos - show current position",
+      ".talents reset - unlearn all talents and refund points",
       ".rested [amount] - add rested xp",
       ".speed <rate> - modify player speed from 0.1 to 10",
       ".tgm - toggle god mode (no damage taken)",

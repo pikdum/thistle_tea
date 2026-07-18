@@ -1,20 +1,16 @@
 defmodule ThistleTea.Game.World.Loader.ClassSpell do
   @moduledoc """
-  Looks up trainable class spells by class and level from the DBC, plus the
-  non-passive rank-1 talent spells of the class's talent tabs so the debug
-  learn command can grant abilities no trainer teaches.
+  Looks up trainable class spells by class and level from trainer data and
+  class quest rewards so the debug learn command can grant them; talent
+  abilities are earned by spending talent points instead.
   """
-  import Bitwise, only: [<<<: 2, &&&: 2]
   import Ecto.Query
 
   alias ThistleTea.DB.Mangos
   alias ThistleTea.DB.Mangos.CreatureTemplate
   alias ThistleTea.DB.Mangos.NpcTrainer
   alias ThistleTea.DB.Mangos.NpcTrainerTemplate
-  alias ThistleTea.DBC
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
-
-  @spell_attr_passive 0x40
 
   @table_options [:named_table, :public, read_concurrency: true, write_concurrency: :auto]
 
@@ -56,36 +52,7 @@ defmodule ThistleTea.Game.World.Loader.ClassSpell do
   defp class_spells(class) do
     case :ets.lookup(__MODULE__, class) do
       [{^class, spells}] -> spells
-      _ -> cache(class, direct_trainer_spells(class) ++ template_trainer_spells(class) ++ talent_spells(class))
-    end
-  end
-
-  defp talent_spells(class) do
-    class_mask = 1 <<< (class - 1)
-
-    rank_one_ids =
-      DBC.all(
-        from(t in Talent,
-          join: tab in TalentTab,
-          on: t.tab == tab.id,
-          where: tab.class_mask == ^class_mask and t.spell_rank_0 > 0,
-          select: t.spell_rank_0
-        )
-      )
-
-    case rank_one_ids do
-      [] ->
-        []
-
-      ids ->
-        DBC.all(
-          from(s in Spell,
-            where: s.id in ^ids,
-            select: {s.id, s.attributes, s.base_level}
-          )
-        )
-        |> Enum.reject(fn {_id, attributes, _level} -> ((attributes || 0) &&& @spell_attr_passive) != 0 end)
-        |> Enum.map(fn {id, _attributes, base_level} -> {id, max(base_level || 1, 1)} end)
+      _ -> cache(class, direct_trainer_spells(class) ++ template_trainer_spells(class))
     end
   end
 

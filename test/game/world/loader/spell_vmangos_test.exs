@@ -127,18 +127,12 @@ defmodule ThistleTea.Game.World.Loader.SpellVmangosTest do
 
     @describetag :dbc_db
 
-    test "warrior debug spells include non-passive talent actives" do
+    test "talent spells stay out of the debug grant list" do
       spell_ids = ClassSpellLoader.trainable_spell_ids(1, 60)
 
-      assert 12_294 in spell_ids
-      assert 23_881 in spell_ids
-      assert 12_975 in spell_ids
-      assert 12_323 in spell_ids
-    end
-
-    test "passive talents stay out of the grant list" do
-      spell_ids = ClassSpellLoader.trainable_spell_ids(1, 60)
-
+      refute 12_294 in spell_ids
+      refute 23_881 in spell_ids
+      refute 12_975 in spell_ids
       refute 12_320 in spell_ids
     end
   end
@@ -259,13 +253,13 @@ defmodule ThistleTea.Game.World.Loader.SpellVmangosTest do
       assert Enum.any?(vanish.effects, &(&1.type == :trigger_spell and &1.trigger_spell_id == 18_461))
     end
 
-    test "debug rogue spells include active talents but exclude passives" do
+    test "debug rogue spells exclude talents" do
       spell_ids = ClassSpell.trainable_spell_ids(4, 60)
 
-      assert 13_750 in spell_ids
-      assert 13_877 in spell_ids
-      assert 14_177 in spell_ids
-      assert 14_185 in spell_ids
+      refute 13_750 in spell_ids
+      refute 13_877 in spell_ids
+      refute 14_177 in spell_ids
+      refute 14_185 in spell_ids
       refute 14_056 in spell_ids
     end
   end
@@ -314,15 +308,15 @@ defmodule ThistleTea.Game.World.Loader.SpellVmangosTest do
       assert SpellLoader.load(2878).target_creature_type_mask == 32
     end
 
-    test "Lay on Hands loads heal-to-full and paladin debug spells include active talents" do
+    test "Lay on Hands loads heal-to-full and paladin debug spells exclude talents" do
       assert Enum.any?(SpellLoader.load(633).effects, &(&1.type == :heal_max_health))
       assert Enum.any?(SpellLoader.load(639).effects, &(&1.type == :heal))
       assert Enum.any?(SpellLoader.load(19_750).effects, &(&1.type == :heal))
 
       spell_ids = ClassSpell.trainable_spell_ids(2, 60)
-      assert 20_066 in spell_ids
-      assert 20_473 in spell_ids
-      assert 20_375 in spell_ids
+      refute 20_066 in spell_ids
+      refute 20_473 in spell_ids
+      refute 20_375 in spell_ids
     end
   end
 
@@ -388,7 +382,7 @@ defmodule ThistleTea.Game.World.Loader.SpellVmangosTest do
              end)
     end
 
-    test "debug Warlocks learn quest demons alongside trainer and talent spells" do
+    test "debug Warlocks learn quest demons alongside trainer spells but not talents" do
       spell_ids = ClassSpell.trainable_spell_ids(9, 60)
 
       assert 688 in spell_ids
@@ -397,7 +391,7 @@ defmodule ThistleTea.Game.World.Loader.SpellVmangosTest do
       assert 691 in spell_ids
       assert 1122 in spell_ids
       assert 18_540 in spell_ids
-      assert 18_288 in spell_ids
+      refute 18_288 in spell_ids
     end
   end
 
