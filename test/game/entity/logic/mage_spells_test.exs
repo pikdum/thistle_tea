@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Entity.Logic.MageSpellsTest do
   alias ThistleTea.Game.Entity.Logic.SpellFeedback
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
+  alias ThistleTea.Game.Spell.Cooldowns
   alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.Spell.ProcRule
 
@@ -78,6 +79,30 @@ defmodule ThistleTea.Game.Entity.Logic.MageSpellsTest do
       {caster, _events} = Aura.cancel_spell(caster, 28_682, 1_000)
 
       assert caster.unit.auras == []
+    end
+
+    test "the final fire crit activates the deferred cooldown" do
+      caster = combustion_caster(1)
+      [%Holder{spell: proc_spell} = proc_holder, visible] = caster.unit.auras
+
+      proc_spell = %{
+        proc_spell
+        | attributes: MapSet.new([:cooldown_on_event]),
+          category: 1163,
+          category_recovery_time_ms: 180_000
+      }
+
+      caster = %{caster | unit: %{caster.unit | auras: [%{proc_holder | spell: proc_spell}, visible]}}
+      caster = Cooldowns.start(caster, proc_spell, 500)
+      assert Cooldowns.on_cooldown?(caster, proc_spell, 500)
+
+      fireball = %Spell{id: 133, school: :fire, dmg_class: 1}
+      caster = SpellFeedback.receive(caster, spell_outcome(:crit), fireball, 1_000)
+
+      assert caster.unit.auras == []
+      assert Enum.any?(caster.internal.events, &(&1.type == :cooldown_event and &1.spell_id == 11_129))
+      assert Cooldowns.on_cooldown?(caster, proc_spell, 1_001)
+      refute Cooldowns.on_cooldown?(caster, proc_spell, 181_001)
     end
   end
 

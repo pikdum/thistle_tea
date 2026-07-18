@@ -27,6 +27,14 @@ defmodule ThistleTea.Game.Spell.ModifiersTest do
       assert Modifiers.value(entity, unaffected, :critical_chance, 5.0) == 5.0
     end
 
+    test "stacked modifier holders multiply their amounts" do
+      holder = %{modifier_holder(:add_flat_modifier, 10, 7, 0) | stacks: 10}
+      entity = entity([holder])
+      spell = %Spell{spell_family: 8, family_flags_0: 0x1}
+
+      assert Modifiers.value(entity, spell, :critical_chance, 0.0) == 100.0
+    end
+
     test "zero masks affect every spell in the same family" do
       entity = entity([modifier_holder(:add_pct_modifier, -100, 14, 0)])
       spell = %Spell{spell_family: 8, family_flags_0: 0x80000000}

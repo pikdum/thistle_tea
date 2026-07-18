@@ -68,10 +68,13 @@ defmodule ThistleTea.Game.Spell.Modifiers do
         type in @modifier_types,
         is_number(amount),
         class_mask_applies?(class_mask, spell),
-        do: aura
+        do: %{aura | amount: amount * holder_stacks(holder)}
   end
 
   def snapshot(_entity, _spell), do: []
+
+  defp holder_stacks(%Holder{stacks: stacks}) when is_integer(stacks) and stacks > 1, do: stacks
+  defp holder_stacks(_holder), do: 1
 
   def integer_value(entity, %Spell{} = spell, operation, base) when is_number(base) do
     entity

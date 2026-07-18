@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
   alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
+  alias ThistleTea.Game.Spell.Cooldowns
   alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.Spell.Proc
   alias ThistleTea.Game.Spell.Scripts
@@ -40,7 +41,8 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
         {holder, events ++ holder_events}
       end)
 
-    {sync_holders(entity, Enum.reject(holders, &is_nil/1)), events}
+    {entity, removal_events} = sync_removals(entity, Enum.reject(holders, &is_nil/1), context)
+    {entity, events ++ removal_events}
   end
 
   def reactions(
@@ -64,7 +66,8 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
         )
       end)
 
-    {sync_holders(entity, holders), events}
+    {entity, removal_events} = sync_removals(entity, holders, context)
+    {entity, events ++ removal_events}
   end
 
   def reactions(
@@ -87,7 +90,8 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
         {holder, events ++ holder_events}
       end)
 
-    {sync_holders(entity, Enum.reject(holders, &is_nil/1)), events}
+    {entity, removal_events} = sync_removals(entity, Enum.reject(holders, &is_nil/1), context)
+    {entity, events ++ removal_events}
   end
 
   def reactions(entity, _event, _context), do: {entity, []}
@@ -112,6 +116,24 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
   defp sync_holders(%{unit: %Unit{} = unit} = entity, holders) do
     %{entity | unit: UnitSync.sync_unit(%{unit | auras: holders})}
     |> Core.mark_broadcast_update()
+  end
+
+  defp sync_removals(%{unit: %Unit{auras: previous}} = entity, holders, context) do
+    removed = previous -- holders
+    entity = sync_holders(entity, holders)
+
+    case {removed, Map.get(context, :now)} do
+      {[], _now} ->
+        {entity, []}
+
+      {removed, now} when is_integer(now) ->
+        script_events = Script.after_remove(entity, removed)
+        {entity, cooldown_events} = Cooldowns.activate_on_event(entity, removed, now)
+        {entity, script_events ++ cooldown_events}
+
+      {removed, _now} ->
+        {entity, Script.after_remove(entity, removed)}
+    end
   end
 
   defp spend_hit_charge(%Holder{charges: charges} = holder) when is_integer(charges) do

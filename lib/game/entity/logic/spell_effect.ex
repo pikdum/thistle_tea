@@ -1159,11 +1159,11 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
         proc_damage: proc_damage
       )
 
-    {state, reaction_events} = melee_ability_reactions(state, context, spell, damage - absorbed)
+    {state, reaction_events} = melee_ability_reactions(state, context, spell, damage - absorbed, now)
     {state, [event | reaction_events]}
   end
 
-  defp melee_ability_reactions(state, %CastContext{} = context, %Spell{} = spell, damage) when damage > 0 do
+  defp melee_ability_reactions(state, %CastContext{} = context, %Spell{} = spell, damage, now) when damage > 0 do
     if Core.dead?(state) do
       {state, []}
     else
@@ -1171,12 +1171,13 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
         attacker_guid: context.caster_guid,
         proc_type: :take_melee_ability,
         outcome: if(context.melee_crit?, do: :crit, else: :normal),
-        spell: spell
+        spell: spell,
+        now: now
       })
     end
   end
 
-  defp melee_ability_reactions(state, _context, _spell, _damage), do: {state, []}
+  defp melee_ability_reactions(state, _context, _spell, _damage, _now), do: {state, []}
 
   defp mitigate_physical(%{unit: %{normal_resistance: armor}}, %CastContext{} = context, :physical, damage)
        when damage > 0 do
