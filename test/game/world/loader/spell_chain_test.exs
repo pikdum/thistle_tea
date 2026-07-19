@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.World.Loader.SpellChainTest do
   @rank_2 90_000_012
   @rank_3 90_000_013
   @ordinary_spell 90_000_020
+  @ordinary_rank_2 90_000_021
 
   setup do
     SpellChain.init()
@@ -21,11 +22,12 @@ defmodule ThistleTea.Game.World.Loader.SpellChainTest do
     :ets.insert(SpellChain, {{:chain, @rank_1}, chain(@rank_1, 0, 1)})
     :ets.insert(SpellChain, {{:chain, @rank_2}, chain(@rank_1, @rank_1, 2)})
     :ets.insert(SpellChain, {{:chain, @rank_3}, chain(@rank_1, @rank_2, 3)})
-    :ets.insert(SpellChain, {{:chain, @ordinary_spell}, nil})
+    :ets.insert(SpellChain, {{:chain, @ordinary_spell}, chain(@ordinary_spell, 0, 1)})
+    :ets.insert(SpellChain, {{:chain, @ordinary_rank_2}, chain(@ordinary_spell, @ordinary_spell, 2)})
     :ets.insert(Talent, {{:by_spell, @rank_1}, {@talent_id, @talent_tab_id, 0}})
 
     on_exit(fn ->
-      Enum.each([@rank_1, @rank_2, @rank_3, @ordinary_spell], fn spell_id ->
+      Enum.each([@rank_1, @rank_2, @rank_3, @ordinary_spell, @ordinary_rank_2], fn spell_id ->
         :ets.delete(SpellChain, {:chain, spell_id})
         :ets.delete(Talent, {:by_spell, spell_id})
       end)
@@ -34,12 +36,15 @@ defmodule ThistleTea.Game.World.Loader.SpellChainTest do
     :ok
   end
 
-  describe "superseded_by_map/1" do
-    test "uses VMangos chain predecessors for rank replacement" do
-      superseded_by = SpellChain.superseded_by_map([@rank_1, @rank_2, @rank_3])
+  describe "talent rank replacement" do
+    test "does not replace ordinary spell ranks from their chain alone" do
+      spell_ids = [@rank_1, @rank_2, @rank_3, @ordinary_spell, @ordinary_rank_2]
+      superseded_by = Talent.superseded_by_map(spell_ids)
 
       assert superseded_by == %{@rank_1 => @rank_2, @rank_2 => @rank_3}
-      assert {[@rank_3], _events} = SpellBook.learn([@rank_1], [@rank_2, @rank_3], superseded_by)
+
+      {known_ids, _events} = SpellBook.learn([], spell_ids, superseded_by)
+      assert Enum.sort(known_ids) == Enum.sort([@rank_3, @ordinary_spell, @ordinary_rank_2])
     end
   end
 

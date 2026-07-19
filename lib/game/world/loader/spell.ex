@@ -153,9 +153,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
       )
       |> Map.new()
 
-    dbc_map
-    |> Map.merge(TalentLoader.superseded_by_map(spell_ids))
-    |> Map.merge(SpellChainLoader.superseded_by_map(spell_ids))
+    Map.merge(dbc_map, TalentLoader.superseded_by_map(spell_ids))
   end
 
   def superseded_by_map(_spell_ids), do: %{}

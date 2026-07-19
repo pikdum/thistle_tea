@@ -1,6 +1,6 @@
 defmodule ThistleTea.Game.World.Loader.SpellChain do
   @moduledoc """
-  Loads VMangos spell rank lineages used for rank replacement and talent-family resolution.
+  Loads VMangos spell rank lineages used for spell metadata and talent-family resolution.
   """
   import Ecto.Query
 
@@ -32,21 +32,6 @@ defmodule ThistleTea.Game.World.Loader.SpellChain do
   end
 
   def get_many(_spell_ids), do: %{}
-
-  def superseded_by_map(spell_ids) when is_list(spell_ids) do
-    spell_ids
-    |> get_many()
-    |> Enum.flat_map(fn
-      {spell_id, %{prev_spell: prev_spell}} when is_integer(prev_spell) and prev_spell > 0 ->
-        [{prev_spell, spell_id}]
-
-      _entry ->
-        []
-    end)
-    |> Map.new()
-  end
-
-  def superseded_by_map(_spell_ids), do: %{}
 
   defp split_cached(spell_ids) do
     Enum.reduce(spell_ids, {%{}, []}, fn spell_id, {cached, missing} ->

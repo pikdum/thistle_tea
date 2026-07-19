@@ -138,14 +138,29 @@ defmodule ThistleTea.Game.World.Loader.Talent do
   def chain(_spell_id), do: nil
 
   def superseded_by_map(spell_ids) when is_list(spell_ids) do
-    spell_ids
-    |> Enum.flat_map(fn spell_id ->
-      case :ets.lookup(__MODULE__, {:superseded_by, spell_id}) do
-        [{_key, next_spell_id}] -> [{spell_id, next_spell_id}]
-        _ -> []
-      end
-    end)
-    |> Map.new()
+    cached =
+      spell_ids
+      |> Enum.flat_map(fn spell_id ->
+        case :ets.lookup(__MODULE__, {:superseded_by, spell_id}) do
+          [{_key, next_spell_id}] -> [{spell_id, next_spell_id}]
+          _ -> []
+        end
+      end)
+      |> Map.new()
+
+    inherited =
+      spell_ids
+      |> SpellChainLoader.get_many()
+      |> Enum.flat_map(fn
+        {spell_id, %{prev_spell: prev_spell}} when is_integer(prev_spell) and prev_spell > 0 ->
+          if by_spell(spell_id), do: [{prev_spell, spell_id}], else: []
+
+        _entry ->
+          []
+      end)
+      |> Map.new()
+
+    Map.merge(cached, inherited)
   rescue
     ArgumentError -> %{}
   end
