@@ -654,9 +654,12 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
 
   defp pay_and_apply_channel_tick(character, %Cast{} = casting, now) do
     if Resources.can_pay_channel_cost?(character, casting.spell, casting.channel_tick_ms) do
+      targets = resolve_targets(character, casting)
+
       character =
         character
         |> Resources.spend_channel_cost(casting.spell, casting.channel_tick_ms, now)
+        |> apply_spell_hit(casting, targets, now)
 
       casting = Cast.advance_channel_tick(casting, now)
       delay_ms = Cast.next_channel_delay(casting, now)

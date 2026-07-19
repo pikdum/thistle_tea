@@ -182,9 +182,23 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
              ] = mob.internal.events
     end
 
-    test "channel tick applies the spell hit and advances the next tick" do
+    test "channel tick applies periodic trigger effects and advances the next tick" do
       now = 1_000
-      spell = %Spell{id: 10, attributes: MapSet.new([:channeled]), effects: []}
+
+      spell = %Spell{
+        id: 5143,
+        duration_ms: 3_000,
+        attributes: MapSet.new([:channeled]),
+        effects: [
+          %Effect{
+            type: :apply_aura,
+            aura: :periodic_trigger_spell,
+            trigger_spell_id: 7268,
+            implicit_target_a: :caster,
+            amplitude_ms: 1_000
+          }
+        ]
+      }
 
       mob = %Mob{
         object: %Object{guid: 1},
@@ -195,11 +209,11 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
           casting: %Cast{
             spell: spell,
             targets: %Targets{raw: <<0::little-size(16)>>, unit_guid: 1},
-            channel_ms: 8_000,
+            channel_ms: 3_000,
             channel_started?: true,
             channel_tick_ms: 1_000,
             next_channel_tick_at: now - 1,
-            ends_at: now + 8_000
+            ends_at: now + 3_000
           }
         }
       }
@@ -207,7 +221,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
       assert {{:running, delay_ms}, mob, %Blackboard{}} = SpellBT.cast_tick(mob, Blackboard.new(), now)
       assert delay_ms > 0
       assert mob.internal.casting.next_channel_tick_at > now
-      assert mob.internal.events == []
+
+      assert [%Event{type: :trigger_spell, source_guid: 1, target_guid: 1, spell_id: 7268}] =
+               mob.internal.events
     end
 
     test "channel tick spends the spell's per-second health cost" do
