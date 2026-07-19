@@ -9,7 +9,10 @@ defmodule ThistleTea.DevSeed do
   import Ecto.Query
 
   alias ThistleTea.DB.Mangos
+  alias ThistleTea.DBC
+  alias ThistleTea.DevSeed.ActionBars
   alias ThistleTea.Game.Entity.Data.Character
+  alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.Skills
   alias ThistleTea.Game.Entity.Logic.SpellBook
@@ -114,6 +117,7 @@ defmodule ThistleTea.DevSeed do
     |> CharacterLoader.build(account_id)
     |> set_level(@level)
     |> learn_class_spells()
+    |> set_debug_action_bars()
     |> max_skills()
     |> set_coinage(@coinage)
     |> move_to_isle()
@@ -166,6 +170,29 @@ defmodule ThistleTea.DevSeed do
     {all_ids, _events} = SpellBook.learn(existing, new_ids, superseded_by)
 
     %{character | internal: %{internal | spells: all_ids}}
+  end
+
+  defp set_debug_action_bars(
+         %Character{internal: internal, player: %Player{} = player, unit: %{class: class}} = character
+       ) do
+    learned_spells =
+      DBC.all(
+        from(s in Spell,
+          where: s.id in ^internal.spells,
+          select: %{
+            id: s.id,
+            name: s.name_en_gb,
+            level: s.spell_level,
+            base_level: s.base_level
+          }
+        )
+      )
+
+    %{
+      character
+      | player: %{player | action_bars: ActionBars.visible_toggles()},
+        internal: %{internal | action_buttons: ActionBars.build(class, learned_spells)}
+    }
   end
 
   defp max_skills(%Character{unit: unit, player: player, internal: internal} = character) do
