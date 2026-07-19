@@ -636,7 +636,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
 
   defp channel_tick(%{internal: %Internal{}} = character, %Cast{} = casting, now) do
     cond do
-      unit_channel_target_dead?(casting) ->
+      unit_channel_target_dead?(character, casting) ->
         {stop_channel(character, casting), 50}
 
       not cast_target_visible?(character, casting) ->
@@ -669,14 +669,23 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
     end
   end
 
-  defp unit_channel_target_dead?(%Cast{targets: %Targets{unit_guid: guid}}) when is_integer(guid) and guid > 0 do
+  defp unit_channel_target_dead?(%{unit: %{channel_object: guid}}, %Cast{}) when is_integer(guid) and guid > 0 do
+    dead_target?(guid)
+  end
+
+  defp unit_channel_target_dead?(_character, %Cast{targets: %Targets{unit_guid: guid}})
+       when is_integer(guid) and guid > 0 do
+    dead_target?(guid)
+  end
+
+  defp unit_channel_target_dead?(_character, _casting), do: false
+
+  defp dead_target?(guid) do
     case Metadata.query(guid, [:alive?]) do
       %{alive?: false} -> true
       _ -> false
     end
   end
-
-  defp unit_channel_target_dead?(_casting), do: false
 
   defp cast_target_visible?(%{object: %{guid: self_guid}} = character, %Cast{
          spell: %Spell{} = spell,

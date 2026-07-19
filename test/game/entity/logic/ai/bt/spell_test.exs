@@ -18,6 +18,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
   alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.Spell.Targets
   alias ThistleTea.Game.Time
+  alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.WorldRef
 
   describe "start_cast/4" do
@@ -257,6 +258,36 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
 
       assert {{:running, _delay_ms}, mob, %Blackboard{}} = SpellBT.cast_tick(mob, Blackboard.new(), now)
       assert mob.unit.health == 67
+    end
+
+    test "stops when the channel object dies even if the cast target is the caster" do
+      now = 1_000
+      target_guid = System.unique_integer([:positive])
+      Metadata.put(target_guid, %{alive?: false})
+      on_exit(fn -> Metadata.delete(target_guid) end)
+
+      spell = %Spell{id: 5143, attributes: MapSet.new([:channeled]), effects: []}
+
+      mob = %Mob{
+        object: %Object{guid: 1},
+        unit: %Unit{channel_object: target_guid, channel_spell: spell.id},
+        internal: %Internal{
+          casting: %Cast{
+            spell: spell,
+            targets: %Targets{raw: <<0::little-size(16)>>, unit_guid: 1},
+            channel_ms: 5_000,
+            channel_started?: true,
+            channel_tick_ms: 1_000,
+            next_channel_tick_at: now - 1,
+            ends_at: now + 5_000
+          }
+        }
+      }
+
+      assert {{:running, 50}, mob, %Blackboard{}} = SpellBT.cast_tick(mob, Blackboard.new(), now)
+      assert mob.internal.casting == nil
+      assert mob.unit.channel_object == 0
+      assert mob.unit.channel_spell == 0
     end
   end
 
