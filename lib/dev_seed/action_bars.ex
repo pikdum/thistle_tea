@@ -588,12 +588,13 @@ defmodule ThistleTea.DevSeed.ActionBars do
     start = Map.fetch!(@bar_starts, bar)
 
     spell_names
-    |> Enum.with_index(start)
-    |> Enum.flat_map(fn {name, slot} ->
+    |> Enum.flat_map(fn name ->
       case Map.get(highest_by_name, name) do
         nil -> []
-        spell -> [{slot, spell.id}]
+        spell -> [spell]
       end
     end)
+    |> Enum.with_index(start)
+    |> Map.new(fn {spell, slot} -> {slot, spell.id} end)
   end
 end

@@ -21,11 +21,23 @@ defmodule ThistleTea.DevSeed.ActionBarsTest do
 
       buttons = ActionBars.build(8, spells)
 
-      assert buttons[1] == 10_149
-      assert buttons[2] == 10_180
-      assert buttons[27] == 3561
+      assert buttons[0] == 10_149
+      assert buttons[1] == 10_180
+      assert buttons[24] == 3561
       refute 133 in Map.values(buttons)
       refute 143 in Map.values(buttons)
+    end
+
+    test "compacts unavailable spells within each bar" do
+      buttons =
+        ActionBars.build(2, [
+          spell(6603, "Attack", 1),
+          spell(20_271, "Judgement", 4),
+          spell(853, "Hammer of Justice", 8),
+          spell(633, "Lay on Hands", 10)
+        ])
+
+      assert buttons == %{0 => 6603, 1 => 20_271, 2 => 853, 60 => 633}
     end
 
     test "places warrior abilities on their stance pages" do
@@ -37,10 +49,10 @@ defmodule ThistleTea.DevSeed.ActionBarsTest do
           spell(20_616, "Intercept", 42)
         ])
 
-      assert buttons[75] == 11_578
-      assert buttons[86] == 11_600
-      assert buttons[94] == 23_923
-      assert buttons[101] == 20_616
+      assert buttons[72] == 11_578
+      assert buttons[84] == 11_600
+      assert buttons[85] == 23_923
+      assert buttons[96] == 20_616
     end
 
     test "places druid abilities on their form pages" do
@@ -52,8 +64,8 @@ defmodule ThistleTea.DevSeed.ActionBarsTest do
         ])
 
       assert buttons[0] == 8905
-      assert buttons[73] == 9849
-      assert buttons[97] == 9880
+      assert buttons[72] == 9849
+      assert buttons[96] == 9880
     end
 
     test "skips configured spells the character has not learned" do
