@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.Spell.Scripts
   alias ThistleTea.Game.World.Loader.CreatureTemplate, as: CreatureTemplateLoader
+  alias ThistleTea.Game.World.Loader.SpellChain, as: SpellChainLoader
   alias ThistleTea.Game.World.Loader.SpellEffectOverride, as: SpellEffectOverrideLoader
   alias ThistleTea.Game.World.Loader.SpellProcEvent, as: SpellProcEventLoader
   alias ThistleTea.Game.World.Loader.SpellScript, as: SpellScriptLoader
@@ -40,43 +41,10 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   def load(_), do: nil
 
   def chain(spell_id) when is_integer(spell_id) and spell_id > 0 do
-    case :ets.lookup(__MODULE__, {:chain, spell_id}) do
-      [{_key, nil}] -> TalentLoader.chain(spell_id)
-      [{_key, chain}] -> chain
-      _ -> cache({:chain, spell_id}, load_chain(spell_id)) || TalentLoader.chain(spell_id)
-    end
+    SpellChainLoader.get(spell_id) || TalentLoader.chain(spell_id)
   end
 
   def chain(_spell_id), do: nil
-
-  defp load_chain(spell_id) do
-    row =
-      Mangos.Repo.all(from(chain in Mangos.SpellChain, where: chain.spell_id == ^spell_id))
-      |> select_matching_chain(spell_id)
-
-    case row do
-      %Mangos.SpellChain{} = row ->
-        %{first_spell: row.first_spell, rank: row.rank, prev_spell: row.prev_spell, req_spell: row.req_spell}
-
-      _ ->
-        nil
-    end
-  end
-
-  defp select_matching_chain(rows, spell_id) do
-    current_name = spell_name(spell_id)
-
-    rows
-    |> Enum.filter(&(spell_name(&1.first_spell) == current_name))
-    |> Enum.max_by(&(&1.rank || 0), fn -> List.first(rows) end)
-  end
-
-  defp spell_name(spell_id) do
-    case DBC.get(Spell, spell_id) do
-      %Spell{name_en_gb: name} -> name
-      _ -> nil
-    end
-  end
 
   def target_position(spell_id) when is_integer(spell_id) and spell_id > 0 do
     case :ets.lookup(__MODULE__, {:target_position, spell_id}) do
@@ -185,7 +153,9 @@ defmodule ThistleTea.Game.World.Loader.Spell do
       )
       |> Map.new()
 
-    Map.merge(dbc_map, TalentLoader.superseded_by_map(spell_ids))
+    dbc_map
+    |> Map.merge(TalentLoader.superseded_by_map(spell_ids))
+    |> Map.merge(SpellChainLoader.superseded_by_map(spell_ids))
   end
 
   def superseded_by_map(_spell_ids), do: %{}
@@ -321,10 +291,11 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   end
 
   defp load_chain_map(spell_ids) do
+    vmangos_chains = SpellChainLoader.get_many(spell_ids)
+
     spell_ids
-    |> Enum.map(&{&1, chain(&1)})
-    |> Enum.reject(fn {_id, chain} -> is_nil(chain) end)
-    |> Map.new()
+    |> Map.new(&{&1, Map.get(vmangos_chains, &1) || TalentLoader.chain(&1)})
+    |> Map.reject(fn {_id, chain} -> is_nil(chain) end)
   end
 
   defp put_chain(%SpellData{} = spell, %{first_spell: first_spell, rank: rank}) do

@@ -31,6 +31,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.World.Loader.PageText, as: PageTextLoader
   alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
+  alias ThistleTea.Game.World.Loader.SpellChain, as: SpellChainLoader
   alias ThistleTea.Game.World.Loader.SpellEffectOverride, as: SpellEffectOverrideLoader
   alias ThistleTea.Game.World.Loader.SpellProcEvent, as: SpellProcEventLoader
   alias ThistleTea.Game.World.Loader.SpellScript, as: SpellScriptLoader
@@ -130,6 +131,7 @@ defmodule ThistleTea.Application do
     GameObjectTemplateLoader.init()
     FishingLoader.init()
     SpellLoader.init()
+    SpellChainLoader.init()
     SpellEffectOverrideLoader.init()
     SpellProcEventLoader.init()
     SpellScriptLoader.init()

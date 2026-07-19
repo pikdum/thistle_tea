@@ -775,8 +775,8 @@ defmodule ThistleTea.Game.Player.DevCommands do
     end
   end
 
-  defp debug_spell_ids(%{character: %Character{unit: %{class: class, level: level}}}) do
-    ClassSpell.trainable_spell_ids(class, level)
+  defp debug_spell_ids(%{character: %Character{internal: internal, unit: %{class: class, level: level}}}) do
+    ClassSpell.trainable_spell_ids(class, level, internal.spells || [])
   end
 
   defp debug_spell_ids(_state), do: []

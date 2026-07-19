@@ -1,8 +1,8 @@
 defmodule ThistleTea.Game.World.Loader.ClassSpell do
   @moduledoc """
   Looks up trainable class spells by class and level from trainer data and
-  class quest rewards so the debug learn command can grant them; talent
-  abilities are earned by spending talent points instead.
+  class quest rewards so the debug learn command can grant them. Trained
+  talent ranks require an already known spell from the same talent family.
   """
   import Ecto.Query
 
@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.World.Loader.ClassSpell do
   alias ThistleTea.DB.Mangos.NpcTrainer
   alias ThistleTea.DB.Mangos.NpcTrainerTemplate
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
+  alias ThistleTea.Game.World.Loader.SpellChain, as: SpellChainLoader
   alias ThistleTea.Game.World.Loader.Talent, as: TalentLoader
 
   @table_options [:named_table, :public, read_concurrency: true, write_concurrency: :auto]
@@ -37,7 +38,10 @@ defmodule ThistleTea.Game.World.Loader.ClassSpell do
     end
   end
 
-  def trainable_spell_ids(class, level) when is_integer(class) and is_integer(level) do
+  def trainable_spell_ids(class, level), do: trainable_spell_ids(class, level, [])
+
+  def trainable_spell_ids(class, level, known_spell_ids)
+      when is_integer(class) and is_integer(level) and is_list(known_spell_ids) do
     class
     |> class_spells()
     |> Kernel.++(Map.get(@quest_reward_spells, class, []))
@@ -46,10 +50,33 @@ defmodule ThistleTea.Game.World.Loader.ClassSpell do
     |> Enum.uniq()
     |> Enum.sort()
     |> SpellLoader.learned_spell_ids()
-    |> Enum.reject(&TalentLoader.by_spell/1)
+    |> grantable_spell_ids(known_spell_ids)
   end
 
-  def trainable_spell_ids(_class, _level), do: []
+  def trainable_spell_ids(_class, _level, _known_spell_ids), do: []
+
+  def grantable_spell_ids(spell_ids, known_spell_ids) when is_list(spell_ids) and is_list(known_spell_ids) do
+    SpellChainLoader.get_many(spell_ids ++ known_spell_ids)
+
+    known_talent_ids =
+      known_spell_ids
+      |> Enum.flat_map(fn spell_id ->
+        case TalentLoader.by_spell(spell_id) do
+          {talent_id, _tab_id, _rank_index} -> [talent_id]
+          _not_talent -> []
+        end
+      end)
+      |> MapSet.new()
+
+    Enum.filter(spell_ids, fn spell_id ->
+      case TalentLoader.by_spell(spell_id) do
+        {talent_id, _tab_id, _rank_index} -> MapSet.member?(known_talent_ids, talent_id)
+        _not_talent -> true
+      end
+    end)
+  end
+
+  def grantable_spell_ids(_spell_ids, _known_spell_ids), do: []
 
   defp class_spells(class) do
     case :ets.lookup(__MODULE__, class) do

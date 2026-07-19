@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.World.Loader.Talent do
 
   alias ThistleTea.DBC
   alias ThistleTea.Game.Entity.Data.Talent, as: TalentData
+  alias ThistleTea.Game.World.Loader.SpellChain, as: SpellChainLoader
 
   @classes 1..11
   @learn_spell_effect 36
@@ -93,15 +94,37 @@ defmodule ThistleTea.Game.World.Loader.Talent do
   def tab_ids(_class), do: []
 
   def by_spell(spell_id) when is_integer(spell_id) and spell_id > 0 do
-    case :ets.lookup(__MODULE__, {:by_spell, spell_id}) do
-      [{_key, entry}] -> entry
-      _ -> nil
-    end
+    cached_spell_identity(spell_id) || inherit_spell_identity(spell_id, MapSet.new())
   rescue
     ArgumentError -> nil
   end
 
   def by_spell(_spell_id), do: nil
+
+  defp cached_spell_identity(spell_id) do
+    case :ets.lookup(__MODULE__, {:by_spell, spell_id}) do
+      [{_key, entry}] -> entry
+      _missing -> nil
+    end
+  end
+
+  defp inherit_spell_identity(spell_id, visited) do
+    if !MapSet.member?(visited, spell_id) do
+      inherit_spell_identity(spell_id, SpellChainLoader.get(spell_id), visited)
+    end
+  end
+
+  defp inherit_spell_identity(spell_id, %{prev_spell: prev_spell}, visited)
+       when is_integer(prev_spell) and prev_spell > 0 do
+    identity =
+      cached_spell_identity(prev_spell) ||
+        inherit_spell_identity(prev_spell, MapSet.put(visited, spell_id))
+
+    if identity, do: :ets.insert(__MODULE__, {{:by_spell, spell_id}, identity})
+    identity
+  end
+
+  defp inherit_spell_identity(_spell_id, _chain, _visited), do: nil
 
   def chain(spell_id) when is_integer(spell_id) and spell_id > 0 do
     case :ets.lookup(__MODULE__, {:chain, spell_id}) do
