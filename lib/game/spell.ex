@@ -238,6 +238,21 @@ defmodule ThistleTea.Game.Spell do
 
   def harmful?(_spell), do: false
 
+  def healing?(%__MODULE__{effects: effects}) do
+    Enum.any?(effects, fn
+      %Effect{type: type} when type in [:heal, :heal_max_health] ->
+        true
+
+      %Effect{type: type, aura: aura} when type in [:apply_aura, :apply_area_aura] ->
+        aura in [:periodic_heal, :obs_mod_health]
+
+      _effect ->
+        false
+    end)
+  end
+
+  def healing?(_spell), do: false
+
   def resurrect_spell?(%__MODULE__{effects: effects}) do
     Enum.any?(effects, &match?(%Effect{type: type} when type in [:resurrect, :resurrect_new], &1))
   end

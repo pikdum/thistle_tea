@@ -1437,7 +1437,13 @@ defmodule ThistleTea.Game.Entity.EventSink do
     emit(entity, Event.deliver_spell(event.target_guid, context, spell))
   end
 
-  defp apply_trigger_override(%Spell{effects: effects} = spell, %Event{slot: index, amount: amount})
+  defp apply_trigger_override(%Spell{} = spell, %Event{} = event) do
+    spell
+    |> apply_trigger_effect_override(event)
+    |> apply_trigger_duration_override(event)
+  end
+
+  defp apply_trigger_effect_override(%Spell{effects: effects} = spell, %Event{slot: index, amount: amount})
        when is_integer(index) and is_integer(amount) do
     effects =
       Enum.map(effects, fn
@@ -1448,7 +1454,14 @@ defmodule ThistleTea.Game.Entity.EventSink do
     %{spell | effects: effects}
   end
 
-  defp apply_trigger_override(spell, _event), do: spell
+  defp apply_trigger_effect_override(spell, _event), do: spell
+
+  defp apply_trigger_duration_override(%Spell{} = spell, %Event{duration_ms: duration_ms})
+       when is_integer(duration_ms) and duration_ms > 0 do
+    %{spell | duration_ms: duration_ms, max_duration_ms: duration_ms}
+  end
+
+  defp apply_trigger_duration_override(spell, _event), do: spell
 
   defp triggered_target(%{object: %{guid: guid}} = entity, %Event{source_guid: guid} = event, spell) do
     SpellTarget.redirect_trigger_target(entity, event.target_guid, spell)

@@ -19,6 +19,8 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Script do
   @sweeping_strikes_loop_spells [12_723, 26_654]
   @retaliation 20_230
   @retaliation_strike 22_858
+  @spirit_of_redemption_state 27_795
+  @spirit_of_redemption_suicide 27_965
   @whirlwind 1680
   @melee_radius 5.0
   @whirlwind_radius 8.0
@@ -242,11 +244,28 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Script do
          caster_level: caster_level
        })
        when is_integer(caster_guid) and is_integer(target_guid) do
-    case {spell.script_name, @wyvern_sting_poison_by_rank[spell_id]} do
-      {"spell_hunter_wyvern_sting", poison_id} when is_integer(poison_id) ->
-        [Event.trigger_spell(caster_guid, caster_level, target_guid, poison_id)]
+    cond do
+      spell_id == @spirit_of_redemption_state ->
+        [
+          Event.trigger_spell(
+            caster_guid,
+            caster_level || 1,
+            target_guid,
+            @spirit_of_redemption_suicide,
+            triggered_by_spell_id: spell_id
+          )
+        ]
 
-      _other ->
+      Spell.vmangos_script?(spell, "spell_hunter_wyvern_sting") ->
+        case @wyvern_sting_poison_by_rank[spell_id] do
+          poison_id when is_integer(poison_id) ->
+            [Event.trigger_spell(caster_guid, caster_level, target_guid, poison_id)]
+
+          _poison_id ->
+            []
+        end
+
+      true ->
         shapeshift_after_remove(entity, spell)
     end
   end

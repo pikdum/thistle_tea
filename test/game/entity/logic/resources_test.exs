@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.Entity.Logic.ResourcesTest do
   use ExUnit.Case, async: true
 
+  alias ThistleTea.Game.Aura, as: AuraData
   alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Unit
@@ -216,6 +217,25 @@ defmodule ThistleTea.Game.Entity.Logic.ResourcesTest do
       }
 
       assert Resources.spend_power(entity, %Spell{mana_cost: 0, power_type: 0}, 5_000) == entity
+    end
+
+    test "school power-cost auras make Spirit of Redemption heals free" do
+      free_holy = %Holder{
+        spell: %Spell{id: 27_792},
+        auras: [%AuraData{type: :mod_power_cost_school_pct, amount: -100, misc_value: 0x2}]
+      }
+
+      entity = %Mob{
+        unit: %Unit{power_type: 0, power1: 100, max_power1: 100, auras: [free_holy]},
+        internal: %Internal{}
+      }
+
+      heal = %Spell{school: :holy, mana_cost: 30, power_type: 0}
+      smite = %Spell{school: :shadow, mana_cost: 30, power_type: 0}
+
+      assert Resources.power_cost(entity, heal) == 0
+      assert Resources.power_cost(entity, smite) == 30
+      assert Resources.spend_power(entity, heal, 5_000).unit.power1 == 100
     end
   end
 

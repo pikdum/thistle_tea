@@ -28,6 +28,7 @@ defmodule ThistleTea.Game.Spell.CastValidation do
 
   def validate(caster, %Spell{} = spell, %Targets{} = targets, target_info, now, opts \\ []) do
     with :ok <- check_caster_alive(caster),
+         :ok <- check_spirit_of_redemption(caster, spell),
          :ok <- check_caster_state(caster, spell, now),
          :ok <- check_combat_state(caster, spell),
          :ok <- check_stance(caster, spell),
@@ -75,6 +76,14 @@ defmodule ThistleTea.Game.Spell.CastValidation do
 
   defp check_caster_alive(caster) do
     if Core.dead?(caster), do: {:error, :caster_dead}, else: :ok
+  end
+
+  defp check_spirit_of_redemption(caster, %Spell{} = spell) do
+    if AuraLogic.has_spell?(caster, 27_827) and not Spell.healing?(spell) do
+      {:error, :not_shapeshift}
+    else
+      :ok
+    end
   end
 
   defp check_combat_state(%{internal: %{in_combat: true}}, %Spell{} = spell) do

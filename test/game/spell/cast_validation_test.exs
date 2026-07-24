@@ -283,6 +283,25 @@ defmodule ThistleTea.Game.Spell.CastValidationTest do
                CastValidation.validate(caster(health: 0), harmful_spell(), Targets.unit(7), hostile_target(), @now)
     end
 
+    test "allows only healing spells in Spirit of Redemption" do
+      spirit = %Holder{spell: %Spell{id: 27_827}}
+      caster = caster(auras: [spirit])
+
+      renew =
+        helpful_spell(effects: [%Effect{type: :apply_aura, aura: :periodic_heal, implicit_target_a: :target_ally}])
+
+      shield =
+        helpful_spell(effects: [%Effect{type: :apply_aura, aura: :school_absorb, implicit_target_a: :target_ally}])
+
+      assert :ok = CastValidation.validate(caster, renew, Targets.unit(7), friendly_target(), @now)
+
+      assert {:error, :not_shapeshift} =
+               CastValidation.validate(caster, shield, Targets.unit(7), friendly_target(), @now)
+
+      assert {:error, :not_shapeshift} =
+               CastValidation.validate(caster, harmful_spell(), Targets.unit(7), hostile_target(), @now)
+    end
+
     test "rejects insufficient power" do
       assert {:error, :no_power} =
                CastValidation.validate(caster(power1: 10), harmful_spell(), Targets.unit(7), hostile_target(), @now)

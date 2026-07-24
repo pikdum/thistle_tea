@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Entity.Logic.Hostility do
   alias ThistleTea.Game.World.Metadata
 
   @unit_flag_non_attackable 0x00000002
+  @unit_flag_non_attackable_2 0x00010000
   @unit_flag_not_selectable 0x02000000
 
   def hostile?(source, target) do
@@ -137,6 +138,6 @@ defmodule ThistleTea.Game.Entity.Logic.Hostility do
   defp targetable?(_target), do: true
 
   defp targetable_unit_flags?(flags) when is_integer(flags) do
-    (flags &&& (@unit_flag_non_attackable ||| @unit_flag_not_selectable)) == 0
+    (flags &&& (@unit_flag_non_attackable ||| @unit_flag_non_attackable_2 ||| @unit_flag_not_selectable)) == 0
   end
 end

@@ -361,6 +361,28 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
              end)
     end
 
+    test "expiring Spirit of Redemption triggers the real death spell" do
+      entity = fixture_entity()
+
+      spirit_state = %Spell{
+        id: 27_795,
+        duration_ms: 15_000,
+        attributes: MapSet.new([:passive]),
+        effects: [
+          %Effect{index: 0, type: :apply_aura, aura: :spirit_of_redemption}
+        ]
+      }
+
+      {entity, _events} = apply_spell(entity, 1, 60, spirit_state)
+      expires_at = entity.unit.auras |> hd() |> Map.fetch!(:expires_at)
+      {_entity, events} = Aura.expire_due(entity, expires_at)
+
+      assert Enum.any?(events, fn event ->
+               event.type == :trigger_spell and event.source_guid == 1 and event.target_guid == 1 and
+                 event.spell_id == 27_965
+             end)
+    end
+
     test "ignores spell IDs without the VMangos aura script label" do
       entity = fixture_entity()
 
@@ -1784,6 +1806,43 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
       assert entity.unit.power_type == 0
       assert entity.unit.power2 == 0
       assert entity.unit.display_id == 55
+    end
+
+    test "uses the Spirit of Redemption display" do
+      entity = fixture_entity()
+      entity = %{entity | unit: %{entity.unit | native_display_id: 55, display_id: 55}}
+
+      spirit = %Spell{
+        id: 27_827,
+        duration_ms: 15_000,
+        effects: [
+          %Effect{index: 0, type: :apply_aura, aura: :mod_shapeshift, misc_value: 32}
+        ]
+      }
+
+      {entity, _events} = apply_spell(entity, 1, 60, spirit)
+
+      assert entity.unit.shapeshift_form == 32
+      assert entity.unit.display_id == 16_031
+    end
+  end
+
+  describe "unattackable auras" do
+    test "sets and clears the aura-derived non-attackable flag" do
+      spell = %Spell{
+        id: 27_792,
+        duration_ms: 15_000,
+        effects: [
+          %Effect{index: 0, type: :apply_aura, aura: :mod_unattackable}
+        ]
+      }
+
+      {entity, _events} = apply_spell(fixture_entity(), 1, 60, spell)
+      assert (entity.unit.flags &&& 0x00010000) != 0
+
+      [holder] = entity.unit.auras
+      {entity, _events} = Aura.expire_due(entity, holder.expires_at)
+      assert (entity.unit.flags &&& 0x00010000) == 0
     end
   end
 

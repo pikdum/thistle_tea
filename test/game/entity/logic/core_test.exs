@@ -3,11 +3,13 @@ defmodule ThistleTea.Game.Entity.Logic.CoreTest do
 
   alias ThistleTea.Game.Aura
   alias ThistleTea.Game.Aura.Holder
+  alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
   alias ThistleTea.Game.Entity.Data.Component.Internal.Loot
   alias ThistleTea.Game.Entity.Data.Component.Internal.Spawn
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
+  alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.Core
@@ -165,6 +167,54 @@ defmodule ThistleTea.Game.Entity.Logic.CoreTest do
     end
   end
 
+  describe "take_damage_with_absorb/4 Spirit of Redemption" do
+    test "turns the first lethal hit into a fifteen-second spirit form" do
+      temporary = %Holder{spell: %Spell{id: 139}}
+      entity = spirit_priest([spirit_talent(), temporary])
+
+      {entity, absorbed} = Core.take_damage_with_absorb(entity, 30, 1_000, source: 777)
+
+      assert absorbed == 0
+      refute Core.dead?(entity)
+      assert entity.unit.health == 100
+      assert entity.unit.power1 == 80
+      assert entity.unit.target == 0
+      assert entity.internal.killed_by == 777
+      assert entity.internal.rooted?
+      assert entity.unit.auras == [spirit_talent()]
+
+      assert [
+               %{type: :trigger_spell, spell_id: 27_827, duration_ms: 15_000, amount: 100, slot: 0},
+               %{type: :trigger_spell, spell_id: 27_792, duration_ms: 15_000},
+               %{type: :trigger_spell, spell_id: 27_795, duration_ms: 15_000}
+             ] = Enum.filter(entity.internal.events, &(&1.type == :trigger_spell))
+    end
+
+    test "absorbs damage while the spirit form is active" do
+      spirit_form = %Holder{spell: %Spell{id: 27_827}}
+      entity = spirit_priest([spirit_talent(), spirit_form])
+
+      {entity, absorbed} = Core.take_damage_with_absorb(entity, 50, 1_000, source: 777)
+
+      assert entity.unit.health == 30
+      assert absorbed == 50
+    end
+
+    test "lets the expiry suicide perform the real death without retriggering" do
+      spirit_form = %Holder{spell: %Spell{id: 27_827}}
+      entity = spirit_priest([spirit_talent(), spirit_form])
+
+      {entity, _absorbed} =
+        Core.take_damage_with_absorb(entity, 30, 16_000,
+          source: entity.object.guid,
+          spell_id: 27_965
+        )
+
+      assert Core.dead?(entity)
+      refute Enum.any?(entity.internal.events, &(&1.type == :trigger_spell and &1.spell_id == 27_827))
+    end
+  end
+
   describe "should_tether?/2" do
     test "returns true when outside tether range after timeout" do
       entity = entity(position: {100.0, 0.0, 0.0, 0.0}, last_hostile_time: 1_000)
@@ -243,6 +293,29 @@ defmodule ThistleTea.Game.Entity.Logic.CoreTest do
       caster_guid: 2,
       spell: %Spell{id: 25_228, name: "Soul Link"},
       auras: [%Aura{type: :split_damage_percent, amount: 30, misc_value: 127}]
+    }
+  end
+
+  defp spirit_talent do
+    %Holder{spell: %Spell{id: 20_711, attributes: MapSet.new([:passive])}}
+  end
+
+  defp spirit_priest(auras) do
+    %Character{
+      object: %Object{guid: 5},
+      unit: %Unit{
+        class: 5,
+        level: 60,
+        health: 30,
+        max_health: 100,
+        power1: 10,
+        max_power1: 80,
+        target: 9,
+        auras: auras
+      },
+      player: %Player{},
+      internal: %Internal{in_combat: true},
+      movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}, spline_nodes: []}
     }
   end
 

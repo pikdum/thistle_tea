@@ -610,6 +610,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp aura_type(68), do: :mod_stalked
   defp aura_type(69), do: :school_absorb
   defp aura_type(71), do: :mod_spell_crit_chance_school
+  defp aura_type(72), do: :mod_power_cost_school_pct
   defp aura_type(79), do: :mod_damage_percent_done
   defp aura_type(81), do: :split_damage_percent
   defp aura_type(82), do: :water_breathing
@@ -622,6 +623,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp aura_type(88), do: :mod_health_regen_percent
   defp aura_type(91), do: :mod_detect_range
   defp aura_type(92), do: :prevent_fleeing
+  defp aura_type(93), do: :mod_unattackable
   defp aura_type(94), do: :interrupt_regen
   defp aura_type(95), do: :ghost
   defp aura_type(97), do: :mana_shield
@@ -673,6 +675,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp aura_type(169), do: :mod_crit_percent_versus
   defp aura_type(174), do: :mod_spell_damage_of_stat_percent
   defp aura_type(175), do: :mod_spell_healing_of_stat_percent
+  defp aura_type(176), do: :spirit_of_redemption
   defp aura_type(179), do: :mod_attacker_spell_crit_chance
   defp aura_type(182), do: :mod_resistance_of_stat_percent
   defp aura_type(185), do: :mod_attacker_ranged_hit_chance

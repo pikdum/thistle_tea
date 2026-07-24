@@ -44,7 +44,6 @@ defmodule ThistleTea.Game.Spell.SupportMatrix do
     32 => :mod_mounted_speed,
     75 => :mod_language,
     78 => :mounted,
-    93 => :death_ward,
     100 => :auras_visible,
     155 => :water_breathing_pct,
     156 => :mod_reputation_gain,

@@ -550,6 +550,7 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
       triggering_spell_id: Keyword.get(opts, :triggered_by_spell_id),
       slot: Keyword.get(opts, :effect_index),
       amount: Keyword.get(opts, :base_points),
+      duration_ms: Keyword.get(opts, :duration_ms),
       resolve_targets?: Keyword.get(opts, :resolve_targets?, false)
     }
   end

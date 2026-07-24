@@ -32,6 +32,11 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
 
   @extra_flag_no_leash_evade 0x00000001
   @leash_timeout_ms 6_000
+  @spirit_of_redemption_talent 20_711
+  @spirit_of_redemption_form 27_827
+  @spirit_of_redemption_auras [27_827, 27_792, 27_795]
+  @spirit_of_redemption_suicide 27_965
+  @spirit_of_redemption_duration_ms 15_000
 
   def update_object(entity, update_type \\ :create_object2)
   def update_object(%Mob{} = entity, update_type), do: update_object(entity, update_type, :unit)
@@ -69,39 +74,44 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
   def take_damage_with_absorb(entity, _damage, _now, _opts), do: {entity, 0}
 
   defp take_unblocked_damage(%{unit: %Unit{health: health}} = entity, damage, now, opts) do
-    school = Keyword.get(opts, :school, :physical)
-    damage = scale_damage_taken(entity, damage, school)
-    {damage, redirect} = Aura.damage_redirect(entity, damage, school)
-    entity = enqueue_redirect(entity, redirect, Keyword.get(opts, :source), school)
-    {entity, remaining} = Aura.absorb_damage(entity, damage, school)
-    absorbed = damage - remaining
-    %{unit: unit} = entity
-    new_health = max(health - remaining, 0)
+    if spirit_damage_immune?(entity, opts) do
+      {entity, damage}
+    else
+      school = Keyword.get(opts, :school, :physical)
+      damage = scale_damage_taken(entity, damage, school)
+      {damage, redirect} = Aura.damage_redirect(entity, damage, school)
+      entity = enqueue_redirect(entity, redirect, Keyword.get(opts, :source), school)
+      {entity, remaining} = Aura.absorb_damage(entity, damage, school)
+      absorbed = damage - remaining
+      %{unit: unit} = entity
+      new_health = max(health - remaining, 0)
 
-    entity = %{entity | unit: %{unit | health: new_health}}
-    entity = Aura.enqueue_death_item_rewards(entity, health, new_health)
+      entity = %{entity | unit: %{unit | health: new_health}}
+      entity = Aura.enqueue_death_item_rewards(entity, health, new_health)
 
-    entity =
-      if remaining > 0 do
+      entity =
+        if remaining > 0 do
+          entity
+          |> Aura.break_on_damage(now)
+          |> CastPushback.on_damage(now, opts)
+        else
+          entity
+        end
+
+      entity =
         entity
-        |> Aura.break_on_damage(now)
-        |> CastPushback.on_damage(now, opts)
-      else
-        entity
-      end
+        |> gain_taken_rage(remaining, Keyword.get(opts, :source))
+        |> Reactive.sync_health()
+        |> Threat.add_damage(Keyword.get(opts, :source), damage * Keyword.get(opts, :threat_multiplier, 1.0))
+        |> maybe_enqueue_death_root(health, new_health)
+        |> maybe_prepare_self_res(health, new_health)
+        |> maybe_record_killer(health, new_health, Keyword.get(opts, :source))
+        |> maybe_enter_spirit_of_redemption(health, new_health, now, opts)
+        |> mark_broadcast_update()
+        |> maybe_dead(now)
 
-    entity =
-      entity
-      |> gain_taken_rage(remaining, Keyword.get(opts, :source))
-      |> Reactive.sync_health()
-      |> Threat.add_damage(Keyword.get(opts, :source), damage * Keyword.get(opts, :threat_multiplier, 1.0))
-      |> maybe_enqueue_death_root(health, new_health)
-      |> maybe_prepare_self_res(health, new_health)
-      |> maybe_record_killer(health, new_health, Keyword.get(opts, :source))
-      |> mark_broadcast_update()
-      |> maybe_dead(now)
-
-    {entity, absorbed}
+      {entity, absorbed}
+    end
   end
 
   defp take_unblocked_damage(entity, _damage, _now, _opts), do: {entity, 0}
@@ -239,6 +249,12 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
   defp no_leash_evade?(_entity), do: false
 
   defp maybe_dead(%{internal: %Internal{}, unit: %Unit{health: 0}, movement_block: %MovementBlock{}} = entity, now) do
+    prepare_death_state(entity, now)
+  end
+
+  defp maybe_dead(entity, _now), do: entity
+
+  defp prepare_death_state(%{internal: %Internal{}, unit: %Unit{}, movement_block: %MovementBlock{}} = entity, now) do
     entity = Movement.sync_position(entity, now)
     %{unit: unit, movement_block: mb} = entity
 
@@ -271,7 +287,64 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
     |> Combat.sync_combat_flag()
   end
 
-  defp maybe_dead(entity, _now), do: entity
+  defp spirit_damage_immune?(entity, opts) do
+    Keyword.get(opts, :spell_id) != @spirit_of_redemption_suicide and holder_spell?(entity, @spirit_of_redemption_form)
+  end
+
+  defp maybe_enter_spirit_of_redemption(
+         %{player: _player, object: %{guid: guid}, unit: %Unit{}, internal: %Internal{}} = entity,
+         health,
+         new_health,
+         now,
+         opts
+       )
+       when is_number(health) and health > 0 and new_health <= 0 and is_integer(guid) do
+    if start_spirit_of_redemption?(entity, opts),
+      do: enter_spirit_of_redemption(entity, guid, now),
+      else: entity
+  end
+
+  defp maybe_enter_spirit_of_redemption(entity, _health, _new_health, _now, _opts), do: entity
+
+  defp start_spirit_of_redemption?(entity, opts) do
+    Keyword.get(opts, :spell_id) != @spirit_of_redemption_suicide and
+      holder_spell?(entity, @spirit_of_redemption_talent)
+  end
+
+  defp enter_spirit_of_redemption(%{unit: %Unit{} = unit, internal: %Internal{} = internal} = entity, guid, now) do
+    unit = %{
+      unit
+      | health: max(unit.max_health || 1, 1),
+        power1: max(unit.max_power1 || 0, 0)
+    }
+
+    entity =
+      %{entity | unit: unit, internal: %{internal | rooted?: true}}
+      |> prepare_death_state(now)
+
+    events =
+      Enum.map(@spirit_of_redemption_auras, &spirit_of_redemption_event(&1, guid, unit))
+
+    Event.enqueue(entity, events)
+  end
+
+  defp spirit_of_redemption_event(@spirit_of_redemption_form, guid, %Unit{} = unit) do
+    Event.trigger_spell(guid, unit.level || 1, guid, @spirit_of_redemption_form,
+      base_points: unit.max_health,
+      effect_index: 0,
+      duration_ms: @spirit_of_redemption_duration_ms
+    )
+  end
+
+  defp spirit_of_redemption_event(spell_id, guid, %Unit{} = unit) do
+    Event.trigger_spell(guid, unit.level || 1, guid, spell_id, duration_ms: @spirit_of_redemption_duration_ms)
+  end
+
+  defp holder_spell?(%{unit: %Unit{auras: holders}}, spell_id) when is_list(holders) do
+    Enum.any?(holders, &match?(%{spell: %Spell{id: ^spell_id}}, &1))
+  end
+
+  defp holder_spell?(_entity, _spell_id), do: false
 
   defp death_auras(holders) when is_list(holders) do
     Enum.filter(holders, fn

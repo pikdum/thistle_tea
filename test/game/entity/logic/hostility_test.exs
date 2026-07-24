@@ -43,6 +43,12 @@ defmodule ThistleTea.Game.Entity.Logic.HostilityTest do
       refute Hostility.valid_attack_target?(mob(wolf()), mob(neutral_creature()))
     end
 
+    test "does not allow attacks against aura-unattackable targets" do
+      target = mob(defias()) |> Map.put(:unit_flags, 0x00010000)
+
+      refute Hostility.valid_attack_target?(player(alliance()), target)
+    end
+
     test "allows player-controlled pets to attack neutral creatures" do
       owner_guid = Guid.from_low_guid(:player, 1)
       pet = mob(alliance()) |> Map.put(:owner_guid, owner_guid)

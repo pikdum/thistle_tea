@@ -21,6 +21,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.UnitSync do
   @aflag_eff_index_0 0x08
 
   @unit_flag_disarmed 0x00200000
+  @unit_flag_non_attackable 0x00010000
   @judgement_aura_state_bit 1 <<< 4
 
   def sync_unit(%Unit{} = unit) do
@@ -30,6 +31,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.UnitSync do
     |> sync_transform()
     |> sync_shapeshift_display()
     |> sync_disarm()
+    |> sync_unattackable()
     |> sync_aura_state()
     |> sync_aura_fields()
   end
@@ -101,6 +103,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.UnitSync do
   defp shapeshift_display_id(16, _race, _current), do: 4613
   defp shapeshift_display_id(31, 6, _current), do: 15_375
   defp shapeshift_display_id(31, _race, _current), do: 15_374
+  defp shapeshift_display_id(32, _race, _current), do: 16_031
   defp shapeshift_display_id(_form, _race, current), do: current
 
   defp sync_disarm(%Unit{auras: holders} = unit) when is_list(holders) do
@@ -118,6 +121,22 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.UnitSync do
   end
 
   defp sync_disarm(unit), do: unit
+
+  defp sync_unattackable(%Unit{auras: holders} = unit) when is_list(holders) do
+    unattackable? = Enum.any?(holders, &Holder.has_aura_type?(&1, :mod_unattackable))
+    flags = unit.flags || 0
+
+    flags =
+      if unattackable? do
+        flags ||| @unit_flag_non_attackable
+      else
+        flags &&& bnot(@unit_flag_non_attackable)
+      end
+
+    %{unit | flags: flags}
+  end
+
+  defp sync_unattackable(unit), do: unit
 
   defp sync_aura_state(%Unit{auras: holders, aura_state: aura_state} = unit) when is_list(holders) do
     active? = Enum.any?(holders, &match?(%Holder{spell: %Spell{exclusive_category: :paladin_seal}}, &1))

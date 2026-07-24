@@ -346,7 +346,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
         []
       end
 
-    {Core.take_damage(state, state.unit.health || 0, now, source: context.caster_guid), events}
+    {Core.take_damage(state, state.unit.health || 0, now, source: context.caster_guid, spell_id: spell.id), events}
   end
 
   defp apply_effect(state, %CastContext{}, _spell, %Effect{type: :add_combo_points}, _now), do: {state, []}
