@@ -654,12 +654,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
 
   defp pay_and_apply_channel_tick(character, %Cast{} = casting, now) do
     if Resources.can_pay_channel_cost?(character, casting.spell, casting.channel_tick_ms) do
-      targets = resolve_targets(character, casting)
-
       character =
         character
         |> Resources.spend_channel_cost(casting.spell, casting.channel_tick_ms, now)
-        |> apply_spell_hit(casting, targets, now)
+        |> apply_channel_tick_effects(casting, now)
 
       casting = Cast.advance_channel_tick(casting, now)
       delay_ms = Cast.next_channel_delay(casting, now)
@@ -762,6 +760,19 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
 
   defp caster_level(%{unit: %{level: level}}) when is_integer(level) and level > 0, do: level
   defp caster_level(_caster), do: 1
+
+  defp apply_channel_tick_effects(character, %Cast{spell: %Spell{} = spell} = casting, now) do
+    case Spell.channel_ticked_effects(spell) do
+      [] ->
+        character
+
+      tick_effects ->
+        targets = resolve_targets(character, casting)
+        apply_spell_hit(character, %{casting | spell: %{spell | effects: tick_effects}}, targets, now)
+    end
+  end
+
+  defp apply_channel_tick_effects(character, _casting, _now), do: character
 
   defp apply_spell_hit(
          %{object: %{guid: caster_guid}} = character,

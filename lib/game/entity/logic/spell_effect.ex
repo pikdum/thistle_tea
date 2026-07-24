@@ -265,11 +265,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
     end
   end
 
-  defp channel_ticked_trigger?(spell, %Effect{type: :apply_aura, aura: :periodic_trigger_spell, trigger_spell_id: id})
-       when is_integer(id) and id > 0 do
-    Spell.attribute?(spell, :channeled)
-  end
-
+  defp channel_ticked_trigger?(spell, %Effect{} = effect), do: Spell.channel_ticked_effect?(spell, effect)
   defp channel_ticked_trigger?(_spell, _effect), do: false
 
   defp apply_effect(state, %CastContext{} = context, spell, %Effect{type: :school_damage} = effect, now) do

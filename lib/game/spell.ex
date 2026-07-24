@@ -310,6 +310,23 @@ defmodule ThistleTea.Game.Spell do
 
   def creature_type_allowed?(_spell, _creature_type), do: false
 
+  def channel_ticked_effect?(%__MODULE__{} = spell, %Effect{
+        type: :apply_aura,
+        aura: :periodic_trigger_spell,
+        trigger_spell_id: trigger_spell_id
+      })
+      when is_integer(trigger_spell_id) and trigger_spell_id > 0 do
+    attribute?(spell, :channeled)
+  end
+
+  def channel_ticked_effect?(_spell, _effect), do: false
+
+  def channel_ticked_effects(%__MODULE__{effects: effects} = spell) when is_list(effects) do
+    Enum.filter(effects, &channel_ticked_effect?(spell, &1))
+  end
+
+  def channel_ticked_effects(_spell), do: []
+
   def channel_tick_ms(%__MODULE__{effects: effects}) do
     effects
     |> Enum.map(& &1.amplitude_ms)

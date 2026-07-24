@@ -227,6 +227,50 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
                mob.internal.events
     end
 
+    test "channel tick does not re-apply plain channel auras" do
+      now = 5_000
+
+      spell = %Spell{
+        id: 12_051,
+        duration_ms: 8_000,
+        attributes: MapSet.new([:channeled]),
+        effects: [%Effect{type: :apply_aura, aura: :mod_power_regen_percent, implicit_target_a: :caster}]
+      }
+
+      holder = %Holder{
+        spell: spell,
+        caster_guid: 1,
+        slot: 5,
+        applied_at: 1_000,
+        expires_at: 9_000,
+        auras: []
+      }
+
+      mob = %Mob{
+        object: %Object{guid: 1},
+        unit: %Unit{health: 100, max_health: 100, auras: [holder]},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+        internal: %Internal{
+          world: %WorldRef{map_id: 0},
+          casting: %Cast{
+            spell: spell,
+            targets: %Targets{raw: <<0::little-size(16)>>, unit_guid: 1},
+            channel_ms: 8_000,
+            channel_started?: true,
+            channel_tick_ms: 1_000,
+            next_channel_tick_at: now - 1,
+            ends_at: 9_000
+          }
+        }
+      }
+
+      assert {{:running, _delay_ms}, mob, %Blackboard{}} = SpellBT.cast_tick(mob, Blackboard.new(), now)
+
+      assert [%Holder{expires_at: 9_000}] = mob.unit.auras
+      assert mob.internal.events in [nil, []]
+      assert mob.internal.casting.next_channel_tick_at > now
+    end
+
     test "channel tick spends the spell's per-second health cost" do
       now = 1_000
 
