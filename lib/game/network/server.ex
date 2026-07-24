@@ -394,7 +394,9 @@ defmodule ThistleTea.Game.Network.Server do
   end
 
   def handle_cast({:reward_kill, victim}, {socket, %{character: %Character{} = character} = state}) do
-    state = apply_kill_reward(state, victim, kill_xp(character, victim))
+    xp = kill_xp(character, victim)
+    state = if xp > 0, do: trigger_kill_procs(state, victim), else: state
+    state = apply_kill_reward(state, victim, xp)
     {:noreply, {socket, state}, socket.read_timeout}
   end
 
@@ -1016,6 +1018,11 @@ defmodule ThistleTea.Game.Network.Server do
   end
 
   defp feed_pet_in_range(_character, _pet_guid, _range_yards), do: :ok
+
+  defp trigger_kill_procs(state, victim) do
+    {character, events} = Aura.reactions(state.character, :kill, %{victim_guid: victim.object.guid, now: Time.now()})
+    %{state | character: EventSink.emit(character, events)}
+  end
 
   defp apply_kill_reward(state, victim, xp) do
     character = Reactive.clear_combo_target(state.character, victim.object.guid)

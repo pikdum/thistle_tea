@@ -50,6 +50,7 @@ defmodule ThistleTea.Game.Spell.Proc do
 
   defp proc_flag?(_flags, _proc_type), do: false
 
+  defp proc_mask(:kill), do: 0x00000002
   defp proc_mask(:deal_harmful_spell), do: 0x00010000
   defp proc_mask(:deal_harmful_periodic), do: 0x00040000
   defp proc_mask(:deal_melee_swing), do: 0x00000004

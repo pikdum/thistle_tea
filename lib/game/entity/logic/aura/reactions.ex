@@ -94,7 +94,34 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
     {entity, events ++ removal_events}
   end
 
+  def reactions(
+        %{object: %{guid: owner_guid}, unit: %Unit{auras: holders}} = entity,
+        :kill,
+        %{victim_guid: victim_guid} = context
+      )
+      when is_list(holders) and is_integer(victim_guid) do
+    {holders, events} =
+      Enum.reduce(holders, {holders, []}, fn %Holder{} = holder, {current_holders, events} ->
+        kill_proc_transition(current_holders, events, holder, owner_guid, context)
+      end)
+
+    {entity, removal_events} = sync_removals(entity, holders, context)
+    {entity, events ++ removal_events}
+  end
+
   def reactions(entity, _event, _context), do: {entity, []}
+
+  defp kill_proc_transition(holders, events, holder, owner_guid, context) do
+    proc? =
+      proc_ready?(holder, Map.get(context, :now)) and
+        Proc.eligible?(holder.spell, nil, :kill, :normal) and Proc.roll?(holder.spell)
+
+    if proc? do
+      generic_outgoing_spell_proc(holders, events, holder, owner_guid, context)
+    else
+      {holders, events}
+    end
+  end
 
   defp outgoing_proc_transition(holders, events, holder, owner_guid, triggering_spell, proc_type, outcome, context) do
     proc? =

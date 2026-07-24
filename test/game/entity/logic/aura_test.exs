@@ -689,6 +689,48 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
       assert {_entity, []} = Aura.reactions(entity, :spell_hit_dealt, %{context | now: 1_500})
       assert {_entity, [%{type: :trigger_spell}]} = Aura.reactions(entity, :spell_hit_dealt, %{context | now: 2_100})
     end
+
+    test "fires kill-flagged proc auras on kills that grant experience" do
+      entity = fixture_entity()
+
+      spirit_tap = %Spell{
+        id: 15_338,
+        name: "Spirit Tap",
+        duration_ms: -1,
+        proc_type_mask: 0x2,
+        proc_chance: 100,
+        effects: [
+          %Effect{
+            index: 0,
+            type: :apply_aura,
+            base_points: 0,
+            die_sides: 0,
+            aura: :proc_trigger_spell,
+            trigger_spell_id: 15_271
+          }
+        ]
+      }
+
+      {entity, _events} = apply_spell(entity, 1, 10, spirit_tap)
+
+      assert {_entity,
+              [
+                %{
+                  type: :trigger_spell,
+                  source_guid: 1,
+                  spell_id: 15_271,
+                  triggering_spell_id: 15_338
+                }
+              ]} = Aura.reactions(entity, :kill, %{victim_guid: 999, now: 1_000})
+    end
+
+    test "kill procs skip auras without the kill proc flag" do
+      entity = fixture_entity()
+
+      {entity, _events} = apply_spell(entity, 1, 10, clearcasting_fixture())
+
+      assert {_entity, []} = Aura.reactions(entity, :kill, %{victim_guid: 999, now: 1_000})
+    end
   end
 
   describe "movement speed modifiers" do
