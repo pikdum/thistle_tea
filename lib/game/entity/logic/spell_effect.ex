@@ -26,6 +26,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   alias ThistleTea.Game.Entity.Logic.Threat
   alias ThistleTea.Game.Entity.Logic.Warlock
   alias ThistleTea.Game.Entity.Logic.Warrior
+  alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Math
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
@@ -34,6 +35,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.Spell.Modifiers
   alias ThistleTea.Game.Spell.Scripts
+  alias ThistleTea.Game.World.Loader.SpellPetAura, as: SpellPetAuraLoader
 
   @schools [:physical, :holy, :fire, :nature, :frost, :shadow, :arcane]
 
@@ -826,7 +828,24 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
     end
   end
 
-  defp apply_class_dummy(state, _context, _spell, _effect, _unscripted, _now), do: {state, []}
+  defp apply_class_dummy(state, context, spell, _effect, _unscripted, _now) do
+    {state, pet_aura_events(state, context, spell)}
+  end
+
+  defp pet_aura_events(%Character{} = state, %CastContext{} = context, %Spell{id: spell_id}) do
+    with pet_guid when is_integer(pet_guid) <- Character.controlled_guid(state),
+         [_link | _rest] = aura_ids <- SpellPetAuraLoader.pet_aura_ids(spell_id, Guid.entry(pet_guid)) do
+      Enum.map(aura_ids, fn aura_id ->
+        Event.trigger_spell(context.caster_guid, context.caster_level, pet_guid, aura_id,
+          triggered_by_spell_id: spell_id
+        )
+      end)
+    else
+      _no_pet -> []
+    end
+  end
+
+  defp pet_aura_events(_state, _context, _spell), do: []
 
   defp vmangos_script_events(state, %CastContext{} = context, %Spell{script_steps: steps}) when is_list(steps) do
     Enum.flat_map(steps, fn

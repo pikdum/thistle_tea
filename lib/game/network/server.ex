@@ -70,6 +70,7 @@ defmodule ThistleTea.Game.Network.Server do
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.ItemEnchantment, as: ItemEnchantmentLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
+  alias ThistleTea.Game.World.Loader.SpellPetAura, as: SpellPetAuraLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Pathfinding
   alias ThistleTea.Game.World.SpatialHash
@@ -790,6 +791,7 @@ defmodule ThistleTea.Game.Network.Server do
         }
       end)
       |> EventSink.emit(aura_events)
+      |> EventSink.emit(passive_pet_aura_events(character, pet_guid))
       |> Core.mark_broadcast_update()
 
     {:noreply, {socket, %{state | character: character}}, {:continue, {:finish_pet_attach, pet_guid, pet_spells}}}
@@ -1028,6 +1030,18 @@ defmodule ThistleTea.Game.Network.Server do
   end
 
   defp feed_pet_in_range(_character, _pet_guid, _range_yards), do: :ok
+
+  defp passive_pet_aura_events(%Character{unit: %Unit{auras: holders, level: level}, object: %{guid: guid}}, pet_guid)
+       when is_list(holders) do
+    pet_entry = Guid.entry(pet_guid)
+
+    holders
+    |> Enum.flat_map(fn %{spell: %Spell{id: spell_id}} -> SpellPetAuraLoader.pet_aura_ids(spell_id, pet_entry) end)
+    |> Enum.uniq()
+    |> Enum.map(&Event.trigger_spell(guid, level || 1, pet_guid, &1))
+  end
+
+  defp passive_pet_aura_events(_character, _pet_guid), do: []
 
   defp trigger_kill_procs(state, victim) do
     {character, events} = Aura.reactions(state.character, :kill, %{victim_guid: victim.object.guid, now: Time.now()})

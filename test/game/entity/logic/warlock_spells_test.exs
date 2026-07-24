@@ -24,6 +24,7 @@ defmodule ThistleTea.Game.Entity.Logic.WarlockSpellsTest do
   alias ThistleTea.Game.Spell.CastValidation
   alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.Spell.Targets
+  alias ThistleTea.Game.World.Loader.SpellPetAura
   alias ThistleTea.Game.WorldRef
 
   describe "Life Tap" do
@@ -74,6 +75,24 @@ defmodule ThistleTea.Game.Entity.Logic.WarlockSpellsTest do
 
       assert result.unit.health == 61
       assert result.unit.power1 == 46
+    end
+  end
+
+  describe "Soul Link pet auras" do
+    test "the dummy cast places the linked aura on the active pet" do
+      SpellPetAura.init()
+      :ets.insert(SpellPetAura, {19_028, [{0, 25_228}]})
+
+      pet_guid = 999
+      caster = character()
+      caster = %{caster | unit: %{caster.unit | summon: pet_guid}}
+
+      soul_link = %Spell{id: 19_028, name: "Soul Link", effects: [%Effect{type: :dummy, base_points: 0}]}
+      context = %CastContext{caster_guid: 1, caster_level: 40}
+
+      {_result, events} = SpellEffect.receive(caster, context, soul_link, 1_000)
+
+      assert Enum.any?(events, &(&1.type == :trigger_spell and &1.spell_id == 25_228 and &1.target_guid == pet_guid))
     end
   end
 
