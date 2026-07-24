@@ -79,6 +79,37 @@ defmodule ThistleTea.Game.Entity.Logic.WarlockSpellsTest do
   end
 
   describe "Soul Link pet auras" do
+    defp soul_link_buff do
+      %Spell{
+        id: 25_228,
+        name: "Soul Link",
+        duration_ms: -1,
+        effects: [
+          %Effect{
+            index: 0,
+            type: :apply_area_aura,
+            base_points: 2,
+            die_sides: 1,
+            base_dice: 1,
+            aura: :mod_damage_percent_done,
+            radius_yards: 100.0,
+            implicit_target_a: :caster
+          },
+          %Effect{
+            index: 1,
+            type: :apply_area_aura,
+            base_points: 29,
+            die_sides: 1,
+            base_dice: 1,
+            aura: :split_damage_percent,
+            misc_value: 127,
+            radius_yards: 100.0,
+            implicit_target_a: :caster
+          }
+        ]
+      }
+    end
+
     test "the dummy cast places the linked aura on the active pet" do
       SpellPetAura.init()
       :ets.insert(SpellPetAura, {19_028, [{0, 25_228}]})
@@ -97,6 +128,54 @@ defmodule ThistleTea.Game.Entity.Logic.WarlockSpellsTest do
                &(&1.type == :trigger_spell and &1.spell_id == 25_228 and &1.target_guid == pet_guid and
                    &1.source_guid == pet_guid)
              )
+    end
+
+    test "the dummy effect delivered to the pet self-casts the linked aura" do
+      SpellPetAura.init()
+      :ets.insert(SpellPetAura, {19_028, [{0, 25_228}]})
+
+      pet = mob()
+      pet = %{pet | internal: %{pet.internal | pet: %Pet{owner_guid: 1, profile: :combat, kind: :summon}}}
+
+      soul_link = %Spell{id: 19_028, name: "Soul Link", effects: [%Effect{type: :dummy, base_points: 0}]}
+      context = %CastContext{caster_guid: 1, caster_level: 40, target_role: :pet}
+
+      {_result, events} = SpellEffect.receive(pet, context, soul_link, 1_000)
+
+      pet_guid = pet.object.guid
+
+      assert Enum.any?(
+               events,
+               &(&1.type == :trigger_spell and &1.spell_id == 25_228 and &1.target_guid == pet_guid and
+                   &1.source_guid == pet_guid)
+             )
+    end
+
+    test "pets arm the area refresh on their self-cast link aura" do
+      pet = mob()
+      pet = %{pet | internal: %{pet.internal | pet: %Pet{owner_guid: 1, profile: :combat, kind: :summon}}}
+      pet_guid = pet.object.guid
+
+      context = %CastContext{caster_guid: pet_guid, caster_level: 40, spell: soul_link_buff()}
+      {pet, _events} = SpellEffect.receive(pet, context, soul_link_buff(), 1_000)
+
+      assert [%Holder{next_area_refresh_at: at, area_radius: 100.0}] = pet.unit.auras
+      assert is_integer(at)
+
+      {_pet, tick_events} = AuraLogic.tick(pet, at)
+      assert Enum.any?(tick_events, &(&1.type == :refresh_party_aura))
+    end
+
+    test "owners receive the propagated area aura with a visible slot and working split" do
+      warlock = character()
+      context = %CastContext{caster_guid: 2, caster_level: 40, spell: soul_link_buff()}
+
+      {warlock, _events} = SpellEffect.receive(warlock, context, soul_link_buff(), 1_000)
+
+      assert [%Holder{spell: %Spell{id: 25_228}, slot: slot, caster_guid: 2}] = warlock.unit.auras
+      assert is_integer(slot)
+
+      assert {70, {2, 30}} = AuraLogic.damage_redirect(warlock, 100, :physical)
     end
   end
 

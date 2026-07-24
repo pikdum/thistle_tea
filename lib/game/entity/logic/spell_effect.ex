@@ -93,6 +93,8 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
 
   defp applicable_effects(_target, _context, effects), do: Enum.reject(effects, &caster_target_effect?/1)
 
+  defp caster_target_effect?(%Effect{type: :apply_area_aura}), do: false
+
   defp caster_target_effect?(%Effect{} = effect) do
     (effect.implicit_target_a == :caster or effect.implicit_target_b == :caster) and
       not caster_trigger_effect?(effect)
@@ -840,6 +842,23 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
       end)
     else
       _no_pet -> []
+    end
+  end
+
+  defp pet_aura_events(
+         %{object: %{guid: pet_guid}, internal: %{pet: %{owner_guid: owner_guid}}} = state,
+         %CastContext{},
+         %Spell{id: spell_id}
+       )
+       when is_integer(owner_guid) do
+    case SpellPetAuraLoader.pet_aura_ids(spell_id, Guid.entry(pet_guid)) do
+      [_link | _rest] = aura_ids ->
+        Enum.map(aura_ids, fn aura_id ->
+          Event.trigger_spell(pet_guid, state.unit.level || 1, pet_guid, aura_id, triggered_by_spell_id: spell_id)
+        end)
+
+      _no_links ->
+        []
     end
   end
 
