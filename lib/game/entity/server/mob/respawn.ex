@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Respawn do
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Mob, as: MobBT
   alias ThistleTea.Game.Entity.Logic.AI.EventAI
+  alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Server.Mob.Corpse
   alias ThistleTea.Game.Entity.Server.Mob.Incarnation
@@ -147,7 +148,8 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Respawn do
       unit_flags: state.unit.flags,
       incarnation_id: Incarnation.id(state),
       alive?: state.unit.health > 0,
-      health_pct: Core.health_pct(state)
+      health_pct: Core.health_pct(state),
+      attacker_spell_hit_chance: Aura.attacker_spell_hit_chance(state)
     })
 
     Metadata.update(state.object.guid, Mob.visibility_metadata(state))

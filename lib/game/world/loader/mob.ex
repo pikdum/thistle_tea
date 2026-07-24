@@ -448,7 +448,8 @@ defmodule ThistleTea.Game.World.Loader.Mob do
         power_type: mob.unit.power_type,
         orientation: elem(mob.movement_block.position, 3),
         aura_sources: Aura.source_spells(mob),
-        dispel_options: Aura.dispel_options(mob)
+        dispel_options: Aura.dispel_options(mob),
+        attacker_spell_hit_chance: Aura.attacker_spell_hit_chance(mob)
       }
       |> Map.merge(Mob.visibility_metadata(mob))
       |> Map.merge(pet_metadata(mob))

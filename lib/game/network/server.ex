@@ -975,7 +975,8 @@ defmodule ThistleTea.Game.Network.Server do
         shapeshift_form: character.unit.shapeshift_form,
         world: character.internal.world,
         aura_sources: Aura.source_spells(character),
-        dispel_options: Aura.dispel_options(character)
+        dispel_options: Aura.dispel_options(character),
+        attacker_spell_hit_chance: Aura.attacker_spell_hit_chance(character)
       }
       |> Map.merge(detection)
     )

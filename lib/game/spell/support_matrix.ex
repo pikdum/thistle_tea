@@ -50,7 +50,6 @@ defmodule ThistleTea.Game.Spell.SupportMatrix do
     156 => :mod_reputation_gain,
     159 => :honorless_target,
     172 => :mod_mounted_speed_not_stack,
-    186 => :mod_attacker_spell_hit_chance,
     192 => :vmangos_linked_aura
   }
 

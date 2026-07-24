@@ -94,6 +94,10 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
 
   def misc_amounts(_entity, _type), do: []
 
+  def attacker_spell_hit_chance(entity) do
+    misc_amounts(entity, :mod_attacker_spell_hit_chance)
+  end
+
   def versus_amount(pairs, mask) when is_list(pairs) and is_integer(mask) do
     Enum.reduce(pairs, 0, fn
       {misc, amount}, acc when Bitwise.band(misc, mask) != 0 -> acc + amount

@@ -740,7 +740,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
         Enum.split_with(targets, fn target_guid ->
           target_guid == caster_guid or
             not Hostility.valid_attack_target?(caster, target_guid) or
-            spell_hits_target?(caster_level, target_guid, hit_bonus)
+            spell_hits_target?(caster_level, target_guid, hit_bonus, spell)
         end)
 
       {hits, Enum.map(missed, &%{guid: &1, reason: spell_miss_reason(spell)})}
@@ -756,17 +756,26 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
       Modifiers.value(caster, spell, :resist_miss_chance, 0)
   end
 
-  defp spell_hits_target?(caster_level, target_guid, hit_bonus) do
+  defp spell_hits_target?(caster_level, target_guid, hit_bonus, %Spell{} = spell) do
     target_player? = Guid.type_id(target_guid) == :player
 
-    target_level =
-      case Metadata.query(target_guid, [:level]) do
-        %{level: level} when is_integer(level) and level > 0 -> level
-        _ -> caster_level
+    metadata = Metadata.query(target_guid, [:level, :attacker_spell_hit_chance])
+    target_level = target_level(metadata, caster_level)
+
+    target_hit_modifier =
+      case metadata do
+        %{attacker_spell_hit_chance: modifiers} ->
+          AuraLogic.versus_amount(modifiers, Spell.school_mask(spell))
+
+        _ ->
+          0
       end
 
-    SpellResist.magic_hit?(caster_level, target_level, target_player?, hit_bonus: hit_bonus)
+    SpellResist.magic_hit?(caster_level, target_level, target_player?, hit_bonus: hit_bonus + target_hit_modifier)
   end
+
+  defp target_level(%{level: level}, _caster_level) when is_integer(level) and level > 0, do: level
+  defp target_level(_metadata, caster_level), do: caster_level
 
   defp spell_miss_reason(%Spell{school: :physical}), do: @spell_miss_reason_miss
   defp spell_miss_reason(%Spell{school: 0}), do: @spell_miss_reason_miss

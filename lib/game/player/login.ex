@@ -100,7 +100,8 @@ defmodule ThistleTea.Game.Player.Login do
         health_pct: Core.health_pct(c),
         shapeshift_form: c.unit.shapeshift_form,
         world: c.internal.world,
-        orientation: elem(c.movement_block.position, 3)
+        orientation: elem(c.movement_block.position, 3),
+        attacker_spell_hit_chance: AuraLogic.attacker_spell_hit_chance(c)
       }
       |> Map.merge(StealthDetection.target_metadata(c))
       |> Map.merge(FactionLoader.metadata(c.unit.faction_template))

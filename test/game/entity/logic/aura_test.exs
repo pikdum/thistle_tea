@@ -3,6 +3,7 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
 
   import Bitwise, only: [&&&: 2, <<<: 2]
 
+  alias ThistleTea.Game.Aura, as: AuraData
   alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
@@ -102,6 +103,28 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
         }
       ]
     }
+  end
+
+  describe "attacker_spell_hit_chance/1" do
+    test "publishes school-masked victim hit modifiers" do
+      heightened_senses = %Holder{
+        spell: %Spell{id: 30_894},
+        auras: [
+          %AuraData{
+            type: :mod_attacker_spell_hit_chance,
+            amount: -2,
+            misc_value: 0x7E
+          }
+        ]
+      }
+
+      mob = %Mob{unit: %Unit{auras: [heightened_senses]}}
+      modifiers = Aura.attacker_spell_hit_chance(mob)
+
+      assert modifiers == [{0x7E, -2}]
+      assert Aura.versus_amount(modifiers, Spell.school_mask(:fire)) == -2
+      assert Aura.versus_amount(modifiers, Spell.school_mask(:physical)) == 0
+    end
   end
 
   defp root_spell do

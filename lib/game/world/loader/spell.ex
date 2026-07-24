@@ -676,6 +676,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp aura_type(179), do: :mod_attacker_spell_crit_chance
   defp aura_type(182), do: :mod_resistance_of_stat_percent
   defp aura_type(185), do: :mod_attacker_ranged_hit_chance
+  defp aura_type(186), do: :mod_attacker_spell_hit_chance
   defp aura_type(187), do: :mod_attacker_melee_crit_chance
   defp aura_type(188), do: :mod_attacker_ranged_crit_chance
   defp aura_type(other) when is_integer(other), do: other
