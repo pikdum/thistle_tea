@@ -51,6 +51,16 @@ defmodule ThistleTea.Game.Spell.ProcTest do
       assert Proc.eligible?(proc_spell, %Spell{}, :deal_melee_ability, :crit)
       refute Proc.eligible?(proc_spell, nil, :take_melee_swing, :normal)
     end
+
+    test "maps ranged attack and ability proc flags on both sides" do
+      proc_spell = %Spell{proc_type_mask: 0x3C0}
+
+      assert Proc.eligible?(proc_spell, %Spell{}, :deal_ranged_attack, :normal)
+      assert Proc.eligible?(proc_spell, %Spell{}, :take_ranged_attack, :normal)
+      assert Proc.eligible?(proc_spell, %Spell{}, :deal_ranged_ability, :crit)
+      assert Proc.eligible?(proc_spell, %Spell{}, :take_ranged_ability, :crit)
+      refute Proc.eligible?(proc_spell, %Spell{}, :deal_melee_ability, :normal)
+    end
   end
 
   describe "roll?/3" do

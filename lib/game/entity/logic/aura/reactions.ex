@@ -29,7 +29,8 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
         :hit_taken,
         %{attacker_guid: attacker_guid, proc_type: proc_type, outcome: outcome} = context
       )
-      when is_list(holders) and is_integer(attacker_guid) and proc_type in [:take_melee_swing, :take_melee_ability] and
+      when is_list(holders) and is_integer(attacker_guid) and
+             proc_type in [:take_melee_swing, :take_melee_ability, :take_ranged_attack, :take_ranged_ability] and
              outcome in [:normal, :crit, :glancing, :crushing, :block, :dodge, :parry, :miss] do
     triggering_spell = Map.get(context, :spell)
 
@@ -51,7 +52,13 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
         %{spell: %Spell{} = triggering_spell, outcome: outcome, proc_type: proc_type} = context
       )
       when is_list(holders) and outcome in [:normal, :crit] and
-             proc_type in [:deal_harmful_spell, :deal_harmful_periodic, :deal_helpful_spell] do
+             proc_type in [
+               :deal_harmful_spell,
+               :deal_harmful_periodic,
+               :deal_helpful_spell,
+               :deal_ranged_attack,
+               :deal_ranged_ability
+             ] do
     {holders, events} =
       Enum.reduce(holders, {holders, []}, fn %Holder{} = holder, {current_holders, events} ->
         outgoing_proc_transition(

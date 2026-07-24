@@ -1053,7 +1053,8 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
         state.object.guid,
         spell,
         damage,
-        opts ++ [resisted: resisted, absorbed: absorbed, crit?: crit?]
+        Keyword.put_new(opts, :proc_type, dealt_spell_proc_type(spell, opts)) ++
+          [resisted: resisted, absorbed: absorbed, crit?: crit?]
       )
 
     {state, reaction_events} = spell_taken_reactions(state, context, spell, damage, crit?, opts, now)
@@ -1062,9 +1063,11 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
 
   defp spell_taken_reactions(state, %CastContext{caster_guid: caster_guid}, spell, damage, crit?, opts, now)
        when is_integer(caster_guid) and is_integer(damage) and damage > 0 do
-    proc_type = if Keyword.get(opts, :periodic?, false), do: :take_harmful_periodic, else: :take_harmful_spell
+    proc_type = taken_spell_proc_type(spell, opts)
 
-    Aura.reactions(state, :spell_hit_taken, %{
+    reaction = if proc_type == :take_ranged_ability, do: :hit_taken, else: :spell_hit_taken
+
+    Aura.reactions(state, reaction, %{
       attacker_guid: caster_guid,
       spell: spell,
       proc_type: proc_type,
@@ -1271,7 +1274,8 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
       Event.spell_damage(context.caster_guid, state.object.guid, spell, damage,
         absorbed: absorbed,
         crit?: context.melee_crit? || false,
-        proc_damage: proc_damage
+        proc_damage: proc_damage,
+        proc_type: dealt_attack_proc_type(spell)
       )
 
     {state, reaction_events} = melee_ability_reactions(state, context, spell, damage - absorbed, now)
@@ -1284,7 +1288,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
     else
       Aura.reactions(state, :hit_taken, %{
         attacker_guid: context.caster_guid,
-        proc_type: :take_melee_ability,
+        proc_type: taken_attack_proc_type(spell),
         outcome: if(context.melee_crit?, do: :crit, else: :normal),
         spell: spell,
         now: now
@@ -1293,6 +1297,38 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   end
 
   defp melee_ability_reactions(state, _context, _spell, _damage, _now), do: {state, []}
+
+  defp dealt_spell_proc_type(%Spell{} = spell, opts) when is_list(opts) do
+    cond do
+      Keyword.get(opts, :periodic?, false) -> :deal_harmful_periodic
+      Spell.ranged_ability?(spell) -> :deal_ranged_ability
+      true -> :deal_harmful_spell
+    end
+  end
+
+  defp taken_spell_proc_type(%Spell{} = spell, opts) when is_list(opts) do
+    cond do
+      Keyword.get(opts, :periodic?, false) -> :take_harmful_periodic
+      Spell.ranged_ability?(spell) -> :take_ranged_ability
+      true -> :take_harmful_spell
+    end
+  end
+
+  defp dealt_attack_proc_type(%Spell{} = spell) do
+    cond do
+      Hunter.auto_shot?(spell) -> :deal_ranged_attack
+      Spell.ranged_ability?(spell) -> :deal_ranged_ability
+      true -> :deal_melee_ability
+    end
+  end
+
+  defp taken_attack_proc_type(%Spell{} = spell) do
+    cond do
+      Hunter.auto_shot?(spell) -> :take_ranged_attack
+      Spell.ranged_ability?(spell) -> :take_ranged_ability
+      true -> :take_melee_ability
+    end
+  end
 
   defp mitigate_physical(%{unit: %{normal_resistance: armor}}, %CastContext{} = context, :physical, damage)
        when damage > 0 do

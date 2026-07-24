@@ -1,13 +1,18 @@
 defmodule ThistleTea.Game.Entity.Logic.HunterTest do
   use ExUnit.Case, async: true
 
+  alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Object
+  alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Hunter
   alias ThistleTea.Game.Entity.Logic.Reactive
+  alias ThistleTea.Game.Entity.Logic.SpellFeedback
   alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Effect
 
   describe "validate_ammo/5" do
@@ -146,6 +151,75 @@ defmodule ThistleTea.Game.Entity.Logic.HunterTest do
       assert Hunter.auto_shot?(auto_shot)
       refute Hunter.auto_shot?(%{auto_shot | family_flags_0: 0x800})
       refute Hunter.auto_shot?(%{auto_shot | effects: [%Effect{type: :school_damage}]})
+    end
+  end
+
+  describe "Improved Aspect of the Hawk" do
+    test "snapshots the aura-107 rank as the aspect's ranged proc chance" do
+      talent = %Spell{
+        id: 19_556,
+        spell_family: 9,
+        duration_ms: -1,
+        effects: [
+          %Effect{
+            type: :apply_aura,
+            aura: :add_flat_modifier,
+            base_points: 4,
+            die_sides: 1,
+            base_dice: 1,
+            misc_value: 18,
+            class_mask: 0x100000
+          }
+        ]
+      }
+
+      aspect = %Spell{
+        id: 13_165,
+        spell_family: 9,
+        family_flags_0: 0x100000,
+        proc_type_mask: 0x10140,
+        proc_chance: 0,
+        duration_ms: -1,
+        effects: [
+          %Effect{index: 0, type: :apply_aura, aura: :mod_ranged_attack_power, base_points: 20},
+          %Effect{index: 1, type: :apply_aura, aura: :proc_trigger_spell, trigger_spell_id: 6150}
+        ]
+      }
+
+      character = %Character{
+        object: %Object{guid: 1},
+        unit: %Unit{level: 60, auras: []},
+        player: %Player{},
+        internal: %Internal{}
+      }
+
+      {character, _events} = Aura.apply_spell(character, 1, 60, talent, 1_000)
+      context = CastContext.from_caster(character, aspect, 1)
+      {character, _events} = Aura.apply_spell(character, context, aspect, 1_000)
+
+      aspect_holder = Enum.find(character.unit.auras, &match?(%Holder{spell: %Spell{id: 13_165}}, &1))
+      assert aspect_holder.spell.proc_chance == 5
+
+      aspect_holder = %{aspect_holder | spell: %{aspect_holder.spell | proc_chance: 100}}
+
+      holders =
+        Enum.map(character.unit.auras, fn
+          %Holder{spell: %Spell{id: 13_165}} -> aspect_holder
+          holder -> holder
+        end)
+
+      character = %{character | unit: %{character.unit | auras: holders}}
+      auto_shot = %Spell{id: 75, spell_family: 9, family_flags_0: 0x1}
+
+      character =
+        SpellFeedback.receive(
+          character,
+          %{outcome: :normal, victim_guid: 2, proc_type: :deal_ranged_attack},
+          auto_shot,
+          2_000
+        )
+
+      assert [%{type: :trigger_spell, spell_id: 6150}] = character.internal.events
     end
   end
 

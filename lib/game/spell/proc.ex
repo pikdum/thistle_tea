@@ -59,6 +59,10 @@ defmodule ThistleTea.Game.Spell.Proc do
   defp proc_mask(:deal_melee_ability), do: 0x00000010
   defp proc_mask(:take_melee_swing), do: 0x00000008
   defp proc_mask(:take_melee_ability), do: 0x00000020
+  defp proc_mask(:deal_ranged_attack), do: 0x00000040
+  defp proc_mask(:take_ranged_attack), do: 0x00000080
+  defp proc_mask(:deal_ranged_ability), do: 0x00000100
+  defp proc_mask(:take_ranged_ability), do: 0x00000200
   defp proc_mask(:take_harmful_spell), do: 0x00020000
   defp proc_mask(:take_harmful_periodic), do: 0x00080000
   defp proc_mask(_proc_type), do: 0

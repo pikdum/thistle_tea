@@ -116,6 +116,8 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
         id: 75,
         school: :physical,
         dmg_class: 3,
+        spell_family: 9,
+        family_flags_0: 0x1,
         effects: [%Effect{type: :weapon_damage, base_points: 0}]
       }
 
@@ -145,6 +147,59 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
       {_marked, [marked_event]} = SpellEffect.receive(marked, context, spell, 1_000)
 
       assert marked_event.damage - unmarked_event.damage == 11
+      assert unmarked_event.proc_type == :deal_ranged_attack
+      assert marked_event.proc_type == :deal_ranged_attack
+
+      take_proc = %Holder{
+        spell: %Spell{proc_type_mask: 0x80, proc_chance: 100},
+        caster_guid: 1,
+        auras: [%ThistleTea.Game.Aura{type: :proc_trigger_spell, trigger_spell_id: 54_321}]
+      }
+
+      victim = %{unmarked | unit: %{unmarked.unit | auras: [take_proc]}}
+      {_victim, events} = SpellEffect.receive(victim, context, spell, 1_000)
+      assert %{type: :trigger_spell, spell_id: 54_321} = Enum.find(events, &(&1.type == :trigger_spell))
+    end
+
+    test "ranged abilities report deal and take ranged ability proc types" do
+      victim_proc = %Holder{
+        spell: %Spell{proc_type_mask: 0x200, proc_chance: 100},
+        caster_guid: 1,
+        auras: [
+          %ThistleTea.Game.Aura{
+            type: :proc_trigger_spell,
+            trigger_spell_id: 12_345
+          }
+        ]
+      }
+
+      aimed_shot = %Spell{
+        id: 19_434,
+        school: :physical,
+        dmg_class: 3,
+        spell_family: 9,
+        family_flags_0: 0x20000,
+        effects: [%Effect{type: :weapon_damage, base_points: 0}]
+      }
+
+      context = %CastContext{
+        caster_guid: 999,
+        caster_level: 60,
+        attack_power: 0,
+        attack_time_ms: 2_800,
+        attack_skill: 300,
+        weapon_base_min: 100,
+        weapon_base_max: 100,
+        melee_crit_chance: 0.0,
+        spell_crit_chance: 0.0,
+        hit_chance_bonus: 100
+      }
+
+      target = %{target_fixture() | unit: %Unit{health: 500, max_health: 500, level: 60, auras: [victim_proc]}}
+      {_target, events} = SpellEffect.receive(target, context, aimed_shot, 1_000)
+
+      assert %{proc_type: :deal_ranged_ability} = Enum.find(events, &(&1.type == :spell_damage))
+      assert %{type: :trigger_spell, spell_id: 12_345} = Enum.find(events, &(&1.type == :trigger_spell))
     end
 
     test "caster-targeted trigger effects fire at the caster, other caster effects stay filtered" do

@@ -69,7 +69,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
         target_guid = entity.object.guid
 
         holder = %Holder{
-          spell: spell,
+          spell: modified_holder_spell(spell, context),
           caster_guid: context.caster_guid,
           caster_level: context.caster_level,
           caster_faction_template: context.caster_faction_template,
@@ -578,6 +578,11 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
   end
 
   defp modified_duration(duration, _context), do: duration
+
+  defp modified_holder_spell(%Spell{} = spell, %CastContext{} = context) do
+    proc_chance = Modifiers.value(context.spell_modifiers, :chance_of_success, spell.proc_chance || 0)
+    if proc_chance == spell.proc_chance, do: spell, else: %{spell | proc_chance: proc_chance}
+  end
 
   defp area_radius(%Spell{effects: effects}) do
     effects
