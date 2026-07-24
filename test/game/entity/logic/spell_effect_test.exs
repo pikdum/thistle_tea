@@ -345,7 +345,11 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
 
       assert target.unit.health == 20
       assert target.internal.broadcast_update? == true
-      assert [%{type: :heal_threat, source_guid: 999, target_guid: 1, amount: 5.0}] = events
+
+      assert [
+               %{type: :heal_threat, source_guid: 999, target_guid: 1, amount: 5.0},
+               %{type: :spell_heal, source_guid: 999, target_guid: 1, proc_type: :deal_helpful_spell}
+             ] = events
     end
 
     test "energize effects restore the matching power" do

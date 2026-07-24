@@ -80,6 +80,11 @@ defmodule ThistleTea.Game.Entity.EventSink do
     entity
   end
 
+  def emit(entity, %Event{type: :spell_heal} = event) do
+    notify_spell_outcome(event)
+    entity
+  end
+
   def emit(entity, %Event{type: :spell_log_miss} = event) do
     %Message.SmsgSpellLogMiss{
       spell_id: event.spell_id,

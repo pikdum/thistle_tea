@@ -29,14 +29,33 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Script do
 
   def outgoing_proc(holders, %Holder{spell: %Spell{} = spell} = holder, owner_guid, context)
       when is_list(holders) and is_integer(owner_guid) do
-    if Spell.vmangos_script?(spell, "spell_mage_combustion_proc") do
-      combustion_proc(holders, holder, owner_guid, context)
-    else
-      :unhandled
+    cond do
+      Spell.vmangos_script?(spell, "spell_mage_combustion_proc") ->
+        combustion_proc(holders, holder, owner_guid, context)
+
+      Paladin.illumination?(spell) ->
+        illumination_proc(holders, holder, owner_guid, context)
+
+      true ->
+        :unhandled
     end
   end
 
   def outgoing_proc(_holders, _holder, _owner_guid, _context), do: :unhandled
+
+  defp illumination_proc(holders, %Holder{} = holder, owner_guid, %{spell: %Spell{mana_cost: cost}})
+       when is_integer(cost) and cost > 0 do
+    event =
+      Event.trigger_spell(owner_guid, holder.caster_level || 1, owner_guid, Paladin.illumination_energize_id(),
+        base_points: cost,
+        effect_index: 0,
+        triggered_by_spell_id: holder.spell.id
+      )
+
+    {:handled, holders, [event]}
+  end
+
+  defp illumination_proc(holders, _holder, _owner_guid, _context), do: {:handled, holders, []}
 
   def outgoing_melee(%Holder{spell: %Spell{id: id}} = holder, owner_guid, victim_guid, context)
       when id in @sweeping_strikes and is_integer(owner_guid) and is_integer(victim_guid) do

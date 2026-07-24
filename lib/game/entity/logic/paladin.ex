@@ -31,6 +31,8 @@ defmodule ThistleTea.Game.Entity.Logic.Paladin do
   @forbearance 25_771
   @eye_for_an_eye [9799, 25_988]
   @eye_for_an_eye_damage 25_997
+  @illumination [20_210, 20_212, 20_213, 20_214, 20_215]
+  @illumination_energize 20_272
 
   @holy_shock %{
     20_473 => %{damage: 25_912, heal: 25_914},
@@ -54,6 +56,11 @@ defmodule ThistleTea.Game.Entity.Logic.Paladin do
   def eye_for_an_eye?(_spell), do: false
 
   def eye_for_an_eye_damage_id, do: @eye_for_an_eye_damage
+
+  def illumination?(%Spell{id: id}), do: id in @illumination
+  def illumination?(_spell), do: false
+
+  def illumination_energize_id, do: @illumination_energize
 
   def holy_shock_ids(spell_id), do: Map.get(@holy_shock, spell_id)
 

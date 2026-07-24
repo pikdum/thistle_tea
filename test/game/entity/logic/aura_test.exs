@@ -847,6 +847,124 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
       assert %{type: :trigger_spell, spell_id: 15_290, amount: 10, source_guid: 7} =
                Enum.find(events, &(&1.type == :trigger_spell))
     end
+
+    test "fires proc-trigger auras on crit heals" do
+      entity = fixture_entity()
+
+      inspiration = %Spell{
+        id: 14_892,
+        name: "Inspiration",
+        duration_ms: -1,
+        proc_type_mask: 0x15550,
+        proc_chance: 100,
+        proc_rule: %ProcRule{proc_ex: 0x2},
+        effects: [
+          %Effect{
+            index: 0,
+            type: :apply_aura,
+            base_points: 0,
+            die_sides: 0,
+            aura: :proc_trigger_spell,
+            trigger_spell_id: 14_893
+          }
+        ]
+      }
+
+      {entity, _events} = apply_spell(entity, 1, 10, inspiration)
+
+      context = %{
+        spell: %Spell{id: 2054, name: "Heal", school: :holy},
+        proc_type: :deal_helpful_spell,
+        victim_guid: 42,
+        now: 1_000
+      }
+
+      assert {_entity, []} = Aura.reactions(entity, :spell_hit_dealt, Map.put(context, :outcome, :normal))
+
+      assert {_entity, [%{type: :trigger_spell, spell_id: 14_893, target_guid: 42}]} =
+               Aura.reactions(entity, :spell_hit_dealt, Map.put(context, :outcome, :crit))
+    end
+
+    test "spends charges of trigger-less proc auras like Divine Favor" do
+      entity = fixture_entity()
+
+      divine_favor = %Spell{
+        id: 20_216,
+        name: "Divine Favor",
+        duration_ms: 60_000,
+        proc_type_mask: 0x14000,
+        proc_chance: 101,
+        proc_charges: 1,
+        effects: [
+          %Effect{
+            index: 0,
+            type: :apply_aura,
+            base_points: 99,
+            die_sides: 1,
+            base_dice: 1,
+            aura: :mod_spell_crit_chance
+          }
+        ]
+      }
+
+      {entity, _events} = apply_spell(entity, 1, 10, divine_favor)
+      assert [%{spell: %Spell{id: 20_216}}] = entity.unit.auras
+
+      context = %{
+        spell: %Spell{id: 635, name: "Holy Light", school: :holy},
+        proc_type: :deal_helpful_spell,
+        outcome: :crit,
+        victim_guid: 42,
+        now: 1_000
+      }
+
+      {entity, _events} = Aura.reactions(entity, :spell_hit_dealt, context)
+      assert entity.unit.auras == []
+    end
+
+    test "illumination refunds the base mana cost on crit heals" do
+      entity = fixture_entity()
+
+      illumination = %Spell{
+        id: 20_210,
+        name: "Illumination",
+        duration_ms: -1,
+        proc_type_mask: 0x4400,
+        proc_chance: 100,
+        proc_rule: %ProcRule{proc_ex: 0x2},
+        effects: [
+          %Effect{
+            index: 0,
+            type: :apply_aura,
+            base_points: 0,
+            die_sides: 0,
+            aura: :proc_trigger_spell,
+            trigger_spell_id: 18_350
+          }
+        ]
+      }
+
+      {entity, _events} = apply_spell(entity, 1, 10, illumination)
+
+      context = %{
+        spell: %Spell{id: 635, name: "Holy Light", school: :holy, mana_cost: 35},
+        proc_type: :deal_helpful_spell,
+        outcome: :crit,
+        victim_guid: 42,
+        now: 1_000
+      }
+
+      assert {_entity,
+              [
+                %{
+                  type: :trigger_spell,
+                  spell_id: 20_272,
+                  amount: 35,
+                  source_guid: 1,
+                  target_guid: 1
+                }
+              ]} = Aura.reactions(entity, :spell_hit_dealt, context)
+    end
   end
 
   describe "movement speed modifiers" do

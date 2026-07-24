@@ -484,10 +484,12 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
         Paladin.blessing_of_light_bonus(state, spell)
 
     healing = max(trunc(healing * healing_taken_multiplier(state, spell)), 0)
-    healing = if heal_crit?(context, spell), do: healing + div(healing, 2), else: healing
+    crit? = heal_crit?(context, spell)
+    healing = if crit?, do: healing + div(healing, 2), else: healing
     events = Threat.heal_threat_events(state, context.caster_guid, healing)
+    heal_event = Event.spell_heal(context.caster_guid, state.object.guid, spell, healing, crit?)
 
-    {Core.heal(state, healing), swiftmend_events ++ events}
+    {Core.heal(state, healing), swiftmend_events ++ events ++ [heal_event]}
   end
 
   defp apply_effect(state, %CastContext{} = context, _spell, %Effect{type: :heal_max_health}, _now) do

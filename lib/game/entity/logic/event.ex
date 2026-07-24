@@ -91,6 +91,20 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
     if Keyword.get(opts, :periodic?, false), do: :deal_harmful_periodic, else: :deal_harmful_spell
   end
 
+  def spell_heal(source_guid, target_guid, spell, healing, crit?) do
+    %__MODULE__{
+      type: :spell_heal,
+      source_guid: source_guid,
+      target_guid: target_guid,
+      spell_id: spell.id,
+      spell: spell,
+      school: spell.school,
+      damage: healing,
+      proc_type: :deal_helpful_spell,
+      crit?: crit?
+    }
+  end
+
   def drain_power(target_guid, power_type) when is_integer(target_guid) and is_integer(power_type) do
     %__MODULE__{type: :drain_power, target_guid: target_guid, misc_value: power_type}
   end

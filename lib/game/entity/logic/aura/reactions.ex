@@ -51,7 +51,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
         %{spell: %Spell{} = triggering_spell, outcome: outcome, proc_type: proc_type} = context
       )
       when is_list(holders) and outcome in [:normal, :crit] and
-             proc_type in [:deal_harmful_spell, :deal_harmful_periodic] do
+             proc_type in [:deal_harmful_spell, :deal_harmful_periodic, :deal_helpful_spell] do
     {holders, events} =
       Enum.reduce(holders, {holders, []}, fn %Holder{} = holder, {current_holders, events} ->
         outgoing_proc_transition(
@@ -206,22 +206,33 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
     end
   end
 
+  @modifier_auras [:add_flat_modifier, :add_pct_modifier]
+
   defp generic_outgoing_spell_proc(holders, events, %Holder{} = holder, owner_guid, context) do
     victim_guid = Map.get(context, :victim_guid)
     proc_auras = trigger_auras(holder)
 
-    if proc_auras != [] and is_integer(victim_guid) do
-      proc_events =
-        Enum.map(proc_auras, fn %Aura{trigger_spell_id: spell_id} ->
-          Event.trigger_spell(owner_guid, holder.caster_level || 1, victim_guid, spell_id,
-            triggered_by_spell_id: holder.spell.id
-          )
-        end)
+    cond do
+      proc_auras != [] and is_integer(victim_guid) ->
+        proc_events =
+          Enum.map(proc_auras, fn %Aura{trigger_spell_id: spell_id} ->
+            Event.trigger_spell(owner_guid, holder.caster_level || 1, victim_guid, spell_id,
+              triggered_by_spell_id: holder.spell.id
+            )
+          end)
 
-      {replace_or_delete(holders, holder, mark_proc(holder, Map.get(context, :now))), events ++ proc_events}
-    else
-      {holders, events}
+        {replace_or_delete(holders, holder, mark_proc(holder, Map.get(context, :now))), events ++ proc_events}
+
+      spends_charge_without_trigger?(holder) ->
+        {replace_or_delete(holders, holder, mark_proc(holder, Map.get(context, :now))), events}
+
+      true ->
+        {holders, events}
     end
+  end
+
+  defp spends_charge_without_trigger?(%Holder{charges: charges} = holder) do
+    is_integer(charges) and not Holder.has_any_type?(holder, @modifier_auras)
   end
 
   defp trigger_auras(%Holder{auras: auras}) do
