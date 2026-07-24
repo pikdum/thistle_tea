@@ -28,6 +28,10 @@ defmodule ThistleTea.Game.Entity do
     dispatch_cast(entity, {:aggro_probe, target_guid})
   end
 
+  def assist_attack(entity, target_guid) do
+    dispatch_cast(entity, {:assist_attack, target_guid})
+  end
+
   def receive_spell(entity, caster, spell) do
     dispatch_cast(entity, {:receive_spell, caster, spell})
   end

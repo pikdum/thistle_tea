@@ -276,6 +276,14 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
     %__MODULE__{type: :attack_start, source_guid: source_guid, target_guid: target_guid}
   end
 
+  def call_assistance(target_guid) when is_integer(target_guid) do
+    %__MODULE__{type: :call_assistance, target_guid: target_guid}
+  end
+
+  def call_for_help(target_guid) when is_integer(target_guid) do
+    %__MODULE__{type: :call_for_help, target_guid: target_guid}
+  end
+
   def attack_stop(source_guid, target_guid) when is_integer(source_guid) and is_integer(target_guid) do
     %__MODULE__{type: :attack_stop, source_guid: source_guid, target_guid: target_guid}
   end

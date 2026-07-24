@@ -17,6 +17,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Blackboard do
             next_wander_at: 0,
             next_waypoint_at: 0,
             next_aggro_at: 0,
+            next_call_for_help_at: 0,
             next_confused_at: 0,
             next_regen_at: 0,
             next_spread_at: 0,

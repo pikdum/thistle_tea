@@ -22,6 +22,15 @@ defmodule FactionTemplate do
     field(:friends_3, :integer, default: 0)
   end
 
+  @flag_respond_to_call_for_help 0x01
+  @flag_flee_from_call_for_help 0x400
+
+  def responds_to_call_for_help?(%__MODULE__{flags: flags}) when is_integer(flags) do
+    (flags &&& @flag_respond_to_call_for_help) != 0 and (flags &&& @flag_flee_from_call_for_help) == 0
+  end
+
+  def responds_to_call_for_help?(_faction_template), do: false
+
   def friendly_to?(%__MODULE__{} = source, %__MODULE__{} = target) do
     cond do
       target.faction in enemy_factions(source) -> false

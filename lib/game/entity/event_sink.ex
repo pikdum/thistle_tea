@@ -37,6 +37,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.AreaEffects
+  alias ThistleTea.Game.World.CallForHelp
   alias ThistleTea.Game.World.ChaseWatch
   alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
   alias ThistleTea.Game.World.Loader.ItemEnchantment, as: ItemEnchantmentLoader
@@ -1075,6 +1076,22 @@ defmodule ThistleTea.Game.Entity.EventSink do
   end
 
   def emit(entity, %Event{type: :attack_start}), do: entity
+
+  def emit(%Mob{} = entity, %Event{type: :call_assistance, target_guid: target_guid})
+      when is_integer(target_guid) and target_guid > 0 do
+    Process.send_after(self(), {:call_assistance, target_guid}, CallForHelp.assist_delay_ms())
+    entity
+  end
+
+  def emit(entity, %Event{type: :call_assistance}), do: entity
+
+  def emit(%Mob{} = entity, %Event{type: :call_for_help, target_guid: target_guid})
+      when is_integer(target_guid) and target_guid > 0 do
+    CallForHelp.pulse(entity, target_guid)
+    entity
+  end
+
+  def emit(entity, %Event{type: :call_for_help}), do: entity
 
   def emit(entity, %Event{type: :play_sound, sound_id: sound_id}) do
     %Message.SmsgPlaySound{sound_id: sound_id}

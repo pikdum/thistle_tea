@@ -32,6 +32,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   alias ThistleTea.Game.Entity.Logic.StealthDetection
   alias ThistleTea.Game.Entity.Logic.Threat
   alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.Math
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Metadata
@@ -62,6 +63,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   @aggro_check_delay 5_000
   @dead_idle_delay 1_000
   @blocked_retry_delay 1_000
+  @call_for_help_delay 1_000
+  @call_for_help_spawn_distance 10.0
 
   def max_aggro_radius, do: @max_aggro_radius
 
@@ -108,6 +111,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
         BT.action(&select_victim/2),
         BT.action(&interrupt_idle_movement/2),
         BT.action(&set_running_true/2),
+        BT.action(&call_for_help_step/2),
         BT.selector([
           BT.sequence([
             BT.condition(&target_dead?/2),
@@ -493,7 +497,53 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     |> reselect_victim()
     |> CombatLogic.sync_combat_flag()
     |> Core.mark_broadcast_update()
+    |> maybe_enqueue_call_assistance(target_guid)
   end
+
+  def maybe_enqueue_call_assistance(
+        %Mob{internal: %Internal{pet: nil, totem: nil, creature: %Creature{call_for_help_range: range}}} = state,
+        target_guid
+      )
+      when is_number(range) and range > 0 and is_integer(target_guid) and target_guid > 0 do
+    Event.enqueue(state, Event.call_assistance(target_guid))
+  end
+
+  def maybe_enqueue_call_assistance(%Mob{} = state, _target_guid), do: state
+
+  defp call_for_help_step(%Mob{} = state, %Blackboard{} = blackboard) do
+    call_for_help_step(state, blackboard, Time.now())
+  end
+
+  def call_for_help_step(%Mob{} = state, %Blackboard{} = blackboard, now) when is_integer(now) do
+    if Blackboard.ready_for?(blackboard, :next_call_for_help_at, now) do
+      blackboard = Blackboard.put_next_at(blackboard, :next_call_for_help_at, @call_for_help_delay, now)
+      {:success, maybe_call_for_help(state), blackboard}
+    else
+      {:success, state, blackboard}
+    end
+  end
+
+  defp maybe_call_for_help(
+         %Mob{
+           internal: %Internal{
+             pet: nil,
+             totem: nil,
+             creature: %Creature{call_for_help_range: range},
+             spawn: %Spawn{position: {sx, sy, sz}}
+           },
+           movement_block: %MovementBlock{position: {x, y, z, _o}},
+           unit: %Unit{target: target}
+         } = state
+       )
+       when is_number(range) and range > 0 and is_integer(target) and target > 0 do
+    if Math.distance({sx, sy, sz}, {x, y, z}) > @call_for_help_spawn_distance do
+      Event.enqueue(state, Event.call_for_help(target))
+    else
+      state
+    end
+  end
+
+  defp maybe_call_for_help(%Mob{} = state), do: state
 
   def reselect_victim(%Mob{} = state) do
     case Threat.reselect(state) do

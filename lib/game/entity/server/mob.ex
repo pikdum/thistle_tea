@@ -7,10 +7,11 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   """
   use GenServer
 
-  import Bitwise, only: [|||: 2]
+  import Bitwise, only: [&&&: 2, |||: 2]
 
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
   alias ThistleTea.Game.Entity.Data.Component.Internal.Loot
   alias ThistleTea.Game.Entity.Data.Component.Internal.Pet
   alias ThistleTea.Game.Entity.Data.Component.Internal.Spawn
@@ -53,6 +54,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
+  alias ThistleTea.Game.World.CallForHelp
   alias ThistleTea.Game.World.ChaseWatch
   alias ThistleTea.Game.World.Loader.Faction, as: FactionLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
@@ -65,6 +67,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   require Logger
 
   @ai_tick_retry_ms 1_000
+  @creature_flag_extra_no_assist 0x00010000
   @dynamic_flag_tapped 0x0004
   @summon_despawn_retry_ms 10_000
   @ooc_gated_despawn_types [1, 2, 4]
@@ -132,6 +135,28 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   end
 
   def handle_cast({:aggro_probe, _target}, state) do
+    {:noreply, state}
+  end
+
+  @impl GenServer
+  def handle_cast(
+        {:assist_attack, target_guid},
+        %Mob{internal: %Internal{in_combat: false, pet: nil, totem: nil}} = state
+      )
+      when is_integer(target_guid) do
+    if can_assist?(state) and Hostility.valid_attack_target?(state, target_guid) do
+      state =
+        state
+        |> engage_combat(target_guid, call_assistance: false)
+        |> wake_ai_tick()
+
+      {:noreply, state, {:continue, :maybe_broadcast}}
+    else
+      {:noreply, state}
+    end
+  end
+
+  def handle_cast({:assist_attack, _target_guid}, state) do
     {:noreply, state}
   end
 
@@ -421,6 +446,19 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
       {:noreply, state, {:continue, :maybe_broadcast}}
     end
+  end
+
+  def handle_info({:call_assistance, target_guid}, %Mob{internal: %Internal{in_combat: true}} = state)
+      when is_integer(target_guid) do
+    if not Core.dead?(state) and not Corpse.removed?(state) do
+      CallForHelp.assist(state, target_guid)
+    end
+
+    {:noreply, state}
+  end
+
+  def handle_info({:call_assistance, _target_guid}, state) do
+    {:noreply, state}
   end
 
   def handle_info({:pet_command, :dismiss, _target_guid}, %Mob{internal: %Internal{pet: %Pet{}}} = state) do
@@ -784,11 +822,13 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     %{state | internal: %{internal | blackboard: blackboard}}
   end
 
-  defp engage_combat(%Mob{internal: %Internal{pet: %Pet{reaction_state: :passive}}} = state, _caster) do
+  defp engage_combat(state, caster), do: engage_combat(state, caster, [])
+
+  defp engage_combat(%Mob{internal: %Internal{pet: %Pet{reaction_state: :passive}}} = state, _caster, _opts) do
     state
   end
 
-  defp engage_combat(%Mob{internal: internal} = state, caster) when is_integer(caster) do
+  defp engage_combat(%Mob{internal: internal} = state, caster, opts) when is_integer(caster) do
     now = Time.now()
     was_in_combat = internal.in_combat == true
 
@@ -797,12 +837,34 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     |> MobBT.reselect_victim()
     |> Combat.sync_combat_flag()
     |> maybe_tap(caster)
+    |> maybe_call_assistance(was_in_combat, caster, opts)
     |> maybe_eventai_enter_combat(was_in_combat, caster, now)
   end
 
-  defp engage_combat(%Mob{} = state, _caster) do
+  defp engage_combat(%Mob{} = state, _caster, _opts) do
     state
   end
+
+  defp maybe_call_assistance(%Mob{} = state, true, _caster, _opts), do: state
+
+  defp maybe_call_assistance(%Mob{} = state, false, caster, opts) do
+    if Keyword.get(opts, :call_assistance, true) do
+      MobBT.maybe_enqueue_call_assistance(state, caster)
+    else
+      state
+    end
+  end
+
+  defp can_assist?(%Mob{} = state) do
+    not Core.dead?(state) and not Corpse.removed?(state) and not no_assist_flag?(state)
+  end
+
+  defp no_assist_flag?(%Mob{internal: %Internal{creature: %Creature{extra_flags: extra_flags}}})
+       when is_integer(extra_flags) do
+    (extra_flags &&& @creature_flag_extra_no_assist) != 0
+  end
+
+  defp no_assist_flag?(%Mob{}), do: false
 
   defp maybe_eventai_enter_combat(%Mob{} = state, true, _caster, _now), do: state
 
