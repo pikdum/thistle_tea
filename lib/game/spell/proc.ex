@@ -3,13 +3,15 @@ defmodule ThistleTea.Game.Spell.Proc do
   Evaluates spell-proc eligibility from DBC proc flags and VMangos
   `spell_proc_event` restrictions.
   """
-  import Bitwise, only: [&&&: 2]
+  import Bitwise, only: [&&&: 2, |||: 2]
 
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.ProcRule
 
   @normal_hit 0x1
   @critical_hit 0x2
+  @trigger_always 0x10000
+  @cast_end 0x80000
 
   def eligible?(%Spell{} = proc_spell, %Spell{} = triggering_spell, proc_type, outcome) do
     proc_flag?(proc_spell, proc_type) and
@@ -81,7 +83,7 @@ defmodule ThistleTea.Game.Spell.Proc do
   end
 
   defp outcome_allowed?(%ProcRule{proc_ex: proc_ex}, outcome) when is_integer(proc_ex) and proc_ex > 0 do
-    (proc_ex &&& outcome_mask(outcome)) != 0
+    (proc_ex &&& (@trigger_always ||| @cast_end)) != 0 or (proc_ex &&& outcome_mask(outcome)) != 0
   end
 
   defp outcome_allowed?(_rule, outcome), do: outcome in [:normal, :crit]

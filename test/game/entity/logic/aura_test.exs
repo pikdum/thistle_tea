@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Effect
+  alias ThistleTea.Game.Spell.ProcRule
   alias ThistleTea.Game.WorldRef
 
   defp fixture_entity(opts \\ []) do
@@ -55,6 +56,26 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
           amplitude_ms: 0,
           misc_value: 1,
           implicit_target_a: :caster
+        }
+      ]
+    }
+  end
+
+  defp clearcasting_fixture do
+    %Spell{
+      id: 11_213,
+      name: "Arcane Concentration",
+      duration_ms: -1,
+      proc_type_mask: 0x10000,
+      proc_chance: 100,
+      effects: [
+        %Effect{
+          index: 0,
+          type: :apply_aura,
+          base_points: 0,
+          die_sides: 0,
+          aura: :proc_trigger_spell,
+          trigger_spell_id: 12_536
         }
       ]
     }
@@ -569,6 +590,104 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
                   spell_id: 6136
                 }
               ]} = Aura.reactions(entity, :hit_taken, %{attacker_guid: 999})
+    end
+
+    test "fires proc-trigger auras when dealing harmful spells" do
+      entity = fixture_entity()
+
+      {entity, _events} = apply_spell(entity, 1, 10, clearcasting_fixture())
+
+      context = %{
+        spell: %Spell{id: 116, school: :frost},
+        outcome: :normal,
+        proc_type: :deal_harmful_spell,
+        victim_guid: 999,
+        now: 1_000
+      }
+
+      assert {_entity,
+              [
+                %{
+                  type: :trigger_spell,
+                  source_guid: 1,
+                  target_guid: 999,
+                  spell_id: 12_536,
+                  triggering_spell_id: 11_213
+                }
+              ]} = Aura.reactions(entity, :spell_hit_dealt, context)
+    end
+
+    test "honors crit-only proc rules for spell procs" do
+      entity = fixture_entity()
+      spell = %{clearcasting_fixture() | proc_rule: %ProcRule{proc_ex: 0x2}}
+
+      {entity, _events} = apply_spell(entity, 1, 10, spell)
+
+      context = %{
+        spell: %Spell{id: 116, school: :frost},
+        proc_type: :deal_harmful_spell,
+        victim_guid: 999,
+        now: 1_000
+      }
+
+      assert {_entity, []} = Aura.reactions(entity, :spell_hit_dealt, Map.put(context, :outcome, :normal))
+
+      assert {_entity, [%{type: :trigger_spell, spell_id: 12_536}]} =
+               Aura.reactions(entity, :spell_hit_dealt, Map.put(context, :outcome, :crit))
+    end
+
+    test "treats cast-end proc rules as eligible" do
+      entity = fixture_entity()
+      spell = %{clearcasting_fixture() | proc_rule: %ProcRule{proc_ex: 0x80000}}
+
+      {entity, _events} = apply_spell(entity, 1, 10, spell)
+
+      context = %{
+        spell: %Spell{id: 116, school: :frost},
+        outcome: :normal,
+        proc_type: :deal_harmful_spell,
+        victim_guid: 999,
+        now: 1_000
+      }
+
+      assert {_entity, [%{type: :trigger_spell, spell_id: 12_536}]} =
+               Aura.reactions(entity, :spell_hit_dealt, context)
+    end
+
+    test "never procs a spell aura from its own spell" do
+      entity = fixture_entity()
+
+      {entity, _events} = apply_spell(entity, 1, 10, clearcasting_fixture())
+
+      context = %{
+        spell: clearcasting_fixture(),
+        outcome: :normal,
+        proc_type: :deal_harmful_spell,
+        victim_guid: 999,
+        now: 1_000
+      }
+
+      assert {_entity, []} = Aura.reactions(entity, :spell_hit_dealt, context)
+    end
+
+    test "respects proc cooldowns on spell procs" do
+      entity = fixture_entity()
+      spell = %{clearcasting_fixture() | proc_rule: %ProcRule{cooldown_ms: 1_000}}
+
+      {entity, _events} = apply_spell(entity, 1, 10, spell)
+
+      context = %{
+        spell: %Spell{id: 116, school: :frost},
+        outcome: :normal,
+        proc_type: :deal_harmful_spell,
+        victim_guid: 999,
+        now: 1_000
+      }
+
+      {entity, [%{type: :trigger_spell}]} = Aura.reactions(entity, :spell_hit_dealt, context)
+
+      assert {_entity, []} = Aura.reactions(entity, :spell_hit_dealt, %{context | now: 1_500})
+      assert {_entity, [%{type: :trigger_spell}]} = Aura.reactions(entity, :spell_hit_dealt, %{context | now: 2_100})
     end
   end
 

@@ -97,18 +97,56 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
   def reactions(entity, _event, _context), do: {entity, []}
 
   defp outgoing_proc_transition(holders, events, holder, owner_guid, triggering_spell, proc_type, outcome, context) do
-    if Proc.eligible?(holder.spell, triggering_spell, proc_type, outcome) and Proc.roll?(holder.spell) do
+    proc? =
+      not self_proc?(holder, triggering_spell) and proc_ready?(holder, Map.get(context, :now)) and
+        Proc.eligible?(holder.spell, triggering_spell, proc_type, outcome) and Proc.roll?(holder.spell)
+
+    if proc? do
       apply_outgoing_proc(holders, events, holder, owner_guid, context)
     else
       {holders, events}
     end
   end
 
+  defp self_proc?(%Holder{spell: %Spell{id: id}}, %Spell{id: id}), do: true
+  defp self_proc?(_holder, _triggering_spell), do: false
+
   defp apply_outgoing_proc(holders, events, holder, owner_guid, context) do
     case Script.outgoing_proc(holders, holder, owner_guid, context) do
       {:handled, updated_holders, proc_events} -> {updated_holders, events ++ proc_events}
-      :unhandled -> {holders, events}
+      :unhandled -> generic_outgoing_spell_proc(holders, events, holder, owner_guid, context)
     end
+  end
+
+  defp generic_outgoing_spell_proc(holders, events, %Holder{} = holder, owner_guid, context) do
+    victim_guid = Map.get(context, :victim_guid)
+    proc_auras = trigger_auras(holder)
+
+    if proc_auras != [] and is_integer(victim_guid) do
+      proc_events =
+        Enum.map(proc_auras, fn %Aura{trigger_spell_id: spell_id} ->
+          Event.trigger_spell(owner_guid, holder.caster_level || 1, victim_guid, spell_id,
+            triggered_by_spell_id: holder.spell.id
+          )
+        end)
+
+      {replace_or_delete(holders, holder, mark_proc(holder, Map.get(context, :now))), events ++ proc_events}
+    else
+      {holders, events}
+    end
+  end
+
+  defp trigger_auras(%Holder{auras: auras}) do
+    Enum.filter(auras, fn
+      %Aura{type: :proc_trigger_spell, trigger_spell_id: spell_id} when is_integer(spell_id) and spell_id > 0 -> true
+      _aura -> false
+    end)
+  end
+
+  defp replace_or_delete(holders, holder, nil), do: List.delete(holders, holder)
+
+  defp replace_or_delete(holders, holder, updated) do
+    List.replace_at(holders, Enum.find_index(holders, &(&1 == holder)), updated)
   end
 
   defp sync_holders(%{unit: %Unit{auras: current}} = entity, current), do: {entity, []}
@@ -216,11 +254,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
          attack_time_ms,
          now
        ) do
-    proc_auras =
-      Enum.filter(holder.auras, fn
-        %Aura{type: :proc_trigger_spell, trigger_spell_id: spell_id} when is_integer(spell_id) and spell_id > 0 -> true
-        _aura -> false
-      end)
+    proc_auras = trigger_auras(holder)
 
     proc? =
       proc_auras != [] and proc_ready?(holder, now) and
