@@ -1147,6 +1147,88 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
       assert Enum.any?(events, &(&1.type == :trigger_spell and &1.spell_id == 17_099))
     end
 
+    test "ignite damage scales with talent rank" do
+      for {rank_spell_id, expected} <- [{11_119, 20}, {12_846, 60}, {12_848, 100}] do
+        entity = fixture_entity()
+
+        ignite = %Spell{
+          id: rank_spell_id,
+          name: "Ignite",
+          duration_ms: -1,
+          proc_type_mask: 0x10000,
+          proc_chance: 100,
+          proc_rule: %ProcRule{school_mask: 0x4, proc_ex: 0x2},
+          effects: [%Effect{index: 0, type: :apply_aura, base_points: 0, die_sides: 0, aura: :dummy}]
+        }
+
+        {entity, _events} = apply_spell(entity, 1, 60, ignite)
+
+        context = %{
+          spell: %Spell{id: 133, name: "Fireball", school: :fire},
+          proc_type: :deal_harmful_spell,
+          outcome: :crit,
+          victim_guid: 999,
+          damage: 500,
+          now: 1_000
+        }
+
+        assert {_entity, [%{type: :trigger_spell, spell_id: 12_654, amount: ^expected}]} =
+                 Aura.reactions(entity, :spell_hit_dealt, context)
+      end
+    end
+
+    test "master of elements refund scales with the dummy aura amount" do
+      for {base_points, expected} <- [{9, 41}, {29, 123}] do
+        entity = fixture_entity()
+
+        master_of_elements = %Spell{
+          id: if(base_points == 9, do: 29_074, else: 29_076),
+          name: "Master of Elements",
+          duration_ms: -1,
+          proc_type_mask: 0x10000,
+          proc_chance: 100,
+          proc_rule: %ProcRule{school_mask: 0x14, proc_ex: 0x2},
+          effects: [
+            %Effect{index: 0, type: :apply_aura, base_points: base_points, die_sides: 1, base_dice: 1, aura: :dummy}
+          ]
+        }
+
+        {entity, _events} = apply_spell(entity, 1, 60, master_of_elements)
+
+        context = %{
+          spell: %Spell{id: 133, name: "Fireball", school: :fire, mana_cost: 410},
+          proc_type: :deal_harmful_spell,
+          outcome: :crit,
+          victim_guid: 999,
+          damage: 500,
+          now: 1_000
+        }
+
+        assert {_entity, [%{type: :trigger_spell, spell_id: 29_077, amount: ^expected}]} =
+                 Aura.reactions(entity, :spell_hit_dealt, context)
+      end
+    end
+
+    test "vampiric embrace heal scales with the damage dealt" do
+      entity = fixture_entity()
+
+      {entity, _events} = apply_spell(entity, 7, 60, vampiric_embrace_fixture())
+
+      for {damage, heal} <- [{50, 10}, {500, 100}] do
+        context = %{
+          attacker_guid: 7,
+          spell: %Spell{id: 10_894, name: "Shadow Word: Pain", school: :shadow},
+          proc_type: :take_harmful_periodic,
+          outcome: :normal,
+          damage: damage,
+          now: 1_000
+        }
+
+        assert {_entity, [%{type: :trigger_spell, spell_id: 15_290, amount: ^heal}]} =
+                 Aura.reactions(entity, :spell_hit_taken, context)
+      end
+    end
+
     test "illumination refunds the base mana cost on crit heals" do
       entity = fixture_entity()
 
