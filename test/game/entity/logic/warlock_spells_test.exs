@@ -92,7 +92,11 @@ defmodule ThistleTea.Game.Entity.Logic.WarlockSpellsTest do
 
       {_result, events} = SpellEffect.receive(caster, context, soul_link, 1_000)
 
-      assert Enum.any?(events, &(&1.type == :trigger_spell and &1.spell_id == 25_228 and &1.target_guid == pet_guid))
+      assert Enum.any?(
+               events,
+               &(&1.type == :trigger_spell and &1.spell_id == 25_228 and &1.target_guid == pet_guid and
+                   &1.source_guid == pet_guid)
+             )
     end
   end
 

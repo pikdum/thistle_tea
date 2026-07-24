@@ -836,9 +836,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
     with pet_guid when is_integer(pet_guid) <- Character.controlled_guid(state),
          [_link | _rest] = aura_ids <- SpellPetAuraLoader.pet_aura_ids(spell_id, Guid.entry(pet_guid)) do
       Enum.map(aura_ids, fn aura_id ->
-        Event.trigger_spell(context.caster_guid, context.caster_level, pet_guid, aura_id,
-          triggered_by_spell_id: spell_id
-        )
+        Event.trigger_spell(pet_guid, context.caster_level, pet_guid, aura_id, triggered_by_spell_id: spell_id)
       end)
     else
       _no_pet -> []

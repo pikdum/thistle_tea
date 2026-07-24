@@ -15,8 +15,10 @@ defmodule ThistleTea.Game.World.Loader.Summon do
   alias ThistleTea.Game.Entity.Data.Component.Internal.Pet
   alias ThistleTea.Game.Entity.Data.CreatureSpell
   alias ThistleTea.Game.Entity.Data.Mob
+  alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Spell, as: SpellData
+  alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.Loader.Mob, as: MobLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.WorldRef
@@ -92,12 +94,42 @@ defmodule ThistleTea.Game.World.Loader.Summon do
       }
 
       %{mob | object: %{mob.object | guid: guid}, unit: unit, internal: internal}
+      |> apply_pet_passive_auras(entry, level)
     else
       _ -> nil
     end
   end
 
   def build_pet(_entry, _owner), do: nil
+
+  defp apply_pet_passive_auras(%Mob{} = mob, entry, level) do
+    entry
+    |> pet_passive_spells(level)
+    |> Enum.reduce(mob, fn spell, acc ->
+      {acc, _events} = AuraLogic.apply_spell(acc, acc.object.guid, acc.unit.level, spell, Time.now())
+      acc
+    end)
+  end
+
+  defp pet_passive_spells(entry, level) do
+    key = {:pet_passives, entry, level}
+
+    case :ets.lookup(__MODULE__, key) do
+      [{^key, spells}] ->
+        spells
+
+      _ ->
+        spells =
+          entry
+          |> pet_spell_profile()
+          |> highest_rank_spell_ids(level, &passive_spell?/1)
+          |> Enum.map(&SpellLoader.load/1)
+          |> Enum.reject(&is_nil/1)
+
+        :ets.insert(__MODULE__, {key, spells})
+        spells
+    end
+  end
 
   def possess(%Mob{} = mob, %{object: %{guid: owner_guid}, unit: owner_unit}, spell_id)
       when is_integer(owner_guid) and is_integer(spell_id) do
@@ -200,9 +232,13 @@ defmodule ThistleTea.Game.World.Loader.Summon do
     end
   end
 
-  defp highest_active_spell_ids({[], _spell_ids}, _level), do: []
+  defp highest_active_spell_ids(profile, level) do
+    highest_rank_spell_ids(profile, level, &(not passive_spell?(&1)))
+  end
 
-  defp highest_active_spell_ids({skill_lines, spell_ids}, level) do
+  defp highest_rank_spell_ids({[], _spell_ids}, _level, _filter), do: []
+
+  defp highest_rank_spell_ids({skill_lines, spell_ids}, level, filter) do
     DBC.all(
       from(ability in SkillLineAbility,
         join: spell in Spell,
@@ -211,7 +247,7 @@ defmodule ThistleTea.Game.World.Loader.Summon do
         select: %{id: spell.id, name: spell.name_en_gb, level: spell.base_level, attributes: spell.attributes}
       )
     )
-    |> Enum.reject(&passive_spell?/1)
+    |> Enum.filter(filter)
     |> Enum.group_by(& &1.name)
     |> Enum.map(fn {_name, ranks} -> Enum.max_by(ranks, & &1.level).id end)
     |> Enum.sort()

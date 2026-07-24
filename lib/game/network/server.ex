@@ -1031,14 +1031,13 @@ defmodule ThistleTea.Game.Network.Server do
 
   defp feed_pet_in_range(_character, _pet_guid, _range_yards), do: :ok
 
-  defp passive_pet_aura_events(%Character{unit: %Unit{auras: holders, level: level}, object: %{guid: guid}}, pet_guid)
-       when is_list(holders) do
+  defp passive_pet_aura_events(%Character{unit: %Unit{auras: holders, level: level}}, pet_guid) when is_list(holders) do
     pet_entry = Guid.entry(pet_guid)
 
     holders
     |> Enum.flat_map(fn %{spell: %Spell{id: spell_id}} -> SpellPetAuraLoader.pet_aura_ids(spell_id, pet_entry) end)
     |> Enum.uniq()
-    |> Enum.map(&Event.trigger_spell(guid, level || 1, pet_guid, &1))
+    |> Enum.map(&Event.trigger_spell(pet_guid, level || 1, pet_guid, &1))
   end
 
   defp passive_pet_aura_events(_character, _pet_guid), do: []
