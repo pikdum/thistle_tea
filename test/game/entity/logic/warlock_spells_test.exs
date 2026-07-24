@@ -47,6 +47,34 @@ defmodule ThistleTea.Game.Entity.Logic.WarlockSpellsTest do
       assert result.unit.health == 61
       assert result.unit.power1 == 39
     end
+
+    test "improved life tap boosts the mana gained" do
+      talent = %Holder{
+        slot: 0,
+        caster_guid: 1,
+        spell: %Spell{id: 18_183, name: "Improved Life Tap"},
+        auras: [%Aura{type: :dummy, amount: 20}]
+      }
+
+      caster = character(health: 100, power1: 0, max_power1: 200, auras: [talent])
+
+      spell = %Spell{
+        id: 1454,
+        name: "Life Tap",
+        script_name: "spell_warlock_life_tap",
+        school: :shadow,
+        spell_family: 5,
+        family_flags_0: 0x00040000,
+        effects: [%Effect{type: :dummy, base_points: 39}]
+      }
+
+      context = %CastContext{caster_guid: 1, caster_level: 20, spell_damage_bonus: %{}}
+
+      {result, _events} = SpellEffect.receive(caster, context, spell, 1_000)
+
+      assert result.unit.health == 61
+      assert result.unit.power1 == 46
+    end
   end
 
   describe "Healthstone creation" do

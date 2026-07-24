@@ -46,6 +46,21 @@ defmodule ThistleTea.Game.Entity.Logic.StatsTest do
       assert recompute(once) == once
     end
 
+    test "predatory strikes adds level-scaled attack power in feral forms" do
+      talent = %Holder{
+        slot: 0,
+        caster_guid: 1,
+        spell: %Spell{id: 16_975, name: "Predatory Strikes"},
+        auras: [%Aura{type: :dummy, amount: 150}]
+      }
+
+      druid = %{mage_unit() | class: 11, shapeshift_form: 1, auras: [talent]}
+      plain = recompute(%{druid | auras: []})
+      unit = recompute(druid)
+
+      assert unit.attack_power == plain.attack_power + div(60 * 150, 100)
+    end
+
     test "adds armor from intellect for resistance-of-stat auras" do
       arcane_resilience = %Aura{type: :mod_resistance_of_stat_percent, amount: 50, misc_value: 1}
 

@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Entity.Logic.Stats do
   alias ThistleTea.Game.Aura
   alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Spell
 
   @resistance_fields [
     {0x01, :normal_resistance, :base_normal_resistance, :armor},
@@ -188,12 +189,39 @@ defmodule ThistleTea.Game.Entity.Logic.Stats do
   defp derive_attack_power(%Unit{} = unit), do: unit
 
   defp unit_attack_power(%Unit{class: @druid, shapeshift_form: 1} = unit) do
-    max((unit.strength || 0) * 2 + (unit.agility || 0) - 20, 0)
+    max((unit.strength || 0) * 2 + (unit.agility || 0) - 20, 0) + predatory_strikes_bonus(unit)
+  end
+
+  defp unit_attack_power(%Unit{class: @druid, shapeshift_form: form} = unit) when form in [5, 8] do
+    melee_attack_power(unit.class, unit.level, unit.strength || 0, unit.agility || 0) +
+      predatory_strikes_bonus(unit)
   end
 
   defp unit_attack_power(%Unit{} = unit) do
     melee_attack_power(unit.class, unit.level, unit.strength || 0, unit.agility || 0)
   end
+
+  @predatory_strikes [16_972, 16_974, 16_975]
+
+  defp predatory_strikes_bonus(%Unit{auras: holders} = unit) when is_list(holders) do
+    level = unit.level || 1
+
+    pct =
+      Enum.find_value(holders, 0, fn
+        %Holder{spell: %Spell{id: id}, auras: auras} when id in @predatory_strikes ->
+          Enum.find_value(auras, fn
+            %Aura{type: :dummy, amount: amount} when is_integer(amount) -> amount
+            _aura -> nil
+          end)
+
+        _holder ->
+          nil
+      end)
+
+    div(level * pct, 100)
+  end
+
+  defp predatory_strikes_bonus(_unit), do: 0
 
   defp derive_weapon_damage(%Unit{} = unit) do
     unit

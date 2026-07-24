@@ -27,6 +27,11 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Script do
     Enum.flat_map(holders, &after_remove_holder(entity, &1))
   end
 
+  @ignite_pct %{11_119 => 4, 11_120 => 8, 12_846 => 12, 12_847 => 16, 12_848 => 20}
+  @ignite_dot 12_654
+  @master_of_elements [29_074, 29_075, 29_076]
+  @master_of_elements_energize 29_077
+
   def outgoing_proc(holders, %Holder{spell: %Spell{} = spell} = holder, owner_guid, context)
       when is_list(holders) and is_integer(owner_guid) do
     cond do
@@ -35,6 +40,12 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Script do
 
       Paladin.illumination?(spell) ->
         illumination_proc(holders, holder, owner_guid, context)
+
+      is_map_key(@ignite_pct, spell.id) ->
+        ignite_proc(holders, holder, owner_guid, context)
+
+      spell.id in @master_of_elements ->
+        master_of_elements_proc(holders, holder, owner_guid, context)
 
       true ->
         :unhandled
@@ -56,6 +67,48 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Script do
   end
 
   defp illumination_proc(holders, _holder, _owner_guid, _context), do: {:handled, holders, []}
+
+  defp ignite_proc(holders, %Holder{spell: %Spell{id: id}} = holder, owner_guid, context) do
+    damage = Map.get(context, :damage) || 0
+    victim_guid = Map.get(context, :victim_guid)
+    tick = trunc(damage * Map.fetch!(@ignite_pct, id) / 100)
+
+    if tick > 0 and is_integer(victim_guid) do
+      event =
+        Event.trigger_spell(owner_guid, holder.caster_level || 1, victim_guid, @ignite_dot,
+          base_points: tick,
+          effect_index: 0,
+          triggered_by_spell_id: id
+        )
+
+      {:handled, holders, [event]}
+    else
+      {:handled, holders, []}
+    end
+  end
+
+  defp master_of_elements_proc(holders, %Holder{} = holder, owner_guid, context) do
+    cost =
+      case Map.get(context, :spell) do
+        %Spell{mana_cost: cost} when is_integer(cost) -> cost
+        _spell -> 0
+      end
+
+    refund = trunc(cost * dummy_amount(holder, 0) / 100)
+
+    if refund > 0 do
+      event =
+        Event.trigger_spell(owner_guid, holder.caster_level || 1, owner_guid, @master_of_elements_energize,
+          base_points: refund,
+          effect_index: 0,
+          triggered_by_spell_id: holder.spell.id
+        )
+
+      {:handled, holders, [event]}
+    else
+      {:handled, holders, []}
+    end
+  end
 
   def outgoing_melee(%Holder{spell: %Spell{id: id}} = holder, owner_guid, victim_guid, context)
       when id in @sweeping_strikes and is_integer(owner_guid) and is_integer(victim_guid) do
@@ -161,7 +214,9 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Script do
 
   def cancel_linked_spell_ids(_holder), do: []
 
-  defp after_remove_holder(%{object: %{guid: target_guid}}, %Holder{
+  @leader_of_the_pack_aura 24_932
+
+  defp after_remove_holder(%{object: %{guid: target_guid}} = entity, %Holder{
          spell: %Spell{id: spell_id} = spell,
          caster_guid: caster_guid,
          caster_level: caster_level
@@ -172,11 +227,25 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Script do
         [Event.trigger_spell(caster_guid, caster_level, target_guid, poison_id)]
 
       _other ->
-        []
+        shapeshift_after_remove(entity, spell)
     end
   end
 
   defp after_remove_holder(_entity, _holder), do: []
+
+  defp shapeshift_after_remove(%{object: %{guid: guid}, unit: %{auras: holders}}, %Spell{} = spell)
+       when is_list(holders) do
+    shapeshift? = Enum.any?(spell.effects, &match?(%{type: :apply_aura, aura: :mod_shapeshift}, &1))
+    still_shifted? = Enum.any?(holders, &Holder.has_aura_type?(&1, :mod_shapeshift))
+
+    if shapeshift? and not still_shifted? do
+      [Event.remove_aura(guid, guid, @leader_of_the_pack_aura)]
+    else
+      []
+    end
+  end
+
+  defp shapeshift_after_remove(_entity, _spell), do: []
 
   defp combustion_proc(holders, %Holder{} = holder, owner_guid, %{outcome: outcome}) do
     with visible_id when is_integer(visible_id) <- combustion_visible_spell_id(holder.spell),

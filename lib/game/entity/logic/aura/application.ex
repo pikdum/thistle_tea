@@ -189,10 +189,85 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
     {entity, events} = MovementSync.sync_movement_state(entity, now)
     viewpoint_events = ViewpointSync.events(previous_holders, holders, entity_guid(entity))
     duration_events = applied_duration_events(entity, holder, now)
+    shapeshift_events = shapeshift_talent_events(entity, holder)
 
     {Core.mark_broadcast_update(entity),
-     modifier_events ++ sit_events ++ control_events ++ viewpoint_events ++ events ++ duration_events}
+     modifier_events ++
+       sit_events ++
+       control_events ++
+       viewpoint_events ++
+       events ++
+       duration_events ++
+       shapeshift_events}
   end
+
+  @cat_form 1
+  @feral_forms [1, 5, 8]
+  @leader_of_the_pack 17_007
+  @leader_of_the_pack_aura 24_932
+  @furor_talents [17_056, 17_058, 17_059, 17_060, 17_061]
+  @furor_energize 17_099
+  @furor_rage 17_057
+
+  defp shapeshift_talent_events(%{object: %{guid: guid}, unit: %Unit{} = unit} = entity, %Holder{} = holder) do
+    case shapeshift_form_misc(holder) do
+      form when form in @feral_forms ->
+        leader_of_the_pack_events(entity, guid, unit.level) ++ furor_events(entity, guid, unit.level, form)
+
+      form when is_integer(form) ->
+        [Event.remove_aura(guid, guid, @leader_of_the_pack_aura)]
+
+      _no_form ->
+        []
+    end
+  end
+
+  defp shapeshift_form_misc(%Holder{auras: auras}) do
+    Enum.find_value(auras, fn
+      %Aura{type: :mod_shapeshift, misc_value: misc} when is_integer(misc) and misc > 0 -> misc
+      _aura -> nil
+    end)
+  end
+
+  defp leader_of_the_pack_events(entity, guid, level) do
+    if holder_spell?(entity, @leader_of_the_pack) do
+      [Event.trigger_spell(guid, level || 1, guid, @leader_of_the_pack_aura)]
+    else
+      []
+    end
+  end
+
+  defp furor_events(entity, guid, level, form) do
+    chance = furor_chance(entity)
+
+    if chance > 0 and :rand.uniform(100) <= chance do
+      spell_id = if form == @cat_form, do: @furor_energize, else: @furor_rage
+      [Event.trigger_spell(guid, level || 1, guid, spell_id)]
+    else
+      []
+    end
+  end
+
+  defp furor_chance(%{unit: %Unit{auras: holders}}) when is_list(holders) do
+    Enum.find_value(holders, 0, fn
+      %Holder{spell: %Spell{id: id}, auras: auras} when id in @furor_talents ->
+        Enum.find_value(auras, fn
+          %Aura{type: :dummy, amount: amount} when is_integer(amount) -> amount
+          _aura -> nil
+        end)
+
+      _holder ->
+        nil
+    end)
+  end
+
+  defp furor_chance(_entity), do: 0
+
+  defp holder_spell?(%{unit: %Unit{auras: holders}}, spell_id) when is_list(holders) do
+    Enum.any?(holders, &match?(%Holder{spell: %Spell{id: ^spell_id}}, &1))
+  end
+
+  defp holder_spell?(_entity, _spell_id), do: false
 
   defp applied_duration_events(
          %Character{unit: %Unit{auras: holders}},

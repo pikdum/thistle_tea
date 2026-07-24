@@ -1049,6 +1049,104 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
                Aura.reactions(entity, :hit_taken, Map.put(context, :outcome, :crit))
     end
 
+    test "ignite applies a dot worth a percentage of fire crit damage" do
+      entity = fixture_entity()
+
+      ignite = %Spell{
+        id: 12_848,
+        name: "Ignite",
+        duration_ms: -1,
+        proc_type_mask: 0x10000,
+        proc_chance: 100,
+        proc_rule: %ProcRule{school_mask: 0x4, proc_ex: 0x2},
+        effects: [
+          %Effect{index: 0, type: :apply_aura, base_points: 0, die_sides: 0, aura: :dummy}
+        ]
+      }
+
+      {entity, _events} = apply_spell(entity, 1, 60, ignite)
+
+      context = %{
+        spell: %Spell{id: 133, name: "Fireball", school: :fire},
+        proc_type: :deal_harmful_spell,
+        outcome: :crit,
+        victim_guid: 999,
+        damage: 500,
+        now: 1_000
+      }
+
+      assert {_entity,
+              [
+                %{type: :trigger_spell, spell_id: 12_654, target_guid: 999, amount: 100}
+              ]} = Aura.reactions(entity, :spell_hit_dealt, context)
+    end
+
+    test "master of elements refunds part of the crit spell's mana cost" do
+      entity = fixture_entity()
+
+      master_of_elements = %Spell{
+        id: 29_076,
+        name: "Master of Elements",
+        duration_ms: -1,
+        proc_type_mask: 0x10000,
+        proc_chance: 100,
+        proc_rule: %ProcRule{school_mask: 0x14, proc_ex: 0x2},
+        effects: [
+          %Effect{index: 0, type: :apply_aura, base_points: 29, die_sides: 1, base_dice: 1, aura: :dummy}
+        ]
+      }
+
+      {entity, _events} = apply_spell(entity, 1, 60, master_of_elements)
+
+      context = %{
+        spell: %Spell{id: 133, name: "Fireball", school: :fire, mana_cost: 410},
+        proc_type: :deal_harmful_spell,
+        outcome: :crit,
+        victim_guid: 999,
+        damage: 500,
+        now: 1_000
+      }
+
+      assert {_entity,
+              [
+                %{type: :trigger_spell, spell_id: 29_077, target_guid: 1, amount: 123}
+              ]} = Aura.reactions(entity, :spell_hit_dealt, context)
+    end
+
+    test "shapeshifting into a feral form procs furor and leader of the pack" do
+      entity = fixture_entity()
+
+      furor = %Spell{
+        id: 17_061,
+        name: "Furor",
+        duration_ms: -1,
+        effects: [%Effect{index: 0, type: :apply_aura, base_points: 99, die_sides: 1, base_dice: 1, aura: :dummy}]
+      }
+
+      leader_of_the_pack = %Spell{
+        id: 17_007,
+        name: "Leader of the Pack",
+        duration_ms: -1,
+        effects: [%Effect{index: 0, type: :apply_aura, base_points: 0, die_sides: 0, aura: :dummy}]
+      }
+
+      cat_form = %Spell{
+        id: 768,
+        name: "Cat Form",
+        duration_ms: -1,
+        effects: [
+          %Effect{index: 0, type: :apply_aura, base_points: 0, die_sides: 0, aura: :mod_shapeshift, misc_value: 1}
+        ]
+      }
+
+      {entity, _events} = apply_spell(entity, 1, 40, furor)
+      {entity, _events} = apply_spell(entity, 1, 40, leader_of_the_pack)
+      {_entity, events} = apply_spell(entity, 1, 40, cat_form)
+
+      assert Enum.any?(events, &(&1.type == :trigger_spell and &1.spell_id == 24_932))
+      assert Enum.any?(events, &(&1.type == :trigger_spell and &1.spell_id == 17_099))
+    end
+
     test "illumination refunds the base mana cost on crit heals" do
       entity = fixture_entity()
 

@@ -49,11 +49,31 @@ defmodule ThistleTea.Game.Entity.Logic.Warlock do
 
     if (state.unit.health || 0) > damage do
       state = Core.take_damage(state, damage, now, school: :shadow, source: state.object.guid)
-      {Resources.gain_power(state, 0, damage), []}
+      {Resources.gain_power(state, 0, improved_life_tap_gain(state, damage)), []}
     else
       {state, []}
     end
   end
+
+  @improved_life_tap [18_182, 18_183]
+
+  defp improved_life_tap_gain(%{unit: %{auras: holders}}, damage) when is_list(holders) do
+    bonus =
+      Enum.find_value(holders, 0, fn
+        %{spell: %Spell{id: id}, auras: auras} when id in @improved_life_tap ->
+          Enum.find_value(auras, fn
+            %{type: :dummy, amount: amount} when is_integer(amount) -> amount
+            _aura -> nil
+          end)
+
+        _holder ->
+          nil
+      end)
+
+    trunc(damage * (100 + bonus) / 100)
+  end
+
+  defp improved_life_tap_gain(_state, damage), do: damage
 
   def conflagrate?(%Spell{} = spell), do: Spell.vmangos_script?(spell, "spell_warlock_conflagrate")
   def conflagrate?(_spell), do: false
