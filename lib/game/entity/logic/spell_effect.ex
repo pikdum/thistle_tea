@@ -541,15 +541,14 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   end
 
   defp apply_effect(state, %CastContext{} = context, spell, %Effect{type: :dummy} = effect, now) do
-    case vmangos_script_events(state, context, spell) do
-      [] ->
-        case Scripts.dummy_effect(spell) do
-          :life_tap -> Warlock.life_tap(state, context, spell, effect, now)
-          dummy_effect -> apply_class_dummy(state, context, spell, effect, dummy_effect, now)
-        end
-
-      events ->
-        {state, events}
+    with [] <- pet_aura_events(state, context, spell),
+         [] <- vmangos_script_events(state, context, spell) do
+      case Scripts.dummy_effect(spell) do
+        :life_tap -> Warlock.life_tap(state, context, spell, effect, now)
+        dummy_effect -> apply_class_dummy(state, context, spell, effect, dummy_effect, now)
+      end
+    else
+      events -> {state, events}
     end
   end
 
@@ -830,9 +829,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
     end
   end
 
-  defp apply_class_dummy(state, context, spell, _effect, _unscripted, _now) do
-    {state, pet_aura_events(state, context, spell)}
-  end
+  defp apply_class_dummy(state, _context, _spell, _effect, _unscripted, _now), do: {state, []}
 
   defp pet_aura_events(%Character{} = state, %CastContext{} = context, %Spell{id: spell_id}) do
     with pet_guid when is_integer(pet_guid) <- Character.controlled_guid(state),

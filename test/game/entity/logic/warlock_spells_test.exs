@@ -615,7 +615,10 @@ defmodule ThistleTea.Game.Entity.Logic.WarlockSpellsTest do
   end
 
   describe "Soul Link" do
-    test "casts the link aura back from the pet to its owner" do
+    test "prefers the pet-aura link over the legacy hidden script aura" do
+      SpellPetAura.init()
+      :ets.insert(SpellPetAura, {19_028, [{0, 25_228}]})
+
       spell = %Spell{
         id: 19_028,
         name: "Soul Link",
@@ -635,9 +638,11 @@ defmodule ThistleTea.Game.Entity.Logic.WarlockSpellsTest do
 
       {_pet, events} = SpellEffect.receive(pet(), context, spell, 1_000)
 
+      refute Enum.any?(events, &(&1.spell_id == 18_814))
+
       assert Enum.any?(events, fn event ->
-               event.type == :trigger_spell and event.source_guid == 2 and event.target_guid == 1 and
-                 event.spell_id == 18_814
+               event.type == :trigger_spell and event.source_guid == 2 and event.target_guid == 2 and
+                 event.spell_id == 25_228
              end)
     end
 
