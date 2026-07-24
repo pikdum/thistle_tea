@@ -109,7 +109,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
     entity
   end
 
-  def emit(entity, %Event{type: :aura_duration} = event) do
+  def emit(%Character{} = entity, %Event{type: :aura_duration} = event) do
     Network.send_packet(%Message.SmsgUpdateAuraDuration{
       aura_slot: event.aura_slot,
       duration_ms: event.duration_ms
@@ -117,6 +117,8 @@ defmodule ThistleTea.Game.Entity.EventSink do
 
     entity
   end
+
+  def emit(entity, %Event{type: :aura_duration}), do: entity
 
   def emit(%Mob{} = entity, %Event{type: :movement_stopped}) do
     World.update_position(entity)
@@ -1092,6 +1094,21 @@ defmodule ThistleTea.Game.Entity.EventSink do
   end
 
   def emit(entity, %Event{type: :call_for_help}), do: entity
+
+  def emit(%Character{object: %{guid: guid}} = entity, %Event{type: :spell_delayed} = event) do
+    Network.send_packet(%Message.SmsgSpellDelayed{caster: guid, delay_ms: event.delay_ms})
+    entity
+  end
+
+  def emit(entity, %Event{type: :spell_delayed}), do: entity
+
+  def emit(entity, %Event{type: :delay_aura, target_guid: target_guid} = event)
+      when is_integer(target_guid) and target_guid > 0 do
+    Entity.delay_aura(target_guid, event.spell_id, event.source_guid, event.delay_ms)
+    entity
+  end
+
+  def emit(entity, %Event{type: :delay_aura}), do: entity
 
   def emit(entity, %Event{type: :play_sound, sound_id: sound_id}) do
     %Message.SmsgPlaySound{sound_id: sound_id}

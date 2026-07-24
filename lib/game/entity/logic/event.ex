@@ -49,6 +49,7 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
     :operation,
     :attack,
     :channel_time_ms,
+    :delay_ms,
     :entry,
     :text,
     :chat_type,
@@ -257,6 +258,25 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
       type: :channel_update,
       source_guid: source_guid,
       channel_time_ms: time_ms
+    }
+  end
+
+  def spell_delayed(source_guid, delay_ms) when is_integer(source_guid) and is_integer(delay_ms) do
+    %__MODULE__{
+      type: :spell_delayed,
+      source_guid: source_guid,
+      delay_ms: delay_ms
+    }
+  end
+
+  def delay_aura(source_guid, target_guid, spell_id, delay_ms)
+      when is_integer(source_guid) and is_integer(target_guid) and is_integer(spell_id) and is_integer(delay_ms) do
+    %__MODULE__{
+      type: :delay_aura,
+      source_guid: source_guid,
+      target_guid: target_guid,
+      spell_id: spell_id,
+      delay_ms: delay_ms
     }
   end
 

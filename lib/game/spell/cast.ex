@@ -17,6 +17,7 @@ defmodule ThistleTea.Game.Spell.Cast do
     modifier_holder_ids: [],
     channel_started?: false,
     consume_item: false,
+    pushback_count: 0,
     started_at: 0,
     ends_at: 0
   ]
@@ -57,6 +58,48 @@ defmodule ThistleTea.Game.Spell.Cast do
   end
 
   def apply_speed_modifier(%__MODULE__{} = cast, _modifier), do: cast
+
+  def push_back_cast(%__MODULE__{cast_time_ms: cast_time_ms} = cast, now)
+      when is_integer(cast_time_ms) and cast_time_ms > 0 and is_integer(now) do
+    {cast, requested} = take_pushback_delay(cast)
+    new_ends_at = min(cast.ends_at + requested, now + cast_time_ms + (cast.channel_ms || 0))
+    delta = max(new_ends_at - cast.ends_at, 0)
+
+    cast = %{
+      cast
+      | ends_at: cast.ends_at + delta,
+        cast_time_ms: cast_time_ms + channel_pushback_delta(cast, delta),
+        next_channel_tick_at: shift_time(cast.next_channel_tick_at, delta)
+    }
+
+    {cast, delta}
+  end
+
+  def push_back_cast(%__MODULE__{} = cast, _now), do: {cast, 0}
+
+  def shorten_channel(%__MODULE__{ends_at: ends_at} = cast, now) when is_integer(ends_at) and is_integer(now) do
+    {cast, requested} = take_pushback_delay(cast)
+    remaining = max(ends_at - now, 0)
+    reduction = min(requested, remaining)
+    new_remaining = remaining - reduction
+    {%{cast | ends_at: now + new_remaining}, reduction, new_remaining}
+  end
+
+  def shorten_channel(%__MODULE__{} = cast, _now), do: {cast, 0, 0}
+
+  defp take_pushback_delay(%__MODULE__{pushback_count: count} = cast) when is_integer(count) do
+    delay = if count < 5, do: 1_000 - count * 200, else: 200
+    {%{cast | pushback_count: count + 1}, delay}
+  end
+
+  defp take_pushback_delay(%__MODULE__{} = cast), do: {%{cast | pushback_count: 1}, 1_000}
+
+  defp channel_pushback_delta(%__MODULE__{channel_ms: channel_ms}, delta)
+       when is_integer(channel_ms) and channel_ms > 0 do
+    delta
+  end
+
+  defp channel_pushback_delta(_cast, _delta), do: 0
 
   def advance_channel_tick(%__MODULE__{channel_tick_ms: tick_ms, next_channel_tick_at: next_tick_at} = cast, now)
       when is_integer(tick_ms) and tick_ms > 0 and is_integer(next_tick_at) do

@@ -18,6 +18,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Aura.HolderSync
+  alias ThistleTea.Game.Entity.Logic.CastPushback
   alias ThistleTea.Game.Entity.Logic.Combat
   alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.Entity.Logic.Movement
@@ -79,7 +80,15 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
 
     entity = %{entity | unit: %{unit | health: new_health}}
     entity = Aura.enqueue_death_item_rewards(entity, health, new_health)
-    entity = if remaining > 0, do: Aura.break_on_damage(entity, now), else: entity
+
+    entity =
+      if remaining > 0 do
+        entity
+        |> Aura.break_on_damage(now)
+        |> CastPushback.on_damage(now, opts)
+      else
+        entity
+      end
 
     entity =
       entity

@@ -385,6 +385,14 @@ defmodule ThistleTea.Game.Network.Server do
     {:noreply, {socket, %{state | character: character}}, {:continue, :maybe_broadcast_update}}
   end
 
+  def handle_cast(
+        {:delay_aura, spell_id, caster_guid, delay_ms},
+        {socket, %{character: %Character{} = character} = state}
+      ) do
+    character = Aura.delay_source_spell(character, spell_id, caster_guid, delay_ms, Time.now())
+    {:noreply, {socket, %{state | character: character}}, {:continue, :maybe_broadcast_update}}
+  end
+
   def handle_cast({:reward_kill, victim}, {socket, %{character: %Character{} = character} = state}) do
     state = apply_kill_reward(state, victim, kill_xp(character, victim))
     {:noreply, {socket, state}, socket.read_timeout}

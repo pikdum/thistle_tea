@@ -22,6 +22,7 @@ defmodule ThistleTea.Game.Network.Message.SmsgCastResult do
     fleeing: 0x1E,
     food_lowlevel: 0x1F,
     immune: 0x22,
+    interrupted: 0x23,
     item_not_ready: 0x28,
     line_of_sight: 0x2A,
     not_known: 0x38,

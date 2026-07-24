@@ -10,8 +10,8 @@ defmodule ThistleTea.Game.Spell.SupportMatrix do
   Deferred auras that are mapped to atoms but currently inert:
   reflect_spells_school, mod_total_threat (Fade), water_breathing,
   state_immunity replacement gaps, empathy, mechanic_resistance,
-  reduce_pushback (cast pushback backlog), track_creatures/track_resources
-  client fields, auras_visible, and the language/reputation cosmetics.
+  track_creatures/track_resources client fields, auras_visible, and the
+  language/reputation cosmetics.
   """
 
   @deferred_effects %{

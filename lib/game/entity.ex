@@ -44,6 +44,10 @@ defmodule ThistleTea.Game.Entity do
     dispatch_cast(entity, {:remove_aura, spell_id, caster_guid})
   end
 
+  def delay_aura(entity, spell_id, caster_guid, delay_ms) do
+    dispatch_cast(entity, {:delay_aura, spell_id, caster_guid, delay_ms})
+  end
+
   def receive_attack(entity, attack) do
     dispatch_cast(entity, {:receive_attack, attack})
   end

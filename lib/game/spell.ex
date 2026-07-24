@@ -54,6 +54,8 @@ defmodule ThistleTea.Game.Spell do
     recovery_time_ms: 0,
     category_recovery_time_ms: 0,
     aura_interrupt_flags: 0,
+    interrupt_flags: 0,
+    channel_interrupt_flags: 0,
     equipped_item_class: -1,
     equipped_item_subclass_mask: 0,
     attributes: MapSet.new(),
@@ -78,6 +80,24 @@ defmodule ThistleTea.Game.Spell do
 
   def breaks_on_damage?(%__MODULE__{aura_interrupt_flags: flags}) when is_integer(flags), do: (flags &&& 0x2) != 0
   def breaks_on_damage?(_spell), do: false
+
+  def pushback_on_damage?(%__MODULE__{interrupt_flags: flags}) when is_integer(flags), do: (flags &&& 0x02) != 0
+  def pushback_on_damage?(_spell), do: false
+
+  def cancels_on_damage?(%__MODULE__{interrupt_flags: flags}) when is_integer(flags), do: (flags &&& 0x10) != 0
+  def cancels_on_damage?(_spell), do: false
+
+  def channel_delayed_on_damage?(%__MODULE__{channel_interrupt_flags: flags}) when is_integer(flags) do
+    (flags &&& 0x4000) != 0
+  end
+
+  def channel_delayed_on_damage?(_spell), do: false
+
+  def channel_cancels_on_damage?(%__MODULE__{channel_interrupt_flags: flags}) when is_integer(flags) do
+    (flags &&& 0x02) != 0
+  end
+
+  def channel_cancels_on_damage?(_spell), do: false
 
   def usable_in_stance?(%__MODULE__{stances: stances}, _form) when stances in [0, nil], do: true
 

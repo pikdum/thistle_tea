@@ -135,6 +135,28 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Lifecycle do
 
   def remove_source_spell(entity, _spell_id, _caster_guid, _now), do: {entity, []}
 
+  def delay_source_spell(%{unit: %Unit{auras: holders} = unit} = entity, spell_id, caster_guid, delay_ms, now)
+      when is_list(holders) and holders != [] and is_integer(spell_id) and is_integer(caster_guid) and
+             is_integer(delay_ms) and delay_ms > 0 do
+    {holders, events} =
+      Enum.map_reduce(holders, [], fn %Holder{} = holder, events ->
+        if Holder.same_source?(holder, spell_id, caster_guid) and is_integer(holder.expires_at) do
+          holder = %{holder | expires_at: max(holder.expires_at - delay_ms, now)}
+          {holder, events ++ duration_event(holder, now)}
+        else
+          {holder, events}
+        end
+      end)
+
+    %{entity | unit: %{unit | auras: holders}}
+    |> Event.enqueue(duration_sync_events(entity, events))
+  end
+
+  def delay_source_spell(entity, _spell_id, _caster_guid, _delay_ms, _now), do: entity
+
+  defp duration_sync_events(%Character{}, events), do: events
+  defp duration_sync_events(_entity, _events), do: []
+
   def cancel_spell(%{unit: %Unit{auras: holders}} = entity, spell_id, now)
       when is_list(holders) and holders != [] and is_integer(spell_id) do
     holder = Enum.find(holders, fn %Holder{spell: %Spell{id: id}} -> id == spell_id end)

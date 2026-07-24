@@ -199,6 +199,15 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     {:noreply, wake_ai_tick(state), {:continue, :maybe_broadcast}}
   end
 
+  def handle_cast({:delay_aura, spell_id, caster_guid, delay_ms}, state) do
+    state =
+      state
+      |> Aura.delay_source_spell(spell_id, caster_guid, delay_ms, Time.now())
+      |> EventSink.emit_pending()
+
+    {:noreply, wake_ai_tick(state)}
+  end
+
   @impl GenServer
   def handle_cast({:receive_heal, amount}, state) do
     state = Core.heal(state, amount)
