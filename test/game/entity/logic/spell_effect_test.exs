@@ -16,6 +16,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Cooldowns
   alias ThistleTea.Game.Spell.Effect
+  alias ThistleTea.Game.Spell.ProcRule
   alias ThistleTea.Game.WorldRef
 
   defp target_fixture do
@@ -35,6 +36,92 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
       internal: %Internal{world: %WorldRef{map_id: 0}},
       movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
     }
+  end
+
+  defp avoided_melee_ability_target(outcome) do
+    {class, equipment_bonuses, avoidance_auras} =
+      case outcome do
+        :dodge ->
+          {1, %{}, [%ThistleTea.Game.Aura{type: :mod_dodge, amount: 100}]}
+
+        :parry ->
+          {1, %{}, [%ThistleTea.Game.Aura{type: :mod_parry_percent, amount: 100}]}
+
+        :block ->
+          {8, %{shields: 1},
+           [
+             %ThistleTea.Game.Aura{type: :mod_dodge, amount: -100},
+             %ThistleTea.Game.Aura{type: :mod_block_percent, amount: 100}
+           ]}
+      end
+
+    avoidance_holder = %Holder{
+      spell: %Spell{id: 90_000},
+      caster_guid: 1,
+      auras: avoidance_auras
+    }
+
+    proc_holder = %Holder{
+      spell: %Spell{
+        id: 90_001,
+        proc_type_mask: 0x20,
+        proc_chance: 100,
+        proc_rule: %ProcRule{proc_ex: avoidance_proc_ex(outcome)}
+      },
+      caster_guid: 1,
+      auras: [%ThistleTea.Game.Aura{type: :proc_trigger_spell, trigger_spell_id: 90_002}]
+    }
+
+    %Character{
+      object: %Object{guid: 1},
+      unit: %Unit{
+        health: 100,
+        max_health: 100,
+        level: 1,
+        class: class,
+        agility: 0,
+        equipment_bonuses: equipment_bonuses,
+        auras: [avoidance_holder, proc_holder]
+      },
+      player: %Player{},
+      internal: %Internal{world: %WorldRef{map_id: 0}},
+      movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
+    }
+  end
+
+  defp avoidance_proc_ex(:dodge), do: 0x10
+  defp avoidance_proc_ex(:parry), do: 0x20
+  defp avoidance_proc_ex(:block), do: 0x40
+
+  defp assert_avoided_melee_ability_reaction(outcome) do
+    spell = %Spell{
+      id: 72,
+      school: :physical,
+      dmg_class: 2,
+      attributes: MapSet.new([:completely_blocked]),
+      effects: [%Effect{type: :weapon_damage, base_points: 0}]
+    }
+
+    context = %CastContext{
+      caster_guid: 999,
+      caster_level: 1,
+      caster_type: :player,
+      attack_skill: 5,
+      hit_chance_bonus: 100,
+      melee_crit_chance: 0.0,
+      attack_time_ms: 2_000,
+      weapon_base_min: 10,
+      weapon_base_max: 10
+    }
+
+    {target, events} =
+      avoided_melee_ability_target(outcome)
+      |> SpellEffect.receive(context, spell, 1_000)
+
+    assert target.unit.health == 100
+    assert %{type: :spell_log_miss, reason: ^outcome} = Enum.find(events, &(&1.type == :spell_log_miss))
+    assert %{type: :attack_outcome, outcome: ^outcome} = Enum.find(events, &(&1.type == :attack_outcome))
+    assert %{type: :trigger_spell, spell_id: 90_002} = Enum.find(events, &(&1.type == :trigger_spell))
   end
 
   describe "receive/4" do
@@ -200,6 +287,18 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
 
       assert %{proc_type: :deal_ranged_ability} = Enum.find(events, &(&1.type == :spell_damage))
       assert %{type: :trigger_spell, spell_id: 12_345} = Enum.find(events, &(&1.type == :trigger_spell))
+    end
+
+    test "dodged melee abilities reach victim proc reactions" do
+      assert_avoided_melee_ability_reaction(:dodge)
+    end
+
+    test "parried melee abilities reach victim proc reactions" do
+      assert_avoided_melee_ability_reaction(:parry)
+    end
+
+    test "blocked melee abilities reach victim proc reactions" do
+      assert_avoided_melee_ability_reaction(:block)
     end
 
     test "caster-targeted trigger effects fire at the caster, other caster effects stay filtered" do

@@ -172,7 +172,8 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
     case result.outcome do
       outcome when outcome in [:miss, :dodge, :parry, :block] ->
         target = maybe_mark_defense(target, context.caster_guid, outcome, now)
-        {target, melee_avoid_events(target, context, spell, outcome)}
+        {target, reaction_events} = avoided_melee_ability_reactions(target, context, spell, outcome, now)
+        {target, melee_avoid_events(target, context, spell, outcome) ++ reaction_events}
 
       _hit ->
         context = %{context | melee_crit?: result.crit?}
@@ -1283,20 +1284,30 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   end
 
   defp melee_ability_reactions(state, %CastContext{} = context, %Spell{} = spell, damage, now) when damage > 0 do
+    outcome = if context.melee_crit?, do: :crit, else: :normal
+    incoming_melee_ability_reactions(state, context, spell, outcome, now)
+  end
+
+  defp melee_ability_reactions(state, _context, _spell, _damage, _now), do: {state, []}
+
+  defp avoided_melee_ability_reactions(state, context, spell, outcome, now) do
+    incoming_melee_ability_reactions(state, context, spell, outcome, now)
+  end
+
+  defp incoming_melee_ability_reactions(state, %CastContext{} = context, %Spell{} = spell, outcome, now) do
     if Core.dead?(state) do
       {state, []}
     else
       Aura.reactions(state, :hit_taken, %{
         attacker_guid: context.caster_guid,
+        attacker_position: attack_position(context.caster_position),
         proc_type: taken_attack_proc_type(spell),
-        outcome: if(context.melee_crit?, do: :crit, else: :normal),
+        outcome: outcome,
         spell: spell,
         now: now
       })
     end
   end
-
-  defp melee_ability_reactions(state, _context, _spell, _damage, _now), do: {state, []}
 
   defp dealt_spell_proc_type(%Spell{} = spell, opts) when is_list(opts) do
     cond do
