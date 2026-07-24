@@ -106,7 +106,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
 
   defp take_unblocked_damage(entity, _damage, _now, _opts), do: {entity, 0}
 
-  defp enqueue_redirect(entity, {target_guid, amount}, source_guid, school) do
+  defp enqueue_redirect(entity, {target_guid, amount}, source_guid, school) when is_integer(amount) and amount > 0 do
     Event.enqueue(entity, Event.redirect_damage(source_guid, target_guid, school, amount))
   end
 

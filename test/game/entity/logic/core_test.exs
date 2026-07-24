@@ -31,6 +31,28 @@ defmodule ThistleTea.Game.Entity.Logic.CoreTest do
     end
   end
 
+  describe "take_damage_with_absorb/4 damage splitting" do
+    test "redirects the split portion to the linked caster" do
+      entity = entity(health: 100, max_health: 100)
+      entity = Map.put(%{entity | unit: %{entity.unit | auras: [soul_link_holder()]}}, :object, %{guid: 1})
+
+      {entity, _absorbed} = Core.take_damage_with_absorb(entity, 100, 1_000, school: :physical, source: 777)
+
+      assert entity.unit.health == 30
+      assert [%{type: :redirect_damage, target_guid: 2, amount: 30}] = entity.internal.events
+    end
+
+    test "skips the redirect when the split portion truncates to zero" do
+      entity = entity(health: 100, max_health: 100)
+      entity = Map.put(%{entity | unit: %{entity.unit | auras: [soul_link_holder()]}}, :object, %{guid: 1})
+
+      {entity, _absorbed} = Core.take_damage_with_absorb(entity, 2, 1_000, school: :physical, source: 777)
+
+      assert entity.unit.health == 98
+      assert entity.internal.events == []
+    end
+  end
+
   describe "take_damage_with_absorb/4 killer recording" do
     test "records the source on the killing blow" do
       entity = damageable(health: 30)
@@ -213,6 +235,15 @@ defmodule ThistleTea.Game.Entity.Logic.CoreTest do
     test "falls back to the level formula when the leash range is unset" do
       assert Core.tether_range(entity([])) == 42
     end
+  end
+
+  defp soul_link_holder do
+    %Holder{
+      slot: 0,
+      caster_guid: 2,
+      spell: %Spell{id: 25_228, name: "Soul Link"},
+      auras: [%Aura{type: :split_damage_percent, amount: 30, misc_value: 127}]
+    }
   end
 
   defp entity(opts) do
