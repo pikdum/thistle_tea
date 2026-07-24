@@ -49,6 +49,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.World.SpawnPool.Catalog, as: SpawnPoolCatalog
   alias ThistleTea.Game.World.System.CellActivator
   alias ThistleTea.Game.World.System.ChatChannels
+  alias ThistleTea.Game.World.System.Duel, as: DuelSystem
   alias ThistleTea.Game.World.System.GameEvent, as: GameEventSystem
   alias ThistleTea.Game.World.System.Instance, as: InstanceSystem
   alias ThistleTea.Game.World.System.Party, as: PartySystem
@@ -96,6 +97,7 @@ defmodule ThistleTea.Application do
         ThistleTea.Telemetry,
         PartySystem,
         InstanceSystem,
+        DuelSystem,
         {Group, name: Groups, log: false},
         EntityRegistry,
         PostOffice,

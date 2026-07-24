@@ -53,7 +53,8 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
           context
           | target_guid: context.caster_guid,
             target_role: :other,
-            target_hostile?: true
+            target_hostile?: true,
+            reflected_by_guid: target.object.guid
         }
 
         {target,
@@ -347,10 +348,47 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
         []
       end
 
-    {Core.take_damage(state, state.unit.health || 0, now, source: context.caster_guid, spell_id: spell.id), events}
+    {Core.take_damage(
+       state,
+       state.unit.health || 0,
+       now,
+       damage_source_opts(context) ++ [spell_id: spell.id]
+     ), events}
   end
 
   defp apply_effect(state, %CastContext{}, _spell, %Effect{type: :add_combo_points}, _now), do: {state, []}
+
+  defp apply_effect(
+         %Character{
+           object: %{guid: target_guid},
+           movement_block: %{position: {target_x, target_y, _target_z, _target_o}}
+         } = state,
+         %CastContext{
+           caster_guid: caster_guid,
+           caster_level: caster_level,
+           caster_type: :player,
+           caster_position: {world, caster_x, caster_y, caster_z},
+           caster_orientation: orientation
+         },
+         _spell,
+         %Effect{type: :duel, misc_value: entry},
+         _now
+       )
+       when is_integer(entry) and entry > 0 and target_guid != caster_guid do
+    flag_position = {world, (caster_x + target_x) / 2, (caster_y + target_y) / 2, caster_z}
+
+    {state,
+     [
+       Event.duel_request(
+         caster_guid,
+         caster_level,
+         target_guid,
+         entry,
+         flag_position,
+         orientation
+       )
+     ]}
+  end
 
   defp apply_effect(
          state,
@@ -726,7 +764,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
         |> Core.mark_broadcast_update()
 
       damage = trunc(drained * burn_multiplier(effect))
-      state = Core.take_damage(state, damage, now, school: school_atom(spell), source: context.caster_guid)
+      state = Core.take_damage(state, damage, now, [school: school_atom(spell)] ++ damage_source_opts(context))
       event = Event.spell_damage(context.caster_guid, state.object.guid, spell, damage)
 
       {state, [event]}
@@ -1045,6 +1083,8 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
       Core.take_damage_with_absorb(state, damage, now,
         school: school,
         source: context.caster_guid,
+        source_owner: context.caster_owner_guid,
+        reflected_by: context.reflected_by_guid,
         threat_multiplier: damage_threat_multiplier(context)
       )
 
@@ -1268,6 +1308,8 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
       Core.take_damage_with_absorb(state, damage, now,
         school: school,
         source: context.caster_guid,
+        source_owner: context.caster_owner_guid,
+        reflected_by: context.reflected_by_guid,
         threat_multiplier: damage_threat_multiplier(context)
       )
 
@@ -1417,6 +1459,14 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
     else
       {state, events}
     end
+  end
+
+  defp damage_source_opts(%CastContext{} = context) do
+    [
+      source: context.caster_guid,
+      source_owner: context.caster_owner_guid,
+      reflected_by: context.reflected_by_guid
+    ]
   end
 
   defp consume_ferocious_bite_energy({state, events}, %CastContext{} = context, %Spell{} = spell) do

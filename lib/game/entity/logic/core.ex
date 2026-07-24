@@ -20,6 +20,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
   alias ThistleTea.Game.Entity.Logic.Aura.HolderSync
   alias ThistleTea.Game.Entity.Logic.CastPushback
   alias ThistleTea.Game.Entity.Logic.Combat
+  alias ThistleTea.Game.Entity.Logic.Dueling
   alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.Entity.Logic.Reactive
@@ -82,11 +83,14 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
       {damage, redirect} = Aura.damage_redirect(entity, damage, school)
       entity = enqueue_redirect(entity, redirect, Keyword.get(opts, :source), school)
       {entity, remaining} = Aura.absorb_damage(entity, damage, school)
-      absorbed = damage - remaining
       %{unit: unit} = entity
+      duel_outcome = duel_lethal_outcome(entity, health, remaining, opts)
+      remaining = duel_remaining_damage(health, remaining, duel_outcome)
+      absorbed = damage - remaining
       new_health = max(health - remaining, 0)
 
       entity = %{entity | unit: %{unit | health: new_health}}
+      entity = enqueue_duel_outcome(entity, duel_outcome)
       entity = Aura.enqueue_death_item_rewards(entity, health, new_health)
 
       entity =
@@ -115,6 +119,30 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
   end
 
   defp take_unblocked_damage(entity, _damage, _now, _opts), do: {entity, 0}
+
+  defp duel_lethal_outcome(entity, health, damage, opts)
+       when is_number(health) and health > 0 and is_number(damage) and damage >= health do
+    cond do
+      Dueling.lethal_source?(entity, opts) -> {:defeated, Dueling.opponent_guid(entity)}
+      Dueling.active?(entity) -> :interrupted
+      true -> nil
+    end
+  end
+
+  defp duel_lethal_outcome(_entity, _health, _damage, _opts), do: nil
+
+  defp duel_remaining_damage(health, damage, {:defeated, _winner_guid}), do: min(damage, max(health - 1, 0))
+  defp duel_remaining_damage(_health, damage, _outcome), do: damage
+
+  defp enqueue_duel_outcome(entity, {:defeated, winner_guid}) when is_integer(winner_guid) do
+    Event.enqueue(entity, Event.duel_defeat(entity.object.guid, winner_guid))
+  end
+
+  defp enqueue_duel_outcome(entity, :interrupted) do
+    Event.enqueue(entity, Event.duel_interrupted(entity.object.guid))
+  end
+
+  defp enqueue_duel_outcome(entity, _outcome), do: entity
 
   defp enqueue_redirect(entity, {target_guid, amount}, source_guid, school) when is_integer(amount) and amount > 0 do
     Event.enqueue(entity, Event.redirect_damage(source_guid, target_guid, school, amount))

@@ -47,6 +47,7 @@ defmodule ThistleTea.Game.Spell.CastValidation do
          :ok <- Hunter.validate_feed(spell, Keyword.get(opts, :feed_context)),
          :ok <- Warlock.validate_ritual(spell, Keyword.get(opts, :ritual_context)),
          :ok <- check_reagents(caster, spell, Keyword.get(opts, :count_item)),
+         :ok <- check_duel(spell, Keyword.get(opts, :duel_context)),
          :ok <- check_target(spell, target_info),
          :ok <- check_target_power_type(spell, target_info),
          :ok <- check_dispel_target(caster, spell, targets, target_info),
@@ -59,6 +60,27 @@ defmodule ThistleTea.Game.Spell.CastValidation do
       check_line_of_sight(spell, target_info)
     end
   end
+
+  defp check_duel(%Spell{} = spell, context) do
+    if Spell.duel?(spell), do: validate_duel_context(context), else: :ok
+  end
+
+  defp validate_duel_context(%{
+         caster_busy?: false,
+         target_busy?: false,
+         target_player?: true,
+         caster_allowed?: true,
+         target_allowed?: true,
+         same_world?: true
+       }), do: :ok
+
+  defp validate_duel_context(%{target_player?: false}), do: {:error, :bad_targets}
+  defp validate_duel_context(%{caster_busy?: true}), do: {:error, :target_dueling}
+  defp validate_duel_context(%{target_busy?: true}), do: {:error, :target_dueling}
+  defp validate_duel_context(%{same_world?: false}), do: {:error, :bad_targets}
+  defp validate_duel_context(%{caster_allowed?: false}), do: {:error, :no_dueling}
+  defp validate_duel_context(%{target_allowed?: false}), do: {:error, :no_dueling}
+  defp validate_duel_context(_context), do: {:error, :bad_targets}
 
   defp check_ammo(caster, spell, opts) do
     if godmode?(caster) do

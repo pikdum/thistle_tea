@@ -48,6 +48,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
   def attacker_context(%{unit: %Unit{} = unit} = attacker) do
     %{
       caster_level: unit.level || 1,
+      caster_owner_guid: caster_owner_guid(attacker),
       caster_player?: player?(attacker),
       crit_chance: attacker_crit_chance(attacker) + Aura.flat_amount(attacker, :mod_crit_percent),
       hit_chance_bonus: Aura.flat_amount(attacker, :mod_hit_chance),
@@ -59,6 +60,10 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
   end
 
   def attacker_context(_attacker), do: %{}
+
+  defp caster_owner_guid(%{internal: %{pet: %{owner_guid: owner_guid}}}) when is_integer(owner_guid), do: owner_guid
+  defp caster_owner_guid(%{object: %{guid: guid}}) when is_integer(guid), do: guid
+  defp caster_owner_guid(_attacker), do: nil
 
   def resolve(defender, attack, damage, opts \\ []) when is_map(attack) do
     ctx = context(defender, attack)

@@ -465,6 +465,13 @@ defmodule ThistleTea.Game.World.Loader.SpellVmangosTest do
     end
   end
 
+  describe "duel spell parsing" do
+    test "loads the duel effect and any-unit target" do
+      assert %Effect{type: :duel, misc_value: 21_680, implicit_target_a: :any_unit} =
+               Enum.find(SpellLoader.load(7_266).effects, &(&1.type == :duel))
+    end
+  end
+
   defp modifier_holder(%Spell{} = spell) do
     effect = Enum.find(spell.effects, &(&1.aura in [:add_flat_modifier, :add_pct_modifier]))
 

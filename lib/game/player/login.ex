@@ -21,6 +21,7 @@ defmodule ThistleTea.Game.Player.Login do
   alias ThistleTea.Game.Entity.Logic.Combat, as: CombatLogic
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Death
+  alias ThistleTea.Game.Entity.Logic.Dueling
   alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Entity.Logic.MovementStats
@@ -73,6 +74,7 @@ defmodule ThistleTea.Game.Player.Login do
       |> normalize_combat_stats()
       |> normalize_faction_template()
       |> normalize_death_state(character_guid)
+      |> Dueling.abandon()
       |> build_spellbook()
       |> PlayerSpells.apply_passives(Time.now())
       |> LogicTalents.sync_points()
@@ -100,6 +102,10 @@ defmodule ThistleTea.Game.Player.Login do
         health_pct: Core.health_pct(c),
         shapeshift_form: c.unit.shapeshift_form,
         world: c.internal.world,
+        area: c.internal.area,
+        controlled_guid: Character.controlled_guid(c),
+        duel_opponent_guid: Dueling.opponent_guid(c),
+        duel_started?: Dueling.active?(c),
         orientation: elem(c.movement_block.position, 3),
         attacker_spell_hit_chance: AuraLogic.attacker_spell_hit_chance(c)
       }

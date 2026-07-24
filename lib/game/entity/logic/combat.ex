@@ -169,6 +169,7 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
         Core.take_damage_with_absorb(entity, result.damage, now,
           school: attack_school(attack),
           source: Map.get(attack, :caster, 0),
+          source_owner: Map.get(attack, :caster_owner_guid),
           threat_multiplier: Map.get(attack, :threat_multiplier, 1.0)
         )
       else

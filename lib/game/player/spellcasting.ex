@@ -29,9 +29,11 @@ defmodule ThistleTea.Game.Player.Spellcasting do
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.ItemStore
+  alias ThistleTea.Game.World.Loader.Exploration, as: ExplorationLoader
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
   alias ThistleTea.Game.World.Loader.MapTemplate, as: MapTemplateLoader
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.System.Duel, as: DuelSystem
   alias ThistleTea.Game.World.System.Party, as: PartySystem
 
   require Logger
@@ -206,7 +208,8 @@ defmodule ThistleTea.Game.Player.Spellcasting do
       ammo_id: character.player.ammo_id,
       ammo_template: ItemLoader.get_template(character.player.ammo_id),
       feed_context: feed_context(character, spell, targets),
-      ritual_context: ritual_context(character, spell)
+      ritual_context: ritual_context(character, spell),
+      duel_context: duel_context(character, spell, targets)
     )
   end
 
@@ -299,6 +302,36 @@ defmodule ThistleTea.Game.Player.Spellcasting do
 
   defp build_target_info(_state, _spell, _targets), do: nil
 
+  defp duel_context(
+         %Character{object: %{guid: caster_guid}, internal: %{area: caster_area, world: caster_world}},
+         %Spell{} = spell,
+         %Targets{unit_guid: target_guid}
+       ) do
+    if Spell.duel?(spell) and is_integer(target_guid) do
+      target = Metadata.query(target_guid, [:area, :world]) || %{}
+
+      %{
+        caster_busy?: DuelSystem.busy?(caster_guid),
+        target_busy?: DuelSystem.busy?(target_guid),
+        target_player?: Guid.entity_type(target_guid) == :player,
+        caster_allowed?: duel_area?(caster_area),
+        target_allowed?: duel_area?(Map.get(target, :area)),
+        same_world?: Map.get(target, :world) == caster_world
+      }
+    end
+  end
+
+  defp duel_context(_character, _spell, _targets), do: nil
+
+  defp duel_area?(area_id) when is_integer(area_id) do
+    case ExplorationLoader.area(area_id) do
+      %{flags: flags} when is_integer(flags) -> Bitwise.band(flags, 0x40) != 0
+      _area -> false
+    end
+  end
+
+  defp duel_area?(_area_id), do: false
+
   defp implicit_pet_guid(%Character{} = character, %Spell{effects: effects}) do
     pet_guid =
       if Enum.any?(effects, &(&1.type == :feed_pet)) do
@@ -328,7 +361,8 @@ defmodule ThistleTea.Game.Player.Spellcasting do
            :orientation,
            :creature_type,
            :aura_sources,
-           :dispel_options
+           :dispel_options,
+           :area
          ]) do
       nil ->
         :unknown
@@ -349,6 +383,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
           orientation: Map.get(metadata, :orientation),
           aura_sources: Map.get(metadata, :aura_sources, MapSet.new()),
           dispel_options: Map.get(metadata, :dispel_options, MapSet.new()),
+          area: Map.get(metadata, :area),
           los?: World.line_of_sight?(character, guid)
         }
     end

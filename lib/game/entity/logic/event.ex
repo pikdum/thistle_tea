@@ -339,6 +339,14 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
     %__MODULE__{type: :attack_stop, source_guid: source_guid, target_guid: target_guid}
   end
 
+  def duel_defeat(loser_guid, winner_guid) when is_integer(loser_guid) and is_integer(winner_guid) do
+    %__MODULE__{type: :duel_defeat, source_guid: winner_guid, target_guid: loser_guid}
+  end
+
+  def duel_interrupted(guid) when is_integer(guid) do
+    %__MODULE__{type: :duel_interrupted, target_guid: guid}
+  end
+
   def attack_not_in_range do
     %__MODULE__{type: :attack_not_in_range}
   end
@@ -520,6 +528,19 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
       entry: entry,
       duration_ms: duration_ms,
       target_guid: Keyword.get(opts, :ritual_target_guid)
+    }
+  end
+
+  def duel_request(source_guid, source_level, target_guid, entry, {world, x, y, z}, facing)
+      when is_integer(source_guid) and is_integer(target_guid) and is_integer(entry) do
+    %__MODULE__{
+      type: :duel_request,
+      source_guid: source_guid,
+      source_level: source_level,
+      target_guid: target_guid,
+      entry: entry,
+      position: {world, x, y, z},
+      facing: facing
     }
   end
 

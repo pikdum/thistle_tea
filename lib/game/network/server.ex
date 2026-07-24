@@ -25,6 +25,7 @@ defmodule ThistleTea.Game.Network.Server do
   alias ThistleTea.Game.Entity.Logic.Combat
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Death
+  alias ThistleTea.Game.Entity.Logic.Dueling
   alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.Entity.Logic.Experience
   alias ThistleTea.Game.Entity.Logic.Hunter
@@ -74,6 +75,7 @@ defmodule ThistleTea.Game.Network.Server do
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Pathfinding
   alias ThistleTea.Game.World.SpatialHash
+  alias ThistleTea.Game.World.System.Duel, as: DuelSystem
   alias ThistleTea.Game.World.System.Instance, as: InstanceSystem
   alias ThistleTea.Game.World.Visibility
   alias ThistleTea.Game.World.Visibility.Tap
@@ -223,6 +225,22 @@ defmodule ThistleTea.Game.Network.Server do
     error ->
       Logger.error("mail delivery crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
       {:noreply, {socket, state}, socket.read_timeout}
+  end
+
+  def handle_cast({:duel_update, {:requested, payload}}, {socket, %{character: %Character{} = character} = state}) do
+    character = Dueling.requested(character, payload)
+    {:noreply, {socket, %{state | character: character}}, {:continue, :maybe_broadcast_update}}
+  end
+
+  def handle_cast({:duel_update, {:started, payload}}, {socket, %{character: %Character{} = character} = state}) do
+    character = Dueling.started(character, payload)
+    {:noreply, {socket, %{state | character: character}}, {:continue, :maybe_broadcast_update}}
+  end
+
+  def handle_cast({:duel_update, {:finished, payload}}, {socket, %{character: %Character{} = character} = state}) do
+    {character, events} = Dueling.finish(character, payload)
+    character = EventSink.emit(character, events)
+    {:noreply, {socket, %{state | character: character}}, {:continue, :maybe_broadcast_update}}
   end
 
   @impl GenServer
@@ -538,6 +556,7 @@ defmodule ThistleTea.Game.Network.Server do
   end
 
   def handle_cast({:start_teleport, x, y, z, orientation, %WorldRef{} = world}, {socket, state}) do
+    DuelSystem.disconnect(state.guid)
     state = suspend_pet_for_teleport(state)
     previous_world = state.character.internal.world
 
@@ -974,6 +993,10 @@ defmodule ThistleTea.Game.Network.Server do
         unit_flags: character.unit.flags,
         shapeshift_form: character.unit.shapeshift_form,
         world: character.internal.world,
+        area: character.internal.area,
+        controlled_guid: Character.controlled_guid(character),
+        duel_opponent_guid: Dueling.opponent_guid(character),
+        duel_started?: Dueling.active?(character),
         aura_sources: Aura.source_spells(character),
         dispel_options: Aura.dispel_options(character),
         attacker_spell_hit_chance: Aura.attacker_spell_hit_chance(character)

@@ -13,6 +13,8 @@ defmodule ThistleTea.Game.Aura.Holder do
   defstruct [
     :spell,
     :caster_guid,
+    :caster_owner_guid,
+    :reflected_by_guid,
     :caster_level,
     :caster_faction_template,
     :slot,

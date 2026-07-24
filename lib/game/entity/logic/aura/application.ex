@@ -73,6 +73,8 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
         holder = %Holder{
           spell: modified_holder_spell(spell, context),
           caster_guid: context.caster_guid,
+          caster_owner_guid: context.caster_owner_guid,
+          reflected_by_guid: context.reflected_by_guid,
           caster_level: context.caster_level,
           caster_faction_template: context.caster_faction_template,
           applied_at: now,

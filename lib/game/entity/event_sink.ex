@@ -46,6 +46,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
   alias ThistleTea.Game.World.Loader.Summon, as: SummonLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Pathfinding
+  alias ThistleTea.Game.World.System.Duel, as: DuelSystem
 
   @victimstate_normal 1
   @heal_threat_radius 100.0
@@ -437,6 +438,30 @@ defmodule ThistleTea.Game.Entity.EventSink do
       enemy: event.target_guid
     }
     |> World.broadcast_packet(entity)
+
+    entity
+  end
+
+  def emit(entity, %Event{type: :duel_defeat, source_guid: winner_guid, target_guid: loser_guid}) do
+    DuelSystem.defeat(loser_guid, winner_guid)
+    entity
+  end
+
+  def emit(entity, %Event{type: :duel_interrupted, target_guid: guid}) do
+    DuelSystem.interrupt(guid)
+    entity
+  end
+
+  def emit(entity, %Event{type: :duel_request, position: {world, x, y, z}} = event) do
+    DuelSystem.challenge(%{
+      initiator_guid: event.source_guid,
+      initiator_level: event.source_level,
+      opponent_guid: event.target_guid,
+      entry: event.entry,
+      world: world,
+      flag_position: {x, y, z},
+      orientation: event.facing
+    })
 
     entity
   end

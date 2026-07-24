@@ -253,6 +253,12 @@ defmodule ThistleTea.Game.Spell do
 
   def healing?(_spell), do: false
 
+  def duel?(%__MODULE__{effects: effects}) do
+    Enum.any?(effects, &match?(%Effect{type: :duel}, &1))
+  end
+
+  def duel?(_spell), do: false
+
   def resurrect_spell?(%__MODULE__{effects: effects}) do
     Enum.any?(effects, &match?(%Effect{type: type} when type in [:resurrect, :resurrect_new], &1))
   end

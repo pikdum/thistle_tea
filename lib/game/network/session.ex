@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Network.Session do
   session keeping only the connection and account.
   """
   alias ThistleTea.Game.Entity
+  alias ThistleTea.Game.Entity.Logic.Dueling
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Party.Group
@@ -20,6 +21,7 @@ defmodule ThistleTea.Game.Network.Session do
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.System.CellActivator
   alias ThistleTea.Game.World.System.ChatChannels
+  alias ThistleTea.Game.World.System.Duel, as: DuelSystem
   alias ThistleTea.Game.World.System.Instance, as: InstanceSystem
   alias ThistleTea.Game.World.System.Party, as: PartySystem
   alias ThistleTea.Game.World.Visibility
@@ -77,6 +79,14 @@ defmodule ThistleTea.Game.Network.Session do
       ref when is_reference(ref) -> Process.cancel_timer(ref)
       _ -> :ok
     end
+
+    state =
+      if state.guid && state.character do
+        DuelSystem.disconnect(state.guid)
+        %{state | character: Dueling.abandon(state.character)}
+      else
+        state
+      end
 
     state = suspend_active_pet(state)
 

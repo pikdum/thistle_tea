@@ -140,6 +140,10 @@ defmodule ThistleTea.Game.Entity do
     dispatch_cast(entity, {:set_speed, rate})
   end
 
+  def duel_update(entity, update) do
+    dispatch_cast(entity, {:duel_update, update})
+  end
+
   def call(entity, message) do
     case resolve_pid(entity) do
       {:ok, pid} -> GenServer.call(pid, message)

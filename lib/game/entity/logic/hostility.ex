@@ -7,26 +7,35 @@ defmodule ThistleTea.Game.Entity.Logic.Hostility do
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.System.Duel, as: DuelSystem
 
   @unit_flag_non_attackable 0x00000002
   @unit_flag_non_attackable_2 0x00010000
   @unit_flag_not_selectable 0x02000000
 
   def hostile?(source, target) do
-    with %FactionTemplate{} = source_template <- faction_template(source),
-         %FactionTemplate{} = target_template <- faction_template(target) do
-      FactionTemplate.hostile_to?(source_template, target_template)
+    if duel_opponents?(source, target) do
+      true
     else
-      _ -> false
+      with %FactionTemplate{} = source_template <- faction_template(source),
+           %FactionTemplate{} = target_template <- faction_template(target) do
+        FactionTemplate.hostile_to?(source_template, target_template)
+      else
+        _ -> false
+      end
     end
   end
 
   def friendly?(source, target) do
-    with %FactionTemplate{} = source_template <- faction_template(source),
-         %FactionTemplate{} = target_template <- faction_template(target) do
-      FactionTemplate.friendly_to?(source_template, target_template)
+    if duel_opponents?(source, target) do
+      false
     else
-      _ -> false
+      with %FactionTemplate{} = source_template <- faction_template(source),
+           %FactionTemplate{} = target_template <- faction_template(target) do
+        FactionTemplate.friendly_to?(source_template, target_template)
+      else
+        _ -> false
+      end
     end
   end
 
@@ -109,6 +118,10 @@ defmodule ThistleTea.Game.Entity.Logic.Hostility do
 
   defp player_controlled?(entity) do
     player_guid?(guid(entity)) or player_guid?(owner_guid(entity))
+  end
+
+  defp duel_opponents?(source, target) do
+    DuelSystem.active_opponents?(guid(source), guid(target))
   end
 
   defp owner_guid(%{owner_guid: owner_guid}) when is_integer(owner_guid), do: owner_guid

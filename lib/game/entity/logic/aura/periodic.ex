@@ -251,6 +251,8 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
       Core.take_damage_with_absorb(entity, damage, now,
         school: school,
         source: holder.caster_guid,
+        source_owner: holder.caster_owner_guid,
+        reflected_by: holder.reflected_by_guid,
         periodic: true
       )
 

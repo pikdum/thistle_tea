@@ -532,6 +532,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp effect_type(78), do: :add_extra_attacks
   defp effect_type(79), do: :clear_threat
   defp effect_type(80), do: :add_combo_points
+  defp effect_type(83), do: :duel
   defp effect_type(85), do: :summon_player
   defp effect_type(type) when type in 87..90, do: :summon_totem
   defp effect_type(96), do: :charge
@@ -698,6 +699,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp target_type(34), do: :party_around_caster
   defp target_type(39), do: :caster_fishing_spot
   defp target_type(24), do: :aoe_enemy_in_cone
+  defp target_type(25), do: :any_unit
   defp target_type(28), do: :aoe_enemy_at_channel
   defp target_type(32), do: :minion_position
   defp target_type(5), do: :pet
