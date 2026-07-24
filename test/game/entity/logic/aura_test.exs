@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Core
+  alias ThistleTea.Game.Entity.Logic.SpellEffect
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.Spell.ProcRule
@@ -961,7 +962,7 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
         id: 13_983,
         name: "Setup",
         duration_ms: -1,
-        proc_type_mask: 0x28,
+        proc_type_mask: 0x20028,
         proc_chance: 100,
         proc_rule: %ProcRule{proc_ex: 0x18},
         effects: [
@@ -984,6 +985,57 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
 
       assert {_entity, [%{type: :trigger_spell, spell_id: 15_250}]} =
                Aura.reactions(entity, :hit_taken, Map.put(context, :outcome, :dodge))
+
+      resisted_spell = %Spell{
+        id: 133,
+        school: :fire,
+        effects: [%Effect{type: :school_damage}]
+      }
+
+      {_entity, events} = SpellEffect.receive_outcome(entity, 999, resisted_spell, :resist, 1_000)
+      assert [%{type: :trigger_spell, spell_id: 15_250, target_guid: 999}] = events
+    end
+
+    test "Magic Absorption restores a percentage of maximum mana after a full resist" do
+      entity = fixture_entity()
+      entity = %{entity | unit: %{entity.unit | power1: 100, max_power1: 1_000}}
+
+      magic_absorption = %Spell{
+        id: 29_447,
+        name: "Magic Absorption",
+        duration_ms: -1,
+        proc_type_mask: 0x20000,
+        proc_chance: 100,
+        proc_rule: %ProcRule{proc_ex: 0x8, cooldown_ms: 1_000},
+        effects: [
+          %Effect{
+            index: 0,
+            type: :apply_aura,
+            aura: :dummy,
+            base_points: 4,
+            die_sides: 1,
+            base_dice: 1
+          },
+          %Effect{index: 1, type: :apply_aura, aura: :mod_resistance, base_points: 9, misc_value: 0x7E}
+        ]
+      }
+
+      {entity, _events} = apply_spell(entity, 1, 60, magic_absorption)
+      resisted_spell = %Spell{id: 116, school: :frost, effects: [%Effect{type: :school_damage}]}
+
+      assert {entity, [event]} = SpellEffect.receive_outcome(entity, 999, resisted_spell, :resist, 1_000)
+
+      assert %{
+               type: :trigger_spell,
+               source_guid: 1,
+               target_guid: 1,
+               spell_id: 29_442,
+               amount: 50,
+               slot: 0
+             } = event
+
+      assert {_entity, []} = SpellEffect.receive_outcome(entity, 999, resisted_spell, :resist, 1_999)
+      assert {_entity, [_event]} = SpellEffect.receive_outcome(entity, 999, resisted_spell, :resist, 2_000)
     end
 
     test "damage shields with block-only proc rules skip regular hits" do

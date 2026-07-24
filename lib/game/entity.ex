@@ -36,6 +36,10 @@ defmodule ThistleTea.Game.Entity do
     dispatch_cast(entity, {:receive_spell, caster, spell})
   end
 
+  def receive_spell_outcome(entity, caster_guid, spell, outcome) do
+    dispatch_cast(entity, {:receive_spell_outcome, caster_guid, spell, outcome})
+  end
+
   def trigger_spell(entity, spell_id, target_guid, opts \\ []) do
     dispatch_cast(entity, {:trigger_spell, spell_id, target_guid, opts})
   end

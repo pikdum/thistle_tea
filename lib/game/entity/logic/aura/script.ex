@@ -31,6 +31,8 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Script do
   @ignite_dot 12_654
   @master_of_elements [29_074, 29_075, 29_076]
   @master_of_elements_energize 29_077
+  @magic_absorption [29_441, 29_444, 29_445, 29_446, 29_447]
+  @magic_absorption_energize 29_442
 
   def outgoing_proc(holders, %Holder{spell: %Spell{} = spell} = holder, owner_guid, context)
       when is_list(holders) and is_integer(owner_guid) do
@@ -155,6 +157,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Script do
 
   def incoming_spell(%Holder{spell: %Spell{} = spell} = holder, owner_guid, attacker_guid, context) do
     cond do
+      spell.id in @magic_absorption -> magic_absorption_proc(holder, owner_guid, context)
       Priest.vampiric_embrace?(spell) -> vampiric_embrace_proc(holder, attacker_guid, context)
       Paladin.eye_for_an_eye?(spell) -> eye_for_an_eye_proc(holder, owner_guid, attacker_guid, context)
       true -> :unhandled
@@ -162,6 +165,23 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Script do
   end
 
   def incoming_spell(_holder, _owner_guid, _attacker_guid, _context), do: :unhandled
+
+  defp magic_absorption_proc(%Holder{} = holder, owner_guid, context) do
+    restored = trunc((Map.get(context, :owner_max_mana) || 0) * dummy_amount(holder, 0) / 100)
+
+    if restored > 0 do
+      event =
+        Event.trigger_spell(owner_guid, holder.caster_level || 1, owner_guid, @magic_absorption_energize,
+          base_points: restored,
+          effect_index: 0,
+          triggered_by_spell_id: holder.spell.id
+        )
+
+      {:handled, holder, [event]}
+    else
+      {:handled, holder, []}
+    end
+  end
 
   defp vampiric_embrace_proc(%Holder{caster_guid: caster_guid} = holder, attacker_guid, %{damage: damage})
        when is_integer(caster_guid) and caster_guid == attacker_guid and is_integer(damage) and damage > 0 do

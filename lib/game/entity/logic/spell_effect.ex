@@ -87,6 +87,20 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
 
   def receive(target, _context, _spell, _now), do: {target, []}
 
+  def receive_outcome(target, caster_guid, %Spell{} = spell, :resist, now)
+      when is_integer(caster_guid) and is_integer(now) do
+    Aura.reactions(target, :spell_hit_taken, %{
+      attacker_guid: caster_guid,
+      spell: spell,
+      proc_type: :take_harmful_spell,
+      outcome: :resist,
+      damage: 0,
+      now: now
+    })
+  end
+
+  def receive_outcome(target, _caster_guid, _spell, _outcome, _now), do: {target, []}
+
   defp immune_to_harmful_spell?(target, %CastContext{caster_guid: caster_guid}, %Spell{} = spell) do
     target.object.guid != caster_guid and Spell.harmful?(spell) and Aura.school_immune?(target, spell.school)
   end

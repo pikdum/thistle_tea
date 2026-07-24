@@ -168,6 +168,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
     |> start_cooldown(casting, now)
     |> queue_cast_result(casting)
     |> queue_spell_go(casting, hits ++ object_hits(casting), misses)
+    |> queue_spell_miss_outcomes(casting, misses)
     |> queue_target_triggers(casting, hits)
     |> queue_area_effects(casting)
     |> queue_farsight(casting)
@@ -623,6 +624,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
     |> start_cooldown(casting, now)
     |> queue_cast_result(casting)
     |> queue_spell_go(casting, hits ++ object_hits(casting), misses)
+    |> queue_spell_miss_outcomes(casting, misses)
     |> queue_target_triggers(casting, hits)
     |> queue_area_effects(casting)
     |> queue_summon_objects(casting)
@@ -713,6 +715,18 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
 
   @spell_miss_reason_miss 1
   @spell_miss_reason_resist 2
+
+  defp queue_spell_miss_outcomes(%{object: %{guid: caster_guid}} = character, %Cast{spell: %Spell{} = spell}, misses)
+       when is_integer(caster_guid) and is_list(misses) do
+    events =
+      for %{guid: target_guid, reason: @spell_miss_reason_resist} <- misses do
+        Event.deliver_spell_outcome(target_guid, caster_guid, spell, :resist)
+      end
+
+    Event.enqueue(character, events)
+  end
+
+  defp queue_spell_miss_outcomes(character, _casting, _misses), do: character
 
   defp roll_spell_hits(_caster, %Spell{dmg_class: 2}, targets), do: {targets, []}
   defp roll_spell_hits(_caster, %Spell{dmg_class: 3}, targets), do: {targets, []}

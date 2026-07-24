@@ -307,6 +307,17 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
     %__MODULE__{type: :deliver_spell, target_guid: target_guid, cast_context: cast_context, spell: spell}
   end
 
+  def deliver_spell_outcome(target_guid, source_guid, spell, outcome)
+      when is_integer(target_guid) and is_integer(source_guid) and is_atom(outcome) do
+    %__MODULE__{
+      type: :deliver_spell_outcome,
+      source_guid: source_guid,
+      target_guid: target_guid,
+      spell: spell,
+      outcome: outcome
+    }
+  end
+
   def attack_start(source_guid, target_guid) when is_integer(source_guid) and is_integer(target_guid) do
     %__MODULE__{type: :attack_start, source_guid: source_guid, target_guid: target_guid}
   end

@@ -99,6 +99,21 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
                       {:send_packet, %Message.SmsgSetPctSpellModifier{effect_index: 30, operation: 10, value: 0}}}
     end
 
+    test "spell miss outcomes are delivered to the victim owner" do
+      caster_guid = Guid.from_low_guid(:player, unique_guid())
+      target_guid = Guid.from_low_guid(:mob, 1, unique_guid())
+      Entity.register(target_guid)
+
+      on_exit(fn -> Entity.unregister(target_guid) end)
+
+      mob = %Mob{object: %Object{guid: caster_guid}}
+      spell = %Spell{id: 116, school: :frost}
+      event = Event.deliver_spell_outcome(target_guid, caster_guid, spell, :resist)
+
+      assert ^mob = EventSink.emit(mob, event)
+      assert_receive {:"$gen_cast", {:receive_spell_outcome, ^caster_guid, ^spell, :resist}}
+    end
+
     @tag :dbc_db
     test "a released judgement trigger delivers its encoded spell to the victim" do
       caster_guid = Guid.from_low_guid(:player, unique_guid())

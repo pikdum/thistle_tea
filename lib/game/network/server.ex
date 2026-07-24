@@ -381,6 +381,20 @@ defmodule ThistleTea.Game.Network.Server do
   end
 
   def handle_cast(
+        {:receive_spell_outcome, caster_guid, spell, outcome},
+        {socket, %{character: %Character{} = character} = state}
+      ) do
+    now = Time.now()
+    character = PlayerCombat.mark_attacked(character, now)
+    {character, events} = SpellEffect.receive_outcome(character, caster_guid, spell, outcome, now)
+    character = EventSink.emit(character, events)
+    state = state |> Map.put(:character, character) |> PlayerTick.ensure_scheduled()
+    notify_defensive_pet(character, caster_guid)
+
+    {:noreply, {socket, state}, {:continue, :maybe_broadcast_update}}
+  end
+
+  def handle_cast(
         {:trigger_spell, spell_id, target_guid, opts},
         {socket, %{character: %Character{} = character} = state}
       )

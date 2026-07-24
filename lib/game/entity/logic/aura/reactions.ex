@@ -99,9 +99,13 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
         :spell_hit_taken,
         %{attacker_guid: attacker_guid, spell: %Spell{}, proc_type: proc_type, outcome: outcome} = context
       )
-      when is_list(holders) and is_integer(attacker_guid) and outcome in [:normal, :crit] and
+      when is_list(holders) and is_integer(attacker_guid) and outcome in [:normal, :crit, :resist] and
              proc_type in [:take_harmful_spell, :take_harmful_periodic] do
-    context = Map.put(context, :owner_max_health, entity.unit.max_health)
+    context =
+      Map.merge(context, %{
+        owner_max_health: entity.unit.max_health,
+        owner_max_mana: entity.unit.max_power1
+      })
 
     {holders, events} =
       Enum.reduce(holders, {holders, []}, fn %Holder{} = holder, {current_holders, events} ->
@@ -146,6 +150,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
   defp apply_incoming_spell_proc(holders, events, holder, owner_guid, attacker_guid, context) do
     case Script.incoming_spell(holder, owner_guid, attacker_guid, context) do
       {:handled, updated_holder, proc_events} ->
+        updated_holder = if updated_holder, do: mark_proc(updated_holder, Map.get(context, :now))
         {replace_or_delete(holders, holder, updated_holder), events ++ proc_events}
 
       :unhandled ->

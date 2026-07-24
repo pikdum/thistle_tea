@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Spell, as: SpellBT
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Event
+  alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Cast
   alias ThistleTea.Game.Spell.Effect
@@ -336,6 +337,77 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
   end
 
   describe "complete_cast/3" do
+    test "queues a take-side outcome when a hostile magic spell is fully resisted" do
+      caster_guid = Guid.from_low_guid(:mob, 1, System.unique_integer([:positive]))
+      target_guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
+      caster_faction = %FactionTemplate{id: 17, faction: 15, flags: 1, faction_group: 8, enemy_group: 1}
+      target_faction = %FactionTemplate{id: 1, faction: 1, flags: 72, faction_group: 3, enemy_group: 12}
+
+      Metadata.put(caster_guid, %{
+        alive?: true,
+        faction_template: caster_faction,
+        faction_can_have_reputation?: false,
+        unit_flags: 0,
+        level: 60
+      })
+
+      Metadata.put(target_guid, %{
+        alive?: true,
+        faction_template: target_faction,
+        faction_can_have_reputation?: false,
+        unit_flags: 0,
+        level: 60
+      })
+
+      on_exit(fn ->
+        Metadata.delete(caster_guid)
+        Metadata.delete(target_guid)
+      end)
+
+      hit_penalty = %Holder{
+        spell: %Spell{id: 1},
+        auras: [%AuraData{type: :mod_spell_hit_chance, amount: -100}]
+      }
+
+      spell = %Spell{
+        id: 116,
+        school: :frost,
+        effects: [%Effect{type: :school_damage, implicit_target_a: :target_enemy}]
+      }
+
+      casting = %Cast{
+        spell: spell,
+        targets: %Targets{raw: <<0::little-size(16)>>, unit_guid: target_guid},
+        ends_at: Time.now()
+      }
+
+      mob = %Mob{
+        object: %Object{guid: caster_guid},
+        unit: %Unit{level: 60, auras: [hit_penalty]},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+        internal: %Internal{world: %WorldRef{map_id: 0}, casting: casting}
+      }
+
+      :rand.seed(:exsss, {1, 2, 3})
+      mob = SpellBT.complete_cast(mob, casting, 1_000)
+
+      assert [
+               %Event{type: :spell_cast_result, spell_id: 116},
+               %Event{
+                 type: :spell_go,
+                 hit_guids: [],
+                 misses: [%{guid: ^target_guid, reason: 2}]
+               },
+               %Event{
+                 type: :deliver_spell_outcome,
+                 source_guid: ^caster_guid,
+                 target_guid: ^target_guid,
+                 spell: ^spell,
+                 outcome: :resist
+               }
+             ] = mob.internal.events
+    end
+
     test "queues cast result and spell go events before clearing cast state" do
       spell = %Spell{id: 133, effects: []}
 

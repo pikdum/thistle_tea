@@ -410,6 +410,11 @@ defmodule ThistleTea.Game.Entity.EventSink do
     entity
   end
 
+  def emit(entity, %Event{type: :deliver_spell_outcome} = event) do
+    Entity.receive_spell_outcome(event.target_guid, event.source_guid, event.spell, event.outcome)
+    entity
+  end
+
   def emit(entity, %Event{type: :remove_aura} = event) do
     Entity.remove_aura(event.target_guid, event.spell_id, event.source_guid)
     entity

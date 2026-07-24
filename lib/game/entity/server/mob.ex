@@ -185,6 +185,20 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     {:noreply, state, {:continue, :maybe_broadcast}}
   end
 
+  def handle_cast({:receive_spell_outcome, caster_guid, spell, outcome}, state) do
+    previous = state
+    state = engage_combat(state, caster_guid)
+    {state, events} = SpellEffect.receive_outcome(state, caster_guid, spell, outcome, Time.now())
+
+    state =
+      state
+      |> EventSink.emit(events)
+      |> sync_behavior_tree(previous)
+      |> wake_ai_tick()
+
+    {:noreply, state, {:continue, :maybe_broadcast}}
+  end
+
   def handle_cast({:trigger_spell, spell_id, target_guid, opts}, %Mob{} = state)
       when is_integer(spell_id) and is_integer(target_guid) and is_list(opts) do
     event = Event.trigger_spell(state.object.guid, state.unit.level || 1, target_guid, spell_id, opts)
