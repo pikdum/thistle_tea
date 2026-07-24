@@ -368,6 +368,8 @@ defmodule ThistleTea.Game.Player.Spellcasting do
         :unknown
 
       metadata ->
+        metadata = Map.put(metadata, :guid, guid)
+
         %{
           guid: guid,
           alive?: Map.get(metadata, :alive?, true),

@@ -104,8 +104,8 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
     if Spell.requires_hostile_target?(spell) do
       Hostility.valid_attack_target?(caster, guid)
     else
-      case Metadata.query(guid, [:alive?]) do
-        %{alive?: true} -> Hostility.friendly?(caster, Metadata.query(guid, [:faction_template]))
+      case Metadata.query(guid, [:alive?, :faction_template]) do
+        %{alive?: true} = metadata -> Hostility.friendly?(caster, Map.put(metadata, :guid, guid))
         _ -> false
       end
     end

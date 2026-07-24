@@ -3,11 +3,27 @@ defmodule ThistleTea.Game.Entity.Logic.HostilityTest do
 
   alias ThistleTea.Game.Entity.Logic.Hostility
   alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.World.System.Duel, as: DuelSystem
 
   describe "hostile?/2" do
     test "uses faction template enemy masks" do
       assert Hostility.hostile?(defias(), alliance())
       refute Hostility.hostile?(wolf(), alliance())
+    end
+
+    test "treats duel opponents as hostile when target metadata carries a guid" do
+      {caster, target_metadata} = start_duel()
+
+      assert Hostility.hostile?(caster, target_metadata)
+      refute Hostility.friendly?(caster, target_metadata)
+    end
+
+    test "same-faction players without a duel stay friendly" do
+      caster = player(alliance())
+      target = player(alliance(), 2) |> Map.delete(:object) |> Map.put(:guid, Guid.from_low_guid(:player, 2))
+
+      refute Hostility.hostile?(caster, target)
+      assert Hostility.friendly?(caster, target)
     end
 
     test "honors explicit friend factions before masks" do
@@ -92,13 +108,38 @@ defmodule ThistleTea.Game.Entity.Logic.HostilityTest do
     %FactionTemplate{id: 35, faction: 31, flags: 0, faction_group: 0, friend_group: 1, enemy_group: 0, friends_0: 31}
   end
 
-  defp player(faction_template) do
+  defp player(faction_template, low_guid \\ 1) do
     %{
-      object: %{guid: Guid.from_low_guid(:player, 1)},
+      object: %{guid: Guid.from_low_guid(:player, low_guid)},
       faction_template: faction_template,
       unit_flags: 0,
       alive?: true
     }
+  end
+
+  defp start_duel do
+    caster_low = System.unique_integer([:positive])
+    target_low = System.unique_integer([:positive])
+    caster = player(alliance(), caster_low)
+    caster_guid = caster.object.guid
+    target_guid = Guid.from_low_guid(:player, target_low)
+
+    :ets.insert(DuelSystem, {caster_guid, %{opponent_guid: target_guid, state: :started}})
+    :ets.insert(DuelSystem, {target_guid, %{opponent_guid: caster_guid, state: :started}})
+
+    on_exit(fn ->
+      :ets.delete(DuelSystem, caster_guid)
+      :ets.delete(DuelSystem, target_guid)
+    end)
+
+    target_metadata = %{
+      guid: target_guid,
+      faction_template: alliance(),
+      unit_flags: 0,
+      alive?: true
+    }
+
+    {caster, target_metadata}
   end
 
   defp mob(faction_template, opts \\ []) do

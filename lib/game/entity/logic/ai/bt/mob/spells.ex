@@ -372,6 +372,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells do
   defp injured_friendly_missing_pct(%Mob{} = state, candidate_guid, threshold) do
     with %{alive?: true} = metadata <-
            Metadata.query(candidate_guid, [:alive?, :faction_template, :unit_flags, :health_pct]),
+         metadata = Map.put(metadata, :guid, candidate_guid),
          true <- injured_candidate_flags_allow?(metadata),
          true <- Hostility.friendly?(state, metadata),
          missing_pct when is_number(missing_pct) and missing_pct > threshold <- missing_health_pct(metadata) do
@@ -464,6 +465,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells do
         :unknown
 
       metadata ->
+        metadata = Map.put(metadata, :guid, target_guid)
+
         %{
           guid: target_guid,
           alive?: Map.get(metadata, :alive?, true),
