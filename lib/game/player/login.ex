@@ -157,6 +157,19 @@ defmodule ThistleTea.Game.Player.Login do
     end
   end
 
+  def restore_active_pet(%{character: %Character{unit: %Unit{summon: summon}, internal: internal}} = state)
+      when is_integer(summon) and summon > 0 do
+    case Entity.pid(summon) do
+      pid when is_pid(pid) ->
+        send(pid, {:attach_pet, self(), internal.active_pet_spell_id || 0, nil})
+        state
+
+      _dead ->
+        state = put_in(state.character.unit.summon, nil)
+        restore_active_pet(state)
+    end
+  end
+
   def restore_active_pet(state), do: state
 
   defp restore_instance_world(

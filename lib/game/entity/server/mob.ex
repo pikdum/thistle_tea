@@ -500,6 +500,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     |> Core.update_object()
     |> Network.send_packet(owner_pid)
 
+    pet_spells = pet_spells || Map.values(state.internal.spellbook || %{})
     send(owner_pid, {:pet_attached, pet_guid, spell_id, pet_spells})
     {:noreply, state}
   end
