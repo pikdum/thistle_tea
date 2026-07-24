@@ -49,10 +49,7 @@ defmodule ThistleTea.Game.Spell.SupportMatrix do
     155 => :water_breathing_pct,
     156 => :mod_reputation_gain,
     159 => :honorless_target,
-    168 => :mod_damage_done_versus,
-    169 => :mod_crit_percent_versus,
     172 => :mod_mounted_speed_not_stack,
-    185 => :mod_attacker_ranged_hit_chance,
     186 => :mod_attacker_spell_hit_chance,
     192 => :vmangos_linked_aura
   }

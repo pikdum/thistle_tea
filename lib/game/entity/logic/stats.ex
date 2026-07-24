@@ -98,8 +98,21 @@ defmodule ThistleTea.Game.Entity.Logic.Stats do
       base = Map.get(acc, base_field) || 0
       base_and_equipment = base + equipment_bonus(acc, bonus_key)
       scaled = trunc(base_and_equipment * aura_base_resistance_multiplier(acc, bit))
-      total = scaled + aura_resistance_bonus(acc, bit)
+      total = scaled + aura_resistance_bonus(acc, bit) + aura_stat_resistance_bonus(acc, bit)
       Map.put(acc, field, trunc(total * aura_resistance_multiplier(acc, bit)))
+    end)
+  end
+
+  defp aura_stat_resistance_bonus(%Unit{} = unit, bit) do
+    intellect = unit.intellect || 0
+
+    sum_aura_amounts(unit, fn
+      %Aura{type: :mod_resistance_of_stat_percent, amount: amount, misc_value: mask}
+      when is_integer(amount) and is_integer(mask) and (mask &&& bit) != 0 ->
+        div(intellect * amount, 100)
+
+      _aura ->
+        0
     end)
   end
 

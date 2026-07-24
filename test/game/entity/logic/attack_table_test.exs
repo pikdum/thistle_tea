@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTableTest do
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.AttackTable
+  alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Cast
 
   @warrior 1
@@ -204,6 +205,57 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTableTest do
       result = AttackTable.resolve(target, attack(caster_player?: false), 100, roll: 1_200)
 
       refute result.outcome == :block
+    end
+  end
+
+  describe "creature-type versus bonuses" do
+    test "scales damage when the defender's creature type matches" do
+      humanoid_mask = 0x40
+      attack = attack(damage_done_versus: [{humanoid_mask, 10}])
+
+      result = AttackTable.resolve(mob(), attack, 100, roll: 5_000)
+
+      assert result.outcome == :normal
+      assert result.damage == 110
+    end
+
+    test "ignores bonuses for other creature types" do
+      beast_mask = 0x1
+      attack = attack(damage_done_versus: [{beast_mask, 10}])
+
+      result = AttackTable.resolve(mob(), attack, 100, roll: 5_000)
+
+      assert result.damage == 100
+    end
+
+    test "boosts crit damage against matching creature types" do
+      humanoid_mask = 0x40
+      attack = attack(crit_damage_versus: [{humanoid_mask, 100}])
+      plain = AttackTable.resolve(mob(), attack(), 100, roll: 3_100)
+      boosted = AttackTable.resolve(mob(), attack, 100, roll: 3_100)
+
+      assert plain.outcome == :crit
+      assert boosted.outcome == :crit
+      assert boosted.damage == trunc(plain.damage / 2 * 3)
+    end
+  end
+
+  describe "attacker hit debuffs" do
+    test "ranged attacks miss more against mod_attacker_ranged_hit_chance" do
+      debuff = %Aura{type: :mod_attacker_ranged_hit_chance, amount: -20}
+
+      defender =
+        character(
+          unit: [
+            auras: [%Holder{spell: %Spell{id: 1, name: "Test"}, slot: 0, caster_guid: 1, auras: [debuff]}]
+          ]
+        )
+
+      with_aura = AttackTable.resolve(defender, attack(ranged?: true), 100, roll: 2_000)
+      without_aura = AttackTable.resolve(character(unit: []), attack(ranged?: true), 100, roll: 2_000)
+
+      assert with_aura.outcome == :miss
+      refute without_aura.outcome == :miss
     end
   end
 

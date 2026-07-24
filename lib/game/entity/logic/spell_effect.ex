@@ -3,6 +3,8 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   Applies a cast spell's effects (damage, healing, auras, item creation, …) to
   a target entity, returning the updated entity and the events to emit.
   """
+  import Bitwise, only: [<<<: 2]
+
   alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.ScriptStep
@@ -959,11 +961,11 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
     rolled =
       trunc(
         rolled * (context.effect_damage_multiplier || 1.0) * (context.damage_done_multiplier || 1.0) *
-          scripted_damage_multiplier(state, spell)
+          versus_damage_multiplier(state, context) * scripted_damage_multiplier(state, spell)
       )
 
     crit? = direct_spell_crit?(state, context, spell, opts)
-    rolled = if crit?, do: rolled + crit_bonus(context, spell, rolled), else: rolled
+    rolled = if crit?, do: rolled + versus_crit_bonus(state, context, crit_bonus(context, spell, rolled)), else: rolled
 
     damage = max(rolled + Aura.flat_modifier(state, :mod_damage_taken, Spell.school_mask(spell)), 0)
 
@@ -1006,6 +1008,22 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   end
 
   defp spell_taken_reactions(state, _context, _spell, _damage, _crit?, _opts, _now), do: {state, []}
+
+  defp versus_damage_multiplier(state, %CastContext{damage_done_versus: pairs}) do
+    max(100 + Aura.versus_amount(pairs, creature_type_mask(state)), 0) / 100
+  end
+
+  defp versus_crit_bonus(state, %CastContext{crit_damage_versus: pairs}, bonus) do
+    trunc(bonus * max(100 + Aura.versus_amount(pairs, creature_type_mask(state)), 0) / 100)
+  end
+
+  @creature_type_humanoid 7
+
+  defp creature_type_mask(%{creature_type: creature_type}) when is_integer(creature_type) and creature_type > 0 do
+    1 <<< (creature_type - 1)
+  end
+
+  defp creature_type_mask(_state), do: 1 <<< (@creature_type_humanoid - 1)
 
   defp scripted_damage_multiplier(state, %Spell{} = spell) do
     if Scripts.judgement_of_command_damage?(spell) do

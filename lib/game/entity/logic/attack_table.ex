@@ -8,7 +8,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
   (`CalcArmorReducedDamage`) is applied to physical damage before the outcome
   modifiers.
   """
-  import Bitwise, only: [&&&: 2, |||: 2]
+  import Bitwise, only: [&&&: 2, |||: 2, <<<: 2]
 
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
@@ -35,6 +35,8 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
   @extra_flag_no_block 0x10
   @extra_flag_always_crush 0x2000
 
+  @creature_type_humanoid 7
+
   @base_miss_chance 5.0
   @default_crit_chance 5.0
   @mob_avoidance_chance 5.0
@@ -50,7 +52,9 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
       crit_chance: attacker_crit_chance(attacker) + Aura.flat_amount(attacker, :mod_crit_percent),
       hit_chance_bonus: Aura.flat_amount(attacker, :mod_hit_chance),
       always_crush?: always_crush?(attacker),
-      caster_position: attacker_position(attacker)
+      caster_position: attacker_position(attacker),
+      damage_done_versus: Aura.misc_amounts(attacker, :mod_damage_done_versus),
+      crit_damage_versus: Aura.misc_amounts(attacker, :mod_crit_percent_versus)
     }
   end
 
@@ -58,6 +62,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
 
   def resolve(defender, attack, damage, opts \\ []) when is_map(attack) do
     ctx = context(defender, attack)
+    damage = scale_versus_damage(ctx, damage)
     roll = Keyword.get_lazy(opts, :roll, fn -> Math.random_int(0, 9_999) end)
     outcome = roll_outcome(ctx, roll)
     result = apply_outcome(outcome, ctx, damage, opts)
@@ -122,7 +127,9 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
       defender_block_bonus: Aura.flat_amount(defender, :mod_block_percent),
       defender_bonuses: unit.equipment_bonuses || %{},
       defender_extra_flags: extra_flags(defender),
-      hit_chance_bonus: hit_chance_bonus(attack),
+      hit_chance_bonus: hit_chance_bonus(attack) + attacker_hit_debuff(defender, attack),
+      versus_damage_pct: versus_pct(attack, :damage_done_versus, defender),
+      versus_crit_pct: versus_pct(attack, :crit_damage_versus, defender),
       standing?: (unit.stand_state || 0) == 0,
       from_behind?: from_behind?(defender, Map.get(attack, :caster_position)),
       avoidance_disabled?: casting?(defender) or stunned?(unit)
@@ -146,6 +153,30 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
 
   defp hit_chance_bonus(%{hit_chance_bonus: bonus}) when is_number(bonus), do: bonus
   defp hit_chance_bonus(_attack), do: 0
+
+  defp attacker_hit_debuff(defender, %{ranged?: true}) do
+    Aura.flat_amount(defender, :mod_attacker_ranged_hit_chance)
+  end
+
+  defp attacker_hit_debuff(_defender, _attack), do: 0
+
+  defp versus_pct(attack, key, defender) do
+    Aura.versus_amount(Map.get(attack, key), defender_creature_type_mask(defender))
+  end
+
+  defp defender_creature_type_mask(%{creature_type: creature_type})
+       when is_integer(creature_type) and creature_type > 0 do
+    1 <<< (creature_type - 1)
+  end
+
+  defp defender_creature_type_mask(_defender), do: 1 <<< (@creature_type_humanoid - 1)
+
+  defp scale_versus_damage(%{versus_damage_pct: pct}, damage)
+       when is_integer(pct) and pct != 0 and is_integer(damage) do
+    trunc(damage * max(100 + pct, 0) / 100)
+  end
+
+  defp scale_versus_damage(_ctx, damage), do: damage
 
   defp roll_special_outcome(ctx, roll) do
     walk_steps(
@@ -179,6 +210,12 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
   end
 
   defp sitting_crit_step(_ctx), do: nil
+
+  defp crit_multiplier(%{versus_crit_pct: pct}) when is_integer(pct) and pct != 0 do
+    @crit_multiplier + pct / 100
+  end
+
+  defp crit_multiplier(_ctx), do: @crit_multiplier
 
   defp miss_bp(%{standing?: false}), do: 0
 
@@ -344,7 +381,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
   defp apply_outcome(:crit, ctx, damage, _opts) do
     %{
       outcome: :crit,
-      damage: trunc(mitigated_damage(ctx, damage) * @crit_multiplier),
+      damage: trunc(mitigated_damage(ctx, damage) * crit_multiplier(ctx)),
       blocked_amount: 0,
       hit_info: @hitinfo_affects_victim ||| @hitinfo_critical,
       victim_state: @victimstate_normal

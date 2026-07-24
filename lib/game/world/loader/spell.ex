@@ -669,9 +669,13 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp aura_type(154), do: :mod_stealth_level
   defp aura_type(161), do: :mod_health_regen_in_combat
   defp aura_type(166), do: :mod_attack_power_pct
+  defp aura_type(168), do: :mod_damage_done_versus
+  defp aura_type(169), do: :mod_crit_percent_versus
   defp aura_type(174), do: :mod_spell_damage_of_stat_percent
   defp aura_type(175), do: :mod_spell_healing_of_stat_percent
   defp aura_type(179), do: :mod_attacker_spell_crit_chance
+  defp aura_type(182), do: :mod_resistance_of_stat_percent
+  defp aura_type(185), do: :mod_attacker_ranged_hit_chance
   defp aura_type(187), do: :mod_attacker_melee_crit_chance
   defp aura_type(188), do: :mod_attacker_ranged_crit_chance
   defp aura_type(other) when is_integer(other), do: other

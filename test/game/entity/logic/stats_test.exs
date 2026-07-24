@@ -46,6 +46,15 @@ defmodule ThistleTea.Game.Entity.Logic.StatsTest do
       assert recompute(once) == once
     end
 
+    test "adds armor from intellect for resistance-of-stat auras" do
+      arcane_resilience = %Aura{type: :mod_resistance_of_stat_percent, amount: 50, misc_value: 1}
+
+      base = recompute(mage_unit())
+      unit = recompute(%{mage_unit() | auras: [holder([arcane_resilience])]})
+
+      assert unit.normal_resistance == base.normal_resistance + div(125 * 50, 100)
+    end
+
     test "adds equipment and aura bonuses on top of base" do
       arcane_intellect = %Aura{type: :mod_stat, amount: 31, misc_value: 3}
       frost_armor = %Aura{type: :mod_resistance, amount: 200, misc_value: 1}

@@ -80,6 +80,29 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
 
   def percent_multiplier(_entity, _type, _school_mask), do: 1.0
 
+  def misc_amounts(%{unit: %Unit{auras: holders}}, type) when is_list(holders) do
+    holders
+    |> Enum.flat_map(fn %Holder{auras: auras} -> auras end)
+    |> Enum.flat_map(fn
+      %Aura{type: ^type, amount: amount, misc_value: misc} when is_integer(amount) and is_integer(misc) ->
+        [{misc, amount}]
+
+      _aura ->
+        []
+    end)
+  end
+
+  def misc_amounts(_entity, _type), do: []
+
+  def versus_amount(pairs, mask) when is_list(pairs) and is_integer(mask) do
+    Enum.reduce(pairs, 0, fn
+      {misc, amount}, acc when Bitwise.band(misc, mask) != 0 -> acc + amount
+      _pair, acc -> acc
+    end)
+  end
+
+  def versus_amount(_pairs, _mask), do: 0
+
   def flat_amount(%{unit: %Unit{auras: holders}}, type) when is_list(holders) do
     holders
     |> Enum.reduce(0, fn %Holder{auras: auras} = holder, acc ->
