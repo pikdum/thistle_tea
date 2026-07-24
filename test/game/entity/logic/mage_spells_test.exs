@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.Entity.Logic.MageSpellsTest do
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Object
+  alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.SpellEffect
@@ -41,6 +42,42 @@ defmodule ThistleTea.Game.Entity.Logic.MageSpellsTest do
 
       assert caster.internal.cooldowns == %{2136 => 10_000, 8056 => 8_000}
       assert [%{type: :clear_cooldown, spell_id: 122}] = caster.internal.events
+    end
+  end
+
+  describe "ward reflection talents" do
+    test "Improved Fire Ward adds its dummy chance to Fire Ward" do
+      talent = %Spell{
+        id: 13_043,
+        spell_family: 3,
+        effects: [%Effect{index: 0, type: :dummy, base_points: 19, die_sides: 1, base_dice: 1}]
+      }
+
+      caster = ward_caster(talent)
+      ward = ward_spell(543, :fire, 0x8)
+      context = CastContext.from_caster(caster, ward, 1)
+      {caster, _events} = Aura.apply_spell(caster, context, ward, 1_000)
+
+      assert [%Holder{auras: auras}] = caster.unit.auras
+      assert %{amount: 20, misc_value: 0x4} = Enum.find(auras, &(&1.type == :reflect_spells_school))
+    end
+
+    test "Frost Warding adds its dummy chance only to Frost Ward" do
+      talent = %Spell{
+        id: 28_332,
+        spell_family: 3,
+        effects: [
+          %Effect{index: 0, type: :apply_aura, aura: :add_flat_modifier, base_points: 29},
+          %Effect{index: 1, type: :dummy, base_points: 19, die_sides: 1, base_dice: 1}
+        ]
+      }
+
+      caster = ward_caster(talent)
+      fire_ward = ward_spell(543, :fire, 0x8)
+      frost_ward = ward_spell(6143, :frost, 0x80100)
+
+      assert CastContext.from_caster(caster, fire_ward, 1).reflect_chance_bonus == 0
+      assert CastContext.from_caster(caster, frost_ward, 1).reflect_chance_bonus == 20
     end
   end
 
@@ -128,6 +165,43 @@ defmodule ThistleTea.Game.Entity.Logic.MageSpellsTest do
         ]
       },
       internal: %Internal{events: []}
+    }
+  end
+
+  defp ward_caster(talent) do
+    %Character{
+      object: %Object{guid: 1},
+      unit: %Unit{level: 60, health: 100, max_health: 100, auras: []},
+      player: %Player{},
+      internal: %Internal{spellbook: %{talent.id => talent}}
+    }
+  end
+
+  defp ward_spell(id, school, family_flags) do
+    %Spell{
+      id: id,
+      school: school,
+      spell_family: 3,
+      family_flags_0: family_flags,
+      duration_ms: 30_000,
+      effects: [
+        %Effect{
+          index: 0,
+          type: :apply_aura,
+          aura: :school_absorb,
+          base_points: 164,
+          misc_value: Spell.school_mask(school)
+        },
+        %Effect{
+          index: 1,
+          type: :apply_aura,
+          aura: :reflect_spells_school,
+          base_points: -1,
+          die_sides: 1,
+          base_dice: 1,
+          misc_value: Spell.school_mask(school)
+        }
+      ]
     }
   end
 

@@ -9,7 +9,8 @@ defmodule ThistleTea.Game.Network.Message.SmsgSpellLogMiss do
     parry: 4,
     block: 5,
     evade: 6,
-    immune: 7
+    immune: 7,
+    reflect: 11
   }
 
   defstruct [:spell_id, :caster, targets: []]

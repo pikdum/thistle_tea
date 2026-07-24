@@ -38,6 +38,79 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
   end
 
   describe "receive/4" do
+    test "school reflection returns a harmful spell to its caster" do
+      reflect = %Holder{
+        spell: %Spell{id: 543},
+        caster_guid: 1,
+        auras: [
+          %ThistleTea.Game.Aura{
+            type: :reflect_spells_school,
+            amount: 100,
+            misc_value: Spell.school_mask(:fire)
+          }
+        ]
+      }
+
+      target = target_fixture()
+      target = %{target | unit: %{target.unit | health: 100, max_health: 100, auras: [reflect]}}
+
+      fireball = %Spell{
+        id: 133,
+        school: :fire,
+        effects: [%Effect{index: 0, type: :school_damage, base_points: 20, implicit_target_a: :target_enemy}]
+      }
+
+      context = %CastContext{caster_guid: 999, caster_level: 10, target_role: :other}
+      {target, events} = SpellEffect.receive(target, context, fireball, 1_000)
+
+      assert target.unit.health == 100
+
+      assert [
+               %{type: :spell_log_miss, source_guid: 999, target_guid: 1, spell_id: 133, reason: :reflect},
+               %{type: :deliver_spell, target_guid: 999, cast_context: reflected_context, spell: ^fireball}
+             ] = events
+
+      assert reflected_context.caster_guid == 999
+      assert reflected_context.target_guid == 999
+      assert reflected_context.target_role == :other
+
+      caster = %{target_fixture() | object: %Object{guid: 999}, unit: %{target.unit | auras: [reflect]}}
+
+      {caster, [%{type: :spell_damage, damage: 20}]} =
+        SpellEffect.receive(caster, reflected_context, fireball, 1_000)
+
+      assert caster.unit.health == 80
+    end
+
+    test "school reflection ignores spells from other schools" do
+      reflect = %Holder{
+        spell: %Spell{id: 543},
+        caster_guid: 1,
+        auras: [
+          %ThistleTea.Game.Aura{
+            type: :reflect_spells_school,
+            amount: 100,
+            misc_value: Spell.school_mask(:fire)
+          }
+        ]
+      }
+
+      frostbolt = %Spell{
+        id: 116,
+        school: :frost,
+        effects: [%Effect{index: 0, type: :school_damage, base_points: 20}]
+      }
+
+      target = target_fixture()
+      target = %{target | unit: %{target.unit | health: 100, max_health: 100, auras: [reflect]}}
+      context = %CastContext{caster_guid: 999, caster_level: 10}
+
+      {target, [%{type: :spell_damage, damage: 20}]} =
+        SpellEffect.receive(target, context, frostbolt, 1_000)
+
+      assert target.unit.health == 80
+    end
+
     test "ranged weapon damage uses target attacker-power auras" do
       spell = %Spell{
         id: 75,

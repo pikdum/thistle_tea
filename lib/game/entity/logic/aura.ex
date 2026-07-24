@@ -117,6 +117,15 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
 
   def flat_amount(_entity, _type), do: 0
 
+  def reflect_spell?(entity, spell, roll \\ fn -> :rand.uniform(100) end)
+
+  def reflect_spell?(entity, %Spell{} = spell, roll) when is_function(roll, 0) do
+    chance = flat_modifier(entity, :reflect_spells_school, Spell.school_mask(spell.school))
+    chance > 0 and (chance >= 100 or roll.() <= chance)
+  end
+
+  def reflect_spell?(_entity, _spell, _roll), do: false
+
   defp holder_stacks(%Holder{stacks: stacks}) when is_integer(stacks) and stacks > 1, do: stacks
   defp holder_stacks(_holder), do: 1
 

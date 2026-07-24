@@ -652,14 +652,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
 
   defp modified_aura_amount(%Spell{} = spell, %Effect{} = effect, amount_override, %CastContext{} = context) do
     amount = aura_amount(spell, effect, amount_override, context)
-
-    amount =
-      if effect.aura in [:mod_increase_speed, :mod_decrease_speed, :mod_increase_swim_speed] do
-        Modifiers.value(context.spell_modifiers, :speed, amount)
-      else
-        amount
-      end
-
+    amount = modify_aura_base_amount(effect.aura, amount, context)
     amount = amount + periodic_benefit(spell, effect, context)
 
     multiplier =
@@ -683,6 +676,17 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
 
     trunc(amount * (multiplier || 1.0))
   end
+
+  defp modify_aura_base_amount(aura, amount, %CastContext{} = context)
+       when aura in [:mod_increase_speed, :mod_decrease_speed, :mod_increase_swim_speed] do
+    Modifiers.value(context.spell_modifiers, :speed, amount)
+  end
+
+  defp modify_aura_base_amount(:reflect_spells_school, amount, %CastContext{} = context) do
+    amount + (context.reflect_chance_bonus || 0)
+  end
+
+  defp modify_aura_base_amount(_aura, amount, _context), do: amount
 
   defp periodic_benefit(%Spell{} = spell, %Effect{aura: aura} = effect, %CastContext{} = context)
        when aura in [:periodic_damage, :periodic_leech] do

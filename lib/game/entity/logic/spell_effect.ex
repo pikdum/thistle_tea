@@ -44,24 +44,40 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   @weapon_effect_types [:weapon_damage, :weapon_damage_noschool, :normalized_weapon_damage, :weapon_percent_damage]
 
   def receive(target, %CastContext{} = context, %Spell{} = spell, now) when is_integer(now) do
-    if immune_to_harmful_spell?(target, context, spell) do
-      {target, [Event.spell_log_miss(context.caster_guid, target.object.guid, spell.id, :immune)]}
-    else
-      effects =
-        target
-        |> applicable_effects(context, spell.effects)
-        |> Warrior.filter_target_effects(target.object.guid, context, spell)
+    cond do
+      immune_to_harmful_spell?(target, context, spell) ->
+        {target, [Event.spell_log_miss(context.caster_guid, target.object.guid, spell.id, :immune)]}
 
-      spell = %{spell | effects: effects}
-      context = %{context | target_guid: target.object.guid, spell: spell}
+      reflect_harmful_spell?(target, context, spell) ->
+        reflected_context = %{
+          context
+          | target_guid: context.caster_guid,
+            target_role: :other,
+            target_hostile?: true
+        }
 
-      if melee_roll_required?(target, context, spell) do
-        receive_melee_ability(target, context, spell, now)
-      else
-        target
-        |> apply_effects(context, effects, [], now)
-        |> with_bonus_threat(context)
-      end
+        {target,
+         [
+           Event.spell_log_miss(context.caster_guid, target.object.guid, spell.id, :reflect),
+           Event.deliver_spell(context.caster_guid, reflected_context, spell)
+         ]}
+
+      true ->
+        effects =
+          target
+          |> applicable_effects(context, spell.effects)
+          |> Warrior.filter_target_effects(target.object.guid, context, spell)
+
+        spell = %{spell | effects: effects}
+        context = %{context | target_guid: target.object.guid, spell: spell}
+
+        if melee_roll_required?(target, context, spell) do
+          receive_melee_ability(target, context, spell, now)
+        else
+          target
+          |> apply_effects(context, effects, [], now)
+          |> with_bonus_threat(context)
+        end
     end
   end
 
@@ -73,6 +89,10 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
 
   defp immune_to_harmful_spell?(target, %CastContext{caster_guid: caster_guid}, %Spell{} = spell) do
     target.object.guid != caster_guid and Spell.harmful?(spell) and Aura.school_immune?(target, spell.school)
+  end
+
+  defp reflect_harmful_spell?(target, %CastContext{caster_guid: caster_guid}, %Spell{} = spell) do
+    target.object.guid != caster_guid and Spell.harmful?(spell) and Aura.reflect_spell?(target, spell)
   end
 
   defp applicable_effects(_target, %CastContext{target_role: :caster}, effects) do
