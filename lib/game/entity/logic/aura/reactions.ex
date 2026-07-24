@@ -30,7 +30,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
         %{attacker_guid: attacker_guid, proc_type: proc_type, outcome: outcome} = context
       )
       when is_list(holders) and is_integer(attacker_guid) and proc_type in [:take_melee_swing, :take_melee_ability] and
-             outcome in [:normal, :crit] do
+             outcome in [:normal, :crit, :glancing, :crushing, :block, :dodge, :parry, :miss] do
     triggering_spell = Map.get(context, :spell)
 
     {holders, events} =
@@ -309,7 +309,9 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
       Holder.has_any_type?(holder, @charge_consuming_on_hit) and
         Proc.eligible?(holder.spell, triggering_spell, proc_type, outcome) and Proc.roll?(holder.spell)
 
-    events = Enum.flat_map(holder.auras, &reaction_event(&1, holder, owner_guid, attacker_guid, proc?))
+    shield? = Proc.shield_outcome_allowed?(holder.spell, outcome)
+
+    events = Enum.flat_map(holder.auras, &reaction_event(&1, holder, owner_guid, attacker_guid, proc?, shield?))
     {if(proc?, do: spend_hit_charge(holder), else: holder), events}
   end
 
@@ -392,32 +394,27 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
   end
 
   defp reaction_event(
-         %Aura{type: type, trigger_spell_id: spell_id},
+         %Aura{type: :damage_shield, trigger_spell_id: spell_id},
          %Holder{} = holder,
          owner_guid,
          attacker_guid,
-         proc?
+         _proc?,
+         shield?
        )
-       when type in [:damage_shield, :proc_trigger_spell] and is_integer(spell_id) and spell_id > 0 do
-    if type == :damage_shield or proc? do
-      aura_owner_guid = holder.caster_guid || owner_guid
-      source_level = holder.caster_level || 1
+       when is_integer(spell_id) and spell_id > 0 do
+    if shield?, do: trigger_reaction_events(holder, spell_id, owner_guid, attacker_guid), else: []
+  end
 
-      {source_guid, target_guid, trigger_spell_id} =
-        Scripts.incoming_proc_trigger(holder.spell, spell_id, aura_owner_guid, attacker_guid)
-
-      if is_integer(trigger_spell_id) do
-        [
-          Event.trigger_spell(source_guid, source_level, target_guid, trigger_spell_id,
-            triggered_by_spell_id: holder.spell.id
-          )
-        ]
-      else
-        []
-      end
-    else
-      []
-    end
+  defp reaction_event(
+         %Aura{type: :proc_trigger_spell, trigger_spell_id: spell_id},
+         %Holder{} = holder,
+         owner_guid,
+         attacker_guid,
+         proc?,
+         _shield?
+       )
+       when is_integer(spell_id) and spell_id > 0 do
+    if proc?, do: trigger_reaction_events(holder, spell_id, owner_guid, attacker_guid), else: []
   end
 
   defp reaction_event(
@@ -425,9 +422,10 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
          %Holder{} = holder,
          _owner_guid,
          attacker_guid,
-         _proc?
+         _proc?,
+         shield?
        )
-       when is_integer(amount) and amount > 0 do
+       when shield? and is_integer(amount) and amount > 0 do
     spell = %{
       holder.spell
       | school: :holy,
@@ -438,5 +436,22 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
     [Event.deliver_spell(attacker_guid, context, spell)]
   end
 
-  defp reaction_event(_aura, _holder, _owner_guid, _attacker_guid, _proc?), do: []
+  defp reaction_event(_aura, _holder, _owner_guid, _attacker_guid, _proc?, _shield?), do: []
+
+  defp trigger_reaction_events(%Holder{} = holder, spell_id, owner_guid, attacker_guid) do
+    aura_owner_guid = holder.caster_guid || owner_guid
+
+    {source_guid, target_guid, trigger_spell_id} =
+      Scripts.incoming_proc_trigger(holder.spell, spell_id, aura_owner_guid, attacker_guid)
+
+    if is_integer(trigger_spell_id) do
+      [
+        Event.trigger_spell(source_guid, holder.caster_level || 1, target_guid, trigger_spell_id,
+          triggered_by_spell_id: holder.spell.id
+        )
+      ]
+    else
+      []
+    end
+  end
 end

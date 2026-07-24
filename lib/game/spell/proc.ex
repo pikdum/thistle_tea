@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.Spell.Proc do
   @critical_hit 0x2
   @trigger_always 0x10000
   @cast_end 0x80000
+  @landed_outcomes [:normal, :crit, :glancing, :crushing]
 
   def eligible?(%Spell{} = proc_spell, %Spell{} = triggering_spell, proc_type, outcome) do
     proc_flag?(proc_spell, proc_type) and
@@ -90,10 +91,24 @@ defmodule ThistleTea.Game.Spell.Proc do
     (proc_ex &&& (@trigger_always ||| @cast_end)) != 0 or (proc_ex &&& outcome_mask(outcome)) != 0
   end
 
-  defp outcome_allowed?(_rule, outcome), do: outcome in [:normal, :crit]
+  defp outcome_allowed?(_rule, outcome), do: outcome in @landed_outcomes
+
+  def shield_outcome_allowed?(%Spell{proc_rule: %ProcRule{proc_ex: proc_ex}}, outcome)
+      when is_integer(proc_ex) and proc_ex > 0 do
+    (proc_ex &&& outcome_mask(outcome)) != 0
+  end
+
+  def shield_outcome_allowed?(_spell, outcome), do: outcome in @landed_outcomes
 
   defp outcome_mask(:normal), do: @normal_hit
   defp outcome_mask(:crit), do: @critical_hit
+  defp outcome_mask(:glancing), do: @normal_hit
+  defp outcome_mask(:crushing), do: @normal_hit
+  defp outcome_mask(:miss), do: 0x4
+  defp outcome_mask(:resist), do: 0x8
+  defp outcome_mask(:dodge), do: 0x10
+  defp outcome_mask(:parry), do: 0x20
+  defp outcome_mask(:block), do: 0x40
   defp outcome_mask(_outcome), do: 0
 
   defp unrestricted_trigger?(%ProcRule{school_mask: 0, spell_family: 0, family_mask_0: 0, family_mask_1: 0}), do: true

@@ -922,6 +922,133 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
       assert entity.unit.auras == []
     end
 
+    test "block-flagged procs fire when the victim blocks" do
+      entity = fixture_entity()
+
+      shield_spec = %Spell{
+        id: 12_298,
+        name: "Shield Specialization",
+        duration_ms: -1,
+        proc_type_mask: 0x2A8,
+        proc_chance: 100,
+        proc_rule: %ProcRule{proc_ex: 0x40},
+        effects: [
+          %Effect{
+            index: 0,
+            type: :apply_aura,
+            base_points: 0,
+            die_sides: 0,
+            aura: :proc_trigger_spell,
+            trigger_spell_id: 23_602
+          }
+        ]
+      }
+
+      {entity, _events} = apply_spell(entity, 1, 10, shield_spec)
+
+      context = %{attacker_guid: 999, proc_type: :take_melee_swing, now: 1_000}
+
+      assert {_entity, []} = Aura.reactions(entity, :hit_taken, Map.put(context, :outcome, :normal))
+
+      assert {_entity, [%{type: :trigger_spell, spell_id: 23_602}]} =
+               Aura.reactions(entity, :hit_taken, Map.put(context, :outcome, :block))
+    end
+
+    test "dodge-flagged procs fire when the victim dodges" do
+      entity = fixture_entity()
+
+      setup_talent = %Spell{
+        id: 13_983,
+        name: "Setup",
+        duration_ms: -1,
+        proc_type_mask: 0x28,
+        proc_chance: 100,
+        proc_rule: %ProcRule{proc_ex: 0x18},
+        effects: [
+          %Effect{
+            index: 0,
+            type: :apply_aura,
+            base_points: 0,
+            die_sides: 0,
+            aura: :proc_trigger_spell,
+            trigger_spell_id: 15_250
+          }
+        ]
+      }
+
+      {entity, _events} = apply_spell(entity, 1, 10, setup_talent)
+
+      context = %{attacker_guid: 999, proc_type: :take_melee_swing, now: 1_000}
+
+      assert {_entity, []} = Aura.reactions(entity, :hit_taken, Map.put(context, :outcome, :normal))
+
+      assert {_entity, [%{type: :trigger_spell, spell_id: 15_250}]} =
+               Aura.reactions(entity, :hit_taken, Map.put(context, :outcome, :dodge))
+    end
+
+    test "damage shields with block-only proc rules skip regular hits" do
+      entity = fixture_entity()
+
+      holy_shield = %Spell{
+        id: 20_925,
+        name: "Holy Shield",
+        duration_ms: 10_000,
+        proc_type_mask: 0x2A8,
+        proc_chance: 100,
+        proc_rule: %ProcRule{proc_ex: 0x40},
+        effects: [
+          %Effect{
+            index: 1,
+            type: :apply_aura,
+            base_points: 0,
+            die_sides: 0,
+            aura: :damage_shield,
+            trigger_spell_id: 20_929
+          }
+        ]
+      }
+
+      {entity, _events} = apply_spell(entity, 1, 10, holy_shield)
+
+      context = %{attacker_guid: 999, proc_type: :take_melee_swing, now: 1_000}
+
+      assert {_entity, []} = Aura.reactions(entity, :hit_taken, Map.put(context, :outcome, :normal))
+
+      assert {_entity, [%{type: :trigger_spell, spell_id: 20_929}]} =
+               Aura.reactions(entity, :hit_taken, Map.put(context, :outcome, :block))
+    end
+
+    test "plain damage shields skip avoided attacks" do
+      entity = fixture_entity()
+
+      spell = %Spell{
+        id: 168,
+        name: "Frost Armor",
+        school: :frost,
+        duration_ms: 600_000,
+        effects: [
+          %Effect{
+            index: 0,
+            type: :apply_aura,
+            base_points: 0,
+            die_sides: 0,
+            aura: :damage_shield,
+            trigger_spell_id: 6136
+          }
+        ]
+      }
+
+      {entity, _events} = apply_spell(entity, 1, 10, spell)
+
+      context = %{attacker_guid: 999, proc_type: :take_melee_swing, now: 1_000}
+
+      assert {_entity, []} = Aura.reactions(entity, :hit_taken, Map.put(context, :outcome, :dodge))
+      assert {_entity, []} = Aura.reactions(entity, :hit_taken, Map.put(context, :outcome, :block))
+
+      assert {_entity, [%{type: :trigger_spell, spell_id: 6136}]} =
+               Aura.reactions(entity, :hit_taken, Map.put(context, :outcome, :crit))
+    end
+
     test "illumination refunds the base mana cost on crit heals" do
       entity = fixture_entity()
 

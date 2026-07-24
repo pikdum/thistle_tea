@@ -186,12 +186,7 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
     event = attacker_state_update(Map.get(attack, :caster, 0), target_guid, result.damage, attack)
     feedback_events = attack_outcome_events(entity, attack, result, absorbed)
 
-    {entity, reaction_events} =
-      if result.damage > 0 do
-        attack_reactions(entity, attack, result.outcome, now)
-      else
-        {entity, []}
-      end
+    {entity, reaction_events} = attack_reactions(entity, attack, result, now)
 
     entity = maybe_defense_skill_up(entity, attack, opts)
 
@@ -278,7 +273,8 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
 
   defp with_absorb_flag(hit_info, _absorbed), do: hit_info
 
-  defp attack_reactions(entity, %{caster: attacker_guid} = attack, outcome, now) when is_integer(attacker_guid) do
+  defp attack_reactions(entity, %{caster: attacker_guid} = attack, %{outcome: outcome} = result, now)
+       when is_integer(attacker_guid) do
     if Core.dead?(entity) do
       {entity, []}
     else
@@ -289,6 +285,7 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
         attacker_position: Map.get(attack, :caster_position),
         proc_type: proc_type,
         outcome: outcome,
+        damage: result.damage,
         spell: Map.get(attack, :spell),
         triggering_spell_id: Map.get(attack, :spell_id),
         now: now
@@ -296,5 +293,5 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
     end
   end
 
-  defp attack_reactions(entity, _attack, _outcome, _now), do: {entity, []}
+  defp attack_reactions(entity, _attack, _result, _now), do: {entity, []}
 end
