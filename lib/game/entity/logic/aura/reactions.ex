@@ -96,6 +96,24 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
 
   def reactions(
         %{object: %{guid: owner_guid}, unit: %Unit{auras: holders}} = entity,
+        :spell_hit_taken,
+        %{attacker_guid: attacker_guid, spell: %Spell{}, proc_type: proc_type, outcome: outcome} = context
+      )
+      when is_list(holders) and is_integer(attacker_guid) and outcome in [:normal, :crit] and
+             proc_type in [:take_harmful_spell, :take_harmful_periodic] do
+    context = Map.put(context, :owner_max_health, entity.unit.max_health)
+
+    {holders, events} =
+      Enum.reduce(holders, {holders, []}, fn %Holder{} = holder, {current_holders, events} ->
+        incoming_spell_transition(current_holders, events, holder, owner_guid, attacker_guid, context)
+      end)
+
+    {entity, removal_events} = sync_removals(entity, holders, context)
+    {entity, events ++ removal_events}
+  end
+
+  def reactions(
+        %{object: %{guid: owner_guid}, unit: %Unit{auras: holders}} = entity,
         :kill,
         %{victim_guid: victim_guid} = context
       )
@@ -110,6 +128,49 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
   end
 
   def reactions(entity, _event, _context), do: {entity, []}
+
+  defp incoming_spell_transition(holders, events, holder, owner_guid, attacker_guid, context) do
+    %{spell: triggering_spell, proc_type: proc_type, outcome: outcome} = context
+
+    proc? =
+      not self_proc?(holder, triggering_spell) and proc_ready?(holder, Map.get(context, :now)) and
+        Proc.eligible?(holder.spell, triggering_spell, proc_type, outcome) and Proc.roll?(holder.spell)
+
+    if proc? do
+      apply_incoming_spell_proc(holders, events, holder, owner_guid, attacker_guid, context)
+    else
+      {holders, events}
+    end
+  end
+
+  defp apply_incoming_spell_proc(holders, events, holder, owner_guid, attacker_guid, context) do
+    case Script.incoming_spell(holder, owner_guid, attacker_guid, context) do
+      {:handled, updated_holder, proc_events} ->
+        {replace_or_delete(holders, holder, updated_holder), events ++ proc_events}
+
+      :unhandled ->
+        generic_incoming_spell_proc(holders, events, holder, owner_guid, attacker_guid, context)
+    end
+  end
+
+  defp generic_incoming_spell_proc(holders, events, %Holder{} = holder, owner_guid, attacker_guid, context) do
+    case trigger_auras(holder) do
+      [] ->
+        {holders, events}
+
+      proc_auras ->
+        source_guid = holder.caster_guid || owner_guid
+
+        proc_events =
+          Enum.map(proc_auras, fn %Aura{trigger_spell_id: spell_id} ->
+            Event.trigger_spell(source_guid, holder.caster_level || 1, attacker_guid, spell_id,
+              triggered_by_spell_id: holder.spell.id
+            )
+          end)
+
+        {replace_or_delete(holders, holder, mark_proc(holder, Map.get(context, :now))), events ++ proc_events}
+    end
+  end
 
   defp kill_proc_transition(holders, events, holder, owner_guid, context) do
     proc? =

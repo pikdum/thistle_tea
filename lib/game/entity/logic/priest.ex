@@ -7,6 +7,8 @@ defmodule ThistleTea.Game.Entity.Logic.Priest do
   alias ThistleTea.Game.Spell
 
   @weakened_soul 6788
+  @vampiric_embrace 15_286
+  @vampiric_embrace_heal 15_290
 
   @holy_nova_heals %{
     15_237 => 23_455,
@@ -39,6 +41,11 @@ defmodule ThistleTea.Game.Entity.Logic.Priest do
   end
 
   def holy_nova_heal_id(_spell), do: nil
+
+  def vampiric_embrace?(%Spell{id: @vampiric_embrace}), do: true
+  def vampiric_embrace?(_spell), do: false
+
+  def vampiric_embrace_heal_id, do: @vampiric_embrace_heal
 
   def touch_of_weakness?(%Spell{} = spell), do: Spell.vmangos_script?(spell, "spell_priest_touch_of_weakness")
   def touch_of_weakness?(_spell), do: false

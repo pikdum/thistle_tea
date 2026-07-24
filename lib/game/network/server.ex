@@ -379,6 +379,16 @@ defmodule ThistleTea.Game.Network.Server do
     {:noreply, {socket, state}, {:continue, :maybe_broadcast_update}}
   end
 
+  def handle_cast(
+        {:trigger_spell, spell_id, target_guid, opts},
+        {socket, %{character: %Character{} = character} = state}
+      )
+      when is_integer(spell_id) and is_integer(target_guid) and is_list(opts) do
+    event = Event.trigger_spell(character.object.guid, character.unit.level || 1, target_guid, spell_id, opts)
+    character = EventSink.emit(character, event)
+    {:noreply, {socket, %{state | character: character}}, {:continue, :maybe_broadcast_update}}
+  end
+
   def handle_cast({:remove_aura, spell_id, caster_guid}, {socket, %{character: %Character{} = character} = state}) do
     {character, events} = Aura.remove_source_spell(character, spell_id, caster_guid, Time.now())
     character = EventSink.emit(character, events)

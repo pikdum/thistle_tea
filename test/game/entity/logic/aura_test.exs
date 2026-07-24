@@ -81,6 +81,28 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
     }
   end
 
+  defp vampiric_embrace_fixture do
+    %Spell{
+      id: 15_286,
+      name: "Vampiric Embrace",
+      school: :shadow,
+      duration_ms: 60_000,
+      proc_type_mask: 0xA0000,
+      proc_chance: 100,
+      proc_rule: %ProcRule{school_mask: 0x20},
+      effects: [
+        %Effect{
+          index: 0,
+          type: :apply_aura,
+          base_points: 19,
+          die_sides: 1,
+          base_dice: 1,
+          aura: :dummy
+        }
+      ]
+    }
+  end
+
   defp root_spell do
     %Spell{
       id: 122,
@@ -730,6 +752,100 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
       {entity, _events} = apply_spell(entity, 1, 10, clearcasting_fixture())
 
       assert {_entity, []} = Aura.reactions(entity, :kill, %{victim_guid: 999, now: 1_000})
+    end
+
+    test "vampiric embrace heals the priest's party from their shadow damage" do
+      entity = fixture_entity()
+
+      {entity, _events} = apply_spell(entity, 7, 60, vampiric_embrace_fixture())
+
+      context = %{
+        attacker_guid: 7,
+        spell: %Spell{id: 10_894, name: "Shadow Word: Pain", school: :shadow},
+        proc_type: :take_harmful_periodic,
+        outcome: :normal,
+        damage: 100,
+        now: 1_000
+      }
+
+      assert {_entity,
+              [
+                %{
+                  type: :trigger_spell,
+                  source_guid: 7,
+                  target_guid: 7,
+                  spell_id: 15_290,
+                  amount: 20,
+                  resolve_targets?: true
+                }
+              ]} = Aura.reactions(entity, :spell_hit_taken, context)
+    end
+
+    test "vampiric embrace ignores shadow damage from other casters" do
+      entity = fixture_entity()
+
+      {entity, _events} = apply_spell(entity, 7, 60, vampiric_embrace_fixture())
+
+      context = %{
+        attacker_guid: 8,
+        spell: %Spell{id: 10_894, name: "Shadow Word: Pain", school: :shadow},
+        proc_type: :take_harmful_periodic,
+        outcome: :normal,
+        damage: 100,
+        now: 1_000
+      }
+
+      assert {_entity, []} = Aura.reactions(entity, :spell_hit_taken, context)
+    end
+
+    test "vampiric embrace ignores non-shadow damage" do
+      entity = fixture_entity()
+
+      {entity, _events} = apply_spell(entity, 7, 60, vampiric_embrace_fixture())
+
+      context = %{
+        attacker_guid: 7,
+        spell: %Spell{id: 133, name: "Fireball", school: :fire},
+        proc_type: :take_harmful_spell,
+        outcome: :normal,
+        damage: 100,
+        now: 1_000
+      }
+
+      assert {_entity, []} = Aura.reactions(entity, :spell_hit_taken, context)
+    end
+
+    test "periodic damage ticks fire take-side spell procs" do
+      entity = fixture_entity()
+
+      shadow_word_pain = %Spell{
+        id: 10_894,
+        name: "Shadow Word: Pain",
+        school: :shadow,
+        duration_ms: 18_000,
+        effects: [
+          %Effect{
+            index: 0,
+            type: :apply_aura,
+            base_points: 49,
+            die_sides: 1,
+            base_dice: 1,
+            aura: :periodic_damage,
+            amplitude_ms: 3_000
+          }
+        ]
+      }
+
+      {entity, _events} = apply_spell(entity, 7, 60, shadow_word_pain)
+      {entity, _events} = apply_spell(entity, 7, 60, vampiric_embrace_fixture())
+
+      [holder | _rest] = entity.unit.auras
+      [aura] = holder.auras
+
+      {_entity, events} = Aura.tick(entity, aura.next_tick_at)
+
+      assert %{type: :trigger_spell, spell_id: 15_290, amount: 10, source_guid: 7} =
+               Enum.find(events, &(&1.type == :trigger_spell))
     end
   end
 

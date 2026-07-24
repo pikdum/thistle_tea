@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.Aura.HolderSync
   alias ThistleTea.Game.Entity.Logic.Aura.Lifecycle
+  alias ThistleTea.Game.Entity.Logic.Aura.Reactions
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.Entity.Logic.Resources
@@ -67,8 +68,31 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
             Event.enqueue(entity, modifier_events)
           end
 
-        {entity, events}
+        {entity, reaction_events} = periodic_taken_reactions(entity, events, now)
+        {entity, events ++ reaction_events}
     end
+  end
+
+  defp periodic_taken_reactions(entity, events, now) do
+    Enum.reduce(events, {entity, []}, fn
+      %Event{type: :spell_damage, periodic?: true, damage: damage, source_guid: caster, spell: %Spell{} = spell},
+      {current, acc}
+      when is_integer(damage) and damage > 0 and is_integer(caster) ->
+        {current, reaction_events} =
+          Reactions.reactions(current, :spell_hit_taken, %{
+            attacker_guid: caster,
+            spell: spell,
+            proc_type: :take_harmful_periodic,
+            outcome: :normal,
+            damage: damage,
+            now: now
+          })
+
+        {current, acc ++ reaction_events}
+
+      _event, acc_pair ->
+        acc_pair
+    end)
   end
 
   defp holder_still_present?(%{unit: %Unit{auras: current}}, %Holder{spell: %Spell{id: id}, caster_guid: caster}) do

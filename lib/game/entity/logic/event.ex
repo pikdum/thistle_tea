@@ -74,6 +74,7 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
       source_guid: source_guid,
       target_guid: target_guid,
       spell_id: spell.id,
+      spell: spell,
       school: spell.school,
       damage: damage,
       proc_damage: Keyword.get(opts, :proc_damage),

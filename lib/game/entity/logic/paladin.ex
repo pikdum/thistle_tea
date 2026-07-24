@@ -29,6 +29,8 @@ defmodule ThistleTea.Game.Entity.Logic.Paladin do
   @flash_of_light_family_mask 0x40000000
   @judgement_aura_family_mask 0x00080000
   @forbearance 25_771
+  @eye_for_an_eye [9799, 25_988]
+  @eye_for_an_eye_damage 25_997
 
   @holy_shock %{
     20_473 => %{damage: 25_912, heal: 25_914},
@@ -47,6 +49,11 @@ defmodule ThistleTea.Game.Entity.Logic.Paladin do
   }
 
   def forbearance_id, do: @forbearance
+
+  def eye_for_an_eye?(%Spell{id: id}), do: id in @eye_for_an_eye
+  def eye_for_an_eye?(_spell), do: false
+
+  def eye_for_an_eye_damage_id, do: @eye_for_an_eye_damage
 
   def holy_shock_ids(spell_id), do: Map.get(@holy_shock, spell_id)
 

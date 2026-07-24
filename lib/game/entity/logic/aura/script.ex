@@ -6,6 +6,8 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Script do
 
   alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Logic.Event
+  alias ThistleTea.Game.Entity.Logic.Paladin
+  alias ThistleTea.Game.Entity.Logic.Priest
   alias ThistleTea.Game.Math
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Proc
@@ -78,6 +80,61 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Script do
   end
 
   def incoming_melee(_entity, _holder, _owner_guid, _attacker_guid, _context), do: :unhandled
+
+  def incoming_spell(%Holder{spell: %Spell{} = spell} = holder, owner_guid, attacker_guid, context) do
+    cond do
+      Priest.vampiric_embrace?(spell) -> vampiric_embrace_proc(holder, attacker_guid, context)
+      Paladin.eye_for_an_eye?(spell) -> eye_for_an_eye_proc(holder, owner_guid, attacker_guid, context)
+      true -> :unhandled
+    end
+  end
+
+  def incoming_spell(_holder, _owner_guid, _attacker_guid, _context), do: :unhandled
+
+  defp vampiric_embrace_proc(%Holder{caster_guid: caster_guid} = holder, attacker_guid, %{damage: damage})
+       when is_integer(caster_guid) and caster_guid == attacker_guid and is_integer(damage) and damage > 0 do
+    heal = max(div(damage * dummy_amount(holder, 20), 100), 1)
+
+    event =
+      Event.trigger_spell(caster_guid, holder.caster_level || 1, caster_guid, Priest.vampiric_embrace_heal_id(),
+        base_points: heal,
+        effect_index: 0,
+        resolve_targets?: true,
+        triggered_by_spell_id: holder.spell.id
+      )
+
+    {:handled, holder, [event]}
+  end
+
+  defp vampiric_embrace_proc(holder, _attacker_guid, _context), do: {:handled, holder, []}
+
+  defp eye_for_an_eye_proc(%Holder{} = holder, owner_guid, attacker_guid, %{damage: damage} = context)
+       when is_integer(damage) and damage > 0 do
+    max_health = Map.get(context, :owner_max_health) || 0
+    reflected = damage |> Kernel.*(dummy_amount(holder, 0)) |> div(100) |> min(div(max_health, 2))
+
+    if reflected > 0 do
+      event =
+        Event.trigger_spell(owner_guid, holder.caster_level || 1, attacker_guid, Paladin.eye_for_an_eye_damage_id(),
+          base_points: reflected,
+          effect_index: 0,
+          triggered_by_spell_id: holder.spell.id
+        )
+
+      {:handled, holder, [event]}
+    else
+      {:handled, holder, []}
+    end
+  end
+
+  defp eye_for_an_eye_proc(holder, _owner_guid, _attacker_guid, _context), do: {:handled, holder, []}
+
+  defp dummy_amount(%Holder{auras: auras}, default) do
+    Enum.find_value(auras, default, fn
+      %{type: :dummy, amount: amount} when is_integer(amount) and amount > 0 -> amount
+      _aura -> nil
+    end)
+  end
 
   def cancel_linked_spell_ids(%Holder{spell: %Spell{} = spell}) do
     if Spell.vmangos_script?(spell, "spell_mage_combustion_buff"), do: [@combustion_proc_aura], else: []

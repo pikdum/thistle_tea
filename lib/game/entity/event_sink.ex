@@ -1131,6 +1131,21 @@ defmodule ThistleTea.Game.Entity.EventSink do
     entity
   end
 
+  def emit(
+        %{object: %{guid: guid}} = entity,
+        %Event{type: :trigger_spell, source_guid: source, resolve_targets?: true} = event
+      )
+      when is_integer(source) and source != guid do
+    Entity.trigger_spell(source, event.spell_id, event.target_guid,
+      base_points: event.amount,
+      effect_index: event.slot,
+      resolve_targets?: true,
+      triggered_by_spell_id: event.triggering_spell_id
+    )
+
+    entity
+  end
+
   def emit(entity, %Event{type: :trigger_spell} = event) do
     case SpellLoader.load(event.spell_id) do
       nil ->

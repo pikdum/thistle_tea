@@ -970,8 +970,25 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
         opts ++ [resisted: resisted, absorbed: absorbed, crit?: crit?]
       )
 
-    {state, [event]}
+    {state, reaction_events} = spell_taken_reactions(state, context, spell, damage, crit?, opts, now)
+    {state, [event | reaction_events]}
   end
+
+  defp spell_taken_reactions(state, %CastContext{caster_guid: caster_guid}, spell, damage, crit?, opts, now)
+       when is_integer(caster_guid) and is_integer(damage) and damage > 0 do
+    proc_type = if Keyword.get(opts, :periodic?, false), do: :take_harmful_periodic, else: :take_harmful_spell
+
+    Aura.reactions(state, :spell_hit_taken, %{
+      attacker_guid: caster_guid,
+      spell: spell,
+      proc_type: proc_type,
+      outcome: if(crit?, do: :crit, else: :normal),
+      damage: damage,
+      now: now
+    })
+  end
+
+  defp spell_taken_reactions(state, _context, _spell, _damage, _crit?, _opts, _now), do: {state, []}
 
   defp scripted_damage_multiplier(state, %Spell{} = spell) do
     if Scripts.judgement_of_command_damage?(spell) do
