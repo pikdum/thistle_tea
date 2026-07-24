@@ -2218,6 +2218,70 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
 
       assert tick_after_refresh == first_tick
     end
+
+    test "Ignite accumulates its tick amount through five refreshed stacks" do
+      ignite = fn amount ->
+        %Spell{
+          id: 12_654,
+          name: "Ignite",
+          school: :fire,
+          duration_ms: 4_000,
+          stack_amount: 5,
+          effects: [
+            %Effect{
+              index: 0,
+              type: :apply_aura,
+              aura: :periodic_damage,
+              base_points: amount,
+              amplitude_ms: 2_000
+            }
+          ]
+        }
+      end
+
+      {entity, _events} = Aura.apply_spell(fixture_entity(), 1, 60, ignite.(10), 0)
+
+      entity =
+        Enum.reduce(1..5, entity, fn application, current ->
+          {current, _events} = Aura.apply_spell(current, 1, 60, ignite.(20), application * 100)
+          current
+        end)
+
+      assert [
+               %Holder{
+                 caster_guid: 1,
+                 stacks: 5,
+                 applied_at: 500,
+                 expires_at: 4_500,
+                 auras: [%{amount: 90, next_tick_at: 2_500}]
+               }
+             ] = entity.unit.auras
+    end
+
+    test "Ignite preserves the original caster while adding another mage's crit" do
+      ignite = %Spell{
+        id: 12_654,
+        name: "Ignite",
+        school: :fire,
+        duration_ms: 4_000,
+        stack_amount: 5,
+        effects: [
+          %Effect{
+            index: 0,
+            type: :apply_aura,
+            aura: :periodic_damage,
+            base_points: 10,
+            amplitude_ms: 2_000
+          }
+        ]
+      }
+
+      {entity, _events} = Aura.apply_spell(fixture_entity(), 1, 60, ignite, 0)
+      {entity, _events} = Aura.apply_spell(entity, 2, 60, ignite, 500)
+
+      assert [%Holder{caster_guid: 1, stacks: 2, auras: [%{amount: 20, next_tick_at: 2_500}]}] =
+               entity.unit.auras
+    end
   end
 
   describe "cross-caster stacking" do

@@ -45,6 +45,8 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
   ]
 
   @aura_interrupt_not_seated 0x40000
+  @ignite_dot 12_654
+  @ignite_max_stacks 5
 
   @regen_tick_ms 5000
   @percent_regen_tick_ms 2000
@@ -170,9 +172,16 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
     existing =
       existing
       |> remove_immune_mechanics(holder)
-      |> remove_non_stacking(holder)
 
-    holders = upsert_holder(existing, holder)
+    holders =
+      if holder.spell.id == @ignite_dot do
+        upsert_ignite(existing, holder)
+      else
+        existing
+        |> remove_non_stacking(holder)
+        |> upsert_holder(holder)
+      end
+
     {entity, modifier_events} = HolderSync.sync(entity, holders)
 
     {entity, sit_events} =
@@ -454,6 +463,65 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
         List.replace_at(existing, index, refreshed)
     end
   end
+
+  defp upsert_ignite(existing, %Holder{} = incoming) do
+    case Enum.find_index(existing, &match?(%Holder{spell: %Spell{id: @ignite_dot}}, &1)) do
+      nil ->
+        slot = UnitSync.display_slot(existing, incoming)
+        existing ++ [%{incoming | slot: slot}]
+
+      index ->
+        current = Enum.at(existing, index)
+
+        refreshed =
+          if ignite_finished?(current) do
+            %{incoming | slot: current.slot}
+          else
+            refresh_ignite(current, incoming)
+          end
+
+        List.replace_at(existing, index, refreshed)
+    end
+  end
+
+  defp refresh_ignite(%Holder{} = current, %Holder{} = incoming) do
+    add_amount? = current.stacks < @ignite_max_stacks
+
+    %{
+      current
+      | applied_at: incoming.applied_at,
+        expires_at: incoming.expires_at,
+        stacks: min(current.stacks + 1, @ignite_max_stacks),
+        auras: refresh_ignite_auras(current.auras, incoming.auras, add_amount?)
+    }
+  end
+
+  defp refresh_ignite_auras(current, incoming, add_amount?) do
+    Enum.map(incoming, fn %Aura{} = aura ->
+      case Enum.find(current, &(&1.index == aura.index and &1.type == aura.type)) do
+        %Aura{amount: current_amount} when add_amount? and is_integer(current_amount) and is_integer(aura.amount) ->
+          %{aura | amount: current_amount + aura.amount}
+
+        %Aura{amount: current_amount} when is_integer(current_amount) ->
+          %{aura | amount: current_amount}
+
+        _current_aura ->
+          aura
+      end
+    end)
+  end
+
+  defp ignite_finished?(%Holder{expires_at: expires_at, auras: auras}) when is_integer(expires_at) do
+    Enum.any?(auras, fn
+      %Aura{type: :periodic_damage, next_tick_at: next_tick_at} when is_integer(next_tick_at) ->
+        next_tick_at > expires_at
+
+      _aura ->
+        false
+    end)
+  end
+
+  defp ignite_finished?(_holder), do: false
 
   defp shared_stack_index(existing, %Spell{id: spell_id} = spell) do
     if Spell.custom?(spell, :allow_stack_between_caster) do
