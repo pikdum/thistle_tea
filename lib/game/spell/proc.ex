@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Spell.Proc do
 
   @normal_hit 0x1
   @critical_hit 0x2
+  @periodic_positive 0x40000
   @trigger_always 0x10000
   @cast_end 0x80000
   @landed_outcomes [:normal, :crit, :glancing, :crushing]
@@ -18,12 +19,12 @@ defmodule ThistleTea.Game.Spell.Proc do
     proc_flag?(proc_spell, proc_type) and
       school_allowed?(proc_spell.proc_rule, triggering_spell) and
       family_allowed?(proc_spell.proc_rule, triggering_spell) and
-      outcome_allowed?(proc_spell.proc_rule, outcome)
+      outcome_allowed?(proc_spell.proc_rule, proc_type, outcome)
   end
 
   def eligible?(%Spell{} = proc_spell, nil, proc_type, outcome) do
     proc_flag?(proc_spell, proc_type) and unrestricted_trigger?(proc_spell.proc_rule) and
-      outcome_allowed?(proc_spell.proc_rule, outcome)
+      outcome_allowed?(proc_spell.proc_rule, proc_type, outcome)
   end
 
   def eligible?(_proc_spell, _triggering_spell, _proc_type, _outcome), do: false
@@ -55,6 +56,7 @@ defmodule ThistleTea.Game.Spell.Proc do
   defp proc_mask(:deal_helpful_spell), do: 0x00004400
   defp proc_mask(:deal_harmful_spell), do: 0x00010000
   defp proc_mask(:deal_harmful_periodic), do: 0x00040000
+  defp proc_mask(:deal_helpful_periodic), do: 0x00040000
   defp proc_mask(:deal_melee_swing), do: 0x00000004
   defp proc_mask(:deal_melee_ability), do: 0x00000010
   defp proc_mask(:take_melee_swing), do: 0x00000008
@@ -91,11 +93,16 @@ defmodule ThistleTea.Game.Spell.Proc do
       (rule.family_mask_1 &&& spell.family_flags_1) != 0
   end
 
-  defp outcome_allowed?(%ProcRule{proc_ex: proc_ex}, outcome) when is_integer(proc_ex) and proc_ex > 0 do
-    (proc_ex &&& (@trigger_always ||| @cast_end)) != 0 or (proc_ex &&& outcome_mask(outcome)) != 0
+  defp outcome_allowed?(%ProcRule{proc_ex: proc_ex}, proc_type, outcome) when is_integer(proc_ex) and proc_ex > 0 do
+    outcome_mask = outcome_mask(outcome) ||| periodic_outcome_mask(proc_type)
+    (proc_ex &&& (@trigger_always ||| @cast_end)) != 0 or (proc_ex &&& outcome_mask) != 0
   end
 
-  defp outcome_allowed?(_rule, outcome), do: outcome in @landed_outcomes
+  defp outcome_allowed?(_rule, :deal_helpful_periodic, _outcome), do: false
+  defp outcome_allowed?(_rule, _proc_type, outcome), do: outcome in @landed_outcomes
+
+  defp periodic_outcome_mask(:deal_helpful_periodic), do: @periodic_positive
+  defp periodic_outcome_mask(_proc_type), do: 0
 
   def shield_outcome_allowed?(%Spell{proc_rule: %ProcRule{proc_ex: proc_ex}}, outcome)
       when is_integer(proc_ex) and proc_ex > 0 do

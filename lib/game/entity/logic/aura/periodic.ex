@@ -133,7 +133,10 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
     entity = Core.heal(entity, aura.amount)
     event = Event.periodic_aura_log(holder.caster_guid, entity.object.guid, holder.spell, :periodic_heal, aura.amount)
 
-    {entity, %{aura | next_tick_at: advance_tick(at, aura.amplitude_ms, now)}, [event | threat_events]}
+    proc_event =
+      Event.spell_heal(holder.caster_guid, entity.object.guid, holder.spell, aura.amount, false, periodic?: true)
+
+    {entity, %{aura | next_tick_at: advance_tick(at, aura.amplitude_ms, now)}, [event, proc_event | threat_events]}
   end
 
   defp tick_aura(entity, %Holder{} = holder, %Aura{type: :obs_mod_health, next_tick_at: at} = aura, now)
@@ -141,8 +144,9 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
     amount = trunc((entity.unit.max_health || 0) * (aura.amount || 0) / 100)
     entity = Core.heal(entity, amount)
     event = Event.periodic_aura_log(holder.caster_guid, entity.object.guid, holder.spell, :periodic_heal, amount)
+    proc_event = Event.spell_heal(holder.caster_guid, entity.object.guid, holder.spell, amount, false, periodic?: true)
 
-    {entity, %{aura | next_tick_at: advance_tick(at, aura.amplitude_ms, now)}, [event]}
+    {entity, %{aura | next_tick_at: advance_tick(at, aura.amplitude_ms, now)}, [event, proc_event]}
   end
 
   defp tick_aura(entity, %Holder{} = holder, %Aura{type: :periodic_energize, next_tick_at: at} = aura, now)

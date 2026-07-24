@@ -496,6 +496,14 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
                  aura_type: :periodic_heal,
                  amount: 25
                },
+               %{
+                 type: :spell_heal,
+                 source_guid: 999,
+                 target_guid: 1,
+                 spell_id: 139,
+                 periodic?: true,
+                 proc_type: :deal_helpful_periodic
+               },
                %{type: :heal_threat, source_guid: 999, target_guid: 1, amount: 12.5}
              ] = events
 
@@ -1346,6 +1354,35 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
                   target_guid: 1
                 }
               ]} = Aura.reactions(entity, :spell_hit_dealt, context)
+    end
+
+    test "helpful periodic ticks reach outgoing proc reactions" do
+      hot_proc = %Spell{
+        id: 90_001,
+        duration_ms: -1,
+        proc_chance: 100,
+        proc_rule: %ProcRule{proc_flags: 0x40000, proc_ex: 0x40000},
+        effects: [
+          %Effect{
+            type: :apply_aura,
+            aura: :proc_trigger_spell,
+            trigger_spell_id: 90_002
+          }
+        ]
+      }
+
+      {entity, _events} = apply_spell(fixture_entity(), 1, 60, hot_proc)
+
+      context = %{
+        spell: %Spell{id: 139, name: "Renew", school: :holy},
+        proc_type: :deal_helpful_periodic,
+        outcome: :normal,
+        victim_guid: 42,
+        now: 1_000
+      }
+
+      assert {_entity, [%{type: :trigger_spell, spell_id: 90_002, target_guid: 42}]} =
+               Aura.reactions(entity, :spell_hit_dealt, context)
     end
   end
 

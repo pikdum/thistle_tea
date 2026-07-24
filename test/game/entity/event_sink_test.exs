@@ -425,6 +425,28 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
                          auras: [%{aura_type: :periodic_heal, amount: 25, misc_value: 0}]
                        }, _opts}}
     end
+
+    test "periodic heals report a helpful periodic outcome to the caster", %{mob: mob, target_guid: target_guid} do
+      caster_guid = Guid.from_low_guid(:player, unique_guid())
+      Entity.register(caster_guid)
+
+      on_exit(fn -> Entity.unregister(caster_guid) end)
+
+      spell = %Spell{id: 139, school: :holy}
+      event = Event.spell_heal(caster_guid, target_guid, spell, 25, false, periodic?: true)
+
+      assert ^mob = EventSink.emit(mob, event)
+
+      assert_receive {:"$gen_cast",
+                      {:spell_outcome,
+                       %{
+                         victim_guid: ^target_guid,
+                         outcome: :normal,
+                         damage: 25,
+                         proc_type: :deal_helpful_periodic,
+                         spell_id: 139
+                       }}}
+    end
   end
 
   defp metadata_fixtures(_context) do

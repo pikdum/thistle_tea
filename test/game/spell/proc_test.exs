@@ -61,6 +61,16 @@ defmodule ThistleTea.Game.Spell.ProcTest do
       assert Proc.eligible?(proc_spell, %Spell{}, :take_ranged_ability, :crit)
       refute Proc.eligible?(proc_spell, %Spell{}, :deal_melee_ability, :normal)
     end
+
+    test "requires the VMangos positive-periodic flag for HoT procs" do
+      triggering_spell = %Spell{school: :nature}
+      periodic_proc = %Spell{proc_rule: %ProcRule{proc_flags: 0x40000, proc_ex: 0x40000}}
+      unrestricted_proc = %Spell{proc_type_mask: 0x40000}
+
+      assert Proc.eligible?(periodic_proc, triggering_spell, :deal_helpful_periodic, :normal)
+      refute Proc.eligible?(periodic_proc, triggering_spell, :deal_harmful_periodic, :normal)
+      refute Proc.eligible?(unrestricted_proc, triggering_spell, :deal_helpful_periodic, :normal)
+    end
   end
 
   describe "roll?/3" do
