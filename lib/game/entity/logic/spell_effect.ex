@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.ScriptStep
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Combat, as: BTCombat
   alias ThistleTea.Game.Entity.Logic.AttackTable
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Core
@@ -467,6 +468,20 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   defp apply_effect(state, %CastContext{} = context, _spell, %Effect{type: :attack_me}, _now) do
     {Threat.taunt(state, context.caster_guid), []}
   end
+
+  defp apply_effect(
+         %{unit: %{target: target}} = state,
+         %CastContext{} = context,
+         spell,
+         %Effect{type: :add_extra_attacks} = effect,
+         _now
+       )
+       when is_integer(target) and target > 0 do
+    count = max(rolled_amount(spell, effect, context), 1)
+    {BTCombat.extra_attacks(state, target, count), []}
+  end
+
+  defp apply_effect(state, %CastContext{}, _spell, %Effect{type: :add_extra_attacks}, _now), do: {state, []}
 
   defp apply_effect(state, %CastContext{} = context, spell, %Effect{type: :modify_threat} = effect, _now) do
     {Threat.change(state, context.caster_guid, rolled_amount(spell, effect, context)), []}

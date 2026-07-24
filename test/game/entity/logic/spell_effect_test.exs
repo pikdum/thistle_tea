@@ -323,6 +323,36 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
       assert events == []
     end
 
+    test "add-extra-attacks effects deliver immediate swings at the current target" do
+      spell = %Spell{
+        id: 20_178,
+        name: "Reckoning",
+        school: :physical,
+        effects: [%Effect{index: 0, type: :add_extra_attacks, base_points: 0, die_sides: 1, base_dice: 1}]
+      }
+
+      target = %{
+        target_fixture()
+        | unit: %Unit{
+            health: 20,
+            max_health: 20,
+            level: 1,
+            auras: [],
+            target: 555,
+            min_damage: 2.0,
+            max_damage: 4.0,
+            base_attack_time: 2_000
+          }
+      }
+
+      context = %CastContext{caster_guid: 1, caster_level: 10}
+
+      {target, _events} = SpellEffect.receive(target, context, spell, 1_000)
+
+      assert [%{type: :deliver_attack, target_guid: 555}] =
+               Enum.filter(target.internal.events, &(&1.type == :deliver_attack))
+    end
+
     test "heal effects restore health and emit heal threat for the effective gain" do
       spell = %Spell{
         id: 2050,

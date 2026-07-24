@@ -529,6 +529,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp effect_type(72), do: :add_farsight
   defp effect_type(73), do: :summon_possessed
   defp effect_type(77), do: :script_effect
+  defp effect_type(78), do: :add_extra_attacks
   defp effect_type(79), do: :clear_threat
   defp effect_type(80), do: :add_combo_points
   defp effect_type(85), do: :summon_player

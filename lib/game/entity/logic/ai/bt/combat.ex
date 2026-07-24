@@ -186,6 +186,12 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
     end
   end
 
+  def extra_attacks(state, target, count) when is_integer(target) and target > 0 and is_integer(count) and count > 0 do
+    Enum.reduce(1..count, state, fn _extra, current -> send_white_swing(current, target) end)
+  end
+
+  def extra_attacks(state, _target, _count), do: state
+
   defp send_white_swing(state, target) do
     attack = CombatLogic.finalize_attack(melee_attack_payload(state))
 
