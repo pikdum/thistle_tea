@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   alias ThistleTea.Game.Spell, as: SpellData
   alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.Spell.Scripts
+  alias ThistleTea.Game.Spell.Semantics
   alias ThistleTea.Game.World.Loader.CreatureTemplate, as: CreatureTemplateLoader
   alias ThistleTea.Game.World.Loader.SpellChain, as: SpellChainLoader
   alias ThistleTea.Game.World.Loader.SpellEffectOverride, as: SpellEffectOverrideLoader
@@ -210,6 +211,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
     |> struct!(equipped_item_fields(row))
     |> struct!(power_fields(row))
     |> append_shapeshift_passives(radius_lookup)
+    |> Semantics.compile()
   end
 
   defp power_fields(row) do
@@ -337,6 +339,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
         %Effect{
           index: index,
           type: type,
+          semantic: Semantics.effect_rule(%Effect{type: type}),
           base_points: int_field(mod, :effect_base_points, row, :"effect_base_points_#{index}") || 0,
           die_sides: int_field(mod, :effect_die_sides, row, :"effect_die_sides_#{index}") || 0,
           base_dice: int_field(mod, :effect_base_dice, row, :"effect_base_dice_#{index}") || 0,

@@ -36,6 +36,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.Spell.Modifiers
   alias ThistleTea.Game.Spell.Scripts
+  alias ThistleTea.Game.Spell.Semantics
   alias ThistleTea.Game.World.Loader.SpellPetAura, as: SpellPetAuraLoader
 
   @schools [:physical, :holy, :fire, :nature, :frost, :shadow, :arcane]
@@ -301,7 +302,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   end
 
   defp script_trigger_events(target, %CastContext{spell: spell} = context) do
-    with trigger_id when is_integer(trigger_id) <- Scripts.apply_trigger(spell),
+    with trigger_id when is_integer(trigger_id) <- Semantics.rules(spell).apply_trigger_spell_id,
          true <- Aura.has_spell?(target, spell.id) do
       [Effects.trigger_spell(context.caster_guid, context.caster_level, target.object.guid, trigger_id)]
     else
@@ -599,7 +600,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
          _now
        )
        when is_integer(spell_id) and spell_id > 0 do
-    if Scripts.dummy_effect(spell) == :execute do
+    if Semantics.rules(spell).dummy == :execute do
       {state, []}
     else
       target_guid = trigger_target_guid(state, context, effect)
@@ -611,7 +612,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   defp apply_effect(state, %CastContext{} = context, spell, %Effect{type: :dummy} = effect, now) do
     with [] <- pet_aura_events(state, context, spell),
          [] <- vmangos_script_events(state, context, spell) do
-      case Scripts.dummy_effect(spell) do
+      case Semantics.rules(spell).dummy do
         :life_tap -> Warlock.life_tap(state, context, spell, effect, now)
         dummy_effect -> apply_class_dummy(state, context, spell, effect, dummy_effect, now)
       end
@@ -1132,7 +1133,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   defp creature_type_mask(_state), do: 1 <<< (@creature_type_humanoid - 1)
 
   defp scripted_damage_multiplier(state, %Spell{} = spell) do
-    if Scripts.judgement_of_command_damage?(spell) do
+    if Semantics.rules(spell).judgement_damage? do
       if Aura.has_aura?(state, :mod_stun), do: 1.0, else: 0.5
     else
       1.0
@@ -1200,7 +1201,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
         ) +
         Warrior.shield_slam_bonus(spell, effect, context.shield_block_value)
 
-    if Scripts.ap_percent_damage?(spell) do
+    if Semantics.rules(spell).attack_power_damage? do
       trunc(roll * (context.attack_power || 0) / 100)
     else
       roll

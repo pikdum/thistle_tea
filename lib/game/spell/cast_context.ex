@@ -13,7 +13,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
   alias ThistleTea.Game.Entity.Logic.Skills
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Modifiers
-  alias ThistleTea.Game.Spell.Scripts
+  alias ThistleTea.Game.Spell.Semantics
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
   alias ThistleTea.Game.World.Loader.SpellThreat, as: SpellThreatLoader
 
@@ -146,7 +146,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
   defp caster_orientation(_caster), do: nil
 
   defp put_melee_snapshot(%__MODULE__{} = context, caster, %Spell{} = spell) do
-    if Scripts.uses_melee_spell_crit?(spell) do
+    if Semantics.rules(spell).melee_spell_crit? do
       %{context | spell_crit_chance: melee_crit_chance(caster, spell)}
     else
       put_attack_snapshot(context, caster, spell)

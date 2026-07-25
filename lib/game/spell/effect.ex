@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Spell.Effect do
   defstruct [
     :index,
     :type,
+    :semantic,
     :base_points,
     :die_sides,
     :base_dice,

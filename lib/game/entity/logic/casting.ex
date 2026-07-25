@@ -33,6 +33,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
   alias ThistleTea.Game.Spell.Cooldowns
   alias ThistleTea.Game.Spell.Modifiers
   alias ThistleTea.Game.Spell.Scripts
+  alias ThistleTea.Game.Spell.Semantics
   alias ThistleTea.Game.Spell.Target
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
@@ -311,7 +312,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
   defp queue_successful_finish_trigger(%{object: %{guid: guid}, unit: %{level: level}} = character, %Cast{
          spell: %Spell{} = spell
        }) do
-    case Scripts.successful_finish_trigger(spell) do
+    case Semantics.rules(spell).finish_trigger_spell_id do
       spell_id when is_integer(spell_id) ->
         Effects.enqueue(character, Effects.trigger_spell(guid, level || 1, guid, spell_id, resolve_targets?: true))
 
