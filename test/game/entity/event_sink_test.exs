@@ -11,7 +11,7 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.EventSink
-  alias ThistleTea.Game.Entity.Logic.Event
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.UpdateObject
@@ -26,19 +26,19 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
     setup [:metadata_fixtures]
 
     test "attacker_gained increments the target's attacker count", %{mob: mob, target_guid: target_guid} do
-      assert ^mob = EventSink.emit(mob, Event.attacker_gained(target_guid))
+      assert ^mob = EventSink.emit(mob, Effects.attacker_gained(target_guid))
       assert Metadata.query(target_guid, [:attacker_count]) == %{attacker_count: 1}
     end
 
     test "attacker_lost decrements the target's attacker count", %{mob: mob, target_guid: target_guid} do
       Metadata.update(target_guid, %{attacker_count: 2})
 
-      assert ^mob = EventSink.emit(mob, Event.attacker_lost(target_guid))
+      assert ^mob = EventSink.emit(mob, Effects.attacker_lost(target_guid))
       assert Metadata.query(target_guid, [:attacker_count]) == %{attacker_count: 1}
     end
 
     test "attacker_lost does not decrement below zero", %{mob: mob, target_guid: target_guid} do
-      assert ^mob = EventSink.emit(mob, Event.attacker_lost(target_guid))
+      assert ^mob = EventSink.emit(mob, Effects.attacker_lost(target_guid))
       assert Metadata.query(target_guid, [:attacker_count]) == %{attacker_count: 0}
     end
 
@@ -51,14 +51,14 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
 
       mob = %Mob{object: %Object{guid: mob_guid}, internal: %Internal{spawn: %Spawn{incarnation_id: 7}}}
 
-      assert ^mob = EventSink.emit(mob, Event.threat_ref_gained(player_guid))
+      assert ^mob = EventSink.emit(mob, Effects.threat_ref_gained(player_guid))
       assert_receive {:"$gen_cast", {:threat_ref_gained, ^mob_guid, 7}}
     end
 
     test "dismiss_pet clears the recall entry on a normal dismissal" do
       character = character_with_pet()
 
-      dismissed = EventSink.emit(character, Event.dismiss_pet(character.object.guid))
+      dismissed = EventSink.emit(character, Effects.dismiss_pet(character.object.guid))
 
       assert dismissed.unit.summon == 0
       assert dismissed.internal.active_pet_entry == nil
@@ -68,7 +68,7 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
     test "dismiss_pet keeps the recall entry when the owner died" do
       character = character_with_pet()
 
-      dismissed = EventSink.emit(character, Event.dismiss_pet(character.object.guid, :owner_died))
+      dismissed = EventSink.emit(character, Effects.dismiss_pet(character.object.guid, :owner_died))
 
       assert dismissed.unit.summon == 0
       assert dismissed.internal.active_pet_entry == 416
@@ -78,7 +78,7 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
     test "dismiss_pet clears the owner's pet action bar" do
       character = character_with_pet()
 
-      EventSink.emit(character, Event.dismiss_pet(character.object.guid, :owner_died))
+      EventSink.emit(character, Effects.dismiss_pet(character.object.guid, :owner_died))
 
       assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgPetSpells{pet_guid: 0}}}
     end
@@ -87,27 +87,27 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
       guid = mob.object.guid
       Metadata.update(guid, %{tapped_player: 123, tapped_group_id: 7})
 
-      assert ^mob = EventSink.emit(mob, Event.tap_cleared())
+      assert ^mob = EventSink.emit(mob, Effects.tap_cleared())
       assert Metadata.query(guid, [:tapped_player, :tapped_group_id]) == %{tapped_player: nil, tapped_group_id: nil}
     end
 
     test "hearthstone teleports a character to their home bind" do
       character = %Character{internal: %Internal{world: %WorldRef{map_id: 1}, home_bind: {0, -8_946.0, -132.0, 84.0}}}
 
-      assert ^character = EventSink.emit(character, Event.teleport_to_spell_target(8690))
+      assert ^character = EventSink.emit(character, Effects.teleport_to_spell_target(8690))
       assert_receive {:"$gen_cast", {:start_teleport, -8_946.0, -132.0, 84.0, 0}}
     end
 
     test "teleport events preserve their orientation" do
       character = %Character{internal: %Internal{world: %WorldRef{map_id: 0}}}
 
-      assert ^character = EventSink.emit(character, Event.teleport({1.0, 2.0, 3.0, 1.5}))
+      assert ^character = EventSink.emit(character, Effects.teleport({1.0, 2.0, 3.0, 1.5}))
       assert_receive {:"$gen_cast", {:start_teleport, 1.0, 2.0, 3.0, 1.5, %WorldRef{map_id: 0}}}
     end
 
     test "feed-pet events preserve the DBC trigger and item target for the player boundary" do
       character = %Character{}
-      event = Event.feed_pet(22, 33, 1539, 10.0)
+      event = Effects.feed_pet(22, 33, 1539, 10.0)
 
       assert ^character = EventSink.emit(character, event)
       assert_receive {:feed_pet, 22, 33, 1539, 10.0}
@@ -116,12 +116,12 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
     test "spell modifier events send the matching client packet" do
       character = %Character{}
 
-      assert ^character = EventSink.emit(character, Event.spell_modifier(:flat, 5, 10, -500))
+      assert ^character = EventSink.emit(character, Effects.spell_modifier(:flat, 5, 10, -500))
 
       assert_receive {:"$gen_cast",
                       {:send_packet, %Message.SmsgSetFlatSpellModifier{effect_index: 5, operation: 10, value: -500}}}
 
-      assert ^character = EventSink.emit(character, Event.spell_modifier(:pct, 30, 10, 0))
+      assert ^character = EventSink.emit(character, Effects.spell_modifier(:pct, 30, 10, 0))
 
       assert_receive {:"$gen_cast",
                       {:send_packet, %Message.SmsgSetPctSpellModifier{effect_index: 30, operation: 10, value: 0}}}
@@ -136,7 +136,7 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
 
       mob = %Mob{object: %Object{guid: caster_guid}}
       spell = %Spell{id: 116, school: :frost}
-      event = Event.deliver_spell_outcome(target_guid, caster_guid, spell, :resist)
+      event = Effects.deliver_spell_outcome(target_guid, caster_guid, spell, :resist)
 
       assert ^mob = EventSink.emit(mob, event)
       assert_receive {:"$gen_cast", {:receive_spell_outcome, ^caster_guid, ^spell, :resist}}
@@ -158,7 +158,7 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
         movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
       }
 
-      event = Event.trigger_spell(caster_guid, 60, target_guid, 20_187)
+      event = Effects.trigger_spell(caster_guid, 60, target_guid, 20_187)
 
       assert ^caster = EventSink.emit(caster, event)
 
@@ -182,7 +182,7 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
         movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
       }
 
-      event = Event.trigger_spell(caster_guid, 60, caster_guid, 25_503, effect_index: 1, base_points: -16)
+      event = Effects.trigger_spell(caster_guid, 60, caster_guid, 25_503, effect_index: 1, base_points: -16)
 
       result = EventSink.emit(caster, event)
 
@@ -201,7 +201,7 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
         movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
       }
 
-      event = Event.trigger_spell(caster_guid, 60, caster_guid, 23_455, resolve_targets?: true)
+      event = Effects.trigger_spell(caster_guid, 60, caster_guid, 23_455, resolve_targets?: true)
       result = EventSink.emit(caster, event)
 
       assert result.unit.health > caster.unit.health
@@ -253,7 +253,7 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
         movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
       }
 
-      assert ^totem = EventSink.emit(totem, Event.trigger_spell(caster_guid, 60, caster_guid, 8349))
+      assert ^totem = EventSink.emit(totem, Effects.trigger_spell(caster_guid, 60, caster_guid, 8349))
 
       assert_receive {:"$gen_cast", {:receive_spell, %CastContext{caster_guid: ^caster_guid}, %Spell{id: 8349}}}
     end
@@ -279,7 +279,7 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
         movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
       }
 
-      event = Event.trigger_spell(caster_guid, 60, target_guid, 20_467)
+      event = Effects.trigger_spell(caster_guid, 60, target_guid, 20_467)
 
       result = EventSink.emit(victim, event)
 
@@ -310,7 +310,7 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
         movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
       }
 
-      event = Event.trigger_spell(caster_guid, 60, target_guid, 20_424)
+      event = Effects.trigger_spell(caster_guid, 60, target_guid, 20_424)
 
       assert ^caster = EventSink.emit(caster, event)
 
@@ -340,7 +340,7 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
         movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
       }
 
-      event = Event.summon_pet(caster_guid, 416, 688)
+      event = Effects.summon_pet(caster_guid, 416, 688)
 
       assert ^caster = EventSink.emit(caster, event)
       assert_receive {:pet_attached, %UpdateObject{object: %Object{guid: pet_guid}}, 688, pet_spells}
@@ -351,7 +351,7 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
     end
 
     test "script attack_start schedules a forced attack", %{mob: mob, target_guid: target_guid} do
-      assert ^mob = EventSink.emit(mob, Event.attack_start(target_guid))
+      assert ^mob = EventSink.emit(mob, Effects.attack_start(target_guid))
       assert_receive {:force_attack, ^target_guid}
     end
 
@@ -361,11 +361,11 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
       on_exit(fn -> Entity.unregister(owner_guid) end)
       spell = %Spell{id: 3110}
 
-      assert ^mob = EventSink.emit(mob, Event.control_granted(owner_guid, mob.object.guid, 20_882, [spell]))
+      assert ^mob = EventSink.emit(mob, Effects.control_granted(owner_guid, mob.object.guid, 20_882, [spell]))
       assert_receive {:control_granted, controlled_guid, 20_882, [^spell], false}
       assert controlled_guid == mob.object.guid
 
-      assert ^mob = EventSink.emit(mob, Event.control_released(owner_guid, mob.object.guid))
+      assert ^mob = EventSink.emit(mob, Effects.control_released(owner_guid, mob.object.guid))
       assert_receive {:control_released, ^controlled_guid}
     end
 
@@ -387,7 +387,7 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
         movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
       }
 
-      assert ^character = EventSink.emit(character, Event.drop_nearby_threat())
+      assert ^character = EventSink.emit(character, Effects.drop_nearby_threat())
       assert_receive {:"$gen_cast", {:drop_threat, ^player_guid}}
     end
 
@@ -409,7 +409,7 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
         movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
       }
 
-      EventSink.emit(mob, Event.attacker_state_update(mob_guid, target_guid, 12, %{}))
+      EventSink.emit(mob, Effects.attacker_state_update(mob_guid, target_guid, 12, %{}))
 
       assert_receive {:"$gen_cast",
                       {:send_packet,
@@ -439,7 +439,7 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
         movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
       }
 
-      event = Event.periodic_aura_log(mob_guid, target_guid, %{id: 139}, :periodic_heal, 25)
+      event = Effects.periodic_aura_log(mob_guid, target_guid, %{id: 139}, :periodic_heal, 25)
 
       EventSink.emit(mob, event)
 
@@ -460,7 +460,7 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
       on_exit(fn -> Entity.unregister(caster_guid) end)
 
       spell = %Spell{id: 139, school: :holy}
-      event = Event.spell_heal(caster_guid, target_guid, spell, 25, false, periodic?: true)
+      event = Effects.spell_heal(caster_guid, target_guid, spell, 25, false, periodic?: true)
 
       assert ^mob = EventSink.emit(mob, event)
 

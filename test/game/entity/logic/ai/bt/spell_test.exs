@@ -12,7 +12,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AI.BT.Spell, as: SpellBT
   alias ThistleTea.Game.Entity.Logic.Aura
-  alias ThistleTea.Game.Entity.Logic.Event
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Cast
@@ -55,10 +55,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
       assert mob.internal.broadcast_update? == true
 
       assert [
-               %Event{type: :spell_cast_result, spell_id: 10},
-               %Event{type: :spell_go, spell_id: 10},
-               %Event{type: :channel_start, spell_id: 10, channel_time_ms: 8_000},
-               %Event{type: :object_update, update_type: :values}
+               %Effects.SpellCastResult{spell_id: 10},
+               %Effects.SpellGo{spell_id: 10},
+               %Effects.ChannelStart{spell_id: 10, channel_time_ms: 8_000},
+               %Effects.ObjectUpdate{update_type: :values}
              ] = mob.internal.events
     end
 
@@ -179,8 +179,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
       assert mob.unit.channel_spell == 0
 
       assert [
-               %Event{type: :channel_update, channel_time_ms: 0},
-               %Event{type: :object_update, update_type: :values}
+               %Effects.ChannelUpdate{channel_time_ms: 0},
+               %Effects.ObjectUpdate{update_type: :values}
              ] = mob.internal.events
     end
 
@@ -224,7 +224,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
       assert delay_ms > 0
       assert mob.internal.casting.next_channel_tick_at > now
 
-      assert [%Event{type: :trigger_spell, source_guid: 1, target_guid: 1, spell_id: 7268}] =
+      assert [%Effects.TriggerSpell{source_guid: 1, target_guid: 1, spell_id: 7268}] =
                mob.internal.events
     end
 
@@ -392,14 +392,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
       mob = SpellBT.complete_cast(mob, casting, 1_000)
 
       assert [
-               %Event{type: :spell_cast_result, spell_id: 116},
-               %Event{
-                 type: :spell_go,
-                 hit_guids: [],
-                 misses: [%{guid: ^target_guid, reason: 2}]
-               },
-               %Event{
-                 type: :deliver_spell_outcome,
+               %Effects.SpellCastResult{spell_id: 116},
+               %Effects.SpellGo{hit_guids: [], misses: [%{guid: ^target_guid, reason: 2}]},
+               %Effects.DeliverSpellOutcome{
                  source_guid: ^caster_guid,
                  target_guid: ^target_guid,
                  spell: ^spell,
@@ -459,7 +454,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
       missed = SpellBT.complete_cast(mob, casting, 1_000)
 
       assert Enum.any?(missed.internal.events, fn
-               %Event{type: :spell_go, hit_guids: [], misses: [%{guid: ^target_guid, reason: 2}]} -> true
+               %Effects.SpellGo{hit_guids: [], misses: [%{guid: ^target_guid, reason: 2}]} -> true
                _event -> false
              end)
 
@@ -469,7 +464,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
       hit = SpellBT.complete_cast(mob, casting, 1_000)
 
       assert Enum.any?(hit.internal.events, fn
-               %Event{type: :spell_go, hit_guids: [^target_guid], misses: []} -> true
+               %Effects.SpellGo{hit_guids: [^target_guid], misses: []} -> true
                _event -> false
              end)
     end
@@ -495,14 +490,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
       assert mob.internal.casting == nil
 
       assert [
-               %Event{type: :spell_cast_result, spell_id: 133},
-               %Event{
-                 type: :spell_go,
-                 spell_id: 133,
-                 source_guid: 1,
-                 hit_guids: [1],
-                 raw_targets: <<0::little-size(16)>>
-               }
+               %Effects.SpellCastResult{spell_id: 133},
+               %Effects.SpellGo{spell_id: 133, source_guid: 1, hit_guids: [1], raw_targets: <<0::little-size(16)>>}
              ] = mob.internal.events
     end
 
@@ -604,10 +593,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
       assert mob.unit.health == 15
 
       assert [
-               %Event{type: :spell_cast_result},
-               %Event{type: :spell_go},
-               %Event{type: :spell_damage, damage: 5, periodic?: false},
-               %Event{type: :object_update, update_type: :values}
+               %Effects.SpellCastResult{},
+               %Effects.SpellGo{},
+               %Effects.SpellDamage{damage: 5, periodic?: false},
+               %Effects.ObjectUpdate{update_type: :values}
              ] = mob.internal.events
     end
 
@@ -630,9 +619,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
       mob = SpellBT.complete_cast(mob, casting, 1_000)
 
       assert [
-               %Event{type: :spell_cast_result},
-               %Event{type: :spell_go, hit_guids: [2]},
-               %Event{type: :deliver_spell, target_guid: 2, spell: ^spell}
+               %Effects.SpellCastResult{},
+               %Effects.SpellGo{hit_guids: [2]},
+               %Effects.DeliverSpell{target_guid: 2, spell: ^spell}
              ] = mob.internal.events
     end
   end
@@ -658,13 +647,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
       character = SpellBT.complete_cast(character, casting, 1_000)
 
       assert Enum.any?(character.internal.events, fn
-               %Event{
-                 type: :feed_pet,
-                 cast_item_guid: 22,
-                 target_guid: 33,
-                 spell_id: 1539,
-                 range_yards: 10.0
-               } ->
+               %Effects.FeedPet{cast_item_guid: 22, target_guid: 33, spell_id: 1539, range_yards: 10.0} ->
                  true
 
                _ ->
@@ -707,12 +690,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
       mob = SpellBT.complete_cast(mob, casting, 1_000)
 
       assert Enum.any?(mob.internal.events, fn
-               %Event{
-                 type: :spawn_area_effect,
-                 position: {10.0, 20.0, 30.0},
-                 duration_ms: 8_000,
-                 spell: %Spell{id: 2120}
-               } ->
+               %Effects.SpawnAreaEffect{position: {10.0, 20.0, 30.0}, duration_ms: 8_000, spell: %Spell{id: 2120}} ->
                  true
 
                _ ->
@@ -778,7 +756,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
 
       mob = SpellBT.complete_cast(mob, casting, 1_000)
 
-      assert Enum.any?(mob.internal.events, &match?(%Event{type: :spawn_area_effect, position: {4.0, 5.0, 6.0}}, &1))
+      assert Enum.any?(mob.internal.events, &match?(%Effects.SpawnAreaEffect{position: {4.0, 5.0, 6.0}}, &1))
     end
   end
 
@@ -804,7 +782,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
       mob = SpellBT.complete_cast(mob, casting, 1_000)
 
       assert Enum.any?(mob.internal.events, fn
-               %Event{type: :spawn_farsight, position: {10.0, 20.0, 30.0}, duration_ms: 60_000} -> true
+               %Effects.SpawnFarsight{position: {10.0, 20.0, 30.0}, duration_ms: 60_000} -> true
                _ -> false
              end)
     end

@@ -8,7 +8,7 @@ defmodule ThistleTea.Game.Player.Fishing do
   alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.Logic.AI.BT.Spell, as: SpellBT
   alias ThistleTea.Game.Entity.Logic.Core
-  alias ThistleTea.Game.Entity.Logic.Event
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Skills
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network
@@ -145,7 +145,7 @@ defmodule ThistleTea.Game.Player.Fishing do
         character
         |> adjust_channel(bobber.object.guid, duration_ms)
         |> Core.mark_broadcast_update()
-        |> Event.enqueue([Event.channel_update(character.object.guid, duration_ms), Event.object_update(:values)])
+        |> Effects.enqueue([Effects.channel_update(character.object.guid, duration_ms), Effects.object_update(:values)])
 
       %{state | character: character}
     else

@@ -9,7 +9,7 @@ defmodule ThistleTea.Game.Entity.Logic.DruidTest do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.Druid
-  alias ThistleTea.Game.Entity.Logic.Event
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.SpellEffect
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
@@ -77,7 +77,7 @@ defmodule ThistleTea.Game.Entity.Logic.DruidTest do
       {target, events} = SpellEffect.receive(melee_target(), context, spell, 1_000)
 
       assert target.unit.health == 708
-      assert Enum.any?(events, &match?(%Event{type: :drain_power, target_guid: 5, misc_value: 3}, &1))
+      assert Enum.any?(events, &match?(%Effects.DrainPower{target_guid: 5, misc_value: 3}, &1))
     end
 
     test "requires the VMangos script label" do
@@ -110,10 +110,10 @@ defmodule ThistleTea.Game.Entity.Logic.DruidTest do
       bear = %Character{object: %Object{guid: 5}, unit: %Unit{level: 60, shapeshift_form: 5}}
       dire_bear = %{bear | unit: %{bear.unit | shapeshift_form: 8}}
 
-      assert %Event{type: :trigger_spell, spell_id: 25_503, slot: 1, amount: -27} =
+      assert %Effects.TriggerSpell{spell_id: 25_503, slot: 1, amount: -27} =
                Druid.enrage_event(bear, spell)
 
-      assert %Event{type: :trigger_spell, spell_id: 25_503, slot: 1, amount: -16} =
+      assert %Effects.TriggerSpell{spell_id: 25_503, slot: 1, amount: -16} =
                Druid.enrage_event(dire_bear, spell)
     end
 

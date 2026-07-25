@@ -22,7 +22,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
   alias ThistleTea.Game.Entity.Logic.Aura.UnitSync
   alias ThistleTea.Game.Entity.Logic.Aura.ViewpointSync
   alias ThistleTea.Game.Entity.Logic.Core
-  alias ThistleTea.Game.Entity.Logic.Event
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Coefficient
@@ -226,7 +226,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
         leader_of_the_pack_events(entity, guid, unit.level) ++ furor_events(entity, guid, unit.level, form)
 
       form when is_integer(form) ->
-        [Event.remove_aura(guid, guid, @leader_of_the_pack_aura)]
+        [Effects.remove_aura(guid, guid, @leader_of_the_pack_aura)]
 
       _no_form ->
         []
@@ -242,7 +242,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
 
   defp leader_of_the_pack_events(entity, guid, level) do
     if holder_spell?(entity, @leader_of_the_pack) do
-      [Event.trigger_spell(guid, level || 1, guid, @leader_of_the_pack_aura)]
+      [Effects.trigger_spell(guid, level || 1, guid, @leader_of_the_pack_aura)]
     else
       []
     end
@@ -253,7 +253,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
 
     if chance > 0 and :rand.uniform(100) <= chance do
       spell_id = if form == @cat_form, do: @furor_energize, else: @furor_rage
-      [Event.trigger_spell(guid, level || 1, guid, spell_id)]
+      [Effects.trigger_spell(guid, level || 1, guid, spell_id)]
     else
       []
     end
@@ -405,7 +405,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
 
         entity
         |> PlayerSync.sync()
-        |> Event.enqueue(modifier_events)
+        |> Effects.enqueue(modifier_events)
         |> Core.mark_broadcast_update()
     end
   end
@@ -614,7 +614,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
 
   defp maybe_sit(%{unit: %Unit{stand_state: stand_state} = unit} = entity, %Holder{spell: %Spell{} = spell}) do
     if (spell.aura_interrupt_flags &&& @aura_interrupt_not_seated) != 0 and stand_state != @stand_state_sit do
-      {%{entity | unit: %{unit | stand_state: @stand_state_sit}}, [Event.stand_state(@stand_state_sit)]}
+      {%{entity | unit: %{unit | stand_state: @stand_state_sit}}, [Effects.stand_state(@stand_state_sit)]}
     else
       {entity, []}
     end

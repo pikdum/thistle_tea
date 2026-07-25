@@ -1,7 +1,7 @@
 defmodule ThistleTea.Game.SpellTest do
   use ExUnit.Case, async: true
 
-  alias ThistleTea.Game.Entity.Logic.Event
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Effect
 
@@ -91,9 +91,9 @@ defmodule ThistleTea.Game.SpellTest do
     end
   end
 
-  describe "Event.trigger_spell/5" do
+  describe "Effects.trigger_spell/5" do
     test "carries data-driven custom effect points" do
-      event = Event.trigger_spell(1, 60, 2, 25_503, effect_index: 0, base_points: -27)
+      event = Effects.trigger_spell(1, 60, 2, 25_503, effect_index: 0, base_points: -27)
 
       assert event.slot == 0
       assert event.amount == -27

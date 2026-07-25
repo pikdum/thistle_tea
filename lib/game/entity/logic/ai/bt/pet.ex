@@ -19,7 +19,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Spell, as: SpellBT
   alias ThistleTea.Game.Entity.Logic.Combat
   alias ThistleTea.Game.Entity.Logic.Core
-  alias ThistleTea.Game.Entity.Logic.Event
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Hostility
   alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.Entity.Logic.Threat
@@ -220,7 +220,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet do
 
       {{:running, @follow_tick_ms}, state, blackboard}
     else
-      _ -> {:success, Event.enqueue(state, Event.despawn_self(0, 0)), blackboard}
+      _ -> {:success, Effects.enqueue(state, Effects.despawn_self(0, 0)), blackboard}
     end
   end
 

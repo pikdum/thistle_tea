@@ -21,7 +21,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
   alias ThistleTea.Game.Entity.Logic.CastPushback
   alias ThistleTea.Game.Entity.Logic.Combat
   alias ThistleTea.Game.Entity.Logic.Dueling
-  alias ThistleTea.Game.Entity.Logic.Event
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.Entity.Logic.Reactive
   alias ThistleTea.Game.Entity.Logic.Resources
@@ -135,17 +135,17 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
   defp duel_remaining_damage(_health, damage, _outcome), do: damage
 
   defp enqueue_duel_outcome(entity, {:defeated, winner_guid}) when is_integer(winner_guid) do
-    Event.enqueue(entity, Event.duel_defeat(entity.object.guid, winner_guid))
+    Effects.enqueue(entity, Effects.duel_defeat(entity.object.guid, winner_guid))
   end
 
   defp enqueue_duel_outcome(entity, :interrupted) do
-    Event.enqueue(entity, Event.duel_interrupted(entity.object.guid))
+    Effects.enqueue(entity, Effects.duel_interrupted(entity.object.guid))
   end
 
   defp enqueue_duel_outcome(entity, _outcome), do: entity
 
   defp enqueue_redirect(entity, {target_guid, amount}, source_guid, school) when is_integer(amount) and amount > 0 do
-    Event.enqueue(entity, Event.redirect_damage(source_guid, target_guid, school, amount))
+    Effects.enqueue(entity, Effects.redirect_damage(source_guid, target_guid, school, amount))
   end
 
   defp enqueue_redirect(entity, _redirect, _source_guid, _school), do: entity
@@ -289,7 +289,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
     {entity, modifier_events} =
       HolderSync.sync(%{entity | unit: %{unit | target: 0}}, death_auras(unit.auras))
 
-    entity = Event.enqueue(entity, modifier_events)
+    entity = Effects.enqueue(entity, modifier_events)
     internal = entity.internal
     unit = entity.unit
 
@@ -319,14 +319,14 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
 
   defp maybe_dismiss_pet(%{player: _player, object: %{guid: guid}, unit: %Unit{summon: summon}} = entity)
        when is_integer(summon) and summon > 0 do
-    Event.enqueue(entity, Event.dismiss_pet(guid, :owner_died))
+    Effects.enqueue(entity, Effects.dismiss_pet(guid, :owner_died))
   end
 
   defp maybe_dismiss_pet(entity), do: entity
 
   defp maybe_release_charm(%{player: _player, object: %{guid: guid}, unit: %Unit{charm: charm}} = entity)
        when is_integer(charm) and charm > 0 do
-    Event.enqueue(entity, Event.release_controlled(guid, charm))
+    Effects.enqueue(entity, Effects.release_controlled(guid, charm))
   end
 
   defp maybe_release_charm(entity), do: entity
@@ -369,11 +369,11 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
     events =
       Enum.map(@spirit_of_redemption_auras, &spirit_of_redemption_event(&1, guid, unit))
 
-    Event.enqueue(entity, events)
+    Effects.enqueue(entity, events)
   end
 
   defp spirit_of_redemption_event(@spirit_of_redemption_form, guid, %Unit{} = unit) do
-    Event.trigger_spell(guid, unit.level || 1, guid, @spirit_of_redemption_form,
+    Effects.trigger_spell(guid, unit.level || 1, guid, @spirit_of_redemption_form,
       base_points: unit.max_health,
       effect_index: 0,
       duration_ms: @spirit_of_redemption_duration_ms
@@ -381,7 +381,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
   end
 
   defp spirit_of_redemption_event(spell_id, guid, %Unit{} = unit) do
-    Event.trigger_spell(guid, unit.level || 1, guid, spell_id, duration_ms: @spirit_of_redemption_duration_ms)
+    Effects.trigger_spell(guid, unit.level || 1, guid, spell_id, duration_ms: @spirit_of_redemption_duration_ms)
   end
 
   defp holder_spell?(%{unit: %Unit{auras: holders}}, spell_id) when is_list(holders) do
@@ -401,7 +401,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
 
   defp maybe_enqueue_death_root(%{player: _player} = entity, health, new_health)
        when is_number(health) and health > 0 and new_health <= 0 do
-    Event.enqueue(entity, Event.movement_root_changed(true))
+    Effects.enqueue(entity, Effects.movement_root_changed(true))
   end
 
   defp maybe_enqueue_death_root(entity, _health, _new_health), do: entity

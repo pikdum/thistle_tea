@@ -13,7 +13,7 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
   alias ThistleTea.Game.Entity.Logic.AttackTable
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Core
-  alias ThistleTea.Game.Entity.Logic.Event
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Reactive
   alias ThistleTea.Game.Entity.Logic.Skills
   alias ThistleTea.Game.Guid
@@ -151,11 +151,11 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
   def finalize_attack(attack), do: attack
 
   def attack_start(attacker, target) when is_integer(attacker) and is_integer(target) do
-    Event.attack_start(attacker, target)
+    Effects.attack_start(attacker, target)
   end
 
   def attacker_state_update(attacker, target, damage, attack \\ %{}) when is_integer(attacker) and is_integer(target) do
-    Event.attacker_state_update(attacker, target, damage, attack)
+    Effects.attacker_state_update(attacker, target, damage, attack)
   end
 
   def receive_attack(entity, attack, now, opts \\ [])
@@ -226,7 +226,7 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
       damage = outcome_damage_basis(attack, result, absorbed)
 
       [
-        Event.attack_outcome(
+        Effects.attack_outcome(
           caster,
           victim_guid,
           result.outcome,

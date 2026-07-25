@@ -11,7 +11,7 @@ defmodule ThistleTea.Game.Entity.Logic.DeathTest do
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.Death
-  alias ThistleTea.Game.Entity.Logic.Event
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.WorldRef
@@ -117,8 +117,8 @@ defmodule ThistleTea.Game.Entity.Logic.DeathTest do
       {character, events} = Death.release_spirit(fixture_character(), [ghost_spell_fixture()], @now)
 
       assert character.movement_block.run_speed == 7.0 * 1.25
-      assert Enum.any?(events, &match?(%Event{type: :movement_speed_changed}, &1))
-      assert Enum.any?(events, &match?(%Event{type: :movement_root_changed, rooted?: false}, &1))
+      assert Enum.any?(events, &match?(%Effects.MovementSpeedChanged{}, &1))
+      assert Enum.any?(events, &match?(%Effects.MovementRootChanged{rooted?: false}, &1))
     end
   end
 
@@ -146,7 +146,7 @@ defmodule ThistleTea.Game.Entity.Logic.DeathTest do
       assert character.movement_block.run_speed == 7.0
       assert character.unit.vis_flag == 0
       assert (character.player.flags &&& 0x10) == 0
-      assert Enum.any?(events, &match?(%Event{type: :movement_root_changed, rooted?: false}, &1))
+      assert Enum.any?(events, &match?(%Effects.MovementRootChanged{rooted?: false}, &1))
     end
   end
 

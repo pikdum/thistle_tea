@@ -7,7 +7,7 @@ defmodule ThistleTea.Game.Entity.Logic.Hunter do
 
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Logic.AI.BT
-  alias ThistleTea.Game.Entity.Logic.Event
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.PlayerCombat
   alias ThistleTea.Game.Entity.Logic.Reactive
   alias ThistleTea.Game.Spell
@@ -128,8 +128,8 @@ defmodule ThistleTea.Game.Entity.Logic.Hunter do
     {character, mob_guids} = PlayerCombat.vanish(character, now)
 
     events =
-      [Event.drop_nearby_threat()] ++
-        Enum.map(mob_guids, &Event.drop_threat/1) ++ attack_stop_events(character)
+      [Effects.drop_nearby_threat()] ++
+        Enum.map(mob_guids, &Effects.drop_threat/1) ++ attack_stop_events(character)
 
     character =
       character
@@ -137,7 +137,7 @@ defmodule ThistleTea.Game.Entity.Logic.Hunter do
       |> then(&%{&1 | internal: %{&1.internal | auto_shot: nil}})
       |> then(&%{&1 | unit: %{&1.unit | stand_state: 7}})
 
-    {character, events ++ [Event.stand_state(7)]}
+    {character, events ++ [Effects.stand_state(7)]}
   end
 
   defp validate_feed_context(nil), do: {:error, :no_pet}
@@ -193,7 +193,7 @@ defmodule ThistleTea.Game.Entity.Logic.Hunter do
     do: Enum.find(items, &match?(%{class: 2, inventory_type: type} when type in [15, 25, 26], &1))
 
   defp attack_stop_events(%Character{object: %{guid: guid}, unit: %{target: target}})
-       when is_integer(target) and target > 0, do: [Event.attack_stop(guid, target)]
+       when is_integer(target) and target > 0, do: [Effects.attack_stop(guid, target)]
 
   defp attack_stop_events(_character), do: []
 end

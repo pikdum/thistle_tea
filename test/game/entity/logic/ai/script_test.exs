@@ -11,7 +11,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.ScriptTest do
   alias ThistleTea.Game.Entity.Data.ScriptStep
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AI.Script
-  alias ThistleTea.Game.Entity.Logic.Event
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.WorldRef
 
@@ -27,8 +27,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.ScriptTest do
       {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], nil, 1_000)
 
       assert [
-               %Event{type: :monster_talk, text: "Hello there!", chat_type: :say},
-               %Event{type: :emote, emote_id: 5}
+               %Effects.MonsterTalk{text: "Hello there!", chat_type: :say},
+               %Effects.Emote{emote_id: 5}
              ] = mob.internal.events
     end
 
@@ -37,7 +37,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.ScriptTest do
 
       {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], nil, 1_000)
 
-      assert [%Event{type: :emote, emote_id: 11}] = mob.internal.events
+      assert [%Effects.Emote{emote_id: 11}] = mob.internal.events
     end
 
     test "triggered self cast enqueues a trigger spell event", %{mob: mob} do
@@ -47,7 +47,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.ScriptTest do
 
       guid = mob.object.guid
 
-      assert [%Event{type: :trigger_spell, spell_id: 12_544, source_guid: ^guid, target_guid: ^guid}] =
+      assert [%Effects.TriggerSpell{spell_id: 12_544, source_guid: ^guid, target_guid: ^guid}] =
                mob.internal.events
     end
 
@@ -106,7 +106,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.ScriptTest do
       assert Blackboard.fleeing?(blackboard)
       assert blackboard.flee_until == 2_000 + Script.flee_duration_ms()
       assert blackboard.flee_from == victim
-      assert [%Event{type: :monster_talk, chat_type: :text_emote}] = mob.internal.events
+      assert [%Effects.MonsterTalk{chat_type: :text_emote}] = mob.internal.events
     end
 
     test "flee without a victim is ignored", %{mob: mob} do
@@ -199,7 +199,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.ScriptTest do
 
       {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], nil, 1_000)
 
-      assert [%Event{type: :summon_creature, summon: summon, steps: []}] = mob.internal.events
+      assert [%Effects.SummonCreature{summon: summon, steps: []}] = mob.internal.events
       assert summon.entry == 1_500
       assert summon.despawn_delay_ms == 30_000
       assert summon.despawn_type == 3
@@ -231,7 +231,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.ScriptTest do
 
       {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], nil, 1_000)
 
-      assert [%Event{type: :summon_creature, summon: summon, steps: ^sub_steps}] = mob.internal.events
+      assert [%Effects.SummonCreature{summon: summon, steps: ^sub_steps}] = mob.internal.events
       assert summon.position == {5.0, 6.0, 7.0, 0.5}
       assert summon.attack_guid == victim
     end
@@ -241,7 +241,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.ScriptTest do
 
       {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], nil, 1_000)
 
-      assert [%Event{type: :despawn_self, duration_ms: 2_000, respawn_delay_ms: 30_000}] = mob.internal.events
+      assert [%Effects.DespawnSelf{duration_ms: 2_000, respawn_delay_ms: 30_000}] = mob.internal.events
     end
 
     test "attack_start targets the victim and skips without one", %{mob: mob} do
@@ -254,7 +254,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.ScriptTest do
       mob = %{mob | unit: %{mob.unit | target: victim}}
 
       {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], nil, 1_000)
-      assert [%Event{type: :attack_start, target_guid: ^victim}] = mob.internal.events
+      assert [%Effects.StartAttack{target_guid: ^victim}] = mob.internal.events
     end
 
     test "start_script runs the chosen resolved sub-script", %{mob: mob} do
@@ -269,7 +269,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.ScriptTest do
 
       {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], nil, 1_000)
 
-      assert [%Event{type: :emote, emote_id: 11}] = mob.internal.events
+      assert [%Effects.Emote{emote_id: 11}] = mob.internal.events
     end
 
     test "stand_state updates the unit and marks a broadcast", %{mob: mob} do
@@ -306,7 +306,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.ScriptTest do
       {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], nil, 1_000)
 
       assert {_x, _y, _z, 2.5} = mob.movement_block.position
-      assert [%Event{type: :set_facing, facing: {:angle, 2.5}}] = mob.internal.events
+      assert [%Effects.SetFacing{facing: {:angle, 2.5}}] = mob.internal.events
     end
 
     test "turn_to the victim enqueues a facing-target event", %{mob: mob} do
@@ -317,7 +317,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.ScriptTest do
 
       {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], nil, 1_000)
 
-      assert [%Event{type: :set_facing, facing: {:target, ^victim}}] = mob.internal.events
+      assert [%Effects.SetFacing{facing: {:target, ^victim}}] = mob.internal.events
     end
 
     test "play_sound picks the object-sound variant for distance-dependent flags", %{mob: mob} do
@@ -329,8 +329,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.ScriptTest do
       {mob, _blackboard} = Script.run(mob, Blackboard.new(), steps, nil, 1_000)
 
       assert [
-               %Event{type: :play_sound, sound_id: 6_943},
-               %Event{type: :play_object_sound, sound_id: 6_944}
+               %Effects.PlaySound{sound_id: 6_943},
+               %Effects.PlayObjectSound{sound_id: 6_944}
              ] = mob.internal.events
     end
 
@@ -351,12 +351,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.ScriptTest do
       self_guid = mob.object.guid
 
       assert [
-               %Event{
-                 type: :forward_script_steps,
-                 target_guid: ^buddy,
-                 source_guid: ^self_guid,
-                 steps: [forwarded]
-               }
+               %Effects.ForwardScriptSteps{target_guid: ^buddy, source_guid: ^self_guid, steps: [forwarded]}
              ] = mob.internal.events
 
       assert forwarded.command == :talk
@@ -389,7 +384,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.ScriptTest do
 
       {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], nil, 1_000)
 
-      assert [%Event{type: :emote, emote_id: 11}] = mob.internal.events
+      assert [%Effects.Emote{emote_id: 11}] = mob.internal.events
     end
 
     test "swap-initial steps are skipped", %{mob: mob} do
@@ -412,7 +407,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.ScriptTest do
 
       {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], nil, 1_000)
 
-      assert [%Event{type: :set_facing, facing: {:target, ^buddy}}] = mob.internal.events
+      assert [%Effects.SetFacing{facing: {:target, ^buddy}}] = mob.internal.events
     end
 
     test "delayed steps are deferred through a script_steps event", %{mob: mob} do
@@ -422,8 +417,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.ScriptTest do
       {mob, _blackboard} = Script.run(mob, Blackboard.new(), [immediate, delayed], nil, 1_000)
 
       assert [
-               %Event{type: :emote, emote_id: 11},
-               %Event{type: :script_steps, steps: [^delayed], duration_ms: 4_000}
+               %Effects.Emote{emote_id: 11},
+               %Effects.ScriptSteps{steps: [^delayed], duration_ms: 4_000}
              ] = mob.internal.events
     end
 

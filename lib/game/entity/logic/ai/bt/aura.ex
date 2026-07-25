@@ -7,7 +7,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Aura do
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
-  alias ThistleTea.Game.Entity.Logic.Event
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Time
 
   def tick_step do
@@ -22,7 +22,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Aura do
 
   def tick(%{unit: %Unit{auras: [_ | _]}} = entity, %Blackboard{} = blackboard, now) when is_integer(now) do
     {entity, events} = AuraLogic.tick(entity, now)
-    {:failure, Event.enqueue(entity, events), blackboard}
+    {:failure, Effects.enqueue(entity, events), blackboard}
   end
 
   def tick(entity, %Blackboard{} = blackboard, _now), do: {:failure, entity, blackboard}

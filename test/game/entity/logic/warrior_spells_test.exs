@@ -15,7 +15,7 @@ defmodule ThistleTea.Game.Entity.Logic.WarriorSpellsTest do
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Combat
   alias ThistleTea.Game.Entity.Logic.Core
-  alias ThistleTea.Game.Entity.Logic.Event
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Reactive
   alias ThistleTea.Game.Entity.Logic.SpellEffect
   alias ThistleTea.Game.Entity.Logic.Threat
@@ -265,7 +265,7 @@ defmodule ThistleTea.Game.Entity.Logic.WarriorSpellsTest do
 
       {target, events} = SpellEffect.receive(target, melee_context(spell), spell, 1_000)
 
-      assert [%Event{type: :spell_damage, damage: 41, crit?: false}] = events
+      assert [%Effects.SpellDamage{damage: 41, crit?: false}] = events
       assert target.unit.health == 159
     end
 
@@ -284,7 +284,7 @@ defmodule ThistleTea.Game.Entity.Logic.WarriorSpellsTest do
 
       {_target, events} = SpellEffect.receive(target, melee_context(spell), spell, 1_000)
 
-      assert [%Event{type: :spell_damage, damage: 39}] = events
+      assert [%Effects.SpellDamage{damage: 39}] = events
     end
 
     test "melee-class school damage can be avoided and reports the miss" do
@@ -303,8 +303,8 @@ defmodule ThistleTea.Game.Entity.Logic.WarriorSpellsTest do
       assert target.unit.health == 200
 
       assert [
-               %Event{type: :spell_log_miss, source_guid: 5, target_guid: 9, spell_id: 1715},
-               %Event{type: :attack_outcome, target_guid: 5, source_guid: 9, spell_id: 1715}
+               %Effects.SpellLogMiss{source_guid: 5, target_guid: 9, spell_id: 1715},
+               %Effects.AttackOutcome{target_guid: 5, source_guid: 9, spell_id: 1715}
              ] = events
     end
   end
@@ -388,8 +388,8 @@ defmodule ThistleTea.Game.Entity.Logic.WarriorSpellsTest do
       {target, events} = SpellEffect.receive(target, context, spell, 1_000)
 
       assert [
-               %Event{type: :spell_damage, spell_id: 20_647, damage: 185},
-               %Event{type: :drain_power, target_guid: 5, misc_value: 1}
+               %Effects.SpellDamage{spell_id: 20_647, damage: 185},
+               %Effects.DrainPower{target_guid: 5, misc_value: 1}
              ] = events
 
       assert target.unit.health == 15
@@ -863,7 +863,7 @@ defmodule ThistleTea.Game.Entity.Logic.WarriorSpellsTest do
 
       {_target, events} = SpellEffect.receive(target, context, spell, 1_000)
 
-      assert [%Event{type: :spell_damage, damage: 63}] = events
+      assert [%Effects.SpellDamage{damage: 63}] = events
     end
 
     test "last stand triggers its health buff on the caster" do
@@ -881,7 +881,7 @@ defmodule ThistleTea.Game.Entity.Logic.WarriorSpellsTest do
 
       buff_id = Scripts.last_stand_health_buff_id()
 
-      assert [%Event{type: :trigger_spell, target_guid: 5, spell_id: ^buff_id}] = events
+      assert [%Effects.TriggerSpell{target_guid: 5, spell_id: ^buff_id}] = events
     end
 
     test "the last stand buff raises max health by thirty percent and heals it" do

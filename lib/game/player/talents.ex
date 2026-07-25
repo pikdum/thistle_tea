@@ -7,7 +7,7 @@ defmodule ThistleTea.Game.Player.Talents do
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.Logic.Core
-  alias ThistleTea.Game.Entity.Logic.Event
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Talents, as: LogicTalents
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network
@@ -75,7 +75,7 @@ defmodule ThistleTea.Game.Player.Talents do
       aura_ids
       |> Enum.uniq()
       |> Enum.reduce(character, fn aura_id, acc ->
-        Event.enqueue(acc, Event.trigger_spell(pet_guid, level, pet_guid, aura_id))
+        Effects.enqueue(acc, Effects.trigger_spell(pet_guid, level, pet_guid, aura_id))
       end)
       |> EventSink.emit_pending()
     else

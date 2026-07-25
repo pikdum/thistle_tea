@@ -5,12 +5,12 @@ defmodule ThistleTea.Game.Entity.Logic.SpellFeedback do
   """
 
   alias ThistleTea.Game.Entity.Logic.Aura
-  alias ThistleTea.Game.Entity.Logic.Event
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Spell
 
   def receive(entity, payload, %Spell{} = spell, now) when is_integer(now) do
     {entity, events} = Aura.reactions(entity, :spell_hit_dealt, Map.merge(payload, %{spell: spell, now: now}))
-    Event.enqueue(entity, events)
+    Effects.enqueue(entity, events)
   end
 
   def receive(entity, _payload, _spell, _now), do: entity

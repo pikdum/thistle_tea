@@ -9,7 +9,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
   alias ThistleTea.Game.Entity.Logic.Aura.HolderSync
   alias ThistleTea.Game.Entity.Logic.Aura.Script
   alias ThistleTea.Game.Entity.Logic.Core
-  alias ThistleTea.Game.Entity.Logic.Event
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Cooldowns
@@ -176,7 +176,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
 
         proc_events =
           Enum.map(proc_auras, fn %Aura{trigger_spell_id: spell_id} ->
-            Event.trigger_spell(source_guid, holder.caster_level || 1, attacker_guid, spell_id,
+            Effects.trigger_spell(source_guid, holder.caster_level || 1, attacker_guid, spell_id,
               triggered_by_spell_id: holder.spell.id
             )
           end)
@@ -229,7 +229,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
       proc_auras != [] and is_integer(victim_guid) ->
         proc_events =
           Enum.map(proc_auras, fn %Aura{trigger_spell_id: spell_id} ->
-            Event.trigger_spell(owner_guid, holder.caster_level || 1, victim_guid, spell_id,
+            Effects.trigger_spell(owner_guid, holder.caster_level || 1, victim_guid, spell_id,
               triggered_by_spell_id: holder.spell.id
             )
           end)
@@ -378,7 +378,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
     if proc? do
       events =
         Enum.map(proc_auras, fn %Aura{trigger_spell_id: spell_id} ->
-          Event.trigger_spell(owner_guid, holder.caster_level || 1, victim_guid, spell_id,
+          Effects.trigger_spell(owner_guid, holder.caster_level || 1, victim_guid, spell_id,
             triggered_by_spell_id: holder.spell.id
           )
         end)
@@ -446,7 +446,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
     }
 
     context = %CastContext{caster_guid: holder.caster_guid, caster_level: holder.caster_level || 1, spell: spell}
-    [Event.deliver_spell(attacker_guid, context, spell)]
+    [Effects.deliver_spell(attacker_guid, context, spell)]
   end
 
   defp reaction_event(_aura, _holder, _owner_guid, _attacker_guid, _proc?, _shield?), do: []
@@ -459,7 +459,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
 
     if is_integer(trigger_spell_id) do
       [
-        Event.trigger_spell(source_guid, holder.caster_level || 1, target_guid, trigger_spell_id,
+        Effects.trigger_spell(source_guid, holder.caster_level || 1, target_guid, trigger_spell_id,
           triggered_by_spell_id: holder.spell.id
         )
       ]

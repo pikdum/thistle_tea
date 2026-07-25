@@ -10,7 +10,7 @@ defmodule ThistleTea.Game.Entity.Server.PlayerTest do
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
-  alias ThistleTea.Game.Entity.Logic.Event
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Regen
   alias ThistleTea.Game.Entity.Server.Player, as: PlayerServer
   alias ThistleTea.Game.Entity.Server.Player.State
@@ -275,7 +275,7 @@ defmodule ThistleTea.Game.Entity.Server.PlayerTest do
         character.internal
         | broadcast_update?: true,
           undetectable_until: Time.now() + 1_000,
-          events: [Event.object_update(:values)]
+          events: [Effects.object_update(:values)]
       }
 
       Metadata.put(guid, %{})

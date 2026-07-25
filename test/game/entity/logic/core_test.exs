@@ -13,7 +13,7 @@ defmodule ThistleTea.Game.Entity.Logic.CoreTest do
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.Core
-  alias ThistleTea.Game.Entity.Logic.Event
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.WorldRef
 
@@ -103,7 +103,7 @@ defmodule ThistleTea.Game.Entity.Logic.CoreTest do
 
       assert Enum.any?(
                entity.internal.events,
-               &match?(%Event{type: :dismiss_pet, source_guid: 6, reason: :owner_died}, &1)
+               &match?(%Effects.DismissPet{source_guid: 6, reason: :owner_died}, &1)
              )
     end
 
@@ -112,7 +112,7 @@ defmodule ThistleTea.Game.Entity.Logic.CoreTest do
 
       {entity, _absorbed} = Core.take_damage_with_absorb(entity, 10, 1_000, source: 777)
 
-      refute Enum.any?(entity.internal.events, &match?(%Event{type: :dismiss_pet}, &1))
+      refute Enum.any?(entity.internal.events, &match?(%Effects.DismissPet{}, &1))
     end
 
     test "does not queue a dismissal when no pet is out" do
@@ -120,7 +120,7 @@ defmodule ThistleTea.Game.Entity.Logic.CoreTest do
 
       {entity, _absorbed} = Core.take_damage_with_absorb(entity, 30, 1_000, source: 777)
 
-      refute Enum.any?(entity.internal.events, &match?(%Event{type: :dismiss_pet}, &1))
+      refute Enum.any?(entity.internal.events, &match?(%Effects.DismissPet{}, &1))
     end
 
     test "queues a charm release when a player dies while controlling a unit" do
@@ -131,7 +131,7 @@ defmodule ThistleTea.Game.Entity.Logic.CoreTest do
 
       assert Enum.any?(
                entity.internal.events,
-               &match?(%Event{type: :release_controlled, source_guid: 6, target_guid: 555, spell_id: nil}, &1)
+               &match?(%Effects.ReleaseControlled{source_guid: 6, target_guid: 555, spell_id: nil}, &1)
              )
     end
   end

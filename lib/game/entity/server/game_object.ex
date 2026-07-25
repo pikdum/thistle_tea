@@ -14,7 +14,7 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
   alias ThistleTea.Game.Entity.Data.GameObject
   alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.Logic.Core
-  alias ThistleTea.Game.Entity.Logic.Event
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Registry, as: EntityRegistry
   alias ThistleTea.Game.Entity.Server.GameObject.Chair
   alias ThistleTea.Game.Entity.Server.GameObject.Chest
@@ -403,7 +403,7 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
 
     Enum.each(spell.effects, fn
       %{type: :persistent_area_aura} = effect ->
-        event = Event.spawn_area_effect(spell, effect, {x, y, z}, spell.duration_ms || 0)
+        event = Effects.spawn_area_effect(spell, effect, {x, y, z}, spell.duration_ms || 0)
         EventSink.emit(caster, event)
 
       _effect ->

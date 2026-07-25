@@ -11,7 +11,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.SpellsTest do
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells, as: MobSpells
-  alias ThistleTea.Game.Entity.Logic.Event
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Effect
@@ -52,7 +52,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.SpellsTest do
 
       assert %{spell: %Spell{id: 20_793}} = state.internal.casting
       assert blackboard.spell_timers == %{0 => 3_000}
-      assert Enum.any?(state.internal.events, &match?(%Event{type: :spell_start, spell_id: 20_793}, &1))
+      assert Enum.any?(state.internal.events, &match?(%Effects.SpellStart{spell_id: 20_793}, &1))
     end
 
     test "skips casting when the target is out of range" do
@@ -76,8 +76,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.SpellsTest do
 
       assert {:failure, state, _blackboard} = MobSpells.try_cast(state, %Blackboard{}, 1_000)
       assert state.internal.casting == nil
-      assert Enum.any?(state.internal.events, &match?(%Event{type: :spell_start}, &1))
-      assert Enum.any?(state.internal.events, &match?(%Event{type: :spell_go}, &1))
+      assert Enum.any?(state.internal.events, &match?(%Effects.SpellStart{}, &1))
+      assert Enum.any?(state.internal.events, &match?(%Effects.SpellGo{}, &1))
     end
 
     test "halts an in-flight move and faces the victim before a timed cast" do
@@ -98,7 +98,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.SpellsTest do
       assert {{:running, 3_000, :casting}, state, _blackboard} = MobSpells.try_cast(state, %Blackboard{}, 1_000)
 
       assert state.movement_block.spline_nodes == []
-      assert Enum.any?(state.internal.events, &match?(%Event{type: :movement_stopped}, &1))
+      assert Enum.any?(state.internal.events, &match?(%Effects.MovementStopped{}, &1))
       {mx, my, _z, orientation} = state.movement_block.position
       assert_in_delta orientation, :math.atan2(0.0 - my, 20.0 - mx), 0.0001
     end
@@ -201,7 +201,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.SpellsTest do
 
       refute Blackboard.combat_movement?(blackboard)
       refute blackboard.attack_started
-      assert Enum.any?(state.internal.events, &match?(%Event{type: :attack_stop}, &1))
+      assert Enum.any?(state.internal.events, &match?(%Effects.AttackStop{}, &1))
       assert MobSpells.holding_ranged?(state, blackboard)
     end
 

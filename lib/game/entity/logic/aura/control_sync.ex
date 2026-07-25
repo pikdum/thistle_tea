@@ -11,7 +11,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.ControlSync do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.Core
-  alias ThistleTea.Game.Entity.Logic.Event
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Spell
@@ -46,7 +46,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.ControlSync do
        ), do: {mob, []}
 
   defp sync_charm(%Mob{} = mob, %Holder{} = holder, %Pet{kind: :charmed} = previous, guid, now) do
-    grant_charm(mob, holder, previous, [Event.control_released(previous.owner_guid, guid)], now)
+    grant_charm(mob, holder, previous, [Effects.control_released(previous.owner_guid, guid)], now)
   end
 
   defp sync_charm(%Mob{} = mob, %Holder{} = holder, nil, _guid, now), do: grant_charm(mob, holder, nil, [], now)
@@ -88,7 +88,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.ControlSync do
     }
 
     spells = (mob.internal.spellbook || %{}) |> Map.values() |> Enum.reject(&Spell.attribute?(&1, :passive))
-    event = Event.control_granted(holder.caster_guid, mob.object.guid, holder.spell.id, spells)
+    event = Effects.control_granted(holder.caster_guid, mob.object.guid, holder.spell.id, spells)
     {mob, events} = halt_for_control(mob, now, events)
     {Core.mark_broadcast_update(mob), events ++ [event]}
   end
@@ -106,7 +106,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.ControlSync do
         internal: %{mob.internal | pet: nil}
     }
 
-    {Core.mark_broadcast_update(mob), [Event.control_released(pet.owner_guid, mob.object.guid)]}
+    {Core.mark_broadcast_update(mob), [Effects.control_released(pet.owner_guid, mob.object.guid)]}
   end
 
   defp sync_possession(
@@ -120,7 +120,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.ControlSync do
   defp sync_possession(%Mob{} = mob, %Holder{} = holder, previous, guid, now) do
     events =
       case previous do
-        %Pet{kind: :charmed, owner_guid: owner_guid} -> [Event.control_released(owner_guid, guid)]
+        %Pet{kind: :charmed, owner_guid: owner_guid} -> [Effects.control_released(owner_guid, guid)]
         _pet -> []
       end
 
@@ -154,14 +154,14 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.ControlSync do
     }
 
     spells = controlled_spells(mob)
-    event = Event.control_granted(holder.caster_guid, mob.object.guid, holder.spell.id, spells, possess?: true)
+    event = Effects.control_granted(holder.caster_guid, mob.object.guid, holder.spell.id, spells, possess?: true)
     {mob, events} = halt_for_control(mob, now, events)
     {Core.mark_broadcast_update(mob), events ++ [event]}
   end
 
   defp halt_for_control(%Mob{movement_block: %MovementBlock{} = movement} = mob, now, events) do
     if movement.spline_nodes not in [nil, []] or is_integer(mob.internal.movement_start_time) do
-      {Movement.halt(mob, now), events ++ [Event.movement_stopped()]}
+      {Movement.halt(mob, now), events ++ [Effects.movement_stopped()]}
     else
       {mob, events}
     end
@@ -206,7 +206,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.ControlSync do
 
   defp release_possession(%Mob{} = mob, %Pet{possession_original_kind: nil} = pet) do
     mob = restore_controlled_unit(mob, pet, nil)
-    {mob, [Event.control_released(pet.owner_guid, mob.object.guid)]}
+    {mob, [Effects.control_released(pet.owner_guid, mob.object.guid)]}
   end
 
   defp release_possession(%Mob{} = mob, %Pet{} = pet) do
@@ -227,7 +227,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.ControlSync do
     }
 
     mob = restore_controlled_unit(mob, pet, restored)
-    {mob, [Event.control_released(pet.owner_guid, mob.object.guid)]}
+    {mob, [Effects.control_released(pet.owner_guid, mob.object.guid)]}
   end
 
   defp restore_controlled_unit(%Mob{} = mob, %Pet{} = pet, restored_pet) do

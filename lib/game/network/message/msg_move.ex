@@ -5,7 +5,7 @@ defmodule ThistleTea.Game.Network.Message.MsgMove do
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
-  alias ThistleTea.Game.Entity.Logic.Event
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Network.ClientMessage
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Packet
@@ -120,7 +120,7 @@ defmodule ThistleTea.Game.Network.Message.MsgMove do
 
     character =
       character
-      |> Event.enqueue(events)
+      |> Effects.enqueue(events)
       |> EventSink.emit_pending()
 
     if character.unit.auras != auras_before do
@@ -137,7 +137,7 @@ defmodule ThistleTea.Game.Network.Message.MsgMove do
       {character, events} =
         AuraLogic.remove_with_interrupt_flags(character, AuraLogic.interrupt_mask(:above_water), Time.now())
 
-      character |> Event.enqueue(events) |> EventSink.emit_pending()
+      character |> Effects.enqueue(events) |> EventSink.emit_pending()
     else
       character
     end

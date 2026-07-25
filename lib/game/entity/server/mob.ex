@@ -34,7 +34,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Combat
   alias ThistleTea.Game.Entity.Logic.Core
-  alias ThistleTea.Game.Entity.Logic.Event
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Experience
   alias ThistleTea.Game.Entity.Logic.Hostility
   alias ThistleTea.Game.Entity.Logic.Movement
@@ -200,7 +200,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
   def handle_cast({:trigger_spell, spell_id, target_guid, opts}, %Mob{} = state)
       when is_integer(spell_id) and is_integer(target_guid) and is_list(opts) do
-    event = Event.trigger_spell(state.object.guid, state.unit.level || 1, target_guid, spell_id, opts)
+    event = Effects.trigger_spell(state.object.guid, state.unit.level || 1, target_guid, spell_id, opts)
     state = state |> EventSink.emit(event) |> wake_ai_tick()
     {:noreply, state, {:continue, :maybe_broadcast}}
   end

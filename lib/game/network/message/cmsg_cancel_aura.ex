@@ -6,7 +6,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgCancelAura do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Spell, as: SpellBT
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
   alias ThistleTea.Game.Entity.Logic.Core
-  alias ThistleTea.Game.Entity.Logic.Event
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Cast
   alias ThistleTea.Game.Time
@@ -22,7 +22,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgCancelAura do
 
     character =
       character
-      |> Event.enqueue(events)
+      |> Effects.enqueue(events)
       |> EventSink.emit_pending()
 
     character =

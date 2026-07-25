@@ -9,7 +9,7 @@ defmodule ThistleTea.Game.Player.GameObjects do
   alias ThistleTea.Game.Entity.Data.GameObjectTemplate
   alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.Logic.Core
-  alias ThistleTea.Game.Entity.Logic.Event
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Loot
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network
@@ -66,7 +66,7 @@ defmodule ThistleTea.Game.Player.GameObjects do
         character =
           character
           |> then(fn character -> %{character | unit: %{character.unit | stand_state: stand_state}} end)
-          |> Event.enqueue([Event.teleport(position), Event.stand_state(stand_state)])
+          |> Effects.enqueue([Effects.teleport(position), Effects.stand_state(stand_state)])
           |> EventSink.emit_pending()
 
         %UpdateObject{update_type: :values, object_type: :player}

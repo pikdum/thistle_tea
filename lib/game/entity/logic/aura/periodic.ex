@@ -11,7 +11,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
   alias ThistleTea.Game.Entity.Logic.Aura.Lifecycle
   alias ThistleTea.Game.Entity.Logic.Aura.Reactions
   alias ThistleTea.Game.Entity.Logic.Core
-  alias ThistleTea.Game.Entity.Logic.Event
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Resources
   alias ThistleTea.Game.Entity.Logic.SpellResist
   alias ThistleTea.Game.Entity.Logic.Threat
@@ -65,7 +65,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
             entity
           else
             {entity, modifier_events} = HolderSync.sync(entity, new_holders)
-            Event.enqueue(entity, modifier_events)
+            Effects.enqueue(entity, modifier_events)
           end
 
         {entity, reaction_events} = periodic_taken_reactions(entity, events, now)
@@ -75,7 +75,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
 
   defp periodic_taken_reactions(entity, events, now) do
     Enum.reduce(events, {entity, []}, fn
-      %Event{type: :spell_damage, periodic?: true, damage: damage, source_guid: caster, spell: %Spell{} = spell},
+      %Effects.SpellDamage{periodic?: true, damage: damage, source_guid: caster, spell: %Spell{} = spell},
       {current, acc}
       when is_integer(damage) and damage > 0 and is_integer(caster) ->
         {current, reaction_events} =
@@ -112,7 +112,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
 
   defp tick_area_refresh(%Holder{next_area_refresh_at: at, area_radius: radius, spell: spell} = holder, now)
        when is_integer(at) and now >= at and is_number(radius) do
-    {%{holder | next_area_refresh_at: advance_tick(at, 1_000, now)}, [Event.refresh_party_aura(spell, radius)]}
+    {%{holder | next_area_refresh_at: advance_tick(at, 1_000, now)}, [Effects.refresh_party_aura(spell, radius)]}
   end
 
   defp tick_area_refresh(holder, _now), do: {holder, []}
@@ -122,7 +122,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
     {entity, damage, log_opts} = apply_periodic_damage(entity, holder, periodic_damage_amount(holder, aura), now)
 
     event =
-      Event.spell_damage(holder.caster_guid, entity.object.guid, holder.spell, damage, log_opts)
+      Effects.spell_damage(holder.caster_guid, entity.object.guid, holder.spell, damage, log_opts)
 
     {entity, %{aura | next_tick_at: advance_tick(at, aura.amplitude_ms, now)}, [event]}
   end
@@ -131,10 +131,10 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
        when is_integer(at) and now >= at do
     threat_events = Threat.heal_threat_events(entity, holder.caster_guid, aura.amount)
     entity = Core.heal(entity, aura.amount)
-    event = Event.periodic_aura_log(holder.caster_guid, entity.object.guid, holder.spell, :periodic_heal, aura.amount)
+    event = Effects.periodic_aura_log(holder.caster_guid, entity.object.guid, holder.spell, :periodic_heal, aura.amount)
 
     proc_event =
-      Event.spell_heal(holder.caster_guid, entity.object.guid, holder.spell, aura.amount, false, periodic?: true)
+      Effects.spell_heal(holder.caster_guid, entity.object.guid, holder.spell, aura.amount, false, periodic?: true)
 
     {entity, %{aura | next_tick_at: advance_tick(at, aura.amplitude_ms, now)}, [event, proc_event | threat_events]}
   end
@@ -143,8 +143,10 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
        when is_integer(at) and now >= at do
     amount = trunc((entity.unit.max_health || 0) * (aura.amount || 0) / 100)
     entity = Core.heal(entity, amount)
-    event = Event.periodic_aura_log(holder.caster_guid, entity.object.guid, holder.spell, :periodic_heal, amount)
-    proc_event = Event.spell_heal(holder.caster_guid, entity.object.guid, holder.spell, amount, false, periodic?: true)
+    event = Effects.periodic_aura_log(holder.caster_guid, entity.object.guid, holder.spell, :periodic_heal, amount)
+
+    proc_event =
+      Effects.spell_heal(holder.caster_guid, entity.object.guid, holder.spell, amount, false, periodic?: true)
 
     {entity, %{aura | next_tick_at: advance_tick(at, aura.amplitude_ms, now)}, [event, proc_event]}
   end
@@ -161,7 +163,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
     {entity, damage, log_opts} = apply_periodic_damage(entity, holder, aura.amount, now)
 
     events = [
-      Event.spell_damage(holder.caster_guid, entity.object.guid, holder.spell, damage, log_opts)
+      Effects.spell_damage(holder.caster_guid, entity.object.guid, holder.spell, damage, log_opts)
       | leech_heal_events(holder, entity, damage, aura)
     ]
 
@@ -182,8 +184,13 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
         events =
           if drained > 0 do
             [
-              Event.grant_power(holder.caster_guid, 0, gained),
-              Event.periodic_aura_log(holder.caster_guid, entity.object.guid, holder.spell, :periodic_energize, drained,
+              Effects.grant_power(holder.caster_guid, 0, gained),
+              Effects.periodic_aura_log(
+                holder.caster_guid,
+                entity.object.guid,
+                holder.spell,
+                :periodic_energize,
+                drained,
                 misc_value: 0
               )
             ]
@@ -207,7 +214,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
           []
 
         {true, spell_id} when is_integer(spell_id) and spell_id > 0 ->
-          [Event.trigger_spell(holder.caster_guid, holder.caster_level, entity.object.guid, spell_id)]
+          [Effects.trigger_spell(holder.caster_guid, holder.caster_level, entity.object.guid, spell_id)]
 
         _ ->
           []
@@ -281,7 +288,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
   defp leech_heal_events(%Holder{caster_guid: caster_guid}, %{object: %{guid: owner_guid}}, damage, %Aura{} = aura)
        when is_integer(caster_guid) and caster_guid != owner_guid and damage > 0 do
     multiplier = if is_number(aura.multiple_value) and aura.multiple_value > 0, do: aura.multiple_value, else: 1.0
-    [Event.heal_entity(caster_guid, trunc(damage * multiplier))]
+    [Effects.heal_entity(caster_guid, trunc(damage * multiplier))]
   end
 
   defp leech_heal_events(_holder, _entity, _damage, _aura), do: []
@@ -290,7 +297,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
     entity = Core.restore_mana(entity, amount)
 
     event =
-      Event.periodic_aura_log(holder.caster_guid, entity.object.guid, holder.spell, :periodic_energize, amount,
+      Effects.periodic_aura_log(holder.caster_guid, entity.object.guid, holder.spell, :periodic_energize, amount,
         misc_value: 0
       )
 
@@ -301,7 +308,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
     entity = Resources.gain_power(entity, power_type, amount)
 
     event =
-      Event.periodic_aura_log(holder.caster_guid, entity.object.guid, holder.spell, :periodic_energize, amount,
+      Effects.periodic_aura_log(holder.caster_guid, entity.object.guid, holder.spell, :periodic_energize, amount,
         misc_value: power_type
       )
 

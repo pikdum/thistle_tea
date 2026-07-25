@@ -25,7 +25,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
   alias ThistleTea.Game.Entity.Logic.Condition, as: ConditionLogic
   alias ThistleTea.Game.Entity.Logic.Core
-  alias ThistleTea.Game.Entity.Logic.Event
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.World
@@ -100,7 +100,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
       }
 
       provided = if step.swap_initial?, do: target_guid, else: self_guid
-      {Event.enqueue(state, Event.forward_script_steps(buddy_guid, [forwarded], provided)), blackboard}
+      {Effects.enqueue(state, Effects.forward_script_steps(buddy_guid, [forwarded], provided)), blackboard}
     else
       Logger.debug("Script #{step.script_id}: swap-final target is not a creature, skipping")
       {state, blackboard}
@@ -113,7 +113,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
     delayed
     |> Enum.group_by(& &1.delay_ms)
     |> Enum.reduce(state, fn {delay_ms, steps}, state ->
-      Event.enqueue(state, Event.script_steps(steps, target_guid, delay_ms))
+      Effects.enqueue(state, Effects.script_steps(steps, target_guid, delay_ms))
     end)
   end
 
@@ -127,7 +127,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
   defp execute(state, blackboard, %ScriptStep{command: :emote} = step, _target_guid, _now) do
     case ScriptStep.emote_ids(step) do
       [] -> {state, blackboard}
-      emote_ids -> {Event.enqueue(state, Event.emote(Enum.random(emote_ids))), blackboard}
+      emote_ids -> {Effects.enqueue(state, Effects.emote(Enum.random(emote_ids))), blackboard}
     end
   end
 
@@ -150,7 +150,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
   defp execute(state, blackboard, %ScriptStep{command: :remove_aura, datalong: spell_id}, _target_guid, now)
        when is_integer(spell_id) and spell_id > 0 do
     {state, events} = AuraLogic.remove_spells(state, [spell_id], now)
-    {Event.enqueue(state, events), blackboard}
+    {Effects.enqueue(state, events), blackboard}
   end
 
   defp execute(state, blackboard, %ScriptStep{command: :remove_aura}, _target_guid, _now) do
@@ -175,17 +175,17 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
       |> Map.put(:attack_guid, resolve_summon_attack(state, step, target_guid))
 
     steps = Map.get(step.sub_scripts, summon.script_id, [])
-    {Event.enqueue(state, Event.summon_creature(summon, steps, target_guid)), blackboard}
+    {Effects.enqueue(state, Effects.summon_creature(summon, steps, target_guid)), blackboard}
   end
 
   defp execute(state, blackboard, %ScriptStep{command: :despawn} = step, _target_guid, _now) do
-    {Event.enqueue(state, Event.despawn_self(step.datalong, step.datalong2 * 1_000)), blackboard}
+    {Effects.enqueue(state, Effects.despawn_self(step.datalong, step.datalong2 * 1_000)), blackboard}
   end
 
   defp execute(state, blackboard, %ScriptStep{command: :attack_start} = step, target_guid, _now) do
     case resolve_target(state, step, target_guid) do
       guid when is_integer(guid) and guid > 0 and guid != state.object.guid ->
-        {Event.enqueue(state, Event.attack_start(guid)), blackboard}
+        {Effects.enqueue(state, Effects.attack_start(guid)), blackboard}
 
       _ ->
         {state, blackboard}
@@ -205,12 +205,12 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
        when step.datalong > 0 do
     event =
       if (step.datalong2 &&& @sound_flag_distance_dependent) == 0 do
-        Event.play_sound(step.datalong)
+        Effects.play_sound(step.datalong)
       else
-        Event.play_object_sound(step.datalong)
+        Effects.play_object_sound(step.datalong)
       end
 
-    {Event.enqueue(state, event), blackboard}
+    {Effects.enqueue(state, event), blackboard}
   end
 
   defp execute(state, blackboard, %ScriptStep{command: :play_sound}, _target_guid, _now) do
@@ -228,7 +228,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
   defp execute(state, blackboard, %ScriptStep{command: :turn_to, datalong: 0} = step, target_guid, _now) do
     case resolve_target(state, step, target_guid) do
       guid when is_integer(guid) and guid > 0 and guid != state.object.guid ->
-        {Event.enqueue(state, Event.set_facing({:target, guid})), blackboard}
+        {Effects.enqueue(state, Effects.set_facing({:target, guid})), blackboard}
 
       _ ->
         {state, blackboard}
@@ -239,7 +239,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
     state =
       state
       |> set_facing_angle(o)
-      |> Event.enqueue(Event.set_facing({:angle, o}))
+      |> Effects.enqueue(Effects.set_facing({:angle, o}))
 
     {state, blackboard}
   end
@@ -286,11 +286,11 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
   end
 
   defp talk(state, text, target_guid) do
-    state = Event.enqueue(state, Event.monster_talk(text.text, text.chat_type, target_guid))
+    state = Effects.enqueue(state, Effects.monster_talk(text.text, text.chat_type, target_guid))
 
     case text do
       %{emote_id: emote_id} when is_integer(emote_id) and emote_id > 0 ->
-        Event.enqueue(state, Event.emote(emote_id))
+        Effects.enqueue(state, Effects.emote(emote_id))
 
       _ ->
         state
@@ -395,7 +395,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
     if Core.dead?(state) do
       {state, blackboard}
     else
-      state = Event.enqueue(state, Event.monster_talk(@flee_text, :text_emote, target))
+      state = Effects.enqueue(state, Effects.monster_talk(@flee_text, :text_emote, target))
       {state, Blackboard.start_flee(blackboard, target, @flee_duration_ms, now)}
     end
   end
@@ -404,7 +404,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
 
   defp trigger_cast(%{object: %{guid: guid}, unit: %Unit{level: level}} = state, %CreatureSpell{} = entry, target_guid) do
     if MobSpells.flags_allow?(state, entry, target_guid) do
-      Event.enqueue(state, Event.trigger_spell(guid, level, target_guid, entry.spell_id))
+      Effects.enqueue(state, Effects.trigger_spell(guid, level, target_guid, entry.spell_id))
     else
       state
     end

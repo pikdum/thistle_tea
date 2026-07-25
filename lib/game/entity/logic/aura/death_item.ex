@@ -8,14 +8,14 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.DeathItem do
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Internal.Loot
   alias ThistleTea.Game.Entity.Data.Component.Unit
-  alias ThistleTea.Game.Entity.Logic.Event
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Experience
 
   def enqueue_rewards(entity, old_health, new_health)
 
   def enqueue_rewards(entity, old_health, new_health)
       when is_number(old_health) and old_health > 0 and is_number(new_health) and new_health <= 0 do
-    Event.enqueue(entity, reward_events(entity))
+    Effects.enqueue(entity, reward_events(entity))
   end
 
   def enqueue_rewards(entity, _old_health, _new_health), do: entity
@@ -28,7 +28,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.DeathItem do
     holders
     |> Enum.flat_map(&holder_rewards(&1, tapped_player, victim_level))
     |> Enum.uniq_by(fn {caster_guid, _item_type, _count} -> caster_guid end)
-    |> Enum.map(fn {caster_guid, item_type, count} -> Event.create_item(caster_guid, item_type, count) end)
+    |> Enum.map(fn {caster_guid, item_type, count} -> Effects.create_item(caster_guid, item_type, count) end)
   end
 
   def reward_events(_entity), do: []

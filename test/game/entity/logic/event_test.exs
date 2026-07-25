@@ -1,54 +1,45 @@
-defmodule ThistleTea.Game.Entity.Logic.EventTest do
+defmodule ThistleTea.Game.Entity.Logic.EffectsTest do
   use ExUnit.Case, async: true
 
-  alias ThistleTea.Game.Entity.Logic.Event
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
 
   describe "monster_move/1" do
     test "returns a monster movement event with packet options" do
-      assert %Event{type: :monster_move, move_opts: [face_target: 1]} = Event.monster_move(face_target: 1)
+      assert %Effects.MonsterMove{move_opts: [face_target: 1]} = Effects.monster_move(face_target: 1)
     end
   end
 
   describe "spell_cast_result/1" do
     test "returns a spell cast result event" do
-      assert %Event{type: :spell_cast_result, spell_id: 133} = Event.spell_cast_result(133)
+      assert %Effects.SpellCastResult{spell_id: 133} = Effects.spell_cast_result(133)
     end
   end
 
   describe "spell_go/4" do
     test "returns a spell go event with resolved hits and raw targets" do
-      assert %Event{
-               type: :spell_go,
-               source_guid: 1,
-               spell_id: 133,
-               hit_guids: [2],
-               raw_targets: <<1, 2>>
-             } = Event.spell_go(1, 133, [2], <<1, 2>>)
+      assert %Effects.SpellGo{source_guid: 1, spell_id: 133, hit_guids: [2], raw_targets: <<1, 2>>} =
+               Effects.spell_go(1, 133, [2], <<1, 2>>)
     end
   end
 
   describe "channel_start/3" do
     test "returns a channel start event" do
-      assert %Event{
-               type: :channel_start,
-               source_guid: 1,
-               spell_id: 10,
-               channel_time_ms: 8_000
-             } = Event.channel_start(1, 10, 8_000)
+      assert %Effects.ChannelStart{source_guid: 1, spell_id: 10, channel_time_ms: 8_000} =
+               Effects.channel_start(1, 10, 8_000)
     end
   end
 
   describe "channel_update/2" do
     test "returns a channel update event" do
-      assert %Event{type: :channel_update, source_guid: 1, channel_time_ms: 0} = Event.channel_update(1, 0)
+      assert %Effects.ChannelUpdate{source_guid: 1, channel_time_ms: 0} = Effects.channel_update(1, 0)
     end
   end
 
   describe "object_update/1" do
     test "returns an object update event" do
-      assert %Event{type: :object_update, update_type: :values} = Event.object_update(:values)
+      assert %Effects.ObjectUpdate{update_type: :values} = Effects.object_update(:values)
     end
   end
 
@@ -56,7 +47,7 @@ defmodule ThistleTea.Game.Entity.Logic.EventTest do
     test "returns an attack delivery event" do
       attack = %{caster: 1, min_damage: 2, max_damage: 3}
 
-      assert %Event{type: :deliver_attack, target_guid: 2, attack: ^attack} = Event.deliver_attack(2, attack)
+      assert %Effects.DeliverAttack{target_guid: 2, attack: ^attack} = Effects.deliver_attack(2, attack)
     end
   end
 
@@ -65,8 +56,8 @@ defmodule ThistleTea.Game.Entity.Logic.EventTest do
       context = %CastContext{caster_guid: 1, target_guid: 2}
       spell = %Spell{id: 133}
 
-      assert %Event{type: :deliver_spell, target_guid: 2, cast_context: ^context, spell: ^spell} =
-               Event.deliver_spell(2, context, spell)
+      assert %Effects.DeliverSpell{target_guid: 2, cast_context: ^context, spell: ^spell} =
+               Effects.deliver_spell(2, context, spell)
     end
   end
 end

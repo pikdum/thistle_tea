@@ -10,7 +10,7 @@ defmodule ThistleTea.Game.Entity.Logic.Warlock do
   alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Core
-  alias ThistleTea.Game.Entity.Logic.Event
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Resources
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
@@ -236,7 +236,7 @@ defmodule ThistleTea.Game.Entity.Logic.Warlock do
   def sacrifice_event(%{object: %{entry: entry}}, %CastContext{} = context) do
     case Map.get(@sacrifice_buffs, entry) do
       spell_id when is_integer(spell_id) ->
-        Event.trigger_spell(context.caster_guid, context.caster_level, context.caster_guid, spell_id)
+        Effects.trigger_spell(context.caster_guid, context.caster_level, context.caster_guid, spell_id)
 
       _ ->
         nil

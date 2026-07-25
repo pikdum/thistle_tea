@@ -3,7 +3,7 @@ defmodule ThistleTea.Game.Entity.Logic.Shaman do
   Pure Shaman weapon-imbue proc decisions. Enchantment and VMangos PPM data
   are supplied by the player boundary.
   """
-  alias ThistleTea.Game.Entity.Logic.Event
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Effect
@@ -30,14 +30,14 @@ defmodule ThistleTea.Game.Entity.Logic.Shaman do
     if flametongue_proc?(spell) do
       trigger_flametongue(entity, victim_guid, spell, proc.attack_time_ms)
     else
-      Event.enqueue(entity, Event.trigger_spell(entity.object.guid, entity.unit.level || 1, victim_guid, spell.id))
+      Effects.enqueue(entity, Effects.trigger_spell(entity.object.guid, entity.unit.level || 1, victim_guid, spell.id))
     end
   end
 
   defp trigger_proc(entity, victim_guid, proc) do
-    Event.enqueue(
+    Effects.enqueue(
       entity,
-      Event.trigger_spell(entity.object.guid, entity.unit.level || 1, victim_guid, proc.effect.spell_id)
+      Effects.trigger_spell(entity.object.guid, entity.unit.level || 1, victim_guid, proc.effect.spell_id)
     )
   end
 
@@ -52,7 +52,7 @@ defmodule ThistleTea.Game.Entity.Logic.Shaman do
       damage = flametongue_damage(Effect.damage_roll(effect), fire_bonus, attack_time_ms)
       spell = %{damage_spell | effects: [%{damage_effect | base_points: damage, die_sides: 0}]}
       cast_context = %{CastContext.from_caster(entity, spell, victim_guid) | spell_damage_bonus: %{}}
-      Event.enqueue(entity, Event.deliver_spell(victim_guid, cast_context, spell))
+      Effects.enqueue(entity, Effects.deliver_spell(victim_guid, cast_context, spell))
     else
       _ -> entity
     end

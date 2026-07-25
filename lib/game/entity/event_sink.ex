@@ -15,7 +15,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
   alias ThistleTea.Game.Entity.Data.GameObjectTemplate, as: DataGameObjectTemplate
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.Core
-  alias ThistleTea.Game.Entity.Logic.Event
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.Entity.Logic.SpellEffect
   alias ThistleTea.Game.Entity.Logic.SpellTarget
@@ -53,7 +53,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
   @spell_hit_type_crit 0x2
 
   def emit_pending(entity) do
-    {entity, events} = Event.drain(entity)
+    {entity, events} = Effects.drain(entity)
     emit(entity, events)
   end
 
@@ -61,7 +61,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
     Enum.reduce(events, entity, &emit(&2, &1))
   end
 
-  def emit(entity, %Event{type: :spell_damage} = event) do
+  def emit(entity, %Effects.SpellDamage{} = event) do
     %Message.SmsgSpellNonMeleeDamageLog{
       attacker: event.source_guid || 0,
       target: event.target_guid,
@@ -81,12 +81,12 @@ defmodule ThistleTea.Game.Entity.EventSink do
     entity
   end
 
-  def emit(entity, %Event{type: :spell_heal} = event) do
+  def emit(entity, %Effects.SpellHeal{} = event) do
     notify_spell_outcome(event)
     entity
   end
 
-  def emit(entity, %Event{type: :spell_log_miss} = event) do
+  def emit(entity, %Effects.SpellLogMiss{} = event) do
     %Message.SmsgSpellLogMiss{
       spell_id: event.spell_id,
       caster: event.source_guid,
@@ -97,7 +97,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
     entity
   end
 
-  def emit(entity, %Event{type: :periodic_aura_log} = event) do
+  def emit(entity, %Effects.PeriodicAuraLog{} = event) do
     %Message.SmsgPeriodicauralog{
       target: event.target_guid,
       caster: event.source_guid || event.target_guid,
@@ -115,7 +115,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
     entity
   end
 
-  def emit(%Character{} = entity, %Event{type: :aura_duration} = event) do
+  def emit(%Character{} = entity, %Effects.AuraDuration{} = event) do
     Network.send_packet(%Message.SmsgUpdateAuraDuration{
       aura_slot: event.aura_slot,
       duration_ms: event.duration_ms
@@ -124,9 +124,9 @@ defmodule ThistleTea.Game.Entity.EventSink do
     entity
   end
 
-  def emit(entity, %Event{type: :aura_duration}), do: entity
+  def emit(entity, %Effects.AuraDuration{}), do: entity
 
-  def emit(%Mob{} = entity, %Event{type: :movement_stopped}) do
+  def emit(%Mob{} = entity, %Effects.MovementStopped{}) do
     World.update_position(entity)
     World.clear_movement(entity)
 
@@ -136,72 +136,72 @@ defmodule ThistleTea.Game.Entity.EventSink do
     entity
   end
 
-  def emit(%Character{} = entity, %Event{type: :movement_stopped}) do
+  def emit(%Character{} = entity, %Effects.MovementStopped{}) do
     World.update_position(entity)
     entity
   end
 
-  def emit(%Character{object: %{guid: guid}} = entity, %Event{type: :movement_root_changed, rooted?: true}) do
+  def emit(%Character{object: %{guid: guid}} = entity, %Effects.MovementRootChanged{rooted?: true}) do
     Network.send_packet(%Message.SmsgForceMoveRoot{guid: guid})
     entity
   end
 
-  def emit(%Character{object: %{guid: guid}} = entity, %Event{type: :movement_root_changed, rooted?: false}) do
+  def emit(%Character{object: %{guid: guid}} = entity, %Effects.MovementRootChanged{rooted?: false}) do
     Network.send_packet(%Message.SmsgForceMoveUnroot{guid: guid})
     entity
   end
 
-  def emit(entity, %Event{type: :movement_root_changed}), do: entity
+  def emit(entity, %Effects.MovementRootChanged{}), do: entity
 
-  def emit(%Character{object: %{guid: guid}} = entity, %Event{type: :feather_fall_changed, enabled?: true}) do
+  def emit(%Character{object: %{guid: guid}} = entity, %Effects.FeatherFallChanged{enabled?: true}) do
     Network.send_packet(%Message.SmsgMoveFeatherFall{guid: guid})
     entity
   end
 
-  def emit(%Character{object: %{guid: guid}} = entity, %Event{type: :feather_fall_changed, enabled?: false}) do
+  def emit(%Character{object: %{guid: guid}} = entity, %Effects.FeatherFallChanged{enabled?: false}) do
     Network.send_packet(%Message.SmsgMoveNormalFall{guid: guid})
     entity
   end
 
-  def emit(entity, %Event{type: :feather_fall_changed}), do: entity
+  def emit(entity, %Effects.FeatherFallChanged{}), do: entity
 
-  def emit(%Character{object: %{guid: guid}} = entity, %Event{type: :hover_changed, enabled?: true}) do
+  def emit(%Character{object: %{guid: guid}} = entity, %Effects.HoverChanged{enabled?: true}) do
     Network.send_packet(%Message.SmsgMoveSetHover{guid: guid})
     entity
   end
 
-  def emit(%Character{object: %{guid: guid}} = entity, %Event{type: :hover_changed, enabled?: false}) do
+  def emit(%Character{object: %{guid: guid}} = entity, %Effects.HoverChanged{enabled?: false}) do
     Network.send_packet(%Message.SmsgMoveUnsetHover{guid: guid})
     entity
   end
 
-  def emit(entity, %Event{type: :hover_changed}), do: entity
+  def emit(entity, %Effects.HoverChanged{}), do: entity
 
-  def emit(%Character{object: %{guid: guid}} = entity, %Event{type: :water_walk_changed, enabled?: true}) do
+  def emit(%Character{object: %{guid: guid}} = entity, %Effects.WaterWalkChanged{enabled?: true}) do
     Network.send_packet(%Message.SmsgMoveWaterWalk{guid: guid})
     entity
   end
 
-  def emit(%Character{object: %{guid: guid}} = entity, %Event{type: :water_walk_changed, enabled?: false}) do
+  def emit(%Character{object: %{guid: guid}} = entity, %Effects.WaterWalkChanged{enabled?: false}) do
     Network.send_packet(%Message.SmsgMoveLandWalk{guid: guid})
     entity
   end
 
-  def emit(entity, %Event{type: :water_walk_changed}), do: entity
+  def emit(entity, %Effects.WaterWalkChanged{}), do: entity
 
-  def emit(%Character{} = entity, %Event{type: :resurrect_request} = event) do
+  def emit(%Character{} = entity, %Effects.ResurrectRequest{} = event) do
     Network.send_packet(%Message.SmsgResurrectRequest{guid: event.source_guid})
     entity
   end
 
-  def emit(entity, %Event{type: :resurrect_request}), do: entity
+  def emit(entity, %Effects.ResurrectRequest{}), do: entity
 
-  def emit(entity, %Event{type: :heal_entity} = event) do
+  def emit(entity, %Effects.HealEntity{} = event) do
     Entity.receive_heal(event.target_guid, event.amount)
     entity
   end
 
-  def emit(entity, %Event{type: :heal_threat} = event) do
+  def emit(entity, %Effects.HealThreat{} = event) do
     entity
     |> World.nearby_mobs(@heal_threat_radius)
     |> Enum.each(fn {guid, _distance} ->
@@ -211,15 +211,15 @@ defmodule ThistleTea.Game.Entity.EventSink do
     entity
   end
 
-  def emit(%Character{object: %{guid: guid}} = entity, %Event{type: :movement_speed_changed, speed: speed})
+  def emit(%Character{object: %{guid: guid}} = entity, %Effects.MovementSpeedChanged{speed: speed})
       when is_number(speed) do
     Network.send_packet(%Message.SmsgForceRunSpeedChange{guid: guid, speed: speed})
     entity
   end
 
-  def emit(entity, %Event{type: :movement_speed_changed}), do: entity
+  def emit(entity, %Effects.MovementSpeedChanged{}), do: entity
 
-  def emit(%Mob{} = entity, %Event{type: :monster_move, move_opts: opts}) do
+  def emit(%Mob{} = entity, %Effects.MonsterMove{move_opts: opts}) do
     World.publish_movement(entity)
     notify_chasers(entity)
 
@@ -229,9 +229,9 @@ defmodule ThistleTea.Game.Entity.EventSink do
     entity
   end
 
-  def emit(entity, %Event{type: :monster_move}), do: entity
+  def emit(entity, %Effects.MonsterMove{}), do: entity
 
-  def emit(%Character{} = entity, %Event{type: :spell_cast_result, spell_id: spell_id}) do
+  def emit(%Character{} = entity, %Effects.SpellCastResult{spell_id: spell_id}) do
     Network.send_packet(%Message.SmsgCastResult{
       spell: spell_id,
       result: 0,
@@ -246,9 +246,9 @@ defmodule ThistleTea.Game.Entity.EventSink do
     entity
   end
 
-  def emit(entity, %Event{type: :spell_cast_result}), do: entity
+  def emit(entity, %Effects.SpellCastResult{}), do: entity
 
-  def emit(%Character{object: %{guid: guid}} = entity, %Event{type: :spell_cast_failed} = event) do
+  def emit(%Character{object: %{guid: guid}} = entity, %Effects.SpellCastFailed{} = event) do
     Network.send_packet(Message.SmsgCastResult.failure(event.spell_id, event.reason))
 
     Network.send_packet(%Message.SmsgSpellFailure{
@@ -263,14 +263,14 @@ defmodule ThistleTea.Game.Entity.EventSink do
     entity
   end
 
-  def emit(%{object: %{guid: guid}} = entity, %Event{type: :spell_cast_failed} = event) do
+  def emit(%{object: %{guid: guid}} = entity, %Effects.SpellCastFailed{} = event) do
     %Message.SmsgSpellFailedOther{caster: guid, id: event.spell_id}
     |> World.broadcast_packet(entity)
 
     entity
   end
 
-  def emit(%{object: %{guid: guid}} = entity, %Event{type: :spell_start} = event) when is_integer(guid) do
+  def emit(%{object: %{guid: guid}} = entity, %Effects.SpellStart{} = event) when is_integer(guid) do
     packed_caster = BinaryUtils.pack_guid(event.source_guid || guid)
 
     %Message.SmsgSpellStart{
@@ -288,9 +288,9 @@ defmodule ThistleTea.Game.Entity.EventSink do
     entity
   end
 
-  def emit(entity, %Event{type: :spell_start}), do: entity
+  def emit(entity, %Effects.SpellStart{}), do: entity
 
-  def emit(%Character{} = entity, %Event{type: :spell_cooldown} = event) do
+  def emit(%Character{} = entity, %Effects.SpellCooldown{} = event) do
     Network.send_packet(%Message.SmsgSpellCooldown{
       guid: event.source_guid,
       cooldowns: [{event.spell_id, event.duration_ms}]
@@ -299,9 +299,9 @@ defmodule ThistleTea.Game.Entity.EventSink do
     entity
   end
 
-  def emit(entity, %Event{type: :spell_cooldown}), do: entity
+  def emit(entity, %Effects.SpellCooldown{}), do: entity
 
-  def emit(%Character{} = entity, %Event{type: :spell_modifier, modifier_type: :flat} = event) do
+  def emit(%Character{} = entity, %Effects.SpellModifier{modifier_type: :flat} = event) do
     Network.send_packet(%Message.SmsgSetFlatSpellModifier{
       effect_index: event.effect_index,
       operation: event.operation,
@@ -311,7 +311,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
     entity
   end
 
-  def emit(%Character{} = entity, %Event{type: :spell_modifier, modifier_type: :pct} = event) do
+  def emit(%Character{} = entity, %Effects.SpellModifier{modifier_type: :pct} = event) do
     Network.send_packet(%Message.SmsgSetPctSpellModifier{
       effect_index: event.effect_index,
       operation: event.operation,
@@ -321,16 +321,16 @@ defmodule ThistleTea.Game.Entity.EventSink do
     entity
   end
 
-  def emit(entity, %Event{type: :spell_modifier}), do: entity
+  def emit(entity, %Effects.SpellModifier{}), do: entity
 
-  def emit(%Character{} = entity, %Event{type: :cooldown_event} = event) do
+  def emit(%Character{} = entity, %Effects.CooldownEvent{} = event) do
     Network.send_packet(%Message.SmsgCooldownEvent{spell_id: event.spell_id, guid: event.source_guid})
     entity
   end
 
-  def emit(entity, %Event{type: :cooldown_event}), do: entity
+  def emit(entity, %Effects.CooldownEvent{}), do: entity
 
-  def emit(%Character{} = entity, %Event{type: :clear_cooldown} = event) do
+  def emit(%Character{} = entity, %Effects.ClearCooldown{} = event) do
     Network.send_packet(%Message.SmsgClearCooldown{
       spell_id: event.spell_id,
       target_guid: event.target_guid
@@ -339,9 +339,9 @@ defmodule ThistleTea.Game.Entity.EventSink do
     entity
   end
 
-  def emit(entity, %Event{type: :clear_cooldown}), do: entity
+  def emit(entity, %Effects.ClearCooldown{}), do: entity
 
-  def emit(%{object: %{guid: guid}} = entity, %Event{type: :spell_go} = event) when is_integer(guid) do
+  def emit(%{object: %{guid: guid}} = entity, %Effects.SpellGo{} = event) when is_integer(guid) do
     %Message.SmsgSpellGo{
       cast_item: event.cast_item_guid || event.source_guid || guid,
       caster: event.source_guid || guid,
@@ -358,16 +358,16 @@ defmodule ThistleTea.Game.Entity.EventSink do
     entity
   end
 
-  def emit(entity, %Event{type: :spell_go}), do: entity
+  def emit(entity, %Effects.SpellGo{}), do: entity
 
-  def emit(%Character{} = entity, %Event{type: :stand_state} = event) do
+  def emit(%Character{} = entity, %Effects.StandState{} = event) do
     Network.send_packet(%Message.SmsgStandstateUpdate{stand_state: event.stand_state})
     entity
   end
 
-  def emit(entity, %Event{type: :stand_state}), do: entity
+  def emit(entity, %Effects.StandState{}), do: entity
 
-  def emit(%Character{} = entity, %Event{type: :channel_start} = event) do
+  def emit(%Character{} = entity, %Effects.ChannelStart{} = event) do
     Network.send_packet(%Message.MsgChannelStart{
       spell_id: event.spell_id,
       duration_ms: event.channel_time_ms
@@ -376,30 +376,30 @@ defmodule ThistleTea.Game.Entity.EventSink do
     entity
   end
 
-  def emit(entity, %Event{type: :channel_start}), do: entity
+  def emit(entity, %Effects.ChannelStart{}), do: entity
 
-  def emit(%Character{} = entity, %Event{type: :channel_update} = event) do
+  def emit(%Character{} = entity, %Effects.ChannelUpdate{} = event) do
     Network.send_packet(%Message.MsgChannelUpdate{time_ms: event.channel_time_ms})
     entity
   end
 
-  def emit(entity, %Event{type: :channel_update}), do: entity
+  def emit(entity, %Effects.ChannelUpdate{}), do: entity
 
-  def emit(%{internal: %Internal{broadcast_update?: true} = internal} = entity, %Event{type: :object_update} = event) do
+  def emit(%{internal: %Internal{broadcast_update?: true} = internal} = entity, %Effects.ObjectUpdate{} = event) do
     Core.update_object(entity, event.update_type || :values)
     |> World.broadcast_packet(entity)
 
     %{entity | internal: %{internal | broadcast_update?: false}}
   end
 
-  def emit(entity, %Event{type: :object_update}), do: entity
+  def emit(entity, %Effects.ObjectUpdate{}), do: entity
 
-  def emit(entity, %Event{type: :deliver_attack} = event) do
+  def emit(entity, %Effects.DeliverAttack{} = event) do
     Entity.receive_attack(event.target_guid, event.attack)
     entity
   end
 
-  def emit(entity, %Event{type: :deliver_spell} = event) do
+  def emit(entity, %Effects.DeliverSpell{} = event) do
     case projectile_delay_ms(entity, event) do
       delay_ms when is_integer(delay_ms) and delay_ms > 0 ->
         Process.send_after(self(), {:deliver_spell, event}, delay_ms)
@@ -411,17 +411,17 @@ defmodule ThistleTea.Game.Entity.EventSink do
     entity
   end
 
-  def emit(entity, %Event{type: :deliver_spell_outcome} = event) do
+  def emit(entity, %Effects.DeliverSpellOutcome{} = event) do
     Entity.receive_spell_outcome(event.target_guid, event.source_guid, event.spell, event.outcome)
     entity
   end
 
-  def emit(entity, %Event{type: :remove_aura} = event) do
+  def emit(entity, %Effects.RemoveAura{} = event) do
     Entity.remove_aura(event.target_guid, event.spell_id, event.source_guid)
     entity
   end
 
-  def emit(entity, %Event{type: :attack_start, source_guid: source_guid, target_guid: target_guid})
+  def emit(entity, %Effects.AttackStart{source_guid: source_guid, target_guid: target_guid})
       when is_integer(source_guid) and is_integer(target_guid) do
     %Message.SmsgAttackstart{
       attacker: source_guid,
@@ -432,7 +432,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
     entity
   end
 
-  def emit(entity, %Event{type: :attack_stop} = event) do
+  def emit(entity, %Effects.AttackStop{} = event) do
     %Message.SmsgAttackstop{
       player: event.source_guid,
       enemy: event.target_guid
@@ -442,17 +442,17 @@ defmodule ThistleTea.Game.Entity.EventSink do
     entity
   end
 
-  def emit(entity, %Event{type: :duel_defeat, source_guid: winner_guid, target_guid: loser_guid}) do
+  def emit(entity, %Effects.DuelDefeat{source_guid: winner_guid, target_guid: loser_guid}) do
     DuelSystem.defeat(loser_guid, winner_guid)
     entity
   end
 
-  def emit(entity, %Event{type: :duel_interrupted, target_guid: guid}) do
+  def emit(entity, %Effects.DuelInterrupted{target_guid: guid}) do
     DuelSystem.interrupt(guid)
     entity
   end
 
-  def emit(entity, %Event{type: :duel_request, position: {world, x, y, z}} = event) do
+  def emit(entity, %Effects.DuelRequest{position: {world, x, y, z}} = event) do
     DuelSystem.challenge(%{
       initiator_guid: event.source_guid,
       initiator_level: event.source_level,
@@ -466,7 +466,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
     entity
   end
 
-  def emit(entity, %Event{type: :attacker_state_update} = event) do
+  def emit(entity, %Effects.AttackerStateUpdate{} = event) do
     attack = event.attack || %{}
     damage = event.damage || 0
 
@@ -494,14 +494,14 @@ defmodule ThistleTea.Game.Entity.EventSink do
     entity
   end
 
-  def emit(entity, %Event{type: :attack_not_in_range}) do
+  def emit(entity, %Effects.AttackNotInRange{}) do
     Packet.build(<<>>, Opcodes.get(:SMSG_ATTACKSWING_NOTINRANGE))
     |> Network.send_packet()
 
     entity
   end
 
-  def emit(entity, %Event{type: :drain_power, target_guid: target_guid, misc_value: power_type}) do
+  def emit(entity, %Effects.DrainPower{target_guid: target_guid, misc_value: power_type}) do
     if Guid.entity_type(target_guid) == :player do
       Entity.drain_power(target_guid, power_type)
     end
@@ -509,7 +509,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
     entity
   end
 
-  def emit(entity, %Event{type: :grant_power} = event) do
+  def emit(entity, %Effects.GrantPower{} = event) do
     if Guid.entity_type(event.target_guid) == :player do
       Entity.grant_power(event.target_guid, event.misc_value, event.amount)
     end
@@ -519,10 +519,10 @@ defmodule ThistleTea.Game.Entity.EventSink do
 
   @charge_speed 25.0
 
-  def emit(%Character{internal: %Internal{world: world}, movement_block: %{position: {x, y, z, _o}}} = entity, %Event{
-        type: :charge,
-        target_guid: target_guid
-      }) do
+  def emit(
+        %Character{internal: %Internal{world: world}, movement_block: %{position: {x, y, z, _o}}} = entity,
+        %Effects.Charge{target_guid: target_guid}
+      ) do
     with {^world, tx, ty, tz} <- World.position(target_guid),
          path when is_list(path) and path != [] <- charge_path(world.map_id, {x, y, z}, {tx, ty, tz}) do
       duration =
@@ -554,9 +554,9 @@ defmodule ThistleTea.Game.Entity.EventSink do
     end
   end
 
-  def emit(entity, %Event{type: :charge}), do: entity
+  def emit(entity, %Effects.Charge{}), do: entity
 
-  def emit(entity, %Event{type: :attack_outcome} = event) do
+  def emit(entity, %Effects.AttackOutcome{} = event) do
     Entity.attack_outcome(event.target_guid, %{
       victim_guid: event.source_guid,
       outcome: event.outcome,
@@ -568,12 +568,12 @@ defmodule ThistleTea.Game.Entity.EventSink do
     entity
   end
 
-  def emit(entity, %Event{type: :attacker_gained, target_guid: target_guid}) do
+  def emit(entity, %Effects.AttackerGained{target_guid: target_guid}) do
     Metadata.increment(target_guid, :attacker_count)
     entity
   end
 
-  def emit(%{object: %{guid: mob_guid}} = entity, %Event{type: :threat_ref_gained, target_guid: target_guid}) do
+  def emit(%{object: %{guid: mob_guid}} = entity, %Effects.ThreatRefGained{target_guid: target_guid}) do
     if Guid.entity_type(target_guid) == :player do
       Entity.threat_ref_gained(target_guid, mob_guid, Incarnation.id(entity))
     end
@@ -581,7 +581,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
     entity
   end
 
-  def emit(%{object: %{guid: mob_guid}} = entity, %Event{type: :threat_ref_lost, target_guid: target_guid}) do
+  def emit(%{object: %{guid: mob_guid}} = entity, %Effects.ThreatRefLost{target_guid: target_guid}) do
     if Guid.entity_type(target_guid) == :player do
       Entity.threat_ref_lost(target_guid, mob_guid, Incarnation.id(entity))
     end
@@ -589,14 +589,14 @@ defmodule ThistleTea.Game.Entity.EventSink do
     entity
   end
 
-  def emit(%Character{object: %{guid: guid}} = entity, %Event{type: :drop_threat, target_guid: mob_guid}) do
+  def emit(%Character{object: %{guid: guid}} = entity, %Effects.DropThreat{target_guid: mob_guid}) do
     Entity.drop_threat(mob_guid, guid)
     entity
   end
 
-  def emit(entity, %Event{type: :drop_threat}), do: entity
+  def emit(entity, %Effects.DropThreat{}), do: entity
 
-  def emit(%Character{} = entity, %Event{type: :drop_nearby_threat}) do
+  def emit(%Character{} = entity, %Effects.DropNearbyThreat{}) do
     Metadata.update(entity.object.guid, StealthDetection.target_metadata(entity))
 
     entity
@@ -606,25 +606,25 @@ defmodule ThistleTea.Game.Entity.EventSink do
     entity
   end
 
-  def emit(entity, %Event{type: :drop_nearby_threat}), do: entity
+  def emit(entity, %Effects.DropNearbyThreat{}), do: entity
 
-  def emit(%Character{} = entity, %Event{type: :blade_flurry, target_guid: primary, damage: damage} = event)
+  def emit(%Character{} = entity, %Effects.BladeFlurry{target_guid: primary, damage: damage} = event)
       when is_integer(event.spell_id) do
     deliver_secondary_melee(entity, primary, damage, event.spell_id, Scripts.blade_flurry_radius_yards())
 
     entity
   end
 
-  def emit(entity, %Event{type: :blade_flurry}), do: entity
+  def emit(entity, %Effects.BladeFlurry{}), do: entity
 
-  def emit(%Character{} = entity, %Event{type: :secondary_melee} = event) do
+  def emit(%Character{} = entity, %Effects.SecondaryMelee{} = event) do
     deliver_secondary_melee(entity, event.target_guid, event.damage, event.spell_id, event.range_yards)
     entity
   end
 
-  def emit(entity, %Event{type: :secondary_melee}), do: entity
+  def emit(entity, %Effects.SecondaryMelee{}), do: entity
 
-  def emit(%Character{} = entity, %Event{type: :refresh_party_aura, spell: %Spell{} = spell, amount: radius})
+  def emit(%Character{} = entity, %Effects.RefreshPartyAura{spell: %Spell{} = spell, amount: radius})
       when is_number(radius) do
     entity
     |> SpellTargetResolver.resolve_query({:party_aoe, radius})
@@ -637,8 +637,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
     entity
   end
 
-  def emit(%Mob{object: %{guid: guid}, internal: %{pet: %{owner_guid: owner_guid}}} = entity, %Event{
-        type: :refresh_party_aura,
+  def emit(%Mob{object: %{guid: guid}, internal: %{pet: %{owner_guid: owner_guid}}} = entity, %Effects.RefreshPartyAura{
         spell: %Spell{} = spell
       }) do
     context = %CastContext{
@@ -653,8 +652,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
     entity
   end
 
-  def emit(%Mob{object: %{guid: guid}, unit: %{created_by: owner_guid}} = entity, %Event{
-        type: :refresh_party_aura,
+  def emit(%Mob{object: %{guid: guid}, unit: %{created_by: owner_guid}} = entity, %Effects.RefreshPartyAura{
         spell: %Spell{} = spell,
         amount: radius
       })
@@ -676,9 +674,9 @@ defmodule ThistleTea.Game.Entity.EventSink do
     entity
   end
 
-  def emit(entity, %Event{type: :refresh_party_aura}), do: entity
+  def emit(entity, %Effects.RefreshPartyAura{}), do: entity
 
-  def emit(entity, %Event{type: :redirect_damage} = event) do
+  def emit(entity, %Effects.RedirectDamage{} = event) do
     spell = %Spell{
       id: 6940,
       name: "Blessing of Sacrifice",
@@ -699,24 +697,24 @@ defmodule ThistleTea.Game.Entity.EventSink do
     entity
   end
 
-  def emit(entity, %Event{type: :attacker_lost, target_guid: target_guid}) do
+  def emit(entity, %Effects.AttackerLost{target_guid: target_guid}) do
     Metadata.decrement(target_guid, :attacker_count, 0)
     entity
   end
 
-  def emit(%{object: %{guid: guid}} = entity, %Event{type: :tap_cleared}) do
+  def emit(%{object: %{guid: guid}} = entity, %Effects.TapCleared{}) do
     Metadata.update(guid, %{tapped_player: nil, tapped_group_id: nil})
     entity
   end
 
-  def emit(%Character{internal: %Internal{world: world}} = entity, %Event{type: :teleport, position: {x, y, z, o}}) do
+  def emit(%Character{internal: %Internal{world: world}} = entity, %Effects.Teleport{position: {x, y, z, o}}) do
     GenServer.cast(self(), {:start_teleport, x, y, z, o, world})
     entity
   end
 
-  def emit(entity, %Event{type: :teleport}), do: entity
+  def emit(entity, %Effects.Teleport{}), do: entity
 
-  def emit(%Character{internal: %Internal{world: world}} = entity, %Event{type: :leap, position: {x, y, z, _o}}) do
+  def emit(%Character{internal: %Internal{world: world}} = entity, %Effects.Leap{position: {x, y, z, _o}}) do
     case clamp_leap_destination(entity, world.map_id, {x, y, z}) do
       {nx, ny, nz} -> GenServer.cast(self(), {:start_teleport, nx, ny, nz, world})
       nil -> nil
@@ -725,17 +723,16 @@ defmodule ThistleTea.Game.Entity.EventSink do
     entity
   end
 
-  def emit(entity, %Event{type: :leap}), do: entity
+  def emit(entity, %Effects.Leap{}), do: entity
 
-  def emit(%Character{internal: %Internal{home_bind: {map, x, y, z}}} = entity, %Event{
-        type: :teleport_to_spell_target,
+  def emit(%Character{internal: %Internal{home_bind: {map, x, y, z}}} = entity, %Effects.TeleportToSpellTarget{
         spell_id: 8690
       }) do
     GenServer.cast(self(), {:start_teleport, x, y, z, map})
     entity
   end
 
-  def emit(%Character{} = entity, %Event{type: :teleport_to_spell_target, spell_id: spell_id}) do
+  def emit(%Character{} = entity, %Effects.TeleportToSpellTarget{spell_id: spell_id}) do
     case SpellLoader.target_position(spell_id) do
       %{map: map, x: x, y: y, z: z} -> GenServer.cast(self(), {:start_teleport, x, y, z, map})
       _ -> nil
@@ -744,40 +741,38 @@ defmodule ThistleTea.Game.Entity.EventSink do
     entity
   end
 
-  def emit(entity, %Event{type: :teleport_to_spell_target}), do: entity
+  def emit(entity, %Effects.TeleportToSpellTarget{}), do: entity
 
-  def emit(%Character{} = entity, %Event{type: :consume_cast_item, cast_item_guid: item_guid})
-      when is_integer(item_guid) do
+  def emit(%Character{} = entity, %Effects.ConsumeCastItem{cast_item_guid: item_guid}) when is_integer(item_guid) do
     send(self(), {:consume_cast_item, item_guid})
     entity
   end
 
-  def emit(entity, %Event{type: :consume_cast_item}), do: entity
+  def emit(entity, %Effects.ConsumeCastItem{}), do: entity
 
-  def emit(%Character{} = entity, %Event{type: :feed_pet} = event) do
+  def emit(%Character{} = entity, %Effects.FeedPet{} = event) do
     send(self(), {:feed_pet, event.cast_item_guid, event.target_guid, event.spell_id, event.range_yards})
     entity
   end
 
-  def emit(entity, %Event{type: :feed_pet}), do: entity
+  def emit(entity, %Effects.FeedPet{}), do: entity
 
-  def emit(%Character{} = entity, %Event{type: :enchant_item} = event) do
+  def emit(%Character{} = entity, %Effects.EnchantItem{} = event) do
     duration_ms = ItemEnchantmentLoader.duration_ms(event.spell.id, event.effect)
     send(self(), {:enchant_item, event.target_guid, event.spell, event.effect.misc_value, duration_ms})
     entity
   end
 
-  def emit(entity, %Event{type: :enchant_item}), do: entity
+  def emit(entity, %Effects.EnchantItem{}), do: entity
 
-  def emit(%Character{} = entity, %Event{type: :open_gameobject, target_guid: object_guid})
-      when is_integer(object_guid) do
+  def emit(%Character{} = entity, %Effects.OpenGameObject{target_guid: object_guid}) when is_integer(object_guid) do
     send(self(), {:open_gameobject_loot, object_guid})
     entity
   end
 
-  def emit(entity, %Event{type: :open_gameobject}), do: entity
+  def emit(entity, %Effects.OpenGameObject{}), do: entity
 
-  def emit(entity, %Event{type: :create_item, target_guid: target_guid, item_id: item_id, count: count})
+  def emit(entity, %Effects.GiveItem{target_guid: target_guid, item_id: item_id, count: count})
       when is_integer(target_guid) do
     case Entity.pid(target_guid) do
       pid when is_pid(pid) -> send(pid, {:create_item, item_id, count})
@@ -787,23 +782,23 @@ defmodule ThistleTea.Game.Entity.EventSink do
     entity
   end
 
-  def emit(%Character{} = entity, %Event{type: :create_item, item_id: item_id, count: count}) do
+  def emit(%Character{} = entity, %Effects.CreateItem{item_id: item_id, count: count}) do
     send(self(), {:create_item, item_id, count})
     entity
   end
 
-  def emit(entity, %Event{type: :create_item}), do: entity
+  def emit(entity, %Effects.CreateItem{}), do: entity
 
-  def emit(%Character{} = entity, %Event{type: :consume_reagents, reagents: reagents}) when is_list(reagents) do
+  def emit(%Character{} = entity, %Effects.ConsumeReagents{reagents: reagents}) when is_list(reagents) do
     send(self(), {:consume_reagents, reagents})
     entity
   end
 
-  def emit(entity, %Event{type: :consume_reagents}), do: entity
+  def emit(entity, %Effects.ConsumeReagents{}), do: entity
 
   def emit(
         %{object: %{guid: caster_guid}, internal: %Internal{world: world}} = entity,
-        %Event{type: :spawn_area_effect} = event
+        %Effects.SpawnAreaEffect{} = event
       ) do
     radius =
       case event.effect do
@@ -822,14 +817,12 @@ defmodule ThistleTea.Game.Entity.EventSink do
     entity
   end
 
-  def emit(entity, %Event{type: :spawn_area_effect}), do: entity
+  def emit(entity, %Effects.SpawnAreaEffect{}), do: entity
 
-  def emit(%Character{object: %{guid: caster_guid}, player: player, internal: %Internal{world: world}} = entity, %Event{
-        type: :spawn_farsight,
-        spell: %Spell{} = spell,
-        position: position,
-        duration_ms: duration_ms
-      }) do
+  def emit(
+        %Character{object: %{guid: caster_guid}, player: player, internal: %Internal{world: world}} = entity,
+        %Effects.SpawnFarsight{spell: %Spell{} = spell, position: position, duration_ms: duration_ms}
+      ) do
     dynamic_object = DataDynamicObject.build(caster_guid, world, spell, position, 0.0)
 
     World.start_entity(%{
@@ -845,9 +838,9 @@ defmodule ThistleTea.Game.Entity.EventSink do
     |> Core.mark_broadcast_update()
   end
 
-  def emit(entity, %Event{type: :spawn_farsight}), do: entity
+  def emit(entity, %Effects.SpawnFarsight{}), do: entity
 
-  def emit(%{object: %{guid: caster_guid}} = entity, %Event{type: :despawn_area_effects, spell_id: spell_id})
+  def emit(%{object: %{guid: caster_guid}} = entity, %Effects.DespawnAreaEffects{spell_id: spell_id})
       when is_integer(caster_guid) do
     caster_guid
     |> AreaEffects.pids(spell_id)
@@ -856,16 +849,16 @@ defmodule ThistleTea.Game.Entity.EventSink do
     entity
   end
 
-  def emit(entity, %Event{type: :despawn_area_effects}), do: entity
+  def emit(entity, %Effects.DespawnAreaEffects{}), do: entity
 
-  def emit(entity, %Event{type: :despawn_entity, target_guid: guid}) when is_integer(guid) do
+  def emit(entity, %Effects.DespawnEntity{target_guid: guid}) when is_integer(guid) do
     World.stop_entity(guid)
     entity
   end
 
-  def emit(entity, %Event{type: :despawn_entity}), do: entity
+  def emit(entity, %Effects.DespawnEntity{}), do: entity
 
-  def emit(entity, %Event{type: :leave_ritual, target_guid: game_object_guid, source_guid: user_guid}) do
+  def emit(entity, %Effects.LeaveRitual{target_guid: game_object_guid, source_guid: user_guid}) do
     Entity.leave_ritual(game_object_guid, user_guid)
     entity
   end
@@ -876,7 +869,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
           internal: %Internal{world: world},
           movement_block: %{position: {_x, _y, _z, _o} = position}
         } = entity,
-        %Event{type: :summon_game_object, entry: entry, duration_ms: duration_ms} = event
+        %Effects.SummonGameObject{entry: entry, duration_ms: duration_ms} = event
       ) do
     case GameObjectTemplateLoader.get(entry) do
       %DataGameObjectTemplate{} = template ->
@@ -898,10 +891,9 @@ defmodule ThistleTea.Game.Entity.EventSink do
     end
   end
 
-  def emit(entity, %Event{type: :summon_game_object}), do: entity
+  def emit(entity, %Effects.SummonGameObject{}), do: entity
 
-  def emit(entity, %Event{
-        type: :summon_request,
+  def emit(entity, %Effects.SummonRequest{
         source_guid: summoner_guid,
         target_guid: target_guid,
         amount: zone_id,
@@ -911,9 +903,9 @@ defmodule ThistleTea.Game.Entity.EventSink do
     entity
   end
 
-  def emit(entity, %Event{type: :summon_request}), do: entity
+  def emit(entity, %Effects.SummonRequest{}), do: entity
 
-  def emit(%{object: %{guid: guid}, internal: %Internal{name: name}} = entity, %Event{type: :monster_talk} = event) do
+  def emit(%{object: %{guid: guid}, internal: %Internal{name: name}} = entity, %Effects.MonsterTalk{} = event) do
     event.chat_type
     |> monster_chat_type()
     |> Message.SmsgMessagechat.monster(event.text, guid, name, event.target_guid)
@@ -922,19 +914,19 @@ defmodule ThistleTea.Game.Entity.EventSink do
     entity
   end
 
-  def emit(%{object: %{guid: guid}} = entity, %Event{type: :emote, emote_id: emote_id}) do
+  def emit(%{object: %{guid: guid}} = entity, %Effects.Emote{emote_id: emote_id}) do
     %Message.SmsgEmote{emote: emote_id, guid: guid}
     |> World.broadcast_packet(entity)
 
     entity
   end
 
-  def emit(entity, %Event{type: :script_steps} = event) do
+  def emit(entity, %Effects.ScriptSteps{} = event) do
     Process.send_after(self(), {:ai_script_steps, event.steps, event.target_guid}, event.duration_ms || 0)
     entity
   end
 
-  def emit(entity, %Event{type: :forward_script_steps} = event) do
+  def emit(entity, %Effects.ForwardScriptSteps{} = event) do
     case Entity.pid(event.target_guid) do
       pid when is_pid(pid) -> send(pid, {:ai_script_steps, event.steps, event.source_guid})
       _ -> nil
@@ -943,7 +935,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
     entity
   end
 
-  def emit(%{internal: %Internal{world: world}} = entity, %Event{type: :summon_creature, summon: summon} = event) do
+  def emit(%{internal: %Internal{world: world}} = entity, %Effects.SummonCreature{summon: summon} = event) do
     with true <- summon_allowed?(world, summon),
          %Mob{} = mob <-
            SummonLoader.build(summon.entry, world, summon.position,
@@ -969,9 +961,9 @@ defmodule ThistleTea.Game.Entity.EventSink do
     entity
   end
 
-  def emit(entity, %Event{type: :summon_creature}), do: entity
+  def emit(entity, %Effects.SummonCreature{}), do: entity
 
-  def emit(entity, %Event{type: :control_granted} = event) do
+  def emit(entity, %Effects.ControlGranted{} = event) do
     case Entity.pid(event.source_guid) do
       pid when is_pid(pid) ->
         send(pid, {:control_granted, event.target_guid, event.spell_id, event.spells, event.enabled?})
@@ -983,7 +975,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
     entity
   end
 
-  def emit(entity, %Event{type: :control_released} = event) do
+  def emit(entity, %Effects.ControlReleased{} = event) do
     case Entity.pid(event.source_guid) do
       pid when is_pid(pid) -> send(pid, {:control_released, event.target_guid})
       _ -> nil
@@ -992,7 +984,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
     entity
   end
 
-  def emit(entity, %Event{type: :release_controlled} = event) do
+  def emit(entity, %Effects.ReleaseControlled{} = event) do
     case Entity.pid(event.target_guid) do
       pid when is_pid(pid) -> send(pid, {:release_control, event.source_guid, event.spell_id})
       _ -> nil
@@ -1001,7 +993,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
     entity
   end
 
-  def emit(entity, %Event{type: :viewpoint_granted} = event) do
+  def emit(entity, %Effects.ViewpointGranted{} = event) do
     case Entity.pid(event.source_guid) do
       pid when is_pid(pid) -> send(pid, {:viewpoint_granted, event.target_guid})
       _ -> nil
@@ -1010,7 +1002,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
     entity
   end
 
-  def emit(entity, %Event{type: :viewpoint_released} = event) do
+  def emit(entity, %Effects.ViewpointReleased{} = event) do
     case Entity.pid(event.source_guid) do
       pid when is_pid(pid) -> send(pid, {:viewpoint_released, event.target_guid})
       _ -> nil
@@ -1019,7 +1011,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
     entity
   end
 
-  def emit(%Character{} = entity, %Event{type: :summon_pet, entry: entry, spell_id: spell_id}) do
+  def emit(%Character{} = entity, %Effects.SummonPet{entry: entry, spell_id: spell_id}) do
     with %Mob{} = built_pet <- SummonLoader.build_pet(entry, entity),
          pet = %{built_pet | unit: %{built_pet.unit | created_by_spell: spell_id}},
          {:ok, pid} <- MobLoader.start_mob(pet) do
@@ -1035,9 +1027,9 @@ defmodule ThistleTea.Game.Entity.EventSink do
     entity
   end
 
-  def emit(entity, %Event{type: :summon_pet}), do: entity
+  def emit(entity, %Effects.SummonPet{}), do: entity
 
-  def emit(%Mob{object: %{guid: guid}} = entity, %Event{type: :tame_creature, source_guid: owner_guid, entry: entry}) do
+  def emit(%Mob{object: %{guid: guid}} = entity, %Effects.TameCreature{source_guid: owner_guid, entry: entry}) do
     case Entity.pid(owner_guid) do
       pid when is_pid(pid) -> send(pid, {:tame_pet, entry})
       _ -> nil
@@ -1047,9 +1039,9 @@ defmodule ThistleTea.Game.Entity.EventSink do
     entity
   end
 
-  def emit(entity, %Event{type: :tame_creature}), do: entity
+  def emit(entity, %Effects.TameCreature{}), do: entity
 
-  def emit(%Character{unit: %Unit{summon: pet_guid}} = entity, %Event{type: :dismiss_pet} = event)
+  def emit(%Character{unit: %Unit{summon: pet_guid}} = entity, %Effects.DismissPet{} = event)
       when is_integer(pet_guid) and pet_guid > 0 do
     World.stop_entity(pet_guid)
     Network.send_packet(Message.SmsgPetSpells.clear())
@@ -1064,7 +1056,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
     %{entity | unit: %{entity.unit | summon: 0}, internal: internal}
   end
 
-  def emit(entity, %Event{type: :dismiss_pet}), do: entity
+  def emit(entity, %Effects.DismissPet{}), do: entity
 
   def emit(
         %Character{
@@ -1072,7 +1064,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
           internal: %Internal{world: world},
           movement_block: %{position: position}
         } = entity,
-        %Event{type: :summon_totem, entry: entry, slot: slot, duration_ms: duration_ms}
+        %Effects.SummonTotem{entry: entry, slot: slot, duration_ms: duration_ms}
       ) do
     old_guid = Map.get(entity.internal.totem_guids, slot)
     if is_integer(old_guid), do: World.stop_entity(old_guid)
@@ -1102,67 +1094,66 @@ defmodule ThistleTea.Game.Entity.EventSink do
     end
   end
 
-  def emit(entity, %Event{type: :summon_totem}), do: entity
+  def emit(entity, %Effects.SummonTotem{}), do: entity
 
-  def emit(entity, %Event{type: :despawn_self} = event) do
+  def emit(entity, %Effects.DespawnSelf{} = event) do
     Process.send_after(self(), {:despawn_creature, event.respawn_delay_ms}, event.duration_ms || 0)
     entity
   end
 
-  def emit(entity, %Event{type: :attack_start, target_guid: target_guid})
-      when is_integer(target_guid) and target_guid > 0 do
+  def emit(entity, %Effects.StartAttack{target_guid: target_guid}) when is_integer(target_guid) and target_guid > 0 do
     send(self(), {:force_attack, target_guid})
     entity
   end
 
-  def emit(entity, %Event{type: :attack_start}), do: entity
+  def emit(entity, %Effects.StartAttack{}), do: entity
 
-  def emit(%Mob{} = entity, %Event{type: :call_assistance, target_guid: target_guid})
+  def emit(%Mob{} = entity, %Effects.CallAssistance{target_guid: target_guid})
       when is_integer(target_guid) and target_guid > 0 do
     Process.send_after(self(), {:call_assistance, target_guid}, CallForHelp.assist_delay_ms())
     entity
   end
 
-  def emit(entity, %Event{type: :call_assistance}), do: entity
+  def emit(entity, %Effects.CallAssistance{}), do: entity
 
-  def emit(%Mob{} = entity, %Event{type: :call_for_help, target_guid: target_guid})
+  def emit(%Mob{} = entity, %Effects.CallForHelp{target_guid: target_guid})
       when is_integer(target_guid) and target_guid > 0 do
     CallForHelp.pulse(entity, target_guid)
     entity
   end
 
-  def emit(entity, %Event{type: :call_for_help}), do: entity
+  def emit(entity, %Effects.CallForHelp{}), do: entity
 
-  def emit(%Character{object: %{guid: guid}} = entity, %Event{type: :spell_delayed} = event) do
+  def emit(%Character{object: %{guid: guid}} = entity, %Effects.SpellDelayed{} = event) do
     Network.send_packet(%Message.SmsgSpellDelayed{caster: guid, delay_ms: event.delay_ms})
     entity
   end
 
-  def emit(entity, %Event{type: :spell_delayed}), do: entity
+  def emit(entity, %Effects.SpellDelayed{}), do: entity
 
-  def emit(entity, %Event{type: :delay_aura, target_guid: target_guid} = event)
+  def emit(entity, %Effects.DelayAura{target_guid: target_guid} = event)
       when is_integer(target_guid) and target_guid > 0 do
     Entity.delay_aura(target_guid, event.spell_id, event.source_guid, event.delay_ms)
     entity
   end
 
-  def emit(entity, %Event{type: :delay_aura}), do: entity
+  def emit(entity, %Effects.DelayAura{}), do: entity
 
-  def emit(entity, %Event{type: :play_sound, sound_id: sound_id}) do
+  def emit(entity, %Effects.PlaySound{sound_id: sound_id}) do
     %Message.SmsgPlaySound{sound_id: sound_id}
     |> World.broadcast_packet(entity)
 
     entity
   end
 
-  def emit(%{object: %{guid: guid}} = entity, %Event{type: :play_object_sound, sound_id: sound_id}) do
+  def emit(%{object: %{guid: guid}} = entity, %Effects.PlayObjectSound{sound_id: sound_id}) do
     %Message.SmsgPlayObjectSound{sound_id: sound_id, guid: guid}
     |> World.broadcast_packet(entity)
 
     entity
   end
 
-  def emit(entity, %Event{type: :set_facing, facing: facing}) do
+  def emit(entity, %Effects.SetFacing{facing: facing}) do
     Message.SmsgMonsterMove.build_face(entity, facing)
     |> World.broadcast_packet(entity)
 
@@ -1171,7 +1162,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
 
   def emit(
         %{object: %{guid: guid}} = entity,
-        %Event{type: :trigger_spell, source_guid: source, resolve_targets?: true} = event
+        %Effects.TriggerSpell{source_guid: source, resolve_targets?: true} = event
       )
       when is_integer(source) and source != guid do
     Entity.trigger_spell(source, event.spell_id, event.target_guid,
@@ -1184,7 +1175,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
     entity
   end
 
-  def emit(entity, %Event{type: :trigger_spell} = event) do
+  def emit(entity, %Effects.TriggerSpell{} = event) do
     case SpellLoader.load(event.spell_id) do
       nil ->
         entity
@@ -1198,18 +1189,29 @@ defmodule ThistleTea.Game.Entity.EventSink do
 
   def emit(entity, _event), do: entity
 
-  defp notify_spell_outcome(%Event{source_guid: source_guid, target_guid: target_guid, proc_type: proc_type} = event)
+  defp notify_spell_outcome(%Effects.SpellDamage{} = event) do
+    notify_spell_outcome(event, event.absorbed)
+  end
+
+  defp notify_spell_outcome(%Effects.SpellHeal{} = event) do
+    notify_spell_outcome(event, 0)
+  end
+
+  defp notify_spell_outcome(
+         %{source_guid: source_guid, target_guid: target_guid, proc_type: proc_type} = event,
+         absorbed
+       )
        when is_integer(source_guid) and is_atom(proc_type) do
     Entity.spell_outcome(source_guid, %{
       victim_guid: target_guid,
       outcome: if(event.crit?, do: :crit, else: :normal),
-      damage: max((event.damage || 0) - (event.absorbed || 0), 0),
+      damage: max((event.damage || 0) - (absorbed || 0), 0),
       proc_type: proc_type,
       spell_id: event.spell_id
     })
   end
 
-  defp notify_spell_outcome(_event), do: :ok
+  defp notify_spell_outcome(_event, _absorbed), do: :ok
 
   defp track_channel_game_object(%{internal: %Internal{} = internal, unit: %Unit{} = unit} = entity, %GameObject{
          object: %{guid: guid},
@@ -1225,7 +1227,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
 
   defp track_channel_game_object(entity, %GameObject{}), do: entity
 
-  defp scripted_proc_spell(%Spell{} = spell, %Event{triggering_spell_id: triggering_spell_id}) do
+  defp scripted_proc_spell(%Spell{} = spell, %Effects.TriggerSpell{triggering_spell_id: triggering_spell_id}) do
     case Scripts.proc_trigger_spell_id(spell, triggering_spell_id) do
       spell_id when spell_id == spell.id -> spell
       spell_id when is_integer(spell_id) -> SpellLoader.load(spell_id)
@@ -1253,7 +1255,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
 
         entity
         |> emit(
-          Event.spell_go(
+          Effects.spell_go(
             event.source_guid || entity.object.guid,
             event.spell_id,
             [target_guid],
@@ -1270,7 +1272,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
     entity =
       emit(
         entity,
-        Event.spell_go(
+        Effects.spell_go(
           event.source_guid || entity.object.guid,
           event.spell_id,
           targets,
@@ -1283,7 +1285,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
     end)
   end
 
-  def deliver_spell(%Event{type: :deliver_spell} = event) do
+  def deliver_spell(%Effects.DeliverSpell{} = event) do
     Entity.receive_spell(event.target_guid, event.cast_context, event.spell)
   end
 
@@ -1356,7 +1358,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
        }) do
     spells = (spellbook || %{}) |> Map.values() |> Enum.reject(&Spell.attribute?(&1, :passive))
 
-    emit(entity, Event.control_granted(entity.object.guid, guid, spell_id, spells, possess?: true))
+    emit(entity, Effects.control_granted(entity.object.guid, guid, spell_id, spells, possess?: true))
 
     :ok
   end
@@ -1416,7 +1418,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
     end
   end
 
-  defp projectile_delay_ms(%{movement_block: %{position: {x, y, z, _o}}}, %Event{
+  defp projectile_delay_ms(%{movement_block: %{position: {x, y, z, _o}}}, %Effects.DeliverSpell{
          spell: %Spell{speed: speed},
          target_guid: target_guid
        })
@@ -1454,24 +1456,31 @@ defmodule ThistleTea.Game.Entity.EventSink do
     end
   end
 
-  defp dispatch_triggered_spell(%{object: %{guid: guid}} = entity, %Event{target_guid: guid} = event, spell) do
+  defp dispatch_triggered_spell(
+         %{object: %{guid: guid}} = entity,
+         %Effects.TriggerSpell{target_guid: guid} = event,
+         spell
+       ) do
     context = trigger_context(entity, event, spell)
     {entity, events} = SpellEffect.receive(entity, context, spell, Time.now())
     emit(entity, events)
   end
 
-  defp dispatch_triggered_spell(entity, %Event{} = event, spell) do
+  defp dispatch_triggered_spell(entity, %Effects.TriggerSpell{} = event, spell) do
     context = trigger_context(entity, event, spell)
-    emit(entity, Event.deliver_spell(event.target_guid, context, spell))
+    emit(entity, Effects.deliver_spell(event.target_guid, context, spell))
   end
 
-  defp apply_trigger_override(%Spell{} = spell, %Event{} = event) do
+  defp apply_trigger_override(%Spell{} = spell, %Effects.TriggerSpell{} = event) do
     spell
     |> apply_trigger_effect_override(event)
     |> apply_trigger_duration_override(event)
   end
 
-  defp apply_trigger_effect_override(%Spell{effects: effects} = spell, %Event{slot: index, amount: amount})
+  defp apply_trigger_effect_override(%Spell{effects: effects} = spell, %Effects.TriggerSpell{
+         slot: index,
+         amount: amount
+       })
        when is_integer(index) and is_integer(amount) do
     effects =
       Enum.map(effects, fn
@@ -1484,20 +1493,20 @@ defmodule ThistleTea.Game.Entity.EventSink do
 
   defp apply_trigger_effect_override(spell, _event), do: spell
 
-  defp apply_trigger_duration_override(%Spell{} = spell, %Event{duration_ms: duration_ms})
+  defp apply_trigger_duration_override(%Spell{} = spell, %Effects.TriggerSpell{duration_ms: duration_ms})
        when is_integer(duration_ms) and duration_ms > 0 do
     %{spell | duration_ms: duration_ms, max_duration_ms: duration_ms}
   end
 
   defp apply_trigger_duration_override(spell, _event), do: spell
 
-  defp triggered_target(%{object: %{guid: guid}} = entity, %Event{source_guid: guid} = event, spell) do
+  defp triggered_target(%{object: %{guid: guid}} = entity, %Effects.TriggerSpell{source_guid: guid} = event, spell) do
     SpellTarget.redirect_trigger_target(entity, event.target_guid, spell)
   end
 
-  defp triggered_target(_entity, %Event{} = event, _spell), do: event.target_guid
+  defp triggered_target(_entity, %Effects.TriggerSpell{} = event, _spell), do: event.target_guid
 
-  defp trigger_context(%{object: %{guid: guid}} = entity, %Event{source_guid: guid} = event, spell) do
+  defp trigger_context(%{object: %{guid: guid}} = entity, %Effects.TriggerSpell{source_guid: guid} = event, spell) do
     %{
       CastContext.from_caster(entity, spell, event.target_guid)
       | target_hostile?: Spell.requires_hostile_target?(spell),
@@ -1505,7 +1514,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
     }
   end
 
-  defp trigger_context(_entity, %Event{} = event, spell) do
+  defp trigger_context(_entity, %Effects.TriggerSpell{} = event, spell) do
     %CastContext{
       caster_guid: event.source_guid,
       caster_level: event.source_level || 1,

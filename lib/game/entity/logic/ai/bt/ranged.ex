@@ -6,7 +6,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Ranged do
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
-  alias ThistleTea.Game.Entity.Logic.Event
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Hunter
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
@@ -63,17 +63,17 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Ranged do
 
     character
     |> then(&%{&1 | internal: %{&1.internal | auto_shot: auto_shot}})
-    |> Event.enqueue(
-      Event.spell_go(character.object.guid, auto_shot.spell.id, [auto_shot.target_guid], auto_shot.raw_targets)
+    |> Effects.enqueue(
+      Effects.spell_go(character.object.guid, auto_shot.spell.id, [auto_shot.target_guid], auto_shot.raw_targets)
     )
-    |> Event.enqueue(Event.deliver_spell(auto_shot.target_guid, context, auto_shot.spell))
+    |> Effects.enqueue(Effects.deliver_spell(auto_shot.target_guid, context, auto_shot.spell))
     |> consume_ammo(auto_shot.spell)
   end
 
   defp consume_ammo(character, %Spell{} = spell) do
     case Hunter.ammo_reagents(character, spell) do
       [] -> character
-      reagents -> Event.enqueue(character, Event.consume_reagents(reagents))
+      reagents -> Effects.enqueue(character, Effects.consume_reagents(reagents))
     end
   end
 end

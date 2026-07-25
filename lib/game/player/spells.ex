@@ -6,7 +6,7 @@ defmodule ThistleTea.Game.Player.Spells do
   """
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
-  alias ThistleTea.Game.Entity.Logic.Event
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Proficiency
   alias ThistleTea.Game.Entity.Logic.SpellBook
   alias ThistleTea.Game.Network
@@ -46,7 +46,7 @@ defmodule ThistleTea.Game.Player.Spells do
 
   def unlearn(%Character{} = character, spell_ids, now) when is_list(spell_ids) and is_integer(now) do
     {character, aura_events} = AuraLogic.remove_spells(character, spell_ids, now)
-    character = Event.enqueue(character, aura_events)
+    character = Effects.enqueue(character, aura_events)
     internal = character.internal
 
     character = %{
@@ -75,7 +75,7 @@ defmodule ThistleTea.Game.Player.Spells do
         {character, events} =
           AuraLogic.apply_spell(character, character.object.guid, character.unit.level || 1, spell, now)
 
-        Event.enqueue(character, events)
+        Effects.enqueue(character, events)
       end
     end)
   end

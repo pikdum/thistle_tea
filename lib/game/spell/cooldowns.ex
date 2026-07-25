@@ -9,7 +9,7 @@ defmodule ThistleTea.Game.Spell.Cooldowns do
   import Bitwise, only: [&&&: 2, <<<: 2]
 
   alias ThistleTea.Game.Aura.Holder
-  alias ThistleTea.Game.Entity.Logic.Event
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Modifiers
 
@@ -38,7 +38,7 @@ defmodule ThistleTea.Game.Spell.Cooldowns do
       entity
     else
       case client_cooldown_ms(spell) do
-        cooldown_ms when cooldown_ms > 0 -> Event.enqueue(entity, Event.spell_cooldown(guid, spell_id, cooldown_ms))
+        cooldown_ms when cooldown_ms > 0 -> Effects.enqueue(entity, Effects.spell_cooldown(guid, spell_id, cooldown_ms))
         _ -> entity
       end
     end
@@ -135,7 +135,7 @@ defmodule ThistleTea.Game.Spell.Cooldowns do
         |> Map.merge(Map.new(entries(spell, now)))
       end)
 
-    events = Enum.map(spells, &Event.cooldown_event(guid, &1.id))
+    events = Enum.map(spells, &Effects.cooldown_event(guid, &1.id))
     {%{entity | internal: %{internal | cooldowns: cooldowns}}, events}
   end
 
@@ -185,7 +185,7 @@ defmodule ThistleTea.Game.Spell.Cooldowns do
 
     entity
     |> reset(Enum.flat_map(spells, &keys/1))
-    |> Event.enqueue(Enum.map(spells, &Event.clear_cooldown(guid, &1.id)))
+    |> Effects.enqueue(Enum.map(spells, &Effects.clear_cooldown(guid, &1.id)))
   end
 
   def reset_matching(entity, _predicate), do: entity

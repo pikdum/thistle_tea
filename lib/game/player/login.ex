@@ -22,7 +22,7 @@ defmodule ThistleTea.Game.Player.Login do
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Death
   alias ThistleTea.Game.Entity.Logic.Dueling
-  alias ThistleTea.Game.Entity.Logic.Event
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Entity.Logic.MovementStats
   alias ThistleTea.Game.Entity.Logic.PlayerFlags
@@ -159,7 +159,7 @@ defmodule ThistleTea.Game.Player.Login do
       {entry, spell_id}
       when is_integer(entry) and entry > 0 and is_integer(spell_id) and spell_id > 0 ->
         if Death.alive?(character) do
-          EventSink.emit(character, Event.summon_pet(character.object.guid, entry, spell_id))
+          EventSink.emit(character, Effects.summon_pet(character.object.guid, entry, spell_id))
         end
 
         state

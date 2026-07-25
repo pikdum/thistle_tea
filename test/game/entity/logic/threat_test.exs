@@ -5,7 +5,7 @@ defmodule ThistleTea.Game.Entity.Logic.ThreatTest do
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
-  alias ThistleTea.Game.Entity.Logic.Event
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Threat
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.World.Metadata
@@ -132,7 +132,7 @@ defmodule ThistleTea.Game.Entity.Logic.ThreatTest do
     test "add enqueues threat_ref_gained only for new entries" do
       entity = mob() |> Threat.add(@player_a, 10) |> Threat.add(@player_a, 10)
 
-      assert [%Event{type: :threat_ref_gained, target_guid: @player_a}] = entity.internal.events
+      assert [%Effects.ThreatRefGained{target_guid: @player_a}] = entity.internal.events
     end
 
     test "wipe enqueues threat_ref_lost for each entry" do
@@ -152,14 +152,14 @@ defmodule ThistleTea.Game.Entity.Logic.ThreatTest do
       entity = mob(target: @player_a, threat: %{@player_a => 100.0, @player_b => 10.0})
       {entity, _decision} = reselect(entity, valid?: fn guid -> guid != @player_a end)
 
-      assert [%Event{type: :threat_ref_lost, target_guid: @player_a}] = entity.internal.events
+      assert [%Effects.ThreatRefLost{target_guid: @player_a}] = entity.internal.events
     end
 
     test "taunt seeds a missing taunter at top threat with a gained event" do
       entity = Threat.taunt(mob(threat: %{@player_a => 200.0}), @player_b)
 
       assert entity.internal.threat == %{@player_a => 200.0, @player_b => 200.0}
-      assert [%Event{type: :threat_ref_gained, target_guid: @player_b}] = entity.internal.events
+      assert [%Effects.ThreatRefGained{target_guid: @player_b}] = entity.internal.events
     end
   end
 

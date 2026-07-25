@@ -13,7 +13,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Combat, as: CombatLogic
   alias ThistleTea.Game.Entity.Logic.Core
-  alias ThistleTea.Game.Entity.Logic.Event
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Hostility
   alias ThistleTea.Game.Entity.Logic.MeleeSpell
   alias ThistleTea.Game.Entity.Logic.PlayerCombat
@@ -163,13 +163,13 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
 
   defp maybe_start_melee_attack(%{object: %{guid: guid}} = state, target, %Blackboard{} = blackboard)
        when is_integer(target) do
-    state = Event.enqueue(state, CombatLogic.attack_start(guid, target))
+    state = Effects.enqueue(state, CombatLogic.attack_start(guid, target))
     {state, Map.put(blackboard, :attack_started, true)}
   end
 
   defp handle_out_of_range(%Character{} = state, blackboard, now) do
     blackboard = Blackboard.put_next_at(blackboard, :next_attack_at, @attack_retry_delay_ms, now)
-    {Event.enqueue(state, Event.attack_not_in_range()), blackboard}
+    {Effects.enqueue(state, Effects.attack_not_in_range()), blackboard}
   end
 
   defp handle_out_of_range(state, blackboard, now) do
@@ -198,7 +198,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
     state
     |> maybe_weapon_skill_up(target)
     |> queue_self_update()
-    |> Event.enqueue(Event.deliver_attack(target, attack))
+    |> Effects.enqueue(Effects.deliver_attack(target, attack))
   end
 
   defp send_offhand_attack(state, target) do
@@ -210,7 +210,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
       |> Map.merge(%{min_damage: min_damage, max_damage: max_damage, offhand?: true})
       |> CombatLogic.finalize_attack()
 
-    Event.enqueue(state, Event.deliver_attack(target, attack))
+    Effects.enqueue(state, Effects.deliver_attack(target, attack))
   end
 
   defp offhand_ready?(state, blackboard, now) do
@@ -244,7 +244,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
           target_hostile?: Hostility.valid_attack_target?(entity, target)
       }
 
-      Event.enqueue(entity, Event.deliver_spell(target, context, spell))
+      Effects.enqueue(entity, Effects.deliver_spell(target, context, spell))
     end)
   end
 
@@ -291,9 +291,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
 
   defp queue_queued_spell_go(%{object: %{guid: guid}} = state, %{id: spell_id}, target, targets)
        when is_integer(guid) and is_integer(spell_id) and is_integer(target) and is_list(targets) do
-    Event.enqueue(state, [
-      Event.spell_cast_result(spell_id),
-      Event.spell_go(guid, spell_id, targets, unit_target_raw(target))
+    Effects.enqueue(state, [
+      Effects.spell_cast_result(spell_id),
+      Effects.spell_go(guid, spell_id, targets, unit_target_raw(target))
     ])
   end
 
@@ -304,7 +304,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
   end
 
   defp queue_self_update(%{internal: %Internal{broadcast_update?: true}} = state) do
-    Event.enqueue(state, Event.object_update(:values))
+    Effects.enqueue(state, Effects.object_update(:values))
   end
 
   defp queue_self_update(state), do: state

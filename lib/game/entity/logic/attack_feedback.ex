@@ -9,7 +9,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackFeedback do
   """
   alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Logic.Aura
-  alias ThistleTea.Game.Entity.Logic.Event
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Paladin
   alias ThistleTea.Game.Entity.Logic.Reactive
   alias ThistleTea.Game.Entity.Logic.Resources
@@ -85,7 +85,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackFeedback do
     damage_spell_id = blade_flurry_damage_spell(entity, proc_type)
 
     if is_integer(proc_damage) and proc_damage > 0 and is_integer(damage_spell_id) do
-      Event.enqueue(entity, Event.blade_flurry(victim_guid, proc_damage, damage_spell_id))
+      Effects.enqueue(entity, Effects.blade_flurry(victim_guid, proc_damage, damage_spell_id))
     else
       entity
     end
@@ -127,7 +127,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackFeedback do
         now: now
       })
 
-    Event.enqueue(entity, events)
+    Effects.enqueue(entity, events)
   end
 
   defp trigger_melee_procs(entity, _payload, _spell, _now), do: entity

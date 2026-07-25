@@ -6,7 +6,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.ModifierSyncTest do
   alias ThistleTea.Game.Aura
   alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Logic.Aura.ModifierSync
-  alias ThistleTea.Game.Entity.Logic.Event
+  alias ThistleTea.Game.Entity.Logic.Effects
 
   describe "events/2" do
     test "emits absolute totals for changed mask bits" do
@@ -14,8 +14,8 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.ModifierSyncTest do
       second = holder(:add_flat_modifier, -200, 10, 0b001)
 
       assert ModifierSync.events([], [first, second]) == [
-               %Event{type: :spell_modifier, modifier_type: :flat, effect_index: 0, operation: 10, amount: -300},
-               %Event{type: :spell_modifier, modifier_type: :flat, effect_index: 2, operation: 10, amount: -100}
+               %Effects.SpellModifier{modifier_type: :flat, effect_index: 0, operation: 10, amount: -300},
+               %Effects.SpellModifier{modifier_type: :flat, effect_index: 2, operation: 10, amount: -100}
              ]
     end
 
@@ -23,7 +23,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.ModifierSyncTest do
       modifier = holder(:add_pct_modifier, -100, 10, 1 <<< 30)
 
       assert ModifierSync.events([modifier], []) == [
-               %Event{type: :spell_modifier, modifier_type: :pct, effect_index: 30, operation: 10, amount: 0}
+               %Effects.SpellModifier{modifier_type: :pct, effect_index: 30, operation: 10, amount: 0}
              ]
     end
 

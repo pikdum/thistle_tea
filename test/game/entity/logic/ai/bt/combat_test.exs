@@ -10,7 +10,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.CombatTest do
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AI.BT.Combat
-  alias ThistleTea.Game.Entity.Logic.Event
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.World.Metadata
@@ -41,8 +41,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.CombatTest do
       assert {:success, mob, %Blackboard{}} = Combat.melee_attack(mob, blackboard, 1_000)
 
       assert [
-               %Event{
-                 type: :deliver_attack,
+               %Effects.DeliverAttack{
                  target_guid: ^target_guid,
                  attack: %{caster: 1, caster_owner_guid: 1, min_damage: 3, max_damage: 3, damage: 3}
                }
@@ -76,7 +75,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.CombatTest do
 
       assert {:success, pet, %Blackboard{}} = Combat.melee_attack(pet, blackboard, 1_000)
 
-      assert [%Event{type: :deliver_attack, attack: %{caster: 1, caster_owner_guid: ^owner_guid}}] =
+      assert [%Effects.DeliverAttack{attack: %{caster: 1, caster_owner_guid: ^owner_guid}}] =
                pet.internal.events
     end
 
@@ -136,9 +135,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.CombatTest do
       assert {:success, mob, %Blackboard{}} = Combat.melee_attack(mob, blackboard, 1_000)
 
       assert [
-               %Event{type: :spell_cast_result, spell_id: 78},
-               %Event{type: :spell_go, spell_id: 78, hit_guids: [^target_guid]},
-               %Event{type: :deliver_spell, target_guid: ^target_guid, spell: %Spell{id: 78}}
+               %Effects.SpellCastResult{spell_id: 78},
+               %Effects.SpellGo{spell_id: 78, hit_guids: [^target_guid]},
+               %Effects.DeliverSpell{target_guid: ^target_guid, spell: %Spell{id: 78}}
              ] = mob.internal.events
 
       assert mob.internal.next_swing_spell == nil
@@ -203,11 +202,11 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.CombatTest do
       assert {:success, character, %Blackboard{}} =
                Combat.melee_attack(character, %Blackboard{attack_started: true, next_attack_at: 0}, 1_000)
 
-      assert %Event{type: :spell_go, hit_guids: [^primary_guid, ^secondary_guid]} =
+      assert %Effects.SpellGo{hit_guids: [^primary_guid, ^secondary_guid]} =
                Enum.find(character.internal.events, &(&1.type == :spell_go))
 
       assert [^primary_guid, ^secondary_guid] =
-               for(%Event{type: :deliver_spell, target_guid: guid} <- character.internal.events, do: guid)
+               for(%Effects.DeliverSpell{target_guid: guid} <- character.internal.events, do: guid)
     end
 
     test "swings immediately on fresh aggro when already in reach" do
@@ -292,7 +291,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.CombatTest do
       assert character.unit.power2 == 0
 
       assert [
-               %Event{type: :deliver_attack, target_guid: ^target_guid, attack: %{damage: 10}}
+               %Effects.DeliverAttack{target_guid: ^target_guid, attack: %{damage: 10}}
              ] = Enum.filter(character.internal.events, &(&1.type == :deliver_attack))
     end
   end

@@ -11,13 +11,13 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.CallForHelpTest do
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AI.BT.Mob, as: MobBT
-  alias ThistleTea.Game.Entity.Logic.Event
+  alias ThistleTea.Game.Entity.Logic.Effects
 
   describe "maybe_enqueue_call_assistance/2" do
     test "queues a call-assistance event for a regular mob" do
       mob = MobBT.maybe_enqueue_call_assistance(mob(), 42)
 
-      assert [%Event{type: :call_assistance, target_guid: 42}] = mob.internal.events
+      assert [%Effects.CallAssistance{target_guid: 42}] = mob.internal.events
     end
 
     test "does not queue for pets or mobs with the range disabled" do
@@ -35,7 +35,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.CallForHelpTest do
 
       {:success, mob, blackboard} = MobBT.call_for_help_step(mob, Blackboard.new(), 5_000)
 
-      assert [%Event{type: :call_for_help, target_guid: 42}] = mob.internal.events
+      assert [%Effects.CallForHelp{target_guid: 42}] = mob.internal.events
       assert blackboard.next_call_for_help_at == 6_000
     end
 

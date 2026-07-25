@@ -8,7 +8,7 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
 
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
-  alias ThistleTea.Game.Entity.Logic.Event
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Math
   alias ThistleTea.Game.World.Pathfinding
   alias ThistleTea.Game.World.SpatialHash
@@ -285,7 +285,7 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
     moved = start_move_to(state, {x, y, z}, now, Keyword.get(opts, :velocity))
 
     case moved.movement_block.spline_nodes do
-      [_ | _] -> Event.enqueue(moved, Event.monster_move(opts))
+      [_ | _] -> Effects.enqueue(moved, Effects.monster_move(opts))
       _ -> moved
     end
   end

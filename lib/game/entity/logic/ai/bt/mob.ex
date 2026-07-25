@@ -25,7 +25,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
   alias ThistleTea.Game.Entity.Logic.Combat, as: CombatLogic
   alias ThistleTea.Game.Entity.Logic.Core
-  alias ThistleTea.Game.Entity.Logic.Event
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Hostility
   alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.Entity.Logic.Regen, as: RegenLogic
@@ -505,7 +505,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
         target_guid
       )
       when is_number(range) and range > 0 and is_integer(target_guid) and target_guid > 0 do
-    Event.enqueue(state, Event.call_assistance(target_guid))
+    Effects.enqueue(state, Effects.call_assistance(target_guid))
   end
 
   def maybe_enqueue_call_assistance(%Mob{} = state, _target_guid), do: state
@@ -537,7 +537,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
        )
        when is_number(range) and range > 0 and is_integer(target) and target > 0 do
     if Math.distance({sx, sy, sz}, {x, y, z}) > @call_for_help_spawn_distance do
-      Event.enqueue(state, Event.call_for_help(target))
+      Effects.enqueue(state, Effects.call_for_help(target))
     else
       state
     end
@@ -579,16 +579,16 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
 
   defp set_victim_state(%Mob{unit: %Unit{target: previous} = unit} = state, new_guid) do
     %{state | unit: %{unit | target: new_guid}}
-    |> Event.enqueue(victim_change_events(previous, new_guid))
+    |> Effects.enqueue(victim_change_events(previous, new_guid))
     |> Core.mark_broadcast_update()
   end
 
   defp victim_change_events(previous, new_guid) when is_integer(previous) and previous > 0 do
-    [Event.attacker_lost(previous), Event.attacker_gained(new_guid)]
+    [Effects.attacker_lost(previous), Effects.attacker_gained(new_guid)]
   end
 
   defp victim_change_events(_previous, new_guid) do
-    [Event.attacker_gained(new_guid)]
+    [Effects.attacker_gained(new_guid)]
   end
 
   defp set_running_true(%Mob{} = state, %Blackboard{} = blackboard) do
@@ -605,7 +605,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
       if Movement.moving?(state, now) do
         state
         |> Movement.halt(now)
-        |> Event.enqueue(Event.movement_stopped())
+        |> Effects.enqueue(Effects.movement_stopped())
       else
         state
       end
@@ -689,7 +689,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
       state
       |> SpellBT.clear_cast()
       |> CombatLogic.sync_combat_flag()
-      |> Event.enqueue(clear_combat_events(state.object.guid, target))
+      |> Effects.enqueue(clear_combat_events(state.object.guid, target))
       |> Core.mark_broadcast_update()
 
     {:success, state, blackboard}
@@ -727,11 +727,11 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   end
 
   defp clear_combat_events(source_guid, target) when is_integer(target) and target > 0 do
-    [Event.attack_stop(source_guid, target), Event.attacker_lost(target), Event.tap_cleared()]
+    [Effects.attack_stop(source_guid, target), Effects.attacker_lost(target), Effects.tap_cleared()]
   end
 
   defp clear_combat_events(_source_guid, _target) do
-    [Event.tap_cleared()]
+    [Effects.tap_cleared()]
   end
 
   defp clear_tap(%Loot{} = loot), do: %{loot | tapped_by: nil}
@@ -827,7 +827,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
         state
         |> Movement.halt(now)
         |> face_position({tx, ty})
-        |> Event.enqueue(Event.movement_stopped())
+        |> Effects.enqueue(Effects.movement_stopped())
 
       {:success, state, blackboard}
     else

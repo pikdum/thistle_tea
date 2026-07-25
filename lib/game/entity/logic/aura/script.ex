@@ -5,7 +5,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Script do
   """
 
   alias ThistleTea.Game.Aura.Holder
-  alias ThistleTea.Game.Entity.Logic.Event
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Paladin
   alias ThistleTea.Game.Entity.Logic.Priest
   alias ThistleTea.Game.Math
@@ -61,7 +61,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Script do
   defp illumination_proc(holders, %Holder{} = holder, owner_guid, %{spell: %Spell{mana_cost: cost}})
        when is_integer(cost) and cost > 0 do
     event =
-      Event.trigger_spell(owner_guid, holder.caster_level || 1, owner_guid, Paladin.illumination_energize_id(),
+      Effects.trigger_spell(owner_guid, holder.caster_level || 1, owner_guid, Paladin.illumination_energize_id(),
         base_points: cost,
         effect_index: 0,
         triggered_by_spell_id: holder.spell.id
@@ -79,7 +79,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Script do
 
     if tick > 0 and is_integer(victim_guid) do
       event =
-        Event.trigger_spell(owner_guid, holder.caster_level || 1, victim_guid, @ignite_dot,
+        Effects.trigger_spell(owner_guid, holder.caster_level || 1, victim_guid, @ignite_dot,
           base_points: tick,
           effect_index: 0,
           triggered_by_spell_id: id
@@ -102,7 +102,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Script do
 
     if refund > 0 do
       event =
-        Event.trigger_spell(owner_guid, holder.caster_level || 1, owner_guid, @master_of_elements_energize,
+        Effects.trigger_spell(owner_guid, holder.caster_level || 1, owner_guid, @master_of_elements_energize,
           base_points: refund,
           effect_index: 0,
           triggered_by_spell_id: holder.spell.id
@@ -128,7 +128,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Script do
 
     if proc? do
       radius = if triggering_spell_id == @whirlwind, do: @whirlwind_radius, else: @melee_radius
-      event = Event.secondary_melee(victim_guid, damage, @sweeping_strikes_damage, radius)
+      event = Effects.secondary_melee(victim_guid, damage, @sweeping_strikes_damage, radius)
       {:handled, spend_charge(holder), [event]}
     else
       {:handled, holder, []}
@@ -148,7 +148,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Script do
         Proc.eligible?(holder.spell, triggering_spell, proc_type, outcome) and Proc.roll?(holder.spell)
 
     if proc? do
-      event = Event.trigger_spell(owner_guid, holder.caster_level || 1, attacker_guid, @retaliation_strike)
+      event = Effects.trigger_spell(owner_guid, holder.caster_level || 1, attacker_guid, @retaliation_strike)
       {:handled, spend_charge(holder), [event]}
     else
       {:handled, holder, []}
@@ -173,7 +173,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Script do
 
     if restored > 0 do
       event =
-        Event.trigger_spell(owner_guid, holder.caster_level || 1, owner_guid, @magic_absorption_energize,
+        Effects.trigger_spell(owner_guid, holder.caster_level || 1, owner_guid, @magic_absorption_energize,
           base_points: restored,
           effect_index: 0,
           triggered_by_spell_id: holder.spell.id
@@ -190,7 +190,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Script do
     heal = max(div(damage * dummy_amount(holder, 20), 100), 1)
 
     event =
-      Event.trigger_spell(caster_guid, holder.caster_level || 1, caster_guid, Priest.vampiric_embrace_heal_id(),
+      Effects.trigger_spell(caster_guid, holder.caster_level || 1, caster_guid, Priest.vampiric_embrace_heal_id(),
         base_points: heal,
         effect_index: 0,
         resolve_targets?: true,
@@ -209,7 +209,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Script do
 
     if reflected > 0 do
       event =
-        Event.trigger_spell(owner_guid, holder.caster_level || 1, attacker_guid, Paladin.eye_for_an_eye_damage_id(),
+        Effects.trigger_spell(owner_guid, holder.caster_level || 1, attacker_guid, Paladin.eye_for_an_eye_damage_id(),
           base_points: reflected,
           effect_index: 0,
           triggered_by_spell_id: holder.spell.id
@@ -247,7 +247,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Script do
     cond do
       spell_id == @spirit_of_redemption_state ->
         [
-          Event.trigger_spell(
+          Effects.trigger_spell(
             caster_guid,
             caster_level || 1,
             target_guid,
@@ -259,7 +259,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Script do
       Spell.vmangos_script?(spell, "spell_hunter_wyvern_sting") ->
         case @wyvern_sting_poison_by_rank[spell_id] do
           poison_id when is_integer(poison_id) ->
-            [Event.trigger_spell(caster_guid, caster_level, target_guid, poison_id)]
+            [Effects.trigger_spell(caster_guid, caster_level, target_guid, poison_id)]
 
           _poison_id ->
             []
@@ -278,7 +278,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Script do
     still_shifted? = Enum.any?(holders, &Holder.has_aura_type?(&1, :mod_shapeshift))
 
     if shapeshift? and not still_shifted? do
-      [Event.remove_aura(guid, guid, @leader_of_the_pack_aura)]
+      [Effects.remove_aura(guid, guid, @leader_of_the_pack_aura)]
     else
       []
     end
@@ -312,7 +312,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Script do
   defp combustion_transition(holders, %Holder{} = holder, owner_guid, visible_id, outcome) do
     updated_holder = if outcome == :crit, do: %{holder | charges: max((holder.charges || 1) - 1, 0)}, else: holder
     updated_holders = List.replace_at(holders, Enum.find_index(holders, &(&1 == holder)), updated_holder)
-    event = Event.trigger_spell(owner_guid, holder.caster_level || 1, owner_guid, visible_id)
+    event = Effects.trigger_spell(owner_guid, holder.caster_level || 1, owner_guid, visible_id)
     {:handled, updated_holders, [event]}
   end
 

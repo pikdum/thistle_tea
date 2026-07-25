@@ -7,7 +7,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.ModifierSync do
 
   alias ThistleTea.Game.Aura
   alias ThistleTea.Game.Aura.Holder
-  alias ThistleTea.Game.Entity.Logic.Event
+  alias ThistleTea.Game.Entity.Logic.Effects
 
   @modifier_types %{add_flat_modifier: :flat, add_pct_modifier: :pct}
   @effect_indexes 0..63
@@ -29,7 +29,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.ModifierSync do
         []
       else
         {modifier_type, effect_index, operation} = key
-        [Event.spell_modifier(modifier_type, effect_index, operation, current_value)]
+        [Effects.spell_modifier(modifier_type, effect_index, operation, current_value)]
       end
     end)
   end

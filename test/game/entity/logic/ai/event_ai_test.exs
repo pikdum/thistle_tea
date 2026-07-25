@@ -12,7 +12,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAITest do
   alias ThistleTea.Game.Entity.Data.ScriptStep
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AI.EventAI
-  alias ThistleTea.Game.Entity.Logic.Event
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.WorldRef
 
@@ -24,7 +24,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAITest do
 
       {mob, _blackboard} = EventAI.on_spawned(mob, Blackboard.new(), 0)
 
-      assert [%Event{type: :monster_talk}] = mob.internal.events
+      assert [%Effects.MonsterTalk{}] = mob.internal.events
     end
 
     test "respects the inverse phase mask" do
@@ -42,7 +42,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAITest do
 
       {mob, _blackboard} = EventAI.on_reached_home(mob, Blackboard.new(), 0)
 
-      assert [%Event{type: :monster_talk}] = mob.internal.events
+      assert [%Effects.MonsterTalk{}] = mob.internal.events
     end
   end
 
@@ -62,7 +62,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAITest do
 
       {mob, _blackboard} = EventAI.on_spawned(mob, Blackboard.new(), 0)
 
-      assert [%Event{type: :monster_talk}] = mob.internal.events
+      assert [%Effects.MonsterTalk{}] = mob.internal.events
     end
 
     test "a failing condition leaves the repeat timer unconsumed" do
@@ -93,7 +93,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAITest do
       mob = mob(events: [event(:hp, param1: 15, param2: 0)], in_combat: true, health: 10)
 
       {mob, blackboard} = EventAI.tick(mob, Blackboard.new(), 1_000)
-      assert [%Event{type: :monster_talk}] = mob.internal.events
+      assert [%Effects.MonsterTalk{}] = mob.internal.events
 
       mob = clear_events(mob)
       blackboard = %{blackboard | next_eventai_at: 0}
@@ -118,7 +118,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAITest do
 
       blackboard = %{blackboard | next_eventai_at: 0}
       {mob, blackboard} = EventAI.tick(mob, blackboard, 1_100)
-      assert [%Event{type: :monster_talk}] = mob.internal.events
+      assert [%Effects.MonsterTalk{}] = mob.internal.events
 
       mob = clear_events(mob)
       blackboard = %{blackboard | next_eventai_at: 0}
@@ -127,7 +127,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAITest do
 
       blackboard = %{blackboard | next_eventai_at: 0}
       {mob, _blackboard} = EventAI.tick(mob, blackboard, 6_200)
-      assert [%Event{type: :monster_talk}] = mob.internal.events
+      assert [%Effects.MonsterTalk{}] = mob.internal.events
     end
 
     test "does not run out-of-combat timers while in combat" do
@@ -149,16 +149,16 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAITest do
       mob = mob(events: [event(:aggro), event(:spawned)])
 
       {mob, blackboard} = EventAI.on_spawned(mob, Blackboard.new(), 0)
-      assert [%Event{type: :monster_talk}] = mob.internal.events
+      assert [%Effects.MonsterTalk{}] = mob.internal.events
       mob = clear_events(mob)
 
       {mob, blackboard} = EventAI.enter_combat(mob, blackboard, enemy, 100)
-      assert [%Event{type: :monster_talk}] = mob.internal.events
+      assert [%Effects.MonsterTalk{}] = mob.internal.events
       assert blackboard.eventai_disabled == MapSet.new([0])
 
       mob = clear_events(mob)
       {mob, _blackboard} = EventAI.on_spawned(mob, blackboard, 200)
-      assert [%Event{type: :monster_talk}] = mob.internal.events
+      assert [%Effects.MonsterTalk{}] = mob.internal.events
     end
 
     test "rolls in-combat timers from their initial params" do
@@ -178,7 +178,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAITest do
 
       blackboard = %{blackboard | next_eventai_at: 0}
       {mob, _blackboard} = EventAI.tick(mob, blackboard, 2_100)
-      assert [%Event{type: :monster_talk}] = mob.internal.events
+      assert [%Effects.MonsterTalk{}] = mob.internal.events
     end
   end
 
@@ -195,13 +195,13 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAITest do
       {mob, blackboard} = EventAI.on_spawned(mob, Blackboard.new(), 0)
       {mob, blackboard} = EventAI.on_evade(mob, blackboard, 10_000)
 
-      assert [%Event{type: :monster_talk}] = mob.internal.events
+      assert [%Effects.MonsterTalk{}] = mob.internal.events
       assert blackboard.eventai_timers[1] == 11_000
       mob = clear_events(mob)
 
       blackboard = %{blackboard | next_eventai_at: 0}
       {mob, _blackboard} = EventAI.tick(mob, blackboard, 11_100)
-      assert [%Event{type: :monster_talk}] = mob.internal.events
+      assert [%Effects.MonsterTalk{}] = mob.internal.events
     end
   end
 
@@ -214,7 +214,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAITest do
       assert mob.internal.events == []
 
       {mob, _blackboard} = EventAI.on_spell_hit(mob, blackboard, caster, 116, 0)
-      assert [%Event{type: :monster_talk, target_guid: ^caster}] = mob.internal.events
+      assert [%Effects.MonsterTalk{target_guid: ^caster}] = mob.internal.events
     end
   end
 
@@ -228,7 +228,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAITest do
       assert mob.internal.events == []
 
       {mob, _blackboard} = EventAI.on_kill(mob, blackboard, player_victim, 0)
-      assert [%Event{type: :monster_talk}] = mob.internal.events
+      assert [%Effects.MonsterTalk{}] = mob.internal.events
     end
   end
 
@@ -242,7 +242,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAITest do
 
       {mob, _blackboard} = EventAI.tick(mob, Blackboard.new(), @negative_now)
 
-      assert [%Event{type: :monster_talk}] = mob.internal.events
+      assert [%Effects.MonsterTalk{}] = mob.internal.events
     end
 
     test "aggro edge event fires on combat entry with a negative now" do
@@ -251,7 +251,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAITest do
 
       {mob, _blackboard} = EventAI.enter_combat(mob, Blackboard.new(), enemy, @negative_now)
 
-      assert [%Event{type: :monster_talk}] = mob.internal.events
+      assert [%Effects.MonsterTalk{}] = mob.internal.events
     end
 
     test "spawned edge event fires with a negative now" do
@@ -259,7 +259,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAITest do
 
       {mob, _blackboard} = EventAI.on_spawned(mob, Blackboard.new(), @negative_now)
 
-      assert [%Event{type: :monster_talk}] = mob.internal.events
+      assert [%Effects.MonsterTalk{}] = mob.internal.events
     end
   end
 

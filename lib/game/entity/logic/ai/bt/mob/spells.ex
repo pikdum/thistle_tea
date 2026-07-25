@@ -21,7 +21,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells do
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
   alias ThistleTea.Game.Entity.Logic.Combat, as: CombatLogic
   alias ThistleTea.Game.Entity.Logic.Core
-  alias ThistleTea.Game.Entity.Logic.Event
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Hostility
   alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.Spell
@@ -176,7 +176,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells do
     state =
       state
       |> prepare_to_cast(spell, target_guid, now)
-      |> Event.enqueue(Event.spell_start(state.object.guid, spell.id, spell.cast_time_ms || 0, targets.raw))
+      |> Effects.enqueue(Effects.spell_start(state.object.guid, spell.id, spell.cast_time_ms || 0, targets.raw))
       |> SpellBT.start_cast(spell, targets, now)
 
     finish_if_instant(state, spell, now)
@@ -236,7 +236,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells do
     state =
       state
       |> prepare_to_cast(spell, target_guid, now)
-      |> Event.enqueue(Event.spell_start(state.object.guid, spell.id, spell.cast_time_ms || 0, targets.raw))
+      |> Effects.enqueue(Effects.spell_start(state.object.guid, spell.id, spell.cast_time_ms || 0, targets.raw))
       |> SpellBT.start_cast(spell, targets, now)
 
     finish_or_schedule(state, blackboard, spell, now)
@@ -274,7 +274,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells do
     if Movement.moving?(state, now) do
       state
       |> Movement.halt(now)
-      |> Event.enqueue(Event.movement_stopped())
+      |> Effects.enqueue(Effects.movement_stopped())
     else
       state
     end
@@ -512,7 +512,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells do
 
   defp enqueue_attack_stop(%Mob{object: %{guid: guid}, unit: %Unit{target: target}} = state)
        when is_integer(target) and target > 0 do
-    Event.enqueue(state, Event.attack_stop(guid, target))
+    Effects.enqueue(state, Effects.attack_stop(guid, target))
   end
 
   defp enqueue_attack_stop(%Mob{} = state), do: state

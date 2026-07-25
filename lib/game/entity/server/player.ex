@@ -27,7 +27,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Death
   alias ThistleTea.Game.Entity.Logic.Dueling
-  alias ThistleTea.Game.Entity.Logic.Event
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Experience
   alias ThistleTea.Game.Entity.Logic.Hunter
   alias ThistleTea.Game.Entity.Logic.Inventory
@@ -325,7 +325,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
 
   def handle_cast({:trigger_spell, spell_id, target_guid, opts}, %{character: %Character{} = character} = state)
       when is_integer(spell_id) and is_integer(target_guid) and is_list(opts) do
-    event = Event.trigger_spell(character.object.guid, character.unit.level || 1, target_guid, spell_id, opts)
+    event = Effects.trigger_spell(character.object.guid, character.unit.level || 1, target_guid, spell_id, opts)
     character = EventSink.emit(character, event)
     {:noreply, %{state | character: character}, {:continue, :maybe_broadcast_update}}
   end
@@ -406,7 +406,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   @impl GenServer
   def handle_cast({:set_speed, rate}, %{character: %Character{} = character} = state) do
     character = MovementStats.set_run_speed_rate(character, rate)
-    character = EventSink.emit(character, [Event.movement_speed_changed(character.movement_block.run_speed)])
+    character = EventSink.emit(character, [Effects.movement_speed_changed(character.movement_block.run_speed)])
 
     {:noreply, %{state | character: character}, {:continue, :maybe_broadcast_update}}
   end
@@ -688,7 +688,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   @impl GenServer
   def handle_info({:tame_pet, entry}, %{character: %Character{} = character} = state)
       when is_integer(entry) and entry > 0 do
-    character = EventSink.emit(character, Event.summon_pet(character.object.guid, entry, 1515))
+    character = EventSink.emit(character, Effects.summon_pet(character.object.guid, entry, 1515))
     {:noreply, %{state | character: character}}
   rescue
     error ->
@@ -984,7 +984,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
     holders
     |> Enum.flat_map(fn %{spell: %Spell{id: spell_id}} -> SpellPetAuraLoader.pet_aura_ids(spell_id, pet_entry) end)
     |> Enum.uniq()
-    |> Enum.map(&Event.trigger_spell(pet_guid, level || 1, pet_guid, &1))
+    |> Enum.map(&Effects.trigger_spell(pet_guid, level || 1, pet_guid, &1))
   end
 
   defp passive_pet_aura_events(_character, _pet_guid), do: []

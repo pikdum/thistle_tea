@@ -4,7 +4,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgStandstatechange do
 
   alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
-  alias ThistleTea.Game.Entity.Logic.Event
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Time
 
   @seated_states [1, 2, 3]
@@ -46,7 +46,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgStandstatechange do
 
     character =
       character
-      |> Event.enqueue(events)
+      |> Effects.enqueue(events)
       |> EventSink.emit_pending()
 
     {character, character.unit.auras != auras_before}

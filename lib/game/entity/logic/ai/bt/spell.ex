@@ -9,7 +9,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
   alias ThistleTea.Game.Entity.Logic.Core
-  alias ThistleTea.Game.Entity.Logic.Event
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Hostility
   alias ThistleTea.Game.Entity.Logic.Hunter
   alias ThistleTea.Game.Entity.Logic.MeleeSpell
@@ -152,7 +152,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
       do_complete_cast(character, casting, now)
     else
       character
-      |> Event.enqueue(Event.spell_cast_failed(Cast.spell_id(casting), :line_of_sight))
+      |> Effects.enqueue(Effects.spell_cast_failed(Cast.spell_id(casting), :line_of_sight))
       |> clear_cast()
     end
   end
@@ -197,7 +197,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
       character
       |> BT.clear_auto_attack()
       |> then(&%{&1 | internal: %{&1.internal | auto_shot: nil}})
-      |> Event.enqueue(Event.attack_stop(character.object.guid, target_guid))
+      |> Effects.enqueue(Effects.attack_stop(character.object.guid, target_guid))
     else
       character
     end
@@ -210,7 +210,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
        }) do
     case Scripts.successful_finish_trigger(spell) do
       spell_id when is_integer(spell_id) ->
-        Event.enqueue(character, Event.trigger_spell(guid, level || 1, guid, spell_id, resolve_targets?: true))
+        Effects.enqueue(character, Effects.trigger_spell(guid, level || 1, guid, spell_id, resolve_targets?: true))
 
       _none ->
         character
@@ -250,7 +250,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
   defp queue_charge(character, %Cast{spell: %Spell{} = spell, targets: %Targets{unit_guid: unit_guid}})
        when is_integer(unit_guid) and unit_guid > 0 do
     if Enum.any?(spell.effects, &(&1.type == :charge)) do
-      Event.enqueue(character, Event.charge(unit_guid))
+      Effects.enqueue(character, Effects.charge(unit_guid))
     else
       character
     end
@@ -260,7 +260,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
 
   defp consume_spell_modifiers(character, %Cast{modifier_holder_ids: [_ | _] = spell_ids}, now) do
     {character, events} = AuraLogic.spend_spell_charges(character, spell_ids, now)
-    Event.enqueue(character, events)
+    Effects.enqueue(character, events)
   end
 
   defp consume_spell_modifiers(character, %Cast{}, _now), do: character
@@ -276,7 +276,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
   defp queue_open_object(character, %Cast{spell: %Spell{} = spell, targets: %Targets{object_guid: object_guid}})
        when is_integer(object_guid) do
     if Enum.any?(spell.effects, &(&1.type == :open_lock)) do
-      Event.enqueue(character, Event.open_gameobject(object_guid))
+      Effects.enqueue(character, Effects.open_gameobject(object_guid))
     else
       character
     end
@@ -292,7 +292,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
 
   defp queue_consume_cast_item(character, %Cast{consume_item: true, cast_item_guid: item_guid})
        when is_integer(item_guid) do
-    Event.enqueue(character, Event.consume_cast_item(item_guid))
+    Effects.enqueue(character, Effects.consume_cast_item(item_guid))
   end
 
   defp queue_consume_cast_item(character, %Cast{}), do: character
@@ -304,7 +304,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
        when is_integer(pet_guid) and pet_guid > 0 and is_integer(item_guid) do
     case Enum.find(effects, &(&1.type == :feed_pet and is_integer(&1.trigger_spell_id))) do
       %Spell.Effect{trigger_spell_id: trigger_spell_id} ->
-        Event.enqueue(character, Event.feed_pet(item_guid, pet_guid, trigger_spell_id, range_yards))
+        Effects.enqueue(character, Effects.feed_pet(item_guid, pet_guid, trigger_spell_id, range_yards))
 
       _ ->
         character
@@ -322,20 +322,20 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
     events =
       for %Spell.Effect{type: :enchant_item_temporary} = effect <- spell.effects,
           is_integer(item_guid) do
-        Event.enchant_item(item_guid, spell, effect)
+        Effects.enchant_item(item_guid, spell, effect)
       end
 
-    Event.enqueue(character, events)
+    Effects.enqueue(character, events)
   end
 
   defp queue_item_enchantments(character, %Cast{spell: %Spell{} = spell, targets: %Targets{item_guid: item_guid}})
        when is_integer(item_guid) do
     events =
       for %Spell.Effect{type: :enchant_item_temporary} = effect <- spell.effects do
-        Event.enchant_item(item_guid, spell, effect)
+        Effects.enchant_item(item_guid, spell, effect)
       end
 
-    Event.enqueue(character, events)
+    Effects.enqueue(character, events)
   end
 
   defp queue_item_enchantments(character, _casting), do: character
@@ -353,7 +353,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
   defp break_stealth(character, %Cast{spell: %Spell{} = spell}, now) do
     if Spell.harmful?(spell) do
       {character, events} = AuraLogic.remove_with_interrupt_flags(character, AuraLogic.interrupt_mask(:cast), now)
-      Event.enqueue(character, events)
+      Effects.enqueue(character, events)
     else
       character
     end
@@ -393,7 +393,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
         unit: %{unit | channel_spell: spell_id, channel_object: game_object_guid}
     }
     |> Core.mark_broadcast_update()
-    |> Event.enqueue([Event.channel_start(guid, spell_id, duration_ms), Event.object_update(:values)])
+    |> Effects.enqueue([Effects.channel_start(guid, spell_id, duration_ms), Effects.object_update(:values)])
   end
 
   def start_game_object_channel(character, _game_object_guid, _spell, _duration_ms, _now), do: character
@@ -416,7 +416,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
 
     %{character | unit: %{unit | channel_spell: spell_id, channel_object: channel_object}}
     |> Core.mark_broadcast_update()
-    |> Event.enqueue([Event.channel_start(guid, spell_id, duration_ms), Event.object_update(:values)])
+    |> Effects.enqueue([Effects.channel_start(guid, spell_id, duration_ms), Effects.object_update(:values)])
   end
 
   defp start_channel(character, _casting), do: character
@@ -474,13 +474,16 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
 
     events =
       case character do
-        %{object: %{guid: guid}} when is_integer(guid) -> [Event.channel_update(guid, 0), Event.object_update(:values)]
-        _ -> [Event.object_update(:values)]
+        %{object: %{guid: guid}} when is_integer(guid) ->
+          [Effects.channel_update(guid, 0), Effects.object_update(:values)]
+
+        _ ->
+          [Effects.object_update(:values)]
       end
 
     character
     |> Core.mark_broadcast_update()
-    |> Event.enqueue(aura_events ++ object_events ++ events)
+    |> Effects.enqueue(aura_events ++ object_events ++ events)
   end
 
   defp stop_channel(%{internal: %Internal{} = internal} = character, %Cast{}, _reason) do
@@ -490,11 +493,11 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
   defp channel_object_events(_guid, _owned?, _user_guid, :completed), do: []
 
   defp channel_object_events(guid, true, _user_guid, :cancelled) when is_integer(guid) do
-    [Event.despawn_entity(guid)]
+    [Effects.despawn_entity(guid)]
   end
 
   defp channel_object_events(guid, false, user_guid, :cancelled) when is_integer(guid) do
-    [Event.leave_ritual(guid, user_guid)]
+    [Effects.leave_ritual(guid, user_guid)]
   end
 
   defp channel_object_events(_guid, _owned?, _user_guid, _reason), do: []
@@ -508,12 +511,12 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
 
     remote_events =
       if target_guid > 0 and target_guid != guid do
-        [Event.remove_aura(guid, target_guid, spell_id)]
+        [Effects.remove_aura(guid, target_guid, spell_id)]
       else
         []
       end
 
-    {character, events ++ remote_events ++ [Event.despawn_area_effects(spell_id)]}
+    {character, events ++ remote_events ++ [Effects.despawn_area_effects(spell_id)]}
   end
 
   defp remove_channel_auras(character, _casting), do: {character, []}
@@ -526,10 +529,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
       position ->
         events =
           for %Spell.Effect{type: :persistent_area_aura} = effect <- spell.effects do
-            Event.spawn_area_effect(spell, effect, position, area_duration(casting, spell))
+            Effects.spawn_area_effect(spell, effect, position, area_duration(casting, spell))
           end
 
-        Event.enqueue(character, events)
+        Effects.enqueue(character, events)
     end
   end
 
@@ -538,7 +541,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
   defp queue_farsight(character, %Cast{spell: %Spell{} = spell, targets: %Targets{} = targets}) do
     if Enum.any?(spell.effects, &(&1.type == :add_farsight)) do
       case Targets.ground_location(targets) do
-        {x, y, z} -> Event.enqueue(character, Event.spawn_farsight(spell, {x, y, z}, spell.duration_ms || 0))
+        {x, y, z} -> Effects.enqueue(character, Effects.spawn_farsight(spell, {x, y, z}, spell.duration_ms || 0))
         _ -> character
       end
     else
@@ -571,7 +574,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
   defp area_duration(_casting, _spell), do: 8_000
 
   defp queue_target_triggers(character, %Cast{spell: %Spell{} = spell}, hits) when is_list(hits) do
-    Event.enqueue(character, AuraLogic.target_trigger_events(character, spell, hits))
+    Effects.enqueue(character, AuraLogic.target_trigger_events(character, spell, hits))
   end
 
   defp queue_target_triggers(character, _casting, _hits), do: character
@@ -582,14 +585,14 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
     events =
       for %Spell.Effect{type: :trans_door, misc_value: entry} <- spell.effects,
           is_integer(entry) and entry > 0 do
-        Event.summon_game_object(entry, area_duration(casting, spell), ritual_target_guid: target_guid)
+        Effects.summon_game_object(entry, area_duration(casting, spell), ritual_target_guid: target_guid)
       end
 
-    Event.enqueue(character, events)
+    Effects.enqueue(character, events)
   end
 
   defp queue_consume_reagents(character, %Cast{spell: %Spell{reagents: [_ | _] = reagents}}) do
-    Event.enqueue(character, Event.consume_reagents(reagents))
+    Effects.enqueue(character, Effects.consume_reagents(reagents))
   end
 
   defp queue_consume_reagents(character, _casting), do: character
@@ -597,7 +600,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
   defp queue_consume_ammo(character, %Cast{spell: %Spell{} = spell}) do
     case Hunter.ammo_reagents(character, spell) do
       [] -> character
-      reagents -> Event.enqueue(character, Event.consume_reagents(reagents))
+      reagents -> Effects.enqueue(character, Effects.consume_reagents(reagents))
     end
   end
 
@@ -608,7 +611,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
   defp start_cooldown(character, _casting, _now), do: character
 
   defp queue_cast_result(character, %{spell: %Spell{id: spell_id}}) do
-    Event.enqueue(character, Event.spell_cast_result(spell_id))
+    Effects.enqueue(character, Effects.spell_cast_result(spell_id))
   end
 
   defp queue_cast_result(character, _casting), do: character
@@ -708,7 +711,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
        when is_integer(guid) do
     raw_targets = if is_binary(casting.targets.raw), do: casting.targets.raw, else: <<>>
 
-    Event.enqueue(character, Event.spell_go(guid, spell_id, targets, raw_targets, casting.cast_item_guid, misses))
+    Effects.enqueue(character, Effects.spell_go(guid, spell_id, targets, raw_targets, casting.cast_item_guid, misses))
   end
 
   defp queue_spell_go(character, _casting, _targets, _misses), do: character
@@ -720,10 +723,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
        when is_integer(caster_guid) and is_list(misses) do
     events =
       for %{guid: target_guid, reason: @spell_miss_reason_resist} <- misses do
-        Event.deliver_spell_outcome(target_guid, caster_guid, spell, :resist)
+        Effects.deliver_spell_outcome(target_guid, caster_guid, spell, :resist)
       end
 
-    Event.enqueue(character, events)
+    Effects.enqueue(character, events)
   end
 
   defp queue_spell_miss_outcomes(character, _casting, _misses), do: character
@@ -828,12 +831,12 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
     {character, events} = SpellEffect.receive(character, context, spell, now)
 
     character
-    |> Event.enqueue(events)
+    |> Effects.enqueue(events)
     |> queue_self_update()
   end
 
   defp dispatch_to_target(character, %CastContext{} = context, spell, target_guid, _now) when is_integer(target_guid) do
-    Event.enqueue(character, Event.deliver_spell(target_guid, context, spell))
+    Effects.enqueue(character, Effects.deliver_spell(target_guid, context, spell))
   end
 
   defp dispatch_to_target(character, _context, _spell, _target_guid, _now), do: character
@@ -851,7 +854,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
   defp resolve_targets(_caster, _casting), do: []
 
   defp queue_self_update(%{internal: %Internal{broadcast_update?: true}} = character) do
-    Event.enqueue(character, Event.object_update(:values))
+    Effects.enqueue(character, Effects.object_update(:values))
   end
 
   defp queue_self_update(character), do: character

@@ -8,7 +8,7 @@ defmodule ThistleTea.Game.Entity.Logic.Druid do
   alias ThistleTea.Game.Aura
   alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
-  alias ThistleTea.Game.Entity.Logic.Event
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Spell
 
   @druid_family 7
@@ -35,7 +35,7 @@ defmodule ThistleTea.Game.Entity.Logic.Druid do
       when is_integer(guid) and is_integer(level) do
     if Spell.vmangos_script?(spell, "spell_druid_enrage") do
       reduction = if form == 8, do: -16, else: -27
-      Event.trigger_spell(guid, level, guid, @enrage_armor_spell, effect_index: 1, base_points: reduction)
+      Effects.trigger_spell(guid, level, guid, @enrage_armor_spell, effect_index: 1, base_points: reduction)
     end
   end
 

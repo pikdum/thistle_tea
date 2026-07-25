@@ -14,7 +14,7 @@ defmodule ThistleTea.Game.Entity.Logic.Dueling do
   alias ThistleTea.Game.Entity.Logic.Aura.HolderSync
   alias ThistleTea.Game.Entity.Logic.Combat
   alias ThistleTea.Game.Entity.Logic.Core
-  alias ThistleTea.Game.Entity.Logic.Event
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Reactive
 
   def requested(%Character{internal: %Internal{} = internal, player: %Player{} = player} = character, %{
@@ -148,7 +148,7 @@ defmodule ThistleTea.Game.Entity.Logic.Dueling do
 
     events =
       if clear_target? and is_integer(target_guid) and target_guid > 0 do
-        events ++ [Event.attack_stop(guid, target_guid)]
+        events ++ [Effects.attack_stop(guid, target_guid)]
       else
         events
       end

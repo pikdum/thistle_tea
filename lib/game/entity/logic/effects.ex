@@ -1,76 +1,13 @@
-defmodule ThistleTea.Game.Entity.Logic.Event do
+defmodule ThistleTea.Game.Entity.Logic.Effects do
   @moduledoc """
-  Event structs produced by pure logic and queued on an entity's internal
-  state; the boundary later drains them via `EventSink` and turns them into
-  packets or process messages. Includes constructors for each event type.
+  Typed effects produced by pure logic and queued on an entity's internal
+  state. Constructors validate inputs and return small enforced-key structs;
+  the owning boundary later drains and interprets them.
   """
-  defstruct [
-    :type,
-    :source_guid,
-    :source_level,
-    :target_guid,
-    :spell_id,
-    :triggering_spell_id,
-    :school,
-    :damage,
-    :proc_damage,
-    :amount,
-    :health,
-    :mana,
-    :periodic?,
-    :proc_type,
-    :aura_type,
-    :misc_value,
-    :aura_slot,
-    :duration_ms,
-    :speed,
-    :rooted?,
-    :enabled?,
-    :position,
-    :item_id,
-    :count,
-    :reagents,
-    :move_opts,
-    :hit_guids,
-    :misses,
-    :resisted,
-    :absorbed,
-    :raw_targets,
-    :cast_item_guid,
-    :stand_state,
-    :update_type,
-    :cast_context,
-    :target_role,
-    :spell,
-    :spells,
-    :effect,
-    :modifier_type,
-    :effect_index,
-    :operation,
-    :attack,
-    :channel_time_ms,
-    :delay_ms,
-    :entry,
-    :text,
-    :chat_type,
-    :emote_id,
-    :steps,
-    :summon,
-    :respawn_delay_ms,
-    :sound_id,
-    :facing,
-    :reason,
-    :outcome,
-    :crit?,
-    :blocked,
-    :slot,
-    :range_yards,
-    :resolve_targets?
-  ]
+  alias __MODULE__, as: Effects
 
   def spell_damage(source_guid, target_guid, spell, damage, opts \\ []) do
-    %__MODULE__{
-      type: :spell_damage,
+    %Effects.SpellDamage{
       source_guid: source_guid,
       target_guid: target_guid,
       spell_id: spell.id,
@@ -92,8 +29,7 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
   end
 
   def spell_heal(source_guid, target_guid, spell, healing, crit?, opts \\ []) do
-    %__MODULE__{
-      type: :spell_heal,
+    %Effects.SpellHeal{
       source_guid: source_guid,
       target_guid: target_guid,
       spell_id: spell.id,
@@ -111,46 +47,35 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
   end
 
   def drain_power(target_guid, power_type) when is_integer(target_guid) and is_integer(power_type) do
-    %__MODULE__{type: :drain_power, target_guid: target_guid, misc_value: power_type}
+    %Effects.DrainPower{target_guid: target_guid, misc_value: power_type}
   end
 
   def grant_power(target_guid, power_type, amount)
       when is_integer(target_guid) and is_integer(power_type) and is_integer(amount) do
-    %__MODULE__{type: :grant_power, target_guid: target_guid, misc_value: power_type, amount: amount}
+    %Effects.GrantPower{target_guid: target_guid, misc_value: power_type, amount: amount}
   end
 
   def charge(target_guid) when is_integer(target_guid) do
-    %__MODULE__{type: :charge, target_guid: target_guid}
+    %Effects.Charge{target_guid: target_guid}
   end
 
   def spell_log_miss(source_guid, target_guid, spell_id, reason)
       when is_integer(source_guid) and is_integer(target_guid) and is_integer(spell_id) and is_atom(reason) do
-    %__MODULE__{
-      type: :spell_log_miss,
-      source_guid: source_guid,
-      target_guid: target_guid,
-      spell_id: spell_id,
-      reason: reason
-    }
+    %Effects.SpellLogMiss{source_guid: source_guid, target_guid: target_guid, spell_id: spell_id, reason: reason}
   end
 
   def aura_duration(slot, duration_ms) when is_integer(slot) and is_integer(duration_ms) do
-    %__MODULE__{
-      type: :aura_duration,
-      aura_slot: slot,
-      duration_ms: duration_ms
-    }
+    %Effects.AuraDuration{aura_slot: slot, duration_ms: duration_ms}
   end
 
   def remove_aura(source_guid, target_guid, spell_id)
       when is_integer(source_guid) and is_integer(target_guid) and is_integer(spell_id) do
-    %__MODULE__{type: :remove_aura, source_guid: source_guid, target_guid: target_guid, spell_id: spell_id}
+    %Effects.RemoveAura{source_guid: source_guid, target_guid: target_guid, spell_id: spell_id}
   end
 
   def periodic_aura_log(source_guid, target_guid, spell, aura_type, amount, opts \\ [])
       when is_integer(source_guid) and is_integer(target_guid) and is_atom(aura_type) and is_integer(amount) do
-    %__MODULE__{
-      type: :periodic_aura_log,
+    %Effects.PeriodicAuraLog{
       source_guid: source_guid,
       target_guid: target_guid,
       spell_id: spell.id,
@@ -161,87 +86,80 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
   end
 
   def movement_stopped do
-    %__MODULE__{type: :movement_stopped}
+    %Effects.MovementStopped{}
   end
 
   def movement_speed_changed(speed) when is_number(speed) do
-    %__MODULE__{type: :movement_speed_changed, speed: speed}
+    %Effects.MovementSpeedChanged{speed: speed}
   end
 
   def movement_root_changed(rooted?) when is_boolean(rooted?) do
-    %__MODULE__{type: :movement_root_changed, rooted?: rooted?}
+    %Effects.MovementRootChanged{rooted?: rooted?}
   end
 
   def feather_fall_changed(enabled?) when is_boolean(enabled?) do
-    %__MODULE__{type: :feather_fall_changed, enabled?: enabled?}
+    %Effects.FeatherFallChanged{enabled?: enabled?}
   end
 
   def hover_changed(enabled?) when is_boolean(enabled?) do
-    %__MODULE__{type: :hover_changed, enabled?: enabled?}
+    %Effects.HoverChanged{enabled?: enabled?}
   end
 
   def water_walk_changed(enabled?) when is_boolean(enabled?) do
-    %__MODULE__{type: :water_walk_changed, enabled?: enabled?}
+    %Effects.WaterWalkChanged{enabled?: enabled?}
   end
 
   def heal_entity(target_guid, amount) when is_integer(target_guid) and is_integer(amount) do
-    %__MODULE__{type: :heal_entity, target_guid: target_guid, amount: amount}
+    %Effects.HealEntity{target_guid: target_guid, amount: amount}
   end
 
   def heal_threat(source_guid, target_guid, amount)
       when is_integer(source_guid) and is_integer(target_guid) and is_number(amount) do
-    %__MODULE__{type: :heal_threat, source_guid: source_guid, target_guid: target_guid, amount: amount}
+    %Effects.HealThreat{source_guid: source_guid, target_guid: target_guid, amount: amount}
   end
 
   def resurrect_request(source_guid, spell_id, health, mana)
       when is_integer(source_guid) and is_integer(spell_id) and is_integer(health) and is_integer(mana) do
-    %__MODULE__{type: :resurrect_request, source_guid: source_guid, spell_id: spell_id, health: health, mana: mana}
+    %Effects.ResurrectRequest{source_guid: source_guid, spell_id: spell_id, health: health, mana: mana}
   end
 
   def monster_move(opts \\ []) when is_list(opts) do
-    %__MODULE__{type: :monster_move, move_opts: opts}
+    %Effects.MonsterMove{move_opts: opts}
   end
 
   def spell_cast_result(spell_id) when is_integer(spell_id) do
-    %__MODULE__{type: :spell_cast_result, spell_id: spell_id}
+    %Effects.SpellCastResult{spell_id: spell_id}
   end
 
   def spell_cast_failed(spell_id, reason) when is_integer(spell_id) and is_atom(reason) do
-    %__MODULE__{type: :spell_cast_failed, spell_id: spell_id, reason: reason}
+    %Effects.SpellCastFailed{spell_id: spell_id, reason: reason}
   end
 
   def spell_cooldown(source_guid, spell_id, cooldown_ms)
       when is_integer(source_guid) and is_integer(spell_id) and is_integer(cooldown_ms) do
-    %__MODULE__{type: :spell_cooldown, source_guid: source_guid, spell_id: spell_id, duration_ms: cooldown_ms}
+    %Effects.SpellCooldown{source_guid: source_guid, spell_id: spell_id, duration_ms: cooldown_ms}
   end
 
   def spell_modifier(type, index, operation, amount)
       when type in [:flat, :pct] and is_integer(index) and is_integer(operation) and is_integer(amount) do
-    %__MODULE__{
-      type: :spell_modifier,
-      modifier_type: type,
-      effect_index: index,
-      operation: operation,
-      amount: amount
-    }
+    %Effects.SpellModifier{modifier_type: type, effect_index: index, operation: operation, amount: amount}
   end
 
   def cooldown_event(source_guid, spell_id) when is_integer(source_guid) and is_integer(spell_id) do
-    %__MODULE__{type: :cooldown_event, source_guid: source_guid, spell_id: spell_id}
+    %Effects.CooldownEvent{source_guid: source_guid, spell_id: spell_id}
   end
 
   def clear_cooldown(target_guid, spell_id) when is_integer(target_guid) and is_integer(spell_id) do
-    %__MODULE__{type: :clear_cooldown, target_guid: target_guid, spell_id: spell_id}
+    %Effects.ClearCooldown{target_guid: target_guid, spell_id: spell_id}
   end
 
   def stand_state(stand_state) when is_integer(stand_state) do
-    %__MODULE__{type: :stand_state, stand_state: stand_state}
+    %Effects.StandState{stand_state: stand_state}
   end
 
   def spell_start(source_guid, spell_id, cast_time_ms, raw_targets)
       when is_integer(source_guid) and is_integer(spell_id) and is_integer(cast_time_ms) and is_binary(raw_targets) do
-    %__MODULE__{
-      type: :spell_start,
+    %Effects.SpellStart{
       source_guid: source_guid,
       spell_id: spell_id,
       duration_ms: cast_time_ms,
@@ -252,8 +170,7 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
   def spell_go(source_guid, spell_id, hit_guids, raw_targets, cast_item_guid \\ nil, misses \\ [])
       when is_integer(source_guid) and is_integer(spell_id) and is_list(hit_guids) and is_binary(raw_targets) and
              is_list(misses) do
-    %__MODULE__{
-      type: :spell_go,
+    %Effects.SpellGo{
       source_guid: source_guid,
       spell_id: spell_id,
       hit_guids: hit_guids,
@@ -265,115 +182,90 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
 
   def channel_start(source_guid, spell_id, duration_ms)
       when is_integer(source_guid) and is_integer(spell_id) and is_integer(duration_ms) do
-    %__MODULE__{
-      type: :channel_start,
-      source_guid: source_guid,
-      spell_id: spell_id,
-      channel_time_ms: duration_ms
-    }
+    %Effects.ChannelStart{source_guid: source_guid, spell_id: spell_id, channel_time_ms: duration_ms}
   end
 
   def channel_update(source_guid, time_ms) when is_integer(source_guid) and is_integer(time_ms) do
-    %__MODULE__{
-      type: :channel_update,
-      source_guid: source_guid,
-      channel_time_ms: time_ms
-    }
+    %Effects.ChannelUpdate{source_guid: source_guid, channel_time_ms: time_ms}
   end
 
   def spell_delayed(source_guid, delay_ms) when is_integer(source_guid) and is_integer(delay_ms) do
-    %__MODULE__{
-      type: :spell_delayed,
-      source_guid: source_guid,
-      delay_ms: delay_ms
-    }
+    %Effects.SpellDelayed{source_guid: source_guid, delay_ms: delay_ms}
   end
 
   def delay_aura(source_guid, target_guid, spell_id, delay_ms)
       when is_integer(source_guid) and is_integer(target_guid) and is_integer(spell_id) and is_integer(delay_ms) do
-    %__MODULE__{
-      type: :delay_aura,
-      source_guid: source_guid,
-      target_guid: target_guid,
-      spell_id: spell_id,
-      delay_ms: delay_ms
-    }
+    %Effects.DelayAura{source_guid: source_guid, target_guid: target_guid, spell_id: spell_id, delay_ms: delay_ms}
   end
 
   def object_update(update_type \\ :values) do
-    %__MODULE__{type: :object_update, update_type: update_type}
+    %Effects.ObjectUpdate{update_type: update_type}
   end
 
   def deliver_attack(target_guid, attack) when is_integer(target_guid) and is_map(attack) do
-    %__MODULE__{type: :deliver_attack, target_guid: target_guid, attack: attack}
+    %Effects.DeliverAttack{target_guid: target_guid, attack: attack}
   end
 
   def deliver_spell(target_guid, cast_context, spell) when is_integer(target_guid) do
-    %__MODULE__{type: :deliver_spell, target_guid: target_guid, cast_context: cast_context, spell: spell}
+    %Effects.DeliverSpell{target_guid: target_guid, cast_context: cast_context, spell: spell}
   end
 
   def deliver_spell_outcome(target_guid, source_guid, spell, outcome)
       when is_integer(target_guid) and is_integer(source_guid) and is_atom(outcome) do
-    %__MODULE__{
-      type: :deliver_spell_outcome,
-      source_guid: source_guid,
-      target_guid: target_guid,
-      spell: spell,
-      outcome: outcome
-    }
+    %Effects.DeliverSpellOutcome{source_guid: source_guid, target_guid: target_guid, spell: spell, outcome: outcome}
   end
 
   def attack_start(source_guid, target_guid) when is_integer(source_guid) and is_integer(target_guid) do
-    %__MODULE__{type: :attack_start, source_guid: source_guid, target_guid: target_guid}
+    %Effects.AttackStart{source_guid: source_guid, target_guid: target_guid}
   end
 
   def call_assistance(target_guid) when is_integer(target_guid) do
-    %__MODULE__{type: :call_assistance, target_guid: target_guid}
+    %Effects.CallAssistance{target_guid: target_guid}
   end
 
   def call_for_help(target_guid) when is_integer(target_guid) do
-    %__MODULE__{type: :call_for_help, target_guid: target_guid}
+    %Effects.CallForHelp{target_guid: target_guid}
   end
 
   def attack_stop(source_guid, target_guid) when is_integer(source_guid) and is_integer(target_guid) do
-    %__MODULE__{type: :attack_stop, source_guid: source_guid, target_guid: target_guid}
+    %Effects.AttackStop{source_guid: source_guid, target_guid: target_guid}
   end
 
   def duel_defeat(loser_guid, winner_guid) when is_integer(loser_guid) and is_integer(winner_guid) do
-    %__MODULE__{type: :duel_defeat, source_guid: winner_guid, target_guid: loser_guid}
+    %Effects.DuelDefeat{source_guid: winner_guid, target_guid: loser_guid}
   end
 
   def duel_interrupted(guid) when is_integer(guid) do
-    %__MODULE__{type: :duel_interrupted, target_guid: guid}
+    %Effects.DuelInterrupted{target_guid: guid}
   end
 
   def attack_not_in_range do
-    %__MODULE__{type: :attack_not_in_range}
+    %Effects.AttackNotInRange{}
   end
 
   def attacker_gained(target_guid) when is_integer(target_guid) do
-    %__MODULE__{type: :attacker_gained, target_guid: target_guid}
+    %Effects.AttackerGained{target_guid: target_guid}
   end
 
   def threat_ref_gained(target_guid) when is_integer(target_guid) do
-    %__MODULE__{type: :threat_ref_gained, target_guid: target_guid}
+    %Effects.ThreatRefGained{target_guid: target_guid}
   end
 
   def threat_ref_lost(target_guid) when is_integer(target_guid) do
-    %__MODULE__{type: :threat_ref_lost, target_guid: target_guid}
+    %Effects.ThreatRefLost{target_guid: target_guid}
   end
 
   def drop_threat(target_guid) when is_integer(target_guid) do
-    %__MODULE__{type: :drop_threat, target_guid: target_guid}
+    %Effects.DropThreat{target_guid: target_guid}
   end
 
   def drop_nearby_threat do
-    %__MODULE__{type: :drop_nearby_threat}
+    %Effects.DropNearbyThreat{}
   end
 
   def blade_flurry(target_guid, damage, spell_id)
       when is_integer(target_guid) and is_integer(damage) and damage > 0 and is_integer(spell_id) do
-    %__MODULE__{type: :blade_flurry, target_guid: target_guid, damage: damage, spell_id: spell_id}
+    %Effects.BladeFlurry{target_guid: target_guid, damage: damage, spell_id: spell_id}
   end
 
   defguardp valid_secondary_melee?(target_guid, damage, spell_id, radius)
@@ -382,27 +274,20 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
 
   def secondary_melee(target_guid, damage, spell_id, radius)
       when valid_secondary_melee?(target_guid, damage, spell_id, radius) do
-    %__MODULE__{
-      type: :secondary_melee,
-      target_guid: target_guid,
-      damage: damage,
-      spell_id: spell_id,
-      range_yards: radius
-    }
+    %Effects.SecondaryMelee{target_guid: target_guid, damage: damage, spell_id: spell_id, range_yards: radius}
   end
 
   def attacker_lost(target_guid) when is_integer(target_guid) do
-    %__MODULE__{type: :attacker_lost, target_guid: target_guid}
+    %Effects.AttackerLost{target_guid: target_guid}
   end
 
   def tap_cleared do
-    %__MODULE__{type: :tap_cleared}
+    %Effects.TapCleared{}
   end
 
   def attack_outcome(attacker_guid, victim_guid, outcome, damage, spell_id, proc_damage \\ nil)
       when is_integer(attacker_guid) and is_integer(victim_guid) and is_atom(outcome) do
-    %__MODULE__{
-      type: :attack_outcome,
+    %Effects.AttackOutcome{
       target_guid: attacker_guid,
       source_guid: victim_guid,
       outcome: outcome,
@@ -414,64 +299,52 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
 
   def attacker_state_update(source_guid, target_guid, damage, attack \\ %{})
       when is_integer(source_guid) and is_integer(target_guid) do
-    %__MODULE__{
-      type: :attacker_state_update,
-      source_guid: source_guid,
-      target_guid: target_guid,
-      damage: damage,
-      attack: attack
-    }
+    %Effects.AttackerStateUpdate{source_guid: source_guid, target_guid: target_guid, damage: damage, attack: attack}
   end
 
   def enqueue(entity, events) when is_list(events) do
     Enum.reduce(events, entity, &enqueue(&2, &1))
   end
 
-  def enqueue(%{internal: %{events: events} = internal} = entity, %__MODULE__{} = event) when is_list(events) do
-    %{entity | internal: %{internal | events: events ++ [event]}}
+  def enqueue(%{internal: %{events: events} = internal} = entity, %{__struct__: _module} = effect)
+      when is_list(events) do
+    %{entity | internal: %{internal | events: events ++ [effect]}}
   end
 
-  def enqueue(%{internal: internal} = entity, %__MODULE__{} = event) do
-    %{entity | internal: %{internal | events: [event]}}
+  def enqueue(%{internal: internal} = entity, %{__struct__: _module} = effect) do
+    %{entity | internal: %{internal | events: [effect]}}
   end
 
   def enqueue(entity, _event), do: entity
 
   def teleport({_x, _y, _z, _o} = position) do
-    %__MODULE__{type: :teleport, position: position}
+    %Effects.Teleport{position: position}
   end
 
   def leap({_x, _y, _z, _o} = position) do
-    %__MODULE__{type: :leap, position: position}
+    %Effects.Leap{position: position}
   end
 
   def teleport_to_spell_target(spell_id) when is_integer(spell_id) do
-    %__MODULE__{type: :teleport_to_spell_target, spell_id: spell_id}
+    %Effects.TeleportToSpellTarget{spell_id: spell_id}
   end
 
   def refresh_party_aura(spell, radius) when is_number(radius) do
-    %__MODULE__{type: :refresh_party_aura, spell: spell, amount: radius}
+    %Effects.RefreshPartyAura{spell: spell, amount: radius}
   end
 
   def redirect_damage(source_guid, target_guid, school, amount)
       when is_integer(target_guid) and is_integer(amount) and amount > 0 do
-    %__MODULE__{
-      type: :redirect_damage,
-      source_guid: source_guid,
-      target_guid: target_guid,
-      school: school,
-      amount: amount
-    }
+    %Effects.RedirectDamage{source_guid: source_guid, target_guid: target_guid, school: school, amount: amount}
   end
 
   def consume_cast_item(item_guid) when is_integer(item_guid) do
-    %__MODULE__{type: :consume_cast_item, cast_item_guid: item_guid}
+    %Effects.ConsumeCastItem{cast_item_guid: item_guid}
   end
 
   def feed_pet(item_guid, pet_guid, trigger_spell_id, range_yards)
       when is_integer(item_guid) and is_integer(pet_guid) and is_integer(trigger_spell_id) do
-    %__MODULE__{
-      type: :feed_pet,
+    %Effects.FeedPet{
       cast_item_guid: item_guid,
       target_guid: pet_guid,
       spell_id: trigger_spell_id,
@@ -480,51 +353,44 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
   end
 
   def enchant_item(item_guid, spell, effect) when is_integer(item_guid) do
-    %__MODULE__{type: :enchant_item, target_guid: item_guid, spell: spell, effect: effect}
+    %Effects.EnchantItem{target_guid: item_guid, spell: spell, effect: effect}
   end
 
   def open_gameobject(object_guid) when is_integer(object_guid) do
-    %__MODULE__{type: :open_gameobject, target_guid: object_guid}
+    %Effects.OpenGameObject{target_guid: object_guid}
   end
 
   def create_item(item_id, count) when is_integer(item_id) and is_integer(count) do
-    %__MODULE__{type: :create_item, item_id: item_id, count: count}
+    %Effects.CreateItem{item_id: item_id, count: count}
   end
 
   def create_item(target_guid, item_id, count)
       when is_integer(target_guid) and is_integer(item_id) and is_integer(count) do
-    %__MODULE__{type: :create_item, target_guid: target_guid, item_id: item_id, count: count}
+    %Effects.GiveItem{target_guid: target_guid, item_id: item_id, count: count}
   end
 
   def spawn_area_effect(spell, effect, {_x, _y, _z} = position, duration_ms) when is_integer(duration_ms) do
-    %__MODULE__{
-      type: :spawn_area_effect,
-      spell: spell,
-      effect: effect,
-      position: position,
-      duration_ms: duration_ms
-    }
+    %Effects.SpawnAreaEffect{spell: spell, effect: effect, position: position, duration_ms: duration_ms}
   end
 
   def spawn_farsight(spell, {_x, _y, _z} = position, duration_ms) when is_integer(duration_ms) do
-    %__MODULE__{type: :spawn_farsight, spell: spell, position: position, duration_ms: duration_ms}
+    %Effects.SpawnFarsight{spell: spell, position: position, duration_ms: duration_ms}
   end
 
   def despawn_area_effects(spell_id) when is_integer(spell_id) do
-    %__MODULE__{type: :despawn_area_effects, spell_id: spell_id}
+    %Effects.DespawnAreaEffects{spell_id: spell_id}
   end
 
   def despawn_entity(guid) when is_integer(guid) do
-    %__MODULE__{type: :despawn_entity, target_guid: guid}
+    %Effects.DespawnEntity{target_guid: guid}
   end
 
   def leave_ritual(game_object_guid, user_guid) when is_integer(game_object_guid) and is_integer(user_guid) do
-    %__MODULE__{type: :leave_ritual, target_guid: game_object_guid, source_guid: user_guid}
+    %Effects.LeaveRitual{target_guid: game_object_guid, source_guid: user_guid}
   end
 
   def summon_game_object(entry, duration_ms, opts \\ []) when is_integer(entry) and is_integer(duration_ms) do
-    %__MODULE__{
-      type: :summon_game_object,
+    %Effects.SummonGameObject{
       entry: entry,
       duration_ms: duration_ms,
       target_guid: Keyword.get(opts, :ritual_target_guid)
@@ -533,8 +399,7 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
 
   def duel_request(source_guid, source_level, target_guid, entry, {world, x, y, z}, facing)
       when is_integer(source_guid) and is_integer(target_guid) and is_integer(entry) do
-    %__MODULE__{
-      type: :duel_request,
+    %Effects.DuelRequest{
       source_guid: source_guid,
       source_level: source_level,
       target_guid: target_guid,
@@ -546,8 +411,7 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
 
   def summon_request(summoner_guid, target_guid, zone_id, {world, x, y, z})
       when is_integer(summoner_guid) and is_integer(target_guid) do
-    %__MODULE__{
-      type: :summon_request,
+    %Effects.SummonRequest{
       source_guid: summoner_guid,
       target_guid: target_guid,
       amount: zone_id,
@@ -556,13 +420,12 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
   end
 
   def consume_reagents(reagents) when is_list(reagents) do
-    %__MODULE__{type: :consume_reagents, reagents: reagents}
+    %Effects.ConsumeReagents{reagents: reagents}
   end
 
   def trigger_spell(source_guid, source_level, target_guid, spell_id, opts \\ [])
       when is_integer(target_guid) and is_integer(spell_id) do
-    %__MODULE__{
-      type: :trigger_spell,
+    %Effects.TriggerSpell{
       source_guid: source_guid,
       source_level: source_level,
       target_guid: target_guid,
@@ -577,25 +440,24 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
   end
 
   def monster_talk(text, chat_type, target_guid) when is_binary(text) and is_atom(chat_type) do
-    %__MODULE__{type: :monster_talk, text: text, chat_type: chat_type, target_guid: target_guid}
+    %Effects.MonsterTalk{text: text, chat_type: chat_type, target_guid: target_guid}
   end
 
   def emote(emote_id) when is_integer(emote_id) do
-    %__MODULE__{type: :emote, emote_id: emote_id}
+    %Effects.Emote{emote_id: emote_id}
   end
 
   def script_steps(steps, target_guid, delay_ms) when is_list(steps) and is_integer(delay_ms) do
-    %__MODULE__{type: :script_steps, steps: steps, target_guid: target_guid, duration_ms: delay_ms}
+    %Effects.ScriptSteps{steps: steps, target_guid: target_guid, duration_ms: delay_ms}
   end
 
   def summon_creature(summon, steps, target_guid) when is_map(summon) and is_list(steps) do
-    %__MODULE__{type: :summon_creature, summon: summon, steps: steps, target_guid: target_guid}
+    %Effects.SummonCreature{summon: summon, steps: steps, target_guid: target_guid}
   end
 
   def control_granted(owner_guid, controlled_guid, spell_id, spells, opts \\ [])
       when is_integer(owner_guid) and is_integer(controlled_guid) and is_integer(spell_id) and is_list(spells) do
-    %__MODULE__{
-      type: :control_granted,
+    %Effects.ControlGranted{
       source_guid: owner_guid,
       target_guid: controlled_guid,
       spell_id: spell_id,
@@ -605,72 +467,67 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
   end
 
   def control_released(owner_guid, controlled_guid) when is_integer(owner_guid) and is_integer(controlled_guid) do
-    %__MODULE__{type: :control_released, source_guid: owner_guid, target_guid: controlled_guid}
+    %Effects.ControlReleased{source_guid: owner_guid, target_guid: controlled_guid}
   end
 
   def release_controlled(owner_guid, controlled_guid, spell_id \\ nil)
       when is_integer(owner_guid) and is_integer(controlled_guid) and (is_integer(spell_id) or is_nil(spell_id)) do
-    %__MODULE__{
-      type: :release_controlled,
-      source_guid: owner_guid,
-      target_guid: controlled_guid,
-      spell_id: spell_id
-    }
+    %Effects.ReleaseControlled{source_guid: owner_guid, target_guid: controlled_guid, spell_id: spell_id}
   end
 
   def viewpoint_granted(owner_guid, viewpoint_guid) when is_integer(owner_guid) and is_integer(viewpoint_guid) do
-    %__MODULE__{type: :viewpoint_granted, source_guid: owner_guid, target_guid: viewpoint_guid}
+    %Effects.ViewpointGranted{source_guid: owner_guid, target_guid: viewpoint_guid}
   end
 
   def viewpoint_released(owner_guid, viewpoint_guid) when is_integer(owner_guid) and is_integer(viewpoint_guid) do
-    %__MODULE__{type: :viewpoint_released, source_guid: owner_guid, target_guid: viewpoint_guid}
+    %Effects.ViewpointReleased{source_guid: owner_guid, target_guid: viewpoint_guid}
   end
 
   def summon_pet(owner_guid, entry, spell_id)
       when is_integer(owner_guid) and is_integer(entry) and entry > 0 and is_integer(spell_id) do
-    %__MODULE__{type: :summon_pet, source_guid: owner_guid, entry: entry, spell_id: spell_id}
+    %Effects.SummonPet{source_guid: owner_guid, entry: entry, spell_id: spell_id}
   end
 
   def tame_creature(owner_guid, entry) when is_integer(owner_guid) and is_integer(entry) and entry > 0 do
-    %__MODULE__{type: :tame_creature, source_guid: owner_guid, entry: entry}
+    %Effects.TameCreature{source_guid: owner_guid, entry: entry}
   end
 
   def dismiss_pet(owner_guid, reason \\ nil) when is_integer(owner_guid) do
-    %__MODULE__{type: :dismiss_pet, source_guid: owner_guid, reason: reason}
+    %Effects.DismissPet{source_guid: owner_guid, reason: reason}
   end
 
   def summon_totem(entry, slot, duration_ms)
       when is_integer(entry) and entry > 0 and slot in 1..4 and is_integer(duration_ms) do
-    %__MODULE__{type: :summon_totem, entry: entry, slot: slot, duration_ms: duration_ms}
+    %Effects.SummonTotem{entry: entry, slot: slot, duration_ms: duration_ms}
   end
 
   def despawn_self(despawn_delay_ms, respawn_delay_ms)
       when is_integer(despawn_delay_ms) and is_integer(respawn_delay_ms) do
-    %__MODULE__{type: :despawn_self, duration_ms: despawn_delay_ms, respawn_delay_ms: respawn_delay_ms}
+    %Effects.DespawnSelf{duration_ms: despawn_delay_ms, respawn_delay_ms: respawn_delay_ms}
   end
 
   def attack_start(target_guid) when is_integer(target_guid) do
-    %__MODULE__{type: :attack_start, target_guid: target_guid}
+    %Effects.StartAttack{target_guid: target_guid}
   end
 
   def forward_script_steps(target_guid, steps, source_guid) when is_integer(target_guid) and is_list(steps) do
-    %__MODULE__{type: :forward_script_steps, target_guid: target_guid, steps: steps, source_guid: source_guid}
+    %Effects.ForwardScriptSteps{target_guid: target_guid, steps: steps, source_guid: source_guid}
   end
 
   def play_sound(sound_id) when is_integer(sound_id) do
-    %__MODULE__{type: :play_sound, sound_id: sound_id}
+    %Effects.PlaySound{sound_id: sound_id}
   end
 
   def play_object_sound(sound_id) when is_integer(sound_id) do
-    %__MODULE__{type: :play_object_sound, sound_id: sound_id}
+    %Effects.PlayObjectSound{sound_id: sound_id}
   end
 
   def set_facing({:angle, angle} = facing) when is_number(angle) do
-    %__MODULE__{type: :set_facing, facing: facing}
+    %Effects.SetFacing{facing: facing}
   end
 
   def set_facing({:target, target_guid} = facing) when is_integer(target_guid) do
-    %__MODULE__{type: :set_facing, facing: facing}
+    %Effects.SetFacing{facing: facing}
   end
 
   def drain(%{internal: %{events: events} = internal} = entity) when is_list(events) do

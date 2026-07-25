@@ -20,7 +20,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Lifecycle do
   alias ThistleTea.Game.Entity.Logic.Aura.StealthSync
   alias ThistleTea.Game.Entity.Logic.Aura.ViewpointSync
   alias ThistleTea.Game.Entity.Logic.Core
-  alias ThistleTea.Game.Entity.Logic.Event
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Cooldowns
 
@@ -149,7 +149,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Lifecycle do
       end)
 
     %{entity | unit: %{unit | auras: holders}}
-    |> Event.enqueue(duration_sync_events(entity, events))
+    |> Effects.enqueue(duration_sync_events(entity, events))
   end
 
   def delay_source_spell(entity, _spell_id, _caster_guid, _delay_ms, _now), do: entity
@@ -209,7 +209,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Lifecycle do
       entity
     else
       {entity, events} = remove_and_sync(entity, kept, now)
-      Event.enqueue(entity, events)
+      Effects.enqueue(entity, events)
     end
   end
 
@@ -246,7 +246,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Lifecycle do
        when is_integer(owner_guid) and is_integer(controlled_guid) and controlled_guid > 0 do
     for %Holder{caster_guid: ^owner_guid, spell: %Spell{id: spell_id, effects: effects}} <- removed,
         Enum.any?(effects, &(&1.type == :summon_possessed)) do
-      Event.release_controlled(owner_guid, controlled_guid, spell_id)
+      Effects.release_controlled(owner_guid, controlled_guid, spell_id)
     end
   end
 
@@ -259,7 +259,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Lifecycle do
     {entity, modifier_events} = HolderSync.sync(entity, holders)
 
     entity
-    |> Event.enqueue(modifier_events)
+    |> Effects.enqueue(modifier_events)
     |> Core.mark_broadcast_update()
   end
 
@@ -295,7 +295,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Lifecycle do
 
   def duration_event(%Holder{slot: slot, expires_at: expires_at}, now)
       when is_integer(slot) and is_integer(expires_at) and expires_at != -1 do
-    [Event.aura_duration(slot, max(expires_at - now, 0))]
+    [Effects.aura_duration(slot, max(expires_at - now, 0))]
   end
 
   def duration_event(_holder, _now), do: []

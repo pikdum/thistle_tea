@@ -10,7 +10,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Absorption do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.Aura.HolderSync
   alias ThistleTea.Game.Entity.Logic.Core
-  alias ThistleTea.Game.Entity.Logic.Event
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Spell
 
   @mana_per_absorbed_damage 2
@@ -35,7 +35,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Absorption do
         {entity, modifier_events} = HolderSync.sync(entity, kept)
 
         entity
-        |> Event.enqueue(modifier_events)
+        |> Effects.enqueue(modifier_events)
         |> Core.mark_broadcast_update()
       end
 

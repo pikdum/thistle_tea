@@ -13,7 +13,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AI.BT.Mob, as: MobBT
-  alias ThistleTea.Game.Entity.Logic.Event
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.Entity.Logic.Threat
   alias ThistleTea.Game.Guid
@@ -219,7 +219,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
 
       assert state.movement_block.spline_nodes == []
       assert blackboard.move_target == nil
-      assert Enum.any?(state.internal.events, &match?(%Event{type: :movement_stopped}, &1))
+      assert Enum.any?(state.internal.events, &match?(%Effects.MovementStopped{}, &1))
     end
   end
 
@@ -294,7 +294,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
 
       assert {:success, state, blackboard} = MobBT.interrupt_idle_movement(state, blackboard, 1_000)
       assert state.movement_block.spline_nodes == []
-      assert Enum.any?(state.internal.events, &match?(%Event{type: :movement_stopped}, &1))
+      assert Enum.any?(state.internal.events, &match?(%Effects.MovementStopped{}, &1))
       assert blackboard.target == nil
       assert blackboard.move_target == nil
       assert blackboard.next_chase_at == 0
@@ -343,7 +343,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
       assert state.movement_block.spline_nodes == []
       assert state.movement_block.position == {2.0, 0.0, 0.0, 0.0}
       assert is_nil(state.internal.movement_start_time)
-      assert [%Event{type: :movement_stopped}] = state.internal.events
+      assert [%Effects.MovementStopped{}] = state.internal.events
     end
 
     test "keeps moving outside the contact ring" do
@@ -537,8 +537,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
       assert state.internal.last_hostile_time == 1_000
 
       assert [
-               %Event{type: :threat_ref_gained, target_guid: ^target_guid},
-               %Event{type: :attacker_gained, target_guid: ^target_guid}
+               %Effects.ThreatRefGained{target_guid: ^target_guid},
+               %Effects.AttackerGained{target_guid: ^target_guid}
              ] = state.internal.events
 
       assert Metadata.query(target_guid, [:attacker_count]) == %{attacker_count: 0}

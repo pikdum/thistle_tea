@@ -13,7 +13,7 @@ defmodule ThistleTea.Game.Player.DevCommands do
   alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Death
-  alias ThistleTea.Game.Entity.Logic.Event
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Entity.Logic.MovementStats
   alias ThistleTea.Game.Entity.Logic.Proficiency
@@ -545,7 +545,7 @@ defmodule ThistleTea.Game.Player.DevCommands do
 
   defp apply_speed_rate(state, rate, {target, _guid}) when is_pid(target) do
     character = MovementStats.set_run_speed_rate(state.character, rate)
-    character = EventSink.emit(character, [Event.movement_speed_changed(character.movement_block.run_speed)])
+    character = EventSink.emit(character, [Effects.movement_speed_changed(character.movement_block.run_speed)])
     put_character(state, character)
   end
 

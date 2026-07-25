@@ -12,7 +12,7 @@ defmodule ThistleTea.Game.Entity.Logic.Threat do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.Combat
-  alias ThistleTea.Game.Entity.Logic.Event
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Hostility
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Metadata
@@ -33,7 +33,7 @@ defmodule ThistleTea.Game.Entity.Logic.Threat do
       when is_integer(healer_guid) and healer_guid > 0 and is_number(healing) and healing > 0 and is_number(health) and
              is_number(max_health) do
     case min(healing, max(max_health - health, 0)) do
-      gain when gain > 0 -> [Event.heal_threat(healer_guid, healed_guid, gain * @heal_threat_ratio)]
+      gain when gain > 0 -> [Effects.heal_threat(healer_guid, healed_guid, gain * @heal_threat_ratio)]
       _no_gain -> []
     end
   end
@@ -52,7 +52,7 @@ defmodule ThistleTea.Game.Entity.Logic.Threat do
     if Map.has_key?(existing, source_guid) do
       entity
     else
-      Event.enqueue(entity, Event.threat_ref_gained(source_guid))
+      Effects.enqueue(entity, Effects.threat_ref_gained(source_guid))
     end
   end
 
@@ -95,7 +95,7 @@ defmodule ThistleTea.Game.Entity.Logic.Threat do
 
     table
     |> Map.keys()
-    |> Enum.reduce(entity, &Event.enqueue(&2, Event.threat_ref_lost(&1)))
+    |> Enum.reduce(entity, &Effects.enqueue(&2, Effects.threat_ref_lost(&1)))
   end
 
   def wipe(%Mob{internal: %Internal{} = internal} = entity) do
@@ -114,7 +114,7 @@ defmodule ThistleTea.Game.Entity.Logic.Threat do
       when is_map(table) and is_integer(guid) do
     if Map.has_key?(table, guid) do
       %{entity | internal: %{internal | threat: Map.delete(table, guid)}}
-      |> Event.enqueue(Event.threat_ref_lost(guid))
+      |> Effects.enqueue(Effects.threat_ref_lost(guid))
     else
       entity
     end
@@ -154,7 +154,7 @@ defmodule ThistleTea.Game.Entity.Logic.Threat do
     entity =
       dropped
       |> Enum.reduce(%{entity | internal: %{entity.internal | threat: pruned}}, fn {guid, _threat}, acc ->
-        Event.enqueue(acc, Event.threat_ref_lost(guid))
+        Effects.enqueue(acc, Effects.threat_ref_lost(guid))
       end)
 
     sorted = Enum.sort_by(pruned, fn {_guid, threat} -> threat end, :desc)

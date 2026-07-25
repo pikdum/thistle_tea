@@ -10,7 +10,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.MovementSync do
   alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Unit
-  alias ThistleTea.Game.Entity.Logic.Event
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.Entity.Logic.MovementStats
 
@@ -45,10 +45,10 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.MovementSync do
 
     entity = %{entity | movement_block: %{mb | movement_flags: new_flags}}
     entity = put_rooted(entity, has_root?)
-    root_events = if has_root? == was_rooted?, do: [], else: [Event.movement_root_changed(has_root?)]
+    root_events = if has_root? == was_rooted?, do: [], else: [Effects.movement_root_changed(has_root?)]
 
     if has_root? and not was_rooted? do
-      {Movement.halt(entity, now), [Event.movement_stopped() | root_events]}
+      {Movement.halt(entity, now), [Effects.movement_stopped() | root_events]}
     else
       {entity, root_events}
     end
@@ -91,9 +91,9 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.MovementSync do
 
   defp sync_movement_flag_aura(entity, _type, _bit), do: {entity, []}
 
-  defp movement_flag_event(:feather_fall, enabled?), do: Event.feather_fall_changed(enabled?)
-  defp movement_flag_event(:hover, enabled?), do: Event.hover_changed(enabled?)
-  defp movement_flag_event(:water_walk, enabled?), do: Event.water_walk_changed(enabled?)
+  defp movement_flag_event(:feather_fall, enabled?), do: Effects.feather_fall_changed(enabled?)
+  defp movement_flag_event(:hover, enabled?), do: Effects.hover_changed(enabled?)
+  defp movement_flag_event(:water_walk, enabled?), do: Effects.water_walk_changed(enabled?)
 
   defp sync_stunned_flag(%{unit: %Unit{auras: holders} = unit} = entity) when is_list(holders) do
     flags = unit.flags || 0
@@ -113,7 +113,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.MovementSync do
     new_run_speed = run_speed(entity)
 
     if is_number(old_run_speed) and is_number(new_run_speed) and old_run_speed != new_run_speed do
-      [Event.movement_speed_changed(new_run_speed)]
+      [Effects.movement_speed_changed(new_run_speed)]
     else
       []
     end

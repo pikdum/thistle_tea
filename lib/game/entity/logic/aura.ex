@@ -17,7 +17,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
   alias ThistleTea.Game.Entity.Logic.Aura.Periodic
   alias ThistleTea.Game.Entity.Logic.Aura.Reactions
   alias ThistleTea.Game.Entity.Logic.Aura.UnitSync
-  alias ThistleTea.Game.Entity.Logic.Event
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Spell
 
   defdelegate apply_spell(entity, context, spell, now), to: AuraApplication
@@ -146,7 +146,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
         trigger_mask_applies?(mask, spell),
         target_guid <- target_guids,
         target_trigger_roll?(chance),
-        do: Event.trigger_spell(guid, level || 1, target_guid, trigger)
+        do: Effects.trigger_spell(guid, level || 1, target_guid, trigger)
   end
 
   def target_trigger_events(_entity, _spell, _target_guids), do: []

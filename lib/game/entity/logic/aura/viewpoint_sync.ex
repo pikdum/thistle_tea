@@ -5,7 +5,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.ViewpointSync do
   """
 
   alias ThistleTea.Game.Aura.Holder
-  alias ThistleTea.Game.Entity.Logic.Event
+  alias ThistleTea.Game.Entity.Logic.Effects
 
   def events(previous_holders, current_holders, target_guid)
       when is_list(previous_holders) and is_list(current_holders) and is_integer(target_guid) do
@@ -28,12 +28,12 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.ViewpointSync do
   defp same_owner?(_previous, _current), do: false
 
   defp release_event(%Holder{caster_guid: owner_guid}, target_guid),
-    do: [Event.viewpoint_released(owner_guid, target_guid)]
+    do: [Effects.viewpoint_released(owner_guid, target_guid)]
 
   defp release_event(nil, _target_guid), do: []
 
   defp grant_event(%Holder{caster_guid: owner_guid}, target_guid),
-    do: [Event.viewpoint_granted(owner_guid, target_guid)]
+    do: [Effects.viewpoint_granted(owner_guid, target_guid)]
 
   defp grant_event(nil, _target_guid), do: []
 end

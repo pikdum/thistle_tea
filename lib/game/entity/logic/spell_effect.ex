@@ -14,7 +14,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Death
   alias ThistleTea.Game.Entity.Logic.Druid
-  alias ThistleTea.Game.Entity.Logic.Event
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Hunter
   alias ThistleTea.Game.Entity.Logic.Mage
   alias ThistleTea.Game.Entity.Logic.Paladin
@@ -46,7 +46,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   def receive(target, %CastContext{} = context, %Spell{} = spell, now) when is_integer(now) do
     cond do
       immune_to_harmful_spell?(target, context, spell) ->
-        {target, [Event.spell_log_miss(context.caster_guid, target.object.guid, spell.id, :immune)]}
+        {target, [Effects.spell_log_miss(context.caster_guid, target.object.guid, spell.id, :immune)]}
 
       reflect_harmful_spell?(target, context, spell) ->
         reflected_context = %{
@@ -59,8 +59,8 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
 
         {target,
          [
-           Event.spell_log_miss(context.caster_guid, target.object.guid, spell.id, :reflect),
-           Event.deliver_spell(context.caster_guid, reflected_context, spell)
+           Effects.spell_log_miss(context.caster_guid, target.object.guid, spell.id, :reflect),
+           Effects.deliver_spell(context.caster_guid, reflected_context, spell)
          ]}
 
       true ->
@@ -185,7 +185,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
           if rogue_feedback_spell?(spell) do
             events ++
               [
-                Event.attack_outcome(
+                Effects.attack_outcome(
                   context.caster_guid,
                   target.object.guid,
                   result.outcome,
@@ -240,7 +240,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
     cond do
       channel_ticked_trigger?(context.spell, effect) ->
         event =
-          Event.trigger_spell(context.caster_guid, context.caster_level, target.object.guid, effect.trigger_spell_id)
+          Effects.trigger_spell(context.caster_guid, context.caster_level, target.object.guid, effect.trigger_spell_id)
 
         {target, events ++ [event], applied}
 
@@ -302,7 +302,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   defp script_trigger_events(target, %CastContext{spell: spell} = context) do
     with trigger_id when is_integer(trigger_id) <- Scripts.apply_trigger(spell),
          true <- Aura.has_spell?(target, spell.id) do
-      [Event.trigger_spell(context.caster_guid, context.caster_level, target.object.guid, trigger_id)]
+      [Effects.trigger_spell(context.caster_guid, context.caster_level, target.object.guid, trigger_id)]
     else
       _ -> []
     end
@@ -334,7 +334,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
     {state, events} = apply_damage_effect(state, context, spell, effect, now)
     damage = min(dealt_damage(events), health_before)
     healed = trunc(damage * leech_multiplier(effect))
-    {state, events ++ if(healed > 0, do: [Event.heal_entity(context.caster_guid, healed)], else: [])}
+    {state, events ++ if(healed > 0, do: [Effects.heal_entity(context.caster_guid, healed)], else: [])}
   end
 
   defp apply_effect(state, %CastContext{} = context, spell, %Effect{type: :instakill}, now) do
@@ -379,7 +379,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
 
     {state,
      [
-       Event.duel_request(
+       Effects.duel_request(
          caster_guid,
          caster_level,
          target_guid,
@@ -398,7 +398,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
          _now
        )
        when state.object.guid == caster_guid and is_integer(entry) and entry > 0 do
-    {state, [Event.summon_pet(caster_guid, entry, spell_id)]}
+    {state, [Effects.summon_pet(caster_guid, entry, spell_id)]}
   end
 
   defp apply_effect(
@@ -409,7 +409,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
          _now
        )
        when type in [:summon_pet, :revive_pet] and is_integer(entry) and entry > 0 do
-    {state, [Event.summon_pet(caster_guid, entry, spell_id)]}
+    {state, [Effects.summon_pet(caster_guid, entry, spell_id)]}
   end
 
   defp apply_effect(
@@ -419,12 +419,12 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
          %Effect{type: :dismiss_pet},
          _now
        ) do
-    {state, [Event.dismiss_pet(caster_guid)]}
+    {state, [Effects.dismiss_pet(caster_guid)]}
   end
 
   defp apply_effect(state, %CastContext{}, spell, %Effect{type: :summon_game_object, misc_value: entry}, _now)
        when is_integer(entry) and entry > 0 do
-    {state, [Event.summon_game_object(entry, max(spell.duration_ms || 0, 0))]}
+    {state, [Effects.summon_game_object(entry, max(spell.duration_ms || 0, 0))]}
   end
 
   defp apply_effect(
@@ -440,7 +440,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
          _now
        )
        when is_integer(target_guid) do
-    {state, [Event.summon_request(summoner_guid, target_guid, zone_id, position)]}
+    {state, [Effects.summon_request(summoner_guid, target_guid, zone_id, position)]}
   end
 
   defp apply_effect(
@@ -472,7 +472,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
       post_spawn_spells: Warlock.summon_spells(spell)
     }
 
-    {state, [Event.summon_creature(summon, [], nil)]}
+    {state, [Effects.summon_creature(summon, [], nil)]}
   end
 
   defp apply_effect(
@@ -506,7 +506,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
       control_spell_id: spell_id
     }
 
-    {state, [Event.summon_creature(summon, [], nil)]}
+    {state, [Effects.summon_creature(summon, [], nil)]}
   end
 
   defp apply_effect(
@@ -517,7 +517,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
          _now
        )
        when slot in 1..4 and is_integer(entry) and entry > 0 do
-    {state, [Event.summon_totem(entry, slot, max(spell.duration_ms || 0, 0))]}
+    {state, [Effects.summon_totem(entry, slot, max(spell.duration_ms || 0, 0))]}
   end
 
   defp apply_effect(
@@ -528,7 +528,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
          _now
        )
        when is_integer(entry) and entry > 0 do
-    {state, [Event.tame_creature(owner_guid, entry)]}
+    {state, [Effects.tame_creature(owner_guid, entry)]}
   end
 
   defp apply_effect(%Character{} = state, %CastContext{}, spell, %Effect{type: :clear_threat}, now) do
@@ -537,8 +537,8 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
 
     events =
       aura_events ++
-        [Event.drop_nearby_threat()] ++
-        Enum.map(mob_guids, &Event.drop_threat/1) ++
+        [Effects.drop_nearby_threat()] ++
+        Enum.map(mob_guids, &Effects.drop_threat/1) ++
         vanish_attack_stop_events(state) ++ maybe_vanish_stealth_events(state, spell)
 
     {state, events}
@@ -581,7 +581,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
     crit? = heal_crit?(context, spell)
     healing = if crit?, do: healing + div(healing, 2), else: healing
     events = Threat.heal_threat_events(state, context.caster_guid, healing)
-    heal_event = Event.spell_heal(context.caster_guid, state.object.guid, spell, healing, crit?)
+    heal_event = Effects.spell_heal(context.caster_guid, state.object.guid, spell, healing, crit?)
 
     {Core.heal(state, healing), swiftmend_events ++ events ++ [heal_event]}
   end
@@ -608,7 +608,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
       {state, []}
     else
       target_guid = trigger_target_guid(state, context, effect)
-      event = Event.trigger_spell(context.caster_guid, context.caster_level, target_guid, spell_id)
+      event = Effects.trigger_spell(context.caster_guid, context.caster_level, target_guid, spell_id)
       {state, [event]}
     end
   end
@@ -634,11 +634,11 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
        ) do
     distance = if is_number(effect.radius_yards) and effect.radius_yards > 0, do: effect.radius_yards, else: 20.0
     destination = {x + :math.cos(o) * distance, y + :math.sin(o) * distance, z, o}
-    {state, [Event.leap(destination)]}
+    {state, [Effects.leap(destination)]}
   end
 
   defp apply_effect(state, %CastContext{}, %Spell{id: spell_id}, %Effect{type: :teleport_units}, _now) do
-    {state, [Event.teleport_to_spell_target(spell_id)]}
+    {state, [Effects.teleport_to_spell_target(spell_id)]}
   end
 
   defp apply_effect(
@@ -652,7 +652,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
     amount = rolled_amount(spell, effect, context)
 
     if effect.implicit_target_a == :caster and state.object.guid != caster_guid do
-      {state, [Event.grant_power(caster_guid, power_type, amount)]}
+      {state, [Effects.grant_power(caster_guid, power_type, amount)]}
     else
       state = Resources.gain_power(state, power_type, amount)
       {Warrior.after_energize(state, spell, now), []}
@@ -668,12 +668,12 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
        )
        when is_integer(item_id) and item_id > 0 do
     count = max(rolled_amount(spell, effect, context), 1)
-    {state, [Event.create_item(item_id, count)]}
+    {state, [Effects.create_item(item_id, count)]}
   end
 
   defp apply_effect(state, %CastContext{}, spell, %Effect{type: :script_effect}, _now) do
     case Warlock.healthstone_item(state, spell) do
-      item_id when is_integer(item_id) and item_id > 0 -> {state, [Event.create_item(item_id, 1)]}
+      item_id when is_integer(item_id) and item_id > 0 -> {state, [Effects.create_item(item_id, 1)]}
       _ -> {state, []}
     end
   end
@@ -690,7 +690,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
       drained = min(rolled_amount(spell, effect, context), available)
       unit = put_power(state.unit, power_type, available - drained)
       gained = trunc(drained * leech_multiplier(effect))
-      {%{state | unit: unit}, [Event.grant_power(caster_guid, 0, gained)]}
+      {%{state | unit: unit}, [Effects.grant_power(caster_guid, 0, gained)]}
     else
       {state, []}
     end
@@ -707,7 +707,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
           }
 
           state = lock_interrupted_school(state, casting, spell, now)
-          {Core.mark_broadcast_update(state), [Event.object_update(:values)]}
+          {Core.mark_broadcast_update(state), [Effects.object_update(:values)]}
         else
           {state, []}
         end
@@ -743,7 +743,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
       {true, heal_spell_id} when is_integer(heal_spell_id) ->
         {state,
          events ++
-           [Event.trigger_spell(context.caster_guid, context.caster_level, context.caster_guid, heal_spell_id)]}
+           [Effects.trigger_spell(context.caster_guid, context.caster_level, context.caster_guid, heal_spell_id)]}
 
       _other ->
         {state, events}
@@ -765,7 +765,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
 
       damage = trunc(drained * burn_multiplier(effect))
       state = Core.take_damage(state, damage, now, [school: school_atom(spell)] ++ damage_source_opts(context))
-      event = Event.spell_damage(context.caster_guid, state.object.guid, spell, damage)
+      event = Effects.spell_damage(context.caster_guid, state.object.guid, spell, damage)
 
       {state, [event]}
     else
@@ -849,7 +849,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
 
   defp apply_class_dummy(state, context, _spell, _effect, :last_stand, _now) do
     event =
-      Event.trigger_spell(
+      Effects.trigger_spell(
         context.caster_guid,
         context.caster_level,
         state.object.guid,
@@ -861,7 +861,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
 
   defp apply_class_dummy(state, context, _spell, _effect, :tame_beast_completion, _now) do
     event =
-      Event.trigger_spell(
+      Effects.trigger_spell(
         context.caster_guid,
         context.caster_level,
         state.object.guid,
@@ -889,14 +889,14 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
 
   defp apply_class_dummy(state, context, _spell, _effect, {:holy_shock, spell_ids}, _now) do
     spell_id = if context.target_hostile?, do: spell_ids.damage, else: spell_ids.heal
-    {state, [Event.trigger_spell(context.caster_guid, context.caster_level, state.object.guid, spell_id)]}
+    {state, [Effects.trigger_spell(context.caster_guid, context.caster_level, state.object.guid, spell_id)]}
   end
 
   defp apply_class_dummy(state, context, _spell, effect, :judgement_of_command, _now) do
     spell_id = Effect.damage_roll(effect)
 
     if spell_id > 1 do
-      {state, [Event.trigger_spell(context.caster_guid, context.caster_level, state.object.guid, spell_id)]}
+      {state, [Effects.trigger_spell(context.caster_guid, context.caster_level, state.object.guid, spell_id)]}
     else
       {state, []}
     end
@@ -908,7 +908,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
     with pet_guid when is_integer(pet_guid) <- Character.controlled_guid(state),
          [_link | _rest] = aura_ids <- SpellPetAuraLoader.pet_aura_ids(spell_id, Guid.entry(pet_guid)) do
       Enum.map(aura_ids, fn aura_id ->
-        Event.trigger_spell(pet_guid, context.caster_level, pet_guid, aura_id, triggered_by_spell_id: spell_id)
+        Effects.trigger_spell(pet_guid, context.caster_level, pet_guid, aura_id, triggered_by_spell_id: spell_id)
       end)
     else
       _no_pet -> []
@@ -924,7 +924,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
     case SpellPetAuraLoader.pet_aura_ids(spell_id, Guid.entry(pet_guid)) do
       [_link | _rest] = aura_ids ->
         Enum.map(aura_ids, fn aura_id ->
-          Event.trigger_spell(pet_guid, state.unit.level || 1, pet_guid, aura_id, triggered_by_spell_id: spell_id)
+          Effects.trigger_spell(pet_guid, state.unit.level || 1, pet_guid, aura_id, triggered_by_spell_id: spell_id)
         end)
 
       _no_links ->
@@ -948,7 +948,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
          {source_guid, target_guid} when is_integer(source_guid) and is_integer(target_guid) <-
            script_guids(state.object.guid, context.caster_guid, step) do
       source_level = if source_guid == state.object.guid, do: state.unit.level || 1, else: context.caster_level
-      [Event.trigger_spell(source_guid, source_level, target_guid, spell_id)]
+      [Effects.trigger_spell(source_guid, source_level, target_guid, spell_id)]
     else
       _ -> []
     end
@@ -992,14 +992,14 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
         _ -> nil
       end
 
-    if is_integer(spell_id), do: [Event.trigger_spell(guid, level || 1, guid, spell_id)], else: []
+    if is_integer(spell_id), do: [Effects.trigger_spell(guid, level || 1, guid, spell_id)], else: []
   end
 
   defp vanish_stealth_events(_state), do: []
 
   defp vanish_attack_stop_events(%{object: %{guid: guid}, unit: %{target: target}})
        when is_integer(target) and target > 0 do
-    [Event.attack_stop(guid, target)]
+    [Effects.attack_stop(guid, target)]
   end
 
   defp vanish_attack_stop_events(_state), do: []
@@ -1019,7 +1019,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
     }
 
     state = %{state | internal: %{internal | pending_resurrect: pending}}
-    {state, [Event.resurrect_request(context.caster_guid, spell.id, health, mana)]}
+    {state, [Effects.resurrect_request(context.caster_guid, spell.id, health, mana)]}
   end
 
   defp burn_multiplier(%Effect{multiple_value: multiple}) when is_number(multiple) and multiple > 0, do: multiple
@@ -1089,7 +1089,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
       )
 
     event =
-      Event.spell_damage(
+      Effects.spell_damage(
         context.caster_guid,
         state.object.guid,
         spell,
@@ -1281,7 +1281,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
 
     {state, events} = melee_ability_damage(state, context, damage_spell, damage, now)
 
-    {state, events ++ [Event.drain_power(context.caster_guid, 1)]}
+    {state, events ++ [Effects.drain_power(context.caster_guid, 1)]}
   end
 
   defp melee_ability_damage(state, %CastContext{} = context, spell, damage, now) do
@@ -1314,7 +1314,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
       )
 
     event =
-      Event.spell_damage(context.caster_guid, state.object.guid, spell, damage,
+      Effects.spell_damage(context.caster_guid, state.object.guid, spell, damage,
         absorbed: absorbed,
         crit?: context.melee_crit? || false,
         proc_damage: proc_damage,
@@ -1401,14 +1401,14 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
 
   defp melee_avoid_events(%{object: %{guid: target_guid}}, %CastContext{} = context, spell, outcome) do
     [
-      Event.spell_log_miss(context.caster_guid, target_guid, spell.id, outcome),
-      Event.attack_outcome(context.caster_guid, target_guid, outcome, 0, spell.id)
+      Effects.spell_log_miss(context.caster_guid, target_guid, spell.id, outcome),
+      Effects.attack_outcome(context.caster_guid, target_guid, outcome, 0, spell.id)
     ]
   end
 
   defp dealt_damage(events) do
     Enum.reduce(events, 0, fn
-      %Event{type: :spell_damage, damage: damage, absorbed: absorbed}, acc when is_integer(damage) ->
+      %Effects.SpellDamage{damage: damage, absorbed: absorbed}, acc when is_integer(damage) ->
         acc + max(damage - (absorbed || 0), 0)
 
       _event, acc ->
@@ -1418,11 +1418,11 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
 
   defp dealt_proc_damage(events) do
     Enum.reduce(events, 0, fn
-      %Event{type: :spell_damage, proc_damage: proc_damage, damage: damage, absorbed: absorbed}, acc
+      %Effects.SpellDamage{proc_damage: proc_damage, damage: damage, absorbed: absorbed}, acc
       when is_integer(proc_damage) and is_integer(damage) and damage > 0 ->
         acc + round(proc_damage * max(damage - (absorbed || 0), 0) / damage)
 
-      %Event{type: :spell_damage, damage: damage, absorbed: absorbed}, acc when is_integer(damage) ->
+      %Effects.SpellDamage{damage: damage, absorbed: absorbed}, acc when is_integer(damage) ->
         acc + max(damage - (absorbed || 0), 0)
 
       _event, acc ->
@@ -1471,7 +1471,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
 
   defp consume_ferocious_bite_energy({state, events}, %CastContext{} = context, %Spell{} = spell) do
     if Druid.ferocious_bite?(spell) do
-      {state, events ++ [Event.drain_power(context.caster_guid, 3)]}
+      {state, events ++ [Effects.drain_power(context.caster_guid, 3)]}
     else
       {state, events}
     end

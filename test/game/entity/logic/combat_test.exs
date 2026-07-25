@@ -12,13 +12,13 @@ defmodule ThistleTea.Game.Entity.Logic.CombatTest do
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Combat
-  alias ThistleTea.Game.Entity.Logic.Event
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Effect
 
   describe "attack_start/2" do
     test "returns an attack_start event" do
-      assert %Event{type: :attack_start, source_guid: 1, target_guid: 2} = Combat.attack_start(1, 2)
+      assert %Effects.AttackStart{source_guid: 1, target_guid: 2} = Combat.attack_start(1, 2)
     end
   end
 
@@ -26,13 +26,7 @@ defmodule ThistleTea.Game.Entity.Logic.CombatTest do
     test "returns an attacker_state_update event with attack details" do
       event = Combat.attacker_state_update(1, 2, 12, %{spell_id: 99})
 
-      assert %Event{
-               type: :attacker_state_update,
-               source_guid: 1,
-               target_guid: 2,
-               damage: 12,
-               attack: %{spell_id: 99}
-             } = event
+      assert %Effects.AttackerStateUpdate{source_guid: 1, target_guid: 2, damage: 12, attack: %{spell_id: 99}} = event
     end
   end
 
@@ -128,21 +122,13 @@ defmodule ThistleTea.Game.Entity.Logic.CombatTest do
       assert mob.internal.broadcast_update? == true
 
       assert [
-               %Event{
-                 type: :attacker_state_update,
+               %Effects.AttackerStateUpdate{
                  source_guid: 1,
                  target_guid: 2,
                  damage: 12,
                  attack: %{hit_info: 0x2, damage_state: 1, blocked_amount: 0, absorb: 0}
                },
-               %Event{
-                 type: :attack_outcome,
-                 target_guid: 1,
-                 source_guid: 2,
-                 outcome: :normal,
-                 damage: 12,
-                 spell_id: nil
-               }
+               %Effects.AttackOutcome{target_guid: 1, source_guid: 2, outcome: :normal, damage: 12, spell_id: nil}
              ] = events
     end
 
@@ -153,15 +139,9 @@ defmodule ThistleTea.Game.Entity.Logic.CombatTest do
       {_mob, events} = Combat.receive_attack(mob, %{caster: 1, damage: 12}, 1_000, roll: 9_999)
 
       assert [
-               %Event{type: :attacker_state_update},
-               %Event{
-                 type: :trigger_spell,
-                 source_guid: 2,
-                 source_level: 10,
-                 target_guid: 1,
-                 spell_id: 6136
-               },
-               %Event{type: :attack_outcome}
+               %Effects.AttackerStateUpdate{},
+               %Effects.TriggerSpell{source_guid: 2, source_level: 10, target_guid: 1, spell_id: 6136},
+               %Effects.AttackOutcome{}
              ] = events
     end
 
@@ -189,7 +169,7 @@ defmodule ThistleTea.Game.Entity.Logic.CombatTest do
 
       assert Enum.any?(
                events,
-               &match?(%Event{type: :trigger_spell, source_guid: 2, target_guid: 1, spell_id: 22_858}, &1)
+               &match?(%Effects.TriggerSpell{source_guid: 2, target_guid: 1, spell_id: 22_858}, &1)
              )
     end
 
@@ -223,7 +203,7 @@ defmodule ThistleTea.Game.Entity.Logic.CombatTest do
 
       {_mob, events} = Combat.receive_attack(mob, %{caster: 1, damage: 12}, 1_000, roll: 9_999)
 
-      assert [%Event{type: :attacker_state_update}, %Event{type: :attack_outcome}] = events
+      assert [%Effects.AttackerStateUpdate{}, %Effects.AttackOutcome{}] = events
     end
 
     test "dodged attacks deal no damage and skip hit reactions" do
@@ -236,12 +216,8 @@ defmodule ThistleTea.Game.Entity.Logic.CombatTest do
       assert mob.unit.health == 100
 
       assert [
-               %Event{
-                 type: :attacker_state_update,
-                 damage: 0,
-                 attack: %{damage_state: 2, hit_info: 0x2}
-               },
-               %Event{type: :attack_outcome, outcome: :dodge, damage: 12}
+               %Effects.AttackerStateUpdate{damage: 0, attack: %{damage_state: 2, hit_info: 0x2}},
+               %Effects.AttackOutcome{outcome: :dodge, damage: 12}
              ] = events
     end
 
@@ -279,8 +255,8 @@ defmodule ThistleTea.Game.Entity.Logic.CombatTest do
       assert mob.unit.health == 100
 
       assert [
-               %Event{type: :attacker_state_update, damage: 0, attack: %{hit_info: 0x12, damage_state: 0}},
-               %Event{type: :attack_outcome, outcome: :miss, damage: 0}
+               %Effects.AttackerStateUpdate{damage: 0, attack: %{hit_info: 0x12, damage_state: 0}},
+               %Effects.AttackOutcome{outcome: :miss, damage: 0}
              ] = events
     end
   end
@@ -290,8 +266,8 @@ defmodule ThistleTea.Game.Entity.Logic.CombatTest do
       mob = %Mob{object: %Object{guid: 1}, unit: %Unit{}, internal: %Internal{}}
       event = Combat.attack_start(1, 2)
 
-      mob = Event.enqueue(mob, event)
-      assert {mob, [^event]} = Event.drain(mob)
+      mob = Effects.enqueue(mob, event)
+      assert {mob, [^event]} = Effects.drain(mob)
       assert mob.internal.events == []
     end
   end

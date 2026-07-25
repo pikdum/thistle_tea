@@ -10,7 +10,7 @@ defmodule ThistleTea.Game.Entity.Logic.Death do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Core
-  alias ThistleTea.Game.Entity.Logic.Event
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Spell
 
   @ghost_spell_id 8326
@@ -52,7 +52,7 @@ defmodule ThistleTea.Game.Entity.Logic.Death do
 
     {character, events} = apply_ghost_spells(character, ghost_spells, now)
 
-    {Core.mark_broadcast_update(character), events ++ [Event.movement_root_changed(false)]}
+    {Core.mark_broadcast_update(character), events ++ [Effects.movement_root_changed(false)]}
   end
 
   def resurrect(%{unit: %Unit{}} = character, restore_percent, now) when restore_percent > 0 do
@@ -73,7 +73,7 @@ defmodule ThistleTea.Game.Entity.Logic.Death do
 
     character = %{character | unit: unit, player: player}
 
-    {Core.mark_broadcast_update(character), events ++ [Event.movement_root_changed(false)]}
+    {Core.mark_broadcast_update(character), events ++ [Effects.movement_root_changed(false)]}
   end
 
   def resurrect_with(%{unit: %Unit{}} = character, health, mana, now)
@@ -94,7 +94,7 @@ defmodule ThistleTea.Game.Entity.Logic.Death do
 
     character = %{character | unit: unit, player: player}
 
-    {Core.mark_broadcast_update(character), events ++ [Event.movement_root_changed(false)]}
+    {Core.mark_broadcast_update(character), events ++ [Effects.movement_root_changed(false)]}
   end
 
   defp clamp_restore(value, max) when is_integer(max) and max > 0, do: value |> max(0) |> min(max)

@@ -6,7 +6,7 @@ defmodule ThistleTea.Game.Entity.Logic.Paladin do
   alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
-  alias ThistleTea.Game.Entity.Logic.Event
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Effect
@@ -93,8 +93,8 @@ defmodule ThistleTea.Game.Entity.Logic.Paladin do
             level = entity.unit.level || 1
 
             entity
-            |> Event.enqueue(aura_events)
-            |> Event.enqueue(Event.trigger_spell(caster_guid, level, target_guid, judgement_id))
+            |> Effects.enqueue(aura_events)
+            |> Effects.enqueue(Effects.trigger_spell(caster_guid, level, target_guid, judgement_id))
 
           _no_judgement ->
             entity
@@ -182,7 +182,7 @@ defmodule ThistleTea.Game.Entity.Logic.Paladin do
         }
 
         context = CastContext.from_caster(entity, spell, victim_guid)
-        Event.enqueue(entity, Event.deliver_spell(victim_guid, context, spell))
+        Effects.enqueue(entity, Effects.deliver_spell(victim_guid, context, spell))
 
       _no_damage_aura ->
         entity
