@@ -15,21 +15,18 @@ defmodule ThistleTea.Game.Entity.EventSink do
   alias ThistleTea.Game.Entity.Data.GameObjectTemplate, as: DataGameObjectTemplate
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.EventSink.ClientProjection
+  alias ThistleTea.Game.Entity.EventSink.Combat, as: CombatEffects
   alias ThistleTea.Game.Entity.EventSink.Movement, as: MovementEffects
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.SpellEffect
   alias ThistleTea.Game.Entity.Logic.SpellTarget
-  alias ThistleTea.Game.Entity.Logic.StealthDetection
   alias ThistleTea.Game.Entity.Server.DynamicObject, as: DynamicObjectServer
-  alias ThistleTea.Game.Entity.Server.Mob.Incarnation
   alias ThistleTea.Game.Entity.SpellTargetResolver
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.BinaryUtils
   alias ThistleTea.Game.Network.Message
-  alias ThistleTea.Game.Network.Opcodes
-  alias ThistleTea.Game.Network.Packet
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Scripts
@@ -37,16 +34,13 @@ defmodule ThistleTea.Game.Entity.EventSink do
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.AreaEffects
-  alias ThistleTea.Game.World.CallForHelp
   alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
   alias ThistleTea.Game.World.Loader.Mob, as: MobLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Loader.Summon, as: SummonLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Pathfinding
-  alias ThistleTea.Game.World.System.Duel, as: DuelSystem
 
-  @victimstate_normal 1
   @heal_threat_radius 100.0
   @spell_hit_type_crit 0x2
   @client_effects [
@@ -64,6 +58,29 @@ defmodule ThistleTea.Game.Entity.EventSink do
     Effects.PlayObjectSound,
     Effects.PlaySound,
     Effects.ScriptSteps
+  ]
+  @combat_effects [
+    Effects.AttackNotInRange,
+    Effects.AttackOutcome,
+    Effects.AttackStart,
+    Effects.AttackStop,
+    Effects.AttackerGained,
+    Effects.AttackerLost,
+    Effects.AttackerStateUpdate,
+    Effects.BladeFlurry,
+    Effects.CallAssistance,
+    Effects.CallForHelp,
+    Effects.DeliverAttack,
+    Effects.DropNearbyThreat,
+    Effects.DropThreat,
+    Effects.DuelDefeat,
+    Effects.DuelInterrupted,
+    Effects.DuelRequest,
+    Effects.SecondaryMelee,
+    Effects.StartAttack,
+    Effects.TapCleared,
+    Effects.ThreatRefGained,
+    Effects.ThreatRefLost
   ]
   @movement_effects [
     Effects.Charge,
@@ -91,6 +108,10 @@ defmodule ThistleTea.Game.Entity.EventSink do
 
   def emit(entity, %{__struct__: effect_module} = effect) when effect_module in @client_effects do
     ClientProjection.emit(entity, effect)
+  end
+
+  def emit(entity, %{__struct__: effect_module} = effect) when effect_module in @combat_effects do
+    CombatEffects.emit(entity, effect)
   end
 
   def emit(entity, %{__struct__: effect_module} = effect) when effect_module in @movement_effects do
@@ -338,11 +359,6 @@ defmodule ThistleTea.Game.Entity.EventSink do
 
   def emit(entity, %Effects.ChannelUpdate{}), do: entity
 
-  def emit(entity, %Effects.DeliverAttack{} = event) do
-    Entity.receive_attack(event.target_guid, event.attack)
-    entity
-  end
-
   def emit(entity, %Effects.DeliverSpell{} = event) do
     case projectile_delay_ms(entity, event) do
       delay_ms when is_integer(delay_ms) and delay_ms > 0 ->
@@ -365,86 +381,6 @@ defmodule ThistleTea.Game.Entity.EventSink do
     entity
   end
 
-  def emit(entity, %Effects.AttackStart{source_guid: source_guid, target_guid: target_guid})
-      when is_integer(source_guid) and is_integer(target_guid) do
-    %Message.SmsgAttackstart{
-      attacker: source_guid,
-      victim: target_guid
-    }
-    |> World.broadcast_packet(entity)
-
-    entity
-  end
-
-  def emit(entity, %Effects.AttackStop{} = event) do
-    %Message.SmsgAttackstop{
-      player: event.source_guid,
-      enemy: event.target_guid
-    }
-    |> World.broadcast_packet(entity)
-
-    entity
-  end
-
-  def emit(entity, %Effects.DuelDefeat{source_guid: winner_guid, target_guid: loser_guid}) do
-    DuelSystem.defeat(loser_guid, winner_guid)
-    entity
-  end
-
-  def emit(entity, %Effects.DuelInterrupted{target_guid: guid}) do
-    DuelSystem.interrupt(guid)
-    entity
-  end
-
-  def emit(entity, %Effects.DuelRequest{position: {world, x, y, z}} = event) do
-    DuelSystem.challenge(%{
-      initiator_guid: event.source_guid,
-      initiator_level: event.source_level,
-      opponent_guid: event.target_guid,
-      entry: event.entry,
-      world: world,
-      flag_position: {x, y, z},
-      orientation: event.facing
-    })
-
-    entity
-  end
-
-  def emit(entity, %Effects.AttackerStateUpdate{} = event) do
-    attack = event.attack || %{}
-    damage = event.damage || 0
-
-    %Message.SmsgAttackerstateupdate{
-      attacker: event.source_guid,
-      target: event.target_guid,
-      hit_info: Map.get(attack, :hit_info, 0x2),
-      total_damage: damage,
-      damages: [
-        %{
-          spell_school_mask: Map.get(attack, :spell_school_mask, 0),
-          damage_float: damage * 1.0,
-          damage_uint: damage,
-          absorb: Map.get(attack, :absorb, 0),
-          resist: Map.get(attack, :resist, 0)
-        }
-      ],
-      damage_state: Map.get(attack, :damage_state, @victimstate_normal),
-      unknown1: Map.get(attack, :unknown1, 0),
-      spell_id: Map.get(attack, :spell_id, 0),
-      blocked_amount: Map.get(attack, :blocked_amount, 0)
-    }
-    |> World.broadcast_packet(entity)
-
-    entity
-  end
-
-  def emit(entity, %Effects.AttackNotInRange{}) do
-    Packet.build(<<>>, Opcodes.get(:SMSG_ATTACKSWING_NOTINRANGE))
-    |> Network.send_packet()
-
-    entity
-  end
-
   def emit(entity, %Effects.DrainPower{target_guid: target_guid, misc_value: power_type}) do
     if Guid.entity_type(target_guid) == :player do
       Entity.drain_power(target_guid, power_type)
@@ -460,74 +396,6 @@ defmodule ThistleTea.Game.Entity.EventSink do
 
     entity
   end
-
-  def emit(entity, %Effects.AttackOutcome{} = event) do
-    Entity.attack_outcome(event.target_guid, %{
-      victim_guid: event.source_guid,
-      outcome: event.outcome,
-      damage: event.damage,
-      proc_damage: event.proc_damage,
-      spell_id: event.spell_id
-    })
-
-    entity
-  end
-
-  def emit(entity, %Effects.AttackerGained{target_guid: target_guid}) do
-    Metadata.increment(target_guid, :attacker_count)
-    entity
-  end
-
-  def emit(%{object: %{guid: mob_guid}} = entity, %Effects.ThreatRefGained{target_guid: target_guid}) do
-    if Guid.entity_type(target_guid) == :player do
-      Entity.threat_ref_gained(target_guid, mob_guid, Incarnation.id(entity))
-    end
-
-    entity
-  end
-
-  def emit(%{object: %{guid: mob_guid}} = entity, %Effects.ThreatRefLost{target_guid: target_guid}) do
-    if Guid.entity_type(target_guid) == :player do
-      Entity.threat_ref_lost(target_guid, mob_guid, Incarnation.id(entity))
-    end
-
-    entity
-  end
-
-  def emit(%Character{object: %{guid: guid}} = entity, %Effects.DropThreat{target_guid: mob_guid}) do
-    Entity.drop_threat(mob_guid, guid)
-    entity
-  end
-
-  def emit(entity, %Effects.DropThreat{}), do: entity
-
-  def emit(%Character{} = entity, %Effects.DropNearbyThreat{}) do
-    Metadata.update(entity.object.guid, StealthDetection.target_metadata(entity))
-
-    entity
-    |> World.nearby_mobs(250)
-    |> Enum.each(fn {mob_guid, _distance} -> Entity.drop_threat(mob_guid, entity.object.guid) end)
-
-    entity
-  end
-
-  def emit(entity, %Effects.DropNearbyThreat{}), do: entity
-
-  def emit(%Character{} = entity, %Effects.BladeFlurry{target_guid: primary, damage: damage} = event)
-      when is_integer(event.spell_id) do
-    deliver_secondary_melee(entity, primary, damage, event.spell_id, Scripts.blade_flurry_radius_yards())
-
-    entity
-  end
-
-  def emit(entity, %Effects.BladeFlurry{}), do: entity
-
-  def emit(%Character{} = entity, %Effects.SecondaryMelee{} = event) do
-    deliver_secondary_melee(entity, event.target_guid, event.damage, event.spell_id, event.range_yards)
-    entity
-  end
-
-  def emit(entity, %Effects.SecondaryMelee{}), do: entity
 
   def emit(%Character{} = entity, %Effects.RefreshPartyAura{spell: %Spell{} = spell, amount: radius})
       when is_number(radius) do
@@ -599,16 +467,6 @@ defmodule ThistleTea.Game.Entity.EventSink do
     }
 
     Entity.receive_spell(event.target_guid, context, spell)
-    entity
-  end
-
-  def emit(entity, %Effects.AttackerLost{target_guid: target_guid}) do
-    Metadata.decrement(target_guid, :attacker_count, 0)
-    entity
-  end
-
-  def emit(%{object: %{guid: guid}} = entity, %Effects.TapCleared{}) do
-    Metadata.update(guid, %{tapped_player: nil, tapped_group_id: nil})
     entity
   end
 
@@ -887,29 +745,6 @@ defmodule ThistleTea.Game.Entity.EventSink do
     entity
   end
 
-  def emit(entity, %Effects.StartAttack{target_guid: target_guid}) when is_integer(target_guid) and target_guid > 0 do
-    send(self(), {:force_attack, target_guid})
-    entity
-  end
-
-  def emit(entity, %Effects.StartAttack{}), do: entity
-
-  def emit(%Mob{} = entity, %Effects.CallAssistance{target_guid: target_guid})
-      when is_integer(target_guid) and target_guid > 0 do
-    Process.send_after(self(), {:call_assistance, target_guid}, CallForHelp.assist_delay_ms())
-    entity
-  end
-
-  def emit(entity, %Effects.CallAssistance{}), do: entity
-
-  def emit(%Mob{} = entity, %Effects.CallForHelp{target_guid: target_guid})
-      when is_integer(target_guid) and target_guid > 0 do
-    CallForHelp.pulse(entity, target_guid)
-    entity
-  end
-
-  def emit(entity, %Effects.CallForHelp{}), do: entity
-
   def emit(%Character{object: %{guid: guid}} = entity, %Effects.SpellDelayed{} = event) do
     Network.send_packet(%Message.SmsgSpellDelayed{caster: guid, delay_ms: event.delay_ms})
     entity
@@ -1149,27 +984,6 @@ defmodule ThistleTea.Game.Entity.EventSink do
   end
 
   defp projectile_delay_ms(_entity, _event), do: 0
-
-  defp random_target([]), do: nil
-  defp random_target(targets), do: Enum.random(targets)
-
-  defp deliver_secondary_melee(entity, primary, damage, spell_id, radius) do
-    secondary =
-      entity
-      |> SpellTargetResolver.resolve_query({:caster_aoe, radius})
-      |> Enum.reject(&(&1 == primary))
-      |> random_target()
-
-    with secondary when is_integer(secondary) <- secondary,
-         %Spell{} = spell <- SpellLoader.load(spell_id),
-         %Spell.Effect{} = effect <- List.first(Spell.damage_effects(spell)) do
-      spell = %{spell | effects: [%{effect | base_points: damage, die_sides: 0, base_dice: 0}]}
-      context = CastContext.from_caster(entity, spell, secondary)
-      Entity.receive_spell(secondary, context, spell)
-    else
-      _ -> nil
-    end
-  end
 
   defp dispatch_triggered_spell(
          %{object: %{guid: guid}} = entity,
