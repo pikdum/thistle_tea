@@ -55,11 +55,14 @@ defmodule ThistleTea.Game.Network.Message.SmsgMonsterMove do
   end
 
   defp apply_facing(%__MODULE__{} = msg, opts) do
-    case Keyword.get(opts, :face_target) do
-      target when is_integer(target) and target > 0 ->
+    case {Keyword.get(opts, :face_target), Keyword.get(opts, :face_angle)} do
+      {target, _angle} when is_integer(target) and target > 0 ->
         %{msg | move_type: @move_type_facing_target, target: target}
 
-      _ ->
+      {_target, angle} when is_number(angle) ->
+        %{msg | move_type: @move_type_facing_angle, angle: angle}
+
+      _facing ->
         msg
     end
   end

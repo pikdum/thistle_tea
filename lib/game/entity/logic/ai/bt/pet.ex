@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet do
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
   alias ThistleTea.Game.Entity.Data.Component.Internal.Pet
+  alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.CreatureSpell
   alias ThistleTea.Game.Entity.Data.Mob
@@ -209,7 +210,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet do
 
           state
           |> run()
-          |> Movement.move_to(destination, [velocity: velocity], now)
+          |> Movement.move_to(destination, [face_angle: orientation, velocity: velocity], now)
+          |> face(orientation)
         else
           state
         end
@@ -233,6 +235,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet do
   defp idle(state, blackboard), do: {{:running, @idle_delay_ms}, state, blackboard}
 
   defp halt_for_melee(state, blackboard), do: {:success, Movement.halt(state, Time.now()), blackboard}
+
+  defp face(%Mob{movement_block: %MovementBlock{position: {x, y, z, _o}} = movement_block} = state, orientation) do
+    %{state | movement_block: %{movement_block | position: {x, y, z, orientation}}}
+  end
 
   defp follow_position({x, y, z}, orientation) do
     angle = orientation + @follow_angle

@@ -64,7 +64,7 @@ defmodule ThistleTea.Game.Network.Message.MsgMove do
     %MovementBlock{position: {x0, y0, z0, _}} = state.character.movement_block
     %MovementBlock{position: {x1, y1, z1, orientation}} = movement_block
     now = Time.now()
-    movement_velocity = movement_velocity(state.guid, {x0, y0, z0}, {x1, y1, z1}, now)
+    movement_velocity = movement_velocity(state.guid, movement_block, {x0, y0, z0}, {x1, y1, z1}, now)
     Metadata.update(state.guid, %{orientation: orientation, movement_velocity: movement_velocity, last_move_at: now})
     position_changed? = x0 != x1 or y0 != y1 or z0 != z1
     character = interrupt_auras(character, position_changed?)
@@ -136,7 +136,19 @@ defmodule ThistleTea.Game.Network.Message.MsgMove do
     end
   end
 
-  defp movement_velocity(guid, {x0, y0, z0}, {x1, y1, z1}, now) do
+  defp movement_velocity(guid, %MovementBlock{} = movement_block, {x0, y0, z0}, {x1, y1, z1}, now) do
+    if extrapolatable?(movement_block) do
+      recent_velocity(guid, {x0, y0, z0}, {x1, y1, z1}, now)
+    else
+      {0.0, 0.0, 0.0}
+    end
+  end
+
+  defp extrapolatable?(%MovementBlock{} = movement_block) do
+    MovementBlock.translating?(movement_block) and not MovementBlock.airborne?(movement_block)
+  end
+
+  defp recent_velocity(guid, {x0, y0, z0}, {x1, y1, z1}, now) do
     case Metadata.query(guid, [:last_move_at]) do
       %{last_move_at: previous} when is_integer(previous) and now > previous and now - previous <= @move_recency_ms ->
         seconds = (now - previous) / 1_000

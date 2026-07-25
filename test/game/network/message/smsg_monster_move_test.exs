@@ -24,6 +24,24 @@ defmodule ThistleTea.Game.Network.Message.SmsgMonsterMoveTest do
       assert msg.target == 2
       assert msg.spline_flags == 0x100
     end
+
+    test "encodes a final facing angle" do
+      msg =
+        build_entity(spline_flags: 0)
+        |> SmsgMonsterMove.build(face_angle: 1.5)
+
+      assert msg.move_type == 4
+      assert msg.angle == 1.5
+    end
+
+    test "prefers a facing target over a facing angle" do
+      msg =
+        build_entity(spline_flags: 0)
+        |> SmsgMonsterMove.build(face_target: 7, face_angle: 1.5)
+
+      assert msg.move_type == 3
+      assert msg.target == 7
+    end
   end
 
   defp build_entity(opts) do

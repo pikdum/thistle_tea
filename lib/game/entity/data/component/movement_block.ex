@@ -4,7 +4,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.MovementBlock do
   speeds (real yards/sec, not DB rates), and spline state, with the binary
   encode/decode for the 1.12 wire format.
   """
-  import Bitwise, only: [&&&: 2, band: 2, bnot: 1, bor: 2]
+  import Bitwise, only: [&&&: 2, |||: 2, band: 2, bnot: 1, bor: 2]
 
   require Logger
 
@@ -68,12 +68,22 @@ defmodule ThistleTea.Game.Entity.Data.Component.MovementBlock do
   @update_flag_has_position 0x40
 
   @movement_flag_forward 0x00000001
+  @movement_flag_backward 0x00000002
+  @movement_flag_strafe_left 0x00000004
+  @movement_flag_strafe_right 0x00000008
   @movement_flag_on_transport 0x00000200
   @movement_flag_jumping 0x00002000
+  @movement_flag_falling_far 0x00004000
   @movement_flag_swimming 0x00200000
   @movement_flag_spline_enabled 0x00400000
   @movement_flag_on_transport 0x02000000
   @movement_flag_spline_elevation 0x04000000
+
+  @movement_flag_mask_translating @movement_flag_forward |||
+                                    @movement_flag_backward |||
+                                    @movement_flag_strafe_left |||
+                                    @movement_flag_strafe_right
+  @movement_flag_mask_airborne @movement_flag_jumping ||| @movement_flag_falling_far
 
   @spline_flag_final_point 0x00010000
   @spline_flag_final_target 0x00020000
@@ -81,6 +91,18 @@ defmodule ThistleTea.Game.Entity.Data.Component.MovementBlock do
 
   def swimming?(%__MODULE__{movement_flags: flags}) when is_integer(flags), do: (flags &&& @movement_flag_swimming) != 0
   def swimming?(_movement_block), do: false
+
+  def translating?(%__MODULE__{movement_flags: flags}) when is_integer(flags) do
+    (flags &&& @movement_flag_mask_translating) != 0
+  end
+
+  def translating?(_movement_block), do: false
+
+  def airborne?(%__MODULE__{movement_flags: flags}) when is_integer(flags) do
+    (flags &&& @movement_flag_mask_airborne) != 0
+  end
+
+  def airborne?(_movement_block), do: false
 
   def from_binary(m, acc \\ %__MODULE__{}) do
     <<

@@ -229,6 +229,32 @@ defmodule ThistleTea.Game.Entity.Data.Component.MovementBlockTest do
     end
   end
 
+  describe "translating?/1" do
+    test "detects forward, backward and strafe motion", context do
+      for flags <- [0x1, 0x2, 0x4, 0x8] do
+        assert MovementBlock.translating?(%{context.base_movement_block | movement_flags: flags})
+      end
+    end
+
+    test "ignores turning and jumping in place", context do
+      for flags <- [0x0, 0x10, 0x20, 0x2000] do
+        refute MovementBlock.translating?(%{context.base_movement_block | movement_flags: flags})
+      end
+    end
+  end
+
+  describe "airborne?/1" do
+    test "detects jumping and falling", context do
+      for flags <- [0x2000, 0x4000] do
+        assert MovementBlock.airborne?(%{context.base_movement_block | movement_flags: flags})
+      end
+    end
+
+    test "ignores grounded movement", context do
+      assert MovementBlock.airborne?(%{context.base_movement_block | movement_flags: 0x1}) == false
+    end
+  end
+
   defp vector({x, y, z}) do
     <<x::little-float-size(32), y::little-float-size(32), z::little-float-size(32)>>
   end
