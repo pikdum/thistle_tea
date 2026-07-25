@@ -49,6 +49,23 @@ defmodule ThistleTea.Game.Entity.Logic.SpellTargetTest do
 
       assert SpellTarget.target_query(spell, %Targets{}) == :none
     end
+
+    test "treats caster-position destination aoe as a caster aoe" do
+      spell = %Spell{
+        id: 5857,
+        effects: [
+          %Effect{
+            type: :school_damage,
+            implicit_target_a: :caster_destination,
+            implicit_target_b: :aoe_enemy_at_dest,
+            radius_yards: 10.0
+          }
+        ]
+      }
+
+      assert SpellTarget.target_query(spell, %Targets{unit_guid: 2}) == {:caster_aoe, 10.0}
+      assert SpellTarget.target_query(spell, %Targets{}) == {:caster_aoe, 10.0}
+    end
   end
 
   describe "area_targeted?/1" do

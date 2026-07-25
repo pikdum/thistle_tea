@@ -17,8 +17,8 @@ defmodule ThistleTea.Game.Entity.Logic.SpellTarget do
       cone_aoe_spell?(spell) ->
         {:caster_cone, max_aoe_radius(spell)}
 
-      targeted_aoe_spell?(spell) and is_tuple(Targets.ground_location(targets)) ->
-        {:targeted_aoe, Targets.ground_location(targets), max_aoe_radius(spell)}
+      query = targeted_aoe_query(spell, targets) ->
+        query
 
       party_aoe_spell?(spell) ->
         {:party_aoe, max_aoe_radius(spell)}
@@ -76,8 +76,28 @@ defmodule ThistleTea.Game.Entity.Logic.SpellTarget do
     Enum.any?(effects, &effect_targets?(&1, [:aoe_enemy_in_cone]))
   end
 
+  defp targeted_aoe_query(%Spell{} = spell, %Targets{} = targets) do
+    cond do
+      not targeted_aoe_spell?(spell) ->
+        nil
+
+      is_tuple(Targets.ground_location(targets)) ->
+        {:targeted_aoe, Targets.ground_location(targets), max_aoe_radius(spell)}
+
+      caster_destination_spell?(spell) ->
+        {:caster_aoe, max_aoe_radius(spell)}
+
+      true ->
+        nil
+    end
+  end
+
   defp targeted_aoe_spell?(%Spell{effects: effects}) do
     Enum.any?(effects, &effect_targets?(&1, [:aoe_enemy_at_dest, :aoe_enemy_at_channel]))
+  end
+
+  defp caster_destination_spell?(%Spell{effects: effects}) do
+    Enum.any?(effects, &effect_targets?(&1, [:caster_destination]))
   end
 
   defp party_aoe_spell?(%Spell{effects: effects}) do
