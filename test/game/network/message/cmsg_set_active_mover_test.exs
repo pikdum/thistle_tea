@@ -3,8 +3,8 @@ defmodule ThistleTea.Game.Network.Message.CmsgSetActiveMoverTest do
 
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Server.Player.State
   alias ThistleTea.Game.Network.Message.CmsgSetActiveMover
-  alias ThistleTea.Game.Network.Session
 
   describe "from_binary/1" do
     test "parses mover guid" do
@@ -14,7 +14,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgSetActiveMoverTest do
 
   describe "handle/2" do
     test "marks matching player ready" do
-      state = CmsgSetActiveMover.handle(%CmsgSetActiveMover{guid: 23}, %Session{guid: 23})
+      state = CmsgSetActiveMover.handle(%CmsgSetActiveMover{guid: 23}, %State{guid: 23})
 
       assert state.ready
       assert state.active_mover_guid == 23
@@ -22,7 +22,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgSetActiveMoverTest do
     end
 
     test "ignores mismatched mover" do
-      state = CmsgSetActiveMover.handle(%CmsgSetActiveMover{guid: 24}, %Session{guid: 23})
+      state = CmsgSetActiveMover.handle(%CmsgSetActiveMover{guid: 24}, %State{guid: 23})
 
       refute state.ready
       assert state.active_mover_guid == nil
@@ -30,7 +30,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgSetActiveMoverTest do
     end
 
     test "accepts the character's controlled unit after entering the world" do
-      session = %Session{guid: 23, ready: true, character: %Character{unit: %Unit{charm: 24}}}
+      session = %State{guid: 23, ready: true, character: %Character{unit: %Unit{charm: 24}}}
 
       state = CmsgSetActiveMover.handle(%CmsgSetActiveMover{guid: 24}, session)
 

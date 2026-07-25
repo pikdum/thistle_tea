@@ -6,8 +6,8 @@ defmodule ThistleTea.Game.Network.Message.CmsgSelfRes do
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Death
   alias ThistleTea.Game.Entity.Logic.Inventory
+  alias ThistleTea.Game.Entity.Server.Player, as: PlayerServer
   alias ThistleTea.Game.Network.InventoryUpdate
-  alias ThistleTea.Game.Network.Server
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Visibility
@@ -41,7 +41,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgSelfRes do
         state = InventoryUpdate.apply(state, {:ok, result})
         {character, events} = Death.resurrect(state.character, @restore_percent, Time.now())
         character = EventSink.emit(character, events)
-        state = Server.maybe_broadcast_update(%{state | character: character})
+        state = PlayerServer.maybe_broadcast_update(%{state | character: character})
         Visibility.notify_visibility_changed(character)
         Visibility.resync_player(state)
 

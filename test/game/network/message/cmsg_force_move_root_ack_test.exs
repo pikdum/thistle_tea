@@ -3,11 +3,11 @@ defmodule ThistleTea.Game.Network.Message.CmsgForceMoveRootAckTest do
 
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
+  alias ThistleTea.Game.Entity.Server.Player.State
   alias ThistleTea.Game.Network.Message.CmsgForceMoveRootAck
   alias ThistleTea.Game.Network.Message.CmsgForceMoveUnrootAck
   alias ThistleTea.Game.Network.Message.Dispatch
   alias ThistleTea.Game.Network.Opcodes
-  alias ThistleTea.Game.Network.Session
 
   describe "from_binary/1" do
     test "parses force root acknowledgements" do
@@ -87,7 +87,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgForceMoveRootAckTest do
   end
 
   defp ack_state(pending) do
-    %Session{
+    %State{
       guid: 1,
       character: %Character{movement_block: %MovementBlock{run_speed: 7.0}},
       pending_movement_acks: pending

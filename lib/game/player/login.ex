@@ -116,7 +116,6 @@ defmodule ThistleTea.Game.Player.Login do
     )
 
     Logger.metadata(character_name: c.internal.name)
-    Entity.register(character_guid)
     {c, mail_session_token} = Mail.open_session(c, character_guid)
 
     {x, y, z, o} = c.movement_block.position

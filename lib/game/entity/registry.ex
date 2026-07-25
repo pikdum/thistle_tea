@@ -24,7 +24,7 @@ defmodule ThistleTea.Game.Entity.Registry do
 
   def whereis(guid) when is_integer(guid) do
     case Registry.lookup(__MODULE__, guid) do
-      [{pid, _}] -> pid
+      [{pid, _}] -> if Process.alive?(pid), do: pid
       [] -> nil
     end
   end
@@ -32,10 +32,7 @@ defmodule ThistleTea.Game.Entity.Registry do
   def whereis(_guid), do: nil
 
   def registered?(guid) when is_integer(guid) do
-    case Registry.lookup(__MODULE__, guid) do
-      [{pid, _}] when is_pid(pid) -> true
-      _ -> false
-    end
+    is_pid(whereis(guid))
   end
 
   def registered?(_guid), do: false

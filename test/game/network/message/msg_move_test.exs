@@ -4,15 +4,15 @@ defmodule ThistleTea.Game.Network.Message.MsgMoveTest do
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Server.Player.State
   alias ThistleTea.Game.Network.Message.MsgMove
-  alias ThistleTea.Game.Network.Session
 
   describe "handle/2" do
     test "routes movement to the active controlled unit without moving the character" do
       mover_guid = :erlang.unique_integer([:positive])
       {:ok, _owner} = Entity.register(mover_guid)
 
-      session = %Session{
+      session = %State{
         guid: 23,
         active_mover_guid: mover_guid,
         ready: true,
@@ -29,7 +29,7 @@ defmodule ThistleTea.Game.Network.Message.MsgMoveTest do
       mover_guid = :erlang.unique_integer([:positive])
       {:ok, _owner} = Entity.register(mover_guid)
 
-      session = %Session{
+      session = %State{
         guid: 23,
         active_mover_guid: mover_guid,
         ready: true,

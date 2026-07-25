@@ -2,15 +2,15 @@ defmodule ThistleTea.Game.Network.Message.CmsgForceMoveUnrootAck do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_FORCE_MOVE_UNROOT_ACK
 
+  alias ThistleTea.Game.Entity.Server.Player.State
   alias ThistleTea.Game.Network.MovementControl
-  alias ThistleTea.Game.Network.Session
 
   defstruct [:guid, :counter, :movement_payload]
 
   @impl ClientMessage
   def handle(
         %__MODULE__{guid: guid, counter: counter, movement_payload: movement_payload},
-        %Session{character: %Character{movement_block: %MovementBlock{} = movement_block} = character} = state
+        %State{character: %Character{movement_block: %MovementBlock{} = movement_block} = character} = state
       ) do
     case MovementControl.acknowledge(state, guid, counter, :unroot) do
       {:ok, state} ->

@@ -15,11 +15,11 @@ defmodule ThistleTea.Game.Player.Quests do
   alias ThistleTea.Game.Entity.Logic.QuestLog
   alias ThistleTea.Game.Entity.Logic.QuestLog.Entry
   alias ThistleTea.Game.Entity.Logic.QuestRequirements
+  alias ThistleTea.Game.Entity.Server.Player, as: PlayerServer
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.InventoryUpdate
   alias ThistleTea.Game.Network.Message
-  alias ThistleTea.Game.Network.Server
   alias ThistleTea.Game.Player.Mail
   alias ThistleTea.Game.Player.Stats, as: PlayerStats
   alias ThistleTea.Game.World.CharacterStore
@@ -528,6 +528,6 @@ defmodule ThistleTea.Game.Player.Quests do
   defp put_character(state, %Character{} = character) do
     CharacterStore.put(character)
     sync_needed_items(character)
-    Server.maybe_broadcast_update(%{state | character: Core.mark_broadcast_update(character)})
+    PlayerServer.maybe_broadcast_update(%{state | character: Core.mark_broadcast_update(character)})
   end
 end

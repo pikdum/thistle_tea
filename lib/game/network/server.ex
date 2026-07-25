@@ -1,93 +1,25 @@
 defmodule ThistleTea.Game.Network.Server do
   @moduledoc """
-  The world-server connection handler (ThousandIsland): dispatches inbound
-  client messages, owns the logged-in character's state and behavior-tree
-  ticks, and batches/dedupes outbound update-object blocks per send.
+  ThousandIsland transport for a world client connection.
+
+  Authentication and character-selection messages run on the connection until
+  login starts a player entity process. Once logged in, inbound messages are
+  dispatched to that process and outbound packets arrive here already encoded.
   """
   use ThousandIsland.Handler
-  use ThistleTea.Game.Network.Opcodes, [:SMSG_AUTH_CHALLENGE, :SMSG_UPDATE_OBJECT]
+  use ThistleTea.Game.Network.Opcodes, [:SMSG_AUTH_CHALLENGE]
 
-  import Bitwise, only: [|||: 2]
-
-  alias ThistleTea.Game.Entity
-  alias ThistleTea.Game.Entity.Data.Character
-  alias ThistleTea.Game.Entity.Data.Component.Internal
-  alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
-  alias ThistleTea.Game.Entity.Data.Component.MovementBlock
-  alias ThistleTea.Game.Entity.Data.Component.Unit
-  alias ThistleTea.Game.Entity.Data.Item, as: DataItem
-  alias ThistleTea.Game.Entity.EventSink
-  alias ThistleTea.Game.Entity.Logic.AI.BT
-  alias ThistleTea.Game.Entity.Logic.AI.BT.Spell, as: SpellBT
-  alias ThistleTea.Game.Entity.Logic.AI.Tick
-  alias ThistleTea.Game.Entity.Logic.AttackFeedback
-  alias ThistleTea.Game.Entity.Logic.Aura
-  alias ThistleTea.Game.Entity.Logic.Combat
-  alias ThistleTea.Game.Entity.Logic.Core
-  alias ThistleTea.Game.Entity.Logic.Death
-  alias ThistleTea.Game.Entity.Logic.Dueling
-  alias ThistleTea.Game.Entity.Logic.Event
-  alias ThistleTea.Game.Entity.Logic.Experience
-  alias ThistleTea.Game.Entity.Logic.Hunter
-  alias ThistleTea.Game.Entity.Logic.Inventory
-  alias ThistleTea.Game.Entity.Logic.MovementStats
-  alias ThistleTea.Game.Entity.Logic.PlayerCombat
-  alias ThistleTea.Game.Entity.Logic.PlayerFlags
-  alias ThistleTea.Game.Entity.Logic.Reactive
-  alias ThistleTea.Game.Entity.Logic.Resources
-  alias ThistleTea.Game.Entity.Logic.Rest
-  alias ThistleTea.Game.Entity.Logic.Shaman
-  alias ThistleTea.Game.Entity.Logic.SpellEffect
-  alias ThistleTea.Game.Entity.Logic.SpellFeedback
-  alias ThistleTea.Game.Entity.Logic.StealthDetection
-  alias ThistleTea.Game.Guid
-  alias ThistleTea.Game.Network
+  alias ThistleTea.Game.Entity.Server.Player, as: PlayerServer
   alias ThistleTea.Game.Network.Connection
-  alias ThistleTea.Game.Network.InventoryUpdate
+  alias ThistleTea.Game.Network.ConnectionState
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Message.Dispatch
-  alias ThistleTea.Game.Network.MovementControl
   alias ThistleTea.Game.Network.Opcodes
   alias ThistleTea.Game.Network.Packet
-  alias ThistleTea.Game.Network.PlayerTick
-  alias ThistleTea.Game.Network.Session
-  alias ThistleTea.Game.Network.UpdateBatcher
-  alias ThistleTea.Game.Network.UpdateObject
-  alias ThistleTea.Game.Party.MemberStats
-  alias ThistleTea.Game.Party.Notifier, as: PartyNotifier
-  alias ThistleTea.Game.Player.Enchantments
-  alias ThistleTea.Game.Player.GameObjects, as: PlayerGameObjects
-  alias ThistleTea.Game.Player.Items
-  alias ThistleTea.Game.Player.Login
-  alias ThistleTea.Game.Player.Mail
-  alias ThistleTea.Game.Player.Quests
-  alias ThistleTea.Game.Player.Spellcasting
-  alias ThistleTea.Game.Player.Stats, as: PlayerStats
-  alias ThistleTea.Game.Spell
-  alias ThistleTea.Game.Spell.CastContext
-  alias ThistleTea.Game.Time
-  alias ThistleTea.Game.World
-  alias ThistleTea.Game.World.CharacterStore
-  alias ThistleTea.Game.World.ItemStore
-  alias ThistleTea.Game.World.Loader.ItemEnchantment, as: ItemEnchantmentLoader
-  alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
-  alias ThistleTea.Game.World.Loader.SpellPetAura, as: SpellPetAuraLoader
-  alias ThistleTea.Game.World.Metadata
-  alias ThistleTea.Game.World.Pathfinding
-  alias ThistleTea.Game.World.SpatialHash
-  alias ThistleTea.Game.World.System.Duel, as: DuelSystem
-  alias ThistleTea.Game.World.System.Instance, as: InstanceSystem
-  alias ThistleTea.Game.World.Visibility
-  alias ThistleTea.Game.World.Visibility.Tap
-  alias ThistleTea.Game.WorldRef
+  alias ThistleTea.Game.Network.Send
   alias ThousandIsland.Socket
 
   require Logger
-
-  @update_flag_high_guid 0x08
-  @update_flag_living 0x20
-  @update_flag_has_position 0x40
-  @player_tick_retry_ms 1_000
 
   @impl ThousandIsland.Handler
   def handle_data(data, _socket, %{conn: %Connection{} = conn} = state) do
@@ -96,9 +28,7 @@ defmodule ThistleTea.Game.Network.Server do
       |> Connection.receive_data(data)
       |> Connection.enqueue_packets()
 
-    state = handle_packets(%{state | conn: conn})
-
-    {:continue, state}
+    {:continue, handle_packets(%{state | conn: conn})}
   end
 
   def handle_packets(%{conn: %Connection{packet_queue: []}} = state), do: state
@@ -106,1074 +36,66 @@ defmodule ThistleTea.Game.Network.Server do
   def handle_packets(%{conn: %Connection{packet_queue: [packet | rest]}} = state) do
     message_name = Opcodes.get(packet.opcode)
 
-    case Dispatch.implemented?(packet.opcode) do
-      true ->
-        state =
+    state =
+      case Dispatch.implemented?(packet.opcode) do
+        true ->
           :telemetry.span([:thistle_tea, :handle_packet], %{opcode: packet.opcode}, fn ->
-            state = Dispatch.to_message(packet) |> Message.handle(state)
+            message = Dispatch.to_message(packet)
+            state = dispatch_message(message, state)
             {state, %{opcode: packet.opcode}}
           end)
 
-        %{state | conn: %{state.conn | packet_queue: rest}}
+        false ->
+          Logger.warning("Unimplemented: #{message_name}")
+          state
+      end
 
-      false ->
-        Logger.warning("Unimplemented: #{message_name}")
-        %{state | conn: %{state.conn | packet_queue: rest}}
-    end
+    state
+    |> then(&%{&1 | conn: %{&1.conn | packet_queue: rest}})
     |> handle_packets()
   end
 
-  defp create_update?(%UpdateObject{update_type: update_type, object: %{guid: guid}})
-       when update_type in [:create_object, :create_object2] and is_integer(guid) do
-    Guid.entity_type(guid) != :item
-  end
-
-  defp create_update?(%UpdateObject{}), do: false
-
-  defp duplicate_create?(state, %UpdateObject{object: %{guid: guid}} = update) do
-    create_update?(update) and Visibility.tracked?(state, guid)
-  end
-
-  defp track_created_updates(state, updates) do
-    created_guids =
-      updates
-      |> Enum.filter(&create_update?/1)
-      |> MapSet.new(& &1.object.guid)
-
-    Visibility.track_entities(state, created_guids)
-  end
-
-  defp source_tracked?(_state, nil), do: true
-
-  defp source_tracked?(state, source_guid) when is_integer(source_guid) do
-    Visibility.tracked?(state, source_guid)
-  end
-
-  defp source_tracked?(_state, _source_guid), do: false
-
   @impl GenServer
-  def handle_cast({:send_packet, %UpdateObject{} = update, opts}, {socket, state}) do
-    source_guid = Keyword.get(opts, :source_guid)
-
-    cond do
-      not source_tracked?(state, source_guid) ->
-        {:noreply, {socket, state}, socket.read_timeout}
-
-      is_integer(source_guid) ->
-        send_update_object(update, socket, state)
-
-      true ->
-        handle_cast({:send_packet, update}, {socket, state})
-    end
-  end
-
-  def handle_cast({:send_packet, %UpdateObject{} = update}, {socket, state}) do
-    if duplicate_create?(state, update) do
-      {:noreply, {socket, state}, socket.read_timeout}
-    else
-      send_update_object(update, socket, state)
-    end
-  end
-
-  def handle_cast({:send_packet, %Packet{opcode: @smsg_update_object}}, {_socket, _state}) do
-    raise "SMSG_UPDATE_OBJECT packets must be sent as UpdateObject structs"
-  end
-
-  def handle_cast({:send_packet, %Packet{opcode: @smsg_update_object}, _opts}, {_socket, _state}) do
-    raise "SMSG_UPDATE_OBJECT packets must be sent as UpdateObject structs"
-  end
-
-  def handle_cast({:send_packet, %Message.SmsgDestroyObject{guid: guid} = packet}, {socket, state}) do
-    if Visibility.tracked?(state, guid) do
-      state = Network.Send.send_packet(packet, {socket, state})
-      state = Visibility.untrack_entity(state, guid)
-      {:noreply, {socket, state}, socket.read_timeout}
-    else
-      {:noreply, {socket, state}, socket.read_timeout}
-    end
-  end
-
-  def handle_cast({:send_packet, %Message.SmsgDestroyObject{guid: guid} = packet, opts}, {socket, state}) do
-    if Keyword.get(opts, :force, false) or source_tracked?(state, Keyword.get(opts, :source_guid)) do
-      state = Network.Send.send_packet(packet, {socket, state})
-      state = Visibility.untrack_entity(state, guid)
-      {:noreply, {socket, state}, socket.read_timeout}
-    else
-      {:noreply, {socket, state}, socket.read_timeout}
-    end
-  end
-
-  def handle_cast({:send_packet, packet, opts}, {socket, state}) do
-    if source_tracked?(state, Keyword.get(opts, :source_guid)) do
-      state = Network.Send.send_packet(packet, {socket, state})
-      {:noreply, {socket, state}, socket.read_timeout}
-    else
-      {:noreply, {socket, state}, socket.read_timeout}
-    end
+  def handle_cast({:write_packet, %Packet{} = packet}, {socket, state}) do
+    state = Send.send_packet(packet, {socket, state})
+    {:noreply, {socket, state}, socket.read_timeout}
   end
 
   def handle_cast({:send_packet, packet}, {socket, state}) do
-    state = Network.Send.send_packet(packet, {socket, state})
+    state = Send.send_packet(packet, {socket, state})
+    {:noreply, {socket, state}, socket.read_timeout}
+  end
+
+  def handle_cast({:send_packet, packet, _opts}, {socket, state}) do
+    state = Send.send_packet(packet, {socket, state})
+    {:noreply, {socket, state}, socket.read_timeout}
+  end
+
+  def handle_cast({:player_logged_out, player_pid}, {socket, %ConnectionState{player_pid: player_pid} = state}) do
+    state = ConnectionState.clear_player(state)
+    {:noreply, {socket, state}, socket.read_timeout}
+  end
+
+  def handle_cast({:player_logged_out, _player_pid}, {socket, state}) do
     {:noreply, {socket, state}, socket.read_timeout}
   end
 
   @impl GenServer
-  def handle_cast({:mail_delivery, token, mail}, {socket, state}) do
-    state = Mail.receive_delivery(state, token, mail)
-    {:noreply, {socket, state}, socket.read_timeout}
-  rescue
-    error ->
-      Logger.error("mail delivery crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
-      {:noreply, {socket, state}, socket.read_timeout}
-  end
-
-  def handle_cast({:duel_update, {:requested, payload}}, {socket, %{character: %Character{} = character} = state}) do
-    character = Dueling.requested(character, payload)
-    {:noreply, {socket, %{state | character: character}}, {:continue, :maybe_broadcast_update}}
-  end
-
-  def handle_cast({:duel_update, {:started, payload}}, {socket, %{character: %Character{} = character} = state}) do
-    character = Dueling.started(character, payload)
-    {:noreply, {socket, %{state | character: character}}, {:continue, :maybe_broadcast_update}}
-  end
-
-  def handle_cast({:duel_update, {:finished, payload}}, {socket, %{character: %Character{} = character} = state}) do
-    {character, events} = Dueling.finish(character, payload)
-    character = EventSink.emit(character, events)
-    {:noreply, {socket, %{state | character: character}}, {:continue, :maybe_broadcast_update}}
-  end
-
-  @impl GenServer
-  def handle_cast(
-        {:send_update_to, pid},
-        {socket, %{character: %Character{movement_block: %MovementBlock{} = movement_block} = character} = state}
-      ) do
-    update_flag = @update_flag_high_guid ||| @update_flag_living ||| @update_flag_has_position
-    movement_block = %{movement_block | update_flag: update_flag}
-
-    %UpdateObject{
-      update_type: :create_object2,
-      object_type: :player
-    }
-    |> struct(Map.from_struct(character))
-    |> Map.put(:movement_block, movement_block)
-    |> Network.send_packet(pid)
-
-    {:noreply, {socket, state}, socket.read_timeout}
-  end
-
-  def handle_cast({:receive_attack, attack}, {socket, %{character: %Character{} = character} = state}) do
-    now = Time.now()
-
-    character =
-      if PlayerCombat.undetectable?(character, now) do
-        character
-      else
-        character = PlayerCombat.mark_attacked(character, now)
-        {character, events} = Combat.receive_attack(character, attack, now)
-        EventSink.emit(character, events)
-      end
-
-    notify_defensive_pet(character, attack.caster)
-
-    {:noreply, {socket, %{state | character: character}}, {:continue, :maybe_broadcast_update}}
-  end
-
-  def handle_cast({:receive_heal, amount}, {socket, %{character: %Character{} = character} = state}) do
-    character = Core.heal(character, amount)
-    {:noreply, {socket, %{state | character: character}}, {:continue, :maybe_broadcast_update}}
-  end
-
-  def handle_cast({:drain_power, power_type}, {socket, %{character: %Character{} = character} = state}) do
-    character = Resources.drain_power(character, power_type)
-    {:noreply, {socket, %{state | character: character}}, {:continue, :maybe_broadcast_update}}
-  end
-
-  def handle_cast({:grant_power, power_type, amount}, {socket, %{character: %Character{} = character} = state}) do
-    character = Resources.gain_power(character, power_type, amount)
-    {:noreply, {socket, %{state | character: character}}, {:continue, :maybe_broadcast_update}}
-  end
-
-  def handle_cast(
-        {:summon_request, summoner_guid, zone_id, world, {x, y, z}},
-        {socket, %{character: %Character{internal: internal} = character} = state}
-      ) do
-    auto_decline_ms = 120_000
-
-    pending = %{
-      summoner_guid: summoner_guid,
-      world: world,
-      position: {x, y, z},
-      expires_at: Time.now() + auto_decline_ms
-    }
-
-    Network.send_packet(%Message.SmsgSummonRequest{
-      summoner_guid: summoner_guid,
-      zone_id: zone_id || 0,
-      auto_decline_ms: auto_decline_ms
-    })
-
-    character = %{character | internal: %{internal | pending_summon: pending}}
-    {:noreply, {socket, %{state | character: character}}}
-  end
-
-  def handle_cast(
-        {:start_game_object_channel, game_object_guid, %Spell{} = spell, duration_ms},
-        {socket, %{character: %Character{} = character} = state}
-      ) do
-    character = SpellBT.start_game_object_channel(character, game_object_guid, spell, duration_ms, Time.now())
-    character = EventSink.emit_pending(character)
-    {:noreply, {socket, %{state | character: character}}, {:continue, :maybe_broadcast_update}}
-  end
-
-  def handle_cast(
-        {:finish_game_object_channel, game_object_guid},
-        {socket, %{character: %Character{} = character} = state}
-      ) do
-    character = SpellBT.finish_game_object_channel(character, game_object_guid)
-    character = EventSink.emit_pending(character)
-    {:noreply, {socket, %{state | character: character}}, {:continue, :maybe_broadcast_update}}
-  end
-
-  def handle_cast({:attack_outcome, payload}, {socket, %{character: %Character{} = character} = state}) do
-    spell = spellbook_spell(character, Map.get(payload, :spell_id))
-    weapon_proc = Enchantments.weapon_proc(character)
-
-    ppm =
-      case weapon_proc do
-        %{effect: %{spell_id: spell_id}} -> ItemEnchantmentLoader.proc_ppm(spell_id)
-        _ -> 0.0
-      end
-
-    character =
-      character
-      |> AttackFeedback.receive(payload, spell, Time.now())
-      |> Shaman.trigger_weapon_enchant(payload, weapon_proc, ppm)
-
-    {:noreply, {socket, %{state | character: character}}, {:continue, :maybe_broadcast_update}}
-  end
-
-  def handle_cast({:spell_outcome, payload}, {socket, %{character: %Character{} = character} = state}) do
-    spell = spellbook_spell(character, Map.get(payload, :spell_id))
-    character = SpellFeedback.receive(character, payload, spell, Time.now())
-
-    {:noreply, {socket, %{state | character: character}}, {:continue, :maybe_broadcast_update}}
-  end
-
-  def handle_cast(
-        {:threat_ref_gained, mob_guid, incarnation_id},
-        {socket, %{character: %Character{} = character} = state}
-      ) do
-    character = PlayerCombat.gain_threat_ref(character, mob_guid, incarnation_id)
-    state = PlayerTick.ensure_scheduled(%{state | character: character})
-    {:noreply, {socket, state}, {:continue, :maybe_broadcast_update}}
-  end
-
-  def handle_cast(
-        {:threat_ref_lost, mob_guid, incarnation_id},
-        {socket, %{character: %Character{} = character} = state}
-      ) do
-    character = PlayerCombat.lose_threat_ref(character, mob_guid, incarnation_id)
-    state = PlayerTick.ensure_scheduled(%{state | character: character})
-    {:noreply, {socket, state}, socket.read_timeout}
-  end
-
-  def handle_cast({:receive_spell, caster, spell}, {socket, %{character: %Character{} = character} = state}) do
-    now = Time.now()
-    harmful? = Spell.harmful?(spell)
-
-    character =
-      if harmful? and PlayerCombat.undetectable?(character, now) do
-        character
-      else
-        character = if harmful?, do: PlayerCombat.mark_attacked(character, now), else: character
-        {character, events} = SpellEffect.receive(character, caster, spell, now)
-        EventSink.emit(character, events)
-      end
-
-    state = %{state | character: character}
-    state = if harmful?, do: PlayerTick.ensure_scheduled(state), else: state
-    if harmful?, do: notify_defensive_pet(character, spell_caster_guid(caster))
-
-    {:noreply, {socket, state}, {:continue, :maybe_broadcast_update}}
-  end
-
-  def handle_cast(
-        {:receive_spell_outcome, caster_guid, spell, outcome},
-        {socket, %{character: %Character{} = character} = state}
-      ) do
-    now = Time.now()
-    character = PlayerCombat.mark_attacked(character, now)
-    {character, events} = SpellEffect.receive_outcome(character, caster_guid, spell, outcome, now)
-    character = EventSink.emit(character, events)
-    state = state |> Map.put(:character, character) |> PlayerTick.ensure_scheduled()
-    notify_defensive_pet(character, caster_guid)
-
-    {:noreply, {socket, state}, {:continue, :maybe_broadcast_update}}
-  end
-
-  def handle_cast(
-        {:trigger_spell, spell_id, target_guid, opts},
-        {socket, %{character: %Character{} = character} = state}
+  def handle_info(
+        {:DOWN, monitor, :process, player_pid, reason},
+        {_socket, %ConnectionState{player_pid: player_pid, player_monitor: monitor} = state}
       )
-      when is_integer(spell_id) and is_integer(target_guid) and is_list(opts) do
-    event = Event.trigger_spell(character.object.guid, character.unit.level || 1, target_guid, spell_id, opts)
-    character = EventSink.emit(character, event)
-    {:noreply, {socket, %{state | character: character}}, {:continue, :maybe_broadcast_update}}
-  end
-
-  def handle_cast({:remove_aura, spell_id, caster_guid}, {socket, %{character: %Character{} = character} = state}) do
-    {character, events} = Aura.remove_source_spell(character, spell_id, caster_guid, Time.now())
-    character = EventSink.emit(character, events)
-    {:noreply, {socket, %{state | character: character}}, {:continue, :maybe_broadcast_update}}
-  end
-
-  def handle_cast(
-        {:delay_aura, spell_id, caster_guid, delay_ms},
-        {socket, %{character: %Character{} = character} = state}
-      ) do
-    character = Aura.delay_source_spell(character, spell_id, caster_guid, delay_ms, Time.now())
-    {:noreply, {socket, %{state | character: character}}, {:continue, :maybe_broadcast_update}}
-  end
-
-  def handle_cast({:reward_kill, victim}, {socket, %{character: %Character{} = character} = state}) do
-    xp = kill_xp(character, victim)
-    state = if xp > 0, do: trigger_kill_procs(state, victim), else: state
-    state = apply_kill_reward(state, victim, xp)
-    {:noreply, {socket, state}, socket.read_timeout}
-  end
-
-  @impl GenServer
-  def handle_cast({:reward_kill_share, victim, xp}, {socket, %{character: %Character{}} = state}) do
-    state = apply_kill_reward(state, victim, xp)
-    {:noreply, {socket, state}, socket.read_timeout}
-  end
-
-  @impl GenServer
-  def handle_cast({:receive_money, amount}, {socket, %{character: %Character{} = character} = state})
-      when is_integer(amount) and amount > 0 do
-    player = %{character.player | coinage: character.player.coinage + amount}
-    Network.send_packet(%Message.SmsgLootMoneyNotify{money: amount})
-    state = InventoryUpdate.apply(state, {:ok, player})
-    {:noreply, {socket, state}, socket.read_timeout}
-  end
-
-  @impl GenServer
-  def handle_cast({:request_party_stats, requester_guid}, {socket, %{character: %Character{} = character} = state}) do
-    Message.SmsgPartyMemberStatsFull
-    |> struct(MemberStats.from_character(character))
-    |> Network.send_packet(requester_guid)
-
-    {:noreply, {socket, state}, socket.read_timeout}
-  end
-
-  @impl GenServer
-  def handle_cast({:party_leader_changed, leader?}, {socket, %{character: %Character{} = character} = state})
-      when is_boolean(leader?) do
-    character = PlayerFlags.set_group_leader(character, leader?)
-
-    if PlayerFlags.group_leader?(character) == PlayerFlags.group_leader?(state.character) do
-      {:noreply, {socket, state}, socket.read_timeout}
-    else
-      character = Core.mark_broadcast_update(character)
-      {:noreply, {socket, %{state | character: character}}, {:continue, :maybe_broadcast_update}}
-    end
-  rescue
-    _error -> {:noreply, {socket, state}, socket.read_timeout}
-  end
-
-  def handle_cast({:party_leader_changed, _leader?}, {socket, state}) do
-    {:noreply, {socket, state}, socket.read_timeout}
-  end
-
-  @impl GenServer
-  def handle_cast({:destroy_object, guid}, {socket, state}) do
-    Network.send_packet(%Message.SmsgDestroyObject{guid: guid})
-    {:noreply, {socket, state}, socket.read_timeout}
-  end
-
-  @impl GenServer
-  def handle_cast({:visibility_changed, guid}, {socket, state}) do
-    state = Visibility.reevaluate_entity(state, guid)
-    {:noreply, {socket, state}, socket.read_timeout}
-  end
-
-  @impl GenServer
-  def handle_cast({:set_speed, rate}, {socket, %{character: %Character{} = character} = state}) do
-    character = MovementStats.set_run_speed_rate(character, rate)
-    character = EventSink.emit(character, [Event.movement_speed_changed(character.movement_block.run_speed)])
-
-    {:noreply, {socket, %{state | character: character}}, {:continue, :maybe_broadcast_update}}
-  end
-
-  @impl GenServer
-  def handle_cast({:start_teleport, x, y, z, map}, {socket, %{character: %Character{} = character} = state}) do
-    {_current_x, _current_y, _current_z, orientation} = character.movement_block.position
-    handle_cast({:start_teleport, x, y, z, orientation, map}, {socket, state})
-  end
-
-  def handle_cast({:start_teleport, x, y, z, orientation, map_id}, {socket, state}) when is_integer(map_id) do
-    {:ok, world} = InstanceSystem.destination(map_id, state.guid)
-    handle_cast({:start_teleport, x, y, z, orientation, world}, {socket, state})
-  end
-
-  def handle_cast(
-        {:start_teleport, x, y, z, orientation, world},
-        {socket, %{character: %Character{internal: %Internal{world: world}}} = state}
-      ) do
-    state = suspend_pet_for_teleport(state)
-    character = state.character
-
-    area =
-      case Pathfinding.get_zone_and_area(world.map_id, {x, y, z}) do
-        {_zone, area} -> area
-        nil -> character.internal.area
-      end
-
-    character = %{
-      character
-      | internal: %{character.internal | area: area},
-        movement_block: %{character.movement_block | position: {x, y, z, orientation}, movement_flags: 0}
-    }
-
-    SpatialHash.update(:players, state.guid, world, x, y, z)
-
-    Network.send_packet(%Message.MsgMoveTeleportAck{
-      guid: state.guid,
-      position: {x, y, z, orientation},
-      timestamp: character.movement_block.timestamp || 0,
-      fall_time: character.movement_block.fall_time || 0
-    })
-
-    state =
-      %{state | character: character}
-      |> Visibility.refresh_player()
-      |> Visibility.resync_player()
-
-    {:noreply, {socket, state}, socket.read_timeout}
-  end
-
-  def handle_cast({:start_teleport, x, y, z, orientation, %WorldRef{} = world}, {socket, state}) do
-    DuelSystem.disconnect(state.guid)
-    state = suspend_pet_for_teleport(state)
-    previous_world = state.character.internal.world
-
-    # Update player's location
-    area =
-      case Pathfinding.get_zone_and_area(world.map_id, {x, y, z}) do
-        {_zone, area} -> area
-        nil -> state.character.internal.area
-      end
-
-    character = state.character
-
-    character = %{
-      character
-      | internal: %{character.internal | area: area, world: world},
-        movement_block: %{character.movement_block | position: {x, y, z, orientation}}
-    }
-
-    # Move in the spatial hash before leaving visibility so old-map observers
-    # resolve the cell :left event as no-longer-visible and destroy us
-    SpatialHash.update(
-      :players,
-      state.guid,
-      character.internal.world,
-      x,
-      y,
-      z
-    )
-
-    state = Visibility.leave_player(%{state | character: character})
-    InstanceSystem.leave(state.guid, previous_world)
-
-    # Send player's client to loading screen to load the new map
-    Network.send_packet(%Message.SmsgTransferPending{map: world.map_id, has_transport: false})
-
-    state = Session.prepare_worldport(%{state | ready: false}, previous_world, world)
-
-    # Send player's client the new location
-    Network.send_packet(%Message.SmsgNewWorld{
-      map: world.map_id,
-      position: %{x: x, y: y, z: z},
-      orientation: orientation
-    })
-
-    Network.send_packet(%Message.SmsgUpdateInstanceOwnership{player_is_saved_to_a_raid: false})
-
-    # The client responds with a MSG_MOVE_WORLDPORT_ACK message which
-    # is handled in the login handler as they share the same init process
-    {:noreply, {socket, state}, socket.read_timeout}
-  end
-
-  def handle_cast({:finish_repop, token}, {socket, state}) do
-    state = MovementControl.finish_repop(state, token)
-    {:noreply, {socket, state}, socket.read_timeout}
-  end
-
-  defp send_update_object(%UpdateObject{} = update, socket, state) do
-    viewer = Map.get(state, :guid)
-    {packet, updates} = UpdateBatcher.batch(update, viewer, &Tap.personalize(&1, viewer))
-    state = Network.Send.send_packet(packet, {socket, state})
-    state = track_created_updates(state, updates)
-    {:noreply, {socket, state}, socket.read_timeout}
-  end
-
-  defp ensure_pet_created(%UpdateObject{} = update, socket, state) do
-    if duplicate_create?(state, update) do
-      state
-    else
-      update = Tap.personalize(update, state.guid)
-      packet = UpdateObject.to_packet([update], state.guid)
-      state = Network.Send.send_packet(packet, {socket, state})
-      track_created_updates(state, [update])
-    end
-  end
-
-  def handle_info(:restore_active_pet, {socket, state}) do
-    {:noreply, {socket, Login.restore_active_pet(state)}, socket.read_timeout}
-  end
-
-  def handle_info({:mail_delivery_ready, deliver_at}, {socket, state}) do
-    {:noreply, {socket, Mail.delivery_ready(state, deliver_at)}, socket.read_timeout}
-  rescue
-    error ->
-      Logger.error("mail delivery timer crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
-      {:noreply, {socket, state}, socket.read_timeout}
-  end
-
-  def handle_info({:finish_repop_timeout, token}, {socket, state}) do
-    state = MovementControl.finish_repop(state, token, true)
-    {:noreply, {socket, state}, socket.read_timeout}
-  end
-
-  @impl GenServer
-  def handle_info(:logout_complete, {socket, %{logout_timer: timer} = state}) when is_reference(timer) do
-    Network.send_packet(%Message.SmsgLogoutComplete{})
-    state = Session.leave_world(state)
-    {:noreply, {socket, state}, socket.read_timeout}
-  end
-
-  def handle_info(:logout_complete, {socket, state}) do
-    {:noreply, {socket, state}, socket.read_timeout}
-  end
-
-  @impl GenServer
-  def handle_info(:spell_complete, {socket, state}) do
-    state = Spellcasting.complete(state)
-    {:noreply, {socket, state}, socket.read_timeout}
-  end
-
-  @impl GenServer
-  def handle_info({:create_item, item_id, count}, {socket, state}) do
-    state = Items.give(state, item_id, count)
-    {:noreply, {socket, state}, socket.read_timeout}
-  rescue
-    error ->
-      Logger.error("create_item crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
-      {:noreply, {socket, state}, socket.read_timeout}
-  end
-
-  @impl GenServer
-  def handle_info({:open_gameobject_loot, object_guid}, {socket, state}) do
-    state = PlayerGameObjects.open_chest(state, object_guid)
-    {:noreply, {socket, state}, socket.read_timeout}
-  rescue
-    error ->
-      Logger.error("open_gameobject_loot crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
-      {:noreply, {socket, state}, socket.read_timeout}
-  end
-
-  @impl GenServer
-  def handle_info({:consume_cast_item, item_guid}, {socket, state}) do
-    state = Items.consume(state, item_guid)
-    {:noreply, {socket, state}, socket.read_timeout}
-  rescue
-    error ->
-      Logger.error("consume_cast_item crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
-      {:noreply, {socket, state}, socket.read_timeout}
-  end
-
-  @impl GenServer
-  def handle_info(
-        {:feed_pet, item_guid, pet_guid, trigger_spell_id, range_yards},
-        {socket, %{character: %Character{} = character} = state}
-      ) do
-    state = feed_pet(state, character, item_guid, pet_guid, trigger_spell_id, range_yards)
-    {:noreply, {socket, state}, socket.read_timeout}
-  rescue
-    error ->
-      Logger.error("feed_pet crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
-      {:noreply, {socket, state}, socket.read_timeout}
-  end
-
-  def handle_info({:farsight_removed, guid}, {socket, %{character: %Character{} = character} = state}) do
-    {character, removed?} =
-      if character.player.farsight == guid do
-        character =
-          %{character | player: %{character.player | farsight: 0}}
-          |> Core.mark_broadcast_update()
-
-        {character, true}
-      else
-        {character, false}
-      end
-
-    state = %{state | character: character}
-    state = if removed?, do: Visibility.reset_viewpoint(state), else: state
-    state = maybe_broadcast_update(state)
-    {:noreply, {socket, state}, socket.read_timeout}
-  end
-
-  def handle_info({:viewpoint_granted, guid}, {socket, %{character: %Character{} = character} = state}) do
-    character =
-      %{character | player: %{character.player | farsight: guid}}
-      |> Core.mark_broadcast_update()
-
-    state = %{state | character: character} |> Visibility.set_viewpoint(guid)
-    {:noreply, {socket, state}, {:continue, :maybe_broadcast_update}}
-  end
-
-  def handle_info({:viewpoint_released, guid}, {socket, %{character: %Character{} = character} = state}) do
-    {character, released?} =
-      if character.player.farsight == guid do
-        character =
-          %{character | player: %{character.player | farsight: 0}}
-          |> Core.mark_broadcast_update()
-
-        {character, true}
-      else
-        {character, false}
-      end
-
-    state = %{state | character: character}
-    state = if released?, do: Visibility.reset_viewpoint(state), else: state
-    {:noreply, {socket, state}, {:continue, :maybe_broadcast_update}}
-  end
-
-  def handle_info({:target_moved, guid}, {socket, state}) do
-    {:noreply, {socket, Visibility.refresh_viewpoint(state, guid)}, socket.read_timeout}
-  end
-
-  @impl GenServer
-  def handle_info({:enchant_item, item_guid, spell, enchantment_id, duration_ms}, {socket, state}) do
-    state = Enchantments.apply_temporary(state, item_guid, spell, enchantment_id, duration_ms)
-    {:noreply, {socket, state}, socket.read_timeout}
-  rescue
-    error ->
-      Logger.error("enchant_item crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
-      {:noreply, {socket, state}, socket.read_timeout}
-  end
-
-  @impl GenServer
-  def handle_info({:expire_item_enchantment, item_guid, token}, {socket, state}) do
-    state = Enchantments.expire(state, item_guid, token)
-    {:noreply, {socket, state}, socket.read_timeout}
-  rescue
-    error ->
-      Logger.error("expire_item_enchantment crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
-      {:noreply, {socket, state}, socket.read_timeout}
-  end
-
-  @impl GenServer
-  def handle_info({:consume_reagents, reagents}, {socket, state}) do
-    state =
-      Enum.reduce(reagents, state, fn {item_id, count}, state ->
-        case Inventory.remove_count(state.character.player, item_id, count, &ItemStore.get/1) do
-          {:ok, result} -> InventoryUpdate.apply(state, {:ok, result})
-          _ -> state
-        end
-      end)
-
-    {:noreply, {socket, state}, socket.read_timeout}
-  rescue
-    error ->
-      Logger.error("consume_reagents crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
-      {:noreply, {socket, state}, socket.read_timeout}
-  end
-
-  @impl GenServer
-  def handle_info({:tame_pet, entry}, {socket, %{character: %Character{} = character} = state})
-      when is_integer(entry) and entry > 0 do
-    character = EventSink.emit(character, Event.summon_pet(character.object.guid, entry, 1515))
-    {:noreply, {socket, %{state | character: character}}, socket.read_timeout}
-  rescue
-    error ->
-      Logger.error("tame_pet crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
-      {:noreply, {socket, state}, socket.read_timeout}
-  end
-
-  @impl GenServer
-  def handle_info({:deliver_spell, event}, {socket, state}) do
-    EventSink.deliver_spell(event)
-    {:noreply, {socket, state}, socket.read_timeout}
-  rescue
-    error ->
-      Logger.error("deliver_spell crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
-      {:noreply, {socket, state}, socket.read_timeout}
+      when reason != :normal do
+    Logger.error("player entity stopped: #{inspect(reason)}")
+    {:close, ConnectionState.clear_player(state)}
   end
 
   def handle_info(
-        {:pet_attached, %UpdateObject{object: %{guid: pet_guid}} = pet_update, spell_id, pet_spells},
-        {socket, %{character: %Character{unit: %Unit{}}} = state}
+        {:DOWN, monitor, :process, player_pid, _reason},
+        {socket, %ConnectionState{player_pid: player_pid, player_monitor: monitor} = state}
       ) do
-    state = ensure_pet_created(pet_update, socket, state)
-    character = state.character
-    {character, aura_events} = Aura.remove_spells(character, [18_789, 18_790, 18_791, 18_792, 25_228], Time.now())
-
-    character =
-      character
-      |> then(fn character ->
-        %{
-          character
-          | unit: %{character.unit | summon: pet_guid},
-            internal: %{
-              character.internal
-              | active_pet_entry: Guid.entry(pet_guid),
-                active_pet_spell_id: spell_id
-            }
-        }
-      end)
-      |> EventSink.emit(aura_events)
-      |> EventSink.emit(passive_pet_aura_events(character, pet_guid))
-      |> Core.mark_broadcast_update()
-
-    {:noreply, {socket, %{state | character: character}}, {:continue, {:finish_pet_attach, pet_guid, pet_spells}}}
+    {:noreply, {socket, ConnectionState.clear_player(state)}, socket.read_timeout}
   end
-
-  def handle_info(
-        {:control_granted, controlled_guid, spell_id, spells, possess?},
-        {socket, %{character: %Character{unit: %Unit{}} = character} = state}
-      ) do
-    character =
-      %{character | unit: %{character.unit | charm: controlled_guid}}
-      |> Core.mark_broadcast_update()
-
-    {character, state} =
-      if possess? do
-        character = %{character | player: %{character.player | farsight: controlled_guid}}
-        Network.send_packet(%Message.SmsgClientControlUpdate{guid: controlled_guid, allow_movement?: true})
-        {character, %{state | active_mover_guid: controlled_guid, active_control_spell_id: spell_id}}
-      else
-        {character, %{state | active_control_spell_id: spell_id}}
-      end
-
-    state =
-      %{state | character: character}
-      |> then(fn state -> if possess?, do: Visibility.set_viewpoint(state, controlled_guid), else: state end)
-
-    {:noreply, {socket, state}, {:continue, {:finish_pet_attach, controlled_guid, spells}}}
-  end
-
-  def handle_info(
-        {:control_released, controlled_guid},
-        {socket, %{character: %Character{unit: %Unit{charm: controlled_guid}} = character} = state}
-      ) do
-    possessed? = state.active_mover_guid == controlled_guid
-
-    {character, state} =
-      if possessed? do
-        Network.send_packet(%Message.SmsgClientControlUpdate{guid: controlled_guid, allow_movement?: false})
-
-        character = %{character | player: %{character.player | farsight: 0}}
-        {character, %{state | active_mover_guid: state.guid}}
-      else
-        {character, state}
-      end
-
-    {character, aura_events} =
-      case state.active_control_spell_id do
-        spell_id when is_integer(spell_id) -> Aura.remove_spells(character, [spell_id], Time.now())
-        _ -> {character, []}
-      end
-
-    character =
-      %{character | unit: %{character.unit | charm: 0}}
-      |> EventSink.emit(aura_events)
-      |> Core.mark_broadcast_update()
-
-    state = %{state | character: character, active_control_spell_id: nil}
-    state = if possessed?, do: Visibility.reset_viewpoint(state), else: state
-    Network.send_packet(Message.SmsgPetSpells.clear())
-    {:noreply, {socket, state}, {:continue, :maybe_broadcast_update}}
-  end
-
-  def handle_info({:control_released, _controlled_guid}, {socket, state}) do
-    {:noreply, {socket, state}, socket.read_timeout}
-  end
-
-  def handle_info(
-        {:pet_removed, pet_guid},
-        {socket, %{character: %Character{unit: %Unit{summon: pet_guid}} = character} = state}
-      ) do
-    {character, aura_events} = Aura.remove_spells(character, [25_228], Time.now())
-
-    hunter_pet? = character.internal.active_pet_spell_id == 1515
-
-    character =
-      character
-      |> then(fn character ->
-        %{
-          character
-          | unit: %{character.unit | summon: 0},
-            internal: %{
-              character.internal
-              | active_pet_entry: if(hunter_pet?, do: character.internal.active_pet_entry),
-                active_pet_spell_id: if(hunter_pet?, do: 1515)
-            }
-        }
-      end)
-      |> EventSink.emit(aura_events)
-      |> Core.mark_broadcast_update()
-
-    Network.send_packet(Message.SmsgPetSpells.clear())
-    {:noreply, {socket, %{state | character: character}}, {:continue, :maybe_broadcast_update}}
-  end
-
-  def handle_info({:pet_removed, _pet_guid}, {socket, state}) do
-    {:noreply, {socket, state}, socket.read_timeout}
-  end
-
-  @impl GenServer
-  def handle_info(:player_tick, {socket, %{character: %Character{} = character} = state}) do
-    {status, character} = tick_player(character)
-    character = EventSink.emit_pending(character)
-    state = %{state | character: character}
-    state = schedule_player_tick(state, character, status)
-    {:noreply, {socket, state}, {:continue, :maybe_broadcast_update}}
-  rescue
-    error ->
-      Logger.error("Player tick crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
-      ref = Process.send_after(self(), :player_tick, @player_tick_retry_ms)
-      {:noreply, {socket, %{state | player_tick_ref: ref}}, socket.read_timeout}
-  end
-
-  def handle_info(:player_tick, {socket, state}) do
-    {:noreply, {socket, state}, socket.read_timeout}
-  end
-
-  @impl GenServer
-  def handle_info({:group, events, _info}, {socket, state}) do
-    state = Visibility.handle_events(state, events)
-    {:noreply, {socket, state}, socket.read_timeout}
-  end
-
-  @impl GenServer
-  def handle_continue({:finish_pet_attach, pet_guid, pet_spells}, {socket, state}) do
-    state = maybe_broadcast_update(state)
-    Network.send_packet(Message.SmsgPetSpells.for_pet(pet_guid, pet_spells))
-    {:noreply, {socket, state}, socket.read_timeout}
-  end
-
-  def handle_continue(:maybe_broadcast_update, {socket, state}) do
-    {:noreply, {socket, maybe_broadcast_update(state)}, socket.read_timeout}
-  end
-
-  def maybe_broadcast_update(%{character: %Character{}} = state) do
-    state
-    |> cancel_cast_if_dead()
-    |> sync_character_metadata()
-    |> then(fn state -> %{state | character: EventSink.emit_pending(state.character)} end)
-    |> do_broadcast_update()
-  end
-
-  def maybe_broadcast_update(state), do: state
-
-  defp cancel_cast_if_dead(%{character: %Character{internal: %Internal{casting: casting}} = character} = state)
-       when not is_nil(casting) do
-    if Core.dead?(character), do: Spellcasting.cancel(state), else: state
-  end
-
-  defp cancel_cast_if_dead(state), do: state
-
-  defp do_broadcast_update(%{character: %Character{internal: %Internal{broadcast_update?: true}} = character} = state) do
-    Core.update_object(character, :values)
-    |> World.broadcast_packet(character)
-
-    PartyNotifier.broadcast_stats(state.guid, character)
-    internal = %{character.internal | broadcast_update?: false}
-    character = %{character | internal: internal}
-    PlayerTick.ensure_scheduled(%{state | character: character})
-  end
-
-  defp do_broadcast_update(state), do: state
-
-  defp sync_character_metadata(%{guid: guid, character: %Character{} = character} = state) when is_integer(guid) do
-    detection = StealthDetection.target_metadata(character)
-
-    Metadata.update(
-      guid,
-      %{
-        level: character.unit.level,
-        alive?: Death.alive?(character),
-        ghost?: Death.ghost?(character),
-        health_pct: Core.health_pct(character),
-        power_type: character.unit.power_type,
-        unit_flags: character.unit.flags,
-        shapeshift_form: character.unit.shapeshift_form,
-        world: character.internal.world,
-        area: character.internal.area,
-        controlled_guid: Character.controlled_guid(character),
-        duel_opponent_guid: Dueling.opponent_guid(character),
-        duel_started?: Dueling.active?(character),
-        aura_sources: Aura.source_spells(character),
-        dispel_options: Aura.dispel_options(character),
-        attacker_spell_hit_chance: Aura.attacker_spell_hit_chance(character)
-      }
-      |> Map.merge(detection)
-    )
-
-    state
-  end
-
-  defp sync_character_metadata(state), do: state
-
-  defp tick_player(%{internal: %Internal{behavior_tree: behavior_tree}} = character) when not is_nil(behavior_tree) do
-    BT.tick(behavior_tree, character)
-  end
-
-  defp tick_player(character), do: {:running, character}
-
-  defp schedule_player_tick(state, character, status) do
-    if Tick.needs_tick?(character) do
-      delay_ms = Tick.player_delay(character, status, Time.now())
-      ref = Process.send_after(self(), :player_tick, delay_ms)
-      %{state | player_tick_ref: ref}
-    else
-      %{state | player_tick_ref: nil}
-    end
-  end
-
-  defp spellbook_spell(%Character{internal: %Internal{spellbook: spellbook}}, spell_id)
-       when is_map(spellbook) and is_integer(spell_id) do
-    Map.get(spellbook, spell_id)
-  end
-
-  defp spellbook_spell(_character, _spell_id), do: nil
-
-  defp feed_pet(state, character, item_guid, pet_guid, trigger_spell_id, range_yards) do
-    with %DataItem{} = item <- owned_item(character, item_guid),
-         {:ok, pet} <- Entity.call(pet_guid, :feed_info),
-         :ok <- feed_pet_in_range(character, pet_guid, range_yards),
-         {:ok, benefit} <- Hunter.feed_benefit(%{item: DataItem.template(item), pet: pet}),
-         %Spell{} = spell <- SpellLoader.load(trigger_spell_id) do
-      state = Items.consume(state, item_guid)
-      spell = Hunter.apply_food_benefit(spell, benefit)
-      context = CastContext.from_caster(state.character, spell, pet_guid)
-      Entity.receive_spell(pet_guid, context, spell)
-      state
-    else
-      _ -> state
-    end
-  end
-
-  defp owned_item(%Character{player: player}, item_guid) when is_integer(item_guid) do
-    case Inventory.find_position(player, item_guid, &ItemStore.get/1) do
-      {_bag, _slot} -> ItemStore.get(item_guid)
-      _ -> nil
-    end
-  end
-
-  defp owned_item(_character, _item_guid), do: nil
-
-  defp feed_pet_in_range(character, pet_guid, range_yards) when is_number(range_yards) and range_yards > 0 do
-    case World.distance_to_guid(character, pet_guid) do
-      distance when is_number(distance) and distance <= range_yards ->
-        if World.line_of_sight?(character, pet_guid), do: :ok, else: {:error, :line_of_sight}
-
-      _ ->
-        {:error, :out_of_range}
-    end
-  end
-
-  defp feed_pet_in_range(_character, _pet_guid, _range_yards), do: :ok
-
-  defp passive_pet_aura_events(%Character{unit: %Unit{auras: holders, level: level}}, pet_guid) when is_list(holders) do
-    pet_entry = Guid.entry(pet_guid)
-
-    holders
-    |> Enum.flat_map(fn %{spell: %Spell{id: spell_id}} -> SpellPetAuraLoader.pet_aura_ids(spell_id, pet_entry) end)
-    |> Enum.uniq()
-    |> Enum.map(&Event.trigger_spell(pet_guid, level || 1, pet_guid, &1))
-  end
-
-  defp passive_pet_aura_events(_character, _pet_guid), do: []
-
-  defp trigger_kill_procs(state, victim) do
-    {character, events} = Aura.reactions(state.character, :kill, %{victim_guid: victim.object.guid, now: Time.now()})
-    %{state | character: EventSink.emit(character, events)}
-  end
-
-  defp apply_kill_reward(state, victim, xp) do
-    character = Reactive.clear_combo_target(state.character, victim.object.guid)
-    state = %{state | character: character}
-
-    state =
-      if xp > 0 do
-        {character, rested_bonus} = Rest.spend(state.character, xp, Time.now())
-        total_xp = xp + rested_bonus
-
-        Network.send_packet(%Message.SmsgLogXpgain{
-          target: victim.object.guid,
-          total_exp: total_xp,
-          exp_type: :kill,
-          experience_without_rested: xp
-        })
-
-        {character, level_ups} = PlayerStats.gain_xp(character, total_xp)
-        send_level_ups(level_ups)
-        CharacterStore.put(character)
-
-        maybe_broadcast_update(%{state | character: Core.mark_broadcast_update(character)})
-      else
-        state
-      end
-
-    state
-    |> Quests.credit_kill(victim.object.guid)
-    |> maybe_broadcast_update()
-  end
-
-  defp kill_xp(%Character{unit: %Unit{health: health, level: player_level}}, %{
-         unit: %Unit{level: mob_level},
-         internal: %Internal{creature: %Creature{} = creature}
-       })
-       when health > 0 do
-    Experience.kill_xp(player_level, mob_level,
-      experience_multiplier: creature.experience_multiplier,
-      extra_flags: creature.extra_flags,
-      elite?: Experience.elite_rank?(creature.rank)
-    )
-  end
-
-  defp kill_xp(_character, _victim), do: 0
-
-  defp send_level_ups(level_ups) do
-    Enum.each(level_ups, fn level_up ->
-      Network.send_packet(struct(Message.SmsgLevelupInfo, level_up))
-    end)
-  end
-
-  defp notify_defensive_pet(%Character{} = character, attacker_guid) when is_integer(attacker_guid) do
-    case Entity.pid(Character.controlled_guid(character)) do
-      pid when is_pid(pid) -> send(pid, {:owner_attacked, attacker_guid})
-      _ -> :ok
-    end
-  end
-
-  defp notify_defensive_pet(%Character{}, _attacker_guid), do: :ok
-
-  defp spell_caster_guid(%{caster_guid: guid}) when is_integer(guid), do: guid
-  defp spell_caster_guid(guid) when is_integer(guid), do: guid
-  defp spell_caster_guid(_caster), do: nil
-
-  defp suspend_pet_for_teleport(%Session{character: %Character{unit: %Unit{summon: pet_guid}}} = state)
-       when is_integer(pet_guid) and pet_guid > 0 do
-    Network.send_packet(Message.SmsgPetSpells.clear())
-    Session.suspend_active_pet(state)
-  end
-
-  defp suspend_pet_for_teleport(%Session{} = state), do: state
 
   @impl ThousandIsland.Handler
   def handle_connection(socket, _) do
@@ -1184,12 +106,24 @@ defmodule ThistleTea.Game.Network.Server do
       <<6::big-size(16), @smsg_auth_challenge::little-size(16)>> <> conn.seed
     )
 
-    {:continue, %Session{conn: conn}}
+    {:continue, %ConnectionState{conn: conn}}
   end
 
   @impl ThousandIsland.Handler
-  def handle_close(_socket, state) do
+  def handle_close(_socket, %ConnectionState{player_pid: player_pid}) when is_pid(player_pid) do
     Logger.info("CLIENT DISCONNECTED")
-    Session.leave_world(state)
+    PlayerServer.disconnect(player_pid)
   end
+
+  def handle_close(_socket, _state) do
+    Logger.info("CLIENT DISCONNECTED")
+    :ok
+  end
+
+  defp dispatch_message(message, %ConnectionState{player_pid: player_pid} = state) when is_pid(player_pid) do
+    :ok = PlayerServer.handle_message(player_pid, message)
+    state
+  end
+
+  defp dispatch_message(message, state), do: Message.handle(message, state)
 end

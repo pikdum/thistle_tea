@@ -20,10 +20,10 @@ defmodule ThistleTea.Game.Player.DevCommands do
   alias ThistleTea.Game.Entity.Logic.QuestLog
   alias ThistleTea.Game.Entity.Logic.Rest
   alias ThistleTea.Game.Entity.Logic.Skills
+  alias ThistleTea.Game.Entity.Server.Player, as: PlayerServer
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
-  alias ThistleTea.Game.Network.Server
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.Player.Characters
   alias ThistleTea.Game.Player.Exploration, as: PlayerExploration
@@ -709,7 +709,7 @@ defmodule ThistleTea.Game.Player.DevCommands do
 
   defp put_character(state, %Character{} = character) do
     CharacterStore.put(character)
-    Server.maybe_broadcast_update(%{state | character: Core.mark_broadcast_update(character)})
+    PlayerServer.maybe_broadcast_update(%{state | character: Core.mark_broadcast_update(character)})
   end
 
   defp max_skills(%{character: %Character{unit: unit, player: player, internal: internal} = character} = state) do

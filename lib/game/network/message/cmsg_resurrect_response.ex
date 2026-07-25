@@ -5,7 +5,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgResurrectResponse do
   alias ThistleTea.Game.Entity.Data.Corpse
   alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.Logic.Death
-  alias ThistleTea.Game.Network.Server
+  alias ThistleTea.Game.Entity.Server.Player, as: PlayerServer
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.Visibility
 
@@ -46,7 +46,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgResurrectResponse do
     {character, events} = Death.resurrect_with(character, pending.health, pending.mana, now)
     character = EventSink.emit(character, events)
 
-    state = Server.maybe_broadcast_update(%{state | character: character})
+    state = PlayerServer.maybe_broadcast_update(%{state | character: character})
 
     Visibility.notify_visibility_changed(state.character)
     state = Visibility.resync_player(state)

@@ -1,11 +1,9 @@
-defmodule ThistleTea.Game.Network.Session do
+defmodule ThistleTea.Game.Entity.Server.Player.State do
   @moduledoc """
-  Connection-handler state for one client session: the network connection,
-  account, logged-in character, and world-presence bookkeeping (visibility
-  cells, tracked entities, timers). `leave_world/1` tears the session down on
-  logout or disconnect — persisting the character, deregistering from world
-  systems and chat channels, notifying the party — and resets to a bare
-  session keeping only the connection and account.
+  Runtime state owned by a logged-in player entity.
+
+  It contains the character and the boundary bookkeeping required to interpret
+  that character's effects. `leave_world/1` tears down that world presence.
   """
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Logic.Dueling
@@ -28,7 +26,7 @@ defmodule ThistleTea.Game.Network.Session do
   alias ThistleTea.Game.WorldRef
 
   defstruct [
-    :conn,
+    :connection_pid,
     :account,
     :guid,
     :packed_guid,
@@ -98,7 +96,7 @@ defmodule ThistleTea.Game.Network.Session do
       leave_world_presence(state)
     end
 
-    %__MODULE__{account: state.account, conn: state.conn}
+    %__MODULE__{account: state.account, connection_pid: state.connection_pid}
   end
 
   def suspend_active_pet(%__MODULE__{character: %{unit: %{summon: pet_guid} = unit} = character} = state)
@@ -130,7 +128,6 @@ defmodule ThistleTea.Game.Network.Session do
   defp leave_world_presence(%__MODULE__{} = state) do
     InstanceSystem.leave(state.guid, state.character.internal.world)
     ChatChannels.leave_all(state.guid)
-    Entity.unregister(state.guid)
     AggroProbe.forget(state.guid)
     Metadata.delete(state.guid)
     SpatialHash.remove(:players, state.guid)

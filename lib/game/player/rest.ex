@@ -11,7 +11,7 @@ defmodule ThistleTea.Game.Player.Rest do
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Rest, as: RestLogic
-  alias ThistleTea.Game.Network.Server
+  alias ThistleTea.Game.Entity.Server.Player, as: PlayerServer
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.Loader.AreaTrigger, as: AreaTriggerLoader
@@ -77,6 +77,6 @@ defmodule ThistleTea.Game.Player.Rest do
 
   defp apply_transition(state, %Character{} = character) do
     CharacterStore.put(character)
-    Server.maybe_broadcast_update(%{state | character: Core.mark_broadcast_update(character)})
+    PlayerServer.maybe_broadcast_update(%{state | character: Core.mark_broadcast_update(character)})
   end
 end

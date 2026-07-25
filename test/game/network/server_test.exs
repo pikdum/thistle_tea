@@ -1,31 +1,10 @@
 defmodule ThistleTea.Game.Network.ServerTest do
   use ExUnit.Case, async: true
-  use ThistleTea.Game.Network.Opcodes, [:SMSG_UPDATE_OBJECT]
 
-  alias ThistleTea.Game.Entity.Data.Character
-  alias ThistleTea.Game.Entity.Data.Component.Internal
-  alias ThistleTea.Game.Entity.Data.Component.MovementBlock
-  alias ThistleTea.Game.Entity.Data.Component.Object
-  alias ThistleTea.Game.Entity.Data.Component.Player
-  alias ThistleTea.Game.Entity.Data.Component.Unit
-  alias ThistleTea.Game.Entity.Logic.Event
-  alias ThistleTea.Game.Entity.Logic.Regen
-  alias ThistleTea.Game.Guid
-  alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Connection
-  alias ThistleTea.Game.Network.Message
+  alias ThistleTea.Game.Network.ConnectionState
   alias ThistleTea.Game.Network.Packet
   alias ThistleTea.Game.Network.Server
-  alias ThistleTea.Game.Network.Session
-  alias ThistleTea.Game.Network.UpdateBatcher
-  alias ThistleTea.Game.Network.UpdateObject
-  alias ThistleTea.Game.Spell
-  alias ThistleTea.Game.Spell.Cast
-  alias ThistleTea.Game.Spell.Targets
-  alias ThistleTea.Game.Time
-  alias ThistleTea.Game.World.Metadata
-  alias ThistleTea.Game.World.SpatialHash
-  alias ThistleTea.Game.WorldRef
   alias ThousandIsland.Socket
   alias ThousandIsland.Telemetry
 
@@ -39,417 +18,66 @@ defmodule ThistleTea.Game.Network.ServerTest do
     end
   end
 
-  describe "UpdateBatcher.batch/2" do
-    test "drains pending update structs into a single packet" do
-      player_update = update_object(:player, 1)
-      mob_update = update_object(:unit, 2)
-      next_player_update = update_object(:player, 3)
+  describe "handle_connection/2" do
+    test "creates protocol-only state and sends the authentication challenge" do
+      socket = test_socket()
 
-      send(self(), {:"$gen_cast", {:send_packet, mob_update}})
-      send(self(), {:"$gen_cast", {:send_packet, next_player_update}})
+      assert {:continue, %ConnectionState{conn: %Connection{}} = state} =
+               Server.handle_connection(socket, %{})
 
-      {packet, updates} = UpdateBatcher.batch(player_update, nil)
-
-      assert object_count(packet) == 3
-      assert length(updates) == 3
-    end
-
-    test "only drains UpdateObject casts; leaves other messages in the mailbox" do
-      send(self(), {:"$gen_cast", {:send_packet, %Packet{opcode: 0x123, payload: <<>>}}})
-
-      {packet, _updates} = UpdateBatcher.batch(update_object(:player, 1), nil)
-      assert object_count(packet) == 1
-
-      assert_received {:"$gen_cast", {:send_packet, %Packet{opcode: 0x123}}}
-    end
-
-    test "dedupes values blocks for the same guid keeping the newest" do
-      stale = update_object(:player, 1, :values)
-      fresh = update_object(:player, 1, :values)
-
-      send(self(), {:"$gen_cast", {:send_packet, fresh}})
-
-      {packet, updates} = UpdateBatcher.batch(stale, nil)
-
-      assert object_count(packet) == 1
-      assert [%UpdateObject{update_type: :values}] = updates
+      refute Map.has_key?(state, :character)
+      assert_receive {:socket_send, challenge}
+      assert byte_size(challenge) == 8
     end
   end
 
   describe "handle_cast/2" do
-    test "drops source-scoped packets for untracked entities" do
-      socket = %{read_timeout: 0}
-      state = %{tracked_entities: MapSet.new()}
-      packet = %Packet{opcode: 0x123, payload: <<>>}
-
-      assert {:noreply, {^socket, ^state}, 0} =
-               Server.handle_cast({:send_packet, packet, source_guid: 1}, {socket, state})
-    end
-
-    test "drops destroy packets for untracked entities" do
-      socket = %{read_timeout: 0}
-      state = %{tracked_entities: MapSet.new()}
-      packet = %Message.SmsgDestroyObject{guid: 1}
-
-      assert {:noreply, {^socket, ^state}, 0} = Server.handle_cast({:send_packet, packet}, {socket, state})
-    end
-
-    test "drops duplicate unscoped create updates" do
-      guid = Guid.from_low_guid(:mob, 1, 1)
+    test "writes an encoded player packet without interpreting it" do
       socket = test_socket()
-      state = connection_state(guid)
+      state = %ConnectionState{conn: %Connection{session_key: <<0>>}}
+      packet = %Packet{opcode: 0x123, payload: <<1, 2, 3>>}
 
-      assert {:noreply, {^socket, ^state}, 0} =
-               Server.handle_cast({:send_packet, update_object(:unit, guid)}, {socket, state})
-
-      refute_receive {:socket_send, _data}
-    end
-
-    test "sends source-scoped create refreshes for tracked entities" do
-      guid = Guid.from_low_guid(:mob, 1, 1)
-      socket = test_socket()
-      state = connection_state(guid)
-
-      assert {:noreply, {^socket, %{tracked_entities: tracked}}, 0} =
-               Server.handle_cast(
-                 {:send_packet, update_object(:unit, guid), source_guid: guid},
-                 {socket, state}
-               )
+      assert {:noreply, {^socket, %ConnectionState{}}, 0} =
+               Server.handle_cast({:write_packet, packet}, {socket, state})
 
       assert_receive {:socket_send, data}
       assert is_binary(data)
-      assert MapSet.member?(tracked, guid)
-    end
-
-    test "raises when a serialized update object packet reaches the server" do
-      socket = %{read_timeout: 0}
-      state = %{}
-      packet = %Packet{opcode: @smsg_update_object, payload: <<>>}
-
-      assert_raise RuntimeError, "SMSG_UPDATE_OBJECT packets must be sent as UpdateObject structs", fn ->
-        Server.handle_cast({:send_packet, packet}, {socket, state})
-      end
-    end
-
-    test "sequences acknowledged movement packets at the send boundary" do
-      socket = test_socket()
-      state = %Session{conn: %Connection{session_key: <<0>>}, guid: 1}
-      packet = %Message.SmsgForceMoveUnroot{guid: 1}
-
-      assert {:noreply, {^socket, %Session{movement_counter: 1, pending_movement_acks: %{0 => :unroot}}}, 0} =
-               Server.handle_cast({:send_packet, packet}, {socket, state})
-
-      assert_receive {:socket_send, _data}
-    end
-
-    test "initializes instance ownership after a cross-map transfer" do
-      guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
-      socket = %{read_timeout: 0}
-      state = %Session{guid: guid, character: character(guid, health: 100, max_health: 100), ready: true}
-      destination = WorldRef.instance(389, 12)
-
-      on_exit(fn -> SpatialHash.remove(:players, guid) end)
-
-      assert {:noreply, {^socket, %Session{ready: false, pending_last_instance_map: nil}}, 0} =
-               Server.handle_cast({:start_teleport, -8.23, -43.26, -21.81, 0.0, destination}, {socket, state})
-
-      assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgTransferPending{map: 389}}}
-      assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgNewWorld{map: 389}}}
-
-      assert_receive {:"$gen_cast",
-                      {:send_packet, %Message.SmsgUpdateInstanceOwnership{player_is_saved_to_a_raid: false}}}
-
-      refute_receive {:"$gen_cast", {:send_packet, %Message.SmsgUpdateLastInstance{}}}
-    end
-
-    test "waits for the near teleport acknowledgement before restoring a suspended pet" do
-      guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
-      pet_guid = Guid.from_low_guid(:pet, 1863, System.unique_integer([:positive]))
-      socket = %{read_timeout: 0}
-      character = character(guid, health: 100, max_health: 100, summon: pet_guid)
-      state = %Session{guid: guid, character: character, ready: true}
-
-      on_exit(fn -> SpatialHash.remove(:players, guid) end)
-
-      assert {:noreply, {^socket, %Session{character: %Character{unit: %Unit{summon: 0}}}}, 0} =
-               Server.handle_cast(
-                 {:start_teleport, -8_949.95, -132.493, 83.5312, 0.0, WorldRef.open(0)},
-                 {socket, state}
-               )
-
-      assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgPetSpells{pet_guid: 0}}}
-      assert_receive {:"$gen_cast", {:send_packet, %Message.MsgMoveTeleportAck{}}}
-      refute_receive :restore_active_pet
-    end
-
-    test "updates the public group leader player flag" do
-      socket = %{read_timeout: 0}
-      character = %{character(1, health: 100, max_health: 100) | player: %Player{flags: 0x20}}
-      state = %{character: character}
-
-      assert {:noreply, {^socket, %{character: leader}}, {:continue, :maybe_broadcast_update}} =
-               Server.handle_cast({:party_leader_changed, true}, {socket, state})
-
-      assert leader.player.flags == 0x21
-
-      assert {:noreply, {^socket, %{character: member}}, {:continue, :maybe_broadcast_update}} =
-               Server.handle_cast({:party_leader_changed, false}, {socket, %{state | character: leader}})
-
-      assert member.player.flags == 0x20
-    end
-
-    test "does not broadcast an unchanged group leader player flag" do
-      socket = %{read_timeout: 0}
-      character = %{character(1, health: 100, max_health: 100) | player: %Player{flags: 0x1}}
-      state = %{character: character}
-
-      assert {:noreply, {^socket, ^state}, 0} =
-               Server.handle_cast({:party_leader_changed, true}, {socket, state})
-    end
-
-    test "records the previous instance when returning to the open world" do
-      guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
-      socket = %{read_timeout: 0}
-      character = character(guid, health: 100, max_health: 100)
-      character = %{character | internal: %{character.internal | world: WorldRef.instance(389, 12)}}
-      state = %Session{guid: guid, character: character, ready: true}
-
-      on_exit(fn -> SpatialHash.remove(:players, guid) end)
-
-      assert {:noreply, {^socket, %Session{ready: false, pending_last_instance_map: 389}}, 0} =
-               Server.handle_cast({:start_teleport, 1814.99, -4419.23, -18.81, 1.91, WorldRef.open(1)}, {socket, state})
-
-      assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgTransferPending{map: 1}}}
-      assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgNewWorld{map: 1}}}
-
-      assert_receive {:"$gen_cast",
-                      {:send_packet, %Message.SmsgUpdateInstanceOwnership{player_is_saved_to_a_raid: false}}}
-
-      refute_receive {:"$gen_cast", {:send_packet, %Message.SmsgUpdateLastInstance{}}}
-    end
-
-    test "marks player in combat when a mob attack lands" do
-      socket = %{read_timeout: 0}
-      sitting = %{character(1, health: 80, max_health: 100, stand_state: 1) | player: %Player{}}
-      state = %{character: sitting}
-
-      assert {:noreply, {^socket, %{character: character}}, {:continue, :maybe_broadcast_update}} =
-               Server.handle_cast({:receive_attack, %{caster: 2, damage: 10}}, {socket, state})
-
-      assert character.unit.health == 60
-      assert character.internal.in_combat == true
-      assert is_integer(character.internal.last_hostile_time)
-      assert Regen.tick(character, 1_000).unit.health == 60
-    end
-
-    test "ignores an attack already in flight during vanish immunity" do
-      socket = %{read_timeout: 0}
-      character = character(1, health: 80, max_health: 100)
-      internal = %{character.internal | undetectable_until: Time.now() + 1_000}
-      state = %{character: %{character | internal: internal}}
-
-      assert {:noreply, {^socket, %{character: character}}, {:continue, :maybe_broadcast_update}} =
-               Server.handle_cast({:receive_attack, %{caster: 2, damage: 10}}, {socket, state})
-
-      assert character.unit.health == 80
-      refute character.internal.in_combat
-    end
-
-    test "syncs detection metadata before aura object events clear the broadcast flag" do
-      guid = System.unique_integer([:positive])
-      character = character(guid, health: 80, max_health: 100)
-
-      internal = %{
-        character.internal
-        | broadcast_update?: true,
-          undetectable_until: Time.now() + 1_000,
-          events: [Event.object_update(:values)]
-      }
-
-      Metadata.put(guid, %{})
-      on_exit(fn -> Metadata.delete(guid) end)
-
-      Server.maybe_broadcast_update(%{guid: guid, character: %{character | internal: internal}})
-
-      assert %{undetectable_until: expires_at, stealthed?: false} =
-               Metadata.query(guid, [:undetectable_until, :stealthed?])
-
-      assert expires_at > Time.now()
-    end
-
-    test "cancels an in-flight cast when the character is dead" do
-      guid = System.unique_integer([:positive])
-      character = character(guid, health: 0, max_health: 100)
-      spell = %Spell{id: 1949, attributes: MapSet.new(), effects: []}
-      casting = Cast.new(spell, %Targets{}, 1_000)
-      character = %{character | internal: %{character.internal | casting: casting}}
-
-      Metadata.put(guid, %{})
-      on_exit(fn -> Metadata.delete(guid) end)
-
-      state = Server.maybe_broadcast_update(%{guid: guid, character: character})
-
-      assert state.character.internal.casting == nil
-      assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgSpellFailure{spell: 1949}}}
-    end
-
-    test "leaves an in-flight cast alone while the character lives" do
-      guid = System.unique_integer([:positive])
-      character = character(guid, health: 50, max_health: 100)
-      spell = %Spell{id: 1949, attributes: MapSet.new(), effects: []}
-      casting = Cast.new(spell, %Targets{}, 1_000)
-      character = %{character | internal: %{character.internal | casting: casting}}
-
-      Metadata.put(guid, %{})
-      on_exit(fn -> Metadata.delete(guid) end)
-
-      state = Server.maybe_broadcast_update(%{guid: guid, character: character})
-
-      assert state.character.internal.casting == casting
-      refute_receive {:"$gen_cast", {:send_packet, %Message.SmsgSpellFailure{}}}, 10
     end
   end
 
   describe "handle_info/2" do
-    test "atomically creates and tracks a pet before completing its attachment" do
-      guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
-      pet_guid = Guid.from_low_guid(:pet, 1863, System.unique_integer([:positive]))
+    test "detaches a normally stopped player while keeping connection state" do
       socket = test_socket()
+      player_pid = self()
+      monitor = make_ref()
 
-      state = %Session{
-        conn: %Connection{session_key: <<0>>},
-        guid: guid,
-        character: character(guid, health: 100, max_health: 100),
-        tracked_entities: MapSet.new()
+      state = %ConnectionState{
+        account: %{id: 1},
+        player_pid: player_pid,
+        player_monitor: monitor
       }
 
-      update = update_object(:unit, pet_guid)
+      assert {:noreply, {^socket, detached}, 0} =
+               Server.handle_info({:DOWN, monitor, :process, player_pid, :normal}, {socket, state})
 
-      assert {:noreply, {^socket, attached}, {:continue, {:finish_pet_attach, ^pet_guid, []}}} =
-               Server.handle_info({:pet_attached, update, 688, []}, {socket, state})
-
-      assert attached.character.unit.summon == pet_guid
-      assert MapSet.member?(attached.tracked_entities, pet_guid)
-      assert_receive {:socket_send, _data}
-
-      assert {:noreply, {^socket, ^attached}, 0} =
-               Server.handle_cast({:send_packet, update}, {socket, attached})
-
-      refute_receive {:socket_send, _data}
+      assert detached == %ConnectionState{account: %{id: 1}, conn: state.conn}
     end
 
-    test "reuses a pet create already sent by visibility before attachment" do
-      guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
-      pet_guid = Guid.from_low_guid(:pet, 1863, System.unique_integer([:positive]))
-      socket = test_socket()
+    test "closes the connection when its player owner crashes" do
+      player_pid = self()
+      monitor = make_ref()
 
-      state = %Session{
-        conn: %Connection{session_key: <<0>>},
-        guid: guid,
-        character: character(guid, health: 100, max_health: 100),
-        tracked_entities: MapSet.new()
+      state = %ConnectionState{
+        account: %{id: 1},
+        player_pid: player_pid,
+        player_monitor: monitor
       }
 
-      update = update_object(:unit, pet_guid)
+      assert {:close, detached} =
+               Server.handle_info({:DOWN, monitor, :process, player_pid, :boom}, {test_socket(), state})
 
-      assert {:noreply, {^socket, visible}, 0} =
-               Server.handle_cast({:send_packet, update}, {socket, state})
-
-      assert MapSet.member?(visible.tracked_entities, pet_guid)
-      assert_receive {:socket_send, _data}
-
-      assert {:noreply, {^socket, attached}, {:continue, {:finish_pet_attach, ^pet_guid, []}}} =
-               Server.handle_info({:pet_attached, update, 688, []}, {socket, visible})
-
-      assert attached.character.unit.summon == pet_guid
-      refute_receive {:socket_send, _data}
+      assert detached == %ConnectionState{account: %{id: 1}, conn: state.conn}
     end
-  end
-
-  describe "Network.send_packet/3" do
-    test "includes source guid metadata in casts" do
-      packet = %Packet{opcode: 0x123, payload: <<>>}
-
-      assert :ok = Network.send_packet(packet, self(), source_guid: 1)
-
-      assert_receive {:"$gen_cast", {:send_packet, ^packet, [source_guid: 1]}}
-    end
-  end
-
-  defp update_object(:player, guid) do
-    update_object(:player, guid, :create_object2)
-  end
-
-  defp update_object(:unit, guid) do
-    update_object(:unit, guid, :create_object2)
-  end
-
-  defp update_object(:player, guid, update_type) do
-    %UpdateObject{
-      update_type: update_type,
-      object_type: :player,
-      movement_block: %MovementBlock{update_flag: 0, position: {0.0, 0.0, 0.0, 0.0}},
-      object: object(guid),
-      unit: unit(),
-      player: %Player{
-        gender: 1,
-        skin: 1,
-        face: 1,
-        hair_style: 1,
-        hair_color: 1,
-        coinage: 500
-      }
-    }
-  end
-
-  defp update_object(:unit, guid, update_type) do
-    %UpdateObject{
-      update_type: update_type,
-      object_type: :unit,
-      movement_block: %MovementBlock{update_flag: 0, position: {0.0, 0.0, 0.0, 0.0}},
-      object: object(guid),
-      unit: unit()
-    }
-  end
-
-  defp character(guid, unit_attrs) do
-    %Character{
-      object: object(guid),
-      unit: struct(unit(), unit_attrs),
-      internal: %Internal{world: %WorldRef{map_id: 0}},
-      movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
-    }
-  end
-
-  defp object(guid) do
-    %Object{
-      guid: guid,
-      type: 1,
-      entry: 1001,
-      scale_x: 1.0
-    }
-  end
-
-  defp unit do
-    %Unit{
-      health: 1000,
-      power1: 100,
-      max_power1: 100,
-      power_type: 0,
-      level: 10,
-      race: 1,
-      class: 1,
-      gender: 1,
-      spirit: 50
-    }
-  end
-
-  defp connection_state(tracked_guid) do
-    %{
-      conn: %Connection{session_key: <<0>>},
-      guid: Guid.from_low_guid(:player, 1),
-      tracked_entities: MapSet.new([tracked_guid])
-    }
   end
 
   defp test_socket do
@@ -470,6 +98,4 @@ defmodule ThistleTea.Game.Network.ServerTest do
       span: span
     }
   end
-
-  defp object_count(%Packet{payload: <<count::little-size(32), 0, _body::binary>>}), do: count
 end

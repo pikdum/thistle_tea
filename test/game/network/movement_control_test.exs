@@ -1,13 +1,13 @@
 defmodule ThistleTea.Game.Network.MovementControlTest do
   use ExUnit.Case, async: true
 
+  alias ThistleTea.Game.Entity.Server.Player.State
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.MovementControl
-  alias ThistleTea.Game.Network.Session
 
   describe "prepare/2" do
     test "assigns one sequence across acknowledged movement changes" do
-      state = %Session{guid: 1}
+      state = %State{guid: 1}
 
       {speed, state} =
         MovementControl.prepare(%Message.SmsgForceRunSpeedChange{guid: 1, speed: 8.75}, state)
@@ -28,7 +28,7 @@ defmodule ThistleTea.Game.Network.MovementControlTest do
     end
 
     test "also advances counters for movement flags without implemented acknowledgements" do
-      state = %Session{guid: 1, movement_counter: 7}
+      state = %State{guid: 1, movement_counter: 7}
 
       {packet, state} = MovementControl.prepare(%Message.SmsgMoveWaterWalk{guid: 1}, state)
 
@@ -40,7 +40,7 @@ defmodule ThistleTea.Game.Network.MovementControlTest do
 
   describe "repop sequencing" do
     test "waits for earlier movement acknowledgements before teleporting" do
-      state = %Session{guid: 1, pending_movement_acks: %{4 => :unroot}}
+      state = %State{guid: 1, pending_movement_acks: %{4 => :unroot}}
       state = MovementControl.defer_repop(state, {10.0, 20.0, 30.0, 1})
       token = state.pending_repop.token
 
@@ -57,7 +57,7 @@ defmodule ThistleTea.Game.Network.MovementControlTest do
     end
 
     test "forces the teleport after the acknowledgement timeout" do
-      state = %Session{guid: 1, pending_movement_acks: %{4 => :unroot}}
+      state = %State{guid: 1, pending_movement_acks: %{4 => :unroot}}
       state = MovementControl.defer_repop(state, {10.0, 20.0, 30.0, 1})
       token = state.pending_repop.token
 

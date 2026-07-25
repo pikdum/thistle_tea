@@ -6,7 +6,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgSpiritHealerActivate do
   alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
   alias ThistleTea.Game.Entity.Logic.Death
-  alias ThistleTea.Game.Network.Server
+  alias ThistleTea.Game.Entity.Server.Player, as: PlayerServer
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
@@ -44,7 +44,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgSpiritHealerActivate do
     {character, sickness_events} = apply_resurrection_sickness(character, now)
     character = EventSink.emit(character, events ++ sickness_events)
 
-    state = Server.maybe_broadcast_update(%{state | character: character})
+    state = PlayerServer.maybe_broadcast_update(%{state | character: character})
 
     Visibility.notify_visibility_changed(state.character)
     Visibility.resync_player(state)

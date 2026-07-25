@@ -9,8 +9,8 @@ defmodule ThistleTea.Game.Network.Message.CmsgRepopRequest do
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Death
   alias ThistleTea.Game.Entity.Logic.Inventory
+  alias ThistleTea.Game.Entity.Server.Player, as: PlayerServer
   alias ThistleTea.Game.Network.MovementControl
-  alias ThistleTea.Game.Network.Server
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Graveyard, as: GraveyardLoader
@@ -48,7 +48,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgRepopRequest do
     {character, events} = Death.release_spirit(character, ghost_spells, now)
     character = EventSink.emit(character, events)
 
-    state = Server.maybe_broadcast_update(%{state | character: character})
+    state = PlayerServer.maybe_broadcast_update(%{state | character: character})
 
     Network.send_packet(%Message.SmsgCorpseReclaimDelay{delay_ms: Death.reclaim_delay_ms()})
 

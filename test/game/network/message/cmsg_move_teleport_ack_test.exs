@@ -1,12 +1,12 @@
 defmodule ThistleTea.Game.Network.Message.CmsgMoveTeleportAckTest do
   use ExUnit.Case, async: true
 
+  alias ThistleTea.Game.Entity.Server.Player.State
   alias ThistleTea.Game.Network.Message.CmsgMoveTeleportAck
-  alias ThistleTea.Game.Network.Session
 
   describe "handle/2" do
     test "restores a suspended pet after the matching teleport acknowledgement" do
-      state = %Session{guid: 1, pending_movement_acks: %{7 => :teleport}}
+      state = %State{guid: 1, pending_movement_acks: %{7 => :teleport}}
 
       state = CmsgMoveTeleportAck.handle(%CmsgMoveTeleportAck{guid: 1, counter: 7}, state)
 
@@ -15,7 +15,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgMoveTeleportAckTest do
     end
 
     test "does not restore a pet for a stale teleport acknowledgement" do
-      state = %Session{guid: 1, pending_movement_acks: %{7 => :teleport}}
+      state = %State{guid: 1, pending_movement_acks: %{7 => :teleport}}
 
       state = CmsgMoveTeleportAck.handle(%CmsgMoveTeleportAck{guid: 1, counter: 6}, state)
 
