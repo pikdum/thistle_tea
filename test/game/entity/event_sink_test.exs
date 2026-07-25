@@ -22,8 +22,21 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.WorldRef
 
+  defmodule UnsupportedEffect do
+    @moduledoc false
+    @enforce_keys [:value]
+    defstruct [:value]
+  end
+
   describe "emit/2" do
     setup [:metadata_fixtures]
+
+    test "raises for unsupported effects", %{mob: mob} do
+      assert_raise FunctionClauseError, fn ->
+        # credo:disable-for-next-line Credo.Check.Refactor.Apply
+        apply(EventSink, :emit, [mob, %UnsupportedEffect{value: :unexpected}])
+      end
+    end
 
     test "attacker_gained increments the target's attacker count", %{mob: mob, target_guid: target_guid} do
       assert ^mob = EventSink.emit(mob, Effects.attacker_gained(target_guid))
