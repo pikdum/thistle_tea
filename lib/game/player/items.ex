@@ -10,7 +10,6 @@ defmodule ThistleTea.Game.Player.Items do
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.InventoryUpdate
   alias ThistleTea.Game.Network.Message
-  alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.World.ItemStore
 
   def give(state, item_id, count) do
@@ -55,8 +54,8 @@ defmodule ThistleTea.Game.Player.Items do
   defp store_item(state, item, item_id, count) do
     case Inventory.store(state.character.player, state.guid, item, &ItemStore.get/1) do
       {:ok, result, placement} ->
-        {bag_slot, item_slot} = finish_placement(item, placement)
-        state = InventoryUpdate.apply(state, {:ok, result})
+        {bag_slot, item_slot} = InventoryUpdate.commit_placement(item, placement)
+        state = InventoryUpdate.apply(state, {:ok, result}, placement)
 
         Network.send_packet(%Message.SmsgItemPushResult{
           player_guid: state.guid,
@@ -73,17 +72,6 @@ defmodule ThistleTea.Game.Player.Items do
         ItemStore.delete(item.object.guid)
         system_message(state, "Inventory full.")
     end
-  end
-
-  defp finish_placement(_item, {:placed, {bag, slot}, placed}) do
-    ItemStore.put(placed)
-    Network.send_packet(UpdateObject.from_item(placed))
-    {bag, slot}
-  end
-
-  defp finish_placement(item, :merged) do
-    ItemStore.delete(item.object.guid)
-    {Inventory.bag_0(), 0xFFFFFFFF}
   end
 
   defp system_message(state, message) do

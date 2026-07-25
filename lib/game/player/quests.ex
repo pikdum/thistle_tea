@@ -20,7 +20,6 @@ defmodule ThistleTea.Game.Player.Quests do
   alias ThistleTea.Game.Network.InventoryUpdate
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Server
-  alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.Player.Mail
   alias ThistleTea.Game.Player.Stats, as: PlayerStats
   alias ThistleTea.Game.World.CharacterStore
@@ -287,8 +286,9 @@ defmodule ThistleTea.Game.Player.Quests do
       %DataItem{} = item ->
         case Inventory.store(state.character.player, guid, item, &ItemStore.get/1) do
           {:ok, result, placement} ->
-            state = InventoryUpdate.apply(state, {:ok, result})
-            send_item_push(state, item, placement, count)
+            placed_at = InventoryUpdate.commit_placement(item, placement)
+            state = InventoryUpdate.apply(state, {:ok, result}, placement)
+            send_item_push(state, item, placed_at, count)
             state
 
           _error ->
@@ -493,8 +493,9 @@ defmodule ThistleTea.Game.Player.Quests do
       %DataItem{} = item ->
         case Inventory.store(state.character.player, guid, item, &ItemStore.get/1) do
           {:ok, result, placement} ->
-            state = InventoryUpdate.apply(state, {:ok, result})
-            send_item_push(state, item, placement, count)
+            placed_at = InventoryUpdate.commit_placement(item, placement)
+            state = InventoryUpdate.apply(state, {:ok, result}, placement)
+            send_item_push(state, item, placed_at, count)
             {:ok, state}
 
           _error ->
@@ -507,19 +508,7 @@ defmodule ThistleTea.Game.Player.Quests do
     end
   end
 
-  defp send_item_push(state, item, placement, count) do
-    {bag_slot, item_slot} =
-      case placement do
-        {:placed, {bag, slot}, placed} ->
-          ItemStore.put(placed)
-          Network.send_packet(UpdateObject.from_item(placed))
-          {bag, slot}
-
-        :merged ->
-          ItemStore.delete(item.object.guid)
-          {Inventory.bag_0(), 0xFFFFFFFF}
-      end
-
+  defp send_item_push(state, %DataItem{} = item, {bag_slot, item_slot}, count) do
     Network.send_packet(%Message.SmsgItemPushResult{
       player_guid: state.guid,
       item_id: item.object.entry,

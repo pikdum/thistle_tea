@@ -16,7 +16,6 @@ defmodule ThistleTea.Game.Player.Mail do
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.InventoryUpdate
   alias ThistleTea.Game.Network.Message
-  alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.Party
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
@@ -211,8 +210,8 @@ defmodule ThistleTea.Game.Player.Mail do
          {:ok, result, placement} <- Inventory.store(character.player, state.guid, item, &ItemStore.get/1) do
       player = %{result.player | coinage: character.player.coinage - cod}
       state = put_mail(state, updated_mail)
-      finish_item_placement(item, placement)
-      state = InventoryUpdate.apply(state, {:ok, %{result | player: player}})
+      InventoryUpdate.commit_placement(item, placement)
+      state = InventoryUpdate.apply(state, {:ok, %{result | player: player}}, placement)
       pay_cod(mail, state.guid, cod)
 
       send_result(mail.id, @action_item_taken, @result_ok,
@@ -451,13 +450,6 @@ defmodule ThistleTea.Game.Player.Mail do
     %{state | character: %{character | internal: %{internal | mailbox: mailbox}}}
   end
 
-  defp finish_item_placement(_item, {:placed, _position, %Item{} = placed}) do
-    ItemStore.put(placed)
-    Network.send_packet(UpdateObject.from_item(placed))
-  end
-
-  defp finish_item_placement(%Item{} = item, :merged), do: ItemStore.delete(item.object.guid)
-
   defp store_text_item(state, %DataMail{} = mail) do
     case ItemStore.create(@body_item_entry, owner: state.guid) do
       %Item{} = item -> store_created_text_item(state, mail, item)
@@ -470,8 +462,8 @@ defmodule ThistleTea.Game.Player.Mail do
 
     case Inventory.store(state.character.player, state.guid, item, &ItemStore.get/1) do
       {:ok, result, placement} ->
-        finish_item_placement(item, placement)
-        state = InventoryUpdate.apply(state, {:ok, result})
+        InventoryUpdate.commit_placement(item, placement)
+        state = InventoryUpdate.apply(state, {:ok, result}, placement)
         mail = %{mail | checked: Bitwise.bor(mail.checked, MailLogic.checked_copied())}
         state = put_mail(state, mail)
         send_result(mail.id, @action_made_permanent, @result_ok)

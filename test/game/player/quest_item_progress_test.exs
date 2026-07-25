@@ -9,10 +9,12 @@ defmodule ThistleTea.Game.Player.QuestItemProgressTest do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.ItemTemplate
   alias ThistleTea.Game.Entity.Data.Quest
+  alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Entity.Logic.QuestLog
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.InventoryUpdate
   alias ThistleTea.Game.Network.Message
+  alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.Player.Quests
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.ItemStore
@@ -66,6 +68,34 @@ defmodule ThistleTea.Game.Player.QuestItemProgressTest do
 
     assert_received {:"$gen_cast",
                      {:send_packet, %Message.SmsgQuestupdateAddItem{item_id: @item_id, count: 1} = _progress}}
+  end
+
+  test "the progress packet precedes the item's create block", %{character: character, player_guid: player_guid} do
+    item = ItemStore.create(grape_template(), owner: player_guid)
+    on_exit(fn -> ItemStore.delete(item.object.guid) end)
+
+    placement = {:placed, {Inventory.bag_0(), 0}, item}
+    player = %{character.player | inv1: item.object.guid}
+    state = %{character: character, guid: player_guid}
+
+    InventoryUpdate.commit_placement(item, placement)
+    InventoryUpdate.apply(state, {:ok, %{player: player, items: [], destroyed: []}}, placement)
+
+    sent = sent_packets()
+    progress_at = Enum.find_index(sent, &match?(%Message.SmsgQuestupdateAddItem{count: 1}, &1))
+    create_at = Enum.find_index(sent, &match?(%UpdateObject{update_type: :create_object2, object_type: :item}, &1))
+
+    assert is_integer(progress_at) and is_integer(create_at)
+    assert progress_at < create_at
+  end
+
+  defp sent_packets(acc \\ []) do
+    receive do
+      {:"$gen_cast", {:send_packet, packet}} -> sent_packets([packet | acc])
+      {:"$gen_cast", {:send_packet, packet, _opts}} -> sent_packets([packet | acc])
+    after
+      0 -> Enum.reverse(acc)
+    end
   end
 
   test "merging into an existing stack still reports the delta", %{

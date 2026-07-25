@@ -61,9 +61,9 @@ defmodule ThistleTea.Game.Network.Message.CmsgBuyItem do
 
     case Inventory.store(c.player, state.guid, item, &ItemStore.get/1) do
       {:ok, result, placement} ->
-        {bag_slot, item_slot} = finish_placement(item, placement)
+        {bag_slot, item_slot} = InventoryUpdate.commit_placement(item, placement)
         player = %{result.player | coinage: c.player.coinage - price}
-        state = InventoryUpdate.apply(state, {:ok, %{result | player: player}})
+        state = InventoryUpdate.apply(state, {:ok, %{result | player: player}}, placement)
 
         Network.send_packet(%Message.SmsgBuyItem{
           vendor_guid: message.vendor_guid,
@@ -87,17 +87,6 @@ defmodule ThistleTea.Game.Network.Message.CmsgBuyItem do
         send_buy_failed(message, :cant_carry_more)
         state
     end
-  end
-
-  defp finish_placement(_item, {:placed, {bag, slot}, placed}) do
-    ItemStore.put(placed)
-    Network.send_packet(UpdateObject.from_item(placed))
-    {bag, slot}
-  end
-
-  defp finish_placement(item, :merged) do
-    ItemStore.delete(item.object.guid)
-    {Inventory.bag_0(), 0xFFFFFFFF}
   end
 
   defp send_buy_failed(%__MODULE__{vendor_guid: vendor_guid, item_id: item_id}, error) do

@@ -39,10 +39,10 @@ defmodule ThistleTea.Game.Network.Message.CmsgAutostoreLootItem do
 
     case item && Inventory.store(c.player, state.guid, item, &ItemStore.get/1) do
       {:ok, result, placement} ->
-        finish_placement(item, placement)
-        state = InventoryUpdate.apply(state, {:ok, result})
+        placed_at = InventoryUpdate.commit_placement(item, placement)
+        state = InventoryUpdate.apply(state, {:ok, result}, placement)
         Network.send_packet(%Message.SmsgLootRemoved{slot: loot_slot})
-        send_push_result(state, loot_item.item_id, loot_item.count, placement)
+        send_push_result(state, loot_item.item_id, loot_item.count, placed_at)
         state
 
       _ ->
@@ -53,22 +53,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgAutostoreLootItem do
     end
   end
 
-  defp finish_placement(_item, {:placed, _pos, placed}) do
-    ItemStore.put(placed)
-    Network.send_packet(UpdateObject.from_item(placed))
-  end
-
-  defp finish_placement(item, :merged) do
-    ItemStore.delete(item.object.guid)
-  end
-
-  defp send_push_result(state, item_id, count, placement) do
-    {bag_slot, item_slot} =
-      case placement do
-        {:placed, {bag, slot}, _placed} -> {bag, slot}
-        :merged -> {Inventory.bag_0(), 0xFFFFFFFF}
-      end
-
+  defp send_push_result(state, item_id, count, {bag_slot, item_slot}) do
     Network.send_packet(%Message.SmsgItemPushResult{
       player_guid: state.guid,
       item_id: item_id,

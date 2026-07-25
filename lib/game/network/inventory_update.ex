@@ -3,8 +3,14 @@ defmodule ThistleTea.Game.Network.InventoryUpdate do
   Applies the result of a pure inventory operation to the player session:
   sends item create/values updates on success or the inventory-change-failure
   packet on error.
+
+  All outbound packets for an inventory change are emitted here so their order
+  stays fixed: quest objective progress first, then destroys, the create block
+  for a newly placed item, item values, and the player's own values. The client
+  renders the "Item: x/y" popup as its current count plus the packet's count,
+  so a create block ahead of the progress packet shows one too many.
   """
-  import Kernel, except: [apply: 2]
+  import Kernel, except: [apply: 2, apply: 3]
 
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Player
@@ -18,11 +24,13 @@ defmodule ThistleTea.Game.Network.InventoryUpdate do
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.ItemStore
 
-  def apply(state, {:ok, %Player{} = player}) do
-    apply(state, {:ok, %{player: player, items: [], destroyed: []}})
+  def apply(state, result, placement \\ nil)
+
+  def apply(state, {:ok, %Player{} = player}, placement) do
+    apply(state, {:ok, %{player: player, items: [], destroyed: []}}, placement)
   end
 
-  def apply(state, {:ok, %{player: %Player{} = player, items: items} = result}) do
+  def apply(state, {:ok, %{player: %Player{} = player, items: items} = result}, placement) do
     old_counts = Quests.quest_item_counts(state.character)
     destroyed = Map.get(result, :destroyed, [])
 
@@ -42,6 +50,8 @@ defmodule ThistleTea.Game.Network.InventoryUpdate do
       Network.send_packet(%Message.SmsgDestroyObject{guid: item.object.guid})
     end)
 
+    send_created(placement)
+
     Enum.each(items, fn item ->
       item
       |> UpdateObject.item_values_update()
@@ -58,10 +68,28 @@ defmodule ThistleTea.Game.Network.InventoryUpdate do
     state
   end
 
-  def apply(state, {:error, error, item1_guid, item2_guid}) do
+  def apply(state, {:error, error, item1_guid, item2_guid}, _placement) do
     send_failure(error, item1_guid, item2_guid)
     state
   end
+
+  def commit_placement(%Item{} = item, placement) do
+    case placement do
+      {:placed, {bag, slot}, placed} ->
+        ItemStore.put(placed)
+        {bag, slot}
+
+      :merged ->
+        ItemStore.delete(item.object.guid)
+        {Inventory.bag_0(), 0xFFFFFFFF}
+    end
+  end
+
+  defp send_created({:placed, _pos, placed}) do
+    Network.send_packet(UpdateObject.from_item(placed))
+  end
+
+  defp send_created(_placement), do: :ok
 
   def send_failure(error, item1_guid, item2_guid) do
     Network.send_packet(%SmsgInventoryChangeFailure{
