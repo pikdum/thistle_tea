@@ -68,30 +68,11 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
       assert_receive {:"$gen_cast", {:threat_ref_gained, ^mob_guid, 7}}
     end
 
-    test "dismiss_pet clears the recall entry on a normal dismissal" do
+    test "dismiss_pet stops the transitioned pet without mutating the owner" do
       character = character_with_pet()
+      effect = Effects.dismiss_pet(character.unit.summon)
 
-      dismissed = EventSink.emit(character, Effects.dismiss_pet(character.object.guid))
-
-      assert dismissed.unit.summon == 0
-      assert dismissed.internal.active_pet_entry == nil
-      assert dismissed.internal.active_pet_spell_id == nil
-    end
-
-    test "dismiss_pet keeps the recall entry when the owner died" do
-      character = character_with_pet()
-
-      dismissed = EventSink.emit(character, Effects.dismiss_pet(character.object.guid, :owner_died))
-
-      assert dismissed.unit.summon == 0
-      assert dismissed.internal.active_pet_entry == 416
-      assert dismissed.internal.active_pet_spell_id == 688
-    end
-
-    test "dismiss_pet clears the owner's pet action bar" do
-      character = character_with_pet()
-
-      EventSink.emit(character, Effects.dismiss_pet(character.object.guid, :owner_died))
+      assert ^character = EventSink.emit(character, effect)
 
       assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgPetSpells{pet_guid: 0}}}
     end

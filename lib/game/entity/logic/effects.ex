@@ -315,8 +315,6 @@ defmodule ThistleTea.Game.Entity.Logic.Effects do
     %{entity | internal: %{internal | events: [effect]}}
   end
 
-  def enqueue(entity, _event), do: entity
-
   def teleport({_x, _y, _z, _o} = position) do
     %Effects.Teleport{position: position}
   end
@@ -492,8 +490,8 @@ defmodule ThistleTea.Game.Entity.Logic.Effects do
     %Effects.TameCreature{source_guid: owner_guid, entry: entry}
   end
 
-  def dismiss_pet(owner_guid, reason \\ nil) when is_integer(owner_guid) do
-    %Effects.DismissPet{source_guid: owner_guid, reason: reason}
+  def dismiss_pet(pet_guid) when is_integer(pet_guid) do
+    %Effects.DismissPet{target_guid: pet_guid}
   end
 
   def summon_totem(entry, slot, duration_ms)

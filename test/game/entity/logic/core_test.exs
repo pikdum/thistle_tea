@@ -100,10 +100,12 @@ defmodule ThistleTea.Game.Entity.Logic.CoreTest do
       {entity, _absorbed} = Core.take_damage_with_absorb(entity, 30, 1_000, source: 777)
 
       assert Core.dead?(entity)
+      assert entity.unit.summon == 0
+      assert entity.internal.active_pet_entry == nil
 
       assert Enum.any?(
                entity.internal.events,
-               &match?(%Effects.DismissPet{source_guid: 6, reason: :owner_died}, &1)
+               &match?(%Effects.DismissPet{target_guid: 123}, &1)
              )
     end
 

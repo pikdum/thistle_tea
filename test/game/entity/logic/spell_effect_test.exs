@@ -916,7 +916,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
 
       character = %{
         character
-        | unit: %{character.unit | health: 100},
+        | unit: %{character.unit | health: 100, summon: 44},
           internal: %{character.internal | active_pet_entry: 1234}
       }
 
@@ -931,8 +931,10 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
       assert [%Effects.SummonPet{entry: 1234, spell_id: 982}] = events
 
       dismiss_pet = %Spell{id: 2641, effects: [%Effect{index: 0, type: :dismiss_pet}]}
-      {_character, events} = SpellEffect.receive(character, context, dismiss_pet, 1_000)
-      assert [%Effects.DismissPet{source_guid: 1}] = events
+      {character, events} = SpellEffect.receive(character, context, dismiss_pet, 1_000)
+      assert character.unit.summon == 0
+      assert character.internal.active_pet_entry == nil
+      assert [%Effects.DismissPet{target_guid: 44}] = events
     end
 
     test "totem effects preserve their elemental summon slot" do

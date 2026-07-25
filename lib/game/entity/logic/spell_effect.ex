@@ -18,6 +18,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   alias ThistleTea.Game.Entity.Logic.Hunter
   alias ThistleTea.Game.Entity.Logic.Mage
   alias ThistleTea.Game.Entity.Logic.Paladin
+  alias ThistleTea.Game.Entity.Logic.Pet
   alias ThistleTea.Game.Entity.Logic.PlayerCombat
   alias ThistleTea.Game.Entity.Logic.Reactive
   alias ThistleTea.Game.Entity.Logic.Resources
@@ -412,14 +413,8 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
     {state, [Effects.summon_pet(caster_guid, entry, spell_id)]}
   end
 
-  defp apply_effect(
-         %Character{} = state,
-         %CastContext{caster_guid: caster_guid},
-         _spell,
-         %Effect{type: :dismiss_pet},
-         _now
-       ) do
-    {state, [Effects.dismiss_pet(caster_guid)]}
+  defp apply_effect(%Character{} = state, %CastContext{}, _spell, %Effect{type: :dismiss_pet}, _now) do
+    Pet.dismiss(state)
   end
 
   defp apply_effect(state, %CastContext{}, spell, %Effect{type: :summon_game_object, misc_value: entry}, _now)

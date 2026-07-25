@@ -17,7 +17,7 @@ defmodule ThistleTea.Game.Entity.Logic.Effects.SummonTypes do
     {:ViewpointReleased, [:source_guid, :target_guid], []},
     {:SummonPet, [:source_guid, :entry, :spell_id], []},
     {:TameCreature, [:source_guid, :entry], []},
-    {:DismissPet, [:source_guid], [reason: nil]},
+    {:DismissPet, [:target_guid], []},
     {:SummonTotem, [:entry, :slot, :duration_ms], []},
     {:DespawnSelf, [:duration_ms, :respawn_delay_ms], []}
   ]

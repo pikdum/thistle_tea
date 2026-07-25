@@ -23,6 +23,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
   alias ThistleTea.Game.Entity.Logic.Dueling
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Movement
+  alias ThistleTea.Game.Entity.Logic.Pet
   alias ThistleTea.Game.Entity.Logic.Reactive
   alias ThistleTea.Game.Entity.Logic.Resources
   alias ThistleTea.Game.Entity.Logic.Threat
@@ -317,9 +318,9 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
     |> Combat.sync_combat_flag()
   end
 
-  defp maybe_dismiss_pet(%{player: _player, object: %{guid: guid}, unit: %Unit{summon: summon}} = entity)
-       when is_integer(summon) and summon > 0 do
-    Effects.enqueue(entity, Effects.dismiss_pet(guid, :owner_died))
+  defp maybe_dismiss_pet(%{player: _player} = entity) do
+    {entity, effects} = Pet.dismiss(entity, :owner_died)
+    Effects.enqueue(entity, effects)
   end
 
   defp maybe_dismiss_pet(entity), do: entity
