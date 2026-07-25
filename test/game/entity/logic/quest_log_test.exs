@@ -107,7 +107,7 @@ defmodule ThistleTea.Game.Entity.Logic.QuestLogTest do
       {:ok, quest_log} = QuestLog.add(%{}, 33)
       {:ok, quest_log, _credit} = QuestLog.increment_kill(quest_log, quest, 299)
 
-      assert {^quest_log, :unchanged} = QuestLog.evaluate(quest_log, quest, fn 750 -> 1 end)
+      assert {quest_log, :counts_changed} = QuestLog.evaluate(quest_log, quest, fn 750 -> 1 end)
 
       assert {quest_log, :completed} = QuestLog.evaluate(quest_log, quest, fn 750 -> 2 end)
       assert %Entry{status: :complete} = QuestLog.get(quest_log, 33)
@@ -150,8 +150,55 @@ defmodule ThistleTea.Game.Entity.Logic.QuestLogTest do
       {:ok, quest_log} = QuestLog.add(%{}, 62)
       {:ok, quest_log} = QuestLog.mark_explored(quest_log, 62)
 
-      assert {^quest_log, :unchanged} = QuestLog.evaluate(quest_log, quest, fn 750 -> 1 end)
+      assert {quest_log, :counts_changed} = QuestLog.evaluate(quest_log, quest, fn 750 -> 1 end)
       assert {_quest_log, :completed} = QuestLog.evaluate(quest_log, quest, fn 750 -> 2 end)
+    end
+  end
+
+  describe "sync_item_counts/3" do
+    test "stores the carried count so the quest-slot field reports item progress" do
+      quest = %Quest{id: 33, required_items: [{0, 750, 8}]}
+      {:ok, quest_log} = QuestLog.add(%{}, 33)
+
+      assert {quest_log, true} = QuestLog.sync_item_counts(quest_log, quest, fn 750 -> 1 end)
+      assert %Entry{counts: %{0 => 1}} = QuestLog.get(quest_log, 33)
+
+      assert {^quest_log, false} = QuestLog.sync_item_counts(quest_log, quest, fn 750 -> 1 end)
+    end
+
+    test "clamps to the required count" do
+      quest = %Quest{id: 33, required_items: [{0, 750, 8}]}
+      {:ok, quest_log} = QuestLog.add(%{}, 33)
+
+      {quest_log, true} = QuestLog.sync_item_counts(quest_log, quest, fn 750 -> 20 end)
+
+      assert %Entry{counts: %{0 => 8}} = QuestLog.get(quest_log, 33)
+    end
+
+    test "places item counters after the creature objectives" do
+      quest = %Quest{
+        id: 33,
+        required_kills: [{0, 299, 4}],
+        required_items: [{0, 750, 8}],
+        objective_slots: [
+          %{creature_or_go_id: 299, creature_or_go_count: 4, item_id: 750, item_count: 8},
+          %{creature_or_go_id: 0, creature_or_go_count: 0, item_id: 0, item_count: 0}
+        ]
+      }
+
+      {:ok, quest_log} = QuestLog.add(%{}, 33)
+      {:ok, quest_log, _credit} = QuestLog.increment_kill(quest_log, quest, 299)
+      {quest_log, true} = QuestLog.sync_item_counts(quest_log, quest, fn 750 -> 3 end)
+
+      assert %Entry{counts: %{0 => 1, 1 => 3}} = QuestLog.get(quest_log, 33)
+    end
+
+    test "evaluate reports a counts-only change so the field gets broadcast" do
+      quest = %Quest{id: 33, required_items: [{0, 750, 8}]}
+      {:ok, quest_log} = QuestLog.add(%{}, 33)
+
+      assert {quest_log, :counts_changed} = QuestLog.evaluate(quest_log, quest, fn 750 -> 1 end)
+      assert {^quest_log, :unchanged} = QuestLog.evaluate(quest_log, quest, fn 750 -> 1 end)
     end
   end
 

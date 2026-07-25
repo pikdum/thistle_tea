@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.Player.QuestItemProgressTest do
   alias ThistleTea.Game.Network.InventoryUpdate
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Player.Quests
+  alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader
   alias ThistleTea.Game.World.Metadata
@@ -30,10 +31,15 @@ defmodule ThistleTea.Game.Player.QuestItemProgressTest do
     :ets.insert(QuestLoader, {{:quest, @quest_id}, quest})
     on_exit(fn -> :ets.delete(QuestLoader, {:quest, @quest_id}) end)
 
+    CharacterStore.init()
+
     {:ok, quest_log} = QuestLog.add(%{}, @quest_id)
-    player_guid = Guid.from_low_guid(:player, System.unique_integer([:positive, :monotonic]))
+    character_id = System.unique_integer([:positive, :monotonic])
+    player_guid = Guid.from_low_guid(:player, character_id)
+    on_exit(fn -> :ets.delete(CharacterStore, character_id) end)
 
     character = %Character{
+      id: character_id,
       object: %Object{guid: player_guid},
       unit: %Unit{race: 1, class: 8, level: 1, health: 50, max_health: 50},
       player: %Player{quest_log: quest_log},
