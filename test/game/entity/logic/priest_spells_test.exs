@@ -187,7 +187,7 @@ defmodule ThistleTea.Game.Entity.Logic.PriestSpellsTest do
       context = %CastContext{caster_guid: 999, caster_level: 10}
       {target, _events} = SpellEffect.receive(mob_fixture(), context, power_word_shield_fixture(), 1_000)
 
-      {target, remaining} = Aura.absorb_damage(target, 30, :shadow)
+      {target, remaining} = Aura.absorb_damage(target, 30, :shadow, 2_000)
 
       assert remaining == 0
       assert Aura.has_spell?(target, 17)

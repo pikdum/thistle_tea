@@ -8,16 +8,16 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Absorption do
   alias ThistleTea.Game.Aura
   alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.Component.Unit
-  alias ThistleTea.Game.Entity.Logic.Aura.HolderSync
-  alias ThistleTea.Game.Entity.Logic.Core
+  alias ThistleTea.Game.Entity.Logic.Aura.Change
+  alias ThistleTea.Game.Entity.Logic.Aura.Transition
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Spell
 
   @mana_per_absorbed_damage 2
   @absorb_auras [:school_absorb, :mana_shield]
 
-  def absorb_damage(%{unit: %Unit{auras: holders}} = entity, damage, school)
-      when is_list(holders) and holders != [] and is_integer(damage) and damage > 0 do
+  def absorb_damage(%{unit: %Unit{auras: holders}} = entity, damage, school, now)
+      when is_list(holders) and holders != [] and is_integer(damage) and damage > 0 and is_integer(now) do
     school_mask = Spell.school_mask(school)
 
     {entity, remaining, new_holders} =
@@ -28,21 +28,13 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Absorption do
 
     kept = new_holders |> Enum.reverse() |> Enum.reject(&exhausted_absorb?/1)
 
-    entity =
-      if kept == holders do
-        entity
-      else
-        {entity, modifier_events} = HolderSync.sync(entity, kept)
+    {entity, transition_events} =
+      Transition.run(entity, %Change{holders: kept, cause: :consumed, now: now})
 
-        entity
-        |> Effects.enqueue(modifier_events)
-        |> Core.mark_broadcast_update()
-      end
-
-    {entity, remaining}
+    {Effects.enqueue(entity, transition_events), remaining}
   end
 
-  def absorb_damage(entity, damage, _school), do: {entity, damage}
+  def absorb_damage(entity, damage, _school, _now), do: {entity, damage}
 
   defp absorb_with_holder(entity, damage, %Holder{auras: auras} = holder, school_mask) do
     {entity, damage, new_auras} =

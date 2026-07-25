@@ -61,7 +61,7 @@ defmodule ThistleTea.Game.Entity.Logic.DuelingTest do
       }
 
       {character, events} =
-        Dueling.finish(character, %{opponent_guid: 2, opponent_pet_guid: 20, started_at: 4_000})
+        Dueling.finish(character, %{opponent_guid: 2, opponent_pet_guid: 20, started_at: 4_000, now: 6_000})
 
       assert Enum.map(character.unit.auras, & &1.spell.id) == [10, 13]
       assert character.unit.target == 0

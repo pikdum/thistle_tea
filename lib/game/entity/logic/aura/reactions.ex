@@ -6,13 +6,12 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
   alias ThistleTea.Game.Aura
   alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.Component.Unit
-  alias ThistleTea.Game.Entity.Logic.Aura.HolderSync
+  alias ThistleTea.Game.Entity.Logic.Aura.Change
   alias ThistleTea.Game.Entity.Logic.Aura.Script
-  alias ThistleTea.Game.Entity.Logic.Core
+  alias ThistleTea.Game.Entity.Logic.Aura.Transition
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
-  alias ThistleTea.Game.Spell.Cooldowns
   alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.Spell.Proc
   alias ThistleTea.Game.Spell.Scripts
@@ -42,7 +41,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
         {holder, events ++ holder_events}
       end)
 
-    {entity, removal_events} = sync_removals(entity, Enum.reject(holders, &is_nil/1), context)
+    {entity, removal_events} = transition_holders(entity, Enum.reject(holders, &is_nil/1), context)
     {entity, events ++ removal_events}
   end
 
@@ -74,7 +73,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
         )
       end)
 
-    {entity, removal_events} = sync_removals(entity, holders, context)
+    {entity, removal_events} = transition_holders(entity, holders, context)
     {entity, events ++ removal_events}
   end
 
@@ -98,7 +97,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
         {holder, events ++ holder_events}
       end)
 
-    {entity, removal_events} = sync_removals(entity, Enum.reject(holders, &is_nil/1), context)
+    {entity, removal_events} = transition_holders(entity, Enum.reject(holders, &is_nil/1), context)
     {entity, events ++ removal_events}
   end
 
@@ -120,7 +119,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
         incoming_spell_transition(current_holders, events, holder, owner_guid, attacker_guid, context)
       end)
 
-    {entity, removal_events} = sync_removals(entity, holders, context)
+    {entity, removal_events} = transition_holders(entity, holders, context)
     {entity, events ++ removal_events}
   end
 
@@ -135,7 +134,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
         kill_proc_transition(current_holders, events, holder, owner_guid, context)
       end)
 
-    {entity, removal_events} = sync_removals(entity, holders, context)
+    {entity, removal_events} = transition_holders(entity, holders, context)
     {entity, events ++ removal_events}
   end
 
@@ -261,29 +260,9 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
     List.replace_at(holders, Enum.find_index(holders, &(&1 == holder)), updated)
   end
 
-  defp sync_holders(%{unit: %Unit{auras: current}} = entity, current), do: {entity, []}
-
-  defp sync_holders(%{unit: %Unit{}} = entity, holders) do
-    {entity, events} = HolderSync.sync(entity, holders)
-    {Core.mark_broadcast_update(entity), events}
-  end
-
-  defp sync_removals(%{unit: %Unit{auras: previous}} = entity, holders, context) do
-    removed = previous -- holders
-    {entity, modifier_events} = sync_holders(entity, holders)
-
-    case {removed, Map.get(context, :now)} do
-      {[], _now} ->
-        {entity, modifier_events}
-
-      {removed, now} when is_integer(now) ->
-        script_events = Script.after_remove(entity, removed)
-        {entity, cooldown_events} = Cooldowns.activate_on_event(entity, removed, now)
-        {entity, modifier_events ++ script_events ++ cooldown_events}
-
-      {removed, _now} ->
-        {entity, modifier_events ++ Script.after_remove(entity, removed)}
-    end
+  defp transition_holders(entity, holders, context) do
+    now = Map.get(context, :now, 0)
+    Transition.run(entity, %Change{holders: holders, cause: :consumed, now: now})
   end
 
   defp spend_hit_charge(%Holder{charges: charges} = holder) when is_integer(charges) do

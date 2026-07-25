@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Party.Group
   alias ThistleTea.Game.Party.Notifier
+  alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.AggroProbe
   alias ThistleTea.Game.World.CharacterStore
@@ -81,7 +82,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
     state =
       if state.guid && state.character do
         DuelSystem.disconnect(state.guid)
-        %{state | character: Dueling.abandon(state.character)}
+        %{state | character: Dueling.abandon(state.character, Time.now())}
       else
         state
       end

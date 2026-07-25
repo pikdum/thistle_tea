@@ -3,26 +3,14 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
   Applies a cast spell's auras to an entity: builds the holder from the
   spell's aura effects (channeled periodic triggers are excluded — those tick
   through the channel, not as auras), enforces rank, same-source, exclusive-
-  category, and mechanic-immunity stacking rules, and allocates display slots
-  via upsert-or-refresh.
+  category, and mechanic-immunity stacking rules before handing the desired
+  holders to the transition funnel.
   """
-  import Bitwise, only: [&&&: 2]
-
   alias ThistleTea.Game.Aura
   alias ThistleTea.Game.Aura.Holder
-  alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Unit
-  alias ThistleTea.Game.Entity.Logic.Aura.ControlSync
-  alias ThistleTea.Game.Entity.Logic.Aura.HolderSync
-  alias ThistleTea.Game.Entity.Logic.Aura.Lifecycle
-  alias ThistleTea.Game.Entity.Logic.Aura.MovementSync
-  alias ThistleTea.Game.Entity.Logic.Aura.ObjectSync
-  alias ThistleTea.Game.Entity.Logic.Aura.PlayerSync
-  alias ThistleTea.Game.Entity.Logic.Aura.StealthSync
-  alias ThistleTea.Game.Entity.Logic.Aura.UnitSync
-  alias ThistleTea.Game.Entity.Logic.Aura.ViewpointSync
-  alias ThistleTea.Game.Entity.Logic.Core
-  alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Logic.Aura.Change
+  alias ThistleTea.Game.Entity.Logic.Aura.Transition
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Coefficient
@@ -44,7 +32,6 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
     :mod_taunt
   ]
 
-  @aura_interrupt_not_seated 0x40000
   @ignite_dot 12_654
   @ignite_max_stacks 5
 
@@ -59,8 +46,6 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
     :periodic_trigger_spell,
     :obs_mod_health
   ]
-
-  @stand_state_sit 1
 
   def apply_spell(entity, %CastContext{} = context, %Spell{} = spell, now) when is_integer(now) do
     case build_auras(entity, context, spell, now) do
@@ -154,7 +139,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
         {entity, []}
 
       blocked_by_mechanic_immunity?(existing, holder.spell) ->
-        {consume_immunity_charge(entity, holder.spell), []}
+        consume_immunity_charge(entity, holder.spell, now)
 
       blocked_by_dispel_immunity?(existing, holder.spell.dispel_type) ->
         {entity, []}
@@ -165,12 +150,10 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
   end
 
   defp do_apply(entity, %Holder{} = holder, now) do
-    do_apply(%{entity | unit: %{entity.unit | auras: []}}, holder, now)
+    do_apply_unblocked(entity, [], holder, now)
   end
 
   defp do_apply_unblocked(entity, existing, %Holder{} = holder, now) do
-    previous_holders = existing
-
     existing =
       existing
       |> remove_immune_mechanics(holder)
@@ -184,116 +167,8 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
         |> upsert_holder(holder)
       end
 
-    {entity, modifier_events} = HolderSync.sync(entity, holders)
-
-    {entity, sit_events} =
-      entity
-      |> ObjectSync.sync()
-      |> PlayerSync.sync()
-      |> StealthSync.sync()
-      |> maybe_reset_shapeshift_power(holder)
-      |> maybe_heal_increased_health(holder)
-      |> maybe_interrupt_casting(holder)
-      |> maybe_sit(holder)
-
-    {entity, control_events} = ControlSync.sync(entity, now)
-    {entity, events} = MovementSync.sync_movement_state(entity, now)
-    viewpoint_events = ViewpointSync.events(previous_holders, holders, entity_guid(entity))
-    duration_events = applied_duration_events(entity, holder, now)
-    shapeshift_events = shapeshift_talent_events(entity, holder)
-
-    {Core.mark_broadcast_update(entity),
-     modifier_events ++
-       sit_events ++
-       control_events ++
-       viewpoint_events ++
-       events ++
-       duration_events ++
-       shapeshift_events}
+    Transition.run(entity, %Change{holders: holders, cause: :applied, now: now})
   end
-
-  @cat_form 1
-  @feral_forms [1, 5, 8]
-  @leader_of_the_pack 17_007
-  @leader_of_the_pack_aura 24_932
-  @furor_talents [17_056, 17_058, 17_059, 17_060, 17_061]
-  @furor_energize 17_099
-  @furor_rage 17_057
-
-  defp shapeshift_talent_events(%{object: %{guid: guid}, unit: %Unit{} = unit} = entity, %Holder{} = holder) do
-    case shapeshift_form_misc(holder) do
-      form when form in @feral_forms ->
-        leader_of_the_pack_events(entity, guid, unit.level) ++ furor_events(entity, guid, unit.level, form)
-
-      form when is_integer(form) ->
-        [Effects.remove_aura(guid, guid, @leader_of_the_pack_aura)]
-
-      _no_form ->
-        []
-    end
-  end
-
-  defp shapeshift_form_misc(%Holder{auras: auras}) do
-    Enum.find_value(auras, fn
-      %Aura{type: :mod_shapeshift, misc_value: misc} when is_integer(misc) and misc > 0 -> misc
-      _aura -> nil
-    end)
-  end
-
-  defp leader_of_the_pack_events(entity, guid, level) do
-    if holder_spell?(entity, @leader_of_the_pack) do
-      [Effects.trigger_spell(guid, level || 1, guid, @leader_of_the_pack_aura)]
-    else
-      []
-    end
-  end
-
-  defp furor_events(entity, guid, level, form) do
-    chance = furor_chance(entity)
-
-    if chance > 0 and :rand.uniform(100) <= chance do
-      spell_id = if form == @cat_form, do: @furor_energize, else: @furor_rage
-      [Effects.trigger_spell(guid, level || 1, guid, spell_id)]
-    else
-      []
-    end
-  end
-
-  defp furor_chance(%{unit: %Unit{auras: holders}}) when is_list(holders) do
-    Enum.find_value(holders, 0, fn
-      %Holder{spell: %Spell{id: id}, auras: auras} when id in @furor_talents ->
-        Enum.find_value(auras, fn
-          %Aura{type: :dummy, amount: amount} when is_integer(amount) -> amount
-          _aura -> nil
-        end)
-
-      _holder ->
-        nil
-    end)
-  end
-
-  defp furor_chance(_entity), do: 0
-
-  defp holder_spell?(%{unit: %Unit{auras: holders}}, spell_id) when is_list(holders) do
-    Enum.any?(holders, &match?(%Holder{spell: %Spell{id: ^spell_id}}, &1))
-  end
-
-  defp holder_spell?(_entity, _spell_id), do: false
-
-  defp applied_duration_events(
-         %Character{unit: %Unit{auras: holders}},
-         %Holder{spell: %Spell{id: spell_id}, caster_guid: caster_guid},
-         now
-       ) do
-    holders
-    |> Enum.find(&Holder.same_source?(&1, spell_id, caster_guid))
-    |> Lifecycle.duration_event(now)
-  end
-
-  defp applied_duration_events(_entity, _holder, _now), do: []
-
-  defp entity_guid(%{object: %{guid: guid}}), do: guid
-  defp entity_guid(_entity), do: nil
 
   defp remove_non_stacking(holders, %Holder{} = incoming) do
     shapeshift? = Holder.has_aura_type?(incoming, :mod_shapeshift)
@@ -393,20 +268,14 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
     Enum.any?(auras, &match?(%Aura{type: :mechanic_immunity, misc_value: ^mechanic}, &1))
   end
 
-  defp consume_immunity_charge(%{unit: %Unit{auras: holders}} = entity, %Spell{mechanic: mechanic}) do
+  defp consume_immunity_charge(%{unit: %Unit{auras: holders}} = entity, %Spell{mechanic: mechanic}, now) do
     case Enum.find_index(holders, &(&1.charges != nil and immunity_holder_for_mechanic?(&1, mechanic))) do
       nil ->
-        entity
+        {entity, []}
 
       index ->
         holders = spend_holder_charge(holders, index)
-
-        {entity, modifier_events} = HolderSync.sync(entity, holders)
-
-        entity
-        |> PlayerSync.sync()
-        |> Effects.enqueue(modifier_events)
-        |> Core.mark_broadcast_update()
+        Transition.run(entity, %Change{holders: holders, cause: :consumed, now: now})
     end
   end
 
@@ -448,15 +317,14 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
 
     case index do
       nil ->
-        slot = UnitSync.display_slot(existing, incoming)
-        existing ++ [%{incoming | slot: slot}]
+        existing ++ [%{incoming | slot: nil}]
 
       index ->
         old = Enum.at(existing, index)
 
         refreshed = %{
           incoming
-          | slot: old.slot,
+          | slot: nil,
             stacks: next_stacks(old, incoming),
             next_proc_at: old.next_proc_at,
             auras: carry_tick_times(old.auras, incoming.auras)
@@ -469,8 +337,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
   defp upsert_ignite(existing, %Holder{} = incoming) do
     case Enum.find_index(existing, &match?(%Holder{spell: %Spell{id: @ignite_dot}}, &1)) do
       nil ->
-        slot = UnitSync.display_slot(existing, incoming)
-        existing ++ [%{incoming | slot: slot}]
+        existing ++ [%{incoming | slot: nil}]
 
       index ->
         current = Enum.at(existing, index)
@@ -546,81 +413,6 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
       end
     end)
   end
-
-  defp maybe_reset_shapeshift_power(%{unit: %Unit{} = unit} = entity, %Holder{} = holder) do
-    cond do
-      not Holder.has_aura_type?(holder, :mod_shapeshift) ->
-        entity
-
-      cat_form?(holder) and unit.class == 11 ->
-        %{entity | unit: %{unit | power4: 0}}
-
-      unit.power_type == 1 and is_integer(unit.power2) and unit.power2 > 0 ->
-        %{entity | unit: %{unit | power2: min(unit.power2, retained_stance_rage(entity))}}
-
-      true ->
-        entity
-    end
-  end
-
-  defp maybe_reset_shapeshift_power(entity, _holder), do: entity
-
-  @tactical_mastery_scripts 831..835
-
-  defp retained_stance_rage(entity) do
-    entity
-    |> ThistleTea.Game.Entity.Logic.Aura.auras_of_type(:override_class_scripts)
-    |> Enum.reduce(0, fn
-      %Aura{misc_value: misc}, best when misc in @tactical_mastery_scripts -> max(best, (misc - 830) * 50)
-      _aura, best -> best
-    end)
-  end
-
-  defp cat_form?(%Holder{auras: auras}) do
-    Enum.any?(auras, &match?(%Aura{type: :mod_shapeshift, misc_value: 1}, &1))
-  end
-
-  @cast_breaking_controls [:mod_stun, :mod_fear, :mod_confuse]
-
-  defp maybe_interrupt_casting(%{internal: %{casting: casting}} = entity, %Holder{} = holder)
-       when not is_nil(casting) do
-    cond do
-      Holder.has_any_type?(holder, @cast_breaking_controls) -> clear_casting(entity)
-      Holder.has_aura_type?(holder, :mod_silence) and silenceable_cast?(casting) -> clear_casting(entity)
-      true -> entity
-    end
-  end
-
-  defp maybe_interrupt_casting(entity, _holder), do: entity
-
-  defp silenceable_cast?(%{spell: %Spell{prevention_type: 1}}), do: true
-  defp silenceable_cast?(_casting), do: false
-
-  defp clear_casting(%{internal: internal, unit: unit} = entity) do
-    %{entity | internal: %{internal | casting: nil}, unit: %{unit | channel_spell: 0, channel_object: 0}}
-  end
-
-  defp maybe_heal_increased_health(entity, %Holder{auras: auras}) do
-    auras
-    |> Enum.reduce(0, fn
-      %Aura{type: :mod_increase_health, amount: amount}, acc when is_integer(amount) and amount > 0 -> acc + amount
-      _aura, acc -> acc
-    end)
-    |> case do
-      0 -> entity
-      amount -> Core.heal(entity, amount)
-    end
-  end
-
-  defp maybe_sit(%{unit: %Unit{stand_state: stand_state} = unit} = entity, %Holder{spell: %Spell{} = spell}) do
-    if (spell.aura_interrupt_flags &&& @aura_interrupt_not_seated) != 0 and stand_state != @stand_state_sit do
-      {%{entity | unit: %{unit | stand_state: @stand_state_sit}}, [Effects.stand_state(@stand_state_sit)]}
-    else
-      {entity, []}
-    end
-  end
-
-  defp maybe_sit(entity, _holder), do: {entity, []}
 
   defp expires_at(_now, 0), do: nil
   defp expires_at(_now, nil), do: nil

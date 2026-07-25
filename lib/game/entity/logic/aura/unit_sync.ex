@@ -40,9 +40,11 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.UnitSync do
     if visible?(spell), do: next_free_slot(holders, negative?)
   end
 
-  defp visible?(%Spell{spell_visual: visual} = spell) do
+  def visible?(%Spell{spell_visual: visual} = spell) do
     not Spell.attribute?(spell, :passive) or (is_integer(visual) and visual > 0)
   end
+
+  def visible?(_spell), do: false
 
   defp next_free_slot(holders, negative?) do
     used = MapSet.new(holders, & &1.slot)

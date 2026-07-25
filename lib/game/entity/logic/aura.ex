@@ -16,12 +16,14 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
   alias ThistleTea.Game.Entity.Logic.Aura.Lifecycle
   alias ThistleTea.Game.Entity.Logic.Aura.Periodic
   alias ThistleTea.Game.Entity.Logic.Aura.Reactions
+  alias ThistleTea.Game.Entity.Logic.Aura.Transition
   alias ThistleTea.Game.Entity.Logic.Aura.UnitSync
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Spell
 
   defdelegate apply_spell(entity, context, spell, now), to: AuraApplication
   defdelegate apply_spell(entity, caster_guid, caster_level, spell, now), to: AuraApplication
+  defdelegate transition(entity, change), to: Transition, as: :run
   defdelegate blocked_by_stronger_rank?(entity_or_holders, spell), to: AuraApplication
   defdelegate mechanic_immune?(entity, spell), to: AuraApplication
   defdelegate dispel_immune?(entity, spell), to: AuraApplication
@@ -46,7 +48,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
 
   defdelegate reactions(entity, event, context), to: Reactions
 
-  defdelegate absorb_damage(entity, damage, school), to: Absorption
+  defdelegate absorb_damage(entity, damage, school, now), to: Absorption
 
   defdelegate sync_unit(unit), to: UnitSync
 

@@ -305,7 +305,8 @@ defmodule ThistleTea.Game.World.System.Duel do
     %{
       opponent_guid: opponent_guid,
       opponent_pet_guid: Map.get(participant_pets, opponent_guid),
-      started_at: match.started_at
+      started_at: match.started_at,
+      now: Time.now()
     }
   end
 

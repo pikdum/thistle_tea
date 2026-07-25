@@ -11,18 +11,11 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Lifecycle do
   alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Unit
-  alias ThistleTea.Game.Entity.Logic.Aura.ControlSync
-  alias ThistleTea.Game.Entity.Logic.Aura.HolderSync
-  alias ThistleTea.Game.Entity.Logic.Aura.MovementSync
-  alias ThistleTea.Game.Entity.Logic.Aura.ObjectSync
-  alias ThistleTea.Game.Entity.Logic.Aura.PlayerSync
+  alias ThistleTea.Game.Entity.Logic.Aura.Change
   alias ThistleTea.Game.Entity.Logic.Aura.Script
-  alias ThistleTea.Game.Entity.Logic.Aura.StealthSync
-  alias ThistleTea.Game.Entity.Logic.Aura.ViewpointSync
-  alias ThistleTea.Game.Entity.Logic.Core
+  alias ThistleTea.Game.Entity.Logic.Aura.Transition
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Spell
-  alias ThistleTea.Game.Spell.Cooldowns
 
   @aura_interrupt_damage 0x02
   @aura_interrupt_cast 0x01
@@ -49,7 +42,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Lifecycle do
     if expired == [] do
       {entity, []}
     else
-      remove_and_sync(entity, kept, now)
+      transition(entity, kept, :expired, now)
     end
   end
 
@@ -62,7 +55,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Lifecycle do
     if removed == [] do
       {entity, []}
     else
-      remove_and_sync(entity, kept, now)
+      transition(entity, kept, :interrupted, now)
     end
   end
 
@@ -75,7 +68,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Lifecycle do
     if removed == [] do
       {entity, []}
     else
-      remove_and_sync(entity, kept, now)
+      transition(entity, kept, :removed, now)
     end
   end
 
@@ -83,15 +76,15 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Lifecycle do
 
   def spend_spell_charges(%{unit: %Unit{auras: holders}} = entity, spell_ids, now)
       when is_list(holders) and holders != [] and is_list(spell_ids) do
-    {holders, removed} =
+    {holders, _removed} =
       Enum.map_reduce(holders, [], &spend_holder_charge(&1, spell_ids, &2))
 
     holders = Enum.reject(holders, &is_nil/1)
 
-    cond do
-      holders == entity.unit.auras -> {entity, []}
-      removed != [] -> remove_and_sync(entity, holders, removed, now)
-      true -> {sync_holders(entity, holders), []}
+    if holders == entity.unit.auras do
+      {entity, []}
+    else
+      transition(entity, holders, :consumed, now)
     end
   end
 
@@ -118,7 +111,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Lifecycle do
     {removed, kept} =
       Enum.split_with(holders, fn holder -> Enum.any?(aura_types, &Holder.has_aura_type?(holder, &1)) end)
 
-    if removed == [], do: {entity, []}, else: remove_and_sync(entity, kept, now)
+    if removed == [], do: {entity, []}, else: transition(entity, kept, :removed, now)
   end
 
   def remove_aura_types(entity, _aura_types, _now), do: {entity, []}
@@ -130,12 +123,12 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Lifecycle do
         id == spell_id and source_guid == caster_guid
       end)
 
-    if removed == [], do: {entity, []}, else: remove_and_sync(entity, kept, now)
+    if removed == [], do: {entity, []}, else: transition(entity, kept, :removed, now)
   end
 
   def remove_source_spell(entity, _spell_id, _caster_guid, _now), do: {entity, []}
 
-  def delay_source_spell(%{unit: %Unit{auras: holders} = unit} = entity, spell_id, caster_guid, delay_ms, now)
+  def delay_source_spell(%{unit: %Unit{auras: holders}} = entity, spell_id, caster_guid, delay_ms, now)
       when is_list(holders) and holders != [] and is_integer(spell_id) and is_integer(caster_guid) and
              is_integer(delay_ms) and delay_ms > 0 do
     {holders, events} =
@@ -148,8 +141,8 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Lifecycle do
         end
       end)
 
-    %{entity | unit: %{unit | auras: holders}}
-    |> Effects.enqueue(duration_sync_events(entity, events))
+    {entity, transition_events} = transition(entity, holders, :delayed, now)
+    Effects.enqueue(entity, transition_events ++ duration_sync_events(entity, events))
   end
 
   def delay_source_spell(entity, _spell_id, _caster_guid, _delay_ms, _now), do: entity
@@ -167,7 +160,12 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Lifecycle do
           do: stealth_spell_ids(holders),
           else: [spell_id | Script.cancel_linked_spell_ids(holder)]
 
-      remove_spells(entity, spell_ids, now)
+      kept =
+        Enum.reject(holders, fn %Holder{spell: %Spell{id: id}} ->
+          id in spell_ids
+        end)
+
+      transition(entity, kept, :cancelled, now)
     else
       {entity, []}
     end
@@ -193,7 +191,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Lifecycle do
           |> Enum.reject(fn {_holder, index} -> index in indexes end)
           |> Enum.map(&elem(&1, 0))
 
-        remove_and_sync(entity, kept, now)
+        transition(entity, kept, :dispelled, now)
     end
   end
 
@@ -208,59 +206,15 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Lifecycle do
     if removed == [] do
       entity
     else
-      {entity, events} = remove_and_sync(entity, kept, now)
+      {entity, events} = transition(entity, kept, :interrupted, now)
       Effects.enqueue(entity, events)
     end
   end
 
   def break_on_damage(entity, _now), do: entity
 
-  defp remove_and_sync(entity, kept, now) do
-    removed = entity.unit.auras -- kept
-    remove_and_sync(entity, kept, removed, now)
-  end
-
-  defp remove_and_sync(entity, kept, removed, now) do
-    previous_holders = entity.unit.auras
-    script_events = Script.after_remove(entity, removed)
-    {entity, cooldown_events} = Cooldowns.activate_on_event(entity, removed, now)
-    {entity, modifier_events} = HolderSync.sync(entity, kept)
-
-    entity =
-      entity
-      |> ObjectSync.sync()
-      |> PlayerSync.sync()
-      |> StealthSync.sync()
-
-    {entity, control_events} = ControlSync.sync(entity, now)
-    {entity, events} = MovementSync.sync_movement_state(entity, now)
-    viewpoint_events = ViewpointSync.events(previous_holders, kept, entity_guid(entity))
-    release_events = release_controlled_events(entity, removed)
-
-    {Core.mark_broadcast_update(entity),
-     modifier_events ++
-       cooldown_events ++ script_events ++ control_events ++ viewpoint_events ++ release_events ++ events}
-  end
-
-  defp release_controlled_events(%{object: %{guid: owner_guid}, unit: %Unit{charm: controlled_guid}}, removed)
-       when is_integer(owner_guid) and is_integer(controlled_guid) and controlled_guid > 0 do
-    for %Holder{caster_guid: ^owner_guid, spell: %Spell{id: spell_id, effects: effects}} <- removed,
-        Enum.any?(effects, &(&1.type == :summon_possessed)) do
-      Effects.release_controlled(owner_guid, controlled_guid, spell_id)
-    end
-  end
-
-  defp release_controlled_events(_entity, _removed), do: []
-
-  defp entity_guid(%{object: %{guid: guid}}), do: guid
-  defp entity_guid(_entity), do: nil
-
-  defp sync_holders(entity, holders) do
-    {entity, modifier_events} = HolderSync.sync(entity, holders)
-
-    entity
-    |> Effects.enqueue(modifier_events)
-    |> Core.mark_broadcast_update()
+  defp transition(entity, holders, cause, now) do
+    Transition.run(entity, %Change{holders: holders, cause: cause, now: now})
   end
 
   defp cancelable?(%Holder{negative?: true}), do: false

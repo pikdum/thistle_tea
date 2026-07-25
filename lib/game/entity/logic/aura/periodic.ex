@@ -9,9 +9,10 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
-  alias ThistleTea.Game.Entity.Logic.Aura.HolderSync
+  alias ThistleTea.Game.Entity.Logic.Aura.Change
   alias ThistleTea.Game.Entity.Logic.Aura.Lifecycle
   alias ThistleTea.Game.Entity.Logic.Aura.Reactions
+  alias ThistleTea.Game.Entity.Logic.Aura.Transition
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Resources
@@ -63,16 +64,11 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
           |> Enum.reverse()
           |> Enum.filter(&holder_still_present?(entity, &1))
 
-        entity =
-          if new_holders == holders do
-            entity
-          else
-            {entity, modifier_events} = HolderSync.sync(entity, new_holders)
-            Effects.enqueue(entity, modifier_events)
-          end
+        {entity, transition_events} =
+          Transition.run(entity, %Change{holders: new_holders, cause: :ticked, now: now})
 
         {entity, reaction_events} = periodic_taken_reactions(entity, events, now)
-        {entity, events ++ reaction_events}
+        {entity, events ++ transition_events ++ reaction_events}
     end
   end
 

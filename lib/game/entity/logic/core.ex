@@ -17,7 +17,6 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
   alias ThistleTea.Game.Entity.Data.GameObject
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.Aura
-  alias ThistleTea.Game.Entity.Logic.Aura.HolderSync
   alias ThistleTea.Game.Entity.Logic.CastPushback
   alias ThistleTea.Game.Entity.Logic.Combat
   alias ThistleTea.Game.Entity.Logic.Dueling
@@ -84,7 +83,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
       damage = scale_damage_taken(entity, damage, school)
       {damage, redirect} = Aura.damage_redirect(entity, damage, school)
       entity = enqueue_redirect(entity, redirect, Keyword.get(opts, :source), school)
-      {entity, remaining} = Aura.absorb_damage(entity, damage, school)
+      {entity, remaining} = Aura.absorb_damage(entity, damage, school, now)
       %{unit: unit} = entity
       duel_outcome = duel_lethal_outcome(entity, health, remaining, opts)
       remaining = duel_remaining_damage(health, remaining, duel_outcome)
@@ -304,10 +303,13 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
     entity = Movement.sync_position(entity, now)
     %{unit: unit, movement_block: mb} = entity
 
-    {entity, modifier_events} =
-      HolderSync.sync(%{entity | unit: %{unit | target: 0}}, death_auras(unit.auras))
+    {entity, aura_events} =
+      Aura.transition(
+        %{entity | unit: %{unit | target: 0}},
+        %Aura.Change{holders: death_auras(unit.auras), cause: :death, now: now}
+      )
 
-    entity = Effects.enqueue(entity, modifier_events)
+    entity = Effects.enqueue(entity, aura_events)
     internal = entity.internal
     unit = entity.unit
 
@@ -373,7 +375,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
       holder_spell?(entity, @spirit_of_redemption_talent)
   end
 
-  defp enter_spirit_of_redemption(%{unit: %Unit{} = unit, internal: %Internal{} = internal} = entity, guid, now) do
+  defp enter_spirit_of_redemption(%{unit: %Unit{} = unit, internal: %Internal{}} = entity, guid, now) do
     unit = %{
       unit
       | health: max(unit.max_health || 1, 1),
@@ -381,8 +383,10 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
     }
 
     entity =
-      %{entity | unit: unit, internal: %{internal | rooted?: true}}
+      %{entity | unit: unit}
       |> prepare_death_state(now)
+
+    entity = %{entity | internal: %{entity.internal | rooted?: true}}
 
     events =
       Enum.map(@spirit_of_redemption_auras, &spirit_of_redemption_event(&1, guid, unit))

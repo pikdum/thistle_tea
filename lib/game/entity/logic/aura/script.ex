@@ -25,8 +25,8 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Script do
   @melee_radius 5.0
   @whirlwind_radius 8.0
 
-  def after_remove(entity, holders) when is_list(holders) do
-    Enum.flat_map(holders, &after_remove_holder(entity, &1))
+  def after_remove(entity, holders, cause) when is_list(holders) do
+    Enum.flat_map(holders, &after_remove_holder(entity, &1, cause))
   end
 
   @ignite_pct %{11_119 => 4, 11_120 => 8, 12_846 => 12, 12_847 => 16, 12_848 => 20}
@@ -238,39 +238,51 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Script do
 
   @leader_of_the_pack_aura 24_932
 
-  defp after_remove_holder(%{object: %{guid: target_guid}} = entity, %Holder{
-         spell: %Spell{id: spell_id} = spell,
-         caster_guid: caster_guid,
-         caster_level: caster_level
-       })
+  defp after_remove_holder(
+         %{object: %{guid: target_guid}},
+         %Holder{spell: %Spell{id: @spirit_of_redemption_state}, caster_guid: caster_guid, caster_level: caster_level},
+         :expired
+       )
        when is_integer(caster_guid) and is_integer(target_guid) do
-    cond do
-      spell_id == @spirit_of_redemption_state ->
-        [
-          Effects.trigger_spell(
-            caster_guid,
-            caster_level || 1,
-            target_guid,
-            @spirit_of_redemption_suicide,
-            triggered_by_spell_id: spell_id
-          )
-        ]
+    [
+      Effects.trigger_spell(
+        caster_guid,
+        caster_level || 1,
+        target_guid,
+        @spirit_of_redemption_suicide,
+        triggered_by_spell_id: @spirit_of_redemption_state
+      )
+    ]
+  end
 
-      Spell.vmangos_script?(spell, "spell_hunter_wyvern_sting") ->
-        case @wyvern_sting_poison_by_rank[spell_id] do
-          poison_id when is_integer(poison_id) ->
-            [Effects.trigger_spell(caster_guid, caster_level, target_guid, poison_id)]
-
-          _poison_id ->
-            []
-        end
-
-      true ->
-        shapeshift_after_remove(entity, spell)
+  defp after_remove_holder(
+         %{object: %{guid: target_guid}} = entity,
+         %Holder{spell: %Spell{id: spell_id} = spell, caster_guid: caster_guid, caster_level: caster_level},
+         cause
+       )
+       when is_integer(caster_guid) and is_integer(target_guid) do
+    if wyvern_sting_removal?(spell, cause) do
+      wyvern_sting_events(spell_id, caster_guid, caster_level, target_guid)
+    else
+      shapeshift_after_remove(entity, spell)
     end
   end
 
-  defp after_remove_holder(_entity, _holder), do: []
+  defp after_remove_holder(_entity, _holder, _cause), do: []
+
+  defp wyvern_sting_removal?(%Spell{} = spell, cause) do
+    cause not in [:death, :duel_end] and Spell.vmangos_script?(spell, "spell_hunter_wyvern_sting")
+  end
+
+  defp wyvern_sting_events(spell_id, caster_guid, caster_level, target_guid) do
+    case @wyvern_sting_poison_by_rank[spell_id] do
+      poison_id when is_integer(poison_id) ->
+        [Effects.trigger_spell(caster_guid, caster_level, target_guid, poison_id)]
+
+      _poison_id ->
+        []
+    end
+  end
 
   defp shapeshift_after_remove(%{object: %{guid: guid}, unit: %{auras: holders}}, %Spell{} = spell)
        when is_list(holders) do

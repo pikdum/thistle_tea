@@ -2110,7 +2110,7 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
     test "fire ward absorbs fire damage and tracks remaining amount" do
       {entity, _events} = apply_spell(fixture_entity(), 1, 1, fire_ward_fixture())
 
-      {entity, remaining} = Aura.absorb_damage(entity, 100, :fire)
+      {entity, remaining} = Aura.absorb_damage(entity, 100, :fire, 2_000)
 
       assert remaining == 0
       assert [%Holder{auras: [%{amount: 64}]}] = entity.unit.auras
@@ -2119,7 +2119,7 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
     test "fire ward does not absorb frost damage" do
       {entity, _events} = apply_spell(fixture_entity(), 1, 1, fire_ward_fixture())
 
-      {_entity, remaining} = Aura.absorb_damage(entity, 100, :frost)
+      {_entity, remaining} = Aura.absorb_damage(entity, 100, :frost, 2_000)
 
       assert remaining == 100
     end
@@ -2127,7 +2127,7 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
     test "fire ward is removed when exhausted" do
       {entity, _events} = apply_spell(fixture_entity(), 1, 1, fire_ward_fixture())
 
-      {entity, remaining} = Aura.absorb_damage(entity, 200, :fire)
+      {entity, remaining} = Aura.absorb_damage(entity, 200, :fire, 2_000)
 
       assert remaining == 200 - 164
       assert entity.unit.auras == []
@@ -2138,7 +2138,7 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
       entity = %{entity | unit: %{entity.unit | power1: 100, max_power1: 100}}
       {entity, _events} = apply_spell(entity, 1, 1, mana_shield_fixture())
 
-      {entity, remaining} = Aura.absorb_damage(entity, 30, :physical)
+      {entity, remaining} = Aura.absorb_damage(entity, 30, :physical, 2_000)
 
       assert remaining == 0
       assert entity.unit.power1 == 40
@@ -2149,7 +2149,7 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
       entity = %{entity | unit: %{entity.unit | power1: 20, max_power1: 100}}
       {entity, _events} = apply_spell(entity, 1, 1, mana_shield_fixture())
 
-      {entity, remaining} = Aura.absorb_damage(entity, 30, :fire)
+      {entity, remaining} = Aura.absorb_damage(entity, 30, :fire, 2_000)
 
       assert remaining == 20
       assert entity.unit.power1 == 0

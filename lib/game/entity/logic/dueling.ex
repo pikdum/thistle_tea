@@ -11,7 +11,7 @@ defmodule ThistleTea.Game.Entity.Logic.Dueling do
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
-  alias ThistleTea.Game.Entity.Logic.Aura.HolderSync
+  alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Combat
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Effects
@@ -65,9 +65,9 @@ defmodule ThistleTea.Game.Entity.Logic.Dueling do
     end
   end
 
-  def abandon(%Character{} = character) do
-    {character, _events} = finish(character, %{})
-    character
+  def abandon(%Character{} = character, now) when is_integer(now) do
+    {character, events} = finish(character, %{now: now})
+    Effects.enqueue(character, events)
   end
 
   def active?(%{internal: %Internal{duel: %Duel{state: :started}}}), do: true
@@ -92,18 +92,19 @@ defmodule ThistleTea.Game.Entity.Logic.Dueling do
     opponent_guid = Map.get(payload, :opponent_guid, duel.opponent_guid)
     opponent_pet_guid = Map.get(payload, :opponent_pet_guid)
     started_at = Map.get(payload, :started_at, duel.started_at)
+    now = Map.fetch!(payload, :now)
     opponents = Enum.filter([opponent_guid, opponent_pet_guid], &is_integer/1)
 
     {character, modifier_events} =
       character
-      |> remove_duel_auras(opponents, started_at)
+      |> remove_duel_auras(opponents, started_at, now)
       |> clear_duel_combat(opponents)
 
     {clear_projection(character), modifier_events}
   end
 
-  defp remove_duel_auras(%Character{unit: %Unit{auras: holders}} = character, opponents, started_at)
-       when is_list(holders) and is_integer(started_at) do
+  defp remove_duel_auras(%Character{unit: %Unit{auras: holders}} = character, opponents, started_at, now)
+       when is_list(holders) and is_integer(started_at) and is_integer(now) do
     kept =
       Enum.reject(holders, fn
         %Holder{negative?: true, caster_guid: caster_guid, applied_at: applied_at}
@@ -114,10 +115,10 @@ defmodule ThistleTea.Game.Entity.Logic.Dueling do
           false
       end)
 
-    HolderSync.sync(character, kept)
+    Aura.transition(character, %Aura.Change{holders: kept, cause: :duel_end, now: now})
   end
 
-  defp remove_duel_auras(character, _opponents, _started_at), do: {character, []}
+  defp remove_duel_auras(character, _opponents, _started_at, _now), do: {character, []}
 
   defp clear_duel_combat({%Character{} = character, events}, opponents) do
     guid = character.object.guid

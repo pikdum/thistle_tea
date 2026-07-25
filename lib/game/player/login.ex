@@ -75,7 +75,7 @@ defmodule ThistleTea.Game.Player.Login do
       |> normalize_combat_stats()
       |> normalize_faction_template()
       |> normalize_death_state(character_guid)
-      |> Dueling.abandon()
+      |> Dueling.abandon(Time.now())
       |> build_spellbook()
       |> PlayerSpells.apply_passives(Time.now())
       |> LogicTalents.sync_points()

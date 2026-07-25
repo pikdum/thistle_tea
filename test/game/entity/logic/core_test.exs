@@ -173,6 +173,7 @@ defmodule ThistleTea.Game.Entity.Logic.CoreTest do
   describe "take_damage_with_absorb/4 death items" do
     test "rewards one DBC-defined item to an eligible tapped caster" do
       holder = %Holder{
+        spell: %Spell{id: 17_876},
         caster_guid: 777,
         caster_level: 10,
         auras: [%Aura{type: :channel_death_item, item_type: 6265, amount: 0}]
@@ -191,6 +192,7 @@ defmodule ThistleTea.Game.Entity.Logic.CoreTest do
 
     test "does not reward death items for gray or differently tapped creatures" do
       holder = %Holder{
+        spell: %Spell{id: 17_876},
         caster_guid: 777,
         caster_level: 60,
         auras: [%Aura{type: :channel_death_item, item_type: 6265, amount: 1}]

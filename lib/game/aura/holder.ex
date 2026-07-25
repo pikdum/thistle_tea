@@ -29,6 +29,8 @@ defmodule ThistleTea.Game.Aura.Holder do
     negative?: false
   ]
 
+  @type t :: %__MODULE__{}
+
   def has_aura_type?(%__MODULE__{auras: auras}, type) do
     Enum.any?(auras, fn %Aura{type: t} -> t == type end)
   end
