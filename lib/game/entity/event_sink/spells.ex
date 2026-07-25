@@ -3,7 +3,6 @@ defmodule ThistleTea.Game.Entity.EventSink.Spells do
 
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Character
-  alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.SpellTarget
   alias ThistleTea.Game.Entity.SpellTargetResolver
@@ -300,47 +299,18 @@ defmodule ThistleTea.Game.Entity.EventSink.Spells do
     entity
   end
 
-  def emit(%Character{} = entity, %Effects.RefreshPartyAura{spell: %Spell{} = spell, amount: radius})
-      when is_number(radius) do
-    entity
-    |> SpellTargetResolver.resolve_query({:party_aoe, radius})
-    |> Enum.reject(&(&1 == entity.object.guid))
-    |> Enum.each(fn target_guid ->
-      context = CastContext.from_caster(entity, spell, target_guid)
-      Entity.receive_spell(target_guid, context, spell)
-    end)
+  def emit(entity, %Effects.DeliverSpellToQuery{spell: %Spell{} = spell} = effect) do
+    excluded = MapSet.new(effect.exclude_guids)
 
     entity
-  end
-
-  def emit(%Mob{object: %{guid: guid}, internal: %{pet: %{owner_guid: owner_guid}}} = entity, %Effects.RefreshPartyAura{
-        spell: %Spell{} = spell
-      }) do
-    context = %CastContext{
-      caster_guid: guid,
-      caster_level: entity.unit.level || 1,
-      target_guid: owner_guid,
-      target_hostile?: false,
-      spell: spell
-    }
-
-    Entity.receive_spell(owner_guid, context, spell)
-    entity
-  end
-
-  def emit(%Mob{object: %{guid: guid}, unit: %{created_by: owner_guid}} = entity, %Effects.RefreshPartyAura{
-        spell: %Spell{} = spell,
-        amount: radius
-      })
-      when is_integer(owner_guid) and owner_guid > 0 and is_number(radius) do
-    entity
-    |> SpellTargetResolver.resolve_query({:party_aoe, radius})
+    |> SpellTargetResolver.resolve_query(effect.query)
+    |> Enum.reject(&MapSet.member?(excluded, &1))
     |> Enum.each(fn target_guid ->
       context = %CastContext{
-        caster_guid: guid,
-        caster_level: entity.unit.level || 1,
+        caster_guid: effect.source_guid,
+        caster_level: effect.source_level,
         target_guid: target_guid,
-        target_hostile?: false,
+        target_hostile?: Spell.requires_hostile_target?(spell),
         spell: spell
       }
 
@@ -349,8 +319,6 @@ defmodule ThistleTea.Game.Entity.EventSink.Spells do
 
     entity
   end
-
-  def emit(entity, %Effects.RefreshPartyAura{}), do: entity
 
   def emit(%Character{object: %{guid: guid}} = entity, %Effects.SpellDelayed{} = effect) do
     Network.send_packet(%Message.SmsgSpellDelayed{caster: guid, delay_ms: effect.delay_ms})

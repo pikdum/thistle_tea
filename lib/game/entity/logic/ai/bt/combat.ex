@@ -197,7 +197,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
 
     state
     |> maybe_weapon_skill_up(target)
-    |> queue_self_update()
     |> Effects.enqueue(Effects.deliver_attack(target, attack))
   end
 
@@ -224,7 +223,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
     state
     |> maybe_weapon_skill_up(target)
     |> Resources.spend_power(spell, Time.now())
-    |> queue_self_update()
     |> queue_queued_spell_go(spell, target, targets)
     |> deliver_queued_spell(spell, targets)
   end
@@ -302,12 +300,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
   defp unit_target_raw(target) do
     <<0x0002::little-size(16)>> <> BinaryUtils.pack_guid(target)
   end
-
-  defp queue_self_update(%{internal: %Internal{broadcast_update?: true}} = state) do
-    Effects.enqueue(state, Effects.object_update(:values))
-  end
-
-  defp queue_self_update(state), do: state
 
   defp combat_reach(%{unit: unit} = state, target) do
     CombatLogic.melee_reach(combat_reach_value(unit), target_combat_reach(state, target))

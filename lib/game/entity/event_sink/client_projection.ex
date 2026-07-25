@@ -4,7 +4,6 @@ defmodule ThistleTea.Game.Entity.EventSink.ClientProjection do
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
-  alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World
@@ -12,15 +11,6 @@ defmodule ThistleTea.Game.Entity.EventSink.ClientProjection do
 
   @listen_range_say 25.0
   @listen_range_yell 300.0
-
-  def emit(%{internal: %Internal{broadcast_update?: true} = internal} = entity, %Effects.ObjectUpdate{} = effect) do
-    Core.update_object(entity, effect.update_type || :values)
-    |> World.broadcast_packet(entity)
-
-    %{entity | internal: %{internal | broadcast_update?: false}}
-  end
-
-  def emit(entity, %Effects.ObjectUpdate{}), do: entity
 
   def emit(%Character{} = entity, %Effects.ConsumeCastItem{cast_item_guid: item_guid}) when is_integer(item_guid) do
     send(self(), {:consume_cast_item, item_guid})

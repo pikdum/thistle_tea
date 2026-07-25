@@ -393,7 +393,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
         unit: %{unit | channel_spell: spell_id, channel_object: game_object_guid}
     }
     |> Core.mark_broadcast_update()
-    |> Effects.enqueue([Effects.channel_start(guid, spell_id, duration_ms), Effects.object_update(:values)])
+    |> Effects.enqueue(Effects.channel_start(guid, spell_id, duration_ms))
   end
 
   def start_game_object_channel(character, _game_object_guid, _spell, _duration_ms, _now), do: character
@@ -416,7 +416,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
 
     %{character | unit: %{unit | channel_spell: spell_id, channel_object: channel_object}}
     |> Core.mark_broadcast_update()
-    |> Effects.enqueue([Effects.channel_start(guid, spell_id, duration_ms), Effects.object_update(:values)])
+    |> Effects.enqueue(Effects.channel_start(guid, spell_id, duration_ms))
   end
 
   defp start_channel(character, _casting), do: character
@@ -475,10 +475,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
     events =
       case character do
         %{object: %{guid: guid}} when is_integer(guid) ->
-          [Effects.channel_update(guid, 0), Effects.object_update(:values)]
+          [Effects.channel_update(guid, 0)]
 
         _ ->
-          [Effects.object_update(:values)]
+          []
       end
 
     character
@@ -832,7 +832,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
 
     character
     |> Effects.enqueue(events)
-    |> queue_self_update()
   end
 
   defp dispatch_to_target(character, %CastContext{} = context, spell, target_guid, _now) when is_integer(target_guid) do
@@ -852,10 +851,4 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
   end
 
   defp resolve_targets(_caster, _casting), do: []
-
-  defp queue_self_update(%{internal: %Internal{broadcast_update?: true}} = character) do
-    Effects.enqueue(character, Effects.object_update(:values))
-  end
-
-  defp queue_self_update(character), do: character
 end

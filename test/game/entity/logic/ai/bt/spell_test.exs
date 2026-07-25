@@ -57,8 +57,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
       assert [
                %Effects.SpellCastResult{spell_id: 10},
                %Effects.SpellGo{spell_id: 10},
-               %Effects.ChannelStart{spell_id: 10, channel_time_ms: 8_000},
-               %Effects.ObjectUpdate{update_type: :values}
+               %Effects.ChannelStart{spell_id: 10, channel_time_ms: 8_000}
              ] = mob.internal.events
     end
 
@@ -178,10 +177,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
       assert mob.internal.casting == nil
       assert mob.unit.channel_spell == 0
 
-      assert [
-               %Effects.ChannelUpdate{channel_time_ms: 0},
-               %Effects.ObjectUpdate{update_type: :values}
-             ] = mob.internal.events
+      assert [%Effects.ChannelUpdate{channel_time_ms: 0}] = mob.internal.events
     end
 
     test "channel tick applies periodic trigger effects and advances the next tick" do
@@ -595,8 +591,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
       assert [
                %Effects.SpellCastResult{},
                %Effects.SpellGo{},
-               %Effects.SpellDamage{damage: 5, periodic?: false},
-               %Effects.ObjectUpdate{update_type: :values}
+               %Effects.SpellDamage{damage: 5, periodic?: false}
              ] = mob.internal.events
     end
 

@@ -145,7 +145,7 @@ defmodule ThistleTea.Game.Player.Fishing do
         character
         |> adjust_channel(bobber.object.guid, duration_ms)
         |> Core.mark_broadcast_update()
-        |> Effects.enqueue([Effects.channel_update(character.object.guid, duration_ms), Effects.object_update(:values)])
+        |> Effects.enqueue(Effects.channel_update(character.object.guid, duration_ms))
 
       %{state | character: character}
     else

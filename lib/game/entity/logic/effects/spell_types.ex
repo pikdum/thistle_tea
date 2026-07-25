@@ -30,7 +30,7 @@ defmodule ThistleTea.Game.Entity.Logic.Effects.SpellTypes do
     {:DeliverSpellOutcome, [:source_guid, :target_guid, :spell, :outcome], []},
     {:DrainPower, [:target_guid, :misc_value], []},
     {:GrantPower, [:target_guid, :misc_value, :amount], []},
-    {:RefreshPartyAura, [:spell, :amount], []},
+    {:DeliverSpellToQuery, [:source_guid, :source_level, :spell, :query], [exclude_guids: []]},
     {:TriggerSpell, [:source_guid, :source_level, :target_guid, :spell_id],
      [
        target_role: nil,

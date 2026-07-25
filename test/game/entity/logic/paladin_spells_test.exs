@@ -266,7 +266,16 @@ defmodule ThistleTea.Game.Entity.Logic.PaladinSpellsTest do
       assert remote_holder.next_area_refresh_at == nil
 
       {_caster, events} = AuraLogic.tick(caster, 2_000)
-      assert [%Effects.RefreshPartyAura{spell: ^spell, amount: 30.0}] = events
+
+      assert [
+               %Effects.DeliverSpellToQuery{
+                 source_guid: 5,
+                 source_level: 60,
+                 spell: ^spell,
+                 query: {:party_aoe, 30.0},
+                 exclude_guids: [5]
+               }
+             ] = events
     end
   end
 

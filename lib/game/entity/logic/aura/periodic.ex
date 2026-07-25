@@ -6,7 +6,9 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
   """
   alias ThistleTea.Game.Aura
   alias ThistleTea.Game.Aura.Holder
+  alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.Aura.HolderSync
   alias ThistleTea.Game.Entity.Logic.Aura.Lifecycle
   alias ThistleTea.Game.Entity.Logic.Aura.Reactions
@@ -17,6 +19,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
   alias ThistleTea.Game.Entity.Logic.Threat
   alias ThistleTea.Game.Entity.Logic.Warlock
   alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.CastContext
 
   def tick(%{unit: %Unit{auras: holders}} = entity, now) when is_list(holders) and holders != [] do
     entity
@@ -106,16 +109,46 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
         {ent, [new_aura | acc], events ++ aura_events}
       end)
 
-    {holder, area_events} = tick_area_refresh(%{holder | auras: Enum.reverse(new_auras)}, now)
+    {holder, area_events} = tick_area_refresh(entity, %{holder | auras: Enum.reverse(new_auras)}, now)
     {entity, holder, events ++ area_events}
   end
 
-  defp tick_area_refresh(%Holder{next_area_refresh_at: at, area_radius: radius, spell: spell} = holder, now)
+  defp tick_area_refresh(entity, %Holder{next_area_refresh_at: at, area_radius: radius, spell: spell} = holder, now)
        when is_integer(at) and now >= at and is_number(radius) do
-    {%{holder | next_area_refresh_at: advance_tick(at, 1_000, now)}, [Effects.refresh_party_aura(spell, radius)]}
+    holder = %{holder | next_area_refresh_at: advance_tick(at, 1_000, now)}
+    {holder, party_aura_effects(entity, spell, radius)}
   end
 
-  defp tick_area_refresh(holder, _now), do: {holder, []}
+  defp tick_area_refresh(_entity, holder, _now), do: {holder, []}
+
+  defp party_aura_effects(%Character{object: %{guid: guid}, unit: %Unit{level: level}}, spell, radius) do
+    [
+      Effects.deliver_spell_to_query(guid, level || 1, spell, {:party_aoe, radius}, exclude_guids: [guid])
+    ]
+  end
+
+  defp party_aura_effects(
+         %Mob{object: %{guid: guid}, unit: %Unit{level: level}, internal: %{pet: %{owner_guid: owner_guid}}},
+         spell,
+         _radius
+       ) do
+    context = %CastContext{
+      caster_guid: guid,
+      caster_level: level || 1,
+      target_guid: owner_guid,
+      target_hostile?: false,
+      spell: spell
+    }
+
+    [Effects.deliver_spell(owner_guid, context, spell)]
+  end
+
+  defp party_aura_effects(%Mob{object: %{guid: guid}, unit: %Unit{level: level, created_by: owner_guid}}, spell, radius)
+       when is_integer(owner_guid) and owner_guid > 0 do
+    [Effects.deliver_spell_to_query(guid, level || 1, spell, {:party_aoe, radius})]
+  end
+
+  defp party_aura_effects(_entity, _spell, _radius), do: []
 
   defp tick_aura(entity, %Holder{} = holder, %Aura{type: :periodic_damage, next_tick_at: at} = aura, now)
        when is_integer(at) and now >= at do

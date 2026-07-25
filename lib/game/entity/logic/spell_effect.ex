@@ -702,7 +702,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
           }
 
           state = lock_interrupted_school(state, casting, spell, now)
-          {Core.mark_broadcast_update(state), [Effects.object_update(:values)]}
+          {Core.mark_broadcast_update(state), []}
         else
           {state, []}
         end

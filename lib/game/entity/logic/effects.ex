@@ -198,10 +198,6 @@ defmodule ThistleTea.Game.Entity.Logic.Effects do
     %Effects.DelayAura{source_guid: source_guid, target_guid: target_guid, spell_id: spell_id, delay_ms: delay_ms}
   end
 
-  def object_update(update_type \\ :values) do
-    %Effects.ObjectUpdate{update_type: update_type}
-  end
-
   def deliver_attack(target_guid, attack) when is_integer(target_guid) and is_map(attack) do
     %Effects.DeliverAttack{target_guid: target_guid, attack: attack}
   end
@@ -327,8 +323,15 @@ defmodule ThistleTea.Game.Entity.Logic.Effects do
     %Effects.TeleportToSpellTarget{spell_id: spell_id}
   end
 
-  def refresh_party_aura(spell, radius) when is_number(radius) do
-    %Effects.RefreshPartyAura{spell: spell, amount: radius}
+  def deliver_spell_to_query(source_guid, source_level, spell, query, opts \\ [])
+      when is_integer(source_guid) and is_integer(source_level) do
+    %Effects.DeliverSpellToQuery{
+      source_guid: source_guid,
+      source_level: source_level,
+      spell: spell,
+      query: query,
+      exclude_guids: Keyword.get(opts, :exclude_guids, [])
+    }
   end
 
   def consume_cast_item(item_guid) when is_integer(item_guid) do

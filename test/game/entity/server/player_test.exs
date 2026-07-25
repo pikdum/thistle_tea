@@ -10,7 +10,6 @@ defmodule ThistleTea.Game.Entity.Server.PlayerTest do
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
-  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Regen
   alias ThistleTea.Game.Entity.Server.Player, as: PlayerServer
   alias ThistleTea.Game.Entity.Server.Player.State
@@ -267,21 +266,20 @@ defmodule ThistleTea.Game.Entity.Server.PlayerTest do
       refute character.internal.in_combat
     end
 
-    test "syncs detection metadata before aura object events clear the broadcast flag" do
+    test "syncs detection metadata before projecting a pending update" do
       guid = System.unique_integer([:positive])
       character = character(guid, health: 80, max_health: 100)
 
       internal = %{
         character.internal
         | broadcast_update?: true,
-          undetectable_until: Time.now() + 1_000,
-          events: [Effects.object_update(:values)]
+          undetectable_until: Time.now() + 1_000
       }
 
       Metadata.put(guid, %{})
       on_exit(fn -> Metadata.delete(guid) end)
 
-      PlayerServer.maybe_broadcast_update(%{guid: guid, character: %{character | internal: internal}})
+      PlayerServer.maybe_broadcast_update(%State{guid: guid, character: %{character | internal: internal}})
 
       assert %{undetectable_until: expires_at, stealthed?: false} =
                Metadata.query(guid, [:undetectable_until, :stealthed?])

@@ -37,12 +37,6 @@ defmodule ThistleTea.Game.Entity.Logic.EffectsTest do
     end
   end
 
-  describe "object_update/1" do
-    test "returns an object update event" do
-      assert %Effects.ObjectUpdate{update_type: :values} = Effects.object_update(:values)
-    end
-  end
-
   describe "deliver_attack/2" do
     test "returns an attack delivery event" do
       attack = %{caster: 1, min_damage: 2, max_damage: 3}

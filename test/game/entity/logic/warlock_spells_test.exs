@@ -164,7 +164,13 @@ defmodule ThistleTea.Game.Entity.Logic.WarlockSpellsTest do
       assert is_integer(at)
 
       {_pet, tick_events} = AuraLogic.tick(pet, at)
-      assert Enum.any?(tick_events, &is_struct(&1, Effects.RefreshPartyAura))
+
+      assert [
+               %Effects.DeliverSpell{
+                 target_guid: 1,
+                 cast_context: %CastContext{caster_guid: ^pet_guid, target_guid: 1}
+               }
+             ] = tick_events
     end
 
     test "owners receive the propagated area aura with a visible slot and working split" do
