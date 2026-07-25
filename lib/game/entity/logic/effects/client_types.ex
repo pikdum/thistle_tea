@@ -19,17 +19,10 @@ defmodule ThistleTea.Game.Entity.Logic.Effects.ClientTypes do
   ]
 
   for {name, required, optional} <- effects do
-    type =
-      case name do
-        :OpenGameObject -> :open_gameobject
-        :GiveItem -> :create_item
-        _name -> name |> Atom.to_string() |> Macro.underscore() |> String.to_atom()
-      end
-
     defmodule Module.concat(ThistleTea.Game.Entity.Logic.Effects, name) do
       @moduledoc false
       @enforce_keys required
-      defstruct [type: type] ++ required ++ optional
+      defstruct required ++ optional
     end
   end
 end

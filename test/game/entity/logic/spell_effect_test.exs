@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.Aura
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.SpellEffect
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Cast
@@ -119,9 +120,9 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
       |> SpellEffect.receive(context, spell, 1_000)
 
     assert target.unit.health == 100
-    assert %{type: :spell_log_miss, reason: ^outcome} = Enum.find(events, &(&1.type == :spell_log_miss))
-    assert %{type: :attack_outcome, outcome: ^outcome} = Enum.find(events, &(&1.type == :attack_outcome))
-    assert %{type: :trigger_spell, spell_id: 90_002} = Enum.find(events, &(&1.type == :trigger_spell))
+    assert %Effects.SpellLogMiss{reason: ^outcome} = Enum.find(events, &is_struct(&1, Effects.SpellLogMiss))
+    assert %Effects.AttackOutcome{outcome: ^outcome} = Enum.find(events, &is_struct(&1, Effects.AttackOutcome))
+    assert %Effects.TriggerSpell{spell_id: 90_002} = Enum.find(events, &is_struct(&1, Effects.TriggerSpell))
   end
 
   describe "receive/4" do
@@ -153,8 +154,8 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
       assert target.unit.health == 100
 
       assert [
-               %{type: :spell_log_miss, source_guid: 999, target_guid: 1, spell_id: 133, reason: :reflect},
-               %{type: :deliver_spell, target_guid: 999, cast_context: reflected_context, spell: ^fireball}
+               %Effects.SpellLogMiss{source_guid: 999, target_guid: 1, spell_id: 133, reason: :reflect},
+               %Effects.DeliverSpell{target_guid: 999, cast_context: reflected_context, spell: ^fireball}
              ] = events
 
       assert reflected_context.caster_guid == 999
@@ -163,7 +164,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
 
       caster = %{target_fixture() | object: %Object{guid: 999}, unit: %{target.unit | auras: [reflect]}}
 
-      {caster, [%{type: :spell_damage, damage: 20}]} =
+      {caster, [%Effects.SpellDamage{damage: 20}]} =
         SpellEffect.receive(caster, reflected_context, fireball, 1_000)
 
       assert caster.unit.health == 80
@@ -192,7 +193,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
       target = %{target | unit: %{target.unit | health: 100, max_health: 100, auras: [reflect]}}
       context = %CastContext{caster_guid: 999, caster_level: 10}
 
-      {target, [%{type: :spell_damage, damage: 20}]} =
+      {target, [%Effects.SpellDamage{damage: 20}]} =
         SpellEffect.receive(target, context, frostbolt, 1_000)
 
       assert target.unit.health == 80
@@ -245,7 +246,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
 
       victim = %{unmarked | unit: %{unmarked.unit | auras: [take_proc]}}
       {_victim, events} = SpellEffect.receive(victim, context, spell, 1_000)
-      assert %{type: :trigger_spell, spell_id: 54_321} = Enum.find(events, &(&1.type == :trigger_spell))
+      assert %Effects.TriggerSpell{spell_id: 54_321} = Enum.find(events, &is_struct(&1, Effects.TriggerSpell))
     end
 
     test "ranged abilities report deal and take ranged ability proc types" do
@@ -285,8 +286,8 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
       target = %{target_fixture() | unit: %Unit{health: 500, max_health: 500, level: 60, auras: [victim_proc]}}
       {_target, events} = SpellEffect.receive(target, context, aimed_shot, 1_000)
 
-      assert %{proc_type: :deal_ranged_ability} = Enum.find(events, &(&1.type == :spell_damage))
-      assert %{type: :trigger_spell, spell_id: 12_345} = Enum.find(events, &(&1.type == :trigger_spell))
+      assert %{proc_type: :deal_ranged_ability} = Enum.find(events, &is_struct(&1, Effects.SpellDamage))
+      assert %Effects.TriggerSpell{spell_id: 12_345} = Enum.find(events, &is_struct(&1, Effects.TriggerSpell))
     end
 
     test "dodged melee abilities reach victim proc reactions" do
@@ -319,11 +320,11 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
 
       assert Enum.any?(
                events,
-               &match?(%{type: :trigger_spell, source_guid: 999, target_guid: 999, spell_id: 23_885}, &1)
+               &match?(%Effects.TriggerSpell{source_guid: 999, target_guid: 999, spell_id: 23_885}, &1)
              )
 
       assert target.unit.health < 500
-      refute Enum.any?(events, &(&1.type == :heal_entity))
+      refute Enum.any?(events, &is_struct(&1, Effects.HealEntity))
     end
 
     test "multiple weapon-damage effects fold into a single strike" do
@@ -349,7 +350,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
 
       {_target, events} = SpellEffect.receive(target, context, spell, 1_000)
 
-      assert [%{type: :spell_damage, damage: 172}] = Enum.filter(events, &(&1.type == :spell_damage))
+      assert [%Effects.SpellDamage{damage: 172}] = Enum.filter(events, &is_struct(&1, Effects.SpellDamage))
     end
 
     test "heals can crit for one and a half times the amount" do
@@ -432,7 +433,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
       assert target.unit.health == 0
       assert target.unit.auras == []
 
-      assert [%{type: :spell_damage, damage: 50, source_guid: 999, target_guid: 1, periodic?: false}] =
+      assert [%Effects.SpellDamage{damage: 50, source_guid: 999, target_guid: 1, periodic?: false}] =
                events
     end
 
@@ -459,7 +460,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
 
       assert target.unit.auras == []
 
-      assert [%{type: :trigger_spell, source_guid: 999, target_guid: 1, spell_id: 7268}] = events
+      assert [%Effects.TriggerSpell{source_guid: 999, target_guid: 1, spell_id: 7268}] = events
     end
 
     test "channeled spells apply secondary auras without the channel-ticked trigger aura" do
@@ -485,7 +486,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
 
       {target, events} = SpellEffect.receive(target_fixture(), context, spell, 1_000)
 
-      assert [%{type: :trigger_spell, spell_id: 16_568}] = Enum.filter(events, &(&1.type == :trigger_spell))
+      assert [%Effects.TriggerSpell{spell_id: 16_568}] = Enum.filter(events, &is_struct(&1, Effects.TriggerSpell))
       assert [%Holder{auras: [%{type: :mod_decrease_speed}]}] = target.unit.auras
     end
 
@@ -508,7 +509,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
                mana: 17
              }
 
-      assert [%{type: :resurrect_request, source_guid: 999, spell_id: 2006, health: 34, mana: 17}] = events
+      assert [%Effects.ResurrectRequest{source_guid: 999, spell_id: 2006, health: 34, mana: 17}] = events
     end
 
     test "resurrect does nothing for non-player targets" do
@@ -576,8 +577,8 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
 
       {target, _events} = SpellEffect.receive(target, context, spell, 1_000)
 
-      assert [%{type: :deliver_attack, target_guid: 555}] =
-               Enum.filter(target.internal.events, &(&1.type == :deliver_attack))
+      assert [%Effects.DeliverAttack{target_guid: 555}] =
+               Enum.filter(target.internal.events, &is_struct(&1, Effects.DeliverAttack))
     end
 
     test "heal effects restore health and emit heal threat for the effective gain" do
@@ -604,8 +605,8 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
       assert target.internal.broadcast_update? == true
 
       assert [
-               %{type: :heal_threat, source_guid: 999, target_guid: 1, amount: 5.0},
-               %{type: :spell_heal, source_guid: 999, target_guid: 1, proc_type: :deal_helpful_spell}
+               %Effects.HealThreat{source_guid: 999, target_guid: 1, amount: 5.0},
+               %Effects.SpellHeal{source_guid: 999, target_guid: 1, proc_type: :deal_helpful_spell}
              ] = events
     end
 
@@ -661,8 +662,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
       {_target, events} = SpellEffect.receive(target_fixture(), context, spell, 1_000)
 
       assert [
-               %{
-                 type: :trigger_spell,
+               %Effects.TriggerSpell{
                  source_guid: 999,
                  source_level: 10,
                  target_guid: 1,
@@ -749,7 +749,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
 
       {_caster, events} = SpellEffect.receive(caster, context, spell, 1_000)
 
-      assert [%{type: :leap, position: {x, y, z, o}}] = events
+      assert [%Effects.Leap{position: {x, y, z, o}}] = events
       assert_in_delta x, 20.0, 0.001
       assert_in_delta y, 0.0, 0.001
       assert z == 0.0
@@ -768,7 +768,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
 
       {_caster, events} = SpellEffect.receive(target_fixture(), context, spell, 1_000)
 
-      assert [%{type: :teleport_to_spell_target, spell_id: 3561}] = events
+      assert [%Effects.TeleportToSpellTarget{spell_id: 3561}] = events
     end
 
     test "create_item effect emits a create_item event" do
@@ -783,7 +783,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
 
       {_caster, events} = SpellEffect.receive(target_fixture(), context, spell, 1_000)
 
-      assert [%{type: :create_item, item_id: 5350, count: 2}] = events
+      assert [%Effects.CreateItem{item_id: 5350, count: 2}] = events
     end
 
     test "interrupt_cast clears the target's cast and locks out the school" do
@@ -839,7 +839,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
       context = %CastContext{caster_guid: 1, caster_level: 10}
       {_caster, events} = SpellEffect.receive(target_fixture(), context, spell, 1_000)
 
-      assert [%{type: :summon_game_object, entry: 2561, duration_ms: 60_000}] = events
+      assert [%Effects.SummonGameObject{entry: 2561, duration_ms: 60_000}] = events
     end
 
     test "summon-player effects preserve the DBC-selected target and caster destination" do
@@ -856,8 +856,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
       {_caster, events} = SpellEffect.receive(target_fixture(), context, spell, 1_000)
 
       assert [
-               %{
-                 type: :summon_request,
+               %Effects.SummonRequest{
                  source_guid: 1,
                  target_guid: 99,
                  amount: 12,
@@ -880,8 +879,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
       {_caster, events} = SpellEffect.receive(target_fixture(), context, spell, 1_000)
 
       assert [
-               %{
-                 type: :summon_creature,
+               %Effects.SummonCreature{
                  summon: %{
                    entry: 11_859,
                    owner_guid: 1,
@@ -899,7 +897,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
 
       {_target, events} = SpellEffect.receive(target, %CastContext{caster_guid: 99, caster_level: 10}, spell, 1_000)
 
-      assert [%{type: :tame_creature, source_guid: 99, entry: 1234}] = events
+      assert [%Effects.TameCreature{source_guid: 99, entry: 1234}] = events
     end
 
     test "tame beast completion triggers VMangos' ownership spell" do
@@ -909,7 +907,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
 
       {_target, events} = SpellEffect.receive(target, context, spell, 1_000)
 
-      assert [%{type: :trigger_spell, source_guid: 99, target_guid: target_guid, spell_id: 13_481}] = events
+      assert [%Effects.TriggerSpell{source_guid: 99, target_guid: target_guid, spell_id: 13_481}] = events
       assert target_guid == target.object.guid
     end
 
@@ -926,15 +924,15 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
 
       call_pet = %Spell{id: 883, effects: [%Effect{index: 0, type: :summon_pet, misc_value: 0}]}
       {_character, events} = SpellEffect.receive(character, context, call_pet, 1_000)
-      assert [%{type: :summon_pet, entry: 1234, spell_id: 883}] = events
+      assert [%Effects.SummonPet{entry: 1234, spell_id: 883}] = events
 
       revive_pet = %Spell{id: 982, effects: [%Effect{index: 0, type: :revive_pet, misc_value: 0}]}
       {_character, events} = SpellEffect.receive(character, context, revive_pet, 1_000)
-      assert [%{type: :summon_pet, entry: 1234, spell_id: 982}] = events
+      assert [%Effects.SummonPet{entry: 1234, spell_id: 982}] = events
 
       dismiss_pet = %Spell{id: 2641, effects: [%Effect{index: 0, type: :dismiss_pet}]}
       {_character, events} = SpellEffect.receive(character, context, dismiss_pet, 1_000)
-      assert [%{type: :dismiss_pet, source_guid: 1}] = events
+      assert [%Effects.DismissPet{source_guid: 1}] = events
     end
 
     test "totem effects preserve their elemental summon slot" do
@@ -946,7 +944,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
 
       {_caster, events} = SpellEffect.receive(target_fixture(), %CastContext{caster_guid: 1}, spell, 1_000)
 
-      assert [%{type: :summon_totem, entry: 2523, slot: 1, duration_ms: 30_000}] = events
+      assert [%Effects.SummonTotem{entry: 2523, slot: 1, duration_ms: 30_000}] = events
     end
 
     test "mod_damage_taken reduces incoming spell damage" do
@@ -981,7 +979,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
       context = %CastContext{caster_guid: 999, caster_level: 10}
       {target, events} = SpellEffect.receive(target, context, fireball, 1_000)
 
-      assert [%{type: :spell_damage, damage: 5}] = events
+      assert [%Effects.SpellDamage{damage: 5}] = events
       assert target.unit.health == 15
     end
 

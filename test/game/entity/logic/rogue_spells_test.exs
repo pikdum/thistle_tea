@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Entity.Logic.RogueSpellsTest do
   alias ThistleTea.Game.Entity.Logic.AttackTable
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Combat
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Reactive
   alias ThistleTea.Game.Entity.Logic.SpellEffect
   alias ThistleTea.Game.Spell
@@ -375,10 +376,10 @@ defmodule ThistleTea.Game.Entity.Logic.RogueSpellsTest do
       refute entity.internal.blackboard.auto_attacking
       assert entity.internal.threat_refs == MapSet.new()
       assert entity.internal.undetectable_until == 2_000
-      assert Enum.count(events, &(&1.type == :drop_threat)) == 2
-      assert Enum.any?(events, &(&1.type == :drop_nearby_threat))
-      assert Enum.any?(events, &(&1.type == :attack_stop and &1.target_guid == 9))
-      assert Enum.any?(events, &(&1.type == :trigger_spell and &1.spell_id == 1787))
+      assert Enum.count(events, &is_struct(&1, Effects.DropThreat)) == 2
+      assert Enum.any?(events, &is_struct(&1, Effects.DropNearbyThreat))
+      assert Enum.any?(events, &(is_struct(&1, Effects.AttackStop) and &1.target_guid == 9))
+      assert Enum.any?(events, &(is_struct(&1, Effects.TriggerSpell) and &1.spell_id == 1787))
     end
 
     test "vanish removes stalked auras as required by the VMangos spell script" do

@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Entity.Logic.DuelingTest do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Dueling
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Spell
 
   describe "requested/2 and started/2" do
@@ -70,7 +71,7 @@ defmodule ThistleTea.Game.Entity.Logic.DuelingTest do
       assert character.internal.duel == nil
       refute character.internal.in_combat
       refute character.internal.blackboard.auto_attacking
-      assert Enum.any?(events, &match?(%{type: :attack_stop, source_guid: 1, target_guid: 2}, &1))
+      assert Enum.any?(events, &match?(%Effects.AttackStop{source_guid: 1, target_guid: 2}, &1))
     end
   end
 
@@ -83,7 +84,7 @@ defmodule ThistleTea.Game.Entity.Logic.DuelingTest do
 
       assert character.unit.health == 1
       assert absorbed == 51
-      assert Enum.any?(character.internal.events, &match?(%{type: :duel_defeat, source_guid: 2}, &1))
+      assert Enum.any?(character.internal.events, &match?(%Effects.DuelDefeat{source_guid: 2}, &1))
     end
 
     test "an opponent pet receives duel credit through its owner" do
@@ -93,7 +94,7 @@ defmodule ThistleTea.Game.Entity.Logic.DuelingTest do
         Core.take_damage_with_absorb(character, 100, 5_000, source: 20, source_owner: 2)
 
       assert character.unit.health == 1
-      assert Enum.any?(character.internal.events, &match?(%{type: :duel_defeat, source_guid: 2}, &1))
+      assert Enum.any?(character.internal.events, &match?(%Effects.DuelDefeat{source_guid: 2}, &1))
     end
 
     test "third-party lethal damage kills normally and interrupts the duel" do
@@ -103,7 +104,7 @@ defmodule ThistleTea.Game.Entity.Logic.DuelingTest do
         Core.take_damage_with_absorb(character, 100, 5_000, source: 9, source_owner: 9)
 
       assert character.unit.health == 0
-      assert Enum.any?(character.internal.events, &match?(%{type: :duel_interrupted}, &1))
+      assert Enum.any?(character.internal.events, &match?(%Effects.DuelInterrupted{}, &1))
     end
 
     test "a spell reflected by the opponent can defeat its original caster" do
@@ -117,7 +118,7 @@ defmodule ThistleTea.Game.Entity.Logic.DuelingTest do
         )
 
       assert character.unit.health == 1
-      assert Enum.any?(character.internal.events, &match?(%{type: :duel_defeat, source_guid: 2}, &1))
+      assert Enum.any?(character.internal.events, &match?(%Effects.DuelDefeat{source_guid: 2}, &1))
     end
   end
 

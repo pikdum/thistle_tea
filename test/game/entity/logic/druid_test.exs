@@ -99,7 +99,7 @@ defmodule ThistleTea.Game.Entity.Logic.DruidTest do
       {target, events} = SpellEffect.receive(melee_target(), context, spell, 1_000)
 
       assert target.unit.health == 900
-      refute Enum.any?(events, &(&1.type == :drain_power))
+      refute Enum.any?(events, &is_struct(&1, Effects.DrainPower))
     end
   end
 

@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Entity.Logic.HunterTest do
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.Aura
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Hunter
   alias ThistleTea.Game.Entity.Logic.Reactive
   alias ThistleTea.Game.Entity.Logic.SpellFeedback
@@ -133,10 +134,10 @@ defmodule ThistleTea.Game.Entity.Logic.HunterTest do
       assert character.internal.threat_refs == MapSet.new()
       assert character.internal.auto_shot == nil
       assert character.unit.stand_state == 7
-      assert Enum.count(events, &(&1.type == :drop_threat)) == 2
-      assert Enum.any?(events, &(&1.type == :drop_nearby_threat))
-      assert Enum.any?(events, &(&1.type == :attack_stop and &1.target_guid == 2))
-      assert Enum.any?(events, &(&1.type == :stand_state and &1.stand_state == 7))
+      assert Enum.count(events, &is_struct(&1, Effects.DropThreat)) == 2
+      assert Enum.any?(events, &is_struct(&1, Effects.DropNearbyThreat))
+      assert Enum.any?(events, &(is_struct(&1, Effects.AttackStop) and &1.target_guid == 2))
+      assert Enum.any?(events, &(is_struct(&1, Effects.StandState) and &1.stand_state == 7))
     end
   end
 
@@ -219,7 +220,7 @@ defmodule ThistleTea.Game.Entity.Logic.HunterTest do
           2_000
         )
 
-      assert [%{type: :trigger_spell, spell_id: 6150}] = character.internal.events
+      assert [%Effects.TriggerSpell{spell_id: 6150}] = character.internal.events
     end
   end
 
@@ -242,10 +243,10 @@ defmodule ThistleTea.Game.Entity.Logic.HunterTest do
 
       assert character.internal.cooldowns == %{133 => 9_000}
 
-      assert Enum.map(character.internal.events, &{&1.type, &1.spell_id}) == [
-               {:clear_cooldown, 3044},
-               {:clear_cooldown, 13_795}
-             ]
+      assert [
+               %Effects.ClearCooldown{spell_id: 3044},
+               %Effects.ClearCooldown{spell_id: 13_795}
+             ] = character.internal.events
     end
 
     test "refocus uses hunter family masks instead of spell IDs" do
@@ -264,7 +265,7 @@ defmodule ThistleTea.Game.Entity.Logic.HunterTest do
       character = Hunter.reset_cooldowns(character, refocus)
 
       assert character.internal.cooldowns == %{13_795 => 16_000}
-      assert [%{type: :clear_cooldown, spell_id: 19_434}] = character.internal.events
+      assert [%Effects.ClearCooldown{spell_id: 19_434}] = character.internal.events
     end
   end
 

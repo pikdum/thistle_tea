@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.AuraTest do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Aura, as: AuraBT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.Aura
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.WorldRef
@@ -33,8 +34,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.AuraTest do
       assert entity.unit.health == 50
 
       assert [
-               %{
-                 type: :spell_damage,
+               %Effects.SpellDamage{
                  source_guid: 999,
                  target_guid: 1,
                  spell_id: 11_366,

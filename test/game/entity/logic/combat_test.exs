@@ -194,7 +194,7 @@ defmodule ThistleTea.Game.Entity.Logic.CombatTest do
         )
 
       assert [%Holder{charges: 30}] = target.unit.auras
-      refute Enum.any?(events, &(&1.type == :trigger_spell and &1.spell_id == 22_858))
+      refute Enum.any?(events, &(is_struct(&1, Effects.TriggerSpell) and &1.spell_id == 22_858))
     end
 
     test "does not include hit reaction events when target dies" do

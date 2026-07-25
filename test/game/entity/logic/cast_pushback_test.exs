@@ -28,13 +28,13 @@ defmodule ThistleTea.Game.Entity.Logic.CastPushbackTest do
       caster = Core.take_damage(caster, 10, 2_500, source: 99)
 
       assert caster.internal.casting.ends_at == 5_000
-      assert [%Effects.SpellDelayed{delay_ms: 1_000}] = events_of_type(caster, :spell_delayed)
+      assert [%Effects.SpellDelayed{delay_ms: 1_000}] = effects_of(caster, Effects.SpellDelayed)
 
       caster = clear_events(caster)
       caster = Core.take_damage(caster, 10, 2_600, source: 99)
 
       assert caster.internal.casting.ends_at == 5_600
-      assert [%Effects.SpellDelayed{delay_ms: 600}] = events_of_type(caster, :spell_delayed)
+      assert [%Effects.SpellDelayed{delay_ms: 600}] = effects_of(caster, Effects.SpellDelayed)
       assert caster.internal.casting.pushback_count == 2
     end
 
@@ -46,7 +46,7 @@ defmodule ThistleTea.Game.Entity.Logic.CastPushbackTest do
       assert caster.internal.casting == nil
 
       assert [%Effects.SpellCastFailed{spell_id: 116, reason: :interrupted}] =
-               events_of_type(caster, :spell_cast_failed)
+               effects_of(caster, Effects.SpellCastFailed)
     end
 
     test "periodic damage never pushes back" do
@@ -55,7 +55,7 @@ defmodule ThistleTea.Game.Entity.Logic.CastPushbackTest do
       caster = Core.take_damage(caster, 10, 2_500, source: 99, periodic: true)
 
       assert caster.internal.casting.ends_at == 4_000
-      assert events_of_type(caster, :spell_delayed) == []
+      assert effects_of(caster, Effects.SpellDelayed) == []
     end
 
     test "mob casters are unaffected" do
@@ -70,7 +70,7 @@ defmodule ThistleTea.Game.Entity.Logic.CastPushbackTest do
       mob = Core.take_damage(mob, 10, 2_500, source: 99)
 
       assert mob.internal.casting.ends_at == 4_000
-      assert events_of_type(mob, :spell_delayed) == []
+      assert effects_of(mob, Effects.SpellDelayed) == []
     end
 
     test "resist-pushback auras can fully prevent the delay" do
@@ -84,7 +84,7 @@ defmodule ThistleTea.Game.Entity.Logic.CastPushbackTest do
       caster = Core.take_damage(caster, 10, 2_500, source: 99)
 
       assert caster.internal.casting.ends_at == 4_000
-      assert events_of_type(caster, :spell_delayed) == []
+      assert effects_of(caster, Effects.SpellDelayed) == []
     end
   end
 
@@ -96,7 +96,7 @@ defmodule ThistleTea.Game.Entity.Logic.CastPushbackTest do
       caster = Core.take_damage(caster, 10, 2_000, source: 99)
 
       assert caster.internal.casting.ends_at == 10_000
-      assert [%Effects.ChannelUpdate{channel_time_ms: 8_000}] = events_of_type(caster, :channel_update)
+      assert [%Effects.ChannelUpdate{channel_time_ms: 8_000}] = effects_of(caster, Effects.ChannelUpdate)
     end
 
     test "interrupts the channel when the remaining time is exhausted" do
@@ -105,7 +105,7 @@ defmodule ThistleTea.Game.Entity.Logic.CastPushbackTest do
       caster = Core.take_damage(caster, 10, 10_900, source: 99)
 
       assert caster.internal.casting == nil
-      assert [%Effects.ChannelUpdate{channel_time_ms: 0}] = events_of_type(caster, :channel_update)
+      assert [%Effects.ChannelUpdate{channel_time_ms: 0}] = effects_of(caster, Effects.ChannelUpdate)
     end
 
     test "self-inflicted damage does not shorten the channel" do
@@ -114,7 +114,7 @@ defmodule ThistleTea.Game.Entity.Logic.CastPushbackTest do
       caster = Core.take_damage(caster, 10, 2_000, source: 1)
 
       assert caster.internal.casting.ends_at == 11_000
-      assert events_of_type(caster, :channel_update) == []
+      assert effects_of(caster, Effects.ChannelUpdate) == []
     end
 
     test "cancels the channel when its flags interrupt on damage" do
@@ -131,7 +131,7 @@ defmodule ThistleTea.Game.Entity.Logic.CastPushbackTest do
       caster = Core.take_damage(caster, 10, 2_000, source: 99)
 
       assert [%Effects.DelayAura{source_guid: 1, target_guid: 77, spell_id: 15_407, delay_ms: 1_000}] =
-               events_of_type(caster, :delay_aura)
+               effects_of(caster, Effects.DelayAura)
     end
 
     test "mob targets shorten the aura without queueing duration packets" do
@@ -171,8 +171,8 @@ defmodule ThistleTea.Game.Entity.Logic.CastPushbackTest do
       caster = Core.take_damage(caster, 10, 2_000, source: 99)
 
       assert [%Holder{expires_at: 10_000}] = caster.unit.auras
-      assert [%Effects.AuraDuration{aura_slot: 3, duration_ms: 8_000}] = events_of_type(caster, :aura_duration)
-      assert events_of_type(caster, :delay_aura) == []
+      assert [%Effects.AuraDuration{aura_slot: 3, duration_ms: 8_000}] = effects_of(caster, Effects.AuraDuration)
+      assert effects_of(caster, Effects.DelayAura) == []
     end
   end
 
@@ -206,10 +206,10 @@ defmodule ThistleTea.Game.Entity.Logic.CastPushbackTest do
     %{caster | unit: unit, internal: %{caster.internal | casting: casting}}
   end
 
-  defp events_of_type(entity, type) do
+  defp effects_of(entity, effect_module) do
     entity.internal.events
     |> List.wrap()
-    |> Enum.filter(&(&1.type == type))
+    |> Enum.filter(&is_struct(&1, effect_module))
   end
 
   defp clear_events(%{internal: %Internal{} = internal} = entity) do

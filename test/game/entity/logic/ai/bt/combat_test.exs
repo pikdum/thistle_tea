@@ -103,7 +103,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.CombatTest do
       blackboard = %Blackboard{attack_started: true, next_attack_at: 0, next_offhand_attack_at: 0}
       assert {:success, mob, blackboard} = Combat.melee_attack(mob, blackboard, 1_000)
 
-      attacks = Enum.filter(mob.internal.events, &(&1.type == :deliver_attack))
+      attacks = Enum.filter(mob.internal.events, &is_struct(&1, Effects.DeliverAttack))
       assert length(attacks) == 2
       assert Enum.any?(attacks, &(Map.get(&1.attack, :offhand?) == true and &1.attack.damage == 4))
       assert blackboard.next_attack_at == 3_000
@@ -203,7 +203,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.CombatTest do
                Combat.melee_attack(character, %Blackboard{attack_started: true, next_attack_at: 0}, 1_000)
 
       assert %Effects.SpellGo{hit_guids: [^primary_guid, ^secondary_guid]} =
-               Enum.find(character.internal.events, &(&1.type == :spell_go))
+               Enum.find(character.internal.events, &is_struct(&1, Effects.SpellGo))
 
       assert [^primary_guid, ^secondary_guid] =
                for(%Effects.DeliverSpell{target_guid: guid} <- character.internal.events, do: guid)
@@ -232,7 +232,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.CombatTest do
       assert {:success, mob, %Blackboard{attack_started: true, next_attack_at: 3_000}} =
                Combat.melee_attack(mob, blackboard, 1_000)
 
-      assert Enum.any?(mob.internal.events, &(&1.type == :deliver_attack))
+      assert Enum.any?(mob.internal.events, &is_struct(&1, Effects.DeliverAttack))
     end
 
     test "retries shortly instead of arming a full swing timer when out of reach on fresh aggro" do
@@ -258,7 +258,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.CombatTest do
       assert {:success, mob, %Blackboard{attack_started: true, next_attack_at: 1_100}} =
                Combat.melee_attack(mob, blackboard, 1_000)
 
-      refute Enum.any?(mob.internal.events, &(&1.type == :deliver_attack))
+      refute Enum.any?(mob.internal.events, &is_struct(&1, Effects.DeliverAttack))
     end
 
     test "grants no rage at swing time since rage flows from resolved outcomes" do
@@ -292,7 +292,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.CombatTest do
 
       assert [
                %Effects.DeliverAttack{target_guid: ^target_guid, attack: %{damage: 10}}
-             ] = Enum.filter(character.internal.events, &(&1.type == :deliver_attack))
+             ] = Enum.filter(character.internal.events, &is_struct(&1, Effects.DeliverAttack))
     end
   end
 

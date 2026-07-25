@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.Entity.Logic.ShamanTest do
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Shaman
 
   defp shaman do
@@ -18,10 +19,10 @@ defmodule ThistleTea.Game.Entity.Logic.ShamanTest do
       frostbrand = %{effect: %{amount: 0, spell_id: 8034}, attack_time_ms: 3000}
 
       triggered = Shaman.trigger_weapon_enchant(shaman(), payload, windfury, 0.0, fn -> 0.2 end)
-      assert [%{type: :trigger_spell, spell_id: 8233, target_guid: 2}] = triggered.internal.events
+      assert [%Effects.TriggerSpell{spell_id: 8233, target_guid: 2}] = triggered.internal.events
 
       triggered = Shaman.trigger_weapon_enchant(shaman(), payload, frostbrand, 9.0, fn -> 0.4 end)
-      assert [%{type: :trigger_spell, spell_id: 8034}] = triggered.internal.events
+      assert [%Effects.TriggerSpell{spell_id: 8034}] = triggered.internal.events
 
       unchanged = Shaman.trigger_weapon_enchant(shaman(), payload, frostbrand, 9.0, fn -> 0.5 end)
       assert unchanged.internal.events == []

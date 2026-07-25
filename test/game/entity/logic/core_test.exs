@@ -42,7 +42,7 @@ defmodule ThistleTea.Game.Entity.Logic.CoreTest do
       {entity, _absorbed} = Core.take_damage_with_absorb(entity, 100, 1_000, school: :physical, source: 777)
 
       assert entity.unit.health == 30
-      assert [%{type: :redirect_damage, target_guid: 2, amount: 30}] = entity.internal.events
+      assert [%Effects.RedirectDamage{target_guid: 2, amount: 30}] = entity.internal.events
     end
 
     test "skips the redirect when the split portion truncates to zero" do
@@ -155,7 +155,7 @@ defmodule ThistleTea.Game.Entity.Logic.CoreTest do
 
       assert Enum.any?(
                entity.internal.events,
-               &match?(%{type: :spell_modifier, modifier_type: :pct, effect_index: 0, amount: 0}, &1)
+               &match?(%Effects.SpellModifier{modifier_type: :pct, effect_index: 0, amount: 0}, &1)
              )
     end
   end
@@ -176,7 +176,7 @@ defmodule ThistleTea.Game.Entity.Logic.CoreTest do
       {entity, _absorbed} =
         Core.take_damage_with_absorb(%{entity | unit: unit, internal: internal}, 30, 1_000, source: 777)
 
-      assert [%{type: :create_item, target_guid: 777, item_id: 6265, count: 1}] = entity.internal.events
+      assert [%Effects.GiveItem{target_guid: 777, item_id: 6265, count: 1}] = entity.internal.events
     end
 
     test "does not reward death items for gray or differently tapped creatures" do
@@ -228,10 +228,10 @@ defmodule ThistleTea.Game.Entity.Logic.CoreTest do
       assert entity.unit.auras == [spirit_talent()]
 
       assert [
-               %{type: :trigger_spell, spell_id: 27_827, duration_ms: 15_000, amount: 100, slot: 0},
-               %{type: :trigger_spell, spell_id: 27_792, duration_ms: 15_000},
-               %{type: :trigger_spell, spell_id: 27_795, duration_ms: 15_000}
-             ] = Enum.filter(entity.internal.events, &(&1.type == :trigger_spell))
+               %Effects.TriggerSpell{spell_id: 27_827, duration_ms: 15_000, amount: 100, slot: 0},
+               %Effects.TriggerSpell{spell_id: 27_792, duration_ms: 15_000},
+               %Effects.TriggerSpell{spell_id: 27_795, duration_ms: 15_000}
+             ] = Enum.filter(entity.internal.events, &is_struct(&1, Effects.TriggerSpell))
     end
 
     test "absorbs damage while the spirit form is active" do
@@ -255,7 +255,7 @@ defmodule ThistleTea.Game.Entity.Logic.CoreTest do
         )
 
       assert Core.dead?(entity)
-      refute Enum.any?(entity.internal.events, &(&1.type == :trigger_spell and &1.spell_id == 27_827))
+      refute Enum.any?(entity.internal.events, &(is_struct(&1, Effects.TriggerSpell) and &1.spell_id == 27_827))
     end
   end
 

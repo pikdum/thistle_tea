@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.Spell.CooldownsTest do
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Mob
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Cooldowns
 
@@ -83,7 +84,7 @@ defmodule ThistleTea.Game.Spell.CooldownsTest do
       holder = %Holder{spell: spell}
       {entity, [event]} = Cooldowns.activate_on_event(entity, [holder], 5_000)
 
-      assert event.type == :cooldown_event
+      assert is_struct(event, Effects.CooldownEvent)
       assert event.spell_id == 1784
       assert Cooldowns.ready_at(entity, spell) == 15_000
       assert Cooldowns.on_cooldown?(entity, spell, 14_999)

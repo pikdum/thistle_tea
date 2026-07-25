@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.Entity.Logic.DuelSpellEffectTest do
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.SpellEffect
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
@@ -42,7 +43,7 @@ defmodule ThistleTea.Game.Entity.Logic.DuelSpellEffectTest do
       }
 
       assert {^target, [event]} = SpellEffect.receive(target, context, spell, 1_000)
-      assert event.type == :duel_request
+      assert is_struct(event, Effects.DuelRequest)
       assert event.source_guid == 1
       assert event.target_guid == 2
       assert event.entry == 21_680

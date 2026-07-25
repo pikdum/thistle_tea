@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Entity.Logic.PaladinSpellsTest do
   alias ThistleTea.Game.Entity.Logic.AttackFeedback
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
   alias ThistleTea.Game.Entity.Logic.Core
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Paladin
   alias ThistleTea.Game.Entity.Logic.SpellEffect
   alias ThistleTea.Game.Spell
@@ -36,7 +37,7 @@ defmodule ThistleTea.Game.Entity.Logic.PaladinSpellsTest do
       result = Paladin.release_seal(character, judgement, 9, 1_000)
 
       assert result.unit.auras == []
-      assert Enum.any?(result.internal.events, &(&1.type == :trigger_spell and &1.spell_id == 20_192))
+      assert Enum.any?(result.internal.events, &(is_struct(&1, Effects.TriggerSpell) and &1.spell_id == 20_192))
       assert result.internal.broadcast_update?
     end
 
@@ -139,7 +140,7 @@ defmodule ThistleTea.Game.Entity.Logic.PaladinSpellsTest do
         caster_context = %CastContext{caster_guid: 5, caster_level: 60, target_guid: 5}
         {caster, _events} = AuraLogic.apply_spell(character([]), caster_context, seal, 1_000)
         caster = Paladin.release_seal(caster, judgement, 9, 2_000)
-        trigger = Enum.find(caster.internal.events, &(&1.type == :trigger_spell))
+        trigger = Enum.find(caster.internal.events, &is_struct(&1, Effects.TriggerSpell))
         triggered_spell = SpellLoader.load(trigger.spell_id)
 
         target = character([])
@@ -210,7 +211,7 @@ defmodule ThistleTea.Game.Entity.Logic.PaladinSpellsTest do
 
       context = %CastContext{caster_guid: 9, caster_level: 60, target_hostile?: true}
 
-      assert {^target, [%{type: :spell_log_miss, reason: :immune}]} = SpellEffect.receive(target, context, stun, 1_000)
+      assert {^target, [%Effects.SpellLogMiss{reason: :immune}]} = SpellEffect.receive(target, context, stun, 1_000)
     end
   end
 
@@ -265,7 +266,7 @@ defmodule ThistleTea.Game.Entity.Logic.PaladinSpellsTest do
       assert remote_holder.next_area_refresh_at == nil
 
       {_caster, events} = AuraLogic.tick(caster, 2_000)
-      assert [%{type: :refresh_party_aura, spell: ^spell, amount: 30.0}] = events
+      assert [%Effects.RefreshPartyAura{spell: ^spell, amount: 30.0}] = events
     end
   end
 
@@ -281,7 +282,7 @@ defmodule ThistleTea.Game.Entity.Logic.PaladinSpellsTest do
       result = Paladin.trigger_seal(character, %{outcome: :normal, victim_guid: 9})
 
       assert [event] = result.internal.events
-      assert event.type == :deliver_spell
+      assert is_struct(event, Effects.DeliverSpell)
       assert event.target_guid == 9
       assert event.spell.id == 25_740
       assert event.spell.school == :holy
@@ -313,7 +314,7 @@ defmodule ThistleTea.Game.Entity.Logic.PaladinSpellsTest do
 
       result = AttackFeedback.receive(character, %{outcome: :normal, damage: 1, victim_guid: 9}, nil, 1_000)
 
-      assert [%{type: :trigger_spell, source_guid: 5, target_guid: 9, spell_id: 20_167}] = result.internal.events
+      assert [%Effects.TriggerSpell{source_guid: 5, target_guid: 9, spell_id: 20_167}] = result.internal.events
 
       assert {_character, []} = AuraLogic.reactions(character, :hit_taken, %{attacker_guid: 9})
     end
@@ -332,7 +333,7 @@ defmodule ThistleTea.Game.Entity.Logic.PaladinSpellsTest do
       target = character([])
       target = %{target | object: %Object{guid: 9}}
 
-      assert {_target, [%{type: :trigger_spell, spell_id: 25_914, target_guid: 9}]} =
+      assert {_target, [%Effects.TriggerSpell{spell_id: 25_914, target_guid: 9}]} =
                SpellEffect.receive(target, context, spell, 1_000)
     end
 
@@ -362,7 +363,7 @@ defmodule ThistleTea.Game.Entity.Logic.PaladinSpellsTest do
       target = character([])
       target = %{target | object: %Object{guid: 9}}
 
-      assert {_target, [%{type: :trigger_spell, spell_id: 20_466, target_guid: 9}]} =
+      assert {_target, [%Effects.TriggerSpell{spell_id: 20_466, target_guid: 9}]} =
                SpellEffect.receive(target, context, spell, 1_000)
     end
 
@@ -418,7 +419,7 @@ defmodule ThistleTea.Game.Entity.Logic.PaladinSpellsTest do
       {target, [event]} = AuraLogic.reactions(character([retribution]), :hit_taken, %{attacker_guid: 9})
 
       assert target.unit.auras == [retribution]
-      assert event.type == :deliver_spell
+      assert is_struct(event, Effects.DeliverSpell)
       assert event.target_guid == 9
       assert event.spell.school == :holy
       assert [%Spell.Effect{type: :school_damage, base_points: 5}] = event.spell.effects
@@ -437,7 +438,7 @@ defmodule ThistleTea.Game.Entity.Logic.PaladinSpellsTest do
       assert damaged.unit.health == 45
 
       assert Enum.any?(damaged.internal.events, fn event ->
-               event.type == :redirect_damage and event.source_guid == 9 and event.target_guid == 7 and
+               is_struct(event, Effects.RedirectDamage) and event.source_guid == 9 and event.target_guid == 7 and
                  event.amount == 45
              end)
     end

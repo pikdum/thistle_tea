@@ -140,7 +140,7 @@ defmodule ThistleTea.Game.Entity.Logic.ThreatTest do
 
       lost =
         entity.internal.events
-        |> Enum.filter(&(&1.type == :threat_ref_lost))
+        |> Enum.filter(&is_struct(&1, Effects.ThreatRefLost))
         |> Enum.map(& &1.target_guid)
         |> Enum.sort()
 

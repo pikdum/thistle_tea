@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Entity.Logic.MageSpellsTest do
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.Aura
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.SpellEffect
   alias ThistleTea.Game.Entity.Logic.SpellFeedback
   alias ThistleTea.Game.Spell
@@ -41,7 +42,7 @@ defmodule ThistleTea.Game.Entity.Logic.MageSpellsTest do
       {caster, _events} = SpellEffect.receive(caster, context, cold_snap, 1_000)
 
       assert caster.internal.cooldowns == %{2136 => 10_000, 8056 => 8_000}
-      assert [%{type: :clear_cooldown, spell_id: 122}] = caster.internal.events
+      assert [%Effects.ClearCooldown{spell_id: 122}] = caster.internal.events
     end
   end
 
@@ -93,7 +94,7 @@ defmodule ThistleTea.Game.Entity.Logic.MageSpellsTest do
 
       caster = SpellFeedback.receive(caster, spell_outcome(:normal), fireball, 1_000)
       assert [%{charges: 3}, _visible] = caster.unit.auras
-      assert [%{type: :trigger_spell, spell_id: 28_682}] = caster.internal.events
+      assert [%Effects.TriggerSpell{spell_id: 28_682}] = caster.internal.events
 
       caster = %{caster | internal: %{caster.internal | events: []}}
       caster = SpellFeedback.receive(caster, spell_outcome(:crit), fireball, 2_000)
@@ -137,7 +138,7 @@ defmodule ThistleTea.Game.Entity.Logic.MageSpellsTest do
       caster = SpellFeedback.receive(caster, spell_outcome(:crit), fireball, 1_000)
 
       assert caster.unit.auras == []
-      assert Enum.any?(caster.internal.events, &(&1.type == :cooldown_event and &1.spell_id == 11_129))
+      assert Enum.any?(caster.internal.events, &(is_struct(&1, Effects.CooldownEvent) and &1.spell_id == 11_129))
       assert Cooldowns.on_cooldown?(caster, proc_spell, 1_001)
       refute Cooldowns.on_cooldown?(caster, proc_spell, 181_001)
     end

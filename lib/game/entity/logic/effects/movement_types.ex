@@ -17,12 +17,10 @@ defmodule ThistleTea.Game.Entity.Logic.Effects.MovementTypes do
   ]
 
   for {name, required, optional} <- effects do
-    type = name |> Atom.to_string() |> Macro.underscore() |> String.to_atom()
-
     defmodule Module.concat(ThistleTea.Game.Entity.Logic.Effects, name) do
       @moduledoc false
       @enforce_keys required
-      defstruct [type: type] ++ required ++ optional
+      defstruct required ++ optional
     end
   end
 end

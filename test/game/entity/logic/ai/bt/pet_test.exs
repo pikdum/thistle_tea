@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.PetTest do
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AI.BT.Pet, as: PetBT
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
@@ -30,7 +31,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.PetTest do
       state = pet_beside_owner(owner_guid)
 
       assert {:success, despawned, %Blackboard{}} = PetBT.follow_owner(state, %Blackboard{}, @now)
-      assert [%{type: :despawn_self}] = despawned.internal.events
+      assert [%Effects.DespawnSelf{}] = despawned.internal.events
     end
   end
 

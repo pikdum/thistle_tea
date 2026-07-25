@@ -409,8 +409,8 @@ defmodule ThistleTea.Game.Entity.Logic.WarriorSpellsTest do
 
       {_target, events} = SpellEffect.receive(target, context, spell, 1_000)
 
-      refute Enum.any?(events, &(&1.type == :drain_power))
-      assert Enum.any?(events, &(&1.type == :spell_log_miss))
+      refute Enum.any?(events, &is_struct(&1, Effects.DrainPower))
+      assert Enum.any?(events, &is_struct(&1, Effects.SpellLogMiss))
     end
   end
 
@@ -563,7 +563,7 @@ defmodule ThistleTea.Game.Entity.Logic.WarriorSpellsTest do
 
       refute Aura.has_aura?(primary, :mod_fear)
       refute Aura.has_aura?(primary, :mod_confuse)
-      assert Enum.any?(primary_events, &(&1.type == :trigger_spell and &1.spell_id == 20_511))
+      assert Enum.any?(primary_events, &(is_struct(&1, Effects.TriggerSpell) and &1.spell_id == 20_511))
 
       secondary = put_in(melee_target().object.guid, 10)
       {secondary, _events} = SpellEffect.receive(secondary, context, spell, 1_000)
@@ -679,7 +679,7 @@ defmodule ThistleTea.Game.Entity.Logic.WarriorSpellsTest do
 
       assert target.unit.health == 200
       assert target.unit.auras == []
-      assert Enum.any?(events, &(&1.type == :spell_log_miss))
+      assert Enum.any?(events, &is_struct(&1, Effects.SpellLogMiss))
     end
   end
 
@@ -817,7 +817,7 @@ defmodule ThistleTea.Game.Entity.Logic.WarriorSpellsTest do
 
       character = SpellBT.complete_cast(character, 1_000)
 
-      assert Enum.any?(character.internal.events, &(&1.type == :charge and &1.target_guid == 9))
+      assert Enum.any?(character.internal.events, &(is_struct(&1, Effects.Charge) and &1.target_guid == 9))
     end
   end
 

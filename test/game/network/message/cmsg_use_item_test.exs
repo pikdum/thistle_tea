@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgUseItemTest do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.ItemTemplate
   alias ThistleTea.Game.Entity.Logic.AI.BT.Spell, as: SpellBT
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.BinaryUtils
@@ -87,7 +88,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgUseItemTest do
       character = SpellBT.complete_cast(state.character, Time.now() + 11_000)
 
       assert Enum.any?(character.internal.events, fn event ->
-               event.type == :consume_cast_item and event.cast_item_guid == item_guid
+               is_struct(event, Effects.ConsumeCastItem) and event.cast_item_guid == item_guid
              end)
     end
 

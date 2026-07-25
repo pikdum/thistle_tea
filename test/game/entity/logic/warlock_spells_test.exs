@@ -17,6 +17,7 @@ defmodule ThistleTea.Game.Entity.Logic.WarlockSpellsTest do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Spell, as: SpellBT
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
   alias ThistleTea.Game.Entity.Logic.Combat
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.SpellEffect
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Cast
@@ -125,7 +126,7 @@ defmodule ThistleTea.Game.Entity.Logic.WarlockSpellsTest do
 
       assert Enum.any?(
                events,
-               &(&1.type == :trigger_spell and &1.spell_id == 25_228 and &1.target_guid == pet_guid and
+               &(is_struct(&1, Effects.TriggerSpell) and &1.spell_id == 25_228 and &1.target_guid == pet_guid and
                    &1.source_guid == pet_guid)
              )
     end
@@ -146,7 +147,7 @@ defmodule ThistleTea.Game.Entity.Logic.WarlockSpellsTest do
 
       assert Enum.any?(
                events,
-               &(&1.type == :trigger_spell and &1.spell_id == 25_228 and &1.target_guid == pet_guid and
+               &(is_struct(&1, Effects.TriggerSpell) and &1.spell_id == 25_228 and &1.target_guid == pet_guid and
                    &1.source_guid == pet_guid)
              )
     end
@@ -163,7 +164,7 @@ defmodule ThistleTea.Game.Entity.Logic.WarlockSpellsTest do
       assert is_integer(at)
 
       {_pet, tick_events} = AuraLogic.tick(pet, at)
-      assert Enum.any?(tick_events, &(&1.type == :refresh_party_aura))
+      assert Enum.any?(tick_events, &is_struct(&1, Effects.RefreshPartyAura))
     end
 
     test "owners receive the propagated area aura with a visible slot and working split" do
@@ -192,7 +193,7 @@ defmodule ThistleTea.Game.Entity.Logic.WarlockSpellsTest do
 
       {_result, events} = SpellEffect.receive(character(), context, spell, 1_000)
 
-      assert Enum.any?(events, &(&1.type == :create_item and &1.item_id == 5512))
+      assert Enum.any?(events, &(is_struct(&1, Effects.CreateItem) and &1.item_id == 5512))
     end
 
     test "does not apply the VMangos item table without its script label" do
@@ -201,7 +202,7 @@ defmodule ThistleTea.Game.Entity.Logic.WarlockSpellsTest do
 
       {_result, events} = SpellEffect.receive(character(), context, spell, 1_000)
 
-      refute Enum.any?(events, &(&1.type == :create_item))
+      refute Enum.any?(events, &is_struct(&1, Effects.CreateItem))
     end
   end
 
@@ -221,7 +222,7 @@ defmodule ThistleTea.Game.Entity.Logic.WarlockSpellsTest do
         target_role: :caster
       }
 
-      {_result, [%{type: :summon_creature, summon: summon}]} =
+      {_result, [%Effects.SummonCreature{summon: summon}]} =
         SpellEffect.receive(character(), context, eye, 1_000)
 
       assert summon.entry == 4277
@@ -250,7 +251,7 @@ defmodule ThistleTea.Game.Entity.Logic.WarlockSpellsTest do
         caster_orientation: 0.5
       }
 
-      {_result, [%{type: :summon_creature, summon: summon}]} =
+      {_result, [%Effects.SummonCreature{summon: summon}]} =
         SpellEffect.receive(character(), context, inferno, 1_000)
 
       assert summon.post_spawn_spells == [
@@ -288,7 +289,7 @@ defmodule ThistleTea.Game.Entity.Logic.WarlockSpellsTest do
       assert controlled.unit.npc_flags == 0
       assert controlled.internal.pet.owner_guid == 1
       assert controlled.internal.pet.kind == :charmed
-      assert Enum.any?(events, &(&1.type == :control_granted and &1.spell_id == 20_882))
+      assert Enum.any?(events, &(is_struct(&1, Effects.ControlGranted) and &1.spell_id == 20_882))
 
       {released, events} = AuraLogic.remove_spells(controlled, [20_882], 2_000)
 
@@ -296,7 +297,7 @@ defmodule ThistleTea.Game.Entity.Logic.WarlockSpellsTest do
       assert released.unit.faction_template == 14
       assert released.unit.npc_flags == 7
       assert released.internal.pet == nil
-      assert Enum.any?(events, &(&1.type == :control_released and &1.target_guid == 2))
+      assert Enum.any?(events, &(is_struct(&1, Effects.ControlReleased) and &1.target_guid == 2))
     end
   end
 
@@ -314,7 +315,7 @@ defmodule ThistleTea.Game.Entity.Logic.WarlockSpellsTest do
       {target, events} = SpellEffect.receive(mob(), context, spell, 1_000)
 
       assert target.unit.health == 151
-      assert Enum.any?(events, &(&1.type == :heal_entity and &1.target_guid == 1 and &1.amount == 49))
+      assert Enum.any?(events, &(is_struct(&1, Effects.HealEntity) and &1.target_guid == 1 and &1.amount == 49))
     end
   end
 
@@ -339,7 +340,7 @@ defmodule ThistleTea.Game.Entity.Logic.WarlockSpellsTest do
       assert target.unit.auras == []
 
       assert Enum.any?(events, fn event ->
-               event.type == :trigger_spell and event.source_guid == 1 and event.target_guid == 1 and
+               is_struct(event, Effects.TriggerSpell) and event.source_guid == 1 and event.target_guid == 1 and
                  event.spell_id == 19_658
              end)
     end
@@ -354,7 +355,7 @@ defmodule ThistleTea.Game.Entity.Logic.WarlockSpellsTest do
       context = %CastContext{caster_guid: 1, caster_level: 40, target_hostile?: true}
       {_target, events} = SpellEffect.receive(mob(), context, devour, 1_000)
 
-      refute Enum.any?(events, &(&1.type == :trigger_spell))
+      refute Enum.any?(events, &is_struct(&1, Effects.TriggerSpell))
     end
   end
 
@@ -410,7 +411,7 @@ defmodule ThistleTea.Game.Entity.Logic.WarlockSpellsTest do
       caster = SpellBT.start_cast(caster, ritual, %Targets{}, 1_000)
 
       assert Enum.any?(caster.internal.events, fn event ->
-               event.type == :summon_game_object and event.entry == 36_727 and event.target_guid == 9 and
+               is_struct(event, Effects.SummonGameObject) and event.entry == 36_727 and event.target_guid == 9 and
                  event.duration_ms == 120_000
              end)
     end
@@ -437,7 +438,7 @@ defmodule ThistleTea.Game.Entity.Logic.WarlockSpellsTest do
       caster = SpellBT.clear_cast(caster)
 
       assert caster.internal.channel_game_object_guid == nil
-      assert Enum.any?(caster.internal.events, &(&1.type == :despawn_entity and &1.target_guid == 77))
+      assert Enum.any?(caster.internal.events, &(is_struct(&1, Effects.DespawnEntity) and &1.target_guid == 77))
     end
 
     test "helper channel cancellation releases the participant without despawning the portal" do
@@ -447,10 +448,10 @@ defmodule ThistleTea.Game.Entity.Logic.WarlockSpellsTest do
       helper = SpellBT.clear_cast(helper)
 
       assert Enum.any?(helper.internal.events, fn event ->
-               event.type == :leave_ritual and event.target_guid == 77 and event.source_guid == 1
+               is_struct(event, Effects.LeaveRitual) and event.target_guid == 77 and event.source_guid == 1
              end)
 
-      refute Enum.any?(helper.internal.events, &(&1.type == :despawn_entity))
+      refute Enum.any?(helper.internal.events, &is_struct(&1, Effects.DespawnEntity))
     end
 
     test "portal completion clears a helper channel without releasing it again" do
@@ -461,7 +462,11 @@ defmodule ThistleTea.Game.Entity.Logic.WarlockSpellsTest do
 
       assert helper.internal.casting == nil
       assert helper.unit.channel_object == 0
-      refute Enum.any?(helper.internal.events, &(&1.type in [:leave_ritual, :despawn_entity]))
+
+      refute Enum.any?(
+               helper.internal.events,
+               &(is_struct(&1, Effects.LeaveRitual) or is_struct(&1, Effects.DespawnEntity))
+             )
     end
   end
 
@@ -555,17 +560,17 @@ defmodule ThistleTea.Game.Entity.Logic.WarlockSpellsTest do
     test "periodic stacking stops after both encoded stat losses reach the VMangos cap" do
       below_cap = idiocy_target(12, 1)
       {_target, events} = AuraLogic.tick(below_cap, 2_000)
-      assert Enum.any?(events, &(&1.type == :trigger_spell and &1.spell_id == 1010))
+      assert Enum.any?(events, &(is_struct(&1, Effects.TriggerSpell) and &1.spell_id == 1010))
 
       capped = idiocy_target(13, 1)
       {_target, events} = AuraLogic.tick(capped, 2_000)
-      refute Enum.any?(events, &(&1.type == :trigger_spell))
+      refute Enum.any?(events, &is_struct(&1, Effects.TriggerSpell))
     end
 
     test "does not recursively trigger when self-cast" do
       target = idiocy_target(1, 2)
       {_target, events} = AuraLogic.tick(target, 2_000)
-      refute Enum.any?(events, &(&1.type == :trigger_spell))
+      refute Enum.any?(events, &is_struct(&1, Effects.TriggerSpell))
     end
   end
 
@@ -610,7 +615,7 @@ defmodule ThistleTea.Game.Entity.Logic.WarlockSpellsTest do
       {result, events} = SpellEffect.receive(pet, context, spell, 1_000)
 
       assert result.unit.health == 0
-      assert Enum.any?(events, &(&1.type == :trigger_spell and &1.target_guid == 1 and &1.spell_id == 18_789))
+      assert Enum.any?(events, &(is_struct(&1, Effects.TriggerSpell) and &1.target_guid == 1 and &1.spell_id == 18_789))
     end
   end
 
@@ -641,7 +646,7 @@ defmodule ThistleTea.Game.Entity.Logic.WarlockSpellsTest do
       refute Enum.any?(events, &(&1.spell_id == 18_814))
 
       assert Enum.any?(events, fn event ->
-               event.type == :trigger_spell and event.source_guid == 2 and event.target_guid == 2 and
+               is_struct(event, Effects.TriggerSpell) and event.source_guid == 2 and event.target_guid == 2 and
                  event.spell_id == 25_228
              end)
     end
@@ -720,7 +725,7 @@ defmodule ThistleTea.Game.Entity.Logic.WarlockSpellsTest do
       caster = SpellBT.clear_cast(caster)
 
       assert Enum.any?(caster.internal.events, fn event ->
-               event.type == :remove_aura and event.source_guid == 1 and event.target_guid == 2 and
+               is_struct(event, Effects.RemoveAura) and event.source_guid == 1 and event.target_guid == 2 and
                  event.spell_id == 755
              end)
     end

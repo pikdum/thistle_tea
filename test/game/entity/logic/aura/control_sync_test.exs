@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.ControlSyncTest do
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
   alias ThistleTea.Game.Entity.Logic.Aura.ControlSync
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Effect
 
@@ -42,7 +43,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.ControlSyncTest do
       assert possessed.internal.pet.possessed?
       assert possessed.internal.pet.command_state == :stay
       assert possessed.internal.pet.reaction_state == :passive
-      assert grant.type == :control_granted
+      assert is_struct(grant, Effects.ControlGranted)
       assert grant.enabled?
 
       {restored, [release]} = ControlSync.sync(%{possessed | unit: %{possessed.unit | auras: []}})
@@ -55,7 +56,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.ControlSyncTest do
       refute restored.internal.pet.possessed?
       assert restored.internal.pet.command_state == :follow
       assert restored.internal.pet.reaction_state == :aggressive
-      assert release.type == :control_released
+      assert is_struct(release, Effects.ControlReleased)
     end
 
     test "possessing an ordinary mob creates and removes a temporary control component" do
@@ -93,7 +94,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.ControlSyncTest do
       assert charmed.unit.faction_template == 35
       assert (charmed.unit.flags &&& 0x00000008) != 0
       assert (charmed.unit.flags &&& 0x1000) != 0
-      assert grant.type == :control_granted
+      assert is_struct(grant, Effects.ControlGranted)
 
       {released, [release]} = ControlSync.sync(%{charmed | unit: %{charmed.unit | auras: []}})
 
@@ -102,7 +103,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.ControlSyncTest do
       assert released.unit.faction_template == 14
       assert (released.unit.flags &&& 0x00000008) == 0
       assert (released.unit.flags &&& 0x1000) != 0
-      assert release.type == :control_released
+      assert is_struct(release, Effects.ControlReleased)
     end
 
     test "new control stops the mob's current movement path" do
@@ -121,8 +122,8 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.ControlSyncTest do
       {possessed, events} = ControlSync.sync(mob, 1_000)
 
       assert possessed.movement_block.spline_nodes == []
-      assert Enum.any?(events, &(&1.type == :movement_stopped))
-      assert Enum.any?(events, &(&1.type == :control_granted))
+      assert Enum.any?(events, &is_struct(&1, Effects.MovementStopped))
+      assert Enum.any?(events, &is_struct(&1, Effects.ControlGranted))
     end
   end
 
@@ -147,7 +148,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.ControlSyncTest do
       {_character, events} = AuraLogic.remove_spells(character, [126], 1_000)
 
       assert Enum.any?(events, fn event ->
-               event.type == :release_controlled and event.source_guid == 10 and event.target_guid == 20 and
+               is_struct(event, Effects.ReleaseControlled) and event.source_guid == 10 and event.target_guid == 20 and
                  event.spell_id == 126
              end)
     end

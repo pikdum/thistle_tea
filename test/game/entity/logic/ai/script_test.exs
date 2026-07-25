@@ -59,7 +59,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.ScriptTest do
 
       {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], nil, 1_000)
 
-      refute Enum.any?(mob.internal.events, &(&1.type == :trigger_spell))
+      refute Enum.any?(mob.internal.events, &is_struct(&1, Effects.TriggerSpell))
     end
 
     test "cast without a resolvable target is skipped", %{mob: mob} do

@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Core
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.SpellEffect
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Effect
@@ -185,14 +186,14 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
 
       {_character, events} = apply_spell(character, 1, 1, frost_armor_fixture())
 
-      assert [%{type: :aura_duration, aura_slot: 0, duration_ms: 600_000}] =
-               Enum.filter(events, &(&1.type == :aura_duration))
+      assert [%Effects.AuraDuration{aura_slot: 0, duration_ms: 600_000}] =
+               Enum.filter(events, &is_struct(&1, Effects.AuraDuration))
     end
 
     test "returns no duration event for mob targets" do
       {_entity, events} = apply_spell(fixture_entity(), 1, 1, frost_armor_fixture())
 
-      assert Enum.filter(events, &(&1.type == :aura_duration)) == []
+      assert Enum.filter(events, &is_struct(&1, Effects.AuraDuration)) == []
     end
 
     test "applies mod_resistance to the matching school field" do
@@ -243,7 +244,7 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
       assert Enum.any?(
                apply_events,
                &match?(
-                 %{type: :spell_modifier, modifier_type: :flat, effect_index: 5, operation: 10, amount: -100},
+                 %Effects.SpellModifier{modifier_type: :flat, effect_index: 5, operation: 10, amount: -100},
                  &1
                )
              )
@@ -253,7 +254,7 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
       assert Enum.any?(
                remove_events,
                &match?(
-                 %{type: :spell_modifier, modifier_type: :flat, effect_index: 5, operation: 10, amount: 0},
+                 %Effects.SpellModifier{modifier_type: :flat, effect_index: 5, operation: 10, amount: 0},
                  &1
                )
              )
@@ -308,7 +309,7 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
 
       {entity, events} = apply_spell(entity, 999, 1, spell)
 
-      assert [%{type: :movement_stopped}, %{type: :movement_root_changed, rooted?: true}] = events
+      assert [%Effects.MovementStopped{}, %Effects.MovementRootChanged{rooted?: true}] = events
       assert (entity.movement_block.movement_flags &&& 0x08000000) != 0
       assert (entity.movement_block.movement_flags &&& 0x00400001) == 0
       assert entity.movement_block.spline_nodes == []
@@ -323,7 +324,7 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
       future = entity.unit.auras |> hd() |> Map.fetch!(:expires_at)
       {entity, events} = Aura.expire_due(entity, future + 1)
 
-      assert [%{type: :movement_root_changed, rooted?: false}] = events
+      assert [%Effects.MovementRootChanged{rooted?: false}] = events
       assert (entity.movement_block.movement_flags &&& 0x08000000) == 0
     end
 
@@ -337,7 +338,7 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
       future = entity.unit.auras |> hd() |> Map.fetch!(:expires_at)
       {entity, events} = Aura.expire_due(entity, future + 1)
 
-      assert [%{type: :movement_root_changed, rooted?: false}] = events
+      assert [%Effects.MovementRootChanged{rooted?: false}] = events
       refute entity.internal.rooted?
     end
 
@@ -356,7 +357,7 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
       {_entity, events} = Aura.expire_due(entity, expires_at)
 
       assert Enum.any?(events, fn event ->
-               event.type == :trigger_spell and event.source_guid == 999 and event.target_guid == 1 and
+               is_struct(event, Effects.TriggerSpell) and event.source_guid == 999 and event.target_guid == 1 and
                  event.spell_id == 24_131
              end)
     end
@@ -378,7 +379,7 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
       {_entity, events} = Aura.expire_due(entity, expires_at)
 
       assert Enum.any?(events, fn event ->
-               event.type == :trigger_spell and event.source_guid == 1 and event.target_guid == 1 and
+               is_struct(event, Effects.TriggerSpell) and event.source_guid == 1 and event.target_guid == 1 and
                  event.spell_id == 27_965
              end)
     end
@@ -396,7 +397,7 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
       expires_at = entity.unit.auras |> hd() |> Map.fetch!(:expires_at)
       {_entity, events} = Aura.expire_due(entity, expires_at)
 
-      refute Enum.any?(events, &(&1.type == :trigger_spell))
+      refute Enum.any?(events, &is_struct(&1, Effects.TriggerSpell))
     end
   end
 
@@ -439,7 +440,7 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
       {entity, events} = Aura.tick(entity, first_tick_at)
 
       assert entity.unit.health == 50
-      assert [%{type: :spell_damage, damage: 50, periodic?: true}] = events
+      assert [%Effects.SpellDamage{damage: 50, periodic?: true}] = events
       [updated] = entity.unit.auras
       [updated_aura] = updated.auras
       amplitude = spell.effects |> hd() |> Map.fetch!(:amplitude_ms)
@@ -510,23 +511,21 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
       assert entity.unit.health == 65
 
       assert [
-               %{
-                 type: :periodic_aura_log,
+               %Effects.PeriodicAuraLog{
                  source_guid: 999,
                  target_guid: 1,
                  spell_id: 139,
                  aura_type: :periodic_heal,
                  amount: 25
                },
-               %{
-                 type: :spell_heal,
+               %Effects.SpellHeal{
                  source_guid: 999,
                  target_guid: 1,
                  spell_id: 139,
                  periodic?: true,
                  proc_type: :deal_helpful_periodic
                },
-               %{type: :heal_threat, source_guid: 999, target_guid: 1, amount: 12.5}
+               %Effects.HealThreat{source_guid: 999, target_guid: 1, amount: 12.5}
              ] = events
 
       [updated] = entity.unit.auras
@@ -568,8 +567,7 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
       assert entity.unit.power1 == 60
 
       assert [
-               %{
-                 type: :periodic_aura_log,
+               %Effects.PeriodicAuraLog{
                  source_guid: 999,
                  target_guid: 1,
                  spell_id: 430,
@@ -622,8 +620,7 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
       assert entity.unit.power2 == 110
 
       assert [
-               %{
-                 type: :periodic_aura_log,
+               %Effects.PeriodicAuraLog{
                  spell_id: 29_131,
                  aura_type: :periodic_energize,
                  amount: 10,
@@ -658,8 +655,7 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
 
       assert {_entity,
               [
-                %{
-                  type: :trigger_spell,
+                %Effects.TriggerSpell{
                   source_guid: 1,
                   source_level: 10,
                   target_guid: 999,
@@ -683,8 +679,7 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
 
       assert {_entity,
               [
-                %{
-                  type: :trigger_spell,
+                %Effects.TriggerSpell{
                   source_guid: 1,
                   target_guid: 999,
                   spell_id: 12_536,
@@ -708,7 +703,7 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
 
       assert {_entity, []} = Aura.reactions(entity, :spell_hit_dealt, Map.put(context, :outcome, :normal))
 
-      assert {_entity, [%{type: :trigger_spell, spell_id: 12_536}]} =
+      assert {_entity, [%Effects.TriggerSpell{spell_id: 12_536}]} =
                Aura.reactions(entity, :spell_hit_dealt, Map.put(context, :outcome, :crit))
     end
 
@@ -726,7 +721,7 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
         now: 1_000
       }
 
-      assert {_entity, [%{type: :trigger_spell, spell_id: 12_536}]} =
+      assert {_entity, [%Effects.TriggerSpell{spell_id: 12_536}]} =
                Aura.reactions(entity, :spell_hit_dealt, context)
     end
 
@@ -760,10 +755,10 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
         now: 1_000
       }
 
-      {entity, [%{type: :trigger_spell}]} = Aura.reactions(entity, :spell_hit_dealt, context)
+      {entity, [%Effects.TriggerSpell{}]} = Aura.reactions(entity, :spell_hit_dealt, context)
 
       assert {_entity, []} = Aura.reactions(entity, :spell_hit_dealt, %{context | now: 1_500})
-      assert {_entity, [%{type: :trigger_spell}]} = Aura.reactions(entity, :spell_hit_dealt, %{context | now: 2_100})
+      assert {_entity, [%Effects.TriggerSpell{}]} = Aura.reactions(entity, :spell_hit_dealt, %{context | now: 2_100})
     end
 
     test "fires kill-flagged proc auras on kills that grant experience" do
@@ -791,8 +786,7 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
 
       assert {_entity,
               [
-                %{
-                  type: :trigger_spell,
+                %Effects.TriggerSpell{
                   source_guid: 1,
                   spell_id: 15_271,
                   triggering_spell_id: 15_338
@@ -824,8 +818,7 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
 
       assert {_entity,
               [
-                %{
-                  type: :trigger_spell,
+                %Effects.TriggerSpell{
                   source_guid: 7,
                   target_guid: 7,
                   spell_id: 15_290,
@@ -898,8 +891,8 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
 
       {_entity, events} = Aura.tick(entity, aura.next_tick_at)
 
-      assert %{type: :trigger_spell, spell_id: 15_290, amount: 10, source_guid: 7} =
-               Enum.find(events, &(&1.type == :trigger_spell))
+      assert %Effects.TriggerSpell{spell_id: 15_290, amount: 10, source_guid: 7} =
+               Enum.find(events, &is_struct(&1, Effects.TriggerSpell))
     end
 
     test "fires proc-trigger auras on crit heals" do
@@ -935,7 +928,7 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
 
       assert {_entity, []} = Aura.reactions(entity, :spell_hit_dealt, Map.put(context, :outcome, :normal))
 
-      assert {_entity, [%{type: :trigger_spell, spell_id: 14_893, target_guid: 42}]} =
+      assert {_entity, [%Effects.TriggerSpell{spell_id: 14_893, target_guid: 42}]} =
                Aura.reactions(entity, :spell_hit_dealt, Map.put(context, :outcome, :crit))
     end
 
@@ -1004,7 +997,7 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
 
       assert {_entity, []} = Aura.reactions(entity, :hit_taken, Map.put(context, :outcome, :normal))
 
-      assert {_entity, [%{type: :trigger_spell, spell_id: 23_602}]} =
+      assert {_entity, [%Effects.TriggerSpell{spell_id: 23_602}]} =
                Aura.reactions(entity, :hit_taken, Map.put(context, :outcome, :block))
     end
 
@@ -1036,7 +1029,7 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
 
       assert {_entity, []} = Aura.reactions(entity, :hit_taken, Map.put(context, :outcome, :normal))
 
-      assert {_entity, [%{type: :trigger_spell, spell_id: 15_250}]} =
+      assert {_entity, [%Effects.TriggerSpell{spell_id: 15_250}]} =
                Aura.reactions(entity, :hit_taken, Map.put(context, :outcome, :dodge))
 
       resisted_spell = %Spell{
@@ -1046,7 +1039,7 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
       }
 
       {_entity, events} = SpellEffect.receive_outcome(entity, 999, resisted_spell, :resist, 1_000)
-      assert [%{type: :trigger_spell, spell_id: 15_250, target_guid: 999}] = events
+      assert [%Effects.TriggerSpell{spell_id: 15_250, target_guid: 999}] = events
     end
 
     test "Magic Absorption restores a percentage of maximum mana after a full resist" do
@@ -1078,8 +1071,7 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
 
       assert {entity, [event]} = SpellEffect.receive_outcome(entity, 999, resisted_spell, :resist, 1_000)
 
-      assert %{
-               type: :trigger_spell,
+      assert %Effects.TriggerSpell{
                source_guid: 1,
                target_guid: 1,
                spell_id: 29_442,
@@ -1119,7 +1111,7 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
 
       assert {_entity, []} = Aura.reactions(entity, :hit_taken, Map.put(context, :outcome, :normal))
 
-      assert {_entity, [%{type: :trigger_spell, spell_id: 20_929}]} =
+      assert {_entity, [%Effects.TriggerSpell{spell_id: 20_929}]} =
                Aura.reactions(entity, :hit_taken, Map.put(context, :outcome, :block))
     end
 
@@ -1150,7 +1142,7 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
       assert {_entity, []} = Aura.reactions(entity, :hit_taken, Map.put(context, :outcome, :dodge))
       assert {_entity, []} = Aura.reactions(entity, :hit_taken, Map.put(context, :outcome, :block))
 
-      assert {_entity, [%{type: :trigger_spell, spell_id: 6136}]} =
+      assert {_entity, [%Effects.TriggerSpell{spell_id: 6136}]} =
                Aura.reactions(entity, :hit_taken, Map.put(context, :outcome, :crit))
     end
 
@@ -1182,7 +1174,7 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
 
       assert {_entity,
               [
-                %{type: :trigger_spell, spell_id: 12_654, target_guid: 999, amount: 100}
+                %Effects.TriggerSpell{spell_id: 12_654, target_guid: 999, amount: 100}
               ]} = Aura.reactions(entity, :spell_hit_dealt, context)
     end
 
@@ -1214,7 +1206,7 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
 
       assert {_entity,
               [
-                %{type: :trigger_spell, spell_id: 29_077, target_guid: 1, amount: 123}
+                %Effects.TriggerSpell{spell_id: 29_077, target_guid: 1, amount: 123}
               ]} = Aura.reactions(entity, :spell_hit_dealt, context)
     end
 
@@ -1248,8 +1240,8 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
       {entity, _events} = apply_spell(entity, 1, 40, leader_of_the_pack)
       {_entity, events} = apply_spell(entity, 1, 40, cat_form)
 
-      assert Enum.any?(events, &(&1.type == :trigger_spell and &1.spell_id == 24_932))
-      assert Enum.any?(events, &(&1.type == :trigger_spell and &1.spell_id == 17_099))
+      assert Enum.any?(events, &(is_struct(&1, Effects.TriggerSpell) and &1.spell_id == 24_932))
+      assert Enum.any?(events, &(is_struct(&1, Effects.TriggerSpell) and &1.spell_id == 17_099))
     end
 
     test "ignite damage scales with talent rank" do
@@ -1277,7 +1269,7 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
           now: 1_000
         }
 
-        assert {_entity, [%{type: :trigger_spell, spell_id: 12_654, amount: ^expected}]} =
+        assert {_entity, [%Effects.TriggerSpell{spell_id: 12_654, amount: ^expected}]} =
                  Aura.reactions(entity, :spell_hit_dealt, context)
       end
     end
@@ -1309,7 +1301,7 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
           now: 1_000
         }
 
-        assert {_entity, [%{type: :trigger_spell, spell_id: 29_077, amount: ^expected}]} =
+        assert {_entity, [%Effects.TriggerSpell{spell_id: 29_077, amount: ^expected}]} =
                  Aura.reactions(entity, :spell_hit_dealt, context)
       end
     end
@@ -1329,7 +1321,7 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
           now: 1_000
         }
 
-        assert {_entity, [%{type: :trigger_spell, spell_id: 15_290, amount: ^heal}]} =
+        assert {_entity, [%Effects.TriggerSpell{spell_id: 15_290, amount: ^heal}]} =
                  Aura.reactions(entity, :spell_hit_taken, context)
       end
     end
@@ -1368,8 +1360,7 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
 
       assert {_entity,
               [
-                %{
-                  type: :trigger_spell,
+                %Effects.TriggerSpell{
                   spell_id: 20_272,
                   amount: 35,
                   source_guid: 1,
@@ -1403,7 +1394,7 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
         now: 1_000
       }
 
-      assert {_entity, [%{type: :trigger_spell, spell_id: 90_002, target_guid: 42}]} =
+      assert {_entity, [%Effects.TriggerSpell{spell_id: 90_002, target_guid: 42}]} =
                Aura.reactions(entity, :spell_hit_dealt, context)
     end
   end
@@ -1448,7 +1439,7 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
 
       assert entity.movement_block.base_run_speed == 7.0
       assert_in_delta entity.movement_block.run_speed, 4.9, 0.000001
-      assert [%{type: :movement_speed_changed, speed: speed}] = events
+      assert [%Effects.MovementSpeedChanged{speed: speed}] = events
       assert_in_delta speed, 4.9, 0.000001
     end
 
@@ -1534,7 +1525,7 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
 
       assert entity.movement_block.base_run_speed == 7.0
       assert entity.movement_block.run_speed == 7.0
-      assert [%{type: :movement_speed_changed, speed: 7.0}] = events
+      assert [%Effects.MovementSpeedChanged{speed: 7.0}] = events
     end
   end
 
@@ -1921,7 +1912,7 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
       {entity, events} = apply_spell(fixture_entity(), 1, 1, food_fixture())
 
       assert entity.unit.stand_state == 1
-      assert Enum.any?(events, &(&1.type == :stand_state and &1.stand_state == 1))
+      assert Enum.any?(events, &(is_struct(&1, Effects.StandState) and &1.stand_state == 1))
     end
 
     test "food auras tick silently without applying direct aura healing" do
@@ -2256,11 +2247,11 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
       {entity, events} = apply_spell(fixture_entity(), 1, 1, slow_fall_fixture())
 
       assert (entity.movement_block.movement_flags &&& 0x20000000) != 0
-      assert Enum.any?(events, &(&1.type == :feather_fall_changed and &1.enabled? == true))
+      assert Enum.any?(events, &(is_struct(&1, Effects.FeatherFallChanged) and &1.enabled? == true))
 
       {entity, events} = Aura.expire_due(entity, 1_000 + 30_001)
       assert (entity.movement_block.movement_flags &&& 0x20000000) == 0
-      assert Enum.any?(events, &(&1.type == :feather_fall_changed and &1.enabled? == false))
+      assert Enum.any?(events, &(is_struct(&1, Effects.FeatherFallChanged) and &1.enabled? == false))
     end
   end
 
@@ -2463,7 +2454,7 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
       matching = %Spell{id: 8647, spell_family: 8, family_flags_0: 0x20000}
       other = %Spell{id: 133, spell_family: 3, family_flags_0: 0x1}
 
-      assert [%{type: :trigger_spell, target_guid: 77, spell_id: 14_181}] =
+      assert [%Effects.TriggerSpell{target_guid: 77, spell_id: 14_181}] =
                Aura.target_trigger_events(caster, matching, [77])
 
       assert Aura.target_trigger_events(caster, other, [77]) == []
@@ -2479,7 +2470,7 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
       {entity, events} = Aura.tick(entity, 4_001)
 
       assert entity.unit.health == 52
-      assert Enum.any?(events, &(&1.type == :periodic_aura_log and &1.amount == 2))
+      assert Enum.any?(events, &(is_struct(&1, Effects.PeriodicAuraLog) and &1.amount == 2))
     end
   end
 

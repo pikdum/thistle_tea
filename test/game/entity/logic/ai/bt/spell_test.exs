@@ -152,7 +152,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
       assert {{:running, 1_000}, mob, %Blackboard{}} = SpellBT.cast_tick(mob, Blackboard.new(), 4_000)
       assert mob.internal.casting.channel_started?
       assert mob.unit.channel_spell == 605
-      assert Enum.any?(mob.internal.events, &(&1.type == :channel_start))
+      assert Enum.any?(mob.internal.events, &is_struct(&1, Effects.ChannelStart))
     end
   end
 
@@ -539,11 +539,11 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
       mob = SpellBT.complete_cast(mob, casting, 1_000)
 
       assert Enum.any?(mob.internal.events, fn event ->
-               event.type == :open_gameobject and event.target_guid == 0xF110_0001
+               is_struct(event, Effects.OpenGameObject) and event.target_guid == 0xF110_0001
              end)
 
       assert Enum.any?(mob.internal.events, fn event ->
-               event.type == :spell_go and event.hit_guids == [0xF110_0001]
+               is_struct(event, Effects.SpellGo) and event.hit_guids == [0xF110_0001]
              end)
     end
 
@@ -567,7 +567,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
       mob = SpellBT.complete_cast(mob, casting, 1_000)
 
       assert Enum.any?(mob.internal.events, fn event ->
-               event.type == :enchant_item and event.target_guid == 0x4000_002A and event.spell == spell and
+               is_struct(event, Effects.EnchantItem) and event.target_guid == 0x4000_002A and event.spell == spell and
                  event.effect == effect
              end)
     end
@@ -721,7 +721,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
 
       mob = SpellBT.complete_cast(mob, casting, 1_000)
 
-      refute Enum.any?(mob.internal.events, &(&1.type == :spawn_area_effect))
+      refute Enum.any?(mob.internal.events, &is_struct(&1, Effects.SpawnAreaEffect))
     end
 
     test "caster-centered persistent aura uses the caster position without a ground target" do

@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackFeedbackTest do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AttackFeedback
   alias ThistleTea.Game.Entity.Logic.Aura
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Reactive
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Effect
@@ -188,7 +189,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackFeedbackTest do
 
       assert Enum.any?(
                entity.internal.events,
-               &match?(%{type: :blade_flurry, target_guid: 77, damage: 123, spell_id: 22_482}, &1)
+               &match?(%Effects.BladeFlurry{target_guid: 77, damage: 123, spell_id: 22_482}, &1)
              )
     end
 
@@ -206,7 +207,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackFeedbackTest do
       entity =
         AttackFeedback.receive(entity, %{outcome: :dodge, damage: 123, proc_damage: 0, victim_guid: 77}, nil, 1_000)
 
-      refute Enum.any?(entity.internal.events, &(&1.type == :blade_flurry))
+      refute Enum.any?(entity.internal.events, &is_struct(&1, Effects.BladeFlurry))
     end
 
     test "sweeping strikes spends a charge and queues VMangos secondary damage" do
@@ -234,7 +235,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackFeedbackTest do
       assert Enum.any?(
                entity.internal.events,
                &match?(
-                 %{type: :secondary_melee, target_guid: 77, damage: 123, spell_id: 12_723, range_yards: 5.0},
+                 %Effects.SecondaryMelee{target_guid: 77, damage: 123, spell_id: 12_723, range_yards: 5.0},
                  &1
                )
              )
@@ -260,7 +261,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackFeedbackTest do
         )
 
       assert [%Holder{charges: 4}] = entity.unit.auras
-      refute Enum.any?(entity.internal.events || [], &(&1.type == :secondary_melee))
+      refute Enum.any?(entity.internal.events || [], &is_struct(&1, Effects.SecondaryMelee))
     end
 
     test "DBC melee proc auras trigger their encoded spell and spend charges" do
@@ -279,7 +280,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackFeedbackTest do
 
       assert result.unit.auras == []
 
-      assert [%{type: :trigger_spell, source_guid: 5, target_guid: 77, spell_id: 24_394}] =
+      assert [%Effects.TriggerSpell{source_guid: 5, target_guid: 77, spell_id: 24_394}] =
                result.internal.events
     end
 

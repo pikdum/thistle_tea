@@ -68,14 +68,14 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
           mob = Movement.sync_position(mob, Time.now())
           {_status, mob} = BT.tick(mob.internal.behavior_tree, mob)
 
-          if Enum.any?(mob.internal.events, &(&1.type == :spell_start)) do
+          if Enum.any?(mob.internal.events, &is_struct(&1, Effects.SpellStart)) do
             {:halt, mob}
           else
             {:cont, finish_current_move(mob)}
           end
         end)
 
-      assert Enum.any?(mob.internal.events, &(&1.type == :spell_start and &1.spell_id == 22_766))
+      assert Enum.any?(mob.internal.events, &(is_struct(&1, Effects.SpellStart) and &1.spell_id == 22_766))
     end
 
     test "fires the reached_home event after combat ends with a dead target" do
@@ -114,14 +114,14 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
           mob = Movement.sync_position(mob, Time.now())
           {_status, mob} = BT.tick(mob.internal.behavior_tree, mob)
 
-          if Enum.any?(mob.internal.events, &(&1.type == :monster_talk)) do
+          if Enum.any?(mob.internal.events, &is_struct(&1, Effects.MonsterTalk)) do
             {:halt, mob}
           else
             {:cont, finish_current_move(mob)}
           end
         end)
 
-      assert Enum.any?(mob.internal.events, &(&1.type == :monster_talk and &1.text == "Home again."))
+      assert Enum.any?(mob.internal.events, &(is_struct(&1, Effects.MonsterTalk) and &1.text == "Home again."))
     end
   end
 
@@ -145,7 +145,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
       assert Threat.entries(mob) == []
       assert mob.unit.target == 0
       refute mob.internal.blackboard.auto_attacking
-      assert Enum.any?(mob.internal.events, &(&1.type == :attack_stop))
+      assert Enum.any?(mob.internal.events, &is_struct(&1, Effects.AttackStop))
     end
 
     @tag :namigator_maps

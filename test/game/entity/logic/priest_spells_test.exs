@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.Entity.Logic.PriestSpellsTest do
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Combat
   alias ThistleTea.Game.Entity.Logic.Core
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.SpellEffect
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
@@ -161,7 +162,7 @@ defmodule ThistleTea.Game.Entity.Logic.PriestSpellsTest do
 
       assert Aura.has_spell?(target, 17)
 
-      assert [%{type: :trigger_spell, source_guid: 999, target_guid: 1, spell_id: 6788}] = events
+      assert [%Effects.TriggerSpell{source_guid: 999, target_guid: 1, spell_id: 6788}] = events
     end
 
     test "Weakened Soul blocks reapplying the shield" do
@@ -274,7 +275,7 @@ defmodule ThistleTea.Game.Entity.Logic.PriestSpellsTest do
 
       assert (entity.movement_block.movement_flags &&& @movement_flag_root) != 0
       assert (entity.unit.flags &&& @unit_flag_stunned) != 0
-      assert Enum.any?(events, &(&1.type == :movement_root_changed and &1.rooted?))
+      assert Enum.any?(events, &(is_struct(&1, Effects.MovementRootChanged) and &1.rooted?))
     end
 
     test "stun breaks on damage via its interrupt flags" do
@@ -352,7 +353,7 @@ defmodule ThistleTea.Game.Entity.Logic.PriestSpellsTest do
       drained = 500 - target.unit.power1
       assert drained in 191..203
       assert target.unit.health == max(100 - div(drained, 2), 0)
-      assert [%{type: :spell_damage, damage: damage}] = events
+      assert [%Effects.SpellDamage{damage: damage}] = events
       assert damage == div(drained, 2)
     end
 
@@ -399,8 +400,8 @@ defmodule ThistleTea.Game.Entity.Logic.PriestSpellsTest do
 
       assert entity.unit.health == 100 - 18
 
-      assert Enum.any?(events, &(&1.type == :spell_damage and &1.damage == 18 and &1.periodic?))
-      assert Enum.any?(events, &(&1.type == :heal_entity and &1.target_guid == 999 and &1.amount == 18))
+      assert Enum.any?(events, &(is_struct(&1, Effects.SpellDamage) and &1.damage == 18 and &1.periodic?))
+      assert Enum.any?(events, &(is_struct(&1, Effects.HealEntity) and &1.target_guid == 999 and &1.amount == 18))
     end
   end
 
@@ -429,9 +430,9 @@ defmodule ThistleTea.Game.Entity.Logic.PriestSpellsTest do
       assert (flags &&& @movement_flag_hover) != 0
       assert (flags &&& @movement_flag_water_walk) != 0
 
-      assert Enum.any?(events, &(&1.type == :feather_fall_changed and &1.enabled?))
-      assert Enum.any?(events, &(&1.type == :hover_changed and &1.enabled?))
-      assert Enum.any?(events, &(&1.type == :water_walk_changed and &1.enabled?))
+      assert Enum.any?(events, &(is_struct(&1, Effects.FeatherFallChanged) and &1.enabled?))
+      assert Enum.any?(events, &(is_struct(&1, Effects.HoverChanged) and &1.enabled?))
+      assert Enum.any?(events, &(is_struct(&1, Effects.WaterWalkChanged) and &1.enabled?))
     end
 
     test "breaks on damage via its interrupt flags" do
@@ -464,7 +465,7 @@ defmodule ThistleTea.Game.Entity.Logic.PriestSpellsTest do
 
       {_target, events} = SpellEffect.receive(dead_player_fixture(), context, resurrection_fixture(), 1_000)
 
-      assert [%{type: :resurrect_request, source_guid: 999, spell_id: 2006, health: 70, mana: 135}] = events
+      assert [%Effects.ResurrectRequest{source_guid: 999, spell_id: 2006, health: 70, mana: 135}] = events
     end
 
     test "queues a resurrect request on a released ghost" do
@@ -473,7 +474,7 @@ defmodule ThistleTea.Game.Entity.Logic.PriestSpellsTest do
       {_target, events} =
         SpellEffect.receive(dead_player_fixture(ghost?: true), context, resurrection_fixture(), 1_000)
 
-      assert [%{type: :resurrect_request}] = events
+      assert [%Effects.ResurrectRequest{}] = events
     end
 
     test "does nothing to living players or mobs" do
@@ -544,7 +545,7 @@ defmodule ThistleTea.Game.Entity.Logic.PriestSpellsTest do
 
       {entity, events} = Aura.reactions(entity, :hit_taken, %{attacker_guid: 999})
 
-      assert Enum.any?(events, &(&1.type == :trigger_spell and &1.spell_id == 28_376))
+      assert Enum.any?(events, &(is_struct(&1, Effects.TriggerSpell) and &1.spell_id == 28_376))
       assert entity.unit.auras == []
     end
 
@@ -554,7 +555,7 @@ defmodule ThistleTea.Game.Entity.Logic.PriestSpellsTest do
 
       {entity, events} = Combat.receive_attack(entity, %{caster: 999, damage: 5}, 2_000, roll: 9_999)
 
-      assert Enum.any?(events, &(&1.type == :trigger_spell and &1.spell_id == 28_376))
+      assert Enum.any?(events, &(is_struct(&1, Effects.TriggerSpell) and &1.spell_id == 28_376))
       assert [%Holder{charges: 2}] = entity.unit.auras
     end
 
@@ -716,7 +717,7 @@ defmodule ThistleTea.Game.Entity.Logic.PriestSpellsTest do
 
       {entity, events} = Aura.tick(entity, 6_000)
 
-      assert Enum.any?(events, &(&1.type == :trigger_spell and &1.spell_id == 10_872))
+      assert Enum.any?(events, &(is_struct(&1, Effects.TriggerSpell) and &1.spell_id == 10_872))
       assert Aura.has_spell?(entity, 552)
     end
   end
