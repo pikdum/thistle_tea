@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
   alias ThistleTea.Game.Entity.Data.GameObject
   alias ThistleTea.Game.Entity.Data.GameObjectTemplate, as: DataGameObjectTemplate
   alias ThistleTea.Game.Entity.Data.Mob
+  alias ThistleTea.Game.Entity.EventSink.ClientProjection
   alias ThistleTea.Game.Entity.EventSink.Movement, as: MovementEffects
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Effects
@@ -38,7 +39,6 @@ defmodule ThistleTea.Game.Entity.EventSink do
   alias ThistleTea.Game.World.AreaEffects
   alias ThistleTea.Game.World.CallForHelp
   alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
-  alias ThistleTea.Game.World.Loader.ItemEnchantment, as: ItemEnchantmentLoader
   alias ThistleTea.Game.World.Loader.Mob, as: MobLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Loader.Summon, as: SummonLoader
@@ -49,6 +49,22 @@ defmodule ThistleTea.Game.Entity.EventSink do
   @victimstate_normal 1
   @heal_threat_radius 100.0
   @spell_hit_type_crit 0x2
+  @client_effects [
+    Effects.ConsumeCastItem,
+    Effects.ConsumeReagents,
+    Effects.CreateItem,
+    Effects.Emote,
+    Effects.EnchantItem,
+    Effects.FeedPet,
+    Effects.ForwardScriptSteps,
+    Effects.GiveItem,
+    Effects.MonsterTalk,
+    Effects.ObjectUpdate,
+    Effects.OpenGameObject,
+    Effects.PlayObjectSound,
+    Effects.PlaySound,
+    Effects.ScriptSteps
+  ]
   @movement_effects [
     Effects.Charge,
     Effects.FeatherFallChanged,
@@ -71,6 +87,10 @@ defmodule ThistleTea.Game.Entity.EventSink do
 
   def emit(entity, events) when is_list(events) do
     Enum.reduce(events, entity, &emit(&2, &1))
+  end
+
+  def emit(entity, %{__struct__: effect_module} = effect) when effect_module in @client_effects do
+    ClientProjection.emit(entity, effect)
   end
 
   def emit(entity, %{__struct__: effect_module} = effect) when effect_module in @movement_effects do
@@ -317,15 +337,6 @@ defmodule ThistleTea.Game.Entity.EventSink do
   end
 
   def emit(entity, %Effects.ChannelUpdate{}), do: entity
-
-  def emit(%{internal: %Internal{broadcast_update?: true} = internal} = entity, %Effects.ObjectUpdate{} = event) do
-    Core.update_object(entity, event.update_type || :values)
-    |> World.broadcast_packet(entity)
-
-    %{entity | internal: %{internal | broadcast_update?: false}}
-  end
-
-  def emit(entity, %Effects.ObjectUpdate{}), do: entity
 
   def emit(entity, %Effects.DeliverAttack{} = event) do
     Entity.receive_attack(event.target_guid, event.attack)
@@ -601,59 +612,6 @@ defmodule ThistleTea.Game.Entity.EventSink do
     entity
   end
 
-  def emit(%Character{} = entity, %Effects.ConsumeCastItem{cast_item_guid: item_guid}) when is_integer(item_guid) do
-    send(self(), {:consume_cast_item, item_guid})
-    entity
-  end
-
-  def emit(entity, %Effects.ConsumeCastItem{}), do: entity
-
-  def emit(%Character{} = entity, %Effects.FeedPet{} = event) do
-    send(self(), {:feed_pet, event.cast_item_guid, event.target_guid, event.spell_id, event.range_yards})
-    entity
-  end
-
-  def emit(entity, %Effects.FeedPet{}), do: entity
-
-  def emit(%Character{} = entity, %Effects.EnchantItem{} = event) do
-    duration_ms = ItemEnchantmentLoader.duration_ms(event.spell.id, event.effect)
-    send(self(), {:enchant_item, event.target_guid, event.spell, event.effect.misc_value, duration_ms})
-    entity
-  end
-
-  def emit(entity, %Effects.EnchantItem{}), do: entity
-
-  def emit(%Character{} = entity, %Effects.OpenGameObject{target_guid: object_guid}) when is_integer(object_guid) do
-    send(self(), {:open_gameobject_loot, object_guid})
-    entity
-  end
-
-  def emit(entity, %Effects.OpenGameObject{}), do: entity
-
-  def emit(entity, %Effects.GiveItem{target_guid: target_guid, item_id: item_id, count: count})
-      when is_integer(target_guid) do
-    case Entity.pid(target_guid) do
-      pid when is_pid(pid) -> send(pid, {:create_item, item_id, count})
-      _pid -> :ok
-    end
-
-    entity
-  end
-
-  def emit(%Character{} = entity, %Effects.CreateItem{item_id: item_id, count: count}) do
-    send(self(), {:create_item, item_id, count})
-    entity
-  end
-
-  def emit(entity, %Effects.CreateItem{}), do: entity
-
-  def emit(%Character{} = entity, %Effects.ConsumeReagents{reagents: reagents}) when is_list(reagents) do
-    send(self(), {:consume_reagents, reagents})
-    entity
-  end
-
-  def emit(entity, %Effects.ConsumeReagents{}), do: entity
-
   def emit(
         %{object: %{guid: caster_guid}, internal: %Internal{world: world}} = entity,
         %Effects.SpawnAreaEffect{} = event
@@ -762,36 +720,6 @@ defmodule ThistleTea.Game.Entity.EventSink do
   end
 
   def emit(entity, %Effects.SummonRequest{}), do: entity
-
-  def emit(%{object: %{guid: guid}, internal: %Internal{name: name}} = entity, %Effects.MonsterTalk{} = event) do
-    event.chat_type
-    |> monster_chat_type()
-    |> Message.SmsgMessagechat.monster(event.text, guid, name, event.target_guid)
-    |> World.broadcast_packet(entity, range: listen_range(event.chat_type))
-
-    entity
-  end
-
-  def emit(%{object: %{guid: guid}} = entity, %Effects.Emote{emote_id: emote_id}) do
-    %Message.SmsgEmote{emote: emote_id, guid: guid}
-    |> World.broadcast_packet(entity)
-
-    entity
-  end
-
-  def emit(entity, %Effects.ScriptSteps{} = event) do
-    Process.send_after(self(), {:ai_script_steps, event.steps, event.target_guid}, event.duration_ms || 0)
-    entity
-  end
-
-  def emit(entity, %Effects.ForwardScriptSteps{} = event) do
-    case Entity.pid(event.target_guid) do
-      pid when is_pid(pid) -> send(pid, {:ai_script_steps, event.steps, event.source_guid})
-      _ -> nil
-    end
-
-    entity
-  end
 
   def emit(%{internal: %Internal{world: world}} = entity, %Effects.SummonCreature{summon: summon} = event) do
     with true <- summon_allowed?(world, summon),
@@ -997,20 +925,6 @@ defmodule ThistleTea.Game.Entity.EventSink do
 
   def emit(entity, %Effects.DelayAura{}), do: entity
 
-  def emit(entity, %Effects.PlaySound{sound_id: sound_id}) do
-    %Message.SmsgPlaySound{sound_id: sound_id}
-    |> World.broadcast_packet(entity)
-
-    entity
-  end
-
-  def emit(%{object: %{guid: guid}} = entity, %Effects.PlayObjectSound{sound_id: sound_id}) do
-    %Message.SmsgPlayObjectSound{sound_id: sound_id, guid: guid}
-    |> World.broadcast_packet(entity)
-
-    entity
-  end
-
   def emit(
         %{object: %{guid: guid}} = entity,
         %Effects.TriggerSpell{source_guid: source, resolve_targets?: true} = event
@@ -1139,16 +1053,6 @@ defmodule ThistleTea.Game.Entity.EventSink do
   def deliver_spell(%Effects.DeliverSpell{} = event) do
     Entity.receive_spell(event.target_guid, event.cast_context, event.spell)
   end
-
-  defp monster_chat_type(chat_type) when chat_type in [:yell, :zone_yell], do: :monster_yell
-  defp monster_chat_type(chat_type) when chat_type in [:text_emote, :boss_emote, :zone_emote], do: :monster_emote
-  defp monster_chat_type(_chat_type), do: :monster_say
-
-  @listen_range_say 25.0
-  @listen_range_yell 300.0
-
-  defp listen_range(chat_type) when chat_type in [:yell, :zone_yell], do: @listen_range_yell
-  defp listen_range(_chat_type), do: @listen_range_say
 
   defp owner_level(%{unit: %{level: level}}) when is_integer(level), do: level
   defp owner_level(_entity), do: 1
