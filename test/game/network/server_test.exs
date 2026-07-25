@@ -162,6 +162,26 @@ defmodule ThistleTea.Game.Network.ServerTest do
       refute_receive {:"$gen_cast", {:send_packet, %Message.SmsgUpdateLastInstance{}}}
     end
 
+    test "waits for the near teleport acknowledgement before restoring a suspended pet" do
+      guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
+      pet_guid = Guid.from_low_guid(:pet, 1863, System.unique_integer([:positive]))
+      socket = %{read_timeout: 0}
+      character = character(guid, health: 100, max_health: 100, summon: pet_guid)
+      state = %Session{guid: guid, character: character, ready: true}
+
+      on_exit(fn -> SpatialHash.remove(:players, guid) end)
+
+      assert {:noreply, {^socket, %Session{character: %Character{unit: %Unit{summon: 0}}}}, 0} =
+               Server.handle_cast(
+                 {:start_teleport, -8_949.95, -132.493, 83.5312, 0.0, WorldRef.open(0)},
+                 {socket, state}
+               )
+
+      assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgPetSpells{pet_guid: 0}}}
+      assert_receive {:"$gen_cast", {:send_packet, %Message.MsgMoveTeleportAck{}}}
+      refute_receive :restore_active_pet
+    end
+
     test "updates the public group leader player flag" do
       socket = %{read_timeout: 0}
       character = %{character(1, health: 100, max_health: 100) | player: %Player{flags: 0x20}}
@@ -287,6 +307,62 @@ defmodule ThistleTea.Game.Network.ServerTest do
 
       assert state.character.internal.casting == casting
       refute_receive {:"$gen_cast", {:send_packet, %Message.SmsgSpellFailure{}}}, 10
+    end
+  end
+
+  describe "handle_info/2" do
+    test "atomically creates and tracks a pet before completing its attachment" do
+      guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
+      pet_guid = Guid.from_low_guid(:pet, 1863, System.unique_integer([:positive]))
+      socket = test_socket()
+
+      state = %Session{
+        conn: %Connection{session_key: <<0>>},
+        guid: guid,
+        character: character(guid, health: 100, max_health: 100),
+        tracked_entities: MapSet.new()
+      }
+
+      update = update_object(:unit, pet_guid)
+
+      assert {:noreply, {^socket, attached}, {:continue, {:finish_pet_attach, ^pet_guid, []}}} =
+               Server.handle_info({:pet_attached, update, 688, []}, {socket, state})
+
+      assert attached.character.unit.summon == pet_guid
+      assert MapSet.member?(attached.tracked_entities, pet_guid)
+      assert_receive {:socket_send, _data}
+
+      assert {:noreply, {^socket, ^attached}, 0} =
+               Server.handle_cast({:send_packet, update}, {socket, attached})
+
+      refute_receive {:socket_send, _data}
+    end
+
+    test "reuses a pet create already sent by visibility before attachment" do
+      guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
+      pet_guid = Guid.from_low_guid(:pet, 1863, System.unique_integer([:positive]))
+      socket = test_socket()
+
+      state = %Session{
+        conn: %Connection{session_key: <<0>>},
+        guid: guid,
+        character: character(guid, health: 100, max_health: 100),
+        tracked_entities: MapSet.new()
+      }
+
+      update = update_object(:unit, pet_guid)
+
+      assert {:noreply, {^socket, visible}, 0} =
+               Server.handle_cast({:send_packet, update}, {socket, state})
+
+      assert MapSet.member?(visible.tracked_entities, pet_guid)
+      assert_receive {:socket_send, _data}
+
+      assert {:noreply, {^socket, attached}, {:continue, {:finish_pet_attach, ^pet_guid, []}}} =
+               Server.handle_info({:pet_attached, update, 688, []}, {socket, visible})
+
+      assert attached.character.unit.summon == pet_guid
+      refute_receive {:socket_send, _data}
     end
   end
 

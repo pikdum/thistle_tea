@@ -12,8 +12,12 @@ defmodule ThistleTea.Game.Network.Message.CmsgMoveTeleportAck do
   def handle(%__MODULE__{guid: guid, counter: counter}, %{guid: guid} = state) do
     case MovementControl.acknowledge(state, guid, counter, :teleport) do
       {:ok, state} ->
+        state = Visibility.refresh_player(state)
+
+        # The 1.12 client can crash if pet attachment packets arrive before it finishes the teleport.
+        send(self(), :restore_active_pet)
+
         state
-        |> Visibility.refresh_player()
         |> MovementControl.maybe_finish_repop()
         |> PlayerExploration.check_current()
 

@@ -513,17 +513,10 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     {:noreply, state}
   end
 
-  def handle_info(
-        {:attach_pet, owner_pid, spell_id, pet_spells},
-        %Mob{object: %{guid: pet_guid}, internal: %Internal{pet: %Pet{}}} = state
-      )
+  def handle_info({:attach_pet, owner_pid, spell_id, pet_spells}, %Mob{internal: %Internal{pet: %Pet{}}} = state)
       when is_pid(owner_pid) do
-    state
-    |> Core.update_object()
-    |> Network.send_packet(owner_pid)
-
     pet_spells = pet_spells || Map.values(state.internal.spellbook || %{})
-    send(owner_pid, {:pet_attached, pet_guid, spell_id, pet_spells})
+    send(owner_pid, {:pet_attached, Core.update_object(state), spell_id, pet_spells})
     {:noreply, state}
   end
 

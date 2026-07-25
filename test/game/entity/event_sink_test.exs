@@ -343,8 +343,7 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
       event = Event.summon_pet(caster_guid, 416, 688)
 
       assert ^caster = EventSink.emit(caster, event)
-      assert_receive {:"$gen_cast", {:send_packet, %UpdateObject{object: %Object{guid: pet_guid}}}}
-      assert_receive {:pet_attached, ^pet_guid, 688, pet_spells}
+      assert_receive {:pet_attached, %UpdateObject{object: %Object{guid: pet_guid}}, 688, pet_spells}
       assert is_pid(Entity.pid(pet_guid))
       assert Enum.any?(pet_spells, &(&1.id == 11_762))
 

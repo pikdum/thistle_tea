@@ -550,8 +550,6 @@ defmodule ThistleTea.Game.Network.Server do
       |> Visibility.refresh_player()
       |> Visibility.resync_player()
 
-    send(self(), :restore_active_pet)
-
     {:noreply, {socket, state}, socket.read_timeout}
   end
 
@@ -619,6 +617,17 @@ defmodule ThistleTea.Game.Network.Server do
     state = Network.Send.send_packet(packet, {socket, state})
     state = track_created_updates(state, updates)
     {:noreply, {socket, state}, socket.read_timeout}
+  end
+
+  defp ensure_pet_created(%UpdateObject{} = update, socket, state) do
+    if duplicate_create?(state, update) do
+      state
+    else
+      update = Tap.personalize(update, state.guid, state.character)
+      packet = UpdateObject.to_packet([update], state.guid)
+      state = Network.Send.send_packet(packet, {socket, state})
+      track_created_updates(state, [update])
+    end
   end
 
   def handle_info(:restore_active_pet, {socket, state}) do
@@ -805,9 +814,11 @@ defmodule ThistleTea.Game.Network.Server do
   end
 
   def handle_info(
-        {:pet_attached, pet_guid, spell_id, pet_spells},
-        {socket, %{character: %Character{unit: %Unit{}} = character} = state}
+        {:pet_attached, %UpdateObject{object: %{guid: pet_guid}} = pet_update, spell_id, pet_spells},
+        {socket, %{character: %Character{unit: %Unit{}}} = state}
       ) do
+    state = ensure_pet_created(pet_update, socket, state)
+    character = state.character
     {character, aura_events} = Aura.remove_spells(character, [18_789, 18_790, 18_791, 18_792, 25_228], Time.now())
 
     character =
