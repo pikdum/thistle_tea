@@ -106,12 +106,6 @@ defmodule ThistleTea.Game.Entity.Data.Quest do
 
   def deliver?(%__MODULE__{required_items: required_items}), do: required_items != []
 
-  def kill_objective_count(%__MODULE__{objective_slots: [_ | _] = objective_slots}) do
-    Enum.count(objective_slots, fn slot -> slot.creature_or_go_id > 0 end)
-  end
-
-  def kill_objective_count(%__MODULE__{required_kills: required_kills}), do: length(required_kills)
-
   def auto_complete?(%__MODULE__{method: 0}), do: true
   def auto_complete?(%__MODULE__{}), do: false
 

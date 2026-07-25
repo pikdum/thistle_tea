@@ -16,7 +16,6 @@ defmodule ThistleTea.Game.Player.QuestItemProgressTest do
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.Player.Quests
-  alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader
   alias ThistleTea.Game.World.Metadata
@@ -33,15 +32,10 @@ defmodule ThistleTea.Game.Player.QuestItemProgressTest do
     :ets.insert(QuestLoader, {{:quest, @quest_id}, quest})
     on_exit(fn -> :ets.delete(QuestLoader, {:quest, @quest_id}) end)
 
-    CharacterStore.init()
-
     {:ok, quest_log} = QuestLog.add(%{}, @quest_id)
-    character_id = System.unique_integer([:positive, :monotonic])
-    player_guid = Guid.from_low_guid(:player, character_id)
-    on_exit(fn -> :ets.delete(CharacterStore, character_id) end)
+    player_guid = Guid.from_low_guid(:player, System.unique_integer([:positive, :monotonic]))
 
     character = %Character{
-      id: character_id,
       object: %Object{guid: player_guid},
       unit: %Unit{race: 1, class: 8, level: 1, health: 50, max_health: 50},
       player: %Player{quest_log: quest_log},
@@ -87,15 +81,6 @@ defmodule ThistleTea.Game.Player.QuestItemProgressTest do
 
     assert is_integer(progress_at) and is_integer(create_at)
     assert progress_at < create_at
-  end
-
-  defp sent_packets(acc \\ []) do
-    receive do
-      {:"$gen_cast", {:send_packet, packet}} -> sent_packets([packet | acc])
-      {:"$gen_cast", {:send_packet, packet, _opts}} -> sent_packets([packet | acc])
-    after
-      0 -> Enum.reverse(acc)
-    end
   end
 
   test "merging into an existing stack still reports the delta", %{
@@ -149,5 +134,14 @@ defmodule ThistleTea.Game.Player.QuestItemProgressTest do
     character = %{character | player: %{character.player | inv1: stack.object.guid}}
 
     assert Quests.quest_item_counts(character) == %{@item_id => 5}
+  end
+
+  defp sent_packets(acc \\ []) do
+    receive do
+      {:"$gen_cast", {:send_packet, packet}} -> sent_packets([packet | acc])
+      {:"$gen_cast", {:send_packet, packet, _opts}} -> sent_packets([packet | acc])
+    after
+      0 -> Enum.reverse(acc)
+    end
   end
 end

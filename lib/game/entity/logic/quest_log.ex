@@ -43,38 +43,17 @@ defmodule ThistleTea.Game.Entity.Logic.QuestLog do
 
   def evaluate(quest_log, %Quest{} = quest, item_count_fn) do
     case get(quest_log, quest.id) do
-      %Entry{status: status} when status in [:incomplete, :complete] ->
-        {quest_log, counts_changed?} = sync_item_counts(quest_log, quest, item_count_fn)
-        satisfied = objectives_satisfied?(quest, get(quest_log, quest.id), item_count_fn)
+      %Entry{status: status} = entry when status in [:incomplete, :complete] ->
+        satisfied = objectives_satisfied?(quest, entry, item_count_fn)
 
         cond do
           satisfied and status == :incomplete -> transition(quest_log, quest, :complete)
           not satisfied and status == :complete -> transition(quest_log, quest, :incomplete)
-          counts_changed? -> {quest_log, :counts_changed}
           true -> {quest_log, :unchanged}
         end
 
       _entry ->
         {quest_log, :unchanged}
-    end
-  end
-
-  def sync_item_counts(quest_log, %Quest{required_items: []}, _item_count_fn), do: {quest_log, false}
-
-  def sync_item_counts(quest_log, %Quest{} = quest, item_count_fn) do
-    %Entry{counts: counts} = get(quest_log, quest.id)
-    offset = Quest.kill_objective_count(quest)
-
-    synced =
-      Enum.reduce(quest.required_items, counts, fn {index, item_id, required}, acc ->
-        Map.put(acc, offset + index, min(item_count_fn.(item_id), required))
-      end)
-
-    if synced == counts do
-      {quest_log, false}
-    else
-      {:ok, quest_log} = update(quest_log, quest.id, fn entry -> %{entry | counts: synced} end)
-      {quest_log, true}
     end
   end
 
