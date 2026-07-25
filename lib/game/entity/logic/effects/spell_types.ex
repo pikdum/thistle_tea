@@ -31,7 +31,6 @@ defmodule ThistleTea.Game.Entity.Logic.Effects.SpellTypes do
     {:DrainPower, [:target_guid, :misc_value], []},
     {:GrantPower, [:target_guid, :misc_value, :amount], []},
     {:RefreshPartyAura, [:spell, :amount], []},
-    {:RedirectDamage, [:source_guid, :target_guid, :school, :amount], []},
     {:TriggerSpell, [:source_guid, :source_level, :target_guid, :spell_id],
      [
        target_role: nil,

@@ -30,6 +30,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
   alias ThistleTea.Game.Math
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.WorldRef
 
   @extra_flag_no_leash_evade 0x00000001
@@ -146,7 +147,23 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
   defp enqueue_duel_outcome(entity, _outcome), do: entity
 
   defp enqueue_redirect(entity, {target_guid, amount}, source_guid, school) when is_integer(amount) and amount > 0 do
-    Effects.enqueue(entity, Effects.redirect_damage(source_guid, target_guid, school, amount))
+    spell = %Spell{
+      id: 6940,
+      name: "Blessing of Sacrifice",
+      school: school,
+      effects: [
+        %Spell.Effect{index: 0, type: :school_damage, base_points: amount, implicit_target_a: :target_enemy}
+      ]
+    }
+
+    context = %CastContext{
+      caster_guid: source_guid,
+      caster_level: 1,
+      target_guid: target_guid,
+      spell: spell
+    }
+
+    Effects.enqueue(entity, Effects.deliver_spell(target_guid, context, spell))
   end
 
   defp enqueue_redirect(entity, _redirect, _source_guid, _school), do: entity

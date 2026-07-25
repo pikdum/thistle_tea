@@ -78,7 +78,6 @@ defmodule ThistleTea.Game.Entity.EventSink do
     Effects.HealEntity,
     Effects.HealThreat,
     Effects.PeriodicAuraLog,
-    Effects.RedirectDamage,
     Effects.RefreshPartyAura,
     Effects.RemoveAura,
     Effects.ResurrectRequest,

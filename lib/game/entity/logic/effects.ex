@@ -331,11 +331,6 @@ defmodule ThistleTea.Game.Entity.Logic.Effects do
     %Effects.RefreshPartyAura{spell: spell, amount: radius}
   end
 
-  def redirect_damage(source_guid, target_guid, school, amount)
-      when is_integer(target_guid) and is_integer(amount) and amount > 0 do
-    %Effects.RedirectDamage{source_guid: source_guid, target_guid: target_guid, school: school, amount: amount}
-  end
-
   def consume_cast_item(item_guid) when is_integer(item_guid) do
     %Effects.ConsumeCastItem{cast_item_guid: item_guid}
   end

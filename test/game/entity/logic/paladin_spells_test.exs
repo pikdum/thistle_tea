@@ -437,10 +437,17 @@ defmodule ThistleTea.Game.Entity.Logic.PaladinSpellsTest do
 
       assert damaged.unit.health == 45
 
-      assert Enum.any?(damaged.internal.events, fn event ->
-               is_struct(event, Effects.RedirectDamage) and event.source_guid == 9 and event.target_guid == 7 and
-                 event.amount == 45
-             end)
+      assert Enum.any?(
+               damaged.internal.events,
+               &match?(
+                 %Effects.DeliverSpell{
+                   target_guid: 7,
+                   cast_context: %CastContext{caster_guid: 9},
+                   spell: %Spell{id: 6940, effects: [%Spell.Effect{base_points: 45}]}
+                 },
+                 &1
+               )
+             )
     end
   end
 

@@ -167,6 +167,8 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
     @tag :dbc_db
     test "a custom trigger overrides the selected DBC effect points" do
       caster_guid = Guid.from_low_guid(:player, unique_guid())
+      Entity.register(caster_guid)
+      on_exit(fn -> Entity.unregister(caster_guid) end)
 
       caster = %Character{
         object: %Object{guid: caster_guid},
@@ -178,14 +180,17 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
 
       event = Effects.trigger_spell(caster_guid, 60, caster_guid, 25_503, effect_index: 1, base_points: -16)
 
-      result = EventSink.emit(caster, event)
+      assert ^caster = EventSink.emit(caster, event)
 
-      assert [%{spell: %Spell{id: 25_503}, auras: [%{amount: -16}]}] = result.unit.auras
+      assert_receive {:"$gen_cast", {:receive_spell, %CastContext{}, %Spell{id: 25_503, effects: spell_effects}}}
+      assert %{base_points: -16} = Enum.find(spell_effects, &(&1.index == 1))
     end
 
     @tag :dbc_db
-    test "a resolved party trigger applies to the caster" do
+    test "a resolved party trigger returns to the caster owner" do
       caster_guid = Guid.from_low_guid(:player, unique_guid())
+      Entity.register(caster_guid)
+      on_exit(fn -> Entity.unregister(caster_guid) end)
 
       caster = %Character{
         object: %Object{guid: caster_guid},
@@ -196,9 +201,9 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
       }
 
       event = Effects.trigger_spell(caster_guid, 60, caster_guid, 23_455, resolve_targets?: true)
-      result = EventSink.emit(caster, event)
+      assert ^caster = EventSink.emit(caster, event)
 
-      assert result.unit.health > caster.unit.health
+      assert_receive {:"$gen_cast", {:receive_spell, %CastContext{target_guid: ^caster_guid}, %Spell{id: 23_455}}}
     end
 
     @tag :dbc_db
@@ -275,9 +280,11 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
 
       event = Effects.trigger_spell(caster_guid, 60, target_guid, 20_467)
 
-      result = EventSink.emit(victim, event)
+      assert ^victim = EventSink.emit(victim, event)
 
-      assert result.unit.health < victim.unit.health
+      assert_receive {:"$gen_cast",
+                      {:receive_spell, %CastContext{caster_guid: ^caster_guid, target_guid: ^target_guid},
+                       %Spell{id: 20_467}}}
     end
 
     @tag :dbc_db

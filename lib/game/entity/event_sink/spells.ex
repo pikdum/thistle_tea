@@ -4,9 +4,7 @@ defmodule ThistleTea.Game.Entity.EventSink.Spells do
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Mob
-  alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.Logic.Effects
-  alias ThistleTea.Game.Entity.Logic.SpellEffect
   alias ThistleTea.Game.Entity.Logic.SpellTarget
   alias ThistleTea.Game.Entity.SpellTargetResolver
   alias ThistleTea.Game.Guid
@@ -17,7 +15,6 @@ defmodule ThistleTea.Game.Entity.EventSink.Spells do
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Scripts
   alias ThistleTea.Game.Spell.Targets
-  alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
 
@@ -355,27 +352,6 @@ defmodule ThistleTea.Game.Entity.EventSink.Spells do
 
   def emit(entity, %Effects.RefreshPartyAura{}), do: entity
 
-  def emit(entity, %Effects.RedirectDamage{} = effect) do
-    spell = %Spell{
-      id: 6940,
-      name: "Blessing of Sacrifice",
-      school: effect.school,
-      effects: [
-        %Spell.Effect{index: 0, type: :school_damage, base_points: effect.amount, implicit_target_a: :target_enemy}
-      ]
-    }
-
-    context = %CastContext{
-      caster_guid: effect.source_guid,
-      caster_level: 1,
-      target_guid: effect.target_guid,
-      spell: spell
-    }
-
-    Entity.receive_spell(effect.target_guid, context, spell)
-    entity
-  end
-
   def emit(%Character{object: %{guid: guid}} = entity, %Effects.SpellDelayed{} = effect) do
     Network.send_packet(%Message.SmsgSpellDelayed{caster: guid, delay_ms: effect.delay_ms})
     entity
@@ -521,19 +497,10 @@ defmodule ThistleTea.Game.Entity.EventSink.Spells do
 
   defp projectile_delay_ms(_entity, _effect), do: 0
 
-  defp dispatch_triggered_spell(
-         %{object: %{guid: guid}} = entity,
-         %Effects.TriggerSpell{target_guid: guid} = effect,
-         spell
-       ) do
-    context = trigger_context(entity, effect, spell)
-    {entity, effects} = SpellEffect.receive(entity, context, spell, Time.now())
-    EventSink.emit(entity, effects)
-  end
-
   defp dispatch_triggered_spell(entity, %Effects.TriggerSpell{} = effect, spell) do
     context = trigger_context(entity, effect, spell)
-    emit(entity, Effects.deliver_spell(effect.target_guid, context, spell))
+    Entity.receive_spell(effect.target_guid, context, spell)
+    entity
   end
 
   defp apply_trigger_override(%Spell{} = spell, %Effects.TriggerSpell{} = effect) do

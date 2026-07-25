@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.Entity.Logic.CoreTest do
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.WorldRef
 
   describe "heal/2" do
@@ -42,7 +43,14 @@ defmodule ThistleTea.Game.Entity.Logic.CoreTest do
       {entity, _absorbed} = Core.take_damage_with_absorb(entity, 100, 1_000, school: :physical, source: 777)
 
       assert entity.unit.health == 30
-      assert [%Effects.RedirectDamage{target_guid: 2, amount: 30}] = entity.internal.events
+
+      assert [
+               %Effects.DeliverSpell{
+                 target_guid: 2,
+                 cast_context: %CastContext{caster_guid: 777, target_guid: 2},
+                 spell: %Spell{id: 6940, effects: [%Spell.Effect{base_points: 30}]}
+               }
+             ] = entity.internal.events
     end
 
     test "skips the redirect when the split portion truncates to zero" do
