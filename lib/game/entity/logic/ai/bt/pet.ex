@@ -31,6 +31,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet do
   @follow_angle :math.pi() / 2
   @follow_start_distance 0.25
   @follow_repath_distance 0.5
+  @stationary_slack_factor 1.4
   @follow_prediction_ms 500
   @follow_tick_ms 100
   @idle_delay_ms 500
@@ -196,16 +197,17 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet do
     end
   end
 
-  defp follow_owner(%Mob{internal: %Internal{pet: %Pet{owner_guid: owner_guid}, world: world}} = state, blackboard) do
-    now = Time.now()
+  defp follow_owner(%Mob{} = state, blackboard), do: follow_owner(state, blackboard, Time.now())
 
+  def follow_owner(%Mob{internal: %Internal{pet: %Pet{owner_guid: owner_guid}, world: world}} = state, blackboard, now)
+      when is_integer(now) do
     with {^world, x, y, z} <- World.projected_position(owner_guid, @follow_prediction_ms, now),
          %{orientation: orientation} when is_number(orientation) <- Metadata.query(owner_guid, [:orientation]) do
       destination = follow_position({x, y, z}, orientation)
       state = Movement.sync_position(state, now)
 
       state =
-        if should_repath?(state, destination) do
+        if should_repath?(state, destination, owner_guid, {x, y, z}, now) do
           velocity = catchup_velocity(state, destination)
 
           state
@@ -251,10 +253,30 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet do
 
   defp run(%Mob{internal: %Internal{} = internal} = state), do: %{state | internal: %{internal | running: true}}
 
-  defp should_repath?(state, destination) do
-    distance_to(state, destination) > @follow_start_distance and
+  defp should_repath?(state, destination, owner_guid, owner_position, now) do
+    not settled_at_owner?(state, owner_guid, owner_position, now) and
+      distance_to(state, destination) > @follow_start_distance and
       destination_changed?(state.movement_block.spline_nodes, destination)
   end
+
+  defp settled_at_owner?(state, owner_guid, owner_position, now) do
+    not World.moving?(owner_guid, now) and not Movement.moving?(state, now) and
+      distance_to(state, owner_position) <= stationary_slack(state, owner_guid)
+  end
+
+  defp stationary_slack(%Mob{unit: %Unit{bounding_radius: radius}}, owner_guid) do
+    @stationary_slack_factor * @follow_distance + bounding_radius(radius) + owner_bounding_radius(owner_guid)
+  end
+
+  defp owner_bounding_radius(owner_guid) do
+    case Metadata.query(owner_guid, [:bounding_radius]) do
+      %{bounding_radius: radius} -> bounding_radius(radius)
+      _ -> Unit.default_bounding_radius()
+    end
+  end
+
+  defp bounding_radius(radius) when is_number(radius) and radius > 0, do: radius
+  defp bounding_radius(_radius), do: Unit.default_bounding_radius()
 
   defp destination_changed?([_ | _] = nodes, destination) do
     point_distance(List.last(nodes), destination) > @follow_repath_distance
