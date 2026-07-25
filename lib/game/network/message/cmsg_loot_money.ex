@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgLootMoney do
   alias ThistleTea.Game.Entity.Logic.Experience
   alias ThistleTea.Game.Network.InventoryUpdate
   alias ThistleTea.Game.Party
+  alias ThistleTea.Game.Player.Looting
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.System.Party, as: PartySystem
 
@@ -14,7 +15,9 @@ defmodule ThistleTea.Game.Network.Message.CmsgLootMoney do
   @impl ClientMessage
   def handle(%__MODULE__{}, %{ready: true, character: %Character{} = c, loot_guid: loot_guid} = state)
       when is_integer(loot_guid) do
-    case Entity.call(loot_guid, :loot_take_gold) do
+    actor = Looting.actor(state, loot_guid)
+
+    case Entity.call(loot_guid, {:loot_take_gold, actor}) do
       {:ok, gold} ->
         share = split_gold(state.guid, c, gold)
         player = %{c.player | coinage: c.player.coinage + share}

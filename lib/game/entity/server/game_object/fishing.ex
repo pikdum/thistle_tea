@@ -19,6 +19,7 @@ defmodule ThistleTea.Game.Entity.Server.GameObject.Fishing do
 
   @fishing_hole_type 25
   @fishing_hole_search_range 22.0
+  @fishing_loot_distance 25.0
   @default_respawn_ms 300_000
 
   def bite(%GameObject{game_object: game_object, internal: %Internal{fishing: %FishingState{} = fishing}} = state) do
@@ -119,7 +120,8 @@ defmodule ThistleTea.Game.Entity.Server.GameObject.Fishing do
   end
 
   defp put_loot(%GameObject{internal: internal} = state, %Loot{} = loot) do
-    internal_loot = %InternalLoot{session: LootSession.new(loot, internal.fishing.owner_guid)}
+    session = LootSession.new(loot, internal.fishing.owner_guid, interaction_distance: @fishing_loot_distance)
+    internal_loot = %InternalLoot{session: session}
     %{state | internal: %{internal | loot: internal_loot}}
   end
 

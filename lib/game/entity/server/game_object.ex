@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
   alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Logic.Loot.Actor
   alias ThistleTea.Game.Entity.Registry, as: EntityRegistry
   alias ThistleTea.Game.Entity.Server.GameObject.Chair
   alias ThistleTea.Game.Entity.Server.GameObject.Chest
@@ -124,7 +125,7 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
 
   @impl GenServer
   def handle_call(
-        {:loot_view, viewer},
+        {:loot_view, %Actor{guid: viewer}},
         _from,
         %GameObject{internal: %Internal{fishing: %{owner_guid: owner_guid}}} = state
       )
@@ -132,8 +133,8 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
     {:reply, {:error, :not_owner}, state}
   end
 
-  def handle_call({:loot_view, viewer}, _from, %GameObject{} = state) do
-    {result, state} = Chest.view(state, viewer)
+  def handle_call({:loot_view, %Actor{} = actor}, _from, %GameObject{} = state) do
+    {result, state} = Chest.view(state, actor)
     {:reply, result, state}
   end
 
@@ -168,8 +169,8 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
     {:reply, result, state}
   end
 
-  def handle_call({:loot_take_item, slot}, _from, %GameObject{} = state) do
-    {result, state} = Chest.take_item(state, slot)
+  def handle_call({:loot_take_item, %Actor{} = actor, slot}, _from, %GameObject{} = state) do
+    {result, state} = Chest.take_item(state, actor, slot)
     {:reply, result, state}
   end
 
@@ -177,24 +178,24 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
     {:reply, :ok, Chest.return_item(state, slot)}
   end
 
-  def handle_call(:loot_take_gold, _from, %GameObject{} = state) do
-    {result, state} = Chest.take_gold(state)
+  def handle_call({:loot_take_gold, %Actor{} = actor}, _from, %GameObject{} = state) do
+    {result, state} = Chest.take_gold(state, actor)
     {:reply, result, state}
   end
 
   def handle_call(
-        {:loot_release, viewer},
+        {:loot_release, %Actor{guid: viewer} = actor},
         _from,
         %GameObject{internal: %Internal{fishing: %{owner_guid: owner_guid}}} = state
       )
       when is_integer(owner_guid) and viewer == owner_guid do
-    state = Chest.release(state, viewer)
+    state = Chest.release(state, actor)
     send(self(), :despawn)
     {:reply, :ok, state}
   end
 
-  def handle_call({:loot_release, viewer}, _from, %GameObject{} = state) do
-    {:reply, :ok, Chest.release(state, viewer)}
+  def handle_call({:loot_release, %Actor{} = actor}, _from, %GameObject{} = state) do
+    {:reply, :ok, Chest.release(state, actor)}
   end
 
   @impl GenServer

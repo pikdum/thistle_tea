@@ -5,9 +5,12 @@ defmodule ThistleTea.Game.Entity.Server.GameObject.ChestTest do
   alias ThistleTea.Game.Entity.Data.Component.Internal.Loot, as: InternalLoot
   alias ThistleTea.Game.Entity.Data.GameObject
   alias ThistleTea.Game.Entity.Logic.Loot
+  alias ThistleTea.Game.Entity.Logic.Loot.Actor
   alias ThistleTea.Game.Entity.Logic.LootSession
   alias ThistleTea.Game.Entity.Server.GameObject.Chest
   alias ThistleTea.Game.WorldRef
+
+  @actor %Actor{guid: 42, group_id: nil, needed_items: MapSet.new([11_119]), distance: 0.0}
 
   defp chest_with_session do
     loot = %Loot{
@@ -32,7 +35,7 @@ defmodule ThistleTea.Game.Entity.Server.GameObject.ChestTest do
 
   describe "view/2" do
     test "returns the loot and tracks the viewer" do
-      {result, state} = Chest.view(chest_with_session(), 42)
+      {result, state} = Chest.view(chest_with_session(), @actor)
 
       assert {:ok, %Loot{items: [%Loot.Item{item_id: 11_119}]}} = result
       assert 42 in LootSession.viewers(state.internal.loot.session)
@@ -42,35 +45,35 @@ defmodule ThistleTea.Game.Entity.Server.GameObject.ChestTest do
       state = chest_with_session()
       state = %{state | internal: %{state.internal | loot: %{state.internal.loot | corpse_removed?: true}}}
 
-      assert {{:error, :no_loot}, _state} = Chest.view(state, 42)
+      assert {{:error, :no_loot}, _state} = Chest.view(state, @actor)
     end
 
     test "returns no loot without loot config" do
       assert {{:error, :no_loot}, _state} =
-               Chest.view(%GameObject{internal: %Internal{world: %WorldRef{map_id: 0}}}, 42)
+               Chest.view(%GameObject{internal: %Internal{world: %WorldRef{map_id: 0}}}, @actor)
     end
   end
 
   describe "take_item/2" do
     test "hands out the item once" do
-      {result, state} = Chest.take_item(chest_with_session(), 0)
+      {result, state} = Chest.take_item(chest_with_session(), @actor, 0)
 
       assert {:ok, %Loot.Item{item_id: 11_119}} = result
-      assert {{:error, _reason}, _state} = Chest.take_item(state, 0)
+      assert {{:error, _reason}, _state} = Chest.take_item(state, @actor, 0)
     end
 
     test "return_item restores a taken slot" do
-      {_result, state} = Chest.take_item(chest_with_session(), 0)
+      {_result, state} = Chest.take_item(chest_with_session(), @actor, 0)
       state = Chest.return_item(state, 0)
 
-      assert {{:ok, %Loot.Item{item_id: 11_119}}, _state} = Chest.take_item(state, 0)
+      assert {{:ok, %Loot.Item{item_id: 11_119}}, _state} = Chest.take_item(state, @actor, 0)
     end
   end
 
   describe "release/2" do
     test "keeps the chest while loot remains" do
-      {_result, state} = Chest.view(chest_with_session(), 42)
-      state = Chest.release(state, 42)
+      {_result, state} = Chest.view(chest_with_session(), @actor)
+      state = Chest.release(state, @actor)
 
       refute state.internal.loot.corpse_removed?
       assert %LootSession{} = state.internal.loot.session

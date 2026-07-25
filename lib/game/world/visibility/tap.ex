@@ -7,11 +7,11 @@ defmodule ThistleTea.Game.World.Visibility.Tap do
   """
   import Bitwise
 
+  alias ThistleTea.Game.Entity.Logic.LootSession
   alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.Loot.ActorFactory
   alias ThistleTea.Game.Network.UpdateObject
-  alias ThistleTea.Game.Party
   alias ThistleTea.Game.World.Metadata
-  alias ThistleTea.Game.World.System.Party, as: PartySystem
 
   @dynamic_flag_lootable 0x0001
   @dynamic_flag_tapped 0x0004
@@ -29,29 +29,28 @@ defmodule ThistleTea.Game.World.Visibility.Tap do
   def personalize(update, _viewer), do: update
 
   defp adjust(flags, mob_guid, viewer) do
-    meta = Metadata.query(mob_guid, [:tapped_player, :tapped_group_id, :assigned_looter]) || %{}
-    tap_eligible? = tap_eligible?(meta, viewer)
-    loot_eligible? = tap_eligible? and Map.get(meta, :assigned_looter) in [nil, viewer]
+    meta = Metadata.query(mob_guid, [:tapped_player, :tapped_group_id, :loot_projection]) || %{}
+    actor = ActorFactory.for_guid(viewer, mob_guid)
+    tap_eligible? = LootSession.tap_allowed?(tap_policy(meta), actor)
+    loot_eligible? = loot_visible?(meta, actor)
 
     flags
     |> clear_if(@dynamic_flag_tapped, tap_eligible?)
     |> clear_if(@dynamic_flag_lootable, not loot_eligible?)
   end
 
-  defp tap_eligible?(meta, viewer) do
-    cond do
-      Map.get(meta, :tapped_player) in [nil, viewer] -> true
-      is_integer(Map.get(meta, :tapped_group_id)) -> viewer_in_group?(viewer, meta.tapped_group_id)
-      true -> false
-    end
+  defp tap_policy(%{loot_projection: projection}) when is_struct(projection, LootSession.Projection) do
+    projection
   end
 
-  defp viewer_in_group?(viewer, group_id) do
-    case PartySystem.group_of(viewer) do
-      %Party.Group{id: ^group_id} -> true
-      _ -> false
-    end
+  defp tap_policy(meta) do
+    %{tapped: %{player: Map.get(meta, :tapped_player), group_id: Map.get(meta, :tapped_group_id)}}
   end
+
+  defp loot_visible?(%{loot_projection: projection}, actor) when is_struct(projection, LootSession.Projection),
+    do: LootSession.visible?(projection, actor)
+
+  defp loot_visible?(_meta, _actor), do: false
 
   defp clear_if(flags, bit, true), do: flags &&& bnot(bit)
   defp clear_if(flags, _bit, false), do: flags

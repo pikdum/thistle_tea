@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.Player.Fishing do
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Player.Enchantments
+  alias ThistleTea.Game.Player.Looting
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Cast
   alias ThistleTea.Game.World
@@ -56,11 +57,10 @@ defmodule ThistleTea.Game.Player.Fishing do
     skill = Skills.value(character.player.skills, skill_id) + Enchantments.skill_bonus(character, skill_id)
 
     case Entity.call(bobber_guid, {:fishing_use, state.guid, skill}) do
-      {:ok, loot, _catch} ->
+      {:ok, _loot, _catch} ->
         character = advance_skill(character)
         character = character |> Casting.cancel() |> EventSink.emit_pending()
-        Network.send_packet(%Message.SmsgLootResponse{guid: bobber_guid, loot: loot, loot_type: @loot_type_fishing})
-        %{state | character: character, loot_guid: bobber_guid}
+        Looting.open(%{state | character: character}, bobber_guid, loot_type: @loot_type_fishing)
 
       {:error, :not_hooked} ->
         character = character |> Casting.cancel() |> EventSink.emit_pending()

@@ -37,6 +37,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Experience
   alias ThistleTea.Game.Entity.Logic.Hostility
+  alias ThistleTea.Game.Entity.Logic.Loot.Actor
   alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.Entity.Logic.SpellEffect
   alias ThistleTea.Game.Entity.Logic.SpellFeedback
@@ -315,18 +316,18 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
   def handle_call(:feed_info, _from, %Mob{} = state), do: {:reply, {:error, :not_pet}, state}
 
-  def handle_call({:loot_view, viewer}, _from, %Mob{} = state) do
-    {result, state} = Corpse.view(state, viewer)
+  def handle_call({:loot_view, %Actor{} = actor}, _from, %Mob{} = state) do
+    {result, state} = Corpse.view(state, actor)
     {:reply, result, state}
   end
 
-  def handle_call({:loot_master_give, giver, slot, target}, _from, %Mob{} = state) do
-    {result, state} = Corpse.master_give(state, giver, slot, target)
+  def handle_call({:loot_master_give, %Actor{} = giver, slot, %Actor{} = recipient}, _from, %Mob{} = state) do
+    {result, state} = Corpse.master_give(state, giver, slot, recipient)
     {:reply, result, state}
   end
 
-  def handle_call({:loot_take_item, slot}, _from, %Mob{} = state) do
-    {result, state} = Corpse.take_item(state, slot)
+  def handle_call({:loot_take_item, %Actor{} = actor, slot}, _from, %Mob{} = state) do
+    {result, state} = Corpse.take_item(state, actor, slot)
     {:reply, result, state}
   end
 
@@ -334,13 +335,13 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     {:reply, :ok, Corpse.return_item(state, slot)}
   end
 
-  def handle_call(:loot_take_gold, _from, %Mob{} = state) do
-    {result, state} = Corpse.take_gold(state)
+  def handle_call({:loot_take_gold, %Actor{} = actor}, _from, %Mob{} = state) do
+    {result, state} = Corpse.take_gold(state, actor)
     {:reply, result, state}
   end
 
-  def handle_call({:loot_release, viewer}, _from, %Mob{} = state) do
-    {:reply, :ok, Corpse.release(state, viewer)}
+  def handle_call({:loot_release, %Actor{} = actor}, _from, %Mob{} = state) do
+    {:reply, :ok, Corpse.release(state, actor)}
   end
 
   @impl GenServer

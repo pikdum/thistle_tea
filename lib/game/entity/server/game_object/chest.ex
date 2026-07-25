@@ -9,6 +9,8 @@ defmodule ThistleTea.Game.Entity.Server.GameObject.Chest do
   alias ThistleTea.Game.Entity.Data.Component.Internal.Loot, as: InternalLoot
   alias ThistleTea.Game.Entity.Data.Component.Internal.Spawn
   alias ThistleTea.Game.Entity.Data.GameObject
+  alias ThistleTea.Game.Entity.Logic.Loot
+  alias ThistleTea.Game.Entity.Logic.Loot.Actor
   alias ThistleTea.Game.Entity.Logic.LootSession
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Loader.Loot, as: LootLoader
@@ -19,20 +21,26 @@ defmodule ThistleTea.Game.Entity.Server.GameObject.Chest do
   def lootable?(%GameObject{internal: %Internal{loot: %InternalLoot{}}}), do: true
   def lootable?(%GameObject{}), do: false
 
-  def view(%GameObject{} = state, viewer) do
+  def view(%GameObject{} = state, %Actor{} = actor) do
     case ensure_session(state) do
       {%LootSession{} = session, state} ->
-        session = LootSession.add_viewer(session, viewer)
-        {{:ok, LootSession.view(session, viewer)}, put_session(state, session)}
+        case LootSession.view(session, actor) do
+          {:ok, %Loot{} = loot} ->
+            session = LootSession.add_viewer(session, actor)
+            {{:ok, loot}, put_session(state, session)}
+
+          {:error, reason} ->
+            {{:error, reason}, state}
+        end
 
       :no_loot ->
         {{:error, :no_loot}, state}
     end
   end
 
-  def take_item(%GameObject{} = state, slot) do
+  def take_item(%GameObject{} = state, %Actor{} = actor, slot) do
     with %LootSession{} = session <- session(state),
-         {:ok, item, session} <- LootSession.take_item(session, slot) do
+         {:ok, item, session} <- LootSession.take_item(session, actor, slot) do
       {{:ok, item}, put_session(state, session)}
     else
       {:error, reason} -> {{:error, reason}, state}
@@ -47,9 +55,9 @@ defmodule ThistleTea.Game.Entity.Server.GameObject.Chest do
     end
   end
 
-  def take_gold(%GameObject{} = state) do
+  def take_gold(%GameObject{} = state, %Actor{} = actor) do
     with %LootSession{} = session <- session(state),
-         {:ok, gold, session} <- LootSession.take_gold(session) do
+         {:ok, gold, session} <- LootSession.take_gold(session, actor) do
       {{:ok, gold}, put_session(state, session)}
     else
       {:error, reason} -> {{:error, reason}, state}
@@ -57,10 +65,10 @@ defmodule ThistleTea.Game.Entity.Server.GameObject.Chest do
     end
   end
 
-  def release(%GameObject{} = state, viewer) do
+  def release(%GameObject{} = state, %Actor{} = actor) do
     case session(state) do
       %LootSession{} = session ->
-        session = LootSession.remove_viewer(session, viewer)
+        session = LootSession.remove_viewer(session, actor)
         state = put_session(state, session)
         if LootSession.finished?(session), do: despawn(state), else: state
 

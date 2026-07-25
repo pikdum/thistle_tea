@@ -2,16 +2,12 @@ defmodule ThistleTea.Game.Network.Message.CmsgLootRelease do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_LOOT_RELEASE
 
-  alias ThistleTea.Game.Entity
+  alias ThistleTea.Game.Player.Looting
 
   defstruct [:guid]
 
   @impl ClientMessage
-  def handle(%__MODULE__{}, %{ready: true, guid: guid, loot_guid: loot_guid} = state) when is_integer(loot_guid) do
-    Entity.call(loot_guid, {:loot_release, guid})
-    Network.send_packet(%Message.SmsgLootReleaseResponse{guid: loot_guid})
-    %{state | loot_guid: nil}
-  end
+  def handle(%__MODULE__{}, %{ready: true} = state), do: Looting.release(state)
 
   def handle(%__MODULE__{guid: guid}, state) do
     Network.send_packet(%Message.SmsgLootReleaseResponse{guid: guid})

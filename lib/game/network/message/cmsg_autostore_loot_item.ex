@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgAutostoreLootItem do
   alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Entity.Logic.Loot
   alias ThistleTea.Game.Network.InventoryUpdate
+  alias ThistleTea.Game.Player.Looting
   alias ThistleTea.Game.World.ItemStore
 
   defstruct [:slot]
@@ -13,7 +14,9 @@ defmodule ThistleTea.Game.Network.Message.CmsgAutostoreLootItem do
   @impl ClientMessage
   def handle(%__MODULE__{slot: slot}, %{ready: true, character: %Character{}, loot_guid: loot_guid} = state)
       when is_integer(loot_guid) do
-    case Entity.call(loot_guid, {:loot_take_item, slot}) do
+    actor = Looting.actor(state, loot_guid)
+
+    case Entity.call(loot_guid, {:loot_take_item, actor, slot}) do
       {:ok, %Loot.Item{} = loot_item} ->
         store_loot_item(state, loot_item, slot)
 

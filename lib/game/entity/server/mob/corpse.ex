@@ -15,10 +15,12 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Corpse do
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Experience
   alias ThistleTea.Game.Entity.Logic.Loot
+  alias ThistleTea.Game.Entity.Logic.Loot.Actor
   alias ThistleTea.Game.Entity.Logic.LootRoll
   alias ThistleTea.Game.Entity.Logic.LootSession
   alias ThistleTea.Game.Entity.Registry, as: EntityRegistry
   alias ThistleTea.Game.Entity.Server.Mob.Respawn
+  alias ThistleTea.Game.Loot.ActorFactory
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Party
@@ -58,9 +60,9 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Corpse do
   def removed?(%Mob{internal: %Internal{loot: %InternalLoot{corpse_removed?: removed?}}}), do: removed? == true
   def removed?(%Mob{}), do: false
 
-  def rolls_pending?(%Mob{} = state) do
+  def pending?(%Mob{} = state) do
     case session(state) do
-      %LootSession{} = session -> LootSession.rolls_pending?(session)
+      %LootSession{} = session -> LootSession.pending?(session)
       _ -> false
     end
   end
@@ -77,7 +79,12 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Corpse do
         state = resolve_pending_rolls(state)
         close_loot_windows(state)
 
-        Metadata.update(state.object.guid, %{tapped_player: nil, tapped_group_id: nil, assigned_looter: nil})
+        Metadata.update(state.object.guid, %{
+          tapped_player: nil,
+          tapped_group_id: nil,
+          assigned_looter: nil,
+          loot_projection: nil
+        })
 
         state = Visibility.leave_entity(state)
         World.remove_position(state)
@@ -86,21 +93,21 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Corpse do
     end
   end
 
-  def view(%Mob{} = state, viewer) do
+  def view(%Mob{} = state, %Actor{} = actor) do
     with %LootSession{} = session <- session(state),
          true <- Core.dead?(state) || :no_loot,
-         true <- LootSession.allowed?(session, viewer, PartySystem.group_of(viewer)) || :no_permission do
-      state = put_session(state, LootSession.add_viewer(session, viewer))
-      {{:ok, LootSession.view(session, viewer)}, state}
+         {:ok, %Loot{} = loot} <- LootSession.view(session, actor) do
+      state = put_session(state, LootSession.add_viewer(session, actor))
+      {{:ok, loot}, state}
     else
-      :no_permission -> {{:error, :no_permission}, state}
+      {:error, reason} -> {{:error, reason}, state}
       _ -> {{:error, :no_loot}, state}
     end
   end
 
-  def take_item(%Mob{} = state, slot) do
+  def take_item(%Mob{} = state, %Actor{} = actor, slot) do
     with %LootSession{} = session <- session(state),
-         {:ok, item, session} <- LootSession.take_item(session, slot) do
+         {:ok, item, session} <- LootSession.take_item(session, actor, slot) do
       {{:ok, item}, finish_if_done(put_session(state, session))}
     else
       {:error, reason} -> {{:error, reason}, state}
@@ -115,9 +122,9 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Corpse do
     end
   end
 
-  def take_gold(%Mob{} = state) do
+  def take_gold(%Mob{} = state, %Actor{} = actor) do
     with %LootSession{} = session <- session(state),
-         {:ok, gold, session} <- LootSession.take_gold(session) do
+         {:ok, gold, session} <- LootSession.take_gold(session, actor) do
       {{:ok, gold}, finish_if_done(put_session(state, session))}
     else
       {:error, reason} -> {{:error, reason}, state}
@@ -125,22 +132,20 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Corpse do
     end
   end
 
-  def release(%Mob{} = state, viewer) do
+  def release(%Mob{} = state, %Actor{} = actor) do
     state =
       case session(state) do
-        %LootSession{} = session -> put_session(state, LootSession.remove_viewer(session, viewer))
+        %LootSession{} = session -> put_session(state, LootSession.remove_viewer(session, actor))
         _ -> state
       end
 
     finish_if_done(state)
   end
 
-  def master_give(%Mob{} = state, giver, slot, target) do
-    with %LootSession{loot_master: ^giver} = session <- session(state),
-         %Loot.Item{} <- LootSession.blocked_item(session, slot),
-         true <- master_give_target_ok?(state, target),
-         pid when is_pid(pid) <- EntityRegistry.whereis(target),
-         {:ok, item, session} <- LootSession.award_item(session, slot) do
+  def master_give(%Mob{} = state, %Actor{} = giver, slot, %Actor{} = recipient) do
+    with %LootSession{} = session <- session(state),
+         pid when is_pid(pid) <- EntityRegistry.whereis(recipient.guid),
+         {:ok, item, session} <- LootSession.master_give(session, giver, recipient, slot) do
       send(pid, {:create_item, item.item_id, item.count})
       {:ok, finish_if_done(put_session(state, session))}
     else
@@ -222,6 +227,8 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Corpse do
   end
 
   defp setup_group_loot_method(%Mob{} = state, %Party.Group{loot_method: method} = group) do
+    state = put_session(state, LootSession.configure_group(session(state), method))
+
     cond do
       method in [@loot_method_group_loot, @loot_method_need_before_greed] -> start_rolls(state, group)
       method == @loot_method_master_loot -> prepare_master(state, group)
@@ -330,9 +337,11 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Corpse do
 
     session = session(state)
 
+    winner_actor = ActorFactory.for_guid(winner, state.object.guid)
+
     case EntityRegistry.whereis(winner) do
       pid when is_pid(pid) ->
-        case LootSession.award_item(session, roll.slot) do
+        case LootSession.roll_award(session, winner_actor, roll.slot) do
           {:ok, item, session} ->
             send(pid, {:create_item, item.item_id, item.count})
             put_session(state, session)
@@ -440,17 +449,12 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Corpse do
     |> Enum.filter(&MapSet.member?(member_guids, &1))
   end
 
-  defp master_give_target_ok?(%Mob{} = state, target) do
-    case tap_group(state) do
-      %Party.Group{} = group -> target in eligible_members(state, group)
-      _ -> false
-    end
-  end
-
   defp session(%Mob{internal: %Internal{loot: %InternalLoot{session: session}}}), do: session
   defp session(%Mob{}), do: nil
 
   defp put_session(%Mob{} = state, session) do
+    projection = if is_struct(session, LootSession), do: LootSession.project(session)
+    Metadata.update(state.object.guid, %{loot_projection: projection})
     put_internal_loot(state, %{state.internal.loot | session: session})
   end
 

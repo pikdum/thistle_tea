@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob.CorpseTest do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.ItemTemplate
   alias ThistleTea.Game.Entity.Data.Mob
+  alias ThistleTea.Game.Entity.Logic.Loot.Actor
   alias ThistleTea.Game.Entity.Server.Mob.Corpse
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
@@ -50,7 +51,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob.CorpseTest do
       prepared = Corpse.prepare(mob(killer), killer)
 
       assert (prepared.unit.dynamic_flags &&& @dynamic_flag_lootable) == 0
-      assert {{:error, :no_loot}, _state} = Corpse.view(prepared, killer)
+      assert {{:error, :no_loot}, _state} = Corpse.view(prepared, actor(killer))
     end
 
     test "keeps a quest-only corpse lootable for a killer on the quest", %{killer: killer} do
@@ -60,7 +61,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob.CorpseTest do
       prepared = Corpse.prepare(mob(killer), killer)
 
       assert (prepared.unit.dynamic_flags &&& @dynamic_flag_lootable) != 0
-      assert {{:ok, loot}, _state} = Corpse.view(prepared, killer)
+      assert {{:ok, loot}, _state} = Corpse.view(prepared, actor(killer, [@quest_item_id]))
       assert [%{item_id: @quest_item_id}] = loot.items
     end
 
@@ -70,10 +71,10 @@ defmodule ThistleTea.Game.Entity.Server.Mob.CorpseTest do
 
       prepared = Corpse.prepare(mob(killer), killer)
 
-      assert {{:ok, loot}, prepared} = Corpse.view(prepared, killer)
+      assert {{:ok, loot}, prepared} = Corpse.view(prepared, actor(killer))
       assert [%{item_id: @grey_item_id, slot: 0}] = loot.items
 
-      assert {{:ok, _item}, looted} = Corpse.take_item(prepared, 0)
+      assert {{:ok, _item}, looted} = Corpse.take_item(prepared, actor(killer), 0)
       assert (looted.unit.dynamic_flags &&& @dynamic_flag_lootable) == 0
     end
 
@@ -87,6 +88,10 @@ defmodule ThistleTea.Game.Entity.Server.Mob.CorpseTest do
   end
 
   defp cache_loot_rows(rows), do: :ets.insert(LootLoader, {{:creature, @loot_id}, rows})
+
+  defp actor(guid, needed_items \\ []) do
+    %Actor{guid: guid, group_id: nil, needed_items: MapSet.new(needed_items), distance: 0.0}
+  end
 
   defp quest_row, do: %{item: @quest_item_id, chance: -100.0, groupid: 0, mincount_or_ref: 1, maxcount: 1}
   defp grey_row, do: %{item: @grey_item_id, chance: 100.0, groupid: 0, mincount_or_ref: 1, maxcount: 1}

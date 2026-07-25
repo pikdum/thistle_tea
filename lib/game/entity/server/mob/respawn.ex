@@ -54,7 +54,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Respawn do
         kick_ai_tick()
         clear_ref(state)
 
-      Corpse.rolls_pending?(state) ->
+      Corpse.pending?(state) ->
         put_spawn(state, %{state.internal.spawn | respawn_pending?: true})
 
       temporary?(state) ->
@@ -108,7 +108,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Respawn do
   end
 
   def maybe_continue(%Mob{internal: %Internal{spawn: %Spawn{respawn_pending?: true}}} = state) do
-    if not Corpse.rolls_pending?(state) do
+    if not Corpse.pending?(state) do
       send(self(), :respawn)
     end
 

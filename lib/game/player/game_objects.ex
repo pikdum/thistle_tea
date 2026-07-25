@@ -8,15 +8,11 @@ defmodule ThistleTea.Game.Player.GameObjects do
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.GameObjectTemplate
   alias ThistleTea.Game.Entity.EventSink
-  alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Effects
-  alias ThistleTea.Game.Entity.Logic.Loot
   alias ThistleTea.Game.Guid
-  alias ThistleTea.Game.Network
-  alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.Player.Fishing
-  alias ThistleTea.Game.Player.Quests
+  alias ThistleTea.Game.Player.Looting
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
 
@@ -80,21 +76,7 @@ defmodule ThistleTea.Game.Player.GameObjects do
     end
   end
 
-  def open_chest(%{character: %Character{} = c} = state, guid) do
-    with true <- chest?(guid),
-         false <- Core.dead?(c),
-         {:ok, %Loot{} = loot} <- Entity.call(guid, {:loot_view, state.guid}) do
-      loot = Quests.filter_loot(loot, c)
-      Logger.info("Chest loot: entry #{Guid.entry(guid)} items=#{length(loot.items)} gold=#{loot.gold}")
-      Network.send_packet(%Message.SmsgLootResponse{guid: guid, loot: loot})
-      %{state | loot_guid: guid}
-    else
-      other ->
-        Logger.info("Chest open failed: entry #{Guid.entry(guid)} reason=#{inspect(other)}")
-        Network.send_packet(%Message.SmsgLootReleaseResponse{guid: guid})
-        state
-    end
-  end
+  def open_chest(state, guid), do: Looting.open(state, guid)
 
   def chest?(guid) do
     Guid.entity_type(guid) == :game_object and
