@@ -29,7 +29,7 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
   alias ThistleTea.Game.Party
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
-  alias ThistleTea.Game.Spell.Targets
+  alias ThistleTea.Game.Spell.Target
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Metadata
@@ -391,7 +391,7 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
 
   defp deliver_trap_spell(%Spell{} = spell, caster, target_guid, level) do
     caster
-    |> SpellTargetResolver.resolve(spell, Targets.unit(target_guid))
+    |> SpellTargetResolver.resolve(spell, Target.unit(target_guid))
     |> Enum.each(fn guid ->
       context = %CastContext{caster_guid: caster.object.guid, caster_level: level, target_guid: guid, spell: spell}
       Entity.receive_spell(guid, context, spell)

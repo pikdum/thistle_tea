@@ -2,6 +2,9 @@ defmodule ThistleTea.Game.Network.Message.SmsgSpellStart do
   @moduledoc false
   use ThistleTea.Game.Network.ServerMessage, :SMSG_SPELL_START
 
+  alias ThistleTea.Game.Spell.Target
+  alias ThistleTea.Game.Spell.TargetCodec
+
   @cast_flags_ammo 0x20
 
   defstruct [
@@ -22,14 +25,14 @@ defmodule ThistleTea.Game.Network.Message.SmsgSpellStart do
         spell: spell,
         flags: flags,
         timer: timer,
-        targets: targets,
+        targets: %Target{} = targets,
         ammo_display_id: ammo_display_id,
         ammo_inventory_type: ammo_inventory_type
       }) do
     cast_item <>
       caster <>
       <<spell::little-size(32), flags::little-size(16), timer::little-size(32)>> <>
-      targets <>
+      TargetCodec.encode(targets) <>
       if Bitwise.band(flags, @cast_flags_ammo) == 0 do
         <<>>
       else

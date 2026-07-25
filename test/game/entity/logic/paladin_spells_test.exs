@@ -17,7 +17,7 @@ defmodule ThistleTea.Game.Entity.Logic.PaladinSpellsTest do
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.CastValidation
-  alias ThistleTea.Game.Spell.Targets
+  alias ThistleTea.Game.Spell.Target
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
 
   describe "release_seal/4" do
@@ -129,7 +129,7 @@ defmodule ThistleTea.Game.Entity.Logic.PaladinSpellsTest do
         los?: true
       }
 
-      assert :ok = CastValidation.validate(caster, judgement, Targets.unit(9), target_info, 2_000)
+      assert :ok = CastValidation.validate(caster, judgement, Target.unit(9), target_info, 2_000)
     end
 
     test "released DBC judgements damage or apply their aura to the victim" do

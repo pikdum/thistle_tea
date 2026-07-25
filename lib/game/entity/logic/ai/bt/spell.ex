@@ -27,7 +27,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
   alias ThistleTea.Game.Spell.Cooldowns
   alias ThistleTea.Game.Spell.Modifiers
   alias ThistleTea.Game.Spell.Scripts
-  alias ThistleTea.Game.Spell.Targets
+  alias ThistleTea.Game.Spell.Target
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Metadata
@@ -44,7 +44,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
   def start_cast(
         %{internal: %Internal{} = internal} = character,
         %Spell{} = spell,
-        %Targets{} = targets,
+        %Target{} = targets,
         now,
         cast_item_guid
       )
@@ -64,7 +64,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
          %{internal: %Internal{} = internal} = character,
          %Internal{},
          %Spell{} = spell,
-         %Targets{} = targets,
+         %Target{} = targets,
          now,
          cast_item_guid
        ) do
@@ -221,15 +221,16 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
 
   defp activate_auto_shot(
          %Character{internal: %Internal{} = internal} = character,
-         %Cast{spell: %Spell{} = spell, targets: %Targets{unit_guid: target_guid, raw: raw}},
+         %Cast{spell: %Spell{} = spell, targets: %Target{} = targets},
          now
-       )
-       when is_integer(target_guid) and target_guid > 0 do
-    if Hunter.auto_shot?(spell) do
+       ) do
+    target_guid = Target.unit_guid(targets)
+
+    if Hunter.auto_shot?(spell) and is_integer(target_guid) and target_guid > 0 do
       auto_shot = %{
         spell: spell,
         target_guid: target_guid,
-        raw_targets: raw,
+        targets: targets,
         next_at: now + character.unit.ranged_attack_time
       }
 
@@ -247,16 +248,15 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
 
   defp release_paladin_seal(character, _casting, _hits, _now), do: character
 
-  defp queue_charge(character, %Cast{spell: %Spell{} = spell, targets: %Targets{unit_guid: unit_guid}})
-       when is_integer(unit_guid) and unit_guid > 0 do
-    if Enum.any?(spell.effects, &(&1.type == :charge)) do
+  defp queue_charge(character, %Cast{spell: %Spell{} = spell, targets: %Target{} = targets}) do
+    unit_guid = Target.unit_guid(targets)
+
+    if is_integer(unit_guid) and unit_guid > 0 and Enum.any?(spell.effects, &(&1.type == :charge)) do
       Effects.enqueue(character, Effects.charge(unit_guid))
     else
       character
     end
   end
-
-  defp queue_charge(character, _casting), do: character
 
   defp consume_spell_modifiers(character, %Cast{modifier_holder_ids: [_ | _] = spell_ids}, now) do
     {character, events} = AuraLogic.spend_spell_charges(character, spell_ids, now)
@@ -273,22 +273,22 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
     end
   end
 
-  defp queue_open_object(character, %Cast{spell: %Spell{} = spell, targets: %Targets{object_guid: object_guid}})
-       when is_integer(object_guid) do
-    if Enum.any?(spell.effects, &(&1.type == :open_lock)) do
+  defp queue_open_object(character, %Cast{spell: %Spell{} = spell, targets: %Target{} = targets}) do
+    object_guid = Target.object_guid(targets)
+
+    if is_integer(object_guid) and Enum.any?(spell.effects, &(&1.type == :open_lock)) do
       Effects.enqueue(character, Effects.open_gameobject(object_guid))
     else
       character
     end
   end
 
-  defp queue_open_object(character, %Cast{}), do: character
-
-  defp object_hits(%Cast{targets: %Targets{object_guid: object_guid}}) when is_integer(object_guid) do
-    [object_guid]
+  defp object_hits(%Cast{targets: %Target{} = targets}) do
+    case Target.object_guid(targets) do
+      object_guid when is_integer(object_guid) -> [object_guid]
+      _none -> []
+    end
   end
-
-  defp object_hits(%Cast{}), do: []
 
   defp queue_consume_cast_item(character, %Cast{consume_item: true, cast_item_guid: item_guid})
        when is_integer(item_guid) do
@@ -299,11 +299,13 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
 
   defp queue_feed_pet(%Character{unit: %{summon: pet_guid}} = character, %Cast{
          spell: %Spell{range_yards: range_yards, effects: effects},
-         targets: %Targets{item_guid: item_guid}
-       })
-       when is_integer(pet_guid) and pet_guid > 0 and is_integer(item_guid) do
-    case Enum.find(effects, &(&1.type == :feed_pet and is_integer(&1.trigger_spell_id))) do
-      %Spell.Effect{trigger_spell_id: trigger_spell_id} ->
+         targets: %Target{} = targets
+       }) do
+    item_guid = Target.item_guid(targets)
+
+    case {pet_guid, item_guid, Enum.find(effects, &(&1.type == :feed_pet and is_integer(&1.trigger_spell_id)))} do
+      {pet_guid, item_guid, %Spell.Effect{trigger_spell_id: trigger_spell_id}}
+      when is_integer(pet_guid) and pet_guid > 0 and is_integer(item_guid) ->
         Effects.enqueue(character, Effects.feed_pet(item_guid, pet_guid, trigger_spell_id, range_yards))
 
       _ ->
@@ -315,8 +317,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
 
   defp queue_item_enchantments(%Character{player: player} = character, %Cast{
          spell: %Spell{} = spell,
-         targets: %Targets{item_guid: target_item_guid}
+         targets: %Target{} = targets
        }) do
+    target_item_guid = Target.item_guid(targets)
     item_guid = if is_integer(target_item_guid), do: target_item_guid, else: player.mainhand
 
     events =
@@ -328,17 +331,17 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
     Effects.enqueue(character, events)
   end
 
-  defp queue_item_enchantments(character, %Cast{spell: %Spell{} = spell, targets: %Targets{item_guid: item_guid}})
-       when is_integer(item_guid) do
+  defp queue_item_enchantments(character, %Cast{spell: %Spell{} = spell, targets: %Target{} = targets}) do
+    item_guid = Target.item_guid(targets)
+
     events =
-      for %Spell.Effect{type: :enchant_item_temporary} = effect <- spell.effects do
+      for %Spell.Effect{type: :enchant_item_temporary} = effect <- spell.effects,
+          is_integer(item_guid) do
         Effects.enchant_item(item_guid, spell, effect)
       end
 
     Effects.enqueue(character, events)
   end
-
-  defp queue_item_enchantments(character, _casting), do: character
 
   defp mark_hostile_cast(%Character{object: %{guid: guid}} = character, %Cast{spell: spell}, targets, now) do
     if Spell.harmful?(spell) and Enum.any?(targets, &(&1 != guid)) do
@@ -380,7 +383,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
       )
       when is_integer(game_object_guid) and is_integer(duration_ms) and duration_ms > 0 and is_integer(now) do
     spell = %{spell | duration_ms: duration_ms, attributes: MapSet.put(spell.attributes, :channeled)}
-    casting = Cast.new(spell, %Targets{object_guid: game_object_guid}, now)
+    casting = Cast.new(spell, Target.object(game_object_guid), now)
 
     %{
       character
@@ -423,8 +426,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
 
   defp channel_target_guid(%{object: %{guid: guid}, unit: %{target: target, summon: pet_guid}}, %Cast{
          spell: %Spell{effects: effects},
-         targets: %Targets{unit_guid: unit_guid}
+         targets: %Target{} = targets
        }) do
+    unit_guid = Target.unit_guid(targets)
+
     case pet_channel_target(pet_guid, effects) do
       nil -> preferred_channel_target(guid, unit_guid, target)
       pet_guid -> pet_guid
@@ -538,9 +543,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
 
   defp queue_area_effects(character, _casting), do: character
 
-  defp queue_farsight(character, %Cast{spell: %Spell{} = spell, targets: %Targets{} = targets}) do
+  defp queue_farsight(character, %Cast{spell: %Spell{} = spell, targets: %Target{} = targets}) do
     if Enum.any?(spell.effects, &(&1.type == :add_farsight)) do
-      case Targets.ground_location(targets) do
+      case Target.ground_location(targets) do
         {x, y, z} -> Effects.enqueue(character, Effects.spawn_farsight(spell, {x, y, z}, spell.duration_ms || 0))
         _ -> character
       end
@@ -551,8 +556,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
 
   defp queue_farsight(character, _casting), do: character
 
-  defp area_effect_position(character, %Spell{} = spell, %Targets{} = targets) do
-    Targets.ground_location(targets) || caster_area_position(character, spell)
+  defp area_effect_position(character, %Spell{} = spell, %Target{} = targets) do
+    Target.ground_location(targets) || caster_area_position(character, spell)
   end
 
   defp area_effect_position(_character, _spell, _targets), do: nil
@@ -580,7 +585,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
   defp queue_target_triggers(character, _casting, _hits), do: character
 
   defp queue_summon_objects(character, %Cast{spell: %Spell{} = spell} = casting) do
-    target_guid = casting.targets.unit_guid || character.unit.target
+    target_guid = Target.unit_guid(casting.targets) || character.unit.target
 
     events =
       for %Spell.Effect{type: :trans_door, misc_value: entry} <- spell.effects,
@@ -676,9 +681,11 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
     dead_target?(guid)
   end
 
-  defp unit_channel_target_dead?(_character, %Cast{targets: %Targets{unit_guid: guid}})
-       when is_integer(guid) and guid > 0 do
-    dead_target?(guid)
+  defp unit_channel_target_dead?(_character, %Cast{targets: %Target{} = targets}) do
+    case Target.unit_guid(targets) do
+      guid when is_integer(guid) and guid > 0 -> dead_target?(guid)
+      _none -> false
+    end
   end
 
   defp unit_channel_target_dead?(_character, _casting), do: false
@@ -692,10 +699,15 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
 
   defp cast_target_visible?(%{object: %{guid: self_guid}} = character, %Cast{
          spell: %Spell{} = spell,
-         targets: %Targets{unit_guid: unit_guid}
-       })
-       when is_integer(unit_guid) and unit_guid > 0 and unit_guid != self_guid do
-    Spell.attribute?(spell, :ignore_line_of_sight) or World.line_of_sight?(character, unit_guid)
+         targets: %Target{} = targets
+       }) do
+    unit_guid = Target.unit_guid(targets)
+
+    if is_integer(unit_guid) and unit_guid > 0 and unit_guid != self_guid do
+      Spell.attribute?(spell, :ignore_line_of_sight) or World.line_of_sight?(character, unit_guid)
+    else
+      true
+    end
   end
 
   defp cast_target_visible?(_character, _casting), do: true
@@ -709,9 +721,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
          misses
        )
        when is_integer(guid) do
-    raw_targets = if is_binary(casting.targets.raw), do: casting.targets.raw, else: <<>>
-
-    Effects.enqueue(character, Effects.spell_go(guid, spell_id, targets, raw_targets, casting.cast_item_guid, misses))
+    Effects.enqueue(
+      character,
+      Effects.spell_go(guid, spell_id, targets, casting.targets, casting.cast_item_guid, misses)
+    )
   end
 
   defp queue_spell_go(character, _casting, _targets, _misses), do: character
@@ -810,8 +823,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
     Enum.reduce(targets, character, fn target_guid, caster ->
       context = %{
         CastContext.from_caster(caster, spell, target_guid)
-        | selected_target_guid: casting.targets.unit_guid,
-          destination_position: Targets.ground_location(casting.targets),
+        | selected_target_guid: Target.unit_guid(casting.targets),
+          destination_position: Target.ground_location(casting.targets),
           target_hostile?: target_guid != caster_guid and Hostility.valid_attack_target?(caster, target_guid),
           target_role: target_role(caster, target_guid)
       }
@@ -840,7 +853,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Spell do
 
   defp dispatch_to_target(character, _context, _spell, _target_guid, _now), do: character
 
-  defp resolve_targets(caster, %Cast{spell: %Spell{} = spell, targets: %Targets{} = targets}) do
+  defp resolve_targets(caster, %Cast{spell: %Spell{} = spell, targets: %Target{} = targets}) do
     resolved = SpellTargetResolver.resolve(caster, spell, targets)
 
     if Enum.any?(spell.effects, &(&1.implicit_target_a == :caster or &1.implicit_target_b == :caster)) do

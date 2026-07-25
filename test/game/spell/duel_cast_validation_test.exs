@@ -9,7 +9,7 @@ defmodule ThistleTea.Game.Spell.DuelCastValidationTest do
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastValidation
   alias ThistleTea.Game.Spell.Effect
-  alias ThistleTea.Game.Spell.Targets
+  alias ThistleTea.Game.Spell.Target
   alias ThistleTea.Game.WorldRef
 
   describe "validate/6 duel checks" do
@@ -32,7 +32,7 @@ defmodule ThistleTea.Game.Spell.DuelCastValidationTest do
     CastValidation.validate(
       caster(),
       duel_spell(),
-      %Targets{unit_guid: 2},
+      Target.unit(2),
       target_info(),
       1_000,
       duel_context: context

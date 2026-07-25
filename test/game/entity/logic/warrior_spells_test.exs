@@ -26,7 +26,7 @@ defmodule ThistleTea.Game.Entity.Logic.WarriorSpellsTest do
   alias ThistleTea.Game.Spell.CastValidation
   alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.Spell.Scripts
-  alias ThistleTea.Game.Spell.Targets
+  alias ThistleTea.Game.Spell.Target
   alias ThistleTea.Game.WorldRef
 
   @battle_form 17
@@ -153,13 +153,13 @@ defmodule ThistleTea.Game.Entity.Logic.WarriorSpellsTest do
       caster = warrior_fixture(form: @defensive_form)
 
       assert {:error, :only_shapeshift} =
-               CastValidation.validate(caster, mocking_blow_like(), %Targets{}, nil, 1_000)
+               CastValidation.validate(caster, mocking_blow_like(), Target.none(), nil, 1_000)
     end
 
     test "accepts stance-locked spells in the required stance" do
       caster = warrior_fixture(form: @battle_form)
 
-      assert :ok = CastValidation.validate(caster, mocking_blow_like(), %Targets{}, nil, 1_000)
+      assert :ok = CastValidation.validate(caster, mocking_blow_like(), Target.none(), nil, 1_000)
     end
   end
 
@@ -181,7 +181,7 @@ defmodule ThistleTea.Game.Entity.Logic.WarriorSpellsTest do
       sword = %{class: 2, subclass: 7}
 
       assert {:error, :equipped_item_class} =
-               CastValidation.validate(caster, shield_block_like(), %Targets{}, nil, 1_000, equipped_items: [sword])
+               CastValidation.validate(caster, shield_block_like(), Target.none(), nil, 1_000, equipped_items: [sword])
     end
 
     test "accepts shield abilities with a shield equipped" do
@@ -189,7 +189,7 @@ defmodule ThistleTea.Game.Entity.Logic.WarriorSpellsTest do
       shield = %{class: 4, subclass: 6}
 
       assert :ok =
-               CastValidation.validate(caster, shield_block_like(), %Targets{}, nil, 1_000, equipped_items: [shield])
+               CastValidation.validate(caster, shield_block_like(), Target.none(), nil, 1_000, equipped_items: [shield])
     end
 
     test "weapon masks accept any listed weapon type" do
@@ -205,10 +205,10 @@ defmodule ThistleTea.Game.Entity.Logic.WarriorSpellsTest do
       sword = %{class: 2, subclass: 7}
       wand = %{class: 2, subclass: 19}
 
-      assert :ok = CastValidation.validate(caster, heroic_strike, %Targets{}, nil, 1_000, equipped_items: [sword])
+      assert :ok = CastValidation.validate(caster, heroic_strike, Target.none(), nil, 1_000, equipped_items: [sword])
 
       assert {:error, :equipped_item_class} =
-               CastValidation.validate(caster, heroic_strike, %Targets{}, nil, 1_000, equipped_items: [wand])
+               CastValidation.validate(caster, heroic_strike, Target.none(), nil, 1_000, equipped_items: [wand])
     end
   end
 
@@ -322,12 +322,12 @@ defmodule ThistleTea.Game.Entity.Logic.WarriorSpellsTest do
       caster = warrior_fixture()
 
       assert {:error, :cant_do_that_yet} =
-               CastValidation.validate(caster, revenge_like(), %Targets{}, nil, 1_000)
+               CastValidation.validate(caster, revenge_like(), Target.none(), nil, 1_000)
 
       caster = Reactive.mark_defense(caster, 1_000)
 
-      assert :ok = CastValidation.validate(caster, revenge_like(), %Targets{}, nil, 2_000)
-      assert {:error, :cant_do_that_yet} = CastValidation.validate(caster, revenge_like(), %Targets{}, nil, 9_000)
+      assert :ok = CastValidation.validate(caster, revenge_like(), Target.none(), nil, 2_000)
+      assert {:error, :cant_do_that_yet} = CastValidation.validate(caster, revenge_like(), Target.none(), nil, 9_000)
     end
 
     test "overpower requires a fresh combo point on the target" do
@@ -345,7 +345,7 @@ defmodule ThistleTea.Game.Entity.Logic.WarriorSpellsTest do
         power_type: 1
       }
 
-      targets = %Targets{unit_guid: 77}
+      targets = Target.unit(77)
 
       assert {:error, :cant_do_that_yet} = CastValidation.validate(caster, spell, targets, nil, 1_000)
 
@@ -359,10 +359,10 @@ defmodule ThistleTea.Game.Entity.Logic.WarriorSpellsTest do
       caster = warrior_fixture()
 
       assert {:error, :target_aurastate} =
-               CastValidation.validate(caster, execute_like(), %Targets{}, %{alive?: true, health_pct: 50}, 1_000)
+               CastValidation.validate(caster, execute_like(), Target.none(), %{alive?: true, health_pct: 50}, 1_000)
 
       assert :ok =
-               CastValidation.validate(caster, execute_like(), %Targets{}, %{alive?: true, health_pct: 15}, 1_000)
+               CastValidation.validate(caster, execute_like(), Target.none(), %{alive?: true, health_pct: 15}, 1_000)
     end
   end
 
@@ -812,7 +812,7 @@ defmodule ThistleTea.Game.Entity.Logic.WarriorSpellsTest do
       }
 
       character = warrior_fixture()
-      casting = Cast.new(spell, %Targets{unit_guid: 9, raw: <<0::16>>}, 1_000)
+      casting = Cast.new(spell, Target.unit(9), 1_000)
       character = %{character | internal: %{character.internal | casting: casting}}
 
       character = SpellBT.complete_cast(character, 1_000)

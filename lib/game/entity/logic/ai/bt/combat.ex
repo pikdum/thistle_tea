@@ -21,10 +21,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
   alias ThistleTea.Game.Entity.Logic.Skills
   alias ThistleTea.Game.Entity.SpellTargetResolver
   alias ThistleTea.Game.Guid
-  alias ThistleTea.Game.Network.BinaryUtils
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
-  alias ThistleTea.Game.Spell.Targets
+  alias ThistleTea.Game.Spell.Target
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
@@ -228,7 +227,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
   end
 
   defp queued_spell_targets(state, %Spell{} = spell, target) do
-    case SpellTargetResolver.resolve(state, spell, Targets.unit(target)) do
+    case SpellTargetResolver.resolve(state, spell, Target.unit(target)) do
       [] -> [target]
       targets -> targets
     end
@@ -291,15 +290,11 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
        when is_integer(guid) and is_integer(spell_id) and is_integer(target) and is_list(targets) do
     Effects.enqueue(state, [
       Effects.spell_cast_result(spell_id),
-      Effects.spell_go(guid, spell_id, targets, unit_target_raw(target))
+      Effects.spell_go(guid, spell_id, targets, Target.unit(target))
     ])
   end
 
   defp queue_queued_spell_go(state, _queued_spell, _target, _targets), do: state
-
-  defp unit_target_raw(target) do
-    <<0x0002::little-size(16)>> <> BinaryUtils.pack_guid(target)
-  end
 
   defp combat_reach(%{unit: unit} = state, target) do
     CombatLogic.melee_reach(combat_reach_value(unit), target_combat_reach(state, target))

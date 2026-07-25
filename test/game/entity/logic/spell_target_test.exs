@@ -4,18 +4,18 @@ defmodule ThistleTea.Game.Entity.Logic.SpellTargetTest do
   alias ThistleTea.Game.Entity.Logic.SpellTarget
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Effect
-  alias ThistleTea.Game.Spell.Targets
+  alias ThistleTea.Game.Spell.Target
 
   describe "target_query/2" do
     test "returns caster aoe query for caster aoe spells" do
       spell = aoe_spell(:aoe_enemy_at_caster)
 
-      assert SpellTarget.target_query(spell, %Targets{unit_guid: 2}) == {:caster_aoe, 10.0}
+      assert SpellTarget.target_query(spell, Target.unit(2)) == {:caster_aoe, 10.0}
     end
 
     test "returns targeted aoe query for ground-target spells" do
       spell = aoe_spell(:aoe_enemy_at_dest)
-      targets = %Targets{destination_location: {1.0, 2.0, 3.0}}
+      targets = Target.at({1.0, 2.0, 3.0})
 
       assert SpellTarget.target_query(spell, targets) == {:targeted_aoe, {1.0, 2.0, 3.0}, 10.0}
     end
@@ -23,31 +23,31 @@ defmodule ThistleTea.Game.Entity.Logic.SpellTargetTest do
     test "returns caster cone query for cone spells" do
       spell = aoe_spell(:aoe_enemy_in_cone)
 
-      assert SpellTarget.target_query(spell, %Targets{unit_guid: 2}) == {:caster_cone, 10.0}
+      assert SpellTarget.target_query(spell, Target.unit(2)) == {:caster_cone, 10.0}
     end
 
     test "returns unit query for direct unit targets" do
       spell = %Spell{id: 133, effects: []}
 
-      assert SpellTarget.target_query(spell, %Targets{unit_guid: 2}) == {:unit, 2}
+      assert SpellTarget.target_query(spell, Target.unit(2)) == {:unit, 2}
     end
 
     test "returns party aoe query for party-around-caster spells" do
       spell = aoe_spell(:party_around_caster)
 
-      assert SpellTarget.target_query(spell, %Targets{}) == {:party_aoe, 10.0}
+      assert SpellTarget.target_query(spell, Target.none()) == {:party_aoe, 10.0}
     end
 
     test "party aoe takes precedence over a selected unit target" do
       spell = aoe_spell(:party_around_caster)
 
-      assert SpellTarget.target_query(spell, %Targets{unit_guid: 2}) == {:party_aoe, 10.0}
+      assert SpellTarget.target_query(spell, Target.unit(2)) == {:party_aoe, 10.0}
     end
 
     test "returns none without matching target data" do
       spell = aoe_spell(:aoe_enemy_at_dest)
 
-      assert SpellTarget.target_query(spell, %Targets{}) == :none
+      assert SpellTarget.target_query(spell, Target.none()) == :none
     end
 
     test "treats caster-position destination aoe as a caster aoe" do
@@ -63,8 +63,8 @@ defmodule ThistleTea.Game.Entity.Logic.SpellTargetTest do
         ]
       }
 
-      assert SpellTarget.target_query(spell, %Targets{unit_guid: 2}) == {:caster_aoe, 10.0}
-      assert SpellTarget.target_query(spell, %Targets{}) == {:caster_aoe, 10.0}
+      assert SpellTarget.target_query(spell, Target.unit(2)) == {:caster_aoe, 10.0}
+      assert SpellTarget.target_query(spell, Target.none()) == {:caster_aoe, 10.0}
     end
   end
 

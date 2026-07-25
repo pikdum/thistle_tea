@@ -8,7 +8,7 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
   alias ThistleTea.Game.Entity.Logic.SpellTarget
   alias ThistleTea.Game.Party
   alias ThistleTea.Game.Spell
-  alias ThistleTea.Game.Spell.Targets
+  alias ThistleTea.Game.Spell.Target
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.System.Party, as: PartySystem
@@ -16,7 +16,7 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
   @cone_arc_radians :math.pi() / 3
   @chain_jump_radius 10.0
 
-  def resolve(%{object: %{guid: caster_guid}} = caster, %Spell{} = spell, %Targets{} = targets) do
+  def resolve(%{object: %{guid: caster_guid}} = caster, %Spell{} = spell, %Target{} = targets) do
     query = pet_target_query(caster, spell) || SpellTarget.target_query(spell, targets)
 
     initial =

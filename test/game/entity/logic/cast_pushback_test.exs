@@ -13,7 +13,7 @@ defmodule ThistleTea.Game.Entity.Logic.CastPushbackTest do
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Cast
-  alias ThistleTea.Game.Spell.Targets
+  alias ThistleTea.Game.Spell.Target
 
   @interrupt_pushback 0x02
   @interrupt_cancel 0x10
@@ -59,7 +59,7 @@ defmodule ThistleTea.Game.Entity.Logic.CastPushbackTest do
     end
 
     test "mob casters are unaffected" do
-      cast = Cast.new(hard_cast_spell(), %Targets{}, 1_000)
+      cast = Cast.new(hard_cast_spell(), Target.none(), 1_000)
 
       mob = %Mob{
         object: %Object{guid: 2},
@@ -190,7 +190,7 @@ defmodule ThistleTea.Game.Entity.Logic.CastPushbackTest do
   end
 
   defp casting_character(spell, now, opts \\ []) do
-    cast = Cast.new(spell, %Targets{}, now)
+    cast = Cast.new(spell, Target.none(), now)
 
     %Character{
       object: %Object{guid: 1},

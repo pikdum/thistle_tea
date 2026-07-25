@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.Entity.Logic.Effects do
   the owning boundary later drains and interprets them.
   """
   alias __MODULE__, as: Effects
+  alias ThistleTea.Game.Spell.Target
 
   def spell_damage(source_guid, target_guid, spell, damage, opts \\ []) do
     %Effects.SpellDamage{
@@ -157,25 +158,24 @@ defmodule ThistleTea.Game.Entity.Logic.Effects do
     %Effects.StandState{stand_state: stand_state}
   end
 
-  def spell_start(source_guid, spell_id, cast_time_ms, raw_targets)
-      when is_integer(source_guid) and is_integer(spell_id) and is_integer(cast_time_ms) and is_binary(raw_targets) do
+  def spell_start(source_guid, spell_id, cast_time_ms, %Target{} = targets)
+      when is_integer(source_guid) and is_integer(spell_id) and is_integer(cast_time_ms) do
     %Effects.SpellStart{
       source_guid: source_guid,
       spell_id: spell_id,
       duration_ms: cast_time_ms,
-      raw_targets: raw_targets
+      targets: targets
     }
   end
 
-  def spell_go(source_guid, spell_id, hit_guids, raw_targets, cast_item_guid \\ nil, misses \\ [])
-      when is_integer(source_guid) and is_integer(spell_id) and is_list(hit_guids) and is_binary(raw_targets) and
-             is_list(misses) do
+  def spell_go(source_guid, spell_id, hit_guids, %Target{} = targets, cast_item_guid \\ nil, misses \\ [])
+      when is_integer(source_guid) and is_integer(spell_id) and is_list(hit_guids) and is_list(misses) do
     %Effects.SpellGo{
       source_guid: source_guid,
       spell_id: spell_id,
       hit_guids: hit_guids,
       misses: misses,
-      raw_targets: raw_targets,
+      targets: targets,
       cast_item_guid: cast_item_guid
     }
   end

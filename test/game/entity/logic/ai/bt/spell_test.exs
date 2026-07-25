@@ -17,7 +17,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Cast
   alias ThistleTea.Game.Spell.Effect
-  alias ThistleTea.Game.Spell.Targets
+  alias ThistleTea.Game.Spell.Target
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.WorldRef
@@ -27,7 +27,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
       spell = %Spell{id: 78, attributes: MapSet.new([:on_next_swing])}
       mob = %Mob{internal: %Internal{}}
 
-      mob = SpellBT.start_cast(mob, spell, %Targets{raw: <<0::little-size(16)>>}, 1_000)
+      mob = SpellBT.start_cast(mob, spell, Target.none(), 1_000)
 
       assert mob.internal.next_swing_spell == spell
       assert mob.internal.casting == nil
@@ -44,7 +44,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
 
       mob = %Mob{object: %Object{guid: 1}, unit: %Unit{target: 7}, internal: %Internal{}}
 
-      mob = SpellBT.start_cast(mob, spell, %Targets{raw: <<0::little-size(16)>>}, 1_000)
+      mob = SpellBT.start_cast(mob, spell, Target.none(), 1_000)
 
       assert mob.internal.casting.channel_ms == 8_000
       assert mob.internal.casting.channel_started?
@@ -69,7 +69,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
 
       spell = %Spell{id: 5185, spell_family: 7, family_flags_0: 0x4, cast_time_ms: 1_500}
       mob = %Mob{object: %Object{guid: 1}, unit: %Unit{auras: [modifier]}, internal: %Internal{}}
-      mob = SpellBT.start_cast(mob, spell, %Targets{raw: <<0::little-size(16)>>}, 1_000)
+      mob = SpellBT.start_cast(mob, spell, Target.none(), 1_000)
 
       assert mob.internal.casting.cast_time_ms == 2_500
       assert mob.internal.casting.ends_at == 3_500
@@ -92,7 +92,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
         internal: %Internal{world: %WorldRef{map_id: 0}}
       }
 
-      mob = SpellBT.start_cast(mob, spell, %Targets{raw: <<0::little-size(16)>>, unit_guid: 1}, 1_000)
+      mob = SpellBT.start_cast(mob, spell, Target.unit(1), 1_000)
 
       assert mob.internal.casting.cast_time_ms == 0
       assert mob.internal.casting.modifier_holder_ids == [12_043]
@@ -126,7 +126,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
         internal: %Internal{}
       }
 
-      mob = SpellBT.start_cast(mob, spell, %Targets{raw: <<0::little-size(16)>>}, 1_000)
+      mob = SpellBT.start_cast(mob, spell, Target.none(), 1_000)
 
       assert mob.unit.power1 == 100
       assert mob.unit.auras == []
@@ -142,7 +142,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
       }
 
       mob = %Mob{object: %Object{guid: 1}, unit: %Unit{}, internal: %Internal{}}
-      mob = SpellBT.start_cast(mob, spell, %Targets{raw: <<0::little-size(16)>>}, 1_000)
+      mob = SpellBT.start_cast(mob, spell, Target.none(), 1_000)
 
       refute mob.internal.casting.channel_started?
       assert mob.unit.channel_spell in [nil, 0]
@@ -165,7 +165,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
         internal: %Internal{
           casting: %Cast{
             spell: spell,
-            targets: %Targets{raw: <<0::little-size(16)>>},
+            targets: Target.none(),
             channel_ms: 8_000,
             channel_started?: true,
             ends_at: now - 1
@@ -206,7 +206,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
           world: %WorldRef{map_id: 0},
           casting: %Cast{
             spell: spell,
-            targets: %Targets{raw: <<0::little-size(16)>>, unit_guid: 1},
+            targets: Target.unit(1),
             channel_ms: 3_000,
             channel_started?: true,
             channel_tick_ms: 1_000,
@@ -251,7 +251,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
           world: %WorldRef{map_id: 0},
           casting: %Cast{
             spell: spell,
-            targets: %Targets{raw: <<0::little-size(16)>>, unit_guid: 1},
+            targets: Target.unit(1),
             channel_ms: 8_000,
             channel_started?: true,
             channel_tick_ms: 1_000,
@@ -287,7 +287,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
           world: %WorldRef{map_id: 0},
           casting: %Cast{
             spell: spell,
-            targets: %Targets{raw: <<0::little-size(16)>>, unit_guid: 1},
+            targets: Target.unit(1),
             channel_ms: 10_000,
             channel_started?: true,
             channel_tick_ms: 1_000,
@@ -315,7 +315,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
         internal: %Internal{
           casting: %Cast{
             spell: spell,
-            targets: %Targets{raw: <<0::little-size(16)>>, unit_guid: 1},
+            targets: Target.unit(1),
             channel_ms: 5_000,
             channel_started?: true,
             channel_tick_ms: 1_000,
@@ -373,7 +373,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
 
       casting = %Cast{
         spell: spell,
-        targets: %Targets{raw: <<0::little-size(16)>>, unit_guid: target_guid},
+        targets: Target.unit(target_guid),
         ends_at: Time.now()
       }
 
@@ -435,7 +435,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
 
       casting = %Cast{
         spell: spell,
-        targets: %Targets{raw: <<0::little-size(16)>>, unit_guid: target_guid},
+        targets: Target.unit(target_guid),
         ends_at: Time.now()
       }
 
@@ -470,7 +470,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
 
       casting = %Cast{
         spell: spell,
-        targets: %Targets{raw: <<0::little-size(16)>>, unit_guid: 1},
+        targets: Target.unit(1),
         ends_at: Time.now()
       }
 
@@ -487,7 +487,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
 
       assert [
                %Effects.SpellCastResult{spell_id: 133},
-               %Effects.SpellGo{spell_id: 133, source_guid: 1, hit_guids: [1], raw_targets: <<0::little-size(16)>>}
+               %Effects.SpellGo{spell_id: 133, source_guid: 1, hit_guids: [1], targets: %Target{}}
              ] = mob.internal.events
     end
 
@@ -500,7 +500,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
       }
 
       spell = %Spell{id: 2061, spell_family: 6, mana_cost: 10, power_type: 0}
-      targets = %Targets{raw: <<0::little-size(16)>>, unit_guid: 1}
+      targets = Target.unit(1)
 
       mob = %Mob{
         object: %Object{guid: 1},
@@ -521,7 +521,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
 
       casting = %Cast{
         spell: spell,
-        targets: %Targets{raw: <<0x4000::little-size(16)>>, object_guid: 0xF110_0001},
+        targets: Target.object(0xF110_0001, :locked),
         ends_at: Time.now()
       }
 
@@ -549,7 +549,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
 
       casting = %Cast{
         spell: spell,
-        targets: %Targets{raw: <<0x10::little-size(16)>>, item_guid: 0x4000_002A},
+        targets: Target.item(0x4000_002A),
         ends_at: Time.now()
       }
 
@@ -573,7 +573,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
 
       casting = %Cast{
         spell: spell,
-        targets: %Targets{raw: <<0::little-size(16)>>, unit_guid: 1},
+        targets: Target.unit(1),
         ends_at: Time.now()
       }
 
@@ -600,7 +600,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
 
       casting = %Cast{
         spell: spell,
-        targets: %Targets{raw: <<0::little-size(16)>>, unit_guid: 2},
+        targets: Target.unit(2),
         ends_at: Time.now()
       }
 
@@ -629,7 +629,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
         effects: [%Effect{index: 0, type: :feed_pet, trigger_spell_id: 1539}]
       }
 
-      targets = %Targets{raw: <<0::little-size(16)>>, item_guid: 22}
+      targets = Target.item(22)
       casting = Cast.new(spell, targets, 1_000)
 
       character = %Character{
@@ -672,7 +672,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
         ]
       }
 
-      targets = %Targets{raw: <<0::little-size(16)>>, destination_location: {10.0, 20.0, 30.0}}
+      targets = Target.at({10.0, 20.0, 30.0})
       casting = Cast.new(spell, targets, 1_000)
 
       mob = %Mob{
@@ -704,7 +704,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
         ]
       }
 
-      targets = %Targets{raw: <<0::little-size(16)>>}
+      targets = Target.none()
       casting = Cast.new(spell, targets, 1_000)
 
       mob = %Mob{
@@ -739,7 +739,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
         ]
       }
 
-      targets = %Targets{raw: <<0::little-size(16)>>}
+      targets = Target.none()
       casting = Cast.new(spell, targets, 1_000)
 
       mob = %Mob{
@@ -764,7 +764,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
         effects: [%Effect{index: 0, type: :add_farsight}]
       }
 
-      targets = %Targets{raw: <<0::little-size(16)>>, destination_location: {10.0, 20.0, 30.0}}
+      targets = Target.at({10.0, 20.0, 30.0})
       casting = Cast.new(spell, targets, 1_000)
 
       mob = %Mob{
@@ -811,7 +811,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
         internal: %Internal{world: %WorldRef{map_id: 0}}
       }
 
-      mob = SpellBT.start_cast(mob, spell, %Targets{raw: <<0::little-size(16)>>}, now)
+      mob = SpellBT.start_cast(mob, spell, Target.none(), now)
       {mob, _events} = Aura.apply_spell(mob, 1, 1, spell, now)
       assert length(mob.unit.auras) == 1
 

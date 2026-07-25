@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.SpellsTest do
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Effect
+  alias ThistleTea.Game.Spell.Target
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.WorldRef
@@ -232,7 +233,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.SpellsTest do
       state = fixture_mob(spells: [entry], spellbook: %{spell.id => spell})
 
       assert {{:running, 2_000, :casting}, state, _blackboard} = MobSpells.try_cast(state, %Blackboard{}, 1_000)
-      assert state.internal.casting.targets.unit_guid == worst
+      assert Target.unit_guid(state.internal.casting.targets) == worst
     end
 
     test "ignores allies above the injury threshold" do
@@ -252,7 +253,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.SpellsTest do
       state = fixture_mob(spells: [entry], spellbook: %{spell.id => spell})
 
       assert {{:running, 2_000, :casting}, state, _blackboard} = MobSpells.try_cast(state, %Blackboard{}, 1_000)
-      assert state.internal.casting.targets.unit_guid == ally
+      assert Target.unit_guid(state.internal.casting.targets) == ally
     end
 
     test "heals itself when it is the most injured candidate" do
@@ -261,7 +262,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.SpellsTest do
       state = fixture_mob(spells: [entry], spellbook: %{spell.id => spell}, health: 20)
 
       assert {{:running, 2_000, :casting}, state, _blackboard} = MobSpells.try_cast(state, %Blackboard{}, 1_000)
-      assert state.internal.casting.targets.unit_guid == state.object.guid
+      assert Target.unit_guid(state.internal.casting.targets) == state.object.guid
     end
 
     test "friendly_injured_except never targets the caster" do
@@ -275,7 +276,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.SpellsTest do
       ally = injured_ally(10.0, 30)
 
       assert {{:running, 2_000, :casting}, state, _blackboard} = MobSpells.try_cast(state, %Blackboard{}, 1_000)
-      assert state.internal.casting.targets.unit_guid == ally
+      assert Target.unit_guid(state.internal.casting.targets) == ally
     end
 
     test "ignores out-of-combat friendlies" do

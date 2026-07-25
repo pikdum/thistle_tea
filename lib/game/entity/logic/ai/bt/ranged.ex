@@ -64,7 +64,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Ranged do
     character
     |> then(&%{&1 | internal: %{&1.internal | auto_shot: auto_shot}})
     |> Effects.enqueue(
-      Effects.spell_go(character.object.guid, auto_shot.spell.id, [auto_shot.target_guid], auto_shot.raw_targets)
+      Effects.spell_go(character.object.guid, auto_shot.spell.id, [auto_shot.target_guid], auto_shot.targets)
     )
     |> Effects.enqueue(Effects.deliver_spell(auto_shot.target_guid, context, auto_shot.spell))
     |> consume_ammo(auto_shot.spell)

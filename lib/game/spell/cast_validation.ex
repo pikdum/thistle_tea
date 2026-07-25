@@ -20,20 +20,20 @@ defmodule ThistleTea.Game.Spell.CastValidation do
   alias ThistleTea.Game.Spell.Cooldowns
   alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.Spell.Scripts
-  alias ThistleTea.Game.Spell.Targets
+  alias ThistleTea.Game.Spell.Target
 
   @power_fields %{0 => :power1, 1 => :power2, 2 => :power3, 3 => :power4, 4 => :power5}
   @health_power_type -2
   @range_leeway_yards 5.0
 
-  def validate(caster, %Spell{} = spell, %Targets{} = targets, target_info, now, opts \\ []) do
+  def validate(caster, %Spell{} = spell, %Target{} = targets, target_info, now, opts \\ []) do
     with :ok <- check_caster_alive(caster),
          :ok <- check_spirit_of_redemption(caster, spell),
          :ok <- check_caster_state(caster, spell, now),
          :ok <- check_combat_state(caster, spell),
          :ok <- check_stance(caster, spell),
          :ok <- check_caster_aura_state(caster, spell, now),
-         :ok <- Hunter.validate_reactive(caster, spell, targets.unit_guid, now),
+         :ok <- Hunter.validate_reactive(caster, spell, Target.unit_guid(targets), now),
          :ok <- check_combo_target(caster, spell, targets, now),
          :ok <- check_stronger_rank(caster, spell, targets),
          :ok <- check_mechanic_immunity(caster, spell, targets),
@@ -130,7 +130,9 @@ defmodule ThistleTea.Game.Spell.CastValidation do
 
   defp check_caster_aura_state(_caster, _spell, _now), do: :ok
 
-  defp check_combo_target(caster, %Spell{} = spell, %Targets{unit_guid: unit_guid}, now) do
+  defp check_combo_target(caster, %Spell{} = spell, %Target{} = targets, now) do
+    unit_guid = Target.unit_guid(targets)
+
     if Scripts.requires_combo_target?(spell) and not Reactive.combo_active?(caster, unit_guid, now) do
       {:error, :cant_do_that_yet}
     else
@@ -191,7 +193,9 @@ defmodule ThistleTea.Game.Spell.CastValidation do
     end
   end
 
-  defp check_stronger_rank(caster, %Spell{} = spell, %Targets{unit_guid: unit_guid}) do
+  defp check_stronger_rank(caster, %Spell{} = spell, %Target{} = targets) do
+    unit_guid = Target.unit_guid(targets)
+
     if self_target?(caster, unit_guid) and AuraLogic.blocked_by_stronger_rank?(caster, spell) do
       {:error, :aura_bounced}
     else
@@ -199,7 +203,9 @@ defmodule ThistleTea.Game.Spell.CastValidation do
     end
   end
 
-  defp check_mechanic_immunity(caster, %Spell{} = spell, %Targets{unit_guid: unit_guid}) do
+  defp check_mechanic_immunity(caster, %Spell{} = spell, %Target{} = targets) do
+    unit_guid = Target.unit_guid(targets)
+
     if self_target?(caster, unit_guid) and AuraLogic.mechanic_immune?(caster, spell) do
       {:error, :immune}
     else
@@ -207,7 +213,9 @@ defmodule ThistleTea.Game.Spell.CastValidation do
     end
   end
 
-  defp check_dispel_immunity(caster, %Spell{} = spell, %Targets{unit_guid: unit_guid}) do
+  defp check_dispel_immunity(caster, %Spell{} = spell, %Target{} = targets) do
+    unit_guid = Target.unit_guid(targets)
+
     if self_target?(caster, unit_guid) and AuraLogic.dispel_immune?(caster, spell) do
       {:error, :immune}
     else
@@ -356,7 +364,9 @@ defmodule ThistleTea.Game.Spell.CastValidation do
     end
   end
 
-  defp check_dispel_target(caster, %Spell{} = spell, %Targets{unit_guid: unit_guid}, target_info) do
+  defp check_dispel_target(caster, %Spell{} = spell, %Target{} = targets, target_info) do
+    unit_guid = Target.unit_guid(targets)
+
     dispel_types =
       spell.effects
       |> Enum.filter(&match?(%{type: :dispel}, &1))

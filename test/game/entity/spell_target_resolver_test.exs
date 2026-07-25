@@ -7,7 +7,7 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolverTest do
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Effect
-  alias ThistleTea.Game.Spell.Targets
+  alias ThistleTea.Game.Spell.Target
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.WorldRef
@@ -16,7 +16,7 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolverTest do
     test "returns direct unit targets without world lookup" do
       caster = %{object: %{guid: 1}}
       spell = %Spell{id: 133, effects: []}
-      targets = %Targets{unit_guid: 2}
+      targets = Target.unit(2)
 
       assert SpellTargetResolver.resolve(caster, spell, targets) == [2]
     end
@@ -25,7 +25,7 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolverTest do
       caster = %{object: %{guid: 1}}
       spell = %Spell{id: 1122, effects: [%Effect{type: :summon_demon}]}
 
-      assert SpellTargetResolver.resolve(caster, spell, %Targets{destination_location: {1.0, 2.0, 3.0}}) == [1]
+      assert SpellTargetResolver.resolve(caster, spell, Target.at({1.0, 2.0, 3.0})) == [1]
     end
 
     test "resolves mixed enemy and caster effects to both owners" do
@@ -38,7 +38,7 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolverTest do
         ]
       }
 
-      assert SpellTargetResolver.resolve(caster, spell, %Targets{unit_guid: 2}) == [2, 1]
+      assert SpellTargetResolver.resolve(caster, spell, Target.unit(2)) == [2, 1]
     end
 
     test "chains through nearest valid targets using DBC chain count" do
@@ -58,7 +58,7 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolverTest do
         effects: [%Effect{type: :school_damage, implicit_target_a: :target_enemy, chain_targets: 3}]
       }
 
-      assert SpellTargetResolver.resolve(caster, spell, %Targets{unit_guid: first}) == [first, second, third]
+      assert SpellTargetResolver.resolve(caster, spell, Target.unit(first)) == [first, second, third]
     end
 
     test "returns nearby mobs for player-cast caster aoe" do
@@ -71,7 +71,7 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolverTest do
       caster = caster(player_guid, {0.0, 0.0, 0.0})
       spell = aoe_spell(:aoe_enemy_at_caster)
 
-      assert SpellTargetResolver.resolve(caster, spell, %Targets{}) == [mob_guid]
+      assert SpellTargetResolver.resolve(caster, spell, Target.none()) == [mob_guid]
     end
 
     test "DBC creature mask filters caster AoE targets" do
@@ -88,7 +88,7 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolverTest do
       caster = caster(player_guid, {0.0, 0.0, 0.0})
       spell = %{aoe_spell(:aoe_enemy_at_caster) | target_creature_type_mask: 36}
 
-      assert SpellTargetResolver.resolve(caster, spell, %Targets{}) == [undead_guid]
+      assert SpellTargetResolver.resolve(caster, spell, Target.none()) == [undead_guid]
     end
 
     test "returns nearby attackable neutral mobs for player-cast caster aoe" do
@@ -101,7 +101,7 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolverTest do
       caster = caster(player_guid, {0.0, 0.0, 0.0})
       spell = aoe_spell(:aoe_enemy_at_caster)
 
-      assert SpellTargetResolver.resolve(caster, spell, %Targets{}) == [mob_guid]
+      assert SpellTargetResolver.resolve(caster, spell, Target.none()) == [mob_guid]
     end
 
     test "returns nearby players for mob-cast caster aoe" do
@@ -114,7 +114,7 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolverTest do
       caster = caster(mob_guid, {3.0, 0.0, 0.0})
       spell = aoe_spell(:aoe_enemy_at_caster)
 
-      assert SpellTargetResolver.resolve(caster, spell, %Targets{}) == [player_guid]
+      assert SpellTargetResolver.resolve(caster, spell, Target.none()) == [player_guid]
     end
 
     test "returns nearby mobs for player-cast targeted aoe" do
@@ -126,7 +126,7 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolverTest do
 
       caster = caster(player_guid, {40.0, 0.0, 0.0})
       spell = aoe_spell(:aoe_enemy_at_dest)
-      targets = %Targets{destination_location: {0.0, 0.0, 0.0}}
+      targets = Target.at({0.0, 0.0, 0.0})
 
       assert SpellTargetResolver.resolve(caster, spell, targets) == [mob_guid]
     end
@@ -140,7 +140,7 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolverTest do
 
       caster = caster(mob_guid, {40.0, 0.0, 0.0})
       spell = aoe_spell(:aoe_enemy_at_channel)
-      targets = %Targets{destination_location: {0.0, 0.0, 0.0}}
+      targets = Target.at({0.0, 0.0, 0.0})
 
       assert SpellTargetResolver.resolve(caster, spell, targets) == [player_guid]
     end
@@ -157,7 +157,7 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolverTest do
       caster = caster(player_guid, {0.0, 0.0, 0.0})
       spell = aoe_spell(:aoe_enemy_in_cone)
 
-      assert SpellTargetResolver.resolve(caster, spell, %Targets{unit_guid: front_mob_guid}) == [front_mob_guid]
+      assert SpellTargetResolver.resolve(caster, spell, Target.unit(front_mob_guid)) == [front_mob_guid]
     end
   end
 

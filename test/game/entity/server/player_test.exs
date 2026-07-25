@@ -21,7 +21,7 @@ defmodule ThistleTea.Game.Entity.Server.PlayerTest do
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Cast
-  alias ThistleTea.Game.Spell.Targets
+  alias ThistleTea.Game.Spell.Target
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.Metadata
@@ -291,7 +291,7 @@ defmodule ThistleTea.Game.Entity.Server.PlayerTest do
       guid = System.unique_integer([:positive])
       character = character(guid, health: 0, max_health: 100)
       spell = %Spell{id: 1949, attributes: MapSet.new(), effects: []}
-      casting = Cast.new(spell, %Targets{}, 1_000)
+      casting = Cast.new(spell, Target.none(), 1_000)
       character = %{character | internal: %{character.internal | casting: casting}}
 
       Metadata.put(guid, %{})
@@ -307,7 +307,7 @@ defmodule ThistleTea.Game.Entity.Server.PlayerTest do
       guid = System.unique_integer([:positive])
       character = character(guid, health: 50, max_health: 100)
       spell = %Spell{id: 1949, attributes: MapSet.new(), effects: []}
-      casting = Cast.new(spell, %Targets{}, 1_000)
+      casting = Cast.new(spell, Target.none(), 1_000)
       character = %{character | internal: %{character.internal | casting: casting}}
 
       Metadata.put(guid, %{})

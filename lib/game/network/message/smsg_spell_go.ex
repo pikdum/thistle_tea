@@ -2,6 +2,9 @@ defmodule ThistleTea.Game.Network.Message.SmsgSpellGo do
   @moduledoc false
   use ThistleTea.Game.Network.ServerMessage, :SMSG_SPELL_GO
 
+  alias ThistleTea.Game.Spell.Target
+  alias ThistleTea.Game.Spell.TargetCodec
+
   @cast_flags_ammo 0x20
 
   defstruct [
@@ -24,7 +27,7 @@ defmodule ThistleTea.Game.Network.Message.SmsgSpellGo do
         flags: flags,
         hits: hits,
         misses: misses,
-        targets: targets,
+        targets: %Target{} = targets,
         ammo_display_id: ammo_display_id,
         ammo_inventory_type: ammo_inventory_type
       }) do
@@ -47,7 +50,7 @@ defmodule ThistleTea.Game.Network.Message.SmsgSpellGo do
       hits_binary <>
       <<length(misses)::little-size(8)>> <>
       misses_binary <>
-      targets <>
+      TargetCodec.encode(targets) <>
       if Bitwise.band(flags, @cast_flags_ammo) == 0 do
         <<>>
       else

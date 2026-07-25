@@ -21,7 +21,7 @@ defmodule ThistleTea.Game.Entity.Logic.PriestSpellsTest do
   alias ThistleTea.Game.Spell.CastValidation
   alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.Spell.Scripts
-  alias ThistleTea.Game.Spell.Targets
+  alias ThistleTea.Game.Spell.Target
   alias ThistleTea.Game.WorldRef
 
   @movement_flag_root 0x08000000
@@ -491,7 +491,7 @@ defmodule ThistleTea.Game.Entity.Logic.PriestSpellsTest do
     test "cast validation requires a dead friendly target" do
       caster = mob_fixture()
       spell = resurrection_fixture()
-      targets = Targets.unit(5)
+      targets = Target.unit(5)
 
       assert {:error, :target_not_dead} =
                CastValidation.validate(caster, spell, targets, %{alive?: true, friendly?: true}, 1_000)
@@ -749,7 +749,7 @@ defmodule ThistleTea.Game.Entity.Logic.PriestSpellsTest do
 
       {caster, _events} = Aura.apply_spell(caster, 5, 10, weakened_soul_fixture(), 1_000)
 
-      targets = Targets.unit(5)
+      targets = Target.unit(5)
 
       assert {:error, :immune} =
                CastValidation.validate(caster, power_word_shield_fixture(), targets, :self, 1_000)

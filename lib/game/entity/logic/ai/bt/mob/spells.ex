@@ -26,7 +26,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells do
   alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastValidation
-  alias ThistleTea.Game.Spell.Targets
+  alias ThistleTea.Game.Spell.Target
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Metadata
@@ -152,7 +152,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells do
     with true <- is_integer(target_guid) and not is_nil(spell),
          true <- flags_allow?(state, entry, target_guid),
          {:ok, state} <- release_previous_cast(state, entry),
-         targets = Targets.unit(target_guid),
+         targets = Target.unit(target_guid),
          :ok <- CastValidation.validate(state, spell, targets, build_target_info(state, target_guid), now) do
       {:ok, {scripted_cast(state, spell, targets, target_guid, now), blackboard}}
     else
@@ -176,7 +176,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells do
     state =
       state
       |> prepare_to_cast(spell, target_guid, now)
-      |> Effects.enqueue(Effects.spell_start(state.object.guid, spell.id, spell.cast_time_ms || 0, targets.raw))
+      |> Effects.enqueue(Effects.spell_start(state.object.guid, spell.id, spell.cast_time_ms || 0, targets))
       |> SpellBT.start_cast(spell, targets, now)
 
     finish_if_instant(state, spell, now)
@@ -209,7 +209,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells do
   end
 
   defp validate_and_cast(%Mob{} = state, %Blackboard{} = blackboard, entry, index, spell, target_guid, now) do
-    targets = Targets.unit(target_guid)
+    targets = Target.unit(target_guid)
 
     case CastValidation.validate(state, spell, targets, build_target_info(state, target_guid), now) do
       :ok ->
@@ -236,7 +236,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells do
     state =
       state
       |> prepare_to_cast(spell, target_guid, now)
-      |> Effects.enqueue(Effects.spell_start(state.object.guid, spell.id, spell.cast_time_ms || 0, targets.raw))
+      |> Effects.enqueue(Effects.spell_start(state.object.guid, spell.id, spell.cast_time_ms || 0, targets))
       |> SpellBT.start_cast(spell, targets, now)
 
     finish_or_schedule(state, blackboard, spell, now)

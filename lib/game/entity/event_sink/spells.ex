@@ -13,7 +13,7 @@ defmodule ThistleTea.Game.Entity.EventSink.Spells do
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Scripts
-  alias ThistleTea.Game.Spell.Targets
+  alias ThistleTea.Game.Spell.Target
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
 
@@ -155,7 +155,7 @@ defmodule ThistleTea.Game.Entity.EventSink.Spells do
       spell: effect.spell_id,
       flags: 0x2,
       timer: effect.duration_ms || 0,
-      targets: effect.raw_targets || <<>>,
+      targets: effect.targets,
       ammo_display_id: nil,
       ammo_inventory_type: nil
     }
@@ -225,7 +225,7 @@ defmodule ThistleTea.Game.Entity.EventSink.Spells do
       flags: 0x100,
       hits: effect.hit_guids || [],
       misses: effect.misses || [],
-      targets: effect.raw_targets || <<>>,
+      targets: effect.targets,
       ammo_display_id: nil,
       ammo_inventory_type: nil
     }
@@ -422,7 +422,7 @@ defmodule ThistleTea.Game.Entity.EventSink.Spells do
             effect.source_guid || entity.object.guid,
             effect.spell_id,
             [target_guid],
-            Targets.unit(target_guid).raw
+            Target.unit(target_guid)
           )
         )
         |> dispatch_triggered_spell(effect, spell)
@@ -430,7 +430,7 @@ defmodule ThistleTea.Game.Entity.EventSink.Spells do
   end
 
   defp dispatch_resolved_trigger(entity, effect, spell) do
-    targets = SpellTargetResolver.resolve(entity, spell, Targets.unit(effect.target_guid))
+    targets = SpellTargetResolver.resolve(entity, spell, Target.unit(effect.target_guid))
 
     entity =
       emit(
@@ -439,7 +439,7 @@ defmodule ThistleTea.Game.Entity.EventSink.Spells do
           effect.source_guid || entity.object.guid,
           effect.spell_id,
           targets,
-          Targets.unit(effect.target_guid).raw
+          Target.unit(effect.target_guid)
         )
       )
 

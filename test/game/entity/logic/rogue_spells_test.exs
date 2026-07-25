@@ -19,7 +19,7 @@ defmodule ThistleTea.Game.Entity.Logic.RogueSpellsTest do
   alias ThistleTea.Game.Spell.CastValidation
   alias ThistleTea.Game.Spell.Cooldowns
   alias ThistleTea.Game.Spell.Effect
-  alias ThistleTea.Game.Spell.Targets
+  alias ThistleTea.Game.Spell.Target
 
   defp rogue(opts \\ []) do
     %Character{
@@ -83,10 +83,10 @@ defmodule ThistleTea.Game.Entity.Logic.RogueSpellsTest do
 
       entity = Reactive.add_combo_points(rogue(), 9, 2)
 
-      assert :ok = CastValidation.validate(entity, eviscerate, Targets.unit(9), nil, 1_000)
+      assert :ok = CastValidation.validate(entity, eviscerate, Target.unit(9), nil, 1_000)
 
       assert {:error, :cant_do_that_yet} =
-               CastValidation.validate(entity, eviscerate, Targets.unit(10), nil, 1_000)
+               CastValidation.validate(entity, eviscerate, Target.unit(10), nil, 1_000)
     end
 
     test "eviscerate damage scales with the spent points" do
@@ -219,8 +219,8 @@ defmodule ThistleTea.Game.Entity.Logic.RogueSpellsTest do
       behind = rogue()
       behind = %{behind | movement_block: %{behind.movement_block | position: {-1.0, 0.0, 0.0, 0.0}}}
 
-      assert {:error, :not_behind} = CastValidation.validate(front, backstab, Targets.unit(9), target_info, 1_000)
-      assert :ok = CastValidation.validate(behind, backstab, Targets.unit(9), target_info, 1_000)
+      assert {:error, :not_behind} = CastValidation.validate(front, backstab, Target.unit(9), target_info, 1_000)
+      assert :ok = CastValidation.validate(behind, backstab, Target.unit(9), target_info, 1_000)
     end
   end
 
@@ -251,9 +251,9 @@ defmodule ThistleTea.Game.Entity.Logic.RogueSpellsTest do
       vanish = %Spell{id: 1856, name: "Vanish"}
 
       assert {:error, :affecting_combat} =
-               CastValidation.validate(rogue(in_combat: true), stealth, %Targets{}, nil, 1_000)
+               CastValidation.validate(rogue(in_combat: true), stealth, Target.none(), nil, 1_000)
 
-      assert :ok = CastValidation.validate(rogue(in_combat: true), vanish, %Targets{}, nil, 1_000)
+      assert :ok = CastValidation.validate(rogue(in_combat: true), vanish, Target.none(), nil, 1_000)
     end
 
     test "cold blood forces the next melee ability to crit" do

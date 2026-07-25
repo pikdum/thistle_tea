@@ -24,7 +24,7 @@ defmodule ThistleTea.Game.Entity.Logic.WarlockSpellsTest do
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.CastValidation
   alias ThistleTea.Game.Spell.Effect
-  alias ThistleTea.Game.Spell.Targets
+  alias ThistleTea.Game.Spell.Target
   alias ThistleTea.Game.World.Loader.SpellPetAura
   alias ThistleTea.Game.WorldRef
 
@@ -380,25 +380,25 @@ defmodule ThistleTea.Game.Entity.Logic.WarlockSpellsTest do
         same_world?: false
       }
 
-      assert :ok = CastValidation.validate(character(), ritual, %Targets{}, nil, 1_000, ritual_context: valid)
+      assert :ok = CastValidation.validate(character(), ritual, Target.none(), nil, 1_000, ritual_context: valid)
 
       assert {:error, :target_in_combat} =
-               CastValidation.validate(character(), ritual, %Targets{}, nil, 1_000,
+               CastValidation.validate(character(), ritual, Target.none(), nil, 1_000,
                  ritual_context: %{valid | target_in_combat?: true}
                )
 
       assert {:error, :target_not_in_instance} =
-               CastValidation.validate(character(), ritual, %Targets{}, nil, 1_000,
+               CastValidation.validate(character(), ritual, Target.none(), nil, 1_000,
                  ritual_context: %{valid | caster_dungeon?: true}
                )
 
       assert {:error, :not_here} =
-               CastValidation.validate(character(), ritual, %Targets{}, nil, 1_000,
+               CastValidation.validate(character(), ritual, Target.none(), nil, 1_000,
                  ritual_context: %{valid | caster_battleground?: true}
                )
 
       assert {:error, :bad_targets} =
-               CastValidation.validate(character(), ritual, %Targets{}, nil, 1_000,
+               CastValidation.validate(character(), ritual, Target.none(), nil, 1_000,
                  ritual_context: %{valid | same_group?: false}
                )
     end
@@ -414,7 +414,7 @@ defmodule ThistleTea.Game.Entity.Logic.WarlockSpellsTest do
 
       caster = character()
       caster = %{caster | unit: %{caster.unit | target: 9}}
-      caster = SpellBT.start_cast(caster, ritual, %Targets{}, 1_000)
+      caster = SpellBT.start_cast(caster, ritual, Target.none(), 1_000)
 
       assert Enum.any?(caster.internal.events, fn event ->
                is_struct(event, Effects.SummonGameObject) and event.entry == 36_727 and event.target_guid == 9 and
@@ -430,7 +430,7 @@ defmodule ThistleTea.Game.Entity.Logic.WarlockSpellsTest do
         effects: []
       }
 
-      caster = SpellBT.start_cast(character(), ritual, %Targets{}, 1_000)
+      caster = SpellBT.start_cast(character(), ritual, Target.none(), 1_000)
 
       caster = %{
         caster
@@ -491,11 +491,11 @@ defmodule ThistleTea.Game.Entity.Logic.WarlockSpellsTest do
 
       target_info = %{alive?: true, hostile?: true, attackable?: true, aura_sources: MapSet.new()}
 
-      assert CastValidation.validate(caster, spell, %Targets{unit_guid: 2}, target_info, 1_000) ==
+      assert CastValidation.validate(caster, spell, Target.unit(2), target_info, 1_000) ==
                {:error, :target_aurastate}
 
       target_info = %{target_info | aura_sources: MapSet.new([{348, 5, 0x00000004, 0, 1}])}
-      assert CastValidation.validate(caster, spell, %Targets{unit_guid: 2}, target_info, 1_000) == :ok
+      assert CastValidation.validate(caster, spell, Target.unit(2), target_info, 1_000) == :ok
     end
 
     test "requires and consumes the caster's Immolate" do
@@ -598,7 +598,7 @@ defmodule ThistleTea.Game.Entity.Logic.WarlockSpellsTest do
   describe "Curse of Tongues" do
     test "negative casting speed increases cast duration" do
       spell = %Spell{id: 686, cast_time_ms: 2_000}
-      cast = spell |> Cast.new(%Targets{}, 1_000) |> Cast.apply_speed_modifier(-50)
+      cast = spell |> Cast.new(Target.none(), 1_000) |> Cast.apply_speed_modifier(-50)
 
       assert cast.cast_time_ms == 4_000
       assert cast.ends_at == 5_000
@@ -727,7 +727,7 @@ defmodule ThistleTea.Game.Entity.Logic.WarlockSpellsTest do
       }
 
       caster = character(summon: 2)
-      caster = SpellBT.start_cast(caster, spell, %Targets{}, 1_000)
+      caster = SpellBT.start_cast(caster, spell, Target.none(), 1_000)
       caster = SpellBT.clear_cast(caster)
 
       assert Enum.any?(caster.internal.events, fn event ->

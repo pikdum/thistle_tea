@@ -12,7 +12,7 @@ defmodule ThistleTea.Game.Spell.CastValidationTest do
   alias ThistleTea.Game.Spell.CastValidation
   alias ThistleTea.Game.Spell.Cooldowns
   alias ThistleTea.Game.Spell.Effect
-  alias ThistleTea.Game.Spell.Targets
+  alias ThistleTea.Game.Spell.Target
   alias ThistleTea.Game.WorldRef
 
   @now 10_000
@@ -88,7 +88,7 @@ defmodule ThistleTea.Game.Spell.CastValidationTest do
       stunned = caster(auras: [control_holder(:mod_stun)])
 
       assert {:error, :stunned} =
-               CastValidation.validate(stunned, harmful_spell(), Targets.unit(7), hostile_target(), @now)
+               CastValidation.validate(stunned, harmful_spell(), Target.unit(7), hostile_target(), @now)
 
       blink =
         helpful_spell(
@@ -96,7 +96,7 @@ defmodule ThistleTea.Game.Spell.CastValidationTest do
           effects: [%Effect{type: :apply_aura, aura: :mechanic_immunity, misc_value: 12, implicit_target_a: :caster}]
         )
 
-      assert :ok = CastValidation.validate(stunned, blink, %Targets{}, nil, @now)
+      assert :ok = CastValidation.validate(stunned, blink, Target.none(), nil, @now)
     end
 
     test "fear and confusion prevent casting" do
@@ -104,10 +104,10 @@ defmodule ThistleTea.Game.Spell.CastValidationTest do
       confused = caster(auras: [control_holder(:mod_confuse)])
 
       assert {:error, :fleeing} =
-               CastValidation.validate(feared, harmful_spell(), Targets.unit(7), hostile_target(), @now)
+               CastValidation.validate(feared, harmful_spell(), Target.unit(7), hostile_target(), @now)
 
       assert {:error, :confused} =
-               CastValidation.validate(confused, harmful_spell(), Targets.unit(7), hostile_target(), @now)
+               CastValidation.validate(confused, harmful_spell(), Target.unit(7), hostile_target(), @now)
     end
 
     test "silence blocks magic but not physical abilities" do
@@ -117,7 +117,7 @@ defmodule ThistleTea.Game.Spell.CastValidationTest do
                CastValidation.validate(
                  silenced,
                  harmful_spell(prevention_type: 1),
-                 Targets.unit(7),
+                 Target.unit(7),
                  hostile_target(),
                  @now
                )
@@ -126,7 +126,7 @@ defmodule ThistleTea.Game.Spell.CastValidationTest do
                CastValidation.validate(
                  silenced,
                  harmful_spell(prevention_type: 0),
-                 Targets.unit(7),
+                 Target.unit(7),
                  hostile_target(),
                  @now
                )
@@ -139,7 +139,7 @@ defmodule ThistleTea.Game.Spell.CastValidationTest do
                CastValidation.validate(
                  pacified,
                  harmful_spell(prevention_type: 2),
-                 Targets.unit(7),
+                 Target.unit(7),
                  hostile_target(),
                  @now
                )
@@ -148,7 +148,7 @@ defmodule ThistleTea.Game.Spell.CastValidationTest do
                CastValidation.validate(
                  pacified,
                  harmful_spell(prevention_type: 1),
-                 Targets.unit(7),
+                 Target.unit(7),
                  hostile_target(),
                  @now
                )
@@ -159,9 +159,9 @@ defmodule ThistleTea.Game.Spell.CastValidationTest do
       fire = harmful_spell(school: :fire, prevention_type: 1)
       frost = harmful_spell(id: 116, school: :frost, prevention_type: 1)
 
-      assert {:error, :silenced} = CastValidation.validate(locked, fire, Targets.unit(7), hostile_target(), @now)
-      assert :ok = CastValidation.validate(locked, frost, Targets.unit(7), hostile_target(), @now)
-      assert :ok = CastValidation.validate(locked, fire, Targets.unit(7), hostile_target(), @now + 5_001)
+      assert {:error, :silenced} = CastValidation.validate(locked, fire, Target.unit(7), hostile_target(), @now)
+      assert :ok = CastValidation.validate(locked, frost, Target.unit(7), hostile_target(), @now)
+      assert :ok = CastValidation.validate(locked, fire, Target.unit(7), hostile_target(), @now + 5_001)
     end
   end
 
@@ -173,12 +173,12 @@ defmodule ThistleTea.Game.Spell.CastValidationTest do
                CastValidation.validate(
                  caster(),
                  charge,
-                 Targets.unit(7),
+                 Target.unit(7),
                  hostile_target(position: {WorldRef.open(0), 3.0, 0.0, 0.0}),
                  @now
                )
 
-      assert :ok = CastValidation.validate(caster(), charge, Targets.unit(7), hostile_target(), @now)
+      assert :ok = CastValidation.validate(caster(), charge, Target.unit(7), hostile_target(), @now)
     end
 
     test "the global cooldown blocks new casts until it lapses" do
@@ -186,13 +186,13 @@ defmodule ThistleTea.Game.Spell.CastValidationTest do
       on_gcd = Cooldowns.trigger_gcd(caster(), spell, @now)
 
       assert {:error, :not_ready} =
-               CastValidation.validate(on_gcd, spell, Targets.unit(7), hostile_target(), @now + 100)
+               CastValidation.validate(on_gcd, spell, Target.unit(7), hostile_target(), @now + 100)
 
-      assert :ok = CastValidation.validate(on_gcd, spell, Targets.unit(7), hostile_target(), @now + 1_500)
+      assert :ok = CastValidation.validate(on_gcd, spell, Target.unit(7), hostile_target(), @now + 1_500)
 
       gcd_free = harmful_spell(id: 2764, gcd_ms: 0)
 
-      assert :ok = CastValidation.validate(on_gcd, gcd_free, Targets.unit(7), hostile_target(), @now + 100)
+      assert :ok = CastValidation.validate(on_gcd, gcd_free, Target.unit(7), hostile_target(), @now + 100)
     end
   end
 
@@ -201,47 +201,47 @@ defmodule ThistleTea.Game.Spell.CastValidationTest do
       claw = harmful_spell(id: 1082, stances: 0x1)
 
       assert {:error, :only_shapeshift} =
-               CastValidation.validate(caster(), claw, Targets.unit(7), hostile_target(), @now)
+               CastValidation.validate(caster(), claw, Target.unit(7), hostile_target(), @now)
 
       assert {:error, :only_shapeshift} =
-               CastValidation.validate(caster(shapeshift_form: 5), claw, Targets.unit(7), hostile_target(), @now)
+               CastValidation.validate(caster(shapeshift_form: 5), claw, Target.unit(7), hostile_target(), @now)
 
-      assert :ok = CastValidation.validate(caster(shapeshift_form: 1), claw, Targets.unit(7), hostile_target(), @now)
+      assert :ok = CastValidation.validate(caster(shapeshift_form: 1), claw, Target.unit(7), hostile_target(), @now)
     end
 
     test "normal spells fail in true forms but cast fine in warrior-style stances" do
       fireball = harmful_spell(attributes: MapSet.new([:not_while_shapeshifted]))
 
       assert {:error, :not_shapeshift} =
-               CastValidation.validate(caster(shapeshift_form: 1), fireball, Targets.unit(7), hostile_target(), @now)
+               CastValidation.validate(caster(shapeshift_form: 1), fireball, Target.unit(7), hostile_target(), @now)
 
       assert :ok =
-               CastValidation.validate(caster(shapeshift_form: 17), fireball, Targets.unit(7), hostile_target(), @now)
+               CastValidation.validate(caster(shapeshift_form: 17), fireball, Target.unit(7), hostile_target(), @now)
 
-      assert :ok = CastValidation.validate(caster(), fireball, Targets.unit(7), hostile_target(), @now)
+      assert :ok = CastValidation.validate(caster(), fireball, Target.unit(7), hostile_target(), @now)
     end
 
     test "stance-excluded spells fail in the excluded form" do
       renew = helpful_spell(stances_not: 0x08000000)
 
       assert {:error, :not_shapeshift} =
-               CastValidation.validate(caster(shapeshift_form: 28), renew, %Targets{}, nil, @now)
+               CastValidation.validate(caster(shapeshift_form: 28), renew, Target.none(), nil, @now)
 
-      assert :ok = CastValidation.validate(caster(), renew, %Targets{}, nil, @now)
+      assert :ok = CastValidation.validate(caster(), renew, Target.none(), nil, @now)
     end
   end
 
   describe "validate/6" do
     test "passes a valid hostile cast" do
       assert :ok =
-               CastValidation.validate(caster(), harmful_spell(), Targets.unit(7), hostile_target(), @now)
+               CastValidation.validate(caster(), harmful_spell(), Target.unit(7), hostile_target(), @now)
     end
 
     test "uses current health for health-powered spells" do
       spell = helpful_spell(mana_cost: 30, power_type: -2)
 
-      assert :ok = CastValidation.validate(caster(health: 31), spell, %Targets{}, nil, @now)
-      assert {:error, :no_power} = CastValidation.validate(caster(health: 30), spell, %Targets{}, nil, @now)
+      assert :ok = CastValidation.validate(caster(health: 31), spell, Target.none(), nil, @now)
+      assert {:error, :no_power} = CastValidation.validate(caster(health: 30), spell, Target.none(), nil, @now)
     end
 
     test "restricts Exorcism and Holy Wrath to undead or demons" do
@@ -249,20 +249,20 @@ defmodule ThistleTea.Game.Spell.CastValidationTest do
       holy_wrath = harmful_spell(name: "Holy Wrath", target_creature_type_mask: 36)
 
       assert :ok =
-               CastValidation.validate(caster(), exorcism, Targets.unit(7), hostile_target(creature_type: 6), @now)
+               CastValidation.validate(caster(), exorcism, Target.unit(7), hostile_target(creature_type: 6), @now)
 
       assert :ok =
-               CastValidation.validate(caster(), holy_wrath, Targets.unit(7), hostile_target(creature_type: 3), @now)
+               CastValidation.validate(caster(), holy_wrath, Target.unit(7), hostile_target(creature_type: 3), @now)
 
       assert {:error, :bad_targets} =
-               CastValidation.validate(caster(), exorcism, Targets.unit(7), hostile_target(creature_type: 7), @now)
+               CastValidation.validate(caster(), exorcism, Target.unit(7), hostile_target(creature_type: 7), @now)
 
       holy_wrath = %{
         holy_wrath
         | effects: [%Effect{type: :school_damage, implicit_target_a: :aoe_enemy_at_caster}]
       }
 
-      assert :ok = CastValidation.validate(caster(), holy_wrath, %Targets{}, nil, @now)
+      assert :ok = CastValidation.validate(caster(), holy_wrath, Target.none(), nil, @now)
     end
 
     test "restricts Turn Undead to undead targets" do
@@ -272,15 +272,15 @@ defmodule ThistleTea.Game.Spell.CastValidationTest do
       }
 
       assert :ok =
-               CastValidation.validate(caster(), turn_undead, Targets.unit(7), hostile_target(creature_type: 6), @now)
+               CastValidation.validate(caster(), turn_undead, Target.unit(7), hostile_target(creature_type: 6), @now)
 
       assert {:error, :bad_targets} =
-               CastValidation.validate(caster(), turn_undead, Targets.unit(7), hostile_target(creature_type: 3), @now)
+               CastValidation.validate(caster(), turn_undead, Target.unit(7), hostile_target(creature_type: 3), @now)
     end
 
     test "rejects a dead caster" do
       assert {:error, :caster_dead} =
-               CastValidation.validate(caster(health: 0), harmful_spell(), Targets.unit(7), hostile_target(), @now)
+               CastValidation.validate(caster(health: 0), harmful_spell(), Target.unit(7), hostile_target(), @now)
     end
 
     test "allows only healing spells in Spirit of Redemption" do
@@ -293,18 +293,18 @@ defmodule ThistleTea.Game.Spell.CastValidationTest do
       shield =
         helpful_spell(effects: [%Effect{type: :apply_aura, aura: :school_absorb, implicit_target_a: :target_ally}])
 
-      assert :ok = CastValidation.validate(caster, renew, Targets.unit(7), friendly_target(), @now)
+      assert :ok = CastValidation.validate(caster, renew, Target.unit(7), friendly_target(), @now)
 
       assert {:error, :not_shapeshift} =
-               CastValidation.validate(caster, shield, Targets.unit(7), friendly_target(), @now)
+               CastValidation.validate(caster, shield, Target.unit(7), friendly_target(), @now)
 
       assert {:error, :not_shapeshift} =
-               CastValidation.validate(caster, harmful_spell(), Targets.unit(7), hostile_target(), @now)
+               CastValidation.validate(caster, harmful_spell(), Target.unit(7), hostile_target(), @now)
     end
 
     test "rejects insufficient power" do
       assert {:error, :no_power} =
-               CastValidation.validate(caster(power1: 10), harmful_spell(), Targets.unit(7), hostile_target(), @now)
+               CastValidation.validate(caster(power1: 10), harmful_spell(), Target.unit(7), hostile_target(), @now)
     end
 
     test "rejects a spell still on cooldown and allows it after expiry" do
@@ -312,42 +312,42 @@ defmodule ThistleTea.Game.Spell.CastValidationTest do
       caster = Cooldowns.start(caster(), spell, @now)
 
       assert {:error, :not_ready} =
-               CastValidation.validate(caster, spell, Targets.unit(7), hostile_target(), @now + 7_999)
+               CastValidation.validate(caster, spell, Target.unit(7), hostile_target(), @now + 7_999)
 
       assert :ok =
-               CastValidation.validate(caster, spell, Targets.unit(7), hostile_target(), @now + 8_000)
+               CastValidation.validate(caster, spell, Target.unit(7), hostile_target(), @now + 8_000)
     end
 
     test "rejects missing reagents and passes when they are on hand" do
       spell = helpful_spell(reagents: [{17_056, 1}])
 
       assert {:error, :reagents} =
-               CastValidation.validate(caster(), spell, Targets.unit(100), :self, @now, count_item: fn _ -> 0 end)
+               CastValidation.validate(caster(), spell, Target.unit(100), :self, @now, count_item: fn _ -> 0 end)
 
       assert :ok =
-               CastValidation.validate(caster(), spell, Targets.unit(100), :self, @now, count_item: fn _ -> 2 end)
+               CastValidation.validate(caster(), spell, Target.unit(100), :self, @now, count_item: fn _ -> 2 end)
     end
 
     test "rejects a friendly target for a harmful spell" do
       assert {:error, :target_friendly} =
-               CastValidation.validate(caster(), harmful_spell(), Targets.unit(7), friendly_target(), @now)
+               CastValidation.validate(caster(), harmful_spell(), Target.unit(7), friendly_target(), @now)
     end
 
     test "rejects a dead target for a harmful spell" do
       assert {:error, :targets_dead} =
-               CastValidation.validate(caster(), harmful_spell(), Targets.unit(7), hostile_target(alive?: false), @now)
+               CastValidation.validate(caster(), harmful_spell(), Target.unit(7), hostile_target(alive?: false), @now)
     end
 
     test "rejects an unattackable neutral target for a harmful spell" do
       target = hostile_target(hostile?: false, attackable?: false)
 
       assert {:error, :bad_targets} =
-               CastValidation.validate(caster(), harmful_spell(), Targets.unit(7), target, @now)
+               CastValidation.validate(caster(), harmful_spell(), Target.unit(7), target, @now)
     end
 
     test "rejects a hostile target for a helpful spell" do
       assert {:error, :target_enemy} =
-               CastValidation.validate(caster(), helpful_spell(), Targets.unit(7), hostile_target(), @now)
+               CastValidation.validate(caster(), helpful_spell(), Target.unit(7), hostile_target(), @now)
     end
 
     test "allows a self-targeting spell cast with an enemy selected" do
@@ -361,13 +361,13 @@ defmodule ThistleTea.Game.Spell.CastValidationTest do
       }
 
       assert :ok =
-               CastValidation.validate(caster(), arcane_missiles, Targets.unit(7), hostile_target(), @now)
+               CastValidation.validate(caster(), arcane_missiles, Target.unit(7), hostile_target(), @now)
 
       assert {:error, :targets_dead} =
                CastValidation.validate(
                  caster(),
                  arcane_missiles,
-                 Targets.unit(7),
+                 Target.unit(7),
                  hostile_target(alive?: false),
                  @now
                )
@@ -375,18 +375,18 @@ defmodule ThistleTea.Game.Spell.CastValidationTest do
 
     test "requires a unit target for harmful spells" do
       assert {:error, :bad_implicit_targets} =
-               CastValidation.validate(caster(), harmful_spell(), %Targets{raw: <<>>}, nil, @now)
+               CastValidation.validate(caster(), harmful_spell(), Target.none(), nil, @now)
 
       assert {:error, :bad_targets} =
-               CastValidation.validate(caster(), harmful_spell(), Targets.unit(100), :self, @now)
+               CastValidation.validate(caster(), harmful_spell(), Target.unit(100), :self, @now)
 
       assert {:error, :bad_targets} =
-               CastValidation.validate(caster(), harmful_spell(), Targets.unit(7), :unknown, @now)
+               CastValidation.validate(caster(), harmful_spell(), Target.unit(7), :unknown, @now)
     end
 
     test "rejects targets out of line of sight" do
       assert {:error, :line_of_sight} =
-               CastValidation.validate(caster(), harmful_spell(), Targets.unit(7), hostile_target(los?: false), @now)
+               CastValidation.validate(caster(), harmful_spell(), Target.unit(7), hostile_target(los?: false), @now)
     end
 
     test "requires a matching removable aura for non-periodic dispels" do
@@ -401,13 +401,13 @@ defmodule ThistleTea.Game.Spell.CastValidationTest do
         )
 
       assert {:error, :nothing_to_dispel} =
-               CastValidation.validate(caster(), cleanse, Targets.unit(7), friendly_target(), @now)
+               CastValidation.validate(caster(), cleanse, Target.unit(7), friendly_target(), @now)
 
       assert :ok =
                CastValidation.validate(
                  caster(),
                  cleanse,
-                 Targets.unit(7),
+                 Target.unit(7),
                  friendly_target(dispel_options: MapSet.new([{3, :negative}])),
                  @now
                )
@@ -416,7 +416,7 @@ defmodule ThistleTea.Game.Spell.CastValidationTest do
                CastValidation.validate(
                  caster(),
                  cleanse,
-                 Targets.unit(7),
+                 Target.unit(7),
                  friendly_target(dispel_options: MapSet.new([{3, :positive}])),
                  @now
                )
@@ -426,7 +426,7 @@ defmodule ThistleTea.Game.Spell.CastValidationTest do
       purge = harmful_spell(effects: [%Effect{type: :dispel, misc_value: 1, implicit_target_a: :target_enemy}])
       target = hostile_target(dispel_options: MapSet.new([{1, :positive}]))
 
-      assert :ok = CastValidation.validate(caster(), purge, Targets.unit(7), target, @now)
+      assert :ok = CastValidation.validate(caster(), purge, Target.unit(7), target, @now)
     end
 
     test "rejects power burn against a different target resource" do
@@ -437,7 +437,7 @@ defmodule ThistleTea.Game.Spell.CastValidationTest do
                CastValidation.validate(
                  caster(),
                  mana_burn,
-                 Targets.unit(7),
+                 Target.unit(7),
                  hostile_target(power_type: 0),
                  @now
                )
@@ -446,7 +446,7 @@ defmodule ThistleTea.Game.Spell.CastValidationTest do
                CastValidation.validate(
                  caster(),
                  mana_burn,
-                 Targets.unit(7),
+                 Target.unit(7),
                  hostile_target(power_type: 1),
                  @now
                )
@@ -455,11 +455,11 @@ defmodule ThistleTea.Game.Spell.CastValidationTest do
     test "allows ignore_line_of_sight spells to bypass the LoS check" do
       spell = harmful_spell(attributes: MapSet.new([:ignore_line_of_sight]))
 
-      assert :ok = CastValidation.validate(caster(), spell, Targets.unit(7), hostile_target(los?: false), @now)
+      assert :ok = CastValidation.validate(caster(), spell, Target.unit(7), hostile_target(los?: false), @now)
     end
 
     test "skips the LoS check when target info has no visibility fact" do
-      assert :ok = CastValidation.validate(caster(), harmful_spell(), Targets.unit(7), hostile_target(), @now)
+      assert :ok = CastValidation.validate(caster(), harmful_spell(), Target.unit(7), hostile_target(), @now)
     end
 
     test "rejects targets out of range or on another map" do
@@ -467,10 +467,10 @@ defmodule ThistleTea.Game.Spell.CastValidationTest do
       other_map = hostile_target(position: {WorldRef.open(1), 10.0, 0.0, 0.0})
 
       assert {:error, :out_of_range} =
-               CastValidation.validate(caster(), harmful_spell(), Targets.unit(7), out_of_range, @now)
+               CastValidation.validate(caster(), harmful_spell(), Target.unit(7), out_of_range, @now)
 
       assert {:error, :out_of_range} =
-               CastValidation.validate(caster(), harmful_spell(), Targets.unit(7), other_map, @now)
+               CastValidation.validate(caster(), harmful_spell(), Target.unit(7), other_map, @now)
     end
 
     test "skips the range check when the target position is unknown" do
@@ -478,7 +478,7 @@ defmodule ThistleTea.Game.Spell.CastValidationTest do
                CastValidation.validate(
                  caster(),
                  harmful_spell(),
-                 Targets.unit(7),
+                 Target.unit(7),
                  hostile_target(position: nil),
                  @now
                )

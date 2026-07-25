@@ -4,7 +4,7 @@ defmodule ThistleTea.Game.Spell.Cast do
   state for channeled spells.
   """
   alias ThistleTea.Game.Spell
-  alias ThistleTea.Game.Spell.Targets
+  alias ThistleTea.Game.Spell.Target
 
   defstruct [
     :spell,
@@ -22,7 +22,7 @@ defmodule ThistleTea.Game.Spell.Cast do
     ends_at: 0
   ]
 
-  def new(%Spell{} = spell, %Targets{} = targets, now) when is_integer(now) do
+  def new(%Spell{} = spell, %Target{} = targets, now) when is_integer(now) do
     cast_time_ms = normalize_time(spell.cast_time_ms)
     channel_ms = if Spell.attribute?(spell, :channeled), do: normalize_time(spell.duration_ms), else: 0
     channel_tick_ms = if channel_ms > 0, do: Spell.channel_tick_ms(spell)

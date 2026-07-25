@@ -7,9 +7,11 @@ defmodule ThistleTea.Game.Entity.Logic.SpellTarget do
   """
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Effect
-  alias ThistleTea.Game.Spell.Targets
+  alias ThistleTea.Game.Spell.Target
 
-  def target_query(%Spell{} = spell, %Targets{} = targets) do
+  def target_query(%Spell{} = spell, %Target{} = targets) do
+    unit_guid = Target.unit_guid(targets)
+
     cond do
       caster_aoe_spell?(spell) ->
         {:caster_aoe, max_aoe_radius(spell)}
@@ -24,10 +26,10 @@ defmodule ThistleTea.Game.Entity.Logic.SpellTarget do
         {:party_aoe, max_aoe_radius(spell)}
 
       raid_class_aoe_spell?(spell) ->
-        {:party_class_aoe, targets.unit_guid, raid_class_radius(spell)}
+        {:party_class_aoe, unit_guid, raid_class_radius(spell)}
 
-      is_integer(targets.unit_guid) ->
-        {:unit, targets.unit_guid}
+      is_integer(unit_guid) ->
+        {:unit, unit_guid}
 
       true ->
         :none
@@ -76,13 +78,13 @@ defmodule ThistleTea.Game.Entity.Logic.SpellTarget do
     Enum.any?(effects, &effect_targets?(&1, [:aoe_enemy_in_cone]))
   end
 
-  defp targeted_aoe_query(%Spell{} = spell, %Targets{} = targets) do
+  defp targeted_aoe_query(%Spell{} = spell, %Target{} = targets) do
     cond do
       not targeted_aoe_spell?(spell) ->
         nil
 
-      is_tuple(Targets.ground_location(targets)) ->
-        {:targeted_aoe, Targets.ground_location(targets), max_aoe_radius(spell)}
+      is_tuple(Target.ground_location(targets)) ->
+        {:targeted_aoe, Target.ground_location(targets), max_aoe_radius(spell)}
 
       caster_destination_spell?(spell) ->
         {:caster_aoe, max_aoe_radius(spell)}

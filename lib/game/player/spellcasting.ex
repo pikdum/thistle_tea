@@ -25,7 +25,8 @@ defmodule ThistleTea.Game.Player.Spellcasting do
   alias ThistleTea.Game.Spell.Cast
   alias ThistleTea.Game.Spell.CastValidation
   alias ThistleTea.Game.Spell.Modifiers
-  alias ThistleTea.Game.Spell.Targets
+  alias ThistleTea.Game.Spell.Target
+  alias ThistleTea.Game.Spell.TargetCodec
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.ItemStore
@@ -64,16 +65,16 @@ defmodule ThistleTea.Game.Player.Spellcasting do
   def cast_result(state, %Spell{} = spell, spell_cast_targets), do: cast_result(state, spell, spell_cast_targets, nil)
 
   def cast_result(state, %Spell{} = spell, spell_cast_targets, cast_item_guid) do
-    targets = Targets.parse(spell_cast_targets, state.guid)
+    targets = TargetCodec.parse(spell_cast_targets, state.guid)
 
     Logger.info(
       "CMSG_CAST_SPELL: #{spell.name} - #{spell.id}",
-      target_name: targets.unit_guid
+      target_name: Target.unit_guid(targets)
     )
 
     with :ok <- validate_cast(state, spell, targets),
          {:ok, state} <- Fishing.prepare_cast(state, spell) do
-      {:ok, do_cast(state, spell, spell_cast_targets, targets, cast_item_guid)}
+      {:ok, do_cast(state, spell, targets, cast_item_guid)}
     else
       {:error, reason, state} ->
         fail_cast(spell, reason)
@@ -167,7 +168,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
 
   defp clear_next_swing_spell(state), do: state
 
-  defp do_cast(state, %Spell{} = spell, spell_cast_targets, targets, cast_item_guid) do
+  defp do_cast(state, %Spell{} = spell, %Target{} = targets, cast_item_guid) do
     state = cancel(state)
     cast_time_ms = Modifiers.integer_value(state.character, spell, :casting_time, spell.cast_time_ms || 0)
 
@@ -180,7 +181,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
       spell: spell.id,
       flags: 0x2,
       timer: cast_time_ms,
-      targets: spell_cast_targets,
+      targets: targets,
       ammo_display_id: nil,
       ammo_inventory_type: nil
     }
@@ -196,7 +197,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
     end
   end
 
-  defp validate_cast(%{character: character} = state, %Spell{} = spell, %Targets{} = targets) do
+  defp validate_cast(%{character: character} = state, %Spell{} = spell, %Target{} = targets) do
     CastValidation.validate(
       character,
       spell,
@@ -241,9 +242,12 @@ defmodule ThistleTea.Game.Player.Spellcasting do
     end
   end
 
-  defp feed_context(%Character{unit: %Unit{summon: pet_guid}} = character, %Spell{effects: effects}, %Targets{
-         item_guid: item_guid
-       }) do
+  defp feed_context(
+         %Character{unit: %Unit{summon: pet_guid}} = character,
+         %Spell{effects: effects},
+         %Target{} = targets
+       ) do
+    item_guid = Target.item_guid(targets)
     feed_pet? = Enum.any?(effects, &(&1.type == :feed_pet))
 
     if feed_pet? do
@@ -282,7 +286,8 @@ defmodule ThistleTea.Game.Player.Spellcasting do
 
   defp equipped_weapon_templates(_character), do: []
 
-  defp build_target_info(%{guid: caster_guid, character: character}, %Spell{} = spell, %Targets{unit_guid: unit_guid}) do
+  defp build_target_info(%{guid: caster_guid, character: character}, %Spell{} = spell, %Target{} = targets) do
+    unit_guid = Target.unit_guid(targets)
     explicit_guid = nonself_guid(unit_guid, caster_guid)
     pet_guid = implicit_pet_guid(character, spell)
 
@@ -305,8 +310,10 @@ defmodule ThistleTea.Game.Player.Spellcasting do
   defp duel_context(
          %Character{object: %{guid: caster_guid}, internal: %{area: caster_area, world: caster_world}},
          %Spell{} = spell,
-         %Targets{unit_guid: target_guid}
+         %Target{} = targets
        ) do
+    target_guid = Target.unit_guid(targets)
+
     if Spell.duel?(spell) and is_integer(target_guid) do
       target = Metadata.query(target_guid, [:area, :world]) || %{}
 

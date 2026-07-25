@@ -4,6 +4,7 @@ defmodule ThistleTea.Game.Entity.Logic.EffectsTest do
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
+  alias ThistleTea.Game.Spell.Target
 
   describe "monster_move/1" do
     test "returns a monster movement event with packet options" do
@@ -18,9 +19,11 @@ defmodule ThistleTea.Game.Entity.Logic.EffectsTest do
   end
 
   describe "spell_go/4" do
-    test "returns a spell go event with resolved hits and raw targets" do
-      assert %Effects.SpellGo{source_guid: 1, spell_id: 133, hit_guids: [2], raw_targets: <<1, 2>>} =
-               Effects.spell_go(1, 133, [2], <<1, 2>>)
+    test "returns a spell go event with resolved hits and semantic targets" do
+      target = Target.unit(2)
+
+      assert %Effects.SpellGo{source_guid: 1, spell_id: 133, hit_guids: [2], targets: ^target} =
+               Effects.spell_go(1, 133, [2], target)
     end
   end
 
