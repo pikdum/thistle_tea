@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Respawn do
   hide the mob immediately and ride the same respawn timer back in.
   """
   alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Pet
   alias ThistleTea.Game.Entity.Data.Component.Internal.Spawn
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.AI.BT
@@ -24,6 +25,17 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Respawn do
   alias ThistleTea.Game.World.Visibility
 
   @default_delay_ms 120_000
+  @ooc_gated_despawn_types [1, 2, 4]
+
+  def summon_despawn_blocked?(%Mob{internal: %Internal{} = internal}) do
+    charm_suspends_despawn?(internal.pet) or (internal.in_combat == true and ooc_gated_despawn?(internal.spawn))
+  end
+
+  defp charm_suspends_despawn?(%Pet{kind: :charmed}), do: true
+  defp charm_suspends_despawn?(_pet), do: false
+
+  defp ooc_gated_despawn?(%Spawn{despawn_type: despawn_type}), do: despawn_type in @ooc_gated_despawn_types
+  defp ooc_gated_despawn?(_spawn), do: false
 
   def schedule(%Mob{internal: %Internal{spawn: %Spawn{respawn_ref: ref}}} = state) when is_reference(ref) do
     state

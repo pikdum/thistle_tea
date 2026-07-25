@@ -3,6 +3,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob.RespawnTest do
 
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Internal.Loot
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Pet
   alias ThistleTea.Game.Entity.Data.Component.Internal.Spawn
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Object
@@ -57,6 +58,28 @@ defmodule ThistleTea.Game.Entity.Server.Mob.RespawnTest do
     end
   end
 
+  describe "summon_despawn_blocked?/1" do
+    test "blocks while the summon is charm-controlled" do
+      mob = fixture_mob(despawn_type: 3, pet: %Pet{owner_guid: 5, kind: :charmed})
+
+      assert Respawn.summon_despawn_blocked?(mob)
+    end
+
+    test "blocks ooc-gated despawn types while in combat" do
+      mob = fixture_mob(despawn_type: 1, in_combat: true)
+
+      assert Respawn.summon_despawn_blocked?(mob)
+      refute Respawn.summon_despawn_blocked?(fixture_mob(despawn_type: 1))
+      refute Respawn.summon_despawn_blocked?(fixture_mob(despawn_type: 3, in_combat: true))
+    end
+
+    test "does not block owned pets that are not charmed" do
+      mob = fixture_mob(despawn_type: 3, pet: %Pet{owner_guid: 5, kind: :summon})
+
+      refute Respawn.summon_despawn_blocked?(mob)
+    end
+  end
+
   defp fixture_mob(opts \\ []) do
     %Mob{
       object: %Object{guid: 1},
@@ -68,10 +91,13 @@ defmodule ThistleTea.Game.Entity.Server.Mob.RespawnTest do
       movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
       internal: %Internal{
         world: %WorldRef{map_id: 0},
+        in_combat: Keyword.get(opts, :in_combat, false),
+        pet: Keyword.get(opts, :pet),
         spawn: %Spawn{
           respawn_delay_ms: Keyword.get(opts, :respawn_delay_ms, 1_000),
           respawn_ref: Keyword.get(opts, :respawn_ref),
-          respawn_pending?: Keyword.get(opts, :respawn_pending?, false)
+          respawn_pending?: Keyword.get(opts, :respawn_pending?, false),
+          despawn_type: Keyword.get(opts, :despawn_type)
         },
         loot: %Loot{}
       }

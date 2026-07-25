@@ -13,9 +13,11 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.ControlSync do
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.Entity.Logic.Movement
+  alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Spell
 
   @unit_flag_possessed 0x01000000
+  @unit_flag_player_controlled 0x00000008
 
   def sync(entity), do: sync(entity, 0)
 
@@ -73,6 +75,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.ControlSync do
           | charmed_by: holder.caster_guid,
             faction_template: faction_template,
             npc_flags: 0,
+            flags: controlled_unit_flags(mob.unit.flags || 0, holder.caster_guid),
             target: 0
         },
         internal: %{
@@ -97,7 +100,8 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.ControlSync do
           mob.unit
           | charmed_by: 0,
             faction_template: pet.original_faction_template,
-            npc_flags: pet.original_npc_flags
+            npc_flags: pet.original_npc_flags,
+            flags: Bitwise.band(mob.unit.flags || 0, Bitwise.bnot(@unit_flag_player_controlled))
         },
         internal: %{mob.internal | pet: nil}
     }
@@ -137,7 +141,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.ControlSync do
           | charmed_by: holder.caster_guid,
             faction_template: faction_template,
             npc_flags: 0,
-            flags: Bitwise.bor(mob.unit.flags || 0, @unit_flag_possessed),
+            flags: controlled_unit_flags(Bitwise.bor(mob.unit.flags || 0, @unit_flag_possessed), holder.caster_guid),
             target: 0
         },
         internal: %{
@@ -257,4 +261,12 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.ControlSync do
 
   defp original_value(%Pet{} = pet, field, fallback), do: Map.get(pet, field) || fallback
   defp original_value(_pet, _field, fallback), do: fallback
+
+  defp controlled_unit_flags(flags, caster_guid) do
+    if Guid.entity_type(caster_guid) == :player do
+      Bitwise.bor(flags, @unit_flag_player_controlled)
+    else
+      flags
+    end
+  end
 end

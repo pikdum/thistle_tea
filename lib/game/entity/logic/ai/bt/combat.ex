@@ -253,6 +253,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
 
     %{
       caster: guid,
+      caster_owner_guid: caster_owner_guid(state),
       min_damage: min_damage,
       max_damage: max_damage,
       threat_multiplier: Aura.percent_multiplier(state, :mod_threat, Spell.school_mask(:physical))
@@ -260,6 +261,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
     |> Map.merge(AttackTable.attacker_context(state))
     |> Map.merge(attack_skill_context(state))
   end
+
+  defp caster_owner_guid(%{internal: %{pet: %{owner_guid: owner_guid}}}) when is_integer(owner_guid), do: owner_guid
+  defp caster_owner_guid(%{object: %{guid: guid}}), do: guid
 
   defp attack_skill_context(%Character{unit: unit, player: player}) when is_struct(player) do
     default = Skills.max_for_level(unit.level || 1)

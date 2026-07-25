@@ -70,7 +70,6 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   @creature_flag_extra_no_assist 0x00010000
   @dynamic_flag_tapped 0x0004
   @summon_despawn_retry_ms 10_000
-  @ooc_gated_despawn_types [1, 2, 4]
 
   def start_link(%Mob{} = state) do
     GenServer.start_link(__MODULE__, state, name: EntityRegistry.via(state.object.guid))
@@ -549,7 +548,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   end
 
   def handle_info(:summon_despawn, %Mob{} = state) do
-    if state.internal.in_combat and ooc_gated_despawn?(state) do
+    if Respawn.summon_despawn_blocked?(state) do
       Process.send_after(self(), :summon_despawn, @summon_despawn_retry_ms)
       {:noreply, state}
     else
@@ -710,12 +709,6 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   end
 
   defp schedule_summon_despawn(%Mob{} = state), do: state
-
-  defp ooc_gated_despawn?(%Mob{internal: %Internal{spawn: %Spawn{despawn_type: despawn_type}}}) do
-    despawn_type in @ooc_gated_despawn_types
-  end
-
-  defp ooc_gated_despawn?(%Mob{}), do: false
 
   defp release_victim(%Mob{internal: %Internal{in_combat: true}, unit: %Unit{target: target}})
        when is_integer(target) and target > 0 do

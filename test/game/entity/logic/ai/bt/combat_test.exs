@@ -44,9 +44,40 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.CombatTest do
                %Event{
                  type: :deliver_attack,
                  target_guid: ^target_guid,
-                 attack: %{caster: 1, min_damage: 3, max_damage: 3, damage: 3}
+                 attack: %{caster: 1, caster_owner_guid: 1, min_damage: 3, max_damage: 3, damage: 3}
                }
              ] = mob.internal.events
+    end
+
+    test "attributes pet swings to the owning player" do
+      target_guid = 2
+      owner_guid = Guid.from_low_guid(:player, 9)
+      SpatialHash.update(:players, target_guid, 0, 1.0, 0.0, 0.0)
+      on_exit(fn -> SpatialHash.remove(:players, target_guid) end)
+
+      pet = %Mob{
+        object: %Object{guid: 1},
+        unit: %Unit{
+          target: target_guid,
+          min_damage: 3,
+          max_damage: 3,
+          combat_reach: 1.0,
+          base_attack_time: 1_000
+        },
+        internal: %Internal{
+          world: %WorldRef{map_id: 0},
+          in_combat: true,
+          pet: %Internal.Pet{owner_guid: owner_guid, kind: :charmed}
+        },
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
+      }
+
+      blackboard = %Blackboard{attack_started: true, next_attack_at: 0}
+
+      assert {:success, pet, %Blackboard{}} = Combat.melee_attack(pet, blackboard, 1_000)
+
+      assert [%Event{type: :deliver_attack, attack: %{caster: 1, caster_owner_guid: ^owner_guid}}] =
+               pet.internal.events
     end
 
     test "queues independent main-hand and off-hand swings for dual wielders" do

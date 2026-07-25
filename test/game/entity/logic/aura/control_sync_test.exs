@@ -1,6 +1,8 @@
 defmodule ThistleTea.Game.Entity.Logic.Aura.ControlSyncTest do
   use ExUnit.Case, async: true
 
+  import Bitwise, only: [&&&: 2]
+
   alias ThistleTea.Game.Aura
   alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.Character
@@ -68,9 +70,39 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.ControlSyncTest do
 
       assert possessed.internal.pet.kind == :possessed
       assert possessed.internal.pet.possessed?
+      assert (possessed.unit.flags &&& 0x01000000) != 0
+      assert (possessed.unit.flags &&& 0x00000008) != 0
       assert restored.internal.pet == nil
       assert restored.unit.faction_template == 14
       assert restored.unit.npc_flags == 3
+      assert restored.unit.flags == 0
+    end
+
+    test "charming a mob flags it player-controlled and strips the flag on release" do
+      mob = %Mob{
+        object: %Object{guid: 20},
+        unit: %Unit{auras: [holder(:mod_charm)], faction_template: 14, npc_flags: 3, flags: 0x1000},
+        internal: %Internal{}
+      }
+
+      {charmed, [grant]} = ControlSync.sync(mob)
+
+      assert charmed.internal.pet.kind == :charmed
+      assert charmed.internal.pet.owner_guid == 10
+      assert charmed.unit.charmed_by == 10
+      assert charmed.unit.faction_template == 35
+      assert (charmed.unit.flags &&& 0x00000008) != 0
+      assert (charmed.unit.flags &&& 0x1000) != 0
+      assert grant.type == :control_granted
+
+      {released, [release]} = ControlSync.sync(%{charmed | unit: %{charmed.unit | auras: []}})
+
+      assert released.internal.pet == nil
+      assert released.unit.charmed_by == 0
+      assert released.unit.faction_template == 14
+      assert (released.unit.flags &&& 0x00000008) == 0
+      assert (released.unit.flags &&& 0x1000) != 0
+      assert release.type == :control_released
     end
 
     test "new control stops the mob's current movement path" do
