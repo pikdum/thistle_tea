@@ -313,6 +313,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
 
     %{entity | unit: unit, internal: internal, movement_block: movement_block}
     |> maybe_dismiss_pet()
+    |> maybe_release_charm()
     |> Combat.sync_combat_flag()
   end
 
@@ -322,6 +323,13 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
   end
 
   defp maybe_dismiss_pet(entity), do: entity
+
+  defp maybe_release_charm(%{player: _player, object: %{guid: guid}, unit: %Unit{charm: charm}} = entity)
+       when is_integer(charm) and charm > 0 do
+    Event.enqueue(entity, Event.release_controlled(guid, charm))
+  end
+
+  defp maybe_release_charm(entity), do: entity
 
   defp spirit_damage_immune?(entity, opts) do
     Keyword.get(opts, :spell_id) != @spirit_of_redemption_suicide and holder_spell?(entity, @spirit_of_redemption_form)

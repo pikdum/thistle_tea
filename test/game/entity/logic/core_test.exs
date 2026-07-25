@@ -122,6 +122,18 @@ defmodule ThistleTea.Game.Entity.Logic.CoreTest do
 
       refute Enum.any?(entity.internal.events, &match?(%Event{type: :dismiss_pet}, &1))
     end
+
+    test "queues a charm release when a player dies while controlling a unit" do
+      entity = player_with_pet(health: 30, summon: 0)
+      entity = %{entity | unit: %{entity.unit | charm: 555}}
+
+      {entity, _absorbed} = Core.take_damage_with_absorb(entity, 30, 1_000, source: 777)
+
+      assert Enum.any?(
+               entity.internal.events,
+               &match?(%Event{type: :release_controlled, source_guid: 6, target_guid: 555, spell_id: nil}, &1)
+             )
+    end
   end
 
   describe "take_damage_with_absorb/4 aura cleanup" do

@@ -434,6 +434,15 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     {:noreply, EventSink.emit(state, events), {:continue, :maybe_broadcast}}
   end
 
+  def handle_info(
+        {:release_control, owner_guid, nil},
+        %Mob{internal: %Internal{pet: %Pet{kind: :charmed, owner_guid: owner_guid, control_spell_id: spell_id}}} = state
+      )
+      when is_integer(spell_id) do
+    {state, events} = Aura.remove_source_spell(state, spell_id, owner_guid, Time.now())
+    {:noreply, EventSink.emit(state, events), {:continue, :maybe_broadcast}}
+  end
+
   def handle_info({:release_control, _owner_guid, _spell_id}, state), do: {:noreply, state}
 
   def handle_info(:respawn, %Mob{} = state) do

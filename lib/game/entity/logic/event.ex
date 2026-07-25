@@ -608,8 +608,8 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
     %__MODULE__{type: :control_released, source_guid: owner_guid, target_guid: controlled_guid}
   end
 
-  def release_controlled(owner_guid, controlled_guid, spell_id)
-      when is_integer(owner_guid) and is_integer(controlled_guid) and is_integer(spell_id) do
+  def release_controlled(owner_guid, controlled_guid, spell_id \\ nil)
+      when is_integer(owner_guid) and is_integer(controlled_guid) and (is_integer(spell_id) or is_nil(spell_id)) do
     %__MODULE__{
       type: :release_controlled,
       source_guid: owner_guid,
