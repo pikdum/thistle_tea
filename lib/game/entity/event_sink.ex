@@ -1075,11 +1075,10 @@ defmodule ThistleTea.Game.Entity.EventSink do
 
     with %Mob{} = built <-
            SummonLoader.build(entry, world, position, despawn_type: 1, despawn_delay_ms: duration_ms),
+         built = SummonLoader.attach_owner(built, owner_guid),
          unit = %{
            built.unit
-           | summoned_by: owner_guid,
-             created_by: owner_guid,
-             faction_template: entity.unit.faction_template,
+           | faction_template: entity.unit.faction_template,
              level: entity.unit.level
          },
          totem = %{
@@ -1336,7 +1335,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
   end
 
   defp put_summon_owner(%Mob{} = mob, %{owner_guid: owner_guid}) when is_integer(owner_guid) do
-    %{mob | unit: %{mob.unit | summoned_by: owner_guid, created_by: owner_guid}}
+    SummonLoader.attach_owner(mob, owner_guid)
   end
 
   defp put_summon_owner(%Mob{} = mob, _summon), do: mob

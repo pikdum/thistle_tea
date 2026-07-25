@@ -6,7 +6,7 @@ defmodule ThistleTea.Game.World.Loader.Summon do
   later summons build without touching the database. Summoned mob guids get
   a session-unique low guid offset far above the seed data's spawn guids.
   """
-  import Bitwise, only: [&&&: 2]
+  import Bitwise, only: [&&&: 2, |||: 2]
   import Ecto.Query
 
   alias ThistleTea.DB.Mangos
@@ -26,6 +26,7 @@ defmodule ThistleTea.Game.World.Loader.Summon do
   @table_options [:named_table, :public, read_concurrency: true, write_concurrency: :auto]
   @low_guid_base 0x400000
   @spell_attr_passive 0x40
+  @unit_flag_player_controlled 0x00000008
 
   def init(table \\ __MODULE__) do
     case :ets.whereis(table) do
@@ -67,8 +68,6 @@ defmodule ThistleTea.Game.World.Loader.Summon do
           %{
             unit
             | summon: 0,
-              summoned_by: owner_guid,
-              created_by: owner_guid,
               faction_template: owner_unit.faction_template,
               pet_number: Guid.low_guid(guid),
               pet_name_timestamp: System.system_time(:second),
@@ -94,6 +93,7 @@ defmodule ThistleTea.Game.World.Loader.Summon do
       }
 
       %{mob | object: %{mob.object | guid: guid}, unit: unit, internal: internal}
+      |> attach_owner(owner_guid)
       |> apply_pet_passive_auras(entry, level)
     else
       _ -> nil
@@ -101,6 +101,28 @@ defmodule ThistleTea.Game.World.Loader.Summon do
   end
 
   def build_pet(_entry, _owner), do: nil
+
+  def attach_owner(%Mob{} = mob, owner_guid) when is_integer(owner_guid) do
+    %{
+      mob
+      | unit: %{
+          mob.unit
+          | summoned_by: owner_guid,
+            created_by: owner_guid,
+            flags: owner_unit_flags(mob.unit.flags, owner_guid)
+        }
+    }
+  end
+
+  def attach_owner(%Mob{} = mob, _owner_guid), do: mob
+
+  defp owner_unit_flags(flags, owner_guid) do
+    if Guid.entity_type(owner_guid) == :player do
+      (flags || 0) ||| @unit_flag_player_controlled
+    else
+      flags
+    end
+  end
 
   defp apply_pet_passive_auras(%Mob{} = mob, entry, level) do
     entry
@@ -152,8 +174,6 @@ defmodule ThistleTea.Game.World.Loader.Summon do
     unit = %{
       mob.unit
       | charmed_by: owner_guid,
-        summoned_by: owner_guid,
-        created_by: owner_guid,
         created_by_spell: spell_id,
         faction_template: owner_unit.faction_template,
         npc_flags: 0,
@@ -170,7 +190,7 @@ defmodule ThistleTea.Game.World.Loader.Summon do
         running: true
     }
 
-    %{mob | unit: unit, internal: internal}
+    %{mob | unit: unit, internal: internal} |> attach_owner(owner_guid)
   end
 
   def pet_spellbook(entry, level) when is_integer(entry) and is_integer(level) do

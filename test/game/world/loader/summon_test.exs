@@ -1,6 +1,8 @@
 defmodule ThistleTea.Game.World.Loader.SummonTest do
   use ExUnit.Case, async: false
 
+  import Bitwise, only: [&&&: 2]
+
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
@@ -30,6 +32,7 @@ defmodule ThistleTea.Game.World.Loader.SummonTest do
       assert pet.unit.health == 558
       assert pet.unit.max_power1 == 1450
       assert pet.unit.summoned_by == owner_guid
+      assert (pet.unit.flags &&& 0x00000008) != 0
       assert pet.unit.faction_template == owner.unit.faction_template
       assert pet.internal.pet.owner_guid == owner_guid
       assert pet.internal.pet.profile == :combat
