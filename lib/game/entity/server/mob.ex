@@ -526,22 +526,17 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
   def handle_info(
         {:pet_cast, spell_id, target_guid},
-        %Mob{internal: %Internal{pet: %Pet{}, spellbook: spellbook}} = state
+        %Mob{internal: %Internal{pet: %Pet{owner_guid: owner_guid}}} = state
       )
       when is_integer(spell_id) do
-    known? = Map.has_key?(spellbook, spell_id)
-
     state =
-      with true <- known?,
-           %Spell{} = spell <- SpellLoader.load(spell_id),
-           true <- valid_pet_spell_target?(state, spell, target_guid) do
-        target_guid = if is_integer(target_guid) and target_guid > 0, do: target_guid, else: state.object.guid
-        blackboard = Blackboard.from_any(state.internal.blackboard)
-        entry = %CreatureSpell{spell_id: spell_id, cast_target: if(Spell.harmful?(spell), do: :victim, else: :self)}
-        {state, blackboard} = MobSpells.attempt_scripted_cast(state, blackboard, entry, target_guid, Time.now())
-        %{state | internal: %{state.internal | blackboard: blackboard}}
-      else
-        _ -> state
+      case pet_cast(state, spell_id, target_guid) do
+        {:ok, state} ->
+          state
+
+        {:error, reason} ->
+          Network.send_packet(%Message.SmsgPetCastFailed{spell_id: spell_id, reason: reason}, owner_guid)
+          state
       end
 
     {:noreply, wake_ai_tick(state), {:continue, :maybe_broadcast}}
@@ -1025,10 +1020,32 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     end
   end
 
-  defp valid_pet_spell_target?(_state, %Spell{} = spell, target_guid) when target_guid in [0, nil],
-    do: not Spell.requires_hostile_target?(spell)
+  defp pet_cast(%Mob{internal: %Internal{spellbook: spellbook}} = state, spell_id, target_guid) do
+    with %Spell{} = spell <- if(Map.has_key?(spellbook, spell_id), do: SpellLoader.load(spell_id)),
+         :ok <- check_pet_spell_target(state, spell, target_guid) do
+      target_guid = if is_integer(target_guid) and target_guid > 0, do: target_guid, else: state.object.guid
+      blackboard = Blackboard.from_any(state.internal.blackboard)
+      entry = %CreatureSpell{spell_id: spell_id, cast_target: if(Spell.harmful?(spell), do: :victim, else: :self)}
 
-  defp valid_pet_spell_target?(state, %Spell{} = spell, target_guid) do
-    not Spell.requires_hostile_target?(spell) or Hostility.valid_attack_target?(state, target_guid)
+      case MobSpells.attempt_commanded_cast(state, blackboard, entry, target_guid, Time.now()) do
+        {:ok, {state, blackboard}} -> {:ok, %{state | internal: %{state.internal | blackboard: blackboard}}}
+        {:error, reason} -> {:error, reason}
+      end
+    else
+      {:error, reason} -> {:error, reason}
+      _ -> {:error, :not_known}
+    end
+  end
+
+  defp check_pet_spell_target(_state, %Spell{} = spell, target_guid) when target_guid in [0, nil] do
+    if Spell.requires_hostile_target?(spell), do: {:error, :bad_implicit_targets}, else: :ok
+  end
+
+  defp check_pet_spell_target(state, %Spell{} = spell, target_guid) do
+    if not Spell.requires_hostile_target?(spell) or Hostility.valid_attack_target?(state, target_guid) do
+      :ok
+    else
+      {:error, :bad_targets}
+    end
   end
 end

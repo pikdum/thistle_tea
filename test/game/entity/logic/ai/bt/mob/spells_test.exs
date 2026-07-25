@@ -151,6 +151,40 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.SpellsTest do
     end
   end
 
+  describe "attempt_commanded_cast/5" do
+    test "starts the cast when validation passes" do
+      target_guid = hostile_player(20.0)
+      spell = fireball()
+      entry = entry(spell.id, cast_target: :victim)
+      state = fixture_mob(spellbook: %{spell.id => spell}) |> with_target(target_guid)
+
+      assert {:ok, {state, %Blackboard{}}} =
+               MobSpells.attempt_commanded_cast(state, %Blackboard{}, entry, target_guid, 1_000)
+
+      assert %{spell: %Spell{id: 20_793}} = state.internal.casting
+    end
+
+    test "returns the cast validation failure reason" do
+      target_guid = hostile_player(100.0)
+      spell = fireball()
+      entry = entry(spell.id, cast_target: :victim)
+      state = fixture_mob(spellbook: %{spell.id => spell}) |> with_target(target_guid)
+
+      assert {:error, :out_of_range} =
+               MobSpells.attempt_commanded_cast(state, %Blackboard{}, entry, target_guid, 1_000)
+    end
+
+    test "rejects targets outside the spell's creature type mask" do
+      target_guid = hostile_player(10.0)
+      spell = %{fireball() | target_creature_type_mask: 0x40}
+      entry = entry(spell.id, cast_target: :victim)
+      state = fixture_mob(spellbook: %{spell.id => spell}) |> with_target(target_guid)
+
+      assert {:error, :bad_targets} =
+               MobSpells.attempt_commanded_cast(state, %Blackboard{}, entry, target_guid, 1_000)
+    end
+  end
+
   describe "main-ranged stance" do
     test "a successful main-ranged cast disables combat movement and stops melee" do
       target_guid = hostile_player(25.0)

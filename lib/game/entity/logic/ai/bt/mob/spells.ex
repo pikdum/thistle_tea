@@ -139,6 +139,14 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells do
 
   def attempt_scripted_cast(%Mob{} = state, %Blackboard{} = blackboard, %CreatureSpell{} = entry, target_guid, now)
       when is_integer(now) do
+    case attempt_commanded_cast(state, blackboard, entry, target_guid, now) do
+      {:ok, result} -> result
+      {:error, _reason} -> {state, blackboard}
+    end
+  end
+
+  def attempt_commanded_cast(%Mob{} = state, %Blackboard{} = blackboard, %CreatureSpell{} = entry, target_guid, now)
+      when is_integer(now) do
     spell = lookup_spell(state, entry.spell_id)
 
     with true <- is_integer(target_guid) and not is_nil(spell),
@@ -146,9 +154,11 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells do
          {:ok, state} <- release_previous_cast(state, entry),
          targets = Targets.unit(target_guid),
          :ok <- CastValidation.validate(state, spell, targets, build_target_info(state, target_guid), now) do
-      {scripted_cast(state, spell, targets, target_guid, now), blackboard}
+      {:ok, {scripted_cast(state, spell, targets, target_guid, now), blackboard}}
     else
-      _ -> {state, blackboard}
+      {:error, reason} -> {:error, reason}
+      :busy -> {:error, :spell_in_progress}
+      _ -> {:error, :bad_targets}
     end
   end
 

@@ -87,6 +87,55 @@ defmodule ThistleTea.Game.Network.Message.PetMessagesTest do
       assert Message.CmsgPetAction.handle(message, state) == state
       assert_receive {:pet_command, :follow, 0}
     end
+
+    test "rejects an attack command without a target" do
+      pet_guid = 125
+      Entity.register(pet_guid)
+      on_exit(fn -> Entity.unregister(pet_guid) end)
+
+      message = %Message.CmsgPetAction{pet_guid: pet_guid, action: 2, action_type: 0x07, target_guid: 0}
+      state = %{character: %Character{unit: %Unit{summon: pet_guid}}}
+
+      assert Message.CmsgPetAction.handle(message, state) == state
+      assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgPetActionFeedback{feedback: :nothing_to_attack}}}
+      refute_receive {:pet_command, :attack, _target}, 10
+    end
+
+    test "rejects an attack command against an invalid target" do
+      pet_guid = 126
+      target_guid = 127
+      Entity.register(pet_guid)
+      Metadata.put(target_guid, %{alive?: false})
+
+      on_exit(fn ->
+        Entity.unregister(pet_guid)
+        Metadata.delete(target_guid)
+      end)
+
+      message = %Message.CmsgPetAction{pet_guid: pet_guid, action: 2, action_type: 0x07, target_guid: target_guid}
+      state = %{character: %Character{unit: %Unit{summon: pet_guid}}}
+
+      assert Message.CmsgPetAction.handle(message, state) == state
+      assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgPetActionFeedback{feedback: :cant_attack_target}}}
+      refute_receive {:pet_command, :attack, _target}, 10
+    end
+  end
+
+  describe "SMSG_PET_ACTION_FEEDBACK" do
+    test "encodes the feedback code as a single byte" do
+      assert Message.SmsgPetActionFeedback.to_binary(Message.SmsgPetActionFeedback.new(:pet_dead)) == <<1>>
+      assert Message.SmsgPetActionFeedback.to_binary(Message.SmsgPetActionFeedback.new(:nothing_to_attack)) == <<2>>
+      assert Message.SmsgPetActionFeedback.to_binary(Message.SmsgPetActionFeedback.new(:cant_attack_target)) == <<3>>
+      assert Message.SmsgPetActionFeedback.to_binary(Message.SmsgPetActionFeedback.new(:no_path_to)) == <<4>>
+    end
+  end
+
+  describe "SMSG_PET_CAST_FAILED" do
+    test "encodes spell id, fail status, and reason code" do
+      message = %Message.SmsgPetCastFailed{spell_id: 6358, reason: :bad_targets}
+
+      assert Message.SmsgPetCastFailed.to_binary(message) == <<6358::little-size(32), 2, 0x0A>>
+    end
   end
 
   describe "SMSG_PET_SPELLS" do

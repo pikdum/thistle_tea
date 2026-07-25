@@ -51,10 +51,24 @@ defmodule ThistleTea.Game.Network.Message.CmsgPetAction do
   defp dispatch(_pid, _message), do: :ok
 
   defp valid_action?(character, %__MODULE__{action_type: @act_command, action: 2, target_guid: target_guid}) do
-    Hostility.valid_attack_target?(character, target_guid)
+    cond do
+      not (is_integer(target_guid) and target_guid > 0) ->
+        reject_attack(:nothing_to_attack)
+
+      not Hostility.valid_attack_target?(character, target_guid) ->
+        reject_attack(:cant_attack_target)
+
+      true ->
+        true
+    end
   end
 
   defp valid_action?(_character, _message), do: true
+
+  defp reject_attack(feedback) do
+    Network.send_packet(Message.SmsgPetActionFeedback.new(feedback))
+    false
+  end
 
   defp command(0), do: :stay
   defp command(1), do: :follow
