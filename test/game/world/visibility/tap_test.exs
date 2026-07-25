@@ -37,12 +37,13 @@ defmodule ThistleTea.Game.World.Visibility.TapTest do
   end
 
   describe "personalize/3" do
-    test "hides the sparkle from a tapper who cannot use the only quest drop", context do
+    test "marks the corpse as another player's tap when the only quest drop is unusable", context do
       publish(context, quest_loot())
 
       flags = personalize(context, character_without_quest())
 
       assert (flags &&& @dynamic_flag_lootable) == 0
+      assert (flags &&& @dynamic_flag_tapped) != 0
     end
 
     test "keeps the sparkle for a tapper on the quest", context do
@@ -51,6 +52,7 @@ defmodule ThistleTea.Game.World.Visibility.TapTest do
       flags = personalize(context, character_on_quest())
 
       assert (flags &&& @dynamic_flag_lootable) != 0
+      assert (flags &&& @dynamic_flag_tapped) == 0
     end
 
     test "keeps the sparkle when general loot remains", context do
@@ -59,6 +61,7 @@ defmodule ThistleTea.Game.World.Visibility.TapTest do
       flags = personalize(context, character_without_quest())
 
       assert (flags &&& @dynamic_flag_lootable) != 0
+      assert (flags &&& @dynamic_flag_tapped) == 0
     end
 
     test "keeps the sparkle when only gold remains", context do
@@ -78,12 +81,26 @@ defmodule ThistleTea.Game.World.Visibility.TapTest do
       assert (flags &&& @dynamic_flag_tapped) != 0
     end
 
+    test "hides the sparkle from a group member who is not the round-robin looter", context do
+      Metadata.put(context.mob_guid, %{
+        tapped_player: context.viewer,
+        assigned_looter: context.viewer + 1,
+        loot_summary: Loot.summary(%Loot{gold: 42})
+      })
+
+      flags = personalize(context, character_without_quest())
+
+      assert (flags &&& @dynamic_flag_lootable) == 0
+      assert (flags &&& @dynamic_flag_tapped) != 0
+    end
+
     test "leaves the flags alone without a published loot summary", context do
       Metadata.put(context.mob_guid, %{tapped_player: context.viewer})
 
       flags = personalize(context, character_without_quest())
 
       assert (flags &&& @dynamic_flag_lootable) != 0
+      assert (flags &&& @dynamic_flag_tapped) == 0
     end
   end
 

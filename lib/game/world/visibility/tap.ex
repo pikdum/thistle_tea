@@ -4,6 +4,11 @@ defmodule ThistleTea.Game.World.Visibility.Tap do
   marker from the tapping player/group and the loot sparkle from players
   without loot rights or without anything they can actually take, mirroring
   how mangos personalizes UNIT_DYNAMIC_FLAGS per recipient.
+
+  A viewer with nothing to take sees the corpse as tapped by somebody else;
+  the client draws the loot cursor for any dead creature it does not believe
+  is another player's tap, so clearing the sparkle alone leaves the hover
+  icon behind.
   """
   import Bitwise
 
@@ -36,15 +41,17 @@ defmodule ThistleTea.Game.World.Visibility.Tap do
 
   defp adjust(flags, mob_guid, viewer, character) do
     meta = Metadata.query(mob_guid, [:tapped_player, :tapped_group_id, :assigned_looter, :loot_summary]) || %{}
-    tap_eligible? = tap_eligible?(meta, viewer)
-
-    loot_eligible? =
-      tap_eligible? and Map.get(meta, :assigned_looter) in [nil, viewer] and
-        takeable?(Map.get(meta, :loot_summary), character)
+    loot_eligible? = loot_eligible?(meta, viewer, character)
 
     flags
-    |> clear_if(@dynamic_flag_tapped, tap_eligible?)
+    |> clear_if(@dynamic_flag_tapped, loot_eligible?)
+    |> set_if(@dynamic_flag_tapped, not loot_eligible?)
     |> clear_if(@dynamic_flag_lootable, not loot_eligible?)
+  end
+
+  defp loot_eligible?(meta, viewer, character) do
+    tap_eligible?(meta, viewer) and Map.get(meta, :assigned_looter) in [nil, viewer] and
+      takeable?(Map.get(meta, :loot_summary), character)
   end
 
   defp takeable?(%{gold?: true}, _character), do: true
@@ -75,4 +82,7 @@ defmodule ThistleTea.Game.World.Visibility.Tap do
 
   defp clear_if(flags, bit, true), do: flags &&& bnot(bit)
   defp clear_if(flags, _bit, false), do: flags
+
+  defp set_if(flags, bit, true), do: flags ||| bit
+  defp set_if(flags, _bit, false), do: flags
 end
