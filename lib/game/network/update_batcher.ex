@@ -3,20 +3,25 @@ defmodule ThistleTea.Game.Network.UpdateBatcher do
   Coalesces queued update-object casts from the connection handler's mailbox
   into one SMSG_UPDATE_OBJECT packet, deduping values blocks so a guid never
   appears twice in a single send (older blocks lose to the newest).
+
+  Every update — including the ones drained out of the mailbox — goes through
+  the caller's `personalize` function, so per-recipient field rewrites cannot
+  be skipped by coalescing.
   """
   alias ThistleTea.Game.Network.UpdateObject
 
   @update_batch_max 100
 
-  def batch(%UpdateObject{} = update, recipient_guid) do
-    updates = accumulate(update)
+  def batch(%UpdateObject{} = update, recipient_guid, personalize \\ & &1) do
+    updates = accumulate(update, personalize)
     {UpdateObject.to_packet(updates, recipient_guid), updates}
   end
 
-  defp accumulate(%UpdateObject{} = update) do
+  defp accumulate(%UpdateObject{} = update, personalize) do
     [update]
     |> drain_pending(1)
     |> Enum.reverse()
+    |> Enum.map(personalize)
     |> dedupe_values()
   end
 
