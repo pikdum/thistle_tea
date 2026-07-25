@@ -5,7 +5,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgAttackswing do
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Hostility
-  alias ThistleTea.Game.Network.PlayerTick
+  alias ThistleTea.Game.Entity.Server.Player.TickScheduler
   alias ThistleTea.Game.World.SpatialHash
 
   require Logger
@@ -28,7 +28,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgAttackswing do
 
       state
       |> Map.put(:character, character)
-      |> PlayerTick.schedule_now()
+      |> TickScheduler.schedule_now()
     else
       send_attack_stop(state, target_guid)
     end

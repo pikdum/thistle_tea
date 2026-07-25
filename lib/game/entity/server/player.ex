@@ -43,12 +43,12 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.Entity.Logic.StealthDetection
   alias ThistleTea.Game.Entity.Server.Player.PacketSink
   alias ThistleTea.Game.Entity.Server.Player.State
+  alias ThistleTea.Game.Entity.Server.Player.TickScheduler
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.InventoryUpdate
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.MovementControl
-  alias ThistleTea.Game.Network.PlayerTick
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.Party.MemberStats
   alias ThistleTea.Game.Party.Notifier, as: PartyNotifier
@@ -282,13 +282,13 @@ defmodule ThistleTea.Game.Entity.Server.Player do
 
   def handle_cast({:threat_ref_gained, mob_guid, incarnation_id}, %{character: %Character{} = character} = state) do
     character = PlayerCombat.gain_threat_ref(character, mob_guid, incarnation_id)
-    state = PlayerTick.ensure_scheduled(%{state | character: character})
+    state = TickScheduler.ensure_scheduled(%{state | character: character})
     {:noreply, state, {:continue, :maybe_broadcast_update}}
   end
 
   def handle_cast({:threat_ref_lost, mob_guid, incarnation_id}, %{character: %Character{} = character} = state) do
     character = PlayerCombat.lose_threat_ref(character, mob_guid, incarnation_id)
-    state = PlayerTick.ensure_scheduled(%{state | character: character})
+    state = TickScheduler.ensure_scheduled(%{state | character: character})
     {:noreply, state}
   end
 
@@ -306,7 +306,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
       end
 
     state = %{state | character: character}
-    state = if harmful?, do: PlayerTick.ensure_scheduled(state), else: state
+    state = if harmful?, do: TickScheduler.ensure_scheduled(state), else: state
     if harmful?, do: notify_defensive_pet(character, spell_caster_guid(caster))
 
     {:noreply, state, {:continue, :maybe_broadcast_update}}
@@ -317,7 +317,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
     character = PlayerCombat.mark_attacked(character, now)
     {character, events} = SpellEffect.receive_outcome(character, caster_guid, spell, outcome, now)
     character = EventSink.emit(character, events)
-    state = state |> Map.put(:character, character) |> PlayerTick.ensure_scheduled()
+    state = %{state | character: character} |> TickScheduler.ensure_scheduled()
     notify_defensive_pet(character, caster_guid)
 
     {:noreply, state, {:continue, :maybe_broadcast_update}}
@@ -883,7 +883,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
     PartyNotifier.broadcast_stats(state.guid, character)
     internal = %{character.internal | broadcast_update?: false}
     character = %{character | internal: internal}
-    PlayerTick.ensure_scheduled(%{state | character: character})
+    TickScheduler.ensure_scheduled(%{state | character: character})
   end
 
   defp do_broadcast_update(state), do: state

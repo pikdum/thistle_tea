@@ -15,11 +15,11 @@ defmodule ThistleTea.Game.Player.Spellcasting do
   alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Entity.Logic.MeleeSpell
   alias ThistleTea.Game.Entity.Logic.Warlock
+  alias ThistleTea.Game.Entity.Server.Player.TickScheduler
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.BinaryUtils
   alias ThistleTea.Game.Network.Message
-  alias ThistleTea.Game.Network.PlayerTick
   alias ThistleTea.Game.Player.Fishing
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Cast
@@ -190,9 +190,9 @@ defmodule ThistleTea.Game.Player.Spellcasting do
     state = %{state | character: character} |> Fishing.start_cast(spell)
 
     cond do
-      Spell.attribute?(spell, :on_next_swing) -> PlayerTick.schedule_now(state)
+      Spell.attribute?(spell, :on_next_swing) -> TickScheduler.schedule_now(state)
       cast_time_ms == 0 and not Spell.attribute?(spell, :channeled) -> complete(state)
-      true -> PlayerTick.schedule_now(state)
+      true -> TickScheduler.schedule_now(state)
     end
   end
 
@@ -426,7 +426,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
   defp lookup_spell(_state, _spell_id), do: nil
 
   defp schedule_tick_for_auras(%{character: %{unit: %Unit{auras: [_ | _]}}} = state) do
-    PlayerTick.schedule_now(state)
+    TickScheduler.schedule_now(state)
   end
 
   defp schedule_tick_for_auras(state), do: state

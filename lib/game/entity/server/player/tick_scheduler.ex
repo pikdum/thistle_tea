@@ -1,6 +1,6 @@
-defmodule ThistleTea.Game.Network.PlayerTick do
+defmodule ThistleTea.Game.Entity.Server.Player.TickScheduler do
   @moduledoc """
-  Schedules `:player_tick` messages on the network handler when the tick
+  Schedules `:player_tick` messages on the owning player process when the tick
   policy (`Logic.AI.Tick`) says the player needs behavior-tree ticking.
   """
   alias ThistleTea.Game.Entity.Data.Character
