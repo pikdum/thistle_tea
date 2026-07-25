@@ -17,8 +17,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells do
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
-  alias ThistleTea.Game.Entity.Logic.AI.BT.Spell, as: SpellBT
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
+  alias ThistleTea.Game.Entity.Logic.Casting
   alias ThistleTea.Game.Entity.Logic.Combat, as: CombatLogic
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Effects
@@ -166,7 +166,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells do
 
   defp release_previous_cast(%Mob{} = state, %CreatureSpell{} = entry) do
     if CreatureSpell.flag?(entry, :interrupt_previous) do
-      {:ok, SpellBT.clear_cast(state)}
+      {:ok, Casting.cancel(state)}
     else
       :busy
     end
@@ -177,7 +177,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells do
       state
       |> prepare_to_cast(spell, target_guid, now)
       |> Effects.enqueue(Effects.spell_start(state.object.guid, spell.id, spell.cast_time_ms || 0, targets))
-      |> SpellBT.start_cast(spell, targets, now)
+      |> Casting.start(spell, targets, now)
 
     finish_if_instant(state, spell, now)
   end
@@ -186,7 +186,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells do
 
   defp finish_if_instant(%Mob{} = state, %Spell{} = spell, now) do
     if (spell.cast_time_ms || 0) == 0 and not Spell.attribute?(spell, :channeled) do
-      SpellBT.complete_cast(state, now)
+      Casting.complete(state, now)
     else
       state
     end
@@ -237,7 +237,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells do
       state
       |> prepare_to_cast(spell, target_guid, now)
       |> Effects.enqueue(Effects.spell_start(state.object.guid, spell.id, spell.cast_time_ms || 0, targets))
-      |> SpellBT.start_cast(spell, targets, now)
+      |> Casting.start(spell, targets, now)
 
     finish_or_schedule(state, blackboard, spell, now)
   end
@@ -248,7 +248,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells do
 
   defp finish_or_schedule(%Mob{} = state, blackboard, %Spell{} = spell, now) do
     if (spell.cast_time_ms || 0) == 0 and not Spell.attribute?(spell, :channeled) do
-      {:cast, :failure, SpellBT.complete_cast(state, now), blackboard}
+      {:cast, :failure, Casting.complete(state, now), blackboard}
     else
       {:cast, BT.running(cast_wake_delay(spell), :casting), state, blackboard}
     end

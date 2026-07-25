@@ -14,8 +14,8 @@ defmodule ThistleTea.Game.Entity.Logic.WarlockSpellsTest do
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Data.ScriptStep
   alias ThistleTea.Game.Entity.Logic.AI.BT.Pet, as: PetBT
-  alias ThistleTea.Game.Entity.Logic.AI.BT.Spell, as: SpellBT
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
+  alias ThistleTea.Game.Entity.Logic.Casting
   alias ThistleTea.Game.Entity.Logic.Combat
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.SpellEffect
@@ -414,7 +414,7 @@ defmodule ThistleTea.Game.Entity.Logic.WarlockSpellsTest do
 
       caster = character()
       caster = %{caster | unit: %{caster.unit | target: 9}}
-      caster = SpellBT.start_cast(caster, ritual, Target.none(), 1_000)
+      caster = Casting.start(caster, ritual, Target.none(), 1_000)
 
       assert Enum.any?(caster.internal.events, fn event ->
                is_struct(event, Effects.SummonGameObject) and event.entry == 36_727 and event.target_guid == 9 and
@@ -430,7 +430,7 @@ defmodule ThistleTea.Game.Entity.Logic.WarlockSpellsTest do
         effects: []
       }
 
-      caster = SpellBT.start_cast(character(), ritual, Target.none(), 1_000)
+      caster = Casting.start(character(), ritual, Target.none(), 1_000)
 
       caster = %{
         caster
@@ -441,7 +441,7 @@ defmodule ThistleTea.Game.Entity.Logic.WarlockSpellsTest do
           }
       }
 
-      caster = SpellBT.clear_cast(caster)
+      caster = Casting.cancel(caster)
 
       assert caster.internal.channel_game_object_guid == nil
       assert Enum.any?(caster.internal.events, &(is_struct(&1, Effects.DespawnEntity) and &1.target_guid == 77))
@@ -450,8 +450,8 @@ defmodule ThistleTea.Game.Entity.Logic.WarlockSpellsTest do
     test "helper channel cancellation releases the participant without despawning the portal" do
       visual = %Spell{id: 698, duration_ms: 120_000, attributes: MapSet.new([:channeled])}
 
-      helper = SpellBT.start_game_object_channel(character(), 77, visual, 120_000, 1_000)
-      helper = SpellBT.clear_cast(helper)
+      helper = Casting.start_game_object_channel(character(), 77, visual, 120_000, 1_000)
+      helper = Casting.cancel(helper)
 
       assert Enum.any?(helper.internal.events, fn event ->
                is_struct(event, Effects.LeaveRitual) and event.target_guid == 77 and event.source_guid == 1
@@ -463,8 +463,8 @@ defmodule ThistleTea.Game.Entity.Logic.WarlockSpellsTest do
     test "portal completion clears a helper channel without releasing it again" do
       visual = %Spell{id: 698, duration_ms: 120_000, attributes: MapSet.new([:channeled])}
 
-      helper = SpellBT.start_game_object_channel(character(), 77, visual, 120_000, 1_000)
-      helper = SpellBT.finish_game_object_channel(helper, 77)
+      helper = Casting.start_game_object_channel(character(), 77, visual, 120_000, 1_000)
+      helper = Casting.finish_game_object_channel(helper, 77)
 
       assert helper.internal.casting == nil
       assert helper.unit.channel_object == 0
@@ -727,8 +727,8 @@ defmodule ThistleTea.Game.Entity.Logic.WarlockSpellsTest do
       }
 
       caster = character(summon: 2)
-      caster = SpellBT.start_cast(caster, spell, Target.none(), 1_000)
-      caster = SpellBT.clear_cast(caster)
+      caster = Casting.start(caster, spell, Target.none(), 1_000)
+      caster = Casting.cancel(caster)
 
       assert Enum.any?(caster.internal.events, fn event ->
                is_struct(event, Effects.RemoveAura) and event.source_guid == 1 and event.target_guid == 2 and

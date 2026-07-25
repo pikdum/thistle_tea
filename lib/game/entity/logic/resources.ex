@@ -33,6 +33,29 @@ defmodule ThistleTea.Game.Entity.Logic.Resources do
 
   def spend_power(entity, _spell, _now), do: entity
 
+  def spend_cost(%{internal: %Internal{godmode: true}} = entity, power_type, _amount, _now)
+      when power_type in [@mana_power_type, @health_power_type], do: entity
+
+  def spend_cost(entity, power_type, amount, now) when is_integer(amount) and amount >= 0 and is_integer(now) do
+    do_spend(entity, power_type, amount, now)
+  end
+
+  def spend_cost(entity, _power_type, _amount, _now), do: entity
+
+  def can_pay_cost?(%{internal: %Internal{godmode: true}}, power_type, _amount)
+      when power_type in [@mana_power_type, @health_power_type], do: true
+
+  def can_pay_cost?(%{unit: %Unit{health: health}}, @health_power_type, amount) when is_integer(amount) do
+    amount == 0 or (is_integer(health) and health > amount)
+  end
+
+  def can_pay_cost?(%{unit: %Unit{} = unit}, power_type, amount) when is_integer(amount) do
+    power = Map.get(unit, Map.get(@power_fields, power_type))
+    amount == 0 or (is_integer(power) and power >= amount)
+  end
+
+  def can_pay_cost?(_entity, _power_type, amount), do: amount == 0
+
   def can_pay_channel_cost?(%{internal: %Internal{godmode: true}}, %Spell{}, _tick_ms), do: true
 
   def can_pay_channel_cost?(

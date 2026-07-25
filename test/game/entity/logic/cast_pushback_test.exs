@@ -201,7 +201,7 @@ defmodule ThistleTea.Game.Entity.Logic.CastPushbackTest do
 
   defp channeling_character(spell, now, opts \\ []) do
     caster = casting_character(spell, now, opts)
-    casting = %{caster.internal.casting | channel_started?: true}
+    casting = %{caster.internal.casting | phase: :channel_tick}
     unit = %{caster.unit | channel_object: Keyword.get(opts, :channel_object, 0), channel_spell: spell.id}
     %{caster | unit: unit, internal: %{caster.internal | casting: casting}}
   end

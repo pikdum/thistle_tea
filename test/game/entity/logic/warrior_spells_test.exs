@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Entity.Logic.WarriorSpellsTest do
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.AttackTable
   alias ThistleTea.Game.Entity.Logic.Aura
+  alias ThistleTea.Game.Entity.Logic.Casting
   alias ThistleTea.Game.Entity.Logic.Combat
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Effects
@@ -801,8 +802,6 @@ defmodule ThistleTea.Game.Entity.Logic.WarriorSpellsTest do
     end
 
     test "completing a charge cast queues the charge movement event" do
-      alias ThistleTea.Game.Entity.Logic.AI.BT.Spell, as: SpellBT
-
       spell = %Spell{
         id: 100,
         name: "Charge",
@@ -815,7 +814,7 @@ defmodule ThistleTea.Game.Entity.Logic.WarriorSpellsTest do
       casting = Cast.new(spell, Target.unit(9), 1_000)
       character = %{character | internal: %{character.internal | casting: casting}}
 
-      character = SpellBT.complete_cast(character, 1_000)
+      character = Casting.complete(character, 1_000)
 
       assert Enum.any?(character.internal.events, &(is_struct(&1, Effects.Charge) and &1.target_guid == 9))
     end

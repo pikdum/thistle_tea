@@ -6,7 +6,7 @@ defmodule ThistleTea.Game.Player.Fishing do
   alias ThistleTea.Game.Entity.Data.Component.Internal.Fishing, as: FishingState
   alias ThistleTea.Game.Entity.Data.GameObject
   alias ThistleTea.Game.Entity.EventSink
-  alias ThistleTea.Game.Entity.Logic.AI.BT.Spell, as: SpellBT
+  alias ThistleTea.Game.Entity.Logic.Casting
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Skills
@@ -58,17 +58,17 @@ defmodule ThistleTea.Game.Player.Fishing do
     case Entity.call(bobber_guid, {:fishing_use, state.guid, skill}) do
       {:ok, loot, _catch} ->
         character = advance_skill(character)
-        character = character |> SpellBT.clear_cast() |> EventSink.emit_pending()
+        character = character |> Casting.cancel() |> EventSink.emit_pending()
         Network.send_packet(%Message.SmsgLootResponse{guid: bobber_guid, loot: loot, loot_type: @loot_type_fishing})
         %{state | character: character, loot_guid: bobber_guid}
 
       {:error, :not_hooked} ->
-        character = character |> SpellBT.clear_cast() |> EventSink.emit_pending()
+        character = character |> Casting.cancel() |> EventSink.emit_pending()
         Network.send_packet(%Message.SmsgFishNotHooked{})
         %{state | character: character}
 
       {:error, :escaped} ->
-        character = character |> SpellBT.clear_cast() |> EventSink.emit_pending()
+        character = character |> Casting.cancel() |> EventSink.emit_pending()
         Network.send_packet(%Message.SmsgFishEscaped{})
         %{state | character: character}
 

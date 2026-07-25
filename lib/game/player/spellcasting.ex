@@ -10,7 +10,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Item, as: DataItem
   alias ThistleTea.Game.Entity.EventSink
-  alias ThistleTea.Game.Entity.Logic.AI.BT.Spell, as: SpellBT
+  alias ThistleTea.Game.Entity.Logic.Casting
   alias ThistleTea.Game.Entity.Logic.Hostility
   alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Entity.Logic.MeleeSpell
@@ -91,7 +91,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
   def complete(%{character: character} = state) do
     character =
       character
-      |> SpellBT.complete_cast(Time.now())
+      |> Casting.complete(Time.now())
       |> EventSink.emit_pending()
 
     state
@@ -144,7 +144,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
         character =
           character
           |> Fishing.cancel_bobber()
-          |> SpellBT.clear_cast()
+          |> Casting.cancel()
           |> EventSink.emit_pending()
 
         state
@@ -187,7 +187,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
     }
     |> World.broadcast_packet(state.character)
 
-    character = SpellBT.start_cast(state.character, spell, targets, Time.now(), cast_item_guid)
+    character = Casting.start(state.character, spell, targets, Time.now(), cast_item_guid)
     state = %{state | character: character} |> Fishing.start_cast(spell)
 
     cond do

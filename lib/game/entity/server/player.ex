@@ -20,11 +20,11 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.Entity.Data.Item, as: DataItem
   alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.Logic.AI.BT
-  alias ThistleTea.Game.Entity.Logic.AI.BT.Spell, as: SpellBT
   alias ThistleTea.Game.Entity.Logic.AI.Tick
   alias ThistleTea.Game.Entity.Logic.AttackFeedback
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.BoundaryResult
+  alias ThistleTea.Game.Entity.Logic.Casting
   alias ThistleTea.Game.Entity.Logic.Combat
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Death
@@ -246,13 +246,13 @@ defmodule ThistleTea.Game.Entity.Server.Player do
         {:start_game_object_channel, game_object_guid, %Spell{} = spell, duration_ms},
         %{character: %Character{} = character} = state
       ) do
-    character = SpellBT.start_game_object_channel(character, game_object_guid, spell, duration_ms, Time.now())
+    character = Casting.start_game_object_channel(character, game_object_guid, spell, duration_ms, Time.now())
     character = EventSink.emit_pending(character)
     {:noreply, %{state | character: character}, {:continue, :maybe_broadcast_update}}
   end
 
   def handle_cast({:finish_game_object_channel, game_object_guid}, %{character: %Character{} = character} = state) do
-    character = SpellBT.finish_game_object_channel(character, game_object_guid)
+    character = Casting.finish_game_object_channel(character, game_object_guid)
     character = EventSink.emit_pending(character)
     {:noreply, %{state | character: character}, {:continue, :maybe_broadcast_update}}
   end

@@ -1,4 +1,4 @@
-defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
+defmodule ThistleTea.Game.Entity.Logic.CastingTest do
   use ExUnit.Case, async: true
 
   alias ThistleTea.Game.Aura, as: AuraData
@@ -12,22 +12,28 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AI.BT.Spell, as: SpellBT
   alias ThistleTea.Game.Entity.Logic.Aura
+  alias ThistleTea.Game.Entity.Logic.Casting
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Cast
+  alias ThistleTea.Game.Spell.CastResolution
+  alias ThistleTea.Game.Spell.CastResolution.Costs
+  alias ThistleTea.Game.Spell.CastResolution.Followups
+  alias ThistleTea.Game.Spell.CastResolution.Impact
+  alias ThistleTea.Game.Spell.CastResolution.PowerCost
   alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.Spell.Target
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.WorldRef
 
-  describe "start_cast/4" do
+  describe "start/5" do
     test "queues on-next-swing spells instead of starting a cast" do
       spell = %Spell{id: 78, attributes: MapSet.new([:on_next_swing])}
       mob = %Mob{internal: %Internal{}}
 
-      mob = SpellBT.start_cast(mob, spell, Target.none(), 1_000)
+      mob = Casting.start(mob, spell, Target.none(), 1_000)
 
       assert mob.internal.next_swing_spell == spell
       assert mob.internal.casting == nil
@@ -44,10 +50,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
 
       mob = %Mob{object: %Object{guid: 1}, unit: %Unit{target: 7}, internal: %Internal{}}
 
-      mob = SpellBT.start_cast(mob, spell, Target.none(), 1_000)
+      mob = Casting.start(mob, spell, Target.none(), 1_000)
 
       assert mob.internal.casting.channel_ms == 8_000
-      assert mob.internal.casting.channel_started?
+      assert mob.internal.casting.phase == :channel_tick
       assert mob.internal.casting.channel_tick_ms == 2_000
       assert mob.internal.casting.next_channel_tick_at == 3_000
       assert mob.unit.channel_spell == 10
@@ -61,6 +67,41 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
              ] = mob.internal.events
     end
 
+    test "snapshots one resolution for launch and channel ticks" do
+      spell = %Spell{
+        id: 5143,
+        power_type: 0,
+        mana_cost: 10,
+        mana_cost_per_second: 5,
+        duration_ms: 3_000,
+        attributes: MapSet.new([:channeled]),
+        effects: [%Effect{implicit_target_a: :caster, amplitude_ms: 1_000}]
+      }
+
+      mob = %Mob{
+        object: %Object{guid: 1},
+        unit: %Unit{level: 10, power1: 50, max_power1: 50},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+        internal: %Internal{world: %WorldRef{map_id: 0}}
+      }
+
+      mob = Casting.start(mob, spell, Target.unit(1), 1_000)
+      resolution = mob.internal.casting.resolution
+
+      assert %CastResolution{
+               hits: [1],
+               costs: %Costs{
+                 power: %PowerCost{power_type: 0, amount: 10},
+                 channel_power: %PowerCost{power_type: 0, amount: 5}
+               },
+               impacts: [%Impact{target_guid: 1, target_role: :caster}]
+             } = resolution
+
+      assert {:waiting, mob, _delay_ms} = Casting.advance(mob, 2_000)
+      assert mob.internal.casting.resolution == resolution
+      assert mob.unit.power1 == 35
+    end
+
     test "applies DBC casting-time modifiers selected by effect class mask" do
       modifier = %Holder{
         spell: %Spell{id: 22_812, spell_family: 7},
@@ -69,7 +110,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
 
       spell = %Spell{id: 5185, spell_family: 7, family_flags_0: 0x4, cast_time_ms: 1_500}
       mob = %Mob{object: %Object{guid: 1}, unit: %Unit{auras: [modifier]}, internal: %Internal{}}
-      mob = SpellBT.start_cast(mob, spell, Target.none(), 1_000)
+      mob = Casting.start(mob, spell, Target.none(), 1_000)
 
       assert mob.internal.casting.cast_time_ms == 2_500
       assert mob.internal.casting.ends_at == 3_500
@@ -92,12 +133,12 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
         internal: %Internal{world: %WorldRef{map_id: 0}}
       }
 
-      mob = SpellBT.start_cast(mob, spell, Target.unit(1), 1_000)
+      mob = Casting.start(mob, spell, Target.unit(1), 1_000)
 
       assert mob.internal.casting.cast_time_ms == 0
       assert mob.internal.casting.modifier_holder_ids == [12_043]
 
-      mob = SpellBT.complete_cast(mob, 1_000)
+      mob = Casting.complete(mob, 1_000)
 
       assert mob.unit.auras == []
     end
@@ -126,7 +167,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
         internal: %Internal{}
       }
 
-      mob = SpellBT.start_cast(mob, spell, Target.none(), 1_000)
+      mob = Casting.start(mob, spell, Target.none(), 1_000)
 
       assert mob.unit.power1 == 100
       assert mob.unit.auras == []
@@ -142,14 +183,14 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
       }
 
       mob = %Mob{object: %Object{guid: 1}, unit: %Unit{}, internal: %Internal{}}
-      mob = SpellBT.start_cast(mob, spell, Target.none(), 1_000)
+      mob = Casting.start(mob, spell, Target.none(), 1_000)
 
-      refute mob.internal.casting.channel_started?
+      assert mob.internal.casting.phase == :preparing
       assert mob.unit.channel_spell in [nil, 0]
       assert mob.internal.events in [nil, []]
 
       assert {{:running, 1_000}, mob, %Blackboard{}} = SpellBT.cast_tick(mob, Blackboard.new(), 4_000)
-      assert mob.internal.casting.channel_started?
+      assert mob.internal.casting.phase == :channel_tick
       assert mob.unit.channel_spell == 605
       assert Enum.any?(mob.internal.events, &is_struct(&1, Effects.ChannelStart))
     end
@@ -167,7 +208,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
             spell: spell,
             targets: Target.none(),
             channel_ms: 8_000,
-            channel_started?: true,
+            phase: :channel_tick,
+            resolution: channel_resolution(),
             ends_at: now - 1
           }
         }
@@ -208,7 +250,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
             spell: spell,
             targets: Target.unit(1),
             channel_ms: 3_000,
-            channel_started?: true,
+            phase: :channel_tick,
+            resolution: channel_resolution(),
             channel_tick_ms: 1_000,
             next_channel_tick_at: now - 1,
             ends_at: now + 3_000
@@ -253,7 +296,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
             spell: spell,
             targets: Target.unit(1),
             channel_ms: 8_000,
-            channel_started?: true,
+            phase: :channel_tick,
+            resolution: channel_resolution(),
             channel_tick_ms: 1_000,
             next_channel_tick_at: now - 1,
             ends_at: 9_000
@@ -289,7 +333,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
             spell: spell,
             targets: Target.unit(1),
             channel_ms: 10_000,
-            channel_started?: true,
+            phase: :channel_tick,
+            resolution: channel_resolution(channel_power: %PowerCost{power_type: -2, amount: 33}),
             channel_tick_ms: 1_000,
             next_channel_tick_at: now - 1,
             ends_at: now + 10_000
@@ -317,7 +362,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
             spell: spell,
             targets: Target.unit(1),
             channel_ms: 5_000,
-            channel_started?: true,
+            phase: :channel_tick,
+            resolution: channel_resolution(),
             channel_tick_ms: 1_000,
             next_channel_tick_at: now - 1,
             ends_at: now + 5_000
@@ -325,14 +371,14 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
         }
       }
 
-      assert {{:running, 50}, mob, %Blackboard{}} = SpellBT.cast_tick(mob, Blackboard.new(), now)
+      assert {:success, mob, %Blackboard{}} = SpellBT.cast_tick(mob, Blackboard.new(), now)
       assert mob.internal.casting == nil
       assert mob.unit.channel_object == 0
       assert mob.unit.channel_spell == 0
     end
   end
 
-  describe "complete_cast/3" do
+  describe "complete/3" do
     test "queues a take-side outcome when a hostile magic spell is fully resisted" do
       caster_guid = Guid.from_low_guid(:mob, 1, System.unique_integer([:positive]))
       target_guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
@@ -385,7 +431,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
       }
 
       :rand.seed(:exsss, {1, 2, 3})
-      mob = SpellBT.complete_cast(mob, casting, 1_000)
+      mob = Casting.complete(mob, casting, 1_000)
 
       assert [
                %Effects.SpellCastResult{spell_id: 116},
@@ -447,7 +493,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
       }
 
       :rand.seed(:exsss, {1, 1, 66})
-      missed = SpellBT.complete_cast(mob, casting, 1_000)
+      missed = Casting.complete(mob, casting, 1_000)
 
       assert Enum.any?(missed.internal.events, fn
                %Effects.SpellGo{hit_guids: [], misses: [%{guid: ^target_guid, reason: 2}]} -> true
@@ -457,7 +503,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
       Metadata.update(target_guid, %{attacker_spell_hit_chance: []})
 
       :rand.seed(:exsss, {1, 1, 66})
-      hit = SpellBT.complete_cast(mob, casting, 1_000)
+      hit = Casting.complete(mob, casting, 1_000)
 
       assert Enum.any?(hit.internal.events, fn
                %Effects.SpellGo{hit_guids: [^target_guid], misses: []} -> true
@@ -481,7 +527,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
         internal: %Internal{world: %WorldRef{map_id: 0}, casting: casting}
       }
 
-      mob = SpellBT.complete_cast(mob, casting, 1_000)
+      mob = Casting.complete(mob, casting, 1_000)
 
       assert mob.internal.casting == nil
 
@@ -510,7 +556,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
       }
 
       casting = %Cast{spell: spell, targets: targets, started_at: 1_000, ends_at: 1_000, modifier_holder_ids: [14_751]}
-      mob = SpellBT.complete_cast(mob, casting, 1_000)
+      mob = Casting.complete(mob, casting, 1_000)
 
       assert mob.unit.power1 == 100
       assert mob.unit.auras == []
@@ -532,7 +578,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
         internal: %Internal{world: %WorldRef{map_id: 0}, casting: casting}
       }
 
-      mob = SpellBT.complete_cast(mob, casting, 1_000)
+      mob = Casting.complete(mob, casting, 1_000)
 
       assert Enum.any?(mob.internal.events, fn event ->
                is_struct(event, Effects.OpenGameObject) and event.target_guid == 0xF110_0001
@@ -560,7 +606,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
         internal: %Internal{world: %WorldRef{map_id: 0}, casting: casting}
       }
 
-      mob = SpellBT.complete_cast(mob, casting, 1_000)
+      mob = Casting.complete(mob, casting, 1_000)
 
       assert Enum.any?(mob.internal.events, fn event ->
                is_struct(event, Effects.EnchantItem) and event.target_guid == 0x4000_002A and event.spell == spell and
@@ -584,7 +630,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
         internal: %Internal{world: %WorldRef{map_id: 0}, casting: casting}
       }
 
-      mob = SpellBT.complete_cast(mob, casting, 1_000)
+      mob = Casting.complete(mob, casting, 1_000)
 
       assert mob.unit.health == 15
 
@@ -611,7 +657,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
         internal: %Internal{world: %WorldRef{map_id: 0}, casting: casting}
       }
 
-      mob = SpellBT.complete_cast(mob, casting, 1_000)
+      mob = Casting.complete(mob, casting, 1_000)
 
       assert [
                %Effects.SpellCastResult{},
@@ -639,7 +685,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
         internal: %Internal{world: %WorldRef{map_id: 0}, casting: casting}
       }
 
-      character = SpellBT.complete_cast(character, casting, 1_000)
+      character = Casting.complete(character, casting, 1_000)
 
       assert Enum.any?(character.internal.events, fn
                %Effects.FeedPet{cast_item_guid: 22, target_guid: 33, spell_id: 1539, range_yards: 10.0} ->
@@ -682,7 +728,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
         internal: %Internal{world: %WorldRef{map_id: 0}, casting: casting}
       }
 
-      mob = SpellBT.complete_cast(mob, casting, 1_000)
+      mob = Casting.complete(mob, casting, 1_000)
 
       assert Enum.any?(mob.internal.events, fn
                %Effects.SpawnAreaEffect{position: {10.0, 20.0, 30.0}, duration_ms: 8_000, spell: %Spell{id: 2120}} ->
@@ -714,7 +760,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
         internal: %Internal{world: %WorldRef{map_id: 0}, casting: casting}
       }
 
-      mob = SpellBT.complete_cast(mob, casting, 1_000)
+      mob = Casting.complete(mob, casting, 1_000)
 
       refute Enum.any?(mob.internal.events, &is_struct(&1, Effects.SpawnAreaEffect))
     end
@@ -749,7 +795,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
         internal: %Internal{world: %WorldRef{map_id: 0}, casting: casting}
       }
 
-      mob = SpellBT.complete_cast(mob, casting, 1_000)
+      mob = Casting.complete(mob, casting, 1_000)
 
       assert Enum.any?(mob.internal.events, &match?(%Effects.SpawnAreaEffect{position: {4.0, 5.0, 6.0}}, &1))
     end
@@ -774,7 +820,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
         internal: %Internal{world: %WorldRef{map_id: 0}, casting: casting}
       }
 
-      mob = SpellBT.complete_cast(mob, casting, 1_000)
+      mob = Casting.complete(mob, casting, 1_000)
 
       assert Enum.any?(mob.internal.events, fn
                %Effects.SpawnFarsight{position: {10.0, 20.0, 30.0}, duration_ms: 60_000} -> true
@@ -811,7 +857,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
         internal: %Internal{world: %WorldRef{map_id: 0}}
       }
 
-      mob = SpellBT.start_cast(mob, spell, Target.none(), now)
+      mob = Casting.start(mob, spell, Target.none(), now)
       {mob, _events} = Aura.apply_spell(mob, 1, 1, spell, now)
       assert length(mob.unit.auras) == 1
 
@@ -819,5 +865,29 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.SpellTest do
       {mob, _events} = Aura.tick(mob, now + 8_001)
       assert mob.unit.auras == []
     end
+  end
+
+  defp channel_resolution(opts \\ []) do
+    %CastResolution{
+      hits: [1],
+      misses: [],
+      costs: %Costs{
+        power: %PowerCost{power_type: nil, amount: 0},
+        channel_power: Keyword.get(opts, :channel_power, %PowerCost{power_type: nil, amount: 0}),
+        reagents: [],
+        ammo: [],
+        cast_item_guid: nil,
+        modifier_holder_ids: []
+      },
+      impacts: [%Impact{target_guid: 1, target_role: :caster}],
+      followups: %Followups{
+        packet_hits: [1],
+        selected_unit_guid: 1,
+        object_guid: nil,
+        item_guid: nil,
+        ground_position: nil,
+        area_position: nil
+      }
+    }
   end
 end

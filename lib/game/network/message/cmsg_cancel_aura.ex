@@ -3,8 +3,8 @@ defmodule ThistleTea.Game.Network.Message.CmsgCancelAura do
   use ThistleTea.Game.Network.ClientMessage, :CMSG_CANCEL_AURA
 
   alias ThistleTea.Game.Entity.EventSink
-  alias ThistleTea.Game.Entity.Logic.AI.BT.Spell, as: SpellBT
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
+  alias ThistleTea.Game.Entity.Logic.Casting
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Spell
@@ -52,7 +52,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgCancelAura do
          spell_id
        ) do
     if Spell.attribute?(spell, :channeled) do
-      SpellBT.clear_cast(character)
+      Casting.cancel(character)
     else
       character
     end

@@ -23,6 +23,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   alias ThistleTea.Game.Entity.Logic.AI.EventAI
   alias ThistleTea.Game.Entity.Logic.AI.Script
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
+  alias ThistleTea.Game.Entity.Logic.Casting
   alias ThistleTea.Game.Entity.Logic.Combat, as: CombatLogic
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Effects
@@ -687,7 +688,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
 
     state =
       state
-      |> SpellBT.clear_cast()
+      |> Casting.cancel()
       |> CombatLogic.sync_combat_flag()
       |> Effects.enqueue(clear_combat_events(state.object.guid, target))
       |> Core.mark_broadcast_update()

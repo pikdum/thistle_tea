@@ -4,18 +4,29 @@ defmodule ThistleTea.Game.Spell.Cast do
   state for channeled spells.
   """
   alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.CastResolution
   alias ThistleTea.Game.Spell.Target
+
+  @phases [:preparing, :launch, :impact, :channel_tick, :finish]
+  @phase_transitions %{
+    preparing: [:launch],
+    launch: [:impact],
+    impact: [:channel_tick, :finish],
+    channel_tick: [:finish],
+    finish: []
+  }
 
   defstruct [
     :spell,
     :targets,
+    :resolution,
     :cast_time_ms,
     :channel_ms,
     :channel_tick_ms,
     :next_channel_tick_at,
     :cast_item_guid,
+    phase: :preparing,
     modifier_holder_ids: [],
-    channel_started?: false,
     consume_item: false,
     pushback_count: 0,
     started_at: 0,
@@ -30,6 +41,7 @@ defmodule ThistleTea.Game.Spell.Cast do
     %__MODULE__{
       spell: spell,
       targets: targets,
+      resolution: nil,
       cast_time_ms: cast_time_ms,
       channel_ms: channel_ms,
       channel_tick_ms: channel_tick_ms,
@@ -41,6 +53,24 @@ defmodule ThistleTea.Game.Spell.Cast do
 
   def spell_id(%__MODULE__{spell: %Spell{id: id}}), do: id
   def spell_id(_cast), do: 0
+
+  def phases, do: @phases
+
+  def put_resolution(%__MODULE__{phase: :launch} = cast, %CastResolution{} = resolution) do
+    %{cast | resolution: resolution}
+  end
+
+  def transition(%__MODULE__{phase: phase} = cast, next_phase) when next_phase in @phases do
+    if next_phase in Map.fetch!(@phase_transitions, phase) do
+      %{cast | phase: next_phase}
+    else
+      raise ArgumentError, "invalid cast phase transition #{inspect(phase)} -> #{inspect(next_phase)}"
+    end
+  end
+
+  def launch_at(%__MODULE__{started_at: started_at, cast_time_ms: cast_time_ms}) do
+    started_at + normalize_time(cast_time_ms)
+  end
 
   def channeled?(%__MODULE__{channel_ms: channel_ms}) when is_integer(channel_ms) and channel_ms > 0, do: true
   def channeled?(_cast), do: false

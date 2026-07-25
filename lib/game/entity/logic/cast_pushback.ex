@@ -9,8 +9,8 @@ defmodule ThistleTea.Game.Entity.Logic.CastPushback do
   """
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
-  alias ThistleTea.Game.Entity.Logic.AI.BT.Spell, as: SpellBT
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
+  alias ThistleTea.Game.Entity.Logic.Casting
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Cast
@@ -28,7 +28,7 @@ defmodule ThistleTea.Game.Entity.Logic.CastPushback do
 
   def on_damage(entity, _now, _opts), do: entity
 
-  defp apply_damage_reaction(entity, %Cast{channel_started?: true, spell: %Spell{} = spell} = casting, now, source) do
+  defp apply_damage_reaction(entity, %Cast{phase: :channel_tick, spell: %Spell{} = spell} = casting, now, source) do
     cond do
       Spell.channel_delayed_on_damage?(spell) ->
         if self_damage?(entity, source) do
@@ -38,7 +38,7 @@ defmodule ThistleTea.Game.Entity.Logic.CastPushback do
         end
 
       Spell.channel_cancels_on_damage?(spell) ->
-        SpellBT.clear_cast(entity)
+        Casting.cancel(entity)
 
       true ->
         entity
@@ -50,7 +50,7 @@ defmodule ThistleTea.Game.Entity.Logic.CastPushback do
       Spell.cancels_on_damage?(spell) ->
         entity
         |> Effects.enqueue(Effects.spell_cast_failed(Cast.spell_id(casting), :interrupted))
-        |> SpellBT.clear_cast()
+        |> Casting.cancel()
 
       Spell.pushback_on_damage?(spell) ->
         maybe_push_back(entity, casting, now)
@@ -86,7 +86,7 @@ defmodule ThistleTea.Game.Entity.Logic.CastPushback do
       entity = delay_channel_auras(entity, casting, reduction, now)
 
       cond do
-        new_remaining <= 0 -> SpellBT.clear_cast(entity)
+        new_remaining <= 0 -> Casting.cancel(entity)
         reduction > 0 -> Effects.enqueue(entity, Effects.channel_update(guid, new_remaining))
         true -> entity
       end
