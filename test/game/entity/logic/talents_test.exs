@@ -9,6 +9,8 @@ defmodule ThistleTea.Game.Entity.Logic.TalentsTest do
   alias ThistleTea.Game.Entity.Logic.Talents
   alias ThistleTea.Game.World.Loader.Talent, as: TalentLoader
 
+  @moduletag :dbc_db
+
   @warrior_tab 161
 
   setup do

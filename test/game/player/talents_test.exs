@@ -11,6 +11,8 @@ defmodule ThistleTea.Game.Player.TalentsTest do
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.World.Loader.Talent, as: TalentLoader
 
+  @moduletag :dbc_db
+
   setup do
     talent_id = System.unique_integer([:positive, :monotonic])
     spell_id = talent_id + 100_000
