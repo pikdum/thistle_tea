@@ -2,16 +2,15 @@ defmodule ThistleTea.Game.Entity.EventSink.Summons do
   @moduledoc false
 
   alias ThistleTea.Game.Entity
+  alias ThistleTea.Game.Entity.Commands
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Internal.Ritual
   alias ThistleTea.Game.Entity.Data.Component.Internal.Totem
-  alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.DynamicObject, as: DataDynamicObject
   alias ThistleTea.Game.Entity.Data.GameObject
   alias ThistleTea.Game.Entity.Data.GameObjectTemplate, as: DataGameObjectTemplate
   alias ThistleTea.Game.Entity.Data.Mob
-  alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Server.DynamicObject, as: DynamicObjectServer
   alias ThistleTea.Game.Guid
@@ -54,10 +53,11 @@ defmodule ThistleTea.Game.Entity.EventSink.Summons do
 
   def emit(entity, %Effects.SpawnAreaEffect{}), do: entity
 
-  def emit(
-        %Character{object: %{guid: caster_guid}, player: player, internal: %Internal{world: world}} = entity,
-        %Effects.SpawnFarsight{spell: %Spell{} = spell, position: position, duration_ms: duration_ms}
-      ) do
+  def emit(%Character{object: %{guid: caster_guid}, internal: %Internal{world: world}} = entity, %Effects.SpawnFarsight{
+        spell: %Spell{} = spell,
+        position: position,
+        duration_ms: duration_ms
+      }) do
     dynamic_object = DataDynamicObject.build(caster_guid, world, spell, position, 0.0)
 
     World.start_entity(%{
@@ -67,10 +67,8 @@ defmodule ThistleTea.Game.Entity.EventSink.Summons do
     })
 
     Entity.request_update_from(dynamic_object.object.guid, caster_guid)
-    send(self(), {:viewpoint_granted, dynamic_object.object.guid})
-
-    %{entity | player: %{player | farsight: dynamic_object.object.guid}}
-    |> Core.mark_broadcast_update()
+    send(self(), %Commands.FarsightStarted{guid: dynamic_object.object.guid})
+    entity
   end
 
   def emit(entity, %Effects.SpawnFarsight{}), do: entity
@@ -118,8 +116,8 @@ defmodule ThistleTea.Game.Entity.EventSink.Summons do
           )
 
         World.start_entity(game_object)
-
-        track_channel_game_object(entity, game_object)
+        maybe_track_channel_game_object(game_object)
+        entity
 
       _ ->
         entity
@@ -281,8 +279,8 @@ defmodule ThistleTea.Game.Entity.EventSink.Summons do
              }
          },
          {:ok, _pid} <- MobLoader.start_mob(totem) do
-      totem_guids = Map.put(entity.internal.totem_guids, slot, totem.object.guid)
-      %{entity | internal: %{entity.internal | totem_guids: totem_guids}}
+      send(self(), %Commands.TotemStarted{slot: slot, guid: totem.object.guid})
+      entity
     else
       _ -> entity
     end
@@ -295,19 +293,11 @@ defmodule ThistleTea.Game.Entity.EventSink.Summons do
     entity
   end
 
-  defp track_channel_game_object(%{internal: %Internal{} = internal, unit: %Unit{} = unit} = entity, %GameObject{
-         object: %{guid: guid},
-         internal: %Internal{ritual: %Ritual{}}
-       }) do
-    %{
-      entity
-      | internal: %{internal | channel_game_object_guid: guid, channel_game_object_owned?: true},
-        unit: %{unit | channel_object: guid}
-    }
-    |> Core.mark_broadcast_update()
+  defp maybe_track_channel_game_object(%GameObject{object: %{guid: guid}, internal: %Internal{ritual: %Ritual{}}}) do
+    send(self(), %Commands.ChannelGameObjectStarted{guid: guid})
   end
 
-  defp track_channel_game_object(entity, %GameObject{}), do: entity
+  defp maybe_track_channel_game_object(%GameObject{}), do: :ok
 
   defp owner_level(%{unit: %{level: level}}) when is_integer(level), do: level
   defp owner_level(_entity), do: 1

@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   import Bitwise, only: [|||: 2]
 
   alias ThistleTea.Game.Entity
+  alias ThistleTea.Game.Entity.Commands
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
@@ -23,6 +24,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.Entity.Logic.AI.Tick
   alias ThistleTea.Game.Entity.Logic.AttackFeedback
   alias ThistleTea.Game.Entity.Logic.Aura
+  alias ThistleTea.Game.Entity.Logic.BoundaryResult
   alias ThistleTea.Game.Entity.Logic.Combat
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Death
@@ -578,6 +580,28 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   end
 
   @impl GenServer
+  def handle_info(%Commands.ChargePathResolved{} = command, %{character: %Character{} = character} = state) do
+    character = BoundaryResult.apply(character, command)
+    World.update_position(character)
+    {:noreply, %{state | character: character}}
+  end
+
+  def handle_info(%Commands.FarsightStarted{guid: guid} = command, %{character: %Character{} = character} = state) do
+    character = BoundaryResult.apply(character, command)
+    state = %{state | character: character} |> Visibility.set_viewpoint(guid)
+    {:noreply, state, {:continue, :maybe_broadcast_update}}
+  end
+
+  def handle_info(%Commands.ChannelGameObjectStarted{} = command, %{character: %Character{} = character} = state) do
+    character = BoundaryResult.apply(character, command)
+    {:noreply, %{state | character: character}, {:continue, :maybe_broadcast_update}}
+  end
+
+  def handle_info(%Commands.TotemStarted{} = command, %{character: %Character{} = character} = state) do
+    character = BoundaryResult.apply(character, command)
+    {:noreply, %{state | character: character}}
+  end
+
   def handle_info({:consume_cast_item, item_guid}, state) do
     state = Items.consume(state, item_guid)
     {:noreply, state}

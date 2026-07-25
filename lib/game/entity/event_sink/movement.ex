@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.Entity.EventSink.Movement do
   @moduledoc false
 
+  alias ThistleTea.Game.Entity.Commands
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Mob
@@ -119,15 +120,16 @@ defmodule ThistleTea.Game.Entity.EventSink.Movement do
           spline_flags: 0x100
       }
 
-      %{entity | movement_block: movement_block}
+      projected = %{entity | movement_block: movement_block}
+
+      projected
       |> Message.SmsgMonsterMove.build()
       |> World.broadcast_packet(entity)
 
       {dx, dy, dz} = List.last(path)
       destination = {dx, dy, dz, charge_facing({x, y}, {dx, dy})}
-      entity = %{entity | movement_block: %{entity.movement_block | position: destination}}
-      World.update_position(entity)
-
+      command = %Commands.ChargePathResolved{path: path, duration_ms: duration, destination: destination}
+      send(self(), command)
       entity
     else
       _no_path -> entity
