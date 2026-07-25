@@ -33,6 +33,8 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.Entity.Logic.Experience
   alias ThistleTea.Game.Entity.Logic.Hunter
   alias ThistleTea.Game.Entity.Logic.Inventory
+  alias ThistleTea.Game.Entity.Logic.Loot.Release
+  alias ThistleTea.Game.Entity.Logic.Loot.Reservation
   alias ThistleTea.Game.Entity.Logic.MovementStats
   alias ThistleTea.Game.Entity.Logic.PlayerCombat
   alias ThistleTea.Game.Entity.Logic.PlayerFlags
@@ -58,6 +60,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.Player.GameObjects, as: PlayerGameObjects
   alias ThistleTea.Game.Player.Items
   alias ThistleTea.Game.Player.Login
+  alias ThistleTea.Game.Player.Looting
   alias ThistleTea.Game.Player.Mail
   alias ThistleTea.Game.Player.Quests
   alias ThistleTea.Game.Player.Spellcasting
@@ -557,6 +560,17 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   def handle_info(:spell_complete, state) do
     state = Spellcasting.complete(state)
     {:noreply, state}
+  end
+
+  @impl GenServer
+  def handle_info({:loot_award, loot_guid, %Reservation{} = reservation}, state) do
+    {:noreply, Looting.accept_reservation(state, loot_guid, reservation)}
+  rescue
+    error ->
+      release = %Release{token: reservation.token, actor_guid: reservation.actor_guid}
+      Entity.loot_reservation_result(loot_guid, release)
+      Logger.error("loot award crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:noreply, state}
   end
 
   @impl GenServer

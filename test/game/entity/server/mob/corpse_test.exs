@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob.CorpseTest do
   alias ThistleTea.Game.Entity.Data.ItemTemplate
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.Loot.Actor
+  alias ThistleTea.Game.Entity.Logic.Loot.Commit
   alias ThistleTea.Game.Entity.Server.Mob.Corpse
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
@@ -74,7 +75,9 @@ defmodule ThistleTea.Game.Entity.Server.Mob.CorpseTest do
       assert {{:ok, loot}, prepared} = Corpse.view(prepared, actor(killer))
       assert [%{item_id: @grey_item_id, slot: 0}] = loot.items
 
-      assert {{:ok, _item}, looted} = Corpse.take_item(prepared, actor(killer), 0)
+      assert {{:ok, reservation}, reserved} = Corpse.reserve_item(prepared, actor(killer), 0, self())
+      commit = %Commit{token: reservation.token, actor_guid: reservation.actor_guid}
+      assert {:ok, looted} = Corpse.commit(reserved, commit)
       assert (looted.unit.dynamic_flags &&& @dynamic_flag_lootable) == 0
     end
 
@@ -84,6 +87,20 @@ defmodule ThistleTea.Game.Entity.Server.Mob.CorpseTest do
       prepared = Corpse.prepare(mob(killer), killer)
 
       assert (prepared.unit.dynamic_flags &&& @dynamic_flag_lootable) != 0
+    end
+
+    test "restores a reservation when the player owner disappears", %{killer: killer} do
+      cache_loot_rows([grey_row()])
+      prepared = Corpse.prepare(mob(killer), killer)
+      owner = spawn(fn -> receive do: (:stop -> :ok) end)
+
+      assert {{:ok, reservation}, reserved} = Corpse.reserve_item(prepared, actor(killer), 0, owner)
+      Process.exit(owner, :kill)
+      assert_receive {:DOWN, token, :process, ^owner, :killed}
+      assert token == reservation.token
+      restored = Corpse.reservation_lost(reserved, reservation.token)
+
+      assert {{:ok, _reservation}, _state} = Corpse.reserve_item(restored, actor(killer), 0, self())
     end
   end
 

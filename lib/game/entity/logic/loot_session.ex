@@ -16,6 +16,8 @@ defmodule ThistleTea.Game.Entity.Logic.LootSession do
   alias ThistleTea.Game.Entity.Logic.Experience
   alias ThistleTea.Game.Entity.Logic.Loot
   alias ThistleTea.Game.Entity.Logic.Loot.Actor
+  alias ThistleTea.Game.Entity.Logic.Loot.Commit
+  alias ThistleTea.Game.Entity.Logic.Loot.Release
   alias ThistleTea.Game.Entity.Logic.Loot.Reservation
   alias ThistleTea.Game.Entity.Logic.LootRoll
   alias ThistleTea.Game.Entity.Logic.LootSession.Projection
@@ -76,13 +78,12 @@ defmodule ThistleTea.Game.Entity.Logic.LootSession do
   def tap_allowed?(%{player: player}, %Actor{guid: player}) when is_integer(player), do: true
   def tap_allowed?(_tapped, %Actor{}), do: false
 
-  def take_item(%__MODULE__{} = session, %Actor{} = actor, slot) do
+  def reserve_item(%__MODULE__{} = session, %Actor{} = actor, slot, token) when is_reference(token) do
     with :ok <- authorize_interaction(session, actor),
          false <- reserved_slot?(session, slot),
          %Loot.Item{} = item <- available_item(session.loot, slot),
-         true <- visible_item?(session, actor, item),
-         {:ok, item, loot} <- Loot.take_item(session.loot, slot) do
-      {:ok, item, %{session | loot: loot}}
+         true <- visible_item?(session, actor, item) do
+      reserve(session, actor, item, token, false)
     else
       {:error, reason} -> {:error, reason}
       _ -> {:error, :already_looted}
@@ -96,33 +97,48 @@ defmodule ThistleTea.Game.Entity.Logic.LootSession do
     end
   end
 
-  def master_give(%__MODULE__{} = session, %Actor{} = giver, %Actor{} = recipient, slot) do
+  def reserve_master(%__MODULE__{} = session, %Actor{} = giver, %Actor{} = recipient, slot, token)
+      when is_reference(token) do
     with :ok <- authorize_interaction(session, giver),
          true <- session.loot_method == @loot_method_master_loot,
          true <- session.loot_master == giver.guid,
          true <- master_recipient?(session, recipient),
-         %Loot.Item{} <- blocked_item(session, slot),
-         {:ok, item, session} <- award_item(session, slot) do
-      {:ok, item, session}
+         %Loot.Item{} = item <- blocked_item(session, slot) do
+      reserve(session, recipient, item, token, true)
     else
       {:error, reason} -> {:error, reason}
       _ -> {:error, :no_permission}
     end
   end
 
-  def roll_award(%__MODULE__{} = session, %Actor{} = winner, slot) do
+  def reserve_roll(%__MODULE__{} = session, %Actor{} = winner, slot, token) when is_reference(token) do
     with true <- tap_allowed?(session, winner),
          true <- Actor.within?(winner, Experience.group_reward_distance()),
-         %Loot.Item{} <- blocked_item(session, slot),
-         {:ok, item, session} <- award_item(session, slot) do
-      {:ok, item, session}
+         %Loot.Item{} = item <- blocked_item(session, slot) do
+      reserve(session, winner, item, token, false)
     else
       _ -> {:error, :no_permission}
     end
   end
 
-  def return_item(%__MODULE__{loot: %Loot{} = loot} = session, slot) do
-    %{session | loot: Loot.return_item(loot, slot)}
+  def commit(%__MODULE__{} = session, %Commit{token: token, actor_guid: actor_guid}) do
+    with %Reservation{actor_guid: ^actor_guid} = reservation <- Map.get(session.reservations, token),
+         {:ok, item, loot} <- session.loot |> Loot.unblock_item(reservation.slot) |> Loot.commit_item(reservation.slot) do
+      {:ok, item, %{session | loot: loot, reservations: Map.delete(session.reservations, token)}}
+    else
+      _ -> {:error, :invalid_reservation}
+    end
+  end
+
+  def release(%__MODULE__{} = session, %Release{token: token, actor_guid: actor_guid}) do
+    case Map.get(session.reservations, token) do
+      %Reservation{actor_guid: ^actor_guid} -> {:ok, release_reservation(session, token)}
+      _ -> {:error, :invalid_reservation}
+    end
+  end
+
+  def release(%__MODULE__{} = session, token) when is_reference(token) do
+    release_reservation(session, token)
   end
 
   def block_master_items(%__MODULE__{loot: %Loot{} = loot} = session, master, threshold) do
@@ -239,17 +255,16 @@ defmodule ThistleTea.Game.Entity.Logic.LootSession do
     Enum.find(items, fn item -> item.slot == slot and not item.looted and not item.blocked end)
   end
 
-  defp award_item(%__MODULE__{} = session, slot) do
-    session
-    |> unblock_item(slot)
-    |> take_item_without_policy(slot)
-  end
+  defp reserve(%__MODULE__{} = session, %Actor{} = actor, %Loot.Item{} = item, token, release_blocked?) do
+    reservation = %Reservation{
+      token: token,
+      slot: item.slot,
+      actor_guid: actor.guid,
+      item: item,
+      release_blocked?: release_blocked?
+    }
 
-  defp take_item_without_policy(%__MODULE__{loot: %Loot{} = loot} = session, slot) do
-    case Loot.take_item(loot, slot) do
-      {:ok, item, loot} -> {:ok, item, %{session | loot: loot}}
-      error -> error
-    end
+    {:ok, reservation, %{session | reservations: Map.put(session.reservations, token, reservation)}}
   end
 
   defp reserved_slot?(%__MODULE__{} = session, slot) do
@@ -262,6 +277,19 @@ defmodule ThistleTea.Game.Entity.Logic.LootSession do
 
   defp policy_reserved_slots(%Projection{reserved_slots: reserved_slots}), do: reserved_slots
   defp policy_reserved_slots(%__MODULE__{} = session), do: reserved_slots(session)
+
+  defp release_reservation(%__MODULE__{} = session, token) do
+    case Map.pop(session.reservations, token) do
+      {%Reservation{release_blocked?: true}, reservations} ->
+        %{session | reservations: reservations}
+
+      {%Reservation{slot: slot}, reservations} ->
+        %{session | loot: Loot.unblock_item(session.loot, slot), reservations: reservations}
+
+      {nil, _reservations} ->
+        session
+    end
+  end
 
   defp rollable_items(%Loot{items: items}, threshold) do
     Enum.filter(items, fn item ->

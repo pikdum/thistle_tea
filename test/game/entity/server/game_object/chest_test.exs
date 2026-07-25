@@ -6,6 +6,8 @@ defmodule ThistleTea.Game.Entity.Server.GameObject.ChestTest do
   alias ThistleTea.Game.Entity.Data.GameObject
   alias ThistleTea.Game.Entity.Logic.Loot
   alias ThistleTea.Game.Entity.Logic.Loot.Actor
+  alias ThistleTea.Game.Entity.Logic.Loot.Commit
+  alias ThistleTea.Game.Entity.Logic.Loot.Release
   alias ThistleTea.Game.Entity.Logic.LootSession
   alias ThistleTea.Game.Entity.Server.GameObject.Chest
   alias ThistleTea.Game.WorldRef
@@ -54,19 +56,24 @@ defmodule ThistleTea.Game.Entity.Server.GameObject.ChestTest do
     end
   end
 
-  describe "take_item/2" do
-    test "hands out the item once" do
-      {result, state} = Chest.take_item(chest_with_session(), @actor, 0)
+  describe "reserve_item/4" do
+    test "hands out the item only after commit" do
+      {result, state} = Chest.reserve_item(chest_with_session(), @actor, 0, self())
 
-      assert {:ok, %Loot.Item{item_id: 11_119}} = result
-      assert {{:error, _reason}, _state} = Chest.take_item(state, @actor, 0)
+      assert {:ok, reservation} = result
+      assert {{:error, _reason}, _state} = Chest.reserve_item(state, @actor, 0, self())
+
+      commit = %Commit{token: reservation.token, actor_guid: reservation.actor_guid}
+      assert {:ok, state} = Chest.commit(state, commit)
+      assert {{:error, _reason}, _state} = Chest.reserve_item(state, @actor, 0, self())
     end
 
-    test "return_item restores a taken slot" do
-      {_result, state} = Chest.take_item(chest_with_session(), @actor, 0)
-      state = Chest.return_item(state, 0)
+    test "release restores a reserved slot" do
+      {{:ok, reservation}, state} = Chest.reserve_item(chest_with_session(), @actor, 0, self())
+      release = %Release{token: reservation.token, actor_guid: reservation.actor_guid}
+      assert {:ok, state} = Chest.release_reservation(state, release)
 
-      assert {{:ok, %Loot.Item{item_id: 11_119}}, _state} = Chest.take_item(state, @actor, 0)
+      assert {{:ok, _reservation}, _state} = Chest.reserve_item(state, @actor, 0, self())
     end
   end
 

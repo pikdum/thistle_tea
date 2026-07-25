@@ -11,7 +11,12 @@ defmodule ThistleTea.Game.Entity.Server.GameObject.Chest do
   alias ThistleTea.Game.Entity.Data.GameObject
   alias ThistleTea.Game.Entity.Logic.Loot
   alias ThistleTea.Game.Entity.Logic.Loot.Actor
+  alias ThistleTea.Game.Entity.Logic.Loot.Commit
+  alias ThistleTea.Game.Entity.Logic.Loot.Release
+  alias ThistleTea.Game.Entity.Logic.Loot.Reservation
   alias ThistleTea.Game.Entity.Logic.LootSession
+  alias ThistleTea.Game.Network
+  alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Loader.Loot, as: LootLoader
   alias ThistleTea.Game.World.Visibility
@@ -38,20 +43,22 @@ defmodule ThistleTea.Game.Entity.Server.GameObject.Chest do
     end
   end
 
-  def take_item(%GameObject{} = state, %Actor{} = actor, slot) do
-    with %LootSession{} = session <- session(state),
-         {:ok, item, session} <- LootSession.take_item(session, actor, slot) do
-      {{:ok, item}, put_session(state, session)}
-    else
-      {:error, reason} -> {{:error, reason}, state}
-      _no_session -> {{:error, :no_loot}, state}
-    end
-  end
-
-  def return_item(%GameObject{} = state, slot) do
+  def reserve_item(%GameObject{} = state, %Actor{} = actor, slot, owner_pid) when is_pid(owner_pid) do
     case session(state) do
-      %LootSession{} = session -> put_session(state, LootSession.return_item(session, slot))
-      _no_session -> state
+      %LootSession{} = session ->
+        token = Process.monitor(owner_pid)
+
+        case LootSession.reserve_item(session, actor, slot, token) do
+          {:ok, %Reservation{} = reservation, session} ->
+            {{:ok, reservation}, put_session(state, session)}
+
+          {:error, reason} ->
+            Process.demonitor(token, [:flush])
+            {{:error, reason}, state}
+        end
+
+      _no_session ->
+        {{:error, :no_loot}, state}
     end
   end
 
@@ -74,6 +81,37 @@ defmodule ThistleTea.Game.Entity.Server.GameObject.Chest do
 
       _no_session ->
         state
+    end
+  end
+
+  def commit(%GameObject{} = state, %Commit{} = command) do
+    with %LootSession{} = session <- session(state),
+         {:ok, %Loot.Item{slot: slot}, session} <- LootSession.commit(session, command) do
+      Process.demonitor(command.token, [:flush])
+      packet = %Message.SmsgLootRemoved{slot: slot}
+      session |> LootSession.viewers() |> Enum.each(&Network.send_packet(packet, &1))
+      {:ok, put_session(state, session)}
+    else
+      _ -> {{:error, :invalid_reservation}, state}
+    end
+  end
+
+  def release_reservation(%GameObject{} = state, %Release{} = command) do
+    with %LootSession{} = session <- session(state),
+         {:ok, session} <- LootSession.release(session, command) do
+      Process.demonitor(command.token, [:flush])
+      {:ok, put_session(state, session)}
+    else
+      _ -> {{:error, :invalid_reservation}, state}
+    end
+  end
+
+  def reservation_lost(%GameObject{} = state, token) when is_reference(token) do
+    Process.demonitor(token, [:flush])
+
+    case session(state) do
+      %LootSession{} = session -> put_session(state, LootSession.release(session, token))
+      _no_session -> state
     end
   end
 

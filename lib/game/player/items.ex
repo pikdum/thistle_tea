@@ -13,9 +13,23 @@ defmodule ThistleTea.Game.Player.Items do
   alias ThistleTea.Game.World.ItemStore
 
   def give(state, item_id, count) do
+    case store(state, item_id, count) do
+      {:ok, state, placed_at} ->
+        send_push_result(state, item_id, count, placed_at, 1)
+        state
+
+      {:error, :item_not_found, state} ->
+        system_message(state, "Item #{item_id} not found.")
+
+      {:error, _reason, state} ->
+        system_message(state, "Inventory full.")
+    end
+  end
+
+  def store(state, item_id, count) do
     case ItemStore.create(item_id, owner: state.guid, stack_count: count) do
-      %DataItem{} = item -> store_item(state, item, item_id, count)
-      _ -> system_message(state, "Item #{item_id} not found.")
+      %DataItem{} = item -> store_item(state, item)
+      _ -> {:error, :item_not_found, state}
     end
   end
 
@@ -51,27 +65,28 @@ defmodule ThistleTea.Game.Player.Items do
     end
   end
 
-  defp store_item(state, item, item_id, count) do
+  defp store_item(state, item) do
     case Inventory.store(state.character.player, state.guid, item, &ItemStore.get/1) do
       {:ok, result, placement} ->
-        {bag_slot, item_slot} = InventoryUpdate.commit_placement(item, placement)
+        placed_at = InventoryUpdate.commit_placement(item, placement)
         state = InventoryUpdate.apply(state, {:ok, result}, placement)
+        {:ok, state, placed_at}
 
-        Network.send_packet(%Message.SmsgItemPushResult{
-          player_guid: state.guid,
-          item_id: item_id,
-          bag_slot: bag_slot,
-          item_slot: item_slot,
-          count: count,
-          created: 1
-        })
-
-        state
-
-      _ ->
+      {:error, reason} ->
         ItemStore.delete(item.object.guid)
-        system_message(state, "Inventory full.")
+        {:error, reason, state}
     end
+  end
+
+  def send_push_result(state, item_id, count, {bag_slot, item_slot}, created \\ 0) do
+    Network.send_packet(%Message.SmsgItemPushResult{
+      player_guid: state.guid,
+      item_id: item_id,
+      bag_slot: bag_slot,
+      item_slot: item_slot,
+      count: count,
+      created: created
+    })
   end
 
   defp system_message(state, message) do

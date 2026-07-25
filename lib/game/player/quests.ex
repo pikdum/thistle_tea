@@ -10,7 +10,6 @@ defmodule ThistleTea.Game.Player.Quests do
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Experience
   alias ThistleTea.Game.Entity.Logic.Inventory
-  alias ThistleTea.Game.Entity.Logic.Loot
   alias ThistleTea.Game.Entity.Logic.QuestDialogStatus
   alias ThistleTea.Game.Entity.Logic.QuestLog
   alias ThistleTea.Game.Entity.Logic.QuestLog.Entry
@@ -330,15 +329,6 @@ defmodule ThistleTea.Game.Player.Quests do
       nil ->
         []
     end
-  end
-
-  def filter_loot(%Loot{} = loot, %Character{} = character) do
-    items =
-      Enum.filter(loot.items, fn item ->
-        not item.quest_item or needs_item?(character, item.item_id)
-      end)
-
-    %{loot | items: items}
   end
 
   def npc_quests(npc_guid) do

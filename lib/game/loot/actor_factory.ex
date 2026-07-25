@@ -40,7 +40,7 @@ defmodule ThistleTea.Game.Loot.ActorFactory do
   defp needed_items(guid) do
     case Metadata.query(guid, [:needed_quest_items]) do
       %{needed_quest_items: %MapSet{} = needed_items} -> needed_items
-      _ -> MapSet.new()
+      _ -> :unknown
     end
   end
 

@@ -7,6 +7,19 @@ defmodule ThistleTea.Game.Entity.Logic.Loot do
 
   defmodule Item do
     @moduledoc false
+
+    @type t :: %__MODULE__{
+            slot: non_neg_integer() | nil,
+            item_id: integer() | nil,
+            display_id: integer() | nil,
+            count: pos_integer(),
+            quality: non_neg_integer(),
+            slot_type: non_neg_integer(),
+            looted: boolean(),
+            blocked: boolean(),
+            quest_item: boolean()
+          }
+
     defstruct [
       :slot,
       :item_id,
@@ -29,7 +42,7 @@ defmodule ThistleTea.Game.Entity.Logic.Loot do
     gold <= 0 and Enum.all?(items, & &1.looted)
   end
 
-  def take_item(%__MODULE__{items: items} = loot, slot) do
+  def commit_item(%__MODULE__{items: items} = loot, slot) do
     case Enum.find(items, fn item -> item.slot == slot and not item.looted and not item.blocked end) do
       %Item{} = item ->
         # credo:disable-for-next-line Credo.Check.Refactor.Nesting
@@ -47,11 +60,6 @@ defmodule ThistleTea.Game.Entity.Logic.Loot do
 
   defp set_blocked(%__MODULE__{items: items} = loot, slot, blocked?) do
     items = Enum.map(items, fn i -> if i.slot == slot, do: %{i | blocked: blocked?}, else: i end)
-    %{loot | items: items}
-  end
-
-  def return_item(%__MODULE__{items: items} = loot, slot) do
-    items = Enum.map(items, fn i -> if i.slot == slot, do: %{i | looted: false}, else: i end)
     %{loot | items: items}
   end
 

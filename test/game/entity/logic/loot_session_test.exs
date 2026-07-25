@@ -3,6 +3,8 @@ defmodule ThistleTea.Game.Entity.Logic.LootSessionTest do
 
   alias ThistleTea.Game.Entity.Logic.Loot
   alias ThistleTea.Game.Entity.Logic.Loot.Actor
+  alias ThistleTea.Game.Entity.Logic.Loot.Commit
+  alias ThistleTea.Game.Entity.Logic.Loot.Release
   alias ThistleTea.Game.Entity.Logic.LootSession
 
   defp loot do
@@ -35,7 +37,7 @@ defmodule ThistleTea.Game.Entity.Logic.LootSessionTest do
 
       assert {:ok, %Loot{}} = LootSession.view(session, actor(100))
       assert {:error, :no_permission} = LootSession.view(session, actor(200))
-      assert {:error, :no_permission} = LootSession.take_item(session, actor(200), 0)
+      assert {:error, :no_permission} = LootSession.reserve_item(session, actor(200), 0, make_ref())
     end
 
     test "group tap allows current group members" do
@@ -55,13 +57,15 @@ defmodule ThistleTea.Game.Entity.Logic.LootSessionTest do
 
       assert {:ok, %Loot{}} = LootSession.view(session, actor(200, group_id: 7))
       assert {:error, :no_permission} = LootSession.view(session, actor(100, group_id: 7))
-      assert {:error, :no_permission} = LootSession.take_item(session, actor(100, group_id: 7), 0)
+
+      assert {:error, :no_permission} =
+               LootSession.reserve_item(session, actor(100, group_id: 7), 0, make_ref())
     end
 
     test "rejects actors outside interaction distance" do
       session = LootSession.new(loot(), nil)
       assert {:error, :too_far} = LootSession.view(session, actor(100, distance: 5.1))
-      assert {:error, :too_far} = LootSession.take_item(session, actor(100, distance: 5.1), 0)
+      assert {:error, :too_far} = LootSession.reserve_item(session, actor(100, distance: 5.1), 0, make_ref())
     end
 
     test "filters quest items from the actor snapshot" do
@@ -122,12 +126,70 @@ defmodule ThistleTea.Game.Entity.Logic.LootSessionTest do
     end
   end
 
-  describe "roll_award/3" do
-    test "unblocks and takes the item for an eligible nearby winner" do
-      {session, _rolls} = loot() |> LootSession.new(nil) |> LootSession.start_rolls(2, [1, 2])
+  describe "reservations" do
+    test "does not mark a direct item looted until the owner commits" do
+      session = LootSession.new(loot(), nil)
+      token = make_ref()
 
-      assert {:ok, %Loot.Item{item_id: 1604}, session} = LootSession.roll_award(session, actor(1), 0)
-      assert {:error, :already_looted} = LootSession.take_item(session, actor(1), 0)
+      assert {:ok, reservation, reserved} = LootSession.reserve_item(session, actor(1), 0, token)
+      refute Enum.find(reserved.loot.items, &(&1.slot == 0)).looted
+      assert LootSession.pending?(reserved)
+      assert {:error, :already_looted} = LootSession.reserve_item(reserved, actor(1), 0, make_ref())
+
+      commit = %Commit{token: token, actor_guid: reservation.actor_guid}
+      assert {:ok, %Loot.Item{item_id: 1604}, committed} = LootSession.commit(reserved, commit)
+      assert Enum.find(committed.loot.items, &(&1.slot == 0)).looted
+      refute LootSession.pending?(committed)
+    end
+
+    test "release restores a direct item after inventory failure" do
+      session = LootSession.new(loot(), nil)
+      token = make_ref()
+      {:ok, reservation, reserved} = LootSession.reserve_item(session, actor(1), 0, token)
+
+      release = %Release{token: token, actor_guid: reservation.actor_guid}
+      assert {:ok, released} = LootSession.release(reserved, release)
+      assert {:ok, _reservation, _reserved} = LootSession.reserve_item(released, actor(1), 0, make_ref())
+    end
+
+    test "rejects a commit from anyone except the reserved actor" do
+      session = LootSession.new(loot(), nil)
+      token = make_ref()
+      {:ok, _reservation, reserved} = LootSession.reserve_item(session, actor(1), 0, token)
+
+      assert {:error, :invalid_reservation} =
+               LootSession.commit(reserved, %Commit{token: token, actor_guid: 2})
+
+      refute Enum.find(reserved.loot.items, &(&1.slot == 0)).looted
+    end
+
+    test "roll reservation restores the item as directly lootable on release" do
+      {session, _rolls} = loot() |> LootSession.new(nil) |> LootSession.start_rolls(2, [1, 2])
+      {_roll, session} = LootSession.pop_roll(session, 0)
+      token = make_ref()
+
+      assert {:ok, reservation, session} = LootSession.reserve_roll(session, actor(1), 0, token)
+      release = %Release{token: token, actor_guid: reservation.actor_guid}
+      assert {:ok, session} = LootSession.release(session, release)
+      assert {:ok, _reservation, _session} = LootSession.reserve_item(session, actor(1), 0, make_ref())
+    end
+
+    test "master reservation remains master-controlled on release" do
+      session =
+        loot()
+        |> LootSession.new(%{player: 100, group_id: 7})
+        |> LootSession.configure_group(2)
+        |> LootSession.block_master_items(100, 2)
+
+      token = make_ref()
+      giver = actor(100, group_id: 7)
+      recipient = actor(200, group_id: 7)
+      {:ok, reservation, reserved} = LootSession.reserve_master(session, giver, recipient, 0, token)
+
+      release = %Release{token: token, actor_guid: reservation.actor_guid}
+      assert {:ok, released} = LootSession.release(reserved, release)
+      assert %Loot.Item{} = LootSession.blocked_item(released, 0)
+      assert {:error, :already_looted} = LootSession.reserve_item(released, recipient, 0, make_ref())
     end
   end
 
@@ -137,22 +199,24 @@ defmodule ThistleTea.Game.Entity.Logic.LootSessionTest do
       refute LootSession.finished?(session)
 
       {:ok, _gold, session} = LootSession.take_gold(session, actor(1))
-      {:ok, _item, session} = LootSession.take_item(session, actor(1), 0)
-      {:ok, _item, session} = LootSession.take_item(session, actor(1), 1)
-      {:ok, _item, session} = LootSession.take_item(session, actor(1, needed_items: [929]), 2)
+      {_item, session} = reserve_and_commit(session, actor(1), 0)
+      {_item, session} = reserve_and_commit(session, actor(1), 1)
+      {_item, session} = reserve_and_commit(session, actor(1, needed_items: [929]), 2)
       assert LootSession.finished?(session)
     end
 
     test "pending rolls keep the session unfinished" do
       {session, _rolls} = loot() |> LootSession.new(nil) |> LootSession.start_rolls(2, [1, 2])
       {:ok, _gold, session} = LootSession.take_gold(session, actor(1))
-      {:ok, _item, session} = LootSession.take_item(session, actor(1), 1)
-      {:ok, _item, session} = LootSession.take_item(session, actor(1, needed_items: [929]), 2)
+      {_item, session} = reserve_and_commit(session, actor(1), 1)
+      {_item, session} = reserve_and_commit(session, actor(1, needed_items: [929]), 2)
 
       refute LootSession.finished?(session)
 
       {_roll, session} = LootSession.pop_roll(session, 0)
-      {:ok, _item, session} = LootSession.roll_award(session, actor(1), 0)
+      token = make_ref()
+      {:ok, reservation, session} = LootSession.reserve_roll(session, actor(1), 0, token)
+      {:ok, _item, session} = LootSession.commit(session, %Commit{token: token, actor_guid: reservation.actor_guid})
       assert LootSession.finished?(session)
     end
   end
@@ -165,5 +229,12 @@ defmodule ThistleTea.Game.Entity.Logic.LootSessionTest do
       assert :error = LootSession.vote(session, 0, 1, :greed)
       assert :error = LootSession.vote(session, 99, 1, :need)
     end
+  end
+
+  defp reserve_and_commit(session, %Actor{} = actor, slot) do
+    token = make_ref()
+    {:ok, reservation, session} = LootSession.reserve_item(session, actor, slot, token)
+    {:ok, item, session} = LootSession.commit(session, %Commit{token: token, actor_guid: reservation.actor_guid})
+    {item, session}
   end
 end

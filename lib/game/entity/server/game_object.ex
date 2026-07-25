@@ -16,6 +16,8 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Loot.Actor
+  alias ThistleTea.Game.Entity.Logic.Loot.Commit
+  alias ThistleTea.Game.Entity.Logic.Loot.Release
   alias ThistleTea.Game.Entity.Registry, as: EntityRegistry
   alias ThistleTea.Game.Entity.Server.GameObject.Chair
   alias ThistleTea.Game.Entity.Server.GameObject.Chest
@@ -118,6 +120,16 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
     end
   end
 
+  def handle_cast(%Commit{} = command, %GameObject{} = state) do
+    {_result, state} = Chest.commit(state, command)
+    {:noreply, state}
+  end
+
+  def handle_cast(%Release{} = command, %GameObject{} = state) do
+    {_result, state} = Chest.release_reservation(state, command)
+    {:noreply, state}
+  end
+
   @impl GenServer
   def handle_cast(_message, state) do
     {:noreply, state}
@@ -169,13 +181,9 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
     {:reply, result, state}
   end
 
-  def handle_call({:loot_take_item, %Actor{} = actor, slot}, _from, %GameObject{} = state) do
-    {result, state} = Chest.take_item(state, actor, slot)
+  def handle_call({:loot_reserve_item, %Actor{} = actor, slot}, {owner_pid, _tag}, %GameObject{} = state) do
+    {result, state} = Chest.reserve_item(state, actor, slot, owner_pid)
     {:reply, result, state}
-  end
-
-  def handle_call({:loot_return_item, slot}, _from, %GameObject{} = state) do
-    {:reply, :ok, Chest.return_item(state, slot)}
   end
 
   def handle_call({:loot_take_gold, %Actor{} = actor}, _from, %GameObject{} = state) do
@@ -208,6 +216,10 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
 
   def handle_info({:event_start, _event}, state) do
     {:noreply, state}
+  end
+
+  def handle_info({:DOWN, token, :process, _pid, _reason}, %GameObject{} = state) when is_reference(token) do
+    {:noreply, Chest.reservation_lost(state, token)}
   end
 
   def handle_info(:despawn, state) do

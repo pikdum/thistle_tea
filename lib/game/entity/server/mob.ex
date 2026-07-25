@@ -38,6 +38,8 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Entity.Logic.Experience
   alias ThistleTea.Game.Entity.Logic.Hostility
   alias ThistleTea.Game.Entity.Logic.Loot.Actor
+  alias ThistleTea.Game.Entity.Logic.Loot.Commit
+  alias ThistleTea.Game.Entity.Logic.Loot.Release
   alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.Entity.Logic.SpellEffect
   alias ThistleTea.Game.Entity.Logic.SpellFeedback
@@ -258,6 +260,16 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     {:noreply, Corpse.roll_vote(state, voter_guid, slot, vote)}
   end
 
+  def handle_cast(%Commit{} = command, %Mob{} = state) do
+    {_result, state} = Corpse.commit(state, command)
+    {:noreply, state}
+  end
+
+  def handle_cast(%Release{} = command, %Mob{} = state) do
+    {_result, state} = Corpse.release_reservation(state, command)
+    {:noreply, state}
+  end
+
   @impl GenServer
   def handle_cast({:receive_attack, %{caster: caster} = attack}, state) do
     state = engage_combat(state, caster)
@@ -326,13 +338,9 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     {:reply, result, state}
   end
 
-  def handle_call({:loot_take_item, %Actor{} = actor, slot}, _from, %Mob{} = state) do
-    {result, state} = Corpse.take_item(state, actor, slot)
+  def handle_call({:loot_reserve_item, %Actor{} = actor, slot}, {owner_pid, _tag}, %Mob{} = state) do
+    {result, state} = Corpse.reserve_item(state, actor, slot, owner_pid)
     {:reply, result, state}
-  end
-
-  def handle_call({:loot_return_item, slot}, _from, %Mob{} = state) do
-    {:reply, :ok, Corpse.return_item(state, slot)}
   end
 
   def handle_call({:loot_take_gold, %Actor{} = actor}, _from, %Mob{} = state) do
@@ -347,6 +355,10 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   @impl GenServer
   def handle_info({:loot_roll_timeout, slot}, %Mob{} = state) do
     {:noreply, Corpse.roll_timeout(state, slot)}
+  end
+
+  def handle_info({:DOWN, token, :process, _pid, _reason}, %Mob{} = state) when is_reference(token) do
+    {:noreply, Corpse.reservation_lost(state, token)}
   end
 
   @impl GenServer

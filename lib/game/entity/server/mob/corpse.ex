@@ -16,6 +16,9 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Corpse do
   alias ThistleTea.Game.Entity.Logic.Experience
   alias ThistleTea.Game.Entity.Logic.Loot
   alias ThistleTea.Game.Entity.Logic.Loot.Actor
+  alias ThistleTea.Game.Entity.Logic.Loot.Commit
+  alias ThistleTea.Game.Entity.Logic.Loot.Release
+  alias ThistleTea.Game.Entity.Logic.Loot.Reservation
   alias ThistleTea.Game.Entity.Logic.LootRoll
   alias ThistleTea.Game.Entity.Logic.LootSession
   alias ThistleTea.Game.Entity.Registry, as: EntityRegistry
@@ -36,6 +39,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Corpse do
   @loot_method_group_loot 3
   @loot_method_need_before_greed 4
   @loot_roll_countdown_ms 60_000
+  @pending_remove_retry_ms 10_000
   @roll_type_need 1
   @roll_type_greed 2
   @corpse_decay_ms 300_000
@@ -75,6 +79,10 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Corpse do
       token != :force and token != corpse_token(state.internal) ->
         state
 
+      token != :force and pending?(state) ->
+        Process.send_after(self(), {:remove_corpse, token}, @pending_remove_retry_ms)
+        state
+
       true ->
         state = resolve_pending_rolls(state)
         close_loot_windows(state)
@@ -82,7 +90,6 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Corpse do
         Metadata.update(state.object.guid, %{
           tapped_player: nil,
           tapped_group_id: nil,
-          assigned_looter: nil,
           loot_projection: nil
         })
 
@@ -105,21 +112,8 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Corpse do
     end
   end
 
-  def take_item(%Mob{} = state, %Actor{} = actor, slot) do
-    with %LootSession{} = session <- session(state),
-         {:ok, item, session} <- LootSession.take_item(session, actor, slot) do
-      {{:ok, item}, finish_if_done(put_session(state, session))}
-    else
-      {:error, reason} -> {{:error, reason}, state}
-      _ -> {{:error, :no_loot}, state}
-    end
-  end
-
-  def return_item(%Mob{} = state, slot) do
-    case session(state) do
-      %LootSession{} = session -> put_session(state, LootSession.return_item(session, slot))
-      _ -> state
-    end
+  def reserve_item(%Mob{} = state, %Actor{} = actor, slot, owner_pid) when is_pid(owner_pid) do
+    reserve(state, owner_pid, &LootSession.reserve_item(&1, actor, slot, &2))
   end
 
   def take_gold(%Mob{} = state, %Actor{} = actor) do
@@ -143,14 +137,63 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Corpse do
   end
 
   def master_give(%Mob{} = state, %Actor{} = giver, slot, %Actor{} = recipient) do
-    with %LootSession{} = session <- session(state),
-         pid when is_pid(pid) <- EntityRegistry.whereis(recipient.guid),
-         {:ok, item, session} <- LootSession.master_give(session, giver, recipient, slot) do
-      send(pid, {:create_item, item.item_id, item.count})
-      {:ok, finish_if_done(put_session(state, session))}
-    else
-      _ -> {{:error, :invalid}, state}
+    case EntityRegistry.whereis(recipient.guid) do
+      pid when is_pid(pid) ->
+        case reserve(state, pid, &LootSession.reserve_master(&1, giver, recipient, slot, &2)) do
+          {{:ok, %Reservation{} = reservation}, state} ->
+            send(pid, {:loot_award, state.object.guid, reservation})
+            {:ok, state}
+
+          {_error, state} ->
+            {{:error, :invalid}, state}
+        end
+
+      _ ->
+        {{:error, :invalid}, state}
     end
+  end
+
+  def commit(%Mob{} = state, %Commit{} = command) do
+    with %LootSession{} = session <- session(state),
+         {:ok, %Loot.Item{slot: slot}, session} <- LootSession.commit(session, command) do
+      Process.demonitor(command.token, [:flush])
+      notify_removed(session, slot)
+
+      state =
+        state
+        |> put_session(session)
+        |> finish_if_done()
+
+      maybe_continue_respawn(state)
+      {:ok, state}
+    else
+      _ -> {{:error, :invalid_reservation}, state}
+    end
+  end
+
+  def release_reservation(%Mob{} = state, %Release{} = command) do
+    with %LootSession{} = session <- session(state),
+         {:ok, session} <- LootSession.release(session, command) do
+      Process.demonitor(command.token, [:flush])
+      state = put_session(state, session)
+      maybe_continue_respawn(state)
+      {:ok, state}
+    else
+      _ -> {{:error, :invalid_reservation}, state}
+    end
+  end
+
+  def reservation_lost(%Mob{} = state, token) when is_reference(token) do
+    Process.demonitor(token, [:flush])
+
+    state =
+      case session(state) do
+        %LootSession{} = session -> put_session(state, LootSession.release(session, token))
+        _ -> state
+      end
+
+    maybe_continue_respawn(state)
+    state
   end
 
   def roll_vote(%Mob{} = state, voter, slot, vote) do
@@ -196,7 +239,9 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Corpse do
 
   defp quest_item_filter(%Mob{} = state, target) do
     looters = candidate_looters(state, target)
-    fn item_id -> Enum.any?(looters, &needs_quest_item?(&1, item_id)) end
+
+    actors = Enum.map(looters, &ActorFactory.for_guid(&1, state.object.guid))
+    fn item_id -> Enum.any?(actors, &Actor.needs_item?(&1, item_id)) end
   end
 
   defp candidate_looters(%Mob{} = state, target) do
@@ -207,13 +252,6 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Corpse do
       _ -> [tapper]
     end
     |> Enum.filter(&is_integer/1)
-  end
-
-  defp needs_quest_item?(looter, item_id) do
-    case Metadata.query(looter, [:needed_quest_items]) do
-      %{needed_quest_items: %MapSet{} = item_ids} -> MapSet.member?(item_ids, item_id)
-      _ -> true
-    end
   end
 
   defp tapped_player(%Mob{internal: %Internal{loot: %InternalLoot{tapped_by: %{player: player}}}}), do: player
@@ -273,7 +311,6 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Corpse do
   defp assign_looter(%Mob{} = state, group) do
     case PartySystem.update_looter(group.id, eligible_members(state, group)) do
       looter when is_integer(looter) ->
-        Metadata.update(state.object.guid, %{assigned_looter: looter})
         put_session(state, LootSession.assign_looter(session(state), looter))
 
       _ ->
@@ -341,13 +378,13 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Corpse do
 
     case EntityRegistry.whereis(winner) do
       pid when is_pid(pid) ->
-        case LootSession.roll_award(session, winner_actor, roll.slot) do
-          {:ok, item, session} ->
-            send(pid, {:create_item, item.item_id, item.count})
-            put_session(state, session)
-
-          _ ->
+        case reserve(state, pid, &LootSession.reserve_roll(&1, winner_actor, roll.slot, &2)) do
+          {{:ok, %Reservation{} = reservation}, state} ->
+            send(pid, {:loot_award, state.object.guid, reservation})
             state
+
+          {_error, state} ->
+            put_session(state, LootSession.unblock_item(session(state), roll.slot))
         end
 
       _ ->
@@ -387,12 +424,34 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Corpse do
     Enum.each(eligible, &Network.send_packet(packet, &1))
   end
 
+  defp reserve(%Mob{} = state, owner_pid, reserve_item) do
+    case session(state) do
+      %LootSession{} = session ->
+        token = Process.monitor(owner_pid)
+
+        case reserve_item.(session, token) do
+          {:ok, %Reservation{} = reservation, session} ->
+            {{:ok, reservation}, put_session(state, session)}
+
+          {:error, reason} ->
+            Process.demonitor(token, [:flush])
+            {{:error, reason}, state}
+        end
+
+      _ ->
+        {{:error, :no_loot}, state}
+    end
+  end
+
+  defp notify_removed(%LootSession{} = session, slot) do
+    packet = %Message.SmsgLootRemoved{slot: slot}
+    session |> LootSession.viewers() |> Enum.each(&Network.send_packet(packet, &1))
+  end
+
   defp finish_if_done(%Mob{} = state) do
     case session(state) do
       %LootSession{} = session ->
         if LootSession.finished?(session) do
-          Metadata.update(state.object.guid, %{assigned_looter: nil})
-
           state = put_session(state, nil)
           state = clear_lootable_flag(state)
           Core.update_object(state, :values) |> World.broadcast_packet(state)

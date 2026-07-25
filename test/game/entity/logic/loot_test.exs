@@ -48,16 +48,16 @@ defmodule ThistleTea.Game.Entity.Logic.LootTest do
     end
   end
 
-  describe "take_item/2" do
+  describe "commit_item/2" do
     test "marks the slot as looted" do
       loot = %Loot{items: [%Loot.Item{slot: 0, item_id: 10}]}
 
-      assert {:ok, %Loot.Item{item_id: 10}, loot} = Loot.take_item(loot, 0)
-      assert {:error, :already_looted} = Loot.take_item(loot, 0)
+      assert {:ok, %Loot.Item{item_id: 10}, loot} = Loot.commit_item(loot, 0)
+      assert {:error, :already_looted} = Loot.commit_item(loot, 0)
     end
 
     test "rejects unknown slots" do
-      assert {:error, :already_looted} = Loot.take_item(%Loot{}, 3)
+      assert {:error, :already_looted} = Loot.commit_item(%Loot{}, 3)
     end
   end
 

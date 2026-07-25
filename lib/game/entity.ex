@@ -3,6 +3,8 @@ defmodule ThistleTea.Game.Entity do
   Boundary facade for talking to live entities by guid: registry lookups and
   casts to the owning process (movement, attacks, spells, update requests).
   """
+  alias ThistleTea.Game.Entity.Logic.Loot.Commit
+  alias ThistleTea.Game.Entity.Logic.Loot.Release
   alias ThistleTea.Game.Entity.Registry, as: EntityRegistry
 
   def register(guid), do: EntityRegistry.register(guid)
@@ -123,6 +125,9 @@ defmodule ThistleTea.Game.Entity do
   def loot_roll_vote(entity, voter_guid, slot, vote) do
     dispatch_cast(entity, {:loot_roll_vote, voter_guid, slot, vote})
   end
+
+  def loot_reservation_result(entity, %Commit{} = result), do: dispatch_cast(entity, result)
+  def loot_reservation_result(entity, %Release{} = result), do: dispatch_cast(entity, result)
 
   def receive_money(entity, amount) do
     dispatch_cast(entity, {:receive_money, amount})
