@@ -18,13 +18,19 @@ defmodule ThistleTea.Game.Network.Message.CmsgLoot do
   @impl ClientMessage
   def handle(%__MODULE__{guid: guid}, %{ready: true, character: %Character{} = c} = state) do
     with false <- Core.dead?(c),
-         {:ok, %Loot{} = loot} <- Entity.call(guid, {:loot_view, state.guid}) do
-      Network.send_packet(%Message.SmsgLootResponse{guid: guid, loot: Quests.filter_loot(loot, c)})
+         {:ok, %Loot{} = loot} <- Entity.call(guid, {:loot_view, state.guid}),
+         %Loot{} = visible <- visible_loot(loot, c) do
+      Network.send_packet(%Message.SmsgLootResponse{guid: guid, loot: visible})
       maybe_send_master_list(state, guid)
       %{state | loot_guid: guid}
     else
       {:error, :no_permission} ->
         Network.send_packet(%Message.SmsgLootResponse{guid: guid, loot: %Loot{}})
+        state
+
+      :nothing_to_take ->
+        Entity.call(guid, {:loot_release, state.guid})
+        Network.send_packet(%Message.SmsgLootReleaseResponse{guid: guid})
         state
 
       _ ->
@@ -42,6 +48,11 @@ defmodule ThistleTea.Game.Network.Message.CmsgLoot do
     %__MODULE__{
       guid: guid
     }
+  end
+
+  defp visible_loot(%Loot{} = loot, %Character{} = character) do
+    visible = Quests.filter_loot(loot, character)
+    if Loot.empty?(visible), do: :nothing_to_take, else: visible
   end
 
   defp maybe_send_master_list(%{guid: viewer}, corpse_guid) do

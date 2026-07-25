@@ -76,4 +76,32 @@ defmodule ThistleTea.Game.Entity.Logic.LootTest do
       refute Loot.empty?(%Loot{items: [%Loot.Item{slot: 0}]})
     end
   end
+
+  describe "summary/1" do
+    test "splits unlooted contents into gold, general items and quest item ids" do
+      loot = %Loot{
+        gold: 10,
+        items: [
+          %Loot.Item{slot: 0, item_id: 2589},
+          %Loot.Item{slot: 1, item_id: 11_119, quest_item: true},
+          %Loot.Item{slot: 2, item_id: 11_119, quest_item: true},
+          %Loot.Item{slot: 3, item_id: 4306, looted: true}
+        ]
+      }
+
+      assert Loot.summary(loot) == %{gold?: true, general_items?: true, quest_item_ids: [11_119]}
+    end
+
+    test "reports quest-only loot" do
+      loot = %Loot{items: [%Loot.Item{slot: 0, item_id: 11_119, quest_item: true}]}
+
+      assert Loot.summary(loot) == %{gold?: false, general_items?: false, quest_item_ids: [11_119]}
+    end
+
+    test "reports nothing for fully looted loot" do
+      loot = %Loot{items: [%Loot.Item{slot: 0, item_id: 2589, looted: true}]}
+
+      assert Loot.summary(loot) == %{gold?: false, general_items?: false, quest_item_ids: []}
+    end
+  end
 end

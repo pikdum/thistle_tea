@@ -614,7 +614,7 @@ defmodule ThistleTea.Game.Network.Server do
   end
 
   defp send_update_object(%UpdateObject{} = update, socket, state) do
-    update = Tap.personalize(update, Map.get(state, :guid))
+    update = Tap.personalize(update, Map.get(state, :guid), Map.get(state, :character))
     {packet, updates} = UpdateBatcher.batch(update, Map.get(state, :guid))
     state = Network.Send.send_packet(packet, {socket, state})
     state = track_created_updates(state, updates)

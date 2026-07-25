@@ -76,7 +76,13 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Corpse do
       true ->
         state = resolve_pending_rolls(state)
         close_loot_windows(state)
-        Metadata.update(state.object.guid, %{tapped_player: nil, tapped_group_id: nil, assigned_looter: nil})
+
+        Metadata.update(state.object.guid, %{
+          tapped_player: nil,
+          tapped_group_id: nil,
+          assigned_looter: nil,
+          loot_summary: nil
+        })
 
         state = Visibility.leave_entity(state)
         World.remove_position(state)
@@ -422,8 +428,12 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Corpse do
   defp session(%Mob{}), do: nil
 
   defp put_session(%Mob{} = state, session) do
+    Metadata.update(state.object.guid, %{loot_summary: loot_summary(session)})
     put_internal_loot(state, %{state.internal.loot | session: session})
   end
+
+  defp loot_summary(%LootSession{loot: %Loot{} = loot}), do: Loot.summary(loot)
+  defp loot_summary(_session), do: nil
 
   defp put_internal_loot(%Mob{internal: %Internal{} = internal} = state, %InternalLoot{} = internal_loot) do
     %{state | internal: %{internal | loot: internal_loot}}
