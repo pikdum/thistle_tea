@@ -612,7 +612,7 @@ defmodule ThistleTea.Game.Network.Server do
   end
 
   defp send_update_object(%UpdateObject{} = update, socket, state) do
-    update = Tap.personalize(update, Map.get(state, :guid), Map.get(state, :character))
+    update = Tap.personalize(update, Map.get(state, :guid))
     {packet, updates} = UpdateBatcher.batch(update, Map.get(state, :guid))
     state = Network.Send.send_packet(packet, {socket, state})
     state = track_created_updates(state, updates)
@@ -623,7 +623,7 @@ defmodule ThistleTea.Game.Network.Server do
     if duplicate_create?(state, update) do
       state
     else
-      update = Tap.personalize(update, state.guid, state.character)
+      update = Tap.personalize(update, state.guid)
       packet = UpdateObject.to_packet([update], state.guid)
       state = Network.Send.send_packet(packet, {socket, state})
       track_created_updates(state, [update])

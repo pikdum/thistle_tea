@@ -2,68 +2,41 @@ defmodule ThistleTea.Game.World.Visibility.Tap do
   @moduledoc """
   Per-viewer dynamic-flag adjustment for mob updates: hides the gray tapped
   marker from the tapping player/group and the loot sparkle from players
-  without loot rights or without anything they can actually take, mirroring
-  how mangos personalizes UNIT_DYNAMIC_FLAGS per recipient.
-
-  A viewer with nothing to take sees the corpse as tapped by somebody else;
-  the client draws the loot cursor for any dead creature it does not believe
-  is another player's tap, so clearing the sparkle alone leaves the hover
-  icon behind.
+  without loot rights, mirroring how mangos personalizes UNIT_DYNAMIC_FLAGS
+  per recipient.
   """
   import Bitwise
 
-  alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.Party
-  alias ThistleTea.Game.Player.Quests
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.System.Party, as: PartySystem
 
   @dynamic_flag_lootable 0x0001
   @dynamic_flag_tapped 0x0004
 
-  def personalize(
-        %UpdateObject{unit: %{dynamic_flags: flags} = unit, object: %{guid: guid}} = update,
-        viewer,
-        character
-      )
+  def personalize(%UpdateObject{unit: %{dynamic_flags: flags} = unit, object: %{guid: guid}} = update, viewer)
       when is_integer(flags) and (flags &&& (@dynamic_flag_tapped ||| @dynamic_flag_lootable)) != 0 and
              is_integer(viewer) do
     if Guid.entity_type(guid) == :mob do
-      %{update | unit: %{unit | dynamic_flags: adjust(flags, guid, viewer, character)}}
+      %{update | unit: %{unit | dynamic_flags: adjust(flags, guid, viewer)}}
     else
       update
     end
   end
 
-  def personalize(update, _viewer, _character), do: update
+  def personalize(update, _viewer), do: update
 
-  defp adjust(flags, mob_guid, viewer, character) do
-    meta = Metadata.query(mob_guid, [:tapped_player, :tapped_group_id, :assigned_looter, :loot_summary]) || %{}
-    loot_eligible? = loot_eligible?(meta, viewer, character)
+  defp adjust(flags, mob_guid, viewer) do
+    meta = Metadata.query(mob_guid, [:tapped_player, :tapped_group_id, :assigned_looter]) || %{}
+    tap_eligible? = tap_eligible?(meta, viewer)
+    loot_eligible? = tap_eligible? and Map.get(meta, :assigned_looter) in [nil, viewer]
 
     flags
-    |> clear_if(@dynamic_flag_tapped, loot_eligible?)
-    |> set_if(@dynamic_flag_tapped, not loot_eligible?)
+    |> clear_if(@dynamic_flag_tapped, tap_eligible?)
     |> clear_if(@dynamic_flag_lootable, not loot_eligible?)
   end
-
-  defp loot_eligible?(meta, viewer, character) do
-    tap_eligible?(meta, viewer) and Map.get(meta, :assigned_looter) in [nil, viewer] and
-      takeable?(Map.get(meta, :loot_summary), character)
-  end
-
-  defp takeable?(%{gold?: true}, _character), do: true
-  defp takeable?(%{general_items?: true}, _character), do: true
-
-  defp takeable?(%{quest_item_ids: [_ | _] = item_ids}, %Character{} = character) do
-    Enum.any?(item_ids, &Quests.needs_item?(character, &1))
-  end
-
-  defp takeable?(%{quest_item_ids: [_ | _]}, _character), do: true
-  defp takeable?(%{gold?: false, general_items?: false, quest_item_ids: []}, _character), do: false
-  defp takeable?(_summary, _character), do: true
 
   defp tap_eligible?(meta, viewer) do
     cond do
@@ -82,7 +55,4 @@ defmodule ThistleTea.Game.World.Visibility.Tap do
 
   defp clear_if(flags, bit, true), do: flags &&& bnot(bit)
   defp clear_if(flags, _bit, false), do: flags
-
-  defp set_if(flags, bit, true), do: flags ||| bit
-  defp set_if(flags, _bit, false), do: flags
 end

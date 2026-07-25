@@ -45,10 +45,10 @@ defmodule ThistleTea.Game.World.Loader.Loot do
     :ok
   end
 
-  def generate(loot_id, min_gold, max_gold) do
+  def generate(loot_id, min_gold, max_gold, wanted_quest_item? \\ &always_wanted/1) do
     %Loot{
       gold: roll_gold(min_gold, max_gold),
-      items: roll_items(loot_id, &creature_rows/1)
+      items: roll_items(loot_id, &creature_rows/1, wanted_quest_item?)
     }
   end
 
@@ -83,10 +83,13 @@ defmodule ThistleTea.Game.World.Loader.Loot do
     %Loot{gold: gold, items: items}
   end
 
-  defp roll_items(loot_id, rows_fn) when is_integer(loot_id) and loot_id > 0 do
+  defp roll_items(loot_id, rows_fn, wanted_quest_item? \\ &always_wanted/1)
+
+  defp roll_items(loot_id, rows_fn, wanted_quest_item?) when is_integer(loot_id) and loot_id > 0 do
     loot_id
     |> rows_fn.()
     |> Loot.roll(&reference_rows/1)
+    |> Enum.filter(fn {item_id, _count, quest_item} -> not quest_item or wanted_quest_item?.(item_id) end)
     |> Enum.map(fn {item_id, count, quest_item} -> {ItemLoader.get_template(item_id), count, quest_item} end)
     |> Enum.reject(fn {template, _count, _quest_item} -> is_nil(template) end)
     |> Enum.with_index()
@@ -102,7 +105,9 @@ defmodule ThistleTea.Game.World.Loader.Loot do
     end)
   end
 
-  defp roll_items(_loot_id, _rows_fn), do: []
+  defp roll_items(_loot_id, _rows_fn, _wanted_quest_item?), do: []
+
+  defp always_wanted(_item_id), do: true
 
   defp creature_rows(loot_id) do
     case :ets.lookup(__MODULE__, {:creature, loot_id}) do

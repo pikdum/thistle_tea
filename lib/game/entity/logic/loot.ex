@@ -29,17 +29,6 @@ defmodule ThistleTea.Game.Entity.Logic.Loot do
     gold <= 0 and Enum.all?(items, & &1.looted)
   end
 
-  def summary(%__MODULE__{gold: gold, items: items}) do
-    unlooted = Enum.reject(items, & &1.looted)
-    {quest_items, general_items} = Enum.split_with(unlooted, & &1.quest_item)
-
-    %{
-      gold?: gold > 0,
-      general_items?: general_items != [],
-      quest_item_ids: quest_items |> Enum.map(& &1.item_id) |> Enum.uniq()
-    }
-  end
-
   def take_item(%__MODULE__{items: items} = loot, slot) do
     case Enum.find(items, fn item -> item.slot == slot and not item.looted and not item.blocked end) do
       %Item{} = item ->

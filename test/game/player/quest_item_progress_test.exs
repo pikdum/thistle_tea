@@ -16,6 +16,7 @@ defmodule ThistleTea.Game.Player.QuestItemProgressTest do
   alias ThistleTea.Game.Player.Quests
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader
+  alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.WorldRef
 
   @quest_id 3904
@@ -77,6 +78,32 @@ defmodule ThistleTea.Game.Player.QuestItemProgressTest do
 
     assert_received {:"$gen_cast", {:send_packet, %Message.SmsgQuestupdateAddItem{item_id: @item_id, count: 1}}}
     assert ItemStore.get(stack.object.guid).item.stack_count == 3
+  end
+
+  test "needed_items lists short quest items and drops satisfied ones", %{
+    character: character,
+    player_guid: player_guid
+  } do
+    assert Quests.needed_items(character) == MapSet.new([@item_id])
+
+    stack = ItemStore.create(grape_template(), owner: player_guid, stack_count: 8)
+    on_exit(fn -> ItemStore.delete(stack.object.guid) end)
+
+    character = %{character | player: %{character.player | inv1: stack.object.guid}}
+
+    assert Quests.needed_items(character) == MapSet.new()
+  end
+
+  test "sync_needed_items publishes the set for other processes to read", %{
+    character: character,
+    player_guid: player_guid
+  } do
+    on_exit(fn -> Metadata.delete(player_guid) end)
+
+    Quests.sync_needed_items(character)
+
+    assert %{needed_quest_items: needed} = Metadata.query(player_guid, [:needed_quest_items])
+    assert MapSet.member?(needed, @item_id)
   end
 
   test "quest_item_counts snapshots current counts", %{character: character, player_guid: player_guid} do

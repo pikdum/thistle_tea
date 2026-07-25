@@ -40,7 +40,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Corpse do
   @corpse_decay_elite_ms 600_000
 
   def prepare(%Mob{internal: %Internal{loot: %InternalLoot{} = internal_loot} = internal} = state, target) do
-    loot = generate_loot(internal_loot)
+    loot = generate_loot(internal_loot, quest_item_filter(state, target))
     session = LootSession.new(loot, internal_loot.tapped_by)
 
     state =
@@ -77,12 +77,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Corpse do
         state = resolve_pending_rolls(state)
         close_loot_windows(state)
 
-        Metadata.update(state.object.guid, %{
-          tapped_player: nil,
-          tapped_group_id: nil,
-          assigned_looter: nil,
-          loot_summary: nil
-        })
+        Metadata.update(state.object.guid, %{tapped_player: nil, tapped_group_id: nil, assigned_looter: nil})
 
         state = Visibility.leave_entity(state)
         World.remove_position(state)
@@ -184,12 +179,40 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Corpse do
     end
   end
 
-  defp generate_loot(%InternalLoot{} = internal_loot) do
+  defp generate_loot(%InternalLoot{} = internal_loot, quest_item_filter) do
     case internal_loot.override do
-      %{items: items, gold: gold} -> LootLoader.generate_fixed(items, gold)
-      _ -> LootLoader.generate(internal_loot.id, internal_loot.min_gold, internal_loot.max_gold)
+      %{items: items, gold: gold} ->
+        LootLoader.generate_fixed(items, gold)
+
+      _ ->
+        LootLoader.generate(internal_loot.id, internal_loot.min_gold, internal_loot.max_gold, quest_item_filter)
     end
   end
+
+  defp quest_item_filter(%Mob{} = state, target) do
+    looters = candidate_looters(state, target)
+    fn item_id -> Enum.any?(looters, &needs_quest_item?(&1, item_id)) end
+  end
+
+  defp candidate_looters(%Mob{} = state, target) do
+    tapper = tapped_player(state) || target
+
+    case tap_group(state) || killer_group(target) do
+      %Party.Group{} = group -> Enum.uniq([tapper | eligible_members(state, group)])
+      _ -> [tapper]
+    end
+    |> Enum.filter(&is_integer/1)
+  end
+
+  defp needs_quest_item?(looter, item_id) do
+    case Metadata.query(looter, [:needed_quest_items]) do
+      %{needed_quest_items: %MapSet{} = item_ids} -> MapSet.member?(item_ids, item_id)
+      _ -> true
+    end
+  end
+
+  defp tapped_player(%Mob{internal: %Internal{loot: %InternalLoot{tapped_by: %{player: player}}}}), do: player
+  defp tapped_player(%Mob{}), do: nil
 
   defp setup_group_loot(%Mob{} = state, target) do
     case tap_group(state) || killer_group(target) do
@@ -428,12 +451,8 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Corpse do
   defp session(%Mob{}), do: nil
 
   defp put_session(%Mob{} = state, session) do
-    Metadata.update(state.object.guid, %{loot_summary: loot_summary(session)})
     put_internal_loot(state, %{state.internal.loot | session: session})
   end
-
-  defp loot_summary(%LootSession{loot: %Loot{} = loot}), do: Loot.summary(loot)
-  defp loot_summary(_session), do: nil
 
   defp put_internal_loot(%Mob{internal: %Internal{} = internal} = state, %InternalLoot{} = internal_loot) do
     %{state | internal: %{internal | loot: internal_loot}}

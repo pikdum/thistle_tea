@@ -38,6 +38,7 @@ defmodule ThistleTea.Game.Player.Login do
   alias ThistleTea.Game.Party.Notifier
   alias ThistleTea.Game.Player.Enchantments
   alias ThistleTea.Game.Player.Mail
+  alias ThistleTea.Game.Player.Quests
   alias ThistleTea.Game.Player.Rest, as: PlayerRest
   alias ThistleTea.Game.Player.Spells, as: PlayerSpells
   alias ThistleTea.Game.Player.Stats, as: PlayerStats
@@ -107,7 +108,8 @@ defmodule ThistleTea.Game.Player.Login do
         duel_opponent_guid: Dueling.opponent_guid(c),
         duel_started?: Dueling.active?(c),
         orientation: elem(c.movement_block.position, 3),
-        attacker_spell_hit_chance: AuraLogic.attacker_spell_hit_chance(c)
+        attacker_spell_hit_chance: AuraLogic.attacker_spell_hit_chance(c),
+        needed_quest_items: Quests.needed_items(c)
       }
       |> Map.merge(StealthDetection.target_metadata(c))
       |> Map.merge(FactionLoader.metadata(c.unit.faction_template))

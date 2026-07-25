@@ -27,6 +27,7 @@ defmodule ThistleTea.Game.Player.Quests do
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
   alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader
+  alias ThistleTea.Game.World.Metadata
 
   def ctx(%Character{} = character) do
     %{
@@ -300,26 +301,35 @@ defmodule ThistleTea.Game.Player.Quests do
     end
   end
 
-  def needs_item?(%Character{player: player}, item_id) do
+  def needs_item?(%Character{} = character, item_id) do
+    MapSet.member?(needed_items(character), item_id)
+  end
+
+  def needed_items(%Character{player: player}) do
     player.quest_log
     |> QuestLog.active_entries()
-    |> Enum.any?(fn
-      %Entry{quest_id: quest_id, status: :incomplete} ->
-        case QuestLoader.get(quest_id) do
-          %Quest{required_items: required_items} ->
-            # credo:disable-for-next-line Credo.Check.Refactor.Nesting
-            Enum.any?(required_items, fn {_index, required_id, required_count} ->
-              required_id == item_id and
-                Inventory.count_entry(player, item_id, &ItemStore.get/1) < required_count
-            end)
-
-          nil ->
-            false
-        end
-
-      %Entry{} ->
-        false
+    |> Enum.flat_map(fn
+      %Entry{quest_id: quest_id, status: :incomplete} -> missing_items(player, quest_id)
+      %Entry{} -> []
     end)
+    |> MapSet.new()
+  end
+
+  def sync_needed_items(%Character{object: %{guid: guid}} = character) do
+    Metadata.update(guid, %{needed_quest_items: needed_items(character)})
+    character
+  end
+
+  defp missing_items(player, quest_id) do
+    case QuestLoader.get(quest_id) do
+      %Quest{required_items: required_items} ->
+        for {_index, item_id, required_count} <- required_items,
+            Inventory.count_entry(player, item_id, &ItemStore.get/1) < required_count,
+            do: item_id
+
+      nil ->
+        []
+    end
   end
 
   def filter_loot(%Loot{} = loot, %Character{} = character) do
@@ -407,6 +417,7 @@ defmodule ThistleTea.Game.Player.Quests do
 
   def on_inventory_changed(%{character: %Character{} = character} = state, old_counts) do
     player = character.player
+    sync_needed_items(character)
 
     quests =
       player
@@ -527,6 +538,7 @@ defmodule ThistleTea.Game.Player.Quests do
 
   defp put_character(state, %Character{} = character) do
     CharacterStore.put(character)
+    sync_needed_items(character)
     Server.maybe_broadcast_update(%{state | character: Core.mark_broadcast_update(character)})
   end
 end
