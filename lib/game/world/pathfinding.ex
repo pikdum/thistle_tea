@@ -34,6 +34,20 @@ defmodule ThistleTea.Game.World.Pathfinding do
     end
   end
 
+  def snap_to_ground(map_id, {x, y, z}) do
+    case find_heights(map_id, {x, y}) do
+      [_ | _] = heights -> {x, y, ground_height(heights, z)}
+      _ -> {x, y, z}
+    end
+  end
+
+  defp ground_height(heights, z) do
+    case Enum.filter(heights, &(&1 <= z)) do
+      [_ | _] = below -> Enum.max(below)
+      [] -> Enum.min_by(heights, &abs(&1 - z))
+    end
+  end
+
   def query_liquid_surface(map_id, {x, y, z}) do
     load_adt_at(map_id, {x, y})
     Namigator.query_liquid_surface(map_id, x, y, z)

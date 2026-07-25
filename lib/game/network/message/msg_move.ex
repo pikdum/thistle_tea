@@ -65,7 +65,14 @@ defmodule ThistleTea.Game.Network.Message.MsgMove do
     %MovementBlock{position: {x1, y1, z1, orientation}} = movement_block
     now = Time.now()
     movement_velocity = movement_velocity(state.guid, movement_block, {x0, y0, z0}, {x1, y1, z1}, now)
-    Metadata.update(state.guid, %{orientation: orientation, movement_velocity: movement_velocity, last_move_at: now})
+
+    Metadata.update(state.guid, %{
+      orientation: orientation,
+      movement_velocity: movement_velocity,
+      airborne?: MovementBlock.airborne?(movement_block),
+      last_move_at: now
+    })
+
     position_changed? = x0 != x1 or y0 != y1 or z0 != z1
     character = interrupt_auras(character, position_changed?)
     character = interrupt_water_auras(character, movement_block, state.character.movement_block)

@@ -27,6 +27,18 @@ defmodule ThistleTea.Game.World.PathfindingTest do
     end
   end
 
+  describe "snap_to_ground/2" do
+    test "drops a mid-jump position back onto the terrain" do
+      {x, y, z} = @human_start
+      assert {^x, ^y, snapped} = Pathfinding.snap_to_ground(0, {x, y, z + 4.0})
+      assert_in_delta snapped, z, 0.5
+    end
+
+    test "keeps the position on an unloaded map" do
+      assert Pathfinding.snap_to_ground(999, {0.0, 0.0, 5.0}) == {0.0, 0.0, 5.0}
+    end
+  end
+
   describe "query_liquid_surface/2" do
     test "returns the liquid surface at a fishing-hole coordinate" do
       assert_in_delta Pathfinding.query_liquid_surface(0, {-2183.26, -1867.59, 0.0}), 0.268, 0.01

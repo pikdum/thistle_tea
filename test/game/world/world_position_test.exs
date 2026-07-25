@@ -93,4 +93,30 @@ defmodule ThistleTea.Game.World.WorldPositionTest do
       refute World.moving?(912, 1_000)
     end
   end
+
+  describe "grounded_target_position/2" do
+    test "leaves a grounded unit's position alone" do
+      SpatialHash.update(:players, 920, 0, 1.0, 2.0, 3.0)
+      Metadata.put(920, %{airborne?: false})
+
+      on_exit(fn ->
+        SpatialHash.remove(:players, 920)
+        Metadata.delete(920)
+      end)
+
+      assert World.grounded_target_position(920, 1_000) == {WorldRef.open(0), 1.0, 2.0, 3.0}
+    end
+
+    test "keeps an airborne unit's position when the map has no navmesh" do
+      SpatialHash.update(:players, 921, 999, 1.0, 2.0, 30.0)
+      Metadata.put(921, %{airborne?: true})
+
+      on_exit(fn ->
+        SpatialHash.remove(:players, 921)
+        Metadata.delete(921)
+      end)
+
+      assert World.grounded_target_position(921, 1_000) == {WorldRef.open(999), 1.0, 2.0, 30.0}
+    end
+  end
 end

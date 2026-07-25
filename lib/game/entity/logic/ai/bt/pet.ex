@@ -225,9 +225,11 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet do
   end
 
   defp chase_target(%Mob{internal: %Internal{world: world}, unit: %Unit{target: target}} = state, blackboard) do
+    now = Time.now()
+
     state =
-      case World.target_position(target) do
-        {^world, x, y, z} -> state |> run() |> Movement.move_to({x, y, z}, [face_target: target], Time.now())
+      case World.grounded_target_position(target, now) do
+        {^world, x, y, z} -> state |> run() |> Movement.move_to({x, y, z}, [face_target: target], now)
         _ -> state
       end
 

@@ -1001,7 +1001,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     target = state.unit.target
     now = Time.now()
 
-    case World.target_position(target) do
+    case World.grounded_target_position(target, now) do
       {world, x, y, z} when world == state.internal.world ->
         {state, blackboard} = maybe_repath_chase(state, blackboard, {x, y, z}, target, now)
         delay_ms = chase_delay(state, target, {x, y}, now)

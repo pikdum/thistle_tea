@@ -187,6 +187,28 @@ defmodule ThistleTea.Game.World do
     position(guid)
   end
 
+  def grounded_target_position(guid, now \\ Time.now()) when is_integer(guid) and is_integer(now) do
+    guid |> position(now) |> ground_if_airborne(guid)
+  end
+
+  defp ground_if_airborne({%WorldRef{map_id: map_id} = world, x, y, z} = position, guid) do
+    if airborne?(guid) do
+      {gx, gy, gz} = Pathfinding.snap_to_ground(map_id, {x, y, z})
+      {world, gx, gy, gz}
+    else
+      position
+    end
+  end
+
+  defp ground_if_airborne(position, _guid), do: position
+
+  defp airborne?(guid) do
+    case Metadata.query(guid, [:airborne?]) do
+      %{airborne?: true} -> true
+      _ -> false
+    end
+  end
+
   def moving?(guid, now \\ Time.now()) when is_integer(guid) and is_integer(now) do
     spline_moving?(guid, now) or recently_moved?(guid, now)
   end
@@ -226,7 +248,7 @@ defmodule ThistleTea.Game.World do
 
   def projected_position(guid, horizon_ms, now \\ Time.now())
       when is_integer(guid) and is_integer(horizon_ms) and horizon_ms >= 0 and is_integer(now) do
-    position = position(guid, now)
+    position = grounded_target_position(guid, now)
     project_position(position, Metadata.query(guid, [:movement_velocity, :moving_until]), horizon_ms, now)
   end
 
