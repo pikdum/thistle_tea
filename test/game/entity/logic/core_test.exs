@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Entity.Logic.CoreTest do
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.Core
+  alias ThistleTea.Game.Entity.Logic.Event
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.WorldRef
 
@@ -89,6 +90,37 @@ defmodule ThistleTea.Game.Entity.Logic.CoreTest do
       {entity, _absorbed} = Core.take_damage_with_absorb(entity, 30, 1_000, source: 0)
 
       assert entity.internal.killed_by == nil
+    end
+  end
+
+  describe "take_damage_with_absorb/4 pet dismissal" do
+    test "queues a saved pet dismissal when a player dies with a pet out" do
+      entity = player_with_pet(health: 30, summon: 123)
+
+      {entity, _absorbed} = Core.take_damage_with_absorb(entity, 30, 1_000, source: 777)
+
+      assert Core.dead?(entity)
+
+      assert Enum.any?(
+               entity.internal.events,
+               &match?(%Event{type: :dismiss_pet, source_guid: 6, reason: :owner_died}, &1)
+             )
+    end
+
+    test "does not dismiss the pet on non-lethal damage" do
+      entity = player_with_pet(health: 30, summon: 123)
+
+      {entity, _absorbed} = Core.take_damage_with_absorb(entity, 10, 1_000, source: 777)
+
+      refute Enum.any?(entity.internal.events, &match?(%Event{type: :dismiss_pet}, &1))
+    end
+
+    test "does not queue a dismissal when no pet is out" do
+      entity = player_with_pet(health: 30, summon: 0)
+
+      {entity, _absorbed} = Core.take_damage_with_absorb(entity, 30, 1_000, source: 777)
+
+      refute Enum.any?(entity.internal.events, &match?(%Event{type: :dismiss_pet}, &1))
     end
   end
 
@@ -344,6 +376,18 @@ defmodule ThistleTea.Game.Entity.Logic.CoreTest do
       unit: %Unit{health: Keyword.get(opts, :health), max_health: 100, level: 1, auras: []},
       internal: %Internal{},
       movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}, spline_nodes: []}
+    }
+  end
+
+  defp player_with_pet(opts) do
+    base = damageable(opts)
+
+    %Character{
+      object: %Object{guid: 6},
+      player: %Player{},
+      unit: %{base.unit | summon: Keyword.get(opts, :summon, 0)},
+      internal: base.internal,
+      movement_block: base.movement_block
     }
   end
 end

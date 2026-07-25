@@ -635,8 +635,8 @@ defmodule ThistleTea.Game.Entity.Logic.Event do
     %__MODULE__{type: :tame_creature, source_guid: owner_guid, entry: entry}
   end
 
-  def dismiss_pet(owner_guid) when is_integer(owner_guid) do
-    %__MODULE__{type: :dismiss_pet, source_guid: owner_guid}
+  def dismiss_pet(owner_guid, reason \\ nil) when is_integer(owner_guid) do
+    %__MODULE__{type: :dismiss_pet, source_guid: owner_guid, reason: reason}
   end
 
   def summon_totem(entry, slot, duration_ms)

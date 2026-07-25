@@ -960,12 +960,20 @@ defmodule ThistleTea.Game.Network.Server do
 
   def maybe_broadcast_update(%{character: %Character{}} = state) do
     state
+    |> cancel_cast_if_dead()
     |> sync_character_metadata()
     |> then(fn state -> %{state | character: EventSink.emit_pending(state.character)} end)
     |> do_broadcast_update()
   end
 
   def maybe_broadcast_update(state), do: state
+
+  defp cancel_cast_if_dead(%{character: %Character{internal: %Internal{casting: casting}} = character} = state)
+       when not is_nil(casting) do
+    if Core.dead?(character), do: Spellcasting.cancel(state), else: state
+  end
+
+  defp cancel_cast_if_dead(state), do: state
 
   defp do_broadcast_update(%{character: %Character{internal: %Internal{broadcast_update?: true}} = character} = state) do
     Core.update_object(character, :values)

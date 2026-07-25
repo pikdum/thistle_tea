@@ -55,6 +55,34 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
       assert_receive {:"$gen_cast", {:threat_ref_gained, ^mob_guid, 7}}
     end
 
+    test "dismiss_pet clears the recall entry on a normal dismissal" do
+      character = character_with_pet()
+
+      dismissed = EventSink.emit(character, Event.dismiss_pet(character.object.guid))
+
+      assert dismissed.unit.summon == 0
+      assert dismissed.internal.active_pet_entry == nil
+      assert dismissed.internal.active_pet_spell_id == nil
+    end
+
+    test "dismiss_pet keeps the recall entry when the owner died" do
+      character = character_with_pet()
+
+      dismissed = EventSink.emit(character, Event.dismiss_pet(character.object.guid, :owner_died))
+
+      assert dismissed.unit.summon == 0
+      assert dismissed.internal.active_pet_entry == 416
+      assert dismissed.internal.active_pet_spell_id == 688
+    end
+
+    test "dismiss_pet clears the owner's pet action bar" do
+      character = character_with_pet()
+
+      EventSink.emit(character, Event.dismiss_pet(character.object.guid, :owner_died))
+
+      assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgPetSpells{pet_guid: 0}}}
+    end
+
     test "tap_cleared clears the entity's own tap metadata", %{mob: mob} do
       guid = mob.object.guid
       Metadata.update(guid, %{tapped_player: 123, tapped_group_id: 7})
@@ -466,5 +494,14 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
 
   defp unique_guid do
     System.unique_integer([:positive, :monotonic])
+  end
+
+  defp character_with_pet do
+    %Character{
+      object: %Object{guid: Guid.from_low_guid(:player, unique_guid())},
+      player: %Player{},
+      unit: %Unit{summon: Guid.from_low_guid(:pet, 416, unique_guid())},
+      internal: %Internal{active_pet_entry: 416, active_pet_spell_id: 688}
+    }
   end
 end

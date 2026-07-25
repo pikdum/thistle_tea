@@ -1049,15 +1049,19 @@ defmodule ThistleTea.Game.Entity.EventSink do
 
   def emit(entity, %Event{type: :tame_creature}), do: entity
 
-  def emit(%Character{unit: %Unit{summon: pet_guid}} = entity, %Event{type: :dismiss_pet})
+  def emit(%Character{unit: %Unit{summon: pet_guid}} = entity, %Event{type: :dismiss_pet} = event)
       when is_integer(pet_guid) and pet_guid > 0 do
     World.stop_entity(pet_guid)
+    Network.send_packet(Message.SmsgPetSpells.clear())
 
-    %{
-      entity
-      | unit: %{entity.unit | summon: 0},
-        internal: %{entity.internal | active_pet_entry: nil, active_pet_spell_id: nil}
-    }
+    internal =
+      if event.reason == :owner_died do
+        entity.internal
+      else
+        %{entity.internal | active_pet_entry: nil, active_pet_spell_id: nil}
+      end
+
+    %{entity | unit: %{entity.unit | summon: 0}, internal: internal}
   end
 
   def emit(entity, %Event{type: :dismiss_pet}), do: entity

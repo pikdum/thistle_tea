@@ -19,6 +19,9 @@ defmodule ThistleTea.Game.Network.ServerTest do
   alias ThistleTea.Game.Network.Session
   alias ThistleTea.Game.Network.UpdateBatcher
   alias ThistleTea.Game.Network.UpdateObject
+  alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.Cast
+  alias ThistleTea.Game.Spell.Targets
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
@@ -252,6 +255,38 @@ defmodule ThistleTea.Game.Network.ServerTest do
                Metadata.query(guid, [:undetectable_until, :stealthed?])
 
       assert expires_at > Time.now()
+    end
+
+    test "cancels an in-flight cast when the character is dead" do
+      guid = System.unique_integer([:positive])
+      character = character(guid, health: 0, max_health: 100)
+      spell = %Spell{id: 1949, attributes: MapSet.new(), effects: []}
+      casting = Cast.new(spell, %Targets{}, 1_000)
+      character = %{character | internal: %{character.internal | casting: casting}}
+
+      Metadata.put(guid, %{})
+      on_exit(fn -> Metadata.delete(guid) end)
+
+      state = Server.maybe_broadcast_update(%{guid: guid, character: character})
+
+      assert state.character.internal.casting == nil
+      assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgSpellFailure{spell: 1949}}}
+    end
+
+    test "leaves an in-flight cast alone while the character lives" do
+      guid = System.unique_integer([:positive])
+      character = character(guid, health: 50, max_health: 100)
+      spell = %Spell{id: 1949, attributes: MapSet.new(), effects: []}
+      casting = Cast.new(spell, %Targets{}, 1_000)
+      character = %{character | internal: %{character.internal | casting: casting}}
+
+      Metadata.put(guid, %{})
+      on_exit(fn -> Metadata.delete(guid) end)
+
+      state = Server.maybe_broadcast_update(%{guid: guid, character: character})
+
+      assert state.character.internal.casting == casting
+      refute_receive {:"$gen_cast", {:send_packet, %Message.SmsgSpellFailure{}}}, 10
     end
   end
 
