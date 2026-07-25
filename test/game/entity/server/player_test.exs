@@ -96,7 +96,7 @@ defmodule ThistleTea.Game.Entity.Server.PlayerTest do
 
   describe "handle_cast/2" do
     test "drops source-scoped packets for untracked entities" do
-      state = %{tracked_entities: MapSet.new()}
+      state = %State{tracked_entities: MapSet.new()}
       packet = %Packet{opcode: 0x123, payload: <<>>}
 
       assert {:noreply, ^state} =
@@ -104,10 +104,11 @@ defmodule ThistleTea.Game.Entity.Server.PlayerTest do
     end
 
     test "drops destroy packets for untracked entities" do
-      state = %{tracked_entities: MapSet.new()}
+      state = %State{tracked_entities: MapSet.new()}
       packet = %Message.SmsgDestroyObject{guid: 1}
 
       assert {:noreply, ^state} = PlayerServer.handle_cast({:send_packet, packet}, state)
+      refute_receive {:"$gen_cast", {:write_packet, %Packet{}}}
     end
 
     test "drops duplicate unscoped create updates" do
@@ -135,7 +136,7 @@ defmodule ThistleTea.Game.Entity.Server.PlayerTest do
     end
 
     test "raises when a serialized update object packet reaches the server" do
-      state = %{}
+      state = %State{}
       packet = %Packet{opcode: @smsg_update_object, payload: <<>>}
 
       assert_raise RuntimeError, "SMSG_UPDATE_OBJECT packets must be sent as UpdateObject structs", fn ->

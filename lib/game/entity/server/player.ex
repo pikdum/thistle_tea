@@ -7,7 +7,6 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   encoded packets.
   """
   use GenServer
-  use ThistleTea.Game.Network.Opcodes, [:SMSG_UPDATE_OBJECT]
 
   import Bitwise, only: [|||: 2]
 
@@ -42,15 +41,14 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.Entity.Logic.SpellEffect
   alias ThistleTea.Game.Entity.Logic.SpellFeedback
   alias ThistleTea.Game.Entity.Logic.StealthDetection
+  alias ThistleTea.Game.Entity.Server.Player.PacketSink
   alias ThistleTea.Game.Entity.Server.Player.State
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.InventoryUpdate
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.MovementControl
-  alias ThistleTea.Game.Network.Packet
   alias ThistleTea.Game.Network.PlayerTick
-  alias ThistleTea.Game.Network.UpdateBatcher
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.Party.MemberStats
   alias ThistleTea.Game.Party.Notifier, as: PartyNotifier
@@ -78,7 +76,6 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.World.System.Duel, as: DuelSystem
   alias ThistleTea.Game.World.System.Instance, as: InstanceSystem
   alias ThistleTea.Game.World.Visibility
-  alias ThistleTea.Game.World.Visibility.Tap
   alias ThistleTea.Game.WorldRef
 
   require Logger
@@ -138,97 +135,10 @@ defmodule ThistleTea.Game.Entity.Server.Player do
     {:stop, :normal, :ok, State.leave_world(state)}
   end
 
-  defp create_update?(%UpdateObject{update_type: update_type, object: %{guid: guid}})
-       when update_type in [:create_object, :create_object2] and is_integer(guid) do
-    Guid.entity_type(guid) != :item
-  end
-
-  defp create_update?(%UpdateObject{}), do: false
-
-  defp duplicate_create?(state, %UpdateObject{object: %{guid: guid}} = update) do
-    create_update?(update) and Visibility.tracked?(state, guid)
-  end
-
-  defp track_created_updates(state, updates) do
-    created_guids =
-      updates
-      |> Enum.filter(&create_update?/1)
-      |> MapSet.new(& &1.object.guid)
-
-    Visibility.track_entities(state, created_guids)
-  end
-
-  defp source_tracked?(_state, nil), do: true
-
-  defp source_tracked?(state, source_guid) when is_integer(source_guid) do
-    Visibility.tracked?(state, source_guid)
-  end
-
-  defp source_tracked?(_state, _source_guid), do: false
-
   @impl GenServer
-  def handle_cast({:send_packet, %UpdateObject{} = update, opts}, state) do
-    source_guid = Keyword.get(opts, :source_guid)
+  def handle_cast({:send_packet, message, opts}, state), do: {:noreply, PacketSink.send(state, message, opts)}
 
-    cond do
-      not source_tracked?(state, source_guid) ->
-        {:noreply, state}
-
-      is_integer(source_guid) ->
-        send_update_object(update, state)
-
-      true ->
-        handle_cast({:send_packet, update}, state)
-    end
-  end
-
-  def handle_cast({:send_packet, %UpdateObject{} = update}, state) do
-    if duplicate_create?(state, update) do
-      {:noreply, state}
-    else
-      send_update_object(update, state)
-    end
-  end
-
-  def handle_cast({:send_packet, %Packet{opcode: @smsg_update_object}}, _state) do
-    raise "SMSG_UPDATE_OBJECT packets must be sent as UpdateObject structs"
-  end
-
-  def handle_cast({:send_packet, %Packet{opcode: @smsg_update_object}, _opts}, _state) do
-    raise "SMSG_UPDATE_OBJECT packets must be sent as UpdateObject structs"
-  end
-
-  def handle_cast({:send_packet, %Message.SmsgDestroyObject{guid: guid} = packet}, state) do
-    if Visibility.tracked?(state, guid) do
-      state = send_packet(state, packet)
-      state = Visibility.untrack_entity(state, guid)
-      {:noreply, state}
-    else
-      {:noreply, state}
-    end
-  end
-
-  def handle_cast({:send_packet, %Message.SmsgDestroyObject{guid: guid} = packet, opts}, state) do
-    if Keyword.get(opts, :force, false) or source_tracked?(state, Keyword.get(opts, :source_guid)) do
-      state = send_packet(state, packet)
-      state = Visibility.untrack_entity(state, guid)
-      {:noreply, state}
-    else
-      {:noreply, state}
-    end
-  end
-
-  def handle_cast({:send_packet, packet, opts}, state) do
-    if source_tracked?(state, Keyword.get(opts, :source_guid)) do
-      {:noreply, send_packet(state, packet)}
-    else
-      {:noreply, state}
-    end
-  end
-
-  def handle_cast({:send_packet, packet}, state) do
-    {:noreply, send_packet(state, packet)}
-  end
+  def handle_cast({:send_packet, message}, state), do: {:noreply, PacketSink.send(state, message)}
 
   @impl GenServer
   def handle_cast({:mail_delivery, token, mail}, state) do
@@ -606,35 +516,6 @@ defmodule ThistleTea.Game.Entity.Server.Player do
     {:noreply, state}
   end
 
-  defp send_update_object(%UpdateObject{} = update, state) do
-    viewer = Map.get(state, :guid)
-    {packet, updates} = UpdateBatcher.batch(update, viewer, &Tap.personalize(&1, viewer))
-    state = send_packet(state, packet)
-    state = track_created_updates(state, updates)
-    {:noreply, state}
-  end
-
-  defp ensure_pet_created(%UpdateObject{} = update, state) do
-    if duplicate_create?(state, update) do
-      state
-    else
-      update = Tap.personalize(update, state.guid)
-      packet = UpdateObject.to_packet([update], state.guid)
-      state = send_packet(state, packet)
-      track_created_updates(state, [update])
-    end
-  end
-
-  defp send_packet(%State{} = state, %Packet{} = packet) do
-    GenServer.cast(state.connection_pid, {:write_packet, packet})
-    state
-  end
-
-  defp send_packet(%State{} = state, message) do
-    {message, state} = MovementControl.prepare(message, state)
-    send_packet(state, Message.to_packet(message))
-  end
-
   @impl GenServer
   def handle_info({:DOWN, _monitor, :process, connection_pid, _reason}, %State{connection_pid: connection_pid} = state) do
     {:stop, :normal, State.leave_world(state)}
@@ -659,7 +540,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
 
   @impl GenServer
   def handle_info(:logout_complete, %{logout_timer: timer} = state) when is_reference(timer) do
-    state = send_packet(state, %Message.SmsgLogoutComplete{})
+    state = PacketSink.send(state, %Message.SmsgLogoutComplete{})
     connection_pid = state.connection_pid
     state = State.leave_world(state)
     GenServer.cast(connection_pid, {:player_logged_out, self()})
@@ -829,7 +710,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
         {:pet_attached, %UpdateObject{object: %{guid: pet_guid}} = pet_update, spell_id, pet_spells},
         %{character: %Character{unit: %Unit{}}} = state
       ) do
-    state = ensure_pet_created(pet_update, state)
+    state = PacketSink.ensure_created(state, pet_update)
     character = state.character
     {character, aura_events} = Aura.remove_spells(character, [18_789, 18_790, 18_791, 18_792, 25_228], Time.now())
 
