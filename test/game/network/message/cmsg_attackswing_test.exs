@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgAttackswingTest do
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Logic.TargetRef
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.Message.CmsgAttackswing
   alias ThistleTea.Game.World.Metadata
@@ -23,6 +24,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgAttackswingTest do
         faction_template: wolf(),
         faction_can_have_reputation?: false,
         alive?: true,
+        incarnation_id: 7,
         unit_flags: 0
       })
 
@@ -44,6 +46,11 @@ defmodule ThistleTea.Game.Network.Message.CmsgAttackswingTest do
       refute state.character.internal.in_combat
       assert state.character.unit.target == target_guid
       assert state.character.internal.blackboard.auto_attacking == true
+
+      assert state.character.internal.blackboard.auto_attack_target == %TargetRef{
+               guid: target_guid,
+               incarnation_id: 7
+             }
     end
   end
 

@@ -64,7 +64,10 @@ defmodule ThistleTea.Game.Entity.Logic.LootSession do
     tap_allowed?(projection, actor) and not Loot.empty?(visible_loot(projection, actor))
   end
 
-  def tap_allowed?(%{tapped: tapped, loot_method: method, assigned_looter: assigned}, %Actor{} = actor) do
+  def tap_allowed?(%{tapped: tapped} = policy, %Actor{} = actor) do
+    method = Map.get(policy, :loot_method)
+    assigned = Map.get(policy, :assigned_looter)
+
     tap_allowed?(tapped, actor) and
       (method != @loot_method_round_robin or assigned in [nil, actor.guid])
   end

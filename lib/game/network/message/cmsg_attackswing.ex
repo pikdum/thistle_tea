@@ -5,7 +5,9 @@ defmodule ThistleTea.Game.Network.Message.CmsgAttackswing do
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Hostility
+  alias ThistleTea.Game.Entity.Logic.TargetRef
   alias ThistleTea.Game.Entity.Server.Player.TickScheduler
+  alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
 
   require Logger
@@ -17,11 +19,13 @@ defmodule ThistleTea.Game.Network.Message.CmsgAttackswing do
     Logger.info("CMSG_ATTACKSWING: #{target_guid}")
 
     if valid_attack_target?(state, target_guid) do
+      target_ref = TargetRef.new(target_guid, Metadata.query(target_guid, [:incarnation_id]) || %{})
+
       character =
         character
         |> maybe_reset_attack_started(target_guid)
         |> set_attack_target(target_guid)
-        |> BT.enable_auto_attack()
+        |> BT.enable_auto_attack(target_ref)
 
       Core.update_object(character, :values)
       |> World.broadcast_packet(character)

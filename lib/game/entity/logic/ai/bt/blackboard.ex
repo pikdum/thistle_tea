@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Blackboard do
             next_offhand_attack_at: 0,
             attack_started: false,
             auto_attacking: false,
+            auto_attack_target: nil,
             next_wander_at: 0,
             next_waypoint_at: 0,
             next_aggro_at: 0,
@@ -113,7 +114,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Blackboard do
   end
 
   def clear_attack(%__MODULE__{} = blackboard) do
-    %{blackboard | next_attack_at: 0, attack_started: false, auto_attacking: false}
+    %{blackboard | next_attack_at: 0, attack_started: false, auto_attacking: false, auto_attack_target: nil}
   end
 
   def reset_spells(%__MODULE__{} = blackboard) do
@@ -170,10 +171,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Blackboard do
   end
 
   def clear_auto_attack(%__MODULE__{} = blackboard) do
-    %{blackboard | attack_started: false, auto_attacking: false}
+    %{blackboard | attack_started: false, auto_attacking: false, auto_attack_target: nil}
   end
 
-  def enable_auto_attack(%__MODULE__{} = blackboard) do
-    %{blackboard | auto_attacking: true}
+  def enable_auto_attack(%__MODULE__{} = blackboard, target) do
+    %{blackboard | auto_attacking: true, auto_attack_target: target}
   end
 end

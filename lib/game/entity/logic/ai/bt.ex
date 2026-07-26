@@ -60,8 +60,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT do
     update_blackboard(state, &Blackboard.clear_attack_started/1)
   end
 
-  def enable_auto_attack(state) do
-    update_blackboard(state, &Blackboard.enable_auto_attack/1)
+  def enable_auto_attack(state, target) do
+    update_blackboard(state, &Blackboard.enable_auto_attack(&1, target))
   end
 
   def clear_auto_attack(state) do

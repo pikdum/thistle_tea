@@ -173,7 +173,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     caster_guid = caster_guid(caster)
 
     state =
-      if Spell.harmful?(spell) do
+      if Spell.harmful?(spell) and not Core.dead?(state) do
         state
         |> engage_combat(caster_guid)
         |> eventai_spell_hit(caster_guid, spell)
@@ -856,6 +856,11 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   defp engage_combat(state, caster), do: engage_combat(state, caster, [])
 
   defp engage_combat(%Mob{internal: %Internal{pet: %Pet{reaction_state: :passive}}} = state, _caster, _opts) do
+    state
+  end
+
+  defp engage_combat(%Mob{unit: %Unit{health: health}} = state, _caster, _opts)
+       when is_number(health) and health <= 0 do
     state
   end
 

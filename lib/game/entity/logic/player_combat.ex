@@ -18,6 +18,7 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombat do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.Combat, as: CombatLogic
+  alias ThistleTea.Game.Entity.Logic.TargetRef
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Metadata
@@ -142,26 +143,29 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombat do
     |> CombatLogic.sync_combat_flag()
   end
 
-  defp auto_attacking_target?(%Character{} = character, %Blackboard{auto_attacking: true}) do
-    active_target?(character)
+  defp auto_attacking_target?(%Character{} = character, %Blackboard{
+         auto_attacking: true,
+         auto_attack_target: %TargetRef{} = target
+       }) do
+    active_target?(character, target)
   end
 
   defp auto_attacking_target?(_character, _blackboard), do: false
 
-  defp active_target?(%Character{internal: %Internal{world: world}, unit: %Unit{target: target}})
+  defp active_target?(
+         %Character{internal: %Internal{world: world}, unit: %Unit{target: target}},
+         %TargetRef{guid: target} = target_ref
+       )
        when is_integer(target) and target > 0 do
     case World.target_position(target) do
-      {^world, _x, _y, _z} -> target_alive?(target)
+      {^world, _x, _y, _z} -> target_ref_active?(target_ref)
       _ -> false
     end
   end
 
-  defp active_target?(_character), do: false
+  defp active_target?(_character, _target_ref), do: false
 
-  defp target_alive?(target) do
-    case Metadata.query(target, [:alive?]) do
-      %{alive?: true} -> true
-      _ -> false
-    end
+  defp target_ref_active?(%TargetRef{guid: target} = target_ref) do
+    TargetRef.active?(target_ref, Metadata.query(target, [:alive?, :incarnation_id]) || %{})
   end
 end

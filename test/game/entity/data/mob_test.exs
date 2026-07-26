@@ -336,6 +336,26 @@ defmodule ThistleTea.Game.Entity.Data.MobTest do
       assert_receive {:"$gen_cast", {:reward_kill, %Mob{object: %Object{guid: ^mob_guid}}}}
     end
 
+    test "does not reengage a finalized corpse when a spell proc arrives late" do
+      player_guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
+      mob_guid = Guid.from_low_guid(:mob, 2, System.unique_integer([:positive]))
+
+      spell = %Spell{
+        id: 12_579,
+        effects: [%Effect{index: 0, type: :apply_aura, implicit_target_a: :target_enemy}]
+      }
+
+      mob = dead_mob(mob_guid, killed_by: player_guid, death_finalized?: true)
+      mob = %{mob | unit: %{mob.unit | target: 0}, internal: %{mob.internal | in_combat: false, threat: %{}}}
+
+      assert {:noreply, %Mob{} = mob, {:continue, :maybe_broadcast}} =
+               MobServer.handle_cast({:receive_spell, player_guid, spell}, mob)
+
+      assert mob.unit.target == 0
+      assert mob.internal.in_combat == false
+      assert mob.internal.threat == %{}
+    end
+
     test "schedules respawn when a mob dies" do
       player_guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
       mob_guid = Guid.from_low_guid(:mob, 2, System.unique_integer([:positive]))

@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombatTest do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.PlayerCombat
+  alias ThistleTea.Game.Entity.Logic.TargetRef
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
@@ -95,7 +96,7 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombatTest do
     test "keeps combat and refreshes the timer while auto-attacking a live target" do
       target_guid = Guid.from_low_guid(:mob, 1, unique_guid())
       SpatialHash.update(:mobs, target_guid, 0, 1.0, 0.0, 0.0)
-      Metadata.put(target_guid, %{alive?: true})
+      Metadata.put(target_guid, %{alive?: true, incarnation_id: 1})
 
       character = character(in_combat: true, target: target_guid, last_hostile_time: 1_000)
 
@@ -104,7 +105,12 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombatTest do
         Metadata.delete(target_guid)
       end)
 
-      {character, blackboard} = PlayerCombat.sync(character, %Blackboard{auto_attacking: true}, 100_000)
+      blackboard = %Blackboard{
+        auto_attacking: true,
+        auto_attack_target: %TargetRef{guid: target_guid, incarnation_id: 1}
+      }
+
+      {character, blackboard} = PlayerCombat.sync(character, blackboard, 100_000)
 
       assert character.internal.in_combat == true
       assert character.internal.last_hostile_time == 100_000
@@ -114,7 +120,7 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombatTest do
     test "stops swinging a dead target but lingers in combat, then drops after the window" do
       target_guid = Guid.from_low_guid(:mob, 1, unique_guid())
       SpatialHash.update(:mobs, target_guid, 0, 1.0, 0.0, 0.0)
-      Metadata.put(target_guid, %{alive?: false})
+      Metadata.put(target_guid, %{alive?: false, incarnation_id: 1})
 
       character = character(in_combat: true, target: target_guid, last_hostile_time: 1_000)
 
@@ -123,7 +129,13 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombatTest do
         Metadata.delete(target_guid)
       end)
 
-      blackboard = %Blackboard{auto_attacking: true, attack_started: true, next_attack_at: 1_500}
+      blackboard = %Blackboard{
+        auto_attacking: true,
+        auto_attack_target: %TargetRef{guid: target_guid, incarnation_id: 1},
+        attack_started: true,
+        next_attack_at: 1_500
+      }
+
       {character, blackboard} = PlayerCombat.sync(character, blackboard, 3_000)
 
       assert character.internal.in_combat == true
@@ -133,6 +145,31 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombatTest do
       {character, _blackboard} = PlayerCombat.sync(character, %Blackboard{auto_attacking: false}, 7_000)
 
       assert character.internal.in_combat == false
+    end
+
+    test "stops an old auto-attack when the same mob guid has respawned" do
+      mob_guid = Guid.from_low_guid(:mob, 1, unique_guid())
+      SpatialHash.update(:mobs, mob_guid, 0, 1.0, 0.0, 0.0)
+      Metadata.put(mob_guid, %{alive?: true, incarnation_id: 2})
+
+      on_exit(fn ->
+        SpatialHash.remove(:mobs, mob_guid)
+        Metadata.delete(mob_guid)
+      end)
+
+      character = character(in_combat: true, target: mob_guid, last_hostile_time: 1_000)
+
+      blackboard = %Blackboard{
+        auto_attacking: true,
+        attack_started: true,
+        auto_attack_target: %TargetRef{guid: mob_guid, incarnation_id: 1}
+      }
+
+      {character, blackboard} = PlayerCombat.sync(character, blackboard, 7_000)
+
+      assert character.internal.in_combat == false
+      assert blackboard.auto_attacking == false
+      assert blackboard.auto_attack_target == nil
     end
 
     test "stays in combat past the drop window while a live mob references the player" do
