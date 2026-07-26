@@ -380,6 +380,9 @@
                 fi
               done
 
+              sqlite_exec "CREATE INDEX IF NOT EXISTS idx_creature_map_position ON creature (map, position_x, position_y);"
+              sqlite_exec "CREATE INDEX IF NOT EXISTS idx_creature_ai_events_creature_id ON creature_ai_events (creature_id);"
+
               sqlite3 vmangos.sqlite "VACUUM;"
 
               runHook postBuild
