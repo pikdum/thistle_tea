@@ -3,8 +3,9 @@ defmodule ThistleTea.DevSeed do
   Seeds a debug playground on Programmer Isle (`.go xyz 16303.2 16318.1 69.44 451`):
   a `debug`/`debug` account with pre-leveled, spell-trained, gold-stocked
   characters for multi-session group testing, plus fast-respawning mobs —
-  loot piñatas with guaranteed green drops for roll testing and level-50
-  hostiles for combat and XP testing.
+  loot piñatas with guaranteed green drops for roll testing, level-50
+  hostiles for combat and XP testing, and a Devilsaur (combat reach 5.0)
+  for big-hitbox spell-range testing.
   """
   import Ecto.Query
 
@@ -58,6 +59,8 @@ defmodule ThistleTea.DevSeed do
   @pinata_offsets [{6.0, 6.0}, {9.0, 3.0}, {12.0, 6.0}]
   @hostile_entry 1783
   @hostile_offsets [{-45.0, 25.0}, {-50.0, 15.0}, {-55.0, 25.0}]
+  @devilsaur_entry 6498
+  @devilsaur_offset {-70.0, -25.0}
   @respawn_secs 5
   @hostile_respawn_secs 30
   @base_low_guid 990_000
@@ -239,6 +242,9 @@ defmodule ThistleTea.DevSeed do
     |> Enum.each(fn {{dx, dy}, index} ->
       spawn_mob(@hostile_entry, @base_low_guid + 100 + index, {x + dx, y + dy, z}, nil, @hostile_respawn_secs)
     end)
+
+    {dx, dy} = @devilsaur_offset
+    spawn_mob(@devilsaur_entry, @base_low_guid + 200, {x + dx, y + dy, z}, nil, @hostile_respawn_secs)
   end
 
   defp spawn_mob(entry, low_guid, {x, y, z}, loot_override, respawn_secs) do
