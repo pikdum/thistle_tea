@@ -118,7 +118,7 @@ defmodule ThistleTea.Application do
         {Registry, keys: :unique, name: SpawnPool.Registry},
         SpawnPoolCatalog,
         {SpawnPool.Supervisor, partitions: 8},
-        CellActivator,
+        {CellActivator, sweep: !test},
         {GameEventSystem, load_schedule: !test}
       ]
       |> Enum.filter(& &1)
