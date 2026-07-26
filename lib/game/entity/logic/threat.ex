@@ -145,7 +145,7 @@ defmodule ThistleTea.Game.Entity.Logic.Threat do
 
   def reselect(%Mob{unit: %Unit{target: current}, internal: %Internal{threat: table}} = entity, opts)
       when is_map(table) do
-    valid? = Keyword.get_lazy(opts, :valid?, fn -> &Hostility.valid_attack_target?(entity, &1) end)
+    valid? = Keyword.get_lazy(opts, :valid?, fn -> &valid_target?(entity, &1) end)
     in_melee? = Keyword.get_lazy(opts, :in_melee?, fn -> &in_melee_range?(entity, &1) end)
 
     {kept, dropped} = Enum.split_with(table, fn {guid, _threat} -> valid?.(guid) end)
@@ -179,9 +179,9 @@ defmodule ThistleTea.Game.Entity.Logic.Threat do
     {entity, decision}
   end
 
-  def reselect(entity, _opts), do: {entity, :keep}
+  def reselect(entity, _opts), do: {entity, :none}
 
-  defp decide([], _current, _current_threat, _in_melee?), do: :keep
+  defp decide([], _current, _current_threat, _in_melee?), do: :none
 
   defp decide([{top_guid, _threat} | _rest], current, nil, _in_melee?) do
     if top_guid == current, do: :keep, else: {:switch, top_guid}
@@ -197,6 +197,13 @@ defmodule ThistleTea.Game.Entity.Logic.Threat do
       {:switch, guid}
     else
       decide(rest, current, current_threat, in_melee?)
+    end
+  end
+
+  defp valid_target?(%Mob{internal: %Internal{world: world}} = entity, guid) do
+    case World.position(guid) do
+      {^world, _x, _y, _z} -> Hostility.valid_attack_target?(entity, guid)
+      _ -> false
     end
   end
 

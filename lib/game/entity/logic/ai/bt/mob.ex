@@ -573,6 +573,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
 
       {state, :keep} ->
         state
+
+      {state, :none} ->
+        state
     end
   end
 
@@ -585,6 +588,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
 
       {state, :keep} ->
         {:success, state, blackboard}
+
+      {state, :none} ->
+        state = reset_after_combat(state, context)
+        {:failure, state, Blackboard.from_any(state.internal.blackboard)}
     end
   end
 

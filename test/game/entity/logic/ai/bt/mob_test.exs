@@ -182,7 +182,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
       internal = %{mob.internal | in_combat: true, threat: %{vanished => 100.0, replacement => 50.0}}
       mob = %{mob | unit: unit, internal: internal}
 
-      put_metadata(replacement, alliance(), 5)
+      put_spatial_target(:players, replacement, {1.0, 0.0, 0.0}, alliance(), 5)
 
       mob = MobBT.drop_threat(mob, vanished)
 
@@ -255,6 +255,32 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
   end
 
   describe "tree/0" do
+    test "leaves combat when the final victim disappears from the world" do
+      target = player_guid()
+      mob = fixture_mob()
+
+      mob =
+        %{
+          mob
+          | unit: %{mob.unit | target: target, health: 100, max_health: 100, auras: []},
+            internal: %{
+              mob.internal
+              | in_combat: true,
+                threat: %{target => 100.0},
+                blackboard: %Blackboard{auto_attacking: true, attack_started: true}
+            }
+        }
+        |> BT.init(MobBT.tree())
+
+      {_status, mob} = BT.tick(mob.internal.behavior_tree, mob, AIEnvironment.context(mob, 1_000))
+
+      refute mob.internal.in_combat
+      assert mob.internal.threat == %{}
+      assert mob.unit.target == 0
+      refute mob.internal.blackboard.auto_attacking
+      assert Enum.any?(mob.internal.events, &is_struct(&1, Effects.AttackStop))
+    end
+
     test "interrupts a wander spline when combat begins" do
       now = Time.now()
 

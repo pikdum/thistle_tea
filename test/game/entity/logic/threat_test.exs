@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Entity.Logic.ThreatTest do
   alias ThistleTea.Game.Entity.Logic.Threat
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.SpatialHash
 
   @mob_guid 100
   @player_a 1
@@ -164,8 +165,17 @@ defmodule ThistleTea.Game.Entity.Logic.ThreatTest do
   end
 
   describe "reselect/2" do
-    test "keeps an empty decision on an empty table" do
-      assert {_entity, :keep} = reselect(mob())
+    test "returns none on an empty table" do
+      assert {_entity, :none} = reselect(mob())
+    end
+
+    test "returns none when the current victim is the final invalid entry" do
+      entity = mob(target: @player_a, threat: %{@player_a => 100.0})
+      {entity, decision} = reselect(entity, valid?: fn _guid -> false end)
+
+      assert decision == :none
+      assert entity.internal.threat == %{}
+      assert [%Effects.ThreatRefLost{target_guid: @player_a}] = entity.internal.events
     end
 
     test "picks the highest threat when there is no current victim" do
@@ -185,9 +195,12 @@ defmodule ThistleTea.Game.Entity.Logic.ThreatTest do
         unit_flags: 0
       })
 
+      SpatialHash.update(:players, player_guid, 0, 1.0, 0.0, 0.0)
+
       on_exit(fn ->
         Metadata.delete(mob_guid)
         Metadata.delete(player_guid)
+        SpatialHash.remove(:players, player_guid)
       end)
 
       entity = mob(guid: mob_guid, threat: %{player_guid => 10.0})
@@ -241,7 +254,7 @@ defmodule ThistleTea.Game.Entity.Logic.ThreatTest do
 
     test "no-ops for entities without a threat table" do
       entity = %Mob{object: %Object{guid: @mob_guid}, unit: %Unit{}, internal: %Internal{}}
-      assert {^entity, :keep} = Threat.reselect(entity, valid?: fn _ -> true end, in_melee?: fn _ -> false end)
+      assert {^entity, :none} = Threat.reselect(entity, valid?: fn _ -> true end, in_melee?: fn _ -> false end)
     end
   end
 
