@@ -1051,7 +1051,13 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
       blackboard = Blackboard.from_any(state.internal.blackboard)
       entry = %CreatureSpell{spell_id: spell_id, cast_target: if(Spell.harmful?(spell), do: :victim, else: :self)}
 
-      case MobSpells.attempt_commanded_cast(state, blackboard, entry, target_guid, Time.now()) do
+      case MobSpells.attempt_commanded_cast(
+             state,
+             blackboard,
+             entry,
+             target_guid,
+             AIEnvironment.context(state)
+           ) do
         {:ok, {state, blackboard}} -> {:ok, %{state | internal: %{state.internal | blackboard: blackboard}}}
         {:error, reason} -> {:error, reason}
       end

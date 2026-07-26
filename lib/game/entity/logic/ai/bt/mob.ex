@@ -18,8 +18,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AI.BT.Combat, as: CombatBT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context
-  alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Navigation
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Random
   alias ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells, as: MobSpells
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Navigation
   alias ThistleTea.Game.Entity.Logic.AI.BT.Regen, as: RegenBT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Spell, as: SpellBT
   alias ThistleTea.Game.Entity.Logic.AI.EventAI
@@ -80,19 +82,19 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
       ]),
       BT.sequence([
         BT.condition(&dead?/2),
-        BT.action(&idle_dead/2)
+        BT.action(&idle_dead/3)
       ]),
       BT.sequence([
         BT.condition(&stunned?/2),
-        BT.action(&idle_stunned/2)
+        BT.action(&idle_stunned/3)
       ]),
       BT.sequence([
         BT.condition(&confused?/2),
-        BT.action(&wait_until_confused_wander_ready/2),
+        BT.action(&wait_until_confused_wander_ready/3),
         BT.action(&pick_confused_point/3),
         BT.action(&move_to_target_with_context/3),
-        BT.action(&wait_for_arrival/2),
-        BT.action(&set_next_confused_wait/2)
+        BT.action(&wait_for_arrival_with_context/3),
+        BT.action(&set_next_confused_wait/3)
       ]),
       BT.sequence([
         BT.condition(&not_in_combat?/2),
@@ -104,26 +106,26 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
         BT.action(&flee_step_with_context/3)
       ]),
       BT.sequence([
-        BT.condition(&aggro_check_ready?/2),
+        BT.condition(&aggro_check_ready?/3),
         BT.condition(&not_in_combat?/2),
         BT.action(&try_aggro_with_context/3)
       ]),
       BT.sequence([
         BT.condition(&in_combat?/2),
         BT.action(&select_victim/3),
-        BT.action(&interrupt_idle_movement/2),
+        BT.action(&interrupt_idle_movement/3),
         BT.action(&set_running_true/2),
-        BT.action(&call_for_help_step/2),
+        BT.action(&call_for_help_step/3),
         BT.selector([
           BT.sequence([
-            BT.condition(&target_dead?/2),
+            BT.condition(&target_dead?/3),
             BT.action(&eventai_target_dead/3),
             BT.action(&set_tether_target/2),
             BT.action(&clear_combat/2),
             BT.action(&move_to_target_with_context/3)
           ]),
           BT.sequence([
-            BT.condition(&should_tether?/2),
+            BT.condition(&should_tether?/3),
             BT.action(&eventai_evade/3),
             BT.action(&set_tether_target/2),
             BT.action(&clear_combat/2),
@@ -139,41 +141,41 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
           BT.sequence([
             BT.condition(&target_valid_same_map?/3),
             BT.condition(&in_combat_range?/3),
-            BT.action(&halt_at_contact/2),
+            BT.action(&halt_at_contact/3),
             BT.action(&melee_attack/3),
             BT.action(&maybe_spread_with_context/3),
-            BT.action(&combat_wait/2)
+            BT.action(&combat_wait/3)
           ]),
           BT.sequence([
             BT.condition(&target_valid_same_map?/3),
-            BT.condition(&chase_ready?/2),
+            BT.condition(&chase_ready?/3),
             BT.action(&chase_repath_and_schedule/3)
           ]),
           BT.sequence([
             BT.condition(&target_valid_same_map?/3),
-            BT.action(&wait_for_chase_tick/2)
+            BT.action(&wait_for_chase_tick/3)
           ]),
-          BT.action(&clear_chase_and_idle/2)
+          BT.action(&clear_chase_and_idle/3)
         ])
       ]),
       BT.sequence([
         BT.condition(&has_waypoints?/2),
-        BT.action(&wait_until_waypoint_ready/2),
-        BT.action(&pick_waypoint/2),
+        BT.action(&wait_until_waypoint_ready/3),
+        BT.action(&pick_waypoint/3),
         BT.action(&move_to_target_with_context/3),
-        BT.action(&wait_for_arrival/2),
+        BT.action(&wait_for_arrival_with_context/3),
         BT.action(&apply_waypoint/3),
-        BT.action(&set_next_waypoint_wait/2)
+        BT.action(&set_next_waypoint_wait/3)
       ]),
       BT.sequence([
         BT.condition(&can_wander?/2),
-        BT.action(&wait_until_wander_ready/2),
+        BT.action(&wait_until_wander_ready/3),
         BT.action(&pick_wander_point/3),
         BT.action(&move_to_target_with_context/3),
-        BT.action(&wait_for_arrival/2),
-        BT.action(&set_next_wander_wait/2)
+        BT.action(&wait_for_arrival_with_context/3),
+        BT.action(&set_next_wander_wait/3)
       ]),
-      BT.action(&idle/2)
+      BT.action(&idle/3)
     ])
   end
 
@@ -215,8 +217,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
 
   defp stunned?(_state, _blackboard), do: false
 
-  defp idle_stunned(%Mob{} = state, %Blackboard{} = blackboard) do
-    idle_stunned(state, blackboard, Time.now())
+  defp idle_stunned(%Mob{} = state, %Blackboard{} = blackboard, %Context{now: now}) do
+    idle_stunned(state, blackboard, now)
   end
 
   defp idle_stunned(%Mob{} = state, %Blackboard{} = blackboard, now) when is_integer(now) do
@@ -225,9 +227,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     {BT.running(passive_delay(state, blackboard, now, @dead_idle_delay), :stunned), state, blackboard}
   end
 
-  defp wait_until_confused_wander_ready(%Mob{} = state, %Blackboard{} = blackboard) do
-    now = Time.now()
-
+  defp wait_until_confused_wander_ready(%Mob{} = state, %Blackboard{} = blackboard, %Context{now: now}) do
     if Blackboard.ready_for?(blackboard, :next_confused_at, now) do
       {:success, state, blackboard}
     else
@@ -239,7 +239,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   defp pick_confused_point(
          %Mob{movement_block: %MovementBlock{position: {x, y, z, _o}}} = state,
          %Blackboard{} = blackboard,
-         %Context{navigation: navigation, now: now}
+         %Context{now: now} = context
        ) do
     state = set_running(state, false)
     blackboard = ensure_confused_anchor(state, blackboard, {x, y, z})
@@ -249,9 +249,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     else
       {_key, anchor} = blackboard.confused_anchor
 
-      case Navigation.find_random_point(navigation, state.internal.world.map_id, anchor, @confused_wander_radius) do
+      case Navigation.wander_point(state, anchor, @confused_wander_radius, context) do
         nil ->
-          blackboard = Blackboard.put_next_at(blackboard, :next_confused_at, confused_wait_delay(), now)
+          blackboard = Blackboard.put_next_at(blackboard, :next_confused_at, confused_wait_delay(context), now)
           {:running, state, Blackboard.clear_move_target(blackboard)}
 
         {wx, wy, wz} ->
@@ -272,13 +272,13 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     end
   end
 
-  defp set_next_confused_wait(%Mob{} = state, %Blackboard{} = blackboard) do
-    blackboard = Blackboard.put_next_at(blackboard, :next_confused_at, confused_wait_delay(), Time.now())
+  defp set_next_confused_wait(%Mob{} = state, %Blackboard{} = blackboard, %Context{now: now} = context) do
+    blackboard = Blackboard.put_next_at(blackboard, :next_confused_at, confused_wait_delay(context), now)
     {:success, state, Blackboard.clear_move_target(blackboard)}
   end
 
-  defp confused_wait_delay do
-    :rand.uniform(1_000) + 500
+  defp confused_wait_delay(%Context{random: random}) do
+    Random.integer(random, 1_000) + 500
   end
 
   defp eventai_step(%Mob{} = state, %Blackboard{} = blackboard, %Context{now: now} = context) do
@@ -346,14 +346,17 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   defp flee_move(
          %Mob{movement_block: %MovementBlock{position: {mx, my, mz, _o}}} = state,
          %Blackboard{} = blackboard,
-         %Context{now: now} = context
+         %Context{now: now, perception: perception} = context
        ) do
     from_guid = blackboard.flee_from || state.unit.target
 
     destination =
-      case World.target_position(from_guid) do
-        {world, tx, ty, _tz} when world == state.internal.world -> flee_destination({mx, my, mz}, {tx, ty})
-        _ -> flee_destination({mx, my, mz}, nil)
+      case Perception.position(perception, from_guid) do
+        {world, tx, ty, _tz} when world == state.internal.world ->
+          flee_destination({mx, my, mz}, {tx, ty}, context)
+
+        _ ->
+          flee_destination({mx, my, mz}, nil, context)
       end
 
     state =
@@ -370,17 +373,17 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     |> min(max(flee_until - now, 1))
   end
 
-  defp flee_destination({mx, my, mz}, {tx, ty}) do
+  defp flee_destination({mx, my, mz}, {tx, ty}, %Context{random: random}) do
     away_angle = :math.atan2(my - ty, mx - tx)
-    flee_destination_at({mx, my, mz}, away_angle + (:rand.uniform() - 0.5) * :math.pi() / 2.0)
+    flee_destination_at({mx, my, mz}, away_angle + (Random.float(random) - 0.5) * :math.pi() / 2.0, random)
   end
 
-  defp flee_destination({mx, my, mz}, nil) do
-    flee_destination_at({mx, my, mz}, :rand.uniform() * 2.0 * :math.pi())
+  defp flee_destination({mx, my, mz}, nil, %Context{random: random}) do
+    flee_destination_at({mx, my, mz}, Random.float(random) * 2.0 * :math.pi(), random)
   end
 
-  defp flee_destination_at({mx, my, mz}, angle) do
-    distance = @flee_min_distance + :rand.uniform() * (@flee_max_distance - @flee_min_distance)
+  defp flee_destination_at({mx, my, mz}, angle, random) do
+    distance = @flee_min_distance + Random.float(random) * (@flee_max_distance - @flee_min_distance)
     {mx + :math.cos(angle) * distance, my + :math.sin(angle) * distance, mz}
   end
 
@@ -392,8 +395,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     not in_combat?(state, blackboard)
   end
 
-  defp aggro_check_ready?(state, %Blackboard{} = blackboard) do
-    aggro_check_ready?(state, blackboard, Time.now())
+  def aggro_check_ready?(state, %Blackboard{} = blackboard, %Context{now: now}) do
+    aggro_check_ready?(state, blackboard, now)
   end
 
   def aggro_check_ready?(_state, %Blackboard{} = blackboard, now) when is_integer(now) do
@@ -411,7 +414,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   def try_aggro(%Mob{} = state, %Blackboard{} = blackboard, %Context{now: now} = context) do
     blackboard = Blackboard.put_next_at(blackboard, :next_aggro_at, @aggro_check_delay, now)
 
-    case pick_aggro_target(state) do
+    case pick_aggro_target(state, context) do
       nil ->
         {:failure, state, blackboard}
 
@@ -422,11 +425,11 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     end
   end
 
-  defp pick_aggro_target(%Mob{} = state) do
+  defp pick_aggro_target(%Mob{} = state, %Context{} = context) do
     if Hostility.can_initiate_attack?(state) do
       state
-      |> nearby_aggro_candidates()
-      |> Enum.filter(fn {guid, distance} -> aggro_candidate?(state, guid, distance) end)
+      |> nearby_aggro_candidates(context)
+      |> Enum.filter(fn {guid, distance} -> aggro_candidate?(state, guid, distance, context) end)
       |> Enum.min_by(fn {_guid, distance} -> distance end, fn -> nil end)
       |> case do
         nil -> nil
@@ -435,30 +438,38 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     end
   end
 
-  defp nearby_aggro_candidates(%Mob{} = state) do
+  defp nearby_aggro_candidates(%Mob{} = state, %Context{perception: perception}) do
     radius = detection_range(state) + @max_level_aggro_bonus
-    World.nearby_players(state, radius) ++ World.nearby_mobs(state, radius)
+    Perception.nearby(perception, :players, radius) ++ Perception.nearby(perception, :mobs, radius)
   end
 
-  defp aggro_candidate?(%Mob{} = state, guid, distance) when is_integer(guid) and is_number(distance) do
-    Hostility.valid_hostile_target?(state, guid) and distance <= aggro_radius(state, guid) and
-      detectable_target?(state, guid, distance) and
-      World.line_of_sight?(state, guid)
+  defp aggro_candidate?(%Mob{} = state, guid, distance, %Context{perception: perception} = context)
+       when is_integer(guid) and is_number(distance) do
+    Hostility.valid_hostile_target?(state, perception_target(perception, guid)) and
+      distance <= aggro_radius(state, guid, perception) and
+      detectable_target?(state, guid, distance, context) and
+      Perception.line_of_sight?(perception, guid)
   end
 
-  defp aggro_candidate?(_state, _guid, _distance), do: false
+  defp aggro_candidate?(_state, _guid, _distance, %Context{}), do: false
 
-  defp detectable_target?(%Mob{unit: %Unit{level: level}}, guid, distance) do
-    target = Metadata.query(guid, [:stealthed?, :stealth_skill, :undetectable_until])
-    StealthDetection.detectable?(%{level: level}, target, distance, Time.now())
+  defp perception_target(perception, guid) do
+    perception
+    |> Perception.metadata(guid)
+    |> Kernel.||(%{})
+    |> Map.put(:guid, guid)
   end
 
-  defp aggro_radius(%Mob{unit: %Unit{level: level}} = state, target_guid)
+  defp detectable_target?(%Mob{unit: %Unit{level: level}}, guid, distance, %Context{now: now, perception: perception}) do
+    StealthDetection.detectable?(%{level: level}, Perception.metadata(perception, guid), distance, now)
+  end
+
+  defp aggro_radius(%Mob{unit: %Unit{level: level}} = state, target_guid, perception)
        when is_integer(level) and is_integer(target_guid) do
-    aggro_radius_for(detection_range(state), level, target_level(target_guid), detect_range_modifier(state))
+    aggro_radius_for(detection_range(state), level, target_level(target_guid, perception), detect_range_modifier(state))
   end
 
-  defp aggro_radius(%Mob{} = state, _target_guid), do: detection_range(state)
+  defp aggro_radius(%Mob{} = state, _target_guid, _perception), do: detection_range(state)
 
   def aggro_radius_for(detection_range, level, target_level, modifier \\ 0)
 
@@ -490,8 +501,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     end)
   end
 
-  defp target_level(guid) when is_integer(guid) do
-    case Metadata.query(guid, [:level]) do
+  defp target_level(guid, perception) when is_integer(guid) do
+    case Perception.metadata(perception, guid) do
       %{level: level} when is_integer(level) -> level
       _ -> 1
     end
@@ -518,8 +529,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
 
   def maybe_enqueue_call_assistance(%Mob{} = state, _target_guid), do: state
 
-  defp call_for_help_step(%Mob{} = state, %Blackboard{} = blackboard) do
-    call_for_help_step(state, blackboard, Time.now())
+  def call_for_help_step(%Mob{} = state, %Blackboard{} = blackboard, %Context{now: now}) do
+    call_for_help_step(state, blackboard, now)
   end
 
   def call_for_help_step(%Mob{} = state, %Blackboard{} = blackboard, now) when is_integer(now) do
@@ -582,7 +593,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
          %Blackboard{} = blackboard,
          %Context{now: now} = context
        ) do
-    if target_dead?(state, blackboard) do
+    if target_dead?(state, blackboard, context) do
       EventAI.on_kill(state, blackboard, target, now, context)
     else
       {state, blackboard}
@@ -607,8 +618,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     {:success, set_running(state, true), blackboard}
   end
 
-  defp interrupt_idle_movement(%Mob{} = state, %Blackboard{} = blackboard) do
-    interrupt_idle_movement(state, blackboard, Time.now())
+  def interrupt_idle_movement(%Mob{} = state, %Blackboard{} = blackboard, %Context{now: now}) do
+    interrupt_idle_movement(state, blackboard, now)
   end
 
   def interrupt_idle_movement(%Mob{} = state, %Blackboard{move_target: move_target} = blackboard, now)
@@ -630,24 +641,20 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     {:success, state, blackboard}
   end
 
-  defp should_tether?(%Mob{} = state, blackboard) do
-    should_tether?(state, blackboard, Time.now())
+  def should_tether?(%Mob{} = state, blackboard, %Context{now: now}) do
+    should_tether?(state, blackboard, now)
   end
 
   def should_tether?(%Mob{} = state, _blackboard, now) when is_integer(now) do
     Core.should_tether?(state, now)
   end
 
-  defp target_dead?(%Mob{unit: %Unit{target: target}}, _blackboard) when is_integer(target) and target > 0 do
-    case Metadata.query(target, [:alive?]) do
-      %{alive?: false} -> true
-      _ -> false
-    end
+  defp target_dead?(%Mob{unit: %Unit{target: target}}, _blackboard, %Context{perception: perception})
+       when is_integer(target) and target > 0 do
+    match?(%{alive?: false}, Perception.metadata(perception, target))
   end
 
-  defp target_dead?(_state, _blackboard) do
-    false
-  end
+  defp target_dead?(_state, _blackboard, %Context{}), do: false
 
   defp tether_target_set?(%Mob{internal: %Internal{spawn: %Spawn{position: {x, y, z}}}}, %Blackboard{
          move_target: {x, y, z}
@@ -776,21 +783,25 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     CombatBT.in_combat_range?(state, blackboard, context)
   end
 
-  defp chase_ready?(state, %Blackboard{} = blackboard) do
-    chase_ready?(state, blackboard, Time.now())
+  def chase_ready?(state, %Blackboard{} = blackboard, %Context{now: now}) do
+    chase_ready?(state, blackboard, now)
   end
 
   def chase_ready?(_state, %Blackboard{} = blackboard, now) when is_integer(now) do
     Blackboard.ready_for?(blackboard, :next_chase_at, now)
   end
 
-  defp combat_wait(%Mob{} = state, %Blackboard{} = blackboard) do
-    combat_wait(state, blackboard, Time.now())
+  def combat_wait(%Mob{} = state, %Blackboard{} = blackboard, %Context{now: now} = context) do
+    combat_wait(state, blackboard, now, context)
   end
 
   def combat_wait(%Mob{} = state, %Blackboard{} = blackboard, now) when is_integer(now) do
+    combat_wait(state, blackboard, now, Context.new(now))
+  end
+
+  defp combat_wait(%Mob{} = state, %Blackboard{} = blackboard, now, %Context{} = context) do
     attack_delay = Blackboard.delay_until(blackboard, :next_attack_at, now)
-    chase_delay = combat_chase_delay(state, blackboard, attack_delay, now)
+    chase_delay = combat_chase_delay(state, blackboard, attack_delay, now, context)
 
     blackboard =
       blackboard
@@ -815,9 +826,24 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     CombatBT.melee_attack_with_context(state, blackboard, context)
   end
 
-  defp halt_at_contact(%Mob{} = state, %Blackboard{} = blackboard) do
-    halt_at_contact(state, blackboard, Time.now())
+  def halt_at_contact(%Mob{unit: %Unit{target: target}} = state, %Blackboard{} = blackboard, %Context{
+        now: now,
+        perception: perception
+      })
+      when is_integer(target) and target > 0 do
+    cond do
+      not Movement.moving?(state, now) ->
+        {:success, state, Blackboard.clear_spreading(blackboard)}
+
+      Blackboard.spreading?(blackboard) ->
+        {:success, state, blackboard}
+
+      true ->
+        maybe_halt_at_contact(state, blackboard, target, now, perception)
+    end
   end
+
+  def halt_at_contact(%Mob{} = state, %Blackboard{} = blackboard, %Context{}), do: {:success, state, blackboard}
 
   def halt_at_contact(%Mob{unit: %Unit{target: target}} = state, %Blackboard{} = blackboard, now)
       when is_integer(target) and target > 0 and is_integer(now) do
@@ -850,12 +876,40 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     end
   end
 
+  defp maybe_halt_at_contact(%Mob{} = state, %Blackboard{} = blackboard, target, now, perception) do
+    with {world, tx, ty, _tz} when world == state.internal.world <- Perception.position(perception, target),
+         true <- within_contact?(state, target, {tx, ty}, perception) do
+      state =
+        state
+        |> Movement.halt(now)
+        |> face_position({tx, ty})
+        |> Effects.enqueue(Effects.movement_stopped())
+
+      {:success, state, blackboard}
+    else
+      _ -> {:success, state, blackboard}
+    end
+  end
+
   defp within_contact?(%Mob{movement_block: %MovementBlock{position: {mx, my, _mz, _o}}} = state, target_guid, {tx, ty}) do
     planar_distance({mx, my, 0.0}, {tx, ty, 0.0}) <= contact_distance(state, target_guid)
   end
 
+  defp within_contact?(
+         %Mob{movement_block: %MovementBlock{position: {mx, my, _mz, _o}}} = state,
+         target_guid,
+         {tx, ty},
+         perception
+       ) do
+    planar_distance({mx, my, 0.0}, {tx, ty, 0.0}) <= contact_distance(state, target_guid, perception)
+  end
+
   defp contact_distance(%Mob{} = state, target_guid) do
     own_combat_reach(state) + target_combat_reach(target_guid)
+  end
+
+  defp contact_distance(%Mob{} = state, target_guid, perception) do
+    own_combat_reach(state) + target_combat_reach(target_guid, perception)
   end
 
   defp face_position(%Mob{movement_block: %MovementBlock{position: {mx, my, _mz, _o}}} = state, {tx, ty}) do
@@ -876,15 +930,15 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
         {:success, state, blackboard}
 
       true ->
-        blackboard = Blackboard.put_next_at(blackboard, :next_spread_at, spread_delay(), now)
+        blackboard = Blackboard.put_next_at(blackboard, :next_spread_at, spread_delay(context), now)
         do_spread(state, blackboard, target, context)
     end
   end
 
   def maybe_spread(%Mob{} = state, %Blackboard{} = blackboard, %Context{}), do: {:success, state, blackboard}
 
-  defp do_spread(%Mob{} = state, %Blackboard{} = blackboard, target_guid, %Context{now: now} = context) do
-    if World.moving?(target_guid, now) do
+  defp do_spread(%Mob{} = state, %Blackboard{} = blackboard, target_guid, %Context{perception: perception} = context) do
+    if Perception.moving?(perception, target_guid) do
       {:success, state, Blackboard.reset_spread(blackboard)}
     else
       back_or_spread(state, blackboard, target_guid, context)
@@ -909,11 +963,11 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
          %Mob{internal: %Internal{world: world}, movement_block: %MovementBlock{position: {mx, my, _mz, _o}}} = state,
          %Blackboard{} = blackboard,
          target_guid,
-         %Context{} = context
+         %Context{perception: perception} = context
        ) do
-    with {^world, tx, ty, tz} <- World.target_position(target_guid),
-         true <- target_deep_in_bounds?(state, target_guid, {tx, ty}),
-         {dx, dy, dz} <- back_movement_destination(state, target_guid, {mx, my}, {tx, ty, tz}) do
+    with {^world, tx, ty, tz} <- Perception.position(perception, target_guid),
+         true <- target_deep_in_bounds?(state, target_guid, {tx, ty}, perception),
+         {dx, dy, dz} <- back_movement_destination(state, target_guid, {mx, my}, {tx, ty, tz}, context) do
       state =
         state
         |> set_running(false)
@@ -928,17 +982,21 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   defp target_deep_in_bounds?(
          %Mob{movement_block: %MovementBlock{position: {mx, my, _mz, _o}}} = state,
          target_guid,
-         {tx, ty}
+         {tx, ty},
+         perception
        ) do
-    bounds = @deep_bounds_factor * min(own_bounding_radius(state), target_bounding_radius(target_guid))
+    bounds = @deep_bounds_factor * min(own_bounding_radius(state), target_bounding_radius(target_guid, perception))
     planar_distance({mx, my, 0.0}, {tx, ty, 0.0}) < :math.sqrt(bounds + @distance_sqr_size_factor)
   end
 
-  defp back_movement_destination(%Mob{} = state, target_guid, {mx, my}, {tx, ty, tz}) do
-    angle = base_chase_angle({mx, my}, {tx, ty})
-    center_distance = @back_movement_gap + own_bounding_radius(state) + target_bounding_radius(target_guid)
+  defp back_movement_destination(%Mob{} = state, target_guid, {mx, my}, {tx, ty, tz}, %Context{
+         perception: perception,
+         random: random
+       }) do
+    angle = base_chase_angle({mx, my}, {tx, ty}, random)
+    center_distance = @back_movement_gap + own_bounding_radius(state) + target_bounding_radius(target_guid, perception)
 
-    if center_distance < melee_reach_to(state, target_guid) do
+    if center_distance < melee_reach_to(state, target_guid, perception) do
       {tx + :math.cos(angle) * center_distance, ty + :math.sin(angle) * center_distance, tz}
     end
   end
@@ -947,12 +1005,12 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
          %Mob{internal: %Internal{world: world}} = state,
          %Blackboard{} = blackboard,
          target_guid,
-         %Context{} = context
+         %Context{perception: perception} = context
        ) do
-    with {neighbor_guid, _distance} <- stacked_neighbor(state, target_guid),
-         {^world, tx, ty, tz} <- World.target_position(target_guid),
-         {^world, nx, ny, _nz} <- World.position(neighbor_guid),
-         {dx, dy, dz} <- spread_destination(state, target_guid, {tx, ty, tz}, {nx, ny}) do
+    with {neighbor_guid, _distance} <- stacked_neighbor(state, target_guid, context),
+         {^world, tx, ty, tz} <- Perception.position(perception, target_guid),
+         {^world, nx, ny, _nz} <- Perception.position(perception, neighbor_guid),
+         {dx, dy, dz} <- spread_destination(state, target_guid, {tx, ty, tz}, {nx, ny}, context) do
       state =
         state
         |> set_running(false)
@@ -964,17 +1022,17 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     end
   end
 
-  defp stacked_neighbor(%Mob{} = state, target_guid) do
-    state
-    |> World.nearby_mobs(@spread_detect_radius)
+  defp stacked_neighbor(%Mob{} = state, target_guid, %Context{perception: perception} = context) do
+    perception
+    |> Perception.nearby(:mobs, @spread_detect_radius)
     |> Enum.filter(fn {other_guid, distance} ->
-      other_guid != target_guid and distance < stack_threshold(state, other_guid)
+      other_guid != target_guid and distance < stack_threshold(state, other_guid, context)
     end)
     |> Enum.min_by(fn {_guid, distance} -> distance end, fn -> nil end)
   end
 
-  defp stack_threshold(%Mob{} = state, other_guid) do
-    bounds = min(max(own_bounding_radius(state), target_bounding_radius(other_guid)), 0.25)
+  defp stack_threshold(%Mob{} = state, other_guid, %Context{perception: perception}) do
+    bounds = min(max(own_bounding_radius(state), target_bounding_radius(other_guid, perception)), 0.25)
     :math.sqrt(bounds + @distance_sqr_size_factor)
   end
 
@@ -982,20 +1040,21 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
          %Mob{movement_block: %MovementBlock{position: {mx, my, _mz, _o}}} = state,
          target_guid,
          {tx, ty, tz},
-         {nx, ny}
+         {nx, ny},
+         %Context{perception: perception, random: random}
        ) do
     my_angle = :math.atan2(my - ty, mx - tx)
     his_angle = :math.atan2(ny - ty, nx - tx)
-    new_angle = my_angle + spread_turn(my_angle, his_angle)
-    center_distance = own_bounding_radius(state) + spread_gap(target_guid)
+    new_angle = my_angle + spread_turn(my_angle, his_angle, random)
+    center_distance = own_bounding_radius(state) + spread_gap(target_guid, perception, random)
 
-    if center_distance < melee_reach_to(state, target_guid) do
+    if center_distance < melee_reach_to(state, target_guid, perception) do
       {tx + :math.cos(new_angle) * center_distance, ty + :math.sin(new_angle) * center_distance, tz}
     end
   end
 
-  defp spread_turn(my_angle, his_angle) do
-    delta = @spread_min_offset + :rand.uniform() * (@spread_max_offset - @spread_min_offset)
+  defp spread_turn(my_angle, his_angle, random) do
+    delta = @spread_min_offset + Random.float(random) * (@spread_max_offset - @spread_min_offset)
     if angular_diff(his_angle, my_angle) > 0.0, do: -delta, else: delta
   end
 
@@ -1003,32 +1062,40 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     :math.atan2(:math.sin(a - b), :math.cos(a - b))
   end
 
-  defp spread_gap(target_guid) do
-    max_gap = if attacker_count(target_guid) > @spread_crowd_threshold, do: @spread_gap_crowded, else: @spread_gap
-    @spread_min_gap + :rand.uniform() * (max_gap - @spread_min_gap)
+  defp spread_gap(target_guid, perception, random) do
+    max_gap =
+      if attacker_count(target_guid, perception) > @spread_crowd_threshold,
+        do: @spread_gap_crowded,
+        else: @spread_gap
+
+    @spread_min_gap + Random.float(random) * (max_gap - @spread_min_gap)
   end
 
-  defp spread_delay do
-    @spread_min_delay + :rand.uniform(@spread_max_delay - @spread_min_delay)
+  defp spread_delay(%Context{random: random}) do
+    @spread_min_delay + Random.integer(random, @spread_max_delay - @spread_min_delay)
   end
 
-  defp chase_repath_and_schedule(%Mob{} = state, %Blackboard{} = blackboard, %Context{now: now} = context) do
+  defp chase_repath_and_schedule(
+         %Mob{} = state,
+         %Blackboard{} = blackboard,
+         %Context{now: now, perception: perception} = context
+       ) do
     target = state.unit.target
 
-    case World.grounded_target_position(target, now) do
+    case Perception.grounded_position(perception, target) do
       {world, x, y, z} when world == state.internal.world ->
         {state, blackboard} = maybe_repath_chase(state, blackboard, {x, y, z}, target, context)
-        delay_ms = chase_delay(state, target, {x, y}, now)
+        delay_ms = chase_delay(state, target, {x, y}, context)
         blackboard = Blackboard.put_next_at(blackboard, :next_chase_at, delay_ms, now)
         {BT.running(delay_ms, :chase), state, blackboard}
 
       _ ->
-        clear_chase_and_idle(state, blackboard)
+        clear_chase_and_idle(state, blackboard, context)
     end
   end
 
-  defp wait_for_chase_tick(%Mob{} = state, %Blackboard{} = blackboard) do
-    wait_for_chase_tick(state, blackboard, Time.now())
+  def wait_for_chase_tick(%Mob{} = state, %Blackboard{} = blackboard, %Context{now: now}) do
+    wait_for_chase_tick(state, blackboard, now)
   end
 
   def wait_for_chase_tick(%Mob{} = state, %Blackboard{} = blackboard, now) when is_integer(now) do
@@ -1036,12 +1103,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     {BT.running(soonest_delay([delay_ms], @chase_tick_delay), :chase), state, blackboard}
   end
 
-  defp clear_chase_and_idle(%Mob{} = state, %Blackboard{} = blackboard) do
-    clear_chase_and_idle(state, blackboard, Time.now())
-  end
-
-  def clear_chase_and_idle(%Mob{} = state, %Blackboard{} = blackboard, now) when is_integer(now) do
-    delay_ms = idle_delay()
+  def clear_chase_and_idle(%Mob{} = state, %Blackboard{} = blackboard, %Context{now: now} = context) do
+    delay_ms = idle_delay(context)
 
     blackboard =
       blackboard
@@ -1051,6 +1114,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     {BT.running(delay_ms, :idle), state, blackboard}
   end
 
+  def clear_chase_and_idle(%Mob{} = state, %Blackboard{} = blackboard, now) when is_integer(now) do
+    clear_chase_and_idle(state, blackboard, Context.new(now))
+  end
+
   defp maybe_repath_chase(
          %Mob{} = state,
          %Blackboard{} = blackboard,
@@ -1058,12 +1125,18 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
          target_guid,
          %Context{now: now} = context
        ) do
-    target_moved = target_moved_enough?(state, blackboard, target_pos, target_guid)
+    target_moved = target_moved_enough?(state, blackboard, target_pos, target_guid, context)
     should_repath = target_moved or not Movement.moving?(state, now)
 
     if should_repath do
-      destination = chase_destination(state, target_pos, target_guid, now)
-      state = move_with_context(state, destination, [face_target: target_guid], context)
+      destination = chase_destination(state, target_pos, target_guid, context)
+
+      state =
+        case Navigation.chase(state, target_guid, destination, context) do
+          {:ok, state} -> state
+          {:error, :no_path, state} -> state
+        end
+
       {state, %{Blackboard.reset_spread(blackboard) | last_target_pos: target_pos}}
     else
       {state, blackboard}
@@ -1074,11 +1147,11 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
          %Mob{movement_block: %MovementBlock{position: {mx, my, _mz, _o}}} = state,
          {tx, ty, tz},
          target_guid,
-         now
+         %Context{now: now, perception: perception, random: random}
        ) do
-    base_angle = base_chase_angle({mx, my}, {tx, ty})
-    chase_distance = CombatLogic.chase_target_distance(melee_reach_to(state, target_guid))
-    angle = base_angle + approach_angle_offset(state, target_guid, now)
+    base_angle = base_chase_angle({mx, my}, {tx, ty}, random)
+    chase_distance = CombatLogic.chase_target_distance(melee_reach_to(state, target_guid, perception))
+    angle = base_angle + approach_angle_offset(state, target_guid, now, perception, random)
 
     {
       tx + :math.cos(angle) * chase_distance,
@@ -1087,61 +1160,67 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     }
   end
 
-  defp base_chase_angle({mx, my}, {tx, ty}) do
+  defp base_chase_angle({mx, my}, {tx, ty}, random) do
     dx = mx - tx
     dy = my - ty
 
     if abs(dx) < 1.0e-4 and abs(dy) < 1.0e-4 do
-      :rand.uniform() * :math.pi() * 2.0
+      Random.float(random) * :math.pi() * 2.0
     else
       :math.atan2(dy, dx)
     end
   end
 
-  defp approach_angle_offset(%Mob{} = state, target_guid, now) do
-    count = approach_spread_count(target_guid, now)
+  defp approach_angle_offset(%Mob{} = state, target_guid, now, perception, random) do
+    count = approach_spread_count(target_guid, now, perception)
 
     if count > 0 do
-      spread = :math.pi() / 2.0 - :math.pi() * :rand.uniform()
-      spread * count / approach_size_factor(state, target_guid) * @approach_spread_scale
+      spread = :math.pi() / 2.0 - :math.pi() * Random.float(random)
+      spread * count / approach_size_factor(state, target_guid, perception) * @approach_spread_scale
     else
       0.0
     end
   end
 
-  defp approach_spread_count(target_guid, now) do
-    if moving_player?(target_guid, now), do: 0, else: max(attacker_count(target_guid) - 1, 0)
+  defp approach_spread_count(target_guid, now, perception) do
+    if moving_player?(target_guid, now, perception),
+      do: 0,
+      else: max(attacker_count(target_guid, perception) - 1, 0)
   end
 
-  defp moving_player?(target_guid, now) do
-    Guid.type_id(target_guid) == :player and World.moving?(target_guid, now)
+  defp moving_player?(target_guid, _now, perception) do
+    Guid.type_id(target_guid) == :player and Perception.moving?(perception, target_guid)
   end
 
-  defp approach_size_factor(%Mob{} = state, target_guid) do
-    factor = own_bounding_radius(state) + target_bounding_radius(target_guid)
+  defp approach_size_factor(%Mob{} = state, target_guid, perception) do
+    factor = own_bounding_radius(state) + target_bounding_radius(target_guid, perception)
     if factor < 0.1, do: Unit.default_bounding_radius(), else: factor
   end
 
-  defp attacker_count(target_guid) when is_integer(target_guid) do
-    case Metadata.query(target_guid, [:attacker_count]) do
+  defp attacker_count(target_guid, perception) when is_integer(target_guid) do
+    case Perception.metadata(perception, target_guid) do
       %{attacker_count: count} when is_number(count) and count > 0 -> count
       _ -> 0
     end
   end
 
-  defp attacker_count(_target_guid), do: 0
+  defp attacker_count(_target_guid, _perception), do: 0
 
   defp own_bounding_radius(%Mob{unit: %Unit{bounding_radius: radius}}) when is_number(radius) and radius > 0, do: radius
   defp own_bounding_radius(%Mob{}), do: Unit.default_bounding_radius()
 
-  defp target_moved_enough?(%Mob{} = state, %Blackboard{last_target_pos: {lx, ly, lz}}, {tx, ty, tz}, target_guid) do
-    threshold = chase_repath_distance(state, target_guid)
+  defp target_moved_enough?(
+         %Mob{} = state,
+         %Blackboard{last_target_pos: {lx, ly, lz}},
+         {tx, ty, tz},
+         target_guid,
+         %Context{perception: perception}
+       ) do
+    threshold = chase_repath_distance(state, target_guid, perception)
     planar_distance({lx, ly, lz}, {tx, ty, tz}) > threshold
   end
 
-  defp target_moved_enough?(%Mob{}, %Blackboard{}, {_x, _y, _z}, _target_guid) do
-    true
-  end
+  defp target_moved_enough?(%Mob{}, %Blackboard{}, {_x, _y, _z}, _target_guid, %Context{}), do: true
 
   defp planar_distance({x1, y1, _z1}, {x2, y2, _z2}) do
     dx = x2 - x1
@@ -1153,6 +1232,13 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     CombatLogic.chase_rechase_distance(melee_reach_to(state, target_guid), target_bounding_radius(target_guid))
   end
 
+  defp chase_repath_distance(%Mob{} = state, target_guid, perception) do
+    CombatLogic.chase_rechase_distance(
+      melee_reach_to(state, target_guid, perception),
+      target_bounding_radius(target_guid, perception)
+    )
+  end
+
   @melee_escape_min_threshold 0.5
 
   def melee_escape_distance(%Mob{} = state, target_guid, distance) when is_number(distance) do
@@ -1161,6 +1247,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
 
   defp melee_reach_to(%Mob{} = state, target_guid) do
     CombatLogic.melee_reach(own_combat_reach(state), target_combat_reach(target_guid))
+  end
+
+  defp melee_reach_to(%Mob{} = state, target_guid, perception) do
+    CombatLogic.melee_reach(own_combat_reach(state), target_combat_reach(target_guid, perception))
   end
 
   defp own_combat_reach(%Mob{unit: %Unit{combat_reach: reach}}) when is_number(reach) and reach > 0, do: reach
@@ -1175,6 +1265,15 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
 
   defp target_combat_reach(_target_guid), do: Unit.default_combat_reach()
 
+  defp target_combat_reach(target_guid, perception) when is_integer(target_guid) do
+    case Perception.metadata(perception, target_guid) do
+      %{combat_reach: combat_reach} when is_number(combat_reach) -> combat_reach
+      _ -> Unit.default_combat_reach()
+    end
+  end
+
+  defp target_combat_reach(_target_guid, _perception), do: Unit.default_combat_reach()
+
   defp target_bounding_radius(target_guid) when is_integer(target_guid) do
     case Metadata.query(target_guid, [:bounding_radius]) do
       %{bounding_radius: bounding_radius} when is_number(bounding_radius) -> bounding_radius
@@ -1184,8 +1283,17 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
 
   defp target_bounding_radius(_target_guid), do: Unit.default_bounding_radius()
 
-  defp wait_until_wander_ready(%Mob{} = state, %Blackboard{} = blackboard) do
-    wait_until_wander_ready(state, blackboard, Time.now())
+  defp target_bounding_radius(target_guid, perception) when is_integer(target_guid) do
+    case Perception.metadata(perception, target_guid) do
+      %{bounding_radius: bounding_radius} when is_number(bounding_radius) -> bounding_radius
+      _ -> Unit.default_bounding_radius()
+    end
+  end
+
+  defp target_bounding_radius(_target_guid, _perception), do: Unit.default_bounding_radius()
+
+  def wait_until_wander_ready(%Mob{} = state, %Blackboard{} = blackboard, %Context{now: now}) do
+    wait_until_wander_ready(state, blackboard, now)
   end
 
   def wait_until_wander_ready(%Mob{} = state, %Blackboard{} = blackboard, now) when is_integer(now) do
@@ -1197,8 +1305,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     end
   end
 
-  defp wait_until_waypoint_ready(%Mob{} = state, %Blackboard{} = blackboard) do
-    wait_until_waypoint_ready(state, blackboard, Time.now())
+  def wait_until_waypoint_ready(%Mob{} = state, %Blackboard{} = blackboard, %Context{now: now}) do
+    wait_until_waypoint_ready(state, blackboard, now)
   end
 
   def wait_until_waypoint_ready(%Mob{} = state, %Blackboard{} = blackboard, now) when is_integer(now) do
@@ -1210,20 +1318,20 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     end
   end
 
-  defp pick_wander_point(%Mob{} = state, %Blackboard{} = blackboard, %Context{navigation: navigation, now: now}) do
+  defp pick_wander_point(%Mob{} = state, %Blackboard{} = blackboard, %Context{now: now} = context) do
     state = set_running(state, Blackboard.run_mode?(blackboard))
 
     if blackboard.target do
       {:success, state, blackboard}
     else
-      case Navigation.find_random_point(
-             navigation,
-             state.internal.world.map_id,
+      case Navigation.wander_point(
+             state,
              state.internal.spawn.position,
-             state.internal.spawn.distance
+             state.internal.spawn.distance,
+             context
            ) do
         nil ->
-          blackboard = Blackboard.put_next_at(blackboard, :next_wander_at, idle_delay(), now)
+          blackboard = Blackboard.put_next_at(blackboard, :next_wander_at, idle_delay(context), now)
           blackboard = Blackboard.clear_move_target(blackboard)
           {reason, delay_ms} = idle_wake(state, blackboard, :next_wander_at, now, :wander)
           {BT.running(delay_ms, reason), state, blackboard}
@@ -1234,7 +1342,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     end
   end
 
-  defp pick_waypoint(%Mob{} = state, %Blackboard{} = blackboard) do
+  defp pick_waypoint(%Mob{} = state, %Blackboard{} = blackboard, %Context{now: now} = context) do
     state = set_running(state, Blackboard.run_mode?(blackboard))
 
     if blackboard.target do
@@ -1242,8 +1350,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     else
       case waypoint_destination(state) do
         nil ->
-          now = Time.now()
-          blackboard = Blackboard.put_next_at(blackboard, :next_waypoint_at, idle_delay(), now)
+          blackboard = Blackboard.put_next_at(blackboard, :next_waypoint_at, idle_delay(context), now)
           blackboard = Blackboard.clear_waypoint(blackboard)
           {reason, delay_ms} = idle_wake(state, blackboard, :next_waypoint_at, now, :waypoint)
           {BT.running(delay_ms, reason), state, blackboard}
@@ -1285,23 +1392,17 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     end
   end
 
-  defp wait_for_arrival(%Mob{} = state, %Blackboard{} = blackboard) do
-    wait_for_arrival(state, blackboard, Time.now())
+  defp wait_for_arrival_with_context(%Mob{} = state, %Blackboard{} = blackboard, %Context{} = context) do
+    wait_for_arrival(state, blackboard, context)
   end
 
   def wait_for_arrival(%Mob{} = state, %Blackboard{} = blackboard, now) when is_integer(now) do
-    if Movement.moving?(state, now) do
-      movement_delay = Movement.next_spatial_update_delay(state, now)
-      {idle_reason, idle_delay} = idle_wake(state, blackboard, now)
+    wait_for_arrival(state, blackboard, Context.new(now))
+  end
 
-      {reason, delay_ms} =
-        [{:movement, movement_delay}, {idle_reason, idle_delay}]
-        |> soonest_wake(:movement, movement_delay)
-
-      {BT.running(delay_ms, reason), state, blackboard}
-    else
-      {:success, state, Blackboard.clear_move_target(blackboard)}
-    end
+  def wait_for_arrival(%Mob{} = state, %Blackboard{} = blackboard, %Context{now: now} = context) do
+    {idle_reason, idle_delay} = idle_wake(state, blackboard, now)
+    Navigation.wait_for_arrival(state, blackboard, context, [{idle_reason, idle_delay}])
   end
 
   defp apply_waypoint(%Mob{} = state, %Blackboard{} = blackboard, %Context{} = context) do
@@ -1323,8 +1424,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     end
   end
 
-  defp set_next_waypoint_wait(%Mob{} = state, %Blackboard{} = blackboard) do
-    set_next_waypoint_wait(state, blackboard, Time.now())
+  def set_next_waypoint_wait(%Mob{} = state, %Blackboard{} = blackboard, %Context{now: now}) do
+    set_next_waypoint_wait(state, blackboard, now)
   end
 
   def set_next_waypoint_wait(%Mob{} = state, %Blackboard{} = blackboard, now) when is_integer(now) do
@@ -1333,28 +1434,25 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     {:success, state, Blackboard.clear_waypoint(blackboard)}
   end
 
-  defp set_next_wander_wait(%Mob{} = state, %Blackboard{} = blackboard) do
-    set_next_wander_wait(state, blackboard, Time.now())
-  end
-
-  def set_next_wander_wait(%Mob{} = state, %Blackboard{} = blackboard, now) when is_integer(now) do
-    blackboard = Blackboard.put_next_at(blackboard, :next_wander_at, wander_wait_delay(), now)
+  def set_next_wander_wait(%Mob{} = state, %Blackboard{} = blackboard, %Context{now: now} = context) do
+    blackboard = Blackboard.put_next_at(blackboard, :next_wander_at, wander_wait_delay(context), now)
     {:success, state, Blackboard.clear_move_target(blackboard)}
   end
 
-  defp idle(%Mob{} = state, %Blackboard{} = blackboard) do
-    idle(state, blackboard, Time.now())
+  def set_next_wander_wait(%Mob{} = state, %Blackboard{} = blackboard, now) when is_integer(now) do
+    blackboard = Blackboard.put_next_at(blackboard, :next_wander_at, wander_wait_delay(Context.new(now)), now)
+    {:success, state, Blackboard.clear_move_target(blackboard)}
   end
 
-  defp idle(%Mob{} = state, %Blackboard{} = blackboard, now) when is_integer(now) do
+  defp idle(%Mob{} = state, %Blackboard{} = blackboard, %Context{now: now}) do
     state = set_running(state, false)
     {reason, delay_ms} = idle_wake(state, blackboard, now)
     {BT.running(delay_ms, reason), state, blackboard}
   end
 
-  defp idle_dead(%Mob{} = state, %Blackboard{} = blackboard) do
+  defp idle_dead(%Mob{} = state, %Blackboard{} = blackboard, %Context{now: now}) do
     state = set_running(state, false)
-    {BT.running(passive_delay(state, blackboard, Time.now(), @dead_idle_delay), :dead), state, blackboard}
+    {BT.running(passive_delay(state, blackboard, now, @dead_idle_delay), :dead), state, blackboard}
   end
 
   defp waypoint_destination(%Mob{internal: %Internal{spawn: %Spawn{waypoint_route: %WaypointRoute{} = route}}}) do
@@ -1381,12 +1479,12 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     %{state | movement_block: %{state.movement_block | position: {x, y, z, o}}}
   end
 
-  defp idle_delay do
-    :rand.uniform(4_000) + 2_000
+  defp idle_delay(%Context{random: random}) do
+    Random.integer(random, 4_000) + 2_000
   end
 
-  defp wander_wait_delay do
-    :rand.uniform(6_000) + 4_000
+  defp wander_wait_delay(%Context{random: random}) do
+    Random.integer(random, 6_000) + 4_000
   end
 
   defp set_running(%Mob{internal: %Internal{} = internal} = state, running) when is_boolean(running) do
@@ -1426,11 +1524,11 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     soonest_delay([aura_delay(state, now)], @blocked_retry_delay)
   end
 
-  defp chase_delay(%Mob{} = state, target_guid, {tx, ty}, now) do
+  defp chase_delay(%Mob{} = state, target_guid, {tx, ty}, %Context{now: now, perception: perception}) do
     if Movement.moving?(state, now) do
       [
         Movement.remaining_move_duration(state, now),
-        Movement.time_to_within(state, {tx, ty}, contact_distance(state, target_guid), now)
+        Movement.time_to_within(state, {tx, ty}, contact_distance(state, target_guid, perception), now)
       ]
       |> soonest_delay(@chase_tick_delay)
       |> min(@chase_tick_delay)
@@ -1439,10 +1537,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     end
   end
 
-  defp combat_chase_delay(%Mob{} = state, %Blackboard{} = blackboard, attack_delay, now) do
+  defp combat_chase_delay(%Mob{} = state, %Blackboard{} = blackboard, attack_delay, now, %Context{} = context) do
     cond do
       Movement.moving?(state, now) ->
-        [Movement.next_spatial_update_delay(state, now), combat_contact_delay(state, blackboard, now)]
+        [Movement.next_spatial_update_delay(state, now), combat_contact_delay(state, blackboard, context)]
         |> soonest_delay(@chase_tick_delay)
 
       is_integer(attack_delay) and attack_delay > 0 ->
@@ -1453,12 +1551,15 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     end
   end
 
-  defp combat_contact_delay(%Mob{unit: %Unit{target: target}} = state, %Blackboard{} = blackboard, now)
+  defp combat_contact_delay(%Mob{unit: %Unit{target: target}} = state, %Blackboard{} = blackboard, %Context{
+         now: now,
+         perception: perception
+       })
        when is_integer(target) and target > 0 do
     if not Blackboard.spreading?(blackboard) do
-      case World.target_position(target) do
+      case Perception.position(perception, target) do
         {world, tx, ty, _tz} when world == state.internal.world ->
-          Movement.time_to_within(state, {tx, ty}, contact_distance(state, target), now)
+          Movement.time_to_within(state, {tx, ty}, contact_distance(state, target, perception), now)
 
         _ ->
           nil
@@ -1466,7 +1567,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     end
   end
 
-  defp combat_contact_delay(%Mob{}, %Blackboard{}, _now), do: nil
+  defp combat_contact_delay(%Mob{}, %Blackboard{}, %Context{}), do: nil
 
   defp aura_delay(%Mob{} = state, now) do
     case AuraLogic.next_event_at(state) do
@@ -1494,7 +1595,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   end
 
   defp move_with_context(%Mob{} = state, destination, opts, %Context{} = context) do
-    case Navigation.move_to(context, state, destination, opts) do
+    case Navigation.move_to(state, destination, opts, context) do
       {:ok, state} -> state
       {:error, :no_path, state} -> state
     end

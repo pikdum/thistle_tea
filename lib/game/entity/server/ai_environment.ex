@@ -34,6 +34,7 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
       position: &World.position(&1, now),
       grounded_position: &World.grounded_target_position(&1, now),
       projected_position: &World.projected_position(&1, &2, now),
+      distance: &distance(entity, &1, now),
       moving?: &World.moving?(&1, now),
       metadata: &Metadata.get/1,
       nearby: &nearby(entity, &1, &2),
@@ -44,6 +45,18 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
   defp nearby(entity, :mobs, radius), do: World.nearby_mobs(entity, radius)
   defp nearby(entity, :players, radius), do: World.nearby_players(entity, radius)
   defp nearby(_entity, _kind, _radius), do: []
+
+  defp distance(%{internal: %{world: world}, movement_block: %{position: {x, y, z, _o}}}, guid, now) do
+    case World.position(guid, now) do
+      {^world, tx, ty, tz} ->
+        :math.sqrt(:math.pow(tx - x, 2) + :math.pow(ty - y, 2) + :math.pow(tz - z, 2))
+
+      _ ->
+        nil
+    end
+  end
+
+  defp distance(_entity, _guid, _now), do: nil
 
   defp random do
     %Random{

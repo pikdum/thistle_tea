@@ -20,13 +20,13 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAI do
   alias ThistleTea.Game.Entity.Data.CreatureSpell
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Random
   alias ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells, as: MobSpells
   alias ThistleTea.Game.Entity.Logic.AI.Script
   alias ThistleTea.Game.Entity.Logic.Condition, as: ConditionLogic
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Guid
-  alias ThistleTea.Game.World
-  alias ThistleTea.Game.World.Metadata
 
   @tick_ms 1_000
   @friendly_hp_default_radius 30.0
@@ -56,7 +56,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAI do
     else
       blackboard =
         blackboard
-        |> ensure_init(events, now)
+        |> ensure_init(events, now, context)
         |> Blackboard.put_next_at(:next_eventai_at, @tick_ms, now)
 
       fire_matching(state, blackboard, events, &AIEvent.timed?/1, nil, now, context)
@@ -75,8 +75,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAI do
     else
       blackboard =
         blackboard
-        |> ensure_init(events, now)
-        |> reset_for_combat(events, now)
+        |> ensure_init(events, now, context)
+        |> reset_for_combat(events, now, context)
 
       fire_matching(state, blackboard, events, &(&1.event_type == :aggro), enemy_guid, now, context)
     end
@@ -120,7 +120,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAI do
 
   def on_evade(state, %Blackboard{} = blackboard, now, %Context{} = context) do
     {state, blackboard} = fire_edges(state, blackboard, :evade, nil, now, context)
-    {state, reset_ooc(blackboard, events(state), now)}
+    {state, reset_ooc(blackboard, events(state), now, context)}
   end
 
   def on_reached_home(state, %Blackboard{} = blackboard, now) do
@@ -169,7 +169,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAI do
     if events == [] do
       {state, blackboard}
     else
-      blackboard = ensure_init(blackboard, events, now)
+      blackboard = ensure_init(blackboard, events, now, context)
       fire_matching(state, blackboard, events, edge_matcher(matcher), invoker_guid, now, context)
     end
   end
@@ -192,13 +192,13 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAI do
          true <- AIEvent.phase_allows?(event, blackboard.eventai_phase),
          true <- casting_allows?(state, event),
          true <- ConditionLogic.met?(state, event.condition),
-         {:ok, invoker_guid} <- satisfy(state, event, invoker_guid) do
+         {:ok, invoker_guid} <- satisfy(state, event, invoker_guid, context) do
       blackboard =
         blackboard
-        |> update_repeat_timer(event, index, now)
+        |> update_repeat_timer(event, index, now, context)
         |> maybe_disable(event, index)
 
-      if chance_passes?(event) do
+      if chance_passes?(event, context.random) do
         run_actions(state, blackboard, event, invoker_guid, context)
       else
         {state, blackboard}
@@ -209,7 +209,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAI do
   end
 
   defp run_actions(state, %Blackboard{} = blackboard, %AIEvent{} = event, invoker_guid, %Context{} = context) do
-    actions = if event.random_action?, do: [Enum.random(event.actions)], else: event.actions
+    actions = if event.random_action?, do: [Random.choice(context.random, event.actions)], else: event.actions
     target_guid = invoker_guid || victim(state)
 
     Enum.reduce(actions, {state, blackboard}, fn steps, {state, blackboard} ->
@@ -217,15 +217,15 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAI do
     end)
   end
 
-  defp satisfy(state, %AIEvent{event_type: :timer_in_combat}, invoker_guid) do
+  defp satisfy(state, %AIEvent{event_type: :timer_in_combat}, invoker_guid, %Context{}) do
     if in_combat?(state), do: {:ok, invoker_guid}, else: :skip
   end
 
-  defp satisfy(state, %AIEvent{event_type: :timer_ooc}, invoker_guid) do
+  defp satisfy(state, %AIEvent{event_type: :timer_ooc}, invoker_guid, %Context{}) do
     if in_combat?(state), do: :skip, else: {:ok, invoker_guid}
   end
 
-  defp satisfy(state, %AIEvent{event_type: :hp} = event, invoker_guid) do
+  defp satisfy(state, %AIEvent{event_type: :hp} = event, invoker_guid, %Context{}) do
     if in_combat?(state) and pct_within?(Core.health_pct(state), event) do
       {:ok, invoker_guid}
     else
@@ -233,7 +233,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAI do
     end
   end
 
-  defp satisfy(state, %AIEvent{event_type: :mana} = event, invoker_guid) do
+  defp satisfy(state, %AIEvent{event_type: :mana} = event, invoker_guid, %Context{}) do
     if in_combat?(state) and pct_within?(mana_pct(state), event) do
       {:ok, invoker_guid}
     else
@@ -241,10 +241,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAI do
     end
   end
 
-  defp satisfy(state, %AIEvent{event_type: :target_hp} = event, invoker_guid) do
+  defp satisfy(state, %AIEvent{event_type: :target_hp} = event, invoker_guid, %Context{perception: perception}) do
     with true <- in_combat?(state),
          target when is_integer(target) <- victim(state),
-         %{health_pct: pct} when is_number(pct) <- Metadata.query(target, [:health_pct]),
+         %{health_pct: pct} when is_number(pct) <- Perception.metadata(perception, target),
          true <- pct_within?(pct, event) do
       {:ok, invoker_guid}
     else
@@ -252,10 +252,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAI do
     end
   end
 
-  defp satisfy(state, %AIEvent{event_type: :range} = event, invoker_guid) do
+  defp satisfy(state, %AIEvent{event_type: :range} = event, invoker_guid, %Context{perception: perception}) do
     with true <- in_combat?(state),
          target when is_integer(target) <- victim(state),
-         distance when is_number(distance) <- World.distance_to_guid(state, target),
+         distance when is_number(distance) <- Perception.distance(perception, target),
          true <- distance >= event.param1 and distance <= event.param2 do
       {:ok, invoker_guid}
     else
@@ -263,16 +263,16 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAI do
     end
   end
 
-  defp satisfy(state, %AIEvent{event_type: :friendly_hp} = event, _invoker_guid) do
+  defp satisfy(state, %AIEvent{event_type: :friendly_hp} = event, _invoker_guid, %Context{} = context) do
     with true <- in_combat?(state),
-         friendly_guid when is_integer(friendly_guid) <- find_injured_friendly(state, event) do
+         friendly_guid when is_integer(friendly_guid) <- find_injured_friendly(state, event, context) do
       {:ok, friendly_guid}
     else
       _ -> :skip
     end
   end
 
-  defp satisfy(_state, %AIEvent{event_type: :kill} = event, invoker_guid) do
+  defp satisfy(_state, %AIEvent{event_type: :kill} = event, invoker_guid, %Context{}) do
     if event.param3 == 1 and Guid.entity_type(invoker_guid) != :player do
       :skip
     else
@@ -280,21 +280,21 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAI do
     end
   end
 
-  defp satisfy(_state, %AIEvent{event_type: event_type}, invoker_guid)
+  defp satisfy(_state, %AIEvent{event_type: event_type}, invoker_guid, %Context{})
        when event_type in [:aggro, :spawned, :death, :evade, :leave_combat, :hit_by_spell, :reached_home] do
     {:ok, invoker_guid}
   end
 
-  defp satisfy(_state, %AIEvent{}, _invoker_guid), do: :skip
+  defp satisfy(_state, %AIEvent{}, _invoker_guid, %Context{}), do: :skip
 
-  defp find_injured_friendly(state, %AIEvent{param2: radius}) do
+  defp find_injured_friendly(state, %AIEvent{param2: radius}, %Context{} = context) do
     entry = %CreatureSpell{
       cast_target: :friendly_injured,
       target_param1: normalize_radius(radius),
       target_param2: 1
     }
 
-    MobSpells.resolve_target(state, entry, nil)
+    MobSpells.resolve_target(state, entry, nil, context)
   end
 
   defp normalize_radius(radius) when is_number(radius) and radius > 0, do: radius
@@ -313,13 +313,13 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAI do
 
   defp mana_pct(_state), do: nil
 
-  defp update_repeat_timer(%Blackboard{} = blackboard, %AIEvent{} = event, index, now) do
+  defp update_repeat_timer(%Blackboard{} = blackboard, %AIEvent{} = event, index, now, %Context{random: random}) do
     case repeat_params(event) do
       nil ->
         blackboard
 
       {min_ms, max_ms} when max_ms >= min_ms ->
-        put_timer(blackboard, index, now + roll_ms(min_ms, max_ms))
+        put_timer(blackboard, index, now + Random.between(random, min_ms, max_ms))
 
       _invalid ->
         disable(blackboard, index)
@@ -338,44 +338,45 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAI do
   defp maybe_disable(%Blackboard{} = blackboard, %AIEvent{repeatable?: true}, _index), do: blackboard
   defp maybe_disable(%Blackboard{} = blackboard, %AIEvent{}, index), do: disable(blackboard, index)
 
-  defp chance_passes?(%AIEvent{chance: chance}) when is_integer(chance) and chance < 100 do
-    :rand.uniform(100) <= chance
+  defp chance_passes?(%AIEvent{chance: chance}, random) when is_integer(chance) and chance < 100 do
+    Random.integer(random, 100) <= chance
   end
 
-  defp chance_passes?(%AIEvent{}), do: true
+  defp chance_passes?(%AIEvent{}, _random), do: true
 
   defp casting_allows?(state, %AIEvent{not_casting?: true}), do: is_nil(state.internal.casting)
   defp casting_allows?(_state, %AIEvent{}), do: true
 
-  defp ensure_init(%Blackboard{eventai_timers: timers} = blackboard, _events, _now) when is_map(timers) do
+  defp ensure_init(%Blackboard{eventai_timers: timers} = blackboard, _events, _now, %Context{}) when is_map(timers) do
     blackboard
   end
 
-  defp ensure_init(%Blackboard{} = blackboard, events, now) do
-    reset_ooc(%{blackboard | eventai_timers: %{}, eventai_disabled: MapSet.new()}, events, now)
+  defp ensure_init(%Blackboard{} = blackboard, events, now, %Context{} = context) do
+    reset_ooc(%{blackboard | eventai_timers: %{}, eventai_disabled: MapSet.new()}, events, now, context)
   end
 
-  defp reset_for_combat(%Blackboard{} = blackboard, events, now) do
+  defp reset_for_combat(%Blackboard{} = blackboard, events, now, %Context{random: random}) do
     blackboard = %{blackboard | eventai_timers: %{}, eventai_disabled: MapSet.new()}
 
     events
     |> Enum.with_index()
     |> Enum.reduce(blackboard, fn
       {%AIEvent{event_type: :timer_in_combat} = event, index}, blackboard ->
-        put_timer(blackboard, index, now + roll_ms(event.param1, event.param2))
+        put_timer(blackboard, index, now + Random.between(random, event.param1, event.param2))
 
       {%AIEvent{}, _index}, blackboard ->
         blackboard
     end)
   end
 
-  defp reset_ooc(%Blackboard{eventai_timers: timers} = blackboard, events, now) when is_map(timers) do
+  defp reset_ooc(%Blackboard{eventai_timers: timers} = blackboard, events, now, %Context{random: random})
+       when is_map(timers) do
     events
     |> Enum.with_index()
     |> Enum.reduce(blackboard, fn
       {%AIEvent{event_type: :timer_ooc} = event, index}, blackboard ->
         blackboard
-        |> put_timer(index, now + roll_ms(event.param1, event.param2))
+        |> put_timer(index, now + Random.between(random, event.param1, event.param2))
         |> enable(index)
 
       {%AIEvent{}, _index}, blackboard ->
@@ -383,14 +384,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAI do
     end)
   end
 
-  defp reset_ooc(%Blackboard{} = blackboard, _events, _now), do: blackboard
-
-  defp roll_ms(min_ms, max_ms) when is_integer(min_ms) and is_integer(max_ms) and max_ms > min_ms do
-    min_ms + :rand.uniform(max_ms - min_ms + 1) - 1
-  end
-
-  defp roll_ms(min_ms, _max_ms) when is_integer(min_ms) and min_ms >= 0, do: min_ms
-  defp roll_ms(_min_ms, _max_ms), do: 0
+  defp reset_ooc(%Blackboard{} = blackboard, _events, _now, %Context{}), do: blackboard
 
   defp enabled?(%Blackboard{eventai_disabled: %MapSet{} = disabled}, index) do
     not MapSet.member?(disabled, index)

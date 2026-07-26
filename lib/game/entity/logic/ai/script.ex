@@ -23,13 +23,14 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Navigation
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Random
   alias ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells, as: MobSpells
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
   alias ThistleTea.Game.Entity.Logic.Condition, as: ConditionLogic
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Guid
-  alias ThistleTea.Game.World
 
   require Logger
 
@@ -67,7 +68,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
          target_guid,
          %Context{} = context
        ) do
-    case resolve_target(state, step, target_guid) do
+    case resolve_target(state, step, target_guid, context) do
       ^self_guid ->
         dispatch(state, blackboard, %{step | swap_final?: false}, target_guid, context)
 
@@ -144,38 +145,118 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
     {state, blackboard}
   end
 
-  defp execute(state, blackboard, %ScriptStep{} = step, target_guid, now, %Context{}) do
-    execute(state, blackboard, step, target_guid, now)
-  end
-
-  defp execute(state, blackboard, %ScriptStep{command: :talk} = step, target_guid, _now) do
-    case pick_talk_text(step) do
+  defp execute(
+         state,
+         blackboard,
+         %ScriptStep{command: :talk} = step,
+         target_guid,
+         _now,
+         %Context{random: random} = context
+       ) do
+    case pick_talk_text(step, random) do
       nil -> {state, blackboard}
-      text -> {talk(state, text, resolve_target(state, step, target_guid)), blackboard}
+      text -> {talk(state, text, resolve_target(state, step, target_guid, context)), blackboard}
     end
   end
 
-  defp execute(state, blackboard, %ScriptStep{command: :emote} = step, _target_guid, _now) do
+  defp execute(state, blackboard, %ScriptStep{command: :emote} = step, _target_guid, _now, %Context{random: random}) do
     case ScriptStep.emote_ids(step) do
       [] -> {state, blackboard}
-      emote_ids -> {Effects.enqueue(state, Effects.emote(Enum.random(emote_ids))), blackboard}
+      emote_ids -> {Effects.enqueue(state, Effects.emote(Random.choice(random, emote_ids))), blackboard}
     end
   end
 
-  defp execute(state, blackboard, %ScriptStep{command: :cast_spell} = step, target_guid, now) do
+  defp execute(state, blackboard, %ScriptStep{command: :cast_spell} = step, target_guid, _now, %Context{} = context) do
     entry = CreatureSpell.from_script_step(step)
-    target = resolve_target(state, step, target_guid)
+    target = resolve_target(state, step, target_guid, context)
 
     cond do
       is_nil(target) or entry.spell_id <= 0 ->
         {state, blackboard}
 
       CreatureSpell.flag?(entry, :triggered) ->
-        {trigger_cast(state, entry, target), blackboard}
+        {trigger_cast(state, entry, target, context), blackboard}
 
       true ->
-        MobSpells.attempt_scripted_cast(state, blackboard, entry, target, now)
+        MobSpells.attempt_scripted_cast(state, blackboard, entry, target, context)
     end
+  end
+
+  defp execute(
+         state,
+         blackboard,
+         %ScriptStep{command: :summon_creature} = step,
+         target_guid,
+         _now,
+         %Context{} = context
+       ) do
+    summon =
+      step
+      |> ScriptStep.summon()
+      |> resolve_summon_position(state)
+      |> Map.put(:attack_guid, resolve_summon_attack(state, step, target_guid, context))
+
+    steps = Map.get(step.sub_scripts, summon.script_id, [])
+    {Effects.enqueue(state, Effects.summon_creature(summon, steps, target_guid)), blackboard}
+  end
+
+  defp execute(state, blackboard, %ScriptStep{command: :attack_start} = step, target_guid, _now, %Context{} = context) do
+    case resolve_target(state, step, target_guid, context) do
+      guid when is_integer(guid) and guid > 0 and guid != state.object.guid ->
+        {Effects.enqueue(state, Effects.attack_start(guid)), blackboard}
+
+      _ ->
+        {state, blackboard}
+    end
+  end
+
+  defp execute(
+         state,
+         blackboard,
+         %ScriptStep{command: :start_script} = step,
+         target_guid,
+         _now,
+         %Context{random: random} = context
+       ) do
+    case choose_start_script(step, random) do
+      nil -> {state, blackboard}
+      script_id -> run(state, blackboard, Map.get(step.sub_scripts, script_id, []), target_guid, context)
+    end
+  end
+
+  defp execute(
+         state,
+         blackboard,
+         %ScriptStep{command: :turn_to, datalong: 0} = step,
+         target_guid,
+         _now,
+         %Context{} = context
+       ) do
+    case resolve_target(state, step, target_guid, context) do
+      guid when is_integer(guid) and guid > 0 and guid != state.object.guid ->
+        {Effects.enqueue(state, Effects.set_facing({:target, guid})), blackboard}
+
+      _ ->
+        {state, blackboard}
+    end
+  end
+
+  defp execute(state, blackboard, %ScriptStep{command: :set_phase_random} = step, _target_guid, _now, %Context{
+         random: random
+       }) do
+    candidates = [step.datalong, step.datalong2] ++ Enum.take_while([step.datalong3, step.datalong4], &(&1 > 0))
+    {state, put_phase(blackboard, Random.choice(random, candidates))}
+  end
+
+  defp execute(state, blackboard, %ScriptStep{command: :set_phase_range} = step, _target_guid, _now, %Context{
+         random: random
+       })
+       when step.datalong2 >= step.datalong do
+    {state, put_phase(blackboard, Random.between(random, step.datalong, step.datalong2))}
+  end
+
+  defp execute(state, blackboard, %ScriptStep{} = step, target_guid, now, %Context{}) do
+    execute(state, blackboard, step, target_guid, now)
   end
 
   defp execute(state, blackboard, %ScriptStep{command: :remove_aura, datalong: spell_id}, _target_guid, now)
@@ -198,36 +279,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
     {state, Blackboard.set_run_mode(blackboard, run?)}
   end
 
-  defp execute(state, blackboard, %ScriptStep{command: :summon_creature} = step, target_guid, _now) do
-    summon =
-      step
-      |> ScriptStep.summon()
-      |> resolve_summon_position(state)
-      |> Map.put(:attack_guid, resolve_summon_attack(state, step, target_guid))
-
-    steps = Map.get(step.sub_scripts, summon.script_id, [])
-    {Effects.enqueue(state, Effects.summon_creature(summon, steps, target_guid)), blackboard}
-  end
-
   defp execute(state, blackboard, %ScriptStep{command: :despawn} = step, _target_guid, _now) do
     {Effects.enqueue(state, Effects.despawn_self(step.datalong, step.datalong2 * 1_000)), blackboard}
-  end
-
-  defp execute(state, blackboard, %ScriptStep{command: :attack_start} = step, target_guid, _now) do
-    case resolve_target(state, step, target_guid) do
-      guid when is_integer(guid) and guid > 0 and guid != state.object.guid ->
-        {Effects.enqueue(state, Effects.attack_start(guid)), blackboard}
-
-      _ ->
-        {state, blackboard}
-    end
-  end
-
-  defp execute(state, blackboard, %ScriptStep{command: :start_script} = step, target_guid, now) do
-    case choose_start_script(step) do
-      nil -> {state, blackboard}
-      script_id -> run(state, blackboard, Map.get(step.sub_scripts, script_id, []), target_guid, now)
-    end
   end
 
   @sound_flag_distance_dependent 0x2
@@ -256,16 +309,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
     {set_stand_state(state, step.datalong), blackboard}
   end
 
-  defp execute(state, blackboard, %ScriptStep{command: :turn_to, datalong: 0} = step, target_guid, _now) do
-    case resolve_target(state, step, target_guid) do
-      guid when is_integer(guid) and guid > 0 and guid != state.object.guid ->
-        {Effects.enqueue(state, Effects.set_facing({:target, guid})), blackboard}
-
-      _ ->
-        {state, blackboard}
-    end
-  end
-
   defp execute(state, blackboard, %ScriptStep{command: :turn_to, position: {_x, _y, _z, o}}, _target_guid, _now) do
     state =
       state
@@ -277,16 +320,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
 
   defp execute(state, blackboard, %ScriptStep{command: :set_phase} = step, _target_guid, _now) do
     {state, put_phase(blackboard, set_phase_value(blackboard, step))}
-  end
-
-  defp execute(state, blackboard, %ScriptStep{command: :set_phase_random} = step, _target_guid, _now) do
-    candidates = [step.datalong, step.datalong2] ++ Enum.take_while([step.datalong3, step.datalong4], &(&1 > 0))
-    {state, put_phase(blackboard, Enum.random(candidates))}
-  end
-
-  defp execute(state, blackboard, %ScriptStep{command: :set_phase_range} = step, _target_guid, _now)
-       when step.datalong2 >= step.datalong do
-    {state, put_phase(blackboard, Enum.random(step.datalong..step.datalong2))}
   end
 
   defp execute(state, blackboard, %ScriptStep{command: :set_phase_range}, _target_guid, _now) do
@@ -332,22 +365,20 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
     %{summon | position: position}
   end
 
-  defp resolve_summon_attack(_state, %ScriptStep{} = step, _target_guid)
+  defp resolve_summon_attack(_state, %ScriptStep{} = step, _target_guid, %Context{})
        when is_nil(step.dataint3) or step.dataint3 < 0 do
     nil
   end
 
-  defp resolve_summon_attack(state, %ScriptStep{} = step, target_guid) do
+  defp resolve_summon_attack(state, %ScriptStep{} = step, target_guid, %Context{} = context) do
     attack_step = %{step | target_type: ScriptStep.decode_target_type(step.dataint3), target_self?: false}
-    resolve_target(state, attack_step, target_guid)
+    resolve_target(state, attack_step, target_guid, context)
   end
 
-  defp choose_start_script(%ScriptStep{} = step) do
-    roll = :rand.uniform(100)
-
+  defp choose_start_script(%ScriptStep{} = step, random) do
     step
     |> ScriptStep.start_script_options()
-    |> choose_start_script(roll, 0)
+    |> choose_start_script(Random.integer(random, 100), 0)
   end
 
   defp choose_start_script([], _roll, _sum), do: nil
@@ -429,16 +460,21 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
 
   defp flee(state, blackboard, _now), do: {state, blackboard}
 
-  defp trigger_cast(%{object: %{guid: guid}, unit: %Unit{level: level}} = state, %CreatureSpell{} = entry, target_guid) do
-    if MobSpells.flags_allow?(state, entry, target_guid) do
+  defp trigger_cast(
+         %{object: %{guid: guid}, unit: %Unit{level: level}} = state,
+         %CreatureSpell{} = entry,
+         target_guid,
+         %Context{} = context
+       ) do
+    if MobSpells.flags_allow?(state, entry, target_guid, context) do
       Effects.enqueue(state, Effects.trigger_spell(guid, level, target_guid, entry.spell_id))
     else
       state
     end
   end
 
-  defp pick_talk_text(%ScriptStep{texts: [_ | _] = texts}), do: Enum.random(texts)
-  defp pick_talk_text(%ScriptStep{}), do: nil
+  defp pick_talk_text(%ScriptStep{texts: [_ | _] = texts}, random), do: Random.choice(random, texts)
+  defp pick_talk_text(%ScriptStep{}, _random), do: nil
 
   defp set_phase_value(%Blackboard{eventai_phase: phase}, %ScriptStep{datalong: value, datalong2: 1}) do
     phase + value
@@ -461,11 +497,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
     buddy_guid
   end
 
-  defp resolve_target(state, %ScriptStep{target_type: target_type} = step, _provided)
-       when target_type in [:nearest_creature_with_entry, :random_creature_with_entry] do
-    find_creature_with_entry(state, step, target_type)
-  end
-
   defp resolve_target(state, %ScriptStep{target_type: :provided}, provided) do
     provided || victim(state)
   end
@@ -481,7 +512,22 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
     victim(state)
   end
 
-  defp resolve_target(state, %ScriptStep{target_type: target_type} = step, _provided)
+  defp resolve_target(_state, %ScriptStep{target_type: {:unsupported, target_type}} = step, _provided) do
+    Logger.debug("Script #{step.script_id}: target type #{target_type} unsupported, skipping")
+    nil
+  end
+
+  defp resolve_target(_state, %ScriptStep{}, _provided), do: nil
+
+  defp resolve_target(state, %ScriptStep{target_type: target_type} = step, _provided, %Context{
+         perception: perception,
+         random: random
+       })
+       when target_type in [:nearest_creature_with_entry, :random_creature_with_entry] do
+    find_creature_with_entry(state, step, target_type, perception, random)
+  end
+
+  defp resolve_target(state, %ScriptStep{target_type: target_type} = step, _provided, %Context{} = context)
        when target_type in [
               :friendly_injured,
               :friendly_injured_except,
@@ -495,15 +541,12 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
       target_param2: step.target_param2
     }
 
-    MobSpells.resolve_target(state, entry, nil)
+    MobSpells.resolve_target(state, entry, nil, context)
   end
 
-  defp resolve_target(_state, %ScriptStep{target_type: {:unsupported, target_type}} = step, _provided) do
-    Logger.debug("Script #{step.script_id}: target type #{target_type} unsupported, skipping")
-    nil
+  defp resolve_target(state, %ScriptStep{} = step, provided, %Context{}) do
+    resolve_target(state, step, provided)
   end
-
-  defp resolve_target(_state, %ScriptStep{}, _provided), do: nil
 
   defp victim(%{unit: %Unit{target: target}}) when is_integer(target) and target > 0, do: target
   defp victim(_state), do: nil
@@ -511,23 +554,23 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
   @default_buddy_radius 30.0
 
   defp find_creature_with_entry(
-         %{object: %{guid: self_guid}, internal: %{world: world}, movement_block: %{position: {x, y, z, _o}}},
+         %{object: %{guid: self_guid}},
          %ScriptStep{target_param1: entry, target_param2: radius},
-         target_type
+         target_type,
+         perception,
+         random
        ) do
     range = if is_number(radius) and radius > 0, do: radius, else: @default_buddy_radius
 
     candidates =
-      world
-      |> World.nearby_mobs_at({x, y, z}, range)
+      perception
+      |> Perception.nearby(:mobs, range)
       |> Enum.filter(fn {guid, _distance} -> guid != self_guid and Guid.entry(guid) == entry end)
 
     case {target_type, candidates} do
       {_target_type, []} -> nil
       {:nearest_creature_with_entry, candidates} -> candidates |> Enum.min_by(&elem(&1, 1)) |> elem(0)
-      {:random_creature_with_entry, candidates} -> candidates |> Enum.random() |> elem(0)
+      {:random_creature_with_entry, candidates} -> random |> Random.choice(candidates) |> elem(0)
     end
   end
-
-  defp find_creature_with_entry(_state, %ScriptStep{}, _target_type), do: nil
 end

@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.SpellsTest do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells, as: MobSpells
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Server.AIEnvironment
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Effect
@@ -20,13 +21,15 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.SpellsTest do
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.WorldRef
 
+  defp context(state), do: AIEnvironment.context(state, 1_000)
+
   describe "try_cast/3" do
     test "initializes spell timers from initial delays without casting" do
       spell = fireball()
       entry = entry(spell.id, delay_initial_min_ms: 5_000, delay_initial_max_ms: 5_000)
       state = fixture_mob(spells: [entry], spellbook: %{spell.id => spell})
 
-      assert {:failure, ^state, blackboard} = MobSpells.try_cast(state, %Blackboard{}, 1_000)
+      assert {:failure, ^state, blackboard} = MobSpells.try_cast(state, %Blackboard{}, context(state))
       assert blackboard.spell_timers == %{0 => 6_000}
       assert blackboard.next_spell_list_at == 2_200
     end
@@ -37,7 +40,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.SpellsTest do
       state = fixture_mob(spells: [entry], spellbook: %{spell.id => spell})
       blackboard = %Blackboard{spell_timers: %{0 => 0}, next_spell_list_at: 2_200}
 
-      assert {:failure, ^state, ^blackboard} = MobSpells.try_cast(state, blackboard, 1_000)
+      assert {:failure, ^state, ^blackboard} = MobSpells.try_cast(state, blackboard, context(state))
     end
 
     test "casts a ready spell at the current victim" do
@@ -49,7 +52,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.SpellsTest do
         fixture_mob(spells: [entry], spellbook: %{spell.id => spell})
         |> with_target(target_guid)
 
-      assert {{:running, 3_000, :casting}, state, blackboard} = MobSpells.try_cast(state, %Blackboard{}, 1_000)
+      assert {{:running, 3_000, :casting}, state, blackboard} = MobSpells.try_cast(state, %Blackboard{}, context(state))
 
       assert %{spell: %Spell{id: 20_793}} = state.internal.casting
       assert blackboard.spell_timers == %{0 => 3_000}
@@ -65,7 +68,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.SpellsTest do
         fixture_mob(spells: [entry], spellbook: %{spell.id => spell})
         |> with_target(target_guid)
 
-      assert {:failure, state, _blackboard} = MobSpells.try_cast(state, %Blackboard{}, 1_000)
+      assert {:failure, state, _blackboard} = MobSpells.try_cast(state, %Blackboard{}, context(state))
       assert state.internal.casting == nil
       assert state.internal.events == []
     end
@@ -75,7 +78,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.SpellsTest do
       entry = entry(spell.id, cast_target: :self)
       state = fixture_mob(spells: [entry], spellbook: %{spell.id => spell})
 
-      assert {:failure, state, _blackboard} = MobSpells.try_cast(state, %Blackboard{}, 1_000)
+      assert {:failure, state, _blackboard} = MobSpells.try_cast(state, %Blackboard{}, context(state))
       assert state.internal.casting == nil
       assert Enum.any?(state.internal.events, &match?(%Effects.SpellStart{}, &1))
       assert Enum.any?(state.internal.events, &match?(%Effects.SpellGo{}, &1))
@@ -96,7 +99,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.SpellsTest do
         )
         |> with_target(target_guid)
 
-      assert {{:running, 3_000, :casting}, state, _blackboard} = MobSpells.try_cast(state, %Blackboard{}, 1_000)
+      assert {{:running, 3_000, :casting}, state, _blackboard} =
+               MobSpells.try_cast(state, %Blackboard{}, context(state))
 
       assert state.movement_block.spline_nodes == []
       assert Enum.any?(state.internal.events, &match?(%Effects.MovementStopped{}, &1))
@@ -121,7 +125,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.SpellsTest do
         fixture_mob(spells: [entry], spellbook: %{spell.id => spell})
         |> with_target(target_guid)
 
-      assert {:failure, state, blackboard} = MobSpells.try_cast(state, %Blackboard{}, 1_000)
+      assert {:failure, state, blackboard} = MobSpells.try_cast(state, %Blackboard{}, context(state))
       assert state.internal.casting == nil
       assert blackboard.spell_timers == %{0 => 9_000}
     end
@@ -135,7 +139,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.SpellsTest do
         fixture_mob(spells: [entry], spellbook: %{spell.id => spell})
         |> with_target(target_guid)
 
-      assert {:failure, state, _blackboard} = MobSpells.try_cast(state, %Blackboard{}, 1_000)
+      assert {:failure, state, _blackboard} = MobSpells.try_cast(state, %Blackboard{}, context(state))
       assert state.internal.casting == nil
     end
 
@@ -147,7 +151,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.SpellsTest do
         fixture_mob(spells: [entry], spellbook: %{spell.id => spell})
         |> with_aura(spell)
 
-      assert {:failure, state, _blackboard} = MobSpells.try_cast(state, %Blackboard{}, 1_000)
+      assert {:failure, state, _blackboard} = MobSpells.try_cast(state, %Blackboard{}, context(state))
       assert state.internal.events == []
     end
   end
@@ -160,7 +164,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.SpellsTest do
       state = fixture_mob(spellbook: %{spell.id => spell}) |> with_target(target_guid)
 
       assert {:ok, {state, %Blackboard{}}} =
-               MobSpells.attempt_commanded_cast(state, %Blackboard{}, entry, target_guid, 1_000)
+               MobSpells.attempt_commanded_cast(state, %Blackboard{}, entry, target_guid, context(state))
 
       assert %{spell: %Spell{id: 20_793}} = state.internal.casting
     end
@@ -172,7 +176,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.SpellsTest do
       state = fixture_mob(spellbook: %{spell.id => spell}) |> with_target(target_guid)
 
       assert {:error, :out_of_range} =
-               MobSpells.attempt_commanded_cast(state, %Blackboard{}, entry, target_guid, 1_000)
+               MobSpells.attempt_commanded_cast(state, %Blackboard{}, entry, target_guid, context(state))
     end
 
     test "rejects targets outside the spell's creature type mask" do
@@ -182,7 +186,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.SpellsTest do
       state = fixture_mob(spellbook: %{spell.id => spell}) |> with_target(target_guid)
 
       assert {:error, :bad_targets} =
-               MobSpells.attempt_commanded_cast(state, %Blackboard{}, entry, target_guid, 1_000)
+               MobSpells.attempt_commanded_cast(state, %Blackboard{}, entry, target_guid, context(state))
     end
   end
 
@@ -198,7 +202,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.SpellsTest do
 
       blackboard = %Blackboard{attack_started: true}
 
-      assert {{:running, 3_000, :casting}, state, blackboard} = MobSpells.try_cast(state, blackboard, 1_000)
+      assert {{:running, 3_000, :casting}, state, blackboard} = MobSpells.try_cast(state, blackboard, context(state))
 
       refute Blackboard.combat_movement?(blackboard)
       refute blackboard.attack_started
@@ -217,7 +221,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.SpellsTest do
 
       blackboard = %Blackboard{spell_timers: %{0 => 0}, combat_movement: false}
 
-      assert {:failure, state, blackboard} = MobSpells.try_cast(state, blackboard, 1_000)
+      assert {:failure, state, blackboard} = MobSpells.try_cast(state, blackboard, context(state))
       assert state.internal.casting == nil
       assert Blackboard.combat_movement?(blackboard)
       refute MobSpells.holding_ranged?(state, blackboard)
@@ -232,7 +236,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.SpellsTest do
       entry = entry(spell.id, cast_target: :friendly_injured)
       state = fixture_mob(spells: [entry], spellbook: %{spell.id => spell})
 
-      assert {{:running, 2_000, :casting}, state, _blackboard} = MobSpells.try_cast(state, %Blackboard{}, 1_000)
+      assert {{:running, 2_000, :casting}, state, _blackboard} =
+               MobSpells.try_cast(state, %Blackboard{}, context(state))
+
       assert Target.unit_guid(state.internal.casting.targets) == worst
     end
 
@@ -242,7 +248,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.SpellsTest do
       entry = entry(spell.id, cast_target: :friendly_injured)
       state = fixture_mob(spells: [entry], spellbook: %{spell.id => spell})
 
-      assert {:failure, state, _blackboard} = MobSpells.try_cast(state, %Blackboard{}, 1_000)
+      assert {:failure, state, _blackboard} = MobSpells.try_cast(state, %Blackboard{}, context(state))
       assert state.internal.casting == nil
     end
 
@@ -252,7 +258,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.SpellsTest do
       entry = entry(spell.id, cast_target: :friendly_injured, target_param2: 4_979)
       state = fixture_mob(spells: [entry], spellbook: %{spell.id => spell})
 
-      assert {{:running, 2_000, :casting}, state, _blackboard} = MobSpells.try_cast(state, %Blackboard{}, 1_000)
+      assert {{:running, 2_000, :casting}, state, _blackboard} =
+               MobSpells.try_cast(state, %Blackboard{}, context(state))
+
       assert Target.unit_guid(state.internal.casting.targets) == ally
     end
 
@@ -261,7 +269,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.SpellsTest do
       entry = entry(spell.id, cast_target: :friendly_injured)
       state = fixture_mob(spells: [entry], spellbook: %{spell.id => spell}, health: 20)
 
-      assert {{:running, 2_000, :casting}, state, _blackboard} = MobSpells.try_cast(state, %Blackboard{}, 1_000)
+      assert {{:running, 2_000, :casting}, state, _blackboard} =
+               MobSpells.try_cast(state, %Blackboard{}, context(state))
+
       assert Target.unit_guid(state.internal.casting.targets) == state.object.guid
     end
 
@@ -270,12 +280,14 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.SpellsTest do
       entry = entry(spell.id, cast_target: :friendly_injured_except)
       state = fixture_mob(spells: [entry], spellbook: %{spell.id => spell}, health: 20)
 
-      assert {:failure, state, _blackboard} = MobSpells.try_cast(state, %Blackboard{}, 1_000)
+      assert {:failure, state, _blackboard} = MobSpells.try_cast(state, %Blackboard{}, context(state))
       assert state.internal.casting == nil
 
       ally = injured_ally(10.0, 30)
 
-      assert {{:running, 2_000, :casting}, state, _blackboard} = MobSpells.try_cast(state, %Blackboard{}, 1_000)
+      assert {{:running, 2_000, :casting}, state, _blackboard} =
+               MobSpells.try_cast(state, %Blackboard{}, context(state))
+
       assert Target.unit_guid(state.internal.casting.targets) == ally
     end
 
@@ -285,7 +297,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.SpellsTest do
       entry = entry(spell.id, cast_target: :friendly_injured)
       state = fixture_mob(spells: [entry], spellbook: %{spell.id => spell})
 
-      assert {:failure, state, _blackboard} = MobSpells.try_cast(state, %Blackboard{}, 1_000)
+      assert {:failure, state, _blackboard} = MobSpells.try_cast(state, %Blackboard{}, context(state))
       assert state.internal.casting == nil
     end
 
@@ -295,7 +307,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.SpellsTest do
       entry = entry(spell.id, cast_target: :friendly_injured)
       state = fixture_mob(spells: [entry], spellbook: %{spell.id => spell})
 
-      assert {:failure, state, _blackboard} = MobSpells.try_cast(state, %Blackboard{}, 1_000)
+      assert {:failure, state, _blackboard} = MobSpells.try_cast(state, %Blackboard{}, context(state))
       assert state.internal.casting == nil
     end
 
@@ -305,7 +317,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.SpellsTest do
       entry = entry(spell.id, cast_target: :friendly_injured, target_param1: 10)
       state = fixture_mob(spells: [entry], spellbook: %{spell.id => spell})
 
-      assert {:failure, state, _blackboard} = MobSpells.try_cast(state, %Blackboard{}, 1_000)
+      assert {:failure, state, _blackboard} = MobSpells.try_cast(state, %Blackboard{}, context(state))
       assert state.internal.casting == nil
     end
   end
@@ -316,7 +328,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.SpellsTest do
       blackboard = %Blackboard{next_spell_list_at: 1_800, combat_movement: false}
 
       assert {{:running, 800, :spell_list}, ^state, ^blackboard} =
-               MobSpells.hold_ranged_wait(state, blackboard, 1_000)
+               MobSpells.hold_ranged_wait(state, blackboard, context(state))
     end
   end
 

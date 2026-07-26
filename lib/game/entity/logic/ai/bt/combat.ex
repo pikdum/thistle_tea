@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Navigation
   alias ThistleTea.Game.Entity.Logic.AttackTable
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Combat, as: CombatLogic
@@ -65,13 +66,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
 
   def target_valid_same_map?(_state, _blackboard), do: false
 
-  def target_valid_same_map?(%{internal: %Internal{world: world}, unit: %Unit{target: target}}, _blackboard, %Context{
-        perception: perception
-      }) do
-    case Perception.position(perception, target) do
-      {^world, _x, _y, _z} -> true
-      _ -> false
-    end
+  def target_valid_same_map?(%{unit: %Unit{target: target}} = state, _blackboard, %Context{} = context) do
+    Navigation.target_valid_same_map?(state, target, context)
   end
 
   def target_valid_same_map?(_state, _blackboard, %Context{}), do: false

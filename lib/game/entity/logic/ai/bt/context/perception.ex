@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception do
     :position,
     :grounded_position,
     :projected_position,
+    :distance,
     :moving?,
     :metadata,
     :nearby,
@@ -16,6 +17,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception do
     :position,
     :grounded_position,
     :projected_position,
+    :distance,
     :moving?,
     :metadata,
     :nearby,
@@ -27,6 +29,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception do
       position: fn _guid -> nil end,
       grounded_position: fn _guid -> nil end,
       projected_position: fn _guid, _horizon_ms -> nil end,
+      distance: fn _guid -> nil end,
       moving?: fn _guid -> false end,
       metadata: fn _guid -> nil end,
       nearby: fn _kind, _radius -> [] end,
@@ -44,6 +47,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception do
     projected_position.(guid, horizon_ms)
   end
 
+  def distance(%__MODULE__{distance: distance}, guid), do: distance.(guid)
   def moving?(%__MODULE__{moving?: moving?}, guid), do: moving?.(guid)
   def metadata(%__MODULE__{metadata: metadata}, guid), do: metadata.(guid)
   def nearby(%__MODULE__{nearby: nearby}, kind, radius), do: nearby.(kind, radius)

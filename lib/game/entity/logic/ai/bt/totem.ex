@@ -10,11 +10,12 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Totem do
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Aura, as: AuraBT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Context
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception
   alias ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells, as: MobSpells
   alias ThistleTea.Game.Entity.Logic.AI.BT.Spell, as: SpellBT
   alias ThistleTea.Game.Entity.Logic.Hostility
   alias ThistleTea.Game.Spell
-  alias ThistleTea.Game.World
 
   @target_radius 30.0
   @idle_delay_ms 200
@@ -23,7 +24,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Totem do
     BT.selector([
       AuraBT.tick_step(),
       SpellBT.casting_sequence(),
-      BT.action(&select_hostile_target/2),
+      BT.action(&select_hostile_target/3),
       MobSpells.step(),
       BT.action(&idle/2)
     ])
@@ -31,33 +32,35 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Totem do
 
   defp select_hostile_target(
          %Mob{internal: %Internal{spellbook: spellbook, creature: %Creature{spells: [entry | _]}}} = state,
-         %Blackboard{} = blackboard
+         %Blackboard{} = blackboard,
+         %Context{} = context
        ) do
     case Map.get(spellbook, entry.spell_id) do
-      %Spell{} = spell -> {:failure, put_target(state, spell), blackboard}
+      %Spell{} = spell -> {:failure, put_target(state, spell, context), blackboard}
       _ -> {:failure, state, blackboard}
     end
   end
 
-  defp select_hostile_target(state, blackboard), do: {:failure, state, blackboard}
+  defp select_hostile_target(state, blackboard, %Context{}), do: {:failure, state, blackboard}
 
-  defp put_target(%Mob{} = state, %Spell{} = spell) do
+  defp put_target(%Mob{} = state, %Spell{} = spell, %Context{} = context) do
     if Spell.requires_hostile_target?(spell) do
-      %{state | unit: %{state.unit | target: nearest_hostile(state) || 0}}
+      %{state | unit: %{state.unit | target: nearest_hostile(state, context) || 0}}
     else
       state
     end
   end
 
-  defp nearest_hostile(%Mob{internal: %{world: world}, movement_block: %{position: {x, y, z, _o}}} = state) do
-    ((:mobs |> World.nearby_units_exact(world, {x, y, z}, @target_radius)) ++
-       (:players |> World.nearby_units_exact(world, {x, y, z}, @target_radius)))
+  defp nearest_hostile(%Mob{} = state, %Context{perception: perception}) do
+    (Perception.nearby(perception, :mobs, @target_radius) ++
+       Perception.nearby(perception, :players, @target_radius))
     |> Enum.map(&elem(&1, 0))
     |> Enum.reject(&(&1 == state.object.guid))
-    |> Enum.find(&Hostility.valid_attack_target?(state, &1))
+    |> Enum.find(fn guid ->
+      metadata = Perception.metadata(perception, guid) || %{}
+      Hostility.valid_attack_target?(state, Map.put(metadata, :guid, guid))
+    end)
   end
-
-  defp nearest_hostile(_state), do: nil
 
   defp idle(state, blackboard), do: {BT.running(@idle_delay_ms, :totem), state, blackboard}
 end

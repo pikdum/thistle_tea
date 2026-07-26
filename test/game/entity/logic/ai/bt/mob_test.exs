@@ -12,7 +12,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
   alias ThistleTea.Game.Entity.Data.ScriptStep
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
-  alias ThistleTea.Game.Entity.Logic.AI.BT.Context
   alias ThistleTea.Game.Entity.Logic.AI.BT.Mob, as: MobBT
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Movement
@@ -68,7 +67,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
       mob =
         Enum.reduce_while(1..10, mob, fn _i, mob ->
           mob = Movement.sync_position(mob, Time.now())
-          {_status, mob} = BT.tick(mob.internal.behavior_tree, mob, Context.new(1_000))
+          {_status, mob} = BT.tick(mob.internal.behavior_tree, mob, AIEnvironment.context(mob, 1_000))
 
           if Enum.any?(mob.internal.events, &is_struct(&1, Effects.SpellStart)) do
             {:halt, mob}
@@ -114,7 +113,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
       mob =
         Enum.reduce_while(1..10, mob, fn _i, mob ->
           mob = Movement.sync_position(mob, Time.now())
-          {_status, mob} = BT.tick(mob.internal.behavior_tree, mob, Context.new(1_000))
+          {_status, mob} = BT.tick(mob.internal.behavior_tree, mob, AIEnvironment.context(mob, 1_000))
 
           if Enum.any?(mob.internal.events, &is_struct(&1, Effects.MonsterTalk)) do
             {:halt, mob}
@@ -447,7 +446,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
       blackboard = %Blackboard{next_attack_at: 5_000}
 
       assert {{:running, 880, :chase}, _state, %Blackboard{next_chase_at: 1_880}} =
-               MobBT.combat_wait(state, blackboard, 1_000)
+               MobBT.combat_wait(state, blackboard, AIEnvironment.context(state, 1_000))
     end
   end
 
@@ -534,7 +533,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
       put_spatial_target(:players, target_guid, {10.0, 0.0, 0.0}, alliance(), 5)
       put_spatial_target(:players, other_guid, {12.0, 0.0, 0.0}, alliance(), 5)
 
-      assert {:failure, state, %Blackboard{next_aggro_at: 6_000}} = MobBT.try_aggro(state, blackboard, 1_000)
+      assert {:failure, state, %Blackboard{next_aggro_at: 6_000}} =
+               MobBT.try_aggro(state, blackboard, AIEnvironment.context(state, 1_000))
+
       assert state.unit.target == target_guid
       assert state.internal.in_combat == true
       assert state.internal.last_hostile_time == 1_000

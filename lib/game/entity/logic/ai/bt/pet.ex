@@ -15,9 +15,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Aura, as: AuraBT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Combat, as: CombatBT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context
-  alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Navigation
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception
   alias ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells, as: MobSpells
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Navigation
   alias ThistleTea.Game.Entity.Logic.AI.BT.Regen, as: RegenBT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Spell, as: SpellBT
   alias ThistleTea.Game.Entity.Logic.Combat
@@ -65,10 +65,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet do
     ])
   end
 
-  defp cast_missing_self_buff(%Mob{object: %{guid: guid}} = state, blackboard, %Context{now: now}) do
+  defp cast_missing_self_buff(%Mob{object: %{guid: guid}} = state, blackboard, %Context{} = context) do
     case next_self_buff(state) do
       %CreatureSpell{} = entry ->
-        {state, blackboard} = MobSpells.attempt_scripted_cast(state, blackboard, entry, guid, now)
+        {state, blackboard} = MobSpells.attempt_scripted_cast(state, blackboard, entry, guid, context)
         {:failure, state, blackboard}
 
       _no_buff ->
@@ -155,20 +155,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet do
 
   defp in_combat?(_state, _blackboard), do: false
 
-  defp target_invalid?(%Mob{internal: %Internal{world: world}, unit: %Unit{target: target}}, _blackboard, %Context{
-         perception: perception
-       }) do
-    case Perception.position(perception, target) do
-      {^world, _x, _y, _z} -> target_dead?(perception, target)
-      _ -> true
-    end
-  end
-
-  defp target_dead?(%Perception{} = perception, guid) do
-    case Perception.metadata(perception, guid) do
-      %{alive?: false} -> true
-      _ -> false
-    end
+  defp target_invalid?(%Mob{unit: %Unit{target: target}} = state, _blackboard, %Context{} = context) do
+    not Navigation.target_alive_same_map?(state, target, context)
   end
 
   defp clear_combat(state, blackboard), do: {:success, clear_combat_state(state), blackboard}
@@ -220,7 +208,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet do
 
           state
           |> run()
-          |> move_with_context(destination, [face_angle: orientation, velocity: velocity], context)
+          |> follow_with_context(destination, orientation, velocity, context)
           |> face(orientation)
         else
           state
@@ -239,7 +227,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet do
        ) do
     state =
       case Perception.grounded_position(perception, target) do
-        {^world, x, y, z} -> state |> run() |> move_with_context({x, y, z}, [face_target: target], context)
+        {^world, x, y, z} -> state |> run() |> chase_with_context(target, {x, y, z}, context)
         _ -> state
       end
 
@@ -312,8 +300,15 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet do
     :math.sqrt(:math.pow(tx - x, 2) + :math.pow(ty - y, 2) + :math.pow(tz - z, 2))
   end
 
-  defp move_with_context(%Mob{} = state, destination, opts, %Context{} = context) do
-    case Navigation.move_to(context, state, destination, opts) do
+  defp chase_with_context(%Mob{} = state, target_guid, destination, %Context{} = context) do
+    case Navigation.chase(state, target_guid, destination, context) do
+      {:ok, state} -> state
+      {:error, :no_path, state} -> state
+    end
+  end
+
+  defp follow_with_context(%Mob{} = state, destination, orientation, velocity, %Context{} = context) do
+    case Navigation.follow(state, destination, orientation, velocity, context) do
       {:ok, state} -> state
       {:error, :no_path, state} -> state
     end
