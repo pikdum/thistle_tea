@@ -3,6 +3,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgMoveTeleportAck do
   use ThistleTea.Game.Network.ClientMessage, :MSG_MOVE_TELEPORT_ACK
 
   alias ThistleTea.Game.Network.MovementControl
+  alias ThistleTea.Game.Player.CompanionVisibility
   alias ThistleTea.Game.Player.Exploration, as: PlayerExploration
   alias ThistleTea.Game.World.Visibility
 
@@ -14,8 +15,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgMoveTeleportAck do
       {:ok, state} ->
         state = Visibility.refresh_player(state)
 
-        # The 1.12 client can crash if pet attachment packets arrive before it finishes the teleport.
-        send(self(), :restore_companion)
+        state = CompanionVisibility.defer_restoration(state)
 
         state
         |> MovementControl.maybe_finish_repop()

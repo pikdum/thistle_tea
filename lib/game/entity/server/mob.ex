@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   import Bitwise, only: [&&&: 2, |||: 2]
 
   alias ThistleTea.Game.Entity
+  alias ThistleTea.Game.Entity.Data.Companion.EntityRef
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
   alias ThistleTea.Game.Entity.Data.Component.Internal.Loot
@@ -48,6 +49,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Entity.Server.Mob.Corpse
   alias ThistleTea.Game.Entity.Server.Mob.Incarnation
   alias ThistleTea.Game.Entity.Server.Mob.Respawn
+  alias ThistleTea.Game.Entity.Server.Player.CompanionOwner.Attachment
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.BinaryUtils
@@ -529,7 +531,16 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   def handle_info({:attach_pet, owner_pid, spell_id, pet_spells}, %Mob{internal: %Internal{pet: %Pet{}}} = state)
       when is_pid(owner_pid) do
     pet_spells = pet_spells || Map.values(state.internal.spellbook || %{})
-    send(owner_pid, {:pet_attached, Core.update_object(state), spell_id, pet_spells})
+
+    attachment = %Attachment{
+      kind: companion_kind(state.internal.pet),
+      entity_ref: %EntityRef{guid: state.object.guid, entry: Guid.entry(state.object.guid), spell_id: spell_id},
+      pid: self(),
+      spells: pet_spells,
+      create: Core.update_object(state)
+    }
+
+    send(owner_pid, attachment)
     {:noreply, state}
   end
 
@@ -657,7 +668,6 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
   @impl GenServer
   def terminate(_reason, state) do
-    notify_pet_owner_removed(state)
     release_victim(state)
     unwatch_chase(state)
     World.remove_position(state)
@@ -681,34 +691,16 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   defp control_mode(%Mob{internal: %Internal{pet: %Pet{kind: kind}}}), do: {:pet, kind}
   defp control_mode(%Mob{}), do: :mob
 
+  defp companion_kind(%Pet{kind: :hunter}), do: :hunter_pet
+  defp companion_kind(%Pet{kind: :possessed}), do: :possession
+  defp companion_kind(%Pet{kind: :charmed}), do: :charm
+  defp companion_kind(%Pet{}), do: :guardian
+
   defp control_metadata(%Mob{internal: %Internal{pet: %Pet{} = pet}}) do
     %{owner_guid: pet.owner_guid, pet_profile: pet.profile}
   end
 
   defp control_metadata(%Mob{}), do: %{owner_guid: nil, pet_profile: nil}
-
-  defp notify_pet_owner_removed(%Mob{
-         object: %{guid: guid},
-         internal: %Internal{pet: %Pet{kind: kind, owner_guid: owner_guid, possessed?: possessed?}}
-       }) do
-    if kind == :charmed or possessed? do
-      case Entity.pid(owner_guid) do
-        pid when is_pid(pid) -> send(pid, {:control_released, guid})
-        _ -> :ok
-      end
-    else
-      notify_pet_owner_removed_as_pet(owner_guid, guid)
-    end
-  end
-
-  defp notify_pet_owner_removed(%Mob{}), do: :ok
-
-  defp notify_pet_owner_removed_as_pet(owner_guid, guid) do
-    case Entity.pid(owner_guid) do
-      pid when is_pid(pid) -> send(pid, {:pet_removed, guid})
-      _ -> :ok
-    end
-  end
 
   defp schedule_summon_despawn(
          %Mob{internal: %Internal{spawn: %Spawn{temporary?: true, despawn_delay_ms: delay}}} = state

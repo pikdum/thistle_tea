@@ -6,17 +6,13 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
   that character's effects. `leave_world/1` tears down that world presence.
   """
   alias ThistleTea.Game.Entity
-  alias ThistleTea.Game.Entity.Data.Character
-  alias ThistleTea.Game.Entity.Data.Companion, as: CompanionData
-  alias ThistleTea.Game.Entity.Data.Companion.EntityRef
-  alias ThistleTea.Game.Entity.Logic.Companion
   alias ThistleTea.Game.Entity.Logic.Dueling
+  alias ThistleTea.Game.Entity.Server.Player.CompanionOwner
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Party.Group
   alias ThistleTea.Game.Party.Notifier
   alias ThistleTea.Game.Time
-  alias ThistleTea.Game.World
   alias ThistleTea.Game.World.AggroProbe
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.Metadata
@@ -48,6 +44,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
     :mail_delivery_ref,
     :pending_last_instance_map,
     :active_mover_guid,
+    :companion_monitor,
     ready: false,
     movement_counter: 0,
     pending_movement_acks: %{},
@@ -90,7 +87,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
         state
       end
 
-    state = suspend_companion(state)
+    state = CompanionOwner.suspend(state)
 
     state = close_mailbox(state)
 
@@ -102,28 +99,6 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
 
     %__MODULE__{account: state.account, connection_pid: state.connection_pid}
   end
-
-  def suspend_companion(%__MODULE__{character: %Character{} = character} = state) do
-    case Companion.relationship(character) do
-      %CompanionData{kind: kind, status: {:active, %EntityRef{guid: guid}}}
-      when kind in [:hunter_pet, :guardian] ->
-        World.stop_entity(guid)
-        %{state | character: Companion.suspend(character)}
-
-      %CompanionData{status: {:active, %EntityRef{guid: guid, spell_id: spell_id}}} ->
-        case Entity.pid(guid) do
-          pid when is_pid(pid) -> send(pid, {:release_control, state.guid, spell_id})
-          _ -> :ok
-        end
-
-        %{state | character: Companion.clear(character)}
-
-      _ ->
-        state
-    end
-  end
-
-  def suspend_companion(%__MODULE__{} = state), do: state
 
   defp close_mailbox(
          %__MODULE__{

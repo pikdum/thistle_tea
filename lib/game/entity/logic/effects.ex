@@ -458,7 +458,7 @@ defmodule ThistleTea.Game.Entity.Logic.Effects do
       target_guid: controlled_guid,
       spell_id: spell_id,
       spells: spells,
-      enabled?: Keyword.get(opts, :possess?, false)
+      kind: Keyword.get(opts, :kind, :charm)
     }
   end
 

@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.StateTest do
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.Companion, as: CompanionLogic
+  alias ThistleTea.Game.Entity.Server.Player.CompanionOwner
   alias ThistleTea.Game.Entity.Server.Player.State
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World.System.CellActivator
@@ -75,7 +76,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.StateTest do
         %Character{unit: %Unit{}, internal: %Internal{}}
         |> CompanionLogic.activate(:guardian, %EntityRef{guid: 123, entry: 1863, spell_id: 712})
 
-      state = State.suspend_companion(%State{character: character})
+      state = CompanionOwner.suspend(%State{character: character})
 
       assert state.character.unit.summon == 0
 

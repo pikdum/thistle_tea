@@ -4,6 +4,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgSetActiveMover do
 
   alias ThistleTea.Game.Entity.Logic.Companion
   alias ThistleTea.Game.Entity.Server.Player.State
+  alias ThistleTea.Game.Player.CompanionVisibility
   alias ThistleTea.Game.Player.Exploration, as: PlayerExploration
   alias ThistleTea.Game.World.Visibility
 
@@ -34,8 +35,10 @@ defmodule ThistleTea.Game.Network.Message.CmsgSetActiveMover do
 
   defp enter_world(state) do
     state = Visibility.enter_player(%{state | ready: true})
-    send(self(), :restore_companion)
-    PlayerExploration.check_current(state)
+
+    state
+    |> CompanionVisibility.defer_restoration()
+    |> PlayerExploration.check_current()
   end
 
   defp set_active_mover(%State{} = state, guid), do: %{state | active_mover_guid: guid}

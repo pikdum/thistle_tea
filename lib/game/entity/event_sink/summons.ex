@@ -4,6 +4,7 @@ defmodule ThistleTea.Game.Entity.EventSink.Summons do
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Commands
   alias ThistleTea.Game.Entity.Data.Character
+  alias ThistleTea.Game.Entity.Data.Companion.EntityRef
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Internal.Ritual
   alias ThistleTea.Game.Entity.Data.Component.Internal.Totem
@@ -11,12 +12,10 @@ defmodule ThistleTea.Game.Entity.EventSink.Summons do
   alias ThistleTea.Game.Entity.Data.GameObject
   alias ThistleTea.Game.Entity.Data.GameObjectTemplate, as: DataGameObjectTemplate
   alias ThistleTea.Game.Entity.Data.Mob
-  alias ThistleTea.Game.Entity.Logic.Companion
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Server.DynamicObject, as: DynamicObjectServer
+  alias ThistleTea.Game.Entity.Server.Player.CompanionOwner.Attachment
   alias ThistleTea.Game.Guid
-  alias ThistleTea.Game.Network
-  alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.World
@@ -168,9 +167,20 @@ defmodule ThistleTea.Game.Entity.EventSink.Summons do
   def emit(entity, %Effects.SummonCreature{}), do: entity
 
   def emit(entity, %Effects.ControlGranted{} = effect) do
-    case Entity.pid(effect.source_guid) do
-      pid when is_pid(pid) ->
-        send(pid, {:control_granted, effect.target_guid, effect.spell_id, effect.spells, effect.enabled?})
+    case {Entity.pid(effect.source_guid), Entity.pid(effect.target_guid)} do
+      {owner_pid, controlled_pid} when is_pid(owner_pid) and is_pid(controlled_pid) ->
+        attachment = %Attachment{
+          kind: effect.kind,
+          entity_ref: %EntityRef{
+            guid: effect.target_guid,
+            entry: Guid.entry(effect.target_guid),
+            spell_id: effect.spell_id
+          },
+          pid: controlled_pid,
+          spells: effect.spells
+        }
+
+        send(owner_pid, attachment)
 
       _ ->
         nil
@@ -219,12 +229,6 @@ defmodule ThistleTea.Game.Entity.EventSink.Summons do
     with %Mob{} = built_pet <- SummonLoader.build_pet(entry, entity),
          pet = %{built_pet | unit: %{built_pet.unit | created_by_spell: spell_id}},
          {:ok, pid} <- MobLoader.start_mob(pet) do
-      old_pet_guid = Companion.summon_guid(entity)
-
-      if is_integer(old_pet_guid) and old_pet_guid > 0 and old_pet_guid != pet.object.guid do
-        World.stop_entity(old_pet_guid)
-      end
-
       send(pid, {:attach_pet, self(), spell_id, Map.values(pet.internal.spellbook)})
     end
 
@@ -247,7 +251,6 @@ defmodule ThistleTea.Game.Entity.EventSink.Summons do
 
   def emit(entity, %Effects.DismissPet{target_guid: pet_guid}) when is_integer(pet_guid) and pet_guid > 0 do
     World.stop_entity(pet_guid)
-    Network.send_packet(Message.SmsgPetSpells.clear())
     entity
   end
 
@@ -352,7 +355,7 @@ defmodule ThistleTea.Game.Entity.EventSink.Summons do
        }) do
     spells = (spellbook || %{}) |> Map.values() |> Enum.reject(&Spell.attribute?(&1, :passive))
 
-    emit(entity, Effects.control_granted(entity.object.guid, guid, spell_id, spells, possess?: true))
+    emit(entity, Effects.control_granted(entity.object.guid, guid, spell_id, spells, kind: :possession))
 
     :ok
   end

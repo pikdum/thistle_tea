@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
   alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.Logic.Companion
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Server.Player.CompanionOwner.Attachment
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.UpdateObject
@@ -75,8 +76,7 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
       effect = Effects.dismiss_pet(character.unit.summon)
 
       assert ^character = EventSink.emit(character, effect)
-
-      assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgPetSpells{pet_guid: 0}}}
+      refute_receive {:"$gen_cast", {:send_packet, %Message.SmsgPetSpells{pet_guid: 0}}}
     end
 
     test "tap_cleared clears the entity's own tap metadata", %{mob: mob} do
@@ -346,7 +346,16 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
       event = Effects.summon_pet(caster_guid, 416, 688)
 
       assert ^caster = EventSink.emit(caster, event)
-      assert_receive {:pet_attached, %UpdateObject{object: %Object{guid: pet_guid}}, 688, pet_spells}
+
+      assert_receive %Attachment{
+        kind: :guardian,
+        entity_ref: %EntityRef{guid: pet_guid, entry: 416, spell_id: 688},
+        pid: pet_pid,
+        spells: pet_spells,
+        create: %UpdateObject{object: %Object{guid: pet_guid}}
+      }
+
+      assert pet_pid == Entity.pid(pet_guid)
       assert is_pid(Entity.pid(pet_guid))
       assert Enum.any?(pet_spells, &(&1.id == 11_762))
 
@@ -361,12 +370,27 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
     test "control transitions notify the controlling entity", %{mob: mob} do
       owner_guid = Guid.from_low_guid(:player, unique_guid())
       Entity.register(owner_guid)
-      on_exit(fn -> Entity.unregister(owner_guid) end)
+      Entity.register(mob.object.guid)
+
+      on_exit(fn ->
+        Entity.unregister(owner_guid)
+        Entity.unregister(mob.object.guid)
+      end)
+
       spell = %Spell{id: 3110}
 
       assert ^mob = EventSink.emit(mob, Effects.control_granted(owner_guid, mob.object.guid, 20_882, [spell]))
-      assert_receive {:control_granted, controlled_guid, 20_882, [^spell], false}
+
+      assert_receive %Attachment{
+        kind: :charm,
+        entity_ref: %EntityRef{guid: controlled_guid, spell_id: 20_882},
+        pid: controlled_pid,
+        spells: [^spell],
+        create: nil
+      }
+
       assert controlled_guid == mob.object.guid
+      assert controlled_pid == self()
 
       assert ^mob = EventSink.emit(mob, Effects.control_released(owner_guid, mob.object.guid))
       assert_receive {:control_released, ^controlled_guid}

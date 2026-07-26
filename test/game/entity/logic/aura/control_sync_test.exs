@@ -46,7 +46,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.ControlSyncTest do
       assert possessed.internal.pet.command_state == :stay
       assert possessed.internal.pet.reaction_state == :passive
       assert is_struct(grant, Effects.ControlGranted)
-      assert grant.enabled?
+      assert grant.kind == :possession
 
       {restored, [release]} = ControlSync.sync(%{possessed | unit: %{possessed.unit | auras: []}})
 

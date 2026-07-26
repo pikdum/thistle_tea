@@ -3,6 +3,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgMoveWorldportAck do
   use ThistleTea.Game.Network.ClientMessage, :MSG_MOVE_WORLDPORT_ACK
 
   alias ThistleTea.Game.Entity.Server.Player.State
+  alias ThistleTea.Game.Player.CompanionVisibility
   alias ThistleTea.Game.Player.Exploration, as: PlayerExploration
   alias ThistleTea.Game.Player.Login
   alias ThistleTea.Game.World.Visibility
@@ -15,8 +16,10 @@ defmodule ThistleTea.Game.Network.Message.CmsgMoveWorldportAck do
 
     state = State.complete_worldport(state)
     state = Visibility.enter_player(%{state | ready: true})
-    send(self(), :restore_companion)
-    PlayerExploration.check_current(state)
+
+    state
+    |> CompanionVisibility.defer_restoration()
+    |> PlayerExploration.check_current()
   end
 
   @impl ClientMessage

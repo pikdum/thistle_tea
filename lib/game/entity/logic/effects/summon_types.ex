@@ -10,7 +10,7 @@ defmodule ThistleTea.Game.Entity.Logic.Effects.SummonTypes do
     {:SummonGameObject, [:entry, :duration_ms], [target_guid: nil]},
     {:SummonRequest, [:source_guid, :target_guid, :amount, :position], []},
     {:SummonCreature, [:summon, :steps, :target_guid], []},
-    {:ControlGranted, [:source_guid, :target_guid, :spell_id, :spells, :enabled?], []},
+    {:ControlGranted, [:source_guid, :target_guid, :spell_id, :spells, :kind], []},
     {:ControlReleased, [:source_guid, :target_guid], []},
     {:ReleaseControlled, [:source_guid, :target_guid], [spell_id: nil]},
     {:ViewpointGranted, [:source_guid, :target_guid], []},

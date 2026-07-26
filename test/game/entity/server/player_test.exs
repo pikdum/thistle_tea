@@ -15,6 +15,8 @@ defmodule ThistleTea.Game.Entity.Server.PlayerTest do
   alias ThistleTea.Game.Entity.Logic.Companion, as: CompanionLogic
   alias ThistleTea.Game.Entity.Logic.Regen
   alias ThistleTea.Game.Entity.Server.Player, as: PlayerServer
+  alias ThistleTea.Game.Entity.Server.Player.CompanionOwner.Attachment
+  alias ThistleTea.Game.Entity.Server.Player.CompanionOwner.Monitor, as: CompanionMonitor
   alias ThistleTea.Game.Entity.Server.Player.State
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network
@@ -336,9 +338,10 @@ defmodule ThistleTea.Game.Entity.Server.PlayerTest do
       }
 
       update = update_object(:unit, pet_guid)
+      attachment = companion_attachment(pet_guid, update, self())
 
-      assert {:noreply, attached, {:continue, {:finish_pet_attach, ^pet_guid, []}}} =
-               PlayerServer.handle_info({:pet_attached, update, 688, []}, state)
+      assert {:noreply, attached, {:continue, {:finish_companion_attach, ^attachment}}} =
+               PlayerServer.handle_info(attachment, state)
 
       assert attached.character.unit.summon == pet_guid
 
@@ -349,10 +352,18 @@ defmodule ThistleTea.Game.Entity.Server.PlayerTest do
                }
 
       assert MapSet.member?(attached.tracked_entities, pet_guid)
+      assert %CompanionMonitor{pid: pid, entity_ref: %EntityRef{guid: ^pet_guid}} = attached.companion_monitor
+      assert pid == self()
       assert_receive {:"$gen_cast", {:write_packet, %Packet{}}}
+      refute_receive {:"$gen_cast", {:send_packet, %Message.SmsgPetSpells{pet_guid: ^pet_guid}}}, 0
 
-      assert {:noreply, ^attached} =
-               PlayerServer.handle_cast({:send_packet, update}, attached)
+      assert {:noreply, completed} =
+               PlayerServer.handle_continue({:finish_companion_attach, attachment}, attached)
+
+      assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgPetSpells{pet_guid: ^pet_guid}}}
+
+      assert {:noreply, ^completed} =
+               PlayerServer.handle_cast({:send_packet, update}, completed)
 
       refute_receive {:"$gen_cast", {:write_packet, %Packet{}}}
     end
@@ -369,6 +380,7 @@ defmodule ThistleTea.Game.Entity.Server.PlayerTest do
       }
 
       update = update_object(:unit, pet_guid)
+      attachment = companion_attachment(pet_guid, update, self())
 
       assert {:noreply, visible} =
                PlayerServer.handle_cast({:send_packet, update}, state)
@@ -376,11 +388,83 @@ defmodule ThistleTea.Game.Entity.Server.PlayerTest do
       assert MapSet.member?(visible.tracked_entities, pet_guid)
       assert_receive {:"$gen_cast", {:write_packet, %Packet{}}}
 
-      assert {:noreply, attached, {:continue, {:finish_pet_attach, ^pet_guid, []}}} =
-               PlayerServer.handle_info({:pet_attached, update, 688, []}, visible)
+      assert {:noreply, attached, {:continue, {:finish_companion_attach, ^attachment}}} =
+               PlayerServer.handle_info(attachment, visible)
 
       assert attached.character.unit.summon == pet_guid
       refute_receive {:"$gen_cast", {:write_packet, %Packet{}}}
+    end
+
+    test "suspends a hunter pet and clears controls when its process exits" do
+      guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
+      pet_guid = Guid.from_low_guid(:pet, 1, System.unique_integer([:positive]))
+      pet_pid = spawn(fn -> receive do: (:stop -> :ok) end)
+
+      state = %State{
+        connection_pid: self(),
+        guid: guid,
+        character: character(guid, health: 100, max_health: 100),
+        tracked_entities: MapSet.new()
+      }
+
+      attachment = %Attachment{
+        kind: :hunter_pet,
+        entity_ref: %EntityRef{guid: pet_guid, entry: 1, spell_id: 1515},
+        pid: pet_pid,
+        spells: [],
+        create: update_object(:unit, pet_guid)
+      }
+
+      {:noreply, attached, _continue} = PlayerServer.handle_info(attachment, state)
+      %CompanionMonitor{token: token} = attached.companion_monitor
+      Process.exit(pet_pid, :kill)
+      assert_receive {:DOWN, ^token, :process, ^pet_pid, :killed} = down
+
+      assert {:noreply, detached, {:continue, :maybe_broadcast_update}} =
+               PlayerServer.handle_info(down, attached)
+
+      assert detached.companion_monitor == nil
+      assert detached.character.internal.companion == %Companion{kind: :hunter_pet, status: {:suspended, 1, 1515}}
+      assert detached.character.unit.summon == 0
+      assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgPetSpells{pet_guid: 0}}}
+    end
+
+    test "uses the monitored relationship for charm release" do
+      guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
+      controlled_guid = Guid.from_low_guid(:mob, 1, System.unique_integer([:positive]))
+
+      state = %State{
+        connection_pid: self(),
+        guid: guid,
+        character: character(guid, health: 100, max_health: 100)
+      }
+
+      attachment = %Attachment{
+        kind: :enslaved,
+        entity_ref: %EntityRef{guid: controlled_guid, entry: 1, spell_id: 1098},
+        pid: self(),
+        spells: []
+      }
+
+      assert {:noreply, attached, {:continue, {:finish_companion_attach, ^attachment}}} =
+               PlayerServer.handle_info(attachment, state)
+
+      assert attached.character.internal.companion ==
+               %Companion{
+                 kind: :enslaved,
+                 status: {:active, %EntityRef{guid: controlled_guid, entry: 1, spell_id: 1098}}
+               }
+
+      assert attached.character.unit.charm == controlled_guid
+      assert %CompanionMonitor{entity_ref: %EntityRef{guid: ^controlled_guid}} = attached.companion_monitor
+
+      assert {:noreply, released, {:continue, :maybe_broadcast_update}} =
+               PlayerServer.handle_info({:control_released, controlled_guid}, attached)
+
+      assert released.companion_monitor == nil
+      assert released.character.internal.companion == Companion.none()
+      assert released.character.unit.charm == 0
+      assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgPetSpells{pet_guid: 0}}}
     end
   end
 
@@ -506,6 +590,16 @@ defmodule ThistleTea.Game.Entity.Server.PlayerTest do
       connection_pid: self(),
       guid: Guid.from_low_guid(:player, 1),
       tracked_entities: MapSet.new([tracked_guid])
+    }
+  end
+
+  defp companion_attachment(pet_guid, update, pid) do
+    %Attachment{
+      kind: :guardian,
+      entity_ref: %EntityRef{guid: pet_guid, entry: Guid.entry(pet_guid), spell_id: 688},
+      pid: pid,
+      spells: [],
+      create: update
     }
   end
 

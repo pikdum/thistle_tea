@@ -154,7 +154,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.ControlSync do
     }
 
     spells = controlled_spells(mob)
-    event = Effects.control_granted(holder.caster_guid, mob.object.guid, holder.spell.id, spells, possess?: true)
+    event = Effects.control_granted(holder.caster_guid, mob.object.guid, holder.spell.id, spells, kind: :possession)
     {mob, events} = halt_for_control(mob, now, events)
     {Core.mark_broadcast_update(mob), events ++ [event]}
   end

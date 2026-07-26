@@ -47,6 +47,9 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.Entity.Logic.SpellEffect
   alias ThistleTea.Game.Entity.Logic.SpellFeedback
   alias ThistleTea.Game.Entity.Logic.StealthDetection
+  alias ThistleTea.Game.Entity.Server.Player.CompanionOwner
+  alias ThistleTea.Game.Entity.Server.Player.CompanionOwner.Attachment
+  alias ThistleTea.Game.Entity.Server.Player.CompanionOwner.Monitor, as: CompanionMonitor
   alias ThistleTea.Game.Entity.Server.Player.PacketSink
   alias ThistleTea.Game.Entity.Server.Player.State
   alias ThistleTea.Game.Entity.Server.Player.TickScheduler
@@ -58,6 +61,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.Party.MemberStats
   alias ThistleTea.Game.Party.Notifier, as: PartyNotifier
+  alias ThistleTea.Game.Player.CompanionVisibility
   alias ThistleTea.Game.Player.Enchantments
   alias ThistleTea.Game.Player.GameObjects, as: PlayerGameObjects
   alias ThistleTea.Game.Player.Items
@@ -433,7 +437,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
         {:start_teleport, x, y, z, orientation, world},
         %{character: %Character{internal: %Internal{world: world}}} = state
       ) do
-    state = suspend_pet_for_teleport(state)
+    state = suspend_companion_for_teleport(state)
     character = state.character
 
     area =
@@ -467,7 +471,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
 
   def handle_cast({:start_teleport, x, y, z, orientation, %WorldRef{} = world}, state) do
     DuelSystem.disconnect(state.guid)
-    state = suspend_pet_for_teleport(state)
+    state = suspend_companion_for_teleport(state)
     previous_world = state.character.internal.world
 
     # Update player's location
@@ -524,6 +528,14 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   end
 
   @impl GenServer
+  def handle_info(
+        {:DOWN, token, :process, _pid, _reason},
+        %State{companion_monitor: %CompanionMonitor{token: token}} = state
+      ) do
+    {:ok, entity_ref, state} = CompanionOwner.process_down(state, token)
+    {:noreply, project_companion_detachment(state, entity_ref), {:continue, :maybe_broadcast_update}}
+  end
+
   def handle_info({:DOWN, _monitor, :process, connection_pid, _reason}, %State{connection_pid: connection_pid} = state) do
     {:stop, :normal, State.leave_world(state)}
   end
@@ -746,111 +758,24 @@ defmodule ThistleTea.Game.Entity.Server.Player do
       {:noreply, state}
   end
 
-  def handle_info(
-        {:pet_attached, %UpdateObject{object: %{guid: pet_guid}} = pet_update, spell_id, pet_spells},
-        %{character: %Character{unit: %Unit{}}} = state
-      ) do
-    state = PacketSink.ensure_created(state, pet_update)
-    character = state.character
-    {character, aura_events} = Aura.remove_spells(character, [18_789, 18_790, 18_791, 18_792, 25_228], Time.now())
-    kind = if spell_id == 1515, do: :hunter_pet, else: :guardian
-
-    character =
-      character
-      |> Companion.activate(kind, %EntityRef{guid: pet_guid, entry: Guid.entry(pet_guid), spell_id: spell_id})
-      |> EventSink.emit(aura_events)
-      |> EventSink.emit(passive_pet_aura_events(character, pet_guid))
-      |> Core.mark_broadcast_update()
-
-    {:noreply, %{state | character: character}, {:continue, {:finish_pet_attach, pet_guid, pet_spells}}}
-  end
-
-  def handle_info(
-        {:control_granted, controlled_guid, spell_id, spells, possess?},
-        %{character: %Character{} = character} = state
-      ) do
-    kind = if possess?, do: :possession, else: :charm
-    entity_ref = %EntityRef{guid: controlled_guid, entry: Guid.entry(controlled_guid), spell_id: spell_id}
-
-    character =
-      Companion.activate(character, kind, entity_ref)
-      |> Core.mark_broadcast_update()
-
-    {character, state} =
-      if possess? do
-        character = %{character | player: %{character.player | farsight: controlled_guid}}
-        Network.send_packet(%Message.SmsgClientControlUpdate{guid: controlled_guid, allow_movement?: true})
-        {character, %{state | active_mover_guid: controlled_guid}}
-      else
-        {character, state}
-      end
-
+  def handle_info(%Attachment{} = attachment, %State{character: %Character{}} = state) do
     state =
-      %{state | character: character}
-      |> then(fn state -> if possess?, do: Visibility.set_viewpoint(state, controlled_guid), else: state end)
+      state
+      |> CompanionVisibility.prepare_attachment(attachment)
+      |> CompanionOwner.attach(attachment)
+      |> project_companion_attachment(attachment)
 
-    {:noreply, state, {:continue, {:finish_pet_attach, controlled_guid, spells}}}
+    {:noreply, state, {:continue, {:finish_companion_attach, attachment}}}
   end
 
-  def handle_info({:control_released, controlled_guid}, %{character: %Character{} = character} = state) do
-    if Companion.control_guid(character) == controlled_guid do
-      possessed? = state.active_mover_guid == controlled_guid
-      entity_ref = Companion.active_ref(character)
+  def handle_info({:control_released, controlled_guid}, %State{} = state) do
+    case CompanionOwner.detach(state, controlled_guid, :released) do
+      {:ok, entity_ref, state} ->
+        {:noreply, project_companion_detachment(state, entity_ref), {:continue, :maybe_broadcast_update}}
 
-      {character, state} =
-        if possessed? do
-          Network.send_packet(%Message.SmsgClientControlUpdate{guid: controlled_guid, allow_movement?: false})
-
-          character = %{character | player: %{character.player | farsight: 0}}
-          {character, %{state | active_mover_guid: state.guid}}
-        else
-          {character, state}
-        end
-
-      {character, aura_events} =
-        case entity_ref do
-          %EntityRef{spell_id: spell_id} -> Aura.remove_spells(character, [spell_id], Time.now())
-          _ -> {character, []}
-        end
-
-      character =
-        character
-        |> Companion.removed(:released)
-        |> EventSink.emit(aura_events)
-        |> Core.mark_broadcast_update()
-
-      state = %{state | character: character}
-      state = if possessed?, do: Visibility.reset_viewpoint(state), else: state
-      Network.send_packet(Message.SmsgPetSpells.clear())
-      {:noreply, state, {:continue, :maybe_broadcast_update}}
-    else
-      {:noreply, state}
+      :stale ->
+        {:noreply, state}
     end
-  end
-
-  def handle_info({:control_released, _controlled_guid}, state) do
-    {:noreply, state}
-  end
-
-  def handle_info({:pet_removed, pet_guid}, %{character: %Character{} = character} = state) do
-    if Companion.summon_guid(character) == pet_guid do
-      {character, aura_events} = Aura.remove_spells(character, [25_228], Time.now())
-
-      character =
-        character
-        |> Companion.removed(:process_down)
-        |> EventSink.emit(aura_events)
-        |> Core.mark_broadcast_update()
-
-      Network.send_packet(Message.SmsgPetSpells.clear())
-      {:noreply, %{state | character: character}, {:continue, :maybe_broadcast_update}}
-    else
-      {:noreply, state}
-    end
-  end
-
-  def handle_info({:pet_removed, _pet_guid}, state) do
-    {:noreply, state}
   end
 
   @impl GenServer
@@ -878,10 +803,9 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   end
 
   @impl GenServer
-  def handle_continue({:finish_pet_attach, pet_guid, pet_spells}, state) do
+  def handle_continue({:finish_companion_attach, %Attachment{} = attachment}, state) do
     state = maybe_broadcast_update(state)
-    Network.send_packet(Message.SmsgPetSpells.for_pet(pet_guid, pet_spells))
-    {:noreply, state}
+    {:noreply, CompanionVisibility.finish_attachment(state, attachment)}
   end
 
   def handle_continue(:maybe_broadcast_update, state) do
@@ -1018,6 +942,71 @@ defmodule ThistleTea.Game.Entity.Server.Player do
 
   defp passive_pet_aura_events(_character, _pet_guid), do: []
 
+  defp project_companion_attachment(%State{character: %Character{} = character} = state, %Attachment{
+         kind: kind,
+         entity_ref: %EntityRef{guid: guid}
+       })
+       when kind in [:hunter_pet, :guardian] do
+    {character, aura_events} = Aura.remove_spells(character, [18_789, 18_790, 18_791, 18_792, 25_228], Time.now())
+
+    character =
+      character
+      |> EventSink.emit(aura_events)
+      |> EventSink.emit(passive_pet_aura_events(character, guid))
+      |> Core.mark_broadcast_update()
+
+    %{state | character: character}
+  end
+
+  defp project_companion_attachment(%State{character: %Character{} = character} = state, %Attachment{
+         kind: :possession,
+         entity_ref: %EntityRef{guid: guid}
+       }) do
+    character =
+      %{character | player: %{character.player | farsight: guid}}
+      |> Core.mark_broadcast_update()
+
+    Network.send_packet(%Message.SmsgClientControlUpdate{guid: guid, allow_movement?: true})
+
+    %{state | character: character, active_mover_guid: guid}
+    |> Visibility.set_viewpoint(guid)
+  end
+
+  defp project_companion_attachment(%State{character: %Character{} = character} = state, %Attachment{}) do
+    %{state | character: Core.mark_broadcast_update(character)}
+  end
+
+  defp project_companion_detachment(%State{character: %Character{} = character} = state, %EntityRef{} = entity_ref) do
+    possession? = state.active_mover_guid == entity_ref.guid
+
+    if possession? do
+      Network.send_packet(%Message.SmsgClientControlUpdate{guid: entity_ref.guid, allow_movement?: false})
+    end
+
+    character =
+      if possession? do
+        %{character | player: %{character.player | farsight: 0}}
+      else
+        character
+      end
+
+    {character, aura_events} = Aura.remove_spells(character, Enum.uniq([25_228, entity_ref.spell_id]), Time.now())
+
+    character =
+      character
+      |> EventSink.emit(aura_events)
+      |> Core.mark_broadcast_update()
+
+    state = %{
+      state
+      | character: character,
+        active_mover_guid: if(possession?, do: state.guid, else: state.active_mover_guid)
+    }
+
+    state = if possession?, do: Visibility.reset_viewpoint(state), else: state
+    CompanionVisibility.clear(state)
+  end
+
   defp trigger_kill_procs(state, victim) do
     {character, events} = Aura.reactions(state.character, :kill, %{victim_guid: victim.object.guid, now: Time.now()})
     %{state | character: EventSink.emit(character, events)}
@@ -1086,10 +1075,11 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   defp spell_caster_guid(guid) when is_integer(guid), do: guid
   defp spell_caster_guid(_caster), do: nil
 
-  defp suspend_pet_for_teleport(%State{character: %Character{} = character} = state) do
+  defp suspend_companion_for_teleport(%State{character: %Character{} = character} = state) do
     if is_integer(Companion.summon_guid(character)) do
-      Network.send_packet(Message.SmsgPetSpells.clear())
-      State.suspend_companion(state)
+      state
+      |> CompanionVisibility.clear()
+      |> CompanionOwner.suspend()
     else
       state
     end
