@@ -8,22 +8,22 @@ defmodule ThistleTea.Game.Entity.Logic.AI.TickTest do
   alias ThistleTea.Game.Entity.Logic.AI.Tick
   alias ThistleTea.Game.Spell.Cast
 
-  describe "mob_delay/1" do
+  describe "mob_delay/3" do
     test "uses the tree's running delay" do
-      assert Tick.mob_delay({:running, 250}) == 250
+      assert Tick.mob_delay(fixture(), {:running, 250}, 1_000) == 250
     end
 
     test "uses reason-tagged running delays" do
-      assert Tick.mob_delay({:running, 250, :movement}) == 250
+      assert Tick.mob_delay(fixture(), {:running, 250, :movement}, 1_000) == 250
     end
 
     test "honors long self-paced sleeps" do
-      assert Tick.mob_delay({:running, 30_000}) == 30_000
+      assert Tick.mob_delay(fixture(), {:running, 30_000}, 1_000) == 30_000
     end
 
     test "defaults without a self-paced delay" do
-      assert Tick.mob_delay(:running) == 100
-      assert Tick.mob_delay(:success) == 100
+      assert Tick.mob_delay(fixture(), :running, 1_000) == 100
+      assert Tick.mob_delay(fixture(), :success, 1_000) == 100
     end
   end
 

@@ -20,7 +20,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Item, as: DataItem
   alias ThistleTea.Game.Entity.EventSink
-  alias ThistleTea.Game.Entity.Logic.AI.BT
+  alias ThistleTea.Game.Entity.Logic.AI.BehaviorRunner
   alias ThistleTea.Game.Entity.Logic.AI.Tick
   alias ThistleTea.Game.Entity.Logic.AttackFeedback
   alias ThistleTea.Game.Entity.Logic.Aura
@@ -781,10 +781,11 @@ defmodule ThistleTea.Game.Entity.Server.Player do
 
   @impl GenServer
   def handle_info(:player_tick, %{character: %Character{} = character} = state) do
-    {status, character} = tick_player(character)
+    now = Time.now()
+    {status, character} = tick_player(character, now)
     character = EventSink.emit_pending(character)
     state = %{state | character: character}
-    state = schedule_player_tick(state, character, status)
+    state = schedule_player_tick(state, character, status, now)
     {:noreply, state, {:continue, :maybe_broadcast_update}}
   rescue
     error ->
@@ -872,15 +873,16 @@ defmodule ThistleTea.Game.Entity.Server.Player do
 
   defp sync_character_metadata(state), do: state
 
-  defp tick_player(%{internal: %Internal{behavior_tree: behavior_tree}} = character) when not is_nil(behavior_tree) do
-    BT.tick(behavior_tree, character, AIEnvironment.context(character))
+  defp tick_player(%{internal: %Internal{behavior_tree: behavior_tree}} = character, now)
+       when not is_nil(behavior_tree) and is_integer(now) do
+    BehaviorRunner.tick(behavior_tree, character, AIEnvironment.context(character, now))
   end
 
-  defp tick_player(character), do: {:running, character}
+  defp tick_player(character, _now), do: {:running, character}
 
-  defp schedule_player_tick(state, character, status) do
+  defp schedule_player_tick(state, character, status, now) do
     if Tick.needs_tick?(character) do
-      delay_ms = Tick.player_delay(character, status, Time.now())
+      delay_ms = Tick.player_delay(character, status, now)
       ref = Process.send_after(self(), :player_tick, delay_ms)
       %{state | player_tick_ref: ref}
     else

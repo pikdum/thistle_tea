@@ -8,7 +8,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Totem do
   alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.AI.BT
-  alias ThistleTea.Game.Entity.Logic.AI.BT.Aura, as: AuraBT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception
@@ -23,7 +22,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Totem do
 
   def tree do
     BT.selector([
-      AuraBT.tick_step(),
       SpellBT.casting_sequence(),
       BT.action(&select_hostile_target/3),
       MobSpells.step(),

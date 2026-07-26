@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Data.ScriptStep
+  alias ThistleTea.Game.Entity.Logic.AI.BehaviorRunner
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AI.BT.Mob, as: MobBT
@@ -68,7 +69,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
       mob =
         Enum.reduce_while(1..10, mob, fn _i, mob ->
           mob = Movement.sync_position(mob, Time.now())
-          {_status, mob} = BT.tick(mob.internal.behavior_tree, mob, AIEnvironment.context(mob, 1_000))
+          {_status, mob} = BehaviorRunner.tick(mob.internal.behavior_tree, mob, AIEnvironment.context(mob, 1_000))
 
           if Enum.any?(mob.internal.events, &is_struct(&1, Effects.SpellStart)) do
             {:halt, mob}
@@ -114,7 +115,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
       mob =
         Enum.reduce_while(1..10, mob, fn _i, mob ->
           mob = Movement.sync_position(mob, Time.now())
-          {_status, mob} = BT.tick(mob.internal.behavior_tree, mob, AIEnvironment.context(mob, 1_000))
+          {_status, mob} = BehaviorRunner.tick(mob.internal.behavior_tree, mob, AIEnvironment.context(mob, 1_000))
 
           if Enum.any?(mob.internal.events, &is_struct(&1, Effects.MonsterTalk)) do
             {:halt, mob}
@@ -272,7 +273,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
         }
         |> BT.init(MobBT.tree())
 
-      {_status, mob} = BT.tick(mob.internal.behavior_tree, mob, AIEnvironment.context(mob, 1_000))
+      {_status, mob} = BehaviorRunner.tick(mob.internal.behavior_tree, mob, AIEnvironment.context(mob, 1_000))
 
       refute mob.internal.in_combat
       assert mob.internal.threat == %{}

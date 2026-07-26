@@ -22,6 +22,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Entity.Data.CreatureSpell
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.EventSink
+  alias ThistleTea.Game.Entity.Logic.AI.BehaviorRunner
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AI.BT.Mob, as: MobBT
@@ -31,6 +32,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Entity.Logic.AI.EventAI
   alias ThistleTea.Game.Entity.Logic.AI.Script
   alias ThistleTea.Game.Entity.Logic.AI.Tick
+  alias ThistleTea.Game.Entity.Logic.AI.TickPlan
   alias ThistleTea.Game.Entity.Logic.AttackFeedback
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Combat
@@ -626,13 +628,14 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
       state = Visibility.refresh_entity(state)
       started_at = System.monotonic_time()
       previous = state
-      {status, state} = BT.tick(behavior_tree, state, AIEnvironment.context(state, now))
+      {status, state} = BehaviorRunner.tick(behavior_tree, state, AIEnvironment.context(state, now))
       state = sync_behavior_tree(state, previous)
       duration = System.monotonic_time() - started_at
       state = EventSink.emit_pending(state)
       state = sync_chase_watch(state)
-      emit_ai_tick_telemetry(state, status, duration)
-      state = schedule_next_ai_tick(state, status)
+      plan = Tick.plan(state, status, now)
+      emit_ai_tick_telemetry(state, status, duration, plan)
+      state = schedule_next_ai_tick(state, plan)
       {:noreply, state, {:continue, :maybe_broadcast}}
     end
   rescue
@@ -753,15 +756,17 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
   defp spellbook_spell(%Mob{}, _spell_id), do: nil
 
-  defp schedule_next_ai_tick(%Mob{} = state, status) do
-    if Core.dead?(state), do: deactivate_ai(state), else: schedule_ai_tick(state, Tick.mob_delay(status))
+  defp schedule_next_ai_tick(%Mob{} = state, %TickPlan{} = plan) do
+    if Core.dead?(state), do: deactivate_ai(state), else: schedule_ai_tick(state, TickPlan.delay(plan))
   end
 
-  defp emit_ai_tick_telemetry(%Mob{object: %{guid: guid}}, status, duration) do
+  defp emit_ai_tick_telemetry(%Mob{object: %{guid: guid}}, status, duration, %TickPlan{} = plan) do
+    wake = TickPlan.next(plan)
+
     :telemetry.execute(
       [:thistle_tea, :mob, :ai_tick],
-      %{duration: duration, next_delay_ms: Tick.mob_delay(status)},
-      %{guid: guid, status: tick_status(status), wake_reason: wake_reason(status)}
+      %{duration: duration, next_delay_ms: TickPlan.delay(plan)},
+      %{guid: guid, status: tick_status(status), wake_reason: wake.source}
     )
   end
 
@@ -769,12 +774,6 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   defp tick_status({:running, _delay, _reason}), do: :running
   defp tick_status(status) when is_atom(status), do: status
   defp tick_status(_status), do: :unknown
-
-  defp wake_reason({:running, _delay, reason}) when is_atom(reason), do: reason
-  defp wake_reason({:running, _delay}), do: :unspecified
-  defp wake_reason(:running), do: :unspecified
-  defp wake_reason(status) when is_atom(status), do: status
-  defp wake_reason(_status), do: :unknown
 
   defp send_resume_move(%Mob{} = state, pid, now) do
     case Movement.resume_spline(state, now) do

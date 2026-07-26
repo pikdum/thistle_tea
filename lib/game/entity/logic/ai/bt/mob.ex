@@ -13,7 +13,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.AI.BT
-  alias ThistleTea.Game.Entity.Logic.AI.BT.Aura, as: AuraBT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AI.BT.Combat, as: CombatBT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context
@@ -21,7 +20,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Random
   alias ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells, as: MobSpells
   alias ThistleTea.Game.Entity.Logic.AI.BT.Navigation
-  alias ThistleTea.Game.Entity.Logic.AI.BT.Regen, as: RegenBT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Spell, as: SpellBT
   alias ThistleTea.Game.Entity.Logic.AI.EventAI
   alias ThistleTea.Game.Entity.Logic.AI.Script
@@ -32,7 +30,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   alias ThistleTea.Game.Entity.Logic.Engagement
   alias ThistleTea.Game.Entity.Logic.Hostility
   alias ThistleTea.Game.Entity.Logic.Movement
-  alias ThistleTea.Game.Entity.Logic.Regen, as: RegenLogic
   alias ThistleTea.Game.Entity.Logic.StealthDetection
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Math
@@ -72,8 +69,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
 
   def tree do
     BT.selector([
-      AuraBT.tick_step(),
-      RegenBT.tick_step(),
       BT.sequence([
         BT.condition(&tether_target_set?/2),
         BT.action(&wait_for_tether_arrival/3)
@@ -222,7 +217,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   defp idle_stunned(%Mob{} = state, %Blackboard{} = blackboard, now) when is_integer(now) do
     state = set_running(state, false)
     blackboard = Blackboard.clear_move_target(blackboard)
-    {BT.running(passive_delay(state, blackboard, now, @dead_idle_delay), :stunned), state, blackboard}
+    {BT.running(@dead_idle_delay, :stunned), state, blackboard}
   end
 
   defp wait_until_confused_wander_ready(%Mob{} = state, %Blackboard{} = blackboard, %Context{now: now}) do
@@ -765,9 +760,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
         {:attack, attack_delay},
         {:chase, chase_delay},
         {:spell, MobSpells.next_spell_delay(state, blackboard, now)},
-        {:eventai, eventai_combat_delay(state, blackboard, now)},
-        {:aura, aura_delay(state, now)},
-        {:regen, regen_delay(state, blackboard, now)}
+        {:eventai, eventai_combat_delay(state, blackboard, now)}
       ]
       |> soonest_wake(:chase, @chase_tick_delay)
 
@@ -1329,12 +1322,12 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     move_to_target(state, blackboard, context)
   end
 
-  def move_to_target(%Mob{} = state, %Blackboard{} = blackboard, %Context{now: now} = context) do
+  def move_to_target(%Mob{} = state, %Blackboard{} = blackboard, %Context{} = context) do
     case blackboard.target do
       {x, y, z} = target ->
         cond do
           Movement.blocked?(state) ->
-            {BT.running(blocked_delay(state, now), :blocked), state, blackboard}
+            {BT.running(@blocked_retry_delay, :blocked), state, blackboard}
 
           blackboard.move_target == target ->
             {:success, state, blackboard}
@@ -1407,9 +1400,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     {BT.running(delay_ms, reason), state, blackboard}
   end
 
-  defp idle_dead(%Mob{} = state, %Blackboard{} = blackboard, %Context{now: now}) do
+  defp idle_dead(%Mob{} = state, %Blackboard{} = blackboard, %Context{}) do
     state = set_running(state, false)
-    {BT.running(passive_delay(state, blackboard, now, @dead_idle_delay), :dead), state, blackboard}
+    {BT.running(@dead_idle_delay, :dead), state, blackboard}
   end
 
   defp waypoint_destination(%Mob{internal: %Internal{spawn: %Spawn{waypoint_route: %WaypointRoute{} = route}}}) do
@@ -1456,9 +1449,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     [
       {key_reason, Blackboard.delay_until(blackboard, key, now)},
       {:aggro, Blackboard.delay_until(blackboard, :next_aggro_at, now)},
-      {:eventai, EventAI.ooc_timer_delay(state, blackboard, now)},
-      {:aura, aura_delay(state, now)},
-      {:regen, regen_delay(state, blackboard, now)}
+      {:eventai, EventAI.ooc_timer_delay(state, blackboard, now)}
     ]
     |> soonest_wake(:aggro, @aggro_check_delay)
   end
@@ -1467,18 +1458,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     if EventAI.has_events?(state) do
       max(Blackboard.delay_until(blackboard, :next_eventai_at, now), 1)
     end
-  end
-
-  defp passive_delay(%Mob{} = state, %Blackboard{} = blackboard, now, fallback) do
-    [
-      aura_delay(state, now),
-      regen_delay(state, blackboard, now)
-    ]
-    |> soonest_delay(fallback)
-  end
-
-  defp blocked_delay(%Mob{} = state, now) do
-    soonest_delay([aura_delay(state, now)], @blocked_retry_delay)
   end
 
   defp chase_delay(%Mob{} = state, target_guid, {tx, ty}, %Context{now: now, perception: perception}) do
@@ -1525,19 +1504,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   end
 
   defp combat_contact_delay(%Mob{}, %Blackboard{}, %Context{}), do: nil
-
-  defp aura_delay(%Mob{} = state, now) do
-    case AuraLogic.next_event_at(state) do
-      at when is_integer(at) -> at - now
-      _ -> nil
-    end
-  end
-
-  defp regen_delay(%Mob{} = state, %Blackboard{} = blackboard, now) do
-    if RegenLogic.needs_regen?(state) do
-      Blackboard.delay_until(blackboard, :next_regen_at, now)
-    end
-  end
 
   defp soonest_delay(delays, fallback) do
     delays
