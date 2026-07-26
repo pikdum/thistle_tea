@@ -86,6 +86,13 @@ defmodule ThistleTea.Game.World.SpawnPool do
     GenServer.call(via(group), :status)
   end
 
+  def worlds do
+    @registry
+    |> Registry.select([{{:"$1", :_, :_}, [], [:"$1"]}])
+    |> Enum.map(fn {world, _group} -> world end)
+    |> Enum.uniq()
+  end
+
   def stop_world(%WorldRef{} = world) do
     @registry
     |> Registry.select([{{:"$1", :"$2", :"$3"}, [], [{{:"$1", :"$2"}}]}])

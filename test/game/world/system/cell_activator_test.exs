@@ -146,6 +146,21 @@ defmodule ThistleTea.Game.World.System.CellActivatorTest do
       assert_receive {:loaded, {^world, 1, 1}}
     end
 
+    test "tears down a world kept alive only by resident pools" do
+      world = System.unique_integer([:positive])
+      occupied = start_supervised!({Agent, fn -> [] end})
+
+      pid =
+        start_sweeper(occupied,
+          grace_ms: 0,
+          world_empty_timeout_ms: 0,
+          pool_worlds: fn -> [world] end
+        )
+
+      send(pid, :sweep)
+      assert_receive {:torn_down, ^world}
+    end
+
     test "does not tear down worlds with players present" do
       world = System.unique_integer([:positive])
       occupied = start_supervised!({Agent, fn -> [{world, 1, 1}] end})
@@ -176,18 +191,18 @@ defmodule ThistleTea.Game.World.System.CellActivatorTest do
   defp start_sweeper(occupied, opts) do
     parent = self()
 
-    start_supervised!(
-      {CellActivator,
-       [
-         name: :"cell_activator_test_#{System.unique_integer([:positive])}",
-         loader: fn cell -> send(parent, {:loaded, cell}) end,
-         player_cells: fn -> Agent.get(occupied, & &1) end,
-         deactivator: fn cells, _wanted ->
-           send(parent, {:deactivated, cells})
-           cells
-         end,
-         world_teardown: fn world -> send(parent, {:torn_down, world}) end
-       ] ++ opts}
-    )
+    defaults = [
+      name: :"cell_activator_test_#{System.unique_integer([:positive])}",
+      loader: fn cell -> send(parent, {:loaded, cell}) end,
+      player_cells: fn -> Agent.get(occupied, & &1) end,
+      pool_worlds: fn -> [] end,
+      deactivator: fn cells, _wanted ->
+        send(parent, {:deactivated, cells})
+        cells
+      end,
+      world_teardown: fn world -> send(parent, {:torn_down, world}) end
+    ]
+
+    start_supervised!({CellActivator, Keyword.merge(defaults, opts)})
   end
 end

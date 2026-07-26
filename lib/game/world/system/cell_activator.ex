@@ -37,6 +37,7 @@ defmodule ThistleTea.Game.World.System.CellActivator do
             loader: nil,
             deactivator: nil,
             player_cells: nil,
+            pool_worlds: nil,
             world_teardown: nil,
             sweep?: false,
             max_concurrency: @default_max_concurrency,
@@ -67,6 +68,7 @@ defmodule ThistleTea.Game.World.System.CellActivator do
       loader: Keyword.get(opts, :loader, &load_cell/1),
       deactivator: Keyword.get(opts, :deactivator, &deactivate_cells/2),
       player_cells: Keyword.get(opts, :player_cells, &occupied_cells/0),
+      pool_worlds: Keyword.get(opts, :pool_worlds, &SpawnPool.worlds/0),
       world_teardown: Keyword.get(opts, :world_teardown, &teardown_world_processes/1),
       sweep?: Keyword.get(opts, :sweep, false),
       max_concurrency: Keyword.get(opts, :max_concurrency, @default_max_concurrency),
@@ -277,10 +279,18 @@ defmodule ThistleTea.Game.World.System.CellActivator do
   end
 
   defp loaded_open_worlds(%__MODULE__{} = state) do
-    state.cells
-    |> MapSet.union(state.orphaned)
-    |> Enum.filter(&open_world_cell?/1)
-    |> MapSet.new(fn {world, _x, _y} -> world end)
+    ledger_worlds =
+      state.cells
+      |> MapSet.union(state.orphaned)
+      |> Enum.filter(&open_world_cell?/1)
+      |> MapSet.new(fn {world, _x, _y} -> world end)
+
+    pool_worlds =
+      state.pool_worlds.()
+      |> Enum.filter(&open_world?/1)
+      |> MapSet.new()
+
+    MapSet.union(ledger_worlds, pool_worlds)
   end
 
   defp populated_worlds(%__MODULE__{} = state) do
@@ -288,8 +298,10 @@ defmodule ThistleTea.Game.World.System.CellActivator do
     |> MapSet.new(fn {world, _x, _y} -> world end)
   end
 
-  defp open_world_cell?({%WorldRef{instance_id: instance_id}, _x, _y}), do: is_nil(instance_id)
-  defp open_world_cell?({_world, _x, _y}), do: true
+  defp open_world_cell?({world, _x, _y}), do: open_world?(world)
+
+  defp open_world?(%WorldRef{instance_id: instance_id}), do: is_nil(instance_id)
+  defp open_world?(_world), do: true
 
   defp forget_world(%__MODULE__{} = state, world) do
     {stopped, loading} =
