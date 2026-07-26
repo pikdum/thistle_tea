@@ -278,6 +278,50 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.CombatTest do
       refute Enum.any?(mob.internal.events, &is_struct(&1, Effects.DeliverAttack))
     end
 
+    test "notifies a player once per continuous out-of-range swing error" do
+      player_guid = Guid.from_low_guid(:player, 1)
+      target_guid = Guid.from_low_guid(:mob, 1, 1)
+      SpatialHash.update(:mobs, target_guid, 0, 50.0, 0.0, 0.0)
+      on_exit(fn -> SpatialHash.remove(:mobs, target_guid) end)
+
+      character = %Character{
+        object: %Object{guid: player_guid},
+        unit: %Unit{
+          target: target_guid,
+          min_damage: 3,
+          max_damage: 3,
+          combat_reach: 1.0,
+          base_attack_time: 2_000
+        },
+        internal: %Internal{world: %WorldRef{map_id: 0}},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
+      }
+
+      blackboard = %Blackboard{combat: %Blackboard.Combat{attack_started: false, next_attack_at: 0}}
+
+      assert {:success, character, blackboard} = Combat.melee_attack(character, blackboard, 1_000)
+      assert Enum.count(character.internal.events, &is_struct(&1, Effects.AttackNotInRange)) == 1
+      assert blackboard.combat.last_swing_error == :not_in_range
+
+      character = %{character | internal: %{character.internal | events: []}}
+
+      assert {:success, character, blackboard} = Combat.melee_attack(character, blackboard, 1_100)
+      refute Enum.any?(character.internal.events, &is_struct(&1, Effects.AttackNotInRange))
+      assert blackboard.combat.next_attack_at == 1_200
+
+      SpatialHash.update(:mobs, target_guid, 0, 1.0, 0.0, 0.0)
+
+      assert {:success, character, blackboard} = Combat.melee_attack(character, blackboard, 1_200)
+      assert Enum.any?(character.internal.events, &is_struct(&1, Effects.DeliverAttack))
+      assert blackboard.combat.last_swing_error == nil
+
+      character = %{character | internal: %{character.internal | events: []}}
+      SpatialHash.update(:mobs, target_guid, 0, 50.0, 0.0, 0.0)
+
+      assert {:success, character, _blackboard} = Combat.melee_attack(character, blackboard, 3_200)
+      assert Enum.count(character.internal.events, &is_struct(&1, Effects.AttackNotInRange)) == 1
+    end
+
     test "grants no rage at swing time since rage flows from resolved outcomes" do
       player_guid = Guid.from_low_guid(:player, 1)
       target_guid = Guid.from_low_guid(:mob, 1, 1)

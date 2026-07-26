@@ -166,6 +166,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
 
   defp perform_ready_attacks(state, target, blackboard, main_ready?, offhand_ready?, now) do
     state = PlayerCombat.mark_initiated(state, now)
+    blackboard = clear_swing_error(blackboard)
     {state, blackboard} = perform_main_hand(state, target, blackboard, main_ready?, now)
     perform_offhand(state, target, blackboard, offhand_ready?, now)
   end
@@ -231,12 +232,19 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
 
   defp handle_out_of_range(%Character{} = state, blackboard, now) do
     blackboard = Blackboard.put_next_at(blackboard, :next_attack_at, @attack_retry_delay_ms, now)
-    {Effects.enqueue(state, Effects.attack_not_in_range()), blackboard}
+    repeated? = blackboard.combat.last_swing_error == :not_in_range
+    combat = %{blackboard.combat | last_swing_error: :not_in_range}
+    state = if repeated?, do: state, else: Effects.enqueue(state, Effects.attack_not_in_range())
+    {state, %{blackboard | combat: combat}}
   end
 
   defp handle_out_of_range(state, blackboard, now) do
     blackboard = Blackboard.put_next_at(blackboard, :next_attack_at, @attack_retry_delay_ms, now)
     {state, blackboard}
+  end
+
+  defp clear_swing_error(%Blackboard{} = blackboard) do
+    %{blackboard | combat: %{blackboard.combat | last_swing_error: nil}}
   end
 
   defp send_melee_attack(state, target, now) when is_integer(target) and is_integer(now) do
