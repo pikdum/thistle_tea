@@ -7,7 +7,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   """
   use GenServer
 
-  import Bitwise, only: [&&&: 2, |||: 2]
+  import Bitwise, only: [&&&: 2]
 
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Companion.EntityRef
@@ -36,6 +36,8 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Entity.Logic.Combat
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Logic.Engagement
+  alias ThistleTea.Game.Entity.Logic.Engagement.Tap
   alias ThistleTea.Game.Entity.Logic.Experience
   alias ThistleTea.Game.Entity.Logic.Hostility
   alias ThistleTea.Game.Entity.Logic.Loot.Actor
@@ -74,7 +76,6 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
   @ai_tick_retry_ms 1_000
   @creature_flag_extra_no_assist 0x00010000
-  @dynamic_flag_tapped 0x0004
   @summon_despawn_retry_ms 10_000
 
   def start_link(%Mob{} = state) do
@@ -866,26 +867,19 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
   defp engage_combat(state, caster), do: engage_combat(state, caster, [])
 
-  defp engage_combat(%Mob{internal: %Internal{pet: %Pet{reaction_state: :passive}}} = state, _caster, _opts) do
-    state
-  end
-
-  defp engage_combat(%Mob{unit: %Unit{health: health}} = state, _caster, _opts)
-       when is_number(health) and health <= 0 do
-    state
-  end
-
-  defp engage_combat(%Mob{internal: internal} = state, caster, opts) when is_integer(caster) do
+  defp engage_combat(%Mob{} = state, caster, opts) when is_integer(caster) do
     now = Time.now()
-    was_in_combat = internal.in_combat == true
+    %Engagement.Result{entity: state, from: from, to: to} = Engagement.enter(state, caster, now)
+    was_in_combat = from == :engaged
 
-    %{state | internal: %{internal | in_combat: true, last_hostile_time: now}}
-    |> Threat.add(caster, 0)
-    |> MobBT.reselect_victim()
-    |> Combat.sync_combat_flag()
-    |> maybe_tap(caster)
-    |> maybe_call_assistance(was_in_combat, caster, opts)
-    |> maybe_eventai_enter_combat(was_in_combat, caster, now)
+    if to == :engaged do
+      state
+      |> maybe_tap(caster)
+      |> maybe_call_assistance(was_in_combat, caster, opts)
+      |> maybe_eventai_enter_combat(was_in_combat, caster, now)
+    else
+      state
+    end
   end
 
   defp engage_combat(%Mob{} = state, _caster, _opts) do
@@ -930,10 +924,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
   defp eventai_spell_hit(%Mob{} = state, _caster_guid, _spell), do: state
 
-  defp maybe_tap(
-         %Mob{unit: %Unit{} = unit, internal: %Internal{loot: %Loot{tapped_by: nil} = loot} = internal} = state,
-         caster
-       ) do
+  defp maybe_tap(%Mob{internal: %Internal{loot: %Loot{tapped_by: nil}}} = state, caster) do
     caster = controlling_player(caster)
 
     if not Core.dead?(state) and Guid.entity_type(caster) == :player do
@@ -943,12 +934,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
           _ -> nil
         end
 
-      internal = %{internal | loot: %{loot | tapped_by: %{player: caster, group_id: group_id}}}
-      unit = %{unit | dynamic_flags: (unit.dynamic_flags || 0) ||| @dynamic_flag_tapped}
-      Metadata.update(state.object.guid, %{tapped_player: caster, tapped_group_id: group_id})
-
-      %{state | unit: unit, internal: internal}
-      |> Core.mark_broadcast_update()
+      Engagement.claim(state, %Tap{player: caster, group_id: group_id})
     else
       state
     end
@@ -964,7 +950,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
       state
       |> mark_death_finalized()
-      |> Threat.wipe()
+      |> EventSink.emit_pending()
       |> Core.mark_broadcast_update()
     else
       state
@@ -978,10 +964,8 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
       state
       |> mark_death_finalized()
-      |> Threat.wipe()
       |> EventAI.with_blackboard(&EventAI.on_death(&1, &2, killer, now, AIEnvironment.context(&1, now)))
       |> EventSink.emit_pending()
-      |> maybe_decrement_on_death(killer)
       |> maybe_reward_kill(killer)
       |> Corpse.prepare(killer)
       |> Respawn.schedule()
@@ -994,13 +978,6 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   defp mark_death_finalized(%Mob{internal: internal} = state) do
     %{state | internal: %{internal | death_finalized?: true}}
   end
-
-  defp maybe_decrement_on_death(%Mob{} = state, target) when is_integer(target) and target > 0 do
-    Metadata.decrement(target, :attacker_count, 0)
-    state
-  end
-
-  defp maybe_decrement_on_death(%Mob{} = state, _target), do: state
 
   defp maybe_reward_kill(%Mob{} = state, target) when is_integer(target) and target > 0 do
     target = controlling_player(target)

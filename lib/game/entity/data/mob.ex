@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
+  alias ThistleTea.Game.Entity.Logic.Engagement
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.WorldRef
@@ -228,10 +229,7 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
 
     internal = %{
       internal
-      | in_combat: false,
-        threat: %{},
-        last_hostile_time: nil,
-        casting: nil,
+      | casting: nil,
         rooted?: false,
         running: false,
         killed_by: nil,
@@ -239,13 +237,15 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
         movement_start_time: nil,
         movement_start_position: nil,
         behavior_tree: nil,
-        blackboard: nil,
         broadcast_update?: false,
         spawn: %{spawn_state | respawn_ref: nil, respawn_pending?: false},
-        loot: %{loot | session: nil, tapped_by: nil, corpse_removed?: false, corpse_token: nil}
+        loot: %{loot | session: nil, corpse_removed?: false, corpse_token: nil}
     }
 
-    %{mob | unit: unit, movement_block: movement_block, internal: internal}
+    %Engagement.Result{entity: mob} =
+      Engagement.reset(%{mob | unit: unit, movement_block: movement_block, internal: internal})
+
+    mob
   end
 
   defp effective_scale(%Mangos.CreatureTemplate{scale: scale}, _display_scale) when is_number(scale) and scale > 0,
@@ -414,8 +414,7 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
         power2: unit.max_power2,
         power3: unit.max_power3,
         power4: unit.max_power4,
-        power5: unit.max_power5,
-        target: 0
+        power5: unit.max_power5
     }
   end
 

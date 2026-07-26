@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.ControlSync do
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Logic.Engagement
   alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Spell
@@ -55,6 +56,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.ControlSync do
   defp grant_charm(%Mob{} = mob, %Holder{} = holder, previous, events, now) do
     original_faction = original_value(previous, :original_faction_template, mob.unit.faction_template)
     original_npc_flags = original_value(previous, :original_npc_flags, mob.unit.npc_flags)
+    %Engagement.Result{entity: mob} = Engagement.leave(mob, :controlled, clear_tap?: false)
 
     pet = %Pet{
       owner_guid: holder.caster_guid,
@@ -75,14 +77,11 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.ControlSync do
           | charmed_by: holder.caster_guid,
             faction_template: faction_template,
             npc_flags: 0,
-            flags: controlled_unit_flags(mob.unit.flags || 0, holder.caster_guid),
-            target: 0
+            flags: controlled_unit_flags(mob.unit.flags || 0, holder.caster_guid)
         },
         internal: %{
           mob.internal
           | pet: pet,
-            in_combat: false,
-            threat: %{},
             running: true
         }
     }
@@ -130,6 +129,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.ControlSync do
   defp grant_possession(%Mob{} = mob, %Holder{} = holder, previous, events, now) do
     original_faction = original_value(previous, :original_faction_template, mob.unit.faction_template)
     original_npc_flags = original_value(previous, :original_npc_flags, mob.unit.npc_flags)
+    %Engagement.Result{entity: mob} = Engagement.leave(mob, :controlled, clear_tap?: false)
 
     pet = possession_pet(previous, holder, original_faction, original_npc_flags, mob.unit.flags || 0)
     faction_template = holder.caster_faction_template || mob.unit.faction_template
@@ -141,14 +141,11 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.ControlSync do
           | charmed_by: holder.caster_guid,
             faction_template: faction_template,
             npc_flags: 0,
-            flags: controlled_unit_flags(Bitwise.bor(mob.unit.flags || 0, @unit_flag_possessed), holder.caster_guid),
-            target: 0
+            flags: controlled_unit_flags(Bitwise.bor(mob.unit.flags || 0, @unit_flag_possessed), holder.caster_guid)
         },
         internal: %{
           mob.internal
           | pet: pet,
-            in_combat: false,
-            threat: %{},
             running: true
         }
     }

@@ -6,7 +6,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   """
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
-  alias ThistleTea.Game.Entity.Data.Component.Internal.Loot
   alias ThistleTea.Game.Entity.Data.Component.Internal.Spawn
   alias ThistleTea.Game.Entity.Data.Component.Internal.Waypoint
   alias ThistleTea.Game.Entity.Data.Component.Internal.WaypointRoute
@@ -27,15 +26,14 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   alias ThistleTea.Game.Entity.Logic.AI.EventAI
   alias ThistleTea.Game.Entity.Logic.AI.Script
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
-  alias ThistleTea.Game.Entity.Logic.Casting
   alias ThistleTea.Game.Entity.Logic.Combat, as: CombatLogic
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Logic.Engagement
   alias ThistleTea.Game.Entity.Logic.Hostility
   alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.Entity.Logic.Regen, as: RegenLogic
   alias ThistleTea.Game.Entity.Logic.StealthDetection
-  alias ThistleTea.Game.Entity.Logic.Threat
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Math
   alias ThistleTea.Game.Time
@@ -508,13 +506,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     end
   end
 
-  defp apply_aggro(%Mob{internal: %Internal{} = internal} = state, target_guid, now) do
-    state = %{state | internal: %{internal | in_combat: true, last_hostile_time: now}}
+  defp apply_aggro(%Mob{} = state, target_guid, now) do
+    %Engagement.Result{entity: state} = Engagement.enter(state, target_guid, now)
 
     state
-    |> Threat.add(target_guid, 0)
-    |> reselect_victim()
-    |> CombatLogic.sync_combat_flag()
     |> Core.mark_broadcast_update()
     |> maybe_enqueue_call_assistance(target_guid)
   end
@@ -564,61 +559,36 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
 
   defp maybe_call_for_help(%Mob{} = state), do: state
 
-  def reselect_victim(%Mob{} = state) do
-    case Threat.reselect(state) do
-      {state, {:switch, new_guid}} ->
-        state
-        |> set_victim_state(new_guid)
-        |> BT.reset_attack_started()
-
-      {state, :keep} ->
-        state
-
-      {state, :none} ->
-        state
-    end
-  end
-
   defp select_victim(%Mob{} = state, %Blackboard{} = blackboard, %Context{} = context) do
-    case Threat.reselect(state) do
-      {state, {:switch, new_guid}} ->
-        {state, blackboard} = maybe_on_kill(state, blackboard, context)
-        state = set_victim_state(state, new_guid)
+    case Engagement.select(state) do
+      %Engagement.Result{
+        entity: state,
+        decision: {:switch, _new_guid},
+        previous_victim: previous_victim
+      } ->
+        {state, blackboard} = maybe_on_kill(state, blackboard, previous_victim, context)
         {:success, state, Blackboard.clear_attack_started(blackboard)}
 
-      {state, :keep} ->
+      %Engagement.Result{entity: state, decision: :keep} ->
         {:success, state, blackboard}
 
-      {state, :none} ->
+      %Engagement.Result{entity: state, decision: :none} ->
         state = reset_after_combat(state, context)
         {:failure, state, Blackboard.from_any(state.internal.blackboard)}
     end
   end
 
   defp maybe_on_kill(
-         %Mob{unit: %Unit{target: target}} = state,
+         %Mob{} = state,
          %Blackboard{} = blackboard,
-         %Context{now: now} = context
+         target,
+         %Context{now: now, perception: perception} = context
        ) do
-    if target_dead?(state, blackboard, context) do
+    if target_dead_in_perception?(target, perception) do
       EventAI.on_kill(state, blackboard, target, now, context)
     else
       {state, blackboard}
     end
-  end
-
-  defp set_victim_state(%Mob{unit: %Unit{target: previous} = unit} = state, new_guid) do
-    %{state | unit: %{unit | target: new_guid}}
-    |> Effects.enqueue(victim_change_events(previous, new_guid))
-    |> Core.mark_broadcast_update()
-  end
-
-  defp victim_change_events(previous, new_guid) when is_integer(previous) and previous > 0 do
-    [Effects.attacker_lost(previous), Effects.attacker_gained(new_guid)]
-  end
-
-  defp victim_change_events(_previous, new_guid) do
-    [Effects.attacker_gained(new_guid)]
   end
 
   defp set_running_true(%Mob{} = state, %Blackboard{} = blackboard) do
@@ -658,10 +628,16 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
 
   defp target_dead?(%Mob{unit: %Unit{target: target}}, _blackboard, %Context{perception: perception})
        when is_integer(target) and target > 0 do
-    match?(%{alive?: false}, Perception.metadata(perception, target))
+    target_dead_in_perception?(target, perception)
   end
 
   defp target_dead?(_state, _blackboard, %Context{}), do: false
+
+  defp target_dead_in_perception?(target, perception) when is_integer(target) and target > 0 do
+    match?(%{alive?: false}, Perception.metadata(perception, target))
+  end
+
+  defp target_dead_in_perception?(_target, _perception), do: false
 
   defp tether_target_set?(%Mob{internal: %Internal{spawn: %Spawn{position: {x, y, z}}}}, %Blackboard{
          move_target: {x, y, z}
@@ -692,31 +668,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     {:failure, state, blackboard}
   end
 
-  @dynamic_flag_tapped 0x0004
-
   defp clear_combat(%Mob{} = state, %Blackboard{} = blackboard) do
-    %Mob{unit: %Unit{target: target} = unit, internal: %Internal{} = internal} = state = Threat.wipe(state)
-    unit = %{unit | target: 0, dynamic_flags: Bitwise.band(unit.dynamic_flags || 0, Bitwise.bnot(@dynamic_flag_tapped))}
-    internal = %{internal | in_combat: false, loot: clear_tap(internal.loot)}
-
-    blackboard =
-      blackboard
-      |> Blackboard.clear_chase()
-      |> Blackboard.clear_attack()
-      |> Blackboard.reset_spread()
-      |> Blackboard.reset_spells()
-      |> Blackboard.clear_flee()
-
-    state = %{state | unit: unit, internal: internal}
-
-    state =
-      state
-      |> Casting.cancel()
-      |> CombatLogic.sync_combat_flag()
-      |> Effects.enqueue(clear_combat_events(state.object.guid, target))
-      |> Core.mark_broadcast_update()
-
-    {:success, state, blackboard}
+    %Engagement.Result{entity: state} = Engagement.leave(state, :evade, blackboard: blackboard)
+    {:success, state, state.internal.blackboard}
   end
 
   def drop_threat(%Mob{} = state, source_guid) when is_integer(source_guid) do
@@ -726,16 +680,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   def drop_threat(state, _source_guid), do: state
 
   def drop_threat(%Mob{} = state, source_guid, %Context{} = context) when is_integer(source_guid) do
-    if Threat.tracking?(state, source_guid) do
-      state = Threat.remove(state, source_guid)
-
-      if Threat.entries(state) == [] do
-        reset_after_combat(state, context)
-      else
-        reselect_victim(state)
-      end
-    else
-      state
+    case Engagement.drop(state, source_guid) do
+      %Engagement.Result{entity: state, reason: :untracked} -> state
+      %Engagement.Result{entity: state, decision: :none} -> reset_after_combat(state, context)
+      %Engagement.Result{entity: state} -> state
     end
   end
 
@@ -762,17 +710,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
         %{state | internal: %{state.internal | blackboard: blackboard}}
     end
   end
-
-  defp clear_combat_events(source_guid, target) when is_integer(target) and target > 0 do
-    [Effects.attack_stop(source_guid, target), Effects.attacker_lost(target), Effects.tap_cleared()]
-  end
-
-  defp clear_combat_events(_source_guid, _target) do
-    [Effects.tap_cleared()]
-  end
-
-  defp clear_tap(%Loot{} = loot), do: %{loot | tapped_by: nil}
-  defp clear_tap(loot), do: loot
 
   defp heal_to_full(
          %Mob{unit: %Unit{health: health, max_health: max_health} = unit} = state,

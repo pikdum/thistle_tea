@@ -254,7 +254,7 @@ defmodule ThistleTea.Game.Entity.Data.MobTest do
 
   describe "respawn/1" do
     test "restores the mob from spawn state" do
-      spawn_unit = %Unit{health: 10, max_health: 10, power1: 4, max_power1: 4, level: 2}
+      spawn_unit = %Unit{health: 10, max_health: 10, power1: 4, max_power1: 4, level: 2, target: 0, dynamic_flags: 0}
       spawn_movement_block = %MovementBlock{position: {1.0, 2.0, 3.0, 4.0}, movement_flags: 0}
 
       mob = %Mob{
@@ -460,7 +460,7 @@ defmodule ThistleTea.Game.Entity.Data.MobTest do
     test "respawns a dead mob in place" do
       mob_guid = Guid.from_low_guid(:mob, 2, System.unique_integer([:positive]))
       previous_incarnation_id = System.unique_integer([:positive, :monotonic])
-      spawn_unit = %Unit{health: 10, max_health: 10, power1: 4, max_power1: 4, level: 2}
+      spawn_unit = %Unit{health: 10, max_health: 10, power1: 4, max_power1: 4, level: 2, target: 0, dynamic_flags: 0}
       spawn_movement_block = %MovementBlock{position: {1.0, 2.0, 3.0, 4.0}, movement_flags: 0}
 
       mob = %Mob{

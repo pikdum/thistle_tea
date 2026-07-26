@@ -20,12 +20,11 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Navigation
   alias ThistleTea.Game.Entity.Logic.AI.BT.Regen, as: RegenBT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Spell, as: SpellBT
-  alias ThistleTea.Game.Entity.Logic.Combat
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Logic.Engagement
   alias ThistleTea.Game.Entity.Logic.Hostility
   alias ThistleTea.Game.Entity.Logic.Movement
-  alias ThistleTea.Game.Entity.Logic.Threat
   alias ThistleTea.Game.Time
 
   @follow_distance 2.0
@@ -103,26 +102,23 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet do
 
     state
     |> clear_combat_state()
-    |> then(fn state -> %{state | internal: %{state.internal | pet: pet, in_combat: false}} end)
+    |> then(fn state -> %{state | internal: %{state.internal | pet: pet}} end)
     |> Movement.halt(Time.now())
   end
 
-  def command(%Mob{internal: %Internal{pet: %Pet{} = pet} = internal} = state, :follow, _target_guid) do
+  def command(%Mob{internal: %Internal{pet: %Pet{} = pet}} = state, :follow, _target_guid) do
     state = clear_combat_state(state)
-    %{state | internal: %{internal | pet: %{pet | command_state: :follow, stay_position: nil}, in_combat: false}}
+    %{state | internal: %{state.internal | pet: %{pet | command_state: :follow, stay_position: nil}}}
   end
 
-  def command(%Mob{internal: %Internal{pet: %Pet{} = pet} = internal, unit: unit} = state, :attack, target_guid)
+  def command(%Mob{internal: %Internal{pet: %Pet{} = pet}} = state, :attack, target_guid)
       when is_integer(target_guid) and target_guid > 0 do
-    state = %{
-      state
-      | internal: %{internal | pet: %{pet | command_state: :attack}, in_combat: true},
-        unit: %{unit | target: target_guid}
-    }
+    state = %{state | internal: %{state.internal | pet: %{pet | command_state: :attack}}}
+
+    %Engagement.Result{entity: state} =
+      Engagement.enter(state, target_guid, Time.now(), allow_passive?: true, selection: :target)
 
     state
-    |> Threat.add(target_guid, 0)
-    |> Combat.sync_combat_flag()
   end
 
   def command(%Mob{} = state, _command, _target_guid), do: state
@@ -161,13 +157,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet do
 
   defp clear_combat(state, blackboard), do: {:success, clear_combat_state(state), blackboard}
 
-  defp clear_combat_state(%Mob{internal: %Internal{pet: %Pet{} = pet} = internal, unit: unit} = state) do
+  defp clear_combat_state(%Mob{internal: %Internal{pet: %Pet{} = pet}} = state) do
     pet = if pet.command_state == :attack, do: %{pet | command_state: :follow}, else: pet
-    state = %{state | internal: %{internal | in_combat: false, pet: pet}, unit: %{unit | target: 0}}
-
-    state
-    |> Threat.wipe()
-    |> Combat.sync_combat_flag()
+    %Engagement.Result{entity: state} = Engagement.leave(state, :pet_command)
+    %{state | internal: %{state.internal | pet: pet}}
   end
 
   defp should_follow?(%Mob{internal: %Internal{pet: %Pet{command_state: :follow}}}, _blackboard), do: true

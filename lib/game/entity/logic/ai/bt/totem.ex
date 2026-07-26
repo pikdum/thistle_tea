@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Totem do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception
   alias ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells, as: MobSpells
   alias ThistleTea.Game.Entity.Logic.AI.BT.Spell, as: SpellBT
+  alias ThistleTea.Game.Entity.Logic.Engagement
   alias ThistleTea.Game.Entity.Logic.Hostility
   alias ThistleTea.Game.Spell
 
@@ -45,7 +46,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Totem do
 
   defp put_target(%Mob{} = state, %Spell{} = spell, %Context{} = context) do
     if Spell.requires_hostile_target?(spell) do
-      %{state | unit: %{state.unit | target: nearest_hostile(state, context) || 0}}
+      %Engagement.Result{entity: state} = Engagement.focus(state, nearest_hostile(state, context), :totem_target)
+      state
     else
       state
     end

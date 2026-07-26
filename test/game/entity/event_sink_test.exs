@@ -87,6 +87,13 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
       assert Metadata.query(guid, [:tapped_player, :tapped_group_id]) == %{tapped_player: nil, tapped_group_id: nil}
     end
 
+    test "tap_claimed projects typed tap ownership", %{mob: mob} do
+      guid = mob.object.guid
+
+      assert ^mob = EventSink.emit(mob, Effects.tap_claimed(123, 7))
+      assert Metadata.query(guid, [:tapped_player, :tapped_group_id]) == %{tapped_player: 123, tapped_group_id: 7}
+    end
+
     test "hearthstone teleports a character to their home bind" do
       character = %Character{internal: %Internal{world: %WorldRef{map_id: 1}, home_bind: {0, -8_946.0, -132.0, 84.0}}}
 

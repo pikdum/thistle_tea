@@ -281,6 +281,10 @@ defmodule ThistleTea.Game.Entity.Logic.Effects do
     %Effects.TapCleared{}
   end
 
+  def tap_claimed(player_guid, group_id) when is_integer(player_guid) do
+    %Effects.TapClaimed{player_guid: player_guid, group_id: group_id}
+  end
+
   def attack_outcome(attacker_guid, victim_guid, outcome, damage, spell_id, proc_damage \\ nil)
       when is_integer(attacker_guid) and is_integer(victim_guid) and is_atom(outcome) do
     %Effects.AttackOutcome{

@@ -22,6 +22,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
   alias ThistleTea.Game.Entity.Logic.Companion
   alias ThistleTea.Game.Entity.Logic.Dueling
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Logic.Engagement
   alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.Entity.Logic.Reactive
   alias ThistleTea.Game.Entity.Logic.Resources
@@ -301,11 +302,12 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
 
   defp prepare_death_state(%{internal: %Internal{}, unit: %Unit{}, movement_block: %MovementBlock{}} = entity, now) do
     entity = Movement.sync_position(entity, now)
+    entity = clear_death_engagement(entity)
     %{unit: unit, movement_block: mb} = entity
 
     {entity, aura_events} =
       Aura.transition(
-        %{entity | unit: %{unit | target: 0}},
+        entity,
         %Aura.Change{holders: death_auras(unit.auras), cause: :death, now: now}
       )
 
@@ -315,8 +317,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
 
     internal = %{
       internal
-      | in_combat: false,
-        running: false,
+      | running: false,
         movement_start_time: nil,
         movement_start_position: nil
     }
@@ -334,6 +335,15 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
     %{entity | unit: unit, internal: internal, movement_block: movement_block}
     |> maybe_release_companion()
     |> Combat.sync_combat_flag()
+  end
+
+  defp clear_death_engagement(%Mob{} = entity) do
+    %Engagement.Result{entity: entity} = Engagement.die(entity)
+    entity
+  end
+
+  defp clear_death_engagement(%{internal: %Internal{} = internal, unit: %Unit{} = unit} = entity) do
+    %{entity | unit: %{unit | target: 0}, internal: %{internal | in_combat: false}}
   end
 
   defp maybe_release_companion(%{player: _player} = entity) do

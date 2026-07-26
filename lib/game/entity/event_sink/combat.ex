@@ -187,6 +187,11 @@ defmodule ThistleTea.Game.Entity.EventSink.Combat do
     entity
   end
 
+  def emit(%{object: %{guid: guid}} = entity, %Effects.TapClaimed{} = effect) do
+    Metadata.update(guid, %{tapped_player: effect.player_guid, tapped_group_id: effect.group_id})
+    entity
+  end
+
   def emit(entity, %Effects.StartAttack{target_guid: target_guid}) when is_integer(target_guid) and target_guid > 0 do
     send(self(), {:force_attack, target_guid})
     entity
