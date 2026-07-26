@@ -9,7 +9,7 @@ defmodule ThistleTea.Game.Entity.Server.NavigationResolver do
   alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.World.Pathfinding
 
-  def resolve(entity, now, find_path \\ &Pathfinding.find_path/3)
+  def resolve(entity, now, find_path \\ &steep_find_path/3)
 
   def resolve(%{internal: %Internal{}, movement_block: %MovementBlock{}} = entity, now, find_path)
       when is_integer(now) and is_function(find_path, 3) do
@@ -33,4 +33,9 @@ defmodule ThistleTea.Game.Entity.Server.NavigationResolver do
       _no_path -> entity
     end
   end
+
+  # traversal is steep-permitted for entity movement (vmangos lets NPCs climb
+  # to the hard limit); destination generation stays on the strict filter via
+  # Pathfinding.find_random_point_around_circle
+  defp steep_find_path(map_id, from, to), do: Pathfinding.find_path(map_id, from, to, allow_steep: true)
 end

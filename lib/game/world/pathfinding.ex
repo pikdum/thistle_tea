@@ -15,11 +15,13 @@ defmodule ThistleTea.Game.World.Pathfinding do
     Namigator.find_random_point_around_circle(map_id, x, y, z, radius)
   end
 
-  def find_path(map_id, {start_x, start_y, start_z}, {stop_x, stop_y, stop_z}) do
+  def find_path(map_id, {start_x, start_y, start_z}, {stop_x, stop_y, stop_z}, opts \\ []) do
     load_adt_at(map_id, {start_x, start_y})
     load_adt_at(map_id, {stop_x, stop_y})
 
-    case Namigator.find_path(map_id, start_x, start_y, start_z, stop_x, stop_y, stop_z) do
+    allow_steep? = Keyword.get(opts, :allow_steep, false)
+
+    case Namigator.find_path(map_id, start_x, start_y, start_z, stop_x, stop_y, stop_z, allow_steep?) do
       [_first | [_second | _rest] = path] -> path
       path -> path
     end

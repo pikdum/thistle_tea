@@ -208,19 +208,22 @@ FINE_NIF(unload_adt_native, ERL_NIF_DIRTY_JOB_CPU_BOUND);
 
 std::optional<std::vector<Point3>>
 find_path_native(ErlNifEnv *, MapResource map, double start_x, double start_y,
-                 double start_z, double stop_x, double stop_y, double stop_z) {
+                 double start_z, double stop_x, double stop_y, double stop_z,
+                 bool allow_steep) {
   auto lock = map->acquire();
   unsigned int amount = 0;
+  const uint8_t steep = allow_steep ? 1 : 0;
   std::vector<Vertex> buffer(256);
   auto result = pathfind_find_path(map->get(), f(start_x), f(start_y),
                                    f(start_z), f(stop_x), f(stop_y), f(stop_z),
-                                   buffer.data(), buffer.size(), &amount);
+                                   steep, buffer.data(), buffer.size(),
+                                   &amount);
 
   if (buffer_too_small(result) && amount > buffer.size()) {
     buffer.resize(amount);
     result = pathfind_find_path(map->get(), f(start_x), f(start_y), f(start_z),
-                                f(stop_x), f(stop_y), f(stop_z), buffer.data(),
-                                buffer.size(), &amount);
+                                f(stop_x), f(stop_y), f(stop_z), steep,
+                                buffer.data(), buffer.size(), &amount);
   }
 
   if (!ok(result)) {

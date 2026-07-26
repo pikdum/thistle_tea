@@ -40,6 +40,18 @@ defmodule ThistleTea.Game.World.PathfindingTest do
     end
   end
 
+  describe "find_path/4" do
+    test "finds a path on player-walkable ground" do
+      path = Pathfinding.find_path(0, @human_start, {-8955.0, -140.0, 84.0})
+      assert is_list(path) and path != []
+    end
+
+    test "steep-permitted pathing succeeds where strict pathing does" do
+      path = Pathfinding.find_path(0, @human_start, {-8955.0, -140.0, 84.0}, allow_steep: true)
+      assert is_list(path) and path != []
+    end
+  end
+
   describe "snap_to_ground/2" do
     test "drops a mid-jump position back onto the terrain" do
       {x, y, z} = @human_start

@@ -64,8 +64,8 @@ defmodule ThistleTea.Native.Namigator do
     with_map(map_id, &unload_adt_native(&1, x, y))
   end
 
-  def find_path(map_id, start_x, start_y, start_z, stop_x, stop_y, stop_z) do
-    with_map(map_id, &find_path_native(&1, start_x, start_y, start_z, stop_x, stop_y, stop_z))
+  def find_path(map_id, start_x, start_y, start_z, stop_x, stop_y, stop_z, allow_steep? \\ false) do
+    with_map(map_id, &find_path_native(&1, start_x, start_y, start_z, stop_x, stop_y, stop_z, allow_steep?))
   end
 
   def find_point_between_points(map_id, start_x, start_y, start_z, stop_x, stop_y, stop_z, distance) do
@@ -113,7 +113,7 @@ defmodule ThistleTea.Native.Namigator do
   defp load_adt_at_native(_map, _x, _y), do: :erlang.nif_error(:nif_not_loaded)
   defp unload_adt_native(_map, _x, _y), do: :erlang.nif_error(:nif_not_loaded)
 
-  defp find_path_native(_map, _start_x, _start_y, _start_z, _stop_x, _stop_y, _stop_z),
+  defp find_path_native(_map, _start_x, _start_y, _start_z, _stop_x, _stop_y, _stop_z, _allow_steep?),
     do: :erlang.nif_error(:nif_not_loaded)
 
   defp find_point_between_points_native(_map, _start_x, _start_y, _start_z, _stop_x, _stop_y, _stop_z, _distance),

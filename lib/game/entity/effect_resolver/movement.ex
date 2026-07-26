@@ -58,7 +58,7 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Movement do
   def resolve(_entity, %Effects.TeleportToSpellTarget{}), do: []
 
   defp charge_path(map, from, to) do
-    Pathfinding.find_path(map, from, to)
+    Pathfinding.find_path(map, from, to, allow_steep: true)
   rescue
     _error -> nil
   end
