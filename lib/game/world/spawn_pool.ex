@@ -145,7 +145,7 @@ defmodule ThistleTea.Game.World.SpawnPool do
     case Map.get(state.running, member) do
       {^pid, monitor_ref} ->
         Process.demonitor(monitor_ref, [:flush])
-        :ok = World.stop_entity(pid)
+        stop_entity(pid)
 
         available = state.blueprints |> Map.keys() |> MapSet.new()
         selection = replace_selection(state, member, available)
@@ -322,7 +322,7 @@ defmodule ThistleTea.Game.World.SpawnPool do
     case Map.get(state.running, member) do
       {^pid, monitor_ref} ->
         Process.demonitor(monitor_ref, [:flush])
-        :ok = World.stop_entity(pid)
+        stop_entity(pid)
 
         %{
           state
@@ -339,6 +339,13 @@ defmodule ThistleTea.Game.World.SpawnPool do
     Enum.reduce(state.running, state, fn {member, {pid, _ref}}, acc ->
       stop_running_member(acc, member, pid)
     end)
+  end
+
+  defp stop_entity(pid) do
+    case World.stop_entity(pid) do
+      :ok -> :ok
+      {:error, :not_found} -> :ok
+    end
   end
 
   defp eligible_singleton_selection(_selection, %{internal: %Internal{event: nil}} = blueprint, _events) do

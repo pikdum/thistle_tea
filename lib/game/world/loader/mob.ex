@@ -77,6 +77,7 @@ defmodule ThistleTea.Game.World.Loader.Mob do
         attacker_count: 0,
         incarnation_id: Incarnation.id(mob),
         alive?: mob.unit.health > 0,
+        in_combat: false,
         health_pct: Core.health_pct(mob),
         power_type: mob.unit.power_type,
         orientation: elem(mob.movement_block.position, 3),

@@ -685,6 +685,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
       metadata =
         %{
           alive?: not Core.dead?(state),
+          in_combat: state.internal.in_combat == true,
           health_pct: Core.health_pct(state),
           power_type: state.unit.power_type,
           unit_flags: state.unit.flags,
