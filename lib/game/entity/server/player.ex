@@ -55,6 +55,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.Entity.Server.Player.PacketSink
   alias ThistleTea.Game.Entity.Server.Player.State
   alias ThistleTea.Game.Entity.Server.Player.TickScheduler
+  alias ThistleTea.Game.Entity.Server.PlayerSupervisor
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.InventoryUpdate
@@ -78,7 +79,6 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.CharacterStore
-  alias ThistleTea.Game.World.EntitySupervisor
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.ItemEnchantment, as: ItemEnchantmentLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
@@ -114,7 +114,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   end
 
   def login(account, connection_pid, character_guid) when is_pid(connection_pid) and is_integer(character_guid) do
-    DynamicSupervisor.start_child(EntitySupervisor, {__MODULE__, {account, connection_pid, character_guid}})
+    DynamicSupervisor.start_child(PlayerSupervisor, {__MODULE__, {account, connection_pid, character_guid}})
   end
 
   def handle_message(pid, message) when is_pid(pid) do

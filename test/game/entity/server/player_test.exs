@@ -18,6 +18,7 @@ defmodule ThistleTea.Game.Entity.Server.PlayerTest do
   alias ThistleTea.Game.Entity.Server.Player.CompanionOwner.Attachment
   alias ThistleTea.Game.Entity.Server.Player.CompanionOwner.Monitor, as: CompanionMonitor
   alias ThistleTea.Game.Entity.Server.Player.State
+  alias ThistleTea.Game.Entity.Server.PlayerSupervisor
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.ConnectionState
@@ -43,6 +44,7 @@ defmodule ThistleTea.Game.Entity.Server.PlayerTest do
       guid = character.object.guid
 
       assert {:ok, player_pid} = PlayerServer.login(account, self(), guid)
+      assert Enum.any?(DynamicSupervisor.which_children(PlayerSupervisor), fn {_, pid, _, _} -> pid == player_pid end)
       assert Entity.pid(guid) == player_pid
 
       assert %State{

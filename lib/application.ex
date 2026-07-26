@@ -6,6 +6,7 @@ defmodule ThistleTea.Application do
 
   alias ThistleTea.DB.Mangos.Repo
   alias ThistleTea.Game.Entity.Registry, as: EntityRegistry
+  alias ThistleTea.Game.Entity.Server.PlayerSupervisor
   alias ThistleTea.Game.Network.Server, as: GameServer
   alias ThistleTea.Game.World.AggroProbe
   alias ThistleTea.Game.World.AreaEffects
@@ -111,6 +112,7 @@ defmodule ThistleTea.Application do
           {ThousandIsland, port: @game_port, handler_module: GameServer, handler_options: @handler_options},
         ThistleTeaWeb.Telemetry,
         !test && ThistleTeaWeb.Endpoint,
+        {DynamicSupervisor, strategy: :one_for_one, name: PlayerSupervisor},
         {DynamicSupervisor, strategy: :one_for_one, name: EntitySupervisor, max_restarts: 1_000_000, max_seconds: 1},
         {Registry, keys: :unique, name: SpawnPool.Registry},
         SpawnPoolCatalog,
