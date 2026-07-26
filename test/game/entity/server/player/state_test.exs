@@ -33,7 +33,6 @@ defmodule ThistleTea.Game.Entity.Server.Player.StateTest do
         account: %{username: "test"},
         ready: true,
         target: 42,
-        latency: 30,
         logout_timer: make_ref()
       }
 

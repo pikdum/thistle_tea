@@ -3,6 +3,8 @@ defmodule ThistleTea.Game.Network.ServerTest do
 
   alias ThistleTea.Game.Network.Connection
   alias ThistleTea.Game.Network.ConnectionState
+  alias ThistleTea.Game.Network.Message.SmsgPong
+  alias ThistleTea.Game.Network.Opcodes
   alias ThistleTea.Game.Network.Packet
   alias ThistleTea.Game.Network.Server
   alias ThousandIsland.Socket
@@ -45,6 +47,27 @@ defmodule ThistleTea.Game.Network.ServerTest do
     end
   end
 
+  describe "handle_packets/1" do
+    test "handles ping on the connection before and after player attachment" do
+      packet = %Packet{
+        opcode: Opcodes.get(:CMSG_PING),
+        payload: <<7::little-size(32), 42::little-size(32)>>
+      }
+
+      for player_pid <- [nil, self()] do
+        state = %ConnectionState{
+          player_pid: player_pid,
+          conn: %Connection{packet_queue: [packet]}
+        }
+
+        assert %ConnectionState{latency: 42, conn: %Connection{packet_queue: []}} =
+                 Server.handle_packets(state)
+
+        assert_receive {:"$gen_cast", {:send_packet, %SmsgPong{sequence_id: 7}}}
+      end
+    end
+  end
+
   describe "handle_info/2" do
     test "detaches a normally stopped player while keeping connection state" do
       socket = test_socket()
@@ -60,7 +83,7 @@ defmodule ThistleTea.Game.Network.ServerTest do
       assert {:noreply, {^socket, detached}, 0} =
                Server.handle_info({:DOWN, monitor, :process, player_pid, :normal}, {socket, state})
 
-      assert detached == %ConnectionState{account: %{id: 1}, conn: state.conn}
+      assert detached == %ConnectionState{account: %{id: 1}, latency: state.latency, conn: state.conn}
     end
 
     test "closes the connection when its player owner crashes" do
@@ -76,7 +99,7 @@ defmodule ThistleTea.Game.Network.ServerTest do
       assert {:close, detached} =
                Server.handle_info({:DOWN, monitor, :process, player_pid, :boom}, {test_socket(), state})
 
-      assert detached == %ConnectionState{account: %{id: 1}, conn: state.conn}
+      assert detached == %ConnectionState{account: %{id: 1}, latency: state.latency, conn: state.conn}
     end
   end
 

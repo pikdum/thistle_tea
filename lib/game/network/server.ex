@@ -120,6 +120,10 @@ defmodule ThistleTea.Game.Network.Server do
     :ok
   end
 
+  defp dispatch_message(%Message.CmsgPing{} = message, %ConnectionState{} = state) do
+    Message.handle(message, state)
+  end
+
   defp dispatch_message(message, %ConnectionState{player_pid: player_pid} = state) when is_pid(player_pid) do
     :ok = PlayerServer.handle_message(player_pid, message)
     state

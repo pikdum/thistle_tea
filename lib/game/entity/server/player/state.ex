@@ -36,7 +36,6 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
     :player_tick_ref,
     :logout_timer,
     :target,
-    :latency,
     :loot_guid,
     :pending_repop,
     :next_exploration_check_at,
