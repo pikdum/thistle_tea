@@ -390,6 +390,43 @@ defmodule ThistleTea.Game.Entity.Data.MobTest do
   end
 
   describe "handle_continue/2" do
+    test "projects a fireball tap before the first hostile update" do
+      player_guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
+      mob_guid = Guid.from_low_guid(:mob, 2, System.unique_integer([:positive]))
+
+      Metadata.put(mob_guid, %{tapped_player: nil, tapped_group_id: nil})
+      on_exit(fn -> Metadata.delete(mob_guid) end)
+
+      fireball = %Spell{
+        id: 133,
+        school: :fire,
+        effects: [%Effect{index: 0, type: :school_damage, base_points: 10, die_sides: 0}]
+      }
+
+      mob = %Mob{
+        object: %Object{guid: mob_guid},
+        unit: %Unit{health: 100, max_health: 100, level: 1, dynamic_flags: 0},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+        internal: %Internal{world: %WorldRef{map_id: 0}, loot: %Loot{}}
+      }
+
+      assert {:noreply, %Mob{} = mob, {:continue, :maybe_broadcast}} =
+               MobServer.handle_cast({:receive_spell, player_guid, fireball}, mob)
+
+      assert mob.unit.health == 90
+      assert mob.internal.loot.tapped_by.player == player_guid
+      assert Metadata.query(mob_guid, [:tapped_player]) == %{tapped_player: nil}
+
+      assert {:noreply, %Mob{} = mob} = MobServer.handle_continue(:maybe_broadcast, mob)
+
+      assert mob.internal.events == []
+
+      assert Metadata.query(mob_guid, [:tapped_player, :tapped_group_id]) == %{
+               tapped_player: player_guid,
+               tapped_group_id: nil
+             }
+    end
+
     test "publishes the authoritative orientation after a mob transition" do
       mob_guid = Guid.from_low_guid(:mob, 2, System.unique_integer([:positive]))
 

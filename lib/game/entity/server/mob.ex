@@ -669,6 +669,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   def handle_continue(:maybe_broadcast, %Mob{} = state) do
     state =
       state
+      |> EventSink.emit_pending()
       |> maybe_finalize_death()
       |> broadcast_if_pending()
       |> sync_orientation_metadata()
