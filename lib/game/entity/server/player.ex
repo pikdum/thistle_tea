@@ -83,9 +83,8 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.World.Loader.ItemEnchantment, as: ItemEnchantmentLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Loader.SpellPetAura, as: SpellPetAuraLoader
-  alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Pathfinding
-  alias ThistleTea.Game.World.SpatialHash
+  alias ThistleTea.Game.World.Presence
   alias ThistleTea.Game.World.System.Duel, as: DuelSystem
   alias ThistleTea.Game.World.System.Instance, as: InstanceSystem
   alias ThistleTea.Game.World.Visibility
@@ -454,7 +453,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
         movement_block: %{character.movement_block | position: {x, y, z, orientation}, movement_flags: 0}
     }
 
-    SpatialHash.update(:players, state.guid, world, x, y, z)
+    Presence.relocate(character)
 
     Network.send_packet(%Message.MsgMoveTeleportAck{
       guid: state.guid,
@@ -491,16 +490,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
         movement_block: %{character.movement_block | position: {x, y, z, orientation}}
     }
 
-    # Move in the spatial hash before leaving visibility so old-map observers
-    # resolve the cell :left event as no-longer-visible and destroy us
-    SpatialHash.update(
-      :players,
-      state.guid,
-      character.internal.world,
-      x,
-      y,
-      z
-    )
+    Presence.relocate(character)
 
     state = Visibility.leave_player(%{state | character: character})
     InstanceSystem.leave(state.guid, previous_world)
@@ -848,8 +838,8 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   defp sync_character_metadata(%{guid: guid, character: %Character{} = character} = state) when is_integer(guid) do
     detection = StealthDetection.target_metadata(character)
 
-    Metadata.update(
-      guid,
+    Presence.sync(
+      character,
       %{
         level: character.unit.level,
         alive?: Death.alive?(character),
@@ -858,8 +848,6 @@ defmodule ThistleTea.Game.Entity.Server.Player do
         power_type: character.unit.power_type,
         unit_flags: character.unit.flags,
         shapeshift_form: character.unit.shapeshift_form,
-        world: character.internal.world,
-        area: character.internal.area,
         controlled_guid: Character.controlled_guid(character),
         duel_opponent_guid: Dueling.opponent_guid(character),
         duel_started?: Dueling.active?(character),

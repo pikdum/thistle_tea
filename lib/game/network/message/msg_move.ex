@@ -17,7 +17,7 @@ defmodule ThistleTea.Game.Network.Message.MsgMove do
   alias ThistleTea.Game.World.AggroProbe
   alias ThistleTea.Game.World.ChaseWatch
   alias ThistleTea.Game.World.Metadata
-  alias ThistleTea.Game.World.SpatialHash
+  alias ThistleTea.Game.World.Presence
   alias ThistleTea.Game.World.Visibility
 
   @spell_failed_moving 0x2E
@@ -64,21 +64,26 @@ defmodule ThistleTea.Game.Network.Message.MsgMove do
     now = Time.now()
     movement_velocity = movement_velocity(state.guid, movement_block, {x0, y0, z0}, {x1, y1, z1}, now)
 
-    Metadata.update(state.guid, %{
+    position_changed? = x0 != x1 or y0 != y1 or z0 != z1
+
+    presence_metadata = %{
       orientation: orientation,
       movement_velocity: movement_velocity,
       airborne?: MovementBlock.airborne?(movement_block),
       last_move_at: now
-    })
+    }
 
-    position_changed? = x0 != x1 or y0 != y1 or z0 != z1
+    presence_metadata =
+      if position_changed?,
+        do: Map.put(presence_metadata, :moving_until, now + @move_recency_ms),
+        else: presence_metadata
+
     character = interrupt_auras(character, position_changed?)
     character = interrupt_water_auras(character, movement_block, state.character.movement_block)
+    Presence.relocate(character, presence_metadata)
 
     new_state =
       if position_changed? do
-        SpatialHash.update(:players, state.guid, world, x1, y1, z1)
-        Metadata.update(state.guid, %{moving_until: now + @move_recency_ms})
         AggroProbe.notify_player_moved(state.guid, world, {x1, y1, z1})
         ChaseWatch.notify_moved(state.guid, {x1, y1, z1})
 

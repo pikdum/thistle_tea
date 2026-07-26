@@ -230,7 +230,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
         target_in_combat?: Bitwise.band(Map.get(target, :unit_flags, 0), 0x00080000) != 0,
         caster_dungeon?: MapTemplateLoader.dungeon?(caster_world.map_id),
         caster_battleground?: MapTemplateLoader.battleground?(caster_world.map_id),
-        same_world?: Map.get(target, :world) == caster_world
+        same_world?: match?({^caster_world, _x, _y, _z}, World.position(target_guid))
       }
     end
   end

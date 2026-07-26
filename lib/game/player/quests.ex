@@ -26,7 +26,7 @@ defmodule ThistleTea.Game.Player.Quests do
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader
-  alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.Presence
 
   def ctx(%Character{} = character) do
     %{
@@ -302,8 +302,8 @@ defmodule ThistleTea.Game.Player.Quests do
     |> MapSet.new()
   end
 
-  def sync_needed_items(%Character{object: %{guid: guid}} = character) do
-    Metadata.update(guid, %{needed_quest_items: needed_items(character)})
+  def sync_needed_items(%Character{} = character) do
+    Presence.sync(character, %{needed_quest_items: needed_items(character)})
     character
   end
 

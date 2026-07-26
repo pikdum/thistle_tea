@@ -15,9 +15,8 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.AggroProbe
   alias ThistleTea.Game.World.CharacterStore
-  alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.PostOffice
-  alias ThistleTea.Game.World.SpatialHash
+  alias ThistleTea.Game.World.Presence
   alias ThistleTea.Game.World.System.CellActivator
   alias ThistleTea.Game.World.System.ChatChannels
   alias ThistleTea.Game.World.System.Duel, as: DuelSystem
@@ -121,8 +120,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
     InstanceSystem.leave(state.guid, state.character.internal.world)
     ChatChannels.leave_all(state.guid)
     AggroProbe.forget(state.guid)
-    Metadata.delete(state.guid)
-    SpatialHash.remove(:players, state.guid)
+    Presence.leave(state.character)
     state = Visibility.leave_player(state)
 
     case PartySystem.group_of(state.guid) do

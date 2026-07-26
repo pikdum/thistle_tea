@@ -22,6 +22,7 @@ defmodule ThistleTea.Game.World do
   alias ThistleTea.Game.World.EntitySupervisor
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Pathfinding
+  alias ThistleTea.Game.World.Presence
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.WorldRef
 
@@ -71,7 +72,7 @@ defmodule ThistleTea.Game.World do
     SpatialHash.query(:players, world, x, y, z, range)
   end
 
-  def update_position(%Character{} = entity), do: update_position(entity, :players)
+  def update_position(%Character{} = entity), do: Presence.relocate(entity)
   def update_position(%Mob{} = entity), do: update_position(entity, :mobs)
   def update_position(%GameObject{} = entity), do: update_position(entity, :game_objects)
   def update_position(%Corpse{} = entity), do: update_position(entity, :corpses)
@@ -90,7 +91,7 @@ defmodule ThistleTea.Game.World do
     SpatialHash.update(table, guid, world, x, y, z)
   end
 
-  def remove_position(%Character{} = entity), do: remove_position(entity, :players)
+  def remove_position(%Character{} = entity), do: Presence.leave(entity)
   def remove_position(%Mob{} = entity), do: remove_position(entity, :mobs)
   def remove_position(%GameObject{} = entity), do: remove_position(entity, :game_objects)
   def remove_position(%Corpse{} = entity), do: remove_position(entity, :corpses)

@@ -170,7 +170,10 @@ defmodule ThistleTea.Game.Entity.Server.PlayerTest do
 
       destination = WorldRef.instance(389, 12)
 
-      on_exit(fn -> SpatialHash.remove(:players, guid) end)
+      on_exit(fn ->
+        Metadata.delete(guid)
+        SpatialHash.remove(:players, guid)
+      end)
 
       assert {:noreply, %State{ready: false, pending_last_instance_map: nil}} =
                PlayerServer.handle_cast({:start_teleport, -8.23, -43.26, -21.81, 0.0, destination}, state)
@@ -181,6 +184,8 @@ defmodule ThistleTea.Game.Entity.Server.PlayerTest do
       assert_receive {:"$gen_cast",
                       {:send_packet, %Message.SmsgUpdateInstanceOwnership{player_is_saved_to_a_raid: false}}}
 
+      assert SpatialHash.get_entity(guid) == {guid, destination, -8.23, -43.26, -21.81}
+      assert Metadata.query(guid, [:orientation, :world]) == %{orientation: 0.0}
       refute_receive {:"$gen_cast", {:send_packet, %Message.SmsgUpdateLastInstance{}}}
     end
 
@@ -190,7 +195,10 @@ defmodule ThistleTea.Game.Entity.Server.PlayerTest do
       character = character(guid, health: 100, max_health: 100, summon: pet_guid)
       state = %State{connection_pid: self(), guid: guid, character: character, ready: true}
 
-      on_exit(fn -> SpatialHash.remove(:players, guid) end)
+      on_exit(fn ->
+        Metadata.delete(guid)
+        SpatialHash.remove(:players, guid)
+      end)
 
       assert {:noreply, %State{character: %Character{unit: %Unit{summon: 0}}}} =
                PlayerServer.handle_cast(
@@ -200,6 +208,8 @@ defmodule ThistleTea.Game.Entity.Server.PlayerTest do
 
       assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgPetSpells{pet_guid: 0}}}
       assert_receive {:"$gen_cast", {:send_packet, %Message.MsgMoveTeleportAck{}}}
+      assert SpatialHash.get_entity(guid) == {guid, WorldRef.open(0), -8_949.95, -132.493, 83.5312}
+      assert Metadata.query(guid, [:orientation, :world]) == %{orientation: 0.0}
       refute_receive :restore_companion
     end
 
@@ -232,7 +242,10 @@ defmodule ThistleTea.Game.Entity.Server.PlayerTest do
       character = %{character | internal: %{character.internal | world: WorldRef.instance(389, 12)}}
       state = %State{connection_pid: self(), guid: guid, character: character, ready: true}
 
-      on_exit(fn -> SpatialHash.remove(:players, guid) end)
+      on_exit(fn ->
+        Metadata.delete(guid)
+        SpatialHash.remove(:players, guid)
+      end)
 
       assert {:noreply, %State{ready: false, pending_last_instance_map: 389}} =
                PlayerServer.handle_cast({:start_teleport, 1814.99, -4419.23, -18.81, 1.91, WorldRef.open(1)}, state)

@@ -52,8 +52,8 @@ defmodule ThistleTea.Game.Player.Login do
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Faction, as: FactionLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
-  alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Pathfinding
+  alias ThistleTea.Game.World.Presence
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.System.Instance, as: InstanceSystem
   alias ThistleTea.Game.World.System.Party, as: PartySystem
@@ -88,8 +88,8 @@ defmodule ThistleTea.Game.Player.Login do
 
     c = PlayerFlags.set_group_leader(c, party_leader?(character_guid))
 
-    Metadata.put(
-      character_guid,
+    Presence.enter(
+      c,
       %{
         name: c.internal.name,
         realm: "",
@@ -105,12 +105,9 @@ defmodule ThistleTea.Game.Player.Login do
         ghost?: Death.ghost?(c),
         health_pct: Core.health_pct(c),
         shapeshift_form: c.unit.shapeshift_form,
-        world: c.internal.world,
-        area: c.internal.area,
         controlled_guid: Character.controlled_guid(c),
         duel_opponent_guid: Dueling.opponent_guid(c),
         duel_started?: Dueling.active?(c),
-        orientation: elem(c.movement_block.position, 3),
         attacker_spell_hit_chance: AuraLogic.attacker_spell_hit_chance(c),
         needed_quest_items: Quests.needed_items(c)
       }
@@ -136,10 +133,6 @@ defmodule ThistleTea.Game.Player.Login do
       %Party.Group{} = group -> Notifier.send_group_list(group)
       _ -> :ok
     end
-
-    {x1, y1, z1, _o1} = c.movement_block.position
-
-    SpatialHash.update(:players, character_guid, c.internal.world, x1, y1, z1)
 
     state = %{
       state
