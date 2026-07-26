@@ -8,6 +8,8 @@ defmodule ThistleTea.Game.World.SpawnPoolTest do
   alias ThistleTea.Game.Entity.Data.GameObject
   alias ThistleTea.Game.Entity.Registry, as: EntityRegistry
   alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.SpawnPool
   alias ThistleTea.Game.World.SpawnPool.Supervisor, as: SpawnPoolSupervisor
   alias ThistleTea.Game.WorldRef
@@ -89,6 +91,85 @@ defmodule ThistleTea.Game.World.SpawnPoolTest do
 
       SpawnPoolSupervisor.terminate_child(second_pid)
     end
+  end
+
+  describe "deactivate_cells/3" do
+    test "stops members whose home cell went inactive and reactivates from cached blueprints" do
+      {guid, group, _world, key, cell} = singleton_fixture()
+
+      :ok = SpawnPool.activate(group, cell, game_object(guid))
+      await_entity(guid)
+
+      :ok = SpawnPool.deactivate_cells(key, [cell], MapSet.new())
+      await_absent(guid)
+
+      Process.sleep(50)
+      assert EntityRegistry.whereis(guid) == nil
+
+      :ok = SpawnPool.activate(group, cell)
+      await_entity(guid)
+
+      stop_pool(key)
+    end
+
+    test "defers busy members until a drain tick clears them" do
+      {guid, group, _world, key, cell} = singleton_fixture()
+
+      :ok = SpawnPool.activate(group, cell, game_object(guid))
+      pid = await_entity(guid)
+
+      Metadata.update(guid, %{in_combat: true})
+      :ok = SpawnPool.deactivate_cells(key, [cell], MapSet.new())
+
+      Process.sleep(50)
+      assert EntityRegistry.whereis(guid) == pid
+
+      Metadata.update(guid, %{in_combat: false})
+      [{pool_pid, _value}] = Registry.lookup(SpawnPool.Registry, key)
+      send(pool_pid, :drain_tick)
+      await_absent(guid)
+
+      stop_pool(key)
+    end
+
+    test "defers members observed by players until they leave" do
+      {guid, group, world, key, cell} = singleton_fixture()
+      player_guid = System.unique_integer([:positive])
+      SpatialHash.update(:players, player_guid, world, 1.0, 1.0, 1.0)
+      on_exit(fn -> SpatialHash.remove(:players, player_guid) end)
+
+      :ok = SpawnPool.activate(group, cell, game_object(guid))
+      pid = await_entity(guid)
+
+      :ok = SpawnPool.deactivate_cells(key, [cell], MapSet.new([cell]))
+      Process.sleep(50)
+      assert EntityRegistry.whereis(guid) == pid
+
+      [{pool_pid, _value}] = Registry.lookup(SpawnPool.Registry, key)
+      send(pool_pid, :drain_tick)
+      Process.sleep(50)
+      assert EntityRegistry.whereis(guid) == pid
+
+      SpatialHash.remove(:players, player_guid)
+      send(pool_pid, :drain_tick)
+      await_absent(guid)
+
+      stop_pool(key)
+    end
+  end
+
+  defp singleton_fixture do
+    low_guid = System.unique_integer([:positive])
+    guid = Guid.from_low_guid(:game_object, 1, low_guid)
+    group = {:singleton, :game_object, low_guid}
+    world = WorldRef.open(0)
+    cell = SpatialHash.cell(world, 1.0, 1.0, 1.0)
+    {guid, group, world, {world, group}, cell}
+  end
+
+  defp stop_pool(key) do
+    [{pool_pid, _value}] = Registry.lookup(SpawnPool.Registry, key)
+    SpawnPoolSupervisor.terminate_child(pool_pid)
   end
 
   defp game_object(guid) do

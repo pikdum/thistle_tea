@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.World.PresenceTest do
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Object
+  alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Presence
@@ -26,6 +27,15 @@ defmodule ThistleTea.Game.World.PresenceTest do
 
       assert SpatialHash.get_entity(character.object.guid) ==
                {character.object.guid, WorldRef.open(0), 1.0, 2.0, 3.0}
+    end
+
+    test "publishes the active farsight viewpoint" do
+      character = character(WorldRef.open(0), {1.0, 2.0, 3.0, 1.5}, 12)
+      character = %{character | player: %Player{farsight: 4321}}
+      on_exit(fn -> Presence.leave(character) end)
+
+      assert :ok = Presence.enter(character, %{})
+      assert Metadata.query(character.object.guid, [:viewpoint]) == %{viewpoint: 4321}
     end
   end
 
