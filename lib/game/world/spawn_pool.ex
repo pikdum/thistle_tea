@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.World.SpawnPool do
   alias ThistleTea.Game.World.Loader.AreaTrigger, as: AreaTriggerLoader
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.SpawnPool.Catalog
+  alias ThistleTea.Game.World.SpawnPool.CellIndex
   alias ThistleTea.Game.World.SpawnPool.Selection
   alias ThistleTea.Game.World.SpawnPool.Supervisor, as: SpawnPoolSupervisor
   alias ThistleTea.Game.World.System.GameEvent
@@ -136,6 +137,7 @@ defmodule ThistleTea.Game.World.SpawnPool do
   def handle_call({:activate, cell, blueprint}, _from, state) do
     state = maybe_put_blueprint(state, blueprint)
     state = %{state | active_cells: MapSet.put(state.active_cells, cell)}
+    CellIndex.register(cell, state.key)
     {state, errors} = start_selected_with_errors(state)
     {:reply, activation_result(errors), state}
   end

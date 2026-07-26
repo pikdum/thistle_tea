@@ -162,6 +162,7 @@ defmodule ThistleTea.Application do
     SpatialHash.setup_tables()
     AggroProbe.init()
     ChaseWatch.init()
+    SpawnPool.CellIndex.init()
 
     :telemetry.attach(
       "handle-packet-handler",
