@@ -177,10 +177,12 @@ defmodule ThistleTea.Game.World do
     end
   end
 
-  def stop_world_entities(%WorldRef{} = world) do
+  def stop_world_entities(%WorldRef{} = world, opts \\ []) do
+    excluded = [:player | Keyword.get(opts, :except, [])]
+
     world
     |> SpatialHash.guids()
-    |> Enum.reject(&(Guid.entity_type(&1) == :player))
+    |> Enum.reject(&(Guid.entity_type(&1) in excluded))
     |> Enum.each(&stop_entity/1)
   end
 

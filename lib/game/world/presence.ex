@@ -39,10 +39,15 @@ defmodule ThistleTea.Game.World.Presence do
     SpatialHash.update(:players, guid, world, x, y, z)
   end
 
-  defp location_metadata(%Character{
-         internal: %Internal{area: area},
-         movement_block: %MovementBlock{position: {_x, _y, _z, orientation}}
-       }) do
-    %{area: area, orientation: orientation}
+  defp location_metadata(
+         %Character{
+           internal: %Internal{area: area},
+           movement_block: %MovementBlock{position: {_x, _y, _z, orientation}}
+         } = character
+       ) do
+    %{area: area, orientation: orientation, viewpoint: viewpoint(character)}
   end
+
+  defp viewpoint(%Character{player: %{farsight: farsight}}) when is_integer(farsight), do: farsight
+  defp viewpoint(%Character{}), do: 0
 end
