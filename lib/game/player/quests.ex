@@ -5,11 +5,13 @@ defmodule ThistleTea.Game.Player.Quests do
   """
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Item, as: DataItem
-  alias ThistleTea.Game.Entity.Data.ItemTemplate
   alias ThistleTea.Game.Entity.Data.Quest
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Experience
   alias ThistleTea.Game.Entity.Logic.Inventory
+  alias ThistleTea.Game.Entity.Logic.Inventory.Batch
+  alias ThistleTea.Game.Entity.Logic.Inventory.ChangeSet
+  alias ThistleTea.Game.Entity.Logic.Inventory.ChangeSet.Placement
   alias ThistleTea.Game.Entity.Logic.QuestDialogStatus
   alias ThistleTea.Game.Entity.Logic.QuestLog
   alias ThistleTea.Game.Entity.Logic.QuestLog.Entry
@@ -23,7 +25,6 @@ defmodule ThistleTea.Game.Player.Quests do
   alias ThistleTea.Game.Player.Stats, as: PlayerStats
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.ItemStore
-  alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
   alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader
   alias ThistleTea.Game.World.Metadata
 
@@ -153,8 +154,8 @@ defmodule ThistleTea.Game.Player.Quests do
          %Entry{status: :complete} <- QuestLog.get(character.player.quest_log, quest_id),
          {:ok, choice} <- validate_reward_choice(quest, reward_index),
          :ok <- validate_required_money(quest, character),
-         :ok <- validate_reward_space(quest, choice, character) do
-      turn_in(state, npc_guid, quest, choice)
+         {:ok, change_set, rewards} <- plan_turn_in_inventory(character, quest, choice) do
+      turn_in(state, npc_guid, quest, change_set, rewards)
     else
       {:error, :inventory_full} ->
         InventoryUpdate.send_failure(:inventory_full, 0, 0)
@@ -165,27 +166,22 @@ defmodule ThistleTea.Game.Player.Quests do
     end
   end
 
-  defp turn_in(state, npc_guid, %Quest{} = quest, choice) do
-    state = remove_required_items(state, quest)
-    state = grant_reward_items(state, quest, choice)
+  defp turn_in(state, npc_guid, %Quest{} = quest, %ChangeSet{} = change_set, rewards) do
+    {:ok, quest_log} = QuestLog.remove(change_set.player.quest_log, quest.id)
+    rewarded = MapSet.put(change_set.player.rewarded_quests, quest.id)
 
-    character = state.character
-    {:ok, quest_log} = QuestLog.remove(character.player.quest_log, quest.id)
-    rewarded = MapSet.put(character.player.rewarded_quests, quest.id)
+    {xp, money} = quest_reward(quest, state.character.unit.level)
+    coinage = max(change_set.player.coinage + money, 0)
 
-    {xp, money} = quest_reward(quest, character.unit.level)
-    {character, level_ups} = PlayerStats.gain_xp(character, xp)
+    player = %{change_set.player | quest_log: quest_log, rewarded_quests: rewarded, coinage: coinage}
+    change_set = ChangeSet.put_player(change_set, player)
+    state = InventoryUpdate.apply(state, {:ok, change_set})
+    send_reward_pushes(state, change_set, rewards)
+
+    {character, level_ups} = PlayerStats.gain_xp(state.character, xp)
     Enum.each(level_ups, fn level_up -> Network.send_packet(struct(Message.SmsgLevelupInfo, level_up)) end)
 
-    coinage = max(character.player.coinage + money, 0)
-
-    character = %{
-      character
-      | player: %{character.player | quest_log: quest_log, rewarded_quests: rewarded, coinage: coinage}
-    }
-
     Network.send_packet(%Message.SmsgQuestgiverQuestComplete{quest: quest, xp: xp, money: money})
-
     state = put_character(state, character)
     state = Mail.send_quest_reward(state, npc_guid, quest)
     send_next_quest(state, npc_guid, quest)
@@ -251,53 +247,45 @@ defmodule ThistleTea.Game.Player.Quests do
 
   defp validate_required_money(%Quest{}, %Character{}), do: :ok
 
-  defp validate_reward_space(%Quest{} = quest, choice, %Character{player: player}) do
-    rewards = quest.reward_items ++ List.wrap(choice)
+  defp plan_turn_in_inventory(%Character{object: %{guid: owner}, player: player}, %Quest{} = quest, choice) do
+    with {:ok, rewards} <- prepare_rewards(quest.reward_items ++ List.wrap(choice), owner) do
+      batch =
+        Enum.reduce(quest.required_items, Batch.new(player), fn {_index, item_id, count}, batch ->
+          Batch.remove(batch, item_id, count)
+        end)
 
-    can_store_all =
-      Enum.all?(rewards, fn {item_id, count} ->
-        case ItemLoader.get_template(item_id) do
-          %ItemTemplate{} = template -> Inventory.can_store?(player, template, count, &ItemStore.get/1)
-          _template -> true
-        end
-      end)
+      batch = Enum.reduce(rewards, batch, fn {%DataItem{} = item, _count}, batch -> Batch.add(batch, item) end)
 
-    if can_store_all, do: :ok, else: {:error, :inventory_full}
+      case Inventory.plan(batch, &ItemStore.get/1) do
+        {:ok, change_set} -> {:ok, change_set, rewards}
+        {:error, error} -> {:error, error}
+      end
+    end
   end
 
-  defp remove_required_items(state, %Quest{required_items: required_items}) do
-    Enum.reduce(required_items, state, fn {_index, item_id, count}, state ->
-      case Inventory.remove_count(state.character.player, item_id, count, &ItemStore.get/1) do
-        {:ok, result} -> InventoryUpdate.apply(state, {:ok, result})
-        _error -> state
+  defp prepare_rewards(rewards, owner) do
+    Enum.reduce_while(rewards, {:ok, []}, fn {item_id, count}, {:ok, prepared} ->
+      case ItemStore.prepare(item_id, owner: owner, stack_count: count) do
+        %DataItem{} = item -> {:cont, {:ok, [{item, count} | prepared]}}
+        nil -> {:halt, {:error, :invalid_reward}}
       end
     end)
+    |> case do
+      {:ok, prepared} -> {:ok, Enum.reverse(prepared)}
+      error -> error
+    end
   end
 
-  defp grant_reward_items(state, %Quest{} = quest, choice) do
-    Enum.reduce(quest.reward_items ++ List.wrap(choice), state, fn {item_id, count}, state ->
-      give_item(state, item_id, count)
-    end)
-  end
-
-  defp give_item(%{guid: guid} = state, item_id, count) do
-    case ItemStore.create(item_id, owner: guid, stack_count: count) do
-      %DataItem{} = item ->
-        case Inventory.store(state.character.player, guid, item, &ItemStore.get/1) do
-          {:ok, result, placement} ->
-            placed_at = InventoryUpdate.commit_placement(item, placement)
-            state = InventoryUpdate.apply(state, {:ok, result}, placement)
-            send_item_push(state, item, placed_at, count)
-            state
-
-          _error ->
-            ItemStore.delete(item.object.guid)
-            state
+  defp send_reward_pushes(state, %ChangeSet{} = change_set, rewards) do
+    Enum.each(rewards, fn {%DataItem{} = item, count} ->
+      placed_at =
+        case ChangeSet.placement(change_set, item.object.guid) do
+          %Placement{status: :placed, position: position} -> position
+          %Placement{status: :merged} -> {Inventory.bag_0(), 0xFFFFFFFF}
         end
 
-      _error ->
-        state
-    end
+      send_item_push(state, item, placed_at, count)
+    end)
   end
 
   def needs_item?(%Character{} = character, item_id) do

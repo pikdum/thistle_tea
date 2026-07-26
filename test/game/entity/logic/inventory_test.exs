@@ -8,6 +8,9 @@ defmodule ThistleTea.Game.Entity.Logic.InventoryTest do
   alias ThistleTea.Game.Entity.Data.Item
   alias ThistleTea.Game.Entity.Data.ItemTemplate
   alias ThistleTea.Game.Entity.Logic.Inventory
+  alias ThistleTea.Game.Entity.Logic.Inventory.Batch
+  alias ThistleTea.Game.Entity.Logic.Inventory.ChangeSet
+  alias ThistleTea.Game.Entity.Logic.Inventory.ChangeSet.Placement
   alias ThistleTea.Game.Entity.Logic.Proficiency
 
   @bag_0 255
@@ -121,6 +124,85 @@ defmodule ThistleTea.Game.Entity.Logic.InventoryTest do
 
       assert {:error, :item_not_found, 0, 0} =
                Inventory.remove_count(player, 750, 5, get_item_fn([pelt]))
+    end
+  end
+
+  describe "plan/2" do
+    test "uses slots freed by removals for additions" do
+      required = build_item(20, %ItemTemplate{entry: 750})
+      reward = build_item(40, %ItemTemplate{entry: 900})
+      fillers = Enum.map(21..35, &build_item(&1, %ItemTemplate{entry: 800 + &1}))
+
+      player =
+        [required | fillers]
+        |> Enum.with_index(@backpack_start)
+        |> Enum.reduce(%Player{}, fn {item, slot}, player -> store(player, slot, item) end)
+
+      get_item = get_item_fn([required, reward | fillers])
+
+      batch =
+        player
+        |> Batch.new()
+        |> Batch.remove(750, 1)
+        |> Batch.add(reward)
+
+      assert {:ok, %ChangeSet{} = change_set} = Inventory.plan(batch, get_item)
+      assert change_set.player.inv1 == reward.object.guid
+      assert [^required] = ChangeSet.destroyed_items(change_set)
+
+      assert %Placement{status: :placed, position: {@bag_0, @backpack_start}} =
+               ChangeSet.placement(change_set, reward.object.guid)
+
+      assert player.inv1 == required.object.guid
+    end
+
+    test "rejects additions that only fit when checked independently" do
+      fillers = Enum.map(20..34, &build_item(&1, %ItemTemplate{entry: 800 + &1}))
+      reward1 = build_item(40, %ItemTemplate{entry: 900})
+      reward2 = build_item(41, %ItemTemplate{entry: 901})
+
+      player =
+        fillers
+        |> Enum.with_index(@backpack_start)
+        |> Enum.reduce(%Player{}, fn {item, slot}, player -> store(player, slot, item) end)
+
+      batch = player |> Batch.new() |> Batch.add(reward1) |> Batch.add(reward2)
+
+      get_item = get_item_fn([reward1, reward2 | fillers])
+
+      assert {:error, :inventory_full} = Inventory.plan(batch, get_item)
+      assert Inventory.item_guid_at(player, {@bag_0, @backpack_start + 15}, get_item) == nil
+    end
+
+    test "later additions see earlier placements and merge into them" do
+      template = %ItemTemplate{entry: 900, stackable: 20}
+      reward1 = build_item(40, template, stack_count: 4)
+      reward2 = build_item(41, template, stack_count: 3)
+      batch = %Player{} |> Batch.new() |> Batch.add(reward1) |> Batch.add(reward2)
+
+      assert {:ok, %ChangeSet{} = change_set} =
+               Inventory.plan(batch, get_item_fn([reward1, reward2]))
+
+      assert [placed] = ChangeSet.placed_items(change_set)
+      assert placed.object.guid == reward1.object.guid
+      assert placed.item.stack_count == 7
+
+      assert [
+               %Placement{status: :placed},
+               %Placement{status: :merged}
+             ] = change_set.placements
+    end
+
+    test "returns no partial change set when a removal cannot be satisfied" do
+      required = build_item(20, %ItemTemplate{entry: 750})
+      reward = build_item(40, %ItemTemplate{entry: 900})
+      player = store(%Player{}, @backpack_start, required)
+      batch = player |> Batch.new() |> Batch.remove(750, 2) |> Batch.add(reward)
+
+      assert {:error, :item_not_found} =
+               Inventory.plan(batch, get_item_fn([required, reward]))
+
+      assert player.inv1 == required.object.guid
     end
   end
 

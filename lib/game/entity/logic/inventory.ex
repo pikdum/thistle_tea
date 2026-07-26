@@ -13,6 +13,9 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Item
   alias ThistleTea.Game.Entity.Data.ItemTemplate
+  alias ThistleTea.Game.Entity.Logic.Inventory.Batch
+  alias ThistleTea.Game.Entity.Logic.Inventory.Batch.Removal
+  alias ThistleTea.Game.Entity.Logic.Inventory.ChangeSet
   alias ThistleTea.Game.Entity.Logic.Proficiency
 
   @bag_0 255
@@ -122,6 +125,40 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
     |> Enum.map(get_item)
     |> Enum.reject(&is_nil/1)
     |> Enum.map(&Item.template/1)
+  end
+
+  def plan(%Batch{} = batch, get_item) when is_function(get_item, 1) do
+    change_set = ChangeSet.new(batch.player)
+
+    with {:ok, change_set} <- plan_removals(change_set, Batch.removals(batch), get_item) do
+      plan_additions(change_set, Batch.additions(batch), get_item)
+    end
+  end
+
+  defp plan_removals(change_set, [], _get_item), do: {:ok, change_set}
+
+  defp plan_removals(%ChangeSet{} = change_set, [%Removal{} = removal | rest], get_item) do
+    lookup = &ChangeSet.get_item(change_set, &1, get_item)
+
+    case remove_count(change_set.player, removal.entry, removal.count, lookup) do
+      {:ok, result} -> plan_removals(ChangeSet.absorb(change_set, result), rest, get_item)
+      {:error, error, _item1_guid, _item2_guid} -> {:error, error}
+    end
+  end
+
+  defp plan_additions(change_set, [], _get_item), do: {:ok, change_set}
+
+  defp plan_additions(%ChangeSet{} = change_set, [%Item{} = item | rest], get_item) do
+    lookup = &ChangeSet.get_item(change_set, &1, get_item)
+
+    case store(change_set.player, item.item.owner, item, lookup) do
+      {:ok, result, placement} ->
+        change_set = change_set |> ChangeSet.absorb(result) |> ChangeSet.place(item, placement)
+        plan_additions(change_set, rest, get_item)
+
+      {:error, error} ->
+        {:error, error}
+    end
   end
 
   def remove_count(%Player{} = player, entry, count, get_item) do

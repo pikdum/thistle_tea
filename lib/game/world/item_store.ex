@@ -24,10 +24,9 @@ defmodule ThistleTea.Game.World.ItemStore do
   def create(template_or_entry, opts \\ [])
 
   def create(%ItemTemplate{} = template, opts) do
-    guid = Guid.from_low_guid(:item, next_low_guid())
-    item = Item.build(template, guid, opts)
-    :ets.insert(__MODULE__, {guid, item})
-    item
+    template
+    |> prepare(opts)
+    |> put()
   end
 
   def create(entry, opts) when is_integer(entry) do
@@ -35,6 +34,22 @@ defmodule ThistleTea.Game.World.ItemStore do
 
     case get_template.(entry) do
       %ItemTemplate{} = template -> create(template, opts)
+      _ -> nil
+    end
+  end
+
+  def prepare(template_or_entry, opts \\ [])
+
+  def prepare(%ItemTemplate{} = template, opts) do
+    guid = Guid.from_low_guid(:item, next_low_guid())
+    Item.build(template, guid, opts)
+  end
+
+  def prepare(entry, opts) when is_integer(entry) do
+    {get_template, opts} = Keyword.pop(opts, :get_template, &ItemLoader.get_template/1)
+
+    case get_template.(entry) do
+      %ItemTemplate{} = template -> prepare(template, opts)
       _ -> nil
     end
   end

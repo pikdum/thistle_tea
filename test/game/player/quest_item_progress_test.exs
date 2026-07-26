@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Player.QuestItemProgressTest do
   alias ThistleTea.Game.Entity.Data.ItemTemplate
   alias ThistleTea.Game.Entity.Data.Quest
   alias ThistleTea.Game.Entity.Logic.Inventory
+  alias ThistleTea.Game.Entity.Logic.Inventory.Batch
   alias ThistleTea.Game.Entity.Logic.QuestLog
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.InventoryUpdate
@@ -99,6 +100,48 @@ defmodule ThistleTea.Game.Player.QuestItemProgressTest do
 
     assert_received {:"$gen_cast", {:send_packet, %Message.SmsgQuestupdateAddItem{item_id: @item_id, count: 1}}}
     assert ItemStore.get(stack.object.guid).item.stack_count == 3
+  end
+
+  test "a planned batch commits new items before projecting its packets", %{
+    character: character,
+    player_guid: player_guid
+  } do
+    item = ItemStore.prepare(grape_template(), owner: player_guid)
+    on_exit(fn -> ItemStore.delete(item.object.guid) end)
+    batch = character.player |> Batch.new() |> Batch.add(item)
+    {:ok, change_set} = Inventory.plan(batch, &ItemStore.get/1)
+    state = %{character: character, guid: player_guid}
+
+    assert ItemStore.get(item.object.guid) == nil
+
+    InventoryUpdate.apply(state, {:ok, change_set})
+
+    assert ItemStore.get(item.object.guid) == item
+
+    sent = sent_packets()
+    progress_at = Enum.find_index(sent, &match?(%Message.SmsgQuestupdateAddItem{count: 1}, &1))
+    create_at = Enum.find_index(sent, &match?(%UpdateObject{update_type: :create_object2, object_type: :item}, &1))
+
+    assert is_integer(progress_at) and is_integer(create_at)
+    assert progress_at < create_at
+  end
+
+  test "a merged prepared item leaves no orphan in the store", %{
+    character: character,
+    player_guid: player_guid
+  } do
+    stack = ItemStore.create(grape_template(), owner: player_guid, stack_count: 2)
+    incoming = ItemStore.prepare(grape_template(), owner: player_guid)
+    on_exit(fn -> ItemStore.delete(stack.object.guid) end)
+    character = %{character | player: %{character.player | inv1: stack.object.guid}}
+    batch = character.player |> Batch.new() |> Batch.add(incoming)
+    {:ok, change_set} = Inventory.plan(batch, &ItemStore.get/1)
+
+    InventoryUpdate.apply(%{character: character, guid: player_guid}, {:ok, change_set})
+
+    assert ItemStore.get(stack.object.guid).item.stack_count == 3
+    assert ItemStore.get(incoming.object.guid) == nil
+    refute Enum.any?(sent_packets(), &match?(%UpdateObject{update_type: :create_object2, object_type: :item}, &1))
   end
 
   test "needed_items lists short quest items and drops satisfied ones", %{
