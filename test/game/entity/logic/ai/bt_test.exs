@@ -4,6 +4,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BTTest do
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Context
 
   defp build_state(blackboard \\ nil) do
     %{internal: %Internal{blackboard: blackboard}}
@@ -35,7 +36,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BTTest do
 
     state = build_state()
 
-    {:success, state} = BT.tick(tree, state)
+    {:success, state} = BT.tick(tree, state, Context.new(1_000))
 
     assert state.internal.blackboard.target == :selected
   end
@@ -45,7 +46,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BTTest do
 
     state = build_state()
 
-    {:running, state} = BT.tick(tree, state)
+    {:running, state} = BT.tick(tree, state, Context.new(1_000))
 
     assert state.internal.blackboard.target == :running
   end
@@ -55,8 +56,19 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BTTest do
 
     state = build_state()
 
-    {{:running, 250, :test}, state} = BT.tick(tree, state)
+    {{:running, 250, :test}, state} = BT.tick(tree, state, Context.new(1_000))
 
     assert state.internal.blackboard.target == :running_with_reason
+  end
+
+  test "passes the explicit environment to context-aware nodes" do
+    tree =
+      BT.action(fn state, blackboard, %Context{now: now} ->
+        {:success, Map.put(state, :now, now), blackboard}
+      end)
+
+    {:success, state} = BT.tick(tree, build_state(), Context.new(42))
+
+    assert state.now == 42
   end
 end

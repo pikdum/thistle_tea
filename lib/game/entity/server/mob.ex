@@ -46,6 +46,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Entity.Logic.SpellFeedback
   alias ThistleTea.Game.Entity.Logic.Threat
   alias ThistleTea.Game.Entity.Registry, as: EntityRegistry
+  alias ThistleTea.Game.Entity.Server.AIEnvironment
   alias ThistleTea.Game.Entity.Server.Mob.Corpse
   alias ThistleTea.Game.Entity.Server.Mob.Incarnation
   alias ThistleTea.Game.Entity.Server.Mob.Respawn
@@ -608,12 +609,13 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     if Corpse.removed?(state) do
       {:noreply, unwatch_chase(state)}
     else
-      state = Movement.sync_position(state, Time.now())
+      now = Time.now()
+      state = Movement.sync_position(state, now)
       World.update_position(state)
       state = Visibility.refresh_entity(state)
       started_at = System.monotonic_time()
       previous = state
-      {status, state} = BT.tick(behavior_tree, state)
+      {status, state} = BT.tick(behavior_tree, state, AIEnvironment.context(state, now))
       state = sync_behavior_tree(state, previous)
       duration = System.monotonic_time() - started_at
       state = EventSink.emit_pending(state)

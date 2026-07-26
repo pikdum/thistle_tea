@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT do
   """
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Context
 
   defstruct type: nil, children: [], fun: nil
 
@@ -23,7 +24,15 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT do
     %__MODULE__{type: :condition, fun: fun}
   end
 
+  def condition(fun) when is_function(fun, 3) do
+    %__MODULE__{type: :condition, fun: fun}
+  end
+
   def action(fun) when is_function(fun, 2) do
+    %__MODULE__{type: :action, fun: fun}
+  end
+
+  def action(fun) when is_function(fun, 3) do
     %__MODULE__{type: :action, fun: fun}
   end
 
@@ -31,9 +40,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT do
     {:running, delay_ms, reason}
   end
 
-  def tick(tree, state) do
+  def tick(tree, state, %Context{} = context) do
     blackboard = blackboard(state)
-    {status, state, blackboard} = run(tree, state, blackboard)
+    {status, state, blackboard} = run(tree, state, blackboard, context)
     {status, put_blackboard(state, blackboard)}
   end
 
@@ -63,17 +72,19 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT do
     update_blackboard(state, &Blackboard.clear_attack/1)
   end
 
-  defp run(%__MODULE__{type: :condition, fun: fun}, state, blackboard) do
-    if fun.(state, blackboard), do: {:success, state, blackboard}, else: {:failure, state, blackboard}
+  defp run(%__MODULE__{type: :condition, fun: fun}, state, blackboard, context) do
+    if invoke(fun, state, blackboard, context),
+      do: {:success, state, blackboard},
+      else: {:failure, state, blackboard}
   end
 
-  defp run(%__MODULE__{type: :action, fun: fun}, state, blackboard) do
-    fun.(state, blackboard)
+  defp run(%__MODULE__{type: :action, fun: fun}, state, blackboard, context) do
+    invoke(fun, state, blackboard, context)
   end
 
-  defp run(%__MODULE__{type: :selector, children: children}, state, blackboard) do
+  defp run(%__MODULE__{type: :selector, children: children}, state, blackboard, context) do
     Enum.reduce_while(children, {:failure, state, blackboard}, fn child, {_status, s, b} ->
-      case run(child, s, b) do
+      case run(child, s, b, context) do
         {:failure, s, b} -> {:cont, {:failure, s, b}}
         {:success, s, b} -> {:halt, {:success, s, b}}
         {:running, s, b} -> {:halt, {:running, s, b}}
@@ -83,9 +94,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT do
     end)
   end
 
-  defp run(%__MODULE__{type: :sequence, children: children}, state, blackboard) do
+  defp run(%__MODULE__{type: :sequence, children: children}, state, blackboard, context) do
     Enum.reduce_while(children, {:success, state, blackboard}, fn child, {_status, s, b} ->
-      case run(child, s, b) do
+      case run(child, s, b, context) do
         {:success, s, b} -> {:cont, {:success, s, b}}
         {:failure, s, b} -> {:halt, {:failure, s, b}}
         {:running, s, b} -> {:halt, {:running, s, b}}
@@ -94,6 +105,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT do
       end
     end)
   end
+
+  defp invoke(fun, state, blackboard, context) when is_function(fun, 3), do: fun.(state, blackboard, context)
+  defp invoke(fun, state, blackboard, _context) when is_function(fun, 2), do: fun.(state, blackboard)
 
   defp blackboard(%{internal: %Internal{blackboard: blackboard}}) do
     Blackboard.from_any(blackboard)

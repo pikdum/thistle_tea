@@ -6,17 +6,17 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Ranged do
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Context
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Hunter
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
-  alias ThistleTea.Game.Time
-  alias ThistleTea.Game.World
 
   @minimum_range 8.0
 
   def sequence do
-    BT.sequence([BT.condition(&active?/2), BT.action(&shoot/2), BT.action(&wait/2)])
+    BT.sequence([BT.condition(&active?/2), BT.action(&shoot_with_context/3), BT.action(&wait/3)])
   end
 
   def active?(%Character{internal: %Internal{auto_shot: %{target_guid: target_guid}}}, %Blackboard{})
@@ -24,11 +24,19 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Ranged do
 
   def active?(_state, _blackboard), do: false
 
-  def shoot(%Character{} = character, %Blackboard{} = blackboard), do: shoot(character, blackboard, Time.now())
+  defp shoot_with_context(
+         %Character{internal: %Internal{auto_shot: auto_shot}} = character,
+         %Blackboard{} = blackboard,
+         %Context{now: now, perception: perception}
+       ) do
+    position = xyz(character.movement_block.position)
+    distance = perceived_distance(position, Perception.position(perception, auto_shot.target_guid))
+    shoot_at_distance(character, blackboard, now, distance, auto_shot)
+  end
 
-  def shoot(%Character{internal: %Internal{auto_shot: auto_shot}} = character, %Blackboard{} = blackboard, now) do
-    distance = World.distance_to_guid(character, auto_shot.target_guid)
+  defp shoot_with_context(character, blackboard, %Context{}), do: {:failure, character, blackboard}
 
+  defp shoot_at_distance(character, blackboard, now, distance, auto_shot) do
     cond do
       not is_number(distance) ->
         {:failure, stop(character), blackboard}
@@ -44,14 +52,12 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Ranged do
     end
   end
 
-  def shoot(character, blackboard, _now), do: {:failure, character, blackboard}
-
-  def wait(%Character{internal: %Internal{auto_shot: %{next_at: next_at}}} = character, blackboard) do
-    delay = max(next_at - Time.now(), 0)
+  defp wait(%Character{internal: %Internal{auto_shot: %{next_at: next_at}}} = character, blackboard, %Context{now: now}) do
+    delay = max(next_at - now, 0)
     {{:running, delay}, character, blackboard}
   end
 
-  def wait(character, blackboard), do: {:failure, character, blackboard}
+  defp wait(character, blackboard, %Context{}), do: {:failure, character, blackboard}
 
   def stop(%Character{internal: %Internal{} = internal} = character),
     do: %{character | internal: %{internal | auto_shot: nil}}
@@ -76,4 +82,12 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Ranged do
       reagents -> Effects.enqueue(character, Effects.consume_reagents(reagents))
     end
   end
+
+  defp perceived_distance({x1, y1, z1}, {_world, x2, y2, z2}) do
+    :math.sqrt(:math.pow(x2 - x1, 2) + :math.pow(y2 - y1, 2) + :math.pow(z2 - z1, 2))
+  end
+
+  defp perceived_distance(_position, _target), do: nil
+
+  defp xyz({x, y, z, _orientation}), do: {x, y, z}
 end

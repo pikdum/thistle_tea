@@ -8,17 +8,17 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Player do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Aura, as: AuraBT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AI.BT.Combat, as: CombatBT
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Context
   alias ThistleTea.Game.Entity.Logic.AI.BT.Ranged, as: RangedBT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Regen, as: RegenBT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Spell, as: SpellBT
   alias ThistleTea.Game.Entity.Logic.PlayerCombat
   alias ThistleTea.Game.Entity.Logic.Reactive
-  alias ThistleTea.Game.Time
 
   def tree do
     BT.selector([
       BT.action(&sync_combat/2),
-      BT.action(&reactive_tick/2),
+      BT.action(&reactive_tick/3),
       AuraBT.tick_step(),
       RegenBT.tick_step(),
       SpellBT.casting_sequence(),
@@ -35,11 +35,11 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Player do
 
   defp sync_combat(state, blackboard), do: {:failure, state, blackboard}
 
-  defp reactive_tick(%Character{} = state, %Blackboard{} = blackboard) do
-    {:failure, Reactive.tick(state, Time.now()), blackboard}
+  defp reactive_tick(%Character{} = state, %Blackboard{} = blackboard, %Context{now: now}) do
+    {:failure, Reactive.tick(state, now), blackboard}
   end
 
-  defp reactive_tick(state, blackboard), do: {:failure, state, blackboard}
+  defp reactive_tick(state, blackboard, %Context{}), do: {:failure, state, blackboard}
 
   defp idle(%Character{} = state, %Blackboard{} = blackboard) do
     {:running, state, blackboard}

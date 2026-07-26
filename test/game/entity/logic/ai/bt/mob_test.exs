@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
   alias ThistleTea.Game.Entity.Data.ScriptStep
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Context
   alias ThistleTea.Game.Entity.Logic.AI.BT.Mob, as: MobBT
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Movement
@@ -66,7 +67,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
       mob =
         Enum.reduce_while(1..10, mob, fn _i, mob ->
           mob = Movement.sync_position(mob, Time.now())
-          {_status, mob} = BT.tick(mob.internal.behavior_tree, mob)
+          {_status, mob} = BT.tick(mob.internal.behavior_tree, mob, Context.new(1_000))
 
           if Enum.any?(mob.internal.events, &is_struct(&1, Effects.SpellStart)) do
             {:halt, mob}
@@ -112,7 +113,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
       mob =
         Enum.reduce_while(1..10, mob, fn _i, mob ->
           mob = Movement.sync_position(mob, Time.now())
-          {_status, mob} = BT.tick(mob.internal.behavior_tree, mob)
+          {_status, mob} = BT.tick(mob.internal.behavior_tree, mob, Context.new(1_000))
 
           if Enum.any?(mob.internal.events, &is_struct(&1, Effects.MonsterTalk)) do
             {:halt, mob}

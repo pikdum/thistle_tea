@@ -47,6 +47,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.Entity.Logic.SpellEffect
   alias ThistleTea.Game.Entity.Logic.SpellFeedback
   alias ThistleTea.Game.Entity.Logic.StealthDetection
+  alias ThistleTea.Game.Entity.Server.AIEnvironment
   alias ThistleTea.Game.Entity.Server.Player.CompanionOwner
   alias ThistleTea.Game.Entity.Server.Player.CompanionOwner.Attachment
   alias ThistleTea.Game.Entity.Server.Player.CompanionOwner.Monitor, as: CompanionMonitor
@@ -872,7 +873,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   defp sync_character_metadata(state), do: state
 
   defp tick_player(%{internal: %Internal{behavior_tree: behavior_tree}} = character) when not is_nil(behavior_tree) do
-    BT.tick(behavior_tree, character)
+    BT.tick(behavior_tree, character, AIEnvironment.context(character))
   end
 
   defp tick_player(character), do: {:running, character}

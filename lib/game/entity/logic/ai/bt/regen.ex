@@ -5,15 +5,11 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Regen do
   """
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Context
   alias ThistleTea.Game.Entity.Logic.Regen, as: RegenLogic
-  alias ThistleTea.Game.Time
 
   def tick_step do
-    BT.action(&tick/2)
-  end
-
-  def tick(entity, %Blackboard{} = blackboard) do
-    tick(entity, blackboard, Time.now())
+    BT.action(&tick_with_context/3)
   end
 
   def tick(entity, %Blackboard{} = blackboard, now) when is_integer(now) do
@@ -24,5 +20,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Regen do
     else
       {:failure, entity, blackboard}
     end
+  end
+
+  defp tick_with_context(entity, %Blackboard{} = blackboard, %Context{now: now}) do
+    tick(entity, blackboard, now)
   end
 end
