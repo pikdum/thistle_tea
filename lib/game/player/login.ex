@@ -269,11 +269,10 @@ defmodule ThistleTea.Game.Player.Login do
     # send initial repuations
 
     # SMSG_LOGIN_SETTIMESPEED
-    # TODO: verify this
     dt = DateTime.utc_now()
 
     date =
-      (dt.year - 80) <<< 24 ||| (dt.month - 1) <<< 20 ||| (dt.day - 1) <<< 14 |||
+      (dt.year - 2000) <<< 24 ||| (dt.month - 1) <<< 20 ||| (dt.day - 1) <<< 14 |||
         rem(Date.day_of_week(dt), 7) <<< 11 ||| dt.hour <<< 6 ||| dt.minute
 
     Network.send_packet(%Message.SmsgLoginSettimespeed{
