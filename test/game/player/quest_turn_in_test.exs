@@ -20,6 +20,8 @@ defmodule ThistleTea.Game.Player.QuestTurnInTest do
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.WorldRef
 
+  @moduletag :vmangos_db
+
   @required_entry 98_100
   @reward1_entry 98_101
   @reward2_entry 98_102

@@ -35,6 +35,8 @@ defmodule ThistleTea.Game.Entity.Server.PlayerTest do
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.WorldRef
 
+  @moduletag :vmangos_db
+
   describe "login/3" do
     test "starts the registered owner of a character" do
       {:ok, account} = Account.get_user("test")
