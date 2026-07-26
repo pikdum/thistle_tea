@@ -5,6 +5,8 @@ defmodule ThistleTea.Game.Player.Spells do
   learned or superseded spell.
   """
   alias ThistleTea.Game.Entity.Data.Character
+  alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Proficiency
@@ -15,6 +17,9 @@ defmodule ThistleTea.Game.Player.Spells do
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.Loader.Skill, as: SkillLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
+
+  @battle_stance_spell_id 2457
+  @warrior_class 1
 
   def learn(%Character{internal: internal} = character, spell_ids) do
     existing_ids = internal.spells || []
@@ -72,18 +77,39 @@ defmodule ThistleTea.Game.Player.Spells do
       if AuraLogic.has_spell?(character, spell.id) do
         character
       else
-        {character, events} =
-          AuraLogic.apply_spell(character, character.object.guid, character.unit.level || 1, spell, now)
-
-        Effects.enqueue(character, events)
+        apply_aura_spell(character, spell, now)
       end
     end)
   end
 
   def apply_passives(character, _now), do: character
 
+  def apply_default_auras(
+        %Character{unit: %Unit{class: @warrior_class}, internal: %Internal{spellbook: spellbook}} = character,
+        now
+      )
+      when is_map(spellbook) and is_integer(now) do
+    if AuraLogic.has_aura?(character, :mod_shapeshift) do
+      character
+    else
+      case Map.get(spellbook, @battle_stance_spell_id) do
+        %Spell{} = spell -> apply_aura_spell(character, spell, now)
+        _missing -> character
+      end
+    end
+  end
+
+  def apply_default_auras(character, _now), do: character
+
   defp passive_aura_spell?(%Spell{} = spell) do
     Spell.attribute?(spell, :passive) and (spell.stances || 0) == 0 and Spell.aura_effects(spell) != []
+  end
+
+  defp apply_aura_spell(%Character{} = character, %Spell{} = spell, now) do
+    {character, events} =
+      AuraLogic.apply_spell(character, character.object.guid, character.unit.level || 1, spell, now)
+
+    Effects.enqueue(character, events)
   end
 
   def send_proficiencies(%Character{} = character) do

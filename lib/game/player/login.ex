@@ -81,6 +81,7 @@ defmodule ThistleTea.Game.Player.Login do
       |> Dueling.abandon(Time.now())
       |> build_spellbook()
       |> PlayerSpells.apply_passives(Time.now())
+      |> PlayerSpells.apply_default_auras(Time.now())
       |> LogicTalents.sync_points()
       |> Enchantments.restore()
       |> evaluate_login_rest()
