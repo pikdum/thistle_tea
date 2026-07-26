@@ -57,8 +57,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Totem do
     |> Enum.map(&elem(&1, 0))
     |> Enum.reject(&(&1 == state.object.guid))
     |> Enum.find(fn guid ->
-      metadata = Perception.metadata(perception, guid) || %{}
-      Hostility.valid_attack_target?(state, Map.put(metadata, :guid, guid))
+      source = Perception.actor(perception, state.object.guid)
+      target = Perception.actor(perception, guid)
+      Hostility.valid_attack_target?(source, target)
     end)
   end
 

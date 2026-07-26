@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Navigation do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Navigation, as: PathSource
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception
+  alias ThistleTea.Game.Entity.Logic.AI.NavigationIntent
   alias ThistleTea.Game.Entity.Logic.Movement
 
   def target_valid_same_map?(%{internal: %Internal{world: world}}, target_guid, %Context{perception: perception})
@@ -25,8 +26,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Navigation do
     target_valid_same_map?(entity, target_guid, context) and not dead?(Perception.metadata(perception, target_guid))
   end
 
-  def move_to(entity, destination, opts, %Context{} = context) do
-    PathSource.move_to(context, entity, destination, opts)
+  def move_to(entity, destination, opts, %Context{}) do
+    NavigationIntent.enqueue(entity, destination, opts)
   end
 
   def chase(entity, target_guid, destination, %Context{} = context) do
@@ -42,12 +43,17 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Navigation do
   end
 
   def wait_for_arrival(entity, %Blackboard{} = blackboard, %Context{now: now}, wakes \\ []) do
-    if Movement.moving?(entity, now) do
-      movement_delay = Movement.next_spatial_update_delay(entity, now)
-      {reason, delay_ms} = soonest_wake([{:movement, movement_delay} | wakes], :movement, movement_delay)
-      {BT.running(delay_ms, reason), entity, blackboard}
-    else
-      {:success, entity, Blackboard.clear_move_target(blackboard)}
+    cond do
+      NavigationIntent.pending?(entity) ->
+        {BT.running(0, :navigation), entity, blackboard}
+
+      Movement.moving?(entity, now) ->
+        movement_delay = Movement.next_spatial_update_delay(entity, now)
+        {reason, delay_ms} = soonest_wake([{:movement, movement_delay} | wakes], :movement, movement_delay)
+        {BT.running(delay_ms, reason), entity, blackboard}
+
+      true ->
+        {:success, entity, Blackboard.clear_move_target(blackboard)}
     end
   end
 

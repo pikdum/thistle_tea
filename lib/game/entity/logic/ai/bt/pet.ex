@@ -170,9 +170,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet do
       perception
       |> Perception.nearby(:mobs, 20.0)
       |> Enum.find_value(fn {guid, _distance} ->
-        metadata = Perception.metadata(perception, guid) || %{}
-        target = Map.put(metadata, :guid, guid)
-        if Hostility.valid_attack_target?(state, target), do: guid
+        source = Perception.actor(perception, state.object.guid)
+        target = Perception.actor(perception, guid)
+        if Hostility.valid_attack_target?(source, target), do: guid
       end)
 
     case target_guid do
@@ -290,17 +290,11 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet do
   end
 
   defp chase_with_context(%Mob{} = state, target_guid, destination, %Context{} = context) do
-    case Navigation.chase(state, target_guid, destination, context) do
-      {:ok, state} -> state
-      {:error, :no_path, state} -> state
-    end
+    Navigation.chase(state, target_guid, destination, context)
   end
 
   defp follow_with_context(%Mob{} = state, destination, orientation, velocity, %Context{} = context) do
-    case Navigation.follow(state, destination, orientation, velocity, context) do
-      {:ok, state} -> state
-      {:error, :no_path, state} -> state
-    end
+    Navigation.follow(state, destination, orientation, velocity, context)
   end
 
   defp set_action(

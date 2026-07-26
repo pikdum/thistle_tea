@@ -18,6 +18,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Respawn do
   alias ThistleTea.Game.Entity.Server.AIEnvironment
   alias ThistleTea.Game.Entity.Server.Mob.Corpse
   alias ThistleTea.Game.Entity.Server.Mob.Incarnation
+  alias ThistleTea.Game.Entity.Server.NavigationResolver
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Loader.Faction, as: FactionLoader
@@ -129,6 +130,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Respawn do
       |> Mob.apply_addon_auras(now)
       |> BT.init(MobBT.tree())
       |> EventAI.with_blackboard(&EventAI.on_spawned(&1, &2, now, AIEnvironment.context(&1, now)))
+      |> NavigationResolver.resolve(now)
       |> put_spawn_position()
       |> broadcast_respawn()
 

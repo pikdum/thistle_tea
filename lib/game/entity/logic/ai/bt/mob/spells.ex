@@ -40,6 +40,21 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells do
 
   def list_tick_ms, do: @list_tick_ms
 
+  def observation_radius(%Mob{internal: %Internal{creature: %Creature{spells: spells}, spellbook: spellbook}})
+      when is_list(spells) and is_map(spellbook) do
+    Enum.reduce(spells, 0.0, fn
+      %CreatureSpell{cast_target: target} = entry, radius
+      when target in [:friendly_injured, :friendly_injured_except] ->
+        spell = Map.get(spellbook, entry.spell_id)
+        max(radius, injured_search_radius(entry, spell))
+
+      _entry, radius ->
+        radius
+    end)
+  end
+
+  def observation_radius(%Mob{}), do: 0.0
+
   def step do
     BT.sequence([
       BT.condition(&has_spells?/2),
@@ -416,7 +431,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells do
     with %{alive?: true} = metadata <- Perception.metadata(perception, candidate_guid),
          metadata = Map.put(metadata, :guid, candidate_guid),
          true <- injured_candidate_flags_allow?(metadata),
-         true <- Hostility.friendly?(state, metadata),
+         true <- Hostility.friendly?(Perception.actor(perception, state.object.guid), metadata),
          missing_pct when is_number(missing_pct) and missing_pct > threshold <- missing_health_pct(metadata) do
       missing_pct
     else
@@ -508,13 +523,14 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells do
 
       metadata ->
         metadata = Map.put(metadata, :guid, target_guid)
+        source = Perception.actor(perception, state.object.guid)
 
         %{
           guid: target_guid,
           alive?: Map.get(metadata, :alive?, true),
-          hostile?: Hostility.hostile?(state, metadata),
-          friendly?: Hostility.friendly?(state, metadata),
-          attackable?: Hostility.attackable?(state, metadata),
+          hostile?: Hostility.hostile?(source, metadata),
+          friendly?: Hostility.friendly?(source, metadata),
+          attackable?: Hostility.attackable?(source, metadata),
           creature_type: Map.get(metadata, :creature_type),
           position: Perception.position(perception, target_guid),
           los?: Perception.line_of_sight?(perception, target_guid)

@@ -5,9 +5,11 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.NavigationTest do
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context
-  alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Navigation, as: PathSource
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception.Observation
   alias ThistleTea.Game.Entity.Logic.AI.BT.Navigation
+  alias ThistleTea.Game.Entity.Logic.AI.NavigationIntent
+  alias ThistleTea.Game.Entity.Server.NavigationResolver
   alias ThistleTea.Game.WorldRef
 
   describe "target_valid_same_map?/3" do
@@ -16,10 +18,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.NavigationTest do
 
       context =
         context(
-          position: fn
-            42 -> {world, 1.0, 2.0, 3.0}
-            _guid -> nil
-          end
+          observations: %{
+            42 => %Observation{guid: 42, position: {world, 1.0, 2.0, 3.0}}
+          }
         )
 
       entity = entity(world: world)
@@ -30,24 +31,46 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.NavigationTest do
   end
 
   describe "chase/4" do
-    test "starts movement along the boundary-supplied path" do
+    test "emits a typed intent that the owner resolves" do
       world = %WorldRef{map_id: 1}
 
-      navigation = %PathSource{
-        find_path: fn _map_id, _start, _destination ->
-          [{2.0, 0.0, 0.0}, {5.0, 0.0, 0.0}]
-        end,
-        find_random_point: fn _map, _anchor, _radius -> nil end
-      }
+      requested = Navigation.chase(entity(world: world), 42, {5.0, 0.0, 0.0}, context())
 
-      context = context(navigation: navigation)
+      assert [
+               %NavigationIntent{
+                 destination: destination,
+                 opts: [face_target: 42]
+               }
+             ] = requested.internal.navigation_intents
 
-      assert {:ok, moved} = Navigation.chase(entity(world: world), 42, {5.0, 0.0, 0.0}, context)
+      assert destination == {5.0, 0.0, 0.0}
+
+      find_path = fn _map_id, _start, _destination ->
+        [{2.0, 0.0, 0.0}, {5.0, 0.0, 0.0}]
+      end
+
+      moved = NavigationResolver.resolve(requested, 0, find_path)
       assert moved.movement_block.spline_nodes == [{2.0, 0.0, 0.0}, {5.0, 0.0, 0.0}]
+      assert moved.internal.navigation_intents == []
+    end
+
+    test "drains a request when no path is available" do
+      requested = Navigation.chase(entity(world: %WorldRef{map_id: 1}), 42, {5.0, 0.0, 0.0}, context())
+      unchanged = NavigationResolver.resolve(requested, 0, fn _map_id, _start, _destination -> nil end)
+
+      assert unchanged.movement_block.spline_nodes == []
+      assert unchanged.internal.navigation_intents == []
     end
   end
 
   describe "wait_for_arrival/4" do
+    test "yields to the owner while a navigation request is pending" do
+      requested = Navigation.move_to(entity(world: %WorldRef{map_id: 1}), {5.0, 0.0, 0.0}, [], context())
+
+      assert {{:running, 0, :navigation}, ^requested, %Blackboard{}} =
+               Navigation.wait_for_arrival(requested, Blackboard.new(), context())
+    end
+
     test "chooses the earliest supplied wake" do
       moving =
         entity(
@@ -63,15 +86,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.NavigationTest do
   end
 
   defp context(opts \\ []) do
-    perception = %{
-      Perception.empty()
-      | position: Keyword.get(opts, :position, fn _guid -> nil end)
-    }
+    perception = Perception.new(0, nil, Keyword.get(opts, :observations, %{}), %{mobs: [], players: []})
 
-    Context.new(0,
-      perception: perception,
-      navigation: Keyword.get(opts, :navigation, PathSource.direct())
-    )
+    Context.new(0, perception: perception)
   end
 
   defp entity(opts) do

@@ -200,6 +200,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
 
   @confused_wander_radius 4.0
 
+  def confused_wander_radius, do: @confused_wander_radius
+
   defp confused?(%Mob{} = state, _blackboard) do
     AuraLogic.has_aura?(state, :mod_confuse) or AuraLogic.has_aura?(state, :mod_fear)
   end
@@ -420,14 +422,14 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
         {:failure, state, blackboard}
 
       target_guid ->
-        state = apply_aggro(state, target_guid, now)
+        state = apply_aggro(state, target_guid, now, context)
         {state, blackboard} = EventAI.enter_combat(state, blackboard, target_guid, now, context)
         {:failure, state, blackboard}
     end
   end
 
-  defp pick_aggro_target(%Mob{} = state, %Context{} = context) do
-    if Hostility.can_initiate_attack?(state) do
+  defp pick_aggro_target(%Mob{} = state, %Context{perception: perception} = context) do
+    if Hostility.can_initiate_attack?(perception_actor(state, perception)) do
       state
       |> nearby_aggro_candidates(context)
       |> Enum.filter(fn {guid, distance} -> aggro_candidate?(state, guid, distance, context) end)
@@ -446,7 +448,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
 
   defp aggro_candidate?(%Mob{} = state, guid, distance, %Context{perception: perception} = context)
        when is_integer(guid) and is_number(distance) do
-    Hostility.valid_hostile_target?(state, perception_target(perception, guid)) and
+    Hostility.valid_hostile_target?(
+      perception_actor(state, perception),
+      perception_target(perception, guid)
+    ) and
       distance <= aggro_radius(state, guid, perception) and
       detectable_target?(state, guid, distance, context) and
       Perception.line_of_sight?(perception, guid)
@@ -455,10 +460,11 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   defp aggro_candidate?(_state, _guid, _distance, %Context{}), do: false
 
   defp perception_target(perception, guid) do
-    perception
-    |> Perception.metadata(guid)
-    |> Kernel.||(%{})
-    |> Map.put(:guid, guid)
+    Perception.actor(perception, guid)
+  end
+
+  defp perception_actor(%Mob{object: %{guid: guid}}, perception) do
+    Perception.actor(perception, guid)
   end
 
   defp detectable_target?(%Mob{unit: %Unit{level: level}}, guid, distance, %Context{now: now, perception: perception}) do
@@ -509,8 +515,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     end
   end
 
-  defp apply_aggro(%Mob{} = state, target_guid, now) do
-    %Engagement.Result{entity: state} = Engagement.enter(state, target_guid, now)
+  defp apply_aggro(%Mob{} = state, target_guid, now, %Context{} = context) do
+    %Engagement.Result{entity: state} =
+      Engagement.enter(state, target_guid, now, selection: victim_selection(state, context))
 
     state
     |> Core.mark_broadcast_update()
@@ -563,7 +570,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   defp maybe_call_for_help(%Mob{} = state), do: state
 
   defp select_victim(%Mob{} = state, %Blackboard{} = blackboard, %Context{} = context) do
-    case Engagement.select(state) do
+    case Engagement.select(state, victim_selection(state, context)) do
       %Engagement.Result{
         entity: state,
         decision: {:switch, _new_guid},
@@ -575,9 +582,14 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
       %Engagement.Result{entity: state, decision: :keep} ->
         {:success, state, blackboard}
 
-      %Engagement.Result{entity: state, decision: :none} ->
-        state = reset_after_combat(state, context)
-        {:failure, state, Blackboard.ensure(state.internal.blackboard)}
+      %Engagement.Result{
+        entity: state,
+        decision: :none,
+        previous_victim: previous_victim
+      } ->
+        {state, blackboard} = maybe_on_kill(state, blackboard, previous_victim, context)
+        state = reset_after_combat(state, blackboard, context)
+        {BT.running(0, :return_home), state, Blackboard.ensure(state.internal.blackboard)}
     end
   end
 
@@ -591,6 +603,31 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
       EventAI.on_kill(state, blackboard, target, now, context)
     else
       {state, blackboard}
+    end
+  end
+
+  defp victim_selection(%Mob{} = state, %Context{perception: perception} = context) do
+    [
+      valid?: &valid_victim?(state, &1, context),
+      in_melee?: &victim_in_melee?(state, &1, perception)
+    ]
+  end
+
+  defp valid_victim?(%Mob{} = state, target_guid, %Context{perception: perception} = context) do
+    Navigation.target_alive_same_map?(state, target_guid, context) and
+      Hostility.valid_attack_target?(
+        perception_actor(state, perception),
+        Perception.actor(perception, target_guid)
+      )
+  end
+
+  defp victim_in_melee?(%Mob{} = state, target_guid, perception) do
+    case Perception.distance(perception, target_guid) do
+      distance when is_number(distance) ->
+        distance <= melee_reach_to(state, target_guid, perception)
+
+      _ ->
+        false
     end
   end
 
@@ -698,11 +735,14 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   def drop_threat(state, _source_guid, %Context{}), do: state
 
   defp reset_after_combat(%Mob{} = state, %Context{} = context) do
-    if Core.dead?(state), do: state, else: reset_living_after_combat(state, context)
+    reset_after_combat(state, Blackboard.ensure(state.internal.blackboard), context)
   end
 
-  defp reset_living_after_combat(%Mob{} = state, %Context{now: now} = context) do
-    blackboard = Blackboard.ensure(state.internal.blackboard)
+  defp reset_after_combat(%Mob{} = state, %Blackboard{} = blackboard, %Context{} = context) do
+    if Core.dead?(state), do: state, else: reset_living_after_combat(state, blackboard, context)
+  end
+
+  defp reset_living_after_combat(%Mob{} = state, %Blackboard{} = blackboard, %Context{now: now} = context) do
     {state, blackboard} = EventAI.on_leave_combat(state, blackboard, now, context)
     {state, blackboard} = EventAI.on_evade(state, blackboard, now, context)
 
@@ -1094,11 +1134,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     if should_repath do
       destination = chase_destination(state, target_pos, target_guid, context)
 
-      state =
-        case Navigation.chase(state, target_guid, destination, context) do
-          {:ok, state} -> state
-          {:error, :no_path, state} -> state
-        end
+      state = Navigation.chase(state, target_guid, destination, context)
 
       blackboard = Blackboard.reset_spread(blackboard)
       navigation = %{blackboard.navigation | last_target_pos: target_pos}
@@ -1537,9 +1573,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   end
 
   defp move_with_context(%Mob{} = state, destination, opts, %Context{} = context) do
-    case Navigation.move_to(state, destination, opts, context) do
-      {:ok, state} -> state
-      {:error, :no_path, state} -> state
-    end
+    Navigation.move_to(state, destination, opts, context)
   end
 end

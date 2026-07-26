@@ -25,6 +25,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Entity.Logic.AI.BehaviorRunner
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception.Request, as: ObservationRequest
   alias ThistleTea.Game.Entity.Logic.AI.BT.Mob, as: MobBT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells, as: MobSpells
   alias ThistleTea.Game.Entity.Logic.AI.BT.Pet, as: PetBT
@@ -54,6 +55,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Entity.Server.Mob.Corpse
   alias ThistleTea.Game.Entity.Server.Mob.Incarnation
   alias ThistleTea.Game.Entity.Server.Mob.Respawn
+  alias ThistleTea.Game.Entity.Server.NavigationResolver
   alias ThistleTea.Game.Entity.Server.Player.CompanionOwner.Attachment
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network
@@ -100,6 +102,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     state =
       state
       |> EventAI.with_blackboard(&EventAI.on_spawned(&1, &2, now, AIEnvironment.context(&1, now)))
+      |> NavigationResolver.resolve(now)
       |> EventSink.emit_pending()
 
     state =
@@ -260,9 +263,12 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
   @impl GenServer
   def handle_cast({:drop_threat, source_guid}, %Mob{} = state) do
+    now = Time.now()
+
     state =
       state
-      |> MobBT.drop_threat(source_guid, AIEnvironment.context(state))
+      |> MobBT.drop_threat(source_guid, AIEnvironment.context(state, now, ObservationRequest.actor(source_guid)))
+      |> NavigationResolver.resolve(now)
       |> EventSink.emit_pending()
       |> wake_ai_tick()
 
@@ -484,7 +490,20 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
       state =
         state
-        |> EventAI.with_blackboard(&Script.execute_steps(&1, &2, steps, target_guid, AIEnvironment.context(&1, now)))
+        |> EventAI.with_blackboard(
+          &Script.execute_steps(
+            &1,
+            &2,
+            steps,
+            target_guid,
+            AIEnvironment.context(
+              &1,
+              now,
+              ObservationRequest.new([target_guid], Script.observation_radius(steps))
+            )
+          )
+        )
+        |> NavigationResolver.resolve(now)
         |> EventSink.emit_pending()
 
       {:noreply, state, {:continue, :maybe_broadcast}}
@@ -629,6 +648,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
       started_at = System.monotonic_time()
       previous = state
       {status, state} = BehaviorRunner.tick(behavior_tree, state, AIEnvironment.context(state, now))
+      state = NavigationResolver.resolve(state, now)
       state = sync_behavior_tree(state, previous)
       duration = System.monotonic_time() - started_at
       state = EventSink.emit_pending(state)
@@ -912,7 +932,11 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   defp maybe_eventai_enter_combat(%Mob{} = state, true, _caster, _now), do: state
 
   defp maybe_eventai_enter_combat(%Mob{} = state, false, caster, now) do
-    EventAI.with_blackboard(state, &EventAI.enter_combat(&1, &2, caster, now, AIEnvironment.context(&1, now)))
+    EventAI.with_blackboard(
+      state,
+      &EventAI.enter_combat(&1, &2, caster, now, AIEnvironment.context(&1, now, ObservationRequest.actor(caster)))
+    )
+    |> NavigationResolver.resolve(now)
   end
 
   defp eventai_spell_hit(%Mob{} = state, caster_guid, %Spell{id: spell_id}) when is_integer(caster_guid) do
@@ -920,8 +944,16 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
     EventAI.with_blackboard(
       state,
-      &EventAI.on_spell_hit(&1, &2, caster_guid, spell_id, now, AIEnvironment.context(&1, now))
+      &EventAI.on_spell_hit(
+        &1,
+        &2,
+        caster_guid,
+        spell_id,
+        now,
+        AIEnvironment.context(&1, now, ObservationRequest.actor(caster_guid))
+      )
     )
+    |> NavigationResolver.resolve(now)
   end
 
   defp eventai_spell_hit(%Mob{} = state, _caster_guid, _spell), do: state
@@ -966,7 +998,16 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
       state
       |> mark_death_finalized()
-      |> EventAI.with_blackboard(&EventAI.on_death(&1, &2, killer, now, AIEnvironment.context(&1, now)))
+      |> EventAI.with_blackboard(
+        &EventAI.on_death(
+          &1,
+          &2,
+          killer,
+          now,
+          AIEnvironment.context(&1, now, ObservationRequest.actor(killer))
+        )
+      )
+      |> NavigationResolver.resolve(now)
       |> EventSink.emit_pending()
       |> maybe_reward_kill(killer)
       |> Corpse.prepare(killer)
@@ -1051,7 +1092,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
              blackboard,
              entry,
              target_guid,
-             AIEnvironment.context(state)
+             AIEnvironment.context(state, Time.now(), ObservationRequest.actor(target_guid))
            ) do
         {:ok, {state, blackboard}} -> {:ok, %{state | internal: %{state.internal | blackboard: blackboard}}}
         {:error, reason} -> {:error, reason}

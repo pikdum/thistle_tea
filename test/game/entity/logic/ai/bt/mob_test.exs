@@ -19,6 +19,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
   alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.Entity.Logic.Threat
   alias ThistleTea.Game.Entity.Server.AIEnvironment
+  alias ThistleTea.Game.Entity.Server.NavigationResolver
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Time
@@ -70,6 +71,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
         Enum.reduce_while(1..10, mob, fn _i, mob ->
           mob = Movement.sync_position(mob, Time.now())
           {_status, mob} = BehaviorRunner.tick(mob.internal.behavior_tree, mob, AIEnvironment.context(mob, 1_000))
+          mob = NavigationResolver.resolve(mob, 1_000)
 
           if Enum.any?(mob.internal.events, &is_struct(&1, Effects.SpellStart)) do
             {:halt, mob}
@@ -116,6 +118,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
         Enum.reduce_while(1..10, mob, fn _i, mob ->
           mob = Movement.sync_position(mob, Time.now())
           {_status, mob} = BehaviorRunner.tick(mob.internal.behavior_tree, mob, AIEnvironment.context(mob, 1_000))
+          mob = NavigationResolver.resolve(mob, 1_000)
 
           if Enum.any?(mob.internal.events, &is_struct(&1, Effects.MonsterTalk)) do
             {:halt, mob}
@@ -169,7 +172,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
           blackboard: %Blackboard{combat: %Blackboard.Combat{auto_attacking: true}}
       }
 
-      mob = MobBT.drop_threat(%{mob | unit: unit, internal: internal}, target)
+      mob =
+        %{mob | unit: unit, internal: internal}
+        |> MobBT.drop_threat(target)
+        |> NavigationResolver.resolve(Time.now())
 
       refute mob.internal.in_combat
       assert mob.unit.health == 100
@@ -278,6 +284,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
         |> BT.init(MobBT.tree())
 
       {_status, mob} = BehaviorRunner.tick(mob.internal.behavior_tree, mob, AIEnvironment.context(mob, 1_000))
+      mob = NavigationResolver.resolve(mob, 1_000)
 
       refute mob.internal.in_combat
       assert mob.internal.threat == %{}

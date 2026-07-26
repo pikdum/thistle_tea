@@ -67,6 +67,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal do
     totem_guids: %{},
     cooldowns: %{},
     events: [],
+    navigation_intents: [],
     broadcast_update?: false,
     death_finalized?: false,
     rooted?: false,

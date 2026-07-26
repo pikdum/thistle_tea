@@ -22,10 +22,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
   alias ThistleTea.Game.Entity.Data.ScriptStep
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context
-  alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Navigation
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Random
   alias ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells, as: MobSpells
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Navigation
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
   alias ThistleTea.Game.Entity.Logic.Condition, as: ConditionLogic
   alias ThistleTea.Game.Entity.Logic.Core
@@ -136,13 +136,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
          _now,
          %Context{} = context
        ) do
-    state =
-      case Navigation.move_to(context, state, {x, y, z}) do
-        {:ok, state} -> state
-        {:error, :no_path, state} -> state
-      end
-
-    {state, blackboard}
+    {Navigation.move_to(state, {x, y, z}, [], context), blackboard}
   end
 
   defp execute(
@@ -558,6 +552,42 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
   defp victim(_state), do: nil
 
   @default_buddy_radius 30.0
+
+  def observation_radius(steps) when is_list(steps) do
+    Enum.reduce(steps, 0.0, fn
+      %ScriptStep{} = step, radius ->
+        max(radius, max(step_observation_radius(step), nested_observation_radius(step)))
+
+      _step, radius ->
+        radius
+    end)
+  end
+
+  def observation_radius(_steps), do: 0.0
+
+  defp step_observation_radius(%ScriptStep{target_type: target_type, target_param2: radius})
+       when target_type in [:nearest_creature_with_entry, :random_creature_with_entry] do
+    positive_radius(radius, @default_buddy_radius)
+  end
+
+  defp step_observation_radius(%ScriptStep{target_type: target_type, target_param1: radius})
+       when target_type in [:friendly_injured, :friendly_injured_except] do
+    positive_radius(radius, @default_buddy_radius)
+  end
+
+  defp step_observation_radius(%ScriptStep{}), do: 0.0
+
+  defp nested_observation_radius(%ScriptStep{sub_scripts: sub_scripts}) when is_map(sub_scripts) do
+    sub_scripts
+    |> Map.values()
+    |> List.flatten()
+    |> observation_radius()
+  end
+
+  defp nested_observation_radius(%ScriptStep{}), do: 0.0
+
+  defp positive_radius(radius, _default) when is_number(radius) and radius > 0, do: radius / 1
+  defp positive_radius(_radius, default), do: default
 
   defp find_creature_with_entry(
          %{object: %{guid: self_guid}},

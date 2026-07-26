@@ -14,7 +14,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Context do
   def new(now, opts \\ []) when is_integer(now) do
     %__MODULE__{
       now: now,
-      perception: Keyword.get(opts, :perception, Perception.empty()),
+      perception: Keyword.get(opts, :perception, Perception.empty(now)),
       random: Keyword.get(opts, :random, Random.fixed()),
       navigation: Keyword.get(opts, :navigation, Navigation.direct())
     }

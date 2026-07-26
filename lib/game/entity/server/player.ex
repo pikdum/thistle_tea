@@ -48,6 +48,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.Entity.Logic.SpellFeedback
   alias ThistleTea.Game.Entity.Logic.StealthDetection
   alias ThistleTea.Game.Entity.Server.AIEnvironment
+  alias ThistleTea.Game.Entity.Server.NavigationResolver
   alias ThistleTea.Game.Entity.Server.Player.CompanionOwner
   alias ThistleTea.Game.Entity.Server.Player.CompanionOwner.Attachment
   alias ThistleTea.Game.Entity.Server.Player.CompanionOwner.Monitor, as: CompanionMonitor
@@ -783,6 +784,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   def handle_info(:player_tick, %{character: %Character{} = character} = state) do
     now = Time.now()
     {status, character} = tick_player(character, now)
+    character = NavigationResolver.resolve(character, now)
     character = EventSink.emit_pending(character)
     state = %{state | character: character}
     state = schedule_player_tick(state, character, status, now)

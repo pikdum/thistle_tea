@@ -45,6 +45,30 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAI do
 
   def has_events?(state), do: events(state) != []
 
+  def observation_radius(state) do
+    state
+    |> events()
+    |> Enum.reduce(0.0, fn %AIEvent{} = event, radius ->
+      max(radius, max(event_observation_radius(event), actions_observation_radius(event)))
+    end)
+  end
+
+  defp event_observation_radius(%AIEvent{event_type: :friendly_hp, param2: radius})
+       when is_number(radius) and radius > 0 do
+    radius / 1
+  end
+
+  defp event_observation_radius(%AIEvent{event_type: :friendly_hp}), do: @friendly_hp_default_radius
+  defp event_observation_radius(%AIEvent{}), do: 0.0
+
+  defp actions_observation_radius(%AIEvent{actions: actions}) when is_list(actions) do
+    actions
+    |> List.flatten()
+    |> Script.observation_radius()
+  end
+
+  defp actions_observation_radius(%AIEvent{}), do: 0.0
+
   def tick(state, %Blackboard{} = blackboard, now) when is_integer(now) do
     tick(state, blackboard, now, Context.new(now))
   end
