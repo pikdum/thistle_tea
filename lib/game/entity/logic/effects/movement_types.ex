@@ -11,8 +11,10 @@ defmodule ThistleTea.Game.Entity.Logic.Effects.MovementTypes do
     {:WaterWalkChanged, [:enabled?], []},
     {:MonsterMove, [:move_opts], []},
     {:Teleport, [:position], []},
+    {:TeleportToWorld, [:world, :position], []},
     {:Leap, [:position], []},
     {:TeleportToSpellTarget, [:spell_id], []},
+    {:ChargeResolved, [:path, :duration_ms, :destination], []},
     {:SetFacing, [:facing], []}
   ]
 

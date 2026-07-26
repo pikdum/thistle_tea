@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.Entity.EventSink.Summons do
   alias ThistleTea.Game.Entity.Data.GameObject
   alias ThistleTea.Game.Entity.Data.GameObjectTemplate, as: DataGameObjectTemplate
   alias ThistleTea.Game.Entity.Data.Mob
+  alias ThistleTea.Game.Entity.EventSink.Context
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Server.DynamicObject, as: DynamicObjectServer
   alias ThistleTea.Game.Entity.Server.Player.CompanionOwner.Attachment
@@ -32,7 +33,8 @@ defmodule ThistleTea.Game.Entity.EventSink.Summons do
 
   def emit(
         %{object: %{guid: caster_guid}, internal: %Internal{world: world}} = entity,
-        %Effects.SpawnAreaEffect{} = effect
+        %Effects.SpawnAreaEffect{} = effect,
+        _context
       ) do
     radius =
       case effect.effect do
@@ -51,13 +53,13 @@ defmodule ThistleTea.Game.Entity.EventSink.Summons do
     entity
   end
 
-  def emit(entity, %Effects.SpawnAreaEffect{}), do: entity
+  def emit(entity, %Effects.SpawnAreaEffect{}, _context), do: entity
 
-  def emit(%Character{object: %{guid: caster_guid}, internal: %Internal{world: world}} = entity, %Effects.SpawnFarsight{
-        spell: %Spell{} = spell,
-        position: position,
-        duration_ms: duration_ms
-      }) do
+  def emit(
+        %Character{object: %{guid: caster_guid}, internal: %Internal{world: world}} = entity,
+        %Effects.SpawnFarsight{spell: %Spell{} = spell, position: position, duration_ms: duration_ms},
+        context
+      ) do
     dynamic_object = DataDynamicObject.build(caster_guid, world, spell, position, 0.0)
 
     World.start_entity(%{
@@ -67,13 +69,13 @@ defmodule ThistleTea.Game.Entity.EventSink.Summons do
     })
 
     Entity.request_update_from(dynamic_object.object.guid, caster_guid)
-    send(self(), %Commands.FarsightStarted{guid: dynamic_object.object.guid})
+    Context.send(context, %Commands.FarsightStarted{guid: dynamic_object.object.guid})
     entity
   end
 
-  def emit(entity, %Effects.SpawnFarsight{}), do: entity
+  def emit(entity, %Effects.SpawnFarsight{}, _context), do: entity
 
-  def emit(%{object: %{guid: caster_guid}} = entity, %Effects.DespawnAreaEffects{spell_id: spell_id})
+  def emit(%{object: %{guid: caster_guid}} = entity, %Effects.DespawnAreaEffects{spell_id: spell_id}, _context)
       when is_integer(caster_guid) do
     caster_guid
     |> AreaEffects.pids(spell_id)
@@ -82,16 +84,16 @@ defmodule ThistleTea.Game.Entity.EventSink.Summons do
     entity
   end
 
-  def emit(entity, %Effects.DespawnAreaEffects{}), do: entity
+  def emit(entity, %Effects.DespawnAreaEffects{}, _context), do: entity
 
-  def emit(entity, %Effects.DespawnEntity{target_guid: guid}) when is_integer(guid) do
+  def emit(entity, %Effects.DespawnEntity{target_guid: guid}, _context) when is_integer(guid) do
     World.stop_entity(guid)
     entity
   end
 
-  def emit(entity, %Effects.DespawnEntity{}), do: entity
+  def emit(entity, %Effects.DespawnEntity{}, _context), do: entity
 
-  def emit(entity, %Effects.LeaveRitual{target_guid: game_object_guid, source_guid: user_guid}) do
+  def emit(entity, %Effects.LeaveRitual{target_guid: game_object_guid, source_guid: user_guid}, _context) do
     Entity.leave_ritual(game_object_guid, user_guid)
     entity
   end
@@ -102,7 +104,8 @@ defmodule ThistleTea.Game.Entity.EventSink.Summons do
           internal: %Internal{world: world},
           movement_block: %{position: {_x, _y, _z, _o} = position}
         } = entity,
-        %Effects.SummonGameObject{entry: entry, duration_ms: duration_ms} = effect
+        %Effects.SummonGameObject{entry: entry, duration_ms: duration_ms} = effect,
+        context
       ) do
     case GameObjectTemplateLoader.get(entry) do
       %DataGameObjectTemplate{} = template ->
@@ -116,7 +119,7 @@ defmodule ThistleTea.Game.Entity.EventSink.Summons do
           )
 
         World.start_entity(game_object)
-        maybe_track_channel_game_object(game_object)
+        maybe_track_channel_game_object(game_object, context)
         entity
 
       _ ->
@@ -124,21 +127,25 @@ defmodule ThistleTea.Game.Entity.EventSink.Summons do
     end
   end
 
-  def emit(entity, %Effects.SummonGameObject{}), do: entity
+  def emit(entity, %Effects.SummonGameObject{}, _context), do: entity
 
-  def emit(entity, %Effects.SummonRequest{
-        source_guid: summoner_guid,
-        target_guid: target_guid,
-        amount: zone_id,
-        position: {world, x, y, z}
-      }) do
+  def emit(
+        entity,
+        %Effects.SummonRequest{
+          source_guid: summoner_guid,
+          target_guid: target_guid,
+          amount: zone_id,
+          position: {world, x, y, z}
+        },
+        _context
+      ) do
     Entity.request_summon(target_guid, summoner_guid, zone_id, world, {x, y, z})
     entity
   end
 
-  def emit(entity, %Effects.SummonRequest{}), do: entity
+  def emit(entity, %Effects.SummonRequest{}, _context), do: entity
 
-  def emit(%{internal: %Internal{world: world}} = entity, %Effects.SummonCreature{summon: summon} = effect) do
+  def emit(%{internal: %Internal{world: world}} = entity, %Effects.SummonCreature{summon: summon} = effect, _context) do
     with true <- summon_allowed?(world, summon),
          %Mob{} = mob <-
            SummonLoader.build(summon.entry, world, summon.position,
@@ -164,9 +171,9 @@ defmodule ThistleTea.Game.Entity.EventSink.Summons do
     entity
   end
 
-  def emit(entity, %Effects.SummonCreature{}), do: entity
+  def emit(entity, %Effects.SummonCreature{}, _context), do: entity
 
-  def emit(entity, %Effects.ControlGranted{} = effect) do
+  def emit(entity, %Effects.ControlGranted{} = effect, _context) do
     case {Entity.pid(effect.source_guid), Entity.pid(effect.target_guid)} do
       {owner_pid, controlled_pid} when is_pid(owner_pid) and is_pid(controlled_pid) ->
         attachment = %Attachment{
@@ -189,7 +196,7 @@ defmodule ThistleTea.Game.Entity.EventSink.Summons do
     entity
   end
 
-  def emit(entity, %Effects.ControlReleased{} = effect) do
+  def emit(entity, %Effects.ControlReleased{} = effect, _context) do
     case Entity.pid(effect.source_guid) do
       pid when is_pid(pid) -> send(pid, {:control_released, effect.target_guid})
       _ -> nil
@@ -198,7 +205,7 @@ defmodule ThistleTea.Game.Entity.EventSink.Summons do
     entity
   end
 
-  def emit(entity, %Effects.ReleaseControlled{} = effect) do
+  def emit(entity, %Effects.ReleaseControlled{} = effect, _context) do
     case Entity.pid(effect.target_guid) do
       pid when is_pid(pid) -> send(pid, {:release_control, effect.source_guid, effect.spell_id})
       _ -> nil
@@ -207,7 +214,7 @@ defmodule ThistleTea.Game.Entity.EventSink.Summons do
     entity
   end
 
-  def emit(entity, %Effects.ViewpointGranted{} = effect) do
+  def emit(entity, %Effects.ViewpointGranted{} = effect, _context) do
     case Entity.pid(effect.source_guid) do
       pid when is_pid(pid) -> send(pid, {:viewpoint_granted, effect.target_guid})
       _ -> nil
@@ -216,7 +223,7 @@ defmodule ThistleTea.Game.Entity.EventSink.Summons do
     entity
   end
 
-  def emit(entity, %Effects.ViewpointReleased{} = effect) do
+  def emit(entity, %Effects.ViewpointReleased{} = effect, _context) do
     case Entity.pid(effect.source_guid) do
       pid when is_pid(pid) -> send(pid, {:viewpoint_released, effect.target_guid})
       _ -> nil
@@ -225,19 +232,25 @@ defmodule ThistleTea.Game.Entity.EventSink.Summons do
     entity
   end
 
-  def emit(%Character{} = entity, %Effects.SummonPet{entry: entry, spell_id: spell_id}) do
+  def emit(%Character{} = entity, %Effects.SummonPet{entry: entry, spell_id: spell_id}, context) do
     with %Mob{} = built_pet <- SummonLoader.build_pet(entry, entity),
          pet = %{built_pet | unit: %{built_pet.unit | created_by_spell: spell_id}},
          {:ok, pid} <- MobLoader.start_mob(pet) do
-      send(pid, {:attach_pet, self(), spell_id, Map.values(pet.internal.spellbook)})
+      case context do
+        %Context{owner_pid: owner_pid} ->
+          send(pid, {:attach_pet, owner_pid, spell_id, Map.values(pet.internal.spellbook)})
+
+        nil ->
+          World.stop_entity(pet.object.guid)
+      end
     end
 
     entity
   end
 
-  def emit(entity, %Effects.SummonPet{}), do: entity
+  def emit(entity, %Effects.SummonPet{}, _context), do: entity
 
-  def emit(%Mob{object: %{guid: guid}} = entity, %Effects.TameCreature{source_guid: owner_guid, entry: entry}) do
+  def emit(%Mob{object: %{guid: guid}} = entity, %Effects.TameCreature{source_guid: owner_guid, entry: entry}, _context) do
     case Entity.pid(owner_guid) do
       pid when is_pid(pid) -> send(pid, {:tame_pet, entry})
       _ -> nil
@@ -247,9 +260,9 @@ defmodule ThistleTea.Game.Entity.EventSink.Summons do
     entity
   end
 
-  def emit(entity, %Effects.TameCreature{}), do: entity
+  def emit(entity, %Effects.TameCreature{}, _context), do: entity
 
-  def emit(entity, %Effects.DismissPet{target_guid: pet_guid}) when is_integer(pet_guid) and pet_guid > 0 do
+  def emit(entity, %Effects.DismissPet{target_guid: pet_guid}, _context) when is_integer(pet_guid) and pet_guid > 0 do
     World.stop_entity(pet_guid)
     entity
   end
@@ -260,7 +273,8 @@ defmodule ThistleTea.Game.Entity.EventSink.Summons do
           internal: %Internal{world: world},
           movement_block: %{position: position}
         } = entity,
-        %Effects.SummonTotem{entry: entry, slot: slot, duration_ms: duration_ms}
+        %Effects.SummonTotem{entry: entry, slot: slot, duration_ms: duration_ms},
+        context
       ) do
     old_guid = Map.get(entity.internal.totem_guids, slot)
     if is_integer(old_guid), do: World.stop_entity(old_guid)
@@ -283,25 +297,28 @@ defmodule ThistleTea.Game.Entity.EventSink.Summons do
              }
          },
          {:ok, _pid} <- MobLoader.start_mob(totem) do
-      send(self(), %Commands.TotemStarted{slot: slot, guid: totem.object.guid})
+      Context.send(context, %Commands.TotemStarted{slot: slot, guid: totem.object.guid})
       entity
     else
       _ -> entity
     end
   end
 
-  def emit(entity, %Effects.SummonTotem{}), do: entity
+  def emit(entity, %Effects.SummonTotem{}, _context), do: entity
 
-  def emit(entity, %Effects.DespawnSelf{} = effect) do
-    Process.send_after(self(), {:despawn_creature, effect.respawn_delay_ms}, effect.duration_ms || 0)
+  def emit(entity, %Effects.DespawnSelf{} = effect, context) do
+    Context.send_after(context, {:despawn_creature, effect.respawn_delay_ms}, effect.duration_ms || 0)
     entity
   end
 
-  defp maybe_track_channel_game_object(%GameObject{object: %{guid: guid}, internal: %Internal{ritual: %Ritual{}}}) do
-    send(self(), %Commands.ChannelGameObjectStarted{guid: guid})
+  defp maybe_track_channel_game_object(
+         %GameObject{object: %{guid: guid}, internal: %Internal{ritual: %Ritual{}}},
+         context
+       ) do
+    Context.send(context, %Commands.ChannelGameObjectStarted{guid: guid})
   end
 
-  defp maybe_track_channel_game_object(%GameObject{}), do: :ok
+  defp maybe_track_channel_game_object(%GameObject{}, _context), do: :ok
 
   defp owner_level(%{unit: %{level: level}}) when is_integer(level), do: level
   defp owner_level(_entity), do: 1
@@ -355,7 +372,7 @@ defmodule ThistleTea.Game.Entity.EventSink.Summons do
        }) do
     spells = (spellbook || %{}) |> Map.values() |> Enum.reject(&Spell.attribute?(&1, :passive))
 
-    emit(entity, Effects.control_granted(entity.object.guid, guid, spell_id, spells, kind: :possession))
+    emit(entity, Effects.control_granted(entity.object.guid, guid, spell_id, spells, kind: :possession), nil)
 
     :ok
   end

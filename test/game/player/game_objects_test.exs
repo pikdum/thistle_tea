@@ -18,24 +18,27 @@ defmodule ThistleTea.Game.Player.GameObjectsTest do
     test "sits the player in the seat returned by a chair game object" do
       entry = System.unique_integer([:positive])
       guid = Guid.from_low_guid(:game_object, entry, System.unique_integer([:positive]))
+      player_guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
       template = %GameObjectTemplate{entry: entry, type: 7, size: 1.0, data: [1, 1]}
       :ets.insert(GameObjectTemplateLoader, {entry, template})
+      Entity.register(player_guid)
 
       owner = start_chair_owner(guid, {:ok, {1.0, 2.0, 3.0, 1.5}, 5})
 
       on_exit(fn ->
         :ets.delete(GameObjectTemplateLoader, entry)
+        Entity.unregister(player_guid)
         if Process.alive?(owner), do: Process.exit(owner, :kill)
       end)
 
       character = %Character{
-        object: %Object{guid: 1},
+        object: %Object{guid: player_guid},
         unit: %Unit{level: 10, stand_state: 0},
         internal: %Internal{world: %WorldRef{map_id: 0}},
         movement_block: %MovementBlock{position: {1.0, 1.0, 3.0, 0.0}}
       }
 
-      state = GameObjects.use_object(%{guid: 1, character: character}, guid)
+      state = GameObjects.use_object(%{guid: player_guid, character: character}, guid)
 
       assert state.character.unit.stand_state == 5
       assert_receive {:"$gen_cast", {:start_teleport, 1.0, 2.0, 3.0, 1.5, %WorldRef{map_id: 0}}}

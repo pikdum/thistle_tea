@@ -16,6 +16,7 @@ defmodule ThistleTea.Game.Entity.Logic.Effects.CombatTypes do
     {:ThreatRefLost, [:target_guid], []},
     {:DropThreat, [:target_guid], []},
     {:DropNearbyThreat, [], []},
+    {:DropNearbyThreatResolved, [:target_guids, :metadata], []},
     {:BladeFlurry, [:target_guid, :damage, :spell_id], []},
     {:SecondaryMelee, [:target_guid, :damage, :spell_id, :range_yards], []},
     {:TapClaimed, [:player_guid], [:group_id]},

@@ -206,6 +206,16 @@ defmodule ThistleTea.Game.Entity.Logic.Effects do
     %Effects.DeliverSpell{target_guid: target_guid, cast_context: cast_context, spell: spell}
   end
 
+  def deliver_heal_threat(mob_guid, source_guid, target_guid, amount)
+      when is_integer(mob_guid) and is_integer(source_guid) and is_integer(target_guid) and is_number(amount) do
+    %Effects.DeliverHealThreat{
+      mob_guid: mob_guid,
+      source_guid: source_guid,
+      target_guid: target_guid,
+      amount: amount
+    }
+  end
+
   def deliver_spell_outcome(target_guid, source_guid, spell, outcome)
       when is_integer(target_guid) and is_integer(source_guid) and is_atom(outcome) do
     %Effects.DeliverSpellOutcome{source_guid: source_guid, target_guid: target_guid, spell: spell, outcome: outcome}
@@ -257,6 +267,10 @@ defmodule ThistleTea.Game.Entity.Logic.Effects do
 
   def drop_nearby_threat do
     %Effects.DropNearbyThreat{}
+  end
+
+  def drop_nearby_threat_resolved(target_guids, metadata) when is_list(target_guids) and is_map(metadata) do
+    %Effects.DropNearbyThreatResolved{target_guids: target_guids, metadata: metadata}
   end
 
   def blade_flurry(target_guid, damage, spell_id)
@@ -317,6 +331,15 @@ defmodule ThistleTea.Game.Entity.Logic.Effects do
 
   def teleport({_x, _y, _z, _o} = position) do
     %Effects.Teleport{position: position}
+  end
+
+  def teleport_to_world(world, {_x, _y, _z} = position) do
+    %Effects.TeleportToWorld{world: world, position: position}
+  end
+
+  def charge_resolved(path, duration_ms, {_x, _y, _z, _o} = destination)
+      when is_list(path) and is_integer(duration_ms) do
+    %Effects.ChargeResolved{path: path, duration_ms: duration_ms, destination: destination}
   end
 
   def leap({_x, _y, _z, _o} = position) do
@@ -436,6 +459,16 @@ defmodule ThistleTea.Game.Entity.Logic.Effects do
       amount: Keyword.get(opts, :base_points),
       duration_ms: Keyword.get(opts, :duration_ms),
       resolve_targets?: Keyword.get(opts, :resolve_targets?, false)
+    }
+  end
+
+  def trigger_spell_request(source_guid, spell_id, target_guid, opts)
+      when is_integer(source_guid) and is_integer(spell_id) and is_integer(target_guid) and is_list(opts) do
+    %Effects.TriggerSpellRequest{
+      source_guid: source_guid,
+      target_guid: target_guid,
+      spell_id: spell_id,
+      opts: opts
     }
   end
 

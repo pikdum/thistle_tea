@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.EventSink
+  alias ThistleTea.Game.Entity.EventSink.Context
   alias ThistleTea.Game.Entity.Logic.Companion
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Server.Player.CompanionOwner.Attachment
@@ -97,14 +98,14 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
     test "hearthstone teleports a character to their home bind" do
       character = %Character{internal: %Internal{world: %WorldRef{map_id: 1}, home_bind: {0, -8_946.0, -132.0, 84.0}}}
 
-      assert ^character = EventSink.emit(character, Effects.teleport_to_spell_target(8690))
+      assert ^character = EventSink.emit(character, Effects.teleport_to_spell_target(8690), Context.new(self()))
       assert_receive {:"$gen_cast", {:start_teleport, -8_946.0, -132.0, 84.0, 0}}
     end
 
     test "teleport events preserve their orientation" do
       character = %Character{internal: %Internal{world: %WorldRef{map_id: 0}}}
 
-      assert ^character = EventSink.emit(character, Effects.teleport({1.0, 2.0, 3.0, 1.5}))
+      assert ^character = EventSink.emit(character, Effects.teleport({1.0, 2.0, 3.0, 1.5}), Context.new(self()))
       assert_receive {:"$gen_cast", {:start_teleport, 1.0, 2.0, 3.0, 1.5, %WorldRef{map_id: 0}}}
     end
 
@@ -112,19 +113,21 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
       character = %Character{}
       event = Effects.feed_pet(22, 33, 1539, 10.0)
 
-      assert ^character = EventSink.emit(character, event)
+      assert ^character = EventSink.emit(character, event, Context.new(self()))
       assert_receive {:feed_pet, 22, 33, 1539, 10.0}
     end
 
     test "spell modifier events send the matching client packet" do
       character = %Character{}
 
-      assert ^character = EventSink.emit(character, Effects.spell_modifier(:flat, 5, 10, -500))
+      context = Context.new(self())
+
+      assert ^character = EventSink.emit(character, Effects.spell_modifier(:flat, 5, 10, -500), context)
 
       assert_receive {:"$gen_cast",
                       {:send_packet, %Message.SmsgSetFlatSpellModifier{effect_index: 5, operation: 10, value: -500}}}
 
-      assert ^character = EventSink.emit(character, Effects.spell_modifier(:pct, 30, 10, 0))
+      assert ^character = EventSink.emit(character, Effects.spell_modifier(:pct, 30, 10, 0), context)
 
       assert_receive {:"$gen_cast",
                       {:send_packet, %Message.SmsgSetPctSpellModifier{effect_index: 30, operation: 10, value: 0}}}
@@ -370,7 +373,22 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
     end
 
     test "script attack_start schedules a forced attack", %{mob: mob, target_guid: target_guid} do
-      assert ^mob = EventSink.emit(mob, Effects.attack_start(target_guid))
+      assert ^mob = EventSink.emit(mob, Effects.attack_start(target_guid), Context.new(self()))
+      assert_receive {:force_attack, ^target_guid}
+    end
+
+    test "owner commands use the explicit context instead of the emitting process", %{
+      mob: mob,
+      target_guid: target_guid
+    } do
+      receiver = self()
+
+      Task.await(
+        Task.async(fn ->
+          EventSink.emit(mob, Effects.attack_start(target_guid), Context.new(receiver))
+        end)
+      )
+
       assert_receive {:force_attack, ^target_guid}
     end
 

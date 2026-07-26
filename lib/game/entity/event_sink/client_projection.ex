@@ -4,6 +4,7 @@ defmodule ThistleTea.Game.Entity.EventSink.ClientProjection do
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.Entity.EventSink.Context
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World
@@ -12,36 +13,38 @@ defmodule ThistleTea.Game.Entity.EventSink.ClientProjection do
   @listen_range_say 25.0
   @listen_range_yell 300.0
 
-  def emit(%Character{} = entity, %Effects.ConsumeCastItem{cast_item_guid: item_guid}) when is_integer(item_guid) do
-    send(self(), {:consume_cast_item, item_guid})
+  def emit(%Character{} = entity, %Effects.ConsumeCastItem{cast_item_guid: item_guid}, context)
+      when is_integer(item_guid) do
+    Context.send(context, {:consume_cast_item, item_guid})
     entity
   end
 
-  def emit(entity, %Effects.ConsumeCastItem{}), do: entity
+  def emit(entity, %Effects.ConsumeCastItem{}, _context), do: entity
 
-  def emit(%Character{} = entity, %Effects.FeedPet{} = effect) do
-    send(self(), {:feed_pet, effect.cast_item_guid, effect.target_guid, effect.spell_id, effect.range_yards})
+  def emit(%Character{} = entity, %Effects.FeedPet{} = effect, context) do
+    Context.send(context, {:feed_pet, effect.cast_item_guid, effect.target_guid, effect.spell_id, effect.range_yards})
     entity
   end
 
-  def emit(entity, %Effects.FeedPet{}), do: entity
+  def emit(entity, %Effects.FeedPet{}, _context), do: entity
 
-  def emit(%Character{} = entity, %Effects.EnchantItem{} = effect) do
+  def emit(%Character{} = entity, %Effects.EnchantItem{} = effect, context) do
     duration_ms = ItemEnchantmentLoader.duration_ms(effect.spell.id, effect.effect)
-    send(self(), {:enchant_item, effect.target_guid, effect.spell, effect.effect.misc_value, duration_ms})
+    Context.send(context, {:enchant_item, effect.target_guid, effect.spell, effect.effect.misc_value, duration_ms})
     entity
   end
 
-  def emit(entity, %Effects.EnchantItem{}), do: entity
+  def emit(entity, %Effects.EnchantItem{}, _context), do: entity
 
-  def emit(%Character{} = entity, %Effects.OpenGameObject{target_guid: object_guid}) when is_integer(object_guid) do
-    send(self(), {:open_gameobject_loot, object_guid})
+  def emit(%Character{} = entity, %Effects.OpenGameObject{target_guid: object_guid}, context)
+      when is_integer(object_guid) do
+    Context.send(context, {:open_gameobject_loot, object_guid})
     entity
   end
 
-  def emit(entity, %Effects.OpenGameObject{}), do: entity
+  def emit(entity, %Effects.OpenGameObject{}, _context), do: entity
 
-  def emit(entity, %Effects.GiveItem{target_guid: target_guid, item_id: item_id, count: count})
+  def emit(entity, %Effects.GiveItem{target_guid: target_guid, item_id: item_id, count: count}, _context)
       when is_integer(target_guid) do
     case Entity.pid(target_guid) do
       pid when is_pid(pid) -> send(pid, {:create_item, item_id, count})
@@ -51,21 +54,25 @@ defmodule ThistleTea.Game.Entity.EventSink.ClientProjection do
     entity
   end
 
-  def emit(%Character{} = entity, %Effects.CreateItem{item_id: item_id, count: count}) do
-    send(self(), {:create_item, item_id, count})
+  def emit(%Character{} = entity, %Effects.CreateItem{item_id: item_id, count: count}, context) do
+    Context.send(context, {:create_item, item_id, count})
     entity
   end
 
-  def emit(entity, %Effects.CreateItem{}), do: entity
+  def emit(entity, %Effects.CreateItem{}, _context), do: entity
 
-  def emit(%Character{} = entity, %Effects.ConsumeReagents{reagents: reagents}) when is_list(reagents) do
-    send(self(), {:consume_reagents, reagents})
+  def emit(%Character{} = entity, %Effects.ConsumeReagents{reagents: reagents}, context) when is_list(reagents) do
+    Context.send(context, {:consume_reagents, reagents})
     entity
   end
 
-  def emit(entity, %Effects.ConsumeReagents{}), do: entity
+  def emit(entity, %Effects.ConsumeReagents{}, _context), do: entity
 
-  def emit(%{object: %{guid: guid}, internal: %Internal{name: name}} = entity, %Effects.MonsterTalk{} = effect) do
+  def emit(
+        %{object: %{guid: guid}, internal: %Internal{name: name}} = entity,
+        %Effects.MonsterTalk{} = effect,
+        _context
+      ) do
     effect.chat_type
     |> monster_chat_type()
     |> Message.SmsgMessagechat.monster(effect.text, guid, name, effect.target_guid)
@@ -74,19 +81,19 @@ defmodule ThistleTea.Game.Entity.EventSink.ClientProjection do
     entity
   end
 
-  def emit(%{object: %{guid: guid}} = entity, %Effects.Emote{emote_id: emote_id}) do
+  def emit(%{object: %{guid: guid}} = entity, %Effects.Emote{emote_id: emote_id}, _context) do
     %Message.SmsgEmote{emote: emote_id, guid: guid}
     |> World.broadcast_packet(entity)
 
     entity
   end
 
-  def emit(entity, %Effects.ScriptSteps{} = effect) do
-    Process.send_after(self(), {:ai_script_steps, effect.steps, effect.target_guid}, effect.duration_ms || 0)
+  def emit(entity, %Effects.ScriptSteps{} = effect, context) do
+    Context.send_after(context, {:ai_script_steps, effect.steps, effect.target_guid}, effect.duration_ms || 0)
     entity
   end
 
-  def emit(entity, %Effects.ForwardScriptSteps{} = effect) do
+  def emit(entity, %Effects.ForwardScriptSteps{} = effect, _context) do
     case Entity.pid(effect.target_guid) do
       pid when is_pid(pid) -> send(pid, {:ai_script_steps, effect.steps, effect.source_guid})
       _ -> nil
@@ -95,14 +102,14 @@ defmodule ThistleTea.Game.Entity.EventSink.ClientProjection do
     entity
   end
 
-  def emit(entity, %Effects.PlaySound{sound_id: sound_id}) do
+  def emit(entity, %Effects.PlaySound{sound_id: sound_id}, _context) do
     %Message.SmsgPlaySound{sound_id: sound_id}
     |> World.broadcast_packet(entity)
 
     entity
   end
 
-  def emit(%{object: %{guid: guid}} = entity, %Effects.PlayObjectSound{sound_id: sound_id}) do
+  def emit(%{object: %{guid: guid}} = entity, %Effects.PlayObjectSound{sound_id: sound_id}, _context) do
     %Message.SmsgPlayObjectSound{sound_id: sound_id, guid: guid}
     |> World.broadcast_packet(entity)
 

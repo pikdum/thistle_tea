@@ -1,11 +1,13 @@
 defmodule ThistleTea.Game.Entity.EventSink do
   @moduledoc """
-  Drains typed effects from an entity and routes each one to its focused
-  boundary interpreter.
+  Drains typed effects, resolves semantic requests, and routes each concrete
+  effect to its focused boundary interpreter.
   """
 
+  alias ThistleTea.Game.Entity.EffectResolver
   alias ThistleTea.Game.Entity.EventSink.ClientProjection
   alias ThistleTea.Game.Entity.EventSink.Combat
+  alias ThistleTea.Game.Entity.EventSink.Context
   alias ThistleTea.Game.Entity.EventSink.Movement
   alias ThistleTea.Game.Entity.EventSink.Spells
   alias ThistleTea.Game.Entity.EventSink.Summons
@@ -34,16 +36,14 @@ defmodule ThistleTea.Game.Entity.EventSink do
     Effects.AttackerGained,
     Effects.AttackerLost,
     Effects.AttackerStateUpdate,
-    Effects.BladeFlurry,
     Effects.CallAssistance,
     Effects.CallForHelp,
     Effects.DeliverAttack,
-    Effects.DropNearbyThreat,
+    Effects.DropNearbyThreatResolved,
     Effects.DropThreat,
     Effects.DuelDefeat,
     Effects.DuelInterrupted,
     Effects.DuelRequest,
-    Effects.SecondaryMelee,
     Effects.StartAttack,
     Effects.TapClaimed,
     Effects.TapCleared,
@@ -51,17 +51,16 @@ defmodule ThistleTea.Game.Entity.EventSink do
     Effects.ThreatRefLost
   ]
   @movement_effects [
-    Effects.Charge,
+    Effects.ChargeResolved,
     Effects.FeatherFallChanged,
     Effects.HoverChanged,
-    Effects.Leap,
     Effects.MonsterMove,
     Effects.MovementRootChanged,
     Effects.MovementSpeedChanged,
     Effects.MovementStopped,
     Effects.SetFacing,
     Effects.Teleport,
-    Effects.TeleportToSpellTarget,
+    Effects.TeleportToWorld,
     Effects.WaterWalkChanged
   ]
   @spell_effects [
@@ -71,14 +70,13 @@ defmodule ThistleTea.Game.Entity.EventSink do
     Effects.ClearCooldown,
     Effects.CooldownEvent,
     Effects.DelayAura,
+    Effects.DeliverHealThreat,
     Effects.DeliverSpell,
     Effects.DeliverSpellOutcome,
     Effects.DrainPower,
     Effects.GrantPower,
     Effects.HealEntity,
-    Effects.HealThreat,
     Effects.PeriodicAuraLog,
-    Effects.DeliverSpellToQuery,
     Effects.RemoveAura,
     Effects.ResurrectRequest,
     Effects.SpellCastFailed,
@@ -92,7 +90,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
     Effects.SpellModifier,
     Effects.SpellStart,
     Effects.StandState,
-    Effects.TriggerSpell
+    Effects.TriggerSpellRequest
   ]
   @summon_effects [
     Effects.ControlGranted,
@@ -115,33 +113,43 @@ defmodule ThistleTea.Game.Entity.EventSink do
     Effects.ViewpointReleased
   ]
 
-  def emit_pending(entity) do
+  def emit_pending(entity, context \\ nil) do
     {entity, effects} = Effects.drain(entity)
-    emit(entity, effects)
+    emit(entity, effects, context)
   end
 
-  def emit(entity, effects) when is_list(effects) do
-    Enum.reduce(effects, entity, &emit(&2, &1))
+  def emit(entity, effects, context \\ nil)
+
+  def emit(entity, effects, context) when is_list(effects) do
+    context = context || Context.from_entity(entity)
+
+    entity
+    |> EffectResolver.resolve(effects)
+    |> Enum.reduce(entity, &emit_resolved(&2, &1, context))
   end
 
-  def emit(entity, %{__struct__: effect_module} = effect) when effect_module in @client_effects do
-    ClientProjection.emit(entity, effect)
+  def emit(entity, %{__struct__: _module} = effect, context) do
+    emit(entity, [effect], context)
   end
 
-  def emit(entity, %{__struct__: effect_module} = effect) when effect_module in @combat_effects do
-    Combat.emit(entity, effect)
+  defp emit_resolved(entity, %{__struct__: effect_module} = effect, context) when effect_module in @client_effects do
+    ClientProjection.emit(entity, effect, context)
   end
 
-  def emit(entity, %{__struct__: effect_module} = effect) when effect_module in @movement_effects do
-    Movement.emit(entity, effect)
+  defp emit_resolved(entity, %{__struct__: effect_module} = effect, context) when effect_module in @combat_effects do
+    Combat.emit(entity, effect, context)
   end
 
-  def emit(entity, %{__struct__: effect_module} = effect) when effect_module in @spell_effects do
-    Spells.emit(entity, effect)
+  defp emit_resolved(entity, %{__struct__: effect_module} = effect, context) when effect_module in @movement_effects do
+    Movement.emit(entity, effect, context)
   end
 
-  def emit(entity, %{__struct__: effect_module} = effect) when effect_module in @summon_effects do
-    Summons.emit(entity, effect)
+  defp emit_resolved(entity, %{__struct__: effect_module} = effect, context) when effect_module in @spell_effects do
+    Spells.emit(entity, effect, context)
+  end
+
+  defp emit_resolved(entity, %{__struct__: effect_module} = effect, context) when effect_module in @summon_effects do
+    Summons.emit(entity, effect, context)
   end
 
   def deliver_spell(%Effects.DeliverSpell{} = effect) do
