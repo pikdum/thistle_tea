@@ -71,16 +71,16 @@ defmodule ThistleTea.Game.Network.Server do
     {:noreply, {socket, state}, socket.read_timeout}
   end
 
-  def handle_cast({:player_logged_out, player_pid}, {socket, %ConnectionState{player_pid: player_pid} = state}) do
-    state = ConnectionState.clear_player(state)
-    {:noreply, {socket, state}, socket.read_timeout}
-  end
-
-  def handle_cast({:player_logged_out, _player_pid}, {socket, state}) do
-    {:noreply, {socket, state}, socket.read_timeout}
-  end
-
   @impl GenServer
+  def handle_info(
+        {:DOWN, monitor, :process, player_pid, {:shutdown, :logout}},
+        {socket, %ConnectionState{player_pid: player_pid, player_monitor: monitor} = state}
+      ) do
+    state = ConnectionState.clear_player(state)
+    state = Send.send_packet(%Message.SmsgLogoutComplete{}, {socket, state})
+    {:noreply, {socket, state}, socket.read_timeout}
+  end
+
   def handle_info(
         {:DOWN, monitor, :process, player_pid, reason},
         {_socket, %ConnectionState{player_pid: player_pid, player_monitor: monitor} = state}

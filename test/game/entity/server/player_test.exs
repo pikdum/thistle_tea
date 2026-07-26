@@ -1,6 +1,6 @@
 defmodule ThistleTea.Game.Entity.Server.PlayerTest do
   use ExUnit.Case, async: true
-  use ThistleTea.Game.Network.Opcodes, [:SMSG_UPDATE_OBJECT]
+  use ThistleTea.Game.Network.Opcodes, [:SMSG_LOGOUT_COMPLETE, :SMSG_UPDATE_OBJECT]
 
   alias ThistleTea.Account
   alias ThistleTea.Game.Entity
@@ -20,6 +20,7 @@ defmodule ThistleTea.Game.Entity.Server.PlayerTest do
   alias ThistleTea.Game.Entity.Server.Player.State
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network
+  alias ThistleTea.Game.Network.ConnectionState
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Packet
   alias ThistleTea.Game.Network.UpdateBatcher
@@ -58,6 +59,46 @@ defmodule ThistleTea.Game.Entity.Server.PlayerTest do
       assert_receive {:DOWN, ^monitor, :process, ^player_pid, :normal}
       assert Entity.pid(guid) == nil
       assert %Character{object: %Object{guid: ^guid}} = CharacterStore.get(character.id)
+    end
+
+    test "returns the client to character selection when the owner already exists" do
+      {:ok, account} = Account.get_user("test")
+      id = System.unique_integer([:positive])
+      guid = Guid.from_low_guid(:player, id)
+      CharacterStore.put(login_character(id, guid, account.id))
+
+      assert {:ok, player_pid} = PlayerServer.login(account, self(), guid)
+
+      connection = %ConnectionState{account: account}
+      message = %Message.CmsgPlayerLogin{character_guid: guid}
+
+      assert ^connection = Message.CmsgPlayerLogin.handle(message, connection)
+
+      assert_receive {:"$gen_cast",
+                      {:send_packet,
+                       %Message.SmsgCharacterLoginFailed{
+                         result: 0x41
+                       }}}
+
+      assert :ok = PlayerServer.disconnect(player_pid)
+    end
+  end
+
+  describe "logout" do
+    test "stops the owner before the connection completes logout" do
+      {:ok, account} = Account.get_user("test")
+      id = System.unique_integer([:positive])
+      guid = Guid.from_low_guid(:player, id)
+      CharacterStore.put(login_character(id, guid, account.id))
+
+      assert {:ok, player_pid} = PlayerServer.login(account, self(), guid)
+      monitor = Process.monitor(player_pid)
+
+      assert :ok = PlayerServer.handle_message(player_pid, %Message.CmsgLogoutRequest{})
+      assert_receive {:DOWN, ^monitor, :process, ^player_pid, {:shutdown, :logout}}, 1_500
+      assert Entity.pid(guid) == nil
+
+      refute_received {:"$gen_cast", {:write_packet, %Packet{opcode: @smsg_logout_complete}}}
     end
   end
 

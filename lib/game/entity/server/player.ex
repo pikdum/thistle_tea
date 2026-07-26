@@ -551,11 +551,8 @@ defmodule ThistleTea.Game.Entity.Server.Player do
 
   @impl GenServer
   def handle_info(:logout_complete, %{logout_timer: timer} = state) when is_reference(timer) do
-    state = PacketSink.send(state, %Message.SmsgLogoutComplete{})
-    connection_pid = state.connection_pid
     state = State.leave_world(state)
-    GenServer.cast(connection_pid, {:player_logged_out, self()})
-    {:stop, :normal, state}
+    {:stop, {:shutdown, :logout}, state}
   end
 
   def handle_info(:logout_complete, state) do

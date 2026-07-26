@@ -69,6 +69,30 @@ defmodule ThistleTea.Game.Network.ServerTest do
   end
 
   describe "handle_info/2" do
+    test "detaches the player before completing an explicit logout" do
+      socket = test_socket()
+      player_pid = self()
+      monitor = make_ref()
+
+      state = %ConnectionState{
+        account: %{id: 1},
+        player_pid: player_pid,
+        player_monitor: monitor,
+        conn: %Connection{session_key: <<0>>}
+      }
+
+      assert {:noreply, {^socket, detached}, 0} =
+               Server.handle_info(
+                 {:DOWN, monitor, :process, player_pid, {:shutdown, :logout}},
+                 {socket, state}
+               )
+
+      assert detached.player_pid == nil
+      assert detached.player_monitor == nil
+      assert_receive {:socket_send, packet}
+      assert is_binary(packet)
+    end
+
     test "detaches a normally stopped player while keeping connection state" do
       socket = test_socket()
       player_pid = self()
