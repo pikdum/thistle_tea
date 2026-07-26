@@ -21,6 +21,8 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Spell
 
+  @frozen_aura_types [:mod_root, :mod_stun]
+
   defdelegate apply_spell(entity, context, spell, now), to: AuraApplication
   defdelegate apply_spell(entity, caster_guid, caster_level, spell, now), to: AuraApplication
   defdelegate transition(entity, change), to: Transition, as: :run
@@ -178,6 +180,18 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
   end
 
   def rooted?(_entity), do: false
+
+  def frozen?(%{unit: %Unit{auras: holders}}) when is_list(holders) do
+    Enum.any?(holders, fn
+      %Holder{spell: %Spell{school: :frost}, auras: auras} ->
+        Enum.any?(auras, &match?(%Aura{type: type} when type in @frozen_aura_types, &1))
+
+      _holder ->
+        false
+    end)
+  end
+
+  def frozen?(_entity), do: false
 
   def has_aura?(%{unit: %Unit{auras: holders}}, type) when is_list(holders) do
     Enum.any?(holders, &Holder.has_aura_type?(&1, type))

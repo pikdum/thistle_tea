@@ -18,6 +18,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Coefficient
+  alias ThistleTea.Game.Spell.Critical
   alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.Spell.Modifiers
   alias ThistleTea.Game.Spell.Scripts
@@ -243,9 +244,12 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
     end
   end
 
-  defp direct_spell_crit?(state, %CastContext{spell_crit_chance: chance}, %Spell{} = spell, opts)
+  defp direct_spell_crit?(state, %CastContext{spell_crit_chance: chance} = context, %Spell{} = spell, opts)
        when is_number(chance) do
-    chance = chance + Aura.flat_amount(state, :mod_attacker_spell_crit_chance)
+    chance =
+      chance +
+        Aura.flat_amount(state, :mod_attacker_spell_crit_chance) +
+        Critical.target_bonus(context.conditional_crit_modifiers, state)
 
     chance > 0 and not Keyword.get(opts, :periodic?, false) and not Spell.attribute?(spell, :cant_crit) and
       spell.dmg_class in [1, 3] and (chance >= 100 or :rand.uniform() * 100 <= chance)

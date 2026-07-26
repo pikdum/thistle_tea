@@ -19,6 +19,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
   alias ThistleTea.Game.Spell.Cast
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Cooldowns
+  alias ThistleTea.Game.Spell.Critical.Modifier
   alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.Spell.ProcRule
   alias ThistleTea.Game.WorldRef
@@ -389,6 +390,28 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
 
       assert target.unit.health == 350
       assert event.damage == 150
+      assert event.crit?
+    end
+
+    test "Shatter raises spell crit chance against a frozen target" do
+      spell = %Spell{id: 133, school: :fire, dmg_class: 1, effects: [%Effect{type: :school_damage, base_points: 100}]}
+
+      context = %CastContext{
+        caster_guid: 999,
+        caster_level: 10,
+        spell_crit_chance: 50.0,
+        conditional_crit_modifiers: [%Modifier{condition: :target_frozen, amount: 50}]
+      }
+
+      frozen = %Holder{
+        spell: %Spell{id: 122, school: :frost},
+        auras: [%ThistleTea.Game.Aura{type: :mod_root}]
+      }
+
+      target = %{target_fixture() | unit: %Unit{health: 500, max_health: 500, level: 10, auras: [frozen]}}
+      {target, [event]} = SpellEffect.receive(target, context, spell, 1_000)
+
+      assert target.unit.health == 350
       assert event.crit?
     end
 

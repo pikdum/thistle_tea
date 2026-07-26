@@ -207,6 +207,21 @@ defmodule ThistleTea.Game.World.Loader.SpellVmangosTest do
       assert Enum.any?(SpellLoader.load(5835).effects, &(&1.aura == :mod_spell_crit_chance_school))
     end
 
+    test "preserves Shatter override class script identifiers" do
+      scripts =
+        for spell_id <- [11_170, 12_982, 12_983, 12_984, 12_985] do
+          spell_id
+          |> SpellLoader.load()
+          |> Map.fetch!(:effects)
+          |> Enum.find_value(fn
+            %Effect{aura: :override_class_scripts, misc_value: script} -> script
+            _effect -> nil
+          end)
+        end
+
+      assert scripts == [849, 910, 911, 912, 913]
+    end
+
     test "loads the cannot-crit attribute" do
       assert Spell.attribute?(SpellLoader.load(5857), :cant_crit)
     end

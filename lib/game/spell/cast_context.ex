@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
   alias ThistleTea.Game.Entity.Logic.Mage
   alias ThistleTea.Game.Entity.Logic.Skills
   alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.Critical
   alias ThistleTea.Game.Spell.Modifiers
   alias ThistleTea.Game.Spell.Semantics
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
@@ -61,6 +62,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
     :combo_points,
     :spell_threat,
     spell_modifiers: [],
+    conditional_crit_modifiers: [],
     damage_done_versus: [],
     crit_damage_versus: [],
     spell_damage_bonus: %{},
@@ -90,6 +92,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
       spell_penetration: Aura.flat_amount(caster, :mod_target_resistance),
       spell_threat: SpellThreatLoader.get(spell_id(spell)),
       spell_modifiers: Modifiers.snapshot(caster, spell),
+      conditional_crit_modifiers: Critical.snapshot(caster, spell),
       threat_multiplier: threat_multiplier(caster, spell),
       damage_done_multiplier: Aura.percent_multiplier(caster, :mod_damage_percent_done, Spell.school_mask(spell)),
       damage_done_versus: Aura.misc_amounts(caster, :mod_damage_done_versus),
@@ -116,6 +119,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
       caster_orientation: caster_orientation(caster),
       target_guid: target_guid,
       spell: spell,
+      conditional_crit_modifiers: Critical.snapshot(caster, spell),
       reflect_chance_bonus: Mage.ward_reflect_chance(caster, spell),
       hit_chance_bonus: Aura.flat_amount(caster, :mod_hit_chance)
     }
