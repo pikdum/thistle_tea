@@ -139,7 +139,7 @@ defmodule ThistleTea.Game.World do
 
   def start_entity(%{entity: %DataDynamicObject{object: %{guid: guid}}} = opts) do
     case SpatialHash.get_entity(guid) do
-      nil -> DynamicSupervisor.start_child(EntitySupervisor, {DynamicObjectServer, opts})
+      nil -> EntitySupervisor.start_child(guid, {DynamicObjectServer, opts})
       _ -> :ok
     end
   end
@@ -147,7 +147,7 @@ defmodule ThistleTea.Game.World do
   def start_entity(entity, server) do
     # TODO needed to prevent dupes, but maybe a registry is better
     case SpatialHash.get_entity(entity.object.guid) do
-      nil -> DynamicSupervisor.start_child(EntitySupervisor, {server, entity})
+      nil -> EntitySupervisor.start_child(entity.object.guid, {server, entity})
       _ -> :ok
     end
   end
@@ -159,7 +159,7 @@ defmodule ThistleTea.Game.World do
     case Entity.pid(entity.object.guid) do
       nil ->
         child_spec = Supervisor.child_spec({server, entity}, restart: :temporary)
-        DynamicSupervisor.start_child(EntitySupervisor, child_spec)
+        EntitySupervisor.start_child(entity.object.guid, child_spec)
 
       pid when is_pid(pid) ->
         {:error, {:already_started, pid}}
@@ -167,12 +167,12 @@ defmodule ThistleTea.Game.World do
   end
 
   def stop_entity(pid) when is_pid(pid) do
-    DynamicSupervisor.terminate_child(EntitySupervisor, pid)
+    EntitySupervisor.terminate_child(pid)
   end
 
   def stop_entity(guid) when is_integer(guid) do
     case Entity.pid(guid) do
-      pid when is_pid(pid) -> DynamicSupervisor.terminate_child(EntitySupervisor, pid)
+      pid when is_pid(pid) -> EntitySupervisor.terminate_child(pid)
       _ -> :ok
     end
   end

@@ -114,7 +114,7 @@ defmodule ThistleTea.Application do
         ThistleTeaWeb.Telemetry,
         !test && ThistleTeaWeb.Endpoint,
         {DynamicSupervisor, strategy: :one_for_one, name: PlayerSupervisor},
-        {DynamicSupervisor, strategy: :one_for_one, name: EntitySupervisor, max_restarts: 1_000_000, max_seconds: 1},
+        {EntitySupervisor, partitions: 8},
         {Registry, keys: :unique, name: SpawnPool.Registry},
         SpawnPoolCatalog,
         {DynamicSupervisor, strategy: :one_for_one, name: SpawnPool.Supervisor},
