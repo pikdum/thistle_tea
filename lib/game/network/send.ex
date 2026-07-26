@@ -24,7 +24,7 @@ defmodule ThistleTea.Game.Network.Send do
 
   def send_packet(%Packet{opcode: opcode, payload: payload}, {socket, state}) do
     size = byte_size(payload) + 2
-    header = <<size::big-size(16), opcode::little-size(16)>>
+    header = size_header(size) <> <<opcode::little-size(16)>>
     {:ok, conn, header} = Crypto.encrypt_header(state.conn, header)
     Socket.send(socket, header <> payload)
     %{state | conn: conn}
@@ -35,4 +35,7 @@ defmodule ThistleTea.Game.Network.Send do
     packet = Message.to_packet(message)
     send_packet(packet, {socket, state})
   end
+
+  defp size_header(size) when size > 0x7FFF, do: <<Bitwise.bor(size, 0x800000)::big-size(24)>>
+  defp size_header(size), do: <<size::big-size(16)>>
 end
