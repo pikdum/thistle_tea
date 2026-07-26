@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.World.SpawnPool do
   alias ThistleTea.Game.World.InstanceSpawn
   alias ThistleTea.Game.World.Loader
   alias ThistleTea.Game.World.Loader.AreaTrigger, as: AreaTriggerLoader
+  alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.SpawnPool.Catalog
   alias ThistleTea.Game.World.SpawnPool.CellIndex
@@ -22,6 +23,10 @@ defmodule ThistleTea.Game.World.SpawnPool do
 
   @registry ThistleTea.Game.World.SpawnPool.Registry
   @activation_timeout_ms 30_000
+  @deactivation_timeout_ms 5_000
+  @drain_interval_ms 30_000
+  @observed_range 440
+  @unit_flag_player_controlled 0x00000008
 
   def start_link(opts) do
     key = Keyword.fetch!(opts, :key)
@@ -63,6 +68,13 @@ defmodule ThistleTea.Game.World.SpawnPool do
   end
 
   def deactivate(_entity), do: :unpooled
+
+  def deactivate_cells(key, cells, wanted) do
+    case GenServer.whereis(via(key)) do
+      nil -> :ok
+      pid -> GenServer.call(pid, {:deactivate_cells, MapSet.new(cells), wanted}, @deactivation_timeout_ms)
+    end
+  end
 
   def refresh_all(events) when is_list(events) do
     @registry
@@ -124,7 +136,8 @@ defmodule ThistleTea.Game.World.SpawnPool do
        selection: selection,
        active_cells: MapSet.new(),
        running: %{},
-       monitors: %{}
+       monitors: %{},
+       drain_ref: nil
      }}
   end
 
@@ -140,6 +153,12 @@ defmodule ThistleTea.Game.World.SpawnPool do
     CellIndex.register(cell, state.key)
     {state, errors} = start_selected_with_errors(state)
     {:reply, activation_result(errors), state}
+  end
+
+  @impl GenServer
+  def handle_call({:deactivate_cells, cells, wanted}, _from, state) do
+    state = %{state | active_cells: MapSet.difference(state.active_cells, cells)}
+    {:reply, :ok, drain_inactive(state, wanted)}
   end
 
   @impl GenServer
@@ -199,6 +218,10 @@ defmodule ThistleTea.Game.World.SpawnPool do
   end
 
   @impl GenServer
+  def handle_info(:drain_tick, state) do
+    {:noreply, drain_inactive(%{state | drain_ref: nil})}
+  end
+
   def handle_info({:DOWN, ref, :process, _pid, _reason}, state) do
     case Map.pop(state.monitors, ref) do
       {nil, _monitors} ->
@@ -349,6 +372,63 @@ defmodule ThistleTea.Game.World.SpawnPool do
       {:error, :not_found} -> :ok
     end
   end
+
+  defp drain_inactive(state, wanted \\ nil) do
+    stragglers =
+      Enum.filter(state.running, fn {member, {_pid, _ref}} ->
+        not selected_cell_active?(state, member)
+      end)
+
+    {state, remaining} =
+      Enum.reduce(stragglers, {state, 0}, fn {member, {pid, _ref}}, {acc, remaining} ->
+        if safe_to_stop?(Map.get(acc.blueprints, member), wanted) do
+          {stop_running_member(acc, member, pid), remaining}
+        else
+          {acc, remaining + 1}
+        end
+      end)
+
+    if remaining > 0, do: schedule_drain(state), else: state
+  end
+
+  defp safe_to_stop?(nil, _wanted), do: true
+
+  defp safe_to_stop?(blueprint, wanted) do
+    guid = blueprint.object.guid
+    metadata = Metadata.get(guid) || %{}
+
+    cond do
+      Map.get(metadata, :in_combat) == true -> false
+      Map.get(metadata, :alive?) == false -> false
+      player_controlled?(metadata) -> false
+      true -> not observed?(guid, wanted)
+    end
+  end
+
+  defp player_controlled?(metadata) do
+    Bitwise.band(Map.get(metadata, :unit_flags) || 0, @unit_flag_player_controlled) != 0
+  end
+
+  defp observed?(guid, wanted) do
+    case SpatialHash.get_entity(guid) do
+      nil -> false
+      {_guid, world, x, y, z} -> observed_at?(world, x, y, z, wanted)
+    end
+  end
+
+  defp observed_at?(world, x, y, z, %MapSet{} = wanted) do
+    MapSet.member?(wanted, SpatialHash.cell(world, x, y, z))
+  end
+
+  defp observed_at?(world, x, y, z, nil) do
+    SpatialHash.query(:players, world, x, y, z, @observed_range) != []
+  end
+
+  defp schedule_drain(%{drain_ref: nil} = state) do
+    %{state | drain_ref: Process.send_after(self(), :drain_tick, @drain_interval_ms)}
+  end
+
+  defp schedule_drain(state), do: state
 
   defp eligible_singleton_selection(_selection, %{internal: %Internal{event: nil}} = blueprint, _events) do
     singleton_selection(blueprint)
