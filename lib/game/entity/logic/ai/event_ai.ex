@@ -19,6 +19,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAI do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.CreatureSpell
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Context
   alias ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells, as: MobSpells
   alias ThistleTea.Game.Entity.Logic.AI.Script
   alias ThistleTea.Game.Entity.Logic.Condition, as: ConditionLogic
@@ -44,6 +45,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAI do
   def has_events?(state), do: events(state) != []
 
   def tick(state, %Blackboard{} = blackboard, now) when is_integer(now) do
+    tick(state, blackboard, now, Context.new(now))
+  end
+
+  def tick(state, %Blackboard{} = blackboard, now, %Context{} = context) when is_integer(now) do
     events = events(state)
 
     if events == [] or not Blackboard.ready_for?(blackboard, :next_eventai_at, now) do
@@ -54,11 +59,15 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAI do
         |> ensure_init(events, now)
         |> Blackboard.put_next_at(:next_eventai_at, @tick_ms, now)
 
-      fire_matching(state, blackboard, events, &AIEvent.timed?/1, nil, now)
+      fire_matching(state, blackboard, events, &AIEvent.timed?/1, nil, now, context)
     end
   end
 
   def enter_combat(state, %Blackboard{} = blackboard, enemy_guid, now) when is_integer(now) do
+    enter_combat(state, blackboard, enemy_guid, now, Context.new(now))
+  end
+
+  def enter_combat(state, %Blackboard{} = blackboard, enemy_guid, now, %Context{} = context) when is_integer(now) do
     events = events(state)
 
     if events == [] do
@@ -69,41 +78,69 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAI do
         |> ensure_init(events, now)
         |> reset_for_combat(events, now)
 
-      fire_matching(state, blackboard, events, &(&1.event_type == :aggro), enemy_guid, now)
+      fire_matching(state, blackboard, events, &(&1.event_type == :aggro), enemy_guid, now, context)
     end
   end
 
   def on_spawned(state, %Blackboard{} = blackboard, now) do
-    fire_edges(state, blackboard, :spawned, nil, now)
+    on_spawned(state, blackboard, now, Context.new(now))
+  end
+
+  def on_spawned(state, %Blackboard{} = blackboard, now, %Context{} = context) do
+    fire_edges(state, blackboard, :spawned, nil, now, context)
   end
 
   def on_death(state, %Blackboard{} = blackboard, killer_guid, now) do
-    fire_edges(state, blackboard, :death, killer_guid, now)
+    on_death(state, blackboard, killer_guid, now, Context.new(now))
+  end
+
+  def on_death(state, %Blackboard{} = blackboard, killer_guid, now, %Context{} = context) do
+    fire_edges(state, blackboard, :death, killer_guid, now, context)
   end
 
   def on_kill(state, %Blackboard{} = blackboard, victim_guid, now) do
-    fire_edges(state, blackboard, :kill, victim_guid, now)
+    on_kill(state, blackboard, victim_guid, now, Context.new(now))
+  end
+
+  def on_kill(state, %Blackboard{} = blackboard, victim_guid, now, %Context{} = context) do
+    fire_edges(state, blackboard, :kill, victim_guid, now, context)
   end
 
   def on_leave_combat(state, %Blackboard{} = blackboard, now) do
-    fire_edges(state, blackboard, :leave_combat, nil, now)
+    on_leave_combat(state, blackboard, now, Context.new(now))
+  end
+
+  def on_leave_combat(state, %Blackboard{} = blackboard, now, %Context{} = context) do
+    fire_edges(state, blackboard, :leave_combat, nil, now, context)
   end
 
   def on_evade(state, %Blackboard{} = blackboard, now) do
-    {state, blackboard} = fire_edges(state, blackboard, :evade, nil, now)
+    on_evade(state, blackboard, now, Context.new(now))
+  end
+
+  def on_evade(state, %Blackboard{} = blackboard, now, %Context{} = context) do
+    {state, blackboard} = fire_edges(state, blackboard, :evade, nil, now, context)
     {state, reset_ooc(blackboard, events(state), now)}
   end
 
   def on_reached_home(state, %Blackboard{} = blackboard, now) do
-    fire_edges(state, blackboard, :reached_home, nil, now)
+    on_reached_home(state, blackboard, now, Context.new(now))
+  end
+
+  def on_reached_home(state, %Blackboard{} = blackboard, now, %Context{} = context) do
+    fire_edges(state, blackboard, :reached_home, nil, now, context)
   end
 
   def on_spell_hit(state, %Blackboard{} = blackboard, caster_guid, spell_id, now) do
+    on_spell_hit(state, blackboard, caster_guid, spell_id, now, Context.new(now))
+  end
+
+  def on_spell_hit(state, %Blackboard{} = blackboard, caster_guid, spell_id, now, %Context{} = context) do
     matcher = fn %AIEvent{} = event ->
       event.event_type == :hit_by_spell and event.param1 in [0, spell_id]
     end
 
-    fire_edges(state, blackboard, matcher, caster_guid, now)
+    fire_edges(state, blackboard, matcher, caster_guid, now, context)
   end
 
   def ooc_timer_delay(state, %Blackboard{} = blackboard, now) when is_integer(now) do
@@ -126,30 +163,30 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAI do
     end
   end
 
-  defp fire_edges(state, %Blackboard{} = blackboard, matcher, invoker_guid, now) do
+  defp fire_edges(state, %Blackboard{} = blackboard, matcher, invoker_guid, now, %Context{} = context) do
     events = events(state)
 
     if events == [] do
       {state, blackboard}
     else
       blackboard = ensure_init(blackboard, events, now)
-      fire_matching(state, blackboard, events, edge_matcher(matcher), invoker_guid, now)
+      fire_matching(state, blackboard, events, edge_matcher(matcher), invoker_guid, now, context)
     end
   end
 
   defp edge_matcher(matcher) when is_function(matcher, 1), do: matcher
   defp edge_matcher(event_type) when is_atom(event_type), do: &(&1.event_type == event_type)
 
-  defp fire_matching(state, blackboard, events, matcher, invoker_guid, now) do
+  defp fire_matching(state, blackboard, events, matcher, invoker_guid, now, %Context{} = context) do
     events
     |> Enum.with_index()
     |> Enum.filter(fn {event, _index} -> matcher.(event) end)
     |> Enum.reduce({state, blackboard}, fn {event, index}, {state, blackboard} ->
-      try_fire(state, blackboard, event, index, invoker_guid, now)
+      try_fire(state, blackboard, event, index, invoker_guid, now, context)
     end)
   end
 
-  defp try_fire(state, %Blackboard{} = blackboard, %AIEvent{} = event, index, invoker_guid, now) do
+  defp try_fire(state, %Blackboard{} = blackboard, %AIEvent{} = event, index, invoker_guid, now, %Context{} = context) do
     with true <- enabled?(blackboard, index),
          true <- due?(blackboard, index, now),
          true <- AIEvent.phase_allows?(event, blackboard.eventai_phase),
@@ -162,7 +199,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAI do
         |> maybe_disable(event, index)
 
       if chance_passes?(event) do
-        run_actions(state, blackboard, event, invoker_guid, now)
+        run_actions(state, blackboard, event, invoker_guid, context)
       else
         {state, blackboard}
       end
@@ -171,12 +208,12 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAI do
     end
   end
 
-  defp run_actions(state, %Blackboard{} = blackboard, %AIEvent{} = event, invoker_guid, now) do
+  defp run_actions(state, %Blackboard{} = blackboard, %AIEvent{} = event, invoker_guid, %Context{} = context) do
     actions = if event.random_action?, do: [Enum.random(event.actions)], else: event.actions
     target_guid = invoker_guid || victim(state)
 
     Enum.reduce(actions, {state, blackboard}, fn steps, {state, blackboard} ->
-      Script.run(state, blackboard, steps, target_guid, now)
+      Script.run(state, blackboard, steps, target_guid, context)
     end)
   end
 

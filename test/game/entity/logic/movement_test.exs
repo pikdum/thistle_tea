@@ -278,14 +278,26 @@ defmodule ThistleTea.Game.Entity.Logic.MovementTest do
     end
   end
 
-  describe "move_to/4" do
+  describe "move_along_path/4" do
     test "does not emit a monster-move when already at the destination" do
       entity = build_entity(position: {5.0, 5.0, 5.0, 0.0}, spline_nodes: nil)
 
-      result = Movement.move_to(entity, {5.0, 5.0, 5.0}, [], 5_000)
+      result = Movement.move_along_path(entity, [{5.0, 5.0, 5.0}], [], 5_000)
 
       assert result.internal.events == []
       assert is_nil(result.movement_block.spline_nodes)
+    end
+
+    test "starts movement along supplied path geometry" do
+      entity =
+        build_entity(position: {0.0, 0.0, 0.0, 0.0}, spline_nodes: nil)
+        |> then(&%{&1 | movement_block: %{&1.movement_block | walk_speed: 2.5, run_speed: 7.0}})
+
+      result = Movement.move_along_path(entity, [{2.0, 0.0, 0.0}, {5.0, 1.0, 0.0}], [], 5_000)
+
+      assert result.movement_block.spline_nodes == [{2.0, 0.0, 0.0}, {5.0, 1.0, 0.0}]
+      assert result.internal.movement_start_time == 5_000
+      assert [_event] = result.internal.events
     end
   end
 end

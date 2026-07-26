@@ -10,7 +10,6 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Math
-  alias ThistleTea.Game.World.Pathfinding
   alias ThistleTea.Game.World.SpatialHash
 
   @max_u32 0xFFFFFFFF
@@ -162,35 +161,38 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
     end
   end
 
-  def start_move_to(entity, {x, y, z}, now) when is_integer(now) do
-    start_move_to(entity, {x, y, z}, now, nil)
+  def move_along_path(%{movement_block: %MovementBlock{movement_flags: flags}} = state, _path, _opts, _now)
+      when is_integer(flags) and (flags &&& @movement_flag_root) > 0 do
+    state
   end
 
-  defp start_move_to(entity, {x, y, z}, now, velocity) when is_integer(now) do
-    entity = sync_position(entity, now)
-    %{movement_block: %MovementBlock{position: {x0, y0, z0, _o}}} = entity
+  def move_along_path(state, path, opts, now) when is_list(path) and is_list(opts) and is_integer(now) do
+    moved = start_path(state, path, now, Keyword.get(opts, :velocity))
 
-    if at_destination?({x0, y0, z0}, {x, y, z}) do
-      entity
-    else
-      move_along_path(entity, {x, y, z}, now, velocity)
+    case moved.movement_block.spline_nodes do
+      [_ | _] -> Effects.enqueue(moved, Effects.monster_move(opts))
+      _ -> moved
     end
   end
 
-  defp move_along_path(entity, {x, y, z}, now, velocity) do
+  defp start_path(entity, path, now, velocity) when is_integer(now) do
+    entity = sync_position(entity, now)
+    %{movement_block: %MovementBlock{position: {x0, y0, z0, _o}}} = entity
+
+    if path == [] or at_destination?({x0, y0, z0}, List.last(path)) do
+      entity
+    else
+      start_resolved_path(entity, path, now, velocity)
+    end
+  end
+
+  defp start_resolved_path(entity, path, now, velocity) do
     entity = increment_spline_id(entity)
 
     %{
       movement_block: %MovementBlock{walk_speed: walk_speed, position: {x0, y0, z0, _o}} = mb,
-      internal: %Internal{world: world, running: running, spline_id: spline_id} = internal
+      internal: %Internal{running: running, spline_id: spline_id} = internal
     } = entity
-
-    path = Pathfinding.find_path(world.map_id, {x0, y0, z0}, {x, y, z})
-
-    if is_nil(path) do
-      # handles maps that haven't been built yet
-      raise "No path found from #{inspect({x0, y0, z0})} to #{inspect({x, y, z})}"
-    end
 
     speed = movement_speed(velocity, running, mb.run_speed, walk_speed)
 
@@ -276,25 +278,11 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
     |> Enum.reverse()
   end
 
-  def move_to(%{movement_block: %MovementBlock{movement_flags: flags}} = state, _destination, _opts, _now)
-      when is_integer(flags) and (flags &&& @movement_flag_root) > 0 do
-    state
-  end
-
-  def move_to(state, {x, y, z}, opts, now) when is_integer(now) do
-    moved = start_move_to(state, {x, y, z}, now, Keyword.get(opts, :velocity))
-
-    case moved.movement_block.spline_nodes do
-      [_ | _] -> Effects.enqueue(moved, Effects.monster_move(opts))
-      _ -> moved
-    end
-  end
-
   defp movement_speed(velocity, _running, _run_speed, _walk_speed) when is_number(velocity) and velocity > 0,
     do: velocity
 
   defp movement_speed(_velocity, true, run_speed, _walk_speed), do: run_speed
-  defp movement_speed(_velocity, false, _run_speed, walk_speed), do: walk_speed
+  defp movement_speed(_velocity, _running, _run_speed, walk_speed), do: walk_speed
 
   def halt(%{movement_block: %MovementBlock{} = mb, internal: %Internal{} = internal} = entity, now)
       when is_integer(now) do
@@ -331,7 +319,7 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
   defp update_position_from_spline(
          %{
            movement_block: %MovementBlock{duration: duration, spline_nodes: spline_nodes, position: {_, _, _, o}} = mb,
-           internal: %Internal{world: world, movement_start_time: start_time, movement_start_position: start_position}
+           internal: %Internal{movement_start_time: start_time, movement_start_position: start_position}
          } = entity,
          now
        )
@@ -347,7 +335,7 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
         List.last(path)
       else
         distance_travelled = total_distance * elapsed / duration
-        point_along_path(world.map_id, path, distance_travelled)
+        point_along_path(path, distance_travelled)
       end
 
     movement_block = %{mb | position: {x, y, z, o}, time_passed: elapsed}
@@ -374,7 +362,7 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
   end
 
   defp spline_flags(true), do: @spline_flag_runmode
-  defp spline_flags(false), do: 0
+  defp spline_flags(_running), do: 0
 
   defp finalize_movement(
          %{
@@ -585,13 +573,13 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
     Math.movement_duration(start, finish, 1.0)
   end
 
-  defp point_along_path(map, [start | rest], distance) do
+  defp point_along_path([start | rest], distance) do
     case Enum.reduce_while(rest, {start, distance}, fn node, {prev, remaining} ->
            segment_distance = segment_distance(prev, node)
 
            # credo:disable-for-next-line Credo.Check.Refactor.Nesting
            if remaining <= segment_distance do
-             point = Pathfinding.find_point_between_points(map, prev, node, remaining) || node
+             point = lerp_point(prev, node, segment_distance, remaining)
              {:halt, {:point, point}}
            else
              {:cont, {node, remaining - segment_distance}}

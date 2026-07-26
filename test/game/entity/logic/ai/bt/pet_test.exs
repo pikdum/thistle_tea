@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.PetTest do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AI.BT.Pet, as: PetBT
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Server.AIEnvironment
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
@@ -21,7 +22,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.PetTest do
       owner_guid = stationary_owner(orientation: :math.pi())
       state = pet_beside_owner(owner_guid)
 
-      assert {{:running, _delay}, turned, %Blackboard{}} = PetBT.follow_owner(state, %Blackboard{}, @now)
+      context = AIEnvironment.context(state, @now)
+
+      assert {{:running, _delay}, turned, %Blackboard{}} = PetBT.follow_owner(state, %Blackboard{}, context)
       assert turned.movement_block.position == state.movement_block.position
       assert turned.internal.events == []
     end
@@ -30,7 +33,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.PetTest do
       owner_guid = Guid.from_low_guid(:player, :erlang.unique_integer([:positive]))
       state = pet_beside_owner(owner_guid)
 
-      assert {:success, despawned, %Blackboard{}} = PetBT.follow_owner(state, %Blackboard{}, @now)
+      context = AIEnvironment.context(state, @now)
+
+      assert {:success, despawned, %Blackboard{}} = PetBT.follow_owner(state, %Blackboard{}, context)
       assert [%Effects.DespawnSelf{}] = despawned.internal.events
     end
   end

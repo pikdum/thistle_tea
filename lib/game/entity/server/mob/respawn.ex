@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Respawn do
   alias ThistleTea.Game.Entity.Logic.AI.EventAI
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Core
+  alias ThistleTea.Game.Entity.Server.AIEnvironment
   alias ThistleTea.Game.Entity.Server.Mob.Corpse
   alias ThistleTea.Game.Entity.Server.Mob.Incarnation
   alias ThistleTea.Game.Time
@@ -118,14 +119,16 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Respawn do
   def maybe_continue(%Mob{} = _state), do: :ok
 
   defp respawn(%Mob{} = state) do
+    now = Time.now()
+
     state =
       state
       |> Corpse.remove()
       |> Incarnation.renew()
       |> Mob.respawn()
-      |> Mob.apply_addon_auras(Time.now())
+      |> Mob.apply_addon_auras(now)
       |> BT.init(MobBT.tree())
-      |> EventAI.with_blackboard(&EventAI.on_spawned(&1, &2, Time.now()))
+      |> EventAI.with_blackboard(&EventAI.on_spawned(&1, &2, now, AIEnvironment.context(&1, now)))
       |> put_spawn_position()
       |> broadcast_respawn()
 

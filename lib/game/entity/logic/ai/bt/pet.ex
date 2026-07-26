@@ -14,6 +14,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet do
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Aura, as: AuraBT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Combat, as: CombatBT
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Context
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Navigation
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception
   alias ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells, as: MobSpells
   alias ThistleTea.Game.Entity.Logic.AI.BT.Regen, as: RegenBT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Spell, as: SpellBT
@@ -24,8 +27,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet do
   alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.Entity.Logic.Threat
   alias ThistleTea.Game.Time
-  alias ThistleTea.Game.World
-  alias ThistleTea.Game.World.Metadata
 
   @follow_distance 2.0
   @follow_angle :math.pi() / 2
@@ -47,27 +48,27 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet do
       BT.sequence([
         BT.condition(&in_combat?/2),
         BT.selector([
-          BT.sequence([BT.condition(&target_invalid?/2), BT.action(&clear_combat/2)]),
+          BT.sequence([BT.condition(&target_invalid?/3), BT.action(&clear_combat/2)]),
           MobSpells.step(),
           BT.sequence([
-            BT.condition(&CombatBT.in_combat_range?/2),
-            BT.action(&halt_for_melee/2),
+            BT.condition(&CombatBT.in_combat_range?/3),
+            BT.action(&halt_for_melee/3),
             CombatBT.melee_sequence()
           ]),
-          BT.action(&chase_target/2)
+          BT.action(&chase_target/3)
         ])
       ]),
-      BT.action(&cast_missing_self_buff/2),
-      BT.sequence([BT.condition(&aggressive?/2), BT.action(&acquire_aggressive_target/2)]),
-      BT.sequence([BT.condition(&should_follow?/2), BT.action(&follow_owner/2)]),
+      BT.action(&cast_missing_self_buff/3),
+      BT.sequence([BT.condition(&aggressive?/2), BT.action(&acquire_aggressive_target/3)]),
+      BT.sequence([BT.condition(&should_follow?/2), BT.action(&follow_owner/3)]),
       BT.action(&idle/2)
     ])
   end
 
-  defp cast_missing_self_buff(%Mob{object: %{guid: guid}} = state, blackboard) do
+  defp cast_missing_self_buff(%Mob{object: %{guid: guid}} = state, blackboard, %Context{now: now}) do
     case next_self_buff(state) do
       %CreatureSpell{} = entry ->
-        {state, blackboard} = MobSpells.attempt_scripted_cast(state, blackboard, entry, guid, Time.now())
+        {state, blackboard} = MobSpells.attempt_scripted_cast(state, blackboard, entry, guid, now)
         {:failure, state, blackboard}
 
       _no_buff ->
@@ -154,15 +155,17 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet do
 
   defp in_combat?(_state, _blackboard), do: false
 
-  defp target_invalid?(%Mob{internal: %Internal{world: world}, unit: %Unit{target: target}}, _blackboard) do
-    case World.target_position(target) do
-      {^world, _x, _y, _z} -> target_dead?(target)
+  defp target_invalid?(%Mob{internal: %Internal{world: world}, unit: %Unit{target: target}}, _blackboard, %Context{
+         perception: perception
+       }) do
+    case Perception.position(perception, target) do
+      {^world, _x, _y, _z} -> target_dead?(perception, target)
       _ -> true
     end
   end
 
-  defp target_dead?(guid) do
-    case Metadata.query(guid, [:alive?]) do
+  defp target_dead?(%Perception{} = perception, guid) do
+    case Perception.metadata(perception, guid) do
       %{alive?: false} -> true
       _ -> false
     end
@@ -185,11 +188,15 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet do
   defp aggressive?(%Mob{internal: %Internal{pet: %Pet{reaction_state: :aggressive}}}, _blackboard), do: true
   defp aggressive?(_state, _blackboard), do: false
 
-  defp acquire_aggressive_target(state, blackboard) do
+  defp acquire_aggressive_target(state, blackboard, %Context{perception: perception}) do
     target_guid =
-      state
-      |> World.nearby_mobs(20.0)
-      |> Enum.find_value(fn {guid, _distance} -> if Hostility.valid_attack_target?(state, guid), do: guid end)
+      perception
+      |> Perception.nearby(:mobs, 20.0)
+      |> Enum.find_value(fn {guid, _distance} ->
+        metadata = Perception.metadata(perception, guid) || %{}
+        target = Map.put(metadata, :guid, guid)
+        if Hostility.valid_attack_target?(state, target), do: guid
+      end)
 
     case target_guid do
       guid when is_integer(guid) -> {:success, command(state, :attack, guid), blackboard}
@@ -197,22 +204,23 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet do
     end
   end
 
-  defp follow_owner(%Mob{} = state, blackboard), do: follow_owner(state, blackboard, Time.now())
-
-  def follow_owner(%Mob{internal: %Internal{pet: %Pet{owner_guid: owner_guid}, world: world}} = state, blackboard, now)
-      when is_integer(now) do
-    with {^world, x, y, z} <- World.projected_position(owner_guid, @follow_prediction_ms, now),
-         %{orientation: orientation} when is_number(orientation) <- Metadata.query(owner_guid, [:orientation]) do
+  def follow_owner(
+        %Mob{internal: %Internal{pet: %Pet{owner_guid: owner_guid}, world: world}} = state,
+        blackboard,
+        %Context{now: now, perception: perception} = context
+      ) do
+    with {^world, x, y, z} <- Perception.projected_position(perception, owner_guid, @follow_prediction_ms),
+         %{orientation: orientation} when is_number(orientation) <- Perception.metadata(perception, owner_guid) do
       destination = follow_position({x, y, z}, orientation)
       state = Movement.sync_position(state, now)
 
       state =
-        if should_repath?(state, destination, owner_guid, {x, y, z}, now) do
+        if should_repath?(state, destination, owner_guid, {x, y, z}, context) do
           velocity = catchup_velocity(state, destination)
 
           state
           |> run()
-          |> Movement.move_to(destination, [face_angle: orientation, velocity: velocity], now)
+          |> move_with_context(destination, [face_angle: orientation, velocity: velocity], context)
           |> face(orientation)
         else
           state
@@ -224,12 +232,14 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet do
     end
   end
 
-  defp chase_target(%Mob{internal: %Internal{world: world}, unit: %Unit{target: target}} = state, blackboard) do
-    now = Time.now()
-
+  defp chase_target(
+         %Mob{internal: %Internal{world: world}, unit: %Unit{target: target}} = state,
+         blackboard,
+         %Context{perception: perception} = context
+       ) do
     state =
-      case World.grounded_target_position(target, now) do
-        {^world, x, y, z} -> state |> run() |> Movement.move_to({x, y, z}, [face_target: target], now)
+      case Perception.grounded_position(perception, target) do
+        {^world, x, y, z} -> state |> run() |> move_with_context({x, y, z}, [face_target: target], context)
         _ -> state
       end
 
@@ -238,7 +248,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet do
 
   defp idle(state, blackboard), do: {{:running, @idle_delay_ms}, state, blackboard}
 
-  defp halt_for_melee(state, blackboard), do: {:success, Movement.halt(state, Time.now()), blackboard}
+  defp halt_for_melee(state, blackboard, %Context{now: now}) do
+    {:success, Movement.halt(state, now), blackboard}
+  end
 
   defp face(%Mob{movement_block: %MovementBlock{position: {x, y, z, _o}} = movement_block} = state, orientation) do
     %{state | movement_block: %{movement_block | position: {x, y, z, orientation}}}
@@ -255,23 +267,24 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet do
 
   defp run(%Mob{internal: %Internal{} = internal} = state), do: %{state | internal: %{internal | running: true}}
 
-  defp should_repath?(state, destination, owner_guid, owner_position, now) do
-    not settled_at_owner?(state, owner_guid, owner_position, now) and
+  defp should_repath?(state, destination, owner_guid, owner_position, %Context{} = context) do
+    not settled_at_owner?(state, owner_guid, owner_position, context) and
       distance_to(state, destination) > @follow_start_distance and
       destination_changed?(state.movement_block.spline_nodes, destination)
   end
 
-  defp settled_at_owner?(state, owner_guid, owner_position, now) do
-    not World.moving?(owner_guid, now) and not Movement.moving?(state, now) and
-      distance_to(state, owner_position) <= stationary_slack(state, owner_guid)
+  defp settled_at_owner?(state, owner_guid, owner_position, %Context{now: now, perception: perception}) do
+    not Perception.moving?(perception, owner_guid) and not Movement.moving?(state, now) and
+      distance_to(state, owner_position) <= stationary_slack(state, owner_guid, perception)
   end
 
-  defp stationary_slack(%Mob{unit: %Unit{bounding_radius: radius}}, owner_guid) do
-    @stationary_slack_factor * @follow_distance + bounding_radius(radius) + owner_bounding_radius(owner_guid)
+  defp stationary_slack(%Mob{unit: %Unit{bounding_radius: radius}}, owner_guid, perception) do
+    @stationary_slack_factor * @follow_distance + bounding_radius(radius) +
+      owner_bounding_radius(owner_guid, perception)
   end
 
-  defp owner_bounding_radius(owner_guid) do
-    case Metadata.query(owner_guid, [:bounding_radius]) do
+  defp owner_bounding_radius(owner_guid, perception) do
+    case Perception.metadata(perception, owner_guid) do
       %{bounding_radius: radius} -> bounding_radius(radius)
       _ -> Unit.default_bounding_radius()
     end
@@ -297,6 +310,13 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet do
 
   defp point_distance({x, y, z}, {tx, ty, tz}) do
     :math.sqrt(:math.pow(tx - x, 2) + :math.pow(ty - y, 2) + :math.pow(tz - z, 2))
+  end
+
+  defp move_with_context(%Mob{} = state, destination, opts, %Context{} = context) do
+    case Navigation.move_to(context, state, destination, opts) do
+      {:ok, state} -> state
+      {:error, :no_path, state} -> state
+    end
   end
 
   defp set_action(

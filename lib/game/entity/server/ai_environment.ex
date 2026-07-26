@@ -22,6 +22,13 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
     }
   end
 
+  def move_to(entity, destination, opts \\ [], now \\ Time.now()) do
+    case Navigation.move_to(context(entity, now), entity, destination, opts) do
+      {:ok, entity} -> entity
+      {:error, :no_path, entity} -> entity
+    end
+  end
+
   defp perception(entity, now) do
     %Perception{
       position: &World.position(&1, now),

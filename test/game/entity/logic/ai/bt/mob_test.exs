@@ -17,6 +17,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.Entity.Logic.Threat
+  alias ThistleTea.Game.Entity.Server.AIEnvironment
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Time
@@ -497,7 +498,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
       state = fixture_mob()
       blackboard = %Blackboard{target: {1.0, 2.0, 3.0}, move_target: {1.0, 2.0, 3.0}}
 
-      assert {:success, ^state, ^blackboard} = MobBT.move_to_target(state, blackboard, 1_000)
+      assert {:success, ^state, ^blackboard} =
+               MobBT.move_to_target(state, blackboard, AIEnvironment.context(state, 1_000))
     end
 
     test "fails and clears stale move target without a target" do
@@ -505,7 +507,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
       blackboard = %Blackboard{move_target: {1.0, 2.0, 3.0}}
 
       assert {:failure, ^state, %Blackboard{target: nil, move_target: nil}} =
-               MobBT.move_to_target(state, blackboard, 1_000)
+               MobBT.move_to_target(state, blackboard, AIEnvironment.context(state, 1_000))
     end
   end
 
@@ -631,7 +633,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
       state = put_in(fixture_mob(start_time: 0, duration: 5_000).unit.target, target_guid)
       blackboard = %Blackboard{next_spread_at: 0}
 
-      assert {:success, ^state, ^blackboard} = MobBT.maybe_spread(state, blackboard, 1_000)
+      assert {:success, ^state, ^blackboard} =
+               MobBT.maybe_spread(state, blackboard, AIEnvironment.context(state, 1_000))
     end
 
     test "waits for the spread timer" do
@@ -639,7 +642,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
       state = put_in(fixture_mob().unit.target, target_guid)
       blackboard = %Blackboard{next_spread_at: 5_000}
 
-      assert {:success, ^state, ^blackboard} = MobBT.maybe_spread(state, blackboard, 1_000)
+      assert {:success, ^state, ^blackboard} =
+               MobBT.maybe_spread(state, blackboard, AIEnvironment.context(state, 1_000))
     end
 
     test "resets the spread budget when the target is moving" do
@@ -651,7 +655,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
       blackboard = %Blackboard{next_spread_at: 0, spread_attempts: 2}
 
       assert {:success, ^state, %Blackboard{spread_attempts: 0, next_spread_at: next}} =
-               MobBT.maybe_spread(state, blackboard, 1_000)
+               MobBT.maybe_spread(state, blackboard, AIEnvironment.context(state, 1_000))
 
       assert next >= 3_500 and next <= 4_500
     end
@@ -661,7 +665,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
       state = put_in(fixture_mob().unit.target, target_guid)
       blackboard = %Blackboard{next_spread_at: 0, spread_attempts: 3}
 
-      assert {:success, ^state, %Blackboard{spread_attempts: 3}} = MobBT.maybe_spread(state, blackboard, 1_000)
+      assert {:success, ^state, %Blackboard{spread_attempts: 3}} =
+               MobBT.maybe_spread(state, blackboard, AIEnvironment.context(state, 1_000))
     end
 
     test "does nothing without a stacked neighbor" do
@@ -670,7 +675,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
       blackboard = %Blackboard{next_spread_at: 0, spread_attempts: 0}
 
       assert {:success, ^state, %Blackboard{spread_attempts: 0, next_spread_at: next}} =
-               MobBT.maybe_spread(state, blackboard, 1_000)
+               MobBT.maybe_spread(state, blackboard, AIEnvironment.context(state, 1_000))
 
       assert next >= 3_500 and next <= 4_500
     end

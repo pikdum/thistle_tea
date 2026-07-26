@@ -16,7 +16,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Context do
       now: now,
       perception: Keyword.get(opts, :perception, Perception.empty()),
       random: Keyword.get(opts, :random, Random.fixed()),
-      navigation: Keyword.get(opts, :navigation, Navigation.empty())
+      navigation: Keyword.get(opts, :navigation, Navigation.direct())
     }
   end
 end

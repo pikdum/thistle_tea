@@ -91,9 +91,11 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     World.update_position(state)
     state = Visibility.join_entity(state)
 
+    now = Time.now()
+
     state =
       state
-      |> EventAI.with_blackboard(&EventAI.on_spawned(&1, &2, Time.now()))
+      |> EventAI.with_blackboard(&EventAI.on_spawned(&1, &2, now, AIEnvironment.context(&1, now)))
       |> EventSink.emit_pending()
 
     state =
@@ -125,7 +127,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
   @impl GenServer
   def handle_cast({:move_to, x, y, z}, state) do
-    state = Movement.move_to(state, {x, y, z}, [], Time.now())
+    state = AIEnvironment.move_to(state, {x, y, z})
     state = EventSink.emit_pending(state)
     {:noreply, state}
   end
@@ -254,7 +256,12 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
   @impl GenServer
   def handle_cast({:drop_threat, source_guid}, %Mob{} = state) do
-    state = state |> MobBT.drop_threat(source_guid) |> EventSink.emit_pending() |> wake_ai_tick()
+    state =
+      state
+      |> MobBT.drop_threat(source_guid, AIEnvironment.context(state))
+      |> EventSink.emit_pending()
+      |> wake_ai_tick()
+
     {:noreply, state}
   end
 
@@ -469,9 +476,11 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     if Corpse.removed?(state) do
       {:noreply, state}
     else
+      now = Time.now()
+
       state =
         state
-        |> EventAI.with_blackboard(&Script.execute_steps(&1, &2, steps, target_guid, Time.now()))
+        |> EventAI.with_blackboard(&Script.execute_steps(&1, &2, steps, target_guid, AIEnvironment.context(&1, now)))
         |> EventSink.emit_pending()
 
       {:noreply, state, {:continue, :maybe_broadcast}}
@@ -891,11 +900,16 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   defp maybe_eventai_enter_combat(%Mob{} = state, true, _caster, _now), do: state
 
   defp maybe_eventai_enter_combat(%Mob{} = state, false, caster, now) do
-    EventAI.with_blackboard(state, &EventAI.enter_combat(&1, &2, caster, now))
+    EventAI.with_blackboard(state, &EventAI.enter_combat(&1, &2, caster, now, AIEnvironment.context(&1, now)))
   end
 
   defp eventai_spell_hit(%Mob{} = state, caster_guid, %Spell{id: spell_id}) when is_integer(caster_guid) do
-    EventAI.with_blackboard(state, &EventAI.on_spell_hit(&1, &2, caster_guid, spell_id, Time.now()))
+    now = Time.now()
+
+    EventAI.with_blackboard(
+      state,
+      &EventAI.on_spell_hit(&1, &2, caster_guid, spell_id, now, AIEnvironment.context(&1, now))
+    )
   end
 
   defp eventai_spell_hit(%Mob{} = state, _caster_guid, _spell), do: state
@@ -944,11 +958,12 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   defp maybe_finalize_death(%Mob{} = state) do
     if Core.dead?(state) do
       killer = state.internal.killed_by
+      now = Time.now()
 
       state
       |> mark_death_finalized()
       |> Threat.wipe()
-      |> EventAI.with_blackboard(&EventAI.on_death(&1, &2, killer, Time.now()))
+      |> EventAI.with_blackboard(&EventAI.on_death(&1, &2, killer, now, AIEnvironment.context(&1, now)))
       |> EventSink.emit_pending()
       |> maybe_decrement_on_death(killer)
       |> maybe_reward_kill(killer)

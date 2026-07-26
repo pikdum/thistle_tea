@@ -9,6 +9,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Context
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception
   alias ThistleTea.Game.Entity.Logic.AttackTable
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Combat, as: CombatLogic
@@ -34,9 +36,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
   def melee_sequence do
     BT.sequence([
       BT.condition(&in_combat?/2),
-      BT.condition(&target_valid_same_map?/2),
-      BT.action(&melee_attack/2),
-      BT.action(&wait_for_next_attack/2)
+      BT.condition(&target_valid_same_map?/3),
+      BT.action(&melee_attack_with_context/3),
+      BT.action(&wait_for_next_attack_with_context/3)
     ])
   end
 
@@ -63,6 +65,17 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
 
   def target_valid_same_map?(_state, _blackboard), do: false
 
+  def target_valid_same_map?(%{internal: %Internal{world: world}, unit: %Unit{target: target}}, _blackboard, %Context{
+        perception: perception
+      }) do
+    case Perception.position(perception, target) do
+      {^world, _x, _y, _z} -> true
+      _ -> false
+    end
+  end
+
+  def target_valid_same_map?(_state, _blackboard, %Context{}), do: false
+
   def in_combat_range?(%{unit: %Unit{target: target}} = state, _blackboard) do
     case World.distance_to_guid(state, target) do
       distance when is_number(distance) -> distance <= combat_reach(state, target)
@@ -71,6 +84,23 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
   end
 
   def in_combat_range?(_state, _blackboard), do: false
+
+  def in_combat_range?(
+        %{movement_block: %{position: {x, y, z, _orientation}}, unit: %Unit{target: target}} = state,
+        _blackboard,
+        %Context{perception: perception}
+      ) do
+    case Perception.position(perception, target) do
+      {_world, tx, ty, tz} ->
+        distance = :math.sqrt(:math.pow(tx - x, 2) + :math.pow(ty - y, 2) + :math.pow(tz - z, 2))
+        distance <= combat_reach(state, target, perception)
+
+      _ ->
+        false
+    end
+  end
+
+  def in_combat_range?(_state, _blackboard, %Context{}), do: false
 
   def melee_attack(%{unit: %Unit{target: target}} = state, %Blackboard{} = blackboard)
       when is_integer(target) and target > 0 do
@@ -106,6 +136,37 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
 
   def melee_attack(state, blackboard, _now), do: {:success, state, blackboard}
 
+  def melee_attack_with_context(
+        %{unit: %Unit{target: target}} = state,
+        %Blackboard{} = blackboard,
+        %Context{now: now} = context
+      )
+      when is_integer(target) and target > 0 do
+    {state, blackboard} = maybe_start_melee_attack(state, target, blackboard)
+    in_range = in_combat_range?(state, blackboard, context)
+    attack_ready = Blackboard.ready_for?(blackboard, :next_attack_at, now)
+    offhand_ready = offhand_ready?(state, blackboard, now)
+
+    {state, blackboard} =
+      cond do
+        in_range and (attack_ready or offhand_ready) ->
+          perform_ready_attacks(state, target, blackboard, attack_ready, offhand_ready, now)
+
+        in_range ->
+          {state, blackboard}
+
+        attack_ready ->
+          handle_out_of_range(state, blackboard, now)
+
+        true ->
+          {state, blackboard}
+      end
+
+    {:success, state, blackboard}
+  end
+
+  def melee_attack_with_context(state, blackboard, %Context{}), do: {:success, state, blackboard}
+
   defp perform_ready_attacks(state, target, blackboard, main_ready?, offhand_ready?, now) do
     state = PlayerCombat.mark_initiated(state, now)
     {state, blackboard} = perform_main_hand(state, target, blackboard, main_ready?, now)
@@ -114,7 +175,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
 
   defp perform_main_hand(state, target, blackboard, true, now) do
     speed = CombatLogic.attack_speed_ms(state)
-    {send_melee_attack(state, target), Blackboard.put_next_at(blackboard, :next_attack_at, speed, now)}
+    {send_melee_attack(state, target, now), Blackboard.put_next_at(blackboard, :next_attack_at, speed, now)}
   end
 
   defp perform_main_hand(state, _target, blackboard, false, _now), do: {state, blackboard}
@@ -155,6 +216,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
 
   def wait_for_next_attack(state, blackboard, _now), do: {:running, state, blackboard}
 
+  defp wait_for_next_attack_with_context(state, %Blackboard{} = blackboard, %Context{now: now}) do
+    wait_for_next_attack(state, blackboard, now)
+  end
+
   defp maybe_start_melee_attack(state, target, %Blackboard{attack_started: true} = blackboard)
        when is_integer(target) do
     {state, blackboard}
@@ -176,11 +241,11 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
     {state, blackboard}
   end
 
-  defp send_melee_attack(state, target) when is_integer(target) do
+  defp send_melee_attack(state, target, now) when is_integer(target) and is_integer(now) do
     {state, queued_spell} = MeleeSpell.consume_next_swing(state)
 
     case queued_spell do
-      %Spell{} = spell -> send_queued_spell_swing(state, spell, target)
+      %Spell{} = spell -> send_queued_spell_swing(state, spell, target, now)
       _no_queued_spell -> send_white_swing(state, target)
     end
   end
@@ -216,12 +281,12 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
       Blackboard.ready_for?(blackboard, :next_offhand_attack_at, now)
   end
 
-  defp send_queued_spell_swing(state, %Spell{} = spell, target) do
+  defp send_queued_spell_swing(state, %Spell{} = spell, target, now) do
     targets = queued_spell_targets(state, spell, target)
 
     state
     |> maybe_weapon_skill_up(target)
-    |> Resources.spend_power(spell, Time.now())
+    |> Resources.spend_power(spell, now)
     |> queue_queued_spell_go(spell, target, targets)
     |> deliver_queued_spell(spell, targets)
   end
@@ -300,6 +365,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
     CombatLogic.melee_reach(combat_reach_value(unit), target_combat_reach(state, target))
   end
 
+  defp combat_reach(%{unit: unit}, target, perception) do
+    CombatLogic.melee_reach(combat_reach_value(unit), perceived_target_combat_reach(target, perception))
+  end
+
   defp combat_reach_value(%Unit{combat_reach: combat_reach}) when is_number(combat_reach) and combat_reach > 0 do
     combat_reach
   end
@@ -322,4 +391,13 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
   end
 
   defp target_combat_reach(_state, _target), do: Unit.default_combat_reach()
+
+  defp perceived_target_combat_reach(target, perception) when is_integer(target) do
+    case Perception.metadata(perception, target) do
+      %{combat_reach: combat_reach} -> combat_reach_value(combat_reach)
+      _ -> Unit.default_combat_reach()
+    end
+  end
+
+  defp perceived_target_combat_reach(_target, _perception), do: Unit.default_combat_reach()
 end

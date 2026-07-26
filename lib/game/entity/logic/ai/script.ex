@@ -21,12 +21,13 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
   alias ThistleTea.Game.Entity.Data.CreatureSpell
   alias ThistleTea.Game.Entity.Data.ScriptStep
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Context
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Navigation
   alias ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells, as: MobSpells
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
   alias ThistleTea.Game.Entity.Logic.Condition, as: ConditionLogic
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Effects
-  alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.World
 
@@ -39,14 +40,23 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
   def flee_duration_ms, do: @flee_duration_ms
 
   def run(state, %Blackboard{} = blackboard, steps, target_guid, now) when is_list(steps) and is_integer(now) do
+    run(state, blackboard, steps, target_guid, Context.new(now))
+  end
+
+  def run(state, %Blackboard{} = blackboard, steps, target_guid, %Context{} = context) when is_list(steps) do
     {due, delayed} = Enum.split_with(steps, &(&1.delay_ms <= 0))
-    {state, blackboard} = execute_steps(state, blackboard, due, target_guid, now)
+    {state, blackboard} = execute_steps(state, blackboard, due, target_guid, context)
     {schedule_delayed(state, delayed, target_guid), blackboard}
   end
 
-  def execute_steps(state, %Blackboard{} = blackboard, steps, target_guid, now) when is_list(steps) do
+  def execute_steps(state, %Blackboard{} = blackboard, steps, target_guid, now)
+      when is_list(steps) and is_integer(now) do
+    execute_steps(state, blackboard, steps, target_guid, Context.new(now))
+  end
+
+  def execute_steps(state, %Blackboard{} = blackboard, steps, target_guid, %Context{} = context) when is_list(steps) do
     Enum.reduce(steps, {state, blackboard}, fn %ScriptStep{} = step, {state, blackboard} ->
-      dispatch(state, blackboard, step, target_guid, now)
+      dispatch(state, blackboard, step, target_guid, context)
     end)
   end
 
@@ -55,11 +65,11 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
          blackboard,
          %ScriptStep{swap_final?: true} = step,
          target_guid,
-         now
+         %Context{} = context
        ) do
     case resolve_target(state, step, target_guid) do
       ^self_guid ->
-        dispatch(state, blackboard, %{step | swap_final?: false}, target_guid, now)
+        dispatch(state, blackboard, %{step | swap_final?: false}, target_guid, context)
 
       buddy_guid when is_integer(buddy_guid) and buddy_guid > 0 ->
         forward_to_buddy(state, blackboard, step, buddy_guid, target_guid)
@@ -69,14 +79,14 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
     end
   end
 
-  defp dispatch(state, blackboard, %ScriptStep{swap_initial?: true} = step, _target_guid, _now) do
+  defp dispatch(state, blackboard, %ScriptStep{swap_initial?: true} = step, _target_guid, %Context{}) do
     Logger.debug("Script #{step.script_id}: swap-initial-targets unsupported, skipping")
     {state, blackboard}
   end
 
-  defp dispatch(state, blackboard, %ScriptStep{} = step, target_guid, now) do
+  defp dispatch(state, blackboard, %ScriptStep{} = step, target_guid, %Context{now: now} = context) do
     if ConditionLogic.met?(state, step.condition) do
-      execute(state, blackboard, step, target_guid, now)
+      execute(state, blackboard, step, target_guid, now, context)
     else
       {state, blackboard}
     end
@@ -115,6 +125,27 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
     |> Enum.reduce(state, fn {delay_ms, steps}, state ->
       Effects.enqueue(state, Effects.script_steps(steps, target_guid, delay_ms))
     end)
+  end
+
+  defp execute(
+         state,
+         blackboard,
+         %ScriptStep{command: :move_to, datalong: 0, position: {x, y, z, _o}},
+         _target,
+         _now,
+         %Context{} = context
+       ) do
+    state =
+      case Navigation.move_to(context, state, {x, y, z}) do
+        {:ok, state} -> state
+        {:error, :no_path, state} -> state
+      end
+
+    {state, blackboard}
+  end
+
+  defp execute(state, blackboard, %ScriptStep{} = step, target_guid, now, %Context{}) do
+    execute(state, blackboard, step, target_guid, now)
   end
 
   defp execute(state, blackboard, %ScriptStep{command: :talk} = step, target_guid, _now) do
@@ -264,10 +295,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
 
   defp execute(state, blackboard, %ScriptStep{command: :flee}, _target_guid, now) do
     flee(state, blackboard, now)
-  end
-
-  defp execute(state, blackboard, %ScriptStep{command: :move_to, datalong: 0, position: {x, y, z, _o}}, _target, now) do
-    {Movement.move_to(state, {x, y, z}, [], now), blackboard}
   end
 
   defp execute(state, blackboard, %ScriptStep{command: :move_to} = step, _target_guid, _now) do
