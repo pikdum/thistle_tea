@@ -19,6 +19,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.World.Loader.ClassSpell, as: ClassSpellLoader
   alias ThistleTea.Game.World.Loader.CreatureTemplate, as: CreatureTemplateLoader
   alias ThistleTea.Game.World.Loader.Exploration, as: ExplorationLoader
+  alias ThistleTea.Game.World.Loader.Faction, as: FactionLoader
   alias ThistleTea.Game.World.Loader.Fishing, as: FishingLoader
   alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
   alias ThistleTea.Game.World.Loader.Gossip, as: GossipLoader
@@ -132,6 +133,7 @@ defmodule ThistleTea.Application do
     QuestLoader.init()
     GossipLoader.init()
     CreatureTemplateLoader.init()
+    FactionLoader.init()
     ExplorationLoader.init()
     GameObjectTemplateLoader.init()
     FishingLoader.init()

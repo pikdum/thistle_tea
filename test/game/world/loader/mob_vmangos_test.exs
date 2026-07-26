@@ -7,6 +7,8 @@ defmodule ThistleTea.Game.World.Loader.MobVmangosTest do
   alias ThistleTea.Game.Entity.Data.ScriptStep
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.World.Loader.Mob, as: MobLoader
+  alias ThistleTea.Game.World.Loader.Mob.Batch
+  alias ThistleTea.Game.WorldRef
 
   @moduletag :dbc_db
 
@@ -148,6 +150,40 @@ defmodule ThistleTea.Game.World.Loader.MobVmangosTest do
 
       refute MapSet.member?(attack_flags, :aura_not_present)
       assert MapSet.member?(aura_flags, :aura_not_present)
+    end
+  end
+
+  describe "Batch.load/1" do
+    test "loads a populated cell with a bounded query count" do
+      rows =
+        {WorldRef.open(0), -71, -2}
+        |> Mangos.Creature.query_cell([])
+        |> Mangos.Repo.all()
+
+      counter = :counters.new(1, [:atomics])
+      handler_id = "mob-batch-query-count-#{System.unique_integer([:positive])}"
+
+      events = [
+        Mangos.Repo.config()[:telemetry_prefix] ++ [:query],
+        ThistleTea.DBC.config()[:telemetry_prefix] ++ [:query]
+      ]
+
+      :ok =
+        :telemetry.attach_many(
+          handler_id,
+          events,
+          fn _event, _measurements, _metadata, counter ->
+            :counters.add(counter, 1, 1)
+          end,
+          counter
+        )
+
+      on_exit(fn -> :telemetry.detach(handler_id) end)
+
+      assert loaded = Batch.load(rows)
+      assert length(loaded) == length(rows)
+      assert length(loaded) > 25
+      assert :counters.get(counter, 1) <= 20
     end
   end
 
