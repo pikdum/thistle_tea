@@ -4,6 +4,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
   alias ThistleTea.Game.Entity.Data.AIEvent
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Loot
   alias ThistleTea.Game.Entity.Data.Component.Internal.Spawn
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Object
@@ -188,6 +189,68 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
       assert mob.internal.in_combat
       assert mob.unit.target == replacement
       refute Threat.tracking?(mob, vanished)
+    end
+
+    test "does nothing when a nearby living mob never tracked the vanished player" do
+      target = player_guid()
+      mob = fixture_mob(position: {20.0, 0.0, 0.0, 0.0})
+      unit = %{mob.unit | health: 40, max_health: 100, auras: []}
+      internal = %{mob.internal | threat: %{}, spawn: %Spawn{position: {0.0, 0.0, 0.0}}}
+      mob = %{mob | unit: unit, internal: internal}
+
+      assert MobBT.drop_threat(mob, target) == mob
+    end
+
+    test "does not evade, heal, or clear loot from a corpse" do
+      target = player_guid()
+      tap = %{player: target, group_id: nil}
+      mob = fixture_mob(position: {20.0, 0.0, 0.0, 0.0}, spline_nodes: [])
+
+      unit = %{
+        mob.unit
+        | health: 0,
+          max_health: 100,
+          target: 0,
+          dynamic_flags: 0x0005,
+          auras: []
+      }
+
+      internal = %{
+        mob.internal
+        | in_combat: false,
+          threat: %{},
+          spawn: %Spawn{position: {0.0, 0.0, 0.0}},
+          loot: %Loot{tapped_by: tap},
+          death_finalized?: true
+      }
+
+      corpse = %{mob | unit: unit, internal: internal}
+
+      assert MobBT.drop_threat(corpse, target) == corpse
+    end
+
+    test "only releases a stale threat reference from a corpse" do
+      target = player_guid()
+      tap = %{player: target, group_id: nil}
+      mob = fixture_mob(position: {20.0, 0.0, 0.0, 0.0}, spline_nodes: [])
+      unit = %{mob.unit | health: 0, max_health: 100, target: 0, dynamic_flags: 0x0005, auras: []}
+
+      internal = %{
+        mob.internal
+        | in_combat: false,
+          threat: %{target => 100.0},
+          spawn: %Spawn{position: {0.0, 0.0, 0.0}},
+          loot: %Loot{tapped_by: tap},
+          death_finalized?: true
+      }
+
+      corpse = %{mob | unit: unit, internal: internal}
+      result = MobBT.drop_threat(corpse, target)
+
+      assert result.unit == corpse.unit
+      assert result.internal.loot == corpse.internal.loot
+      assert result.internal.threat == %{}
+      assert [%Effects.ThreatRefLost{target_guid: ^target}] = result.internal.events
     end
   end
 

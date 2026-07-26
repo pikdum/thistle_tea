@@ -719,18 +719,26 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   def drop_threat(state, _source_guid), do: state
 
   def drop_threat(%Mob{} = state, source_guid, %Context{} = context) when is_integer(source_guid) do
-    state = Threat.remove(state, source_guid)
+    if Threat.tracking?(state, source_guid) do
+      state = Threat.remove(state, source_guid)
 
-    if Threat.entries(state) == [] do
-      reset_after_combat(state, context)
+      if Threat.entries(state) == [] do
+        reset_after_combat(state, context)
+      else
+        reselect_victim(state)
+      end
     else
-      reselect_victim(state)
+      state
     end
   end
 
   def drop_threat(state, _source_guid, %Context{}), do: state
 
-  defp reset_after_combat(%Mob{} = state, %Context{now: now} = context) do
+  defp reset_after_combat(%Mob{} = state, %Context{} = context) do
+    if Core.dead?(state), do: state, else: reset_living_after_combat(state, context)
+  end
+
+  defp reset_living_after_combat(%Mob{} = state, %Context{now: now} = context) do
     blackboard = Blackboard.from_any(state.internal.blackboard)
     {state, blackboard} = EventAI.on_leave_combat(state, blackboard, now, context)
     {state, blackboard} = EventAI.on_evade(state, blackboard, now, context)
