@@ -21,7 +21,7 @@ defmodule ThistleTea.Game.World.System.Instance do
   end
 
   def enter(map_id, guid, server \\ __MODULE__) when is_integer(map_id) and is_integer(guid) do
-    GenServer.call(server, {:enter, map_id, owner(guid), guid})
+    GenServer.call(server, {:enter, map_id, guid})
   end
 
   def leave(guid, world, server \\ __MODULE__)
@@ -33,7 +33,7 @@ defmodule ThistleTea.Game.World.System.Instance do
   def leave(_guid, _world, _server), do: :ok
 
   def world_for(map_id, guid, server \\ __MODULE__) when is_integer(map_id) and is_integer(guid) do
-    GenServer.call(server, {:world_for, map_id, owner(guid)})
+    GenServer.call(server, {:world_for, map_id, guid})
   end
 
   def count(server \\ __MODULE__), do: GenServer.call(server, :count)
@@ -47,15 +47,11 @@ defmodule ThistleTea.Game.World.System.Instance do
   end
 
   def info(guid, server \\ __MODULE__) when is_integer(guid) do
-    owner = owner(guid)
-    GenServer.call(server, {:info, owner, guid})
+    GenServer.call(server, {:info, guid})
   end
 
   def reset(guid, server \\ __MODULE__) when is_integer(guid) do
-    case reset_owner(guid) do
-      {:ok, owner} -> GenServer.call(server, {:reset, owner})
-      error -> error
-    end
+    GenServer.call(server, {:reset, guid})
   end
 
   def switch(guid, %WorldRef{} = world, server \\ __MODULE__) when is_integer(guid) do
@@ -69,12 +65,15 @@ defmodule ThistleTea.Game.World.System.Instance do
        instances: %Instance{},
        cleanup_refs: %{},
        empty_timeout_ms: Keyword.get(opts, :empty_timeout_ms, @empty_timeout_ms),
-       cleanup: Keyword.get(opts, :cleanup, &cleanup_world/1)
+       cleanup: Keyword.get(opts, :cleanup, &cleanup_world/1),
+       owner: Keyword.get(opts, :owner, &owner/1),
+       reset_owner: Keyword.get(opts, :reset_owner, &reset_owner/1)
      }}
   end
 
   @impl GenServer
-  def handle_call({:enter, map_id, owner, guid}, _from, state) do
+  def handle_call({:enter, map_id, guid}, _from, state) do
+    owner = state.owner.(guid)
     {world, emptied, instances} = Instance.enter(state.instances, map_id, owner, guid)
 
     state =
@@ -85,18 +84,24 @@ defmodule ThistleTea.Game.World.System.Instance do
     {:reply, {:ok, world}, state}
   end
 
-  def handle_call({:world_for, map_id, owner}, _from, state) do
-    {:reply, Instance.world_for(state.instances, map_id, owner), state}
+  def handle_call({:world_for, map_id, guid}, _from, state) do
+    world =
+      Instance.world_for_guid(state.instances, map_id, guid) ||
+        Instance.world_for(state.instances, map_id, state.owner.(guid))
+
+    {:reply, world, state}
   end
 
   def handle_call(:count, _from, state) do
     {:reply, map_size(state.instances.copies), state}
   end
 
-  def handle_call({:info, owner, guid}, _from, state) do
+  def handle_call({:info, guid}, _from, state) do
+    owner = state.owner.(guid)
+
     copies =
-      state.instances
-      |> Instance.copies_for_owner(owner)
+      (Instance.copies_for_guid(state.instances, guid) ++ Instance.copies_for_owner(state.instances, owner))
+      |> Enum.uniq_by(& &1.world)
       |> Enum.map(fn copy ->
         %{world: copy.world, owner: copy.owner, members: MapSet.to_list(copy.members)}
       end)
@@ -105,13 +110,19 @@ defmodule ThistleTea.Game.World.System.Instance do
     {:reply, info, state}
   end
 
-  def handle_call({:reset, owner}, _from, state) do
-    copies = Instance.copies_for_owner(state.instances, owner)
-    {empty, occupied} = Enum.split_with(copies, &(MapSet.size(&1.members) == 0))
+  def handle_call({:reset, guid}, _from, state) do
+    case state.reset_owner.(guid) do
+      {:ok, owner} ->
+        copies = Instance.copies_for_owner(state.instances, owner)
+        {empty, occupied} = Enum.split_with(copies, &(MapSet.size(&1.members) == 0))
 
-    state = Enum.reduce(empty, state, &reset_copy/2)
-    result = %{reset: Enum.map(empty, & &1.world), failed: Enum.map(occupied, & &1.world)}
-    {:reply, {:ok, result}, state}
+        state = Enum.reduce(empty, state, &reset_copy/2)
+        result = %{reset: Enum.map(empty, & &1.world), failed: Enum.map(occupied, & &1.world)}
+        {:reply, {:ok, result}, state}
+
+      error ->
+        {:reply, error, state}
+    end
   end
 
   def handle_call({:switch, guid, world}, _from, state) do

@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.World.System.Duel do
   import Bitwise, only: [&&&: 2]
 
   alias ThistleTea.Game.Duel
+  alias ThistleTea.Game.Duel.Admission
   alias ThistleTea.Game.Duel.Match
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.GameObject
@@ -37,6 +38,12 @@ defmodule ThistleTea.Game.World.System.Duel do
 
   def challenge(attrs, server \\ __MODULE__) when is_map(attrs) do
     GenServer.call(server, {:challenge, attrs})
+  end
+
+  def challenge_admission(initiator_guid, opponent_guid, world, server \\ __MODULE__) do
+    GenServer.call(server, {:challenge_admission, initiator_guid, opponent_guid, world})
+  catch
+    :exit, _ -> nil
   end
 
   def accept(guid, server \\ __MODULE__) when is_integer(guid) do
@@ -120,10 +127,13 @@ defmodule ThistleTea.Game.World.System.Duel do
     initiator_guid = Map.get(attrs, :initiator_guid)
     opponent_guid = Map.get(attrs, :opponent_guid)
 
-    with :ok <- validate_challenge(state, initiator_guid, opponent_guid, attrs),
+    admission = build_admission(state, initiator_guid, opponent_guid, Map.get(attrs, :world))
+
+    with :ok <- validate_challenge_attrs(attrs),
+         :ok <- Duel.validate_admission(admission),
          {:ok, arbiter_guid} <- state.spawn_flag.(attrs),
          {:ok, match, duels} <-
-           Duel.challenge(state.duels, initiator_guid, opponent_guid, %{
+           Duel.challenge(state.duels, admission, %{
              arbiter_guid: arbiter_guid,
              world: Map.get(attrs, :world),
              flag_position: Map.get(attrs, :flag_position)
@@ -136,6 +146,10 @@ defmodule ThistleTea.Game.World.System.Duel do
     else
       {:error, reason} -> {:reply, {:error, reason}, state}
     end
+  end
+
+  def handle_call({:challenge_admission, initiator_guid, opponent_guid, world}, _from, state) do
+    {:reply, build_admission(state, initiator_guid, opponent_guid, world), state}
   end
 
   def handle_call({:accept, guid}, _from, state) do
@@ -247,22 +261,32 @@ defmodule ThistleTea.Game.World.System.Duel do
     end
   end
 
-  defp validate_challenge(state, initiator_guid, opponent_guid, attrs) do
+  defp validate_challenge_attrs(attrs) do
     validations = [
-      {valid_players?(initiator_guid, opponent_guid), :invalid_players},
-      {state.online?.(initiator_guid) and state.online?.(opponent_guid), :not_online},
-      {state.dueling_allowed?.(initiator_guid) and state.dueling_allowed?.(opponent_guid), :no_dueling},
       {match?(%WorldRef{}, Map.get(attrs, :world)), :invalid_world},
-      {participants_in_world?(state, [initiator_guid, opponent_guid], Map.get(attrs, :world)), :invalid_world},
-      {valid_position?(Map.get(attrs, :flag_position)), :invalid_position},
-      {not Duel.busy?(state.duels, initiator_guid), :initiator_busy},
-      {not Duel.busy?(state.duels, opponent_guid), :opponent_busy}
+      {valid_position?(Map.get(attrs, :flag_position)), :invalid_position}
     ]
 
     case Enum.find(validations, fn {valid?, _reason} -> not valid? end) do
       {_invalid, reason} -> {:error, reason}
       nil -> :ok
     end
+  end
+
+  defp build_admission(state, initiator_guid, opponent_guid, world) do
+    %Admission{
+      initiator_guid: initiator_guid,
+      opponent_guid: opponent_guid,
+      initiator_player?: player_guid?(initiator_guid),
+      opponent_player?: player_guid?(opponent_guid),
+      initiator_online?: state.online?.(initiator_guid),
+      opponent_online?: state.online?.(opponent_guid),
+      initiator_allowed?: state.dueling_allowed?.(initiator_guid),
+      opponent_allowed?: state.dueling_allowed?.(opponent_guid),
+      same_world?: participants_in_world?(state, [initiator_guid, opponent_guid], world),
+      initiator_busy?: Duel.busy?(state.duels, initiator_guid),
+      opponent_busy?: Duel.busy?(state.duels, opponent_guid)
+    }
   end
 
   defp complete_match(state, match, loser_guid, reason) do
@@ -471,10 +495,6 @@ defmodule ThistleTea.Game.World.System.Duel do
 
   defp player_guid?(guid) when is_integer(guid), do: Guid.entity_type(guid) == :player
   defp player_guid?(_guid), do: false
-
-  defp valid_players?(initiator_guid, opponent_guid) do
-    player_guid?(initiator_guid) and player_guid?(opponent_guid) and initiator_guid != opponent_guid
-  end
 
   defp valid_position?({x, y, z}), do: is_number(x) and is_number(y) and is_number(z)
   defp valid_position?(_position), do: false

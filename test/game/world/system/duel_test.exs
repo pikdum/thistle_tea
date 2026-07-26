@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.World.System.DuelTest do
   use ExUnit.Case, async: true
 
+  alias ThistleTea.Game.Duel.Admission
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World.System.Duel, as: DuelSystem
   alias ThistleTea.Game.WorldRef
@@ -88,6 +89,24 @@ defmodule ThistleTea.Game.World.System.DuelTest do
       assert_receive {:winner, 1, %Message.SmsgDuelWinner{fled?: true, winner_name: "Player2", loser_name: "Player1"}}
       refute_received {:trigger, 1, 7_267}
       assert DuelSystem.match(1, server) == nil
+    end
+
+    test "provides the admission snapshot used by spell validation", %{
+      server: server,
+      attrs: attrs
+    } do
+      assert %Admission{
+               initiator_guid: 1,
+               opponent_guid: 2,
+               initiator_busy?: false,
+               opponent_busy?: false,
+               same_world?: true
+             } = DuelSystem.challenge_admission(1, 2, attrs.world, server)
+
+      assert {:ok, _match} = DuelSystem.challenge(attrs, server)
+
+      assert %Admission{initiator_busy?: true, opponent_busy?: true} =
+               DuelSystem.challenge_admission(1, 2, attrs.world, server)
     end
   end
 end

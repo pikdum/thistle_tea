@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Spell.CastValidation do
   """
   import Bitwise, only: [&&&: 2, <<<: 2]
 
+  alias ThistleTea.Game.Duel
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Hunter
@@ -65,22 +66,14 @@ defmodule ThistleTea.Game.Spell.CastValidation do
     if Spell.duel?(spell), do: validate_duel_context(context), else: :ok
   end
 
-  defp validate_duel_context(%{
-         caster_busy?: false,
-         target_busy?: false,
-         target_player?: true,
-         caster_allowed?: true,
-         target_allowed?: true,
-         same_world?: true
-       }), do: :ok
-
-  defp validate_duel_context(%{target_player?: false}), do: {:error, :bad_targets}
-  defp validate_duel_context(%{caster_busy?: true}), do: {:error, :target_dueling}
-  defp validate_duel_context(%{target_busy?: true}), do: {:error, :target_dueling}
-  defp validate_duel_context(%{same_world?: false}), do: {:error, :bad_targets}
-  defp validate_duel_context(%{caster_allowed?: false}), do: {:error, :no_dueling}
-  defp validate_duel_context(%{target_allowed?: false}), do: {:error, :no_dueling}
-  defp validate_duel_context(_context), do: {:error, :bad_targets}
+  defp validate_duel_context(context) do
+    case Duel.validate_admission(context) do
+      :ok -> :ok
+      {:error, reason} when reason in [:initiator_busy, :opponent_busy] -> {:error, :target_dueling}
+      {:error, :no_dueling} -> {:error, :no_dueling}
+      {:error, _reason} -> {:error, :bad_targets}
+    end
+  end
 
   defp check_ammo(caster, spell, opts) do
     if godmode?(caster) do

@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.Spell.DuelCastValidationTest do
   use ExUnit.Case, async: true
 
+  alias ThistleTea.Game.Duel.Admission
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Object
@@ -18,12 +19,12 @@ defmodule ThistleTea.Game.Spell.DuelCastValidationTest do
     end
 
     test "rejects occupied targets and disabled areas" do
-      assert {:error, :target_dueling} = validate(%{duel_context() | target_busy?: true})
-      assert {:error, :no_dueling} = validate(%{duel_context() | caster_allowed?: false})
+      assert {:error, :target_dueling} = validate(%{duel_context() | opponent_busy?: true})
+      assert {:error, :no_dueling} = validate(%{duel_context() | initiator_allowed?: false})
     end
 
     test "rejects non-player and cross-world targets" do
-      assert {:error, :bad_targets} = validate(%{duel_context() | target_player?: false})
+      assert {:error, :bad_targets} = validate(%{duel_context() | opponent_player?: false})
       assert {:error, :bad_targets} = validate(%{duel_context() | same_world?: false})
     end
   end
@@ -40,12 +41,17 @@ defmodule ThistleTea.Game.Spell.DuelCastValidationTest do
   end
 
   defp duel_context do
-    %{
-      caster_busy?: false,
-      target_busy?: false,
-      target_player?: true,
-      caster_allowed?: true,
-      target_allowed?: true,
+    %Admission{
+      initiator_guid: 1,
+      opponent_guid: 2,
+      initiator_player?: true,
+      opponent_player?: true,
+      initiator_online?: true,
+      opponent_online?: true,
+      initiator_busy?: false,
+      opponent_busy?: false,
+      initiator_allowed?: true,
+      opponent_allowed?: true,
       same_world?: true
     }
   end

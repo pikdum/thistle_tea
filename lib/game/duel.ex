@@ -21,23 +21,82 @@ defmodule ThistleTea.Game.Duel do
     ]
   end
 
+  defmodule Admission do
+    @moduledoc false
+
+    @enforce_keys [
+      :initiator_guid,
+      :opponent_guid,
+      :initiator_player?,
+      :opponent_player?,
+      :initiator_online?,
+      :opponent_online?,
+      :initiator_allowed?,
+      :opponent_allowed?,
+      :same_world?,
+      :initiator_busy?,
+      :opponent_busy?
+    ]
+    defstruct [
+      :initiator_guid,
+      :opponent_guid,
+      :initiator_player?,
+      :opponent_player?,
+      :initiator_online?,
+      :opponent_online?,
+      :initiator_allowed?,
+      :opponent_allowed?,
+      :same_world?,
+      :initiator_busy?,
+      :opponent_busy?
+    ]
+  end
+
   @outbound_radius 75.0
   @inbound_radius 70.0
   @forfeit_delay_ms 10_000
 
   defstruct next_id: 1, matches: %{}, player_matches: %{}
 
-  def challenge(%__MODULE__{} = duels, initiator_guid, opponent_guid, attrs)
-      when is_integer(initiator_guid) and is_integer(opponent_guid) and initiator_guid != opponent_guid and
-             is_map(attrs) do
-    cond do
-      busy?(duels, initiator_guid) -> {:error, :initiator_busy}
-      busy?(duels, opponent_guid) -> {:error, :opponent_busy}
-      true -> add_match(duels, initiator_guid, opponent_guid, attrs)
+  def challenge(%__MODULE__{} = duels, %Admission{} = admission, attrs) when is_map(attrs) do
+    with :ok <- validate_admission(admission) do
+      cond do
+        busy?(duels, admission.initiator_guid) -> {:error, :initiator_busy}
+        busy?(duels, admission.opponent_guid) -> {:error, :opponent_busy}
+        true -> add_match(duels, admission.initiator_guid, admission.opponent_guid, attrs)
+      end
     end
   end
 
-  def challenge(%__MODULE__{}, _initiator_guid, _opponent_guid, _attrs), do: {:error, :invalid_players}
+  def challenge(%__MODULE__{}, _admission, _attrs), do: {:error, :invalid_players}
+
+  def validate_admission(%Admission{initiator_guid: initiator_guid, opponent_guid: opponent_guid})
+      when not is_integer(initiator_guid) or not is_integer(opponent_guid) or initiator_guid == opponent_guid,
+      do: {:error, :invalid_players}
+
+  def validate_admission(%Admission{initiator_player?: false}), do: {:error, :invalid_players}
+  def validate_admission(%Admission{opponent_player?: false}), do: {:error, :invalid_players}
+  def validate_admission(%Admission{initiator_online?: false}), do: {:error, :not_online}
+  def validate_admission(%Admission{opponent_online?: false}), do: {:error, :not_online}
+  def validate_admission(%Admission{initiator_allowed?: false}), do: {:error, :no_dueling}
+  def validate_admission(%Admission{opponent_allowed?: false}), do: {:error, :no_dueling}
+  def validate_admission(%Admission{same_world?: false}), do: {:error, :invalid_world}
+  def validate_admission(%Admission{initiator_busy?: true}), do: {:error, :initiator_busy}
+  def validate_admission(%Admission{opponent_busy?: true}), do: {:error, :opponent_busy}
+
+  def validate_admission(%Admission{
+        initiator_player?: true,
+        opponent_player?: true,
+        initiator_online?: true,
+        opponent_online?: true,
+        initiator_allowed?: true,
+        opponent_allowed?: true,
+        same_world?: true,
+        initiator_busy?: false,
+        opponent_busy?: false
+      }), do: :ok
+
+  def validate_admission(_admission), do: {:error, :invalid_players}
 
   def accept(%__MODULE__{} = duels, opponent_guid, now) when is_integer(opponent_guid) and is_integer(now) do
     case match_for(duels, opponent_guid) do

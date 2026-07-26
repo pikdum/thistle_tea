@@ -13,10 +13,9 @@ defmodule ThistleTea.Game.Player.Mail do
   alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Entity.Logic.Mail, as: MailLogic
   alias ThistleTea.Game.Guid
-  alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.InventoryUpdate
-  alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Party
+  alias ThistleTea.Game.Player.Mail.ClientProjection
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.CharacterStore
@@ -29,22 +28,6 @@ defmodule ThistleTea.Game.Player.Mail do
   @interaction_distance 5.0
   @body_item_entry 8383
   @max_coinage 0x7FFFFFFE
-
-  @action_send 0
-  @action_money_taken 1
-  @action_item_taken 2
-  @action_returned 3
-  @action_deleted 4
-  @action_made_permanent 5
-
-  @result_ok 0
-  @result_equip_error 1
-  @result_self 2
-  @result_not_enough_money 3
-  @result_recipient_not_found 4
-  @result_not_same_team 5
-  @result_internal 6
-  @result_attachment_invalid 19
 
   def open_session(%Character{internal: internal} = character, guid) when is_integer(guid) do
     {token, pending} = PostOffice.open(guid)
@@ -109,7 +92,7 @@ defmodule ThistleTea.Game.Player.Mail do
     mailbox = MailLogic.add(internal.mailbox, mail)
     PostOffice.acknowledge(guid, token, [mail.id])
     state = %{state | character: %{character | internal: %{internal | mailbox: mailbox}}}
-    if MailLogic.visible?(mail, Time.now()), do: Network.send_packet(%Message.SmsgReceivedMail{})
+    if MailLogic.visible?(mail, Time.now()), do: ClientProjection.received()
     schedule_delivery(state)
   end
 
@@ -119,7 +102,7 @@ defmodule ThistleTea.Game.Player.Mail do
     now = Time.now()
 
     if Enum.any?(mailbox, &(&1.deliver_at == deliver_at and MailLogic.unread?(&1, now))) do
-      Network.send_packet(%Message.SmsgReceivedMail{})
+      ClientProjection.received()
     end
 
     schedule_delivery(%{state | mail_delivery_ref: nil})
@@ -141,22 +124,22 @@ defmodule ThistleTea.Game.Player.Mail do
         {:ok, _mail} ->
           player = %{inventory_result.player | coinage: character.player.coinage - cost}
           state = InventoryUpdate.apply(state, {:ok, %{inventory_result | player: player}})
-          send_result(0, @action_send, @result_ok)
+          ClientProjection.result(0, :send, :ok)
           state
 
         {:error, _reason} ->
           restore_sent_item(item)
-          send_error(state, @result_internal)
+          send_error(state, :internal)
       end
     else
-      nil -> send_error(state, @result_recipient_not_found)
-      {:error, :self} -> send_error(state, @result_self)
-      {:error, :team} -> send_error(state, @result_not_same_team)
-      {:error, :cod_without_item} -> send_error(state, @result_attachment_invalid)
-      {:error, :invalid_item} -> send_error(state, @result_attachment_invalid)
-      {:error, _error, _item1, _item2} -> send_error(state, @result_attachment_invalid)
-      false -> send_error(state, @result_not_enough_money)
-      {:error, _reason} -> send_error(state, @result_internal)
+      nil -> send_error(state, :recipient_not_found)
+      {:error, :self} -> send_error(state, :self)
+      {:error, :team} -> send_error(state, :not_same_team)
+      {:error, :cod_without_item} -> send_error(state, :attachment_invalid)
+      {:error, :invalid_item} -> send_error(state, :attachment_invalid)
+      {:error, _error, _item1, _item2} -> send_error(state, :attachment_invalid)
+      false -> send_error(state, :not_enough_money)
+      {:error, _reason} -> send_error(state, :internal)
     end
   end
 
@@ -171,7 +154,7 @@ defmodule ThistleTea.Game.Player.Mail do
         |> MailLogic.visible(now)
         |> Enum.map(fn mail -> {mail, ItemStore.get(mail.item_guid)} end)
 
-      Network.send_packet(%Message.SmsgMailListResult{mails: mails, now: now})
+      ClientProjection.list(mails, now)
     end
 
     state
@@ -187,11 +170,11 @@ defmodule ThistleTea.Game.Player.Mail do
       player = %{character.player | coinage: character.player.coinage + money}
       state = put_mail(state, mail)
       state = InventoryUpdate.apply(state, {:ok, player})
-      send_result(mail.id, @action_money_taken, @result_ok)
+      ClientProjection.result(mail.id, :money_taken, :ok)
       state
     else
       false ->
-        send_result(message.mail_id, @action_money_taken, @result_internal)
+        ClientProjection.result(message.mail_id, :money_taken, :internal)
         state
 
       _ ->
@@ -214,7 +197,7 @@ defmodule ThistleTea.Game.Player.Mail do
       state = InventoryUpdate.apply(state, {:ok, %{result | player: player}}, placement)
       pay_cod(mail, state.guid, cod)
 
-      send_result(mail.id, @action_item_taken, @result_ok,
+      ClientProjection.result(mail.id, :item_taken, :ok,
         item_entry: item.object.entry,
         item_count: item.item.stack_count || 1
       )
@@ -222,7 +205,7 @@ defmodule ThistleTea.Game.Player.Mail do
       state
     else
       false ->
-        send_result(message.mail_id, @action_item_taken, @result_not_enough_money)
+        ClientProjection.result(message.mail_id, :item_taken, :not_enough_money)
         state
 
       {:error, error} ->
@@ -256,7 +239,7 @@ defmodule ThistleTea.Game.Player.Mail do
       case PostOffice.post(attrs) do
         {:ok, _returned} ->
           state = remove_mail(state, mail.id)
-          send_result(mail.id, @action_returned, @result_ok)
+          ClientProjection.result(mail.id, :returned, :ok)
           state
 
         {:error, _reason} ->
@@ -276,7 +259,7 @@ defmodule ThistleTea.Game.Player.Mail do
          true <- MailLogic.deletable?(mail) do
       if mail.item_guid > 0, do: ItemStore.delete(mail.item_guid)
       state = remove_mail(state, mail.id)
-      send_result(mail.id, @action_deleted, @result_ok)
+      ClientProjection.result(mail.id, :deleted, :ok)
       state
     else
       _ -> state
@@ -294,7 +277,7 @@ defmodule ThistleTea.Game.Player.Mail do
         _ -> ""
       end
 
-    Network.send_packet(%Message.SmsgItemTextQueryResponse{item_text_id: message.item_text_id, text: text})
+    ClientProjection.text(message.item_text_id, text)
     state
   end
 
@@ -313,7 +296,7 @@ defmodule ThistleTea.Game.Player.Mail do
 
   def query_next_time(%{character: %Character{internal: %{mailbox: mailbox}}} = state) do
     unread_mails = if MailLogic.has_unread?(mailbox, Time.now()), do: 0.0, else: -1.0
-    Network.send_packet(%Message.MsgQueryNextMailTime{unread_mails: unread_mails})
+    ClientProjection.next_delivery(unread_mails)
     state
   end
 
@@ -466,7 +449,7 @@ defmodule ThistleTea.Game.Player.Mail do
         state = InventoryUpdate.apply(state, {:ok, result}, placement)
         mail = %{mail | checked: Bitwise.bor(mail.checked, MailLogic.checked_copied())}
         state = put_mail(state, mail)
-        send_result(mail.id, @action_made_permanent, @result_ok)
+        ClientProjection.result(mail.id, :made_permanent, :ok)
         state
 
       {:error, error} ->
@@ -492,24 +475,13 @@ defmodule ThistleTea.Game.Player.Mail do
   defp pay_cod(%DataMail{}, _buyer, _cod), do: :ok
 
   defp send_error(state, result) do
-    send_result(0, @action_send, result)
+    ClientProjection.result(0, :send, result)
     state
   end
 
   defp send_item_inventory_error(state, mail_id, error) do
-    send_result(mail_id, @action_item_taken, @result_equip_error, equip_error: Inventory.error_code(error))
+    ClientProjection.result(mail_id, :item_taken, :equip_error, equip_error: Inventory.error_code(error))
 
     state
-  end
-
-  defp send_result(mail_id, action, result, opts \\ []) do
-    Network.send_packet(%Message.SmsgSendMailResult{
-      mail_id: mail_id,
-      action: action,
-      result: result,
-      equip_error: Keyword.get(opts, :equip_error, 0),
-      item_entry: Keyword.get(opts, :item_entry, 0),
-      item_count: Keyword.get(opts, :item_count, 0)
-    })
   end
 end

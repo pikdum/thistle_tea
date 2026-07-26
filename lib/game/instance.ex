@@ -10,19 +10,19 @@ defmodule ThistleTea.Game.Instance do
     defstruct [:world, :owner, members: MapSet.new()]
   end
 
-  defstruct copies: %{}, owner_index: %{}, member_index: %{}, next_id: 1
+  defstruct copies: %{}, owner_index: %{}, member_index: %{}, bindings: %{}, next_id: 1
 
   def enter(%__MODULE__{} = instances, map_id, owner, guid) when is_integer(map_id) and is_integer(guid) do
     {instances, emptied} = remove_member(instances, guid)
-    owner_key = {map_id, owner}
-    {world, instances} = find_or_create(instances, owner_key)
+    {world, instances} = find_bound_or_create(instances, map_id, owner, guid)
     copy = Map.fetch!(instances.copies, world)
     copy = %{copy | members: MapSet.put(copy.members, guid)}
 
     instances = %{
       instances
       | copies: Map.put(instances.copies, world, copy),
-        member_index: Map.put(instances.member_index, guid, world)
+        member_index: Map.put(instances.member_index, guid, world),
+        bindings: Map.put(instances.bindings, {map_id, guid}, world)
     }
 
     emptied = if emptied != world, do: emptied
@@ -40,6 +40,10 @@ defmodule ThistleTea.Game.Instance do
     Map.get(instances.owner_index, {map_id, owner})
   end
 
+  def world_for_guid(%__MODULE__{} = instances, map_id, guid) when is_integer(map_id) and is_integer(guid) do
+    Map.get(instances.bindings, {map_id, guid})
+  end
+
   def member_world(%__MODULE__{} = instances, guid) when is_integer(guid) do
     Map.get(instances.member_index, guid)
   end
@@ -49,6 +53,22 @@ defmodule ThistleTea.Game.Instance do
     |> Map.values()
     |> Enum.filter(&(&1.owner == owner))
     |> Enum.sort_by(& &1.world.instance_id)
+  end
+
+  def copies_for_guid(%__MODULE__{} = instances, guid) when is_integer(guid) do
+    instances.bindings
+    |> Enum.flat_map(fn
+      {{_map_id, ^guid}, world} -> [world]
+      {_binding, _world} -> []
+    end)
+    |> Enum.uniq()
+    |> Enum.flat_map(fn world ->
+      case Map.get(instances.copies, world) do
+        %Copy{} = copy -> [copy]
+        nil -> []
+      end
+    end)
+    |> Enum.sort_by(&{&1.world.map_id, &1.world.instance_id})
   end
 
   def join_copy(%__MODULE__{} = instances, guid, %WorldRef{} = world) when is_integer(guid) do
@@ -61,7 +81,8 @@ defmodule ThistleTea.Game.Instance do
         instances = %{
           instances
           | copies: Map.put(instances.copies, world, copy),
-            member_index: Map.put(instances.member_index, guid, world)
+            member_index: Map.put(instances.member_index, guid, world),
+            bindings: Map.put(instances.bindings, {world.map_id, guid}, world)
         }
 
         emptied = if emptied != world, do: emptied
@@ -85,11 +106,19 @@ defmodule ThistleTea.Game.Instance do
         %{
           instances
           | copies: Map.delete(instances.copies, world),
-            owner_index: Map.delete(instances.owner_index, {world.map_id, owner})
+            owner_index: Map.delete(instances.owner_index, {world.map_id, owner}),
+            bindings: delete_world_bindings(instances.bindings, world)
         }
 
       _occupied_or_missing ->
         instances
+    end
+  end
+
+  defp find_bound_or_create(%__MODULE__{} = instances, map_id, owner, guid) do
+    case world_for_guid(instances, map_id, guid) do
+      %WorldRef{} = world -> {world, instances}
+      nil -> find_or_create(instances, {map_id, owner})
     end
   end
 
@@ -126,5 +155,11 @@ defmodule ThistleTea.Game.Instance do
         emptied = if MapSet.size(copy.members) == 0, do: world
         {instances, emptied}
     end
+  end
+
+  defp delete_world_bindings(bindings, world) do
+    bindings
+    |> Enum.reject(fn {_binding, bound_world} -> bound_world == world end)
+    |> Map.new()
   end
 end

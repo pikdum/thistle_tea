@@ -31,7 +31,6 @@ defmodule ThistleTea.Game.Player.Spellcasting do
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.ItemStore
-  alias ThistleTea.Game.World.Loader.Exploration, as: ExplorationLoader
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
   alias ThistleTea.Game.World.Loader.MapTemplate, as: MapTemplateLoader
   alias ThistleTea.Game.World.Metadata
@@ -306,36 +305,18 @@ defmodule ThistleTea.Game.Player.Spellcasting do
   defp build_target_info(_state, _spell, _targets), do: nil
 
   defp duel_context(
-         %Character{object: %{guid: caster_guid}, internal: %{area: caster_area, world: caster_world}},
+         %Character{object: %{guid: caster_guid}, internal: %{world: caster_world}},
          %Spell{} = spell,
          %Target{} = targets
        ) do
     target_guid = Target.unit_guid(targets)
 
     if Spell.duel?(spell) and is_integer(target_guid) do
-      target = Metadata.query(target_guid, [:area, :world]) || %{}
-
-      %{
-        caster_busy?: DuelSystem.busy?(caster_guid),
-        target_busy?: DuelSystem.busy?(target_guid),
-        target_player?: Guid.entity_type(target_guid) == :player,
-        caster_allowed?: duel_area?(caster_area),
-        target_allowed?: duel_area?(Map.get(target, :area)),
-        same_world?: Map.get(target, :world) == caster_world
-      }
+      DuelSystem.challenge_admission(caster_guid, target_guid, caster_world)
     end
   end
 
   defp duel_context(_character, _spell, _targets), do: nil
-
-  defp duel_area?(area_id) when is_integer(area_id) do
-    case ExplorationLoader.area(area_id) do
-      %{flags: flags} when is_integer(flags) -> Bitwise.band(flags, 0x40) != 0
-      _area -> false
-    end
-  end
-
-  defp duel_area?(_area_id), do: false
 
   defp implicit_pet_guid(%Character{} = character, %Spell{effects: effects}) do
     pet_guid =

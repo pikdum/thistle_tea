@@ -80,6 +80,27 @@ defmodule ThistleTea.Game.World.System.InstanceTest do
       assert InstanceSystem.info(first_guid, name).current == second_world
       refute first_world == second_world
     end
+
+    test "uses the captured copy after the owner resolver changes" do
+      name = unique_name()
+      guid = System.unique_integer([:positive])
+      {:ok, owner} = start_supervised({Agent, fn -> {:party, 7} end})
+
+      start_supervised!(
+        {InstanceSystem,
+         name: name,
+         owner: fn _guid -> Agent.get(owner, & &1) end,
+         reset_owner: fn _guid -> {:ok, Agent.get(owner, & &1)} end}
+      )
+
+      assert {:ok, world} = InstanceSystem.enter(389, guid, name)
+      InstanceSystem.leave(guid, world, name)
+      Agent.update(owner, fn _owner -> {:player, guid} end)
+
+      assert InstanceSystem.world_for(389, guid, name) == world
+      assert {:ok, ^world} = InstanceSystem.enter(389, guid, name)
+      assert InstanceSystem.info(guid, name).copies |> Enum.any?(&(&1.world == world))
+    end
   end
 
   defp unique_name do

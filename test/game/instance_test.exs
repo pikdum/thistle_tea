@@ -28,6 +28,15 @@ defmodule ThistleTea.Game.InstanceTest do
       assert emptied == first
       assert Instance.empty?(instances, first)
     end
+
+    test "keeps a player's copy binding when party membership changes" do
+      {world, nil, instances} = Instance.enter(%Instance{}, 389, {:party, 7}, 100)
+      {instances, ^world} = Instance.leave(instances, 100, world)
+      {reentered, nil, instances} = Instance.enter(instances, 389, {:player, 100}, 100)
+
+      assert reentered == world
+      assert Instance.world_for_guid(instances, 389, 100) == world
+    end
   end
 
   describe "destroy_empty/2" do
@@ -40,6 +49,7 @@ defmodule ThistleTea.Game.InstanceTest do
 
       instances = Instance.destroy_empty(instances, world)
       assert Instance.world_for(instances, 389, owner) == nil
+      assert Instance.world_for_guid(instances, 389, 100) == nil
     end
   end
 
