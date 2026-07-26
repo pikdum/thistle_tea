@@ -3,11 +3,11 @@
     "mangoszero-server": {
       "flake": false,
       "locked": {
-        "lastModified": 1783285705,
-        "narHash": "sha256-HZJ3JXFpyPijlQJw8J7/XKyX+HsXvCXEdr5JIaCV02s=",
+        "lastModified": 1785091805,
+        "narHash": "sha256-T2cO5SSiF6mEYzwxuc8Jl+esSaTCsDbqFg+YgZGQJMY=",
         "ref": "refs/heads/master",
-        "rev": "266496d61e09fea5b2d4cfae332f8b9214a425ea",
-        "revCount": 1811,
+        "rev": "43a7fcc5bc27bde5fa7bdfb3d0e3caf201c81e7d",
+        "revCount": 1848,
         "submodules": true,
         "type": "git",
         "url": "https://github.com/mangoszero/server.git"
@@ -54,11 +54,11 @@
     },
     "nixpkgs": {
       "locked": {
-        "lastModified": 1783776592,
-        "narHash": "sha256-UgCQzxeWI75XM8G+hPrPh+MKzEPjG3SpAj7dtqSbksA=",
+        "lastModified": 1784796856,
+        "narHash": "sha256-wWFrV5/Qbm+lyt5x20E/bSbfJiGKMo4RCxZV8cl/WZI=",
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "e7a3ca8092b61ff85b6a45bf863ea2b2d6a661b3",
+        "rev": "e2587caef70cea85dd97d7daab492899902dbf5d",
         "type": "github"
       },
       "original": {
