@@ -20,7 +20,8 @@ defmodule ThistleTea.Game.World.SpawnPoolTest do
       blueprint = game_object(guid)
 
       :ok = SpawnPool.activate(group, {WorldRef.open(0), 0, 0}, blueprint)
-      first_pid = await_entity(guid)
+      first_pid = EntityRegistry.whereis(guid)
+      assert is_pid(first_pid)
 
       send(first_pid, :chest_respawn)
       second_pid = await_replacement(guid, first_pid)

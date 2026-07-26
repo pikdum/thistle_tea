@@ -20,6 +20,7 @@ defmodule ThistleTea.Game.World.SpawnPool do
 
   @registry ThistleTea.Game.World.SpawnPool.Registry
   @supervisor ThistleTea.Game.World.SpawnPool.Supervisor
+  @activation_timeout_ms 30_000
 
   def start_link(opts) do
     key = Keyword.fetch!(opts, :key)
@@ -39,7 +40,7 @@ defmodule ThistleTea.Game.World.SpawnPool do
       key = {world, group}
 
       with {:ok, pid} <- ensure_started(key, blueprint) do
-        GenServer.cast(pid, {:activate, cell, blueprint})
+        GenServer.call(pid, {:activate, cell, blueprint}, @activation_timeout_ms)
       end
     else
       :ok
@@ -132,12 +133,14 @@ defmodule ThistleTea.Game.World.SpawnPool do
   end
 
   @impl GenServer
-  def handle_cast({:activate, cell, blueprint}, state) do
+  def handle_call({:activate, cell, blueprint}, _from, state) do
     state = maybe_put_blueprint(state, blueprint)
     state = %{state | active_cells: MapSet.put(state.active_cells, cell)}
-    {:noreply, start_selected(state)}
+    {state, errors} = start_selected_with_errors(state)
+    {:reply, activation_result(errors), state}
   end
 
+  @impl GenServer
   def handle_cast({:recycle, member, pid}, state) do
     case Map.get(state.running, member) do
       {^pid, monitor_ref} ->
@@ -260,11 +263,16 @@ defmodule ThistleTea.Game.World.SpawnPool do
   defp replace_selection(%{selection: selection}, _member, _available), do: selection
 
   defp start_selected(state) do
-    Enum.reduce(state.selection.leaves, state, fn member, acc ->
+    {state, _errors} = start_selected_with_errors(state)
+    state
+  end
+
+  defp start_selected_with_errors(state) do
+    Enum.reduce(state.selection.leaves, {state, []}, fn member, {acc, errors} ->
       cond do
-        Map.has_key?(acc.running, member) -> acc
-        not selected_cell_active?(acc, member) -> acc
-        true -> start_member(acc, member)
+        Map.has_key?(acc.running, member) -> {acc, errors}
+        not selected_cell_active?(acc, member) -> {acc, errors}
+        true -> start_member(acc, member, errors)
       end
     end)
   end
@@ -276,16 +284,19 @@ defmodule ThistleTea.Game.World.SpawnPool do
     end
   end
 
-  defp start_member(state, member) do
+  defp start_member(state, member, errors) do
     blueprint = Map.fetch!(state.blueprints, member)
 
     case start_blueprint(blueprint) do
-      {:ok, pid} -> monitor_member(state, member, pid)
-      {:error, {:already_started, pid}} -> monitor_member(state, member, pid)
-      :ok -> state
-      {:error, _reason} -> state
+      {:ok, pid} -> {monitor_member(state, member, pid), errors}
+      {:error, {:already_started, pid}} -> {monitor_member(state, member, pid), errors}
+      :ok -> {state, errors}
+      {:error, reason} -> {state, [{member, reason} | errors]}
     end
   end
+
+  defp activation_result([]), do: :ok
+  defp activation_result(errors), do: {:error, Enum.reverse(errors)}
 
   defp start_blueprint(%Mob{} = mob), do: Loader.Mob.start_pool_mob(mob)
   defp start_blueprint(%GameObject{} = game_object), do: Loader.GameObject.start_pool_game_object(game_object)

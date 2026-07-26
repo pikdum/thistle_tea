@@ -409,11 +409,11 @@ defmodule ThistleTea.Game.World.Loader.Mob do
   defp activate(%Mangos.Creature{} = creature, cell) do
     case Catalog.group_for(:creature, creature.guid) do
       {:pool, _pool_id} = group ->
-        SpawnPool.activate(group, cell)
+        :ok = SpawnPool.activate(group, cell)
 
       {:singleton, :creature, _guid} = group ->
         loaded = load_creature(creature)
-        SpawnPool.activate(group, cell, Mob.build(loaded))
+        :ok = SpawnPool.activate(group, cell, Mob.build(loaded))
     end
   end
 

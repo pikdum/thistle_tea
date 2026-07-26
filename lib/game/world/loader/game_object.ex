@@ -29,6 +29,6 @@ defmodule ThistleTea.Game.World.Loader.GameObject do
   defp activate(%Mangos.GameObject{} = game_object, cell) do
     group = Catalog.group_for(:game_object, game_object.guid)
     blueprint = if match?({:singleton, _, _}, group), do: GameObject.build(game_object)
-    SpawnPool.activate(group, cell, blueprint)
+    :ok = SpawnPool.activate(group, cell, blueprint)
   end
 end
