@@ -33,5 +33,54 @@ defmodule ThistleTea.Game.World.System.CellActivatorTest do
       CellActivator.activate([{0, 1, 2}], name)
       assert_receive {:loaded, {0, 1, 2}}
     end
+
+    test "bounds concurrent cell loads" do
+      parent = self()
+
+      loader = fn cell ->
+        send(parent, {:started, cell, self()})
+        receive do: (:continue -> :ok)
+      end
+
+      name = :"cell_activator_test_#{System.unique_integer([:positive])}"
+      start_supervised!({CellActivator, name: name, loader: loader, max_concurrency: 2})
+
+      CellActivator.activate([{0, 1, 1}, {0, 1, 2}, {0, 1, 3}], name)
+
+      assert_receive {:started, _cell, first}
+      assert_receive {:started, _cell, second}
+      refute_receive {:started, _cell, _pid}, 50
+
+      send(first, :continue)
+      send(second, :continue)
+      assert_receive {:started, _cell, third}
+      send(third, :continue)
+    end
+
+    test "retries a failed cell load" do
+      parent = self()
+      attempts = start_supervised!({Agent, fn -> 0 end})
+
+      loader = fn cell ->
+        attempt = Agent.get_and_update(attempts, &{&1 + 1, &1 + 1})
+
+        if attempt == 1 do
+          exit(:load_failed)
+        else
+          send(parent, {:loaded, cell})
+        end
+      end
+
+      name = :"cell_activator_test_#{System.unique_integer([:positive])}"
+
+      start_supervised!({CellActivator, name: name, loader: loader, max_concurrency: 1, retry_delay_ms: 10})
+
+      CellActivator.activate([{0, 1, 2}], name)
+      assert_receive {:loaded, {0, 1, 2}}
+      assert Agent.get(attempts, & &1) == 2
+
+      CellActivator.activate([{0, 1, 2}], name)
+      refute_receive {:loaded, {0, 1, 2}}, 50
+    end
   end
 end
