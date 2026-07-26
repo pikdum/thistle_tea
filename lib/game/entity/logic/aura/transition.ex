@@ -20,6 +20,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Transition do
   alias ThistleTea.Game.Entity.Logic.Aura.StealthSync
   alias ThistleTea.Game.Entity.Logic.Aura.UnitSync
   alias ThistleTea.Game.Entity.Logic.Aura.ViewpointSync
+  alias ThistleTea.Game.Entity.Logic.Companion
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Spell
@@ -325,9 +326,12 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Transition do
 
   defp maybe_sit(entity, _holder), do: {entity, []}
 
-  defp release_controlled_events(%{object: %{guid: owner_guid}, unit: %Unit{charm: controlled_guid}}, removed)
-       when is_integer(owner_guid) and is_integer(controlled_guid) and controlled_guid > 0 do
+  defp release_controlled_events(%Character{object: %{guid: owner_guid}} = character, removed)
+       when is_integer(owner_guid) do
+    controlled_guid = Companion.control_guid(character)
+
     for %Holder{caster_guid: ^owner_guid, spell: %Spell{id: spell_id, effects: effects}} <- removed,
+        is_integer(controlled_guid),
         Enum.any?(effects, &(&1.type == :summon_possessed)) do
       Effects.release_controlled(owner_guid, controlled_guid, spell_id)
     end

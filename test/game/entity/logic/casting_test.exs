@@ -4,6 +4,7 @@ defmodule ThistleTea.Game.Entity.Logic.CastingTest do
   alias ThistleTea.Game.Aura, as: AuraData
   alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.Character
+  alias ThistleTea.Game.Entity.Data.Companion.EntityRef
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Object
@@ -13,6 +14,7 @@ defmodule ThistleTea.Game.Entity.Logic.CastingTest do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Spell, as: SpellBT
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Casting
+  alias ThistleTea.Game.Entity.Logic.Companion
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Spell
@@ -678,12 +680,14 @@ defmodule ThistleTea.Game.Entity.Logic.CastingTest do
       targets = Target.item(22)
       casting = Cast.new(spell, targets, 1_000)
 
-      character = %Character{
-        object: %Object{guid: 1},
-        unit: %Unit{summon: 33},
-        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
-        internal: %Internal{world: %WorldRef{map_id: 0}, casting: casting}
-      }
+      character =
+        %Character{
+          object: %Object{guid: 1},
+          unit: %Unit{},
+          movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+          internal: %Internal{world: %WorldRef{map_id: 0}, casting: casting}
+        }
+        |> Companion.activate(:hunter_pet, %EntityRef{guid: 33, entry: 1, spell_id: 1515})
 
       character = Casting.complete(character, casting, 1_000)
 

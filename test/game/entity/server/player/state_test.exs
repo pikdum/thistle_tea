@@ -2,8 +2,11 @@ defmodule ThistleTea.Game.Entity.Server.Player.StateTest do
   use ExUnit.Case, async: false
 
   alias ThistleTea.Game.Entity.Data.Character
+  alias ThistleTea.Game.Entity.Data.Companion
+  alias ThistleTea.Game.Entity.Data.Companion.EntityRef
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Logic.Companion, as: CompanionLogic
   alias ThistleTea.Game.Entity.Server.Player.State
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World.System.CellActivator
@@ -66,18 +69,18 @@ defmodule ThistleTea.Game.Entity.Server.Player.StateTest do
     end
   end
 
-  describe "suspend_active_pet/1" do
-    test "clears the live guid while retaining the pet restore state" do
-      character = %Character{
-        unit: %Unit{summon: 123},
-        internal: %Internal{active_pet_entry: 1863, active_pet_spell_id: 712}
-      }
+  describe "suspend_companion/1" do
+    test "replaces the active reference with stable restore state" do
+      character =
+        %Character{unit: %Unit{}, internal: %Internal{}}
+        |> CompanionLogic.activate(:guardian, %EntityRef{guid: 123, entry: 1863, spell_id: 712})
 
-      state = State.suspend_active_pet(%State{character: character})
+      state = State.suspend_companion(%State{character: character})
 
       assert state.character.unit.summon == 0
-      assert state.character.internal.active_pet_entry == 1863
-      assert state.character.internal.active_pet_spell_id == 712
+
+      assert state.character.internal.companion ==
+               %Companion{kind: :guardian, status: {:suspended, 1863, 712}}
     end
   end
 end

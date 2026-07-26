@@ -3,8 +3,11 @@ defmodule ThistleTea.Game.Network.Message.PetMessagesTest do
 
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Character
+  alias ThistleTea.Game.Entity.Data.Companion.EntityRef
+  alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.CreatureSpell
+  alias ThistleTea.Game.Entity.Logic.Companion
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Message.Dispatch
   alias ThistleTea.Game.Network.Opcodes
@@ -27,7 +30,7 @@ defmodule ThistleTea.Game.Network.Message.PetMessagesTest do
       message =
         Message.CmsgPetSetAction.from_binary(<<pet_guid::little-size(64), 3::little-size(32), data::little-size(32)>>)
 
-      state = %{character: %Character{unit: %Unit{summon: pet_guid}}}
+      state = %{character: companion(:guardian, pet_guid)}
 
       assert Message.CmsgPetSetAction.handle(message, state) == state
       assert_receive {:pet_set_actions, [%{position: 3, action: 11_778, action_type: 0xC1}]}
@@ -43,7 +46,7 @@ defmodule ThistleTea.Game.Network.Message.PetMessagesTest do
         actions: [%{position: 3, action: 3110, action_type: 0xC1}]
       }
 
-      state = %{character: %Character{unit: %Unit{charm: controlled_guid}}}
+      state = %{character: companion(:charm, controlled_guid)}
 
       assert Message.CmsgPetSetAction.handle(message, state) == state
       assert_receive {:pet_set_actions, [%{action: 3110}]}
@@ -64,7 +67,7 @@ defmodule ThistleTea.Game.Network.Message.PetMessagesTest do
           <<pet_guid::little-size(64), data::little-size(32), target_guid::little-size(64)>>
         )
 
-      state = %{character: %Character{unit: %Unit{summon: pet_guid}}}
+      state = %{character: companion(:guardian, pet_guid)}
 
       assert Message.CmsgPetAction.handle(message, state) == state
       assert_receive {:pet_command, :follow, ^target_guid}
@@ -82,7 +85,7 @@ defmodule ThistleTea.Game.Network.Message.PetMessagesTest do
         target_guid: 0
       }
 
-      state = %{character: %Character{unit: %Unit{charm: controlled_guid}}}
+      state = %{character: companion(:charm, controlled_guid)}
 
       assert Message.CmsgPetAction.handle(message, state) == state
       assert_receive {:pet_command, :follow, 0}
@@ -94,7 +97,7 @@ defmodule ThistleTea.Game.Network.Message.PetMessagesTest do
       on_exit(fn -> Entity.unregister(pet_guid) end)
 
       message = %Message.CmsgPetAction{pet_guid: pet_guid, action: 2, action_type: 0x07, target_guid: 0}
-      state = %{character: %Character{unit: %Unit{summon: pet_guid}}}
+      state = %{character: companion(:guardian, pet_guid)}
 
       assert Message.CmsgPetAction.handle(message, state) == state
       assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgPetActionFeedback{feedback: :nothing_to_attack}}}
@@ -113,7 +116,7 @@ defmodule ThistleTea.Game.Network.Message.PetMessagesTest do
       end)
 
       message = %Message.CmsgPetAction{pet_guid: pet_guid, action: 2, action_type: 0x07, target_guid: target_guid}
-      state = %{character: %Character{unit: %Unit{summon: pet_guid}}}
+      state = %{character: companion(:guardian, pet_guid)}
 
       assert Message.CmsgPetAction.handle(message, state) == state
       assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgPetActionFeedback{feedback: :cant_attack_target}}}
@@ -179,5 +182,10 @@ defmodule ThistleTea.Game.Network.Message.PetMessagesTest do
       assert Message.CmsgNameQuery.handle(%Message.CmsgNameQuery{guid: pet_guid}, state) == state
       assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgNameQueryResponse{character_name: "Voidwalker"}}}
     end
+  end
+
+  defp companion(kind, guid) do
+    %Character{unit: %Unit{}, internal: %Internal{}}
+    |> Companion.activate(kind, %EntityRef{guid: guid, entry: 1, spell_id: 1})
   end
 end

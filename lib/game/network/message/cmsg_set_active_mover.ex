@@ -2,6 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgSetActiveMover do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_SET_ACTIVE_MOVER
 
+  alias ThistleTea.Game.Entity.Logic.Companion
   alias ThistleTea.Game.Entity.Server.Player.State
   alias ThistleTea.Game.Player.Exploration, as: PlayerExploration
   alias ThistleTea.Game.World.Visibility
@@ -17,9 +18,9 @@ defmodule ThistleTea.Game.Network.Message.CmsgSetActiveMover do
     state |> set_active_mover(guid) |> enter_world()
   end
 
-  def handle(%__MODULE__{guid: guid}, %{ready: true, character: %Character{unit: %{charm: guid}}} = state)
+  def handle(%__MODULE__{guid: guid}, %{ready: true, character: %Character{} = character} = state)
       when is_integer(guid) and guid > 0 do
-    set_active_mover(state, guid)
+    if Companion.control_guid(character) == guid, do: set_active_mover(state, guid), else: state
   end
 
   def handle(%__MODULE__{}, state), do: state
@@ -33,7 +34,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgSetActiveMover do
 
   defp enter_world(state) do
     state = Visibility.enter_player(%{state | ready: true})
-    send(self(), :restore_active_pet)
+    send(self(), :restore_companion)
     PlayerExploration.check_current(state)
   end
 

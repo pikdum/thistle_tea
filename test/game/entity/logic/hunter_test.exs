@@ -3,11 +3,13 @@ defmodule ThistleTea.Game.Entity.Logic.HunterTest do
 
   alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.Character
+  alias ThistleTea.Game.Entity.Data.Companion.EntityRef
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.Aura
+  alias ThistleTea.Game.Entity.Logic.Companion
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Hunter
   alias ThistleTea.Game.Entity.Logic.Reactive
@@ -47,14 +49,17 @@ defmodule ThistleTea.Game.Entity.Logic.HunterTest do
 
   describe "validate_tame/3" do
     test "requires a tameable beast at or below the hunter level and no active pet" do
-      hunter = %{unit: %{level: 20, summon: 0}}
+      hunter = %Character{unit: %Unit{level: 20}, internal: %Internal{}}
       spell = %Spell{effects: [%Effect{type: :tame_creature}]}
 
       assert Hunter.validate_tame(hunter, spell, %{tameable?: true, level: 20}) == :ok
       assert Hunter.validate_tame(hunter, spell, %{tameable?: false, level: 20}) == {:error, :bad_targets}
       assert Hunter.validate_tame(hunter, spell, %{tameable?: true, level: 21}) == {:error, :bad_targets}
 
-      assert Hunter.validate_tame(%{unit: %{level: 20, summon: 99}}, spell, %{tameable?: true, level: 10}) ==
+      hunter_with_pet =
+        Companion.activate(hunter, :hunter_pet, %EntityRef{guid: 99, entry: 1, spell_id: 1515})
+
+      assert Hunter.validate_tame(hunter_with_pet, spell, %{tameable?: true, level: 10}) ==
                {:error, :already_have_summon}
     end
   end

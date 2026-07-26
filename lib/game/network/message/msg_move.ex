@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.Network.Message.MsgMove do
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
+  alias ThistleTea.Game.Entity.Logic.Companion
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Network.ClientMessage
   alias ThistleTea.Game.Network.Message
@@ -31,17 +32,14 @@ defmodule ThistleTea.Game.Network.Message.MsgMove do
   @impl ClientMessage
   def handle(
         %__MODULE__{payload: payload, opcode: opcode},
-        %{
-          ready: true,
-          guid: player_guid,
-          active_mover_guid: mover_guid,
-          character: %Character{unit: %Unit{charm: mover_guid}}
-        } = state
+        %{ready: true, guid: player_guid, active_mover_guid: mover_guid, character: %Character{} = character} = state
       )
       when is_integer(mover_guid) and mover_guid > 0 and mover_guid != player_guid do
-    case Entity.pid(mover_guid) do
-      pid when is_pid(pid) -> send(pid, {:controlled_move, payload, opcode})
-      _ -> nil
+    if Companion.control_guid(character) == mover_guid do
+      case Entity.pid(mover_guid) do
+        pid when is_pid(pid) -> send(pid, {:controlled_move, payload, opcode})
+        _ -> nil
+      end
     end
 
     state

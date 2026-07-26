@@ -3,6 +3,7 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
 
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Character
+  alias ThistleTea.Game.Entity.Data.Companion.EntityRef
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Internal.Spawn
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
@@ -11,6 +12,7 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.EventSink
+  alias ThistleTea.Game.Entity.Logic.Companion
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.Message
@@ -497,11 +499,14 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
   end
 
   defp character_with_pet do
+    pet_guid = Guid.from_low_guid(:pet, 416, unique_guid())
+
     %Character{
       object: %Object{guid: Guid.from_low_guid(:player, unique_guid())},
       player: %Player{},
-      unit: %Unit{summon: Guid.from_low_guid(:pet, 416, unique_guid())},
-      internal: %Internal{active_pet_entry: 416, active_pet_spell_id: 688}
+      unit: %Unit{},
+      internal: %Internal{}
     }
+    |> Companion.activate(:guardian, %EntityRef{guid: pet_guid, entry: 416, spell_id: 688})
   end
 end

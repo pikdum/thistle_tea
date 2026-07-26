@@ -15,7 +15,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgMoveWorldportAck do
 
     state = State.complete_worldport(state)
     state = Visibility.enter_player(%{state | ready: true})
-    send(self(), :restore_active_pet)
+    send(self(), :restore_companion)
     PlayerExploration.check_current(state)
   end
 

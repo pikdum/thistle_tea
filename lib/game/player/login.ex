@@ -10,6 +10,8 @@ defmodule ThistleTea.Game.Player.Login do
   alias ThistleTea.DBC
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Character
+  alias ThistleTea.Game.Entity.Data.Companion
+  alias ThistleTea.Game.Entity.Data.Companion.EntityRef
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Unit
@@ -19,6 +21,7 @@ defmodule ThistleTea.Game.Player.Login do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Player, as: PlayerBT
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
   alias ThistleTea.Game.Entity.Logic.Combat, as: CombatLogic
+  alias ThistleTea.Game.Entity.Logic.Companion, as: CompanionLogic
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Death
   alias ThistleTea.Game.Entity.Logic.Dueling
@@ -153,36 +156,50 @@ defmodule ThistleTea.Game.Player.Login do
     |> Mail.schedule_delivery()
   end
 
-  def restore_active_pet(%{character: %Character{unit: %Unit{summon: summon}, internal: internal} = character} = state)
-      when summon in [0, nil] do
-    case {internal.active_pet_entry, internal.active_pet_spell_id} do
-      {entry, spell_id}
-      when is_integer(entry) and entry > 0 and is_integer(spell_id) and spell_id > 0 ->
-        if Death.alive?(character) do
-          EventSink.emit(character, Effects.summon_pet(character.object.guid, entry, spell_id))
-        end
-
-        state
-
-      _ ->
-        state
+  def restore_companion(
+        %{
+          character:
+            %Character{internal: %Internal{companion: %Companion{kind: kind, status: {:suspended, entry, spell_id}}}} =
+              character
+        } = state
+      )
+      when kind in [:hunter_pet, :guardian] and is_integer(entry) and entry > 0 and is_integer(spell_id) and
+             spell_id > 0 do
+    if Death.alive?(character) do
+      EventSink.emit(character, Effects.summon_pet(character.object.guid, entry, spell_id))
     end
+
+    state
   end
 
-  def restore_active_pet(%{character: %Character{unit: %Unit{summon: summon}, internal: internal}} = state)
-      when is_integer(summon) and summon > 0 do
-    case Entity.pid(summon) do
+  def restore_companion(
+        %{
+          character: %Character{
+            internal: %Internal{companion: %Companion{kind: kind, status: {:active, %EntityRef{} = ref}}}
+          }
+        } = state
+      )
+      when kind in [:hunter_pet, :guardian] do
+    case Entity.pid(ref.guid) do
       pid when is_pid(pid) ->
-        send(pid, {:attach_pet, self(), internal.active_pet_spell_id || 0, nil})
+        send(pid, {:attach_pet, self(), ref.spell_id, nil})
         state
 
       _dead ->
-        state = put_in(state.character.unit.summon, nil)
-        restore_active_pet(state)
+        state = %{state | character: CompanionLogic.suspend(state.character)}
+        restore_companion(state)
     end
   end
 
-  def restore_active_pet(state), do: state
+  def restore_companion(
+        %{
+          character: %Character{internal: %Internal{companion: %Companion{status: {:active, %EntityRef{}}}}} = character
+        } = state
+      ) do
+    %{state | character: CompanionLogic.clear(character)}
+  end
+
+  def restore_companion(state), do: state
 
   defp restore_instance_world(
          %Character{internal: %Internal{world: %WorldRef{map_id: map_id, instance_id: instance_id}} = internal} =

@@ -2,7 +2,10 @@ defmodule ThistleTea.Game.Network.Message.CmsgSetActiveMoverTest do
   use ExUnit.Case, async: true
 
   alias ThistleTea.Game.Entity.Data.Character
+  alias ThistleTea.Game.Entity.Data.Companion.EntityRef
+  alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Logic.Companion
   alias ThistleTea.Game.Entity.Server.Player.State
   alias ThistleTea.Game.Network.Message.CmsgSetActiveMover
 
@@ -30,7 +33,11 @@ defmodule ThistleTea.Game.Network.Message.CmsgSetActiveMoverTest do
     end
 
     test "accepts the character's controlled unit after entering the world" do
-      session = %State{guid: 23, ready: true, character: %Character{unit: %Unit{charm: 24}}}
+      character =
+        %Character{unit: %Unit{}, internal: %Internal{}}
+        |> Companion.activate(:possession, %EntityRef{guid: 24, entry: 1, spell_id: 126})
+
+      session = %State{guid: 23, ready: true, character: character}
 
       state = CmsgSetActiveMover.handle(%CmsgSetActiveMover{guid: 24}, session)
 

@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
+  alias ThistleTea.Game.Entity.Logic.Companion
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Hostility
@@ -393,10 +394,12 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
     end
   end
 
-  defp queue_feed_pet(%Character{unit: %{summon: pet_guid}} = character, %Cast{
+  defp queue_feed_pet(%Character{} = character, %Cast{
          spell: %Spell{range_yards: range_yards, effects: effects},
          resolution: %CastResolution{followups: %Followups{item_guid: item_guid}}
        }) do
+    pet_guid = Companion.summon_guid(character)
+
     case {pet_guid, item_guid, Enum.find(effects, &(&1.type == :feed_pet and is_integer(&1.trigger_spell_id)))} do
       {pet_guid, item_guid, %Spell.Effect{trigger_spell_id: trigger_spell_id}}
       when is_integer(pet_guid) and pet_guid > 0 and is_integer(item_guid) ->
@@ -525,11 +528,12 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
 
   defp start_channel(character, _casting), do: character
 
-  defp channel_target_guid(%{object: %{guid: guid}, unit: %{target: target, summon: pet_guid}}, %Cast{
+  defp channel_target_guid(%{object: %{guid: guid}, unit: %{target: target}} = character, %Cast{
          spell: %Spell{effects: effects},
          targets: %Target{} = targets
        }) do
     unit_guid = Target.unit_guid(targets)
+    pet_guid = if is_struct(character, Character), do: Companion.summon_guid(character)
 
     case pet_channel_target(pet_guid, effects) do
       nil -> preferred_channel_target(guid, unit_guid, target)
@@ -938,7 +942,11 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
   defp apply_impacts(character, _casting, _impacts, _now), do: character
 
   defp target_role(%{object: %{guid: guid}}, guid), do: :caster
-  defp target_role(%{unit: %{summon: pet_guid}}, pet_guid) when is_integer(pet_guid) and pet_guid > 0, do: :pet
+
+  defp target_role(%Character{} = caster, target_guid) do
+    if Companion.summon_guid(caster) == target_guid, do: :pet, else: :other
+  end
+
   defp target_role(_caster, _target_guid), do: :other
 
   defp dispatch_to_target(character, %CastContext{caster_guid: caster_guid} = context, spell, target_guid, now)

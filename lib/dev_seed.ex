@@ -14,6 +14,7 @@ defmodule ThistleTea.DevSeed do
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Mob
+  alias ThistleTea.Game.Entity.Logic.Companion
   alias ThistleTea.Game.Entity.Logic.Skills
   alias ThistleTea.Game.Entity.Logic.SpellBook
   alias ThistleTea.Game.Network.Message.CmsgCharCreate
@@ -144,9 +145,7 @@ defmodule ThistleTea.DevSeed do
 
   defp set_debug_ammo(character, _class), do: character
 
-  defp set_debug_pet(%Character{internal: internal} = character, 3) do
-    %{character | internal: %{internal | active_pet_entry: 2960, active_pet_spell_id: 1515}}
-  end
+  defp set_debug_pet(%Character{} = character, 3), do: Companion.suspend_as(character, :hunter_pet, 2960, 1515)
 
   defp set_debug_pet(character, _class), do: character
 

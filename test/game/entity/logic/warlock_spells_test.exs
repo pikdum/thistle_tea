@@ -4,6 +4,7 @@ defmodule ThistleTea.Game.Entity.Logic.WarlockSpellsTest do
   alias ThistleTea.Game.Aura
   alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.Character
+  alias ThistleTea.Game.Entity.Data.Companion.EntityRef
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
   alias ThistleTea.Game.Entity.Data.Component.Internal.Pet
@@ -17,6 +18,7 @@ defmodule ThistleTea.Game.Entity.Logic.WarlockSpellsTest do
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
   alias ThistleTea.Game.Entity.Logic.Casting
   alias ThistleTea.Game.Entity.Logic.Combat
+  alias ThistleTea.Game.Entity.Logic.Companion
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.SpellEffect
   alias ThistleTea.Game.Spell
@@ -117,7 +119,7 @@ defmodule ThistleTea.Game.Entity.Logic.WarlockSpellsTest do
 
       pet_guid = 999
       caster = character()
-      caster = %{caster | unit: %{caster.unit | summon: pet_guid}}
+      caster = Companion.activate(caster, :guardian, %EntityRef{guid: pet_guid, entry: 416, spell_id: 688})
 
       soul_link = %Spell{id: 19_028, name: "Soul Link", effects: [%Effect{type: :dummy, base_points: 0}]}
       context = %CastContext{caster_guid: 1, caster_level: 40}
@@ -778,15 +780,22 @@ defmodule ThistleTea.Game.Entity.Logic.WarlockSpellsTest do
   end
 
   defp character(overrides \\ []) do
+    {summon, overrides} = Keyword.pop(overrides, :summon)
     unit = struct(%Unit{health: 100, max_health: 100, power1: 100, max_power1: 100, level: 40, auras: []}, overrides)
 
-    %Character{
+    character = %Character{
       object: %Object{guid: 1},
       unit: unit,
       player: %Player{},
       internal: %Internal{world: %WorldRef{map_id: 0}, events: []},
       movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
     }
+
+    if is_integer(summon) and summon > 0 do
+      Companion.activate(character, :guardian, %EntityRef{guid: summon, entry: 416, spell_id: 688})
+    else
+      character
+    end
   end
 
   defp mob(auras \\ []) do

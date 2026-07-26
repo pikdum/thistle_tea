@@ -3,6 +3,8 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
 
   alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.Character
+  alias ThistleTea.Game.Entity.Data.Companion
+  alias ThistleTea.Game.Entity.Data.Companion.EntityRef
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Object
@@ -10,6 +12,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.Aura
+  alias ThistleTea.Game.Entity.Logic.Companion, as: CompanionLogic
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.SpellEffect
   alias ThistleTea.Game.Spell
@@ -914,11 +917,9 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
     test "call, revive, and dismiss use the stable hunter pet entry" do
       character = dead_character_fixture()
 
-      character = %{
-        character
-        | unit: %{character.unit | health: 100, summon: 44},
-          internal: %{character.internal | active_pet_entry: 1234}
-      }
+      character =
+        %{character | unit: %{character.unit | health: 100}}
+        |> CompanionLogic.activate(:hunter_pet, %EntityRef{guid: 44, entry: 1234, spell_id: 1515})
 
       context = %CastContext{caster_guid: 1, caster_level: 10}
 
@@ -933,7 +934,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
       dismiss_pet = %Spell{id: 2641, effects: [%Effect{index: 0, type: :dismiss_pet}]}
       {character, events} = SpellEffect.receive(character, context, dismiss_pet, 1_000)
       assert character.unit.summon == 0
-      assert character.internal.active_pet_entry == nil
+      assert character.internal.companion == Companion.none()
       assert [%Effects.DismissPet{target_guid: 44}] = events
     end
 

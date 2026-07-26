@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
   alias ThistleTea.Game.Entity.Data.Item, as: DataItem
   alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.Logic.Casting
+  alias ThistleTea.Game.Entity.Logic.Companion
   alias ThistleTea.Game.Entity.Logic.Hostility
   alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Entity.Logic.MeleeSpell
@@ -242,13 +243,10 @@ defmodule ThistleTea.Game.Player.Spellcasting do
     end
   end
 
-  defp feed_context(
-         %Character{unit: %Unit{summon: pet_guid}} = character,
-         %Spell{effects: effects},
-         %Target{} = targets
-       ) do
+  defp feed_context(%Character{} = character, %Spell{effects: effects}, %Target{} = targets) do
     item_guid = Target.item_guid(targets)
     feed_pet? = Enum.any?(effects, &(&1.type == :feed_pet))
+    pet_guid = Companion.summon_guid(character)
 
     if feed_pet? do
       %{item: owned_item_template(character, item_guid), pet: pet_feed_info(pet_guid)}
@@ -342,7 +340,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
   defp implicit_pet_guid(%Character{} = character, %Spell{effects: effects}) do
     pet_guid =
       if Enum.any?(effects, &(&1.type == :feed_pet)) do
-        character.unit.summon
+        Companion.summon_guid(character)
       else
         Character.controlled_guid(character)
       end

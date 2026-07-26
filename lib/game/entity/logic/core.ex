@@ -19,10 +19,10 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.CastPushback
   alias ThistleTea.Game.Entity.Logic.Combat
+  alias ThistleTea.Game.Entity.Logic.Companion
   alias ThistleTea.Game.Entity.Logic.Dueling
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Movement
-  alias ThistleTea.Game.Entity.Logic.Pet
   alias ThistleTea.Game.Entity.Logic.Reactive
   alias ThistleTea.Game.Entity.Logic.Resources
   alias ThistleTea.Game.Entity.Logic.Threat
@@ -332,24 +332,16 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
     }
 
     %{entity | unit: unit, internal: internal, movement_block: movement_block}
-    |> maybe_dismiss_pet()
-    |> maybe_release_charm()
+    |> maybe_release_companion()
     |> Combat.sync_combat_flag()
   end
 
-  defp maybe_dismiss_pet(%{player: _player} = entity) do
-    {entity, effects} = Pet.dismiss(entity, :owner_died)
+  defp maybe_release_companion(%{player: _player} = entity) do
+    {entity, effects} = Companion.dismiss(entity, :owner_died)
     Effects.enqueue(entity, effects)
   end
 
-  defp maybe_dismiss_pet(entity), do: entity
-
-  defp maybe_release_charm(%{player: _player, object: %{guid: guid}, unit: %Unit{charm: charm}} = entity)
-       when is_integer(charm) and charm > 0 do
-    Effects.enqueue(entity, Effects.release_controlled(guid, charm))
-  end
-
-  defp maybe_release_charm(entity), do: entity
+  defp maybe_release_companion(entity), do: entity
 
   defp spirit_damage_immune?(entity, opts) do
     Keyword.get(opts, :spell_id) != @spirit_of_redemption_suicide and holder_spell?(entity, @spirit_of_redemption_form)

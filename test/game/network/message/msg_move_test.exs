@@ -3,7 +3,10 @@ defmodule ThistleTea.Game.Network.Message.MsgMoveTest do
 
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Character
+  alias ThistleTea.Game.Entity.Data.Companion.EntityRef
+  alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Logic.Companion
   alias ThistleTea.Game.Entity.Server.Player.State
   alias ThistleTea.Game.Network.Message.MsgMove
 
@@ -16,7 +19,7 @@ defmodule ThistleTea.Game.Network.Message.MsgMoveTest do
         guid: 23,
         active_mover_guid: mover_guid,
         ready: true,
-        character: %Character{unit: %Unit{charm: mover_guid}}
+        character: controlled_character(mover_guid)
       }
 
       message = %MsgMove{opcode: :MSG_MOVE_HEARTBEAT, payload: <<1, 2, 3>>}
@@ -33,7 +36,7 @@ defmodule ThistleTea.Game.Network.Message.MsgMoveTest do
         guid: 23,
         active_mover_guid: mover_guid,
         ready: true,
-        character: %Character{unit: %Unit{charm: mover_guid + 1}}
+        character: controlled_character(mover_guid + 1)
       }
 
       message = %MsgMove{opcode: :MSG_MOVE_HEARTBEAT, payload: <<1, 2, 3>>}
@@ -41,5 +44,10 @@ defmodule ThistleTea.Game.Network.Message.MsgMoveTest do
       assert MsgMove.handle(message, session) == session
       refute_receive {:controlled_move, _, _}
     end
+  end
+
+  defp controlled_character(guid) do
+    %Character{unit: %Unit{}, internal: %Internal{}}
+    |> Companion.activate(:possession, %EntityRef{guid: guid, entry: 1, spell_id: 126})
   end
 end

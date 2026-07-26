@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.Entity.Logic.Hunter do
 
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Logic.AI.BT
+  alias ThistleTea.Game.Entity.Logic.Companion
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.PlayerCombat
   alias ThistleTea.Game.Entity.Logic.Reactive
@@ -160,13 +161,19 @@ defmodule ThistleTea.Game.Entity.Logic.Hunter do
 
   defp validate_feed_context(_context), do: {:error, :bad_targets}
 
-  defp validate_tame_target(%{unit: %{summon: summon}}, _target) when is_integer(summon) and summon > 0,
-    do: {:error, :already_have_summon}
-
-  defp validate_tame_target(%{unit: %{level: level}}, %{tameable?: true, level: target_level})
-       when is_integer(level) and is_integer(target_level) and target_level <= level, do: :ok
+  defp validate_tame_target(%Character{} = caster, target) do
+    case Companion.relationship(caster) do
+      %{status: status} when status != :none -> {:error, :already_have_summon}
+      _ -> validate_tame_level(caster, target)
+    end
+  end
 
   defp validate_tame_target(_caster, _target), do: {:error, :bad_targets}
+
+  defp validate_tame_level(%Character{unit: %{level: level}}, %{tameable?: true, level: target_level})
+       when is_integer(level) and is_integer(target_level) and target_level <= level, do: :ok
+
+  defp validate_tame_level(_caster, _target), do: {:error, :bad_targets}
 
   defp tame_creature?(%Spell{effects: effects}), do: Enum.any?(effects, &(&1.type == :tame_creature))
   defp feed_pet?(%Spell{effects: effects}), do: Enum.any?(effects, &(&1.type == :feed_pet))

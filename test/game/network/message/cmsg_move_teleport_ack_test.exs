@@ -11,7 +11,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgMoveTeleportAckTest do
       state = CmsgMoveTeleportAck.handle(%CmsgMoveTeleportAck{guid: 1, counter: 7}, state)
 
       assert state.pending_movement_acks == %{}
-      assert_receive :restore_active_pet
+      assert_receive :restore_companion
     end
 
     test "does not restore a pet for a stale teleport acknowledgement" do
@@ -20,7 +20,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgMoveTeleportAckTest do
       state = CmsgMoveTeleportAck.handle(%CmsgMoveTeleportAck{guid: 1, counter: 6}, state)
 
       assert state.pending_movement_acks == %{7 => :teleport}
-      refute_receive :restore_active_pet
+      refute_receive :restore_companion
     end
   end
 end

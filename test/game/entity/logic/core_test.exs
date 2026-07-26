@@ -4,6 +4,8 @@ defmodule ThistleTea.Game.Entity.Logic.CoreTest do
   alias ThistleTea.Game.Aura
   alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.Character
+  alias ThistleTea.Game.Entity.Data.Companion
+  alias ThistleTea.Game.Entity.Data.Companion.EntityRef
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
   alias ThistleTea.Game.Entity.Data.Component.Internal.Loot
@@ -12,6 +14,7 @@ defmodule ThistleTea.Game.Entity.Logic.CoreTest do
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Logic.Companion, as: LogicCompanion
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Spell
@@ -109,7 +112,7 @@ defmodule ThistleTea.Game.Entity.Logic.CoreTest do
 
       assert Core.dead?(entity)
       assert entity.unit.summon == 0
-      assert entity.internal.active_pet_entry == nil
+      assert entity.internal.companion == %Companion{kind: :hunter_pet, status: {:suspended, 416, 688}}
 
       assert Enum.any?(
                entity.internal.events,
@@ -135,13 +138,19 @@ defmodule ThistleTea.Game.Entity.Logic.CoreTest do
 
     test "queues a charm release when a player dies while controlling a unit" do
       entity = player_with_pet(health: 30, summon: 0)
-      entity = %{entity | unit: %{entity.unit | charm: 555}}
+
+      entity =
+        LogicCompanion.activate(
+          entity,
+          :charm,
+          %EntityRef{guid: 555, entry: 1, spell_id: 1098}
+        )
 
       {entity, _absorbed} = Core.take_damage_with_absorb(entity, 30, 1_000, source: 777)
 
       assert Enum.any?(
                entity.internal.events,
-               &match?(%Effects.ReleaseControlled{source_guid: 6, target_guid: 555, spell_id: nil}, &1)
+               &match?(%Effects.ReleaseControlled{source_guid: 6, target_guid: 555, spell_id: 1098}, &1)
              )
     end
   end
@@ -406,12 +415,20 @@ defmodule ThistleTea.Game.Entity.Logic.CoreTest do
   defp player_with_pet(opts) do
     base = damageable(opts)
 
-    %Character{
+    character = %Character{
       object: %Object{guid: 6},
       player: %Player{},
-      unit: %{base.unit | summon: Keyword.get(opts, :summon, 0)},
+      unit: base.unit,
       internal: base.internal,
       movement_block: base.movement_block
     }
+
+    case Keyword.get(opts, :summon, 0) do
+      guid when is_integer(guid) and guid > 0 ->
+        LogicCompanion.activate(character, :hunter_pet, %EntityRef{guid: guid, entry: 416, spell_id: 688})
+
+      _ ->
+        character
+    end
   end
 end

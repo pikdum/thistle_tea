@@ -5,11 +5,14 @@ defmodule ThistleTea.Game.Entity.Server.PlayerTest do
   alias ThistleTea.Account
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Character
+  alias ThistleTea.Game.Entity.Data.Companion
+  alias ThistleTea.Game.Entity.Data.Companion.EntityRef
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Logic.Companion, as: CompanionLogic
   alias ThistleTea.Game.Entity.Logic.Regen
   alias ThistleTea.Game.Entity.Server.Player, as: PlayerServer
   alias ThistleTea.Game.Entity.Server.Player.State
@@ -195,7 +198,7 @@ defmodule ThistleTea.Game.Entity.Server.PlayerTest do
 
       assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgPetSpells{pet_guid: 0}}}
       assert_receive {:"$gen_cast", {:send_packet, %Message.MsgMoveTeleportAck{}}}
-      refute_receive :restore_active_pet
+      refute_receive :restore_companion
     end
 
     test "updates the public group leader player flag" do
@@ -338,6 +341,13 @@ defmodule ThistleTea.Game.Entity.Server.PlayerTest do
                PlayerServer.handle_info({:pet_attached, update, 688, []}, state)
 
       assert attached.character.unit.summon == pet_guid
+
+      assert attached.character.internal.companion ==
+               %Companion{
+                 kind: :guardian,
+                 status: {:active, %EntityRef{guid: pet_guid, entry: 1863, spell_id: 688}}
+               }
+
       assert MapSet.member?(attached.tracked_entities, pet_guid)
       assert_receive {:"$gen_cast", {:write_packet, %Packet{}}}
 
@@ -421,12 +431,24 @@ defmodule ThistleTea.Game.Entity.Server.PlayerTest do
   end
 
   defp character(guid, unit_attrs) do
-    %Character{
+    {summon, unit_attrs} = Keyword.pop(unit_attrs, :summon)
+
+    character = %Character{
       object: object(guid),
       unit: struct(unit(), unit_attrs),
       internal: %Internal{world: %WorldRef{map_id: 0}},
       movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
     }
+
+    if is_integer(summon) and summon > 0 do
+      CompanionLogic.activate(character, :guardian, %EntityRef{
+        guid: summon,
+        entry: Guid.entry(summon),
+        spell_id: 688
+      })
+    else
+      character
+    end
   end
 
   defp login_character(id, guid, account_id) do

@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal do
   phase), and `Internal.Summon` (summoned game objects) — which stay nil on
   entities they don't apply to.
   """
+  alias ThistleTea.Game.Entity.Data.Companion
   alias ThistleTea.Game.WorldRef
 
   defstruct [
@@ -29,8 +30,6 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal do
     :ritual,
     :totem,
     :duel,
-    :active_pet_entry,
-    :active_pet_spell_id,
     :auto_shot,
     :fishing,
     :event,
@@ -60,6 +59,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal do
     :combo_target_guid,
     :undetectable_until,
     world: WorldRef.open(0),
+    companion: Companion.none(),
     rest_bonus: 0.0,
     mailbox: [],
     starting_items: [],

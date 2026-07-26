@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Entity.EventSink.Summons do
   alias ThistleTea.Game.Entity.Data.GameObject
   alias ThistleTea.Game.Entity.Data.GameObjectTemplate, as: DataGameObjectTemplate
   alias ThistleTea.Game.Entity.Data.Mob
+  alias ThistleTea.Game.Entity.Logic.Companion
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Server.DynamicObject, as: DynamicObjectServer
   alias ThistleTea.Game.Guid
@@ -218,7 +219,7 @@ defmodule ThistleTea.Game.Entity.EventSink.Summons do
     with %Mob{} = built_pet <- SummonLoader.build_pet(entry, entity),
          pet = %{built_pet | unit: %{built_pet.unit | created_by_spell: spell_id}},
          {:ok, pid} <- MobLoader.start_mob(pet) do
-      old_pet_guid = entity.unit.summon
+      old_pet_guid = Companion.summon_guid(entity)
 
       if is_integer(old_pet_guid) and old_pet_guid > 0 and old_pet_guid != pet.object.guid do
         World.stop_entity(old_pet_guid)

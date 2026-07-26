@@ -4,10 +4,10 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.SummonControl do
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Logic.AI.BT.Combat, as: BTCombat
   alias ThistleTea.Game.Entity.Logic.Aura
+  alias ThistleTea.Game.Entity.Logic.Companion
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Death
   alias ThistleTea.Game.Entity.Logic.Effects
-  alias ThistleTea.Game.Entity.Logic.Pet
   alias ThistleTea.Game.Entity.Logic.PlayerCombat
   alias ThistleTea.Game.Entity.Logic.Rogue
   alias ThistleTea.Game.Entity.Logic.SpellEffect.Amount
@@ -61,19 +61,16 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.SummonControl do
     {state, [Effects.summon_pet(caster_guid, entry, spell_id)]}
   end
 
-  def apply(
-        %Character{internal: %{active_pet_entry: entry}} = state,
-        %CastContext{caster_guid: caster_guid},
-        %Spell{id: spell_id},
-        %Effect{type: type, misc_value: 0},
-        _now
-      )
-      when type in [:summon_pet, :revive_pet] and is_integer(entry) and entry > 0 do
-    {state, [Effects.summon_pet(caster_guid, entry, spell_id)]}
+  def apply(%Character{} = state, %CastContext{caster_guid: caster_guid}, %Spell{id: spell_id}, effect, _now)
+      when effect.type in [:summon_pet, :revive_pet] and effect.misc_value == 0 do
+    case Companion.entry(state) do
+      entry when is_integer(entry) and entry > 0 -> {state, [Effects.summon_pet(caster_guid, entry, spell_id)]}
+      _ -> {state, []}
+    end
   end
 
   def apply(%Character{} = state, %CastContext{}, _spell, %Effect{type: :dismiss_pet}, _now) do
-    Pet.dismiss(state)
+    Companion.dismiss(state)
   end
 
   def apply(state, %CastContext{}, spell, %Effect{type: :summon_game_object, misc_value: entry}, _now)

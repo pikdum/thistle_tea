@@ -2,6 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgPetNameQuery do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_PET_NAME_QUERY
 
+  alias ThistleTea.Game.Entity.Logic.Companion
   alias ThistleTea.Game.World.Metadata
 
   defstruct [:pet_number, :pet_guid]
@@ -9,18 +10,20 @@ defmodule ThistleTea.Game.Network.Message.CmsgPetNameQuery do
   @impl ClientMessage
   def handle(
         %__MODULE__{pet_number: pet_number, pet_guid: pet_guid},
-        %{guid: owner_guid, character: %Character{unit: %Unit{summon: pet_guid}}} = state
+        %{guid: owner_guid, character: %Character{} = c} = state
       ) do
-    case Metadata.query(pet_guid, [:name, :owner_guid]) do
-      %{name: name, owner_guid: ^owner_guid} when is_binary(name) ->
-        Network.send_packet(%Message.SmsgPetNameQueryResponse{
-          pet_number: pet_number,
-          name: name,
-          timestamp: System.system_time(:second)
-        })
+    if Companion.summon_guid(c) == pet_guid do
+      case Metadata.query(pet_guid, [:name, :owner_guid]) do
+        %{name: name, owner_guid: ^owner_guid} when is_binary(name) ->
+          Network.send_packet(%Message.SmsgPetNameQueryResponse{
+            pet_number: pet_number,
+            name: name,
+            timestamp: System.system_time(:second)
+          })
 
-      _ ->
-        :ok
+        _ ->
+          :ok
+      end
     end
 
     state

@@ -15,7 +15,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgMoveTeleportAck do
         state = Visibility.refresh_player(state)
 
         # The 1.12 client can crash if pet attachment packets arrive before it finishes the teleport.
-        send(self(), :restore_active_pet)
+        send(self(), :restore_companion)
 
         state
         |> MovementControl.maybe_finish_repop()

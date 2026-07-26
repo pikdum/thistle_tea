@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.ControlSyncTest do
   alias ThistleTea.Game.Aura
   alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.Character
+  alias ThistleTea.Game.Entity.Data.Companion.EntityRef
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Internal.Pet
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
@@ -14,6 +15,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.ControlSyncTest do
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
   alias ThistleTea.Game.Entity.Logic.Aura.ControlSync
+  alias ThistleTea.Game.Entity.Logic.Companion
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Effect
@@ -139,11 +141,13 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.ControlSyncTest do
 
       holder = %Holder{spell: spell, caster_guid: 10, auras: [%Aura{type: :dummy}]}
 
-      character = %Character{
-        object: %Object{guid: 10},
-        unit: %Unit{charm: 20, auras: [holder]},
-        internal: %Internal{}
-      }
+      character =
+        %Character{
+          object: %Object{guid: 10},
+          unit: %Unit{auras: [holder]},
+          internal: %Internal{}
+        }
+        |> Companion.activate(:possession, %EntityRef{guid: 20, entry: 4277, spell_id: 126})
 
       {_character, events} = AuraLogic.remove_spells(character, [126], 1_000)
 
