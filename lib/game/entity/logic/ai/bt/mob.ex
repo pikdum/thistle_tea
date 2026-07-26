@@ -831,15 +831,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
         perception: perception
       })
       when is_integer(target) and target > 0 do
-    cond do
-      not Movement.moving?(state, now) ->
-        {:success, state, Blackboard.clear_spreading(blackboard)}
-
-      Blackboard.spreading?(blackboard) ->
-        {:success, state, blackboard}
-
-      true ->
-        maybe_halt_at_contact(state, blackboard, target, now, perception)
+    if Blackboard.spreading?(blackboard) and Movement.moving?(state, now) do
+      {:success, state, blackboard}
+    else
+      maybe_halt_at_contact(state, Blackboard.clear_spreading(blackboard), target, now, perception)
     end
   end
 
@@ -847,15 +842,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
 
   def halt_at_contact(%Mob{unit: %Unit{target: target}} = state, %Blackboard{} = blackboard, now)
       when is_integer(target) and target > 0 and is_integer(now) do
-    cond do
-      not Movement.moving?(state, now) ->
-        {:success, state, Blackboard.clear_spreading(blackboard)}
-
-      Blackboard.spreading?(blackboard) ->
-        {:success, state, blackboard}
-
-      true ->
-        maybe_halt_at_contact(state, blackboard, target, now)
+    if Blackboard.spreading?(blackboard) and Movement.moving?(state, now) do
+      {:success, state, blackboard}
+    else
+      maybe_halt_at_contact(state, Blackboard.clear_spreading(blackboard), target, now)
     end
   end
 
@@ -866,9 +856,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
          true <- within_contact?(state, target, {tx, ty}) do
       state =
         state
-        |> Movement.halt(now)
-        |> face_position({tx, ty})
-        |> Effects.enqueue(Effects.movement_stopped())
+        |> maybe_halt(now)
+        |> face_target(target, {tx, ty})
 
       {:success, state, blackboard}
     else
@@ -881,9 +870,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
          true <- within_contact?(state, target, {tx, ty}, perception) do
       state =
         state
-        |> Movement.halt(now)
-        |> face_position({tx, ty})
-        |> Effects.enqueue(Effects.movement_stopped())
+        |> maybe_halt(now)
+        |> face_target(target, {tx, ty})
 
       {:success, state, blackboard}
     else
@@ -912,8 +900,25 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     own_combat_reach(state) + target_combat_reach(target_guid, perception)
   end
 
-  defp face_position(%Mob{movement_block: %MovementBlock{position: {mx, my, _mz, _o}}} = state, {tx, ty}) do
-    set_orientation(state, :math.atan2(ty - my, tx - mx))
+  defp maybe_halt(%Mob{} = state, now) do
+    if Movement.moving?(state, now) do
+      state
+      |> Movement.halt(now)
+      |> Effects.enqueue(Effects.movement_stopped())
+    else
+      state
+    end
+  end
+
+  defp face_target(%Mob{movement_block: %MovementBlock{position: {_, _, _, previous}}} = state, target, position) do
+    state = Movement.face_towards(state, position)
+    {_, _, _, orientation} = state.movement_block.position
+
+    if orientation == previous do
+      state
+    else
+      Effects.enqueue(state, Effects.set_facing({:target, target}))
+    end
   end
 
   defp maybe_spread_with_context(%Mob{} = state, %Blackboard{} = blackboard, %Context{} = context) do

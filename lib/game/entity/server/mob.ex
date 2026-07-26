@@ -88,6 +88,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     state = Incarnation.ensure(state)
     state = BT.init(state, behavior_tree(state))
     Metadata.update(state.object.guid, %{incarnation_id: Incarnation.id(state)})
+    state = sync_orientation_metadata(state)
     World.update_position(state)
     state = Visibility.join_entity(state)
 
@@ -422,11 +423,11 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
         } = state
       ) do
     movement_block = MovementBlock.from_binary(payload, movement_block)
-    {x, y, z, orientation} = movement_block.position
+    {x, y, z, _orientation} = movement_block.position
     state = %{state | movement_block: movement_block, unit: %{state.unit | stand_state: 0}}
 
     World.update_position(state)
-    Metadata.update(state.object.guid, %{orientation: orientation})
+    sync_orientation_metadata(state)
     state = Visibility.refresh_entity(state)
 
     BinaryUtils.pack_guid(state.object.guid)
@@ -646,6 +647,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
       state
       |> maybe_finalize_death()
       |> broadcast_if_pending()
+      |> sync_orientation_metadata()
 
     {:noreply, state}
   end
@@ -661,7 +663,6 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
           health_pct: Core.health_pct(state),
           power_type: state.unit.power_type,
           unit_flags: state.unit.flags,
-          orientation: elem(state.movement_block.position, 3),
           aura_sources: Aura.source_spells(state),
           dispel_options: Aura.dispel_options(state),
           attacker_spell_hit_chance: Aura.attacker_spell_hit_chance(state)
@@ -676,6 +677,16 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   end
 
   defp broadcast_if_pending(%Mob{} = state), do: state
+
+  defp sync_orientation_metadata(
+         %Mob{object: %{guid: guid}, movement_block: %MovementBlock{position: {_x, _y, _z, orientation}}} = state
+       )
+       when is_integer(guid) and is_number(orientation) do
+    Metadata.update(guid, %{orientation: orientation})
+    state
+  end
+
+  defp sync_orientation_metadata(%Mob{} = state), do: state
 
   @impl GenServer
   def terminate(_reason, state) do

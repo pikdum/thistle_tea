@@ -229,6 +229,20 @@ defmodule ThistleTea.Game.Entity.Logic.MovementTest do
     assert updated.internal.movement_start_time == entity.internal.movement_start_time
   end
 
+  test "sync_position faces the active spline segment" do
+    entity =
+      build_entity(
+        start_time: 0,
+        start_position: {0.0, 0.0, 0.0},
+        duration: 2_000,
+        spline_nodes: [{10.0, 0.0, 0.0}, {10.0, 10.0, 0.0}]
+      )
+
+    updated = Movement.sync_position(entity, 1_500)
+
+    assert updated.movement_block.position == {10.0, 5.0, 0.0, :math.pi() / 2}
+  end
+
   test "sync_position finalizes movement when complete" do
     now = 5_000
 
@@ -296,8 +310,19 @@ defmodule ThistleTea.Game.Entity.Logic.MovementTest do
       result = Movement.move_along_path(entity, [{2.0, 0.0, 0.0}, {5.0, 1.0, 0.0}], [], 5_000)
 
       assert result.movement_block.spline_nodes == [{2.0, 0.0, 0.0}, {5.0, 1.0, 0.0}]
+      assert result.movement_block.position == {0.0, 0.0, 0.0, 0.0}
       assert result.internal.movement_start_time == 5_000
       assert [_event] = result.internal.events
+    end
+
+    test "faces the first supplied path segment immediately" do
+      entity =
+        build_entity(position: {0.0, 0.0, 0.0, 0.0}, spline_nodes: nil)
+        |> then(&%{&1 | movement_block: %{&1.movement_block | walk_speed: 2.5, run_speed: 7.0}})
+
+      result = Movement.move_along_path(entity, [{0.0, 5.0, 0.0}], [], 5_000)
+
+      assert result.movement_block.position == {0.0, 0.0, 0.0, :math.pi() / 2}
     end
   end
 end

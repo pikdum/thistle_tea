@@ -344,7 +344,32 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
       assert state.movement_block.spline_nodes == []
       assert state.movement_block.position == {2.0, 0.0, 0.0, 0.0}
       assert is_nil(state.internal.movement_start_time)
-      assert [%Effects.MovementStopped{}] = state.internal.events
+
+      assert [
+               %Effects.MovementStopped{},
+               %Effects.SetFacing{facing: {:target, ^target_guid}}
+             ] = state.internal.events
+    end
+
+    test "re-faces a stationary target that crosses through melee range" do
+      target_guid = player_guid()
+      SpatialHash.update(:players, target_guid, 0, -2.0, 0.0, 0.0)
+      on_exit(fn -> SpatialHash.remove(:players, target_guid) end)
+
+      state =
+        fixture_mob(
+          start_time: nil,
+          position: {0.0, 0.0, 0.0, 0.0},
+          movement_start_position: nil,
+          spline_nodes: []
+        )
+
+      state = put_in(state.unit.target, target_guid)
+
+      assert {:success, state, %Blackboard{}} = MobBT.halt_at_contact(state, %Blackboard{}, 2_000)
+      {_x, _y, _z, orientation} = state.movement_block.position
+      assert_in_delta abs(orientation), :math.pi(), 0.0001
+      assert [%Effects.SetFacing{facing: {:target, ^target_guid}}] = state.internal.events
     end
 
     test "keeps moving outside the contact ring" do

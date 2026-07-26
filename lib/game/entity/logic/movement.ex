@@ -190,7 +190,7 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
     entity = increment_spline_id(entity)
 
     %{
-      movement_block: %MovementBlock{walk_speed: walk_speed, position: {x0, y0, z0, _o}} = mb,
+      movement_block: %MovementBlock{walk_speed: walk_speed, position: {x0, y0, z0, orientation}} = mb,
       internal: %Internal{running: running, spline_id: spline_id} = internal
     } = entity
 
@@ -204,10 +204,12 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
       |> max(1)
 
     internal = %{internal | movement_start_time: now, movement_start_position: {x0, y0, z0}}
+    {_position, orientation} = pose_along_path([{x0, y0, z0} | path], 0.0, orientation)
 
     movement_block = %{
       mb
-      | spline_nodes: path,
+      | position: {x0, y0, z0, orientation},
+        spline_nodes: path,
         duration: duration,
         time_passed: 0,
         movement_flags: movement_flags(mb.movement_flags, running),
@@ -242,14 +244,15 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
   defp remaining_spline_entity(
          %{
            internal: %Internal{movement_start_time: start_time, movement_start_position: start_position},
-           movement_block: %MovementBlock{spline_nodes: spline_nodes, duration: duration, position: {_, _, _, o}} = mb
+           movement_block:
+             %MovementBlock{spline_nodes: spline_nodes, duration: duration, position: {_, _, _, orientation}} = mb
          } = entity,
          now
        ) do
     elapsed = min(max(now - start_time, 0), duration)
     path = [start_position | spline_nodes]
     travelled = path_length(path) * elapsed / duration
-    {x, y, z} = position_at(start_position, spline_nodes, duration, elapsed)
+    {{x, y, z}, orientation} = pose_along_path(path, travelled, orientation)
 
     case nodes_after(path, travelled) do
       [] ->
@@ -258,7 +261,7 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
       remaining_nodes ->
         movement_block = %{
           mb
-          | position: {x, y, z, o},
+          | position: {x, y, z, orientation},
             spline_nodes: remaining_nodes,
             duration: max(remaining_move_duration(entity, now), 1)
         }
@@ -303,6 +306,21 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
     %{entity | movement_block: movement_block, internal: internal}
   end
 
+  def face_towards(
+        %{movement_block: %MovementBlock{position: {x, y, z, _orientation}} = movement_block} = entity,
+        {target_x, target_y}
+      )
+      when is_number(target_x) and is_number(target_y) do
+    if target_x == x and target_y == y do
+      entity
+    else
+      orientation = :math.atan2(target_y - y, target_x - x)
+      %{entity | movement_block: %{movement_block | position: {x, y, z, orientation}}}
+    end
+  end
+
+  def face_towards(entity, _target), do: entity
+
   def blocked?(%{movement_block: %MovementBlock{movement_flags: flags}})
       when is_integer(flags) and (flags &&& @movement_flag_root) > 0 do
     true
@@ -318,7 +336,8 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
 
   defp update_position_from_spline(
          %{
-           movement_block: %MovementBlock{duration: duration, spline_nodes: spline_nodes, position: {_, _, _, o}} = mb,
+           movement_block:
+             %MovementBlock{duration: duration, spline_nodes: spline_nodes, position: {_, _, _, orientation}} = mb,
            internal: %Internal{movement_start_time: start_time, movement_start_position: start_position}
          } = entity,
          now
@@ -330,15 +349,15 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
     path = [start_position | spline_nodes]
     total_distance = path_length(path)
 
-    {x, y, z} =
+    {{x, y, z}, orientation} =
       if total_distance <= 0 do
-        List.last(path)
+        {List.last(path), orientation}
       else
         distance_travelled = total_distance * elapsed / duration
-        point_along_path(path, distance_travelled)
+        pose_along_path(path, distance_travelled, orientation)
       end
 
-    movement_block = %{mb | position: {x, y, z, o}, time_passed: elapsed}
+    movement_block = %{mb | position: {x, y, z, orientation}, time_passed: elapsed}
     entity = %{entity | movement_block: movement_block}
 
     if elapsed >= duration do
@@ -366,8 +385,8 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
 
   defp finalize_movement(
          %{
-           movement_block: %MovementBlock{spline_nodes: spline_nodes, position: {_, _, _, o}} = mb,
-           internal: %Internal{} = internal
+           movement_block: %MovementBlock{spline_nodes: spline_nodes, position: {_, _, _, orientation}} = mb,
+           internal: %Internal{movement_start_position: start_position} = internal
          } = entity
        ) do
     case spline_nodes do
@@ -379,10 +398,12 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
 
       _ ->
         {x, y, z} = List.last(spline_nodes)
+        path = if is_tuple(start_position), do: [start_position | spline_nodes], else: spline_nodes
+        {_position, orientation} = pose_along_path(path, path_length(path), orientation)
 
         movement_block = %{
           mb
-          | position: {x, y, z, o},
+          | position: {x, y, z, orientation},
             spline_nodes: [],
             movement_flags: 0,
             time_passed: mb.duration,
@@ -406,27 +427,12 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
       List.last(path)
     else
       elapsed = min(max(elapsed, 0), duration)
-      lerp_along_path(path, total_distance * elapsed / duration)
+      {position, _orientation} = pose_along_path(path, total_distance * elapsed / duration, 0.0)
+      position
     end
   end
 
   def position_at(start_position, _spline_nodes, _duration, _elapsed), do: start_position
-
-  defp lerp_along_path([start | rest], distance) do
-    case Enum.reduce_while(rest, {start, distance}, fn node, {prev, remaining} ->
-           segment_distance = segment_distance(prev, node)
-
-           # credo:disable-for-next-line Credo.Check.Refactor.Nesting
-           if remaining <= segment_distance do
-             {:halt, {:point, lerp_point(prev, node, segment_distance, remaining)}}
-           else
-             {:cont, {node, remaining - segment_distance}}
-           end
-         end) do
-      {:point, point} -> point
-      {last, _remaining} -> last
-    end
-  end
 
   defp lerp_point({x1, y1, z1}, {x2, y2, z2}, segment_distance, remaining) when segment_distance > 0 do
     t = remaining / segment_distance
@@ -573,23 +579,31 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
     Math.movement_duration(start, finish, 1.0)
   end
 
-  defp point_along_path([start | rest], distance) do
-    case Enum.reduce_while(rest, {start, distance}, fn node, {prev, remaining} ->
-           segment_distance = segment_distance(prev, node)
+  defp pose_along_path([start | rest], distance, orientation) do
+    rest
+    |> Enum.reduce_while({start, distance, orientation}, fn node, {previous, remaining, previous_orientation} ->
+      segment_distance = segment_distance(previous, node)
+      orientation = segment_orientation(previous, node, previous_orientation)
 
-           # credo:disable-for-next-line Credo.Check.Refactor.Nesting
-           if remaining <= segment_distance do
-             point = lerp_point(prev, node, segment_distance, remaining)
-             {:halt, {:point, point}}
-           else
-             {:cont, {node, remaining - segment_distance}}
-           end
-         end) do
-      {:point, point} ->
-        point
+      cond do
+        segment_distance <= 0 ->
+          {:cont, {node, remaining, orientation}}
 
-      {last, _remaining} ->
-        last
+        remaining <= segment_distance ->
+          position = lerp_point(previous, node, segment_distance, max(remaining, 0.0))
+          {:halt, {:pose, position, orientation}}
+
+        true ->
+          {:cont, {node, remaining - segment_distance, orientation}}
+      end
+    end)
+    |> case do
+      {:pose, position, orientation} -> {position, orientation}
+      {last, _remaining, orientation} -> {last, orientation}
     end
+  end
+
+  defp segment_orientation({x1, y1, _z1}, {x2, y2, _z2}, fallback) do
+    if x1 == x2 and y1 == y2, do: fallback, else: :math.atan2(y2 - y1, x2 - x1)
   end
 end

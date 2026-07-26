@@ -390,6 +390,23 @@ defmodule ThistleTea.Game.Entity.Data.MobTest do
   end
 
   describe "handle_continue/2" do
+    test "publishes the authoritative orientation after a mob transition" do
+      mob_guid = Guid.from_low_guid(:mob, 2, System.unique_integer([:positive]))
+
+      Metadata.put(mob_guid, %{orientation: 0.0})
+      on_exit(fn -> Metadata.delete(mob_guid) end)
+
+      mob = %Mob{
+        object: %Object{guid: mob_guid},
+        unit: %Unit{health: 1, max_health: 1},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, :math.pi()}},
+        internal: %Internal{broadcast_update?: false}
+      }
+
+      assert {:noreply, %Mob{}} = MobServer.handle_continue(:maybe_broadcast, mob)
+      assert Metadata.query(mob_guid, [:orientation]) == %{orientation: :math.pi()}
+    end
+
     test "finalizes a death that did not arrive through an attack" do
       player_guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
       mob_guid = Guid.from_low_guid(:mob, 2, System.unique_integer([:positive]))

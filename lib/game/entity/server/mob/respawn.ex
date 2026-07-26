@@ -164,6 +164,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Respawn do
       incarnation_id: Incarnation.id(state),
       alive?: state.unit.health > 0,
       health_pct: Core.health_pct(state),
+      orientation: elem(state.movement_block.position, 3),
       attacker_spell_hit_chance: Aura.attacker_spell_hit_chance(state)
     })
 
