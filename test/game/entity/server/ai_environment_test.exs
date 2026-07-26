@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironmentTest do
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.WorldRef
+  alias ThistleTea.Native.Namigator
 
   describe "context/3" do
     test "captures an immutable observation of an explicit actor" do
@@ -58,6 +59,92 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironmentTest do
       perception = AIEnvironment.context(mob, 1_000).perception
 
       assert Perception.nearby(perception, :players, 150.0) == [{actor_guid, 100.0}]
+    end
+
+    test "checks line of sight only for combat-relevant actors" do
+      world = %WorldRef{map_id: 999}
+      target_guid = Guid.from_low_guid(:player, 98_004)
+      nearby_guids = Enum.map(1..20, &Guid.from_low_guid(:mob, 1, 98_004 + &1))
+
+      put_actor(:players, target_guid, world, 10.0)
+
+      Enum.with_index(nearby_guids, 1)
+      |> Enum.each(fn {guid, offset} -> put_actor(:mobs, guid, world, offset / 100) end)
+
+      on_exit(fn ->
+        remove_actor(:players, target_guid)
+        Enum.each(nearby_guids, &remove_actor(:mobs, &1))
+      end)
+
+      tracer = start_line_of_sight_trace()
+
+      mob = mob(world)
+      mob = %{mob | unit: %{mob.unit | target: target_guid}, internal: %{mob.internal | in_combat: true}}
+      perception = AIEnvironment.context(mob, 1_000).perception
+
+      assert length(Perception.nearby(perception, :mobs, 2.0)) == 20
+      assert line_of_sight_call_count(tracer) == 1
+    end
+
+    test "bounds a regular combat snapshot to nearby movement coordination" do
+      world = %WorldRef{map_id: 999}
+      actor_guid = Guid.from_low_guid(:mob, 1, 98_025)
+
+      put_actor(:mobs, actor_guid, world, 3.0)
+      on_exit(fn -> remove_actor(:mobs, actor_guid) end)
+
+      mob = mob(world)
+      mob = %{mob | internal: %{mob.internal | in_combat: true}}
+      perception = AIEnvironment.context(mob, 1_000).perception
+
+      assert Perception.nearby(perception, :mobs, 75.0) == []
+    end
+  end
+
+  defp put_actor(kind, guid, world, distance) do
+    SpatialHash.update(kind, guid, world, distance, 0.0, 0.0)
+    Metadata.put(guid, %{alive?: true, level: 10})
+  end
+
+  defp remove_actor(kind, guid) do
+    SpatialHash.remove(kind, guid)
+    Metadata.delete(guid)
+  end
+
+  defp start_line_of_sight_trace do
+    test_pid = self()
+    tracer = spawn_link(fn -> line_of_sight_tracer(0) end)
+    :erlang.trace(test_pid, true, [:call, {:tracer, tracer}])
+    :erlang.trace_pattern({Namigator, :line_of_sight, 7}, true, [])
+
+    on_exit(fn ->
+      :erlang.trace_pattern({Namigator, :line_of_sight, 7}, false, [])
+    end)
+
+    tracer
+  end
+
+  defp line_of_sight_call_count(tracer) do
+    send(tracer, {:count, self()})
+
+    receive do
+      {:line_of_sight_call_count, count} ->
+        send(tracer, :stop)
+        count
+    end
+  end
+
+  defp line_of_sight_tracer(count) do
+    receive do
+      {:trace, _pid, :call, {Namigator, :line_of_sight, _args}} ->
+        line_of_sight_tracer(count + 1)
+
+      {:count, caller} ->
+        send(caller, {:line_of_sight_call_count, count})
+        line_of_sight_tracer(count)
+
+      :stop ->
+        :ok
     end
   end
 

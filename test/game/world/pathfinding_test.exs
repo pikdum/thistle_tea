@@ -25,6 +25,19 @@ defmodule ThistleTea.Game.World.PathfindingTest do
     test "an unloaded map fails open" do
       assert Pathfinding.line_of_sight?(999, {0.0, 0.0, 0.0}, {1.0, 1.0, 1.0})
     end
+
+    test "serves concurrent rays from a loaded ADT" do
+      results =
+        1..200
+        |> Task.async_stream(
+          fn _ -> Pathfinding.line_of_sight?(0, @human_start, {-8955.0, -140.0, 84.0}) end,
+          max_concurrency: 20,
+          ordered: false
+        )
+        |> Enum.to_list()
+
+      assert Enum.all?(results, &(&1 == {:ok, true}))
+    end
   end
 
   describe "snap_to_ground/2" do

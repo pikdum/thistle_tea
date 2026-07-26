@@ -13,6 +13,7 @@
 #include <fine/sync.hpp>
 
 #include "pathfind/pathfind_c_bindings.hpp"
+#include "utility/MathHelper.hpp"
 
 class PathfindError : public std::runtime_error {
 public:
@@ -42,7 +43,12 @@ public:
 
   pathfind::Map *get() const { return map.get(); }
 
-  std::unique_lock<fine::Mutex> acquire() { return std::unique_lock(mutex); }
+  std::unique_lock<fine::SharedMutex> acquire() {
+    return std::unique_lock(mutex);
+  }
+  std::shared_lock<fine::SharedMutex> acquire_shared() {
+    return std::shared_lock(mutex);
+  }
 
 private:
   static bool ok(PathfindResultType result) {
@@ -51,7 +57,7 @@ private:
 
   std::string name;
   std::unique_ptr<pathfind::Map, decltype(&pathfind_free_map)> map;
-  fine::Mutex mutex;
+  fine::SharedMutex mutex;
 };
 
 FINE_RESOURCE(PathfindMap);
@@ -71,6 +77,41 @@ static bool buffer_too_small(PathfindResultType result) {
 }
 
 static float f(double value) { return static_cast<float>(value); }
+
+static bool valid_adt_coordinate(int value) {
+  return value >= 0 && value < MeshSettings::Adts;
+}
+
+static std::optional<Point2> ensure_adt_loaded(MapResource map, int x, int y) {
+  if (!valid_adt_coordinate(x) || !valid_adt_coordinate(y)) {
+    return std::nullopt;
+  }
+
+  {
+    auto lock = map->acquire_shared();
+    uint8_t loaded = 0;
+    auto result = pathfind_is_adt_loaded(map->get(), x, y, &loaded);
+
+    if (!ok(result)) {
+      return std::nullopt;
+    }
+
+    if (loaded != 0) {
+      return Point2(static_cast<double>(x), static_cast<double>(y));
+    }
+  }
+
+  auto lock = map->acquire();
+  float adt_x = 0.0f;
+  float adt_y = 0.0f;
+  auto result = pathfind_load_adt(map->get(), x, y, &adt_x, &adt_y);
+
+  if (!ok(result)) {
+    return std::nullopt;
+  }
+
+  return Point2(adt_x, adt_y);
+}
 
 LoadResult load_map_native(ErlNifEnv *, std::string data_path,
                            std::string map_name) {
@@ -133,32 +174,21 @@ FINE_NIF(load_all_adts_native, ERL_NIF_DIRTY_JOB_CPU_BOUND);
 
 std::optional<Point2> load_adt_native(ErlNifEnv *, MapResource map, int64_t x,
                                       int64_t y) {
-  auto lock = map->acquire();
-  float adt_x = 0.0f;
-  float adt_y = 0.0f;
-  auto result = pathfind_load_adt(map->get(), static_cast<int>(x),
-                                  static_cast<int>(y), &adt_x, &adt_y);
-
-  if (!ok(result)) {
+  if (x < 0 || x >= MeshSettings::Adts || y < 0 || y >= MeshSettings::Adts) {
     return std::nullopt;
   }
 
-  return Point2(adt_x, adt_y);
+  return ensure_adt_loaded(map, static_cast<int>(x), static_cast<int>(y));
 }
 FINE_NIF(load_adt_native, ERL_NIF_DIRTY_JOB_CPU_BOUND);
 
 std::optional<Point2> load_adt_at_native(ErlNifEnv *, MapResource map, double x,
                                          double y) {
-  auto lock = map->acquire();
-  float adt_x = 0.0f;
-  float adt_y = 0.0f;
-  auto result = pathfind_load_adt_at(map->get(), f(x), f(y), &adt_x, &adt_y);
+  int adt_x = 0;
+  int adt_y = 0;
+  math::Convert::WorldToAdt({f(x), f(y), 0.0f}, adt_x, adt_y);
 
-  if (!ok(result)) {
-    return std::nullopt;
-  }
-
-  return Point2(adt_x, adt_y);
+  return ensure_adt_loaded(map, adt_x, adt_y);
 }
 FINE_NIF(load_adt_at_native, ERL_NIF_DIRTY_JOB_CPU_BOUND);
 
@@ -271,7 +301,7 @@ std::optional<bool> line_of_sight_native(ErlNifEnv *, MapResource map,
                                          double start_x, double start_y,
                                          double start_z, double stop_x,
                                          double stop_y, double stop_z) {
-  auto lock = map->acquire();
+  auto lock = map->acquire_shared();
   uint8_t los = 0;
   auto result =
       pathfind_line_of_sight(map->get(), f(start_x), f(start_y), f(start_z),

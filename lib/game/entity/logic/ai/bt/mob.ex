@@ -68,6 +68,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   @call_for_help_spawn_distance 10.0
 
   def max_aggro_radius, do: @max_aggro_radius
+  def combat_observation_radius, do: @spread_detect_radius
 
   def tree do
     BT.selector([

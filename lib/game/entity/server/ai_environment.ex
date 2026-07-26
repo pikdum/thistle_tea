@@ -66,7 +66,8 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
       |> Enum.filter(&(is_integer(&1) and &1 > 0))
       |> Enum.uniq()
 
-    observations = Map.new(guids, &{&1, observe(entity, &1, now)})
+    line_of_sight_guids = line_of_sight_guids(entity, now, observed_guids, nearby)
+    observations = Map.new(guids, &{&1, observe(entity, &1, now, line_of_sight_guids)})
     nearby = Map.new(nearby, fn {kind, entries} -> {kind, observed_distances(entries, observations)} end)
 
     Perception.new(now, origin(entity), observations, nearby)
@@ -88,6 +89,7 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
 
   defp base_observation_radius(%Mob{internal: %Internal{pet: %Pet{}}}), do: @pet_observation_radius
   defp base_observation_radius(%Mob{internal: %Internal{totem: %Totem{}}}), do: @totem_observation_radius
+  defp base_observation_radius(%Mob{internal: %Internal{in_combat: true}}), do: MobBT.combat_observation_radius()
   defp base_observation_radius(%Mob{}), do: MobBT.max_aggro_radius()
 
   defp waypoint_observation_radius(%Mob{
@@ -139,7 +141,7 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
   defp threat_guids(threat) when is_map(threat), do: Map.keys(threat)
   defp threat_guids(_threat), do: []
 
-  defp observe(entity, guid, now) do
+  defp observe(entity, guid, now, line_of_sight_guids) do
     position = World.position(guid, now)
 
     %Observation{
@@ -149,8 +151,52 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
       distance: distance(origin(entity), position),
       metadata: Metadata.get(guid),
       moving?: World.moving?(guid, now),
-      line_of_sight?: guid == own_guid(entity) or World.line_of_sight?(entity, guid)
+      line_of_sight?: line_of_sight?(entity, guid, line_of_sight_guids)
     }
+  end
+
+  defp line_of_sight?(entity, guid, line_of_sight_guids) do
+    guid == own_guid(entity) or
+      not MapSet.member?(line_of_sight_guids, guid) or
+      World.line_of_sight?(entity, guid)
+  end
+
+  defp line_of_sight_guids(entity, now, observed_guids, nearby) do
+    observed_guids
+    |> Enum.concat(direct_guids(entity))
+    |> Enum.concat(nearby_line_of_sight_guids(entity, now, nearby))
+    |> Enum.filter(&(is_integer(&1) and &1 > 0))
+    |> MapSet.new()
+  end
+
+  defp nearby_line_of_sight_guids(entity, now, nearby) do
+    if nearby_line_of_sight_needed?(entity, now) do
+      Enum.flat_map(nearby, fn {_kind, entries} -> Enum.map(entries, &elem(&1, 0)) end)
+    else
+      []
+    end
+  end
+
+  defp nearby_line_of_sight_needed?(%Mob{internal: %Internal{totem: %Totem{}}}, _now), do: true
+
+  defp nearby_line_of_sight_needed?(
+         %Mob{internal: %Internal{pet: nil, in_combat: false, blackboard: blackboard}} = entity,
+         now
+       ) do
+    nearby_targeting_needed?(entity) or
+      MobBT.aggro_check_ready?(entity, Blackboard.ensure(blackboard), now)
+  end
+
+  defp nearby_line_of_sight_needed?(%Mob{} = entity, _now) do
+    nearby_targeting_needed?(entity)
+  end
+
+  defp nearby_line_of_sight_needed?(_entity, _now), do: false
+
+  defp nearby_targeting_needed?(%Mob{} = entity) do
+    MobSpells.observation_radius(entity) > 0 or
+      EventAI.observation_radius(entity) > 0 or
+      waypoint_observation_radius(entity) > 0
   end
 
   defp observed_distances(entries, observations) do
