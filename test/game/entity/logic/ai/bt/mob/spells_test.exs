@@ -30,15 +30,18 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.SpellsTest do
       state = fixture_mob(spells: [entry], spellbook: %{spell.id => spell})
 
       assert {:failure, ^state, blackboard} = MobSpells.try_cast(state, %Blackboard{}, context(state))
-      assert blackboard.spell_timers == %{0 => 6_000}
-      assert blackboard.next_spell_list_at == 2_200
+      assert blackboard.spells.timers == %{0 => 6_000}
+      assert blackboard.spells.next_list_at == 2_200
     end
 
     test "respects the list tick cadence" do
       spell = fireball()
       entry = entry(spell.id)
       state = fixture_mob(spells: [entry], spellbook: %{spell.id => spell})
-      blackboard = %Blackboard{spell_timers: %{0 => 0}, next_spell_list_at: 2_200}
+
+      blackboard = %Blackboard{
+        spells: %Blackboard.Spells{timers: %{0 => 0}, next_list_at: 2_200}
+      }
 
       assert {:failure, ^state, ^blackboard} = MobSpells.try_cast(state, blackboard, context(state))
     end
@@ -55,7 +58,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.SpellsTest do
       assert {{:running, 3_000, :casting}, state, blackboard} = MobSpells.try_cast(state, %Blackboard{}, context(state))
 
       assert %{spell: %Spell{id: 20_793}} = state.internal.casting
-      assert blackboard.spell_timers == %{0 => 3_000}
+      assert blackboard.spells.timers == %{0 => 3_000}
       assert Enum.any?(state.internal.events, &match?(%Effects.SpellStart{spell_id: 20_793}, &1))
     end
 
@@ -127,7 +130,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.SpellsTest do
 
       assert {:failure, state, blackboard} = MobSpells.try_cast(state, %Blackboard{}, context(state))
       assert state.internal.casting == nil
-      assert blackboard.spell_timers == %{0 => 9_000}
+      assert blackboard.spells.timers == %{0 => 9_000}
     end
 
     test "skips a not-in-melee spell when the target is adjacent" do
@@ -200,12 +203,12 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.SpellsTest do
         fixture_mob(spells: [entry], spellbook: %{spell.id => spell})
         |> with_target(target_guid)
 
-      blackboard = %Blackboard{attack_started: true}
+      blackboard = %Blackboard{combat: %Blackboard.Combat{attack_started: true}}
 
       assert {{:running, 3_000, :casting}, state, blackboard} = MobSpells.try_cast(state, blackboard, context(state))
 
       refute Blackboard.combat_movement?(blackboard)
-      refute blackboard.attack_started
+      refute blackboard.combat.attack_started
       assert Enum.any?(state.internal.events, &match?(%Effects.AttackStop{}, &1))
       assert MobSpells.holding_ranged?(state, blackboard)
     end
@@ -219,7 +222,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.SpellsTest do
         fixture_mob(spells: [entry], spellbook: %{spell.id => spell})
         |> with_target(target_guid)
 
-      blackboard = %Blackboard{spell_timers: %{0 => 0}, combat_movement: false}
+      blackboard = %Blackboard{
+        spells: %Blackboard.Spells{timers: %{0 => 0}, combat_movement: false}
+      }
 
       assert {:failure, state, blackboard} = MobSpells.try_cast(state, blackboard, context(state))
       assert state.internal.casting == nil
@@ -325,7 +330,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.SpellsTest do
   describe "hold_ranged_wait/3" do
     test "waits for the next list tick" do
       state = fixture_mob(spells: [entry(1)], spellbook: %{})
-      blackboard = %Blackboard{next_spell_list_at: 1_800, combat_movement: false}
+
+      blackboard = %Blackboard{
+        spells: %Blackboard.Spells{next_list_at: 1_800, combat_movement: false}
+      }
 
       assert {{:running, 800, :spell_list}, ^state, ^blackboard} =
                MobSpells.hold_ranged_wait(state, blackboard, context(state))
@@ -335,7 +343,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.SpellsTest do
   describe "next_spell_delay/3" do
     test "returns the delay until the next list tick" do
       state = fixture_mob(spells: [entry(1)], spellbook: %{})
-      blackboard = %Blackboard{next_spell_list_at: 1_500}
+      blackboard = %Blackboard{spells: %Blackboard.Spells{next_list_at: 1_500}}
 
       assert MobSpells.next_spell_delay(state, blackboard, 1_000) == 500
     end

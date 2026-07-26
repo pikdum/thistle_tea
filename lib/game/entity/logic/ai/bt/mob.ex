@@ -14,6 +14,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard.Combat, as: CombatMemory
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard.Navigation, as: NavigationMemory
   alias ThistleTea.Game.Entity.Logic.AI.BT.Combat, as: CombatBT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception
@@ -237,10 +239,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     state = set_running(state, false)
     blackboard = ensure_confused_anchor(state, blackboard, {x, y, z})
 
-    if blackboard.target do
+    if blackboard.navigation.target do
       {:success, state, blackboard}
     else
-      {_key, anchor} = blackboard.confused_anchor
+      {_key, anchor} = blackboard.navigation.confused_anchor
 
       case Navigation.wander_point(state, anchor, @confused_wander_radius, context) do
         nil ->
@@ -248,7 +250,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
           {:running, state, Blackboard.clear_move_target(blackboard)}
 
         {wx, wy, wz} ->
-          {:success, state, %{blackboard | target: {wx, wy, wz}}}
+          navigation = %{blackboard.navigation | target: {wx, wy, wz}}
+          {:success, state, %{blackboard | navigation: navigation}}
       end
     end
   end
@@ -256,12 +259,13 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   defp ensure_confused_anchor(%Mob{} = state, %Blackboard{} = blackboard, current_position) do
     key = AuraLogic.confuse_anchor_key(state)
 
-    case blackboard.confused_anchor do
+    case blackboard.navigation.confused_anchor do
       {^key, _anchor} ->
         blackboard
 
       _ ->
-        %{Blackboard.clear_move_target(blackboard) | confused_anchor: {key, current_position}}
+        blackboard = Blackboard.clear_move_target(blackboard)
+        %{blackboard | navigation: %{blackboard.navigation | confused_anchor: {key, current_position}}}
     end
   end
 
@@ -318,7 +322,11 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     flee_step(state, blackboard, context)
   end
 
-  defp flee_step(%Mob{} = state, %Blackboard{flee_until: flee_until} = blackboard, %Context{now: now} = context)
+  defp flee_step(
+         %Mob{} = state,
+         %Blackboard{combat: %CombatMemory{flee_until: flee_until}} = blackboard,
+         %Context{now: now} = context
+       )
        when is_integer(flee_until) do
     cond do
       now >= flee_until or Core.dead?(state) ->
@@ -341,7 +349,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
          %Blackboard{} = blackboard,
          %Context{now: now, perception: perception} = context
        ) do
-    from_guid = blackboard.flee_from || state.unit.target
+    from_guid = blackboard.combat.flee_from || state.unit.target
 
     destination =
       case Perception.position(perception, from_guid) do
@@ -360,7 +368,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     {BT.running(flee_wait_delay(state, blackboard, now), :flee), state, blackboard}
   end
 
-  defp flee_wait_delay(%Mob{} = state, %Blackboard{flee_until: flee_until}, now) do
+  defp flee_wait_delay(%Mob{} = state, %Blackboard{combat: %CombatMemory{flee_until: flee_until}}, now) do
     [Movement.remaining_move_duration(state, now), flee_until - now]
     |> soonest_delay(@flee_repath_ms)
     |> min(max(flee_until - now, 1))
@@ -569,7 +577,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
 
       %Engagement.Result{entity: state, decision: :none} ->
         state = reset_after_combat(state, context)
-        {:failure, state, Blackboard.from_any(state.internal.blackboard)}
+        {:failure, state, Blackboard.ensure(state.internal.blackboard)}
     end
   end
 
@@ -594,7 +602,11 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     interrupt_idle_movement(state, blackboard, now)
   end
 
-  def interrupt_idle_movement(%Mob{} = state, %Blackboard{move_target: move_target} = blackboard, now)
+  def interrupt_idle_movement(
+        %Mob{} = state,
+        %Blackboard{navigation: %NavigationMemory{move_target: move_target}} = blackboard,
+        now
+      )
       when is_tuple(move_target) and is_integer(now) do
     state =
       if Movement.moving?(state, now) do
@@ -605,7 +617,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
         state
       end
 
-    blackboard = %{Blackboard.clear_waypoint(blackboard) | next_chase_at: 0}
+    blackboard = blackboard |> Blackboard.clear_waypoint() |> Blackboard.reset_deadline(:next_chase_at)
     {:success, state, blackboard}
   end
 
@@ -635,7 +647,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   defp target_dead_in_perception?(_target, _perception), do: false
 
   defp tether_target_set?(%Mob{internal: %Internal{spawn: %Spawn{position: {x, y, z}}}}, %Blackboard{
-         move_target: {x, y, z}
+         navigation: %NavigationMemory{move_target: {x, y, z}}
        }) do
     true
   end
@@ -656,7 +668,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
          %Mob{internal: %Internal{spawn: %Spawn{position: {x, y, z}}}} = state,
          %Blackboard{} = blackboard
        ) do
-    {:success, state, %{blackboard | target: {x, y, z}}}
+    navigation = %{blackboard.navigation | target: {x, y, z}}
+    {:success, state, %{blackboard | navigation: navigation}}
   end
 
   defp set_tether_target(%Mob{} = state, %Blackboard{} = blackboard) do
@@ -689,7 +702,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   end
 
   defp reset_living_after_combat(%Mob{} = state, %Context{now: now} = context) do
-    blackboard = Blackboard.from_any(state.internal.blackboard)
+    blackboard = Blackboard.ensure(state.internal.blackboard)
     {state, blackboard} = EventAI.on_leave_combat(state, blackboard, now, context)
     {state, blackboard} = EventAI.on_evade(state, blackboard, now, context)
 
@@ -1087,7 +1100,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
           {:error, :no_path, state} -> state
         end
 
-      {state, %{Blackboard.reset_spread(blackboard) | last_target_pos: target_pos}}
+      blackboard = Blackboard.reset_spread(blackboard)
+      navigation = %{blackboard.navigation | last_target_pos: target_pos}
+      {state, %{blackboard | navigation: navigation}}
     else
       {state, blackboard}
     end
@@ -1161,7 +1176,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
 
   defp target_moved_enough?(
          %Mob{} = state,
-         %Blackboard{last_target_pos: {lx, ly, lz}},
+         %Blackboard{navigation: %NavigationMemory{last_target_pos: {lx, ly, lz}}},
          {tx, ty, tz},
          target_guid,
          %Context{perception: perception}
@@ -1271,7 +1286,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   defp pick_wander_point(%Mob{} = state, %Blackboard{} = blackboard, %Context{now: now} = context) do
     state = set_running(state, Blackboard.run_mode?(blackboard))
 
-    if blackboard.target do
+    if blackboard.navigation.target do
       {:success, state, blackboard}
     else
       case Navigation.wander_point(
@@ -1287,7 +1302,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
           {BT.running(delay_ms, reason), state, blackboard}
 
         {x, y, z} ->
-          {:success, state, %{blackboard | target: {x, y, z}}}
+          navigation = %{blackboard.navigation | target: {x, y, z}}
+          {:success, state, %{blackboard | navigation: navigation}}
       end
     end
   end
@@ -1295,7 +1311,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   defp pick_waypoint(%Mob{} = state, %Blackboard{} = blackboard, %Context{now: now} = context) do
     state = set_running(state, Blackboard.run_mode?(blackboard))
 
-    if blackboard.target do
+    if blackboard.navigation.target do
       {:success, state, blackboard}
     else
       case waypoint_destination(state) do
@@ -1306,12 +1322,14 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
           {BT.running(delay_ms, reason), state, blackboard}
 
         %{position: {x, y, z, o}, wait_time: wait_time} ->
-          blackboard = %{
-            blackboard
+          navigation = %{
+            blackboard.navigation
             | target: {x, y, z},
               orientation: o,
               wait_time: wait_time || 0
           }
+
+          blackboard = %{blackboard | navigation: navigation}
 
           {:success, state, blackboard}
       end
@@ -1323,18 +1341,19 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   end
 
   def move_to_target(%Mob{} = state, %Blackboard{} = blackboard, %Context{} = context) do
-    case blackboard.target do
+    case blackboard.navigation.target do
       {x, y, z} = target ->
         cond do
           Movement.blocked?(state) ->
             {BT.running(@blocked_retry_delay, :blocked), state, blackboard}
 
-          blackboard.move_target == target ->
+          blackboard.navigation.move_target == target ->
             {:success, state, blackboard}
 
           true ->
             state = move_with_context(state, {x, y, z}, [], context)
-            {:success, state, %{blackboard | move_target: target}}
+            navigation = %{blackboard.navigation | move_target: target}
+            {:success, state, %{blackboard | navigation: navigation}}
         end
 
       _ ->
@@ -1357,7 +1376,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
 
   defp apply_waypoint(%Mob{} = state, %Blackboard{} = blackboard, %Context{} = context) do
     state =
-      case blackboard.orientation do
+      case blackboard.navigation.orientation do
         o when is_number(o) -> set_orientation(state, o)
         _ -> state
       end
@@ -1379,7 +1398,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   end
 
   def set_next_waypoint_wait(%Mob{} = state, %Blackboard{} = blackboard, now) when is_integer(now) do
-    wait_time = blackboard.wait_time || 0
+    wait_time = blackboard.navigation.wait_time || 0
     blackboard = Blackboard.put_next_at(blackboard, :next_waypoint_at, wait_time, now)
     {:success, state, Blackboard.clear_waypoint(blackboard)}
   end

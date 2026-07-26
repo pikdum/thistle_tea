@@ -74,27 +74,27 @@ defmodule ThistleTea.Game.Entity.Logic.AI.ScriptTest do
       blackboard = Blackboard.new()
 
       {_mob, blackboard} = Script.run(mob, blackboard, [%ScriptStep{command: :set_phase, datalong: 3}], nil, 0)
-      assert blackboard.eventai_phase == 3
+      assert blackboard.event_ai.phase == 3
 
       {_mob, blackboard} =
         Script.run(mob, blackboard, [%ScriptStep{command: :set_phase, datalong: 2, datalong2: 1}], nil, 0)
 
-      assert blackboard.eventai_phase == 5
+      assert blackboard.event_ai.phase == 5
 
       {_mob, blackboard} =
         Script.run(mob, blackboard, [%ScriptStep{command: :set_phase, datalong: 9, datalong2: 2}], nil, 0)
 
-      assert blackboard.eventai_phase == 0
+      assert blackboard.event_ai.phase == 0
 
       {_mob, blackboard} =
         Script.run(mob, blackboard, [%ScriptStep{command: :set_phase_range, datalong: 4, datalong2: 4}], nil, 0)
 
-      assert blackboard.eventai_phase == 4
+      assert blackboard.event_ai.phase == 4
 
       {_mob, blackboard} =
         Script.run(mob, blackboard, [%ScriptStep{command: :set_phase_random, datalong: 7, datalong2: 7}], nil, 0)
 
-      assert blackboard.eventai_phase == 7
+      assert blackboard.event_ai.phase == 7
     end
 
     test "flee marks the blackboard and emotes when a victim exists", %{mob: mob} do
@@ -104,8 +104,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.ScriptTest do
       {mob, blackboard} = Script.run(mob, Blackboard.new(), [%ScriptStep{command: :flee}], nil, 2_000)
 
       assert Blackboard.fleeing?(blackboard)
-      assert blackboard.flee_until == 2_000 + Script.flee_duration_ms()
-      assert blackboard.flee_from == victim
+      assert blackboard.combat.flee_until == 2_000 + Script.flee_duration_ms()
+      assert blackboard.combat.flee_from == victim
       assert [%Effects.MonsterTalk{chat_type: :text_emote}] = mob.internal.events
     end
 

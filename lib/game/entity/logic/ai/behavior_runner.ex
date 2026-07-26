@@ -15,7 +15,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BehaviorRunner do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Regen, as: RegenBT
 
   def tick(tree, %{internal: %Internal{} = internal} = entity, %Context{now: now} = context) do
-    blackboard = Blackboard.from_any(internal.blackboard)
+    blackboard = Blackboard.ensure(internal.blackboard)
     {:failure, entity, blackboard} = AuraBT.tick(entity, blackboard, now)
     {:failure, entity, blackboard} = RegenBT.tick(entity, blackboard, now)
     entity = %{entity | internal: %{entity.internal | blackboard: blackboard}}

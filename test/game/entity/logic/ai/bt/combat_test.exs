@@ -36,7 +36,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.CombatTest do
         movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
       }
 
-      blackboard = %Blackboard{attack_started: true, next_attack_at: 0}
+      blackboard = %Blackboard{combat: %Blackboard.Combat{attack_started: true, next_attack_at: 0}}
 
       assert {:success, mob, %Blackboard{}} = Combat.melee_attack(mob, blackboard, 1_000)
 
@@ -71,7 +71,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.CombatTest do
         movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
       }
 
-      blackboard = %Blackboard{attack_started: true, next_attack_at: 0}
+      blackboard = %Blackboard{combat: %Blackboard.Combat{attack_started: true, next_attack_at: 0}}
 
       assert {:success, pet, %Blackboard{}} = Combat.melee_attack(pet, blackboard, 1_000)
 
@@ -100,14 +100,21 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.CombatTest do
         movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
       }
 
-      blackboard = %Blackboard{attack_started: true, next_attack_at: 0, next_offhand_attack_at: 0}
+      blackboard = %Blackboard{
+        combat: %Blackboard.Combat{
+          attack_started: true,
+          next_attack_at: 0,
+          next_offhand_attack_at: 0
+        }
+      }
+
       assert {:success, mob, blackboard} = Combat.melee_attack(mob, blackboard, 1_000)
 
       attacks = Enum.filter(mob.internal.events, &is_struct(&1, Effects.DeliverAttack))
       assert length(attacks) == 2
       assert Enum.any?(attacks, &(Map.get(&1.attack, :offhand?) == true and &1.attack.damage == 4))
-      assert blackboard.next_attack_at == 3_000
-      assert blackboard.next_offhand_attack_at == 2_500
+      assert blackboard.combat.next_attack_at == 3_000
+      assert blackboard.combat.next_offhand_attack_at == 2_500
     end
 
     test "sends queued melee spell go before delivering the attack" do
@@ -130,7 +137,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.CombatTest do
         movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
       }
 
-      blackboard = %Blackboard{attack_started: true, next_attack_at: 0}
+      blackboard = %Blackboard{combat: %Blackboard.Combat{attack_started: true, next_attack_at: 0}}
 
       assert {:success, mob, %Blackboard{}} = Combat.melee_attack(mob, blackboard, 1_000)
 
@@ -200,7 +207,11 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.CombatTest do
       }
 
       assert {:success, character, %Blackboard{}} =
-               Combat.melee_attack(character, %Blackboard{attack_started: true, next_attack_at: 0}, 1_000)
+               Combat.melee_attack(
+                 character,
+                 %Blackboard{combat: %Blackboard.Combat{attack_started: true, next_attack_at: 0}},
+                 1_000
+               )
 
       assert %Effects.SpellGo{hit_guids: [^primary_guid, ^secondary_guid]} =
                Enum.find(character.internal.events, &is_struct(&1, Effects.SpellGo))
@@ -227,9 +238,12 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.CombatTest do
         movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
       }
 
-      blackboard = %Blackboard{attack_started: false, next_attack_at: 0}
+      blackboard = %Blackboard{combat: %Blackboard.Combat{attack_started: false, next_attack_at: 0}}
 
-      assert {:success, mob, %Blackboard{attack_started: true, next_attack_at: 3_000}} =
+      assert {:success, mob,
+              %Blackboard{
+                combat: %Blackboard.Combat{attack_started: true, next_attack_at: 3_000}
+              }} =
                Combat.melee_attack(mob, blackboard, 1_000)
 
       assert Enum.any?(mob.internal.events, &is_struct(&1, Effects.DeliverAttack))
@@ -253,9 +267,12 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.CombatTest do
         movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
       }
 
-      blackboard = %Blackboard{attack_started: false, next_attack_at: 0}
+      blackboard = %Blackboard{combat: %Blackboard.Combat{attack_started: false, next_attack_at: 0}}
 
-      assert {:success, mob, %Blackboard{attack_started: true, next_attack_at: 1_100}} =
+      assert {:success, mob,
+              %Blackboard{
+                combat: %Blackboard.Combat{attack_started: true, next_attack_at: 1_100}
+              }} =
                Combat.melee_attack(mob, blackboard, 1_000)
 
       refute Enum.any?(mob.internal.events, &is_struct(&1, Effects.DeliverAttack))
@@ -284,7 +301,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.CombatTest do
         movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
       }
 
-      blackboard = %Blackboard{attack_started: true, next_attack_at: 0}
+      blackboard = %Blackboard{combat: %Blackboard.Combat{attack_started: true, next_attack_at: 0}}
 
       assert {:success, character, %Blackboard{}} = Combat.melee_attack(character, blackboard, 1_000)
 
@@ -298,7 +315,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.CombatTest do
 
   describe "wait_for_next_attack/3" do
     test "returns running delay from explicit time" do
-      blackboard = %Blackboard{next_attack_at: 1_250}
+      blackboard = %Blackboard{combat: %Blackboard.Combat{next_attack_at: 1_250}}
       state = %Mob{}
 
       assert {{:running, 250}, ^state, ^blackboard} = Combat.wait_for_next_attack(state, blackboard, 1_000)
@@ -309,20 +326,30 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.CombatTest do
     test "a player qualifies on auto-attack intent even before the combat flag is set" do
       character = %Character{unit: %Unit{target: 2}, internal: %Internal{in_combat: false}}
 
-      assert Combat.in_combat?(character, %Blackboard{auto_attacking: true})
+      assert Combat.in_combat?(
+               character,
+               %Blackboard{combat: %Blackboard.Combat{auto_attacking: true}}
+             )
     end
 
     test "a player without auto-attack intent does not qualify even while flagged in combat" do
       character = %Character{unit: %Unit{target: 2}, internal: %Internal{in_combat: true}}
 
-      refute Combat.in_combat?(character, %Blackboard{auto_attacking: false})
+      refute Combat.in_combat?(
+               character,
+               %Blackboard{combat: %Blackboard.Combat{auto_attacking: false}}
+             )
     end
 
     test "a mob still requires the in-combat flag, not just intent" do
       not_engaged = %Mob{unit: %Unit{target: 2}, internal: %Internal{in_combat: false}}
       engaged = %Mob{unit: %Unit{target: 2}, internal: %Internal{in_combat: true}}
 
-      refute Combat.in_combat?(not_engaged, %Blackboard{auto_attacking: true})
+      refute Combat.in_combat?(
+               not_engaged,
+               %Blackboard{combat: %Blackboard.Combat{auto_attacking: true}}
+             )
+
       assert Combat.in_combat?(engaged, %Blackboard{})
     end
   end

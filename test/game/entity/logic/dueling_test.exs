@@ -56,7 +56,10 @@ defmodule ThistleTea.Game.Entity.Logic.DuelingTest do
           internal: %{
             character.internal
             | combo_target_guid: 2,
-              blackboard: %Blackboard{target: 2, auto_attacking: true, attack_started: true}
+              blackboard: %Blackboard{
+                navigation: %Blackboard.Navigation{target: 2},
+                combat: %Blackboard.Combat{auto_attacking: true, attack_started: true}
+              }
           }
       }
 
@@ -70,7 +73,7 @@ defmodule ThistleTea.Game.Entity.Logic.DuelingTest do
       assert character.player.duel_team == 0
       assert character.internal.duel == nil
       refute character.internal.in_combat
-      refute character.internal.blackboard.auto_attacking
+      refute character.internal.blackboard.combat.auto_attacking
       assert Enum.any?(events, &match?(%Effects.AttackStop{source_guid: 1, target_guid: 2}, &1))
     end
   end

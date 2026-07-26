@@ -45,9 +45,9 @@ defmodule ThistleTea.Game.Network.Message.CmsgAttackswingTest do
 
       refute state.character.internal.in_combat
       assert state.character.unit.target == target_guid
-      assert state.character.internal.blackboard.auto_attacking == true
+      assert state.character.internal.blackboard.combat.auto_attacking == true
 
-      assert state.character.internal.blackboard.auto_attack_target == %TargetRef{
+      assert state.character.internal.blackboard.combat.auto_attack_target == %TargetRef{
                guid: target_guid,
                incarnation_id: 7
              }

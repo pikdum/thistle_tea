@@ -36,7 +36,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.CallForHelpTest do
       {:success, mob, blackboard} = MobBT.call_for_help_step(mob, Blackboard.new(), 5_000)
 
       assert [%Effects.CallForHelp{target_guid: 42}] = mob.internal.events
-      assert blackboard.next_call_for_help_at == 6_000
+      assert blackboard.combat.next_call_for_help_at == 6_000
     end
 
     test "stays quiet near spawn and between pulses" do
@@ -45,7 +45,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.CallForHelpTest do
       assert near_spawn.internal.events in [nil, []]
 
       dragged = mob(position: {20.0, 0.0, 0.0, 0.0}, target: 42)
-      waiting = %{Blackboard.new() | next_call_for_help_at: 6_000}
+      waiting = Blackboard.put_next_at(Blackboard.new(), :next_call_for_help_at, 1_000, 5_000)
       {:success, dragged, ^waiting} = MobBT.call_for_help_step(dragged, waiting, 5_000)
       assert dragged.internal.events in [nil, []]
     end

@@ -26,15 +26,21 @@ defmodule ThistleTea.Game.Network.Message.CmsgAttackstopTest do
             internal: %Internal{
               world: %WorldRef{map_id: 0},
               in_combat: true,
-              blackboard: %Blackboard{next_attack_at: 12_345, attack_started: true, auto_attacking: true}
+              blackboard: %Blackboard{
+                combat: %Blackboard.Combat{
+                  next_attack_at: 12_345,
+                  attack_started: true,
+                  auto_attacking: true
+                }
+              }
             }
           },
           player_tick_ref: nil
         })
 
-      assert state.character.internal.blackboard.next_attack_at == 12_345
-      assert state.character.internal.blackboard.attack_started == false
-      assert state.character.internal.blackboard.auto_attacking == false
+      assert state.character.internal.blackboard.combat.next_attack_at == 12_345
+      assert state.character.internal.blackboard.combat.attack_started == false
+      assert state.character.internal.blackboard.combat.auto_attacking == false
     end
   end
 

@@ -19,6 +19,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAI do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.CreatureSpell
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard.EventAI, as: EventMemory
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Random
@@ -37,7 +38,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAI do
   def events(_state), do: []
 
   def with_blackboard(%{internal: %Internal{}} = state, fun) when is_function(fun, 2) do
-    blackboard = Blackboard.from_any(state.internal.blackboard)
+    blackboard = Blackboard.ensure(state.internal.blackboard)
     {state, blackboard} = fun.(state, blackboard)
     %{state | internal: %{state.internal | blackboard: blackboard}}
   end
@@ -189,7 +190,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAI do
   defp try_fire(state, %Blackboard{} = blackboard, %AIEvent{} = event, index, invoker_guid, now, %Context{} = context) do
     with true <- enabled?(blackboard, index),
          true <- due?(blackboard, index, now),
-         true <- AIEvent.phase_allows?(event, blackboard.eventai_phase),
+         true <- AIEvent.phase_allows?(event, blackboard.event_ai.phase),
          true <- casting_allows?(state, event),
          true <- ConditionLogic.met?(state, event.condition),
          {:ok, invoker_guid} <- satisfy(state, event, invoker_guid, context) do
@@ -347,16 +348,19 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAI do
   defp casting_allows?(state, %AIEvent{not_casting?: true}), do: is_nil(state.internal.casting)
   defp casting_allows?(_state, %AIEvent{}), do: true
 
-  defp ensure_init(%Blackboard{eventai_timers: timers} = blackboard, _events, _now, %Context{}) when is_map(timers) do
+  defp ensure_init(%Blackboard{event_ai: %EventMemory{timers: timers}} = blackboard, _events, _now, %Context{})
+       when is_map(timers) do
     blackboard
   end
 
   defp ensure_init(%Blackboard{} = blackboard, events, now, %Context{} = context) do
-    reset_ooc(%{blackboard | eventai_timers: %{}, eventai_disabled: MapSet.new()}, events, now, context)
+    event_ai = %{blackboard.event_ai | timers: %{}, disabled: MapSet.new()}
+    reset_ooc(%{blackboard | event_ai: event_ai}, events, now, context)
   end
 
   defp reset_for_combat(%Blackboard{} = blackboard, events, now, %Context{random: random}) do
-    blackboard = %{blackboard | eventai_timers: %{}, eventai_disabled: MapSet.new()}
+    event_ai = %{blackboard.event_ai | timers: %{}, disabled: MapSet.new()}
+    blackboard = %{blackboard | event_ai: event_ai}
 
     events
     |> Enum.with_index()
@@ -369,7 +373,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAI do
     end)
   end
 
-  defp reset_ooc(%Blackboard{eventai_timers: timers} = blackboard, events, now, %Context{random: random})
+  defp reset_ooc(%Blackboard{event_ai: %EventMemory{timers: timers}} = blackboard, events, now, %Context{random: random})
        when is_map(timers) do
     events
     |> Enum.with_index()
@@ -386,28 +390,28 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAI do
 
   defp reset_ooc(%Blackboard{} = blackboard, _events, _now, %Context{}), do: blackboard
 
-  defp enabled?(%Blackboard{eventai_disabled: %MapSet{} = disabled}, index) do
+  defp enabled?(%Blackboard{event_ai: %EventMemory{disabled: %MapSet{} = disabled}}, index) do
     not MapSet.member?(disabled, index)
   end
 
   defp enabled?(%Blackboard{}, _index), do: true
 
-  defp disable(%Blackboard{eventai_disabled: %MapSet{} = disabled} = blackboard, index) do
-    %{blackboard | eventai_disabled: MapSet.put(disabled, index)}
+  defp disable(%Blackboard{event_ai: %EventMemory{disabled: %MapSet{} = disabled}} = blackboard, index) do
+    %{blackboard | event_ai: %{blackboard.event_ai | disabled: MapSet.put(disabled, index)}}
   end
 
   defp disable(%Blackboard{} = blackboard, index) do
-    %{blackboard | eventai_disabled: MapSet.new([index])}
+    %{blackboard | event_ai: %{blackboard.event_ai | disabled: MapSet.new([index])}}
   end
 
-  defp enable(%Blackboard{eventai_disabled: %MapSet{} = disabled} = blackboard, index) do
-    %{blackboard | eventai_disabled: MapSet.delete(disabled, index)}
+  defp enable(%Blackboard{event_ai: %EventMemory{disabled: %MapSet{} = disabled}} = blackboard, index) do
+    %{blackboard | event_ai: %{blackboard.event_ai | disabled: MapSet.delete(disabled, index)}}
   end
 
   defp enable(%Blackboard{} = blackboard, _index), do: blackboard
 
-  defp put_timer(%Blackboard{eventai_timers: timers} = blackboard, index, ready_at) do
-    %{blackboard | eventai_timers: Map.put(timers || %{}, index, ready_at)}
+  defp put_timer(%Blackboard{event_ai: %EventMemory{timers: timers}} = blackboard, index, ready_at) do
+    %{blackboard | event_ai: %{blackboard.event_ai | timers: Map.put(timers || %{}, index, ready_at)}}
   end
 
   defp due?(%Blackboard{} = blackboard, index, now) when is_integer(now) do
@@ -417,7 +421,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAI do
     end
   end
 
-  defp timer_at(%Blackboard{eventai_timers: timers}, index) when is_map(timers) do
+  defp timer_at(%Blackboard{event_ai: %EventMemory{timers: timers}}, index) when is_map(timers) do
     Map.get(timers, index)
   end
 

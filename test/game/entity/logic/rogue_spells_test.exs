@@ -353,7 +353,7 @@ defmodule ThistleTea.Game.Entity.Logic.RogueSpellsTest do
         | threat_refs: MapSet.new([{101, 1}, {102, 1}]),
           last_hostile_time: 900,
           spellbook: %{1787 => stealth},
-          blackboard: %Blackboard{auto_attacking: true}
+          blackboard: %Blackboard{combat: %Blackboard.Combat{auto_attacking: true}}
       }
 
       entity = %{entity | internal: internal}
@@ -373,7 +373,7 @@ defmodule ThistleTea.Game.Entity.Logic.RogueSpellsTest do
       {entity, events} = SpellEffect.receive(entity, context, vanish, 1_000)
 
       refute entity.internal.in_combat
-      refute entity.internal.blackboard.auto_attacking
+      refute entity.internal.blackboard.combat.auto_attacking
       assert entity.internal.threat_refs == MapSet.new()
       assert entity.internal.undetectable_until == 2_000
       assert Enum.count(events, &is_struct(&1, Effects.DropThreat)) == 2

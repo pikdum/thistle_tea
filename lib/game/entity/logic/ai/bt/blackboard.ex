@@ -1,64 +1,35 @@
 defmodule ThistleTea.Game.Entity.Logic.AI.BT.Blackboard do
   @moduledoc """
-  Per-entity scratch state shared across behavior-tree ticks: current targets
-  and per-key next-run timestamps used to pace actions between ticks.
+  Typed per-entity memory shared across behavior-tree ticks.
+
+  Each subsystem owns a dedicated struct so navigation, combat, spell,
+  EventAI, and maintenance state cannot accidentally write one another's
+  fields.
   """
-  defstruct target: nil,
-            move_target: nil,
-            orientation: nil,
-            wait_time: nil,
-            last_target_pos: nil,
-            chase_started: false,
-            next_chase_at: 0,
-            next_attack_at: 0,
-            next_offhand_attack_at: 0,
-            attack_started: false,
-            auto_attacking: false,
-            auto_attack_target: nil,
-            next_wander_at: 0,
-            next_waypoint_at: 0,
-            next_aggro_at: 0,
-            next_call_for_help_at: 0,
-            next_confused_at: 0,
-            next_regen_at: 0,
-            next_spread_at: 0,
-            spread_attempts: 0,
-            spreading: false,
-            confused_anchor: nil,
-            spell_timers: nil,
-            next_spell_list_at: 0,
-            combat_movement: true,
-            eventai_phase: 0,
-            run_mode: false,
-            eventai_timers: nil,
-            eventai_disabled: nil,
-            next_eventai_at: 0,
-            flee_until: nil,
-            flee_from: nil
 
-  def new do
-    %__MODULE__{}
-  end
+  alias __MODULE__.Combat
+  alias __MODULE__.EventAI
+  alias __MODULE__.Maintenance
+  alias __MODULE__.Navigation
+  alias __MODULE__.Spells
 
-  def from_any(%__MODULE__{} = blackboard), do: blackboard
-  def from_any(nil), do: new()
+  defstruct navigation: %Navigation{},
+            combat: %Combat{},
+            spells: %Spells{},
+            event_ai: %EventAI{},
+            maintenance: %Maintenance{}
 
-  def from_any(%{} = data) do
-    struct(__MODULE__, data)
-  end
+  def new, do: %__MODULE__{}
+
+  def ensure(%__MODULE__{} = blackboard), do: blackboard
+  def ensure(nil), do: new()
 
   def ready_for?(%__MODULE__{} = blackboard, key, now) when is_atom(key) and is_integer(now) do
-    case Map.get(blackboard, key) do
-      nil -> true
-      0 -> true
-      ready_at -> now >= ready_at
-    end
+    deadline(blackboard, key) in [nil, 0] or now >= deadline(blackboard, key)
   end
 
   def delay_until(%__MODULE__{} = blackboard, key, now) when is_atom(key) and is_integer(now) do
-    case Map.get(blackboard, key) do
-      nil -> 0
-      0 -> 0
+    case deadline(blackboard, key) do
       ready_at when is_integer(ready_at) -> max(ready_at - now, 0)
       _ -> 0
     end
@@ -66,115 +37,172 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Blackboard do
 
   def put_next_at(%__MODULE__{} = blackboard, key, delay_ms, now)
       when is_atom(key) and is_integer(delay_ms) and is_integer(now) do
-    Map.put(blackboard, key, now + delay_ms)
+    put_deadline(blackboard, key, now + delay_ms)
   end
 
-  def put_next_at(%__MODULE__{} = blackboard, _key, _delay_ms, _now) do
-    blackboard
+  def put_next_at(%__MODULE__{} = blackboard, _key, _delay_ms, _now), do: blackboard
+
+  def reset_deadline(%__MODULE__{} = blackboard, key) when is_atom(key) do
+    put_deadline(blackboard, key, 0)
   end
 
-  def clear_move_target(%__MODULE__{} = blackboard) do
-    %{blackboard | move_target: nil, target: nil}
+  def clear_move_target(%__MODULE__{navigation: navigation} = blackboard) do
+    %{blackboard | navigation: %{navigation | move_target: nil, target: nil}}
   end
 
-  def clear_waypoint(%__MODULE__{} = blackboard) do
-    %{blackboard | target: nil, move_target: nil, orientation: nil, wait_time: nil}
+  def clear_waypoint(%__MODULE__{navigation: navigation} = blackboard) do
+    %{blackboard | navigation: %{navigation | target: nil, move_target: nil, orientation: nil, wait_time: nil}}
   end
 
-  def clear_chase(%__MODULE__{} = blackboard) do
-    %{blackboard | chase_started: false, last_target_pos: nil}
+  def clear_chase(%__MODULE__{navigation: navigation} = blackboard) do
+    %{blackboard | navigation: %{navigation | chase_started: false, last_target_pos: nil}}
   end
 
-  def spread_attempts(%__MODULE__{} = blackboard) do
-    Map.get(blackboard, :spread_attempts) || 0
+  def spread_attempts(%__MODULE__{combat: %Combat{spread_attempts: attempts}}), do: attempts
+
+  def bump_spread(%__MODULE__{combat: combat} = blackboard) do
+    %{blackboard | combat: %{combat | spread_attempts: combat.spread_attempts + 1, spreading: true}}
   end
 
-  def bump_spread(%__MODULE__{} = blackboard) do
-    blackboard
-    |> Map.put(:spread_attempts, spread_attempts(blackboard) + 1)
-    |> Map.put(:spreading, true)
+  def reset_spread(%__MODULE__{combat: combat} = blackboard) do
+    %{blackboard | combat: %{combat | spread_attempts: 0, spreading: false}}
   end
 
-  def reset_spread(%__MODULE__{} = blackboard) do
-    blackboard
-    |> Map.put(:spread_attempts, 0)
-    |> Map.put(:spreading, false)
+  def spreading?(%__MODULE__{combat: %Combat{spreading: spreading}}), do: spreading
+
+  def mark_spreading(%__MODULE__{combat: combat} = blackboard) do
+    %{blackboard | combat: %{combat | spreading: true}}
   end
 
-  def spreading?(%__MODULE__{} = blackboard) do
-    Map.get(blackboard, :spreading) || false
+  def clear_spreading(%__MODULE__{combat: combat} = blackboard) do
+    %{blackboard | combat: %{combat | spreading: false}}
   end
 
-  def mark_spreading(%__MODULE__{} = blackboard) do
-    Map.put(blackboard, :spreading, true)
-  end
+  def clear_attack(%__MODULE__{combat: combat} = blackboard) do
+    combat = %{
+      combat
+      | next_attack_at: 0,
+        attack_started: false,
+        auto_attacking: false,
+        auto_attack_target: nil
+    }
 
-  def clear_spreading(%__MODULE__{} = blackboard) do
-    Map.put(blackboard, :spreading, false)
-  end
-
-  def clear_attack(%__MODULE__{} = blackboard) do
-    %{blackboard | next_attack_at: 0, attack_started: false, auto_attacking: false, auto_attack_target: nil}
+    %{blackboard | combat: combat}
   end
 
   def reset_spells(%__MODULE__{} = blackboard) do
-    blackboard
-    |> Map.put(:spell_timers, nil)
-    |> Map.put(:next_spell_list_at, 0)
-    |> Map.put(:combat_movement, true)
+    %{blackboard | spells: %Spells{}}
   end
 
-  def combat_movement?(%__MODULE__{} = blackboard) do
-    Map.get(blackboard, :combat_movement) != false
+  def combat_movement?(%__MODULE__{spells: %Spells{combat_movement: enabled}}), do: enabled
+
+  def run_mode?(%__MODULE__{navigation: %Navigation{run_mode: enabled}}), do: enabled
+
+  def set_run_mode(%__MODULE__{navigation: navigation} = blackboard, enabled) when is_boolean(enabled) do
+    %{blackboard | navigation: %{navigation | run_mode: enabled}}
   end
 
-  def run_mode?(%__MODULE__{} = blackboard) do
-    Map.get(blackboard, :run_mode) == true
+  def set_combat_movement(%__MODULE__{spells: spells} = blackboard, enabled) when is_boolean(enabled) do
+    %{blackboard | spells: %{spells | combat_movement: enabled}}
   end
 
-  def set_run_mode(%__MODULE__{} = blackboard, enabled) when is_boolean(enabled) do
-    Map.put(blackboard, :run_mode, enabled)
-  end
-
-  def set_combat_movement(%__MODULE__{} = blackboard, enabled) when is_boolean(enabled) do
-    Map.put(blackboard, :combat_movement, enabled)
-  end
-
-  def spell_timer_ready?(%__MODULE__{} = blackboard, index, now) when is_integer(index) and is_integer(now) do
-    case Map.get(blackboard, :spell_timers) do
+  def spell_timer_ready?(%__MODULE__{spells: %Spells{timers: timers}}, index, now)
+      when is_integer(index) and is_integer(now) do
+    case timers do
       %{^index => ready_at} when is_integer(ready_at) -> now >= ready_at
       _ -> false
     end
   end
 
-  def put_spell_timer(%__MODULE__{} = blackboard, index, delay_ms, now)
+  def put_spell_timer(%__MODULE__{spells: spells} = blackboard, index, delay_ms, now)
       when is_integer(index) and is_integer(delay_ms) and is_integer(now) do
-    timers = Map.get(blackboard, :spell_timers) || %{}
-    Map.put(blackboard, :spell_timers, Map.put(timers, index, now + delay_ms))
+    timers = Map.put(spells.timers || %{}, index, now + delay_ms)
+    %{blackboard | spells: %{spells | timers: timers}}
   end
 
-  def fleeing?(%__MODULE__{} = blackboard) do
-    is_integer(Map.get(blackboard, :flee_until))
-  end
+  def fleeing?(%__MODULE__{combat: %Combat{flee_until: flee_until}}), do: is_integer(flee_until)
 
-  def start_flee(%__MODULE__{} = blackboard, from_guid, duration_ms, now)
+  def start_flee(%__MODULE__{combat: combat} = blackboard, from_guid, duration_ms, now)
       when is_integer(duration_ms) and is_integer(now) do
-    %{blackboard | flee_until: now + duration_ms, flee_from: from_guid}
+    %{blackboard | combat: %{combat | flee_until: now + duration_ms, flee_from: from_guid}}
   end
 
-  def clear_flee(%__MODULE__{} = blackboard) do
-    %{blackboard | flee_until: nil, flee_from: nil}
+  def clear_flee(%__MODULE__{combat: combat} = blackboard) do
+    %{blackboard | combat: %{combat | flee_until: nil, flee_from: nil}}
   end
 
-  def clear_attack_started(%__MODULE__{} = blackboard) do
-    %{blackboard | attack_started: false}
+  def clear_attack_started(%__MODULE__{combat: combat} = blackboard) do
+    %{blackboard | combat: %{combat | attack_started: false}}
   end
 
-  def clear_auto_attack(%__MODULE__{} = blackboard) do
-    %{blackboard | attack_started: false, auto_attacking: false, auto_attack_target: nil}
+  def clear_auto_attack(%__MODULE__{combat: combat} = blackboard) do
+    %{blackboard | combat: %{combat | attack_started: false, auto_attacking: false, auto_attack_target: nil}}
   end
 
-  def enable_auto_attack(%__MODULE__{} = blackboard, target) do
-    %{blackboard | auto_attacking: true, auto_attack_target: target}
+  def enable_auto_attack(%__MODULE__{combat: combat} = blackboard, target) do
+    %{blackboard | combat: %{combat | auto_attacking: true, auto_attack_target: target}}
+  end
+
+  defp deadline(%__MODULE__{navigation: %Navigation{next_chase_at: at}}, :next_chase_at), do: at
+  defp deadline(%__MODULE__{navigation: %Navigation{next_wander_at: at}}, :next_wander_at), do: at
+  defp deadline(%__MODULE__{navigation: %Navigation{next_waypoint_at: at}}, :next_waypoint_at), do: at
+  defp deadline(%__MODULE__{navigation: %Navigation{next_confused_at: at}}, :next_confused_at), do: at
+  defp deadline(%__MODULE__{combat: %Combat{next_attack_at: at}}, :next_attack_at), do: at
+  defp deadline(%__MODULE__{combat: %Combat{next_offhand_attack_at: at}}, :next_offhand_attack_at), do: at
+  defp deadline(%__MODULE__{combat: %Combat{next_aggro_at: at}}, :next_aggro_at), do: at
+
+  defp deadline(%__MODULE__{combat: %Combat{next_call_for_help_at: at}}, :next_call_for_help_at), do: at
+
+  defp deadline(%__MODULE__{combat: %Combat{next_spread_at: at}}, :next_spread_at), do: at
+  defp deadline(%__MODULE__{spells: %Spells{next_list_at: at}}, :next_spell_list_at), do: at
+  defp deadline(%__MODULE__{event_ai: %EventAI{next_at: at}}, :next_eventai_at), do: at
+  defp deadline(%__MODULE__{maintenance: %Maintenance{next_regen_at: at}}, :next_regen_at), do: at
+
+  defp put_deadline(%__MODULE__{navigation: navigation} = blackboard, :next_chase_at, at) do
+    %{blackboard | navigation: %{navigation | next_chase_at: at}}
+  end
+
+  defp put_deadline(%__MODULE__{navigation: navigation} = blackboard, :next_wander_at, at) do
+    %{blackboard | navigation: %{navigation | next_wander_at: at}}
+  end
+
+  defp put_deadline(%__MODULE__{navigation: navigation} = blackboard, :next_waypoint_at, at) do
+    %{blackboard | navigation: %{navigation | next_waypoint_at: at}}
+  end
+
+  defp put_deadline(%__MODULE__{navigation: navigation} = blackboard, :next_confused_at, at) do
+    %{blackboard | navigation: %{navigation | next_confused_at: at}}
+  end
+
+  defp put_deadline(%__MODULE__{combat: combat} = blackboard, :next_attack_at, at) do
+    %{blackboard | combat: %{combat | next_attack_at: at}}
+  end
+
+  defp put_deadline(%__MODULE__{combat: combat} = blackboard, :next_offhand_attack_at, at) do
+    %{blackboard | combat: %{combat | next_offhand_attack_at: at}}
+  end
+
+  defp put_deadline(%__MODULE__{combat: combat} = blackboard, :next_aggro_at, at) do
+    %{blackboard | combat: %{combat | next_aggro_at: at}}
+  end
+
+  defp put_deadline(%__MODULE__{combat: combat} = blackboard, :next_call_for_help_at, at) do
+    %{blackboard | combat: %{combat | next_call_for_help_at: at}}
+  end
+
+  defp put_deadline(%__MODULE__{combat: combat} = blackboard, :next_spread_at, at) do
+    %{blackboard | combat: %{combat | next_spread_at: at}}
+  end
+
+  defp put_deadline(%__MODULE__{spells: spells} = blackboard, :next_spell_list_at, at) do
+    %{blackboard | spells: %{spells | next_list_at: at}}
+  end
+
+  defp put_deadline(%__MODULE__{event_ai: event_ai} = blackboard, :next_eventai_at, at) do
+    %{blackboard | event_ai: %{event_ai | next_at: at}}
+  end
+
+  defp put_deadline(%__MODULE__{maintenance: maintenance} = blackboard, :next_regen_at, at) do
+    %{blackboard | maintenance: %{maintenance | next_regen_at: at}}
   end
 end

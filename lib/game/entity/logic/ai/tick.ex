@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Tick do
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard.Combat
   alias ThistleTea.Game.Entity.Logic.AI.TickPlan
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Regen
@@ -25,7 +26,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Tick do
 
   def needs_tick?(%{internal: %Internal{in_combat: true}}), do: true
 
-  def needs_tick?(%{internal: %Internal{blackboard: %Blackboard{auto_attacking: true}}, unit: %Unit{target: target}})
+  def needs_tick?(%{
+        internal: %Internal{blackboard: %Blackboard{combat: %Combat{auto_attacking: true}}},
+        unit: %Unit{target: target}
+      })
       when is_integer(target) and target > 0 do
     true
   end
@@ -76,7 +80,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Tick do
 
   defp schedule_regen(plan, %{internal: %Internal{blackboard: blackboard}} = entity) do
     if Regen.needs_regen?(entity) do
-      delay_ms = Blackboard.delay_until(Blackboard.from_any(blackboard), :next_regen_at, plan.now)
+      delay_ms = Blackboard.delay_until(Blackboard.ensure(blackboard), :next_regen_at, plan.now)
       TickPlan.schedule_in(plan, :regen, delay_ms)
     else
       plan

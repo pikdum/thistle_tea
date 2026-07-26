@@ -193,7 +193,7 @@ defmodule ThistleTea.Game.Entity.Logic.Engagement do
     if previous == target_guid do
       entity
     else
-      blackboard = entity.internal.blackboard |> Blackboard.from_any() |> Blackboard.clear_attack_started()
+      blackboard = entity.internal.blackboard |> Blackboard.ensure() |> Blackboard.clear_attack_started()
 
       %{entity | unit: %{entity.unit | target: target_guid}, internal: %{entity.internal | blackboard: blackboard}}
       |> Effects.enqueue(victim_change_effects(previous, target_guid))
@@ -231,7 +231,7 @@ defmodule ThistleTea.Game.Entity.Logic.Engagement do
 
   defp clear_combat_memory(blackboard) do
     blackboard
-    |> Blackboard.from_any()
+    |> Blackboard.ensure()
     |> Blackboard.clear_chase()
     |> Blackboard.clear_attack()
     |> Blackboard.reset_spread()

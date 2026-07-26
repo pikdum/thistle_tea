@@ -13,15 +13,18 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BTTest do
   defp always_false(_state, _blackboard), do: false
 
   defp set_target(state, %Blackboard{} = blackboard) do
-    {:success, state, %{blackboard | target: :selected}}
+    navigation = %{blackboard.navigation | target: :selected}
+    {:success, state, %{blackboard | navigation: navigation}}
   end
 
   defp keep_running(state, %Blackboard{} = blackboard) do
-    {:running, state, %{blackboard | target: :running}}
+    navigation = %{blackboard.navigation | target: :running}
+    {:running, state, %{blackboard | navigation: navigation}}
   end
 
   defp keep_running_with_reason(state, %Blackboard{} = blackboard) do
-    {BT.running(250, :test), state, %{blackboard | target: :running_with_reason}}
+    navigation = %{blackboard.navigation | target: :running_with_reason}
+    {BT.running(250, :test), state, %{blackboard | navigation: navigation}}
   end
 
   test "selector falls through on failure and updates blackboard" do
@@ -38,7 +41,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BTTest do
 
     {:success, state} = BT.tick(tree, state, Context.new(1_000))
 
-    assert state.internal.blackboard.target == :selected
+    assert state.internal.blackboard.navigation.target == :selected
   end
 
   test "sequence stops on running child" do
@@ -48,7 +51,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BTTest do
 
     {:running, state} = BT.tick(tree, state, Context.new(1_000))
 
-    assert state.internal.blackboard.target == :running
+    assert state.internal.blackboard.navigation.target == :running
   end
 
   test "sequence preserves reason-tagged running status" do
@@ -58,7 +61,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BTTest do
 
     {{:running, 250, :test}, state} = BT.tick(tree, state, Context.new(1_000))
 
-    assert state.internal.blackboard.target == :running_with_reason
+    assert state.internal.blackboard.navigation.target == :running_with_reason
   end
 
   test "passes the explicit environment to context-aware nodes" do

@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard.Combat, as: CombatMemory
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception
   alias ThistleTea.Game.Entity.Logic.AI.BT.Navigation
@@ -43,7 +44,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
     ])
   end
 
-  def in_combat?(%Character{unit: %Unit{target: target}}, %Blackboard{auto_attacking: true})
+  def in_combat?(%Character{unit: %Unit{target: target}}, %Blackboard{combat: %CombatMemory{auto_attacking: true}})
       when is_integer(target) and target > 0 do
     true
   end
@@ -216,7 +217,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
     wait_for_next_attack(state, blackboard, now)
   end
 
-  defp maybe_start_melee_attack(state, target, %Blackboard{attack_started: true} = blackboard)
+  defp maybe_start_melee_attack(state, target, %Blackboard{combat: %CombatMemory{attack_started: true}} = blackboard)
        when is_integer(target) do
     {state, blackboard}
   end
@@ -224,7 +225,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
   defp maybe_start_melee_attack(%{object: %{guid: guid}} = state, target, %Blackboard{} = blackboard)
        when is_integer(target) do
     state = Effects.enqueue(state, CombatLogic.attack_start(guid, target))
-    {state, Map.put(blackboard, :attack_started, true)}
+    combat = %{blackboard.combat | attack_started: true}
+    {state, %{blackboard | combat: combat}}
   end
 
   defp handle_out_of_range(%Character{} = state, blackboard, now) do

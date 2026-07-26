@@ -54,7 +54,7 @@ defmodule ThistleTea.Game.Entity.Logic.EngagementTest do
       assert mob.unit.target == 0
       assert Bitwise.band(mob.unit.flags, @combat_flag) == 0
       assert Bitwise.band(mob.unit.dynamic_flags, @tapped_flag) == 0
-      refute mob.internal.blackboard.auto_attacking
+      refute mob.internal.blackboard.combat.auto_attacking
       assert Enum.any?(mob.internal.events, &is_struct(&1, Effects.AttackStop))
       assert Enum.any?(mob.internal.events, &is_struct(&1, Effects.ThreatRefLost))
       assert Enum.any?(mob.internal.events, &is_struct(&1, Effects.TapCleared))
@@ -87,7 +87,9 @@ defmodule ThistleTea.Game.Entity.Logic.EngagementTest do
         in_combat: false,
         threat: %{},
         loot: %Loot{},
-        blackboard: %Blackboard{auto_attacking: true, attack_started: true}
+        blackboard: %Blackboard{
+          combat: %Blackboard.Combat{auto_attacking: true, attack_started: true}
+        }
       }
     }
   end

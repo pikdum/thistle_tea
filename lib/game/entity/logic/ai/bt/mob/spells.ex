@@ -99,7 +99,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells do
   defp spell_entries(%Mob{}), do: []
 
   defp ensure_spell_timers(%Blackboard{} = blackboard, spells, now, random) do
-    case Map.get(blackboard, :spell_timers) do
+    case blackboard.spells.timers do
       timers when is_map(timers) ->
         blackboard
 

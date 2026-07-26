@@ -110,7 +110,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT do
   defp invoke(fun, state, blackboard, _context) when is_function(fun, 2), do: fun.(state, blackboard)
 
   defp blackboard(%{internal: %Internal{blackboard: blackboard}}) do
-    Blackboard.from_any(blackboard)
+    Blackboard.ensure(blackboard)
   end
 
   defp blackboard(_state) do

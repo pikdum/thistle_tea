@@ -81,10 +81,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAITest do
       mob = mob(events: [ooc_event], db_guid: 99)
 
       {mob, blackboard} = EventAI.tick(mob, Blackboard.new(), 0)
-      blackboard = %{blackboard | next_eventai_at: 0}
+      blackboard = Blackboard.reset_deadline(blackboard, :next_eventai_at)
       {mob, blackboard} = EventAI.tick(mob, blackboard, 1_100)
       assert mob.internal.events == []
-      assert blackboard.eventai_timers == %{0 => 1_000}
+      assert blackboard.event_ai.timers == %{0 => 1_000}
     end
   end
 
@@ -96,7 +96,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAITest do
       assert [%Effects.MonsterTalk{}] = mob.internal.events
 
       mob = clear_events(mob)
-      blackboard = %{blackboard | next_eventai_at: 0}
+      blackboard = Blackboard.reset_deadline(blackboard, :next_eventai_at)
       {mob, _blackboard} = EventAI.tick(mob, blackboard, 3_000)
       assert mob.internal.events == []
     end
@@ -116,16 +116,16 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAITest do
       {mob, blackboard} = EventAI.tick(mob, Blackboard.new(), 0)
       assert mob.internal.events == []
 
-      blackboard = %{blackboard | next_eventai_at: 0}
+      blackboard = Blackboard.reset_deadline(blackboard, :next_eventai_at)
       {mob, blackboard} = EventAI.tick(mob, blackboard, 1_100)
       assert [%Effects.MonsterTalk{}] = mob.internal.events
 
       mob = clear_events(mob)
-      blackboard = %{blackboard | next_eventai_at: 0}
+      blackboard = Blackboard.reset_deadline(blackboard, :next_eventai_at)
       {mob, blackboard} = EventAI.tick(mob, blackboard, 2_000)
       assert mob.internal.events == []
 
-      blackboard = %{blackboard | next_eventai_at: 0}
+      blackboard = Blackboard.reset_deadline(blackboard, :next_eventai_at)
       {mob, _blackboard} = EventAI.tick(mob, blackboard, 6_200)
       assert [%Effects.MonsterTalk{}] = mob.internal.events
     end
@@ -154,7 +154,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAITest do
 
       {mob, blackboard} = EventAI.enter_combat(mob, blackboard, enemy, 100)
       assert [%Effects.MonsterTalk{}] = mob.internal.events
-      assert blackboard.eventai_disabled == MapSet.new([0])
+      assert blackboard.event_ai.disabled == MapSet.new([0])
 
       mob = clear_events(mob)
       {mob, _blackboard} = EventAI.on_spawned(mob, blackboard, 200)
@@ -176,7 +176,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAITest do
       {mob, blackboard} = EventAI.tick(mob, blackboard, 1_000)
       assert mob.internal.events == []
 
-      blackboard = %{blackboard | next_eventai_at: 0}
+      blackboard = Blackboard.reset_deadline(blackboard, :next_eventai_at)
       {mob, _blackboard} = EventAI.tick(mob, blackboard, 2_100)
       assert [%Effects.MonsterTalk{}] = mob.internal.events
     end
@@ -196,10 +196,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAITest do
       {mob, blackboard} = EventAI.on_evade(mob, blackboard, 10_000)
 
       assert [%Effects.MonsterTalk{}] = mob.internal.events
-      assert blackboard.eventai_timers[1] == 11_000
+      assert blackboard.event_ai.timers[1] == 11_000
       mob = clear_events(mob)
 
-      blackboard = %{blackboard | next_eventai_at: 0}
+      blackboard = Blackboard.reset_deadline(blackboard, :next_eventai_at)
       {mob, _blackboard} = EventAI.tick(mob, blackboard, 11_100)
       assert [%Effects.MonsterTalk{}] = mob.internal.events
     end

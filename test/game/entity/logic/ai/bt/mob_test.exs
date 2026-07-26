@@ -138,7 +138,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
         internal: %Internal{
           in_combat: true,
           threat: %{target => 100.0},
-          blackboard: %Blackboard{auto_attacking: true, attack_started: true}
+          blackboard: %Blackboard{
+            combat: %Blackboard.Combat{auto_attacking: true, attack_started: true}
+          }
         }
       }
 
@@ -147,7 +149,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
       refute mob.internal.in_combat
       assert Threat.entries(mob) == []
       assert mob.unit.target == 0
-      refute mob.internal.blackboard.auto_attacking
+      refute mob.internal.blackboard.combat.auto_attacking
       assert Enum.any?(mob.internal.events, &is_struct(&1, Effects.AttackStop))
     end
 
@@ -164,14 +166,14 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
           running: true,
           threat: %{target => 100.0},
           spawn: %Spawn{position: spawn},
-          blackboard: %Blackboard{auto_attacking: true}
+          blackboard: %Blackboard{combat: %Blackboard.Combat{auto_attacking: true}}
       }
 
       mob = MobBT.drop_threat(%{mob | unit: unit, internal: internal}, target)
 
       refute mob.internal.in_combat
       assert mob.unit.health == 100
-      assert mob.internal.blackboard.move_target == spawn
+      assert mob.internal.blackboard.navigation.move_target == spawn
       assert Movement.moving?(mob, Time.now())
     end
 
@@ -268,7 +270,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
               mob.internal
               | in_combat: true,
                 threat: %{target => 100.0},
-                blackboard: %Blackboard{auto_attacking: true, attack_started: true}
+                blackboard: %Blackboard{
+                  combat: %Blackboard.Combat{auto_attacking: true, attack_started: true}
+                }
             }
         }
         |> BT.init(MobBT.tree())
@@ -278,7 +282,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
       refute mob.internal.in_combat
       assert mob.internal.threat == %{}
       assert mob.unit.target == 0
-      refute mob.internal.blackboard.auto_attacking
+      refute mob.internal.blackboard.combat.auto_attacking
       assert Enum.any?(mob.internal.events, &is_struct(&1, Effects.AttackStop))
     end
 
@@ -305,11 +309,17 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
           internal: %{state.internal | in_combat: true}
       }
 
-      blackboard = %Blackboard{target: {1.0, 0.0, 0.0}, move_target: {1.0, 0.0, 0.0}}
+      blackboard = %Blackboard{
+        navigation: %Blackboard.Navigation{
+          target: {1.0, 0.0, 0.0},
+          move_target: {1.0, 0.0, 0.0}
+        }
+      }
+
       {:success, state, blackboard} = MobBT.interrupt_idle_movement(state, blackboard, now)
 
       assert state.movement_block.spline_nodes == []
-      assert blackboard.move_target == nil
+      assert blackboard.navigation.move_target == nil
       assert Enum.any?(state.internal.events, &match?(%Effects.MovementStopped{}, &1))
     end
   end
@@ -317,7 +327,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
   describe "wait_until_wander_ready/3" do
     test "returns a running delay from explicit time" do
       state = fixture_mob()
-      blackboard = %Blackboard{next_wander_at: 1_250}
+      blackboard = %Blackboard{navigation: %Blackboard.Navigation{next_wander_at: 1_250}}
 
       assert {{:running, 250, :wander}, ^state, ^blackboard} =
                MobBT.wait_until_wander_ready(state, blackboard, 1_000)
@@ -325,7 +335,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
 
     test "succeeds when ready at explicit time" do
       state = fixture_mob()
-      blackboard = %Blackboard{next_wander_at: 1_000}
+      blackboard = %Blackboard{navigation: %Blackboard.Navigation{next_wander_at: 1_000}}
 
       assert {:success, ^state, ^blackboard} =
                MobBT.wait_until_wander_ready(state, blackboard, 1_000)
@@ -333,7 +343,11 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
 
     test "wakes for aggro before a long wander wait" do
       state = fixture_mob()
-      blackboard = %Blackboard{next_wander_at: 5_000, next_aggro_at: 1_250}
+
+      blackboard = %Blackboard{
+        navigation: %Blackboard.Navigation{next_wander_at: 5_000},
+        combat: %Blackboard.Combat{next_aggro_at: 1_250}
+      }
 
       assert {{:running, 250, :aggro}, ^state, ^blackboard} =
                MobBT.wait_until_wander_ready(state, blackboard, 1_000)
@@ -343,7 +357,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
   describe "wait_until_waypoint_ready/3" do
     test "returns a running delay from explicit time" do
       state = fixture_mob()
-      blackboard = %Blackboard{next_waypoint_at: 1_250}
+      blackboard = %Blackboard{navigation: %Blackboard.Navigation{next_waypoint_at: 1_250}}
 
       assert {{:running, 250, :waypoint}, ^state, ^blackboard} =
                MobBT.wait_until_waypoint_ready(state, blackboard, 1_000)
@@ -351,7 +365,11 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
 
     test "wakes for aggro before a long waypoint wait" do
       state = fixture_mob()
-      blackboard = %Blackboard{next_waypoint_at: 5_000, next_aggro_at: 1_250}
+
+      blackboard = %Blackboard{
+        navigation: %Blackboard.Navigation{next_waypoint_at: 5_000},
+        combat: %Blackboard.Combat{next_aggro_at: 1_250}
+      }
 
       assert {{:running, 250, :aggro}, ^state, ^blackboard} =
                MobBT.wait_until_waypoint_ready(state, blackboard, 1_000)
@@ -361,7 +379,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
   describe "wait_for_chase_tick/3" do
     test "returns delay until the next chase check" do
       state = fixture_mob()
-      blackboard = %Blackboard{next_chase_at: 1_250}
+      blackboard = %Blackboard{navigation: %Blackboard.Navigation{next_chase_at: 1_250}}
 
       assert {{:running, 250, :chase}, ^state, ^blackboard} =
                MobBT.wait_for_chase_tick(state, blackboard, 1_000)
@@ -378,22 +396,27 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
         )
 
       blackboard = %Blackboard{
-        target: {100.0, 0.0, 0.0},
-        move_target: {100.0, 0.0, 0.0},
-        next_chase_at: 5_000
+        navigation: %Blackboard.Navigation{
+          target: {100.0, 0.0, 0.0},
+          move_target: {100.0, 0.0, 0.0},
+          next_chase_at: 5_000
+        }
       }
 
       assert {:success, state, blackboard} = MobBT.interrupt_idle_movement(state, blackboard, 1_000)
       assert state.movement_block.spline_nodes == []
       assert Enum.any?(state.internal.events, &match?(%Effects.MovementStopped{}, &1))
-      assert blackboard.target == nil
-      assert blackboard.move_target == nil
-      assert blackboard.next_chase_at == 0
+      assert blackboard.navigation.target == nil
+      assert blackboard.navigation.move_target == nil
+      assert blackboard.navigation.next_chase_at == 0
     end
 
     test "leaves combat movement untouched" do
       state = fixture_mob(start_time: 0, duration: 10_000, spline_nodes: [{100.0, 0.0, 0.0}])
-      blackboard = %Blackboard{last_target_pos: {100.0, 0.0, 0.0}}
+
+      blackboard = %Blackboard{
+        navigation: %Blackboard.Navigation{last_target_pos: {100.0, 0.0, 0.0}}
+      }
 
       assert {:success, ^state, ^blackboard} = MobBT.interrupt_idle_movement(state, blackboard, 1_000)
     end
@@ -498,7 +521,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
         )
 
       state = put_in(state.unit.target, target_guid)
-      blackboard = %Blackboard{spreading: true}
+      blackboard = %Blackboard{combat: %Blackboard.Combat{spreading: true}}
 
       assert {:success, ^state, ^blackboard} = MobBT.halt_at_contact(state, blackboard, 2_000)
       assert state.movement_block.spline_nodes == [{2.0, 0.0, 0.0}]
@@ -508,8 +531,12 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
       target_guid = player_guid()
       state = put_in(fixture_mob().unit.target, target_guid)
 
-      assert {:success, ^state, %Blackboard{spreading: false}} =
-               MobBT.halt_at_contact(state, %Blackboard{spreading: true}, 2_000)
+      assert {:success, ^state, %Blackboard{combat: %Blackboard.Combat{spreading: false}}} =
+               MobBT.halt_at_contact(
+                 state,
+                 %Blackboard{combat: %Blackboard.Combat{spreading: true}},
+                 2_000
+               )
     end
   end
 
@@ -534,9 +561,19 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
   describe "combat_wait/3" do
     test "paces by the next swing when already stationary in range" do
       state = fixture_mob()
-      blackboard = %Blackboard{next_attack_at: 1_750, chase_started: true, last_target_pos: {1.0, 2.0, 3.0}}
 
-      assert {{:running, delay, :attack}, ^state, %Blackboard{next_chase_at: next_chase_at, chase_started: false}} =
+      blackboard = %Blackboard{
+        navigation: %Blackboard.Navigation{chase_started: true, last_target_pos: {1.0, 2.0, 3.0}},
+        combat: %Blackboard.Combat{next_attack_at: 1_750}
+      }
+
+      assert {{:running, delay, :attack}, ^state,
+              %Blackboard{
+                navigation: %Blackboard.Navigation{
+                  next_chase_at: next_chase_at,
+                  chase_started: false
+                }
+              }} =
                MobBT.combat_wait(state, blackboard, 1_000)
 
       assert delay == 750
@@ -545,9 +582,16 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
 
     test "paces by movement boundary before the next swing while still moving" do
       state = fixture_mob(start_time: 0, duration: 10_000, spline_nodes: [{250.0, 0.0, 0.0}])
-      blackboard = %Blackboard{next_attack_at: 5_000, chase_started: true, last_target_pos: {1.0, 2.0, 3.0}}
 
-      assert {{:running, 3_980, :chase}, ^state, %Blackboard{next_chase_at: 4_980, chase_started: false}} =
+      blackboard = %Blackboard{
+        navigation: %Blackboard.Navigation{chase_started: true, last_target_pos: {1.0, 2.0, 3.0}},
+        combat: %Blackboard.Combat{next_attack_at: 5_000}
+      }
+
+      assert {{:running, 3_980, :chase}, ^state,
+              %Blackboard{
+                navigation: %Blackboard.Navigation{next_chase_at: 4_980, chase_started: false}
+              }} =
                MobBT.combat_wait(state, blackboard, 1_000)
     end
 
@@ -558,9 +602,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
 
       state = fixture_mob(start_time: 0, duration: 10_000, spline_nodes: [{250.0, 0.0, 0.0}])
       state = put_in(state.unit.target, target_guid)
-      blackboard = %Blackboard{next_attack_at: 5_000}
+      blackboard = %Blackboard{combat: %Blackboard.Combat{next_attack_at: 5_000}}
 
-      assert {{:running, 880, :chase}, _state, %Blackboard{next_chase_at: 1_880}} =
+      assert {{:running, 880, :chase}, _state, %Blackboard{navigation: %Blackboard.Navigation{next_chase_at: 1_880}}} =
                MobBT.combat_wait(state, blackboard, AIEnvironment.context(state, 1_000))
     end
   end
@@ -568,7 +612,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
   describe "wait_for_arrival/3" do
     test "returns remaining movement duration from explicit time" do
       state = fixture_mob(start_time: 900, duration: 500)
-      blackboard = %Blackboard{move_target: {1.0, 2.0, 3.0}}
+
+      blackboard = %Blackboard{
+        navigation: %Blackboard.Navigation{move_target: {1.0, 2.0, 3.0}}
+      }
 
       assert {{:running, 400, :movement}, ^state, ^blackboard} =
                MobBT.wait_for_arrival(state, blackboard, 1_000)
@@ -576,7 +623,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
 
     test "waits until arrival when movement stays in the current spatial cell" do
       state = fixture_mob(start_time: 900, duration: 5_000)
-      blackboard = %Blackboard{move_target: {1.0, 2.0, 3.0}}
+
+      blackboard = %Blackboard{
+        navigation: %Blackboard.Navigation{move_target: {1.0, 2.0, 3.0}}
+      }
 
       assert {{:running, 4_900, :movement}, ^state, ^blackboard} =
                MobBT.wait_for_arrival(state, blackboard, 1_000)
@@ -584,7 +634,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
 
     test "wakes at the next spatial cell boundary before arrival" do
       state = fixture_mob(start_time: 0, duration: 10_000, spline_nodes: [{250.0, 0.0, 0.0}])
-      blackboard = %Blackboard{move_target: {250.0, 0.0, 0.0}}
+
+      blackboard = %Blackboard{
+        navigation: %Blackboard.Navigation{move_target: {250.0, 0.0, 0.0}}
+      }
 
       assert {{:running, 3_980, :movement}, ^state, ^blackboard} =
                MobBT.wait_for_arrival(state, blackboard, 1_000)
@@ -592,7 +645,11 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
 
     test "wakes for aggro before the next spatial cell boundary" do
       state = fixture_mob(start_time: 0, duration: 10_000, spline_nodes: [{250.0, 0.0, 0.0}])
-      blackboard = %Blackboard{move_target: {250.0, 0.0, 0.0}, next_aggro_at: 1_250}
+
+      blackboard = %Blackboard{
+        navigation: %Blackboard.Navigation{move_target: {250.0, 0.0, 0.0}},
+        combat: %Blackboard.Combat{next_aggro_at: 1_250}
+      }
 
       assert {{:running, 250, :aggro}, ^state, ^blackboard} =
                MobBT.wait_for_arrival(state, blackboard, 1_000)
@@ -600,9 +657,15 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
 
     test "clears move target after arrival" do
       state = fixture_mob(start_time: 0, duration: 500)
-      blackboard = %Blackboard{target: {1.0, 2.0, 3.0}, move_target: {1.0, 2.0, 3.0}}
 
-      assert {:success, ^state, %Blackboard{target: nil, move_target: nil}} =
+      blackboard = %Blackboard{
+        navigation: %Blackboard.Navigation{
+          target: {1.0, 2.0, 3.0},
+          move_target: {1.0, 2.0, 3.0}
+        }
+      }
+
+      assert {:success, ^state, %Blackboard{navigation: %Blackboard.Navigation{target: nil, move_target: nil}}} =
                MobBT.wait_for_arrival(state, blackboard, 1_000)
     end
   end
@@ -610,7 +673,13 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
   describe "move_to_target/3" do
     test "succeeds when already moving to target" do
       state = fixture_mob()
-      blackboard = %Blackboard{target: {1.0, 2.0, 3.0}, move_target: {1.0, 2.0, 3.0}}
+
+      blackboard = %Blackboard{
+        navigation: %Blackboard.Navigation{
+          target: {1.0, 2.0, 3.0},
+          move_target: {1.0, 2.0, 3.0}
+        }
+      }
 
       assert {:success, ^state, ^blackboard} =
                MobBT.move_to_target(state, blackboard, AIEnvironment.context(state, 1_000))
@@ -618,9 +687,12 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
 
     test "fails and clears stale move target without a target" do
       state = fixture_mob()
-      blackboard = %Blackboard{move_target: {1.0, 2.0, 3.0}}
 
-      assert {:failure, ^state, %Blackboard{target: nil, move_target: nil}} =
+      blackboard = %Blackboard{
+        navigation: %Blackboard.Navigation{move_target: {1.0, 2.0, 3.0}}
+      }
+
+      assert {:failure, ^state, %Blackboard{navigation: %Blackboard.Navigation{target: nil, move_target: nil}}} =
                MobBT.move_to_target(state, blackboard, AIEnvironment.context(state, 1_000))
     end
   end
@@ -628,9 +700,24 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
   describe "set_next_waypoint_wait/3" do
     test "schedules from explicit time and clears waypoint state" do
       state = fixture_mob()
-      blackboard = %Blackboard{target: {1.0, 2.0, 3.0}, orientation: 1.5, wait_time: 250}
 
-      assert {:success, ^state, %Blackboard{next_waypoint_at: 1_250, target: nil, orientation: nil, wait_time: nil}} =
+      blackboard = %Blackboard{
+        navigation: %Blackboard.Navigation{
+          target: {1.0, 2.0, 3.0},
+          orientation: 1.5,
+          wait_time: 250
+        }
+      }
+
+      assert {:success, ^state,
+              %Blackboard{
+                navigation: %Blackboard.Navigation{
+                  next_waypoint_at: 1_250,
+                  target: nil,
+                  orientation: nil,
+                  wait_time: nil
+                }
+              }} =
                MobBT.set_next_waypoint_wait(state, blackboard, 1_000)
     end
   end
@@ -648,7 +735,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
       put_spatial_target(:players, target_guid, {10.0, 0.0, 0.0}, alliance(), 5)
       put_spatial_target(:players, other_guid, {12.0, 0.0, 0.0}, alliance(), 5)
 
-      assert {:failure, state, %Blackboard{next_aggro_at: 6_000}} =
+      assert {:failure, state, %Blackboard{combat: %Blackboard.Combat{next_aggro_at: 6_000}}} =
                MobBT.try_aggro(state, blackboard, AIEnvironment.context(state, 1_000))
 
       assert state.unit.target == target_guid
@@ -675,7 +762,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
       put_spatial_target(:mobs, friendly_guid, {10.0, 0.0, 0.0}, defias(), 5)
       put_spatial_target(:mobs, neutral_guid, {8.0, 0.0, 0.0}, wolf(), 5)
 
-      assert {:failure, ^state, %Blackboard{next_aggro_at: 6_000}} = MobBT.try_aggro(state, blackboard, 1_000)
+      assert {:failure, ^state, %Blackboard{combat: %Blackboard.Combat{next_aggro_at: 6_000}}} =
+               MobBT.try_aggro(state, blackboard, 1_000)
     end
 
     test "uses level-adjusted aggro range" do
@@ -688,7 +776,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
       put_metadata(source_guid, defias(), 5)
       put_spatial_target(:players, target_guid, {6.0, 0.0, 0.0}, alliance(), 30)
 
-      assert {:failure, ^state, %Blackboard{next_aggro_at: 6_000}} = MobBT.try_aggro(state, blackboard, 1_000)
+      assert {:failure, ^state, %Blackboard{combat: %Blackboard.Combat{next_aggro_at: 6_000}}} =
+               MobBT.try_aggro(state, blackboard, 1_000)
     end
 
     test "uses the creature detection range for aggro distance" do
@@ -701,7 +790,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
       put_metadata(source_guid, defias(), 5)
       put_spatial_target(:players, target_guid, {12.0, 0.0, 0.0}, alliance(), 5)
 
-      assert {:failure, ^state, %Blackboard{next_aggro_at: 6_000}} = MobBT.try_aggro(state, blackboard, 1_000)
+      assert {:failure, ^state, %Blackboard{combat: %Blackboard.Combat{next_aggro_at: 6_000}}} =
+               MobBT.try_aggro(state, blackboard, 1_000)
+
       assert state.unit.target == 0
     end
 
@@ -714,7 +805,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
       put_spatial_target(:players, target_guid, {5.0, 0.0, 0.0}, alliance(), 5)
       Metadata.update(target_guid, %{stealthed?: true, stealth_skill: 25})
 
-      assert {:failure, state, %Blackboard{next_aggro_at: 6_000}} = MobBT.try_aggro(state, %Blackboard{}, 1_000)
+      assert {:failure, state, %Blackboard{combat: %Blackboard.Combat{next_aggro_at: 6_000}}} =
+               MobBT.try_aggro(state, %Blackboard{}, 1_000)
+
       assert state.unit.target == 0
     end
   end
@@ -747,7 +840,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
     test "skips while the mob is still moving" do
       target_guid = player_guid()
       state = put_in(fixture_mob(start_time: 0, duration: 5_000).unit.target, target_guid)
-      blackboard = %Blackboard{next_spread_at: 0}
+      blackboard = %Blackboard{combat: %Blackboard.Combat{next_spread_at: 0}}
 
       assert {:success, ^state, ^blackboard} =
                MobBT.maybe_spread(state, blackboard, AIEnvironment.context(state, 1_000))
@@ -756,7 +849,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
     test "waits for the spread timer" do
       target_guid = player_guid()
       state = put_in(fixture_mob().unit.target, target_guid)
-      blackboard = %Blackboard{next_spread_at: 5_000}
+      blackboard = %Blackboard{combat: %Blackboard.Combat{next_spread_at: 5_000}}
 
       assert {:success, ^state, ^blackboard} =
                MobBT.maybe_spread(state, blackboard, AIEnvironment.context(state, 1_000))
@@ -768,9 +861,15 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
       on_exit(fn -> SpatialHash.clear_movement(target_guid) end)
 
       state = put_in(fixture_mob().unit.target, target_guid)
-      blackboard = %Blackboard{next_spread_at: 0, spread_attempts: 2}
 
-      assert {:success, ^state, %Blackboard{spread_attempts: 0, next_spread_at: next}} =
+      blackboard = %Blackboard{
+        combat: %Blackboard.Combat{next_spread_at: 0, spread_attempts: 2}
+      }
+
+      assert {:success, ^state,
+              %Blackboard{
+                combat: %Blackboard.Combat{spread_attempts: 0, next_spread_at: next}
+              }} =
                MobBT.maybe_spread(state, blackboard, AIEnvironment.context(state, 1_000))
 
       assert next >= 3_500 and next <= 4_500
@@ -779,18 +878,27 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
     test "stops nudging after the attempt cap" do
       target_guid = player_guid()
       state = put_in(fixture_mob().unit.target, target_guid)
-      blackboard = %Blackboard{next_spread_at: 0, spread_attempts: 3}
 
-      assert {:success, ^state, %Blackboard{spread_attempts: 3}} =
+      blackboard = %Blackboard{
+        combat: %Blackboard.Combat{next_spread_at: 0, spread_attempts: 3}
+      }
+
+      assert {:success, ^state, %Blackboard{combat: %Blackboard.Combat{spread_attempts: 3}}} =
                MobBT.maybe_spread(state, blackboard, AIEnvironment.context(state, 1_000))
     end
 
     test "does nothing without a stacked neighbor" do
       target_guid = player_guid()
       state = put_in(fixture_mob().unit.target, target_guid)
-      blackboard = %Blackboard{next_spread_at: 0, spread_attempts: 0}
 
-      assert {:success, ^state, %Blackboard{spread_attempts: 0, next_spread_at: next}} =
+      blackboard = %Blackboard{
+        combat: %Blackboard.Combat{next_spread_at: 0, spread_attempts: 0}
+      }
+
+      assert {:success, ^state,
+              %Blackboard{
+                combat: %Blackboard.Combat{spread_attempts: 0, next_spread_at: next}
+              }} =
                MobBT.maybe_spread(state, blackboard, AIEnvironment.context(state, 1_000))
 
       assert next >= 3_500 and next <= 4_500

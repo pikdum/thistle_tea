@@ -106,15 +106,17 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombatTest do
       end)
 
       blackboard = %Blackboard{
-        auto_attacking: true,
-        auto_attack_target: %TargetRef{guid: target_guid, incarnation_id: 1}
+        combat: %Blackboard.Combat{
+          auto_attacking: true,
+          auto_attack_target: %TargetRef{guid: target_guid, incarnation_id: 1}
+        }
       }
 
       {character, blackboard} = PlayerCombat.sync(character, blackboard, 100_000)
 
       assert character.internal.in_combat == true
       assert character.internal.last_hostile_time == 100_000
-      assert blackboard.auto_attacking == true
+      assert blackboard.combat.auto_attacking == true
     end
 
     test "stops swinging a dead target but lingers in combat, then drops after the window" do
@@ -130,19 +132,26 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombatTest do
       end)
 
       blackboard = %Blackboard{
-        auto_attacking: true,
-        auto_attack_target: %TargetRef{guid: target_guid, incarnation_id: 1},
-        attack_started: true,
-        next_attack_at: 1_500
+        combat: %Blackboard.Combat{
+          auto_attacking: true,
+          auto_attack_target: %TargetRef{guid: target_guid, incarnation_id: 1},
+          attack_started: true,
+          next_attack_at: 1_500
+        }
       }
 
       {character, blackboard} = PlayerCombat.sync(character, blackboard, 3_000)
 
       assert character.internal.in_combat == true
-      assert blackboard.auto_attacking == false
-      assert blackboard.next_attack_at == 1_500
+      assert blackboard.combat.auto_attacking == false
+      assert blackboard.combat.next_attack_at == 1_500
 
-      {character, _blackboard} = PlayerCombat.sync(character, %Blackboard{auto_attacking: false}, 7_000)
+      {character, _blackboard} =
+        PlayerCombat.sync(
+          character,
+          %Blackboard{combat: %Blackboard.Combat{auto_attacking: false}},
+          7_000
+        )
 
       assert character.internal.in_combat == false
     end
@@ -160,16 +169,18 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombatTest do
       character = character(in_combat: true, target: mob_guid, last_hostile_time: 1_000)
 
       blackboard = %Blackboard{
-        auto_attacking: true,
-        attack_started: true,
-        auto_attack_target: %TargetRef{guid: mob_guid, incarnation_id: 1}
+        combat: %Blackboard.Combat{
+          auto_attacking: true,
+          attack_started: true,
+          auto_attack_target: %TargetRef{guid: mob_guid, incarnation_id: 1}
+        }
       }
 
       {character, blackboard} = PlayerCombat.sync(character, blackboard, 7_000)
 
       assert character.internal.in_combat == false
-      assert blackboard.auto_attacking == false
-      assert blackboard.auto_attack_target == nil
+      assert blackboard.combat.auto_attacking == false
+      assert blackboard.combat.auto_attack_target == nil
     end
 
     test "stays in combat past the drop window while a live mob references the player" do
@@ -233,7 +244,12 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombatTest do
         Metadata.delete(target_guid)
       end)
 
-      {character, _blackboard} = PlayerCombat.sync(character, %Blackboard{auto_attacking: false}, 7_000)
+      {character, _blackboard} =
+        PlayerCombat.sync(
+          character,
+          %Blackboard{combat: %Blackboard.Combat{auto_attacking: false}},
+          7_000
+        )
 
       assert character.internal.in_combat == false
     end

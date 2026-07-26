@@ -41,7 +41,11 @@ defmodule ThistleTea.Game.Entity.Logic.AI.TickTest do
     end
 
     test "ticks while auto-attacking a target before the combat flag is set" do
-      character = fixture(blackboard: %Blackboard{auto_attacking: true}, target: 42)
+      character =
+        fixture(
+          blackboard: %Blackboard{combat: %Blackboard.Combat{auto_attacking: true}},
+          target: 42
+        )
 
       assert Tick.needs_tick?(character)
     end
@@ -73,7 +77,13 @@ defmodule ThistleTea.Game.Entity.Logic.AI.TickTest do
     end
 
     test "wakes for regen before a long running delay" do
-      character = fixture(health: 10, blackboard: %{next_regen_at: 1_200})
+      character =
+        fixture(
+          health: 10,
+          blackboard: %Blackboard{
+            maintenance: %Blackboard.Maintenance{next_regen_at: 1_200}
+          }
+        )
 
       assert Tick.player_delay(character, {:running, 2_000}, 1_000) == 200
     end
@@ -85,7 +95,13 @@ defmodule ThistleTea.Game.Entity.Logic.AI.TickTest do
     end
 
     test "passive regen sleeps until the next regen tick" do
-      character = fixture(health: 10, blackboard: %{next_regen_at: 3_500})
+      character =
+        fixture(
+          health: 10,
+          blackboard: %Blackboard{
+            maintenance: %Blackboard.Maintenance{next_regen_at: 3_500}
+          }
+        )
 
       assert Tick.player_delay(character, :success, 1_000) == 2_500
     end

@@ -332,7 +332,11 @@ defmodule ThistleTea.Game.Entity.Logic.AttackFeedbackTest do
         auras: auras
       },
       player: %Player{},
-      internal: %Internal{blackboard: %Blackboard{auto_attacking: true, attack_started: true}}
+      internal: %Internal{
+        blackboard: %Blackboard{
+          combat: %Blackboard.Combat{auto_attacking: true, attack_started: true}
+        }
+      }
     }
   end
 end

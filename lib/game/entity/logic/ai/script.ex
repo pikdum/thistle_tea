@@ -476,18 +476,24 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
   defp pick_talk_text(%ScriptStep{texts: [_ | _] = texts}, random), do: Random.choice(random, texts)
   defp pick_talk_text(%ScriptStep{}, _random), do: nil
 
-  defp set_phase_value(%Blackboard{eventai_phase: phase}, %ScriptStep{datalong: value, datalong2: 1}) do
+  defp set_phase_value(%Blackboard{event_ai: %Blackboard.EventAI{phase: phase}}, %ScriptStep{
+         datalong: value,
+         datalong2: 1
+       }) do
     phase + value
   end
 
-  defp set_phase_value(%Blackboard{eventai_phase: phase}, %ScriptStep{datalong: value, datalong2: 2}) do
+  defp set_phase_value(%Blackboard{event_ai: %Blackboard.EventAI{phase: phase}}, %ScriptStep{
+         datalong: value,
+         datalong2: 2
+       }) do
     phase - value
   end
 
   defp set_phase_value(%Blackboard{}, %ScriptStep{datalong: value}), do: value
 
   defp put_phase(%Blackboard{} = blackboard, phase) when is_integer(phase) do
-    %{blackboard | eventai_phase: phase |> max(0) |> min(@max_phase)}
+    %{blackboard | event_ai: %{blackboard.event_ai | phase: phase |> max(0) |> min(@max_phase)}}
   end
 
   defp resolve_target(%{object: %{guid: guid}}, %ScriptStep{target_self?: true}, _provided), do: guid

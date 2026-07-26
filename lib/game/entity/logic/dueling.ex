@@ -124,8 +124,15 @@ defmodule ThistleTea.Game.Entity.Logic.Dueling do
     guid = character.object.guid
     target_guid = character.unit.target
     clear_target? = target_guid in opponents
-    blackboard = Blackboard.from_any(character.internal.blackboard)
-    blackboard = if blackboard.target in opponents, do: %{blackboard | target: nil}, else: blackboard
+    blackboard = Blackboard.ensure(character.internal.blackboard)
+
+    blackboard =
+      if blackboard.navigation.target in opponents do
+        %{blackboard | navigation: %{blackboard.navigation | target: nil}}
+      else
+        blackboard
+      end
+
     blackboard = Blackboard.clear_attack(blackboard)
 
     character =

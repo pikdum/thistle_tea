@@ -17,6 +17,7 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombat do
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard.Combat
   alias ThistleTea.Game.Entity.Logic.Combat, as: CombatLogic
   alias ThistleTea.Game.Entity.Logic.TargetRef
   alias ThistleTea.Game.Time
@@ -36,7 +37,7 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombat do
 
   def vanish(%Character{internal: %Internal{} = internal} = character, now) when is_integer(now) do
     refs = internal.threat_refs || MapSet.new()
-    blackboard = internal.blackboard |> Blackboard.from_any() |> Blackboard.clear_auto_attack()
+    blackboard = internal.blackboard |> Blackboard.ensure() |> Blackboard.clear_auto_attack()
 
     character =
       %{
@@ -144,8 +145,7 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombat do
   end
 
   defp auto_attacking_target?(%Character{} = character, %Blackboard{
-         auto_attacking: true,
-         auto_attack_target: %TargetRef{} = target
+         combat: %Combat{auto_attacking: true, auto_attack_target: %TargetRef{} = target}
        }) do
     active_target?(character, target)
   end

@@ -537,7 +537,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
   def handle_info({:pet_set_actions, actions}, %Mob{internal: %Internal{pet: %Pet{}}} = state) do
     state = PetBT.set_actions(state, actions)
-    blackboard = %{Blackboard.from_any(state.internal.blackboard) | spell_timers: nil, next_spell_list_at: 0}
+    blackboard = state.internal.blackboard |> Blackboard.ensure() |> Blackboard.reset_spells()
     state = %{state | internal: %{state.internal | blackboard: blackboard}} |> wake_ai_tick()
     {:noreply, state}
   end
@@ -837,9 +837,12 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
          %Mob{internal: %Internal{in_combat: true, blackboard: blackboard}, unit: %Unit{target: target}} = state
        )
        when is_integer(target) and target > 0 do
-    case Blackboard.from_any(blackboard) do
-      %Blackboard{last_target_pos: {x, y, z}} -> {target, {x, y, z}, MobBT.chase_repath_distance(state, target)}
-      %Blackboard{} -> melee_hold_watch(state, target)
+    case Blackboard.ensure(blackboard) do
+      %Blackboard{navigation: %Blackboard.Navigation{last_target_pos: {x, y, z}}} ->
+        {target, {x, y, z}, MobBT.chase_repath_distance(state, target)}
+
+      %Blackboard{} ->
+        melee_hold_watch(state, target)
     end
   end
 
@@ -855,12 +858,12 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   end
 
   defp mark_chase_ready(%Mob{internal: %Internal{blackboard: blackboard} = internal} = state) do
-    blackboard = %{Blackboard.from_any(blackboard) | next_chase_at: 0}
+    blackboard = blackboard |> Blackboard.ensure() |> Blackboard.reset_deadline(:next_chase_at)
     %{state | internal: %{internal | blackboard: blackboard}}
   end
 
   defp mark_aggro_ready(%Mob{internal: %Internal{blackboard: blackboard} = internal} = state) do
-    blackboard = %{Blackboard.from_any(blackboard) | next_aggro_at: 0}
+    blackboard = blackboard |> Blackboard.ensure() |> Blackboard.reset_deadline(:next_aggro_at)
     %{state | internal: %{internal | blackboard: blackboard}}
   end
 
@@ -1040,7 +1043,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     with %Spell{} = spell <- if(Map.has_key?(spellbook, spell_id), do: SpellLoader.load(spell_id)),
          :ok <- check_pet_spell_target(state, spell, target_guid) do
       target_guid = if is_integer(target_guid) and target_guid > 0, do: target_guid, else: state.object.guid
-      blackboard = Blackboard.from_any(state.internal.blackboard)
+      blackboard = Blackboard.ensure(state.internal.blackboard)
       entry = %CreatureSpell{spell_id: spell_id, cast_target: if(Spell.harmful?(spell), do: :victim, else: :self)}
 
       case MobSpells.attempt_commanded_cast(
