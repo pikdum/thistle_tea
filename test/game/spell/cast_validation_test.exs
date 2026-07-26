@@ -473,6 +473,28 @@ defmodule ThistleTea.Game.Spell.CastValidationTest do
                CastValidation.validate(caster(), harmful_spell(), Target.unit(7), other_map, @now)
     end
 
+    test "combat reach extends the maximum range" do
+      barely_too_far = hostile_target(position: {WorldRef.open(0), 44.0, 0.0, 0.0})
+
+      assert {:error, :out_of_range} =
+               CastValidation.validate(caster(), harmful_spell(), Target.unit(7), barely_too_far, @now)
+
+      big_target = Map.put(barely_too_far, :combat_reach, 4.0)
+      long_arms = caster(combat_reach: 1.5)
+
+      assert :ok = CastValidation.validate(long_arms, harmful_spell(), Target.unit(7), big_target, @now)
+    end
+
+    test "combat reach shrinks the distance measured against the minimum range" do
+      charge = harmful_spell(min_range_yards: 8.0, range_yards: 25.0)
+      target = hostile_target(position: {WorldRef.open(0), 10.0, 0.0, 0.0}, combat_reach: 4.0)
+
+      assert {:error, :too_close} =
+               CastValidation.validate(caster(combat_reach: 1.5), charge, Target.unit(7), target, @now)
+
+      assert :ok = CastValidation.validate(caster(), charge, Target.unit(7), Map.delete(target, :combat_reach), @now)
+    end
+
     test "skips the range check when the target position is unknown" do
       assert :ok =
                CastValidation.validate(

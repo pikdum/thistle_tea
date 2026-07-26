@@ -346,6 +346,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
            :tameable?,
            :orientation,
            :creature_type,
+           :combat_reach,
            :aura_sources,
            :dispel_options,
            :area
@@ -367,6 +368,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
           level: Map.get(metadata, :level),
           tameable?: Map.get(metadata, :tameable?, false),
           creature_type: Map.get(metadata, :creature_type),
+          combat_reach: Map.get(metadata, :combat_reach),
           position: World.position(guid),
           orientation: Map.get(metadata, :orientation),
           aura_sources: Map.get(metadata, :aura_sources, MapSet.new()),

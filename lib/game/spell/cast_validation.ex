@@ -460,14 +460,17 @@ defmodule ThistleTea.Game.Spell.CastValidation do
 
   defp check_incidental_target(_target_info), do: :ok
 
-  defp check_range(caster, %Spell{range_yards: range} = spell, %{position: {map, x, y, z}})
+  defp check_range(caster, %Spell{range_yards: range} = spell, %{position: {map, x, y, z}} = target_info)
        when is_number(range) and range > 0 do
     case caster_position(caster) do
       {caster_map, _cx, _cy, _cz} when caster_map != map ->
         {:error, :out_of_range}
 
       {_map, cx, cy, cz} ->
-        check_distance(distance({cx, cy, cz}, {x, y, z}), spell)
+        combat_distance =
+          max(distance({cx, cy, cz}, {x, y, z}) - combat_reach_sum(caster, target_info), 0.0)
+
+        check_distance(combat_distance, spell)
 
       nil ->
         :ok
@@ -475,6 +478,13 @@ defmodule ThistleTea.Game.Spell.CastValidation do
   end
 
   defp check_range(_caster, _spell, _target_info), do: :ok
+
+  defp combat_reach_sum(caster, target_info) do
+    combat_reach(caster.unit.combat_reach) + combat_reach(Map.get(target_info, :combat_reach))
+  end
+
+  defp combat_reach(reach) when is_number(reach) and reach > 0, do: reach
+  defp combat_reach(_reach), do: 0.0
 
   defp check_distance(distance, %Spell{range_yards: range, min_range_yards: min_range}) do
     cond do
