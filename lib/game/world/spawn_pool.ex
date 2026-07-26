@@ -15,11 +15,11 @@ defmodule ThistleTea.Game.World.SpawnPool do
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.SpawnPool.Catalog
   alias ThistleTea.Game.World.SpawnPool.Selection
+  alias ThistleTea.Game.World.SpawnPool.Supervisor, as: SpawnPoolSupervisor
   alias ThistleTea.Game.World.System.GameEvent
   alias ThistleTea.Game.WorldRef
 
   @registry ThistleTea.Game.World.SpawnPool.Registry
-  @supervisor ThistleTea.Game.World.SpawnPool.Supervisor
   @activation_timeout_ms 30_000
 
   def start_link(opts) do
@@ -77,7 +77,7 @@ defmodule ThistleTea.Game.World.SpawnPool do
     @registry
     |> Registry.select([{{:"$1", :"$2", :"$3"}, [], [{{:"$1", :"$2"}}]}])
     |> Enum.each(fn
-      {{^world, _group}, pid} -> DynamicSupervisor.terminate_child(@supervisor, pid)
+      {{^world, _group} = key, pid} -> SpawnPoolSupervisor.terminate_child(key, pid)
       {_other_key, _pid} -> :ok
     end)
   end
@@ -90,7 +90,7 @@ defmodule ThistleTea.Game.World.SpawnPool do
   end
 
   defp start_pool(key, blueprint) do
-    case DynamicSupervisor.start_child(@supervisor, {__MODULE__, key: key, blueprint: blueprint}) do
+    case SpawnPoolSupervisor.start_child(key, {__MODULE__, key: key, blueprint: blueprint}) do
       {:ok, pid} -> {:ok, pid}
       {:error, {:already_started, pid}} -> {:ok, pid}
       {:error, :already_present} -> wait_for_pool(key)

@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.World.SpawnPool.GameObjectRuntimeTest do
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.SpawnPool
   alias ThistleTea.Game.World.SpawnPool.Catalog
+  alias ThistleTea.Game.World.SpawnPool.Supervisor, as: SpawnPoolSupervisor
   alias ThistleTea.Game.WorldRef
 
   @pool_key {WorldRef.open(1), {:pool, 4303}}
@@ -34,7 +35,7 @@ defmodule ThistleTea.Game.World.SpawnPool.GameObjectRuntimeTest do
       assert length(running) == 37
 
       [{pool_pid, _value}] = Registry.lookup(SpawnPool.Registry, @pool_key)
-      DynamicSupervisor.terminate_child(SpawnPool.Supervisor, pool_pid)
+      SpawnPoolSupervisor.terminate_child(pool_pid)
     end
   end
 

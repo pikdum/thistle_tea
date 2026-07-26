@@ -117,7 +117,7 @@ defmodule ThistleTea.Application do
         {EntitySupervisor, partitions: 8},
         {Registry, keys: :unique, name: SpawnPool.Registry},
         SpawnPoolCatalog,
-        {DynamicSupervisor, strategy: :one_for_one, name: SpawnPool.Supervisor},
+        {SpawnPool.Supervisor, partitions: 8},
         CellActivator,
         {GameEventSystem, load_schedule: !test}
       ]

@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.World.SpawnPoolTest do
   alias ThistleTea.Game.Entity.Registry, as: EntityRegistry
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.World.SpawnPool
+  alias ThistleTea.Game.World.SpawnPool.Supervisor, as: SpawnPoolSupervisor
   alias ThistleTea.Game.WorldRef
 
   describe "singleton lifecycle" do
@@ -39,7 +40,7 @@ defmodule ThistleTea.Game.World.SpawnPoolTest do
              }
 
       [{pool_pid, _value}] = Registry.lookup(SpawnPool.Registry, key)
-      DynamicSupervisor.terminate_child(SpawnPool.Supervisor, pool_pid)
+      SpawnPoolSupervisor.terminate_child(pool_pid)
     end
 
     test "stops and restarts event-gated incarnations when eligibility changes" do
@@ -61,7 +62,7 @@ defmodule ThistleTea.Game.World.SpawnPoolTest do
       refute first_pid == second_pid
 
       [{pool_pid, _value}] = Registry.lookup(SpawnPool.Registry, key)
-      DynamicSupervisor.terminate_child(SpawnPool.Supervisor, pool_pid)
+      SpawnPoolSupervisor.terminate_child(pool_pid)
     end
 
     test "isolates and stops pools by world copy" do
@@ -86,7 +87,7 @@ defmodule ThistleTea.Game.World.SpawnPoolTest do
       await_pool_absent(first_key)
       assert [{^second_pid, _value}] = Registry.lookup(SpawnPool.Registry, second_key)
 
-      DynamicSupervisor.terminate_child(SpawnPool.Supervisor, second_pid)
+      SpawnPoolSupervisor.terminate_child(second_pid)
     end
   end
 

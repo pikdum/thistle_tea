@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.World.SpawnPool.RuntimeTest do
   alias ThistleTea.Game.World.Loader
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.SpawnPool
+  alias ThistleTea.Game.World.SpawnPool.Supervisor, as: SpawnPoolSupervisor
   alias ThistleTea.Game.WorldRef
 
   @pool_key {WorldRef.open(0), {:pool, 1270}}
@@ -34,7 +35,7 @@ defmodule ThistleTea.Game.World.SpawnPool.RuntimeTest do
       assert running_hogger_count(rows) == 1
 
       [{pool_pid, _value}] = Registry.lookup(SpawnPool.Registry, @pool_key)
-      DynamicSupervisor.terminate_child(SpawnPool.Supervisor, pool_pid)
+      SpawnPoolSupervisor.terminate_child(pool_pid)
     end
   end
 
