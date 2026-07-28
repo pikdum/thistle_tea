@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.World.Loader.SummonTest do
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Logic.Combat
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.World.Loader.Summon
   alias ThistleTea.Game.WorldRef
@@ -72,6 +73,22 @@ defmodule ThistleTea.Game.World.Loader.SummonTest do
       assert pet.unit.power3 == 100
       assert pet.unit.max_power5 == 1_050_000
       assert pet.unit.power5 == 166_500
+    end
+
+    test "builds the debug hunter pet with VMangos damage and max-rank family abilities" do
+      owner = %Character{
+        object: %Object{guid: Guid.from_low_guid(:player, 1)},
+        unit: %Unit{level: 50, faction_template: 1},
+        internal: %Internal{world: %WorldRef{map_id: 0}},
+        movement_block: %MovementBlock{position: {1.0, 2.0, 3.0, 0.0}}
+      }
+
+      pet = Summon.build_pet(2960, owner)
+      {min_damage, max_damage} = Combat.damage_range(pet)
+
+      assert_in_delta min_damage, 42.2625, 0.0001
+      assert_in_delta max_damage, 53.2875, 0.0001
+      assert Map.keys(pet.internal.spellbook) |> Enum.sort() == [17_260, 24_603]
     end
   end
 end

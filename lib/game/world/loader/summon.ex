@@ -58,12 +58,14 @@ defmodule ThistleTea.Game.World.Loader.Summon do
       spellbook = pet_spellbook(entry, level)
       creature = %{mob.internal.creature | spells: pet_action_spells(spellbook)}
       hunter_pet? = hunter_pet?(creature)
+      creature = normalize_pet_damage_multiplier(creature, hunter_pet?)
       stats = pet_stats(if(hunter_pet?, do: 1, else: entry), level)
 
       unit =
         mob.unit
         |> apply_pet_stats(stats, level)
         |> apply_pet_resources(hunter_pet?)
+        |> apply_hunter_pet_damage(hunter_pet?)
         |> then(fn unit ->
           %{
             unit
@@ -210,23 +212,39 @@ defmodule ThistleTea.Game.World.Loader.Summon do
   def pet_spellbook(_entry, _level), do: %{}
 
   defp pet_spell_profile(entry) do
+    {spell_ids, include_grimoires?} =
+      case creature_spell_data(entry) do
+        [_ | _] = spell_ids -> {spell_ids, false}
+        [] -> {pet_create_spell_ids(entry), true}
+      end
+
+    skill_lines =
+      DBC.all(
+        from(ability in SkillLineAbility,
+          where: ability.spell in ^spell_ids,
+          select: ability.skill_line,
+          distinct: true
+        )
+      )
+
+    spell_ids = if include_grimoires?, do: spell_ids ++ grimoire_pet_spell_ids(), else: spell_ids
+    {skill_lines, spell_ids}
+  end
+
+  defp creature_spell_data(entry) do
+    with %Mangos.Creature{creature_template: %Mangos.CreatureTemplate{pet_spell_data_id: id}} <- template(entry),
+         true <- is_integer(id) and id > 0,
+         %CreatureSpellData{} = row <- DBC.get(CreatureSpellData, id) do
+      CreatureSpellData.spell_ids(row)
+    else
+      _missing -> []
+    end
+  end
+
+  defp pet_create_spell_ids(entry) do
     case Mangos.Repo.get(Mangos.PetCreateInfoSpell, entry) do
-      %Mangos.PetCreateInfoSpell{} = row ->
-        spell_ids = Mangos.PetCreateInfoSpell.spell_ids(row)
-
-        skill_lines =
-          DBC.all(
-            from(ability in SkillLineAbility,
-              where: ability.spell in ^spell_ids,
-              select: ability.skill_line,
-              distinct: true
-            )
-          )
-
-        {skill_lines, spell_ids ++ grimoire_pet_spell_ids()}
-
-      _ ->
-        {[], []}
+      %Mangos.PetCreateInfoSpell{} = row -> Mangos.PetCreateInfoSpell.spell_ids(row)
+      _missing -> []
     end
   end
 
@@ -259,11 +277,20 @@ defmodule ThistleTea.Game.World.Loader.Summon do
   defp highest_rank_spell_ids({[], _spell_ids}, _level, _filter), do: []
 
   defp highest_rank_spell_ids({skill_lines, spell_ids}, level, filter) do
+    names =
+      DBC.all(
+        from(spell in Spell,
+          where: spell.id in ^spell_ids,
+          select: spell.name_en_gb,
+          distinct: true
+        )
+      )
+
     DBC.all(
       from(ability in SkillLineAbility,
         join: spell in Spell,
         on: spell.id == ability.spell,
-        where: ability.skill_line in ^skill_lines and ability.spell in ^spell_ids and spell.base_level <= ^level,
+        where: ability.skill_line in ^skill_lines and spell.name_en_gb in ^names and spell.base_level <= ^level,
         select: %{id: spell.id, name: spell.name_en_gb, level: spell.base_level, attributes: spell.attributes}
       )
     )
@@ -335,6 +362,9 @@ defmodule ThistleTea.Game.World.Loader.Summon do
   defp hunter_pet?(%{type_flags: type_flags}) when is_integer(type_flags), do: (type_flags &&& 0x1) != 0
   defp hunter_pet?(_creature), do: false
 
+  defp normalize_pet_damage_multiplier(creature, true), do: %{creature | damage_multiplier: 1.0}
+  defp normalize_pet_damage_multiplier(creature, false), do: creature
+
   defp pet_food_mask(family) when is_integer(family) and family > 0 do
     case DBC.get(CreatureFamily, family) do
       %CreatureFamily{pet_food_mask: food_mask} -> food_mask
@@ -373,4 +403,20 @@ defmodule ThistleTea.Game.World.Loader.Summon do
   end
 
   defp apply_pet_resources(unit, false), do: unit
+
+  defp apply_hunter_pet_damage(unit, true) do
+    attack_speed = (unit.base_attack_time || 2_000) / 2_000
+    min_damage = unit.level * 1.15 * 1.05 * attack_speed
+    max_damage = unit.level * 1.45 * 1.05 * attack_speed
+
+    %{
+      unit
+      | min_damage: min_damage,
+        max_damage: max_damage,
+        base_min_damage: min_damage,
+        base_max_damage: max_damage
+    }
+  end
+
+  defp apply_hunter_pet_damage(unit, false), do: unit
 end
