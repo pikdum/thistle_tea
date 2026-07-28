@@ -25,11 +25,12 @@ defmodule ThistleTea.Game.Entity.Data.Companion do
   @type status :: :none | {:active, EntityRef.t()} | {:suspended, non_neg_integer(), non_neg_integer()}
 
   @enforce_keys [:kind, :status]
-  defstruct [:kind, :status]
+  defstruct [:kind, :status, autocast: MapSet.new()]
 
   @type t :: %__MODULE__{
           kind: kind() | nil,
-          status: status()
+          status: status(),
+          autocast: MapSet.t(non_neg_integer())
         }
 
   def none, do: %__MODULE__{kind: nil, status: :none}

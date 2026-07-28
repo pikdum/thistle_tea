@@ -777,6 +777,15 @@ defmodule ThistleTea.Game.Entity.Logic.WarlockSpellsTest do
       assert MapSet.member?(enabled.internal.pet.autocast, 11_778)
       refute MapSet.member?(disabled.internal.pet.autocast, 11_778)
     end
+
+    test "restores only autocast spells known by the rebuilt pet" do
+      pet = pet()
+      pet = %{pet | internal: %{pet.internal | spellbook: %{11_778 => %Spell{id: 11_778}}}}
+
+      restored = PetBT.restore_autocast(pet, MapSet.new([11_778, 99_999]))
+
+      assert restored.internal.pet.autocast == MapSet.new([11_778])
+    end
   end
 
   defp character(overrides \\ []) do

@@ -6,13 +6,18 @@ defmodule ThistleTea.Game.Network.Message.SmsgPetSpells do
 
   @act_command 0x07
   @act_reaction 0x06
+  @act_enabled 0xC1
   @act_disabled 0x81
 
   defstruct [:pet_guid, :duration, :reaction_state, :command_state, action_bars: [], spells: [], cooldowns: []]
 
   def for_pet(pet_guid, spells) when is_integer(pet_guid) and is_list(spells) do
+    for_pet(pet_guid, spells, MapSet.new())
+  end
+
+  def for_pet(pet_guid, spells, %MapSet{} = autocast) when is_integer(pet_guid) and is_list(spells) do
     spell_ids = spells |> Enum.map(&spell_id/1) |> Enum.filter(&(&1 > 0)) |> Enum.take(4)
-    spell_buttons = Enum.map(spell_ids, &button(&1, @act_disabled))
+    spell_buttons = Enum.map(spell_ids, &button(&1, spell_state(&1, autocast)))
     empty_buttons = List.duplicate(button(0, @act_disabled), 4 - length(spell_buttons))
 
     %__MODULE__{
@@ -25,7 +30,7 @@ defmodule ThistleTea.Game.Network.Message.SmsgPetSpells do
           spell_buttons ++
           empty_buttons ++
           [button(2, @act_reaction), button(1, @act_reaction), button(0, @act_reaction)],
-      spells: Enum.map(spell_ids, &button(&1, @act_disabled))
+      spells: Enum.map(spell_ids, &button(&1, spell_state(&1, autocast)))
     }
   end
 
@@ -46,6 +51,10 @@ defmodule ThistleTea.Game.Network.Message.SmsgPetSpells do
   end
 
   defp button(action, type), do: action ||| type <<< 24
+
+  defp spell_state(spell_id, autocast) do
+    if MapSet.member?(autocast, spell_id), do: @act_enabled, else: @act_disabled
+  end
 
   defp spell_id(%{spell_id: spell_id}) when is_integer(spell_id), do: spell_id
   defp spell_id(%{id: spell_id}) when is_integer(spell_id), do: spell_id

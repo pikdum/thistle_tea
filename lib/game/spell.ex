@@ -7,6 +7,8 @@ defmodule ThistleTea.Game.Spell do
 
   alias ThistleTea.Game.Spell.Effect
 
+  @creature_type_mask_ignored_spell_ids [2641, 23_356]
+
   defstruct [
     :id,
     :name,
@@ -259,6 +261,9 @@ defmodule ThistleTea.Game.Spell do
   end
 
   def duel?(_spell), do: false
+
+  def creature_type_mask_ignored?(%__MODULE__{id: id}), do: id in @creature_type_mask_ignored_spell_ids
+  def creature_type_mask_ignored?(_spell), do: false
 
   def resurrect_spell?(%__MODULE__{effects: effects}) do
     Enum.any?(effects, &match?(%Effect{type: type} when type in [:resurrect, :resurrect_new], &1))

@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Entity.Logic.CastingTest do
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Object
+  alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
@@ -381,6 +382,49 @@ defmodule ThistleTea.Game.Entity.Logic.CastingTest do
   end
 
   describe "complete/3" do
+    test "dismiss pet transitions the owner instead of the pet target" do
+      spell = %Spell{
+        id: 2641,
+        effects: [%Effect{index: 0, type: :dismiss_pet, implicit_target_a: :pet}]
+      }
+
+      resolution = %{
+        channel_resolution()
+        | hits: [1],
+          impacts: [%Impact{target_guid: 1, target_role: :caster}],
+          followups: %{channel_resolution().followups | packet_hits: [], selected_unit_guid: 44}
+      }
+
+      casting = %Cast{
+        spell: spell,
+        targets: Target.none(),
+        phase: :impact,
+        resolution: resolution,
+        ends_at: 1_000
+      }
+
+      character =
+        %Character{
+          object: %Object{guid: 1},
+          unit: %Unit{health: 100, level: 10},
+          player: %Player{},
+          internal: %Internal{},
+          movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
+        }
+        |> Companion.activate(:hunter_pet, %EntityRef{guid: 44, entry: 2960, spell_id: 1515})
+        |> Casting.complete(casting, 1_000)
+
+      assert character.unit.summon == 0
+
+      assert character.internal.companion ==
+               %ThistleTea.Game.Entity.Data.Companion{
+                 kind: :hunter_pet,
+                 status: {:suspended, 2960, 1515}
+               }
+
+      assert Enum.any?(character.internal.events, &match?(%Effects.DismissPet{target_guid: 44}, &1))
+    end
+
     test "queues a take-side outcome when a hostile magic spell is fully resisted" do
       caster_guid = Guid.from_low_guid(:mob, 1, System.unique_integer([:positive]))
       target_guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))

@@ -1,8 +1,12 @@
 defmodule ThistleTea.Game.Entity.SpellTargetResolverTest do
   use ExUnit.Case, async: false
 
+  alias ThistleTea.Game.Entity.Data.Character
+  alias ThistleTea.Game.Entity.Data.Companion.EntityRef
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
+  alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Logic.Companion
   alias ThistleTea.Game.Entity.SpellTargetResolver
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Spell
@@ -89,6 +93,20 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolverTest do
       spell = %{aoe_spell(:aoe_enemy_at_caster) | target_creature_type_mask: 36}
 
       assert SpellTargetResolver.resolve(caster, spell, Target.none()) == [undead_guid]
+    end
+
+    test "dismiss pet bypasses the creature mask without metadata" do
+      caster =
+        %Character{object: %{guid: 1}, unit: %Unit{}, internal: %Internal{}}
+        |> Companion.activate(:hunter_pet, %EntityRef{guid: 7, entry: 2960, spell_id: 1515})
+
+      spell = %Spell{
+        id: 2641,
+        target_creature_type_mask: 1,
+        effects: [%Effect{type: :dismiss_pet, implicit_target_a: :pet}]
+      }
+
+      assert SpellTargetResolver.resolve(caster, spell, Target.none()) == [7, 1]
     end
 
     test "returns nearby attackable neutral mobs for player-cast caster aoe" do

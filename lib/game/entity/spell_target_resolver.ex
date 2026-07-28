@@ -53,6 +53,7 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
 
   defp caster_execution_effect?(%{implicit_target_a: :caster}), do: true
   defp caster_execution_effect?(%{implicit_target_b: :caster}), do: true
+  defp caster_execution_effect?(%{type: :dismiss_pet}), do: true
   defp caster_execution_effect?(%{type: :summon_demon, implicit_target_a: nil, implicit_target_b: nil}), do: true
   defp caster_execution_effect?(_effect), do: false
 
@@ -269,9 +270,13 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
     end
   end
 
-  defp creature_type_allowed?(%Spell{target_creature_type_mask: mask}, _guid) when mask in [0, nil], do: true
-
   defp creature_type_allowed?(%Spell{} = spell, guid) do
+    Spell.creature_type_mask_ignored?(spell) or creature_type_matches?(spell, guid)
+  end
+
+  defp creature_type_matches?(%Spell{target_creature_type_mask: mask}, _guid) when mask in [0, nil], do: true
+
+  defp creature_type_matches?(%Spell{} = spell, guid) do
     case Metadata.query(guid, [:creature_type]) do
       %{creature_type: creature_type} -> Spell.creature_type_allowed?(spell, creature_type)
       _ -> false

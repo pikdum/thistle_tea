@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.Player.CompanionVisibility do
   restoration ordering.
   """
 
+  alias ThistleTea.Game.Entity.Logic.Companion
   alias ThistleTea.Game.Entity.Server.Player.CompanionOwner.Attachment
   alias ThistleTea.Game.Entity.Server.Player.PacketSink
   alias ThistleTea.Game.Entity.Server.Player.State
@@ -19,8 +20,10 @@ defmodule ThistleTea.Game.Player.CompanionVisibility do
 
   def prepare_attachment(%State{} = state, %Attachment{}), do: state
 
-  def finish_attachment(%State{} = state, %Attachment{entity_ref: entity_ref, spells: spells}) do
-    Network.send_packet(Message.SmsgPetSpells.for_pet(entity_ref.guid, spells))
+  def finish_attachment(%State{} = state, %Attachment{entity_ref: entity_ref, pid: pid, spells: spells}) do
+    autocast = Companion.autocast(state.character)
+    send(pid, {:pet_restore_autocast, autocast})
+    Network.send_packet(Message.SmsgPetSpells.for_pet(entity_ref.guid, spells, autocast))
     state
   end
 

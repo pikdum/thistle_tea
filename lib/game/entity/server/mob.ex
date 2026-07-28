@@ -561,6 +561,13 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     {:noreply, state}
   end
 
+  def handle_info({:pet_restore_autocast, autocast}, %Mob{internal: %Internal{pet: %Pet{}}} = state) do
+    state = PetBT.restore_autocast(state, autocast)
+    blackboard = state.internal.blackboard |> Blackboard.ensure() |> Blackboard.reset_spells()
+    state = %{state | internal: %{state.internal | blackboard: blackboard}} |> wake_ai_tick()
+    {:noreply, state}
+  end
+
   def handle_info({:attach_pet, owner_pid, spell_id, pet_spells}, %Mob{internal: %Internal{pet: %Pet{}}} = state)
       when is_pid(owner_pid) do
     pet_spells = pet_spells || Map.values(state.internal.spellbook || %{})

@@ -1,6 +1,8 @@
 defmodule ThistleTea.Game.Entity.Logic.SpellEffect.Resource do
   @moduledoc false
 
+  alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Pet
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Resources
@@ -13,6 +15,19 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.Resource do
   @power_fields %{0 => :power1, 1 => :power2, 2 => :power3, 3 => :power4, 4 => :power5}
 
   def apply(state, %CastContext{}, _spell, %Effect{type: :add_combo_points}, _now), do: {state, []}
+
+  def apply(
+        %{internal: %Internal{pet: %Pet{}}, unit: %{power5: happiness} = unit} = state,
+        %CastContext{} = context,
+        spell,
+        %Effect{type: :power_drain, misc_value: 4} = effect,
+        _now
+      )
+      when is_integer(happiness) do
+    drained = min(Amount.roll(spell, effect, context), max(happiness, 0))
+    state = %{state | unit: %{unit | power5: happiness - drained}} |> Core.mark_broadcast_update()
+    {state, []}
+  end
 
   def apply(
         state,

@@ -278,6 +278,27 @@ defmodule ThistleTea.Game.Spell.CastValidationTest do
                CastValidation.validate(caster(), turn_undead, Target.unit(7), hostile_target(creature_type: 3), @now)
     end
 
+    test "dismiss pet ignores the DBC creature-type mask" do
+      dismiss_pet = %Spell{
+        id: 2641,
+        target_creature_type_mask: 1,
+        effects: [
+          %Effect{type: :power_drain, misc_value: 4, implicit_target_a: :pet},
+          %Effect{type: :dismiss_pet, implicit_target_a: :pet}
+        ]
+      }
+
+      target_info =
+        friendly_target()
+        |> Map.delete(:creature_type)
+        |> Map.put(:power_type, 2)
+
+      assert :ok = CastValidation.validate(caster(), dismiss_pet, Target.none(), target_info, @now)
+
+      assert {:error, :bad_targets} =
+               CastValidation.validate(caster(), %{dismiss_pet | id: 999}, Target.unit(7), target_info, @now)
+    end
+
     test "rejects a dead caster" do
       assert {:error, :caster_dead} =
                CastValidation.validate(caster(health: 0), harmful_spell(), Target.unit(7), hostile_target(), @now)

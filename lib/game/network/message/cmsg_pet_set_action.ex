@@ -3,6 +3,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgPetSetAction do
   use ThistleTea.Game.Network.ClientMessage, :CMSG_PET_SET_ACTION
 
   alias ThistleTea.Game.Entity
+  alias ThistleTea.Game.Entity.Logic.Companion
 
   defstruct [:pet_guid, actions: []]
 
@@ -13,9 +14,11 @@ defmodule ThistleTea.Game.Network.Message.CmsgPetSetAction do
         pid when is_pid(pid) -> send(pid, {:pet_set_actions, actions})
         _ -> :ok
       end
-    end
 
-    state
+      %{state | character: Companion.set_autocast(character, actions)}
+    else
+      state
+    end
   end
 
   def handle(%__MODULE__{}, state), do: state

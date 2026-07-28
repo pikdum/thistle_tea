@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
   alias ThistleTea.Game.Entity.Data.Companion
   alias ThistleTea.Game.Entity.Data.Companion.EntityRef
   alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Pet
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Player
@@ -957,8 +958,34 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
       dismiss_pet = %Spell{id: 2641, effects: [%Effect{index: 0, type: :dismiss_pet}]}
       {character, events} = SpellEffect.receive(character, context, dismiss_pet, 1_000)
       assert character.unit.summon == 0
-      assert character.internal.companion == Companion.none()
+      assert character.internal.companion == %Companion{kind: :hunter_pet, status: {:suspended, 1234, 1515}}
       assert [%Effects.DismissPet{target_guid: 44}] = events
+    end
+
+    test "dismiss pet drains happiness without granting mana" do
+      pet =
+        target_fixture()
+        |> then(fn pet ->
+          %{
+            pet
+            | unit: %{pet.unit | power_type: 2, power2: 100, power5: 166_500},
+              internal: %{pet.internal | pet: %Pet{}}
+          }
+        end)
+
+      spell = %Spell{
+        id: 2641,
+        effects: [
+          %Effect{index: 0, type: :power_drain, base_points: 49_999, misc_value: 4, implicit_target_a: :pet}
+        ]
+      }
+
+      {pet, events} =
+        SpellEffect.receive(pet, %CastContext{caster_guid: 99, caster_level: 10, target_role: :pet}, spell, 1_000)
+
+      assert pet.unit.power2 == 100
+      assert pet.unit.power5 == 116_501
+      assert events == []
     end
 
     test "growl adds threat for the pet rather than its owner" do

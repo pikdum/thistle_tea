@@ -14,10 +14,13 @@ defmodule ThistleTea.Game.Entity.Logic.Companion do
 
   @summon_kinds [:hunter_pet, :guardian]
   @control_kinds [:enslaved, :charm, :possession]
+  @act_enabled 0xC1
+  @act_disabled 0x81
 
   def activate(%Character{} = character, kind, %EntityRef{} = entity_ref)
       when kind in @summon_kinds or kind in @control_kinds do
-    put_relationship(character, %Companion{kind: kind, status: {:active, entity_ref}})
+    autocast = activation_autocast(relationship(character), kind, entity_ref.entry)
+    put_relationship(character, %Companion{kind: kind, status: {:active, entity_ref}, autocast: autocast})
   end
 
   def suspend(%Character{internal: %Internal{companion: %Companion{} = companion}} = character) do
@@ -55,6 +58,10 @@ defmodule ThistleTea.Game.Entity.Logic.Companion do
 
   def dismiss(%Character{} = character, reason) do
     case relationship(character) do
+      %Companion{kind: :hunter_pet, status: {:active, %EntityRef{} = entity_ref}} ->
+        character = suspend(character)
+        {character, [Effects.dismiss_pet(entity_ref.guid)]}
+
       %Companion{kind: kind, status: {:active, %EntityRef{} = entity_ref}} when kind in @summon_kinds ->
         character = if reason == :owner_died, do: suspend(character), else: clear(character)
         {character, [Effects.dismiss_pet(entity_ref.guid)]}
@@ -82,6 +89,27 @@ defmodule ThistleTea.Game.Entity.Logic.Companion do
 
   def clear(%Character{} = character) do
     put_relationship(character, Companion.none())
+  end
+
+  def set_autocast(%Character{} = character, actions) when is_list(actions) do
+    case relationship(character) do
+      %Companion{kind: kind, status: {:active, %EntityRef{}}, autocast: autocast} = companion
+      when kind in @summon_kinds ->
+        companion = %{companion | autocast: Enum.reduce(actions, autocast, &update_autocast/2)}
+        put_relationship(character, companion)
+
+      %Companion{} ->
+        character
+    end
+  end
+
+  def set_autocast(%Character{} = character, _actions), do: character
+
+  def autocast(%Character{} = character) do
+    case relationship(character) do
+      %Companion{autocast: %MapSet{} = autocast} -> autocast
+      %Companion{} -> MapSet.new()
+    end
   end
 
   def relationship(%Character{internal: %Internal{companion: %Companion{} = companion}}), do: companion
@@ -150,4 +178,22 @@ defmodule ThistleTea.Game.Entity.Logic.Companion do
     %{character | internal: %{internal | companion: companion}}
     |> project()
   end
+
+  defp activation_autocast(%Companion{kind: kind, status: status, autocast: %MapSet{} = autocast}, kind, entry) do
+    case status do
+      {:active, %EntityRef{entry: ^entry}} -> autocast
+      {:suspended, ^entry, _spell_id} -> autocast
+      _ -> MapSet.new()
+    end
+  end
+
+  defp activation_autocast(%Companion{}, _kind, _entry), do: MapSet.new()
+
+  defp update_autocast(%{action: spell_id, action_type: @act_enabled}, autocast)
+       when is_integer(spell_id) and spell_id > 0, do: MapSet.put(autocast, spell_id)
+
+  defp update_autocast(%{action: spell_id, action_type: @act_disabled}, autocast)
+       when is_integer(spell_id) and spell_id > 0, do: MapSet.delete(autocast, spell_id)
+
+  defp update_autocast(_action, autocast), do: autocast
 end

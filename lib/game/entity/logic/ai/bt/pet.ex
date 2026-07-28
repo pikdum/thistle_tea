@@ -140,6 +140,17 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet do
 
   def set_actions(%Mob{} = state, _actions), do: state
 
+  def restore_autocast(
+        %Mob{internal: %Internal{pet: %Pet{} = pet, spellbook: spellbook} = internal} = state,
+        %MapSet{} = autocast
+      )
+      when is_map(spellbook) do
+    autocast = MapSet.intersection(autocast, MapSet.new(Map.keys(spellbook)))
+    %{state | internal: %{internal | pet: %{pet | autocast: autocast}}}
+  end
+
+  def restore_autocast(%Mob{} = state, %MapSet{}), do: state
+
   defp dead?(state, _blackboard), do: Core.dead?(state)
 
   defp in_combat?(%Mob{internal: %Internal{in_combat: true}, unit: %Unit{target: target}}, _blackboard)

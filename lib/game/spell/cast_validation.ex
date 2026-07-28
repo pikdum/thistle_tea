@@ -50,7 +50,7 @@ defmodule ThistleTea.Game.Spell.CastValidation do
          :ok <- check_reagents(caster, spell, Keyword.get(opts, :count_item)),
          :ok <- check_duel(spell, Keyword.get(opts, :duel_context)),
          :ok <- check_target(spell, target_info),
-         :ok <- check_target_power_type(spell, target_info),
+         :ok <- check_target_power_type(spell, targets, target_info),
          :ok <- check_dispel_target(caster, spell, targets, target_info),
          :ok <- check_creature_type(spell, target_info),
          :ok <- check_position(caster, spell, target_info),
@@ -374,7 +374,17 @@ defmodule ThistleTea.Game.Spell.CastValidation do
     end
   end
 
-  defp check_target_power_type(%Spell{effects: effects}, %{power_type: target_power_type})
+  defp check_target_power_type(%Spell{} = spell, %Target{} = targets, %{guid: target_guid} = target_info) do
+    if Target.unit_guid(targets) == target_guid do
+      validate_target_power_type(spell, target_info)
+    else
+      :ok
+    end
+  end
+
+  defp check_target_power_type(_spell, _targets, _target_info), do: :ok
+
+  defp validate_target_power_type(%Spell{effects: effects}, %{power_type: target_power_type})
        when is_integer(target_power_type) do
     required_types =
       effects
@@ -384,7 +394,7 @@ defmodule ThistleTea.Game.Spell.CastValidation do
     if required_types == [] or target_power_type in required_types, do: :ok, else: {:error, :bad_targets}
   end
 
-  defp check_target_power_type(_spell, _target_info), do: :ok
+  defp validate_target_power_type(_spell, _target_info), do: :ok
 
   defp target_dispel_options(caster, unit_guid, target_info) do
     if self_target?(caster, unit_guid), do: AuraLogic.dispel_options(caster), else: dispel_options(target_info)
@@ -435,17 +445,21 @@ defmodule ThistleTea.Game.Spell.CastValidation do
 
   defp check_friendly_target(_target_info), do: :ok
 
-  defp check_creature_type(%Spell{target_creature_type_mask: mask}, _target_info) when mask in [0, nil], do: :ok
+  defp check_creature_type(%Spell{} = spell, target_info) do
+    if Spell.creature_type_mask_ignored?(spell), do: :ok, else: validate_creature_type(spell, target_info)
+  end
 
-  defp check_creature_type(%Spell{} = spell, target_info) when target_info in [nil, :self] do
+  defp validate_creature_type(%Spell{target_creature_type_mask: mask}, _target_info) when mask in [0, nil], do: :ok
+
+  defp validate_creature_type(%Spell{} = spell, target_info) when target_info in [nil, :self] do
     if area_target_spell?(spell), do: :ok, else: {:error, :bad_targets}
   end
 
-  defp check_creature_type(%Spell{} = spell, %{creature_type: creature_type}) do
+  defp validate_creature_type(%Spell{} = spell, %{creature_type: creature_type}) do
     if Spell.creature_type_allowed?(spell, creature_type), do: :ok, else: {:error, :bad_targets}
   end
 
-  defp check_creature_type(%Spell{}, _target_info), do: {:error, :bad_targets}
+  defp validate_creature_type(%Spell{}, _target_info), do: {:error, :bad_targets}
 
   defp area_target_spell?(%Spell{effects: effects}) do
     Enum.any?(effects, fn effect ->

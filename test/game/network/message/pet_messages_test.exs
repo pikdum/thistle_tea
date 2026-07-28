@@ -61,7 +61,8 @@ defmodule ThistleTea.Game.Network.Message.PetMessagesTest do
 
       state = %{character: companion(:guardian, pet_guid)}
 
-      assert Message.CmsgPetSetAction.handle(message, state) == state
+      updated = Message.CmsgPetSetAction.handle(message, state)
+      assert Companion.autocast(updated.character) == MapSet.new([11_778])
       assert_receive {:pet_set_actions, [%{position: 3, action: 11_778, action_type: 0xC1}]}
     end
 
@@ -187,6 +188,14 @@ defmodule ThistleTea.Game.Network.Message.PetMessagesTest do
       message = Message.SmsgPetSpells.for_pet(123, [%Spell{id: 11_778}])
 
       assert length(message.spells) == 1
+    end
+
+    test "marks persisted autocast spells enabled" do
+      message = Message.SmsgPetSpells.for_pet(123, [%Spell{id: 11_778}], MapSet.new([11_778]))
+
+      assert [encoded_spell] = message.spells
+      assert Bitwise.bsr(encoded_spell, 24) == 0xC1
+      assert Enum.any?(message.action_bars, &(Bitwise.band(&1, 0x00FFFFFF) == 11_778 and Bitwise.bsr(&1, 24) == 0xC1))
     end
   end
 

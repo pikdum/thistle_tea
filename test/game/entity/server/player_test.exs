@@ -481,6 +481,8 @@ defmodule ThistleTea.Game.Entity.Server.PlayerTest do
       assert {:noreply, completed} =
                PlayerServer.handle_continue({:finish_companion_attach, attachment}, attached)
 
+      assert_receive {:pet_restore_autocast, autocast}
+      assert autocast == MapSet.new()
       assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgPetSpells{pet_guid: ^pet_guid}}}
 
       assert {:noreply, ^completed} =
