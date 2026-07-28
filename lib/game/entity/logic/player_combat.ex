@@ -19,6 +19,7 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombat do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard.Combat
   alias ThistleTea.Game.Entity.Logic.Combat, as: CombatLogic
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.TargetRef
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
@@ -34,6 +35,34 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombat do
   def mark_attacked(character, _now), do: character
 
   def mark_initiated(character, now), do: mark_attacked(character, now)
+
+  def disengage(%Character{object: %{guid: guid}, unit: %Unit{} = unit, internal: %Internal{} = internal} = character) do
+    refs = internal.threat_refs || MapSet.new()
+    blackboard = internal.blackboard |> Blackboard.ensure() |> Blackboard.clear_auto_attack()
+
+    character =
+      %{
+        character
+        | unit: %{unit | target: 0},
+          internal: %{
+            internal
+            | threat_refs: MapSet.new(),
+              in_combat: false,
+              last_hostile_time: nil,
+              blackboard: blackboard
+          }
+      }
+      |> CombatLogic.sync_combat_flag()
+
+    effects =
+      [Effects.drop_nearby_threat()] ++
+        Enum.map(threat_ref_guids(refs), &Effects.drop_threat/1) ++
+        attack_stop_effects(guid, unit.target)
+
+    {character, effects}
+  end
+
+  def disengage(character), do: {character, []}
 
   def vanish(%Character{internal: %Internal{} = internal} = character, now) when is_integer(now) do
     refs = internal.threat_refs || MapSet.new()
@@ -127,6 +156,13 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombat do
     |> Enum.map(fn {mob_guid, _incarnation_id} -> mob_guid end)
     |> Enum.uniq()
   end
+
+  defp attack_stop_effects(source_guid, target_guid)
+       when is_integer(source_guid) and is_integer(target_guid) and target_guid > 0 do
+    [Effects.attack_stop(source_guid, target_guid)]
+  end
+
+  defp attack_stop_effects(_source_guid, _target_guid), do: []
 
   defp touch_hostile(%Character{internal: %Internal{} = internal} = character, now) do
     %{character | internal: %{internal | last_hostile_time: now}}

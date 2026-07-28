@@ -148,6 +148,30 @@ defmodule ThistleTea.Game.Entity.Logic.DeathTest do
       assert (character.player.flags &&& 0x10) == 0
       assert Enum.any?(events, &match?(%Effects.MovementRootChanged{rooted?: false}, &1))
     end
+
+    test "cannot carry stale combat through resurrection", %{ghost: ghost} do
+      mob_guid = 99
+
+      ghost = %{
+        ghost
+        | unit: %{ghost.unit | target: mob_guid, flags: 0x00080000},
+          internal: %{
+            ghost.internal
+            | in_combat: true,
+              last_hostile_time: 500,
+              threat_refs: MapSet.new([{mob_guid, 1}])
+          }
+      }
+
+      {character, events} = Death.resurrect(ghost, 0.5, @now)
+
+      refute character.internal.in_combat
+      assert character.internal.last_hostile_time == nil
+      assert character.internal.threat_refs == MapSet.new()
+      assert character.unit.target == 0
+      assert (character.unit.flags &&& 0x00080000) == 0
+      assert Enum.any?(events, &match?(%Effects.DropThreat{target_guid: ^mob_guid}, &1))
+    end
   end
 
   describe "resurrection_sickness_duration_ms/1" do

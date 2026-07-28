@@ -199,17 +199,23 @@ defmodule ThistleTea.Game.Entity.Server.Player do
 
   def handle_cast({:receive_attack, attack}, %{character: %Character{} = character} = state) do
     now = Time.now()
+    alive? = Death.alive?(character)
 
     character =
-      if PlayerCombat.undetectable?(character, now) do
-        character
-      else
-        character = PlayerCombat.mark_attacked(character, now)
-        {character, events} = Combat.receive_attack(character, attack, now)
-        EventSink.emit(character, events)
+      cond do
+        not alive? ->
+          character
+
+        PlayerCombat.undetectable?(character, now) ->
+          character
+
+        true ->
+          character = PlayerCombat.mark_attacked(character, now)
+          {character, events} = Combat.receive_attack(character, attack, now)
+          EventSink.emit(character, events)
       end
 
-    notify_defensive_pet(character, attack.caster)
+    if alive?, do: notify_defensive_pet(character, attack.caster)
 
     {:noreply, %{state | character: character}, {:continue, :maybe_broadcast_update}}
   end
@@ -307,30 +313,32 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   def handle_cast({:receive_spell, caster, spell}, %{character: %Character{} = character} = state) do
     now = Time.now()
     harmful? = Spell.harmful?(spell)
-
-    character =
-      if harmful? and PlayerCombat.undetectable?(character, now) do
-        character
-      else
-        character = if harmful?, do: PlayerCombat.mark_attacked(character, now), else: character
-        {character, events} = SpellEffect.receive(character, caster, spell, now)
-        EventSink.emit(character, events)
-      end
+    alive? = Death.alive?(character)
+    character = apply_incoming_spell(character, caster, spell, now, harmful?, alive?)
 
     state = %{state | character: character}
-    state = if harmful?, do: TickScheduler.ensure_scheduled(state), else: state
-    if harmful?, do: notify_defensive_pet(character, spell_caster_guid(caster))
+    state = if harmful? and alive?, do: TickScheduler.ensure_scheduled(state), else: state
+    if harmful? and alive?, do: notify_defensive_pet(character, spell_caster_guid(caster))
 
     {:noreply, state, {:continue, :maybe_broadcast_update}}
   end
 
   def handle_cast({:receive_spell_outcome, caster_guid, spell, outcome}, %{character: %Character{} = character} = state) do
-    now = Time.now()
-    character = PlayerCombat.mark_attacked(character, now)
-    {character, events} = SpellEffect.receive_outcome(character, caster_guid, spell, outcome, now)
-    character = EventSink.emit(character, events)
-    state = %{state | character: character} |> TickScheduler.ensure_scheduled()
-    notify_defensive_pet(character, caster_guid)
+    harmful? = Spell.harmful?(spell)
+
+    state =
+      if harmful? and not Death.alive?(character) do
+        state
+      else
+        now = Time.now()
+        character = if harmful?, do: PlayerCombat.mark_attacked(character, now), else: character
+        {character, events} = SpellEffect.receive_outcome(character, caster_guid, spell, outcome, now)
+        character = EventSink.emit(character, events)
+        state = %{state | character: character}
+        if harmful?, do: TickScheduler.ensure_scheduled(state), else: state
+      end
+
+    if harmful? and Death.alive?(character), do: notify_defensive_pet(state.character, caster_guid)
 
     {:noreply, state, {:continue, :maybe_broadcast_update}}
   end
@@ -438,7 +446,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
         {:start_teleport, x, y, z, orientation, world},
         %{character: %Character{internal: %Internal{world: world}}} = state
       ) do
-    state = suspend_companion_for_teleport(state)
+    state = state |> disengage_for_world_transition() |> suspend_companion_for_teleport()
     character = state.character
 
     area =
@@ -472,7 +480,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
 
   def handle_cast({:start_teleport, x, y, z, orientation, %WorldRef{} = world}, state) do
     DuelSystem.disconnect(state.guid)
-    state = suspend_companion_for_teleport(state)
+    state = state |> disengage_for_world_transition() |> suspend_companion_for_teleport()
     previous_world = state.character.internal.world
 
     # Update player's location
@@ -1061,6 +1069,23 @@ defmodule ThistleTea.Game.Entity.Server.Player do
 
   defp notify_defensive_pet(%Character{}, _attacker_guid), do: :ok
 
+  defp apply_incoming_spell(%Character{} = character, _caster, _spell, _now, true, false), do: character
+
+  defp apply_incoming_spell(%Character{} = character, caster, spell, now, true, true) do
+    if PlayerCombat.undetectable?(character, now) do
+      character
+    else
+      character = PlayerCombat.mark_attacked(character, now)
+      {character, events} = SpellEffect.receive(character, caster, spell, now)
+      EventSink.emit(character, events)
+    end
+  end
+
+  defp apply_incoming_spell(%Character{} = character, caster, spell, now, false, _alive?) do
+    {character, events} = SpellEffect.receive(character, caster, spell, now)
+    EventSink.emit(character, events)
+  end
+
   defp spell_caster_guid(%{caster_guid: guid}) when is_integer(guid), do: guid
   defp spell_caster_guid(guid) when is_integer(guid), do: guid
   defp spell_caster_guid(_caster), do: nil
@@ -1073,6 +1098,11 @@ defmodule ThistleTea.Game.Entity.Server.Player do
     else
       state
     end
+  end
+
+  defp disengage_for_world_transition(%State{character: %Character{} = character} = state) do
+    {character, effects} = PlayerCombat.disengage(character)
+    %{state | character: EventSink.emit(character, effects)}
   end
 
   @impl GenServer

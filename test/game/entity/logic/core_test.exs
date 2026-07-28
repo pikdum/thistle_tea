@@ -17,6 +17,7 @@ defmodule ThistleTea.Game.Entity.Logic.CoreTest do
   alias ThistleTea.Game.Entity.Logic.Companion, as: LogicCompanion
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.WorldRef
@@ -152,6 +153,34 @@ defmodule ThistleTea.Game.Entity.Logic.CoreTest do
                entity.internal.events,
                &match?(%Effects.ReleaseControlled{source_guid: 6, target_guid: 555, spell_id: 1098}, &1)
              )
+    end
+  end
+
+  describe "take_damage_with_absorb/4 player combat cleanup" do
+    test "releases mob-owned threat when a player dies" do
+      mob_guid = Guid.from_low_guid(:mob, 1, 77)
+
+      entity =
+        player_with_pet(health: 30, summon: 0)
+        |> then(fn character ->
+          internal = %{
+            character.internal
+            | in_combat: true,
+              last_hostile_time: 1_000,
+              threat_refs: MapSet.new([{mob_guid, 1}])
+          }
+
+          %{character | unit: %{character.unit | target: mob_guid}, internal: internal}
+        end)
+
+      {entity, _absorbed} = Core.take_damage_with_absorb(entity, 30, 1_000, source: mob_guid)
+
+      refute entity.internal.in_combat
+      assert entity.internal.last_hostile_time == nil
+      assert entity.internal.threat_refs == MapSet.new()
+      assert entity.unit.target == 0
+      assert Enum.any?(entity.internal.events, &match?(%Effects.DropNearbyThreat{}, &1))
+      assert Enum.any?(entity.internal.events, &match?(%Effects.DropThreat{target_guid: ^mob_guid}, &1))
     end
   end
 

@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Entity.Server.PlayerTest do
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.Companion, as: CompanionLogic
+  alias ThistleTea.Game.Entity.Logic.PlayerCombat
   alias ThistleTea.Game.Entity.Logic.Regen
   alias ThistleTea.Game.Entity.Server.Player, as: PlayerServer
   alias ThistleTea.Game.Entity.Server.Player.CompanionOwner.Attachment
@@ -237,7 +238,14 @@ defmodule ThistleTea.Game.Entity.Server.PlayerTest do
     test "waits for the near teleport acknowledgement before restoring a suspended pet" do
       guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
       pet_guid = Guid.from_low_guid(:pet, 1863, System.unique_integer([:positive]))
-      character = character(guid, health: 100, max_health: 100, summon: pet_guid)
+      mob_guid = Guid.from_low_guid(:mob, 1, System.unique_integer([:positive]))
+
+      character =
+        character(guid, health: 100, max_health: 100, summon: pet_guid)
+        |> PlayerCombat.mark_attacked(1_000)
+        |> PlayerCombat.gain_threat_ref(mob_guid, 1)
+        |> then(fn character -> %{character | unit: %{character.unit | target: mob_guid}} end)
+
       state = %State{connection_pid: self(), guid: guid, character: character, ready: true}
 
       on_exit(fn ->
@@ -245,12 +253,15 @@ defmodule ThistleTea.Game.Entity.Server.PlayerTest do
         SpatialHash.remove(:players, guid)
       end)
 
-      assert {:noreply, %State{character: %Character{unit: %Unit{summon: 0}}}} =
+      assert {:noreply, %State{character: %Character{unit: %Unit{summon: 0}} = teleported}} =
                PlayerServer.handle_cast(
                  {:start_teleport, -8_949.95, -132.493, 83.5312, 0.0, WorldRef.open(0)},
                  state
                )
 
+      refute teleported.internal.in_combat
+      assert teleported.internal.threat_refs == MapSet.new()
+      assert teleported.unit.target == 0
       assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgPetSpells{pet_guid: 0}}}
       assert_receive {:"$gen_cast", {:send_packet, %Message.MsgMoveTeleportAck{}}}
       assert SpatialHash.get_entity(guid) == {guid, WorldRef.open(0), -8_949.95, -132.493, 83.5312}
@@ -327,6 +338,33 @@ defmodule ThistleTea.Game.Entity.Server.PlayerTest do
 
       assert character.unit.health == 80
       refute character.internal.in_combat
+    end
+
+    test "ignores an attack already in flight after death" do
+      dead = character(1, health: 0, max_health: 100)
+      state = %{character: dead}
+
+      assert {:noreply, %{character: ^dead}, {:continue, :maybe_broadcast_update}} =
+               PlayerServer.handle_cast({:receive_attack, %{caster: 2, damage: 10}}, state)
+    end
+
+    test "ignores an attack already in flight after spirit release" do
+      ghost = character(1, health: 1, max_health: 100)
+      ghost = %{ghost | player: %Player{flags: 0x10}}
+      state = %{character: ghost}
+
+      assert {:noreply, %{character: ^ghost}, {:continue, :maybe_broadcast_update}} =
+               PlayerServer.handle_cast({:receive_attack, %{caster: 2, damage: 10}}, state)
+    end
+
+    test "ignores a harmful spell outcome already in flight after spirit release" do
+      ghost = character(1, health: 1, max_health: 100)
+      ghost = %{ghost | player: %Player{flags: 0x10}}
+      spell = %Spell{id: 133, effects: [%Spell.Effect{type: :school_damage}]}
+      state = %{character: ghost}
+
+      assert {:noreply, ^state, {:continue, :maybe_broadcast_update}} =
+               PlayerServer.handle_cast({:receive_spell_outcome, 2, spell, :resist}, state)
     end
 
     test "syncs detection metadata before projecting a pending update" do

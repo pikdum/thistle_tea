@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombatTest do
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.PlayerCombat
   alias ThistleTea.Game.Entity.Logic.TargetRef
   alias ThistleTea.Game.Guid
@@ -61,6 +62,30 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombatTest do
         |> PlayerCombat.lose_threat_ref(100, 1)
 
       assert character.internal.threat_refs == MapSet.new([{100, 2}])
+    end
+  end
+
+  describe "disengage/1" do
+    test "clears player combat state and releases every owning mob" do
+      target_guid = Guid.from_low_guid(:mob, 1, unique_guid())
+      other_guid = Guid.from_low_guid(:mob, 2, unique_guid())
+
+      character =
+        character(in_combat: true, target: target_guid, last_hostile_time: 1_000)
+        |> PlayerCombat.gain_threat_ref(target_guid, 1)
+        |> PlayerCombat.gain_threat_ref(other_guid, 2)
+
+      {character, effects} = PlayerCombat.disengage(character)
+
+      refute character.internal.in_combat
+      assert character.internal.last_hostile_time == nil
+      assert character.internal.threat_refs == MapSet.new()
+      assert character.unit.target == 0
+      assert Bitwise.band(character.unit.flags, @unit_flag_in_combat) == 0
+      assert Enum.any?(effects, &is_struct(&1, Effects.DropNearbyThreat))
+      assert Enum.any?(effects, &match?(%Effects.DropThreat{target_guid: ^target_guid}, &1))
+      assert Enum.any?(effects, &match?(%Effects.DropThreat{target_guid: ^other_guid}, &1))
+      assert Enum.any?(effects, &match?(%Effects.AttackStop{target_guid: ^target_guid}, &1))
     end
   end
 

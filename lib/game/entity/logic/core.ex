@@ -24,6 +24,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Engagement
   alias ThistleTea.Game.Entity.Logic.Movement
+  alias ThistleTea.Game.Entity.Logic.PlayerCombat
   alias ThistleTea.Game.Entity.Logic.Reactive
   alias ThistleTea.Game.Entity.Logic.Resources
   alias ThistleTea.Game.Entity.Logic.Threat
@@ -340,6 +341,11 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
   defp clear_death_engagement(%Mob{} = entity) do
     %Engagement.Result{entity: entity} = Engagement.die(entity)
     entity
+  end
+
+  defp clear_death_engagement(%Character{} = entity) do
+    {entity, effects} = PlayerCombat.disengage(entity)
+    Effects.enqueue(entity, effects)
   end
 
   defp clear_death_engagement(%{internal: %Internal{} = internal, unit: %Unit{} = unit} = entity) do

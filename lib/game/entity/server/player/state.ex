@@ -6,7 +6,10 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
   that character's effects. `leave_world/1` tears down that world presence.
   """
   alias ThistleTea.Game.Entity
+  alias ThistleTea.Game.Entity.Data.Character
+  alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.Logic.Dueling
+  alias ThistleTea.Game.Entity.Logic.PlayerCombat
   alias ThistleTea.Game.Entity.Server.Player.CompanionOwner
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
@@ -85,6 +88,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
         state
       end
 
+    state = disengage(state)
     state = CompanionOwner.suspend(state)
 
     state = close_mailbox(state)
@@ -97,6 +101,13 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
 
     %__MODULE__{account: state.account, connection_pid: state.connection_pid}
   end
+
+  defp disengage(%__MODULE__{character: %Character{} = character} = state) do
+    {character, effects} = PlayerCombat.disengage(character)
+    %{state | character: EventSink.emit(character, effects)}
+  end
+
+  defp disengage(%__MODULE__{} = state), do: state
 
   defp close_mailbox(
          %__MODULE__{
