@@ -59,9 +59,10 @@ defmodule ThistleTea.Game.Entity.Logic.Engagement do
     previous = entity
     entity = %{entity | internal: %{internal | in_combat: true, last_hostile_time: now}}
     entity = Threat.add(entity, target_guid, 0)
+    selection = Keyword.get(opts, :selection, default_selection(entity))
 
     %Result{entity: entity, decision: decision} =
-      select_on_enter(entity, target_guid, Keyword.get(opts, :selection, []))
+      select_on_enter(entity, target_guid, selection)
 
     entity = entity |> Combat.sync_combat_flag() |> mark_broadcast_update()
     result(previous, entity, :enter, decision)
@@ -207,7 +208,14 @@ defmodule ThistleTea.Game.Entity.Logic.Engagement do
     result(previous, entity, :select, {:switch, target_guid})
   end
 
+  defp select_on_enter(entity, _target_guid, :preserve), do: result(entity, entity, :select, :keep)
+
   defp select_on_enter(entity, _target_guid, opts) when is_list(opts), do: select(entity, opts)
+
+  defp default_selection(%Mob{internal: %Internal{pet: %Pet{command_state: :attack}}, unit: %Unit{target: target_guid}})
+       when is_integer(target_guid) and target_guid > 0, do: :preserve
+
+  defp default_selection(%Mob{}), do: []
 
   defp victim_change_effects(previous, target_guid) when is_integer(previous) do
     [Effects.attacker_lost(previous), Effects.attacker_gained(target_guid)]

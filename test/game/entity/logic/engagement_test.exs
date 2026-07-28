@@ -3,6 +3,7 @@ defmodule ThistleTea.Game.Entity.Logic.EngagementTest do
 
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Internal.Loot
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Pet
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
@@ -36,6 +37,31 @@ defmodule ThistleTea.Game.Entity.Logic.EngagementTest do
       assert Bitwise.band(mob.unit.flags, @combat_flag) == @combat_flag
       assert Enum.any?(mob.internal.events, &is_struct(&1, Effects.ThreatRefGained))
       assert Enum.any?(mob.internal.events, &is_struct(&1, Effects.AttackerGained))
+    end
+
+    test "keeps an explicitly commanded pet victim while tracking another attacker" do
+      commanded_target = 20
+      other_attacker = 30
+
+      pet =
+        mob()
+        |> then(fn mob ->
+          %{
+            mob
+            | unit: %{mob.unit | target: commanded_target},
+              internal: %{
+                mob.internal
+                | pet: %Pet{command_state: :attack},
+                  in_combat: true,
+                  threat: %{commanded_target => 0.0}
+              }
+          }
+        end)
+
+      %Engagement.Result{entity: pet, decision: :keep} = Engagement.enter(pet, other_attacker, 2_000)
+
+      assert pet.unit.target == commanded_target
+      assert pet.internal.threat == %{commanded_target => 0.0, other_attacker => 0.0}
     end
   end
 
