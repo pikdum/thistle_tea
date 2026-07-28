@@ -2,6 +2,7 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironmentTest do
   use ExUnit.Case, async: false
 
   alias ThistleTea.Game.Entity.Data.AIEvent
+  alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
@@ -98,6 +99,30 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironmentTest do
       perception = AIEnvironment.context(mob, 1_000).perception
 
       assert Perception.nearby(perception, :mobs, 75.0) == []
+    end
+
+    test "observes an auto shot target after melee attack stop clears the selected target" do
+      world = %WorldRef{map_id: 0}
+      player_guid = Guid.from_low_guid(:player, 98_026)
+      target_guid = Guid.from_low_guid(:mob, 1, 98_027)
+
+      put_actor(:mobs, target_guid, world, 20.0)
+      on_exit(fn -> remove_actor(:mobs, target_guid) end)
+
+      character = %Character{
+        object: %Object{guid: player_guid},
+        unit: %Unit{target: 0},
+        internal: %Internal{
+          world: world,
+          auto_shot: %{target_guid: target_guid}
+        },
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
+      }
+
+      perception = AIEnvironment.context(character, 1_000).perception
+
+      assert Perception.distance(perception, target_guid) == 20.0
+      assert Perception.metadata(perception, target_guid) == %{alive?: true, level: 10}
     end
   end
 

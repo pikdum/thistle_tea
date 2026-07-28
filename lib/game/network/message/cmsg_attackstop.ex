@@ -4,7 +4,6 @@ defmodule ThistleTea.Game.Network.Message.CmsgAttackstop do
 
   alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.Logic.AI.BT
-  alias ThistleTea.Game.Entity.Logic.AI.BT.Ranged
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Server.Player.TickScheduler
 
@@ -29,7 +28,6 @@ defmodule ThistleTea.Game.Network.Message.CmsgAttackstop do
     character =
       character
       |> BT.clear_auto_attack()
-      |> Ranged.stop()
       |> clear_target()
       |> EventSink.emit_pending()
 

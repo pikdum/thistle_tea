@@ -42,6 +42,33 @@ defmodule ThistleTea.Game.Network.Message.CmsgAttackstopTest do
       assert state.character.internal.blackboard.combat.attack_started == false
       assert state.character.internal.blackboard.combat.auto_attacking == false
     end
+
+    test "does not cancel auto shot while switching away from melee" do
+      player_guid = Guid.from_low_guid(:player, unique_id())
+      target_guid = Guid.from_low_guid(:mob, 1, unique_id())
+      auto_shot = %{target_guid: target_guid, next_at: 12_345}
+
+      state =
+        CmsgAttackstop.handle(%CmsgAttackstop{}, %{
+          guid: player_guid,
+          character: %Character{
+            object: %Object{guid: player_guid},
+            unit: %Unit{target: target_guid},
+            movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+            internal: %Internal{
+              world: %WorldRef{map_id: 0},
+              auto_shot: auto_shot,
+              blackboard: %Blackboard{
+                combat: %Blackboard.Combat{attack_started: true, auto_attacking: true}
+              }
+            }
+          },
+          player_tick_ref: nil
+        })
+
+      assert state.character.internal.auto_shot == auto_shot
+      assert state.character.internal.blackboard.combat.auto_attacking == false
+    end
   end
 
   defp unique_id do

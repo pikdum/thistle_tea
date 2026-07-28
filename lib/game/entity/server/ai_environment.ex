@@ -128,12 +128,15 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
     Enum.filter([owner_guid, target], &(is_integer(&1) and &1 > 0))
   end
 
-  defp direct_guids(%{internal: %Internal{threat: threat}, unit: %Unit{target: target}}) do
-    [target | threat_guids(threat)]
+  defp direct_guids(%{internal: %Internal{auto_shot: auto_shot, threat: threat}, unit: %Unit{target: target}}) do
+    [auto_repeat_target(auto_shot), target | threat_guids(threat)]
     |> Enum.filter(&(is_integer(&1) and &1 > 0))
   end
 
   defp direct_guids(_entity), do: []
+
+  defp auto_repeat_target(%{target_guid: target_guid}), do: target_guid
+  defp auto_repeat_target(_auto_repeat), do: nil
 
   defp own_guid(%{object: %{guid: guid}}) when is_integer(guid) and guid > 0, do: guid
   defp own_guid(_entity), do: nil
