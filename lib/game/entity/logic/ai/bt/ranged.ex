@@ -13,8 +13,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Ranged do
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
 
-  @minimum_range 8.0
-
   def sequence do
     BT.sequence([BT.condition(&active?/2), BT.action(&shoot_with_context/3), BT.action(&wait/3)])
   end
@@ -29,8 +27,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Ranged do
          %Blackboard{} = blackboard,
          %Context{now: now, perception: perception}
        ) do
-    position = xyz(character.movement_block.position)
-    distance = perceived_distance(position, Perception.position(perception, auto_shot.target_guid))
+    distance = combat_distance(character, auto_shot.target_guid, perception)
     shoot_at_distance(character, blackboard, now, distance, auto_shot)
   end
 
@@ -41,7 +38,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Ranged do
       not is_number(distance) ->
         {:failure, stop(character), blackboard}
 
-      distance < @minimum_range or distance > auto_shot.spell.range_yards ->
+      outside_range?(distance, auto_shot.spell) ->
         {:success, character, blackboard}
 
       now < auto_shot.next_at ->
@@ -83,11 +80,20 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Ranged do
     end
   end
 
-  defp perceived_distance({x1, y1, z1}, {_world, x2, y2, z2}) do
-    :math.sqrt(:math.pow(x2 - x1, 2) + :math.pow(y2 - y1, 2) + :math.pow(z2 - z1, 2))
+  defp combat_distance(%Character{unit: unit}, target_guid, %Perception{} = perception) do
+    with distance when is_number(distance) <- Perception.distance(perception, target_guid),
+         target when is_map(target) <- Perception.metadata(perception, target_guid) do
+      max(distance - combat_reach(unit.combat_reach) - combat_reach(Map.get(target, :combat_reach)), 0.0)
+    else
+      _unknown -> nil
+    end
   end
 
-  defp perceived_distance(_position, _target), do: nil
+  defp combat_reach(reach) when is_number(reach) and reach > 0, do: reach
+  defp combat_reach(_reach), do: 0.0
 
-  defp xyz({x, y, z, _orientation}), do: {x, y, z}
+  defp outside_range?(distance, %Spell{min_range_yards: min_range, range_yards: max_range}) do
+    (is_number(min_range) and min_range > 0 and distance < min_range) or
+      (is_number(max_range) and max_range > 0 and distance > max_range)
+  end
 end
