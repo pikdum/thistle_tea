@@ -23,6 +23,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
   alias ThistleTea.Game.Network.BinaryUtils
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Player.Fishing
+  alias ThistleTea.Game.Player.Projectile
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Cast
   alias ThistleTea.Game.Spell.CastValidation
@@ -183,6 +184,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
   defp do_cast(state, %Spell{} = spell, %Target{} = targets, cast_item_guid) do
     state = cancel(state)
     cast_time_ms = Modifiers.integer_value(state.character, spell, :casting_time, spell.cast_time_ms || 0)
+    projectile = Projectile.fields(state.character, spell)
 
     cast_item =
       if cast_item_guid, do: BinaryUtils.pack_guid(cast_item_guid), else: state.packed_guid
@@ -191,11 +193,11 @@ defmodule ThistleTea.Game.Player.Spellcasting do
       cast_item: cast_item,
       caster: state.packed_guid,
       spell: spell.id,
-      flags: 0x2,
+      flags: Bitwise.bor(0x2, projectile.flags),
       timer: cast_time_ms,
       targets: targets,
-      ammo_display_id: nil,
-      ammo_inventory_type: nil
+      ammo_display_id: projectile.display_id,
+      ammo_inventory_type: projectile.inventory_type
     }
     |> World.broadcast_packet(state.character)
 

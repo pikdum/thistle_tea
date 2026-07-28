@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Entity.EventSink.Spells do
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.BinaryUtils
   alias ThistleTea.Game.Network.Message
+  alias ThistleTea.Game.Player.Projectile
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.World
 
@@ -136,16 +137,17 @@ defmodule ThistleTea.Game.Entity.EventSink.Spells do
 
   def emit(%{object: %{guid: guid}} = entity, %Effects.SpellStart{} = effect, _context) when is_integer(guid) do
     packed_caster = BinaryUtils.pack_guid(effect.source_guid || guid)
+    projectile = Projectile.fields(entity, effect.spell_id)
 
     %Message.SmsgSpellStart{
       cast_item: packed_caster,
       caster: packed_caster,
       spell: effect.spell_id,
-      flags: 0x2,
+      flags: Bitwise.bor(0x2, projectile.flags),
       timer: effect.duration_ms || 0,
       targets: effect.targets,
-      ammo_display_id: nil,
-      ammo_inventory_type: nil
+      ammo_display_id: projectile.display_id,
+      ammo_inventory_type: projectile.inventory_type
     }
     |> World.broadcast_packet(entity)
 
@@ -206,16 +208,18 @@ defmodule ThistleTea.Game.Entity.EventSink.Spells do
   def emit(entity, %Effects.ClearCooldown{}, _context), do: entity
 
   def emit(%{object: %{guid: guid}} = entity, %Effects.SpellGo{} = effect, _context) when is_integer(guid) do
+    projectile = Projectile.fields(entity, effect.spell_id)
+
     %Message.SmsgSpellGo{
       cast_item: effect.cast_item_guid || effect.source_guid || guid,
       caster: effect.source_guid || guid,
       spell: effect.spell_id,
-      flags: 0x100,
+      flags: Bitwise.bor(0x100, projectile.flags),
       hits: effect.hit_guids || [],
       misses: effect.misses || [],
       targets: effect.targets,
-      ammo_display_id: nil,
-      ammo_inventory_type: nil
+      ammo_display_id: projectile.display_id,
+      ammo_inventory_type: projectile.inventory_type
     }
     |> World.broadcast_packet(entity)
 
