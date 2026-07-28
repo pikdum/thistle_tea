@@ -15,21 +15,26 @@ defmodule ThistleTea.Game.Network.Message.CmsgZoneupdate do
     %{internal: %{world: world, area: current_area}} = character
     {x, y, z, _o} = character.movement_block.position
 
-    state =
+    {state, server_zone} =
       case Pathfinding.get_zone_and_area(world.map_id, {x, y, z}) do
-        {_zone, area} when area != current_area ->
+        {zone, area} when area != current_area ->
           character = %{character | internal: %{character.internal | area: area}}
           CharacterStore.put(character)
           PartyNotifier.broadcast_stats(state.guid, character)
-          %{state | character: character}
+          {%{state | character: character}, zone}
 
-        _ ->
-          state
+        {zone, _area} ->
+          {state, zone}
+
+        _unknown ->
+          {state, PlayerRest.default_zone(world.map_id)}
       end
 
+    zone = server_zone || client_zone
+
     state =
-      if is_integer(client_zone) and client_zone > 0 do
-        PlayerRest.update_zone(state, client_zone)
+      if is_integer(zone) and zone > 0 do
+        PlayerRest.update_zone(state, zone)
       else
         state
       end

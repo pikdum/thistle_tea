@@ -353,7 +353,7 @@ defmodule ThistleTea.Game.Player.Login do
 
     case Pathfinding.get_zone_and_area(character.internal.world.map_id, {x, y, z}) do
       {zone, _area} -> PlayerRest.evaluate_zone(character, zone)
-      _unknown -> character
+      _unknown -> PlayerRest.evaluate_zone(character, PlayerRest.default_zone(character.internal.world.map_id))
     end
   end
 

@@ -72,6 +72,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.Player.Looting
   alias ThistleTea.Game.Player.Mail
   alias ThistleTea.Game.Player.Quests
+  alias ThistleTea.Game.Player.Rest, as: PlayerRest
   alias ThistleTea.Game.Player.Spellcasting
   alias ThistleTea.Game.Player.Stats, as: PlayerStats
   alias ThistleTea.Game.Spell
@@ -449,17 +450,19 @@ defmodule ThistleTea.Game.Entity.Server.Player do
     state = state |> disengage_for_world_transition() |> suspend_companion_for_teleport()
     character = state.character
 
-    area =
-      case Pathfinding.get_zone_and_area(world.map_id, {x, y, z}) do
-        {_zone, area} -> area
-        nil -> character.internal.area
-      end
+    {zone, area} = destination_zone_and_area(character, world.map_id, {x, y, z})
 
-    character = %{
+    character =
       character
-      | internal: %{character.internal | area: area},
-        movement_block: %{character.movement_block | position: {x, y, z, orientation}, movement_flags: 0}
-    }
+      |> PlayerRest.evaluate_zone(zone)
+      |> mark_rest_transition(character)
+      |> then(fn character ->
+        %{
+          character
+          | internal: %{character.internal | area: area},
+            movement_block: %{character.movement_block | position: {x, y, z, orientation}, movement_flags: 0}
+        }
+      end)
 
     Presence.relocate(character)
 
@@ -474,6 +477,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
       %{state | character: character}
       |> Visibility.refresh_player()
       |> Visibility.resync_player()
+      |> maybe_broadcast_update()
 
     {:noreply, state}
   end
@@ -482,21 +486,20 @@ defmodule ThistleTea.Game.Entity.Server.Player do
     DuelSystem.disconnect(state.guid)
     state = state |> disengage_for_world_transition() |> suspend_companion_for_teleport()
     previous_world = state.character.internal.world
-
-    # Update player's location
-    area =
-      case Pathfinding.get_zone_and_area(world.map_id, {x, y, z}) do
-        {_zone, area} -> area
-        nil -> state.character.internal.area
-      end
-
     character = state.character
+    {zone, area} = destination_zone_and_area(character, world.map_id, {x, y, z})
 
-    character = %{
+    character =
       character
-      | internal: %{character.internal | area: area, world: world},
-        movement_block: %{character.movement_block | position: {x, y, z, orientation}}
-    }
+      |> PlayerRest.evaluate_zone(zone)
+      |> mark_rest_transition(character)
+      |> then(fn character ->
+        %{
+          character
+          | internal: %{character.internal | area: area, world: world},
+            movement_block: %{character.movement_block | position: {x, y, z, orientation}}
+        }
+      end)
 
     Presence.relocate(character)
 
@@ -1103,6 +1106,30 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   defp disengage_for_world_transition(%State{character: %Character{} = character} = state) do
     {character, effects} = PlayerCombat.disengage(character)
     %{state | character: EventSink.emit(character, effects)}
+  end
+
+  defp destination_zone_and_area(%Character{} = character, map_id, position) do
+    case Pathfinding.get_zone_and_area(map_id, position) do
+      {zone, area} ->
+        {zone, area}
+
+      _unknown ->
+        zone = PlayerRest.default_zone(map_id)
+        {zone, fallback_destination_area(character, map_id, zone)}
+    end
+  end
+
+  defp fallback_destination_area(
+         %Character{internal: %Internal{world: %WorldRef{map_id: map_id}, area: area}},
+         map_id,
+         _zone
+       ), do: area
+
+  defp fallback_destination_area(%Character{}, _map_id, zone) when is_integer(zone), do: zone
+  defp fallback_destination_area(%Character{}, _map_id, _zone), do: 0
+
+  defp mark_rest_transition(%Character{} = character, %Character{} = previous) do
+    if character == previous, do: character, else: Core.mark_broadcast_update(character)
   end
 
   @impl GenServer

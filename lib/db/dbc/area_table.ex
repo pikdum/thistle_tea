@@ -10,5 +10,6 @@ defmodule AreaTable do
     field(:flags, :integer)
     field(:exploration_level, :integer)
     field(:name, :string, source: :area_name_en_gb)
+    field(:faction_group, :integer)
   end
 end

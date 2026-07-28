@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.Entity.Server.PlayerTest do
   alias ThistleTea.Game.Entity.Logic.Companion, as: CompanionLogic
   alias ThistleTea.Game.Entity.Logic.PlayerCombat
   alias ThistleTea.Game.Entity.Logic.Regen
+  alias ThistleTea.Game.Entity.Logic.Rest, as: RestLogic
   alias ThistleTea.Game.Entity.Server.Player, as: PlayerServer
   alias ThistleTea.Game.Entity.Server.Player.CompanionOwner.Attachment
   alias ThistleTea.Game.Entity.Server.Player.CompanionOwner.Monitor, as: CompanionMonitor
@@ -233,6 +234,30 @@ defmodule ThistleTea.Game.Entity.Server.PlayerTest do
       assert SpatialHash.get_entity(guid) == {guid, destination, -8.23, -43.26, -21.81}
       assert Metadata.query(guid, [:orientation, :world]) == %{orientation: 0.0}
       refute_receive {:"$gen_cast", {:send_packet, %Message.SmsgUpdateLastInstance{}}}
+    end
+
+    test "clears city rest when teleporting to a map without loaded navigation data" do
+      guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
+
+      character =
+        %{character(guid, health: 100, max_health: 100) | player: %Player{flags: 0, next_level_xp: 100_000}}
+        |> RestLogic.start(:city, 1_000)
+
+      state = %State{connection_pid: self(), guid: guid, character: character, ready: true}
+
+      on_exit(fn ->
+        Metadata.delete(guid)
+        SpatialHash.remove(:players, guid)
+      end)
+
+      assert {:noreply, %State{character: teleported}} =
+               PlayerServer.handle_cast(
+                 {:start_teleport, -11_969.9, -1_646.19, 41.298, 0.0, WorldRef.open(309)},
+                 state
+               )
+
+      refute RestLogic.resting?(teleported)
+      assert teleported.internal.area == 1977
     end
 
     test "waits for the near teleport acknowledgement before restoring a suspended pet" do
