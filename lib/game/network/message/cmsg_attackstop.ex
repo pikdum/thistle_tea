@@ -2,6 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgAttackstop do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_ATTACKSTOP
 
+  alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Ranged
   alias ThistleTea.Game.Entity.Logic.Core
@@ -30,6 +31,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgAttackstop do
       |> BT.clear_auto_attack()
       |> Ranged.stop()
       |> clear_target()
+      |> EventSink.emit_pending()
 
     Core.update_object(character, :values)
     |> World.broadcast_packet(character)

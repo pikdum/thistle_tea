@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.Entity.Logic.Hunter do
 
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Logic.AI.BT
+  alias ThistleTea.Game.Entity.Logic.AutoRepeat
   alias ThistleTea.Game.Entity.Logic.Companion
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.PlayerCombat
@@ -127,15 +128,16 @@ defmodule ThistleTea.Game.Entity.Logic.Hunter do
 
   defp apply_feign_death(character, now) do
     {character, mob_guids} = PlayerCombat.vanish(character, now)
+    {character, auto_repeat_events} = AutoRepeat.cancel(character)
 
     events =
-      [Effects.drop_nearby_threat()] ++
+      auto_repeat_events ++
+        [Effects.drop_nearby_threat()] ++
         Enum.map(mob_guids, &Effects.drop_threat/1) ++ attack_stop_events(character)
 
     character =
       character
       |> BT.clear_auto_attack()
-      |> then(&%{&1 | internal: %{&1.internal | auto_shot: nil}})
       |> then(&%{&1 | unit: %{&1.unit | stand_state: 7}})
 
     {character, events ++ [Effects.stand_state(7)]}

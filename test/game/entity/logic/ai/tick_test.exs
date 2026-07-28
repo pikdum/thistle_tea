@@ -32,6 +32,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.TickTest do
       assert Tick.needs_tick?(fixture(casting: %Cast{}))
     end
 
+    test "ticks while auto shot is active" do
+      assert Tick.needs_tick?(fixture(auto_shot: %{target_guid: 42}))
+    end
+
     test "ticks while in combat with a target" do
       assert Tick.needs_tick?(fixture(in_combat: true, target: 42))
     end
@@ -119,6 +123,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.TickTest do
       },
       internal: %Internal{
         casting: Keyword.get(opts, :casting),
+        auto_shot: Keyword.get(opts, :auto_shot),
         in_combat: Keyword.get(opts, :in_combat, false),
         blackboard: Keyword.get(opts, :blackboard)
       }

@@ -74,18 +74,23 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombatTest do
         character(in_combat: true, target: target_guid, last_hostile_time: 1_000)
         |> PlayerCombat.gain_threat_ref(target_guid, 1)
         |> PlayerCombat.gain_threat_ref(other_guid, 2)
+        |> then(fn character ->
+          %{character | internal: %{character.internal | auto_shot: %{target_guid: target_guid}}}
+        end)
 
       {character, effects} = PlayerCombat.disengage(character)
 
       refute character.internal.in_combat
       assert character.internal.last_hostile_time == nil
       assert character.internal.threat_refs == MapSet.new()
+      assert character.internal.auto_shot == nil
       assert character.unit.target == 0
       assert Bitwise.band(character.unit.flags, @unit_flag_in_combat) == 0
       assert Enum.any?(effects, &is_struct(&1, Effects.DropNearbyThreat))
       assert Enum.any?(effects, &match?(%Effects.DropThreat{target_guid: ^target_guid}, &1))
       assert Enum.any?(effects, &match?(%Effects.DropThreat{target_guid: ^other_guid}, &1))
       assert Enum.any?(effects, &match?(%Effects.AttackStop{target_guid: ^target_guid}, &1))
+      assert Enum.any?(effects, &is_struct(&1, Effects.CancelAutoRepeat))
     end
   end
 

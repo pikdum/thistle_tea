@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Item, as: DataItem
   alias ThistleTea.Game.Entity.EventSink
+  alias ThistleTea.Game.Entity.Logic.AutoRepeat
   alias ThistleTea.Game.Entity.Logic.Casting
   alias ThistleTea.Game.Entity.Logic.Companion
   alias ThistleTea.Game.Entity.Logic.Hostility
@@ -97,10 +98,21 @@ defmodule ThistleTea.Game.Player.Spellcasting do
     state
     |> Map.put(:character, character)
     |> Map.delete(:spell)
-    |> schedule_tick_for_auras()
+    |> TickScheduler.ensure_scheduled()
   end
 
   def complete(state), do: state
+
+  def cancel_auto_repeat(%{character: %Character{} = character} = state) do
+    {character, effects} = AutoRepeat.cancel(character)
+    character = EventSink.emit(character, effects)
+
+    state
+    |> Map.put(:character, character)
+    |> TickScheduler.ensure_scheduled()
+  end
+
+  def cancel_auto_repeat(state), do: state
 
   def cancel_cast_request(state) do
     state
@@ -412,10 +424,4 @@ defmodule ThistleTea.Game.Player.Spellcasting do
   end
 
   defp lookup_spell(_state, _spell_id), do: nil
-
-  defp schedule_tick_for_auras(%{character: %{unit: %Unit{auras: [_ | _]}}} = state) do
-    TickScheduler.schedule_now(state)
-  end
-
-  defp schedule_tick_for_auras(state), do: state
 end

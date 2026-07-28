@@ -18,6 +18,7 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombat do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard.Combat
+  alias ThistleTea.Game.Entity.Logic.AutoRepeat
   alias ThistleTea.Game.Entity.Logic.Combat, as: CombatLogic
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.TargetRef
@@ -36,7 +37,9 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombat do
 
   def mark_initiated(character, now), do: mark_attacked(character, now)
 
-  def disengage(%Character{object: %{guid: guid}, unit: %Unit{} = unit, internal: %Internal{} = internal} = character) do
+  def disengage(%Character{object: %{guid: guid}} = character) do
+    {character, auto_repeat_effects} = AutoRepeat.cancel(character)
+    %Character{unit: %Unit{} = unit, internal: %Internal{} = internal} = character
     refs = internal.threat_refs || MapSet.new()
     blackboard = internal.blackboard |> Blackboard.ensure() |> Blackboard.clear_auto_attack()
 
@@ -55,7 +58,8 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombat do
       |> CombatLogic.sync_combat_flag()
 
     effects =
-      [Effects.drop_nearby_threat()] ++
+      auto_repeat_effects ++
+        [Effects.drop_nearby_threat()] ++
         Enum.map(threat_ref_guids(refs), &Effects.drop_threat/1) ++
         attack_stop_effects(guid, unit.target)
 

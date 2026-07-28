@@ -117,6 +117,13 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
       assert_receive {:feed_pet, 22, 33, 1539, 10.0}
     end
 
+    test "cancel auto repeat sends the empty client packet" do
+      character = %Character{}
+
+      assert ^character = EventSink.emit(character, Effects.cancel_auto_repeat(), Context.new(self()))
+      assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgCancelAutoRepeat{}}}
+    end
+
     test "spell modifier events send the matching client packet" do
       character = %Character{}
 

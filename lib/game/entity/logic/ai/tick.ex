@@ -19,6 +19,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Tick do
 
   def needs_tick?(%{internal: %Internal{casting: %Cast{}}}), do: true
 
+  def needs_tick?(%{internal: %Internal{auto_shot: %{target_guid: target_guid}}})
+      when is_integer(target_guid) and target_guid > 0, do: true
+
   def needs_tick?(%{internal: %Internal{in_combat: true}, unit: %Unit{target: target}})
       when is_integer(target) and target > 0 do
     true

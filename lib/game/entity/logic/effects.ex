@@ -7,6 +7,10 @@ defmodule ThistleTea.Game.Entity.Logic.Effects do
   alias __MODULE__, as: Effects
   alias ThistleTea.Game.Spell.Target
 
+  def cancel_auto_repeat do
+    %Effects.CancelAutoRepeat{}
+  end
+
   def spell_damage(source_guid, target_guid, spell, damage, opts \\ []) do
     %Effects.SpellDamage{
       source_guid: source_guid,

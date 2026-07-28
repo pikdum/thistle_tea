@@ -22,7 +22,15 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.RangedTest do
       character = %Character{internal: %Internal{auto_shot: %{target_guid: 7}}}
 
       assert Ranged.active?(character, Blackboard.new())
-      refute character |> Ranged.stop() |> Ranged.active?(Blackboard.new())
+      character = Ranged.stop(character)
+      refute Ranged.active?(character, Blackboard.new())
+      assert [%Effects.CancelAutoRepeat{}] = character.internal.events
+    end
+
+    test "does not remain active after death" do
+      character = %Character{unit: %Unit{health: 0}, internal: %Internal{auto_shot: %{target_guid: 7}}}
+
+      refute Ranged.active?(character, Blackboard.new())
     end
   end
 

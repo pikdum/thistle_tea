@@ -8,6 +8,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Ranged do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception
+  alias ThistleTea.Game.Entity.Logic.AutoRepeat
+  alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Hunter
   alias ThistleTea.Game.Spell
@@ -17,8 +19,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Ranged do
     BT.sequence([BT.condition(&active?/2), BT.action(&shoot_with_context/3), BT.action(&wait/3)])
   end
 
-  def active?(%Character{internal: %Internal{auto_shot: %{target_guid: target_guid}}}, %Blackboard{})
-      when is_integer(target_guid) and target_guid > 0, do: true
+  def active?(%Character{internal: %Internal{auto_shot: %{target_guid: target_guid}}} = character, %Blackboard{})
+      when is_integer(target_guid) and target_guid > 0, do: not Core.dead?(character)
 
   def active?(_state, _blackboard), do: false
 
@@ -56,8 +58,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Ranged do
 
   defp wait(character, blackboard, %Context{}), do: {:failure, character, blackboard}
 
-  def stop(%Character{internal: %Internal{} = internal} = character),
-    do: %{character | internal: %{internal | auto_shot: nil}}
+  def stop(%Character{} = character) do
+    {character, effects} = AutoRepeat.cancel(character)
+    Effects.enqueue(character, effects)
+  end
 
   defp fire(character, auto_shot, now) do
     context = CastContext.from_caster(character, auto_shot.spell, auto_shot.target_guid)

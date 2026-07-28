@@ -142,6 +142,7 @@ defmodule ThistleTea.Game.Entity.Logic.HunterTest do
       assert Enum.count(events, &is_struct(&1, Effects.DropThreat)) == 2
       assert Enum.any?(events, &is_struct(&1, Effects.DropNearbyThreat))
       assert Enum.any?(events, &(is_struct(&1, Effects.AttackStop) and &1.target_guid == 2))
+      assert Enum.any?(events, &is_struct(&1, Effects.CancelAutoRepeat))
       assert Enum.any?(events, &(is_struct(&1, Effects.StandState) and &1.stand_state == 7))
     end
   end

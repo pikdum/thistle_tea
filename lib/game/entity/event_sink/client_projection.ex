@@ -13,6 +13,13 @@ defmodule ThistleTea.Game.Entity.EventSink.ClientProjection do
   @listen_range_say 25.0
   @listen_range_yell 300.0
 
+  def emit(%Character{} = entity, %Effects.CancelAutoRepeat{}, context) do
+    Context.send_packet(context, %Message.SmsgCancelAutoRepeat{})
+    entity
+  end
+
+  def emit(entity, %Effects.CancelAutoRepeat{}, _context), do: entity
+
   def emit(%Character{} = entity, %Effects.ConsumeCastItem{cast_item_guid: item_guid}, context)
       when is_integer(item_guid) do
     Context.send(context, {:consume_cast_item, item_guid})
