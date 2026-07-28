@@ -88,7 +88,7 @@ defmodule ThistleTea.Game.World.Loader.SummonTest do
 
       assert_in_delta min_damage, 42.2625, 0.0001
       assert_in_delta max_damage, 53.2875, 0.0001
-      assert Map.keys(pet.internal.spellbook) |> Enum.sort() == [17_260, 24_603]
+      assert Map.keys(pet.internal.spellbook) |> Enum.sort() == [14_920, 17_260, 24_603]
     end
   end
 end

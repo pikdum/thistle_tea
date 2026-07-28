@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.Entity.Logic.RegenTest do
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Pet
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
@@ -325,6 +326,22 @@ defmodule ThistleTea.Game.Entity.Logic.RegenTest do
       assert Regen.tick(entity, 10_000) == entity
     end
 
+    test "hunter pets regenerate focus in and out of combat" do
+      out_of_combat = mob([power_type: 2, power3: 10, max_power3: 100], pet: %Pet{kind: :hunter})
+      in_combat = mob([power_type: 2, power3: 90, max_power3: 100], pet: %Pet{kind: :hunter}, in_combat: true)
+
+      assert Regen.tick_focus(out_of_combat).unit.power3 == 35
+      assert Regen.tick_focus(in_combat).unit.power3 == 100
+    end
+
+    test "hunter pet focus regen respects percent modifiers" do
+      entity =
+        mob([power_type: 2, power3: 10, max_power3: 100], pet: %Pet{kind: :hunter})
+        |> with_aura(:mod_power_regen_percent, 100, misc_value: 2)
+
+      assert Regen.tick_focus(entity).unit.power3 == 60
+    end
+
     test "respects the regenerate_stats flags" do
       no_regen = mob([health: 50, power1: 0, max_power1: 90], regenerate_stats: 0)
       health_only = mob([health: 50, power1: 0, max_power1: 90], regenerate_stats: 1)
@@ -341,6 +358,13 @@ defmodule ThistleTea.Game.Entity.Logic.RegenTest do
       assert Regen.tick_ms(character(class: @mage)) == 2_000
     end
 
+    test "keeps separate creature and focus intervals for hunter pets" do
+      pet = mob([power_type: 2, power3: 0, max_power3: 100], pet: %Pet{kind: :hunter})
+
+      assert Regen.tick_ms(pet) == 5_000
+      assert Regen.focus_tick_ms(pet) == 4_000
+    end
+
     test "needs_regen?/1 for creatures" do
       assert Regen.needs_regen?(mob(health: 50))
       assert Regen.needs_regen?(mob(health: 300, power1: 0, max_power1: 90))
@@ -350,6 +374,9 @@ defmodule ThistleTea.Game.Entity.Logic.RegenTest do
       refute Regen.needs_regen?(mob(health: 0))
       refute Regen.needs_regen?(mob([health: 50], regenerate_stats: 0))
       refute Regen.needs_regen?(mob([power1: 0, max_power1: 90], in_combat: true, regenerate_stats: 1))
+
+      pet = mob([power_type: 2, power3: 0, max_power3: 100], pet: %Pet{kind: :hunter}, in_combat: true)
+      assert Regen.needs_regen?(pet)
     end
   end
 

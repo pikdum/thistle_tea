@@ -82,13 +82,30 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Tick do
   defp schedule_aura(plan, _entity), do: plan
 
   defp schedule_regen(plan, %{internal: %Internal{blackboard: blackboard}} = entity) do
-    if Regen.needs_regen?(entity) do
-      delay_ms = Blackboard.delay_until(Blackboard.ensure(blackboard), :next_regen_at, plan.now)
+    blackboard = Blackboard.ensure(blackboard)
+
+    plan
+    |> schedule_resource_regen(entity, blackboard)
+    |> schedule_focus_regen(entity, blackboard)
+  end
+
+  defp schedule_regen(plan, _entity), do: plan
+
+  defp schedule_resource_regen(plan, entity, blackboard) do
+    if Regen.needs_resource_regen?(entity) do
+      delay_ms = Blackboard.delay_until(blackboard, :next_regen_at, plan.now)
       TickPlan.schedule_in(plan, :regen, delay_ms)
     else
       plan
     end
   end
 
-  defp schedule_regen(plan, _entity), do: plan
+  defp schedule_focus_regen(plan, entity, blackboard) do
+    if Regen.needs_focus_regen?(entity) do
+      delay_ms = Blackboard.delay_until(blackboard, :next_focus_regen_at, plan.now)
+      TickPlan.schedule_in(plan, :focus_regen, delay_ms)
+    else
+      plan
+    end
+  end
 end

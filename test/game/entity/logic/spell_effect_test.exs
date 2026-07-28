@@ -961,6 +961,23 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
       assert [%Effects.DismissPet{target_guid: 44}] = events
     end
 
+    test "growl adds threat for the pet rather than its owner" do
+      owner_guid = 40
+      pet_guid = 41
+      target = %{target_fixture() | internal: %Internal{threat: %{owner_guid => 10.0}}}
+
+      growl = %Spell{
+        id: 14_920,
+        effects: [%Effect{index: 0, type: :modify_threat, base_points: 319, implicit_target_a: :target_enemy}]
+      }
+
+      {target, _events} =
+        SpellEffect.receive(target, %CastContext{caster_guid: pet_guid, caster_level: 50}, growl, 1_000)
+
+      assert target.internal.threat[owner_guid] == 10.0
+      assert target.internal.threat[pet_guid] == 319.0
+    end
+
     test "totem effects preserve their elemental summon slot" do
       spell = %Spell{
         id: 3599,

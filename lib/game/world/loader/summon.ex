@@ -26,7 +26,9 @@ defmodule ThistleTea.Game.World.Loader.Summon do
   @table_options [:named_table, :public, read_concurrency: true, write_concurrency: :auto]
   @low_guid_base 0x400000
   @spell_attr_passive 0x40
+  @static_flag_tameable 0x00000010
   @unit_flag_player_controlled 0x00000008
+  @growl_rank_one 2649
 
   def init(table \\ __MODULE__) do
     case :ets.whereis(table) do
@@ -218,6 +220,8 @@ defmodule ThistleTea.Game.World.Loader.Summon do
         [] -> {pet_create_spell_ids(entry), true}
       end
 
+    spell_ids = if hunter_pet_entry?(entry), do: [@growl_rank_one | spell_ids], else: spell_ids
+
     skill_lines =
       DBC.all(
         from(ability in SkillLineAbility,
@@ -361,6 +365,17 @@ defmodule ThistleTea.Game.World.Loader.Summon do
 
   defp hunter_pet?(%{type_flags: type_flags}) when is_integer(type_flags), do: (type_flags &&& 0x1) != 0
   defp hunter_pet?(_creature), do: false
+
+  defp hunter_pet_entry?(entry) do
+    case template(entry) do
+      %Mangos.Creature{creature_template: %Mangos.CreatureTemplate{creature_type_flags: flags}}
+      when is_integer(flags) ->
+        (flags &&& @static_flag_tameable) != 0
+
+      _creature ->
+        false
+    end
+  end
 
   defp normalize_pet_damage_multiplier(creature, true), do: %{creature | damage_multiplier: 1.0}
   defp normalize_pet_damage_multiplier(creature, false), do: creature

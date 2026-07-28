@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Entity.Logic.Regen do
   alias ThistleTea.Game.Aura
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Pet
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
@@ -18,15 +19,18 @@ defmodule ThistleTea.Game.Entity.Logic.Regen do
 
   @tick_ms 2_000
   @creature_tick_ms 5_000
+  @focus_tick_ms 4_000
   @regen_flag_health 0x1
   @regen_flag_power 0x2
   @five_second_rule_ms 5_000
   @energy_per_tick 20
+  @focus_per_tick 25
   @rage_decay_per_tick 20
   @sitting_multiplier 1.5
 
   @mana_power_type 0
   @rage_power_type 1
+  @focus_power_type 2
   @energy_power_type 3
 
   @class_warrior 1
@@ -41,6 +45,9 @@ defmodule ThistleTea.Game.Entity.Logic.Regen do
 
   def tick_ms(%Mob{}), do: @creature_tick_ms
   def tick_ms(_entity), do: @tick_ms
+
+  def focus_tick_ms(%Mob{internal: %Internal{pet: %Pet{kind: :hunter}}}), do: @focus_tick_ms
+  def focus_tick_ms(_entity), do: nil
 
   def tick(%Mob{} = entity, now) when is_integer(now) do
     if Death.alive?(entity) do
@@ -62,17 +69,33 @@ defmodule ThistleTea.Game.Entity.Logic.Regen do
     end
   end
 
-  def needs_regen?(%Mob{} = entity) do
+  def tick_focus(%Mob{internal: %Internal{pet: %Pet{kind: :hunter}}} = entity) do
+    if Death.alive?(entity), do: regen_focus(entity), else: entity
+  end
+
+  def tick_focus(entity), do: entity
+
+  def needs_regen?(entity) do
+    needs_resource_regen?(entity) or needs_focus_regen?(entity)
+  end
+
+  def needs_resource_regen?(%Mob{} = entity) do
     Death.alive?(entity) and
       (creature_needs_health_regen?(entity) or creature_needs_mana_regen?(entity))
   end
 
-  def needs_regen?(%{unit: %Unit{}} = entity) do
+  def needs_resource_regen?(%{unit: %Unit{}} = entity) do
     Death.alive?(entity) and
       (missing_health?(entity) or missing_power?(entity))
   end
 
-  def needs_regen?(_entity), do: false
+  def needs_resource_regen?(_entity), do: false
+
+  def needs_focus_regen?(%Mob{internal: %Internal{pet: %Pet{kind: :hunter}}} = entity) do
+    Death.alive?(entity) and missing_focus?(entity)
+  end
+
+  def needs_focus_regen?(_entity), do: false
 
   defp creature_regen_health(%{internal: %Internal{in_combat: true}} = entity), do: entity
 
@@ -275,8 +298,23 @@ defmodule ThistleTea.Game.Entity.Logic.Regen do
 
   defp regen_energy(entity), do: entity
 
+  defp regen_focus(%{unit: %Unit{power3: focus, max_power3: max_focus} = unit} = entity)
+       when is_integer(focus) and is_integer(max_focus) and max_focus > 0 and focus < max_focus do
+    gain = trunc(@focus_per_tick * multiplier_by_misc(entity, :mod_power_regen_percent, @focus_power_type))
+
+    %{entity | unit: %{unit | power3: min(focus + gain, max_focus)}}
+    |> Core.mark_broadcast_update()
+  end
+
+  defp regen_focus(entity), do: entity
+
   defp in_combat?(%{internal: %Internal{in_combat: true}}), do: true
   defp in_combat?(_entity), do: false
+
+  defp missing_focus?(%{unit: %Unit{power3: focus, max_power3: max_focus}})
+       when is_integer(focus) and is_integer(max_focus) and max_focus > 0, do: focus < max_focus
+
+  defp missing_focus?(_entity), do: false
 
   defp standing?(%{unit: %Unit{stand_state: stand_state}}) when is_integer(stand_state) and stand_state != 0 do
     false

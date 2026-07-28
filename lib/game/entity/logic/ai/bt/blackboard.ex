@@ -158,6 +158,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Blackboard do
   defp deadline(%__MODULE__{event_ai: %EventAI{next_at: at}}, :next_eventai_at), do: at
   defp deadline(%__MODULE__{maintenance: %Maintenance{next_regen_at: at}}, :next_regen_at), do: at
 
+  defp deadline(%__MODULE__{maintenance: %Maintenance{next_focus_regen_at: at}}, :next_focus_regen_at), do: at
+
   defp put_deadline(%__MODULE__{navigation: navigation} = blackboard, :next_chase_at, at) do
     %{blackboard | navigation: %{navigation | next_chase_at: at}}
   end
@@ -204,5 +206,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Blackboard do
 
   defp put_deadline(%__MODULE__{maintenance: maintenance} = blackboard, :next_regen_at, at) do
     %{blackboard | maintenance: %{maintenance | next_regen_at: at}}
+  end
+
+  defp put_deadline(%__MODULE__{maintenance: maintenance} = blackboard, :next_focus_regen_at, at) do
+    %{blackboard | maintenance: %{maintenance | next_focus_regen_at: at}}
   end
 end
