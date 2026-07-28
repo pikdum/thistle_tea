@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.Player.Talents do
   """
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.EventSink
+  alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Talents, as: LogicTalents
@@ -20,7 +21,7 @@ defmodule ThistleTea.Game.Player.Talents do
   def learn(%{character: %Character{} = character} = state, talent_id, requested_rank) do
     with {:ok, talent_spell_ids} <- LogicTalents.validate(character, talent_id, requested_rank),
          {:ok, character, _events} <- Spells.learn(character, with_dependent_spells(talent_spell_ids)) do
-      character = apply_pet_aura_links(character, talent_spell_ids)
+      character = sync_pet_aura_links(state.character, character, Time.now())
       commit(state, character)
     else
       _invalid -> state
@@ -35,7 +36,12 @@ defmodule ThistleTea.Game.Player.Talents do
         state
 
       talent_spell_ids ->
-        commit(state, Spells.unlearn(character, with_dependent_spells(talent_spell_ids), Time.now()))
+        now = Time.now()
+
+        character
+        |> Spells.unlearn(with_dependent_spells(talent_spell_ids), now)
+        |> then(&sync_pet_aura_links(character, &1, now))
+        |> then(&commit(state, &1))
     end
   end
 
@@ -66,20 +72,39 @@ defmodule ThistleTea.Game.Player.Talents do
     Enum.flat_map(spell_ids, &[&1 | TalentLoader.dependent_spell_ids(&1)])
   end
 
-  defp apply_pet_aura_links(%Character{} = character, talent_spell_ids) do
-    with pet_guid when is_integer(pet_guid) <- Character.controlled_guid(character),
-         [_id | _rest] = aura_ids <-
-           Enum.flat_map(talent_spell_ids, &SpellPetAuraLoader.pet_aura_ids(&1, Guid.entry(pet_guid))) do
-      level = character.unit.level || 1
+  defp sync_pet_aura_links(%Character{} = previous, %Character{} = character, now) do
+    case Character.controlled_guid(character) do
+      pet_guid when is_integer(pet_guid) ->
+        pet_entry = Guid.entry(pet_guid)
+        previous_ids = pet_aura_ids(previous, pet_entry)
+        current_ids = pet_aura_ids(character, pet_entry)
+        removed_ids = previous_ids -- current_ids
+        added_ids = current_ids -- previous_ids
+        level = character.unit.level || 1
 
-      aura_ids
-      |> Enum.uniq()
-      |> Enum.reduce(character, fn aura_id, acc ->
-        Effects.enqueue(acc, Effects.trigger_spell(pet_guid, level, pet_guid, aura_id))
-      end)
-      |> EventSink.emit_pending()
-    else
-      _no_links -> character
+        {character, local_events} =
+          Enum.reduce(removed_ids, {character, []}, fn aura_id, {current, events} ->
+            {current, aura_events} = AuraLogic.remove_source_spell(current, aura_id, pet_guid, now)
+            {current, events ++ aura_events}
+          end)
+
+        external_events =
+          Enum.map(removed_ids, &Effects.remove_aura(pet_guid, pet_guid, &1)) ++
+            Enum.map(added_ids, &Effects.trigger_spell(pet_guid, level, pet_guid, &1))
+
+        character
+        |> Effects.enqueue(local_events)
+        |> EventSink.emit(external_events)
+
+      _no_pet ->
+        character
     end
+  end
+
+  defp pet_aura_ids(%Character{internal: internal}, pet_entry) do
+    internal.spells
+    |> List.wrap()
+    |> Enum.flat_map(&SpellPetAuraLoader.pet_aura_ids(&1, pet_entry))
+    |> Enum.uniq()
   end
 end
