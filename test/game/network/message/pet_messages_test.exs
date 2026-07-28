@@ -18,6 +18,35 @@ defmodule ThistleTea.Game.Network.Message.PetMessagesTest do
     assert Dispatch.implemented?(Opcodes.get(:CMSG_PET_ACTION))
     assert Dispatch.implemented?(Opcodes.get(:CMSG_PET_NAME_QUERY))
     assert Dispatch.implemented?(Opcodes.get(:CMSG_PET_SET_ACTION))
+    assert Dispatch.implemented?(Opcodes.get(:CMSG_REQUEST_PET_INFO))
+  end
+
+  describe "CMSG_REQUEST_PET_INFO" do
+    test "decodes the empty request and reuses the active companion attachment handshake" do
+      pet_guid = 123
+      Entity.register(pet_guid)
+      on_exit(fn -> Entity.unregister(pet_guid) end)
+
+      message = Message.CmsgRequestPetInfo.from_binary(<<>>)
+      state = %{ready: true, character: companion(:hunter_pet, pet_guid)}
+
+      assert Message.CmsgRequestPetInfo.handle(message, state) == state
+      assert_receive {:attach_pet, owner_pid, 1, nil}
+      assert owner_pid == self()
+    end
+
+    test "does not start a second summon while initial restoration is pending" do
+      message = Message.CmsgRequestPetInfo.from_binary(<<>>)
+
+      character =
+        %Character{unit: %Unit{health: 100}, internal: %Internal{}}
+        |> Companion.suspend_as(:hunter_pet, 2960, 1515)
+
+      state = %{ready: true, character: character}
+
+      assert Message.CmsgRequestPetInfo.handle(message, state) == state
+      refute_receive {:attach_pet, _owner_pid, _spell_id, _spells}, 10
+    end
   end
 
   describe "CMSG_PET_SET_ACTION" do

@@ -57,6 +57,7 @@ defmodule ThistleTea.Game.Network.Message.Dispatch do
               CMSG_PET_NAME_QUERY: Message.CmsgPetNameQuery,
               CMSG_PET_ACTION: Message.CmsgPetAction,
               CMSG_PET_SET_ACTION: Message.CmsgPetSetAction,
+              CMSG_REQUEST_PET_INFO: Message.CmsgRequestPetInfo,
               CMSG_ITEM_QUERY_SINGLE: Message.CmsgItemQuerySingle,
               CMSG_ITEM_NAME_QUERY: Message.CmsgItemNameQuery,
               CMSG_READ_ITEM: Message.CmsgReadItem,

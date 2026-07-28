@@ -195,6 +195,24 @@ defmodule ThistleTea.Game.Player.Login do
 
   def restore_companion(state), do: state
 
+  def refresh_companion(
+        %{
+          character: %Character{
+            internal: %Internal{companion: %Companion{kind: kind, status: {:active, %EntityRef{} = ref}}}
+          }
+        } = state
+      )
+      when kind in [:hunter_pet, :guardian] do
+    case Entity.pid(ref.guid) do
+      pid when is_pid(pid) -> send(pid, {:attach_pet, self(), ref.spell_id, nil})
+      _missing -> :ok
+    end
+
+    state
+  end
+
+  def refresh_companion(state), do: state
+
   defp restore_instance_world(
          %Character{internal: %Internal{world: %WorldRef{map_id: map_id, instance_id: instance_id}} = internal} =
            character,
