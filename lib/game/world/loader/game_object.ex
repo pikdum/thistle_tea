@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.World.Loader.GameObject do
   alias ThistleTea.Game.World.SpawnPool
   alias ThistleTea.Game.World.SpawnPool.Catalog
   alias ThistleTea.Game.World.System.GameEvent
+  alias ThistleTea.Game.World.Transports
 
   def load(cell) do
     events = GameEvent.get_events()
@@ -27,8 +28,12 @@ defmodule ThistleTea.Game.World.Loader.GameObject do
   def start_pool_game_object(%GameObject{} = game_object), do: World.start_incarnation(game_object)
 
   defp activate(%Mangos.GameObject{} = game_object, cell) do
-    group = Catalog.group_for(:game_object, game_object.guid)
-    blueprint = if match?({:singleton, _, _}, group), do: GameObject.build(game_object)
-    :ok = SpawnPool.activate(group, cell, blueprint)
+    blueprint = GameObject.build(game_object)
+
+    if not Transports.global_animation?(blueprint) do
+      group = Catalog.group_for(:game_object, game_object.guid)
+      blueprint = if match?({:singleton, _, _}, group), do: blueprint
+      :ok = SpawnPool.activate(group, cell, blueprint)
+    end
   end
 end

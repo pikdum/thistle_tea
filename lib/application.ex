@@ -43,6 +43,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.World.Loader.Summon, as: SummonLoader
   alias ThistleTea.Game.World.Loader.Talent, as: TalentLoader
   alias ThistleTea.Game.World.Loader.Trainer, as: TrainerLoader
+  alias ThistleTea.Game.World.Loader.Transport, as: TransportLoader
   alias ThistleTea.Game.World.Loader.Vendor, as: VendorLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.PostOffice
@@ -55,6 +56,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.World.System.GameEvent, as: GameEventSystem
   alias ThistleTea.Game.World.System.Instance, as: InstanceSystem
   alias ThistleTea.Game.World.System.Party, as: PartySystem
+  alias ThistleTea.Game.World.Transports
   alias ThistleTea.Native.Namigator
 
   require Logger
@@ -156,6 +158,8 @@ defmodule ThistleTea.Application do
     PageTextLoader.init()
     AreaTriggerLoader.init()
     SummonLoader.init()
+    TransportLoader.init()
+    Transports.init()
     :ets.new(:spline_counters, [:named_table, :public, write_concurrency: :auto])
     :ets.insert(:spline_counters, {:spline_id, 0})
     setup_database()
@@ -217,6 +221,7 @@ defmodule ThistleTea.Application do
         LootLoader.load_fishing()
         MailLoader.load_all()
         MapTemplateLoader.load_all()
+        TransportLoader.load_all()
         SpellEffectOverrideLoader.load_all()
         SpellPetAuraLoader.load_all()
         SpellProcEventLoader.load_all()
@@ -224,6 +229,8 @@ defmodule ThistleTea.Application do
         SpellScriptNameLoader.load_all()
         SpellThreatLoader.load_all()
         TalentLoader.load_all()
+        Logger.info("Starting transports...")
+        :ok = Transports.start_all()
         Logger.info("Seeding debug data...")
         ThistleTea.DevSeed.run()
       end

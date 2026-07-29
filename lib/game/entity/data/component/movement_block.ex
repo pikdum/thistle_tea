@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.MovementBlock do
     :movement_flags,
     :timestamp,
     :position,
+    :stationary_position,
     :transport_guid,
     :transport_position,
     :pitch,
@@ -265,7 +266,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.MovementBlock do
             end
 
         (m.update_flag &&& @update_flag_has_position) > 0 ->
-          {x, y, z, orientation} = m.position
+          {x, y, z, orientation} = update_position(m)
 
           <<x::little-float-size(32), y::little-float-size(32), z::little-float-size(32),
             orientation::little-float-size(32)>>
@@ -306,6 +307,13 @@ defmodule ThistleTea.Game.Entity.Data.Component.MovementBlock do
       movement_flags
     end
   end
+
+  defp update_position(%__MODULE__{update_flag: update_flag, stationary_position: stationary_position})
+       when (update_flag &&& @update_flag_transport) > 0 and is_tuple(stationary_position) do
+    stationary_position
+  end
+
+  defp update_position(%__MODULE__{position: position}), do: position
 
   defp spline_create_binary(%__MODULE__{} = m) do
     path = create_spline_path(m)

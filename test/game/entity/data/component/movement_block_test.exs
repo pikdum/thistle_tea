@@ -202,6 +202,23 @@ defmodule ThistleTea.Game.Entity.Data.Component.MovementBlockTest do
                  BinaryUtils.pack_guid(target_guid)
     end
 
+    test "serializes a transport from its stationary position and current progress", context do
+      movement_block = %{
+        context.base_movement_block
+        | update_flag: 0x52,
+          position: {100.0, 200.0, 300.0, 1.0},
+          stationary_position: {4.0, 5.0, 6.0, 0.75},
+          transport_progress_in_ms: 12_345
+      }
+
+      result = MovementBlock.to_binary(movement_block)
+
+      assert result ==
+               <<0x52>> <>
+                 vector({4.0, 5.0, 6.0}) <>
+                 <<0.75::little-float-size(32), 1::little-size(32), 12_345::little-size(32)>>
+    end
+
     test "includes jumping data when flag set", context do
       movement_block = %{
         context.base_movement_block

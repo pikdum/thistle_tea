@@ -204,4 +204,46 @@ defmodule ThistleTea.Game.Entity.Data.GameObjectTest do
       assert go.internal.chair.height == 2
     end
   end
+
+  describe "build/1 transports" do
+    test "builds an animated transport with its transport guid and stationary movement data" do
+      row = %Mangos.GameObject{
+        guid: 18_802,
+        id: 176_080,
+        map: 369,
+        position_x: -45.3934,
+        position_y: 2472.93,
+        position_z: 6.90526,
+        orientation: 1.5708,
+        rotation0: 0.0,
+        rotation1: 0.0,
+        rotation2: -0.707107,
+        rotation3: 0.707107,
+        state: 1,
+        animprogress: 0,
+        game_object_template: %Mangos.GameObjectTemplate{
+          entry: 176_080,
+          type: 11,
+          display_id: 3831,
+          name: "Subway",
+          faction: 0,
+          flags: 40,
+          size: 1.0,
+          data0: 7,
+          data1: 0
+        },
+        game_event_game_object: nil
+      }
+
+      transport = GameObject.build(row)
+
+      assert Guid.transport?(transport.object.guid)
+      assert transport.game_object.flags == 0x28
+      assert transport.game_object.state == 0
+      assert transport.game_object.level == 7
+      assert transport.movement_block.update_flag == 0x52
+      assert transport.movement_block.stationary_position == {-45.3934, 2472.93, 6.90526, 1.5708}
+      assert transport.movement_block.transport_progress_in_ms == 0
+    end
+  end
 end

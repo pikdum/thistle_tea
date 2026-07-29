@@ -16,10 +16,12 @@ defmodule ThistleTea.Game.World do
   alias ThistleTea.Game.Entity.Server.DynamicObject, as: DynamicObjectServer
   alias ThistleTea.Game.Entity.Server.GameObject, as: GameObjectServer
   alias ThistleTea.Game.Entity.Server.Mob, as: MobServer
+  alias ThistleTea.Game.Entity.Server.Transport, as: TransportServer
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.EntitySupervisor
+  alias ThistleTea.Game.World.Loader.Transport, as: TransportLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Pathfinding
   alias ThistleTea.Game.World.Presence
@@ -133,7 +135,13 @@ defmodule ThistleTea.Game.World do
     SpatialHash.query_cells(:players, world, x, y, z, 250)
   end
 
-  def start_entity(%GameObject{} = entity), do: start_entity(entity, GameObjectServer)
+  def start_entity(%GameObject{} = entity) do
+    case transport_route(entity) do
+      nil -> start_entity(entity, GameObjectServer)
+      route -> start_entity(entity, TransportServer, {entity, route})
+    end
+  end
+
   def start_entity(%Mob{} = entity), do: start_entity(entity, MobServer)
   def start_entity(%Corpse{} = entity), do: start_entity(entity, CorpseServer)
 
@@ -144,26 +152,40 @@ defmodule ThistleTea.Game.World do
     end
   end
 
-  def start_entity(entity, server) do
+  def start_entity(entity, server), do: start_entity(entity, server, entity)
+
+  defp start_entity(entity, server, argument) do
     # TODO needed to prevent dupes, but maybe a registry is better
     case SpatialHash.get_entity(entity.object.guid) do
-      nil -> EntitySupervisor.start_child(entity.object.guid, {server, entity})
+      nil -> EntitySupervisor.start_child(entity.object.guid, {server, argument})
       _ -> :ok
     end
   end
 
-  def start_incarnation(%GameObject{} = entity), do: start_incarnation(entity, GameObjectServer)
+  def start_incarnation(%GameObject{} = entity) do
+    case transport_route(entity) do
+      nil -> start_incarnation(entity, GameObjectServer, entity)
+      route -> start_incarnation(entity, TransportServer, {entity, route})
+    end
+  end
+
   def start_incarnation(%Mob{} = entity), do: start_incarnation(entity, MobServer)
 
-  defp start_incarnation(entity, server) do
+  defp start_incarnation(entity, server), do: start_incarnation(entity, server, entity)
+
+  defp start_incarnation(entity, server, argument) do
     case Entity.pid(entity.object.guid) do
       nil ->
-        child_spec = Supervisor.child_spec({server, entity}, restart: :temporary)
+        child_spec = Supervisor.child_spec({server, argument}, restart: :temporary)
         EntitySupervisor.start_child(entity.object.guid, child_spec)
 
       pid when is_pid(pid) ->
         {:error, {:already_started, pid}}
     end
+  end
+
+  defp transport_route(%GameObject{} = entity) do
+    if GameObject.transport?(entity), do: TransportLoader.get(entity.object.entry)
   end
 
   def stop_entity(pid) when is_pid(pid) do

@@ -20,7 +20,8 @@ defmodule ThistleTea.Game.World.InstanceSpawn do
   end
 
   def materialize(%GameObject{} = game_object, %WorldRef{} = world) do
-    guid = runtime_guid(world, :game_object, game_object.object.entry, game_object.object.guid)
+    type = if Guid.transport?(game_object.object.guid), do: :transport, else: :game_object
+    guid = runtime_guid(world, type, game_object.object.entry, game_object.object.guid)
     %{game_object | object: %{game_object.object | guid: guid}, internal: %{game_object.internal | world: world}}
   end
 

@@ -16,9 +16,11 @@ defmodule ThistleTea.Game.Entity.Data.GameObject do
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.GameObjectTemplate
+  alias ThistleTea.Game.Entity.Data.Transport.Pose
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.WorldRef
 
+  @update_flag_transport 0x02
   @update_flag_all 0x10
   @update_flag_has_position 0x40
 
@@ -28,6 +30,11 @@ defmodule ThistleTea.Game.Entity.Data.GameObject do
             internal: %Internal{}
 
   @go_state_active 1
+  @go_state_ready 0
+  @go_type_transport 11
+  @go_type_mo_transport 15
+  @go_flag_transport 0x08
+  @go_flag_nodespawn 0x20
 
   def build_summoned(%GameObjectTemplate{} = ot, world, {x, y, z, o}, opts \\ []) do
     %__MODULE__{
@@ -161,18 +168,18 @@ defmodule ThistleTea.Game.Entity.Data.GameObject do
 
     %__MODULE__{
       object: %Object{
-        guid: Guid.from_low_guid(:game_object, o.id, o.guid),
+        guid: Guid.from_low_guid(guid_type(ot.type), o.id, o.guid),
         entry: o.id,
         scale_x: ot.size
       },
       game_object: %GameObject{
         display_id: ot.display_id,
-        flags: ot.flags,
+        flags: transport_flags(ot),
         rotation0: o.rotation0,
         rotation1: o.rotation1,
         rotation2: o.rotation2,
         rotation3: o.rotation3,
-        state: o.state,
+        state: transport_state(ot, o.state),
         pos_x: o.position_x,
         pos_y: o.position_y,
         pos_z: o.position_z,
@@ -180,11 +187,14 @@ defmodule ThistleTea.Game.Entity.Data.GameObject do
         dyn_flags: chest_dyn_flags(ot),
         faction: ot.faction,
         type_id: ot.type,
+        level: transport_pause(ot),
         anim_progress: o.animprogress
       },
       movement_block: %MovementBlock{
-        update_flag: @update_flag_all ||| @update_flag_has_position,
-        position: {o.position_x, o.position_y, o.position_z, o.orientation}
+        update_flag: transport_update_flag(ot.type),
+        position: {o.position_x, o.position_y, o.position_z, o.orientation},
+        stationary_position: transport_stationary_position(ot.type, o),
+        transport_progress_in_ms: transport_progress(ot.type)
       },
       internal: %Internal{
         world: WorldRef.open(o.map),
@@ -196,6 +206,80 @@ defmodule ThistleTea.Game.Entity.Data.GameObject do
       }
     }
   end
+
+  def build_transport(%GameObjectTemplate{} = template, %Pose{map_id: map_id} = pose) when is_integer(map_id) do
+    {x, y, z, orientation} = pose.position
+
+    %__MODULE__{
+      object: %Object{
+        guid: Guid.from_low_guid(:mo_transport, template.entry),
+        entry: template.entry,
+        scale_x: template.size
+      },
+      game_object: %GameObject{
+        display_id: template.display_id,
+        flags: template.flags,
+        rotation0: 0.0,
+        rotation1: 0.0,
+        rotation2: :math.sin(orientation / 2),
+        rotation3: :math.cos(orientation / 2),
+        state: @go_state_ready,
+        pos_x: x,
+        pos_y: y,
+        pos_z: z,
+        facing: orientation,
+        dyn_flags: 0,
+        faction: template.faction,
+        type_id: @go_type_mo_transport,
+        level: 0,
+        anim_progress: 100
+      },
+      movement_block: %MovementBlock{
+        update_flag: @update_flag_transport ||| @update_flag_all ||| @update_flag_has_position,
+        position: pose.position,
+        stationary_position: {0.0, 0.0, 0.0, orientation},
+        transport_progress_in_ms: pose.progress_ms
+      },
+      internal: %Internal{world: WorldRef.open(map_id)}
+    }
+  end
+
+  def transport?(%__MODULE__{game_object: %GameObject{type_id: type}}) do
+    type in [@go_type_transport, @go_type_mo_transport]
+  end
+
+  defp guid_type(@go_type_transport), do: :transport
+  defp guid_type(_type), do: :game_object
+
+  defp transport_flags(%Mangos.GameObjectTemplate{type: @go_type_transport, flags: flags}) do
+    flags ||| @go_flag_transport ||| @go_flag_nodespawn
+  end
+
+  defp transport_flags(%Mangos.GameObjectTemplate{flags: flags}), do: flags
+
+  defp transport_state(%Mangos.GameObjectTemplate{type: @go_type_transport, data1: start_open}, _state) do
+    if start_open == 0, do: @go_state_ready, else: @go_state_active
+  end
+
+  defp transport_state(%Mangos.GameObjectTemplate{}, state), do: state
+
+  defp transport_pause(%Mangos.GameObjectTemplate{type: @go_type_transport, data0: pause}), do: pause
+  defp transport_pause(%Mangos.GameObjectTemplate{}), do: nil
+
+  defp transport_update_flag(@go_type_transport) do
+    @update_flag_transport ||| @update_flag_all ||| @update_flag_has_position
+  end
+
+  defp transport_update_flag(_type), do: @update_flag_all ||| @update_flag_has_position
+
+  defp transport_stationary_position(@go_type_transport, %Mangos.GameObject{} = game_object) do
+    {game_object.position_x, game_object.position_y, game_object.position_z, game_object.orientation}
+  end
+
+  defp transport_stationary_position(_type, %Mangos.GameObject{}), do: nil
+
+  defp transport_progress(@go_type_transport), do: 0
+  defp transport_progress(_type), do: nil
 
   @go_type_chest 3
   @go_type_chair 7

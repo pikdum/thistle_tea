@@ -53,4 +53,15 @@ defmodule ThistleTea.Game.GuidTest do
       assert Guid.entity_type(0) == nil
     end
   end
+
+  describe "transport?/1" do
+    test "recognizes animated and map-object transport guids" do
+      animated = Guid.from_low_guid(:transport, 176_080, 18_802)
+      ship = Guid.from_low_guid(:mo_transport, 164_871)
+
+      assert Guid.transport?(animated)
+      assert Guid.transport?(ship)
+      refute Guid.transport?(Guid.from_low_guid(:game_object, 176_080, 18_802))
+    end
+  end
 end

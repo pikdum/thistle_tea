@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.World.Loader.Transport do
 
   alias ThistleTea.DB.Mangos
   alias ThistleTea.DBC
+  alias ThistleTea.Game.Entity.Data.GameObject
   alias ThistleTea.Game.Entity.Data.Transport
   alias ThistleTea.Game.Entity.Logic.Transport, as: TransportLogic
 
@@ -29,6 +30,7 @@ defmodule ThistleTea.Game.World.Loader.Transport do
 
     Enum.each(ship_routes ++ animation_routes, &cache/1)
     :ets.insert(__MODULE__, {:ship_entries, Enum.map(ship_routes, & &1.entry)})
+    :ets.insert(__MODULE__, {:animation_entries, Enum.map(animation_routes, & &1.entry)})
 
     :ok
   end
@@ -127,6 +129,22 @@ defmodule ThistleTea.Game.World.Loader.Transport do
     end
   rescue
     ArgumentError -> []
+  end
+
+  def animation_entries do
+    case :ets.lookup(__MODULE__, :animation_entries) do
+      [{:animation_entries, entries}] -> entries
+      _ -> []
+    end
+  rescue
+    ArgumentError -> []
+  end
+
+  def animation_spawns do
+    animation_entries()
+    |> Mangos.GameObject.query_entries()
+    |> Mangos.Repo.all()
+    |> Enum.map(&GameObject.build/1)
   end
 
   defp build_animation_routes(rows) do

@@ -109,11 +109,18 @@ defmodule ThistleTea.Game.Guid do
 
   def entity_type(_), do: nil
 
+  def transport?(guid) when is_integer(guid) do
+    high_guid(guid) in [@high_guid_transport, @high_guid_mo_transport]
+  end
+
+  def transport?(_guid), do: false
+
   defp type_id_from_high(@high_guid_item), do: :item
   defp type_id_from_high(@high_guid_unit), do: :unit
   defp type_id_from_high(@high_guid_pet), do: :unit
   defp type_id_from_high(@high_guid_player), do: :player
   defp type_id_from_high(@high_guid_game_object), do: :game_object
+  defp type_id_from_high(@high_guid_transport), do: :game_object
   defp type_id_from_high(@high_guid_dynamic_object), do: :dynamic_object
   defp type_id_from_high(@high_guid_corpse), do: :corpse
   defp type_id_from_high(@high_guid_mo_transport), do: :game_object
