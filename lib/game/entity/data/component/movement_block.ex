@@ -6,13 +6,14 @@ defmodule ThistleTea.Game.Entity.Data.Component.MovementBlock do
   """
   import Bitwise, only: [&&&: 2, |||: 2, band: 2, bnot: 1, bor: 2]
 
-  require Logger
+  alias ThistleTea.Game.Network.BinaryUtils
 
   defstruct [
     :update_flag,
     :movement_flags,
     :timestamp,
     :position,
+    :transport_guid,
     :transport_position,
     :pitch,
     :fall_time,
@@ -71,7 +72,6 @@ defmodule ThistleTea.Game.Entity.Data.Component.MovementBlock do
   @movement_flag_backward 0x00000002
   @movement_flag_strafe_left 0x00000004
   @movement_flag_strafe_right 0x00000008
-  @movement_flag_on_transport 0x00000200
   @movement_flag_jumping 0x00002000
   @movement_flag_falling_far 0x00004000
   @movement_flag_swimming 0x00200000
@@ -122,13 +122,26 @@ defmodule ThistleTea.Game.Entity.Data.Component.MovementBlock do
       acc
       | movement_flags: movement_flags,
         timestamp: timestamp,
-        position: {x, y, z, orientation}
+        position: {x, y, z, orientation},
+        transport_guid: nil,
+        transport_position: nil
     }
 
-    # on_transport
-    if (movement_flags &&& @movement_flag_on_transport) > 0 do
-      Logger.error("TODO: parse packed guid for transport")
-    end
+    {movement_block, rest} =
+      if (movement_flags &&& @movement_flag_on_transport) > 0 do
+        {transport_guid, rest} = BinaryUtils.unpack_guid(rest)
+
+        <<x::little-float-size(32), y::little-float-size(32), z::little-float-size(32),
+          orientation::little-float-size(32), rest::binary>> = rest
+
+        {%{
+           movement_block
+           | transport_guid: transport_guid,
+             transport_position: {x, y, z, orientation}
+         }, rest}
+      else
+        {movement_block, rest}
+      end
 
     # swimming
     {movement_block, rest} =
@@ -210,8 +223,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.MovementBlock do
             if (movement_flags &&& @movement_flag_on_transport) > 0 do
               {x, y, z, orientation} = m.transport_position
 
-              # TODO: packed guid
-              <<1, 4>> <>
+              BinaryUtils.pack_guid(m.transport_guid) <>
                 <<x::little-float-size(32), y::little-float-size(32), z::little-float-size(32),
                   orientation::little-float-size(32)>>
             else
@@ -274,8 +286,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.MovementBlock do
         <<>>
       end <>
       if (m.update_flag &&& @update_flag_melee_attacking) > 0 do
-        # TODO: packed guid
-        <<1, 4>>
+        BinaryUtils.pack_guid(m.target_guid || 0)
       else
         <<>>
       end <>

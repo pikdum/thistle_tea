@@ -2,6 +2,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.MovementBlockTest do
   use ExUnit.Case, async: true
 
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
+  alias ThistleTea.Game.Network.BinaryUtils
 
   def base_packet(_context) do
     %{
@@ -53,6 +54,38 @@ defmodule ThistleTea.Game.Entity.Data.Component.MovementBlockTest do
       assert result.movement_flags == swimming_flag
       assert result.pitch == 1.25
       assert result.fall_time == 500
+    end
+
+    test "parses transport guid and local position" do
+      transport_flag = 0x02000000
+      transport_guid = 0x1FC000000000BEEF
+
+      packet =
+        <<transport_flag::little-size(32), 1000::little-size(32)>> <>
+          vector({1.0, 2.0, 3.0}) <>
+          <<0.5::little-float-size(32)>> <>
+          BinaryUtils.pack_guid(transport_guid) <>
+          vector({4.0, 5.0, 6.0}) <>
+          <<0.75::little-float-size(32), 500::little-size(32)>>
+
+      result = MovementBlock.from_binary(packet)
+
+      assert result.transport_guid == transport_guid
+      assert result.transport_position == {4.0, 5.0, 6.0, 0.75}
+      assert result.fall_time == 500
+    end
+
+    test "clears stale transport data after leaving a transport", context do
+      movement_block = %{
+        context.base_movement_block
+        | transport_guid: 0x1FC000000000BEEF,
+          transport_position: {4.0, 5.0, 6.0, 0.75}
+      }
+
+      result = MovementBlock.from_binary(context.base_packet, movement_block)
+
+      assert result.transport_guid == nil
+      assert result.transport_position == nil
     end
 
     test "parses with jumping flag" do
@@ -127,6 +160,46 @@ defmodule ThistleTea.Game.Entity.Data.Component.MovementBlockTest do
 
       assert is_binary(result)
       assert byte_size(result) > 0
+    end
+
+    test "serializes transport guid and local position", context do
+      transport_guid = 0x1FC000000000BEEF
+
+      movement_block = %{
+        context.base_movement_block
+        | update_flag: 0x20,
+          movement_flags: 0x02000000,
+          transport_guid: transport_guid,
+          transport_position: {4.0, 5.0, 6.0, 0.75}
+      }
+
+      result = MovementBlock.to_binary(movement_block)
+
+      expected =
+        <<0x20, 0x02000000::little-size(32), 1000::little-size(32)>> <>
+          vector({1.0, 2.0, 3.0}) <>
+          <<0.5::little-float-size(32)>> <>
+          BinaryUtils.pack_guid(transport_guid) <>
+          vector({4.0, 5.0, 6.0}) <>
+          <<0.75::little-float-size(32), 0::little-size(32), 2.5::little-float-size(32), 7.0::little-float-size(32),
+            4.5::little-float-size(32), 4.7::little-float-size(32), 2.5::little-float-size(32),
+            3.14::little-float-size(32)>>
+
+      assert result == expected
+      assert MovementBlock.from_binary(binary_part(result, 1, byte_size(result) - 25)).transport_guid == transport_guid
+    end
+
+    test "serializes melee target as a packed guid", context do
+      target_guid = 0xF130000100000004
+      movement_block = %{context.base_movement_block | update_flag: 0x44, target_guid: target_guid}
+
+      result = MovementBlock.to_binary(movement_block)
+
+      assert result ==
+               <<0x44>> <>
+                 vector({1.0, 2.0, 3.0}) <>
+                 <<0.5::little-float-size(32)>> <>
+                 BinaryUtils.pack_guid(target_guid)
     end
 
     test "includes jumping data when flag set", context do
