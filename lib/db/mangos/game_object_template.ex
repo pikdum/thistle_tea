@@ -3,6 +3,7 @@ defmodule ThistleTea.DB.Mangos.GameObjectTemplate do
 
   @primary_key {:entry, :integer, autogenerate: false}
   schema "gameobject_template" do
+    field(:patch, :integer, default: 0)
     field(:type, :integer, default: 0)
     field(:display_id, :integer, source: :displayId, default: 0)
     field(:name, :string, default: "")
