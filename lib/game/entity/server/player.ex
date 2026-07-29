@@ -564,7 +564,8 @@ defmodule ThistleTea.Game.Entity.Server.Player do
     position = TransportLogic.passenger_world_position(local_position, transport_position)
 
     if state.character.internal.world == world do
-      character = %{state.character | movement_block: %{state.character.movement_block | position: position}}
+      movement_block = %{state.character.movement_block | position: position, timestamp: 0}
+      character = %{state.character | movement_block: movement_block}
       Presence.relocate(character)
 
       {x, y, z, _orientation} = position
@@ -1215,7 +1216,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
         %{
           character
           | internal: %{character.internal | area: area, world: world},
-            movement_block: %{character.movement_block | position: {x, y, z, orientation}}
+            movement_block: %{character.movement_block | position: {x, y, z, orientation}, timestamp: 0}
         }
       end)
 

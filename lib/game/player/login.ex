@@ -31,6 +31,7 @@ defmodule ThistleTea.Game.Player.Login do
   alias ThistleTea.Game.Entity.Logic.PlayerFlags
   alias ThistleTea.Game.Entity.Logic.StealthDetection
   alias ThistleTea.Game.Entity.Logic.Talents, as: LogicTalents
+  alias ThistleTea.Game.Entity.Logic.Transport, as: TransportLogic
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.BinaryUtils
   alias ThistleTea.Game.Network.Message
@@ -323,14 +324,20 @@ defmodule ThistleTea.Game.Player.Login do
   end
 
   def send_worldport_packets(%Character{} = character) do
+    {character, updates} = worldport_updates(character)
     send_init_packets(character, send_self?: false)
-    Network.send_packet(worldport_updates(character))
+    Network.send_packet(updates)
+    character
   end
 
   def worldport_updates(%Character{} = character) do
     case attached_transport_update(character) do
-      %UpdateObject{} = transport_update -> [transport_update, self_update(character)]
-      nil -> [self_update(character)]
+      %UpdateObject{} = transport_update ->
+        character = align_to_transport(character, transport_update)
+        {character, [transport_update, self_update(character)]}
+
+      nil ->
+        {character, [self_update(character)]}
     end
   end
 
@@ -357,6 +364,17 @@ defmodule ThistleTea.Game.Player.Login do
   end
 
   defp attached_transport_update(%Character{}), do: nil
+
+  defp align_to_transport(
+         %Character{movement_block: %MovementBlock{transport_position: local_position} = movement_block} = character,
+         %UpdateObject{movement_block: %MovementBlock{position: transport_position}}
+       )
+       when is_tuple(local_position) and is_tuple(transport_position) do
+    position = TransportLogic.passenger_world_position(local_position, transport_position)
+    %{character | movement_block: %{movement_block | position: position, timestamp: 0}}
+  end
+
+  defp align_to_transport(%Character{} = character, %UpdateObject{}), do: character
 
   defp schedule_aura_tick(%{character: %{unit: %Unit{auras: [_ | _]}}} = state) do
     ref = Process.send_after(self(), :player_tick, 0)

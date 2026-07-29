@@ -55,7 +55,8 @@ defmodule ThistleTea.Game.Player.LoginTest do
       transport_update = %UpdateObject{
         update_type: :create_object2,
         object_type: :game_object,
-        object: %Object{guid: transport_guid}
+        object: %Object{guid: transport_guid},
+        movement_block: %MovementBlock{position: {100.0, 200.0, 30.0, 0.75}}
       }
 
       start_supervised!({TransportUpdateServer, {transport_guid, transport_update}})
@@ -69,13 +70,19 @@ defmodule ThistleTea.Game.Player.LoginTest do
         }
       }
 
-      assert [
-               %UpdateObject{object: %Object{guid: ^transport_guid}},
-               %UpdateObject{object: %Object{guid: ^player_guid}, movement_block: player_movement}
-             ] = Login.worldport_updates(character)
+      assert {
+               aligned,
+               [
+                 %UpdateObject{object: %Object{guid: ^transport_guid}},
+                 %UpdateObject{object: %Object{guid: ^player_guid}, movement_block: player_movement}
+               ]
+             } = Login.worldport_updates(character)
 
+      assert %{aligned.movement_block | update_flag: 0x71} == player_movement
       assert player_movement.transport_guid == transport_guid
       assert player_movement.update_flag == 0x71
+      assert player_movement.timestamp == 0
+      assert player_movement.position == {99.5185616753786, 206.38499938446245, 36.0, 1.5}
     end
 
     test "includes only the player when detached" do
@@ -86,7 +93,7 @@ defmodule ThistleTea.Game.Player.LoginTest do
         movement_block: %MovementBlock{position: {1.0, 2.0, 3.0, 0.5}}
       }
 
-      assert [%UpdateObject{object: %Object{guid: ^player_guid}}] = Login.worldport_updates(character)
+      assert {^character, [%UpdateObject{object: %Object{guid: ^player_guid}}]} = Login.worldport_updates(character)
     end
   end
 

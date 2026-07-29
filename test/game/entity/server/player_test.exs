@@ -496,6 +496,7 @@ defmodule ThistleTea.Game.Entity.Server.PlayerTest do
         | movement_block: %{
             character.movement_block
             | movement_flags: 0x02000000,
+              timestamp: 123,
               transport_guid: transport_guid,
               transport_position: local_position
           }
@@ -524,6 +525,7 @@ defmodule ThistleTea.Game.Entity.Server.PlayerTest do
         Transport.passenger_world_position(local_position, transport.position)
 
       assert_tuple_in_delta(relocated.movement_block.position, expected)
+      assert relocated.movement_block.timestamp == 0
       assert {^guid, %WorldRef{map_id: 0}, x, y, z} = SpatialHash.get_entity(guid)
       assert_tuple_in_delta({x, y, z}, Tuple.delete_at(expected, 3))
       assert_receive {:target_moved, ^guid}
@@ -539,6 +541,7 @@ defmodule ThistleTea.Game.Entity.Server.PlayerTest do
         | movement_block: %{
             character.movement_block
             | movement_flags: 0x02000000,
+              timestamp: 123,
               transport_guid: transport_guid,
               transport_position: {1.0, 2.0, 3.0, 0.25}
           }
@@ -563,6 +566,7 @@ defmodule ThistleTea.Game.Entity.Server.PlayerTest do
                PlayerServer.handle_info({:transport_pose, transport}, state)
 
       assert worldported.internal.world == destination
+      assert worldported.movement_block.timestamp == 0
       assert worldported.movement_block.transport_guid == transport_guid
       assert worldported.movement_block.transport_position == {1.0, 2.0, 3.0, 0.25}
 
