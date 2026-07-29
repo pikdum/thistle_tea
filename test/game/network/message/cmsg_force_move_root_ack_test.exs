@@ -7,7 +7,6 @@ defmodule ThistleTea.Game.Network.Message.CmsgForceMoveRootAckTest do
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Server.Player.State
   alias ThistleTea.Game.Guid
-  alias ThistleTea.Game.Network.BinaryUtils
   alias ThistleTea.Game.Network.Message.CmsgForceMoveRootAck
   alias ThistleTea.Game.Network.Message.CmsgForceMoveUnrootAck
   alias ThistleTea.Game.Network.Message.Dispatch
@@ -122,8 +121,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgForceMoveRootAckTest do
 
   defp transport_movement_payload(transport_guid) do
     <<0x02000000::little-size(32), 123::little-size(32), 10.0::little-float-size(32), 20.0::little-float-size(32),
-      30.0::little-float-size(32), 1.0::little-float-size(32)>> <>
-      BinaryUtils.pack_guid(transport_guid) <>
+      30.0::little-float-size(32), 1.0::little-float-size(32), transport_guid::little-size(64)>> <>
       <<1.0::little-float-size(32), 2.0::little-float-size(32), 3.0::little-float-size(32), 0.25::little-float-size(32),
         0::little-size(32)>>
   end

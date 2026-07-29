@@ -63,8 +63,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.MovementBlockTest do
       packet =
         <<transport_flag::little-size(32), 1000::little-size(32)>> <>
           vector({1.0, 2.0, 3.0}) <>
-          <<0.5::little-float-size(32)>> <>
-          BinaryUtils.pack_guid(transport_guid) <>
+          <<0.5::little-float-size(32), transport_guid::little-size(64)>> <>
           vector({4.0, 5.0, 6.0}) <>
           <<0.75::little-float-size(32), 500::little-size(32)>>
 
@@ -73,6 +72,21 @@ defmodule ThistleTea.Game.Entity.Data.Component.MovementBlockTest do
       assert result.transport_guid == transport_guid
       assert result.transport_position == {4.0, 5.0, 6.0, 0.75}
       assert result.fall_time == 500
+    end
+
+    test "parses a captured zeppelin movement packet" do
+      packet =
+        <<9, 0, 0, 2, 24, 11, 112, 5, 1, 127, 171, 68, 221, 230, 144, 197, 90, 254, 91, 66, 32, 139, 142, 62, 232, 171,
+          2, 0, 0, 0, 192, 31, 22, 148, 45, 193, 127, 162, 193, 192, 241, 227, 134, 193, 94, 136, 140, 64, 24, 5, 0, 0>>
+
+      result = MovementBlock.from_binary(packet)
+
+      assert result.transport_guid == 0x1FC000000002ABE8
+
+      assert result.transport_position ==
+               {-10.848653793334961, -6.051085948944092, -16.861299514770508, 4.391646385192871}
+
+      assert result.fall_time == 1304
     end
 
     test "clears stale transport data after leaving a transport", context do
@@ -178,8 +192,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.MovementBlockTest do
       expected =
         <<0x20, 0x02000000::little-size(32), 1000::little-size(32)>> <>
           vector({1.0, 2.0, 3.0}) <>
-          <<0.5::little-float-size(32)>> <>
-          BinaryUtils.pack_guid(transport_guid) <>
+          <<0.5::little-float-size(32), transport_guid::little-size(64)>> <>
           vector({4.0, 5.0, 6.0}) <>
           <<0.75::little-float-size(32), 0::little-size(32), 2.5::little-float-size(32), 7.0::little-float-size(32),
             4.5::little-float-size(32), 4.7::little-float-size(32), 2.5::little-float-size(32),

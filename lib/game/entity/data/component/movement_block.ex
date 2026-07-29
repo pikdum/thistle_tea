@@ -159,9 +159,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.MovementBlock do
 
     {movement_block, rest} =
       if (movement_flags &&& @movement_flag_on_transport) > 0 do
-        {transport_guid, rest} = BinaryUtils.unpack_guid(rest)
-
-        <<x::little-float-size(32), y::little-float-size(32), z::little-float-size(32),
+        <<transport_guid::little-size(64), x::little-float-size(32), y::little-float-size(32), z::little-float-size(32),
           orientation::little-float-size(32), rest::binary>> = rest
 
         {%{
@@ -253,9 +251,8 @@ defmodule ThistleTea.Game.Entity.Data.Component.MovementBlock do
             if (movement_flags &&& @movement_flag_on_transport) > 0 do
               {x, y, z, orientation} = m.transport_position
 
-              BinaryUtils.pack_guid(m.transport_guid) <>
-                <<x::little-float-size(32), y::little-float-size(32), z::little-float-size(32),
-                  orientation::little-float-size(32)>>
+              <<m.transport_guid::little-size(64), x::little-float-size(32), y::little-float-size(32),
+                z::little-float-size(32), orientation::little-float-size(32)>>
             else
               <<>>
             end <>
