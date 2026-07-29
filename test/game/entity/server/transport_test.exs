@@ -36,6 +36,14 @@ defmodule ThistleTea.Game.Entity.Server.TransportTest do
       assert {^world, x, _y, _z} = World.position(entity.object.guid)
       assert_in_delta x, elem(advanced.position, 0), 0.000001
       assert Transports.get(entity.object.guid).progress_ms == 3_000
+
+      assert {:ok, next_cycle} = Transports.advance(entity.object.guid, 20_000)
+      assert next_cycle.progress_ms == 3_000
+
+      assert {:ok, %UpdateObject{movement_block: movement_block}} =
+               Entity.transport_update(entity.object.guid)
+
+      assert movement_block.transport_progress_in_ms == 23_000
     end
 
     test "moves global ship visibility between maps" do

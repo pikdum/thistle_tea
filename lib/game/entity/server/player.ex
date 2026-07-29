@@ -1208,6 +1208,9 @@ defmodule ThistleTea.Game.Entity.Server.Player do
     character = state.character
     {zone, area} = destination_zone_and_area(character, world.map_id, {x, y, z})
 
+    {transport_x, transport_y, transport_z, transport_orientation} =
+      character.movement_block.transport_position
+
     character =
       character
       |> PlayerRest.evaluate_zone(zone)
@@ -1235,8 +1238,8 @@ defmodule ThistleTea.Game.Entity.Server.Player do
 
     Network.send_packet(%Message.SmsgNewWorld{
       map: world.map_id,
-      position: %{x: x, y: y, z: z},
-      orientation: orientation
+      position: %{x: transport_x, y: transport_y, z: transport_z},
+      orientation: transport_orientation
     })
 
     Network.send_packet(%Message.SmsgUpdateInstanceOwnership{player_is_saved_to_a_raid: false})

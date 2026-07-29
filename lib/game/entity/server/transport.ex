@@ -152,7 +152,7 @@ defmodule ThistleTea.Game.Entity.Server.Transport do
   defp move(%State{} = state, now) do
     elapsed_ms = now - state.started_at + state.offset_ms
     pose = pose_at(state, elapsed_ms)
-    entity = put_pose(state.entity, state.route, pose)
+    entity = put_pose(state.entity, state.route, pose, elapsed_ms)
     World.update_position(entity)
     next_state = %{state | entity: entity, last_pose: pose}
     publish(next_state)
@@ -185,7 +185,8 @@ defmodule ThistleTea.Game.Entity.Server.Transport do
          %GameObject{game_object: game_object, movement_block: movement_block, internal: %Internal{} = internal} =
            entity,
          %TransportRoute{} = route,
-         pose
+         pose,
+         elapsed_ms
        ) do
     {x, y, z, orientation} = pose.position
     world = pose_world(route, pose, internal.world)
@@ -204,7 +205,7 @@ defmodule ThistleTea.Game.Entity.Server.Transport do
       movement_block
       | position: pose.position,
         stationary_position: stationary_position(route, movement_block, orientation),
-        transport_progress_in_ms: pose.progress_ms
+        transport_progress_in_ms: transport_progress(route, pose, elapsed_ms)
     }
 
     %{entity | game_object: game_object, movement_block: movement_block, internal: %{internal | world: world}}
@@ -218,6 +219,12 @@ defmodule ThistleTea.Game.Entity.Server.Transport do
   end
 
   defp stationary_position(%TransportRoute{}, %MovementBlock{stationary_position: position}, _orientation), do: position
+
+  defp transport_progress(%TransportRoute{kind: :ship}, _pose, elapsed_ms) do
+    Integer.mod(elapsed_ms, 0x1_0000_0000)
+  end
+
+  defp transport_progress(%TransportRoute{}, pose, _elapsed_ms), do: pose.progress_ms
 
   defp schedule_tick(%State{schedule?: false} = state), do: state
   defp schedule_tick(%State{tick_ref: ref} = state) when is_reference(ref), do: state

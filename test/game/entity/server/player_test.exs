@@ -579,7 +579,13 @@ defmodule ThistleTea.Game.Entity.Server.PlayerTest do
                          transport_map: 0
                        }}}
 
-      assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgNewWorld{map: 1}}}
+      assert_receive {:"$gen_cast",
+                      {:send_packet,
+                       %Message.SmsgNewWorld{
+                         map: 1,
+                         position: %{x: 1.0, y: 2.0, z: 3.0},
+                         orientation: 0.25
+                       }}}
     end
 
     test "resurrects a dead passenger before a transport map change" do
