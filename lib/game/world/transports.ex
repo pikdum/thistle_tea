@@ -14,6 +14,8 @@ defmodule ThistleTea.Game.World.Transports do
   alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
   alias ThistleTea.Game.World.Loader.MapTemplate, as: MapTemplateLoader
   alias ThistleTea.Game.World.Loader.Transport, as: TransportLoader
+  alias ThistleTea.Game.World.SpatialHash
+  alias ThistleTea.Game.WorldRef
 
   @table_options [:named_table, :public, read_concurrency: true, write_concurrency: :auto]
 
@@ -54,19 +56,52 @@ defmodule ThistleTea.Game.World.Transports do
 
   def global_animation?(%GameObject{}), do: false
 
-  def publish(%GameObject{} = entity, %Transport{} = route, pose) do
+  def publish(%GameObject{} = entity, %Transport{} = route, pose, passenger_count \\ 0) do
     snapshot = %{
       guid: entity.object.guid,
       entry: entity.object.entry,
       world: entity.internal.world,
+      name: route.name,
       route_kind: route.kind,
       position: pose.position,
       progress_ms: pose.progress_ms,
-      period_ms: route.period_ms
+      period_ms: route.period_ms,
+      frame_index: pose.frame_index,
+      moving?: pose.moving?,
+      passenger_count: passenger_count
     }
 
     :ets.insert(__MODULE__, {entity.object.guid, snapshot})
     :ok
+  end
+
+  def all do
+    __MODULE__
+    |> :ets.tab2list()
+    |> Enum.map(fn {_guid, snapshot} -> snapshot end)
+  rescue
+    ArgumentError -> []
+  end
+
+  def on_world(%WorldRef{} = world) do
+    all()
+    |> Enum.filter(&(&1.world == world))
+    |> Enum.sort_by(& &1.guid)
+  end
+
+  def target(character, entry \\ nil)
+
+  def target(%Character{} = character, entry) when is_integer(entry) do
+    candidates = Enum.filter(all(), &(&1.entry == entry))
+    nearest_or_first(character, candidates)
+  end
+
+  def target(%Character{movement_block: %MovementBlock{transport_guid: guid}} = character, nil) when is_integer(guid) do
+    get(guid) || nearest(character, on_world(character.internal.world))
+  end
+
+  def target(%Character{} = character, nil) do
+    nearest(character, on_world(character.internal.world))
   end
 
   def unpublish(guid) when is_integer(guid) do
@@ -142,4 +177,19 @@ defmodule ThistleTea.Game.World.Transports do
   end
 
   defp leave(_transport_guid, _player_guid), do: :ok
+
+  defp nearest_or_first(%Character{} = character, candidates) do
+    same_world = Enum.filter(candidates, &(&1.world == character.internal.world))
+    nearest(character, same_world) || Enum.min_by(candidates, & &1.guid, fn -> nil end)
+  end
+
+  defp nearest(%Character{movement_block: %MovementBlock{position: {x, y, z, _orientation}}}, candidates) do
+    Enum.min_by(
+      candidates,
+      fn %{position: {transport_x, transport_y, transport_z, _orientation}} ->
+        SpatialHash.distance({x, y, z}, {transport_x, transport_y, transport_z})
+      end,
+      fn -> nil end
+    )
+  end
 end

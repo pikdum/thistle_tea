@@ -80,7 +80,7 @@ defmodule ThistleTea.Game.Entity.Server.Transport do
   end
 
   def handle_cast({:transport_leave, player_guid}, %State{} = state) do
-    {:noreply, remove_passenger(state, player_guid)}
+    {:noreply, state |> remove_passenger(player_guid) |> publish()}
   end
 
   @impl GenServer
@@ -94,7 +94,7 @@ defmodule ThistleTea.Game.Entity.Server.Transport do
         %State{entity: %{internal: %{world: world}}} = state
       ) do
     if Entity.pid(player_guid) == player_pid and TransportLogic.valid_passenger_position?(local_position) do
-      state = put_passenger(state, player_guid, player_pid)
+      state = state |> put_passenger(player_guid, player_pid) |> publish()
       {:reply, {:ok, snapshot(state)}, state}
     else
       {:reply, {:error, :invalid_passenger}, state}
@@ -126,7 +126,7 @@ defmodule ThistleTea.Game.Entity.Server.Transport do
         passenger_monitor == monitor
       end)
 
-    {:noreply, %{state | passengers: passengers}}
+    {:noreply, %{state | passengers: passengers} |> publish()}
   end
 
   @impl GenServer
@@ -147,8 +147,8 @@ defmodule ThistleTea.Game.Entity.Server.Transport do
     entity = put_pose(state.entity, state.route, pose)
     World.update_position(entity)
     entity = Visibility.refresh_entity(entity)
-    Transports.publish(entity, state.route, pose)
     next_state = %{state | entity: entity, last_pose: pose}
+    publish(next_state)
     notify_passengers(state, next_state)
     next_state
   end
@@ -243,6 +243,11 @@ defmodule ThistleTea.Game.Entity.Server.Transport do
     end
   end
 
+  defp publish(%State{entity: entity, route: route, last_pose: pose, passengers: passengers} = state) do
+    Transports.publish(entity, route, pose, map_size(passengers))
+    state
+  end
+
   defp notify_passengers(%State{last_pose: nil}, %State{}), do: :ok
 
   defp notify_passengers(%State{} = previous, %State{} = current) do
@@ -269,10 +274,13 @@ defmodule ThistleTea.Game.Entity.Server.Transport do
       guid: entity.object.guid,
       entry: entity.object.entry,
       world: entity.internal.world,
+      name: route.name,
       route_kind: route.kind,
       position: pose.position,
       progress_ms: pose.progress_ms,
       period_ms: route.period_ms,
+      frame_index: pose.frame_index,
+      moving?: pose.moving?,
       passenger_count: map_size(passengers)
     }
   end

@@ -43,6 +43,7 @@ defmodule ThistleTea.Game.Player.DevCommands do
   alias ThistleTea.Game.World.PostOffice
   alias ThistleTea.Game.World.System.GameEvent
   alias ThistleTea.Game.World.System.Instance, as: InstanceSystem
+  alias ThistleTea.Game.World.Transports
   alias ThistleTea.Game.WorldRef
 
   require Logger
@@ -100,6 +101,9 @@ defmodule ThistleTea.Game.Player.DevCommands do
       ".debug spells - learn class trainer spells up to your level",
       ".debug events - show active events and the next scheduled change",
       ".debug explore - unlock every world-map area",
+      ".debug transport - show the attached or nearest transport",
+      ".debug transport list - list active transports on this map",
+      ".debug transport advance <seconds> [entry] - advance a transport schedule",
       ".character level <level> - set player level",
       ".die - kill your character",
       ".go xyz <x> <y> <z> [map] - teleport",
@@ -244,6 +248,20 @@ defmodule ThistleTea.Game.Player.DevCommands do
   def run(state, ".debug random equipment" <> _) do
     state
     |> add_random_equipment()
+    |> handled()
+  end
+
+  def run(state, ".debug transport" <> params) do
+    params
+    |> String.split(" ", trim: true)
+    |> case do
+      [] -> show_transport(state)
+      ["status"] -> show_transport(state)
+      ["list"] -> list_transports(state)
+      ["advance", seconds] -> advance_transport(state, seconds, nil)
+      ["advance", seconds, entry] -> advance_transport(state, seconds, entry)
+      _ -> transport_usage(state)
+    end
     |> handled()
   end
 
@@ -529,6 +547,59 @@ defmodule ThistleTea.Game.Player.DevCommands do
       _ -> :error
     end
   end
+
+  defp show_transport(%{character: %Character{} = character} = state) do
+    case Transports.target(character) do
+      nil -> system_message(state, "No active transport found on this map.")
+      transport -> system_message(state, transport_label(transport))
+    end
+  end
+
+  defp list_transports(%{character: %Character{internal: %{world: world}}} = state) do
+    case Transports.on_world(world) do
+      [] ->
+        system_message(state, "No active transports found on this map.")
+
+      transports ->
+        transports
+        |> Enum.reduce(system_message(state, "Active transports on #{world_label(world)}:"), fn transport, acc ->
+          system_message(acc, transport_label(transport))
+        end)
+    end
+  end
+
+  defp advance_transport(%{character: %Character{} = character} = state, seconds, entry) do
+    with {:ok, seconds} <- parse_positive_integer(seconds),
+         {:ok, entry} <- parse_optional_positive_integer(entry),
+         transport when not is_nil(transport) <- Transports.target(character, entry),
+         {:ok, advanced} <- Transports.advance(transport.guid, seconds * 1_000) do
+      state
+      |> system_message("Advanced transport #{advanced.entry} by #{seconds}s.")
+      |> system_message(transport_label(advanced))
+    else
+      nil -> system_message(state, "No matching active transport found.")
+      {:error, :not_found} -> system_message(state, "Transport process is not active.")
+      _ -> transport_usage(state)
+    end
+  end
+
+  defp transport_usage(state) do
+    system_message(state, "Invalid command. Use: .debug transport [list|advance <seconds> [entry]]")
+  end
+
+  defp transport_label(transport) do
+    {x, y, z, _orientation} = transport.position
+    motion = if transport.moving?, do: "moving", else: "stopped"
+
+    "#{transport.name} entry #{transport.entry}, guid #{transport.guid}, #{world_label(transport.world)}, " <>
+      "#{transport.progress_ms}ms/#{transport.period_ms}ms, #{motion}, passengers #{transport.passenger_count}, " <>
+      "position #{format_coordinate(x)} #{format_coordinate(y)} #{format_coordinate(z)}"
+  end
+
+  defp format_coordinate(value), do: value |> Float.round(2) |> Float.to_string()
+
+  defp parse_optional_positive_integer(nil), do: {:ok, nil}
+  defp parse_optional_positive_integer(value), do: parse_positive_integer(value)
 
   defp modify_speed(state, rate) do
     case Float.parse(rate) do

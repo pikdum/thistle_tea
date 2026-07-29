@@ -54,6 +54,7 @@ defmodule ThistleTea.Game.Entity.Server.TransportTest do
       expected = TransportLogic.passenger_world_position(local_position, route_pose(route, 0))
       assert_tuple_in_delta(attached.position, expected)
       assert {:ok, %{passenger_count: 1}} = Entity.call(entity.object.guid, :transport_info)
+      assert Transports.get(entity.object.guid).passenger_count == 1
 
       assert {:ok, _transport} = Transports.advance(entity.object.guid, 3_000)
       assert_receive {:transport_pose, %{guid: guid, passenger_count: 1}}
@@ -64,6 +65,7 @@ defmodule ThistleTea.Game.Entity.Server.TransportTest do
 
       assert detached.transport_guid == nil
       assert {:ok, %{passenger_count: 0}} = Entity.call(entity.object.guid, :transport_info)
+      assert Transports.get(entity.object.guid).passenger_count == 0
 
       GenServer.stop(pid)
     end
