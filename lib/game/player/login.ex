@@ -227,7 +227,7 @@ defmodule ThistleTea.Game.Player.Login do
 
   defp restore_instance_world(%Character{} = character, _guid), do: character
 
-  def send_init_packets(c) do
+  def send_init_packets(c, opts \\ []) do
     WorldStates.initialize(c)
 
     # needed for no white chatbox + keybinds
@@ -317,24 +317,46 @@ defmodule ThistleTea.Game.Player.Login do
       Network.send_packet(item_updates)
     end
 
-    # packet for player
-    update_flag =
-      @update_flag_self ||| @update_flag_all ||| @update_flag_living ||| @update_flag_has_position
-
-    movement_block = %{c.movement_block | update_flag: update_flag}
-
-    update =
-      %UpdateObject{
-        update_type: :create_object2,
-        object_type: :player
-      }
-      |> struct(Map.from_struct(c))
-
-    %{update | movement_block: movement_block}
-    |> Network.send_packet()
+    if Keyword.get(opts, :send_self?, true), do: Network.send_packet(self_update(c))
 
     EventSink.emit(c, AuraLogic.self_duration_events(c, Time.now()))
   end
+
+  def send_worldport_packets(%Character{} = character) do
+    send_init_packets(character, send_self?: false)
+    Network.send_packet(worldport_updates(character))
+  end
+
+  def worldport_updates(%Character{} = character) do
+    case attached_transport_update(character) do
+      %UpdateObject{} = transport_update -> [transport_update, self_update(character)]
+      nil -> [self_update(character)]
+    end
+  end
+
+  def self_update(%Character{} = character) do
+    update_flag =
+      @update_flag_self ||| @update_flag_all ||| @update_flag_living ||| @update_flag_has_position
+
+    movement_block = %{character.movement_block | update_flag: update_flag}
+
+    %UpdateObject{
+      update_type: :create_object2,
+      object_type: :player
+    }
+    |> struct(Map.from_struct(character))
+    |> then(&%{&1 | movement_block: movement_block})
+  end
+
+  defp attached_transport_update(%Character{movement_block: %MovementBlock{transport_guid: guid}})
+       when is_integer(guid) do
+    case Entity.transport_update(guid) do
+      {:ok, %UpdateObject{} = update} -> update
+      _error -> nil
+    end
+  end
+
+  defp attached_transport_update(%Character{}), do: nil
 
   defp schedule_aura_tick(%{character: %{unit: %Unit{auras: [_ | _]}}} = state) do
     ref = Process.send_after(self(), :player_tick, 0)

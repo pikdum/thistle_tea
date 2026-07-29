@@ -12,7 +12,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgMoveWorldportAck do
 
   @impl ClientMessage
   def handle(%__MODULE__{}, state) do
-    Login.send_init_packets(state.character)
+    Login.send_worldport_packets(state.character)
 
     state = State.complete_worldport(state)
     state = Visibility.enter_player(%{state | ready: true})
