@@ -21,6 +21,7 @@ defmodule ThistleTea.Game.World.Visibility do
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.System.CellActivator
+  alias ThistleTea.Game.World.Transports
   alias ThistleTea.Game.World.Visibility.Filter
   alias ThistleTea.Game.WorldRef
 
@@ -327,14 +328,28 @@ defmodule ThistleTea.Game.World.Visibility do
   end
 
   defp visible_members(cells) do
-    cells
-    |> Enum.flat_map(fn cell ->
-      @group
-      |> Group.members(cell_key(cell))
-      |> Enum.map(fn {_pid, meta} -> meta end)
-    end)
+    cell_members =
+      Enum.flat_map(cells, fn cell ->
+        @group
+        |> Group.members(cell_key(cell))
+        |> Enum.map(fn {_pid, meta} -> meta end)
+      end)
+
+    (cell_members ++ pinned_transports(cells))
     |> Map.new(fn %{guid: guid} = meta -> {guid, meta} end)
     |> Map.values()
+  end
+
+  defp pinned_transports(cells) do
+    case Enum.at(cells, 0) do
+      {%WorldRef{} = world, _x, _y} ->
+        world
+        |> Transports.ships_on_world()
+        |> Enum.map(&%{guid: &1.guid, type: :game_object})
+
+      nil ->
+        []
+    end
   end
 
   defp track_joined(state, %{guid: guid} = meta) do
@@ -351,7 +366,7 @@ defmodule ThistleTea.Game.World.Visibility do
   defp track_left(state, guid, type) do
     state = remove_from_entity_lists(state, guid, type)
 
-    if tracked?(state, guid) and not currently_visible?(state, guid) do
+    if tracked?(state, guid) and not Transports.ship?(guid) and not currently_visible?(state, guid) do
       send_destroy(guid)
       untrack_entity(state, guid)
     else
@@ -364,13 +379,24 @@ defmodule ThistleTea.Game.World.Visibility do
   end
 
   defp currently_visible?(%{visibility_cells: cells}, guid) do
-    case SpatialHash.get_entity(guid) do
-      {^guid, world, x, y, z} -> MapSet.member?(cells, SpatialHash.cell(world, x, y, z))
-      _ -> false
+    if pinned_transport?(guid, cells) do
+      true
+    else
+      case SpatialHash.get_entity(guid) do
+        {^guid, world, x, y, z} -> MapSet.member?(cells, SpatialHash.cell(world, x, y, z))
+        _ -> false
+      end
     end
   end
 
   defp currently_visible?(_state, _guid), do: false
+
+  defp pinned_transport?(guid, cells) do
+    case {Transports.get(guid), Enum.at(cells, 0)} do
+      {%{route_kind: :ship, world: world}, {world, _x, _y}} -> true
+      _ -> false
+    end
+  end
 
   defp put_entity_lists(state, visible) do
     state

@@ -2,12 +2,17 @@ defmodule ThistleTea.Game.Network.Message.CmsgForceMoveRootAckTest do
   use ExUnit.Case, async: true
 
   alias ThistleTea.Game.Entity.Data.Character
+  alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
+  alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Server.Player.State
+  alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.Network.BinaryUtils
   alias ThistleTea.Game.Network.Message.CmsgForceMoveRootAck
   alias ThistleTea.Game.Network.Message.CmsgForceMoveUnrootAck
   alias ThistleTea.Game.Network.Message.Dispatch
   alias ThistleTea.Game.Network.Opcodes
+  alias ThistleTea.Game.WorldRef
 
   describe "from_binary/1" do
     test "parses force root acknowledgements" do
@@ -68,6 +73,35 @@ defmodule ThistleTea.Game.Network.Message.CmsgForceMoveRootAckTest do
       assert state.character.movement_block.position == nil
       assert state.pending_movement_acks == %{3 => :unroot}
     end
+
+    test "rejects a transport attachment that is not active" do
+      player_guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
+      transport_guid = Guid.from_low_guid(:mo_transport, 164_871)
+
+      state = %State{
+        guid: player_guid,
+        character: %Character{
+          object: %Object{guid: player_guid},
+          movement_block: %MovementBlock{position: {1.0, 2.0, 3.0, 4.0}},
+          internal: %Internal{world: WorldRef.open(0)}
+        },
+        pending_movement_acks: %{2 => :root}
+      }
+
+      state =
+        CmsgForceMoveRootAck.handle(
+          %CmsgForceMoveRootAck{
+            guid: player_guid,
+            counter: 2,
+            movement_payload: transport_movement_payload(transport_guid)
+          },
+          state
+        )
+
+      assert state.character.movement_block.position == {1.0, 2.0, 3.0, 4.0}
+      assert state.character.movement_block.transport_guid == nil
+      assert state.pending_movement_acks == %{}
+    end
   end
 
   describe "Dispatch.implemented?/1" do
@@ -84,6 +118,14 @@ defmodule ThistleTea.Game.Network.Message.CmsgForceMoveRootAckTest do
   defp movement_payload do
     <<0::little-size(32), 123::little-size(32), 1.0::little-float-size(32), 2.0::little-float-size(32),
       3.0::little-float-size(32), 4.0::little-float-size(32), 0::little-size(32)>>
+  end
+
+  defp transport_movement_payload(transport_guid) do
+    <<0x02000000::little-size(32), 123::little-size(32), 10.0::little-float-size(32), 20.0::little-float-size(32),
+      30.0::little-float-size(32), 1.0::little-float-size(32)>> <>
+      BinaryUtils.pack_guid(transport_guid) <>
+      <<1.0::little-float-size(32), 2.0::little-float-size(32), 3.0::little-float-size(32), 0.25::little-float-size(32),
+        0::little-size(32)>>
   end
 
   defp ack_state(pending) do

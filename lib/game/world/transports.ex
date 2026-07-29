@@ -89,6 +89,18 @@ defmodule ThistleTea.Game.World.Transports do
     |> Enum.sort_by(& &1.guid)
   end
 
+  def ships_on_world(%WorldRef{} = world) do
+    world
+    |> on_world()
+    |> Enum.filter(&(&1.route_kind == :ship))
+  end
+
+  def ship?(guid) when is_integer(guid) do
+    match?(%{route_kind: :ship}, get(guid))
+  end
+
+  def ship?(_guid), do: false
+
   def target(character, entry \\ nil)
 
   def target(%Character{} = character, entry) when is_integer(entry) do
@@ -122,6 +134,13 @@ defmodule ThistleTea.Game.World.Transports do
 
   def advance(guid, milliseconds) when is_integer(guid) and is_integer(milliseconds) do
     Entity.call(guid, {:advance, milliseconds})
+  end
+
+  def reconcile(
+        %Character{movement_block: %MovementBlock{transport_guid: nil}},
+        %MovementBlock{transport_guid: nil} = movement_block
+      ) do
+    {:ok, movement_block}
   end
 
   def reconcile(

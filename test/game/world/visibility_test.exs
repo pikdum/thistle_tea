@@ -8,11 +8,15 @@ defmodule ThistleTea.Game.World.VisibilityTest do
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Data.GameObject
+  alias ThistleTea.Game.Entity.Data.Transport
+  alias ThistleTea.Game.Entity.Data.Transport.Pose
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.System.CellActivator
+  alias ThistleTea.Game.World.Transports
   alias ThistleTea.Game.World.Visibility
   alias ThistleTea.Game.WorldRef
 
@@ -60,6 +64,42 @@ defmodule ThistleTea.Game.World.VisibilityTest do
 
       assert_receive {:activated, {%WorldRef{map_id: 0}, 0, 0}}
       Visibility.leave_player(state)
+    end
+
+    test "pins every active ship on the player's map" do
+      self_guid = Guid.from_low_guid(:player, unique_low())
+      transport_guid = Guid.from_low_guid(:mo_transport, unique_low())
+      world = WorldRef.open(0)
+      publish_transport(transport_guid, world)
+      Entity.register(transport_guid)
+
+      on_exit(fn ->
+        Entity.unregister(transport_guid)
+        Transports.unpublish(transport_guid)
+      end)
+
+      state = %{
+        guid: self_guid,
+        character: character(self_guid, ghost?: false),
+        visibility_cells: MapSet.new([{world, 0, 0}]),
+        tracked_entities: MapSet.new(),
+        cell_activator: nil
+      }
+
+      Visibility.resync_player(state)
+      assert_receive {:"$gen_cast", {:send_update_to, ^self_guid}}
+
+      state = %{state | tracked_entities: MapSet.new([transport_guid])}
+
+      event = %Group.Event{
+        type: :left,
+        key: Visibility.cell_key({world, 0, 0}),
+        meta: %{guid: transport_guid, type: :game_object}
+      }
+
+      state = Visibility.handle_events(state, [event])
+      assert Visibility.tracked?(state, transport_guid)
+      refute_receive {:"$gen_cast", {:send_packet, %Message.SmsgDestroyObject{}, _opts}}
     end
   end
 
@@ -318,6 +358,25 @@ defmodule ThistleTea.Game.World.VisibilityTest do
       internal: %Internal{world: %WorldRef{map_id: 0}},
       movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
     }
+  end
+
+  defp publish_transport(guid, world) do
+    entity = %GameObject{
+      object: %Object{guid: guid, entry: 164_871},
+      internal: %Internal{world: world}
+    }
+
+    route = %Transport{name: "Pinned Ship", kind: :ship, period_ms: 20_000}
+
+    pose = %Pose{
+      map_id: world.map_id,
+      position: {10_000.0, 10_000.0, 0.0, 0.0},
+      progress_ms: 0,
+      frame_index: 0,
+      moving?: true
+    }
+
+    Transports.publish(entity, route, pose)
   end
 
   defp unique_low do

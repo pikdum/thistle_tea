@@ -7,12 +7,15 @@ defmodule ThistleTea.Game.Network.UpdateObject do
 
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Item, as: DataItem
+  alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.BinaryUtils
   alias ThistleTea.Game.Network.Packet
   alias ThistleTea.Game.Time
 
   defstruct [
     :update_type,
+    :out_of_range_guids,
+    :has_transport,
     :object_type,
     :movement_block,
     :object,
@@ -31,6 +34,7 @@ defmodule ThistleTea.Game.Network.UpdateObject do
   @update_type_values 0
   @update_type_create_object 2
   @update_type_create_object2 3
+  @update_type_out_of_range_objects 4
 
   defp update_type(:create_object), do: @update_type_create_object
   defp update_type(:create_object2), do: @update_type_create_object2
@@ -190,12 +194,12 @@ defmodule ThistleTea.Game.Network.UpdateObject do
   defp visibility_target(guid, guid), do: :self
   defp visibility_target(_object_guid, _recipient_guid), do: :other
 
-  defp packet_header(%__MODULE__{} = _obj) do
-    <<1::little-size(32), 0>>
+  defp packet_header(%__MODULE__{} = obj) do
+    <<1::little-size(32), transport_header([obj])>>
   end
 
   defp packet_header(objects) when is_list(objects) do
-    <<Enum.count(objects)::little-size(32), 0>>
+    <<Enum.count(objects)::little-size(32), transport_header(objects)>>
   end
 
   def to_packet(obj_or_objects, recipient_guid \\ nil)
@@ -214,12 +218,49 @@ defmodule ThistleTea.Game.Network.UpdateObject do
     }
   end
 
+  def to_packet(
+        %__MODULE__{update_type: :out_of_range_objects, out_of_range_guids: guids, has_transport: has_transport},
+        _recipient_guid
+      )
+      when is_list(guids) do
+    packed_guids = Enum.map_join(guids, &BinaryUtils.pack_guid/1)
+
+    %Packet{
+      opcode: @smsg_update_object,
+      payload:
+        <<1::little-size(32), bool_byte(has_transport), @update_type_out_of_range_objects,
+          length(guids)::little-size(32)>> <>
+          packed_guids
+    }
+  end
+
   def to_packet(%__MODULE__{} = obj, recipient_guid) do
     %Packet{
       opcode: @smsg_update_object,
       payload: packet_header(obj) <> packet_body(obj, recipient_guid)
     }
   end
+
+  def out_of_range(guids, opts \\ []) when is_list(guids) do
+    %__MODULE__{
+      update_type: :out_of_range_objects,
+      out_of_range_guids: guids,
+      has_transport: Keyword.get(opts, :has_transport, false)
+    }
+  end
+
+  defp transport_header(objects) do
+    if Enum.any?(objects, &(transport_update?(&1) and &1.has_transport != false)), do: 1, else: 0
+  end
+
+  defp transport_update?(%__MODULE__{object: %{guid: guid}}) do
+    Guid.high_guid(guid) == Guid.high_guid(:mo_transport)
+  end
+
+  defp transport_update?(%__MODULE__{}), do: false
+
+  defp bool_byte(true), do: 1
+  defp bool_byte(_value), do: 0
 
   def object_type_flags(%__MODULE__{} = obj) do
     Enum.reduce(@object_type_flags_map, 0, fn {field, type}, acc ->

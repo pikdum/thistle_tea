@@ -5,6 +5,8 @@ defmodule ThistleTea.UpdateObjectTest do
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.Network.BinaryUtils
   alias ThistleTea.Game.Network.UpdateObject
 
   describe "sanity check" do
@@ -36,6 +38,28 @@ defmodule ThistleTea.UpdateObjectTest do
     test "to_packet/1 - :create_object", %{create_object_update: create_object_update} do
       packet = UpdateObject.to_packet(create_object_update)
       assert byte_size(packet.payload) > 0
+    end
+
+    test "out_of_range/1 emits packed guid removals" do
+      guids = [0x1FC0000000028427, 0xF12002AFE800496A]
+      packet = guids |> UpdateObject.out_of_range() |> UpdateObject.to_packet()
+
+      expected_guids = Enum.map_join(guids, &BinaryUtils.pack_guid/1)
+
+      assert packet.payload ==
+               <<1::little-size(32), 0, 4, 2::little-size(32)>> <> expected_guids
+    end
+
+    test "transport creates set the packet transport header", %{create_object_update: update} do
+      guid = Guid.from_low_guid(:mo_transport, 164_871)
+      update = %{update | object: %{update.object | guid: guid}}
+
+      assert <<1::little-size(32), 1, _rest::binary>> = UpdateObject.to_packet(update).payload
+      assert <<1::little-size(32), 0, _rest::binary>> = UpdateObject.to_packet(%{update | has_transport: false}).payload
+
+      elevator_guid = Guid.from_low_guid(:transport, 176_080, 1)
+      update = %{update | object: %{update.object | guid: elevator_guid}, has_transport: nil}
+      assert <<1::little-size(32), 0, _rest::binary>> = UpdateObject.to_packet(update).payload
     end
   end
 

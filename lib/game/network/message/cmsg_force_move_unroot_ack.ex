@@ -8,15 +8,12 @@ defmodule ThistleTea.Game.Network.Message.CmsgForceMoveUnrootAck do
   defstruct [:guid, :counter, :movement_payload]
 
   @impl ClientMessage
-  def handle(
-        %__MODULE__{guid: guid, counter: counter, movement_payload: movement_payload},
-        %State{character: %Character{movement_block: %MovementBlock{} = movement_block} = character} = state
-      ) do
+  def handle(%__MODULE__{guid: guid, counter: counter, movement_payload: movement_payload}, %State{} = state) do
     case MovementControl.acknowledge(state, guid, counter, :unroot) do
       {:ok, state} ->
-        movement_block = MovementBlock.from_binary(movement_payload, movement_block)
-
-        MovementControl.maybe_finish_repop(%{state | character: %{character | movement_block: movement_block}})
+        state
+        |> MovementControl.reconcile_movement(movement_payload)
+        |> MovementControl.maybe_finish_repop()
 
       {:error, state} ->
         state

@@ -18,6 +18,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Data.Corpse
   alias ThistleTea.Game.Entity.Data.Item, as: DataItem
   alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.Logic.AI.BehaviorRunner
@@ -67,6 +68,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.Party.Notifier, as: PartyNotifier
   alias ThistleTea.Game.Player.CompanionVisibility
   alias ThistleTea.Game.Player.Enchantments
+  alias ThistleTea.Game.Player.Exploration, as: PlayerExploration
   alias ThistleTea.Game.Player.GameObjects, as: PlayerGameObjects
   alias ThistleTea.Game.Player.Items
   alias ThistleTea.Game.Player.Login
@@ -80,7 +82,9 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
+  alias ThistleTea.Game.World.AggroProbe
   alias ThistleTea.Game.World.CharacterStore
+  alias ThistleTea.Game.World.ChaseWatch
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.ItemEnchantment, as: ItemEnchantmentLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
@@ -562,7 +566,18 @@ defmodule ThistleTea.Game.Entity.Server.Player do
     if state.character.internal.world == world do
       character = %{state.character | movement_block: %{state.character.movement_block | position: position}}
       Presence.relocate(character)
-      {:noreply, Visibility.refresh_player(%{state | character: character})}
+
+      {x, y, z, _orientation} = position
+      AggroProbe.notify_player_moved(state.guid, world, {x, y, z})
+      ChaseWatch.notify_moved(state.guid, {x, y, z})
+
+      state =
+        %{state | character: character}
+        |> PlayerRest.check_tavern_exit()
+        |> PlayerExploration.check_movement()
+        |> Visibility.refresh_player()
+
+      {:noreply, state}
     else
       {:noreply, transport_worldport(state, transport, position)}
     end
@@ -576,7 +591,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
     if character.movement_block.transport_guid == transport_guid do
       character = %{character | movement_block: MovementBlock.clear_transport(character.movement_block)}
       Presence.relocate(character)
-      {:noreply, %{state | character: character}}
+      {:noreply, %{state | character: character, transport_refresh_pending: nil}}
     else
       {:noreply, state}
     end
@@ -1174,14 +1189,20 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   defp detach_transport(%State{character: %Character{} = character} = state) do
     Transports.leave(character)
     character = %{character | movement_block: MovementBlock.clear_transport(character.movement_block)}
-    %{state | character: character}
+    %{state | character: character, transport_refresh_pending: nil}
   end
 
   defp detach_transport(state), do: state
 
   defp transport_worldport(%State{} = state, %{entry: entry, world: %WorldRef{} = world}, {x, y, z, orientation}) do
     DuelSystem.disconnect(state.guid)
-    state = state |> disengage_for_world_transition() |> suspend_companion_for_teleport()
+
+    state =
+      state
+      |> prepare_transport_worldport()
+      |> disengage_for_world_transition()
+      |> suspend_companion_for_teleport()
+
     previous_world = state.character.internal.world
     character = state.character
     {zone, area} = destination_zone_and_area(character, world.map_id, {x, y, z})
@@ -1219,6 +1240,22 @@ defmodule ThistleTea.Game.Entity.Server.Player do
 
     Network.send_packet(%Message.SmsgUpdateInstanceOwnership{player_is_saved_to_a_raid: false})
     state
+  end
+
+  defp prepare_transport_worldport(%State{character: %Character{} = character} = state) do
+    now = Time.now()
+    {character, control_events} = Aura.remove_aura_types(character, [:mod_confuse, :mod_fear], now)
+    character = EventSink.emit(character, control_events)
+    state = %{state | character: character}
+
+    if Death.alive?(character) do
+      maybe_broadcast_update(state)
+    else
+      World.stop_entity(Corpse.guid_for(state.guid))
+      {character, resurrection_events} = Death.resurrect(character, 1.0, now)
+      character = EventSink.emit(character, resurrection_events)
+      maybe_broadcast_update(%{state | character: character})
+    end
   end
 
   @impl GenServer

@@ -4,8 +4,11 @@ defmodule ThistleTea.Game.Network.MovementControl do
   including deferring spirit-release teleports until earlier changes settle.
   """
 
+  alias ThistleTea.Game.Entity.Data.Character
+  alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Server.Player.State
   alias ThistleTea.Game.Network.Message
+  alias ThistleTea.Game.World.Transports
 
   @ack_timeout_ms 4_000
   @max_counter 0xFFFFFFFF
@@ -67,6 +70,39 @@ defmodule ThistleTea.Game.Network.MovementControl do
   end
 
   def acknowledge(state, _guid, _counter, _expected), do: {:error, state}
+
+  def reconcile_movement(
+        %State{character: %Character{movement_block: %MovementBlock{} = previous} = character} = state,
+        payload
+      )
+      when is_binary(payload) do
+    movement_block = MovementBlock.from_binary(payload, previous)
+
+    case Transports.reconcile(character, movement_block) do
+      {:ok, movement_block} ->
+        state
+        |> track_transport_boarding(previous, movement_block)
+        |> then(&%{&1 | character: %{character | movement_block: movement_block}})
+
+      {:error, _reason} ->
+        state
+    end
+  end
+
+  def track_transport_boarding(%State{} = state, %MovementBlock{transport_guid: previous_guid}, %MovementBlock{
+        transport_guid: current_guid
+      }) do
+    cond do
+      is_integer(current_guid) and current_guid != previous_guid ->
+        %{state | transport_refresh_pending: current_guid}
+
+      is_nil(current_guid) ->
+        %{state | transport_refresh_pending: nil}
+
+      true ->
+        state
+    end
+  end
 
   def defer_repop(%State{} = state, {x, y, z, map}) do
     token = make_ref()

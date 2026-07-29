@@ -188,6 +188,10 @@ defmodule ThistleTea.Game.World do
     if GameObject.transport?(entity), do: TransportLoader.get(entity.object.entry)
   end
 
+  defp global_transport?(guid, %WorldRef{} = world) do
+    Guid.transport?(guid) and WorldRef.open?(world)
+  end
+
   def stop_entity(pid) when is_pid(pid) do
     EntitySupervisor.terminate_child(pid)
   end
@@ -204,7 +208,7 @@ defmodule ThistleTea.Game.World do
 
     world
     |> SpatialHash.guids()
-    |> Enum.reject(&(Guid.entity_type(&1) in excluded or Guid.transport?(&1)))
+    |> Enum.reject(&(Guid.entity_type(&1) in excluded or global_transport?(&1, world)))
     |> Enum.each(&stop_entity/1)
   end
 

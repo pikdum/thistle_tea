@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Entity.Server.TransportTest do
   alias ThistleTea.Game.Entity.Data.GameObjectTemplate
   alias ThistleTea.Game.Entity.Logic.Transport, as: TransportLogic
   alias ThistleTea.Game.Entity.Server.Transport, as: TransportServer
+  alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Transports
   alias ThistleTea.Game.WorldRef
@@ -35,6 +36,51 @@ defmodule ThistleTea.Game.Entity.Server.TransportTest do
       assert {^world, x, _y, _z} = World.position(entity.object.guid)
       assert_in_delta x, elem(advanced.position, 0), 0.000001
       assert Transports.get(entity.object.guid).progress_ms == 3_000
+    end
+
+    test "moves global ship visibility between maps" do
+      entry = :erlang.unique_integer([:positive])
+      route = TransportLogic.build_ship(entry, "Test Ship", 10, cross_map_nodes(), 10, 1, 60_000)
+      entity = GameObject.build_transport(template(entry), TransportLogic.pose_at(route, 0))
+      {:ok, pid} = TransportServer.start_link({entity, route, schedule: false, clock: fn -> 1_000 end})
+      on_exit(fn -> if Process.alive?(pid), do: GenServer.stop(pid) end)
+
+      old_player = :erlang.unique_integer([:positive])
+      new_player = :erlang.unique_integer([:positive])
+      {:ok, _old_owner} = Entity.register(old_player)
+      {:ok, _new_owner} = Entity.register(new_player)
+      World.SpatialHash.insert(:players, old_player, WorldRef.open(0), 0.0, 0.0, 0.0)
+      World.SpatialHash.insert(:players, new_player, WorldRef.open(1), 0.0, 0.0, 0.0)
+
+      on_exit(fn ->
+        Entity.unregister(old_player)
+        Entity.unregister(new_player)
+        World.SpatialHash.remove(:players, old_player)
+        World.SpatialHash.remove(:players, new_player)
+      end)
+
+      destination_frame = Enum.find(route.keyframes, &(&1.map_id == 1))
+
+      assert {:ok, %{world: %WorldRef{map_id: 1}}} =
+               Transports.advance(entity.object.guid, destination_frame.arrive_at_ms)
+
+      assert_receive {:"$gen_cast",
+                      {:send_packet,
+                       %UpdateObject{
+                         update_type: :out_of_range_objects,
+                         out_of_range_guids: [transport_guid],
+                         has_transport: false
+                       }}}
+
+      assert transport_guid == entity.object.guid
+
+      assert_receive {:"$gen_cast",
+                      {:send_packet,
+                       %UpdateObject{
+                         update_type: :create_object2,
+                         object: %{guid: ^transport_guid},
+                         has_transport: false
+                       }}}
     end
   end
 

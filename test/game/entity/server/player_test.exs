@@ -34,6 +34,7 @@ defmodule ThistleTea.Game.Entity.Server.PlayerTest do
   alias ThistleTea.Game.Spell.Target
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.CharacterStore
+  alias ThistleTea.Game.World.ChaseWatch
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.WorldRef
@@ -501,8 +502,10 @@ defmodule ThistleTea.Game.Entity.Server.PlayerTest do
       }
 
       state = %State{connection_pid: self(), guid: guid, character: character, ready: true}
+      ChaseWatch.watch(guid, self(), {0.0, 0.0, 0.0}, 1.0)
 
       on_exit(fn ->
+        ChaseWatch.unwatch(self())
         Metadata.delete(guid)
         SpatialHash.remove(:players, guid)
       end)
@@ -523,6 +526,7 @@ defmodule ThistleTea.Game.Entity.Server.PlayerTest do
       assert_tuple_in_delta(relocated.movement_block.position, expected)
       assert {^guid, %WorldRef{map_id: 0}, x, y, z} = SpatialHash.get_entity(guid)
       assert_tuple_in_delta({x, y, z}, Tuple.delete_at(expected, 3))
+      assert_receive {:target_moved, ^guid}
     end
 
     test "worldports with transport attachment preserved across map changes" do
@@ -572,6 +576,43 @@ defmodule ThistleTea.Game.Entity.Server.PlayerTest do
                        }}}
 
       assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgNewWorld{map: 1}}}
+    end
+
+    test "resurrects a dead passenger before a transport map change" do
+      guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
+      transport_guid = Guid.from_low_guid(:mo_transport, 164_871)
+      character = %{character(guid, health: 0, max_health: 100) | player: %Player{flags: 0}}
+
+      character = %{
+        character
+        | movement_block: %{
+            character.movement_block
+            | movement_flags: 0x02000000,
+              transport_guid: transport_guid,
+              transport_position: {1.0, 2.0, 3.0, 0.25}
+          }
+      }
+
+      state = %State{connection_pid: self(), guid: guid, character: character, ready: true}
+
+      on_exit(fn ->
+        Metadata.delete(guid)
+        SpatialHash.remove(:players, guid)
+      end)
+
+      transport = %{
+        guid: transport_guid,
+        entry: 164_871,
+        world: WorldRef.open(1),
+        position: {100.0, 200.0, 30.0, 0.75}
+      }
+
+      assert {:noreply, %State{character: worldported}} =
+               PlayerServer.handle_info({:transport_pose, transport}, state)
+
+      assert worldported.unit.health == 100
+      assert worldported.internal.world == WorldRef.open(1)
+      assert worldported.movement_block.transport_guid == transport_guid
     end
 
     test "atomically creates and tracks a pet before completing its attachment" do

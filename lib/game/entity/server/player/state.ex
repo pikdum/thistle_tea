@@ -46,6 +46,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
     :mail_session_token,
     :mail_delivery_ref,
     :pending_last_instance_map,
+    :transport_refresh_pending,
     :active_mover_guid,
     :companion_monitor,
     ready: false,

@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.Network.MovementControlTest do
   use ExUnit.Case, async: true
 
+  alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Server.Player.State
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.MovementControl
@@ -35,6 +36,20 @@ defmodule ThistleTea.Game.Network.MovementControlTest do
       assert packet.counter == 7
       assert state.movement_counter == 8
       assert state.pending_movement_acks == %{}
+    end
+  end
+
+  describe "track_transport_boarding/3" do
+    test "marks first boarding and clears the marker on departure" do
+      state = %State{}
+      detached = %MovementBlock{}
+      attached = %MovementBlock{transport_guid: 123}
+
+      state = MovementControl.track_transport_boarding(state, detached, attached)
+      assert state.transport_refresh_pending == 123
+
+      state = MovementControl.track_transport_boarding(state, attached, detached)
+      assert state.transport_refresh_pending == nil
     end
   end
 

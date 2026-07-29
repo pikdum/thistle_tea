@@ -13,9 +13,12 @@ defmodule ThistleTea.Game.Entity.Server.Transport do
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Transport, as: TransportLogic
   alias ThistleTea.Game.Entity.Registry, as: EntityRegistry
+  alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network
+  alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
+  alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.Transports
   alias ThistleTea.Game.World.Visibility
   alias ThistleTea.Game.WorldRef
@@ -88,6 +91,10 @@ defmodule ThistleTea.Game.Entity.Server.Transport do
     {:reply, {:ok, snapshot(state)}, state}
   end
 
+  def handle_call(:transport_update, _from, %State{entity: entity} = state) do
+    {:reply, {:ok, Core.update_object(entity)}, state}
+  end
+
   def handle_call(
         {:transport_board, player_guid, world, local_position},
         {player_pid, _tag},
@@ -130,11 +137,12 @@ defmodule ThistleTea.Game.Entity.Server.Transport do
   end
 
   @impl GenServer
-  def terminate(_reason, %State{entity: entity, passengers: passengers}) do
+  def terminate(_reason, %State{entity: entity, route: route, passengers: passengers}) do
     Enum.each(passengers, fn {_guid, %Passenger{pid: pid}} ->
       send(pid, {:transport_lost, entity.object.guid})
     end)
 
+    remove_from_world_players(entity, route)
     Transports.unpublish(entity.object.guid)
     World.remove_position(entity)
     Visibility.leave_entity(entity)
@@ -146,9 +154,11 @@ defmodule ThistleTea.Game.Entity.Server.Transport do
     pose = pose_at(state, elapsed_ms)
     entity = put_pose(state.entity, state.route, pose)
     World.update_position(entity)
-    entity = Visibility.refresh_entity(entity)
     next_state = %{state | entity: entity, last_pose: pose}
     publish(next_state)
+    entity = Visibility.refresh_entity(entity)
+    next_state = %{next_state | entity: entity}
+    sync_world_visibility(state, next_state)
     notify_passengers(state, next_state)
     next_state
   end
@@ -246,6 +256,49 @@ defmodule ThistleTea.Game.Entity.Server.Transport do
   defp publish(%State{entity: entity, route: route, last_pose: pose, passengers: passengers} = state) do
     Transports.publish(entity, route, pose, map_size(passengers))
     state
+  end
+
+  defp sync_world_visibility(
+         %State{entity: %{internal: %{world: previous_world}}},
+         %State{entity: %{internal: %{world: current_world}}} = state
+       )
+       when previous_world != current_world do
+    passenger_guids = Map.keys(state.passengers)
+    remove_from_world_players(state.entity.object.guid, previous_world, passenger_guids)
+    create_for_world_players(state.entity, current_world, passenger_guids)
+    :ok
+  end
+
+  defp sync_world_visibility(%State{}, %State{}), do: :ok
+
+  defp remove_from_world_players(%GameObject{} = entity, %TransportRoute{kind: :ship}) do
+    remove_from_world_players(entity.object.guid, entity.internal.world, [])
+  end
+
+  defp remove_from_world_players(%GameObject{}, %TransportRoute{}), do: :ok
+
+  defp remove_from_world_players(guid, world, excluded_guids) do
+    packet = UpdateObject.out_of_range([guid])
+
+    world
+    |> player_guids()
+    |> Enum.reject(&(&1 in excluded_guids))
+    |> Enum.each(&Network.send_packet(packet, &1))
+  end
+
+  defp create_for_world_players(%GameObject{} = entity, world, excluded_guids) do
+    update = %{Core.update_object(entity) | has_transport: false}
+
+    world
+    |> player_guids()
+    |> Enum.reject(&(&1 in excluded_guids))
+    |> Enum.each(&Network.send_packet(update, &1))
+  end
+
+  defp player_guids(world) do
+    world
+    |> SpatialHash.guids()
+    |> Enum.filter(&(Guid.entity_type(&1) == :player))
   end
 
   defp notify_passengers(%State{last_pose: nil}, %State{}), do: :ok

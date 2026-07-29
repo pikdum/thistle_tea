@@ -20,6 +20,16 @@ defmodule ThistleTea.Game.Entity.Server.Player.PacketSink do
 
   def send(state, message, opts \\ [])
 
+  def send(
+        %State{} = state,
+        %UpdateObject{update_type: :out_of_range_objects, out_of_range_guids: guids} = update,
+        _opts
+      ) do
+    state
+    |> send_packet(UpdateObject.to_packet(update, state.guid))
+    |> then(fn state -> Enum.reduce(guids, state, &Visibility.untrack_entity(&2, &1)) end)
+  end
+
   def send(%State{} = state, %UpdateObject{} = update, opts) do
     source_guid = Keyword.get(opts, :source_guid)
 

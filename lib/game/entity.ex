@@ -149,6 +149,10 @@ defmodule ThistleTea.Game.Entity do
     call(entity, {:transport_board, player_guid, world, local_position})
   end
 
+  def transport_update(entity) do
+    call(entity, :transport_update)
+  end
+
   def leave_transport(entity, player_guid) do
     dispatch_cast(entity, {:transport_leave, player_guid})
   end

@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Network.Message.MsgMove do
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Network.ClientMessage
   alias ThistleTea.Game.Network.Message
+  alias ThistleTea.Game.Network.MovementControl
   alias ThistleTea.Game.Network.Packet
   alias ThistleTea.Game.Player.Exploration, as: PlayerExploration
   alias ThistleTea.Game.Player.Rest, as: PlayerRest
@@ -59,8 +60,12 @@ defmodule ThistleTea.Game.Network.Message.MsgMove do
     movement_block = MovementBlock.from_binary(payload, movement_block)
 
     case Transports.reconcile(character, movement_block) do
-      {:ok, movement_block} -> handle_player_movement(message, state, movement_block)
-      {:error, _reason} -> state
+      {:ok, movement_block} ->
+        state = MovementControl.track_transport_boarding(state, character.movement_block, movement_block)
+        handle_player_movement(message, state, movement_block)
+
+      {:error, _reason} ->
+        state
     end
   end
 
