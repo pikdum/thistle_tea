@@ -16,6 +16,7 @@ defmodule ThistleTea.Game.Entity.Server.PlayerTest do
   alias ThistleTea.Game.Entity.Logic.PlayerCombat
   alias ThistleTea.Game.Entity.Logic.Regen
   alias ThistleTea.Game.Entity.Logic.Rest, as: RestLogic
+  alias ThistleTea.Game.Entity.Logic.Transport
   alias ThistleTea.Game.Entity.Server.Player, as: PlayerServer
   alias ThistleTea.Game.Entity.Server.Player.CompanionOwner.Attachment
   alias ThistleTea.Game.Entity.Server.Player.CompanionOwner.Monitor, as: CompanionMonitor
@@ -294,6 +295,41 @@ defmodule ThistleTea.Game.Entity.Server.PlayerTest do
       refute_receive :restore_companion
     end
 
+    test "ordinary teleports detach from a transport" do
+      guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
+      transport_guid = Guid.from_low_guid(:mo_transport, 164_871)
+      character = character(guid, health: 100, max_health: 100)
+
+      movement_block = %{
+        character.movement_block
+        | movement_flags: 0x02000000,
+          transport_guid: transport_guid,
+          transport_position: {1.0, 2.0, 3.0, 0.25}
+      }
+
+      state = %State{
+        connection_pid: self(),
+        guid: guid,
+        character: %{character | movement_block: movement_block},
+        ready: true
+      }
+
+      on_exit(fn ->
+        Metadata.delete(guid)
+        SpatialHash.remove(:players, guid)
+      end)
+
+      assert {:noreply, %State{character: teleported}} =
+               PlayerServer.handle_cast(
+                 {:start_teleport, 10.0, 20.0, 30.0, 0.5, WorldRef.open(0)},
+                 state
+               )
+
+      assert teleported.movement_block.transport_guid == nil
+      assert teleported.movement_block.transport_position == nil
+      assert Bitwise.band(teleported.movement_block.movement_flags, 0x02000000) == 0
+    end
+
     test "updates the public group leader player flag" do
       character = %{character(1, health: 100, max_health: 100) | player: %Player{flags: 0x20}}
       state = %{character: character}
@@ -447,6 +483,97 @@ defmodule ThistleTea.Game.Entity.Server.PlayerTest do
   end
 
   describe "handle_info/2" do
+    test "relocates an attached player from transport-local coordinates" do
+      guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
+      transport_guid = Guid.from_low_guid(:mo_transport, 164_871)
+      local_position = {2.0, 3.0, 4.0, 0.5}
+
+      character = character(guid, health: 100, max_health: 100)
+
+      character = %{
+        character
+        | movement_block: %{
+            character.movement_block
+            | movement_flags: 0x02000000,
+              transport_guid: transport_guid,
+              transport_position: local_position
+          }
+      }
+
+      state = %State{connection_pid: self(), guid: guid, character: character, ready: true}
+
+      on_exit(fn ->
+        Metadata.delete(guid)
+        SpatialHash.remove(:players, guid)
+      end)
+
+      transport = %{
+        guid: transport_guid,
+        entry: 164_871,
+        world: WorldRef.open(0),
+        position: {10.0, 20.0, 30.0, 1.0}
+      }
+
+      assert {:noreply, %State{character: relocated}} =
+               PlayerServer.handle_info({:transport_pose, transport}, state)
+
+      expected =
+        Transport.passenger_world_position(local_position, transport.position)
+
+      assert_tuple_in_delta(relocated.movement_block.position, expected)
+      assert {^guid, %WorldRef{map_id: 0}, x, y, z} = SpatialHash.get_entity(guid)
+      assert_tuple_in_delta({x, y, z}, Tuple.delete_at(expected, 3))
+    end
+
+    test "worldports with transport attachment preserved across map changes" do
+      guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
+      transport_guid = Guid.from_low_guid(:mo_transport, 164_871)
+      character = character(guid, health: 100, max_health: 100)
+
+      character = %{
+        character
+        | movement_block: %{
+            character.movement_block
+            | movement_flags: 0x02000000,
+              transport_guid: transport_guid,
+              transport_position: {1.0, 2.0, 3.0, 0.25}
+          }
+      }
+
+      state = %State{connection_pid: self(), guid: guid, character: character, ready: true}
+      destination = WorldRef.open(1)
+
+      on_exit(fn ->
+        Metadata.delete(guid)
+        SpatialHash.remove(:players, guid)
+      end)
+
+      transport = %{
+        guid: transport_guid,
+        entry: 164_871,
+        world: destination,
+        position: {100.0, 200.0, 30.0, 0.75}
+      }
+
+      assert {:noreply, %State{ready: false, character: worldported}} =
+               PlayerServer.handle_info({:transport_pose, transport}, state)
+
+      assert worldported.internal.world == destination
+      assert worldported.movement_block.transport_guid == transport_guid
+      assert worldported.movement_block.transport_position == {1.0, 2.0, 3.0, 0.25}
+
+      assert_receive {:"$gen_cast",
+                      {:send_packet,
+                       %Message.SmsgTransferPending{
+                         map: 1,
+                         has_transport: true,
+                         transport: 164_871,
+                         transport_map: 0
+                       }}}
+
+      assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgNewWorld{map: 1}}}
+    end
+
     test "atomically creates and tracks a pet before completing its attachment" do
       guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
       pet_guid = Guid.from_low_guid(:pet, 1863, System.unique_integer([:positive]))
@@ -727,4 +854,13 @@ defmodule ThistleTea.Game.Entity.Server.PlayerTest do
   end
 
   defp object_count(%Packet{payload: <<count::little-size(32), 0, _body::binary>>}), do: count
+
+  defp assert_tuple_in_delta(actual, expected) do
+    actual
+    |> Tuple.to_list()
+    |> Enum.zip(Tuple.to_list(expected))
+    |> Enum.each(fn {actual_value, expected_value} ->
+      assert_in_delta actual_value, expected_value, 0.000001
+    end)
+  end
 end

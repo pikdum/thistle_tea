@@ -204,7 +204,7 @@ defmodule ThistleTea.Game.World do
 
     world
     |> SpatialHash.guids()
-    |> Enum.reject(&(Guid.entity_type(&1) in excluded))
+    |> Enum.reject(&(Guid.entity_type(&1) in excluded or Guid.transport?(&1)))
     |> Enum.each(&stop_entity/1)
   end
 

@@ -47,6 +47,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.Entity.Logic.SpellEffect
   alias ThistleTea.Game.Entity.Logic.SpellFeedback
   alias ThistleTea.Game.Entity.Logic.StealthDetection
+  alias ThistleTea.Game.Entity.Logic.Transport, as: TransportLogic
   alias ThistleTea.Game.Entity.Server.AIEnvironment
   alias ThistleTea.Game.Entity.Server.NavigationResolver
   alias ThistleTea.Game.Entity.Server.Player.CompanionOwner
@@ -88,6 +89,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.World.Presence
   alias ThistleTea.Game.World.System.Duel, as: DuelSystem
   alias ThistleTea.Game.World.System.Instance, as: InstanceSystem
+  alias ThistleTea.Game.World.Transports
   alias ThistleTea.Game.World.Visibility
   alias ThistleTea.Game.WorldRef
 
@@ -447,6 +449,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
         {:start_teleport, x, y, z, orientation, world},
         %{character: %Character{internal: %Internal{world: world}}} = state
       ) do
+    state = detach_transport(state)
     state = state |> disengage_for_world_transition() |> suspend_companion_for_teleport()
     character = state.character
 
@@ -483,6 +486,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   end
 
   def handle_cast({:start_teleport, x, y, z, orientation, %WorldRef{} = world}, state) do
+    state = detach_transport(state)
     DuelSystem.disconnect(state.guid)
     state = state |> disengage_for_world_transition() |> suspend_companion_for_teleport()
     previous_world = state.character.internal.world
@@ -541,6 +545,41 @@ defmodule ThistleTea.Game.Entity.Server.Player do
 
   def handle_info({:DOWN, _monitor, :process, connection_pid, _reason}, %State{connection_pid: connection_pid} = state) do
     {:stop, :normal, State.leave_world(state)}
+  end
+
+  def handle_info(
+        {:transport_pose,
+         %{guid: transport_guid, world: %WorldRef{} = world, position: transport_position} = transport},
+        %State{
+          character: %Character{
+            movement_block: %MovementBlock{transport_guid: transport_guid, transport_position: local_position}
+          }
+        } = state
+      )
+      when is_tuple(local_position) do
+    position = TransportLogic.passenger_world_position(local_position, transport_position)
+
+    if state.character.internal.world == world do
+      character = %{state.character | movement_block: %{state.character.movement_block | position: position}}
+      Presence.relocate(character)
+      {:noreply, Visibility.refresh_player(%{state | character: character})}
+    else
+      {:noreply, transport_worldport(state, transport, position)}
+    end
+  end
+
+  def handle_info({:transport_pose, _transport}, state) do
+    {:noreply, state}
+  end
+
+  def handle_info({:transport_lost, transport_guid}, %State{character: %Character{} = character} = state) do
+    if character.movement_block.transport_guid == transport_guid do
+      character = %{character | movement_block: MovementBlock.clear_transport(character.movement_block)}
+      Presence.relocate(character)
+      {:noreply, %{state | character: character}}
+    else
+      {:noreply, state}
+    end
   end
 
   def handle_info(:restore_companion, state) do
@@ -1130,6 +1169,56 @@ defmodule ThistleTea.Game.Entity.Server.Player do
 
   defp mark_rest_transition(%Character{} = character, %Character{} = previous) do
     if character == previous, do: character, else: Core.mark_broadcast_update(character)
+  end
+
+  defp detach_transport(%State{character: %Character{} = character} = state) do
+    Transports.leave(character)
+    character = %{character | movement_block: MovementBlock.clear_transport(character.movement_block)}
+    %{state | character: character}
+  end
+
+  defp detach_transport(state), do: state
+
+  defp transport_worldport(%State{} = state, %{entry: entry, world: %WorldRef{} = world}, {x, y, z, orientation}) do
+    DuelSystem.disconnect(state.guid)
+    state = state |> disengage_for_world_transition() |> suspend_companion_for_teleport()
+    previous_world = state.character.internal.world
+    character = state.character
+    {zone, area} = destination_zone_and_area(character, world.map_id, {x, y, z})
+
+    character =
+      character
+      |> PlayerRest.evaluate_zone(zone)
+      |> mark_rest_transition(character)
+      |> then(fn character ->
+        %{
+          character
+          | internal: %{character.internal | area: area, world: world},
+            movement_block: %{character.movement_block | position: {x, y, z, orientation}}
+        }
+      end)
+
+    Presence.relocate(character)
+    state = Visibility.leave_player(%{state | character: character})
+    InstanceSystem.leave(state.guid, previous_world)
+
+    Network.send_packet(%Message.SmsgTransferPending{
+      map: world.map_id,
+      has_transport: true,
+      transport: entry,
+      transport_map: previous_world.map_id
+    })
+
+    state = State.prepare_worldport(%{state | ready: false}, previous_world, world)
+
+    Network.send_packet(%Message.SmsgNewWorld{
+      map: world.map_id,
+      position: %{x: x, y: y, z: z},
+      orientation: orientation
+    })
+
+    Network.send_packet(%Message.SmsgUpdateInstanceOwnership{player_is_saved_to_a_raid: false})
+    state
   end
 
   @impl GenServer

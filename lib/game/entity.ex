@@ -145,6 +145,14 @@ defmodule ThistleTea.Game.Entity do
     dispatch_cast(entity, {:set_speed, rate})
   end
 
+  def board_transport(entity, player_guid, world, local_position) do
+    call(entity, {:transport_board, player_guid, world, local_position})
+  end
+
+  def leave_transport(entity, player_guid) do
+    dispatch_cast(entity, {:transport_leave, player_guid})
+  end
+
   def duel_update(entity, update) do
     dispatch_cast(entity, {:duel_update, update})
   end

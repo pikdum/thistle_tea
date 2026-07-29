@@ -359,7 +359,9 @@ defmodule ThistleTea.Game.Player.Login do
 
   defp normalize_movement_state(%Character{movement_block: movement_block, internal: internal} = character) do
     movement_block =
-      %{movement_block | movement_flags: 0, timestamp: 0, fall_time: 0}
+      movement_block
+      |> MovementBlock.clear_transport()
+      |> then(&%{&1 | movement_flags: 0, timestamp: 0, fall_time: 0})
       |> Map.merge(MovementBlock.player_speeds())
 
     MovementStats.recompute(%{

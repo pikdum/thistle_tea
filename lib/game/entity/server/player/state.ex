@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
   """
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Character
+  alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.Logic.Dueling
   alias ThistleTea.Game.Entity.Logic.PlayerCombat
@@ -25,6 +26,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
   alias ThistleTea.Game.World.System.Duel, as: DuelSystem
   alias ThistleTea.Game.World.System.Instance, as: InstanceSystem
   alias ThistleTea.Game.World.System.Party, as: PartySystem
+  alias ThistleTea.Game.World.Transports
   alias ThistleTea.Game.World.Visibility
   alias ThistleTea.Game.WorldRef
 
@@ -90,6 +92,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
 
     state = disengage(state)
     state = CompanionOwner.suspend(state)
+    state = leave_transport(state)
 
     state = close_mailbox(state)
 
@@ -108,6 +111,14 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
   end
 
   defp disengage(%__MODULE__{} = state), do: state
+
+  defp leave_transport(%__MODULE__{character: %Character{} = character} = state) do
+    Transports.leave(character)
+    character = %{character | movement_block: MovementBlock.clear_transport(character.movement_block)}
+    %{state | character: character}
+  end
+
+  defp leave_transport(%__MODULE__{} = state), do: state
 
   defp close_mailbox(
          %__MODULE__{

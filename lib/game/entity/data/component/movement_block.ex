@@ -105,6 +105,35 @@ defmodule ThistleTea.Game.Entity.Data.Component.MovementBlock do
 
   def airborne?(_movement_block), do: false
 
+  def on_transport?(%__MODULE__{transport_guid: guid, transport_position: position}) do
+    is_integer(guid) and guid > 0 and is_tuple(position)
+  end
+
+  def on_transport?(_movement_block), do: false
+
+  def clear_transport(%__MODULE__{movement_flags: flags} = movement_block) do
+    flags = if is_integer(flags), do: band(flags, bnot(@movement_flag_on_transport)), else: flags
+
+    %{
+      movement_block
+      | movement_flags: flags,
+        transport_guid: nil,
+        transport_position: nil
+    }
+  end
+
+  def position_changed?(%__MODULE__{transport_guid: guid, transport_position: previous}, %__MODULE__{
+        transport_guid: guid,
+        transport_position: current
+      })
+      when is_integer(guid) and is_tuple(previous) and is_tuple(current) do
+    xyz(previous) != xyz(current)
+  end
+
+  def position_changed?(%__MODULE__{position: previous}, %__MODULE__{position: current}) do
+    xyz(previous) != xyz(current)
+  end
+
   def from_binary(m, acc \\ %__MODULE__{}) do
     <<
       # movement flags
@@ -403,4 +432,6 @@ defmodule ThistleTea.Game.Entity.Data.Component.MovementBlock do
   defp vector_binary({x, y, z}) do
     <<x::little-float-size(32), y::little-float-size(32), z::little-float-size(32)>>
   end
+
+  defp xyz({x, y, z, _orientation}), do: {x, y, z}
 end

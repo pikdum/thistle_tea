@@ -18,6 +18,7 @@ defmodule ThistleTea.Game.Network.Message.MsgMove do
   alias ThistleTea.Game.World.ChaseWatch
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Presence
+  alias ThistleTea.Game.World.Transports
   alias ThistleTea.Game.World.Visibility
 
   @spell_failed_moving 0x2E
@@ -51,20 +52,42 @@ defmodule ThistleTea.Game.Network.Message.MsgMove do
           ready: true,
           guid: player_guid,
           active_mover_guid: mover_guid,
-          character: %Character{movement_block: %MovementBlock{} = movement_block, unit: %Unit{} = unit} = character
+          character: %Character{movement_block: %MovementBlock{} = movement_block, unit: %Unit{}} = character
         } = state
       )
       when mover_guid in [nil, player_guid] do
     movement_block = MovementBlock.from_binary(payload, movement_block)
 
+    case Transports.reconcile(character, movement_block) do
+      {:ok, movement_block} -> handle_player_movement(message, state, movement_block)
+      {:error, _reason} -> state
+    end
+  end
+
+  def handle(_message, state), do: state
+
+  @impl ClientMessage
+  def from_binary(payload) do
+    %__MODULE__{
+      payload: payload
+    }
+  end
+
+  defp handle_player_movement(
+         message,
+         %{character: %Character{movement_block: %MovementBlock{} = previous_movement_block, unit: %Unit{} = unit}} =
+           state,
+         %MovementBlock{} = movement_block
+       ) do
+    character = state.character
     character = %{character | movement_block: movement_block, unit: %{unit | stand_state: 0}}
     %{internal: %{world: world}} = character
-    %MovementBlock{position: {x0, y0, z0, _}} = state.character.movement_block
+    %MovementBlock{position: {x0, y0, z0, _}} = previous_movement_block
     %MovementBlock{position: {x1, y1, z1, orientation}} = movement_block
     now = Time.now()
     movement_velocity = movement_velocity(state.guid, movement_block, {x0, y0, z0}, {x1, y1, z1}, now)
 
-    position_changed? = x0 != x1 or y0 != y1 or z0 != z1
+    position_changed? = MovementBlock.position_changed?(previous_movement_block, movement_block)
 
     presence_metadata = %{
       orientation: orientation,
@@ -98,15 +121,6 @@ defmodule ThistleTea.Game.Network.Message.MsgMove do
     new_state
     |> Visibility.refresh_player()
     |> broadcast(message)
-  end
-
-  def handle(_message, state), do: state
-
-  @impl ClientMessage
-  def from_binary(payload) do
-    %__MODULE__{
-      payload: payload
-    }
   end
 
   defp broadcast(state, message) do

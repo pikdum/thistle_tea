@@ -4,9 +4,12 @@ defmodule ThistleTea.Game.World.Transports do
   """
 
   alias ThistleTea.Game.Entity
+  alias ThistleTea.Game.Entity.Data.Character
+  alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.GameObject
   alias ThistleTea.Game.Entity.Data.Transport
   alias ThistleTea.Game.Entity.Logic.Transport, as: TransportLogic
+  alias ThistleTea.Game.Guid
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
   alias ThistleTea.Game.World.Loader.MapTemplate, as: MapTemplateLoader
@@ -86,8 +89,57 @@ defmodule ThistleTea.Game.World.Transports do
     Entity.call(guid, {:advance, milliseconds})
   end
 
+  def reconcile(
+        %Character{object: %{guid: player_guid}, movement_block: %MovementBlock{transport_guid: previous_guid}},
+        %MovementBlock{transport_guid: nil} = movement_block
+      ) do
+    leave(previous_guid, player_guid)
+    {:ok, movement_block}
+  end
+
+  def reconcile(
+        %Character{
+          object: %{guid: player_guid},
+          internal: %{world: world},
+          movement_block: %MovementBlock{transport_guid: previous_guid}
+        },
+        %MovementBlock{transport_guid: transport_guid, transport_position: local_position} = movement_block
+      )
+      when is_integer(transport_guid) do
+    with true <- Guid.transport?(transport_guid),
+         true <- TransportLogic.valid_passenger_position?(local_position),
+         {:ok, transport} <- Entity.board_transport(transport_guid, player_guid, world, local_position) do
+      leave_changed(previous_guid, transport_guid, player_guid)
+      position = TransportLogic.passenger_world_position(local_position, transport.position)
+      {:ok, %{movement_block | position: position}}
+    else
+      _ -> {:error, :invalid_transport}
+    end
+  end
+
+  def reconcile(%Character{}, %MovementBlock{}), do: {:error, :invalid_transport}
+
+  def leave(%Character{object: %{guid: player_guid}, movement_block: %MovementBlock{transport_guid: transport_guid}}) do
+    leave(transport_guid, player_guid)
+  end
+
+  def leave(_character), do: :ok
+
   defp successful_start?(:ok), do: true
   defp successful_start?({:ok, _pid}), do: true
   defp successful_start?({:error, {:already_started, _pid}}), do: true
   defp successful_start?(_result), do: false
+
+  defp leave_changed(previous_guid, current_guid, player_guid) when previous_guid != current_guid do
+    leave(previous_guid, player_guid)
+  end
+
+  defp leave_changed(_previous_guid, _current_guid, _player_guid), do: :ok
+
+  defp leave(transport_guid, player_guid) when is_integer(transport_guid) do
+    Entity.leave_transport(transport_guid, player_guid)
+    :ok
+  end
+
+  defp leave(_transport_guid, _player_guid), do: :ok
 end

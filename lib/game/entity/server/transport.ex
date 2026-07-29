@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.Entity.Server.Transport do
 
   use GenServer
 
+  alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.GameObject
@@ -31,10 +32,17 @@ defmodule ThistleTea.Game.Entity.Server.Transport do
       :last_pose,
       :tick_ref,
       :clock,
+      passengers: %{},
       tick_ms: 50,
       offset_ms: 0,
       schedule?: true
     ]
+  end
+
+  defmodule Passenger do
+    @moduledoc false
+
+    defstruct [:pid, :monitor]
   end
 
   def start_link({%GameObject{} = entity, %TransportRoute{} = route}) do
@@ -71,9 +79,30 @@ defmodule ThistleTea.Game.Entity.Server.Transport do
     {:noreply, state}
   end
 
+  def handle_cast({:transport_leave, player_guid}, %State{} = state) do
+    {:noreply, remove_passenger(state, player_guid)}
+  end
+
   @impl GenServer
   def handle_call(:transport_info, _from, %State{} = state) do
     {:reply, {:ok, snapshot(state)}, state}
+  end
+
+  def handle_call(
+        {:transport_board, player_guid, world, local_position},
+        {player_pid, _tag},
+        %State{entity: %{internal: %{world: world}}} = state
+      ) do
+    if Entity.pid(player_guid) == player_pid and TransportLogic.valid_passenger_position?(local_position) do
+      state = put_passenger(state, player_guid, player_pid)
+      {:reply, {:ok, snapshot(state)}, state}
+    else
+      {:reply, {:error, :invalid_passenger}, state}
+    end
+  end
+
+  def handle_call({:transport_board, _player_guid, _world, _local_position}, _from, %State{} = state) do
+    {:reply, {:error, :wrong_world}, state}
   end
 
   def handle_call({:advance, milliseconds}, _from, %State{} = state) when is_integer(milliseconds) do
@@ -91,8 +120,21 @@ defmodule ThistleTea.Game.Entity.Server.Transport do
       {:noreply, schedule_tick(%{state | tick_ref: nil})}
   end
 
+  def handle_info({:DOWN, monitor, :process, _pid, _reason}, %State{} = state) do
+    passengers =
+      Map.reject(state.passengers, fn {_guid, %Passenger{monitor: passenger_monitor}} ->
+        passenger_monitor == monitor
+      end)
+
+    {:noreply, %{state | passengers: passengers}}
+  end
+
   @impl GenServer
-  def terminate(_reason, %State{entity: entity}) do
+  def terminate(_reason, %State{entity: entity, passengers: passengers}) do
+    Enum.each(passengers, fn {_guid, %Passenger{pid: pid}} ->
+      send(pid, {:transport_lost, entity.object.guid})
+    end)
+
     Transports.unpublish(entity.object.guid)
     World.remove_position(entity)
     Visibility.leave_entity(entity)
@@ -106,7 +148,9 @@ defmodule ThistleTea.Game.Entity.Server.Transport do
     World.update_position(entity)
     entity = Visibility.refresh_entity(entity)
     Transports.publish(entity, state.route, pose)
-    %{state | entity: entity, last_pose: pose}
+    next_state = %{state | entity: entity, last_pose: pose}
+    notify_passengers(state, next_state)
+    next_state
   end
 
   defp pose_at(%State{route: %TransportRoute{kind: :ship} = route}, elapsed_ms) do
@@ -172,7 +216,55 @@ defmodule ThistleTea.Game.Entity.Server.Transport do
     %{state | tick_ref: Process.send_after(self(), :transport_tick, tick_ms)}
   end
 
-  defp snapshot(%State{entity: entity, route: route, last_pose: pose}) do
+  defp put_passenger(%State{} = state, player_guid, player_pid) do
+    case Map.get(state.passengers, player_guid) do
+      %Passenger{pid: ^player_pid} ->
+        state
+
+      %Passenger{monitor: monitor} ->
+        Process.demonitor(monitor, [:flush])
+        passenger = %Passenger{pid: player_pid, monitor: Process.monitor(player_pid)}
+        %{state | passengers: Map.put(state.passengers, player_guid, passenger)}
+
+      nil ->
+        passenger = %Passenger{pid: player_pid, monitor: Process.monitor(player_pid)}
+        %{state | passengers: Map.put(state.passengers, player_guid, passenger)}
+    end
+  end
+
+  defp remove_passenger(%State{} = state, player_guid) do
+    case Map.pop(state.passengers, player_guid) do
+      {%Passenger{monitor: monitor}, passengers} ->
+        Process.demonitor(monitor, [:flush])
+        %{state | passengers: passengers}
+
+      {nil, _passengers} ->
+        state
+    end
+  end
+
+  defp notify_passengers(%State{last_pose: nil}, %State{}), do: :ok
+
+  defp notify_passengers(%State{} = previous, %State{} = current) do
+    if pose_changed?(previous, current) do
+      transport = snapshot(current)
+
+      Enum.each(current.passengers, fn {_guid, %Passenger{pid: pid}} ->
+        send(pid, {:transport_pose, transport})
+      end)
+    end
+  end
+
+  defp pose_changed?(%State{entity: previous_entity, last_pose: previous}, %State{
+         entity: current_entity,
+         last_pose: current
+       }) do
+    previous.position != current.position or
+      previous.map_id != current.map_id or
+      previous_entity.internal.world != current_entity.internal.world
+  end
+
+  defp snapshot(%State{entity: entity, route: route, last_pose: pose, passengers: passengers}) do
     %{
       guid: entity.object.guid,
       entry: entity.object.entry,
@@ -180,7 +272,8 @@ defmodule ThistleTea.Game.Entity.Server.Transport do
       route_kind: route.kind,
       position: pose.position,
       progress_ms: pose.progress_ms,
-      period_ms: route.period_ms
+      period_ms: route.period_ms,
+      passenger_count: map_size(passengers)
     }
   end
 end

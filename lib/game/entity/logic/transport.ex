@@ -139,6 +139,13 @@ defmodule ThistleTea.Game.Entity.Logic.Transport do
     }
   end
 
+  def valid_passenger_position?({x, y, z, orientation}) do
+    Enum.all?([x, y, z, orientation], &is_number/1) and
+      abs(x) <= 250 and abs(y) <= 250 and abs(z) <= 100
+  end
+
+  def valid_passenger_position?(_position), do: false
+
   defp initial_keyframes(nodes) do
     extended_points = orientation_points(nodes)
     final_index = length(nodes) - 2

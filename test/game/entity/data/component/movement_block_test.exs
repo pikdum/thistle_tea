@@ -345,6 +345,25 @@ defmodule ThistleTea.Game.Entity.Data.Component.MovementBlockTest do
     end
   end
 
+  describe "position_changed?/2" do
+    test "uses deck-local coordinates while attached to the same transport" do
+      previous = %MovementBlock{
+        position: {10.0, 20.0, 30.0, 0.0},
+        transport_guid: 123,
+        transport_position: {1.0, 2.0, 3.0, 0.0}
+      }
+
+      current = %{
+        previous
+        | position: {40.0, 50.0, 60.0, 0.0},
+          transport_position: {1.0, 2.0, 3.0, 1.0}
+      }
+
+      refute MovementBlock.position_changed?(previous, current)
+      assert MovementBlock.position_changed?(previous, %{current | transport_position: {2.0, 2.0, 3.0, 1.0}})
+    end
+  end
+
   defp vector({x, y, z}) do
     <<x::little-float-size(32), y::little-float-size(32), z::little-float-size(32)>>
   end
