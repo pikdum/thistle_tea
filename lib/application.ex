@@ -42,6 +42,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.World.Loader.SpellThreat, as: SpellThreatLoader
   alias ThistleTea.Game.World.Loader.Summon, as: SummonLoader
   alias ThistleTea.Game.World.Loader.Talent, as: TalentLoader
+  alias ThistleTea.Game.World.Loader.Taxi, as: TaxiLoader
   alias ThistleTea.Game.World.Loader.Trainer, as: TrainerLoader
   alias ThistleTea.Game.World.Loader.Transport, as: TransportLoader
   alias ThistleTea.Game.World.Loader.Vendor, as: VendorLoader
@@ -158,6 +159,7 @@ defmodule ThistleTea.Application do
     PageTextLoader.init()
     AreaTriggerLoader.init()
     SummonLoader.init()
+    TaxiLoader.init()
     TransportLoader.init()
     Transports.init()
     :ets.new(:spline_counters, [:named_table, :public, write_concurrency: :auto])
@@ -229,6 +231,7 @@ defmodule ThistleTea.Application do
         SpellScriptNameLoader.load_all()
         SpellThreatLoader.load_all()
         TalentLoader.load_all()
+        TaxiLoader.load_all()
         Logger.info("Starting transports...")
         :ok = Transports.start_all()
         Logger.info("Seeding debug data...")

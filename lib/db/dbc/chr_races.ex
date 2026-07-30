@@ -16,7 +16,7 @@ defmodule ChrRaces do
     field(:unknown1, :integer)
     field(:res_sickness_spell, :integer)
     field(:splash_sound_entry, :integer)
-    field(:unknown2, :integer)
+    field(:starting_taxi_mask, :integer, source: :unknown2)
     field(:client_file_path, :string)
     field(:cinematic_sequence, :integer)
     field(:name_en_gb, :string)
