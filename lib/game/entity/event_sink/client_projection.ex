@@ -109,6 +109,15 @@ defmodule ThistleTea.Game.Entity.EventSink.ClientProjection do
     entity
   end
 
+  def emit(entity, %Effects.SendTaxiPath{} = effect, _context) do
+    case Entity.pid(effect.target_guid) do
+      pid when is_pid(pid) -> send(pid, {:send_taxi_path, effect.path_id})
+      _ -> nil
+    end
+
+    entity
+  end
+
   def emit(entity, %Effects.PlaySound{sound_id: sound_id}, _context) do
     %Message.SmsgPlaySound{sound_id: sound_id}
     |> World.broadcast_packet(entity)

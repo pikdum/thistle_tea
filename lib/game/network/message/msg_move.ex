@@ -3,6 +3,7 @@ defmodule ThistleTea.Game.Network.Message.MsgMove do
   use ThistleTea.Game.Network.ClientMessage, :MSG_MOVE_JUMP
 
   alias ThistleTea.Game.Entity
+  alias ThistleTea.Game.Entity.Data.Taxi.Flight
   alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
   alias ThistleTea.Game.Entity.Logic.Companion
@@ -32,6 +33,8 @@ defmodule ThistleTea.Game.Network.Message.MsgMove do
   ]
 
   @impl ClientMessage
+  def handle(%__MODULE__{}, %{character: %Character{internal: %{taxi_flight: %Flight{}}}} = state), do: state
+
   def handle(
         %__MODULE__{payload: payload, opcode: opcode},
         %{ready: true, guid: player_guid, active_mover_guid: mover_guid, character: %Character{} = character} = state

@@ -16,6 +16,7 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
   @movement_flag_forward 0x00000001
   @movement_flag_walk_mode 0x00000100
   @movement_flag_spline_enabled 0x00400000
+  @movement_flag_flying 0x01000000
   @movement_flag_root 0x08000000
   @spline_flag_runmode 0x00000100
   @move_epsilon 0.1
@@ -167,7 +168,7 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
   end
 
   def move_along_path(state, path, opts, now) when is_list(path) and is_list(opts) and is_integer(now) do
-    moved = start_path(state, path, now, Keyword.get(opts, :velocity))
+    moved = start_path(state, path, now, opts)
 
     case moved.movement_block.spline_nodes do
       [_ | _] -> Effects.enqueue(moved, Effects.monster_move(opts))
@@ -175,18 +176,18 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
     end
   end
 
-  defp start_path(entity, path, now, velocity) when is_integer(now) do
+  defp start_path(entity, path, now, opts) when is_integer(now) do
     entity = sync_position(entity, now)
     %{movement_block: %MovementBlock{position: {x0, y0, z0, _o}}} = entity
 
     if path == [] or at_destination?({x0, y0, z0}, List.last(path)) do
       entity
     else
-      start_resolved_path(entity, path, now, velocity)
+      start_resolved_path(entity, path, now, opts)
     end
   end
 
-  defp start_resolved_path(entity, path, now, velocity) do
+  defp start_resolved_path(entity, path, now, opts) do
     entity = increment_spline_id(entity)
 
     %{
@@ -194,7 +195,9 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
       internal: %Internal{running: running, spline_id: spline_id} = internal
     } = entity
 
-    speed = movement_speed(velocity, running, mb.run_speed, walk_speed)
+    running = Keyword.get(opts, :run?, running)
+    speed = movement_speed(Keyword.get(opts, :velocity), running, mb.run_speed, walk_speed)
+    flying? = Keyword.get(opts, :flying?, false)
 
     duration =
       [{x0, y0, z0} | path]
@@ -212,8 +215,8 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
         spline_nodes: path,
         duration: duration,
         time_passed: 0,
-        movement_flags: movement_flags(mb.movement_flags, running),
-        spline_flags: spline_flags(running),
+        movement_flags: movement_flags(mb.movement_flags, running, flying?),
+        spline_flags: spline_flags(running, flying?),
         spline_id: spline_id,
         spline_start_position: {x0, y0, z0}
     }
@@ -329,7 +332,7 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
   def blocked?(_entity), do: false
 
   defp clear_motion_flags(flags) when is_integer(flags) do
-    flags &&& bnot(bor(@movement_flag_forward, @movement_flag_spline_enabled))
+    flags &&& bnot(bor(bor(@movement_flag_forward, @movement_flag_spline_enabled), @movement_flag_flying))
   end
 
   defp clear_motion_flags(_flags), do: 0
@@ -369,9 +372,10 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
 
   defp update_position_from_spline(entity, _now), do: finalize_movement(entity)
 
-  defp movement_flags(flags, running) do
+  defp movement_flags(flags, running, flying?) do
     flags = flags || 0
     flags = bor(flags, bor(@movement_flag_forward, @movement_flag_spline_enabled))
+    flags = if flying?, do: bor(flags, @movement_flag_flying), else: flags
 
     if running do
       flags &&& bnot(@movement_flag_walk_mode)
@@ -380,8 +384,10 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
     end
   end
 
-  defp spline_flags(true), do: @spline_flag_runmode
-  defp spline_flags(_running), do: 0
+  defp spline_flags(running, flying?) do
+    flags = if running, do: @spline_flag_runmode, else: 0
+    if flying?, do: bor(flags, 0x00000200), else: flags
+  end
 
   defp finalize_movement(
          %{

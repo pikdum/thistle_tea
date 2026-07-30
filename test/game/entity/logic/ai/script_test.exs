@@ -257,6 +257,15 @@ defmodule ThistleTea.Game.Entity.Logic.AI.ScriptTest do
       assert [%Effects.StartAttack{target_guid: ^victim}] = mob.internal.events
     end
 
+    test "send_taxi_path targets a player through a semantic effect", %{mob: mob} do
+      player_guid = Guid.from_low_guid(:player, 9)
+      step = %ScriptStep{command: :send_taxi_path, datalong: 315}
+
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], player_guid, 1_000)
+
+      assert [%Effects.SendTaxiPath{target_guid: ^player_guid, path_id: 315}] = mob.internal.events
+    end
+
     test "start_script runs the chosen resolved sub-script", %{mob: mob} do
       sub_steps = [%ScriptStep{command: :emote, datalong: 11}]
 

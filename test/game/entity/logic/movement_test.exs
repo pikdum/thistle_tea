@@ -1,6 +1,8 @@
 defmodule ThistleTea.Game.Entity.Logic.MovementTest do
   use ExUnit.Case, async: true
 
+  import Bitwise, only: [&&&: 2]
+
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Logic.Movement
@@ -323,6 +325,18 @@ defmodule ThistleTea.Game.Entity.Logic.MovementTest do
       result = Movement.move_along_path(entity, [{0.0, 5.0, 0.0}], [], 5_000)
 
       assert result.movement_block.position == {0.0, 0.0, 0.0, :math.pi() / 2}
+    end
+
+    test "starts a flying spline at the requested velocity" do
+      entity =
+        build_entity(position: {0.0, 0.0, 0.0, 0.0}, spline_nodes: nil)
+        |> then(&%{&1 | movement_block: %{&1.movement_block | walk_speed: 2.5, run_speed: 7.0}})
+
+      result = Movement.move_along_path(entity, [{32.0, 0.0, 0.0}], [velocity: 32.0, flying?: true], 5_000)
+
+      assert result.movement_block.duration == 1_000
+      assert (result.movement_block.movement_flags &&& 0x01000000) != 0
+      assert (result.movement_block.spline_flags &&& 0x00000200) != 0
     end
   end
 end

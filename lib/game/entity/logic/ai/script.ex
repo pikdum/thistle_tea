@@ -207,6 +207,28 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
   defp execute(
          state,
          blackboard,
+         %ScriptStep{command: :send_taxi_path, datalong: path_id} = step,
+         target_guid,
+         _now,
+         %Context{} = context
+       )
+       when is_integer(path_id) and path_id > 0 do
+    case resolve_target(state, step, target_guid, context) do
+      guid when is_integer(guid) ->
+        if Guid.entity_type(guid) == :player do
+          {Effects.enqueue(state, Effects.send_taxi_path(guid, path_id)), blackboard}
+        else
+          {state, blackboard}
+        end
+
+      _ ->
+        {state, blackboard}
+    end
+  end
+
+  defp execute(
+         state,
+         blackboard,
          %ScriptStep{command: :start_script} = step,
          target_guid,
          _now,

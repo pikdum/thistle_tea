@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.Entity.Logic.Effects.ClientTypes do
     {:Emote, [:emote_id], []},
     {:ScriptSteps, [:steps, :target_guid, :duration_ms], []},
     {:ForwardScriptSteps, [:target_guid, :steps, :source_guid], []},
+    {:SendTaxiPath, [:target_guid, :path_id], []},
     {:PlaySound, [:sound_id], []},
     {:PlayObjectSound, [:sound_id], []}
   ]

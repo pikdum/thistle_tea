@@ -5,14 +5,18 @@ defmodule ThistleTea.Game.Player.DevCommandsTest do
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Object
+  alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.GameObject
   alias ThistleTea.Game.Entity.Data.GameObjectTemplate
+  alias ThistleTea.Game.Entity.Data.Taxi.Network
+  alias ThistleTea.Game.Entity.Data.Taxi.Node
   alias ThistleTea.Game.Entity.Logic.Transport, as: TransportLogic
   alias ThistleTea.Game.Entity.Server.Transport, as: TransportServer
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Player.DevCommands
   alias ThistleTea.Game.World.CharacterStore
+  alias ThistleTea.Game.World.Loader.Taxi, as: TaxiLoader
   alias ThistleTea.Game.World.PostOffice
   alias ThistleTea.Game.World.Transports
   alias ThistleTea.Game.WorldRef
@@ -105,6 +109,56 @@ defmodule ThistleTea.Game.Player.DevCommandsTest do
       assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgMessagechat{message: message}}}
 
       assert message =~ "Invalid command"
+    end
+  end
+
+  describe ".debug taxi" do
+    test "unlocks the loaded flight network" do
+      id = System.unique_integer([:positive, :monotonic])
+      previous_network = TaxiLoader.get()
+
+      network =
+        Network.build(
+          [
+            %Node{
+              id: 2,
+              map_id: 0,
+              position: {0.0, 0.0, 0.0},
+              name: "Debug",
+              mount_display_ids: %{alliance: 6852}
+            }
+          ],
+          [],
+          %{},
+          []
+        )
+
+      :ets.insert(TaxiLoader, {:network, network})
+
+      character = %Character{
+        id: id,
+        object: %Object{guid: Guid.from_low_guid(:player, id)},
+        player: %Player{},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+        internal: %Internal{world: WorldRef.open(0)}
+      }
+
+      state = %{guid: character.object.guid, character: character}
+
+      on_exit(fn ->
+        :ets.delete(CharacterStore, id)
+
+        if previous_network do
+          :ets.insert(TaxiLoader, {:network, previous_network})
+        else
+          :ets.delete(TaxiLoader, :network)
+        end
+      end)
+
+      assert {:handled, state} = DevCommands.run(state, ".debug taxi")
+      assert state.character.player.taxi_nodes == MapSet.new([2])
+      assert CharacterStore.get(id).player.taxi_nodes == MapSet.new([2])
+      assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgMessagechat{message: "All flight paths unlocked."}}}
     end
   end
 

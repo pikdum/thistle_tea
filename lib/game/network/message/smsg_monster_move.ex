@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.Network.Message.SmsgMonsterMove do
   @move_type_facing_target 3
   @move_type_facing_angle 4
   @spline_flag_runmode 0x00000100
+  @spline_flag_flying 0x00000200
   @spline_flag_final_facing 0x00070000
 
   defstruct [
@@ -141,18 +142,7 @@ defmodule ThistleTea.Game.Network.Message.SmsgMonsterMove do
 
     spline_count = Enum.count(splines)
 
-    [{xd, yd, zd} = destination | rest] = Enum.reverse(splines)
-    splines = Enum.reverse(rest)
-
-    initial_acc =
-      <<spline_count::little-size(32), xd::little-float-size(32), yd::little-float-size(32), zd::little-float-size(32)>>
-
-    splines_binary =
-      Enum.reduce(splines, initial_acc, fn vec, acc ->
-        offset = offset(destination, vec) |> adjust_offset()
-        packed = BinaryUtils.pack_vector(offset)
-        acc <> <<packed::little-size(32)>>
-      end)
+    splines_binary = encode_splines(splines, spline_flags, spline_count)
 
     BinaryUtils.pack_guid(guid) <>
       <<
@@ -181,6 +171,26 @@ defmodule ThistleTea.Game.Network.Message.SmsgMonsterMove do
         spline_flags::little-size(32),
         duration::little-size(32)
       >> <> splines_binary
+  end
+
+  defp encode_splines(splines, spline_flags, spline_count) when band(spline_flags, @spline_flag_flying) != 0 do
+    Enum.reduce(splines, <<spline_count::little-size(32)>>, fn {x, y, z}, acc ->
+      acc <> <<x::little-float-size(32), y::little-float-size(32), z::little-float-size(32)>>
+    end)
+  end
+
+  defp encode_splines(splines, _spline_flags, spline_count) do
+    [{xd, yd, zd} = destination | rest] = Enum.reverse(splines)
+    splines = Enum.reverse(rest)
+
+    initial_acc =
+      <<spline_count::little-size(32), xd::little-float-size(32), yd::little-float-size(32), zd::little-float-size(32)>>
+
+    Enum.reduce(splines, initial_acc, fn vec, acc ->
+      offset = offset(destination, vec) |> adjust_offset()
+      packed = BinaryUtils.pack_vector(offset)
+      acc <> <<packed::little-size(32)>>
+    end)
   end
 
   defp offset({xd, yd, zd}, {xi, yi, zi}) do

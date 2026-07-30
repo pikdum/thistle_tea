@@ -32,6 +32,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal do
     :duel,
     :auto_shot,
     :fishing,
+    :taxi_flight,
     :event,
     :in_combat,
     :threat,

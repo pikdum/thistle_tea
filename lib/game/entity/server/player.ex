@@ -78,6 +78,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.Player.Rest, as: PlayerRest
   alias ThistleTea.Game.Player.Spellcasting
   alias ThistleTea.Game.Player.Stats, as: PlayerStats
+  alias ThistleTea.Game.Player.Taxi, as: PlayerTaxi
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Time
@@ -600,6 +601,30 @@ defmodule ThistleTea.Game.Entity.Server.Player do
 
   def handle_info(:restore_companion, state) do
     {:noreply, Login.restore_companion(state)}
+  end
+
+  def handle_info({:taxi_arrived, token}, state) do
+    {:noreply, PlayerTaxi.arrive(state, token)}
+  rescue
+    error ->
+      Logger.error("taxi arrival crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:noreply, state}
+  end
+
+  def handle_info({:taxi_progress, token}, state) do
+    {:noreply, PlayerTaxi.progress(state, token)}
+  rescue
+    error ->
+      Logger.error("taxi progress crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:noreply, state}
+  end
+
+  def handle_info({:send_taxi_path, path_id}, state) do
+    {:noreply, PlayerTaxi.start_path(state, path_id)}
+  rescue
+    error ->
+      Logger.error("script taxi path crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:noreply, state}
   end
 
   def handle_info({:mail_delivery_ready, deliver_at}, state) do

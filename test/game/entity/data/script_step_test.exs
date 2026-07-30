@@ -40,7 +40,7 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStepTest do
       assert ScriptStep.cast_spell_id(step) == 12_544
     end
 
-    test "keeps unsupported commands and target types as tagged ids" do
+    test "decodes taxi commands and keeps unsupported target types as tagged ids" do
       step =
         ScriptStep.build(%{
           id: 5,
@@ -66,7 +66,7 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStepTest do
           condition_id: 0
         })
 
-      assert step.command == {:unsupported, 30}
+      assert step.command == :send_taxi_path
       assert step.target_type == {:unsupported, 25}
     end
   end

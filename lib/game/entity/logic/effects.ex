@@ -551,6 +551,10 @@ defmodule ThistleTea.Game.Entity.Logic.Effects do
     %Effects.ForwardScriptSteps{target_guid: target_guid, steps: steps, source_guid: source_guid}
   end
 
+  def send_taxi_path(target_guid, path_id) when is_integer(target_guid) and is_integer(path_id) and path_id > 0 do
+    %Effects.SendTaxiPath{target_guid: target_guid, path_id: path_id}
+  end
+
   def play_sound(sound_id) when is_integer(sound_id) do
     %Effects.PlaySound{sound_id: sound_id}
   end

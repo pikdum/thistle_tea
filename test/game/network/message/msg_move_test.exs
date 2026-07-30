@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.Network.Message.MsgMoveTest do
   alias ThistleTea.Game.Entity.Data.Companion.EntityRef
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Data.Taxi.Flight
   alias ThistleTea.Game.Entity.Logic.Companion
   alias ThistleTea.Game.Entity.Server.Player.State
   alias ThistleTea.Game.Network.Message.MsgMove
@@ -43,6 +44,13 @@ defmodule ThistleTea.Game.Network.Message.MsgMoveTest do
 
       assert MsgMove.handle(message, session) == session
       refute_receive {:controlled_move, _, _}
+    end
+
+    test "ignores client movement during a taxi flight" do
+      character = %Character{unit: %Unit{}, internal: %Internal{taxi_flight: struct(Flight)}}
+      session = %State{guid: 23, ready: true, character: character}
+
+      assert MsgMove.handle(%MsgMove{opcode: :MSG_MOVE_HEARTBEAT, payload: <<>>}, session) == session
     end
   end
 

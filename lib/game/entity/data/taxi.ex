@@ -16,6 +16,30 @@ defmodule ThistleTea.Game.Entity.Data.Taxi.Path do
   defstruct [:id, :source_node_id, :destination_node_id, :cost, :nodes]
 end
 
+defmodule ThistleTea.Game.Entity.Data.Taxi.Flight do
+  @moduledoc false
+  @enforce_keys [
+    :token,
+    :path_ids,
+    :source_node_id,
+    :destination_node_id,
+    :destination_position,
+    :mount_display_id,
+    :started_at,
+    :duration_ms
+  ]
+  defstruct [
+    :token,
+    :path_ids,
+    :source_node_id,
+    :destination_node_id,
+    :destination_position,
+    :mount_display_id,
+    :started_at,
+    :duration_ms
+  ]
+end
+
 defmodule ThistleTea.Game.Entity.Data.Taxi.Network do
   @moduledoc """
   Immutable flight network assembled at the database boundary.

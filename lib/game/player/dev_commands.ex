@@ -32,6 +32,7 @@ defmodule ThistleTea.Game.Player.DevCommands do
   alias ThistleTea.Game.Player.Spells
   alias ThistleTea.Game.Player.Stats
   alias ThistleTea.Game.Player.Talents
+  alias ThistleTea.Game.Player.Taxi, as: PlayerTaxi
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.ItemStore
@@ -39,6 +40,7 @@ defmodule ThistleTea.Game.Player.DevCommands do
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
   alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader
   alias ThistleTea.Game.World.Loader.Skill, as: SkillLoader
+  alias ThistleTea.Game.World.Loader.Taxi, as: TaxiLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.PostOffice
   alias ThistleTea.Game.World.System.GameEvent
@@ -101,6 +103,7 @@ defmodule ThistleTea.Game.Player.DevCommands do
       ".debug spells - learn class trainer spells up to your level",
       ".debug events - show active events and the next scheduled change",
       ".debug explore - unlock every world-map area",
+      ".debug taxi - unlock every flight path",
       ".debug transport - show the attached or nearest transport",
       ".debug transport list - list active transports on this map",
       ".debug transport advance <seconds> [entry] - advance a transport schedule",
@@ -230,6 +233,13 @@ defmodule ThistleTea.Game.Player.DevCommands do
     state
     |> PlayerExploration.unlock_all()
     |> system_message("World map fully explored.")
+    |> handled()
+  end
+
+  def run(state, ".debug taxi" <> _) do
+    state
+    |> PlayerTaxi.unlock_all(TaxiLoader.get())
+    |> system_message("All flight paths unlocked.")
     |> handled()
   end
 

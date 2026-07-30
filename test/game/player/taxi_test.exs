@@ -9,7 +9,11 @@ defmodule ThistleTea.Game.Player.TaxiTest do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Taxi.Network
   alias ThistleTea.Game.Entity.Data.Taxi.Node
+  alias ThistleTea.Game.Entity.Data.Taxi.Path
+  alias ThistleTea.Game.Entity.Data.Taxi.PathNode
+  alias ThistleTea.Game.Entity.Server.Player.State
   alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.Network.Message.SmsgActivatetaxireply
   alias ThistleTea.Game.Network.Message.SmsgNewTaxiPath
   alias ThistleTea.Game.Network.Message.SmsgShowtaxinodes
   alias ThistleTea.Game.Network.Message.SmsgTaxinodeStatus
@@ -26,10 +30,12 @@ defmodule ThistleTea.Game.Player.TaxiTest do
 
     Metadata.put(flightmaster_guid, %{npc_flags: 0x8, alive?: true})
     SpatialHash.update(:mobs, flightmaster_guid, WorldRef.open(0), 2.0, 0.0, 0.0)
+    SpatialHash.update(:players, character.object.guid, WorldRef.open(0), 0.0, 0.0, 0.0)
 
     on_exit(fn ->
       Metadata.delete(flightmaster_guid)
       SpatialHash.remove(:mobs, flightmaster_guid)
+      SpatialHash.remove(:players, character.object.guid)
     end)
 
     %{character: character, flightmaster_guid: flightmaster_guid}
@@ -90,13 +96,69 @@ defmodule ThistleTea.Game.Player.TaxiTest do
     end
   end
 
+  describe "activate/4" do
+    test "starts and completes a paid flight", context do
+      character = put_known(context.character, [2, 4])
+
+      state = %State{
+        ready: true,
+        guid: character.object.guid,
+        character: character,
+        visibility_cells: MapSet.new()
+      }
+
+      state = Taxi.activate(state, context.flightmaster_guid, [2, 4], network())
+
+      assert state.character.player.coinage == 75
+      assert state.character.unit.mount_display_id == 6852
+      assert state.character.internal.taxi_flight
+      assert is_reference(state.taxi_arrival_ref)
+      assert_receive {:"$gen_cast", {:send_packet, %SmsgActivatetaxireply{reply: 0}}}
+      assert SpatialHash.get_movement(character.object.guid)
+
+      token = state.character.internal.taxi_flight.token
+      state = Taxi.arrive(state, token)
+
+      assert state.character.movement_block.position == {100.0, 0.0, 0.0, 0.0}
+      assert state.character.unit.mount_display_id == 0
+      refute state.character.internal.taxi_flight
+      refute SpatialHash.get_movement(character.object.guid)
+      assert CharacterStore.get(state.character.id).player.coinage == 75
+      assert_receive :restore_companion
+
+      if is_reference(state.player_tick_ref), do: Process.cancel_timer(state.player_tick_ref)
+    end
+
+    test "rejects a route through an unknown node", context do
+      character = put_known(context.character, [2])
+
+      state = %State{
+        ready: true,
+        guid: character.object.guid,
+        character: character,
+        visibility_cells: MapSet.new()
+      }
+
+      assert Taxi.activate(state, context.flightmaster_guid, [2, 4], network()) == state
+      assert_receive {:"$gen_cast", {:send_packet, %SmsgActivatetaxireply{reply: 6}}}
+    end
+  end
+
   defp character(id) do
     %Character{
       id: id,
       account_id: 1,
       object: %Object{guid: Guid.from_low_guid(:player, id)},
-      unit: %Unit{race: 1},
-      player: %Player{taxi_nodes: MapSet.new()},
+      unit: %Unit{
+        race: 1,
+        level: 1,
+        health: 100,
+        flags: 0,
+        mount_display_id: 0,
+        shapeshift_form: 0,
+        stand_state: 0
+      },
+      player: %Player{taxi_nodes: MapSet.new(), coinage: 100},
       movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
       internal: %Internal{world: WorldRef.open(0)}
     }
@@ -124,6 +186,17 @@ defmodule ThistleTea.Game.Player.TaxiTest do
       }
     ]
 
-    Network.build(nodes, [], %{}, [])
+    path = %Path{
+      id: 12,
+      source_node_id: 2,
+      destination_node_id: 4,
+      cost: 25,
+      nodes: [
+        %PathNode{index: 0, map_id: 0, position: {2.0, 0.0, 0.0}},
+        %PathNode{index: 1, map_id: 0, position: {100.0, 0.0, 0.0}}
+      ]
+    }
+
+    Network.build(nodes, [path], %{}, [])
   end
 end

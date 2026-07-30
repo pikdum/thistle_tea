@@ -4,6 +4,7 @@ defmodule ThistleTea.Game.Entity.EventSink.Movement do
   alias ThistleTea.Game.Entity.Commands
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Mob
+  alias ThistleTea.Game.Entity.Data.Taxi.Flight
   alias ThistleTea.Game.Entity.EventSink.Context
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Network.Message
@@ -84,6 +85,15 @@ defmodule ThistleTea.Game.Entity.EventSink.Movement do
   def emit(%Mob{} = entity, %Effects.MonsterMove{move_opts: opts}, _context) do
     World.publish_movement(entity)
     notify_chasers(entity)
+
+    Message.SmsgMonsterMove.build(entity, opts || [])
+    |> World.broadcast_packet(entity)
+
+    entity
+  end
+
+  def emit(%Character{internal: %{taxi_flight: %Flight{}}} = entity, %Effects.MonsterMove{move_opts: opts}, _context) do
+    World.publish_movement(entity)
 
     Message.SmsgMonsterMove.build(entity, opts || [])
     |> World.broadcast_packet(entity)

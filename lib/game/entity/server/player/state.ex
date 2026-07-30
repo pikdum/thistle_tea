@@ -16,6 +16,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Party.Group
   alias ThistleTea.Game.Party.Notifier
+  alias ThistleTea.Game.Player.Taxi
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.AggroProbe
   alias ThistleTea.Game.World.CharacterStore
@@ -47,6 +48,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
     :mail_delivery_ref,
     :pending_last_instance_map,
     :transport_refresh_pending,
+    :taxi_arrival_ref,
     :active_mover_guid,
     :companion_monitor,
     ready: false,
@@ -93,6 +95,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
 
     state = disengage(state)
     state = CompanionOwner.suspend(state)
+    state = Taxi.disconnect(state)
     state = leave_transport(state)
 
     state = close_mailbox(state)
