@@ -30,6 +30,7 @@ defmodule ThistleTea.Game.Player.Taxi do
 
   @flightmaster_flag 0x00000008
   @interaction_distance 5.0
+  @taxi_start_distance :math.sqrt(1_000.0)
   @reply_ok 0
   @reply_unspecified 1
   @reply_no_such_path 2
@@ -112,9 +113,12 @@ defmodule ThistleTea.Game.Player.Taxi do
          false <- TaxiLogic.active?(character),
          true <- character.internal.in_combat != true,
          %Path{} = path <- TaxiNetwork.path(network, path_id),
+         %Node{} = source <- TaxiNetwork.node(network, path.source_node_id),
+         :ok <- validate_source_position(character, source),
          itinerary = %{paths: [path], nodes: path.nodes, total_cost: 0},
          :ok <- validate_itinerary(character, itinerary, network),
          {:ok, mount_display_id} <- mount_display_id(character, path.source_node_id, network) do
+      send_reply(@reply_ok)
       start_flight(state, itinerary, mount_display_id, network, false)
     else
       _invalid -> state
@@ -245,6 +249,17 @@ defmodule ThistleTea.Game.Player.Taxi do
   end
 
   defp validate_fare(%Character{}, _fare), do: {:error, :unspecified}
+
+  defp validate_source_position(%Character{internal: %{world: world}, movement_block: %{position: position}}, %Node{
+         map_id: map_id,
+         position: source_position
+       }) do
+    if map_id == world.map_id and SpatialHash.distance(xyz(position), source_position) <= @taxi_start_distance do
+      :ok
+    else
+      {:error, :too_far_away}
+    end
+  end
 
   defp mount_display_id(%Character{unit: unit}, source_node_id, network) do
     with %Node{mount_display_ids: mount_display_ids} <- TaxiNetwork.node(network, source_node_id),

@@ -144,6 +144,45 @@ defmodule ThistleTea.Game.Player.TaxiTest do
     end
   end
 
+  describe "start_path/3" do
+    test "starts a free scripted path without requiring known nodes", context do
+      character = context.character
+
+      state = %State{
+        ready: true,
+        guid: character.object.guid,
+        character: character,
+        visibility_cells: MapSet.new()
+      }
+
+      state = Taxi.start_path(state, 12, network())
+
+      assert state.character.player.coinage == 100
+      assert state.character.internal.taxi_flight.path_ids == [12]
+      assert_receive {:"$gen_cast", {:send_packet, %SmsgActivatetaxireply{reply: 0}}}
+
+      state = Taxi.disconnect(state)
+      if is_reference(state.player_tick_ref), do: Process.cancel_timer(state.player_tick_ref)
+    end
+
+    test "rejects a scripted path away from its source", context do
+      character = %{
+        context.character
+        | movement_block: %{context.character.movement_block | position: {1_000.0, 0.0, 0.0, 0.0}}
+      }
+
+      state = %State{
+        ready: true,
+        guid: character.object.guid,
+        character: character,
+        visibility_cells: MapSet.new()
+      }
+
+      assert Taxi.start_path(state, 12, network()) == state
+      refute_receive {:"$gen_cast", {:send_packet, %SmsgActivatetaxireply{}}}
+    end
+  end
+
   defp character(id) do
     %Character{
       id: id,
