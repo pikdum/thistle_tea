@@ -100,7 +100,7 @@ defmodule ThistleTea.Game.Network.MovementControl do
         %{state | transport_refresh_pending: nil}
 
       true ->
-        state
+        %{state | transport_refresh_pending: nil}
     end
   end
 

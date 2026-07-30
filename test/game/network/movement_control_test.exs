@@ -40,10 +40,16 @@ defmodule ThistleTea.Game.Network.MovementControlTest do
   end
 
   describe "track_transport_boarding/3" do
-    test "marks first boarding and clears the marker on departure" do
+    test "marks first boarding and clears the marker after confirmation or departure" do
       state = %State{}
       detached = %MovementBlock{}
       attached = %MovementBlock{transport_guid: 123}
+
+      state = MovementControl.track_transport_boarding(state, detached, attached)
+      assert state.transport_refresh_pending == 123
+
+      state = MovementControl.track_transport_boarding(state, attached, attached)
+      assert state.transport_refresh_pending == nil
 
       state = MovementControl.track_transport_boarding(state, detached, attached)
       assert state.transport_refresh_pending == 123
