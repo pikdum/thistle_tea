@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgGossipHello do
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Message.SmsgGossipMessage.GossipItem
   alias ThistleTea.Game.Network.Message.SmsgGossipMessage.QuestItem
+  alias ThistleTea.Game.Player.GossipCondition
   alias ThistleTea.Game.Player.Quests
   alias ThistleTea.Game.World.Loader.Gossip, as: GossipLoader
   alias ThistleTea.Game.World.Loader.Gossip.Menu
@@ -66,8 +67,8 @@ defmodule ThistleTea.Game.Network.Message.CmsgGossipHello do
       %{option_id: ^spirit_healer_option_id} ->
         not Death.alive?(character)
 
-      _option ->
-        true
+      option ->
+        GossipCondition.met?(character, option.condition)
     end)
   end
 

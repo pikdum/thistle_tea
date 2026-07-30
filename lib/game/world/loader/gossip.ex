@@ -6,6 +6,9 @@ defmodule ThistleTea.Game.World.Loader.Gossip do
   import Ecto.Query
 
   alias ThistleTea.DB.Mangos
+  alias ThistleTea.Game.Entity.Data.ScriptStep
+  alias ThistleTea.Game.World.Loader.Condition, as: ConditionLoader
+  alias ThistleTea.Game.World.Loader.Script
 
   @table_options [:named_table, :public, read_concurrency: true, write_concurrency: :auto]
 
@@ -24,7 +27,7 @@ defmodule ThistleTea.Game.World.Loader.Gossip do
 
   defmodule Option do
     @moduledoc false
-    defstruct [:id, :icon, :text, :option_id, :action_menu_id, coded: 0]
+    defstruct [:id, :icon, :text, :option_id, :action_menu_id, :condition, coded: 0, taxi_path_steps: []]
   end
 
   def init(table \\ __MODULE__) do
@@ -35,12 +38,32 @@ defmodule ThistleTea.Game.World.Loader.Gossip do
   end
 
   def load_all do
-    options_by_menu =
+    option_rows =
       from(o in Mangos.GossipMenuOption,
-        where: o.condition_id == 0 and o.option_id in ^@supported_option_ids
+        where: o.option_id in ^@supported_option_ids
       )
       |> Mangos.Repo.all()
-      |> Enum.group_by(& &1.menu_id)
+
+    taxi_steps_by_script =
+      option_rows
+      |> Enum.map(& &1.action_script_id)
+      |> Enum.filter(&(&1 > 0))
+      |> then(&Script.load_by_ids(Mangos.GossipScript, &1))
+      |> Map.new(fn {script_id, steps} ->
+        {script_id, Enum.filter(steps, &match?(%ScriptStep{command: :send_taxi_path}, &1))}
+      end)
+
+    option_rows =
+      Enum.filter(option_rows, fn row ->
+        row.condition_id == 0 or Map.get(taxi_steps_by_script, row.action_script_id, []) != []
+      end)
+
+    conditions =
+      option_rows
+      |> Enum.map(& &1.condition_id)
+      |> ConditionLoader.load_by_ids()
+
+    options_by_menu = Enum.group_by(option_rows, & &1.menu_id)
 
     Mangos.GossipMenu
     |> Mangos.Repo.all()
@@ -59,7 +82,9 @@ defmodule ThistleTea.Game.World.Loader.Gossip do
             text: o.option_text,
             option_id: o.option_id,
             action_menu_id: o.action_menu_id,
-            coded: o.box_coded
+            condition: Map.get(conditions, o.condition_id),
+            coded: o.box_coded,
+            taxi_path_steps: Map.get(taxi_steps_by_script, o.action_script_id, [])
           }
         end)
 
