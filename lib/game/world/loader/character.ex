@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.World.Loader.Character do
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Data.Taxi.Network, as: TaxiNetwork
   alias ThistleTea.Game.Player.Stats
   alias ThistleTea.Game.World.Loader.Skill, as: SkillLoader
   alias ThistleTea.Game.WorldRef
@@ -105,6 +106,7 @@ defmodule ThistleTea.Game.World.Loader.Character do
         next_level_xp: stats.next_level_xp,
         rest_state_experience: 0,
         coinage: 0,
+        taxi_nodes: TaxiNetwork.node_ids_from_mask([chr_race.starting_taxi_mask]),
         skills: SkillLoader.initial_skills(spells, params.race, params.class, stats.level)
       },
       movement_block:

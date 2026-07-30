@@ -46,6 +46,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.Player do
     guild_timestamp: {0x00C5, 1, :int},
     quest_log: {:virtual, %{}},
     rewarded_quests: {:virtual, MapSet.new()},
+    taxi_nodes: {:virtual, MapSet.new()},
     quest_slot_1: {0x00C6, 3, {:fn, [:quest_log], &__MODULE__.quest_slot_1/1}, :private},
     quest_slot_2: {0x00C9, 3, {:fn, [:quest_log], &__MODULE__.quest_slot_2/1}, :private},
     quest_slot_3: {0x00CC, 3, {:fn, [:quest_log], &__MODULE__.quest_slot_3/1}, :private},

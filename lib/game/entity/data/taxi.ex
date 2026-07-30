@@ -20,7 +20,7 @@ defmodule ThistleTea.Game.Entity.Data.Taxi.Network do
   @moduledoc """
   Immutable flight network assembled at the database boundary.
   """
-  import Bitwise, only: [<<<: 2, |||: 2]
+  import Bitwise, only: [&&&: 2, <<<: 2, |||: 2]
 
   alias ThistleTea.Game.Entity.Data.Taxi.Node
   alias ThistleTea.Game.Entity.Data.Taxi.Path
@@ -93,6 +93,14 @@ defmodule ThistleTea.Game.Entity.Data.Taxi.Network do
     end)
   end
 
+  def node_ids_from_mask(words) when is_list(words) do
+    words
+    |> Enum.with_index()
+    |> Enum.reduce(MapSet.new(), fn {word, word_index}, node_ids ->
+      Enum.reduce(0..31, node_ids, &put_mask_bit(&2, word, word_index, &1))
+    end)
+  end
+
   defp network_node?(node_id, routes, spell_path_ids) do
     outgoing =
       for {{source, _destination}, path_id} <- routes,
@@ -112,6 +120,14 @@ defmodule ThistleTea.Game.Entity.Data.Taxi.Network do
   end
 
   defp nearest_candidate(_node, _map_id, _position, _team), do: []
+
+  defp put_mask_bit(node_ids, word, word_index, bit) do
+    if (word &&& 1 <<< bit) == 0 do
+      node_ids
+    else
+      MapSet.put(node_ids, word_index * 32 + bit + 1)
+    end
+  end
 
   defp itinerary_paths(network, node_ids) do
     node_ids

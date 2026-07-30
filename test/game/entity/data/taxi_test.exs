@@ -85,6 +85,12 @@ defmodule ThistleTea.Game.Entity.Data.TaxiTest do
     end
   end
 
+  describe "node_ids_from_mask/1" do
+    test "decodes a race starting-node mask" do
+      assert Network.node_ids_from_mask([0b1010]) == MapSet.new([2, 4])
+    end
+  end
+
   defp taxi_node(id, position \\ {0.0, 0.0, 0.0}, mounts \\ %{alliance: 1, horde: 1}) do
     %Node{id: id, map_id: 0, position: position, name: "Node #{id}", mount_display_ids: mounts}
   end
