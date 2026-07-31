@@ -10,6 +10,8 @@ defmodule ThistleTea.Game.Player.DevCommands do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.ItemTemplate
   alias ThistleTea.Game.Entity.Data.Quest
+  alias ThistleTea.Game.Entity.Data.Reputation.Definition
+  alias ThistleTea.Game.Entity.Data.Reputation.State, as: ReputationState
   alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Death
@@ -18,6 +20,7 @@ defmodule ThistleTea.Game.Player.DevCommands do
   alias ThistleTea.Game.Entity.Logic.MovementStats
   alias ThistleTea.Game.Entity.Logic.Proficiency
   alias ThistleTea.Game.Entity.Logic.QuestLog
+  alias ThistleTea.Game.Entity.Logic.Reputation, as: ReputationLogic
   alias ThistleTea.Game.Entity.Logic.Rest
   alias ThistleTea.Game.Entity.Logic.Skills
   alias ThistleTea.Game.Entity.Server.Player, as: PlayerServer
@@ -29,6 +32,7 @@ defmodule ThistleTea.Game.Player.DevCommands do
   alias ThistleTea.Game.Player.Exploration, as: PlayerExploration
   alias ThistleTea.Game.Player.Items
   alias ThistleTea.Game.Player.Quests
+  alias ThistleTea.Game.Player.Reputation, as: PlayerReputation
   alias ThistleTea.Game.Player.Spells
   alias ThistleTea.Game.Player.Stats
   alias ThistleTea.Game.Player.Talents
@@ -39,6 +43,7 @@ defmodule ThistleTea.Game.Player.DevCommands do
   alias ThistleTea.Game.World.Loader.ClassSpell
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
   alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader
+  alias ThistleTea.Game.World.Loader.Reputation, as: ReputationLoader
   alias ThistleTea.Game.World.Loader.Skill, as: SkillLoader
   alias ThistleTea.Game.World.Loader.Taxi, as: TaxiLoader
   alias ThistleTea.Game.World.Metadata
@@ -99,6 +104,11 @@ defmodule ThistleTea.Game.Player.DevCommands do
       ".addquest <quest_id> - add a quest to your quest log",
       ".debug random equipment - add a random player-obtainable equipment set",
       ".debug professions - set known professions to 300/300",
+      ".debug reputation <faction_id> - show standing and flags",
+      ".debug reputation add <faction_id> <delta> - change standing",
+      ".debug reputation find <name> - find faction ids",
+      ".debug reputation set <faction_id> <standing> - set absolute standing",
+      ".debug reputation war <faction_id> <on|off> - toggle at-war",
       ".debug skills - max out known skills for your level",
       ".debug spells - learn class trainer spells up to your level",
       ".debug events - show active events and the next scheduled change",
@@ -217,6 +227,13 @@ defmodule ThistleTea.Game.Player.DevCommands do
     state
     |> debug_spell_ids()
     |> then(&learn_spells(state, &1, "Already know all debug spells."))
+    |> handled()
+  end
+
+  def run(state, ".debug reputation" <> params) do
+    params
+    |> String.split(" ", trim: true)
+    |> debug_reputation(state)
     |> handled()
   end
 
@@ -430,6 +447,120 @@ defmodule ThistleTea.Game.Player.DevCommands do
       %{name: name} when is_binary(name) -> name
       _ -> "guid #{guid}"
     end
+  end
+
+  defp debug_reputation([], state), do: reputation_usage(state)
+
+  defp debug_reputation(["find" | words], state) when words != [] do
+    query = words |> Enum.join(" ") |> String.downcase()
+
+    matches =
+      ReputationLoader.catalog().factions
+      |> Map.values()
+      |> Enum.filter(&String.contains?(String.downcase(&1.name || ""), query))
+      |> Enum.sort_by(& &1.name)
+      |> Enum.take(15)
+
+    case matches do
+      [] ->
+        system_message(state, "No reputation factions match #{inspect(Enum.join(words, " "))}.")
+
+      matches ->
+        Enum.reduce(matches, state, fn definition, state ->
+          system_message(state, "#{definition.name} (#{definition.id}), slot #{definition.index}")
+        end)
+    end
+  end
+
+  defp debug_reputation(["set", faction_id, standing], state) do
+    with {:ok, faction_id} <- parse_positive_integer(faction_id),
+         {standing, ""} <- Integer.parse(standing),
+         %Definition{} <- ReputationLoader.faction(faction_id) do
+      state
+      |> PlayerReputation.set(faction_id, standing)
+      |> reputation_status(faction_id)
+    else
+      _ -> reputation_usage(state)
+    end
+  end
+
+  defp debug_reputation(["add", faction_id, delta], state) do
+    with {:ok, faction_id} <- parse_positive_integer(faction_id),
+         {delta, ""} <- Integer.parse(delta),
+         %Definition{} <- ReputationLoader.faction(faction_id) do
+      state
+      |> PlayerReputation.modify(faction_id, delta)
+      |> reputation_status(faction_id)
+    else
+      _ -> reputation_usage(state)
+    end
+  end
+
+  defp debug_reputation(["war", faction_id, enabled], state) when enabled in ["on", "off"] do
+    with {:ok, faction_id} <- parse_positive_integer(faction_id),
+         %Definition{index: index} <- ReputationLoader.faction(faction_id) do
+      state
+      |> PlayerReputation.set_at_war(index, enabled == "on", notify?: true)
+      |> reputation_status(faction_id)
+    else
+      _ -> reputation_usage(state)
+    end
+  end
+
+  defp debug_reputation([faction_id], state) do
+    with {:ok, faction_id} <- parse_positive_integer(faction_id),
+         %Definition{} <- ReputationLoader.faction(faction_id) do
+      reputation_status(state, faction_id)
+    else
+      _ -> reputation_usage(state)
+    end
+  end
+
+  defp debug_reputation(_params, state), do: reputation_usage(state)
+
+  defp reputation_status(%{character: %Character{} = character} = state, faction_id) do
+    definition = ReputationLoader.faction(faction_id)
+    reputation_state = ReputationLogic.state(character.player.reputation, faction_id)
+    standing = PlayerReputation.standing(character, faction_id)
+    rank = ReputationLogic.rank(standing)
+
+    system_message(
+      state,
+      "#{definition.name} (#{faction_id}), slot #{definition.index}: #{standing}, " <>
+        "#{rank_label(rank)}, flags #{reputation_flags(reputation_state)}"
+    )
+  end
+
+  defp reputation_usage(state) do
+    system_message(
+      state,
+      "Use: .debug reputation <faction_id>|find <name>|set <faction_id> <standing>|" <>
+        "add <faction_id> <delta>|war <faction_id> <on|off>"
+    )
+  end
+
+  defp reputation_flags(%ReputationState{flags: flags}) do
+    [
+      {0x01, "visible"},
+      {0x02, "at-war"},
+      {0x04, "hidden"},
+      {0x08, "forced-invisible"},
+      {0x10, "peace-forced"},
+      {0x20, "inactive"}
+    ]
+    |> Enum.flat_map(fn {flag, label} -> if Bitwise.band(flags, flag) == 0, do: [], else: [label] end)
+    |> case do
+      [] -> "none"
+      labels -> Enum.join(labels, ",")
+    end
+  end
+
+  defp reputation_flags(nil), do: "none"
+
+  defp rank_label(rank) do
+    rank
+    |> Atom.to_string()
+    |> String.capitalize()
   end
 
   defp additem(state, item_id_str, count_str) do

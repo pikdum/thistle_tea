@@ -6,17 +6,25 @@ defmodule ThistleTea.Game.Player.DevCommandsTest do
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Player
+  alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.GameObject
   alias ThistleTea.Game.Entity.Data.GameObjectTemplate
+  alias ThistleTea.Game.Entity.Data.Reputation.Catalog
+  alias ThistleTea.Game.Entity.Data.Reputation.Definition
+  alias ThistleTea.Game.Entity.Data.Reputation.Variant
   alias ThistleTea.Game.Entity.Data.Taxi.Network
   alias ThistleTea.Game.Entity.Data.Taxi.Node
+  alias ThistleTea.Game.Entity.Logic.Reputation, as: ReputationLogic
   alias ThistleTea.Game.Entity.Logic.Transport, as: TransportLogic
   alias ThistleTea.Game.Entity.Server.Transport, as: TransportServer
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Player.DevCommands
+  alias ThistleTea.Game.Player.Reputation, as: PlayerReputation
   alias ThistleTea.Game.World.CharacterStore
+  alias ThistleTea.Game.World.Loader.Reputation, as: ReputationLoader
   alias ThistleTea.Game.World.Loader.Taxi, as: TaxiLoader
+  alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.PostOffice
   alias ThistleTea.Game.World.Transports
   alias ThistleTea.Game.WorldRef
@@ -159,6 +167,51 @@ defmodule ThistleTea.Game.Player.DevCommandsTest do
       assert state.character.player.taxi_nodes == MapSet.new([2])
       assert CharacterStore.get(id).player.taxi_nodes == MapSet.new([2])
       assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgMessagechat{message: "All flight paths unlocked."}}}
+    end
+  end
+
+  describe ".debug reputation" do
+    test "finds, sets, and reports faction standing" do
+      id = System.unique_integer([:positive, :monotonic])
+      guid = Guid.from_low_guid(:player, id)
+      previous_catalog = ReputationLoader.catalog()
+
+      definition = %Definition{
+        id: 72,
+        index: 19,
+        name: "Stormwind",
+        variants: [%Variant{race_mask: 1, base_standing: 0, flags: 0x01}]
+      }
+
+      catalog = %Catalog{factions: %{72 => definition}}
+      ReputationLoader.put_catalog(catalog)
+
+      character = %Character{
+        id: id,
+        object: %Object{guid: guid},
+        unit: %Unit{race: 1, class: 1, level: 60, auras: []},
+        player: %Player{reputation: ReputationLogic.initialize(catalog, 1, 1)},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+        internal: %Internal{world: WorldRef.open(0)}
+      }
+
+      state = %{guid: guid, character: character}
+
+      on_exit(fn ->
+        ReputationLoader.put_catalog(previous_catalog)
+        :ets.delete(CharacterStore, id)
+        Metadata.delete(guid)
+      end)
+
+      assert {:handled, state} = DevCommands.run(state, ".debug reputation set 72 9000")
+      assert PlayerReputation.standing(state.character, 72) == 9_000
+
+      assert_receive {:"$gen_cast",
+                      {:send_packet, %Message.SmsgMessagechat{message: "Stormwind (72), slot 19: 9000, Honored" <> _}}}
+
+      assert {:handled, ^state} = DevCommands.run(state, ".debug reputation find storm")
+
+      assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgMessagechat{message: "Stormwind (72), slot 19"}}}
     end
   end
 
