@@ -140,6 +140,82 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
   end
 
   defp execute(
+         %{object: %{guid: source_guid}} = state,
+         blackboard,
+         %ScriptStep{command: :quest_explored, datalong: quest_id} = step,
+         target_guid,
+         _now,
+         %Context{}
+       )
+       when is_integer(quest_id) and quest_id > 0 do
+    case script_player_guid(source_guid, target_guid) do
+      nil ->
+        {state, blackboard}
+
+      player_guid ->
+        opts = [
+          group?: step.datalong3 != 0,
+          distance: max(step.datalong2, 0),
+          world_object_guid: script_world_object_guid(source_guid, target_guid)
+        ]
+
+        {Effects.enqueue(state, Effects.quest_event_credit(player_guid, quest_id, opts)), blackboard}
+    end
+  end
+
+  defp execute(
+         %{object: %{guid: source_guid}} = state,
+         blackboard,
+         %ScriptStep{command: :kill_credit, datalong: creature_entry} = step,
+         target_guid,
+         _now,
+         %Context{}
+       )
+       when is_integer(creature_entry) and creature_entry > 0 do
+    case script_player_guid(source_guid, target_guid) do
+      nil ->
+        {state, blackboard}
+
+      player_guid ->
+        event = Effects.quest_kill_credit(player_guid, creature_entry, group?: step.datalong2 != 0)
+        {Effects.enqueue(state, event), blackboard}
+    end
+  end
+
+  defp execute(
+         %{object: %{guid: source_guid}} = state,
+         blackboard,
+         %ScriptStep{command: :fail_quest, datalong: quest_id},
+         target_guid,
+         _now,
+         %Context{}
+       )
+       when is_integer(quest_id) and quest_id > 0 do
+    case script_player_guid(source_guid, target_guid) do
+      nil -> {state, blackboard}
+      player_guid -> {Effects.enqueue(state, Effects.quest_fail(player_guid, quest_id, group?: true)), blackboard}
+    end
+  end
+
+  defp execute(
+         %{object: %{guid: source_guid}} = state,
+         blackboard,
+         %ScriptStep{command: :quest_credit},
+         target_guid,
+         _now,
+         %Context{}
+       ) do
+    player_guid = script_player_guid(source_guid, target_guid)
+    world_object_guid = script_world_object_guid(source_guid, target_guid)
+
+    if is_integer(player_guid) and is_integer(world_object_guid) do
+      {Effects.enqueue(state, Effects.quest_interaction_credit(player_guid, world_object_guid)), blackboard}
+    else
+      {state, blackboard}
+    end
+  end
+
+  defp execute(
          state,
          blackboard,
          %ScriptStep{command: :talk} = step,
@@ -273,6 +349,22 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
 
   defp execute(state, blackboard, %ScriptStep{} = step, target_guid, now, %Context{}) do
     execute(state, blackboard, step, target_guid, now)
+  end
+
+  defp script_player_guid(source_guid, target_guid) do
+    cond do
+      Guid.entity_type(target_guid) == :player -> target_guid
+      Guid.entity_type(source_guid) == :player -> source_guid
+      true -> nil
+    end
+  end
+
+  defp script_world_object_guid(source_guid, target_guid) do
+    cond do
+      Guid.entity_type(source_guid) != :player -> source_guid
+      Guid.entity_type(target_guid) != :player -> target_guid
+      true -> nil
+    end
   end
 
   defp execute(state, blackboard, %ScriptStep{command: :remove_aura, datalong: spell_id}, _target_guid, now)

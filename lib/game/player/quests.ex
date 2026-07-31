@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Player.Quests do
   alias ThistleTea.Game.Entity.Data.Item, as: DataItem
   alias ThistleTea.Game.Entity.Data.Quest
   alias ThistleTea.Game.Entity.Logic.Core
+  alias ThistleTea.Game.Entity.Logic.Death
   alias ThistleTea.Game.Entity.Logic.Experience
   alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Entity.Logic.Inventory.Batch
@@ -22,14 +23,17 @@ defmodule ThistleTea.Game.Player.Quests do
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.InventoryUpdate
   alias ThistleTea.Game.Network.Message
+  alias ThistleTea.Game.Party.Group
   alias ThistleTea.Game.Player.Mail
   alias ThistleTea.Game.Player.Reputation, as: PlayerReputation
   alias ThistleTea.Game.Player.Stats, as: PlayerStats
   alias ThistleTea.Game.Time
+  alias ThistleTea.Game.World
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader
   alias ThistleTea.Game.World.Presence
+  alias ThistleTea.Game.World.System.Party, as: PartySystem
 
   def ctx(%Character{} = character) do
     %{
@@ -442,8 +446,11 @@ defmodule ThistleTea.Game.Player.Quests do
     end
   end
 
-  def credit_kill(%{character: %Character{} = character} = state, victim_guid) do
-    creature_entry = Guid.entry(victim_guid)
+  def credit_kill(%{character: %Character{}} = state, victim_guid) do
+    credit_kill_entry(state, Guid.entry(victim_guid), victim_guid)
+  end
+
+  def credit_kill_entry(%{character: %Character{} = character} = state, creature_entry, victim_guid) do
     player = character.player
 
     {quest_log, credited?} =
@@ -500,6 +507,124 @@ defmodule ThistleTea.Game.Player.Quests do
   end
 
   def credit_event(state, _quest_id), do: state
+
+  def credit_scripted_event(state, quest_id, true, distance, world_object_guid) do
+    case party_members(state.guid) do
+      nil ->
+        credit_scripted_event_member(state, quest_id, distance, world_object_guid)
+
+      members ->
+        state = credit_scripted_event_member(state, quest_id, distance, world_object_guid)
+        send_to_other_members(members, state.guid, {:quest_group_event_credit, quest_id, distance, world_object_guid})
+        state
+    end
+  end
+
+  def credit_scripted_event(state, quest_id, false, distance, world_object_guid) do
+    credit_scripted_event_member(state, quest_id, distance, world_object_guid)
+  end
+
+  def credit_scripted_event_member(
+        %{character: %Character{} = character} = state,
+        quest_id,
+        distance,
+        world_object_guid
+      ) do
+    if within_script_distance?(character, world_object_guid, distance) do
+      credit_event(state, quest_id)
+    else
+      fail_member(state, quest_id)
+    end
+  end
+
+  def credit_scripted_kill(state, creature_entry, true) do
+    case party_members(state.guid) do
+      nil ->
+        credit_kill_entry(state, creature_entry, 0)
+
+      members ->
+        state = credit_scripted_kill_member(state, creature_entry, state.guid)
+        send_to_other_members(members, state.guid, {:quest_group_kill_credit, creature_entry, state.guid})
+        state
+    end
+  end
+
+  def credit_scripted_kill(state, creature_entry, false) do
+    credit_kill_entry(state, creature_entry, 0)
+  end
+
+  def credit_scripted_kill_member(%{character: %Character{} = character} = state, creature_entry, source_guid) do
+    distance = if source_guid == state.guid, do: 0.0, else: World.distance_to_guid(character, source_guid)
+
+    if not Death.ghost?(character) and is_number(distance) and distance <= Experience.group_reward_distance() do
+      credit_kill_entry(state, creature_entry, 0)
+    else
+      state
+    end
+  end
+
+  def fail(state, quest_id, true) do
+    state = fail_member(state, quest_id)
+
+    state.guid
+    |> party_members()
+    |> send_to_other_members(state.guid, {:quest_fail_member, quest_id})
+
+    state
+  end
+
+  def fail(state, quest_id, false), do: fail_member(state, quest_id)
+
+  def fail_member(%{character: %Character{player: player} = character} = state, quest_id) do
+    case QuestLog.fail(player.quest_log, quest_id) do
+      {:ok, quest_log, timed?} ->
+        message =
+          if timed? do
+            %Message.SmsgQuestupdateFailedtimer{quest_id: quest_id}
+          else
+            %Message.SmsgQuestupdateFailed{quest_id: quest_id}
+          end
+
+        Network.send_packet(message)
+        put_character(state, %{character | player: %{player | quest_log: quest_log}})
+
+      _error ->
+        state
+    end
+  end
+
+  defp within_script_distance?(_character, _world_object_guid, distance) when not is_integer(distance) or distance <= 0,
+    do: true
+
+  defp within_script_distance?(_character, world_object_guid, _distance) when not is_integer(world_object_guid),
+    do: true
+
+  defp within_script_distance?(character, world_object_guid, distance) do
+    case World.distance_to_guid(character, world_object_guid) do
+      actual when is_number(actual) -> actual <= distance
+      _distance -> false
+    end
+  end
+
+  defp party_members(player_guid) do
+    case PartySystem.group_of(player_guid) do
+      %Group{members: members} -> Enum.map(members, & &1.guid)
+      _group -> nil
+    end
+  end
+
+  defp send_to_other_members(nil, _player_guid, _message), do: :ok
+
+  defp send_to_other_members(member_guids, player_guid, message) do
+    member_guids
+    |> Enum.reject(&(&1 == player_guid))
+    |> Enum.each(fn guid ->
+      case Entity.pid(guid) do
+        pid when is_pid(pid) -> send(pid, message)
+        _pid -> :ok
+      end
+    end)
+  end
 
   defp credit_entity_objective(state, %Character{} = character, target_guid, spell_id, increment) do
     entity_type = quest_entity_type(target_guid)

@@ -86,6 +86,29 @@ defmodule ThistleTea.Game.Entity.Logic.QuestLogTest do
     end
   end
 
+  describe "fail/2" do
+    test "fails an ordinary active quest" do
+      {:ok, quest_log} = QuestLog.add(%{}, 33)
+
+      assert {:ok, quest_log, false} = QuestLog.fail(quest_log, 33)
+      assert %Entry{status: :failed, expires_at_ms: nil, client_expires_at: 1} = QuestLog.get(quest_log, 33)
+    end
+
+    test "reports when the failed quest had a timer" do
+      {:ok, quest_log} = QuestLog.add(%{}, %Quest{id: 33, limit_time: 60}, 10_000, 1_700_000_000)
+
+      assert {:ok, quest_log, true} = QuestLog.fail(quest_log, 33)
+      assert %Entry{status: :failed, expires_at_ms: nil, client_expires_at: 1} = QuestLog.get(quest_log, 33)
+    end
+
+    test "rejects missing and already failed quests" do
+      assert QuestLog.fail(%{}, 33) == {:error, :not_active}
+      {:ok, quest_log} = QuestLog.add(%{}, 33)
+      {:ok, quest_log, false} = QuestLog.fail(quest_log, 33)
+      assert QuestLog.fail(quest_log, 33) == {:error, :already_failed}
+    end
+  end
+
   describe "remove/2" do
     test "leaves an empty tombstone" do
       {:ok, quest_log} = QuestLog.add(%{}, 33)

@@ -419,6 +419,64 @@ defmodule ThistleTea.Game.Entity.Logic.AI.ScriptTest do
       assert [%Effects.SetFacing{facing: {:target, ^buddy}}] = mob.internal.events
     end
 
+    test "quest_explored enqueues group event credit with distance context", %{mob: mob} do
+      player_guid = Guid.from_low_guid(:player, 9)
+      world_object_guid = mob.object.guid
+      step = %ScriptStep{command: :quest_explored, datalong: 986, datalong2: 80, datalong3: 1}
+
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], player_guid, 1_000)
+
+      assert [
+               %Effects.QuestEventCredit{
+                 player_guid: ^player_guid,
+                 quest_id: 986,
+                 group?: true,
+                 distance: 80,
+                 world_object_guid: ^world_object_guid
+               }
+             ] = mob.internal.events
+    end
+
+    test "kill_credit enqueues scripted creature credit", %{mob: mob} do
+      player_guid = Guid.from_low_guid(:player, 9)
+      step = %ScriptStep{command: :kill_credit, datalong: 11_220, datalong2: 1}
+
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], player_guid, 1_000)
+
+      assert [
+               %Effects.QuestKillCredit{
+                 player_guid: ^player_guid,
+                 creature_entry: 11_220,
+                 group?: true
+               }
+             ] = mob.internal.events
+    end
+
+    test "fail_quest enqueues group quest failure", %{mob: mob} do
+      player_guid = Guid.from_low_guid(:player, 9)
+      step = %ScriptStep{command: :fail_quest, datalong: 986}
+
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], player_guid, 1_000)
+
+      assert [%Effects.QuestFail{player_guid: ^player_guid, quest_id: 986, group?: true}] =
+               mob.internal.events
+    end
+
+    test "quest_credit enqueues interaction credit for the world object", %{mob: mob} do
+      player_guid = Guid.from_low_guid(:player, 9)
+      world_object_guid = mob.object.guid
+      step = %ScriptStep{command: :quest_credit}
+
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], player_guid, 1_000)
+
+      assert [
+               %Effects.QuestInteractionCredit{
+                 player_guid: ^player_guid,
+                 target_guid: ^world_object_guid
+               }
+             ] = mob.internal.events
+    end
+
     test "delayed steps are deferred through a script_steps event", %{mob: mob} do
       immediate = %ScriptStep{command: :emote, datalong: 11}
       delayed = %ScriptStep{command: :emote, datalong: 22, delay_ms: 4_000}

@@ -21,7 +21,10 @@ defmodule ThistleTea.Game.Entity.Logic.Effects.ClientTypes do
     {:ForcedReactionsChanged, [:reactions, :friendly_faction_ids], []},
     {:ReputationChange, [:faction_id, :value], []},
     {:QuestCastCredit, [:target_guids, :spell_id], []},
-    {:QuestEventCredit, [:player_guid, :quest_id], []}
+    {:QuestEventCredit, [:player_guid, :quest_id], [group?: false, distance: 0, world_object_guid: nil]},
+    {:QuestFail, [:player_guid, :quest_id], [group?: false]},
+    {:QuestInteractionCredit, [:player_guid, :target_guid], []},
+    {:QuestKillCredit, [:player_guid, :creature_entry], [group?: false]}
   ]
 
   for {name, required, optional} <- effects do

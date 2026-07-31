@@ -571,9 +571,38 @@ defmodule ThistleTea.Game.Entity.Logic.Effects do
     %Effects.QuestCastCredit{target_guids: target_guids, spell_id: spell_id}
   end
 
-  def quest_event_credit(player_guid, quest_id)
+  def quest_event_credit(player_guid, quest_id, opts \\ [])
       when is_integer(player_guid) and player_guid > 0 and is_integer(quest_id) and quest_id > 0 do
-    %Effects.QuestEventCredit{player_guid: player_guid, quest_id: quest_id}
+    %Effects.QuestEventCredit{
+      player_guid: player_guid,
+      quest_id: quest_id,
+      group?: Keyword.get(opts, :group?, false),
+      distance: Keyword.get(opts, :distance, 0),
+      world_object_guid: Keyword.get(opts, :world_object_guid)
+    }
+  end
+
+  def quest_fail(player_guid, quest_id, opts \\ [])
+      when is_integer(player_guid) and player_guid > 0 and is_integer(quest_id) and quest_id > 0 do
+    %Effects.QuestFail{
+      player_guid: player_guid,
+      quest_id: quest_id,
+      group?: Keyword.get(opts, :group?, false)
+    }
+  end
+
+  def quest_interaction_credit(player_guid, target_guid)
+      when is_integer(player_guid) and player_guid > 0 and is_integer(target_guid) and target_guid > 0 do
+    %Effects.QuestInteractionCredit{player_guid: player_guid, target_guid: target_guid}
+  end
+
+  def quest_kill_credit(player_guid, creature_entry, opts \\ [])
+      when is_integer(player_guid) and player_guid > 0 and is_integer(creature_entry) and creature_entry > 0 do
+    %Effects.QuestKillCredit{
+      player_guid: player_guid,
+      creature_entry: creature_entry,
+      group?: Keyword.get(opts, :group?, false)
+    }
   end
 
   def forced_reactions_changed(reactions, friendly_faction_ids)

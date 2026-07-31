@@ -171,8 +171,44 @@ defmodule ThistleTea.Game.Entity.EventSink.ClientProjection do
 
   def emit(entity, %Effects.QuestEventCredit{} = effect, _context) do
     case Entity.pid(effect.player_guid) do
-      pid when is_pid(pid) -> send(pid, {:quest_event_credit, effect.quest_id})
+      pid when is_pid(pid) ->
+        send(
+          pid,
+          {:quest_event_credit, effect.quest_id, effect.group?, effect.distance, effect.world_object_guid}
+        )
+
+      _pid ->
+        :ok
+    end
+
+    entity
+  end
+
+  def emit(entity, %Effects.QuestFail{} = effect, _context) do
+    case Entity.pid(effect.player_guid) do
+      pid when is_pid(pid) -> send(pid, {:quest_fail, effect.quest_id, effect.group?})
       _pid -> :ok
+    end
+
+    entity
+  end
+
+  def emit(entity, %Effects.QuestInteractionCredit{} = effect, _context) do
+    case Entity.pid(effect.player_guid) do
+      pid when is_pid(pid) -> send(pid, {:quest_interaction_credit, effect.target_guid})
+      _pid -> :ok
+    end
+
+    entity
+  end
+
+  def emit(entity, %Effects.QuestKillCredit{} = effect, _context) do
+    case Entity.pid(effect.player_guid) do
+      pid when is_pid(pid) ->
+        send(pid, {:quest_kill_credit, effect.creature_entry, effect.group?})
+
+      _pid ->
+        :ok
     end
 
     entity

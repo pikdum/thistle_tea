@@ -69,6 +69,13 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStepTest do
       assert step.command == :send_taxi_path
       assert step.target_type == {:unsupported, 25}
     end
+
+    test "decodes quest credit commands" do
+      assert ScriptStep.build(row(7)).command == :quest_explored
+      assert ScriptStep.build(row(8)).command == :kill_credit
+      assert ScriptStep.build(row(70)).command == :fail_quest
+      assert ScriptStep.build(row(83)).command == :quest_credit
+    end
   end
 
   describe "talk_text_ids/1" do
@@ -87,5 +94,31 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStepTest do
       assert ScriptStep.emote_ids(step) == [11]
       assert ScriptStep.emote_ids(%ScriptStep{command: :talk, datalong: 11}) == []
     end
+  end
+
+  defp row(command) do
+    %{
+      id: 5,
+      delay: 0,
+      priority: 0,
+      command: command,
+      datalong: 0,
+      datalong2: 0,
+      datalong3: 0,
+      datalong4: 0,
+      dataint: 0,
+      dataint2: 0,
+      dataint3: 0,
+      dataint4: 0,
+      target_type: 0,
+      target_param1: 0,
+      target_param2: 0,
+      data_flags: 0,
+      x: 0.0,
+      y: 0.0,
+      z: 0.0,
+      o: 0.0,
+      condition_id: 0
+    }
   end
 end

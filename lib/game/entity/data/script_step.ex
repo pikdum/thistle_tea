@@ -134,6 +134,8 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStep do
   defp command(0), do: :talk
   defp command(1), do: :emote
   defp command(3), do: :move_to
+  defp command(7), do: :quest_explored
+  defp command(8), do: :kill_credit
   defp command(10), do: :summon_creature
   defp command(14), do: :remove_aura
   defp command(15), do: :cast_spell
@@ -151,6 +153,8 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStep do
   defp command(45), do: :set_phase_random
   defp command(46), do: :set_phase_range
   defp command(47), do: :flee
+  defp command(70), do: :fail_quest
+  defp command(83), do: :quest_credit
   defp command(other), do: {:unsupported, other}
 
   def decode_target_type(value) when is_integer(value) and value < 0, do: nil

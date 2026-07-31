@@ -870,6 +870,34 @@ defmodule ThistleTea.Game.Entity.Server.Player do
     {:noreply, Quests.credit_event(state, quest_id)}
   end
 
+  def handle_info({:quest_event_credit, quest_id, group?, distance, world_object_guid}, %State{} = state) do
+    {:noreply, Quests.credit_scripted_event(state, quest_id, group?, distance, world_object_guid)}
+  end
+
+  def handle_info({:quest_group_event_credit, quest_id, distance, world_object_guid}, %State{} = state) do
+    {:noreply, Quests.credit_scripted_event_member(state, quest_id, distance, world_object_guid)}
+  end
+
+  def handle_info({:quest_fail, quest_id, group?}, %State{} = state) do
+    {:noreply, Quests.fail(state, quest_id, group?)}
+  end
+
+  def handle_info({:quest_fail_member, quest_id}, %State{} = state) do
+    {:noreply, Quests.fail_member(state, quest_id)}
+  end
+
+  def handle_info({:quest_interaction_credit, target_guid}, %State{} = state) do
+    {:noreply, Quests.credit_entity_interaction(state, target_guid)}
+  end
+
+  def handle_info({:quest_kill_credit, creature_entry, group?}, %State{} = state) do
+    {:noreply, Quests.credit_scripted_kill(state, creature_entry, group?)}
+  end
+
+  def handle_info({:quest_group_kill_credit, creature_entry, source_guid}, %State{} = state) do
+    {:noreply, Quests.credit_scripted_kill_member(state, creature_entry, source_guid)}
+  end
+
   def handle_info({:quest_timer_expired, quest_id, expires_at_ms}, %State{} = state) do
     {:noreply, Quests.expire_timed(state, quest_id, expires_at_ms)}
   end

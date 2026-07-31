@@ -165,6 +165,30 @@ defmodule ThistleTea.Game.Entity.Logic.QuestLog do
     end
   end
 
+  def fail(quest_log, quest_id) do
+    case get(quest_log, quest_id) do
+      %Entry{status: status} = entry when status in [:incomplete, :complete] ->
+        fail_entry(quest_log, quest_id, entry)
+
+      %Entry{} ->
+        {:error, :already_failed}
+
+      nil ->
+        {:error, :not_active}
+    end
+  end
+
+  defp fail_entry(quest_log, quest_id, entry) do
+    timed? = is_integer(entry.expires_at_ms)
+
+    case update(quest_log, quest_id, fn entry ->
+           %{entry | status: :failed, expires_at_ms: nil, client_expires_at: 1}
+         end) do
+      {:ok, quest_log} -> {:ok, quest_log, timed?}
+      error -> error
+    end
+  end
+
   def timed?(quest_log) do
     Enum.any?(active_entries(quest_log), &is_integer(&1.expires_at_ms))
   end

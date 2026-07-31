@@ -31,6 +31,9 @@ defmodule ThistleTea.Game.Entity.EventSink do
     Effects.PlaySound,
     Effects.QuestCastCredit,
     Effects.QuestEventCredit,
+    Effects.QuestFail,
+    Effects.QuestInteractionCredit,
+    Effects.QuestKillCredit,
     Effects.ReputationChange,
     Effects.SendTaxiPath,
     Effects.ScriptSteps
