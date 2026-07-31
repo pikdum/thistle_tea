@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.World.Loader.Script do
   alias ThistleTea.DB.Mangos
   alias ThistleTea.Game.Entity.Data.ScriptStep
   alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.World.Loader.Condition, as: ConditionLoader
 
   def load_by_ids(schema, script_ids), do: load_by_ids(schema, script_ids, MapSet.new())
 
@@ -27,6 +28,7 @@ defmodule ThistleTea.Game.World.Loader.Script do
     |> Enum.map(&resolve_buddy_guid/1)
     |> resolve_texts()
     |> resolve_nested_scripts(visited)
+    |> attach_conditions()
     |> Enum.group_by(& &1.script_id)
   end
 
@@ -104,6 +106,29 @@ defmodule ThistleTea.Game.World.Loader.Script do
     from(t in Mangos.BroadcastText, where: t.entry in ^Enum.uniq(text_ids))
     |> Mangos.Repo.all()
     |> Map.new(fn row -> {row.entry, build_text(row)} end)
+  end
+
+  defp attach_conditions(steps) do
+    conditions =
+      steps
+      |> Enum.flat_map(&with_sub_steps/1)
+      |> Enum.map(& &1.condition_id)
+      |> ConditionLoader.load_by_ids()
+
+    Enum.map(steps, &attach_step_condition(&1, conditions))
+  end
+
+  defp with_sub_steps(%ScriptStep{} = step) do
+    [step | step.sub_scripts |> Map.values() |> List.flatten() |> Enum.flat_map(&with_sub_steps/1)]
+  end
+
+  defp attach_step_condition(%ScriptStep{} = step, conditions) do
+    sub_scripts =
+      Map.new(step.sub_scripts, fn {script_id, steps} ->
+        {script_id, Enum.map(steps, &attach_step_condition(&1, conditions))}
+      end)
+
+    %{step | condition: Map.get(conditions, step.condition_id), sub_scripts: sub_scripts}
   end
 
   defp build_text(%Mangos.BroadcastText{} = row) do

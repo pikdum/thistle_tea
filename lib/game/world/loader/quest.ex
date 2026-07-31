@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.World.Loader.Quest do
   """
   alias ThistleTea.DB.Mangos
   alias ThistleTea.Game.Entity.Data.Quest
+  alias ThistleTea.Game.World.Loader.Script
 
   @table_options [:named_table, :public, read_concurrency: true, write_concurrency: :auto]
 
@@ -16,10 +17,20 @@ defmodule ThistleTea.Game.World.Loader.Quest do
   end
 
   def load_all do
-    Mangos.QuestTemplate
-    |> Mangos.Repo.all()
+    rows = Mangos.Repo.all(Mangos.QuestTemplate)
+    start_scripts = load_scripts(rows, :start_script, Mangos.QuestStartScript)
+    complete_scripts = load_scripts(rows, :complete_script, Mangos.QuestEndScript)
+
+    rows
     |> Enum.each(fn row ->
       quest = Quest.build(row)
+
+      quest = %{
+        quest
+        | start_script_steps: Map.get(start_scripts, quest.start_script_id, []),
+          complete_script_steps: Map.get(complete_scripts, quest.complete_script_id, [])
+      }
+
       :ets.insert(__MODULE__, {{:quest, quest.id}, quest})
     end)
 
@@ -27,6 +38,13 @@ defmodule ThistleTea.Game.World.Loader.Quest do
     load_creature_relations(Mangos.CreatureInvolvedRelation, :ender)
 
     :ok
+  end
+
+  defp load_scripts(rows, field, schema) do
+    rows
+    |> Enum.map(&Map.get(&1, field))
+    |> Enum.filter(&(&1 > 0))
+    |> then(&Script.load_by_ids(schema, &1))
   end
 
   def get(quest_id) do

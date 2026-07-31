@@ -8,6 +8,10 @@ defmodule ThistleTea.Game.Entity.Data.Quest do
 
   defstruct [
     :id,
+    start_script_id: 0,
+    complete_script_id: 0,
+    start_script_steps: [],
+    complete_script_steps: [],
     method: 2,
     zone_or_sort: 0,
     min_level: 0,
@@ -65,6 +69,8 @@ defmodule ThistleTea.Game.Entity.Data.Quest do
   def build(%Mangos.QuestTemplate{} = row) do
     %__MODULE__{
       id: row.entry,
+      start_script_id: row.start_script,
+      complete_script_id: row.complete_script,
       method: row.method,
       zone_or_sort: row.zone_or_sort,
       min_level: row.min_level,

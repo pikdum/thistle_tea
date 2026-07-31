@@ -132,6 +132,35 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     end
   end
 
+  def handle_cast({:start_script, steps, target_guid}, %Mob{} = state)
+      when is_list(steps) and is_integer(target_guid) do
+    now = Time.now()
+
+    state =
+      state
+      |> EventAI.with_blackboard(
+        &Script.run(
+          &1,
+          &2,
+          steps,
+          target_guid,
+          AIEnvironment.context(
+            &1,
+            now,
+            ObservationRequest.new([target_guid], Script.observation_radius(steps))
+          )
+        )
+      )
+      |> NavigationResolver.resolve(now)
+      |> EventSink.emit_pending()
+
+    {:noreply, state, {:continue, :maybe_broadcast}}
+  rescue
+    error ->
+      Logger.error("start_script crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:noreply, state}
+  end
+
   @impl GenServer
   def handle_cast({:move_to, x, y, z}, state) do
     state = AIEnvironment.move_to(state, {x, y, z})

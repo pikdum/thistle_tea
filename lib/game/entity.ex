@@ -122,6 +122,10 @@ defmodule ThistleTea.Game.Entity do
     dispatch_cast(entity, {:reward_kill_share, victim, xp})
   end
 
+  def start_script(entity, steps, target_guid) when is_list(steps) and is_integer(target_guid) do
+    dispatch_cast(entity, {:start_script, steps, target_guid})
+  end
+
   def loot_roll_vote(entity, voter_guid, slot, vote) do
     dispatch_cast(entity, {:loot_roll_vote, voter_guid, slot, vote})
   end

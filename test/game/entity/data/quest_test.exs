@@ -8,6 +8,8 @@ defmodule ThistleTea.Game.Entity.Data.QuestTest do
     test "translates core fields from a quest_template row" do
       row = %Mangos.QuestTemplate{
         entry: 33,
+        start_script: 33,
+        complete_script: 34,
         method: 2,
         min_level: 3,
         quest_level: 8,
@@ -23,6 +25,8 @@ defmodule ThistleTea.Game.Entity.Data.QuestTest do
       quest = Quest.build(row)
 
       assert quest.id == 33
+      assert quest.start_script_id == 33
+      assert quest.complete_script_id == 34
       assert quest.min_level == 3
       assert quest.level == 8
       assert quest.required_races == 1

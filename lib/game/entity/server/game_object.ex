@@ -13,6 +13,8 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
   alias ThistleTea.Game.Entity.Data.Component.Internal.Trap
   alias ThistleTea.Game.Entity.Data.GameObject
   alias ThistleTea.Game.Entity.EventSink
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
+  alias ThistleTea.Game.Entity.Logic.AI.Script
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Loot.Actor
@@ -33,6 +35,7 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Target
+  alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Metadata
@@ -41,6 +44,8 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
   alias ThistleTea.Game.World.System.GameEvent
   alias ThistleTea.Game.World.System.Party, as: PartySystem
   alias ThistleTea.Game.World.Visibility
+
+  require Logger
 
   def start_link(%GameObject{} = state) do
     GenServer.start_link(__MODULE__, state, name: EntityRegistry.via(state.object.guid))
@@ -64,6 +69,16 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
     |> Network.send_packet(pid)
 
     {:noreply, state}
+  end
+
+  def handle_cast({:start_script, steps, target_guid}, %GameObject{} = state)
+      when is_list(steps) and is_integer(target_guid) do
+    {state, _blackboard} = Script.run(state, Blackboard.new(), steps, target_guid, Time.now())
+    {:noreply, EventSink.emit_pending(state)}
+  rescue
+    error ->
+      Logger.error("start_script crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:noreply, state}
   end
 
   @impl GenServer

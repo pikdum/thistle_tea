@@ -129,5 +129,7 @@ defmodule ThistleTea.DB.Mangos.QuestTemplate do
     field(:offer_reward_emote_delay2, :integer, default: 0, source: :OfferRewardEmoteDelay2)
     field(:offer_reward_emote_delay3, :integer, default: 0, source: :OfferRewardEmoteDelay3)
     field(:offer_reward_emote_delay4, :integer, default: 0, source: :OfferRewardEmoteDelay4)
+    field(:start_script, :integer, default: 0, source: :StartScript)
+    field(:complete_script, :integer, default: 0, source: :CompleteScript)
   end
 end

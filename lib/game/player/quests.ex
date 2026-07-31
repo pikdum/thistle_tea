@@ -3,6 +3,7 @@ defmodule ThistleTea.Game.Player.Quests do
   Player-session quest flows: questgiver hello/details/accept/complete/reward
   exchanges, quest-log changes, and the packets each step sends.
   """
+  alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Item, as: DataItem
   alias ThistleTea.Game.Entity.Data.Quest
@@ -104,13 +105,15 @@ defmodule ThistleTea.Game.Player.Quests do
          %Quest{} = quest <- QuestLoader.get(quest_id),
          true <- quest_id in QuestLoader.given_by(Guid.entry(npc_guid)),
          :ok <- QuestRequirements.can_take(quest, ctx(state.character)) do
-      force_accept(state, quest_id)
+      force_accept(state, quest_id, npc_guid)
     else
       _other -> state
     end
   end
 
-  def force_accept(%{character: %Character{player: player}} = state, quest_id) do
+  def force_accept(state, quest_id), do: force_accept(state, quest_id, nil)
+
+  def force_accept(%{character: %Character{player: player}} = state, quest_id, source_guid) do
     with %Quest{} = quest <- QuestLoader.get(quest_id),
          {:ok, quest_log} <-
            QuestLog.add(player.quest_log, quest, Time.now(), System.system_time(:second)),
@@ -138,7 +141,9 @@ defmodule ThistleTea.Game.Player.Quests do
           state
         end
 
-      schedule_timer(state, quest.id)
+      state
+      |> schedule_timer(quest.id)
+      |> run_quest_script(source_guid, quest.start_script_steps)
     else
       {:error, :log_full} ->
         Network.send_packet(%Message.SmsgQuestlogFull{})
@@ -259,9 +264,18 @@ defmodule ThistleTea.Game.Player.Quests do
     state = put_character(state, character)
     state = PlayerReputation.reward_quest(state, quest)
     state = Mail.send_quest_reward(state, npc_guid, quest)
+    state = run_quest_script(state, npc_guid, quest.complete_script_steps)
     send_next_quest(state, npc_guid, quest)
     state
   end
+
+  defp run_quest_script(state, source_guid, steps)
+       when is_integer(source_guid) and source_guid > 0 and is_list(steps) and steps != [] do
+    Entity.start_script(source_guid, steps, state.guid)
+    state
+  end
+
+  defp run_quest_script(state, _source_guid, _steps), do: state
 
   defp quest_reward(%Quest{} = quest, player_level) do
     if player_level >= PlayerStats.max_level() do
