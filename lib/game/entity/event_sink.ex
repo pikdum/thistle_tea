@@ -113,6 +113,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
     Effects.DismissPet,
     Effects.LeaveRitual,
     Effects.ReleaseControlled,
+    Effects.RespawnSelf,
     Effects.SpawnAreaEffect,
     Effects.SpawnFarsight,
     Effects.SummonCreature,

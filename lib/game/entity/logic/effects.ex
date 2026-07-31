@@ -557,6 +557,10 @@ defmodule ThistleTea.Game.Entity.Logic.Effects do
     %Effects.DespawnSelf{duration_ms: despawn_delay_ms, respawn_delay_ms: respawn_delay_ms}
   end
 
+  def respawn_self(even_if_alive?) when is_boolean(even_if_alive?) do
+    %Effects.RespawnSelf{even_if_alive?: even_if_alive?}
+  end
+
   def attack_start(target_guid) when is_integer(target_guid) do
     %Effects.StartAttack{target_guid: target_guid}
   end

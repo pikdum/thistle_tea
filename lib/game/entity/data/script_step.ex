@@ -193,6 +193,7 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStep do
   defp command(68), do: :start_script_for_all
   defp command(69), do: :edit_map_event
   defp command(70), do: :fail_quest
+  defp command(71), do: :respawn_creature
   defp command(74), do: :add_aura
   defp command(76), do: :summon_object
   defp command(80), do: :set_game_object_state

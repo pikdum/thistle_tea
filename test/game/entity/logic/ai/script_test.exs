@@ -616,6 +616,13 @@ defmodule ThistleTea.Game.Entity.Logic.AI.ScriptTest do
       assert [%Effects.TriggerSpell{source_guid: ^guid, target_guid: ^guid, spell_id: 11_048}] = mob.internal.events
     end
 
+    test "respawn_creature enqueues an owner lifecycle request", %{mob: mob} do
+      step = %ScriptStep{command: :respawn_creature, datalong: 1}
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], nil, 1_000)
+
+      assert [%Effects.RespawnSelf{even_if_alive?: true}] = mob.internal.events
+    end
+
     test "set_default_movement updates the spawn movement policy", %{mob: mob} do
       spawn = %Spawn{distance: 0, movement_type: 0}
       mob = %{mob | internal: %{mob.internal | spawn: spawn}}

@@ -79,6 +79,7 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStepTest do
       assert ScriptStep.build(row(61)).command == :start_map_event
       assert ScriptStep.build(row(69)).command == :edit_map_event
       assert ScriptStep.build(row(70)).command == :fail_quest
+      assert ScriptStep.build(row(71)).command == :respawn_creature
       assert ScriptStep.build(row(74)).command == :add_aura
       assert ScriptStep.build(row(76)).command == :summon_object
       assert ScriptStep.build(row(80)).command == :set_game_object_state

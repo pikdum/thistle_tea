@@ -68,6 +68,10 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Respawn do
     end
   end
 
+  def force(%Mob{} = state, even_if_alive?) when is_boolean(even_if_alive?) do
+    if Core.dead?(state) or even_if_alive?, do: respawn(state), else: state
+  end
+
   def despawn(%Mob{} = state, respawn_delay_ms) do
     cond do
       temporary?(state) ->

@@ -522,6 +522,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
     {Effects.enqueue(state, effect), blackboard}
   end
 
+  defp execute(%Mob{} = state, blackboard, %ScriptStep{command: :respawn_creature} = step, _target, _now) do
+    {Effects.enqueue(state, Effects.respawn_self(step.datalong != 0)), blackboard}
+  end
+
   defp execute(state, blackboard, %ScriptStep{command: :morph} = step, _target_guid, _now) do
     {morph(state, morph_display_id(state, step)), blackboard}
   end

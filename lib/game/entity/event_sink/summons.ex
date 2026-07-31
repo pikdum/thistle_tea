@@ -313,6 +313,11 @@ defmodule ThistleTea.Game.Entity.EventSink.Summons do
     entity
   end
 
+  def emit(entity, %Effects.RespawnSelf{even_if_alive?: even_if_alive?}, context) do
+    Context.send(context, {:script_respawn, even_if_alive?})
+    entity
+  end
+
   defp summon_position({x, y, z, orientation}, {source_x, source_y, source_z, source_orientation}) do
     {
       coordinate(x, source_x),

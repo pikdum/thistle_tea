@@ -19,7 +19,8 @@ defmodule ThistleTea.Game.Entity.Logic.Effects.SummonTypes do
     {:TameCreature, [:source_guid, :entry], []},
     {:DismissPet, [:target_guid], []},
     {:SummonTotem, [:entry, :slot, :duration_ms], []},
-    {:DespawnSelf, [:duration_ms, :respawn_delay_ms], []}
+    {:DespawnSelf, [:duration_ms, :respawn_delay_ms], []},
+    {:RespawnSelf, [:even_if_alive?], []}
   ]
 
   for {name, required, optional} <- effects do

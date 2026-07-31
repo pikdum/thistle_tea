@@ -536,6 +536,14 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     {:noreply, Respawn.handle(state)}
   end
 
+  def handle_info({:script_respawn, even_if_alive?}, %Mob{} = state) when is_boolean(even_if_alive?) do
+    {:noreply, Respawn.force(state, even_if_alive?)}
+  rescue
+    error ->
+      Logger.error("script respawn crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:noreply, state}
+  end
+
   def handle_info({:ai_script_steps, steps, target_guid}, %Mob{} = state) do
     if Corpse.removed?(state) do
       {:noreply, state}
