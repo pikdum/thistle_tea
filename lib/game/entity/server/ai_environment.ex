@@ -40,11 +40,16 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
 
   def context(entity, now \\ Time.now(), request \\ %Request{})
 
-  def context(entity, now, %Request{actors: actors, radius: requested_radius})
-      when is_integer(now) and is_list(actors) and is_number(requested_radius) and requested_radius >= 0 do
+  def context(entity, now, %Request{
+        actors: actors,
+        radius: requested_radius,
+        game_object_radius: requested_game_object_radius
+      })
+      when is_integer(now) and is_list(actors) and is_number(requested_radius) and requested_radius >= 0 and
+             is_number(requested_game_object_radius) and requested_game_object_radius >= 0 do
     %Context{
       now: now,
-      perception: perception(entity, now, actors, requested_radius),
+      perception: perception(entity, now, actors, requested_radius, requested_game_object_radius),
       random: random(),
       navigation: navigation(entity, now),
       waypoints: WaypointLoader.context()
@@ -57,9 +62,10 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
     |> NavigationResolver.resolve(now)
   end
 
-  defp perception(entity, now, observed_guids, requested_radius) do
+  defp perception(entity, now, observed_guids, requested_radius, requested_game_object_radius) do
     radius = max(observation_radius(entity), requested_radius)
-    nearby = nearby_guids(entity, radius)
+    game_object_radius = max(game_object_observation_radius(entity), requested_game_object_radius)
+    nearby = nearby_guids(entity, radius, game_object_radius)
 
     guids =
       [own_guid(entity) | direct_guids(entity)]
@@ -88,6 +94,15 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
   end
 
   defp observation_radius(_entity), do: 0.0
+
+  defp game_object_observation_radius(%Mob{} = entity) do
+    max(
+      EventAI.game_object_observation_radius(entity),
+      waypoint_game_object_observation_radius(entity)
+    )
+  end
+
+  defp game_object_observation_radius(_entity), do: 0.0
 
   defp base_observation_radius(%Mob{internal: %Internal{pet: %Pet{}}}), do: @pet_observation_radius
   defp base_observation_radius(%Mob{internal: %Internal{totem: %Totem{}}}), do: @totem_observation_radius
@@ -121,14 +136,41 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
 
   defp waypoint_route_observation_radius(nil), do: 0.0
 
-  defp nearby_guids(entity, radius) when is_number(radius) and radius > 0 do
-    %{
-      mobs: World.nearby_mobs(entity, radius),
-      players: World.nearby_players(entity, radius)
-    }
+  defp waypoint_game_object_observation_radius(%Mob{} = entity) do
+    entity
+    |> waypoint_route()
+    |> waypoint_route_game_object_observation_radius()
   end
 
-  defp nearby_guids(_entity, _radius), do: %{mobs: [], players: []}
+  defp waypoint_route_game_object_observation_radius(%WaypointRoute{points: points}) when is_map(points) do
+    points
+    |> Map.values()
+    |> Enum.flat_map(fn
+      %Waypoint{script_steps: steps} when is_list(steps) -> steps
+      _waypoint -> []
+    end)
+    |> Script.game_object_observation_radius()
+  end
+
+  defp waypoint_route_game_object_observation_radius(nil), do: 0.0
+
+  defp nearby_guids(entity, radius, game_object_radius) do
+    nearby =
+      if radius > 0 do
+        %{
+          mobs: World.nearby_mobs(entity, radius),
+          players: World.nearby_players(entity, radius)
+        }
+      else
+        %{mobs: [], players: []}
+      end
+
+    if game_object_radius > 0 do
+      Map.put(nearby, :game_objects, World.nearby_game_objects(entity, game_object_radius))
+    else
+      Map.put(nearby, :game_objects, [])
+    end
+  end
 
   defp direct_guids(%{
          internal: %Internal{pet: %Pet{owner_guid: owner_guid}, threat: threat},

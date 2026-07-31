@@ -412,6 +412,14 @@ defmodule ThistleTea.Game.Entity.Logic.Effects do
     %Effects.DespawnEntity{target_guid: guid}
   end
 
+  def remove_self(respawn_delay_ms \\ nil) do
+    %Effects.RemoveSelf{respawn_delay_ms: respawn_delay_ms}
+  end
+
+  def activate_game_object(user_guid) when is_integer(user_guid) do
+    %Effects.ActivateGameObject{user_guid: user_guid}
+  end
+
   def leave_ritual(game_object_guid, user_guid) when is_integer(game_object_guid) and is_integer(user_guid) do
     %Effects.LeaveRitual{target_guid: game_object_guid, source_guid: user_guid}
   end

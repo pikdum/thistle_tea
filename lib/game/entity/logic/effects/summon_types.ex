@@ -6,6 +6,8 @@ defmodule ThistleTea.Game.Entity.Logic.Effects.SummonTypes do
     {:SpawnFarsight, [:spell, :position, :duration_ms], []},
     {:DespawnAreaEffects, [:spell_id], []},
     {:DespawnEntity, [:target_guid], []},
+    {:RemoveSelf, [:respawn_delay_ms], []},
+    {:ActivateGameObject, [:user_guid], []},
     {:LeaveRitual, [:target_guid, :source_guid], []},
     {:SummonGameObject, [:entry, :duration_ms], [target_guid: nil, position: nil]},
     {:SummonRequest, [:source_guid, :target_guid, :amount, :position], []},

@@ -17,6 +17,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.ScriptTest do
   alias ThistleTea.Game.Entity.Data.ScriptStep
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Waypoints
   alias ThistleTea.Game.Entity.Logic.AI.Script
   alias ThistleTea.Game.Entity.Logic.Effects
@@ -611,6 +612,69 @@ defmodule ThistleTea.Game.Entity.Logic.AI.ScriptTest do
       assert [%Effects.GameObjectCustomAnimation{animation: 1}] = game_object.internal.events
     end
 
+    test "activate_object requests owner-local game object use" do
+      user_guid = Guid.from_low_guid(:player, 9)
+
+      game_object = %GameObjectEntity{
+        object: %Object{guid: Guid.from_low_guid(:game_object, 1, 1)},
+        game_object: %GameObjectComponent{state: 0},
+        internal: %Internal{}
+      }
+
+      {game_object, _blackboard} =
+        Script.run(
+          game_object,
+          Blackboard.new(),
+          [%ScriptStep{command: :activate_object}],
+          user_guid,
+          1_000
+        )
+
+      assert [%Effects.ActivateGameObject{user_guid: ^user_guid}] = game_object.internal.events
+    end
+
+    test "nearest game object commands are forwarded to the object owner", %{mob: mob} do
+      game_object_guid = Guid.from_low_guid(:game_object, 1_000, 22)
+
+      perception =
+        Perception.new(
+          1_000,
+          nil,
+          %{},
+          %{mobs: [], players: [], game_objects: [{game_object_guid, 5.0}]}
+        )
+
+      context = Context.new(1_000, perception: perception)
+
+      step = %ScriptStep{
+        command: :activate_object,
+        target_type: :nearest_game_object_with_entry,
+        target_param1: 1_000,
+        target_param2: 10
+      }
+
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], nil, context)
+
+      assert [%Effects.ForwardScriptSteps{target_guid: ^game_object_guid, steps: [forwarded]}] =
+               mob.internal.events
+
+      assert forwarded.command == :activate_object
+      assert forwarded.target_type == :provided
+    end
+
+    test "reports nested game object observation radius" do
+      nested = %ScriptStep{
+        command: :remove_object,
+        target_type: :nearest_game_object_with_entry,
+        target_param2: 45
+      }
+
+      step = %ScriptStep{sub_scripts: %{1 => [nested]}}
+
+      assert Script.game_object_observation_radius([step]) == 45
+      assert Script.observation_radius([step]) == 45
+    end
+
     test "add_aura uses the trigger spell pipeline", %{mob: mob} do
       step = %ScriptStep{command: :add_aura, datalong: 11_048}
       {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], nil, 1_000)
@@ -768,8 +832,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.ScriptTest do
       {mob, _blackboard} =
         Script.run(mob, Blackboard.new(), [%ScriptStep{command: :remove_object}], nil, 1_000)
 
-      assert [%Effects.DespawnEntity{target_guid: guid}] = mob.internal.events
-      assert guid == mob.object.guid
+      assert [%Effects.RemoveSelf{respawn_delay_ms: nil}] = mob.internal.events
     end
 
     test "set_sheath updates the unit field", %{mob: mob} do

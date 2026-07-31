@@ -166,6 +166,7 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStep do
   defp command(7), do: :quest_explored
   defp command(8), do: :kill_credit
   defp command(10), do: :summon_creature
+  defp command(13), do: :activate_object
   defp command(14), do: :remove_aura
   defp command(15), do: :cast_spell
   defp command(16), do: :play_sound
@@ -220,6 +221,8 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStep do
   defp target_type(8), do: :owner_or_self
   defp target_type(10), do: :nearest_creature_with_entry
   defp target_type(11), do: :creature_with_guid
+  defp target_type(13), do: :nearest_game_object_with_entry
+  defp target_type(14), do: :game_object_with_guid
   defp target_type(16), do: :friendly
   defp target_type(17), do: :friendly_injured
   defp target_type(18), do: :friendly_injured_except

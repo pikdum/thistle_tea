@@ -23,6 +23,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.Logic.AI.BehaviorRunner
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception.Request, as: ObservationRequest
   alias ThistleTea.Game.Entity.Logic.AI.Script
   alias ThistleTea.Game.Entity.Logic.AI.Tick
   alias ThistleTea.Game.Entity.Logic.AttackFeedback
@@ -992,7 +993,13 @@ defmodule ThistleTea.Game.Entity.Server.Player do
 
   defp run_script(%State{character: %Character{} = character} = state, steps, target_guid) do
     now = Time.now()
-    context = AIEnvironment.context(character, now)
+
+    request =
+      ObservationRequest.new([target_guid], Script.observation_radius(steps),
+        game_object_radius: Script.game_object_observation_radius(steps)
+      )
+
+    context = AIEnvironment.context(character, now, request)
     {character, _blackboard} = Script.run(character, Blackboard.new(), steps, target_guid, context)
     %{state | character: character}
   end

@@ -3,6 +3,7 @@ defmodule ThistleTea.Game.World.Loader.QuestVmangosTest do
 
   alias ThistleTea.Game.Entity.Data.Quest
   alias ThistleTea.Game.Entity.Data.ScriptStep
+  alias ThistleTea.Game.Guid
   alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader
 
   @moduletag :vmangos_db
@@ -43,6 +44,15 @@ defmodule ThistleTea.Game.World.Loader.QuestVmangosTest do
       assert event.failure_condition.value2 == 80
       assert [%ScriptStep{command: :fail_quest, datalong: 648} | _steps] = event.sub_scripts[64_801]
       assert [%ScriptStep{} | _steps] = event.sub_scripts[64_802]
+    end
+
+    test "resolves game object database guid targets" do
+      assert %Quest{complete_script_steps: steps} = QuestLoader.get(848)
+      step = Enum.find(steps, &(&1.command == :activate_object))
+
+      assert step.target_type == :game_object_with_guid
+      assert Guid.entity_type(step.buddy_guid) == :game_object
+      assert Guid.low_guid(step.buddy_guid) == 13_292
     end
   end
 end

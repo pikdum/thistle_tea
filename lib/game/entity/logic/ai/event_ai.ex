@@ -64,6 +64,13 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAI do
     end)
   end
 
+  def game_object_observation_radius(state) do
+    state
+    |> events()
+    |> Enum.flat_map(fn %AIEvent{actions: actions} -> List.flatten(actions) end)
+    |> Script.game_object_observation_radius()
+  end
+
   defp event_observation_radius(%AIEvent{event_type: :friendly_hp, param2: radius})
        when is_number(radius) and radius > 0 do
     radius / 1

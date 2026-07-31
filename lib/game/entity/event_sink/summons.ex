@@ -93,6 +93,16 @@ defmodule ThistleTea.Game.Entity.EventSink.Summons do
 
   def emit(entity, %Effects.DespawnEntity{}, _context), do: entity
 
+  def emit(entity, %Effects.RemoveSelf{respawn_delay_ms: respawn_delay_ms}, context) do
+    Context.send(context, {:script_remove_object, respawn_delay_ms})
+    entity
+  end
+
+  def emit(entity, %Effects.ActivateGameObject{user_guid: user_guid}, context) do
+    Context.send(context, {:script_activate_object, user_guid})
+    entity
+  end
+
   def emit(entity, %Effects.LeaveRitual{target_guid: game_object_guid, source_guid: user_guid}, _context) do
     Entity.leave_ritual(game_object_guid, user_guid)
     entity

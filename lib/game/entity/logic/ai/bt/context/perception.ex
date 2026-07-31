@@ -8,7 +8,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception do
   @enforce_keys [:now, :origin, :entities, :nearby]
   defstruct [:now, :origin, :entities, :nearby]
 
-  def empty(now \\ 0), do: new(now, nil, %{}, %{mobs: [], players: []})
+  def empty(now \\ 0), do: new(now, nil, %{}, %{mobs: [], players: [], game_objects: []})
 
   def new(now, origin, entities, nearby) when is_integer(now) and is_map(entities) and is_map(nearby) do
     %__MODULE__{now: now, origin: origin, entities: entities, nearby: nearby}
@@ -64,7 +64,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception do
     end
   end
 
-  def nearby(%__MODULE__{nearby: nearby}, kind, radius) when kind in [:mobs, :players] and is_number(radius) do
+  def nearby(%__MODULE__{nearby: nearby}, kind, radius)
+      when kind in [:mobs, :players, :game_objects] and is_number(radius) do
     nearby
     |> Map.get(kind, [])
     |> Enum.filter(fn {_guid, distance} -> is_number(distance) and distance <= radius end)

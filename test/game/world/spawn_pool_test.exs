@@ -67,6 +67,49 @@ defmodule ThistleTea.Game.World.SpawnPoolTest do
       SpawnPoolSupervisor.terminate_child(pool_pid)
     end
 
+    test "suspends a scripted object until its cell is activated again" do
+      {guid, group, _world, key, cell} = singleton_fixture()
+
+      :ok = SpawnPool.activate(group, cell, game_object(guid))
+      pid = await_entity(guid)
+
+      send(pid, {:script_remove_object, nil})
+      await_absent(guid)
+
+      Process.sleep(50)
+      assert EntityRegistry.whereis(guid) == nil
+
+      :ok = SpawnPool.activate(group, cell)
+      await_replacement(guid, pid)
+
+      stop_pool(key)
+    end
+
+    test "reactivates a scripted object after its respawn delay" do
+      {guid, group, _world, key, cell} = singleton_fixture()
+
+      :ok = SpawnPool.activate(group, cell, game_object(guid))
+      pid = await_entity(guid)
+
+      send(pid, {:script_remove_object, 100})
+      await_absent(guid)
+      await_replacement(guid, pid)
+
+      stop_pool(key)
+    end
+
+    test "activates a live game object through its owner" do
+      {guid, group, _world, key, cell} = singleton_fixture()
+
+      :ok = SpawnPool.activate(group, cell, game_object(guid))
+      pid = await_entity(guid)
+
+      send(pid, {:script_activate_object, Guid.from_low_guid(:player, 1)})
+      await_game_object_state(pid, 1)
+
+      stop_pool(key)
+    end
+
     test "isolates and stops pools by world copy" do
       low_guid = System.unique_integer([:positive])
       guid = Guid.from_low_guid(:game_object, 1, low_guid)
@@ -175,7 +218,7 @@ defmodule ThistleTea.Game.World.SpawnPoolTest do
   defp game_object(guid) do
     %GameObject{
       object: %Object{guid: guid, entry: 1},
-      game_object: %GameObjectComponent{},
+      game_object: %GameObjectComponent{state: 0},
       movement_block: %MovementBlock{position: {1.0, 1.0, 1.0, 0.0}},
       internal: %Internal{world: %WorldRef{map_id: 0}}
     }
@@ -208,6 +251,20 @@ defmodule ThistleTea.Game.World.SpawnPoolTest do
     case EntityRegistry.whereis(guid) do
       nil -> :ok
       _pid -> Process.sleep(10) && await_absent(guid, attempts - 1)
+    end
+  end
+
+  defp await_game_object_state(pid, expected_state, attempts \\ 50)
+  defp await_game_object_state(_pid, _expected_state, 0), do: flunk("game object state did not change")
+
+  defp await_game_object_state(pid, expected_state, attempts) do
+    case :sys.get_state(pid) do
+      %GameObject{game_object: %GameObjectComponent{state: ^expected_state}} ->
+        :ok
+
+      %GameObject{} ->
+        Process.sleep(10)
+        await_game_object_state(pid, expected_state, attempts - 1)
     end
   end
 

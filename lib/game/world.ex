@@ -51,6 +51,18 @@ defmodule ThistleTea.Game.World do
     nearby_units_exact(:mobs, world, {x, y, z}, range)
   end
 
+  def nearby_game_objects(
+        %{
+          object: %{guid: self_guid},
+          internal: %Internal{world: world},
+          movement_block: %MovementBlock{position: {x, y, z, _o}}
+        },
+        range \\ 30
+      ) do
+    nearby_units_exact(:game_objects, world, {x, y, z}, range)
+    |> Enum.reject(fn {guid, _distance} -> guid == self_guid end)
+  end
+
   @position_drift_margin 180.0
 
   def nearby_units_exact(table, world, {x, y, z} = origin, range, now \\ Time.now()) do

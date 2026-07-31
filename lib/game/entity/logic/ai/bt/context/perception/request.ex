@@ -1,13 +1,14 @@
 defmodule ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception.Request do
   @moduledoc false
 
-  defstruct actors: [], radius: 0.0
+  defstruct actors: [], radius: 0.0, game_object_radius: 0.0
 
   def actor(guid) when is_integer(guid), do: %__MODULE__{actors: [guid]}
 
-  def new(actors \\ [], radius \\ 0.0)
+  def new(actors \\ [], radius \\ 0.0, opts \\ [])
 
-  def new(actors, radius) when is_list(actors) and is_number(radius) and radius >= 0 do
-    %__MODULE__{actors: actors, radius: radius}
+  def new(actors, radius, opts) when is_list(actors) and is_number(radius) and radius >= 0 and is_list(opts) do
+    game_object_radius = Keyword.get(opts, :game_object_radius, 0.0)
+    %__MODULE__{actors: actors, radius: radius, game_object_radius: game_object_radius}
   end
 end

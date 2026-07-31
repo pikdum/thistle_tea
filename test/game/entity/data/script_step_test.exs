@@ -73,6 +73,7 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStepTest do
     test "decodes quest credit commands" do
       assert ScriptStep.build(row(7)).command == :quest_explored
       assert ScriptStep.build(row(8)).command == :kill_credit
+      assert ScriptStep.build(row(13)).command == :activate_object
       assert ScriptStep.build(row(17)).command == :create_item
       assert ScriptStep.build(row(20)).command == :movement
       assert ScriptStep.build(row(4)).command == :modify_flags
@@ -92,6 +93,14 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStepTest do
       assert ScriptStep.build(row(80)).command == :set_game_object_state
       assert ScriptStep.build(row(83)).command == :quest_credit
       assert ScriptStep.build(row(89)).command == :play_custom_animation
+    end
+
+    test "decodes game object target selectors" do
+      nearest = row(13) |> Map.put(:target_type, 13) |> ScriptStep.build()
+      by_guid = row(13) |> Map.put(:target_type, 14) |> ScriptStep.build()
+
+      assert nearest.target_type == :nearest_game_object_with_entry
+      assert by_guid.target_type == :game_object_with_guid
     end
   end
 

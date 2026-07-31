@@ -147,7 +147,9 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
           AIEnvironment.context(
             &1,
             now,
-            ObservationRequest.new([target_guid], Script.observation_radius(steps))
+            ObservationRequest.new([target_guid], Script.observation_radius(steps),
+              game_object_radius: Script.game_object_observation_radius(steps)
+            )
           )
         )
       )
@@ -544,6 +546,18 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
       {:noreply, state}
   end
 
+  def handle_info({:script_remove_object, respawn_delay_ms}, %Mob{} = state) do
+    case SpawnPool.suspend(state, respawn_delay_ms) do
+      :pooled ->
+        {:noreply, state}
+
+      :unpooled ->
+        pid = self()
+        Task.start(fn -> World.stop_entity(pid) end)
+        {:noreply, state}
+    end
+  end
+
   def handle_info({:ai_script_steps, steps, target_guid}, %Mob{} = state) do
     if Corpse.removed?(state) do
       {:noreply, state}
@@ -561,7 +575,9 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
             AIEnvironment.context(
               &1,
               now,
-              ObservationRequest.new([target_guid], Script.observation_radius(steps))
+              ObservationRequest.new([target_guid], Script.observation_radius(steps),
+                game_object_radius: Script.game_object_observation_radius(steps)
+              )
             )
           )
         )

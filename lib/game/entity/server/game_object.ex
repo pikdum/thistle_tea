@@ -242,6 +242,28 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
     despawn(state)
   end
 
+  def handle_info({:script_activate_object, user_guid}, %GameObject{internal: %Internal{trap: %Trap{} = trap}} = state)
+      when is_integer(user_guid) do
+    trigger_trap(state, trap, user_guid)
+    {:noreply, state}
+  end
+
+  def handle_info({:script_activate_object, _user_guid}, %GameObject{} = state) do
+    game_object = %{state.game_object | state: if(state.game_object.state == 0, do: 1, else: 0)}
+    state = %{state | game_object: game_object} |> Core.mark_broadcast_update() |> broadcast_if_pending()
+    {:noreply, state}
+  end
+
+  def handle_info({:script_remove_object, respawn_delay_ms}, %GameObject{} = state) do
+    case SpawnPool.suspend(state, respawn_delay_ms) do
+      :pooled ->
+        {:noreply, state}
+
+      :unpooled ->
+        despawn(state)
+    end
+  end
+
   def handle_info(:trap_tick, %GameObject{internal: %Internal{trap: %Trap{} = trap}} = state) do
     case TrapServer.target(state) do
       target_guid when is_integer(target_guid) ->

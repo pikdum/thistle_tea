@@ -69,6 +69,16 @@ defmodule ThistleTea.Game.World.SpawnPool do
 
   def deactivate(_entity), do: :unpooled
 
+  def suspend(entity, respawn_delay_ms \\ nil)
+
+  def suspend(%{internal: %Internal{spawn: %Spawn{pool_group: group, pool_member: member}}}, respawn_delay_ms)
+      when not is_nil(group) and not is_nil(member) do
+    GenServer.cast(via(group), {:suspend, member, self(), respawn_delay_ms})
+    :pooled
+  end
+
+  def suspend(_entity, _respawn_delay_ms), do: :unpooled
+
   def deactivate_cells(key, cells, wanted) do
     case GenServer.whereis(via(key)) do
       nil -> :ok
@@ -196,6 +206,16 @@ defmodule ThistleTea.Game.World.SpawnPool do
     {:noreply, stop_running_member(state, member, pid)}
   end
 
+  def handle_cast({:suspend, member, pid, respawn_delay_ms}, state) do
+    state = stop_running_member(state, member, pid)
+
+    if is_integer(respawn_delay_ms) and respawn_delay_ms > 0 do
+      Process.send_after(self(), {:reactivate, member}, respawn_delay_ms)
+    end
+
+    {:noreply, state}
+  end
+
   def handle_cast({:refresh, events}, %{group: {:pool, root_id}} = state) do
     blueprints = load_blueprints(root_id, events) |> attach_all(state.key)
 
@@ -227,6 +247,14 @@ defmodule ThistleTea.Game.World.SpawnPool do
   @impl GenServer
   def handle_info(:drain_tick, state) do
     {:noreply, drain_inactive(%{state | drain_ref: nil})}
+  end
+
+  def handle_info({:reactivate, member}, state) do
+    if MapSet.member?(state.selection.leaves, member) do
+      {:noreply, start_selected(state)}
+    else
+      {:noreply, state}
+    end
   end
 
   def handle_info({:DOWN, ref, :process, _pid, _reason}, state) do

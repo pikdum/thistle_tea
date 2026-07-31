@@ -25,7 +25,7 @@ defmodule ThistleTea.Game.World.Loader.Script do
     |> Mangos.Repo.all()
     |> Enum.map(&ScriptStep.build/1)
     |> Enum.map(&resolve_mount_display/1)
-    |> Enum.map(&resolve_buddy_guid/1)
+    |> resolve_buddy_guids()
     |> resolve_texts()
     |> resolve_nested_scripts(visited)
     |> attach_conditions()
@@ -47,15 +47,39 @@ defmodule ThistleTea.Game.World.Loader.Script do
 
   defp resolve_mount_display(%ScriptStep{} = step), do: step
 
-  defp resolve_buddy_guid(%ScriptStep{target_type: :creature_with_guid, target_param1: db_guid} = step)
-       when is_integer(db_guid) and db_guid > 0 do
-    case Mangos.Repo.get(Mangos.Creature, db_guid) do
-      %Mangos.Creature{id: entry} -> %{step | buddy_guid: Guid.from_low_guid(:mob, entry, db_guid)}
-      _ -> step
-    end
+  defp resolve_buddy_guids(steps) do
+    creature_guids = buddy_db_guids(steps, :creature_with_guid)
+    game_object_guids = buddy_db_guids(steps, :game_object_with_guid)
+
+    creatures =
+      from(c in Mangos.Creature, where: c.guid in ^creature_guids)
+      |> Mangos.Repo.all()
+      |> Map.new(&{&1.guid, Guid.from_low_guid(:mob, &1.id, &1.guid)})
+
+    game_objects =
+      from(g in Mangos.GameObject, where: g.guid in ^game_object_guids)
+      |> Mangos.Repo.all()
+      |> Map.new(&{&1.guid, Guid.from_low_guid(:game_object, &1.id, &1.guid)})
+
+    Enum.map(steps, fn
+      %ScriptStep{target_type: :creature_with_guid, target_param1: db_guid} = step ->
+        %{step | buddy_guid: Map.get(creatures, db_guid)}
+
+      %ScriptStep{target_type: :game_object_with_guid, target_param1: db_guid} = step ->
+        %{step | buddy_guid: Map.get(game_objects, db_guid)}
+
+      %ScriptStep{} = step ->
+        step
+    end)
   end
 
-  defp resolve_buddy_guid(%ScriptStep{} = step), do: step
+  defp buddy_db_guids(steps, target_type) do
+    steps
+    |> Enum.filter(&(&1.target_type == target_type))
+    |> Enum.map(& &1.target_param1)
+    |> Enum.filter(&(is_integer(&1) and &1 > 0))
+    |> Enum.uniq()
+  end
 
   defp resolve_nested_scripts(steps, visited) do
     nested_ids =
