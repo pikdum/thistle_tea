@@ -47,6 +47,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.World.Loader.Trainer, as: TrainerLoader
   alias ThistleTea.Game.World.Loader.Transport, as: TransportLoader
   alias ThistleTea.Game.World.Loader.Vendor, as: VendorLoader
+  alias ThistleTea.Game.World.Loader.Waypoint, as: WaypointLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.PostOffice
   alias ThistleTea.Game.World.SpatialHash
@@ -163,6 +164,7 @@ defmodule ThistleTea.Application do
     SummonLoader.init()
     TaxiLoader.init()
     TransportLoader.init()
+    WaypointLoader.init()
     Transports.init()
     :ets.new(:spline_counters, [:named_table, :public, write_concurrency: :auto])
     :ets.insert(:spline_counters, {:spline_id, 0})
@@ -212,6 +214,8 @@ defmodule ThistleTea.Application do
 
     with {:ok, pid} <- Supervisor.start_link(children, opts) do
       if !test do
+        Logger.info("Loading waypoints...")
+        WaypointLoader.load_all()
         Logger.info("Loading quests...")
         QuestLoader.load_all()
         Logger.info("Loading reputation...")

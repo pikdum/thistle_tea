@@ -30,6 +30,26 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal.WaypointRouteTest do
     end
   end
 
+  describe "start/3" do
+    test "selects an explicit start point and repeat mode" do
+      route = %WaypointRoute{
+        first_point: 1,
+        destination_point: 1,
+        points: %{1 => %Waypoint{}, 2 => %Waypoint{}}
+      }
+
+      assert %WaypointRoute{destination_point: 2, repeat?: false} =
+               WaypointRoute.start(route, 2, false)
+    end
+
+    test "falls back to the first point for zero or invalid starts" do
+      route = %WaypointRoute{first_point: 1, destination_point: 2, points: %{1 => %Waypoint{}, 2 => %Waypoint{}}}
+
+      assert WaypointRoute.start(route, 0, true).destination_point == 1
+      assert WaypointRoute.start(route, 99, true).destination_point == 1
+    end
+  end
+
   describe "increment_waypoint/1" do
     test "increments to next waypoint" do
       route = %WaypointRoute{
@@ -74,6 +94,27 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal.WaypointRouteTest do
       result = WaypointRoute.increment_waypoint(route)
       assert result.first_point == 1
       assert result.points == route.points
+    end
+
+    test "advances across non-contiguous point ids" do
+      route = %WaypointRoute{
+        first_point: 1,
+        destination_point: 1,
+        points: %{1 => %Waypoint{}, 3 => %Waypoint{}}
+      }
+
+      assert WaypointRoute.increment_waypoint(route).destination_point == 3
+    end
+
+    test "stops a non-repeating route after its final point" do
+      route = %WaypointRoute{
+        first_point: 1,
+        destination_point: 2,
+        points: %{1 => %Waypoint{}, 2 => %Waypoint{}},
+        repeat?: false
+      }
+
+      assert WaypointRoute.increment_waypoint(route).destination_point == nil
     end
   end
 end

@@ -54,6 +54,21 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Blackboard do
     %{blackboard | navigation: %{navigation | target: nil, move_target: nil, orientation: nil, wait_time: nil}}
   end
 
+  def start_waypoints(%__MODULE__{navigation: navigation} = blackboard, route, initial_delay, now)
+      when is_integer(initial_delay) and is_integer(now) do
+    navigation = %{
+      navigation
+      | scripted_waypoint_route: route,
+        target: nil,
+        move_target: nil,
+        orientation: nil,
+        wait_time: nil,
+        next_waypoint_at: now + max(initial_delay, 0)
+    }
+
+    %{blackboard | navigation: navigation}
+  end
+
   def clear_chase(%__MODULE__{navigation: navigation} = blackboard) do
     %{blackboard | navigation: %{navigation | chase_started: false, last_target_pos: nil}}
   end

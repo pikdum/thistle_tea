@@ -153,6 +153,7 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStep do
   defp command(45), do: :set_phase_random
   defp command(46), do: :set_phase_range
   defp command(47), do: :flee
+  defp command(60), do: :start_waypoints
   defp command(70), do: :fail_quest
   defp command(83), do: :quest_credit
   defp command(other), do: {:unsupported, other}

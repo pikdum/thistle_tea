@@ -107,6 +107,14 @@ defmodule ThistleTea.Game.Entity.Logic.QuestLogTest do
       {:ok, quest_log, false} = QuestLog.fail(quest_log, 33)
       assert QuestLog.fail(quest_log, 33) == {:error, :already_failed}
     end
+
+    test "does not regress a completed quest" do
+      {:ok, quest_log} = QuestLog.add(%{}, 33)
+      {:ok, quest_log} = QuestLog.update(quest_log, 33, &%{&1 | status: :complete})
+
+      assert QuestLog.fail(quest_log, 33) == {:error, :not_incomplete}
+      assert %Entry{status: :complete} = QuestLog.get(quest_log, 33)
+    end
   end
 
   describe "remove/2" do

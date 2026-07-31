@@ -183,13 +183,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     false
   end
 
-  defp has_waypoints?(%Mob{internal: %Internal{spawn: %Spawn{waypoint_route: %WaypointRoute{}}}}, _blackboard) do
-    true
-  end
-
-  defp has_waypoints?(%Mob{}, _blackboard) do
-    false
-  end
+  defp has_waypoints?(%Mob{} = state, %Blackboard{} = blackboard),
+    do: is_struct(waypoint_destination(state, blackboard), Waypoint)
 
   defp can_wander?(%Mob{internal: %Internal{spawn: %Spawn{movement_type: 1}}}, _blackboard) do
     true
@@ -1367,7 +1362,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     if blackboard.navigation.target do
       {:success, state, blackboard}
     else
-      case waypoint_destination(state) do
+      case waypoint_destination(state, blackboard) do
         nil ->
           blackboard = Blackboard.put_next_at(blackboard, :next_waypoint_at, idle_delay(context), now)
           blackboard = Blackboard.clear_waypoint(blackboard)
@@ -1435,12 +1430,12 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
       end
 
     {state, blackboard} = run_waypoint_scripts(state, blackboard, context)
-    state = increment_waypoint(state)
+    {state, blackboard} = increment_waypoint(state, blackboard)
     {:success, state, blackboard}
   end
 
   defp run_waypoint_scripts(%Mob{} = state, %Blackboard{} = blackboard, %Context{} = context) do
-    case waypoint_destination(state) do
+    case waypoint_destination(state, blackboard) do
       %Waypoint{script_steps: [_ | _] = steps} -> Script.run(state, blackboard, steps, nil, context)
       _ -> {state, blackboard}
     end
@@ -1477,25 +1472,44 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     {BT.running(@dead_idle_delay, :dead), state, blackboard}
   end
 
-  defp waypoint_destination(%Mob{internal: %Internal{spawn: %Spawn{waypoint_route: %WaypointRoute{} = route}}}) do
-    WaypointRoute.destination_waypoint(route)
+  defp waypoint_destination(%Mob{} = state, %Blackboard{} = blackboard) do
+    case waypoint_route(state, blackboard) do
+      %WaypointRoute{} = route -> WaypointRoute.destination_waypoint(route)
+      nil -> nil
+    end
   end
 
-  defp waypoint_destination(%Mob{}) do
-    nil
+  defp waypoint_route(%Mob{}, %Blackboard{
+         navigation: %NavigationMemory{scripted_waypoint_route: %WaypointRoute{} = route}
+       }) do
+    route
+  end
+
+  defp waypoint_route(%Mob{internal: %Internal{spawn: %Spawn{waypoint_route: %WaypointRoute{} = route}}}, %Blackboard{}) do
+    route
+  end
+
+  defp waypoint_route(%Mob{}, %Blackboard{}), do: nil
+
+  defp increment_waypoint(
+         %Mob{} = state,
+         %Blackboard{navigation: %NavigationMemory{scripted_waypoint_route: %WaypointRoute{} = route} = navigation} =
+           blackboard
+       ) do
+    navigation = %{navigation | scripted_waypoint_route: WaypointRoute.increment_waypoint(route)}
+    {state, %{blackboard | navigation: navigation}}
   end
 
   defp increment_waypoint(
          %Mob{internal: %Internal{spawn: %Spawn{waypoint_route: %WaypointRoute{} = route} = spawn_state} = internal} =
-           state
+           state,
+         %Blackboard{} = blackboard
        ) do
     route = WaypointRoute.increment_waypoint(route)
-    %{state | internal: %{internal | spawn: %{spawn_state | waypoint_route: route}}}
+    {%{state | internal: %{internal | spawn: %{spawn_state | waypoint_route: route}}}, blackboard}
   end
 
-  defp increment_waypoint(%Mob{} = state) do
-    state
-  end
+  defp increment_waypoint(%Mob{} = state, %Blackboard{} = blackboard), do: {state, blackboard}
 
   defp set_orientation(%Mob{movement_block: %MovementBlock{position: {x, y, z, _o}}} = state, o) do
     %{state | movement_block: %{state.movement_block | position: {x, y, z, o}}}

@@ -3,6 +3,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Blackboard.Navigation do
 
   defstruct target: nil,
             move_target: nil,
+            scripted_waypoint_route: nil,
             orientation: nil,
             wait_time: nil,
             last_target_pos: nil,

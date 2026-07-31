@@ -31,6 +31,7 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
   alias ThistleTea.Game.Entity.Server.NavigationResolver
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
+  alias ThistleTea.Game.World.Loader.Waypoint, as: WaypointLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Pathfinding
 
@@ -45,7 +46,8 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
       now: now,
       perception: perception(entity, now, actors, requested_radius),
       random: random(),
-      navigation: navigation(entity, now)
+      navigation: navigation(entity, now),
+      waypoints: WaypointLoader.context()
     }
   end
 
@@ -92,10 +94,22 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
   defp base_observation_radius(%Mob{internal: %Internal{in_combat: true}}), do: MobBT.combat_observation_radius()
   defp base_observation_radius(%Mob{}), do: MobBT.max_aggro_radius()
 
-  defp waypoint_observation_radius(%Mob{
-         internal: %Internal{spawn: %Spawn{waypoint_route: %WaypointRoute{points: points}}}
-       })
-       when is_map(points) do
+  defp waypoint_observation_radius(%Mob{} = entity) do
+    entity
+    |> waypoint_route()
+    |> waypoint_route_observation_radius()
+  end
+
+  defp waypoint_route(%Mob{
+         internal: %Internal{
+           blackboard: %Blackboard{navigation: %NavigationMemory{scripted_waypoint_route: %WaypointRoute{} = route}}
+         }
+       }), do: route
+
+  defp waypoint_route(%Mob{internal: %Internal{spawn: %Spawn{waypoint_route: %WaypointRoute{} = route}}}), do: route
+  defp waypoint_route(%Mob{}), do: nil
+
+  defp waypoint_route_observation_radius(%WaypointRoute{points: points}) when is_map(points) do
     points
     |> Map.values()
     |> Enum.flat_map(fn
@@ -105,7 +119,7 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
     |> Script.observation_radius()
   end
 
-  defp waypoint_observation_radius(%Mob{}), do: 0.0
+  defp waypoint_route_observation_radius(nil), do: 0.0
 
   defp nearby_guids(entity, radius) when is_number(radius) and radius > 0 do
     %{

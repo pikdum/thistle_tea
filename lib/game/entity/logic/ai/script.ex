@@ -19,11 +19,13 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
 
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.CreatureSpell
+  alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Data.ScriptStep
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Random
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Waypoints
   alias ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells, as: MobSpells
   alias ThistleTea.Game.Entity.Logic.AI.BT.Navigation
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
@@ -139,6 +141,21 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
     {Navigation.move_to(state, {x, y, z}, [], context), blackboard}
   end
 
+  defp execute(%Mob{} = state, blackboard, %ScriptStep{command: :start_waypoints} = step, _target_guid, now, %Context{
+         waypoints: waypoints
+       }) do
+    cond do
+      Core.dead?(state) ->
+        {state, blackboard}
+
+      route = Waypoints.resolve(waypoints, state, step) ->
+        {state, Blackboard.start_waypoints(blackboard, route, max(step.datalong3, 0), now)}
+
+      true ->
+        {state, blackboard}
+    end
+  end
+
   defp execute(
          %{object: %{guid: source_guid}} = state,
          blackboard,
@@ -216,7 +233,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
   end
 
   defp execute(
-         state,
+         %Mob{} = state,
          blackboard,
          %ScriptStep{command: :talk} = step,
          target_guid,
@@ -250,6 +267,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
       true ->
         MobSpells.attempt_scripted_cast(state, blackboard, entry, target, context)
     end
+  end
+
+  defp execute(state, blackboard, %ScriptStep{command: :start_waypoints}, _target_guid, _now, %Context{}) do
+    {state, blackboard}
   end
 
   defp execute(

@@ -167,11 +167,14 @@ defmodule ThistleTea.Game.Entity.Logic.QuestLog do
 
   def fail(quest_log, quest_id) do
     case get(quest_log, quest_id) do
-      %Entry{status: status} = entry when status in [:incomplete, :complete] ->
+      %Entry{status: :incomplete} = entry ->
         fail_entry(quest_log, quest_id, entry)
 
-      %Entry{} ->
+      %Entry{status: :failed} ->
         {:error, :already_failed}
+
+      %Entry{} ->
+        {:error, :not_incomplete}
 
       nil ->
         {:error, :not_active}

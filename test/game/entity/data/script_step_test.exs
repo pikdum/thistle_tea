@@ -73,6 +73,7 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStepTest do
     test "decodes quest credit commands" do
       assert ScriptStep.build(row(7)).command == :quest_explored
       assert ScriptStep.build(row(8)).command == :kill_credit
+      assert ScriptStep.build(row(60)).command == :start_waypoints
       assert ScriptStep.build(row(70)).command == :fail_quest
       assert ScriptStep.build(row(83)).command == :quest_credit
     end

@@ -3,6 +3,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.ScriptTest do
 
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Waypoint
+  alias ThistleTea.Game.Entity.Data.Component.Internal.WaypointRoute
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Unit
@@ -10,6 +12,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.ScriptTest do
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Data.ScriptStep
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Context
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Waypoints
   alias ThistleTea.Game.Entity.Logic.AI.Script
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Guid
@@ -475,6 +479,35 @@ defmodule ThistleTea.Game.Entity.Logic.AI.ScriptTest do
                  target_guid: ^world_object_guid
                }
              ] = mob.internal.events
+    end
+
+    test "start_waypoints installs the selected route and initial delay", %{mob: mob} do
+      route = %WaypointRoute{
+        first_point: 1,
+        destination_point: 1,
+        points: %{1 => %Waypoint{}, 2 => %Waypoint{}}
+      }
+
+      context =
+        Context.new(1_000,
+          waypoints: Waypoints.new(%{{:special, 7_784} => route})
+        )
+
+      step = %ScriptStep{
+        command: :start_waypoints,
+        datalong: 3,
+        datalong2: 2,
+        datalong3: 500,
+        datalong4: 0,
+        dataint2: 7_784
+      }
+
+      {_mob, blackboard} = Script.run(mob, Blackboard.new(), [step], nil, context)
+
+      assert %WaypointRoute{destination_point: 2, repeat?: false} =
+               blackboard.navigation.scripted_waypoint_route
+
+      assert blackboard.navigation.next_waypoint_at == 1_500
     end
 
     test "delayed steps are deferred through a script_steps event", %{mob: mob} do

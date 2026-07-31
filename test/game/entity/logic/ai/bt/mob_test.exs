@@ -6,6 +6,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
   alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
   alias ThistleTea.Game.Entity.Data.Component.Internal.Loot
   alias ThistleTea.Game.Entity.Data.Component.Internal.Spawn
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Waypoint
+  alias ThistleTea.Game.Entity.Data.Component.Internal.WaypointRoute
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Unit
@@ -414,6 +416,33 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
 
       assert {{:running, 250, :aggro}, ^state, ^blackboard} =
                MobBT.wait_until_waypoint_ready(state, blackboard, 1_000)
+    end
+  end
+
+  describe "scripted waypoint routes" do
+    test "the behavior tree prioritizes the runtime route over spawn movement" do
+      route = %WaypointRoute{
+        first_point: 1,
+        destination_point: 1,
+        points: %{1 => %Waypoint{position: {10.0, 0.0, 0.0, nil}, wait_time: 0}},
+        repeat?: false
+      }
+
+      blackboard = %Blackboard{
+        navigation: %Blackboard.Navigation{scripted_waypoint_route: route}
+      }
+
+      state =
+        fixture_mob(spline_nodes: [])
+        |> BT.init(MobBT.tree(), blackboard)
+
+      assert {{:running, 0, :navigation}, state} =
+               BehaviorRunner.tick(MobBT.tree(), state, AIEnvironment.context(state, 1_000))
+
+      state = NavigationResolver.resolve(state, 1_000, fn _map, _from, to -> [to] end)
+
+      assert state.movement_block.spline_nodes == [{10.0, 0.0, 0.0}]
+      assert state.internal.blackboard.navigation.move_target == {10.0, 0.0, 0.0}
     end
   end
 
