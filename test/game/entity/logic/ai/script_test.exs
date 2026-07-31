@@ -558,6 +558,18 @@ defmodule ThistleTea.Game.Entity.Logic.AI.ScriptTest do
       assert game_object.internal.broadcast_update?
     end
 
+    test "set_faction applies and explicitly restores a scripted faction", %{mob: mob} do
+      mob = %{mob | unit: %{mob.unit | faction_template: 35}}
+      set = %ScriptStep{command: :set_faction, datalong: 113, datalong2: 1}
+
+      {mob, blackboard} = Script.run(mob, Blackboard.new(), [set], nil, 1_000)
+      assert mob.unit.faction_template == 113
+
+      clear = %ScriptStep{command: :set_faction, datalong: 0}
+      {mob, _blackboard} = Script.run(mob, blackboard, [clear], nil, 1_000)
+      assert mob.unit.faction_template == 35
+    end
+
     test "set_default_movement updates the spawn movement policy", %{mob: mob} do
       spawn = %Spawn{distance: 0, movement_type: 0}
       mob = %{mob | internal: %{mob.internal | spawn: spawn}}

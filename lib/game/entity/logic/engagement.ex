@@ -16,6 +16,7 @@ defmodule ThistleTea.Game.Entity.Logic.Engagement do
   alias ThistleTea.Game.Entity.Logic.Casting
   alias ThistleTea.Game.Entity.Logic.Combat
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Logic.TemporaryFaction
   alias ThistleTea.Game.Entity.Logic.Threat
 
   @dynamic_flag_tapped 0x0004
@@ -119,6 +120,7 @@ defmodule ThistleTea.Game.Entity.Logic.Engagement do
       |> Combat.sync_combat_flag()
       |> Effects.enqueue(leave_effects(entity.object.guid, target, clear_tap?))
       |> mark_broadcast_update()
+      |> TemporaryFaction.restore(:combat_stop)
 
     result(previous, entity, reason)
   end

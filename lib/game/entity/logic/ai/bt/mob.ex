@@ -33,6 +33,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   alias ThistleTea.Game.Entity.Logic.Hostility
   alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.Entity.Logic.StealthDetection
+  alias ThistleTea.Game.Entity.Logic.TemporaryFaction
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Math
   alias ThistleTea.Game.Time
@@ -692,7 +693,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
       delay_ms = Movement.next_spatial_update_delay(state, now)
       {BT.running(delay_ms, :movement), state, blackboard}
     else
-      state = restore_spawn_orientation(state)
+      state = state |> restore_spawn_orientation() |> TemporaryFaction.restore(:reach_home)
       {state, blackboard} = EventAI.on_reached_home(state, blackboard, now, context)
       {:success, state, Blackboard.clear_move_target(blackboard)}
     end

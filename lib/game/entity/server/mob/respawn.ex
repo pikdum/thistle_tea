@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Respawn do
   alias ThistleTea.Game.Entity.Logic.AI.EventAI
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Core
+  alias ThistleTea.Game.Entity.Logic.TemporaryFaction
   alias ThistleTea.Game.Entity.Server.AIEnvironment
   alias ThistleTea.Game.Entity.Server.Mob.Corpse
   alias ThistleTea.Game.Entity.Server.Mob.Incarnation
@@ -127,6 +128,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Respawn do
       |> Corpse.remove()
       |> Incarnation.renew()
       |> Mob.respawn()
+      |> TemporaryFaction.after_respawn()
       |> Mob.apply_addon_auras(now)
       |> BT.init(MobBT.tree())
       |> EventAI.with_blackboard(&EventAI.on_spawned(&1, &2, now, AIEnvironment.context(&1, now)))

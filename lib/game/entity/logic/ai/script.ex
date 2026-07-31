@@ -33,6 +33,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
   alias ThistleTea.Game.Entity.Logic.Condition, as: ConditionLogic
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Logic.TemporaryFaction
   alias ThistleTea.Game.Guid
 
   require Logger
@@ -484,6 +485,14 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
       end
 
     {Core.mark_broadcast_update(state), blackboard}
+  end
+
+  defp execute(%Mob{} = state, blackboard, %ScriptStep{command: :set_faction, datalong: 0}, _target_guid, _now) do
+    {TemporaryFaction.clear(state), blackboard}
+  end
+
+  defp execute(%Mob{} = state, blackboard, %ScriptStep{command: :set_faction} = step, _target_guid, _now) do
+    {TemporaryFaction.set(state, step.datalong, step.datalong2), blackboard}
   end
 
   defp execute(state, blackboard, %ScriptStep{command: :morph} = step, _target_guid, _now) do

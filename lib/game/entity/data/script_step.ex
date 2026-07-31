@@ -169,6 +169,7 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStep do
   defp command(15), do: :cast_spell
   defp command(16), do: :play_sound
   defp command(18), do: :despawn
+  defp command(22), do: :set_faction
   defp command(23), do: :morph
   defp command(24), do: :mount
   defp command(25), do: :set_run

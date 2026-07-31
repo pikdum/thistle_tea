@@ -19,6 +19,9 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal.Creature do
     :detection_range,
     :call_for_help_range,
     :leash_range,
+    :script_faction_original,
+    :script_faction_value,
+    :script_faction_flags,
     spells: [],
     addon_auras: [],
     ai_events: []
