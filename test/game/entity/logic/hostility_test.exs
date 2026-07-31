@@ -65,12 +65,23 @@ defmodule ThistleTea.Game.Entity.Logic.HostilityTest do
       hostile_player =
         player(alliance(), 2, %{29 => %{rank: :honored, at_war?: false, forced_rank: :hostile}})
 
-      creature = mob(wolf(), faction_can_have_reputation?: true)
+      creature = mob(wolf(), faction_can_have_reputation?: false)
 
       assert Hostility.friendly?(friendly_player, creature)
       assert Hostility.friendly?(creature, friendly_player)
       assert Hostility.hostile?(hostile_player, creature)
       assert Hostility.hostile?(creature, hostile_player)
+    end
+
+    test "forced reactions override contested guards" do
+      player =
+        player(alliance(), 1, %{29 => %{rank: :neutral, at_war?: false, forced_rank: :friendly}})
+        |> Map.put(:contested_pvp?, true)
+
+      creature = mob(contested_guard(), faction_can_have_reputation?: false)
+
+      assert Hostility.friendly?(player, creature)
+      assert Hostility.friendly?(creature, player)
     end
 
     test "contested guards attack players carrying the contested PvP flag" do

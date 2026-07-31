@@ -187,44 +187,42 @@ defmodule ThistleTea.Game.Entity.Logic.Hostility do
   end
 
   defp player_reaction_to_creature(player, creature) do
-    with true <- faction_can_have_reputation?(creature),
-         faction_id when is_integer(faction_id) <- faction_id(creature),
-         entry when is_map(entry) <- reputation_entry(player, faction_id) do
-      {:ok, player_creature_reaction(entry, creature, player)}
-    else
-      _ -> :none
-    end
-  end
+    faction_id = faction_id(creature)
+    entry = reputation_entry(player, faction_id)
 
-  defp player_creature_reaction(entry, creature, player) do
-    case Map.get(entry, :forced_rank) do
-      nil when entry.at_war? -> :hostile
-      nil -> if contested_guard_reaction?(creature, player), do: :hostile, else: :friendly
-      rank -> rank_reaction(rank)
+    cond do
+      is_map(entry) and Map.has_key?(entry, :forced_rank) ->
+        {:ok, rank_reaction(entry.forced_rank)}
+
+      contested_guard_reaction?(creature, player) ->
+        {:ok, :hostile}
+
+      faction_can_have_reputation?(creature) and is_map(entry) ->
+        {:ok, if(entry.at_war?, do: :hostile, else: :friendly)}
+
+      true ->
+        :none
     end
   end
 
   defp creature_reaction_to_player(creature, player) do
-    with true <- faction_can_have_reputation?(creature),
-         faction_id when is_integer(faction_id) <- faction_id(creature),
-         entry when is_map(entry) <- reputation_entry(player, faction_id) do
-      {:ok, creature_player_reaction(entry, creature, player)}
-    else
-      _ -> :none
+    faction_id = faction_id(creature)
+    entry = reputation_entry(player, faction_id)
+
+    cond do
+      is_map(entry) and Map.has_key?(entry, :forced_rank) ->
+        {:ok, rank_reaction(entry.forced_rank)}
+
+      contested_guard_reaction?(creature, player) ->
+        {:ok, :hostile}
+
+      faction_can_have_reputation?(creature) and is_map(entry) ->
+        {:ok, entry |> creature_player_rank() |> rank_reaction()}
+
+      true ->
+        :none
     end
   end
-
-  defp creature_player_reaction(entry, creature, player) do
-    if contested_guard_reaction?(creature, player) do
-      :hostile
-    else
-      entry
-      |> creature_player_rank()
-      |> rank_reaction()
-    end
-  end
-
-  defp creature_player_rank(%{forced_rank: forced_rank}), do: forced_rank
 
   defp creature_player_rank(%{at_war?: true, rank: rank}) when rank in [:friendly, :honored, :revered, :exalted],
     do: :neutral

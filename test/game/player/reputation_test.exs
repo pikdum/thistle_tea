@@ -284,7 +284,7 @@ defmodule ThistleTea.Game.Player.ReputationTest do
     end
 
     test "sends and projects active aura-forced reactions", %{id: id} do
-      catalog = catalog([definition(575, 20)])
+      catalog = catalog([])
       character = state(id, catalog).character
       ReputationLoader.put_catalog(catalog)
 

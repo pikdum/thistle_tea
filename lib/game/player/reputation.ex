@@ -61,23 +61,27 @@ defmodule ThistleTea.Game.Player.Reputation do
   def projection(%Character{} = character) do
     forced_reactions = Map.new(forced_reactions(character))
 
-    character
-    |> standings()
-    |> Map.new(fn {faction_id, standing} ->
-      state = ReputationLogic.state(character.player.reputation, faction_id)
+    projection =
+      character
+      |> standings()
+      |> Map.new(fn {faction_id, standing} ->
+        state = ReputationLogic.state(character.player.reputation, faction_id)
 
-      entry = %{
-        rank: ReputationLogic.rank(standing),
-        at_war?: state != nil and ReputationLogic.at_war?(character.player.reputation, faction_id)
-      }
+        entry = %{
+          rank: ReputationLogic.rank(standing),
+          at_war?: state != nil and ReputationLogic.at_war?(character.player.reputation, faction_id)
+        }
 
-      entry =
-        case Map.fetch(forced_reactions, faction_id) do
-          {:ok, rank} -> Map.put(entry, :forced_rank, rank_name(rank))
-          :error -> entry
-        end
+        {faction_id, entry}
+      end)
 
-      {faction_id, entry}
+    Enum.reduce(forced_reactions, projection, fn {faction_id, rank}, projection ->
+      Map.update(
+        projection,
+        faction_id,
+        %{rank: :neutral, at_war?: false, forced_rank: rank_name(rank)},
+        &Map.put(&1, :forced_rank, rank_name(rank))
+      )
     end)
   end
 
