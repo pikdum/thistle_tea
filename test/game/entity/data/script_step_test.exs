@@ -88,6 +88,7 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStepTest do
       assert ScriptStep.build(row(34)).command == :set_home_position
       assert ScriptStep.build(row(41)).command == :remove_object
       assert ScriptStep.build(row(51)).command == :set_sheath
+      assert ScriptStep.build(row(52)).command == :invincibility
       assert ScriptStep.build(row(60)).command == :start_waypoints
       assert ScriptStep.build(row(61)).command == :start_map_event
       assert ScriptStep.build(row(69)).command == :edit_map_event

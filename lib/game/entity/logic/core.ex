@@ -89,6 +89,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
       %{unit: unit} = entity
       duel_outcome = duel_lethal_outcome(entity, health, remaining, opts)
       remaining = duel_remaining_damage(health, remaining, duel_outcome)
+      remaining = invincibility_remaining_damage(entity, health, remaining)
       absorbed = damage - remaining
       new_health = max(health - remaining, 0)
 
@@ -136,6 +137,13 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
 
   defp duel_remaining_damage(health, damage, {:defeated, _winner_guid}), do: min(damage, max(health - 1, 0))
   defp duel_remaining_damage(_health, damage, _outcome), do: damage
+
+  defp invincibility_remaining_damage(%{internal: %Internal{invincibility_health_threshold: threshold}}, health, damage)
+       when is_integer(threshold) and threshold > 0 do
+    min(damage, max(health - threshold, 0))
+  end
+
+  defp invincibility_remaining_damage(_entity, _health, damage), do: damage
 
   defp enqueue_duel_outcome(entity, {:defeated, winner_guid}) when is_integer(winner_guid) do
     Effects.enqueue(entity, Effects.duel_defeat(entity.object.guid, winner_guid))

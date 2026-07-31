@@ -68,6 +68,23 @@ defmodule ThistleTea.Game.Entity.Logic.CoreTest do
     end
   end
 
+  describe "take_damage_with_absorb/4 invincibility" do
+    test "clamps damage at the scripted health threshold" do
+      entity = damageable(health: 100)
+      entity = %{entity | internal: %{entity.internal | invincibility_health_threshold: 10}}
+
+      {entity, absorbed} = Core.take_damage_with_absorb(entity, 100, 1_000, source: 777)
+
+      assert entity.unit.health == 10
+      assert absorbed == 10
+
+      {entity, absorbed} = Core.take_damage_with_absorb(entity, 100, 2_000, source: 777)
+
+      assert entity.unit.health == 10
+      assert absorbed == 100
+    end
+  end
+
   describe "take_damage_with_absorb/4 killer recording" do
     test "records the source on the killing blow" do
       entity = damageable(health: 30)

@@ -921,6 +921,17 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
     {state, blackboard}
   end
 
+  defp execute(
+         %Mob{internal: internal, unit: unit} = state,
+         blackboard,
+         %ScriptStep{command: :invincibility, datalong: health, datalong2: is_percent},
+         _target,
+         _now
+       ) do
+    threshold = if is_percent == 0, do: health, else: div(unit.max_health * health, 100)
+    {%{state | internal: %{internal | invincibility_health_threshold: max(threshold, 0)}}, blackboard}
+  end
+
   defp execute(state, blackboard, %ScriptStep{command: :turn_to, position: {_x, _y, _z, o}}, _target_guid, _now) do
     state =
       state

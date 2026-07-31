@@ -951,6 +951,30 @@ defmodule ThistleTea.Game.Entity.Logic.AI.ScriptTest do
       assert mob.internal.broadcast_update?
     end
 
+    test "invincibility sets absolute and percentage health floors", %{mob: mob} do
+      {mob, blackboard} =
+        Script.run(
+          mob,
+          Blackboard.new(),
+          [%ScriptStep{command: :invincibility, datalong: 25, datalong2: 1}],
+          nil,
+          1_000
+        )
+
+      assert mob.internal.invincibility_health_threshold == 25
+
+      {mob, _blackboard} =
+        Script.run(
+          mob,
+          blackboard,
+          [%ScriptStep{command: :invincibility, datalong: 10, datalong2: 0}],
+          nil,
+          1_000
+        )
+
+      assert mob.internal.invincibility_health_threshold == 10
+    end
+
     test "combat_stop clears mob combat ownership", %{mob: mob} do
       target = Guid.from_low_guid(:player, 55)
 

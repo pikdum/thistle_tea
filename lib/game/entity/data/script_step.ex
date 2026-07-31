@@ -201,6 +201,7 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStep do
   defp command(46), do: :set_phase_range
   defp command(47), do: :flee
   defp command(51), do: :set_sheath
+  defp command(52), do: :invincibility
   defp command(60), do: :start_waypoints
   defp command(61), do: :start_map_event
   defp command(62), do: :end_map_event

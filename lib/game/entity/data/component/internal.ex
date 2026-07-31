@@ -59,6 +59,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal do
     :combo_expires_at,
     :combo_target_guid,
     :undetectable_until,
+    :invincibility_health_threshold,
     world: WorldRef.open(0),
     companion: Companion.none(),
     rest_bonus: 0.0,
