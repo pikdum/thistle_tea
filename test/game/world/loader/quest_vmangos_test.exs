@@ -83,5 +83,13 @@ defmodule ThistleTea.Game.World.Loader.QuestVmangosTest do
                :unchanged
              ] = step.equipment_items
     end
+
+    test "preloads scripted door spawns" do
+      assert %Quest{start_script_steps: steps} = QuestLoader.get(6_482)
+      step = Enum.find(steps, &(&1.command == :open_door))
+
+      assert step.datalong == 48_166
+      assert Guid.low_guid(step.game_object_spawn.object.guid) == 48_166
+    end
   end
 end

@@ -264,6 +264,30 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
     end
   end
 
+  def handle_info({:script_operate_game_object, action, reset_delay_ms}, %GameObject{} = state)
+      when action in [:open, :close, :reset] and is_integer(reset_delay_ms) do
+    previous_state = state.game_object.state
+    next_state = door_state(action, previous_state)
+    state = put_game_object_state(state, next_state)
+
+    if action != :reset and next_state != previous_state and reset_delay_ms > 0 do
+      Process.send_after(self(), {:script_restore_game_object_state, previous_state, next_state}, reset_delay_ms)
+    end
+
+    {:noreply, state}
+  end
+
+  def handle_info(
+        {:script_restore_game_object_state, previous_state, expected_state},
+        %GameObject{game_object: %{state: expected_state}} = state
+      ) do
+    {:noreply, put_game_object_state(state, previous_state)}
+  end
+
+  def handle_info({:script_restore_game_object_state, _previous_state, _expected_state}, %GameObject{} = state) do
+    {:noreply, state}
+  end
+
   def handle_info({:ai_script_steps, steps, target_guid}, %GameObject{} = state)
       when is_list(steps) and is_integer(target_guid) do
     {:noreply, run_script(state, steps, target_guid)}
@@ -381,6 +405,17 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
     context = AIEnvironment.context(state, now, request)
     {state, _blackboard} = Script.run(state, Blackboard.new(), steps, target_guid, context)
     state |> EventSink.emit_pending() |> broadcast_if_pending()
+  end
+
+  defp door_state(:open, 1), do: 0
+  defp door_state(:open, state), do: state
+  defp door_state(:close, 0), do: 1
+  defp door_state(:close, state), do: state
+  defp door_state(:reset, _state), do: 1
+
+  defp put_game_object_state(%GameObject{} = state, game_object_state) do
+    game_object = %{state.game_object | state: game_object_state}
+    %{state | game_object: game_object} |> Core.mark_broadcast_update() |> broadcast_if_pending()
   end
 
   defp cast_ritual_completion(state, %Ritual{} = ritual, world, {x, y, z, orientation}) do

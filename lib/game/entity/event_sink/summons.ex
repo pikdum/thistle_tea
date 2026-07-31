@@ -131,6 +131,24 @@ defmodule ThistleTea.Game.Entity.EventSink.Summons do
     entity
   end
 
+  def emit(
+        %{internal: %Internal{world: world}} = entity,
+        %Effects.OperateGameObject{
+          action: action,
+          reset_delay_ms: reset_delay_ms,
+          blueprint: %GameObject{} = blueprint
+        },
+        _context
+      ) do
+    SpawnPool.operate_game_object(world, blueprint, action, reset_delay_ms)
+    entity
+  end
+
+  def emit(entity, %Effects.OperateGameObject{action: action, reset_delay_ms: reset_delay_ms, blueprint: nil}, context) do
+    Context.send(context, {:script_operate_game_object, action, reset_delay_ms})
+    entity
+  end
+
   def emit(entity, %Effects.LeaveRitual{target_guid: game_object_guid, source_guid: user_guid}, _context) do
     Entity.leave_ritual(game_object_guid, user_guid)
     entity

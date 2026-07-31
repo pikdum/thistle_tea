@@ -173,6 +173,8 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStep do
   defp command(8), do: :kill_credit
   defp command(9), do: :respawn_game_object
   defp command(10), do: :summon_creature
+  defp command(11), do: :open_door
+  defp command(12), do: :close_door
   defp command(13), do: :activate_object
   defp command(14), do: :remove_aura
   defp command(15), do: :cast_spell
@@ -218,6 +220,7 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStep do
   defp command(81), do: :despawn_game_object
   defp command(82), do: :load_game_object_spawn
   defp command(83), do: :quest_credit
+  defp command(87), do: :reset_door_or_button
   defp command(89), do: :play_custom_animation
   defp command(other), do: {:unsupported, other}
 

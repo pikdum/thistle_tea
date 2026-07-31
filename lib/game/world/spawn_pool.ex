@@ -87,6 +87,18 @@ defmodule ThistleTea.Game.World.SpawnPool do
     end
   end
 
+  def operate_game_object(world, %GameObject{} = blueprint, action, reset_delay_ms)
+      when action in [:open, :close, :reset] and is_integer(reset_delay_ms) do
+    world = WorldRef.coerce(world)
+    key = {world, game_object_group(blueprint)}
+    member = member_key(blueprint)
+
+    case GenServer.whereis(via(key)) do
+      nil -> :ok
+      pid -> GenServer.cast(pid, {:operate_game_object, member, action, reset_delay_ms})
+    end
+  end
+
   def recycle(%{internal: %Internal{spawn: %Spawn{pool_group: group, pool_member: member}}})
       when not is_nil(group) and not is_nil(member) do
     GenServer.cast(via(group), {:recycle, member, self()})
@@ -276,6 +288,15 @@ defmodule ThistleTea.Game.World.SpawnPool do
       end
 
     schedule_reactivation(member, respawn_delay_ms)
+    {:noreply, state}
+  end
+
+  def handle_cast({:operate_game_object, member, action, reset_delay_ms}, state) do
+    case Map.get(state.running, member) do
+      {pid, _monitor_ref} -> send(pid, {:script_operate_game_object, action, reset_delay_ms})
+      nil -> :ok
+    end
+
     {:noreply, state}
   end
 

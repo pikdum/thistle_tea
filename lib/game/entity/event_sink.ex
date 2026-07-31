@@ -115,6 +115,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
     Effects.RespawnGameObject,
     Effects.DespawnGameObject,
     Effects.LoadGameObjectSpawn,
+    Effects.OperateGameObject,
     Effects.DismissPet,
     Effects.LeaveRitual,
     Effects.ReleaseControlled,

@@ -130,6 +130,20 @@ defmodule ThistleTea.Game.World.SpawnPoolTest do
       stop_pool(key)
     end
 
+    test "operates and restores a scripted door through its spawn pool" do
+      {guid, group, world, key, cell} = singleton_fixture()
+      blueprint = put_in(game_object(guid).game_object.state, 1)
+
+      :ok = SpawnPool.activate(group, cell, blueprint)
+      pid = await_entity(guid)
+
+      :ok = SpawnPool.operate_game_object(world, blueprint, :open, 300)
+      await_game_object_state(pid, 0)
+      await_game_object_state(pid, 1)
+
+      stop_pool(key)
+    end
+
     test "temporarily respawns a suspended game object" do
       {guid, group, world, key, cell} = singleton_fixture()
       blueprint = game_object(guid)

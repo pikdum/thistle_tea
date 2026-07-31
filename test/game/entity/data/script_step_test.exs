@@ -74,6 +74,8 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStepTest do
       assert ScriptStep.build(row(7)).command == :quest_explored
       assert ScriptStep.build(row(8)).command == :kill_credit
       assert ScriptStep.build(row(9)).command == :respawn_game_object
+      assert ScriptStep.build(row(11)).command == :open_door
+      assert ScriptStep.build(row(12)).command == :close_door
       assert ScriptStep.build(row(13)).command == :activate_object
       assert ScriptStep.build(row(17)).command == :create_item
       assert ScriptStep.build(row(19)).command == :set_equipment
@@ -98,6 +100,7 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStepTest do
       assert ScriptStep.build(row(81)).command == :despawn_game_object
       assert ScriptStep.build(row(82)).command == :load_game_object_spawn
       assert ScriptStep.build(row(83)).command == :quest_credit
+      assert ScriptStep.build(row(87)).command == :reset_door_or_button
       assert ScriptStep.build(row(89)).command == :play_custom_animation
     end
 

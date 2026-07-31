@@ -669,6 +669,46 @@ defmodule ThistleTea.Game.Entity.Logic.AI.ScriptTest do
              ] = mob.internal.events
     end
 
+    test "door commands enqueue spawn and owner operations", %{mob: mob} do
+      blueprint = %GameObjectEntity{
+        object: %Object{guid: Guid.from_low_guid(:game_object, 1_000, 22)},
+        game_object: %GameObjectComponent{state: 1},
+        movement_block: %MovementBlock{position: {1.0, 2.0, 3.0, 0.0}},
+        internal: %Internal{world: WorldRef.open(0)}
+      }
+
+      {mob, _blackboard} =
+        Script.run(
+          mob,
+          Blackboard.new(),
+          [%ScriptStep{command: :open_door, datalong2: 1, game_object_spawn: blueprint}],
+          nil,
+          1_000
+        )
+
+      assert [
+               %Effects.OperateGameObject{
+                 action: :open,
+                 reset_delay_ms: 3_000,
+                 blueprint: ^blueprint
+               }
+             ] = mob.internal.events
+
+      game_object = %{blueprint | internal: %Internal{}}
+
+      {game_object, _blackboard} =
+        Script.run(
+          game_object,
+          Blackboard.new(),
+          [%ScriptStep{command: :reset_door_or_button}],
+          nil,
+          1_000
+        )
+
+      assert [%Effects.OperateGameObject{action: :reset, reset_delay_ms: 0, blueprint: nil}] =
+               game_object.internal.events
+    end
+
     test "nearest game object commands are forwarded to the object owner", %{mob: mob} do
       game_object_guid = Guid.from_low_guid(:game_object, 1_000, 22)
 

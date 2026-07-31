@@ -62,6 +62,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
     :activate_object,
     :set_game_object_state,
     :play_custom_animation,
+    :reset_door_or_button,
     :remove_object
   ]
   @default_buddy_radius 30.0
@@ -674,6 +675,46 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
       _missing_user ->
         {state, blackboard}
     end
+  end
+
+  defp execute(
+         state,
+         blackboard,
+         %ScriptStep{command: command, datalong2: reset_delay_seconds, game_object_spawn: %GameObject{} = blueprint},
+         _target_guid,
+         _now,
+         %Context{}
+       )
+       when command in [:open_door, :close_door] do
+    action = if command == :open_door, do: :open, else: :close
+    reset_delay_ms = max(reset_delay_seconds, 3) * 1_000
+    effect = Effects.operate_game_object(action, reset_delay_ms, blueprint: blueprint)
+    {Effects.enqueue(state, effect), blackboard}
+  end
+
+  defp execute(
+         %GameObject{} = state,
+         blackboard,
+         %ScriptStep{command: command, datalong2: reset_delay_seconds},
+         _target_guid,
+         _now,
+         %Context{}
+       )
+       when command in [:open_door, :close_door] do
+    action = if command == :open_door, do: :open, else: :close
+    reset_delay_ms = max(reset_delay_seconds, 3) * 1_000
+    {Effects.enqueue(state, Effects.operate_game_object(action, reset_delay_ms)), blackboard}
+  end
+
+  defp execute(
+         %GameObject{} = state,
+         blackboard,
+         %ScriptStep{command: :reset_door_or_button},
+         _target_guid,
+         _now,
+         %Context{}
+       ) do
+    {Effects.enqueue(state, Effects.operate_game_object(:reset, 0)), blackboard}
   end
 
   defp execute(

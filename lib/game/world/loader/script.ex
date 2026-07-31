@@ -85,7 +85,13 @@ defmodule ThistleTea.Game.World.Loader.Script do
     |> Enum.uniq()
   end
 
-  @game_object_spawn_commands [:respawn_game_object, :despawn_game_object, :load_game_object_spawn]
+  @game_object_spawn_commands [
+    :respawn_game_object,
+    :open_door,
+    :close_door,
+    :despawn_game_object,
+    :load_game_object_spawn
+  ]
 
   defp resolve_game_object_spawns(steps) do
     blueprints =

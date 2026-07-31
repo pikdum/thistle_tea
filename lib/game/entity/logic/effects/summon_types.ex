@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Entity.Logic.Effects.SummonTypes do
     {:RespawnGameObject, [:blueprint, :duration_ms], []},
     {:DespawnGameObject, [:blueprint, :respawn_delay_ms], []},
     {:LoadGameObjectSpawn, [:blueprint], []},
+    {:OperateGameObject, [:action, :reset_delay_ms], [blueprint: nil]},
     {:LeaveRitual, [:target_guid, :source_guid], []},
     {:SummonGameObject, [:entry, :duration_ms], [target_guid: nil, position: nil]},
     {:SummonRequest, [:source_guid, :target_guid, :amount, :position], []},

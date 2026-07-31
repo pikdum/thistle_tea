@@ -432,6 +432,15 @@ defmodule ThistleTea.Game.Entity.Logic.Effects do
     %Effects.LoadGameObjectSpawn{blueprint: blueprint}
   end
 
+  def operate_game_object(action, reset_delay_ms, opts \\ [])
+      when action in [:open, :close, :reset] and is_integer(reset_delay_ms) do
+    %Effects.OperateGameObject{
+      action: action,
+      reset_delay_ms: reset_delay_ms,
+      blueprint: Keyword.get(opts, :blueprint)
+    }
+  end
+
   def leave_ritual(game_object_guid, user_guid) when is_integer(game_object_guid) and is_integer(user_guid) do
     %Effects.LeaveRitual{target_guid: game_object_guid, source_guid: user_guid}
   end
