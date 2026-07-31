@@ -623,6 +623,14 @@ defmodule ThistleTea.Game.Entity.Logic.AI.ScriptTest do
       assert [%Effects.RespawnSelf{even_if_alive?: true}] = mob.internal.events
     end
 
+    test "create_item targets the player participating in the script", %{mob: mob} do
+      player_guid = Guid.from_low_guid(:player, 9)
+      step = %ScriptStep{command: :create_item, datalong: 22_048, datalong2: 1}
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], player_guid, 1_000)
+
+      assert [%Effects.GiveItem{target_guid: ^player_guid, item_id: 22_048, count: 1}] = mob.internal.events
+    end
+
     test "set_default_movement updates the spawn movement policy", %{mob: mob} do
       spawn = %Spawn{distance: 0, movement_type: 0}
       mob = %{mob | internal: %{mob.internal | spawn: spawn}}

@@ -526,6 +526,16 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
     {Effects.enqueue(state, Effects.respawn_self(step.datalong != 0)), blackboard}
   end
 
+  defp execute(state, blackboard, %ScriptStep{command: :create_item} = step, target_guid, _now) do
+    case script_player_guid(state.object.guid, target_guid) do
+      nil ->
+        {state, blackboard}
+
+      player_guid ->
+        {Effects.enqueue(state, Effects.create_item(player_guid, step.datalong, step.datalong2)), blackboard}
+    end
+  end
+
   defp execute(state, blackboard, %ScriptStep{command: :morph} = step, _target_guid, _now) do
     {morph(state, morph_display_id(state, step)), blackboard}
   end
