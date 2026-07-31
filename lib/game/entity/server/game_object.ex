@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
   alias ThistleTea.Game.Entity.Data.GameObject
   alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception.Request, as: ObservationRequest
   alias ThistleTea.Game.Entity.Logic.AI.Script
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Effects
@@ -21,6 +22,7 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
   alias ThistleTea.Game.Entity.Logic.Loot.Commit
   alias ThistleTea.Game.Entity.Logic.Loot.Release
   alias ThistleTea.Game.Entity.Registry, as: EntityRegistry
+  alias ThistleTea.Game.Entity.Server.AIEnvironment
   alias ThistleTea.Game.Entity.Server.GameObject.Chair
   alias ThistleTea.Game.Entity.Server.GameObject.Chest
   alias ThistleTea.Game.Entity.Server.GameObject.Fishing
@@ -73,9 +75,7 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
 
   def handle_cast({:start_script, steps, target_guid}, %GameObject{} = state)
       when is_list(steps) and is_integer(target_guid) do
-    {state, _blackboard} = Script.run(state, Blackboard.new(), steps, target_guid, Time.now())
-    state = state |> EventSink.emit_pending() |> broadcast_if_pending()
-    {:noreply, state}
+    {:noreply, run_script(state, steps, target_guid)}
   rescue
     error ->
       Logger.error("start_script crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
@@ -264,6 +264,15 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
     end
   end
 
+  def handle_info({:ai_script_steps, steps, target_guid}, %GameObject{} = state)
+      when is_list(steps) and is_integer(target_guid) do
+    {:noreply, run_script(state, steps, target_guid)}
+  rescue
+    error ->
+      Logger.error("ai_script_steps crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:noreply, state}
+  end
+
   def handle_info(:trap_tick, %GameObject{internal: %Internal{trap: %Trap{} = trap}} = state) do
     case TrapServer.target(state) do
       target_guid when is_integer(target_guid) ->
@@ -359,6 +368,19 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
   end
 
   defp schedule_trap(_state), do: nil
+
+  defp run_script(%GameObject{} = state, steps, target_guid) do
+    now = Time.now()
+
+    request =
+      ObservationRequest.new([target_guid], Script.observation_radius(steps),
+        game_object_radius: Script.game_object_observation_radius(steps)
+      )
+
+    context = AIEnvironment.context(state, now, request)
+    {state, _blackboard} = Script.run(state, Blackboard.new(), steps, target_guid, context)
+    state |> EventSink.emit_pending() |> broadcast_if_pending()
+  end
 
   defp cast_ritual_completion(state, %Ritual{} = ritual, world, {x, y, z, orientation}) do
     with spell_id when is_integer(spell_id) <- ritual.completion_spell_id,

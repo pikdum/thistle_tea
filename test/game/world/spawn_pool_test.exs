@@ -1,11 +1,13 @@
 defmodule ThistleTea.Game.World.SpawnPoolTest do
   use ExUnit.Case, async: false
 
+  alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Component.GameObject, as: GameObjectComponent
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.GameObject
+  alias ThistleTea.Game.Entity.Data.ScriptStep
   alias ThistleTea.Game.Entity.Registry, as: EntityRegistry
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.World.Metadata
@@ -106,6 +108,24 @@ defmodule ThistleTea.Game.World.SpawnPoolTest do
 
       send(pid, {:script_activate_object, Guid.from_low_guid(:player, 1)})
       await_game_object_state(pid, 1)
+
+      stop_pool(key)
+    end
+
+    test "executes immediate and delayed scripts through the game object owner" do
+      {guid, group, _world, key, cell} = singleton_fixture()
+
+      :ok = SpawnPool.activate(group, cell, game_object(guid))
+      await_entity(guid)
+
+      steps = [
+        %ScriptStep{command: :set_game_object_state, datalong: 1},
+        %ScriptStep{command: :set_game_object_state, datalong: 2, delay_ms: 200}
+      ]
+
+      Entity.start_script(guid, steps, Guid.from_low_guid(:player, 1))
+      pid = await_game_object_state_by_guid(guid, 1)
+      await_game_object_state(pid, 2)
 
       stop_pool(key)
     end
@@ -300,6 +320,27 @@ defmodule ThistleTea.Game.World.SpawnPoolTest do
       %GameObject{} ->
         Process.sleep(10)
         await_game_object_state(pid, expected_state, attempts - 1)
+    end
+  end
+
+  defp await_game_object_state_by_guid(guid, expected_state, attempts \\ 50)
+  defp await_game_object_state_by_guid(_guid, _expected_state, 0), do: flunk("game object state did not change")
+
+  defp await_game_object_state_by_guid(guid, expected_state, attempts) do
+    case EntityRegistry.whereis(guid) do
+      pid when is_pid(pid) ->
+        case :sys.get_state(pid) do
+          %GameObject{game_object: %GameObjectComponent{state: ^expected_state}} ->
+            pid
+
+          %GameObject{} ->
+            Process.sleep(10)
+            await_game_object_state_by_guid(guid, expected_state, attempts - 1)
+        end
+
+      nil ->
+        Process.sleep(10)
+        await_game_object_state_by_guid(guid, expected_state, attempts - 1)
     end
   end
 

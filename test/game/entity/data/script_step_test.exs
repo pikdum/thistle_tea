@@ -79,6 +79,7 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStepTest do
       assert ScriptStep.build(row(20)).command == :movement
       assert ScriptStep.build(row(4)).command == :modify_flags
       assert ScriptStep.build(row(5)).command == :interrupt_casts
+      assert ScriptStep.build(row(31)).command == :terminate_script
       assert ScriptStep.build(row(22)).command == :set_faction
       assert ScriptStep.build(row(34)).command == :set_home_position
       assert ScriptStep.build(row(41)).command == :remove_object

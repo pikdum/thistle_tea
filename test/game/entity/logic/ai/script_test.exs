@@ -18,6 +18,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.ScriptTest do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception.Observation
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Waypoints
   alias ThistleTea.Game.Entity.Logic.AI.Script
   alias ThistleTea.Game.Entity.Logic.Effects
@@ -926,10 +927,80 @@ defmodule ThistleTea.Game.Entity.Logic.AI.ScriptTest do
 
       {mob, _blackboard} = Script.run(mob, Blackboard.new(), [immediate, delayed], nil, 1_000)
 
+      assert [%Effects.Emote{emote_id: 11}, %Effects.ScriptSteps{steps: [scheduled], duration_ms: 4_000}] =
+               mob.internal.events
+
+      assert scheduled == %{delayed | delay_ms: 0}
+    end
+
+    test "delayed steps form an ordered cancellable chain", %{mob: mob} do
+      steps = [
+        %ScriptStep{command: :emote, datalong: 11, delay_ms: 1_000},
+        %ScriptStep{command: :terminate_script, delay_ms: 2_000},
+        %ScriptStep{command: :emote, datalong: 22, delay_ms: 3_000}
+      ]
+
+      {mob, blackboard} = Script.run(mob, Blackboard.new(), steps, nil, 1_000)
+
+      assert [%Effects.ScriptSteps{duration_ms: 1_000, steps: scheduled}] = mob.internal.events
+      assert Enum.map(scheduled, & &1.delay_ms) == [0, 1_000, 2_000]
+
+      mob = %{mob | internal: %{mob.internal | events: []}}
+      {mob, blackboard} = Script.run(mob, blackboard, scheduled, nil, 2_000)
+
       assert [
                %Effects.Emote{emote_id: 11},
-               %Effects.ScriptSteps{steps: [^delayed], duration_ms: 4_000}
+               %Effects.ScriptSteps{duration_ms: 1_000, steps: remaining}
              ] = mob.internal.events
+
+      mob = %{mob | internal: %{mob.internal | events: []}}
+      {mob, _blackboard} = Script.run(mob, blackboard, remaining, nil, 3_000)
+      assert mob.internal.events == []
+    end
+
+    test "terminate_script checks nearby living creature presence", %{mob: mob} do
+      buddy_guid = Guid.from_low_guid(:mob, 5_895, 20)
+
+      perception =
+        Perception.new(
+          1_000,
+          nil,
+          %{buddy_guid => %Observation{guid: buddy_guid, metadata: %{alive?: true}}},
+          %{mobs: [{buddy_guid, 10.0}], players: [], game_objects: []}
+        )
+
+      context = Context.new(1_000, perception: perception)
+
+      terminate_if_found = %ScriptStep{
+        command: :terminate_script,
+        datalong: 5_895,
+        datalong2: 20,
+        datalong3: 1
+      }
+
+      {mob, _blackboard} =
+        Script.run(
+          mob,
+          Blackboard.new(),
+          [terminate_if_found, %ScriptStep{command: :emote, datalong: 11}],
+          nil,
+          context
+        )
+
+      assert mob.internal.events == []
+
+      terminate_if_missing = %{terminate_if_found | datalong3: 0}
+
+      {mob, _blackboard} =
+        Script.run(
+          mob,
+          Blackboard.new(),
+          [terminate_if_missing, %ScriptStep{command: :emote, datalong: 11}],
+          nil,
+          context
+        )
+
+      assert [%Effects.Emote{emote_id: 11}] = mob.internal.events
     end
 
     test "unsupported commands are skipped", %{mob: mob} do

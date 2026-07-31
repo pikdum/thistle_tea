@@ -63,6 +63,12 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
     :play_custom_animation,
     :remove_object
   ]
+  @default_buddy_radius 30.0
+  @entry_target_types [
+    :nearest_creature_with_entry,
+    :random_creature_with_entry,
+    :nearest_game_object_with_entry
+  ]
 
   def flee_duration_ms, do: @flee_duration_ms
 
@@ -72,8 +78,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
 
   def run(state, %Blackboard{} = blackboard, steps, target_guid, %Context{} = context) when is_list(steps) do
     {due, delayed} = Enum.split_with(steps, &(&1.delay_ms <= 0))
-    {state, blackboard} = execute_steps(state, blackboard, due, target_guid, context)
-    {schedule_delayed(state, delayed, target_guid), blackboard}
+    {state, blackboard, status} = execute_steps_with_status(state, blackboard, due, target_guid, context)
+    state = if status == :continue, do: schedule_delayed(state, delayed, target_guid), else: state
+    {state, blackboard}
   end
 
   def execute_steps(state, %Blackboard{} = blackboard, steps, target_guid, now)
@@ -82,8 +89,18 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
   end
 
   def execute_steps(state, %Blackboard{} = blackboard, steps, target_guid, %Context{} = context) when is_list(steps) do
-    Enum.reduce(steps, {state, blackboard}, fn %ScriptStep{} = step, {state, blackboard} ->
-      dispatch(state, blackboard, step, target_guid, context)
+    {state, blackboard, _status} = execute_steps_with_status(state, blackboard, steps, target_guid, context)
+    {state, blackboard}
+  end
+
+  defp execute_steps_with_status(state, blackboard, steps, target_guid, context) do
+    Enum.reduce_while(steps, {state, blackboard, :continue}, fn %ScriptStep{} = step, {state, blackboard, :continue} ->
+      if terminate?(state, step, context) do
+        {:halt, {state, blackboard, :terminated}}
+      else
+        {state, blackboard} = dispatch(state, blackboard, step, target_guid, context)
+        {:cont, {state, blackboard, :continue}}
+      end
     end)
   end
 
@@ -165,11 +182,36 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
   defp schedule_delayed(state, [], _target_guid), do: state
 
   defp schedule_delayed(state, delayed, target_guid) do
-    delayed
-    |> Enum.group_by(& &1.delay_ms)
-    |> Enum.reduce(state, fn {delay_ms, steps}, state ->
-      Effects.enqueue(state, Effects.script_steps(steps, target_guid, delay_ms))
-    end)
+    next_delay_ms = delayed |> Enum.map(& &1.delay_ms) |> Enum.min()
+    steps = Enum.map(delayed, &%{&1 | delay_ms: &1.delay_ms - next_delay_ms})
+    Effects.enqueue(state, Effects.script_steps(steps, target_guid, next_delay_ms))
+  end
+
+  defp terminate?(_state, %ScriptStep{command: :terminate_script, datalong: 0}, %Context{}), do: true
+
+  defp terminate?(
+         _state,
+         %ScriptStep{command: :terminate_script, datalong: entry, datalong2: radius, datalong3: option},
+         %Context{perception: perception}
+       )
+       when entry > 0 do
+    found? =
+      perception
+      |> Perception.nearby(:mobs, positive_radius(radius, @default_buddy_radius))
+      |> Enum.any?(fn {guid, _distance} ->
+        Guid.entry(guid) == entry and alive_observation?(perception, guid)
+      end)
+
+    (option == 0 and not found?) or (option == 1 and found?)
+  end
+
+  defp terminate?(_state, %ScriptStep{}, %Context{}), do: false
+
+  defp alive_observation?(perception, guid) do
+    case Perception.metadata(perception, guid) do
+      %{alive?: alive?} -> alive?
+      _metadata -> true
+    end
   end
 
   defp execute(
@@ -1069,13 +1111,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
   defp victim(%{unit: %Unit{target: target}}) when is_integer(target) and target > 0, do: target
   defp victim(_state), do: nil
 
-  @default_buddy_radius 30.0
-  @entry_target_types [
-    :nearest_creature_with_entry,
-    :random_creature_with_entry,
-    :nearest_game_object_with_entry
-  ]
-
   def observation_radius(steps) when is_list(steps) do
     Enum.reduce(steps, 0.0, fn
       %ScriptStep{} = step, radius ->
@@ -1095,6 +1130,11 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
 
   defp step_observation_radius(%ScriptStep{target_type: target_type, target_param1: radius})
        when target_type in [:friendly_injured, :friendly_injured_except] do
+    positive_radius(radius, @default_buddy_radius)
+  end
+
+  defp step_observation_radius(%ScriptStep{command: :terminate_script, datalong: entry, datalong2: radius})
+       when entry > 0 do
     positive_radius(radius, @default_buddy_radius)
   end
 

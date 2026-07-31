@@ -567,7 +567,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
       state =
         state
         |> EventAI.with_blackboard(
-          &Script.execute_steps(
+          &Script.run(
             &1,
             &2,
             steps,

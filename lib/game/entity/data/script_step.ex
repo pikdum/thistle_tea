@@ -182,6 +182,7 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStep do
   defp command(26), do: :attack_start
   defp command(28), do: :stand_state
   defp command(30), do: :send_taxi_path
+  defp command(31), do: :terminate_script
   defp command(34), do: :set_home_position
   defp command(35), do: :turn_to
   defp command(39), do: :start_script
