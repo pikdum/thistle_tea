@@ -570,6 +570,25 @@ defmodule ThistleTea.Game.Entity.Logic.AI.ScriptTest do
       assert mob.unit.faction_template == 35
     end
 
+    test "summon_object reuses the semantic game object summon effect", %{mob: mob} do
+      step = %ScriptStep{
+        command: :summon_object,
+        datalong: 21_145,
+        datalong2: 300,
+        position: {-9084.64, 830.321, 109.609, 0.541051}
+      }
+
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], nil, 1_000)
+
+      assert [
+               %Effects.SummonGameObject{
+                 entry: 21_145,
+                 duration_ms: 300_000,
+                 position: {-9084.64, 830.321, 109.609, 0.541051}
+               }
+             ] = mob.internal.events
+    end
+
     test "set_default_movement updates the spawn movement policy", %{mob: mob} do
       spawn = %Spawn{distance: 0, movement_type: 0}
       mob = %{mob | internal: %{mob.internal | spawn: spawn}}

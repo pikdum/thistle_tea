@@ -7,7 +7,7 @@ defmodule ThistleTea.Game.Entity.Logic.Effects.SummonTypes do
     {:DespawnAreaEffects, [:spell_id], []},
     {:DespawnEntity, [:target_guid], []},
     {:LeaveRitual, [:target_guid, :source_guid], []},
-    {:SummonGameObject, [:entry, :duration_ms], [target_guid: nil]},
+    {:SummonGameObject, [:entry, :duration_ms], [target_guid: nil, position: nil]},
     {:SummonRequest, [:source_guid, :target_guid, :amount, :position], []},
     {:SummonCreature, [:summon, :steps, :target_guid], []},
     {:ControlGranted, [:source_guid, :target_guid, :spell_id, :spells, :kind], []},

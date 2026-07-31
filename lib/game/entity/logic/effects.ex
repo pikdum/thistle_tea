@@ -420,7 +420,8 @@ defmodule ThistleTea.Game.Entity.Logic.Effects do
     %Effects.SummonGameObject{
       entry: entry,
       duration_ms: duration_ms,
-      target_guid: Keyword.get(opts, :ritual_target_guid)
+      target_guid: Keyword.get(opts, :ritual_target_guid),
+      position: Keyword.get(opts, :position)
     }
   end
 

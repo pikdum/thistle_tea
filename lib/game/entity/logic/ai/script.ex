@@ -495,6 +495,11 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
     {TemporaryFaction.set(state, step.datalong, step.datalong2), blackboard}
   end
 
+  defp execute(state, blackboard, %ScriptStep{command: :summon_object} = step, _target_guid, _now) do
+    effect = Effects.summon_game_object(step.datalong, step.datalong2 * 1_000, position: step.position)
+    {Effects.enqueue(state, effect), blackboard}
+  end
+
   defp execute(state, blackboard, %ScriptStep{command: :morph} = step, _target_guid, _now) do
     {morph(state, morph_display_id(state, step)), blackboard}
   end

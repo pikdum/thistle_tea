@@ -193,6 +193,7 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStep do
   defp command(68), do: :start_script_for_all
   defp command(69), do: :edit_map_event
   defp command(70), do: :fail_quest
+  defp command(76), do: :summon_object
   defp command(83), do: :quest_credit
   defp command(other), do: {:unsupported, other}
 

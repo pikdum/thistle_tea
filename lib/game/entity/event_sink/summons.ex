@@ -102,11 +102,13 @@ defmodule ThistleTea.Game.Entity.EventSink.Summons do
         %{
           object: %{guid: owner_guid},
           internal: %Internal{world: world},
-          movement_block: %{position: {_x, _y, _z, _o} = position}
+          movement_block: %{position: {_x, _y, _z, _o} = source_position}
         } = entity,
         %Effects.SummonGameObject{entry: entry, duration_ms: duration_ms} = effect,
         context
       ) do
+    position = summon_position(effect.position, source_position)
+
     case GameObjectTemplateLoader.get(entry) do
       %DataGameObjectTemplate{} = template ->
         game_object =
@@ -310,6 +312,20 @@ defmodule ThistleTea.Game.Entity.EventSink.Summons do
     Context.send_after(context, {:despawn_creature, effect.respawn_delay_ms}, effect.duration_ms || 0)
     entity
   end
+
+  defp summon_position({x, y, z, orientation}, {source_x, source_y, source_z, source_orientation}) do
+    {
+      coordinate(x, source_x),
+      coordinate(y, source_y),
+      coordinate(z, source_z),
+      coordinate(orientation, source_orientation)
+    }
+  end
+
+  defp summon_position(_position, source_position), do: source_position
+
+  defp coordinate(value, _fallback) when is_number(value) and value != 0, do: value
+  defp coordinate(_value, fallback), do: fallback
 
   defp maybe_track_channel_game_object(
          %GameObject{object: %{guid: guid}, internal: %Internal{ritual: %Ritual{}}},
