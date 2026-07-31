@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgGossipHello do
   alias ThistleTea.Game.Player.Quests
   alias ThistleTea.Game.World.Loader.Gossip, as: GossipLoader
   alias ThistleTea.Game.World.Loader.Gossip.Menu
+  alias ThistleTea.Game.World.Loader.Gossip.Text
 
   @default_gossip_text_id 68
 
@@ -48,13 +49,26 @@ defmodule ThistleTea.Game.Network.Message.CmsgGossipHello do
 
     Network.send_packet(%Message.SmsgGossipMessage{
       guid: npc_guid,
-      title_text_id: menu.text_id,
+      title_text_id: title_text_id(menu, c),
       gossips: gossips,
       quests: quests
     })
 
     %{state | gossip_menu_options: options}
   end
+
+  def title_text_id(%Menu{texts: texts}, %Character{} = character) when texts != [] do
+    texts
+    |> Enum.filter(fn
+      %Text{condition_id: 0} -> true
+      %Text{condition: condition} -> GossipCondition.met?(character, condition)
+    end)
+    |> Enum.max_by(& &1.condition_id, fn -> %Text{text_id: @default_gossip_text_id} end)
+    |> then(& &1.text_id)
+  end
+
+  def title_text_id(%Menu{text_id: text_id}, %Character{}) when is_integer(text_id), do: text_id
+  def title_text_id(%Menu{}, %Character{}), do: @default_gossip_text_id
 
   defp visible_options(options, npc_guid, %Character{unit: unit} = character) do
     trainer_option_id = GossipLoader.option_trainer()

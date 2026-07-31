@@ -1,15 +1,25 @@
 defmodule ThistleTea.Game.Network.Message.CmsgGossipSelectOptionTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
 
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Object
+  alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.ScriptStep
+  alias ThistleTea.Game.Entity.Data.Taxi.Network
+  alias ThistleTea.Game.Entity.Data.Taxi.Node
+  alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.Message.CmsgGossipSelectOption
   alias ThistleTea.Game.Network.Message.SmsgGossipComplete
+  alias ThistleTea.Game.Network.Message.SmsgShowtaxinodes
   alias ThistleTea.Game.World.Loader.Gossip.Option
+  alias ThistleTea.Game.World.Loader.Taxi, as: TaxiLoader
+  alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.SpatialHash
+  alias ThistleTea.Game.WorldRef
 
   describe "handle/2" do
     test "dispatches a taxi gossip script to the player owner" do
@@ -35,6 +45,61 @@ defmodule ThistleTea.Game.Network.Message.CmsgGossipSelectOptionTest do
       assert %{gossip_menu_options: []} = CmsgGossipSelectOption.handle(message, state)
       assert_receive {:send_taxi_path, 315}
       assert_receive {:"$gen_cast", {:send_packet, %SmsgGossipComplete{}}}
+    end
+
+    test "opens the flight map for a taxi-vendor option" do
+      previous_network = TaxiLoader.get()
+      player_id = System.unique_integer([:positive, :monotonic])
+      player_guid = Guid.from_low_guid(:player, player_id)
+      flightmaster_guid = Guid.from_low_guid(:mob, 352, System.unique_integer([:positive, :monotonic]))
+
+      network =
+        Network.build(
+          [
+            %Node{
+              id: 2,
+              map_id: 0,
+              position: {2.0, 0.0, 0.0},
+              name: "Stormwind",
+              mount_display_ids: %{alliance: 6852}
+            }
+          ],
+          [],
+          %{},
+          []
+        )
+
+      :ets.insert(TaxiLoader, {:network, network})
+      Metadata.put(flightmaster_guid, %{npc_flags: 0x8, alive?: true})
+      SpatialHash.update(:mobs, flightmaster_guid, WorldRef.open(0), 2.0, 0.0, 0.0)
+
+      on_exit(fn ->
+        Metadata.delete(flightmaster_guid)
+        SpatialHash.remove(:mobs, flightmaster_guid)
+
+        if previous_network do
+          :ets.insert(TaxiLoader, {:network, previous_network})
+        else
+          :ets.delete(TaxiLoader, :network)
+        end
+      end)
+
+      character = %Character{
+        id: player_id,
+        object: %Object{guid: player_guid},
+        unit: %Unit{race: 1},
+        player: %Player{taxi_nodes: MapSet.new([2])},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+        internal: %Internal{world: WorldRef.open(0)}
+      }
+
+      option = %Option{id: 0, option_id: 4}
+      state = %{character: character, gossip_menu_options: [option]}
+      message = %CmsgGossipSelectOption{guid: flightmaster_guid, gossip_list_id: 0}
+
+      assert CmsgGossipSelectOption.handle(message, state) == state
+
+      assert_receive {:"$gen_cast", {:send_packet, %SmsgShowtaxinodes{guid: ^flightmaster_guid, nearest_node: 2}}}
     end
   end
 end

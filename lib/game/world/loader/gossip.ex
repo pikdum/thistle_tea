@@ -14,15 +14,21 @@ defmodule ThistleTea.Game.World.Loader.Gossip do
 
   @option_gossip 1
   @option_vendor 3
+  @option_taxi 4
   @option_trainer 5
   @option_spirit_healer 6
-  @supported_option_ids [@option_gossip, @option_vendor, @option_trainer, @option_spirit_healer]
+  @supported_option_ids [@option_gossip, @option_vendor, @option_taxi, @option_trainer, @option_spirit_healer]
 
   @npc_flag_trainer 0x10
 
   defmodule Menu do
     @moduledoc false
-    defstruct [:menu_id, :text_id, options: []]
+    defstruct [:menu_id, :text_id, texts: [], options: []]
+  end
+
+  defmodule Text do
+    @moduledoc false
+    defstruct [:text_id, :condition_id, :condition]
   end
 
   defmodule Option do
@@ -38,6 +44,8 @@ defmodule ThistleTea.Game.World.Loader.Gossip do
   end
 
   def load_all do
+    menu_rows = Mangos.Repo.all(Mangos.GossipMenu)
+
     option_rows =
       from(o in Mangos.GossipMenuOption,
         where: o.option_id in ^@supported_option_ids
@@ -59,17 +67,31 @@ defmodule ThistleTea.Game.World.Loader.Gossip do
       end)
 
     conditions =
-      option_rows
+      (option_rows ++ menu_rows)
       |> Enum.map(& &1.condition_id)
       |> ConditionLoader.load_by_ids()
 
     options_by_menu = Enum.group_by(option_rows, & &1.menu_id)
 
-    Mangos.GossipMenu
-    |> Mangos.Repo.all()
+    menu_rows
     |> Enum.group_by(& &1.entry)
     |> Enum.each(fn {menu_id, rows} ->
-      row = Enum.min_by(rows, fn row -> {row.condition_id, row.text_id} end)
+      texts =
+        rows
+        |> Enum.sort_by(&{&1.condition_id, &1.text_id})
+        |> Enum.map(fn row ->
+          %Text{
+            text_id: row.text_id,
+            condition_id: row.condition_id,
+            condition: Map.get(conditions, row.condition_id)
+          }
+        end)
+
+      text_id =
+        case Enum.find(texts, &(&1.condition_id == 0)) do
+          %Text{text_id: text_id} -> text_id
+          nil -> nil
+        end
 
       options =
         options_by_menu
@@ -88,7 +110,7 @@ defmodule ThistleTea.Game.World.Loader.Gossip do
           }
         end)
 
-      menu = %Menu{menu_id: menu_id, text_id: row.text_id, options: options}
+      menu = %Menu{menu_id: menu_id, text_id: text_id, texts: texts, options: options}
       :ets.insert(__MODULE__, {{:menu, menu_id}, menu})
     end)
 
@@ -141,6 +163,7 @@ defmodule ThistleTea.Game.World.Loader.Gossip do
 
   def option_vendor, do: @option_vendor
   def option_gossip, do: @option_gossip
+  def option_taxi, do: @option_taxi
   def option_trainer, do: @option_trainer
   def option_spirit_healer, do: @option_spirit_healer
 end

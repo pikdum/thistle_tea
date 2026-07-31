@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Player.Gossip do
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Message.CmsgGossipHello
   alias ThistleTea.Game.Network.Message.CmsgTrainerList
+  alias ThistleTea.Game.Player.Taxi
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.Loader.Gossip, as: GossipLoader
   alias ThistleTea.Game.World.Loader.Gossip.Menu
@@ -22,6 +23,7 @@ defmodule ThistleTea.Game.Player.Gossip do
   def select(%{character: %Character{} = character} = state, guid, gossip_list_id) do
     option_ids = %{
       vendor: GossipLoader.option_vendor(),
+      taxi: GossipLoader.option_taxi(),
       trainer: GossipLoader.option_trainer(),
       spirit_healer: GossipLoader.option_spirit_healer()
     }
@@ -49,6 +51,10 @@ defmodule ThistleTea.Game.Player.Gossip do
     })
 
     state
+  end
+
+  defp dispatch(state, _character, guid, %Option{option_id: option_id}, %{taxi: option_id}) do
+    Taxi.query(state, guid)
   end
 
   defp dispatch(state, _character, guid, %Option{option_id: option_id}, %{trainer: option_id}) do

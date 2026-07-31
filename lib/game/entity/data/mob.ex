@@ -59,6 +59,7 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
       max_power1: max_mana,
       level: level,
       class: ct.unit_class,
+      gender: display_gender(display_info_addon),
       faction_template: ct.faction_alliance,
       flags: unit_flags(ct),
       npc_flags: ct.npc_flags,
@@ -255,6 +256,9 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
   defp effective_scale(_template, display_scale) when is_number(display_scale) and display_scale > 0, do: display_scale
 
   defp effective_scale(_template, _display_scale), do: 1.0
+
+  defp display_gender(%Mangos.CreatureDisplayInfoAddon{gender: gender}) when gender in 0..2, do: gender
+  defp display_gender(_display_info_addon), do: 0
 
   defp level(%Mangos.Creature{} = creature) do
     case creature.selected_level do

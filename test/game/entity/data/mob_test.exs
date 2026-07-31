@@ -51,6 +51,30 @@ defmodule ThistleTea.Game.Entity.Data.MobTest do
       assert mob.movement_block.swim_back_speed == 3.75
     end
 
+    test "sets creature gender from its selected display" do
+      creature =
+        %Mangos.Creature{
+          guid: 1,
+          id: 2,
+          modelid: 3,
+          curhealth: 10,
+          creature_movement: [],
+          creature_display_info_addon: %Mangos.CreatureDisplayInfoAddon{display_id: 3, gender: 1},
+          creature_template: %Mangos.CreatureTemplate{
+            entry: 2,
+            name: "Test Creature",
+            speed_walk: 1.0,
+            speed_run: 1.0,
+            min_level: 1,
+            max_level: 1,
+            scale: 1.0
+          }
+        }
+        |> Map.put(:equip_items, [nil, nil, nil])
+
+      assert Mob.build(creature).unit.gender == 1
+    end
+
     test "stores XP reward metadata from creature templates" do
       creature =
         %Mangos.Creature{
