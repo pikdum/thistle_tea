@@ -1126,6 +1126,24 @@ defmodule ThistleTea.Game.Entity.Logic.AI.ScriptTest do
                mob.internal.events
     end
 
+    test "map event targets resolve from immutable context", %{mob: mob} do
+      event_target = Guid.from_low_guid(:player, 55)
+
+      step = %ScriptStep{
+        command: :talk,
+        target_type: :map_event_target,
+        target_param1: 5_944,
+        texts: [%{text: "Found you", chat_type: :say, language: 0, emote_id: 0}]
+      }
+
+      selector = {:map_event_target, 5_944, 0}
+      context = Context.new(1_000, script_targets: %{selector => event_target})
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], nil, context)
+
+      assert [%Effects.MonsterTalk{target_guid: ^event_target}] = mob.internal.events
+      assert Script.target_requests([step]) == [selector]
+    end
+
     test "unsupported commands are skipped", %{mob: mob} do
       step = %ScriptStep{command: {:unsupported, 10}}
 

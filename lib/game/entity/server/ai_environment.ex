@@ -54,7 +54,8 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
       random: random(),
       navigation: navigation(entity, now),
       waypoints: WaypointLoader.context(),
-      script_conditions: script_condition_results(entity, actors, request.script_conditions)
+      script_conditions: script_condition_results(entity, actors, request.script_conditions),
+      script_targets: script_target_results(entity, request.script_targets)
     }
   end
 
@@ -200,6 +201,35 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
   end
 
   defp script_condition_results(_entity, _actors, _conditions), do: %{}
+
+  defp script_target_results(%{internal: %Internal{world: world}} = entity, requested) when is_list(requested) do
+    selectors = Enum.uniq(requested ++ entity_script_target_requests(entity))
+    ScriptedEvent.target_results(world, selectors)
+  end
+
+  defp script_target_results(_entity, _requested), do: %{}
+
+  defp entity_script_target_requests(%Mob{} = entity) do
+    EventAI.script_target_requests(entity) ++ waypoint_script_target_requests(entity)
+  end
+
+  defp entity_script_target_requests(_entity), do: []
+
+  defp waypoint_script_target_requests(%Mob{} = entity) do
+    case waypoint_route(entity) do
+      %WaypointRoute{points: points} when is_map(points) ->
+        points
+        |> Map.values()
+        |> Enum.flat_map(fn
+          %Waypoint{script_steps: steps} when is_list(steps) -> steps
+          _waypoint -> []
+        end)
+        |> Script.target_requests()
+
+      nil ->
+        []
+    end
+  end
 
   defp auto_repeat_target(%{target_guid: target_guid}), do: target_guid
   defp auto_repeat_target(_auto_repeat), do: nil

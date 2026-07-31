@@ -60,6 +60,12 @@ defmodule ThistleTea.Game.World.System.ScriptedEvent do
     GenServer.call(__MODULE__, {:condition_results, WorldRef.coerce(world), source_guid, target_guid, conditions})
   end
 
+  def target_results(_world, []), do: %{}
+
+  def target_results(world, selectors) when is_list(selectors) do
+    GenServer.call(__MODULE__, {:target_results, WorldRef.coerce(world), selectors})
+  end
+
   @impl GenServer
   def init(state), do: {:ok, state}
 
@@ -71,6 +77,11 @@ defmodule ThistleTea.Game.World.System.ScriptedEvent do
           {entry, condition_met?(condition, events, world, source_guid, target_guid)}
       end)
 
+    {:reply, results, events}
+  end
+
+  def handle_call({:target_results, world, selectors}, _from, events) do
+    results = Map.new(selectors, &{&1, event_target(events, world, &1)})
     {:reply, results, events}
   end
 
@@ -207,6 +218,25 @@ defmodule ThistleTea.Game.World.System.ScriptedEvent do
   end
 
   defp apply_command(events, _effect), do: events
+
+  defp event_target(events, world, {target_type, event_id, entry}) do
+    case Map.get(events, event_key(world, event_id)) do
+      %Event{} = event -> select_event_target(event, target_type, entry)
+      nil -> nil
+    end
+  end
+
+  defp select_event_target(%Event{source_guid: guid}, :map_event_source, _entry), do: guid
+  defp select_event_target(%Event{target_guid: guid}, :map_event_target, _entry), do: guid
+
+  defp select_event_target(%Event{targets: targets}, :map_event_extra_target, entry) do
+    targets
+    |> Enum.find(fn %Target{guid: guid} -> entry == 0 or Guid.entry(guid) == entry end)
+    |> case do
+      %Target{guid: guid} -> guid
+      nil -> nil
+    end
+  end
 
   defp evaluate(events, key, %Event{} = event) do
     target_result = target_result(event, events)

@@ -1221,6 +1221,18 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
     MobSpells.resolve_target(state, entry, nil, context)
   end
 
+  @map_event_target_types [:map_event_source, :map_event_target, :map_event_extra_target]
+
+  defp resolve_target(
+         _state,
+         %ScriptStep{target_type: target_type, target_param1: event_id, target_param2: entry},
+         _provided,
+         %Context{script_targets: targets}
+       )
+       when target_type in @map_event_target_types do
+    Map.get(targets, {target_type, event_id, entry})
+  end
+
   defp resolve_target(state, %ScriptStep{} = step, provided, %Context{}) do
     resolve_target(state, step, provided)
   end
@@ -1254,6 +1266,29 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
   end
 
   def termination_conditions(_steps), do: []
+
+  def target_requests(steps) when is_list(steps) do
+    steps
+    |> Enum.flat_map(fn
+      %ScriptStep{
+        target_type: target_type,
+        target_param1: event_id,
+        target_param2: entry,
+        sub_scripts: sub_scripts
+      }
+      when target_type in @map_event_target_types ->
+        [{target_type, event_id, entry} | sub_scripts |> Map.values() |> List.flatten() |> target_requests()]
+
+      %ScriptStep{sub_scripts: sub_scripts} ->
+        sub_scripts |> Map.values() |> List.flatten() |> target_requests()
+
+      _step ->
+        []
+    end)
+    |> Enum.uniq()
+  end
+
+  def target_requests(_steps), do: []
 
   defp step_observation_radius(%ScriptStep{target_type: target_type, target_param2: radius})
        when target_type in @entry_target_types do

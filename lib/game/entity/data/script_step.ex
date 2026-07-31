@@ -244,6 +244,9 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStep do
   defp target_type(18), do: :friendly_injured_except
   defp target_type(19), do: :friendly_missing_buff
   defp target_type(20), do: :friendly_missing_buff_except
+  defp target_type(22), do: :map_event_source
+  defp target_type(23), do: :map_event_target
+  defp target_type(24), do: :map_event_extra_target
   defp target_type(28), do: :random_creature_with_entry
   defp target_type(other), do: {:unsupported, other}
 end

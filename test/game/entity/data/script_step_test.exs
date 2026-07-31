@@ -112,6 +112,16 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStepTest do
       assert nearest.target_type == :nearest_game_object_with_entry
       assert by_guid.target_type == :game_object_with_guid
     end
+
+    test "decodes map event target selectors" do
+      source = row(0) |> Map.put(:target_type, 22) |> ScriptStep.build()
+      target = row(0) |> Map.put(:target_type, 23) |> ScriptStep.build()
+      extra = row(0) |> Map.put(:target_type, 24) |> ScriptStep.build()
+
+      assert source.target_type == :map_event_source
+      assert target.target_type == :map_event_target
+      assert extra.target_type == :map_event_extra_target
+    end
   end
 
   describe "condition_ids/1" do

@@ -114,6 +114,25 @@ defmodule ThistleTea.Game.World.System.ScriptedEventTest do
            ) == %{1 => true, 2 => true}
   end
 
+  test "target results expose map event source, target, and matching extra targets", context do
+    start = %ScriptStep{command: :start_map_event, datalong: 5_944, datalong2: 600}
+    add = %ScriptStep{command: :add_map_event_target, datalong: 5_944}
+    command(context, start)
+    command(%{context | source_guid: context.extra_guid}, add)
+
+    selectors = [
+      {:map_event_source, 5_944, 0},
+      {:map_event_target, 5_944, 0},
+      {:map_event_extra_target, 5_944, Guid.entry(context.extra_guid)}
+    ]
+
+    assert ScriptedEventSystem.target_results(context.world, selectors) == %{
+             {:map_event_source, 5_944, 0} => context.source_guid,
+             {:map_event_target, 5_944, 0} => context.target_guid,
+             {:map_event_extra_target, 5_944, Guid.entry(context.extra_guid)} => context.extra_guid
+           }
+  end
+
   test "all-dead target conditions complete multi-creature events", context do
     success = %ScriptStep{command: :quest_explored, datalong: 434}
     dead = %Condition{type: :alive, reverse?: true}
