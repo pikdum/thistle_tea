@@ -24,8 +24,22 @@ defmodule ThistleTea.Game.World.Loader.GameObject do
     |> Map.new(fn game_object -> {{:game_object, game_object.guid}, GameObject.build(game_object)} end)
   end
 
+  def all_blueprints(guids) when is_list(guids) do
+    Mangos.GameObject.query_guids_all(guids)
+    |> Mangos.Repo.all()
+    |> Map.new(&{&1.guid, GameObject.build(&1)})
+  end
+
   def start_game_object(%GameObject{} = game_object), do: World.start_entity(game_object)
   def start_pool_game_object(%GameObject{} = game_object), do: World.start_incarnation(game_object)
+
+  def spawned_by_default?(%Mangos.GameObject{spawntimesecsmin: seconds}) when is_integer(seconds) do
+    seconds >= 0
+  end
+
+  def spawned_by_default?(%Mangos.GameObject{}), do: true
+
+  defp activate(%Mangos.GameObject{spawntimesecsmin: seconds}, _cell) when is_integer(seconds) and seconds < 0, do: :ok
 
   defp activate(%Mangos.GameObject{} = game_object, cell) do
     blueprint = GameObject.build(game_object)

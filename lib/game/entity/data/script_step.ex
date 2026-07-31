@@ -28,6 +28,7 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStep do
             swap_initial?: false,
             swap_final?: false,
             buddy_guid: nil,
+            game_object_spawn: nil,
             position: nil,
             condition_id: 0,
             condition: nil,
@@ -165,6 +166,7 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStep do
   defp command(5), do: :interrupt_casts
   defp command(7), do: :quest_explored
   defp command(8), do: :kill_credit
+  defp command(9), do: :respawn_game_object
   defp command(10), do: :summon_creature
   defp command(13), do: :activate_object
   defp command(14), do: :remove_aura
@@ -205,6 +207,8 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStep do
   defp command(74), do: :add_aura
   defp command(76), do: :summon_object
   defp command(80), do: :set_game_object_state
+  defp command(81), do: :despawn_game_object
+  defp command(82), do: :load_game_object_spawn
   defp command(83), do: :quest_credit
   defp command(89), do: :play_custom_animation
   defp command(other), do: {:unsupported, other}

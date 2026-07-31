@@ -633,6 +633,40 @@ defmodule ThistleTea.Game.Entity.Logic.AI.ScriptTest do
       assert [%Effects.ActivateGameObject{user_guid: ^user_guid}] = game_object.internal.events
     end
 
+    test "game object spawn lifecycle commands enqueue boundary effects", %{mob: mob} do
+      blueprint = %GameObjectEntity{
+        object: %Object{guid: Guid.from_low_guid(:game_object, 1_000, 22)},
+        game_object: %GameObjectComponent{state: 0},
+        movement_block: %MovementBlock{position: {1.0, 2.0, 3.0, 0.0}},
+        internal: %Internal{world: WorldRef.open(0)}
+      }
+
+      steps = [
+        %ScriptStep{
+          command: :respawn_game_object,
+          datalong2: 2,
+          game_object_spawn: blueprint
+        },
+        %ScriptStep{
+          command: :despawn_game_object,
+          datalong2: 30,
+          game_object_spawn: blueprint
+        },
+        %ScriptStep{
+          command: :load_game_object_spawn,
+          game_object_spawn: blueprint
+        }
+      ]
+
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), steps, nil, 1_000)
+
+      assert [
+               %Effects.RespawnGameObject{blueprint: ^blueprint, duration_ms: 5_000},
+               %Effects.DespawnGameObject{blueprint: ^blueprint, respawn_delay_ms: 30_000},
+               %Effects.LoadGameObjectSpawn{blueprint: ^blueprint}
+             ] = mob.internal.events
+    end
+
     test "nearest game object commands are forwarded to the object owner", %{mob: mob} do
       game_object_guid = Guid.from_low_guid(:game_object, 1_000, 22)
 

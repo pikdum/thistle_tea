@@ -569,6 +569,49 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
     end
   end
 
+  defp execute(
+         state,
+         blackboard,
+         %ScriptStep{
+           command: :respawn_game_object,
+           game_object_spawn: %GameObject{} = blueprint,
+           datalong2: duration_seconds
+         },
+         _target_guid,
+         _now,
+         %Context{}
+       ) do
+    duration_ms = max(duration_seconds, 5) * 1_000
+    {Effects.enqueue(state, Effects.respawn_game_object(blueprint, duration_ms)), blackboard}
+  end
+
+  defp execute(
+         state,
+         blackboard,
+         %ScriptStep{
+           command: :despawn_game_object,
+           game_object_spawn: %GameObject{} = blueprint,
+           datalong2: respawn_delay_seconds
+         },
+         _target_guid,
+         _now,
+         %Context{}
+       ) do
+    respawn_delay_ms = positive_seconds(respawn_delay_seconds)
+    {Effects.enqueue(state, Effects.despawn_game_object(blueprint, respawn_delay_ms)), blackboard}
+  end
+
+  defp execute(
+         state,
+         blackboard,
+         %ScriptStep{command: :load_game_object_spawn, game_object_spawn: %GameObject{} = blueprint},
+         _target_guid,
+         _now,
+         %Context{}
+       ) do
+    {Effects.enqueue(state, Effects.load_game_object_spawn(blueprint)), blackboard}
+  end
+
   defp execute(state, blackboard, %ScriptStep{} = step, target_guid, now, %Context{}) do
     execute(state, blackboard, step, target_guid, now)
   end
@@ -1095,6 +1138,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
 
   defp positive_radius(radius, _default) when is_number(radius) and radius > 0, do: radius / 1
   defp positive_radius(_radius, default), do: default
+
+  defp positive_seconds(seconds) when is_integer(seconds) and seconds > 0, do: seconds * 1_000
+  defp positive_seconds(_seconds), do: nil
 
   defp find_creature_with_entry(
          %{object: %{guid: self_guid}},

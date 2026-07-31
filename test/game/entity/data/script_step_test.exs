@@ -73,6 +73,7 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStepTest do
     test "decodes quest credit commands" do
       assert ScriptStep.build(row(7)).command == :quest_explored
       assert ScriptStep.build(row(8)).command == :kill_credit
+      assert ScriptStep.build(row(9)).command == :respawn_game_object
       assert ScriptStep.build(row(13)).command == :activate_object
       assert ScriptStep.build(row(17)).command == :create_item
       assert ScriptStep.build(row(20)).command == :movement
@@ -91,6 +92,8 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStepTest do
       assert ScriptStep.build(row(74)).command == :add_aura
       assert ScriptStep.build(row(76)).command == :summon_object
       assert ScriptStep.build(row(80)).command == :set_game_object_state
+      assert ScriptStep.build(row(81)).command == :despawn_game_object
+      assert ScriptStep.build(row(82)).command == :load_game_object_spawn
       assert ScriptStep.build(row(83)).command == :quest_credit
       assert ScriptStep.build(row(89)).command == :play_custom_animation
     end

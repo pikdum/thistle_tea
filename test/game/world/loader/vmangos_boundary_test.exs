@@ -3,6 +3,7 @@ defmodule ThistleTea.Game.World.Loader.VMangosBoundaryTest do
 
   alias ThistleTea.DB.Mangos
   alias ThistleTea.Game.Entity.Data.GameObject
+  alias ThistleTea.Game.World.Loader.GameObject, as: GameObjectLoader
   alias ThistleTea.Game.World.Loader.NpcText, as: NpcTextLoader
   alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader
 
@@ -21,6 +22,15 @@ defmodule ThistleTea.Game.World.Loader.VMangosBoundaryTest do
       assert game_object.game_object.display_id == row.game_object_template.display_id
       assert row.spawntimesecsmin == 300
       assert row.spawntimesecsmax == 300
+    end
+
+    test "keeps script-spawned game objects out of default cell activation" do
+      row =
+        Mangos.GameObject.query_guids_all([35_875])
+        |> Mangos.Repo.one!()
+
+      assert row.spawntimesecsmin == -60
+      refute GameObjectLoader.spawned_by_default?(row)
     end
   end
 

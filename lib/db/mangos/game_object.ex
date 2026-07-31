@@ -64,6 +64,16 @@ defmodule ThistleTea.DB.Mangos.GameObject do
     )
   end
 
+  def query_guids_all(guids) when is_list(guids) do
+    from(g in __MODULE__,
+      where: g.guid in ^guids,
+      join: gt in assoc(g, :game_object_template),
+      left_join: ge in assoc(g, :game_event_game_object),
+      preload: [game_object_template: gt, game_event_game_object: ge],
+      select: g
+    )
+  end
+
   def query_entries(entries) when is_list(entries) do
     from(g in __MODULE__,
       where: g.id in ^entries,

@@ -420,6 +420,18 @@ defmodule ThistleTea.Game.Entity.Logic.Effects do
     %Effects.ActivateGameObject{user_guid: user_guid}
   end
 
+  def respawn_game_object(blueprint, duration_ms) when is_integer(duration_ms) and duration_ms > 0 do
+    %Effects.RespawnGameObject{blueprint: blueprint, duration_ms: duration_ms}
+  end
+
+  def despawn_game_object(blueprint, respawn_delay_ms) do
+    %Effects.DespawnGameObject{blueprint: blueprint, respawn_delay_ms: respawn_delay_ms}
+  end
+
+  def load_game_object_spawn(blueprint) do
+    %Effects.LoadGameObjectSpawn{blueprint: blueprint}
+  end
+
   def leave_ritual(game_object_guid, user_guid) when is_integer(game_object_guid) and is_integer(user_guid) do
     %Effects.LeaveRitual{target_guid: game_object_guid, source_guid: user_guid}
   end

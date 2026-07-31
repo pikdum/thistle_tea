@@ -110,6 +110,41 @@ defmodule ThistleTea.Game.World.SpawnPoolTest do
       stop_pool(key)
     end
 
+    test "temporarily respawns a suspended game object" do
+      {guid, group, world, key, cell} = singleton_fixture()
+      blueprint = game_object(guid)
+
+      :ok = SpawnPool.activate(group, cell, blueprint)
+      pid = await_entity(guid)
+      send(pid, {:script_remove_object, nil})
+      await_absent(guid)
+      await_pool_running(key, [])
+
+      :ok = SpawnPool.respawn_game_object(world, blueprint, 500)
+      replacement = await_replacement(guid, pid)
+      refute replacement == pid
+      await_absent(guid, 100)
+
+      Process.sleep(50)
+      assert EntityRegistry.whereis(guid) == nil
+
+      stop_pool(key)
+    end
+
+    test "loads and despawns a game object spawn with delayed reactivation" do
+      {guid, _group, world, key, _cell} = singleton_fixture()
+      blueprint = game_object(guid)
+
+      :ok = SpawnPool.load_game_object(world, blueprint)
+      pid = await_entity(guid)
+
+      :ok = SpawnPool.suspend_game_object(world, blueprint, 100)
+      await_absent(guid)
+      await_replacement(guid, pid)
+
+      stop_pool(key)
+    end
+
     test "isolates and stops pools by world copy" do
       low_guid = System.unique_integer([:positive])
       guid = Guid.from_low_guid(:game_object, 1, low_guid)
@@ -202,7 +237,7 @@ defmodule ThistleTea.Game.World.SpawnPoolTest do
   end
 
   defp singleton_fixture do
-    low_guid = System.unique_integer([:positive])
+    low_guid = 8_000_000 + System.unique_integer([:positive])
     guid = Guid.from_low_guid(:game_object, 1, low_guid)
     group = {:singleton, :game_object, low_guid}
     world = WorldRef.open(0)
@@ -275,6 +310,16 @@ defmodule ThistleTea.Game.World.SpawnPoolTest do
     case Registry.lookup(SpawnPool.Registry, key) do
       [] -> :ok
       _present -> Process.sleep(10) && await_pool_absent(key, attempts - 1)
+    end
+  end
+
+  defp await_pool_running(key, expected, attempts \\ 50)
+  defp await_pool_running(_key, _expected, 0), do: flunk("spawn pool running members did not change")
+
+  defp await_pool_running(key, expected, attempts) do
+    case SpawnPool.status(key) do
+      %{running: ^expected} -> :ok
+      _status -> Process.sleep(10) && await_pool_running(key, expected, attempts - 1)
     end
   end
 end

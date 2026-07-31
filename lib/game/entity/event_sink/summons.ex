@@ -27,6 +27,7 @@ defmodule ThistleTea.Game.Entity.EventSink.Summons do
   alias ThistleTea.Game.World.Loader.Summon, as: SummonLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Pathfinding
+  alias ThistleTea.Game.World.SpawnPool
 
   @summon_unique_default_range 50.0
   @corpse_counting_despawn_types [3, 4, 8]
@@ -100,6 +101,33 @@ defmodule ThistleTea.Game.Entity.EventSink.Summons do
 
   def emit(entity, %Effects.ActivateGameObject{user_guid: user_guid}, context) do
     Context.send(context, {:script_activate_object, user_guid})
+    entity
+  end
+
+  def emit(
+        %{internal: %Internal{world: world}} = entity,
+        %Effects.RespawnGameObject{blueprint: %GameObject{} = blueprint, duration_ms: duration_ms},
+        _context
+      ) do
+    SpawnPool.respawn_game_object(world, blueprint, duration_ms)
+    entity
+  end
+
+  def emit(
+        %{internal: %Internal{world: world}} = entity,
+        %Effects.DespawnGameObject{blueprint: %GameObject{} = blueprint, respawn_delay_ms: respawn_delay_ms},
+        _context
+      ) do
+    SpawnPool.suspend_game_object(world, blueprint, respawn_delay_ms)
+    entity
+  end
+
+  def emit(
+        %{internal: %Internal{world: world}} = entity,
+        %Effects.LoadGameObjectSpawn{blueprint: %GameObject{} = blueprint},
+        _context
+      ) do
+    SpawnPool.load_game_object(world, blueprint)
     entity
   end
 

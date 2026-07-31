@@ -53,6 +53,40 @@ defmodule ThistleTea.Game.World.SpawnPool do
     end
   end
 
+  def load_game_object(world, %GameObject{} = blueprint) do
+    world = WorldRef.coerce(world)
+    group = game_object_group(blueprint)
+    activate(group, game_object_cell(world, blueprint), blueprint)
+  end
+
+  def respawn_game_object(world, %GameObject{} = blueprint, duration_ms)
+      when is_integer(duration_ms) and duration_ms > 0 do
+    world = WorldRef.coerce(world)
+    group = game_object_group(blueprint)
+    cell = game_object_cell(world, blueprint)
+    key = {world, group}
+
+    with true <- AreaTriggerLoader.spawnable_world?(world),
+         {:ok, pid} <- ensure_started(key, blueprint) do
+      GenServer.call(pid, {:respawn_game_object, cell, blueprint, duration_ms}, @activation_timeout_ms)
+    else
+      false -> :ok
+      error -> error
+    end
+  end
+
+  def suspend_game_object(world, %GameObject{} = blueprint, respawn_delay_ms \\ nil) do
+    world = WorldRef.coerce(world)
+    group = game_object_group(blueprint)
+    key = {world, group}
+    member = member_key(blueprint)
+
+    case GenServer.whereis(via(key)) do
+      nil -> :ok
+      pid -> GenServer.cast(pid, {:suspend_member, member, respawn_delay_ms})
+    end
+  end
+
   def recycle(%{internal: %Internal{spawn: %Spawn{pool_group: group, pool_member: member}}})
       when not is_nil(group) and not is_nil(member) do
     GenServer.cast(via(group), {:recycle, member, self()})
@@ -172,6 +206,24 @@ defmodule ThistleTea.Game.World.SpawnPool do
     {:reply, activation_result(errors), state}
   end
 
+  def handle_call({:respawn_game_object, cell, blueprint, duration_ms}, _from, state) do
+    member = member_key(blueprint)
+    already_running? = Map.has_key?(state.running, member)
+    state = maybe_put_blueprint(state, blueprint)
+    state = %{state | active_cells: MapSet.put(state.active_cells, cell)}
+    CellIndex.register(cell, state.key)
+    {state, errors} = start_selected_with_errors(state)
+
+    if not already_running? do
+      case Map.get(state.running, member) do
+        {pid, _monitor_ref} -> Process.send_after(self(), {:expire_member, member, pid}, duration_ms)
+        nil -> :ok
+      end
+    end
+
+    {:reply, activation_result(errors), state}
+  end
+
   @impl GenServer
   def handle_call({:deactivate_cells, cells, wanted}, _from, state) do
     state = %{state | active_cells: MapSet.difference(state.active_cells, cells)}
@@ -216,6 +268,17 @@ defmodule ThistleTea.Game.World.SpawnPool do
     {:noreply, state}
   end
 
+  def handle_cast({:suspend_member, member, respawn_delay_ms}, state) do
+    state =
+      case Map.get(state.running, member) do
+        {pid, _monitor_ref} -> stop_running_member(state, member, pid)
+        nil -> state
+      end
+
+    schedule_reactivation(member, respawn_delay_ms)
+    {:noreply, state}
+  end
+
   def handle_cast({:refresh, events}, %{group: {:pool, root_id}} = state) do
     blueprints = load_blueprints(root_id, events) |> attach_all(state.key)
 
@@ -255,6 +318,10 @@ defmodule ThistleTea.Game.World.SpawnPool do
     else
       {:noreply, state}
     end
+  end
+
+  def handle_info({:expire_member, member, pid}, state) do
+    {:noreply, stop_running_member(state, member, pid)}
   end
 
   def handle_info({:DOWN, ref, :process, _pid, _reason}, state) do
@@ -373,6 +440,21 @@ defmodule ThistleTea.Game.World.SpawnPool do
 
   defp member_key(%Mob{internal: %Internal{creature: creature}}), do: {:creature, creature.db_guid}
   defp member_key(%GameObject{object: object}), do: {:game_object, Bitwise.band(object.guid, 0x00FFFFFF)}
+
+  defp game_object_group(%GameObject{} = blueprint) do
+    {:game_object, db_guid} = member_key(blueprint)
+    Catalog.group_for(:game_object, db_guid)
+  end
+
+  defp game_object_cell(world, %GameObject{movement_block: %{position: {x, y, z, _o}}}) do
+    SpatialHash.cell(world, x, y, z)
+  end
+
+  defp schedule_reactivation(member, respawn_delay_ms) when is_integer(respawn_delay_ms) and respawn_delay_ms > 0 do
+    Process.send_after(self(), {:reactivate, member}, respawn_delay_ms)
+  end
+
+  defp schedule_reactivation(_member, _respawn_delay_ms), do: :ok
 
   defp cell(%{internal: %Internal{world: world}, movement_block: %{position: {x, y, z, _o}}}) do
     SpatialHash.cell(world, x, y, z)

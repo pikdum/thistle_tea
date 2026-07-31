@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.World.Loader.Script do
   alias ThistleTea.Game.Entity.Data.ScriptStep
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.World.Loader.Condition, as: ConditionLoader
+  alias ThistleTea.Game.World.Loader.GameObject, as: GameObjectLoader
 
   def load_by_ids(schema, script_ids), do: load_by_ids(schema, script_ids, MapSet.new())
 
@@ -26,6 +27,7 @@ defmodule ThistleTea.Game.World.Loader.Script do
     |> Enum.map(&ScriptStep.build/1)
     |> Enum.map(&resolve_mount_display/1)
     |> resolve_buddy_guids()
+    |> resolve_game_object_spawns()
     |> resolve_texts()
     |> resolve_nested_scripts(visited)
     |> attach_conditions()
@@ -79,6 +81,26 @@ defmodule ThistleTea.Game.World.Loader.Script do
     |> Enum.map(& &1.target_param1)
     |> Enum.filter(&(is_integer(&1) and &1 > 0))
     |> Enum.uniq()
+  end
+
+  @game_object_spawn_commands [:respawn_game_object, :despawn_game_object, :load_game_object_spawn]
+
+  defp resolve_game_object_spawns(steps) do
+    blueprints =
+      steps
+      |> Enum.filter(&(&1.command in @game_object_spawn_commands))
+      |> Enum.map(& &1.datalong)
+      |> Enum.filter(&(is_integer(&1) and &1 > 0))
+      |> Enum.uniq()
+      |> GameObjectLoader.all_blueprints()
+
+    Enum.map(steps, fn
+      %ScriptStep{command: command, datalong: db_guid} = step when command in @game_object_spawn_commands ->
+        %{step | game_object_spawn: Map.get(blueprints, db_guid)}
+
+      %ScriptStep{} = step ->
+        step
+    end)
   end
 
   defp resolve_nested_scripts(steps, visited) do

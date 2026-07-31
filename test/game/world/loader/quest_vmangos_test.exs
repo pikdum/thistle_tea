@@ -54,5 +54,14 @@ defmodule ThistleTea.Game.World.Loader.QuestVmangosTest do
       assert Guid.entity_type(step.buddy_guid) == :game_object
       assert Guid.low_guid(step.buddy_guid) == 13_292
     end
+
+    test "preloads scripted game object spawns" do
+      assert %Quest{complete_script_steps: steps} = QuestLoader.get(308)
+      step = Enum.find(steps, &(&1.command == :respawn_game_object))
+
+      assert step.datalong == 35_875
+      assert step.game_object_spawn.object.entry == 270
+      assert Guid.low_guid(step.game_object_spawn.object.guid) == 35_875
+    end
   end
 end
