@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Player.GameObjects do
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.Player.Fishing
   alias ThistleTea.Game.Player.Looting
+  alias ThistleTea.Game.Player.Quests
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
 
@@ -23,6 +24,7 @@ defmodule ThistleTea.Game.Player.GameObjects do
 
   def use_object(%{character: %Character{} = character} = state, guid) do
     Logger.info("CMSG_GAMEOBJ_USE: entry #{Guid.entry(guid)} chest?=#{chest?(guid)}")
+    state = Quests.credit_entity_interaction(state, guid)
 
     cond do
       fishing_bobber?(guid) ->

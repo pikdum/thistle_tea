@@ -382,6 +382,44 @@ defmodule ThistleTea.Game.Entity.Logic.CastingTest do
   end
 
   describe "complete/3" do
+    test "queues quest cast credit for successful unit and gameobject targets" do
+      unit_guid = Guid.from_low_guid(:mob, 10_978, 1)
+      object_guid = Guid.from_low_guid(:game_object, 176_158, 2)
+      spell = %Spell{id: 17_166}
+
+      resolution = %{
+        channel_resolution()
+        | hits: [unit_guid],
+          followups: %{channel_resolution().followups | object_guid: object_guid}
+      }
+
+      casting = %Cast{
+        spell: spell,
+        targets: Target.object(object_guid),
+        phase: :finish,
+        resolution: resolution,
+        ends_at: 1_000
+      }
+
+      character = %Character{
+        object: %Object{guid: 1},
+        unit: %Unit{},
+        player: %Player{},
+        internal: %Internal{},
+        movement_block: %MovementBlock{}
+      }
+
+      character = Casting.complete(character, casting, 1_000)
+
+      assert Enum.any?(character.internal.events, fn
+               %Effects.QuestCastCredit{target_guids: targets, spell_id: 17_166} ->
+                 targets == [object_guid, unit_guid]
+
+               _effect ->
+                 false
+             end)
+    end
+
     test "dismiss pet transitions the owner instead of the pet target" do
       spell = %Spell{
         id: 2641,

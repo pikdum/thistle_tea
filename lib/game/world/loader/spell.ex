@@ -509,6 +509,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp effect_type(8), do: :power_drain
   defp effect_type(9), do: :health_leech
   defp effect_type(10), do: :heal
+  defp effect_type(16), do: :quest_complete
   defp effect_type(18), do: :resurrect
   defp effect_type(22), do: :parry
   defp effect_type(24), do: :create_item
@@ -521,6 +522,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp effect_type(38), do: :dispel
   defp effect_type(40), do: :dual_wield
   defp effect_type(60), do: :proficiency
+  defp effect_type(61), do: :send_event
   defp effect_type(50), do: :trans_door
   defp effect_type(53), do: :enchant_item
   defp effect_type(54), do: :enchant_item_temporary

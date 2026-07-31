@@ -209,6 +209,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
     entity =
       entity
       |> queue_successful_finish_trigger(casting)
+      |> queue_quest_cast_credit(casting, resolution)
       |> stop_breakable_control_attack(casting, resolution.hits)
       |> consume_unavoidable_finisher(casting)
       |> activate_auto_shot(casting, now)
@@ -219,6 +220,21 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
       cancel(entity)
     end
   end
+
+  defp queue_quest_cast_credit(%Character{} = character, %Cast{spell: %Spell{id: spell_id}}, %CastResolution{
+         hits: hits,
+         followups: %Followups{object_guid: object_guid}
+       }) do
+    targets =
+      case object_guid do
+        guid when is_integer(guid) and guid > 0 -> Enum.uniq([guid | hits])
+        _guid -> hits
+      end
+
+    Effects.enqueue(character, Effects.quest_cast_credit(targets, spell_id))
+  end
+
+  defp queue_quest_cast_credit(entity, _casting, _resolution), do: entity
 
   defp resolve(entity, %Cast{spell: %Spell{} = spell, targets: %Target{} = targets} = casting) do
     resolved_targets = resolve_targets(entity, casting)

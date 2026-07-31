@@ -862,6 +862,14 @@ defmodule ThistleTea.Game.Entity.Server.Player do
     {:noreply, PlayerReputation.reward_spell(state, faction_id, value)}
   end
 
+  def handle_info({:quest_cast_credit, target_guids, spell_id}, %State{} = state) do
+    {:noreply, Quests.credit_cast(state, target_guids, spell_id)}
+  end
+
+  def handle_info({:quest_event_credit, quest_id}, %State{} = state) do
+    {:noreply, Quests.credit_event(state, quest_id)}
+  end
+
   def handle_info({:stop_attack_factions, faction_ids}, %State{character: %Character{} = character} = state)
       when is_list(faction_ids) do
     if PlayerReputation.faction_id(character.unit.target) in faction_ids do

@@ -139,7 +139,17 @@ defmodule ThistleTea.Game.Spell.Semantics do
     :feed_pet
   ]
 
-  @script [:trigger_spell, :dummy, :script_effect, :learn_spell, :parry, :dual_wield, :proficiency]
+  @script [
+    :trigger_spell,
+    :dummy,
+    :script_effect,
+    :learn_spell,
+    :parry,
+    :dual_wield,
+    :proficiency,
+    :quest_complete,
+    :send_event
+  ]
   @reputation [:reputation]
 
   def compile(%Spell{} = spell) do

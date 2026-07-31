@@ -58,6 +58,7 @@ defmodule ThistleTea.Game.Player.Quests do
   end
 
   defp do_hello(state, npc_guid) do
+    state = credit_entity_interaction(state, npc_guid)
     {giver_quests, ender_quests} = npc_quests(npc_guid)
 
     case QuestDialogStatus.menu(giver_quests, ender_quests, ctx(state.character)) do
@@ -412,6 +413,82 @@ defmodule ThistleTea.Game.Player.Quests do
       put_character(state, %{character | player: %{player | quest_log: quest_log}})
     else
       state
+    end
+  end
+
+  def credit_entity_interaction(
+        %{character: %Character{player: %{quest_log: quest_log}} = character} = state,
+        target_guid
+      )
+      when is_map(quest_log) do
+    credit_entity_objective(state, character, target_guid, 0, &QuestLog.increment_interaction/4)
+  end
+
+  def credit_entity_interaction(state, _target_guid), do: state
+
+  def credit_cast(%{character: %Character{player: %{quest_log: quest_log}}} = state, target_guids, spell_id)
+      when is_map(quest_log) and is_list(target_guids) and is_integer(spell_id) and spell_id > 0 do
+    Enum.reduce(target_guids, state, fn target_guid, state ->
+      credit_entity_objective(state, state.character, target_guid, spell_id, &QuestLog.increment_cast/5)
+    end)
+  end
+
+  def credit_cast(state, target_guids, spell_id) when is_list(target_guids) and is_integer(spell_id) and spell_id > 0 do
+    state
+  end
+
+  def credit_event(%{character: %Character{player: %{quest_log: quest_log}}} = state, quest_id)
+      when is_map(quest_log) do
+    explore_area(state, quest_id)
+  end
+
+  def credit_event(state, _quest_id), do: state
+
+  defp credit_entity_objective(state, %Character{} = character, target_guid, spell_id, increment) do
+    entity_type = quest_entity_type(target_guid)
+    target_entry = Guid.entry(target_guid)
+    player = character.player
+
+    {quest_log, credited?} =
+      Enum.reduce(active_quests(player), {player.quest_log, false}, fn quest, {quest_log, credited?} ->
+        result =
+          case spell_id do
+            0 -> increment.(quest_log, quest, entity_type, target_entry)
+            spell_id -> increment.(quest_log, quest, entity_type, target_entry, spell_id)
+          end
+
+        case result do
+          {:ok, quest_log, credit} ->
+            send_entity_credit(quest, target_guid, target_entry, credit)
+            {quest_log, _event} = complete_check(quest_log, quest, character)
+            {quest_log, true}
+
+          :no_credit ->
+            {quest_log, credited?}
+        end
+      end)
+
+    if credited? do
+      put_character(state, %{character | player: %{player | quest_log: quest_log}})
+    else
+      state
+    end
+  end
+
+  defp send_entity_credit(quest, target_guid, target_entry, credit) do
+    Network.send_packet(%Message.SmsgQuestupdateAddKill{
+      quest_id: quest.id,
+      creature_entry: target_entry,
+      count: credit.count,
+      required: credit.required,
+      victim_guid: target_guid
+    })
+  end
+
+  defp quest_entity_type(guid) do
+    case Guid.entity_type(guid) do
+      :mob -> :creature
+      type -> type
     end
   end
 

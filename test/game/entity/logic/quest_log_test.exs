@@ -96,6 +96,48 @@ defmodule ThistleTea.Game.Entity.Logic.QuestLogTest do
     end
   end
 
+  describe "increment_interaction/4" do
+    test "credits only matching non-spell gameobject objectives" do
+      quest = %Quest{
+        id: 33,
+        required_entity_objectives: [
+          {0, :game_object, 3189, 0, 1},
+          {1, :game_object, 1721, 3366, 1}
+        ]
+      }
+
+      {:ok, quest_log} = QuestLog.add(%{}, quest.id)
+
+      assert {:ok, quest_log, %{index: 0, count: 1}} =
+               QuestLog.increment_interaction(quest_log, quest, :game_object, 3189)
+
+      assert QuestLog.increment_interaction(quest_log, quest, :game_object, 1721) == :no_credit
+      assert QuestLog.increment_interaction(quest_log, quest, :creature, 3189) == :no_credit
+    end
+  end
+
+  describe "increment_cast/5" do
+    test "matches the target type, entry, and spell" do
+      quest = %Quest{
+        id: 33,
+        required_entity_objectives: [
+          {0, :creature, 10_978, 17_166, 1},
+          {1, :game_object, 176_158, 17_155, 1}
+        ]
+      }
+
+      {:ok, quest_log} = QuestLog.add(%{}, quest.id)
+
+      assert {:ok, quest_log, %{index: 0, count: 1}} =
+               QuestLog.increment_cast(quest_log, quest, :creature, 10_978, 17_166)
+
+      assert {:ok, _quest_log, %{index: 1, count: 1}} =
+               QuestLog.increment_cast(quest_log, quest, :game_object, 176_158, 17_155)
+
+      assert QuestLog.increment_cast(quest_log, quest, :creature, 10_978, 17_155) == :no_credit
+    end
+  end
+
   describe "evaluate/3" do
     test "completes when kills and items are satisfied" do
       quest = %Quest{
@@ -152,6 +194,24 @@ defmodule ThistleTea.Game.Entity.Logic.QuestLogTest do
 
       assert {^quest_log, :unchanged} = QuestLog.evaluate(quest_log, quest, fn 750 -> 1 end)
       assert {_quest_log, :completed} = QuestLog.evaluate(quest_log, quest, fn 750 -> 2 end)
+    end
+
+    test "entity objectives share the client counter slots" do
+      quest = %Quest{
+        id: 62,
+        required_entity_objectives: [
+          {0, :creature, 10_978, 17_166, 1},
+          {2, :game_object, 176_158, 0, 1}
+        ]
+      }
+
+      {:ok, quest_log} = QuestLog.add(%{}, quest.id)
+      {:ok, quest_log, _credit} = QuestLog.increment_cast(quest_log, quest, :creature, 10_978, 17_166)
+      assert {^quest_log, :unchanged} = QuestLog.evaluate(quest_log, quest, fn _item_id -> 0 end)
+
+      {:ok, quest_log, _credit} = QuestLog.increment_interaction(quest_log, quest, :game_object, 176_158)
+      assert {quest_log, :completed} = QuestLog.evaluate(quest_log, quest, fn _item_id -> 0 end)
+      assert %Entry{counts: %{0 => 1, 2 => 1}} = QuestLog.get(quest_log, quest.id)
     end
 
     test "reputation objectives complete and regress with standing" do

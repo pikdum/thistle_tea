@@ -136,6 +136,19 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
   end
 
   describe "receive/4" do
+    test "emits quest event credit for quest-complete effects" do
+      spell = %Spell{
+        id: 10_617,
+        effects: [%Effect{index: 0, type: :quest_complete, misc_value: 2561}]
+      }
+
+      context = %CastContext{caster_guid: 99, caster_level: 10}
+
+      {_target, events} = SpellEffect.receive(target_fixture(), context, spell, 1_000)
+
+      assert [%Effects.QuestEventCredit{player_guid: 99, quest_id: 2561}] = events
+    end
+
     test "school reflection returns a harmful spell to its caster" do
       reflect = %Holder{
         spell: %Spell{id: 543},

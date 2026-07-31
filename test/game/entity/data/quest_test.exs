@@ -70,6 +70,22 @@ defmodule ThistleTea.Game.Entity.Data.QuestTest do
       assert Quest.build(row).required_kills == []
     end
 
+    test "normalizes creature, gameobject, and spell objectives" do
+      row = %Mangos.QuestTemplate{
+        entry: 1,
+        req_creature_or_go_id1: 299,
+        req_creature_or_go_count1: 8,
+        req_creature_or_go_id2: -55,
+        req_creature_or_go_count2: 3,
+        req_spell_cast2: 12_345
+      }
+
+      assert Quest.build(row).required_entity_objectives == [
+               {0, :creature, 299, 0, 8},
+               {1, :game_object, 55, 12_345, 3}
+             ]
+    end
+
     test "normalizes item objectives and rewards" do
       row = %Mangos.QuestTemplate{
         entry: 2,

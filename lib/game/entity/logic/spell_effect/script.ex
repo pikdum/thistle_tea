@@ -19,6 +19,11 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.Script do
   alias ThistleTea.Game.Spell.Semantics
   alias ThistleTea.Game.World.Loader.SpellPetAura, as: SpellPetAuraLoader
 
+  def apply(state, %CastContext{} = context, _spell, %Effect{type: :quest_complete, misc_value: quest_id}, _now)
+      when is_integer(quest_id) and quest_id > 0 do
+    {state, [Effects.quest_event_credit(context.caster_guid, quest_id)]}
+  end
+
   def apply(
         state,
         %CastContext{} = context,

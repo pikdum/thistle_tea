@@ -162,6 +162,22 @@ defmodule ThistleTea.Game.Entity.EventSink.ClientProjection do
 
   def emit(entity, %Effects.ReputationChange{}, _context), do: entity
 
+  def emit(%Character{} = entity, %Effects.QuestCastCredit{} = effect, context) do
+    Context.send(context, {:quest_cast_credit, effect.target_guids, effect.spell_id})
+    entity
+  end
+
+  def emit(entity, %Effects.QuestCastCredit{}, _context), do: entity
+
+  def emit(entity, %Effects.QuestEventCredit{} = effect, _context) do
+    case Entity.pid(effect.player_guid) do
+      pid when is_pid(pid) -> send(pid, {:quest_event_credit, effect.quest_id})
+      _pid -> :ok
+    end
+
+    entity
+  end
+
   defp monster_chat_type(chat_type) when chat_type in [:yell, :zone_yell], do: :monster_yell
   defp monster_chat_type(chat_type) when chat_type in [:text_emote, :boss_emote, :zone_emote], do: :monster_emote
   defp monster_chat_type(_chat_type), do: :monster_say

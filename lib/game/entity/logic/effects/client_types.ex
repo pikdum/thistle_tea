@@ -19,7 +19,9 @@ defmodule ThistleTea.Game.Entity.Logic.Effects.ClientTypes do
     {:PlayObjectSound, [:sound_id], []},
     {:FactionAtWarChanged, [:index, :enabled], []},
     {:ForcedReactionsChanged, [:reactions, :friendly_faction_ids], []},
-    {:ReputationChange, [:faction_id, :value], []}
+    {:ReputationChange, [:faction_id, :value], []},
+    {:QuestCastCredit, [:target_guids, :spell_id], []},
+    {:QuestEventCredit, [:player_guid, :quest_id], []}
   ]
 
   for {name, required, optional} <- effects do

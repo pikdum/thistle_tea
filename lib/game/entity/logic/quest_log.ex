@@ -22,10 +22,25 @@ defmodule ThistleTea.Game.Entity.Logic.QuestLog do
   def max_slots, do: @max_slots
 
   def increment_kill(quest_log, %Quest{} = quest, creature_entry) do
+    increment_entity_objective(quest_log, quest, :creature, creature_entry, 0)
+  end
+
+  def increment_interaction(quest_log, %Quest{} = quest, entity_type, entry)
+      when entity_type in [:creature, :game_object] do
+    increment_entity_objective(quest_log, quest, entity_type, entry, 0)
+  end
+
+  def increment_cast(quest_log, %Quest{} = quest, entity_type, entry, spell_id)
+      when entity_type in [:creature, :game_object] and is_integer(spell_id) and spell_id > 0 do
+    increment_entity_objective(quest_log, quest, entity_type, entry, spell_id)
+  end
+
+  defp increment_entity_objective(quest_log, %Quest{} = quest, entity_type, target_entry, spell_id) do
     with %Entry{status: :incomplete, counts: counts} <- get(quest_log, quest.id),
-         {index, _entry, required} <-
-           Enum.find(quest.required_kills, fn {_index, entry, _required} ->
-             entry == creature_entry
+         {index, ^entity_type, ^target_entry, ^spell_id, required} <-
+           Enum.find(entity_objectives(quest), fn
+             {_index, ^entity_type, ^target_entry, ^spell_id, _required} -> true
+             _objective -> false
            end),
          current when current < required <- Map.get(counts, index, 0) do
       count = current + 1
@@ -63,8 +78,8 @@ defmodule ThistleTea.Game.Entity.Logic.QuestLog do
         item_count_fn,
         reputation_fn \\ fn _ -> 0 end
       ) do
-    kills_satisfied =
-      Enum.all?(quest.required_kills, fn {index, _entry, required} ->
+    entities_satisfied =
+      Enum.all?(entity_objectives(quest), fn {index, _entity_type, _entry, _spell_id, required} ->
         Map.get(counts, index, 0) >= required
       end)
 
@@ -79,7 +94,7 @@ defmodule ThistleTea.Game.Entity.Logic.QuestLog do
       quest.reputation_objective_faction <= 0 or
         reputation_fn.(quest.reputation_objective_faction) >= quest.reputation_objective_value
 
-    kills_satisfied and items_satisfied and exploration_satisfied and reputation_satisfied
+    entities_satisfied and items_satisfied and exploration_satisfied and reputation_satisfied
   end
 
   def mark_explored(quest_log, quest_id) do
@@ -99,6 +114,14 @@ defmodule ThistleTea.Game.Entity.Logic.QuestLog do
     {:ok, quest_log} = update(quest_log, quest.id, fn entry -> %{entry | status: status} end)
     event = if status == :complete, do: :completed, else: :incompleted
     {quest_log, event}
+  end
+
+  defp entity_objectives(%Quest{required_entity_objectives: [_objective | _rest] = objectives}), do: objectives
+
+  defp entity_objectives(%Quest{required_kills: required_kills}) do
+    Enum.map(required_kills, fn {index, entry, required} ->
+      {index, :creature, entry, 0, required}
+    end)
   end
 
   def add(quest_log, quest_id) do

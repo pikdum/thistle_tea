@@ -40,6 +40,7 @@ defmodule ThistleTea.Game.Entity.Data.Quest do
     objective_texts: [],
     required_items: [],
     required_kills: [],
+    required_entity_objectives: [],
     objective_slots: [],
     point_map_id: 0,
     point_x: 0.0,
@@ -96,6 +97,7 @@ defmodule ThistleTea.Game.Entity.Data.Quest do
       objective_texts: Enum.map(1..4, fn i -> Map.get(row, :"objective_text#{i}") || "" end),
       required_items: indexed_id_counts(row, :req_item_id, :req_item_count, 4),
       required_kills: required_kills(row),
+      required_entity_objectives: required_entity_objectives(row),
       objective_slots: objective_slots(row),
       point_map_id: row.point_map_id,
       point_x: row.point_x,
@@ -151,6 +153,20 @@ defmodule ThistleTea.Game.Entity.Data.Quest do
       count = Map.get(row, :"req_creature_or_go_count#{i}") || 0
       spell = Map.get(row, :"req_spell_cast#{i}") || 0
       if entry > 0 and spell == 0, do: [{i - 1, entry, max(count, 1)}], else: []
+    end)
+  end
+
+  defp required_entity_objectives(row) do
+    Enum.flat_map(1..4, fn i ->
+      signed_entry = Map.get(row, :"req_creature_or_go_id#{i}") || 0
+      count = Map.get(row, :"req_creature_or_go_count#{i}") || 0
+      spell_id = Map.get(row, :"req_spell_cast#{i}") || 0
+
+      case signed_entry do
+        entry when entry > 0 -> [{i - 1, :creature, entry, spell_id, max(count, 1)}]
+        entry when entry < 0 -> [{i - 1, :game_object, abs(entry), spell_id, max(count, 1)}]
+        _entry -> []
+      end
     end)
   end
 

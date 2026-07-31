@@ -567,6 +567,15 @@ defmodule ThistleTea.Game.Entity.Logic.Effects do
     %Effects.ReputationChange{faction_id: faction_id, value: value}
   end
 
+  def quest_cast_credit(target_guids, spell_id) when is_list(target_guids) and is_integer(spell_id) and spell_id > 0 do
+    %Effects.QuestCastCredit{target_guids: target_guids, spell_id: spell_id}
+  end
+
+  def quest_event_credit(player_guid, quest_id)
+      when is_integer(player_guid) and player_guid > 0 and is_integer(quest_id) and quest_id > 0 do
+    %Effects.QuestEventCredit{player_guid: player_guid, quest_id: quest_id}
+  end
+
   def forced_reactions_changed(reactions, friendly_faction_ids)
       when is_list(reactions) and is_list(friendly_faction_ids) do
     %Effects.ForcedReactionsChanged{
