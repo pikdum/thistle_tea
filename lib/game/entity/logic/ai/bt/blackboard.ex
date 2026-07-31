@@ -59,11 +59,72 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Blackboard do
     navigation = %{
       navigation
       | scripted_waypoint_route: route,
+        movement_override: :waypoint,
+        wander_anchor: nil,
+        wander_radius: nil,
         target: nil,
         move_target: nil,
         orientation: nil,
         wait_time: nil,
         next_waypoint_at: now + max(initial_delay, 0)
+    }
+
+    %{blackboard | navigation: navigation}
+  end
+
+  def start_wander(%__MODULE__{navigation: navigation} = blackboard, anchor, radius)
+      when is_tuple(anchor) and is_number(radius) do
+    navigation = %{
+      navigation
+      | scripted_waypoint_route: nil,
+        movement_override: :random,
+        wander_anchor: anchor,
+        wander_radius: radius,
+        target: nil,
+        move_target: nil,
+        next_wander_at: 0
+    }
+
+    %{blackboard | navigation: navigation}
+  end
+
+  def idle_movement(%__MODULE__{navigation: navigation} = blackboard) do
+    navigation = %{
+      navigation
+      | scripted_waypoint_route: nil,
+        movement_override: :idle,
+        wander_anchor: nil,
+        wander_radius: nil,
+        target: nil,
+        move_target: nil
+    }
+
+    %{blackboard | navigation: navigation}
+  end
+
+  def start_home(%__MODULE__{navigation: navigation} = blackboard, position) when is_tuple(position) do
+    navigation = %{
+      navigation
+      | scripted_waypoint_route: nil,
+        movement_override: :home,
+        wander_anchor: nil,
+        wander_radius: nil,
+        target: position,
+        move_target: nil
+    }
+
+    %{blackboard | navigation: navigation}
+  end
+
+  def clear_movement_override(%__MODULE__{navigation: navigation} = blackboard) do
+    navigation = %{
+      navigation
+      | scripted_waypoint_route: nil,
+        movement_override: nil,
+        wander_anchor: nil,
+        wander_radius: nil,
+        target: nil,
+        move_target: nil
     }
 
     %{blackboard | navigation: navigation}

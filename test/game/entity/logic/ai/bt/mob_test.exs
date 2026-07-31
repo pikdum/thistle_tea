@@ -16,6 +16,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
   alias ThistleTea.Game.Entity.Logic.AI.BehaviorRunner
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Context
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Navigation, as: NavigationContext
   alias ThistleTea.Game.Entity.Logic.AI.BT.Mob, as: MobBT
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Movement
@@ -443,6 +445,54 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
 
       assert state.movement_block.spline_nodes == [{10.0, 0.0, 0.0}]
       assert state.internal.blackboard.navigation.move_target == {10.0, 0.0, 0.0}
+    end
+
+    test "the behavior tree uses a runtime random movement anchor" do
+      anchor = {5.0, 6.0, 7.0}
+      destination = {8.0, 9.0, 10.0}
+      blackboard = Blackboard.start_wander(Blackboard.new(), anchor, 12.0)
+
+      state =
+        fixture_mob(spline_nodes: [])
+        |> BT.init(MobBT.tree(), blackboard)
+
+      context =
+        Context.new(1_000,
+          navigation: NavigationContext.new(%{{0, anchor, 12.0} => destination})
+        )
+
+      assert {{:running, 0, :navigation}, state} =
+               BehaviorRunner.tick(MobBT.tree(), state, context)
+
+      state = NavigationResolver.resolve(state, 1_000, fn _map, _from, to -> [to] end)
+
+      assert state.movement_block.spline_nodes == [destination]
+      assert state.internal.blackboard.navigation.move_target == destination
+    end
+
+    test "home movement restores the spawn movement policy after arrival" do
+      home = {10.0, 0.0, 0.0}
+      spawn = %Spawn{position: home, movement_type: 1, distance: 5.0}
+      blackboard = Blackboard.start_home(Blackboard.new(), home)
+
+      state =
+        fixture_mob(spline_nodes: [])
+        |> then(&%{&1 | internal: %{&1.internal | spawn: spawn}})
+        |> BT.init(MobBT.tree(), blackboard)
+
+      assert {{:running, 0, :navigation}, state} =
+               BehaviorRunner.tick(MobBT.tree(), state, Context.new(1_000))
+
+      state =
+        state
+        |> NavigationResolver.resolve(1_000, fn _map, _from, to -> [to] end)
+        |> finish_current_move()
+
+      {:success, state} =
+        BehaviorRunner.tick(MobBT.tree(), state, Context.new(1_000))
+
+      assert state.internal.blackboard.navigation.movement_override == nil
+      assert state.internal.blackboard.navigation.target == nil
     end
   end
 

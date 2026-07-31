@@ -156,6 +156,11 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
         ])
       ]),
       BT.sequence([
+        BT.condition(&scripted_home?/2),
+        BT.action(&move_to_target_with_context/3),
+        BT.action(&wait_for_scripted_home/3)
+      ]),
+      BT.sequence([
         BT.condition(&has_waypoints?/2),
         BT.action(&wait_until_waypoint_ready/3),
         BT.action(&pick_waypoint/3),
@@ -184,8 +189,16 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     false
   end
 
+  defp has_waypoints?(%Mob{}, %Blackboard{navigation: %NavigationMemory{movement_override: override}})
+       when override in [:idle, :random], do: false
+
   defp has_waypoints?(%Mob{} = state, %Blackboard{} = blackboard),
     do: is_struct(waypoint_destination(state, blackboard), Waypoint)
+
+  defp can_wander?(%Mob{}, %Blackboard{navigation: %NavigationMemory{movement_override: :random}}), do: true
+
+  defp can_wander?(%Mob{}, %Blackboard{navigation: %NavigationMemory{movement_override: override}})
+       when not is_nil(override), do: false
 
   defp can_wander?(%Mob{internal: %Internal{spawn: %Spawn{movement_type: 1}}}, _blackboard) do
     true
@@ -193,6 +206,19 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
 
   defp can_wander?(%Mob{}, _blackboard) do
     false
+  end
+
+  defp scripted_home?(%Mob{}, %Blackboard{navigation: %NavigationMemory{movement_override: :home}}), do: true
+  defp scripted_home?(%Mob{}, %Blackboard{}), do: false
+
+  defp wait_for_scripted_home(%Mob{} = state, %Blackboard{} = blackboard, %Context{} = context) do
+    case wait_for_arrival(state, blackboard, context) do
+      {:success, state, blackboard} ->
+        {:success, state, Blackboard.clear_movement_override(blackboard)}
+
+      result ->
+        result
+    end
   end
 
   @confused_wander_radius 4.0
@@ -679,6 +705,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   end
 
   defp target_dead_in_perception?(_target, _perception), do: false
+
+  defp tether_target_set?(%Mob{}, %Blackboard{navigation: %NavigationMemory{movement_override: :home}}), do: false
 
   defp tether_target_set?(%Mob{internal: %Internal{spawn: %Spawn{position: {x, y, z}}}}, %Blackboard{
          navigation: %NavigationMemory{move_target: {x, y, z}}
@@ -1340,8 +1368,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     else
       case Navigation.wander_point(
              state,
-             state.internal.spawn.position,
-             state.internal.spawn.distance,
+             wander_anchor(state, blackboard),
+             wander_radius(state, blackboard),
              context
            ) do
         nil ->
@@ -1356,6 +1384,20 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
       end
     end
   end
+
+  defp wander_anchor(%Mob{}, %Blackboard{
+         navigation: %NavigationMemory{movement_override: :random, wander_anchor: anchor}
+       })
+       when is_tuple(anchor), do: anchor
+
+  defp wander_anchor(%Mob{internal: %Internal{spawn: %Spawn{position: position}}}, %Blackboard{}), do: position
+
+  defp wander_radius(%Mob{}, %Blackboard{
+         navigation: %NavigationMemory{movement_override: :random, wander_radius: radius}
+       })
+       when is_number(radius), do: radius
+
+  defp wander_radius(%Mob{internal: %Internal{spawn: %Spawn{distance: distance}}}, %Blackboard{}), do: distance
 
   defp pick_waypoint(%Mob{} = state, %Blackboard{} = blackboard, %Context{now: now} = context) do
     state = set_running(state, Blackboard.run_mode?(blackboard))

@@ -33,6 +33,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
   alias ThistleTea.Game.Entity.Logic.Condition, as: ConditionLogic
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.Entity.Logic.TemporaryFaction
   alias ThistleTea.Game.Guid
 
@@ -166,6 +167,71 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
       true ->
         {state, blackboard}
     end
+  end
+
+  defp execute(
+         %Mob{unit: %Unit{health: health}} = state,
+         blackboard,
+         %ScriptStep{command: :movement},
+         _target,
+         _now,
+         %Context{}
+       )
+       when is_number(health) and health <= 0 do
+    {state, blackboard}
+  end
+
+  defp execute(%Mob{} = state, blackboard, %ScriptStep{command: :movement, datalong: 0}, _target, now, %Context{}) do
+    {halt_scripted_movement(state, now), Blackboard.idle_movement(blackboard)}
+  end
+
+  defp execute(
+         %Mob{internal: %{spawn: spawn}, movement_block: %{position: {x, y, z, _o}}} = state,
+         blackboard,
+         %ScriptStep{command: :movement, datalong: 1, position: {radius, _, _, _}} = step,
+         _target,
+         now,
+         %Context{}
+       )
+       when not is_nil(spawn) do
+    anchor = if step.datalong2 == 0, do: spawn.position || {x, y, z}, else: {x, y, z}
+    state = halt_scripted_movement(state, now)
+    {state, Blackboard.start_wander(blackboard, anchor, max(radius, 0))}
+  end
+
+  defp execute(%Mob{} = state, blackboard, %ScriptStep{command: :movement, datalong: 2} = step, _target, now, %Context{
+         waypoints: waypoints
+       }) do
+    waypoint_step = %{
+      step
+      | command: :start_waypoints,
+        datalong: 0,
+        datalong2: step.datalong3,
+        datalong3: 0,
+        datalong4: step.datalong2,
+        dataint: 0,
+        dataint2: 0
+    }
+
+    case Waypoints.resolve(waypoints, state, waypoint_step) do
+      nil -> {state, blackboard}
+      route -> {halt_scripted_movement(state, now), Blackboard.start_waypoints(blackboard, route, 0, now)}
+    end
+  end
+
+  defp execute(
+         %Mob{internal: %{spawn: %{position: {x, y, z}}}} = state,
+         blackboard,
+         %ScriptStep{command: :movement, datalong: 7},
+         _target,
+         now,
+         %Context{}
+       ) do
+    {halt_scripted_movement(state, now), Blackboard.start_home(blackboard, {x, y, z})}
+  end
+
+  defp execute(%Mob{} = state, blackboard, %ScriptStep{command: :movement}, _target, _now, %Context{}) do
+    {state, blackboard}
   end
 
   defp execute(
@@ -331,8 +397,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
         waypoint_route: route
     }
 
-    navigation = %{blackboard.navigation | scripted_waypoint_route: nil}
-    blackboard = blackboard |> then(&%{&1 | navigation: navigation}) |> Blackboard.clear_waypoint()
+    blackboard = Blackboard.clear_movement_override(blackboard)
     {%{state | internal: %{internal | spawn: spawn}}, blackboard}
   end
 
@@ -618,6 +683,14 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
   defp modify_flags(value, %ScriptStep{datalong2: flags}) do
     value = value || 0
     if (value &&& flags) == 0, do: value ||| flags, else: value &&& bnot(flags)
+  end
+
+  defp halt_scripted_movement(state, now) do
+    if Movement.moving?(state, now) do
+      state |> Movement.halt(now) |> Effects.enqueue(Effects.movement_stopped())
+    else
+      state
+    end
   end
 
   defp talk(state, %{chat_type: chat_type}, _target_guid) when chat_type in [:whisper, :boss_whisper] do

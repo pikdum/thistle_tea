@@ -635,11 +635,81 @@ defmodule ThistleTea.Game.Entity.Logic.AI.ScriptTest do
       spawn = %Spawn{distance: 0, movement_type: 0}
       mob = %{mob | internal: %{mob.internal | spawn: spawn}}
       step = %ScriptStep{command: :set_default_movement, datalong: 1, datalong3: 12}
+      blackboard = Blackboard.idle_movement(Blackboard.new())
 
-      {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], nil, Context.new(1_000))
+      {mob, blackboard} = Script.run(mob, blackboard, [step], nil, Context.new(1_000))
 
       assert mob.internal.spawn.movement_type == 1
       assert mob.internal.spawn.distance == 12
+      assert blackboard.navigation.movement_override == nil
+    end
+
+    test "movement idle halts the active spline and overrides spawn movement", %{mob: mob} do
+      mob = active_movement(mob)
+      step = %ScriptStep{command: :movement, datalong: 0}
+
+      {mob, blackboard} = Script.run(mob, Blackboard.new(), [step], nil, 1_000)
+
+      assert mob.movement_block.spline_nodes == []
+      assert [%Effects.MovementStopped{}] = mob.internal.events
+      assert blackboard.navigation.movement_override == :idle
+    end
+
+    test "movement random stores the selected runtime anchor and radius", %{mob: mob} do
+      spawn = %Spawn{position: {1.0, 2.0, 3.0}, distance: 5, movement_type: 0}
+      mob = %{mob | internal: %{mob.internal | spawn: spawn}}
+      mob = %{mob | movement_block: %{mob.movement_block | position: {10.0, 20.0, 30.0, 0.0}}}
+      step = %ScriptStep{command: :movement, datalong: 1, datalong2: 1, position: {8.5, 0.0, 0.0, 0.0}}
+
+      {_mob, blackboard} = Script.run(mob, Blackboard.new(), [step], nil, 1_000)
+
+      assert blackboard.navigation.movement_override == :random
+      assert blackboard.navigation.wander_anchor == {10.0, 20.0, 30.0}
+      assert blackboard.navigation.wander_radius == 8.5
+      assert blackboard.navigation.next_wander_at == 0
+    end
+
+    test "movement waypoint resolves its start point and repeat policy", %{mob: mob} do
+      spawn = %Spawn{position: {0.0, 0.0, 0.0}, movement_type: 0}
+      mob = %{mob | internal: %{mob.internal | spawn: spawn}}
+
+      route = %WaypointRoute{
+        first_point: 1,
+        destination_point: 1,
+        points: %{
+          1 => %Waypoint{position: {1.0, 0.0, 0.0, nil}},
+          2 => %Waypoint{position: {2.0, 0.0, 0.0, nil}}
+        }
+      }
+
+      waypoints = Waypoints.new(%{{:guid, Guid.low_guid(mob.object.guid)} => route})
+      step = %ScriptStep{command: :movement, datalong: 2, datalong2: 0, datalong3: 2}
+
+      {_mob, blackboard} =
+        Script.run(mob, Blackboard.new(), [step], nil, Context.new(1_000, waypoints: waypoints))
+
+      assert blackboard.navigation.movement_override == :waypoint
+      assert blackboard.navigation.scripted_waypoint_route.destination_point == 2
+      refute blackboard.navigation.scripted_waypoint_route.repeat?
+    end
+
+    test "movement home records a temporary home target", %{mob: mob} do
+      spawn = %Spawn{position: {1.0, 2.0, 3.0}, movement_type: 1, distance: 5}
+      mob = %{mob | internal: %{mob.internal | spawn: spawn}}
+      step = %ScriptStep{command: :movement, datalong: 7}
+
+      {_mob, blackboard} = Script.run(mob, Blackboard.new(), [step], nil, 1_000)
+
+      assert blackboard.navigation.movement_override == :home
+      assert blackboard.navigation.target == {1.0, 2.0, 3.0}
+    end
+
+    test "movement commands are ignored while dead", %{mob: mob} do
+      mob = %{mob | unit: %{mob.unit | health: 0}}
+      blackboard = Blackboard.new()
+
+      assert {^mob, ^blackboard} =
+               Script.run(mob, blackboard, [%ScriptStep{command: :movement, datalong: 1}], nil, 1_000)
     end
 
     test "delayed steps are deferred through a script_steps event", %{mob: mob} do
@@ -687,5 +757,22 @@ defmodule ThistleTea.Game.Entity.Logic.AI.ScriptTest do
     }
 
     {:ok, mob: mob}
+  end
+
+  defp active_movement(%Mob{} = mob) do
+    movement_block = %{
+      mob.movement_block
+      | duration: 10_000,
+        spline_nodes: [{10.0, 0.0, 0.0}],
+        spline_id: 1
+    }
+
+    internal = %{
+      mob.internal
+      | movement_start_time: 0,
+        movement_start_position: {0.0, 0.0, 0.0}
+    }
+
+    %{mob | movement_block: movement_block, internal: internal}
   end
 end
