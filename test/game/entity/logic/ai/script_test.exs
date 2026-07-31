@@ -3,6 +3,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.ScriptTest do
 
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Spawn
   alias ThistleTea.Game.Entity.Data.Component.Internal.Waypoint
   alias ThistleTea.Game.Entity.Data.Component.Internal.WaypointRoute
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
@@ -508,6 +509,34 @@ defmodule ThistleTea.Game.Entity.Logic.AI.ScriptTest do
                blackboard.navigation.scripted_waypoint_route
 
       assert blackboard.navigation.next_waypoint_at == 1_500
+    end
+
+    test "map event commands enqueue a world-system request", %{mob: mob} do
+      player_guid = Guid.from_low_guid(:player, 9)
+      step = %ScriptStep{command: :start_map_event, datalong: 648, datalong2: 2_400}
+
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], player_guid, 1_000)
+
+      assert [
+               %Effects.ScriptedEventCommand{
+                 source_guid: source_guid,
+                 target_guid: ^player_guid,
+                 step: ^step
+               }
+             ] = mob.internal.events
+
+      assert source_guid == mob.object.guid
+    end
+
+    test "set_default_movement updates the spawn movement policy", %{mob: mob} do
+      spawn = %Spawn{distance: 0, movement_type: 0}
+      mob = %{mob | internal: %{mob.internal | spawn: spawn}}
+      step = %ScriptStep{command: :set_default_movement, datalong: 1, datalong3: 12}
+
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], nil, Context.new(1_000))
+
+      assert mob.internal.spawn.movement_type == 1
+      assert mob.internal.spawn.distance == 12
     end
 
     test "delayed steps are deferred through a script_steps event", %{mob: mob} do

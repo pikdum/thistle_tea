@@ -34,5 +34,15 @@ defmodule ThistleTea.Game.World.Loader.QuestVmangosTest do
                ]
              } = QuestLoader.get(67)
     end
+
+    test "resolves escort event conditions and outcome scripts" do
+      assert %Quest{start_script_steps: steps} = QuestLoader.get(648)
+      event = Enum.find(steps, &(&1.command == :start_map_event))
+
+      assert event.failure_condition.type == :escort
+      assert event.failure_condition.value2 == 80
+      assert [%ScriptStep{command: :fail_quest, datalong: 648} | _steps] = event.sub_scripts[64_801]
+      assert [%ScriptStep{} | _steps] = event.sub_scripts[64_802]
+    end
   end
 end

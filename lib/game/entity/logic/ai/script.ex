@@ -39,6 +39,16 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
   @flee_duration_ms 7_000
   @flee_text "%s attempts to run away in fear!"
   @max_phase 31
+  @scripted_event_commands [
+    :start_map_event,
+    :end_map_event,
+    :add_map_event_target,
+    :remove_map_event_target,
+    :set_map_event_data,
+    :send_map_event,
+    :start_script_for_all,
+    :edit_map_event
+  ]
 
   def flee_duration_ms, do: @flee_duration_ms
 
@@ -270,6 +280,61 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
   end
 
   defp execute(state, blackboard, %ScriptStep{command: :start_waypoints}, _target_guid, _now, %Context{}) do
+    {state, blackboard}
+  end
+
+  defp execute(
+         %{object: %{guid: source_guid}, internal: %{world: world}} = state,
+         blackboard,
+         %ScriptStep{command: command} = step,
+         target_guid,
+         _now,
+         %Context{}
+       )
+       when command in @scripted_event_commands do
+    effect = Effects.scripted_event_command(world, source_guid, target_guid, step)
+    {Effects.enqueue(state, effect), blackboard}
+  end
+
+  defp execute(
+         %Mob{internal: %{spawn: spawn} = internal} = state,
+         blackboard,
+         %ScriptStep{command: :set_default_movement} = step,
+         _target_guid,
+         _now,
+         %Context{waypoints: waypoints}
+       )
+       when not is_nil(spawn) do
+    movement_type = step.datalong
+
+    route =
+      if movement_type == 2 do
+        default_step = %{
+          step
+          | command: :start_waypoints,
+            datalong: 0,
+            datalong2: 0,
+            datalong4: 1,
+            dataint: 0,
+            dataint2: 0
+        }
+
+        Waypoints.resolve(waypoints, state, default_step)
+      end
+
+    spawn = %{
+      spawn
+      | movement_type: movement_type,
+        distance: if(movement_type == 1, do: step.datalong3, else: spawn.distance),
+        waypoint_route: route
+    }
+
+    navigation = %{blackboard.navigation | scripted_waypoint_route: nil}
+    blackboard = blackboard |> then(&%{&1 | navigation: navigation}) |> Blackboard.clear_waypoint()
+    {%{state | internal: %{internal | spawn: spawn}}, blackboard}
+  end
+
+  defp execute(state, blackboard, %ScriptStep{command: :set_default_movement}, _target_guid, _now, %Context{}) do
     {state, blackboard}
   end
 

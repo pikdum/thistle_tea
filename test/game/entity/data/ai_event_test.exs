@@ -61,6 +61,26 @@ defmodule ThistleTea.Game.Entity.Data.AIEventTest do
       assert event.actions == []
       refute AIEvent.timed?(event)
     end
+
+    test "decodes scripted event notifications" do
+      row = %{
+        id: 1,
+        event_type: 31,
+        event_inverse_phase_mask: 0,
+        event_chance: 100,
+        event_flags: 0,
+        event_param1: 5862,
+        event_param2: 7,
+        event_param3: 0,
+        event_param4: 0,
+        action1_script: 0,
+        action2_script: 0,
+        action3_script: 0,
+        condition_id: 0
+      }
+
+      assert %AIEvent{event_type: :script_event, param1: 5862, param2: 7} = AIEvent.build(row, %{})
+    end
   end
 
   describe "phase_allows?/2" do

@@ -81,5 +81,6 @@ defmodule ThistleTea.Game.Entity.Data.AIEvent do
   defp event_type(14), do: :friendly_hp
   defp event_type(21), do: :reached_home
   defp event_type(30), do: :leave_combat
+  defp event_type(31), do: :script_event
   defp event_type(other), do: {:unsupported, other}
 end

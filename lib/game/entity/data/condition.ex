@@ -42,6 +42,7 @@ defmodule ThistleTea.Game.Entity.Data.Condition do
     case type(row.type) do
       :not -> Enum.filter([row.value1], &positive?/1)
       type when type in [:or, :and] -> Enum.filter([row.value1, row.value2, row.value3, row.value4], &positive?/1)
+      :map_event_targets -> Enum.filter([row.value2], &positive?/1)
       _ -> []
     end
   end
@@ -70,7 +71,13 @@ defmodule ThistleTea.Game.Entity.Data.Condition do
   defp type(0), do: :none
   defp type(5), do: :reputation_rank_min
   defp type(16), do: :source_entry
+  defp type(25), do: :escort
   defp type(30), do: :reputation_rank_max
+  defp type(35), do: :map_event_data
+  defp type(36), do: :map_event_active
+  defp type(46), do: :alive
+  defp type(47), do: :map_event_targets
   defp type(52), do: :db_guid
+  defp type(56), do: :nearby_player
   defp type(other), do: {:unsupported, other}
 end

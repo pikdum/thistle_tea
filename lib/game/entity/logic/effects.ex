@@ -488,6 +488,15 @@ defmodule ThistleTea.Game.Entity.Logic.Effects do
     %Effects.ScriptSteps{steps: steps, target_guid: target_guid, duration_ms: delay_ms}
   end
 
+  def scripted_event_command(world, source_guid, target_guid, step) when is_integer(source_guid) and source_guid > 0 do
+    %Effects.ScriptedEventCommand{
+      world: world,
+      source_guid: source_guid,
+      target_guid: target_guid,
+      step: step
+    }
+  end
+
   def summon_creature(summon, steps, target_guid) when is_map(summon) and is_list(steps) do
     %Effects.SummonCreature{summon: summon, steps: steps, target_guid: target_guid}
   end

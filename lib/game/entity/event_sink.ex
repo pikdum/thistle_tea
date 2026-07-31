@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
   alias ThistleTea.Game.Entity.EventSink.Combat
   alias ThistleTea.Game.Entity.EventSink.Context
   alias ThistleTea.Game.Entity.EventSink.Movement
+  alias ThistleTea.Game.Entity.EventSink.ScriptedEvents
   alias ThistleTea.Game.Entity.EventSink.Spells
   alias ThistleTea.Game.Entity.EventSink.Summons
   alias ThistleTea.Game.Entity.Logic.Effects
@@ -122,6 +123,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
     Effects.ViewpointGranted,
     Effects.ViewpointReleased
   ]
+  @scripted_event_effects [Effects.ScriptedEventCommand]
 
   def emit_pending(entity, context \\ nil) do
     {entity, effects} = Effects.drain(entity)
@@ -160,6 +162,11 @@ defmodule ThistleTea.Game.Entity.EventSink do
 
   defp emit_resolved(entity, %{__struct__: effect_module} = effect, context) when effect_module in @summon_effects do
     Summons.emit(entity, effect, context)
+  end
+
+  defp emit_resolved(entity, %{__struct__: effect_module} = effect, context)
+       when effect_module in @scripted_event_effects do
+    ScriptedEvents.emit(entity, effect, context)
   end
 
   def deliver_spell(%Effects.DeliverSpell{} = effect) do

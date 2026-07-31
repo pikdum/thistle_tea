@@ -1,0 +1,206 @@
+defmodule ThistleTea.Game.World.System.ScriptedEventTest do
+  use ExUnit.Case, async: false
+
+  alias ThistleTea.Game.Entity
+  alias ThistleTea.Game.Entity.Data.Condition
+  alias ThistleTea.Game.Entity.Data.ScriptStep
+  alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.SpatialHash
+  alias ThistleTea.Game.World.System.ScriptedEvent, as: ScriptedEventSystem
+  alias ThistleTea.Game.WorldRef
+
+  setup do
+    :sys.replace_state(ScriptedEventSystem, fn _events -> %{} end)
+
+    id = System.unique_integer([:positive, :monotonic])
+    source_guid = Guid.from_low_guid(:mob, 7_784, id)
+    target_guid = Guid.from_low_guid(:player, id)
+    extra_guid = Guid.from_low_guid(:mob, 4_236, id + 1)
+    world = %WorldRef{map_id: 0}
+
+    Enum.each([source_guid, target_guid, extra_guid], &Entity.register/1)
+    Metadata.put(source_guid, %{alive?: true})
+    Metadata.put(target_guid, %{alive?: true})
+    Metadata.put(extra_guid, %{alive?: true})
+    SpatialHash.update(:mobs, source_guid, world, 0.0, 0.0, 0.0)
+    SpatialHash.update(:players, target_guid, world, 10.0, 0.0, 0.0)
+    SpatialHash.update(:mobs, extra_guid, world, 5.0, 0.0, 0.0)
+
+    on_exit(fn ->
+      Enum.each([source_guid, target_guid, extra_guid], fn guid ->
+        Entity.unregister(guid)
+        Metadata.delete(guid)
+      end)
+
+      SpatialHash.remove(:mobs, source_guid)
+      SpatialHash.remove(:players, target_guid)
+      SpatialHash.remove(:mobs, extra_guid)
+      :sys.replace_state(ScriptedEventSystem, fn _events -> %{} end)
+    end)
+
+    {:ok, source_guid: source_guid, target_guid: target_guid, extra_guid: extra_guid, world: world}
+  end
+
+  test "escort failure conditions run the configured failure script", context do
+    failure = %ScriptStep{command: :fail_quest, datalong: 648}
+
+    start = %ScriptStep{
+      command: :start_map_event,
+      datalong: 648,
+      datalong2: 600,
+      dataint3: 1_019,
+      dataint4: 64_801,
+      failure_condition: %Condition{type: :escort, value1: 1, value2: 80},
+      sub_scripts: %{64_801 => [failure]}
+    }
+
+    command(context, start)
+    Metadata.update(context.source_guid, %{alive?: false})
+    evaluate_event()
+
+    assert_receive {:"$gen_cast", {:start_script, [^failure], target_guid}}
+    assert target_guid == context.target_guid
+    assert :sys.get_state(ScriptedEventSystem) == %{}
+  end
+
+  test "map event data can satisfy the success condition", context do
+    success = %ScriptStep{command: :quest_explored, datalong: 3382}
+
+    start = %ScriptStep{
+      command: :start_map_event,
+      datalong: 338_201,
+      datalong2: 600,
+      dataint: 1_015,
+      dataint2: 33_822,
+      success_condition: %Condition{
+        type: :map_event_data,
+        value1: 338_201,
+        value2: 0,
+        value3: 2,
+        value4: 1
+      },
+      sub_scripts: %{33_822 => [success]}
+    }
+
+    command(context, start)
+    command(context, %ScriptStep{command: :set_map_event_data, datalong: 338_201, datalong3: 2, datalong4: 1})
+    evaluate_event()
+
+    assert_receive {:"$gen_cast", {:start_script, [^success], target_guid}}
+    assert target_guid == context.target_guid
+  end
+
+  test "all-dead target conditions complete multi-creature events", context do
+    success = %ScriptStep{command: :quest_explored, datalong: 434}
+    dead = %Condition{type: :alive, reverse?: true}
+
+    start = %ScriptStep{
+      command: :start_map_event,
+      datalong: 434,
+      datalong2: 600,
+      dataint: 4_340,
+      dataint2: 4_340,
+      success_condition: %Condition{
+        type: :map_event_targets,
+        value1: 434,
+        value2: 121,
+        children: [dead]
+      },
+      sub_scripts: %{4_340 => [success]}
+    }
+
+    add = %ScriptStep{command: :add_map_event_target, datalong: 434}
+
+    command(context, start)
+    command(%{context | source_guid: context.extra_guid}, add)
+    evaluate_event()
+    refute_received {:"$gen_cast", {:start_script, [^success], _target_guid}}
+
+    Metadata.update(context.extra_guid, %{alive?: false})
+    evaluate_event()
+
+    assert_receive {:"$gen_cast", {:start_script, [^success], target_guid}}
+    assert target_guid == context.target_guid
+  end
+
+  test "map event notifications reach only selected creature targets", context do
+    start = %ScriptStep{command: :start_map_event, datalong: 5862, datalong2: 600}
+    add = %ScriptStep{command: :add_map_event_target, datalong: 5862}
+
+    command(context, start)
+    command(%{context | source_guid: context.extra_guid}, add)
+    command(context, %ScriptStep{command: :send_map_event, datalong: 5862, datalong2: 7, datalong3: 0})
+
+    assert_receive {:"$gen_cast", {:script_event, 5862, 7}}
+    refute_receive {:"$gen_cast", {:script_event, 5862, 7}}
+
+    command(context, %ScriptStep{command: :send_map_event, datalong: 5862, datalong2: 8, datalong3: 1})
+
+    assert_receive {:"$gen_cast", {:script_event, 5862, 8}}
+    refute_receive {:"$gen_cast", {:script_event, 5862, 8}}
+  end
+
+  test "map event definitions can be edited while active", context do
+    success = %ScriptStep{command: :quest_explored, datalong: 434}
+    condition = %Condition{type: :map_event_data, value1: 434, value2: 0, value3: 0}
+
+    command(context, %ScriptStep{command: :start_map_event, datalong: 434, datalong2: 600})
+
+    command(
+      context,
+      %ScriptStep{
+        command: :edit_map_event,
+        datalong: 434,
+        dataint: 4_340,
+        dataint2: 4_341,
+        dataint3: -1,
+        dataint4: -1,
+        success_condition: condition,
+        sub_scripts: %{4_341 => [success]}
+      }
+    )
+
+    evaluate_event()
+
+    assert_receive {:"$gen_cast", {:start_script, [^success], target_guid}}
+    assert target_guid == context.target_guid
+  end
+
+  test "start script for all filters nearby objects by type and entry", context do
+    sub_step = %ScriptStep{command: :stand_state, datalong: 0}
+
+    command(
+      context,
+      %ScriptStep{
+        command: :start_script_for_all,
+        datalong: 99,
+        datalong2: 2,
+        datalong3: 4_236,
+        datalong4: 20,
+        sub_scripts: %{99 => [sub_step]}
+      }
+    )
+
+    assert_receive {:"$gen_cast", {:start_script, [^sub_step], target_guid}}
+    assert target_guid == context.target_guid
+    refute_receive {:"$gen_cast", {:start_script, [^sub_step], _target_guid}}
+  end
+
+  defp command(context, step) do
+    context.world
+    |> Effects.scripted_event_command(context.source_guid, context.target_guid, step)
+    |> ScriptedEventSystem.command()
+
+    :sys.get_state(ScriptedEventSystem)
+    :ok
+  end
+
+  defp evaluate_event do
+    [{key, event}] = Map.to_list(:sys.get_state(ScriptedEventSystem))
+    send(ScriptedEventSystem, {:evaluate, key, event.token})
+    :sys.get_state(ScriptedEventSystem)
+    :ok
+  end
+end

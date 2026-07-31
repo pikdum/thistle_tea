@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAITest do
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Data.ScriptStep
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Context
   alias ThistleTea.Game.Entity.Logic.AI.EventAI
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Guid
@@ -215,6 +216,19 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAITest do
 
       {mob, _blackboard} = EventAI.on_spell_hit(mob, blackboard, caster, 116, 0)
       assert [%Effects.MonsterTalk{target_guid: ^caster}] = mob.internal.events
+    end
+  end
+
+  describe "on_script_event/6" do
+    test "matches the event id and data" do
+      event = event(:script_event, param1: 5862, param2: 1)
+      mob = mob(events: [event])
+
+      {mob, blackboard} = EventAI.on_script_event(mob, Blackboard.new(), 5862, 2, 0, Context.new(0))
+      assert mob.internal.events == []
+
+      {mob, _blackboard} = EventAI.on_script_event(mob, blackboard, 5862, 1, 0, Context.new(0))
+      assert [%Effects.MonsterTalk{}] = mob.internal.events
     end
   end
 

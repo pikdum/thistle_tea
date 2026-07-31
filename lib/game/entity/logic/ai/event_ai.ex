@@ -5,9 +5,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAI do
   events (timers, HP/mana thresholds, range, friendly HP) are evaluated from
   `tick/3` on the creature's behavior-tree ticks with a one-second cadence;
   edge events (aggro, spawned, death, evade, kill, spell hit, leave combat,
-  reached home) fire from the owning process at those moments. Events carrying a resolved
-  condition tree are gated through the condition evaluator before their
-  repeat timers are consumed, per vmangos ordering. Per-event enable/cooldown
+  reached home, scripted map event) fire from the owning process at those
+  moments. Events carrying a resolved condition tree are gated through the
+  condition evaluator before their repeat timers are consumed, per vmangos
+  ordering. Per-event enable/cooldown
   state and the script-controlled phase live on the blackboard: non-repeatable
   events disable until the next combat entry, event timers re-roll from their
   repeat params, and out-of-combat timers re-initialize on evade, matching
@@ -31,6 +32,16 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAI do
 
   @tick_ms 1_000
   @friendly_hp_default_radius 30.0
+  @unconditional_events [
+    :aggro,
+    :spawned,
+    :death,
+    :evade,
+    :leave_combat,
+    :hit_by_spell,
+    :reached_home,
+    :script_event
+  ]
 
   def tick_ms, do: @tick_ms
 
@@ -166,6 +177,14 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAI do
     end
 
     fire_edges(state, blackboard, matcher, caster_guid, now, context)
+  end
+
+  def on_script_event(state, %Blackboard{} = blackboard, event_id, data, now, %Context{} = context) do
+    matcher = fn %AIEvent{} = event ->
+      event.event_type == :script_event and event.param1 == event_id and event.param2 == data
+    end
+
+    fire_edges(state, blackboard, matcher, nil, now, context)
   end
 
   def ooc_timer_delay(state, %Blackboard{} = blackboard, now) when is_integer(now) do
@@ -306,7 +325,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAI do
   end
 
   defp satisfy(_state, %AIEvent{event_type: event_type}, invoker_guid, %Context{})
-       when event_type in [:aggro, :spawned, :death, :evade, :leave_combat, :hit_by_spell, :reached_home] do
+       when event_type in @unconditional_events do
     {:ok, invoker_guid}
   end
 

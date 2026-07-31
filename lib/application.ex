@@ -59,6 +59,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.World.System.GameEvent, as: GameEventSystem
   alias ThistleTea.Game.World.System.Instance, as: InstanceSystem
   alias ThistleTea.Game.World.System.Party, as: PartySystem
+  alias ThistleTea.Game.World.System.ScriptedEvent, as: ScriptedEventSystem
   alias ThistleTea.Game.World.Transports
   alias ThistleTea.Native.Namigator
 
@@ -103,6 +104,7 @@ defmodule ThistleTea.Application do
         {Phoenix.PubSub, name: ThistleTea.PubSub},
         ThistleTea.Telemetry,
         PartySystem,
+        ScriptedEventSystem,
         InstanceSystem,
         DuelSystem,
         {Group, name: Groups, log: false},

@@ -112,7 +112,7 @@ defmodule ThistleTea.Game.World.Loader.Script do
     conditions =
       steps
       |> Enum.flat_map(&with_sub_steps/1)
-      |> Enum.map(& &1.condition_id)
+      |> Enum.flat_map(&ScriptStep.condition_ids/1)
       |> ConditionLoader.load_by_ids()
 
     Enum.map(steps, &attach_step_condition(&1, conditions))
@@ -128,8 +128,26 @@ defmodule ThistleTea.Game.World.Loader.Script do
         {script_id, Enum.map(steps, &attach_step_condition(&1, conditions))}
       end)
 
-    %{step | condition: Map.get(conditions, step.condition_id), sub_scripts: sub_scripts}
+    %{
+      step
+      | condition: Map.get(conditions, step.condition_id),
+        success_condition: map_event_condition(step, conditions, :success),
+        failure_condition: map_event_condition(step, conditions, :failure),
+        target_condition: map_event_condition(step, conditions, :target),
+        sub_scripts: sub_scripts
+    }
   end
+
+  defp map_event_condition(%ScriptStep{command: command, dataint: id}, conditions, :success)
+       when command in [:start_map_event, :add_map_event_target, :edit_map_event], do: Map.get(conditions, id)
+
+  defp map_event_condition(%ScriptStep{command: command, dataint3: id}, conditions, :failure)
+       when command in [:start_map_event, :add_map_event_target, :edit_map_event], do: Map.get(conditions, id)
+
+  defp map_event_condition(%ScriptStep{command: :remove_map_event_target, datalong2: id}, conditions, :target),
+    do: Map.get(conditions, id)
+
+  defp map_event_condition(%ScriptStep{}, _conditions, _kind), do: nil
 
   defp build_text(%Mangos.BroadcastText{} = row) do
     %{

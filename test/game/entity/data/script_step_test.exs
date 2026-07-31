@@ -74,8 +74,20 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStepTest do
       assert ScriptStep.build(row(7)).command == :quest_explored
       assert ScriptStep.build(row(8)).command == :kill_credit
       assert ScriptStep.build(row(60)).command == :start_waypoints
+      assert ScriptStep.build(row(61)).command == :start_map_event
+      assert ScriptStep.build(row(69)).command == :edit_map_event
       assert ScriptStep.build(row(70)).command == :fail_quest
       assert ScriptStep.build(row(83)).command == :quest_credit
+    end
+  end
+
+  describe "condition_ids/1" do
+    test "collects command and map-event condition ids" do
+      start = %ScriptStep{command: :start_map_event, condition_id: 5, dataint: 10, dataint3: 11}
+      remove = %ScriptStep{command: :remove_map_event_target, datalong2: 12}
+
+      assert ScriptStep.condition_ids(start) == [5, 10, 11]
+      assert ScriptStep.condition_ids(remove) == [12]
     end
   end
 

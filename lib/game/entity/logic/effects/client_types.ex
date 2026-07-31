@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Entity.Logic.Effects.ClientTypes do
     {:MonsterTalk, [:text, :chat_type, :target_guid], []},
     {:Emote, [:emote_id], []},
     {:ScriptSteps, [:steps, :target_guid, :duration_ms], []},
+    {:ScriptedEventCommand, [:world, :source_guid, :target_guid, :step], []},
     {:ForwardScriptSteps, [:target_guid, :steps, :source_guid], []},
     {:SendTaxiPath, [:target_guid, :path_id], []},
     {:PlaySound, [:sound_id], []},

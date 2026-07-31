@@ -126,6 +126,10 @@ defmodule ThistleTea.Game.Entity do
     dispatch_cast(entity, {:start_script, steps, target_guid})
   end
 
+  def script_event(entity, event_id, data) when is_integer(event_id) and is_integer(data) do
+    dispatch_cast(entity, {:script_event, event_id, data})
+  end
+
   def loot_roll_vote(entity, voter_guid, slot, vote) do
     dispatch_cast(entity, {:loot_roll_vote, voter_guid, slot, vote})
   end

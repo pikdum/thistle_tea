@@ -31,6 +31,9 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStep do
             position: nil,
             condition_id: 0,
             condition: nil,
+            success_condition: nil,
+            failure_condition: nil,
+            target_condition: nil,
             texts: [],
             sub_scripts: %{}
 
@@ -98,7 +101,31 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStep do
     Enum.filter([step.datalong, step.datalong2, step.datalong3, step.datalong4], &(is_integer(&1) and &1 > 0))
   end
 
+  def nested_script_ids(%__MODULE__{command: command} = step)
+      when command in [:start_map_event, :add_map_event_target, :edit_map_event] do
+    Enum.filter([step.dataint2, step.dataint4], &(is_integer(&1) and &1 > 0))
+  end
+
+  def nested_script_ids(%__MODULE__{command: :start_script_for_all, datalong: script_id})
+      when is_integer(script_id) and script_id > 0, do: [script_id]
+
   def nested_script_ids(%__MODULE__{}), do: []
+
+  def condition_ids(%__MODULE__{} = step) do
+    event_condition_ids =
+      case step.command do
+        command when command in [:start_map_event, :add_map_event_target, :edit_map_event] ->
+          [step.dataint, step.dataint3]
+
+        :remove_map_event_target ->
+          [step.datalong2]
+
+        _command ->
+          []
+      end
+
+    Enum.filter([step.condition_id | event_condition_ids], &(is_integer(&1) and &1 > 0))
+  end
 
   def start_script_options(%__MODULE__{command: :start_script} = step) do
     [
@@ -154,6 +181,15 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStep do
   defp command(46), do: :set_phase_range
   defp command(47), do: :flee
   defp command(60), do: :start_waypoints
+  defp command(61), do: :start_map_event
+  defp command(62), do: :end_map_event
+  defp command(63), do: :add_map_event_target
+  defp command(64), do: :remove_map_event_target
+  defp command(65), do: :set_map_event_data
+  defp command(66), do: :send_map_event
+  defp command(67), do: :set_default_movement
+  defp command(68), do: :start_script_for_all
+  defp command(69), do: :edit_map_event
   defp command(70), do: :fail_quest
   defp command(83), do: :quest_credit
   defp command(other), do: {:unsupported, other}

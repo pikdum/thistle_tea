@@ -161,6 +161,31 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
       {:noreply, state}
   end
 
+  def handle_cast({:script_event, event_id, data}, %Mob{} = state) when is_integer(event_id) and is_integer(data) do
+    now = Time.now()
+
+    state =
+      state
+      |> EventAI.with_blackboard(
+        &EventAI.on_script_event(
+          &1,
+          &2,
+          event_id,
+          data,
+          now,
+          AIEnvironment.context(&1, now)
+        )
+      )
+      |> NavigationResolver.resolve(now)
+      |> EventSink.emit_pending()
+
+    {:noreply, state, {:continue, :maybe_broadcast}}
+  rescue
+    error ->
+      Logger.error("script_event crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:noreply, state}
+  end
+
   @impl GenServer
   def handle_cast({:move_to, x, y, z}, state) do
     state = AIEnvironment.move_to(state, {x, y, z})
