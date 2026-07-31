@@ -132,6 +132,13 @@ defmodule ThistleTea.Game.Entity.EventSink.ClientProjection do
     entity
   end
 
+  def emit(%Character{} = entity, %Effects.ReputationChange{} = effect, context) do
+    Context.send(context, {:reputation_change, effect.faction_id, effect.value})
+    entity
+  end
+
+  def emit(entity, %Effects.ReputationChange{}, _context), do: entity
+
   defp monster_chat_type(chat_type) when chat_type in [:yell, :zone_yell], do: :monster_yell
   defp monster_chat_type(chat_type) when chat_type in [:text_emote, :boss_emote, :zone_emote], do: :monster_emote
   defp monster_chat_type(_chat_type), do: :monster_say

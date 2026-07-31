@@ -44,6 +44,11 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
     }
   end
 
+  defp character_fixture do
+    character = dead_character_fixture()
+    %{character | unit: %{character.unit | health: 100}}
+  end
+
   defp avoided_melee_ability_target(outcome) do
     {class, equipment_bonuses, avoidance_auras} =
       case outcome do
@@ -811,6 +816,23 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
       {_caster, events} = SpellEffect.receive(target_fixture(), context, spell, 1_000)
 
       assert [%Effects.CreateItem{item_id: 5350, count: 2}] = events
+    end
+
+    test "reputation effect emits a typed standing change for players" do
+      spell = %Spell{
+        id: 21_187,
+        name: "Stormpike Reputation +5",
+        school: :physical,
+        effects: [
+          %Effect{index: 0, type: :reputation, base_points: 4, die_sides: 1, base_dice: 1, misc_value: 730}
+        ]
+      }
+
+      context = %CastContext{caster_guid: 1, caster_level: 10}
+
+      {_character, events} = SpellEffect.receive(character_fixture(), context, spell, 1_000)
+
+      assert [%Effects.ReputationChange{faction_id: 730, value: 5}] = events
     end
 
     test "interrupt_cast clears the target's cast and locks out the school" do

@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Entity.Logic.Reputation do
   alias ThistleTea.Game.Entity.Data.Reputation.Spillover
   alias ThistleTea.Game.Entity.Data.Reputation.State
   alias ThistleTea.Game.Entity.Data.Reputation.Variant
+  alias ThistleTea.Game.Entity.Logic.Experience
 
   @bottom -42_000
   @cap 42_999
@@ -125,6 +126,36 @@ defmodule ThistleTea.Game.Entity.Logic.Reputation do
     end
   end
 
+  def calculate_gain(value, rate, level_rate, bonus, random \\ &:rand.uniform/0)
+      when is_integer(value) and is_number(rate) and is_number(level_rate) and is_integer(bonus) and
+             is_function(random, 0) do
+    if rate <= 0 or 100 + bonus <= 0 do
+      0
+    else
+      value
+      |> Kernel.*(rate * level_rate * (100 + bonus) / 100)
+      |> dither(random.())
+    end
+  end
+
+  def level_rate(_source, value, _player_level, _content_level) when value <= 0, do: 1.0
+
+  def level_rate(:kill, _value, player_level, creature_level) do
+    if creature_level <= Experience.gray_level(player_level), do: 0.2, else: 1.0
+  end
+
+  def level_rate(:quest, _value, player_level, quest_level) do
+    case max(player_level - quest_level - 5, 0) do
+      0 -> 1.0
+      1 -> 0.8
+      2 -> 0.6
+      3 -> 0.4
+      _ -> 0.2
+    end
+  end
+
+  def level_rate(_source, _value, _player_level, _content_level), do: 1.0
+
   def modify(%Reputation{} = reputation, %Catalog{} = catalog, faction_id, delta, context, opts \\ [])
       when is_integer(delta) do
     changes =
@@ -140,6 +171,17 @@ defmodule ThistleTea.Game.Entity.Logic.Reputation do
   def set(%Reputation{} = reputation, %Catalog{} = catalog, faction_id, value, context) when is_integer(value) do
     current = standing(reputation, catalog, faction_id, context.race, context.class)
     modify(reputation, catalog, faction_id, value - current, context, spillover?: false)
+  end
+
+  def set_visible(%Reputation{} = reputation, faction_id) do
+    with %State{} = state <- state(reputation, faction_id),
+         false <- flag?(state.flags, @hidden ||| @invisible_forced),
+         false <- visible?(state) do
+      updated = %{state | flags: state.flags ||| @visible}
+      {:ok, put_state(reputation, updated), change(updated)}
+    else
+      _ -> {:error, :not_allowed}
+    end
   end
 
   def set_at_war(%Reputation{} = reputation, %Catalog{} = catalog, index, enabled, context) when is_boolean(enabled) do
@@ -273,4 +315,7 @@ defmodule ThistleTea.Game.Entity.Logic.Reputation do
       flags: state.flags
     }
   end
+
+  defp dither(value, random) when value < 0, do: -floor(abs(value) + random)
+  defp dither(value, random), do: floor(value + random)
 end

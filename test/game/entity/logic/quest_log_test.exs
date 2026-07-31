@@ -153,6 +153,20 @@ defmodule ThistleTea.Game.Entity.Logic.QuestLogTest do
       assert {^quest_log, :unchanged} = QuestLog.evaluate(quest_log, quest, fn 750 -> 1 end)
       assert {_quest_log, :completed} = QuestLog.evaluate(quest_log, quest, fn 750 -> 2 end)
     end
+
+    test "reputation objectives complete and regress with standing" do
+      quest = %Quest{id: 62, reputation_objective_faction: 529, reputation_objective_value: 3_000}
+      {:ok, quest_log} = QuestLog.add(%{}, 62)
+
+      assert {^quest_log, :unchanged} =
+               QuestLog.evaluate(quest_log, quest, fn _item_id -> 0 end, fn 529 -> 2_999 end)
+
+      assert {quest_log, :completed} =
+               QuestLog.evaluate(quest_log, quest, fn _item_id -> 0 end, fn 529 -> 3_000 end)
+
+      assert {_quest_log, :incompleted} =
+               QuestLog.evaluate(quest_log, quest, fn _item_id -> 0 end, fn 529 -> 2_999 end)
+    end
   end
 
   describe "mark_explored/2" do

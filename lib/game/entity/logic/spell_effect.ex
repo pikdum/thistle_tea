@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   alias ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal
   alias ThistleTea.Game.Entity.Logic.SpellEffect.Inventory, as: InventoryEffects
   alias ThistleTea.Game.Entity.Logic.SpellEffect.Movement, as: MovementEffects
+  alias ThistleTea.Game.Entity.Logic.SpellEffect.Reputation, as: ReputationEffects
   alias ThistleTea.Game.Entity.Logic.SpellEffect.Resource, as: ResourceEffects
   alias ThistleTea.Game.Entity.Logic.SpellEffect.Script, as: ScriptEffects
   alias ThistleTea.Game.Entity.Logic.SpellEffect.SummonControl, as: SummonControlEffects
@@ -269,12 +270,23 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
       %Semantics.Aura{} -> AuraEffects.apply(state, context, spell, effect, now)
       %Semantics.Resource{} -> ResourceEffects.apply(state, context, spell, effect, now)
       %Semantics.Movement{} -> MovementEffects.apply(state, context, spell, effect, now)
-      %Semantics.Inventory{} -> InventoryEffects.apply(state, context, spell, effect, now)
-      %Semantics.Script{} -> ScriptEffects.apply(state, context, spell, effect, now)
-      %Semantics.SummonControl{} -> SummonControlEffects.apply(state, context, spell, effect, now)
-      _rule -> {state, []}
+      rule -> apply_secondary_effect(rule, state, context, spell, effect, now)
     end
   end
+
+  defp apply_secondary_effect(%Semantics.Inventory{}, state, context, spell, effect, now),
+    do: InventoryEffects.apply(state, context, spell, effect, now)
+
+  defp apply_secondary_effect(%Semantics.Script{}, state, context, spell, effect, now),
+    do: ScriptEffects.apply(state, context, spell, effect, now)
+
+  defp apply_secondary_effect(%Semantics.Reputation{}, state, context, spell, effect, now),
+    do: ReputationEffects.apply(state, context, spell, effect, now)
+
+  defp apply_secondary_effect(%Semantics.SummonControl{}, state, context, spell, effect, now),
+    do: SummonControlEffects.apply(state, context, spell, effect, now)
+
+  defp apply_secondary_effect(_rule, state, _context, _spell, _effect, _now), do: {state, []}
 
   defp maybe_mark_defense(state, attacker_guid, outcome, now) when outcome in [:dodge, :parry, :block] do
     Reactive.mark_defense(state, attacker_guid, outcome, now)

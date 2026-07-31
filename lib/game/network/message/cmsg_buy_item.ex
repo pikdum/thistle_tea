@@ -3,8 +3,10 @@ defmodule ThistleTea.Game.Network.Message.CmsgBuyItem do
   use ThistleTea.Game.Network.ClientMessage, :CMSG_BUY_ITEM
 
   alias ThistleTea.Game.Entity.Logic.Inventory
+  alias ThistleTea.Game.Entity.Logic.Reputation, as: ReputationLogic
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.InventoryUpdate
+  alias ThistleTea.Game.Player.Reputation
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Vendor, as: VendorLoader
 
@@ -43,6 +45,10 @@ defmodule ThistleTea.Game.Network.Message.CmsgBuyItem do
     coinage = c.player.coinage
 
     cond do
+      not reputation_met?(c, template) ->
+        send_buy_failed(message, :reputation_require)
+        state
+
       coinage < price ->
         send_buy_failed(message, :not_enough_money)
         state
@@ -54,6 +60,15 @@ defmodule ThistleTea.Game.Network.Message.CmsgBuyItem do
       true ->
         complete_purchase(state, c, message, vendor_item, template, total_count, price)
     end
+  end
+
+  defp reputation_met?(_character, %{required_reputation_faction: faction_id})
+       when not is_integer(faction_id) or faction_id <= 0, do: true
+
+  defp reputation_met?(character, template) do
+    required_rank = ReputationLogic.rank_value(template.required_reputation_rank)
+    current_rank = character |> Reputation.rank(template.required_reputation_faction) |> ReputationLogic.rank_value()
+    is_integer(required_rank) and current_rank >= required_rank
   end
 
   defp complete_purchase(state, c, message, vendor_item, template, total_count, price) do

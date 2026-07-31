@@ -16,6 +16,7 @@ defmodule ThistleTea.Game.Player.Login do
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Corpse
+  alias ThistleTea.Game.Entity.Data.Reputation
   alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Player, as: PlayerBT
@@ -29,6 +30,7 @@ defmodule ThistleTea.Game.Player.Login do
   alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Entity.Logic.MovementStats
   alias ThistleTea.Game.Entity.Logic.PlayerFlags
+  alias ThistleTea.Game.Entity.Logic.Reputation, as: ReputationLogic
   alias ThistleTea.Game.Entity.Logic.StealthDetection
   alias ThistleTea.Game.Entity.Logic.Talents, as: LogicTalents
   alias ThistleTea.Game.Entity.Logic.Transport, as: TransportLogic
@@ -43,6 +45,7 @@ defmodule ThistleTea.Game.Player.Login do
   alias ThistleTea.Game.Player.Enchantments
   alias ThistleTea.Game.Player.Mail
   alias ThistleTea.Game.Player.Quests
+  alias ThistleTea.Game.Player.Reputation, as: PlayerReputation
   alias ThistleTea.Game.Player.Rest, as: PlayerRest
   alias ThistleTea.Game.Player.Spells, as: PlayerSpells
   alias ThistleTea.Game.Player.Stats, as: PlayerStats
@@ -52,6 +55,7 @@ defmodule ThistleTea.Game.Player.Login do
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Faction, as: FactionLoader
+  alias ThistleTea.Game.World.Loader.Reputation, as: ReputationLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Pathfinding
   alias ThistleTea.Game.World.Presence
@@ -78,6 +82,7 @@ defmodule ThistleTea.Game.Player.Login do
       |> normalize_movement_state()
       |> normalize_combat_stats()
       |> normalize_faction_template()
+      |> normalize_reputation()
       |> normalize_death_state(character_guid)
       |> Dueling.abandon(Time.now())
       |> build_spellbook()
@@ -110,6 +115,7 @@ defmodule ThistleTea.Game.Player.Login do
         controlled_guid: Character.controlled_guid(c),
         duel_opponent_guid: Dueling.opponent_guid(c),
         duel_started?: Dueling.active?(c),
+        reputation: PlayerReputation.projection(c),
         attacker_spell_hit_chance: AuraLogic.attacker_spell_hit_chance(c),
         needed_quest_items: Quests.needed_items(c)
       }
@@ -285,7 +291,7 @@ defmodule ThistleTea.Game.Player.Login do
 
     PlayerSpells.send_proficiencies(c)
 
-    # send initial repuations
+    PlayerReputation.send_initial(c)
 
     # SMSG_LOGIN_SETTIMESPEED
     dt = DateTime.utc_now()
@@ -449,6 +455,18 @@ defmodule ThistleTea.Game.Player.Login do
   end
 
   defp normalize_faction_template(character), do: character
+
+  defp normalize_reputation(%Character{unit: unit, player: player} = character) do
+    reputation =
+      ReputationLogic.normalize(
+        player.reputation || %Reputation{},
+        ReputationLoader.catalog(),
+        unit.race,
+        unit.class
+      )
+
+    %{character | player: %{player | reputation: reputation}}
+  end
 
   defp normalize_death_state(%Character{} = character, character_guid) do
     if Death.ghost?(character) and is_nil(SpatialHash.get_entity(Corpse.guid_for(character_guid))) do

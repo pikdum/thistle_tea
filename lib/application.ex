@@ -32,6 +32,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.World.Loader.NpcText, as: NpcTextLoader
   alias ThistleTea.Game.World.Loader.PageText, as: PageTextLoader
   alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader
+  alias ThistleTea.Game.World.Loader.Reputation, as: ReputationLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Loader.SpellChain, as: SpellChainLoader
   alias ThistleTea.Game.World.Loader.SpellEffectOverride, as: SpellEffectOverrideLoader
@@ -134,6 +135,7 @@ defmodule ThistleTea.Application do
     CharacterStore.init()
     VendorLoader.init()
     QuestLoader.init()
+    ReputationLoader.init()
     GossipLoader.init()
     CreatureTemplateLoader.init()
     FactionLoader.init()
@@ -212,6 +214,8 @@ defmodule ThistleTea.Application do
       if !test do
         Logger.info("Loading quests...")
         QuestLoader.load_all()
+        Logger.info("Loading reputation...")
+        ReputationLoader.load_all()
         Logger.info("Loading gossip menus...")
         GossipLoader.load_all()
         Logger.info("Loading templates...")

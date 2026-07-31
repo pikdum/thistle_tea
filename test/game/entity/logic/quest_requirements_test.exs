@@ -11,7 +11,8 @@ defmodule ThistleTea.Game.Entity.Logic.QuestRequirementsTest do
       race: 1,
       class: 1,
       quest_log: %{},
-      rewarded_quests: MapSet.new()
+      rewarded_quests: MapSet.new(),
+      reputation: %{}
     })
   end
 
@@ -65,6 +66,24 @@ defmodule ThistleTea.Game.Entity.Logic.QuestRequirementsTest do
 
       assert QuestRequirements.can_take(quest, ctx()) == {:error, :missing_prerequisite}
       assert QuestRequirements.can_take(quest, ctx(rewarded_quests: MapSet.new([1]))) == :ok
+    end
+
+    test "checks minimum and exclusive maximum reputation bounds" do
+      quest = %Quest{
+        id: 1,
+        required_min_reputation_faction: 529,
+        required_min_reputation_value: 3_000,
+        required_max_reputation_faction: 87,
+        required_max_reputation_value: 0
+      }
+
+      assert QuestRequirements.can_take(quest, ctx(reputation: %{529 => 2_999, 87 => -1})) ==
+               {:error, :low_reputation}
+
+      assert QuestRequirements.can_take(quest, ctx(reputation: %{529 => 3_000, 87 => 0})) ==
+               {:error, :high_reputation}
+
+      assert QuestRequirements.can_take(quest, ctx(reputation: %{529 => 3_000, 87 => -1})) == :ok
     end
   end
 end

@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Entity.Logic.Condition do
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
   alias ThistleTea.Game.Entity.Data.Condition
+  alias ThistleTea.Game.Entity.Logic.Reputation
 
   require Logger
 
@@ -41,6 +42,22 @@ defmodule ThistleTea.Game.Entity.Logic.Condition do
       _ ->
         false
     end
+  end
+
+  defp evaluate(%{player: %{reputation: %{ranks: ranks}}}, %Condition{
+         type: :reputation_rank_min,
+         value1: faction_id,
+         value2: required_rank
+       }) do
+    Reputation.rank_value(Map.get(ranks, faction_id, :neutral)) >= required_rank
+  end
+
+  defp evaluate(%{player: %{reputation: %{ranks: ranks}}}, %Condition{
+         type: :reputation_rank_max,
+         value1: faction_id,
+         value2: maximum_rank
+       }) do
+    Reputation.rank_value(Map.get(ranks, faction_id, :neutral)) <= maximum_rank
   end
 
   defp evaluate(_state, %Condition{type: {:unsupported, type}, entry: entry}) do

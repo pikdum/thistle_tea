@@ -16,7 +16,8 @@ defmodule ThistleTea.Game.Entity.Logic.Effects.ClientTypes do
     {:ForwardScriptSteps, [:target_guid, :steps, :source_guid], []},
     {:SendTaxiPath, [:target_guid, :path_id], []},
     {:PlaySound, [:sound_id], []},
-    {:PlayObjectSound, [:sound_id], []}
+    {:PlayObjectSound, [:sound_id], []},
+    {:ReputationChange, [:faction_id, :value], []}
   ]
 
   for {name, required, optional} <- effects do

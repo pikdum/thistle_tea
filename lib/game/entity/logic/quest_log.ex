@@ -41,10 +41,10 @@ defmodule ThistleTea.Game.Entity.Logic.QuestLog do
     end
   end
 
-  def evaluate(quest_log, %Quest{} = quest, item_count_fn) do
+  def evaluate(quest_log, %Quest{} = quest, item_count_fn, reputation_fn \\ fn _faction_id -> 0 end) do
     case get(quest_log, quest.id) do
       %Entry{status: status} = entry when status in [:incomplete, :complete] ->
-        satisfied = objectives_satisfied?(quest, entry, item_count_fn)
+        satisfied = objectives_satisfied?(quest, entry, item_count_fn, reputation_fn)
 
         cond do
           satisfied and status == :incomplete -> transition(quest_log, quest, :complete)
@@ -57,7 +57,12 @@ defmodule ThistleTea.Game.Entity.Logic.QuestLog do
     end
   end
 
-  def objectives_satisfied?(%Quest{} = quest, %Entry{counts: counts} = entry, item_count_fn) do
+  def objectives_satisfied?(
+        %Quest{} = quest,
+        %Entry{counts: counts} = entry,
+        item_count_fn,
+        reputation_fn \\ fn _ -> 0 end
+      ) do
     kills_satisfied =
       Enum.all?(quest.required_kills, fn {index, _entry, required} ->
         Map.get(counts, index, 0) >= required
@@ -70,7 +75,11 @@ defmodule ThistleTea.Game.Entity.Logic.QuestLog do
 
     exploration_satisfied = not Quest.exploration?(quest) or entry.explored?
 
-    kills_satisfied and items_satisfied and exploration_satisfied
+    reputation_satisfied =
+      quest.reputation_objective_faction <= 0 or
+        reputation_fn.(quest.reputation_objective_faction) >= quest.reputation_objective_value
+
+    kills_satisfied and items_satisfied and exploration_satisfied and reputation_satisfied
   end
 
   def mark_explored(quest_log, quest_id) do

@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.Entity.Logic.ConditionTest do
   alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Condition
+  alias ThistleTea.Game.Entity.Data.Reputation
   alias ThistleTea.Game.Entity.Logic.Condition, as: ConditionLogic
 
   setup [:mob]
@@ -52,6 +53,28 @@ defmodule ThistleTea.Game.Entity.Logic.ConditionTest do
       assert ConditionLogic.met?(mob, %Condition{type: :none})
       assert ConditionLogic.met?(mob, %Condition{type: {:unsupported, 9}})
       assert ConditionLogic.met?(mob, %Condition{type: {:unsupported, :unresolved}})
+    end
+
+    test "reputation rank bounds use the player's projected rank" do
+      player = %{player: %{reputation: %Reputation{ranks: %{529 => :honored}}}}
+
+      assert ConditionLogic.met?(player, %Condition{
+               type: :reputation_rank_min,
+               value1: 529,
+               value2: 5
+             })
+
+      refute ConditionLogic.met?(player, %Condition{
+               type: :reputation_rank_min,
+               value1: 529,
+               value2: 6
+             })
+
+      assert ConditionLogic.met?(player, %Condition{
+               type: :reputation_rank_max,
+               value1: 529,
+               value2: 5
+             })
     end
   end
 

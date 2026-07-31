@@ -47,6 +47,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.Player do
     quest_log: {:virtual, %{}},
     rewarded_quests: {:virtual, MapSet.new()},
     taxi_nodes: {:virtual, MapSet.new()},
+    reputation: {:virtual, %ThistleTea.Game.Entity.Data.Reputation{}},
     quest_slot_1: {0x00C6, 3, {:fn, [:quest_log], &__MODULE__.quest_slot_1/1}, :private},
     quest_slot_2: {0x00C9, 3, {:fn, [:quest_log], &__MODULE__.quest_slot_2/1}, :private},
     quest_slot_3: {0x00CC, 3, {:fn, [:quest_log], &__MODULE__.quest_slot_3/1}, :private},

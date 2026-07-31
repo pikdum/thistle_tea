@@ -541,6 +541,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp effect_type(96), do: :charge
   defp effect_type(101), do: :feed_pet
   defp effect_type(102), do: :dismiss_pet
+  defp effect_type(103), do: :reputation
   defp effect_type(108), do: :dispel_mechanic
   defp effect_type(109), do: :revive_pet
   defp effect_type(112), do: :summon_demon
@@ -673,6 +674,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp aura_type(151), do: :track_stealthed
   defp aura_type(153), do: :split_damage_flat
   defp aura_type(154), do: :mod_stealth_level
+  defp aura_type(156), do: :mod_reputation_gain
   defp aura_type(161), do: :mod_health_regen_in_combat
   defp aura_type(166), do: :mod_attack_power_pct
   defp aura_type(168), do: :mod_damage_done_versus
@@ -686,6 +688,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp aura_type(186), do: :mod_attacker_spell_hit_chance
   defp aura_type(187), do: :mod_attacker_melee_crit_chance
   defp aura_type(188), do: :mod_attacker_ranged_crit_chance
+  defp aura_type(190), do: :mod_faction_reputation_gain
   defp aura_type(other) when is_integer(other), do: other
 
   defp target_type(0), do: nil

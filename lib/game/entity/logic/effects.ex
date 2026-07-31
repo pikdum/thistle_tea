@@ -563,6 +563,10 @@ defmodule ThistleTea.Game.Entity.Logic.Effects do
     %Effects.PlayObjectSound{sound_id: sound_id}
   end
 
+  def reputation_change(faction_id, value) when is_integer(faction_id) and faction_id > 0 and is_integer(value) do
+    %Effects.ReputationChange{faction_id: faction_id, value: value}
+  end
+
   def set_facing({:angle, angle} = facing) when is_number(angle) do
     %Effects.SetFacing{facing: facing}
   end

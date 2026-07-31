@@ -22,6 +22,7 @@ defmodule ThistleTea.Game.Player.Quests do
   alias ThistleTea.Game.Network.InventoryUpdate
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Player.Mail
+  alias ThistleTea.Game.Player.Reputation, as: PlayerReputation
   alias ThistleTea.Game.Player.Stats, as: PlayerStats
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.ItemStore
@@ -34,7 +35,8 @@ defmodule ThistleTea.Game.Player.Quests do
       race: character.unit.race,
       class: character.unit.class,
       quest_log: character.player.quest_log,
-      rewarded_quests: character.player.rewarded_quests
+      rewarded_quests: character.player.rewarded_quests,
+      reputation: PlayerReputation.standings(character)
     }
   end
 
@@ -97,7 +99,12 @@ defmodule ThistleTea.Game.Player.Quests do
          {:ok, quest_log} <- QuestLog.add(player.quest_log, quest_id),
          {:ok, state} <- grant_source_item(state, quest) do
       {quest_log, event} =
-        QuestLog.evaluate(quest_log, quest, item_counter(state.character.player))
+        QuestLog.evaluate(
+          quest_log,
+          quest,
+          item_counter(state.character.player),
+          &PlayerReputation.standing(state.character, &1)
+        )
 
       if event == :completed do
         Network.send_packet(%Message.SmsgQuestupdateComplete{quest_id: quest.id})
@@ -105,7 +112,13 @@ defmodule ThistleTea.Game.Player.Quests do
 
       character = state.character
       character = %{character | player: %{character.player | quest_log: quest_log}}
-      put_character(state, character)
+      state = put_character(state, character)
+
+      if quest.reputation_objective_faction > 0 do
+        PlayerReputation.set_visible(state, quest.reputation_objective_faction)
+      else
+        state
+      end
     else
       {:error, :log_full} ->
         Network.send_packet(%Message.SmsgQuestlogFull{})
@@ -183,6 +196,7 @@ defmodule ThistleTea.Game.Player.Quests do
 
     Network.send_packet(%Message.SmsgQuestgiverQuestComplete{quest: quest, xp: xp, money: money})
     state = put_character(state, character)
+    state = PlayerReputation.reward_quest(state, quest)
     state = Mail.send_quest_reward(state, npc_guid, quest)
     send_next_quest(state, npc_guid, quest)
     state
@@ -346,7 +360,7 @@ defmodule ThistleTea.Game.Player.Quests do
     with %Quest{} = quest <- QuestLoader.get(quest_id),
          true <- Quest.exploration?(quest),
          {:ok, quest_log} <- QuestLog.mark_explored(player.quest_log, quest_id) do
-      {quest_log, _event} = complete_check(quest_log, quest, player)
+      {quest_log, _event} = complete_check(quest_log, quest, character)
       put_character(state, %{character | player: %{player | quest_log: quest_log}})
     else
       _other -> state
@@ -369,7 +383,7 @@ defmodule ThistleTea.Game.Player.Quests do
               victim_guid: victim_guid
             })
 
-            {quest_log, _event} = complete_check(quest_log, quest, player)
+            {quest_log, _event} = complete_check(quest_log, quest, character)
             {quest_log, true}
 
           :no_credit ->
@@ -410,7 +424,7 @@ defmodule ThistleTea.Game.Player.Quests do
       {quest_log, changed?} =
         Enum.reduce(quests, {player.quest_log, false}, fn quest, {quest_log, changed?} ->
           # credo:disable-for-next-line Credo.Check.Refactor.Nesting
-          case complete_check(quest_log, quest, player) do
+          case complete_check(quest_log, quest, character) do
             {quest_log, :unchanged} -> {quest_log, changed?}
             {quest_log, _event} -> {quest_log, true}
           end
@@ -421,6 +435,27 @@ defmodule ThistleTea.Game.Player.Quests do
       else
         state
       end
+    end
+  end
+
+  def on_reputation_changed(%{character: %Character{} = character} = state) do
+    quests =
+      character.player
+      |> active_quests()
+      |> Enum.filter(&(&1.reputation_objective_faction > 0))
+
+    {quest_log, changed?} =
+      Enum.reduce(quests, {character.player.quest_log, false}, fn quest, {quest_log, changed?} ->
+        case complete_check(quest_log, quest, character) do
+          {quest_log, :unchanged} -> {quest_log, changed?}
+          {quest_log, _event} -> {quest_log, true}
+        end
+      end)
+
+    if changed? do
+      put_character(state, %{character | player: %{character.player | quest_log: quest_log}})
+    else
+      state
     end
   end
 
@@ -440,8 +475,13 @@ defmodule ThistleTea.Game.Player.Quests do
     end)
   end
 
-  defp complete_check(quest_log, %Quest{} = quest, player) do
-    case QuestLog.evaluate(quest_log, quest, item_counter(player)) do
+  defp complete_check(quest_log, %Quest{} = quest, %Character{} = character) do
+    case QuestLog.evaluate(
+           quest_log,
+           quest,
+           item_counter(character.player),
+           &PlayerReputation.standing(character, &1)
+         ) do
       {quest_log, :completed} ->
         Network.send_packet(%Message.SmsgQuestupdateComplete{quest_id: quest.id})
         {quest_log, :completed}

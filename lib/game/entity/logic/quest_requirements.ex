@@ -11,16 +11,21 @@ defmodule ThistleTea.Game.Entity.Logic.QuestRequirements do
   @repeatable_flag 0x1
 
   def can_take(%Quest{} = quest, ctx) do
-    cond do
-      QuestLog.active?(ctx.quest_log, quest.id) -> {:error, :already_active}
-      rewarded?(quest, ctx) -> {:error, :already_rewarded}
-      quest.limit_time > 0 -> {:error, :timed_unsupported}
-      not race_allowed?(quest, ctx.race) -> {:error, :wrong_race}
-      not class_allowed?(quest, ctx.class) -> {:error, :wrong_class}
-      ctx.level < quest.min_level -> {:error, :low_level}
-      not prerequisite_met?(quest, ctx) -> {:error, :missing_prerequisite}
-      true -> :ok
-    end
+    [
+      {QuestLog.active?(ctx.quest_log, quest.id), :already_active},
+      {rewarded?(quest, ctx), :already_rewarded},
+      {quest.limit_time > 0, :timed_unsupported},
+      {not race_allowed?(quest, ctx.race), :wrong_race},
+      {not class_allowed?(quest, ctx.class), :wrong_class},
+      {ctx.level < quest.min_level, :low_level},
+      {not minimum_reputation_met?(quest, ctx), :low_reputation},
+      {not maximum_reputation_met?(quest, ctx), :high_reputation},
+      {not prerequisite_met?(quest, ctx), :missing_prerequisite}
+    ]
+    |> Enum.find_value(:ok, fn
+      {true, reason} -> {:error, reason}
+      {false, _reason} -> false
+    end)
   end
 
   def can_take?(%Quest{} = quest, ctx), do: can_take(quest, ctx) == :ok
@@ -45,6 +50,24 @@ defmodule ThistleTea.Game.Entity.Logic.QuestRequirements do
   defp prerequisite_met?(%Quest{prev_quest_id: prev}, ctx) when prev > 0, do: MapSet.member?(rewarded_set(ctx), prev)
 
   defp prerequisite_met?(%Quest{}, _ctx), do: true
+
+  defp minimum_reputation_met?(%Quest{required_min_reputation_faction: faction_id}, _ctx) when faction_id <= 0, do: true
+
+  defp minimum_reputation_met?(
+         %Quest{required_min_reputation_faction: faction_id, required_min_reputation_value: required},
+         ctx
+       ) do
+    Map.get(ctx.reputation, faction_id, 0) >= required
+  end
+
+  defp maximum_reputation_met?(%Quest{required_max_reputation_faction: faction_id}, _ctx) when faction_id <= 0, do: true
+
+  defp maximum_reputation_met?(
+         %Quest{required_max_reputation_faction: faction_id, required_max_reputation_value: maximum},
+         ctx
+       ) do
+    Map.get(ctx.reputation, faction_id, 0) < maximum
+  end
 
   defp rewarded_set(%{rewarded_quests: %MapSet{} = rewarded}), do: rewarded
   defp rewarded_set(_ctx), do: MapSet.new()

@@ -15,6 +15,12 @@ defmodule ThistleTea.Game.Entity.Data.Quest do
     type: 0,
     required_classes: 0,
     required_races: 0,
+    reputation_objective_faction: 0,
+    reputation_objective_value: 0,
+    required_min_reputation_faction: 0,
+    required_min_reputation_value: 0,
+    required_max_reputation_faction: 0,
+    required_max_reputation_value: 0,
     suggested_players: 0,
     limit_time: 0,
     flags: 0,
@@ -41,6 +47,7 @@ defmodule ThistleTea.Game.Entity.Data.Quest do
     point_opt: 0,
     reward_items: [],
     reward_choice_items: [],
+    reward_reputation: [],
     reward_money: 0,
     reward_money_max_level: 0,
     reward_xp: 0,
@@ -64,6 +71,12 @@ defmodule ThistleTea.Game.Entity.Data.Quest do
       type: row.type,
       required_classes: row.required_classes,
       required_races: row.required_races,
+      reputation_objective_faction: row.rep_objective_faction,
+      reputation_objective_value: row.rep_objective_value,
+      required_min_reputation_faction: row.required_min_rep_faction,
+      required_min_reputation_value: row.required_min_rep_value,
+      required_max_reputation_faction: row.required_max_rep_faction,
+      required_max_reputation_value: row.required_max_rep_value,
       suggested_players: row.suggested_players,
       limit_time: row.limit_time,
       flags: row.quest_flags,
@@ -90,6 +103,7 @@ defmodule ThistleTea.Game.Entity.Data.Quest do
       point_opt: row.point_opt,
       reward_items: id_count_pairs(row, :rew_item_id, :rew_item_count, 4),
       reward_choice_items: id_count_pairs(row, :rew_choice_item_id, :rew_choice_item_count, 6),
+      reward_reputation: reputation_rewards(row),
       reward_money: row.rew_or_req_money,
       reward_money_max_level: row.rew_money_max_level,
       reward_xp: row.rew_xp,
@@ -137,6 +151,25 @@ defmodule ThistleTea.Game.Entity.Data.Quest do
       count = Map.get(row, :"req_creature_or_go_count#{i}") || 0
       spell = Map.get(row, :"req_spell_cast#{i}") || 0
       if entry > 0 and spell == 0, do: [{i - 1, entry, max(count, 1)}], else: []
+    end)
+  end
+
+  defp reputation_rewards(row) do
+    Enum.flat_map(1..5, fn index ->
+      faction_id = Map.fetch!(row, :"rew_rep_faction#{index}")
+      value = Map.fetch!(row, :"rew_rep_value#{index}")
+
+      if faction_id > 0 and value != 0 do
+        [
+          %{
+            faction_id: faction_id,
+            value: value,
+            no_spillover?: Bitwise.band(row.rew_rep_spillover_mask, Bitwise.bsl(1, index - 1)) != 0
+          }
+        ]
+      else
+        []
+      end
     end)
   end
 

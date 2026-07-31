@@ -75,6 +75,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.Player.Looting
   alias ThistleTea.Game.Player.Mail
   alias ThistleTea.Game.Player.Quests
+  alias ThistleTea.Game.Player.Reputation, as: PlayerReputation
   alias ThistleTea.Game.Player.Rest, as: PlayerRest
   alias ThistleTea.Game.Player.Spellcasting
   alias ThistleTea.Game.Player.Stats, as: PlayerStats
@@ -848,6 +849,10 @@ defmodule ThistleTea.Game.Entity.Server.Player do
     {:noreply, state, {:continue, {:finish_companion_attach, attachment}}}
   end
 
+  def handle_info({:reputation_change, faction_id, value}, %State{} = state) do
+    {:noreply, PlayerReputation.reward_spell(state, faction_id, value)}
+  end
+
   def handle_info({:control_released, controlled_guid}, %State{} = state) do
     case CompanionOwner.detach(state, controlled_guid, :released) do
       {:ok, entity_ref, state} ->
@@ -1119,9 +1124,16 @@ defmodule ThistleTea.Game.Entity.Server.Player do
       end
 
     state
+    |> maybe_reward_kill_reputation(victim)
     |> Quests.credit_kill(victim.object.guid)
     |> maybe_broadcast_update()
   end
+
+  defp maybe_reward_kill_reputation(state, %{internal: %Internal{pet: nil}} = victim) do
+    PlayerReputation.reward_kill(state, Guid.entry(victim.object.guid), victim.unit.level)
+  end
+
+  defp maybe_reward_kill_reputation(state, _victim), do: state
 
   defp kill_xp(%Character{unit: %Unit{health: health, level: player_level}}, %{
          unit: %Unit{level: mob_level},

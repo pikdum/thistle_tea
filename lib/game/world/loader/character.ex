@@ -106,6 +106,7 @@ defmodule ThistleTea.Game.World.Loader.Character do
         next_level_xp: stats.next_level_xp,
         rest_state_experience: 0,
         coinage: 0,
+        watched_faction_index: -1,
         taxi_nodes: TaxiNetwork.node_ids_from_mask([chr_race.starting_taxi_mask]),
         skills: SkillLoader.initial_skills(spells, params.race, params.class, stats.level)
       },

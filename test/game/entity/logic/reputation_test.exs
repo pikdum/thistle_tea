@@ -55,6 +55,24 @@ defmodule ThistleTea.Game.Entity.Logic.ReputationTest do
     end
   end
 
+  describe "calculate_gain/5" do
+    test "dithers fractional gains and losses without applying positive bonuses to losses" do
+      assert Reputation.calculate_gain(25, 1.0, 1.0, 10, fn -> 0.4 end) == 27
+      assert Reputation.calculate_gain(25, 1.0, 1.0, 10, fn -> 0.6 end) == 28
+      assert Reputation.calculate_gain(-25, 1.0, 1.0, 0, fn -> 0.4 end) == -25
+      assert Reputation.calculate_gain(25, 0.0, 1.0, 10, fn -> 0.4 end) == 0
+    end
+
+    test "applies classic low-level quest and kill reductions only to gains" do
+      assert Reputation.level_rate(:quest, 25, 60, 55) == 1.0
+      assert Reputation.level_rate(:quest, 25, 60, 54) == 0.8
+      assert Reputation.level_rate(:quest, 25, 60, 51) == 0.2
+      assert Reputation.level_rate(:kill, 5, 60, 49) == 0.2
+      assert Reputation.level_rate(:kill, -5, 60, 1) == 1.0
+      assert Reputation.level_rate(:spell, 5, 60, 1) == 1.0
+    end
+  end
+
   describe "modify/6" do
     test "stores an offset from the racial base and makes the faction visible" do
       catalog = catalog([definition(72, 19, [variant(base: 3_100, flags: 0x10)])])
@@ -148,6 +166,25 @@ defmodule ThistleTea.Game.Entity.Logic.ReputationTest do
 
       assert Reputation.standing(reputation, catalog, 72, @human, @warrior) == 9_000
       assert Reputation.state(reputation, 72).standing == 5_900
+    end
+  end
+
+  describe "set_visible/2" do
+    test "reveals an ordinary faction but not hidden or forced-invisible factions" do
+      catalog =
+        catalog([
+          definition(1, 0, [variant()]),
+          definition(2, 1, [variant(flags: 0x04)]),
+          definition(3, 2, [variant(flags: 0x08)])
+        ])
+
+      reputation = Reputation.initialize(catalog, @human, @warrior)
+
+      assert {:ok, reputation, change} = Reputation.set_visible(reputation, 1)
+      assert Reputation.visible?(Reputation.state(reputation, 1))
+      assert Bitwise.band(change.flags, 0x01) != 0
+      assert {:error, :not_allowed} = Reputation.set_visible(reputation, 2)
+      assert {:error, :not_allowed} = Reputation.set_visible(reputation, 3)
     end
   end
 

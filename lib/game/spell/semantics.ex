@@ -61,6 +61,12 @@ defmodule ThistleTea.Game.Spell.Semantics.Script do
   defstruct [:kind]
 end
 
+defmodule ThistleTea.Game.Spell.Semantics.Reputation do
+  @moduledoc false
+  @enforce_keys [:kind]
+  defstruct [:kind]
+end
+
 defmodule ThistleTea.Game.Spell.Semantics.Unsupported do
   @moduledoc false
   @enforce_keys [:kind]
@@ -80,6 +86,7 @@ defmodule ThistleTea.Game.Spell.Semantics do
   alias ThistleTea.Game.Spell.Semantics.DamageHeal
   alias ThistleTea.Game.Spell.Semantics.Inventory
   alias ThistleTea.Game.Spell.Semantics.Movement
+  alias ThistleTea.Game.Spell.Semantics.Reputation
   alias ThistleTea.Game.Spell.Semantics.Resource
   alias ThistleTea.Game.Spell.Semantics.Rules
   alias ThistleTea.Game.Spell.Semantics.Script
@@ -133,6 +140,7 @@ defmodule ThistleTea.Game.Spell.Semantics do
   ]
 
   @script [:trigger_spell, :dummy, :script_effect, :learn_spell, :parry, :dual_wield, :proficiency]
+  @reputation [:reputation]
 
   def compile(%Spell{} = spell) do
     effects = Enum.map(spell.effects, &compile_effect/1)
@@ -163,6 +171,7 @@ defmodule ThistleTea.Game.Spell.Semantics do
   def effect_rule(%Effect{type: type}) when type in @summon_control, do: %SummonControl{kind: type}
   def effect_rule(%Effect{type: type}) when type in @inventory, do: %Inventory{kind: type}
   def effect_rule(%Effect{type: type}) when type in @script, do: %Script{kind: type}
+  def effect_rule(%Effect{type: type}) when type in @reputation, do: %Reputation{kind: type}
   def effect_rule(%Effect{type: type}), do: %Unsupported{kind: type}
 
   def rules(%Spell{semantics: %Rules{} = rules}), do: rules

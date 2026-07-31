@@ -93,6 +93,35 @@ defmodule ThistleTea.Game.Entity.Data.QuestTest do
       assert Quest.deliver?(quest)
     end
 
+    test "translates reputation gates, objectives, and reward spillover flags" do
+      row = %Mangos.QuestTemplate{
+        entry: 3,
+        rep_objective_faction: 529,
+        rep_objective_value: 3_000,
+        required_min_rep_faction: 529,
+        required_min_rep_value: 0,
+        required_max_rep_faction: 87,
+        required_max_rep_value: 0,
+        rew_rep_faction1: 529,
+        rew_rep_value1: 250,
+        rew_rep_faction2: 87,
+        rew_rep_value2: -25,
+        rew_rep_spillover_mask: 0x02
+      }
+
+      quest = Quest.build(row)
+
+      assert quest.reputation_objective_faction == 529
+      assert quest.reputation_objective_value == 3_000
+      assert quest.required_min_reputation_faction == 529
+      assert quest.required_max_reputation_faction == 87
+
+      assert quest.reward_reputation == [
+               %{faction_id: 529, value: 250, no_spillover?: false},
+               %{faction_id: 87, value: -25, no_spillover?: true}
+             ]
+    end
+
     test "nil text columns become empty strings" do
       row = %Mangos.QuestTemplate{entry: 3, title: nil, details: nil, objectives: nil}
       quest = Quest.build(row)

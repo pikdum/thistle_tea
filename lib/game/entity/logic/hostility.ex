@@ -17,11 +17,12 @@ defmodule ThistleTea.Game.Entity.Logic.Hostility do
     if duel_opponents?(source, target) do
       true
     else
-      with %FactionTemplate{} = source_template <- faction_template(source),
-           %FactionTemplate{} = target_template <- faction_template(target) do
-        FactionTemplate.hostile_to?(source_template, target_template)
-      else
-        _ -> false
+      case reputation_reaction(source, target) do
+        {:ok, reaction} ->
+          reaction == :hostile
+
+        :none ->
+          template_hostile?(source, target)
       end
     end
   end
@@ -30,11 +31,12 @@ defmodule ThistleTea.Game.Entity.Logic.Hostility do
     if duel_opponents?(source, target) do
       false
     else
-      with %FactionTemplate{} = source_template <- faction_template(source),
-           %FactionTemplate{} = target_template <- faction_template(target) do
-        FactionTemplate.friendly_to?(source_template, target_template)
-      else
-        _ -> false
+      case reputation_reaction(source, target) do
+        {:ok, reaction} ->
+          reaction == :friendly
+
+        :none ->
+          template_friendly?(source, target)
       end
     end
   end
@@ -85,8 +87,26 @@ defmodule ThistleTea.Game.Entity.Logic.Hostility do
 
   def faction_template(_source), do: nil
 
+  defp template_hostile?(source, target) do
+    with %FactionTemplate{} = source_template <- faction_template(source),
+         %FactionTemplate{} = target_template <- faction_template(target) do
+      FactionTemplate.hostile_to?(source_template, target_template)
+    else
+      _ -> false
+    end
+  end
+
+  defp template_friendly?(source, target) do
+    with %FactionTemplate{} = source_template <- faction_template(source),
+         %FactionTemplate{} = target_template <- faction_template(target) do
+      FactionTemplate.friendly_to?(source_template, target_template)
+    else
+      _ -> false
+    end
+  end
+
   defp target_metadata(guid) when is_integer(guid) do
-    case Metadata.query(guid, [:alive?, :faction_template, :faction_can_have_reputation?, :unit_flags]) do
+    case Metadata.query(guid, [:alive?, :faction_template, :faction_can_have_reputation?, :unit_flags, :reputation]) do
       nil -> %{guid: guid}
       metadata -> Map.put(metadata, :guid, guid)
     end
@@ -141,6 +161,79 @@ defmodule ThistleTea.Game.Entity.Logic.Hostility do
   end
 
   defp faction_can_have_reputation?(_entity), do: false
+
+  defp reputation_reaction(source, target) do
+    cond do
+      player_controlled?(source) and not player_controlled?(target) ->
+        player_reaction_to_creature(source, target)
+
+      not player_controlled?(source) and player_controlled?(target) ->
+        creature_reaction_to_player(source, target)
+
+      true ->
+        :none
+    end
+  end
+
+  defp player_reaction_to_creature(player, creature) do
+    with true <- faction_can_have_reputation?(creature),
+         faction_id when is_integer(faction_id) <- faction_id(creature),
+         %{at_war?: at_war?} <- reputation_entry(player, faction_id) do
+      {:ok, if(at_war?, do: :hostile, else: :friendly)}
+    else
+      _ -> :none
+    end
+  end
+
+  defp creature_reaction_to_player(creature, player) do
+    with true <- faction_can_have_reputation?(creature),
+         faction_id when is_integer(faction_id) <- faction_id(creature),
+         %{rank: rank} <- reputation_entry(player, faction_id) do
+      {:ok, rank_reaction(rank)}
+    else
+      _ -> :none
+    end
+  end
+
+  defp reputation_entry(player, faction_id) do
+    player
+    |> reputation_projection()
+    |> Map.get(faction_id)
+  end
+
+  defp reputation_projection(%{reputation: reputation}) when is_map(reputation), do: reputation
+
+  defp reputation_projection(entity) do
+    case player_owner_guid(entity) do
+      guid when is_integer(guid) ->
+        case Metadata.query(guid, [:reputation]) do
+          %{reputation: reputation} when is_map(reputation) -> reputation
+          _ -> %{}
+        end
+
+      _ ->
+        %{}
+    end
+  end
+
+  defp player_owner_guid(entity) do
+    cond do
+      player_guid?(guid(entity)) -> guid(entity)
+      player_guid?(owner_guid(entity)) -> owner_guid(entity)
+      true -> nil
+    end
+  end
+
+  defp faction_id(entity) do
+    case faction_template(entity) do
+      %FactionTemplate{faction: faction_id} when faction_id > 0 -> faction_id
+      _ -> nil
+    end
+  end
+
+  defp rank_reaction(rank) when rank in [:hated, :hostile], do: :hostile
+  defp rank_reaction(rank) when rank in [:friendly, :honored, :revered, :exalted], do: :friendly
+  defp rank_reaction(_rank), do: :neutral
 
   defp alive?(%{alive?: false}), do: false
   defp alive?(%{unit: %Unit{}} = entity), do: not Core.dead?(entity)
