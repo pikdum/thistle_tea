@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Network.Message.ReputationMessagesTest do
   alias ThistleTea.Game.Network.Message.SmsgSetFactionAtwar
   alias ThistleTea.Game.Network.Message.SmsgSetFactionStanding
   alias ThistleTea.Game.Network.Message.SmsgSetFactionVisible
+  alias ThistleTea.Game.Network.Message.SmsgSetForcedReactions
 
   describe "SMSG_INITIALIZE_FACTIONS" do
     test "encodes all 64 flag and signed-standing slots" do
@@ -31,6 +32,19 @@ defmodule ThistleTea.Game.Network.Message.ReputationMessagesTest do
       assert binary ==
                <<2::little-size(32), 19::little-size(32), 250::little-signed-size(32), 0::little-size(32),
                  -125::little-signed-size(32)>>
+    end
+  end
+
+  describe "SMSG_SET_FORCED_REACTIONS" do
+    test "encodes faction ids and reputation ranks" do
+      binary =
+        SmsgSetForcedReactions.to_binary(%SmsgSetForcedReactions{
+          reactions: [{575, 3}, {529, 0}]
+        })
+
+      assert binary ==
+               <<2::little-size(32), 575::little-size(32), 3::little-size(32), 529::little-size(32),
+                 0::little-size(32)>>
     end
   end
 

@@ -39,6 +39,7 @@ defmodule ThistleTea.Game.Player.Reputation do
       end)
 
     Network.send_packet(%Message.SmsgInitializeFactions{factions: factions})
+    Network.send_packet(%Message.SmsgSetForcedReactions{reactions: forced_reactions(character)})
   end
 
   def standing(%Character{} = character, faction_id) do
@@ -58,17 +59,39 @@ defmodule ThistleTea.Game.Player.Reputation do
   end
 
   def projection(%Character{} = character) do
+    forced_reactions = Map.new(forced_reactions(character))
+
     character
     |> standings()
     |> Map.new(fn {faction_id, standing} ->
       state = ReputationLogic.state(character.player.reputation, faction_id)
 
-      {faction_id,
-       %{
-         rank: ReputationLogic.rank(standing),
-         at_war?: state != nil and ReputationLogic.at_war?(character.player.reputation, faction_id)
-       }}
+      entry = %{
+        rank: ReputationLogic.rank(standing),
+        at_war?: state != nil and ReputationLogic.at_war?(character.player.reputation, faction_id)
+      }
+
+      entry =
+        case Map.fetch(forced_reactions, faction_id) do
+          {:ok, rank} -> Map.put(entry, :forced_rank, rank_name(rank))
+          :error -> entry
+        end
+
+      {faction_id, entry}
     end)
+  end
+
+  def forced_reactions(%Character{} = character) do
+    character
+    |> Aura.misc_amounts(:force_reaction)
+    |> Enum.reduce(%{}, fn
+      {faction_id, rank}, reactions when faction_id > 0 and rank in 0..7 ->
+        Map.put(reactions, faction_id, rank)
+
+      _reaction, reactions ->
+        reactions
+    end)
+    |> Enum.sort()
   end
 
   def rank(%Character{} = character, faction_id) do
@@ -274,6 +297,11 @@ defmodule ThistleTea.Game.Player.Reputation do
   defp state_at_index(_entry, _index), do: nil
 
   defp context(%Character{} = character), do: %{race: character.unit.race, class: character.unit.class}
+
+  defp rank_name(rank) do
+    ReputationLogic.ranks()
+    |> Enum.at(rank)
+  end
 
   defp team_for_race(race) when race in @alliance_races, do: :alliance
   defp team_for_race(race) when race in @horde_races, do: :horde

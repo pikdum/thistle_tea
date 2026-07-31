@@ -48,6 +48,21 @@ defmodule ThistleTea.Game.Entity.Logic.HostilityTest do
       assert Hostility.hostile?(creature, hostile_player)
       assert Hostility.friendly?(creature, honored_player)
     end
+
+    test "forced reactions override standing and at-war in both directions" do
+      friendly_player =
+        player(alliance(), 1, %{29 => %{rank: :hostile, at_war?: true, forced_rank: :friendly}})
+
+      hostile_player =
+        player(alliance(), 2, %{29 => %{rank: :honored, at_war?: false, forced_rank: :hostile}})
+
+      creature = mob(wolf(), faction_can_have_reputation?: true)
+
+      assert Hostility.friendly?(friendly_player, creature)
+      assert Hostility.friendly?(creature, friendly_player)
+      assert Hostility.hostile?(hostile_player, creature)
+      assert Hostility.hostile?(creature, hostile_player)
+    end
   end
 
   describe "valid_attack_target?/2" do
@@ -75,6 +90,13 @@ defmodule ThistleTea.Game.Entity.Logic.HostilityTest do
 
     test "allows an at-war player to attack a neutral reputation faction" do
       player = player(alliance(), 1, %{29 => %{rank: :neutral, at_war?: true}})
+      target = mob(wolf(), faction_can_have_reputation?: true)
+
+      assert Hostility.valid_attack_target?(player, target)
+    end
+
+    test "allows a forced-neutral player to attack a reputation faction" do
+      player = player(alliance(), 1, %{29 => %{rank: :friendly, at_war?: false, forced_rank: :neutral}})
       target = mob(wolf(), faction_can_have_reputation?: true)
 
       assert Hostility.valid_attack_target?(player, target)

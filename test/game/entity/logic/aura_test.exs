@@ -9,9 +9,12 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Object
+  alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
+  alias ThistleTea.Game.Entity.Data.Reputation
   alias ThistleTea.Game.Entity.Logic.Aura
+  alias ThistleTea.Game.Entity.Logic.Aura.Change
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.SpellEffect
@@ -194,6 +197,50 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
       {_entity, events} = apply_spell(fixture_entity(), 1, 1, frost_armor_fixture())
 
       assert Enum.filter(events, &is_struct(&1, Effects.AuraDuration)) == []
+    end
+
+    test "projects forced reactions when their aura changes" do
+      character = %Character{
+        object: %Object{guid: 1},
+        unit: %Unit{level: 1, health: 100, max_health: 100, auras: []},
+        player: %Player{reputation: %Reputation{ranks: %{575 => :friendly}}},
+        internal: %Internal{world: %WorldRef{map_id: 0}},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
+      }
+
+      holder = %Holder{
+        spell: %Spell{id: 6405},
+        caster_guid: 1,
+        auras: [%AuraData{type: :force_reaction, misc_value: 575, amount: 4}]
+      }
+
+      {character, applied_events} =
+        Aura.transition(character, %Change{holders: [holder], cause: :applied, now: 1_000})
+
+      assert Enum.any?(
+               applied_events,
+               &match?(
+                 %Effects.ForcedReactionsChanged{
+                   reactions: [{575, 4}],
+                   friendly_faction_ids: [575]
+                 },
+                 &1
+               )
+             )
+
+      {_character, removed_events} =
+        Aura.transition(character, %Change{holders: [], cause: :removed, now: 2_000})
+
+      assert Enum.any?(
+               removed_events,
+               &match?(
+                 %Effects.ForcedReactionsChanged{
+                   reactions: [],
+                   friendly_faction_ids: [575]
+                 },
+                 &1
+               )
+             )
     end
 
     test "applies mod_resistance to the matching school field" do

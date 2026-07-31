@@ -21,6 +21,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
     Effects.Emote,
     Effects.EnchantItem,
     Effects.FeedPet,
+    Effects.ForcedReactionsChanged,
     Effects.ForwardScriptSteps,
     Effects.GiveItem,
     Effects.MonsterTalk,

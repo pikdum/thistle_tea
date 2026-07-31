@@ -91,6 +91,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.World.Loader.ItemEnchantment, as: ItemEnchantmentLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Loader.SpellPetAura, as: SpellPetAuraLoader
+  alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Pathfinding
   alias ThistleTea.Game.World.Presence
   alias ThistleTea.Game.World.System.Duel, as: DuelSystem
@@ -853,6 +854,18 @@ defmodule ThistleTea.Game.Entity.Server.Player do
     {:noreply, PlayerReputation.reward_spell(state, faction_id, value)}
   end
 
+  def handle_info({:stop_attack_factions, faction_ids}, %State{character: %Character{} = character} = state)
+      when is_list(faction_ids) do
+    if reputation_faction_id(character.unit.target) in faction_ids do
+      {character, effects} = PlayerCombat.stop_attack(character)
+      character = EventSink.emit(character, effects)
+      state = TickScheduler.ensure_scheduled(%{state | character: character})
+      {:noreply, state, {:continue, :maybe_broadcast_update}}
+    else
+      {:noreply, state}
+    end
+  end
+
   def handle_info({:control_released, controlled_guid}, %State{} = state) do
     case CompanionOwner.detach(state, controlled_guid, :released) do
       {:ok, entity_ref, state} ->
@@ -946,7 +959,8 @@ defmodule ThistleTea.Game.Entity.Server.Player do
         duel_started?: Dueling.active?(character),
         aura_sources: Aura.source_spells(character),
         dispel_options: Aura.dispel_options(character),
-        attacker_spell_hit_chance: Aura.attacker_spell_hit_chance(character)
+        attacker_spell_hit_chance: Aura.attacker_spell_hit_chance(character),
+        reputation: PlayerReputation.projection(character)
       }
       |> Map.merge(detection)
     )
@@ -1184,6 +1198,15 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   defp spell_caster_guid(%{caster_guid: guid}) when is_integer(guid), do: guid
   defp spell_caster_guid(guid) when is_integer(guid), do: guid
   defp spell_caster_guid(_caster), do: nil
+
+  defp reputation_faction_id(guid) when is_integer(guid) and guid > 0 do
+    case Metadata.query(guid, [:faction_template]) do
+      %{faction_template: %FactionTemplate{faction: faction_id}} when faction_id > 0 -> faction_id
+      _metadata -> nil
+    end
+  end
+
+  defp reputation_faction_id(_guid), do: nil
 
   defp suspend_companion_for_teleport(%State{character: %Character{} = character} = state) do
     if is_integer(Companion.summon_guid(character)) do

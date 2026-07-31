@@ -126,10 +126,14 @@ defmodule ThistleTea.Game.Entity.Logic.Hostility do
   end
 
   defp neutral_player_creature_attackable?(source, target) do
-    source
-    |> non_player_target(target)
-    |> faction_can_have_reputation?()
-    |> Kernel.not()
+    player = player_target(source, target)
+    creature = non_player_target(source, target)
+
+    forced_reaction?(player, creature) or not faction_can_have_reputation?(creature)
+  end
+
+  defp player_target(source, target) do
+    if player_controlled?(source), do: source, else: target
   end
 
   defp non_player_target(source, target) do
@@ -178,8 +182,11 @@ defmodule ThistleTea.Game.Entity.Logic.Hostility do
   defp player_reaction_to_creature(player, creature) do
     with true <- faction_can_have_reputation?(creature),
          faction_id when is_integer(faction_id) <- faction_id(creature),
-         %{at_war?: at_war?} <- reputation_entry(player, faction_id) do
-      {:ok, if(at_war?, do: :hostile, else: :friendly)}
+         entry when is_map(entry) <- reputation_entry(player, faction_id) do
+      case Map.get(entry, :forced_rank) do
+        nil -> {:ok, if(entry.at_war?, do: :hostile, else: :friendly)}
+        rank -> {:ok, rank_reaction(rank)}
+      end
     else
       _ -> :none
     end
@@ -188,10 +195,19 @@ defmodule ThistleTea.Game.Entity.Logic.Hostility do
   defp creature_reaction_to_player(creature, player) do
     with true <- faction_can_have_reputation?(creature),
          faction_id when is_integer(faction_id) <- faction_id(creature),
-         %{rank: rank} <- reputation_entry(player, faction_id) do
-      {:ok, rank_reaction(rank)}
+         entry when is_map(entry) <- reputation_entry(player, faction_id) do
+      {:ok, rank_reaction(Map.get(entry, :forced_rank, entry.rank))}
     else
       _ -> :none
+    end
+  end
+
+  defp forced_reaction?(player, creature) do
+    with faction_id when is_integer(faction_id) <- faction_id(creature),
+         entry when is_map(entry) <- reputation_entry(player, faction_id) do
+      Map.has_key?(entry, :forced_rank)
+    else
+      _ -> false
     end
   end
 

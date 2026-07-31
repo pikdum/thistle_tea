@@ -1,6 +1,8 @@
 defmodule ThistleTea.Game.Player.ReputationTest do
   use ExUnit.Case, async: false
 
+  alias ThistleTea.Game.Aura, as: AuraData
+  alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
@@ -16,6 +18,7 @@ defmodule ThistleTea.Game.Player.ReputationTest do
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Player.Reputation
+  alias ThistleTea.Game.Spell
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.Loader.Reputation, as: ReputationLoader
   alias ThistleTea.Game.World.Metadata
@@ -117,6 +120,30 @@ defmodule ThistleTea.Game.Player.ReputationTest do
 
       assert length(factions) == 64
       assert Enum.at(factions, 13) == {0x01, 250}
+      assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgSetForcedReactions{reactions: []}}}
+    end
+
+    test "sends and projects active aura-forced reactions", %{id: id} do
+      catalog = catalog([definition(575, 20)])
+      character = state(id, catalog).character
+      ReputationLoader.put_catalog(catalog)
+
+      holder = %Holder{
+        spell: %Spell{id: 6405},
+        auras: [%AuraData{type: :force_reaction, misc_value: 575, amount: 3}]
+      }
+
+      character = %{character | unit: %{character.unit | auras: [holder]}}
+
+      assert Reputation.projection(character)[575] == %{
+               rank: :neutral,
+               at_war?: false,
+               forced_rank: :neutral
+             }
+
+      Reputation.send_initial(character)
+
+      assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgSetForcedReactions{reactions: [{575, 3}]}}}
     end
   end
 

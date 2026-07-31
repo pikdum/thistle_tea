@@ -42,6 +42,23 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
       end
     end
 
+    test "forced reaction changes update the client and request friendly attack cancellation" do
+      character = %Character{
+        object: %Object{guid: Guid.from_low_guid(:player, unique_guid())},
+        unit: %Unit{},
+        player: %Player{},
+        internal: %Internal{}
+      }
+
+      effect = Effects.forced_reactions_changed([{575, 4}], [575])
+
+      assert ^character = EventSink.emit(character, effect, Context.new(self()))
+
+      assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgSetForcedReactions{reactions: [{575, 4}]}}}
+
+      assert_receive {:stop_attack_factions, [575]}
+    end
+
     test "attacker_gained increments the target's attacker count", %{mob: mob, target_guid: target_guid} do
       assert ^mob = EventSink.emit(mob, Effects.attacker_gained(target_guid))
       assert Metadata.query(target_guid, [:attacker_count]) == %{attacker_count: 1}

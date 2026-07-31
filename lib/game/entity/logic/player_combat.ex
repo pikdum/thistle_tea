@@ -37,6 +37,21 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombat do
 
   def mark_initiated(character, now), do: mark_attacked(character, now)
 
+  def stop_attack(%Character{object: %{guid: guid}, unit: %Unit{} = unit, internal: %Internal{} = internal} = character) do
+    {character, auto_repeat_effects} = AutoRepeat.cancel(character)
+    blackboard = internal.blackboard |> Blackboard.ensure() |> Blackboard.clear_auto_attack()
+
+    character = %{
+      character
+      | unit: %{unit | target: 0},
+        internal: %{character.internal | blackboard: blackboard}
+    }
+
+    {character, auto_repeat_effects ++ attack_stop_effects(guid, unit.target)}
+  end
+
+  def stop_attack(character), do: {character, []}
+
   def disengage(%Character{object: %{guid: guid}} = character) do
     {character, auto_repeat_effects} = AutoRepeat.cancel(character)
     %Character{unit: %Unit{} = unit, internal: %Internal{} = internal} = character

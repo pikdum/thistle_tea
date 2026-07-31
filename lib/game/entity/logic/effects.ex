@@ -567,6 +567,14 @@ defmodule ThistleTea.Game.Entity.Logic.Effects do
     %Effects.ReputationChange{faction_id: faction_id, value: value}
   end
 
+  def forced_reactions_changed(reactions, friendly_faction_ids)
+      when is_list(reactions) and is_list(friendly_faction_ids) do
+    %Effects.ForcedReactionsChanged{
+      reactions: reactions,
+      friendly_faction_ids: friendly_faction_ids
+    }
+  end
+
   def set_facing({:angle, angle} = facing) when is_number(angle) do
     %Effects.SetFacing{facing: facing}
   end

@@ -36,6 +36,26 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombatTest do
     end
   end
 
+  describe "stop_attack/1" do
+    test "clears melee and ranged auto attacks without leaving combat" do
+      target_guid = Guid.from_low_guid(:mob, 1, unique_guid())
+
+      character =
+        character(in_combat: true, target: target_guid)
+        |> then(fn character ->
+          %{character | internal: %{character.internal | auto_shot: %{target_guid: target_guid}}}
+        end)
+
+      {character, effects} = PlayerCombat.stop_attack(character)
+
+      assert character.internal.in_combat
+      assert character.unit.target == 0
+      assert character.internal.auto_shot == nil
+      assert Enum.any?(effects, &is_struct(&1, Effects.CancelAutoRepeat))
+      assert Enum.any?(effects, &match?(%Effects.AttackStop{target_guid: ^target_guid}, &1))
+    end
+  end
+
   describe "gain_threat_ref/3 and lose_threat_ref/3" do
     test "gaining a ref enters combat and records the mob" do
       character = PlayerCombat.gain_threat_ref(character(), 100, 1)

@@ -487,6 +487,13 @@ defmodule ThistleTea.Game.World.Loader.SpellVmangosTest do
     end
   end
 
+  describe "reputation spell parsing" do
+    test "loads force-reaction aura faction and rank data" do
+      assert %Effect{aura: :force_reaction, misc_value: 575, base_points: 3} =
+               Enum.find(SpellLoader.load(6405).effects, &(&1.aura == :force_reaction))
+    end
+  end
+
   defp modifier_holder(%Spell{} = spell) do
     effect = Enum.find(spell.effects, &(&1.aura in [:add_flat_modifier, :add_pct_modifier]))
 

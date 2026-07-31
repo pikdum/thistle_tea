@@ -23,6 +23,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Transition do
   alias ThistleTea.Game.Entity.Logic.Companion
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Logic.Reputation, as: ReputationLogic
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Cooldowns
 
@@ -72,14 +73,64 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Transition do
     {entity, movement_events} = MovementSync.sync_movement_state(entity, now)
     viewpoint_events = ViewpointSync.events(previous, holders, entity_guid(entity))
     release_events = release_controlled_events(entity, removed)
+    forced_reaction_events = forced_reaction_events(entity, previous, holders)
 
     events =
       modifier_events ++
         application_events ++
         cooldown_events ++
-        script_events ++ control_events ++ viewpoint_events ++ release_events ++ movement_events
+        script_events ++
+        control_events ++
+        viewpoint_events ++ release_events ++ movement_events ++ forced_reaction_events
 
     {Core.mark_broadcast_update(entity), events}
+  end
+
+  defp forced_reaction_events(%Character{} = character, previous, current) do
+    previous_reactions = forced_reactions(previous)
+    current_reactions = forced_reactions(current)
+
+    if previous_reactions == current_reactions do
+      []
+    else
+      changed_factions =
+        previous_reactions
+        |> Map.keys()
+        |> Kernel.++(Map.keys(current_reactions))
+        |> Enum.uniq()
+        |> Enum.filter(&(Map.get(previous_reactions, &1) != Map.get(current_reactions, &1)))
+
+      friendly_faction_ids =
+        Enum.filter(changed_factions, &friendly_reaction?(character, current_reactions, &1))
+
+      reactions = current_reactions |> Enum.sort() |> Enum.to_list()
+      [Effects.forced_reactions_changed(reactions, friendly_faction_ids)]
+    end
+  end
+
+  defp forced_reaction_events(_entity, _previous, _current), do: []
+
+  defp forced_reactions(holders) do
+    holders
+    |> Enum.flat_map(fn %Holder{auras: auras} -> auras end)
+    |> Enum.reduce(%{}, fn
+      %Aura{type: :force_reaction, misc_value: faction_id, amount: rank}, reactions
+      when is_integer(faction_id) and faction_id > 0 and is_integer(rank) and rank in 0..7 ->
+        Map.put(reactions, faction_id, rank)
+
+      _aura, reactions ->
+        reactions
+    end)
+  end
+
+  defp friendly_reaction?(character, current_reactions, faction_id) do
+    rank =
+      case Map.fetch(current_reactions, faction_id) do
+        {:ok, forced_rank} -> forced_rank
+        :error -> character.player.reputation.ranks |> Map.get(faction_id) |> ReputationLogic.rank_value()
+      end
+
+    is_integer(rank) and rank >= ReputationLogic.rank_value(:friendly)
   end
 
   defp put_holders(%{unit: %Unit{} = unit} = entity, holders) do

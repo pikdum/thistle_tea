@@ -663,6 +663,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp aura_type(136), do: :mod_healing_done_percent
   defp aura_type(137), do: :mod_total_stat_percent
   defp aura_type(138), do: :mod_melee_haste
+  defp aura_type(139), do: :force_reaction
   defp aura_type(140), do: :mod_ranged_haste
   defp aura_type(141), do: :mod_ranged_haste
   defp aura_type(142), do: :mod_base_resistance_percent

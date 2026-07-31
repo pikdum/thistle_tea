@@ -132,6 +132,18 @@ defmodule ThistleTea.Game.Entity.EventSink.ClientProjection do
     entity
   end
 
+  def emit(%Character{} = entity, %Effects.ForcedReactionsChanged{} = effect, context) do
+    Context.send_packet(context, %Message.SmsgSetForcedReactions{reactions: effect.reactions})
+
+    if effect.friendly_faction_ids != [] do
+      Context.send(context, {:stop_attack_factions, effect.friendly_faction_ids})
+    end
+
+    entity
+  end
+
+  def emit(entity, %Effects.ForcedReactionsChanged{}, _context), do: entity
+
   def emit(%Character{} = entity, %Effects.ReputationChange{} = effect, context) do
     Context.send(context, {:reputation_change, effect.faction_id, effect.value})
     entity
