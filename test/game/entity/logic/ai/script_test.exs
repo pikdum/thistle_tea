@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.Entity.Logic.AI.ScriptTest do
   use ExUnit.Case, async: true
 
+  alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.GameObject, as: GameObjectComponent
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
@@ -20,6 +21,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.ScriptTest do
   alias ThistleTea.Game.Entity.Logic.AI.Script
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.Cast
   alias ThistleTea.Game.WorldRef
 
   setup [:mob]
@@ -710,6 +713,114 @@ defmodule ThistleTea.Game.Entity.Logic.AI.ScriptTest do
 
       assert {^mob, ^blackboard} =
                Script.run(mob, blackboard, [%ScriptStep{command: :movement, datalong: 1}], nil, 1_000)
+    end
+
+    test "interrupt_casts cancels the selected active spell", %{mob: mob} do
+      casting = %Cast{spell: %Spell{id: 22_313}, channel_ms: 0}
+      mob = %{mob | internal: %{mob.internal | casting: casting}}
+
+      {mob, _blackboard} =
+        Script.run(mob, Blackboard.new(), [%ScriptStep{command: :interrupt_casts, datalong2: 22_313}], nil, 1_000)
+
+      assert mob.internal.casting == nil
+    end
+
+    test "interrupt_casts preserves a different active spell", %{mob: mob} do
+      casting = %Cast{spell: %Spell{id: 22_313}, channel_ms: 0}
+      mob = %{mob | internal: %{mob.internal | casting: casting}}
+
+      {mob, _blackboard} =
+        Script.run(mob, Blackboard.new(), [%ScriptStep{command: :interrupt_casts, datalong2: 1}], nil, 1_000)
+
+      assert mob.internal.casting == casting
+    end
+
+    test "set_home_position supports current, provided, and default homes", %{mob: mob} do
+      original = %MovementBlock{position: {1.0, 2.0, 3.0, 0.5}}
+      spawn = %Spawn{movement_block: original, position: {1.0, 2.0, 3.0}, home_orientation: 0.5}
+
+      mob = %{
+        mob
+        | movement_block: %{mob.movement_block | position: {4.0, 5.0, 6.0, 1.5}},
+          internal: %{mob.internal | spawn: spawn}
+      }
+
+      {mob, blackboard} =
+        Script.run(mob, Blackboard.new(), [%ScriptStep{command: :set_home_position, datalong: 1}], nil, 1_000)
+
+      assert mob.internal.spawn.position == {4.0, 5.0, 6.0}
+      assert mob.internal.spawn.home_orientation == 1.5
+
+      provided = %ScriptStep{command: :set_home_position, datalong: 0, position: {7.0, 8.0, 9.0, 2.5}}
+      {mob, blackboard} = Script.run(mob, blackboard, [provided], nil, 1_000)
+
+      assert mob.internal.spawn.position == {7.0, 8.0, 9.0}
+      assert mob.internal.spawn.home_orientation == 2.5
+
+      {mob, _blackboard} =
+        Script.run(mob, blackboard, [%ScriptStep{command: :set_home_position, datalong: 2}], nil, 1_000)
+
+      assert mob.internal.spawn.position == {1.0, 2.0, 3.0}
+      assert mob.internal.spawn.home_orientation == 0.5
+    end
+
+    test "remove_object requests removal of its script owner", %{mob: mob} do
+      {mob, _blackboard} =
+        Script.run(mob, Blackboard.new(), [%ScriptStep{command: :remove_object}], nil, 1_000)
+
+      assert [%Effects.DespawnEntity{target_guid: guid}] = mob.internal.events
+      assert guid == mob.object.guid
+    end
+
+    test "set_sheath updates the unit field", %{mob: mob} do
+      {mob, _blackboard} =
+        Script.run(mob, Blackboard.new(), [%ScriptStep{command: :set_sheath, datalong: 1}], nil, 1_000)
+
+      assert mob.unit.sheath_state == 1
+      assert mob.internal.broadcast_update?
+    end
+
+    test "combat_stop clears mob combat ownership", %{mob: mob} do
+      target = Guid.from_low_guid(:player, 55)
+
+      mob = %{
+        mob
+        | unit: %{mob.unit | target: target},
+          internal: %{mob.internal | in_combat: true, threat: %{target => 10.0}}
+      }
+
+      {mob, blackboard} =
+        Script.run(mob, Blackboard.new(), [%ScriptStep{command: :combat_stop}], nil, 1_000)
+
+      refute mob.internal.in_combat
+      assert mob.internal.threat == %{}
+      assert mob.unit.target == 0
+      assert blackboard == mob.internal.blackboard
+    end
+
+    test "combat_stop disengages a player from referenced mobs" do
+      player_guid = Guid.from_low_guid(:player, 55)
+      mob_guid = Guid.from_low_guid(:mob, 589, 2)
+
+      character = %Character{
+        object: %Object{guid: player_guid},
+        unit: %Unit{target: mob_guid, flags: 0},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+        internal: %Internal{
+          world: %WorldRef{map_id: 0},
+          in_combat: true,
+          threat_refs: MapSet.new([{mob_guid, 1}]),
+          blackboard: Blackboard.new()
+        }
+      }
+
+      {character, _blackboard} =
+        Script.run(character, Blackboard.new(), [%ScriptStep{command: :combat_stop}], mob_guid, 1_000)
+
+      refute character.internal.in_combat
+      assert character.internal.threat_refs == MapSet.new()
+      assert character.unit.target == 0
+      assert Enum.any?(character.internal.events, &is_struct(&1, Effects.DropThreat))
     end
 
     test "delayed steps are deferred through a script_steps event", %{mob: mob} do

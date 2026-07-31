@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal.Spawn do
     :unit,
     :movement_block,
     :position,
+    :home_orientation,
     :distance,
     :movement_type,
     :waypoint_route,

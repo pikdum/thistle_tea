@@ -76,12 +76,17 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStepTest do
       assert ScriptStep.build(row(17)).command == :create_item
       assert ScriptStep.build(row(20)).command == :movement
       assert ScriptStep.build(row(4)).command == :modify_flags
+      assert ScriptStep.build(row(5)).command == :interrupt_casts
       assert ScriptStep.build(row(22)).command == :set_faction
+      assert ScriptStep.build(row(34)).command == :set_home_position
+      assert ScriptStep.build(row(41)).command == :remove_object
+      assert ScriptStep.build(row(51)).command == :set_sheath
       assert ScriptStep.build(row(60)).command == :start_waypoints
       assert ScriptStep.build(row(61)).command == :start_map_event
       assert ScriptStep.build(row(69)).command == :edit_map_event
       assert ScriptStep.build(row(70)).command == :fail_quest
       assert ScriptStep.build(row(71)).command == :respawn_creature
+      assert ScriptStep.build(row(73)).command == :combat_stop
       assert ScriptStep.build(row(74)).command == :add_aura
       assert ScriptStep.build(row(76)).command == :summon_object
       assert ScriptStep.build(row(80)).command == :set_game_object_state

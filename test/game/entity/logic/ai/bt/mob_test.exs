@@ -32,6 +32,26 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
   alias ThistleTea.Game.WorldRef
 
   describe "reached_home" do
+    test "restores a scripted home orientation" do
+      home = {0.0, 0.0, 0.0}
+      spawn = %Spawn{position: home, home_orientation: 1.25}
+
+      blackboard = %Blackboard{
+        navigation: %Blackboard.Navigation{move_target: home}
+      }
+
+      mob =
+        fixture_mob(position: {0.0, 0.0, 0.0, 0.0}, spline_nodes: [])
+        |> then(&%{&1 | internal: %{&1.internal | spawn: spawn}})
+        |> BT.init(MobBT.tree(), blackboard)
+
+      assert {:success, mob} =
+               BehaviorRunner.tick(MobBT.tree(), mob, Context.new(1_000))
+
+      assert mob.movement_block.position == {0.0, 0.0, 0.0, 1.25}
+      assert Enum.any?(mob.internal.events, &is_struct(&1, Effects.SetFacing))
+    end
+
     test "casts a reached_home self spell like Wastewander stealth" do
       victim = Guid.from_low_guid(:player, 998)
       Metadata.put(victim, %{alive?: false})

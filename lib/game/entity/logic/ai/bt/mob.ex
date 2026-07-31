@@ -730,17 +730,26 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   defp restore_spawn_orientation(
          %Mob{
            movement_block: %MovementBlock{position: {x, y, z, current_orientation}} = movement_block,
-           internal: %Internal{
-             spawn: %Spawn{movement_block: %MovementBlock{position: {_spawn_x, _spawn_y, _spawn_z, spawn_orientation}}}
-           }
+           internal: %Internal{spawn: %Spawn{} = spawn}
          } = state
-       )
-       when is_number(spawn_orientation) and spawn_orientation != current_orientation do
-    %{state | movement_block: %{movement_block | position: {x, y, z, spawn_orientation}}}
-    |> Effects.enqueue(Effects.set_facing({:angle, spawn_orientation}))
+       ) do
+    case home_orientation(spawn) do
+      orientation when is_number(orientation) and orientation != current_orientation ->
+        %{state | movement_block: %{movement_block | position: {x, y, z, orientation}}}
+        |> Effects.enqueue(Effects.set_facing({:angle, orientation}))
+
+      _orientation ->
+        state
+    end
   end
 
   defp restore_spawn_orientation(%Mob{} = state), do: state
+
+  defp home_orientation(%Spawn{home_orientation: orientation}) when is_number(orientation), do: orientation
+
+  defp home_orientation(%Spawn{movement_block: %MovementBlock{position: {_x, _y, _z, orientation}}}), do: orientation
+
+  defp home_orientation(%Spawn{}), do: nil
 
   defp set_tether_target(
          %Mob{internal: %Internal{spawn: %Spawn{position: {x, y, z}}}} = state,

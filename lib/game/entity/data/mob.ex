@@ -159,6 +159,7 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
           unit: unit,
           movement_block: movement_block,
           position: {c.position_x, c.position_y, c.position_z},
+          home_orientation: c.orientation,
           distance: spawn_distance(c),
           movement_type: c.movement_type,
           waypoint_route: WaypointRoute.build(c),

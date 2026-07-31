@@ -17,6 +17,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
   """
   import Bitwise, only: [&&&: 2, |||: 2, bnot: 1]
 
+  alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.CreatureSpell
   alias ThistleTea.Game.Entity.Data.GameObject
@@ -30,12 +31,16 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells, as: MobSpells
   alias ThistleTea.Game.Entity.Logic.AI.BT.Navigation
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
+  alias ThistleTea.Game.Entity.Logic.Casting
   alias ThistleTea.Game.Entity.Logic.Condition, as: ConditionLogic
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Logic.Engagement
   alias ThistleTea.Game.Entity.Logic.Movement
+  alias ThistleTea.Game.Entity.Logic.PlayerCombat
   alias ThistleTea.Game.Entity.Logic.TemporaryFaction
   alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.Spell.Cast
 
   require Logger
 
@@ -234,6 +239,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
     {state, blackboard}
   end
 
+  defp execute(state, blackboard, %ScriptStep{command: :interrupt_casts} = step, _target, _now, %Context{}) do
+    {interrupt_casts(state, step.datalong2), blackboard}
+  end
+
   defp execute(
          %{object: %{guid: source_guid}} = state,
          blackboard,
@@ -403,6 +412,25 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
 
   defp execute(state, blackboard, %ScriptStep{command: :set_default_movement}, _target_guid, _now, %Context{}) do
     {state, blackboard}
+  end
+
+  defp execute(
+         %Mob{internal: %{spawn: spawn} = internal} = state,
+         blackboard,
+         %ScriptStep{command: :set_home_position} = step,
+         _target_guid,
+         _now,
+         %Context{}
+       )
+       when not is_nil(spawn) do
+    case home_position(state, step) do
+      {x, y, z, orientation} ->
+        spawn = %{spawn | position: {x, y, z}, home_orientation: orientation}
+        {%{state | internal: %{internal | spawn: spawn}}, blackboard}
+
+      nil ->
+        {state, blackboard}
+    end
   end
 
   defp execute(
@@ -591,6 +619,21 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
     {Effects.enqueue(state, Effects.respawn_self(step.datalong != 0)), blackboard}
   end
 
+  defp execute(%{object: %{guid: guid}} = state, blackboard, %ScriptStep{command: :remove_object}, _target, _now)
+       when is_struct(state, Mob) or is_struct(state, GameObject) do
+    {Effects.enqueue(state, Effects.despawn_entity(guid)), blackboard}
+  end
+
+  defp execute(%Mob{} = state, blackboard, %ScriptStep{command: :combat_stop}, _target, _now) do
+    %Engagement.Result{entity: state} = Engagement.leave(state, :script, blackboard: blackboard)
+    {state, state.internal.blackboard}
+  end
+
+  defp execute(%Character{} = state, blackboard, %ScriptStep{command: :combat_stop}, _target, _now) do
+    {state, effects} = PlayerCombat.disengage(state)
+    {Effects.enqueue(state, effects), blackboard}
+  end
+
   defp execute(state, blackboard, %ScriptStep{command: :create_item} = step, target_guid, _now) do
     case script_player_guid(state.object.guid, target_guid) do
       nil ->
@@ -639,6 +682,11 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
 
   defp execute(state, blackboard, %ScriptStep{command: :stand_state} = step, _target_guid, _now) do
     {set_stand_state(state, step.datalong), blackboard}
+  end
+
+  defp execute(%{unit: %Unit{} = unit} = state, blackboard, %ScriptStep{command: :set_sheath} = step, _target, _now) do
+    state = %{state | unit: %{unit | sheath_state: step.datalong}} |> Core.mark_broadcast_update()
+    {state, blackboard}
   end
 
   defp execute(state, blackboard, %ScriptStep{command: :turn_to, position: {_x, _y, _z, o}}, _target_guid, _now) do
@@ -692,6 +740,23 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
       state
     end
   end
+
+  defp interrupt_casts(%{internal: %{casting: nil}} = state, _spell_id), do: state
+
+  defp interrupt_casts(%{internal: %{casting: casting}} = state, spell_id) do
+    if spell_id == 0 or Cast.spell_id(casting) == spell_id, do: Casting.cancel(state), else: state
+  end
+
+  defp interrupt_casts(state, _spell_id), do: state
+
+  defp home_position(%Mob{}, %ScriptStep{datalong: 0, position: position}), do: position
+
+  defp home_position(%Mob{movement_block: %{position: position}}, %ScriptStep{datalong: 1}), do: position
+
+  defp home_position(%Mob{internal: %{spawn: %{movement_block: %{position: position}}}}, %ScriptStep{datalong: 2}),
+    do: position
+
+  defp home_position(%Mob{}, %ScriptStep{}), do: nil
 
   defp talk(state, %{chat_type: chat_type}, _target_guid) when chat_type in [:whisper, :boss_whisper] do
     Logger.debug("Script talk: whisper chat type unsupported, skipping")

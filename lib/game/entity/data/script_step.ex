@@ -162,6 +162,7 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStep do
   defp command(1), do: :emote
   defp command(3), do: :move_to
   defp command(4), do: :modify_flags
+  defp command(5), do: :interrupt_casts
   defp command(7), do: :quest_explored
   defp command(8), do: :kill_credit
   defp command(10), do: :summon_creature
@@ -178,12 +179,15 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStep do
   defp command(26), do: :attack_start
   defp command(28), do: :stand_state
   defp command(30), do: :send_taxi_path
+  defp command(34), do: :set_home_position
   defp command(35), do: :turn_to
   defp command(39), do: :start_script
+  defp command(41), do: :remove_object
   defp command(44), do: :set_phase
   defp command(45), do: :set_phase_random
   defp command(46), do: :set_phase_range
   defp command(47), do: :flee
+  defp command(51), do: :set_sheath
   defp command(60), do: :start_waypoints
   defp command(61), do: :start_map_event
   defp command(62), do: :end_map_event
@@ -196,6 +200,7 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStep do
   defp command(69), do: :edit_map_event
   defp command(70), do: :fail_quest
   defp command(71), do: :respawn_creature
+  defp command(73), do: :combat_stop
   defp command(74), do: :add_aura
   defp command(76), do: :summon_object
   defp command(80), do: :set_game_object_state
