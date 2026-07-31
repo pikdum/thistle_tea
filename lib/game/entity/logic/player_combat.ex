@@ -15,12 +15,15 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombat do
   """
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Data.Reputation
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard.Combat
   alias ThistleTea.Game.Entity.Logic.AutoRepeat
   alias ThistleTea.Game.Entity.Logic.Combat, as: CombatLogic
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Logic.Reputation, as: ReputationLogic
   alias ThistleTea.Game.Entity.Logic.TargetRef
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
@@ -28,14 +31,33 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombat do
 
   @combat_drop_ms 5_000
 
-  def mark_attacked(%Character{internal: %Internal{} = internal} = character, now) when is_integer(now) do
+  def mark_attacked(character, now, faction_id \\ nil)
+
+  def mark_attacked(%Character{internal: %Internal{} = internal} = character, now, faction_id) when is_integer(now) do
     %{character | internal: %{internal | in_combat: true, last_hostile_time: now}}
     |> CombatLogic.sync_combat_flag()
+    |> mark_temporary_at_war(faction_id)
   end
 
-  def mark_attacked(character, _now), do: character
+  def mark_attacked(character, _now, _faction_id), do: character
 
   def mark_initiated(character, now), do: mark_attacked(character, now)
+
+  def mark_temporary_at_war(
+        %Character{player: %Player{reputation: %Reputation{} = reputation} = player} = character,
+        faction_id
+      ) do
+    case ReputationLogic.set_temporary_at_war(reputation, faction_id) do
+      {:ok, reputation, change} ->
+        character = %{character | player: %{player | reputation: reputation}}
+        Effects.enqueue(character, Effects.faction_at_war_changed(change.index, true))
+
+      {:error, :not_allowed} ->
+        character
+    end
+  end
+
+  def mark_temporary_at_war(character, _faction_id), do: character
 
   def stop_attack(%Character{object: %{guid: guid}, unit: %Unit{} = unit, internal: %Internal{} = internal} = character) do
     {character, auto_repeat_effects} = AutoRepeat.cancel(character)
@@ -78,7 +100,8 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombat do
         Enum.map(threat_ref_guids(refs), &Effects.drop_threat/1) ++
         attack_stop_effects(guid, unit.target)
 
-    {character, effects}
+    {character, temporary_war_effects} = clear_temporary_at_war(character)
+    {character, effects ++ temporary_war_effects}
   end
 
   def disengage(character), do: {character, []}
@@ -101,6 +124,8 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombat do
       }
       |> CombatLogic.sync_combat_flag()
 
+    {character, temporary_war_effects} = clear_temporary_at_war(character)
+    character = Effects.enqueue(character, temporary_war_effects)
     {character, threat_ref_guids(refs)}
   end
 
@@ -195,9 +220,22 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombat do
   defp within_drop_window?(_character, _now), do: false
 
   defp clear(%Character{internal: %Internal{} = internal} = character) do
-    %{character | internal: %{internal | in_combat: false}}
-    |> CombatLogic.sync_combat_flag()
+    character =
+      %{character | internal: %{internal | in_combat: false}}
+      |> CombatLogic.sync_combat_flag()
+
+    {character, effects} = clear_temporary_at_war(character)
+    Effects.enqueue(character, effects)
   end
+
+  defp clear_temporary_at_war(%Character{player: %Player{reputation: %Reputation{} = reputation} = player} = character) do
+    {reputation, changes} = ReputationLogic.clear_temporary_at_war(reputation)
+    character = %{character | player: %{player | reputation: reputation}}
+    effects = Enum.map(changes, &Effects.faction_at_war_changed(&1.index, false))
+    {character, effects}
+  end
+
+  defp clear_temporary_at_war(character), do: {character, []}
 
   defp auto_attacking_target?(%Character{} = character, %Blackboard{
          combat: %Combat{auto_attacking: true, auto_attack_target: %TargetRef{} = target}

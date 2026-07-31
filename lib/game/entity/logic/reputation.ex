@@ -206,6 +206,43 @@ defmodule ThistleTea.Game.Entity.Logic.Reputation do
     end
   end
 
+  def set_temporary_at_war(%Reputation{} = reputation, faction_id) when is_integer(faction_id) do
+    with %State{} = state <- state(reputation, faction_id),
+         false <- at_war?(reputation, faction_id),
+         true <- temporary_war_allowed?(reputation, state) do
+      updated = %{state | flags: put_flag(state.flags, @at_war, true)}
+
+      reputation = %{
+        reputation
+        | states: Map.put(reputation.states, faction_id, updated),
+          temporary_at_war: MapSet.put(reputation.temporary_at_war, faction_id)
+      }
+
+      {:ok, reputation, change(updated)}
+    else
+      _not_changed -> {:error, :not_allowed}
+    end
+  end
+
+  def set_temporary_at_war(%Reputation{}, _faction_id), do: {:error, :not_allowed}
+
+  def clear_temporary_at_war(%Reputation{} = reputation) do
+    {reputation, changes} =
+      Enum.reduce(reputation.temporary_at_war, {reputation, []}, fn faction_id, {reputation, changes} ->
+        state = state(reputation, faction_id)
+        rank = Map.get(reputation.ranks, faction_id)
+
+        if state && at_war?(reputation, faction_id) && rank not in [:hated, :hostile] do
+          updated = %{state | flags: put_flag(state.flags, @at_war, false)}
+          {put_state(reputation, updated), changes ++ [change(updated)]}
+        else
+          {reputation, changes}
+        end
+      end)
+
+    {%{reputation | temporary_at_war: MapSet.new()}, changes}
+  end
+
   def at_war?(%Reputation{} = reputation, faction_id) do
     case state(reputation, faction_id) do
       %State{flags: flags} -> flag?(flags, @at_war)
@@ -268,9 +305,15 @@ defmodule ThistleTea.Game.Entity.Logic.Reputation do
   end
 
   defp war_change_allowed?(%State{flags: flags} = state, definition, enabled, context) do
-    not flag?(flags, @hidden ||| @invisible_forced) and
+    flag?(flags, @at_war) != enabled and
+      not flag?(flags, @hidden ||| @invisible_forced) and
       not (enabled and flag?(flags, @peace_forced) and
              rank(total_standing(state, definition, context)) != :hated)
+  end
+
+  defp temporary_war_allowed?(%Reputation{} = reputation, %State{flags: flags, faction_id: faction_id}) do
+    not flag?(flags, @hidden ||| @invisible_forced) and
+      not (flag?(flags, @peace_forced) and Map.get(reputation.ranks, faction_id) != :hated)
   end
 
   defp inactive_change_allowed?(%State{flags: flags}, true) do

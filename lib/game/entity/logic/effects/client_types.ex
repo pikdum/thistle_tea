@@ -17,6 +17,7 @@ defmodule ThistleTea.Game.Entity.Logic.Effects.ClientTypes do
     {:SendTaxiPath, [:target_guid, :path_id], []},
     {:PlaySound, [:sound_id], []},
     {:PlayObjectSound, [:sound_id], []},
+    {:FactionAtWarChanged, [:index, :enabled], []},
     {:ForcedReactionsChanged, [:reactions, :friendly_faction_ids], []},
     {:ReputationChange, [:faction_id, :value], []}
   ]

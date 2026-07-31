@@ -59,6 +59,20 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
       assert_receive {:stop_attack_factions, [575]}
     end
 
+    test "temporary at-war changes update the client" do
+      character = %Character{
+        object: %Object{guid: Guid.from_low_guid(:player, unique_guid())},
+        unit: %Unit{},
+        player: %Player{},
+        internal: %Internal{}
+      }
+
+      assert ^character =
+               EventSink.emit(character, Effects.faction_at_war_changed(13, true), Context.new(self()))
+
+      assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgSetFactionAtwar{index: 13, enabled: true}}}
+    end
+
     test "attacker_gained increments the target's attacker count", %{mob: mob, target_guid: target_guid} do
       assert ^mob = EventSink.emit(mob, Effects.attacker_gained(target_guid))
       assert Metadata.query(target_guid, [:attacker_count]) == %{attacker_count: 1}

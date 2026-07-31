@@ -1,7 +1,7 @@
 defmodule ThistleTea.Game.Entity.Data.Reputation do
   @moduledoc false
 
-  defstruct states: %{}, ranks: %{}
+  defstruct states: %{}, ranks: %{}, temporary_at_war: MapSet.new()
 end
 
 defmodule ThistleTea.Game.Entity.Data.Reputation.Catalog do

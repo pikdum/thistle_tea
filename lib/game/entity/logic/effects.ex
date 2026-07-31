@@ -575,6 +575,10 @@ defmodule ThistleTea.Game.Entity.Logic.Effects do
     }
   end
 
+  def faction_at_war_changed(index, enabled) when is_integer(index) and is_boolean(enabled) do
+    %Effects.FactionAtWarChanged{index: index, enabled: enabled}
+  end
+
   def set_facing({:angle, angle} = facing) when is_number(angle) do
     %Effects.SetFacing{facing: facing}
   end

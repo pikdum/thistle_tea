@@ -220,7 +220,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
           character
 
         true ->
-          character = PlayerCombat.mark_attacked(character, now)
+          character = PlayerCombat.mark_attacked(character, now, reputation_faction_id(attack.caster))
           {character, events} = Combat.receive_attack(character, attack, now)
           EventSink.emit(character, events)
       end
@@ -309,7 +309,11 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   end
 
   def handle_cast({:threat_ref_gained, mob_guid, incarnation_id}, %{character: %Character{} = character} = state) do
-    character = PlayerCombat.gain_threat_ref(character, mob_guid, incarnation_id)
+    character =
+      character
+      |> PlayerCombat.gain_threat_ref(mob_guid, incarnation_id)
+      |> PlayerCombat.mark_temporary_at_war(reputation_faction_id(mob_guid))
+
     state = TickScheduler.ensure_scheduled(%{state | character: character})
     {:noreply, state, {:continue, :maybe_broadcast_update}}
   end
@@ -341,7 +345,12 @@ defmodule ThistleTea.Game.Entity.Server.Player do
         state
       else
         now = Time.now()
-        character = if harmful?, do: PlayerCombat.mark_attacked(character, now), else: character
+
+        character =
+          if harmful?,
+            do: PlayerCombat.mark_attacked(character, now, reputation_faction_id(caster_guid)),
+            else: character
+
         {character, events} = SpellEffect.receive_outcome(character, caster_guid, spell, outcome, now)
         character = EventSink.emit(character, events)
         state = %{state | character: character}
@@ -1184,7 +1193,13 @@ defmodule ThistleTea.Game.Entity.Server.Player do
     if PlayerCombat.undetectable?(character, now) do
       character
     else
-      character = PlayerCombat.mark_attacked(character, now)
+      character =
+        PlayerCombat.mark_attacked(
+          character,
+          now,
+          caster |> spell_caster_guid() |> reputation_faction_id()
+        )
+
       {character, events} = SpellEffect.receive(character, caster, spell, now)
       EventSink.emit(character, events)
     end

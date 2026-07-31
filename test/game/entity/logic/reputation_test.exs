@@ -196,6 +196,7 @@ defmodule ThistleTea.Game.Entity.Logic.ReputationTest do
       assert {:ok, reputation, change} = Reputation.set_at_war(reputation, catalog, 19, true, context())
       assert Reputation.at_war?(reputation, 72)
       assert Bitwise.band(change.flags, 0x02) != 0
+      assert {:error, :not_allowed} = Reputation.set_at_war(reputation, catalog, 19, true, context())
 
       assert {:ok, reputation, _change} = Reputation.set_at_war(reputation, catalog, 19, false, context())
       refute Reputation.at_war?(reputation, 72)
@@ -212,6 +213,50 @@ defmodule ThistleTea.Game.Entity.Logic.ReputationTest do
 
       assert {:error, :not_allowed} = Reputation.set_at_war(reputation, catalog, 0, true, context())
       assert {:error, :not_allowed} = Reputation.set_at_war(reputation, catalog, 1, true, context())
+    end
+  end
+
+  describe "temporary at-war lifecycle" do
+    test "marks a neutral attacking faction and clears it after combat" do
+      catalog = catalog([definition(529, 13, [variant(flags: 0x01)])])
+      reputation = Reputation.initialize(catalog, @human, @warrior)
+
+      assert {:ok, reputation, change} = Reputation.set_temporary_at_war(reputation, 529)
+      assert change.index == 13
+      assert Reputation.at_war?(reputation, 529)
+      assert reputation.temporary_at_war == MapSet.new([529])
+
+      assert {reputation, [change]} = Reputation.clear_temporary_at_war(reputation)
+      refute Reputation.at_war?(reputation, 529)
+      assert change.index == 13
+      assert reputation.temporary_at_war == MapSet.new()
+    end
+
+    test "keeps a temporarily hostile faction at war when combat ends" do
+      catalog = catalog([definition(529, 13, [variant(flags: 0x01)])])
+      reputation = Reputation.initialize(catalog, @human, @warrior)
+      {:ok, reputation, _change} = Reputation.set_temporary_at_war(reputation, 529)
+      {reputation, _changes} = Reputation.modify(reputation, catalog, 529, -6_000, context())
+
+      assert {reputation, []} = Reputation.clear_temporary_at_war(reputation)
+      assert Reputation.at_war?(reputation, 529)
+      assert reputation.temporary_at_war == MapSet.new()
+    end
+
+    test "does not mark hidden, peace-forced, or already at-war factions as temporary" do
+      catalog =
+        catalog([
+          definition(1, 0, [variant(flags: 0x04)]),
+          definition(2, 1, [variant(flags: 0x10)]),
+          definition(3, 2, [variant(flags: 0x02)])
+        ])
+
+      reputation = Reputation.initialize(catalog, @human, @warrior)
+
+      assert {:error, :not_allowed} = Reputation.set_temporary_at_war(reputation, 1)
+      assert {:error, :not_allowed} = Reputation.set_temporary_at_war(reputation, 2)
+      assert {:error, :not_allowed} = Reputation.set_temporary_at_war(reputation, 3)
+      assert reputation.temporary_at_war == MapSet.new()
     end
   end
 

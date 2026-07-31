@@ -4,7 +4,10 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombatTest do
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Object
+  alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Data.Reputation
+  alias ThistleTea.Game.Entity.Data.Reputation.State
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.PlayerCombat
@@ -23,6 +26,19 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombatTest do
       assert character.internal.in_combat == true
       assert character.internal.last_hostile_time == 1_000
       assert Bitwise.band(character.unit.flags, @unit_flag_in_combat) == @unit_flag_in_combat
+    end
+
+    test "temporarily marks an attacking reputation faction at war" do
+      character = PlayerCombat.mark_attacked(character_with_reputation(), 1_000, 529)
+
+      assert character.internal.in_combat
+      assert character.player.reputation.temporary_at_war == MapSet.new([529])
+      assert Bitwise.band(character.player.reputation.states[529].flags, 0x02) != 0
+
+      assert Enum.any?(
+               character.internal.events,
+               &match?(%Effects.FactionAtWarChanged{index: 13, enabled: true}, &1)
+             )
     end
   end
 
@@ -130,6 +146,20 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombatTest do
 
       assert character.internal.in_combat == false
       assert Bitwise.band(character.unit.flags, @unit_flag_in_combat) == 0
+    end
+
+    test "clears temporary faction war when the combat window lapses" do
+      character = PlayerCombat.mark_attacked(character_with_reputation(), 1_000, 529)
+      {character, _blackboard} = PlayerCombat.sync(character, %Blackboard{}, 7_000)
+
+      refute character.internal.in_combat
+      assert Bitwise.band(character.player.reputation.states[529].flags, 0x02) == 0
+      assert character.player.reputation.temporary_at_war == MapSet.new()
+
+      assert Enum.any?(
+               character.internal.events,
+               &match?(%Effects.FactionAtWarChanged{index: 13, enabled: false}, &1)
+             )
     end
 
     test "drops combat after the window even with a nonzero attacker_count" do
@@ -315,6 +345,17 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombatTest do
         last_hostile_time: Keyword.get(opts, :last_hostile_time)
       }
     }
+  end
+
+  defp character_with_reputation do
+    character = character()
+
+    reputation = %Reputation{
+      states: %{529 => %State{faction_id: 529, index: 13, flags: 0x01}},
+      ranks: %{529 => :neutral}
+    }
+
+    %{character | player: %Player{reputation: reputation}}
   end
 
   defp unique_guid do
