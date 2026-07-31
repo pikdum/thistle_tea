@@ -15,10 +15,11 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
   out-of-combat casts go through the trigger-spell pipeline, in-combat casts
   through the mob casting machinery.
   """
-  import Bitwise, only: [&&&: 2]
+  import Bitwise, only: [&&&: 2, |||: 2, bnot: 1]
 
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.CreatureSpell
+  alias ThistleTea.Game.Entity.Data.GameObject
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Data.ScriptStep
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
@@ -463,6 +464,28 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
     {state, blackboard}
   end
 
+  defp execute(%Mob{} = state, blackboard, %ScriptStep{command: :modify_flags} = step, _target_guid, _now) do
+    state =
+      case step.datalong do
+        46 -> %{state | unit: %{state.unit | flags: modify_flags(state.unit.flags, step)}}
+        147 -> %{state | unit: %{state.unit | npc_flags: modify_flags(state.unit.npc_flags, step)}}
+        _field -> state
+      end
+
+    {Core.mark_broadcast_update(state), blackboard}
+  end
+
+  defp execute(%GameObject{} = state, blackboard, %ScriptStep{command: :modify_flags} = step, _target_guid, _now) do
+    state =
+      if step.datalong == 9 do
+        %{state | game_object: %{state.game_object | flags: modify_flags(state.game_object.flags, step)}}
+      else
+        state
+      end
+
+    {Core.mark_broadcast_update(state), blackboard}
+  end
+
   defp execute(state, blackboard, %ScriptStep{command: :morph} = step, _target_guid, _now) do
     {morph(state, morph_display_id(state, step)), blackboard}
   end
@@ -532,6 +555,14 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
   defp execute(state, blackboard, %ScriptStep{command: {:unsupported, command}} = step, _target_guid, _now) do
     Logger.debug("Script #{step.script_id}: command #{command} unsupported, skipping")
     {state, blackboard}
+  end
+
+  defp modify_flags(value, %ScriptStep{datalong2: flags, datalong3: 1}), do: (value || 0) ||| flags
+  defp modify_flags(value, %ScriptStep{datalong2: flags, datalong3: 2}), do: (value || 0) &&& bnot(flags)
+
+  defp modify_flags(value, %ScriptStep{datalong2: flags}) do
+    value = value || 0
+    if (value &&& flags) == 0, do: value ||| flags, else: value &&& bnot(flags)
   end
 
   defp talk(state, %{chat_type: chat_type}, _target_guid) when chat_type in [:whisper, :boss_whisper] do

@@ -74,7 +74,8 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
   def handle_cast({:start_script, steps, target_guid}, %GameObject{} = state)
       when is_list(steps) and is_integer(target_guid) do
     {state, _blackboard} = Script.run(state, Blackboard.new(), steps, target_guid, Time.now())
-    {:noreply, EventSink.emit_pending(state)}
+    state = state |> EventSink.emit_pending() |> broadcast_if_pending()
+    {:noreply, state}
   rescue
     error ->
       Logger.error("start_script crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
@@ -450,6 +451,13 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
   end
 
   defp spend_charge(state), do: state
+
+  defp broadcast_if_pending(%GameObject{internal: %Internal{broadcast_update?: true} = internal} = state) do
+    Core.update_object(state, :values) |> World.broadcast_packet(state)
+    %{state | internal: %{internal | broadcast_update?: false}}
+  end
+
+  defp broadcast_if_pending(%GameObject{} = state), do: state
 
   defp allowed_user?(%Summon{party_only?: true, owner_guid: owner_guid}, user_guid) when is_integer(owner_guid) do
     user_guid == owner_guid or same_group?(owner_guid, user_guid)

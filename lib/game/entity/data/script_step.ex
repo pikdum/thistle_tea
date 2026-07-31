@@ -161,6 +161,7 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStep do
   defp command(0), do: :talk
   defp command(1), do: :emote
   defp command(3), do: :move_to
+  defp command(4), do: :modify_flags
   defp command(7), do: :quest_explored
   defp command(8), do: :kill_credit
   defp command(10), do: :summon_creature

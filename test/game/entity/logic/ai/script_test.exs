@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.Entity.Logic.AI.ScriptTest do
   use ExUnit.Case, async: true
 
+  alias ThistleTea.Game.Entity.Data.Component.GameObject, as: GameObjectComponent
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
   alias ThistleTea.Game.Entity.Data.Component.Internal.Spawn
@@ -10,6 +11,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.ScriptTest do
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Condition
+  alias ThistleTea.Game.Entity.Data.GameObject, as: GameObjectEntity
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Data.ScriptStep
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
@@ -526,6 +528,34 @@ defmodule ThistleTea.Game.Entity.Logic.AI.ScriptTest do
              ] = mob.internal.events
 
       assert source_guid == mob.object.guid
+    end
+
+    test "modify_flags changes typed unit and npc flag fields", %{mob: mob} do
+      steps = [
+        %ScriptStep{command: :modify_flags, datalong: 46, datalong2: 0x200, datalong3: 1},
+        %ScriptStep{command: :modify_flags, datalong: 147, datalong2: 0x2, datalong3: 2}
+      ]
+
+      mob = %{mob | unit: %{mob.unit | flags: 0x100, npc_flags: 0x3}}
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), steps, nil, 1_000)
+
+      assert mob.unit.flags == 0x300
+      assert mob.unit.npc_flags == 0x1
+      assert mob.internal.broadcast_update?
+    end
+
+    test "modify_flags changes game object interaction flags" do
+      game_object = %GameObjectEntity{
+        object: %Object{guid: Guid.from_low_guid(:game_object, 1, 1)},
+        game_object: %GameObjectComponent{flags: 0x10},
+        internal: %Internal{}
+      }
+
+      step = %ScriptStep{command: :modify_flags, datalong: 9, datalong2: 0x10, datalong3: 2}
+      {game_object, _blackboard} = Script.run(game_object, Blackboard.new(), [step], nil, 1_000)
+
+      assert game_object.game_object.flags == 0
+      assert game_object.internal.broadcast_update?
     end
 
     test "set_default_movement updates the spawn movement policy", %{mob: mob} do
