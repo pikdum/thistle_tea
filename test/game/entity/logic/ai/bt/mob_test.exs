@@ -107,7 +107,12 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
           world: %WorldRef{map_id: 0},
           in_combat: true,
           creature: %Creature{ai_events: [event]},
-          spawn: %Spawn{position: {0.0, 0.0, 0.0}, movement_type: 1, distance: 5.0},
+          spawn: %Spawn{
+            movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 2.5}},
+            position: {0.0, 0.0, 0.0},
+            movement_type: 1,
+            distance: 5.0
+          },
           spellbook: %{}
         }
       }
@@ -128,6 +133,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
         end)
 
       assert Enum.any?(mob.internal.events, &(is_struct(&1, Effects.MonsterTalk) and &1.text == "Home again."))
+      assert mob.movement_block.position == {0.0, 0.0, 0.0, 2.5}
+      assert Enum.any?(mob.internal.events, &match?(%Effects.SetFacing{facing: {:angle, 2.5}}, &1))
     end
   end
 
@@ -154,6 +161,33 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
       assert mob.unit.target == 0
       refute mob.internal.blackboard.combat.auto_attacking
       assert Enum.any?(mob.internal.events, &is_struct(&1, Effects.AttackStop))
+    end
+
+    test "restores spawn orientation after the last hostile reference is removed at home" do
+      target = player_guid()
+
+      mob =
+        fixture_mob(position: {0.0, 0.0, 0.0, 1.0})
+        |> BT.init(MobBT.tree())
+
+      unit = %{mob.unit | target: target, health: 40, max_health: 100, auras: []}
+
+      internal = %{
+        mob.internal
+        | in_combat: true,
+          threat: %{target => 100.0},
+          spawn: %Spawn{
+            movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 2.5}},
+            position: {0.0, 0.0, 0.0}
+          },
+          blackboard: %Blackboard{combat: %Blackboard.Combat{auto_attacking: true}}
+      }
+
+      mob = MobBT.drop_threat(%{mob | unit: unit, internal: internal}, target)
+      {_status, mob} = BehaviorRunner.tick(mob.internal.behavior_tree, mob, AIEnvironment.context(mob, Time.now()))
+
+      assert mob.movement_block.position == {0.0, 0.0, 0.0, 2.5}
+      assert Enum.any?(mob.internal.events, &match?(%Effects.SetFacing{facing: {:angle, 2.5}}, &1))
     end
 
     @tag :namigator_maps

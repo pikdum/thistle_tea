@@ -697,10 +697,26 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
       delay_ms = Movement.next_spatial_update_delay(state, now)
       {BT.running(delay_ms, :movement), state, blackboard}
     else
+      state = restore_spawn_orientation(state)
       {state, blackboard} = EventAI.on_reached_home(state, blackboard, now, context)
       {:success, state, Blackboard.clear_move_target(blackboard)}
     end
   end
+
+  defp restore_spawn_orientation(
+         %Mob{
+           movement_block: %MovementBlock{position: {x, y, z, current_orientation}} = movement_block,
+           internal: %Internal{
+             spawn: %Spawn{movement_block: %MovementBlock{position: {_spawn_x, _spawn_y, _spawn_z, spawn_orientation}}}
+           }
+         } = state
+       )
+       when is_number(spawn_orientation) and spawn_orientation != current_orientation do
+    %{state | movement_block: %{movement_block | position: {x, y, z, spawn_orientation}}}
+    |> Effects.enqueue(Effects.set_facing({:angle, spawn_orientation}))
+  end
+
+  defp restore_spawn_orientation(%Mob{} = state), do: state
 
   defp set_tether_target(
          %Mob{internal: %Internal{spawn: %Spawn{position: {x, y, z}}}} = state,
