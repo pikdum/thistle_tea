@@ -608,6 +608,14 @@ defmodule ThistleTea.Game.Entity.Logic.AI.ScriptTest do
       assert [%Effects.GameObjectCustomAnimation{animation: 1}] = game_object.internal.events
     end
 
+    test "add_aura uses the trigger spell pipeline", %{mob: mob} do
+      step = %ScriptStep{command: :add_aura, datalong: 11_048}
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], nil, 1_000)
+
+      guid = mob.object.guid
+      assert [%Effects.TriggerSpell{source_guid: ^guid, target_guid: ^guid, spell_id: 11_048}] = mob.internal.events
+    end
+
     test "set_default_movement updates the spawn movement policy", %{mob: mob} do
       spawn = %Spawn{distance: 0, movement_type: 0}
       mob = %{mob | internal: %{mob.internal | spawn: spawn}}

@@ -22,6 +22,8 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.Entity.Data.Item, as: DataItem
   alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.Logic.AI.BehaviorRunner
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
+  alias ThistleTea.Game.Entity.Logic.AI.Script
   alias ThistleTea.Game.Entity.Logic.AI.Tick
   alias ThistleTea.Game.Entity.Logic.AttackFeedback
   alias ThistleTea.Game.Entity.Logic.Aura
@@ -160,6 +162,15 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   def handle_cast({:send_packet, message, opts}, state), do: {:noreply, PacketSink.send(state, message, opts)}
 
   def handle_cast({:send_packet, message}, state), do: {:noreply, PacketSink.send(state, message)}
+
+  def handle_cast({:start_script, steps, target_guid}, %State{character: %Character{}} = state)
+      when is_list(steps) and is_integer(target_guid) do
+    {:noreply, run_script(state, steps, target_guid), {:continue, :maybe_broadcast_update}}
+  rescue
+    error ->
+      Logger.error("start_script crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:noreply, state}
+  end
 
   @impl GenServer
   def handle_cast({:mail_delivery, token, mail}, state) do
@@ -637,6 +648,15 @@ defmodule ThistleTea.Game.Entity.Server.Player do
       {:noreply, state}
   end
 
+  def handle_info({:ai_script_steps, steps, target_guid}, %State{character: %Character{}} = state)
+      when is_list(steps) and is_integer(target_guid) do
+    {:noreply, run_script(state, steps, target_guid), {:continue, :maybe_broadcast_update}}
+  rescue
+    error ->
+      Logger.error("ai_script_steps crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:noreply, state}
+  end
+
   def handle_info({:mail_delivery_ready, deliver_at}, state) do
     {:noreply, Mail.delivery_ready(state, deliver_at)}
   rescue
@@ -969,6 +989,13 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   end
 
   def maybe_broadcast_update(state), do: state
+
+  defp run_script(%State{character: %Character{} = character} = state, steps, target_guid) do
+    now = Time.now()
+    context = AIEnvironment.context(character, now)
+    {character, _blackboard} = Script.run(character, Blackboard.new(), steps, target_guid, context)
+    %{state | character: character}
+  end
 
   defp cancel_cast_if_dead(%{character: %Character{internal: %Internal{casting: casting}} = character} = state)
        when not is_nil(casting) do

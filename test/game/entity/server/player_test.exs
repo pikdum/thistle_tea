@@ -12,7 +12,9 @@ defmodule ThistleTea.Game.Entity.Server.PlayerTest do
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Data.ScriptStep
   alias ThistleTea.Game.Entity.Logic.Companion, as: CompanionLogic
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.PlayerCombat
   alias ThistleTea.Game.Entity.Logic.Regen
   alias ThistleTea.Game.Entity.Logic.Rest, as: RestLogic
@@ -107,6 +109,20 @@ defmodule ThistleTea.Game.Entity.Server.PlayerTest do
       assert Entity.pid(guid) == nil
 
       refute_received {:"$gen_cast", {:write_packet, %Packet{opcode: @smsg_logout_complete}}}
+    end
+  end
+
+  describe "handle_cast/2 scripted steps" do
+    test "runs scripts against the owned character" do
+      guid = Guid.from_low_guid(:player, 7)
+      state = %State{guid: guid, character: character(guid, level: 10)}
+      step = %ScriptStep{command: :add_aura, datalong: 22_888}
+
+      assert {:noreply, state, {:continue, :maybe_broadcast_update}} =
+               PlayerServer.handle_cast({:start_script, [step], guid}, state)
+
+      assert [%Effects.TriggerSpell{source_guid: ^guid, target_guid: ^guid, spell_id: 22_888}] =
+               state.character.internal.events
     end
   end
 

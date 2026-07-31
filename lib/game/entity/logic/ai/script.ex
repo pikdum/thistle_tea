@@ -510,6 +510,18 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
     {Effects.enqueue(state, effect), blackboard}
   end
 
+  defp execute(
+         %{object: %{guid: guid}, unit: %Unit{level: level}} = state,
+         blackboard,
+         %ScriptStep{command: :add_aura, datalong: spell_id},
+         _target_guid,
+         _now
+       )
+       when is_integer(spell_id) and spell_id > 0 do
+    effect = Effects.trigger_spell(guid, level || 1, guid, spell_id)
+    {Effects.enqueue(state, effect), blackboard}
+  end
+
   defp execute(state, blackboard, %ScriptStep{command: :morph} = step, _target_guid, _now) do
     {morph(state, morph_display_id(state, step)), blackboard}
   end
@@ -578,6 +590,11 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
 
   defp execute(state, blackboard, %ScriptStep{command: {:unsupported, command}} = step, _target_guid, _now) do
     Logger.debug("Script #{step.script_id}: command #{command} unsupported, skipping")
+    {state, blackboard}
+  end
+
+  defp execute(state, blackboard, %ScriptStep{} = step, _target_guid, _now) do
+    Logger.debug("Script #{step.script_id}: command #{step.command} unsupported for entity, skipping")
     {state, blackboard}
   end
 
