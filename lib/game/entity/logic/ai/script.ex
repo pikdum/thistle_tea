@@ -38,6 +38,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
   alias ThistleTea.Game.Entity.Logic.Engagement
   alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.Entity.Logic.PlayerCombat
+  alias ThistleTea.Game.Entity.Logic.ScriptEquipment
   alias ThistleTea.Game.Entity.Logic.TemporaryFaction
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Spell.Cast
@@ -346,6 +347,31 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
 
   defp execute(state, blackboard, %ScriptStep{command: :interrupt_casts} = step, _target, _now, %Context{}) do
     {interrupt_casts(state, step.datalong2), blackboard}
+  end
+
+  defp execute(
+         %Mob{internal: %{spawn: %{unit: default_unit}}} = state,
+         blackboard,
+         %ScriptStep{command: :set_equipment, datalong: reset_default},
+         _target,
+         _now,
+         %Context{}
+       )
+       when reset_default != 0 do
+    state = %{state | unit: ScriptEquipment.reset(state.unit, default_unit)}
+    {Core.mark_broadcast_update(state), blackboard}
+  end
+
+  defp execute(
+         %Mob{} = state,
+         blackboard,
+         %ScriptStep{command: :set_equipment, datalong: 0, equipment_items: [_, _, _] = items},
+         _target,
+         _now,
+         %Context{}
+       ) do
+    state = %{state | unit: ScriptEquipment.apply(state.unit, items)}
+    {Core.mark_broadcast_update(state), blackboard}
   end
 
   defp execute(

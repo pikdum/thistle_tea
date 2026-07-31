@@ -76,6 +76,7 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStepTest do
       assert ScriptStep.build(row(9)).command == :respawn_game_object
       assert ScriptStep.build(row(13)).command == :activate_object
       assert ScriptStep.build(row(17)).command == :create_item
+      assert ScriptStep.build(row(19)).command == :set_equipment
       assert ScriptStep.build(row(20)).command == :movement
       assert ScriptStep.build(row(4)).command == :modify_flags
       assert ScriptStep.build(row(5)).command == :interrupt_casts

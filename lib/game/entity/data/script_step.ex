@@ -29,6 +29,7 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStep do
             swap_final?: false,
             buddy_guid: nil,
             game_object_spawn: nil,
+            equipment_items: [],
             position: nil,
             condition_id: 0,
             condition: nil,
@@ -178,6 +179,7 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStep do
   defp command(16), do: :play_sound
   defp command(17), do: :create_item
   defp command(18), do: :despawn
+  defp command(19), do: :set_equipment
   defp command(20), do: :movement
   defp command(22), do: :set_faction
   defp command(23), do: :morph

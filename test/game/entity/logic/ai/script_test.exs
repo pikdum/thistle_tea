@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.ScriptTest do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Condition
   alias ThistleTea.Game.Entity.Data.GameObject, as: GameObjectEntity
+  alias ThistleTea.Game.Entity.Data.ItemTemplate
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Data.ScriptStep
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
@@ -861,6 +862,38 @@ defmodule ThistleTea.Game.Entity.Logic.AI.ScriptTest do
 
       assert mob.internal.spawn.position == {1.0, 2.0, 3.0}
       assert mob.internal.spawn.home_orientation == 0.5
+    end
+
+    test "set_equipment applies slot changes and restores spawn defaults", %{mob: mob} do
+      default = %{
+        mob.unit
+        | virtual_item_slot_display: 42,
+          virtual_item_info: <<1::64, 2::64, 3::64>>
+      }
+
+      mob = %{mob | unit: default, internal: %{mob.internal | spawn: %Spawn{unit: default}}}
+
+      item = %ItemTemplate{
+        display_id: 99,
+        class: 2,
+        subclass: 7,
+        material: 1,
+        inventory_type: 13,
+        sheath: 3
+      }
+
+      change = %ScriptStep{command: :set_equipment, equipment_items: [item, nil, :unchanged]}
+      {mob, blackboard} = Script.run(mob, Blackboard.new(), [change], nil, 1_000)
+
+      assert Bitwise.band(mob.unit.virtual_item_slot_display, 0xFFFFFFFF) == 99
+      assert Bitwise.band(Bitwise.bsr(mob.unit.virtual_item_slot_display, 32), 0xFFFFFFFF) == 0
+      assert mob.internal.broadcast_update?
+
+      reset = %ScriptStep{command: :set_equipment, datalong: 1}
+      {mob, _blackboard} = Script.run(mob, blackboard, [reset], nil, 1_000)
+
+      assert mob.unit.virtual_item_slot_display == 42
+      assert mob.unit.virtual_item_info == default.virtual_item_info
     end
 
     test "remove_object requests removal of its script owner", %{mob: mob} do

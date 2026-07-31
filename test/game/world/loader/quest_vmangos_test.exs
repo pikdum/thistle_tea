@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.World.Loader.QuestVmangosTest do
   use ExUnit.Case, async: false
 
+  alias ThistleTea.Game.Entity.Data.ItemTemplate
   alias ThistleTea.Game.Entity.Data.Quest
   alias ThistleTea.Game.Entity.Data.ScriptStep
   alias ThistleTea.Game.Guid
@@ -70,6 +71,17 @@ defmodule ThistleTea.Game.World.Loader.QuestVmangosTest do
 
       assert step.termination_condition.entry == 5_713
       assert step.termination_condition.type == :map_event_active
+    end
+
+    test "preloads scripted equipment item templates" do
+      assert %Quest{complete_script_steps: steps} = QuestLoader.get(112)
+      step = Enum.find(steps, &(&1.command == :set_equipment and &1.delay_ms == 0))
+
+      assert [
+               %ItemTemplate{entry: 3_699},
+               %ItemTemplate{entry: 3_697},
+               :unchanged
+             ] = step.equipment_items
     end
   end
 end
