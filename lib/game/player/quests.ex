@@ -24,6 +24,7 @@ defmodule ThistleTea.Game.Player.Quests do
   alias ThistleTea.Game.Player.Mail
   alias ThistleTea.Game.Player.Reputation, as: PlayerReputation
   alias ThistleTea.Game.Player.Stats, as: PlayerStats
+  alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader
@@ -111,7 +112,8 @@ defmodule ThistleTea.Game.Player.Quests do
 
   def force_accept(%{character: %Character{player: player}} = state, quest_id) do
     with %Quest{} = quest <- QuestLoader.get(quest_id),
-         {:ok, quest_log} <- QuestLog.add(player.quest_log, quest_id),
+         {:ok, quest_log} <-
+           QuestLog.add(player.quest_log, quest, Time.now(), System.system_time(:second)),
          {:ok, state} <- grant_source_item(state, quest) do
       {quest_log, event} =
         QuestLog.evaluate(
@@ -129,11 +131,14 @@ defmodule ThistleTea.Game.Player.Quests do
       character = %{character | player: %{character.player | quest_log: quest_log}}
       state = put_character(state, character)
 
-      if quest.reputation_objective_faction > 0 do
-        PlayerReputation.set_visible(state, quest.reputation_objective_faction)
-      else
-        state
-      end
+      state =
+        if quest.reputation_objective_faction > 0 do
+          PlayerReputation.set_visible(state, quest.reputation_objective_faction)
+        else
+          state
+        end
+
+      schedule_timer(state, quest.id)
     else
       {:error, :log_full} ->
         Network.send_packet(%Message.SmsgQuestlogFull{})
@@ -144,6 +149,44 @@ defmodule ThistleTea.Game.Player.Quests do
         state
 
       _other ->
+        state
+    end
+  end
+
+  def restore_timers(%{character: %Character{player: player}} = state) do
+    Enum.reduce(QuestLog.timed_entries(player.quest_log), state, fn entry, state ->
+      schedule_timer(state, entry.quest_id)
+    end)
+  end
+
+  def expire_timed(%{character: %Character{player: player} = character} = state, quest_id, expected_expires_at) do
+    case QuestLog.get(player.quest_log, quest_id) do
+      %Entry{expires_at_ms: ^expected_expires_at} ->
+        case QuestLog.fail_timed(player.quest_log, quest_id, Time.now()) do
+          {:ok, quest_log} ->
+            Network.send_packet(%Message.SmsgQuestupdateFailedtimer{quest_id: quest_id})
+            put_character(state, %{character | player: %{player | quest_log: quest_log}})
+
+          {:error, :not_expired} ->
+            schedule_timer(state, quest_id)
+
+          _error ->
+            state
+        end
+
+      _stale ->
+        state
+    end
+  end
+
+  defp schedule_timer(%{character: %Character{player: player}} = state, quest_id) do
+    case QuestLog.get(player.quest_log, quest_id) do
+      %Entry{expires_at_ms: expires_at_ms} when is_integer(expires_at_ms) ->
+        delay_ms = max(expires_at_ms - Time.now(), 0)
+        Process.send_after(self(), {:quest_timer_expired, quest_id, expires_at_ms}, delay_ms)
+        state
+
+      _entry ->
         state
     end
   end

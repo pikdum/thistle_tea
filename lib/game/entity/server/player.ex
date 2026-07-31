@@ -870,6 +870,10 @@ defmodule ThistleTea.Game.Entity.Server.Player do
     {:noreply, Quests.credit_event(state, quest_id)}
   end
 
+  def handle_info({:quest_timer_expired, quest_id, expires_at_ms}, %State{} = state) do
+    {:noreply, Quests.expire_timed(state, quest_id, expires_at_ms)}
+  end
+
   def handle_info({:stop_attack_factions, faction_ids}, %State{character: %Character{} = character} = state)
       when is_list(faction_ids) do
     if PlayerReputation.faction_id(character.unit.target) in faction_ids do

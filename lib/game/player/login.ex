@@ -155,6 +155,7 @@ defmodule ThistleTea.Game.Player.Login do
     state
     |> schedule_aura_tick()
     |> Mail.schedule_delivery()
+    |> Quests.restore_timers()
   end
 
   def restore_companion(

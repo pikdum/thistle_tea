@@ -42,6 +42,50 @@ defmodule ThistleTea.Game.Entity.Logic.QuestLogTest do
     end
   end
 
+  describe "add/4" do
+    test "records monotonic and client deadlines for timed quests" do
+      quest = %Quest{id: 33, limit_time: 600}
+
+      {:ok, quest_log} = QuestLog.add(%{}, quest, 10_000, 1_700_000_000)
+
+      assert %Entry{
+               expires_at_ms: 610_000,
+               client_expires_at: 1_700_000_600
+             } = QuestLog.get(quest_log, quest.id)
+
+      assert <<33::little-size(32), 0::little-size(32), 1_700_000_600::little-size(32)>> =
+               QuestLog.slot_binary(QuestLog.get(quest_log, quest.id))
+    end
+
+    test "leaves ordinary quests without deadlines" do
+      {:ok, quest_log} = QuestLog.add(%{}, %Quest{id: 33}, 10_000, 1_700_000_000)
+
+      assert %Entry{expires_at_ms: nil, client_expires_at: nil} = QuestLog.get(quest_log, 33)
+    end
+  end
+
+  describe "fail_timed/3" do
+    test "fails active quests at their deadline" do
+      {:ok, quest_log} = QuestLog.add(%{}, %Quest{id: 33, limit_time: 60}, 10_000, 1_700_000_000)
+
+      assert QuestLog.fail_timed(quest_log, 33, 69_999) == {:error, :not_expired}
+      assert {:ok, quest_log} = QuestLog.fail_timed(quest_log, 33, 70_000)
+
+      assert %Entry{
+               status: :failed,
+               expires_at_ms: nil,
+               client_expires_at: 1
+             } = QuestLog.get(quest_log, 33)
+    end
+
+    test "recognizes the active timer" do
+      refute QuestLog.timed?(%{})
+      {:ok, quest_log} = QuestLog.add(%{}, %Quest{id: 33, limit_time: 60}, 10_000, 1_700_000_000)
+      assert QuestLog.timed?(quest_log)
+      assert [%Entry{quest_id: 33}] = QuestLog.timed_entries(quest_log)
+    end
+  end
+
   describe "remove/2" do
     test "leaves an empty tombstone" do
       {:ok, quest_log} = QuestLog.add(%{}, 33)
@@ -284,6 +328,13 @@ defmodule ThistleTea.Game.Entity.Logic.QuestLogTest do
                QuestLog.slot_binary(complete)
 
       assert <<33::little-size(32), 0, 0, 0, 2, 0::little-size(32)>> =
+               QuestLog.slot_binary(failed)
+    end
+
+    test "failed timed quest leaves the timer sentinel" do
+      failed = %Entry{quest_id: 33, status: :failed, client_expires_at: 1}
+
+      assert <<33::little-size(32), 0, 0, 0, 2, 1::little-size(32)>> =
                QuestLog.slot_binary(failed)
     end
   end

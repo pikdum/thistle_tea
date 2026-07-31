@@ -16,7 +16,7 @@ defmodule ThistleTea.Game.Entity.Logic.QuestLog do
 
   defmodule Entry do
     @moduledoc false
-    defstruct [:quest_id, status: :incomplete, counts: %{}, explored?: false]
+    defstruct [:quest_id, :expires_at_ms, :client_expires_at, status: :incomplete, counts: %{}, explored?: false]
   end
 
   def max_slots, do: @max_slots
@@ -132,6 +132,47 @@ defmodule ThistleTea.Game.Entity.Logic.QuestLog do
     end
   end
 
+  def add(quest_log, %Quest{limit_time: limit_time} = quest, now_ms, unix_seconds)
+      when limit_time > 0 and is_integer(now_ms) and is_integer(unix_seconds) do
+    with {:ok, quest_log} <- add(quest_log, quest.id) do
+      update(quest_log, quest.id, fn entry ->
+        %{
+          entry
+          | expires_at_ms: now_ms + limit_time * 1_000,
+            client_expires_at: unix_seconds + limit_time
+        }
+      end)
+    end
+  end
+
+  def add(quest_log, %Quest{} = quest, now_ms, unix_seconds) when is_integer(now_ms) and is_integer(unix_seconds) do
+    add(quest_log, quest.id)
+  end
+
+  def fail_timed(quest_log, quest_id, now_ms) when is_integer(now_ms) do
+    case get(quest_log, quest_id) do
+      %Entry{status: status, expires_at_ms: expires_at_ms}
+      when status in [:incomplete, :complete] and is_integer(expires_at_ms) and expires_at_ms <= now_ms ->
+        update(quest_log, quest_id, fn entry ->
+          %{entry | status: :failed, expires_at_ms: nil, client_expires_at: 1}
+        end)
+
+      %Entry{} ->
+        {:error, :not_expired}
+
+      nil ->
+        {:error, :not_active}
+    end
+  end
+
+  def timed?(quest_log) do
+    Enum.any?(active_entries(quest_log), &is_integer(&1.expires_at_ms))
+  end
+
+  def timed_entries(quest_log) do
+    Enum.filter(active_entries(quest_log), &is_integer(&1.expires_at_ms))
+  end
+
   def remove(quest_log, quest_id) do
     case find(quest_log, quest_id) do
       {slot, %Entry{}} -> {:ok, Map.put(quest_log, slot, :empty)}
@@ -176,13 +217,13 @@ defmodule ThistleTea.Game.Entity.Logic.QuestLog do
   def slot_binary(nil), do: nil
   def slot_binary(:empty), do: <<0::size(96)>>
 
-  def slot_binary(%Entry{quest_id: quest_id, status: status, counts: counts}) do
+  def slot_binary(%Entry{quest_id: quest_id, status: status, counts: counts, client_expires_at: client_expires_at}) do
     counter_word =
       Enum.reduce(counts, @status_bytes[status] <<< 24, fn {index, count}, acc ->
         acc ||| min(count, @max_counter) <<< (6 * index)
       end)
 
-    <<quest_id::little-size(32), counter_word::little-size(32), 0::little-size(32)>>
+    <<quest_id::little-size(32), counter_word::little-size(32), client_expires_at || 0::little-size(32)>>
   end
 
   defp free_slot(quest_log) do

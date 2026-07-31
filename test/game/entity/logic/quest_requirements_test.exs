@@ -35,9 +35,14 @@ defmodule ThistleTea.Game.Entity.Logic.QuestRequirementsTest do
       assert QuestRequirements.can_take(%Quest{id: 1, special_flags: 1}, context) == :ok
     end
 
-    test "rejects timed quests" do
-      assert QuestRequirements.can_take(%Quest{id: 1, limit_time: 600}, ctx()) ==
-               {:error, :timed_unsupported}
+    test "allows one timed quest at a time" do
+      timed = %Quest{id: 1, limit_time: 600}
+      assert QuestRequirements.can_take(timed, ctx()) == :ok
+
+      {:ok, quest_log} = QuestLog.add(%{}, %Quest{id: 2, limit_time: 60}, 10_000, 1_700_000_000)
+
+      assert QuestRequirements.can_take(timed, ctx(quest_log: quest_log)) ==
+               {:error, :timed_quest_active}
     end
 
     test "checks the race mask" do
