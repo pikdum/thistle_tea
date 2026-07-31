@@ -106,7 +106,14 @@ defmodule ThistleTea.Game.Entity.Logic.Hostility do
   end
 
   defp target_metadata(guid) when is_integer(guid) do
-    case Metadata.query(guid, [:alive?, :faction_template, :faction_can_have_reputation?, :unit_flags, :reputation]) do
+    case Metadata.query(guid, [
+           :alive?,
+           :faction_template,
+           :faction_can_have_reputation?,
+           :unit_flags,
+           :reputation,
+           :contested_pvp?
+         ]) do
       nil -> %{guid: guid}
       metadata -> Map.put(metadata, :guid, guid)
     end
@@ -183,12 +190,17 @@ defmodule ThistleTea.Game.Entity.Logic.Hostility do
     with true <- faction_can_have_reputation?(creature),
          faction_id when is_integer(faction_id) <- faction_id(creature),
          entry when is_map(entry) <- reputation_entry(player, faction_id) do
-      case Map.get(entry, :forced_rank) do
-        nil -> {:ok, if(entry.at_war?, do: :hostile, else: :friendly)}
-        rank -> {:ok, rank_reaction(rank)}
-      end
+      {:ok, player_creature_reaction(entry, creature, player)}
     else
       _ -> :none
+    end
+  end
+
+  defp player_creature_reaction(entry, creature, player) do
+    case Map.get(entry, :forced_rank) do
+      nil when entry.at_war? -> :hostile
+      nil -> if contested_guard_reaction?(creature, player), do: :hostile, else: :friendly
+      rank -> rank_reaction(rank)
     end
   end
 
@@ -196,9 +208,47 @@ defmodule ThistleTea.Game.Entity.Logic.Hostility do
     with true <- faction_can_have_reputation?(creature),
          faction_id when is_integer(faction_id) <- faction_id(creature),
          entry when is_map(entry) <- reputation_entry(player, faction_id) do
-      {:ok, rank_reaction(Map.get(entry, :forced_rank, entry.rank))}
+      {:ok, creature_player_reaction(entry, creature, player)}
     else
       _ -> :none
+    end
+  end
+
+  defp creature_player_reaction(entry, creature, player) do
+    if contested_guard_reaction?(creature, player) do
+      :hostile
+    else
+      entry
+      |> creature_player_rank()
+      |> rank_reaction()
+    end
+  end
+
+  defp creature_player_rank(%{forced_rank: forced_rank}), do: forced_rank
+
+  defp creature_player_rank(%{at_war?: true, rank: rank}) when rank in [:friendly, :honored, :revered, :exalted],
+    do: :neutral
+
+  defp creature_player_rank(%{rank: rank}), do: rank
+
+  defp contested_guard_reaction?(creature, player) do
+    creature
+    |> faction_template()
+    |> FactionTemplate.attacks_contested_players?() and contested_pvp?(player)
+  end
+
+  defp contested_pvp?(%{contested_pvp?: contested_pvp?}) when is_boolean(contested_pvp?), do: contested_pvp?
+
+  defp contested_pvp?(entity) do
+    case player_owner_guid(entity) do
+      guid when is_integer(guid) ->
+        case Metadata.query(guid, [:contested_pvp?]) do
+          %{contested_pvp?: contested_pvp?} when is_boolean(contested_pvp?) -> contested_pvp?
+          _metadata -> false
+        end
+
+      _no_player ->
+        false
     end
   end
 

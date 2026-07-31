@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgGossipHello do
   alias ThistleTea.Game.Network.Message.SmsgGossipMessage.QuestItem
   alias ThistleTea.Game.Player.GossipCondition
   alias ThistleTea.Game.Player.Quests
+  alias ThistleTea.Game.Player.Reputation
   alias ThistleTea.Game.World.Loader.Gossip, as: GossipLoader
   alias ThistleTea.Game.World.Loader.Gossip.Menu
   alias ThistleTea.Game.World.Loader.Gossip.Text
@@ -76,7 +77,12 @@ defmodule ThistleTea.Game.Network.Message.CmsgGossipHello do
 
     Enum.filter(options, fn
       %{option_id: ^trainer_option_id} ->
-        GossipLoader.trainer_of?(Guid.entry(npc_guid), unit.class, unit.race)
+        GossipLoader.trainer_of?(
+          Guid.entry(npc_guid),
+          unit.class,
+          unit.race,
+          Reputation.exalted_with?(character, npc_guid)
+        )
 
       %{option_id: ^spirit_healer_option_id} ->
         not Death.alive?(character)
@@ -88,17 +94,21 @@ defmodule ThistleTea.Game.Network.Message.CmsgGossipHello do
 
   @impl ClientMessage
   def handle(%__MODULE__{guid: guid}, %{ready: true, character: %Character{} = c} = state) do
-    quests = quest_items(guid, c)
+    if Reputation.can_interact?(c, guid) do
+      quests = quest_items(guid, c)
 
-    case GossipLoader.menu_for_creature(Guid.entry(guid)) do
-      %Menu{} = menu ->
-        send_menu(guid, menu, quests, state)
+      case GossipLoader.menu_for_creature(Guid.entry(guid)) do
+        %Menu{} = menu ->
+          send_menu(guid, menu, quests, state)
 
-      nil when quests != [] ->
-        send_menu(guid, %Menu{text_id: @default_gossip_text_id, options: []}, quests, state)
+        nil when quests != [] ->
+          send_menu(guid, %Menu{text_id: @default_gossip_text_id, options: []}, quests, state)
 
-      nil ->
-        state
+        nil ->
+          state
+      end
+    else
+      state
     end
   end
 

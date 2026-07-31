@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Player.Gossip do
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Message.CmsgGossipHello
   alias ThistleTea.Game.Network.Message.CmsgTrainerList
+  alias ThistleTea.Game.Player.Reputation
   alias ThistleTea.Game.Player.Taxi
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.Loader.Gossip, as: GossipLoader
@@ -44,10 +45,10 @@ defmodule ThistleTea.Game.Player.Gossip do
     run_taxi_script(state, steps)
   end
 
-  defp dispatch(state, _character, guid, %Option{option_id: option_id}, %{vendor: option_id}) do
+  defp dispatch(state, character, guid, %Option{option_id: option_id}, %{vendor: option_id}) do
     Network.send_packet(%Message.SmsgListInventory{
       vendor_guid: guid,
-      items: VendorLoader.items(Guid.entry(guid))
+      items: Reputation.vendor_items(character, guid, VendorLoader.items(Guid.entry(guid)))
     })
 
     state

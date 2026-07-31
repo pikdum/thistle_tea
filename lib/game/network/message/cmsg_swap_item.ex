@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgSwapItem do
   alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Entity.Logic.Proficiency
   alias ThistleTea.Game.Network.InventoryUpdate
+  alias ThistleTea.Game.Player.Reputation
   alias ThistleTea.Game.World.ItemStore
 
   defstruct [:dst_bag, :dst_slot, :src_bag, :src_slot]
@@ -18,7 +19,8 @@ defmodule ThistleTea.Game.Network.Message.CmsgSwapItem do
       state.guid,
       {message.src_bag, message.src_slot},
       {message.dst_bag, message.dst_slot},
-      &ItemStore.get/1
+      &ItemStore.get/1,
+      validate_item: &Reputation.validate_item_requirement(c, &1)
     )
     |> then(&InventoryUpdate.apply(state, &1))
   end

@@ -138,10 +138,10 @@ defmodule ThistleTea.Game.World.Loader.Gossip do
     :ok
   end
 
-  def trainer_of?(creature_entry, class, race) do
+  def trainer_of?(creature_entry, class, race, exalted? \\ false) do
     case :ets.lookup(__MODULE__, {:trainer, creature_entry}) do
       [{_key, %{type: 0, class: trainer_class}}] -> trainer_class == class
-      [{_key, %{type: 1, race: trainer_race}}] -> trainer_race == race
+      [{_key, %{type: 1, race: trainer_race}}] -> trainer_race == race or exalted?
       [{_key, %{}}] -> true
       _ -> false
     end

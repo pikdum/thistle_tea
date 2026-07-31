@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgTrainerBuySpell do
   alias ThistleTea.Game.Entity.Logic.Skills
   alias ThistleTea.Game.Entity.Logic.Trainer
   alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.Player.Reputation
   alias ThistleTea.Game.Player.Spells
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.Loader.Gossip, as: GossipLoader
@@ -21,12 +22,20 @@ defmodule ThistleTea.Game.Network.Message.CmsgTrainerBuySpell do
       ) do
     entry = Guid.entry(trainer_guid)
 
-    with true <- GossipLoader.trainer_of?(entry, c.unit.class, c.unit.race),
+    with true <- Reputation.can_interact?(c, trainer_guid),
+         true <-
+           GossipLoader.trainer_of?(
+             entry,
+             c.unit.class,
+             c.unit.race,
+             Reputation.exalted_with?(c, trainer_guid)
+           ),
          %TrainerSpell{} = spell <- find_spell(entry, spell_id),
          true <- Trainer.fits_class_race?(spell, c.unit.class, c.unit.race),
          :green <- Trainer.state(spell, c.internal.spells, c.unit.level, c.player.skills),
-         true <- spell.cost <= c.player.coinage do
-      buy(state, c, trainer_guid, spell)
+         price = Reputation.price(c, trainer_guid, spell.cost),
+         true <- price <= c.player.coinage do
+      buy(state, c, trainer_guid, spell, price)
     else
       _ -> state
     end
@@ -49,8 +58,8 @@ defmodule ThistleTea.Game.Network.Message.CmsgTrainerBuySpell do
     |> Enum.find(&(&1.teach_spell_id == teach_spell_id))
   end
 
-  defp buy(state, c, trainer_guid, %TrainerSpell{} = spell) do
-    character = %{c | player: %{c.player | coinage: c.player.coinage - spell.cost}}
+  defp buy(state, c, trainer_guid, %TrainerSpell{} = spell, price) do
+    character = %{c | player: %{c.player | coinage: c.player.coinage - price}}
 
     case Spells.learn(character, [spell.learned_spell_id]) do
       {:ok, character, _events} ->

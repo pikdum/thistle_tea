@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgSwapInvItem do
   alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Entity.Logic.Proficiency
   alias ThistleTea.Game.Network.InventoryUpdate
+  alias ThistleTea.Game.Player.Reputation
   alias ThistleTea.Game.World.ItemStore
 
   defstruct [:src_slot, :dst_slot]
@@ -14,7 +15,9 @@ defmodule ThistleTea.Game.Network.Message.CmsgSwapInvItem do
     bag_0 = Inventory.bag_0()
     prof = Proficiency.from_character(c)
 
-    Inventory.swap(c.player, c.unit, prof, state.guid, {bag_0, src_slot}, {bag_0, dst_slot}, &ItemStore.get/1)
+    Inventory.swap(c.player, c.unit, prof, state.guid, {bag_0, src_slot}, {bag_0, dst_slot}, &ItemStore.get/1,
+      validate_item: &Reputation.validate_item_requirement(c, &1)
+    )
     |> then(&InventoryUpdate.apply(state, &1))
   end
 

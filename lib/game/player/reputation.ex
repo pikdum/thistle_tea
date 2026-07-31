@@ -100,6 +100,100 @@ defmodule ThistleTea.Game.Player.Reputation do
     |> ReputationLogic.rank()
   end
 
+  def faction_id(guid) when is_integer(guid) and guid > 0 do
+    case Metadata.query(guid, [:faction_template]) do
+      %{faction_template: %FactionTemplate{faction: faction_id}} when faction_id > 0 -> faction_id
+      _metadata -> nil
+    end
+  end
+
+  def faction_id(_guid), do: nil
+
+  def can_interact?(%Character{} = character, target_guid) do
+    case faction_id(target_guid) do
+      faction_id when is_integer(faction_id) ->
+        case ReputationLogic.state(character.player.reputation, faction_id) do
+          %State{} ->
+            ReputationLogic.rank_value(rank(character, faction_id)) >
+              ReputationLogic.rank_value(:unfriendly)
+
+          nil ->
+            true
+        end
+
+      _no_faction ->
+        true
+    end
+  end
+
+  def exalted_with?(%Character{} = character, target_guid) do
+    case faction_id(target_guid) do
+      faction_id when is_integer(faction_id) -> rank(character, faction_id) == :exalted
+      _no_faction -> false
+    end
+  end
+
+  def price(%Character{} = character, target_guid, amount) when is_integer(amount) and amount >= 0 do
+    case faction_id(target_guid) do
+      faction_id when is_integer(faction_id) ->
+        if ReputationLogic.rank_value(rank(character, faction_id)) >= ReputationLogic.rank_value(:honored),
+          do: div(amount * 9 + 5, 10),
+          else: amount
+
+      _no_faction ->
+        amount
+    end
+  end
+
+  def item_requirement_met?(%Character{} = character, target_guid, template) do
+    required_rank = ReputationLogic.rank_value(template.required_reputation_rank)
+
+    required_faction =
+      case template.required_reputation_faction do
+        faction_id when is_integer(faction_id) and faction_id > 0 -> faction_id
+        _no_explicit_faction when is_integer(required_rank) and required_rank > 0 -> faction_id(target_guid)
+        _no_requirement -> nil
+      end
+
+    case required_faction do
+      faction_id when is_integer(faction_id) ->
+        ReputationLogic.meets_requirement?(
+          character.player.reputation,
+          ReputationLoader.catalog(),
+          faction_id,
+          required_rank,
+          context(character)
+        )
+
+      _no_faction ->
+        required_rank in [nil, 0]
+    end
+  end
+
+  def validate_item_requirement(%Character{} = character, template) do
+    if template.required_reputation_faction > 0 and
+         not item_requirement_met?(character, nil, template) do
+      {:error, :cant_equip_reputation}
+    else
+      :ok
+    end
+  end
+
+  def vendor_items(%Character{} = character, vendor_guid, items) when is_list(items) do
+    items
+    |> Enum.filter(fn %{template: template} ->
+      template.required_reputation_faction > 0 or
+        template.required_reputation_rank <= 0 or
+        item_requirement_met?(character, vendor_guid, template)
+    end)
+    |> Enum.with_index(1)
+    |> Enum.map(fn {%{template: template} = item, index} ->
+      item
+      |> Map.put(:index, index)
+      |> Map.put(:price, price(character, vendor_guid, template.buy_price))
+    end)
+  end
+
   def modify(%{character: %Character{} = character} = state, faction_id, delta, opts \\ []) do
     catalog = ReputationLoader.catalog()
     previous = character.player.reputation
@@ -208,19 +302,21 @@ defmodule ThistleTea.Game.Player.Reputation do
   end
 
   defp reward_kill_entry(state, %KillReward{} = reward, creature_level, catalog) do
-    if ReputationLogic.rank_value(rank(state.character, reward.faction_id)) <= reward.max_rank do
-      delta = reputation_gain(state.character, :kill, reward.value, reward.faction_id, creature_level)
-      state = modify(state, reward.faction_id, delta)
+    delta = reputation_gain(state.character, :kill, reward.value, reward.faction_id, creature_level)
 
-      case {reward.team_award?, Map.get(catalog.factions, reward.faction_id)} do
-        {true, %Definition{parent_faction_id: parent_id}} when parent_id > 0 ->
-          modify(state, parent_id, div(delta, 2), spillover?: false)
-
-        _ ->
-          state
+    state =
+      if ReputationLogic.rank_value(rank(state.character, reward.faction_id)) <= reward.max_rank do
+        modify(state, reward.faction_id, delta)
+      else
+        state
       end
-    else
-      state
+
+    case {reward.team_award?, Map.get(catalog.factions, reward.faction_id)} do
+      {true, %Definition{parent_faction_id: parent_id}} when parent_id > 0 ->
+        modify(state, parent_id, div(delta, 2), spillover?: false)
+
+      _ ->
+        state
     end
   end
 

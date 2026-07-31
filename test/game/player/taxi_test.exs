@@ -7,10 +7,14 @@ defmodule ThistleTea.Game.Player.TaxiTest do
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Data.Reputation.Catalog
+  alias ThistleTea.Game.Entity.Data.Reputation.Definition
+  alias ThistleTea.Game.Entity.Data.Reputation.Variant
   alias ThistleTea.Game.Entity.Data.Taxi.Network
   alias ThistleTea.Game.Entity.Data.Taxi.Node
   alias ThistleTea.Game.Entity.Data.Taxi.Path
   alias ThistleTea.Game.Entity.Data.Taxi.PathNode
+  alias ThistleTea.Game.Entity.Logic.Reputation
   alias ThistleTea.Game.Entity.Server.Player.State
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.Message.SmsgActivatetaxireply
@@ -19,6 +23,7 @@ defmodule ThistleTea.Game.Player.TaxiTest do
   alias ThistleTea.Game.Network.Message.SmsgTaxinodeStatus
   alias ThistleTea.Game.Player.Taxi
   alias ThistleTea.Game.World.CharacterStore
+  alias ThistleTea.Game.World.Loader.Reputation, as: ReputationLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.WorldRef
@@ -126,6 +131,45 @@ defmodule ThistleTea.Game.Player.TaxiTest do
       assert CharacterStore.get(state.character.id).player.coinage == 75
       assert_receive :restore_companion
 
+      if is_reference(state.player_tick_ref), do: Process.cancel_timer(state.player_tick_ref)
+    end
+
+    test "rounds the honored flightmaster discount for each path", context do
+      previous_catalog = ReputationLoader.catalog()
+
+      catalog = %Catalog{
+        factions: %{
+          72 => %Definition{id: 72, index: 19, variants: [%Variant{}]}
+        }
+      }
+
+      ReputationLoader.put_catalog(catalog)
+      on_exit(fn -> ReputationLoader.put_catalog(previous_catalog) end)
+
+      reputation = Reputation.initialize(catalog, 1, 1)
+      {reputation, _changes} = Reputation.set(reputation, catalog, 72, 9_000, %{race: 1, class: 1})
+
+      character =
+        context.character
+        |> put_known([2, 4])
+        |> then(&%{&1 | player: %{&1.player | reputation: reputation}})
+
+      Metadata.update(context.flightmaster_guid, %{
+        faction_template: %FactionTemplate{faction: 72}
+      })
+
+      state = %State{
+        ready: true,
+        guid: character.object.guid,
+        character: character,
+        visibility_cells: MapSet.new()
+      }
+
+      state = Taxi.activate(state, context.flightmaster_guid, [2, 4], network())
+
+      assert state.character.player.coinage == 77
+
+      state = Taxi.disconnect(state)
       if is_reference(state.player_tick_ref), do: Process.cancel_timer(state.player_tick_ref)
     end
 

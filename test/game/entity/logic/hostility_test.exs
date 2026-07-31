@@ -49,6 +49,15 @@ defmodule ThistleTea.Game.Entity.Logic.HostilityTest do
       assert Hostility.friendly?(creature, honored_player)
     end
 
+    test "caps friendly standing at neutral for an at-war creature reaction" do
+      player = player(alliance(), 1, %{29 => %{rank: :honored, at_war?: true}})
+      creature = mob(wolf(), faction_can_have_reputation?: true)
+
+      refute Hostility.hostile?(creature, player)
+      refute Hostility.friendly?(creature, player)
+      assert Hostility.hostile?(player, creature)
+    end
+
     test "forced reactions override standing and at-war in both directions" do
       friendly_player =
         player(alliance(), 1, %{29 => %{rank: :hostile, at_war?: true, forced_rank: :friendly}})
@@ -62,6 +71,17 @@ defmodule ThistleTea.Game.Entity.Logic.HostilityTest do
       assert Hostility.friendly?(creature, friendly_player)
       assert Hostility.hostile?(hostile_player, creature)
       assert Hostility.hostile?(creature, hostile_player)
+    end
+
+    test "contested guards attack players carrying the contested PvP flag" do
+      player =
+        player(alliance(), 1, %{29 => %{rank: :honored, at_war?: false}})
+        |> Map.put(:contested_pvp?, true)
+
+      creature = mob(contested_guard(), faction_can_have_reputation?: true)
+
+      assert Hostility.hostile?(player, creature)
+      assert Hostility.hostile?(creature, player)
     end
   end
 
@@ -145,6 +165,10 @@ defmodule ThistleTea.Game.Entity.Logic.HostilityTest do
 
   defp wolf do
     %FactionTemplate{id: 32, faction: 29, flags: 16, faction_group: 0, friend_group: 0, enemy_group: 0, enemies_0: 28}
+  end
+
+  defp contested_guard do
+    %{wolf() | flags: 0x1000}
   end
 
   defp neutral_creature do

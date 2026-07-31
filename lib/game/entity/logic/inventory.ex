@@ -88,7 +88,8 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
     can_only_do_with_empty_bags: 31,
     int_bag_error: 40,
     already_looted: 49,
-    inventory_full: 50
+    inventory_full: 50,
+    cant_equip_reputation: 64
   }
 
   def bag_0, do: @bag_0
@@ -223,11 +224,11 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
     direct ++ contents
   end
 
-  def auto_equip(%Player{} = player, %Unit{} = unit, %Proficiency{} = prof, owner_guid, src_pos, get_item) do
-    ctx = ctx(player, unit, prof, owner_guid, get_item)
+  def auto_equip(%Player{} = player, %Unit{} = unit, %Proficiency{} = prof, owner_guid, src_pos, get_item, opts \\ []) do
+    ctx = ctx(player, unit, prof, owner_guid, get_item, opts)
 
     with {:ok, src_item} <- fetch_item(ctx, src_pos),
-         {:ok, dest} <- find_equip_slot(player, unit, prof, src_item, get_item) do
+         {:ok, dest} <- find_equip_slot(player, unit, prof, src_item, get_item, opts) do
       if {@bag_0, dest} == src_pos do
         {:ok, result(ctx)}
       else
@@ -238,8 +239,17 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
     end
   end
 
-  def swap(%Player{} = player, %Unit{} = unit, %Proficiency{} = prof, owner_guid, src_pos, dst_pos, get_item) do
-    ctx = ctx(player, unit, prof, owner_guid, get_item)
+  def swap(
+        %Player{} = player,
+        %Unit{} = unit,
+        %Proficiency{} = prof,
+        owner_guid,
+        src_pos,
+        dst_pos,
+        get_item,
+        opts \\ []
+      ) do
+    ctx = ctx(player, unit, prof, owner_guid, get_item, opts)
 
     if src_pos == dst_pos do
       {:ok, result(ctx)}
@@ -340,11 +350,12 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
     free_position(ctx(player, nil, nil, nil, get_item))
   end
 
-  def find_equip_slot(%Player{} = player, %Unit{} = unit, %Proficiency{} = prof, %Item{} = item, get_item) do
-    ctx = ctx(player, unit, prof, nil, get_item)
+  def find_equip_slot(%Player{} = player, %Unit{} = unit, %Proficiency{} = prof, %Item{} = item, get_item, opts \\ []) do
+    ctx = ctx(player, unit, prof, nil, get_item, opts)
     template = Item.template(item)
 
-    with :ok <- can_use(unit, prof, template) do
+    with :ok <- can_use(unit, prof, template),
+         :ok <- ctx.validate_item.(template) do
       case candidate_slots(template, unit.class, prof) do
         [] ->
           {:error, :item_cant_be_equipped}
@@ -370,8 +381,17 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
     end
   end
 
-  defp ctx(player, unit, prof, owner_guid, get_item) do
-    %{player: player, unit: unit, prof: prof, owner: owner_guid, get_item: get_item, changed: %{}, destroyed: []}
+  defp ctx(player, unit, prof, owner_guid, get_item, opts \\ []) do
+    %{
+      player: player,
+      unit: unit,
+      prof: prof,
+      owner: owner_guid,
+      get_item: get_item,
+      validate_item: Keyword.get(opts, :validate_item, fn _template -> :ok end),
+      changed: %{},
+      destroyed: []
+    }
   end
 
   defp result(ctx) do
@@ -583,7 +603,8 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
   defp validate_bag_cycle(_ctx, _item, _dst_pos), do: :ok
 
   defp validate_equipment_placement(ctx, template, slot) do
-    with :ok <- can_use(ctx.unit, ctx.prof, template) do
+    with :ok <- can_use(ctx.unit, ctx.prof, template),
+         :ok <- ctx.validate_item.(template) do
       cond do
         offhand_weapon_without_dual_wield?(ctx, template, slot) -> {:error, :cant_dual_wield}
         slot not in candidate_slots(template, ctx.unit.class, ctx.prof) -> {:error, :item_doesnt_go_to_slot}

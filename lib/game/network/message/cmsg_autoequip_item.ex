@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgAutoequipItem do
   alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Entity.Logic.Proficiency
   alias ThistleTea.Game.Network.InventoryUpdate
+  alias ThistleTea.Game.Player.Reputation
   alias ThistleTea.Game.World.ItemStore
 
   defstruct [:src_bag, :src_slot]
@@ -13,7 +14,9 @@ defmodule ThistleTea.Game.Network.Message.CmsgAutoequipItem do
   def handle(%__MODULE__{src_bag: src_bag, src_slot: src_slot}, %{ready: true, character: %Character{} = c} = state) do
     prof = Proficiency.from_character(c)
 
-    Inventory.auto_equip(c.player, c.unit, prof, state.guid, {src_bag, src_slot}, &ItemStore.get/1)
+    Inventory.auto_equip(c.player, c.unit, prof, state.guid, {src_bag, src_slot}, &ItemStore.get/1,
+      validate_item: &Reputation.validate_item_requirement(c, &1)
+    )
     |> then(&InventoryUpdate.apply(state, &1))
   end
 

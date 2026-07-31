@@ -24,4 +24,11 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerFlagsTest do
       refute PlayerFlags.group_leader?(character)
     end
   end
+
+  describe "contested_pvp?/1" do
+    test "reads the contested PvP update-field bit" do
+      refute PlayerFlags.contested_pvp?(%Character{player: %Player{flags: 0}})
+      assert PlayerFlags.contested_pvp?(%Character{player: %Player{flags: 0x100}})
+    end
+  end
 end

@@ -91,7 +91,6 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.World.Loader.ItemEnchantment, as: ItemEnchantmentLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Loader.SpellPetAura, as: SpellPetAuraLoader
-  alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Pathfinding
   alias ThistleTea.Game.World.Presence
   alias ThistleTea.Game.World.System.Duel, as: DuelSystem
@@ -220,7 +219,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
           character
 
         true ->
-          character = PlayerCombat.mark_attacked(character, now, reputation_faction_id(attack.caster))
+          character = PlayerCombat.mark_attacked(character, now, PlayerReputation.faction_id(attack.caster))
           {character, events} = Combat.receive_attack(character, attack, now)
           EventSink.emit(character, events)
       end
@@ -312,7 +311,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
     character =
       character
       |> PlayerCombat.gain_threat_ref(mob_guid, incarnation_id)
-      |> PlayerCombat.mark_temporary_at_war(reputation_faction_id(mob_guid))
+      |> PlayerCombat.mark_temporary_at_war(PlayerReputation.faction_id(mob_guid))
 
     state = TickScheduler.ensure_scheduled(%{state | character: character})
     {:noreply, state, {:continue, :maybe_broadcast_update}}
@@ -348,7 +347,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
 
         character =
           if harmful?,
-            do: PlayerCombat.mark_attacked(character, now, reputation_faction_id(caster_guid)),
+            do: PlayerCombat.mark_attacked(character, now, PlayerReputation.faction_id(caster_guid)),
             else: character
 
         {character, events} = SpellEffect.receive_outcome(character, caster_guid, spell, outcome, now)
@@ -865,7 +864,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
 
   def handle_info({:stop_attack_factions, faction_ids}, %State{character: %Character{} = character} = state)
       when is_list(faction_ids) do
-    if reputation_faction_id(character.unit.target) in faction_ids do
+    if PlayerReputation.faction_id(character.unit.target) in faction_ids do
       {character, effects} = PlayerCombat.stop_attack(character)
       character = EventSink.emit(character, effects)
       state = TickScheduler.ensure_scheduled(%{state | character: character})
@@ -966,6 +965,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
         controlled_guid: Character.controlled_guid(character),
         duel_opponent_guid: Dueling.opponent_guid(character),
         duel_started?: Dueling.active?(character),
+        contested_pvp?: PlayerFlags.contested_pvp?(character),
         aura_sources: Aura.source_spells(character),
         dispel_options: Aura.dispel_options(character),
         attacker_spell_hit_chance: Aura.attacker_spell_hit_chance(character),
@@ -1197,7 +1197,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
         PlayerCombat.mark_attacked(
           character,
           now,
-          caster |> spell_caster_guid() |> reputation_faction_id()
+          caster |> spell_caster_guid() |> PlayerReputation.faction_id()
         )
 
       {character, events} = SpellEffect.receive(character, caster, spell, now)
@@ -1213,15 +1213,6 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   defp spell_caster_guid(%{caster_guid: guid}) when is_integer(guid), do: guid
   defp spell_caster_guid(guid) when is_integer(guid), do: guid
   defp spell_caster_guid(_caster), do: nil
-
-  defp reputation_faction_id(guid) when is_integer(guid) and guid > 0 do
-    case Metadata.query(guid, [:faction_template]) do
-      %{faction_template: %FactionTemplate{faction: faction_id}} when faction_id > 0 -> faction_id
-      _metadata -> nil
-    end
-  end
-
-  defp reputation_faction_id(_guid), do: nil
 
   defp suspend_companion_for_teleport(%State{character: %Character{} = character} = state) do
     if is_integer(Companion.summon_guid(character)) do

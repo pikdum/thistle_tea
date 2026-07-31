@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgTrainerList do
   alias ThistleTea.Game.Entity.Logic.Trainer
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.Message.SmsgTrainerList
+  alias ThistleTea.Game.Player.Reputation
   alias ThistleTea.Game.World.Loader.Gossip, as: GossipLoader
   alias ThistleTea.Game.World.Loader.Trainer, as: TrainerLoader
 
@@ -13,27 +14,33 @@ defmodule ThistleTea.Game.Network.Message.CmsgTrainerList do
   def send_list(%{character: %Character{unit: unit, player: player, internal: internal}} = state, trainer_guid) do
     entry = Guid.entry(trainer_guid)
 
-    if GossipLoader.trainer_of?(entry, unit.class, unit.race) do
+    if Reputation.can_interact?(state.character, trainer_guid) and
+         GossipLoader.trainer_of?(
+           entry,
+           unit.class,
+           unit.race,
+           Reputation.exalted_with?(state.character, trainer_guid)
+         ) do
       %{trainer_type: trainer_type, spells: spells} = TrainerLoader.trainer_info(entry)
 
       Network.send_packet(%Message.SmsgTrainerList{
         guid: trainer_guid,
         trainer_type: trainer_type,
-        spells: list_spells(spells, unit, player.skills, internal.spells)
+        spells: list_spells(spells, state.character, trainer_guid, unit, player.skills, internal.spells)
       })
     end
 
     state
   end
 
-  defp list_spells(spells, unit, skills, known_ids) do
+  defp list_spells(spells, character, trainer_guid, unit, skills, known_ids) do
     spells
     |> Enum.filter(&Trainer.fits_class_race?(&1, unit.class, unit.race))
     |> Enum.map(fn spell ->
       %SmsgTrainerList.Spell{
         spell_id: spell.teach_spell_id,
         state: Trainer.state(spell, known_ids, unit.level, skills),
-        cost: spell.cost,
+        cost: Reputation.price(character, trainer_guid, spell.cost),
         req_level: spell.req_level,
         req_skill: spell.req_skill,
         req_skill_value: spell.req_skill_value,

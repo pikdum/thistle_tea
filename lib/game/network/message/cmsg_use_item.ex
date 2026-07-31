@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgUseItem do
   alias ThistleTea.Game.Entity.Logic.Proficiency
   alias ThistleTea.Game.Network.InventoryUpdate
   alias ThistleTea.Game.Player.Items
+  alias ThistleTea.Game.Player.Reputation
   alias ThistleTea.Game.Player.Spellcasting
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Cast
@@ -76,7 +77,9 @@ defmodule ThistleTea.Game.Network.Message.CmsgUseItem do
          not (bag == Inventory.bag_0() and Inventory.equipment_slot?(slot)) do
       {:error, :item_not_found}
     else
-      Inventory.can_use(unit, Proficiency.from_character(character), template)
+      with :ok <- Inventory.can_use(unit, Proficiency.from_character(character), template) do
+        Reputation.validate_item_requirement(character, template)
+      end
     end
   end
 

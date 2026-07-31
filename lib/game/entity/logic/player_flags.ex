@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerFlags do
   alias ThistleTea.Game.Entity.Data.Component.Player
 
   @group_leader 0x00000001
+  @contested_pvp 0x00000100
 
   def set_group_leader(%Character{player: %Player{} = player} = character, true) do
     flags = (player.flags || 0) ||| @group_leader
@@ -24,4 +25,10 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerFlags do
   end
 
   def group_leader?(%Character{}), do: false
+
+  def contested_pvp?(%Character{player: %Player{flags: flags}}) when is_integer(flags) do
+    (flags &&& @contested_pvp) != 0
+  end
+
+  def contested_pvp?(%Character{}), do: false
 end

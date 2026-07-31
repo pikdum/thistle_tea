@@ -40,6 +40,20 @@ defmodule ThistleTea.Game.Entity.Logic.ReputationTest do
     end
   end
 
+  describe "normalize/4" do
+    test "restores the mandatory at-war flag for hostile standing" do
+      catalog = catalog([definition(529, 13, [variant()])])
+      reputation = Reputation.initialize(catalog, @human, @warrior)
+      state = %{Reputation.state(reputation, 529) | standing: -6_000, flags: 0}
+      reputation = %{reputation | states: %{529 => state}}
+
+      reputation = Reputation.normalize(reputation, catalog, @human, @warrior)
+
+      assert Reputation.at_war?(reputation, 529)
+      assert reputation.ranks[529] == :hostile
+    end
+  end
+
   describe "rank/1" do
     test "uses classic standing thresholds" do
       assert Reputation.rank(-42_000) == :hated
@@ -166,6 +180,18 @@ defmodule ThistleTea.Game.Entity.Logic.ReputationTest do
 
       assert Reputation.standing(reputation, catalog, 72, @human, @warrior) == 9_000
       assert Reputation.state(reputation, 72).standing == 5_900
+    end
+  end
+
+  describe "meets_requirement?/5" do
+    test "compares current and required ranks for a known faction" do
+      catalog = catalog([definition(529, 13, [variant(base: 3_000)])])
+      reputation = Reputation.initialize(catalog, @human, @warrior)
+
+      assert Reputation.meets_requirement?(reputation, catalog, 529, :friendly, context())
+      assert Reputation.meets_requirement?(reputation, catalog, 529, 4, context())
+      refute Reputation.meets_requirement?(reputation, catalog, 529, :honored, context())
+      refute Reputation.meets_requirement?(reputation, catalog, 999, :neutral, context())
     end
   end
 

@@ -270,6 +270,24 @@ defmodule ThistleTea.Game.Entity.Logic.InventoryTest do
                Inventory.auto_equip(player, unit, @prof, @owner, {@bag_0, @backpack_start}, get_item_fn([priest_only]))
     end
 
+    test "applies an injected item-use requirement", %{unit: unit, chest: chest} do
+      player = store(%Player{}, @backpack_start, chest)
+
+      assert {:error, :cant_equip_reputation, guid, 0} =
+               Inventory.auto_equip(
+                 player,
+                 unit,
+                 @prof,
+                 @owner,
+                 {@bag_0, @backpack_start},
+                 get_item_fn([chest]),
+                 validate_item: fn _template -> {:error, :cant_equip_reputation} end
+               )
+
+      assert guid == chest.object.guid
+      assert Inventory.error_code(:cant_equip_reputation) == 64
+    end
+
     test "rejects weapons without the matching proficiency", %{unit: unit} do
       dagger = build_item(11, %ItemTemplate{entry: 1100, inventory_type: 13, class: 2, subclass: 15})
       player = store(%Player{}, @backpack_start, dagger)

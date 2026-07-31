@@ -41,11 +41,23 @@ defmodule ThistleTea.Game.Player.Quests do
   end
 
   def dialog_status(npc_guid, %Character{} = character) do
-    {giver_quests, ender_quests} = npc_quests(npc_guid)
-    QuestDialogStatus.for_npc(giver_quests, ender_quests, ctx(character))
+    if PlayerReputation.can_interact?(character, npc_guid) do
+      {giver_quests, ender_quests} = npc_quests(npc_guid)
+      QuestDialogStatus.for_npc(giver_quests, ender_quests, ctx(character))
+    else
+      QuestDialogStatus.none()
+    end
   end
 
   def hello(state, npc_guid) do
+    if PlayerReputation.can_interact?(state.character, npc_guid) do
+      do_hello(state, npc_guid)
+    else
+      state
+    end
+  end
+
+  defp do_hello(state, npc_guid) do
     {giver_quests, ender_quests} = npc_quests(npc_guid)
 
     case QuestDialogStatus.menu(giver_quests, ender_quests, ctx(state.character)) do
@@ -75,7 +87,8 @@ defmodule ThistleTea.Game.Player.Quests do
   def query_quest(state, npc_guid, quest_id) do
     entry = Guid.entry(npc_guid)
 
-    with %Quest{} = quest <- QuestLoader.get(quest_id),
+    with true <- PlayerReputation.can_interact?(state.character, npc_guid),
+         %Quest{} = quest <- QuestLoader.get(quest_id),
          true <-
            quest_id in QuestLoader.given_by(entry) or quest_id in QuestLoader.ended_by(entry) do
       send_details(npc_guid, quest)
@@ -85,7 +98,8 @@ defmodule ThistleTea.Game.Player.Quests do
   end
 
   def accept(state, npc_guid, quest_id) do
-    with %Quest{} = quest <- QuestLoader.get(quest_id),
+    with true <- PlayerReputation.can_interact?(state.character, npc_guid),
+         %Quest{} = quest <- QuestLoader.get(quest_id),
          true <- quest_id in QuestLoader.given_by(Guid.entry(npc_guid)),
          :ok <- QuestRequirements.can_take(quest, ctx(state.character)) do
       force_accept(state, quest_id)
@@ -145,7 +159,8 @@ defmodule ThistleTea.Game.Player.Quests do
   end
 
   def complete_quest(%{character: %Character{} = character} = state, npc_guid, quest_id) do
-    with %Quest{} = quest <- ender_quest(npc_guid, quest_id),
+    with true <- PlayerReputation.can_interact?(character, npc_guid),
+         %Quest{} = quest <- ender_quest(npc_guid, quest_id),
          %Entry{} = entry <- QuestLog.get(character.player.quest_log, quest_id) do
       send_turn_in_dialog(npc_guid, quest, entry.status == :complete)
     end
@@ -154,7 +169,8 @@ defmodule ThistleTea.Game.Player.Quests do
   end
 
   def request_reward(%{character: %Character{} = character} = state, npc_guid, quest_id) do
-    with %Quest{} = quest <- ender_quest(npc_guid, quest_id),
+    with true <- PlayerReputation.can_interact?(character, npc_guid),
+         %Quest{} = quest <- ender_quest(npc_guid, quest_id),
          %Entry{status: :complete} <- QuestLog.get(character.player.quest_log, quest_id) do
       send_offer_reward(npc_guid, quest)
     end
@@ -163,7 +179,8 @@ defmodule ThistleTea.Game.Player.Quests do
   end
 
   def choose_reward(%{character: %Character{} = character} = state, npc_guid, quest_id, reward_index) do
-    with %Quest{} = quest <- ender_quest(npc_guid, quest_id),
+    with true <- PlayerReputation.can_interact?(character, npc_guid),
+         %Quest{} = quest <- ender_quest(npc_guid, quest_id),
          %Entry{status: :complete} <- QuestLog.get(character.player.quest_log, quest_id),
          {:ok, choice} <- validate_reward_choice(quest, reward_index),
          :ok <- validate_required_money(quest, character),

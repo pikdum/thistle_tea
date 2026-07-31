@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Player.ReputationTest do
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Data.ItemTemplate
   alias ThistleTea.Game.Entity.Data.Quest
   alias ThistleTea.Game.Entity.Data.Reputation.Catalog
   alias ThistleTea.Game.Entity.Data.Reputation.Definition
@@ -104,6 +105,165 @@ defmodule ThistleTea.Game.Player.ReputationTest do
       assert Reputation.standing(state.character, 469) == 5
       assert Reputation.standing(state.character, 76) == 0
     end
+
+    test "awards the parent faction after the primary faction rank cap", %{id: id} do
+      catalog =
+        catalog(
+          [definition(72, 19, 469), definition(469, 11)],
+          %{
+            123 => [
+              %KillReward{
+                faction_id: 72,
+                value: 10,
+                max_rank: 4,
+                team: :alliance,
+                team_award?: true
+              }
+            ]
+          }
+        )
+
+      state = state(id, catalog)
+      ReputationLoader.put_catalog(catalog)
+      character = put_standing(state.character, catalog, 72, 9_000)
+
+      state = Reputation.reward_kill(%{state | character: character}, 123, 10)
+
+      assert Reputation.standing(state.character, 72) == 9_000
+      assert Reputation.standing(state.character, 469) == 5
+    end
+
+    test "applies general and kill-only faction aura bonuses", %{id: id} do
+      catalog =
+        catalog(
+          [definition(529, 13)],
+          %{
+            123 => [
+              %KillReward{
+                faction_id: 529,
+                value: 100,
+                max_rank: 7,
+                team: :alliance
+              }
+            ]
+          }
+        )
+
+      state = state(id, catalog)
+      ReputationLoader.put_catalog(catalog)
+
+      holder = %Holder{
+        spell: %Spell{id: 1},
+        auras: [
+          %AuraData{type: :mod_reputation_gain, amount: 10},
+          %AuraData{type: :mod_faction_reputation_gain, misc_value: 529, amount: 20}
+        ]
+      }
+
+      character = %{state.character | unit: %{state.character.unit | auras: [holder]}}
+      state = Reputation.reward_kill(%{state | character: character}, 123, 10)
+
+      assert Reputation.standing(state.character, 529) == 130
+
+      state = Reputation.reward_spell(state, 529, 100)
+
+      assert Reputation.standing(state.character, 529) == 240
+    end
+  end
+
+  describe "price/3" do
+    test "rounds the honored NPC discount to the nearest copper", %{id: id} do
+      catalog = catalog([definition(72, 19)])
+      character = state(id, catalog).character
+      vendor_guid = vendor_guid(72)
+      ReputationLoader.put_catalog(catalog)
+
+      assert Reputation.price(character, vendor_guid, 25) == 25
+
+      character = put_standing(character, catalog, 72, 9_000)
+
+      assert Reputation.price(character, vendor_guid, 25) == 23
+    end
+  end
+
+  describe "creature access" do
+    test "blocks unfriendly interaction and unlocks cross-race trainers at exalted", %{id: id} do
+      catalog = catalog([definition(72, 19)])
+      character = state(id, catalog).character
+      trainer_guid = vendor_guid(72)
+      ReputationLoader.put_catalog(catalog)
+
+      assert Reputation.can_interact?(character, trainer_guid)
+      refute Reputation.exalted_with?(character, trainer_guid)
+
+      character = put_standing(character, catalog, 72, -3_000)
+
+      refute Reputation.can_interact?(character, trainer_guid)
+      refute Reputation.exalted_with?(character, trainer_guid)
+
+      character = put_standing(character, catalog, 72, 42_000)
+
+      assert Reputation.can_interact?(character, trainer_guid)
+      assert Reputation.exalted_with?(character, trainer_guid)
+    end
+  end
+
+  describe "item_requirement_met?/3" do
+    test "checks explicit item factions and vendor-faction fallbacks", %{id: id} do
+      catalog = catalog([definition(72, 19), definition(529, 13)])
+      character = state(id, catalog).character
+      vendor_guid = vendor_guid(72)
+      ReputationLoader.put_catalog(catalog)
+
+      explicit = %ItemTemplate{required_reputation_faction: 529, required_reputation_rank: 4}
+      implicit = %ItemTemplate{required_reputation_rank: 4}
+
+      refute Reputation.item_requirement_met?(character, vendor_guid, explicit)
+      refute Reputation.item_requirement_met?(character, vendor_guid, implicit)
+
+      assert Reputation.validate_item_requirement(character, explicit) ==
+               {:error, :cant_equip_reputation}
+
+      character =
+        character
+        |> put_standing(catalog, 529, 3_000)
+        |> put_standing(catalog, 72, 3_000)
+
+      assert Reputation.item_requirement_met?(character, vendor_guid, explicit)
+      assert Reputation.item_requirement_met?(character, vendor_guid, implicit)
+      assert Reputation.validate_item_requirement(character, explicit) == :ok
+    end
+  end
+
+  describe "vendor_items/3" do
+    test "shows explicit requirements, hides unmet vendor requirements, and prices the result", %{id: id} do
+      catalog = catalog([definition(72, 19), definition(529, 13)])
+      character = state(id, catalog).character |> put_standing(catalog, 72, 9_000)
+      vendor_guid = vendor_guid(72)
+      ReputationLoader.put_catalog(catalog)
+
+      explicit = %ItemTemplate{
+        entry: 1,
+        buy_price: 25,
+        required_reputation_faction: 529,
+        required_reputation_rank: 4
+      }
+
+      implicit = %ItemTemplate{entry: 2, buy_price: 25, required_reputation_rank: 6}
+      unrestricted = %ItemTemplate{entry: 3, buy_price: 25}
+
+      items =
+        Reputation.vendor_items(character, vendor_guid, [
+          %{index: 1, template: explicit, max_count: 0},
+          %{index: 2, template: implicit, max_count: 0},
+          %{index: 3, template: unrestricted, max_count: 0}
+        ])
+
+      assert Enum.map(items, &{&1.index, &1.template.entry, &1.price}) == [
+               {1, 1, 23},
+               {2, 3, 23}
+             ]
+    end
   end
 
   describe "send_initial/1" do
@@ -174,6 +334,20 @@ defmodule ThistleTea.Game.Player.ReputationTest do
       parent_faction_id: parent_faction_id,
       variants: [%Variant{}]
     }
+  end
+
+  defp put_standing(%Character{} = character, catalog, faction_id, standing) do
+    {reputation, _changes} =
+      ReputationLogic.set(character.player.reputation, catalog, faction_id, standing, context())
+
+    %{character | player: %{character.player | reputation: reputation}}
+  end
+
+  defp vendor_guid(faction_id) do
+    guid = Guid.from_low_guid(:mob, faction_id, System.unique_integer([:positive, :monotonic]))
+    Metadata.put(guid, %{faction_template: %FactionTemplate{faction: faction_id}})
+    on_exit(fn -> Metadata.delete(guid) end)
+    guid
   end
 
   defp context, do: %{race: 1, class: 1}

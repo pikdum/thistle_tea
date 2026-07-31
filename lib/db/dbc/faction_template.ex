@@ -24,12 +24,19 @@ defmodule FactionTemplate do
 
   @flag_respond_to_call_for_help 0x01
   @flag_flee_from_call_for_help 0x400
+  @flag_attack_contested_players 0x1000
 
   def responds_to_call_for_help?(%__MODULE__{flags: flags}) when is_integer(flags) do
     (flags &&& @flag_respond_to_call_for_help) != 0 and (flags &&& @flag_flee_from_call_for_help) == 0
   end
 
   def responds_to_call_for_help?(_faction_template), do: false
+
+  def attacks_contested_players?(%__MODULE__{flags: flags}) when is_integer(flags) do
+    (flags &&& @flag_attack_contested_players) != 0
+  end
+
+  def attacks_contested_players?(_faction_template), do: false
 
   def friendly_to?(%__MODULE__{} = source, %__MODULE__{} = target) do
     cond do

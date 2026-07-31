@@ -18,6 +18,7 @@ defmodule ThistleTea.Game.Player.Taxi do
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
+  alias ThistleTea.Game.Player.Reputation
   alias ThistleTea.Game.Player.Spellcasting
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
@@ -91,6 +92,7 @@ defmodule ThistleTea.Game.Player.Taxi do
     with {:ok, %Node{id: source_node_id}} <- flightmaster_node(character, flightmaster_guid, network),
          :ok <- validate_activation(character, node_ids, source_node_id),
          {:ok, itinerary} <- TaxiNetwork.itinerary(network, node_ids),
+         itinerary = discounted_itinerary(character, flightmaster_guid, itinerary),
          :ok <- validate_itinerary(character, itinerary, network),
          {:ok, mount_display_id} <- mount_display_id(character, source_node_id, network),
          :ok <- validate_fare(character, itinerary.total_cost) do
@@ -250,6 +252,15 @@ defmodule ThistleTea.Game.Player.Taxi do
 
   defp validate_fare(%Character{}, _fare), do: {:error, :unspecified}
 
+  defp discounted_itinerary(character, flightmaster_guid, itinerary) do
+    total_cost =
+      Enum.reduce(itinerary.paths, 0, fn path, total ->
+        total + Reputation.price(character, flightmaster_guid, path.cost)
+      end)
+
+    %{itinerary | total_cost: total_cost}
+  end
+
   defp validate_source_position(%Character{internal: %{world: world}, movement_block: %{position: position}}, %Node{
          map_id: map_id,
          position: source_position
@@ -337,7 +348,7 @@ defmodule ThistleTea.Game.Player.Taxi do
   end
 
   defp flightmaster_node(
-         %Character{unit: unit, internal: %{world: world}, movement_block: %{position: player_position}},
+         %Character{unit: unit, internal: %{world: world}, movement_block: %{position: player_position}} = character,
          guid,
          network
        )
@@ -345,6 +356,7 @@ defmodule ThistleTea.Game.Player.Taxi do
     with :mob <- Guid.entity_type(guid),
          %{npc_flags: npc_flags, alive?: true} <- Metadata.query(guid, [:npc_flags, :alive?]),
          true <- (npc_flags &&& @flightmaster_flag) != 0,
+         true <- Reputation.can_interact?(character, guid),
          {^world, x, y, z} <- World.position(guid),
          true <- SpatialHash.distance(xyz(player_position), {x, y, z}) <= @interaction_distance,
          %Node{} = node <- TaxiNetwork.nearest_node(network, world.map_id, {x, y, z}, team_for_race(unit.race)) do

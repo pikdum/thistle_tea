@@ -68,11 +68,12 @@ defmodule ThistleTea.Game.Entity.Logic.Reputation do
           %{existing | index: initial.index}
       end)
 
-    ranks =
-      Map.new(states, fn {faction_id, %State{standing: standing}} ->
+    {states, ranks} =
+      Enum.reduce(states, {%{}, %{}}, fn {faction_id, %State{standing: standing} = state}, {states, ranks} ->
         definition = Map.fetch!(catalog.factions, faction_id)
         total = base_standing(definition, race, class) + standing
-        {faction_id, rank(total)}
+        state = %{state | flags: force_war_if_hostile(state.flags, total)}
+        {Map.put(states, faction_id, state), Map.put(ranks, faction_id, rank(total))}
       end)
 
     %{reputation | states: states, ranks: ranks}
@@ -256,6 +257,18 @@ defmodule ThistleTea.Game.Entity.Logic.Reputation do
   def hostile?(%Reputation{} = reputation, %Catalog{} = catalog, faction_id, context) do
     at_war?(reputation, faction_id) or
       rank(standing(reputation, catalog, faction_id, context.race, context.class)) in [:hated, :hostile]
+  end
+
+  def meets_requirement?(%Reputation{} = reputation, %Catalog{} = catalog, faction_id, required_rank, context) do
+    with faction_id when is_integer(faction_id) and faction_id > 0 <- faction_id,
+         %State{} <- state(reputation, faction_id),
+         %Definition{} <- Map.get(catalog.factions, faction_id),
+         required_rank when is_integer(required_rank) <- rank_value(required_rank) do
+      current_rank = standing(reputation, catalog, faction_id, context.race, context.class) |> rank() |> rank_value()
+      current_rank >= required_rank
+    else
+      _invalid_requirement -> false
+    end
   end
 
   defp apply_changes(reputation, catalog, changes, context) do
