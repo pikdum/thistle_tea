@@ -118,11 +118,7 @@ defmodule ThistleTea.Game.World.Loader.Script do
       |> Enum.flat_map(&[&1.dataint, &1.dataint2, &1.dataint3])
       |> Enum.filter(&(is_integer(&1) and &1 > 0))
       |> Enum.uniq()
-      |> then(fn ids ->
-        from(item in Mangos.ItemTemplate, where: item.entry in ^ids)
-        |> Mangos.Repo.all()
-        |> Map.new(&{&1.entry, ItemTemplate.build(&1)})
-      end)
+      |> load_equipment_templates()
 
     Enum.map(steps, fn
       %ScriptStep{command: :set_equipment, datalong: 0} = step ->
@@ -137,6 +133,14 @@ defmodule ThistleTea.Game.World.Loader.Script do
   defp equipment_item(entry, _templates) when entry < 0, do: :unchanged
   defp equipment_item(0, _templates), do: nil
   defp equipment_item(entry, templates), do: Map.get(templates, entry)
+
+  defp load_equipment_templates([]), do: %{}
+
+  defp load_equipment_templates(ids) do
+    from(item in Mangos.ItemTemplate, where: item.entry in ^ids)
+    |> Mangos.Repo.all()
+    |> Map.new(&{&1.entry, ItemTemplate.build(&1)})
+  end
 
   defp resolve_nested_scripts(steps, visited) do
     nested_ids =
