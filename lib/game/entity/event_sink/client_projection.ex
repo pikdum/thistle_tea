@@ -95,17 +95,20 @@ defmodule ThistleTea.Game.Entity.EventSink.ClientProjection do
     entity
   end
 
+  def emit(%{object: %{guid: guid}} = entity, %Effects.GameObjectCustomAnimation{animation: animation}, _context) do
+    %Message.SmsgGameobjectCustomAnim{guid: guid, animation: animation}
+    |> World.broadcast_packet(entity)
+
+    entity
+  end
+
   def emit(entity, %Effects.ScriptSteps{} = effect, context) do
     Context.send_after(context, {:ai_script_steps, effect.steps, effect.target_guid}, effect.duration_ms || 0)
     entity
   end
 
   def emit(entity, %Effects.ForwardScriptSteps{} = effect, _context) do
-    case Entity.pid(effect.target_guid) do
-      pid when is_pid(pid) -> send(pid, {:ai_script_steps, effect.steps, effect.source_guid})
-      _ -> nil
-    end
-
+    Entity.start_script(effect.target_guid, effect.steps, effect.source_guid)
     entity
   end
 

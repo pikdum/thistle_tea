@@ -114,7 +114,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
          buddy_guid,
          target_guid
        ) do
-    if Guid.entity_type(buddy_guid) == :mob do
+    if Guid.entity_type(buddy_guid) in [:mob, :game_object] do
       forwarded = %{
         step
         | swap_initial?: false,
@@ -497,6 +497,16 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
 
   defp execute(state, blackboard, %ScriptStep{command: :summon_object} = step, _target_guid, _now) do
     effect = Effects.summon_game_object(step.datalong, step.datalong2 * 1_000, position: step.position)
+    {Effects.enqueue(state, effect), blackboard}
+  end
+
+  defp execute(%GameObject{} = state, blackboard, %ScriptStep{command: :set_game_object_state} = step, _target, _now) do
+    state = %{state | game_object: %{state.game_object | state: step.datalong}}
+    {Core.mark_broadcast_update(state), blackboard}
+  end
+
+  defp execute(%GameObject{} = state, blackboard, %ScriptStep{command: :play_custom_animation} = step, _target, _now) do
+    effect = Effects.game_object_custom_animation(step.datalong)
     {Effects.enqueue(state, effect), blackboard}
   end
 

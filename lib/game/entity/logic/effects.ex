@@ -485,6 +485,10 @@ defmodule ThistleTea.Game.Entity.Logic.Effects do
     %Effects.Emote{emote_id: emote_id}
   end
 
+  def game_object_custom_animation(animation) when is_integer(animation) do
+    %Effects.GameObjectCustomAnimation{animation: animation}
+  end
+
   def script_steps(steps, target_guid, delay_ms) when is_list(steps) and is_integer(delay_ms) do
     %Effects.ScriptSteps{steps: steps, target_guid: target_guid, duration_ms: delay_ms}
   end

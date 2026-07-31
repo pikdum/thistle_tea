@@ -194,7 +194,9 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStep do
   defp command(69), do: :edit_map_event
   defp command(70), do: :fail_quest
   defp command(76), do: :summon_object
+  defp command(80), do: :set_game_object_state
   defp command(83), do: :quest_credit
+  defp command(89), do: :play_custom_animation
   defp command(other), do: {:unsupported, other}
 
   def decode_target_type(value) when is_integer(value) and value < 0, do: nil

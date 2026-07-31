@@ -589,6 +589,25 @@ defmodule ThistleTea.Game.Entity.Logic.AI.ScriptTest do
              ] = mob.internal.events
     end
 
+    test "game object state and animation commands stay typed" do
+      game_object = %GameObjectEntity{
+        object: %Object{guid: Guid.from_low_guid(:game_object, 1, 1)},
+        game_object: %GameObjectComponent{state: 0},
+        internal: %Internal{}
+      }
+
+      steps = [
+        %ScriptStep{command: :set_game_object_state, datalong: 2},
+        %ScriptStep{command: :play_custom_animation, datalong: 1}
+      ]
+
+      {game_object, _blackboard} = Script.run(game_object, Blackboard.new(), steps, nil, 1_000)
+
+      assert game_object.game_object.state == 2
+      assert game_object.internal.broadcast_update?
+      assert [%Effects.GameObjectCustomAnimation{animation: 1}] = game_object.internal.events
+    end
+
     test "set_default_movement updates the spawn movement policy", %{mob: mob} do
       spawn = %Spawn{distance: 0, movement_type: 0}
       mob = %{mob | internal: %{mob.internal | spawn: spawn}}
