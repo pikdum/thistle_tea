@@ -9,8 +9,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Context do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Random
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Waypoints
 
-  @enforce_keys [:now, :perception, :random, :navigation, :waypoints]
-  defstruct [:now, :perception, :random, :navigation, :waypoints]
+  @enforce_keys [:now, :perception, :random, :navigation, :waypoints, :script_conditions]
+  defstruct [:now, :perception, :random, :navigation, :waypoints, :script_conditions]
 
   def new(now, opts \\ []) when is_integer(now) do
     %__MODULE__{
@@ -18,7 +18,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Context do
       perception: Keyword.get(opts, :perception, Perception.empty(now)),
       random: Keyword.get(opts, :random, Random.fixed()),
       navigation: Keyword.get(opts, :navigation, Navigation.direct()),
-      waypoints: Keyword.get(opts, :waypoints, Waypoints.empty())
+      waypoints: Keyword.get(opts, :waypoints, Waypoints.empty()),
+      script_conditions: Keyword.get(opts, :script_conditions, %{})
     }
   end
 end

@@ -92,6 +92,28 @@ defmodule ThistleTea.Game.World.System.ScriptedEventTest do
     assert target_guid == context.target_guid
   end
 
+  test "condition results expose map event and nearby game object state", context do
+    start = %ScriptStep{command: :start_map_event, datalong: 5_713, datalong2: 600}
+    command(context, start)
+
+    game_object_guid = Guid.from_low_guid(:game_object, 21_145, System.unique_integer([:positive]))
+    SpatialHash.update(:game_objects, game_object_guid, context.world, 12.0, 0.0, 0.0)
+
+    on_exit(fn -> SpatialHash.remove(:game_objects, game_object_guid) end)
+
+    conditions = [
+      %Condition{entry: 1, type: :map_event_active, value1: 5_713},
+      %Condition{entry: 2, type: :nearby_game_object, value1: 21_145, value2: 30}
+    ]
+
+    assert ScriptedEventSystem.condition_results(
+             context.world,
+             context.source_guid,
+             context.target_guid,
+             conditions
+           ) == %{1 => true, 2 => true}
+  end
+
   test "all-dead target conditions complete multi-creature events", context do
     success = %ScriptStep{command: :quest_explored, datalong: 434}
     dead = %Condition{type: :alive, reverse?: true}

@@ -71,6 +71,7 @@ defmodule ThistleTea.Game.Entity.Data.Condition do
   defp type(0), do: :none
   defp type(5), do: :reputation_rank_min
   defp type(16), do: :source_entry
+  defp type(21), do: :nearby_game_object
   defp type(25), do: :escort
   defp type(30), do: :reputation_rank_max
   defp type(35), do: :map_event_data

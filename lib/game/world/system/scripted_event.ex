@@ -54,8 +54,25 @@ defmodule ThistleTea.Game.World.System.ScriptedEvent do
 
   def command(%Effects.ScriptedEventCommand{} = effect), do: GenServer.cast(__MODULE__, {:command, effect})
 
+  def condition_results(_world, _source_guid, _target_guid, []), do: %{}
+
+  def condition_results(world, source_guid, target_guid, conditions) when is_list(conditions) do
+    GenServer.call(__MODULE__, {:condition_results, WorldRef.coerce(world), source_guid, target_guid, conditions})
+  end
+
   @impl GenServer
   def init(state), do: {:ok, state}
+
+  @impl GenServer
+  def handle_call({:condition_results, world, source_guid, target_guid, conditions}, _from, events) do
+    results =
+      Map.new(conditions, fn
+        %Condition{entry: entry} = condition ->
+          {entry, condition_met?(condition, events, world, source_guid, target_guid)}
+      end)
+
+    {:reply, results, events}
+  end
 
   @impl GenServer
   def handle_cast({:command, %Effects.ScriptedEventCommand{} = effect}, events) do
@@ -329,6 +346,24 @@ defmodule ThistleTea.Game.World.System.ScriptedEvent do
 
   defp evaluate_condition(%Condition{type: :map_event_active, value1: id}, events, world, _source, _target),
     do: Map.has_key?(events, event_key(world, id))
+
+  defp evaluate_condition(
+         %Condition{type: :nearby_game_object, value1: entry, value2: radius},
+         _events,
+         world,
+         source,
+         target
+       ) do
+    case SpatialHash.get_entity(target) || SpatialHash.get_entity(source) do
+      {_guid, ^world, x, y, z} ->
+        :game_objects
+        |> SpatialHash.query(world, x, y, z, radius)
+        |> Enum.any?(fn {guid, _distance} -> Guid.entry(guid) == entry end)
+
+      _missing ->
+        false
+    end
+  end
 
   defp evaluate_condition(
          %Condition{type: :map_event_targets, value1: id, children: [child]},

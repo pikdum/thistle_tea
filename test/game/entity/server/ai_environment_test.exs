@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironmentTest do
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Data.Condition
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception.Request
@@ -123,6 +124,26 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironmentTest do
 
       assert Perception.distance(perception, target_guid) == 20.0
       assert Perception.metadata(perception, target_guid) == %{alive?: true, level: 10}
+    end
+
+    test "captures requested script condition results" do
+      world = %WorldRef{map_id: 0}
+      target_guid = Guid.from_low_guid(:player, 98_028)
+      game_object_guid = Guid.from_low_guid(:game_object, 21_145, 98_029)
+      condition = %Condition{entry: 1, type: :nearby_game_object, value1: 21_145, value2: 30}
+
+      SpatialHash.update(:players, target_guid, world, 0.0, 0.0, 0.0)
+      SpatialHash.update(:game_objects, game_object_guid, world, 5.0, 0.0, 0.0)
+
+      on_exit(fn ->
+        SpatialHash.remove(:players, target_guid)
+        SpatialHash.remove(:game_objects, game_object_guid)
+      end)
+
+      request = Request.new([target_guid], 0.0, script_conditions: [condition])
+      context = AIEnvironment.context(mob(world), 1_000, request)
+
+      assert context.script_conditions == %{1 => true}
     end
   end
 

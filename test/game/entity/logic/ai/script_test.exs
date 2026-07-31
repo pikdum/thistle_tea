@@ -1003,6 +1003,32 @@ defmodule ThistleTea.Game.Entity.Logic.AI.ScriptTest do
       assert [%Effects.Emote{emote_id: 11}] = mob.internal.events
     end
 
+    test "terminate_condition stops the chain and can fail the player's quest", %{mob: mob} do
+      player_guid = Guid.from_low_guid(:player, 55)
+      condition = %Condition{entry: 5_713, type: :map_event_active, value1: 5_713}
+
+      step = %ScriptStep{
+        command: :terminate_condition,
+        datalong: 5_713,
+        datalong2: 5_713,
+        termination_condition: condition
+      }
+
+      context = Context.new(1_000, script_conditions: %{5_713 => true})
+
+      {mob, _blackboard} =
+        Script.run(
+          mob,
+          Blackboard.new(),
+          [step, %ScriptStep{command: :emote, datalong: 11}],
+          player_guid,
+          context
+        )
+
+      assert [%Effects.QuestFail{player_guid: ^player_guid, quest_id: 5_713, group?: true}] =
+               mob.internal.events
+    end
+
     test "unsupported commands are skipped", %{mob: mob} do
       step = %ScriptStep{command: {:unsupported, 10}}
 

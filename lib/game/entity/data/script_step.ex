@@ -35,6 +35,7 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStep do
             success_condition: nil,
             failure_condition: nil,
             target_condition: nil,
+            termination_condition: nil,
             texts: [],
             sub_scripts: %{}
 
@@ -121,6 +122,9 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStep do
         :remove_map_event_target ->
           [step.datalong2]
 
+        :terminate_condition ->
+          [step.datalong]
+
         _command ->
           []
       end
@@ -183,6 +187,7 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStep do
   defp command(28), do: :stand_state
   defp command(30), do: :send_taxi_path
   defp command(31), do: :terminate_script
+  defp command(32), do: :terminate_condition
   defp command(34), do: :set_home_position
   defp command(35), do: :turn_to
   defp command(39), do: :start_script

@@ -80,6 +80,7 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStepTest do
       assert ScriptStep.build(row(4)).command == :modify_flags
       assert ScriptStep.build(row(5)).command == :interrupt_casts
       assert ScriptStep.build(row(31)).command == :terminate_script
+      assert ScriptStep.build(row(32)).command == :terminate_condition
       assert ScriptStep.build(row(22)).command == :set_faction
       assert ScriptStep.build(row(34)).command == :set_home_position
       assert ScriptStep.build(row(41)).command == :remove_object
@@ -112,9 +113,11 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStepTest do
     test "collects command and map-event condition ids" do
       start = %ScriptStep{command: :start_map_event, condition_id: 5, dataint: 10, dataint3: 11}
       remove = %ScriptStep{command: :remove_map_event_target, datalong2: 12}
+      terminate = %ScriptStep{command: :terminate_condition, datalong: 13}
 
       assert ScriptStep.condition_ids(start) == [5, 10, 11]
       assert ScriptStep.condition_ids(remove) == [12]
+      assert ScriptStep.condition_ids(terminate) == [13]
     end
   end
 

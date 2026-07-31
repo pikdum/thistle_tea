@@ -95,11 +95,13 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
 
   defp execute_steps_with_status(state, blackboard, steps, target_guid, context) do
     Enum.reduce_while(steps, {state, blackboard, :continue}, fn %ScriptStep{} = step, {state, blackboard, :continue} ->
-      if terminate?(state, step, context) do
-        {:halt, {state, blackboard, :terminated}}
-      else
-        {state, blackboard} = dispatch(state, blackboard, step, target_guid, context)
-        {:cont, {state, blackboard, :continue}}
+      case termination(state, step, target_guid, context) do
+        {:terminate, state} ->
+          {:halt, {state, blackboard, :terminated}}
+
+        :continue ->
+          {state, blackboard} = dispatch(state, blackboard, step, target_guid, context)
+          {:cont, {state, blackboard, :continue}}
       end
     end)
   end
@@ -187,11 +189,14 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
     Effects.enqueue(state, Effects.script_steps(steps, target_guid, next_delay_ms))
   end
 
-  defp terminate?(_state, %ScriptStep{command: :terminate_script, datalong: 0}, %Context{}), do: true
+  defp termination(state, %ScriptStep{command: :terminate_script, datalong: 0}, _target_guid, %Context{}) do
+    {:terminate, state}
+  end
 
-  defp terminate?(
-         _state,
+  defp termination(
+         state,
          %ScriptStep{command: :terminate_script, datalong: entry, datalong2: radius, datalong3: option},
+         _target_guid,
          %Context{perception: perception}
        )
        when entry > 0 do
@@ -202,10 +207,44 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
         Guid.entry(guid) == entry and alive_observation?(perception, guid)
       end)
 
-    (option == 0 and not found?) or (option == 1 and found?)
+    if (option == 0 and not found?) or (option == 1 and found?) do
+      {:terminate, state}
+    else
+      :continue
+    end
   end
 
-  defp terminate?(_state, %ScriptStep{}, %Context{}), do: false
+  defp termination(
+         %{object: %{guid: source_guid}} = state,
+         %ScriptStep{
+           command: :terminate_condition,
+           datalong: condition_id,
+           datalong2: failed_quest_id,
+           datalong3: flags
+         },
+         target_guid,
+         %Context{script_conditions: condition_results}
+       ) do
+    met? = Map.get(condition_results, condition_id, false)
+    terminate? = if (flags &&& 0x1) == 0, do: met?, else: not met?
+
+    if terminate? do
+      state =
+        case {failed_quest_id, script_player_guid(source_guid, target_guid)} do
+          {quest_id, player_guid} when quest_id > 0 and is_integer(player_guid) ->
+            Effects.enqueue(state, Effects.quest_fail(player_guid, quest_id, group?: true))
+
+          _missing ->
+            state
+        end
+
+      {:terminate, state}
+    else
+      :continue
+    end
+  end
+
+  defp termination(_state, %ScriptStep{}, _target_guid, %Context{}), do: :continue
 
   defp alive_observation?(perception, guid) do
     case Perception.metadata(perception, guid) do
@@ -1122,6 +1161,21 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
   end
 
   def observation_radius(_steps), do: 0.0
+
+  def termination_conditions(steps) when is_list(steps) do
+    steps
+    |> Enum.flat_map(fn
+      %ScriptStep{termination_condition: condition, sub_scripts: sub_scripts} ->
+        [condition | sub_scripts |> Map.values() |> List.flatten() |> termination_conditions()]
+
+      _step ->
+        []
+    end)
+    |> Enum.reject(&is_nil/1)
+    |> Enum.uniq_by(& &1.entry)
+  end
+
+  def termination_conditions(_steps), do: []
 
   defp step_observation_radius(%ScriptStep{target_type: target_type, target_param2: radius})
        when target_type in @entry_target_types do

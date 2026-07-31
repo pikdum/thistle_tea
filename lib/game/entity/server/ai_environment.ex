@@ -34,17 +34,18 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
   alias ThistleTea.Game.World.Loader.Waypoint, as: WaypointLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Pathfinding
+  alias ThistleTea.Game.World.System.ScriptedEvent
 
   @pet_observation_radius 20.0
   @totem_observation_radius 30.0
 
   def context(entity, now \\ Time.now(), request \\ %Request{})
 
-  def context(entity, now, %Request{
-        actors: actors,
-        radius: requested_radius,
-        game_object_radius: requested_game_object_radius
-      })
+  def context(
+        entity,
+        now,
+        %Request{actors: actors, radius: requested_radius, game_object_radius: requested_game_object_radius} = request
+      )
       when is_integer(now) and is_list(actors) and is_number(requested_radius) and requested_radius >= 0 and
              is_number(requested_game_object_radius) and requested_game_object_radius >= 0 do
     %Context{
@@ -52,7 +53,8 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
       perception: perception(entity, now, actors, requested_radius, requested_game_object_radius),
       random: random(),
       navigation: navigation(entity, now),
-      waypoints: WaypointLoader.context()
+      waypoints: WaypointLoader.context(),
+      script_conditions: script_condition_results(entity, actors, request.script_conditions)
     }
   end
 
@@ -190,6 +192,14 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
   end
 
   defp direct_guids(_entity), do: []
+
+  defp script_condition_results(%{object: %{guid: source_guid}, internal: %Internal{world: world}}, actors, conditions)
+       when is_list(conditions) do
+    target_guid = Enum.find(actors, &(is_integer(&1) and &1 > 0))
+    ScriptedEvent.condition_results(world, source_guid, target_guid, conditions)
+  end
+
+  defp script_condition_results(_entity, _actors, _conditions), do: %{}
 
   defp auto_repeat_target(%{target_guid: target_guid}), do: target_guid
   defp auto_repeat_target(_auto_repeat), do: nil

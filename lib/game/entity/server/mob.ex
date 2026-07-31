@@ -148,7 +148,8 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
             &1,
             now,
             ObservationRequest.new([target_guid], Script.observation_radius(steps),
-              game_object_radius: Script.game_object_observation_radius(steps)
+              game_object_radius: Script.game_object_observation_radius(steps),
+              script_conditions: Script.termination_conditions(steps)
             )
           )
         )
@@ -576,7 +577,8 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
               &1,
               now,
               ObservationRequest.new([target_guid], Script.observation_radius(steps),
-                game_object_radius: Script.game_object_observation_radius(steps)
+                game_object_radius: Script.game_object_observation_radius(steps),
+                script_conditions: Script.termination_conditions(steps)
               )
             )
           )

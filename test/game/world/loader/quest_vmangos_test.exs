@@ -63,5 +63,13 @@ defmodule ThistleTea.Game.World.Loader.QuestVmangosTest do
       assert step.game_object_spawn.object.entry == 270
       assert Guid.low_guid(step.game_object_spawn.object.guid) == 35_875
     end
+
+    test "resolves script termination conditions" do
+      assert %Quest{start_script_steps: steps} = QuestLoader.get(5_713)
+      step = Enum.find(steps, &(&1.command == :terminate_condition))
+
+      assert step.termination_condition.entry == 5_713
+      assert step.termination_condition.type == :map_event_active
+    end
   end
 end

@@ -180,6 +180,7 @@ defmodule ThistleTea.Game.World.Loader.Script do
         success_condition: map_event_condition(step, conditions, :success),
         failure_condition: map_event_condition(step, conditions, :failure),
         target_condition: map_event_condition(step, conditions, :target),
+        termination_condition: termination_condition(step, conditions),
         sub_scripts: sub_scripts
     }
   end
@@ -194,6 +195,12 @@ defmodule ThistleTea.Game.World.Loader.Script do
     do: Map.get(conditions, id)
 
   defp map_event_condition(%ScriptStep{}, _conditions, _kind), do: nil
+
+  defp termination_condition(%ScriptStep{command: :terminate_condition, datalong: id}, conditions) do
+    Map.get(conditions, id)
+  end
+
+  defp termination_condition(%ScriptStep{}, _conditions), do: nil
 
   defp build_text(%Mangos.BroadcastText{} = row) do
     %{
