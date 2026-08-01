@@ -52,15 +52,13 @@ defmodule ThistleTea.Game.World do
     |> Enum.reject(fn {guid, _distance} -> guid == self_guid end)
   end
 
-  @position_drift_margin 180.0
-
   def setup_spatial_index, do: SpatialHash.setup_tables()
 
   def nearby_units_exact(table, world, {x, y, z} = origin, range, now \\ Time.now()) do
     world = WorldRef.coerce(world)
 
-    SpatialHash.query(table, world, x, y, z, range + @position_drift_margin)
-    |> Enum.flat_map(fn {guid, _stale_distance} ->
+    SpatialHash.query_cells(table, world, x, y, z, range + SpatialGrid.max_cell_drift())
+    |> Enum.flat_map(fn guid ->
       case position(guid, now) do
         {^world, tx, ty, tz} ->
           distance = Math.distance(origin, {tx, ty, tz})

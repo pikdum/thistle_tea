@@ -7,6 +7,8 @@ defmodule ThistleTea.Game.SpatialGrid do
 
   @cell_size 125
 
+  def max_cell_drift, do: :math.sqrt(2) * @cell_size
+
   def cell_bounds({_world, cx, cy}) do
     x1 = cx * @cell_size - 0.5
     x2 = (cx + 1) * @cell_size - 0.5

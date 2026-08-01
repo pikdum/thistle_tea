@@ -70,6 +70,28 @@ defmodule ThistleTea.Game.World.PositionTest do
       assert World.distance_between(source_guid, target_guid, 1_500) == 0.0
       assert World.distance_between(source, target_guid, 1_500) == 0.0
     end
+
+    test "exact queries do not discard projected vertical movement by its stale distance" do
+      guid = Guid.from_low_guid(:mob, 1, unique_guid())
+
+      moving = %{
+        mob(guid)
+        | internal: %{
+            mob(guid).internal
+            | movement_start_position: {0.0, 0.0, 1_000.0}
+          },
+          movement_block: %{
+            mob(guid).movement_block
+            | position: {0.0, 0.0, 1_000.0, 0.0},
+              spline_nodes: [{0.0, 0.0, -1_000.0}]
+          }
+      }
+
+      on_exit(fn -> World.remove_position(moving) end)
+      World.update_position(moving)
+
+      assert World.nearby_units_exact(:mobs, WorldRef.open(0), {0.0, 0.0, 0.0}, 1.0, 1_500) == [{guid, 0.0}]
+    end
   end
 
   defp mob(guid) do
