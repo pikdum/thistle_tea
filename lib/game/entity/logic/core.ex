@@ -353,6 +353,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
     }
 
     %{entity | unit: unit, internal: internal, movement_block: movement_block}
+    |> Effects.enqueue(Effects.movement_stopped())
     |> maybe_release_companion()
     |> Combat.sync_combat_flag()
   end

@@ -359,6 +359,8 @@ defmodule ThistleTea.Game.Entity.Data.MobTest do
 
       on_exit(fn ->
         Entity.unregister(player_guid)
+        SpatialHash.remove(:mobs, mob_guid)
+        Metadata.delete(mob_guid)
       end)
 
       mob = %Mob{
@@ -409,6 +411,8 @@ defmodule ThistleTea.Game.Entity.Data.MobTest do
 
       on_exit(fn ->
         Entity.unregister(player_guid)
+        SpatialHash.remove(:mobs, mob_guid)
+        Metadata.delete(mob_guid)
       end)
 
       mob = %Mob{

@@ -120,6 +120,25 @@ defmodule ThistleTea.Game.Entity.Logic.CoreTest do
 
       assert entity.internal.killed_by == nil
     end
+
+    test "stops projected movement on death" do
+      movement_block = %{
+        damageable(health: 30).movement_block
+        | position: {0.0, 0.0, 0.0, 0.0},
+          spline_nodes: [{10.0, 0.0, 0.0}],
+          duration: 1_000
+      }
+
+      entity = %{
+        damageable(health: 30)
+        | movement_block: movement_block,
+          internal: %Internal{movement_start_time: 500, movement_start_position: {0.0, 0.0, 0.0}}
+      }
+
+      {entity, _absorbed} = Core.take_damage_with_absorb(entity, 30, 1_000, source: 777)
+
+      assert Enum.any?(entity.internal.events, &match?(%Effects.MovementStopped{}, &1))
+    end
   end
 
   describe "take_damage_with_absorb/4 pet dismissal" do
@@ -242,7 +261,10 @@ defmodule ThistleTea.Game.Entity.Logic.CoreTest do
       {entity, _absorbed} =
         Core.take_damage_with_absorb(%{entity | unit: unit, internal: internal}, 30, 1_000, source: 777)
 
-      assert [%Effects.GiveItem{target_guid: 777, item_id: 6265, count: 1}] = entity.internal.events
+      assert Enum.any?(
+               entity.internal.events,
+               &match?(%Effects.GiveItem{target_guid: 777, item_id: 6265, count: 1}, &1)
+             )
     end
 
     test "does not reward death items for gray or differently tapped creatures" do
@@ -261,7 +283,7 @@ defmodule ThistleTea.Game.Entity.Logic.CoreTest do
         {entity, _absorbed} =
           Core.take_damage_with_absorb(%{entity | unit: unit, internal: internal}, 30, 1_000, source: 777)
 
-        assert entity.internal.events in [nil, []]
+        refute Enum.any?(entity.internal.events, &is_struct(&1, Effects.GiveItem))
       end
     end
   end
