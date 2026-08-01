@@ -31,6 +31,7 @@ defmodule ThistleTea.MixProject do
   defp deps do
     [
       {:tidewave, "~> 0.6", only: [:dev]},
+      {:benchee, "~> 1.5", only: [:dev, :bench], runtime: false},
       {:deps_nix, "~> 3.0", only: :dev, runtime: false},
       {:mix_test_watch, "~> 1.0", only: [:dev, :test], runtime: false},
       {:binary, "~> 0.0.5"},
