@@ -292,11 +292,20 @@ defmodule ThistleTea.Game.Entity.Logic.MovementTest do
     end
 
     test "does not enqueue repeated stops for stationary movement" do
-      entity = build_entity(start_time: nil, start_position: nil, duration: 0, spline_nodes: [])
+      entity = build_entity(start_time: nil, start_position: nil, duration: 0, spline_nodes: [], movement_flags: 0)
 
       stopped = Movement.stop(entity, 500)
 
       assert stopped.internal.events == []
+    end
+
+    test "enqueues a stop for translating client movement" do
+      entity = build_entity(start_time: nil, start_position: nil, duration: 0, spline_nodes: [], movement_flags: 0xE)
+
+      stopped = Movement.stop(entity, 500)
+
+      assert stopped.movement_block.movement_flags == 0
+      assert [%Effects.MovementStopped{}] = stopped.internal.events
     end
 
     test "finishes natural movement without emitting an interruption" do

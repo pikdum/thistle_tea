@@ -67,6 +67,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
   def cast_result(state, %Spell{} = spell, spell_cast_targets), do: cast_result(state, spell, spell_cast_targets, nil)
 
   def cast_result(state, %Spell{} = spell, spell_cast_targets, cast_item_guid) do
+    state = snapshot_action_position(state)
     targets = TargetCodec.parse(spell_cast_targets, state.guid)
 
     Logger.info(
@@ -87,6 +88,12 @@ defmodule ThistleTea.Game.Player.Spellcasting do
         {:error, state}
     end
   end
+
+  defp snapshot_action_position(%{character: %Character{} = character} = state) do
+    %{state | character: World.snapshot_position(character)}
+  end
+
+  defp snapshot_action_position(state), do: state
 
   defp cast_state({_result, state}), do: state
 

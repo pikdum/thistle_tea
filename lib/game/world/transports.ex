@@ -202,13 +202,19 @@ defmodule ThistleTea.Game.World.Transports do
     nearest(character, same_world) || Enum.min_by(candidates, & &1.guid, fn -> nil end)
   end
 
-  defp nearest(%Character{movement_block: %MovementBlock{position: {x, y, z, _orientation}}}, candidates) do
-    Enum.min_by(
-      candidates,
-      fn %{position: {transport_x, transport_y, transport_z, _orientation}} ->
-        Math.distance({x, y, z}, {transport_x, transport_y, transport_z})
-      end,
-      fn -> nil end
-    )
+  defp nearest(%Character{} = character, candidates) do
+    case World.position(character) do
+      {_world, x, y, z} ->
+        Enum.min_by(
+          candidates,
+          fn %{position: {transport_x, transport_y, transport_z, _orientation}} ->
+            Math.distance({x, y, z}, {transport_x, transport_y, transport_z})
+          end,
+          fn -> nil end
+        )
+
+      nil ->
+        nil
+    end
   end
 end

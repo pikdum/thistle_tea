@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.World.Position do
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Logic.Movement
+  alias ThistleTea.Game.SpatialGrid
   alias ThistleTea.Game.World.Position.ClientMotion
   alias ThistleTea.Game.World.Position.Spline
   alias ThistleTea.Game.World.SpatialHash
@@ -91,6 +92,8 @@ defmodule ThistleTea.Game.World.Position do
       when is_number(vx) and is_number(vy) and is_number(vz) and is_integer(now) and is_integer(duration_ms) and
              duration_ms > 0 do
     if !(vx == 0.0 and vy == 0.0 and vz == 0.0) do
+      duration_ms = bounded_client_duration({vx, vy, vz}, duration_ms)
+
       %ClientMotion{
         world: WorldRef.coerce(world),
         origin: {x, y, z},
@@ -125,6 +128,12 @@ defmodule ThistleTea.Game.World.Position do
 
   defp reconcile_projection(guid, nil), do: SpatialHash.clear_projection(guid)
   defp reconcile_projection(guid, projection), do: SpatialHash.put_projection(guid, projection)
+
+  defp bounded_client_duration({vx, vy, vz}, requested_duration_ms) do
+    speed = :math.sqrt(vx * vx + vy * vy + vz * vz)
+    max_duration_ms = trunc(SpatialGrid.max_cell_drift() / speed * 1_000)
+    min(requested_duration_ms, max(max_duration_ms, 1))
+  end
 
   defp spline_position(%Spline{} = projection, now) do
     Movement.position_at(

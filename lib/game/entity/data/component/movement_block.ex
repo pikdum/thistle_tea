@@ -78,6 +78,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.MovementBlock do
   @movement_flag_falling_far 0x00004000
   @movement_flag_swimming 0x00200000
   @movement_flag_spline_enabled 0x00400000
+  @movement_flag_flying 0x01000000
   @movement_flag_on_transport 0x02000000
   @movement_flag_spline_elevation 0x04000000
 
@@ -99,6 +100,13 @@ defmodule ThistleTea.Game.Entity.Data.Component.MovementBlock do
   end
 
   def translating?(_movement_block), do: false
+
+  def clear_motion_flags(flags) when is_integer(flags) do
+    motion_flags = @movement_flag_mask_translating ||| @movement_flag_spline_enabled ||| @movement_flag_flying
+    band(flags, bnot(motion_flags))
+  end
+
+  def clear_motion_flags(_flags), do: 0
 
   def client_velocity(%__MODULE__{} = movement_block) do
     if translating?(movement_block) and not airborne?(movement_block) do

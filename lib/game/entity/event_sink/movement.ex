@@ -22,6 +22,7 @@ defmodule ThistleTea.Game.Entity.EventSink.Movement do
   end
 
   def emit(%Character{} = entity, %Effects.MovementStopped{}, _context) do
+    entity = World.snapshot_position(entity)
     World.update_position(entity)
     entity
   end

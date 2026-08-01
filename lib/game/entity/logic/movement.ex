@@ -342,7 +342,7 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
         spline_start_position: nil,
         duration: 0,
         time_passed: 0,
-        movement_flags: clear_motion_flags(mb.movement_flags)
+        movement_flags: MovementBlock.clear_motion_flags(mb.movement_flags)
     }
 
     internal = %{internal | movement_start_time: nil, movement_start_position: nil}
@@ -350,11 +350,11 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
   end
 
   defp projected?(%{
-         movement_block: %MovementBlock{spline_nodes: spline_nodes, duration: duration},
+         movement_block: %MovementBlock{spline_nodes: spline_nodes, duration: duration} = movement_block,
          internal: %Internal{movement_start_time: start_time, movement_start_position: start_position}
        }) do
-    is_list(spline_nodes) and spline_nodes != [] and is_integer(duration) and duration > 0 and
-      is_integer(start_time) and is_tuple(start_position)
+    (is_list(spline_nodes) and spline_nodes != [] and is_integer(duration) and duration > 0 and
+       is_integer(start_time) and is_tuple(start_position)) or MovementBlock.translating?(movement_block)
   end
 
   defp projected?(_entity), do: false
@@ -380,12 +380,6 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
   end
 
   def blocked?(_entity), do: false
-
-  defp clear_motion_flags(flags) when is_integer(flags) do
-    flags &&& bnot(bor(bor(@movement_flag_forward, @movement_flag_spline_enabled), @movement_flag_flying))
-  end
-
-  defp clear_motion_flags(_flags), do: 0
 
   defp update_position_from_spline(
          %{

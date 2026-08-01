@@ -259,14 +259,16 @@ defmodule ThistleTea.Game.Player.Taxi do
     %{itinerary | total_cost: total_cost}
   end
 
-  defp validate_source_position(%Character{internal: %{world: world}, movement_block: %{position: position}}, %Node{
+  defp validate_source_position(%Character{internal: %{world: world}} = character, %Node{
          map_id: map_id,
          position: source_position
        }) do
-    if map_id == world.map_id and Math.distance(xyz(position), source_position) <= @taxi_start_distance do
+    with true <- map_id == world.map_id,
+         {^world, x, y, z} <- World.position(character),
+         true <- Math.distance({x, y, z}, source_position) <= @taxi_start_distance do
       :ok
     else
-      {:error, :too_far_away}
+      _too_far -> {:error, :too_far_away}
     end
   end
 
@@ -345,18 +347,15 @@ defmodule ThistleTea.Game.Player.Taxi do
     })
   end
 
-  defp flightmaster_node(
-         %Character{unit: unit, internal: %{world: world}, movement_block: %{position: player_position}} = character,
-         guid,
-         network
-       )
+  defp flightmaster_node(%Character{unit: unit, internal: %{world: world}} = character, guid, network)
        when is_integer(guid) do
     with :mob <- Guid.entity_type(guid),
          %{npc_flags: npc_flags, alive?: true} <- Metadata.query(guid, [:npc_flags, :alive?]),
          true <- (npc_flags &&& @flightmaster_flag) != 0,
          true <- Reputation.can_interact?(character, guid),
          {^world, x, y, z} <- World.position(guid),
-         true <- Math.distance(xyz(player_position), {x, y, z}) <= @interaction_distance,
+         distance when is_number(distance) <- World.distance_between(character, guid),
+         true <- distance <= @interaction_distance,
          %Node{} = node <- TaxiNetwork.nearest_node(network, world.map_id, {x, y, z}, team_for_race(unit.race)) do
       {:ok, node}
     else
@@ -365,6 +364,4 @@ defmodule ThistleTea.Game.Player.Taxi do
   end
 
   defp flightmaster_node(%Character{}, _guid, _network), do: {:error, :invalid_flightmaster}
-
-  defp xyz({x, y, z, _orientation}), do: {x, y, z}
 end

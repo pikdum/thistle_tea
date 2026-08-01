@@ -52,27 +52,21 @@ defmodule ThistleTea.Game.Player.GameObjects do
       match?(%GameObjectTemplate{type: @go_type_chair}, GameObjectTemplateLoader.get(Guid.entry(guid)))
   end
 
-  defp sit_on_chair(
-         %{
-           character:
-             %Character{internal: %{world: world}, movement_block: %{position: {x, y, z, _orientation}}} = character
-         } = state,
-         guid
-       ) do
-    case Entity.call(guid, {:chair_seat, world, {x, y, z}}) do
-      {:ok, position, stand_state} ->
-        character =
-          character
-          |> then(fn character -> %{character | unit: %{character.unit | stand_state: stand_state}} end)
-          |> Effects.enqueue([Effects.teleport(position), Effects.stand_state(stand_state)])
-          |> EventSink.emit_pending()
+  defp sit_on_chair(%{character: %Character{internal: %{world: world}} = character} = state, guid) do
+    with {^world, x, y, z} <- World.position(character),
+         {:ok, position, stand_state} <- Entity.call(guid, {:chair_seat, world, {x, y, z}}) do
+      character =
+        character
+        |> then(fn character -> %{character | unit: %{character.unit | stand_state: stand_state}} end)
+        |> Effects.enqueue([Effects.teleport(position), Effects.stand_state(stand_state)])
+        |> EventSink.emit_pending()
 
-        %UpdateObject{update_type: :values, object_type: :player}
-        |> struct(Map.from_struct(character))
-        |> World.broadcast_packet(character, include_self?: false)
+      %UpdateObject{update_type: :values, object_type: :player}
+      |> struct(Map.from_struct(character))
+      |> World.broadcast_packet(character, include_self?: false)
 
-        %{state | character: character}
-
+      %{state | character: character}
+    else
       _error ->
         state
     end

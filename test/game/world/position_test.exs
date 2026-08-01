@@ -6,6 +6,8 @@ defmodule ThistleTea.Game.World.PositionTest do
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Mob
+  alias ThistleTea.Game.Entity.EventSink
+  alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Position
@@ -68,12 +70,48 @@ defmodule ThistleTea.Game.World.PositionTest do
       assert %ClientMotion{} = Position.projection(guid)
       assert World.position(guid, 1_100) == {WorldRef.open(0), 7.0, 0.0, 0.0}
       assert World.position(guid, 2_000) == {WorldRef.open(0), 52.5, 0.0, 0.0}
+
+      assert World.snapshot_position(character, 1_100).movement_block.position ==
+               {7.0, 0.0, 0.0, 0.0}
+
       assert Position.moving?(guid, 1_500)
       refute Position.moving?(guid, 2_000)
 
       Position.put(character, :players, nil)
       assert Position.projection(guid) == nil
       assert World.position(guid, 2_000) == {WorldRef.open(0), 0.0, 0.0, 0.0}
+    end
+
+    test "materializes client motion before an authoritative stop" do
+      guid = Guid.from_low_guid(:player, unique_guid())
+      now = System.monotonic_time(:millisecond)
+
+      character =
+        mob(guid)
+        |> stop_at({0.0, 0.0, 0.0, 0.0})
+        |> then(&%{&1 | movement_block: %{&1.movement_block | movement_flags: 1}})
+        |> then(&struct(Character, Map.from_struct(&1)))
+
+      projection = Position.client_motion(character, {70.0, 0.0, 0.0}, now - 100, 750)
+      on_exit(fn -> World.remove_position(character) end)
+      Position.put(character, :players, projection)
+
+      stopped = character |> Movement.stop(now) |> EventSink.emit_pending()
+      {x, y, z, orientation} = stopped.movement_block.position
+
+      assert_in_delta x, 7.0, 1.0
+      assert {y, z, orientation} == {0.0, 0.0, 0.0}
+      assert Position.projection(guid) == nil
+    end
+
+    test "bounds client projection drift to the spatial broad-phase margin" do
+      character = struct(Character, Map.from_struct(stop_at(mob(77), {0.0, 0.0, 0.0, 0.0})))
+
+      assert %ClientMotion{started_at: 1_000, expires_at: expires_at} =
+               Position.client_motion(character, {1_000.0, 0.0, 0.0}, 1_000, 750)
+
+      assert expires_at < 1_750
+      assert_in_delta expires_at, 1_176, 1
     end
   end
 

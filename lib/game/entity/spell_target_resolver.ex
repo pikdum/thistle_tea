@@ -230,14 +230,8 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
       World.nearby_units_exact(:mobs, map, position, radius, now)
   end
 
-  defp caster_position(
-         %{object: %{guid: guid}, internal: %{world: world}, movement_block: %{position: {x, y, z, _orientation}}},
-         now
-       ) do
-    case World.position(guid, now) do
-      {^world, projected_x, projected_y, projected_z} -> {world, projected_x, projected_y, projected_z}
-      _missing -> {world, x, y, z}
-    end
+  defp caster_position(%{object: %{guid: guid}} = caster, now) when is_integer(guid) do
+    World.position(caster, now)
   end
 
   defp caster_position(_caster, _now), do: nil

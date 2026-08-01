@@ -27,12 +27,13 @@ defmodule ThistleTea.Game.World do
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Pathfinding
   alias ThistleTea.Game.World.Position
+  alias ThistleTea.Game.World.Position.ClientMotion
   alias ThistleTea.Game.World.Presence
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.WorldRef
 
   def nearby_players(entity, range \\ 250) do
-    case entity_position(entity, Time.now()) do
+    case position(entity, Time.now()) do
       {world, x, y, z} -> nearby_units_exact(:players, world, {x, y, z}, range)
       nil -> []
     end
@@ -143,7 +144,7 @@ defmodule ThistleTea.Game.World do
   end
 
   def tracking_players(entity) do
-    case entity_position(entity, Time.now()) do
+    case position(entity, Time.now()) do
       {world, x, y, z} -> SpatialHash.query_cells(:players, world, x, y, z, 250)
       nil -> []
     end
@@ -267,7 +268,39 @@ defmodule ThistleTea.Game.World do
     end
   end
 
-  def position(guid, now \\ Time.now()) when is_integer(guid), do: Position.get(guid, now)
+  def position(subject, now \\ Time.now())
+
+  def position(guid, now) when is_integer(guid) and is_integer(now), do: Position.get(guid, now)
+
+  def position(
+        %{object: %{guid: guid}, internal: %Internal{world: world}, movement_block: %MovementBlock{}} = entity,
+        now
+      )
+      when is_integer(guid) and is_integer(now) do
+    case Position.projection(guid) do
+      %ClientMotion{world: ^world} ->
+        case Position.get(guid, now) do
+          {^world, x, y, z} -> {world, x, y, z}
+          _missing -> canonical_entity_position(entity, now)
+        end
+
+      _stationary_or_server_movement ->
+        canonical_entity_position(entity, now)
+    end
+  end
+
+  def position(entity, now) when is_integer(now), do: canonical_entity_position(entity, now)
+
+  def snapshot_position(
+        %{movement_block: %MovementBlock{position: {_x, _y, _z, orientation}}} = entity,
+        now \\ Time.now()
+      )
+      when is_integer(now) do
+    case position(entity, now) do
+      {_world, x, y, z} -> %{entity | movement_block: %{entity.movement_block | position: {x, y, z, orientation}}}
+      nil -> entity
+    end
+  end
 
   def projected_position(guid, horizon_ms, now \\ Time.now())
       when is_integer(guid) and is_integer(horizon_ms) and horizon_ms >= 0 and is_integer(now) do
@@ -287,7 +320,7 @@ defmodule ThistleTea.Game.World do
 
   def distance_between(%{internal: %Internal{}, movement_block: %MovementBlock{}} = source, guid, now)
       when is_integer(guid) and is_integer(now) do
-    case {entity_position(source, now), position(guid, now)} do
+    case {position(source, now), position(guid, now)} do
       {{world, x1, y1, z1}, {world, x2, y2, z2}} -> Math.distance({x1, y1, z1}, {x2, y2, z2})
       _ -> nil
     end
@@ -304,7 +337,7 @@ defmodule ThistleTea.Game.World do
   def line_of_sight?(%{internal: %Internal{}, movement_block: %MovementBlock{}} = entity, guid) when is_integer(guid) do
     now = Time.now()
 
-    case {entity_position(entity, now), position(guid, now)} do
+    case {position(entity, now), position(guid, now)} do
       {{world, x1, y1, z1}, {world, x2, y2, z2}} ->
         Pathfinding.line_of_sight?(world.map_id, {x1, y1, z1}, {x2, y2, z2})
 
@@ -337,16 +370,16 @@ defmodule ThistleTea.Game.World do
   end
 
   defp nearby(entity, table, range) do
-    case entity_position(entity, Time.now()) do
+    case position(entity, Time.now()) do
       {world, x, y, z} -> nearby_units_exact(table, world, {x, y, z}, range)
       nil -> []
     end
   end
 
-  defp entity_position(%{internal: %Internal{world: world}, movement_block: %MovementBlock{}} = entity, now) do
+  defp canonical_entity_position(%{internal: %Internal{world: world}, movement_block: %MovementBlock{}} = entity, now) do
     %{movement_block: %MovementBlock{position: {x, y, z, _orientation}}} = Movement.sync_position(entity, now)
     {world, x, y, z}
   end
 
-  defp entity_position(_entity, _now), do: nil
+  defp canonical_entity_position(_entity, _now), do: nil
 end
