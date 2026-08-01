@@ -4,6 +4,7 @@ defmodule ThistleTea.Game.Entity.Server.PlayerTest do
 
   alias ThistleTea.Account
   alias ThistleTea.Game.Entity
+  alias ThistleTea.Game.Entity.Commands
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Companion
   alias ThistleTea.Game.Entity.Data.Companion.EntityRef
@@ -22,6 +23,7 @@ defmodule ThistleTea.Game.Entity.Server.PlayerTest do
   alias ThistleTea.Game.Entity.Server.Player, as: PlayerServer
   alias ThistleTea.Game.Entity.Server.Player.CompanionOwner.Attachment
   alias ThistleTea.Game.Entity.Server.Player.CompanionOwner.Monitor, as: CompanionMonitor
+  alias ThistleTea.Game.Entity.Server.Player.ServerMovement
   alias ThistleTea.Game.Entity.Server.Player.State
   alias ThistleTea.Game.Entity.Server.PlayerSupervisor
   alias ThistleTea.Game.Guid
@@ -345,6 +347,37 @@ defmodule ThistleTea.Game.Entity.Server.PlayerTest do
       assert teleported.movement_block.transport_guid == nil
       assert teleported.movement_block.transport_position == nil
       assert Bitwise.band(teleported.movement_block.movement_flags, 0x02000000) == 0
+    end
+
+    test "teleports cancel projected server movement" do
+      guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
+      character = character(guid, health: 100, max_health: 100)
+      started_at = Time.now()
+
+      state =
+        %State{connection_pid: self(), guid: guid, character: character, ready: true}
+        |> ServerMovement.start(%Commands.ChargePathResolved{
+          path: [{100.0, 0.0, 0.0}],
+          duration_ms: 10_000,
+          started_at: started_at
+        })
+
+      on_exit(fn ->
+        Metadata.delete(guid)
+        SpatialHash.remove(:players, guid)
+      end)
+
+      assert SpatialHash.get_movement(guid)
+
+      assert {:noreply, %State{character: teleported, server_movement: nil}} =
+               PlayerServer.handle_cast(
+                 {:start_teleport, 10.0, 20.0, 30.0, 0.5, WorldRef.open(0)},
+                 state
+               )
+
+      assert teleported.movement_block.position == {10.0, 20.0, 30.0, 0.5}
+      assert teleported.internal.movement_start_time == nil
+      assert SpatialHash.get_movement(guid) == nil
     end
 
     test "updates the public group leader player flag" do

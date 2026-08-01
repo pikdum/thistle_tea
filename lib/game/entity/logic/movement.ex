@@ -176,6 +176,20 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
     end
   end
 
+  def start_timed_path(entity, path, duration, now, opts \\ [])
+      when is_list(path) and is_integer(duration) and duration > 0 and is_integer(now) and is_list(opts) do
+    entity = sync_position(entity, now)
+    %{movement_block: %MovementBlock{position: {x0, y0, z0, _orientation}}} = entity
+
+    if path == [] or at_destination?({x0, y0, z0}, List.last(path)) do
+      entity
+    else
+      entity
+      |> increment_spline_id()
+      |> begin_path(path, duration, now, opts)
+    end
+  end
+
   defp start_path(entity, path, now, opts) when is_integer(now) do
     entity = sync_position(entity, now)
     %{movement_block: %MovementBlock{position: {x0, y0, z0, _o}}} = entity
@@ -188,24 +202,34 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
   end
 
   defp start_resolved_path(entity, path, now, opts) do
-    entity = increment_spline_id(entity)
-
     %{
-      movement_block: %MovementBlock{walk_speed: walk_speed, position: {x0, y0, z0, orientation}} = mb,
-      internal: %Internal{running: running, spline_id: spline_id} = internal
+      movement_block: %MovementBlock{walk_speed: walk_speed, run_speed: run_speed},
+      internal: %Internal{running: running}
     } = entity
 
     running = Keyword.get(opts, :run?, running)
-    speed = movement_speed(Keyword.get(opts, :velocity), running, mb.run_speed, walk_speed)
-    flying? = Keyword.get(opts, :flying?, false)
+    speed = movement_speed(Keyword.get(opts, :velocity), running, run_speed, walk_speed)
 
     duration =
-      [{x0, y0, z0} | path]
+      [position(entity) | path]
       |> Math.movement_duration(speed)
       |> Kernel.*(1_000)
       |> trunc()
       |> max(1)
 
+    entity
+    |> increment_spline_id()
+    |> begin_path(path, duration, now, opts)
+  end
+
+  defp begin_path(entity, path, duration, now, opts) do
+    %{
+      movement_block: %MovementBlock{position: {x0, y0, z0, orientation}} = mb,
+      internal: %Internal{running: default_running, spline_id: spline_id} = internal
+    } = entity
+
+    running = Keyword.get(opts, :run?, default_running)
+    flying? = Keyword.get(opts, :flying?, false)
     internal = %{internal | movement_start_time: now, movement_start_position: {x0, y0, z0}}
     {_position, orientation} = pose_along_path([{x0, y0, z0} | path], 0.0, orientation)
 
@@ -223,6 +247,8 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
 
     %{entity | movement_block: movement_block, internal: internal}
   end
+
+  defp position(%{movement_block: %MovementBlock{position: {x, y, z, _orientation}}}), do: {x, y, z}
 
   defp at_destination?({x0, y0, z0}, {x, y, z}) do
     abs(x0 - x) <= @move_epsilon and abs(y0 - y) <= @move_epsilon and abs(z0 - z) <= @move_epsilon

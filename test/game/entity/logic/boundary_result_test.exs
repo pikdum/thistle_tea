@@ -11,12 +11,15 @@ defmodule ThistleTea.Game.Entity.Logic.BoundaryResultTest do
 
   describe "apply/2" do
     test "applies a resolved charge path atomically" do
-      character = %Character{movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}}
+      character = %Character{
+        internal: %Internal{spline_id: 4},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
+      }
 
       command = %Commands.ChargePathResolved{
         path: [{2.0, 0.0, 0.0}],
         duration_ms: 80,
-        destination: {2.0, 0.0, 0.0, 0.5}
+        started_at: 1_000
       }
 
       character = BoundaryResult.apply(character, command)
@@ -24,7 +27,10 @@ defmodule ThistleTea.Game.Entity.Logic.BoundaryResultTest do
       assert character.movement_block.spline_nodes == [{2.0, 0.0, 0.0}]
       assert character.movement_block.duration == 80
       assert character.movement_block.spline_flags == 0x100
-      assert character.movement_block.position == {2.0, 0.0, 0.0, 0.5}
+      assert character.movement_block.position == {0.0, 0.0, 0.0, 0.0}
+      assert character.movement_block.spline_start_position == {0.0, 0.0, 0.0}
+      assert character.internal.movement_start_time == 1_000
+      assert character.internal.movement_start_position == {0.0, 0.0, 0.0}
     end
 
     test "records a started farsight object" do

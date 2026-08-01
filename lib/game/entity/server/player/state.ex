@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
   alias ThistleTea.Game.Entity.Logic.Dueling
   alias ThistleTea.Game.Entity.Logic.PlayerCombat
   alias ThistleTea.Game.Entity.Server.Player.CompanionOwner
+  alias ThistleTea.Game.Entity.Server.Player.ServerMovement
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Party.Group
@@ -49,6 +50,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
     :pending_last_instance_map,
     :transport_refresh_pending,
     :taxi_arrival_ref,
+    :server_movement,
     :active_mover_guid,
     :companion_monitor,
     ready: false,
@@ -95,6 +97,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
 
     state = disengage(state)
     state = CompanionOwner.suspend(state)
+    state = ServerMovement.cancel(state)
     state = Taxi.disconnect(state)
     state = leave_transport(state)
 

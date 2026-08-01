@@ -58,6 +58,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.Entity.Server.Player.CompanionOwner.Attachment
   alias ThistleTea.Game.Entity.Server.Player.CompanionOwner.Monitor, as: CompanionMonitor
   alias ThistleTea.Game.Entity.Server.Player.PacketSink
+  alias ThistleTea.Game.Entity.Server.Player.ServerMovement
   alias ThistleTea.Game.Entity.Server.Player.State
   alias ThistleTea.Game.Entity.Server.Player.TickScheduler
   alias ThistleTea.Game.Entity.Server.PlayerSupervisor
@@ -476,7 +477,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
         {:start_teleport, x, y, z, orientation, world},
         %{character: %Character{internal: %Internal{world: world}}} = state
       ) do
-    state = detach_transport(state)
+    state = state |> cancel_authoritative_movement() |> detach_transport()
     state = state |> disengage_for_world_transition() |> suspend_companion_for_teleport()
     character = state.character
 
@@ -513,7 +514,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   end
 
   def handle_cast({:start_teleport, x, y, z, orientation, %WorldRef{} = world}, state) do
-    state = detach_transport(state)
+    state = state |> cancel_authoritative_movement() |> detach_transport()
     DuelSystem.disconnect(state.guid)
     state = state |> disengage_for_world_transition() |> suspend_companion_for_teleport()
     previous_world = state.character.internal.world
@@ -641,6 +642,14 @@ defmodule ThistleTea.Game.Entity.Server.Player do
       {:noreply, state}
   end
 
+  def handle_info({:server_movement_arrived, token}, state) do
+    {:noreply, ServerMovement.finish(state, token)}
+  rescue
+    error ->
+      Logger.error("server movement arrival crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:noreply, state}
+  end
+
   def handle_info({:send_taxi_path, path_id}, state) do
     {:noreply, PlayerTaxi.start_path(state, path_id)}
   rescue
@@ -719,10 +728,8 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   end
 
   @impl GenServer
-  def handle_info(%Commands.ChargePathResolved{} = command, %{character: %Character{} = character} = state) do
-    character = BoundaryResult.apply(character, command)
-    World.update_position(character)
-    {:noreply, %{state | character: character}}
+  def handle_info(%Commands.ChargePathResolved{} = command, %{character: %Character{}} = state) do
+    {:noreply, ServerMovement.start(state, command)}
   end
 
   def handle_info(%Commands.FarsightStarted{guid: guid} = command, %{character: %Character{} = character} = state) do
@@ -1353,11 +1360,18 @@ defmodule ThistleTea.Game.Entity.Server.Player do
 
   defp detach_transport(state), do: state
 
+  defp cancel_authoritative_movement(%State{} = state) do
+    state
+    |> ServerMovement.cancel()
+    |> PlayerTaxi.disconnect()
+  end
+
   defp transport_worldport(%State{} = state, %{entry: entry, world: %WorldRef{} = world}, {x, y, z, orientation}) do
     DuelSystem.disconnect(state.guid)
 
     state =
       state
+      |> ServerMovement.cancel()
       |> prepare_transport_worldport()
       |> disengage_for_world_transition()
       |> suspend_companion_for_teleport()

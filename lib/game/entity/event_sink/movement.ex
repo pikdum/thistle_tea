@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Entity.EventSink.Movement do
   alias ThistleTea.Game.Entity.EventSink.Context
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Network.Message
+  alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.ChaseWatch
 
@@ -118,7 +119,7 @@ defmodule ThistleTea.Game.Entity.EventSink.Movement do
     command = %Commands.ChargePathResolved{
       path: effect.path,
       duration_ms: effect.duration_ms,
-      destination: effect.destination
+      started_at: Time.now()
     }
 
     Context.send(context, command)
