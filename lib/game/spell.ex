@@ -354,6 +354,19 @@ defmodule ThistleTea.Game.Spell do
 
   def channel_ticked_effects(_spell), do: []
 
+  def target_dependent_channel?(%__MODULE__{effects: effects} = spell) when is_list(effects) do
+    attribute?(spell, :channeled) and
+      Enum.any?(effects, fn
+        %Effect{type: :apply_aura, aura: aura, implicit_target_a: target} ->
+          not is_nil(aura) and target not in [nil, :caster]
+
+        _effect ->
+          false
+      end)
+  end
+
+  def target_dependent_channel?(_spell), do: false
+
   def channel_tick_ms(%__MODULE__{effects: effects}) do
     effects
     |> Enum.map(& &1.amplitude_ms)

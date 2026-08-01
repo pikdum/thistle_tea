@@ -435,6 +435,106 @@ defmodule ThistleTea.Game.Entity.Logic.CastingTest do
   end
 
   describe "complete/3" do
+    test "stops a target-dependent channel when its only target resists" do
+      now = 1_000
+      target_guid = 7
+
+      spell = %Spell{
+        id: 19_304,
+        duration_ms: 6_000,
+        attributes: MapSet.new([:channeled]),
+        effects: [
+          %Effect{
+            type: :apply_aura,
+            aura: :periodic_damage,
+            implicit_target_a: :target_enemy,
+            amplitude_ms: 1_000
+          }
+        ]
+      }
+
+      resolution = %{
+        channel_resolution()
+        | hits: [],
+          misses: [%{guid: target_guid, reason: 2}],
+          impacts: [],
+          followups: %{channel_resolution().followups | packet_hits: [], selected_unit_guid: target_guid}
+      }
+
+      casting =
+        spell
+        |> Cast.new(Target.unit(target_guid), now)
+        |> Cast.transition(:launch)
+        |> Cast.put_resolution(resolution)
+        |> Cast.transition(:impact)
+
+      mob = %Mob{
+        object: %Object{guid: 1},
+        unit: %Unit{target: target_guid},
+        internal: %Internal{}
+      }
+
+      mob = Casting.complete(mob, casting, now)
+
+      assert mob.internal.casting == nil
+      assert mob.unit.channel_object == 0
+      assert mob.unit.channel_spell == 0
+
+      assert [
+               %Effects.ChannelStart{spell_id: 19_304, channel_time_ms: 6_000},
+               %Effects.RemoveAura{target_guid: ^target_guid, spell_id: 19_304},
+               %Effects.DespawnAreaEffects{spell_id: 19_304},
+               %Effects.ChannelUpdate{channel_time_ms: 0}
+             ] = mob.internal.events
+    end
+
+    test "keeps a self-aura channel active when its selected enemy is not an impact target" do
+      now = 1_000
+      target_guid = 7
+
+      spell = %Spell{
+        id: 5143,
+        duration_ms: 5_000,
+        attributes: MapSet.new([:channeled]),
+        effects: [
+          %Effect{
+            type: :apply_aura,
+            aura: :periodic_trigger_spell,
+            implicit_target_a: :caster,
+            trigger_spell_id: 7268,
+            amplitude_ms: 1_000
+          }
+        ]
+      }
+
+      resolution = %{
+        channel_resolution()
+        | hits: [],
+          impacts: [],
+          followups: %{channel_resolution().followups | packet_hits: [], selected_unit_guid: target_guid}
+      }
+
+      casting =
+        spell
+        |> Cast.new(Target.unit(target_guid), now)
+        |> Cast.transition(:launch)
+        |> Cast.put_resolution(resolution)
+        |> Cast.transition(:impact)
+
+      mob = %Mob{
+        object: %Object{guid: 1},
+        unit: %Unit{target: target_guid},
+        internal: %Internal{}
+      }
+
+      mob = Casting.complete(mob, casting, now)
+
+      assert %Cast{phase: :channel_tick} = mob.internal.casting
+      assert mob.unit.channel_object == target_guid
+      assert mob.unit.channel_spell == 5143
+      assert [%Effects.ChannelStart{spell_id: 5143, channel_time_ms: 5_000}] = mob.internal.events
+    end
+
     test "queues quest cast credit for successful unit and gameobject targets" do
       unit_guid = Guid.from_low_guid(:mob, 10_978, 1)
       object_guid = Guid.from_low_guid(:game_object, 176_158, 2)

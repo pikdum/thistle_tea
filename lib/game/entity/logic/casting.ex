@@ -199,7 +199,12 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
     if Cast.channeled?(casting) do
       casting = Cast.transition(casting, :channel_tick)
       entity = entity |> put_cast(casting) |> start_channel(casting)
-      {:waiting, entity, Cast.next_channel_delay(casting, now)}
+
+      if valid_channel_target?(casting) do
+        {:waiting, entity, Cast.next_channel_delay(casting, now)}
+      else
+        {:finished, stop_channel(entity, casting)}
+      end
     else
       casting = Cast.transition(casting, :finish)
       entity |> put_cast(casting) |> advance_phase(casting, now)
@@ -809,6 +814,23 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
   end
 
   defp unit_channel_target_dead?(_character, _casting), do: false
+
+  defp valid_channel_target?(%Cast{
+         spell: %Spell{} = spell,
+         targets: %Target{} = targets,
+         resolution: %CastResolution{hits: hits}
+       }) do
+    if Spell.target_dependent_channel?(spell) do
+      case Target.unit_guid(targets) do
+        guid when is_integer(guid) and guid > 0 -> guid in hits
+        _none -> hits != []
+      end
+    else
+      true
+    end
+  end
+
+  defp valid_channel_target?(_casting), do: true
 
   defp unit_channel_target_in_range?(character, %Cast{spell: %Spell{} = spell} = casting) do
     case unit_channel_target_guid(character, casting) do
