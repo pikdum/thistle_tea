@@ -31,6 +31,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
   alias ThistleTea.Game.Spell.CastResolution.Followups
   alias ThistleTea.Game.Spell.CastResolution.Impact
   alias ThistleTea.Game.Spell.CastResolution.PowerCost
+  alias ThistleTea.Game.Spell.CastValidation
   alias ThistleTea.Game.Spell.Cooldowns
   alias ThistleTea.Game.Spell.Modifiers
   alias ThistleTea.Game.Spell.Scripts
@@ -766,7 +767,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
       unit_channel_target_dead?(character, casting) ->
         {stop_channel(character, casting), 50}
 
-      not cast_target_visible?(character, casting) ->
+      not unit_channel_target_in_range?(character, casting) ->
         {stop_channel(character, casting), 50}
 
       is_integer(casting.next_channel_tick_at) and now >= casting.next_channel_tick_at ->
@@ -808,6 +809,44 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
   end
 
   defp unit_channel_target_dead?(_character, _casting), do: false
+
+  defp unit_channel_target_in_range?(character, %Cast{spell: %Spell{} = spell} = casting) do
+    case unit_channel_target_guid(character, casting) do
+      guid when is_integer(guid) and guid > 0 ->
+        metadata =
+          case Metadata.query(guid, [:combat_reach, :faction_template]) do
+            nil -> %{}
+            metadata -> metadata
+          end
+
+        target_info =
+          metadata
+          |> Map.put(:position, World.position(guid))
+          |> Map.put(:hostile?, channel_target_hostile?(character, guid, spell, metadata))
+
+        CastValidation.channel_in_range?(character, spell, target_info)
+
+      _none ->
+        true
+    end
+  end
+
+  defp unit_channel_target_in_range?(_character, _casting), do: true
+
+  defp channel_target_hostile?(character, guid, %Spell{} = spell, metadata) do
+    case metadata do
+      %{faction_template: _faction_template} ->
+        Hostility.hostile?(character, Map.put(metadata, :guid, guid))
+
+      _unknown ->
+        Spell.harmful?(spell)
+    end
+  end
+
+  defp unit_channel_target_guid(%{unit: %{channel_object: guid}}, %Cast{}) when is_integer(guid) and guid > 0, do: guid
+
+  defp unit_channel_target_guid(_character, %Cast{targets: %Target{} = targets}), do: Target.unit_guid(targets)
+  defp unit_channel_target_guid(_character, _casting), do: nil
 
   defp dead_target?(guid) do
     case Metadata.query(guid, [:alive?]) do

@@ -196,6 +196,23 @@ defmodule ThistleTea.Game.Spell.CastValidationTest do
     end
   end
 
+  describe "channel_in_range?/3" do
+    test "uses combat reach and the VMangos hostile channel grace range" do
+      spell = harmful_spell(range_yards: 30.0, attributes: MapSet.new([:channeled]))
+      caster = caster(combat_reach: 1.5)
+
+      inside_grace = hostile_target(position: {WorldRef.open(0), 53.0, 0.0, 0.0}, combat_reach: 12.5)
+      outside_grace = hostile_target(position: {WorldRef.open(0), 54.0, 0.0, 0.0}, combat_reach: 12.5)
+
+      assert CastValidation.channel_in_range?(caster, spell, inside_grace)
+      refute CastValidation.channel_in_range?(caster, spell, outside_grace)
+    end
+
+    test "allows an established channel when target position is unavailable" do
+      assert CastValidation.channel_in_range?(caster(), harmful_spell(), hostile_target(position: nil))
+    end
+  end
+
   describe "stance gating" do
     test "stance-locked abilities fail outside their form, including no form at all" do
       claw = harmful_spell(id: 1082, stances: 0x1)

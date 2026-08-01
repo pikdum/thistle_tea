@@ -26,6 +26,8 @@ defmodule ThistleTea.Game.Spell.CastValidation do
   @power_fields %{0 => :power1, 1 => :power2, 2 => :power3, 3 => :power4, 4 => :power5}
   @health_power_type -2
   @range_leeway_yards 5.0
+  @hostile_channel_range_multiplier 1.33
+  @friendly_channel_range_leeway_yards 1.25
 
   def validate(caster, %Spell{} = spell, %Target{} = targets, target_info, now, opts \\ []) do
     with :ok <- check_caster_alive(caster),
@@ -61,6 +63,25 @@ defmodule ThistleTea.Game.Spell.CastValidation do
       check_line_of_sight(spell, target_info)
     end
   end
+
+  def channel_in_range?(caster, %Spell{range_yards: range} = spell, target_info) when is_number(range) and range > 0 do
+    hostile? = Map.get(target_info, :hostile?, Spell.harmful?(spell))
+
+    max_range =
+      if hostile? do
+        range * @hostile_channel_range_multiplier
+      else
+        range + @friendly_channel_range_leeway_yards
+      end
+
+    case combat_distance(caster, target_info) do
+      {:ok, distance} -> distance <= max_range
+      :different_world -> false
+      :unknown -> true
+    end
+  end
+
+  def channel_in_range?(_caster, _spell, _target_info), do: true
 
   defp check_duel(%Spell{} = spell, context) do
     if Spell.duel?(spell), do: validate_duel_context(context), else: :ok
@@ -474,24 +495,32 @@ defmodule ThistleTea.Game.Spell.CastValidation do
 
   defp check_incidental_target(_target_info), do: :ok
 
-  defp check_range(caster, %Spell{range_yards: range} = spell, %{position: {map, x, y, z}} = target_info)
-       when is_number(range) and range > 0 do
-    case caster_position(caster) do
-      {caster_map, _cx, _cy, _cz} when caster_map != map ->
-        {:error, :out_of_range}
-
-      {_map, cx, cy, cz} ->
-        combat_distance =
-          max(distance({cx, cy, cz}, {x, y, z}) - combat_reach_sum(caster, target_info), 0.0)
-
-        check_distance(combat_distance, spell)
-
-      nil ->
-        :ok
+  defp check_range(caster, %Spell{range_yards: range} = spell, %{position: position} = target_info)
+       when is_tuple(position) and tuple_size(position) == 4 and is_number(range) and range > 0 do
+    case combat_distance(caster, target_info) do
+      {:ok, distance} -> check_distance(distance, spell)
+      :different_world -> {:error, :out_of_range}
+      :unknown -> :ok
     end
   end
 
   defp check_range(_caster, _spell, _target_info), do: :ok
+
+  defp combat_distance(caster, %{position: {map, x, y, z}} = target_info) do
+    case caster_position(caster) do
+      {caster_map, _cx, _cy, _cz} when caster_map != map ->
+        :different_world
+
+      {_map, cx, cy, cz} ->
+        distance = max(distance({cx, cy, cz}, {x, y, z}) - combat_reach_sum(caster, target_info), 0.0)
+        {:ok, distance}
+
+      nil ->
+        :unknown
+    end
+  end
+
+  defp combat_distance(_caster, _target_info), do: :unknown
 
   defp combat_reach_sum(caster, target_info) do
     combat_reach(caster.unit.combat_reach) + combat_reach(Map.get(target_info, :combat_reach))

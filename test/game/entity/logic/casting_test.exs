@@ -29,6 +29,7 @@ defmodule ThistleTea.Game.Entity.Logic.CastingTest do
   alias ThistleTea.Game.Spell.Target
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.WorldRef
 
   describe "start/5" do
@@ -378,6 +379,58 @@ defmodule ThistleTea.Game.Entity.Logic.CastingTest do
       assert mob.internal.casting == nil
       assert mob.unit.channel_object == 0
       assert mob.unit.channel_spell == 0
+    end
+
+    test "keeps ticking inside the reach-aware hostile channel grace range" do
+      now = 1_000
+      target_guid = System.unique_integer([:positive])
+      world = WorldRef.open(0)
+      SpatialHash.insert(:mobs, target_guid, world, 53.0, 0.0, 0.0)
+      Metadata.put(target_guid, %{alive?: true, combat_reach: 12.5})
+
+      on_exit(fn ->
+        SpatialHash.remove(:mobs, target_guid)
+        Metadata.delete(target_guid)
+      end)
+
+      spell = %Spell{
+        id: 19_304,
+        range_yards: 30.0,
+        duration_ms: 6_000,
+        attributes: MapSet.new([:channeled]),
+        effects: [
+          %Effect{
+            type: :apply_aura,
+            aura: :periodic_damage,
+            implicit_target_a: :target_enemy,
+            amplitude_ms: 1_000
+          }
+        ]
+      }
+
+      mob = %Mob{
+        object: %Object{guid: 1},
+        unit: %Unit{channel_object: target_guid, channel_spell: spell.id, combat_reach: 1.5},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+        internal: %Internal{
+          world: world,
+          casting: %Cast{
+            spell: spell,
+            targets: Target.unit(1),
+            channel_ms: 6_000,
+            phase: :channel_tick,
+            resolution: channel_resolution(),
+            channel_tick_ms: 1_000,
+            next_channel_tick_at: now - 1,
+            ends_at: now + 6_000
+          }
+        }
+      }
+
+      assert {{:running, _delay_ms}, mob, %Blackboard{}} = SpellBT.cast_tick(mob, Blackboard.new(), now)
+      assert %Cast{} = mob.internal.casting
+      assert mob.internal.casting.next_channel_tick_at > now
+      assert mob.internal.events in [nil, []]
     end
   end
 
