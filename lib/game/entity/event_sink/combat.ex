@@ -182,9 +182,14 @@ defmodule ThistleTea.Game.Entity.EventSink.Combat do
 
   def emit(entity, %Effects.CallAssistance{}, _context), do: entity
 
-  def emit(%Mob{} = entity, %Effects.CallForHelp{target_guid: target_guid}, _context)
+  def emit(%Mob{} = entity, %Effects.CallForHelp{target_guid: target_guid, radius: radius}, _context)
       when is_integer(target_guid) and target_guid > 0 do
-    CallForHelp.pulse(entity, target_guid)
+    if is_number(radius) and radius > 0 do
+      CallForHelp.pulse(entity, target_guid, radius)
+    else
+      CallForHelp.pulse(entity, target_guid)
+    end
+
     entity
   end
 

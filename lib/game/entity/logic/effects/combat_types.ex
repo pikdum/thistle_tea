@@ -24,7 +24,7 @@ defmodule ThistleTea.Game.Entity.Logic.Effects.CombatTypes do
     {:AttackOutcome, [:target_guid, :source_guid, :outcome, :damage, :proc_damage, :spell_id], []},
     {:AttackerStateUpdate, [:source_guid, :target_guid, :damage, :attack], []},
     {:CallAssistance, [:target_guid], []},
-    {:CallForHelp, [:target_guid], []}
+    {:CallForHelp, [:target_guid], [:radius]}
   ]
 
   for {name, required, optional} <- effects do

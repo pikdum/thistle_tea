@@ -40,7 +40,7 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStepTest do
       assert ScriptStep.cast_spell_id(step) == 12_544
     end
 
-    test "decodes taxi commands and keeps unsupported target types as tagged ids" do
+    test "decodes taxi commands and nearest-player targets" do
       step =
         ScriptStep.build(%{
           id: 5,
@@ -67,7 +67,13 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStepTest do
         })
 
       assert step.command == :send_taxi_path
-      assert step.target_type == {:unsupported, 25}
+      assert step.target_type == :nearest_player
+
+      assert row(30) |> Map.put(:target_type, 26) |> ScriptStep.build() |> Map.fetch!(:target_type) ==
+               :nearest_hostile_player
+
+      assert row(30) |> Map.put(:target_type, 27) |> ScriptStep.build() |> Map.fetch!(:target_type) ==
+               :nearest_friendly_player
     end
 
     test "decodes quest credit commands" do
@@ -85,8 +91,12 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStepTest do
       assert ScriptStep.build(row(31)).command == :terminate_script
       assert ScriptStep.build(row(32)).command == :terminate_condition
       assert ScriptStep.build(row(22)).command == :set_faction
+      assert ScriptStep.build(row(29)).command == :modify_threat
       assert ScriptStep.build(row(34)).command == :set_home_position
       assert ScriptStep.build(row(41)).command == :remove_object
+      assert ScriptStep.build(row(42)).command == :set_melee_attack
+      assert ScriptStep.build(row(43)).command == :set_combat_movement
+      assert ScriptStep.build(row(50)).command == :call_for_help
       assert ScriptStep.build(row(51)).command == :set_sheath
       assert ScriptStep.build(row(52)).command == :invincibility
       assert ScriptStep.build(row(60)).command == :start_waypoints
@@ -101,6 +111,7 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStepTest do
       assert ScriptStep.build(row(81)).command == :despawn_game_object
       assert ScriptStep.build(row(82)).command == :load_game_object_spawn
       assert ScriptStep.build(row(83)).command == :quest_credit
+      assert ScriptStep.build(row(85)).command == :send_script_event
       assert ScriptStep.build(row(87)).command == :reset_door_or_button
       assert ScriptStep.build(row(89)).command == :play_custom_animation
     end
@@ -121,6 +132,15 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStepTest do
       assert source.target_type == :map_event_source
       assert target.target_type == :map_event_target
       assert extra.target_type == :map_event_extra_target
+    end
+
+    test "decodes remaining runtime-backed target selectors" do
+      assert row(0) |> Map.put(:target_type, 6) |> ScriptStep.build() |> Map.fetch!(:target_type) == :hostile_nearest
+      assert row(0) |> Map.put(:target_type, 7) |> ScriptStep.build() |> Map.fetch!(:target_type) == :hostile_farthest
+      assert row(0) |> Map.put(:target_type, 9) |> ScriptStep.build() |> Map.fetch!(:target_type) == :owner
+
+      assert row(0) |> Map.put(:target_type, 29) |> ScriptStep.build() |> Map.fetch!(:target_type) ==
+               :random_game_object_with_entry
     end
   end
 

@@ -233,8 +233,8 @@ defmodule ThistleTea.Game.Entity.Logic.Effects do
     %Effects.CallAssistance{target_guid: target_guid}
   end
 
-  def call_for_help(target_guid) when is_integer(target_guid) do
-    %Effects.CallForHelp{target_guid: target_guid}
+  def call_for_help(target_guid, radius \\ nil) when is_integer(target_guid) do
+    %Effects.CallForHelp{target_guid: target_guid, radius: radius}
   end
 
   def attack_stop(source_guid, target_guid) when is_integer(source_guid) and is_integer(target_guid) do
@@ -529,6 +529,12 @@ defmodule ThistleTea.Game.Entity.Logic.Effects do
       target_guid: target_guid,
       step: step
     }
+  end
+
+  def send_script_event(owner_guid, invoker_guid, event_id, data)
+      when is_integer(owner_guid) and (is_integer(invoker_guid) or is_nil(invoker_guid)) and is_integer(event_id) and
+             is_integer(data) do
+    %Effects.SendScriptEvent{owner_guid: owner_guid, invoker_guid: invoker_guid, event_id: event_id, data: data}
   end
 
   def summon_creature(summon, steps, target_guid) when is_map(summon) and is_list(steps) do

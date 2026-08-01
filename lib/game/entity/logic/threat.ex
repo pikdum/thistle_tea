@@ -135,6 +135,29 @@ defmodule ThistleTea.Game.Entity.Logic.Threat do
 
   def modify(entity, _guid, _amount), do: entity
 
+  def modify_percent(%Mob{internal: %Internal{threat: table} = internal} = entity, guid, percent)
+      when is_map(table) and is_integer(guid) and is_number(percent) do
+    case table do
+      %{^guid => current} ->
+        multiplier = max(100 + percent, 0) / 100
+        %{entity | internal: %{internal | threat: Map.put(table, guid, current * multiplier)}}
+
+      _ ->
+        entity
+    end
+  end
+
+  def modify_percent(entity, _guid, _percent), do: entity
+
+  def modify_all_percent(%Mob{internal: %Internal{threat: table} = internal} = entity, percent)
+      when is_map(table) and is_number(percent) do
+    multiplier = max(100 + percent, 0) / 100
+    table = Map.new(table, fn {guid, threat} -> {guid, threat * multiplier} end)
+    %{entity | internal: %{internal | threat: table}}
+  end
+
+  def modify_all_percent(entity, _percent), do: entity
+
   def entries(%Mob{internal: %Internal{threat: table}}) when is_map(table) do
     Enum.sort_by(table, fn {_guid, threat} -> threat end, :desc)
   end

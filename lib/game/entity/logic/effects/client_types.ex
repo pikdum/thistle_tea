@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.Entity.Logic.Effects.ClientTypes do
     {:GameObjectCustomAnimation, [:animation], []},
     {:ScriptSteps, [:steps, :target_guid, :duration_ms], []},
     {:ScriptedEventCommand, [:world, :source_guid, :target_guid, :step], []},
+    {:SendScriptEvent, [:owner_guid, :invoker_guid, :event_id, :data], []},
     {:ForwardScriptSteps, [:target_guid, :steps, :source_guid], []},
     {:SendTaxiPath, [:target_guid, :path_id], []},
     {:PlaySound, [:sound_id], []},

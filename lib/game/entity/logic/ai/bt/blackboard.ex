@@ -160,7 +160,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Blackboard do
       | next_attack_at: 0,
         attack_started: false,
         auto_attacking: false,
-        auto_attack_target: nil
+        auto_attack_target: nil,
+        melee_enabled: true
     }
 
     %{blackboard | combat: combat}
@@ -172,6 +173,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Blackboard do
 
   def combat_movement?(%__MODULE__{spells: %Spells{combat_movement: enabled}}), do: enabled
 
+  def melee_enabled?(%__MODULE__{combat: %Combat{melee_enabled: enabled}}), do: enabled
+
   def run_mode?(%__MODULE__{navigation: %Navigation{run_mode: enabled}}), do: enabled
 
   def set_run_mode(%__MODULE__{navigation: navigation} = blackboard, enabled) when is_boolean(enabled) do
@@ -180,6 +183,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Blackboard do
 
   def set_combat_movement(%__MODULE__{spells: spells} = blackboard, enabled) when is_boolean(enabled) do
     %{blackboard | spells: %{spells | combat_movement: enabled}}
+  end
+
+  def set_melee_enabled(%__MODULE__{combat: combat} = blackboard, enabled) when is_boolean(enabled) do
+    %{blackboard | combat: %{combat | melee_enabled: enabled}}
   end
 
   def spell_timer_ready?(%__MODULE__{spells: %Spells{timers: timers}}, index, now)

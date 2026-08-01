@@ -838,7 +838,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   end
 
   def chase_ready?(_state, %Blackboard{} = blackboard, now) when is_integer(now) do
-    Blackboard.ready_for?(blackboard, :next_chase_at, now)
+    Blackboard.combat_movement?(blackboard) and Blackboard.ready_for?(blackboard, :next_chase_at, now)
   end
 
   def combat_wait(%Mob{} = state, %Blackboard{} = blackboard, %Context{now: now} = context) do
@@ -871,7 +871,11 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   end
 
   defp melee_attack(%Mob{} = state, %Blackboard{} = blackboard, %Context{} = context) do
-    CombatBT.melee_attack_with_context(state, blackboard, context)
+    if Blackboard.melee_enabled?(blackboard) do
+      CombatBT.melee_attack_with_context(state, blackboard, context)
+    else
+      {:success, state, blackboard}
+    end
   end
 
   def halt_at_contact(%Mob{unit: %Unit{target: target}} = state, %Blackboard{} = blackboard, %Context{

@@ -189,6 +189,7 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStep do
   defp command(25), do: :set_run
   defp command(26), do: :attack_start
   defp command(28), do: :stand_state
+  defp command(29), do: :modify_threat
   defp command(30), do: :send_taxi_path
   defp command(31), do: :terminate_script
   defp command(32), do: :terminate_condition
@@ -196,10 +197,13 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStep do
   defp command(35), do: :turn_to
   defp command(39), do: :start_script
   defp command(41), do: :remove_object
+  defp command(42), do: :set_melee_attack
+  defp command(43), do: :set_combat_movement
   defp command(44), do: :set_phase
   defp command(45), do: :set_phase_random
   defp command(46), do: :set_phase_range
   defp command(47), do: :flee
+  defp command(50), do: :call_for_help
   defp command(51), do: :set_sheath
   defp command(52), do: :invincibility
   defp command(60), do: :start_waypoints
@@ -221,6 +225,7 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStep do
   defp command(81), do: :despawn_game_object
   defp command(82), do: :load_game_object_spawn
   defp command(83), do: :quest_credit
+  defp command(85), do: :send_script_event
   defp command(87), do: :reset_door_or_button
   defp command(89), do: :play_custom_animation
   defp command(other), do: {:unsupported, other}
@@ -234,7 +239,10 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStep do
   defp target_type(3), do: :hostile_last_aggro
   defp target_type(4), do: :hostile_random
   defp target_type(5), do: :hostile_random_not_top
+  defp target_type(6), do: :hostile_nearest
+  defp target_type(7), do: :hostile_farthest
   defp target_type(8), do: :owner_or_self
+  defp target_type(9), do: :owner
   defp target_type(10), do: :nearest_creature_with_entry
   defp target_type(11), do: :creature_with_guid
   defp target_type(13), do: :nearest_game_object_with_entry
@@ -247,6 +255,10 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStep do
   defp target_type(22), do: :map_event_source
   defp target_type(23), do: :map_event_target
   defp target_type(24), do: :map_event_extra_target
+  defp target_type(25), do: :nearest_player
+  defp target_type(26), do: :nearest_hostile_player
+  defp target_type(27), do: :nearest_friendly_player
   defp target_type(28), do: :random_creature_with_entry
+  defp target_type(29), do: :random_game_object_with_entry
   defp target_type(other), do: {:unsupported, other}
 end

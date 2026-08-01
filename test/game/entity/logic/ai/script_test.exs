@@ -110,6 +110,125 @@ defmodule ThistleTea.Game.Entity.Logic.AI.ScriptTest do
       assert blackboard.event_ai.phase == 7
     end
 
+    test "combat capability commands update typed blackboard state", %{mob: mob} do
+      steps = [
+        %ScriptStep{command: :set_melee_attack, datalong: 0},
+        %ScriptStep{command: :set_combat_movement, datalong: 0}
+      ]
+
+      {_mob, blackboard} = Script.run(mob, Blackboard.new(), steps, nil, 0)
+
+      refute Blackboard.melee_enabled?(blackboard)
+      refute Blackboard.combat_movement?(blackboard)
+    end
+
+    test "call_for_help enqueues the scripted radius", %{mob: mob} do
+      target = Guid.from_low_guid(:player, 7)
+      mob = %{mob | unit: %{mob.unit | target: target}}
+      step = %ScriptStep{command: :call_for_help, position: {35.0, 0.0, 0.0, 0.0}}
+
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], nil, 0)
+
+      assert [%Effects.CallForHelp{target_guid: ^target, radius: 35.0}] = mob.internal.events
+    end
+
+    test "modify_threat applies a percentage to one target or the whole table", %{mob: mob} do
+      target = Guid.from_low_guid(:player, 7)
+      other = Guid.from_low_guid(:player, 8)
+
+      mob = %{
+        mob
+        | unit: %{mob.unit | target: target},
+          internal: %{mob.internal | threat: %{target => 100.0, other => 50.0}}
+      }
+
+      one = %ScriptStep{command: :modify_threat, datalong: 1, position: {-30.0, 0.0, 0.0, 0.0}}
+      {mob, blackboard} = Script.run(mob, Blackboard.new(), [one], nil, 0)
+      assert mob.internal.threat == %{target => 70.0, other => 50.0}
+
+      all = %ScriptStep{command: :modify_threat, datalong: 8, position: {-100.0, 0.0, 0.0, 0.0}}
+      {mob, _blackboard} = Script.run(mob, blackboard, [all], nil, 0)
+      assert mob.internal.threat == %{target => 0.0, other => 0.0}
+    end
+
+    test "send_script_event targets the source AI with the selected invoker", %{mob: mob} do
+      target = Guid.from_low_guid(:mob, 5_895, 20)
+      step = %ScriptStep{command: :send_script_event, datalong: 5_944, datalong2: 3}
+
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], target, 0)
+
+      assert [
+               %Effects.SendScriptEvent{
+                 owner_guid: owner,
+                 invoker_guid: ^target,
+                 event_id: 5_944,
+                 data: 3
+               }
+             ] = mob.internal.events
+
+      assert owner == mob.object.guid
+    end
+
+    test "hostile selectors use the threat table instead of always returning the victim", %{mob: mob} do
+      top = Guid.from_low_guid(:player, 1)
+      second = Guid.from_low_guid(:player, 2)
+      last = Guid.from_low_guid(:player, 3)
+      threat = %{top => 100.0, second => 70.0, last => 10.0}
+      mob = %{mob | unit: %{mob.unit | target: top}, internal: %{mob.internal | threat: threat}}
+      step = %ScriptStep{command: :cast_spell, datalong: 12_544, datalong2: 0x02, target_type: :hostile_random_not_top}
+
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], nil, 0)
+
+      assert [%Effects.TriggerSpell{target_guid: ^second}] = mob.internal.events
+    end
+
+    test "farthest hostile and nearest player selectors use perception distances", %{mob: mob} do
+      near = Guid.from_low_guid(:player, 1)
+      far = Guid.from_low_guid(:player, 2)
+      mob = %{mob | internal: %{mob.internal | threat: %{near => 100.0, far => 50.0}}}
+
+      observations = %{
+        near => %Observation{guid: near, distance: 4.0},
+        far => %Observation{guid: far, distance: 18.0}
+      }
+
+      nearby = %{mobs: [], players: [{near, 4.0}, {far, 18.0}], game_objects: []}
+      perception = Perception.new(0, nil, observations, nearby)
+      context = Context.new(0, perception: perception)
+
+      farthest = %ScriptStep{command: :turn_to, target_type: :hostile_farthest, target_param1: 1}
+      {mob, blackboard} = Script.run(mob, Blackboard.new(), [farthest], nil, context)
+      assert [%Effects.SetFacing{facing: {:target, ^far}}] = mob.internal.events
+
+      mob = %{mob | internal: %{mob.internal | events: []}}
+      nearest = %ScriptStep{command: :turn_to, target_type: :nearest_player, target_param1: 20}
+      {mob, _blackboard} = Script.run(mob, blackboard, [nearest], nil, context)
+      assert [%Effects.SetFacing{facing: {:target, ^near}}] = mob.internal.events
+    end
+
+    test "nearest friendly player uses the perception faction snapshot", %{mob: mob} do
+      hostile = Guid.from_low_guid(:player, 1)
+      friendly = Guid.from_low_guid(:player, 2)
+      mob_faction = %FactionTemplate{faction: 15, faction_group: 8, friend_group: 8, enemy_group: 1}
+      hostile_faction = %FactionTemplate{faction: 1, faction_group: 1, friend_group: 1, enemy_group: 8}
+      friendly_faction = %FactionTemplate{faction: 15, faction_group: 8, friend_group: 8, enemy_group: 1}
+      mob = %{mob | unit: %{mob.unit | faction_template: mob_faction}}
+
+      observations = %{
+        mob.object.guid => %Observation{guid: mob.object.guid, metadata: %{faction_template: mob_faction}},
+        hostile => %Observation{guid: hostile, distance: 4.0, metadata: %{faction_template: hostile_faction}},
+        friendly => %Observation{guid: friendly, distance: 8.0, metadata: %{faction_template: friendly_faction}}
+      }
+
+      nearby = %{mobs: [], players: [{hostile, 4.0}, {friendly, 8.0}], game_objects: []}
+      context = Context.new(0, perception: Perception.new(0, nil, observations, nearby))
+      step = %ScriptStep{command: :turn_to, target_type: :nearest_friendly_player, target_param1: 20}
+
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], nil, context)
+
+      assert [%Effects.SetFacing{facing: {:target, ^friendly}}] = mob.internal.events
+    end
+
     test "flee marks the blackboard and emotes when a victim exists", %{mob: mob} do
       victim = Guid.from_low_guid(:player, 7)
       mob = %{mob | unit: %{mob.unit | target: victim}}

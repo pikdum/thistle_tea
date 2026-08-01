@@ -36,10 +36,12 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Engagement
+  alias ThistleTea.Game.Entity.Logic.Hostility
   alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.Entity.Logic.PlayerCombat
   alias ThistleTea.Game.Entity.Logic.ScriptEquipment
   alias ThistleTea.Game.Entity.Logic.TemporaryFaction
+  alias ThistleTea.Game.Entity.Logic.Threat
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Spell.Cast
 
@@ -69,7 +71,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
   @entry_target_types [
     :nearest_creature_with_entry,
     :random_creature_with_entry,
-    :nearest_game_object_with_entry
+    :nearest_game_object_with_entry,
+    :random_game_object_with_entry
   ]
 
   def flee_duration_ms, do: @flee_duration_ms
@@ -760,6 +763,46 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
     {Effects.enqueue(state, Effects.load_game_object_spawn(blueprint)), blackboard}
   end
 
+  defp execute(
+         %Mob{} = state,
+         blackboard,
+         %ScriptStep{command: :modify_threat, datalong: 8, position: {percent, _y, _z, _o}},
+         _target_guid,
+         _now,
+         %Context{}
+       ) do
+    {Threat.modify_all_percent(state, percent), blackboard}
+  end
+
+  defp execute(
+         %Mob{} = state,
+         blackboard,
+         %ScriptStep{command: :modify_threat} = step,
+         target_guid,
+         _now,
+         %Context{} = context
+       ) do
+    target_step = %{step | target_type: ScriptStep.decode_target_type(step.datalong), target_self?: false}
+
+    case resolve_target(state, target_step, target_guid, context) do
+      guid when is_integer(guid) -> {Threat.modify_percent(state, guid, elem(step.position, 0)), blackboard}
+      _missing -> {state, blackboard}
+    end
+  end
+
+  defp execute(
+         %{object: %{guid: source_guid}} = state,
+         blackboard,
+         %ScriptStep{command: :send_script_event} = step,
+         target_guid,
+         _now,
+         %Context{} = context
+       ) do
+    invoker_guid = resolve_target(state, step, target_guid, context)
+    effect = Effects.send_script_event(source_guid, invoker_guid, step.datalong, step.datalong2)
+    {Effects.enqueue(state, effect), blackboard}
+  end
+
   defp execute(state, blackboard, %ScriptStep{} = step, target_guid, now, %Context{}) do
     execute(state, blackboard, step, target_guid, now)
   end
@@ -818,6 +861,29 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
 
   defp execute(%Mob{} = state, blackboard, %ScriptStep{command: :set_faction} = step, _target_guid, _now) do
     {TemporaryFaction.set(state, step.datalong, step.datalong2), blackboard}
+  end
+
+  defp execute(state, blackboard, %ScriptStep{command: :set_melee_attack, datalong: enabled}, _target, _now) do
+    {state, Blackboard.set_melee_enabled(blackboard, enabled != 0)}
+  end
+
+  defp execute(state, blackboard, %ScriptStep{command: :set_combat_movement, datalong: enabled}, _target, _now) do
+    {state, Blackboard.set_combat_movement(blackboard, enabled != 0)}
+  end
+
+  defp execute(
+         %{unit: %Unit{target: target}} = state,
+         blackboard,
+         %ScriptStep{command: :call_for_help, position: {radius, _y, _z, _o}},
+         _target_guid,
+         _now
+       )
+       when is_integer(target) and target > 0 and is_number(radius) and radius > 0 do
+    {Effects.enqueue(state, Effects.call_for_help(target, radius)), blackboard}
+  end
+
+  defp execute(state, blackboard, %ScriptStep{command: :call_for_help}, _target_guid, _now) do
+    {state, blackboard}
   end
 
   defp execute(state, blackboard, %ScriptStep{command: :summon_object} = step, _target_guid, _now) do
@@ -1158,7 +1224,27 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
   end
 
   defp resolve_target(%{object: %{guid: guid}}, %ScriptStep{target_self?: true}, _provided), do: guid
+
+  defp resolve_target(
+         %{internal: %{pet: %{owner_guid: owner_guid}}},
+         %ScriptStep{target_type: :owner_or_self},
+         _provided
+       )
+       when is_integer(owner_guid) and owner_guid > 0 do
+    owner_guid
+  end
+
   defp resolve_target(%{object: %{guid: guid}}, %ScriptStep{target_type: :owner_or_self}, _provided), do: guid
+
+  defp resolve_target(%{internal: %{pet: %{owner_guid: owner_guid}}}, %ScriptStep{target_type: :owner}, _provided)
+       when is_integer(owner_guid) and owner_guid > 0 do
+    owner_guid
+  end
+
+  defp resolve_target(%{unit: %Unit{summoned_by: owner_guid}}, %ScriptStep{target_type: :owner}, _provided)
+       when is_integer(owner_guid) and owner_guid > 0 do
+    owner_guid
+  end
 
   defp resolve_target(_state, %ScriptStep{target_type: :creature_with_guid, buddy_guid: buddy_guid}, _provided) do
     buddy_guid
@@ -1198,10 +1284,54 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
     find_creature_with_entry(state, step, target_type, perception, random)
   end
 
-  defp resolve_target(state, %ScriptStep{target_type: :nearest_game_object_with_entry} = step, _provided, %Context{
+  defp resolve_target(state, %ScriptStep{target_type: target_type} = step, _provided, %Context{} = context)
+       when target_type in [
+              :hostile_second_aggro,
+              :hostile_last_aggro,
+              :hostile_random,
+              :hostile_random_not_top,
+              :hostile_nearest,
+              :hostile_farthest
+            ] do
+    resolve_hostile_target(state, step, context)
+  end
+
+  defp resolve_target(state, %ScriptStep{target_type: target_type} = step, _provided, %Context{
+         perception: perception,
+         random: random
+       })
+       when target_type in [:nearest_game_object_with_entry, :random_game_object_with_entry] do
+    find_game_object_with_entry(state, step, target_type, perception, random)
+  end
+
+  defp resolve_target(_state, %ScriptStep{target_type: :nearest_player, target_param1: radius}, _provided, %Context{
          perception: perception
        }) do
-    find_game_object_with_entry(state, step, perception)
+    perception
+    |> Perception.nearby(:players, positive_radius(radius, @default_buddy_radius))
+    |> Enum.min_by(&elem(&1, 1), fn -> nil end)
+    |> case do
+      {guid, _distance} -> guid
+      nil -> nil
+    end
+  end
+
+  defp resolve_target(state, %ScriptStep{target_type: target_type, target_param1: radius}, _provided, %Context{
+         perception: perception
+       })
+       when target_type in [:nearest_hostile_player, :nearest_friendly_player] do
+    source = Perception.actor(perception, state.object.guid)
+
+    perception
+    |> Perception.nearby(:players, positive_radius(radius, @default_buddy_radius))
+    |> Enum.filter(fn {guid, _distance} ->
+      player_reaction_allows?(target_type, source, Perception.actor(perception, guid))
+    end)
+    |> Enum.min_by(&elem(&1, 1), fn -> nil end)
+    |> case do
+      {guid, _distance} -> guid
+      nil -> nil
+    end
   end
 
   defp resolve_target(state, %ScriptStep{target_type: target_type} = step, _provided, %Context{} = context)
@@ -1296,7 +1426,13 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
   end
 
   defp step_observation_radius(%ScriptStep{target_type: target_type, target_param1: radius})
-       when target_type in [:friendly_injured, :friendly_injured_except] do
+       when target_type in [
+              :friendly_injured,
+              :friendly_injured_except,
+              :nearest_player,
+              :nearest_hostile_player,
+              :nearest_friendly_player
+            ] do
     positive_radius(radius, @default_buddy_radius)
   end
 
@@ -1328,7 +1464,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
 
   def game_object_observation_radius(_steps), do: 0.0
 
-  defp game_object_step_radius(%ScriptStep{target_type: :nearest_game_object_with_entry, target_param2: radius}) do
+  defp game_object_step_radius(%ScriptStep{target_type: target_type, target_param2: radius})
+       when target_type in [:nearest_game_object_with_entry, :random_game_object_with_entry] do
     positive_radius(radius, @default_buddy_radius)
   end
 
@@ -1373,17 +1510,81 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
   defp find_game_object_with_entry(
          %{object: %{guid: self_guid}},
          %ScriptStep{target_param1: entry, target_param2: radius},
-         perception
+         target_type,
+         perception,
+         random
        ) do
     range = positive_radius(radius, @default_buddy_radius)
 
-    perception
-    |> Perception.nearby(:game_objects, range)
-    |> Enum.filter(fn {guid, _distance} -> guid != self_guid and Guid.entry(guid) == entry end)
-    |> Enum.min_by(&elem(&1, 1), fn -> nil end)
+    candidates =
+      perception
+      |> Perception.nearby(:game_objects, range)
+      |> Enum.filter(fn {guid, _distance} -> guid != self_guid and Guid.entry(guid) == entry end)
+
+    case {target_type, candidates} do
+      {_target_type, []} -> nil
+      {:nearest_game_object_with_entry, candidates} -> candidates |> Enum.min_by(&elem(&1, 1)) |> elem(0)
+      {:random_game_object_with_entry, candidates} -> random |> Random.choice(candidates) |> elem(0)
+    end
+  end
+
+  defp resolve_hostile_target(state, %ScriptStep{target_type: target_type, target_param1: flags}, %Context{} = context) do
+    candidates =
+      state
+      |> Threat.entries()
+      |> Enum.map(&elem(&1, 0))
+      |> Enum.filter(&target_flags_allow?(&1, flags, context.perception))
+
+    select_hostile_target(target_type, candidates, context)
+  end
+
+  defp select_hostile_target(_target_type, [], %Context{}), do: nil
+  defp select_hostile_target(:hostile_second_aggro, [_top, second | _rest], %Context{}), do: second
+  defp select_hostile_target(:hostile_second_aggro, _candidates, %Context{}), do: nil
+  defp select_hostile_target(:hostile_last_aggro, candidates, %Context{}), do: List.last(candidates)
+
+  defp select_hostile_target(:hostile_random, candidates, %Context{random: random}) do
+    Random.choice(random, candidates)
+  end
+
+  defp select_hostile_target(:hostile_random_not_top, [_top | rest], %Context{random: random}) when rest != [] do
+    Random.choice(random, rest)
+  end
+
+  defp select_hostile_target(:hostile_random_not_top, _candidates, %Context{}), do: nil
+
+  defp select_hostile_target(:hostile_nearest, candidates, %Context{perception: perception}) do
+    distance_extreme(candidates, perception, :nearest)
+  end
+
+  defp select_hostile_target(:hostile_farthest, candidates, %Context{perception: perception}) do
+    distance_extreme(candidates, perception, :farthest)
+  end
+
+  defp target_flags_allow?(guid, flags, perception) do
+    (!flag?(flags, 0x001) or Perception.line_of_sight?(perception, guid)) and
+      (!flag?(flags, 0x002) or Guid.entity_type(guid) == :player) and
+      (!flag?(flags, 0x200) or Guid.entity_type(guid) == :player)
+  end
+
+  defp flag?(flags, mask) when is_integer(flags), do: (flags &&& mask) != 0
+  defp flag?(_flags, _mask), do: false
+
+  defp player_reaction_allows?(:nearest_hostile_player, source, target), do: Hostility.hostile?(source, target)
+  defp player_reaction_allows?(:nearest_friendly_player, source, target), do: Hostility.friendly?(source, target)
+
+  defp distance_extreme(candidates, perception, direction) do
+    candidates
+    |> Enum.flat_map(fn guid ->
+      case Perception.distance(perception, guid) do
+        distance when is_number(distance) -> [{guid, distance}]
+        _missing -> []
+      end
+    end)
     |> case do
-      {guid, _distance} -> guid
-      nil -> nil
+      [] -> nil
+      distances when direction == :nearest -> distances |> Enum.min_by(&elem(&1, 1)) |> elem(0)
+      distances -> distances |> Enum.max_by(&elem(&1, 1)) |> elem(0)
     end
   end
 end

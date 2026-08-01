@@ -38,6 +38,13 @@ defmodule ThistleTea.Game.World.CallForHelp do
 
   def pulse(_state, _target_guid), do: :ok
 
+  def pulse(%Mob{} = state, target_guid, radius)
+      when is_integer(target_guid) and target_guid > 0 and is_number(radius) and radius > 0 do
+    notify_helpers(state, target_guid, radius, :friendly)
+  end
+
+  def pulse(_state, _target_guid, _radius), do: :ok
+
   defp notify_helpers(%Mob{object: %{guid: caller_guid}} = state, target_guid, radius, faction_check) do
     case metadata_faction(caller_guid) do
       %FactionTemplate{} = caller_faction ->
