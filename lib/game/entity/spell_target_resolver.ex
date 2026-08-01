@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
   alias ThistleTea.Game.Party
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Target
+  alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.System.Party, as: PartySystem
@@ -161,12 +162,20 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
 
   defp nearby_enemy_guids(_caster, _caster_guid, _radius), do: []
 
-  defp nearby_cone_enemy_guids(%{movement_block: %{position: {x, y, _z, orientation}}} = caster, caster_guid, radius)
+  defp nearby_cone_enemy_guids(%{movement_block: %{position: {_x, _y, _z, orientation}}} = caster, caster_guid, radius)
        when is_number(radius) and radius > 0 do
-    caster
-    |> nearby_units(radius)
-    |> hostile_living_guids(caster, caster_guid)
-    |> Enum.filter(&in_cone?(&1, {x, y}, orientation))
+    now = Time.now()
+
+    case caster_position(caster, now) do
+      {world, x, y, z} ->
+        world
+        |> nearby_units_at({x, y, z}, radius, now)
+        |> hostile_living_guids(caster, caster_guid)
+        |> Enum.filter(&in_cone?(&1, {x, y}, orientation))
+
+      nil ->
+        []
+    end
   end
 
   defp nearby_cone_enemy_guids(_caster, _caster_guid, _radius), do: []
@@ -202,18 +211,36 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
 
   defp nearby_enemy_guids_at(_caster, _caster_guid, _position, _radius), do: []
 
-  defp nearby_units(
-         %{object: %{guid: self_guid}, internal: %{world: world}, movement_block: %{position: {x, y, z, _o}}},
-         radius
-       ) do
-    nearby_units_at(world, {x, y, z}, radius)
+  defp nearby_units(%{object: %{guid: self_guid}} = caster, radius) do
+    now = Time.now()
+
+    case caster_position(caster, now) do
+      {world, x, y, z} -> nearby_units_at(world, {x, y, z}, radius, now)
+      nil -> []
+    end
     |> Enum.reject(fn {guid, _distance} -> guid == self_guid end)
   end
 
   defp nearby_units_at(map, position, radius) do
-    World.nearby_units_exact(:players, map, position, radius) ++
-      World.nearby_units_exact(:mobs, map, position, radius)
+    nearby_units_at(map, position, radius, Time.now())
   end
+
+  defp nearby_units_at(map, position, radius, now) do
+    World.nearby_units_exact(:players, map, position, radius, now) ++
+      World.nearby_units_exact(:mobs, map, position, radius, now)
+  end
+
+  defp caster_position(
+         %{object: %{guid: guid}, internal: %{world: world}, movement_block: %{position: {x, y, z, _orientation}}},
+         now
+       ) do
+    case World.position(guid, now) do
+      {^world, projected_x, projected_y, projected_z} -> {world, projected_x, projected_y, projected_z}
+      _missing -> {world, x, y, z}
+    end
+  end
+
+  defp caster_position(_caster, _now), do: nil
 
   defp hostile_living_guids(results, caster, caster_guid) do
     results

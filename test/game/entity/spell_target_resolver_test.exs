@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolverTest do
   alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.Spell.Target
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.Position
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.WorldRef
 
@@ -74,6 +75,25 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolverTest do
 
       caster = caster(player_guid, {0.0, 0.0, 0.0})
       spell = aoe_spell(:aoe_enemy_at_caster)
+
+      assert SpellTargetResolver.resolve(caster, spell, Target.none()) == [mob_guid]
+    end
+
+    test "centers caster aoe on projected client motion" do
+      player_guid = player_guid()
+      mob_guid = mob_guid()
+      now = System.monotonic_time(:millisecond)
+
+      put_spatial_target(:players, player_guid, {0.0, 0.0, 0.0})
+      put_spatial_target(:mobs, mob_guid, {7.0, 0.0, 0.0})
+
+      caster = caster(player_guid, {0.0, 0.0, 0.0})
+      projection = Position.client_motion(caster, {70.0, 0.0, 0.0}, now - 100, 750)
+      Position.put(caster, :players, projection)
+
+      spell = %Spell{
+        effects: [%Effect{type: :school_damage, implicit_target_a: :aoe_enemy_at_caster, radius_yards: 3.0}]
+      }
 
       assert SpellTargetResolver.resolve(caster, spell, Target.none()) == [mob_guid]
     end
