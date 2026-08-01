@@ -133,8 +133,7 @@ defmodule ThistleTea.Game.Player.Taxi do
       when is_reference(token) do
     cancel_arrival(state)
     character = TaxiLogic.finish(state.character, Time.now())
-    World.clear_movement(character)
-    Presence.relocate(character)
+    World.update_position(character)
 
     state =
       %{state | character: character, taxi_arrival_ref: nil}
@@ -171,8 +170,7 @@ defmodule ThistleTea.Game.Player.Taxi do
 
     if TaxiLogic.active?(character) do
       character = TaxiLogic.finish(character, Time.now())
-      World.clear_movement(character)
-      Presence.relocate(character)
+      World.update_position(character)
       %{state | character: character, taxi_arrival_ref: nil}
     else
       %{state | taxi_arrival_ref: nil}

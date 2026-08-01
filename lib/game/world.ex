@@ -11,7 +11,6 @@ defmodule ThistleTea.Game.World do
   alias ThistleTea.Game.Entity.Data.DynamicObject, as: DataDynamicObject
   alias ThistleTea.Game.Entity.Data.GameObject
   alias ThistleTea.Game.Entity.Data.Mob
-  alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.Entity.Server.Corpse, as: CorpseServer
   alias ThistleTea.Game.Entity.Server.DynamicObject, as: DynamicObjectServer
   alias ThistleTea.Game.Entity.Server.GameObject, as: GameObjectServer
@@ -24,6 +23,7 @@ defmodule ThistleTea.Game.World do
   alias ThistleTea.Game.World.Loader.Transport, as: TransportLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Pathfinding
+  alias ThistleTea.Game.World.Position
   alias ThistleTea.Game.World.Presence
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.WorldRef
@@ -94,15 +94,10 @@ defmodule ThistleTea.Game.World do
   def update_position(_entity), do: :ok
 
   def update_position(
-        %{
-          object: %{guid: guid},
-          internal: %Internal{world: world},
-          movement_block: %MovementBlock{position: {x, y, z, _o}, spline_nodes: spline_nodes}
-        },
+        %{object: %{guid: _guid}, internal: %Internal{world: _world}, movement_block: %MovementBlock{}} = entity,
         table
       ) do
-    if spline_nodes in [nil, []], do: SpatialHash.clear_movement(guid)
-    SpatialHash.update(table, guid, world, x, y, z)
+    Position.put(entity, table)
   end
 
   def remove_position(%Character{} = entity), do: Presence.leave(entity)
@@ -112,9 +107,7 @@ defmodule ThistleTea.Game.World do
   def remove_position(%DataDynamicObject{} = entity), do: remove_position(entity, :dynamic_objects)
   def remove_position(_entity), do: :ok
 
-  def remove_position(%{object: %{guid: guid}}, table) do
-    SpatialHash.remove(table, guid)
-  end
+  def remove_position(%{object: %{guid: _guid}} = entity, table), do: Position.remove(entity, table)
 
   def broadcast_packet(packet, entity, opts \\ [])
 
@@ -254,17 +247,7 @@ defmodule ThistleTea.Game.World do
     spline_moving?(guid, now) or recently_moved?(guid, now)
   end
 
-  defp spline_moving?(guid, now) do
-    case SpatialHash.get_movement(guid) do
-      {_world, _start_position, spline_nodes, start_time, duration}
-      when is_list(spline_nodes) and spline_nodes != [] and is_integer(start_time) and is_integer(duration) and
-             duration > 0 ->
-        now <= start_time + duration
-
-      _ ->
-        false
-    end
-  end
+  defp spline_moving?(guid, now), do: Position.moving?(guid, now)
 
   defp recently_moved?(guid, now) do
     case Metadata.query(guid, [:moving_until]) do
@@ -273,19 +256,7 @@ defmodule ThistleTea.Game.World do
     end
   end
 
-  def position(guid, now \\ Time.now()) when is_integer(guid) do
-    case SpatialHash.get_movement(guid) do
-      {world, start_position, spline_nodes, start_time, duration} ->
-        {x, y, z} = Movement.position_at(start_position, spline_nodes, duration, now - start_time)
-        {world, x, y, z}
-
-      nil ->
-        case SpatialHash.get_entity(guid) do
-          {^guid, world, x, y, z} -> {world, x, y, z}
-          nil -> nil
-        end
-    end
-  end
+  def position(guid, now \\ Time.now()) when is_integer(guid), do: Position.get(guid, now)
 
   def projected_position(guid, horizon_ms, now \\ Time.now())
       when is_integer(guid) and is_integer(horizon_ms) and horizon_ms >= 0 and is_integer(now) do
@@ -300,24 +271,6 @@ defmodule ThistleTea.Game.World do
   end
 
   defp project_position(position, _metadata, _horizon_ms, _now), do: position
-
-  def publish_movement(%{
-        object: %{guid: guid},
-        internal: %Internal{world: world, movement_start_time: start_time, movement_start_position: start_position},
-        movement_block: %MovementBlock{spline_nodes: spline_nodes, duration: duration}
-      })
-      when is_integer(start_time) and is_tuple(start_position) and is_list(spline_nodes) and spline_nodes != [] and
-             is_integer(duration) and duration > 0 do
-    SpatialHash.put_movement(guid, {world, start_position, spline_nodes, start_time, duration})
-  end
-
-  def publish_movement(_entity), do: :ok
-
-  def clear_movement(%{object: %{guid: guid}}) when is_integer(guid) do
-    SpatialHash.clear_movement(guid)
-  end
-
-  def clear_movement(_entity), do: :ok
 
   def distance_to_guid(
         %{internal: %Internal{world: world}, movement_block: %MovementBlock{position: {x1, y1, z1, _o}}},

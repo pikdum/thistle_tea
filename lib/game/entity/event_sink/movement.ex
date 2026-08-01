@@ -13,7 +13,6 @@ defmodule ThistleTea.Game.Entity.EventSink.Movement do
 
   def emit(%Mob{} = entity, %Effects.MovementStopped{}, _context) do
     World.update_position(entity)
-    World.clear_movement(entity)
 
     Message.SmsgMonsterMove.build_stop(entity)
     |> World.broadcast_packet(entity)
@@ -83,7 +82,7 @@ defmodule ThistleTea.Game.Entity.EventSink.Movement do
   def emit(entity, %Effects.MovementSpeedChanged{}, _context), do: entity
 
   def emit(%Mob{} = entity, %Effects.MonsterMove{move_opts: opts}, _context) do
-    World.publish_movement(entity)
+    World.update_position(entity)
     notify_chasers(entity)
 
     Message.SmsgMonsterMove.build(entity, opts || [])
@@ -93,7 +92,7 @@ defmodule ThistleTea.Game.Entity.EventSink.Movement do
   end
 
   def emit(%Character{internal: %{taxi_flight: %Flight{}}} = entity, %Effects.MonsterMove{move_opts: opts}, _context) do
-    World.publish_movement(entity)
+    World.update_position(entity)
 
     Message.SmsgMonsterMove.build(entity, opts || [])
     |> World.broadcast_packet(entity)

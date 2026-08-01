@@ -7,7 +7,7 @@ defmodule ThistleTea.Game.World.Presence do
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.World.Metadata
-  alias ThistleTea.Game.World.SpatialHash
+  alias ThistleTea.Game.World.Position
 
   def enter(%Character{} = character, metadata) when is_map(metadata) do
     Metadata.put(character.object.guid, Map.merge(metadata, location_metadata(character)))
@@ -27,16 +27,12 @@ defmodule ThistleTea.Game.World.Presence do
 
   def leave(%Character{} = character) do
     Metadata.delete(character.object.guid)
-    SpatialHash.remove(:players, character.object.guid)
+    Position.remove(character, :players)
     :ok
   end
 
-  defp put_position(%Character{
-         object: %{guid: guid},
-         internal: %Internal{world: world},
-         movement_block: %MovementBlock{position: {x, y, z, _orientation}}
-       }) do
-    SpatialHash.update(:players, guid, world, x, y, z)
+  defp put_position(%Character{movement_block: %MovementBlock{}} = character) do
+    Position.put(character, :players)
   end
 
   defp location_metadata(
