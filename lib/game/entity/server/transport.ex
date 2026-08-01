@@ -18,7 +18,6 @@ defmodule ThistleTea.Game.Entity.Server.Transport do
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
-  alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.Transports
   alias ThistleTea.Game.World.Visibility
   alias ThistleTea.Game.WorldRef
@@ -304,7 +303,7 @@ defmodule ThistleTea.Game.Entity.Server.Transport do
 
   defp player_guids(world) do
     world
-    |> SpatialHash.guids()
+    |> World.guids()
     |> Enum.filter(&(Guid.entity_type(&1) == :player))
   end
 

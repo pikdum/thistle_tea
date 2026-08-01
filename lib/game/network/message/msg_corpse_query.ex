@@ -3,7 +3,7 @@ defmodule ThistleTea.Game.Network.Message.MsgCorpseQuery do
   use ThistleTea.Game.Network.ClientMessage, :MSG_CORPSE_QUERY
 
   alias ThistleTea.Game.Entity.Data.Corpse
-  alias ThistleTea.Game.World.SpatialHash
+  alias ThistleTea.Game.World
   alias ThistleTea.Game.WorldRef
 
   defstruct []
@@ -12,8 +12,8 @@ defmodule ThistleTea.Game.Network.Message.MsgCorpseQuery do
   def handle(%__MODULE__{}, %{ready: true, guid: guid} = state) do
     corpse_guid = Corpse.guid_for(guid)
 
-    case SpatialHash.get_entity(corpse_guid) do
-      {^corpse_guid, %WorldRef{map_id: map_id}, x, y, z} ->
+    case World.position(corpse_guid) do
+      {%WorldRef{map_id: map_id}, x, y, z} ->
         Network.send_packet(%Message.MsgCorpseQueryResponse{map: map_id, position: {x, y, z}})
 
       _ ->

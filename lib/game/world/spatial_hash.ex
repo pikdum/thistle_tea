@@ -3,9 +3,9 @@ defmodule ThistleTea.Game.World.SpatialHash do
   ETS-backed spatial hash with 125-yard cells per entity table, plus active
   spline-movement records, powering range queries and visibility cells.
   """
+  alias ThistleTea.Game.World.Grid
   alias ThistleTea.Game.WorldRef
 
-  @cell_size 125
   @cell_table_options [:named_table, :public, :duplicate_bag, read_concurrency: true, write_concurrency: :auto]
   @entity_table_options [:named_table, :public, :set, read_concurrency: true, write_concurrency: :auto]
 
@@ -113,34 +113,9 @@ defmodule ThistleTea.Game.World.SpatialHash do
       {{124.5, 249.5}, {249.5, 374.5}}
 
   """
-  def cell_bounds({_world, cx, cy}) do
-    x1 = cx * @cell_size - 0.5
-    x2 = (cx + 1) * @cell_size - 0.5
-    y1 = cy * @cell_size - 0.5
-    y2 = (cy + 1) * @cell_size - 0.5
-    {{x1, x2}, {y1, y2}}
-  end
-
-  def cell(world, x, y, _z) do
-    {WorldRef.coerce(world), Integer.floor_div(round(x), @cell_size), Integer.floor_div(round(y), @cell_size)}
-  end
-
-  def cells_in_range(world, x, y, _z, range) do
-    world = WorldRef.coerce(world)
-    cell_range = div(round(range), @cell_size) + 1
-    rounded_x = round(x)
-    rounded_y = round(y)
-
-    for dx <- -cell_range..cell_range,
-        dy <- -cell_range..cell_range do
-      {
-        world,
-        Integer.floor_div(rounded_x + dx * @cell_size, @cell_size),
-        Integer.floor_div(rounded_y + dy * @cell_size, @cell_size)
-      }
-    end
-    |> Enum.uniq()
-  end
+  defdelegate cell_bounds(cell), to: Grid
+  defdelegate cell(world, x, y, z), to: Grid
+  defdelegate cells_in_range(world, x, y, z, range), to: Grid
 
   def distance({x1, y1, z1}, {x2, y2, z2}) do
     dx = x2 - x1

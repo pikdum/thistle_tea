@@ -306,7 +306,7 @@ defmodule ThistleTea.Game.Player.Mail do
     with :game_object <- Guid.entity_type(mailbox_guid),
          %GameObjectTemplate{type: @mailbox_type} <- GameObjectTemplateLoader.get(Guid.entry(mailbox_guid)),
          distance when is_number(distance) and distance <= @interaction_distance <-
-           World.distance_to_guid(character, mailbox_guid) do
+           World.distance_between(character, mailbox_guid) do
       :ok
     else
       _ -> {:error, :invalid_mailbox}

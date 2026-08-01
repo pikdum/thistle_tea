@@ -10,11 +10,11 @@ defmodule ThistleTea.Game.World.Transports do
   alias ThistleTea.Game.Entity.Data.Transport
   alias ThistleTea.Game.Entity.Logic.Transport, as: TransportLogic
   alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.Math
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
   alias ThistleTea.Game.World.Loader.MapTemplate, as: MapTemplateLoader
   alias ThistleTea.Game.World.Loader.Transport, as: TransportLoader
-  alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.WorldRef
 
   @table_options [:named_table, :public, read_concurrency: true, write_concurrency: :auto]
@@ -206,7 +206,7 @@ defmodule ThistleTea.Game.World.Transports do
     Enum.min_by(
       candidates,
       fn %{position: {transport_x, transport_y, transport_z, _orientation}} ->
-        SpatialHash.distance({x, y, z}, {transport_x, transport_y, transport_z})
+        Math.distance({x, y, z}, {transport_x, transport_y, transport_z})
       end,
       fn -> nil end
     )

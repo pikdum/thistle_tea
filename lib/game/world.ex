@@ -32,7 +32,7 @@ defmodule ThistleTea.Game.World do
         %{internal: %Internal{world: world}, movement_block: %MovementBlock{position: {x, y, z, _o}}},
         range \\ 250
       ) do
-    SpatialHash.query(:players, world, x, y, z, range)
+    nearby_units_exact(:players, world, {x, y, z}, range)
   end
 
   def nearby_mobs(
@@ -83,7 +83,7 @@ defmodule ThistleTea.Game.World do
   end
 
   def nearby_players_at(world, {x, y, z}, range \\ 30) do
-    SpatialHash.query(:players, world, x, y, z, range)
+    nearby_units_exact(:players, world, {x, y, z}, range)
   end
 
   def update_position(%Character{} = entity), do: Presence.relocate(entity)
@@ -217,6 +217,8 @@ defmodule ThistleTea.Game.World do
     |> Enum.each(&stop_entity/1)
   end
 
+  def guids(%WorldRef{} = world), do: SpatialHash.guids(world)
+
   def target_position(guid) when is_integer(guid) do
     position(guid)
   end
@@ -272,13 +274,24 @@ defmodule ThistleTea.Game.World do
 
   defp project_position(position, _metadata, _horizon_ms, _now), do: position
 
-  def distance_to_guid(
+  def distance_between(source, target, now \\ Time.now())
+
+  def distance_between(
         %{internal: %Internal{world: world}, movement_block: %MovementBlock{position: {x1, y1, z1, _o}}},
-        guid
+        guid,
+        now
       )
-      when is_integer(guid) do
-    case target_position(guid) do
+      when is_integer(guid) and is_integer(now) do
+    case position(guid, now) do
       {^world, x2, y2, z2} -> SpatialHash.distance({x1, y1, z1}, {x2, y2, z2})
+      _ -> nil
+    end
+  end
+
+  def distance_between(source_guid, target_guid, now)
+      when is_integer(source_guid) and is_integer(target_guid) and is_integer(now) do
+    case {position(source_guid, now), position(target_guid, now)} do
+      {{world, x1, y1, z1}, {world, x2, y2, z2}} -> SpatialHash.distance({x1, y1, z1}, {x2, y2, z2})
       _ -> nil
     end
   end

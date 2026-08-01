@@ -554,7 +554,7 @@ defmodule ThistleTea.Game.Player.Quests do
   end
 
   def credit_scripted_kill_member(%{character: %Character{} = character} = state, creature_entry, source_guid) do
-    distance = if source_guid == state.guid, do: 0.0, else: World.distance_to_guid(character, source_guid)
+    distance = if source_guid == state.guid, do: 0.0, else: World.distance_between(character, source_guid)
 
     if not Death.ghost?(character) and is_number(distance) and distance <= Experience.group_reward_distance() do
       credit_kill_entry(state, creature_entry, 0)
@@ -600,7 +600,7 @@ defmodule ThistleTea.Game.Player.Quests do
     do: true
 
   defp within_script_distance?(character, world_object_guid, distance) do
-    case World.distance_to_guid(character, world_object_guid) do
+    case World.distance_between(character, world_object_guid) do
       actual when is_number(actual) -> actual <= distance
       _distance -> false
     end

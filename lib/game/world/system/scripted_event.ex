@@ -16,7 +16,6 @@ defmodule ThistleTea.Game.World.System.ScriptedEvent do
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Metadata
-  alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.WorldRef
 
   require Logger
@@ -384,10 +383,10 @@ defmodule ThistleTea.Game.World.System.ScriptedEvent do
          source,
          target
        ) do
-    case SpatialHash.get_entity(target) || SpatialHash.get_entity(source) do
-      {_guid, ^world, x, y, z} ->
+    case World.position(target) || World.position(source) do
+      {^world, x, y, z} ->
         :game_objects
-        |> SpatialHash.query(world, x, y, z, radius)
+        |> World.nearby_units_exact(world, {x, y, z}, radius)
         |> Enum.any?(fn {guid, _distance} -> Guid.entry(guid) == entry end)
 
       _missing ->
@@ -417,7 +416,7 @@ defmodule ThistleTea.Game.World.System.ScriptedEvent do
 
   defp evaluate_condition(%Condition{type: :nearby_player, value2: radius}, _events, world, _source, target) do
     case World.position(target) do
-      {^world, x, y, z} -> SpatialHash.query(:players, world, x, y, z, radius) != []
+      {^world, x, y, z} -> World.nearby_players_at(world, {x, y, z}, radius) != []
       _position -> false
     end
   end
@@ -447,13 +446,9 @@ defmodule ThistleTea.Game.World.System.ScriptedEvent do
   defp present?(guid), do: Metadata.get(guid) != nil
 
   defp within?(world, source_guid, target_guid, distance) do
-    case {World.position(source_guid), World.position(target_guid)} do
-      {{^world, x1, y1, z1}, {^world, x2, y2, z2}} ->
-        SpatialHash.distance({x1, y1, z1}, {x2, y2, z2}) <= distance
-
-      _positions ->
-        false
-    end
+    match?({^world, _x, _y, _z}, World.position(source_guid)) and
+      match?({^world, _x, _y, _z}, World.position(target_guid)) and
+      World.distance_between(source_guid, target_guid) <= distance
   end
 
   defp send_event(%Event{} = event, data, target_mode) do
@@ -483,16 +478,16 @@ defmodule ThistleTea.Game.World.System.ScriptedEvent do
   end
 
   defp nearby_targets(0, world, x, y, z, radius),
-    do: SpatialHash.query(:game_objects, world, x, y, z, radius) |> Enum.map(&elem(&1, 0))
+    do: World.nearby_units_exact(:game_objects, world, {x, y, z}, radius) |> Enum.map(&elem(&1, 0))
 
   defp nearby_targets(1, world, x, y, z, radius),
     do: nearby_targets(2, world, x, y, z, radius) ++ nearby_targets(3, world, x, y, z, radius)
 
   defp nearby_targets(2, world, x, y, z, radius),
-    do: SpatialHash.query(:mobs, world, x, y, z, radius) |> Enum.map(&elem(&1, 0))
+    do: World.nearby_units_exact(:mobs, world, {x, y, z}, radius) |> Enum.map(&elem(&1, 0))
 
   defp nearby_targets(3, world, x, y, z, radius),
-    do: SpatialHash.query(:players, world, x, y, z, radius) |> Enum.map(&elem(&1, 0))
+    do: World.nearby_units_exact(:players, world, {x, y, z}, radius) |> Enum.map(&elem(&1, 0))
 
   defp nearby_targets(_type, _world, _x, _y, _z, _radius), do: []
 

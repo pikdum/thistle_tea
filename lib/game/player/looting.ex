@@ -19,7 +19,6 @@ defmodule ThistleTea.Game.Player.Looting do
   alias ThistleTea.Game.Party
   alias ThistleTea.Game.Player.Items
   alias ThistleTea.Game.World
-  alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.System.Party, as: PartySystem
 
   require Logger
@@ -170,11 +169,11 @@ defmodule ThistleTea.Game.Player.Looting do
   defp maybe_send_master_list(%{guid: viewer}, corpse_guid) do
     with %Party.Group{loot_method: @loot_method_master_loot, master_looter: ^viewer} = group <-
            PartySystem.group_of(viewer),
-         {^corpse_guid, map, x, y, z} <- SpatialHash.get_entity(corpse_guid) do
+         {world, x, y, z} <- World.position(corpse_guid) do
       member_guids = MapSet.new(group.members, & &1.guid)
 
       looters =
-        SpatialHash.query(:players, map, x, y, z, Experience.group_reward_distance())
+        World.nearby_players_at(world, {x, y, z}, Experience.group_reward_distance())
         |> Enum.map(fn {guid, _distance} -> guid end)
         |> Enum.filter(&MapSet.member?(member_guids, &1))
 

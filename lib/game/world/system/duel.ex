@@ -22,7 +22,6 @@ defmodule ThistleTea.Game.World.System.Duel do
   alias ThistleTea.Game.World.Loader.Exploration, as: ExplorationLoader
   alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
   alias ThistleTea.Game.World.Metadata
-  alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.WorldRef
 
   @countdown_ms 3_000
@@ -562,8 +561,8 @@ defmodule ThistleTea.Game.World.System.Duel do
   defp broadcast_winner(packet, anchor_guid) do
     case World.position(anchor_guid) do
       {world, x, y, z} ->
-        :players
-        |> SpatialHash.query(world, x, y, z, @winner_range)
+        world
+        |> World.nearby_players_at({x, y, z}, @winner_range)
         |> Enum.each(fn {guid, _distance} -> Network.send_packet(packet, guid) end)
 
       _position ->

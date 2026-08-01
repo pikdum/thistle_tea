@@ -74,7 +74,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
   def target_valid_same_map?(_state, _blackboard, %Context{}), do: false
 
   def in_combat_range?(%{unit: %Unit{target: target}} = state, _blackboard) do
-    case World.distance_to_guid(state, target) do
+    case World.distance_between(state, target) do
       distance when is_number(distance) -> distance <= combat_reach(state, target)
       _ -> false
     end

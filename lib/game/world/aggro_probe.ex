@@ -6,10 +6,10 @@ defmodule ThistleTea.Game.World.AggroProbe do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Mob, as: MobBT
   alias ThistleTea.Game.Entity.Logic.Hostility
   alias ThistleTea.Game.Entity.Logic.StealthDetection
+  alias ThistleTea.Game.Math
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Metadata
-  alias ThistleTea.Game.World.SpatialHash
 
   @table_options [:named_table, :public, read_concurrency: true, write_concurrency: :auto]
   @movement_threshold 2.0
@@ -51,7 +51,7 @@ defmodule ThistleTea.Game.World.AggroProbe do
   end
 
   defp moved_enough?({lx, ly, _lz}, {x, y, _z}) do
-    SpatialHash.distance({lx, ly, 0.0}, {x, y, 0.0}) >= @movement_threshold
+    Math.distance({lx, ly, 0.0}, {x, y, 0.0}) >= @movement_threshold
   end
 
   defp moved_enough?(_last_position, _position), do: true

@@ -7,8 +7,8 @@ defmodule ThistleTea.Game.Network.Message.CmsgAttackswing do
   alias ThistleTea.Game.Entity.Logic.Hostility
   alias ThistleTea.Game.Entity.Logic.TargetRef
   alias ThistleTea.Game.Entity.Server.Player.TickScheduler
+  alias ThistleTea.Game.Guid
   alias ThistleTea.Game.World.Metadata
-  alias ThistleTea.Game.World.SpatialHash
 
   require Logger
 
@@ -61,17 +61,14 @@ defmodule ThistleTea.Game.Network.Message.CmsgAttackswing do
   defp valid_attack_target?(%{guid: guid, character: %Character{internal: %{world: world}} = character}, target_guid)
        when is_integer(target_guid) and target_guid > 0 do
     target_guid != guid and
-      match?({^target_guid, ^world, _x, _y, _z}, SpatialHash.get_entity(target_guid)) and
+      match?({^world, _x, _y, _z}, World.position(target_guid)) and
       unit_target?(target_guid) and
       Hostility.attackable?(character, target_guid)
   end
 
   defp valid_attack_target?(_state, _target_guid), do: false
 
-  defp unit_target?(target_guid) when is_integer(target_guid) do
-    :ets.match(:players, {:"$1", target_guid}) != [] or
-      :ets.match(:mobs, {:"$1", target_guid}) != []
-  end
+  defp unit_target?(target_guid) when is_integer(target_guid), do: Guid.entity_type(target_guid) in [:player, :mob]
 
   defp send_attack_stop(%{guid: guid} = state, target_guid) when is_integer(guid) do
     enemy = if is_integer(target_guid) and target_guid > 0, do: target_guid, else: 0

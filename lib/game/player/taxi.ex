@@ -16,6 +16,7 @@ defmodule ThistleTea.Game.Player.Taxi do
   alias ThistleTea.Game.Entity.Server.Player, as: PlayerServer
   alias ThistleTea.Game.Entity.Server.Player.CompanionOwner
   alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.Math
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Player.Reputation
@@ -26,7 +27,6 @@ defmodule ThistleTea.Game.Player.Taxi do
   alias ThistleTea.Game.World.Loader.Taxi, as: TaxiLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Presence
-  alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.Visibility
 
   @flightmaster_flag 0x00000008
@@ -263,7 +263,7 @@ defmodule ThistleTea.Game.Player.Taxi do
          map_id: map_id,
          position: source_position
        }) do
-    if map_id == world.map_id and SpatialHash.distance(xyz(position), source_position) <= @taxi_start_distance do
+    if map_id == world.map_id and Math.distance(xyz(position), source_position) <= @taxi_start_distance do
       :ok
     else
       {:error, :too_far_away}
@@ -356,7 +356,7 @@ defmodule ThistleTea.Game.Player.Taxi do
          true <- (npc_flags &&& @flightmaster_flag) != 0,
          true <- Reputation.can_interact?(character, guid),
          {^world, x, y, z} <- World.position(guid),
-         true <- SpatialHash.distance(xyz(player_position), {x, y, z}) <= @interaction_distance,
+         true <- Math.distance(xyz(player_position), {x, y, z}) <= @interaction_distance,
          %Node{} = node <- TaxiNetwork.nearest_node(network, world.map_id, {x, y, z}, team_for_race(unit.race)) do
       {:ok, node}
     else

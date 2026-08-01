@@ -9,7 +9,6 @@ defmodule ThistleTea.Game.Loot.ActorFactory do
   alias ThistleTea.Game.Player.Quests
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Metadata
-  alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.System.Party, as: PartySystem
 
   def for_character(%Character{object: %{guid: guid}} = character, target_guid) do
@@ -17,7 +16,7 @@ defmodule ThistleTea.Game.Loot.ActorFactory do
       guid: guid,
       group_id: group_id(guid),
       needed_items: Quests.needed_items(character),
-      distance: World.distance_to_guid(character, target_guid)
+      distance: World.distance_between(character, target_guid)
     }
   end
 
@@ -26,7 +25,7 @@ defmodule ThistleTea.Game.Loot.ActorFactory do
       guid: guid,
       group_id: group_id(guid),
       needed_items: needed_items(guid),
-      distance: distance(guid, target_guid)
+      distance: World.distance_between(guid, target_guid)
     }
   end
 
@@ -41,16 +40,6 @@ defmodule ThistleTea.Game.Loot.ActorFactory do
     case Metadata.query(guid, [:needed_quest_items]) do
       %{needed_quest_items: %MapSet{} = needed_items} -> needed_items
       _ -> :unknown
-    end
-  end
-
-  defp distance(source_guid, target_guid) do
-    case {SpatialHash.get_entity(source_guid), SpatialHash.get_entity(target_guid)} do
-      {{^source_guid, world, sx, sy, sz}, {^target_guid, world, tx, ty, tz}} ->
-        SpatialHash.distance({sx, sy, sz}, {tx, ty, tz})
-
-      _ ->
-        nil
     end
   end
 end

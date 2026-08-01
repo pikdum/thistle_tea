@@ -1011,7 +1011,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
   defp melee_hold_watch(%Mob{internal: %Internal{world: world}} = state, target) do
     with {^world, x, y, z} <- World.target_position(target),
-         distance when is_number(distance) <- World.distance_to_guid(state, target) do
+         distance when is_number(distance) <- World.distance_between(state, target) do
       {target, {x, y, z}, MobBT.melee_escape_distance(state, target, distance)}
     else
       _ -> nil

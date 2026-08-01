@@ -242,7 +242,7 @@ defmodule ThistleTea.Game.Entity.Logic.Threat do
   defp taunt_caster(_entity), do: nil
 
   defp in_melee_range?(%Mob{} = entity, guid) do
-    case World.distance_to_guid(entity, guid) do
+    case World.distance_between(entity, guid) do
       distance when is_number(distance) ->
         distance <= Combat.melee_reach(own_combat_reach(entity), target_combat_reach(guid))
 

@@ -56,7 +56,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgReclaimCorpse do
   end
 
   defp corpse_in_range?(character, corpse_guid) do
-    case World.distance_to_guid(character, corpse_guid) do
+    case World.distance_between(character, corpse_guid) do
       distance when is_number(distance) -> distance <= Death.corpse_reclaim_radius()
       _ -> false
     end

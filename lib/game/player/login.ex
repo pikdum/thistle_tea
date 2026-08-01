@@ -52,6 +52,7 @@ defmodule ThistleTea.Game.Player.Login do
   alias ThistleTea.Game.Player.WorldStates
   alias ThistleTea.Game.Spell.Cooldowns
   alias ThistleTea.Game.Time
+  alias ThistleTea.Game.World
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Faction, as: FactionLoader
@@ -59,7 +60,6 @@ defmodule ThistleTea.Game.Player.Login do
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Pathfinding
   alias ThistleTea.Game.World.Presence
-  alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.System.Instance, as: InstanceSystem
   alias ThistleTea.Game.World.System.Party, as: PartySystem
   alias ThistleTea.Game.WorldRef
@@ -475,7 +475,7 @@ defmodule ThistleTea.Game.Player.Login do
   end
 
   defp normalize_death_state(%Character{} = character, character_guid) do
-    if Death.ghost?(character) and is_nil(SpatialHash.get_entity(Corpse.guid_for(character_guid))) do
+    if Death.ghost?(character) and is_nil(World.position(Corpse.guid_for(character_guid))) do
       {character, _events} = Death.resurrect(character, 0.5, Time.now())
       %{character | internal: %{character.internal | broadcast_update?: false}}
     else

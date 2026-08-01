@@ -48,6 +48,29 @@ defmodule ThistleTea.Game.World.PositionTest do
     end
   end
 
+  describe "distance_between/3" do
+    test "uses projected positions for both guid operands" do
+      source_guid = Guid.from_low_guid(:mob, 1, unique_guid())
+      target_guid = Guid.from_low_guid(:mob, 1, unique_guid())
+      source = mob(source_guid)
+
+      target = %{
+        mob(target_guid)
+        | movement_block: %{mob(target_guid).movement_block | position: {20.0, 0.0, 0.0, 0.0}}
+      }
+
+      on_exit(fn ->
+        World.remove_position(source)
+        World.remove_position(target)
+      end)
+
+      World.update_position(source)
+      World.update_position(target)
+
+      assert World.distance_between(source_guid, target_guid, 1_500) == 0.0
+    end
+  end
+
   defp mob(guid) do
     %Mob{
       object: %Object{guid: guid},

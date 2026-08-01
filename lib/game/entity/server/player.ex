@@ -1110,7 +1110,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   defp owned_item(_character, _item_guid), do: nil
 
   defp feed_pet_in_range(character, pet_guid, range_yards) when is_number(range_yards) and range_yards > 0 do
-    case World.distance_to_guid(character, pet_guid) do
+    case World.distance_between(character, pet_guid) do
       distance when is_number(distance) and distance <= range_yards ->
         if World.line_of_sight?(character, pet_guid), do: :ok, else: {:error, :line_of_sight}
 
