@@ -1034,7 +1034,10 @@ defmodule ThistleTea.Game.Entity.Server.Player do
         level: character.unit.level,
         alive?: Death.alive?(character),
         ghost?: Death.ghost?(character),
+        in_combat: character.internal.in_combat == true,
+        rooted?: character.internal.rooted? == true,
         health_pct: Core.health_pct(character),
+        mana_pct: Core.mana_pct(character),
         power_type: character.unit.power_type,
         unit_flags: character.unit.flags,
         shapeshift_form: character.unit.shapeshift_form,
@@ -1043,6 +1046,8 @@ defmodule ThistleTea.Game.Entity.Server.Player do
         duel_started?: Dueling.active?(character),
         contested_pvp?: PlayerFlags.contested_pvp?(character),
         aura_sources: Aura.source_spells(character),
+        aura_stacks: Aura.spell_stacks(character),
+        crowd_controlled?: Aura.crowd_controlled?(character),
         dispel_options: Aura.dispel_options(character),
         attacker_spell_hit_chance: Aura.attacker_spell_hit_chance(character),
         reputation: PlayerReputation.projection(character)
@@ -1277,13 +1282,24 @@ defmodule ThistleTea.Game.Entity.Server.Player do
         )
 
       {character, events} = SpellEffect.receive(character, caster, spell, now)
+      notify_spell_hit_target(caster, character.object.guid, spell, events)
       EventSink.emit(character, events)
     end
   end
 
   defp apply_incoming_spell(%Character{} = character, caster, spell, now, false, _alive?) do
     {character, events} = SpellEffect.receive(character, caster, spell, now)
+    notify_spell_hit_target(caster, character.object.guid, spell, events)
     EventSink.emit(character, events)
+  end
+
+  defp notify_spell_hit_target(caster, target_guid, %Spell{} = spell, events)
+       when is_integer(target_guid) and is_list(events) do
+    caster_guid = spell_caster_guid(caster)
+
+    if Guid.entity_type(caster_guid) == :mob and SpellEffect.successful_hit?(events) do
+      Entity.spell_hit_target(caster_guid, target_guid, spell)
+    end
   end
 
   defp spell_caster_guid(%{caster_guid: guid}) when is_integer(guid), do: guid

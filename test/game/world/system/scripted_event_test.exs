@@ -174,13 +174,13 @@ defmodule ThistleTea.Game.World.System.ScriptedEventTest do
     command(%{context | source_guid: context.extra_guid}, add)
     command(context, %ScriptStep{command: :send_map_event, datalong: 5862, datalong2: 7, datalong3: 0})
 
-    assert_receive {:"$gen_cast", {:script_event, 5862, 7}}
-    refute_receive {:"$gen_cast", {:script_event, 5862, 7}}
+    assert_receive {:"$gen_cast", {:script_event, 5862, 7, nil}}
+    refute_receive {:"$gen_cast", {:script_event, 5862, 7, nil}}
 
     command(context, %ScriptStep{command: :send_map_event, datalong: 5862, datalong2: 8, datalong3: 1})
 
-    assert_receive {:"$gen_cast", {:script_event, 5862, 8}}
-    refute_receive {:"$gen_cast", {:script_event, 5862, 8}}
+    assert_receive {:"$gen_cast", {:script_event, 5862, 8, nil}}
+    refute_receive {:"$gen_cast", {:script_event, 5862, 8, nil}}
   end
 
   test "map event definitions can be edited while active", context do

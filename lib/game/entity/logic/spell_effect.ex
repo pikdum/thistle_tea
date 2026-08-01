@@ -73,6 +73,10 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
 
   def receive(target, _context, _spell, _now), do: {target, []}
 
+  def successful_hit?(events) when is_list(events) do
+    Enum.all?(events, &(not is_struct(&1, Effects.SpellLogMiss)))
+  end
+
   def receive_outcome(target, caster_guid, %Spell{} = spell, :resist, now)
       when is_integer(caster_guid) and is_integer(now) do
     Aura.reactions(target, :spell_hit_taken, %{

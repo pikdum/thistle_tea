@@ -81,6 +81,40 @@ defmodule ThistleTea.Game.Entity.Data.AIEventTest do
 
       assert %AIEvent{event_type: :script_event, param1: 5862, param2: 7} = AIEvent.build(row, %{})
     end
+
+    test "decodes aura, emote, line-of-sight, and rooted event families" do
+      base = %{
+        id: 1,
+        event_inverse_phase_mask: 0,
+        event_chance: 100,
+        event_flags: 0,
+        event_param1: 0,
+        event_param2: 0,
+        event_param3: 0,
+        event_param4: 0,
+        action1_script: 0,
+        action2_script: 0,
+        action3_script: 0,
+        condition_id: 0
+      }
+
+      expected = %{
+        10 => :ooc_los,
+        15 => :friendly_is_cc,
+        16 => :friendly_missing_buff,
+        18 => :target_mana,
+        22 => :receive_emote,
+        23 => :aura,
+        24 => :target_aura,
+        27 => :missing_aura,
+        28 => :target_missing_aura,
+        33 => :victim_rooted,
+        36 => :spell_hit_target
+      }
+
+      assert Map.new(expected, fn {id, _type} -> {id, AIEvent.build(Map.put(base, :event_type, id), %{}).event_type} end) ==
+               expected
+    end
   end
 
   describe "phase_allows?/2" do

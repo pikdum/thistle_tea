@@ -110,12 +110,17 @@ defmodule ThistleTea.Game.Player.Login do
         attacker_count: 0,
         alive?: Death.alive?(c),
         ghost?: Death.ghost?(c),
+        in_combat: c.internal.in_combat == true,
+        rooted?: c.internal.rooted? == true,
         health_pct: Core.health_pct(c),
+        mana_pct: Core.mana_pct(c),
         shapeshift_form: c.unit.shapeshift_form,
         controlled_guid: Character.controlled_guid(c),
         duel_opponent_guid: Dueling.opponent_guid(c),
         duel_started?: Dueling.active?(c),
         reputation: PlayerReputation.projection(c),
+        aura_stacks: AuraLogic.spell_stacks(c),
+        crowd_controlled?: AuraLogic.crowd_controlled?(c),
         attacker_spell_hit_chance: AuraLogic.attacker_spell_hit_chance(c),
         needed_quest_items: Quests.needed_items(c)
       }

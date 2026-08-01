@@ -26,8 +26,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAI do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Random
   alias ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells, as: MobSpells
   alias ThistleTea.Game.Entity.Logic.AI.Script
+  alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
   alias ThistleTea.Game.Entity.Logic.Condition, as: ConditionLogic
   alias ThistleTea.Game.Entity.Logic.Core
+  alias ThistleTea.Game.Entity.Logic.Hostility
   alias ThistleTea.Game.Guid
 
   @tick_ms 1_000
@@ -40,6 +42,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAI do
     :leave_combat,
     :hit_by_spell,
     :reached_home,
+    :receive_emote,
+    :spell_hit_target,
     :script_event
   ]
 
@@ -84,6 +88,16 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAI do
   end
 
   defp event_observation_radius(%AIEvent{event_type: :friendly_hp}), do: @friendly_hp_default_radius
+
+  defp event_observation_radius(%AIEvent{event_type: event_type, param2: radius})
+       when event_type in [:friendly_is_cc, :friendly_missing_buff] and is_number(radius) and radius > 0 do
+    radius / 1
+  end
+
+  defp event_observation_radius(%AIEvent{event_type: :ooc_los, param2: radius}) when is_number(radius) and radius > 0 do
+    radius / 1
+  end
+
   defp event_observation_radius(%AIEvent{}), do: 0.0
 
   defp actions_observation_radius(%AIEvent{actions: actions}) when is_list(actions) do
@@ -186,19 +200,53 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAI do
   end
 
   def on_spell_hit(state, %Blackboard{} = blackboard, caster_guid, spell_id, now, %Context{} = context) do
+    on_spell_hit(state, blackboard, caster_guid, spell_id, -1, now, context)
+  end
+
+  def on_spell_hit(state, %Blackboard{} = blackboard, caster_guid, spell_id, school_mask, now, %Context{} = context) do
     matcher = fn %AIEvent{} = event ->
-      event.event_type == :hit_by_spell and event.param1 in [0, spell_id]
+      event.event_type == :hit_by_spell and event.param1 in [0, spell_id] and
+        (event.param2 in [0, -1] or Bitwise.band(event.param2, school_mask) != 0)
     end
 
     fire_edges(state, blackboard, matcher, caster_guid, now, context)
   end
 
+  def on_receive_emote(state, %Blackboard{} = blackboard, player_guid, emote_id, now, %Context{} = context) do
+    matcher = fn %AIEvent{} = event ->
+      event.event_type == :receive_emote and event.param1 == emote_id
+    end
+
+    fire_edges(state, blackboard, matcher, player_guid, now, context)
+  end
+
+  def on_spell_hit_target(
+        state,
+        %Blackboard{} = blackboard,
+        target_guid,
+        spell_id,
+        school_mask,
+        now,
+        %Context{} = context
+      ) do
+    matcher = fn %AIEvent{} = event ->
+      event.event_type == :spell_hit_target and event.param1 in [0, spell_id] and
+        (event.param2 in [0, -1] or Bitwise.band(event.param2, school_mask) != 0)
+    end
+
+    fire_edges(state, blackboard, matcher, target_guid, now, context)
+  end
+
   def on_script_event(state, %Blackboard{} = blackboard, event_id, data, now, %Context{} = context) do
+    on_script_event(state, blackboard, event_id, data, nil, now, context)
+  end
+
+  def on_script_event(state, %Blackboard{} = blackboard, event_id, data, invoker_guid, now, %Context{} = context) do
     matcher = fn %AIEvent{} = event ->
       event.event_type == :script_event and event.param1 == event_id and event.param2 == data
     end
 
-    fire_edges(state, blackboard, matcher, nil, now, context)
+    fire_edges(state, blackboard, matcher, invoker_guid, now, context)
   end
 
   def ooc_timer_delay(state, %Blackboard{} = blackboard, now) when is_integer(now) do
@@ -310,6 +358,17 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAI do
     end
   end
 
+  defp satisfy(state, %AIEvent{event_type: :target_mana} = event, invoker_guid, %Context{perception: perception}) do
+    with true <- in_combat?(state),
+         target when is_integer(target) <- victim(state),
+         %{mana_pct: pct} when is_number(pct) <- Perception.metadata(perception, target),
+         true <- pct_within?(pct, event) do
+      {:ok, invoker_guid}
+    else
+      _ -> :skip
+    end
+  end
+
   defp satisfy(state, %AIEvent{event_type: :range} = event, invoker_guid, %Context{perception: perception}) do
     with true <- in_combat?(state),
          target when is_integer(target) <- victim(state),
@@ -321,10 +380,83 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAI do
     end
   end
 
+  defp satisfy(state, %AIEvent{event_type: :ooc_los} = event, _invoker_guid, %Context{} = context) do
+    with false <- in_combat?(state),
+         guid when is_integer(guid) <- find_ooc_los_unit(state, event, context) do
+      {:ok, guid}
+    else
+      _ -> :skip
+    end
+  end
+
   defp satisfy(state, %AIEvent{event_type: :friendly_hp} = event, _invoker_guid, %Context{} = context) do
     with true <- in_combat?(state),
          friendly_guid when is_integer(friendly_guid) <- find_injured_friendly(state, event, context) do
       {:ok, friendly_guid}
+    else
+      _ -> :skip
+    end
+  end
+
+  defp satisfy(state, %AIEvent{event_type: :friendly_is_cc} = event, _invoker_guid, %Context{} = context) do
+    if in_combat?(state) do
+      case find_friendly(state, event.param2, context, &Map.get(&1, :crowd_controlled?, false)) do
+        guid when is_integer(guid) -> {:ok, guid}
+        _missing -> :skip
+      end
+    else
+      :skip
+    end
+  end
+
+  defp satisfy(state, %AIEvent{event_type: :friendly_missing_buff} = event, _invoker_guid, %Context{} = context) do
+    missing_buff? = fn metadata -> metadata |> Map.get(:aura_stacks, %{}) |> Map.get(event.param1, 0) == 0 end
+
+    case find_friendly(state, event.param2, context, missing_buff?) do
+      guid when is_integer(guid) -> {:ok, guid}
+      _missing -> :skip
+    end
+  end
+
+  defp satisfy(state, %AIEvent{event_type: :aura} = event, invoker_guid, %Context{}) do
+    if in_combat?(state) and aura_stacks(state, event.param1) >= event.param2,
+      do: {:ok, invoker_guid},
+      else: :skip
+  end
+
+  defp satisfy(state, %AIEvent{event_type: :missing_aura} = event, invoker_guid, %Context{}) do
+    if in_combat?(state) and aura_stacks(state, event.param1) < event.param2,
+      do: {:ok, invoker_guid},
+      else: :skip
+  end
+
+  defp satisfy(state, %AIEvent{event_type: :target_aura} = event, invoker_guid, %Context{perception: perception}) do
+    with true <- in_combat?(state),
+         target when is_integer(target) <- victim(state),
+         stacks when is_integer(stacks) <- perceived_aura_stacks(perception, target, event.param1),
+         true <- stacks >= event.param2 do
+      {:ok, invoker_guid}
+    else
+      _ -> :skip
+    end
+  end
+
+  defp satisfy(state, %AIEvent{event_type: :target_missing_aura} = event, invoker_guid, %Context{perception: perception}) do
+    with true <- in_combat?(state),
+         target when is_integer(target) <- victim(state),
+         stacks when is_integer(stacks) <- perceived_aura_stacks(perception, target, event.param1),
+         true <- stacks < event.param2 do
+      {:ok, invoker_guid}
+    else
+      _ -> :skip
+    end
+  end
+
+  defp satisfy(state, %AIEvent{event_type: :victim_rooted}, invoker_guid, %Context{perception: perception}) do
+    with true <- in_combat?(state),
+         target when is_integer(target) <- victim(state),
+         %{rooted?: true} <- Perception.metadata(perception, target) do
+      {:ok, invoker_guid}
     else
       _ -> :skip
     end
@@ -358,18 +490,90 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAI do
   defp normalize_radius(radius) when is_number(radius) and radius > 0, do: radius
   defp normalize_radius(_radius), do: @friendly_hp_default_radius
 
+  defp find_ooc_los_unit(state, %AIEvent{param1: reaction, param2: radius}, %Context{perception: perception}) do
+    source = Perception.actor(perception, state.object.guid)
+
+    perception
+    |> nearby_units(normalize_radius(radius))
+    |> Enum.filter(fn {guid, _distance} ->
+      Perception.line_of_sight?(perception, guid) and
+        reaction_allows?(reaction, source, Perception.actor(perception, guid))
+    end)
+    |> Enum.min_by(&elem(&1, 1), fn -> nil end)
+    |> case do
+      {guid, _distance} -> guid
+      nil -> nil
+    end
+  end
+
+  defp nearby_units(perception, radius) do
+    Perception.nearby(perception, :mobs, radius) ++ Perception.nearby(perception, :players, radius)
+  end
+
+  defp find_friendly(state, radius, %Context{perception: perception}, predicate) when is_function(predicate, 1) do
+    source = Perception.actor(perception, state.object.guid)
+
+    state
+    |> friendly_candidates(perception, normalize_radius(radius))
+    |> Enum.find_value(fn {guid, metadata} ->
+      target = Map.put(metadata, :guid, guid)
+
+      if friendly_candidate?(source, target) and predicate.(metadata), do: guid
+    end)
+  end
+
+  defp friendly_candidates(state, perception, radius) do
+    self_metadata = %{
+      alive?: not Core.dead?(state),
+      in_combat: in_combat?(state),
+      unit_flags: state.unit.flags,
+      aura_stacks: AuraLogic.spell_stacks(state),
+      crowd_controlled?: AuraLogic.crowd_controlled?(state)
+    }
+
+    nearby =
+      perception
+      |> nearby_units(radius)
+      |> Enum.flat_map(fn {guid, _distance} ->
+        case Perception.metadata(perception, guid) do
+          metadata when is_map(metadata) -> [{guid, metadata}]
+          _missing -> []
+        end
+      end)
+
+    [{state.object.guid, self_metadata} | nearby]
+  end
+
+  defp friendly_candidate?(source, %{alive?: true, in_combat: true} = target) do
+    selectable?(Map.get(target, :unit_flags)) and not Hostility.hostile?(source, target)
+  end
+
+  defp friendly_candidate?(_source, _target), do: false
+
+  defp selectable?(flags) when is_integer(flags), do: Bitwise.band(flags, 0x02000000) == 0
+  defp selectable?(_flags), do: true
+
+  defp reaction_allows?(0, _source, _target), do: true
+  defp reaction_allows?(1, source, target), do: Hostility.hostile?(source, target)
+  defp reaction_allows?(2, source, target), do: not Hostility.hostile?(source, target)
+  defp reaction_allows?(_reaction, _source, _target), do: false
+
+  defp aura_stacks(state, spell_id), do: state |> AuraLogic.spell_stacks() |> Map.get(spell_id, 0)
+
+  defp perceived_aura_stacks(perception, guid, spell_id) do
+    case Perception.metadata(perception, guid) do
+      %{aura_stacks: stacks} when is_map(stacks) -> Map.get(stacks, spell_id, 0)
+      _metadata -> 0
+    end
+  end
+
   defp pct_within?(pct, %AIEvent{param1: max_pct, param2: min_pct}) when is_number(pct) do
     pct <= max_pct and pct >= min_pct
   end
 
   defp pct_within?(_pct, _event), do: false
 
-  defp mana_pct(%{unit: %Unit{power1: mana, max_power1: max_mana}})
-       when is_number(mana) and is_number(max_mana) and max_mana > 0 do
-    mana * 100 / max_mana
-  end
-
-  defp mana_pct(_state), do: nil
+  defp mana_pct(state), do: Core.mana_pct(state)
 
   defp update_repeat_timer(%Blackboard{} = blackboard, %AIEvent{} = event, index, now, %Context{random: random}) do
     case repeat_params(event) do
@@ -385,9 +589,28 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAI do
   end
 
   defp repeat_params(%AIEvent{event_type: :kill} = event), do: {event.param1, event.param2}
+  defp repeat_params(%AIEvent{event_type: :victim_rooted} = event), do: {event.param1, event.param2}
 
   defp repeat_params(%AIEvent{event_type: event_type} = event)
-       when event_type in [:timer_in_combat, :timer_ooc, :hp, :mana, :target_hp, :range, :friendly_hp, :hit_by_spell] do
+       when event_type in [
+              :timer_in_combat,
+              :timer_ooc,
+              :hp,
+              :mana,
+              :target_hp,
+              :target_mana,
+              :range,
+              :ooc_los,
+              :friendly_hp,
+              :friendly_is_cc,
+              :friendly_missing_buff,
+              :hit_by_spell,
+              :spell_hit_target,
+              :aura,
+              :target_aura,
+              :missing_aura,
+              :target_missing_aura
+            ] do
     {event.param3, event.param4}
   end
 

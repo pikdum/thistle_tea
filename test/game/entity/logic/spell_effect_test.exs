@@ -136,6 +136,17 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
   end
 
   describe "receive/4" do
+    test "reports successful dummy hits without requiring damage or healing" do
+      spell = %Spell{id: 14_291, effects: [%Effect{index: 0, type: :dummy}]}
+      context = %CastContext{caster_guid: 99, caster_level: 10}
+
+      {_target, events} = SpellEffect.receive(target_fixture(), context, spell, 1_000)
+
+      assert events == []
+      assert SpellEffect.successful_hit?(events)
+      refute SpellEffect.successful_hit?([Effects.spell_log_miss(99, 1, spell.id, :immune)])
+    end
+
     test "emits quest event credit for quest-complete effects" do
       spell = %Spell{
         id: 10_617,

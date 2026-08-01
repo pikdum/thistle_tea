@@ -22,6 +22,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
   alias ThistleTea.Game.Spell
 
   @frozen_aura_types [:mod_root, :mod_stun]
+  @crowd_control_aura_types [:mod_charm, :mod_stun, :mod_fear, :mod_confuse]
 
   defdelegate apply_spell(entity, context, spell, now), to: AuraApplication
   defdelegate apply_spell(entity, caster_guid, caster_level, spell, now), to: AuraApplication
@@ -204,6 +205,20 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
   end
 
   def has_spell?(_entity, _spell_id), do: false
+
+  def spell_stacks(%{unit: %Unit{auras: holders}}) when is_list(holders) do
+    Enum.reduce(holders, %{}, fn %Holder{spell: %Spell{id: spell_id}} = holder, stacks ->
+      Map.update(stacks, spell_id, holder_stacks(holder), &max(&1, holder_stacks(holder)))
+    end)
+  end
+
+  def spell_stacks(_entity), do: %{}
+
+  def crowd_controlled?(%{unit: %Unit{auras: holders}} = entity) when is_list(holders) do
+    frozen?(entity) or Enum.any?(holders, &Holder.has_any_type?(&1, @crowd_control_aura_types))
+  end
+
+  def crowd_controlled?(_entity), do: false
 
   def source_spells(%{unit: %Unit{auras: holders}}) when is_list(holders) do
     MapSet.new(holders, fn %Holder{spell: %Spell{} = spell, caster_guid: caster_guid} ->

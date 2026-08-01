@@ -2,6 +2,8 @@ defmodule ThistleTea.Game.Network.Message.CmsgTextEmote do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_TEXT_EMOTE
 
+  alias ThistleTea.Game.Entity
+  alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World.Metadata
 
@@ -107,6 +109,10 @@ defmodule ThistleTea.Game.Network.Message.CmsgTextEmote do
   def handle(%__MODULE__{text_emote: text_emote, emote: emote, target: target}, state) do
     target_name = get_target_name(target)
     emote_id = text_emote_to_emote()[text_emote] || 0
+
+    if Guid.entity_type(target) == :mob do
+      Entity.receive_emote(target, state.guid, text_emote)
+    end
 
     [
       %Message.SmsgTextEmote{guid: state.guid, text_emote: text_emote, emote: emote, name: target_name},

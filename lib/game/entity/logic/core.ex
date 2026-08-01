@@ -234,6 +234,17 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
 
   def health_pct(_entity), do: 100
 
+  def mana_pct(%{unit: %Unit{power1: mana, max_power1: max_mana}})
+      when is_number(mana) and is_number(max_mana) and max_mana > 0 do
+    mana
+    |> max(0)
+    |> Kernel./(max_mana)
+    |> Kernel.*(100)
+    |> trunc()
+  end
+
+  def mana_pct(_entity), do: nil
+
   def mark_broadcast_update(%{internal: %Internal{} = internal} = entity) do
     %{entity | internal: %{internal | broadcast_update?: true}}
   end

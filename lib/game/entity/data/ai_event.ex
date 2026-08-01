@@ -56,7 +56,24 @@ defmodule ThistleTea.Game.Entity.Data.AIEvent do
   defp int(_value, default), do: default
 
   def timed?(%__MODULE__{event_type: event_type}) do
-    event_type in [:timer_in_combat, :timer_ooc, :hp, :mana, :target_hp, :range, :friendly_hp]
+    event_type in [
+      :timer_in_combat,
+      :timer_ooc,
+      :hp,
+      :mana,
+      :range,
+      :ooc_los,
+      :target_hp,
+      :friendly_hp,
+      :friendly_is_cc,
+      :friendly_missing_buff,
+      :target_mana,
+      :aura,
+      :target_aura,
+      :missing_aura,
+      :target_missing_aura,
+      :victim_rooted
+    ]
   end
 
   def phase_allows?(%__MODULE__{inverse_phase_mask: mask}, phase) when is_integer(mask) and is_integer(phase) do
@@ -76,11 +93,22 @@ defmodule ThistleTea.Game.Entity.Data.AIEvent do
   defp event_type(7), do: :evade
   defp event_type(8), do: :hit_by_spell
   defp event_type(9), do: :range
+  defp event_type(10), do: :ooc_los
   defp event_type(11), do: :spawned
   defp event_type(12), do: :target_hp
   defp event_type(14), do: :friendly_hp
+  defp event_type(15), do: :friendly_is_cc
+  defp event_type(16), do: :friendly_missing_buff
+  defp event_type(18), do: :target_mana
   defp event_type(21), do: :reached_home
+  defp event_type(22), do: :receive_emote
+  defp event_type(23), do: :aura
+  defp event_type(24), do: :target_aura
+  defp event_type(27), do: :missing_aura
+  defp event_type(28), do: :target_missing_aura
   defp event_type(30), do: :leave_combat
   defp event_type(31), do: :script_event
+  defp event_type(33), do: :victim_rooted
+  defp event_type(36), do: :spell_hit_target
   defp event_type(other), do: {:unsupported, other}
 end

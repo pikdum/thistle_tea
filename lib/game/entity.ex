@@ -126,8 +126,17 @@ defmodule ThistleTea.Game.Entity do
     dispatch_cast(entity, {:start_script, steps, target_guid})
   end
 
-  def script_event(entity, event_id, data) when is_integer(event_id) and is_integer(data) do
-    dispatch_cast(entity, {:script_event, event_id, data})
+  def script_event(entity, event_id, data, invoker_guid \\ nil)
+      when is_integer(event_id) and is_integer(data) and (is_integer(invoker_guid) or is_nil(invoker_guid)) do
+    dispatch_cast(entity, {:script_event, event_id, data, invoker_guid})
+  end
+
+  def receive_emote(entity, player_guid, emote_id) when is_integer(player_guid) and is_integer(emote_id) do
+    dispatch_cast(entity, {:receive_emote, player_guid, emote_id})
+  end
+
+  def spell_hit_target(entity, target_guid, spell) when is_integer(target_guid) do
+    dispatch_cast(entity, {:spell_hit_target, target_guid, spell})
   end
 
   def loot_roll_vote(entity, voter_guid, slot, vote) do

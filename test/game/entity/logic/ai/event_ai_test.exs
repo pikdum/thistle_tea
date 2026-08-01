@@ -1,6 +1,8 @@
 defmodule ThistleTea.Game.Entity.Logic.AI.EventAITest do
   use ExUnit.Case, async: true
 
+  alias ThistleTea.Game.Aura, as: AuraData
+  alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.AIEvent
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
@@ -12,9 +14,12 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAITest do
   alias ThistleTea.Game.Entity.Data.ScriptStep
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception.Observation
   alias ThistleTea.Game.Entity.Logic.AI.EventAI
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.Spell
   alias ThistleTea.Game.WorldRef
 
   @talk_step %ScriptStep{command: :talk, texts: [%{text: "!", chat_type: :say, language: 0, emote_id: 0}]}
@@ -142,6 +147,78 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAITest do
 
       assert mob.internal.events == []
     end
+
+    test "fires aura and missing-aura events from local stacks" do
+      present = event(:aura, param1: 12_544, param2: 2)
+      missing = event(:missing_aura, param1: 13_337, param2: 1)
+      mob = mob(events: [present, missing], in_combat: true)
+      holder = %Holder{spell: %Spell{id: 12_544}, stacks: 2}
+      mob = %{mob | unit: %{mob.unit | auras: [holder]}}
+
+      {mob, _blackboard} = EventAI.tick(mob, Blackboard.new(), 1_000)
+
+      assert [%Effects.MonsterTalk{}, %Effects.MonsterTalk{}] = mob.internal.events
+    end
+
+    test "fires target aura checks from immutable perception" do
+      target = Guid.from_low_guid(:player, 3)
+      present = event(:target_aura, param1: 11_971, param2: 5)
+      missing = event(:target_missing_aura, param1: 15_572, param2: 1)
+      mob = mob(events: [present, missing], in_combat: true)
+      mob = %{mob | unit: %{mob.unit | target: target}}
+      context = target_context(mob, target, %{aura_stacks: %{11_971 => 5}})
+
+      {mob, _blackboard} = EventAI.tick(mob, Blackboard.new(), 1_000, context)
+
+      assert [%Effects.MonsterTalk{}, %Effects.MonsterTalk{}] = mob.internal.events
+    end
+
+    test "fires victim-rooted events from immutable perception" do
+      target = Guid.from_low_guid(:player, 3)
+      rooted = event(:victim_rooted, param1: 10_000, param2: 10_000, repeatable?: true)
+      mob = mob(events: [rooted], in_combat: true)
+      mob = %{mob | unit: %{mob.unit | target: target}}
+      context = target_context(mob, target, %{rooted?: true})
+
+      {mob, blackboard} = EventAI.tick(mob, Blackboard.new(), 1_000, context)
+
+      assert [%Effects.MonsterTalk{}] = mob.internal.events
+      assert blackboard.event_ai.timers[0] == 11_000
+    end
+
+    test "fires target-mana events from immutable perception" do
+      target = Guid.from_low_guid(:player, 3)
+      mob = mob(events: [event(:target_mana, param1: 25, param2: 10)], in_combat: true)
+      mob = %{mob | unit: %{mob.unit | target: target}}
+      context = target_context(mob, target, %{mana_pct: 20})
+
+      {mob, _blackboard} = EventAI.tick(mob, Blackboard.new(), 1_000, context)
+
+      assert [%Effects.MonsterTalk{}] = mob.internal.events
+    end
+
+    test "fires out-of-combat line-of-sight events for nearby units" do
+      player = Guid.from_low_guid(:player, 3)
+      mob = mob(events: [event(:ooc_los, param1: 0, param2: 20, param3: 5_000, param4: 5_000)])
+      nearby = %{mobs: [], players: [{player, 5.0}], game_objects: []}
+      context = target_context(mob, player, %{}, nearby: nearby)
+
+      {mob, _blackboard} = EventAI.tick(mob, Blackboard.new(), 1_000, context)
+
+      assert [%Effects.MonsterTalk{target_guid: ^player}] = mob.internal.events
+    end
+
+    test "finds friendly crowd control and missing buffs" do
+      crowd_control = event(:friendly_is_cc, param2: 30)
+      missing_buff = event(:friendly_missing_buff, param1: 27_995, param2: 30)
+      mob = mob(events: [crowd_control, missing_buff], in_combat: true)
+      holder = %Holder{spell: %Spell{id: 12}, auras: [%AuraData{type: :mod_stun}]}
+      mob = %{mob | unit: %{mob.unit | auras: [holder]}}
+
+      {mob, _blackboard} = EventAI.tick(mob, Blackboard.new(), 1_000)
+
+      assert [%Effects.MonsterTalk{}, %Effects.MonsterTalk{}] = mob.internal.events
+    end
   end
 
   describe "enter_combat/4" do
@@ -230,6 +307,41 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAITest do
       {mob, _blackboard} = EventAI.on_script_event(mob, blackboard, 5862, 1, 0, Context.new(0))
       assert [%Effects.MonsterTalk{}] = mob.internal.events
     end
+
+    test "uses the supplied action invoker" do
+      invoker = Guid.from_low_guid(:player, 9)
+      mob = mob(events: [event(:script_event, param1: 5862, param2: 1)])
+
+      {mob, _blackboard} =
+        EventAI.on_script_event(mob, Blackboard.new(), 5862, 1, invoker, 0, Context.new(0))
+
+      assert [%Effects.MonsterTalk{target_guid: ^invoker}] = mob.internal.events
+    end
+  end
+
+  describe "on_receive_emote/6" do
+    test "matches the text emote and preserves the player as action invoker" do
+      player = Guid.from_low_guid(:player, 3)
+      mob = mob(events: [event(:receive_emote, param1: 78)])
+
+      {mob, blackboard} = EventAI.on_receive_emote(mob, Blackboard.new(), player, 101, 0, Context.new(0))
+      assert mob.internal.events == []
+
+      {mob, _blackboard} = EventAI.on_receive_emote(mob, blackboard, player, 78, 0, Context.new(0))
+      assert [%Effects.MonsterTalk{target_guid: ^player}] = mob.internal.events
+    end
+  end
+
+  describe "on_spell_hit_target/7" do
+    test "matches spell and school while preserving the hit target" do
+      target = Guid.from_low_guid(:player, 3)
+      mob = mob(events: [event(:spell_hit_target, param1: 14_291, param2: 0x7F)])
+
+      {mob, _blackboard} =
+        EventAI.on_spell_hit_target(mob, Blackboard.new(), target, 14_291, 0x04, 0, Context.new(0))
+
+      assert [%Effects.MonsterTalk{target_guid: ^target}] = mob.internal.events
+    end
   end
 
   describe "on_kill/4" do
@@ -312,5 +424,18 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAITest do
 
   defp clear_events(%Mob{internal: %Internal{} = internal} = mob) do
     %{mob | internal: %{internal | events: []}}
+  end
+
+  defp target_context(mob, target, target_metadata, opts \\ []) do
+    source = mob.object.guid
+
+    observations = %{
+      source => %Observation{guid: source, metadata: %{}},
+      target => %Observation{guid: target, metadata: target_metadata, distance: 5.0}
+    }
+
+    nearby = Keyword.get(opts, :nearby, %{mobs: [], players: [], game_objects: []})
+    perception = Perception.new(1_000, nil, observations, nearby)
+    Context.new(1_000, perception: perception)
   end
 end

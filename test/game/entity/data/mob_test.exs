@@ -313,6 +313,27 @@ defmodule ThistleTea.Game.Entity.Data.MobTest do
   end
 
   describe "handle_cast/2" do
+    test "notifies a mob caster when a dummy spell hits successfully" do
+      caster_guid = Guid.from_low_guid(:mob, 1, System.unique_integer([:positive]))
+      target_guid = Guid.from_low_guid(:mob, 2, System.unique_integer([:positive]))
+      Entity.register(caster_guid)
+      on_exit(fn -> Entity.unregister(caster_guid) end)
+
+      spell = %Spell{id: 14_291, effects: [%Effect{index: 0, type: :dummy}]}
+
+      mob = %Mob{
+        object: %Object{guid: target_guid},
+        unit: %Unit{health: 100, max_health: 100, level: 1, auras: []},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+        internal: %Internal{world: %WorldRef{map_id: 0}}
+      }
+
+      assert {:noreply, %Mob{}, {:continue, :maybe_broadcast}} =
+               MobServer.handle_cast({:receive_spell, caster_guid, spell}, mob)
+
+      assert_receive {:"$gen_cast", {:spell_hit_target, ^target_guid, ^spell}}
+    end
+
     test "handles an avoided spell outcome" do
       spell = %Spell{id: 18_070, name: "Earthborer Acid"}
 

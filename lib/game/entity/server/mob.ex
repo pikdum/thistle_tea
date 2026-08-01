@@ -165,8 +165,10 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
       {:noreply, state}
   end
 
-  def handle_cast({:script_event, event_id, data}, %Mob{} = state) when is_integer(event_id) and is_integer(data) do
+  def handle_cast({:script_event, event_id, data, invoker_guid}, %Mob{} = state)
+      when is_integer(event_id) and is_integer(data) and (is_integer(invoker_guid) or is_nil(invoker_guid)) do
     now = Time.now()
+    request = if is_integer(invoker_guid), do: ObservationRequest.actor(invoker_guid), else: %ObservationRequest{}
 
     state =
       state
@@ -176,8 +178,9 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
           &2,
           event_id,
           data,
+          invoker_guid,
           now,
-          AIEnvironment.context(&1, now)
+          AIEnvironment.context(&1, now, request)
         )
       )
       |> NavigationResolver.resolve(now)
@@ -187,6 +190,48 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   rescue
     error ->
       Logger.error("script_event crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:noreply, state}
+  end
+
+  def handle_cast({:receive_emote, player_guid, emote_id}, %Mob{} = state)
+      when is_integer(player_guid) and is_integer(emote_id) do
+    now = Time.now()
+
+    state =
+      state
+      |> EventAI.with_blackboard(
+        &EventAI.on_receive_emote(
+          &1,
+          &2,
+          player_guid,
+          emote_id,
+          now,
+          AIEnvironment.context(&1, now, ObservationRequest.actor(player_guid))
+        )
+      )
+      |> NavigationResolver.resolve(now)
+      |> EventSink.emit_pending()
+
+    {:noreply, state, {:continue, :maybe_broadcast}}
+  rescue
+    error ->
+      Logger.error("receive_emote crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:noreply, state}
+  end
+
+  def handle_cast({:spell_hit_target, target_guid, %Spell{} = spell}, %Mob{} = state) when is_integer(target_guid) do
+    now = Time.now()
+
+    state =
+      state
+      |> eventai_spell_hit_target(target_guid, spell, now)
+      |> EventSink.emit_pending()
+      |> wake_ai_tick()
+
+    {:noreply, state, {:continue, :maybe_broadcast}}
+  rescue
+    error ->
+      Logger.error("spell_hit_target crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
       {:noreply, state}
   end
 
@@ -247,6 +292,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
       end
 
     {state, events} = SpellEffect.receive(state, caster, spell, Time.now())
+    notify_spell_hit_target(caster_guid, state.object.guid, spell, events)
 
     state =
       state
@@ -775,10 +821,14 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
         %{
           alive?: not Core.dead?(state),
           in_combat: state.internal.in_combat == true,
+          rooted?: state.internal.rooted? == true,
           health_pct: Core.health_pct(state),
+          mana_pct: Core.mana_pct(state),
           power_type: state.unit.power_type,
           unit_flags: state.unit.flags,
           aura_sources: Aura.source_spells(state),
+          aura_stacks: Aura.spell_stacks(state),
+          crowd_controlled?: Aura.crowd_controlled?(state),
           dispel_options: Aura.dispel_options(state),
           attacker_spell_hit_chance: Aura.attacker_spell_hit_chance(state)
         }
@@ -1030,7 +1080,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     |> NavigationResolver.resolve(now)
   end
 
-  defp eventai_spell_hit(%Mob{} = state, caster_guid, %Spell{id: spell_id}) when is_integer(caster_guid) do
+  defp eventai_spell_hit(%Mob{} = state, caster_guid, %Spell{id: spell_id} = spell) when is_integer(caster_guid) do
     now = Time.now()
 
     EventAI.with_blackboard(
@@ -1040,6 +1090,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
         &2,
         caster_guid,
         spell_id,
+        Spell.school_mask(spell),
         now,
         AIEnvironment.context(&1, now, ObservationRequest.actor(caster_guid))
       )
@@ -1048,6 +1099,34 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   end
 
   defp eventai_spell_hit(%Mob{} = state, _caster_guid, _spell), do: state
+
+  defp eventai_spell_hit_target(%Mob{} = state, target_guid, %Spell{id: spell_id} = spell, now)
+       when is_integer(target_guid) and is_integer(now) do
+    EventAI.with_blackboard(
+      state,
+      &EventAI.on_spell_hit_target(
+        &1,
+        &2,
+        target_guid,
+        spell_id,
+        Spell.school_mask(spell),
+        now,
+        AIEnvironment.context(&1, now, ObservationRequest.actor(target_guid))
+      )
+    )
+    |> NavigationResolver.resolve(now)
+  end
+
+  defp eventai_spell_hit_target(%Mob{} = state, _target_guid, _spell, _now), do: state
+
+  defp notify_spell_hit_target(caster_guid, target_guid, %Spell{} = spell, events)
+       when is_integer(caster_guid) and is_integer(target_guid) and is_list(events) do
+    if Guid.entity_type(caster_guid) == :mob and SpellEffect.successful_hit?(events) do
+      Entity.spell_hit_target(caster_guid, target_guid, spell)
+    end
+  end
+
+  defp notify_spell_hit_target(_caster_guid, _target_guid, _spell, _events), do: :ok
 
   defp maybe_tap(%Mob{internal: %Internal{loot: %Loot{tapped_by: nil}}} = state, caster) do
     caster = controlling_player(caster)
