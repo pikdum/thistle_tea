@@ -8,6 +8,8 @@ defmodule ThistleTea.Game.World.PresenceTest do
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.Position
+  alias ThistleTea.Game.World.Position.ClientMotion
   alias ThistleTea.Game.World.Presence
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.WorldRef
@@ -58,6 +60,21 @@ defmodule ThistleTea.Game.World.PresenceTest do
 
       assert SpatialHash.get_entity(character.object.guid) ==
                {character.object.guid, WorldRef.instance(389, 7), 4.0, 5.0, 6.0}
+    end
+  end
+
+  describe "relocate_client/5" do
+    test "publishes metadata, stationary origin, and bounded motion together" do
+      character = character(WorldRef.open(0), {1.0, 2.0, 3.0, 0.0}, 12)
+      on_exit(fn -> Presence.leave(character) end)
+
+      assert :ok = Presence.relocate_client(character, %{moving_until: 1_750}, {70.0, 0.0, 0.0}, 1_000, 750)
+
+      assert %ClientMotion{origin: origin, velocity: velocity} = Position.projection(character.object.guid)
+      assert origin == {1.0, 2.0, 3.0}
+      assert velocity == {70.0, 0.0, 0.0}
+
+      assert Position.get(character.object.guid, 1_100) == {WorldRef.open(0), 8.0, 2.0, 3.0}
     end
   end
 

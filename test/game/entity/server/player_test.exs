@@ -40,6 +40,7 @@ defmodule ThistleTea.Game.Entity.Server.PlayerTest do
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.ChaseWatch
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.Position
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.WorldRef
 
@@ -367,7 +368,7 @@ defmodule ThistleTea.Game.Entity.Server.PlayerTest do
         SpatialHash.remove(:players, guid)
       end)
 
-      assert SpatialHash.get_movement(guid)
+      assert Position.projection(guid)
 
       assert {:noreply, %State{character: teleported, server_movement: nil}} =
                PlayerServer.handle_cast(
@@ -377,7 +378,7 @@ defmodule ThistleTea.Game.Entity.Server.PlayerTest do
 
       assert teleported.movement_block.position == {10.0, 20.0, 30.0, 0.5}
       assert teleported.internal.movement_start_time == nil
-      assert SpatialHash.get_movement(guid) == nil
+      assert Position.projection(guid) == nil
     end
 
     test "updates the public group leader player flag" do

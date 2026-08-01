@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.World.VisibilityTest do
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.Position.Spline
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.System.CellActivator
   alias ThistleTea.Game.World.Transports
@@ -181,11 +182,13 @@ defmodule ThistleTea.Game.World.VisibilityTest do
       local_cells = Visibility.visible_cells(character)
       SpatialHash.insert(:mobs, viewpoint_guid, 0, 1_000.0, 1_000.0, 0.0)
 
-      SpatialHash.put_movement(
-        viewpoint_guid,
-        {WorldRef.open(0), {1_000.0, 1_000.0, 0.0}, [{1_500.0, 1_000.0, 0.0}],
-         System.monotonic_time(:millisecond) - 50_000, 100_000}
-      )
+      SpatialHash.put_projection(viewpoint_guid, %Spline{
+        world: WorldRef.open(0),
+        origin: {1_000.0, 1_000.0, 0.0},
+        nodes: [{1_500.0, 1_000.0, 0.0}],
+        started_at: System.monotonic_time(:millisecond) - 50_000,
+        duration_ms: 100_000
+      })
 
       state = %{
         guid: self_guid,

@@ -9,6 +9,8 @@ defmodule ThistleTea.Game.World.PositionTest do
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Position
+  alias ThistleTea.Game.World.Position.ClientMotion
+  alias ThistleTea.Game.World.Position.Spline
   alias ThistleTea.Game.WorldRef
 
   describe "put/2" do
@@ -21,7 +23,13 @@ defmodule ThistleTea.Game.World.PositionTest do
       World.update_position(moving)
 
       assert Position.projection(guid) ==
-               {world, {0.0, 0.0, 0.0}, [{10.0, 0.0, 0.0}], 1_000, 1_000}
+               %Spline{
+                 world: world,
+                 origin: {0.0, 0.0, 0.0},
+                 nodes: [{10.0, 0.0, 0.0}],
+                 started_at: 1_000,
+                 duration_ms: 1_000
+               }
 
       assert World.position(guid, 1_500) == {WorldRef.open(0), 5.0, 0.0, 0.0}
 
@@ -45,6 +53,27 @@ defmodule ThistleTea.Game.World.PositionTest do
 
       assert Position.projection(guid) == nil
       assert World.position(guid, 1_500) == {WorldRef.open(0), 5.0, 0.0, 0.0}
+    end
+  end
+
+  describe "put/3" do
+    test "projects bounded client motion and settles at its expiry" do
+      guid = Guid.from_low_guid(:player, unique_guid())
+      character = struct(Character, Map.from_struct(stop_at(mob(guid), {0.0, 0.0, 0.0, 0.0})))
+      projection = Position.client_motion(character, {70.0, 0.0, 0.0}, 1_000, 750)
+      on_exit(fn -> World.remove_position(character) end)
+
+      Position.put(character, :players, projection)
+
+      assert %ClientMotion{} = Position.projection(guid)
+      assert World.position(guid, 1_100) == {WorldRef.open(0), 7.0, 0.0, 0.0}
+      assert World.position(guid, 2_000) == {WorldRef.open(0), 52.5, 0.0, 0.0}
+      assert Position.moving?(guid, 1_500)
+      refute Position.moving?(guid, 2_000)
+
+      Position.put(character, :players, nil)
+      assert Position.projection(guid) == nil
+      assert World.position(guid, 2_000) == {WorldRef.open(0), 0.0, 0.0, 0.0}
     end
   end
 

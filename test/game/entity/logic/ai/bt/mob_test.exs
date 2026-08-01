@@ -28,6 +28,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.Position.Spline
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.WorldRef
 
@@ -997,8 +998,16 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
 
     test "resets the spread budget when the target is moving" do
       target_guid = player_guid()
-      SpatialHash.put_movement(target_guid, {0, {0.0, 0.0, 0.0}, [{10.0, 0.0, 0.0}], 0, 10_000})
-      on_exit(fn -> SpatialHash.clear_movement(target_guid) end)
+
+      SpatialHash.put_projection(target_guid, %Spline{
+        world: WorldRef.open(0),
+        origin: {0.0, 0.0, 0.0},
+        nodes: [{10.0, 0.0, 0.0}],
+        started_at: 0,
+        duration_ms: 10_000
+      })
+
+      on_exit(fn -> SpatialHash.clear_projection(target_guid) end)
 
       state = put_in(fixture_mob().unit.target, target_guid)
 

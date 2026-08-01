@@ -25,6 +25,7 @@ defmodule ThistleTea.Game.Player.TaxiTest do
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.Loader.Reputation, as: ReputationLoader
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.Position
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.WorldRef
 
@@ -119,7 +120,7 @@ defmodule ThistleTea.Game.Player.TaxiTest do
       assert state.character.internal.taxi_flight
       assert is_reference(state.taxi_arrival_ref)
       assert_receive {:"$gen_cast", {:send_packet, %SmsgActivatetaxireply{reply: 0}}}
-      assert SpatialHash.get_movement(character.object.guid)
+      assert Position.projection(character.object.guid)
 
       token = state.character.internal.taxi_flight.token
       state = Taxi.arrive(state, token)
@@ -127,7 +128,7 @@ defmodule ThistleTea.Game.Player.TaxiTest do
       assert state.character.movement_block.position == {100.0, 0.0, 0.0, 0.0}
       assert state.character.unit.mount_display_id == 0
       refute state.character.internal.taxi_flight
-      refute SpatialHash.get_movement(character.object.guid)
+      refute Position.projection(character.object.guid)
       assert CharacterStore.get(state.character.id).player.coinage == 75
       assert_receive :restore_companion
 

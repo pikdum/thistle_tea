@@ -19,18 +19,17 @@ defmodule ThistleTea.Game.World.SpatialHash do
     :ets.new(:entity_movement, @entity_table_options)
   end
 
-  def put_movement(guid, {world, start_position, spline_nodes, start_time, duration}) do
-    movement = {WorldRef.coerce(world), start_position, spline_nodes, start_time, duration}
-    :ets.insert(:entity_movement, {guid, movement})
+  def put_projection(guid, projection) when is_integer(guid) and is_struct(projection) do
+    :ets.insert(:entity_movement, {guid, projection})
   end
 
-  def clear_movement(guid) do
+  def clear_projection(guid) do
     :ets.delete(:entity_movement, guid)
   end
 
-  def get_movement(guid) do
+  def get_projection(guid) do
     case :ets.lookup(:entity_movement, guid) do
-      [{^guid, movement}] -> movement
+      [{^guid, projection}] -> projection
       [] -> nil
     end
   end

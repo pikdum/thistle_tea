@@ -21,6 +21,14 @@ defmodule ThistleTea.Game.World.Presence do
     :ok
   end
 
+  def relocate_client(%Character{} = character, metadata, velocity, now, projection_duration_ms)
+      when is_map(metadata) do
+    Metadata.update(character.object.guid, Map.merge(metadata, location_metadata(character)))
+    projection = Position.client_motion(character, velocity, now, projection_duration_ms)
+    Position.put(character, :players, projection)
+    :ok
+  end
+
   def sync(%Character{} = character, metadata) when is_map(metadata) do
     Metadata.update(character.object.guid, Map.merge(metadata, location_metadata(character)))
   end
