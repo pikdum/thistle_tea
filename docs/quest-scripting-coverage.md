@@ -11,7 +11,7 @@ This inventory covers the VMangos data in `db/vmangos.sqlite` as of July 31,
 - Implemented direct rows: 2,350.
 - Blocked direct rows: 5 across four quests.
 - Combined quest, generic, and movement data: 7,142 rows.
-- Commands with no runtime implementation in that combined set: 148 rows.
+- Commands with no runtime implementation in that combined set: 136 rows.
 
 The direct-row number describes command availability, not a claim that every
 quest is end-to-end complete. A quest can enter generic or waypoint scripts
@@ -25,8 +25,8 @@ that use a partial target selector or an unsupported secondary command.
   movement modes, run/walk, flee, home position, waypoint routes, and map-event
   escort lifecycle.
 - Combat and unit state: attack start, combat stop, cast interruption, aura
-  add/remove, spell casts, temporary faction, typed flag changes, phase
-  changes, and invincibility health floors.
+  add/remove, spell casts, temporary faction, typed flag changes, melee and
+  combat-movement capabilities, phase changes, and invincibility health floors.
 - Quest objectives: exploration/event credit, kill credit, talk credit, group
   failure, item creation, and timed quest failure.
 - Spawning and object lifecycle: temporary creatures, summoned objects,
@@ -64,11 +64,9 @@ The combined quest/generic/movement data contains these unmapped commands:
 | 33 enter evade | 8 | A single semantic evade transition shared with AI reset. |
 | 59 react state | 8 | Canonical aggressive/defensive/passive AI state in behavior context. |
 | 78 join creature group | 8 | Runtime creature formations and ownership. |
-| 6 teleport | 6 | A shared player/creature teleport transition with visibility and attachment handling. |
-| 42 melee attack toggle | 6 | Canonical behavior capability state. |
-| 43 combat movement toggle | 6 | Canonical behavior capability state. |
 | 75 add threat | 7 | Remote semantic threat delivery to the target owner. |
 | 77 set fly | 7 | Flight movement capability and spline flag projection. |
+| 6 teleport | 6 | A shared player/creature teleport transition with visibility and attachment handling. |
 | 79 leave creature group | 5 | Runtime creature formations and ownership. |
 | 92 start script on zone | 5 | Zone membership index and player/pet fanout. |
 | 55 creature spells | 4 | Unified preloaded spell cache and runtime list replacement. |
@@ -79,11 +77,13 @@ The combined quest/generic/movement data contains these unmapped commands:
 
 ## Partial selectors and parameter modes
 
-- Owner-only target type 9 has one generic row.
-- Nearest-player target types 25 and 27 have five combined rows.
+- Owner-only target type 9 and nearest-player target types 25 and 27 are
+  implemented.
 - `MOVE_TO` coordinate modes 1 and 2 have 13 rows; mode 0 is implemented.
 - Movement type 15 (follow) has six rows; idle, random, waypoint, and home are
   implemented.
+- Initial source/target swap without a final buddy-owner swap has 35 rows.
+- Whisper and boss-whisper talk modes have seven rows.
 - Morph-by-creature-entry has 28 movement rows. Morph-by-display-ID is
   implemented; entry-based morphing needs a preloaded template display choice.
 
