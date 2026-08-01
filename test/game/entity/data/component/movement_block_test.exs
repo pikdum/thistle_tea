@@ -146,6 +146,44 @@ defmodule ThistleTea.Game.Entity.Data.Component.MovementBlockTest do
     end
   end
 
+  describe "client_velocity/1" do
+    test "derives forward motion from orientation and canonical run speed", context do
+      movement_block = %{
+        context.base_movement_block
+        | movement_flags: 0x00000001,
+          position: {1.0, 2.0, 3.0, :math.pi() / 2},
+          run_speed: 70.0
+      }
+
+      assert_velocity(MovementBlock.client_velocity(movement_block), {0.0, 70.0, 0.0})
+    end
+
+    test "uses backward and walking speeds", context do
+      backward = %{context.base_movement_block | movement_flags: 0x00000002, position: {0.0, 0.0, 0.0, 0.0}}
+      walking = %{context.base_movement_block | movement_flags: 0x00000101, position: {0.0, 0.0, 0.0, 0.0}}
+
+      assert_velocity(MovementBlock.client_velocity(backward), {-4.5, 0.0, 0.0})
+      assert_velocity(MovementBlock.client_velocity(walking), {2.5, 0.0, 0.0})
+    end
+
+    test "normalizes diagonal translation", context do
+      movement_block = %{
+        context.base_movement_block
+        | movement_flags: 0x00000005,
+          position: {0.0, 0.0, 0.0, 0.0}
+      }
+
+      diagonal = 7.0 / :math.sqrt(2)
+      assert_velocity(MovementBlock.client_velocity(movement_block), {diagonal, diagonal, 0.0})
+    end
+
+    test "does not extrapolate airborne translation", context do
+      movement_block = %{context.base_movement_block | movement_flags: 0x00002001}
+
+      assert MovementBlock.client_velocity(movement_block) == {0.0, 0.0, 0.0}
+    end
+  end
+
   describe "to_binary/1" do
     test "serializes minimal movement block", context do
       result = MovementBlock.to_binary(context.base_movement_block)
@@ -379,5 +417,11 @@ defmodule ThistleTea.Game.Entity.Data.Component.MovementBlockTest do
 
   defp vector({x, y, z}) do
     <<x::little-float-size(32), y::little-float-size(32), z::little-float-size(32)>>
+  end
+
+  defp assert_velocity({vx, vy, vz}, {expected_x, expected_y, expected_z}) do
+    assert_in_delta vx, expected_x, 0.001
+    assert_in_delta vy, expected_y, 0.001
+    assert_in_delta vz, expected_z, 0.001
   end
 end

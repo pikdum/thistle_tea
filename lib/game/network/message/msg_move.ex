@@ -18,14 +18,12 @@ defmodule ThistleTea.Game.Network.Message.MsgMove do
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.AggroProbe
   alias ThistleTea.Game.World.ChaseWatch
-  alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Presence
   alias ThistleTea.Game.World.Transports
   alias ThistleTea.Game.World.Visibility
 
   @spell_failed_moving 0x2E
-  @move_recency_ms 750
-  @max_projection_speed 20.0
+  @client_projection_ms 750
 
   defstruct [
     :opcode,
@@ -34,6 +32,8 @@ defmodule ThistleTea.Game.Network.Message.MsgMove do
 
   @impl ClientMessage
   def handle(%__MODULE__{}, %{character: %Character{internal: %{taxi_flight: %Flight{}}}} = state), do: state
+
+  def handle(%__MODULE__{}, %{server_movement: server_movement} = state) when not is_nil(server_movement), do: state
 
   def handle(
         %__MODULE__{payload: payload, opcode: opcode},
@@ -90,31 +90,35 @@ defmodule ThistleTea.Game.Network.Message.MsgMove do
     character = state.character
     character = %{character | movement_block: movement_block, unit: %{unit | stand_state: 0}}
     %{internal: %{world: world}} = character
-    %MovementBlock{position: {x0, y0, z0, _}} = previous_movement_block
     %MovementBlock{position: {x1, y1, z1, orientation}} = movement_block
     now = Time.now()
-    movement_velocity = movement_velocity(state.guid, movement_block, {x0, y0, z0}, {x1, y1, z1}, now)
+    movement_velocity = MovementBlock.client_velocity(movement_block)
 
     position_changed? = MovementBlock.position_changed?(previous_movement_block, movement_block)
+    translating? = MovementBlock.translating?(movement_block)
 
     presence_metadata = %{
       orientation: orientation,
       movement_velocity: movement_velocity,
       airborne?: MovementBlock.airborne?(movement_block),
-      last_move_at: now
+      last_move_at: now,
+      moving_until: if(translating?, do: now + @client_projection_ms, else: now)
     }
 
-    presence_metadata =
-      if position_changed?,
-        do: Map.put(presence_metadata, :moving_until, now + @move_recency_ms),
-        else: presence_metadata
-
-    character = interrupt_auras(character, position_changed?)
+    moved? = position_changed? or translating?
+    character = interrupt_auras(character, moved?)
     character = interrupt_water_auras(character, movement_block, state.character.movement_block)
-    Presence.relocate(character, presence_metadata)
+
+    Presence.relocate_client(
+      character,
+      presence_metadata,
+      movement_velocity,
+      now,
+      @client_projection_ms
+    )
 
     new_state =
-      if position_changed? do
+      if moved? do
         AggroProbe.notify_player_moved(state.guid, world, {x1, y1, z1})
         ChaseWatch.notify_moved(state.guid, {x1, y1, z1})
 
@@ -165,40 +169,6 @@ defmodule ThistleTea.Game.Network.Message.MsgMove do
       character |> Effects.enqueue(events) |> EventSink.emit_pending()
     else
       character
-    end
-  end
-
-  defp movement_velocity(guid, %MovementBlock{} = movement_block, {x0, y0, z0}, {x1, y1, z1}, now) do
-    if extrapolatable?(movement_block) do
-      recent_velocity(guid, {x0, y0, z0}, {x1, y1, z1}, now)
-    else
-      {0.0, 0.0, 0.0}
-    end
-  end
-
-  defp extrapolatable?(%MovementBlock{} = movement_block) do
-    MovementBlock.translating?(movement_block) and not MovementBlock.airborne?(movement_block)
-  end
-
-  defp recent_velocity(guid, {x0, y0, z0}, {x1, y1, z1}, now) do
-    case Metadata.query(guid, [:last_move_at]) do
-      %{last_move_at: previous} when is_integer(previous) and now > previous and now - previous <= @move_recency_ms ->
-        seconds = (now - previous) / 1_000
-        clamp_velocity({(x1 - x0) / seconds, (y1 - y0) / seconds, (z1 - z0) / seconds})
-
-      _ ->
-        {0.0, 0.0, 0.0}
-    end
-  end
-
-  defp clamp_velocity({vx, vy, vz}) do
-    speed = :math.sqrt(vx * vx + vy * vy + vz * vz)
-
-    if speed > @max_projection_speed do
-      scale = @max_projection_speed / speed
-      {vx * scale, vy * scale, vz * scale}
-    else
-      {vx, vy, vz}
     end
   end
 end

@@ -73,6 +73,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.MovementBlock do
   @movement_flag_backward 0x00000002
   @movement_flag_strafe_left 0x00000004
   @movement_flag_strafe_right 0x00000008
+  @movement_flag_walk_mode 0x00000100
   @movement_flag_jumping 0x00002000
   @movement_flag_falling_far 0x00004000
   @movement_flag_swimming 0x00200000
@@ -99,6 +100,16 @@ defmodule ThistleTea.Game.Entity.Data.Component.MovementBlock do
 
   def translating?(_movement_block), do: false
 
+  def client_velocity(%__MODULE__{} = movement_block) do
+    if translating?(movement_block) and not airborne?(movement_block) do
+      movement_block
+      |> translation_axes()
+      |> velocity_from_axes(movement_block)
+    else
+      {0.0, 0.0, 0.0}
+    end
+  end
+
   def airborne?(%__MODULE__{movement_flags: flags}) when is_integer(flags) do
     (flags &&& @movement_flag_mask_airborne) != 0
   end
@@ -110,6 +121,65 @@ defmodule ThistleTea.Game.Entity.Data.Component.MovementBlock do
   end
 
   def on_transport?(_movement_block), do: false
+
+  defp translation_axes(%__MODULE__{movement_flags: flags}) do
+    forward = flag_axis(flags, @movement_flag_forward, @movement_flag_backward)
+    strafe = flag_axis(flags, @movement_flag_strafe_left, @movement_flag_strafe_right)
+    {forward, strafe}
+  end
+
+  defp flag_axis(flags, positive, negative) do
+    flag_value(flags, positive) - flag_value(flags, negative)
+  end
+
+  defp flag_value(flags, flag) when (flags &&& flag) != 0, do: 1.0
+  defp flag_value(_flags, _flag), do: 0.0
+
+  defp velocity_from_axes({forward, strafe}, _movement_block) when forward == 0 and strafe == 0, do: {0.0, 0.0, 0.0}
+
+  defp velocity_from_axes({forward, strafe}, %__MODULE__{position: {_x, _y, _z, orientation}} = movement_block)
+       when is_number(orientation) do
+    pitch = movement_pitch(movement_block)
+    {fx, fy, fz} = forward_vector(orientation, pitch)
+    {lx, ly, lz} = {-:math.sin(orientation), :math.cos(orientation), 0.0}
+    {dx, dy, dz} = {forward * fx + strafe * lx, forward * fy + strafe * ly, forward * fz + strafe * lz}
+    magnitude = :math.sqrt(dx * dx + dy * dy + dz * dz)
+    speed = movement_speed(movement_block, forward)
+
+    if magnitude > 0 and speed > 0 do
+      {dx * speed / magnitude, dy * speed / magnitude, dz * speed / magnitude}
+    else
+      {0.0, 0.0, 0.0}
+    end
+  end
+
+  defp velocity_from_axes(_axes, _movement_block), do: {0.0, 0.0, 0.0}
+
+  defp movement_pitch(%__MODULE__{} = movement_block) do
+    if swimming?(movement_block) and is_number(movement_block.pitch), do: movement_block.pitch, else: 0.0
+  end
+
+  defp forward_vector(orientation, pitch) do
+    horizontal = :math.cos(pitch)
+    {:math.cos(orientation) * horizontal, :math.sin(orientation) * horizontal, :math.sin(pitch)}
+  end
+
+  defp movement_speed(%__MODULE__{movement_flags: flags, walk_speed: speed}, _forward)
+       when (flags &&& @movement_flag_walk_mode) != 0 and is_number(speed), do: speed
+
+  defp movement_speed(%__MODULE__{} = movement_block, forward) when forward < 0, do: backward_speed(movement_block)
+
+  defp movement_speed(%__MODULE__{} = movement_block, _forward), do: forward_speed(movement_block)
+
+  defp backward_speed(%__MODULE__{movement_flags: flags, swim_back_speed: speed})
+       when (flags &&& @movement_flag_swimming) != 0, do: speed || 0.0
+
+  defp backward_speed(%__MODULE__{run_back_speed: speed}), do: speed || 0.0
+
+  defp forward_speed(%__MODULE__{movement_flags: flags, swim_speed: speed})
+       when (flags &&& @movement_flag_swimming) != 0, do: speed || 0.0
+
+  defp forward_speed(%__MODULE__{run_speed: speed}), do: speed || 0.0
 
   def clear_transport(%__MODULE__{movement_flags: flags} = movement_block) do
     flags = if is_integer(flags), do: band(flags, bnot(@movement_flag_on_transport)), else: flags

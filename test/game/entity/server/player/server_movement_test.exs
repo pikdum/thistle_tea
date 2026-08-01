@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.ServerMovementTest do
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Position
+  alias ThistleTea.Game.World.Position.Spline
   alias ThistleTea.Game.WorldRef
 
   describe "start/3" do
@@ -23,8 +24,13 @@ defmodule ThistleTea.Game.Entity.Server.Player.ServerMovementTest do
 
       assert %ServerMovement{} = state.server_movement
 
-      assert Position.projection(guid) ==
-               {WorldRef.open(0), {0.0, 0.0, 0.0}, [{10.0, 0.0, 0.0}], 1_000, 100}
+      assert Position.projection(guid) == %Spline{
+               world: WorldRef.open(0),
+               origin: {0.0, 0.0, 0.0},
+               nodes: [{10.0, 0.0, 0.0}],
+               started_at: 1_000,
+               duration_ms: 100
+             }
 
       assert World.position(guid, 1_050) == {WorldRef.open(0), 5.0, 0.0, 0.0}
 
