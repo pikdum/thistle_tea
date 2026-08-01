@@ -10,7 +10,7 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Math
-  alias ThistleTea.Game.World.Grid
+  alias ThistleTea.Game.SpatialGrid
 
   @max_u32 0xFFFFFFFF
   @movement_flag_forward 0x00000001
@@ -87,7 +87,7 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
 
   defp cell_at(map, start_position, spline_nodes, duration, elapsed) do
     {x, y, z} = position_at(start_position, spline_nodes, duration, elapsed)
-    Grid.cell(map, x, y, z)
+    SpatialGrid.cell(map, x, y, z)
   end
 
   defp boundary_delay(path, travelled, map, current_cell, duration, total_distance, remaining_delay) do
@@ -592,10 +592,10 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
 
   defp distance_to_leave_cell_segment(map, cell, {x1, y1, _z1}, {x2, y2, _z2}, distance) do
     cond do
-      Grid.cell(map, x1, y1, 0.0) != cell ->
+      SpatialGrid.cell(map, x1, y1, 0.0) != cell ->
         0.0
 
-      Grid.cell(map, x2, y2, 0.0) == cell ->
+      SpatialGrid.cell(map, x2, y2, 0.0) == cell ->
         nil
 
       true ->
@@ -604,7 +604,7 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
   end
 
   defp cell_boundary_distance(cell, x, y, dx, dy, distance) do
-    {{x_min, x_max}, {y_min, y_max}} = Grid.cell_bounds(cell)
+    {{x_min, x_max}, {y_min, y_max}} = SpatialGrid.cell_bounds(cell)
 
     [boundary_fraction(x, dx, x_min, x_max), boundary_fraction(y, dy, y_min, y_max)]
     |> Enum.reject(&is_nil/1)

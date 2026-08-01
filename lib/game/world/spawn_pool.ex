@@ -8,12 +8,12 @@ defmodule ThistleTea.Game.World.SpawnPool do
   alias ThistleTea.Game.Entity.Data.Component.Internal.Spawn
   alias ThistleTea.Game.Entity.Data.GameObject
   alias ThistleTea.Game.Entity.Data.Mob
+  alias ThistleTea.Game.SpatialGrid
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.InstanceSpawn
   alias ThistleTea.Game.World.Loader
   alias ThistleTea.Game.World.Loader.AreaTrigger, as: AreaTriggerLoader
   alias ThistleTea.Game.World.Metadata
-  alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.SpawnPool.Catalog
   alias ThistleTea.Game.World.SpawnPool.CellIndex
   alias ThistleTea.Game.World.SpawnPool.Selection
@@ -468,7 +468,7 @@ defmodule ThistleTea.Game.World.SpawnPool do
   end
 
   defp game_object_cell(world, %GameObject{movement_block: %{position: {x, y, z, _o}}}) do
-    SpatialHash.cell(world, x, y, z)
+    SpatialGrid.cell(world, x, y, z)
   end
 
   defp schedule_reactivation(member, respawn_delay_ms) when is_integer(respawn_delay_ms) and respawn_delay_ms > 0 do
@@ -478,7 +478,7 @@ defmodule ThistleTea.Game.World.SpawnPool do
   defp schedule_reactivation(_member, _respawn_delay_ms), do: :ok
 
   defp cell(%{internal: %Internal{world: world}, movement_block: %{position: {x, y, z, _o}}}) do
-    SpatialHash.cell(world, x, y, z)
+    SpatialGrid.cell(world, x, y, z)
   end
 
   defp stop_running_member(state, member, pid) do
@@ -548,18 +548,18 @@ defmodule ThistleTea.Game.World.SpawnPool do
   end
 
   defp observed?(guid, wanted) do
-    case SpatialHash.get_entity(guid) do
+    case World.position(guid) do
       nil -> false
-      {_guid, world, x, y, z} -> observed_at?(world, x, y, z, wanted)
+      {world, x, y, z} -> observed_at?(world, x, y, z, wanted)
     end
   end
 
   defp observed_at?(world, x, y, z, %MapSet{} = wanted) do
-    MapSet.member?(wanted, SpatialHash.cell(world, x, y, z))
+    MapSet.member?(wanted, SpatialGrid.cell(world, x, y, z))
   end
 
   defp observed_at?(world, x, y, z, nil) do
-    SpatialHash.query(:players, world, x, y, z, @observed_range) != []
+    World.players_near?(world, {x, y, z}, @observed_range)
   end
 
   defp schedule_drain(%{drain_ref: nil} = state) do

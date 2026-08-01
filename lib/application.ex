@@ -8,6 +8,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.Entity.Registry, as: EntityRegistry
   alias ThistleTea.Game.Entity.Server.PlayerSupervisor
   alias ThistleTea.Game.Network.Server, as: GameServer
+  alias ThistleTea.Game.World
   alias ThistleTea.Game.World.AggroProbe
   alias ThistleTea.Game.World.AreaEffects
   alias ThistleTea.Game.World.CharacterStore
@@ -50,7 +51,6 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.World.Loader.Waypoint, as: WaypointLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.PostOffice
-  alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.SpawnPool
   alias ThistleTea.Game.World.SpawnPool.Catalog, as: SpawnPoolCatalog
   alias ThistleTea.Game.World.System.CellActivator
@@ -171,7 +171,7 @@ defmodule ThistleTea.Application do
     :ets.new(:spline_counters, [:named_table, :public, write_concurrency: :auto])
     :ets.insert(:spline_counters, {:spline_id, 0})
     setup_database()
-    SpatialHash.setup_tables()
+    World.setup_spatial_index()
     AggroProbe.init()
     ChaseWatch.init()
     SpawnPool.CellIndex.init()

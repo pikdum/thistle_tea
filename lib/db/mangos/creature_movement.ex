@@ -3,7 +3,7 @@ defmodule ThistleTea.DB.Mangos.CreatureMovement do
 
   import Ecto.Query
 
-  alias ThistleTea.Game.World.SpatialHash
+  alias ThistleTea.Game.Math
 
   @primary_key {:id, :integer, autogenerate: false}
   schema "creature_movement" do
@@ -43,7 +43,7 @@ defmodule ThistleTea.DB.Mangos.CreatureMovement do
   def closest_point(creature_movement, {x, y, z}) do
     creature_movement
     |> Enum.min_by(fn %__MODULE__{} = cm ->
-      SpatialHash.distance({cm.position_x, cm.position_y, cm.position_z}, {x, y, z})
+      Math.distance({cm.position_x, cm.position_y, cm.position_z}, {x, y, z})
     end)
     |> Map.get(:point)
   end

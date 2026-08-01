@@ -9,10 +9,10 @@ defmodule ThistleTea.Game.World.System.CellActivator do
   use GenServer
 
   alias ThistleTea.Game.Entity
+  alias ThistleTea.Game.SpatialGrid
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Loader
   alias ThistleTea.Game.World.Metadata
-  alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.SpawnPool
   alias ThistleTea.Game.World.SpawnPool.CellIndex
   alias ThistleTea.Game.WorldRef
@@ -166,17 +166,15 @@ defmodule ThistleTea.Game.World.System.CellActivator do
   end
 
   defp occupied_cells do
-    :players
-    |> SpatialHash.cells()
-    |> Enum.flat_map(fn cell -> SpatialHash.entities(:players, cell) end)
+    World.player_cell_memberships()
     |> Enum.filter(fn {_cell, guid} -> Entity.online?(guid) end)
     |> Enum.flat_map(fn {cell, guid} -> [cell | viewpoint_cells(guid)] end)
   end
 
   defp viewpoint_cells(guid) do
     with %{viewpoint: viewpoint} when is_integer(viewpoint) and viewpoint > 0 <- Metadata.query(guid, [:viewpoint]),
-         {_guid, world, x, y, z} <- SpatialHash.get_entity(viewpoint) do
-      [SpatialHash.cell(world, x, y, z)]
+         {world, x, y, z} <- World.position(viewpoint) do
+      [SpatialGrid.cell(world, x, y, z)]
     else
       _ -> []
     end

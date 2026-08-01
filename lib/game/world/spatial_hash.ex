@@ -3,7 +3,7 @@ defmodule ThistleTea.Game.World.SpatialHash do
   ETS-backed spatial hash with 125-yard cells per entity table, plus active
   spline-movement records, powering range queries and visibility cells.
   """
-  alias ThistleTea.Game.World.Grid
+  alias ThistleTea.Game.SpatialGrid
   alias ThistleTea.Game.WorldRef
 
   @cell_table_options [:named_table, :public, :duplicate_bag, read_concurrency: true, write_concurrency: :auto]
@@ -113,9 +113,9 @@ defmodule ThistleTea.Game.World.SpatialHash do
       {{124.5, 249.5}, {249.5, 374.5}}
 
   """
-  defdelegate cell_bounds(cell), to: Grid
-  defdelegate cell(world, x, y, z), to: Grid
-  defdelegate cells_in_range(world, x, y, z, range), to: Grid
+  defdelegate cell_bounds(cell), to: SpatialGrid
+  defdelegate cell(world, x, y, z), to: SpatialGrid
+  defdelegate cells_in_range(world, x, y, z, range), to: SpatialGrid
 
   def distance({x1, y1, z1}, {x2, y2, z2}) do
     dx = x2 - x1

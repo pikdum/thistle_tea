@@ -15,11 +15,11 @@ defmodule ThistleTea.Game.World.Visibility do
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
+  alias ThistleTea.Game.SpatialGrid
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.ChaseWatch
   alias ThistleTea.Game.World.Groups
   alias ThistleTea.Game.World.Metadata
-  alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.System.CellActivator
   alias ThistleTea.Game.World.Transports
   alias ThistleTea.Game.World.Visibility.Filter
@@ -167,7 +167,7 @@ defmodule ThistleTea.Game.World.Visibility do
   end
 
   def current_cell(%{internal: %Internal{world: world}, movement_block: %MovementBlock{position: {x, y, z, _o}}}) do
-    SpatialHash.cell(world, x, y, z)
+    SpatialGrid.cell(world, x, y, z)
   end
 
   def group_name, do: @group
@@ -248,13 +248,7 @@ defmodule ThistleTea.Game.World.Visibility do
 
   defp corpse_distance(%{object: %{guid: viewer_guid}}, target_guid) do
     corpse_guid = Corpse.guid_for(viewer_guid)
-
-    with {_, world, cx, cy, cz} <- SpatialHash.get_entity(corpse_guid),
-         {_, ^world, tx, ty, tz} <- SpatialHash.get_entity(target_guid) do
-      SpatialHash.distance({cx, cy, cz}, {tx, ty, tz})
-    else
-      _ -> nil
-    end
+    World.distance_between(corpse_guid, target_guid)
   end
 
   defp corpse_distance(_character, _target_guid), do: nil
@@ -315,15 +309,12 @@ defmodule ThistleTea.Game.World.Visibility do
   defp viewpoint_cells(_character), do: nil
 
   defp viewpoint_location(guid) do
-    case SpatialHash.get_entity(guid) do
-      {^guid, world, x, y, z} -> {world, x, y, z}
-      _ -> nil
-    end
+    World.position(guid)
   end
 
   defp visible_cells_at(world, x, y, z) do
     world
-    |> SpatialHash.cells_in_range(x, y, z, @range)
+    |> SpatialGrid.cells_in_range(x, y, z, @range)
     |> MapSet.new()
   end
 
@@ -382,9 +373,9 @@ defmodule ThistleTea.Game.World.Visibility do
     if pinned_transport?(guid, cells) do
       true
     else
-      case SpatialHash.get_entity(guid) do
-        {^guid, world, x, y, z} -> MapSet.member?(cells, SpatialHash.cell(world, x, y, z))
-        _ -> false
+      case World.cell_for(guid) do
+        nil -> false
+        cell -> MapSet.member?(cells, cell)
       end
     end
   end

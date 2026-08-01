@@ -11,13 +11,16 @@ defmodule ThistleTea.Game.World do
   alias ThistleTea.Game.Entity.Data.DynamicObject, as: DataDynamicObject
   alias ThistleTea.Game.Entity.Data.GameObject
   alias ThistleTea.Game.Entity.Data.Mob
+  alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.Entity.Server.Corpse, as: CorpseServer
   alias ThistleTea.Game.Entity.Server.DynamicObject, as: DynamicObjectServer
   alias ThistleTea.Game.Entity.Server.GameObject, as: GameObjectServer
   alias ThistleTea.Game.Entity.Server.Mob, as: MobServer
   alias ThistleTea.Game.Entity.Server.Transport, as: TransportServer
   alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.Math
   alias ThistleTea.Game.Network
+  alias ThistleTea.Game.SpatialGrid
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.EntitySupervisor
   alias ThistleTea.Game.World.Loader.Transport, as: TransportLoader
@@ -28,22 +31,15 @@ defmodule ThistleTea.Game.World do
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.WorldRef
 
-  def nearby_players(
-        %{internal: %Internal{world: world}, movement_block: %MovementBlock{position: {x, y, z, _o}}},
-        range \\ 250
-      ) do
-    nearby_units_exact(:players, world, {x, y, z}, range)
+  def nearby_players(entity, range \\ 250) do
+    case entity_position(entity, Time.now()) do
+      {world, x, y, z} -> nearby_units_exact(:players, world, {x, y, z}, range)
+      nil -> []
+    end
   end
 
-  def nearby_mobs(
-        %{
-          object: %{guid: self_guid},
-          internal: %Internal{world: world},
-          movement_block: %MovementBlock{position: {x, y, z, _o}}
-        },
-        range \\ 30
-      ) do
-    nearby_units_exact(:mobs, world, {x, y, z}, range)
+  def nearby_mobs(%{object: %{guid: self_guid}} = entity, range \\ 30) do
+    nearby(entity, :mobs, range)
     |> Enum.reject(fn {guid, _distance} -> guid == self_guid end)
   end
 
@@ -51,19 +47,14 @@ defmodule ThistleTea.Game.World do
     nearby_units_exact(:mobs, world, {x, y, z}, range)
   end
 
-  def nearby_game_objects(
-        %{
-          object: %{guid: self_guid},
-          internal: %Internal{world: world},
-          movement_block: %MovementBlock{position: {x, y, z, _o}}
-        },
-        range \\ 30
-      ) do
-    nearby_units_exact(:game_objects, world, {x, y, z}, range)
+  def nearby_game_objects(%{object: %{guid: self_guid}} = entity, range \\ 30) do
+    nearby(entity, :game_objects, range)
     |> Enum.reject(fn {guid, _distance} -> guid == self_guid end)
   end
 
   @position_drift_margin 180.0
+
+  def setup_spatial_index, do: SpatialHash.setup_tables()
 
   def nearby_units_exact(table, world, {x, y, z} = origin, range, now \\ Time.now()) do
     world = WorldRef.coerce(world)
@@ -72,7 +63,7 @@ defmodule ThistleTea.Game.World do
     |> Enum.flat_map(fn {guid, _stale_distance} ->
       case position(guid, now) do
         {^world, tx, ty, tz} ->
-          distance = SpatialHash.distance(origin, {tx, ty, tz})
+          distance = Math.distance(origin, {tx, ty, tz})
           # credo:disable-for-next-line Credo.Check.Refactor.Nesting
           if distance <= range, do: [{guid, distance}], else: []
 
@@ -84,6 +75,23 @@ defmodule ThistleTea.Game.World do
 
   def nearby_players_at(world, {x, y, z}, range \\ 30) do
     nearby_units_exact(:players, world, {x, y, z}, range)
+  end
+
+  def players_near?(world, {x, y, z}, range) do
+    nearby_players_at(world, {x, y, z}, range) != []
+  end
+
+  def player_cell_memberships do
+    :players
+    |> SpatialHash.cells()
+    |> Enum.flat_map(&SpatialHash.entities(:players, &1))
+  end
+
+  def cell_for(guid, now \\ Time.now()) when is_integer(guid) and is_integer(now) do
+    case position(guid, now) do
+      {world, x, y, z} -> SpatialGrid.cell(world, x, y, z)
+      nil -> nil
+    end
   end
 
   def update_position(%Character{} = entity), do: Presence.relocate(entity)
@@ -136,8 +144,11 @@ defmodule ThistleTea.Game.World do
     Network.send_packet(packet, guid, source_guid: source_guid)
   end
 
-  def tracking_players(%{internal: %Internal{world: world}, movement_block: %MovementBlock{position: {x, y, z, _o}}}) do
-    SpatialHash.query_cells(:players, world, x, y, z, 250)
+  def tracking_players(entity) do
+    case entity_position(entity, Time.now()) do
+      {world, x, y, z} -> SpatialHash.query_cells(:players, world, x, y, z, 250)
+      nil -> []
+    end
   end
 
   def start_entity(%GameObject{} = entity) do
@@ -276,14 +287,10 @@ defmodule ThistleTea.Game.World do
 
   def distance_between(source, target, now \\ Time.now())
 
-  def distance_between(
-        %{internal: %Internal{world: world}, movement_block: %MovementBlock{position: {x1, y1, z1, _o}}},
-        guid,
-        now
-      )
+  def distance_between(%{internal: %Internal{}, movement_block: %MovementBlock{}} = source, guid, now)
       when is_integer(guid) and is_integer(now) do
-    case position(guid, now) do
-      {^world, x2, y2, z2} -> SpatialHash.distance({x1, y1, z1}, {x2, y2, z2})
+    case {entity_position(source, now), position(guid, now)} do
+      {{world, x1, y1, z1}, {world, x2, y2, z2}} -> Math.distance({x1, y1, z1}, {x2, y2, z2})
       _ -> nil
     end
   end
@@ -291,19 +298,20 @@ defmodule ThistleTea.Game.World do
   def distance_between(source_guid, target_guid, now)
       when is_integer(source_guid) and is_integer(target_guid) and is_integer(now) do
     case {position(source_guid, now), position(target_guid, now)} do
-      {{world, x1, y1, z1}, {world, x2, y2, z2}} -> SpatialHash.distance({x1, y1, z1}, {x2, y2, z2})
+      {{world, x1, y1, z1}, {world, x2, y2, z2}} -> Math.distance({x1, y1, z1}, {x2, y2, z2})
       _ -> nil
     end
   end
 
-  def line_of_sight?(
-        %{internal: %Internal{world: world}, movement_block: %MovementBlock{position: {x1, y1, z1, _o}}},
-        guid
-      )
-      when is_integer(guid) do
-    case target_position(guid) do
-      {^world, x2, y2, z2} -> Pathfinding.line_of_sight?(world.map_id, {x1, y1, z1}, {x2, y2, z2})
-      _ -> true
+  def line_of_sight?(%{internal: %Internal{}, movement_block: %MovementBlock{}} = entity, guid) when is_integer(guid) do
+    now = Time.now()
+
+    case {entity_position(entity, now), position(guid, now)} do
+      {{world, x1, y1, z1}, {world, x2, y2, z2}} ->
+        Pathfinding.line_of_sight?(world.map_id, {x1, y1, z1}, {x2, y2, z2})
+
+      _ ->
+        true
     end
   end
 
@@ -329,4 +337,18 @@ defmodule ThistleTea.Game.World do
     |> nearby_players(range)
     |> Enum.map(fn {guid, _distance} -> guid end)
   end
+
+  defp nearby(entity, table, range) do
+    case entity_position(entity, Time.now()) do
+      {world, x, y, z} -> nearby_units_exact(table, world, {x, y, z}, range)
+      nil -> []
+    end
+  end
+
+  defp entity_position(%{internal: %Internal{world: world}, movement_block: %MovementBlock{}} = entity, now) do
+    %{movement_block: %MovementBlock{position: {x, y, z, _orientation}}} = Movement.sync_position(entity, now)
+    {world, x, y, z}
+  end
+
+  defp entity_position(_entity, _now), do: nil
 end

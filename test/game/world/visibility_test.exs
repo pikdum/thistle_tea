@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.World.VisibilityTest do
   alias ThistleTea.Game.Entity.Data.Transport.Pose
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.Message
+  alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.System.CellActivator
@@ -173,12 +174,18 @@ defmodule ThistleTea.Game.World.VisibilityTest do
   end
 
   describe "viewpoints" do
-    test "moves visibility to the camera source and restores the player view" do
+    test "moves visibility to the projected camera source and restores the player view" do
       self_guid = Guid.from_low_guid(:player, unique_low())
       viewpoint_guid = Guid.from_low_guid(:mob, unique_low(), unique_low())
       character = character(self_guid, ghost?: false)
       local_cells = Visibility.visible_cells(character)
       SpatialHash.insert(:mobs, viewpoint_guid, 0, 1_000.0, 1_000.0, 0.0)
+
+      SpatialHash.put_movement(
+        viewpoint_guid,
+        {WorldRef.open(0), {1_000.0, 1_000.0, 0.0}, [{1_500.0, 1_000.0, 0.0}],
+         System.monotonic_time(:millisecond) - 50_000, 100_000}
+      )
 
       state = %{
         guid: self_guid,
@@ -189,9 +196,11 @@ defmodule ThistleTea.Game.World.VisibilityTest do
       }
 
       remote = Visibility.set_viewpoint(state, viewpoint_guid)
-      remote_cell = SpatialHash.cell(WorldRef.open(0), 1_000.0, 1_000.0, 0.0)
+      remote_cell = World.cell_for(viewpoint_guid)
+      raw_cell = SpatialHash.cell(WorldRef.open(0), 1_000.0, 1_000.0, 0.0)
 
       assert MapSet.member?(remote.visibility_cells, remote_cell)
+      refute remote_cell == raw_cell
       refute remote.visibility_cells == local_cells
 
       restored = Visibility.reset_viewpoint(remote)

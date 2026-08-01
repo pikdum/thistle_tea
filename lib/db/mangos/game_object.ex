@@ -4,7 +4,7 @@ defmodule ThistleTea.DB.Mangos.GameObject do
   import Ecto.Query
 
   alias ThistleTea.DB.Mangos
-  alias ThistleTea.Game.World.SpatialHash
+  alias ThistleTea.Game.SpatialGrid
   alias ThistleTea.Game.WorldRef
 
   @primary_key {:guid, :integer, autogenerate: false}
@@ -39,7 +39,7 @@ defmodule ThistleTea.DB.Mangos.GameObject do
 
   def query_cell({world, _x, _y} = cell, events \\ []) do
     map = WorldRef.map_id(world)
-    {{x1, x2}, {y1, y2}} = SpatialHash.cell_bounds(cell)
+    {{x1, x2}, {y1, y2}} = SpatialGrid.cell_bounds(cell)
 
     from(g in __MODULE__,
       where:

@@ -14,7 +14,6 @@ defmodule ThistleTea.Game.Architecture.DependencyTest do
                               {"lib/game/entity/logic/core.ex", "ThistleTea.Game.Network.UpdateObject"},
                               {"lib/game/entity/logic/hostility.ex", "ThistleTea.Game.World.Metadata"},
                               {"lib/game/entity/logic/hostility.ex", "ThistleTea.Game.World.System.Duel"},
-                              {"lib/game/entity/logic/movement.ex", "ThistleTea.Game.World.SpatialHash"},
                               {"lib/game/entity/logic/player_combat.ex", "ThistleTea.Game.World"},
                               {"lib/game/entity/logic/player_combat.ex", "ThistleTea.Game.World.Metadata"},
                               {"lib/game/entity/logic/shaman.ex", "ThistleTea.Game.World.Loader.Spell"},
@@ -23,6 +22,12 @@ defmodule ThistleTea.Game.Architecture.DependencyTest do
                               {"lib/game/entity/logic/talents.ex", "ThistleTea.Game.World.Loader.Talent"},
                               {"lib/game/entity/logic/threat.ex", "ThistleTea.Game.World"},
                               {"lib/game/entity/logic/threat.ex", "ThistleTea.Game.World.Metadata"}
+                            ])
+
+  @spatial_index_boundaries MapSet.new([
+                              "lib/game/world.ex",
+                              "lib/game/world/position.ex",
+                              "lib/game/world/spatial_hash.ex"
                             ])
 
   test "pure logic does not acquire new boundary dependencies" do
@@ -39,6 +44,19 @@ defmodule ThistleTea.Game.Architecture.DependencyTest do
       end)
 
     assert violations == []
+  end
+
+  test "mutable spatial index access stays behind world boundaries" do
+    users =
+      Path.wildcard(Path.join([@root, "lib/**/*.ex"]))
+      |> Enum.filter(fn path ->
+        path
+        |> File.read!()
+        |> String.contains?("ThistleTea.Game.World.SpatialHash")
+      end)
+      |> MapSet.new(&Path.relative_to(&1, @root))
+
+    assert users == @spatial_index_boundaries
   end
 
   test "target and movement rules stay outside concrete event interpreters" do

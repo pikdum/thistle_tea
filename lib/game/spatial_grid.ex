@@ -1,6 +1,6 @@
-defmodule ThistleTea.Game.World.Grid do
+defmodule ThistleTea.Game.SpatialGrid do
   @moduledoc """
-  Spatial cell geometry shared by world indexing and movement scheduling.
+  Pure geometry for the world's spatial cells.
   """
 
   alias ThistleTea.Game.WorldRef

@@ -68,6 +68,7 @@ defmodule ThistleTea.Game.World.PositionTest do
       World.update_position(target)
 
       assert World.distance_between(source_guid, target_guid, 1_500) == 0.0
+      assert World.distance_between(source, target_guid, 1_500) == 0.0
     end
   end
 
