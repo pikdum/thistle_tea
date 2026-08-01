@@ -99,7 +99,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet do
     state
     |> clear_combat_state()
     |> then(fn state -> %{state | internal: %{state.internal | pet: pet}} end)
-    |> Movement.halt(Time.now())
+    |> Movement.stop(Time.now())
   end
 
   def command(%Mob{internal: %Internal{pet: %Pet{} = pet}} = state, :follow, _target_guid) do
@@ -126,7 +126,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet do
     if reaction == :passive do
       state
       |> clear_combat_state()
-      |> Movement.halt(Time.now())
+      |> Movement.stop(Time.now())
     else
       state
     end
@@ -237,7 +237,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet do
   defp idle(state, blackboard), do: {{:running, @idle_delay_ms}, state, blackboard}
 
   defp halt_for_melee(state, blackboard, %Context{now: now}) do
-    {:success, Movement.halt(state, now), blackboard}
+    {:success, Movement.stop(state, now), blackboard}
   end
 
   defp face(%Mob{movement_block: %MovementBlock{position: {x, y, z, _o}} = movement_block} = state, orientation) do

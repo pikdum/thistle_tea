@@ -1044,7 +1044,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
 
   defp halt_scripted_movement(state, now) do
     if Movement.moving?(state, now) do
-      state |> Movement.halt(now) |> Effects.enqueue(Effects.movement_stopped())
+      Movement.stop(state, now)
     else
       state
     end

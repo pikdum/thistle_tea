@@ -67,7 +67,7 @@ defmodule ThistleTea.Game.Entity.Logic.Taxi do
         now
       )
       when is_integer(now) do
-    character = Movement.halt(character, now)
+    character = Movement.finish(character, now)
     {_old_x, _old_y, _old_z, orientation} = character.movement_block.position
     movement_block = %{character.movement_block | position: {x, y, z, orientation}}
     unit = %{unit | flags: (unit.flags || 0) &&& bnot(@taxi_flags), mount_display_id: 0}

@@ -290,8 +290,22 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
   defp movement_speed(_velocity, true, run_speed, _walk_speed), do: run_speed
   defp movement_speed(_velocity, _running, _run_speed, walk_speed), do: walk_speed
 
-  def halt(%{movement_block: %MovementBlock{} = mb, internal: %Internal{} = internal} = entity, now)
-      when is_integer(now) do
+  def stop(entity, now) when is_integer(now) do
+    {entity, events} = stop_with_effects(entity, now)
+    Effects.enqueue(entity, events)
+  end
+
+  def stop_with_effects(entity, now) when is_integer(now) do
+    stopped? = projected?(entity)
+    entity = halt(entity, now)
+    events = if stopped?, do: [Effects.movement_stopped()], else: []
+    {entity, events}
+  end
+
+  def finish(entity, now) when is_integer(now), do: halt(entity, now)
+
+  defp halt(%{movement_block: %MovementBlock{} = mb, internal: %Internal{} = internal} = entity, now)
+       when is_integer(now) do
     entity = sync_position(entity, now)
 
     movement_block = %{
@@ -308,6 +322,16 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
     internal = %{internal | movement_start_time: nil, movement_start_position: nil}
     %{entity | movement_block: movement_block, internal: internal}
   end
+
+  defp projected?(%{
+         movement_block: %MovementBlock{spline_nodes: spline_nodes, duration: duration},
+         internal: %Internal{movement_start_time: start_time, movement_start_position: start_position}
+       }) do
+    is_list(spline_nodes) and spline_nodes != [] and is_integer(duration) and duration > 0 and
+      is_integer(start_time) and is_tuple(start_position)
+  end
+
+  defp projected?(_entity), do: false
 
   def face_towards(
         %{movement_block: %MovementBlock{position: {x, y, z, _orientation}} = movement_block} = entity,

@@ -671,8 +671,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     state =
       if Movement.moving?(state, now) do
         state
-        |> Movement.halt(now)
-        |> Effects.enqueue(Effects.movement_stopped())
+        |> Movement.stop(now)
       else
         state
       end
@@ -955,8 +954,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   defp maybe_halt(%Mob{} = state, now) do
     if Movement.moving?(state, now) do
       state
-      |> Movement.halt(now)
-      |> Effects.enqueue(Effects.movement_stopped())
+      |> Movement.stop(now)
     else
       state
     end

@@ -40,6 +40,28 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.PetTest do
     end
   end
 
+  describe "command/3" do
+    test "stay stops the active spline through the movement transition" do
+      state = active_pet()
+
+      stopped = PetBT.command(state, :stay, 0)
+
+      assert stopped.movement_block.spline_nodes == []
+      assert Enum.any?(stopped.internal.events, &is_struct(&1, Effects.MovementStopped))
+    end
+  end
+
+  describe "reaction/2" do
+    test "passive stops the active spline through the movement transition" do
+      state = active_pet()
+
+      stopped = PetBT.reaction(state, :passive)
+
+      assert stopped.movement_block.spline_nodes == []
+      assert Enum.any?(stopped.internal.events, &is_struct(&1, Effects.MovementStopped))
+    end
+  end
+
   defp stationary_owner(opts) do
     guid = Guid.from_low_guid(:player, :erlang.unique_integer([:positive]))
     SpatialHash.update(:players, guid, world(), 0.0, 0.0, 0.0)
@@ -66,6 +88,25 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.PetTest do
         pet: %Internal.Pet{owner_guid: owner_guid, command_state: :follow}
       },
       movement_block: %MovementBlock{position: {0.0, 2.0, 0.0, 0.0}, run_speed: 7.0}
+    }
+  end
+
+  defp active_pet do
+    owner_guid = Guid.from_low_guid(:player, :erlang.unique_integer([:positive]))
+    state = pet_beside_owner(owner_guid)
+
+    %{
+      state
+      | internal: %{
+          state.internal
+          | movement_start_time: @now,
+            movement_start_position: {0.0, 2.0, 0.0}
+        },
+        movement_block: %{
+          state.movement_block
+          | spline_nodes: [{10.0, 2.0, 0.0}],
+            duration: 1_000
+        }
     }
   end
 

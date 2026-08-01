@@ -48,7 +48,8 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.MovementSync do
     root_events = if has_root? == was_rooted?, do: [], else: [Effects.movement_root_changed(has_root?)]
 
     if has_root? and not was_rooted? do
-      {Movement.halt(entity, now), [Effects.movement_stopped() | root_events]}
+      {entity, movement_events} = Movement.stop_with_effects(entity, now)
+      {entity, movement_events ++ root_events}
     else
       {entity, root_events}
     end

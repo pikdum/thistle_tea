@@ -158,7 +158,8 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.ControlSync do
 
   defp halt_for_control(%Mob{movement_block: %MovementBlock{} = movement} = mob, now, events) do
     if movement.spline_nodes not in [nil, []] or is_integer(mob.internal.movement_start_time) do
-      {Movement.halt(mob, now), events ++ [Effects.movement_stopped()]}
+      {mob, movement_events} = Movement.stop_with_effects(mob, now)
+      {mob, events ++ movement_events}
     else
       {mob, events}
     end

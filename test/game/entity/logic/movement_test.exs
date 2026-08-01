@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.Entity.Logic.MovementTest do
 
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.WorldRef
 
@@ -271,6 +272,47 @@ defmodule ThistleTea.Game.Entity.Logic.MovementTest do
     assert is_nil(updated.movement_block.spline_start_position)
     assert is_nil(updated.internal.movement_start_time)
     assert is_nil(updated.internal.movement_start_position)
+  end
+
+  describe "stop/2" do
+    test "halts active projected movement and enqueues its semantic stop" do
+      entity =
+        build_entity(
+          start_time: 0,
+          start_position: {0.0, 0.0, 0.0},
+          duration: 1_000,
+          spline_nodes: [{10.0, 0.0, 0.0}]
+        )
+
+      stopped = Movement.stop(entity, 500)
+
+      assert stopped.movement_block.position == {5.0, 0.0, 0.0, 0.0}
+      assert stopped.movement_block.spline_nodes == []
+      assert [%Effects.MovementStopped{}] = stopped.internal.events
+    end
+
+    test "does not enqueue repeated stops for stationary movement" do
+      entity = build_entity(start_time: nil, start_position: nil, duration: 0, spline_nodes: [])
+
+      stopped = Movement.stop(entity, 500)
+
+      assert stopped.internal.events == []
+    end
+
+    test "finishes natural movement without emitting an interruption" do
+      entity =
+        build_entity(
+          start_time: 0,
+          start_position: {0.0, 0.0, 0.0},
+          duration: 1_000,
+          spline_nodes: [{10.0, 0.0, 0.0}]
+        )
+
+      finished = Movement.finish(entity, 1_000)
+
+      assert finished.movement_block.position == {10.0, 0.0, 0.0, 0.0}
+      assert finished.internal.events == []
+    end
   end
 
   describe "position_at/4" do
