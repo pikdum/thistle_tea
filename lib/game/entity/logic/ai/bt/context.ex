@@ -16,6 +16,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Context do
     :navigation,
     :waypoints,
     :script_conditions,
+    :script_conditions_by_target,
     :script_targets,
     :condition_now
   ]
@@ -26,6 +27,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Context do
     :navigation,
     :waypoints,
     :script_conditions,
+    :script_conditions_by_target,
     :script_targets,
     :condition_now,
     :condition_area
@@ -39,6 +41,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Context do
       navigation: Keyword.get(opts, :navigation, Navigation.direct()),
       waypoints: Keyword.get(opts, :waypoints, Waypoints.empty()),
       script_conditions: Keyword.get(opts, :script_conditions, %{}),
+      script_conditions_by_target: Keyword.get(opts, :script_conditions_by_target, %{}),
       script_targets: Keyword.get(opts, :script_targets, %{}),
       condition_now: Keyword.get(opts, :condition_now),
       condition_area: Keyword.get(opts, :condition_area)

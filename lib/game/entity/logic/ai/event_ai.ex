@@ -328,8 +328,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAI do
   defp condition_met?(_state, nil, _invoker_guid, _context), do: true
 
   defp condition_met?(state, condition, invoker_guid, context) do
+    target_guid = invoker_guid || victim(state)
+
     state
-    |> EntityContext.build(context, invoker_guid)
+    |> EntityContext.build(context, target_guid)
     |> ConditionEvaluator.evaluate(condition)
     |> Kernel.==(:met)
   end

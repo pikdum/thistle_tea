@@ -31,9 +31,16 @@ defmodule ThistleTea.Game.Entity.Logic.Condition.EntityContext do
       world: %{map_id: map_id(entity)},
       now: ai_context.condition_now,
       content_patch: @content_patch,
-      environment: %{condition_results: ai_context.script_conditions}
+      environment: %{condition_results: condition_results(ai_context, target_guid)}
     )
   end
+
+  defp condition_results(%AIContext{script_conditions_by_target: results}, target_guid)
+       when is_map(results) and map_size(results) > 0 do
+    Map.get(results, target_guid, %{})
+  end
+
+  defp condition_results(%AIContext{script_conditions: results}, _target_guid), do: results
 
   defp subject(
          %Character{object: object, unit: unit, player: player, internal: internal, movement_block: movement} =

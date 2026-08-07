@@ -81,6 +81,38 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAITest do
       assert [%Effects.MonsterTalk{}] = mob.internal.events
     end
 
+    test "timed event conditions fall back to the current victim" do
+      victim_guid = Guid.from_low_guid(:player, 456)
+      condition = %Condition{type: :level, value1: 20, value2: 0}
+      mob = mob(events: [event(:timer_in_combat, condition: condition)], in_combat: true, target: victim_guid)
+      context = target_context(mob, victim_guid, %{level: 20})
+
+      {mob, _blackboard} = EventAI.tick(mob, Blackboard.new(), 1_000, context)
+
+      assert [%Effects.MonsterTalk{}] = mob.internal.events
+    end
+
+    test "timed environmental conditions use the current victim's scoped facts" do
+      victim_guid = Guid.from_low_guid(:player, 457)
+      condition = %Condition{entry: 2_319, type: :line_of_sight, reverse?: true}
+      mob = mob(events: [event(:timer_in_combat, condition: condition)], in_combat: true, target: victim_guid)
+
+      context =
+        mob
+        |> target_context(victim_guid, %{})
+        |> then(fn context ->
+          %{
+            context
+            | script_conditions: %{2_319 => :unmet},
+              script_conditions_by_target: %{victim_guid => %{2_319 => :met}}
+          }
+        end)
+
+      {mob, _blackboard} = EventAI.tick(mob, Blackboard.new(), 1_000, context)
+
+      assert [%Effects.MonsterTalk{}] = mob.internal.events
+    end
+
     test "an unknown event condition is denied" do
       condition = %Condition{entry: 9, type: :item_with_bank, value1: 100, value2: 1}
       mob = mob(events: [event(:spawned, condition: condition)], db_guid: 99)
@@ -429,7 +461,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAITest do
 
     %Mob{
       object: %Object{guid: Guid.from_low_guid(:mob, 589, 1)},
-      unit: %Unit{health: health, max_health: 100, level: 14, target: 0, auras: []},
+      unit: %Unit{health: health, max_health: 100, level: 14, target: Keyword.get(opts, :target, 0), auras: []},
       movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
       internal: %Internal{
         world: %WorldRef{map_id: 0},

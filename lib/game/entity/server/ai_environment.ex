@@ -50,6 +50,8 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
       when is_integer(now) and is_list(actors) and is_number(requested_radius) and requested_radius >= 0 and
              is_number(requested_game_object_radius) and requested_game_object_radius >= 0 do
     conditions = all_conditions(entity, request)
+    condition_results = script_condition_results(entity, condition_groups(entity, request))
+    condition_target = explicit_actor(actors) || event_ai_target(entity)
 
     %Context{
       now: now,
@@ -57,7 +59,8 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
       random: random(),
       navigation: navigation(entity, now),
       waypoints: WaypointLoader.context(),
-      script_conditions: script_condition_results(entity, actors, Requirements.environment_conditions(conditions)),
+      script_conditions: Map.get(condition_results, condition_target, %{}),
+      script_conditions_by_target: condition_results,
       script_targets: script_target_results(entity, request.script_targets),
       condition_now: local_time(),
       condition_area: condition_area(entity, Requirements.plan(conditions))
@@ -199,24 +202,46 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
 
   defp direct_guids(_entity), do: []
 
-  defp script_condition_results(%{object: %{guid: source_guid}, internal: %Internal{world: world}}, actors, conditions)
-       when is_list(conditions) do
-    target_guid = Enum.find(actors, &(is_integer(&1) and &1 > 0))
-    ScriptedEvent.condition_results(world, source_guid, target_guid, conditions)
+  defp script_condition_results(%{object: %{guid: source_guid}, internal: %Internal{world: world}}, groups)
+       when is_map(groups) do
+    Map.new(groups, fn {target_guid, conditions} ->
+      {target_guid, ScriptedEvent.condition_results(world, source_guid, target_guid, conditions)}
+    end)
   end
 
-  defp script_condition_results(_entity, _actors, _conditions), do: %{}
+  defp script_condition_results(_entity, _groups), do: %{}
+
+  defp condition_groups(entity, request) do
+    actor = explicit_actor(request.actors)
+
+    %{}
+    |> put_condition_group(actor, request.script_conditions)
+    |> put_condition_group(actor || event_ai_target(entity), event_ai_conditions(entity))
+    |> put_condition_group(nil, waypoint_conditions(entity))
+  end
+
+  defp put_condition_group(groups, target_guid, conditions) do
+    environmental = Requirements.environment_conditions(conditions)
+
+    if environmental == [] do
+      groups
+    else
+      Map.update(groups, target_guid, environmental, &Enum.uniq(&1 ++ environmental))
+    end
+  end
+
+  defp explicit_actor(actors), do: Enum.find(actors, &(is_integer(&1) and &1 > 0))
+
+  defp event_ai_target(%Mob{unit: %Unit{target: target}}) when is_integer(target) and target > 0, do: target
+  defp event_ai_target(_entity), do: nil
 
   defp all_conditions(entity, request) do
-    (request.script_conditions ++ entity_conditions(entity))
+    (request.script_conditions ++ event_ai_conditions(entity) ++ waypoint_conditions(entity))
     |> Enum.uniq()
   end
 
-  defp entity_conditions(%Mob{} = entity) do
-    EventAI.conditions(entity) ++ waypoint_conditions(entity)
-  end
-
-  defp entity_conditions(_entity), do: []
+  defp event_ai_conditions(%Mob{} = entity), do: EventAI.conditions(entity)
+  defp event_ai_conditions(_entity), do: []
 
   defp waypoint_conditions(%Mob{} = entity) do
     case waypoint_route(entity) do
@@ -233,6 +258,8 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
         []
     end
   end
+
+  defp waypoint_conditions(_entity), do: []
 
   defp script_target_results(%{internal: %Internal{world: world}} = entity, requested) when is_list(requested) do
     selectors = Enum.uniq(requested ++ entity_script_target_requests(entity))

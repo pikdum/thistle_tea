@@ -148,6 +148,35 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironmentTest do
       assert context.script_conditions == %{1 => :met}
     end
 
+    test "captures EventAI world facts against the current victim" do
+      world = %WorldRef{map_id: 0}
+      victim_guid = Guid.from_low_guid(:player, 98_030)
+      game_object_guid = Guid.from_low_guid(:game_object, 21_145, 98_031)
+      condition = %Condition{entry: 3, type: :nearby_game_object, value1: 21_145, value2: 10}
+      event = %AIEvent{event_type: :timer_in_combat, condition: condition}
+
+      SpatialHash.update(:players, victim_guid, world, 100.0, 0.0, 0.0)
+      SpatialHash.update(:game_objects, game_object_guid, world, 105.0, 0.0, 0.0)
+
+      on_exit(fn ->
+        SpatialHash.remove(:players, victim_guid)
+        SpatialHash.remove(:game_objects, game_object_guid)
+      end)
+
+      mob = mob(world)
+
+      mob = %{
+        mob
+        | unit: %{mob.unit | target: victim_guid},
+          internal: %{mob.internal | creature: %Creature{ai_events: [event]}}
+      }
+
+      context = AIEnvironment.context(mob, 1_000)
+
+      assert context.script_conditions == %{3 => :met}
+      assert context.script_conditions_by_target == %{victim_guid => %{3 => :met}}
+    end
+
     test "requests scripted map-event facts from their owner" do
       world = %WorldRef{map_id: 0}
       condition = %Condition{entry: 2, type: :map_event_active, value1: 5_713}
