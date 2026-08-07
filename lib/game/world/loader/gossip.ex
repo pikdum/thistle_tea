@@ -17,7 +17,15 @@ defmodule ThistleTea.Game.World.Loader.Gossip do
   @option_taxi 4
   @option_trainer 5
   @option_spirit_healer 6
-  @supported_option_ids [@option_gossip, @option_vendor, @option_taxi, @option_trainer, @option_spirit_healer]
+  @option_banker 9
+  @supported_option_ids [
+    @option_gossip,
+    @option_vendor,
+    @option_taxi,
+    @option_trainer,
+    @option_spirit_healer,
+    @option_banker
+  ]
 
   @npc_flag_trainer 0x10
 
@@ -166,4 +174,5 @@ defmodule ThistleTea.Game.World.Loader.Gossip do
   def option_taxi, do: @option_taxi
   def option_trainer, do: @option_trainer
   def option_spirit_healer, do: @option_spirit_healer
+  def option_banker, do: @option_banker
 end

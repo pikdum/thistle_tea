@@ -84,6 +84,19 @@ defmodule ThistleTea.Game.World.Loader.GossipVmangosTest do
       assert PlayerGossip.title_text_id(bunthen_menu, alliance_druid) == 4917
       assert PlayerGossip.title_text_id(bunthen_menu, horde_druid) == 4918
     end
+
+    test "loads Olivia Burnside's banker option" do
+      assert :ok = Gossip.load_all()
+
+      assert %Menu{menu_id: 699, options: options} = Gossip.menu_for_creature(2455)
+
+      assert %Option{
+               id: 0,
+               option_id: 9,
+               icon: 6,
+               text: "I would like to check my deposit box."
+             } = Enum.find(options, &(&1.id == 0))
+    end
   end
 
   defp character(race, class) do

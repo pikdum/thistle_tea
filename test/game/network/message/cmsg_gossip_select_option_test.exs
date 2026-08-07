@@ -13,9 +13,11 @@ defmodule ThistleTea.Game.Network.Message.CmsgGossipSelectOptionTest do
   alias ThistleTea.Game.Entity.Data.ScriptStep
   alias ThistleTea.Game.Entity.Data.Taxi.Network
   alias ThistleTea.Game.Entity.Data.Taxi.Node
+  alias ThistleTea.Game.Entity.Server.Player.State
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.Message.CmsgGossipSelectOption
   alias ThistleTea.Game.Network.Message.SmsgGossipComplete
+  alias ThistleTea.Game.Network.Message.SmsgShowBank
   alias ThistleTea.Game.Network.Message.SmsgShowtaxinodes
   alias ThistleTea.Game.World.Loader.Gossip.Option
   alias ThistleTea.Game.World.Loader.Taxi, as: TaxiLoader
@@ -110,6 +112,37 @@ defmodule ThistleTea.Game.Network.Message.CmsgGossipSelectOptionTest do
       assert CmsgGossipSelectOption.handle(message, state) == state
 
       assert_receive {:"$gen_cast", {:send_packet, %SmsgShowtaxinodes{guid: ^flightmaster_guid, nearest_node: 2}}}
+    end
+
+    test "opens the bank for a banker option" do
+      player_id = System.unique_integer([:positive, :monotonic])
+      player_guid = Guid.from_low_guid(:player, player_id)
+      banker_guid = Guid.from_low_guid(:mob, 54, System.unique_integer([:positive, :monotonic]))
+      {:ok, _owner} = Entity.register(player_guid)
+
+      Metadata.put(banker_guid, %{npc_flags: 0x00000100, alive?: true})
+      SpatialHash.update(:mobs, banker_guid, WorldRef.open(0), 2.0, 0.0, 0.0)
+
+      on_exit(fn ->
+        Metadata.delete(banker_guid)
+        SpatialHash.remove(:mobs, banker_guid)
+      end)
+
+      character = %Character{
+        id: player_id,
+        object: %Object{guid: player_guid},
+        unit: %Unit{health: 100, max_health: 100},
+        player: %Player{skills: %{}, quest_log: %{}, rewarded_quests: MapSet.new(), reputation: %Reputation{}},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+        internal: %Internal{world: WorldRef.open(0)}
+      }
+
+      option = %Option{id: 0, option_id: 9}
+      state = %State{ready: true, guid: player_guid, character: character, gossip_menu_options: [option]}
+      message = %CmsgGossipSelectOption{guid: banker_guid, gossip_list_id: 0}
+
+      assert %State{active_banker_guid: ^banker_guid} = CmsgGossipSelectOption.handle(message, state)
+      assert_receive {:"$gen_cast", {:send_packet, %SmsgShowBank{banker_guid: ^banker_guid}}}
     end
 
     test "revalidates a conditioned option after player state changes" do
