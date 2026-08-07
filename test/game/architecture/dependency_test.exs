@@ -75,6 +75,18 @@ defmodule ThistleTea.Game.Architecture.DependencyTest do
     assert violations == []
   end
 
+  test "condition-aware gameplay paths do not query Mangos" do
+    violations =
+      condition_runtime_files()
+      |> Enum.filter(fn path ->
+        source = File.read!(path)
+        String.contains?(source, "ThistleTea.DB.Mangos") or String.contains?(source, "Mangos.Repo")
+      end)
+      |> Enum.map(&Path.relative_to(&1, @root))
+
+    assert violations == []
+  end
+
   defp logic_boundary_dependencies do
     Path.wildcard(Path.join([@root, "lib/game/entity/logic/**/*.ex"]))
     |> Enum.flat_map(fn path ->
@@ -97,5 +109,26 @@ defmodule ThistleTea.Game.Architecture.DependencyTest do
       Path.join([@root, "lib/game/entity/event_sink.ex"])
       | Path.wildcard(Path.join([@root, "lib/game/entity/event_sink/*.ex"]))
     ]
+  end
+
+  defp condition_runtime_files do
+    relative = [
+      "lib/game/entity/logic/condition.ex",
+      "lib/game/entity/logic/loot.ex",
+      "lib/game/entity/logic/loot_session.ex",
+      "lib/game/entity/logic/ai/event_ai.ex",
+      "lib/game/entity/logic/ai/script.ex",
+      "lib/game/player/area_triggers.ex",
+      "lib/game/player/gossip.ex",
+      "lib/game/player/gossip_condition.ex",
+      "lib/game/player/looting.ex",
+      "lib/game/player/vendor.ex",
+      "lib/game/network/message/cmsg_buy_item.ex",
+      "lib/game/network/message/cmsg_gossip_hello.ex",
+      "lib/game/network/message/cmsg_list_inventory.ex"
+    ]
+
+    Enum.map(relative, &Path.join(@root, &1)) ++
+      Path.wildcard(Path.join([@root, "lib/game/entity/logic/condition/**/*.ex"]))
   end
 end

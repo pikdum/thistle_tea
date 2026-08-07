@@ -14,7 +14,7 @@ every consumer has migrated.
 - Distinct direct condition roots: 977.
 - Reachable condition IDs: 1776.
 - Reachable definitions with known VMangos numeric mappings: 1776.
-- Reachable definitions handled end to end by the shared evaluator: 626.
+- Reachable definitions handled end to end by the shared evaluator: 1512.
 - Missing child IDs: none.
 - Cycles: none.
 
@@ -57,86 +57,90 @@ every consumer has migrated.
 | ID | Semantic type | Definitions | Runtime status | Missing dependency |
 | ---: | --- | ---: | --- | --- |
 | -1 | `and` | 412 | evaluable | - |
-| 8 | `quest_rewarded` | 351 | unmapped | - |
+| 8 | `quest_rewarded` | 351 | evaluable | - |
 | 23 | `item_with_bank` | 140 | blocked | bank inventory |
-| 9 | `quest_taken` | 108 | unmapped | - |
+| 9 | `quest_taken` | 108 | evaluable | - |
 | -2 | `or` | 76 | evaluable | - |
-| 22 | `quest_none` | 73 | unmapped | - |
+| 22 | `quest_none` | 73 | evaluable | - |
 | 52 | `db_guid` | 66 | evaluable | - |
-| 2 | `item` | 59 | unmapped | - |
-| 7 | `skill` | 54 | unmapped | - |
-| 1 | `aura` | 45 | unmapped | - |
+| 2 | `item` | 59 | evaluable | - |
+| 7 | `skill` | 54 | evaluable | - |
+| 1 | `aura` | 45 | evaluable | - |
 | 5 | `reputation_rank_min` | 41 | evaluable | - |
-| 14 | `race_class` | 35 | partial | - |
-| 15 | `level` | 31 | unmapped | - |
+| 14 | `race_class` | 35 | evaluable | - |
+| 15 | `level` | 31 | evaluable | - |
 | 34 | `instance_data` | 31 | blocked | instance data |
-| 17 | `spell` | 30 | unmapped | - |
-| 20 | `nearby_creature` | 25 | unmapped | - |
-| 12 | `active_game_event` | 21 | unmapped | - |
-| 36 | `map_event_active` | 19 | partial | - |
+| 17 | `spell` | 30 | evaluable | - |
+| 20 | `nearby_creature` | 25 | partial | scripted-event boundary only |
+| 12 | `active_game_event` | 21 | evaluable | - |
+| 36 | `map_event_active` | 19 | partial | scripted-event boundary only |
 | 16 | `source_entry` | 17 | evaluable | - |
-| 24 | `content_patch` | 16 | unmapped | - |
+| 24 | `content_patch` | 16 | evaluable | - |
 | -3 | `not` | 12 | evaluable | - |
-| 4 | `area_id` | 12 | unmapped | - |
-| 19 | `quest_available` | 7 | unmapped | - |
-| 21 | `nearby_game_object` | 7 | partial | - |
-| 50 | `object_fit_condition` | 7 | unmapped | - |
+| 4 | `area_id` | 12 | evaluable | - |
+| 19 | `quest_available` | 7 | evaluable | - |
+| 21 | `nearby_game_object` | 7 | partial | scripted-event boundary only |
+| 50 | `object_fit_condition` | 7 | partial | spawned game objects; child capabilities still apply |
 | 11 | `saved_variable` | 5 | blocked | global saved-variable owner |
 | 18 | `instance_script` | 5 | blocked | instance-script callbacks |
-| 33 | `map_id` | 5 | unmapped | - |
+| 33 | `map_id` | 5 | evaluable | - |
 | 57 | `creature_group_member` | 5 | blocked | creature formation owner |
-| 6 | `team` | 4 | partial | - |
-| 29 | `skill_below` | 4 | unmapped | - |
-| 35 | `map_event_data` | 4 | partial | - |
-| 41 | `health_percent` | 4 | unmapped | - |
+| 6 | `team` | 4 | evaluable | - |
+| 29 | `skill_below` | 4 | evaluable | - |
+| 35 | `map_event_data` | 4 | partial | scripted-event boundary only |
+| 41 | `health_percent` | 4 | evaluable | - |
 | 51 | `pvp_rank` | 4 | blocked | authoritative honor rank |
-| 53 | `local_time` | 4 | unmapped | - |
-| 28 | `is_player` | 3 | unmapped | - |
-| 38 | `distance_to_target` | 3 | unmapped | - |
-| 43 | `in_combat` | 3 | unmapped | - |
-| 46 | `alive` | 3 | partial | - |
-| 54 | `distance_to_position` | 3 | unmapped | - |
-| 27 | `gender` | 2 | unmapped | - |
+| 53 | `local_time` | 4 | evaluable | - |
+| 28 | `is_player` | 3 | evaluable | - |
+| 38 | `distance_to_target` | 3 | partial | scripted-event boundary only |
+| 43 | `in_combat` | 3 | evaluable | - |
+| 46 | `alive` | 3 | evaluable | - |
+| 54 | `distance_to_position` | 3 | partial | scripted-event boundary only |
+| 27 | `gender` | 2 | evaluable | - |
 | 30 | `reputation_rank_max` | 2 | evaluable | - |
-| 39 | `moving` | 2 | unmapped | - |
-| 45 | `in_group` | 2 | unmapped | - |
-| 48 | `object_spawned` | 2 | unmapped | - |
-| 55 | `object_go_state` | 2 | unmapped | - |
-| 10 | `argent_dawn_commission_aura` | 1 | unmapped | - |
+| 39 | `moving` | 2 | evaluable | - |
+| 45 | `in_group` | 2 | evaluable | - |
+| 48 | `object_spawned` | 2 | evaluable | - |
+| 55 | `object_go_state` | 2 | evaluable | - |
+| 10 | `argent_dawn_commission_aura` | 1 | evaluable | - |
 | 13 | `cannot_path_to_victim` | 1 | blocked | authoritative path-failure state |
 | 31 | `has_flag` | 1 | blocked | typed update-field capability |
-| 37 | `line_of_sight` | 1 | unmapped | - |
-| 40 | `has_pet` | 1 | unmapped | - |
-| 44 | `reaction` | 1 | unmapped | - |
-| 47 | `map_event_targets` | 1 | partial | - |
-| 49 | `object_loot_state` | 1 | unmapped | - |
+| 37 | `line_of_sight` | 1 | partial | scripted-event boundary only |
+| 40 | `has_pet` | 1 | evaluable | - |
+| 44 | `reaction` | 1 | evaluable | - |
+| 47 | `map_event_targets` | 1 | partial | scripted-event target snapshots only |
+| 49 | `object_loot_state` | 1 | blocked | authoritative VMangos loot-state owner |
 | 58 | `creature_group_dead` | 1 | blocked | creature formation owner |
-| 59 | `area_explored` | 1 | unmapped | - |
+| 59 | `area_explored` | 1 | evaluable | - |
 
 ## Consumer integration
 
 | Consumer | Integration status | Unknown policy |
 | --- | --- | --- |
-| Gossip menus and options | Partial special-case evaluator | Legacy open for unsupported leaves |
-| EventAI and loaded scripts | Partial shared evaluator | Legacy open for unsupported leaves |
-| Area-trigger teleports | Condition tree not loaded | Reject every nonzero condition |
-| Vendors | Condition ID discarded | Not evaluated |
-| Loot | Condition ID discarded | Not evaluated |
+| Gossip menus and options | Shared evaluator; display and selection are revalidated | Deny unknown |
+| EventAI and loaded scripts | Shared evaluator with `AIEnvironment` facts | Deny unknown |
+| Area-trigger teleports | Resolved tree cached with teleport | Deny unknown |
+| Vendors | Typed conditioned rows; purchase revalidated | Deny unknown |
+| Loot | Actor-aware direct items; conditioned references validated before expansion | Deny unknown at view, roll, assignment, reservation, and pre-transfer validation |
 | Quest availability | Condition ID not integrated | Not evaluated |
 | Remaining discovered consumers | Inventory only | Not integrated |
 
 ## Dependency-ranked backlog
 
-1. Player-owned state and catalogs: aura, items, quests, skills, spells,
-   reputation, team, race/class, level, gender, group, exploration, and time.
-2. Existing world projections: game events, nearby objects and players,
-   distance, line of sight, reaction, game-object state, and scripted events.
-3. Consumer migrations: gossip/scripts, vendors/teleports, then actor-aware
-   loot with reservation and commit revalidation.
-4. Explicitly blocked owners: bank inventory, saved variables, instance
-   scripts/data, raw flags, honor rank, and creature formations.
+1. Consumer migrations: quest and remaining discovered consumers.
+2. Partial world facts currently collected only by the scripted-event
+   boundary or for spawned game objects.
+3. Explicitly blocked owners: bank inventory, saved variables, instance
+   scripts/data, raw flags, game-object loot state, honor rank, and creature
+   formations.
 
 The inventory includes every schema column whose normalized name is
 `condition_id`, `conditionId`, `required_condition`, or `RequiredCondition`.
 Combinator traversal follows `NOT`, `AND`, `OR`, map-event target conditions,
 and game-object fit-condition children.
+
+Conditioned reference expansion is denied when no authoritative fact owner
+can evaluate it. The pinned database has five such rows, all requiring
+blocked instance data; their references are skipped rather than approximated.
+`npc_vendor_template` composition remains outside the vendor
+loader because the current creature cache does not model VMangos `vendor_id`.

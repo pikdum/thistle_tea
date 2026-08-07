@@ -76,8 +76,63 @@ defmodule ThistleTea.Game.World.Loader.ConditionCoverage do
     59 => :area_explored
   }
 
-  @implemented MapSet.new([-3, -2, -1, 0, 5, 16, 30, 52])
-  @partial MapSet.new([6, 14, 21, 25, 35, 36, 46, 47, 56])
+  @implemented MapSet.new([
+                 -3,
+                 -2,
+                 -1,
+                 0,
+                 1,
+                 2,
+                 3,
+                 4,
+                 5,
+                 6,
+                 7,
+                 8,
+                 9,
+                 10,
+                 12,
+                 14,
+                 15,
+                 16,
+                 17,
+                 19,
+                 22,
+                 24,
+                 27,
+                 28,
+                 29,
+                 30,
+                 33,
+                 39,
+                 40,
+                 41,
+                 42,
+                 43,
+                 44,
+                 45,
+                 46,
+                 48,
+                 52,
+                 53,
+                 55,
+                 59
+               ])
+  @partial MapSet.new([20, 21, 25, 35, 36, 37, 38, 47, 50, 54, 56])
+
+  @partial_dependencies %{
+    20 => "scripted-event boundary only",
+    21 => "scripted-event boundary only",
+    25 => "scripted-event boundary only",
+    35 => "scripted-event boundary only",
+    36 => "scripted-event boundary only",
+    37 => "scripted-event boundary only",
+    38 => "scripted-event boundary only",
+    47 => "scripted-event target snapshots only",
+    50 => "spawned game objects; child capabilities still apply",
+    54 => "scripted-event boundary only",
+    56 => "scripted-event boundary only"
+  }
 
   @blocked_dependencies %{
     11 => "global saved-variable owner",
@@ -87,6 +142,7 @@ defmodule ThistleTea.Game.World.Loader.ConditionCoverage do
     26 => "holiday projection",
     31 => "typed update-field capability",
     34 => "instance data",
+    49 => "authoritative VMangos loot-state owner",
     51 => "authoritative honor rank",
     57 => "creature formation owner",
     58 => "creature formation owner"
@@ -169,29 +225,33 @@ defmodule ThistleTea.Game.World.Loader.ConditionCoverage do
 
     | Consumer | Integration status | Unknown policy |
     | --- | --- | --- |
-    | Gossip menus and options | Partial special-case evaluator | Legacy open for unsupported leaves |
-    | EventAI and loaded scripts | Partial shared evaluator | Legacy open for unsupported leaves |
-    | Area-trigger teleports | Condition tree not loaded | Reject every nonzero condition |
-    | Vendors | Condition ID discarded | Not evaluated |
-    | Loot | Condition ID discarded | Not evaluated |
+    | Gossip menus and options | Shared evaluator; display and selection are revalidated | Deny unknown |
+    | EventAI and loaded scripts | Shared evaluator with `AIEnvironment` facts | Deny unknown |
+    | Area-trigger teleports | Resolved tree cached with teleport | Deny unknown |
+    | Vendors | Typed conditioned rows; purchase revalidated | Deny unknown |
+    | Loot | Actor-aware direct items; conditioned references validated before expansion | Deny unknown at view, roll, assignment, reservation, and pre-transfer validation |
     | Quest availability | Condition ID not integrated | Not evaluated |
     | Remaining discovered consumers | Inventory only | Not integrated |
 
     ## Dependency-ranked backlog
 
-    1. Player-owned state and catalogs: aura, items, quests, skills, spells,
-       reputation, team, race/class, level, gender, group, exploration, and time.
-    2. Existing world projections: game events, nearby objects and players,
-       distance, line of sight, reaction, game-object state, and scripted events.
-    3. Consumer migrations: gossip/scripts, vendors/teleports, then actor-aware
-       loot with reservation and commit revalidation.
-    4. Explicitly blocked owners: bank inventory, saved variables, instance
-       scripts/data, raw flags, honor rank, and creature formations.
+    1. Consumer migrations: quest and remaining discovered consumers.
+    2. Partial world facts currently collected only by the scripted-event
+       boundary or for spawned game objects.
+    3. Explicitly blocked owners: bank inventory, saved variables, instance
+       scripts/data, raw flags, game-object loot state, honor rank, and creature
+       formations.
 
     The inventory includes every schema column whose normalized name is
     `condition_id`, `conditionId`, `required_condition`, or `RequiredCondition`.
     Combinator traversal follows `NOT`, `AND`, `OR`, map-event target conditions,
     and game-object fit-condition children.
+
+    Conditioned reference expansion is denied when no authoritative fact owner
+    can evaluate it. The pinned database has five such rows, all requiring
+    blocked instance data; their references are skipped rather than approximated.
+    `npc_vendor_template` composition remains outside the vendor
+    loader because the current creature cache does not model VMangos `vendor_id`.
     """
   end
 
@@ -298,12 +358,14 @@ defmodule ThistleTea.Game.World.Loader.ConditionCoverage do
       MapSet.member?(@implemented, type) -> "evaluable"
       MapSet.member?(@partial, type) -> "partial"
       Map.has_key?(@blocked_dependencies, type) -> "blocked"
-      Map.has_key?(@type_names, type) -> "unmapped"
+      Map.has_key?(@type_names, type) -> "pending"
       true -> "unknown upstream"
     end
   end
 
-  defp dependency(type), do: Map.get(@blocked_dependencies, type, "-")
+  defp dependency(type) do
+    Map.get(@blocked_dependencies, type, Map.get(@partial_dependencies, type, "-"))
+  end
 
   defp format_ids(ids) do
     case Enum.sort(ids) do
