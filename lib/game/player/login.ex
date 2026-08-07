@@ -42,6 +42,7 @@ defmodule ThistleTea.Game.Player.Login do
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.Party
   alias ThistleTea.Game.Party.Notifier
+  alias ThistleTea.Game.Player.ConditionContext
   alias ThistleTea.Game.Player.Enchantments
   alias ThistleTea.Game.Player.Mail
   alias ThistleTea.Game.Player.Quests
@@ -122,7 +123,8 @@ defmodule ThistleTea.Game.Player.Login do
         aura_stacks: AuraLogic.spell_stacks(c),
         crowd_controlled?: AuraLogic.crowd_controlled?(c),
         attacker_spell_hit_chance: AuraLogic.attacker_spell_hit_chance(c),
-        needed_quest_items: Quests.needed_items(c)
+        needed_quest_items: Quests.needed_items(c),
+        condition_subject: ConditionContext.snapshot(c).target
       }
       |> Map.merge(StealthDetection.target_metadata(c))
       |> Map.merge(FactionLoader.metadata(c.unit.faction_template))

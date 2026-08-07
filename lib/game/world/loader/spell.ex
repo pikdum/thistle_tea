@@ -721,6 +721,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   @on_next_swing_2 0x00000400
   @passive 0x00000040
   @ability 0x00000010
+  @allow_while_mounted 0x01000000
   @hidden_in_combat_log 0x00000100
   @not_while_shapeshifted 0x00010000
   @not_in_combat 0x10000000
@@ -752,6 +753,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
       |> add_if(attrs, @on_next_swing_2, :on_next_swing)
       |> add_if(attrs, @passive, :passive)
       |> add_if(attrs, @ability, :ability)
+      |> add_if(attrs, @allow_while_mounted, :allow_while_mounted)
       |> add_if(attrs, @hidden_in_combat_log, :hidden_in_combat_log)
       |> add_if(attrs, @not_while_shapeshifted, :not_while_shapeshifted)
       |> add_if(attrs, @not_in_combat, :not_in_combat)

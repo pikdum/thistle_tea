@@ -22,9 +22,11 @@ defmodule ThistleTea.Game.Network.InventoryUpdate do
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Message.SmsgInventoryChangeFailure
   alias ThistleTea.Game.Network.UpdateObject
+  alias ThistleTea.Game.Player.ConditionContext
   alias ThistleTea.Game.Player.Quests
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.ItemStore
+  alias ThistleTea.Game.World.Presence
 
   def apply(state, result, placement \\ nil)
 
@@ -68,6 +70,7 @@ defmodule ThistleTea.Game.Network.InventoryUpdate do
       |> Network.send_packet()
     end)
 
+    state = sync_condition_subject(state)
     broadcast_player(state)
     state
   end
@@ -100,8 +103,8 @@ defmodule ThistleTea.Game.Network.InventoryUpdate do
       |> Network.send_packet()
     end)
 
+    state = sync_condition_subject(state)
     broadcast_player(state)
-
     state
   end
 
@@ -135,6 +138,11 @@ defmodule ThistleTea.Game.Network.InventoryUpdate do
     }
     |> struct(Map.from_struct(state.character))
     |> World.broadcast_packet(state.character)
+  end
+
+  defp sync_condition_subject(%{character: %Character{} = character} = state) do
+    Presence.sync(character, %{condition_subject: ConditionContext.snapshot(character).target})
+    state
   end
 
   def send_failure(error, item1_guid, item2_guid) do

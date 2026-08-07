@@ -35,6 +35,7 @@ defmodule ThistleTea.Game.Player.QuestItemProgressTest do
 
     {:ok, quest_log} = QuestLog.add(%{}, @quest_id)
     player_guid = Guid.from_low_guid(:player, System.unique_integer([:positive, :monotonic]))
+    on_exit(fn -> Metadata.delete(player_guid) end)
 
     character = %Character{
       object: %Object{guid: player_guid},
@@ -63,6 +64,9 @@ defmodule ThistleTea.Game.Player.QuestItemProgressTest do
 
     assert_received {:"$gen_cast",
                      {:send_packet, %Message.SmsgQuestupdateAddItem{item_id: @item_id, count: 1} = _progress}}
+
+    assert %{condition_subject: %{item_counts: %{@item_id => 1}}} =
+             Metadata.query(player_guid, [:condition_subject])
   end
 
   test "the progress packet precedes the item's create block", %{character: character, player_guid: player_guid} do
@@ -100,6 +104,9 @@ defmodule ThistleTea.Game.Player.QuestItemProgressTest do
 
     assert_received {:"$gen_cast", {:send_packet, %Message.SmsgQuestupdateAddItem{item_id: @item_id, count: 1}}}
     assert ItemStore.get(stack.object.guid).item.stack_count == 3
+
+    assert %{condition_subject: %{item_counts: %{@item_id => 3}}} =
+             Metadata.query(player_guid, [:condition_subject])
   end
 
   test "a planned batch commits new items before projecting its packets", %{
@@ -162,12 +169,13 @@ defmodule ThistleTea.Game.Player.QuestItemProgressTest do
     character: character,
     player_guid: player_guid
   } do
-    on_exit(fn -> Metadata.delete(player_guid) end)
-
     Quests.sync_needed_items(character)
 
-    assert %{needed_quest_items: needed} = Metadata.query(player_guid, [:needed_quest_items])
+    assert %{needed_quest_items: needed, condition_subject: condition_subject} =
+             Metadata.query(player_guid, [:needed_quest_items, :condition_subject])
+
     assert MapSet.member?(needed, @item_id)
+    assert condition_subject.quest_log == character.player.quest_log
   end
 
   test "quest_item_counts snapshots current counts", %{character: character, player_guid: player_guid} do

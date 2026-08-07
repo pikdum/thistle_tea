@@ -24,6 +24,7 @@ defmodule ThistleTea.Game.Player.Quests do
   alias ThistleTea.Game.Network.InventoryUpdate
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Party.Group
+  alias ThistleTea.Game.Player.ConditionContext
   alias ThistleTea.Game.Player.Mail
   alias ThistleTea.Game.Player.Reputation, as: PlayerReputation
   alias ThistleTea.Game.Player.Stats, as: PlayerStats
@@ -32,6 +33,7 @@ defmodule ThistleTea.Game.Player.Quests do
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader
+  alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Presence
   alias ThistleTea.Game.World.System.Party, as: PartySystem
 
@@ -396,7 +398,17 @@ defmodule ThistleTea.Game.Player.Quests do
   end
 
   def sync_needed_items(%Character{} = character) do
-    Presence.sync(character, %{needed_quest_items: needed_items(character)})
+    previous_subject =
+      case Metadata.query(character.object.guid, [:condition_subject]) do
+        %{condition_subject: condition_subject} -> condition_subject
+        _missing -> nil
+      end
+
+    Presence.sync(character, %{
+      needed_quest_items: needed_items(character),
+      condition_subject: ConditionContext.refresh_subject(character, previous_subject)
+    })
+
     character
   end
 
