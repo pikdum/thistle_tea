@@ -27,7 +27,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAI do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells, as: MobSpells
   alias ThistleTea.Game.Entity.Logic.AI.Script
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
-  alias ThistleTea.Game.Entity.Logic.Condition, as: ConditionLogic
+  alias ThistleTea.Game.Entity.Logic.Condition, as: ConditionEvaluator
+  alias ThistleTea.Game.Entity.Logic.Condition.EntityContext
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Hostility
   alias ThistleTea.Game.Guid
@@ -80,6 +81,16 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAI do
     |> events()
     |> Enum.flat_map(fn %AIEvent{actions: actions} -> List.flatten(actions) end)
     |> Script.target_requests()
+  end
+
+  def conditions(state) do
+    state
+    |> events()
+    |> Enum.flat_map(fn %AIEvent{condition: condition, actions: actions} ->
+      [condition | actions |> List.flatten() |> Script.conditions()]
+    end)
+    |> Enum.reject(&is_nil/1)
+    |> Enum.uniq()
   end
 
   defp event_observation_radius(%AIEvent{event_type: :friendly_hp, param2: radius})
@@ -297,7 +308,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAI do
          true <- due?(blackboard, index, now),
          true <- AIEvent.phase_allows?(event, blackboard.event_ai.phase),
          true <- casting_allows?(state, event),
-         true <- ConditionLogic.met?(state, event.condition),
+         true <- condition_met?(state, event.condition, invoker_guid, context),
          {:ok, invoker_guid} <- satisfy(state, event, invoker_guid, context) do
       blackboard =
         blackboard
@@ -312,6 +323,15 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAI do
     else
       _ -> {state, blackboard}
     end
+  end
+
+  defp condition_met?(_state, nil, _invoker_guid, _context), do: true
+
+  defp condition_met?(state, condition, invoker_guid, context) do
+    state
+    |> EntityContext.build(context, invoker_guid)
+    |> ConditionEvaluator.evaluate(condition)
+    |> Kernel.==(:met)
   end
 
   defp run_actions(state, %Blackboard{} = blackboard, %AIEvent{} = event, invoker_guid, %Context{} = context) do

@@ -318,6 +318,25 @@ defmodule ThistleTea.Game.Entity.Logic.AI.ScriptTest do
       assert mob.internal.events == []
     end
 
+    test "source and target swap before evaluating a step condition", %{mob: mob} do
+      target_guid = Guid.from_low_guid(:mob, 123, 456)
+      condition = %Condition{type: :source_entry, value1: 123, swap_targets?: true}
+      step = %ScriptStep{command: :emote, datalong: 11, condition: condition}
+
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], target_guid, 1_000)
+
+      assert [%Effects.Emote{emote_id: 11}] = mob.internal.events
+    end
+
+    test "steps with an unknown condition are skipped", %{mob: mob} do
+      condition = %Condition{entry: 9, type: :item_with_bank, value1: 100, value2: 1}
+      step = %ScriptStep{command: :emote, datalong: 11, condition: condition}
+
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], nil, 1_000)
+
+      assert mob.internal.events == []
+    end
+
     test "summon_creature enqueues a summon event with explicit coordinates", %{mob: mob} do
       step = %ScriptStep{
         command: :summon_creature,

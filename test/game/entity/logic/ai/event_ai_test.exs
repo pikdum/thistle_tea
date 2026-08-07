@@ -71,6 +71,25 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAITest do
       assert [%Effects.MonsterTalk{}] = mob.internal.events
     end
 
+    test "source and invoker swap before evaluating an event condition" do
+      invoker_guid = Guid.from_low_guid(:mob, 123, 456)
+      condition = %Condition{type: :source_entry, value1: 123, swap_targets?: true}
+      mob = mob(events: [event(:kill, condition: condition)], db_guid: 99)
+
+      {mob, _blackboard} = EventAI.on_kill(mob, Blackboard.new(), invoker_guid, 0)
+
+      assert [%Effects.MonsterTalk{}] = mob.internal.events
+    end
+
+    test "an unknown event condition is denied" do
+      condition = %Condition{entry: 9, type: :item_with_bank, value1: 100, value2: 1}
+      mob = mob(events: [event(:spawned, condition: condition)], db_guid: 99)
+
+      {mob, _blackboard} = EventAI.on_spawned(mob, Blackboard.new(), 0)
+
+      assert mob.internal.events == []
+    end
+
     test "a failing condition leaves the repeat timer unconsumed" do
       condition = %Condition{type: :db_guid, value1: 12_345}
 

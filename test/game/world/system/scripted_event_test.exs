@@ -4,6 +4,7 @@ defmodule ThistleTea.Game.World.System.ScriptedEventTest do
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Condition
   alias ThistleTea.Game.Entity.Data.ScriptStep
+  alias ThistleTea.Game.Entity.Logic.Condition.Reason
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.World.Metadata
@@ -103,7 +104,10 @@ defmodule ThistleTea.Game.World.System.ScriptedEventTest do
 
     conditions = [
       %Condition{entry: 1, type: :map_event_active, value1: 5_713},
-      %Condition{entry: 2, type: :nearby_game_object, value1: 21_145, value2: 30}
+      %Condition{entry: 2, type: :nearby_game_object, value1: 21_145, value2: 30},
+      %Condition{entry: 3, type: :nearby_creature, value1: 4_236, value2: 30},
+      %Condition{entry: 4, type: :distance_to_target, value1: 10, value2: 0},
+      %Condition{entry: 5, type: :distance_to_position, value1: 10, value2: 0, value3: 0, value4: 1}
     ]
 
     assert ScriptedEventSystem.condition_results(
@@ -111,7 +115,117 @@ defmodule ThistleTea.Game.World.System.ScriptedEventTest do
              context.source_guid,
              context.target_guid,
              conditions
-           ) == %{1 => true, 2 => true}
+           ) == %{1 => :met, 2 => :met, 3 => :met, 4 => :met, 5 => :met}
+  end
+
+  test "condition results preserve exact faction-reaction comparisons", context do
+    player_faction = %FactionTemplate{faction: 1, faction_group: 1, friend_group: 1}
+    creature_faction = %FactionTemplate{faction: 29}
+
+    Metadata.update(context.source_guid, %{
+      faction_template: creature_faction,
+      faction_can_have_reputation?: true
+    })
+
+    Metadata.update(context.target_guid, %{
+      faction_template: player_faction,
+      reputation: %{29 => %{rank: :honored, at_war?: false}}
+    })
+
+    condition = %Condition{entry: 6, type: :reaction, value1: 4, value2: 1}
+
+    assert ScriptedEventSystem.condition_results(
+             context.world,
+             context.source_guid,
+             context.target_guid,
+             [condition]
+           ) == %{6 => :met}
+
+    Metadata.update(context.target_guid, %{reputation: %{29 => %{rank: :honored, at_war?: true}}})
+
+    assert ScriptedEventSystem.condition_results(
+             context.world,
+             context.source_guid,
+             context.target_guid,
+             [condition]
+           ) == %{6 => :unmet}
+  end
+
+  test "nearby-player modes distinguish any, hostile, and friendly players", context do
+    Metadata.update(context.source_guid, %{
+      faction_template: %FactionTemplate{faction: 15, faction_group: 8, enemy_group: 1}
+    })
+
+    Metadata.update(context.target_guid, %{
+      faction_template: %FactionTemplate{faction: 1, faction_group: 1, friend_group: 1}
+    })
+
+    conditions = [
+      %Condition{entry: 9, type: :nearby_player, value1: 0, value2: 30},
+      %Condition{entry: 10, type: :nearby_player, value1: 1, value2: 30},
+      %Condition{entry: 11, type: :nearby_player, value1: 2, value2: 30}
+    ]
+
+    assert ScriptedEventSystem.condition_results(
+             context.world,
+             context.target_guid,
+             context.source_guid,
+             conditions
+           ) == %{9 => :met, 10 => :met, 11 => :unmet}
+  end
+
+  test "object-fit conditions evaluate the referenced game-object snapshot", context do
+    db_guid = System.unique_integer([:positive, :monotonic])
+    game_object_guid = Guid.from_low_guid(:game_object, 21_145, db_guid)
+
+    Metadata.put(game_object_guid, %{db_guid: db_guid, go_spawned?: true, go_state: 0})
+    SpatialHash.update(:game_objects, game_object_guid, context.world, 12.0, 0.0, 0.0)
+
+    on_exit(fn ->
+      Metadata.delete(game_object_guid)
+      SpatialHash.remove(:game_objects, game_object_guid)
+    end)
+
+    condition = %Condition{
+      entry: 7,
+      type: :object_fit_condition,
+      value1: db_guid,
+      value2: 122,
+      children: [%Condition{entry: 122, type: :object_spawned}]
+    }
+
+    assert ScriptedEventSystem.condition_results(
+             context.world,
+             context.source_guid,
+             context.target_guid,
+             [condition]
+           ) == %{7 => :met}
+
+    Metadata.update(game_object_guid, %{go_spawned?: false})
+    reversed = %{condition | children: [%Condition{entry: 61, type: :object_spawned, reverse?: true}]}
+
+    assert ScriptedEventSystem.condition_results(
+             context.world,
+             context.source_guid,
+             context.target_guid,
+             [reversed]
+           ) == %{7 => :met}
+  end
+
+  test "condition results preserve unavailable world facts as unknown", context do
+    condition = %Condition{entry: 8, type: :nearby_creature, value1: 4_236, value2: 30}
+
+    assert %{
+             8 =>
+               {:unknown,
+                [
+                  %Reason{
+                    entry: 8,
+                    type: :nearby_creature,
+                    capability: {:missing_fact, :source_or_target, :position}
+                  }
+                ]}
+           } = ScriptedEventSystem.condition_results(context.world, nil, nil, [condition])
   end
 
   test "target results expose map event source, target, and matching extra targets", context do

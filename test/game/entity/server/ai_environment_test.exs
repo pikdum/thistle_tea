@@ -16,6 +16,8 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironmentTest do
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
+  alias ThistleTea.Game.World.System.ScriptedEvent
+  alias ThistleTea.Game.World.System.ScriptedEvent.Event
   alias ThistleTea.Game.WorldRef
   alias ThistleTea.Native.Namigator
 
@@ -143,7 +145,23 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironmentTest do
       request = Request.new([target_guid], 0.0, script_conditions: [condition])
       context = AIEnvironment.context(mob(world), 1_000, request)
 
-      assert context.script_conditions == %{1 => true}
+      assert context.script_conditions == %{1 => :met}
+    end
+
+    test "requests scripted map-event facts from their owner" do
+      world = %WorldRef{map_id: 0}
+      condition = %Condition{entry: 2, type: :map_event_active, value1: 5_713}
+      key = {world, 5_713}
+      event = %Event{id: 5_713, world: world}
+
+      previous = :sys.get_state(ScriptedEvent)
+      :sys.replace_state(ScriptedEvent, &Map.put(&1, key, event))
+      on_exit(fn -> :sys.replace_state(ScriptedEvent, fn _state -> previous end) end)
+
+      request = Request.new([], 0.0, script_conditions: [condition])
+      context = AIEnvironment.context(mob(world), 1_000, request)
+
+      assert context.script_conditions == %{2 => :met}
     end
   end
 

@@ -11,11 +11,16 @@ defmodule ThistleTea.Game.World.System.ScriptedEvent do
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Condition
   alias ThistleTea.Game.Entity.Data.ScriptStep
+  alias ThistleTea.Game.Entity.Logic.Condition.Result
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Logic.Hostility
+  alias ThistleTea.Game.Entity.Logic.Reputation
   alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.Math
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.Pathfinding
   alias ThistleTea.Game.WorldRef
 
   require Logger
@@ -72,8 +77,8 @@ defmodule ThistleTea.Game.World.System.ScriptedEvent do
   def handle_call({:condition_results, world, source_guid, target_guid, conditions}, _from, events) do
     results =
       Map.new(conditions, fn
-        %Condition{entry: entry} = condition ->
-          {entry, condition_met?(condition, events, world, source_guid, target_guid)}
+        %Condition{} = condition ->
+          {condition_key(condition), condition_result(condition, events, world, source_guid, target_guid)}
       end)
 
     {:reply, results, events}
@@ -332,33 +337,44 @@ defmodule ThistleTea.Game.World.System.ScriptedEvent do
   defp condition_met?(nil, _events, _world, _source_guid, _target_guid), do: false
 
   defp condition_met?(%Condition{} = condition, events, world, source_guid, target_guid) do
+    condition_result(condition, events, world, source_guid, target_guid) == :met
+  end
+
+  defp condition_result(%Condition{} = condition, events, world, source_guid, target_guid) do
     {source_guid, target_guid} =
       if condition.swap_targets?, do: {target_guid, source_guid}, else: {source_guid, target_guid}
 
     result = evaluate_condition(condition, events, world, source_guid, target_guid)
-    if condition.reverse?, do: not result, else: result
+    if condition.reverse?, do: Result.negate(result), else: result
   end
 
-  defp evaluate_condition(%Condition{type: :none}, _events, _world, _source_guid, _target_guid), do: true
+  defp evaluate_condition(%Condition{type: :none}, _events, _world, _source_guid, _target_guid), do: :met
 
   defp evaluate_condition(%Condition{type: :not, children: [child]}, events, world, source_guid, target_guid),
-    do: not condition_met?(child, events, world, source_guid, target_guid)
+    do: child |> condition_result(events, world, source_guid, target_guid) |> Result.negate()
 
   defp evaluate_condition(%Condition{type: :or, children: children}, events, world, source_guid, target_guid),
-    do: Enum.any?(children, &condition_met?(&1, events, world, source_guid, target_guid))
+    do: children |> Enum.map(&condition_result(&1, events, world, source_guid, target_guid)) |> Result.combine_or()
 
   defp evaluate_condition(%Condition{type: :and, children: children}, events, world, source_guid, target_guid),
-    do: Enum.all?(children, &condition_met?(&1, events, world, source_guid, target_guid))
+    do: children |> Enum.map(&condition_result(&1, events, world, source_guid, target_guid)) |> Result.combine_and()
 
-  defp evaluate_condition(%Condition{type: :escort, value1: flags, value2: distance}, _events, world, source, target) do
-    source_dead? = (flags &&& 0x1) != 0 and not alive?(source)
-    target_dead? = (flags &&& 0x2) != 0 and not alive?(target)
-    too_far? = distance > 0 and not within?(world, source, target, distance)
-    source_dead? or target_dead? or too_far?
+  defp evaluate_condition(
+         %Condition{type: :escort, value1: flags, value2: distance} = condition,
+         _events,
+         world,
+         source,
+         target
+       ) do
+    []
+    |> maybe_add_dead_result((flags &&& 0x1) != 0, condition, source)
+    |> maybe_add_dead_result((flags &&& 0x2) != 0, condition, target)
+    |> maybe_add_distance_result(distance > 0, condition, world, source, target, distance)
+    |> Result.combine_or()
   end
 
   defp evaluate_condition(
-         %Condition{type: :map_event_data, value1: id, value2: index, value3: expected, value4: comparison},
+         %Condition{type: :map_event_data, value1: id, value2: index, value3: expected, value4: comparison} = condition,
          events,
          world,
          _source,
@@ -370,14 +386,14 @@ defmodule ThistleTea.Game.World.System.ScriptedEvent do
         nil -> nil
       end
 
-    compare(value, expected, comparison)
+    if is_integer(value), do: Result.compare_result(value, expected, comparison, condition), else: :unmet
   end
 
   defp evaluate_condition(%Condition{type: :map_event_active, value1: id}, events, world, _source, _target),
-    do: Map.has_key?(events, event_key(world, id))
+    do: Result.truth(Map.has_key?(events, event_key(world, id)))
 
   defp evaluate_condition(
-         %Condition{type: :nearby_game_object, value1: entry, value2: radius},
+         %Condition{type: :nearby_creature, value1: entry, value2: radius, value3: dead, value4: not_self} = condition,
          _events,
          world,
          source,
@@ -385,12 +401,35 @@ defmodule ThistleTea.Game.World.System.ScriptedEvent do
        ) do
     case World.position(target) || World.position(source) do
       {^world, x, y, z} ->
-        :game_objects
+        :mobs
         |> World.nearby_units_exact(world, {x, y, z}, radius)
-        |> Enum.any?(fn {guid, _distance} -> Guid.entry(guid) == entry end)
+        |> Enum.filter(fn {guid, _distance} -> Guid.entry(guid) == entry and (not_self == 0 or guid != target) end)
+        |> Enum.map(&nearby_creature_result(condition, &1, dead))
+        |> Result.combine_or()
 
       _missing ->
-        false
+        Result.unknown(condition, {:missing_fact, :source_or_target, :position})
+    end
+  end
+
+  defp evaluate_condition(
+         %Condition{type: :nearby_game_object, value1: entry, value2: radius} = condition,
+         _events,
+         world,
+         source,
+         target
+       ) do
+    case World.position(target) || World.position(source) do
+      {^world, x, y, z} ->
+        result =
+          :game_objects
+          |> World.nearby_units_exact(world, {x, y, z}, radius)
+          |> Enum.any?(fn {guid, _distance} -> Guid.entry(guid) == entry end)
+
+        Result.truth(result)
+
+      _missing ->
+        Result.unknown(condition, {:missing_fact, :source_or_target, :position})
     end
   end
 
@@ -403,53 +442,246 @@ defmodule ThistleTea.Game.World.System.ScriptedEvent do
        ) do
     case Map.get(events, event_key(world, id)) do
       %Event{targets: targets} ->
-        Enum.all?(targets, fn target ->
-          not present?(target.guid) or condition_met?(child, events, world, source, target.guid)
-        end)
+        targets
+        |> Enum.map(&event_target_condition_result(&1, child, events, world, source))
+        |> Result.combine_and()
 
       nil ->
-        true
+        :met
     end
   end
 
-  defp evaluate_condition(%Condition{type: :alive}, _events, _world, _source, target), do: alive?(target)
+  defp evaluate_condition(%Condition{type: :alive} = condition, _events, _world, _source, target) do
+    alive_result(condition, target)
+  end
 
-  defp evaluate_condition(%Condition{type: :nearby_player, value2: radius}, _events, world, _source, target) do
+  defp evaluate_condition(
+         %Condition{type: :reaction, value1: expected, value2: comparison} = condition,
+         _events,
+         _world,
+         source,
+         target
+       ) do
+    if reaction_available?(source, target) do
+      rank = target |> Hostility.reaction_rank(source) |> Reputation.rank_value()
+      Result.compare_result(rank, expected, comparison, condition)
+    else
+      Result.unknown(condition, {:missing_fact, :source_or_target, :reaction})
+    end
+  end
+
+  defp evaluate_condition(%Condition{type: :object_spawned} = condition, _events, _world, _source, target) do
+    metadata_result(condition, target, :go_spawned?)
+  end
+
+  defp evaluate_condition(
+         %Condition{type: :object_loot_state, value1: expected} = condition,
+         _events,
+         _world,
+         _source,
+         target
+       ) do
+    metadata_comparison_result(condition, target, :loot_state, expected)
+  end
+
+  defp evaluate_condition(
+         %Condition{type: :object_go_state, value1: expected} = condition,
+         _events,
+         _world,
+         _source,
+         target
+       ) do
+    metadata_comparison_result(condition, target, :go_state, expected)
+  end
+
+  defp evaluate_condition(
+         %Condition{type: :object_fit_condition, value1: db_guid, children: [child]},
+         events,
+         world,
+         source,
+         _target
+       ) do
+    case Metadata.find_guid_by(:db_guid, db_guid) do
+      guid when is_integer(guid) ->
+        if match?({^world, _x, _y, _z}, World.position(guid)) do
+          condition_result(child, events, world, source, guid)
+        else
+          :unmet
+        end
+
+      _missing ->
+        :unmet
+    end
+  end
+
+  defp evaluate_condition(
+         %Condition{type: :distance_to_target, value1: expected, value2: comparison} = condition,
+         _events,
+         _world,
+         source,
+         target
+       ) do
+    source
+    |> World.distance_between(target)
+    |> trunc_distance()
+    |> case do
+      distance when is_integer(distance) -> Result.compare_result(distance, expected, comparison, condition)
+      _missing -> Result.unknown(condition, {:missing_fact, :source_or_target, :position})
+    end
+  end
+
+  defp evaluate_condition(%Condition{type: :line_of_sight} = condition, _events, world, source, target) do
+    case {World.position(source), World.position(target)} do
+      {{^world, x1, y1, z1}, {^world, x2, y2, z2}} ->
+        Result.truth(Pathfinding.line_of_sight?(world.map_id, {x1, y1, z1}, {x2, y2, z2}))
+
+      _missing ->
+        Result.unknown(condition, {:missing_fact, :source_or_target, :position})
+    end
+  end
+
+  defp evaluate_condition(
+         %Condition{type: :distance_to_position, value1: x, value2: y, value3: z, value4: maximum} = condition,
+         _events,
+         world,
+         _source,
+         target
+       ) do
     case World.position(target) do
-      {^world, x, y, z} -> World.nearby_players_at(world, {x, y, z}, radius) != []
-      _position -> false
+      {^world, tx, ty, tz} -> Result.truth(Math.distance({tx, ty, tz}, {x, y, z}) <= maximum)
+      _missing -> Result.unknown(condition, {:missing_fact, :target, :position})
+    end
+  end
+
+  defp evaluate_condition(
+         %Condition{type: :nearby_player, value1: mode, value2: radius} = condition,
+         _events,
+         world,
+         _source,
+         target
+       ) do
+    case World.position(target) do
+      {^world, x, y, z} ->
+        players = World.nearby_players_at(world, {x, y, z}, radius)
+        nearby_player_result(condition, target, players, mode)
+
+      _position ->
+        Result.unknown(condition, {:missing_fact, :target, :position})
     end
   end
 
   defp evaluate_condition(%Condition{type: :source_entry} = condition, _events, _world, source, _target) do
-    entry = Guid.entry(source)
-    entry in [condition.value1, condition.value2, condition.value3, condition.value4]
+    if is_integer(source) and source > 0 do
+      Result.truth(Guid.entry(source) in [condition.value1, condition.value2, condition.value3, condition.value4])
+    else
+      Result.unknown(condition, {:missing_fact, :source, :entry})
+    end
   end
 
   defp evaluate_condition(%Condition{type: :db_guid} = condition, _events, _world, source, _target) do
-    guid = Guid.low_guid(source)
-    guid in [condition.value1, condition.value2, condition.value3, condition.value4]
+    if is_integer(source) and source > 0 do
+      Result.truth(Guid.low_guid(source) in [condition.value1, condition.value2, condition.value3, condition.value4])
+    else
+      Result.unknown(condition, {:missing_fact, :source, :db_guid})
+    end
   end
 
-  defp evaluate_condition(%Condition{}, _events, _world, _source, _target), do: false
-
-  defp compare(nil, _expected, _comparison), do: false
-  defp compare(value, expected, 1), do: value >= expected
-  defp compare(value, expected, 2), do: value <= expected
-  defp compare(value, expected, _comparison), do: value == expected
-
-  defp alive?(guid) when is_integer(guid) and guid > 0 do
-    match?(%{alive?: true}, Metadata.query(guid, [:alive?]))
+  defp evaluate_condition(%Condition{} = condition, _events, _world, _source, _target) do
+    Result.unknown(condition, {:unsupported_capability, condition.type})
   end
 
-  defp alive?(_guid), do: false
+  defp trunc_distance(distance) when is_number(distance), do: trunc(distance)
+  defp trunc_distance(_distance), do: nil
+
+  defp maybe_add_dead_result(results, false, _condition, _guid), do: results
+
+  defp maybe_add_dead_result(results, true, condition, guid) do
+    [condition |> alive_result(guid) |> Result.negate() | results]
+  end
+
+  defp maybe_add_distance_result(results, false, _condition, _world, _source, _target, _distance), do: results
+
+  defp maybe_add_distance_result(results, true, condition, world, source, target, maximum) do
+    result =
+      case {World.position(source), World.position(target)} do
+        {{^world, _sx, _sy, _sz}, {^world, _tx, _ty, _tz}} ->
+          Result.truth(World.distance_between(source, target) > maximum)
+
+        {{_source_world, _sx, _sy, _sz}, {_target_world, _tx, _ty, _tz}} ->
+          :met
+
+        _missing ->
+          Result.unknown(condition, {:missing_fact, :source_or_target, :position})
+      end
+
+    [result | results]
+  end
+
+  defp alive_result(condition, guid) do
+    case Metadata.query(guid, [:alive?]) do
+      %{alive?: alive?} when is_boolean(alive?) -> Result.truth(alive?)
+      _missing -> Result.unknown(condition, {:missing_fact, :target, :alive})
+    end
+  end
+
+  defp nearby_creature_result(condition, {guid, _distance}, dead) do
+    case alive_result(condition, guid) do
+      :met -> Result.truth(dead == 0)
+      :unmet -> Result.truth(dead != 0)
+      {:unknown, _reasons} = unknown -> unknown
+    end
+  end
+
+  defp event_target_condition_result(target, child, events, world, source) do
+    if present?(target.guid), do: condition_result(child, events, world, source, target.guid), else: :met
+  end
+
+  defp reaction_available?(source, target) do
+    match?(%{faction_template: %{}}, Metadata.query(source, [:faction_template])) and
+      match?(%{faction_template: %{}}, Metadata.query(target, [:faction_template]))
+  end
+
+  defp metadata_result(condition, guid, key) do
+    case Metadata.query(guid, [key]) do
+      %{^key => value} when is_boolean(value) -> Result.truth(value)
+      _missing -> Result.unknown(condition, {:missing_fact, :target, key})
+    end
+  end
+
+  defp metadata_comparison_result(condition, guid, key, expected) do
+    case Metadata.query(guid, [key]) do
+      %{^key => value} when is_integer(value) -> Result.truth(value == expected)
+      _missing -> Result.unknown(condition, {:missing_fact, :target, key})
+    end
+  end
+
+  defp nearby_player_result(_condition, _target, players, 0), do: Result.truth(players != [])
+
+  defp nearby_player_result(condition, target, players, mode) when mode in [1, 2] do
+    players
+    |> Enum.map(fn {guid, _distance} -> player_reaction_result(condition, target, guid, mode) end)
+    |> Result.combine_or()
+  end
+
+  defp nearby_player_result(condition, _target, _players, mode) do
+    Result.unknown(condition, {:invalid_mode, mode})
+  end
+
+  defp player_reaction_result(condition, target, player_guid, mode) do
+    if reaction_available?(target, player_guid) do
+      matches? =
+        case mode do
+          1 -> Hostility.hostile?(target, player_guid)
+          2 -> Hostility.friendly?(target, player_guid)
+        end
+
+      Result.truth(matches?)
+    else
+      Result.unknown(condition, {:missing_fact, :nearby_player, :reaction})
+    end
+  end
+
   defp present?(guid), do: Metadata.get(guid) != nil
-
-  defp within?(world, source_guid, target_guid, distance) do
-    match?({^world, _x, _y, _z}, World.position(source_guid)) and
-      match?({^world, _x, _y, _z}, World.position(target_guid)) and
-      World.distance_between(source_guid, target_guid) <= distance
-  end
 
   defp send_event(%Event{} = event, data, target_mode) do
     main = [event.source_guid, event.target_guid]
@@ -513,4 +745,6 @@ defmodule ThistleTea.Game.World.System.ScriptedEvent do
 
   defp schedule(key, token), do: Process.send_after(self(), {:evaluate, key, token}, 1_000)
   defp event_key(world, id), do: {WorldRef.coerce(world), id}
+  defp condition_key(%Condition{entry: entry}) when is_integer(entry) and entry > 0, do: entry
+  defp condition_key(%Condition{} = condition), do: condition
 end

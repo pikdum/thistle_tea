@@ -399,7 +399,7 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
     request =
       ObservationRequest.new([target_guid], Script.observation_radius(steps),
         game_object_radius: Script.game_object_observation_radius(steps),
-        script_conditions: Script.termination_conditions(steps),
+        script_conditions: Script.conditions(steps),
         script_targets: Script.target_requests(steps)
       )
 

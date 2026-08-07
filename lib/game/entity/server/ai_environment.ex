@@ -28,6 +28,7 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
   alias ThistleTea.Game.Entity.Logic.AI.NavigationIntent
   alias ThistleTea.Game.Entity.Logic.AI.Script
   alias ThistleTea.Game.Entity.Logic.Aura
+  alias ThistleTea.Game.Entity.Logic.Condition.Requirements
   alias ThistleTea.Game.Entity.Server.NavigationResolver
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
@@ -48,14 +49,18 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
       )
       when is_integer(now) and is_list(actors) and is_number(requested_radius) and requested_radius >= 0 and
              is_number(requested_game_object_radius) and requested_game_object_radius >= 0 do
+    conditions = all_conditions(entity, request)
+
     %Context{
       now: now,
       perception: perception(entity, now, actors, requested_radius, requested_game_object_radius),
       random: random(),
       navigation: navigation(entity, now),
       waypoints: WaypointLoader.context(),
-      script_conditions: script_condition_results(entity, actors, request.script_conditions),
-      script_targets: script_target_results(entity, request.script_targets)
+      script_conditions: script_condition_results(entity, actors, Requirements.environment_conditions(conditions)),
+      script_targets: script_target_results(entity, request.script_targets),
+      condition_now: local_time(),
+      condition_area: condition_area(entity, Requirements.plan(conditions))
     }
   end
 
@@ -202,6 +207,33 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
 
   defp script_condition_results(_entity, _actors, _conditions), do: %{}
 
+  defp all_conditions(entity, request) do
+    (request.script_conditions ++ entity_conditions(entity))
+    |> Enum.uniq()
+  end
+
+  defp entity_conditions(%Mob{} = entity) do
+    EventAI.conditions(entity) ++ waypoint_conditions(entity)
+  end
+
+  defp entity_conditions(_entity), do: []
+
+  defp waypoint_conditions(%Mob{} = entity) do
+    case waypoint_route(entity) do
+      %WaypointRoute{points: points} when is_map(points) ->
+        points
+        |> Map.values()
+        |> Enum.flat_map(fn
+          %Waypoint{script_steps: steps} when is_list(steps) -> steps
+          _waypoint -> []
+        end)
+        |> Script.conditions()
+
+      nil ->
+        []
+    end
+  end
+
   defp script_target_results(%{internal: %Internal{world: world}} = entity, requested) when is_list(requested) do
     selectors = Enum.uniq(requested ++ entity_script_target_requests(entity))
     ScriptedEvent.target_results(world, selectors)
@@ -239,6 +271,20 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
 
   defp threat_guids(threat) when is_map(threat), do: Map.keys(threat)
   defp threat_guids(_threat), do: []
+
+  defp local_time do
+    {{year, month, day}, {hour, minute, second}} = :calendar.local_time()
+    NaiveDateTime.new!(year, month, day, hour, minute, second)
+  end
+
+  defp condition_area(entity, requirements) do
+    if Enum.any?(requirements, &match?({:subject, {:first_available, _source, _target}, :area_id}, &1)) do
+      case origin(entity) do
+        {world, x, y, z} -> Pathfinding.get_zone_and_area(world.map_id, {x, y, z})
+        _missing -> nil
+      end
+    end
+  end
 
   defp observe(entity, guid, now, line_of_sight_guids) do
     position = World.position(guid, now)

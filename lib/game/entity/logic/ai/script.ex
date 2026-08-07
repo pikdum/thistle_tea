@@ -32,7 +32,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Navigation
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
   alias ThistleTea.Game.Entity.Logic.Casting
-  alias ThistleTea.Game.Entity.Logic.Condition, as: ConditionLogic
+  alias ThistleTea.Game.Entity.Logic.Condition, as: ConditionEvaluator
+  alias ThistleTea.Game.Entity.Logic.Condition.EntityContext
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Engagement
@@ -154,11 +155,20 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
   end
 
   defp dispatch(state, blackboard, %ScriptStep{} = step, target_guid, %Context{now: now} = context) do
-    if ConditionLogic.met?(state, step.condition) do
+    if condition_met?(state, step.condition, target_guid, context) do
       execute(state, blackboard, step, target_guid, now, context)
     else
       {state, blackboard}
     end
+  end
+
+  defp condition_met?(_state, nil, _target_guid, _context), do: true
+
+  defp condition_met?(state, condition, target_guid, context) do
+    state
+    |> EntityContext.build(context, target_guid)
+    |> ConditionEvaluator.evaluate(condition)
+    |> Kernel.==(:met)
   end
 
   defp forward_to_buddy(
@@ -223,15 +233,24 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
          %{object: %{guid: source_guid}} = state,
          %ScriptStep{
            command: :terminate_condition,
-           datalong: condition_id,
            datalong2: failed_quest_id,
-           datalong3: flags
+           datalong3: flags,
+           termination_condition: condition
          },
          target_guid,
-         %Context{script_conditions: condition_results}
+         %Context{} = context
        ) do
-    met? = Map.get(condition_results, condition_id, false)
-    terminate? = if (flags &&& 0x1) == 0, do: met?, else: not met?
+    result =
+      state
+      |> EntityContext.build(context, target_guid)
+      |> ConditionEvaluator.evaluate(condition)
+
+    terminate? =
+      case {result, flags &&& 0x1} do
+        {:met, 0} -> true
+        {:unmet, 1} -> true
+        _unknown_or_not_selected -> false
+      end
 
     if terminate? do
       state =
@@ -1392,10 +1411,34 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
         []
     end)
     |> Enum.reject(&is_nil/1)
-    |> Enum.uniq_by(& &1.entry)
+    |> Enum.uniq()
   end
 
   def termination_conditions(_steps), do: []
+
+  def conditions(steps) when is_list(steps) do
+    steps
+    |> Enum.flat_map(fn
+      %ScriptStep{} = step ->
+        nested = step.sub_scripts |> Map.values() |> List.flatten() |> conditions()
+
+        [
+          step.condition,
+          step.termination_condition,
+          step.success_condition,
+          step.failure_condition,
+          step.target_condition
+          | nested
+        ]
+
+      _step ->
+        []
+    end)
+    |> Enum.reject(&is_nil/1)
+    |> Enum.uniq()
+  end
+
+  def conditions(_steps), do: []
 
   def target_requests(steps) when is_list(steps) do
     steps

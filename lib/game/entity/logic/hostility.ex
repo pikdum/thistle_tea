@@ -14,30 +14,30 @@ defmodule ThistleTea.Game.Entity.Logic.Hostility do
   @unit_flag_not_selectable 0x02000000
 
   def hostile?(source, target) do
-    if duel_opponents?(source, target) do
-      true
-    else
-      case reputation_reaction(source, target) do
-        {:ok, reaction} ->
-          reaction == :hostile
-
-        :none ->
-          template_hostile?(source, target)
-      end
-    end
+    source |> reaction_rank(target) |> rank_reaction() |> Kernel.==(:hostile)
   end
 
   def friendly?(source, target) do
-    if duel_opponents?(source, target) do
-      false
-    else
-      case reputation_reaction(source, target) do
-        {:ok, reaction} ->
-          reaction == :friendly
+    source |> reaction_rank(target) |> rank_reaction() |> Kernel.==(:friendly)
+  end
 
-        :none ->
-          template_friendly?(source, target)
-      end
+  def reaction_rank(source, target) when is_integer(source) or is_integer(target) do
+    reaction_rank(reaction_entity(source), reaction_entity(target))
+  end
+
+  def reaction_rank(source, target) do
+    cond do
+      same_controller?(source, target) ->
+        :friendly
+
+      duel_opponents?(source, target) ->
+        :hostile
+
+      true ->
+        case reputation_reaction(source, target) do
+          {:ok, rank} -> rank
+          :none -> template_reaction_rank(source, target)
+        end
     end
   end
 
@@ -87,21 +87,17 @@ defmodule ThistleTea.Game.Entity.Logic.Hostility do
 
   def faction_template(_source), do: nil
 
-  defp template_hostile?(source, target) do
+  defp template_reaction_rank(source, target) do
     with %FactionTemplate{} = source_template <- faction_template(source),
          %FactionTemplate{} = target_template <- faction_template(target) do
-      FactionTemplate.hostile_to?(source_template, target_template)
+      cond do
+        FactionTemplate.hostile_to?(source_template, target_template) -> :hostile
+        FactionTemplate.friendly_to?(source_template, target_template) -> :friendly
+        FactionTemplate.friendly_to?(target_template, source_template) -> :friendly
+        true -> :neutral
+      end
     else
-      _ -> false
-    end
-  end
-
-  defp template_friendly?(source, target) do
-    with %FactionTemplate{} = source_template <- faction_template(source),
-         %FactionTemplate{} = target_template <- faction_template(target) do
-      FactionTemplate.friendly_to?(source_template, target_template)
-    else
-      _ -> false
+      _ -> :neutral
     end
   end
 
@@ -112,12 +108,16 @@ defmodule ThistleTea.Game.Entity.Logic.Hostility do
            :faction_can_have_reputation?,
            :unit_flags,
            :reputation,
+           :owner_guid,
            :contested_pvp?
          ]) do
       nil -> %{guid: guid}
       metadata -> Map.put(metadata, :guid, guid)
     end
   end
+
+  defp reaction_entity(guid) when is_integer(guid), do: target_metadata(guid)
+  defp reaction_entity(entity), do: entity
 
   defp attack_reaction_allows?(source, target) do
     cond do
@@ -192,7 +192,7 @@ defmodule ThistleTea.Game.Entity.Logic.Hostility do
 
     cond do
       is_map(entry) and Map.has_key?(entry, :forced_rank) ->
-        {:ok, rank_reaction(entry.forced_rank)}
+        {:ok, entry.forced_rank}
 
       contested_guard_reaction?(creature, player) ->
         {:ok, :hostile}
@@ -211,13 +211,13 @@ defmodule ThistleTea.Game.Entity.Logic.Hostility do
 
     cond do
       is_map(entry) and Map.has_key?(entry, :forced_rank) ->
-        {:ok, rank_reaction(entry.forced_rank)}
+        {:ok, entry.forced_rank}
 
       contested_guard_reaction?(creature, player) ->
         {:ok, :hostile}
 
       faction_can_have_reputation?(creature) and is_map(entry) ->
-        {:ok, entry |> creature_player_rank() |> rank_reaction()}
+        {:ok, creature_player_rank(entry)}
 
       true ->
         :none
@@ -286,6 +286,12 @@ defmodule ThistleTea.Game.Entity.Logic.Hostility do
       player_guid?(owner_guid(entity)) -> owner_guid(entity)
       true -> nil
     end
+  end
+
+  defp same_controller?(source, target) do
+    source_owner = player_owner_guid(source)
+    target_owner = player_owner_guid(target)
+    is_integer(source_owner) and source_owner == target_owner
   end
 
   defp faction_id(entity) do

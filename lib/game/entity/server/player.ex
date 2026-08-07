@@ -71,6 +71,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.Party.MemberStats
   alias ThistleTea.Game.Party.Notifier, as: PartyNotifier
   alias ThistleTea.Game.Player.CompanionVisibility
+  alias ThistleTea.Game.Player.ConditionContext
   alias ThistleTea.Game.Player.Enchantments
   alias ThistleTea.Game.Player.Exploration, as: PlayerExploration
   alias ThistleTea.Game.Player.GameObjects, as: PlayerGameObjects
@@ -95,6 +96,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.World.Loader.ItemEnchantment, as: ItemEnchantmentLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Loader.SpellPetAura, as: SpellPetAuraLoader
+  alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Pathfinding
   alias ThistleTea.Game.World.Presence
   alias ThistleTea.Game.World.System.Duel, as: DuelSystem
@@ -1004,7 +1006,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
     request =
       ObservationRequest.new([target_guid], Script.observation_radius(steps),
         game_object_radius: Script.game_object_observation_radius(steps),
-        script_conditions: Script.termination_conditions(steps),
+        script_conditions: Script.conditions(steps),
         script_targets: Script.target_requests(steps)
       )
 
@@ -1035,6 +1037,12 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   defp sync_character_metadata(%{guid: guid, character: %Character{} = character} = state) when is_integer(guid) do
     detection = StealthDetection.target_metadata(character)
 
+    previous_subject =
+      case Metadata.query(guid, [:condition_subject]) do
+        %{condition_subject: condition_subject} -> condition_subject
+        _missing -> nil
+      end
+
     Presence.sync(
       character,
       %{
@@ -1057,7 +1065,8 @@ defmodule ThistleTea.Game.Entity.Server.Player do
         crowd_controlled?: Aura.crowd_controlled?(character),
         dispel_options: Aura.dispel_options(character),
         attacker_spell_hit_chance: Aura.attacker_spell_hit_chance(character),
-        reputation: PlayerReputation.projection(character)
+        reputation: PlayerReputation.projection(character),
+        condition_subject: ConditionContext.refresh_subject(character, previous_subject)
       }
       |> Map.merge(detection)
     )

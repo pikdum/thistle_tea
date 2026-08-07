@@ -8,6 +8,8 @@ defmodule ThistleTea.Game.Network.Message.CmsgGossipSelectOptionTest do
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Data.Condition
+  alias ThistleTea.Game.Entity.Data.Reputation
   alias ThistleTea.Game.Entity.Data.ScriptStep
   alias ThistleTea.Game.Entity.Data.Taxi.Network
   alias ThistleTea.Game.Entity.Data.Taxi.Node
@@ -35,8 +37,10 @@ defmodule ThistleTea.Game.Network.Message.CmsgGossipSelectOptionTest do
 
       character = %Character{
         object: %Object{guid: player_guid},
-        unit: %Unit{},
-        internal: %Internal{}
+        unit: %Unit{health: 100, max_health: 100, power1: 0, max_power1: 0, auras: []},
+        player: %Player{skills: %{}, quest_log: %{}, rewarded_quests: MapSet.new(), reputation: %Reputation{}},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+        internal: %Internal{world: WorldRef.open(0), spellbook: %{}}
       }
 
       state = %{character: character, gossip_menu_options: [option]}
@@ -88,7 +92,13 @@ defmodule ThistleTea.Game.Network.Message.CmsgGossipSelectOptionTest do
         id: player_id,
         object: %Object{guid: player_guid},
         unit: %Unit{race: 1},
-        player: %Player{taxi_nodes: MapSet.new([2])},
+        player: %Player{
+          taxi_nodes: MapSet.new([2]),
+          skills: %{},
+          quest_log: %{},
+          rewarded_quests: MapSet.new(),
+          reputation: %Reputation{}
+        },
         movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
         internal: %Internal{world: WorldRef.open(0)}
       }
@@ -100,6 +110,44 @@ defmodule ThistleTea.Game.Network.Message.CmsgGossipSelectOptionTest do
       assert CmsgGossipSelectOption.handle(message, state) == state
 
       assert_receive {:"$gen_cast", {:send_packet, %SmsgShowtaxinodes{guid: ^flightmaster_guid, nearest_node: 2}}}
+    end
+
+    test "revalidates a conditioned option after player state changes" do
+      option = %Option{
+        id: 0,
+        option_id: 1,
+        condition: %Condition{entry: 1, type: :level, value1: 10, value2: 1},
+        taxi_path_steps: [%ScriptStep{command: :send_taxi_path, datalong: 315}]
+      }
+
+      character = %Character{
+        object: %Object{guid: 1},
+        unit: %Unit{
+          level: 9,
+          race: 1,
+          class: 1,
+          health: 100,
+          max_health: 100,
+          power1: 0,
+          max_power1: 0,
+          auras: []
+        },
+        player: %Player{
+          skills: %{},
+          quest_log: %{},
+          rewarded_quests: MapSet.new(),
+          reputation: %Reputation{}
+        },
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+        internal: %Internal{world: WorldRef.open(0), spellbook: %{}}
+      }
+
+      state = %{character: character, gossip_menu_options: [option]}
+      message = %CmsgGossipSelectOption{guid: 2, gossip_list_id: 0}
+
+      assert CmsgGossipSelectOption.handle(message, state) == state
+      refute_receive {:send_taxi_path, 315}
+      refute_receive {:"$gen_cast", {:send_packet, _packet}}
     end
   end
 end

@@ -96,6 +96,32 @@ defmodule ThistleTea.Game.Entity.Logic.HostilityTest do
     end
   end
 
+  describe "reaction_rank/2" do
+    test "preserves exact reputation ranks for creature reactions" do
+      player = player(alliance(), 1, %{29 => %{rank: :honored, at_war?: false}})
+      creature = mob(wolf(), faction_can_have_reputation?: true)
+
+      assert Hostility.reaction_rank(creature, player) == :honored
+      assert Hostility.reaction_rank(player, creature) == :friendly
+    end
+
+    test "caps an at-war creature reaction at neutral" do
+      player = player(alliance(), 1, %{29 => %{rank: :exalted, at_war?: true}})
+      creature = mob(wolf(), faction_can_have_reputation?: true)
+
+      assert Hostility.reaction_rank(creature, player) == :neutral
+      assert Hostility.reaction_rank(player, creature) == :hostile
+    end
+
+    test "returns the exact forced rank in both directions" do
+      player = player(alliance(), 1, %{29 => %{rank: :neutral, at_war?: true, forced_rank: :revered}})
+      creature = mob(wolf(), faction_can_have_reputation?: true)
+
+      assert Hostility.reaction_rank(creature, player) == :revered
+      assert Hostility.reaction_rank(player, creature) == :revered
+    end
+  end
+
   describe "valid_attack_target?/2" do
     test "allows players to attack neutral creature factions without reputation" do
       player = player(alliance())
