@@ -1,0 +1,52 @@
+defmodule ThistleTea.Game.Entity.Logic.Condition.Subject do
+  @moduledoc """
+  Immutable projection of actor facts understood by VMangos conditions.
+  """
+
+  defstruct guid: nil,
+            kind: nil,
+            owner_guid: nil,
+            entry: nil,
+            db_guid: nil,
+            position: nil,
+            map_id: nil,
+            zone_id: nil,
+            area_id: nil,
+            level: nil,
+            gender: nil,
+            alive?: nil,
+            moving?: nil,
+            combat?: nil,
+            health: nil,
+            max_health: nil,
+            mana: nil,
+            max_mana: nil,
+            aura_ids: nil,
+            aura_effects: nil,
+            argent_dawn_commission?: nil,
+            race: nil,
+            class: nil,
+            team: nil,
+            group?: nil,
+            skills: nil,
+            spellbook: nil,
+            quest_log: nil,
+            rewarded_quests: nil,
+            reputation: nil,
+            reputation_ranks: nil,
+            honor_rank: nil,
+            explored_areas: nil,
+            item_counts: nil,
+            equipped_item_ids: nil,
+            pet_guid: nil,
+            has_pet?: nil,
+            player_owned?: nil,
+            last_waypoint: nil,
+            go_spawned?: nil,
+            loot_state: nil,
+            go_state: nil,
+            formation_leader_guid: nil,
+            formation_dead?: nil
+
+  def new(options \\ []) when is_list(options), do: struct!(__MODULE__, options)
+end
