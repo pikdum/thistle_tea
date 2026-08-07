@@ -18,6 +18,8 @@ defmodule ThistleTea.Game.Entity.Logic.InventoryTest do
   @offhand_slot 16
   @first_bag_slot 19
   @backpack_start 23
+  @bank_start 39
+  @bank_bag_start 63
   @owner 1
   @prof Proficiency.all()
 
@@ -62,6 +64,10 @@ defmodule ThistleTea.Game.Entity.Logic.InventoryTest do
 
   defp store(player, slot, item) do
     Map.put(player, :"inv#{slot - @backpack_start + 1}", item.object.guid)
+  end
+
+  defp store_bank(player, slot, item) do
+    Map.put(player, :"bank#{slot - @bank_start + 1}", item.object.guid)
   end
 
   defp updated(items, %Item{} = item) do
@@ -843,6 +849,370 @@ defmodule ThistleTea.Game.Entity.Logic.InventoryTest do
       assert chest.object.guid in guids
       assert bag.object.guid in guids
       assert sword.object.guid in guids
+    end
+  end
+
+  describe "bank storage catalog" do
+    test "maps every vanilla bank region through the canonical slot catalog" do
+      assert Inventory.field_for_position({@bag_0, @bank_start}) == :bank1
+      assert Inventory.field_for_position({@bag_0, @bank_start + 23}) == :bank24
+      assert Inventory.field_for_position({@bag_0, @bank_bag_start}) == :bank_bag1
+      assert Inventory.field_for_position({@bag_0, @bank_bag_start + 5}) == :bank_bag6
+      assert Inventory.field_for_position({@bag_0, 69}) == nil
+    end
+
+    test "classifies carried, bank, and purchased bank bag positions" do
+      player = %Player{bank_bag_slots: 1}
+
+      assert Inventory.carried_position?({@bag_0, @backpack_start})
+      assert Inventory.carried_position?({@first_bag_slot, 0})
+      refute Inventory.carried_position?({@bag_0, @bank_start})
+
+      assert Inventory.bank_position?({@bag_0, @bank_start})
+      assert Inventory.bank_position?({@bank_bag_start, 0})
+      assert Inventory.bank_bag_bar_position?({@bag_0, @bank_bag_start})
+      assert Inventory.purchased_bank_bag_position?(player, {@bag_0, @bank_bag_start})
+      assert Inventory.purchased_bank_bag_position?(player, {@bank_bag_start, 0})
+      refute Inventory.purchased_bank_bag_position?(player, {@bag_0, @bank_bag_start + 1})
+      assert Inventory.touches_bank?([{@bag_0, @backpack_start}, {@bag_0, @bank_start}])
+    end
+
+    test "rejects locked bank bag slots", %{unit: unit, bag: bag} do
+      player = store(%Player{}, @backpack_start, bag)
+
+      assert {:error, :must_purchase_that_bag_slot, _, 0} =
+               Inventory.swap(
+                 player,
+                 unit,
+                 @prof,
+                 @owner,
+                 {@bag_0, @backpack_start},
+                 {@bag_0, @bank_bag_start},
+                 get_item_fn([bag])
+               )
+    end
+  end
+
+  describe "bank item enumeration" do
+    test "keeps carried, bank, and all-owned scopes distinct" do
+      carried = build_item(20, %ItemTemplate{entry: 2000})
+      banked = build_item(21, %ItemTemplate{entry: 2001})
+      contained = build_item(22, %ItemTemplate{entry: 2002})
+      bank_bag = build_item(23, %ItemTemplate{entry: 2003, inventory_type: 18, container_slots: 6, class: 1})
+      bank_bag = put_in(bank_bag.container.slot_1, contained.object.guid)
+
+      player = %Player{
+        inv1: carried.object.guid,
+        bank1: banked.object.guid,
+        bank_bag1: bank_bag.object.guid,
+        bank_bag_slots: 1
+      }
+
+      lookup = get_item_fn([carried, banked, contained, bank_bag])
+
+      assert Enum.map(Inventory.owned_items(player, lookup), & &1.object.guid) == [carried.object.guid]
+
+      assert MapSet.new(Inventory.bank_items(player, lookup), & &1.object.guid) ==
+               MapSet.new([banked.object.guid, bank_bag.object.guid, contained.object.guid])
+
+      assert MapSet.new(Inventory.all_owned_items(player, lookup), & &1.object.guid) ==
+               MapSet.new([carried.object.guid, banked.object.guid, bank_bag.object.guid, contained.object.guid])
+    end
+
+    test "ignores missing entries, loops, and duplicate GUIDs" do
+      item = build_item(20, %ItemTemplate{entry: 2000, inventory_type: 18, container_slots: 6, class: 1})
+      item = put_in(item.container.slot_1, item.object.guid)
+      player = %Player{inv1: item.object.guid, bank1: item.object.guid, bank2: 999}
+
+      assert Inventory.all_owned_items(player, get_item_fn([item])) == [item]
+    end
+
+    test "counts carried items separately from bank items" do
+      template = %ItemTemplate{entry: 2000, stackable: 20}
+      carried = build_item(20, template, stack_count: 3)
+      banked = build_item(21, template, stack_count: 4)
+      player = %Player{inv1: carried.object.guid, bank1: banked.object.guid}
+      lookup = get_item_fn([carried, banked])
+
+      assert Inventory.count_entry(player, 2000, lookup) == 3
+      assert Inventory.count_entry_with_bank(player, 2000, lookup) == 7
+    end
+  end
+
+  describe "bank transitions" do
+    test "swaps across carried and bank positions in every direction", %{unit: unit} do
+      carried1 = build_item(20, %ItemTemplate{entry: 2000})
+      carried2 = build_item(21, %ItemTemplate{entry: 2001})
+      banked1 = build_item(22, %ItemTemplate{entry: 2002})
+      banked2 = build_item(23, %ItemTemplate{entry: 2003})
+
+      player = %Player{
+        inv1: carried1.object.guid,
+        inv2: carried2.object.guid,
+        bank1: banked1.object.guid,
+        bank2: banked2.object.guid
+      }
+
+      lookup = get_item_fn([carried1, carried2, banked1, banked2])
+
+      assert {:ok, first} =
+               Inventory.swap(
+                 player,
+                 unit,
+                 @prof,
+                 @owner,
+                 {@bag_0, @backpack_start},
+                 {@bag_0, @bank_start},
+                 lookup
+               )
+
+      assert first.player.inv1 == banked1.object.guid
+      assert first.player.bank1 == carried1.object.guid
+
+      assert {:ok, second} =
+               Inventory.swap(
+                 first.player,
+                 unit,
+                 @prof,
+                 @owner,
+                 {@bag_0, @bank_start},
+                 {@bag_0, @bank_start + 1},
+                 lookup
+               )
+
+      assert second.player.bank1 == banked2.object.guid
+      assert second.player.bank2 == carried1.object.guid
+
+      assert {:ok, third} =
+               Inventory.swap(
+                 second.player,
+                 unit,
+                 @prof,
+                 @owner,
+                 {@bag_0, @backpack_start + 1},
+                 {@bag_0, @backpack_start},
+                 lookup
+               )
+
+      assert third.player.inv1 == carried2.object.guid
+      assert third.player.inv2 == banked1.object.guid
+    end
+
+    test "auto-banks by merging before using an empty base slot" do
+      template = %ItemTemplate{entry: 2000, stackable: 10}
+      carried = build_item(20, template, stack_count: 5)
+      banked = build_item(21, template, stack_count: 8)
+      player = %Player{inv1: carried.object.guid, bank1: banked.object.guid}
+
+      assert {:ok, result} =
+               Inventory.auto_store(
+                 player,
+                 @owner,
+                 {@bag_0, @backpack_start},
+                 :bank,
+                 get_item_fn([carried, banked])
+               )
+
+      assert result.player.inv1 == 0
+      assert result.player.bank2 == carried.object.guid
+      assert updated(result.items, banked).item.stack_count == 10
+      assert updated(result.items, carried).item.stack_count == 3
+    end
+
+    test "auto-withdraws by merging before using the current carried order" do
+      template = %ItemTemplate{entry: 2000, stackable: 10}
+      banked = build_item(20, template, stack_count: 5)
+      carried = build_item(21, template, stack_count: 8)
+      player = %Player{bank1: banked.object.guid, inv1: carried.object.guid}
+
+      assert {:ok, result} =
+               Inventory.auto_store(
+                 player,
+                 @owner,
+                 {@bag_0, @bank_start},
+                 :carried,
+                 get_item_fn([banked, carried])
+               )
+
+      assert result.player.bank1 == 0
+      assert result.player.inv2 == banked.object.guid
+      assert updated(result.items, carried).item.stack_count == 10
+      assert updated(result.items, banked).item.stack_count == 3
+    end
+
+    test "returns full errors without mutating either storage scope" do
+      source = build_item(20, %ItemTemplate{entry: 2000})
+      filler = build_item(21, %ItemTemplate{entry: 2001})
+
+      bank_full =
+        Enum.reduce(1..24, %Player{inv1: source.object.guid}, fn index, player ->
+          Map.put(player, :"bank#{index}", filler.object.guid)
+        end)
+
+      assert {:error, :bank_full, _, 0} =
+               Inventory.auto_store(
+                 bank_full,
+                 @owner,
+                 {@bag_0, @backpack_start},
+                 :bank,
+                 get_item_fn([source, filler])
+               )
+
+      assert bank_full.inv1 == source.object.guid
+
+      carried_full =
+        Enum.reduce(1..16, %Player{bank1: source.object.guid}, fn index, player ->
+          Map.put(player, :"inv#{index}", filler.object.guid)
+        end)
+
+      assert {:error, :inventory_full, _, 0} =
+               Inventory.auto_store(
+                 carried_full,
+                 @owner,
+                 {@bag_0, @bank_start},
+                 :carried,
+                 get_item_fn([source, filler])
+               )
+
+      assert carried_full.bank1 == source.object.guid
+    end
+
+    test "uses eligible specialized bank bags before base slots" do
+      herb = build_item(20, %ItemTemplate{entry: 2000, bag_family: 0x20})
+
+      herb_bag =
+        build_item(
+          21,
+          %ItemTemplate{entry: 2001, inventory_type: 18, container_slots: 6, class: 1, bag_family: 0x20}
+        )
+
+      player = %Player{inv1: herb.object.guid, bank_bag1: herb_bag.object.guid, bank_bag_slots: 1}
+
+      assert {:ok, result} =
+               Inventory.auto_store(
+                 player,
+                 @owner,
+                 {@bag_0, @backpack_start},
+                 :bank,
+                 get_item_fn([herb, herb_bag])
+               )
+
+      assert updated(result.items, herb_bag).container.slot_1 == herb.object.guid
+      assert result.player.bank1 in [nil, 0]
+    end
+
+    test "rejects incompatible manual bag placement", %{unit: unit} do
+      ordinary = build_item(20, %ItemTemplate{entry: 2000})
+
+      herb_bag =
+        build_item(
+          21,
+          %ItemTemplate{entry: 2001, inventory_type: 18, container_slots: 6, class: 1, bag_family: 0x20}
+        )
+
+      player = %Player{inv1: ordinary.object.guid, bank_bag1: herb_bag.object.guid, bank_bag_slots: 1}
+
+      assert {:error, :item_doesnt_go_to_slot, _, _} =
+               Inventory.swap(
+                 player,
+                 unit,
+                 @prof,
+                 @owner,
+                 {@bag_0, @backpack_start},
+                 {@bank_bag_start, 0},
+                 get_item_fn([ordinary, herb_bag])
+               )
+    end
+
+    test "requires bank bags to be empty when placing and removing them", %{unit: unit, bag: bag, chest: chest} do
+      bag = put_in(bag.container.slot_1, chest.object.guid)
+      player = %Player{bag1: bag.object.guid, bank_bag_slots: 1}
+
+      assert {:error, :can_only_do_with_empty_bags, _, 0} =
+               Inventory.swap(
+                 player,
+                 unit,
+                 @prof,
+                 @owner,
+                 {@bag_0, @first_bag_slot},
+                 {@bag_0, @bank_bag_start},
+                 get_item_fn([bag, chest])
+               )
+
+      empty_bag = %{bag | container: %{bag.container | slot_1: 0}}
+      player = %Player{bag1: empty_bag.object.guid, bank_bag_slots: 1}
+
+      assert {:ok, placed} =
+               Inventory.swap(
+                 player,
+                 unit,
+                 @prof,
+                 @owner,
+                 {@bag_0, @first_bag_slot},
+                 {@bag_0, @bank_bag_start},
+                 get_item_fn([empty_bag])
+               )
+
+      assert placed.player.bank_bag1 == empty_bag.object.guid
+
+      assert {:ok, removed} =
+               Inventory.swap(
+                 placed.player,
+                 unit,
+                 @prof,
+                 @owner,
+                 {@bag_0, @bank_bag_start},
+                 {@bag_0, @first_bag_slot},
+                 get_item_after(placed, get_item_fn([empty_bag]))
+               )
+
+      assert removed.player.bag1 == empty_bag.object.guid
+    end
+
+    test "splits and destroys stacks in bank storage" do
+      stack = build_item(20, %ItemTemplate{entry: 2000, stackable: 10}, stack_count: 8)
+      split = build_item(21, %ItemTemplate{entry: 2000, stackable: 10}, stack_count: 3)
+      player = store_bank(%Player{}, @bank_start, stack)
+
+      assert {:ok, split_result, placed} =
+               Inventory.split(
+                 player,
+                 @owner,
+                 {@bag_0, @bank_start},
+                 {@bag_0, @bank_start + 1},
+                 split,
+                 get_item_fn([stack])
+               )
+
+      assert split_result.player.bank2 == split.object.guid
+      assert updated(split_result.items, stack).item.stack_count == 5
+      assert placed.object.guid == split.object.guid
+
+      lookup = get_item_after(split_result, get_item_fn([stack, split]))
+
+      assert {:ok, destroyed, item} =
+               Inventory.destroy(split_result.player, {@bag_0, @bank_start + 1}, lookup)
+
+      assert destroyed.player.bank2 == 0
+      assert item.object.guid == split.object.guid
+    end
+
+    test "ordinary storage and removals remain carried-only" do
+      banked = build_item(20, %ItemTemplate{entry: 2000})
+      incoming = build_item(21, %ItemTemplate{entry: 2001})
+      player = %Player{bank1: banked.object.guid}
+      lookup = get_item_fn([banked, incoming])
+
+      assert {:error, :item_not_found, 0, 0} = Inventory.remove_count(player, 2000, 1, lookup)
+
+      assert {:ok, stored, {:placed, {@bag_0, @backpack_start}, _item}} =
+               Inventory.store(player, @owner, incoming, lookup)
+
+      assert stored.player.inv1 == incoming.object.guid
+      assert stored.player.bank1 == banked.object.guid
+
+      batch = player |> Batch.new() |> Batch.remove(2000, 1)
+      assert {:error, :item_not_found} = Inventory.plan(batch, lookup)
     end
   end
 end

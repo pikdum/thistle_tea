@@ -44,7 +44,11 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
 
   @bag_fields [:bag1, :bag2, :bag3, :bag4]
   @backpack_fields Enum.map(1..16, fn i -> String.to_atom("inv#{i}") end)
-  @slot_fields @equipment_fields ++ @bag_fields ++ @backpack_fields
+  @bank_fields Enum.map(1..24, fn i -> String.to_atom("bank#{i}") end)
+  @bank_bag_fields Enum.map(1..6, fn i -> String.to_atom("bank_bag#{i}") end)
+  @carried_fields @equipment_fields ++ @bag_fields ++ @backpack_fields
+  @bank_storage_fields @bank_fields ++ @bank_bag_fields
+  @slot_fields @carried_fields ++ @bank_storage_fields
 
   @field_by_slot @slot_fields |> Enum.with_index() |> Map.new(fn {field, index} -> {index, field} end)
   @slot_by_field @slot_fields |> Enum.with_index() |> Map.new()
@@ -52,9 +56,14 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
   @equipment_slot_count length(@equipment_fields)
   @bag_slot_start @equipment_slot_count
   @backpack_slot_start @bag_slot_start + length(@bag_fields)
-  @slot_count length(@slot_fields)
+  @carried_slot_count length(@carried_fields)
+  @bank_slot_start @carried_slot_count
+  @bank_bag_slot_start @bank_slot_start + length(@bank_fields)
+  @bank_slot_count length(@slot_fields)
 
   @bag_slots Enum.to_list(@bag_slot_start..(@backpack_slot_start - 1))
+  @bank_slots Enum.to_list(@bank_slot_start..(@bank_bag_slot_start - 1))
+  @bank_bag_slots Enum.to_list(@bank_bag_slot_start..(@bank_slot_count - 1))
 
   @mainhand_slot @slot_by_field[:mainhand]
   @offhand_slot @slot_by_field[:offhand]
@@ -86,9 +95,12 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
     couldnt_split_items: 27,
     not_a_bag: 30,
     can_only_do_with_empty_bags: 31,
+    must_purchase_that_bag_slot: 34,
+    too_far_away_from_bank: 35,
     int_bag_error: 40,
     already_looted: 49,
     inventory_full: 50,
+    bank_full: 51,
     cant_equip_reputation: 64
   }
 
@@ -104,7 +116,42 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
 
   def bag_slot?(slot), do: is_integer(slot) and slot >= @bag_slot_start and slot < @backpack_slot_start
 
-  def backpack_slot?(slot), do: is_integer(slot) and slot >= @backpack_slot_start and slot < @slot_count
+  def backpack_slot?(slot), do: is_integer(slot) and slot >= @backpack_slot_start and slot < @carried_slot_count
+
+  def base_bank_slot?(slot), do: is_integer(slot) and slot >= @bank_slot_start and slot < @bank_bag_slot_start
+
+  def bank_bag_slot?(slot), do: is_integer(slot) and slot >= @bank_bag_slot_start and slot < @bank_slot_count
+
+  def carried_position?({@bag_0, slot}), do: is_integer(slot) and slot >= 0 and slot < @carried_slot_count
+
+  def carried_position?({bag, slot}), do: bag_slot?(bag) and is_integer(slot) and slot >= 0
+
+  def carried_position?(_position), do: false
+
+  def bank_position?({@bag_0, slot}), do: base_bank_slot?(slot) or bank_bag_slot?(slot)
+
+  def bank_position?({bag, slot}), do: bank_bag_slot?(bag) and is_integer(slot) and slot >= 0
+
+  def bank_position?(_position), do: false
+
+  def bank_bag_bar_position?({@bag_0, slot}), do: bank_bag_slot?(slot)
+  def bank_bag_bar_position?(_position), do: false
+
+  def purchased_bank_bag_position?(%Player{} = player, {@bag_0, slot}) do
+    bank_bag_slot?(slot) and slot < @bank_bag_slot_start + purchased_bank_bag_slots(player)
+  end
+
+  def purchased_bank_bag_position?(%Player{} = player, {bag, slot}) do
+    purchased_bank_bag_position?(player, {@bag_0, bag}) and is_integer(slot) and slot >= 0
+  end
+
+  def purchased_bank_bag_position?(%Player{}, _position), do: false
+
+  def touches_bank?(positions) when is_list(positions), do: Enum.any?(positions, &bank_position?/1)
+  def touches_bank?(position), do: bank_position?(position)
+
+  def field_for_position({@bag_0, slot}) when is_integer(slot), do: Map.get(@field_by_slot, slot)
+  def field_for_position(_position), do: nil
 
   def visible_entry_field(slot) when is_atom(slot), do: visible_entry_field(slot_index(slot))
   def visible_entry_field(slot) when is_integer(slot), do: :"visible_item_#{slot + 1}_0"
@@ -199,29 +246,68 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
   def count_entry(%Player{} = player, entry, get_item) do
     player
     |> owned_items(get_item)
+    |> count_items(entry)
+  end
+
+  def count_entry_with_bank(%Player{} = player, entry, get_item) do
+    player
+    |> all_owned_items(get_item)
+    |> count_items(entry)
+  end
+
+  defp count_items(items, entry) do
+    items
     |> Enum.filter(fn %Item{object: object} -> object.entry == entry end)
     |> Enum.map(fn %Item{item: item} -> item.stack_count || 1 end)
     |> Enum.sum()
   end
 
   def owned_items(%Player{} = player, get_item) do
-    direct =
-      @slot_fields
-      |> Enum.map(fn field -> Map.get(player, field) end)
-      |> Enum.filter(fn guid -> is_integer(guid) and guid > 0 end)
-      |> Enum.map(get_item)
-      |> Enum.reject(&is_nil/1)
+    items_in_fields(player, @carried_fields, get_item)
+  end
 
-    contents =
-      direct
-      |> Enum.filter(&Item.container?/1)
-      |> Enum.flat_map(fn bag ->
-        bag_slot_guids(bag)
-        |> Enum.map(get_item)
-        |> Enum.reject(&is_nil/1)
-      end)
+  def bank_items(%Player{} = player, get_item) do
+    items_in_fields(player, @bank_storage_fields, get_item)
+  end
 
-    direct ++ contents
+  def all_owned_items(%Player{} = player, get_item) do
+    items_in_fields(player, @slot_fields, get_item)
+  end
+
+  def positions(%Player{} = player, scope, get_item) when scope in [:carried, :bank, :all_owned] do
+    ctx = ctx(player, nil, nil, nil, get_item)
+
+    case scope do
+      :carried -> direct_positions(:carried) ++ carried_container_positions(ctx)
+      :bank -> direct_positions(:bank) ++ bank_container_positions(ctx)
+      :all_owned -> direct_positions(:all_owned) ++ carried_container_positions(ctx) ++ bank_container_positions(ctx)
+    end
+  end
+
+  defp items_in_fields(player, fields, get_item) do
+    fields
+    |> Enum.map(fn field -> Map.get(player, field) end)
+    |> collect_items(get_item, MapSet.new(), [])
+    |> Enum.reverse()
+  end
+
+  defp collect_items([], _get_item, _seen, items), do: items
+
+  defp collect_items([guid | rest], get_item, seen, items) when is_integer(guid) and guid > 0 do
+    if MapSet.member?(seen, guid) do
+      collect_items(rest, get_item, seen, items)
+    else
+      seen = MapSet.put(seen, guid)
+
+      case get_item.(guid) do
+        %Item{} = item -> collect_items(rest ++ bag_slot_guids(item), get_item, seen, [item | items])
+        _missing -> collect_items(rest, get_item, seen, items)
+      end
+    end
+  end
+
+  defp collect_items([_invalid | rest], get_item, seen, items) do
+    collect_items(rest, get_item, seen, items)
   end
 
   def auto_equip(%Player{} = player, %Unit{} = unit, %Proficiency{} = prof, owner_guid, src_pos, get_item, opts \\ []) do
@@ -259,22 +345,50 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
   end
 
   def store(%Player{} = player, owner_guid, %Item{} = item, get_item) do
+    store(player, owner_guid, item, :carried, get_item)
+  end
+
+  def store(%Player{} = player, owner_guid, %Item{} = item, scope, get_item) when scope in [:carried, :bank] do
     ctx = ctx(player, nil, nil, owner_guid, get_item)
-    {ctx, remaining} = merge_into_stacks(ctx, item)
+    {ctx, remaining} = merge_into_stacks(ctx, item, scope)
 
     cond do
       remaining == 0 ->
         {:ok, result(ctx), :merged}
 
-      free_position(ctx) == nil ->
-        {:error, :inventory_full}
+      free_position(ctx, scope, item) == nil ->
+        {:error, storage_full_error(scope)}
 
       true ->
-        pos = free_position(ctx)
+        pos = free_position(ctx, scope, item)
         item = put_stack_count(item, remaining)
         ctx = put_pos(ctx, pos, item)
         {ctx, placed} = pop_changed(ctx, item)
         {:ok, result(ctx), {:placed, pos, placed}}
+    end
+  end
+
+  def auto_store(%Player{} = player, owner_guid, src_pos, scope, get_item) when scope in [:carried, :bank] do
+    ctx = ctx(player, nil, nil, owner_guid, get_item)
+
+    with {:ok, item} <- fetch_item(ctx, src_pos),
+         :ok <- validate_auto_store_source(ctx, item, src_pos, scope) do
+      ctx = put_pos(ctx, src_pos, nil)
+      {ctx, remaining} = merge_into_stacks(ctx, item, scope)
+
+      cond do
+        remaining == 0 ->
+          {:ok, result(ctx)}
+
+        pos = free_position(ctx, scope, item) ->
+          item = put_stack_count(item, remaining)
+          {:ok, ctx |> mark_changed(item) |> put_pos(pos, item) |> result()}
+
+        true ->
+          {:error, storage_full_error(scope), item.object.guid, 0}
+      end
+    else
+      {:error, error} -> {:error, error, guid_at(ctx, src_pos) || 0, 0}
     end
   end
 
@@ -283,11 +397,13 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
   end
 
   def find_position(%Player{} = player, guid, get_item) do
+    find_position(player, guid, :carried, get_item)
+  end
+
+  def find_position(%Player{} = player, guid, scope, get_item) when scope in [:carried, :bank, :all_owned] do
     ctx = ctx(player, nil, nil, nil, get_item)
 
-    direct = Enum.map(0..(@slot_count - 1), fn slot -> {@bag_0, slot} end)
-
-    Enum.find(direct ++ storage_positions(ctx), fn pos ->
+    Enum.find(positions(player, scope, get_item), fn pos ->
       guid_at(ctx, pos) == guid
     end)
   end
@@ -306,7 +422,7 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
 
   def can_store?(%Player{} = player, %ItemTemplate{} = template, count, get_item) do
     ctx = ctx(player, nil, nil, nil, get_item)
-    free_position(ctx) != nil or stack_room(ctx, template) >= count
+    free_position(ctx, :carried, template) != nil or stack_room(ctx, template, :carried) >= count
   end
 
   def split(%Player{} = player, owner_guid, src_pos, dst_pos, %Item{} = new_item, get_item) do
@@ -408,6 +524,8 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
          {:ok, _dst} <- valid_destination(ctx, dst_pos),
          dst_item = item_at(ctx, dst_pos),
          :ok <- validate_bag_cycle(ctx, src_item, dst_pos),
+         :ok <- validate_bank_bag_move(ctx, src_item, src_pos, dst_pos),
+         :ok <- validate_bank_bag_move(ctx, dst_item, dst_pos, src_pos),
          :ok <- validate_placement(ctx, src_item, dst_pos),
          :ok <- validate_placement(ctx, dst_item, src_pos),
          :ok <- validate_two_hand(ctx, src_item, src_pos, dst_pos, dst_item) do
@@ -451,13 +569,13 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
     {:ok, result(ctx)}
   end
 
-  defp merge_into_stacks(ctx, %Item{} = item) do
+  defp merge_into_stacks(ctx, %Item{} = item, scope) do
     max_stack = max_stack(item)
     entry = item.object.entry
     incoming_guid = item.object.guid
 
     if max_stack > 1 do
-      Enum.reduce_while(storage_positions(ctx), {ctx, stack_count(item)}, fn pos, {ctx, remaining} ->
+      Enum.reduce_while(stack_positions(ctx, scope, item), {ctx, stack_count(item)}, fn pos, {ctx, remaining} ->
         case item_at(ctx, pos) do
           %Item{object: %Object{entry: ^entry, guid: guid}} = stack when guid != incoming_guid ->
             space = max_stack - stack_count(stack)
@@ -476,10 +594,10 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
     end
   end
 
-  defp stack_room(ctx, %ItemTemplate{entry: entry} = template) do
+  defp stack_room(ctx, %ItemTemplate{entry: entry} = template, scope) do
     max_stack = max(template.stackable, 1)
 
-    storage_positions(ctx)
+    stack_positions(ctx, scope, template)
     |> Enum.map(fn pos ->
       case item_at(ctx, pos) do
         %Item{object: %Object{entry: ^entry}} = stack -> max(max_stack - stack_count(stack), 0)
@@ -489,22 +607,56 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
     |> Enum.sum()
   end
 
-  defp storage_positions(ctx) do
-    backpack = Enum.map(@backpack_slot_start..(@slot_count - 1), fn slot -> {@bag_0, slot} end)
+  defp stack_positions(ctx, :carried, item_or_template) do
+    carried_storage_positions(ctx)
+    |> Enum.filter(&accepts_item?(ctx, &1, item_or_template))
+  end
 
-    bags =
-      Enum.flat_map(@bag_slots, fn bag_slot ->
-        case item_at(ctx, {@bag_0, bag_slot}) do
-          %Item{container: %Container{}} = bag ->
-            # credo:disable-for-next-line Credo.Check.Refactor.Nesting
-            Enum.map(0..(container_size(bag.container) - 1)//1, fn slot -> {bag_slot, slot} end)
+  defp stack_positions(ctx, :bank, item_or_template) do
+    template = item_template(item_or_template)
+    base = Enum.map(@bank_slots, &{@bag_0, &1})
+    specialized = eligible_container_positions(ctx, purchased_bank_bag_slots(ctx.player), template, :specialized)
+    all_bags = eligible_container_positions(ctx, purchased_bank_bag_slots(ctx.player), template, :all)
+    base ++ specialized ++ (all_bags -- specialized)
+  end
 
-          _ ->
-            []
-        end
-      end)
+  defp carried_storage_positions(ctx) do
+    backpack = Enum.map(@backpack_slot_start..(@carried_slot_count - 1), &{@bag_0, &1})
+    backpack ++ container_positions(ctx, @bag_slots)
+  end
 
-    backpack ++ bags
+  defp carried_container_positions(ctx), do: container_positions(ctx, @bag_slots)
+
+  defp bank_container_positions(ctx) do
+    count = purchased_bank_bag_slots(ctx.player)
+    container_positions(ctx, Enum.take(@bank_bag_slots, count))
+  end
+
+  defp container_positions(ctx, bag_slots) do
+    Enum.flat_map(bag_slots, fn bag_slot ->
+      case item_at(ctx, {@bag_0, bag_slot}) do
+        %Item{container: %Container{}} = bag ->
+          Enum.map(0..(container_size(bag.container) - 1)//1, &{bag_slot, &1})
+
+        _ ->
+          []
+      end
+    end)
+  end
+
+  defp eligible_container_positions(ctx, count, template, mode) do
+    ctx
+    |> container_positions(Enum.take(@bank_bag_slots, count))
+    |> Enum.filter(fn position ->
+      case item_at(ctx, {@bag_0, elem(position, 0)}) do
+        %Item{} = bag ->
+          (mode == :all or specialized_bag_accepts?(bag, template)) and
+            accepts_item?(ctx, position, template)
+
+        _missing ->
+          false
+      end
+    end)
   end
 
   defp validate_split(ctx, %Item{} = src_item, dst_pos, count) do
@@ -520,7 +672,7 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
   defp equipment_pos?({@bag_0, slot}), do: equipment_slot?(slot)
   defp equipment_pos?(_pos), do: false
 
-  defp bag_bar_pos?({@bag_0, slot}), do: bag_slot?(slot)
+  defp bag_bar_pos?({@bag_0, slot}), do: bag_slot?(slot) or bank_bag_slot?(slot)
   defp bag_bar_pos?(_pos), do: false
 
   defp stack_count(%Item{item: %{stack_count: count}}) when is_integer(count) and count > 0, do: count
@@ -621,6 +773,19 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
   defp validate_placement(_ctx, nil, _pos), do: :ok
 
   defp validate_placement(ctx, %Item{} = item, {@bag_0, slot}) do
+    validate_direct_placement(ctx, item, slot)
+  end
+
+  defp validate_placement(ctx, %Item{} = item, {bag, slot} = position) do
+    cond do
+      Item.container?(item) and not bag_empty?(ctx, item) -> {:error, :nonempty_bag_over_other_bag}
+      not accepts_item?(ctx, position, item) -> {:error, :item_doesnt_go_to_slot}
+      not valid_container_slot?(ctx, bag, slot) -> {:error, :item_doesnt_go_to_slot}
+      true -> :ok
+    end
+  end
+
+  defp validate_direct_placement(ctx, item, slot) do
     template = Item.template(item)
 
     cond do
@@ -630,7 +795,10 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
       bag_slot?(slot) ->
         if template.inventory_type == @invtype_bag, do: :ok, else: {:error, :not_a_bag}
 
-      backpack_slot?(slot) ->
+      bank_bag_slot?(slot) ->
+        validate_bank_bag_placement(ctx, item, template, slot)
+
+      backpack_slot?(slot) or base_bank_slot?(slot) ->
         validate_bag_empty_if_bag(ctx, item)
 
       true ->
@@ -638,9 +806,20 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
     end
   end
 
-  defp validate_placement(ctx, %Item{} = item, {_bag, _slot}) do
-    if Item.container?(item) and not bag_empty?(ctx, item) do
-      {:error, :nonempty_bag_over_other_bag}
+  defp validate_bank_bag_placement(ctx, item, template, slot) do
+    cond do
+      not purchased_bank_bag_position?(ctx.player, {@bag_0, slot}) -> {:error, :must_purchase_that_bag_slot}
+      template.inventory_type != @invtype_bag -> {:error, :not_a_bag}
+      true -> validate_bag_empty_if_bag(ctx, item)
+    end
+  end
+
+  defp validate_bank_bag_move(_ctx, nil, _src_pos, _dst_pos), do: :ok
+
+  defp validate_bank_bag_move(ctx, %Item{} = item, src_pos, dst_pos) do
+    if (bank_bag_bar_position?(src_pos) or bank_bag_bar_position?(dst_pos)) and
+         Item.container?(item) and not bag_empty?(ctx, item) do
+      {:error, :can_only_do_with_empty_bags}
     else
       :ok
     end
@@ -705,31 +884,29 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
     free_position(ctx) != nil or (dst_item == nil and storage_pos?(src_pos))
   end
 
-  defp storage_pos?({@bag_0, slot}), do: backpack_slot?(slot)
-  defp storage_pos?({_bag, _slot}), do: true
+  defp storage_pos?({@bag_0, slot}), do: backpack_slot?(slot) or base_bank_slot?(slot)
+  defp storage_pos?({bag, _slot}), do: bag_slot?(bag) or bank_bag_slot?(bag)
 
   defp free_position(ctx) do
-    backpack =
-      Enum.find_value(@backpack_slot_start..(@slot_count - 1), fn slot ->
-        if guid_at(ctx, {@bag_0, slot}) == nil, do: {@bag_0, slot}
-      end)
-
-    backpack || free_bag_position(ctx)
+    free_position(ctx, :carried, nil)
   end
 
-  defp free_bag_position(ctx) do
-    Enum.find_value(@bag_slots, fn bag_slot ->
-      case item_at(ctx, {@bag_0, bag_slot}) do
-        %Item{container: %Container{}} = bag ->
-          Enum.find_value(0..(container_size(bag.container) - 1)//1, fn slot ->
-            # credo:disable-for-next-line Credo.Check.Refactor.Nesting
-            if guid_at(ctx, {bag_slot, slot}) == nil, do: {bag_slot, slot}
-          end)
-
-        _ ->
-          nil
-      end
+  defp free_position(ctx, :carried, item_or_template) do
+    carried_storage_positions(ctx)
+    |> Enum.find(fn position ->
+      guid_at(ctx, position) == nil and accepts_item?(ctx, position, item_or_template)
     end)
+  end
+
+  defp free_position(ctx, :bank, item_or_template) do
+    template = item_template(item_or_template)
+    count = purchased_bank_bag_slots(ctx.player)
+    specialized = eligible_container_positions(ctx, count, template, :specialized)
+    base = Enum.map(@bank_slots, &{@bag_0, &1})
+    all_bags = eligible_container_positions(ctx, count, template, :all)
+
+    (specialized ++ base ++ (all_bags -- specialized))
+    |> Enum.find(fn position -> guid_at(ctx, position) == nil end)
   end
 
   defp validate_destructible(ctx, %Item{} = item) do
@@ -749,12 +926,17 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
     end
   end
 
-  defp valid_destination(_ctx, {@bag_0, slot}) when is_integer(slot) and slot >= 0 and slot < @slot_count do
-    {:ok, {@bag_0, slot}}
+  defp valid_destination(ctx, {@bag_0, slot} = position)
+       when is_integer(slot) and slot >= 0 and slot < @bank_slot_count do
+    if bank_bag_slot?(slot) and not purchased_bank_bag_position?(ctx.player, position) do
+      {:error, :must_purchase_that_bag_slot}
+    else
+      {:ok, position}
+    end
   end
 
   defp valid_destination(ctx, {bag, slot} = pos) when is_integer(bag) and is_integer(slot) do
-    with true <- bag_slot?(bag),
+    with true <- bag_slot?(bag) or purchased_bank_bag_position?(ctx.player, {@bag_0, bag}),
          %Item{container: %Container{}} = bag_item <- item_at(ctx, {@bag_0, bag}),
          true <- slot >= 0 and slot < container_size(bag_item.container) do
       {:ok, pos}
@@ -843,4 +1025,52 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
   end
 
   defp put_visible_entry(player, slot, item), do: sync_visible_item(player, slot, item)
+
+  defp direct_positions(:carried), do: Enum.map(0..(@carried_slot_count - 1), &{@bag_0, &1})
+  defp direct_positions(:bank), do: Enum.map(@bank_slots ++ @bank_bag_slots, &{@bag_0, &1})
+  defp direct_positions(:all_owned), do: Enum.map(0..(@bank_slot_count - 1), &{@bag_0, &1})
+
+  defp purchased_bank_bag_slots(%Player{bank_bag_slots: count}) when is_integer(count), do: count |> max(0) |> min(6)
+  defp purchased_bank_bag_slots(%Player{}), do: 0
+
+  defp storage_full_error(:carried), do: :inventory_full
+  defp storage_full_error(:bank), do: :bank_full
+
+  defp item_template(%Item{} = item), do: Item.template(item)
+  defp item_template(%ItemTemplate{} = template), do: template
+  defp item_template(nil), do: nil
+
+  defp accepts_item?(_ctx, {@bag_0, _slot}, _item_or_template), do: true
+  defp accepts_item?(_ctx, _position, nil), do: true
+
+  defp accepts_item?(ctx, {bag_slot, _slot}, item_or_template) do
+    case item_at(ctx, {@bag_0, bag_slot}) do
+      %Item{} = bag -> bag_accepts?(bag, item_template(item_or_template))
+      _missing -> false
+    end
+  end
+
+  defp bag_accepts?(%Item{} = bag, %ItemTemplate{} = template) do
+    bag_family = Item.template(bag).bag_family || 0
+    item_family = template.bag_family || 0
+    bag_family == 0 or (bag_family &&& item_family) != 0
+  end
+
+  defp specialized_bag_accepts?(%Item{} = bag, %ItemTemplate{} = template) do
+    bag_family = Item.template(bag).bag_family || 0
+    bag_family != 0 and bag_accepts?(bag, template)
+  end
+
+  defp valid_container_slot?(ctx, bag, slot) do
+    match?({:ok, _position}, valid_destination(ctx, {bag, slot}))
+  end
+
+  defp validate_auto_store_source(ctx, item, src_pos, scope) do
+    cond do
+      scope == :bank and bank_position?(src_pos) -> {:error, :item_doesnt_go_to_slot}
+      scope == :carried and carried_position?(src_pos) -> {:error, :item_doesnt_go_to_slot}
+      Item.container?(item) and not bag_empty?(ctx, item) -> {:error, :can_only_do_with_empty_bags}
+      true -> :ok
+    end
+  end
 end
