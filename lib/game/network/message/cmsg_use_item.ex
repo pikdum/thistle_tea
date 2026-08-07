@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgUseItem do
   alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Entity.Logic.Proficiency
   alias ThistleTea.Game.Network.InventoryUpdate
+  alias ThistleTea.Game.Player.Bank
   alias ThistleTea.Game.Player.Items
   alias ThistleTea.Game.Player.Reputation
   alias ThistleTea.Game.Player.Spellcasting
@@ -33,6 +34,14 @@ defmodule ThistleTea.Game.Network.Message.CmsgUseItem do
   def handle(%__MODULE__{} = message, %{ready: true, character: %Character{} = c} = state, load_spell)
       when is_function(load_spell, 1) do
     pos = {message.bag, message.slot}
+
+    case Bank.authorize_positions(state, [pos]) do
+      {:ok, state} -> use_item(message, state, c, pos, load_spell)
+      {:error, state} -> reject_remote_bank(state)
+    end
+  end
+
+  defp use_item(message, state, c, pos, load_spell) do
     get_item = &ItemStore.get/1
 
     with guid when is_integer(guid) <- Inventory.item_guid_at(c.player, pos, get_item),
@@ -58,6 +67,11 @@ defmodule ThistleTea.Game.Network.Message.CmsgUseItem do
         InventoryUpdate.send_failure(:item_not_found, 0, 0)
         state
     end
+  end
+
+  defp reject_remote_bank(state) do
+    InventoryUpdate.send_failure(:too_far_away_from_bank, 0, 0)
+    state
   end
 
   @impl ClientMessage

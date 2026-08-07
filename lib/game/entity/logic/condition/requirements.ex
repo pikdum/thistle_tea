@@ -46,7 +46,7 @@ defmodule ThistleTea.Game.Entity.Logic.Condition.Requirements do
     spell: :spellbook,
     quest_available: :quest_log,
     quest_none: :quest_log,
-    item_with_bank: :bank_item_counts,
+    item_with_bank: :item_counts_with_bank,
     gender: :gender,
     is_player: :kind,
     skill_below: :skills,
@@ -122,6 +122,10 @@ defmodule ThistleTea.Game.Entity.Logic.Condition.Requirements do
 
   defp scan_condition(%Condition{type: :item} = condition, _source, target, requirements) do
     MapSet.put(requirements, {:item_count, target, condition.value1})
+  end
+
+  defp scan_condition(%Condition{type: :item_with_bank} = condition, _source, target, requirements) do
+    MapSet.put(requirements, {:bank_item_count, target, condition.value1})
   end
 
   defp scan_condition(%Condition{type: :item_equipped} = condition, _source, target, requirements) do

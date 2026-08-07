@@ -98,6 +98,7 @@ defmodule ThistleTea.Game.World.Loader.ConditionCoverage do
                  17,
                  19,
                  22,
+                 23,
                  24,
                  27,
                  28,
@@ -138,7 +139,6 @@ defmodule ThistleTea.Game.World.Loader.ConditionCoverage do
     11 => "global saved-variable owner",
     13 => "authoritative path-failure state",
     18 => "instance-script callbacks",
-    23 => "bank inventory",
     26 => "holiday projection",
     31 => "typed update-field capability",
     34 => "instance data",
@@ -238,9 +238,8 @@ defmodule ThistleTea.Game.World.Loader.ConditionCoverage do
     1. Consumer migrations: quest and remaining discovered consumers.
     2. Partial world facts currently collected only by the scripted-event
        boundary or for spawned game objects.
-    3. Explicitly blocked owners: bank inventory, saved variables, instance
-       scripts/data, raw flags, game-object loot state, honor rank, and creature
-       formations.
+    3. Explicitly blocked owners: saved variables, instance scripts/data, raw
+       flags, game-object loot state, honor rank, and creature formations.
 
     The inventory includes every schema column whose normalized name is
     `condition_id`, `conditionId`, `required_condition`, or `RequiredCondition`.

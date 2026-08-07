@@ -16,6 +16,25 @@ defmodule ThistleTea.Game.Player.Inventory do
   alias ThistleTea.Game.Player.Reputation
   alias ThistleTea.Game.World.ItemStore
 
+  def auto_equip(%{character: character} = state, source_position) do
+    case Bank.authorize_positions(state, [source_position]) do
+      {:ok, state} ->
+        Inventory.auto_equip(
+          character.player,
+          character.unit,
+          Proficiency.from_character(character),
+          state.guid,
+          source_position,
+          &ItemStore.get/1,
+          validate_item: &Reputation.validate_item_requirement(character, &1)
+        )
+        |> then(&InventoryUpdate.apply(state, &1))
+
+      {:error, state} ->
+        reject_remote_bank(state)
+    end
+  end
+
   def swap(%State{} = state, source_position, destination_position) do
     case Bank.authorize_positions(state, [source_position, destination_position]) do
       {:ok, state} ->

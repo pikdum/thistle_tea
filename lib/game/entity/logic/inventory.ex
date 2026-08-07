@@ -378,6 +378,7 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
 
       cond do
         remaining == 0 ->
+          ctx = %{ctx | changed: Map.delete(ctx.changed, item.object.guid), destroyed: [item | ctx.destroyed]}
           {:ok, result(ctx)}
 
         pos = free_position(ctx, scope, item) ->

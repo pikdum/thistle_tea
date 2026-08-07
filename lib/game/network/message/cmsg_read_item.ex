@@ -6,15 +6,27 @@ defmodule ThistleTea.Game.Network.Message.CmsgReadItem do
   alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Entity.Logic.Proficiency
   alias ThistleTea.Game.Network.InventoryUpdate
+  alias ThistleTea.Game.Player.Bank
   alias ThistleTea.Game.World.ItemStore
 
   defstruct [:bag, :slot]
 
   @impl ClientMessage
   def handle(%__MODULE__{bag: bag, slot: slot}, %{ready: true, character: %Character{} = c} = state) do
+    position = {bag, slot}
+
+    case Bank.authorize_positions(state, [position]) do
+      {:ok, state} -> read_item(state, c, position)
+      {:error, state} -> reject_remote_bank(state)
+    end
+  end
+
+  def handle(_message, state), do: state
+
+  defp read_item(state, c, position) do
     get_item = &ItemStore.get/1
 
-    with guid when is_integer(guid) <- Inventory.item_guid_at(c.player, {bag, slot}, get_item),
+    with guid when is_integer(guid) <- Inventory.item_guid_at(c.player, position, get_item),
          %Item{} = item <- get_item.(guid),
          template = Item.template(item),
          true <- is_integer(template.page_text) and template.page_text > 0 do
@@ -26,7 +38,10 @@ defmodule ThistleTea.Game.Network.Message.CmsgReadItem do
     state
   end
 
-  def handle(_message, state), do: state
+  defp reject_remote_bank(state) do
+    InventoryUpdate.send_failure(:too_far_away_from_bank, 0, 0)
+    state
+  end
 
   defp respond(c, template, guid) do
     case Inventory.can_use(c.unit, Proficiency.from_character(c), template) do

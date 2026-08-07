@@ -37,6 +37,19 @@ defmodule ThistleTea.Game.Entity.Logic.Condition.RequirementsTest do
                  {:subject, :source, :entry}
                ])
     end
+
+    test "records distinct carried and bank-inclusive item IDs" do
+      conditions = [
+        %Condition{type: :item, value1: 100},
+        %Condition{type: :item_with_bank, value1: 200, swap_targets?: true}
+      ]
+
+      assert Requirements.plan(conditions) ==
+               MapSet.new([
+                 {:item_count, :target, 100},
+                 {:bank_item_count, :source, 200}
+               ])
+    end
   end
 
   describe "environment_conditions/1" do

@@ -8,6 +8,8 @@ defmodule ThistleTea.Game.Player.LoginTest do
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Data.Item
+  alias ThistleTea.Game.Entity.Data.ItemTemplate
   alias ThistleTea.Game.Entity.Logic.Death
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.UpdateObject
@@ -94,6 +96,39 @@ defmodule ThistleTea.Game.Player.LoginTest do
       }
 
       assert {^character, [%UpdateObject{object: %Object{guid: ^player_guid}}]} = Login.worldport_updates(character)
+    end
+  end
+
+  describe "owned_item_updates/2" do
+    test "creates carried and bank item objects exactly once" do
+      carried = Item.build(%ItemTemplate{entry: 100}, 10, owner: 1)
+      banked = Item.build(%ItemTemplate{entry: 200}, 20, owner: 1)
+      bank_bag = Item.build(%ItemTemplate{entry: 300, inventory_type: 18, container_slots: 6, class: 1}, 30, owner: 1)
+      contained = Item.build(%ItemTemplate{entry: 400}, 40, owner: 1, contained: 30)
+      bank_bag = put_in(bank_bag.container.slot_1, contained.object.guid)
+
+      player = %Player{
+        inv1: carried.object.guid,
+        bank1: banked.object.guid,
+        bank_bag1: bank_bag.object.guid,
+        bank_bag_slots: 1
+      }
+
+      character = %Character{
+        object: %Object{guid: 1},
+        player: player,
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
+      }
+
+      items = Map.new([carried, banked, bank_bag, contained], &{&1.object.guid, &1})
+      updates = Login.owned_item_updates(character, &Map.get(items, &1))
+
+      assert Enum.map(updates, & &1.object.guid) == [10, 20, 30, 40]
+      assert Enum.uniq_by(updates, & &1.object.guid) == updates
+
+      self_update = Login.self_update(character)
+      assert self_update.player.bank1 == banked.object.guid
+      assert self_update.player.bank_bag1 == bank_bag.object.guid
     end
   end
 

@@ -152,13 +152,14 @@ defmodule ThistleTea.Game.Entity.Logic.Condition.LocalFactsTest do
       assert Evaluator.evaluate(context(mana: 0, max_mana: 0), mana_condition) == :met
     end
 
-    test "bank inventory remains explicitly blocked" do
-      assert {:unknown, [%Reason{capability: :bank_inventory}]} =
-               Evaluator.evaluate(context(item_counts: %{100 => 10}), %Condition{
-                 type: :item_with_bank,
-                 value1: 100,
-                 value2: 1
-               })
+    test "bank-inclusive item counts are distinct from carried counts" do
+      condition = %Condition{type: :item_with_bank, value1: 100, value2: 3}
+
+      assert Evaluator.evaluate(context(item_counts_with_bank: %{100 => 3}), condition) == :met
+      assert Evaluator.evaluate(context(item_counts_with_bank: %{100 => 2}), condition) == :unmet
+
+      assert {:unknown, [%Reason{capability: {:missing_fact, :target, :item_counts_with_bank}}]} =
+               Evaluator.evaluate(context(item_counts: %{100 => 10}), condition)
     end
 
     test "game-object state uses immutable owner projections" do

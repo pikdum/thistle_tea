@@ -103,8 +103,12 @@ defmodule ThistleTea.Game.Entity.Logic.Condition.Leaf.Player do
       when is_map(quest_log) and is_struct(rewarded, MapSet),
       do: handled(QuestLog.get(quest_log, quest_id) == nil and not MapSet.member?(rewarded, quest_id))
 
-  def evaluate(_context, %Condition{type: :item_with_bank} = condition),
-    do: {:handled, Result.unknown(condition, :bank_inventory)}
+  def evaluate(%Context{target: %Subject{item_counts_with_bank: counts}}, %Condition{
+        type: :item_with_bank,
+        value1: item_id,
+        value2: required
+      })
+      when is_map(counts), do: handled(Map.get(counts, item_id, 0) >= required)
 
   def evaluate(%Context{target: %Subject{skills: skills}}, %Condition{
         type: :skill_below,

@@ -51,11 +51,17 @@ defmodule ThistleTea.Game.Player.ConditionContext do
 
   def snapshot(%Character{} = character, options \\ []) do
     item_lookup = Keyword.get(options, :item_lookup, &ItemStore.get/1)
-    item_ids = character.player |> Inventory.owned_items(item_lookup) |> Enum.map(& &1.object.entry) |> Enum.uniq()
+    item_ids = character.player |> Inventory.all_owned_items(item_lookup) |> Enum.map(& &1.object.entry) |> Enum.uniq()
 
     requirements =
       item_ids
-      |> Enum.flat_map(&[{:item_count, :target, &1}, {:item_equipped, :target, &1}])
+      |> Enum.flat_map(
+        &[
+          {:item_count, :target, &1},
+          {:bank_item_count, :target, &1},
+          {:item_equipped, :target, &1}
+        ]
+      )
       |> MapSet.new()
       |> MapSet.put({:active_game_event, 0})
       |> MapSet.put(:content_patch)
@@ -87,6 +93,7 @@ defmodule ThistleTea.Game.Player.ConditionContext do
         %{
           fresh
           | item_counts: previous.item_counts,
+            item_counts_with_bank: previous.item_counts_with_bank,
             equipped_item_ids: previous.equipped_item_ids,
             explored_areas: previous.explored_areas
         }
@@ -101,6 +108,7 @@ defmodule ThistleTea.Game.Player.ConditionContext do
     unit = character.unit
     internal = character.internal
     item_ids = requested_ids(requirements, :item_count)
+    bank_item_ids = requested_ids(requirements, :bank_item_count)
     equipped_ids = requested_ids(requirements, :item_equipped)
     exploration_ids = requested_exploration_ids(requirements)
     holders = unit.auras || []
@@ -139,6 +147,7 @@ defmodule ThistleTea.Game.Player.ConditionContext do
       reputation_ranks: player.reputation.ranks,
       explored_areas: explored_areas(character, exploration_ids, options),
       item_counts: item_counts(player, item_ids, item_lookup),
+      item_counts_with_bank: item_counts_with_bank(player, bank_item_ids, item_lookup),
       equipped_item_ids: equipped_item_ids(player, equipped_ids, item_lookup),
       pet_guid: Companion.active_guid(character),
       has_pet?: Companion.active_guid(character) != nil
@@ -277,6 +286,10 @@ defmodule ThistleTea.Game.Player.ConditionContext do
 
   defp item_counts(player, ids, lookup) do
     Map.new(ids, &{&1, Inventory.count_entry(player, &1, lookup)})
+  end
+
+  defp item_counts_with_bank(player, ids, lookup) do
+    Map.new(ids, &{&1, Inventory.count_entry_with_bank(player, &1, lookup)})
   end
 
   defp equipped_item_ids(player, ids, lookup) do

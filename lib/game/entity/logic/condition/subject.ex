@@ -37,6 +37,7 @@ defmodule ThistleTea.Game.Entity.Logic.Condition.Subject do
             honor_rank: nil,
             explored_areas: nil,
             item_counts: nil,
+            item_counts_with_bank: nil,
             equipped_item_ids: nil,
             pet_guid: nil,
             has_pet?: nil,

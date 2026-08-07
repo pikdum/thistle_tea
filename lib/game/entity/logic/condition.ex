@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.Entity.Logic.Condition do
   @target_facts %{
     aura: :auras,
     item: :item_counts,
+    item_with_bank: :item_counts_with_bank,
     item_equipped: :equipped_item_ids,
     reputation_rank_min: :reputation_ranks,
     team: :team,

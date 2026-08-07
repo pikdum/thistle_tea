@@ -25,6 +25,7 @@ defmodule ThistleTea.Game.Network.InventoryUpdate do
   alias ThistleTea.Game.Player.ConditionContext
   alias ThistleTea.Game.Player.Quests
   alias ThistleTea.Game.World
+  alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Presence
 
@@ -46,6 +47,7 @@ defmodule ThistleTea.Game.Network.InventoryUpdate do
     character =
       %{state.character | player: change_set.player}
       |> Character.sync_equipment_stats()
+      |> store_character()
 
     state =
       state
@@ -85,6 +87,7 @@ defmodule ThistleTea.Game.Network.InventoryUpdate do
     character =
       %{state.character | player: player}
       |> Character.sync_equipment_stats()
+      |> store_character()
 
     state =
       state
@@ -162,4 +165,10 @@ defmodule ThistleTea.Game.Network.InventoryUpdate do
   end
 
   defp required_level(_error, _item_guid), do: 0
+
+  defp store_character(%Character{id: id} = character) when is_integer(id) and id > 0 do
+    CharacterStore.put(character)
+  end
+
+  defp store_character(%Character{} = character), do: character
 end

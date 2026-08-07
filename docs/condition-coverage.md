@@ -14,7 +14,7 @@ every consumer has migrated.
 - Distinct direct condition roots: 977.
 - Reachable condition IDs: 1776.
 - Reachable definitions with known VMangos numeric mappings: 1776.
-- Reachable definitions handled end to end by the shared evaluator: 1512.
+- Reachable definitions handled end to end by the shared evaluator: 1652.
 - Missing child IDs: none.
 - Cycles: none.
 
@@ -58,7 +58,7 @@ every consumer has migrated.
 | ---: | --- | ---: | --- | --- |
 | -1 | `and` | 412 | evaluable | - |
 | 8 | `quest_rewarded` | 351 | evaluable | - |
-| 23 | `item_with_bank` | 140 | blocked | bank inventory |
+| 23 | `item_with_bank` | 140 | evaluable | - |
 | 9 | `quest_taken` | 108 | evaluable | - |
 | -2 | `or` | 76 | evaluable | - |
 | 22 | `quest_none` | 73 | evaluable | - |
@@ -130,9 +130,8 @@ every consumer has migrated.
 1. Consumer migrations: quest and remaining discovered consumers.
 2. Partial world facts currently collected only by the scripted-event
    boundary or for spawned game objects.
-3. Explicitly blocked owners: bank inventory, saved variables, instance
-   scripts/data, raw flags, game-object loot state, honor rank, and creature
-   formations.
+3. Explicitly blocked owners: saved variables, instance scripts/data, raw
+   flags, game-object loot state, honor rank, and creature formations.
 
 The inventory includes every schema column whose normalized name is
 `condition_id`, `conditionId`, `required_condition`, or `RequiredCondition`.

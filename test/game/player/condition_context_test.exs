@@ -25,6 +25,7 @@ defmodule ThistleTea.Game.Player.ConditionContextTest do
 
       conditions = [
         %Condition{type: :item, value1: 100, value2: 5},
+        %Condition{type: :item_with_bank, value1: 100, value2: 7},
         %Condition{type: :item_equipped, value1: 200},
         %Condition{type: :quest_available, value1: 300},
         %Condition{type: :active_game_event, value1: 7}
@@ -51,6 +52,7 @@ defmodule ThistleTea.Game.Player.ConditionContextTest do
       assert Evaluator.evaluate(context, Enum.at(conditions, 1)) == :met
       assert Evaluator.evaluate(context, Enum.at(conditions, 2)) == :met
       assert Evaluator.evaluate(context, Enum.at(conditions, 3)) == :met
+      assert Evaluator.evaluate(context, Enum.at(conditions, 4)) == :met
       assert_received :quest_lookup
       assert_received :reputation
       assert_received :game_events
@@ -69,6 +71,36 @@ defmodule ThistleTea.Game.Player.ConditionContextTest do
         )
 
       assert context.target.level == 20
+    end
+
+    test "distinguishes items inside purchased bank bags from carried items" do
+      banked = Item.build(%ItemTemplate{entry: 300}, 31, stack_count: 2)
+      bag = Item.build(%ItemTemplate{entry: 400, inventory_type: 18, container_slots: 6, class: 1}, 30)
+      bag = put_in(bag.container.slot_1, banked.object.guid)
+
+      character = %{
+        character()
+        | player: %{character().player | inv1: nil, bank1: nil, bank_bag1: 30, bank_bag_slots: 1}
+      }
+
+      items = %{30 => bag, 31 => banked}
+
+      carried = %Condition{type: :item, value1: 300, value2: 1}
+      inclusive = %Condition{type: :item_with_bank, value1: 300, value2: 2}
+      context = ConditionContext.build(character, [carried, inclusive], item_lookup: &Map.get(items, &1))
+
+      assert Evaluator.evaluate(context, carried) == :unmet
+      assert Evaluator.evaluate(context, inclusive) == :met
+    end
+
+    test "distinguishes base bank items from carried items" do
+      character = %{character() | player: %{character().player | inv1: nil, bank1: 30}}
+      carried = %Condition{type: :item, value1: 100, value2: 1}
+      inclusive = %Condition{type: :item_with_bank, value1: 100, value2: 2}
+      context = ConditionContext.build(character, [carried, inclusive], item_lookup: &item/1)
+
+      assert Evaluator.evaluate(context, carried) == :unmet
+      assert Evaluator.evaluate(context, inclusive) == :met
     end
 
     test "matches both authoritative zone and sub-area IDs" do
@@ -108,10 +140,16 @@ defmodule ThistleTea.Game.Player.ConditionContextTest do
 
   describe "refresh_subject/3" do
     test "refreshes player-owned facts without discarding published inventory totals" do
-      previous = %Subject{item_counts: %{100 => 5}, equipped_item_ids: MapSet.new([200])}
+      previous = %Subject{
+        item_counts: %{100 => 5},
+        item_counts_with_bank: %{100 => 7},
+        equipped_item_ids: MapSet.new([200])
+      }
+
       refreshed = ConditionContext.refresh_subject(character(), previous, item_lookup: fn _guid -> nil end)
 
       assert refreshed.item_counts == %{100 => 5}
+      assert refreshed.item_counts_with_bank == %{100 => 7}
       assert refreshed.equipped_item_ids == MapSet.new([200])
       assert refreshed.level == 20
       assert refreshed.quest_log == %{}
@@ -124,6 +162,7 @@ defmodule ThistleTea.Game.Player.ConditionContextTest do
       unit: %Unit{level: 20, race: 1, class: 1, health: 100, max_health: 100, power1: 0, max_power1: 0, auras: []},
       player: %Player{
         inv1: 10,
+        bank1: 30,
         mainhand: 20,
         skills: %{},
         quest_log: %{},
@@ -137,5 +176,6 @@ defmodule ThistleTea.Game.Player.ConditionContextTest do
 
   defp item(10), do: Item.build(%ItemTemplate{entry: 100}, 10, stack_count: 5)
   defp item(20), do: Item.build(%ItemTemplate{entry: 200}, 20)
+  defp item(30), do: Item.build(%ItemTemplate{entry: 100}, 30, stack_count: 2)
   defp item(_guid), do: nil
 end

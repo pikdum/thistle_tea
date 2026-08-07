@@ -53,8 +53,15 @@ defmodule ThistleTea.Game.Player.Bank do
     end
   end
 
-  def authorize_positions(%State{} = state, positions) when is_list(positions) do
-    if Inventory.touches_bank?(positions), do: authorize(state), else: {:ok, state}
+  def authorize_positions(state, positions) when is_map(state) and is_list(positions) do
+    if Inventory.touches_bank?(positions) do
+      case state do
+        %State{} -> authorize(state)
+        _map -> {:error, Map.put(state, :active_banker_guid, nil)}
+      end
+    else
+      {:ok, state}
+    end
   end
 
   def auto_bank(%State{} = state, source_position) do

@@ -17,6 +17,7 @@ defmodule ThistleTea.Game.Player.BankTest do
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Player.Bank
   alias ThistleTea.Game.Player.Inventory, as: PlayerInventory
+  alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Reputation, as: ReputationLoader
   alias ThistleTea.Game.World.Metadata
@@ -147,6 +148,19 @@ defmodule ThistleTea.Game.Player.BankTest do
 
       assert accepted.character.player.inv1 == 0
       assert accepted.character.player.bank1 == item.object.guid
+      assert CharacterStore.get(accepted.character.id).player.bank1 == item.object.guid
+
+      assert %{condition_subject: subject} = Metadata.get(accepted.guid)
+      assert subject.item_counts == %{20_000 => 0}
+      assert subject.item_counts_with_bank == %{20_000 => 1}
+
+      withdrawn = Bank.auto_store_bank(accepted, {@bag_0, @bank_start})
+      assert withdrawn.character.player.inv1 == item.object.guid
+      assert withdrawn.character.player.bank1 == 0
+
+      assert %{condition_subject: subject} = Metadata.get(withdrawn.guid)
+      assert subject.item_counts == %{20_000 => 1}
+      assert subject.item_counts_with_bank == %{20_000 => 1}
     end
 
     test "rejects remote bank splits and destruction", %{state: state} do

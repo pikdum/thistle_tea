@@ -323,10 +323,7 @@ defmodule ThistleTea.Game.Player.Login do
       })
     end
 
-    item_updates =
-      c.player
-      |> Inventory.owned_items(&ItemStore.get/1)
-      |> Enum.map(&UpdateObject.from_item/1)
+    item_updates = owned_item_updates(c)
 
     if item_updates != [] do
       Network.send_packet(item_updates)
@@ -367,6 +364,12 @@ defmodule ThistleTea.Game.Player.Login do
     }
     |> struct(Map.from_struct(character))
     |> then(&%{&1 | movement_block: movement_block})
+  end
+
+  def owned_item_updates(%Character{} = character, item_lookup \\ &ItemStore.get/1) do
+    character.player
+    |> Inventory.all_owned_items(item_lookup)
+    |> Enum.map(&UpdateObject.from_item/1)
   end
 
   defp attached_transport_update(%Character{movement_block: %MovementBlock{transport_guid: guid}})
