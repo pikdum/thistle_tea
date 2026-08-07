@@ -1,6 +1,9 @@
 defmodule ThistleTea.Game.Entity.Logic.LootSessionTest do
   use ExUnit.Case, async: true
 
+  alias ThistleTea.Game.Entity.Data.Condition
+  alias ThistleTea.Game.Entity.Logic.Condition.Context
+  alias ThistleTea.Game.Entity.Logic.Condition.Subject
   alias ThistleTea.Game.Entity.Logic.Loot
   alias ThistleTea.Game.Entity.Logic.Loot.Actor
   alias ThistleTea.Game.Entity.Logic.Loot.Commit
@@ -23,7 +26,8 @@ defmodule ThistleTea.Game.Entity.Logic.LootSessionTest do
       guid: guid,
       group_id: Keyword.get(opts, :group_id),
       needed_items: MapSet.new(Keyword.get(opts, :needed_items, [])),
-      distance: Keyword.get(opts, :distance, 0.0)
+      distance: Keyword.get(opts, :distance, 0.0),
+      condition_context: Keyword.get(opts, :condition_context)
     }
   end
 
@@ -88,6 +92,18 @@ defmodule ThistleTea.Game.Entity.Logic.LootSessionTest do
       assert Enum.map(items, & &1.slot) == [1]
     end
 
+    test "shows conditioned items only to actors whose snapshot satisfies them" do
+      condition = %Condition{entry: 1, type: :level, value1: 10, value2: 1}
+      loot = %Loot{items: [%Loot.Item{slot: 0, item_id: 1604, condition: condition}]}
+      session = LootSession.new(loot, nil)
+
+      assert {:ok, %Loot{items: [%Loot.Item{item_id: 1604}]}} =
+               LootSession.view(session, condition_actor(1, 10))
+
+      assert {:error, :nothing_to_take} = LootSession.view(session, condition_actor(2, 9))
+      assert {:error, :nothing_to_take} = LootSession.view(session, actor(3))
+    end
+
     test "shows blocked items to the master with the master slot type" do
       session =
         loot()
@@ -123,6 +139,18 @@ defmodule ThistleTea.Game.Entity.Logic.LootSessionTest do
       assert LootSession.pending?(session)
       assert {:ok, %{items: items}} = LootSession.view(session, actor(999))
       assert Enum.map(items, & &1.slot) == [1]
+    end
+
+    test "includes only condition-eligible actors in a roll" do
+      condition = %Condition{entry: 1, type: :level, value1: 10, value2: 1}
+      loot = %Loot{items: [%Loot.Item{slot: 0, item_id: 1604, quality: 2, condition: condition}]}
+
+      {_session, [roll]} =
+        loot
+        |> LootSession.new(nil)
+        |> LootSession.start_rolls(2, [condition_actor(1, 10), condition_actor(2, 9)])
+
+      assert roll.eligible == [1]
     end
   end
 
@@ -191,6 +219,29 @@ defmodule ThistleTea.Game.Entity.Logic.LootSessionTest do
       assert %Loot.Item{} = LootSession.blocked_item(released, 0)
       assert {:error, :already_looted} = LootSession.reserve_item(released, recipient, 0, make_ref())
     end
+
+    test "master assignment and commit revalidate condition eligibility" do
+      condition = %Condition{entry: 1, type: :level, value1: 10, value2: 1}
+
+      session =
+        %Loot{items: [%Loot.Item{slot: 0, item_id: 1604, quality: 2, condition: condition}]}
+        |> LootSession.new(%{player: 100, group_id: 7})
+        |> LootSession.configure_group(2)
+        |> LootSession.block_master_items(100, 2)
+
+      giver = condition_actor(100, 60, group_id: 7)
+      eligible = condition_actor(200, 10, group_id: 7)
+      ineligible = condition_actor(200, 9, group_id: 7)
+
+      assert {:error, :no_permission} =
+               LootSession.reserve_master(session, giver, ineligible, 0, make_ref())
+
+      token = make_ref()
+      assert {:ok, reservation, reserved} = LootSession.reserve_master(session, giver, eligible, 0, token)
+
+      assert {:error, :no_permission} = LootSession.validate_commit(reserved, ineligible, reservation.token)
+      assert :ok = LootSession.validate_commit(reserved, eligible, reservation.token)
+    end
   end
 
   describe "finished?/1" do
@@ -236,5 +287,10 @@ defmodule ThistleTea.Game.Entity.Logic.LootSessionTest do
     {:ok, reservation, session} = LootSession.reserve_item(session, actor, slot, token)
     {:ok, item, session} = LootSession.commit(session, %Commit{token: token, actor_guid: reservation.actor_guid})
     {item, session}
+  end
+
+  defp condition_actor(guid, level, opts \\ []) do
+    context = Context.new(target: %Subject{guid: guid, kind: :player, level: level})
+    actor(guid, Keyword.put(opts, :condition_context, context))
   end
 end

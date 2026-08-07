@@ -46,6 +46,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Entity.Logic.Loot.Actor
   alias ThistleTea.Game.Entity.Logic.Loot.Commit
   alias ThistleTea.Game.Entity.Logic.Loot.Release
+  alias ThistleTea.Game.Entity.Logic.LootSession
   alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.Entity.Logic.SpellEffect
   alias ThistleTea.Game.Entity.Logic.SpellFeedback
@@ -465,6 +466,11 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   def handle_call({:loot_reserve_item, %Actor{} = actor, slot}, {owner_pid, _tag}, %Mob{} = state) do
     {result, state} = Corpse.reserve_item(state, actor, slot, owner_pid)
     {:reply, result, state}
+  end
+
+  def handle_call({:loot_validate_commit, %Actor{} = actor, token}, _from, %Mob{} = state) do
+    reply = LootSession.validate_commit(state.internal.loot.session, actor, token)
+    {:reply, reply, state}
   end
 
   def handle_call({:loot_take_gold, %Actor{} = actor}, _from, %Mob{} = state) do

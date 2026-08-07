@@ -87,15 +87,21 @@ defmodule ThistleTea.Game.Player.Looting do
 
   def take_item(state, _slot), do: state
 
-  def accept_reservation(state, loot_guid, %Reservation{} = reservation) do
-    case Items.store(state, reservation.item.item_id, reservation.item.count) do
-      {:ok, state, placed_at} ->
-        commit = %Commit{token: reservation.token, actor_guid: state.guid}
-        Entity.loot_reservation_result(loot_guid, commit)
-        Items.send_push_result(state, reservation.item.item_id, reservation.item.count, placed_at)
-        state
+  def accept_reservation(%{character: %Character{}} = state, loot_guid, %Reservation{} = reservation) do
+    actor = actor(state, loot_guid)
 
+    with :ok <- Entity.call(loot_guid, {:loot_validate_commit, actor, reservation.token}),
+         {:ok, state, placed_at} <- Items.store(state, reservation.item.item_id, reservation.item.count) do
+      commit = %Commit{token: reservation.token, actor_guid: state.guid}
+      Entity.loot_reservation_result(loot_guid, commit)
+      Items.send_push_result(state, reservation.item.item_id, reservation.item.count, placed_at)
+      state
+    else
       {:error, reason, state} ->
+        release_reservation(loot_guid, reservation)
+        inventory_failure(state, reason)
+
+      {:error, reason} ->
         release_reservation(loot_guid, reservation)
         inventory_failure(state, reason)
     end
@@ -104,6 +110,11 @@ defmodule ThistleTea.Game.Player.Looting do
       release_reservation(loot_guid, reservation)
       Logger.error("loot transfer crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
       inventory_failure(state, :inventory_full)
+  end
+
+  def accept_reservation(state, loot_guid, %Reservation{} = reservation) do
+    release_reservation(loot_guid, reservation)
+    inventory_failure(state, :inventory_full)
   end
 
   def take_money(%{character: %Character{} = character, loot_guid: loot_guid} = state) when is_integer(loot_guid) do

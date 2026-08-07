@@ -216,6 +216,7 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
 
   def visibility_metadata(%__MODULE__{unit: %Unit{} = unit, internal: %Internal{creature: %Creature{} = creature}}) do
     %{
+      db_guid: creature.db_guid,
       npc_flags: unit.npc_flags || 0,
       spirit_service?: ((unit.npc_flags || 0) &&& @npc_flag_spirit_service) != 0,
       ghost_visible?: ((creature.type_flags || 0) &&& @creature_type_flag_ghost_visible) != 0,

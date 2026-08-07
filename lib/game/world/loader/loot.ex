@@ -3,11 +3,10 @@ defmodule ThistleTea.Game.World.Loader.Loot do
   Generates a loot instance for a loot id by feeding Mangos loot-template rows
   through the pure loot roller.
   """
-  import Ecto.Query
-
   alias ThistleTea.DB.Mangos
   alias ThistleTea.Game.Entity.Data.ItemTemplate
   alias ThistleTea.Game.Entity.Logic.Loot
+  alias ThistleTea.Game.World.Loader.Condition, as: ConditionLoader
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
 
   @table_options [:named_table, :public, read_concurrency: true, write_concurrency: :auto]
@@ -19,31 +18,29 @@ defmodule ThistleTea.Game.World.Loader.Loot do
     end
   end
 
-  def load_fishing do
-    rows = Mangos.Repo.all(Mangos.FishingLootTemplate)
+  def load_all do
+    creature = Mangos.Repo.all(Mangos.CreatureLootTemplate)
+    gameobject = Mangos.Repo.all(Mangos.GameObjectLootTemplate)
+    fishing = Mangos.Repo.all(Mangos.FishingLootTemplate)
+    references = Mangos.Repo.all(Mangos.ReferenceLootTemplate)
 
-    rows
-    |> Enum.group_by(& &1.entry, &row/1)
-    |> Enum.each(fn {entry, entry_rows} -> :ets.insert(__MODULE__, {{:fishing, entry}, entry_rows}) end)
+    cache_rows(:creature, creature)
+    cache_rows(:gameobject, gameobject)
+    cache_rows(:fishing, fishing)
+    cache_rows(:reference, references)
 
-    rows
+    [creature, gameobject, fishing, references]
+    |> List.flatten()
     |> Enum.map(& &1.item)
     |> Enum.filter(&(&1 > 0))
     |> Enum.uniq()
     |> Enum.each(&ItemLoader.get_template/1)
 
-    _references =
-      rows
-      |> Enum.map(& &1.mincount_or_ref)
-      |> Enum.filter(&(&1 < 0))
-      |> Enum.reduce(MapSet.new(), fn reference, seen -> preload_reference(-reference, seen) end)
-
-    Mangos.Repo.all(from(g in Mangos.GameObjectTemplate, where: g.type == 25, select: g.data1, distinct: true))
-    |> Enum.filter(&(&1 > 0))
-    |> Enum.each(&preload_gameobject/1)
-
+    :ets.insert(__MODULE__, {:loaded, true})
     :ok
   end
+
+  def load_fishing, do: load_all()
 
   def generate(loot_id, min_gold, max_gold, wanted_quest_item? \\ &always_wanted/1) do
     %Loot{
@@ -89,18 +86,21 @@ defmodule ThistleTea.Game.World.Loader.Loot do
     loot_id
     |> rows_fn.()
     |> Loot.roll(&reference_rows/1)
-    |> Enum.filter(fn {item_id, _count, quest_item} -> not quest_item or wanted_quest_item?.(item_id) end)
-    |> Enum.map(fn {item_id, count, quest_item} -> {ItemLoader.get_template(item_id), count, quest_item} end)
-    |> Enum.reject(fn {template, _count, _quest_item} -> is_nil(template) end)
+    |> Enum.filter(fn {item_id, _count, quest_item, _condition} -> not quest_item or wanted_quest_item?.(item_id) end)
+    |> Enum.map(fn {item_id, count, quest_item, condition} ->
+      {ItemLoader.get_template(item_id), count, quest_item, condition}
+    end)
+    |> Enum.reject(fn {template, _count, _quest_item, _condition} -> is_nil(template) end)
     |> Enum.with_index()
-    |> Enum.map(fn {{%ItemTemplate{} = template, count, quest_item}, index} ->
+    |> Enum.map(fn {{%ItemTemplate{} = template, count, quest_item, condition}, index} ->
       %Loot.Item{
         slot: index,
         item_id: template.entry,
         display_id: template.display_id,
         count: count,
         quality: template.quality,
-        quest_item: quest_item
+        quest_item: quest_item,
+        condition: condition
       }
     end)
   end
@@ -115,8 +115,7 @@ defmodule ThistleTea.Game.World.Loader.Loot do
         rows
 
       _ ->
-        rows = Mangos.CreatureLootTemplate.query(loot_id) |> Mangos.Repo.all() |> Enum.map(&row/1)
-        cache({:creature, loot_id}, rows)
+        load_missing(:creature, loot_id, Mangos.CreatureLootTemplate)
     end
   end
 
@@ -126,8 +125,7 @@ defmodule ThistleTea.Game.World.Loader.Loot do
         rows
 
       _ ->
-        rows = Mangos.GameObjectLootTemplate.query(loot_id) |> Mangos.Repo.all() |> Enum.map(&row/1)
-        cache({:gameobject, loot_id}, rows)
+        load_missing(:gameobject, loot_id, Mangos.GameObjectLootTemplate)
     end
   end
 
@@ -147,52 +145,42 @@ defmodule ThistleTea.Game.World.Loader.Loot do
         rows
 
       _ ->
-        rows = Mangos.ReferenceLootTemplate.query(entry) |> Mangos.Repo.all() |> Enum.map(&row/1)
-        cache({:reference, entry}, rows)
+        load_missing(:reference, entry, Mangos.ReferenceLootTemplate)
     end
   end
 
-  defp preload_reference(entry, seen) do
-    if MapSet.member?(seen, entry) do
-      seen
-    else
-      rows = Mangos.ReferenceLootTemplate.query(entry) |> Mangos.Repo.all()
-      cache({:reference, entry}, Enum.map(rows, &row/1))
-
-      Enum.each(rows, &preload_item/1)
-
-      Enum.reduce(rows, MapSet.put(seen, entry), &preload_nested_reference/2)
+  defp load_missing(kind, entry, schema) do
+    case :ets.lookup(__MODULE__, :loaded) do
+      [{:loaded, true}] -> []
+      _not_preloaded -> entry |> schema.query() |> Mangos.Repo.all() |> rows() |> then(&cache({kind, entry}, &1))
     end
   end
 
-  defp preload_nested_reference(%{mincount_or_ref: reference}, seen) when reference < 0 do
-    preload_reference(-reference, seen)
+  defp rows(template_rows) do
+    conditions =
+      template_rows
+      |> Enum.map(& &1.condition_id)
+      |> ConditionLoader.load_by_ids()
+
+    Enum.map(template_rows, &row(&1, conditions))
   end
 
-  defp preload_nested_reference(_row, seen), do: seen
-
-  defp preload_item(%{item: item}) when item > 0, do: ItemLoader.get_template(item)
-  defp preload_item(_row), do: nil
-
-  defp preload_gameobject(loot_id) do
-    rows = Mangos.GameObjectLootTemplate.query(loot_id) |> Mangos.Repo.all()
-    cache({:gameobject, loot_id}, Enum.map(rows, &row/1))
-
-    Enum.each(rows, &preload_item/1)
-
-    rows
-    |> Enum.map(& &1.mincount_or_ref)
-    |> Enum.filter(&(&1 < 0))
-    |> Enum.reduce(MapSet.new(), fn reference, seen -> preload_reference(-reference, seen) end)
+  defp cache_rows(kind, template_rows) do
+    template_rows
+    |> rows()
+    |> Enum.group_by(& &1.entry)
+    |> Enum.each(fn {entry, entry_rows} -> cache({kind, entry}, entry_rows) end)
   end
 
-  defp row(template_row) do
+  defp row(template_row, conditions) do
     %{
+      entry: template_row.entry,
       item: template_row.item,
       chance: template_row.chance,
       groupid: template_row.groupid,
       mincount_or_ref: template_row.mincount_or_ref,
-      maxcount: template_row.maxcount
+      maxcount: template_row.maxcount,
+      condition: Map.get(conditions, template_row.condition_id)
     }
   end
 

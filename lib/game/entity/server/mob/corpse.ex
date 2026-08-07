@@ -280,7 +280,8 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Corpse do
 
     case eligible_members(state, group) do
       [_, _ | _] = eligible ->
-        {session, rolls} = LootSession.start_rolls(session, group.loot_threshold, eligible)
+        actors = Enum.map(eligible, &ActorFactory.for_guid(&1, state.object.guid))
+        {session, rolls} = LootSession.start_rolls(session, group.loot_threshold, actors)
 
         Enum.each(rolls, fn roll ->
           packet = %Message.SmsgLootStartRoll{

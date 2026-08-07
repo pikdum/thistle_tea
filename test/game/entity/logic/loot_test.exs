@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.Entity.Logic.LootTest do
   use ExUnit.Case, async: true
 
+  alias ThistleTea.Game.Entity.Data.Condition
   alias ThistleTea.Game.Entity.Logic.Loot
 
   defp row(attrs) do
@@ -13,13 +14,13 @@ defmodule ThistleTea.Game.Entity.Logic.LootTest do
     test "drops items that pass their chance roll" do
       rows = [row(%{item: 10, chance: 50.0}), row(%{item: 20, chance: 30.0})]
 
-      assert [{10, 1, false}] = Loot.roll(rows, &no_references/1, fn -> 0.4 end)
+      assert [{10, 1, false, nil}] = Loot.roll(rows, &no_references/1, fn -> 0.4 end)
     end
 
     test "rolls quest items with negative chance and tags them" do
       rows = [row(%{item: 10, chance: -80.0})]
 
-      assert [{10, 1, true}] = Loot.roll(rows, &no_references/1, fn -> 0.5 end)
+      assert [{10, 1, true, nil}] = Loot.roll(rows, &no_references/1, fn -> 0.5 end)
       assert [] = Loot.roll(rows, &no_references/1, fn -> 0.9 end)
     end
 
@@ -29,21 +30,42 @@ defmodule ThistleTea.Game.Entity.Logic.LootTest do
         row(%{item: 20, chance: 40.0, groupid: 1})
       ]
 
-      assert [{10, 1, false}] = Loot.roll(rows, &no_references/1, fn -> 0.3 end)
-      assert [{20, 1, false}] = Loot.roll(rows, &no_references/1, fn -> 0.7 end)
+      assert [{10, 1, false, nil}] = Loot.roll(rows, &no_references/1, fn -> 0.3 end)
+      assert [{20, 1, false, nil}] = Loot.roll(rows, &no_references/1, fn -> 0.7 end)
     end
 
     test "resolves references through the reference table" do
       rows = [row(%{item: 0, chance: 100.0, mincount_or_ref: -5000, maxcount: 1})]
       references = fn 5000 -> [row(%{item: 42, chance: 100.0})] end
 
-      assert [{42, 1, false}] = Loot.roll(rows, references, fn -> 0.5 end)
+      assert [{42, 1, false, nil}] = Loot.roll(rows, references, fn -> 0.5 end)
+    end
+
+    test "preserves direct-item conditions reached through references" do
+      condition = %Condition{entry: 10, type: :level, value1: 20, value2: 1}
+      rows = [row(%{item: 0, chance: 100.0, mincount_or_ref: -5000, maxcount: 1})]
+      references = fn 5000 -> [row(%{item: 42, chance: 100.0, condition: condition})] end
+
+      assert [{42, 1, false, ^condition}] = Loot.roll(rows, references, fn -> 0.5 end)
+    end
+
+    test "rejects conditioned reference expansion unless its owner approves it" do
+      condition = %Condition{entry: 11, type: :instance_data, value1: 1}
+      reference_row = row(%{item: 0, chance: 100.0, mincount_or_ref: -5000, maxcount: 1, condition: condition})
+      references = fn 5000 -> [row(%{item: 42, chance: 100.0})] end
+
+      assert [] = Loot.roll([reference_row], references, fn -> 0.5 end)
+
+      assert [{42, 1, false, nil}] =
+               Loot.roll([reference_row], references, fn -> 0.5 end, fn reference ->
+                 reference.condition == condition
+               end)
     end
 
     test "rolls counts within min and max" do
       rows = [row(%{item: 10, chance: 100.0, mincount_or_ref: 2, maxcount: 4})]
 
-      assert [{10, count, false}] = Loot.roll(rows, &no_references/1, fn -> 0.5 end)
+      assert [{10, count, false, nil}] = Loot.roll(rows, &no_references/1, fn -> 0.5 end)
       assert count in 2..4
     end
   end

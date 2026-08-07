@@ -17,7 +17,8 @@ defmodule ThistleTea.Game.Entity.Logic.Loot do
             slot_type: non_neg_integer(),
             looted: boolean(),
             blocked: boolean(),
-            quest_item: boolean()
+            quest_item: boolean(),
+            condition: struct() | nil
           }
 
     defstruct [
@@ -29,7 +30,8 @@ defmodule ThistleTea.Game.Entity.Logic.Loot do
       slot_type: 0,
       looted: false,
       blocked: false,
-      quest_item: false
+      quest_item: false,
+      condition: nil
     ]
   end
 
@@ -69,21 +71,22 @@ defmodule ThistleTea.Game.Entity.Logic.Loot do
 
   def take_gold(%__MODULE__{}), do: {:error, :no_gold}
 
-  def roll(rows, get_reference_rows, rand \\ &:rand.uniform/0) do
+  def roll(rows, get_reference_rows, rand \\ &:rand.uniform/0, reference_allowed? \\ &unconditioned_reference?/1) do
     rows
-    |> roll_rows(get_reference_rows, rand, 0)
+    |> roll_rows(get_reference_rows, rand, reference_allowed?, 0)
     |> Enum.take(@max_items)
   end
 
-  defp roll_rows(_rows, _get_reference_rows, _rand, depth) when depth > @max_reference_depth, do: []
+  defp roll_rows(_rows, _get_reference_rows, _rand, _reference_allowed?, depth) when depth > @max_reference_depth,
+    do: []
 
-  defp roll_rows(rows, get_reference_rows, rand, depth) do
+  defp roll_rows(rows, get_reference_rows, rand, reference_allowed?, depth) do
     {grouped, ungrouped} = Enum.split_with(rows, fn row -> row.groupid > 0 end)
 
     ungrouped_drops =
       ungrouped
       |> Enum.filter(fn row -> rand.() * 100 < abs(row.chance) end)
-      |> Enum.flat_map(fn row -> resolve_row(row, get_reference_rows, rand, depth) end)
+      |> Enum.flat_map(fn row -> resolve_row(row, get_reference_rows, rand, reference_allowed?, depth) end)
 
     grouped_drops =
       grouped
@@ -91,25 +94,27 @@ defmodule ThistleTea.Game.Entity.Logic.Loot do
       |> Enum.flat_map(fn {_groupid, group} ->
         case roll_group(group, rand) do
           nil -> []
-          row -> resolve_row(row, get_reference_rows, rand, depth)
+          row -> resolve_row(row, get_reference_rows, rand, reference_allowed?, depth)
         end
       end)
 
     ungrouped_drops ++ grouped_drops
   end
 
-  defp resolve_row(%{mincount_or_ref: ref} = row, get_reference_rows, rand, depth) when ref < 0 do
-    reference_rows = get_reference_rows.(-ref)
+  defp resolve_row(%{mincount_or_ref: ref} = row, get_reference_rows, rand, reference_allowed?, depth) when ref < 0 do
+    reference_rows = if reference_allowed?.(row), do: get_reference_rows.(-ref), else: []
 
     Enum.flat_map(1..max(row.maxcount, 1), fn _ ->
-      roll_rows(reference_rows, get_reference_rows, rand, depth + 1)
+      roll_rows(reference_rows, get_reference_rows, rand, reference_allowed?, depth + 1)
     end)
   end
 
-  defp resolve_row(row, _get_reference_rows, rand, _depth) do
+  defp resolve_row(row, _get_reference_rows, rand, _reference_allowed?, _depth) do
     count = row.mincount_or_ref + trunc(rand.() * (max(row.maxcount, row.mincount_or_ref) - row.mincount_or_ref + 1))
-    [{row.item, max(min(count, row.maxcount), row.mincount_or_ref), row.chance < 0}]
+    [{row.item, max(min(count, row.maxcount), row.mincount_or_ref), row.chance < 0, Map.get(row, :condition)}]
   end
+
+  defp unconditioned_reference?(row), do: is_nil(Map.get(row, :condition))
 
   defp roll_group(group, rand) do
     roll = rand.() * 100

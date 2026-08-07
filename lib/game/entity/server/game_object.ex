@@ -21,6 +21,7 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
   alias ThistleTea.Game.Entity.Logic.Loot.Actor
   alias ThistleTea.Game.Entity.Logic.Loot.Commit
   alias ThistleTea.Game.Entity.Logic.Loot.Release
+  alias ThistleTea.Game.Entity.Logic.LootSession
   alias ThistleTea.Game.Entity.Registry, as: EntityRegistry
   alias ThistleTea.Game.Entity.Server.AIEnvironment
   alias ThistleTea.Game.Entity.Server.GameObject.Chair
@@ -29,6 +30,7 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
   alias ThistleTea.Game.Entity.Server.GameObject.Ritual, as: RitualServer
   alias ThistleTea.Game.Entity.Server.GameObject.Trap, as: TrapServer
   alias ThistleTea.Game.Entity.SpellTargetResolver
+  alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message.SmsgFishNotHooked
   alias ThistleTea.Game.Network.Message.SmsgGameobjectCustomAnim
@@ -57,6 +59,7 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
   def init(%GameObject{} = state) do
     GameEvent.subscribe(state)
     Process.flag(:trap_exit, true)
+    publish_condition_metadata(state)
     World.update_position(state)
     state = Visibility.join_entity(state)
     schedule_despawn(state)
@@ -182,6 +185,7 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
 
   def handle_call({:fishing_use, owner_guid, skill}, _from, %GameObject{} = state) do
     {result, state} = Fishing.use(state, owner_guid, skill)
+    state = publish_condition_metadata(state)
     if match?({:error, reason} when reason in [:not_hooked, :escaped], result), do: send(self(), :despawn)
     {:reply, result, state}
   end
@@ -202,6 +206,11 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
     {:reply, result, state}
   end
 
+  def handle_call({:loot_validate_commit, %Actor{} = actor, token}, _from, %GameObject{} = state) do
+    reply = LootSession.validate_commit(state.internal.loot.session, actor, token)
+    {:reply, reply, state}
+  end
+
   def handle_call({:loot_take_gold, %Actor{} = actor}, _from, %GameObject{} = state) do
     {result, state} = Chest.take_gold(state, actor)
     {:reply, result, state}
@@ -219,7 +228,8 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
   end
 
   def handle_call({:loot_release, %Actor{} = actor}, _from, %GameObject{} = state) do
-    {:reply, :ok, Chest.release(state, actor)}
+    state = state |> Chest.release(actor) |> publish_condition_metadata()
+    {:reply, :ok, state}
   end
 
   @impl GenServer
@@ -249,8 +259,7 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
   end
 
   def handle_info({:script_activate_object, _user_guid}, %GameObject{} = state) do
-    game_object = %{state.game_object | state: if(state.game_object.state == 0, do: 1, else: 0)}
-    state = %{state | game_object: game_object} |> Core.mark_broadcast_update() |> broadcast_if_pending()
+    state = put_game_object_state(state, if(state.game_object.state == 0, do: 1, else: 0))
     {:noreply, state}
   end
 
@@ -310,7 +319,7 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
   end
 
   def handle_info(:fishing_bite, %GameObject{} = state) do
-    state = Fishing.bite(state)
+    state = state |> Fishing.bite() |> publish_condition_metadata()
     Core.update_object(state, :values) |> World.broadcast_packet(state)
 
     %SmsgGameobjectCustomAnim{guid: state.object.guid}
@@ -334,18 +343,18 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
   def handle_info(:fishing_hole_depleted, %GameObject{} = state) do
     case SpawnPool.recycle(state) do
       :pooled -> {:noreply, state}
-      :unpooled -> {:noreply, Fishing.deplete(state)}
+      :unpooled -> {:noreply, state |> Fishing.deplete() |> publish_condition_metadata(false)}
     end
   end
 
   def handle_info(:fishing_hole_respawn, %GameObject{} = state) do
-    {:noreply, Fishing.respawn(state)}
+    {:noreply, state |> Fishing.respawn() |> publish_condition_metadata()}
   end
 
   def handle_info(:chest_respawn, %GameObject{} = state) do
     case SpawnPool.recycle(state) do
       :pooled -> {:noreply, state}
-      :unpooled -> {:noreply, Chest.respawn(state)}
+      :unpooled -> {:noreply, state |> Chest.respawn() |> publish_condition_metadata()}
     end
   end
 
@@ -416,7 +425,11 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
 
   defp put_game_object_state(%GameObject{} = state, game_object_state) do
     game_object = %{state.game_object | state: game_object_state}
-    %{state | game_object: game_object} |> Core.mark_broadcast_update() |> broadcast_if_pending()
+
+    %{state | game_object: game_object}
+    |> publish_condition_metadata()
+    |> Core.mark_broadcast_update()
+    |> broadcast_if_pending()
   end
 
   defp cast_ritual_completion(state, %Ritual{} = ritual, world, {x, y, z, orientation}) do
@@ -539,6 +552,19 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
   end
 
   defp broadcast_if_pending(%GameObject{} = state), do: state
+
+  defp publish_condition_metadata(%GameObject{} = state, spawned? \\ true) do
+    Metadata.update(state.object.guid, %{
+      db_guid: condition_db_guid(state),
+      go_spawned?: spawned?,
+      go_state: state.game_object.state
+    })
+
+    state
+  end
+
+  defp condition_db_guid(%GameObject{object: %{guid: guid}, internal: %Internal{summon: nil}}), do: Guid.low_guid(guid)
+  defp condition_db_guid(%GameObject{}), do: nil
 
   defp allowed_user?(%Summon{party_only?: true, owner_guid: owner_guid}, user_guid) when is_integer(owner_guid) do
     user_guid == owner_guid or same_group?(owner_guid, user_guid)
