@@ -62,7 +62,7 @@ defmodule ThistleTea.Game.Player.Inventory do
          source_guid when is_integer(source_guid) <-
            Inventory.item_guid_at(state.character.player, source_position, &ItemStore.get/1),
          %Item{} = source_item <- ItemStore.get(source_guid),
-         %Item{} = new_item <- ItemStore.create(Item.template(source_item), owner: state.guid, stack_count: count) do
+         %Item{} = new_item <- ItemStore.prepare(Item.template(source_item), owner: state.guid, stack_count: count) do
       commit_split(state, source_position, destination_position, new_item)
     else
       {:error, state} -> reject_remote_bank(state)
@@ -104,7 +104,6 @@ defmodule ThistleTea.Game.Player.Inventory do
         InventoryUpdate.apply(state, {:ok, change_set})
 
       {:error, error, item1_guid, item2_guid} ->
-        ItemStore.delete(new_item.object.guid)
         InventoryUpdate.send_failure(error, item1_guid, item2_guid)
         state
     end

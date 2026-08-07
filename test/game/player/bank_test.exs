@@ -187,14 +187,31 @@ defmodule ThistleTea.Game.Player.BankTest do
       prices = %{1 => 1_000, 2 => 10_000, 3 => 100_000, 4 => 250_000, 5 => 500_000, 6 => 1_000_000}
       state = put_in(state.character.player.coinage, 2_000_000)
 
-      state =
-        Enum.reduce(1..6, state, fn expected_slots, state ->
+      {state, remaining_coinage} =
+        Enum.reduce(1..6, {state, 2_000_000}, fn expected_slots, {state, coinage} ->
           state = Bank.buy_slot(state, banker_guid, price_lookup: &Map.get(prices, &1))
+          coinage = coinage - Map.fetch!(prices, expected_slots)
+
           assert state.character.player.bank_bag_slots == expected_slots
-          state
+          assert state.character.player.coinage == coinage
+
+          assert Enum.any?(sent_packets(), fn
+                   %UpdateObject{
+                     update_type: :values,
+                     object_type: :player,
+                     player: %Player{bank_bag_slots: ^expected_slots, coinage: ^coinage}
+                   } ->
+                     true
+
+                   _packet ->
+                     false
+                 end)
+
+          {state, coinage}
         end)
 
-      assert state.character.player.coinage == 139_000
+      assert remaining_coinage == 139_000
+      assert CharacterStore.get(state.character.id).player == state.character.player
       refute_received {:"$gen_cast", {:send_packet, %Message.SmsgBuyBankSlotResult{}}}
     end
 
@@ -225,6 +242,32 @@ defmodule ThistleTea.Game.Player.BankTest do
   end
 
   describe "inventory packet order" do
+    test "projects a direct transfer as one player values update", %{banker_guid: banker_guid, state: state} do
+      carried = ItemStore.create(%ItemTemplate{entry: 20_000}, owner: state.guid)
+      banked = ItemStore.create(%ItemTemplate{entry: 20_001}, owner: state.guid)
+
+      on_exit(fn ->
+        ItemStore.delete(carried.object.guid)
+        ItemStore.delete(banked.object.guid)
+      end)
+
+      state =
+        state
+        |> put_in([Access.key(:character), Access.key(:player), Access.key(:inv1)], carried.object.guid)
+        |> put_in([Access.key(:character), Access.key(:player), Access.key(:bank1)], banked.object.guid)
+        |> Bank.activate(banker_guid)
+
+      sent_packets()
+      state = PlayerInventory.swap(state, {@bag_0, @backpack_start}, {@bag_0, @bank_start})
+
+      assert state.character.player.inv1 == banked.object.guid
+      assert state.character.player.bank1 == carried.object.guid
+
+      assert [
+               %UpdateObject{update_type: :values, object_type: :player}
+             ] = sent_packets()
+    end
+
     test "orders merge, split, and destroy projections", %{banker_guid: banker_guid, state: state} do
       template = %ItemTemplate{entry: 20_000, stackable: 10}
       source = ItemStore.create(template, owner: state.guid, stack_count: 3)
