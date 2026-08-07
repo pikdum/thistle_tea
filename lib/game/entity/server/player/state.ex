@@ -52,6 +52,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
     :taxi_arrival_ref,
     :server_movement,
     :active_mover_guid,
+    :active_banker_guid,
     :companion_monitor,
     ready: false,
     movement_counter: 0,
@@ -67,11 +68,11 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
         instance_id: nil
       })
       when is_integer(instance_id) do
-    %{state | pending_last_instance_map: map_id}
+    %{state | pending_last_instance_map: map_id, active_banker_guid: nil}
   end
 
   def prepare_worldport(%__MODULE__{} = state, %WorldRef{}, %WorldRef{}) do
-    %{state | pending_last_instance_map: nil}
+    %{state | pending_last_instance_map: nil, active_banker_guid: nil}
   end
 
   def complete_worldport(%__MODULE__{pending_last_instance_map: map_id} = state) when is_integer(map_id) do

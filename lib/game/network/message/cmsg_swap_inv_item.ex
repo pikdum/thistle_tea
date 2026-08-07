@@ -2,23 +2,15 @@ defmodule ThistleTea.Game.Network.Message.CmsgSwapInvItem do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_SWAP_INV_ITEM
 
-  alias ThistleTea.Game.Entity.Logic.Inventory
-  alias ThistleTea.Game.Entity.Logic.Proficiency
-  alias ThistleTea.Game.Network.InventoryUpdate
-  alias ThistleTea.Game.Player.Reputation
-  alias ThistleTea.Game.World.ItemStore
+  alias ThistleTea.Game.Entity.Logic.Inventory, as: InventoryLogic
+  alias ThistleTea.Game.Player.Inventory
 
   defstruct [:src_slot, :dst_slot]
 
   @impl ClientMessage
-  def handle(%__MODULE__{src_slot: src_slot, dst_slot: dst_slot}, %{ready: true, character: %Character{} = c} = state) do
-    bag_0 = Inventory.bag_0()
-    prof = Proficiency.from_character(c)
-
-    Inventory.swap(c.player, c.unit, prof, state.guid, {bag_0, src_slot}, {bag_0, dst_slot}, &ItemStore.get/1,
-      validate_item: &Reputation.validate_item_requirement(c, &1)
-    )
-    |> then(&InventoryUpdate.apply(state, &1))
+  def handle(%__MODULE__{src_slot: src_slot, dst_slot: dst_slot}, %{ready: true, character: %Character{}} = state) do
+    bag_0 = InventoryLogic.bag_0()
+    Inventory.swap(state, {bag_0, src_slot}, {bag_0, dst_slot})
   end
 
   def handle(_message, state), do: state

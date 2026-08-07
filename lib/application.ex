@@ -17,6 +17,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.World.Groups
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.AreaTrigger, as: AreaTriggerLoader
+  alias ThistleTea.Game.World.Loader.BankBagSlotPrice, as: BankBagSlotPriceLoader
   alias ThistleTea.Game.World.Loader.ClassSpell, as: ClassSpellLoader
   alias ThistleTea.Game.World.Loader.CreatureTemplate, as: CreatureTemplateLoader
   alias ThistleTea.Game.World.Loader.Exploration, as: ExplorationLoader
@@ -163,6 +164,7 @@ defmodule ThistleTea.Application do
     NpcTextLoader.init()
     PageTextLoader.init()
     AreaTriggerLoader.init()
+    BankBagSlotPriceLoader.init()
     SummonLoader.init()
     TaxiLoader.init()
     TransportLoader.init()
@@ -226,6 +228,7 @@ defmodule ThistleTea.Application do
         GossipLoader.load_all()
         VendorLoader.load_all()
         AreaTriggerLoader.load_all()
+        BankBagSlotPriceLoader.load_all()
         Logger.info("Loading templates...")
         CreatureTemplateLoader.load_all()
         ExplorationLoader.load_all()
