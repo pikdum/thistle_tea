@@ -8,6 +8,8 @@ defmodule ThistleTea.Game.World.Loader.AreaTrigger do
   import Ecto.Query
 
   alias ThistleTea.DB.Mangos
+  alias ThistleTea.Game.Entity.Data.AreaTriggerTeleport
+  alias ThistleTea.Game.World.Loader.Condition, as: ConditionLoader
   alias ThistleTea.Game.WorldRef
 
   @supported_build 5875
@@ -20,6 +22,34 @@ defmodule ThistleTea.Game.World.Loader.AreaTrigger do
       :undefined -> :ets.new(table, @table_options)
       _table_id -> table
     end
+  end
+
+  def load_all do
+    Mangos.Repo.all(from(t in Mangos.AreaTriggerTemplate, where: t.build <= @supported_build))
+    |> latest_by(& &1.id, & &1.build)
+    |> Enum.each(&:ets.insert(__MODULE__, {{:trigger, &1.id}, trigger(&1)}))
+
+    Mangos.Repo.all(Mangos.AreaTriggerInvolvedRelation)
+    |> Enum.each(&:ets.insert(__MODULE__, {{:quest, &1.id}, positive(&1.quest)}))
+
+    Mangos.Repo.all(Mangos.AreaTriggerTavern)
+    |> Enum.filter(&((&1.patch_min || 0) <= @supported_patch))
+    |> Enum.each(&:ets.insert(__MODULE__, {{:tavern, &1.id}, true}))
+
+    teleports =
+      Mangos.Repo.all(from(t in Mangos.AreaTriggerTeleport, where: t.patch <= @supported_patch))
+      |> latest_by(& &1.id, & &1.patch)
+
+    conditions = teleports |> Enum.map(& &1.required_condition) |> ConditionLoader.load_by_ids()
+    Enum.each(teleports, &:ets.insert(__MODULE__, {{:teleport, &1.id}, teleport(&1, conditions)}))
+
+    Mangos.Repo.all(from(m in Mangos.MapTemplate, where: m.patch <= @supported_patch))
+    |> latest_by(& &1.entry, & &1.patch)
+    |> Enum.filter(&(&1.map_type == 1))
+    |> Enum.each(&:ets.insert(__MODULE__, {{:instance_map, &1.entry}, true}))
+
+    :ets.insert(__MODULE__, {:loaded, true})
+    :ok
   end
 
   def get(id) when is_integer(id) and id > 0 do
@@ -90,9 +120,13 @@ defmodule ThistleTea.Game.World.Loader.AreaTrigger do
   defp lookup(key, load) do
     case :ets.lookup(__MODULE__, key) do
       [{^key, value}] -> value
-      _miss -> cache(key, load.())
+      _miss -> if(preloaded?(), do: missing_value(key), else: cache(key, load.()))
     end
   end
+
+  defp preloaded?, do: :ets.lookup(__MODULE__, :loaded) == [{:loaded, true}]
+  defp missing_value({kind, _id}) when kind in [:tavern, :instance_map], do: false
+  defp missing_value({_kind, _id}), do: nil
 
   defp cache(key, value) do
     :ets.insert(__MODULE__, {key, value})
@@ -111,18 +145,7 @@ defmodule ThistleTea.Game.World.Loader.AreaTrigger do
 
     case row do
       %Mangos.AreaTriggerTemplate{} = t ->
-        %{
-          id: t.id,
-          map: t.map_id,
-          x: t.x,
-          y: t.y,
-          z: t.z,
-          radius: t.radius,
-          box_x: t.box_x,
-          box_y: t.box_y,
-          box_z: t.box_z,
-          box_orientation: t.box_orientation
-        }
+        trigger(t)
 
       _missing ->
         nil
@@ -155,18 +178,8 @@ defmodule ThistleTea.Game.World.Loader.AreaTrigger do
 
     case row do
       %Mangos.AreaTriggerTeleport{} = teleport ->
-        %{
-          id: teleport.id,
-          name: teleport.name,
-          message: teleport.message,
-          required_level: teleport.required_level,
-          required_condition: teleport.required_condition,
-          target_map: teleport.target_map,
-          x: teleport.target_position_x,
-          y: teleport.target_position_y,
-          z: teleport.target_position_z,
-          orientation: teleport.target_orientation
-        }
+        conditions = ConditionLoader.load_by_ids([teleport.required_condition])
+        teleport(teleport, conditions)
 
       _missing ->
         nil
@@ -185,4 +198,43 @@ defmodule ThistleTea.Game.World.Loader.AreaTrigger do
 
     match?(%Mangos.MapTemplate{map_type: 1}, row)
   end
+
+  defp trigger(t) do
+    %{
+      id: t.id,
+      map: t.map_id,
+      x: t.x,
+      y: t.y,
+      z: t.z,
+      radius: t.radius,
+      box_x: t.box_x,
+      box_y: t.box_y,
+      box_z: t.box_z,
+      box_orientation: t.box_orientation
+    }
+  end
+
+  defp teleport(row, conditions) do
+    %AreaTriggerTeleport{
+      id: row.id,
+      name: row.name,
+      message: row.message,
+      required_level: row.required_level,
+      condition: Map.get(conditions, row.required_condition),
+      target_map: row.target_map,
+      x: row.target_position_x,
+      y: row.target_position_y,
+      z: row.target_position_z,
+      orientation: row.target_orientation
+    }
+  end
+
+  defp latest_by(rows, key, version) do
+    rows
+    |> Enum.group_by(key)
+    |> Enum.map(fn {_key, versions} -> Enum.max_by(versions, version) end)
+  end
+
+  defp positive(value) when is_integer(value) and value > 0, do: value
+  defp positive(_value), do: nil
 end

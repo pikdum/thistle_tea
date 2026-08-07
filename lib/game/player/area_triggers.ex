@@ -5,9 +5,11 @@ defmodule ThistleTea.Game.Player.AreaTriggers do
   """
 
   alias ThistleTea.Game.Entity.Data.Character
+  alias ThistleTea.Game.Entity.Logic.Condition
   alias ThistleTea.Game.Entity.Logic.Death
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
+  alias ThistleTea.Game.Player.ConditionContext
   alias ThistleTea.Game.Player.Quests
   alias ThistleTea.Game.Player.Rest, as: PlayerRest
   alias ThistleTea.Game.World.Loader.AreaTrigger, as: AreaTriggerLoader
@@ -57,16 +59,19 @@ defmodule ThistleTea.Game.Player.AreaTriggers do
   defp maybe_teleport(state, nil), do: state
 
   defp maybe_teleport(%{character: %Character{} = character} = state, teleport) do
-    cond do
-      character.unit.level < teleport.required_level ->
-        reject_teleport(state, teleport)
+    level_met? = character.unit.level >= teleport.required_level
+    condition_met? = teleport_condition_met?(character, teleport.condition)
 
-      teleport.required_condition > 0 ->
-        reject_teleport(state, teleport)
+    if level_met? and condition_met?,
+      do: start_teleport(state, teleport),
+      else: reject_teleport(state, teleport)
+  end
 
-      true ->
-        start_teleport(state, teleport)
-    end
+  defp teleport_condition_met?(_character, nil), do: true
+
+  defp teleport_condition_met?(character, condition) do
+    context = ConditionContext.build(character, [condition])
+    Condition.evaluate(context, condition) == :met
   end
 
   defp reject_teleport(state, %{message: message}) when is_binary(message) and message != "" do

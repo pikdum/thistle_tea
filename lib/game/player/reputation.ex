@@ -12,11 +12,13 @@ defmodule ThistleTea.Game.Player.Reputation do
   alias ThistleTea.Game.Entity.Data.Reputation.Definition
   alias ThistleTea.Game.Entity.Data.Reputation.KillReward
   alias ThistleTea.Game.Entity.Data.Reputation.State
+  alias ThistleTea.Game.Entity.Data.VendorItem
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Hostility
   alias ThistleTea.Game.Entity.Logic.Reputation, as: ReputationLogic
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
+  alias ThistleTea.Game.Player.ConditionContext
   alias ThistleTea.Game.Player.Quests
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.Loader.Reputation, as: ReputationLoader
@@ -192,10 +194,14 @@ defmodule ThistleTea.Game.Player.Reputation do
     end)
     |> Enum.with_index(1)
     |> Enum.map(fn {%{template: template} = item, index} ->
-      item
-      |> Map.put(:index, index)
-      |> Map.put(:price, price(character, vendor_guid, template.buy_price))
+      price_vendor_item(item, index, price(character, vendor_guid, template.buy_price))
     end)
+  end
+
+  defp price_vendor_item(%VendorItem{} = item, index, price), do: %{item | index: index, price: price}
+
+  defp price_vendor_item(%{} = item, index, price) do
+    Map.merge(item, %{index: index, price: price})
   end
 
   def modify(%{character: %Character{} = character} = state, faction_id, delta, opts \\ []) do
@@ -381,7 +387,17 @@ defmodule ThistleTea.Game.Player.Reputation do
     player = %{character.player | reputation: reputation}
     character = %{character | player: player}
     CharacterStore.put(character)
-    Presence.sync(character, %{reputation: projection(character)})
+
+    previous_subject =
+      case Metadata.query(character.object.guid, [:condition_subject]) do
+        %{condition_subject: condition_subject} -> condition_subject
+        _missing -> nil
+      end
+
+    Presence.sync(character, %{
+      reputation: projection(character),
+      condition_subject: ConditionContext.refresh_subject(character, previous_subject)
+    })
 
     if recheck_quests? do
       Quests.on_reputation_changed(%{state | character: character})
