@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.Player.BankTest do
   use ExUnit.Case, async: false
 
+  alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
@@ -15,6 +16,7 @@ defmodule ThistleTea.Game.Player.BankTest do
   alias ThistleTea.Game.Entity.Server.Player.State
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.Message
+  alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.Player.Bank
   alias ThistleTea.Game.Player.Inventory, as: PlayerInventory
   alias ThistleTea.Game.World.CharacterStore
@@ -33,6 +35,7 @@ defmodule ThistleTea.Game.Player.BankTest do
     id = System.unique_integer([:positive, :monotonic])
     banker_guid = Guid.from_low_guid(:mob, 54, id)
     character = character(id)
+    {:ok, _owner} = Entity.register(character.object.guid)
 
     Metadata.put(banker_guid, %{npc_flags: @banker_flag, alive?: true})
     SpatialHash.update(:mobs, banker_guid, WorldRef.open(0), 2.0, 0.0, 0.0)
@@ -221,6 +224,52 @@ defmodule ThistleTea.Game.Player.BankTest do
     end
   end
 
+  describe "inventory packet order" do
+    test "orders merge, split, and destroy projections", %{banker_guid: banker_guid, state: state} do
+      template = %ItemTemplate{entry: 20_000, stackable: 10}
+      source = ItemStore.create(template, owner: state.guid, stack_count: 3)
+      destination = ItemStore.create(template, owner: state.guid, stack_count: 7)
+
+      on_exit(fn ->
+        ItemStore.delete(source.object.guid)
+        ItemStore.delete(destination.object.guid)
+      end)
+
+      state =
+        state
+        |> put_in([Access.key(:character), Access.key(:player), Access.key(:inv1)], source.object.guid)
+        |> put_in([Access.key(:character), Access.key(:player), Access.key(:bank1)], destination.object.guid)
+        |> Bank.activate(banker_guid)
+
+      sent_packets()
+      state = Bank.auto_bank(state, {@bag_0, @backpack_start})
+      packets = sent_packets()
+
+      assert packet_index(packets, &match?(%Message.SmsgDestroyObject{}, &1)) <
+               packet_index(packets, &match?(%UpdateObject{update_type: :values, object_type: :item}, &1))
+
+      assert packet_index(packets, &match?(%UpdateObject{update_type: :values, object_type: :item}, &1)) <
+               packet_index(packets, &match?(%UpdateObject{update_type: :values, object_type: :player}, &1))
+
+      sent_packets()
+      state = PlayerInventory.split(state, {@bag_0, @bank_start}, {@bag_0, @bank_start + 1}, 2)
+      packets = sent_packets()
+
+      assert packet_index(packets, &match?(%UpdateObject{update_type: :create_object2}, &1)) <
+               packet_index(packets, &match?(%UpdateObject{update_type: :values, object_type: :item}, &1))
+
+      assert packet_index(packets, &match?(%UpdateObject{update_type: :values, object_type: :item}, &1)) <
+               packet_index(packets, &match?(%UpdateObject{update_type: :values, object_type: :player}, &1))
+
+      sent_packets()
+      _state = PlayerInventory.destroy(state, {@bag_0, @bank_start + 1})
+      packets = sent_packets()
+
+      assert packet_index(packets, &match?(%Message.SmsgDestroyObject{}, &1)) <
+               packet_index(packets, &match?(%UpdateObject{update_type: :values, object_type: :player}, &1))
+    end
+  end
+
   defp character(id) do
     %Character{
       id: id,
@@ -231,5 +280,18 @@ defmodule ThistleTea.Game.Player.BankTest do
       movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
       internal: %Internal{world: WorldRef.open(0)}
     }
+  end
+
+  defp packet_index(packets, matcher) do
+    Enum.find_index(packets, matcher) || flunk("expected packet in #{inspect(packets)}")
+  end
+
+  defp sent_packets(acc \\ []) do
+    receive do
+      {:"$gen_cast", {:send_packet, packet}} -> sent_packets([packet | acc])
+      {:"$gen_cast", {:send_packet, packet, _opts}} -> sent_packets([packet | acc])
+    after
+      0 -> Enum.reverse(acc)
+    end
   end
 end

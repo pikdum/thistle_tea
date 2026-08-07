@@ -1124,6 +1124,29 @@ defmodule ThistleTea.Game.Entity.Logic.InventoryTest do
                )
     end
 
+    test "rejects splitting a stack into an incompatible bank bag" do
+      stack = build_item(20, %ItemTemplate{entry: 2000, stackable: 10}, stack_count: 5)
+      split = build_item(21, %ItemTemplate{entry: 2000, stackable: 10}, stack_count: 2)
+
+      herb_bag =
+        build_item(
+          22,
+          %ItemTemplate{entry: 2001, inventory_type: 18, container_slots: 6, class: 1, bag_family: 0x20}
+        )
+
+      player = %Player{bank1: stack.object.guid, bank_bag1: herb_bag.object.guid, bank_bag_slots: 1}
+
+      assert {:error, :couldnt_split_items, _, _} =
+               Inventory.split(
+                 player,
+                 @owner,
+                 {@bag_0, @bank_start},
+                 {@bank_bag_start, 0},
+                 split,
+                 get_item_fn([stack, herb_bag])
+               )
+    end
+
     test "requires bank bags to be empty when placing and removing them", %{unit: unit, bag: bag, chest: chest} do
       bag = put_in(bag.container.slot_1, chest.object.guid)
       player = %Player{bag1: bag.object.guid, bank_bag_slots: 1}

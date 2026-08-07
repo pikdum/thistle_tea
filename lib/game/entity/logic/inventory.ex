@@ -464,7 +464,7 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
   end
 
   def free_position(%Player{} = player, get_item) do
-    free_position(ctx(player, nil, nil, nil, get_item))
+    free_position(ctx(player, nil, nil, nil, get_item), :carried, nil)
   end
 
   def find_equip_slot(%Player{} = player, %Unit{} = unit, %Proficiency{} = prof, %Item{} = item, get_item, opts \\ []) do
@@ -666,6 +666,7 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
       not match?({:ok, _}, valid_destination(ctx, dst_pos)) -> {:error, :couldnt_split_items}
       equipment_pos?(dst_pos) or bag_bar_pos?(dst_pos) -> {:error, :couldnt_split_items}
       guid_at(ctx, dst_pos) != nil -> {:error, :couldnt_split_items}
+      validate_placement(ctx, src_item, dst_pos) != :ok -> {:error, :couldnt_split_items}
       true -> :ok
     end
   end
@@ -866,7 +867,7 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
   defp store_offhand_if_two_hand(ctx, %Item{} = src_item, dst_pos) do
     with true <- equipping_two_hand?(src_item, dst_pos),
          %Item{} = offhand_item <- item_at(ctx, {@bag_0, @offhand_slot}),
-         pos when pos != nil <- free_position(ctx) do
+         pos when pos != nil <- free_position(ctx, :carried, offhand_item) do
       ctx
       |> put_pos({@bag_0, @offhand_slot}, nil)
       |> put_pos(pos, offhand_item)
@@ -882,15 +883,12 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
   defp equipping_two_hand?(_item, _dst_pos), do: false
 
   defp offhand_storable?(ctx, src_pos, dst_item) do
-    free_position(ctx) != nil or (dst_item == nil and storage_pos?(src_pos))
+    offhand_item = item_at(ctx, {@bag_0, @offhand_slot})
+    free_position(ctx, :carried, offhand_item) != nil or (dst_item == nil and storage_pos?(src_pos))
   end
 
   defp storage_pos?({@bag_0, slot}), do: backpack_slot?(slot) or base_bank_slot?(slot)
   defp storage_pos?({bag, _slot}), do: bag_slot?(bag) or bank_bag_slot?(bag)
-
-  defp free_position(ctx) do
-    free_position(ctx, :carried, nil)
-  end
 
   defp free_position(ctx, :carried, item_or_template) do
     carried_storage_positions(ctx)
