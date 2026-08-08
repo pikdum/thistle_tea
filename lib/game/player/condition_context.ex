@@ -161,19 +161,22 @@ defmodule ThistleTea.Game.Player.ConditionContext do
     }
   end
 
-  defp environment_facts(%Character{} = character, %Subject{} = source, conditions, options) do
+  defp environment_facts(%Character{} = character, source, conditions, options) do
     environmental = Requirements.environment_conditions(conditions)
 
     if environmental == [] do
       %{}
     else
       collector = Keyword.get(options, :condition_results, &ScriptedEvent.condition_results/4)
+      source_guid = if match?(%Subject{}, source), do: source.guid
 
       %{
-        condition_results: collector.(character.internal.world, source.guid, character.object.guid, environmental)
+        condition_results: collector.(character.internal.world, source_guid, character.object.guid, environmental)
       }
     end
   end
+
+  defp enrich_source(nil, _requirements, _options), do: nil
 
   defp enrich_source(%Subject{guid: guid} = source, requirements, options) when is_integer(guid) and guid > 0 do
     metadata = Metadata.get(guid) || %{}

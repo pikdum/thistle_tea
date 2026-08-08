@@ -5,6 +5,9 @@ defmodule ThistleTea.Game.World.Loader.QuestVmangosTest do
   alias ThistleTea.Game.Entity.Data.ItemTemplate
   alias ThistleTea.Game.Entity.Data.Quest
   alias ThistleTea.Game.Entity.Data.ScriptStep
+  alias ThistleTea.Game.Entity.Logic.Condition, as: Evaluator
+  alias ThistleTea.Game.Entity.Logic.Condition.Context
+  alias ThistleTea.Game.Entity.Logic.Condition.Subject
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader
 
@@ -48,6 +51,64 @@ defmodule ThistleTea.Game.World.Loader.QuestVmangosTest do
 
       assert %Quest{required_condition: %Condition{entry: 3_755, type: :instance_data}} = QuestLoader.get(5_122)
       assert %Quest{required_condition: %Condition{entry: 3_757, type: :instance_data}} = QuestLoader.get(5_125)
+    end
+
+    test "quest roots need no source facts or target swapping" do
+      nodes = conditioned_quests() |> Enum.flat_map(&flatten(&1.required_condition))
+
+      refute Enum.any?(nodes, & &1.swap_targets?)
+
+      source_only_types = [
+        :source_entry,
+        :db_guid,
+        :cannot_path_to_victim,
+        :has_flag,
+        :last_waypoint,
+        :creature_group_member,
+        :creature_group_dead
+      ]
+
+      refute Enum.any?(nodes, &(&1.type in source_only_types))
+    end
+
+    test "74 roots are evaluable with player facts and two need only instance data" do
+      target = %Subject{
+        guid: 1,
+        kind: :player,
+        level: 60,
+        race: 1,
+        class: 1,
+        zone_id: 0,
+        area_id: 0,
+        aura_ids: MapSet.new(),
+        aura_effects: MapSet.new(),
+        skills: %{},
+        quest_log: %{},
+        rewarded_quests: MapSet.new(),
+        reputation: %{},
+        item_counts_with_bank: %{}
+      }
+
+      context =
+        Context.new(
+          source: nil,
+          target: target,
+          quests: %{1_194 => QuestLoader.get(1_194)},
+          environment: %{condition_results: map_event_results()}
+        )
+
+      {known, unknown} =
+        Enum.split_with(conditioned_quests(), fn quest ->
+          Evaluator.evaluate(context, quest.required_condition) in [:met, :unmet]
+        end)
+
+      assert length(known) == 74
+      assert Enum.map(unknown, & &1.id) |> Enum.sort() == [5_122, 5_125]
+
+      Enum.each(unknown, fn quest ->
+        assert {:unknown, reasons} = Evaluator.evaluate(context, quest.required_condition)
+        assert Enum.all?(reasons, &(&1.capability == {:unsupported_capability, :instance_data}))
+      end)
     end
 
     test "preloads quest start scripts" do
@@ -129,5 +190,21 @@ defmodule ThistleTea.Game.World.Loader.QuestVmangosTest do
 
   defp flatten(%Condition{children: children} = condition) do
     [condition | Enum.flat_map(children, &flatten/1)]
+  end
+
+  defp conditioned_quests do
+    QuestLoader
+    |> :ets.tab2list()
+    |> Enum.flat_map(fn
+      {{:quest, _quest_id}, %Quest{required_condition_id: condition_id} = quest} when condition_id > 0 -> [quest]
+      _entry -> []
+    end)
+  end
+
+  defp map_event_results do
+    conditioned_quests()
+    |> Enum.flat_map(&flatten(&1.required_condition))
+    |> Enum.filter(&(&1.type == :map_event_active))
+    |> Map.new(&{&1.entry, :unmet})
   end
 end

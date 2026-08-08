@@ -136,6 +136,41 @@ defmodule ThistleTea.Game.Player.ConditionContextTest do
 
       assert_received {:collected, %WorldRef{map_id: 1}, ^source_guid, 1, [^condition]}
     end
+
+    test "retains an explicitly absent source without world lookups" do
+      owner = self()
+      condition = %Condition{entry: 77, type: :map_event_active, value1: 12}
+
+      context =
+        ConditionContext.build(character(), [condition],
+          source: nil,
+          condition_results: fn world, source_guid, target_guid, conditions ->
+            send(owner, {:collected, world, source_guid, target_guid, conditions})
+            %{77 => false}
+          end
+        )
+
+      assert context.source == nil
+      assert %Subject{guid: 1, kind: :player} = context.target
+      assert_received {:collected, %WorldRef{map_id: 1}, nil, 1, [^condition]}
+    end
+
+    test "preserves default and explicit subject sources" do
+      character = character()
+      explicit = %Subject{guid: 42, kind: :creature, entry: 7}
+
+      assert %Subject{guid: 1, kind: :player} = ConditionContext.build(character, []).source
+
+      assert %Subject{guid: 42, kind: :creature, entry: 7} =
+               ConditionContext.build(character, [], source: explicit).source
+    end
+
+    test "source-dependent conditions with an absent source are unknown" do
+      condition = %Condition{entry: 77, type: :source_entry, value1: 7}
+      context = ConditionContext.build(character(), [condition], source: nil)
+
+      assert {:unknown, _reasons} = Evaluator.evaluate(context, condition)
+    end
   end
 
   describe "refresh_subject/3" do

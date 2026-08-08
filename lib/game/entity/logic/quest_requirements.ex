@@ -6,11 +6,24 @@ defmodule ThistleTea.Game.Entity.Logic.QuestRequirements do
   import Bitwise
 
   alias ThistleTea.Game.Entity.Data.Quest
+  alias ThistleTea.Game.Entity.Logic.Condition.Reason
   alias ThistleTea.Game.Entity.Logic.QuestLog
 
   @repeatable_flag 0x1
 
-  def can_take(%Quest{} = quest, ctx) do
+  def can_take(%Quest{} = quest, ctx), do: can_take(quest, ctx, default_condition_result(quest))
+
+  def can_take(%Quest{} = quest, ctx, :met), do: base_can_take(quest, ctx)
+  def can_take(%Quest{}, _ctx, :unmet), do: {:error, :required_condition}
+
+  def can_take(%Quest{}, _ctx, {:unknown, reasons}), do: {:error, {:required_condition_unknown, reasons}}
+
+  def can_take(%Quest{} = quest, ctx, nil), do: can_take(quest, ctx)
+
+  def can_take?(%Quest{} = quest, ctx), do: can_take(quest, ctx) == :ok
+  def can_take?(%Quest{} = quest, ctx, condition_result), do: can_take(quest, ctx, condition_result) == :ok
+
+  def base_can_take(%Quest{} = quest, ctx) do
     [
       {QuestLog.active?(ctx.quest_log, quest.id), :already_active},
       {rewarded?(quest, ctx), :already_rewarded},
@@ -28,7 +41,7 @@ defmodule ThistleTea.Game.Entity.Logic.QuestRequirements do
     end)
   end
 
-  def can_take?(%Quest{} = quest, ctx), do: can_take(quest, ctx) == :ok
+  def base_can_take?(%Quest{} = quest, ctx), do: base_can_take(quest, ctx) == :ok
 
   defp rewarded?(%Quest{special_flags: special_flags}, _ctx) when (special_flags &&& @repeatable_flag) != 0, do: false
 
@@ -71,4 +84,11 @@ defmodule ThistleTea.Game.Entity.Logic.QuestRequirements do
 
   defp rewarded_set(%{rewarded_quests: %MapSet{} = rewarded}), do: rewarded
   defp rewarded_set(_ctx), do: MapSet.new()
+
+  defp default_condition_result(%Quest{required_condition_id: 0}), do: :met
+
+  defp default_condition_result(%Quest{required_condition_id: condition_id, required_condition: condition}) do
+    type = if is_struct(condition), do: condition.type, else: {:unsupported, :unresolved}
+    {:unknown, [%Reason{entry: condition_id, type: type, capability: :condition_result_missing}]}
+  end
 end

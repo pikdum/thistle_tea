@@ -24,14 +24,14 @@ defmodule ThistleTea.Game.Entity.Logic.QuestDialogStatus do
   def available, do: @available
   def reward, do: @reward
 
-  def for_npc(giver_quests, ender_quests, ctx) do
+  def for_npc(giver_quests, ender_quests, ctx, condition_results \\ %{}) do
     ender_statuses = Enum.map(ender_quests, &ender_status(&1, ctx))
-    giver_statuses = Enum.map(giver_quests, &giver_status(&1, ctx))
+    giver_statuses = Enum.map(giver_quests, &giver_status(&1, ctx, condition_results))
 
     Enum.max(ender_statuses ++ giver_statuses, fn -> @none end)
   end
 
-  def menu(giver_quests, ender_quests, ctx) do
+  def menu(giver_quests, ender_quests, ctx, condition_results \\ %{}) do
     ender_entries =
       Enum.flat_map(ender_quests, fn quest ->
         case ender_status(quest, ctx) do
@@ -46,7 +46,7 @@ defmodule ThistleTea.Game.Entity.Logic.QuestDialogStatus do
     giver_entries =
       Enum.flat_map(giver_quests, fn quest ->
         if not MapSet.member?(ender_ids, quest.id) and
-             QuestRequirements.can_take?(quest, ctx) do
+             QuestRequirements.can_take?(quest, ctx, Map.get(condition_results, quest.id)) do
           [{quest, @available}]
         else
           []
@@ -64,8 +64,8 @@ defmodule ThistleTea.Game.Entity.Logic.QuestDialogStatus do
     end
   end
 
-  defp giver_status(%Quest{} = quest, ctx) do
-    case QuestRequirements.can_take(quest, ctx) do
+  defp giver_status(%Quest{} = quest, ctx, condition_results) do
+    case QuestRequirements.can_take(quest, ctx, Map.get(condition_results, quest.id)) do
       :ok -> @available
       {:error, :low_level} -> @unavailable
       {:error, _reason} -> @none

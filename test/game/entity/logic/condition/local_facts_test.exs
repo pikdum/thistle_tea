@@ -83,6 +83,15 @@ defmodule ThistleTea.Game.Entity.Logic.Condition.LocalFactsTest do
                Evaluator.evaluate(context(), condition)
     end
 
+    test "conditioned nested quest availability is unknown" do
+      condition = %Condition{entry: 9, type: :quest_available, value1: 100}
+      target = subject(level: 20, race: 1, class: 1, quest_log: %{}, rewarded_quests: MapSet.new(), reputation: %{})
+      context = Context.new(target: target, quests: %{100 => %Quest{id: 100, required_condition_id: 42}})
+
+      assert {:unknown, [%Reason{entry: 9, capability: {:nested_required_condition, 100}}]} =
+               Evaluator.evaluate(context, condition)
+    end
+
     test "game events, level, spells, patch, map, and time are boundary facts" do
       context =
         context(

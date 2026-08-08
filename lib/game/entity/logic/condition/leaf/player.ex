@@ -4,6 +4,7 @@ defmodule ThistleTea.Game.Entity.Logic.Condition.Leaf.Player do
   import Bitwise, only: [&&&: 2, <<<: 2]
 
   alias ThistleTea.Game.Entity.Data.Condition
+  alias ThistleTea.Game.Entity.Data.Quest
   alias ThistleTea.Game.Entity.Logic.Condition.Context
   alias ThistleTea.Game.Entity.Logic.Condition.Result
   alias ThistleTea.Game.Entity.Logic.Condition.Subject
@@ -91,8 +92,14 @@ defmodule ThistleTea.Game.Entity.Logic.Condition.Leaf.Player do
       )
       when is_map(quests) do
     case Map.get(quests, quest_id) do
-      nil -> {:handled, Result.unknown(condition, {:missing_catalog, :quest, quest_id})}
-      quest -> {:handled, quest_available(target, quest, condition)}
+      nil ->
+        {:handled, Result.unknown(condition, {:missing_catalog, :quest, quest_id})}
+
+      %Quest{required_condition_id: required_condition_id} when required_condition_id > 0 ->
+        {:handled, Result.unknown(condition, {:nested_required_condition, quest_id})}
+
+      %Quest{} = quest ->
+        {:handled, quest_available(target, quest, condition)}
     end
   end
 
@@ -147,7 +154,7 @@ defmodule ThistleTea.Game.Entity.Logic.Condition.Leaf.Player do
       reputation: reputation
     }
 
-    Result.truth(QuestRequirements.can_take?(quest, ctx))
+    Result.truth(QuestRequirements.base_can_take?(quest, ctx))
   end
 
   defp quest_available(_subject, _quest, condition),

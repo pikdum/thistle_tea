@@ -36,6 +36,21 @@ defmodule ThistleTea.Game.Entity.Logic.QuestDialogStatusTest do
       assert QuestDialogStatus.for_npc(quests, [], context) == QuestDialogStatus.none()
     end
 
+    test "condition failure hides a quest before low-level icon selection" do
+      quest = %Quest{id: 1, min_level: 50, required_condition_id: 42}
+
+      assert QuestDialogStatus.for_npc([quest], [], ctx(), %{1 => :unmet}) == QuestDialogStatus.none()
+
+      assert QuestDialogStatus.for_npc([quest], [], ctx(), %{1 => {:unknown, [:unavailable]}}) ==
+               QuestDialogStatus.none()
+    end
+
+    test "met condition preserves the low-level unavailable icon" do
+      quest = %Quest{id: 1, min_level: 50, required_condition_id: 42}
+
+      assert QuestDialogStatus.for_npc([quest], [], ctx(), %{1 => :met}) == QuestDialogStatus.unavailable()
+    end
+
     test "incomplete for an ender with the quest in progress" do
       {:ok, quest_log} = QuestLog.add(%{}, 1)
       quests = [%Quest{id: 1}]
@@ -78,6 +93,24 @@ defmodule ThistleTea.Game.Entity.Logic.QuestDialogStatusTest do
       assert QuestDialogStatus.menu([quest], [], context) == []
 
       assert [{%Quest{id: 1}, icon}] = QuestDialogStatus.menu([], [quest], context)
+      assert icon == QuestDialogStatus.incomplete()
+    end
+
+    test "conditioned giver entries require an explicit met result" do
+      quest = %Quest{id: 1, required_condition_id: 42}
+
+      assert QuestDialogStatus.menu([quest], [], ctx()) == []
+      assert QuestDialogStatus.menu([quest], [], ctx(), %{1 => :unmet}) == []
+      assert [{^quest, icon}] = QuestDialogStatus.menu([quest], [], ctx(), %{1 => :met})
+      assert icon == QuestDialogStatus.available()
+    end
+
+    test "active ender entries ignore the start condition" do
+      {:ok, quest_log} = QuestLog.add(%{}, 1)
+      quest = %Quest{id: 1, required_condition_id: 42}
+      context = ctx(quest_log: quest_log)
+
+      assert [{^quest, icon}] = QuestDialogStatus.menu([quest], [quest], context, %{1 => :unmet})
       assert icon == QuestDialogStatus.incomplete()
     end
   end
