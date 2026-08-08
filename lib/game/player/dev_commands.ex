@@ -39,6 +39,8 @@ defmodule ThistleTea.Game.Player.DevCommands do
   alias ThistleTea.Game.Player.Taxi, as: PlayerTaxi
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.CharacterStore
+  alias ThistleTea.Game.World.InstanceData
+  alias ThistleTea.Game.World.InstanceData.Snapshot
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.ClassSpell
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
@@ -123,6 +125,7 @@ defmodule ThistleTea.Game.Player.DevCommands do
       ".guid - show target guid",
       ".help - show help",
       ".instance info - show instance ownership and membership",
+      ".instance data [field] - show read-only instance script data",
       ".instance reset - reset empty owned instances",
       ".instance switch <id> - join a copy of the current map",
       ".learn <spell_id> - learn a spell",
@@ -381,6 +384,12 @@ defmodule ThistleTea.Game.Player.DevCommands do
     |> handled()
   end
 
+  def run(state, ".instance data" <> params) do
+    state
+    |> show_instance_data(String.split(params, " ", trim: true))
+    |> handled()
+  end
+
   def run(state, ".instance reset" <> _) do
     state
     |> reset_instances()
@@ -632,6 +641,51 @@ defmodule ThistleTea.Game.Player.DevCommands do
       {:error, :not_leader} ->
         system_message(state, "Only the party leader can reset instances.")
     end
+  end
+
+  defp show_instance_data(state, []) do
+    state.character.internal.world
+    |> InstanceData.read_all()
+    |> instance_data_message()
+    |> then(&system_message(state, &1))
+  end
+
+  defp show_instance_data(state, [field]) do
+    case Integer.parse(field) do
+      {field, ""} when field >= 0 ->
+        state.character.internal.world
+        |> InstanceData.read([field])
+        |> instance_data_message()
+        |> then(&system_message(state, &1))
+
+      _invalid ->
+        system_message(state, "Invalid command. Use: .instance data [field]")
+    end
+  end
+
+  defp show_instance_data(state, _params) do
+    system_message(state, "Invalid command. Use: .instance data [field]")
+  end
+
+  defp instance_data_message(%Snapshot{status: :available, fields: fields, script_name: script_name}) do
+    values =
+      fields
+      |> Enum.sort_by(&elem(&1, 0))
+      |> Enum.map_join(", ", fn
+        {field, {:ok, value}} -> "#{field}=#{value}"
+        {field, {:error, {:unsupported_field, unsupported}}} when unsupported == field -> "#{field}=unsupported"
+        {field, {:error, _reason}} -> "#{field}=unknown"
+      end)
+
+    "Instance data (#{script_name}): #{values}"
+  end
+
+  defp instance_data_message(%Snapshot{status: :no_instance_script}), do: "Current map has no instance script."
+  defp instance_data_message(%Snapshot{status: :open_world}), do: "Current world is not an instance copy."
+  defp instance_data_message(%Snapshot{status: :missing_copy}), do: "Instance copy is no longer active."
+
+  defp instance_data_message(%Snapshot{status: {:unsupported_script, script_name}}) do
+    "Instance script #{script_name} has no registered fields."
   end
 
   defp switch_instance(state, instance_id) do

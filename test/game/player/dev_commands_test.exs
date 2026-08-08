@@ -18,10 +18,12 @@ defmodule ThistleTea.Game.Player.DevCommandsTest do
   alias ThistleTea.Game.Entity.Logic.Transport, as: TransportLogic
   alias ThistleTea.Game.Entity.Server.Transport, as: TransportServer
   alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.Instance.Copy
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Player.DevCommands
   alias ThistleTea.Game.Player.Reputation, as: PlayerReputation
   alias ThistleTea.Game.World.CharacterStore
+  alias ThistleTea.Game.World.InstanceData
   alias ThistleTea.Game.World.Loader.Reputation, as: ReputationLoader
   alias ThistleTea.Game.World.Loader.Taxi, as: TaxiLoader
   alias ThistleTea.Game.World.Metadata
@@ -212,6 +214,56 @@ defmodule ThistleTea.Game.Player.DevCommandsTest do
       assert {:handled, ^state} = DevCommands.run(state, ".debug reputation find storm")
 
       assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgMessagechat{message: "Stormwind (72), slot 19"}}}
+    end
+  end
+
+  describe ".instance data" do
+    test "reports registered data without exposing a write path" do
+      world = WorldRef.instance(329, System.unique_integer([:positive, :monotonic]))
+      state = %{guid: 1, character: %{debug_character() | internal: %Internal{world: world}}}
+
+      InstanceData.publish(%Copy{
+        world: world,
+        owner: {:player, 1},
+        script_name: "instance_stratholme",
+        data: %{7 => 2}
+      })
+
+      on_exit(fn -> InstanceData.remove(world) end)
+
+      assert {:handled, ^state} = DevCommands.run(state, ".instance data")
+
+      assert_receive {:"$gen_cast",
+                      {:send_packet, %Message.SmsgMessagechat{message: "Instance data (instance_stratholme): 7=2"}}}
+
+      assert {:handled, ^state} = DevCommands.run(state, ".instance data 5")
+
+      assert_receive {:"$gen_cast",
+                      {:send_packet,
+                       %Message.SmsgMessagechat{message: "Instance data (instance_stratholme): 5=unsupported"}}}
+
+      assert {:handled, ^state} = DevCommands.run(state, ".instance data 7 2")
+
+      assert_receive {:"$gen_cast",
+                      {:send_packet, %Message.SmsgMessagechat{message: "Invalid command. Use: .instance data [field]"}}}
+
+      assert InstanceData.read(world, [7]).fields == %{7 => {:ok, 2}}
+    end
+
+    test "distinguishes open worlds from destroyed copies" do
+      open_state = %{guid: 1, character: debug_character()}
+      missing_world = WorldRef.instance(329, System.unique_integer([:positive, :monotonic]))
+      missing_state = %{guid: 1, character: %{debug_character() | internal: %Internal{world: missing_world}}}
+
+      assert {:handled, ^open_state} = DevCommands.run(open_state, ".instance data 7")
+
+      assert_receive {:"$gen_cast",
+                      {:send_packet, %Message.SmsgMessagechat{message: "Current world is not an instance copy."}}}
+
+      assert {:handled, ^missing_state} = DevCommands.run(missing_state, ".instance data")
+
+      assert_receive {:"$gen_cast",
+                      {:send_packet, %Message.SmsgMessagechat{message: "Instance copy is no longer active."}}}
     end
   end
 
