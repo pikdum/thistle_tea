@@ -7,9 +7,9 @@ defmodule ThistleTea.Game.World.Loader.QuestVmangosTest do
   alias ThistleTea.Game.Entity.Data.ScriptStep
   alias ThistleTea.Game.Entity.Logic.Condition, as: Evaluator
   alias ThistleTea.Game.Entity.Logic.Condition.Context
+  alias ThistleTea.Game.Entity.Logic.Condition.InstanceDataSnapshot, as: Snapshot
   alias ThistleTea.Game.Entity.Logic.Condition.Subject
   alias ThistleTea.Game.Guid
-  alias ThistleTea.Game.World.InstanceData.Snapshot
   alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader
   alias ThistleTea.Game.WorldRef
 

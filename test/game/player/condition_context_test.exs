@@ -13,10 +13,10 @@ defmodule ThistleTea.Game.Player.ConditionContextTest do
   alias ThistleTea.Game.Entity.Data.Quest
   alias ThistleTea.Game.Entity.Data.Reputation
   alias ThistleTea.Game.Entity.Logic.Condition, as: Evaluator
+  alias ThistleTea.Game.Entity.Logic.Condition.InstanceDataSnapshot, as: Snapshot
   alias ThistleTea.Game.Entity.Logic.Condition.Subject
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Player.ConditionContext
-  alias ThistleTea.Game.World.InstanceData.Snapshot
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.WorldRef
 

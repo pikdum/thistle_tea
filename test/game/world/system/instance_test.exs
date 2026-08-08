@@ -1,8 +1,8 @@
 defmodule ThistleTea.Game.World.System.InstanceTest do
   use ExUnit.Case, async: false
 
+  alias ThistleTea.Game.Entity.Logic.Condition.InstanceDataSnapshot, as: Snapshot
   alias ThistleTea.Game.World.InstanceData
-  alias ThistleTea.Game.World.InstanceData.Snapshot
   alias ThistleTea.Game.World.System.Instance, as: InstanceSystem
 
   describe "instance lifecycle" do

@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Player.DevCommands do
   alias ThistleTea.Game.Entity.Data.Reputation.Definition
   alias ThistleTea.Game.Entity.Data.Reputation.State, as: ReputationState
   alias ThistleTea.Game.Entity.EventSink
+  alias ThistleTea.Game.Entity.Logic.Condition.InstanceDataSnapshot, as: Snapshot
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Death
   alias ThistleTea.Game.Entity.Logic.Effects
@@ -40,7 +41,6 @@ defmodule ThistleTea.Game.Player.DevCommands do
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.InstanceData
-  alias ThistleTea.Game.World.InstanceData.Snapshot
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.ClassSpell
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader

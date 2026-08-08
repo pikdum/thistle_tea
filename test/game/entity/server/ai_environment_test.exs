@@ -13,9 +13,9 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironmentTest do
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception.Request
+  alias ThistleTea.Game.Entity.Logic.Condition.InstanceDataSnapshot, as: Snapshot
   alias ThistleTea.Game.Entity.Server.AIEnvironment
   alias ThistleTea.Game.Guid
-  alias ThistleTea.Game.World.InstanceData.Snapshot
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.System.ScriptedEvent

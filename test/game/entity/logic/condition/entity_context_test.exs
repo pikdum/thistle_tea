@@ -11,8 +11,8 @@ defmodule ThistleTea.Game.Entity.Logic.Condition.EntityContextTest do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context, as: AIContext
   alias ThistleTea.Game.Entity.Logic.Condition, as: Evaluator
   alias ThistleTea.Game.Entity.Logic.Condition.EntityContext
+  alias ThistleTea.Game.Entity.Logic.Condition.InstanceDataSnapshot, as: Snapshot
   alias ThistleTea.Game.Guid
-  alias ThistleTea.Game.World.InstanceData.Snapshot
   alias ThistleTea.Game.WorldRef
 
   describe "build/3" do

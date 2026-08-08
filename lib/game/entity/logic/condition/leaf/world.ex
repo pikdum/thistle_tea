@@ -3,9 +3,9 @@ defmodule ThistleTea.Game.Entity.Logic.Condition.Leaf.World do
 
   alias ThistleTea.Game.Entity.Data.Condition
   alias ThistleTea.Game.Entity.Logic.Condition.Context
+  alias ThistleTea.Game.Entity.Logic.Condition.InstanceDataSnapshot, as: Snapshot
   alias ThistleTea.Game.Entity.Logic.Condition.Result
   alias ThistleTea.Game.Entity.Logic.Condition.Subject
-  alias ThistleTea.Game.World.InstanceData.Snapshot
 
   def evaluate(
         %Context{world: %{instance_data: %Snapshot{status: :available, fields: fields}}},

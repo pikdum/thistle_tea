@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
   alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.EventSink.Context
   alias ThistleTea.Game.Entity.Logic.Companion
+  alias ThistleTea.Game.Entity.Logic.Condition.InstanceDataSnapshot, as: Snapshot
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Server.Player.CompanionOwner.Attachment
   alias ThistleTea.Game.Guid
@@ -24,7 +25,6 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.InstanceData
-  alias ThistleTea.Game.World.InstanceData.Snapshot
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.System.Instance, as: InstanceSystem

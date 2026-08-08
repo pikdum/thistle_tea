@@ -1,9 +1,9 @@
 defmodule ThistleTea.Game.World.InstanceDataTest do
   use ExUnit.Case, async: true
 
+  alias ThistleTea.Game.Entity.Logic.Condition.InstanceDataSnapshot, as: Snapshot
   alias ThistleTea.Game.Instance.Copy
   alias ThistleTea.Game.World.InstanceData
-  alias ThistleTea.Game.World.InstanceData.Snapshot
   alias ThistleTea.Game.WorldRef
 
   describe "read/3" do

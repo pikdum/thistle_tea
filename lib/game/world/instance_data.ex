@@ -3,15 +3,10 @@ defmodule ThistleTea.Game.World.InstanceData do
   Concurrent read projection of authoritative per-copy instance script data.
   """
 
+  alias ThistleTea.Game.Entity.Logic.Condition.InstanceDataSnapshot, as: Snapshot
   alias ThistleTea.Game.Instance.Copy
   alias ThistleTea.Game.InstanceScript
   alias ThistleTea.Game.WorldRef
-
-  defmodule Snapshot do
-    @moduledoc false
-    @enforce_keys [:world, :status]
-    defstruct [:world, :status, :script_name, fields: %{}]
-  end
 
   @table_options [:named_table, :public, read_concurrency: true]
 

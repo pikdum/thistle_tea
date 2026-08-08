@@ -4,9 +4,9 @@ defmodule ThistleTea.Game.Entity.Logic.ConditionTest do
   alias ThistleTea.Game.Entity.Data.Condition
   alias ThistleTea.Game.Entity.Logic.Condition, as: Evaluator
   alias ThistleTea.Game.Entity.Logic.Condition.Context
+  alias ThistleTea.Game.Entity.Logic.Condition.InstanceDataSnapshot, as: Snapshot
   alias ThistleTea.Game.Entity.Logic.Condition.Reason
   alias ThistleTea.Game.Entity.Logic.Condition.Subject
-  alias ThistleTea.Game.World.InstanceData.Snapshot
   alias ThistleTea.Game.WorldRef
 
   describe "evaluate/2" do
