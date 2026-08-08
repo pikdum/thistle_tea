@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.Player.QuestRequiredConditionTest do
   use ExUnit.Case, async: false
 
+  alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
@@ -11,6 +12,7 @@ defmodule ThistleTea.Game.Player.QuestRequiredConditionTest do
   alias ThistleTea.Game.Entity.Data.ItemTemplate
   alias ThistleTea.Game.Entity.Data.Quest
   alias ThistleTea.Game.Entity.Data.Reputation
+  alias ThistleTea.Game.Entity.Data.ScriptStep
   alias ThistleTea.Game.Entity.Logic.QuestDialogStatus
   alias ThistleTea.Game.Entity.Logic.QuestLog
   alias ThistleTea.Game.Guid
@@ -99,10 +101,13 @@ defmodule ThistleTea.Game.Player.QuestRequiredConditionTest do
         context,
         %Condition{entry: 1, type: :item_with_bank, value1: context.item_id, value2: 1},
         src_item_id: source_item_id,
-        limit_time: 60
+        limit_time: 60,
+        start_script_steps: [%ScriptStep{command: :talk}]
       )
 
     put_quest(context, quest, giver: true)
+    assert {:ok, _owner} = Entity.register(context.npc_guid)
+    on_exit(fn -> Entity.unregister(context.npc_guid) end)
     banked = bank_item(context, context.character)
     assert [{^quest, _icon}] = Quests.quest_menu(context.npc_guid, banked)
 
@@ -116,6 +121,7 @@ defmodule ThistleTea.Game.Player.QuestRequiredConditionTest do
     refute owned_entry?(context.player_guid, source_item_id)
 
     assert [%Message.SmsgQuestgiverQuestInvalid{reason: 0}] = sent_packets()
+    refute_receive {:"$gen_cast", {:start_script, _steps, _target_guid}}
     refute_receive {:quest_timer_expired, _, _}
   end
 
