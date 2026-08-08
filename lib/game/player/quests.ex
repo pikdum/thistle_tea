@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.Player.Quests do
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Item, as: DataItem
   alias ThistleTea.Game.Entity.Data.Quest
+  alias ThistleTea.Game.Entity.Logic.Condition, as: ConditionEvaluator
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Death
   alias ThistleTea.Game.Entity.Logic.Experience
@@ -37,6 +38,11 @@ defmodule ThistleTea.Game.Player.Quests do
   alias ThistleTea.Game.World.Presence
   alias ThistleTea.Game.World.System.Party, as: PartySystem
 
+  defmodule Availability do
+    @moduledoc false
+    defstruct [:quest_context, condition_results: %{}]
+  end
+
   def ctx(%Character{} = character) do
     %{
       level: character.unit.level,
@@ -51,7 +57,14 @@ defmodule ThistleTea.Game.Player.Quests do
   def dialog_status(npc_guid, %Character{} = character) do
     if PlayerReputation.can_interact?(character, npc_guid) do
       {giver_quests, ender_quests} = npc_quests(npc_guid)
-      QuestDialogStatus.for_npc(giver_quests, ender_quests, ctx(character))
+      availability = availability(character, giver_quests)
+
+      QuestDialogStatus.for_npc(
+        giver_quests,
+        ender_quests,
+        availability.quest_context,
+        availability.condition_results
+      )
     else
       QuestDialogStatus.none()
     end
@@ -67,9 +80,8 @@ defmodule ThistleTea.Game.Player.Quests do
 
   defp do_hello(state, npc_guid) do
     state = credit_entity_interaction(state, npc_guid)
-    {giver_quests, ender_quests} = npc_quests(npc_guid)
 
-    case QuestDialogStatus.menu(giver_quests, ender_quests, ctx(state.character)) do
+    case quest_menu(npc_guid, state.character) do
       [] ->
         state
 
@@ -110,10 +122,19 @@ defmodule ThistleTea.Game.Player.Quests do
     with true <- PlayerReputation.can_interact?(state.character, npc_guid),
          %Quest{} = quest <- QuestLoader.get(quest_id),
          true <- quest_id in QuestLoader.given_by(Guid.entry(npc_guid)),
-         :ok <- QuestRequirements.can_take(quest, ctx(state.character)) do
+         :ok <- takeability(state.character, quest) do
       force_accept(state, quest_id, npc_guid)
     else
-      _other -> state
+      {:error, :required_condition} ->
+        send_condition_invalid()
+        state
+
+      {:error, {:required_condition_unknown, _reasons}} ->
+        send_condition_invalid()
+        state
+
+      _other ->
+        state
     end
   end
 
@@ -294,7 +315,7 @@ defmodule ThistleTea.Game.Player.Quests do
   defp send_next_quest(state, npc_guid, %Quest{next_quest_in_chain: next_id}) when next_id > 0 do
     with %Quest{} = next_quest <- QuestLoader.get(next_id),
          true <- next_id in QuestLoader.given_by(Guid.entry(npc_guid)),
-         :ok <- QuestRequirements.can_take(next_quest, ctx(state.character)) do
+         :ok <- takeability(state.character, next_quest) do
       send_details(npc_guid, next_quest)
     end
 
@@ -429,12 +450,46 @@ defmodule ThistleTea.Game.Player.Quests do
     {load_quests(QuestLoader.given_by(entry)), load_quests(QuestLoader.ended_by(entry))}
   end
 
+  def quest_menu(npc_guid, %Character{} = character) do
+    {giver_quests, ender_quests} = npc_quests(npc_guid)
+    availability = availability(character, giver_quests)
+
+    QuestDialogStatus.menu(
+      giver_quests,
+      ender_quests,
+      availability.quest_context,
+      availability.condition_results
+    )
+  end
+
+  def availability(%Character{} = character, quests) when is_list(quests) do
+    conditions = quests |> Enum.map(& &1.required_condition) |> Enum.reject(&is_nil/1)
+    context = ConditionContext.build(character, conditions, source: nil)
+
+    condition_results =
+      quests
+      |> Enum.reject(&is_nil(&1.required_condition))
+      |> Map.new(fn quest -> {quest.id, ConditionEvaluator.evaluate(context, quest.required_condition)} end)
+
+    %Availability{quest_context: ctx(character), condition_results: condition_results}
+  end
+
   def send_details(npc_guid, %Quest{} = quest) do
     Network.send_packet(%Message.SmsgQuestgiverQuestDetails{
       npc_guid: npc_guid,
       quest: quest,
       activate_accept: true
     })
+  end
+
+  defp takeability(%Character{} = character, %Quest{} = quest) do
+    availability = availability(character, [quest])
+    result = Map.get(availability.condition_results, quest.id)
+    QuestRequirements.can_take(quest, availability.quest_context, result)
+  end
+
+  defp send_condition_invalid do
+    Network.send_packet(%Message.SmsgQuestgiverQuestInvalid{reason: 0})
   end
 
   defp send_quest_list(npc_guid, entries) do

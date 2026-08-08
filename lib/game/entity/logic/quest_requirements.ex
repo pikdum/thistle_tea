@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.Entity.Logic.QuestRequirements do
   """
   import Bitwise
 
+  alias ThistleTea.Game.Entity.Data.Condition
   alias ThistleTea.Game.Entity.Data.Quest
   alias ThistleTea.Game.Entity.Logic.Condition.Reason
   alias ThistleTea.Game.Entity.Logic.QuestLog
@@ -88,7 +89,12 @@ defmodule ThistleTea.Game.Entity.Logic.QuestRequirements do
   defp default_condition_result(%Quest{required_condition_id: 0}), do: :met
 
   defp default_condition_result(%Quest{required_condition_id: condition_id, required_condition: condition}) do
-    type = if is_struct(condition), do: condition.type, else: {:unsupported, :unresolved}
+    type =
+      case condition do
+        %Condition{type: type} -> type
+        _condition -> {:unsupported, :unresolved}
+      end
+
     {:unknown, [%Reason{entry: condition_id, type: type, capability: :condition_result_missing}]}
   end
 end

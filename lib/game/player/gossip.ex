@@ -11,7 +11,6 @@ defmodule ThistleTea.Game.Player.Gossip do
   alias ThistleTea.Game.Entity.Logic.AI.Script
   alias ThistleTea.Game.Entity.Logic.Condition.Subject
   alias ThistleTea.Game.Entity.Logic.Death
-  alias ThistleTea.Game.Entity.Logic.QuestDialogStatus
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
@@ -69,10 +68,8 @@ defmodule ThistleTea.Game.Player.Gossip do
   def select(state, _guid, _gossip_list_id), do: state
 
   def quest_items(npc_guid, character) do
-    {giver_quests, ender_quests} = Quests.npc_quests(npc_guid)
-
-    giver_quests
-    |> QuestDialogStatus.menu(ender_quests, Quests.ctx(character))
+    npc_guid
+    |> Quests.quest_menu(character)
     |> Enum.map(fn {%Quest{} = quest, icon} ->
       %QuestItem{quest_id: quest.id, quest_icon: icon, level: quest.level, title: quest.title}
     end)
