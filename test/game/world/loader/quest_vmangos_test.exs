@@ -9,7 +9,9 @@ defmodule ThistleTea.Game.World.Loader.QuestVmangosTest do
   alias ThistleTea.Game.Entity.Logic.Condition.Context
   alias ThistleTea.Game.Entity.Logic.Condition.Subject
   alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.World.InstanceData.Snapshot
   alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader
+  alias ThistleTea.Game.WorldRef
 
   @moduletag :vmangos_db
 
@@ -71,7 +73,7 @@ defmodule ThistleTea.Game.World.Loader.QuestVmangosTest do
       refute Enum.any?(nodes, &(&1.type in source_only_types))
     end
 
-    test "74 roots are evaluable with player facts and two need only instance data" do
+    test "74 roots are evaluable without a snapshot and all roots evaluate with registered instance data" do
       target = %Subject{
         guid: 1,
         kind: :player,
@@ -107,8 +109,26 @@ defmodule ThistleTea.Game.World.Loader.QuestVmangosTest do
 
       Enum.each(unknown, fn quest ->
         assert {:unknown, reasons} = Evaluator.evaluate(context, quest.required_condition)
-        assert Enum.all?(reasons, &(&1.capability == {:unsupported_capability, :instance_data}))
+        assert Enum.all?(reasons, &(&1.capability == {:missing_fact, :world, :instance_data}))
       end)
+
+      world = WorldRef.instance(329, 1)
+
+      zero = %Snapshot{
+        world: world,
+        status: :available,
+        script_name: "instance_stratholme",
+        fields: %{7 => {:ok, 0}}
+      }
+
+      two = %{zero | fields: %{7 => {:ok, 2}}}
+      zero_context = %{context | world: %{instance_data: zero}}
+      two_context = %{context | world: %{instance_data: two}}
+
+      assert Evaluator.evaluate(zero_context, QuestLoader.get(5_122).required_condition) == :met
+      assert Evaluator.evaluate(zero_context, QuestLoader.get(5_125).required_condition) == :unmet
+      assert Evaluator.evaluate(two_context, QuestLoader.get(5_122).required_condition) == :unmet
+      assert Evaluator.evaluate(two_context, QuestLoader.get(5_125).required_condition) == :met
     end
 
     test "preloads quest start scripts" do
