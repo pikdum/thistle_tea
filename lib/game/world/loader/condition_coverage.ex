@@ -230,12 +230,12 @@ defmodule ThistleTea.Game.World.Loader.ConditionCoverage do
     | Area-trigger teleports | Resolved tree cached with teleport | Deny unknown |
     | Vendors | Typed conditioned rows; purchase revalidated | Deny unknown |
     | Loot | Actor-aware direct items; conditioned references validated before expansion | Deny unknown at view, roll, assignment, reservation, and pre-transfer validation |
-    | Quest availability | Condition ID not integrated | Not evaluated |
+    | Quest availability | Shared evaluator; display and acceptance are revalidated | Deny unknown |
     | Remaining discovered consumers | Inventory only | Not integrated |
 
     ## Dependency-ranked backlog
 
-    1. Consumer migrations: quest and remaining discovered consumers.
+    1. Consumer migrations: remaining discovered consumers.
     2. Partial world facts currently collected only by the scripted-event
        boundary or for spawned game objects.
     3. Explicitly blocked owners: saved variables, instance scripts/data, raw
