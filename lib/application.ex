@@ -15,6 +15,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.World.ChaseWatch
   alias ThistleTea.Game.World.EntitySupervisor
   alias ThistleTea.Game.World.Groups
+  alias ThistleTea.Game.World.InstanceData
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.AreaTrigger, as: AreaTriggerLoader
   alias ThistleTea.Game.World.Loader.BankBagSlotPrice, as: BankBagSlotPriceLoader
@@ -133,6 +134,7 @@ defmodule ThistleTea.Application do
 
     :ets.new(:session, [:named_table, :public, read_concurrency: true, write_concurrency: :auto])
     Metadata.init()
+    InstanceData.init()
     ItemLoader.init()
     ItemEnchantmentLoader.init()
     ItemStore.init()

@@ -8,12 +8,15 @@ defmodule ThistleTea.Game.World.System.Instance do
   alias ThistleTea.Game.Instance
   alias ThistleTea.Game.Party
   alias ThistleTea.Game.World
+  alias ThistleTea.Game.World.InstanceData
   alias ThistleTea.Game.World.Loader.AreaTrigger, as: AreaTriggerLoader
   alias ThistleTea.Game.World.Loader.MapTemplate, as: MapTemplateLoader
   alias ThistleTea.Game.World.SpawnPool
   alias ThistleTea.Game.World.System.CellActivator
   alias ThistleTea.Game.World.System.Party, as: PartySystem
   alias ThistleTea.Game.WorldRef
+
+  require Logger
 
   @empty_timeout_ms 300_000
 
@@ -59,6 +62,10 @@ defmodule ThistleTea.Game.World.System.Instance do
     GenServer.call(server, {:switch, guid, world})
   end
 
+  def command(world, field, value, mode, server \\ __MODULE__) do
+    GenServer.call(server, {:command, world, field, value, mode})
+  end
+
   @impl GenServer
   def init(opts) do
     {:ok,
@@ -69,7 +76,9 @@ defmodule ThistleTea.Game.World.System.Instance do
        cleanup: Keyword.get(opts, :cleanup, &cleanup_world/1),
        owner: Keyword.get(opts, :owner, &owner/1),
        reset_owner: Keyword.get(opts, :reset_owner, &reset_owner/1),
-       script_name: Keyword.get(opts, :script_name, &MapTemplateLoader.instance_script_name/1)
+       script_name: Keyword.get(opts, :script_name, &MapTemplateLoader.instance_script_name/1),
+       projection: Keyword.get(opts, :projection, InstanceData),
+       projection_table: Keyword.get(opts, :projection_table, InstanceData)
      }}
   end
 
@@ -77,7 +86,12 @@ defmodule ThistleTea.Game.World.System.Instance do
   def handle_call({:enter, map_id, guid}, _from, state) do
     owner = state.owner.(guid)
     script_name = state.script_name.(map_id)
-    {world, emptied, instances} = Instance.enter(state.instances, map_id, owner, guid, script_name)
+    previous = state.instances
+    {world, emptied, instances} = Instance.enter(previous, map_id, owner, guid, script_name)
+
+    if is_nil(Instance.copy(previous, world)) do
+      state.projection.publish(state.projection_table, Instance.copy(instances, world))
+    end
 
     state =
       %{state | instances: instances}
@@ -85,6 +99,25 @@ defmodule ThistleTea.Game.World.System.Instance do
       |> schedule_cleanup(emptied)
 
     {:reply, {:ok, world}, state}
+  rescue
+    error ->
+      Logger.warning("Instance admission failed: #{Exception.message(error)}")
+      {:reply, {:error, :instance_unavailable}, state}
+  end
+
+  def handle_call({:command, world, field, value, mode}, _from, state) do
+    case Instance.command(state.instances, world, field, value, mode) do
+      {:ok, stored, _effects, instances} ->
+        state.projection.publish(state.projection_table, Instance.copy(instances, world))
+        {:reply, {:ok, stored}, %{state | instances: instances}}
+
+      {:error, _reason} = error ->
+        {:reply, error, state}
+    end
+  rescue
+    error ->
+      Logger.warning("Instance data command failed: #{Exception.message(error)}")
+      {:reply, {:error, :instance_command_failed}, state}
   end
 
   def handle_call({:world_for, map_id, guid}, _from, state) do
@@ -181,6 +214,7 @@ defmodule ThistleTea.Game.World.System.Instance do
   defp reset_copy(copy, state) do
     state.cleanup.(copy.world)
     instances = Instance.destroy_empty(state.instances, copy.world)
+    state.projection.remove(state.projection_table, copy.world)
     state = cancel_cleanup(state, copy.world)
     %{state | instances: instances}
   end
@@ -211,6 +245,7 @@ defmodule ThistleTea.Game.World.System.Instance do
     if Instance.empty?(state.instances, world) do
       state.cleanup.(world)
       instances = Instance.destroy_empty(state.instances, world)
+      state.projection.remove(state.projection_table, world)
       {:noreply, %{state | instances: instances, cleanup_refs: cleanup_refs}}
     else
       {:noreply, %{state | cleanup_refs: cleanup_refs}}
