@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Data.GameObject
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.EventSink.Context
@@ -22,8 +23,11 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.World
+  alias ThistleTea.Game.World.InstanceData
+  alias ThistleTea.Game.World.InstanceData.Snapshot
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
+  alias ThistleTea.Game.World.System.Instance, as: InstanceSystem
   alias ThistleTea.Game.WorldRef
 
   defmodule UnsupportedEffect do
@@ -40,6 +44,30 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
         # credo:disable-for-next-line Credo.Check.Refactor.Apply
         apply(EventSink, :emit, [mob, %UnsupportedEffect{value: :unexpected}])
       end
+    end
+
+    test "instance data effects synchronously publish before pending emission returns", %{mob: mob} do
+      {server, table, world} = instance_owner()
+      effect = Effects.instance_data_command(world, 7, 1, :raw, 5_122)
+      mob = %{mob | internal: %{mob.internal | world: world, events: [effect]}}
+
+      assert %{internal: %{events: []}} = EventSink.emit_pending(mob, Context.new(self(), instance_system: server))
+      assert %Snapshot{fields: %{7 => {:ok, 1}}} = InstanceData.read(world, [7], table)
+    end
+
+    test "instance owner rejection leaves all entity kinds alive and unchanged", %{mob: mob} do
+      {server, table, world} = instance_owner()
+      context = Context.new(self(), instance_system: server)
+      effect = Effects.instance_data_command(world, 5, 2, :raw, 1_044_002)
+      mob = %{mob | internal: %{mob.internal | world: world}}
+      game_object = %GameObject{internal: %Internal{world: world}}
+      character = %Character{internal: %Internal{world: world}}
+
+      assert ^mob = EventSink.emit(mob, effect, context)
+      assert ^game_object = EventSink.emit(game_object, effect, context)
+      assert ^character = EventSink.emit(character, effect, context)
+      assert Process.alive?(Process.whereis(server))
+      assert %Snapshot{fields: %{7 => {:ok, 0}}} = InstanceData.read(world, [7], table)
     end
 
     test "forced reaction changes update the client and request friendly attack cancellation" do
@@ -564,6 +592,23 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
                          spell_id: 139
                        }}}
     end
+  end
+
+  defp instance_owner do
+    server = :"event_sink_instance_#{System.unique_integer([:positive])}"
+    table = :ets.new(:event_sink_instance_data, [:set, :public, read_concurrency: true])
+
+    start_supervised!(
+      {InstanceSystem,
+       name: server,
+       projection_table: table,
+       script_name: fn 329 -> "instance_stratholme" end,
+       owner: fn guid -> {:player, guid} end}
+    )
+
+    guid = System.unique_integer([:positive])
+    {:ok, world} = InstanceSystem.enter(329, guid, server)
+    {server, table, world}
   end
 
   defp metadata_fixtures(_context) do

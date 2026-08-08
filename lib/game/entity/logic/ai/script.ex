@@ -822,6 +822,24 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
     {Effects.enqueue(state, effect), blackboard}
   end
 
+  defp execute(
+         %{internal: %{world: world}} = state,
+         blackboard,
+         %ScriptStep{command: :set_instance_data} = step,
+         _target_guid,
+         _now,
+         %Context{}
+       ) do
+    case ScriptStep.instance_data_command(step) do
+      {:ok, command} ->
+        effect = Effects.instance_data_command(world, command.field, command.value, command.mode, step.script_id)
+        {Effects.enqueue(state, effect), blackboard}
+
+      {:error, :unsupported} ->
+        {state, blackboard}
+    end
+  end
+
   defp execute(state, blackboard, %ScriptStep{} = step, target_guid, now, %Context{}) do
     execute(state, blackboard, step, target_guid, now)
   end

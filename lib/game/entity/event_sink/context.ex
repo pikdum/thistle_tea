@@ -7,9 +7,11 @@ defmodule ThistleTea.Game.Entity.EventSink.Context do
   alias ThistleTea.Game.Network
 
   @enforce_keys [:owner_pid]
-  defstruct [:owner_pid]
+  defstruct [:owner_pid, :instance_system]
 
-  def new(owner_pid) when is_pid(owner_pid), do: %__MODULE__{owner_pid: owner_pid}
+  def new(owner_pid, options \\ []) when is_pid(owner_pid) do
+    %__MODULE__{owner_pid: owner_pid, instance_system: Keyword.get(options, :instance_system)}
+  end
 
   def from_entity(%{object: %{guid: guid}}) when is_integer(guid) do
     case Entity.pid(guid) do

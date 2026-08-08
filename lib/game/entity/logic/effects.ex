@@ -531,6 +531,17 @@ defmodule ThistleTea.Game.Entity.Logic.Effects do
     }
   end
 
+  def instance_data_command(world, field, value, mode, script_id)
+      when is_integer(field) and is_integer(value) and is_atom(mode) do
+    %Effects.InstanceDataCommand{
+      world: world,
+      field: field,
+      value: value,
+      mode: mode,
+      script_id: script_id
+    }
+  end
+
   def send_script_event(owner_guid, invoker_guid, event_id, data)
       when is_integer(owner_guid) and (is_integer(invoker_guid) or is_nil(invoker_guid)) and is_integer(event_id) and
              is_integer(data) do

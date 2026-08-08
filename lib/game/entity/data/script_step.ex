@@ -49,7 +49,7 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStep do
       script_id: row.id,
       delay_ms: int(row.delay) * 1_000,
       priority: int(row.priority),
-      command: command(row.command),
+      command: command(row.command, int(row.datalong3)),
       datalong: int(row.datalong),
       datalong2: int(row.datalong2),
       datalong3: int(row.datalong3),
@@ -145,6 +145,14 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStep do
 
   def start_script_options(%__MODULE__{}), do: []
 
+  def instance_data_command(%__MODULE__{command: :set_instance_data} = step) do
+    with {:ok, mode} <- instance_data_mode(step.datalong3) do
+      {:ok, %{field: step.datalong, value: step.datalong2, mode: mode}}
+    end
+  end
+
+  def instance_data_command(%__MODULE__{}), do: {:error, :unsupported}
+
   @summon_flag_set_run 0x01
   @summon_flag_unique 0x04
   @summon_flag_unique_temp 0x08
@@ -163,6 +171,10 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStep do
       position: step.position
     }
   end
+
+  defp command(37, mode) when mode in 0..2, do: :set_instance_data
+  defp command(37, _mode), do: {:unsupported, 37}
+  defp command(command, _mode), do: command(command)
 
   defp command(0), do: :talk
   defp command(1), do: :emote
@@ -229,6 +241,11 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStep do
   defp command(87), do: :reset_door_or_button
   defp command(89), do: :play_custom_animation
   defp command(other), do: {:unsupported, other}
+
+  defp instance_data_mode(0), do: {:ok, :raw}
+  defp instance_data_mode(1), do: {:ok, :increment}
+  defp instance_data_mode(2), do: {:ok, :decrement}
+  defp instance_data_mode(_mode), do: {:error, :unsupported}
 
   def decode_target_type(value) when is_integer(value) and value < 0, do: nil
   def decode_target_type(value), do: target_type(value)

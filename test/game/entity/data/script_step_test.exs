@@ -116,6 +116,16 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStepTest do
       assert ScriptStep.build(row(89)).command == :play_custom_animation
     end
 
+    test "decodes instance data command modes and rejects invalid modes" do
+      assert instance_data_step(0) == {:set_instance_data, :raw}
+      assert instance_data_step(1) == {:set_instance_data, :increment}
+      assert instance_data_step(2) == {:set_instance_data, :decrement}
+
+      invalid = row(37) |> Map.put(:datalong3, 3) |> ScriptStep.build()
+      assert invalid.command == {:unsupported, 37}
+      assert ScriptStep.instance_data_command(invalid) == {:error, :unsupported}
+    end
+
     test "decodes game object target selectors" do
       nearest = row(13) |> Map.put(:target_type, 13) |> ScriptStep.build()
       by_guid = row(13) |> Map.put(:target_type, 14) |> ScriptStep.build()
@@ -198,5 +208,15 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStepTest do
       o: 0.0,
       condition_id: 0
     }
+  end
+
+  defp instance_data_step(mode) do
+    step =
+      row(37)
+      |> Map.merge(%{datalong: 7, datalong2: 2, datalong3: mode})
+      |> ScriptStep.build()
+
+    assert {:ok, %{field: 7, value: 2, mode: decoded_mode}} = ScriptStep.instance_data_command(step)
+    {step.command, decoded_mode}
   end
 end

@@ -1290,6 +1290,30 @@ defmodule ThistleTea.Game.Entity.Logic.AI.ScriptTest do
       assert mob.internal.events == []
       assert blackboard == Blackboard.new()
     end
+
+    test "instance data commands enqueue one semantic effect without changing the blackboard", %{mob: mob} do
+      world = WorldRef.instance(329, 17)
+      mob = %{mob | internal: %{mob.internal | world: world}}
+      blackboard = Blackboard.new()
+      step = %ScriptStep{script_id: 5_122, command: :set_instance_data, datalong: 7, datalong2: 1, datalong3: 0}
+
+      {updated, returned_blackboard} = Script.run(mob, blackboard, [step], nil, 1_000)
+
+      assert returned_blackboard == blackboard
+      assert %{updated | internal: %{updated.internal | events: []}} == mob
+
+      assert [%Effects.InstanceDataCommand{world: ^world, field: 7, value: 1, mode: :raw, script_id: 5_122}] =
+               updated.internal.events
+    end
+
+    test "invalid instance data modes enqueue no effect", %{mob: mob} do
+      step = %ScriptStep{command: :set_instance_data, datalong: 7, datalong2: 1, datalong3: 9}
+
+      {updated, blackboard} = Script.run(mob, Blackboard.new(), [step], nil, 1_000)
+
+      assert updated == mob
+      assert blackboard == Blackboard.new()
+    end
   end
 
   defp mob(_context) do
