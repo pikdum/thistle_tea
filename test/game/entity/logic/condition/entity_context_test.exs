@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.Entity.Logic.Condition.EntityContextTest do
   alias ThistleTea.Game.Entity.Logic.Condition, as: Evaluator
   alias ThistleTea.Game.Entity.Logic.Condition.EntityContext
   alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.World.InstanceData.Snapshot
   alias ThistleTea.Game.WorldRef
 
   describe "build/3" do
@@ -31,5 +32,30 @@ defmodule ThistleTea.Game.Entity.Logic.Condition.EntityContextTest do
       assert Evaluator.evaluate(context, %Condition{type: :area_id, value1: 34}) == :met
       assert Evaluator.evaluate(context, %Condition{type: :area_id, value1: 56}) == :unmet
     end
+
+    test "purely projects the boundary-supplied instance snapshot" do
+      world = WorldRef.instance(329, 7)
+      mob = mob(world)
+
+      snapshot = %Snapshot{
+        world: world,
+        status: :available,
+        script_name: "instance_stratholme",
+        fields: %{7 => {:ok, 2}}
+      }
+
+      context = EntityContext.build(mob, AIContext.new(1_000, instance_data: snapshot))
+
+      assert Evaluator.evaluate(context, %Condition{type: :instance_data, value1: 7, value2: 2}) == :met
+    end
+  end
+
+  defp mob(world) do
+    %Mob{
+      object: %Object{guid: Guid.from_low_guid(:mob, 1, 1), entry: 1},
+      unit: %Unit{health: 100, max_health: 100, auras: []},
+      movement_block: %MovementBlock{position: {1.0, 2.0, 3.0, 0.0}},
+      internal: %Internal{world: world, area: 34, creature: %Creature{db_guid: 1}}
+    }
   end
 end

@@ -30,7 +30,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Context do
     :script_conditions_by_target,
     :script_targets,
     :condition_now,
-    :condition_area
+    :condition_area,
+    :instance_data
   ]
 
   def new(now, opts \\ []) when is_integer(now) do
@@ -44,7 +45,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Context do
       script_conditions_by_target: Keyword.get(opts, :script_conditions_by_target, %{}),
       script_targets: Keyword.get(opts, :script_targets, %{}),
       condition_now: Keyword.get(opts, :condition_now),
-      condition_area: Keyword.get(opts, :condition_area)
+      condition_area: Keyword.get(opts, :condition_area),
+      instance_data: Keyword.get(opts, :instance_data)
     }
   end
 end

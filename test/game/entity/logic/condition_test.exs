@@ -6,6 +6,8 @@ defmodule ThistleTea.Game.Entity.Logic.ConditionTest do
   alias ThistleTea.Game.Entity.Logic.Condition.Context
   alias ThistleTea.Game.Entity.Logic.Condition.Reason
   alias ThistleTea.Game.Entity.Logic.Condition.Subject
+  alias ThistleTea.Game.World.InstanceData.Snapshot
+  alias ThistleTea.Game.WorldRef
 
   describe "evaluate/2" do
     test "nil and none are met" do
@@ -129,6 +131,70 @@ defmodule ThistleTea.Game.Entity.Logic.ConditionTest do
     end
   end
 
+  describe "instance_data" do
+    test "evaluates equality and ordered comparisons from a supplied snapshot" do
+      context = instance_context(%{7 => {:ok, 2}})
+
+      assert Evaluator.evaluate(context, instance_condition(2, 0)) == :met
+      assert Evaluator.evaluate(context, instance_condition(1, 0)) == :unmet
+      assert Evaluator.evaluate(context, instance_condition(1, 1)) == :met
+      assert Evaluator.evaluate(context, instance_condition(3, 1)) == :unmet
+      assert Evaluator.evaluate(context, instance_condition(3, 2)) == :met
+      assert Evaluator.evaluate(context, instance_condition(1, 2)) == :unmet
+    end
+
+    test "compares an unwritten registered field as zero" do
+      assert Evaluator.evaluate(instance_context(%{7 => {:ok, 0}}), instance_condition(0, 0)) == :met
+    end
+
+    test "treats definitive absence as unmet" do
+      condition = instance_condition(0, 0)
+
+      assert Evaluator.evaluate(instance_context(:no_instance_script), condition) == :unmet
+      assert Evaluator.evaluate(instance_context(:open_world), condition) == :unmet
+    end
+
+    test "keeps unsupported and missing capabilities structured unknowns" do
+      condition = instance_condition(0, 0)
+
+      assert {:unknown, [%Reason{capability: {:unsupported_instance_field, 7}}]} =
+               Evaluator.evaluate(instance_context(%{7 => {:error, {:unsupported_field, 7}}}), condition)
+
+      assert {:unknown, [%Reason{capability: {:unsupported_instance_script, "instance_other"}}]} =
+               Evaluator.evaluate(instance_context({:unsupported_script, "instance_other"}), condition)
+
+      assert {:unknown, [%Reason{capability: :missing_instance_copy}]} =
+               Evaluator.evaluate(instance_context(:missing_copy), condition)
+
+      assert {:unknown, [%Reason{capability: {:missing_fact, :world, :instance_data}}]} =
+               Evaluator.evaluate(Context.new(), condition)
+    end
+
+    test "invalid comparison and reversed unknown remain unknown" do
+      condition = %{instance_condition(0, 9) | reverse?: true}
+
+      assert {:unknown, [%Reason{capability: :invalid_comparison}]} =
+               Evaluator.evaluate(instance_context(%{7 => {:ok, 0}}), condition)
+
+      unsupported = %{instance_condition(0, 0) | reverse?: true}
+
+      assert {:unknown, [%Reason{capability: {:unsupported_instance_field, 7}}]} =
+               Evaluator.evaluate(
+                 instance_context(%{7 => {:error, {:unsupported_field, 7}}}),
+                 unsupported
+               )
+    end
+
+    test "composes instance results with three-valued AND and OR" do
+      met = instance_condition(2, 0)
+      unknown = %{instance_condition(0, 0) | value1: 5}
+      context = instance_context(%{7 => {:ok, 2}, 5 => {:error, {:unsupported_field, 5}}})
+
+      assert {:unknown, _reasons} = Evaluator.evaluate(context, %Condition{type: :and, children: [met, unknown]})
+      assert Evaluator.evaluate(context, %Condition{type: :or, children: [met, unknown]}) == :met
+    end
+  end
+
   defp assert_combinations(type, combinations) do
     Enum.each(combinations, fn {values, expected} ->
       tree = %Condition{type: type, children: Enum.map(values, &leaf/1)}
@@ -147,4 +213,24 @@ defmodule ThistleTea.Game.Entity.Logic.ConditionTest do
   defp leaf(:unknown), do: %Condition{entry: 5, type: :level}
 
   defp context, do: Context.new(source: Subject.new(entry: 38))
+
+  defp instance_condition(expected, comparison) do
+    %Condition{entry: 3_755, type: :instance_data, value1: 7, value2: expected, value3: comparison}
+  end
+
+  defp instance_context(fields) when is_map(fields) do
+    snapshot = %Snapshot{
+      world: WorldRef.instance(329, 1),
+      status: :available,
+      script_name: "instance_stratholme",
+      fields: fields
+    }
+
+    Context.new(world: %{instance_data: snapshot})
+  end
+
+  defp instance_context(status) do
+    snapshot = %Snapshot{world: WorldRef.instance(329, 1), status: status}
+    Context.new(world: %{instance_data: snapshot})
+  end
 end

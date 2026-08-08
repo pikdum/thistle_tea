@@ -32,6 +32,7 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
   alias ThistleTea.Game.Entity.Server.NavigationResolver
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
+  alias ThistleTea.Game.World.InstanceData
   alias ThistleTea.Game.World.Loader.Waypoint, as: WaypointLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Pathfinding
@@ -40,16 +41,18 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
   @pet_observation_radius 20.0
   @totem_observation_radius 30.0
 
-  def context(entity, now \\ Time.now(), request \\ %Request{})
+  def context(entity, now \\ Time.now(), request \\ %Request{}, options \\ [])
 
   def context(
         entity,
         now,
-        %Request{actors: actors, radius: requested_radius, game_object_radius: requested_game_object_radius} = request
+        %Request{actors: actors, radius: requested_radius, game_object_radius: requested_game_object_radius} = request,
+        options
       )
       when is_integer(now) and is_list(actors) and is_number(requested_radius) and requested_radius >= 0 and
-             is_number(requested_game_object_radius) and requested_game_object_radius >= 0 do
+             is_number(requested_game_object_radius) and requested_game_object_radius >= 0 and is_list(options) do
     conditions = all_conditions(entity, request)
+    requirements = Requirements.plan(conditions)
     condition_results = script_condition_results(entity, condition_groups(entity, request))
     condition_target = explicit_actor(actors) || event_ai_target(entity)
 
@@ -63,7 +66,8 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
       script_conditions_by_target: condition_results,
       script_targets: script_target_results(entity, request.script_targets),
       condition_now: local_time(),
-      condition_area: condition_area(entity, Requirements.plan(conditions))
+      condition_area: condition_area(entity, requirements),
+      instance_data: instance_data(entity, requirements, options)
     }
   end
 
@@ -312,6 +316,23 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
       end
     end
   end
+
+  defp instance_data(%{internal: %Internal{world: world}}, requirements, options) do
+    fields =
+      requirements
+      |> Enum.flat_map(fn
+        {:instance_data, field} -> [field]
+        _requirement -> []
+      end)
+      |> Enum.uniq()
+
+    if fields != [] do
+      lookup = Keyword.get(options, :instance_data, &InstanceData.read/2)
+      lookup.(world, fields)
+    end
+  end
+
+  defp instance_data(_entity, _requirements, _options), do: nil
 
   defp observe(entity, guid, now, line_of_sight_guids) do
     position = World.position(guid, now)

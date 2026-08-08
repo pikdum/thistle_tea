@@ -18,6 +18,7 @@ defmodule ThistleTea.Game.Player.ConditionContext do
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
+  alias ThistleTea.Game.World.InstanceData
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Exploration, as: ExplorationLoader
   alias ThistleTea.Game.World.Loader.Graveyard
@@ -157,8 +158,24 @@ defmodule ThistleTea.Game.Player.ConditionContext do
   defp world_facts(%Character{} = character, requirements, options) do
     %{
       map_id: character.internal.world.map_id,
-      active_game_events: active_game_events(requirements, options)
+      active_game_events: active_game_events(requirements, options),
+      instance_data: instance_data(character.internal.world, requirements, options)
     }
+  end
+
+  defp instance_data(world, requirements, options) do
+    fields =
+      requirements
+      |> Enum.flat_map(fn
+        {:instance_data, field} -> [field]
+        _requirement -> []
+      end)
+      |> Enum.uniq()
+
+    if fields != [] do
+      lookup = Keyword.get(options, :instance_data, &InstanceData.read/2)
+      lookup.(world, fields)
+    end
   end
 
   defp environment_facts(%Character{} = character, source, conditions, options) do

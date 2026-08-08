@@ -9,11 +9,13 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironmentTest do
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Condition
+  alias ThistleTea.Game.Entity.Data.GameObject
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception.Request
   alias ThistleTea.Game.Entity.Server.AIEnvironment
   alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.World.InstanceData.Snapshot
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.System.ScriptedEvent
@@ -192,6 +194,75 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironmentTest do
 
       assert context.script_conditions == %{2 => :met}
     end
+
+    test "batches EventAI and loaded-script instance fields once for the exact copy" do
+      owner = self()
+      world = WorldRef.instance(329, 51)
+      event_condition = %Condition{entry: 3_756, type: :instance_data, value1: 7, value2: 1}
+      script_condition = %Condition{entry: 3_758, type: :instance_data, value1: 5, value2: 3}
+      event = %AIEvent{event_type: :timer_in_combat, condition: event_condition}
+      mob = mob(world)
+      mob = %{mob | internal: %{mob.internal | creature: %Creature{ai_events: [event]}}}
+      request = Request.new([], 0.0, script_conditions: [script_condition, event_condition])
+
+      context =
+        AIEnvironment.context(mob, 1_000, request,
+          instance_data: fn passed_world, fields ->
+            send(owner, {:instance_data, passed_world, MapSet.new(fields)})
+
+            %Snapshot{
+              world: passed_world,
+              status: :available,
+              script_name: "instance_stratholme",
+              fields: %{7 => {:ok, 1}, 5 => {:error, {:unsupported_field, 5}}}
+            }
+          end
+        )
+
+      assert context.instance_data.world == world
+      assert_received {:instance_data, ^world, fields}
+      assert fields == MapSet.new([5, 7])
+      refute_received {:instance_data, _, _}
+    end
+
+    test "skips instance lookup when no condition requests it" do
+      AIEnvironment.context(mob(WorldRef.open(0)), 1_000, %Request{},
+        instance_data: fn _world, _fields -> flunk("instance lookup was not planned") end
+      )
+    end
+
+    test "uses a game object's full instance identity" do
+      owner = self()
+      world = WorldRef.instance(329, 52)
+      condition = %Condition{type: :instance_data, value1: 7, value2: 0}
+      request = Request.new([], 0.0, script_conditions: [condition])
+
+      context =
+        AIEnvironment.context(game_object(world), 1_000, request,
+          instance_data: fn passed_world, [7] ->
+            send(owner, {:game_object_instance, passed_world})
+            %Snapshot{world: passed_world, status: :available, fields: %{7 => {:ok, 0}}}
+          end
+        )
+
+      assert context.instance_data.world == world
+      assert_received {:game_object_instance, ^world}
+    end
+
+    test "keeps identical map IDs isolated by instance ID" do
+      condition = %Condition{type: :instance_data, value1: 7, value2: 1}
+      request = Request.new([], 0.0, script_conditions: [condition])
+
+      lookup = fn world, [7] ->
+        %Snapshot{world: world, status: :available, fields: %{7 => {:ok, world.instance_id}}}
+      end
+
+      first = AIEnvironment.context(mob(WorldRef.instance(329, 1)), 1_000, request, instance_data: lookup)
+      second = AIEnvironment.context(mob(WorldRef.instance(329, 2)), 1_000, request, instance_data: lookup)
+
+      assert first.instance_data.fields == %{7 => {:ok, 1}}
+      assert second.instance_data.fields == %{7 => {:ok, 2}}
+    end
   end
 
   defp put_actor(kind, guid, world, distance) do
@@ -246,6 +317,15 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironmentTest do
       object: %Object{guid: Guid.from_low_guid(:mob, 1, 98_002)},
       unit: %Unit{target: 0, auras: []},
       internal: %Internal{world: world, threat: %{}},
+      movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
+    }
+  end
+
+  defp game_object(world) do
+    %GameObject{
+      object: %Object{guid: Guid.from_low_guid(:game_object, 1, 98_100)},
+      game_object: %ThistleTea.Game.Entity.Data.Component.GameObject{},
+      internal: %Internal{world: world},
       movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
     }
   end

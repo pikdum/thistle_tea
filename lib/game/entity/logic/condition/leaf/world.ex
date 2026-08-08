@@ -5,6 +5,55 @@ defmodule ThistleTea.Game.Entity.Logic.Condition.Leaf.World do
   alias ThistleTea.Game.Entity.Logic.Condition.Context
   alias ThistleTea.Game.Entity.Logic.Condition.Result
   alias ThistleTea.Game.Entity.Logic.Condition.Subject
+  alias ThistleTea.Game.World.InstanceData.Snapshot
+
+  def evaluate(
+        %Context{world: %{instance_data: %Snapshot{status: :available, fields: fields}}},
+        %Condition{type: :instance_data, value1: field, value2: expected, value3: comparison} = condition
+      ) do
+    case Map.fetch(fields, field) do
+      {:ok, {:ok, actual}} ->
+        {:handled, Result.compare_result(actual, expected, comparison, condition)}
+
+      {:ok, {:error, {:unsupported_field, ^field}}} ->
+        {:handled, Result.unknown(condition, {:unsupported_instance_field, field})}
+
+      {:ok, {:error, reason}} ->
+        {:handled, Result.unknown(condition, {:invalid_instance_data, reason})}
+
+      :error ->
+        {:handled, Result.unknown(condition, {:missing_fact, :world, {:instance_data, field}})}
+    end
+  end
+
+  def evaluate(
+        %Context{world: %{instance_data: %Snapshot{status: status}}},
+        %Condition{type: :instance_data} = condition
+      ) do
+    result =
+      case status do
+        :no_instance_script ->
+          :unmet
+
+        :open_world ->
+          :unmet
+
+        :missing_copy ->
+          Result.unknown(condition, :missing_instance_copy)
+
+        {:unsupported_script, script_name} ->
+          Result.unknown(condition, {:unsupported_instance_script, script_name})
+
+        other ->
+          Result.unknown(condition, {:invalid_instance_snapshot, other})
+      end
+
+    {:handled, result}
+  end
+
+  def evaluate(%Context{}, %Condition{type: :instance_data} = condition) do
+    {:handled, Result.unknown(condition, {:missing_fact, :world, :instance_data})}
+  end
 
   def evaluate(%Context{source: %Subject{entry: entry}}, %Condition{type: :source_entry} = condition)
       when is_integer(entry), do: handled(matches_any_value?(entry, condition))

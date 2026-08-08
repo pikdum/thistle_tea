@@ -16,6 +16,7 @@ defmodule ThistleTea.Game.Player.ConditionContextTest do
   alias ThistleTea.Game.Entity.Logic.Condition.Subject
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Player.ConditionContext
+  alias ThistleTea.Game.World.InstanceData.Snapshot
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.WorldRef
 
@@ -67,6 +68,7 @@ defmodule ThistleTea.Game.Player.ConditionContextTest do
           reputation_standings: fn _character -> flunk("reputation lookup was not planned") end,
           game_events: fn -> flunk("game-event lookup was not planned") end,
           group_lookup: fn _guid -> flunk("group lookup was not planned") end,
+          instance_data: fn _world, _fields -> flunk("instance data lookup was not planned") end,
           zone_and_area: fn _map_id, _position -> flunk("zone lookup was not planned") end
         )
 
@@ -171,6 +173,47 @@ defmodule ThistleTea.Game.Player.ConditionContextTest do
 
       assert {:unknown, _reasons} = Evaluator.evaluate(context, condition)
     end
+
+    test "batches deduplicated instance fields for the exact copy alongside game events" do
+      owner = self()
+      world = WorldRef.instance(329, 41)
+      character = %{character() | internal: %{character().internal | world: world}}
+
+      conditions = [
+        %Condition{type: :instance_data, value1: 7, value2: 2},
+        %Condition{type: :instance_data, value1: 7, value2: 2},
+        %Condition{type: :active_game_event, value1: 9}
+      ]
+
+      context =
+        ConditionContext.build(character, conditions,
+          source: nil,
+          game_events: fn -> [9] end,
+          instance_data: fn passed_world, fields ->
+            send(owner, {:instance_data, passed_world, fields})
+            snapshot(passed_world, %{7 => {:ok, 2}})
+          end
+        )
+
+      assert context.source == nil
+      assert context.world.active_game_events == MapSet.new([9])
+      assert Evaluator.evaluate(context, Enum.at(conditions, 0)) == :met
+      assert_received {:instance_data, ^world, [7]}
+      refute_received {:instance_data, _, _}
+    end
+
+    test "preserves unsupported instance fields for fail-closed evaluation" do
+      world = WorldRef.instance(329, 42)
+      character = %{character() | internal: %{character().internal | world: world}}
+      condition = %Condition{type: :instance_data, value1: 5, value2: 3}
+
+      context =
+        ConditionContext.build(character, [condition],
+          instance_data: fn ^world, [5] -> snapshot(world, %{5 => {:error, {:unsupported_field, 5}}}) end
+        )
+
+      assert {:unknown, _reasons} = Evaluator.evaluate(context, condition)
+    end
   end
 
   describe "refresh_subject/3" do
@@ -213,4 +256,8 @@ defmodule ThistleTea.Game.Player.ConditionContextTest do
   defp item(20), do: Item.build(%ItemTemplate{entry: 200}, 20)
   defp item(30), do: Item.build(%ItemTemplate{entry: 100}, 30, stack_count: 2)
   defp item(_guid), do: nil
+
+  defp snapshot(world, fields) do
+    %Snapshot{world: world, status: :available, script_name: "instance_stratholme", fields: fields}
+  end
 end
