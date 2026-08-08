@@ -3,18 +3,25 @@ defmodule ThistleTea.Game.Instance do
   Pure instance-copy membership and ownership transitions.
   """
 
+  import Bitwise
+
+  alias ThistleTea.Game.InstanceScript
   alias ThistleTea.Game.WorldRef
+
+  @uint32_max 0xFFFFFFFF
 
   defmodule Copy do
     @moduledoc false
-    defstruct [:world, :owner, members: MapSet.new()]
+    defstruct [:world, :owner, :script_name, members: MapSet.new(), data: %{}]
   end
 
   defstruct copies: %{}, owner_index: %{}, member_index: %{}, bindings: %{}, next_id: 1
 
-  def enter(%__MODULE__{} = instances, map_id, owner, guid) when is_integer(map_id) and is_integer(guid) do
+  def enter(instances, map_id, owner, guid, script_name \\ nil)
+
+  def enter(%__MODULE__{} = instances, map_id, owner, guid, script_name) when is_integer(map_id) and is_integer(guid) do
     {instances, emptied} = remove_member(instances, guid)
-    {world, instances} = find_bound_or_create(instances, map_id, owner, guid)
+    {world, instances} = find_bound_or_create(instances, map_id, owner, guid, script_name)
     copy = Map.fetch!(instances.copies, world)
     copy = %{copy | members: MapSet.put(copy.members, guid)}
 
@@ -47,6 +54,42 @@ defmodule ThistleTea.Game.Instance do
   def member_world(%__MODULE__{} = instances, guid) when is_integer(guid) do
     Map.get(instances.member_index, guid)
   end
+
+  def copy(%__MODULE__{copies: copies}, %WorldRef{} = world), do: Map.get(copies, world)
+
+  def read(%__MODULE__{} = instances, %WorldRef{} = world, field) do
+    with :ok <- validate_world(world),
+         :ok <- validate_field(field),
+         {:ok, copy} <- fetch_copy(instances, world),
+         {:ok, initial} <- initial_value(copy, field) do
+      {:ok, Map.get(copy.data, field, initial)}
+    end
+  end
+
+  def read(%__MODULE__{}, _world, _field), do: {:error, :open_world}
+
+  def read_many(%__MODULE__{} = instances, %WorldRef{} = world, fields) do
+    fields
+    |> Enum.uniq()
+    |> Map.new(&{&1, read(instances, world, &1)})
+  end
+
+  def command(%__MODULE__{} = instances, %WorldRef{} = world, field, value, mode) do
+    with :ok <- validate_world(world),
+         :ok <- validate_field(field),
+         :ok <- validate_value(value),
+         :ok <- validate_mode(mode),
+         {:ok, copy} <- fetch_copy(instances, world),
+         {:ok, current} <- current_value(copy, field),
+         updated = updated_value(current, value, mode),
+         {:ok, stored, effects} <- InstanceScript.set_data(copy.script_name, field, updated) do
+      copy = %{copy | data: Map.put(copy.data, field, stored)}
+      instances = %{instances | copies: Map.put(instances.copies, world, copy)}
+      {:ok, stored, effects, instances}
+    end
+  end
+
+  def command(%__MODULE__{}, _world, _field, _value, _mode), do: {:error, :open_world}
 
   def copies_for_owner(%__MODULE__{copies: copies}, owner) do
     copies
@@ -115,14 +158,14 @@ defmodule ThistleTea.Game.Instance do
     end
   end
 
-  defp find_bound_or_create(%__MODULE__{} = instances, map_id, owner, guid) do
+  defp find_bound_or_create(%__MODULE__{} = instances, map_id, owner, guid, script_name) do
     case world_for_guid(instances, map_id, guid) do
       %WorldRef{} = world -> {world, instances}
-      nil -> find_or_create(instances, {map_id, owner})
+      nil -> find_or_create(instances, {map_id, owner}, script_name)
     end
   end
 
-  defp find_or_create(%__MODULE__{} = instances, owner_key) do
+  defp find_or_create(%__MODULE__{} = instances, owner_key, script_name) do
     case Map.get(instances.owner_index, owner_key) do
       %WorldRef{} = world ->
         {world, instances}
@@ -130,7 +173,7 @@ defmodule ThistleTea.Game.Instance do
       nil ->
         {map_id, owner} = owner_key
         world = WorldRef.instance(map_id, instances.next_id)
-        copy = %Copy{world: world, owner: owner}
+        copy = %Copy{world: world, owner: owner, script_name: script_name}
 
         instances = %{
           instances
@@ -162,4 +205,36 @@ defmodule ThistleTea.Game.Instance do
     |> Enum.reject(fn {_binding, bound_world} -> bound_world == world end)
     |> Map.new()
   end
+
+  defp validate_world(%WorldRef{instance_id: instance_id}) when is_integer(instance_id), do: :ok
+  defp validate_world(%WorldRef{}), do: {:error, :open_world}
+
+  defp validate_field(field) when is_integer(field) and field >= 0 and field <= @uint32_max, do: :ok
+  defp validate_field(field), do: {:error, {:invalid_field, field}}
+
+  defp validate_value(value) when is_integer(value) and value >= 0, do: :ok
+  defp validate_value(value), do: {:error, {:invalid_value, value}}
+
+  defp validate_mode(mode) when mode in [:raw, :increment, :decrement], do: :ok
+  defp validate_mode(mode), do: {:error, {:invalid_mode, mode}}
+
+  defp fetch_copy(%__MODULE__{copies: copies}, world) do
+    case Map.get(copies, world) do
+      %Copy{} = copy -> {:ok, copy}
+      nil -> {:error, :missing_copy}
+    end
+  end
+
+  defp initial_value(%Copy{script_name: nil}, _field), do: {:error, :no_instance_script}
+  defp initial_value(%Copy{script_name: script_name}, field), do: InstanceScript.initial_value(script_name, field)
+
+  defp current_value(copy, field) do
+    with {:ok, initial} <- initial_value(copy, field) do
+      {:ok, Map.get(copy.data, field, initial)}
+    end
+  end
+
+  defp updated_value(_current, value, :raw), do: band(value, @uint32_max)
+  defp updated_value(current, value, :increment), do: band(current + value, @uint32_max)
+  defp updated_value(current, value, :decrement), do: max(current - band(value, @uint32_max), 0)
 end

@@ -101,6 +101,25 @@ defmodule ThistleTea.Game.World.System.InstanceTest do
       assert {:ok, ^world} = InstanceSystem.enter(389, guid, name)
       assert InstanceSystem.info(guid, name).copies |> Enum.any?(&(&1.world == world))
     end
+
+    test "captures the map script only when a copy is created" do
+      name = unique_name()
+      guid = System.unique_integer([:positive])
+      {:ok, script_name} = start_supervised({Agent, fn -> "instance_stratholme" end})
+
+      start_supervised!(
+        {InstanceSystem,
+         name: name, script_name: fn _map_id -> Agent.get(script_name, & &1) end, owner: fn _guid -> {:player, guid} end}
+      )
+
+      assert {:ok, world} = InstanceSystem.enter(329, guid, name)
+      InstanceSystem.leave(guid, world, name)
+      Agent.update(script_name, fn _name -> nil end)
+      assert {:ok, ^world} = InstanceSystem.enter(329, guid, name)
+
+      assert %{script_name: "instance_stratholme"} =
+               InstanceSystem.info(guid, name).copies |> Enum.find(&(&1.world == world))
+    end
   end
 
   defp unique_name do

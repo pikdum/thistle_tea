@@ -5,7 +5,16 @@ defmodule ThistleTea.Game.World.Loader.MapTemplateTest do
 
   setup do
     table = :ets.new(:map_template_test, [:set])
-    :ets.insert(table, [{0, 0}, {33, 1}, {249, 2}, {30, 3}])
+
+    rows = [
+      %{entry: 0, patch: 10, map_type: 0, script_name: ""},
+      %{entry: 33, patch: 10, map_type: 1, script_name: "instance_shadowfang_keep"},
+      %{entry: 249, patch: 9, map_type: 1, script_name: "old_onyxia"},
+      %{entry: 249, patch: 10, map_type: 2, script_name: "instance_onyxias_lair"},
+      %{entry: 30, patch: 10, map_type: 3, script_name: nil}
+    ]
+
+    MapTemplate.load(rows, table)
     %{table: table}
   end
 
@@ -16,6 +25,13 @@ defmodule ThistleTea.Game.World.Loader.MapTemplateTest do
       assert MapTemplate.dungeon?(table, 249)
       refute MapTemplate.battleground?(table, 249)
       assert MapTemplate.battleground?(table, 30)
+    end
+
+    test "retains the selected script name and normalizes empty names", %{table: table} do
+      assert MapTemplate.instance_script_name(table, 33) == "instance_shadowfang_keep"
+      assert MapTemplate.instance_script_name(table, 249) == "instance_onyxias_lair"
+      assert MapTemplate.instance_script_name(table, 0) == nil
+      assert MapTemplate.instance_script_name(table, 30) == nil
     end
   end
 end

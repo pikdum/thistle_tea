@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.World.System.Instance do
   alias ThistleTea.Game.Party
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Loader.AreaTrigger, as: AreaTriggerLoader
+  alias ThistleTea.Game.World.Loader.MapTemplate, as: MapTemplateLoader
   alias ThistleTea.Game.World.SpawnPool
   alias ThistleTea.Game.World.System.CellActivator
   alias ThistleTea.Game.World.System.Party, as: PartySystem
@@ -67,14 +68,16 @@ defmodule ThistleTea.Game.World.System.Instance do
        empty_timeout_ms: Keyword.get(opts, :empty_timeout_ms, @empty_timeout_ms),
        cleanup: Keyword.get(opts, :cleanup, &cleanup_world/1),
        owner: Keyword.get(opts, :owner, &owner/1),
-       reset_owner: Keyword.get(opts, :reset_owner, &reset_owner/1)
+       reset_owner: Keyword.get(opts, :reset_owner, &reset_owner/1),
+       script_name: Keyword.get(opts, :script_name, &MapTemplateLoader.instance_script_name/1)
      }}
   end
 
   @impl GenServer
   def handle_call({:enter, map_id, guid}, _from, state) do
     owner = state.owner.(guid)
-    {world, emptied, instances} = Instance.enter(state.instances, map_id, owner, guid)
+    script_name = state.script_name.(map_id)
+    {world, emptied, instances} = Instance.enter(state.instances, map_id, owner, guid, script_name)
 
     state =
       %{state | instances: instances}
@@ -103,7 +106,13 @@ defmodule ThistleTea.Game.World.System.Instance do
       (Instance.copies_for_guid(state.instances, guid) ++ Instance.copies_for_owner(state.instances, owner))
       |> Enum.uniq_by(& &1.world)
       |> Enum.map(fn copy ->
-        %{world: copy.world, owner: copy.owner, members: MapSet.to_list(copy.members)}
+        %{
+          world: copy.world,
+          owner: copy.owner,
+          members: MapSet.to_list(copy.members),
+          script_name: copy.script_name,
+          data: copy.data
+        }
       end)
 
     info = %{owner: owner, current: Instance.member_world(state.instances, guid), copies: copies}
