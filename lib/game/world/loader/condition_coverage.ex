@@ -119,12 +119,13 @@ defmodule ThistleTea.Game.World.Loader.ConditionCoverage do
                  55,
                  59
                ])
-  @partial MapSet.new([20, 21, 25, 35, 36, 37, 38, 47, 50, 54, 56])
+  @partial MapSet.new([20, 21, 25, 34, 35, 36, 37, 38, 47, 50, 54, 56])
 
   @partial_dependencies %{
     20 => "scripted-event boundary only",
     21 => "scripted-event boundary only",
     25 => "scripted-event boundary only",
+    34 => "registered instance-script fields only; Stratholme field 7",
     35 => "scripted-event boundary only",
     36 => "scripted-event boundary only",
     37 => "scripted-event boundary only",
@@ -141,7 +142,6 @@ defmodule ThistleTea.Game.World.Loader.ConditionCoverage do
     18 => "instance-script callbacks",
     26 => "holiday projection",
     31 => "typed update-field capability",
-    34 => "instance data",
     49 => "authoritative VMangos loot-state owner",
     51 => "authoritative honor rank",
     57 => "creature formation owner",
@@ -238,8 +238,9 @@ defmodule ThistleTea.Game.World.Loader.ConditionCoverage do
     1. Consumer migrations: remaining discovered consumers.
     2. Partial world facts currently collected only by the scripted-event
        boundary or for spawned game objects.
-    3. Explicitly blocked owners: saved variables, instance scripts/data, raw
-       flags, game-object loot state, honor rank, and creature formations.
+    3. Explicitly blocked owners: saved variables, instance-specific callbacks,
+       unregistered instance fields, raw flags, game-object loot state, honor
+       rank, and creature formations.
 
     The inventory includes every schema column whose normalized name is
     `condition_id`, `conditionId`, `required_condition`, or `RequiredCondition`.
@@ -247,8 +248,9 @@ defmodule ThistleTea.Game.World.Loader.ConditionCoverage do
     and game-object fit-condition children.
 
     Conditioned reference expansion is denied when no authoritative fact owner
-    can evaluate it. The pinned database has five such rows, all requiring
-    blocked instance data; their references are skipped rather than approximated.
+    can evaluate it. Registered instance fields are available from player and AI
+    boundary snapshots; unregistered instance-conditioned references remain
+    denied rather than approximated.
     `npc_vendor_template` composition remains outside the vendor
     loader because the current creature cache does not model VMangos `vendor_id`.
     """

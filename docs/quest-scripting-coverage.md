@@ -1,6 +1,6 @@
 # Quest scripting coverage
 
-This inventory covers the VMangos data in `db/vmangos.sqlite` as of July 31,
+This inventory covers the VMangos data in `db/vmangos.sqlite` as of August 8,
 2026. The primary acceptance set is `quest_start_scripts` and
 `quest_end_scripts`, with recursively referenced `generic_scripts` and
 `creature_movement_scripts` included when judging escort and event behavior.
@@ -8,10 +8,10 @@ This inventory covers the VMangos data in `db/vmangos.sqlite` as of July 31,
 ## Coverage summary
 
 - Direct quest start/end data: 2,355 rows across 314 quest script IDs.
-- Implemented direct rows: 2,350.
-- Blocked direct rows: 5 across four quests.
+- Implemented direct rows: 2,351.
+- Blocked direct rows: 4 across three quests.
 - Combined quest, generic, and movement data: 7,142 rows.
-- Commands with no runtime implementation in that combined set: 136 rows.
+- Commands with no numeric runtime mapping in that combined set: 117 rows.
 
 The direct-row number describes command availability, not a claim that every
 quest is end-to-end complete. A quest can enter generic or waypoint scripts
@@ -35,7 +35,8 @@ that use a partial target selector or an unsupported secondary command.
 - Script orchestration: nested generic scripts, weighted script selection,
   ordered cancellable delays, creature-presence termination, condition
   termination, map-event commands and source/target/extra-target selection, and
-  script fanout to nearby objects.
+  script fanout to nearby objects. Registered instance-data commands cross a
+  typed effect boundary into the instance owner.
 - Creature presentation: per-slot scripted equipment set, clear, preserve, and
   reset-to-default behavior.
 
@@ -44,7 +45,6 @@ that use a partial target selector or an unsupported secondary command.
 | Command | Rows | Quests | Missing capability |
 | --- | ---: | --- | --- |
 | 27 `UPDATE_ENTRY` | 2 | 434, 4505 | Atomic runtime creature archetype replacement. A correct implementation must replace template-derived stats, faction, display, equipment, spells, loot, AI, metadata, and the respawn snapshot through one transition. |
-| 37 `SET_INST_DATA` | 1 | 5122 | Generic instance-script key/value state and instance-specific event callbacks. The current instance system owns membership and reset lifecycle, but not VMangos instance script fields. |
 | 55 `CREATURE_SPELLS` | 2 | 5713 | Runtime spell-list replacement backed by a unified preloaded spell cache. Quest script loading is VMangos-data-only in CI, while spell construction requires DBC data; querying DBC during gameplay is not acceptable. |
 
 These commands are intentionally left unsupported instead of implementing a
@@ -56,7 +56,6 @@ The combined quest/generic/movement data contains these unmapped commands:
 
 | Command | Rows | Required work |
 | --- | ---: | --- |
-| 37 instance data | 19 | Instance script state API and per-instance callbacks. |
 | 27 update entry | 15 | Atomic creature archetype replacement. |
 | 90 start script on group | 13 | Runtime group/formation ownership and member enumeration. |
 | 91 load creature spawn | 12 | Script-addressable creature spawn blueprints and forced pool activation. |
@@ -76,6 +75,12 @@ The combined quest/generic/movement data contains these unmapped commands:
 | 2 field set | 1 | A typed field abstraction; raw update-field writes are intentionally not exposed. |
 
 ## Partial selectors and parameter modes
+
+- Command 37 `SET_INST_DATA` has 19 combined quest, generic, and movement rows
+  with numeric decoding. Only quest-end script 5122's Stratholme field-7 write
+  is registered end to end. Other maps and fields are rejected until their
+  `SetData` callbacks are audited and implemented. A later condition row in the
+  same pure script batch does not observe an earlier write from that batch.
 
 - Owner-only target type 9 and nearest-player target types 25 and 27 are
   implemented.

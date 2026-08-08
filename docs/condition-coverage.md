@@ -69,7 +69,7 @@ every consumer has migrated.
 | 5 | `reputation_rank_min` | 41 | evaluable | - |
 | 14 | `race_class` | 35 | evaluable | - |
 | 15 | `level` | 31 | evaluable | - |
-| 34 | `instance_data` | 31 | blocked | instance data |
+| 34 | `instance_data` | 31 | partial | registered instance-script fields only; Stratholme field 7 |
 | 17 | `spell` | 30 | evaluable | - |
 | 20 | `nearby_creature` | 25 | partial | scripted-event boundary only |
 | 12 | `active_game_event` | 21 | evaluable | - |
@@ -130,8 +130,9 @@ every consumer has migrated.
 1. Consumer migrations: remaining discovered consumers.
 2. Partial world facts currently collected only by the scripted-event
    boundary or for spawned game objects.
-3. Explicitly blocked owners: saved variables, instance scripts/data, raw
-   flags, game-object loot state, honor rank, and creature formations.
+3. Explicitly blocked owners: saved variables, instance-specific callbacks,
+   unregistered instance fields, raw flags, game-object loot state, honor
+   rank, and creature formations.
 
 The inventory includes every schema column whose normalized name is
 `condition_id`, `conditionId`, `required_condition`, or `RequiredCondition`.
@@ -139,7 +140,8 @@ Combinator traversal follows `NOT`, `AND`, `OR`, map-event target conditions,
 and game-object fit-condition children.
 
 Conditioned reference expansion is denied when no authoritative fact owner
-can evaluate it. The pinned database has five such rows, all requiring
-blocked instance data; their references are skipped rather than approximated.
+can evaluate it. Registered instance fields are available from player and AI
+boundary snapshots; unregistered instance-conditioned references remain
+denied rather than approximated.
 `npc_vendor_template` composition remains outside the vendor
 loader because the current creature cache does not model VMangos `vendor_id`.

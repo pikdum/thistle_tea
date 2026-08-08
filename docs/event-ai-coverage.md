@@ -1,6 +1,6 @@
 # EventAI coverage
 
-This inventory covers the VMangos data in `db/vmangos.sqlite` as of July 31,
+This inventory covers the VMangos data in `db/vmangos.sqlite` as of August 8,
 2026. Trigger coverage and action coverage are measured independently: an event
 can fire while one of its action scripts still contains an unsupported command,
 selector, or parameter mode.
@@ -11,8 +11,8 @@ selector, or parameter mode.
 - Supported trigger rows: 6,220.
 - Blocked trigger rows: 36.
 - EventAI action data: 7,409 rows across 6,215 script IDs.
-- Mapped action-command rows: 7,142.
-- Unmapped action-command rows: 267.
+- Mapped action-command rows: 7,249.
+- Unmapped action-command rows: 160.
 
 The command number measures interpreter availability, not end-to-end creature
 behavior. The partial-mode inventory below remains part of the backlog even
@@ -46,6 +46,7 @@ The shared script interpreter now covers these EventAI-heavy commands:
 | 50 `CALL_FOR_HELP` | 40 | Existing call-for-help world system with the scripted radius. |
 | 29 `MODIFY_THREAT` | 22 | Percent modification of one threat entry or the complete threat list. |
 | 85 `SEND_SCRIPT_EVENT` | 6 | Owner-local EventAI script-event delivery. |
+| 37 `SET_INST_DATA` | 107 | Typed instance-owner command. Only scripts 1044002 and 1091703 targeting Stratholme field 7 are registered end to end. |
 
 Hostile threat-list selectors now distinguish second, last, random, random
 excluding top, nearest, and farthest targets. Owner, nearest-player, and random
@@ -73,7 +74,6 @@ dependencies called out explicitly:
 
 | Command | Rows | Required work |
 | --- | ---: | --- |
-| 37 `SET_INST_DATA` | 107 | Generic instance script fields and instance-specific callbacks. |
 | 2 `FIELD_SET` | 30 | Typed update-field transitions; raw update-field mutation is intentionally not exposed. |
 | 49 `ZONE_COMBAT_PULSE` | 26 | Zone membership and engagement fanout. |
 | 27 `UPDATE_ENTRY` | 20 | Atomic runtime creature archetype replacement. |
@@ -96,9 +96,13 @@ dependencies called out explicitly:
 
 ## Partial selectors and parameter modes
 
-These counts are separate dimensions and must not be added to the 267 unmapped
+These counts are separate dimensions and must not be added to the 160 unmapped
 command rows:
 
+- Command 37 has 107 numerically mapped EventAI rows. Two field-7 rows,
+  scripts 1044002 and 1091703, are registered for Stratholme; the other 105
+  rows remain mapped-but-unregistered and fail closed. Same-batch
+  read-after-write is not provided.
 - Target type 12, creature GUID from instance data: 9 rows.
 - `MOVE_TO` coordinate types 2 and 3: 18 rows; coordinate type 0 is supported.
 - `MOVEMENT` types 6, 15, and 19: 45 rows; idle, random, waypoint, and home are
