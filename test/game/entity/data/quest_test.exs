@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.Entity.Data.QuestTest do
         quest_level: 8,
         required_races: 1,
         required_classes: 0,
+        required_condition: 42,
         prev_quest_id: 0,
         src_item_id: 0,
         title: "Wolves Across the Border",
@@ -30,6 +31,8 @@ defmodule ThistleTea.Game.Entity.Data.QuestTest do
       assert quest.min_level == 3
       assert quest.level == 8
       assert quest.required_races == 1
+      assert quest.required_condition_id == 42
+      assert quest.required_condition == nil
       assert quest.title == "Wolves Across the Border"
       assert quest.objective_texts == ["", "", "", ""]
     end
@@ -149,6 +152,13 @@ defmodule ThistleTea.Game.Entity.Data.QuestTest do
       assert quest.title == ""
       assert quest.details == ""
       assert quest.objectives_text == ""
+    end
+
+    test "defaults to no required condition" do
+      quest = Quest.build(%Mangos.QuestTemplate{entry: 4})
+
+      assert quest.required_condition_id == 0
+      assert quest.required_condition == nil
     end
   end
 

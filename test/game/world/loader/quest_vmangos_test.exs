@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.World.Loader.QuestVmangosTest do
   use ExUnit.Case, async: false
 
+  alias ThistleTea.Game.Entity.Data.Condition
   alias ThistleTea.Game.Entity.Data.ItemTemplate
   alias ThistleTea.Game.Entity.Data.Quest
   alias ThistleTea.Game.Entity.Data.ScriptStep
@@ -16,6 +17,39 @@ defmodule ThistleTea.Game.World.Loader.QuestVmangosTest do
   end
 
   describe "load_all/0" do
+    test "preloads every required condition tree" do
+      conditioned_quests =
+        QuestLoader
+        |> :ets.tab2list()
+        |> Enum.flat_map(fn
+          {{:quest, _quest_id}, %Quest{required_condition_id: condition_id} = quest} when condition_id > 0 -> [quest]
+          _entry -> []
+        end)
+
+      assert length(conditioned_quests) == 76
+
+      Enum.each(conditioned_quests, fn quest ->
+        assert %Condition{entry: entry} = quest.required_condition
+        assert entry == quest.required_condition_id
+
+        refute Enum.any?(flatten(quest.required_condition), fn condition ->
+                 condition.type == {:unsupported, :unresolved}
+               end)
+      end)
+    end
+
+    test "resolves pinned bank, quest availability, and instance data roots" do
+      assert %Quest{required_condition: taste_of_flame} = QuestLoader.get(4_022)
+      assert Enum.any?(flatten(taste_of_flame), &(&1.type == :item_with_bank and &1.value1 == 10_575))
+
+      assert %Quest{required_condition: zameks_distraction} = QuestLoader.get(1_191)
+      assert Enum.any?(flatten(zameks_distraction), &(&1.type == :quest_available and &1.value1 == 1_194))
+      assert %Quest{required_condition_id: 0, required_condition: nil} = QuestLoader.get(1_194)
+
+      assert %Quest{required_condition: %Condition{entry: 3_755, type: :instance_data}} = QuestLoader.get(5_122)
+      assert %Quest{required_condition: %Condition{entry: 3_757, type: :instance_data}} = QuestLoader.get(5_125)
+    end
+
     test "preloads quest start scripts" do
       assert %Quest{
                start_script_id: 54,
@@ -91,5 +125,9 @@ defmodule ThistleTea.Game.World.Loader.QuestVmangosTest do
       assert step.datalong == 48_166
       assert Guid.low_guid(step.game_object_spawn.object.guid) == 48_166
     end
+  end
+
+  defp flatten(%Condition{children: children} = condition) do
+    [condition | Enum.flat_map(children, &flatten/1)]
   end
 end

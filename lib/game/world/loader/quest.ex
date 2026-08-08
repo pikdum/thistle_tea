@@ -4,7 +4,9 @@ defmodule ThistleTea.Game.World.Loader.Quest do
   Mangos.
   """
   alias ThistleTea.DB.Mangos
+  alias ThistleTea.Game.Entity.Data.Condition
   alias ThistleTea.Game.Entity.Data.Quest
+  alias ThistleTea.Game.World.Loader.Condition, as: ConditionLoader
   alias ThistleTea.Game.World.Loader.Script
 
   @table_options [:named_table, :public, read_concurrency: true, write_concurrency: :auto]
@@ -20,10 +22,11 @@ defmodule ThistleTea.Game.World.Loader.Quest do
     rows = Mangos.Repo.all(Mangos.QuestTemplate)
     start_scripts = load_scripts(rows, :start_script, Mangos.QuestStartScript)
     complete_scripts = load_scripts(rows, :complete_script, Mangos.QuestEndScript)
+    required_conditions = rows |> Enum.map(& &1.required_condition) |> ConditionLoader.load_by_ids()
 
     rows
     |> Enum.each(fn row ->
-      quest = Quest.build(row)
+      quest = row |> Quest.build() |> attach_required_condition(required_conditions)
 
       quest = %{
         quest
@@ -38,6 +41,14 @@ defmodule ThistleTea.Game.World.Loader.Quest do
     load_creature_relations(Mangos.CreatureInvolvedRelation, :ender)
 
     :ok
+  end
+
+  def attach_required_condition(%Quest{required_condition_id: 0} = quest, _conditions), do: quest
+
+  def attach_required_condition(%Quest{required_condition_id: condition_id} = quest, conditions)
+      when condition_id > 0 do
+    condition = Map.get(conditions, condition_id, Condition.unresolved(condition_id))
+    %{quest | required_condition: condition}
   end
 
   defp load_scripts(rows, field, schema) do

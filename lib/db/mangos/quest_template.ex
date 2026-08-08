@@ -13,6 +13,7 @@ defmodule ThistleTea.DB.Mangos.QuestTemplate do
     field(:required_races, :integer, default: 0, source: :RequiredRaces)
     field(:required_skill, :integer, default: 0, source: :RequiredSkill)
     field(:required_skill_value, :integer, default: 0, source: :RequiredSkillValue)
+    field(:required_condition, :integer, default: 0, source: :RequiredCondition)
     field(:rep_objective_faction, :integer, default: 0, source: :RepObjectiveFaction)
     field(:rep_objective_value, :integer, default: 0, source: :RepObjectiveValue)
     field(:required_min_rep_faction, :integer, default: 0, source: :RequiredMinRepFaction)
