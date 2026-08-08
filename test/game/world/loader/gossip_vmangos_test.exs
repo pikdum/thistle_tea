@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.World.Loader.GossipVmangosTest do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Reputation
   alias ThistleTea.Game.Entity.Data.ScriptStep
+  alias ThistleTea.Game.Entity.Logic.QuestLog.Entry
   alias ThistleTea.Game.Player.ConditionContext
   alias ThistleTea.Game.Player.Gossip, as: PlayerGossip
   alias ThistleTea.Game.Player.GossipCondition
@@ -96,6 +97,28 @@ defmodule ThistleTea.Game.World.Loader.GossipVmangosTest do
                icon: 6,
                text: "I would like to check my deposit box."
              } = Enum.find(options, &(&1.id == 0))
+    end
+
+    test "loads Tharnariun's conditioned replacement-item option" do
+      assert :ok = Gossip.load_all()
+
+      assert %Menu{menu_id: 269, options: options} = Gossip.menu_for_creature(3701)
+
+      assert %Option{
+               id: 0,
+               option_id: 1,
+               action_menu_id: -1,
+               text: "Tharnariun, I have lost the trap. Could you please give me another?",
+               condition: %{entry: 1094, type: :and} = condition,
+               action_steps: [%ScriptStep{command: :create_item, datalong: 7586, datalong2: 1}]
+             } = Enum.find(options, &(&1.id == 0))
+
+      character = character(1, 1)
+      player = %{character.player | quest_log: %{0 => %Entry{quest_id: 2118, status: :incomplete}}}
+      character = %{character | player: player}
+      context = ConditionContext.build(character, [condition], item_lookup: fn _guid -> nil end)
+
+      assert GossipCondition.allows?(context, condition, :deny_unknown)
     end
   end
 

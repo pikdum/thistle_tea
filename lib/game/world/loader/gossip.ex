@@ -41,7 +41,17 @@ defmodule ThistleTea.Game.World.Loader.Gossip do
 
   defmodule Option do
     @moduledoc false
-    defstruct [:id, :icon, :text, :option_id, :action_menu_id, :condition, coded: 0, taxi_path_steps: []]
+    defstruct [
+      :id,
+      :icon,
+      :text,
+      :option_id,
+      :action_menu_id,
+      :condition,
+      action_steps: [],
+      coded: 0,
+      taxi_path_steps: []
+    ]
   end
 
   def init(table \\ __MODULE__) do
@@ -60,18 +70,15 @@ defmodule ThistleTea.Game.World.Loader.Gossip do
       )
       |> Mangos.Repo.all()
 
-    taxi_steps_by_script =
+    action_steps_by_script =
       option_rows
       |> Enum.map(& &1.action_script_id)
       |> Enum.filter(&(&1 > 0))
       |> then(&Script.load_by_ids(Mangos.GossipScript, &1))
-      |> Map.new(fn {script_id, steps} ->
-        {script_id, Enum.filter(steps, &match?(%ScriptStep{command: :send_taxi_path}, &1))}
-      end)
 
-    option_rows =
-      Enum.filter(option_rows, fn row ->
-        row.condition_id == 0 or Map.get(taxi_steps_by_script, row.action_script_id, []) != []
+    taxi_steps_by_script =
+      Map.new(action_steps_by_script, fn {script_id, steps} ->
+        {script_id, Enum.filter(steps, &match?(%ScriptStep{command: :send_taxi_path}, &1))}
       end)
 
     conditions =
@@ -113,6 +120,7 @@ defmodule ThistleTea.Game.World.Loader.Gossip do
             option_id: o.option_id,
             action_menu_id: o.action_menu_id,
             condition: Map.get(conditions, o.condition_id),
+            action_steps: Map.get(action_steps_by_script, o.action_script_id, []),
             coded: o.box_coded,
             taxi_path_steps: Map.get(taxi_steps_by_script, o.action_script_id, [])
           }

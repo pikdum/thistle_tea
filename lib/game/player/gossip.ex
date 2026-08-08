@@ -3,6 +3,7 @@ defmodule ThistleTea.Game.Player.Gossip do
   Player boundary for conditioned gossip menus and actions.
   """
 
+  alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Quest
   alias ThistleTea.Game.Entity.EventSink
@@ -127,6 +128,18 @@ defmodule ThistleTea.Game.Player.Gossip do
     run_taxi_script(state, steps)
   end
 
+  defp dispatch(
+         state,
+         character,
+         guid,
+         %Option{option_id: option_id, action_menu_id: action_menu_id, action_steps: steps},
+         %{gossip: option_id}
+       ) do
+    state = dispatch_gossip_menu(state, character, guid, action_menu_id)
+    if steps != [], do: Entity.start_script(guid, steps, character.object.guid)
+    state
+  end
+
   defp dispatch(state, character, guid, %Option{option_id: option_id}, %{vendor: option_id}) do
     Network.send_packet(%Message.SmsgListInventory{
       vendor_guid: guid,
@@ -155,6 +168,20 @@ defmodule ThistleTea.Game.Player.Gossip do
       nil -> state
     end
   end
+
+  defp dispatch_gossip_menu(state, character, guid, action_menu_id) when action_menu_id > 0 do
+    case GossipLoader.get_menu(action_menu_id) do
+      %Menu{} = menu -> send_menu(guid, menu, quest_items(guid, character), state)
+      nil -> state
+    end
+  end
+
+  defp dispatch_gossip_menu(state, _character, _guid, action_menu_id) when action_menu_id < 0 do
+    Network.send_packet(%Message.SmsgGossipComplete{})
+    %{state | gossip_menu_options: []}
+  end
+
+  defp dispatch_gossip_menu(state, _character, _guid, _action_menu_id), do: state
 
   defp visible_options(options, npc_guid, %Character{unit: unit} = character, context) do
     trainer = GossipLoader.option_trainer()
@@ -199,6 +226,7 @@ defmodule ThistleTea.Game.Player.Gossip do
 
   defp option_ids do
     %{
+      gossip: GossipLoader.option_gossip(),
       vendor: GossipLoader.option_vendor(),
       taxi: GossipLoader.option_taxi(),
       trainer: GossipLoader.option_trainer(),

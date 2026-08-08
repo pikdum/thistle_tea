@@ -53,6 +53,37 @@ defmodule ThistleTea.Game.Network.Message.CmsgGossipSelectOptionTest do
       assert_receive {:"$gen_cast", {:send_packet, %SmsgGossipComplete{}}}
     end
 
+    test "closes gossip and runs a replacement-item script on the source creature" do
+      player_guid = Guid.from_low_guid(:player, System.unique_integer([:positive, :monotonic]))
+      creature_guid = Guid.from_low_guid(:mob, 3701, System.unique_integer([:positive, :monotonic]))
+      {:ok, _player_owner} = Entity.register(player_guid)
+      {:ok, _creature_owner} = Entity.register(creature_guid)
+
+      steps = [%ScriptStep{command: :create_item, datalong: 7586, datalong2: 1}]
+
+      option = %Option{
+        id: 0,
+        option_id: 1,
+        action_menu_id: -1,
+        action_steps: steps
+      }
+
+      character = %Character{
+        object: %Object{guid: player_guid},
+        unit: %Unit{health: 100, max_health: 100, power1: 0, max_power1: 0, auras: []},
+        player: %Player{skills: %{}, quest_log: %{}, rewarded_quests: MapSet.new(), reputation: %Reputation{}},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+        internal: %Internal{world: WorldRef.open(0), spellbook: %{}}
+      }
+
+      state = %{character: character, gossip_menu_options: [option]}
+      message = %CmsgGossipSelectOption{guid: creature_guid, gossip_list_id: 0}
+
+      assert %{gossip_menu_options: []} = CmsgGossipSelectOption.handle(message, state)
+      assert_receive {:"$gen_cast", {:send_packet, %SmsgGossipComplete{}}}
+      assert_receive {:"$gen_cast", {:start_script, ^steps, ^player_guid}}
+    end
+
     test "opens the flight map for a taxi-vendor option" do
       previous_network = TaxiLoader.get()
       player_id = System.unique_integer([:positive, :monotonic])
