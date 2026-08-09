@@ -3,6 +3,8 @@ defmodule ThistleTea.Game.Entity.EventSink.Movement do
 
   alias ThistleTea.Game.Entity.Commands
   alias ThistleTea.Game.Entity.Data.Character
+  alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Data.Taxi.Flight
   alias ThistleTea.Game.Entity.EventSink.Context
@@ -11,6 +13,8 @@ defmodule ThistleTea.Game.Entity.EventSink.Movement do
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.ChaseWatch
+  alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.Visibility
 
   def emit(%Mob{} = entity, %Effects.MovementStopped{}, _context) do
     World.update_position(entity)
@@ -20,6 +24,40 @@ defmodule ThistleTea.Game.Entity.EventSink.Movement do
 
     entity
   end
+
+  def emit(
+        %Mob{object: %{guid: guid}, internal: %Internal{}} = entity,
+        %Effects.CreatureTeleported{
+          world: world,
+          from_position: {from_x, from_y, from_z, _from_orientation},
+          position: {_x, _y, _z, orientation},
+          movement_block: %MovementBlock{} = movement_block
+        },
+        _context
+      ) do
+    snapshot = %{
+      entity
+      | movement_block: movement_block,
+        internal: %{entity.internal | world: world}
+    }
+
+    packet = %Message.MsgMoveTeleport{guid: guid, movement_block: movement_block}
+    old_observers = World.tracking_players_at(world, {from_x, from_y, from_z})
+    World.broadcast_packet(packet, snapshot, recipients: old_observers)
+
+    World.update_position(snapshot)
+    snapshot = Visibility.refresh_entity(snapshot)
+    Metadata.update(guid, %{orientation: orientation})
+    notify_chasers(snapshot)
+
+    {world, x, y, z} = World.position(snapshot)
+    new_observers = World.tracking_players_at(world, {x, y, z})
+    World.broadcast_packet(packet, snapshot, recipients: new_observers)
+
+    %{entity | internal: %{entity.internal | visibility_cell: snapshot.internal.visibility_cell}}
+  end
+
+  def emit(entity, %Effects.CreatureTeleported{}, _context), do: entity
 
   def emit(%Character{} = entity, %Effects.MovementStopped{}, _context) do
     entity = World.snapshot_position(entity)

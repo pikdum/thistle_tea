@@ -150,6 +150,10 @@ defmodule ThistleTea.Game.World do
     end
   end
 
+  def tracking_players_at(%WorldRef{} = world, {x, y, z}) when is_number(x) and is_number(y) and is_number(z) do
+    SpatialHash.query_cells(:players, world, x, y, z, 250)
+  end
+
   def start_entity(%GameObject{} = entity) do
     case transport_route(entity) do
       nil -> start_entity(entity, GameObjectServer)

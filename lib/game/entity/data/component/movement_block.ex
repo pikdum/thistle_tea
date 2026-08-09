@@ -307,54 +307,57 @@ defmodule ThistleTea.Game.Entity.Data.Component.MovementBlock do
 
   def refresh_timestamp(%__MODULE__{} = m, _now), do: m
 
+  def movement_info_to_binary(%__MODULE__{} = m) do
+    movement_flags = m.movement_flags || 0
+    {x, y, z, orientation} = m.position
+
+    <<
+      movement_flags::little-size(32),
+      m.timestamp || 0::little-size(32),
+      x::little-float-size(32),
+      y::little-float-size(32),
+      z::little-float-size(32),
+      orientation::little-float-size(32)
+    >> <>
+      if (movement_flags &&& @movement_flag_on_transport) > 0 do
+        {transport_x, transport_y, transport_z, transport_orientation} = m.transport_position
+
+        <<m.transport_guid::little-size(64), transport_x::little-float-size(32), transport_y::little-float-size(32),
+          transport_z::little-float-size(32), transport_orientation::little-float-size(32)>>
+      else
+        <<>>
+      end <>
+      if (movement_flags &&& @movement_flag_swimming) > 0 do
+        <<m.pitch::little-float-size(32)>>
+      else
+        <<>>
+      end <>
+      <<m.fall_time || 0::little-size(32)>> <>
+      if (movement_flags &&& @movement_flag_jumping) > 0 do
+        <<
+          m.z_speed::little-float-size(32),
+          m.cos_angle::little-float-size(32),
+          m.sin_angle::little-float-size(32),
+          m.xy_speed::little-float-size(32)
+        >>
+      else
+        <<>>
+      end <>
+      if (movement_flags &&& @movement_flag_spline_elevation) > 0 do
+        <<m.spline_elevation::little-float-size(32)>>
+      else
+        <<>>
+      end
+  end
+
   # credo:disable-for-next-line Credo.Check.Refactor.CyclomaticComplexity
   def to_binary(%__MODULE__{} = m) do
     <<m.update_flag::little-size(8)>> <>
       cond do
         (m.update_flag &&& @update_flag_living) > 0 ->
-          {x, y, z, orientation} = m.position
           movement_flags = object_update_movement_flags(m)
 
-          <<
-            movement_flags::little-size(32),
-            # timestamp
-            m.timestamp::little-size(32),
-            # living position
-            x::little-float-size(32),
-            y::little-float-size(32),
-            z::little-float-size(32),
-            # living orientation
-            orientation::little-float-size(32)
-          >> <>
-            if (movement_flags &&& @movement_flag_on_transport) > 0 do
-              {x, y, z, orientation} = m.transport_position
-
-              <<m.transport_guid::little-size(64), x::little-float-size(32), y::little-float-size(32),
-                z::little-float-size(32), orientation::little-float-size(32)>>
-            else
-              <<>>
-            end <>
-            if (movement_flags &&& @movement_flag_swimming) > 0 do
-              <<m.pitch::little-float-size(32)>>
-            else
-              <<>>
-            end <>
-            <<m.fall_time::little-size(32)>> <>
-            if (movement_flags &&& @movement_flag_jumping) > 0 do
-              <<
-                m.z_speed::little-float-size(32),
-                m.cos_angle::little-float-size(32),
-                m.sin_angle::little-float-size(32),
-                m.xy_speed::little-float-size(32)
-              >>
-            else
-              <<>>
-            end <>
-            if (movement_flags &&& @movement_flag_spline_elevation) > 0 do
-              <<m.spline_elevation::little-float-size(32)>>
-            else
-              <<>>
-            end <>
+          movement_info_to_binary(%{m | movement_flags: movement_flags}) <>
             <<
               m.walk_speed::little-float-size(32),
               m.run_speed::little-float-size(32),
