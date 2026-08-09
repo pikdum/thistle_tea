@@ -35,6 +35,8 @@ defmodule ThistleTea.Game.CreatureTeleportContentTest do
 
       assert teleported.internal.world == world
       assert teleported.movement_block.position == destination
+      assert teleported.unit == source.unit
+      assert teleported.internal.spawn == source.internal.spawn
       assert [%Effects.CreatureTeleported{} = effect] = teleported.internal.events
       assert effect.world == world
       assert effect.position == destination

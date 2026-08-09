@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.ScriptTest do
   alias ThistleTea.Game.Entity.Data.Component.GameObject, as: GameObjectComponent
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Pet
   alias ThistleTea.Game.Entity.Data.Component.Internal.Spawn
   alias ThistleTea.Game.Entity.Data.Component.Internal.Waypoint
   alias ThistleTea.Game.Entity.Data.Component.Internal.WaypointRoute
@@ -1016,11 +1017,13 @@ defmodule ThistleTea.Game.Entity.Logic.AI.ScriptTest do
     end
 
     test "teleport_to fails closed for ineligible sources", %{mob: mob} do
-      step = %ScriptStep{command: :teleport_to, datalong: 0, position: {1.0, 2.0, 3.0, 4.0}}
+      step = %ScriptStep{command: :teleport_to, datalong: 0, datalong2: 9, position: {1.0, 2.0, 3.0, 4.0}}
       player_controlled = %{mob | unit: %{mob.unit | flags: 0x00000008}}
+      possessed = %{mob | internal: %{mob.internal | pet: %Pet{possessed?: true}}}
       absent = %{mob | internal: %{mob.internal | visibility_cell: nil}}
+      malformed = %{mob | movement_block: %{mob.movement_block | position: nil}}
 
-      for source <- [absent, player_controlled] do
+      for source <- [absent, player_controlled, possessed, malformed] do
         {unchanged, blackboard} = Script.run(source, Blackboard.new(), [step], nil, 1_000)
         assert unchanged == source
         assert blackboard == Blackboard.new()
@@ -1035,6 +1038,30 @@ defmodule ThistleTea.Game.Entity.Logic.AI.ScriptTest do
 
       {unchanged, _blackboard} = Script.run(character, Blackboard.new(), [step], nil, 1_000)
       assert unchanged == character
+
+      game_object = %GameObjectEntity{
+        object: %Object{guid: Guid.from_low_guid(:game_object, 1, 1)},
+        game_object: %GameObjectComponent{},
+        internal: %Internal{world: WorldRef.open(0)}
+      }
+
+      {unchanged, _blackboard} = Script.run(game_object, Blackboard.new(), [step], nil, 1_000)
+      assert unchanged == game_object
+    end
+
+    test "an unsupported teleport source keeps unrelated delayed steps", %{mob: mob} do
+      absent = %{mob | internal: %{mob.internal | visibility_cell: nil}}
+
+      steps = [
+        %ScriptStep{command: :teleport_to, datalong: 0, position: {1.0, 2.0, 3.0, 4.0}},
+        %ScriptStep{command: :emote, datalong: 11, delay_ms: 2_000}
+      ]
+
+      {unchanged, _blackboard} = Script.run(absent, Blackboard.new(), steps, nil, 1_000)
+
+      assert unchanged.movement_block == absent.movement_block
+      assert [%Effects.ScriptSteps{duration_ms: 2_000, steps: [scheduled]}] = unchanged.internal.events
+      assert scheduled.command == :emote
     end
 
     test "movement random stores the selected runtime anchor and radius", %{mob: mob} do
