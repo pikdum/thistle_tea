@@ -37,6 +37,11 @@ defmodule ThistleTea.Game.World.Loader.Summon do
     end
   end
 
+  def preload(entries) when is_list(entries) do
+    Enum.each(entries, &template/1)
+    :ok
+  end
+
   def build(entry, world, {x, y, z, o}, opts \\ []) when is_integer(entry) and is_list(opts) do
     creature = template(entry)
     world = WorldRef.coerce(world)

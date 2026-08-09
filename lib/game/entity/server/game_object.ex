@@ -149,6 +149,11 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
     {:noreply, state}
   end
 
+  def handle_cast({:operate_game_object, action, reset_delay_ms}, %GameObject{} = state)
+      when action in [:open, :close, :reset] and is_integer(reset_delay_ms) do
+    {:noreply, operate_game_object(state, action, reset_delay_ms)}
+  end
+
   @impl GenServer
   def handle_cast(_message, state) do
     {:noreply, state}
@@ -275,15 +280,7 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
 
   def handle_info({:script_operate_game_object, action, reset_delay_ms}, %GameObject{} = state)
       when action in [:open, :close, :reset] and is_integer(reset_delay_ms) do
-    previous_state = state.game_object.state
-    next_state = door_state(action, previous_state)
-    state = put_game_object_state(state, next_state)
-
-    if action != :reset and next_state != previous_state and reset_delay_ms > 0 do
-      Process.send_after(self(), {:script_restore_game_object_state, previous_state, next_state}, reset_delay_ms)
-    end
-
-    {:noreply, state}
+    {:noreply, operate_game_object(state, action, reset_delay_ms)}
   end
 
   def handle_info(
@@ -422,6 +419,18 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
   defp door_state(:close, 0), do: 1
   defp door_state(:close, state), do: state
   defp door_state(:reset, _state), do: 1
+
+  defp operate_game_object(%GameObject{} = state, action, reset_delay_ms) do
+    previous_state = state.game_object.state
+    next_state = door_state(action, previous_state)
+    state = put_game_object_state(state, next_state)
+
+    if action != :reset and next_state != previous_state and reset_delay_ms > 0 do
+      Process.send_after(self(), {:script_restore_game_object_state, previous_state, next_state}, reset_delay_ms)
+    end
+
+    state
+  end
 
   defp put_game_object_state(%GameObject{} = state, game_object_state) do
     game_object = %{state.game_object | state: game_object_state}

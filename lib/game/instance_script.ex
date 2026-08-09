@@ -5,6 +5,16 @@ defmodule ThistleTea.Game.InstanceScript do
 
   alias ThistleTea.Game.InstanceScript.Stratholme
 
+  @adapters [Stratholme]
+
+  def broadcast_text_ids do
+    @adapters |> Enum.flat_map(& &1.broadcast_text_ids()) |> Enum.uniq()
+  end
+
+  def summon_entries do
+    @adapters |> Enum.flat_map(& &1.summon_entries()) |> Enum.uniq()
+  end
+
   def registered_fields(script_name) do
     case adapter(script_name) do
       nil -> []
@@ -79,6 +89,9 @@ defmodule ThistleTea.Game.InstanceScript.Stratholme do
     :baron_run_expired
   ]
   @baron_ultimatum_spells [27_861, 27_863, 27_864, 27_865]
+
+  def broadcast_text_ids, do: [11_812, 11_813, 11_814, 11_815, 11_816, 11_817, 11_931]
+  def summon_entries, do: [@ysida_entry]
 
   def registered_fields, do: [@baron_run, @baron, @aurius_event]
 

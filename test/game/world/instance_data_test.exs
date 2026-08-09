@@ -17,7 +17,7 @@ defmodule ThistleTea.Game.World.InstanceDataTest do
       assert %Snapshot{
                status: :available,
                script_name: "instance_stratholme",
-               fields: %{7 => {:ok, 2}, 5 => {:error, {:unsupported_field, 5}}}
+               fields: %{7 => {:ok, 2}, 5 => {:ok, 0}}
              } = InstanceData.read(world, [7, 5, 7], table)
     end
 

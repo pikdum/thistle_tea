@@ -16,6 +16,7 @@ defmodule ThistleTea.Game.Player.GameObjects do
   alias ThistleTea.Game.Player.Quests
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
+  alias ThistleTea.Game.World.System.Instance, as: InstanceSystem
 
   require Logger
 
@@ -37,6 +38,7 @@ defmodule ThistleTea.Game.Player.GameObjects do
         sit_on_chair(state, guid)
 
       true ->
+        InstanceSystem.game_object_used(character.internal.world, Guid.entry(guid))
         Entity.use_game_object(guid, state.guid, character.unit.level)
         state
     end

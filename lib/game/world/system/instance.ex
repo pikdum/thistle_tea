@@ -6,9 +6,11 @@ defmodule ThistleTea.Game.World.System.Instance do
   use GenServer
 
   alias ThistleTea.Game.Instance
+  alias ThistleTea.Game.InstanceScript.Effects
   alias ThistleTea.Game.Party
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.InstanceData
+  alias ThistleTea.Game.World.InstanceEffectSink
   alias ThistleTea.Game.World.Loader.AreaTrigger, as: AreaTriggerLoader
   alias ThistleTea.Game.World.Loader.MapTemplate, as: MapTemplateLoader
   alias ThistleTea.Game.World.SpawnPool
@@ -66,19 +68,25 @@ defmodule ThistleTea.Game.World.System.Instance do
     GenServer.call(server, {:command, world, field, value, mode})
   end
 
+  def game_object_used(world, entry, server \\ __MODULE__) do
+    GenServer.call(server, {:game_object_used, world, entry})
+  end
+
   @impl GenServer
   def init(opts) do
     {:ok,
      %{
        instances: %Instance{},
        cleanup_refs: %{},
+       script_timer_refs: %{},
        empty_timeout_ms: Keyword.get(opts, :empty_timeout_ms, @empty_timeout_ms),
        cleanup: Keyword.get(opts, :cleanup, &cleanup_world/1),
        owner: Keyword.get(opts, :owner, &owner/1),
        reset_owner: Keyword.get(opts, :reset_owner, &reset_owner/1),
        script_name: Keyword.get(opts, :script_name, &MapTemplateLoader.instance_script_name/1),
        projection: Keyword.get(opts, :projection, InstanceData),
-       projection_table: Keyword.get(opts, :projection_table, InstanceData)
+       projection_table: Keyword.get(opts, :projection_table, InstanceData),
+       effect_sink: Keyword.get(opts, :effect_sink, &InstanceEffectSink.emit/2)
      }}
   end
 
@@ -107,9 +115,10 @@ defmodule ThistleTea.Game.World.System.Instance do
 
   def handle_call({:command, world, field, value, mode}, _from, state) do
     case Instance.command(state.instances, world, field, value, mode) do
-      {:ok, stored, _effects, instances} ->
+      {:ok, stored, effects, instances} ->
         state.projection.publish(state.projection_table, Instance.copy(instances, world))
-        {:reply, {:ok, stored}, %{state | instances: instances}}
+        state = dispatch_effects(%{state | instances: instances}, world, effects)
+        {:reply, {:ok, stored}, state}
 
       {:error, _reason} = error ->
         {:reply, error, state}
@@ -118,6 +127,22 @@ defmodule ThistleTea.Game.World.System.Instance do
     error ->
       Logger.warning("Instance data command failed: #{Exception.message(error)}")
       {:reply, {:error, :instance_command_failed}, state}
+  end
+
+  def handle_call({:game_object_used, world, entry}, _from, state) do
+    case Instance.game_object_used(state.instances, world, entry) do
+      {:ok, effects, instances} ->
+        state.projection.publish(state.projection_table, Instance.copy(instances, world))
+        state = dispatch_effects(%{state | instances: instances}, world, effects)
+        {:reply, :ok, state}
+
+      {:error, _reason} ->
+        {:reply, :ok, state}
+    end
+  rescue
+    error ->
+      Logger.warning("Instance game object callback failed: #{Exception.message(error)}")
+      {:reply, :ok, state}
   end
 
   def handle_call({:world_for, map_id, guid}, _from, state) do
@@ -196,6 +221,13 @@ defmodule ThistleTea.Game.World.System.Instance do
     end
   end
 
+  def handle_info({:instance_script_timer, %WorldRef{} = world, key, token}, state) do
+    case Map.get(state.script_timer_refs, {world, key}) do
+      {_timer_ref, ^token} -> run_script_timer(state, world, key)
+      _stale -> {:noreply, state}
+    end
+  end
+
   defp owner(guid) do
     case PartySystem.group_of(guid) do
       %Party.Group{id: id} -> {:party, id}
@@ -215,7 +247,7 @@ defmodule ThistleTea.Game.World.System.Instance do
     state.cleanup.(copy.world)
     instances = Instance.destroy_empty(state.instances, copy.world)
     state.projection.remove(state.projection_table, copy.world)
-    state = cancel_cleanup(state, copy.world)
+    state = state |> cancel_cleanup(copy.world) |> cancel_world_script_timers(copy.world)
     %{state | instances: instances}
   end
 
@@ -246,10 +278,67 @@ defmodule ThistleTea.Game.World.System.Instance do
       state.cleanup.(world)
       instances = Instance.destroy_empty(state.instances, world)
       state.projection.remove(state.projection_table, world)
-      {:noreply, %{state | instances: instances, cleanup_refs: cleanup_refs}}
+      state = cancel_world_script_timers(%{state | instances: instances, cleanup_refs: cleanup_refs}, world)
+      {:noreply, state}
     else
       {:noreply, %{state | cleanup_refs: cleanup_refs}}
     end
+  end
+
+  defp run_script_timer(state, world, key) do
+    state = %{state | script_timer_refs: Map.delete(state.script_timer_refs, {world, key})}
+
+    case Instance.timer(state.instances, world, key) do
+      {:ok, effects, instances} ->
+        state.projection.publish(state.projection_table, Instance.copy(instances, world))
+        {:noreply, dispatch_effects(%{state | instances: instances}, world, effects)}
+
+      {:error, _reason} ->
+        {:noreply, state}
+    end
+  end
+
+  defp dispatch_effects(state, world, effects) do
+    Enum.reduce(effects, state, &dispatch_effect(world, &1, &2))
+  end
+
+  defp dispatch_effect(world, %Effects.Schedule{} = effect, state) do
+    state = cancel_script_timer(state, world, effect.key)
+    token = make_ref()
+    timer_ref = Process.send_after(self(), {:instance_script_timer, world, effect.key, token}, effect.delay_ms)
+    refs = Map.put(state.script_timer_refs, {world, effect.key}, {timer_ref, token})
+    %{state | script_timer_refs: refs}
+  end
+
+  defp dispatch_effect(world, %Effects.CancelSchedules{keys: keys}, state) do
+    Enum.reduce(keys, state, &cancel_script_timer(&2, world, &1))
+  end
+
+  defp dispatch_effect(world, effect, state) do
+    state.effect_sink.(world, effect)
+    state
+  rescue
+    error ->
+      Logger.warning("Instance effect failed: #{Exception.message(error)}")
+      state
+  end
+
+  defp cancel_script_timer(state, world, key) do
+    case Map.pop(state.script_timer_refs, {world, key}) do
+      {nil, _refs} ->
+        state
+
+      {{timer_ref, _token}, refs} ->
+        Process.cancel_timer(timer_ref)
+        %{state | script_timer_refs: refs}
+    end
+  end
+
+  defp cancel_world_script_timers(state, world) do
+    state.script_timer_refs
+    |> Map.keys()
+    |> Enum.filter(fn {timer_world, _key} -> timer_world == world end)
+    |> Enum.reduce(state, fn {_world, key}, state -> cancel_script_timer(state, world, key) end)
   end
 
   defp cleanup_world(world) do

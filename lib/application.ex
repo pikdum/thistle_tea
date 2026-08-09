@@ -7,6 +7,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.DB.Mangos.Repo
   alias ThistleTea.Game.Entity.Registry, as: EntityRegistry
   alias ThistleTea.Game.Entity.Server.PlayerSupervisor
+  alias ThistleTea.Game.InstanceScript
   alias ThistleTea.Game.Network.Server, as: GameServer
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.AggroProbe
@@ -19,6 +20,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.AreaTrigger, as: AreaTriggerLoader
   alias ThistleTea.Game.World.Loader.BankBagSlotPrice, as: BankBagSlotPriceLoader
+  alias ThistleTea.Game.World.Loader.BroadcastText, as: BroadcastTextLoader
   alias ThistleTea.Game.World.Loader.ClassSpell, as: ClassSpellLoader
   alias ThistleTea.Game.World.Loader.CreatureTemplate, as: CreatureTemplateLoader
   alias ThistleTea.Game.World.Loader.Exploration, as: ExplorationLoader
@@ -167,6 +169,7 @@ defmodule ThistleTea.Application do
     PageTextLoader.init()
     AreaTriggerLoader.init()
     BankBagSlotPriceLoader.init()
+    BroadcastTextLoader.init()
     SummonLoader.init()
     TaxiLoader.init()
     TransportLoader.init()
@@ -231,6 +234,8 @@ defmodule ThistleTea.Application do
         VendorLoader.load_all()
         AreaTriggerLoader.load_all()
         BankBagSlotPriceLoader.load_all()
+        BroadcastTextLoader.load_all(InstanceScript.broadcast_text_ids())
+        SummonLoader.preload(InstanceScript.summon_entries())
         Logger.info("Loading templates...")
         CreatureTemplateLoader.load_all()
         ExplorationLoader.load_all()

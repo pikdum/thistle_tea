@@ -50,6 +50,27 @@ defmodule ThistleTea.Game.Entity do
     dispatch_cast(entity, {:remove_aura, spell_id, caster_guid})
   end
 
+  def remove_spell_auras(entity, spell_ids) when is_list(spell_ids) do
+    dispatch_cast(entity, {:remove_spell_auras, spell_ids})
+  end
+
+  def monster_talk(entity, text, chat_type) when is_binary(text) and is_atom(chat_type) do
+    dispatch_cast(entity, {:monster_talk, text, chat_type})
+  end
+
+  def modify_npc_flags(entity, flags, mode) when is_integer(flags) and mode in [:add, :remove] do
+    dispatch_cast(entity, {:modify_npc_flags, flags, mode})
+  end
+
+  def operate_game_object(entity, action, reset_delay_ms \\ 0)
+      when action in [:open, :close, :reset] and is_integer(reset_delay_ms) do
+    dispatch_cast(entity, {:operate_game_object, action, reset_delay_ms})
+  end
+
+  def quest_kill_credit(entity, creature_entry) when is_integer(creature_entry) and creature_entry > 0 do
+    dispatch_cast(entity, {:quest_kill_credit, creature_entry})
+  end
+
   def delay_aura(entity, spell_id, caster_guid, delay_ms) do
     dispatch_cast(entity, {:delay_aura, spell_id, caster_guid, delay_ms})
   end

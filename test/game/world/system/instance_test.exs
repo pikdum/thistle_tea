@@ -2,6 +2,9 @@ defmodule ThistleTea.Game.World.System.InstanceTest do
   use ExUnit.Case, async: false
 
   alias ThistleTea.Game.Entity.Logic.Condition.InstanceDataSnapshot, as: Snapshot
+  alias ThistleTea.Game.InstanceScript.Effects.CastPlayerSpell
+  alias ThistleTea.Game.InstanceScript.Effects.MonsterTalk
+  alias ThistleTea.Game.InstanceScript.Effects.SummonCreature
   alias ThistleTea.Game.World.InstanceData
   alias ThistleTea.Game.World.System.Instance, as: InstanceSystem
 
@@ -140,8 +143,42 @@ defmodule ThistleTea.Game.World.System.InstanceTest do
       assert {:ok, 2} = InstanceSystem.command(world, 7, 2, :raw, name)
       assert %Snapshot{fields: %{7 => {:ok, 2}}} = InstanceData.read(world, [7], table)
 
-      assert {:error, {:unsupported_field, 5}} = InstanceSystem.command(world, 5, 1, :raw, name)
+      assert {:error, {:unsupported_field, 6}} = InstanceSystem.command(world, 6, 1, :raw, name)
       assert %Snapshot{fields: %{7 => {:ok, 2}}} = InstanceData.read(world, [7], table)
+    end
+
+    test "dispatches exact-copy effects and owns script timers", %{test: test} do
+      parent = self()
+      name = unique_name()
+      guid = System.unique_integer([:positive])
+
+      table =
+        start_instance_system(
+          name: name,
+          script_name: fn 329 -> "instance_stratholme" end,
+          effect_sink: fn world, effect -> send(parent, {test, world, effect}) end
+        )
+
+      assert {:ok, world} = InstanceSystem.enter(329, guid, name)
+      assert :ok = InstanceSystem.game_object_used(world, 175_357, name)
+      assert %Snapshot{fields: %{0 => {:ok, 1}}} = InstanceData.read(world, [0], table)
+
+      assert_receive {^test, ^world, %SummonCreature{entry: 16_031}}
+      assert_receive {^test, ^world, %MonsterTalk{broadcast_text_id: 11_812}}
+      assert_receive {^test, ^world, %CastPlayerSpell{spell_id: 27_861}}
+
+      state = :sys.get_state(name)
+      assert map_size(state.script_timer_refs) == 5
+      {_timer_ref, token} = Map.fetch!(state.script_timer_refs, {world, :baron_run_10_minutes})
+      send(Process.whereis(name), {:instance_script_timer, world, :baron_run_10_minutes, token})
+
+      assert_receive {^test, ^world, %MonsterTalk{broadcast_text_id: 11_813}}
+      assert_receive {^test, ^world, %CastPlayerSpell{spell_id: 27_863}}
+
+      assert {:ok, 3} = InstanceSystem.command(world, 5, 3, :raw, name)
+      state = :sys.get_state(name)
+      assert Map.keys(state.script_timer_refs) == [{world, :ysida_reward}]
+      assert %Snapshot{fields: %{0 => {:ok, 3}, 5 => {:ok, 3}}} = InstanceData.read(world, [0, 5], table)
     end
 
     test "keeps copy projections isolated and removes timed-out data" do

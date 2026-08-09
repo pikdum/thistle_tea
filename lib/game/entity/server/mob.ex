@@ -332,6 +332,25 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     {:noreply, wake_ai_tick(state), {:continue, :maybe_broadcast}}
   end
 
+  def handle_cast({:remove_spell_auras, spell_ids}, state) when is_list(spell_ids) do
+    previous = state
+    {state, events} = Aura.remove_spells(state, spell_ids, Time.now())
+    state = state |> EventSink.emit(events) |> sync_behavior_tree(previous)
+    {:noreply, wake_ai_tick(state), {:continue, :maybe_broadcast}}
+  end
+
+  def handle_cast({:monster_talk, text, chat_type}, state) when is_binary(text) and is_atom(chat_type) do
+    state = EventSink.emit(state, Effects.monster_talk(text, chat_type, nil))
+    {:noreply, state}
+  end
+
+  def handle_cast({:modify_npc_flags, flags, mode}, %Mob{} = state)
+      when is_integer(flags) and mode in [:add, :remove] do
+    npc_flags = modify_flags(state.unit.npc_flags || 0, flags, mode)
+    state = %{state | unit: %{state.unit | npc_flags: npc_flags}} |> Core.mark_broadcast_update()
+    {:noreply, state, {:continue, :maybe_broadcast}}
+  end
+
   def handle_cast({:delay_aura, spell_id, caster_guid, delay_ms}, state) do
     state =
       state
@@ -848,6 +867,9 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   end
 
   defp broadcast_if_pending(%Mob{} = state), do: state
+
+  defp modify_flags(value, flags, :add), do: Bitwise.bor(value, flags)
+  defp modify_flags(value, flags, :remove), do: Bitwise.band(value, Bitwise.bnot(flags))
 
   defp sync_orientation_metadata(
          %Mob{object: %{guid: guid}, movement_block: %MovementBlock{position: {_x, _y, _z, orientation}}} = state

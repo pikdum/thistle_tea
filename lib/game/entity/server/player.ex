@@ -389,6 +389,17 @@ defmodule ThistleTea.Game.Entity.Server.Player do
     {:noreply, %{state | character: character}, {:continue, :maybe_broadcast_update}}
   end
 
+  def handle_cast({:remove_spell_auras, spell_ids}, %{character: %Character{} = character} = state)
+      when is_list(spell_ids) do
+    {character, events} = Aura.remove_spells(character, spell_ids, Time.now())
+    character = EventSink.emit(character, events)
+    {:noreply, %{state | character: character}, {:continue, :maybe_broadcast_update}}
+  end
+
+  def handle_cast({:quest_kill_credit, creature_entry}, %State{} = state) when is_integer(creature_entry) do
+    {:noreply, Quests.credit_scripted_kill(state, creature_entry, false)}
+  end
+
   def handle_cast({:delay_aura, spell_id, caster_guid, delay_ms}, %{character: %Character{} = character} = state) do
     character = Aura.delay_source_spell(character, spell_id, caster_guid, delay_ms, Time.now())
     {:noreply, %{state | character: character}, {:continue, :maybe_broadcast_update}}
