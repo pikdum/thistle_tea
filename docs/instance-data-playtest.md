@@ -27,6 +27,29 @@ Use a fresh server process so instance state starts empty.
 Watch the server log for instance-owner crashes, stale projection rows,
 commands applied to open map 329, and unsupported field-7 diagnostics.
 
+## Baron run and field-5 acceptance
+
+Use a fresh server and enter a real Stratholme copy through area trigger 2214.
+
+1. Reach the gauntlet gate near `{3727.29, -3599.08, 142.22}` and use it.
+2. Confirm `.instance data 0` reports one, Ysida spawns in the Baron room, and
+   every player already in the copy receives spell 27861.
+3. Reach Baron Rivendare with Aurius' field-7 chain active and enter combat.
+4. Confirm `.instance data 5` reports one and the two Baron gates plus the
+   gauntlet port close for this copy only.
+5. Evade once when practical and confirm field 5 becomes two and the gates
+   reopen, then pull Baron again.
+6. Kill Baron and confirm fields 0 and 5 both report three, all four ultimatum
+   auras are absent, the gates and Ysida's cage are open, and eligible players
+   receive Ysida kill credit for quest 8945.
+7. Confirm Aurius regains gossip and quest-giver flags through conditioned
+   EventAI script 1091705 and quest 5125 can be completed.
+8. Confirm a separately owned Stratholme copy retains fields 0 and 5 at zero
+   and does not receive door, aura, credit, summon, or creature effects.
+
+Watch logs for `instance data command rejected`, `Instance effect failed`,
+owner crashes, cross-copy packets, and unsupported condition 3758 diagnostics.
+
 ## Aurius teleport acceptance
 
 Use a fresh server and enter Stratholme through area trigger 2214. Do not
@@ -71,13 +94,10 @@ When practical, also observe one imported open-world path:
 
 ## Known limits
 
-- Condition 3758 and Stratholme field 5 remain unknown. The Baron callbacks
-  that operate doors, resolve the timed run, remove auras, grant Ysida credit,
-  and restore Aurius' quest-giver flag are not implemented.
-- Tests can prove quest 5125's required condition and farewell gossip text,
-  but the complete live turn-in path remains blocked on field 5.
-- Stratholme field 5, closed-door callbacks, the Baron timer, Ysida credit, and
-  Aurius' quest-giver restoration remain outside the creature-teleport slice.
-- Aurius' delay-12 command-3 path can still be blocked by the closed Baron door.
+- Only Stratholme fields 0, 5, and 7 are registered. The remaining encounter
+  fields and instance-specific callbacks still fail closed.
+- The Baron run is ephemeral with its instance copy and is not durably saved.
+- Aurius' delay-12 command-3 path can still fail when pathfinding cannot reach
+  its destination before Baron dies.
 - A later condition row in the same pure script batch does not observe an
   instance-data write from an earlier row in that batch.

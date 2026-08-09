@@ -21,6 +21,7 @@ defmodule ThistleTea.Game.InstanceAuriusTest do
   alias ThistleTea.Game.Entity.Logic.QuestLog
   alias ThistleTea.Game.Entity.Logic.QuestRequirements
   alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.InstanceScript.Effects, as: InstanceEffects
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Player.ConditionContext
   alias ThistleTea.Game.Player.Gossip, as: PlayerGossip
@@ -34,13 +35,15 @@ defmodule ThistleTea.Game.InstanceAuriusTest do
   setup do
     id = System.unique_integer([:positive, :monotonic])
     server = :"aurius_instance_#{id}"
+    owner = self()
 
     start_supervised!(
       {InstanceSystem,
        name: server,
        projection_table: InstanceData,
        script_name: fn 329 -> "instance_stratholme" end,
-       owner: fn guid -> {:player, guid} end}
+       owner: fn guid -> {:player, guid} end,
+       effect_sink: fn world, effect -> send(owner, {:instance_effect, world, effect}) end}
     )
 
     first_guid = Guid.from_low_guid(:player, id)
@@ -48,7 +51,7 @@ defmodule ThistleTea.Game.InstanceAuriusTest do
     {:ok, first_world} = InstanceSystem.enter(329, first_guid, server)
     {:ok, second_world} = InstanceSystem.enter(329, second_guid, server)
 
-    quest_5122 = quest(5_122, condition(3_755, 7, 0), complete_script_steps: [command_step(5_122, 1)])
+    quest_5122 = quest(5_122, condition(3_755, 7, 0), complete_script_steps: [command_step(5_122, 7, 1)])
     quest_5125 = quest(5_125, condition(3_757, 7, 2))
     npc_entry = 10_917
     npc_guid = Guid.from_low_guid(:mob, npc_entry, id)
@@ -87,14 +90,14 @@ defmodule ThistleTea.Game.InstanceAuriusTest do
     assert PlayerGossip.title_text_id(context.menu, context.first, context.npc_guid) == 3_755
 
     npc = %Mob{object: %Object{guid: context.npc_guid}, internal: %Internal{world: context.first_world}}
-    npc = execute(npc, command_step(5_122, 1), context.server)
+    npc = execute(npc, command_step(5_122, 7, 1), context.server)
 
     one = Quests.availability(context.first, [context.quest_5122, context.quest_5125])
     assert one.condition_results == %{5_122 => :unmet, 5_125 => :unmet}
     assert PlayerGossip.title_text_id(context.menu, context.first, context.npc_guid) == 3_756
     assert PlayerGossip.title_text_id(context.menu, context.second, context.npc_guid) == 3_755
 
-    npc = execute(npc, command_step(1_091_703, 2), context.server)
+    npc = execute(npc, command_step(1_091_703, 7, 2), context.server)
     assert npc.internal.world == context.first_world
 
     two = Quests.availability(context.first, [context.quest_5122, context.quest_5125])
@@ -106,15 +109,27 @@ defmodule ThistleTea.Game.InstanceAuriusTest do
     field_five = condition(3_758, 5, 3)
     field_five_context = ConditionContext.build(context.first, [field_five], source: nil)
     assert Evaluator.evaluate(field_five_context, field_five) == :unmet
+
+    npc = execute(npc, command_step(1_044_001, 5, 1), context.server)
+    assert_receive {:instance_effect, first_world, %InstanceEffects.OperateGameObject{action: :close}}
+    assert first_world == context.first_world
+
+    _npc = execute(npc, command_step(1_044_003, 5, 3), context.server)
+    field_five_context = ConditionContext.build(context.first, [field_five], source: nil)
+    other_copy_context = ConditionContext.build(context.second, [field_five], source: nil)
+
+    assert Evaluator.evaluate(field_five_context, field_five) == :met
+    assert Evaluator.evaluate(other_copy_context, field_five) == :unmet
+    assert_receive {:instance_effect, ^first_world, %InstanceEffects.OperateGameObject{action: :open}}
   end
 
   test "fresh acceptance rejects a stale state-two menu and active enders ignore later field changes", context do
     npc = %Mob{object: %Object{guid: context.npc_guid}, internal: %Internal{world: context.first_world}}
-    npc = execute(npc, command_step(1_091_703, 2), context.server)
+    npc = execute(npc, command_step(1_091_703, 7, 2), context.server)
 
     assert Enum.any?(Quests.quest_menu(context.npc_guid, context.first), fn {quest, _icon} -> quest.id == 5_125 end)
 
-    _npc = execute(npc, command_step(5_122, 1), context.server)
+    _npc = execute(npc, command_step(5_122, 7, 1), context.server)
     state = %{guid: context.first.object.guid, character: context.first, gossip_menu_options: []}
 
     assert Quests.accept(state, context.npc_guid, 5_125) == state
@@ -176,13 +191,13 @@ defmodule ThistleTea.Game.InstanceAuriusTest do
     }
   end
 
-  defp command_step(script_id, value) do
+  defp command_step(script_id, field, value) do
     ScriptStep.build(%{
       id: script_id,
       delay: 0,
       priority: 0,
       command: 37,
-      datalong: 7,
+      datalong: field,
       datalong2: value,
       datalong3: 0,
       datalong4: 0,

@@ -78,9 +78,11 @@ The combined quest/generic/movement data contains these unmapped commands:
 
 - Command 37 `SET_INST_DATA` has 19 combined quest, generic, and movement rows
   with numeric decoding. Only quest-end script 5122's Stratholme field-7 write
-  is registered end to end. Other maps and fields are rejected until their
-  `SetData` callbacks are audited and implemented. A later condition row in the
-  same pure script batch does not observe an earlier write from that batch.
+  is registered end to end in this inventory. Stratholme fields 0, 5, and 7
+  are registered for the instance callback and EventAI paths; other maps and
+  fields are rejected until their `SetData` callbacks are audited and
+  implemented. A later condition row in the same pure script batch does not
+  observe an earlier write from that batch.
 
 - Owner-only target type 9 and nearest-player target types 25 and 27 are
   implemented.

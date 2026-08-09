@@ -125,7 +125,7 @@ defmodule ThistleTea.Game.World.Loader.ConditionCoverage do
     20 => "scripted-event boundary only",
     21 => "scripted-event boundary only",
     25 => "scripted-event boundary only",
-    34 => "registered instance-script fields only; Stratholme field 7",
+    34 => "registered instance-script fields only; Stratholme fields 0, 5, and 7",
     35 => "scripted-event boundary only",
     36 => "scripted-event boundary only",
     37 => "scripted-event boundary only",

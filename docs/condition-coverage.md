@@ -69,7 +69,7 @@ every consumer has migrated.
 | 5 | `reputation_rank_min` | 41 | evaluable | - |
 | 14 | `race_class` | 35 | evaluable | - |
 | 15 | `level` | 31 | evaluable | - |
-| 34 | `instance_data` | 31 | partial | registered instance-script fields only; Stratholme field 7 |
+| 34 | `instance_data` | 31 | partial | registered instance-script fields only; Stratholme fields 0, 5, and 7 |
 | 17 | `spell` | 30 | evaluable | - |
 | 20 | `nearby_creature` | 25 | partial | scripted-event boundary only |
 | 12 | `active_game_event` | 21 | evaluable | - |

@@ -46,7 +46,7 @@ The shared script interpreter now covers these EventAI-heavy commands:
 | 50 `CALL_FOR_HELP` | 40 | Existing call-for-help world system with the scripted radius. |
 | 29 `MODIFY_THREAT` | 22 | Percent modification of one threat entry or the complete threat list. |
 | 85 `SEND_SCRIPT_EVENT` | 6 | Owner-local EventAI script-event delivery. |
-| 37 `SET_INST_DATA` | 107 | Typed instance-owner command. Only scripts 1044002 and 1091703 targeting Stratholme field 7 are registered end to end. |
+| 37 `SET_INST_DATA` | 107 | Typed instance-owner command. Stratholme's Baron and Aurius fields are registered for scripts 1044001, 1044002, 1044003, and 1091703. |
 | 6 `TELEPORT_TO` | 1 | Highlord Taelan Fordring's server-controlled same-world teleport, including spline interruption and old/new observer projection. |
 
 Hostile threat-list selectors now distinguish second, last, random, random
@@ -99,9 +99,9 @@ dependencies called out explicitly:
 These counts are separate dimensions and must not be added to the 159 unmapped
 command rows:
 
-- Command 37 has 107 numerically mapped EventAI rows. Two field-7 rows,
-  scripts 1044002 and 1091703, are registered for Stratholme; the other 105
-  rows remain mapped-but-unregistered and fail closed. Same-batch
+- Command 37 has 107 numerically mapped EventAI rows. Five field-5/field-7
+  rows across scripts 1044001, 1044002, 1044003, and 1091703 are registered
+  for Stratholme; the other 102 rows remain mapped-but-unregistered and fail closed. Same-batch
   read-after-write is not provided.
 - Target type 12, creature GUID from instance data: 9 rows.
 - `MOVE_TO` coordinate types 2 and 3: 18 rows; coordinate type 0 is supported.
