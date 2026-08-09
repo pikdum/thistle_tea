@@ -28,6 +28,7 @@ defmodule ThistleTea.Game.Player.DevCommandsTest do
   alias ThistleTea.Game.World.Loader.Taxi, as: TaxiLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.PostOffice
+  alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.Transports
   alias ThistleTea.Game.WorldRef
 
@@ -264,6 +265,55 @@ defmodule ThistleTea.Game.Player.DevCommandsTest do
 
       assert_receive {:"$gen_cast",
                       {:send_packet, %Message.SmsgMessagechat{message: "Instance copy is no longer active."}}}
+    end
+  end
+
+  describe ".debug position" do
+    test "reports open-world and instance positions with orientation" do
+      open_guid = Guid.from_low_guid(:mob, 1, System.unique_integer([:positive, :monotonic]))
+      instance_guid = Guid.from_low_guid(:mob, 2, System.unique_integer([:positive, :monotonic]))
+      instance = WorldRef.instance(329, System.unique_integer([:positive, :monotonic]))
+      state = %{guid: 1, character: debug_character()}
+
+      SpatialHash.insert(:mobs, open_guid, WorldRef.open(0), 1.0, 2.0, 3.0)
+      SpatialHash.insert(:mobs, instance_guid, instance, 4032.73, -3366.51, 115.063)
+      Metadata.put(open_guid, %{orientation: 0.0})
+      Metadata.put(instance_guid, %{orientation: 5.42797})
+
+      on_exit(fn ->
+        SpatialHash.remove(:mobs, open_guid)
+        SpatialHash.remove(:mobs, instance_guid)
+        Metadata.delete(open_guid)
+        Metadata.delete(instance_guid)
+      end)
+
+      assert {:handled, ^state} = DevCommands.run(state, ".debug position #{open_guid}")
+
+      assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgMessagechat{message: open_message}}}
+
+      assert open_message ==
+               "Entity #{open_guid}: map 0 / open, position 1.0 2.0 3.0, orientation 0.0"
+
+      assert {:handled, ^state} = DevCommands.run(state, ".debug position #{instance_guid}")
+
+      assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgMessagechat{message: message}}}
+
+      assert message ==
+               "Entity #{instance_guid}: map 329 / instance #{instance.instance_id}, position 4032.73 -3366.51 115.063, orientation 5.42797"
+    end
+
+    test "reports missing entities and rejects malformed guids" do
+      state = %{guid: 1, character: debug_character()}
+
+      assert {:handled, ^state} = DevCommands.run(state, ".debug position 999999")
+
+      assert_receive {:"$gen_cast",
+                      {:send_packet, %Message.SmsgMessagechat{message: "Entity 999999 is inactive or missing."}}}
+
+      assert {:handled, ^state} = DevCommands.run(state, ".debug position nope")
+
+      assert_receive {:"$gen_cast",
+                      {:send_packet, %Message.SmsgMessagechat{message: "Invalid command. Use: .debug position <guid>"}}}
     end
   end
 

@@ -39,6 +39,7 @@ defmodule ThistleTea.Game.Player.DevCommands do
   alias ThistleTea.Game.Player.Talents
   alias ThistleTea.Game.Player.Taxi, as: PlayerTaxi
   alias ThistleTea.Game.Time
+  alias ThistleTea.Game.World
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.InstanceData
   alias ThistleTea.Game.World.ItemStore
@@ -106,6 +107,7 @@ defmodule ThistleTea.Game.Player.DevCommands do
       ".addquest <quest_id> - add a quest to your quest log",
       ".debug random equipment - add a random player-obtainable equipment set",
       ".debug professions - set known professions to 300/300",
+      ".debug position <guid> - show an entity's projected world position",
       ".debug reputation <faction_id> - show standing and flags",
       ".debug reputation add <faction_id> <delta> - change standing",
       ".debug reputation find <name> - find faction ids",
@@ -237,6 +239,16 @@ defmodule ThistleTea.Game.Player.DevCommands do
     params
     |> String.split(" ", trim: true)
     |> debug_reputation(state)
+    |> handled()
+  end
+
+  def run(state, ".debug position" <> params) do
+    params
+    |> String.split(" ", trim: true)
+    |> case do
+      [guid] -> show_entity_position(state, guid)
+      _invalid -> system_message(state, "Invalid command. Use: .debug position <guid>")
+    end
     |> handled()
   end
 
@@ -720,6 +732,26 @@ defmodule ThistleTea.Game.Player.DevCommands do
 
   defp world_label(%WorldRef{map_id: map_id, instance_id: instance_id}) do
     "map #{map_id} / instance #{instance_id}"
+  end
+
+  defp show_entity_position(state, guid_text) do
+    with {guid, ""} when guid > 0 <- Integer.parse(guid_text),
+         {%WorldRef{} = world, x, y, z} <- World.position(guid) do
+      orientation =
+        case Metadata.query(guid, [:orientation]) do
+          %{orientation: orientation} when is_number(orientation) -> orientation
+          _missing -> "unknown"
+        end
+
+      system_message(
+        state,
+        "Entity #{guid}: #{world_label(world)}, position #{x} #{y} #{z}, orientation #{orientation}"
+      )
+    else
+      {_guid, _rest} -> system_message(state, "Invalid command. Use: .debug position <guid>")
+      :error -> system_message(state, "Invalid command. Use: .debug position <guid>")
+      nil -> system_message(state, "Entity #{guid_text} is inactive or missing.")
+    end
   end
 
   defp owner_label({:party, id}), do: "party #{id}"
