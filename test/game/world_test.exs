@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.WorldTest do
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.EntitySupervisor
+  alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.WorldRef
 
@@ -47,6 +48,32 @@ defmodule ThistleTea.Game.WorldTest do
 
       World.stop_world_entities(instance_world)
       assert_receive {:DOWN, ^instance_monitor, :process, ^instance_pid, :shutdown}
+    end
+  end
+
+  describe "spawn_guid/3" do
+    test "resolves database identities inside the exact world copy" do
+      db_guid = System.unique_integer([:positive, :monotonic])
+      first_world = WorldRef.instance(329, System.unique_integer([:positive, :monotonic]))
+      second_world = WorldRef.instance(329, System.unique_integer([:positive, :monotonic]))
+      first_guid = Guid.runtime(:mob, 10_917)
+      second_guid = Guid.runtime(:mob, 10_917)
+
+      SpatialHash.insert(:mobs, first_guid, first_world, 1.0, 2.0, 3.0)
+      SpatialHash.insert(:mobs, second_guid, second_world, 4.0, 5.0, 6.0)
+      Metadata.put(first_guid, %{db_guid: db_guid})
+      Metadata.put(second_guid, %{db_guid: db_guid})
+
+      on_exit(fn ->
+        SpatialHash.remove(:mobs, first_guid)
+        SpatialHash.remove(:mobs, second_guid)
+        Metadata.delete(first_guid)
+        Metadata.delete(second_guid)
+      end)
+
+      assert World.spawn_guid(first_world, :mob, db_guid) == first_guid
+      assert World.spawn_guid(second_world, :mob, db_guid) == second_guid
+      assert World.spawn_guid(WorldRef.instance(329, -1), :mob, db_guid) == nil
     end
   end
 

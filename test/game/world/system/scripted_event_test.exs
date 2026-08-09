@@ -247,6 +247,29 @@ defmodule ThistleTea.Game.World.System.ScriptedEventTest do
            }
   end
 
+  test "target results resolve creature database guids within one copy", context do
+    db_guid = System.unique_integer([:positive, :monotonic])
+    other_world = WorldRef.instance(context.world.map_id, 2)
+    current_guid = Guid.runtime(:mob, 10_917)
+    other_guid = Guid.runtime(:mob, 10_917)
+
+    SpatialHash.update(:mobs, current_guid, context.world, 20.0, 0.0, 0.0)
+    SpatialHash.update(:mobs, other_guid, other_world, 20.0, 0.0, 0.0)
+    Metadata.put(current_guid, %{db_guid: db_guid})
+    Metadata.put(other_guid, %{db_guid: db_guid})
+
+    on_exit(fn ->
+      SpatialHash.remove(:mobs, current_guid)
+      SpatialHash.remove(:mobs, other_guid)
+      Metadata.delete(current_guid)
+      Metadata.delete(other_guid)
+    end)
+
+    selector = {:creature_with_guid, db_guid, 0}
+
+    assert ScriptedEventSystem.target_results(context.world, [selector]) == %{selector => current_guid}
+  end
+
   test "all-dead target conditions complete multi-creature events", context do
     success = %ScriptStep{command: :quest_explored, datalong: 434}
     dead = %Condition{type: :alive, reverse?: true}

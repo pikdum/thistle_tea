@@ -233,6 +233,18 @@ defmodule ThistleTea.Game.World do
 
   def guids(%WorldRef{} = world), do: SpatialHash.guids(world)
 
+  def spawn_guid(%WorldRef{} = world, entity_type, db_guid)
+      when entity_type in [:mob, :game_object] and is_integer(db_guid) and db_guid > 0 do
+    world
+    |> guids()
+    |> Enum.find(fn guid ->
+      Guid.entity_type(guid) == entity_type and
+        match?(%{db_guid: ^db_guid}, Metadata.query(guid, [:db_guid]))
+    end)
+  end
+
+  def spawn_guid(%WorldRef{}, _entity_type, _db_guid), do: nil
+
   def target_position(guid) when is_integer(guid) do
     position(guid)
   end

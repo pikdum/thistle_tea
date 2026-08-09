@@ -223,6 +223,10 @@ defmodule ThistleTea.Game.World.System.ScriptedEvent do
 
   defp apply_command(events, _effect), do: events
 
+  defp event_target(_events, world, {:creature_with_guid, db_guid, _param2}) do
+    World.spawn_guid(world, :mob, db_guid)
+  end
+
   defp event_target(events, world, {target_type, event_id, entry}) do
     case Map.get(events, event_key(world, event_id)) do
       %Event{} = event -> select_event_target(event, target_type, entry)

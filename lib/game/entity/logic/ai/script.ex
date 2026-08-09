@@ -1323,10 +1323,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
     owner_guid
   end
 
-  defp resolve_target(_state, %ScriptStep{target_type: :creature_with_guid, buddy_guid: buddy_guid}, _provided) do
-    buddy_guid
-  end
-
   defp resolve_target(_state, %ScriptStep{target_type: :game_object_with_guid, buddy_guid: buddy_guid}, _provided) do
     buddy_guid
   end
@@ -1440,6 +1436,23 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
     Map.get(targets, {target_type, event_id, entry})
   end
 
+  defp resolve_target(
+         _state,
+         %ScriptStep{
+           target_type: :creature_with_guid,
+           target_param1: db_guid,
+           target_param2: param2,
+           buddy_guid: buddy_guid
+         },
+         _provided,
+         %Context{script_targets: targets}
+       ) do
+    case Map.fetch(targets, {:creature_with_guid, db_guid, param2}) do
+      {:ok, guid} -> guid
+      :error -> buddy_guid
+    end
+  end
+
   defp resolve_target(state, %ScriptStep{} = step, provided, %Context{}) do
     resolve_target(state, step, provided)
   end
@@ -1501,6 +1514,18 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
   def target_requests(steps) when is_list(steps) do
     steps
     |> Enum.flat_map(fn
+      %ScriptStep{
+        target_type: :creature_with_guid,
+        target_param1: db_guid,
+        target_param2: param2,
+        sub_scripts: sub_scripts
+      }
+      when is_integer(db_guid) and db_guid > 0 ->
+        [
+          {:creature_with_guid, db_guid, param2}
+          | sub_scripts |> Map.values() |> List.flatten() |> target_requests()
+        ]
+
       %ScriptStep{
         target_type: target_type,
         target_param1: event_id,

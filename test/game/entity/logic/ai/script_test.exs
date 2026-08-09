@@ -1410,6 +1410,35 @@ defmodule ThistleTea.Game.Entity.Logic.AI.ScriptTest do
       assert Script.target_requests([step]) == [selector]
     end
 
+    test "creature database targets resolve to the current copy from immutable context", %{mob: mob} do
+      blueprint_guid = Guid.from_low_guid(:mob, 10_917, 53_297)
+      runtime_guid = Guid.runtime(:mob, 10_917)
+
+      step = %ScriptStep{
+        command: :start_script,
+        datalong: 10_917,
+        target_type: :creature_with_guid,
+        target_param1: 53_297,
+        buddy_guid: blueprint_guid,
+        swap_final?: true,
+        sub_scripts: %{10_917 => [%ScriptStep{command: :emote, datalong: 1}]}
+      }
+
+      selector = {:creature_with_guid, 53_297, 0}
+      context = Context.new(1_000, script_targets: %{selector => runtime_guid})
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), [step], nil, context)
+
+      assert [%Effects.ForwardScriptSteps{target_guid: ^runtime_guid}] = mob.internal.events
+      assert Script.target_requests([step]) == [selector]
+
+      missing_context = Context.new(1_000, script_targets: %{selector => nil})
+
+      {mob, _blackboard} =
+        Script.run(%{mob | internal: %{mob.internal | events: []}}, Blackboard.new(), [step], nil, missing_context)
+
+      assert mob.internal.events == []
+    end
+
     test "unsupported commands are skipped", %{mob: mob} do
       step = %ScriptStep{command: {:unsupported, 10}}
 

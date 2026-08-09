@@ -3,6 +3,18 @@ defmodule ThistleTea.Game.CreatureTeleportVmangosTest do
 
   alias Ecto.Adapters.SQL
   alias ThistleTea.DB.Mangos.Repo
+  alias ThistleTea.Game.Entity.Data.Mob
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
+  alias ThistleTea.Game.Entity.Logic.AI.EventAI
+  alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Server.AIEnvironment
+  alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.World
+  alias ThistleTea.Game.World.InstanceSpawn
+  alias ThistleTea.Game.World.Loader.Mob, as: MobLoader
+  alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.SpatialHash
+  alias ThistleTea.Game.WorldRef
 
   @moduletag :vmangos_db
 
@@ -48,6 +60,37 @@ defmodule ThistleTea.Game.CreatureTeleportVmangosTest do
 
     assert rows("SELECT guid, id, map FROM creature WHERE id = 10435") == [[54_237, 10_435, 329]]
     assert rows("SELECT datalong FROM creature_movement_scripts WHERE id = 1043504 AND command = 6") == [[0]]
+  end
+
+  test "loaded Baron aggro resolves Aurius inside the current copy" do
+    world = WorldRef.instance(329, System.unique_integer([:positive, :monotonic]))
+    player_guid = Guid.from_low_guid(:player, System.unique_integer([:positive, :monotonic]))
+    blueprints = MobLoader.blueprints([54_241, 53_297])
+    baron = blueprints |> Map.fetch!({:creature, 54_241}) |> InstanceSpawn.materialize(world)
+    aurius = blueprints |> Map.fetch!({:creature, 53_297}) |> InstanceSpawn.materialize(world)
+
+    Enum.each([baron, aurius], fn mob ->
+      World.update_position(mob)
+      Metadata.put(mob.object.guid, Mob.visibility_metadata(mob))
+    end)
+
+    on_exit(fn ->
+      Enum.each([baron, aurius], fn mob ->
+        SpatialHash.remove(:mobs, mob.object.guid)
+        Metadata.delete(mob.object.guid)
+      end)
+    end)
+
+    context = AIEnvironment.context(baron, 1_000)
+    selector = {:creature_with_guid, 53_297, 0}
+    assert context.script_targets[selector] == aurius.object.guid
+
+    {baron, _blackboard} = EventAI.enter_combat(baron, Blackboard.new(), player_guid, 1_000, context)
+
+    assert Enum.any?(baron.internal.events, fn
+             %Effects.ForwardScriptSteps{target_guid: target_guid} -> target_guid == aurius.object.guid
+             _effect -> false
+           end)
   end
 
   defp teleport_rows(table) do
