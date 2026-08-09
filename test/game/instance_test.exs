@@ -100,7 +100,7 @@ defmodule ThistleTea.Game.InstanceTest do
       {no_script, nil, instances} = Instance.enter(instances, 389, {:player, 300}, 300)
 
       failures = [
-        {supported, 5, 1, :raw, {:unsupported_field, 5}},
+        {supported, 6, 1, :raw, {:unsupported_field, 6}},
         {unsupported, 7, 1, :raw, {:unsupported_script, "instance_shadowfang_keep"}},
         {no_script, 7, 1, :raw, :no_instance_script},
         {WorldRef.instance(329, 999), 7, 1, :raw, :missing_copy},

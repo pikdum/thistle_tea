@@ -105,7 +105,7 @@ defmodule ThistleTea.Game.InstanceAuriusTest do
 
     field_five = condition(3_758, 5, 3)
     field_five_context = ConditionContext.build(context.first, [field_five], source: nil)
-    assert {:unknown, _reasons} = Evaluator.evaluate(field_five_context, field_five)
+    assert Evaluator.evaluate(field_five_context, field_five) == :unmet
   end
 
   test "fresh acceptance rejects a stale state-two menu and active enders ignore later field changes", context do

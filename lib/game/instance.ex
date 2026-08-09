@@ -82,14 +82,38 @@ defmodule ThistleTea.Game.Instance do
          {:ok, copy} <- fetch_copy(instances, world),
          {:ok, current} <- current_value(copy, field),
          updated = updated_value(current, value, mode),
-         {:ok, stored, effects} <- InstanceScript.set_data(copy.script_name, field, updated) do
-      copy = %{copy | data: Map.put(copy.data, field, stored)}
+         {:ok, stored, data, effects} <- InstanceScript.set_data(copy.script_name, copy.data, field, updated) do
+      copy = %{copy | data: data}
       instances = %{instances | copies: Map.put(instances.copies, world, copy)}
       {:ok, stored, effects, instances}
     end
   end
 
   def command(%__MODULE__{}, _world, _field, _value, _mode), do: {:error, :open_world}
+
+  def game_object_used(%__MODULE__{} = instances, %WorldRef{} = world, entry) when is_integer(entry) do
+    with :ok <- validate_world(world),
+         {:ok, copy} <- fetch_copy(instances, world),
+         {:ok, data, effects} <- InstanceScript.game_object_used(copy.script_name, copy.data, entry) do
+      copy = %{copy | data: data}
+      instances = %{instances | copies: Map.put(instances.copies, world, copy)}
+      {:ok, effects, instances}
+    end
+  end
+
+  def game_object_used(%__MODULE__{}, _world, _entry), do: {:error, :open_world}
+
+  def timer(%__MODULE__{} = instances, %WorldRef{} = world, key) do
+    with :ok <- validate_world(world),
+         {:ok, copy} <- fetch_copy(instances, world),
+         {:ok, data, effects} <- InstanceScript.timer(copy.script_name, copy.data, key) do
+      copy = %{copy | data: data}
+      instances = %{instances | copies: Map.put(instances.copies, world, copy)}
+      {:ok, effects, instances}
+    end
+  end
+
+  def timer(%__MODULE__{}, _world, _key), do: {:error, :open_world}
 
   def copies_for_owner(%__MODULE__{copies: copies}, owner) do
     copies
