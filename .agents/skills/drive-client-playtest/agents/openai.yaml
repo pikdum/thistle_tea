@@ -1,0 +1,4 @@
+interface:
+  display_name: "Drive WoW Client Playtests"
+  short_description: "Launch and automate isolated WoW playtests"
+  default_prompt: "Use $drive-client-playtest to launch an isolated WoW client and verify this gameplay path."

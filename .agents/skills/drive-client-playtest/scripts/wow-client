@@ -1,0 +1,444 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ensure_tools() {
+  local missing=0
+
+  for command_name in Xvfb xdotool import; do
+    if ! command -v "$command_name" >/dev/null 2>&1; then
+      missing=1
+    fi
+  done
+
+  if [[ "$missing" == 1 && "${THISTLE_PLAYTEST_NIX_READY:-0}" != 1 ]]; then
+    export THISTLE_PLAYTEST_NIX_READY=1
+    exec nix shell nixpkgs#xorg-server nixpkgs#xdotool nixpkgs#imagemagick --command bash "$0" "$@"
+  fi
+
+  if [[ "$missing" == 1 ]]; then
+    fail "Xvfb, xdotool, and ImageMagick are required"
+  fi
+}
+
+fail() {
+  echo "error: $*" >&2
+  exit 1
+}
+
+usage() {
+  echo "usage: wow-client launch|status|window|focus|login-debug|chat|type|key|click|drag|capture|stop ..." >&2
+  exit 2
+}
+
+require_session() {
+  local session_dir="${1:-}"
+
+  [[ -n "$session_dir" ]] || usage
+  [[ -d "$session_dir" ]] || fail "session directory does not exist: $session_dir"
+  [[ -f "$session_dir/session.kind" ]] || fail "not a playtest session: $session_dir"
+  [[ "$(<"$session_dir/session.kind")" == drive-client-playtest ]] || fail "not a playtest session: $session_dir"
+  printf '%s\n' "$session_dir"
+}
+
+session_value() {
+  local session_dir="$1"
+  local name="$2"
+  local path="$session_dir/$name"
+
+  [[ -f "$path" ]] || fail "session is missing $name: $session_dir"
+  <"$path" tr -d '\n'
+}
+
+process_alive() {
+  local pid="$1"
+
+  [[ "$pid" =~ ^[1-9][0-9]*$ ]] || return 1
+  kill -0 "$pid" 2>/dev/null
+}
+
+process_start_time() {
+  local pid="$1"
+
+  process_alive "$pid" || return 1
+  awk '{print $22}' "/proc/$pid/stat"
+}
+
+record_process() {
+  local session_dir="$1"
+  local name="$2"
+  local pid="$3"
+
+  printf '%s\n' "$pid" >"$session_dir/$name.pid"
+  process_start_time "$pid" >"$session_dir/$name.start"
+}
+
+session_process_alive() {
+  local session_dir="$1"
+  local name="$2"
+  local pid
+  local expected_start
+  local actual_start
+
+  pid="$(session_value "$session_dir" "$name.pid")"
+  expected_start="$(session_value "$session_dir" "$name.start")"
+  actual_start="$(process_start_time "$pid")" || return 1
+  [[ "$actual_start" == "$expected_start" ]]
+}
+
+find_window() {
+  local session_dir="$1"
+  local display
+  local ids
+
+  display="$(session_value "$session_dir" display)"
+  mapfile -t ids < <(DISPLAY="$display" xdotool search --onlyvisible --name '^World of Warcraft$' 2>/dev/null || true)
+
+  [[ "${#ids[@]}" -gt 0 ]] || return 1
+  printf '%s\n' "${ids[0]}"
+}
+
+wait_for_window() {
+  local session_dir="$1"
+  local window_id
+
+  for _attempt in $(seq 1 180); do
+    if window_id="$(find_window "$session_dir")"; then
+      printf '%s\n' "$window_id"
+      return 0
+    fi
+
+    session_process_alive "$session_dir" wow || return 1
+    sleep 0.5
+  done
+
+  return 1
+}
+
+focus_window() {
+  local session_dir="$1"
+  local display
+  local window_id
+
+  display="$(session_value "$session_dir" display)"
+  window_id="$(find_window "$session_dir")" || fail "WoW window is not available"
+  DISPLAY="$display" xdotool windowfocus --sync "$window_id"
+  printf '%s\n' "$window_id"
+}
+
+button_number() {
+  case "$1" in
+    left) printf '1\n' ;;
+    middle) printf '2\n' ;;
+    right) printf '3\n' ;;
+    *) fail "mouse button must be left, middle, or right" ;;
+  esac
+}
+
+choose_display() {
+  local requested="${THISTLE_PLAYTEST_DISPLAY_NUMBER:-}"
+
+  if [[ -n "$requested" ]]; then
+    [[ "$requested" =~ ^[0-9]+$ ]] || fail "THISTLE_PLAYTEST_DISPLAY_NUMBER must be numeric"
+    [[ ! -S "/tmp/.X11-unix/X$requested" && ! -e "/tmp/.X${requested}-lock" ]] || fail "X display :$requested is busy"
+    printf '%s\n' "$requested"
+    return
+  fi
+
+  for candidate in $(seq 98 109); do
+    if [[ ! -S "/tmp/.X11-unix/X$candidate" && ! -e "/tmp/.X${candidate}-lock" ]]; then
+      printf '%s\n' "$candidate"
+      return
+    fi
+  done
+
+  fail "no free X display between :98 and :109"
+}
+
+terminate_session_process() {
+  local session_dir="$1"
+  local name="$2"
+  local pid
+  local pgid
+
+  session_process_alive "$session_dir" "$name" || return 0
+  pid="$(session_value "$session_dir" "$name.pid")"
+  pgid="$(ps -o pgid= -p "$pid" | tr -d ' ')"
+
+  if [[ "$pgid" == "$pid" ]]; then
+    kill -TERM -- "-$pid" 2>/dev/null || true
+  else
+    kill -TERM "$pid" 2>/dev/null || true
+  fi
+
+  for _attempt in $(seq 1 40); do
+    session_process_alive "$session_dir" "$name" || return 0
+    sleep 0.1
+  done
+
+  if [[ "$pgid" == "$pid" ]]; then
+    kill -KILL -- "-$pid" 2>/dev/null || true
+  else
+    kill -KILL "$pid" 2>/dev/null || true
+  fi
+}
+
+launch_client() {
+  local wow_dir="${THISTLE_PLAYTEST_WOW_DIR:-/storage/games/World of Warcraft - Vanilla}"
+  local proton_path="${THISTLE_PLAYTEST_PROTON_PATH:-/home/pikdum/.local/share/Steam/steamapps/common/Proton - Experimental}"
+  local cache_dir="${THISTLE_PLAYTEST_CACHE_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}}"
+  local display_number
+  local display
+  local session_dir
+  local xvfb_pid
+  local wow_pid
+  local window_id
+
+  [[ -f "$wow_dir/WoW.exe" ]] || fail "WoW.exe not found in $wow_dir"
+  [[ -f "$wow_dir/realmlist.wtf" ]] || fail "realmlist.wtf not found in $wow_dir"
+  grep -Eiq 'set[[:space:]]+realmlist[[:space:]]+(localhost|127\.0\.0\.1)' "$wow_dir/realmlist.wtf" || fail "realmlist.wtf does not point to localhost"
+  [[ -d "$proton_path" ]] || fail "Proton path does not exist: $proton_path"
+  command -v umu-run >/dev/null 2>&1 || fail "umu-run is not available"
+  command -v setsid >/dev/null 2>&1 || fail "setsid is not available"
+
+  mkdir -p "$cache_dir"
+  session_dir="$(mktemp -d "$cache_dir/thistle-wow-playtest.XXXXXX")"
+  mkdir -p "$session_dir/prefix" "$session_dir/screenshots"
+  printf 'drive-client-playtest\n' >"$session_dir/session.kind"
+  display_number="$(choose_display)"
+  display=":$display_number"
+  printf '%s\n' "$display" >"$session_dir/display"
+
+  (
+    exec setsid Xvfb "$display" -screen 0 1280x720x24 -ac -nolisten tcp
+  ) >"$session_dir/xvfb.log" 2>&1 </dev/null &
+  xvfb_pid=$!
+  record_process "$session_dir" xvfb "$xvfb_pid"
+
+  for _attempt in $(seq 1 50); do
+    [[ -S "/tmp/.X11-unix/X$display_number" ]] && break
+    process_alive "$xvfb_pid" || fail "Xvfb exited; see $session_dir/xvfb.log"
+    sleep 0.1
+  done
+
+  [[ -S "/tmp/.X11-unix/X$display_number" ]] || fail "Xvfb did not become ready; see $session_dir/xvfb.log"
+
+  (
+    cd "$wow_dir"
+    exec setsid env \
+      DISPLAY="$display" \
+      WINEPREFIX="$session_dir/prefix" \
+      PROTONPATH="$proton_path" \
+      WINEDEBUG=-all \
+      LIBGL_ALWAYS_SOFTWARE=1 \
+      SDL_AUDIODRIVER=dummy \
+      STEAM_COMPAT_MOUNTS=/storage \
+      umu-run WoW.exe -windowed -opengl
+  ) >"$session_dir/wow.log" 2>&1 </dev/null &
+  wow_pid=$!
+  record_process "$session_dir" wow "$wow_pid"
+
+  if ! window_id="$(wait_for_window "$session_dir")"; then
+    terminate_session_process "$session_dir" wow
+    terminate_session_process "$session_dir" xvfb
+    fail "WoW window did not appear; see $session_dir/wow.log"
+  fi
+
+  printf 'session=%s\n' "$session_dir"
+  printf 'display=%s\n' "$display"
+  printf 'window=%s\n' "$window_id"
+  printf 'screenshots=%s\n' "$session_dir/screenshots"
+  printf 'wow_log=%s\n' "$session_dir/wow.log"
+}
+
+show_status() {
+  local session_dir="$1"
+  local window_id="none"
+
+  window_id="$(find_window "$session_dir" || printf 'none')"
+
+  printf 'session=%s\n' "$session_dir"
+  printf 'display=%s\n' "$(session_value "$session_dir" display)"
+  printf 'xvfb_alive=%s\n' "$(session_process_alive "$session_dir" xvfb && printf true || printf false)"
+  printf 'wow_alive=%s\n' "$(session_process_alive "$session_dir" wow && printf true || printf false)"
+  printf 'window=%s\n' "$window_id"
+  printf 'screenshots=%s\n' "$session_dir/screenshots"
+  printf 'wow_log=%s\n' "$session_dir/wow.log"
+}
+
+login_debug() {
+  local session_dir="$1"
+  local display
+  local window_id
+
+  display="$(session_value "$session_dir" display)"
+  window_id="$(focus_window "$session_dir")"
+  DISPLAY="$display" xdotool mousemove --window "$window_id" 650 390 click 1 key ctrl+a type --clearmodifiers --delay 50 debug
+  DISPLAY="$display" xdotool mousemove --window "$window_id" 650 448 click 1 key ctrl+a type --clearmodifiers --delay 50 debug
+  DISPLAY="$display" xdotool key Return
+  sleep 6
+  DISPLAY="$display" xdotool key Return
+  sleep 8
+}
+
+send_chat() {
+  local session_dir="$1"
+  shift
+  local text="$*"
+  local display
+
+  [[ -n "$text" ]] || usage
+  display="$(session_value "$session_dir" display)"
+  focus_window "$session_dir" >/dev/null
+  DISPLAY="$display" xdotool key Return
+  sleep 0.8
+  DISPLAY="$display" xdotool type --clearmodifiers --delay 20 -- "$text"
+  DISPLAY="$display" xdotool key Return
+}
+
+type_text() {
+  local session_dir="$1"
+  shift
+  local text="$*"
+  local display
+
+  [[ -n "$text" ]] || usage
+  display="$(session_value "$session_dir" display)"
+  focus_window "$session_dir" >/dev/null
+  DISPLAY="$display" xdotool type --clearmodifiers --delay 20 -- "$text"
+}
+
+send_key() {
+  local session_dir="$1"
+  shift
+  local display
+
+  [[ "$#" -gt 0 ]] || usage
+  display="$(session_value "$session_dir" display)"
+  focus_window "$session_dir" >/dev/null
+  DISPLAY="$display" xdotool key --clearmodifiers "$@"
+}
+
+click_at() {
+  local session_dir="$1"
+  local button
+  local x="$3"
+  local y="$4"
+  local display
+  local window_id
+
+  button="$(button_number "$2")"
+  display="$(session_value "$session_dir" display)"
+  window_id="$(focus_window "$session_dir")"
+  DISPLAY="$display" xdotool mousemove --window "$window_id" "$x" "$y" click "$button"
+}
+
+drag_to() {
+  local session_dir="$1"
+  local button
+  local x1="$3"
+  local y1="$4"
+  local x2="$5"
+  local y2="$6"
+  local display
+  local window_id
+
+  button="$(button_number "$2")"
+  display="$(session_value "$session_dir" display)"
+  window_id="$(focus_window "$session_dir")"
+  DISPLAY="$display" xdotool mousemove --window "$window_id" "$x1" "$y1" mousedown "$button"
+  sleep 0.15
+  DISPLAY="$display" xdotool mousemove --sync --window "$window_id" "$x2" "$y2"
+  sleep 0.15
+  DISPLAY="$display" xdotool mouseup "$button"
+}
+
+capture_screen() {
+  local session_dir="$1"
+  local name="${2:-$(date +%Y%m%d-%H%M%S)}"
+  local display
+  local path
+
+  [[ "$name" =~ ^[A-Za-z0-9._-]+$ ]] || fail "capture name may contain only letters, digits, dot, underscore, and hyphen"
+  display="$(session_value "$session_dir" display)"
+  path="$session_dir/screenshots/$name.png"
+  DISPLAY="$display" import -window root "$path"
+  printf '%s\n' "$path"
+}
+
+stop_client() {
+  local session_dir="$1"
+
+  terminate_session_process "$session_dir" wow
+  terminate_session_process "$session_dir" xvfb
+  printf 'stopped=%s\n' "$session_dir"
+  printf 'artifacts_retained=%s\n' "$session_dir"
+}
+
+main() {
+  ensure_tools "$@"
+  local command_name="${1:-}"
+  shift || true
+
+  case "$command_name" in
+    launch)
+      [[ "$#" == 0 ]] || usage
+      launch_client
+      ;;
+    status)
+      [[ "$#" == 1 ]] || usage
+      show_status "$(require_session "$1")"
+      ;;
+    window)
+      [[ "$#" == 1 ]] || usage
+      find_window "$(require_session "$1")" || fail "WoW window is not available"
+      ;;
+    focus)
+      [[ "$#" == 1 ]] || usage
+      focus_window "$(require_session "$1")"
+      ;;
+    login-debug)
+      [[ "$#" == 1 ]] || usage
+      login_debug "$(require_session "$1")"
+      ;;
+    chat)
+      [[ "$#" -ge 2 ]] || usage
+      local chat_session
+      chat_session="$(require_session "$1")"
+      shift
+      send_chat "$chat_session" "$@"
+      ;;
+    type)
+      [[ "$#" -ge 2 ]] || usage
+      local type_session
+      type_session="$(require_session "$1")"
+      shift
+      type_text "$type_session" "$@"
+      ;;
+    key)
+      [[ "$#" -ge 2 ]] || usage
+      local key_session
+      key_session="$(require_session "$1")"
+      shift
+      send_key "$key_session" "$@"
+      ;;
+    click)
+      [[ "$#" == 4 ]] || usage
+      click_at "$(require_session "$1")" "$2" "$3" "$4"
+      ;;
+    drag)
+      [[ "$#" == 6 ]] || usage
+      drag_to "$(require_session "$1")" "$2" "$3" "$4" "$5" "$6"
+      ;;
+    capture)
+      [[ "$#" -ge 1 && "$#" -le 2 ]] || usage
+      capture_screen "$(require_session "$1")" "${2:-}"
+      ;;
+    stop)
+      [[ "$#" == 1 ]] || usage
+      stop_client "$(require_session "$1")"
+      ;;
+    *) usage ;;
+  esac
+}
+
+main "$@"
