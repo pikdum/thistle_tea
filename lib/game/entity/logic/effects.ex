@@ -132,6 +132,20 @@ defmodule ThistleTea.Game.Entity.Logic.Effects do
     %Effects.MonsterMove{move_opts: opts}
   end
 
+  def creature_teleported(world, from_position, position, movement_block, script_id, declared_map_id, options)
+      when is_tuple(from_position) and is_tuple(position) and is_integer(script_id) and is_integer(declared_map_id) and
+             is_integer(options) do
+    %Effects.CreatureTeleported{
+      world: world,
+      from_position: from_position,
+      position: position,
+      movement_block: movement_block,
+      script_id: script_id,
+      declared_map_id: declared_map_id,
+      options: options
+    }
+  end
+
   def spell_cast_result(spell_id) when is_integer(spell_id) do
     %Effects.SpellCastResult{spell_id: spell_id}
   end

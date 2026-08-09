@@ -23,6 +23,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.ScriptTest do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Waypoints
   alias ThistleTea.Game.Entity.Logic.AI.Script
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Server.NavigationResolver
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Cast
@@ -936,6 +937,106 @@ defmodule ThistleTea.Game.Entity.Logic.AI.ScriptTest do
       assert blackboard.navigation.movement_override == :idle
     end
 
+    test "teleport_to is an in-order movement barrier for a server-controlled mob", %{mob: mob} do
+      world = WorldRef.instance(329, 77)
+      destination = {4068.74, -3535.97, 122.825, 2.47837}
+
+      mob =
+        mob
+        |> active_movement()
+        |> then(&%{&1 | internal: %{&1.internal | world: world, visibility_cell: {world, 0, 0}}})
+
+      blackboard =
+        Blackboard.new()
+        |> then(&%{&1 | navigation: %{&1.navigation | target: {9.0, 9.0, 9.0}, move_target: {8.0, 8.0, 8.0}}})
+
+      step = %ScriptStep{
+        script_id: 1_043_504,
+        command: :teleport_to,
+        datalong: 0,
+        datalong2: 7,
+        target_type: :victim,
+        position: destination
+      }
+
+      {mob, blackboard} = Script.run(mob, blackboard, [step], Guid.from_low_guid(:player, 42), 5_000)
+
+      assert mob.internal.world == world
+      assert mob.movement_block.position == destination
+      assert is_nil(blackboard.navigation.target)
+      assert is_nil(blackboard.navigation.move_target)
+
+      assert [%Effects.CreatureTeleported{} = effect] = mob.internal.events
+      assert effect.world == world
+      assert effect.from_position == {5.0, 0.0, 0.0, 0.0}
+      assert effect.position == destination
+      assert effect.script_id == 1_043_504
+      assert effect.declared_map_id == 0
+      assert effect.options == 7
+    end
+
+    test "teleport_to drops earlier movement work and preserves later movement and delays", %{mob: mob} do
+      world = WorldRef.instance(329, 41)
+      movement_block = %{mob.movement_block | walk_speed: 2.5, run_speed: 7.0}
+
+      mob = %{
+        mob
+        | movement_block: movement_block,
+          internal: %{mob.internal | world: world, visibility_cell: {world, 0, 0}}
+      }
+
+      steps = [
+        %ScriptStep{command: :move_to, datalong: 0, position: {10.0, 0.0, 0.0, 0.0}},
+        %ScriptStep{script_id: 10_917, command: :teleport_to, datalong: 329, position: {20.0, 0.0, 0.0, 1.0}},
+        %ScriptStep{command: :move_to, datalong: 0, position: {30.0, 0.0, 0.0, 0.0}},
+        %ScriptStep{command: :emote, datalong: 11, delay_ms: 1_000}
+      ]
+
+      {mob, _blackboard} = Script.run(mob, Blackboard.new(), steps, nil, 5_000)
+
+      assert [intent] = mob.internal.navigation_intents
+      assert intent.destination == {30.0, 0.0, 0.0}
+
+      mob =
+        NavigationResolver.resolve(mob, 5_000, fn map_id, from, to ->
+          assert map_id == 329
+          assert from == {20.0, 0.0, 0.0}
+          assert to == {30.0, 0.0, 0.0}
+          [{30.0, 0.0, 0.0}]
+        end)
+
+      assert [
+               %Effects.CreatureTeleported{} = effect,
+               %Effects.ScriptSteps{duration_ms: 1_000},
+               %Effects.MonsterMove{}
+             ] = mob.internal.events
+
+      assert effect.position == {20.0, 0.0, 0.0, 1.0}
+      assert mob.internal.movement_start_position == {20.0, 0.0, 0.0}
+    end
+
+    test "teleport_to fails closed for ineligible sources", %{mob: mob} do
+      step = %ScriptStep{command: :teleport_to, datalong: 0, position: {1.0, 2.0, 3.0, 4.0}}
+      player_controlled = %{mob | unit: %{mob.unit | flags: 0x00000008}}
+      absent = %{mob | internal: %{mob.internal | visibility_cell: nil}}
+
+      for source <- [absent, player_controlled] do
+        {unchanged, blackboard} = Script.run(source, Blackboard.new(), [step], nil, 1_000)
+        assert unchanged == source
+        assert blackboard == Blackboard.new()
+      end
+
+      character = %Character{
+        object: %Object{guid: Guid.from_low_guid(:player, 7)},
+        unit: %Unit{},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+        internal: %Internal{world: WorldRef.open(0)}
+      }
+
+      {unchanged, _blackboard} = Script.run(character, Blackboard.new(), [step], nil, 1_000)
+      assert unchanged == character
+    end
+
     test "movement random stores the selected runtime anchor and radius", %{mob: mob} do
       spawn = %Spawn{position: {1.0, 2.0, 3.0}, distance: 5, movement_type: 0}
       mob = %{mob | internal: %{mob.internal | spawn: spawn}}
@@ -1331,6 +1432,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.ScriptTest do
       movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
       internal: %Internal{
         world: %WorldRef{map_id: 0},
+        visibility_cell: {%WorldRef{map_id: 0}, 0, 0},
         name: "Defias Pillager",
         in_combat: false,
         creature: %Creature{},

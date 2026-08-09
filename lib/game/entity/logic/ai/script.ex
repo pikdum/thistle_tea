@@ -18,6 +18,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
   import Bitwise, only: [&&&: 2, |||: 2, bnot: 1]
 
   alias ThistleTea.Game.Entity.Data.Character
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Pet
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.CreatureSpell
   alias ThistleTea.Game.Entity.Data.GameObject
@@ -45,12 +46,14 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
   alias ThistleTea.Game.Entity.Logic.Threat
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Spell.Cast
+  alias ThistleTea.Game.WorldRef
 
   require Logger
 
   @flee_duration_ms 7_000
   @flee_text "%s attempts to run away in fear!"
   @max_phase 31
+  @unit_flag_player_controlled 0x00000008
   @scripted_event_commands [
     :start_map_event,
     :end_map_event,
@@ -286,6 +289,28 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
          %Context{} = context
        ) do
     {Navigation.move_to(state, {x, y, z}, [], context), blackboard}
+  end
+
+  defp execute(%Mob{} = state, blackboard, %ScriptStep{command: :teleport_to} = step, _target_guid, now, %Context{}) do
+    with true <- server_controlled_teleport_source?(state),
+         {:ok, teleport} <- ScriptStep.teleport_to(step) do
+      {state, transition} = Movement.teleport(state, teleport.position, now)
+
+      effect =
+        Effects.creature_teleported(
+          state.internal.world,
+          transition.from_position,
+          transition.position,
+          transition.movement_block,
+          step.script_id,
+          teleport.declared_map_id,
+          teleport.options
+        )
+
+      {Effects.enqueue(state, effect), Blackboard.clear_move_target(blackboard)}
+    else
+      _unsupported -> {state, blackboard}
+    end
   end
 
   defp execute(%Mob{} = state, blackboard, %ScriptStep{command: :start_waypoints} = step, _target_guid, now, %Context{
@@ -1086,6 +1111,21 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Script do
       state
     end
   end
+
+  defp server_controlled_teleport_source?(%Mob{
+         unit: %Unit{flags: flags},
+         movement_block: %{position: {x, y, z, o}},
+         internal: %{world: %WorldRef{}, visibility_cell: visibility_cell, pet: pet}
+       }) do
+    not is_nil(visibility_cell) and not player_controlled?(flags, pet) and
+      Enum.all?([x, y, z, o], &is_number/1)
+  end
+
+  defp server_controlled_teleport_source?(%Mob{}), do: false
+
+  defp player_controlled?(_flags, %Pet{possessed?: true}), do: true
+  defp player_controlled?(flags, _pet) when is_integer(flags), do: (flags &&& @unit_flag_player_controlled) != 0
+  defp player_controlled?(_flags, _pet), do: false
 
   defp interrupt_casts(%{internal: %{casting: nil}} = state, _spell_id), do: state
 

@@ -153,6 +153,23 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStep do
 
   def instance_data_command(%__MODULE__{}), do: {:error, :unsupported}
 
+  def teleport_to(%__MODULE__{command: :teleport_to} = step) do
+    with true <- nonnegative_integer?(step.datalong),
+         true <- nonnegative_integer?(step.datalong2),
+         true <- finite_position?(step.position) do
+      {:ok,
+       %{
+         declared_map_id: step.datalong,
+         options: step.datalong2,
+         position: step.position
+       }}
+    else
+      _invalid -> {:error, :unsupported}
+    end
+  end
+
+  def teleport_to(%__MODULE__{}), do: {:error, :unsupported}
+
   @summon_flag_set_run 0x01
   @summon_flag_unique 0x04
   @summon_flag_unique_temp 0x08
@@ -181,6 +198,7 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStep do
   defp command(3), do: :move_to
   defp command(4), do: :modify_flags
   defp command(5), do: :interrupt_casts
+  defp command(6), do: :teleport_to
   defp command(7), do: :quest_explored
   defp command(8), do: :kill_credit
   defp command(9), do: :respawn_game_object
@@ -246,6 +264,18 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStep do
   defp instance_data_mode(1), do: {:ok, :increment}
   defp instance_data_mode(2), do: {:ok, :decrement}
   defp instance_data_mode(_mode), do: {:error, :unsupported}
+
+  defp nonnegative_integer?(value), do: is_integer(value) and value >= 0
+
+  defp finite_position?({x, y, z, o}) do
+    Enum.all?([x, y, z, o], &finite_number?/1)
+  end
+
+  defp finite_position?(_position), do: false
+
+  defp finite_number?(value) when is_integer(value), do: true
+  defp finite_number?(value) when is_float(value), do: true
+  defp finite_number?(_value), do: false
 
   def decode_target_type(value) when is_integer(value) and value < 0, do: nil
   def decode_target_type(value), do: target_type(value)

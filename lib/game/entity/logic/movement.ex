@@ -330,6 +330,33 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
 
   def finish(entity, now) when is_integer(now), do: halt(entity, now)
 
+  def teleport(
+        %{movement_block: %MovementBlock{}, internal: %Internal{}} = entity,
+        {x, y, z, orientation} = position,
+        now
+      )
+      when is_number(x) and is_number(y) and is_number(z) and is_number(orientation) and is_integer(now) do
+    entity = sync_position(entity, now)
+    from_position = entity.movement_block.position
+    entity = halt(entity, now)
+
+    internal = %{
+      entity.internal
+      | events: Enum.reject(entity.internal.events, &stale_movement_projection?/1),
+        navigation_intents: []
+    }
+
+    movement_block = %{entity.movement_block | position: position, timestamp: now}
+    entity = %{entity | movement_block: movement_block, internal: internal}
+
+    {entity,
+     %{
+       from_position: from_position,
+       position: position,
+       movement_block: movement_block
+     }}
+  end
+
   defp halt(%{movement_block: %MovementBlock{} = mb, internal: %Internal{} = internal} = entity, now)
        when is_integer(now) do
     entity = sync_position(entity, now)
@@ -358,6 +385,10 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
   end
 
   defp projected?(_entity), do: false
+
+  defp stale_movement_projection?(%Effects.MonsterMove{}), do: true
+  defp stale_movement_projection?(%Effects.MovementStopped{}), do: true
+  defp stale_movement_projection?(_effect), do: false
 
   def face_towards(
         %{movement_block: %MovementBlock{position: {x, y, z, _orientation}} = movement_block} = entity,

@@ -5,15 +5,18 @@ defmodule ThistleTea.Game.Entity.Logic.MovementTest do
 
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
+  alias ThistleTea.Game.Entity.Logic.AI.NavigationIntent
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.WorldRef
 
   defp build_entity(opts) do
     internal = %Internal{
-      world: %WorldRef{map_id: 0},
+      world: Keyword.get(opts, :world, %WorldRef{map_id: 0}),
       movement_start_time: Keyword.get(opts, :start_time),
-      movement_start_position: Keyword.get(opts, :start_position)
+      movement_start_position: Keyword.get(opts, :start_position),
+      events: Keyword.get(opts, :events, []),
+      navigation_intents: Keyword.get(opts, :navigation_intents, [])
     }
 
     movement_block = %MovementBlock{
@@ -342,6 +345,56 @@ defmodule ThistleTea.Game.Entity.Logic.MovementTest do
 
     test "returns the start position without spline nodes" do
       assert Movement.position_at({1.0, 2.0, 3.0}, [], 1_000, 500) == {1.0, 2.0, 3.0}
+    end
+  end
+
+  describe "teleport/3" do
+    test "interrupts an active spline at its interpolated pose and installs the exact destination" do
+      world = WorldRef.instance(329, 77)
+      destination = {4032.73, -3366.51, 115.063, 5.42797}
+
+      entity =
+        build_entity(
+          world: world,
+          start_time: 0,
+          start_position: {0.0, 0.0, 0.0},
+          duration: 1_000,
+          spline_nodes: [{10.0, 0.0, 0.0}],
+          movement_flags: 0x01400101,
+          spline_flags: 0x100,
+          spline_id: 8,
+          spline_start_position: {0.0, 0.0, 0.0},
+          events: [Effects.monster_move(), Effects.movement_stopped(), Effects.movement_root_changed(true)],
+          navigation_intents: [%NavigationIntent{destination: {20.0, 0.0, 0.0}}]
+        )
+
+      {teleported, transition} = Movement.teleport(entity, destination, 500)
+
+      assert transition.from_position == {5.0, 0.0, 0.0, 0.0}
+      assert transition.position == destination
+      assert transition.movement_block == teleported.movement_block
+      assert teleported.internal.world == world
+      assert teleported.movement_block.position == destination
+      assert teleported.movement_block.spline_nodes == []
+      assert teleported.movement_block.duration == 0
+      assert teleported.movement_block.spline_flags == 0
+      assert is_nil(teleported.movement_block.spline_id)
+      assert is_nil(teleported.movement_block.spline_start_position)
+      assert is_nil(teleported.internal.movement_start_time)
+      assert is_nil(teleported.internal.movement_start_position)
+      assert teleported.internal.navigation_intents == []
+      assert [%Effects.MovementRootChanged{rooted?: true}] = teleported.internal.events
+      assert (teleported.movement_block.movement_flags &&& 0x01400001) == 0
+    end
+
+    test "still records an exact same-position orientation change while stationary" do
+      entity = build_entity(position: {1.0, 2.0, 3.0, 0.5}, duration: 0, spline_nodes: [], movement_flags: 0)
+
+      {teleported, transition} = Movement.teleport(entity, {1.0, 2.0, 3.0, 0.0}, 900)
+
+      assert transition.from_position == {1.0, 2.0, 3.0, 0.5}
+      assert teleported.movement_block.position == {1.0, 2.0, 3.0, 0.0}
+      assert teleported.movement_block.timestamp == 900
     end
   end
 

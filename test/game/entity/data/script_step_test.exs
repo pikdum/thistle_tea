@@ -166,6 +166,48 @@ defmodule ThistleTea.Game.Entity.Data.ScriptStepTest do
     end
   end
 
+  describe "teleport_to/1" do
+    test "preserves the declared map, options, pose, and routing fields" do
+      step =
+        row(6)
+        |> Map.merge(%{
+          datalong: 0,
+          datalong2: 9,
+          target_type: 11,
+          data_flags: 0x02,
+          x: 1.25,
+          y: -2.5,
+          z: 3.75,
+          o: 0.0
+        })
+        |> ScriptStep.build()
+
+      assert step.command == :teleport_to
+      assert step.target_type == :creature_with_guid
+      assert step.swap_final?
+
+      assert {:ok, teleport} = ScriptStep.teleport_to(step)
+      assert teleport == %{declared_map_id: 0, options: 9, position: {1.25, -2.5, 3.75, 0.0}}
+    end
+
+    test "fails closed for malformed payloads" do
+      valid = %ScriptStep{command: :teleport_to, datalong: 329, datalong2: 0, position: {1.0, 2.0, 3.0, 4.0}}
+
+      for invalid <- [
+            %{valid | datalong: -1},
+            %{valid | datalong: 1.0},
+            %{valid | datalong2: -1},
+            %{valid | datalong2: 1.0},
+            %{valid | position: nil},
+            %{valid | position: {1.0, 2.0, :nan, 4.0}}
+          ] do
+        assert ScriptStep.teleport_to(invalid) == {:error, :unsupported}
+      end
+
+      assert ScriptStep.teleport_to(%{valid | command: :move_to}) == {:error, :unsupported}
+    end
+  end
+
   describe "talk_text_ids/1" do
     test "collects the non-zero broadcast text ids of talk steps" do
       step = %ScriptStep{command: :talk, dataint: 1_866, dataint2: 1_867, dataint3: 0, dataint4: 0}

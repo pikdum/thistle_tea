@@ -10,6 +10,8 @@ defmodule ThistleTea.Game.Entity.Logic.Effects.MovementTypes do
     {:HoverChanged, [:enabled?], []},
     {:WaterWalkChanged, [:enabled?], []},
     {:MonsterMove, [:move_opts], []},
+    {:CreatureTeleported, [:world, :from_position, :position, :movement_block, :script_id, :declared_map_id, :options],
+     []},
     {:Teleport, [:position], []},
     {:TeleportToWorld, [:world, :position], []},
     {:Leap, [:position], []},
