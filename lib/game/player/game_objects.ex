@@ -75,6 +75,7 @@ defmodule ThistleTea.Game.Player.GameObjects do
   end
 
   def open_chest(state, guid), do: Looting.open(state, guid)
+  def open_object(state, guid), do: use_object(state, guid)
 
   def chest?(guid) do
     Guid.entity_type(guid) == :game_object and

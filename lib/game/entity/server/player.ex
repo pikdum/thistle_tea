@@ -732,7 +732,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
 
   @impl GenServer
   def handle_info({:open_gameobject_loot, object_guid}, state) do
-    state = PlayerGameObjects.open_chest(state, object_guid)
+    state = PlayerGameObjects.open_object(state, object_guid)
     {:noreply, state}
   rescue
     error ->

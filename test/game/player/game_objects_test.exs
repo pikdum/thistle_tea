@@ -14,6 +14,36 @@ defmodule ThistleTea.Game.Player.GameObjectsTest do
   alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
   alias ThistleTea.Game.WorldRef
 
+  describe "open_object/2" do
+    test "routes an open-lock completion through ordinary door use" do
+      entry = System.unique_integer([:positive])
+      guid = Guid.from_low_guid(:game_object, entry, System.unique_integer([:positive]))
+      player_guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
+      template = %GameObjectTemplate{entry: entry, type: 0, size: 1.0, data: [0, 0]}
+      :ets.insert(GameObjectTemplateLoader, {entry, template})
+      Entity.register(player_guid)
+
+      owner = start_game_object_owner(guid)
+
+      on_exit(fn ->
+        :ets.delete(GameObjectTemplateLoader, entry)
+        Entity.unregister(player_guid)
+        if Process.alive?(owner), do: Process.exit(owner, :kill)
+      end)
+
+      character = %Character{
+        object: %Object{guid: player_guid},
+        unit: %Unit{level: 10},
+        internal: %Internal{world: %WorldRef{map_id: 0}},
+        movement_block: %MovementBlock{position: {1.0, 1.0, 3.0, 0.0}}
+      }
+
+      GameObjects.open_object(%{guid: player_guid, character: character}, guid)
+
+      assert_receive {:"$gen_cast", {:gameobject_use, ^player_guid, 10}}
+    end
+  end
+
   describe "use_object/2" do
     test "sits the player in the seat returned by a chair game object" do
       entry = System.unique_integer([:positive])
@@ -43,6 +73,23 @@ defmodule ThistleTea.Game.Player.GameObjectsTest do
       assert state.character.unit.stand_state == 5
       assert_receive {:"$gen_cast", {:start_teleport, 1.0, 2.0, 3.0, 1.5, %WorldRef{map_id: 0}}}
       assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgStandstateUpdate{stand_state: 5}}}
+    end
+  end
+
+  defp start_game_object_owner(guid) do
+    parent = self()
+
+    spawn(fn ->
+      {:ok, _owner} = Entity.register(guid)
+      send(parent, :game_object_owner_ready)
+      serve_game_object(parent)
+    end)
+    |> tap(fn _pid -> assert_receive :game_object_owner_ready end)
+  end
+
+  defp serve_game_object(parent) do
+    receive do
+      {:"$gen_cast", message} -> send(parent, {:"$gen_cast", message})
     end
   end
 
