@@ -624,12 +624,15 @@ defmodule ThistleTea.Game.Player.DevCommands do
   end
 
   defp teleport_player(state, x, y, z, map) do
-    system_message(state, "Teleporting to #{x}, #{y}, #{z} on map #{map}")
+    system_message(state, "Teleporting to #{x}, #{y}, #{z} on #{destination_label(map)}")
 
     GenServer.cast(self(), {:start_teleport, x, y, z, map})
 
     state
   end
+
+  defp destination_label(%WorldRef{} = world), do: world_label(world)
+  defp destination_label(map_id) when is_integer(map_id), do: "map #{map_id}"
 
   defp reset_instances(state) do
     case InstanceSystem.reset(state.guid) do

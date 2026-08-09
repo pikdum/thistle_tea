@@ -267,6 +267,21 @@ defmodule ThistleTea.Game.Player.DevCommandsTest do
     end
   end
 
+  describe ".go xyz" do
+    test "preserves the current instance copy when no map is supplied" do
+      world = WorldRef.instance(329, System.unique_integer([:positive, :monotonic]))
+      character = %{debug_character() | internal: %Internal{world: world}}
+      state = %{guid: 1, character: character}
+
+      assert {:handled, ^state} = DevCommands.run(state, ".go xyz 3680.53 -3643.80 140.03")
+
+      assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgMessagechat{message: message}}}
+      assert message == "Teleporting to 3680.53, -3643.8, 140.03 on map 329 / instance #{world.instance_id}"
+
+      assert_receive {:"$gen_cast", {:start_teleport, 3680.53, -3643.8, 140.03, ^world}}
+    end
+  end
+
   defp debug_character do
     %Character{
       object: %Object{guid: 1},
