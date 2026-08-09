@@ -11,8 +11,8 @@ selector, or parameter mode.
 - Supported trigger rows: 6,220.
 - Blocked trigger rows: 36.
 - EventAI action data: 7,409 rows across 6,215 script IDs.
-- Mapped action-command rows: 7,249.
-- Unmapped action-command rows: 160.
+- Mapped action-command rows: 7,250.
+- Unmapped action-command rows: 159.
 
 The command number measures interpreter availability, not end-to-end creature
 behavior. The partial-mode inventory below remains part of the backlog even
@@ -47,6 +47,7 @@ The shared script interpreter now covers these EventAI-heavy commands:
 | 29 `MODIFY_THREAT` | 22 | Percent modification of one threat entry or the complete threat list. |
 | 85 `SEND_SCRIPT_EVENT` | 6 | Owner-local EventAI script-event delivery. |
 | 37 `SET_INST_DATA` | 107 | Typed instance-owner command. Only scripts 1044002 and 1091703 targeting Stratholme field 7 are registered end to end. |
+| 6 `TELEPORT_TO` | 1 | Highlord Taelan Fordring's server-controlled same-world teleport, including spline interruption and old/new observer projection. |
 
 Hostile threat-list selectors now distinguish second, last, random, random
 excluding top, nearest, and farthest targets. Owner, nearest-player, and random
@@ -89,14 +90,13 @@ dependencies called out explicitly:
 | 48 `DEAL_DAMAGE` | 4 | Remote typed damage delivery with source attribution. |
 | 72 `ASSIST_UNIT` | 4 | Selected-target attacker and helper projections plus engagement delivery. |
 | 79 `LEAVE_CREATURE_GROUP` | 2 | Runtime creature formations and ownership. |
-| 6 `TELEPORT_TO` | 1 | Shared player and creature teleport transition with visibility and attachment handling. |
 | 38 `SET_INST_DATA64` | 1 | Instance script GUID fields and entity-lifetime cleanup. |
 | 77 `SET_FLY` | 1 | Flight movement capability and spline-flag projection. |
 | 90 `START_SCRIPT_ON_GROUP` | 1 | Group or formation ownership and script fanout. |
 
 ## Partial selectors and parameter modes
 
-These counts are separate dimensions and must not be added to the 160 unmapped
+These counts are separate dimensions and must not be added to the 159 unmapped
 command rows:
 
 - Command 37 has 107 numerically mapped EventAI rows. Two field-7 rows,
@@ -108,6 +108,9 @@ command rows:
 - `MOVEMENT` types 6, 15, and 19: 45 rows; idle, random, waypoint, and home are
   supported.
 - Initial source/target swap without a final buddy-owner swap: 16 rows.
+- Command 6 is numerically mapped only for ordinary server-controlled creature
+  sources. Player and client-controlled source modes remain unsupported; the
+  mapped-row count does not claim those source modes.
 
 ## Validation gates
 

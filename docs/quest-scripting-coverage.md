@@ -11,7 +11,7 @@ This inventory covers the VMangos data in `db/vmangos.sqlite` as of August 8,
 - Implemented direct rows: 2,351.
 - Blocked direct rows: 4 across three quests.
 - Combined quest, generic, and movement data: 7,142 rows.
-- Commands with no numeric runtime mapping in that combined set: 117 rows.
+- Commands with no numeric runtime mapping in that combined set: 111 rows.
 
 The direct-row number describes command availability, not a claim that every
 quest is end-to-end complete. A quest can enter generic or waypoint scripts
@@ -22,8 +22,8 @@ that use a partial target selector or an unsupported secondary command.
 - Presentation: talk, emote, sound, stand state, sheath state, facing, morph by
   display ID, mount, custom game-object animation, and game-object state.
 - Movement and escort control: point movement, idle/random/waypoint/home
-  movement modes, run/walk, flee, home position, waypoint routes, and map-event
-  escort lifecycle.
+  movement modes, run/walk, flee, home position, waypoint routes, same-world
+  server-controlled creature teleports, and map-event escort lifecycle.
 - Combat and unit state: attack start, combat stop, cast interruption, aura
   add/remove, spell casts, temporary faction, typed flag changes, melee and
   combat-movement capabilities, phase changes, and invincibility health floors.
@@ -35,8 +35,9 @@ that use a partial target selector or an unsupported secondary command.
 - Script orchestration: nested generic scripts, weighted script selection,
   ordered cancellable delays, creature-presence termination, condition
   termination, map-event commands and source/target/extra-target selection, and
-  script fanout to nearby objects. Registered instance-data commands cross a
-  typed effect boundary into the instance owner.
+  script fanout to nearby objects. Final-target forwarding makes the receiving
+  creature the teleport source. Registered instance-data commands cross a typed
+  effect boundary into the instance owner.
 - Creature presentation: per-slot scripted equipment set, clear, preserve, and
   reset-to-default behavior.
 
@@ -65,7 +66,6 @@ The combined quest/generic/movement data contains these unmapped commands:
 | 78 join creature group | 8 | Runtime creature formations and ownership. |
 | 75 add threat | 7 | Remote semantic threat delivery to the target owner. |
 | 77 set fly | 7 | Flight movement capability and spline flag projection. |
-| 6 teleport | 6 | A shared player/creature teleport transition with visibility and attachment handling. |
 | 79 leave creature group | 5 | Runtime creature formations and ownership. |
 | 92 start script on zone | 5 | Zone membership index and player/pet fanout. |
 | 55 creature spells | 4 | Unified preloaded spell cache and runtime list replacement. |
@@ -91,6 +91,15 @@ The combined quest/generic/movement data contains these unmapped commands:
 - Whisper and boss-whisper talk modes have seven rows.
 - Morph-by-creature-entry has 28 movement rows. Morph-by-display-ID is
   implemented; entry-based morphing needs a preloaded template display choice.
+- Command 6 `TELEPORT_TO` is mapped for ordinary server-controlled creature
+  sources. It interrupts the old spline, preserves the exact current
+  `WorldRef`, and projects the relocation to old and new observers. Player and
+  client-controlled source modes remain unsupported because they require the
+  acknowledgement and attachment lifecycle.
+- Creature command 6 retains the declared map and option fields for auditing
+  but does not use them as relocation policy. Magistrate Barthilas is the
+  pinned regression: his row declares map 0 while his runtime world remains map
+  329 and the same instance copy.
 
 ## Validation gates
 
