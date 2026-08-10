@@ -46,6 +46,7 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
   alias ThistleTea.Game.World.Pathfinding
   alias ThistleTea.Game.World.SpawnPool
   alias ThistleTea.Game.World.System.GameEvent
+  alias ThistleTea.Game.World.System.Instance, as: InstanceSystem
   alias ThistleTea.Game.World.System.Party, as: PartySystem
   alias ThistleTea.Game.World.Visibility
 
@@ -62,11 +63,22 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
     publish_condition_metadata(state)
     World.update_position(state)
     state = Visibility.join_entity(state)
+    notify_instance_spawn(state)
     schedule_despawn(state)
     schedule_fishing_bite(state)
     schedule_trap(state)
     {:ok, state}
   end
+
+  defp notify_instance_spawn(%GameObject{
+         object: %{entry: entry},
+         internal: %Internal{world: %{instance_id: instance_id} = world}
+       })
+       when is_integer(instance_id) do
+    InstanceSystem.game_object_spawned(world, entry)
+  end
+
+  defp notify_instance_spawn(_state), do: :ok
 
   @impl GenServer
   def handle_cast({:send_update_to, pid}, state) do

@@ -4,6 +4,7 @@ defmodule ThistleTea.Game.World.System.InstanceTest do
   alias ThistleTea.Game.Entity.Logic.Condition.InstanceDataSnapshot, as: Snapshot
   alias ThistleTea.Game.InstanceScript.Effects.CastPlayerSpell
   alias ThistleTea.Game.InstanceScript.Effects.MonsterTalk
+  alias ThistleTea.Game.InstanceScript.Effects.OperateGameObject
   alias ThistleTea.Game.InstanceScript.Effects.SummonCreature
   alias ThistleTea.Game.World.InstanceData
   alias ThistleTea.Game.World.System.Instance, as: InstanceSystem
@@ -179,6 +180,26 @@ defmodule ThistleTea.Game.World.System.InstanceTest do
       state = :sys.get_state(name)
       assert Map.keys(state.script_timer_refs) == [{world, :ysida_reward}]
       assert %Snapshot{fields: %{0 => {:ok, 3}, 5 => {:ok, 3}}} = InstanceData.read(world, [0, 5], table)
+    end
+
+    test "reconciles a spawned game object from current script data", %{test: test} do
+      parent = self()
+      name = unique_name()
+      guid = System.unique_integer([:positive])
+
+      start_instance_system(
+        name: name,
+        script_name: fn 329 -> "instance_stratholme" end,
+        effect_sink: fn world, effect -> send(parent, {test, world, effect}) end
+      )
+
+      assert {:ok, world} = InstanceSystem.enter(329, guid, name)
+      assert {:ok, 3} = InstanceSystem.command(world, 1, 3, :raw, name)
+      assert_receive {^test, ^world, %OperateGameObject{entry: 175_380}}
+
+      InstanceSystem.game_object_spawned(world, 175_380, name)
+      assert InstanceSystem.count(name) == 1
+      assert_receive {^test, ^world, %OperateGameObject{entry: 175_380}}
     end
 
     test "keeps copy projections isolated and removes timed-out data" do

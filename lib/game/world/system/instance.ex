@@ -72,6 +72,10 @@ defmodule ThistleTea.Game.World.System.Instance do
     GenServer.call(server, {:game_object_used, world, entry})
   end
 
+  def game_object_spawned(world, entry, server \\ __MODULE__) do
+    GenServer.cast(server, {:game_object_spawned, world, entry})
+  end
+
   def creature_event(world, event, server \\ __MODULE__) do
     GenServer.cast(server, {:creature_event, world, event})
   end
@@ -229,6 +233,20 @@ defmodule ThistleTea.Game.World.System.Instance do
   rescue
     error ->
       Logger.warning("Instance creature callback failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
+  def handle_cast({:game_object_spawned, world, entry}, state) do
+    case Instance.game_object_spawned(state.instances, world, entry) do
+      {:ok, effects, instances} ->
+        {:noreply, dispatch_effects(%{state | instances: instances}, world, effects)}
+
+      {:error, _reason} ->
+        {:noreply, state}
+    end
+  rescue
+    error ->
+      Logger.warning("Instance game object spawn callback failed: #{Exception.message(error)}")
       {:noreply, state}
   end
 

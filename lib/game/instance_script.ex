@@ -49,6 +49,13 @@ defmodule ThistleTea.Game.InstanceScript do
     end
   end
 
+  def game_object_spawned(script_name, data, script_state, entry) do
+    case adapter(script_name) do
+      nil -> {:error, {:unsupported_script, script_name}}
+      adapter -> adapter.game_object_spawned(data, script_state, entry)
+    end
+  end
+
   def creature_event(script_name, data, script_state, event) do
     case adapter(script_name) do
       nil -> {:error, {:unsupported_script, script_name}}
@@ -195,6 +202,10 @@ defmodule ThistleTea.Game.InstanceScript.Stratholme do
 
   def game_object_used(data, _entry), do: {:ok, data, []}
 
+  def game_object_spawned(data, script_state, entry) do
+    {:ok, game_object_spawn_effects(data, ensure_script_state(script_state), entry)}
+  end
+
   def creature_event(data, script_state, event) do
     handle_creature_event(data, ensure_script_state(script_state), event)
   end
@@ -315,7 +326,7 @@ defmodule ThistleTea.Game.InstanceScript.Stratholme do
     if script_state.ramstein_dead? do
       {:ok, data, script_state, []}
     else
-      script_state = %{script_state | ramstein_dead?: true}
+      script_state = %{script_state | ramstein_dead?: true, slaughter_gate_open?: true}
       with_script_state(set_ramstein(data, @done), script_state)
     end
   end
@@ -406,6 +417,7 @@ defmodule ThistleTea.Game.InstanceScript.Stratholme do
   end
 
   def timer(data, script_state, :ramstein_arrival) do
+    script_state = %{ensure_script_state(script_state) | ramstein_arrived?: true}
     {:ok, data, script_state, [operate(@ziggurat_four, :close), talk(@ramstein_entry, 6_425)]}
   end
 
@@ -426,6 +438,7 @@ defmodule ThistleTea.Game.InstanceScript.Stratholme do
   end
 
   def timer(data, script_state, :slaughter_square_gate_reset) do
+    script_state = %{ensure_script_state(script_state) | slaughter_gate_open?: false}
     {:ok, data, script_state, [operate(@slaughter_square_gate, :close)]}
   end
 
@@ -540,7 +553,9 @@ defmodule ThistleTea.Game.InstanceScript.Stratholme do
         dead_abominations: MapSet.new(),
         abomination_queue: [],
         ramstein_summoned?: false,
+        ramstein_arrived?: false,
         ramstein_dead?: false,
+        slaughter_gate_open?: false,
         black_guards_announced?: false,
         dead_black_guards: MapSet.new()
       },
@@ -614,4 +629,65 @@ defmodule ThistleTea.Game.InstanceScript.Stratholme do
       )
     end)
   end
+
+  defp game_object_spawn_effects(data, _script_state, entry) when entry in [175_380, 175_379, 175_381] do
+    field = @ziggurat_doors |> Enum.find_value(fn {field, door} -> if door == entry, do: field end)
+    if Map.get(data, field, @not_started) == @done, do: [operate(entry, :open)], else: []
+  end
+
+  defp game_object_spawn_effects(data, _script_state, @port_gauntlet) do
+    cond do
+      Map.get(data, @baron, @not_started) == @in_progress -> [operate(@port_gauntlet, :close)]
+      Map.get(data, @ramstein, @not_started) in [@in_progress, @special] -> [operate(@port_gauntlet, :close)]
+      Map.get(data, @crystal_all_die, @not_started) == @done -> [operate(@port_gauntlet, :open)]
+      true -> []
+    end
+  end
+
+  defp game_object_spawn_effects(data, _script_state, @port_slaughter) do
+    if Map.get(data, @crystal_all_die, @not_started) == @done,
+      do: [operate(@port_slaughter, :open)],
+      else: []
+  end
+
+  defp game_object_spawn_effects(data, script_state, @ziggurat_four) do
+    cond do
+      Map.get(data, @baron, @not_started) == @in_progress ->
+        [operate(@ziggurat_four, :close)]
+
+      Map.get(data, @ramstein, @not_started) == @done ->
+        [operate(@ziggurat_four, :open)]
+
+      Map.get(data, @ramstein, @not_started) == @in_progress and script_state.ramstein_arrived? ->
+        [operate(@ziggurat_four, :close)]
+
+      Map.get(data, @ramstein_event, @not_started) == @done ->
+        [operate(@ziggurat_four, :open)]
+
+      true ->
+        []
+    end
+  end
+
+  defp game_object_spawn_effects(data, _script_state, @ziggurat_five) do
+    cond do
+      Map.get(data, @baron, @not_started) == @in_progress -> [operate(@ziggurat_five, :close)]
+      Map.get(data, @ramstein, @not_started) == @done -> [operate(@ziggurat_five, :open)]
+      true -> []
+    end
+  end
+
+  defp game_object_spawn_effects(_data, script_state, @slaughter_square_gate) do
+    if script_state.slaughter_gate_open?,
+      do: [operate(@slaughter_square_gate, :open)],
+      else: []
+  end
+
+  defp game_object_spawn_effects(data, _script_state, @ysida_cage_entry) do
+    if Map.get(data, @baron_run, @not_started) in [@fail, @done],
+      do: [operate(@ysida_cage_entry, :open)],
+      else: []
+  end
+
+  defp game_object_spawn_effects(_data, _script_state, _entry), do: []
 end

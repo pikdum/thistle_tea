@@ -103,6 +103,16 @@ defmodule ThistleTea.Game.Instance do
 
   def game_object_used(%__MODULE__{}, _world, _entry), do: {:error, :open_world}
 
+  def game_object_spawned(%__MODULE__{} = instances, %WorldRef{} = world, entry) when is_integer(entry) do
+    with :ok <- validate_world(world),
+         {:ok, copy} <- fetch_copy(instances, world),
+         {:ok, effects} <- InstanceScript.game_object_spawned(copy.script_name, copy.data, copy.script_state, entry) do
+      {:ok, effects, instances}
+    end
+  end
+
+  def game_object_spawned(%__MODULE__{}, _world, _entry), do: {:error, :open_world}
+
   def creature_event(%__MODULE__{} = instances, %WorldRef{} = world, event) do
     with :ok <- validate_world(world),
          {:ok, copy} <- fetch_copy(instances, world),

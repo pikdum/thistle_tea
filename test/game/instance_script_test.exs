@@ -83,6 +83,28 @@ defmodule ThistleTea.Game.InstanceScriptTest do
   end
 
   describe "undead-side progression" do
+    test "reconciles unloaded doors when their owners spawn", context do
+      assert {:ok, _effects, instances} =
+               Instance.creature_event(context.instances, context.world, creature_event(10_436, :death))
+
+      assert {:ok, [%Effects.OperateGameObject{entry: 175_380, action: :open}], ^instances} =
+               Instance.game_object_spawned(instances, context.world, 175_380)
+
+      assert {:ok, 3, [], instances} = Instance.command(instances, context.world, 6, 3, :raw)
+
+      assert {:ok, [%Effects.OperateGameObject{entry: 175_374, action: :open}], ^instances} =
+               Instance.game_object_spawned(instances, context.world, 175_374)
+
+      assert {:ok, _effects, instances} =
+               Instance.creature_event(instances, context.world, creature_event(10_439, :death))
+
+      assert {:ok, [%Effects.OperateGameObject{entry: 175_358, action: :open}], ^instances} =
+               Instance.game_object_spawned(instances, context.world, 175_358)
+
+      assert {:ok, _effects, instances} = Instance.timer(instances, context.world, :slaughter_square_gate_reset)
+      assert {:ok, [], ^instances} = Instance.game_object_spawned(instances, context.world, 175_358)
+    end
+
     test "opens each ziggurat when its boss dies", context do
       bosses = [{10_436, 1, 175_380}, {10_437, 2, 175_379}, {10_438, 3, 175_381}]
 
