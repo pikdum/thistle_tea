@@ -83,6 +83,62 @@ defmodule ThistleTea.Game.InstanceAuriusVmangosTest do
     end)
   end
 
+  test "pins Stratholme ziggurat, crystal, and abomination spawns" do
+    assert rows("SELECT guid, id FROM creature WHERE map = 329 AND id IN (10436, 10437, 10438, 10440) ORDER BY id") == [
+             [54_238, 10_436],
+             [54_239, 10_437],
+             [54_240, 10_438],
+             [54_241, 10_440]
+           ]
+
+    assert rows("SELECT guid FROM creature WHERE map = 329 AND id = 10415 ORDER BY guid") == [
+             [53_955],
+             [53_963],
+             [53_968]
+           ]
+
+    assert rows("SELECT guid FROM creature WHERE map = 329 AND id = 10399 ORDER BY guid") ==
+             Enum.map(
+               [
+                 53_257,
+                 53_258,
+                 53_259,
+                 53_260,
+                 53_261,
+                 53_262,
+                 53_263,
+                 53_264,
+                 53_265,
+                 53_266,
+                 53_268,
+                 53_269,
+                 53_270,
+                 53_271,
+                 53_272
+               ],
+               &[&1]
+             )
+
+    assert rows("SELECT guid FROM creature WHERE map = 329 AND id IN (10416, 10417) ORDER BY guid") ==
+             Enum.map(
+               [53_969, 54_002, 54_018, 54_019, 54_020, 54_021, 54_022, 54_026, 54_027, 54_039, 54_040, 54_041, 54_050],
+               &[&1]
+             )
+
+    assert rows(
+             "SELECT guid, id FROM gameobject WHERE map = 329 AND id IN (175358, 175373, 175374, 175379, 175380, 175381, 175405, 175796) ORDER BY id"
+           ) == [
+             [49_594, 175_358],
+             [6_908, 175_373],
+             [6_911, 175_374],
+             [11_414, 175_379],
+             [11_415, 175_380],
+             [11_416, 175_381],
+             [11_808, 175_405],
+             [35_848, 175_796]
+           ]
+  end
+
   test "loaded Baron lifecycle drives field five through the instance owner" do
     owner = self()
     id = System.unique_integer([:positive, :monotonic])

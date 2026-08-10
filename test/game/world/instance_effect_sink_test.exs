@@ -21,9 +21,10 @@ defmodule ThistleTea.Game.World.InstanceEffectSinkTest do
     options = [
       guids: fn ^world -> all_guids end,
       dispatch: fn command -> send(owner, command) end,
-      summon: fn summoned_world, entry, position, despawn_delay_ms ->
-        send(owner, {:summon, summoned_world, entry, position, despawn_delay_ms})
+      summon: fn summoned_world, entry, position, despawn_delay_ms, move_to ->
+        send(owner, {:summon, summoned_world, entry, position, despawn_delay_ms, move_to})
       end,
+      spawn_guid: fn ^world, :mob, 53_955 -> crystal end,
       broadcast_text: fn 11_812 -> %{text: "Intruders!", chat_type: :zone_yell} end
     ]
 
@@ -113,7 +114,19 @@ defmodule ThistleTea.Game.World.InstanceEffectSinkTest do
   test "builds summons in the exact copy", context do
     effect = %Effects.SummonCreature{entry: 16_031, position: {1.0, 2.0, 3.0, 4.0}, despawn_delay_ms: 5_000}
     assert :ok = InstanceEffectSink.emit(context.world, effect, context.options)
-    assert_receive {:summon, world, 16_031, {1.0, 2.0, 3.0, 4.0}, 5_000}
+    assert_receive {:summon, world, 16_031, {1.0, 2.0, 3.0, 4.0}, 5_000, nil}
     assert world == context.world
+  end
+
+  test "resolves one exact database spawn for a script spell", context do
+    effect = %Effects.TriggerCreatureSpell{
+      creature_entry: 10_415,
+      creature_db_guid: 53_955,
+      spell_id: 5
+    }
+
+    assert :ok = InstanceEffectSink.emit(context.world, effect, context.options)
+    assert_receive {:trigger_creature_spell, guid, 5}
+    assert guid == context.crystal
   end
 end

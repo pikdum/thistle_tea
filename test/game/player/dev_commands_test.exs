@@ -236,7 +236,9 @@ defmodule ThistleTea.Game.Player.DevCommandsTest do
 
       assert_receive {:"$gen_cast",
                       {:send_packet,
-                       %Message.SmsgMessagechat{message: "Instance data (instance_stratholme): 0=0, 5=0, 7=2"}}}
+                       %Message.SmsgMessagechat{
+                         message: "Instance data (instance_stratholme): 0=0, 1=0, 2=0, 3=0, 4=0, 5=0, 6=0, 7=2, 8=0"
+                       }}}
 
       assert {:handled, ^state} = DevCommands.run(state, ".instance data 5")
 

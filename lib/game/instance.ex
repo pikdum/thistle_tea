@@ -119,8 +119,9 @@ defmodule ThistleTea.Game.Instance do
   def timer(%__MODULE__{} = instances, %WorldRef{} = world, key) do
     with :ok <- validate_world(world),
          {:ok, copy} <- fetch_copy(instances, world),
-         {:ok, data, effects} <- InstanceScript.timer(copy.script_name, copy.data, key) do
-      copy = %{copy | data: data}
+         {:ok, data, script_state, effects} <-
+           InstanceScript.timer(copy.script_name, copy.data, copy.script_state, key) do
+      copy = %{copy | data: data, script_state: script_state}
       instances = %{instances | copies: Map.put(instances.copies, world, copy)}
       {:ok, effects, instances}
     end

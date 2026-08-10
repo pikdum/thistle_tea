@@ -94,8 +94,8 @@ When practical, also observe one imported open-world path:
 
 ## Known limits
 
-- Only Stratholme fields 0, 5, and 7 are registered. The remaining encounter
-  fields and instance-specific callbacks still fail closed.
+- Stratholme fields 0 through 8 are registered. Fields outside that audited
+  encounter range and other instance scripts still fail closed.
 - The Baron run is ephemeral with its instance copy and is not durably saved.
 - Aurius' delay-12 command-3 path can still fail when pathfinding cannot reach
   its destination before Baron dies.

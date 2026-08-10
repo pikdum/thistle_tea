@@ -143,7 +143,7 @@ defmodule ThistleTea.Game.World.System.InstanceTest do
       assert {:ok, 2} = InstanceSystem.command(world, 7, 2, :raw, name)
       assert %Snapshot{fields: %{7 => {:ok, 2}}} = InstanceData.read(world, [7], table)
 
-      assert {:error, {:unsupported_field, 6}} = InstanceSystem.command(world, 6, 1, :raw, name)
+      assert {:error, {:unsupported_field, 9}} = InstanceSystem.command(world, 9, 1, :raw, name)
       assert %Snapshot{fields: %{7 => {:ok, 2}}} = InstanceData.read(world, [7], table)
     end
 

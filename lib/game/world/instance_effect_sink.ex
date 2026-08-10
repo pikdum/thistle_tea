@@ -16,28 +16,29 @@ defmodule ThistleTea.Game.World.InstanceEffectSink do
   def emit(%WorldRef{} = world, effect, options \\ []) do
     guids = Keyword.get(options, :guids, &World.guids/1)
     dispatch = Keyword.get(options, :dispatch, &dispatch/1)
-    summon = Keyword.get(options, :summon, &summon/4)
+    summon = Keyword.get(options, :summon, &summon/5)
+    spawn_guid = Keyword.get(options, :spawn_guid, &World.spawn_guid/3)
     broadcast_text = Keyword.get(options, :broadcast_text, &BroadcastText.get/1)
 
-    project(world, effect, guids, dispatch, summon, broadcast_text)
+    project(world, effect, guids, dispatch, summon, spawn_guid, broadcast_text)
   end
 
-  defp project(world, %Effects.OperateGameObject{} = effect, guids, dispatch, _summon, _text) do
+  defp project(world, %Effects.OperateGameObject{} = effect, guids, dispatch, _summon, _spawn_guid, _text) do
     world
     |> entity_guids(:game_object, effect.entry, guids)
     |> Enum.each(&dispatch.({:operate_game_object, &1, effect.action}))
   end
 
-  defp project(world, %Effects.SummonCreature{} = effect, _guids, _dispatch, summon, _text) do
-    summon.(world, effect.entry, effect.position, effect.despawn_delay_ms)
+  defp project(world, %Effects.SummonCreature{} = effect, _guids, _dispatch, summon, _spawn_guid, _text) do
+    summon.(world, effect.entry, effect.position, effect.despawn_delay_ms, effect.move_to)
     :ok
   end
 
-  defp project(world, %Effects.MonsterTalk{} = effect, guids, dispatch, _summon, text) do
+  defp project(world, %Effects.MonsterTalk{} = effect, guids, dispatch, _summon, _spawn_guid, text) do
     case text.(effect.broadcast_text_id) do
       %{text: message, chat_type: chat_type} ->
         world
-        |> entity_guids(:mob, effect.creature_entry, guids)
+        |> targeted_creature_guids(effect, guids, nil)
         |> Enum.each(&dispatch.({:monster_talk, &1, message, chat_type}))
 
       _missing ->
@@ -45,43 +46,56 @@ defmodule ThistleTea.Game.World.InstanceEffectSink do
     end
   end
 
-  defp project(world, %Effects.CastPlayerSpell{} = effect, guids, dispatch, _summon, _text) do
+  defp project(world, %Effects.CastPlayerSpell{} = effect, guids, dispatch, _summon, _spawn_guid, _text) do
     world |> entity_guids(:player, nil, guids) |> Enum.each(&dispatch.({:cast_player_spell, &1, effect.spell_id}))
   end
 
-  defp project(world, %Effects.RemovePlayerAuras{} = effect, guids, dispatch, _summon, _text) do
+  defp project(world, %Effects.RemovePlayerAuras{} = effect, guids, dispatch, _summon, _spawn_guid, _text) do
     world |> entity_guids(:player, nil, guids) |> Enum.each(&dispatch.({:remove_player_auras, &1, effect.spell_ids}))
   end
 
-  defp project(world, %Effects.QuestKillCredit{} = effect, guids, dispatch, _summon, _text) do
+  defp project(world, %Effects.QuestKillCredit{} = effect, guids, dispatch, _summon, _spawn_guid, _text) do
     world |> entity_guids(:player, nil, guids) |> Enum.each(&dispatch.({:quest_kill_credit, &1, effect.creature_entry}))
   end
 
-  defp project(world, %Effects.ModifyCreatureNpcFlags{} = effect, guids, dispatch, _summon, _text) do
+  defp project(world, %Effects.ModifyCreatureNpcFlags{} = effect, guids, dispatch, _summon, _spawn_guid, _text) do
     world
     |> entity_guids(:mob, effect.creature_entry, guids)
     |> Enum.each(&dispatch.({:modify_creature_npc_flags, &1, effect.flags, effect.mode}))
   end
 
-  defp project(world, %Effects.ModifyCreatureUnitFlags{} = effect, guids, dispatch, _summon, _text) do
+  defp project(world, %Effects.ModifyCreatureUnitFlags{} = effect, guids, dispatch, _summon, _spawn_guid, _text) do
     world
     |> entity_guids(:mob, effect.creature_entry, guids)
     |> Enum.each(&dispatch.({:modify_creature_unit_flags, &1, effect.flags, effect.mode}))
   end
 
-  defp project(world, %Effects.MoveCreature{} = effect, guids, dispatch, _summon, _text) do
+  defp project(world, %Effects.MoveCreature{} = effect, guids, dispatch, _summon, _spawn_guid, _text) do
     {x, y, z} = effect.position
-    world |> entity_guids(:mob, effect.creature_entry, guids) |> Enum.each(&dispatch.({:move_creature, &1, {x, y, z}}))
+
+    world
+    |> targeted_creature_guids(effect, guids, nil)
+    |> Enum.each(&dispatch.({:move_creature, &1, {x, y, z}}))
   end
 
-  defp project(world, %Effects.TriggerCreatureSpell{} = effect, guids, dispatch, _summon, _text) do
+  defp project(world, %Effects.TriggerCreatureSpell{} = effect, guids, dispatch, _summon, spawn_guid, _text) do
     world
-    |> targeted_creature_guids(effect, guids)
+    |> targeted_creature_guids(effect, guids, spawn_guid)
     |> Enum.each(&dispatch.({:trigger_creature_spell, &1, effect.spell_id}))
   end
 
-  defp targeted_creature_guids(_world, %{creature_guid: guid}, _guids) when is_integer(guid), do: [guid]
-  defp targeted_creature_guids(world, effect, guids), do: entity_guids(world, :mob, effect.creature_entry, guids)
+  defp targeted_creature_guids(_world, %{creature_guid: guid}, _guids, _spawn_guid) when is_integer(guid), do: [guid]
+
+  defp targeted_creature_guids(world, %{creature_db_guid: db_guid}, _guids, spawn_guid)
+       when is_integer(db_guid) and is_function(spawn_guid, 3) do
+    case spawn_guid.(world, :mob, db_guid) do
+      guid when is_integer(guid) -> [guid]
+      _missing -> []
+    end
+  end
+
+  defp targeted_creature_guids(world, effect, guids, _spawn_guid),
+    do: entity_guids(world, :mob, effect.creature_entry, guids)
 
   defp entity_guids(world, entity_type, entry, guids) do
     world
@@ -108,10 +122,11 @@ defmodule ThistleTea.Game.World.InstanceEffectSink do
   defp dispatch({:trigger_creature_spell, guid, spell_id}),
     do: Entity.trigger_spell(guid, spell_id, guid, triggered: true)
 
-  defp summon(world, entry, position, despawn_delay_ms) do
+  defp summon(world, entry, position, despawn_delay_ms, move_to) do
     with %Mob{} = mob <-
            SummonLoader.build(entry, world, position, despawn_type: 3, despawn_delay_ms: despawn_delay_ms),
          {:ok, _pid} <- MobLoader.start_mob(mob) do
+      if is_tuple(move_to), do: Entity.move_to(mob.object.guid, move_to)
       :ok
     else
       _error -> :ok

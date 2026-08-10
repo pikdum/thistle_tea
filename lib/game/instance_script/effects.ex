@@ -22,13 +22,13 @@ defmodule ThistleTea.Game.InstanceScript.Effects do
   defmodule SummonCreature do
     @moduledoc false
     @enforce_keys [:entry, :position, :despawn_delay_ms]
-    defstruct [:entry, :position, :despawn_delay_ms]
+    defstruct [:entry, :position, :despawn_delay_ms, :move_to]
   end
 
   defmodule MonsterTalk do
     @moduledoc false
     @enforce_keys [:creature_entry, :broadcast_text_id]
-    defstruct [:creature_entry, :broadcast_text_id]
+    defstruct [:creature_entry, :broadcast_text_id, :creature_guid]
   end
 
   defmodule CastPlayerSpell do
@@ -64,12 +64,12 @@ defmodule ThistleTea.Game.InstanceScript.Effects do
   defmodule MoveCreature do
     @moduledoc false
     @enforce_keys [:creature_entry, :position]
-    defstruct [:creature_entry, :position]
+    defstruct [:creature_entry, :position, :creature_guid]
   end
 
   defmodule TriggerCreatureSpell do
     @moduledoc false
     @enforce_keys [:creature_entry, :spell_id]
-    defstruct [:creature_entry, :spell_id, :creature_guid]
+    defstruct [:creature_entry, :spell_id, :creature_guid, :creature_db_guid]
   end
 end
