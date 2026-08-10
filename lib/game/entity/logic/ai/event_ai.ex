@@ -19,6 +19,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAI do
   alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.CreatureSpell
+  alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard.EventAI, as: EventMemory
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context
@@ -30,8 +31,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAI do
   alias ThistleTea.Game.Entity.Logic.Condition, as: ConditionEvaluator
   alias ThistleTea.Game.Entity.Logic.Condition.EntityContext
   alias ThistleTea.Game.Entity.Logic.Core
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Hostility
   alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.WorldRef
 
   @tick_ms 1_000
   @friendly_hp_default_radius 30.0
@@ -143,6 +146,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAI do
   end
 
   def enter_combat(state, %Blackboard{} = blackboard, enemy_guid, now, %Context{} = context) when is_integer(now) do
+    state = enqueue_instance_event(state, :aggro)
     events = events(state)
 
     if events == [] do
@@ -162,7 +166,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAI do
   end
 
   def on_spawned(state, %Blackboard{} = blackboard, now, %Context{} = context) do
-    fire_edges(state, blackboard, :spawned, nil, now, context)
+    state |> enqueue_instance_event(:spawned) |> fire_edges(blackboard, :spawned, nil, now, context)
   end
 
   def on_death(state, %Blackboard{} = blackboard, killer_guid, now) do
@@ -170,7 +174,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAI do
   end
 
   def on_death(state, %Blackboard{} = blackboard, killer_guid, now, %Context{} = context) do
-    fire_edges(state, blackboard, :death, killer_guid, now, context)
+    state |> enqueue_instance_event(:death) |> fire_edges(blackboard, :death, killer_guid, now, context)
   end
 
   def on_kill(state, %Blackboard{} = blackboard, victim_guid, now) do
@@ -194,9 +198,26 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAI do
   end
 
   def on_evade(state, %Blackboard{} = blackboard, now, %Context{} = context) do
+    state = enqueue_instance_event(state, :evade)
     {state, blackboard} = fire_edges(state, blackboard, :evade, nil, now, context)
     {state, reset_ooc(blackboard, events(state), now, context)}
   end
+
+  defp enqueue_instance_event(
+         %Mob{
+           object: %{guid: creature_guid, entry: creature_entry},
+           internal: %Internal{
+             world: %WorldRef{instance_id: instance_id} = world,
+             creature: %Creature{db_guid: db_guid}
+           }
+         } = state,
+         event
+       )
+       when is_integer(instance_id) do
+    Effects.enqueue(state, Effects.instance_creature_event(world, creature_guid, creature_entry, event, db_guid))
+  end
+
+  defp enqueue_instance_event(state, _event), do: state
 
   def on_reached_home(state, %Blackboard{} = blackboard, now) do
     on_reached_home(state, blackboard, now, Context.new(now))

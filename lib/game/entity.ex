@@ -62,6 +62,10 @@ defmodule ThistleTea.Game.Entity do
     dispatch_cast(entity, {:modify_npc_flags, flags, mode})
   end
 
+  def modify_unit_flags(entity, flags, mode) when is_integer(flags) and mode in [:add, :remove] do
+    dispatch_cast(entity, {:modify_unit_flags, flags, mode})
+  end
+
   def operate_game_object(entity, action, reset_delay_ms \\ 0)
       when action in [:open, :close, :reset] and is_integer(reset_delay_ms) do
     dispatch_cast(entity, {:operate_game_object, action, reset_delay_ms})

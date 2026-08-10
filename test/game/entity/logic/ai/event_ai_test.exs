@@ -40,6 +40,30 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAITest do
 
       assert mob.internal.events == []
     end
+
+    test "enqueues exact-copy creature lifecycle facts without EventAI rows" do
+      world = WorldRef.instance(329, 7)
+      mob = mob(events: [], db_guid: 53_955, world: world)
+
+      {mob, blackboard} = EventAI.on_spawned(mob, Blackboard.new(), 0)
+      {mob, blackboard} = EventAI.enter_combat(mob, blackboard, Guid.from_low_guid(:player, 2), 1)
+      {mob, blackboard} = EventAI.on_evade(mob, blackboard, 2)
+      {mob, _blackboard} = EventAI.on_death(mob, blackboard, Guid.from_low_guid(:player, 2), 3)
+
+      assert Enum.map(mob.internal.events, & &1.event) == [:spawned, :aggro, :evade, :death]
+
+      assert Enum.all?(mob.internal.events, fn
+               %Effects.InstanceCreatureEvent{
+                 world: ^world,
+                 creature_entry: 589,
+                 db_guid: 53_955
+               } ->
+                 true
+
+               _effect ->
+                 false
+             end)
+    end
   end
 
   describe "on_reached_home/3" do
@@ -460,11 +484,11 @@ defmodule ThistleTea.Game.Entity.Logic.AI.EventAITest do
     health = Keyword.get(opts, :health, 100)
 
     %Mob{
-      object: %Object{guid: Guid.from_low_guid(:mob, 589, 1)},
+      object: %Object{guid: Guid.from_low_guid(:mob, 589, 1), entry: 589},
       unit: %Unit{health: health, max_health: 100, level: 14, target: Keyword.get(opts, :target, 0), auras: []},
       movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
       internal: %Internal{
-        world: %WorldRef{map_id: 0},
+        world: Keyword.get(opts, :world, %WorldRef{map_id: 0}),
         name: "Defias Pillager",
         in_combat: Keyword.get(opts, :in_combat, false),
         creature: %Creature{ai_events: Keyword.fetch!(opts, :events), db_guid: Keyword.get(opts, :db_guid)},

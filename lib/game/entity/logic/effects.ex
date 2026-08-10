@@ -556,6 +556,18 @@ defmodule ThistleTea.Game.Entity.Logic.Effects do
     }
   end
 
+  def instance_creature_event(world, creature_guid, creature_entry, event, db_guid)
+      when is_integer(creature_guid) and is_integer(creature_entry) and event in [:spawned, :aggro, :evade, :death] and
+             (is_integer(db_guid) or is_nil(db_guid)) do
+    %Effects.InstanceCreatureEvent{
+      world: world,
+      creature_guid: creature_guid,
+      creature_entry: creature_entry,
+      event: event,
+      db_guid: db_guid
+    }
+  end
+
   def send_script_event(owner_guid, invoker_guid, event_id, data)
       when is_integer(owner_guid) and (is_integer(invoker_guid) or is_nil(invoker_guid)) and is_integer(event_id) and
              is_integer(data) do

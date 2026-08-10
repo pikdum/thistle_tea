@@ -16,6 +16,7 @@ defmodule ThistleTea.Game.Entity.Logic.Effects.ClientTypes do
     {:ScriptSteps, [:steps, :target_guid, :duration_ms], []},
     {:ScriptedEventCommand, [:world, :source_guid, :target_guid, :step], []},
     {:InstanceDataCommand, [:world, :field, :value, :mode], [script_id: nil]},
+    {:InstanceCreatureEvent, [:world, :creature_guid, :creature_entry, :event], [db_guid: nil]},
     {:SendScriptEvent, [:owner_guid, :invoker_guid, :event_id, :data], []},
     {:ForwardScriptSteps, [:target_guid, :steps, :source_guid], []},
     {:SendTaxiPath, [:target_guid, :path_id], []},

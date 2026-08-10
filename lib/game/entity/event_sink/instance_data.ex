@@ -7,6 +7,11 @@ defmodule ThistleTea.Game.Entity.EventSink.InstanceData do
 
   require Logger
 
+  def emit(entity, %Effects.InstanceCreatureEvent{} = effect, context) do
+    InstanceSystem.creature_event(effect.world, effect, instance_system(context))
+    entity
+  end
+
   def emit(entity, %Effects.InstanceDataCommand{} = effect, context) do
     server = instance_system(context)
 

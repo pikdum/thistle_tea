@@ -63,6 +63,12 @@ defmodule ThistleTea.Game.World.InstanceEffectSink do
     |> Enum.each(&dispatch.({:modify_creature_npc_flags, &1, effect.flags, effect.mode}))
   end
 
+  defp project(world, %Effects.ModifyCreatureUnitFlags{} = effect, guids, dispatch, _summon, _text) do
+    world
+    |> entity_guids(:mob, effect.creature_entry, guids)
+    |> Enum.each(&dispatch.({:modify_creature_unit_flags, &1, effect.flags, effect.mode}))
+  end
+
   defp project(world, %Effects.MoveCreature{} = effect, guids, dispatch, _summon, _text) do
     {x, y, z} = effect.position
     world |> entity_guids(:mob, effect.creature_entry, guids) |> Enum.each(&dispatch.({:move_creature, &1, {x, y, z}}))
@@ -70,9 +76,12 @@ defmodule ThistleTea.Game.World.InstanceEffectSink do
 
   defp project(world, %Effects.TriggerCreatureSpell{} = effect, guids, dispatch, _summon, _text) do
     world
-    |> entity_guids(:mob, effect.creature_entry, guids)
+    |> targeted_creature_guids(effect, guids)
     |> Enum.each(&dispatch.({:trigger_creature_spell, &1, effect.spell_id}))
   end
+
+  defp targeted_creature_guids(_world, %{creature_guid: guid}, _guids) when is_integer(guid), do: [guid]
+  defp targeted_creature_guids(world, effect, guids), do: entity_guids(world, :mob, effect.creature_entry, guids)
 
   defp entity_guids(world, entity_type, entry, guids) do
     world
@@ -92,6 +101,7 @@ defmodule ThistleTea.Game.World.InstanceEffectSink do
   defp dispatch({:quest_kill_credit, guid, entry}), do: Entity.quest_kill_credit(guid, entry)
 
   defp dispatch({:modify_creature_npc_flags, guid, flags, mode}), do: Entity.modify_npc_flags(guid, flags, mode)
+  defp dispatch({:modify_creature_unit_flags, guid, flags, mode}), do: Entity.modify_unit_flags(guid, flags, mode)
 
   defp dispatch({:move_creature, guid, position}), do: Entity.move_to(guid, position)
 

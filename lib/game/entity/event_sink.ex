@@ -134,7 +134,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
     Effects.ViewpointReleased
   ]
   @scripted_event_effects [Effects.ScriptedEventCommand, Effects.SendScriptEvent]
-  @instance_effects [Effects.InstanceDataCommand]
+  @instance_effects [Effects.InstanceCreatureEvent, Effects.InstanceDataCommand]
 
   def emit_pending(entity, context \\ nil) do
     {entity, effects} = Effects.drain(entity)

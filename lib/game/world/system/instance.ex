@@ -72,6 +72,10 @@ defmodule ThistleTea.Game.World.System.Instance do
     GenServer.call(server, {:game_object_used, world, entry})
   end
 
+  def creature_event(world, event, server \\ __MODULE__) do
+    GenServer.cast(server, {:creature_event, world, event})
+  end
+
   @impl GenServer
   def init(opts) do
     {:ok,
@@ -211,6 +215,21 @@ defmodule ThistleTea.Game.World.System.Instance do
   def handle_cast({:leave, guid, world}, state) do
     {instances, emptied} = Instance.leave(state.instances, guid, world)
     {:noreply, schedule_cleanup(%{state | instances: instances}, emptied)}
+  end
+
+  def handle_cast({:creature_event, world, event}, state) do
+    case Instance.creature_event(state.instances, world, event) do
+      {:ok, effects, instances} ->
+        state.projection.publish(state.projection_table, Instance.copy(instances, world))
+        {:noreply, dispatch_effects(%{state | instances: instances}, world, effects)}
+
+      {:error, _reason} ->
+        {:noreply, state}
+    end
+  rescue
+    error ->
+      Logger.warning("Instance creature callback failed: #{Exception.message(error)}")
+      {:noreply, state}
   end
 
   @impl GenServer

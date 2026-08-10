@@ -12,7 +12,7 @@ defmodule ThistleTea.Game.Instance do
 
   defmodule Copy do
     @moduledoc false
-    defstruct [:world, :owner, :script_name, members: MapSet.new(), data: %{}]
+    defstruct [:world, :owner, :script_name, members: MapSet.new(), data: %{}, script_state: %{}]
   end
 
   defstruct copies: %{}, owner_index: %{}, member_index: %{}, bindings: %{}, next_id: 1
@@ -102,6 +102,19 @@ defmodule ThistleTea.Game.Instance do
   end
 
   def game_object_used(%__MODULE__{}, _world, _entry), do: {:error, :open_world}
+
+  def creature_event(%__MODULE__{} = instances, %WorldRef{} = world, event) do
+    with :ok <- validate_world(world),
+         {:ok, copy} <- fetch_copy(instances, world),
+         {:ok, data, script_state, effects} <-
+           InstanceScript.creature_event(copy.script_name, copy.data, copy.script_state, event) do
+      copy = %{copy | data: data, script_state: script_state}
+      instances = %{instances | copies: Map.put(instances.copies, world, copy)}
+      {:ok, effects, instances}
+    end
+  end
+
+  def creature_event(%__MODULE__{}, _world, _event), do: {:error, :open_world}
 
   def timer(%__MODULE__{} = instances, %WorldRef{} = world, key) do
     with :ok <- validate_world(world),

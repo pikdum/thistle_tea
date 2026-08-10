@@ -49,6 +49,13 @@ defmodule ThistleTea.Game.InstanceScript do
     end
   end
 
+  def creature_event(script_name, data, script_state, event) do
+    case adapter(script_name) do
+      nil -> {:error, {:unsupported_script, script_name}}
+      adapter -> adapter.creature_event(data, script_state, event)
+    end
+  end
+
   def timer(script_name, data, key) do
     case adapter(script_name) do
       nil -> {:error, {:unsupported_script, script_name}}
@@ -129,6 +136,8 @@ defmodule ThistleTea.Game.InstanceScript.Stratholme do
   end
 
   def game_object_used(data, _entry), do: {:ok, data, []}
+
+  def creature_event(data, script_state, _event), do: {:ok, data, script_state, []}
 
   def timer(data, :baron_run_10_minutes),
     do: baron_run_timer(data, [talk(@baron_entry, 11_813), cast_player_spell(27_863)])

@@ -351,6 +351,13 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     {:noreply, state, {:continue, :maybe_broadcast}}
   end
 
+  def handle_cast({:modify_unit_flags, flags, mode}, %Mob{} = state)
+      when is_integer(flags) and mode in [:add, :remove] do
+    flags = modify_flags(state.unit.flags || 0, flags, mode)
+    state = %{state | unit: %{state.unit | flags: flags}} |> Core.mark_broadcast_update()
+    {:noreply, state, {:continue, :maybe_broadcast}}
+  end
+
   def handle_cast({:delay_aura, spell_id, caster_guid, delay_ms}, state) do
     state =
       state

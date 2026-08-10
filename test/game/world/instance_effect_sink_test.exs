@@ -13,9 +13,10 @@ defmodule ThistleTea.Game.World.InstanceEffectSinkTest do
     other_player = Guid.from_low_guid(:player, 11)
     baron = Guid.from_low_guid(:mob, 10_440, 12)
     ysida = Guid.from_low_guid(:mob, 16_031, 13)
+    crystal = Guid.from_low_guid(:mob, 10_415, 16)
     door = Guid.from_low_guid(:game_object, 175_405, 14)
     other_door = Guid.from_low_guid(:game_object, 175_796, 15)
-    all_guids = [player, other_player, baron, ysida, door, other_door]
+    all_guids = [player, other_player, baron, ysida, crystal, door, other_door]
 
     options = [
       guids: fn ^world -> all_guids end,
@@ -32,6 +33,7 @@ defmodule ThistleTea.Game.World.InstanceEffectSinkTest do
       other_player: other_player,
       baron: baron,
       ysida: ysida,
+      crystal: crystal,
       door: door,
       options: options
     }
@@ -78,11 +80,34 @@ defmodule ThistleTea.Game.World.InstanceEffectSinkTest do
     assert :ok =
              InstanceEffectSink.emit(
                context.world,
+               %Effects.ModifyCreatureUnitFlags{creature_entry: 10_440, flags: 0x02000002, mode: :remove},
+               context.options
+             )
+
+    assert_receive {:modify_creature_unit_flags, baron, 0x02000002, :remove}
+    assert baron == context.baron
+
+    assert :ok =
+             InstanceEffectSink.emit(
+               context.world,
                %Effects.MoveCreature{creature_entry: 16_031, position: {1.0, 2.0, 3.0}},
                context.options
              )
 
     assert_receive {:move_creature, ^ysida, {1.0, 2.0, 3.0}}
+  end
+
+  test "targets one exact creature guid for a script spell", context do
+    effect = %Effects.TriggerCreatureSpell{
+      creature_entry: 10_415,
+      creature_guid: context.crystal,
+      spell_id: 5
+    }
+
+    assert :ok = InstanceEffectSink.emit(context.world, effect, context.options)
+    assert_receive {:trigger_creature_spell, guid, 5}
+    assert guid == context.crystal
+    refute_receive {:trigger_creature_spell, _, _}
   end
 
   test "builds summons in the exact copy", context do

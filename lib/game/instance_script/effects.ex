@@ -55,6 +55,12 @@ defmodule ThistleTea.Game.InstanceScript.Effects do
     defstruct [:creature_entry, :flags, :mode]
   end
 
+  defmodule ModifyCreatureUnitFlags do
+    @moduledoc false
+    @enforce_keys [:creature_entry, :flags, :mode]
+    defstruct [:creature_entry, :flags, :mode]
+  end
+
   defmodule MoveCreature do
     @moduledoc false
     @enforce_keys [:creature_entry, :position]
@@ -64,6 +70,6 @@ defmodule ThistleTea.Game.InstanceScript.Effects do
   defmodule TriggerCreatureSpell do
     @moduledoc false
     @enforce_keys [:creature_entry, :spell_id]
-    defstruct [:creature_entry, :spell_id]
+    defstruct [:creature_entry, :spell_id, :creature_guid]
   end
 end
