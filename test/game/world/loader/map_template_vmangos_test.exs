@@ -12,7 +12,7 @@ defmodule ThistleTea.Game.World.Loader.MapTemplateVmangosTest do
 
     assert MapTemplate.dungeon?(329)
     assert MapTemplate.instance_script_name(329) == "instance_stratholme"
-    assert InstanceScript.registered_fields("instance_stratholme") == [0, 5, 7]
+    assert InstanceScript.registered_fields("instance_stratholme") == Enum.to_list(0..8)
     assert InstanceScript.initial_value("instance_stratholme", 7) == {:ok, 0}
     assert InstanceScript.initial_value("instance_stratholme", 5) == {:ok, 0}
   end
