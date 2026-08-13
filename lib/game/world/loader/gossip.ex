@@ -18,13 +18,15 @@ defmodule ThistleTea.Game.World.Loader.Gossip do
   @option_trainer 5
   @option_spirit_healer 6
   @option_banker 9
+  @option_battlefield 12
   @supported_option_ids [
     @option_gossip,
     @option_vendor,
     @option_taxi,
     @option_trainer,
     @option_spirit_healer,
-    @option_banker
+    @option_banker,
+    @option_battlefield
   ]
 
   @npc_flag_trainer 0x10
@@ -46,6 +48,7 @@ defmodule ThistleTea.Game.World.Loader.Gossip do
       :icon,
       :text,
       :option_id,
+      :npc_flag,
       :action_menu_id,
       :condition,
       action_steps: [],
@@ -64,11 +67,8 @@ defmodule ThistleTea.Game.World.Loader.Gossip do
   def load_all do
     menu_rows = Mangos.Repo.all(Mangos.GossipMenu)
 
-    option_rows =
-      from(o in Mangos.GossipMenuOption,
-        where: o.option_id in ^@supported_option_ids
-      )
-      |> Mangos.Repo.all()
+    all_option_rows = Mangos.Repo.all(Mangos.GossipMenuOption)
+    option_rows = Enum.filter(all_option_rows, &(&1.option_id in @supported_option_ids))
 
     action_steps_by_script =
       option_rows
@@ -87,6 +87,8 @@ defmodule ThistleTea.Game.World.Loader.Gossip do
       |> ConditionLoader.load_by_ids()
 
     options_by_menu = Enum.group_by(option_rows, & &1.menu_id)
+    option_menu_ids = MapSet.new(all_option_rows, & &1.menu_id)
+    default_option_rows = Map.get(options_by_menu, 0, [])
 
     menu_rows
     |> Enum.group_by(& &1.entry)
@@ -109,8 +111,12 @@ defmodule ThistleTea.Game.World.Loader.Gossip do
         end
 
       options =
-        options_by_menu
-        |> Map.get(menu_id, [])
+        if MapSet.member?(option_menu_ids, menu_id),
+          do: Map.get(options_by_menu, menu_id, []),
+          else: default_option_rows
+
+      options =
+        options
         |> Enum.sort_by(& &1.id)
         |> Enum.map(fn o ->
           %Option{
@@ -118,6 +124,7 @@ defmodule ThistleTea.Game.World.Loader.Gossip do
             icon: o.option_icon,
             text: o.option_text,
             option_id: o.option_id,
+            npc_flag: o.npc_option_npcflag,
             action_menu_id: o.action_menu_id,
             condition: Map.get(conditions, o.condition_id),
             action_steps: Map.get(action_steps_by_script, o.action_script_id, []),
@@ -132,11 +139,12 @@ defmodule ThistleTea.Game.World.Loader.Gossip do
 
     from(ct in Mangos.CreatureTemplate,
       where: ct.gossip_menu_id > 0,
-      select: {ct.entry, ct.gossip_menu_id}
+      select: {ct.entry, ct.gossip_menu_id, ct.npc_flags}
     )
     |> Mangos.Repo.all()
-    |> Enum.each(fn {creature_entry, menu_id} ->
+    |> Enum.each(fn {creature_entry, menu_id, npc_flags} ->
       :ets.insert(__MODULE__, {{:creature_menu, creature_entry}, menu_id})
+      :ets.insert(__MODULE__, {{:creature_npc_flags, creature_entry}, npc_flags})
     end)
 
     from(ct in Mangos.CreatureTemplate,
@@ -177,10 +185,18 @@ defmodule ThistleTea.Game.World.Loader.Gossip do
     end
   end
 
+  def npc_flags(creature_entry) do
+    case :ets.lookup(__MODULE__, {:creature_npc_flags, creature_entry}) do
+      [{_key, npc_flags}] -> npc_flags
+      _ -> 0
+    end
+  end
+
   def option_vendor, do: @option_vendor
   def option_gossip, do: @option_gossip
   def option_taxi, do: @option_taxi
   def option_trainer, do: @option_trainer
   def option_spirit_healer, do: @option_spirit_healer
   def option_banker, do: @option_banker
+  def option_battlefield, do: @option_battlefield
 end

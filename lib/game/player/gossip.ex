@@ -18,6 +18,7 @@ defmodule ThistleTea.Game.Player.Gossip do
   alias ThistleTea.Game.Network.Message.SmsgGossipMessage.GossipItem
   alias ThistleTea.Game.Network.Message.SmsgGossipMessage.QuestItem
   alias ThistleTea.Game.Player.Bank
+  alias ThistleTea.Game.Player.Battlegrounds
   alias ThistleTea.Game.Player.ConditionContext
   alias ThistleTea.Game.Player.GossipCondition
   alias ThistleTea.Game.Player.Quests
@@ -159,6 +160,9 @@ defmodule ThistleTea.Game.Player.Gossip do
     state
   end
 
+  defp dispatch(state, _character, guid, %Option{option_id: option_id}, %{battlefield: option_id}),
+    do: Battlegrounds.battlemaster_hello(state, guid)
+
   defp dispatch(state, character, guid, %Option{action_menu_id: action_menu_id}, _option_ids) do
     case GossipLoader.get_menu(action_menu_id) do
       %Menu{} = menu -> send_menu(guid, menu, quest_items(guid, character), state)
@@ -185,7 +189,7 @@ defmodule ThistleTea.Game.Player.Gossip do
     spirit_healer = GossipLoader.option_spirit_healer()
 
     Enum.filter(options, fn option ->
-      option_allowed?(context, option, :deny_unknown) and
+      npc_flag_allowed?(option, npc_guid) and option_allowed?(context, option, :deny_unknown) and
         case option.option_id do
           ^trainer ->
             GossipLoader.trainer_of?(
@@ -202,6 +206,14 @@ defmodule ThistleTea.Game.Player.Gossip do
             true
         end
     end)
+  end
+
+  defp npc_flag_allowed?(%Option{npc_flag: npc_flag}, _npc_guid) when npc_flag in [nil, 0], do: true
+
+  defp npc_flag_allowed?(%Option{npc_flag: npc_flag}, npc_guid) do
+    GossipLoader.npc_flags(Guid.entry(npc_guid))
+    |> Bitwise.band(npc_flag)
+    |> Kernel.!=(0)
   end
 
   defp option_allowed?(_context, nil, _policy), do: false
@@ -228,7 +240,8 @@ defmodule ThistleTea.Game.Player.Gossip do
       taxi: GossipLoader.option_taxi(),
       trainer: GossipLoader.option_trainer(),
       spirit_healer: GossipLoader.option_spirit_healer(),
-      banker: GossipLoader.option_banker()
+      banker: GossipLoader.option_banker(),
+      battlefield: GossipLoader.option_battlefield()
     }
   end
 end

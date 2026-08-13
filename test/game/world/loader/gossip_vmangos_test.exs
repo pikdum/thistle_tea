@@ -99,6 +99,22 @@ defmodule ThistleTea.Game.World.Loader.GossipVmangosTest do
              } = Enum.find(options, &(&1.id == 0))
     end
 
+    test "inherits the default battlemaster option when the creature menu has none" do
+      assert :ok = Gossip.load_all()
+
+      assert %Menu{menu_id: 6460, options: options} = Gossip.menu_for_creature(14_981)
+
+      assert %Option{
+               id: 10,
+               option_id: 12,
+               npc_flag: 2048,
+               icon: 9,
+               text: "I wish to join the battle!"
+             } = Enum.find(options, &(&1.id == 10))
+
+      assert Bitwise.band(Gossip.npc_flags(14_981), 2048) != 0
+    end
+
     test "loads Tharnariun's conditioned replacement-item option" do
       assert :ok = Gossip.load_all()
 
