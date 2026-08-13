@@ -206,6 +206,13 @@ defmodule ThistleTea.Game.Battleground.WarsongGulchTest do
     end
   end
 
+  describe "leave/4" do
+    test "removes an unaccepted reservation without announcing a player departure", %{match: match} do
+      assert %Result{match: left, effects: []} = WarsongGulch.leave(match, @alliance, nil, nil)
+      refute Map.has_key?(left.players, @alliance)
+    end
+  end
+
   defp active_with_players(match) do
     match = WarsongGulch.enter(match, @alliance, return_to(1)).match
     match = WarsongGulch.enter(match, @horde, return_to(2)).match

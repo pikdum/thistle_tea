@@ -165,7 +165,7 @@ defmodule ThistleTea.Game.Battleground.WarsongGulch do
         result
 
       {%Player{} = player, players} ->
-        effects = result.effects ++ remove_carried_aura(player, result.match) ++ [%Effects.PlayerLeft{guid: guid}]
+        effects = result.effects ++ remove_carried_aura(player, result.match) ++ player_left_effects(player)
         %{result | match: %{result.match | players: players}, effects: effects}
     end
   end
@@ -616,6 +616,11 @@ defmodule ThistleTea.Game.Battleground.WarsongGulch do
       _none -> []
     end
   end
+
+  defp player_left_effects(%Player{status: status, guid: guid}) when status in [:inside, :offline],
+    do: [%Effects.PlayerLeft{guid: guid}]
+
+  defp player_left_effects(%Player{}), do: []
 
   defp announce(broadcast_text_id, audience, actor_guid \\ nil) do
     %Effects.Announce{broadcast_text_id: broadcast_text_id, audience: audience, actor_guid: actor_guid}

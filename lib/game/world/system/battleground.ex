@@ -150,7 +150,17 @@ defmodule ThistleTea.Game.World.System.Battleground do
   end
 
   def handle_call({:port, guid, 0, _return_to}, _from, state) do
-    {:reply, :ok, remove_player(state, guid, nil)}
+    state =
+      case Map.get(state.players, guid) do
+        {:invited, pid, _team} ->
+          :ok = Match.leave(pid, guid, nil, dropped_flag_guid())
+          remove_player(state, guid, pid)
+
+        _status ->
+          remove_player(state, guid, nil)
+      end
+
+    {:reply, :ok, state}
   end
 
   def handle_call({:port, guid, 1, return_to}, _from, state) do

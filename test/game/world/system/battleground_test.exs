@@ -96,6 +96,19 @@ defmodule ThistleTea.Game.World.System.BattlegroundTest do
       assert %{status: :none} = BattlegroundSystem.status(1, server)
       assert %{status: :none} = BattlegroundSystem.status(3, server)
     end
+
+    test "removes a declined invitation from the match and frees its slot", %{server: server} do
+      assert :ok = BattlegroundSystem.join(alliance(1), 489, server)
+      assert :ok = BattlegroundSystem.join(horde(2), 489, server)
+      world = WorldRef.instance(489, 1)
+
+      assert :ok = BattlegroundSystem.port(1, 0, nil, server)
+      assert %{status: :none} = BattlegroundSystem.status(1, server)
+      assert Enum.map(BattlegroundSystem.scoreboard(world, server), & &1.guid) == [2]
+
+      assert :ok = BattlegroundSystem.join(alliance(3), 489, server)
+      assert %{status: :wait_join, client_instance_id: 1} = BattlegroundSystem.status(3, server)
+    end
   end
 
   defp alliance(guid), do: %{guid: guid, name: "Alliance#{guid}", team: :alliance, level: 60}
