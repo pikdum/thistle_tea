@@ -334,6 +334,31 @@ defmodule ThistleTea.Game.Player.DevCommandsTest do
     end
   end
 
+  describe ".battleground" do
+    test "reports status through the full command and VMangos-style alias" do
+      guid = Guid.from_low_guid(:player, System.unique_integer([:positive, :monotonic]))
+      state = %{guid: guid, character: debug_character()}
+
+      assert {:handled, ^state} = DevCommands.run(state, ".battleground info")
+      assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgMessagechat{message: "Battleground: none."}}}
+
+      assert {:handled, ^state} = DevCommands.run(state, ".bg info")
+      assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgMessagechat{message: "Battleground: none."}}}
+    end
+
+    test "shows usage for unsupported subcommands" do
+      state = %{guid: 1, character: debug_character()}
+
+      assert {:handled, ^state} = DevCommands.run(state, ".battleground score alliance")
+
+      assert_receive {:"$gen_cast",
+                      {:send_packet,
+                       %Message.SmsgMessagechat{
+                         message: "Invalid command. Use: .battleground <join [warsong]|start|info|leave>"
+                       }}}
+    end
+  end
+
   defp debug_character do
     %Character{
       object: %Object{guid: 1},

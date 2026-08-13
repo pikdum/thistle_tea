@@ -124,6 +124,48 @@ defmodule ThistleTea.Game.World.System.BattlegroundTest do
     end
   end
 
+  describe "debug controls" do
+    test "invites one queued player into an isolated match and starts it immediately", %{server: server} do
+      assert :ok = BattlegroundSystem.join(alliance(1), 489, server)
+      assert %{status: :wait_queue} = BattlegroundSystem.status(1, server)
+
+      assert {:ok, %{status: :wait_join, client_instance_id: 1}} =
+               BattlegroundSystem.debug_start_queued(1, server)
+
+      assert_receive {:effects, [%OperateGates{action: :close}]}
+
+      assert %{
+               status: :wait_join,
+               phase: :countdown,
+               scores: %{alliance: 0, horde: 0},
+               flags: %{alliance: :base, horde: :base},
+               players: %{alliance: 1, horde: 0, inside: 0}
+             } = BattlegroundSystem.debug_info(1, server)
+
+      return_to = {WorldRef.open(0), {10.0, 20.0, 30.0, 0.5}}
+
+      assert {:ok, %WorldRef{} = world, _destination} =
+               BattlegroundSystem.port(1, 1, return_to, server)
+
+      assert_receive {:effects, [_player_joined]}
+      assert :ok = BattlegroundSystem.debug_start_now(world, server)
+      assert_receive {:effects, effects}
+      assert Enum.any?(effects, &match?(%OperateGates{action: :open}, &1))
+
+      assert %{status: :in_progress, phase: :active, players: %{inside: 1}} =
+               BattlegroundSystem.debug_info(1, server)
+
+      assert {:error, :not_counting_down} = BattlegroundSystem.debug_start_now(world, server)
+    end
+
+    test "rejects solo admission unless the player is queued", %{server: server} do
+      assert {:error, :not_queued} = BattlegroundSystem.debug_start_queued(1, server)
+
+      assert {:error, :not_in_battleground} =
+               BattlegroundSystem.debug_start_now(WorldRef.instance(489, 99), server)
+    end
+  end
+
   defp alliance(guid), do: %{guid: guid, name: "Alliance#{guid}", team: :alliance, level: 60}
   defp horde(guid), do: %{guid: guid, name: "Horde#{guid}", team: :horde, level: 60}
 end

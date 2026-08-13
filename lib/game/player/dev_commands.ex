@@ -29,6 +29,7 @@ defmodule ThistleTea.Game.Player.DevCommands do
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.UpdateObject
+  alias ThistleTea.Game.Player.Battlegrounds, as: PlayerBattlegrounds
   alias ThistleTea.Game.Player.Characters
   alias ThistleTea.Game.Player.Exploration, as: PlayerExploration
   alias ThistleTea.Game.Player.Items
@@ -51,6 +52,7 @@ defmodule ThistleTea.Game.Player.DevCommands do
   alias ThistleTea.Game.World.Loader.Taxi, as: TaxiLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.PostOffice
+  alias ThistleTea.Game.World.System.Battleground, as: BattlegroundSystem
   alias ThistleTea.Game.World.System.GameEvent
   alias ThistleTea.Game.World.System.Instance, as: InstanceSystem
   alias ThistleTea.Game.World.Transports
@@ -61,6 +63,7 @@ defmodule ThistleTea.Game.Player.DevCommands do
   @speed_min 0.1
   @speed_max 10.0
   @max_coinage 0x7FFFFFFF
+  @warsong_gulch_map_id 489
 
   def run(state, ".additem" <> params) do
     params
@@ -384,6 +387,14 @@ defmodule ThistleTea.Game.Player.DevCommands do
     |> handled()
   end
 
+  def run(state, ".battleground" <> params) do
+    state
+    |> battleground_command(String.split(params, " ", trim: true))
+    |> handled()
+  end
+
+  def run(state, ".bg" <> params), do: run(state, ".battleground" <> params)
+
   def run(state, ".instance info" <> _) do
     info = InstanceSystem.info(state.guid)
     world = state.character.internal.world
@@ -642,6 +653,65 @@ defmodule ThistleTea.Game.Player.DevCommands do
 
     state
   end
+
+  defp battleground_command(state, ["join"]), do: battleground_command(state, ["join", "warsong"])
+
+  defp battleground_command(state, ["join", "warsong"]) do
+    case PlayerBattlegrounds.debug_join_solo(state, @warsong_gulch_map_id) do
+      {:ok, state} ->
+        system_message(state, "Solo Warsong Gulch invitation created. Click Enter Battle.")
+
+      {:error, reason, state} ->
+        system_message(state, battleground_error(reason))
+    end
+  end
+
+  defp battleground_command(state, ["start"]) do
+    case PlayerBattlegrounds.debug_start_now(state) do
+      {:ok, state} -> system_message(state, "Warsong Gulch started; gates opened.")
+      {:error, reason, state} -> system_message(state, battleground_error(reason))
+    end
+  end
+
+  defp battleground_command(state, ["info"]) do
+    state.guid
+    |> BattlegroundSystem.debug_info()
+    |> battleground_info_message()
+    |> then(&system_message(state, &1))
+  end
+
+  defp battleground_command(state, ["leave"]) do
+    case PlayerBattlegrounds.debug_leave(state) do
+      {:ok, state} -> system_message(state, "Left the battleground queue or match.")
+      {:error, reason, state} -> system_message(state, battleground_error(reason))
+    end
+  end
+
+  defp battleground_command(state, _params) do
+    system_message(state, "Invalid command. Use: .battleground <join [warsong]|start|info|leave>")
+  end
+
+  defp battleground_info_message(%{status: :none}), do: "Battleground: none."
+
+  defp battleground_info_message(%{status: :wait_queue, map_id: map_id, bracket: bracket}) do
+    "Battleground: queued for map #{map_id}, bracket #{bracket}."
+  end
+
+  defp battleground_info_message(info) do
+    scores = "#{info.scores.alliance}-#{info.scores.horde}"
+    teams = "#{info.players.alliance} Alliance / #{info.players.horde} Horde / #{info.players.inside} inside"
+    flags = "Alliance #{info.flags.alliance}, Horde #{info.flags.horde}"
+
+    "Battleground: #{info.status}, #{world_label(info.world)}, phase #{info.phase}, score #{scores}, players #{teams}, flags #{flags}."
+  end
+
+  defp battleground_error(:already_queued), do: "You are already queued or matched."
+  defp battleground_error(:level_restricted), do: "Your level is outside the Warsong Gulch range."
+  defp battleground_error(:unsupported_battleground), do: "Warsong Gulch data is not loaded."
+  defp battleground_error(:not_counting_down), do: "The battleground is not counting down."
+  defp battleground_error(:not_in_battleground), do: "You are not in a battleground."
+  defp battleground_error(:not_ready), do: "Your player session is not ready."
+  defp battleground_error(_reason), do: "The battleground debug command could not be completed."
 
   defp destination_label(%WorldRef{} = world), do: world_label(world)
   defp destination_label(map_id) when is_integer(map_id), do: "map #{map_id}"

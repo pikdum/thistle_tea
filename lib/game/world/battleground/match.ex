@@ -42,6 +42,7 @@ defmodule ThistleTea.Game.World.Battleground.Match do
   end
 
   def queue_resurrection(server, guid), do: GenServer.cast(server, {:queue_resurrection, guid})
+  def start_now(server), do: GenServer.call(server, :start_now)
   def snapshot(server), do: GenServer.call(server, :snapshot)
   def world_states(server), do: GenServer.call(server, :world_states)
   def scoreboard(server), do: GenServer.call(server, :scoreboard)
@@ -118,6 +119,13 @@ defmodule ThistleTea.Game.World.Battleground.Match do
         {:reply, :unhandled, state}
     end
   end
+
+  def handle_call(:start_now, _from, %{match: %{phase: :countdown}} = state) do
+    result = WarsongGulch.handle_timer(state.match, :start, Time.now())
+    {:reply, :ok, apply_result(state, result)}
+  end
+
+  def handle_call(:start_now, _from, state), do: {:reply, {:error, :not_counting_down}, state}
 
   def handle_call(:snapshot, _from, state), do: {:reply, state.match, state}
   def handle_call(:world_states, _from, state), do: {:reply, WarsongGulch.world_states(state.match), state}

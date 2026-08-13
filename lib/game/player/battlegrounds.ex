@@ -53,6 +53,55 @@ defmodule ThistleTea.Game.Player.Battlegrounds do
 
   def join(state, _map_id, _join_as_group?, _instance_id), do: state
 
+  def debug_join_solo(%{ready: true, character: %Character{}} = state, map_id) do
+    case queue_players([snapshot(state)], map_id, 0) do
+      {:ok, [guid]} ->
+        case ensure_debug_invitation(guid) do
+          :ok ->
+            notify_queued(guid, map_id)
+            {:ok, state}
+
+          {:error, reason} ->
+            BattlegroundSystem.leave_queue(guid)
+            {:error, reason, state}
+        end
+
+      {:error, reason} ->
+        {:error, reason, state}
+    end
+  end
+
+  def debug_join_solo(state, _map_id), do: {:error, :not_ready, state}
+
+  def debug_start_now(%{ready: true, character: %Character{} = character} = state) do
+    case BattlegroundSystem.debug_start_now(character.internal.world) do
+      :ok -> {:ok, state}
+      {:error, reason} -> {:error, reason, state}
+    end
+  end
+
+  def debug_start_now(state), do: {:error, :not_ready, state}
+
+  def debug_leave(%{ready: true, guid: guid} = state) do
+    case BattlegroundSystem.status(guid) do
+      %{status: :wait_queue} ->
+        :ok = BattlegroundSystem.leave_queue(guid)
+        {:ok, send_status(state)}
+
+      %{status: :wait_join} ->
+        :ok = BattlegroundSystem.port(guid, 0, nil)
+        {:ok, send_status(state)}
+
+      %{status: :in_progress} ->
+        {:ok, state |> leave() |> send_status()}
+
+      %{status: :none} ->
+        {:error, :not_in_battleground, state}
+    end
+  end
+
+  def debug_leave(state), do: {:error, :not_ready, state}
+
   def send_status(%{ready: true, guid: guid} = state) do
     guid
     |> BattlegroundSystem.status()
@@ -205,6 +254,22 @@ defmodule ThistleTea.Game.Player.Battlegrounds do
     case BattlegroundSystem.join_group_for_instance(players, map_id, instance_id) do
       :ok -> {:ok, Enum.map(players, & &1.guid)}
       error -> error
+    end
+  end
+
+  defp ensure_debug_invitation(guid) do
+    case BattlegroundSystem.status(guid) do
+      %{status: :wait_queue} ->
+        case BattlegroundSystem.debug_start_queued(guid) do
+          {:ok, _status} -> :ok
+          {:error, reason} -> {:error, reason}
+        end
+
+      %{status: :wait_join} ->
+        :ok
+
+      _status ->
+        {:error, :queue_inconsistent}
     end
   end
 

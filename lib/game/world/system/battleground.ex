@@ -33,6 +33,15 @@ defmodule ThistleTea.Game.World.System.Battleground do
   def leave_queue(guid, server \\ __MODULE__) when is_integer(guid), do: GenServer.call(server, {:leave_queue, guid})
   def list(map_id, level, server \\ __MODULE__), do: GenServer.call(server, {:list, map_id, level})
   def status(guid, server \\ __MODULE__) when is_integer(guid), do: GenServer.call(server, {:status, guid})
+  def debug_info(guid, server \\ __MODULE__) when is_integer(guid), do: GenServer.call(server, {:debug_info, guid})
+
+  def debug_start_queued(guid, server \\ __MODULE__) when is_integer(guid) do
+    GenServer.call(server, {:debug_start_queued, guid})
+  end
+
+  def debug_start_now(%WorldRef{} = world, server \\ __MODULE__) do
+    GenServer.call(server, {:debug_start_now, world})
+  end
 
   def port(guid, action, return_to, server \\ __MODULE__) when action in [0, 1] do
     GenServer.call(server, {:port, guid, action, return_to})
@@ -147,6 +156,40 @@ defmodule ThistleTea.Game.World.System.Battleground do
 
   def handle_call({:status, guid}, _from, state) do
     {:reply, status_for(state, guid), state}
+  end
+
+  def handle_call({:debug_info, guid}, _from, state) do
+    {:reply, debug_info_for(state, guid), state}
+  end
+
+  def handle_call({:debug_start_queued, guid}, _from, state) do
+    case Map.get(state.players, guid) do
+      {:queued, {map_id, bracket, _team} = key, _joined_at} ->
+        with {:ok, reservation, queue} <- pop_reservation(Map.get(state.queues, key, []), guid),
+             template when not is_nil(template) <- state.catalog.template_for_map(map_id) do
+          state = %{state | queues: Map.put(state.queues, key, queue)}
+          state = start_match(state, map_id, bracket, template, [reservation])
+          {:reply, {:ok, status_for(state, guid)}, state}
+        else
+          _missing -> {:reply, {:error, :queue_inconsistent}, state}
+        end
+
+      {:invited, _pid, _team} ->
+        {:reply, {:error, :already_invited}, state}
+
+      {:inside, _pid, _team} ->
+        {:reply, {:error, :already_inside}, state}
+
+      nil ->
+        {:reply, {:error, :not_queued}, state}
+    end
+  end
+
+  def handle_call({:debug_start_now, world}, _from, state) do
+    case Map.get(state.worlds, world) do
+      pid when is_pid(pid) -> {:reply, Match.start_now(pid), state}
+      nil -> {:reply, {:error, :not_in_battleground}, state}
+    end
   end
 
   def handle_call({:port, guid, 0, _return_to}, _from, state) do
@@ -397,6 +440,13 @@ defmodule ThistleTea.Game.World.System.Battleground do
     %{state | queues: Map.put(state.queues, key, queue), players: players}
   end
 
+  defp pop_reservation(queue, guid) do
+    case Enum.split_while(queue, &(&1.guid != guid)) do
+      {before, [reservation | after_reservation]} -> {:ok, reservation, before ++ after_reservation}
+      {_before, []} -> :error
+    end
+  end
+
   defp joinable_match(state, map_id, bracket, team, group_size, desired_instance_id) do
     state.matches
     |> Enum.sort_by(fn {_pid, info} -> info.client_instance_id end)
@@ -514,6 +564,32 @@ defmodule ThistleTea.Game.World.System.Battleground do
 
       nil ->
         %{status: :none}
+    end
+  end
+
+  defp debug_info_for(state, guid) do
+    status = status_for(state, guid)
+
+    case Map.get(state.players, guid) do
+      {status_kind, pid, _team} when status_kind in [:invited, :inside] ->
+        info = Map.fetch!(state.matches, pid)
+        match = Match.snapshot(pid)
+        team_counts = match.players |> Map.values() |> Enum.frequencies_by(& &1.team)
+
+        Map.merge(status, %{
+          world: info.world,
+          phase: match.phase,
+          scores: match.team_scores,
+          flags: Map.new(match.flags, fn {team, flag} -> {team, flag.state} end),
+          players: %{
+            alliance: Map.get(team_counts, :alliance, 0),
+            horde: Map.get(team_counts, :horde, 0),
+            inside: Enum.count(match.players, fn {_player_guid, player} -> player.status == :inside end)
+          }
+        })
+
+      _status ->
+        status
     end
   end
 
