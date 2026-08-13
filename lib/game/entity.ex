@@ -71,6 +71,20 @@ defmodule ThistleTea.Game.Entity do
     dispatch_cast(entity, {:operate_game_object, action, reset_delay_ms})
   end
 
+  def hide_game_object(entity), do: dispatch_cast(entity, {:battleground_hide_game_object})
+
+  def battleground_resurrect(entity, position) do
+    dispatch_cast(entity, {:battleground_resurrect, position})
+  end
+
+  def reward_reputation(entity, faction_id, amount) do
+    dispatch_cast(entity, {:battleground_reputation, faction_id, amount})
+  end
+
+  def teleport(entity, world, {x, y, z, orientation}) do
+    dispatch_cast(entity, {:start_teleport, x, y, z, orientation, world})
+  end
+
   def quest_kill_credit(entity, creature_entry) when is_integer(creature_entry) and creature_entry > 0 do
     dispatch_cast(entity, {:quest_kill_credit, creature_entry})
   end

@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Player.AreaTriggers do
   alias ThistleTea.Game.Player.Quests
   alias ThistleTea.Game.Player.Rest, as: PlayerRest
   alias ThistleTea.Game.World.Loader.AreaTrigger, as: AreaTriggerLoader
+  alias ThistleTea.Game.World.System.Battleground, as: BattlegroundSystem
   alias ThistleTea.Game.World.System.Instance, as: InstanceSystem
 
   @trigger_range_delta 5.0
@@ -28,9 +29,15 @@ defmodule ThistleTea.Game.Player.AreaTriggers do
              {x, y, z},
              @trigger_range_delta
            ) do
-      state
-      |> maybe_explore_quest(trigger_id)
-      |> enter_tavern_or_teleport(trigger_id)
+      case BattlegroundSystem.area_trigger(
+             character.internal.world,
+             character.object.guid,
+             trigger_id,
+             character.movement_block.position
+           ) do
+        :handled -> state
+        :unhandled -> state |> maybe_explore_quest(trigger_id) |> enter_tavern_or_teleport(trigger_id)
+      end
     else
       _out_of_range -> state
     end

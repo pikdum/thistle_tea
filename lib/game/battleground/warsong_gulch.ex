@@ -66,6 +66,8 @@ defmodule ThistleTea.Game.Battleground.WarsongGulch do
   @flag_drop_ms 10_000
   @resurrection_wave_ms 30_000
   @auto_leave_ms 120_000
+  @flag_capture_honor [48, 82, 136, 226, 378, 396]
+  @win_honor [24, 41, 68, 113, 189, 198]
 
   @world_state_flag_taken_alliance 1_545
   @world_state_flag_taken_horde 1_546
@@ -121,6 +123,18 @@ defmodule ThistleTea.Game.Battleground.WarsongGulch do
     end
   end
 
+  def reserve(%__MODULE__{phase: phase} = match, reservations) when phase in [:countdown, :active] do
+    players =
+      Enum.reduce(reservations, match.players, fn reservation, players ->
+        player = struct(Player, reservation)
+        Map.put_new(players, player.guid, player)
+      end)
+
+    %Result{match: %{match | players: players}}
+  end
+
+  def reserve(%__MODULE__{} = match, _reservations), do: %Result{match: match}
+
   def reconnect(%__MODULE__{} = match, guid) do
     case Map.get(match.players, guid) do
       %Player{} = player ->
@@ -163,6 +177,11 @@ defmodule ThistleTea.Game.Battleground.WarsongGulch do
     else
       _ -> {:unhandled, %Result{match: match}}
     end
+  end
+
+  def use_game_object(%__MODULE__{} = match, _guid, _object_guid, entry, _position, _now)
+      when entry in [@alliance_flag_base, @horde_flag_base, @alliance_flag_ground, @horde_flag_ground] do
+    {:handled, %Result{match: match}}
   end
 
   def use_game_object(%__MODULE__{} = match, _guid, _object_guid, _entry, _position, _now) do
@@ -419,11 +438,17 @@ defmodule ThistleTea.Game.Battleground.WarsongGulch do
       match = put_flag(match, captured_flag_team, captured_flag)
       match = put_team_score(match, scoring_team, Map.fetch!(match.team_scores, scoring_team) + 1)
       match = update_player(match, player.guid, &%{&1 | flag_captures: &1.flag_captures + 1})
+      match = reward_team_bonus(match, scoring_team, Enum.at(@flag_capture_honor, match.bracket, 0))
 
       effects = [
         %Effects.RemoveFlagAura{guid: player.guid, team: captured_flag_team},
         %Effects.HideBaseFlags{},
         announce(capture_text(captured_flag_team), scoring_team, player.guid),
+        %Effects.RewardReputation{
+          team: scoring_team,
+          faction_id: reputation_faction(scoring_team),
+          amount: 35
+        },
         %Effects.PlaySound{sound_id: capture_sound(scoring_team)},
         %Effects.UpdateWorldStates{states: world_states(match)}
       ]
@@ -485,6 +510,7 @@ defmodule ThistleTea.Game.Battleground.WarsongGulch do
   end
 
   defp end_match(match, winner, now, prior_effects) do
+    match = reward_team_bonus(match, winner, Enum.at(@win_honor, match.bracket, 0))
     match = %{match | phase: {:ended, winner}, ended_at: now}
     aura_effects = carried_aura_effects(match)
     players = scoreboard(match)
@@ -567,6 +593,16 @@ defmodule ThistleTea.Game.Battleground.WarsongGulch do
   defp put_flag(match, team, %Flag{} = flag), do: %{match | flags: Map.put(match.flags, team, flag)}
   defp put_team_score(match, team, score), do: %{match | team_scores: Map.put(match.team_scores, team, score)}
 
+  defp reward_team_bonus(match, team, amount) do
+    players =
+      Map.new(match.players, fn {guid, player} ->
+        player = if player.team == team, do: %{player | bonus_honor: player.bonus_honor + amount}, else: player
+        {guid, player}
+      end)
+
+    %{match | players: players}
+  end
+
   defp carried_aura_effects(match) do
     Enum.flat_map(match.flags, fn
       {team, %Flag{state: :carried, carrier: guid}} -> [%Effects.RemoveFlagAura{guid: guid, team: team}]
@@ -604,4 +640,6 @@ defmodule ThistleTea.Game.Battleground.WarsongGulch do
   defp pickup_sound(:horde), do: @sound_horde_flag_picked_up
   defp capture_sound(:alliance), do: @sound_flag_captured_alliance
   defp capture_sound(:horde), do: @sound_flag_captured_horde
+  defp reputation_faction(:alliance), do: 890
+  defp reputation_faction(:horde), do: 889
 end

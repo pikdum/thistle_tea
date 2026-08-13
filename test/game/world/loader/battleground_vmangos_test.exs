@@ -32,6 +32,23 @@ defmodule ThistleTea.Game.World.Loader.BattlegroundVMangosTest do
         )
       )
 
+    creatures =
+      Mangos.Repo.all(
+        from(bg in Mangos.CreatureBattleground,
+          join: creature in Mangos.Creature,
+          on: creature.guid == bg.guid,
+          where: creature.map == 489,
+          select: %{
+            map: creature.map,
+            event1: bg.event1,
+            event2: bg.event2,
+            kind: :creature,
+            db_guid: creature.guid,
+            entry: creature.id
+          }
+        )
+      )
+
     safe_locs = %{
       769 => %{location_x: 1_519.530_273_437_5, location_y: 1_481.868_408_203_125, location_z: 352.023_742_675_781_25},
       770 => %{
@@ -41,7 +58,7 @@ defmodule ThistleTea.Game.World.Loader.BattlegroundVMangosTest do
       }
     }
 
-    assert :ok = BattlegroundLoader.load(templates, safe_locs, battlemasters, game_objects, table)
+    assert :ok = BattlegroundLoader.load(templates, safe_locs, battlemasters, game_objects ++ creatures, table)
 
     assert %Template{
              min_players_per_team: 4,
@@ -56,5 +73,6 @@ defmodule ThistleTea.Game.World.Loader.BattlegroundVMangosTest do
     assert BattlegroundLoader.base_flag_db_guid(:alliance, table) == 90_000
     assert BattlegroundLoader.base_flag_db_guid(:horde, table) == 90_001
     assert length(BattlegroundLoader.gate_entries(table)) == 6
+    assert BattlegroundLoader.spirit_guide_entries(table) == [13_116, 13_117]
   end
 end

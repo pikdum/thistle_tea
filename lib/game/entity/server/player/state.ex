@@ -23,6 +23,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.PostOffice
   alias ThistleTea.Game.World.Presence
+  alias ThistleTea.Game.World.System.Battleground, as: BattlegroundSystem
   alias ThistleTea.Game.World.System.CellActivator
   alias ThistleTea.Game.World.System.ChatChannels
   alias ThistleTea.Game.World.System.Duel, as: DuelSystem
@@ -103,6 +104,10 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
     state = leave_transport(state)
 
     state = close_mailbox(state)
+
+    if state.guid && state.character do
+      BattlegroundSystem.disconnect(state.guid, state.character.movement_block.position)
+    end
 
     if state.character, do: CharacterStore.put(state.character)
 

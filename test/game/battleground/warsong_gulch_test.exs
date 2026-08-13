@@ -189,6 +189,7 @@ defmodule ThistleTea.Game.Battleground.WarsongGulchTest do
 
       assert ended.phase == {:ended, :alliance}
       assert ended.team_scores.alliance == 3
+      assert ended.players[@alliance].bonus_honor == 1_386
     end
   end
 

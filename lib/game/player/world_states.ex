@@ -9,9 +9,12 @@ defmodule ThistleTea.Game.Player.WorldStates do
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World.Pathfinding
+  alias ThistleTea.Game.World.System.Battleground, as: BattlegroundSystem
   alias ThistleTea.Game.WorldRef
 
   def initialize(%Character{} = character) do
+    BattlegroundSystem.reconnect(character.object.guid, character.internal.world)
+
     character
     |> build()
     |> Network.send_packet()
@@ -21,7 +24,7 @@ defmodule ThistleTea.Game.Player.WorldStates do
         %Character{
           internal: %Internal{world: %WorldRef{map_id: map_id}, area: area},
           movement_block: %MovementBlock{position: {x, y, z, _orientation}}
-        },
+        } = character,
         zone_and_area \\ &Pathfinding.get_zone_and_area/2
       ) do
     zone =
@@ -30,6 +33,7 @@ defmodule ThistleTea.Game.Player.WorldStates do
         _ -> area || 0
       end
 
-    %Message.SmsgInitWorldStates{map: map_id, area: zone, states: []}
+    states = BattlegroundSystem.world_states(character.internal.world)
+    %Message.SmsgInitWorldStates{map: map_id, area: zone, states: states}
   end
 end

@@ -45,6 +45,7 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Pathfinding
   alias ThistleTea.Game.World.SpawnPool
+  alias ThistleTea.Game.World.System.Battleground, as: BattlegroundSystem
   alias ThistleTea.Game.World.System.GameEvent
   alias ThistleTea.Game.World.System.Instance, as: InstanceSystem
   alias ThistleTea.Game.World.System.Party, as: PartySystem
@@ -70,12 +71,12 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
     {:ok, state}
   end
 
-  defp notify_instance_spawn(%GameObject{
-         object: %{entry: entry},
-         internal: %Internal{world: %{instance_id: instance_id} = world}
-       })
+  defp notify_instance_spawn(
+         %GameObject{object: %{entry: entry}, internal: %Internal{world: %{instance_id: instance_id} = world}} = state
+       )
        when is_integer(instance_id) do
     InstanceSystem.game_object_spawned(world, entry)
+    BattlegroundSystem.game_object_spawned(world, state.object.guid, entry)
   end
 
   defp notify_instance_spawn(_state), do: :ok
@@ -85,6 +86,11 @@ defmodule ThistleTea.Game.Entity.Server.GameObject do
     Core.update_object(state)
     |> Network.send_packet(pid)
 
+    {:noreply, state}
+  end
+
+  def handle_cast({:battleground_hide_game_object}, state) do
+    send(self(), {:script_remove_object, nil})
     {:noreply, state}
   end
 

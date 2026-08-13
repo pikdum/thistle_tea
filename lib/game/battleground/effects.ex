@@ -96,6 +96,12 @@ defmodule ThistleTea.Game.Battleground.Effects do
     defstruct [:winner, :players]
   end
 
+  defmodule RewardReputation do
+    @moduledoc false
+    @enforce_keys [:team, :faction_id, :amount]
+    defstruct [:team, :faction_id, :amount]
+  end
+
   defmodule ExitPlayers do
     @moduledoc false
     @enforce_keys [:destinations]

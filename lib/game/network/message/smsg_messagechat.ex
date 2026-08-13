@@ -11,6 +11,9 @@ defmodule ThistleTea.Game.Network.Message.SmsgMessagechat do
   @chat_type_monster_yell 0x0C
   @chat_type_monster_emote 0x0D
   @chat_type_channel 0x0E
+  @chat_type_battleground_neutral 0x52
+  @chat_type_battleground_alliance 0x53
+  @chat_type_battleground_horde 0x54
 
   @chat_type %{
     say: @chat_type_say,
@@ -20,7 +23,10 @@ defmodule ThistleTea.Game.Network.Message.SmsgMessagechat do
     channel: @chat_type_channel,
     monster_say: @chat_type_monster_say,
     monster_yell: @chat_type_monster_yell,
-    monster_emote: @chat_type_monster_emote
+    monster_emote: @chat_type_monster_emote,
+    battleground_neutral: @chat_type_battleground_neutral,
+    battleground_alliance: @chat_type_battleground_alliance,
+    battleground_horde: @chat_type_battleground_horde
   }
 
   def chat_type, do: @chat_type

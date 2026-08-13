@@ -30,6 +30,15 @@ defmodule ThistleTea.Game.World.Loader.GameObjectTemplate do
 
   def get(_entry), do: nil
 
+  def cached(entry) when is_integer(entry) and entry > 0 do
+    case :ets.lookup(__MODULE__, entry) do
+      [{^entry, %GameObjectTemplate{} = template}] -> template
+      _missing -> nil
+    end
+  end
+
+  def cached(_entry), do: nil
+
   defp load(entry) do
     case Mangos.Repo.get(Mangos.GameObjectTemplate, entry) do
       %Mangos.GameObjectTemplate{} = row -> cache(row)

@@ -112,6 +112,15 @@ defmodule ThistleTea.Game.World.Loader.Battleground do
     |> Enum.sort()
   end
 
+  def spirit_guide_entries(table \\ __MODULE__) do
+    Battleground.warsong_gulch_map()
+    |> event_members(2, table)
+    |> Enum.filter(&(&1.kind == :creature))
+    |> Enum.map(& &1.entry)
+    |> Enum.uniq()
+    |> Enum.sort()
+  end
+
   def broadcast_text_ids, do: @warsong_broadcast_text_ids
 
   defp template(row, safe_locs) do

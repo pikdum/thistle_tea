@@ -99,6 +99,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Pathfinding
   alias ThistleTea.Game.World.Presence
+  alias ThistleTea.Game.World.System.Battleground, as: BattlegroundSystem
   alias ThistleTea.Game.World.System.Duel, as: DuelSystem
   alias ThistleTea.Game.World.System.Instance, as: InstanceSystem
   alias ThistleTea.Game.World.Transports
@@ -475,6 +476,23 @@ defmodule ThistleTea.Game.Entity.Server.Player do
     {:noreply, %{state | character: character}, {:continue, :maybe_broadcast_update}}
   end
 
+  def handle_cast({:battleground_resurrect, position}, %{character: %Character{} = character} = state) do
+    if Death.alive?(character) do
+      {:noreply, state}
+    else
+      World.stop_entity(Corpse.guid_for(state.guid))
+      {character, events} = Death.resurrect(character, 1.0, Time.now())
+      state = maybe_broadcast_update(%{state | character: EventSink.emit(character, events)})
+      Visibility.notify_visibility_changed(state.character)
+      {x, y, z, orientation} = position
+      handle_cast({:start_teleport, x, y, z, orientation, character.internal.world}, state)
+    end
+  end
+
+  def handle_cast({:battleground_reputation, faction_id, amount}, state) do
+    {:noreply, PlayerReputation.reward_spell(state, faction_id, amount)}
+  end
+
   @impl GenServer
   def handle_cast({:start_teleport, x, y, z, map}, %{character: %Character{} = character} = state) do
     {_current_x, _current_y, _current_z, orientation} = character.movement_block.position
@@ -531,6 +549,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
     DuelSystem.disconnect(state.guid)
     state = state |> disengage_for_world_transition() |> suspend_companion_for_teleport()
     previous_world = state.character.internal.world
+    previous_position = state.character.movement_block.position
     character = state.character
     {zone, area} = destination_zone_and_area(character, world.map_id, {x, y, z})
 
@@ -549,6 +568,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
     Presence.relocate(character)
 
     state = Visibility.leave_player(%{state | character: character})
+    BattlegroundSystem.world_left(state.guid, previous_world, previous_position)
     InstanceSystem.leave(state.guid, previous_world)
 
     # Send player's client to loading screen to load the new map
@@ -1004,12 +1024,42 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   def maybe_broadcast_update(%{character: %Character{}} = state) do
     state
     |> cancel_cast_if_dead()
+    |> finalize_battleground_death()
     |> sync_character_metadata()
     |> then(fn state -> %{state | character: EventSink.emit_pending(state.character)} end)
     |> do_broadcast_update()
   end
 
   def maybe_broadcast_update(state), do: state
+
+  defp finalize_battleground_death(
+         %{character: %Character{internal: %Internal{death_finalized?: false} = internal} = character} = state
+       ) do
+    if Core.dead?(character) do
+      BattlegroundSystem.player_died(
+        character.internal.world,
+        state.guid,
+        character.internal.killed_by,
+        character.movement_block.position
+      )
+
+      %{state | character: %{character | internal: %{internal | death_finalized?: true}}}
+    else
+      state
+    end
+  end
+
+  defp finalize_battleground_death(
+         %{character: %Character{internal: %Internal{death_finalized?: true} = internal} = character} = state
+       ) do
+    if Death.alive?(character) do
+      %{state | character: %{character | internal: %{internal | death_finalized?: false, killed_by: nil}}}
+    else
+      state
+    end
+  end
+
+  defp finalize_battleground_death(state), do: state
 
   defp run_script(%State{character: %Character{} = character} = state, steps, target_guid) do
     now = Time.now()

@@ -87,6 +87,16 @@ defmodule ThistleTea.Game.World.SpawnPool do
     end
   end
 
+  def resume_game_object(%WorldRef{} = world, db_guid) when is_integer(db_guid) do
+    group = Catalog.group_for(:game_object, db_guid)
+    member = {:game_object, db_guid}
+
+    case GenServer.whereis(via({world, group})) do
+      nil -> :ok
+      pid -> send(pid, {:reactivate, member})
+    end
+  end
+
   def operate_game_object(world, %GameObject{} = blueprint, action, reset_delay_ms)
       when action in [:open, :close, :reset] and is_integer(reset_delay_ms) do
     world = WorldRef.coerce(world)

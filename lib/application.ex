@@ -12,6 +12,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.AggroProbe
   alias ThistleTea.Game.World.AreaEffects
+  alias ThistleTea.Game.World.Battleground.Supervisor, as: BattlegroundSupervisor
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.ChaseWatch
   alias ThistleTea.Game.World.EntitySupervisor
@@ -20,6 +21,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.AreaTrigger, as: AreaTriggerLoader
   alias ThistleTea.Game.World.Loader.BankBagSlotPrice, as: BankBagSlotPriceLoader
+  alias ThistleTea.Game.World.Loader.Battleground, as: BattlegroundLoader
   alias ThistleTea.Game.World.Loader.BroadcastText, as: BroadcastTextLoader
   alias ThistleTea.Game.World.Loader.ClassSpell, as: ClassSpellLoader
   alias ThistleTea.Game.World.Loader.CreatureTemplate, as: CreatureTemplateLoader
@@ -57,6 +59,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.World.PostOffice
   alias ThistleTea.Game.World.SpawnPool
   alias ThistleTea.Game.World.SpawnPool.Catalog, as: SpawnPoolCatalog
+  alias ThistleTea.Game.World.System.Battleground, as: BattlegroundSystem
   alias ThistleTea.Game.World.System.CellActivator
   alias ThistleTea.Game.World.System.ChatChannels
   alias ThistleTea.Game.World.System.Duel, as: DuelSystem
@@ -117,6 +120,8 @@ defmodule ThistleTea.Application do
         AreaEffects,
         ThistleTea.DBC,
         Repo,
+        BattlegroundSupervisor,
+        BattlegroundSystem,
         {ChatChannels, load_catalog: !test},
         !test &&
           {ThousandIsland, port: @auth_port, handler_module: ThistleTea.Auth, handler_options: @handler_options},
@@ -169,6 +174,7 @@ defmodule ThistleTea.Application do
     PageTextLoader.init()
     AreaTriggerLoader.init()
     BankBagSlotPriceLoader.init()
+    BattlegroundLoader.init()
     BroadcastTextLoader.init()
     SummonLoader.init()
     TaxiLoader.init()
@@ -234,7 +240,9 @@ defmodule ThistleTea.Application do
         VendorLoader.load_all()
         AreaTriggerLoader.load_all()
         BankBagSlotPriceLoader.load_all()
-        BroadcastTextLoader.load_all(InstanceScript.broadcast_text_ids())
+        BattlegroundLoader.load_all()
+
+        BroadcastTextLoader.load_all(InstanceScript.broadcast_text_ids() ++ BattlegroundLoader.broadcast_text_ids())
         SummonLoader.preload(InstanceScript.summon_entries())
         Logger.info("Loading templates...")
         CreatureTemplateLoader.load_all()

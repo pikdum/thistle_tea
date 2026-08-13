@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgRepopRequest do
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Graveyard, as: GraveyardLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
+  alias ThistleTea.Game.World.System.Battleground, as: BattlegroundSystem
   alias ThistleTea.Game.World.Visibility
 
   defstruct []
@@ -83,11 +84,21 @@ defmodule ThistleTea.Game.Network.Message.CmsgRepopRequest do
     %{internal: %Internal{world: world}, movement_block: %MovementBlock{position: {x, y, z, _o}}} = character
     team = GraveyardLoader.team_for_race(character.unit.race)
 
-    case GraveyardLoader.closest(world.map_id, {x, y, z}, team) do
+    case BattlegroundSystem.graveyard(world, character.object.guid) do
+      {gx, gy, gz, _orientation} ->
+        MovementControl.defer_repop(state, {gx, gy, gz, world})
+
+      nil ->
+        defer_open_world_graveyard(state, world.map_id, {x, y, z}, team)
+    end
+  end
+
+  defp defer_open_world_graveyard(state, map_id, position, team) do
+    case GraveyardLoader.closest(map_id, position, team) do
       %{map: graveyard_map, position: {gx, gy, gz}} ->
         MovementControl.defer_repop(state, {gx, gy, gz, graveyard_map})
 
-      _ ->
+      _missing ->
         state
     end
   end
