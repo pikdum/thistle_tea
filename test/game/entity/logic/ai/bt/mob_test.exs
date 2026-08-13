@@ -907,6 +907,21 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
                MobBT.try_aggro(state, blackboard, 1_000)
     end
 
+    test "does not proximity aggro when disabled by creature extra flags" do
+      source_guid = mob_guid(17)
+      target_guid = player_guid()
+
+      state = fixture_mob(guid: source_guid, level: 5, faction_template: 17)
+      blackboard = %Blackboard{}
+
+      put_metadata(source_guid, defias(), 5)
+      Metadata.update(source_guid, %{proximity_aggro?: false})
+      put_spatial_target(:players, target_guid, {10.0, 0.0, 0.0}, alliance(), 5)
+
+      assert {:failure, ^state, %Blackboard{combat: %Blackboard.Combat{next_aggro_at: 6_000}}} =
+               MobBT.try_aggro(state, blackboard, AIEnvironment.context(state, 1_000))
+    end
+
     test "uses level-adjusted aggro range" do
       source_guid = mob_guid(17)
       target_guid = player_guid()

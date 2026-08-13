@@ -85,7 +85,15 @@ defmodule ThistleTea.Game.World.AggroProbe do
   end
 
   defp maybe_probe(mob_guid, distance, player_guid, player) do
-    mob = Metadata.query(mob_guid, [:alive?, :faction_template, :unit_flags, :level, :detection_range])
+    mob =
+      Metadata.query(mob_guid, [
+        :alive?,
+        :faction_template,
+        :unit_flags,
+        :level,
+        :detection_range,
+        :proximity_aggro?
+      ])
 
     if eligible?(mob, player, distance) do
       Entity.aggro_probe(mob_guid, player_guid)

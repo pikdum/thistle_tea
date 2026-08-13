@@ -186,6 +186,14 @@ defmodule ThistleTea.Game.Entity.Logic.HostilityTest do
     test "returns false for non-attackable units" do
       refute Hostility.can_initiate_attack?(%{faction_template: defias(), unit_flags: 0x00000002})
     end
+
+    test "returns false when VMangos disables proximity aggro" do
+      refute Hostility.can_initiate_attack?(%{
+               faction_template: defias(),
+               unit_flags: 0,
+               proximity_aggro?: false
+             })
+    end
   end
 
   defp alliance do

@@ -49,6 +49,13 @@ defmodule ThistleTea.Game.World.Loader.BattlegroundVMangosTest do
         )
       )
 
+    spirit_guides =
+      Mangos.Repo.all(
+        from(template in Mangos.CreatureTemplate,
+          where: template.entry in [13_116, 13_117]
+        )
+      )
+
     safe_locs = %{
       769 => %{location_x: 1_519.530_273_437_5, location_y: 1_481.868_408_203_125, location_z: 352.023_742_675_781_25},
       770 => %{
@@ -76,5 +83,7 @@ defmodule ThistleTea.Game.World.Loader.BattlegroundVMangosTest do
     assert BattlegroundLoader.ghost_gate_db_guids(table) == [90_064, 90_065, 90_066, 90_067]
     assert BattlegroundLoader.ghost_gate_entries(table) == [180_322]
     assert BattlegroundLoader.spirit_guide_entries(table) == [13_116, 13_117]
+    assert Enum.map(spirit_guides, & &1.entry) |> Enum.sort() == [13_116, 13_117]
+    assert Enum.all?(spirit_guides, &(Bitwise.band(&1.extra_flags, 0x00000002) != 0))
   end
 end

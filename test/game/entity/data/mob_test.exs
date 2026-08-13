@@ -21,6 +21,14 @@ defmodule ThistleTea.Game.Entity.Data.MobTest do
   alias ThistleTea.Game.WorldRef
 
   describe "build/1" do
+    test "derives proximity aggro from VMangos creature extra flags" do
+      regular = %Mob{internal: %Internal{creature: %Creature{extra_flags: 0}}}
+      defensive = %Mob{internal: %Internal{creature: %Creature{extra_flags: 0x00000002}}}
+
+      assert Mob.proximity_aggro?(regular)
+      refute Mob.proximity_aggro?(defensive)
+    end
+
     test "stores creature movement speeds as actual speeds" do
       creature =
         %Mangos.Creature{

@@ -48,7 +48,7 @@ defmodule ThistleTea.Game.Entity.Logic.Hostility do
   end
 
   def can_initiate_attack?(source) do
-    alive?(source) and targetable?(source) and not neutral_to_all?(source)
+    alive?(source) and targetable?(source) and proximity_aggro?(source) and not neutral_to_all?(source)
   end
 
   def valid_hostile_target?(source, target) when is_integer(target) do
@@ -316,4 +316,7 @@ defmodule ThistleTea.Game.Entity.Logic.Hostility do
   defp targetable_unit_flags?(flags) when is_integer(flags) do
     (flags &&& (@unit_flag_non_attackable ||| @unit_flag_non_attackable_2 ||| @unit_flag_not_selectable)) == 0
   end
+
+  defp proximity_aggro?(%{proximity_aggro?: false}), do: false
+  defp proximity_aggro?(_source), do: true
 end

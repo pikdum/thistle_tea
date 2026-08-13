@@ -63,6 +63,19 @@ defmodule ThistleTea.Game.World.AggroProbeTest do
       refute_receive {:"$gen_cast", {:aggro_probe, ^player_guid}}
     end
 
+    test "does not probe mobs with proximity aggro disabled" do
+      table = table()
+      player_guid = player_guid()
+      mob_guid = mob_guid()
+
+      put_player(player_guid)
+      put_mob(mob_guid, {10.0, 0.0, 0.0}, proximity_aggro?: false)
+
+      AggroProbe.notify_player_moved(player_guid, 0, {0.0, 0.0, 0.0}, table)
+
+      refute_receive {:"$gen_cast", {:aggro_probe, ^player_guid}}
+    end
+
     test "does not probe mobs beyond their level-scaled aggro radius" do
       table = table()
       player_guid = player_guid()
@@ -150,7 +163,8 @@ defmodule ThistleTea.Game.World.AggroProbeTest do
       alive?: Keyword.get(opts, :alive?, true),
       faction_template: Keyword.get(opts, :faction_template, defias()),
       unit_flags: 0,
-      level: 5
+      level: 5,
+      proximity_aggro?: Keyword.get(opts, :proximity_aggro?, true)
     })
 
     on_exit(fn ->
