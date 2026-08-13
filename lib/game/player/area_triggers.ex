@@ -18,7 +18,8 @@ defmodule ThistleTea.Game.Player.AreaTriggers do
 
   @trigger_range_delta 5.0
 
-  def handle(%{ready: true, character: %Character{} = character} = state, trigger_id) when is_integer(trigger_id) do
+  def handle(%{ready: true, guid: guid, character: %Character{} = character} = state, trigger_id)
+      when is_integer(trigger_id) do
     {x, y, z, _orientation} = character.movement_block.position
 
     with %{} = trigger <- AreaTriggerLoader.get(trigger_id),
@@ -31,7 +32,7 @@ defmodule ThistleTea.Game.Player.AreaTriggers do
            ) do
       case BattlegroundSystem.area_trigger(
              character.internal.world,
-             character.object.guid,
+             guid,
              trigger_id,
              character.movement_block.position
            ) do
