@@ -91,7 +91,8 @@ defmodule ThistleTea.Game.World.Battleground.Match do
     dropped_guid = dropped_flag_guid(state.match, guid, dropped_guid)
     result = WarsongGulch.leave(state.match, guid, position, dropped_guid)
     notify_left(state.manager, guid)
-    {:reply, :ok, apply_result(state, result)}
+    state = state |> apply_result(result) |> shutdown_if_empty()
+    {:reply, :ok, state}
   end
 
   def handle_call({:use_game_object, guid, object_guid, entry, position}, _from, state) do
@@ -109,7 +110,7 @@ defmodule ThistleTea.Game.World.Battleground.Match do
       {:leave, return_to} ->
         result = WarsongGulch.leave(state.match, guid, position, dropped_guid)
         notify_left(state.manager, guid)
-        state = apply_result(state, result)
+        state = state |> apply_result(result) |> shutdown_if_empty()
         state.effect_sink.(state.match, [%ExitPlayers{destinations: %{guid => return_to}}])
         {:reply, :handled, state}
 
@@ -166,6 +167,11 @@ defmodule ThistleTea.Game.World.Battleground.Match do
 
   defp player(match, guid), do: Map.get(match.players, guid)
   defp notify_left(manager, guid), do: GenServer.cast(manager, {:match_player_left, self(), guid})
+
+  defp shutdown_if_empty(state) do
+    if map_size(state.match.players) == 0, do: send(self(), :shutdown)
+    state
+  end
 
   defp dropped_flag_guid(match, guid, _requested_guid) do
     case WarsongGulch.carried_flag(match, guid) do

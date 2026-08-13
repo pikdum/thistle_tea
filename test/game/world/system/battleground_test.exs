@@ -109,6 +109,19 @@ defmodule ThistleTea.Game.World.System.BattlegroundTest do
       assert :ok = BattlegroundSystem.join(alliance(3), 489, server)
       assert %{status: :wait_join, client_instance_id: 1} = BattlegroundSystem.status(3, server)
     end
+
+    test "stops the isolated world after its final reservation leaves", %{server: server} do
+      assert :ok = BattlegroundSystem.join(alliance(1), 489, server)
+      assert :ok = BattlegroundSystem.join(horde(2), 489, server)
+      world = WorldRef.instance(489, 1)
+      pid = BattlegroundSystem.match_for_world(world, server)
+      ref = Process.monitor(pid)
+
+      assert :ok = BattlegroundSystem.port(1, 0, nil, server)
+      refute_receive {:DOWN, ^ref, :process, ^pid, _reason}, 50
+      assert :ok = BattlegroundSystem.port(2, 0, nil, server)
+      assert_receive {:DOWN, ^ref, :process, ^pid, :normal}
+    end
   end
 
   defp alliance(guid), do: %{guid: guid, name: "Alliance#{guid}", team: :alliance, level: 60}
