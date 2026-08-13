@@ -27,6 +27,7 @@ defmodule ThistleTea.Game.World.Loader.BattlegroundTest do
         %{map: 489, event1: 0, event2: 0, kind: :game_object, db_guid: 90_000, entry: 179_830},
         %{map: 489, event1: 1, event2: 0, kind: :game_object, db_guid: 90_001, entry: 179_831},
         %{map: 489, event1: 2, event2: 0, kind: :creature, db_guid: 150_000, entry: 13_116},
+        %{map: 489, event1: 253, event2: 0, kind: :game_object, db_guid: 90_064, entry: 180_322},
         %{map: 489, event1: 254, event2: 0, kind: :game_object, db_guid: 90_008, entry: 179_918}
       ]
 
@@ -46,6 +47,8 @@ defmodule ThistleTea.Game.World.Loader.BattlegroundTest do
       assert BattlegroundLoader.base_flag_db_guid(:alliance, table) == 90_000
       assert BattlegroundLoader.base_flag_db_guid(:horde, table) == 90_001
       assert BattlegroundLoader.gate_entries(table) == [179_918]
+      assert BattlegroundLoader.ghost_gate_db_guids(table) == [90_064]
+      assert BattlegroundLoader.ghost_gate_entries(table) == [180_322]
       assert BattlegroundLoader.spirit_guide_entries(table) == [13_116]
     end
   end

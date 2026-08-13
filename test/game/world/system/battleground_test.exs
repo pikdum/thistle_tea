@@ -2,7 +2,10 @@ defmodule ThistleTea.Game.World.System.BattlegroundTest do
   use ExUnit.Case, async: false
 
   alias ThistleTea.Game.Battleground.Effects.OperateGates
+  alias ThistleTea.Game.Battleground.Effects.UpdateStatus
   alias ThistleTea.Game.Battleground.Template
+  alias ThistleTea.Game.Entity
+  alias ThistleTea.Game.Guid
   alias ThistleTea.Game.World.System.Battleground, as: BattlegroundSystem
   alias ThistleTea.Game.WorldRef
 
@@ -30,6 +33,7 @@ defmodule ThistleTea.Game.World.System.BattlegroundTest do
 
     def template_for_map(_map), do: nil
     def gate_entries, do: []
+    def ghost_gate_entries, do: [180_322]
   end
 
   setup do
@@ -152,6 +156,10 @@ defmodule ThistleTea.Game.World.System.BattlegroundTest do
       assert_receive {:effects, effects}
       assert Enum.any?(effects, &match?(%OperateGates{action: :open}, &1))
 
+      send(pid = BattlegroundSystem.match_for_world(world, server), {:battleground_timer, :status_refresh})
+      assert_receive {:effects, [%UpdateStatus{}, _scoreboard]}
+      assert Process.alive?(pid)
+
       assert %{status: :in_progress, phase: :active, players: %{inside: 1}} =
                BattlegroundSystem.debug_info(1, server)
 
@@ -163,6 +171,21 @@ defmodule ThistleTea.Game.World.System.BattlegroundTest do
 
       assert {:error, :not_in_battleground} =
                BattlegroundSystem.debug_start_now(WorldRef.instance(489, 99), server)
+    end
+
+    test "removes ghost gates that load after the battle starts", %{server: server} do
+      assert :ok = BattlegroundSystem.join(alliance(1), 489, server)
+      assert {:ok, _status} = BattlegroundSystem.debug_start_queued(1, server)
+      assert {:ok, %WorldRef{} = world, _destination} = BattlegroundSystem.port(1, 1, nil, server)
+      assert :ok = BattlegroundSystem.debug_start_now(world, server)
+
+      guid = Guid.runtime(:game_object, 180_322)
+      assert {:ok, _owner} = Entity.register(guid)
+
+      BattlegroundSystem.game_object_spawned(world, guid, 180_322, server)
+      BattlegroundSystem.status(1, server)
+
+      assert_receive {:"$gen_cast", {:battleground_hide_game_object}}
     end
   end
 

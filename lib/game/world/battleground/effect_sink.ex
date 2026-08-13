@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.World.Battleground.EffectSink do
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
+  alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Loader.Battleground, as: BattlegroundLoader
   alias ThistleTea.Game.World.Loader.BroadcastText, as: BroadcastTextLoader
@@ -32,6 +33,24 @@ defmodule ThistleTea.Game.World.Battleground.EffectSink do
     |> World.guids()
     |> Enum.filter(&MapSet.member?(gate_entries, Guid.entry(&1)))
     |> Enum.each(&Entity.operate_game_object(&1, action))
+  end
+
+  defp emit_effect(match, %Effects.DespawnGhostGates{}) do
+    Enum.each(BattlegroundLoader.ghost_gate_db_guids(), &SpawnPool.suspend_game_object(match.world, &1, nil))
+  end
+
+  defp emit_effect(match, %Effects.UpdateStatus{}) do
+    elapsed_ms = max(Time.now() - match.started_at, 0)
+
+    packet = %Message.SmsgBattlefieldStatus{
+      map: match.world.map_id,
+      bracket: match.bracket,
+      client_instance_id: match.client_instance_id,
+      status: :in_progress,
+      time_two_ms: elapsed_ms
+    }
+
+    send_to(match, :all, packet)
   end
 
   defp emit_effect(_match, %Effects.HideGameObject{guid: guid}), do: Entity.hide_game_object(guid)

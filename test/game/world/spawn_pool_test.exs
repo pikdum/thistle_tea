@@ -179,6 +179,19 @@ defmodule ThistleTea.Game.World.SpawnPoolTest do
       stop_pool(key)
     end
 
+    test "suspends a game object by its database guid" do
+      {guid, _group, world, key, _cell} = singleton_fixture()
+      blueprint = game_object(guid)
+
+      :ok = SpawnPool.load_game_object(world, blueprint)
+      await_entity(guid)
+
+      :ok = SpawnPool.suspend_game_object(world, Guid.low_guid(guid))
+      await_absent(guid)
+
+      stop_pool(key)
+    end
+
     test "isolates and stops pools by world copy" do
       low_guid = System.unique_integer([:positive])
       guid = Guid.from_low_guid(:game_object, 1, low_guid)

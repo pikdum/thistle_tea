@@ -57,7 +57,19 @@ defmodule ThistleTea.Game.Battleground.WarsongGulchTest do
 
       assert active.phase == :active
       assert %Effects.OperateGates{action: :open} in effects
+      assert %Effects.DespawnGhostGates{} in effects
       assert %Effects.UpdateWorldStates{states: WarsongGulch.world_states(active)} in effects
+    end
+
+    test "refreshes the client timer and scoreboard after the battle starts", %{match: match} do
+      %Result{match: active} = WarsongGulch.handle_timer(match, :start, 121_000)
+
+      assert %Result{
+               effects: [
+                 %Effects.UpdateStatus{},
+                 %Effects.Scoreboard{ended?: false}
+               ]
+             } = WarsongGulch.handle_timer(active, :status_refresh, 122_000)
     end
 
     test "resurrects each queued player once and schedules the next wave", %{match: match} do

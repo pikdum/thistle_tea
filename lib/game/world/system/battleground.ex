@@ -622,8 +622,10 @@ defmodule ThistleTea.Game.World.System.Battleground do
 
     cond do
       entry in catalog.gate_entries() ->
-        action = if match.phase == :countdown, do: :close, else: :open
-        Entity.operate_game_object(guid, action)
+        reconcile_gate(match.phase, guid)
+
+      entry in catalog.ghost_gate_entries() ->
+        reconcile_ghost_gate(match.phase, guid)
 
       entry == 179_830 and match.flags.alliance.state != :base ->
         Entity.hide_game_object(guid)
@@ -635,4 +637,10 @@ defmodule ThistleTea.Game.World.System.Battleground do
         :ok
     end
   end
+
+  defp reconcile_gate(:countdown, guid), do: Entity.operate_game_object(guid, :close)
+  defp reconcile_gate(_phase, guid), do: Entity.operate_game_object(guid, :open)
+
+  defp reconcile_ghost_gate(:countdown, _guid), do: :ok
+  defp reconcile_ghost_gate(_phase, guid), do: Entity.hide_game_object(guid)
 end

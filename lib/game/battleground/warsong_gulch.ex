@@ -236,8 +236,20 @@ defmodule ThistleTea.Game.Battleground.WarsongGulch do
       match: match,
       effects: [
         %Effects.OperateGates{action: :open},
+        %Effects.DespawnGhostGates{},
         announce(10_014, :neutral),
         %Effects.UpdateWorldStates{states: world_states(match)}
+      ],
+      timers: [status_refresh: 1_000]
+    }
+  end
+
+  def handle_timer(%__MODULE__{phase: :active} = match, :status_refresh, _now) do
+    %Result{
+      match: match,
+      effects: [
+        %Effects.UpdateStatus{},
+        %Effects.Scoreboard{ended?: false, players: scoreboard(match)}
       ]
     }
   end

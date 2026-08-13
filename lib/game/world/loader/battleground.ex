@@ -112,6 +112,23 @@ defmodule ThistleTea.Game.World.Loader.Battleground do
     |> Enum.sort()
   end
 
+  def ghost_gate_db_guids(table \\ __MODULE__) do
+    Battleground.warsong_gulch_map()
+    |> event_members(253, table)
+    |> Enum.filter(&(&1.kind == :game_object))
+    |> Enum.map(& &1.db_guid)
+    |> Enum.sort()
+  end
+
+  def ghost_gate_entries(table \\ __MODULE__) do
+    Battleground.warsong_gulch_map()
+    |> event_members(253, table)
+    |> Enum.filter(&(&1.kind == :game_object))
+    |> Enum.map(& &1.entry)
+    |> Enum.uniq()
+    |> Enum.sort()
+  end
+
   def spirit_guide_entries(table \\ __MODULE__) do
     Battleground.warsong_gulch_map()
     |> event_members(2, table)

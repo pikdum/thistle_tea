@@ -73,6 +73,8 @@ defmodule ThistleTea.Game.World.Loader.BattlegroundVMangosTest do
     assert BattlegroundLoader.base_flag_db_guid(:alliance, table) == 90_000
     assert BattlegroundLoader.base_flag_db_guid(:horde, table) == 90_001
     assert length(BattlegroundLoader.gate_entries(table)) == 6
+    assert BattlegroundLoader.ghost_gate_db_guids(table) == [90_064, 90_065, 90_066, 90_067]
+    assert BattlegroundLoader.ghost_gate_entries(table) == [180_322]
     assert BattlegroundLoader.spirit_guide_entries(table) == [13_116, 13_117]
   end
 end

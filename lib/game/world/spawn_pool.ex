@@ -75,12 +75,24 @@ defmodule ThistleTea.Game.World.SpawnPool do
     end
   end
 
-  def suspend_game_object(world, %GameObject{} = blueprint, respawn_delay_ms \\ nil) do
+  def suspend_game_object(world, game_object_or_guid, respawn_delay_ms \\ nil)
+
+  def suspend_game_object(world, %GameObject{} = blueprint, respawn_delay_ms) do
     world = WorldRef.coerce(world)
     group = game_object_group(blueprint)
     key = {world, group}
     member = member_key(blueprint)
 
+    suspend_member(key, member, respawn_delay_ms)
+  end
+
+  def suspend_game_object(%WorldRef{} = world, db_guid, respawn_delay_ms)
+      when is_integer(db_guid) and (is_integer(respawn_delay_ms) or is_nil(respawn_delay_ms)) do
+    group = Catalog.group_for(:game_object, db_guid)
+    suspend_member({world, group}, {:game_object, db_guid}, respawn_delay_ms)
+  end
+
+  defp suspend_member(key, member, respawn_delay_ms) do
     case GenServer.whereis(via(key)) do
       nil -> :ok
       pid -> GenServer.cast(pid, {:suspend_member, member, respawn_delay_ms})

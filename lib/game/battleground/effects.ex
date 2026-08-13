@@ -7,6 +7,16 @@ defmodule ThistleTea.Game.Battleground.Effects do
     defstruct [:action]
   end
 
+  defmodule DespawnGhostGates do
+    @moduledoc false
+    defstruct []
+  end
+
+  defmodule UpdateStatus do
+    @moduledoc false
+    defstruct []
+  end
+
   defmodule HideGameObject do
     @moduledoc false
     @enforce_keys [:guid]
