@@ -2,7 +2,9 @@ defmodule ThistleTea.Game.CreatureTeleportVmangosTest do
   use ExUnit.Case, async: false
 
   alias Ecto.Adapters.SQL
+  alias ThistleTea.DB.Mangos
   alias ThistleTea.DB.Mangos.Repo
+  alias ThistleTea.Game.Entity.Data.AIEvent
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AI.EventAI
@@ -11,7 +13,8 @@ defmodule ThistleTea.Game.CreatureTeleportVmangosTest do
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.InstanceSpawn
-  alias ThistleTea.Game.World.Loader.Mob, as: MobLoader
+  alias ThistleTea.Game.World.Loader.Condition, as: ConditionLoader
+  alias ThistleTea.Game.World.Loader.Script, as: ScriptLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.WorldRef
@@ -65,9 +68,8 @@ defmodule ThistleTea.Game.CreatureTeleportVmangosTest do
   test "loaded Baron aggro resolves Aurius inside the current copy" do
     world = WorldRef.instance(329, System.unique_integer([:positive, :monotonic]))
     player_guid = Guid.from_low_guid(:player, System.unique_integer([:positive, :monotonic]))
-    blueprints = MobLoader.blueprints([54_241, 53_297])
-    baron = blueprints |> Map.fetch!({:creature, 54_241}) |> InstanceSpawn.materialize(world)
-    aurius = blueprints |> Map.fetch!({:creature, 53_297}) |> InstanceSpawn.materialize(world)
+    baron = 54_241 |> mob_fixture() |> InstanceSpawn.materialize(world)
+    aurius = 53_297 |> mob_fixture() |> InstanceSpawn.materialize(world)
 
     Enum.each([baron, aurius], fn mob ->
       World.update_position(mob)
@@ -128,4 +130,24 @@ defmodule ThistleTea.Game.CreatureTeleportVmangosTest do
   end
 
   defp rows(query), do: SQL.query!(Repo, query, []).rows
+
+  defp mob_fixture(guid) do
+    creature =
+      Mangos.Creature.query_guids([guid], [])
+      |> Repo.one!()
+      |> Repo.preload([:creature_template, :creature_movement])
+
+    events = Mangos.CreatureAiEvent.query(creature.id) |> Repo.all()
+    script_ids = Enum.flat_map(events, &Mangos.CreatureAiEvent.action_script_ids/1)
+    scripts = ScriptLoader.load_by_ids(Mangos.CreatureAiScript, script_ids)
+    conditions = ConditionLoader.load_by_ids(Enum.map(events, & &1.condition_id))
+
+    ai_events =
+      Enum.map(events, fn row ->
+        event = AIEvent.build(row, scripts)
+        %{event | condition: Map.get(conditions, event.condition_id)}
+      end)
+
+    Mob.build(%{creature | ai_events: ai_events})
+  end
 end

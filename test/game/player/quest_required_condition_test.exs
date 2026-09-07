@@ -179,6 +179,7 @@ defmodule ThistleTea.Game.Player.QuestRequiredConditionTest do
     assert Quests.availability(context.character, [quest]).condition_results == %{quest.id => :unmet}
   end
 
+  @tag :vmangos_db
   test "active ender and reward flows ignore an unknown start condition", context do
     quest = conditioned_quest(context, %Condition{entry: 42, type: :instance_data, value1: 7})
     put_quest(context, quest, giver: true, ender: true)
@@ -198,6 +199,7 @@ defmodule ThistleTea.Game.Player.QuestRequiredConditionTest do
     refute QuestLog.active?(turned_in.character.player.quest_log, quest.id)
   end
 
+  @tag :vmangos_db
   test "next quest offers apply the same condition gate", context do
     current = %Quest{id: context.quest_id, next_quest_in_chain: context.quest_id + 1}
 

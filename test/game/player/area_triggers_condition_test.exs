@@ -16,6 +16,7 @@ defmodule ThistleTea.Game.Player.AreaTriggersConditionTest do
   alias ThistleTea.Game.WorldRef
 
   describe "condition policy" do
+    @tag :vmangos_db
     test "accepts or rejects a cached conditioned teleport" do
       trigger_id = System.unique_integer([:positive, :monotonic])
       condition = %Condition{entry: 1, type: :level, value1: 10, value2: 1}

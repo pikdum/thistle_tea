@@ -2,7 +2,10 @@ defmodule ThistleTea.Game.InstanceAuriusVmangosTest do
   use ExUnit.Case, async: false
 
   alias Ecto.Adapters.SQL
+  alias ThistleTea.DB.Mangos
   alias ThistleTea.DB.Mangos.Repo
+  alias ThistleTea.Game.Entity.Data.AIEvent
+  alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.EventSink.Context, as: SinkContext
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
@@ -11,7 +14,8 @@ defmodule ThistleTea.Game.InstanceAuriusVmangosTest do
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.World.InstanceData
   alias ThistleTea.Game.World.InstanceSpawn
-  alias ThistleTea.Game.World.Loader.Mob, as: MobLoader
+  alias ThistleTea.Game.World.Loader.Condition, as: ConditionLoader
+  alias ThistleTea.Game.World.Loader.Script, as: ScriptLoader
   alias ThistleTea.Game.World.System.Instance, as: InstanceSystem
 
   @moduletag :vmangos_db
@@ -155,7 +159,7 @@ defmodule ThistleTea.Game.InstanceAuriusVmangosTest do
 
     player_guid = Guid.from_low_guid(:player, id)
     {:ok, world} = InstanceSystem.enter(329, player_guid, server)
-    baron = MobLoader.blueprints([54_241]) |> Map.fetch!({:creature, 54_241}) |> InstanceSpawn.materialize(world)
+    baron = 54_241 |> mob_fixture() |> InstanceSpawn.materialize(world)
     context = AIEnvironment.context(baron, 1_000)
 
     {baron, blackboard} = EventAI.enter_combat(baron, Blackboard.new(), player_guid, 1_000, context)
@@ -179,4 +183,24 @@ defmodule ThistleTea.Game.InstanceAuriusVmangosTest do
   end
 
   defp rows(query), do: SQL.query!(Repo, query, []).rows
+
+  defp mob_fixture(guid) do
+    creature =
+      Mangos.Creature.query_guids([guid], [])
+      |> Repo.one!()
+      |> Repo.preload([:creature_template, :creature_movement])
+
+    events = Mangos.CreatureAiEvent.query(creature.id) |> Repo.all()
+    script_ids = Enum.flat_map(events, &Mangos.CreatureAiEvent.action_script_ids/1)
+    scripts = ScriptLoader.load_by_ids(Mangos.CreatureAiScript, script_ids)
+    conditions = ConditionLoader.load_by_ids(Enum.map(events, & &1.condition_id))
+
+    ai_events =
+      Enum.map(events, fn row ->
+        event = AIEvent.build(row, scripts)
+        %{event | condition: Map.get(conditions, event.condition_id)}
+      end)
+
+    Mob.build(%{creature | ai_events: ai_events})
+  end
 end
