@@ -127,7 +127,7 @@
             version = "0.1.0";
             src = ./assets;
             # Bump via `prefetch-npm-deps assets/package-lock.json`.
-            npmDepsHash = "sha256-gmFzwKg+2a/KQmhvP6/u7GME5+CGAVgm/KNO0HV4jDU=";
+            npmDepsHash = "sha256-TNxal2RxAA7Mo/MIqdV7n/tk2esYEuHrq7XkzteZHAo=";
             dontNpmBuild = true;
 
             installPhase = ''
