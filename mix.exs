@@ -30,7 +30,7 @@ defmodule ThistleTea.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      {:tidewave, "~> 0.8", only: [:dev]},
+      {:tidewave, "~> 0.9", only: [:dev]},
       {:benchee, "~> 1.5", only: [:dev, :bench], runtime: false},
       {:deps_nix, "~> 3.0", only: :dev, runtime: false},
       {:mix_test_watch, "~> 1.0", only: [:dev, :test], runtime: false},
