@@ -70,11 +70,11 @@ defmodule ThistleTea.Game.World.InstanceEffectSink do
     |> Enum.each(&dispatch.({:modify_creature_unit_flags, &1, effect.flags, effect.mode}))
   end
 
-  defp project(world, %Effects.MoveCreature{} = effect, guids, dispatch, _summon, _spawn_guid, _text) do
+  defp project(world, %Effects.MoveCreature{} = effect, guids, dispatch, _summon, spawn_guid, _text) do
     {x, y, z} = effect.position
 
     world
-    |> targeted_creature_guids(effect, guids, nil)
+    |> targeted_creature_guids(effect, guids, spawn_guid)
     |> Enum.each(&dispatch.({:move_creature, &1, {x, y, z}}))
   end
 

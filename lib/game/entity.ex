@@ -67,7 +67,7 @@ defmodule ThistleTea.Game.Entity do
   end
 
   def operate_game_object(entity, action, reset_delay_ms \\ 0)
-      when action in [:open, :close, :reset] and is_integer(reset_delay_ms) do
+      when action in [:open, :close, :reset, :destroy] and is_integer(reset_delay_ms) do
     dispatch_cast(entity, {:operate_game_object, action, reset_delay_ms})
   end
 

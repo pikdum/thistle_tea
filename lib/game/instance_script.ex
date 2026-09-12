@@ -3,9 +3,10 @@ defmodule ThistleTea.Game.InstanceScript do
   Registry for audited instance-script data adapters.
   """
 
+  alias ThistleTea.Game.InstanceScript.Deadmines
   alias ThistleTea.Game.InstanceScript.Stratholme
 
-  @adapters [Stratholme]
+  @adapters [Deadmines, Stratholme]
 
   def broadcast_text_ids do
     @adapters |> Enum.flat_map(& &1.broadcast_text_ids()) |> Enum.uniq()
@@ -70,6 +71,7 @@ defmodule ThistleTea.Game.InstanceScript do
     end
   end
 
+  defp adapter("instance_deadmines"), do: Deadmines
   defp adapter("instance_stratholme"), do: Stratholme
   defp adapter(_script_name), do: nil
 end

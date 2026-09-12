@@ -48,6 +48,25 @@ defmodule ThistleTea.Game.World.InstanceEffectSinkTest do
     refute_receive {:operate_game_object, _, _}
   end
 
+  describe "emit/3" do
+    test "moves only the requested database spawn", context do
+      effect = %Effects.MoveCreature{
+        creature_entry: 10_415,
+        creature_db_guid: 53_955,
+        position: {1.0, 2.0, 3.0}
+      }
+
+      assert :ok = InstanceEffectSink.emit(context.world, effect, context.options)
+      assert_receive {:move_creature, guid, {1.0, 2.0, 3.0}}
+      assert guid == context.crystal
+      refute_receive {:move_creature, _, _}
+
+      options = Keyword.put(context.options, :spawn_guid, fn _, _, _ -> nil end)
+      assert :ok = InstanceEffectSink.emit(context.world, effect, options)
+      refute_receive {:move_creature, _, _}
+    end
+  end
+
   test "fans player effects out to every player in the exact copy", context do
     effect = %Effects.CastPlayerSpell{spell_id: 27_861}
     assert :ok = InstanceEffectSink.emit(context.world, effect, context.options)
