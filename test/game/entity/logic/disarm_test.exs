@@ -5,14 +5,18 @@ defmodule ThistleTea.Game.Entity.Logic.DisarmTest do
   alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
+  alias ThistleTea.Game.Entity.Logic.AttackTable
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
   alias ThistleTea.Game.Entity.Logic.Aura.Change
   alias ThistleTea.Game.Entity.Logic.Casting
   alias ThistleTea.Game.Entity.Logic.Combat
+  alias ThistleTea.Game.Entity.Logic.CombatRatings
+  alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Disarm
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Stats
@@ -45,6 +49,7 @@ defmodule ThistleTea.Game.Entity.Logic.DisarmTest do
 
     character = %Character{
       object: %Object{guid: 1},
+      movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
       unit: unit,
       player: %Player{skills: %{162 => %{value: 37}}},
       internal: %Internal{}
@@ -69,6 +74,14 @@ defmodule ThistleTea.Game.Entity.Logic.DisarmTest do
   end
 
   describe "damage_range/1" do
+    test "restores weapon damage when death removes disarm", %{character: character} do
+      character = character |> disarm() |> Core.take_damage(1_000, 500)
+      assert character.unit.health == 0
+      refute Disarm.active?(character)
+      assert Combat.damage_range(character) == {70.0, 90.0}
+      assert Combat.attack_speed_ms(character) == 3_000
+    end
+
     test "uses unarmed damage plus attack power while preserving offhand damage", %{character: character} do
       assert Combat.damage_range(character) == {70.0, 90.0}
       offhand = Combat.offhand_damage_range(character)
@@ -148,6 +161,7 @@ defmodule ThistleTea.Game.Entity.Logic.DisarmTest do
       character = disarm(character)
       assert Disarm.validate(character, spell) == {:error, :equipped_item}
       assert Disarm.validate(character, %{spell | dmg_class: 3}) == :ok
+      assert Disarm.validate(character, %{spell | dmg_class: 1, equipped_item_subclass_mask: 0x80000}) == :ok
       assert Disarm.validate(character, %{spell | equipped_item_class: -1}) == :ok
       assert Disarm.validate(character, %{spell | equipped_item_class: 4}) == :ok
       assert CastValidation.validate(character, spell, Target.self(1), nil, 0) == {:error, :equipped_item}
@@ -159,6 +173,22 @@ defmodule ThistleTea.Game.Entity.Logic.DisarmTest do
       assert Disarm.validate(mob, spell) == {:error, :equipped_item}
       assert Disarm.validate(mob, %{spell | effects: [%Effect{type: :school_damage}]}) == :ok
       assert Disarm.validate(%{mob | unit: %{mob.unit | virtual_item_info: nil}}, spell) == :ok
+    end
+  end
+
+  describe "parry_disabled?/1" do
+    test "requires a remaining offhand weapon to parry while disarmed", %{character: character} do
+      character = disarm(character)
+      refute Disarm.parry_disabled?(character)
+      character = %{character | unit: %{character.unit | base_offhand_max_damage: nil}}
+      assert Disarm.parry_disabled?(character)
+      synced = CombatRatings.sync(character)
+      assert synced.player.parry_percentage == 0.0
+      attack = %{caster_level: 50, caster_player?: true, caster_attack_skill: 250}
+      refute AttackTable.resolve(character, attack, 100, roll: 700).outcome == :parry
+      {character, _events} = AuraLogic.remove_spells(character, [676], 1_000)
+      assert character.player.parry_percentage == 5.0
+      assert AttackTable.resolve(character, attack, 100, roll: 700).outcome == :parry
     end
   end
 

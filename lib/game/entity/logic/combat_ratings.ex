@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Entity.Logic.CombatRatings do
   """
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Logic.Disarm
 
   @warrior 1
   @paladin 2
@@ -106,7 +107,7 @@ defmodule ThistleTea.Game.Entity.Logic.CombatRatings do
       | crit_percentage: crit,
         ranged_crit_percentage: crit,
         dodge_percentage: dodge_chance(unit.class, level, agility),
-        parry_percentage: parry_chance(unit.class),
+        parry_percentage: if(Disarm.parry_disabled?(character), do: 0.0, else: parry_chance(unit.class)),
         block_percentage: block_chance(unit.equipment_bonuses || %{})
     }
 

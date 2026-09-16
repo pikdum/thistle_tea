@@ -30,8 +30,19 @@ defmodule ThistleTea.Game.Entity.Logic.Disarm do
 
   def damage_multiplier(_entity), do: 1.0
 
+  def parry_disabled?(%Character{unit: %Unit{base_offhand_max_damage: offhand}} = entity) do
+    unarmed?(entity) and not (is_number(offhand) and offhand > 0)
+  end
+
+  def parry_disabled?(_entity), do: false
+
   def validate(%Character{} = entity, %Spell{equipped_item_class: 2} = spell) do
-    if active?(entity) and not Spell.ranged_ability?(spell), do: {:error, :equipped_item}, else: :ok
+    if active?(entity) and not ranged_weapon?(spell), do: {:error, :equipped_item}, else: :ok
+  end
+
+  defp ranged_weapon?(%Spell{equipped_item_subclass_mask: mask} = spell) do
+    Spell.ranged_ability?(spell) or
+      (is_integer(mask) and mask > 0 and Bitwise.band(mask, Bitwise.bnot(0xD000C)) == 0)
   end
 
   def validate(%Mob{} = entity, %Spell{effects: effects}) do

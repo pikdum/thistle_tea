@@ -9,12 +9,14 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.CombatTest do
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Data.ItemTemplate
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AI.BT.Combat
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.World.Loader.Item
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.WorldRef
@@ -22,6 +24,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.CombatTest do
   describe "melee_attack/3" do
     test "replaces a disarmed queued weapon ability with an unarmed swing" do
       target_guid = 2
+      template = %ItemTemplate{entry: 99_987_654, class: 2, subclass: 15}
+      :ets.insert(Item, {template.entry, template})
+      on_exit(fn -> :ets.delete(Item, template.entry) end)
       SpatialHash.update(:players, target_guid, 0, 1.0, 0.0, 0.0)
       on_exit(fn -> SpatialHash.remove(:players, target_guid) end)
 
@@ -34,9 +39,12 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.CombatTest do
           combat_reach: 1.0,
           power2: 500,
           base_attack_time: 2_000,
+          min_offhand_damage: 30.0,
+          max_offhand_damage: 40.0,
+          offhand_attack_time: 1_500,
           auras: [%Holder{spell: %Spell{id: 676}, caster_guid: 2, auras: [%Aura{type: :mod_disarm}]}]
         },
-        player: %Player{skills: %{162 => %{value: 37}}},
+        player: %Player{visible_item_17_0: template.entry, skills: %{162 => %{value: 37}, 173 => %{value: 120}}},
         internal: %Internal{
           world: WorldRef.open(0),
           in_combat: true,
@@ -53,7 +61,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.CombatTest do
 
       assert [
                %Effects.SpellCastFailed{spell_id: 78, reason: :equipped_item},
-               %Effects.DeliverAttack{attack: %{caster_attack_skill: 37, min_damage: 21.0, max_damage: 22.0}}
+               %Effects.DeliverAttack{attack: %{caster_attack_skill: 37, min_damage: 21.0, max_damage: 22.0}},
+               %Effects.DeliverAttack{
+                 attack: %{caster_attack_skill: 120, min_damage: 15.0, max_damage: 20.0, offhand?: true}
+               }
              ] = character.internal.events
     end
 

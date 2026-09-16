@@ -16,6 +16,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.CombatRatings
   alias ThistleTea.Game.Entity.Logic.Daze
+  alias ThistleTea.Game.Entity.Logic.Disarm
   alias ThistleTea.Game.Entity.Logic.MechanicResistance
   alias ThistleTea.Game.Entity.Logic.Skills
   alias ThistleTea.Game.Math
@@ -142,7 +143,8 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
       versus_crit_pct: versus_pct(attack, :crit_damage_versus, defender),
       standing?: (unit.stand_state || 0) == 0,
       from_behind?: from_behind?(defender, Map.get(attack, :caster_position)),
-      avoidance_disabled?: casting?(defender) or stunned?(unit)
+      avoidance_disabled?: casting?(defender) or stunned?(unit),
+      parry_disabled?: Disarm.parry_disabled?(defender)
     }
   end
 
@@ -271,6 +273,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
   end
 
   defp parry_bp(%{ranged?: true}), do: 0
+  defp parry_bp(%{parry_disabled?: true}), do: 0
   defp parry_bp(%{avoidance_disabled?: true}), do: 0
   defp parry_bp(%{from_behind?: true}), do: 0
 
