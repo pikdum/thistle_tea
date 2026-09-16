@@ -94,6 +94,7 @@ nix develop .#wow-tools            # shell with all of the above + sqlite + mari
 - Soulstones and Reincarnation, with reagent consumption, cooldowns, and talent modifiers
 - fall damage, Safe Fall, and Slow Fall protection
 - underwater breath timers, drowning, water-breathing effects, and extended breath reserves
+- swimming speed bonuses and snare updates, synchronized with the player and nearby observers
 - gossip + trainers
 - chests, fishing, and chairs
 - resource tracking for herbs, minerals, and treasure, with exclusive tracking modes
