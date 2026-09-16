@@ -988,6 +988,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
   defp target_level(%{level: level}, _caster_level) when is_integer(level) and level > 0, do: level
   defp target_level(_metadata, caster_level), do: caster_level
 
+  defp spell_miss_reason(%Spell{dmg_class: 1}), do: @spell_miss_reason_resist
   defp spell_miss_reason(%Spell{school: :physical}), do: @spell_miss_reason_miss
   defp spell_miss_reason(%Spell{school: 0}), do: @spell_miss_reason_miss
   defp spell_miss_reason(_spell), do: @spell_miss_reason_resist

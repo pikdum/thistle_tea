@@ -813,7 +813,8 @@ defmodule ThistleTea.Game.Entity.Logic.CastingTest do
 
       spell = %Spell{
         id: 133,
-        school: :fire,
+        school: :physical,
+        dmg_class: 1,
         mechanic: 12,
         effects: [%Effect{type: :school_damage, implicit_target_a: :target_enemy}]
       }
