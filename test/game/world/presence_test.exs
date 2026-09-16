@@ -55,7 +55,7 @@ defmodule ThistleTea.Game.World.PresenceTest do
       spell = %Spell{
         id: 118,
         mechanic: 17,
-        target_creature_type_mask: 0x49,
+        target_creature_type_mask: 0xC1,
         effects: [%Effect{type: :apply_aura, aura: :mod_confuse, implicit_target_a: :target_enemy}]
       }
 
