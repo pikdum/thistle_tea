@@ -18,6 +18,7 @@ defmodule ThistleTea.Game.Network.Message.MsgMoveTest do
   alias ThistleTea.Game.Network.Message.MsgMove
   alias ThistleTea.Game.Network.Message.SmsgEnvironmentalDamageLog
   alias ThistleTea.Game.Network.Opcodes
+  alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Position
@@ -44,6 +45,7 @@ defmodule ThistleTea.Game.Network.Message.MsgMoveTest do
         packed_guid: BinaryUtils.pack_guid(guid),
         ready: true,
         character: character,
+        next_exploration_check_at: Time.now() + 60_000,
         player_guids: []
       }
 

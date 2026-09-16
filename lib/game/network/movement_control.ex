@@ -38,11 +38,11 @@ defmodule ThistleTea.Game.Network.MovementControl do
   end
 
   def prepare(%Message.SmsgMoveFeatherFall{} = packet, %State{} = state) do
-    stamp(state, nil, &%{packet | counter: &1})
+    stamp(state, {:feather_fall, true}, &%{packet | counter: &1})
   end
 
   def prepare(%Message.SmsgMoveNormalFall{} = packet, %State{} = state) do
-    stamp(state, nil, &%{packet | counter: &1})
+    stamp(state, {:feather_fall, false}, &%{packet | counter: &1})
   end
 
   def prepare(%Message.SmsgMoveSetHover{} = packet, %State{} = state) do

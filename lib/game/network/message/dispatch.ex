@@ -97,6 +97,7 @@ defmodule ThistleTea.Game.Network.Message.Dispatch do
               MSG_MOVE_WORLDPORT_ACK: Message.CmsgMoveWorldportAck,
               CMSG_FORCE_RUN_SPEED_CHANGE_ACK: Message.CmsgForceRunSpeedChangeAck,
               CMSG_FORCE_MOVE_ROOT_ACK: Message.CmsgForceMoveRootAck,
+              CMSG_MOVE_FEATHER_FALL_ACK: Message.CmsgMoveFeatherFallAck,
               CMSG_FORCE_MOVE_UNROOT_ACK: Message.CmsgForceMoveUnrootAck,
               CMSG_MOVE_TIME_SKIPPED: Message.CmsgMoveTimeSkipped,
               CMSG_LOGOUT_REQUEST: Message.CmsgLogoutRequest,
