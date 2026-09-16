@@ -4,6 +4,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.StealthSync do
   """
   import Bitwise, only: [|||: 2, &&&: 2, bnot: 1]
 
+  alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
@@ -14,6 +15,21 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.StealthSync do
   @unit_dynamic_track 0x02
   @unit_dynamic_special_info 0x10
   @player_flag_stealth 0x20
+  @player_flag_invisibility 0x40
+
+  def interrupt_holders(previous, desired) do
+    if concealed?(desired) and not concealed?(previous) do
+      Enum.reject(desired, &Holder.interruptible?(&1, 0x00100000))
+    else
+      desired
+    end
+  end
+
+  defp concealed?(holders) do
+    Enum.any?(holders, fn holder ->
+      Enum.any?(holder.auras, &(&1.type in [:mod_stealth, :mod_invisibility]))
+    end)
+  end
 
   def sync(%Character{unit: %Unit{} = unit, player: %Player{} = player} = entity) do
     stealthed? = Aura.has_aura?(entity, :mod_stealth)
@@ -29,7 +45,13 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.StealthSync do
       |> put_flag(@unit_dynamic_special_info, empathy?)
 
     unit = %{unit | vis_flag: vis_flag, dynamic_flags: dynamic_flags}
-    player = %{player | field_bytes2_flags: put_flag(player.field_bytes2_flags, @player_flag_stealth, stealthed?)}
+
+    flags =
+      player.field_bytes2_flags
+      |> put_flag(@player_flag_stealth, stealthed?)
+      |> put_flag(@player_flag_invisibility, Aura.has_aura?(entity, :mod_invisibility))
+
+    player = %{player | field_bytes2_flags: flags}
     %{entity | unit: unit, player: player}
   end
 

@@ -35,7 +35,6 @@ defmodule ThistleTea.Game.Spell.SupportMatrix do
   }
 
   @deferred_auras %{
-    19 => :mod_invisibility_detect,
     75 => :mod_language,
     100 => :auras_visible,
     156 => :mod_reputation_gain,

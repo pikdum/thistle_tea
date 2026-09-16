@@ -50,6 +50,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Transition do
       when is_list(desired) and cause in @causes and is_integer(now) do
     previous = if is_list(unit.auras), do: unit.auras, else: []
     desired = MountSync.interrupt_holders(previous, desired)
+    desired = StealthSync.interrupt_holders(previous, desired)
 
     if desired == previous do
       {entity, []}
