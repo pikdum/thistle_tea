@@ -512,6 +512,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp effect_type(10), do: :heal
   defp effect_type(16), do: :quest_complete
   defp effect_type(18), do: :resurrect
+  defp effect_type(94), do: :self_resurrect
   defp effect_type(22), do: :parry
   defp effect_type(24), do: :create_item
   defp effect_type(25), do: :weapon

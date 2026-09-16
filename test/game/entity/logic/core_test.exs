@@ -306,14 +306,16 @@ defmodule ThistleTea.Game.Entity.Logic.CoreTest do
   end
 
   describe "take_damage_with_absorb/4 self resurrection" do
-    test "offers Reincarnation after lethal damage when learned" do
+    test "captures Soulstone before death removes its aura" do
       entity = damageable(health: 30)
-      entity = %{entity | internal: %{entity.internal | spellbook: %{20_608 => %Spell{id: 20_608}}}}
+      holder = %Holder{spell: %Spell{id: 20_707}, auras: [%Aura{type: :dummy}]}
+      entity = %{entity | unit: %{entity.unit | auras: [holder]}}
       entity = Map.put(entity, :player, %Player{})
 
       {entity, _absorbed} = Core.take_damage_with_absorb(entity, 30, 1_000)
 
-      assert entity.player.self_res_spell == 21_169
+      assert entity.player.self_res_spell == 3026
+      assert entity.unit.auras == []
     end
   end
 

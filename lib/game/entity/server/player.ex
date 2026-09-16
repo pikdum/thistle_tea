@@ -82,6 +82,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.Player.Quests
   alias ThistleTea.Game.Player.Reputation, as: PlayerReputation
   alias ThistleTea.Game.Player.Rest, as: PlayerRest
+  alias ThistleTea.Game.Player.SelfResurrection
   alias ThistleTea.Game.Player.Spellcasting
   alias ThistleTea.Game.Player.Stats, as: PlayerStats
   alias ThistleTea.Game.Player.Taxi, as: PlayerTaxi
@@ -1059,6 +1060,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
         character.movement_block.position
       )
 
+      character = SelfResurrection.prepare(character, Time.now())
       %{state | character: %{character | internal: %{internal | death_finalized?: true}}}
     else
       state

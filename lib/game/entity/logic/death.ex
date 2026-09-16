@@ -52,7 +52,7 @@ defmodule ThistleTea.Game.Entity.Logic.Death do
     character = %{
       character
       | unit: %{unit | health: 1, vis_flag: @unit_byte1_always_stand},
-        player: %{player | flags: (player.flags || 0) ||| @player_flag_ghost}
+        player: %{player | flags: (player.flags || 0) ||| @player_flag_ghost, self_res_spell: 0}
     }
 
     {character, events} = apply_ghost_spells(character, ghost_spells, now)

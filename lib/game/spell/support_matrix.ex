@@ -29,7 +29,6 @@ defmodule ThistleTea.Game.Spell.SupportMatrix do
     78 => :attack,
     84 => :stuck,
     86 => :holiday_gift,
-    94 => :self_resurrect,
     95 => :skinning,
     116 => :remove_insignia,
     118 => :skill

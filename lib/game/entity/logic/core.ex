@@ -27,6 +27,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
   alias ThistleTea.Game.Entity.Logic.PlayerCombat
   alias ThistleTea.Game.Entity.Logic.Reactive
   alias ThistleTea.Game.Entity.Logic.Resources
+  alias ThistleTea.Game.Entity.Logic.SelfResurrection
   alias ThistleTea.Game.Entity.Logic.Threat
   alias ThistleTea.Game.Math
   alias ThistleTea.Game.Network.UpdateObject
@@ -109,7 +110,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
         |> Reactive.sync_health()
         |> Threat.add_damage(Keyword.get(opts, :source), damage * Keyword.get(opts, :threat_multiplier, 1.0))
         |> maybe_enqueue_death_root(health, new_health)
-        |> maybe_prepare_self_res(health, new_health)
+        |> maybe_prepare_self_res(health, new_health, now)
         |> maybe_record_killer(health, new_health, Keyword.get(opts, :source))
         |> maybe_enter_spirit_of_redemption(health, new_health, now, opts)
         |> mark_broadcast_update()
@@ -468,13 +469,12 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
 
   defp maybe_enqueue_death_root(entity, _health, _new_health), do: entity
 
-  defp maybe_prepare_self_res(%{player: player, internal: %Internal{spellbook: spellbook}} = entity, health, new_health)
-       when is_number(health) and health > 0 and new_health <= 0 and is_map(spellbook) do
-    self_res_spell = if Map.has_key?(spellbook, 20_608), do: 21_169, else: 0
-    %{entity | player: %{player | self_res_spell: self_res_spell}}
+  defp maybe_prepare_self_res(entity, health, new_health, now)
+       when is_number(health) and health > 0 and new_health <= 0 do
+    SelfResurrection.capture(entity, now)
   end
 
-  defp maybe_prepare_self_res(entity, _health, _new_health), do: entity
+  defp maybe_prepare_self_res(entity, _health, _new_health, _now), do: entity
 
   defp maybe_record_killer(%{internal: %Internal{} = internal} = entity, health, new_health, source)
        when is_number(health) and health > 0 and new_health <= 0 and is_integer(source) and source > 0 do
