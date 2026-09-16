@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.Player.Looting do
   alias ThistleTea.Game.Entity.Logic.Loot.Commit
   alias ThistleTea.Game.Entity.Logic.Loot.Release
   alias ThistleTea.Game.Entity.Logic.Loot.Reservation
+  alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Loot.ActorFactory
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.InventoryUpdate
@@ -19,6 +20,7 @@ defmodule ThistleTea.Game.Player.Looting do
   alias ThistleTea.Game.Party
   alias ThistleTea.Game.Player.Items
   alias ThistleTea.Game.World
+  alias ThistleTea.Game.World.System.Instance, as: InstanceSystem
   alias ThistleTea.Game.World.System.Party, as: PartySystem
 
   require Logger
@@ -38,6 +40,10 @@ defmodule ThistleTea.Game.Player.Looting do
 
     with false <- Core.dead?(character),
          {:ok, %Loot{} = loot} <- Entity.call(guid, {:loot_view, actor}) do
+      if Guid.entity_type(guid) == :game_object do
+        InstanceSystem.game_object_used(character.internal.world, Guid.entry(guid))
+      end
+
       Network.send_packet(%Message.SmsgLootResponse{
         guid: guid,
         loot: loot,

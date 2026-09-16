@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Player.GameObjects do
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.UpdateObject
+  alias ThistleTea.Game.Player.Deadmines
   alias ThistleTea.Game.Player.Fishing
   alias ThistleTea.Game.Player.Looting
   alias ThistleTea.Game.Player.Quests
@@ -29,6 +30,9 @@ defmodule ThistleTea.Game.Player.GameObjects do
     state = Quests.credit_entity_interaction(state, guid)
 
     cond do
+      Deadmines.cannon?(guid) ->
+        Deadmines.fire(state, guid)
+
       fishing_bobber?(guid) ->
         Fishing.catch_fish(state, guid)
 
@@ -90,6 +94,9 @@ defmodule ThistleTea.Game.Player.GameObjects do
 
   def open_chest(state, guid), do: Looting.open(state, guid)
   def open_object(state, guid), do: use_object(state, guid)
+
+  def activate_object(state, guid, 6_250), do: Deadmines.fire(state, guid, false)
+  def activate_object(state, guid, _spell_id), do: use_object(state, guid)
 
   def chest?(guid) do
     Guid.entity_type(guid) == :game_object and

@@ -528,6 +528,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp effect_type(54), do: :enchant_item_temporary
   defp effect_type(55), do: :tame_creature
   defp effect_type(56), do: :summon_pet
+  defp effect_type(59), do: :activate_object
   defp effect_type(62), do: :power_burn
   defp effect_type(63), do: :modify_threat
   defp effect_type(68), do: :interrupt_cast

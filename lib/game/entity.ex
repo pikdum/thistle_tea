@@ -26,6 +26,10 @@ defmodule ThistleTea.Game.Entity do
     dispatch_cast(entity, {:move_to, x, y, z})
   end
 
+  def move_to(entity, {x, y, z}, opts) when is_list(opts) do
+    dispatch_cast(entity, {:move_to, x, y, z, opts})
+  end
+
   def aggro_probe(entity, target_guid) do
     dispatch_cast(entity, {:aggro_probe, target_guid})
   end

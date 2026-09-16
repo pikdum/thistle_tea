@@ -41,6 +41,7 @@ defmodule ThistleTea.Game.InstanceDeadminesTest do
               ], instances} = Instance.game_object_used(context.instances, context.world, 16_398)
 
       assert {:ok, [], ^instances} = Instance.game_object_used(instances, context.world, 16_398)
+      assert {:error, :already_started} = Instance.command(instances, context.world, 1, 1, :raw)
 
       assert {:ok, [%Effects.OperateGameObject{action: :destroy}], ^instances} =
                Instance.game_object_spawned(instances, context.world, 16_397)

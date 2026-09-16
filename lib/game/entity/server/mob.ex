@@ -238,9 +238,17 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
   @impl GenServer
   def handle_cast({:move_to, x, y, z}, state) do
-    state = AIEnvironment.move_to(state, {x, y, z})
+    handle_cast({:move_to, x, y, z, []}, state)
+  end
+
+  def handle_cast({:move_to, x, y, z, opts}, state) when is_list(opts) do
+    state = AIEnvironment.move_to(state, {x, y, z}, opts)
     state = EventSink.emit_pending(state)
     {:noreply, state}
+  rescue
+    error ->
+      Logger.error("move_to crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:noreply, state}
   end
 
   @impl GenServer

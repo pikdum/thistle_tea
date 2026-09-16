@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.Entity.Server.GameObjectTest do
   use ExUnit.Case, async: true
 
+  alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Component.GameObject, as: GameObjectComponent
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Internal.Fishing
@@ -41,5 +42,25 @@ defmodule ThistleTea.Game.Entity.Server.GameObjectTest do
     :sys.get_state(pid)
 
     assert Metadata.query(guid, [:go_state]) == %{go_state: 1}
+  end
+
+  describe "handle_cast/2" do
+    test "projects a destroyed door state and can reset it" do
+      guid = Guid.from_low_guid(:game_object, 16_397, System.unique_integer([:positive]))
+
+      state = %GameObject{
+        object: %Object{guid: guid, entry: 16_397},
+        game_object: %GameObjectComponent{state: 1},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+        internal: %Internal{world: WorldRef.open(0)}
+      }
+
+      pid = start_supervised!({GameObjectServer, state})
+      Entity.operate_game_object(guid, :destroy)
+      assert :sys.get_state(pid).game_object.state == 2
+      assert Metadata.query(guid, [:go_state]) == %{go_state: 2}
+      Entity.operate_game_object(guid, :reset)
+      assert :sys.get_state(pid).game_object.state == 1
+    end
   end
 end

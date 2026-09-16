@@ -826,6 +826,21 @@ defmodule ThistleTea.Game.Entity.Logic.CastingTest do
              end)
     end
 
+    test "retains the activating spell for a game object completion" do
+      spell = %Spell{id: 6_250, effects: [%Effect{index: 0, type: :activate_object}]}
+      casting = %Cast{spell: spell, targets: Target.object(0xF110_0001), ends_at: 1_000}
+
+      mob = %Mob{
+        object: %Object{guid: 1},
+        unit: %Unit{health: 100, max_health: 100},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+        internal: %Internal{world: %WorldRef{map_id: 0}, casting: casting}
+      }
+
+      mob = Casting.complete(mob, casting, 1_000)
+      assert %Effects.OpenGameObject{target_guid: 0xF110_0001, spell_id: 6_250} in mob.internal.events
+    end
+
     test "queues temporary item enchantments for the targeted item" do
       effect = %Effect{index: 0, type: :enchant_item_temporary, misc_value: 263}
       spell = %Spell{id: 8087, effects: [effect]}

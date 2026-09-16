@@ -409,10 +409,15 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
          spell: %Spell{} = spell,
          resolution: %CastResolution{followups: %Followups{object_guid: object_guid}}
        }) do
-    if is_integer(object_guid) and Enum.any?(spell.effects, &(&1.type == :open_lock)) do
-      Effects.enqueue(character, Effects.open_gameobject(object_guid))
-    else
-      character
+    cond do
+      is_integer(object_guid) and Enum.any?(spell.effects, &(&1.type == :activate_object)) ->
+        Effects.enqueue(character, %Effects.OpenGameObject{target_guid: object_guid, spell_id: spell.id})
+
+      is_integer(object_guid) and Enum.any?(spell.effects, &(&1.type == :open_lock)) ->
+        Effects.enqueue(character, Effects.open_gameobject(object_guid))
+
+      true ->
+        character
     end
   end
 

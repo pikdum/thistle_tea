@@ -72,10 +72,22 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
   end
 
   def move_to(entity, destination, opts \\ [], now \\ Time.now()) do
+    {stop_patrol?, opts} = Keyword.pop(opts, :stop_patrol?, false)
+
     entity
+    |> prepare_point_movement(stop_patrol?)
     |> NavigationIntent.enqueue(destination, opts)
     |> NavigationResolver.resolve(now)
   end
+
+  defp prepare_point_movement(
+         %Mob{internal: %Internal{blackboard: %Blackboard{} = blackboard} = internal} = entity,
+         true
+       ) do
+    %{entity | internal: %{internal | blackboard: Blackboard.idle_movement(blackboard)}}
+  end
+
+  defp prepare_point_movement(entity, _stop_patrol?), do: entity
 
   defp perception(entity, now, observed_guids, requested_radius, requested_game_object_radius) do
     radius = max(observation_radius(entity), requested_radius)

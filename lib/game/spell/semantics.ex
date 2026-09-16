@@ -133,6 +133,7 @@ defmodule ThistleTea.Game.Spell.Semantics do
   @inventory [
     :create_item,
     :open_lock,
+    :activate_object,
     :enchant_item,
     :enchant_item_temporary,
     :enchant_held_item,

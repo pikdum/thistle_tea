@@ -6,7 +6,7 @@ defmodule ThistleTea.Game.Entity.Logic.Effects.ClientTypes do
     {:ConsumeCastItem, [:cast_item_guid], []},
     {:FeedPet, [:cast_item_guid, :target_guid, :spell_id, :range_yards], []},
     {:EnchantItem, [:target_guid, :spell, :effect], []},
-    {:OpenGameObject, [:target_guid], []},
+    {:OpenGameObject, [:target_guid], [spell_id: nil]},
     {:CreateItem, [:item_id, :count], []},
     {:GiveItem, [:target_guid, :item_id, :count], []},
     {:ConsumeReagents, [:reagents], []},

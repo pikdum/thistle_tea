@@ -75,7 +75,11 @@ defmodule ThistleTea.Game.World.InstanceEffectSink do
 
     world
     |> targeted_creature_guids(effect, guids, spawn_guid)
-    |> Enum.each(&dispatch.({:move_creature, &1, {x, y, z}}))
+    |> Enum.each(fn guid ->
+      if effect.opts == [],
+        do: dispatch.({:move_creature, guid, {x, y, z}}),
+        else: dispatch.({:move_creature, guid, {x, y, z}, effect.opts})
+    end)
   end
 
   defp project(world, %Effects.TriggerCreatureSpell{} = effect, guids, dispatch, _summon, spawn_guid, _text) do
@@ -118,6 +122,7 @@ defmodule ThistleTea.Game.World.InstanceEffectSink do
   defp dispatch({:modify_creature_unit_flags, guid, flags, mode}), do: Entity.modify_unit_flags(guid, flags, mode)
 
   defp dispatch({:move_creature, guid, position}), do: Entity.move_to(guid, position)
+  defp dispatch({:move_creature, guid, position, opts}), do: Entity.move_to(guid, position, opts)
 
   defp dispatch({:trigger_creature_spell, guid, spell_id}),
     do: Entity.trigger_spell(guid, spell_id, guid, triggered: true)

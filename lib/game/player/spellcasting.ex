@@ -22,6 +22,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.BinaryUtils
   alias ThistleTea.Game.Network.Message
+  alias ThistleTea.Game.Player.Deadmines
   alias ThistleTea.Game.Player.Fishing
   alias ThistleTea.Game.Player.Projectile
   alias ThistleTea.Game.Spell
@@ -75,7 +76,8 @@ defmodule ThistleTea.Game.Player.Spellcasting do
       target_name: Target.unit_guid(targets)
     )
 
-    with :ok <- validate_cast(state, spell, targets),
+    with :ok <- Deadmines.validate_cast(state, spell, targets, cast_item_guid),
+         :ok <- validate_cast(state, spell, targets),
          {:ok, state} <- Fishing.prepare_cast(state, spell) do
       {:ok, do_cast(state, spell, targets, cast_item_guid)}
     else

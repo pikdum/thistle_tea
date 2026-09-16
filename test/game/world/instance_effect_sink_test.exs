@@ -61,6 +61,10 @@ defmodule ThistleTea.Game.World.InstanceEffectSinkTest do
       assert guid == context.crystal
       refute_receive {:move_creature, _, _}
 
+      running = %{effect | opts: [run?: true]}
+      assert :ok = InstanceEffectSink.emit(context.world, running, context.options)
+      assert_receive {:move_creature, ^guid, {1.0, 2.0, 3.0}, [run?: true]}
+
       options = Keyword.put(context.options, :spawn_guid, fn _, _, _ -> nil end)
       assert :ok = InstanceEffectSink.emit(context.world, effect, options)
       refute_receive {:move_creature, _, _}

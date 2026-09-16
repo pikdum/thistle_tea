@@ -41,6 +41,28 @@ defmodule ThistleTea.Game.World.PathfindingTest do
   end
 
   describe "find_path/4" do
+    test "routes the Deadmines alarm pirates to the breached door" do
+      destination = {-99.6611, -671.071655, 7.42241}
+
+      for start <- [{-102.521, -697.942, 8.84454}, {-89.7001, -691.332, 8.24514}] do
+        path = Pathfinding.find_path(36, start, destination, allow_steep: true)
+        assert is_list(path) and path != []
+        {x, y, z} = List.last(path)
+        assert_in_delta x, elem(destination, 0), 1.0
+        assert_in_delta y, elem(destination, 1), 1.0
+        assert_in_delta z, elem(destination, 2), 1.0
+      end
+    end
+
+    test "routes the gunpowder ambush into the corridor" do
+      path =
+        Pathfinding.find_path(36, {-131.290833, -591.243103, 18.077190}, {-115.263672, -617.396118, 13.579387},
+          allow_steep: true
+        )
+
+      assert is_list(path) and path != []
+    end
+
     test "finds a path on player-walkable ground" do
       path = Pathfinding.find_path(0, @human_start, {-8955.0, -140.0, 84.0})
       assert is_list(path) and path != []

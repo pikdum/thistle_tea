@@ -26,7 +26,7 @@ defmodule ThistleTea.Game.InstanceScript.Deadmines do
 
       {:ok, 1, Map.put(data, @end_door, 1), effects}
     else
-      {:ok, Map.fetch!(data, @end_door), data, []}
+      {:error, :already_started}
     end
   end
 
@@ -48,8 +48,10 @@ defmodule ThistleTea.Game.InstanceScript.Deadmines do
   end
 
   def game_object_used(data, 16_398) do
-    {:ok, _stored, data, effects} = set_data(data, @end_door, 1)
-    {:ok, data, effects}
+    case set_data(data, @end_door, 1) do
+      {:ok, _stored, data, effects} -> {:ok, data, effects}
+      {:error, :already_started} -> {:ok, data, []}
+    end
   end
 
   def game_object_used(data, _entry), do: {:ok, data, []}
@@ -111,6 +113,7 @@ defmodule ThistleTea.Game.InstanceScript.Deadmines do
     %Effects.MoveCreature{
       creature_entry: 657,
       creature_db_guid: db_guid,
+      opts: [run?: true, stop_patrol?: true],
       position: {-99.6611, -671.071655, 7.42241}
     }
   end

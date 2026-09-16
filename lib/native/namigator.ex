@@ -12,6 +12,7 @@ defmodule ThistleTea.Native.Namigator do
   @maps_to_process [
     {0, "Azeroth"},
     {1, "Kalimdor"},
+    {36, "DeadminesInstance"},
     {451, "development"},
     {389, "OrgrimmarInstance"},
     {329, "Stratholme"}

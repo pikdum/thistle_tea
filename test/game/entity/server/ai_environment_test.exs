@@ -11,6 +11,8 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironmentTest do
   alias ThistleTea.Game.Entity.Data.Condition
   alias ThistleTea.Game.Entity.Data.GameObject
   alias ThistleTea.Game.Entity.Data.Mob
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard.Navigation
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception.Request
   alias ThistleTea.Game.Entity.Logic.Condition.InstanceDataSnapshot, as: Snapshot
@@ -22,6 +24,27 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironmentTest do
   alias ThistleTea.Game.World.System.ScriptedEvent.Event
   alias ThistleTea.Game.WorldRef
   alias ThistleTea.Native.Namigator
+
+  describe "move_to/4" do
+    test "scripted point movement can take over a running patrol" do
+      blackboard = %Blackboard{
+        navigation: %Navigation{movement_override: :waypoint, target: {1.0, 2.0, 3.0}, move_target: {1.0, 2.0, 3.0}}
+      }
+
+      entity = %Mob{
+        internal: %Internal{world: WorldRef.open(999), blackboard: blackboard},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
+      }
+
+      ordinary = AIEnvironment.move_to(entity, {4.0, 5.0, 6.0}, [], 1_000)
+      assert ordinary.internal.blackboard == blackboard
+
+      scripted = AIEnvironment.move_to(entity, {4.0, 5.0, 6.0}, [run?: true, stop_patrol?: true], 1_000)
+      assert scripted.internal.blackboard.navigation.movement_override == :idle
+      assert scripted.internal.blackboard.navigation.target == nil
+      assert scripted.internal.blackboard.navigation.move_target == nil
+    end
+  end
 
   describe "context/3" do
     test "captures an immutable observation of an explicit actor" do

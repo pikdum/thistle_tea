@@ -82,6 +82,7 @@ nix develop .#wow-tools            # shell with all of the above + sqlite + mari
 - quests
 - xp, leveling, and exploration
 - isolated dungeon instances (Ragefire Chasm)
+- Deadmines boss doors and gunpowder cannon breach, with Smite's alarms and pirate response
 - dying + resurrecting
 - gossip + trainers
 - chests, fishing, and chairs
