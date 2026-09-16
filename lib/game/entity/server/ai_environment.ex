@@ -28,7 +28,6 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
   alias ThistleTea.Game.Entity.Logic.AI.NavigationIntent
   alias ThistleTea.Game.Entity.Logic.AI.Script
   alias ThistleTea.Game.Entity.Logic.Aura
-  alias ThistleTea.Game.Entity.Logic.Breathing
   alias ThistleTea.Game.Entity.Logic.Condition.Requirements
   alias ThistleTea.Game.Entity.Server.NavigationResolver
   alias ThistleTea.Game.Player.Movement, as: PlayerMovement
@@ -75,9 +74,8 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
     }
   end
 
-  defp liquid_surface(entity) do
-    if Breathing.needs_tick?(entity), do: PlayerMovement.liquid_surface(entity)
-  end
+  defp liquid_surface(%Character{} = character), do: PlayerMovement.liquid_surface(character)
+  defp liquid_surface(_entity), do: nil
 
   def move_to(entity, destination, opts \\ [], now \\ Time.now()) do
     {stop_patrol?, opts} = Keyword.pop(opts, :stop_patrol?, false)

@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Player.Movement do
   alias ThistleTea.Game.Entity.Logic.Breathing
   alias ThistleTea.Game.Entity.Logic.Falling
   alias ThistleTea.Game.Entity.Server.Player, as: PlayerServer
+  alias ThistleTea.Game.Entity.Server.Player.TickScheduler
   alias ThistleTea.Game.World.Loader.ModelGeometry
   alias ThistleTea.Game.World.Pathfinding
 
@@ -30,8 +31,10 @@ defmodule ThistleTea.Game.Player.Movement do
     Pathfinding.query_liquid_surface(character.internal.world.map_id, {x, y, z})
   end
 
-  def publish_changes(%{character: %Character{internal: %{broadcast_update?: true}}} = state) do
-    PlayerServer.maybe_broadcast_update(state)
+  def publish_changes(%{character: %Character{}} = state) do
+    state
+    |> PlayerServer.maybe_broadcast_update()
+    |> TickScheduler.ensure_scheduled()
   end
 
   def publish_changes(state), do: state
