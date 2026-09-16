@@ -228,6 +228,19 @@ defmodule ThistleTea.Game.World.System.ScriptedEventTest do
            } = ScriptedEventSystem.condition_results(context.world, nil, nil, [condition])
   end
 
+  describe "condition_results/4" do
+    test "treats spawn-time distance without an invoker as unknown", context do
+      condition = %Condition{entry: 2_428, type: :distance_to_target, value1: 8, value2: 2}
+
+      for {source, target} <- [{context.source_guid, nil}, {nil, context.target_guid}, {nil, nil}] do
+        assert %{2_428 => {:unknown, [%Reason{capability: {:missing_fact, :source_or_target, :position}}]}} =
+                 ScriptedEventSystem.condition_results(context.world, source, target, [condition])
+      end
+
+      assert Process.alive?(Process.whereis(ScriptedEventSystem))
+    end
+  end
+
   test "target results expose map event source, target, and matching extra targets", context do
     start = %ScriptStep{command: :start_map_event, datalong: 5_944, datalong2: 600}
     add = %ScriptStep{command: :add_map_event_target, datalong: 5_944}

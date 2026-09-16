@@ -518,6 +518,11 @@ defmodule ThistleTea.Game.World.System.ScriptedEvent do
     end
   end
 
+  defp evaluate_condition(%Condition{type: :distance_to_target} = condition, _events, _world, source, target)
+       when not is_integer(source) or not is_integer(target) do
+    Result.unknown(condition, {:missing_fact, :source_or_target, :position})
+  end
+
   defp evaluate_condition(
          %Condition{type: :distance_to_target, value1: expected, value2: comparison} = condition,
          _events,
