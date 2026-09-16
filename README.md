@@ -78,6 +78,7 @@ nix develop .#wow-tools            # shell with all of the above + sqlite + mari
 - auto-attacks + class abilities
 - ground mounts, mounted speed bonuses, and dismounting on cancellation or swimming
 - parry haste for player and mob melee swings, including dual-wield timing
+- main-hand disarm: unarmed player combat, armed-creature damage reduction, weapon ability checks, and off-hand preservation
 - rear-hit daze from uncontrolled creatures, with level and defense-skill scaling
 - mechanic resistance for spells and melee abilities, including Orc Hardiness
 - exclusive resistance buffs use the strongest effect per school, with weaker protection resuming on removal
