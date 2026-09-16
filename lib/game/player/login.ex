@@ -122,6 +122,7 @@ defmodule ThistleTea.Game.Player.Login do
         reputation: PlayerReputation.projection(c),
         aura_stacks: AuraLogic.spell_stacks(c),
         crowd_controlled?: AuraLogic.crowd_controlled?(c),
+        mechanic_resistance: AuraLogic.misc_amounts(c, :mechanic_resistance),
         attacker_spell_hit_chance: AuraLogic.attacker_spell_hit_chance(c),
         needed_quest_items: Quests.needed_items(c),
         condition_subject: ConditionContext.snapshot(c).target

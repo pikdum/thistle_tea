@@ -783,6 +783,73 @@ defmodule ThistleTea.Game.Entity.Logic.CastingTest do
              end)
     end
 
+    test "applies matching mechanic resistance from metadata and observes its removal" do
+      caster_guid = Guid.from_low_guid(:mob, 1, System.unique_integer([:positive]))
+      target_guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
+      caster_faction = %FactionTemplate{id: 17, faction: 15, flags: 1, faction_group: 8, enemy_group: 1}
+      target_faction = %FactionTemplate{id: 1, faction: 1, flags: 72, faction_group: 3, enemy_group: 12}
+
+      Metadata.put(caster_guid, %{
+        alive?: true,
+        faction_template: caster_faction,
+        faction_can_have_reputation?: false,
+        unit_flags: 0,
+        level: 60
+      })
+
+      Metadata.put(target_guid, %{
+        alive?: true,
+        faction_template: target_faction,
+        faction_can_have_reputation?: false,
+        unit_flags: 0,
+        level: 60,
+        mechanic_resistance: [{12, 25}, {7, 100}]
+      })
+
+      on_exit(fn ->
+        Metadata.delete(caster_guid)
+        Metadata.delete(target_guid)
+      end)
+
+      spell = %Spell{
+        id: 133,
+        school: :fire,
+        mechanic: 12,
+        effects: [%Effect{type: :school_damage, implicit_target_a: :target_enemy}]
+      }
+
+      casting = %Cast{
+        spell: spell,
+        targets: Target.unit(target_guid),
+        ends_at: Time.now()
+      }
+
+      mob = %Mob{
+        object: %Object{guid: caster_guid},
+        unit: %Unit{level: 60},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+        internal: %Internal{world: %WorldRef{map_id: 0}, casting: casting}
+      }
+
+      :rand.seed(:exsss, {1, 1, 66})
+      missed = Casting.complete(mob, casting, 1_000)
+
+      assert Enum.any?(missed.internal.events, fn
+               %Effects.SpellGo{hit_guids: [], misses: [%{guid: ^target_guid, reason: 2}]} -> true
+               _event -> false
+             end)
+
+      Metadata.update(target_guid, %{mechanic_resistance: [{7, 100}]})
+
+      :rand.seed(:exsss, {1, 1, 66})
+      hit = Casting.complete(mob, casting, 1_000)
+
+      assert Enum.any?(hit.internal.events, fn
+               %Effects.SpellGo{hit_guids: [^target_guid], misses: []} -> true
+               _event -> false
+             end)
+    end
+
     test "queues cast result and spell go events before clearing cast state" do
       spell = %Spell{id: 133, effects: []}
 

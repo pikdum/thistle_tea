@@ -136,6 +136,68 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
   end
 
   describe "receive/4" do
+    test "resists a melee stun without applying it or reporting a successful attack" do
+      target = mechanic_resistance_target(12)
+      spell = mechanic_stun_spell(12, 12)
+      spell = %{spell | dmg_class: 2}
+      context = %CastContext{caster_guid: 999, caster_level: 1, hit_chance_bonus: 100}
+
+      {result, events} = SpellEffect.receive(target, context, spell, 1_000)
+
+      refute Aura.has_spell?(result, spell.id)
+      assert %Effects.SpellLogMiss{reason: :resist} = Enum.find(events, &is_struct(&1, Effects.SpellLogMiss))
+      assert %Effects.AttackOutcome{outcome: :resist} = Enum.find(events, &is_struct(&1, Effects.AttackOutcome))
+      refute SpellEffect.successful_hit?(events)
+    end
+
+    test "resisting an effect preserves unrelated damage and aura effects" do
+      target = mechanic_resistance_target(12)
+      spell = mechanic_stun_spell(0, 12)
+
+      spell = %{
+        spell
+        | effects:
+            spell.effects ++
+              [
+                %Effect{index: 1, type: :school_damage, base_points: 5, implicit_target_a: :target_enemy},
+                %Effect{
+                  index: 2,
+                  type: :apply_aura,
+                  aura: :mod_decrease_speed,
+                  base_points: -20,
+                  implicit_target_a: :target_enemy
+                }
+              ]
+      }
+
+      {result, events} = SpellEffect.receive(target, %CastContext{caster_guid: 999, caster_level: 1}, spell, 1_000)
+
+      assert result.unit.health == 15
+      refute Aura.has_aura?(result, :mod_stun)
+      assert Aura.has_aura?(result, :mod_decrease_speed)
+      assert SpellEffect.successful_hit?(events)
+    end
+
+    test "reports resistance when every applicable effect is resisted" do
+      target = mechanic_resistance_target(12)
+      spell = mechanic_stun_spell(0, 12)
+      context = %CastContext{caster_guid: 999, spell_threat: %{threat: 100}}
+      {result, events} = SpellEffect.receive(target, context, spell, 1_000)
+
+      assert result == target
+      assert [%Effects.SpellLogMiss{reason: :resist}] = events
+    end
+
+    test "does not roll the whole spell mechanic again at impact" do
+      spell = mechanic_stun_spell(12, 12)
+
+      {result, events} =
+        SpellEffect.receive(mechanic_resistance_target(12), %CastContext{caster_guid: 999}, spell, 1_000)
+
+      assert Aura.has_aura?(result, :mod_stun)
+      assert SpellEffect.successful_hit?(events)
+    end
+
     test "reports successful dummy hits without requiring damage or healing" do
       spell = %Spell{id: 14_291, effects: [%Effect{index: 0, type: :dummy}]}
       context = %CastContext{caster_guid: 99, caster_level: 10}
@@ -726,6 +788,36 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
                }
              ] = events
     end
+  end
+
+  defp mechanic_resistance_target(mechanic) do
+    target = target_fixture()
+
+    holder = %Holder{
+      spell: %Spell{id: 90_100},
+      caster_guid: 1,
+      auras: [%ThistleTea.Game.Aura{type: :mechanic_resistance, misc_value: mechanic, amount: 100}]
+    }
+
+    %{target | unit: %{target.unit | auras: [holder]}}
+  end
+
+  defp mechanic_stun_spell(mechanic, effect_mechanic) do
+    %Spell{
+      id: 90_101,
+      school: :physical,
+      mechanic: mechanic,
+      duration_ms: 5_000,
+      effects: [
+        %Effect{
+          index: 0,
+          type: :apply_aura,
+          aura: :mod_stun,
+          mechanic: effect_mechanic,
+          implicit_target_a: :target_enemy
+        }
+      ]
+    }
   end
 
   describe "spell power bonuses" do

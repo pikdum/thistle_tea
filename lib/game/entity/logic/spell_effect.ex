@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Logic.MechanicResistance
   alias ThistleTea.Game.Entity.Logic.Reactive
   alias ThistleTea.Game.Entity.Logic.Rogue
   alias ThistleTea.Game.Entity.Logic.SpellEffect.Aura, as: AuraEffects
@@ -19,6 +20,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   alias ThistleTea.Game.Entity.Logic.SpellEffect.SummonControl, as: SummonControlEffects
   alias ThistleTea.Game.Entity.Logic.Threat
   alias ThistleTea.Game.Entity.Logic.Warrior
+  alias ThistleTea.Game.Math
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Effect
@@ -61,7 +63,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
           receive_melee_ability(target, context, spell, now)
         else
           target
-          |> apply_effects(context, effects, [], now)
+          |> apply_resisted_effects(context, now)
           |> with_bonus_threat(context)
         end
     end
@@ -166,6 +168,10 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
     result = AttackTable.roll_special(target, special_attack(context, spell))
 
     case result.outcome do
+      :resist ->
+        {target, reactions} = receive_outcome(target, context.caster_guid, spell, :resist, now)
+        {target, melee_avoid_events(target, context, spell, :resist) ++ reactions}
+
       outcome when outcome in [:miss, :dodge, :parry, :block] ->
         target = maybe_mark_defense(target, context.caster_guid, outcome, now)
         {target, reaction_events} = DamageHeal.avoided_melee_ability_reactions(target, context, spell, outcome, now)
@@ -174,7 +180,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
       _hit ->
         context = %{context | melee_crit?: result.crit?}
 
-        {target, events} = apply_effects(target, context, spell.effects, [], now)
+        {target, events} = apply_resisted_effects(target, context, now)
 
         events =
           if rogue_feedback_spell?(spell) do
@@ -183,7 +189,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
                 Effects.attack_outcome(
                   context.caster_guid,
                   target.object.guid,
-                  result.outcome,
+                  if(successful_hit?(events), do: result.outcome, else: :resist),
                   dealt_damage(events),
                   spell.id,
                   dealt_proc_damage(events)
@@ -200,10 +206,32 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   defp with_bonus_threat({target, events}, %CastContext{} = context) do
     case context.spell_threat do
       %{threat: flat} when is_number(flat) and flat > 0 ->
-        {Threat.add(target, context.caster_guid, flat * (context.threat_multiplier || 1.0)), events}
+        if successful_hit?(events) do
+          {Threat.add(target, context.caster_guid, flat * (context.threat_multiplier || 1.0)), events}
+        else
+          {target, events}
+        end
 
       _no_bonus ->
         {target, events}
+    end
+  end
+
+  defp apply_resisted_effects(target, %CastContext{spell: spell} = context, now) do
+    resistance = MechanicResistance.projection(target)
+
+    effects =
+      Enum.reject(spell.effects, fn effect ->
+        context.caster_guid != target.object.guid and Spell.harmful?(spell) and
+          MechanicResistance.effect_resisted?(resistance, spell, effect, Math.random_int(0, 99))
+      end)
+
+    if effects == [] and spell.effects != [] do
+      {target, reactions} = receive_outcome(target, context.caster_guid, spell, :resist, now)
+      {target, [Effects.spell_log_miss(context.caster_guid, target.object.guid, spell.id, :resist) | reactions]}
+    else
+      context = %{context | spell: %{spell | effects: effects}}
+      apply_effects(target, context, effects, [], now)
     end
   end
 
@@ -343,6 +371,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
       crit_chance: context.melee_crit_chance,
       caster_position: attack_position(context.caster_position),
       spell_school_mask: Spell.school_mask(spell),
+      mechanic: spell.mechanic,
       block_allowed?: Spell.attribute?(spell, :completely_blocked),
       ranged?: Spell.ranged_ability?(spell)
     }

@@ -173,6 +173,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Respawn do
       alive?: state.unit.health > 0,
       health_pct: Core.health_pct(state),
       orientation: elem(state.movement_block.position, 3),
+      mechanic_resistance: Aura.misc_amounts(state, :mechanic_resistance),
       attacker_spell_hit_chance: Aura.attacker_spell_hit_chance(state)
     })
 

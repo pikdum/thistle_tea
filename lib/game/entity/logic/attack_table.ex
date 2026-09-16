@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.CombatRatings
+  alias ThistleTea.Game.Entity.Logic.MechanicResistance
   alias ThistleTea.Game.Entity.Logic.Skills
   alias ThistleTea.Game.Math
 
@@ -120,6 +121,8 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
       block_allowed?: Map.get(attack, :block_allowed?, true),
       ranged?: Map.get(attack, :ranged?, false),
       physical?: physical_school?(Map.get(attack, :spell_school_mask)),
+      mechanic_resistance_bp:
+        trunc(MechanicResistance.chance(MechanicResistance.projection(defender), Map.get(attack, :mechanic)) * 100),
       skill_diff: skill_diff,
       defender_level: defender_level,
       defender_player?: defender_player?,
@@ -184,6 +187,14 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
   defp scale_versus_damage(_ctx, damage), do: damage
 
   defp roll_special_outcome(ctx, roll) do
+    if roll >= miss_bp(ctx) and roll < miss_bp(ctx) + ctx.mechanic_resistance_bp do
+      :resist
+    else
+      roll_special_avoidance(ctx, roll)
+    end
+  end
+
+  defp roll_special_avoidance(ctx, roll) do
     walk_steps(
       [
         {:miss, miss_bp(ctx)},

@@ -208,6 +208,21 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTableTest do
     end
   end
 
+  describe "roll_special/3 mechanic resistance" do
+    test "checks resistance after miss without shifting the avoidance table" do
+      holder = %Holder{auras: [%Aura{type: :mechanic_resistance, misc_value: 12, amount: 25}]}
+      defender = mob(unit: [auras: [holder]])
+      special = attack(mechanic: 12)
+
+      assert AttackTable.roll_special(defender, special, roll: 499).outcome == :miss
+      assert AttackTable.roll_special(defender, special, roll: 500).outcome == :resist
+      assert AttackTable.roll_special(defender, special, roll: 2_999).outcome == :resist
+      assert AttackTable.roll_special(defender, special, roll: 3_000, crit_roll: 9_999).outcome == :normal
+      assert AttackTable.roll_special(defender, attack(mechanic: 7), roll: 500).outcome == :dodge
+      assert AttackTable.resolve(defender, special, 100, roll: 500).outcome == :dodge
+    end
+  end
+
   describe "creature-type versus bonuses" do
     test "scales damage when the defender's creature type matches" do
       humanoid_mask = 0x40

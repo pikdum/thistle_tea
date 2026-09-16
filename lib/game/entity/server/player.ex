@@ -1141,6 +1141,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
         aura_stacks: Aura.spell_stacks(character),
         crowd_controlled?: Aura.crowd_controlled?(character),
         dispel_options: Aura.dispel_options(character),
+        mechanic_resistance: Aura.misc_amounts(character, :mechanic_resistance),
         attacker_spell_hit_chance: Aura.attacker_spell_hit_chance(character),
         reputation: PlayerReputation.projection(character),
         condition_subject: ConditionContext.refresh_subject(character, previous_subject)

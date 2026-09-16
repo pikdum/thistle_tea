@@ -32,6 +32,14 @@ defmodule ThistleTea.Game.Entity.Logic.SpellResistTest do
   end
 
   describe "magic_hit?/4" do
+    test "mechanic resistance reduces hit chance before the final caps" do
+      assert SpellResist.magic_hit?(20, 20, true, mechanic_resistance: 25, roll: 7_099)
+      refute SpellResist.magic_hit?(20, 20, true, mechanic_resistance: 25, roll: 7_100)
+      assert SpellResist.magic_hit?(20, 20, true, mechanic_resistance: 100, roll: 99)
+      refute SpellResist.magic_hit?(20, 20, true, mechanic_resistance: 100, roll: 100)
+      assert SpellResist.magic_hit?(20, 20, true, mechanic_resistance: 25, hit_bonus: 10, roll: 8_099)
+    end
+
     test "hits when the roll is under the hit chance" do
       assert SpellResist.magic_hit?(20, 20, false, roll: 9_599)
       refute SpellResist.magic_hit?(20, 20, false, roll: 9_600)

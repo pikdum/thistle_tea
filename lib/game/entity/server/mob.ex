@@ -883,6 +883,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
           aura_stacks: Aura.spell_stacks(state),
           crowd_controlled?: Aura.crowd_controlled?(state),
           dispel_options: Aura.dispel_options(state),
+          mechanic_resistance: Aura.misc_amounts(state, :mechanic_resistance),
           attacker_spell_hit_chance: Aura.attacker_spell_hit_chance(state)
         }
         |> Map.merge(FactionLoader.metadata(state.unit.faction_template))

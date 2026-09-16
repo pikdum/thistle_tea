@@ -88,6 +88,7 @@ defmodule ThistleTea.Game.World.Loader.Mob do
         aura_stacks: Aura.spell_stacks(mob),
         crowd_controlled?: Aura.crowd_controlled?(mob),
         dispel_options: Aura.dispel_options(mob),
+        mechanic_resistance: Aura.misc_amounts(mob, :mechanic_resistance),
         attacker_spell_hit_chance: Aura.attacker_spell_hit_chance(mob)
       }
       |> Map.merge(Mob.visibility_metadata(mob))
