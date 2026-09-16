@@ -22,7 +22,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.MovementSync do
   @unit_flag_stunned 0x00040000
 
   def sync_movement_state(entity, now) do
-    old_run_speed = run_speed(entity)
+    previous = entity
     entity = MovementStats.recompute(entity)
     {entity, events} = sync_movement_flags(entity, now)
     {entity, feather_events} = sync_movement_flag_aura(entity, :feather_fall, @movement_flag_safe_fall)
@@ -30,7 +30,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.MovementSync do
     {entity, water_walk_events} = sync_movement_flag_aura(entity, :water_walk, @movement_flag_water_walk)
     entity = sync_stunned_flag(entity)
     flag_events = feather_events ++ hover_events ++ water_walk_events
-    {entity, speed_change_events(entity, old_run_speed) ++ events ++ flag_events}
+    {entity, speed_change_events(previous, entity) ++ events ++ flag_events}
   end
 
   defp sync_movement_flags(%{movement_block: %MovementBlock{} = mb, unit: %Unit{auras: holders}} = entity, now) do
@@ -110,16 +110,21 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.MovementSync do
 
   defp sync_stunned_flag(entity), do: entity
 
-  defp speed_change_events(entity, old_run_speed) do
-    new_run_speed = run_speed(entity)
+  defp speed_change_events(%{movement_block: %MovementBlock{} = previous}, %{movement_block: %MovementBlock{} = current}) do
+    [
+      {:run_speed, previous.run_speed, current.run_speed},
+      {:run_back_speed, previous.run_back_speed, current.run_back_speed},
+      {:swim_speed, previous.swim_speed, current.swim_speed},
+      {:swim_back_speed, previous.swim_back_speed, current.swim_back_speed}
+    ]
+    |> Enum.flat_map(fn
+      {type, old, new} when is_number(old) and is_number(new) and old != new ->
+        [Effects.movement_speed_changed(new, type)]
 
-    if is_number(old_run_speed) and is_number(new_run_speed) and old_run_speed != new_run_speed do
-      [Effects.movement_speed_changed(new_run_speed)]
-    else
-      []
-    end
+      _ ->
+        []
+    end)
   end
 
-  defp run_speed(%{movement_block: %MovementBlock{run_speed: run_speed}}), do: run_speed
-  defp run_speed(_entity), do: nil
+  defp speed_change_events(_previous, _current), do: []
 end

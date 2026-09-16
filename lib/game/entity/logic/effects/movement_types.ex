@@ -4,7 +4,7 @@ defmodule ThistleTea.Game.Entity.Logic.Effects.MovementTypes do
   effects = [
     {:Charge, [:target_guid], []},
     {:MovementStopped, [], []},
-    {:MovementSpeedChanged, [:speed], []},
+    {:MovementSpeedChanged, [:speed], [movement_type: :run_speed]},
     {:MovementRootChanged, [:rooted?], []},
     {:FeatherFallChanged, [:enabled?], []},
     {:HoverChanged, [:enabled?], []},

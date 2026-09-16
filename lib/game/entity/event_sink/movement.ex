@@ -113,9 +113,13 @@ defmodule ThistleTea.Game.Entity.EventSink.Movement do
 
   def emit(entity, %Effects.WaterWalkChanged{}, _context), do: entity
 
-  def emit(%Character{object: %{guid: guid}} = entity, %Effects.MovementSpeedChanged{speed: speed}, context)
+  def emit(
+        %Character{object: %{guid: guid}} = entity,
+        %Effects.MovementSpeedChanged{speed: speed, movement_type: type},
+        context
+      )
       when is_number(speed) do
-    Context.send_packet(context, %Message.SmsgForceRunSpeedChange{guid: guid, speed: speed})
+    Context.send_packet(context, speed_packet(type, guid, speed))
     entity
   end
 
@@ -187,6 +191,11 @@ defmodule ThistleTea.Game.Entity.EventSink.Movement do
 
     entity
   end
+
+  defp speed_packet(:run_speed, guid, speed), do: %Message.SmsgForceRunSpeedChange{guid: guid, speed: speed}
+  defp speed_packet(:run_back_speed, guid, speed), do: %Message.SmsgForceRunBackSpeedChange{guid: guid, speed: speed}
+  defp speed_packet(:swim_speed, guid, speed), do: %Message.SmsgForceSwimSpeedChange{guid: guid, speed: speed}
+  defp speed_packet(:swim_back_speed, guid, speed), do: %Message.SmsgForceSwimBackSpeedChange{guid: guid, speed: speed}
 
   defp notify_chasers(%{object: %{guid: guid}, movement_block: %{position: {x, y, z, _o}}}) do
     ChaseWatch.notify_moved(guid, {x, y, z})

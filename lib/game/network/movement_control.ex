@@ -25,6 +25,18 @@ defmodule ThistleTea.Game.Network.MovementControl do
     stamp(state, {:run_speed, speed}, &%{packet | move_event: &1})
   end
 
+  def prepare(%Message.SmsgForceRunBackSpeedChange{speed: speed} = packet, %State{} = state) do
+    stamp(state, {:run_back_speed, speed}, &%{packet | move_event: &1})
+  end
+
+  def prepare(%Message.SmsgForceSwimSpeedChange{speed: speed} = packet, %State{} = state) do
+    stamp(state, {:swim_speed, speed}, &%{packet | move_event: &1})
+  end
+
+  def prepare(%Message.SmsgForceSwimBackSpeedChange{speed: speed} = packet, %State{} = state) do
+    stamp(state, {:swim_back_speed, speed}, &%{packet | move_event: &1})
+  end
+
   def prepare(%Message.MsgMoveTeleportAck{} = packet, %State{} = state) do
     stamp(state, :teleport, &%{packet | counter: &1})
   end
@@ -70,6 +82,13 @@ defmodule ThistleTea.Game.Network.MovementControl do
   end
 
   def acknowledge(state, _guid, _counter, _expected), do: {:error, state}
+
+  def acknowledge_speed(%State{} = state, guid, counter, type, speed) do
+    case acknowledge(state, guid, counter, {type, speed}) do
+      {:ok, state} -> maybe_finish_repop(state)
+      {:error, state} -> state
+    end
+  end
 
   def reconcile_movement(
         %State{character: %Character{movement_block: %MovementBlock{} = previous} = character} = state,
@@ -149,7 +168,8 @@ defmodule ThistleTea.Game.Network.MovementControl do
   defp put_pending(pending, _counter, nil), do: pending
   defp put_pending(pending, counter, change), do: Map.put(pending, counter, change)
 
-  defp matching_ack?({:run_speed, sent}, {:run_speed, received}) do
+  defp matching_ack?({type, sent}, {type, received})
+       when type in [:run_speed, :run_back_speed, :swim_speed, :swim_back_speed] do
     is_number(sent) and is_number(received) and abs(sent - received) < 0.01
   end
 

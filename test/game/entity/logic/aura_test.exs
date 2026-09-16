@@ -1486,8 +1486,17 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
 
       assert entity.movement_block.base_run_speed == 7.0
       assert_in_delta entity.movement_block.run_speed, 4.9, 0.000001
-      assert [%Effects.MovementSpeedChanged{speed: speed}] = events
+
+      assert [
+               %Effects.MovementSpeedChanged{movement_type: :run_speed, speed: speed},
+               %Effects.MovementSpeedChanged{movement_type: :run_back_speed, speed: back},
+               %Effects.MovementSpeedChanged{movement_type: :swim_speed, speed: swim}
+             ] = events
+
       assert_in_delta speed, 4.9, 0.000001
+      assert_in_delta back, 3.15, 0.000001
+      assert_in_delta swim, 3.29, 0.000001
+      assert entity.movement_block.swim_back_speed == 2.5
     end
 
     test "overlapping slows apply only the strongest one" do

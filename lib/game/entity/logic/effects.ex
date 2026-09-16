@@ -98,8 +98,9 @@ defmodule ThistleTea.Game.Entity.Logic.Effects do
     %Effects.MovementStopped{}
   end
 
-  def movement_speed_changed(speed) when is_number(speed) do
-    %Effects.MovementSpeedChanged{speed: speed}
+  def movement_speed_changed(speed, movement_type \\ :run_speed)
+      when is_number(speed) and movement_type in [:run_speed, :run_back_speed, :swim_speed, :swim_back_speed] do
+    %Effects.MovementSpeedChanged{speed: speed, movement_type: movement_type}
   end
 
   def movement_root_changed(rooted?) when is_boolean(rooted?) do

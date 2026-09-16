@@ -1,6 +1,6 @@
-defmodule ThistleTea.Game.Network.Message.CmsgForceRunSpeedChangeAck do
+defmodule ThistleTea.Game.Network.Message.CmsgForceRunBackSpeedChangeAck do
   @moduledoc false
-  use ThistleTea.Game.Network.ClientMessage, :CMSG_FORCE_RUN_SPEED_CHANGE_ACK
+  use ThistleTea.Game.Network.ClientMessage, :CMSG_FORCE_RUN_BACK_SPEED_CHANGE_ACK
 
   alias ThistleTea.Game.Network.MovementControl
 
@@ -8,7 +8,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgForceRunSpeedChangeAck do
 
   @impl ClientMessage
   def handle(%__MODULE__{guid: guid, counter: counter, new_speed: speed}, state) do
-    MovementControl.acknowledge_speed(state, guid, counter, :run_speed, speed)
+    MovementControl.acknowledge_speed(state, guid, counter, :run_back_speed, speed)
   end
 
   @impl ClientMessage

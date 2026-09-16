@@ -22,7 +22,7 @@ defmodule ThistleTea.Game.Entity.Logic.MovementStats do
         [{:swim_speed, :base_swim_speed}],
         buff_multiplier(unit, :mod_increase_swim_speed) * slow
       )
-      |> apply_speed_multiplier([{:swim_back_speed, :base_swim_back_speed}], slow)
+      |> apply_speed_multiplier([{:swim_back_speed, :base_swim_back_speed}], 1.0)
 
     %{entity | movement_block: movement_block}
   end
