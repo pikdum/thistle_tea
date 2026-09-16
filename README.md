@@ -77,6 +77,7 @@ nix develop .#wow-tools            # shell with all of the above + sqlite + mari
 - mob spawns, combat, navigation, and respawns
 - auto-attacks + class abilities
 - parry haste for player and mob melee swings, including dual-wield timing
+- rear-hit daze from uncontrolled creatures, with level and defense-skill scaling
 - mechanic resistance for spells and melee abilities, including Orc Hardiness
 - crowd-control diminishing returns, shared across casters with recovery after control ends
 - Priest Fade: temporary threat reduction with target switching and restoration on expiry
