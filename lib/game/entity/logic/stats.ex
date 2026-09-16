@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Entity.Logic.Stats do
   alias ThistleTea.Game.Aura
   alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Logic.Disarm
   alias ThistleTea.Game.Spell
 
   @resistance_fields [
@@ -244,7 +245,7 @@ defmodule ThistleTea.Game.Entity.Logic.Stats do
     do: %{unit | base_attack_time: 2_500}
 
   defp derive_melee_attack_time(%Unit{base_melee_attack_time: base} = unit) when is_number(base) and base > 0,
-    do: %{unit | base_attack_time: base}
+    do: %{unit | base_attack_time: if(Disarm.unarmed?(unit), do: 2_000, else: base)}
 
   defp derive_melee_attack_time(%Unit{} = unit), do: unit
 
@@ -280,7 +281,12 @@ defmodule ThistleTea.Game.Entity.Logic.Stats do
   end
 
   defp derive_mainhand_damage(%Unit{} = unit) do
-    derive_damage(unit, :base_min_damage, :base_max_damage, :min_damage, :max_damage, unit.base_attack_time)
+    if is_number(unit.base_melee_attack_time) and Disarm.unarmed?(unit) do
+      bonus = attack_power_bonus(unit.attack_power, unit.base_attack_time)
+      %{unit | min_damage: 1.0 + bonus, max_damage: 2.0 + bonus}
+    else
+      derive_damage(unit, :base_min_damage, :base_max_damage, :min_damage, :max_damage, unit.base_attack_time)
+    end
   end
 
   defp derive_damage(%Unit{} = unit, base_min_field, base_max_field, min_field, max_field, attack_time) do

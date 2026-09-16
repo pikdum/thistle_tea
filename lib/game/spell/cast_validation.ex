@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.Spell.CastValidation do
   alias ThistleTea.Game.Duel
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
   alias ThistleTea.Game.Entity.Logic.Core
+  alias ThistleTea.Game.Entity.Logic.Disarm
   alias ThistleTea.Game.Entity.Logic.Hunter
   alias ThistleTea.Game.Entity.Logic.Mount
   alias ThistleTea.Game.Entity.Logic.Paladin
@@ -47,6 +48,7 @@ defmodule ThistleTea.Game.Spell.CastValidation do
          :ok <- check_warlock_resources(caster, spell),
          :ok <- check_cooldown(caster, spell, now),
          :ok <- check_power(caster, spell),
+         :ok <- Disarm.validate(caster, spell),
          :ok <- check_equipped_item(caster, spell, Keyword.get(opts, :equipped_items, [])),
          :ok <- check_ammo(caster, spell, opts),
          :ok <- Hunter.validate_feed(spell, Keyword.get(opts, :feed_context)),

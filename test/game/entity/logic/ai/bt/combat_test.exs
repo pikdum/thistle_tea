@@ -1,6 +1,8 @@
 defmodule ThistleTea.Game.Entity.Logic.AI.BT.CombatTest do
   use ExUnit.Case, async: false
 
+  alias ThistleTea.Game.Aura
+  alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
@@ -18,6 +20,43 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.CombatTest do
   alias ThistleTea.Game.WorldRef
 
   describe "melee_attack/3" do
+    test "replaces a disarmed queued weapon ability with an unarmed swing" do
+      target_guid = 2
+      SpatialHash.update(:players, target_guid, 0, 1.0, 0.0, 0.0)
+      on_exit(fn -> SpatialHash.remove(:players, target_guid) end)
+
+      character = %Character{
+        object: %Object{guid: 1},
+        unit: %Unit{
+          target: target_guid,
+          min_damage: 21.0,
+          max_damage: 22.0,
+          combat_reach: 1.0,
+          power2: 500,
+          base_attack_time: 2_000,
+          auras: [%Holder{spell: %Spell{id: 676}, caster_guid: 2, auras: [%Aura{type: :mod_disarm}]}]
+        },
+        player: %Player{skills: %{162 => %{value: 37}}},
+        internal: %Internal{
+          world: WorldRef.open(0),
+          in_combat: true,
+          next_swing_spell: %Spell{id: 78, equipped_item_class: 2, mana_cost: 150, power_type: 1}
+        },
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
+      }
+
+      blackboard = %Blackboard{combat: %Blackboard.Combat{attack_started: true, next_attack_at: 0}}
+      assert {:success, character, blackboard} = Combat.melee_attack(character, blackboard, 1_000)
+      assert character.internal.next_swing_spell == nil
+      assert character.unit.power2 == 500
+      assert blackboard.combat.next_attack_at == 3_000
+
+      assert [
+               %Effects.SpellCastFailed{spell_id: 78, reason: :equipped_item},
+               %Effects.DeliverAttack{attack: %{caster_attack_skill: 37, min_damage: 21.0, max_damage: 22.0}}
+             ] = character.internal.events
+    end
+
     test "queues attack delivery events instead of dispatching directly" do
       target_guid = 2
       SpatialHash.update(:players, target_guid, 0, 1.0, 0.0, 0.0)

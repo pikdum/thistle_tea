@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Daze
+  alias ThistleTea.Game.Entity.Logic.Disarm
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.ParryHaste
   alias ThistleTea.Game.Entity.Logic.Reactive
@@ -97,20 +98,20 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
         } = entity
       )
       when is_number(min_damage) and is_number(max_damage) do
-    multiplier = damage_multiplier(damage_multiplier)
+    multiplier = damage_multiplier(damage_multiplier) * Disarm.damage_multiplier(entity)
 
     outgoing_damage_range(entity, {min_damage * multiplier, max_damage * multiplier})
   end
 
   def damage_range(%{unit: %Unit{min_damage: min_damage, max_damage: max_damage}} = entity)
       when is_number(min_damage) and is_number(max_damage) do
-    outgoing_damage_range(entity, {min_damage, max_damage})
+    range = scale_damage_range({min_damage, max_damage}, Disarm.damage_multiplier(entity))
+    outgoing_damage_range(entity, range)
   end
 
   def damage_range(_entity), do: {@default_damage, @default_damage}
 
   @physical_school_mask 0x1
-  @disarmed_damage_factor 0.5
 
   defp scale_damage_range(range, 1.0), do: range
   defp scale_damage_range({min_damage, max_damage}, multiplier), do: {min_damage * multiplier, max_damage * multiplier}
@@ -123,13 +124,7 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
   end
 
   defp outgoing_damage_multiplier(entity) do
-    base = Aura.percent_multiplier(entity, :mod_damage_percent_done, @physical_school_mask)
-
-    if Aura.has_aura?(entity, :mod_disarm) do
-      base * @disarmed_damage_factor
-    else
-      base
-    end
+    Aura.percent_multiplier(entity, :mod_damage_percent_done, @physical_school_mask)
   end
 
   def attack_damage(%{damage: damage}) when is_number(damage), do: trunc(damage)

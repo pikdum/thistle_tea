@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.CombatRatings
+  alias ThistleTea.Game.Entity.Logic.Disarm
   alias ThistleTea.Game.Entity.Logic.Mage
   alias ThistleTea.Game.Entity.Logic.Skills
   alias ThistleTea.Game.Spell
@@ -212,7 +213,15 @@ defmodule ThistleTea.Game.Spell.CastContext do
 
   defp melee_attack_power(_caster), do: 0
 
-  defp weapon_base(%{unit: unit}, base_field, current_field) do
+  defp weapon_base(%{unit: unit} = caster, base_field, current_field) do
+    if match?(%Character{}, caster) and Disarm.unarmed?(caster) do
+      if base_field == :base_min_damage, do: 1.0, else: 2.0
+    else
+      equipped_weapon_base(unit, base_field, current_field)
+    end
+  end
+
+  defp equipped_weapon_base(unit, base_field, current_field) do
     case Map.get(unit, base_field) do
       base when is_number(base) -> base
       _ -> Map.get(unit, current_field) || 0
@@ -220,7 +229,9 @@ defmodule ThistleTea.Game.Spell.CastContext do
   end
 
   defp normalized_speed(%Character{} = caster) do
-    case main_hand_template(caster) do
+    weapon = if !Disarm.unarmed?(caster), do: main_hand_template(caster)
+
+    case weapon do
       %{inventory_type: @two_hand_inventory_type} -> @normalized_two_hand
       %{subclass: @dagger_subclass} -> @normalized_dagger
       %{class: @weapon_item_class} -> @normalized_one_hand
@@ -231,7 +242,11 @@ defmodule ThistleTea.Game.Spell.CastContext do
   defp normalized_speed(_caster), do: @normalized_unarmed
 
   defp attack_skill(%Character{unit: unit, player: player} = caster) when is_struct(player) do
-    skill_id = Skills.main_hand_weapon_skill(player, &ItemLoader.get_template/1)
+    skill_id =
+      if Disarm.unarmed?(caster),
+        do: Skills.unarmed_skill(),
+        else: Skills.main_hand_weapon_skill(player, &ItemLoader.get_template/1)
+
     Skills.value(player.skills, skill_id, Skills.max_for_level(unit.level || 1)) + skill_aura_bonus(caster, skill_id)
   end
 

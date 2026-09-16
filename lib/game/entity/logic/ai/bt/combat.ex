@@ -17,6 +17,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Combat, as: CombatLogic
   alias ThistleTea.Game.Entity.Logic.Core
+  alias ThistleTea.Game.Entity.Logic.Disarm
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Hostility
   alias ThistleTea.Game.Entity.Logic.Invisibility
@@ -280,6 +281,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
     attack =
       state
       |> melee_attack_payload()
+      |> Map.merge(offhand_skill_context(state))
       |> Map.merge(%{min_damage: min_damage, max_damage: max_damage, offhand?: true})
       |> CombatLogic.finalize_attack()
 
@@ -292,6 +294,18 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
   end
 
   defp send_queued_spell_swing(state, %Spell{} = spell, target, now) do
+    case Disarm.validate(state, spell) do
+      :ok ->
+        send_valid_queued_spell_swing(state, spell, target, now)
+
+      {:error, reason} ->
+        state
+        |> Effects.enqueue(Effects.spell_cast_failed(spell.id, reason))
+        |> send_white_swing(target)
+    end
+  end
+
+  defp send_valid_queued_spell_swing(state, %Spell{} = spell, target, now) do
     targets = queued_spell_targets(state, spell, target)
 
     state
@@ -337,22 +351,31 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
   defp caster_owner_guid(%{internal: %{pet: %{owner_guid: owner_guid}}}) when is_integer(owner_guid), do: owner_guid
   defp caster_owner_guid(%{object: %{guid: guid}}), do: guid
 
-  defp attack_skill_context(%Character{unit: unit, player: player}) when is_struct(player) do
+  defp attack_skill_context(%Character{unit: unit, player: player} = state) when is_struct(player) do
     default = Skills.max_for_level(unit.level || 1)
-    %{caster_attack_skill: Skills.value(player.skills, weapon_skill_id(player), default)}
+    %{caster_attack_skill: Skills.value(player.skills, weapon_skill_id(state), default)}
   end
 
   defp attack_skill_context(_state), do: %{}
 
-  defp weapon_skill_id(player) do
-    Skills.main_hand_weapon_skill(player, &ItemLoader.get_template/1)
+  defp offhand_skill_context(%Character{unit: unit, player: player}) do
+    skill_id = Skills.off_hand_weapon_skill(player, &ItemLoader.get_template/1)
+    %{caster_attack_skill: Skills.value(player.skills, skill_id, Skills.max_for_level(unit.level || 1))}
+  end
+
+  defp offhand_skill_context(_state), do: %{}
+
+  defp weapon_skill_id(%Character{player: player} = state) do
+    if Disarm.unarmed?(state),
+      do: Skills.unarmed_skill(),
+      else: Skills.main_hand_weapon_skill(player, &ItemLoader.get_template/1)
   end
 
   defp maybe_weapon_skill_up(%Character{unit: unit, player: player} = state, target) when is_struct(player) do
     opts = [player_level: unit.level || 1, intellect: unit.intellect || 0]
 
     with false <- Guid.entity_type(target) == :player,
-         {:gained, skills} <- Skills.combat_skill_up(player.skills, weapon_skill_id(player), opts) do
+         {:gained, skills} <- Skills.combat_skill_up(player.skills, weapon_skill_id(state), opts) do
       Core.mark_broadcast_update(%{state | player: %{player | skills: skills}})
     else
       _no_gain -> state

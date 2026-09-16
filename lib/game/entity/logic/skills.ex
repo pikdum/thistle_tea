@@ -59,6 +59,10 @@ defmodule ThistleTea.Game.Entity.Logic.Skills do
     equipped_weapon_skill(player.visible_item_16_0, get_template, @unarmed_skill)
   end
 
+  def off_hand_weapon_skill(player, get_template) when is_function(get_template, 1) do
+    equipped_weapon_skill(player.visible_item_17_0, get_template, @unarmed_skill)
+  end
+
   def ranged_weapon_skill(player, get_template) when is_function(get_template, 1) do
     equipped_weapon_skill(player.visible_item_18_0, get_template, nil)
   end

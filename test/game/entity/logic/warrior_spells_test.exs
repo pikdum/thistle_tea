@@ -751,15 +751,27 @@ defmodule ThistleTea.Game.Entity.Logic.WarriorSpellsTest do
       assert with_block.outcome == :block
     end
 
-    test "disarm halves weapon damage and sets the unit flag" do
+    test "disarm substitutes unarmed damage and sets the unit flag" do
       entity = warrior_fixture()
-      entity = %{entity | unit: %{entity.unit | min_damage: 40.0, max_damage: 60.0}}
+
+      entity = %{
+        entity
+        | unit: %{
+            entity.unit
+            | min_damage: 40.0,
+              max_damage: 60.0,
+              base_min_damage: 40.0,
+              base_max_damage: 60.0,
+              base_melee_attack_time: 3_000
+          }
+      }
 
       assert Combat.damage_range(entity) == {40.0, 60.0}
 
       entity = buffed(entity, 676, :mod_disarm, -1)
 
-      assert Combat.damage_range(entity) == {20.0, 30.0}
+      assert Combat.damage_range(entity) == {1.0, 2.0}
+      assert Combat.attack_speed_ms(entity) == 2_000
       assert Bitwise.band(entity.unit.flags, 0x00200000) == 0x00200000
     end
 

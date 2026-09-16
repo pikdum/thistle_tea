@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
   alias ThistleTea.Game.Entity.Logic.Companion
   alias ThistleTea.Game.Entity.Logic.Core
+  alias ThistleTea.Game.Entity.Logic.Disarm
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Hostility
   alias ThistleTea.Game.Entity.Logic.Hunter
@@ -47,6 +48,15 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
 
   def start(%{internal: %Internal{}} = character, %Spell{} = spell, %Target{} = targets, now, cast_item_guid)
       when is_integer(now) do
+    case Disarm.validate(character, spell) do
+      :ok -> start_available_spell(character, spell, targets, now, cast_item_guid)
+      {:error, reason} -> Effects.enqueue(character, Effects.spell_cast_failed(spell.id, reason))
+    end
+  end
+
+  def start(entity, _spell, _targets, _now, _cast_item_guid), do: entity
+
+  defp start_available_spell(character, spell, targets, now, cast_item_guid) do
     character = character |> Mount.prepare_cast(spell, now) |> interrupt_action_auras(:action, now)
 
     if Spell.attribute?(spell, :on_next_swing) do
@@ -55,8 +65,6 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
       do_start(character, character.internal, spell, targets, now, cast_item_guid)
     end
   end
-
-  def start(entity, _spell, _targets, _now, _cast_item_guid), do: entity
 
   defp do_start(
          %{internal: %Internal{} = internal} = character,
@@ -146,7 +154,8 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
   end
 
   defp launch(entity, %Cast{} = casting, now) do
-    if cast_target_visible?(entity, casting) do
+    with :ok <- Disarm.validate(entity, casting.spell),
+         true <- cast_target_visible?(entity, casting) do
       resolution = resolve(entity, casting)
 
       casting =
@@ -158,12 +167,19 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
       |> put_cast(casting)
       |> advance_phase(casting, now)
     else
-      entity =
-        entity
-        |> Effects.enqueue(Effects.spell_cast_failed(Cast.spell_id(casting), :line_of_sight))
-        |> cancel()
+      failure ->
+        reason =
+          case failure do
+            {:error, reason} -> reason
+            false -> :line_of_sight
+          end
 
-      {:finished, entity}
+        entity =
+          entity
+          |> Effects.enqueue(Effects.spell_cast_failed(Cast.spell_id(casting), reason))
+          |> cancel()
+
+        {:finished, entity}
     end
   end
 
