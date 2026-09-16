@@ -40,6 +40,11 @@ A first Crystal Lake teleport used a height below terrain and was discarded.
 Repeating above terrain produced a real `MSG_MOVE_START_SWIM`, removed the
 mount, and restored run speed to 7.0.
 
+A final repeat at `-9500 -220 65` on map 0 captured the actual water-entry
+transition with a read-only sampler: `{14582, 14.0, false}` became
+`{0, 7.0, true}` (mount display, run speed, swimming). The client screenshot
+`swimming-proof.png` shows the dismounted character underwater.
+
 Evidence is retained in:
 
 - `/home/pikdum/.cache/thistle-wow-playtest.5rUwuC/screenshots/`
@@ -65,3 +70,4 @@ Validation: `mix compile --warnings-as-errors`, `mix test.all` (2,870 passing
 tests), `mix credo --strict`, formatting, and diff checks. Mount tests cover
 speed stacking, replacement, snares, cancellation, interruption, death, casting,
 swimming restrictions, and taxi cast rejection. Existing taxi tests also pass.
+The isolated client and local server were stopped after acceptance.
