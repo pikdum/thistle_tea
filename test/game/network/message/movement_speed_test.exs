@@ -21,6 +21,25 @@ defmodule ThistleTea.Game.Network.Message.MovementSpeedTest do
   ]
 
   describe "to_binary/1" do
+    test "observer packets include movement information before the speed" do
+      movement = %MovementBlock{position: {1.0, 2.0, 3.0, 0.5}, movement_flags: 0, timestamp: 100}
+
+      info =
+        <<0::little-size(32), 100::little-size(32), 1.0::little-float-size(32), 2.0::little-float-size(32),
+          3.0::little-float-size(32), 0.5::little-float-size(32), 0::little-size(32)>>
+
+      for {module, opcode} <- [
+            {Message.MsgMoveSetRunSpeed, 0xCD},
+            {Message.MsgMoveSetRunBackSpeed, 0xCF},
+            {Message.MsgMoveSetSwimSpeed, 0xD3},
+            {Message.MsgMoveSetSwimBackSpeed, 0xD5}
+          ] do
+        packet = module.to_packet(struct!(module, guid: 42, movement_block: movement, speed: 3.25))
+        assert packet.opcode == opcode
+        assert packet.payload == <<1, 42, info::binary, 3.25::little-float-size(32)>>
+      end
+    end
+
     test "encodes packed GUID, movement counter and speed for every mode" do
       for {_type, server, _client, _opcode} <- @modes do
         packet = struct!(server, guid: 42, move_event: 9, speed: 3.25)

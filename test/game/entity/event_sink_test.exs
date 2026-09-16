@@ -39,6 +39,38 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
   describe "emit/2" do
     setup [:metadata_fixtures]
 
+    test "movement speeds reach nearby observers without duplicating the owner's update" do
+      owner_guid = Guid.from_low_guid(:player, unique_guid())
+      observer_guid = Guid.from_low_guid(:player, unique_guid())
+      Entity.register(owner_guid)
+      Entity.register(observer_guid)
+      SpatialHash.update(:players, owner_guid, 0, 0.0, 0.0, 0.0)
+      SpatialHash.update(:players, observer_guid, 0, 1.0, 0.0, 0.0)
+
+      on_exit(fn ->
+        for guid <- [owner_guid, observer_guid] do
+          Entity.unregister(guid)
+          SpatialHash.remove(:players, guid)
+        end
+      end)
+
+      character = %Character{
+        object: %Object{guid: owner_guid},
+        internal: %Internal{world: WorldRef.open(0)},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
+      }
+
+      EventSink.emit(character, Effects.movement_speed_changed(9.444444, :swim_speed), Context.new(self()))
+
+      assert_receive {:"$gen_cast",
+                      {:send_packet, %Message.SmsgForceSwimSpeedChange{guid: ^owner_guid, speed: 9.444444}}}
+
+      assert_receive {:"$gen_cast",
+                      {:send_packet, %Message.MsgMoveSetSwimSpeed{guid: ^owner_guid, speed: 9.444444}, _opts}}
+
+      refute_receive {:"$gen_cast", {:send_packet, %Message.MsgMoveSetSwimSpeed{}, _opts}}
+    end
+
     test "raises for unsupported effects", %{mob: mob} do
       assert_raise FunctionClauseError, fn ->
         # credo:disable-for-next-line Credo.Check.Refactor.Apply

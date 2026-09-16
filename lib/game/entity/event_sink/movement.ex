@@ -120,6 +120,7 @@ defmodule ThistleTea.Game.Entity.EventSink.Movement do
       )
       when is_number(speed) do
     Context.send_packet(context, speed_packet(type, guid, speed))
+    broadcast_speed(entity, type, speed)
     entity
   end
 
@@ -196,6 +197,22 @@ defmodule ThistleTea.Game.Entity.EventSink.Movement do
   defp speed_packet(:run_back_speed, guid, speed), do: %Message.SmsgForceRunBackSpeedChange{guid: guid, speed: speed}
   defp speed_packet(:swim_speed, guid, speed), do: %Message.SmsgForceSwimSpeedChange{guid: guid, speed: speed}
   defp speed_packet(:swim_back_speed, guid, speed), do: %Message.SmsgForceSwimBackSpeedChange{guid: guid, speed: speed}
+
+  defp broadcast_speed(
+         %Character{object: %{guid: guid}, movement_block: %MovementBlock{} = movement} = entity,
+         type,
+         speed
+       ) do
+    packet = struct!(observer_speed_module(type), guid: guid, movement_block: movement, speed: speed)
+    World.broadcast_packet(packet, entity, include_self?: false)
+  end
+
+  defp broadcast_speed(_entity, _type, _speed), do: :ok
+
+  defp observer_speed_module(:run_speed), do: Message.MsgMoveSetRunSpeed
+  defp observer_speed_module(:run_back_speed), do: Message.MsgMoveSetRunBackSpeed
+  defp observer_speed_module(:swim_speed), do: Message.MsgMoveSetSwimSpeed
+  defp observer_speed_module(:swim_back_speed), do: Message.MsgMoveSetSwimBackSpeed
 
   defp notify_chasers(%{object: %{guid: guid}, movement_block: %{position: {x, y, z, _o}}}) do
     ChaseWatch.notify_moved(guid, {x, y, z})
