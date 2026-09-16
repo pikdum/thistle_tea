@@ -92,6 +92,7 @@ nix develop .#wow-tools            # shell with all of the above + sqlite + mari
 - Deadmines boss doors and gunpowder cannon breach, with Smite's alarms and pirate response
 - dying + resurrecting
 - fall damage, Safe Fall, and Slow Fall protection
+- underwater breath timers, drowning, water-breathing effects, and extended breath reserves
 - gossip + trainers
 - chests, fishing, and chairs
 - mail
