@@ -46,6 +46,8 @@ defmodule ThistleTea.Game.Entity.Logic.DiminishingReturns do
     %{entity | internal: %{internal | diminishing_returns: history}}
   end
 
+  def reconcile(entity, _previous, _current, _now), do: entity
+
   defp diminish(%{internal: %Internal{} = internal} = entity, holder, group, now) do
     entry = internal.diminishing_returns |> Map.get(group, %__MODULE__{}) |> recover(now)
 

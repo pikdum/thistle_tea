@@ -184,6 +184,7 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
     %{
       CastContext.from_caster(entity, spell, effect.target_guid)
       | target_hostile?: Spell.requires_hostile_target?(spell),
+        triggered_by_aura?: is_integer(effect.triggering_spell_id),
         target_role: effect.target_role
     }
   end
@@ -191,6 +192,7 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
   defp trigger_context(_entity, %Effects.TriggerSpell{} = effect, spell) do
     %CastContext{
       caster_guid: effect.source_guid,
+      triggered_by_aura?: is_integer(effect.triggering_spell_id),
       caster_level: effect.source_level || 1,
       target_guid: effect.target_guid,
       target_role: effect.target_role,

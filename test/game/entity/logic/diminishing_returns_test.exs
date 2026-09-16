@@ -4,6 +4,7 @@ defmodule ThistleTea.Game.Entity.Logic.DiminishingReturnsTest do
   alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Pet
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.DiminishingReturns
@@ -69,6 +70,31 @@ defmodule ThistleTea.Game.Entity.Logic.DiminishingReturnsTest do
       npc_context = %{context() | caster_type: :mob}
       player = target()
       assert {:ok, ^player, ^root} = DiminishingReturns.apply(player, root, npc_context, 0)
+    end
+
+    test "player pets participate in PvP groups" do
+      pet = %Mob{object: %Object{guid: 2}, internal: %Internal{pet: %Pet{owner_guid: 3}}}
+      pet_context = %{context() | caster_type: :mob, caster_owner_guid: 4}
+      {:ok, pet, _} = DiminishingReturns.apply(pet, holder(0, 7), pet_context, 0)
+      {:ok, _, root} = DiminishingReturns.apply(pet, holder(1_000, 7), pet_context, 1_000)
+      assert root.expires_at == 5_000
+    end
+
+    test "self casts are exempt unless reflected" do
+      self_context = %{context() | caster_guid: 2}
+      target = target()
+      holder = holder(0)
+      assert {:ok, ^target, ^holder} = DiminishingReturns.apply(target, holder, self_context, 0)
+
+      reflected = %{self_context | reflected_by_guid: 3}
+      {:ok, target, _} = DiminishingReturns.apply(target, holder, reflected, 0)
+      assert target.internal.diminishing_returns.controlled_stun.applications == 1
+    end
+
+    test "permanent holders stay exempt with negative monotonic timestamps" do
+      target = target()
+      holder = %{holder(-50_000) | expires_at: -1}
+      assert {:ok, ^target, ^holder} = DiminishingReturns.apply(target, holder, context(), -50_000)
     end
   end
 

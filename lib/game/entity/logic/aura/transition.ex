@@ -23,6 +23,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Transition do
   alias ThistleTea.Game.Entity.Logic.Aura.ViewpointSync
   alias ThistleTea.Game.Entity.Logic.Companion
   alias ThistleTea.Game.Entity.Logic.Core
+  alias ThistleTea.Game.Entity.Logic.DiminishingReturns
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Reputation, as: ReputationLogic
   alias ThistleTea.Game.Spell
@@ -63,6 +64,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Transition do
     entity =
       entity
       |> put_holders(holders)
+      |> DiminishingReturns.reconcile(previous, holders, now)
       |> ObjectSync.sync()
       |> PlayerSync.sync()
       |> StealthSync.sync()

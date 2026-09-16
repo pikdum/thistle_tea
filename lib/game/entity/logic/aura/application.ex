@@ -11,6 +11,8 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.Aura.Change
   alias ThistleTea.Game.Entity.Logic.Aura.Transition
+  alias ThistleTea.Game.Entity.Logic.DiminishingReturns
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Coefficient
@@ -71,7 +73,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
           negative?: negative?(spell, auras, context, target_guid)
         }
 
-        do_apply(entity, holder, now)
+        do_apply(entity, holder, context, now)
     end
   end
 
@@ -133,7 +135,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
     type in [:mod_resistance, :mod_resistance_exclusive] and is_number(amount) and amount < 0
   end
 
-  defp do_apply(%{unit: %Unit{auras: existing}} = entity, %Holder{} = holder, now) when is_list(existing) do
+  defp do_apply(%{unit: %Unit{auras: existing}} = entity, %Holder{} = holder, context, now) when is_list(existing) do
     cond do
       blocked_by_stronger_rank?(existing, holder.spell) ->
         {entity, []}
@@ -145,12 +147,22 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
         {entity, []}
 
       true ->
-        do_apply_unblocked(entity, existing, holder, now)
+        apply_diminished(entity, existing, holder, context, now)
     end
   end
 
-  defp do_apply(entity, %Holder{} = holder, now) do
-    do_apply_unblocked(entity, [], holder, now)
+  defp do_apply(entity, %Holder{} = holder, context, now) do
+    apply_diminished(entity, [], holder, context, now)
+  end
+
+  defp apply_diminished(entity, existing, holder, context, now) do
+    case DiminishingReturns.apply(entity, holder, context, now) do
+      {:ok, entity, holder} ->
+        do_apply_unblocked(entity, existing, holder, now)
+
+      {:immune, entity} ->
+        {entity, [Effects.spell_log_miss(context.caster_guid, entity.object.guid, holder.spell.id, :immune)]}
+    end
   end
 
   defp do_apply_unblocked(entity, existing, %Holder{} = holder, now) do
