@@ -72,11 +72,12 @@ stun and reset the application count to one. Roots tracked their own group
 independently of that stun history.
 
 An additional Polymorph attempt was rejected with `bad_targets` before aura
-application. Inspection found that player target metadata does not publish a
-creature type, which existing creature-mask validation requires. Polymorph was
-excluded from real-client acceptance; its group classification has automated
-coverage. There were no owner crashes or movement/projection errors during the
-accepted stun and root sequences.
+application because player metadata lacked the creature type required by mask
+validation. That issue and a stale expiry timer discovered in the follow-up
+duel are fixed and covered in [Polymorph acceptance](polymorph-playtest.md).
+The duration table above records holder timestamps; the follow-up also checks
+the actual removal time after a shortened refresh. There were no owner crashes
+or movement/projection errors during the accepted stun and root sequences.
 
 One temporary observer task ended with `:noproc` after its client disconnected
 during cleanup. Client combat logging was enabled, but its on-disk log did not
