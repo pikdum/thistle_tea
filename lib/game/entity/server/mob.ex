@@ -415,6 +415,19 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   end
 
   @impl GenServer
+  def handle_cast({:temporary_threat, source_guid, incarnation_id, amount}, %Mob{} = state) do
+    if is_integer(incarnation_id) and Incarnation.id(state) == incarnation_id do
+      {:noreply, state |> Threat.set_temporary(source_guid, amount) |> wake_ai_tick()}
+    else
+      {:noreply, state}
+    end
+  rescue
+    error ->
+      Logger.error("Temporary threat update failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
+  @impl GenServer
   def handle_cast({:loot_roll_vote, voter_guid, slot, vote}, %Mob{} = state) do
     {:noreply, Corpse.roll_vote(state, voter_guid, slot, vote)}
   end

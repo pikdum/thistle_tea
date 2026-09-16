@@ -137,6 +137,10 @@ defmodule ThistleTea.Game.Entity do
     dispatch_cast(entity, {:drop_threat, source_guid})
   end
 
+  def temporary_threat(entity, source_guid, incarnation_id, amount) do
+    dispatch_cast(entity, {:temporary_threat, source_guid, incarnation_id, amount})
+  end
+
   def use_game_object(entity, user_guid, user_level) do
     dispatch_cast(entity, {:gameobject_use, user_guid, user_level})
   end

@@ -18,6 +18,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Transition do
   alias ThistleTea.Game.Entity.Logic.Aura.PlayerSync
   alias ThistleTea.Game.Entity.Logic.Aura.Script
   alias ThistleTea.Game.Entity.Logic.Aura.StealthSync
+  alias ThistleTea.Game.Entity.Logic.Aura.ThreatSync
   alias ThistleTea.Game.Entity.Logic.Aura.UnitSync
   alias ThistleTea.Game.Entity.Logic.Aura.ViewpointSync
   alias ThistleTea.Game.Entity.Logic.Companion
@@ -74,6 +75,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Transition do
     viewpoint_events = ViewpointSync.events(previous, holders, entity_guid(entity))
     release_events = release_controlled_events(entity, removed)
     forced_reaction_events = forced_reaction_events(entity, previous, holders)
+    threat_events = ThreatSync.events(entity, previous, holders)
 
     events =
       modifier_events ++
@@ -81,7 +83,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Transition do
         cooldown_events ++
         script_events ++
         control_events ++
-        viewpoint_events ++ release_events ++ movement_events ++ forced_reaction_events
+        viewpoint_events ++ release_events ++ movement_events ++ forced_reaction_events ++ threat_events
 
     {Core.mark_broadcast_update(entity), events}
   end

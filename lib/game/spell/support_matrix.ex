@@ -8,7 +8,7 @@ defmodule ThistleTea.Game.Spell.SupportMatrix do
   can never silently no-op.
 
   Deferred auras that are mapped to atoms but currently inert:
-  mod_total_threat (Fade), water_breathing,
+  water_breathing,
   state_immunity replacement gaps, empathy, mechanic_resistance,
   track_creatures/track_resources client fields, auras_visible, and the
   language/reputation cosmetics.

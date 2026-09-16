@@ -61,6 +61,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
     Effects.StartAttack,
     Effects.TapClaimed,
     Effects.TapCleared,
+    Effects.TemporaryThreat,
     Effects.ThreatRefGained,
     Effects.ThreatRefLost
   ]

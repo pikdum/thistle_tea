@@ -149,6 +149,13 @@ defmodule ThistleTea.Game.Entity.EventSink.Combat do
 
   def emit(entity, %Effects.DropThreat{}, _context), do: entity
 
+  def emit(%Character{object: %{guid: guid}} = entity, %Effects.TemporaryThreat{} = effect, _context) do
+    Entity.temporary_threat(effect.target_guid, guid, effect.incarnation_id, effect.amount)
+    entity
+  end
+
+  def emit(entity, %Effects.TemporaryThreat{}, _context), do: entity
+
   def emit(%Character{} = entity, %Effects.DropNearbyThreatResolved{} = effect, _context) do
     Metadata.update(entity.object.guid, effect.metadata)
     Enum.each(effect.target_guids, &Entity.drop_threat(&1, entity.object.guid))

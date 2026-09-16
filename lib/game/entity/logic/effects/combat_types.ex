@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.Entity.Logic.Effects.CombatTypes do
     {:AttackerLost, [:target_guid], []},
     {:ThreatRefGained, [:target_guid], []},
     {:ThreatRefLost, [:target_guid], []},
+    {:TemporaryThreat, [:target_guid, :incarnation_id, :amount], []},
     {:DropThreat, [:target_guid], []},
     {:DropNearbyThreat, [], []},
     {:DropNearbyThreatResolved, [:target_guids, :metadata], []},

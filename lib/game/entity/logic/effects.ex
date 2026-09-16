@@ -287,6 +287,11 @@ defmodule ThistleTea.Game.Entity.Logic.Effects do
     %Effects.DropThreat{target_guid: target_guid}
   end
 
+  def temporary_threat(target_guid, incarnation_id, amount)
+      when is_integer(target_guid) and is_integer(incarnation_id) and is_number(amount) do
+    %Effects.TemporaryThreat{target_guid: target_guid, incarnation_id: incarnation_id, amount: amount}
+  end
+
   def drop_nearby_threat do
     %Effects.DropNearbyThreat{}
   end
