@@ -466,6 +466,13 @@ defmodule ThistleTea.Game.World.Loader.SpellVmangosTest do
       assert SpellLoader.load(13_163).exclusive_category == :hunter_aspect
       assert SpellLoader.load(13_161).exclusive_category == :hunter_aspect
       assert SpellLoader.load(1494).exclusive_category == :tracking
+
+      for {id, value} <- [{2383, 2}, {2580, 3}, {2481, 6}] do
+        spell = SpellLoader.load(id)
+        assert spell.exclusive_category == :tracking
+        assert Enum.any?(spell.effects, &(&1.aura == :track_resources and &1.misc_value == value))
+      end
+
       assert SpellLoader.load(324).exclusive_category == :shaman_shield
     end
 

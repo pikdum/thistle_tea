@@ -9,7 +9,7 @@ defmodule ThistleTea.Game.Spell.SupportMatrix do
 
   Deferred auras that are mapped to atoms but currently inert:
   state_immunity replacement gaps, empathy,
-  track_creatures/track_resources client fields, auras_visible, and the
+  auras_visible, and the
   language/reputation cosmetics.
   """
 

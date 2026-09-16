@@ -96,6 +96,7 @@ nix develop .#wow-tools            # shell with all of the above + sqlite + mari
 - underwater breath timers, drowning, water-breathing effects, and extended breath reserves
 - gossip + trainers
 - chests, fishing, and chairs
+- resource tracking for herbs, minerals, and treasure, with exclusive tracking modes
 - mail
 
 ## helpful resources

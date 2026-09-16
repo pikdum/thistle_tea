@@ -15,12 +15,42 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.TransitionTest do
   alias ThistleTea.Game.Entity.Logic.Aura.Change
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.Effect
 
   @movement_flag_root 0x08000000
   @unit_vis_creep 0x02
   @player_flag_stealth 0x20
 
   describe "transition/2" do
+    test "switching tracking categories replaces the aura and both projections" do
+      modes = [{2383, :track_resources, 2}, {2580, :track_resources, 3}, {1494, :track_creatures, 1}]
+
+      Enum.reduce(modes, character(), fn {id, type, value}, entity ->
+        spell = %Spell{
+          id: id,
+          exclusive_category: :tracking,
+          duration_ms: -1,
+          effects: [
+            %Effect{
+              index: 0,
+              type: :apply_aura,
+              aura: type,
+              misc_value: value,
+              base_points: 0,
+              die_sides: 0,
+              implicit_target_a: :caster
+            }
+          ]
+        }
+
+        {entity, _events} = Aura.apply_spell(entity, 1, 60, spell, 1_000)
+        assert Enum.map(entity.unit.auras, & &1.spell.id) == [id]
+        assert entity.player.track_resources == if(type == :track_resources, do: 1 <<< (value - 1), else: 0)
+        assert entity.player.track_creatures == if(type == :track_creatures, do: 1 <<< (value - 1), else: 0)
+        entity
+      end)
+    end
+
     test "reconciles identical removals consistently for every cause" do
       holder = projection_holder()
 
@@ -30,6 +60,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.TransitionTest do
       assert active.object.scale_x == 1.5
       assert active.unit.normal_resistance == 27
       assert active.player.track_creatures == 1 <<< 1
+      assert active.player.track_resources == 1 <<< 6
       assert (active.unit.vis_flag &&& @unit_vis_creep) != 0
       assert (active.player.field_bytes2_flags &&& @player_flag_stealth) != 0
       assert (active.movement_block.movement_flags &&& @movement_flag_root) != 0
@@ -44,7 +75,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.TransitionTest do
         end)
 
       assert results |> Enum.map(&elem(&1, 0)) |> Enum.uniq() == [
-               {[], 1.0, 7, 0, 0, 0, 0, false}
+               {[], 1.0, 7, 0, 0, 0, 0, 0, false}
              ]
 
       assert results |> Enum.map(&elem(&1, 1)) |> Enum.uniq() |> length() == 1
@@ -134,6 +165,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.TransitionTest do
       %AuraData{type: :mod_scale, amount: 50},
       %AuraData{type: :mod_resistance, amount: 20, misc_value: 1},
       %AuraData{type: :track_creatures, misc_value: 2},
+      %AuraData{type: :track_resources, misc_value: 7},
       %AuraData{type: :mod_stealth},
       %AuraData{type: :mod_root}
     ])
@@ -156,6 +188,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.TransitionTest do
       entity.object.scale_x,
       entity.unit.normal_resistance,
       entity.player.track_creatures,
+      entity.player.track_resources,
       entity.unit.vis_flag &&& @unit_vis_creep,
       entity.player.field_bytes2_flags &&& @player_flag_stealth,
       entity.movement_block.movement_flags &&& @movement_flag_root,

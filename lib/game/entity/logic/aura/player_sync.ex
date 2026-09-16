@@ -8,24 +8,12 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.PlayerSync do
   alias ThistleTea.Game.Entity.Data.Component.Player
 
   def sync(%Character{unit: %{auras: holders}, player: %Player{}} = character) when is_list(holders) do
-    tracked_type =
-      Enum.find_value(holders, fn %Holder{auras: auras} ->
-        Enum.find_value(auras, fn
-          %Aura{type: :track_creatures, misc_value: creature_type}
-          when is_integer(creature_type) and creature_type > 0 ->
-            creature_type
-
-          _aura ->
-            nil
-        end)
-      end)
-
-    track_creatures = if tracked_type, do: 1 <<< (tracked_type - 1), else: 0
     track_stealthed? = Enum.any?(holders, &Holder.has_aura_type?(&1, :track_stealthed))
 
     player = %{
       character.player
-      | track_creatures: track_creatures,
+      | track_creatures: tracking_mask(holders, :track_creatures),
+        track_resources: tracking_mask(holders, :track_resources),
         field_bytes_flags: put_flag(character.player.field_bytes_flags, 0x02, track_stealthed?)
     }
 
@@ -33,6 +21,18 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.PlayerSync do
   end
 
   def sync(entity), do: entity
+
+  defp tracking_mask(holders, type) do
+    holders
+    |> Enum.flat_map(& &1.auras)
+    |> Enum.reduce(0, fn
+      %Aura{type: ^type, misc_value: value}, mask when is_integer(value) and value in 1..32 ->
+        mask ||| 1 <<< (value - 1)
+
+      _aura, mask ->
+        mask
+    end)
+  end
 
   defp put_flag(flags, flag, true), do: (flags || 0) ||| flag
   defp put_flag(flags, flag, false), do: (flags || 0) &&& bnot(flag)
