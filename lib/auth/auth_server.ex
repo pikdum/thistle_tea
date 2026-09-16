@@ -1,7 +1,7 @@
 defmodule ThistleTea.Auth do
   @moduledoc """
   The auth/logon server: handles SRP6 logon challenge/proof and serves the
-  realm list, creating accounts on first login.
+  realm list for registered accounts.
   """
   use ThousandIsland.Handler
 
@@ -42,14 +42,8 @@ defmodule ThistleTea.Auth do
     |> Map.put(:public_b_wire, pad_leading(public_b, byte_size(@n)))
   end
 
-  defp account_state(username) do
-    {:ok, account} = ThistleTea.Account.get_user(username)
-
-    Map.put(%{n: @n, g: @g}, :account, account)
-  end
-
   defp logon_challenge_state(account) do
-    account_state(account)
+    %{n: @n, g: @g, account: account}
     |> calculate_b()
     |> calculate_public_b()
   end
@@ -123,20 +117,15 @@ defmodule ThistleTea.Auth do
        ) do
     Logger.metadata(username: username)
     Logger.info("CMD_AUTH_LOGON_CHALLENGE")
-    challenge = logon_challenge_state(username)
 
-    security_flag = if protocol_version >= 3, do: <<0>>, else: <<>>
+    case ThistleTea.Account.get_user(username) do
+      {:ok, account} ->
+        send_logon_challenge(socket, state, account, protocol_version)
 
-    packet =
-      <<0, 0, 0>> <>
-        reverse(challenge.public_b_wire) <>
-        <<1>> <>
-        challenge.g <>
-        <<32>> <>
-        reverse(challenge.n) <> challenge.account.password_salt <> :crypto.strong_rand_bytes(16) <> security_flag
-
-    ThousandIsland.Socket.send(socket, packet)
-    {:continue, Map.merge(state, Map.put(challenge, :protocol_version, protocol_version))}
+      {:error, _reason} ->
+        ThousandIsland.Socket.send(socket, <<0, 0, 4>>)
+        {:close, state}
+    end
   end
 
   defp handle_packet(
@@ -225,10 +214,17 @@ defmodule ThistleTea.Auth do
        ) do
     Logger.metadata(username: username)
     Logger.info("CMD_AUTH_RECONNECT_CHALLENGE")
-    challenge_data = :crypto.strong_rand_bytes(16)
-    {:ok, a} = ThistleTea.Account.get_user(username)
-    ThousandIsland.Socket.send(socket, <<2, 0>> <> challenge_data <> a.password_salt)
-    {:continue, Map.merge(state, %{username: username, challenge_data: challenge_data})}
+
+    with {:ok, account} <- ThistleTea.Account.get_user(username),
+         [{_, session}] <- :ets.lookup(:session, account.username) do
+      challenge_data = :crypto.strong_rand_bytes(16)
+      ThousandIsland.Socket.send(socket, <<2, 0>> <> challenge_data <> :crypto.strong_rand_bytes(16))
+      {:continue, Map.merge(state, %{account: account, challenge_data: challenge_data, session: session})}
+    else
+      _ ->
+        ThousandIsland.Socket.send(socket, <<2, 4>>)
+        {:close, state}
+    end
   end
 
   defp handle_packet(
@@ -239,10 +235,9 @@ defmodule ThistleTea.Auth do
        ) do
     username = state.account.username
     Logger.info("CMD_AUTH_RECONNECT_PROOF")
-    [{_, session}] = :ets.lookup(:session, username)
 
     server_proof =
-      :crypto.hash(:sha, username <> proof_data <> state.challenge_data <> session)
+      :crypto.hash(:sha, username <> proof_data <> state.challenge_data <> state.session)
 
     if client_proof === server_proof do
       Logger.info("RECONNECT SUCCESS")
@@ -259,6 +254,22 @@ defmodule ThistleTea.Auth do
     Logger.error("UNIMPLEMENTED: #{inspect(opcode, base: :hex)}")
     ThousandIsland.Socket.send(socket, <<0, 0, 5>>)
     {:close, state}
+  end
+
+  defp send_logon_challenge(socket, state, account, protocol_version) do
+    challenge = logon_challenge_state(account)
+    security_flag = if protocol_version >= 3, do: <<0>>, else: <<>>
+
+    packet =
+      <<0, 0, 0>> <>
+        reverse(challenge.public_b_wire) <>
+        <<1>> <>
+        challenge.g <>
+        <<32>> <>
+        reverse(challenge.n) <> challenge.account.password_salt <> :crypto.strong_rand_bytes(16) <> security_flag
+
+    ThousandIsland.Socket.send(socket, packet)
+    {:continue, Map.merge(state, Map.put(challenge, :protocol_version, protocol_version))}
   end
 
   defp interleave(s) do
