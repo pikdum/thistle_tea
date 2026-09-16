@@ -356,16 +356,31 @@ defmodule ThistleTea.Game.Entity.Logic.Stats do
   end
 
   defp aura_resistance_bonus(%Unit{} = unit, bit) do
+    additive_resistance_bonus(unit, bit) + exclusive_resistance_bonus(unit, bit)
+  end
+
+  defp additive_resistance_bonus(unit, bit) do
     sum_aura_amounts(unit, fn
-      %Aura{type: type, amount: amount, misc_value: mask}
-      when type in [:mod_resistance, :mod_resistance_exclusive] and
-             is_integer(amount) and is_integer(mask) and (mask &&& bit) != 0 ->
+      %Aura{type: :mod_resistance, amount: amount, misc_value: mask}
+      when is_integer(amount) and is_integer(mask) and (mask &&& bit) != 0 ->
         amount
 
       _aura ->
         0
     end)
   end
+
+  defp exclusive_resistance_bonus(%Unit{auras: holders}, bit) when is_list(holders) do
+    amounts =
+      for %Holder{auras: auras, stacks: stacks} <- holders,
+          %Aura{type: :mod_resistance_exclusive, amount: amount, misc_value: mask} <- auras,
+          is_integer(amount) and is_integer(mask) and (mask &&& bit) != 0,
+          do: amount * if(is_integer(stacks) and stacks > 1, do: stacks, else: 1)
+
+    Enum.max([0 | amounts]) + Enum.min([0 | amounts])
+  end
+
+  defp exclusive_resistance_bonus(_unit, _bit), do: 0
 
   defp aura_base_resistance_multiplier(%Unit{} = unit, bit) do
     percent =

@@ -32,6 +32,52 @@ defmodule ThistleTea.Game.Entity.Logic.StatsTest do
   defp recompute(unit), do: apply(&Stats.recompute/1, [unit])
 
   describe "recompute/1" do
+    test "selects exclusive resistance bonuses and penalties independently for each school" do
+      auras = [
+        %Aura{type: :mod_resistance_exclusive, amount: 20, misc_value: 126},
+        %Aura{type: :mod_resistance_exclusive, amount: 60, misc_value: 4},
+        %Aura{type: :mod_resistance_exclusive, amount: 40, misc_value: 20},
+        %Aura{type: :mod_resistance_exclusive, amount: -10, misc_value: 126},
+        %Aura{type: :mod_resistance_exclusive, amount: -25, misc_value: 16},
+        %Aura{type: :mod_resistance, amount: 8, misc_value: 126},
+        %Aura{type: :mod_resistance, amount: 7, misc_value: 126}
+      ]
+
+      unit = recompute(%{mage_unit() | base_fire_resistance: 5, equipment_bonuses: %{fire: 10}, auras: [holder(auras)]})
+
+      assert unit.fire_resistance == 80
+      assert unit.frost_resistance == 30
+      assert unit.nature_resistance == 25
+      assert unit.shadow_resistance == 25
+      assert unit.arcane_resistance == 25
+      assert unit.holy_resistance == 25
+      assert unit.normal_resistance == 0
+      assert recompute(unit) == unit
+    end
+
+    test "falls back after stronger resistance effects end without losing weaker auras" do
+      weak = holder([%Aura{type: :mod_resistance_exclusive, amount: 20, misc_value: 4}])
+      strong = holder([%Aura{type: :mod_resistance_exclusive, amount: 60, misc_value: 4}])
+      base = %{mage_unit() | base_fire_resistance: 5}
+
+      for holders <- [[weak, strong], [strong, weak], [weak, strong, strong]] do
+        active = recompute(%{base | auras: holders})
+        assert active.fire_resistance == 65
+        assert recompute(%{active | auras: [weak]}).fire_resistance == 25
+        assert recompute(%{active | auras: []}).fire_resistance == 5
+      end
+    end
+
+    test "compares stacked exclusive amounts before applying resistance multipliers" do
+      stacked = %{holder([%Aura{type: :mod_resistance_exclusive, amount: 20, misc_value: 1}]) | stacks: 3}
+      other = holder([%Aura{type: :mod_resistance_exclusive, amount: 50, misc_value: 1}])
+      multiplier = holder([%Aura{type: :mod_resistance_percent, amount: 50, misc_value: 1}])
+
+      unit = recompute(%{mage_unit() | base_normal_resistance: 100, auras: [stacked, other, multiplier]})
+
+      assert unit.normal_resistance == 240
+    end
+
     test "derives stats and maxima from base values" do
       unit = recompute(mage_unit())
 
