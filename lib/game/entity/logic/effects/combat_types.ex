@@ -2,6 +2,7 @@ defmodule ThistleTea.Game.Entity.Logic.Effects.CombatTypes do
   @moduledoc false
 
   effects = [
+    {:EnvironmentalDamage, [:type, :damage], []},
     {:DeliverAttack, [:target_guid, :attack], []},
     {:AttackStart, [:source_guid, :target_guid], []},
     {:StartAttack, [:target_guid], []},

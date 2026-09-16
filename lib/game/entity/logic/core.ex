@@ -82,10 +82,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
       {entity, damage}
     else
       school = Keyword.get(opts, :school, :physical)
-      damage = scale_damage_taken(entity, damage, school)
-      {damage, redirect} = Aura.damage_redirect(entity, damage, school)
-      entity = enqueue_redirect(entity, redirect, Keyword.get(opts, :source), school)
-      {entity, remaining} = Aura.absorb_damage(entity, damage, school, now)
+      {entity, damage, remaining} = mitigate_damage(entity, damage, school, now, opts)
       %{unit: unit} = entity
       duel_outcome = duel_lethal_outcome(entity, health, remaining, opts)
       remaining = duel_remaining_damage(health, remaining, duel_outcome)
@@ -123,6 +120,18 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
   end
 
   defp take_unblocked_damage(entity, _damage, _now, _opts), do: {entity, 0}
+
+  defp mitigate_damage(entity, damage, school, now, opts) do
+    if Keyword.get(opts, :environmental?, false) do
+      {entity, damage, damage}
+    else
+      damage = scale_damage_taken(entity, damage, school)
+      {damage, redirect} = Aura.damage_redirect(entity, damage, school)
+      entity = enqueue_redirect(entity, redirect, Keyword.get(opts, :source), school)
+      {entity, remaining} = Aura.absorb_damage(entity, damage, school, now)
+      {entity, damage, remaining}
+    end
+  end
 
   defp duel_lethal_outcome(entity, health, damage, opts)
        when is_number(health) and health > 0 and is_number(damage) and damage >= health do
