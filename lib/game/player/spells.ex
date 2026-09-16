@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.Player.Spells do
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.Loader.Skill, as: SkillLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
@@ -35,6 +36,7 @@ defmodule ThistleTea.Game.Player.Spells do
         character =
           %{character | internal: %{internal | spells: all_ids, spellbook: spellbook}}
           |> learn_skills()
+          |> apply_passives(Time.now())
 
         CharacterStore.put(character)
         Enum.each(events, &send_event_packet/1)
