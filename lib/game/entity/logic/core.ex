@@ -332,7 +332,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
   defp prepare_death_state(%{internal: %Internal{}, unit: %Unit{}, movement_block: %MovementBlock{}} = entity, now) do
     entity = Movement.sync_position(entity, now)
     entity = clear_death_engagement(entity)
-    %{unit: unit, movement_block: mb} = entity
+    unit = entity.unit
 
     {entity, aura_events} =
       Aura.transition(
@@ -343,6 +343,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
     entity = Effects.enqueue(entity, aura_events)
     internal = entity.internal
     unit = entity.unit
+    mb = entity.movement_block
 
     internal = %{
       internal

@@ -221,6 +221,23 @@ defmodule ThistleTea.Game.Entity.Logic.CoreTest do
   end
 
   describe "take_damage_with_absorb/4 aura cleanup" do
+    test "retains recomputed speeds after removing a snare on death" do
+      entity = entity(health: 20, max_health: 100)
+      holder = %Holder{spell: %Spell{id: 1}, auras: [%Aura{type: :mod_decrease_speed, amount: -50}]}
+
+      entity = %{
+        entity
+        | unit: %{entity.unit | auras: [holder]},
+          movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}, base_run_speed: 7.0, run_speed: 3.5}
+      }
+
+      {entity, _absorbed} = Core.take_damage_with_absorb(entity, 30, 1_000)
+
+      assert entity.unit.health == 0
+      assert entity.unit.auras == []
+      assert entity.movement_block.run_speed == 7.0
+    end
+
     test "keeps passive auras and removes temporary auras on death" do
       passive = %Holder{slot: 0, spell: %Spell{id: 1, attributes: MapSet.new([:passive])}}
 
