@@ -1,13 +1,42 @@
 defmodule ThistleTea.Game.Entity.Logic.ParryHasteTest do
   use ExUnit.Case, async: true
 
+  alias ThistleTea.Game.Aura
+  alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
+  alias ThistleTea.Game.Entity.Logic.Combat
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.ParryHaste
 
   @now -10_000
+
+  describe "Combat.receive_attack/4" do
+    test "a parried swing advances the defender and reports zero damage" do
+      entity = defender(2_000)
+      entity = %{entity | object: %Object{guid: 100}, unit: %{entity.unit | health: 100, level: 20}}
+      attack = %{caster: 1, caster_level: 20, caster_player?: true, damage: 10}
+
+      {result, events} = Combat.receive_attack(entity, attack, @now, roll: 1_000)
+
+      assert result.unit.health == 100
+      assert result.internal.blackboard.combat.next_attack_at == @now + 1_200
+      assert [%Effects.AttackerStateUpdate{damage: 0, attack: %{damage_state: 3}} | _] = events
+    end
+
+    test "a ranged attack cannot trigger parry haste" do
+      entity = defender(2_000)
+      entity = %{entity | object: %Object{guid: 100}, unit: %{entity.unit | health: 100, level: 20}}
+      attack = %{caster: 1, caster_level: 20, caster_player?: true, damage: 0, ranged?: true}
+
+      {result, _events} = Combat.receive_attack(entity, attack, @now, roll: 1_000)
+
+      assert result.internal.blackboard == entity.internal.blackboard
+    end
+  end
 
   describe "apply/3" do
     test "removes forty percent of the weapon period" do
@@ -33,6 +62,16 @@ defmodule ThistleTea.Game.Entity.Logic.ParryHasteTest do
 
     test "repeated parries cannot cross the floor" do
       result = Enum.reduce(1..5, defender(2_000), fn _, entity -> ParryHaste.apply(entity, :parry, @now) end)
+      assert result.internal.blackboard.combat.next_attack_at == @now + 400
+    end
+
+    test "uses the unmodified weapon period under melee haste" do
+      entity = defender(1_000)
+      holder = %Holder{auras: [%Aura{type: :mod_melee_haste, amount: 100}]}
+      entity = %{entity | unit: %{entity.unit | auras: [holder]}}
+
+      assert Combat.attack_speed_ms(entity) == 1_000
+      result = ParryHaste.apply(entity, :parry, @now)
       assert result.internal.blackboard.combat.next_attack_at == @now + 400
     end
 

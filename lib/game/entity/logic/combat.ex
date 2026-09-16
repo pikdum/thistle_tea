@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Logic.ParryHaste
   alias ThistleTea.Game.Entity.Logic.Reactive
   alias ThistleTea.Game.Entity.Logic.Skills
   alias ThistleTea.Game.Guid
@@ -163,6 +164,7 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
   def receive_attack(%{object: %{guid: target_guid}} = entity, attack, now, opts)
       when is_map(attack) and is_integer(target_guid) and is_integer(now) do
     result = AttackTable.resolve(entity, attack, attack_damage(attack), opts)
+    entity = ParryHaste.apply(entity, result.outcome, now)
 
     {entity, absorbed} =
       if result.damage > 0 do

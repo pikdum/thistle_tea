@@ -3,6 +3,8 @@ defmodule ThistleTea.Game.Entity.Server.PlayerTest do
   use ThistleTea.Game.Network.Opcodes, [:SMSG_LOGOUT_COMPLETE, :SMSG_UPDATE_OBJECT]
 
   alias ThistleTea.Account
+  alias ThistleTea.Game.Aura
+  alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Commands
   alias ThistleTea.Game.Entity.Data.Character
@@ -14,6 +16,7 @@ defmodule ThistleTea.Game.Entity.Server.PlayerTest do
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.ScriptStep
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.Companion, as: CompanionLogic
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Falling
@@ -459,6 +462,40 @@ defmodule ThistleTea.Game.Entity.Server.PlayerTest do
       assert character.internal.in_combat == true
       assert is_integer(character.internal.last_hostile_time)
       assert Regen.tick(character, 1_000).unit.health == 60
+    end
+
+    test "a parry replaces the pending tick so the shortened swing runs on time" do
+      now = Time.now()
+      blackboard = Blackboard.put_next_at(%Blackboard{}, :next_attack_at, 2_000, now)
+
+      holder = %Holder{
+        spell: %Spell{id: 1},
+        auras: [%Aura{type: :mod_parry_percent, amount: 200}, %Aura{type: :mod_dodge, amount: -200}]
+      }
+
+      character = character(1, health: 100, max_health: 100, level: 20, class: 1, base_attack_time: 2_000)
+
+      character = %{
+        character
+        | unit: %{character.unit | auras: [holder]},
+          player: %Player{},
+          internal: %{character.internal | blackboard: blackboard}
+      }
+
+      old_ref = Process.send_after(self(), :old_attack_tick, 60_000)
+      state = %State{character: character, player_tick_ref: old_ref}
+
+      {:noreply, state, {:continue, :maybe_broadcast_update}} =
+        PlayerServer.handle_cast(
+          {:receive_attack, %{caster: 2, caster_level: 20, hit_chance_bonus: 100, damage: 10}},
+          state
+        )
+
+      assert state.character.unit.health == 100
+      assert state.character.internal.blackboard.combat.next_attack_at == now + 1_200
+      assert state.player_tick_ref != old_ref
+      assert Process.read_timer(old_ref) == false
+      assert_receive :player_tick
     end
 
     test "ignores an attack already in flight during vanish immunity" do

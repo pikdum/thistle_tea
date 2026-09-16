@@ -242,7 +242,14 @@ defmodule ThistleTea.Game.Entity.Server.Player do
 
     if alive?, do: notify_defensive_pet(character, attack.caster)
 
-    {:noreply, %{state | character: character}, {:continue, :maybe_broadcast_update}}
+    state =
+      if character.internal.blackboard == state.character.internal.blackboard do
+        %{state | character: character}
+      else
+        TickScheduler.schedule_now(%{state | character: character})
+      end
+
+    {:noreply, state, {:continue, :maybe_broadcast_update}}
   end
 
   def handle_cast({:receive_heal, amount}, %{character: %Character{} = character} = state) do
