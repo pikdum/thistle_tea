@@ -60,7 +60,7 @@ defmodule ThistleTea.Game.Entity.Logic.Breathing do
 
   defp advance(character, previous, duration, draining?, now, damage_bonus) do
     maximum = if duration > 0, do: duration, else: previous.duration
-    remaining = previous.remaining + max(now - previous.updated_at, 0) * previous.scale
+    remaining = previous.remaining + max(now - previous.updated_at, 0) * previous.scale + maximum - previous.duration
 
     timer = %{
       previous

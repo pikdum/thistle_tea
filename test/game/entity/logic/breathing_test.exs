@@ -103,8 +103,19 @@ defmodule ThistleTea.Game.Entity.Logic.BreathingTest do
       assert extended.internal.breath.duration == 240_000
       expired = %{extended | unit: %{extended.unit | auras: []}} |> Breathing.update(10.0, 10_000)
       assert expired.internal.breath.duration == 60_000
-      assert expired.internal.breath.remaining == 60_000
+      assert expired.internal.breath.remaining == 50_000
       assert %Effects.StartMirrorTimer{duration: 60_000} = List.last(expired.internal.events)
+    end
+
+    test "extending an active reserve preserves time already spent underwater", %{character: character} do
+      extended =
+        character
+        |> Breathing.update(10.0, 0)
+        |> with_aura(:water_breathing_pct, 300)
+        |> Breathing.update(10.0, 10_000)
+
+      assert extended.internal.breath.duration == 240_000
+      assert extended.internal.breath.remaining == 230_000
     end
 
     test "physical immunity suppresses drowning damage and its log", %{character: character} do

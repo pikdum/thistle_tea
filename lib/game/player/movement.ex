@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.Player.Movement do
   use ThistleTea.Game.Network.Opcodes, [:MSG_MOVE_FALL_LAND, :MSG_MOVE_START_SWIM]
 
   alias ThistleTea.Game.Entity.Data.Character
+  alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.Logic.Breathing
   alias ThistleTea.Game.Entity.Logic.Falling
   alias ThistleTea.Game.Entity.Server.Player, as: PlayerServer
@@ -31,10 +32,15 @@ defmodule ThistleTea.Game.Player.Movement do
     Pathfinding.query_liquid_surface(character.internal.world.map_id, {x, y, z})
   end
 
-  def publish_changes(%{character: %Character{}} = state) do
-    state
-    |> PlayerServer.maybe_broadcast_update()
-    |> TickScheduler.ensure_scheduled()
+  def publish_changes(%{character: %Character{} = character} = state) do
+    state =
+      if character.internal.broadcast_update? do
+        PlayerServer.maybe_broadcast_update(state)
+      else
+        %{state | character: EventSink.emit_pending(character)}
+      end
+
+    TickScheduler.ensure_scheduled(state)
   end
 
   def publish_changes(state), do: state
