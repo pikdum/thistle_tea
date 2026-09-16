@@ -93,8 +93,12 @@ defmodule ThistleTea.Game.Party.Notifier do
 
   defp notify_leader_status(guid, leader?) do
     case EntityRegistry.whereis(guid) do
-      pid when is_pid(pid) -> GenServer.cast(pid, {:party_leader_changed, leader?})
-      _ -> :ok
+      pid when is_pid(pid) ->
+        GenServer.cast(pid, {:party_leader_changed, leader?})
+        GenServer.cast(pid, :party_visibility_changed)
+
+      _ ->
+        :ok
     end
   end
 end

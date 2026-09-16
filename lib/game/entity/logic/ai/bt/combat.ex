@@ -19,6 +19,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Hostility
+  alias ThistleTea.Game.Entity.Logic.Invisibility
   alias ThistleTea.Game.Entity.Logic.MeleeSpell
   alias ThistleTea.Game.Entity.Logic.PlayerCombat
   alias ThistleTea.Game.Entity.Logic.Resources
@@ -68,7 +69,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
   def target_valid_same_map?(_state, _blackboard), do: false
 
   def target_valid_same_map?(%{unit: %Unit{target: target}} = state, _blackboard, %Context{} = context) do
-    Navigation.target_valid_same_map?(state, target, context)
+    Navigation.target_valid_same_map?(state, target, context) and
+      Invisibility.detectable?(Invisibility.metadata(state), Perception.metadata(context.perception, target))
   end
 
   def target_valid_same_map?(_state, _blackboard, %Context{}), do: false
@@ -165,6 +167,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
   def melee_attack_with_context(state, blackboard, %Context{}), do: {:success, state, blackboard}
 
   defp perform_ready_attacks(state, target, blackboard, main_ready?, offhand_ready?, now) do
+    {state, events} = Aura.remove_with_interrupt_flags(state, Aura.interrupt_mask(:attack), now)
+    state = Effects.enqueue(state, events)
     state = PlayerCombat.mark_initiated(state, now)
     blackboard = clear_swing_error(blackboard)
     {state, blackboard} = perform_main_hand(state, target, blackboard, main_ready?, now)

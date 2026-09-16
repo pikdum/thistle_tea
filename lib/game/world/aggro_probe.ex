@@ -77,7 +77,8 @@ defmodule ThistleTea.Game.World.AggroProbe do
            :level,
            :stealthed?,
            :stealth_skill,
-           :undetectable_until
+           :undetectable_until,
+           :invisibility
          ]) do
       %{alive?: true} = player -> player
       _ -> nil
@@ -92,7 +93,10 @@ defmodule ThistleTea.Game.World.AggroProbe do
         :unit_flags,
         :level,
         :detection_range,
-        :proximity_aggro?
+        :proximity_aggro?,
+        :invisibility,
+        :invisibility_detection,
+        :detects_all_invisibility?
       ])
 
     if eligible?(mob, player, distance) do

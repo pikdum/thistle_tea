@@ -74,7 +74,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.PacketSink do
   end
 
   def ensure_created(%State{} = state, %UpdateObject{} = update) do
-    if duplicate_create?(state, update) do
+    if duplicate_create?(state, update) or not visible_update?(state, update) do
       state
     else
       update = Tap.personalize(update, state.guid)
@@ -88,12 +88,22 @@ defmodule ThistleTea.Game.Entity.Server.Player.PacketSink do
 
   defp send_update(%UpdateObject{} = update, %State{} = state) do
     viewer = state.guid
-    {packet, updates} = UpdateBatcher.batch(update, viewer, &Tap.personalize(&1, viewer))
+    {packet, updates} = UpdateBatcher.batch(update, viewer, &Tap.personalize(&1, viewer), &visible_update?(state, &1))
 
-    state
-    |> send_packet(packet)
-    |> track_created_updates(updates)
+    if updates == [] do
+      state
+    else
+      state
+      |> send_packet(packet)
+      |> track_created_updates(updates)
+    end
   end
+
+  defp visible_update?(state, %UpdateObject{object: %{guid: guid}}) when is_integer(guid) do
+    Guid.entity_type(guid) == :item or Visibility.can_see?(state, guid)
+  end
+
+  defp visible_update?(_state, _update), do: true
 
   defp send_message(%State{} = state, %Packet{} = packet), do: send_packet(state, packet)
 

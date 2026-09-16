@@ -43,6 +43,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Entity.Logic.Engagement.Tap
   alias ThistleTea.Game.Entity.Logic.Experience
   alias ThistleTea.Game.Entity.Logic.Hostility
+  alias ThistleTea.Game.Entity.Logic.Invisibility
   alias ThistleTea.Game.Entity.Logic.Loot.Actor
   alias ThistleTea.Game.Entity.Logic.Loot.Commit
   alias ThistleTea.Game.Entity.Logic.Loot.Release
@@ -93,7 +94,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     Process.flag(:trap_exit, true)
     state = Incarnation.ensure(state)
     state = BT.init(state, behavior_tree(state))
-    Metadata.update(state.object.guid, %{incarnation_id: Incarnation.id(state)})
+    Metadata.update(state.object.guid, Map.put(Invisibility.metadata(state), :incarnation_id, Incarnation.id(state)))
     state = sync_orientation_metadata(state)
     World.update_position(state)
     state = Visibility.join_entity(state)
@@ -867,6 +868,8 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
   defp broadcast_if_pending(%Mob{internal: %Internal{broadcast_update?: true}} = state) do
     if !Corpse.removed?(state) do
+      detection = Invisibility.metadata(state)
+      previous_detection = Metadata.query(state.object.guid, Map.keys(detection))
       update_type = if Core.dead?(state), do: :create_object2, else: :values
       Core.update_object(state, update_type) |> World.broadcast_packet(state)
 
@@ -888,8 +891,10 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
         }
         |> Map.merge(FactionLoader.metadata(state.unit.faction_template))
         |> Map.merge(control_metadata(state))
+        |> Map.merge(detection)
 
       Metadata.update(state.object.guid, metadata)
+      if previous_detection != detection, do: Visibility.notify_visibility_changed(state)
     end
 
     %{state | internal: %{state.internal | broadcast_update?: false}}

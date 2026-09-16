@@ -1,6 +1,8 @@
 defmodule ThistleTea.Game.World.VisibilityTest do
   use ExUnit.Case, async: false
 
+  alias ThistleTea.Game.Aura
+  alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
@@ -102,6 +104,58 @@ defmodule ThistleTea.Game.World.VisibilityTest do
       state = Visibility.handle_events(state, [event])
       assert Visibility.tracked?(state, transport_guid)
       refute_receive {:"$gen_cast", {:send_packet, %Message.SmsgDestroyObject{}, _opts}}
+    end
+  end
+
+  describe "can_see?/2" do
+    test "reveals hidden units only with matching detection and preserves self visibility" do
+      guid = Guid.from_low_guid(:player, unique_low())
+      target = Guid.from_low_guid(:mob, unique_low(), unique_low())
+      viewer = character(guid, ghost?: false)
+      state = %{guid: guid, character: viewer}
+      Metadata.put(target, %{invisibility: %{0 => 200}})
+      on_exit(fn -> Metadata.delete(target) end)
+
+      refute Visibility.can_see?(state, target)
+      assert Visibility.can_see?(state, guid)
+
+      detection = %Holder{
+        auras: [%Aura{type: :mod_invisibility_detect, misc_value: 0, amount: 200}]
+      }
+
+      detected = %{viewer | unit: %{viewer.unit | auras: [detection]}}
+      assert Visibility.can_see?(%{state | character: detected}, target)
+      Metadata.update(target, %{invisibility: %{1 => 200}})
+      refute Visibility.can_see?(%{state | character: detected}, target)
+      Metadata.update(target, %{invisibility: %{}})
+      assert Visibility.can_see?(state, target)
+    end
+
+    test "destroys a hidden tracked unit and recreates it after invisibility ends" do
+      guid = Guid.from_low_guid(:player, unique_low())
+      target = Guid.from_low_guid(:mob, unique_low(), unique_low())
+      SpatialHash.insert(:mobs, target, 0, 0, 0, 0)
+      Metadata.put(target, %{invisibility: %{0 => 200}})
+      Entity.register(target)
+
+      on_exit(fn ->
+        SpatialHash.remove(:mobs, target)
+        Metadata.delete(target)
+      end)
+
+      state = %{
+        guid: guid,
+        character: character(guid, ghost?: false),
+        visibility_cells: MapSet.new([{WorldRef.open(0), 0, 0}]),
+        tracked_entities: MapSet.new([target])
+      }
+
+      Visibility.reevaluate_entity(state, target)
+      assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgDestroyObject{guid: ^target}, force: true}}
+      state = Visibility.untrack_entity(state, target)
+      Metadata.update(target, %{invisibility: %{}})
+      Visibility.reevaluate_entity(state, target)
+      assert_receive {:"$gen_cast", {:send_update_to, ^guid}}
     end
   end
 

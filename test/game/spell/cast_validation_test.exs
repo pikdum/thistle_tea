@@ -84,6 +84,17 @@ defmodule ThistleTea.Game.Spell.CastValidationTest do
   end
 
   describe "caster state gating" do
+    test "rejects a concealed explicit target" do
+      assert {:error, :bad_targets} =
+               CastValidation.validate(
+                 caster(),
+                 harmful_spell(),
+                 Target.self(100),
+                 hostile_target(visible?: false),
+                 @now
+               )
+    end
+
     test "stunned casters cannot cast, except stun-immunity-purging spells" do
       stunned = caster(auras: [control_holder(:mod_stun)])
 

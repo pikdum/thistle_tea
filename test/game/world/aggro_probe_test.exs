@@ -8,6 +8,22 @@ defmodule ThistleTea.Game.World.AggroProbeTest do
   alias ThistleTea.Game.World.SpatialHash
 
   describe "notify_player_moved/4" do
+    test "invisibility blocks aggro until the creature has matching detection" do
+      table = table()
+      player_guid = player_guid()
+      mob_guid = mob_guid()
+      put_player(player_guid)
+      Metadata.update(player_guid, %{invisibility: %{0 => 200}})
+      put_mob(mob_guid, {1.0, 0.0, 0.0})
+
+      AggroProbe.notify_player_moved(player_guid, 0, {0.0, 0.0, 0.0}, table)
+      refute_receive {:"$gen_cast", {:aggro_probe, ^player_guid}}
+
+      Metadata.update(mob_guid, %{invisibility_detection: %{0 => 200}})
+      AggroProbe.notify_player_moved(player_guid, 0, {3.0, 0.0, 0.0}, table)
+      assert_receive {:"$gen_cast", {:aggro_probe, ^player_guid}}
+    end
+
     test "probes nearby hostile mobs when a player moves" do
       table = table()
       player_guid = player_guid()

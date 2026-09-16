@@ -371,6 +371,8 @@ defmodule ThistleTea.Game.Spell.CastValidation do
 
   defp check_reagents(_caster, _spell, _count_item), do: :ok
 
+  defp check_target(%Spell{}, %{visible?: false}), do: {:error, :bad_targets}
+
   defp check_target(%Spell{} = spell, target_info) do
     cond do
       Spell.resurrect_spell?(spell) -> check_resurrect_target(target_info)

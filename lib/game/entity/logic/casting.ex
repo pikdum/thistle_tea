@@ -47,7 +47,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
 
   def start(%{internal: %Internal{}} = character, %Spell{} = spell, %Target{} = targets, now, cast_item_guid)
       when is_integer(now) do
-    character = Mount.prepare_cast(character, spell, now)
+    character = character |> Mount.prepare_cast(spell, now) |> interrupt_action_auras(:action, now)
 
     if Spell.attribute?(spell, :on_next_swing) do
       MeleeSpell.queue_next_swing(character, spell)
@@ -179,6 +179,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
       |> queue_spell_miss_outcomes(casting, resolution.misses)
       |> queue_consume_costs(resolution.costs)
       |> break_stealth(casting, now)
+      |> interrupt_action_auras(:action_complete, now)
       |> mark_hostile_cast(casting, attempted_targets, now)
 
     casting = Cast.transition(casting, :impact)
@@ -488,6 +489,11 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
     else
       character
     end
+  end
+
+  defp interrupt_action_auras(entity, action, now) do
+    {entity, events} = AuraLogic.remove_with_interrupt_flags(entity, AuraLogic.interrupt_mask(action), now)
+    Effects.enqueue(entity, events)
   end
 
   def cancel(%{internal: %Internal{} = internal} = character) do

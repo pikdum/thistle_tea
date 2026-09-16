@@ -39,6 +39,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.System.Duel, as: DuelSystem
   alias ThistleTea.Game.World.System.Party, as: PartySystem
+  alias ThistleTea.Game.World.Visibility
 
   require Logger
 
@@ -383,6 +384,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
 
         %{
           guid: guid,
+          visible?: Visibility.can_see?(%{guid: character.object.guid, character: character}, guid),
           alive?: Map.get(metadata, :alive?, true),
           hostile?: Hostility.hostile?(character, metadata),
           friendly?: Hostility.friendly?(character, metadata),

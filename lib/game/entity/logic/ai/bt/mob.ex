@@ -32,6 +32,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Engagement
   alias ThistleTea.Game.Entity.Logic.Hostility
+  alias ThistleTea.Game.Entity.Logic.Invisibility
   alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.Entity.Logic.StealthDetection
   alias ThistleTea.Game.Entity.Logic.TemporaryFaction
@@ -492,8 +493,12 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     Perception.actor(perception, guid)
   end
 
-  defp detectable_target?(%Mob{unit: %Unit{level: level}}, guid, distance, %Context{now: now, perception: perception}) do
-    StealthDetection.detectable?(%{level: level}, Perception.metadata(perception, guid), distance, now)
+  defp detectable_target?(%Mob{unit: %Unit{level: level}} = state, guid, distance, %Context{
+         now: now,
+         perception: perception
+       }) do
+    detector = Map.put(Invisibility.metadata(state), :level, level)
+    StealthDetection.detectable?(detector, Perception.metadata(perception, guid), distance, now)
   end
 
   defp aggro_radius(%Mob{unit: %Unit{level: level}} = state, target_guid, perception)
@@ -640,6 +645,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
 
   defp valid_victim?(%Mob{} = state, target_guid, %Context{perception: perception} = context) do
     Navigation.target_alive_same_map?(state, target_guid, context) and
+      Invisibility.detectable?(Invisibility.metadata(state), Perception.metadata(perception, target_guid)) and
       Hostility.valid_attack_target?(
         perception_actor(state, perception),
         Perception.actor(perception, target_guid)

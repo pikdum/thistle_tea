@@ -12,15 +12,16 @@ defmodule ThistleTea.Game.Network.UpdateBatcher do
 
   @update_batch_max 100
 
-  def batch(%UpdateObject{} = update, recipient_guid, personalize \\ & &1) do
-    updates = accumulate(update, personalize)
+  def batch(%UpdateObject{} = update, recipient_guid, personalize \\ & &1, visible? \\ fn _ -> true end) do
+    updates = accumulate(update, personalize, visible?)
     {UpdateObject.to_packet(updates, recipient_guid), updates}
   end
 
-  defp accumulate(%UpdateObject{} = update, personalize) do
+  defp accumulate(%UpdateObject{} = update, personalize, visible?) do
     [update]
     |> drain_pending(1)
     |> Enum.reverse()
+    |> Enum.filter(visible?)
     |> Enum.map(personalize)
     |> dedupe_values()
   end

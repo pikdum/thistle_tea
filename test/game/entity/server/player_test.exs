@@ -171,6 +171,20 @@ defmodule ThistleTea.Game.Entity.Server.PlayerTest do
   end
 
   describe "handle_cast/2" do
+    test "drops stale queued creates for invisible units" do
+      guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
+      target = Guid.from_low_guid(:mob, System.unique_integer([:positive]), 721)
+      Metadata.put(target, %{invisibility: %{0 => 200}})
+      on_exit(fn -> Metadata.delete(target) end)
+      state = %State{guid: guid, character: character(guid, []), connection_pid: self()}
+      GenServer.cast(self(), {:send_packet, update_object(:unit, target)})
+
+      {:noreply, state} = PlayerServer.handle_cast({:send_packet, update_object(:player, guid)}, state)
+      assert_receive {:"$gen_cast", {:write_packet, packet}}
+      assert object_count(packet) == 1
+      refute MapSet.member?(state.tracked_entities, target)
+    end
+
     test "drops source-scoped packets for untracked entities" do
       state = %State{tracked_entities: MapSet.new()}
       packet = %Packet{opcode: 0x123, payload: <<>>}

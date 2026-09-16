@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.World.Visibility do
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Corpse
   alias ThistleTea.Game.Entity.Logic.Death
+  alias ThistleTea.Game.Entity.Logic.Invisibility
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
@@ -21,6 +22,7 @@ defmodule ThistleTea.Game.World.Visibility do
   alias ThistleTea.Game.World.Groups
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.System.CellActivator
+  alias ThistleTea.Game.World.System.Party, as: PartySystem
   alias ThistleTea.Game.World.Transports
   alias ThistleTea.Game.World.Visibility.Filter
   alias ThistleTea.Game.WorldRef
@@ -233,17 +235,38 @@ defmodule ThistleTea.Game.World.Visibility do
 
   def notify_visibility_changed(_character), do: :ok
 
-  defp can_see?(state, guid) do
+  def can_see?(%{guid: guid}, guid), do: true
+
+  def can_see?(state, guid) do
     case Map.get(state, :character) do
       %Character{} = character ->
         ghost? = Death.ghost?(character)
         type = Guid.entity_type(guid)
         distance = if ghost? and type == :mob, do: corpse_distance(character, guid)
-        Filter.can_see?(ghost?, type, Metadata.get(guid) || %{}, distance)
+        meta = Metadata.get(guid) || %{}
+
+        Filter.can_see?(ghost?, type, meta, distance) and
+          (Invisibility.detectable?(Invisibility.metadata(character), meta) or
+             owned_or_grouped?(character.object.guid, guid, meta))
 
       _missing ->
         true
     end
+  end
+
+  def sync_detection(state, previous, current) when previous == current, do: state
+
+  def sync_detection(%{character: character} = state, _previous, _current) do
+    notify_visibility_changed(character)
+    resync_player(state)
+  end
+
+  defp owned_or_grouped?(viewer, target, meta) do
+    Map.get(meta, :owner_guid) == viewer or
+      case PartySystem.group_of(viewer) do
+        %{members: members} -> Enum.any?(members, &(&1.guid == target))
+        _ -> false
+      end
   end
 
   defp corpse_distance(%{object: %{guid: viewer_guid}}, target_guid) do

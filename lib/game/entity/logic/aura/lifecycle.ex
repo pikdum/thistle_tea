@@ -31,6 +31,9 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Lifecycle do
   def interrupt_mask(:stand), do: @aura_interrupt_not_seated
   def interrupt_mask(:above_water), do: @aura_interrupt_above_water
   def interrupt_mask(:under_water), do: @aura_interrupt_under_water
+  def interrupt_mask(:action), do: 0x00000004
+  def interrupt_mask(:action_complete), do: 0x00010000
+  def interrupt_mask(:attack), do: 0x00001000
 
   def self_duration_events(%Character{unit: %Unit{auras: holders}}, now) when is_list(holders) and is_integer(now) do
     Enum.flat_map(holders, &duration_event(&1, now))

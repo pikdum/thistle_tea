@@ -17,6 +17,16 @@ defmodule ThistleTea.Game.World.Loader.SpellVmangosTest do
 
   @moduletag :dbc_db
 
+  describe "invisibility auras" do
+    test "loads potion invisibility and all warlock detection ranks" do
+      assert Enum.any?(SpellLoader.load(11_392).effects, &(&1.aura == :mod_invisibility and &1.misc_value == 0))
+
+      for id <- [132, 2970, 11_743] do
+        assert Enum.any?(SpellLoader.load(id).effects, &(&1.aura == :mod_invisibility_detect and &1.misc_value == 0))
+      end
+    end
+  end
+
   setup_all do
     :ok = SpellThreat.load_all()
     :ok = SpellEffectOverride.load_all()

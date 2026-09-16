@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgAttackswing do
   alias ThistleTea.Game.Entity.Server.Player.TickScheduler
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.Visibility
 
   require Logger
 
@@ -58,11 +59,15 @@ defmodule ThistleTea.Game.Network.Message.CmsgAttackswing do
 
   defp maybe_reset_attack_started(character, _target_guid), do: character
 
-  defp valid_attack_target?(%{guid: guid, character: %Character{internal: %{world: world}} = character}, target_guid)
+  defp valid_attack_target?(
+         %{guid: guid, character: %Character{internal: %{world: world}} = character} = state,
+         target_guid
+       )
        when is_integer(target_guid) and target_guid > 0 do
     target_guid != guid and
       match?({^world, _x, _y, _z}, World.position(target_guid)) and
       unit_target?(target_guid) and
+      Visibility.can_see?(state, target_guid) and
       Hostility.attackable?(character, target_guid)
   end
 

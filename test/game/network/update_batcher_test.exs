@@ -26,6 +26,16 @@ defmodule ThistleTea.Game.Network.UpdateBatcherTest do
     end
   end
 
+  describe "batch/4" do
+    test "filters hidden initial and queued objects before serialization" do
+      GenServer.cast(self(), {:send_packet, values_update(2)})
+      GenServer.cast(self(), {:send_packet, values_update(3)})
+
+      {_packet, updates} = UpdateBatcher.batch(values_update(1), 99, & &1, &(&1.object.guid == 2))
+      assert [%UpdateObject{object: %Object{guid: 2}}] = updates
+    end
+  end
+
   defp values_update(guid, opts \\ []) do
     %UpdateObject{
       update_type: :values,

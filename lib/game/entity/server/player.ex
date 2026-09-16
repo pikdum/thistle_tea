@@ -476,6 +476,15 @@ defmodule ThistleTea.Game.Entity.Server.Player do
     {:noreply, state}
   end
 
+  def handle_cast(:party_visibility_changed, %{character: %Character{} = character} = state) do
+    Visibility.notify_visibility_changed(character)
+    {:noreply, Visibility.resync_player(state)}
+  rescue
+    error ->
+      Logger.error("Party visibility refresh failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
   @impl GenServer
   def handle_cast({:set_speed, rate}, %{character: %Character{} = character} = state) do
     character = MovementStats.set_run_speed_rate(character, rate)
@@ -1115,6 +1124,8 @@ defmodule ThistleTea.Game.Entity.Server.Player do
 
   defp sync_character_metadata(%{guid: guid, character: %Character{} = character} = state) when is_integer(guid) do
     detection = StealthDetection.target_metadata(character)
+    detection_keys = [:invisibility, :invisibility_detection, :detects_all_invisibility?]
+    previous_detection = Metadata.query(guid, detection_keys)
 
     previous_subject =
       case Metadata.query(guid, [:condition_subject]) do
@@ -1151,7 +1162,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
       |> Map.merge(detection)
     )
 
-    state
+    Visibility.sync_detection(state, previous_detection, Map.take(detection, detection_keys))
   end
 
   defp sync_character_metadata(state), do: state
