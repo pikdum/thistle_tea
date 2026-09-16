@@ -12,11 +12,13 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Player do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Ranged, as: RangedBT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Spell, as: SpellBT
   alias ThistleTea.Game.Entity.Logic.Breathing
+  alias ThistleTea.Game.Entity.Logic.Intoxication
   alias ThistleTea.Game.Entity.Logic.PlayerCombat
   alias ThistleTea.Game.Entity.Logic.Reactive
 
   def tree do
     BT.selector([
+      BT.action(&sobering_tick/3),
       BT.action(&breathing_tick/3),
       BT.action(&sync_combat/2),
       BT.action(&reactive_tick/3),
@@ -25,6 +27,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Player do
       CombatBT.melee_sequence(),
       BT.action(&idle/2)
     ])
+  end
+
+  defp sobering_tick(state, blackboard, %Context{now: now}) do
+    {:failure, Intoxication.tick(state, now), blackboard}
   end
 
   defp breathing_tick(%Character{} = state, blackboard, %Context{} = context) do

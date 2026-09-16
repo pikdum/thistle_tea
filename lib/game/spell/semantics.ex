@@ -106,7 +106,7 @@ defmodule ThistleTea.Game.Spell.Semantics do
   ]
 
   @aura [:apply_aura, :apply_area_aura, :persistent_area_aura, :dispel, :dispel_mechanic]
-  @resource [:energize, :power_drain, :power_burn, :add_combo_points]
+  @resource [:energize, :power_drain, :power_burn, :add_combo_points, :inebriate]
   @movement [:leap, :teleport_units, :charge, :add_farsight, :distract]
 
   @summon_control [

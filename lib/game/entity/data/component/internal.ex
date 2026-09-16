@@ -39,6 +39,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal do
     :threat_refs,
     :last_hostile_time,
     :last_mana_use_at,
+    :next_sober_at,
     :health_regen_carry,
     :running,
     :behavior_tree,

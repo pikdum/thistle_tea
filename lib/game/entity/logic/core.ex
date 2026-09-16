@@ -23,6 +23,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
   alias ThistleTea.Game.Entity.Logic.Dueling
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Engagement
+  alias ThistleTea.Game.Entity.Logic.Intoxication
   alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.Entity.Logic.PlayerCombat
   alias ThistleTea.Game.Entity.Logic.Reactive
@@ -366,6 +367,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
     }
 
     %{entity | unit: unit, internal: internal, movement_block: movement_block}
+    |> Intoxication.clear()
     |> Effects.enqueue(Effects.movement_stopped())
     |> maybe_release_companion()
     |> Combat.sync_combat_flag()

@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.Resource do
   alias ThistleTea.Game.Entity.Data.Component.Internal.Pet
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Logic.Intoxication
   alias ThistleTea.Game.Entity.Logic.Resources
   alias ThistleTea.Game.Entity.Logic.SpellEffect.Amount
   alias ThistleTea.Game.Entity.Logic.Warrior
@@ -86,6 +87,10 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.Resource do
     else
       {state, []}
     end
+  end
+
+  def apply(state, %CastContext{} = context, spell, %Effect{type: :inebriate} = effect, now) do
+    {Intoxication.drink(state, Amount.roll(spell, effect, context), now), []}
   end
 
   def apply(state, _context, _spell, _effect, _now), do: {state, []}

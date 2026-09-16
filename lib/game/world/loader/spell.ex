@@ -546,6 +546,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp effect_type(type) when type in 87..90, do: :summon_totem
   defp effect_type(96), do: :charge
   defp effect_type(101), do: :feed_pet
+  defp effect_type(100), do: :inebriate
   defp effect_type(102), do: :dismiss_pet
   defp effect_type(103), do: :reputation
   defp effect_type(108), do: :dispel_mechanic

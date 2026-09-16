@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Tick do
   alias ThistleTea.Game.Entity.Logic.AI.TickPlan
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Breathing
+  alias ThistleTea.Game.Entity.Logic.Intoxication
   alias ThistleTea.Game.Entity.Logic.Regen
   alias ThistleTea.Game.Spell.Cast
 
@@ -40,7 +41,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Tick do
 
   def needs_tick?(%{unit: %Unit{auras: [_ | _]}}), do: true
 
-  def needs_tick?(character), do: Breathing.needs_tick?(character) or Regen.needs_regen?(character)
+  def needs_tick?(character),
+    do: Breathing.needs_tick?(character) or Regen.needs_regen?(character) or Intoxication.needs_tick?(character)
 
   def plan(entity, status, now) when is_integer(now) do
     TickPlan.new(now)
@@ -48,6 +50,15 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Tick do
     |> schedule_aura(entity)
     |> schedule_regen(entity)
     |> schedule_breathing(entity)
+    |> schedule_sobering(entity)
+  end
+
+  defp schedule_sobering(plan, entity) do
+    if Intoxication.needs_tick?(entity) do
+      TickPlan.schedule_at(plan, :sobering, entity.internal.next_sober_at || plan.now)
+    else
+      plan
+    end
   end
 
   defp schedule_breathing(plan, entity) do
