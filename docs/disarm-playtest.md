@@ -29,7 +29,8 @@ The reference behaviors are `Aura::HandleAuraModDisarm`,
 
 Focused tests exercise damage and speed, off-hand preservation, independent
 attack skills, overlapping aura expiry, changed canonical weapon inputs,
-current attack power, feral forms, death cleanup, creature weapon presence,
+current attack power, feral forms, death cleanup, creature weapon presence
+and flat damage bonuses,
 cast and queued-swing rejection, unarmed spell snapshots, parry restoration,
 wand eligibility, and the serialized equipment-error packet.
 

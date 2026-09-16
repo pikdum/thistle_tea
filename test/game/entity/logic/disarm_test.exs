@@ -151,6 +151,16 @@ defmodule ThistleTea.Game.Entity.Logic.DisarmTest do
       assert Combat.attack_speed_ms(mob) == 2_600
       assert Combat.offhand_damage_range(mob) == {15.0, 20.0}
       assert Combat.damage_range(%{mob | unit: %{unit | virtual_item_info: <<0::192>>}}) == {100.0, 150.0}
+
+      bonus = %Holder{
+        spell: %Spell{id: 2},
+        caster_guid: 3,
+        auras: [%Aura{type: :mod_damage_done, amount: 25, misc_value: 1}]
+      }
+
+      buffed = %{mob | unit: %{unit | auras: [holder(), bonus]}}
+      assert Combat.damage_range(buffed) == {50.0, 70.0}
+      assert Combat.offhand_damage_range(buffed) == {40.0, 45.0}
     end
   end
 

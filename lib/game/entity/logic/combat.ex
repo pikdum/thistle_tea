@@ -98,15 +98,14 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
         } = entity
       )
       when is_number(min_damage) and is_number(max_damage) do
-    multiplier = damage_multiplier(damage_multiplier) * Disarm.damage_multiplier(entity)
+    multiplier = damage_multiplier(damage_multiplier)
 
-    outgoing_damage_range(entity, {min_damage * multiplier, max_damage * multiplier})
+    mainhand_damage_range(entity, {min_damage * multiplier, max_damage * multiplier})
   end
 
   def damage_range(%{unit: %Unit{min_damage: min_damage, max_damage: max_damage}} = entity)
       when is_number(min_damage) and is_number(max_damage) do
-    range = scale_damage_range({min_damage, max_damage}, Disarm.damage_multiplier(entity))
-    outgoing_damage_range(entity, range)
+    mainhand_damage_range(entity, {min_damage, max_damage})
   end
 
   def damage_range(_entity), do: {@default_damage, @default_damage}
@@ -115,6 +114,12 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
 
   defp scale_damage_range(range, 1.0), do: range
   defp scale_damage_range({min_damage, max_damage}, multiplier), do: {min_damage * multiplier, max_damage * multiplier}
+
+  defp mainhand_damage_range(entity, range) do
+    entity
+    |> outgoing_damage_range(range)
+    |> scale_damage_range(Disarm.damage_multiplier(entity))
+  end
 
   defp outgoing_damage_range(entity, {min_damage, max_damage}) do
     flat = Aura.flat_modifier(entity, :mod_damage_done, @physical_school_mask)
