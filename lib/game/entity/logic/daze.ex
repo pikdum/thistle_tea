@@ -35,7 +35,7 @@ defmodule ThistleTea.Game.Entity.Logic.Daze do
       when is_integer(level) and is_integer(attacker_level) do
     base = if level < 30, do: 0.65 * level + 0.5, else: 20.0
     attack_skill = Map.get(attack, :caster_attack_skill) || attacker_level * 5
-    (base + (attack_skill - defense_skill(entity, level)) * 0.2) |> max(0.0) |> min(40.0)
+    (base + (attack_skill - Skills.defense_value(entity)) * 0.2) |> max(0.0) |> min(40.0)
   end
 
   defp eligible?(entity, %{caster_can_daze?: true, caster: caster, caster_level: level} = attack)
@@ -58,7 +58,4 @@ defmodule ThistleTea.Game.Entity.Logic.Daze do
   end
 
   defp behind?(_entity, _position), do: false
-
-  defp defense_skill(%{player: %{skills: skills}}, level), do: Skills.value(skills, Skills.defense_skill(), level * 5)
-  defp defense_skill(_entity, level), do: level * 5
 end

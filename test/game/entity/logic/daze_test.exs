@@ -46,6 +46,21 @@ defmodule ThistleTea.Game.Entity.Logic.DazeTest do
       assert Daze.chance(character, %{attack | caster_level: 1}) == 0.0
       assert Daze.chance(character, Map.put(attack, :caster_attack_skill, 175)) == 25.0
     end
+
+    test "defense bonuses protect against daze and melee hits", %{character: character, attack: attack} do
+      holder = %Holder{
+        auras: [
+          %Aura{type: :mod_skill, misc_value: 95, amount: 10},
+          %Aura{type: :mod_skill_talent, misc_value: 95, amount: 10},
+          %Aura{type: :mod_skill, misc_value: 43, amount: 100}
+        ]
+      }
+
+      defended = %{character | unit: %{character.unit | auras: [holder]}}
+      assert Daze.chance(defended, attack) == 16.0
+      assert AttackTable.resolve(character, attack, 10, roll: 550).outcome != :miss
+      assert AttackTable.resolve(defended, attack, 10, roll: 550).outcome == :miss
+    end
   end
 
   describe "events/4" do

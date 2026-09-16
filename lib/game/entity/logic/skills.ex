@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.Entity.Logic.Skills do
   from combat use, `:tier` skills use their trained profession cap, `:mono`
   skills stay 1/1, and `:language` skills stay 300/300.
   """
+  alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Experience
 
   @max_skill_entries 128
@@ -35,6 +36,20 @@ defmodule ThistleTea.Game.Entity.Logic.Skills do
   }
 
   def defense_skill, do: @defense_skill
+
+  def defense_value(%{player: %{skills: skills}, unit: %{level: level}} = entity) do
+    base = value(skills, @defense_skill, max_for_level(level || 1))
+
+    bonus =
+      [:mod_skill, :mod_skill_talent]
+      |> Enum.flat_map(&Aura.auras_of_type(entity, &1))
+      |> Enum.filter(&(&1.misc_value == @defense_skill and is_integer(&1.amount)))
+      |> Enum.reduce(0, &(&1.amount + &2))
+
+    max(base + bonus, 0)
+  end
+
+  def defense_value(%{unit: %{level: level}}), do: max_for_level(level || 1)
   def unarmed_skill, do: @unarmed_skill
   def fishing_skill, do: @fishing_skill
 
