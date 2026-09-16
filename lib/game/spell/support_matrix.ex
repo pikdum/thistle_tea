@@ -25,7 +25,6 @@ defmodule ThistleTea.Game.Spell.SupportMatrix do
     45 => :honor,
     47 => :tradeskill,
     49 => :detect,
-    69 => :distract,
     71 => :pickpocket,
     76 => :summon_object_wild,
     78 => :attack,

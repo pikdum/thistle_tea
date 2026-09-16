@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.Entity.Logic.Engagement do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.Casting
   alias ThistleTea.Game.Entity.Logic.Combat
+  alias ThistleTea.Game.Entity.Logic.Distraction
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.TemporaryFaction
   alias ThistleTea.Game.Entity.Logic.Threat
@@ -58,7 +59,8 @@ defmodule ThistleTea.Game.Entity.Logic.Engagement do
   defp enter_active(%Mob{internal: %Internal{} = internal} = entity, target_guid, now, opts)
        when is_integer(target_guid) and target_guid > 0 and is_integer(now) do
     previous = entity
-    entity = %{entity | internal: %{internal | in_combat: true, last_hostile_time: now}}
+    blackboard = internal.blackboard |> Blackboard.ensure() |> Distraction.clear()
+    entity = %{entity | internal: %{internal | in_combat: true, last_hostile_time: now, blackboard: blackboard}}
     entity = Threat.add(entity, target_guid, 0)
     selection = Keyword.get(opts, :selection, default_selection(entity))
 

@@ -241,6 +241,8 @@ defmodule ThistleTea.Game.Spell do
 
   def harmful?(_spell), do: false
 
+  def starts_combat?(%__MODULE__{} = spell), do: harmful?(spell) and not attribute?(spell, :no_threat)
+
   def healing?(%__MODULE__{effects: effects}) do
     Enum.any?(effects, fn
       %Effect{type: type} when type in [:heal, :heal_max_health] ->

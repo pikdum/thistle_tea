@@ -2,6 +2,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Blackboard.Navigation do
   @moduledoc false
 
   defstruct target: nil,
+            distracted_until: nil,
             move_target: nil,
             scripted_waypoint_route: nil,
             movement_override: nil,

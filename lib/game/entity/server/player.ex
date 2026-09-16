@@ -347,7 +347,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
 
     state = %{state | character: character}
     state = if harmful? and alive?, do: TickScheduler.ensure_scheduled(state), else: state
-    if harmful? and alive?, do: notify_defensive_pet(character, spell_caster_guid(caster))
+    if Spell.starts_combat?(spell) and alive?, do: notify_defensive_pet(character, spell_caster_guid(caster))
 
     {:noreply, state, {:continue, :maybe_broadcast_update}}
   end
@@ -362,7 +362,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
         now = Time.now()
 
         character =
-          if harmful?,
+          if Spell.starts_combat?(spell),
             do: PlayerCombat.mark_attacked(character, now, PlayerReputation.faction_id(caster_guid)),
             else: character
 
@@ -372,7 +372,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
         if harmful?, do: TickScheduler.ensure_scheduled(state), else: state
       end
 
-    if harmful? and Death.alive?(character), do: notify_defensive_pet(state.character, caster_guid)
+    if Spell.starts_combat?(spell) and Death.alive?(character), do: notify_defensive_pet(state.character, caster_guid)
 
     {:noreply, state, {:continue, :maybe_broadcast_update}}
   end
@@ -1361,11 +1361,11 @@ defmodule ThistleTea.Game.Entity.Server.Player do
       character
     else
       character =
-        PlayerCombat.mark_attacked(
-          character,
-          now,
-          caster |> spell_caster_guid() |> PlayerReputation.faction_id()
-        )
+        if Spell.starts_combat?(spell) do
+          PlayerCombat.mark_attacked(character, now, caster |> spell_caster_guid() |> PlayerReputation.faction_id())
+        else
+          character
+        end
 
       {character, events} = SpellEffect.receive(character, caster, spell, now)
       notify_spell_hit_target(caster, character.object.guid, spell, events)

@@ -292,7 +292,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     caster_guid = caster_guid(caster)
 
     state =
-      if Spell.harmful?(spell) and not Core.dead?(state) do
+      if Spell.starts_combat?(spell) and not Core.dead?(state) do
         state
         |> engage_combat(caster_guid)
         |> eventai_spell_hit(caster_guid, spell)
@@ -314,7 +314,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
   def handle_cast({:receive_spell_outcome, caster_guid, spell, outcome}, state) do
     previous = state
-    state = engage_combat(state, caster_guid)
+    state = if Spell.starts_combat?(spell), do: engage_combat(state, caster_guid), else: state
     {state, events} = SpellEffect.receive_outcome(state, caster_guid, spell, outcome, Time.now())
 
     state =

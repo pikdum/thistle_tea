@@ -19,6 +19,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Navigation
   alias ThistleTea.Game.Entity.Logic.AI.BT.Spell, as: SpellBT
   alias ThistleTea.Game.Entity.Logic.Core
+  alias ThistleTea.Game.Entity.Logic.Distraction
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Engagement
   alias ThistleTea.Game.Entity.Logic.Hostility
@@ -55,6 +56,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet do
       ]),
       BT.action(&cast_missing_self_buff/3),
       BT.sequence([BT.condition(&aggressive?/2), BT.action(&acquire_aggressive_target/3)]),
+      BT.action(&Distraction.tick/3),
       BT.sequence([BT.condition(&should_follow?/2), BT.action(&follow_owner/3)]),
       BT.action(&idle/2)
     ])

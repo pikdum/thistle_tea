@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.Entity.Logic.SpellEffect.Movement do
   @moduledoc false
 
+  alias ThistleTea.Game.Entity.Logic.Distraction
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
@@ -20,6 +21,10 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.Movement do
 
   def apply(state, %CastContext{}, %Spell{id: spell_id}, %Effect{type: :teleport_units}, _now) do
     {state, [Effects.teleport_to_spell_target(spell_id)]}
+  end
+
+  def apply(state, %CastContext{destination_position: destination}, _spell, %Effect{type: :distract} = effect, now) do
+    Distraction.apply(state, destination, Effect.roll(effect, 0) * 1_000, now)
   end
 
   def apply(state, _context, _spell, _effect, _now), do: {state, []}

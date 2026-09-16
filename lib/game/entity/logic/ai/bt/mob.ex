@@ -28,6 +28,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
   alias ThistleTea.Game.Entity.Logic.Combat, as: CombatLogic
   alias ThistleTea.Game.Entity.Logic.Core
+  alias ThistleTea.Game.Entity.Logic.Distraction
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Engagement
   alias ThistleTea.Game.Entity.Logic.Hostility
@@ -155,6 +156,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
           BT.action(&clear_chase_and_idle/3)
         ])
       ]),
+      BT.action(&Distraction.tick/3),
       BT.sequence([
         BT.condition(&scripted_home?/2),
         BT.action(&move_to_target_with_context/3),

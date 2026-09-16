@@ -435,6 +435,41 @@ defmodule ThistleTea.Game.Entity.Logic.CastingTest do
   end
 
   describe "complete/3" do
+    test "a no-threat distraction preserves stealth and avoids combat" do
+      stealth = %Holder{
+        spell: %Spell{id: 1784, aura_interrupt_flags: Aura.interrupt_mask(:cast)},
+        auras: [%AuraData{type: :mod_stealth, amount: 100}]
+      }
+
+      spell = %Spell{
+        id: 1725,
+        attributes: MapSet.new([:no_threat, :allow_while_stealthed]),
+        effects: [%Effect{type: :distract, implicit_target_a: :aoe_enemy_at_dest}]
+      }
+
+      resolution = %{channel_resolution() | hits: [7], impacts: [%Impact{target_guid: 7, target_role: :other}]}
+
+      casting =
+        spell
+        |> Cast.new(Target.at({1.0, 2.0, 3.0}), 1_000)
+        |> Cast.transition(:launch)
+        |> Cast.put_resolution(resolution)
+        |> Cast.transition(:impact)
+
+      character = %Character{
+        object: %Object{guid: 1},
+        unit: %Unit{health: 100, auras: [stealth]},
+        player: %Player{},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+        internal: %Internal{world: WorldRef.open(0), in_combat: false}
+      }
+
+      character = Casting.complete(character, casting, 1_000)
+      assert Aura.has_aura?(character, :mod_stealth)
+      refute character.internal.in_combat
+      assert Enum.any?(character.internal.events, &is_struct(&1, Effects.DeliverSpell))
+    end
+
     test "stops a target-dependent channel when its only target resists" do
       now = 1_000
       target_guid = 7

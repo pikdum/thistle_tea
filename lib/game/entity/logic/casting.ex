@@ -468,7 +468,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
   end
 
   defp mark_hostile_cast(%Character{object: %{guid: guid}} = character, %Cast{spell: spell}, targets, now) do
-    if Spell.harmful?(spell) and Enum.any?(targets, &(&1 != guid)) do
+    if Spell.starts_combat?(spell) and Enum.any?(targets, &(&1 != guid)) do
       PlayerCombat.mark_initiated(character, now)
     else
       character
@@ -478,7 +478,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
   defp mark_hostile_cast(character, _casting, _targets, _now), do: character
 
   defp break_stealth(character, %Cast{spell: %Spell{} = spell}, now) do
-    if Spell.harmful?(spell) do
+    if Spell.harmful?(spell) and not Spell.attribute?(spell, :allow_while_stealthed) do
       {character, events} = AuraLogic.remove_with_interrupt_flags(character, AuraLogic.interrupt_mask(:cast), now)
       Effects.enqueue(character, events)
     else
