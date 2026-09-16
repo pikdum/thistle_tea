@@ -20,14 +20,10 @@ defmodule ThistleTea.Game.Entity.Server.Player.PacketSink do
 
   def send(state, message, opts \\ [])
 
-  def send(
-        %State{} = state,
-        %UpdateObject{update_type: :out_of_range_objects, out_of_range_guids: guids} = update,
-        _opts
-      ) do
+  def send(%State{} = state, %UpdateObject{update_type: :out_of_range_objects} = update, _opts) do
     state
     |> send_packet(UpdateObject.to_packet(update, state.guid))
-    |> then(fn state -> Enum.reduce(guids, state, &Visibility.untrack_entity(&2, &1)) end)
+    |> track_updates([update])
   end
 
   def send(%State{} = state, %UpdateObject{} = update, opts) do
@@ -82,7 +78,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.PacketSink do
 
       state
       |> send_packet(packet)
-      |> track_created_updates([update])
+      |> track_updates([update])
     end
   end
 
@@ -95,7 +91,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.PacketSink do
     else
       state
       |> send_packet(packet)
-      |> track_created_updates(updates)
+      |> track_updates(updates)
     end
   end
 
@@ -128,13 +124,16 @@ defmodule ThistleTea.Game.Entity.Server.Player.PacketSink do
     create_update?(update) and Visibility.tracked?(state, guid)
   end
 
-  defp track_created_updates(%State{} = state, updates) do
-    created_guids =
-      updates
-      |> Enum.filter(&create_update?/1)
-      |> MapSet.new(& &1.object.guid)
+  defp track_updates(%State{} = state, updates) do
+    Enum.reduce(updates, state, &track_update/2)
+  end
 
-    Visibility.track_entities(state, created_guids)
+  defp track_update(%UpdateObject{update_type: :out_of_range_objects, out_of_range_guids: guids}, state) do
+    Enum.reduce(guids, state, &Visibility.untrack_entity(&2, &1))
+  end
+
+  defp track_update(%UpdateObject{} = update, state) do
+    if create_update?(update), do: Visibility.track_entities(state, MapSet.new([update.object.guid])), else: state
   end
 
   defp source_tracked?(_state, nil), do: true

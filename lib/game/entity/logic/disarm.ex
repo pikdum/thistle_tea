@@ -40,11 +40,6 @@ defmodule ThistleTea.Game.Entity.Logic.Disarm do
     if active?(entity) and not ranged_weapon?(spell), do: {:error, :equipped_item}, else: :ok
   end
 
-  defp ranged_weapon?(%Spell{equipped_item_subclass_mask: mask} = spell) do
-    Spell.ranged_ability?(spell) or
-      (is_integer(mask) and mask > 0 and Bitwise.band(mask, Bitwise.bnot(0xD000C)) == 0)
-  end
-
   def validate(%Mob{} = entity, %Spell{effects: effects}) do
     weapon_attack? = Enum.any?(effects, &(&1.type in [:weapon_damage, :weapon_damage_noschool]))
 
@@ -54,4 +49,9 @@ defmodule ThistleTea.Game.Entity.Logic.Disarm do
   end
 
   def validate(_entity, _spell), do: :ok
+
+  defp ranged_weapon?(%Spell{equipped_item_subclass_mask: mask} = spell) do
+    Spell.ranged_ability?(spell) or
+      (is_integer(mask) and mask > 0 and Bitwise.band(mask, Bitwise.bnot(0xD000C)) == 0)
+  end
 end

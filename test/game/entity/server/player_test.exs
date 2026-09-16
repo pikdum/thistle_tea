@@ -171,6 +171,38 @@ defmodule ThistleTea.Game.Entity.Server.PlayerTest do
   end
 
   describe "handle_cast/2" do
+    test "untracks removals drained after a create in the same batch" do
+      guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
+      target = Guid.from_low_guid(:mob, System.unique_integer([:positive]), 721)
+      state = %State{guid: guid, character: character(guid, []), connection_pid: self()}
+      GenServer.cast(self(), {:send_packet, UpdateObject.out_of_range([target])})
+
+      assert {:noreply, state} = PlayerServer.handle_cast({:send_packet, update_object(:unit, target)}, state)
+      assert_receive {:"$gen_cast", {:write_packet, packet}}
+      assert object_count(packet) == 2
+      refute MapSet.member?(state.tracked_entities, target)
+    end
+
+    test "tracks a recreate following a queued removal in wire order" do
+      guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
+      target = Guid.from_low_guid(:mob, System.unique_integer([:positive]), 721)
+
+      state = %State{
+        guid: guid,
+        character: character(guid, []),
+        connection_pid: self(),
+        tracked_entities: MapSet.new([target])
+      }
+
+      GenServer.cast(self(), {:send_packet, UpdateObject.out_of_range([target])})
+      GenServer.cast(self(), {:send_packet, update_object(:unit, target)})
+
+      assert {:noreply, state} = PlayerServer.handle_cast({:send_packet, update_object(:player, guid)}, state)
+      assert_receive {:"$gen_cast", {:write_packet, packet}}
+      assert object_count(packet) == 3
+      assert MapSet.member?(state.tracked_entities, target)
+    end
+
     test "drops stale queued creates for invisible units" do
       guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
       target = Guid.from_low_guid(:mob, System.unique_integer([:positive]), 721)

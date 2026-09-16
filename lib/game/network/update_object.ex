@@ -152,6 +152,12 @@ defmodule ThistleTea.Game.Network.UpdateObject do
     <<value::little-size(size)>> <> build_bytes(rest)
   end
 
+  defp packet_body(%__MODULE__{update_type: :out_of_range_objects, out_of_range_guids: guids}, _recipient_guid)
+       when is_list(guids) do
+    <<@update_type_out_of_range_objects, length(guids)::little-size(32)>> <>
+      Enum.map_join(guids, &BinaryUtils.pack_guid/1)
+  end
+
   defp packet_body(%__MODULE__{update_type: :values, object: object} = obj, recipient_guid) do
     target = visibility_target(object.guid, recipient_guid)
     fields = flatten_field_structs(obj, target)
@@ -218,22 +224,6 @@ defmodule ThistleTea.Game.Network.UpdateObject do
     }
   end
 
-  def to_packet(
-        %__MODULE__{update_type: :out_of_range_objects, out_of_range_guids: guids, has_transport: has_transport},
-        _recipient_guid
-      )
-      when is_list(guids) do
-    packed_guids = Enum.map_join(guids, &BinaryUtils.pack_guid/1)
-
-    %Packet{
-      opcode: @smsg_update_object,
-      payload:
-        <<1::little-size(32), bool_byte(has_transport), @update_type_out_of_range_objects,
-          length(guids)::little-size(32)>> <>
-          packed_guids
-    }
-  end
-
   def to_packet(%__MODULE__{} = obj, recipient_guid) do
     %Packet{
       opcode: @smsg_update_object,
@@ -257,10 +247,9 @@ defmodule ThistleTea.Game.Network.UpdateObject do
     Guid.high_guid(guid) == Guid.high_guid(:mo_transport)
   end
 
-  defp transport_update?(%__MODULE__{}), do: false
+  defp transport_update?(%__MODULE__{update_type: :out_of_range_objects, has_transport: true}), do: true
 
-  defp bool_byte(true), do: 1
-  defp bool_byte(_value), do: 0
+  defp transport_update?(%__MODULE__{}), do: false
 
   def object_type_flags(%__MODULE__{} = obj) do
     Enum.reduce(@object_type_flags_map, 0, fn {field, type}, acc ->
