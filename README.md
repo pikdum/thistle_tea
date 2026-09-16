@@ -85,6 +85,7 @@ nix develop .#wow-tools            # shell with all of the above + sqlite + mari
 - Priest Fade: temporary threat reduction with target switching and restoration on expiry
 - Rogue Distract: ground-targeted facing and timed patrol pauses, preserving stealth
 - pets
+- typed invisibility and detection, with observer visibility, creature aggro, and action interruption
 - items, bags, equipment, and vendors
 - alcohol intoxication, client drunkenness effects, gradual sobering, and death cleanup
 - looting + group loot
