@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
   alias ThistleTea.Game.Entity.Logic.AttackTable
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Core
+  alias ThistleTea.Game.Entity.Logic.Daze
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.ParryHaste
   alias ThistleTea.Game.Entity.Logic.Reactive
@@ -191,9 +192,11 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
 
     {entity, reaction_events} = attack_reactions(entity, attack, result, now)
 
+    daze_roll = Keyword.get(opts, :daze_roll, fn -> :rand.uniform() * 100 end)
+    daze_events = Daze.events(entity, attack, result.damage - absorbed, daze_roll)
     entity = maybe_defense_skill_up(entity, attack, opts)
 
-    {entity, [event | reaction_events] ++ feedback_events}
+    {entity, daze_events ++ [event | reaction_events] ++ feedback_events}
   end
 
   def receive_attack(entity, _attack, _now, _opts), do: {entity, []}

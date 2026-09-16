@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.CombatRatings
+  alias ThistleTea.Game.Entity.Logic.Daze
   alias ThistleTea.Game.Entity.Logic.MechanicResistance
   alias ThistleTea.Game.Entity.Logic.Skills
   alias ThistleTea.Game.Math
@@ -51,6 +52,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
       caster_level: unit.level || 1,
       caster_owner_guid: caster_owner_guid(attacker),
       caster_player?: player?(attacker),
+      caster_can_daze?: Daze.attacker?(attacker),
       crit_chance: attacker_crit_chance(attacker) + Aura.flat_amount(attacker, :mod_crit_percent),
       hit_chance_bonus: Aura.flat_amount(attacker, :mod_hit_chance),
       always_crush?: always_crush?(attacker),
