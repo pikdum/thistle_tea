@@ -70,6 +70,7 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
       condition_now: local_time(),
       condition_area: condition_area(entity, requirements),
       liquid_surface: liquid_surface(entity),
+      body_height: PlayerMovement.body_height(entity),
       instance_data: instance_data(entity, requirements, options)
     }
   end

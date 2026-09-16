@@ -17,15 +17,14 @@ defmodule ThistleTea.Game.Entity.Logic.Breathing do
 
   @breath_ms 60_000
   @pulse_ms 2_000
-  @head_height 2.0
 
   def needs_tick?(%Character{internal: %Internal{breath: %__MODULE__{}}}), do: true
   def needs_tick?(%Character{movement_block: %MovementBlock{} = movement}), do: MovementBlock.swimming?(movement)
   def needs_tick?(_entity), do: false
 
-  def update(%Character{} = character, liquid_surface, now, damage_bonus \\ 0) do
+  def update(%Character{} = character, liquid_surface, now, damage_bonus \\ 0, body_height \\ 2.0) do
     depth = depth(character, liquid_surface)
-    submerged? = depth > @head_height * scale(character)
+    submerged? = depth > body_height * scale(character)
 
     if not Death.alive?(character) or depth <= 0 or character.internal.godmode do
       stop(character)

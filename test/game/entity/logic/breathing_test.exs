@@ -9,6 +9,9 @@ defmodule ThistleTea.Game.Entity.Logic.BreathingTest do
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Logic.AI.BehaviorRunner
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Context
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Player, as: PlayerBT
   alias ThistleTea.Game.Entity.Logic.AI.Tick
   alias ThistleTea.Game.Entity.Logic.Breathing
   alias ThistleTea.Game.Entity.Logic.Effects
@@ -110,6 +113,34 @@ defmodule ThistleTea.Game.Entity.Logic.BreathingTest do
 
       assert immune.unit.health == 1000
       refute Enum.any?(immune.internal.events, &match?(%Effects.EnvironmentalDamage{}, &1))
+    end
+  end
+
+  describe "update/5" do
+    setup [:character]
+
+    test "uses the current model height and object scale at the waterline", %{character: character} do
+      assert Breathing.update(character, 1.5, 0, 0, 2.0).internal.breath == nil
+      assert Breathing.update(character, 1.5, 0, 0, 1.0).internal.breath != nil
+      enlarged = %{character | object: %{character.object | scale_x: 2.0}}
+      assert Breathing.update(enlarged, 1.5, 0, 0, 1.0).internal.breath == nil
+    end
+  end
+
+  describe "tick/3" do
+    setup [:character]
+
+    test "stationary player upkeep resumes breathing after the protective aura expires", %{character: character} do
+      protected = with_aura(character, :water_breathing, 0)
+      [holder] = protected.unit.auras
+      protected = %{protected | unit: %{protected.unit | auras: [%{holder | expires_at: 1000}]}}
+      {:running, protected} = BehaviorRunner.tick(PlayerBT.tree(), protected, Context.new(0, liquid_surface: 10.0))
+      assert protected.internal.breath == nil
+      {:running, exposed} = BehaviorRunner.tick(PlayerBT.tree(), protected, Context.new(1000, liquid_surface: 10.0))
+      assert exposed.unit.auras == []
+      assert exposed.internal.breath.remaining == 60_000
+      {:running, drowning} = BehaviorRunner.tick(PlayerBT.tree(), exposed, Context.new(61_000, liquid_surface: 10.0))
+      assert drowning.unit.health == 800
     end
   end
 

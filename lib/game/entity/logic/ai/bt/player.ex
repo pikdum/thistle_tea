@@ -29,7 +29,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Player do
 
   defp breathing_tick(%Character{} = state, blackboard, %Context{} = context) do
     bonus = Random.between(context.random, 0, max((state.unit.level || 1) - 1, 0))
-    {:failure, Breathing.update(state, context.liquid_surface, context.now, bonus), blackboard}
+
+    {:failure, Breathing.update(state, context.liquid_surface, context.now, bonus, context.body_height || 2.0),
+     blackboard}
   end
 
   defp breathing_tick(state, blackboard, _context), do: {:failure, state, blackboard}
