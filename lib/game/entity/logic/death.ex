@@ -104,7 +104,7 @@ defmodule ThistleTea.Game.Entity.Logic.Death do
     {Core.mark_broadcast_update(character), combat_events ++ events ++ [Effects.movement_root_changed(false)]}
   end
 
-  defp clamp_restore(value, max) when is_integer(max) and max > 0, do: value |> max(0) |> min(max)
+  defp clamp_restore(value, max) when is_integer(max) and max >= 0, do: value |> max(0) |> min(max)
   defp clamp_restore(value, _max), do: max(value, 0)
 
   def resurrection_sickness_duration_ms(level) when is_integer(level) and level >= @resurrection_sickness_level do

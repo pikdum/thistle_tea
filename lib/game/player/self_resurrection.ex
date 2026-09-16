@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.Player.SelfResurrection do
   """
 
   alias ThistleTea.Game.Entity.Data.Character
+  alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Death
@@ -18,7 +19,9 @@ defmodule ThistleTea.Game.Player.SelfResurrection do
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Visibility
 
-  def prepare(%Character{} = character, now, get_spell \\ &SpellLoader.load/1, get_item \\ &ItemStore.get/1) do
+  def prepare(character, now, get_spell \\ &SpellLoader.load/1, get_item \\ &ItemStore.get/1)
+
+  def prepare(%Character{player: %Player{}} = character, now, get_spell, get_item) do
     spell_id = SelfResurrectionLogic.candidate_spell_id(character)
     spell = get_spell.(spell_id)
 
@@ -30,6 +33,8 @@ defmodule ThistleTea.Game.Player.SelfResurrection do
 
     %{character | player: %{character.player | self_res_spell: if(available?, do: spell_id, else: 0)}}
   end
+
+  def prepare(character, _now, _get_spell, _get_item), do: character
 
   def use(%{ready: true, character: %Character{} = character} = state) do
     now = Time.now()

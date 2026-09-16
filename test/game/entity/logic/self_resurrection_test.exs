@@ -67,6 +67,12 @@ defmodule ThistleTea.Game.Entity.Logic.SelfResurrectionTest do
       assert resurrected.unit.power1 == 80
     end
 
+    test "does not grant mana to a class with no mana pool", %{character: character} do
+      character = %{character | unit: %{character.unit | max_power1: 0}}
+      assert {:ok, resurrected, _events} = SelfResurrection.resurrect(character, soulstone(), 1_000)
+      assert resurrected.unit.power1 == 0
+    end
+
     test "rejects living, released, missing and mismatched offers", %{character: character} do
       released = %{character | player: %{character.player | flags: 0x10}}
       living = %{character | unit: %{character.unit | health: 1}}

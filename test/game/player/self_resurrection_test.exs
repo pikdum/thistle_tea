@@ -14,6 +14,11 @@ defmodule ThistleTea.Game.Player.SelfResurrectionTest do
   setup [:build_character]
 
   describe "prepare/4" do
+    test "preserves an incomplete character without player fields", %{character: character} do
+      character = %{character | player: nil}
+      assert SelfResurrection.prepare(character, 1_000) == character
+    end
+
     test "offers learned Reincarnation only with a carried Ankh", %{character: character, spell: spell, ankh: ankh} do
       get_spell = fn 21_169 -> spell end
       get_item = fn 123 -> ankh end
