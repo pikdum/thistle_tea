@@ -93,6 +93,7 @@ defmodule ThistleTea.Game.World.System.CellActivatorTest do
 
       send(pid, :sweep)
       assert_receive {:loaded, {^world, 10, 10}}
+      await_loaded(pid, {world, 10, 10})
 
       Agent.update(occupied, fn _cells -> [] end)
       send(pid, :sweep)
@@ -110,6 +111,7 @@ defmodule ThistleTea.Game.World.System.CellActivatorTest do
 
       send(pid, :sweep)
       assert_receive {:loaded, {^world, 10, 10}}
+      await_loaded(pid, {world, 10, 10})
 
       send(pid, :sweep)
       send(pid, :sweep)
@@ -117,17 +119,30 @@ defmodule ThistleTea.Game.World.System.CellActivatorTest do
     end
 
     test "invalidate keeps running cells eligible for deactivation" do
+      parent = self()
       world = System.unique_integer([:positive])
       occupied = start_supervised!({Agent, fn -> [] end})
-      pid = start_sweeper(occupied, grace_ms: 0)
 
-      CellActivator.activate([{world, 1, 1}], pid)
-      assert_receive {:loaded, {^world, 1, 1}}
+      loader = fn cell ->
+        send(parent, {:started, cell, self()})
+        receive do: (:continue -> :ok)
+      end
+
+      pid = start_sweeper(occupied, grace_ms: 0, loader: loader, max_concurrency: 1)
+
+      CellActivator.activate([{world, 1, 1}, {world, 1, 2}], pid)
+      assert_receive {:started, {^world, 1, 1}, worker}
+      ref = Process.monitor(worker)
 
       CellActivator.invalidate(pid)
+      assert_receive {:DOWN, ^ref, :process, ^worker, :killed}
       send(pid, :sweep)
       assert_receive {:deactivated, cells}
-      assert MapSet.member?(cells, {world, 1, 1})
+      assert cells == MapSet.new([{world, 1, 1}])
+
+      CellActivator.activate([{world, 1, 1}], pid)
+      assert_receive {:started, {^world, 1, 1}, replacement}
+      refute replacement == worker
     end
 
     test "tears down an open world after it stays empty" do
@@ -137,6 +152,7 @@ defmodule ThistleTea.Game.World.System.CellActivatorTest do
 
       send(pid, :sweep)
       assert_receive {:loaded, {^world, 1, 1}}
+      await_loaded(pid, {world, 1, 1})
 
       Agent.update(occupied, fn _cells -> [] end)
       send(pid, :sweep)
@@ -168,6 +184,7 @@ defmodule ThistleTea.Game.World.System.CellActivatorTest do
 
       send(pid, :sweep)
       assert_receive {:loaded, {^world, 1, 1}}
+      await_loaded(pid, {world, 1, 1})
 
       send(pid, :sweep)
       send(pid, :sweep)
@@ -185,6 +202,19 @@ defmodule ThistleTea.Game.World.System.CellActivatorTest do
       send(pid, :sweep)
       refute_receive {:deactivated, _cells}, 50
       refute_receive {:torn_down, _world}, 50
+    end
+  end
+
+  defp await_loaded(pid, cell, attempts \\ 200)
+
+  defp await_loaded(pid, cell, 0) do
+    assert MapSet.member?(:sys.get_state(pid).cells, cell)
+  end
+
+  defp await_loaded(pid, cell, attempts) do
+    if !MapSet.member?(:sys.get_state(pid).cells, cell) do
+      Process.sleep(5)
+      await_loaded(pid, cell, attempts - 1)
     end
   end
 

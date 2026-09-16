@@ -8,14 +8,15 @@ defmodule ThistleTea.Game.World.System.GameEventTest do
   describe "start_link/1" do
     test "activates the current schedule and applies its next transition" do
       parent = self()
-      now = DateTime.utc_now()
+      now = ~U[2026-01-01 00:00:01.900000Z]
+      clock = start_supervised!({Agent, fn -> now end})
 
       schedule =
         Schedule.new([
           %Entry{
             id: 9,
-            starts_at: DateTime.add(now, -1, :second),
-            ends_at: DateTime.add(now, 5, :second),
+            starts_at: ~U[2026-01-01 00:00:00Z],
+            ends_at: ~U[2026-01-01 00:00:06Z],
             occurrence_seconds: 60,
             length_seconds: 2
           }
@@ -27,6 +28,7 @@ defmodule ThistleTea.Game.World.System.GameEventTest do
         {GameEvent,
          name: name,
          schedule: schedule,
+         now: fn -> Agent.get(clock, & &1) end,
          on_change: fn new_events, old_events -> send(parent, {:changed, new_events, old_events}) end}
       )
 
@@ -39,10 +41,13 @@ defmodule ThistleTea.Game.World.System.GameEventTest do
       assert active_entry.id == 9
       assert next.stops == [active_entry]
       assert next.starts == []
+      assert next.at == ~U[2026-01-01 00:00:02Z]
 
+      Agent.update(clock, fn _ -> next.at end)
       assert_receive {:changed, %MapSet{} = inactive, %MapSet{} = active}, 1_500
       assert inactive == MapSet.new()
       assert active == MapSet.new([9])
+      assert GameEvent.get_events(name) == []
     end
   end
 end

@@ -89,7 +89,7 @@ defmodule ThistleTea.Game.World.System.CellActivator do
      %{
        state
        | cells: MapSet.new(),
-         orphaned: MapSet.union(state.orphaned, state.cells),
+         orphaned: state.orphaned |> MapSet.union(state.cells) |> MapSet.union(loading_cells(state)),
          requested: MapSet.new(),
          queued: MapSet.new(),
          queue: [],
@@ -353,14 +353,15 @@ defmodule ThistleTea.Game.World.System.CellActivator do
   end
 
   defp known_cells(%__MODULE__{} = state) do
-    loading =
-      state.loading
-      |> Map.values()
-      |> MapSet.new(fn {_pid, cell} -> cell end)
-
     state.cells
     |> MapSet.union(state.queued)
-    |> MapSet.union(loading)
+    |> MapSet.union(loading_cells(state))
+  end
+
+  defp loading_cells(%__MODULE__{} = state) do
+    state.loading
+    |> Map.values()
+    |> MapSet.new(fn {_pid, cell} -> cell end)
   end
 
   defp prioritize(cells) do
