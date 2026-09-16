@@ -96,6 +96,54 @@ defmodule ThistleTea.Game.Entity.Logic.ThreatTest do
     end
   end
 
+  describe "set_temporary/3" do
+    test "restores threat while retaining gains made during Fade" do
+      entity = mob(threat: %{@player_a => 800.0, @player_b => 400.0}, target: @player_a)
+      faded = Threat.set_temporary(entity, @player_a, -600)
+      assert faded.internal.threat[@player_a] == 200.0
+      assert {_, {:switch, @player_b}} = reselect(faded)
+
+      restored = faded |> Threat.add(@player_a, 50) |> Threat.set_temporary(@player_a, 0)
+      assert restored.internal.threat[@player_a] == 850.0
+      assert restored.internal.temporary_threat == %{}
+      assert {_, {:switch, @player_a}} = reselect(%{restored | unit: %{restored.unit | target: @player_b}})
+    end
+
+    test "matches VMangos clamping and full modifier restoration" do
+      entity = mob(threat: %{@player_a => 100.0}) |> Threat.set_temporary(@player_a, -600)
+      assert entity.internal.threat[@player_a] == 0.0
+      assert Threat.set_temporary(entity, @player_a, 0).internal.threat[@player_a] == 600.0
+    end
+
+    test "refreshes are idempotent and replacements undo the previous modifier" do
+      entity = mob(threat: %{@player_a => 800.0}) |> Threat.set_temporary(@player_a, -200)
+      assert Threat.set_temporary(entity, @player_a, -200) == entity
+      assert Threat.set_temporary(entity, @player_a, -300).internal.threat[@player_a] == 500.0
+    end
+
+    test "does not create threat references" do
+      entity = mob()
+      assert Threat.set_temporary(entity, @player_a, -600) == entity
+      assert Threat.set_temporary(entity, @player_a, 0) == entity
+    end
+
+    test "removal and combat reset discard restoration state" do
+      entity = mob(threat: %{@player_a => 800.0}) |> Threat.set_temporary(@player_a, -600)
+
+      for cleared <- [Threat.remove(entity, @player_a), Threat.wipe(entity)] do
+        assert cleared.internal.temporary_threat == %{}
+        restored = cleared |> Threat.add(@player_a, 10) |> Threat.set_temporary(@player_a, 0)
+        assert restored.internal.threat[@player_a] == 10.0
+      end
+    end
+
+    test "pruning invalid targets discards restoration state" do
+      entity = mob(threat: %{@player_a => 800.0}) |> Threat.set_temporary(@player_a, -600)
+      {pruned, :none} = reselect(entity, valid?: fn _ -> false end)
+      assert pruned.internal.temporary_threat == %{}
+    end
+  end
+
   describe "change/3" do
     test "positive spell threat creates an entry" do
       entity = Threat.change(mob(), @player_a, 10)

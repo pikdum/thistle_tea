@@ -62,6 +62,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal do
     :undetectable_until,
     :invincibility_health_threshold,
     world: WorldRef.open(0),
+    temporary_threat: %{},
     companion: Companion.none(),
     rest_bonus: 0.0,
     mailbox: [],

@@ -91,7 +91,7 @@ defmodule ThistleTea.Game.Entity.Logic.Threat do
   def taunt(entity, _taunter_guid), do: entity
 
   def wipe(%Mob{internal: %Internal{threat: table} = internal} = entity) when is_map(table) do
-    entity = %{entity | internal: %{internal | threat: %{}}}
+    entity = %{entity | internal: %{internal | threat: %{}, temporary_threat: %{}}}
 
     table
     |> Map.keys()
@@ -99,7 +99,7 @@ defmodule ThistleTea.Game.Entity.Logic.Threat do
   end
 
   def wipe(%Mob{internal: %Internal{} = internal} = entity) do
-    %{entity | internal: %{internal | threat: %{}}}
+    %{entity | internal: %{internal | threat: %{}, temporary_threat: %{}}}
   end
 
   def wipe(entity), do: entity
@@ -113,7 +113,14 @@ defmodule ThistleTea.Game.Entity.Logic.Threat do
   def remove(%Mob{internal: %Internal{threat: table} = internal} = entity, guid)
       when is_map(table) and is_integer(guid) do
     if Map.has_key?(table, guid) do
-      %{entity | internal: %{internal | threat: Map.delete(table, guid)}}
+      %{
+        entity
+        | internal: %{
+            internal
+            | threat: Map.delete(table, guid),
+              temporary_threat: Map.delete(internal.temporary_threat, guid)
+          }
+      }
       |> Effects.enqueue(Effects.threat_ref_lost(guid))
     else
       entity
@@ -134,6 +141,26 @@ defmodule ThistleTea.Game.Entity.Logic.Threat do
   end
 
   def modify(entity, _guid, _amount), do: entity
+
+  def set_temporary(%Mob{internal: %Internal{} = internal} = entity, guid, amount)
+      when is_integer(guid) and is_number(amount) do
+    previous = Map.get(internal.temporary_threat, guid, 0)
+
+    if tracking?(entity, guid) and previous != amount do
+      entity = entity |> modify(guid, -previous) |> modify(guid, amount)
+
+      temporary =
+        if amount == 0,
+          do: Map.delete(internal.temporary_threat, guid),
+          else: Map.put(internal.temporary_threat, guid, amount)
+
+      %{entity | internal: %{entity.internal | temporary_threat: temporary}}
+    else
+      entity
+    end
+  end
+
+  def set_temporary(entity, _guid, _amount), do: entity
 
   def modify_percent(%Mob{internal: %Internal{threat: table} = internal} = entity, guid, percent)
       when is_map(table) and is_integer(guid) and is_number(percent) do
@@ -176,9 +203,19 @@ defmodule ThistleTea.Game.Entity.Logic.Threat do
 
     entity =
       dropped
-      |> Enum.reduce(%{entity | internal: %{entity.internal | threat: pruned}}, fn {guid, _threat}, acc ->
-        Effects.enqueue(acc, Effects.threat_ref_lost(guid))
-      end)
+      |> Enum.reduce(
+        %{
+          entity
+          | internal: %{
+              entity.internal
+              | threat: pruned,
+                temporary_threat: Map.take(entity.internal.temporary_threat, Map.keys(pruned))
+            }
+        },
+        fn {guid, _threat}, acc ->
+          Effects.enqueue(acc, Effects.threat_ref_lost(guid))
+        end
+      )
 
     sorted = Enum.sort_by(pruned, fn {_guid, threat} -> threat end, :desc)
 

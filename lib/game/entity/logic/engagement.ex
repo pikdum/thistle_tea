@@ -139,6 +139,7 @@ defmodule ThistleTea.Game.Entity.Logic.Engagement do
       entity.internal
       | in_combat: false,
         threat: %{},
+        temporary_threat: %{},
         last_hostile_time: nil,
         loot: clear_tap(entity.internal.loot, true),
         blackboard: nil
