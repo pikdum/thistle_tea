@@ -78,6 +78,7 @@ nix develop .#wow-tools            # shell with all of the above + sqlite + mari
 - auto-attacks + class abilities
 - parry haste for player and mob melee swings, including dual-wield timing
 - mechanic resistance for spells and melee abilities, including Orc Hardiness
+- crowd-control diminishing returns, shared across casters with recovery after control ends
 - Priest Fade: temporary threat reduction with target switching and restoration on expiry
 - Rogue Distract: ground-targeted facing and timed patrol pauses, preserving stealth
 - pets
