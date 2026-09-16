@@ -76,6 +76,7 @@ nix develop .#wow-tools            # shell with all of the above + sqlite + mari
 - chatting, channels, and parties
 - mob spawns, combat, navigation, and respawns
 - auto-attacks + class abilities
+- school-based spell cost reductions, with stacking, client cost displays, and free casts
 - ground mounts, mounted speed bonuses, and dismounting on cancellation or swimming
 - parry haste for player and mob melee swings, including dual-wield timing
 - main-hand disarm: unarmed player combat, armed-creature damage reduction, weapon ability checks, and off-hand preservation
