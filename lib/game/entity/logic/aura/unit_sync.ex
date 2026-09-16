@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.UnitSync do
   alias ThistleTea.Game.Aura
   alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Logic.Aura.PowerCostSync
   alias ThistleTea.Game.Entity.Logic.Stats
   alias ThistleTea.Game.Spell
 
@@ -28,6 +29,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.UnitSync do
     unit
     |> sync_shapeshift()
     |> Stats.recompute()
+    |> PowerCostSync.sync()
     |> sync_native_display()
     |> sync_shapeshift_display()
     |> sync_transform()

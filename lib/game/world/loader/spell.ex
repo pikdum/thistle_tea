@@ -626,6 +626,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp aura_type(69), do: :school_absorb
   defp aura_type(71), do: :mod_spell_crit_chance_school
   defp aura_type(72), do: :mod_power_cost_school_pct
+  defp aura_type(73), do: :mod_power_cost_school
   defp aura_type(79), do: :mod_damage_percent_done
   defp aura_type(81), do: :split_damage_percent
   defp aura_type(82), do: :water_breathing
