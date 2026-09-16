@@ -410,7 +410,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   end
 
   defp effect_misc_value(mod, row, index, _type, _aura) do
-    int_field(mod, :effect_misc_value, row, :"effect_misc_value_#{index}") || 0
+    signed32(int_field(mod, :effect_misc_value, row, :"effect_misc_value_#{index}"), 0)
   end
 
   defp transform_display_id(entry) when is_integer(entry) and entry > 0 do
