@@ -2230,6 +2230,46 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
       assert entity.unit.auras == []
       assert entity.unit.health == 90
     end
+
+    test "Polymorph overrides Ghost Wolf and restores its display when broken" do
+      entity = fixture_entity()
+      entity = %{entity | unit: %{entity.unit | native_display_id: 49, display_id: 49}}
+
+      wolf = %Spell{
+        id: 2645,
+        duration_ms: -1,
+        effects: [%Effect{index: 0, type: :apply_aura, aura: :mod_shapeshift, misc_value: 16}]
+      }
+
+      {entity, _} = apply_spell(entity, 1, 1, wolf)
+      assert entity.unit.display_id == 4613
+      {entity, _} = apply_spell(entity, 2, 1, polymorph_fixture())
+      assert entity.unit.display_id == 16_372
+      assert entity.unit.shapeshift_form == 16
+
+      entity = Aura.break_on_damage(entity, 2_000)
+      assert entity.unit.display_id == 4613
+      assert Enum.map(entity.unit.auras, & &1.spell.id) == [2645]
+
+      {entity, _} = Aura.remove_spells(entity, [2645], 3_000)
+      assert entity.unit.display_id == 49
+    end
+
+    test "druid form mechanic immunity rejects Polymorph without advancing diminishing returns" do
+      form = %Spell{
+        id: 768,
+        duration_ms: -1,
+        effects: [
+          %Effect{index: 0, type: :apply_aura, aura: :mod_shapeshift, misc_value: 1},
+          %Effect{index: 1, type: :apply_aura, aura: :mechanic_immunity, misc_value: 17}
+        ]
+      }
+
+      {entity, _} = apply_spell(fixture_entity(), 1, 1, form)
+      {entity, _} = apply_spell(entity, 2, 1, %{polymorph_fixture() | mechanic: 17})
+      assert Enum.map(entity.unit.auras, & &1.spell.id) == [768]
+      assert entity.internal.diminishing_returns == %{}
+    end
   end
 
   describe "mod_stat" do

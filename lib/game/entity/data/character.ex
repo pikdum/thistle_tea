@@ -22,6 +22,10 @@ defmodule ThistleTea.Game.Entity.Data.Character do
   @base_max_damage 2.0
   @item_class_weapon 2
 
+  def creature_type(%__MODULE__{unit: %Unit{shapeshift_form: form}}) when form in [1, 3, 4, 5, 8, 14, 15, 16], do: 1
+
+  def creature_type(%__MODULE__{}), do: 7
+
   def sync_equipment_stats(%__MODULE__{} = character) do
     character
     |> sync_mainhand_inputs()

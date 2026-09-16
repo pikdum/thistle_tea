@@ -28,8 +28,9 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.UnitSync do
     unit
     |> sync_shapeshift()
     |> Stats.recompute()
-    |> sync_transform()
+    |> sync_native_display()
     |> sync_shapeshift_display()
+    |> sync_transform()
     |> sync_disarm()
     |> sync_unattackable()
     |> sync_aura_state()
@@ -58,14 +59,18 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.UnitSync do
       |> Enum.flat_map(fn %Holder{auras: auras} -> auras end)
       |> Enum.find(fn %Aura{type: type, misc_value: misc} -> type == :transform and is_integer(misc) and misc > 0 end)
 
-    case {transform, unit.native_display_id} do
-      {%Aura{misc_value: display_id}, _native} -> %{unit | display_id: display_id}
-      {nil, native} when is_integer(native) and native > 0 -> %{unit | display_id: native}
+    case transform do
+      %Aura{misc_value: display_id} -> %{unit | display_id: display_id}
       _ -> unit
     end
   end
 
   defp sync_transform(unit), do: unit
+
+  defp sync_native_display(%Unit{native_display_id: native} = unit) when is_integer(native) and native > 0,
+    do: %{unit | display_id: native}
+
+  defp sync_native_display(unit), do: unit
 
   defp sync_shapeshift(%Unit{auras: holders} = unit) when is_list(holders) do
     auras = Enum.flat_map(holders, fn %Holder{auras: auras} -> auras end)

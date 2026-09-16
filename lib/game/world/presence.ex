@@ -49,7 +49,12 @@ defmodule ThistleTea.Game.World.Presence do
            movement_block: %MovementBlock{position: {_x, _y, _z, orientation}}
          } = character
        ) do
-    %{area: area, orientation: orientation, viewpoint: viewpoint(character)}
+    %{
+      area: area,
+      orientation: orientation,
+      viewpoint: viewpoint(character),
+      creature_type: Character.creature_type(character)
+    }
   end
 
   defp viewpoint(%Character{player: %{farsight: farsight}}) when is_integer(farsight), do: farsight
