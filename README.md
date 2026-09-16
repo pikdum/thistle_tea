@@ -85,6 +85,7 @@ nix develop .#wow-tools            # shell with all of the above + sqlite + mari
 - Rogue Distract: ground-targeted facing and timed patrol pauses, preserving stealth
 - pets
 - items, bags, equipment, and vendors
+- alcohol intoxication, client drunkenness effects, gradual sobering, and death cleanup
 - looting + group loot
 - quests
 - xp, leveling, and exploration
