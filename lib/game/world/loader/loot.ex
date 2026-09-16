@@ -3,6 +3,8 @@ defmodule ThistleTea.Game.World.Loader.Loot do
   Generates a loot instance for a loot id by feeding Mangos loot-template rows
   through the pure loot roller.
   """
+  import Ecto.Query
+
   alias ThistleTea.DB.Mangos
   alias ThistleTea.Game.Entity.Data.ItemTemplate
   alias ThistleTea.Game.Entity.Logic.Loot
@@ -29,18 +31,46 @@ defmodule ThistleTea.Game.World.Loader.Loot do
     cache_rows(:fishing, fishing)
     cache_rows(:reference, references)
 
-    [creature, gameobject, fishing, references]
-    |> List.flatten()
-    |> Enum.map(& &1.item)
-    |> Enum.filter(&(&1 > 0))
-    |> Enum.uniq()
-    |> Enum.each(&ItemLoader.get_template/1)
+    preload_items([creature, gameobject, fishing, references])
 
     :ets.insert(__MODULE__, {:loaded, true})
     :ok
   end
 
-  def load_fishing, do: load_all()
+  def load_fishing do
+    fishing = Mangos.Repo.all(Mangos.FishingLootTemplate)
+    cache_rows(:fishing, fishing)
+    references = preload_references(fishing, MapSet.new())
+    preload_items([fishing, references])
+    :ok
+  end
+
+  defp preload_references(template_rows, seen) do
+    entries =
+      template_rows
+      |> Enum.filter(&(&1.mincount_or_ref < 0))
+      |> MapSet.new(&(-&1.mincount_or_ref))
+      |> MapSet.difference(seen)
+
+    if MapSet.size(entries) == 0 do
+      []
+    else
+      ids = MapSet.to_list(entries)
+      references = Mangos.Repo.all(from(r in Mangos.ReferenceLootTemplate, where: r.entry in ^ids))
+      grouped = references |> rows() |> Enum.group_by(& &1.entry)
+      Enum.each(entries, &cache({:reference, &1}, Map.get(grouped, &1, [])))
+      references ++ preload_references(references, MapSet.union(seen, entries))
+    end
+  end
+
+  defp preload_items(template_rows) do
+    template_rows
+    |> List.flatten()
+    |> Enum.map(& &1.item)
+    |> Enum.filter(&(&1 > 0))
+    |> Enum.uniq()
+    |> Enum.each(&ItemLoader.get_template/1)
+  end
 
   def generate(loot_id, min_gold, max_gold, wanted_quest_item? \\ &always_wanted/1) do
     %Loot{
