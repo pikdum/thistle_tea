@@ -29,6 +29,7 @@ defmodule ThistleTea.Game.Spell.Effect do
     :trigger_spell_id,
     :summon_slot,
     :bonus_coefficient,
+    mechanic: 0,
     area_target?: false,
     damage_multiplier: 1.0
   ]

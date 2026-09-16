@@ -339,6 +339,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
         %Effect{
           index: index,
           type: type,
+          mechanic: int_field(mod, :effect_mechanic, row, :"effect_mechanic_#{index}") || 0,
           semantic: Semantics.effect_rule(%Effect{type: type}),
           base_points: int_field(mod, :effect_base_points, row, :"effect_base_points_#{index}") || 0,
           die_sides: int_field(mod, :effect_die_sides, row, :"effect_die_sides_#{index}") || 0,
