@@ -49,6 +49,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal do
     :movement_start_time,
     :movement_start_position,
     :fall,
+    :breath,
     :pending_resurrect,
     :pending_summon,
     :killed_by,

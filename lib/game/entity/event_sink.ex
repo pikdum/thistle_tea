@@ -16,6 +16,8 @@ defmodule ThistleTea.Game.Entity.EventSink do
   alias ThistleTea.Game.Entity.Logic.Effects
 
   @client_effects [
+    Effects.StartMirrorTimer,
+    Effects.StopMirrorTimer,
     Effects.CancelAutoRepeat,
     Effects.ConsumeCastItem,
     Effects.ConsumeReagents,

@@ -107,7 +107,7 @@ defmodule ThistleTea.Game.Network.Message.MsgMove do
     }
 
     moved? = position_changed? or translating?
-    character = PlayerMovement.apply_fall(character, message.opcode, now)
+    character = PlayerMovement.apply_environment(character, message.opcode, now)
     character = interrupt_auras(character, moved?)
     character = interrupt_water_auras(character, movement_block, state.character.movement_block)
 

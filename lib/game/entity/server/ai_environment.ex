@@ -28,8 +28,10 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
   alias ThistleTea.Game.Entity.Logic.AI.NavigationIntent
   alias ThistleTea.Game.Entity.Logic.AI.Script
   alias ThistleTea.Game.Entity.Logic.Aura
+  alias ThistleTea.Game.Entity.Logic.Breathing
   alias ThistleTea.Game.Entity.Logic.Condition.Requirements
   alias ThistleTea.Game.Entity.Server.NavigationResolver
+  alias ThistleTea.Game.Player.Movement, as: PlayerMovement
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.InstanceData
@@ -67,8 +69,13 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
       script_targets: script_target_results(entity, request.script_targets),
       condition_now: local_time(),
       condition_area: condition_area(entity, requirements),
+      liquid_surface: liquid_surface(entity),
       instance_data: instance_data(entity, requirements, options)
     }
+  end
+
+  defp liquid_surface(entity) do
+    if Breathing.needs_tick?(entity), do: PlayerMovement.liquid_surface(entity)
   end
 
   def move_to(entity, destination, opts \\ [], now \\ Time.now()) do

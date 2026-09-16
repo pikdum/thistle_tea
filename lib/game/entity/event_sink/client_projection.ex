@@ -13,6 +13,22 @@ defmodule ThistleTea.Game.Entity.EventSink.ClientProjection do
   @listen_range_say 25.0
   @listen_range_yell 300.0
 
+  def emit(%Character{} = entity, %Effects.StartMirrorTimer{} = effect, context) do
+    Context.send_packet(context, %Message.SmsgStartMirrorTimer{
+      timer: effect.timer,
+      remaining: effect.remaining,
+      duration: effect.duration,
+      scale: effect.scale
+    })
+
+    entity
+  end
+
+  def emit(%Character{} = entity, %Effects.StopMirrorTimer{timer: timer}, context) do
+    Context.send_packet(context, %Message.SmsgStopMirrorTimer{timer: timer})
+    entity
+  end
+
   def emit(%Character{} = entity, %Effects.CancelAutoRepeat{}, context) do
     Context.send_packet(context, %Message.SmsgCancelAutoRepeat{})
     entity

@@ -2,6 +2,8 @@ defmodule ThistleTea.Game.Entity.Logic.Effects.ClientTypes do
   @moduledoc false
 
   effects = [
+    {:StartMirrorTimer, [:timer, :remaining, :duration, :scale], []},
+    {:StopMirrorTimer, [:timer], []},
     {:CancelAutoRepeat, [], []},
     {:ConsumeCastItem, [:cast_item_guid], []},
     {:FeedPet, [:cast_item_guid, :target_guid, :spell_id, :range_yards], []},

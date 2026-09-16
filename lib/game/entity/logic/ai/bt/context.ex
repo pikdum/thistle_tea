@@ -31,6 +31,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Context do
     :script_targets,
     :condition_now,
     :condition_area,
+    :liquid_surface,
     :instance_data
   ]
 
@@ -46,6 +47,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Context do
       script_targets: Keyword.get(opts, :script_targets, %{}),
       condition_now: Keyword.get(opts, :condition_now),
       condition_area: Keyword.get(opts, :condition_area),
+      liquid_surface: Keyword.get(opts, :liquid_surface),
       instance_data: Keyword.get(opts, :instance_data)
     }
   end

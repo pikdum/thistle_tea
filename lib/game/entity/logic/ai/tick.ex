@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Tick do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard.Combat
   alias ThistleTea.Game.Entity.Logic.AI.TickPlan
   alias ThistleTea.Game.Entity.Logic.Aura
+  alias ThistleTea.Game.Entity.Logic.Breathing
   alias ThistleTea.Game.Entity.Logic.Regen
   alias ThistleTea.Game.Spell.Cast
 
@@ -39,13 +40,18 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Tick do
 
   def needs_tick?(%{unit: %Unit{auras: [_ | _]}}), do: true
 
-  def needs_tick?(character), do: Regen.needs_regen?(character)
+  def needs_tick?(character), do: Breathing.needs_tick?(character) or Regen.needs_regen?(character)
 
   def plan(entity, status, now) when is_integer(now) do
     TickPlan.new(now)
     |> schedule_status(status)
     |> schedule_aura(entity)
     |> schedule_regen(entity)
+    |> schedule_breathing(entity)
+  end
+
+  defp schedule_breathing(plan, entity) do
+    if Breathing.needs_tick?(entity), do: TickPlan.schedule_in(plan, :breathing, 1_000), else: plan
   end
 
   def mob_delay(entity, status, now), do: entity |> plan(status, now) |> TickPlan.delay(@default_tick_ms)

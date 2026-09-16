@@ -425,7 +425,7 @@ defmodule ThistleTea.Game.Player.Login do
     MovementStats.recompute(%{
       character
       | movement_block: movement_block,
-        internal: %{internal | visibility_cell: nil}
+        internal: %{internal | visibility_cell: nil, breath: nil}
     })
   end
 
