@@ -30,13 +30,11 @@ defmodule ThistleTea.Game.Entity.Logic.IntoxicationTest do
       drunk = Intoxication.drink(tipsy, 45, -19_000)
       assert drunk.player.drunk_value == 12_800
       assert drunk.internal.next_sober_at == -10_000
-      assert Intoxication.state(drunk.player.drunk_value) == :drunk
     end
 
     test "clamps alcohol and allows sobering spells", %{character: character} do
       smashed = Intoxication.drink(character, 1000, 0)
       assert smashed.player.drunk_value == 65_535
-      assert Intoxication.state(smashed.player.drunk_value) == :smashed
       sober = Intoxication.drink(smashed, -1000, 1)
       assert sober.player.drunk_value == 0
       assert sober.internal.next_sober_at == nil
@@ -100,13 +98,6 @@ defmodule ThistleTea.Game.Entity.Logic.IntoxicationTest do
       assert dead.unit.health == 0
       assert dead.player.drunk_value == 0
       assert dead.internal.next_sober_at == nil
-    end
-  end
-
-  describe "state/1" do
-    test "matches client drunkenness thresholds" do
-      assert Enum.map([0, 1, 2, 12_799, 12_800, 22_999, 23_000], &Intoxication.state/1) ==
-               [:sober, :sober, :tipsy, :tipsy, :drunk, :drunk, :smashed]
     end
   end
 

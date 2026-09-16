@@ -36,11 +36,6 @@ defmodule ThistleTea.Game.Entity.Logic.Intoxication do
   def needs_tick?(%Character{player: %{drunk_value: value}}) when is_integer(value), do: value > 0
   def needs_tick?(_entity), do: false
 
-  def state(value) when is_integer(value) and value >= 23_000, do: :smashed
-  def state(value) when is_integer(value) and value >= 12_800, do: :drunk
-  def state(value) when is_integer(value) and value >= 2, do: :tipsy
-  def state(_value), do: :sober
-
   defp put_value(character, value, deadline) do
     %{
       character
