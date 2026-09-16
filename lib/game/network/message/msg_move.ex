@@ -165,13 +165,15 @@ defmodule ThistleTea.Game.Network.Message.MsgMove do
   end
 
   defp interrupt_water_auras(character, current, previous) do
-    if MovementBlock.swimming?(previous) and not MovementBlock.swimming?(current) do
+    if MovementBlock.swimming?(previous) == MovementBlock.swimming?(current) do
+      character
+    else
+      action = if MovementBlock.swimming?(current), do: :under_water, else: :above_water
+
       {character, events} =
-        AuraLogic.remove_with_interrupt_flags(character, AuraLogic.interrupt_mask(:above_water), Time.now())
+        AuraLogic.remove_with_interrupt_flags(character, AuraLogic.interrupt_mask(action), Time.now())
 
       character |> Effects.enqueue(events) |> EventSink.emit_pending()
-    else
-      character
     end
   end
 end

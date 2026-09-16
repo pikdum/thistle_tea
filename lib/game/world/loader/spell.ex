@@ -405,7 +405,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
     int_field(mod, :effect_item_type, row, :"effect_item_type_#{index}") || 0
   end
 
-  defp effect_misc_value(mod, row, index, _type, :transform) do
+  defp effect_misc_value(mod, row, index, _type, aura) when aura in [:transform, :mounted] do
     transform_display_id(int_field(mod, :effect_misc_value, row, :"effect_misc_value_#{index}") || 0)
   end
 
@@ -592,6 +592,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp aura_type(26), do: :mod_root
   defp aura_type(27), do: :mod_silence
   defp aura_type(31), do: :mod_increase_speed
+  defp aura_type(32), do: :mod_increase_mounted_speed
   defp aura_type(33), do: :mod_decrease_speed
   defp aura_type(34), do: :mod_increase_health
   defp aura_type(35), do: :mod_increase_energy
@@ -624,6 +625,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp aura_type(79), do: :mod_damage_percent_done
   defp aura_type(81), do: :split_damage_percent
   defp aura_type(82), do: :water_breathing
+  defp aura_type(78), do: :mounted
   defp aura_type(87), do: :mod_damage_percent_taken
   defp aura_type(74), do: :reflect_spells_school
   defp aura_type(77), do: :mechanic_immunity
@@ -661,6 +663,8 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp aura_type(124), do: :mod_ranged_attack_power
   defp aura_type(127), do: :ranged_attack_power_attacker_bonus
   defp aura_type(128), do: :mod_possess_pet
+  defp aura_type(129), do: :mod_speed_always
+  defp aura_type(130), do: :mod_mounted_speed_always
   defp aura_type(132), do: :mod_increase_energy_percent
   defp aura_type(133), do: :mod_increase_health_percent
   defp aura_type(134), do: :mod_mana_regen_interrupt
@@ -685,6 +689,8 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp aura_type(166), do: :mod_attack_power_pct
   defp aura_type(168), do: :mod_damage_done_versus
   defp aura_type(169), do: :mod_crit_percent_versus
+  defp aura_type(171), do: :mod_speed_not_stack
+  defp aura_type(172), do: :mod_mounted_speed_not_stack
   defp aura_type(174), do: :mod_spell_damage_of_stat_percent
   defp aura_type(175), do: :mod_spell_healing_of_stat_percent
   defp aura_type(176), do: :spirit_of_redemption

@@ -195,10 +195,15 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
     cond do
       exclusive_category_conflict?(existing, incoming) -> true
       shapeshift? and Holder.has_aura_type?(existing, :mod_shapeshift) -> true
+      mount_conflict?(existing, incoming) -> true
       other.id == spell.id and existing.caster_guid != incoming.caster_guid -> replaces_same_spell?(existing, incoming)
       Spell.same_chain?(other, spell) -> replaces_chain_rank?(existing, incoming)
       true -> false
     end
+  end
+
+  defp mount_conflict?(existing, incoming) do
+    Holder.has_aura_type?(incoming, :mounted) and Holder.has_aura_type?(existing, :mounted)
   end
 
   defp replaces_same_spell?(existing, %Holder{spell: spell} = incoming) do

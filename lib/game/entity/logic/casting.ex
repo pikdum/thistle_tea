@@ -16,6 +16,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
   alias ThistleTea.Game.Entity.Logic.Hunter
   alias ThistleTea.Game.Entity.Logic.MechanicResistance
   alias ThistleTea.Game.Entity.Logic.MeleeSpell
+  alias ThistleTea.Game.Entity.Logic.Mount
   alias ThistleTea.Game.Entity.Logic.Paladin
   alias ThistleTea.Game.Entity.Logic.PlayerCombat
   alias ThistleTea.Game.Entity.Logic.Reactive
@@ -44,12 +45,14 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
 
   def start(entity, spell, targets, now, cast_item_guid \\ nil)
 
-  def start(%{internal: %Internal{} = internal} = character, %Spell{} = spell, %Target{} = targets, now, cast_item_guid)
+  def start(%{internal: %Internal{}} = character, %Spell{} = spell, %Target{} = targets, now, cast_item_guid)
       when is_integer(now) do
+    character = Mount.prepare_cast(character, spell, now)
+
     if Spell.attribute?(spell, :on_next_swing) do
       MeleeSpell.queue_next_swing(character, spell)
     else
-      do_start(character, internal, spell, targets, now, cast_item_guid)
+      do_start(character, character.internal, spell, targets, now, cast_item_guid)
     end
   end
 

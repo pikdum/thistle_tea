@@ -35,6 +35,7 @@ defmodule ThistleTea.Game.World.Loader.MapTemplate do
   end
 
   def dungeon?(map_id), do: dungeon?(__MODULE__, map_id)
+  def mount_allowed?(map_id), do: not dungeon?(map_id) or map_id in [209, 269, 309, 509]
   def dungeon?(table, map_id), do: map_type(table, map_id) in @dungeon_types
   def battleground?(map_id), do: battleground?(__MODULE__, map_id)
   def battleground?(table, map_id), do: map_type(table, map_id) == @battleground_type

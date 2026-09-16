@@ -38,14 +38,11 @@ defmodule ThistleTea.Game.Spell.SupportMatrix do
 
   @deferred_auras %{
     19 => :mod_invisibility_detect,
-    32 => :mod_mounted_speed,
     75 => :mod_language,
-    78 => :mounted,
     100 => :auras_visible,
     155 => :water_breathing_pct,
     156 => :mod_reputation_gain,
     159 => :honorless_target,
-    172 => :mod_mounted_speed_not_stack,
     192 => :vmangos_linked_aura
   }
 

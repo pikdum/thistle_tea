@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Transition do
   alias ThistleTea.Game.Entity.Logic.Aura.Change
   alias ThistleTea.Game.Entity.Logic.Aura.ControlSync
   alias ThistleTea.Game.Entity.Logic.Aura.ModifierSync
+  alias ThistleTea.Game.Entity.Logic.Aura.MountSync
   alias ThistleTea.Game.Entity.Logic.Aura.MovementSync
   alias ThistleTea.Game.Entity.Logic.Aura.ObjectSync
   alias ThistleTea.Game.Entity.Logic.Aura.PlayerSync
@@ -48,6 +49,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Transition do
   def run(%{unit: %Unit{} = unit} = entity, %Change{holders: desired, cause: cause, now: now})
       when is_list(desired) and cause in @causes and is_integer(now) do
     previous = if is_list(unit.auras), do: unit.auras, else: []
+    desired = MountSync.interrupt_holders(previous, desired)
 
     if desired == previous do
       {entity, []}
@@ -64,6 +66,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Transition do
     entity =
       entity
       |> put_holders(holders)
+      |> MountSync.sync(previous, holders)
       |> DiminishingReturns.reconcile(previous, holders, now)
       |> ObjectSync.sync()
       |> PlayerSync.sync()

@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Spell.CastValidation do
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Hunter
+  alias ThistleTea.Game.Entity.Logic.Mount
   alias ThistleTea.Game.Entity.Logic.Paladin
   alias ThistleTea.Game.Entity.Logic.Reactive
   alias ThistleTea.Game.Entity.Logic.Resources
@@ -34,6 +35,7 @@ defmodule ThistleTea.Game.Spell.CastValidation do
          :ok <- check_spirit_of_redemption(caster, spell),
          :ok <- check_caster_state(caster, spell, now),
          :ok <- check_combat_state(caster, spell),
+         :ok <- Mount.validate(caster, spell, opts),
          :ok <- check_stance(caster, spell),
          :ok <- check_caster_aura_state(caster, spell, now),
          :ok <- Hunter.validate_reactive(caster, spell, Target.unit_guid(targets), now),

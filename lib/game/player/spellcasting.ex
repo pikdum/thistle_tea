@@ -231,6 +231,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
       equipped_items: equipped_weapon_templates(character),
       ammo_id: character.player.ammo_id,
       ammo_template: ItemLoader.get_template(character.player.ammo_id),
+      mount_allowed?: MapTemplateLoader.mount_allowed?(character.internal.world.map_id),
       feed_context: feed_context(character, spell, targets),
       ritual_context: ritual_context(character, spell),
       duel_context: duel_context(character, spell, targets)
