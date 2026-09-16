@@ -870,8 +870,6 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     if !Corpse.removed?(state) do
       detection = Invisibility.metadata(state)
       previous_detection = Metadata.query(state.object.guid, Map.keys(detection))
-      update_type = if Core.dead?(state), do: :create_object2, else: :values
-      Core.update_object(state, update_type) |> World.broadcast_packet(state)
 
       metadata =
         %{
@@ -895,6 +893,8 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
       Metadata.update(state.object.guid, metadata)
       if previous_detection != detection, do: Visibility.notify_visibility_changed(state)
+      update_type = if Core.dead?(state), do: :create_object2, else: :values
+      Core.update_object(state, update_type) |> World.broadcast_packet(state)
     end
 
     %{state | internal: %{state.internal | broadcast_update?: false}}

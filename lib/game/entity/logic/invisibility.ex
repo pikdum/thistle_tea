@@ -17,7 +17,7 @@ defmodule ThistleTea.Game.Entity.Logic.Invisibility do
     }
   end
 
-  def detectable?(detector, target) do
+  def detectable?(detector, target) when is_map(detector) and is_map(target) do
     invisible = Map.get(target, :invisibility, %{})
     shared = Map.get(detector, :invisibility, %{})
     detection = Map.get(detector, :invisibility_detection, %{})
@@ -27,6 +27,8 @@ defmodule ThistleTea.Game.Entity.Logic.Invisibility do
         Map.has_key?(shared, type) or Map.get(detection, type, 0) >= level
       end)
   end
+
+  def detectable?(_detector, _target), do: false
 
   defp levels(entity, type) do
     entity

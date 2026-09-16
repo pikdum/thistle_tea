@@ -13,8 +13,12 @@ defmodule ThistleTea.Game.World.VisibilityTest do
   alias ThistleTea.Game.Entity.Data.GameObject
   alias ThistleTea.Game.Entity.Data.Transport
   alias ThistleTea.Game.Entity.Data.Transport.Pose
+  alias ThistleTea.Game.Entity.Logic.Invisibility
+  alias ThistleTea.Game.Entity.Server.Player.State
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.Message
+  alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Position.Spline
@@ -108,6 +112,48 @@ defmodule ThistleTea.Game.World.VisibilityTest do
   end
 
   describe "can_see?/2" do
+    test "client aura cancellation republishes detection and hides a tracked target" do
+      guid = Guid.from_low_guid(:player, unique_low())
+      target = Guid.from_low_guid(:mob, unique_low(), unique_low())
+      cell = {WorldRef.open(0), 0, 0}
+      member = start_member(cell, %{guid: target, type: :mob})
+      viewer = character(guid, ghost?: false)
+      viewer = %{viewer | unit: %{viewer.unit | health: 100, max_health: 100, level: 60, auras: []}}
+
+      viewer =
+        Enum.reduce([{132, 100}, {11_743, 300}], viewer, fn {id, level}, viewer ->
+          spell = %Spell{
+            id: id,
+            effects: [
+              %Effect{index: 0, type: :apply_aura, aura: :mod_invisibility_detect, base_points: level, misc_value: 0}
+            ]
+          }
+
+          viewer |> ThistleTea.Game.Entity.Logic.Aura.apply_spell(guid, 60, spell, 0) |> elem(0)
+        end)
+
+      Metadata.put(guid, Invisibility.metadata(viewer))
+      Metadata.put(target, %{invisibility: %{0 => 200}})
+
+      on_exit(fn ->
+        Metadata.delete(guid)
+        Metadata.delete(target)
+        stop_member(member)
+      end)
+
+      state = %State{
+        guid: guid,
+        character: viewer,
+        visibility_cells: MapSet.new([cell]),
+        tracked_entities: MapSet.new([target])
+      }
+
+      state = Message.CmsgCancelAura.handle(%Message.CmsgCancelAura{spell_id: 11_743}, state)
+      assert Metadata.get(guid).invisibility_detection[0] == 100
+      refute Visibility.tracked?(state, target)
+      assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgDestroyObject{guid: ^target}, force: true}}
+    end
+
     test "reveals hidden units only with matching detection and preserves self visibility" do
       guid = Guid.from_low_guid(:player, unique_low())
       target = Guid.from_low_guid(:mob, unique_low(), unique_low())

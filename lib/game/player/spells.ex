@@ -2,18 +2,22 @@ defmodule ThistleTea.Game.Player.Spells do
   @moduledoc """
   Boundary for teaching a player spells: applies rank supersession, rebuilds
   the spellbook, persists the character, and notifies the client of each
-  learned or superseded spell.
+  learned or superseded spell. Aura cancellation uses the owning player's
+  publication path so derived metadata and visibility change with the aura.
   """
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
+  alias ThistleTea.Game.Entity.Logic.Casting
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Proficiency
   alias ThistleTea.Game.Entity.Logic.SpellBook
+  alias ThistleTea.Game.Entity.Server.Player, as: PlayerServer
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.Cast
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.Loader.Skill, as: SkillLoader
@@ -21,6 +25,21 @@ defmodule ThistleTea.Game.Player.Spells do
 
   @battle_stance_spell_id 2457
   @warrior_class 1
+
+  def cancel_aura(%{character: %Character{} = character} = state, spell_id) do
+    character = maybe_cancel_channel(character, spell_id)
+    {character, events} = AuraLogic.cancel_spell(character, spell_id, Time.now())
+    character = Effects.enqueue(character, events)
+    PlayerServer.maybe_broadcast_update(%{state | character: character})
+  end
+
+  def cancel_aura(state, _spell_id), do: state
+
+  defp maybe_cancel_channel(%Character{internal: %{casting: %Cast{spell: %Spell{id: id} = spell}}} = character, id) do
+    if Spell.attribute?(spell, :channeled), do: Casting.cancel(character), else: character
+  end
+
+  defp maybe_cancel_channel(character, _spell_id), do: character
 
   def learn(%Character{internal: internal} = character, spell_ids) do
     existing_ids = internal.spells || []

@@ -19,6 +19,11 @@ defmodule ThistleTea.Game.Entity.Logic.InvisibilityTest do
   setup [:character]
 
   describe "detectable?/2" do
+    test "rejects a target whose perception metadata disappeared" do
+      refute Invisibility.detectable?(%{}, nil)
+      refute StealthDetection.detectable?(%{level: 60}, nil, 1.0, 1000)
+    end
+
     test "requires sufficient detection in a matching type" do
       target = %{invisibility: %{0 => 200}}
       refute Invisibility.detectable?(%{}, target)
