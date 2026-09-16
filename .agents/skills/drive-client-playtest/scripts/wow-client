@@ -183,7 +183,7 @@ terminate_session_process() {
 }
 
 launch_client() {
-  local wow_dir="${THISTLE_PLAYTEST_WOW_DIR:-/storage/games/World of Warcraft - Vanilla}"
+  local wow_dir="${THISTLE_PLAYTEST_WOW_DIR:-/storage/games/World of Warcraft - Vanilla (Automation)}"
   local proton_path="${THISTLE_PLAYTEST_PROTON_PATH:-/home/pikdum/.local/share/Steam/steamapps/common/Proton - Experimental}"
   local cache_dir="${THISTLE_PLAYTEST_CACHE_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}}"
   local display_number

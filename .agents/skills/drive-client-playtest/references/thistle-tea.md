@@ -4,7 +4,7 @@
 
 The helper defaults to:
 
-- client directory: `/storage/games/World of Warcraft - Vanilla`
+- client directory: `/storage/games/World of Warcraft - Vanilla (Automation)`
 - executable: `WoW.exe`
 - realm list: `realmlist.wtf`, which must already point to localhost
 - Proton: `/home/pikdum/.local/share/Steam/steamapps/common/Proton - Experimental`
