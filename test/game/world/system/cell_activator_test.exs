@@ -77,7 +77,7 @@ defmodule ThistleTea.Game.World.System.CellActivatorTest do
       start_supervised!({CellActivator, name: name, loader: loader, max_concurrency: 1, retry_delay_ms: 10})
 
       CellActivator.activate([{0, 1, 2}], name)
-      assert_receive {:loaded, {0, 1, 2}}
+      assert_receive {:loaded, {0, 1, 2}}, 1_000
       assert Agent.get(attempts, & &1) == 2
 
       CellActivator.activate([{0, 1, 2}], name)
