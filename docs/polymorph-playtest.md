@@ -99,3 +99,4 @@ isolated run passed 2,841 tests but failed the existing cell-activator sweep
 test because its first deactivation message contained only neighboring cells.
 The identical seed passed on rerun without code changes. These intermittent
 validation failures are separate from the Polymorph regressions covered here.
+Their causes and fixes are recorded in the [flaky test investigation](flaky-test-investigation.md).
