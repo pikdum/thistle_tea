@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.Entity.Data.MobTest do
   alias ThistleTea.Game.Entity.Server.Mob, as: MobServer
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
@@ -321,6 +322,38 @@ defmodule ThistleTea.Game.Entity.Data.MobTest do
   end
 
   describe "handle_cast/2" do
+    test "Distract reaches an idle mob without engaging it" do
+      guid = Guid.from_low_guid(:mob, 478, System.unique_integer([:positive]))
+
+      spell = %Spell{
+        id: 1725,
+        school: :physical,
+        attributes: MapSet.new([:no_threat]),
+        effects: [%Effect{type: :distract, base_points: 10, implicit_target_a: :aoe_enemy_at_dest}]
+      }
+
+      context = %CastContext{caster_guid: 1, target_role: :other, destination_position: {0.0, 5.0, 0.0}}
+
+      mob = %Mob{
+        object: %Object{guid: guid},
+        unit: %Unit{health: 100, max_health: 100, level: 10, auras: []},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+        internal: %Internal{world: WorldRef.open(0), in_combat: false}
+      }
+
+      assert {:noreply, mob, {:continue, :maybe_broadcast}} =
+               MobServer.handle_cast({:receive_spell, context, spell}, mob)
+
+      refute mob.internal.in_combat
+      assert is_integer(mob.internal.blackboard.navigation.distracted_until)
+      assert_in_delta elem(mob.movement_block.position, 3), :math.pi() / 2, 0.001
+
+      assert {:noreply, mob, {:continue, :maybe_broadcast}} =
+               MobServer.handle_cast({:receive_spell_outcome, 1, spell, :resist}, mob)
+
+      refute mob.internal.in_combat
+    end
+
     test "notifies a mob caster when a dummy spell hits successfully" do
       caster_guid = Guid.from_low_guid(:mob, 1, System.unique_integer([:positive]))
       target_guid = Guid.from_low_guid(:mob, 2, System.unique_integer([:positive]))

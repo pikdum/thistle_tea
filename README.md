@@ -76,6 +76,7 @@ nix develop .#wow-tools            # shell with all of the above + sqlite + mari
 - chatting, channels, and parties
 - mob spawns, combat, navigation, and respawns
 - auto-attacks + class abilities
+- Rogue Distract: ground-targeted facing and timed patrol pauses, preserving stealth
 - pets
 - items, bags, equipment, and vendors
 - looting + group loot
