@@ -521,7 +521,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
       |> then(fn character ->
         %{
           character
-          | internal: %{character.internal | area: area},
+          | internal: %{character.internal | area: area, fall: nil},
             movement_block: %{character.movement_block | position: {x, y, z, orientation}, movement_flags: 0}
         }
       end)
@@ -560,7 +560,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
       |> then(fn character ->
         %{
           character
-          | internal: %{character.internal | area: area, world: world},
+          | internal: %{character.internal | area: area, world: world, fall: nil},
             movement_block: %{character.movement_block | position: {x, y, z, orientation}}
         }
       end)

@@ -57,6 +57,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
     Effects.DuelDefeat,
     Effects.DuelInterrupted,
     Effects.DuelRequest,
+    Effects.EnvironmentalDamage,
     Effects.StartAttack,
     Effects.TapClaimed,
     Effects.TapCleared,

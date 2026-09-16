@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Entity.Logic.FallingTest do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Falling
+  alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.Spell
 
   describe "update/3" do
@@ -139,6 +140,22 @@ defmodule ThistleTea.Game.Entity.Logic.FallingTest do
     test "discards the fall before relocation", %{character: character} do
       landed = character |> move(200.0, 0x4000) |> Falling.reset() |> land(0.0)
       assert landed.unit.health == 1000
+    end
+
+    test "teleporting clears tracked height", %{character: character} do
+      falling = move(character, 200.0, 0x4000)
+      {teleported, _transition} = Movement.teleport(falling, {0.0, 0.0, 0.0, 0.0}, 2000)
+      assert teleported.internal.fall == nil
+      assert land(teleported, 0.0).unit.health == 1000
+    end
+
+    test "server-driven movement clears tracked height", %{character: character} do
+      moving =
+        character
+        |> move(200.0, 0x4000)
+        |> Movement.start_timed_path([{0.0, 0.0, 0.0}], 1000, 1000)
+
+      assert moving.internal.fall == nil
     end
   end
 

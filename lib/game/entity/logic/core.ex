@@ -347,6 +347,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
     internal = %{
       internal
       | running: false,
+        fall: nil,
         movement_start_time: nil,
         movement_start_position: nil
     }

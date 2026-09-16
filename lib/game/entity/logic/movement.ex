@@ -230,7 +230,7 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
 
     running = Keyword.get(opts, :run?, default_running)
     flying? = Keyword.get(opts, :flying?, false)
-    internal = %{internal | movement_start_time: now, movement_start_position: {x0, y0, z0}}
+    internal = %{internal | movement_start_time: now, movement_start_position: {x0, y0, z0}, fall: nil}
     {_position, orientation} = pose_along_path([{x0, y0, z0} | path], 0.0, orientation)
 
     movement_block = %{
@@ -343,7 +343,8 @@ defmodule ThistleTea.Game.Entity.Logic.Movement do
     internal = %{
       entity.internal
       | events: Enum.reject(entity.internal.events, &stale_movement_projection?/1),
-        navigation_intents: []
+        navigation_intents: [],
+        fall: nil
     }
 
     movement_block = %{entity.movement_block | position: position, timestamp: now}

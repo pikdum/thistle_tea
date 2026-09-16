@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.Network.Message.MsgMoveTest do
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Object
+  alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Taxi.Flight
   alias ThistleTea.Game.Entity.Logic.Companion
@@ -15,6 +16,7 @@ defmodule ThistleTea.Game.Network.Message.MsgMoveTest do
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.BinaryUtils
   alias ThistleTea.Game.Network.Message.MsgMove
+  alias ThistleTea.Game.Network.Message.SmsgEnvironmentalDamageLog
   alias ThistleTea.Game.Network.Opcodes
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Metadata
@@ -24,6 +26,43 @@ defmodule ThistleTea.Game.Network.Message.MsgMoveTest do
   alias ThistleTea.Game.WorldRef
 
   describe "handle/2" do
+    test "landing damages the owner, projects health, and broadcasts the combat log once" do
+      guid = Guid.from_low_guid(:player, System.unique_integer([:positive, :monotonic]))
+      {:ok, _owner} = Entity.register(guid)
+      character = moving_character(guid)
+
+      character = %{
+        character
+        | unit: %{character.unit | health: 1000, max_health: 1000, level: 10},
+          player: %Player{flags: 0}
+      }
+
+      on_exit(fn -> Presence.leave(character) end)
+
+      state = %State{
+        guid: guid,
+        packed_guid: BinaryUtils.pack_guid(guid),
+        ready: true,
+        character: character,
+        player_guids: []
+      }
+
+      falling = MsgMove.handle(move_message(:MSG_MOVE_HEARTBEAT, 0x4000, {0.0, 0.0, 30.0, 0.0}), state)
+      landing = move_message(:MSG_MOVE_FALL_LAND, 0, {0.0, 0.0, 0.0, 0.0}, 2000)
+      landed = MsgMove.handle(landing, falling)
+
+      assert landed.character.unit.health == 703
+      assert landed.character.internal.fall == nil
+      refute landed.character.internal.broadcast_update?
+      assert landed.character.internal.events == []
+
+      assert_receive {:"$gen_cast",
+                      {:send_packet, %SmsgEnvironmentalDamageLog{guid: ^guid, damage_type: 2, damage: 297}}}
+
+      assert MsgMove.handle(landing, landed).character.unit.health == 703
+      refute_receive {:"$gen_cast", {:send_packet, %SmsgEnvironmentalDamageLog{}}}
+    end
+
     test "routes movement to the active controlled unit without moving the character" do
       mover_guid = :erlang.unique_integer([:positive])
       {:ok, _owner} = Entity.register(mover_guid)
@@ -109,10 +148,10 @@ defmodule ThistleTea.Game.Network.Message.MsgMoveTest do
     end
   end
 
-  defp move_message(opcode, flags, {x, y, z, orientation}) do
+  defp move_message(opcode, flags, {x, y, z, orientation}, fall_time \\ 0) do
     payload =
       <<flags::little-size(32), 1_000::little-size(32), x::little-float-size(32), y::little-float-size(32),
-        z::little-float-size(32), orientation::little-float-size(32), 0::little-size(32)>>
+        z::little-float-size(32), orientation::little-float-size(32), fall_time::little-size(32)>>
 
     %MsgMove{opcode: Opcodes.get(opcode), payload: payload}
   end

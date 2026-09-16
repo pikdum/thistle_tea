@@ -18,6 +18,13 @@ defmodule ThistleTea.Game.Entity.EventSink.Combat do
 
   @victimstate_normal 1
 
+  def emit(entity, %Effects.EnvironmentalDamage{type: :fall, damage: damage}, _context) do
+    %Message.SmsgEnvironmentalDamageLog{guid: entity.object.guid, damage_type: 2, damage: damage}
+    |> World.broadcast_packet(entity)
+
+    entity
+  end
+
   def emit(entity, %Effects.DeliverAttack{} = effect, _context) do
     Entity.receive_attack(effect.target_guid, effect.attack)
     entity

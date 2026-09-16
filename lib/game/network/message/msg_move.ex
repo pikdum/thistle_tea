@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Network.Message.MsgMove do
   alias ThistleTea.Game.Network.MovementControl
   alias ThistleTea.Game.Network.Packet
   alias ThistleTea.Game.Player.Exploration, as: PlayerExploration
+  alias ThistleTea.Game.Player.Movement, as: PlayerMovement
   alias ThistleTea.Game.Player.Rest, as: PlayerRest
   alias ThistleTea.Game.Player.Spellcasting
   alias ThistleTea.Game.Time
@@ -106,6 +107,7 @@ defmodule ThistleTea.Game.Network.Message.MsgMove do
     }
 
     moved? = position_changed? or translating?
+    character = PlayerMovement.apply_fall(character, message.opcode, now)
     character = interrupt_auras(character, moved?)
     character = interrupt_water_auras(character, movement_block, state.character.movement_block)
 
@@ -133,6 +135,7 @@ defmodule ThistleTea.Game.Network.Message.MsgMove do
     new_state
     |> Visibility.refresh_player()
     |> broadcast(message)
+    |> PlayerMovement.publish_changes()
   end
 
   defp broadcast(state, message) do
