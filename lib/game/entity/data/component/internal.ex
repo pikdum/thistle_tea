@@ -63,6 +63,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal do
     :invincibility_health_threshold,
     world: WorldRef.open(0),
     temporary_threat: %{},
+    diminishing_returns: %{},
     companion: Companion.none(),
     rest_bonus: 0.0,
     mailbox: [],

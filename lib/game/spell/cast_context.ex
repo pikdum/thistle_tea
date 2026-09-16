@@ -61,6 +61,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
     :caster_max_health,
     :combo_points,
     :spell_threat,
+    triggered_by_aura?: false,
     spell_modifiers: [],
     conditional_crit_modifiers: [],
     damage_done_versus: [],

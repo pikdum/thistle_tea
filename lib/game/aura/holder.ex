@@ -20,6 +20,7 @@ defmodule ThistleTea.Game.Aura.Holder do
     :slot,
     :applied_at,
     :expires_at,
+    :diminishing_group,
     :charges,
     :area_radius,
     :next_area_refresh_at,
