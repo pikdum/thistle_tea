@@ -91,6 +91,7 @@ nix develop .#wow-tools            # shell with all of the above + sqlite + mari
 - isolated dungeon instances (Ragefire Chasm)
 - Deadmines boss doors and gunpowder cannon breach, with Smite's alarms and pirate response
 - dying + resurrecting
+- Soulstones and Reincarnation, with reagent consumption, cooldowns, and talent modifiers
 - fall damage, Safe Fall, and Slow Fall protection
 - underwater breath timers, drowning, water-breathing effects, and extended breath reserves
 - gossip + trainers
