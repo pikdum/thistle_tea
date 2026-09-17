@@ -53,9 +53,12 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Lifecycle do
 
   def expire_due(entity, _now), do: {entity, []}
 
-  def remove_with_interrupt_flags(%{unit: %Unit{auras: holders}} = entity, mask, now)
+  def remove_with_interrupt_flags(entity, mask, now, preserved_types \\ [])
+
+  def remove_with_interrupt_flags(%{unit: %Unit{auras: holders}} = entity, mask, now, preserved_types)
       when is_list(holders) and holders != [] and is_integer(mask) do
-    {removed, kept} = Enum.split_with(holders, &Holder.interruptible?(&1, mask))
+    {removed, kept} =
+      Enum.split_with(holders, &(Holder.interruptible?(&1, mask) and not Holder.has_any_type?(&1, preserved_types)))
 
     if removed == [] do
       {entity, []}
@@ -64,7 +67,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Lifecycle do
     end
   end
 
-  def remove_with_interrupt_flags(entity, _mask, _now), do: {entity, []}
+  def remove_with_interrupt_flags(entity, _mask, _now, _preserved_types), do: {entity, []}
 
   def remove_spells(%{unit: %Unit{auras: holders}} = entity, spell_ids, now)
       when is_list(holders) and holders != [] and is_list(spell_ids) do

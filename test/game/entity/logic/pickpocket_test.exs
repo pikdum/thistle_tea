@@ -53,6 +53,22 @@ defmodule ThistleTea.Game.Entity.Logic.PickpocketTest do
   end
 
   describe "Casting.advance/2" do
+    test "cast preparation preserves stealth but still interrupts invisibility", %{
+      caster: caster,
+      spell: spell,
+      target: target
+    } do
+      invisibility = %Holder{
+        spell: %Spell{id: 999, aura_interrupt_flags: 4},
+        auras: [%AuraData{type: :mod_invisibility, amount: 100, misc_value: 0}]
+      }
+
+      caster = %{caster | unit: %{caster.unit | auras: caster.unit.auras ++ [invisibility]}}
+      caster = Casting.start(caster, spell, Target.unit(target.guid), 1_000)
+      assert Aura.has_aura?(caster, :mod_stealth)
+      refute Aura.has_aura?(caster, :mod_invisibility)
+    end
+
     test "a successful cast opens pockets while preserving stealth and peace", %{
       caster: caster,
       spell: spell,
@@ -118,7 +134,7 @@ defmodule ThistleTea.Game.Entity.Logic.PickpocketTest do
 
   defp caster_fixture(_) do
     stealth = %Holder{
-      spell: %Spell{id: 1784, aura_interrupt_flags: 0x1000},
+      spell: %Spell{id: 1784, aura_interrupt_flags: 15_367},
       caster_guid: 1,
       auras: [%AuraData{type: :mod_stealth, amount: 100}]
     }

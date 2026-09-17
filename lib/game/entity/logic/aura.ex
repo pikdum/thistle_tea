@@ -35,6 +35,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
   defdelegate self_duration_events(entity, now), to: Lifecycle
   defdelegate expire_due(entity, now), to: Lifecycle
   defdelegate remove_with_interrupt_flags(entity, mask, now), to: Lifecycle
+  defdelegate remove_with_interrupt_flags(entity, mask, now, preserved_types), to: Lifecycle
   defdelegate remove_spells(entity, spell_ids, now), to: Lifecycle
   defdelegate spend_spell_charges(entity, spell_ids, now), to: Lifecycle
   defdelegate remove_aura_types(entity, aura_types, now), to: Lifecycle

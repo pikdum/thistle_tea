@@ -58,7 +58,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
   def start(entity, _spell, _targets, _now, _cast_item_guid), do: entity
 
   defp start_available_spell(character, spell, targets, now, cast_item_guid) do
-    character = character |> Mount.prepare_cast(spell, now) |> interrupt_action_auras(:action, now)
+    character = character |> Mount.prepare_cast(spell, now) |> interrupt_action_auras(:action, spell, now)
 
     if Spell.attribute?(spell, :on_next_swing) do
       MeleeSpell.queue_next_swing(character, spell)
@@ -196,7 +196,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
       |> queue_spell_miss_outcomes(casting, resolution.misses)
       |> queue_consume_costs(resolution.costs)
       |> break_stealth(casting, now)
-      |> interrupt_action_auras(:action_complete, now)
+      |> interrupt_action_auras(:action_complete, casting.spell, now)
       |> mark_hostile_cast(casting, attempted_targets, now)
 
     casting = Cast.transition(casting, :impact)
@@ -539,8 +539,12 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
 
   defp failure_breaks_stealth?(_casting), do: false
 
-  defp interrupt_action_auras(entity, action, now) do
-    {entity, events} = AuraLogic.remove_with_interrupt_flags(entity, AuraLogic.interrupt_mask(action), now)
+  defp interrupt_action_auras(entity, action, spell, now) do
+    preserved_types = if Spell.attribute?(spell, :allow_while_stealthed), do: [:mod_stealth], else: []
+
+    {entity, events} =
+      AuraLogic.remove_with_interrupt_flags(entity, AuraLogic.interrupt_mask(action), now, preserved_types)
+
     Effects.enqueue(entity, events)
   end
 
