@@ -17,6 +17,7 @@ defmodule ThistleTea.Game.Entity.Logic.CastingTest do
   alias ThistleTea.Game.Entity.Logic.Casting
   alias ThistleTea.Game.Entity.Logic.Companion
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Logic.SpellEffect
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Cast
@@ -256,7 +257,13 @@ defmodule ThistleTea.Game.Entity.Logic.CastingTest do
             targets: Target.unit(1),
             channel_ms: 3_000,
             phase: :channel_tick,
-            resolution: channel_resolution(),
+            resolution: %{
+              channel_resolution()
+              | impacts: [
+                  %Impact{target_guid: 1, target_role: :caster},
+                  %Impact{target_guid: 2, target_role: :other, hit_outcome: :resist}
+                ]
+            },
             channel_tick_ms: 1_000,
             next_channel_tick_at: now - 1,
             ends_at: now + 3_000
@@ -716,6 +723,35 @@ defmodule ThistleTea.Game.Entity.Logic.CastingTest do
                  outcome: :resist
                }
              ] = mob.internal.events
+
+      spell = %{spell | dmg_class: 1}
+      casting = %{casting | spell: spell}
+      mob = %{mob | internal: %{mob.internal | events: [], casting: casting}}
+      :rand.seed(:exsss, {1, 2, 3})
+      mob = Casting.complete(mob, casting, 1_000)
+
+      assert [
+               %Effects.SpellCastResult{},
+               %Effects.SpellGo{hit_guids: [^target_guid], misses: []},
+               %Effects.DeliverSpell{cast_context: context, target_guid: ^target_guid}
+             ] = mob.internal.events
+
+      assert context.hit_outcome == :resist
+
+      target = %Mob{
+        object: %Object{guid: target_guid},
+        unit: %Unit{health: 100, max_health: 100},
+        internal: %Internal{}
+      }
+
+      {target, [%Effects.SpellLogMiss{reason: :resist}]} = SpellEffect.receive(target, context, spell, 1_000)
+      assert target.unit.health == 100
+
+      reflection = %Holder{spell: %Spell{id: 112}, auras: [%AuraData{type: :reflect_spells, amount: 100}]}
+      target = %{target | unit: %{target.unit | auras: [reflection]}}
+
+      {_target, [%Effects.SpellLogMiss{reason: :reflect}, %Effects.DeliverSpell{}]} =
+        SpellEffect.receive(target, context, spell, 1_000)
     end
 
     test "applies the victim's school-masked spell hit modifier from metadata" do
@@ -837,7 +873,7 @@ defmodule ThistleTea.Game.Entity.Logic.CastingTest do
       missed = Casting.complete(mob, casting, 1_000)
 
       assert Enum.any?(missed.internal.events, fn
-               %Effects.SpellGo{hit_guids: [], misses: [%{guid: ^target_guid, reason: 2}]} -> true
+               %Effects.DeliverSpell{target_guid: ^target_guid, cast_context: %{hit_outcome: :resist}} -> true
                _event -> false
              end)
 

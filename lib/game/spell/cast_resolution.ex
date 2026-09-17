@@ -51,11 +51,12 @@ defmodule ThistleTea.Game.Spell.CastResolution do
     @moduledoc false
 
     @enforce_keys [:target_guid, :target_role]
-    defstruct [:target_guid, :target_role]
+    defstruct [:target_guid, :target_role, hit_outcome: :hit]
 
     @type t :: %__MODULE__{
             target_guid: non_neg_integer(),
-            target_role: :caster | :pet | :other
+            target_role: :caster | :pet | :other,
+            hit_outcome: :hit | :resist
           }
   end
 

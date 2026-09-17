@@ -36,6 +36,19 @@ defmodule ThistleTea.Game.Entity.Logic.SpellReflectionTest do
   end
 
   describe "receive/4" do
+    test "reflection precedes the saved resist outcome", %{target: target, context: context} do
+      context = %{context | hit_outcome: :resist}
+      target = put_holders(target, [charged_holder(1)])
+      {target, events} = SpellEffect.receive(target, context, damage_spell(), 100)
+      assert target.unit.auras == []
+      assert target.unit.health == 100
+      assert [%Effects.SpellLogMiss{reason: :reflect}, %Effects.DeliverSpell{cast_context: returned}] = events
+      assert returned.hit_outcome == :hit
+
+      {target, [%Effects.SpellLogMiss{reason: :resist}]} = SpellEffect.receive(target, context, damage_spell(), 200)
+      assert target.unit.health == 100
+    end
+
     test "reflects magic damage from every school with caster attribution", %{target: target, context: context} do
       for school <- [:physical, :holy, :fire, :nature, :frost, :shadow, :arcane] do
         spell = damage_spell(school)

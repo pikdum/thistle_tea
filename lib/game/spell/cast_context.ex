@@ -63,6 +63,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
     :combo_points,
     :spell_threat,
     triggered_by_aura?: false,
+    hit_outcome: :hit,
     dispel_resistance: %{},
     spell_modifiers: [],
     conditional_crit_modifiers: [],

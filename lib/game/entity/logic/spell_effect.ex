@@ -53,7 +53,8 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
           | target_guid: context.caster_guid,
             target_role: :other,
             target_hostile?: true,
-            reflected_by_guid: target.object.guid
+            reflected_by_guid: target.object.guid,
+            hit_outcome: :hit
         }
 
         {target,
@@ -61,6 +62,10 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
            Effects.spell_log_miss(context.caster_guid, target.object.guid, spell.id, :reflect),
            Effects.deliver_spell(context.caster_guid, reflected_context, spell)
          ] ++ reactions}
+
+      context.hit_outcome == :resist ->
+        {target, reactions} = receive_outcome(target, context.caster_guid, spell, :resist, now)
+        {target, [Effects.spell_log_miss(context.caster_guid, target.object.guid, spell.id, :resist) | reactions]}
 
       true ->
         effects =

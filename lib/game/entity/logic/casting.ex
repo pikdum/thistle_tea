@@ -282,10 +282,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
         cast_item_guid: cast_item_cost(casting),
         modifier_holder_ids: casting.modifier_holder_ids
       },
-      impacts:
-        Enum.map(hits, fn target_guid ->
-          %Impact{target_guid: target_guid, target_role: target_role(entity, target_guid)}
-        end),
+      impacts: resolved_impacts(entity, spell, hits, misses),
       followups: %Followups{
         packet_hits: hits ++ object_hit(object_guid),
         selected_unit_guid: Target.unit_guid(targets),
@@ -295,6 +292,19 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
         area_position: area_effect_position(entity, spell, targets)
       }
     }
+  end
+
+  defp resolved_impacts(entity, spell, hits, misses) do
+    impacts = Enum.map(hits, &%Impact{target_guid: &1, target_role: target_role(entity, &1)})
+
+    if Spell.reflectable?(spell) do
+      impacts ++
+        Enum.map(misses, fn %{guid: guid} ->
+          %Impact{target_guid: guid, target_role: target_role(entity, guid), hit_outcome: :resist}
+        end)
+    else
+      impacts
+    end
   end
 
   defp empty_resolution(object_guid) do
@@ -975,11 +985,14 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
 
   defp queue_spell_go(
          %{object: %{guid: guid}} = character,
-         %Cast{spell: %Spell{id: spell_id}} = casting,
+         %Cast{spell: %Spell{id: spell_id} = spell} = casting,
          targets,
          misses
        )
        when is_integer(guid) do
+    {targets, misses} =
+      if Spell.reflectable?(spell), do: {targets ++ Enum.map(misses, & &1.guid), []}, else: {targets, misses}
+
     Effects.enqueue(
       character,
       Effects.spell_go(guid, spell_id, targets, casting.targets, casting.cast_item_guid, misses)
@@ -994,7 +1007,8 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
   defp queue_spell_miss_outcomes(%{object: %{guid: caster_guid}} = character, %Cast{spell: %Spell{} = spell}, misses)
        when is_integer(caster_guid) and is_list(misses) do
     events =
-      for %{guid: target_guid, reason: @spell_miss_reason_resist} <- misses do
+      for %{guid: target_guid, reason: @spell_miss_reason_resist} <- misses,
+          not Spell.reflectable?(spell) do
         Effects.deliver_spell_outcome(target_guid, caster_guid, spell, :resist)
       end
 
@@ -1079,7 +1093,8 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
         character
 
       tick_effects ->
-        apply_impacts(character, %{casting | spell: %{spell | effects: tick_effects}}, impacts, now)
+        hits = Enum.filter(impacts, &(&1.hit_outcome == :hit))
+        apply_impacts(character, %{casting | spell: %{spell | effects: tick_effects}}, hits, now)
     end
   end
 
@@ -1092,13 +1107,14 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
          now
        )
        when is_integer(caster_guid) and is_list(impacts) do
-    Enum.reduce(impacts, character, fn %Impact{target_guid: target_guid, target_role: target_role}, caster ->
+    Enum.reduce(impacts, character, fn %Impact{target_guid: target_guid, target_role: target_role} = impact, caster ->
       context = %{
         CastContext.from_caster(caster, spell, target_guid)
         | selected_target_guid: Target.unit_guid(casting.targets),
           destination_position: Target.ground_location(casting.targets),
           target_hostile?: target_guid != caster_guid and Hostility.valid_attack_target?(caster, target_guid),
-          target_role: target_role
+          target_role: target_role,
+          hit_outcome: impact.hit_outcome
       }
 
       dispatch_to_target(caster, context, spell, target_guid, now)
