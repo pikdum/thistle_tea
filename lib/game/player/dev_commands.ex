@@ -321,7 +321,7 @@ defmodule ThistleTea.Game.Player.DevCommands do
         system_message(state, "Disable god mode first (.tgm).")
 
       true ->
-        character = Core.take_damage(character, character.unit.health, Time.now())
+        character = Core.take_damage(character, character.unit.health, Time.now(), environmental?: true)
 
         state
         |> put_character(character)

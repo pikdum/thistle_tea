@@ -1,6 +1,8 @@
 defmodule ThistleTea.Game.Player.DevCommandsTest do
   use ExUnit.Case, async: false
 
+  alias ThistleTea.Game.Aura
+  alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
@@ -22,6 +24,7 @@ defmodule ThistleTea.Game.Player.DevCommandsTest do
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Player.DevCommands
   alias ThistleTea.Game.Player.Reputation, as: PlayerReputation
+  alias ThistleTea.Game.Spell
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.InstanceData
   alias ThistleTea.Game.World.Loader.Reputation, as: ReputationLoader
@@ -31,6 +34,43 @@ defmodule ThistleTea.Game.Player.DevCommandsTest do
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.World.Transports
   alias ThistleTea.Game.WorldRef
+
+  describe ".die" do
+    test "bypasses shields without spending mana" do
+      id = System.unique_integer([:positive, :monotonic])
+      guid = Guid.from_low_guid(:player, id)
+
+      holders =
+        for {type, spell_id} <- [{:mana_shield, 1463}, {:school_absorb, 11_426}] do
+          %Holder{
+            spell: %Spell{id: spell_id},
+            auras: [%Aura{type: type, amount: 500, misc_value: 127, multiple_value: 2.0}]
+          }
+        end
+
+      character = %{
+        debug_character()
+        | id: id,
+          object: %Object{guid: guid},
+          unit: %Unit{level: 50, health: 100, max_health: 100, power1: 200, max_power1: 200, auras: holders},
+          player: %Player{flags: 0}
+      }
+
+      state = %{guid: guid, character: character, player_tick_ref: nil}
+
+      on_exit(fn ->
+        :ets.delete(CharacterStore, id)
+        Metadata.delete(guid)
+        SpatialHash.remove(:players, guid)
+      end)
+
+      assert {:handled, updated} = DevCommands.run(state, ".die")
+      assert updated.character.unit.health == 0
+      assert updated.character.unit.power1 == 200
+      assert updated.character.unit.auras == []
+      assert updated.character.internal.death_finalized?
+    end
+  end
 
   describe ".mail" do
     test "posts an immediate letter to an offline character" do
