@@ -25,6 +25,8 @@ defmodule ThistleTea.Game.Network.Connection.Crypto do
 
   def decrypt_header(%Connection{} = conn), do: {:error, conn, :not_enough_data}
 
+  def encrypt_header(%Connection{session_key: nil} = conn, header), do: {:ok, conn, header}
+
   def encrypt_header(%Connection{} = conn, header) do
     {encrypted_header, send_i, send_j} =
       encrypt_bytes(header, conn.session_key, byte_size(conn.session_key), conn.send_i, conn.send_j, <<>>)
