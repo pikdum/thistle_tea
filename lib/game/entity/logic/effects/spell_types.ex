@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.Entity.Logic.Effects.SpellTypes do
     {:SpellHeal, [:source_guid, :target_guid, :spell_id, :spell, :school, :damage, :proc_type, :crit?],
      [periodic?: false]},
     {:SpellLogMiss, [:source_guid, :target_guid, :spell_id, :reason], []},
+    {:SpellDamageImmune, [:source_guid, :target_guid, :spell_id], []},
     {:PeriodicAuraLog, [:source_guid, :target_guid, :spell_id, :aura_type, :amount], [misc_value: 0]},
     {:AuraDuration, [:aura_slot, :duration_ms], []},
     {:RemoveAura, [:source_guid, :target_guid, :spell_id], []},

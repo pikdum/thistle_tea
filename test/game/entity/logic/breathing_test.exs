@@ -119,11 +119,12 @@ defmodule ThistleTea.Game.Entity.Logic.BreathingTest do
     end
 
     test "physical immunity suppresses drowning damage and its log", %{character: character} do
-      immune =
-        character |> with_aura(:school_immunity, 0, 1) |> Breathing.update(10.0, 0) |> Breathing.update(10.0, 60_000)
+      for type <- [:school_immunity, :damage_immunity] do
+        immune = character |> with_aura(type, 0, 1) |> Breathing.update(10.0, 0) |> Breathing.update(10.0, 60_000)
 
-      assert immune.unit.health == 1000
-      refute Enum.any?(immune.internal.events, &match?(%Effects.EnvironmentalDamage{}, &1))
+        assert immune.unit.health == 1000
+        refute Enum.any?(immune.internal.events, &match?(%Effects.EnvironmentalDamage{}, &1))
+      end
     end
   end
 

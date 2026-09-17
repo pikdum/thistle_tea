@@ -61,7 +61,7 @@ defmodule ThistleTea.Game.Entity.Logic.FallingTest do
     end
 
     test "slow fall, hover and physical immunity prevent damage", %{character: character} do
-      for type <- [:feather_fall, :hover, :school_immunity] do
+      for type <- [:feather_fall, :hover, :school_immunity, :damage_immunity] do
         protected = with_aura(character, type, 0, 1)
         landed = protected |> move(200.0, 0x4000) |> land(0.0)
         assert landed.unit.health == 1000

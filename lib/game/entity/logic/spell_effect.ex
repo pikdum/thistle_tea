@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   alias ThistleTea.Game.Entity.Logic.AttackTable
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Core
+  alias ThistleTea.Game.Entity.Logic.DamageImmunity
   alias ThistleTea.Game.Entity.Logic.EffectImmunity
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.MechanicResistance
@@ -89,7 +90,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   def receive_outcome(target, _caster_guid, _spell, _outcome, _now), do: {target, []}
 
   defp immune_to_harmful_spell?(target, %CastContext{caster_guid: caster_guid}, %Spell{} = spell) do
-    target.object.guid != caster_guid and Spell.harmful?(spell) and Aura.school_immune?(target, spell.school)
+    target.object.guid != caster_guid and Spell.harmful?(spell) and DamageImmunity.immune?(target, spell.school, spell)
   end
 
   defp reflect_harmful_spell?(target, %CastContext{caster_guid: caster_guid}, %Spell{} = spell) do

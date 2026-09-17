@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Entity.Logic.Breathing do
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Core
+  alias ThistleTea.Game.Entity.Logic.DamageImmunity
   alias ThistleTea.Game.Entity.Logic.Death
   alias ThistleTea.Game.Entity.Logic.Effects
 
@@ -92,7 +93,7 @@ defmodule ThistleTea.Game.Entity.Logic.Breathing do
       character = put_timer(character, %{timer | next_damage_at: now + @pulse_ms})
 
       character =
-        if Aura.school_immune?(character, :physical) do
+        if DamageImmunity.immune?(character, :physical) do
           character
         else
           character

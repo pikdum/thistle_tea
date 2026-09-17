@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
   alias ThistleTea.Game.Entity.Logic.Aura.Reactions
   alias ThistleTea.Game.Entity.Logic.Aura.Transition
   alias ThistleTea.Game.Entity.Logic.Core
+  alias ThistleTea.Game.Entity.Logic.DamageImmunity
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Resources
   alias ThistleTea.Game.Entity.Logic.SpellResist
@@ -101,7 +102,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
   defp tick_holder(entity, %Holder{auras: auras} = holder, now) do
     {entity, new_auras, events} =
       Enum.reduce(auras, {entity, [], []}, fn aura, {ent, acc, events} ->
-        {ent, new_aura, aura_events} = tick_aura(ent, holder, aura, now)
+        {ent, new_aura, aura_events} = tick_checked_aura(ent, holder, aura, now)
         {ent, [new_aura | acc], events ++ aura_events}
       end)
 
@@ -116,6 +117,23 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
   end
 
   defp tick_area_refresh(_entity, holder, _now), do: {holder, []}
+
+  defp tick_checked_aura(entity, %Holder{} = holder, %Aura{type: type, next_tick_at: at} = aura, now)
+       when type in [:periodic_damage, :periodic_leech, :periodic_mana_leech] and is_integer(at) and now >= at do
+    if DamageImmunity.immune?(entity, holder.spell.school, holder.spell) do
+      event = %Effects.SpellDamageImmune{
+        source_guid: holder.caster_guid,
+        target_guid: entity.object.guid,
+        spell_id: holder.spell.id
+      }
+
+      {entity, %{aura | next_tick_at: advance_tick(at, aura.amplitude_ms, now)}, [event]}
+    else
+      tick_aura(entity, holder, aura, now)
+    end
+  end
+
+  defp tick_checked_aura(entity, holder, aura, now), do: tick_aura(entity, holder, aura, now)
 
   defp party_aura_effects(%Character{object: %{guid: guid}, unit: %Unit{level: level}}, spell, radius) do
     [
@@ -286,6 +304,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
     {entity, absorbed} =
       Core.take_damage_with_absorb(entity, damage, now,
         school: school,
+        spell: holder.spell,
         source: holder.caster_guid,
         source_owner: holder.caster_owner_guid,
         reflected_by: holder.reflected_by_guid,

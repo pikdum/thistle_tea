@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
   alias ThistleTea.Game.Entity.Logic.AttackTable
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Core
+  alias ThistleTea.Game.Entity.Logic.DamageImmunity
   alias ThistleTea.Game.Entity.Logic.Daze
   alias ThistleTea.Game.Entity.Logic.Disarm
   alias ThistleTea.Game.Entity.Logic.Effects
@@ -164,7 +165,7 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
 
   def receive_attack(%{object: %{guid: target_guid}} = entity, attack, now, opts)
       when is_map(attack) and is_integer(target_guid) and is_integer(now) do
-    result = AttackTable.resolve(entity, attack, attack_damage(attack), opts)
+    result = resolve_attack(entity, attack, opts)
     entity = ParryHaste.apply(entity, result.outcome, now)
 
     {entity, absorbed} =
@@ -200,6 +201,14 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
   end
 
   def receive_attack(entity, _attack, _now, _opts), do: {entity, []}
+
+  defp resolve_attack(entity, attack, opts) do
+    if DamageImmunity.immune?(entity, attack_school(attack)) do
+      %{outcome: :immune, damage: 0, pre_armor_damage: 0, hit_info: 0x2, victim_state: 7, blocked_amount: 0}
+    else
+      AttackTable.resolve(entity, attack, attack_damage(attack), opts)
+    end
+  end
 
   defp maybe_defense_skill_up(%Character{unit: unit, player: player} = entity, attack, opts) do
     skill_up_opts = [

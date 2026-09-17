@@ -20,6 +20,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
   alias ThistleTea.Game.Entity.Logic.CastPushback
   alias ThistleTea.Game.Entity.Logic.Combat
   alias ThistleTea.Game.Entity.Logic.Companion
+  alias ThistleTea.Game.Entity.Logic.DamageImmunity
   alias ThistleTea.Game.Entity.Logic.Dueling
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Engagement
@@ -70,7 +71,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
   def take_damage_with_absorb(%{internal: %Internal{godmode: true}} = entity, _damage, _now, _opts), do: {entity, 0}
 
   def take_damage_with_absorb(entity, damage, now, opts) when is_number(damage) and damage > 0 and is_integer(now) do
-    if Aura.school_immune?(entity, Keyword.get(opts, :school, :physical)) do
+    if DamageImmunity.immune?(entity, Keyword.get(opts, :school, :physical), Keyword.get(opts, :spell)) do
       {entity, damage}
     else
       take_unblocked_damage(entity, damage, now, opts)

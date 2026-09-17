@@ -613,6 +613,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp aura_type(37), do: :effect_immunity
   defp aura_type(38), do: :state_immunity
   defp aura_type(39), do: :school_immunity
+  defp aura_type(40), do: :damage_immunity
   defp aura_type(41), do: :dispel_immunity
   defp aura_type(42), do: :proc_trigger_spell
   defp aura_type(43), do: :damage_shield
@@ -786,6 +787,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
       |> add_if(attrs, @aura_is_debuff, :negative)
       |> add_if(attrs, @cant_cancel, :cant_cancel)
       |> add_if(attrs, @cooldown_on_event, :cooldown_on_event)
+      |> add_if(attrs, 0x20000000, :no_immunities)
 
     base = if attrs == 0x150010, do: MapSet.put(base, :target_facing_caster), else: base
     base = if from_behind?(attrs_ex1, attrs_ex2), do: MapSet.put(base, :from_behind), else: base
@@ -805,6 +807,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
     |> add_if(attrs_ex1, @finishing_move_damage_ex_1, :finishing_move)
     |> add_if(attrs_ex1, @finishing_move_duration_ex_1, :finishing_move)
     |> add_if(attrs_ex2, @ignore_line_of_sight_ex2, :ignore_line_of_sight)
+    |> add_if(attrs_ex2, 0x04000000, :no_school_immunities)
     |> add_if(attrs_ex2, @cant_crit_ex2, :cant_crit)
     |> add_if(attrs_ex2, @allow_while_not_shapeshifted_ex2, :allow_while_not_shapeshifted)
     |> add_if(attrs_ex3, @completely_blocked_ex3, :completely_blocked)

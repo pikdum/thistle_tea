@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Entity.Logic.Falling do
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Core
+  alias ThistleTea.Game.Entity.Logic.DamageImmunity
   alias ThistleTea.Game.Entity.Logic.Death
   alias ThistleTea.Game.Entity.Logic.Effects
 
@@ -78,7 +79,7 @@ defmodule ThistleTea.Game.Entity.Logic.Falling do
   defp protected?(character) do
     not Death.alive?(character) or character.internal.godmode or
       not is_nil(character.internal.taxi_flight) or Aura.has_aura?(character, :feather_fall) or
-      Aura.has_aura?(character, :hover) or Aura.school_immune?(character, :physical)
+      Aura.has_aura?(character, :hover) or DamageImmunity.immune?(character, :physical)
   end
 
   defp coordinates(%MovementBlock{transport_guid: guid, transport_position: {_, _, z, _}})

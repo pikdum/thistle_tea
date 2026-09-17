@@ -7,7 +7,7 @@ defmodule ThistleTea.Game.World.Loader.EffectImmunityDbcTest do
   alias ThistleTea.Game.World.Loader.SpellChain
 
   @moduletag :dbc_db
-  @spell_ids [829, 1069, 26_602]
+  @spell_ids [829, 1069, 26_602, 16_621, 100, 355]
 
   setup do
     previous = Map.new(@spell_ids, &{&1, :ets.lookup(SpellChain, {:chain, &1})})
@@ -24,6 +24,12 @@ defmodule ThistleTea.Game.World.Loader.EffectImmunityDbcTest do
   end
 
   describe "load/1" do
+    test "loads damage immunity and immunity bypass attributes" do
+      assert [%Effect{aura: :damage_immunity, misc_value: 1}] = SpellLoader.load(16_621).effects
+      assert Spell.attribute?(SpellLoader.load(100), :no_immunities)
+      assert Spell.attribute?(SpellLoader.load(355), :no_school_immunities)
+    end
+
     test "normalizes state and effect immunity targets" do
       assert [%Effect{aura: :state_immunity, misc_value: :mod_stun}] = SpellLoader.load(829).effects
       spell = SpellLoader.load(26_602)

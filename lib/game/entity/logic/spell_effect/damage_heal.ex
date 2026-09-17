@@ -69,7 +69,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
        state,
        state.unit.health || 0,
        now,
-       damage_source_opts(context) ++ [spell_id: spell.id]
+       damage_source_opts(context) ++ [spell_id: spell.id, spell: spell]
      ), events}
   end
 
@@ -185,6 +185,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
     {state, absorbed} =
       Core.take_damage_with_absorb(state, damage, now,
         school: school,
+        spell: spell,
         source: context.caster_guid,
         source_owner: context.caster_owner_guid,
         reflected_by: context.reflected_by_guid,
@@ -394,6 +395,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
     {state, absorbed} =
       Core.take_damage_with_absorb(state, damage, now,
         school: school,
+        spell: spell,
         source: context.caster_guid,
         source_owner: context.caster_owner_guid,
         reflected_by: context.reflected_by_guid,
