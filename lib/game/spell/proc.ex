@@ -120,6 +120,7 @@ defmodule ThistleTea.Game.Spell.Proc do
   defp outcome_mask(:dodge), do: 0x10
   defp outcome_mask(:parry), do: 0x20
   defp outcome_mask(:block), do: 0x40
+  defp outcome_mask(:reflect), do: 0x800
   defp outcome_mask(_outcome), do: 0
 
   defp unrestricted_trigger?(%ProcRule{school_mask: 0, spell_family: 0, family_mask_0: 0, family_mask_1: 0}), do: true

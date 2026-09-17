@@ -130,7 +130,10 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
   def reflect_spell?(entity, spell, roll \\ fn -> :rand.uniform(100) end)
 
   def reflect_spell?(entity, %Spell{} = spell, roll) when is_function(roll, 0) do
-    chance = flat_modifier(entity, :reflect_spells_school, Spell.school_mask(spell.school))
+    chance =
+      flat_amount(entity, :reflect_spells) +
+        flat_modifier(entity, :reflect_spells_school, Spell.school_mask(spell.school))
+
     chance > 0 and (chance >= 100 or roll.() <= chance)
   end
 

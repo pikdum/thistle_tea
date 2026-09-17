@@ -17,6 +17,29 @@ defmodule ThistleTea.Game.World.Loader.SpellVmangosTest do
 
   @moduletag :dbc_db
 
+  describe "spell reflection" do
+    test "loads general reflection and the guaranteed first reflection from Sheen of Zanza" do
+      sheen = SpellLoader.load(24_417)
+      assert Enum.any?(sheen.effects, &(&1.aura == :reflect_spells and &1.base_points == 2))
+      assert Enum.any?(sheen.effects, &(&1.type == :trigger_spell and &1.trigger_spell_id == 30_003))
+
+      first = SpellLoader.load(30_003)
+      assert first.proc_charges == 1
+      assert first.proc_rule.proc_ex == 0x800
+      assert Enum.any?(first.effects, &(&1.aura == :reflect_spells and &1.base_points == 99))
+      assert Enum.any?(SpellLoader.load(20_223).effects, &(&1.aura == :reflect_spells))
+    end
+
+    test "loads reflection eligibility from DBC" do
+      assert Spell.reflectable?(SpellLoader.load(133))
+      assert Spell.reflectable?(SpellLoader.load(116))
+      refute Spell.reflectable?(SpellLoader.load(1752))
+      frost_nova = SpellLoader.load(122)
+      assert Spell.attribute?(frost_nova, :no_reflection)
+      refute Spell.reflectable?(frost_nova)
+    end
+  end
+
   describe "invisibility auras" do
     test "loads potion invisibility and all warlock detection ranks" do
       assert Enum.any?(SpellLoader.load(11_392).effects, &(&1.aura == :mod_invisibility and &1.misc_value == 0))

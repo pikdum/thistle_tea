@@ -106,7 +106,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
         :spell_hit_taken,
         %{attacker_guid: attacker_guid, spell: %Spell{}, proc_type: proc_type, outcome: outcome} = context
       )
-      when is_list(holders) and is_integer(attacker_guid) and outcome in [:normal, :crit, :resist] and
+      when is_list(holders) and is_integer(attacker_guid) and outcome in [:normal, :crit, :resist, :reflect] and
              proc_type in [:take_harmful_spell, :take_harmful_periodic] do
     context =
       Map.merge(context, %{
@@ -165,10 +165,20 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
     end
   end
 
+  defp consume_reflection_charge(holders, events, %Holder{} = holder, %{outcome: :reflect, spell: spell, now: now}) do
+    if reflects_school?(holder, Spell.school_mask(spell)) do
+      {replace_or_delete(holders, holder, mark_proc(holder, now)), events}
+    else
+      {holders, events}
+    end
+  end
+
+  defp consume_reflection_charge(holders, events, _holder, _context), do: {holders, events}
+
   defp generic_incoming_spell_proc(holders, events, %Holder{} = holder, owner_guid, attacker_guid, context) do
     case trigger_auras(holder) do
       [] ->
-        {holders, events}
+        consume_reflection_charge(holders, events, holder, context)
 
       proc_auras ->
         source_guid = holder.caster_guid || owner_guid
@@ -182,6 +192,19 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Reactions do
 
         {replace_or_delete(holders, holder, mark_proc(holder, Map.get(context, :now))), events ++ proc_events}
     end
+  end
+
+  defp reflects_school?(%Holder{auras: auras}, school_mask) do
+    Enum.any?(auras, fn
+      %Aura{type: :reflect_spells} ->
+        true
+
+      %Aura{type: :reflect_spells_school, misc_value: mask} when is_integer(mask) ->
+        Bitwise.band(mask, school_mask) != 0
+
+      _aura ->
+        false
+    end)
   end
 
   defp kill_proc_transition(holders, events, holder, owner_guid, context) do

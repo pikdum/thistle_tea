@@ -38,6 +38,16 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
         {target, [Effects.spell_log_miss(context.caster_guid, target.object.guid, spell.id, :immune)]}
 
       reflect_harmful_spell?(target, context, spell) ->
+        {target, reactions} =
+          Aura.reactions(target, :spell_hit_taken, %{
+            attacker_guid: context.caster_guid,
+            spell: spell,
+            proc_type: :take_harmful_spell,
+            outcome: :reflect,
+            damage: 0,
+            now: now
+          })
+
         reflected_context = %{
           context
           | target_guid: context.caster_guid,
@@ -50,7 +60,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
          [
            Effects.spell_log_miss(context.caster_guid, target.object.guid, spell.id, :reflect),
            Effects.deliver_spell(context.caster_guid, reflected_context, spell)
-         ]}
+         ] ++ reactions}
 
       true ->
         effects =
@@ -93,9 +103,11 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
     target.object.guid != caster_guid and Spell.harmful?(spell) and DamageImmunity.immune?(target, spell.school, spell)
   end
 
-  defp reflect_harmful_spell?(target, %CastContext{caster_guid: caster_guid}, %Spell{} = spell) do
-    target.object.guid != caster_guid and Spell.harmful?(spell) and Aura.reflect_spell?(target, spell)
+  defp reflect_harmful_spell?(target, %CastContext{caster_guid: caster_guid, reflected_by_guid: nil}, %Spell{} = spell) do
+    target.object.guid != caster_guid and Spell.reflectable?(spell) and Aura.reflect_spell?(target, spell)
   end
+
+  defp reflect_harmful_spell?(_target, _context, _spell), do: false
 
   defp applicable_effects(_target, %CastContext{target_role: :caster}, effects) do
     Enum.reject(effects, fn effect ->

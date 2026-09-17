@@ -69,6 +69,13 @@ defmodule ThistleTea.Game.Spell do
 
   def attribute?(%__MODULE__{attributes: attrs}, attr), do: MapSet.member?(attrs, attr)
 
+  def reflectable?(%__MODULE__{dmg_class: 1} = spell) do
+    harmful?(spell) and
+      not Enum.any?([:ability, :no_reflection, :no_immunities, :passive], &attribute?(spell, &1))
+  end
+
+  def reflectable?(_spell), do: false
+
   def level_units(%__MODULE__{} = spell, caster_level) when is_integer(caster_level) and caster_level > 0 do
     caster_level
     |> min_level_cap(spell.max_level)

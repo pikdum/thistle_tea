@@ -614,6 +614,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp aura_type(25), do: :mod_pacify
   defp aura_type(26), do: :mod_root
   defp aura_type(27), do: :mod_silence
+  defp aura_type(28), do: :reflect_spells
   defp aura_type(31), do: :mod_increase_speed
   defp aura_type(32), do: :mod_increase_mounted_speed
   defp aura_type(33), do: :mod_decrease_speed
@@ -805,6 +806,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
 
     base
     |> add_if(attrs_ex1, 0x00000020, :allow_while_stealthed)
+    |> add_if(attrs_ex1, 0x00000080, :no_reflection)
     |> add_if(attrs_ex1, 0x00000400, :no_threat)
     |> add_if(attrs_ex1, 0x00001000, :failure_breaks_stealth)
     |> add_if(attrs_ex1, 0x00200000, :threat_only_on_miss)

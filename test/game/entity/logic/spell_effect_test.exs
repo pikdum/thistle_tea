@@ -240,6 +240,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
 
       fireball = %Spell{
         id: 133,
+        dmg_class: 1,
         school: :fire,
         effects: [%Effect{index: 0, type: :school_damage, base_points: 20, implicit_target_a: :target_enemy}]
       }
