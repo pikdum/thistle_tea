@@ -207,11 +207,13 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
 
   defp tick_aura(entity, %Holder{} = holder, %Aura{type: :periodic_leech, next_tick_at: at} = aura, now)
        when is_integer(at) and now >= at do
+    health_before = max(entity.unit.health || 0, 0)
     {entity, damage, log_opts} = apply_periodic_damage(entity, holder, aura.amount, now)
+    health_drained = max(health_before - (entity.unit.health || 0), 0)
 
     events = [
       Effects.spell_damage(holder.caster_guid, entity.object.guid, holder.spell, damage, log_opts)
-      | leech_heal_events(holder, entity, damage, aura)
+      | leech_heal_events(holder, entity, health_drained, aura)
     ]
 
     {entity, %{aura | next_tick_at: advance_tick(at, aura.amplitude_ms, now)}, events}

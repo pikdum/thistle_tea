@@ -580,6 +580,29 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
       assert updated_aura.next_tick_at == first_tick_at + 3_000
     end
 
+    test "periodic leech heals only health lost after absorption and overkill" do
+      for {health, shield, healed} <- [{100, 20, 0}, {100, 15, 5}, {5, 0, 5}] do
+        entity = fixture_entity()
+        absorb = %Holder{spell: %Spell{id: 17}, auras: [%AuraData{type: :school_absorb, amount: shield, misc_value: 1}]}
+        entity = %{entity | unit: %{entity.unit | health: health, auras: [absorb]}}
+
+        spell = %Spell{
+          id: 689,
+          school: :physical,
+          duration_ms: 5_000,
+          effects: [
+            %Effect{index: 0, type: :apply_aura, aura: :periodic_leech, base_points: 20, amplitude_ms: 1_000}
+          ]
+        }
+
+        {entity, _events} = apply_spell(entity, 999, 1, spell)
+        {entity, events} = Aura.tick(entity, 2_000)
+        assert entity.unit.health == health - healed
+        heals = Enum.filter(events, &match?(%Effects.HealEntity{}, &1))
+        assert heals == if(healed > 0, do: [%Effects.HealEntity{target_guid: 999, amount: healed}], else: [])
+      end
+    end
+
     test "schedules mana drain ticks and caps the transfer at available mana" do
       entity = fixture_entity()
       entity = %{entity | unit: %{entity.unit | power_type: 0, power1: 30, max_power1: 100}}
