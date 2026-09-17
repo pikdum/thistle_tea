@@ -17,7 +17,8 @@ Reference behavior: `Spell::EffectDispel` in
 `refs/vmangos/src/game/Spells/SpellEffects.cpp`, and `GetDispellMask` in
 `SpellEntry.h`. The packet layout is verified against the vanilla definition
 in `refs/wow_messages/wow_message_parser/wowm/world/spell/smsg_spelldispellog.wowm`.
-This change does not implement talent-based dispel resistance.
+Talent-based resistance is covered by the subsequent
+[dispel resistance implementation and playtest](dispel-resistance-playtest.md).
 
 Testing also exposed that ordinary periodic-damage auras ignored their stack
 count. Their damage now scales with remaining stacks. Ignite keeps its

@@ -86,6 +86,8 @@ nix develop .#wow-tools            # shell with all of the above + sqlite + mari
 - school-specific damage immunity, with melee and periodic immune feedback and spell bypass attributes
 - periodic mana drains and life leech, with transfers limited by available mana and actual health lost
 - stack-aware dispels, with partial cures, Dispel All categories, and client combat-log feedback
+- talent-based dispel resistance, including Vile Poisons, per-stack attempts, and failed-dispel feedback
+- spell modifiers use VMangos family masks, including all 64 bits, to affect only the intended abilities
 - stacked damage-over-time effects scale with remaining stacks after partial cures
 - exclusive resistance buffs use the strongest effect per school, with weaker protection resuming on removal
 - crowd-control diminishing returns, shared across casters with recovery after control ends
