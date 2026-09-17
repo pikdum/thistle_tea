@@ -1105,10 +1105,12 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
 
   defp dispatch_to_target(character, %CastContext{caster_guid: caster_guid} = context, spell, target_guid, now)
        when target_guid == caster_guid do
-    {character, events} = SpellEffect.receive(character, context, spell, now)
-
-    character
-    |> Effects.enqueue(events)
+    if Enum.any?(spell.effects, &(&1.type == :dispel)) do
+      Effects.enqueue(character, Effects.deliver_spell(target_guid, context, spell))
+    else
+      {character, events} = SpellEffect.receive(character, context, spell, now)
+      Effects.enqueue(character, events)
+    end
   end
 
   defp dispatch_to_target(character, %CastContext{} = context, spell, target_guid, _now) when is_integer(target_guid) do

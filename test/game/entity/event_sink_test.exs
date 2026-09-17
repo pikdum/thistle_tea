@@ -75,6 +75,21 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
       assert_receive {:"$gen_cast",
                       {:send_packet,
                        %Message.SmsgSpelldispellog{caster: ^observer_guid, victim: ^owner_guid, spells: [123, 456]}}}
+
+      EventSink.emit(character, %Effects.DispelFailed{
+        source_guid: observer_guid,
+        target_guid: owner_guid,
+        spell_ids: [789, 789]
+      })
+
+      assert_receive {:"$gen_cast",
+                      {:send_packet,
+                       %Message.SmsgDispelFailed{caster: ^observer_guid, target: ^owner_guid, spells: [789, 789]},
+                       _opts}}
+
+      assert_receive {:"$gen_cast",
+                      {:send_packet,
+                       %Message.SmsgDispelFailed{caster: ^observer_guid, target: ^owner_guid, spells: [789, 789]}}}
     end
 
     test "damage immunity reaches the owner and nearby observers" do

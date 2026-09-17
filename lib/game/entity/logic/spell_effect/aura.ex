@@ -34,8 +34,11 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.Aura do
 
   def apply(state, %CastContext{} = context, spell, %Effect{type: :dispel, misc_value: dispel_type} = effect, now) do
     count = max(Amount.roll(spell, effect, context), 1)
-    {state, events, spell_ids} = Dispel.apply(state, dispel_type, now, dispel_polarity(context), count)
-    events = events ++ dispel_events(state, context, spell_ids)
+
+    {state, events, spell_ids, failed_ids} =
+      Dispel.attempt(state, dispel_type, now, dispel_polarity(context), count, resistance: context.dispel_resistance)
+
+    events = events ++ dispel_events(state, context, spell_ids) ++ failed_dispel_events(state, context, failed_ids)
 
     case {spell_ids != [], Warlock.devour_magic_heal(spell)} do
       {true, heal_spell_id} when is_integer(heal_spell_id) ->
@@ -60,6 +63,12 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.Aura do
         spell_ids: spell_ids
       }
     ]
+  end
+
+  defp failed_dispel_events(_state, _context, []), do: []
+
+  defp failed_dispel_events(state, context, spell_ids) do
+    [%Effects.DispelFailed{source_guid: context.caster_guid, target_guid: state.object.guid, spell_ids: spell_ids}]
   end
 
   defp script_trigger_events(target, %CastContext{spell: spell} = context) do

@@ -20,6 +20,45 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.DispelTest do
 
   setup [:entity]
 
+  describe "attempt/6" do
+    test "failed attempts preserve stacks, schedules and derived stats", %{entity: entity} do
+      assert {^entity, [], [], [10, 10, 10]} =
+               Dispel.attempt(entity, 1, 2_000, :negative, 10, resistance: %{{10, 2} => 100})
+    end
+
+    test "a resisted stack is not retried in the same cast", %{entity: entity} do
+      [holder] = entity.unit.auras
+      protected = %{holder | stacks: 1}
+      unprotected = %{holder | caster_guid: 3, stacks: 1}
+      entity = %{entity | unit: %{entity.unit | auras: [protected, unprotected]}}
+
+      {updated, _events, [10], [10]} =
+        Dispel.attempt(entity, 1, 2_000, :negative, 2,
+          resistance: %{{10, 2} => 100},
+          choose: &hd/1
+        )
+
+      assert updated.unit.auras == [protected]
+    end
+
+    test "rolls each stack separately and keeps failed stacks on partial success", %{entity: entity} do
+      roll = fn ->
+        receive do
+          {:roll, value} -> value
+        end
+      end
+
+      for value <- [30, 31, 100], do: send(self(), {:roll, value})
+
+      {updated, _events, [10], [10]} =
+        Dispel.attempt(entity, 1, 2_000, :negative, 3, resistance: %{{10, 2} => 30}, roll: roll)
+
+      assert [%Holder{stacks: 1, expires_at: 10_000, auras: [aura]}] = updated.unit.auras
+      assert aura.next_tick_at == 3_000
+      assert updated.unit.strength == 90
+    end
+  end
+
   describe "apply/5" do
     test "removes one stack and recomputes stats without refreshing the aura", %{entity: entity} do
       {updated, _events, [10]} = Dispel.apply(entity, 1, 2_000, :negative, 1)
@@ -119,6 +158,23 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.DispelTest do
   end
 
   describe "receive/4" do
+    test "resistance emits failure feedback without triggering Devour Magic healing", %{entity: entity} do
+      spell = %Spell{
+        id: 19_505,
+        script_name: "spell_warlock_devour_magic",
+        effects: [%Effect{index: 0, type: :dispel, misc_value: 1}]
+      }
+
+      context = %CastContext{
+        caster_guid: 3,
+        target_hostile?: false,
+        dispel_resistance: %{{10, 2} => 100}
+      }
+
+      assert {^entity, [%Effects.DispelFailed{source_guid: 3, target_guid: 1, spell_ids: [10]}]} =
+               SpellEffect.receive(entity, context, spell, 2_000)
+    end
+
     test "logs a partial removal and triggers Devour Magic healing", %{entity: entity} do
       spell = %Spell{
         id: 19_505,

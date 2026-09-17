@@ -60,6 +60,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Entity.Server.Mob.Respawn
   alias ThistleTea.Game.Entity.Server.NavigationResolver
   alias ThistleTea.Game.Entity.Server.Player.CompanionOwner.Attachment
+  alias ThistleTea.Game.Entity.SpellReception
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.BinaryUtils
@@ -302,7 +303,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
         state
       end
 
-    {state, events} = SpellEffect.receive(state, caster, spell, Time.now())
+    {state, events} = SpellReception.receive(state, caster, spell, Time.now())
     notify_spell_hit_target(caster_guid, state.object.guid, spell, events)
 
     state =

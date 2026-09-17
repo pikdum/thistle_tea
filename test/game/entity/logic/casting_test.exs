@@ -1020,6 +1020,28 @@ defmodule ThistleTea.Game.Entity.Logic.CastingTest do
                %Effects.DeliverSpell{target_guid: 2, spell: ^spell}
              ] = mob.internal.events
     end
+
+    test "routes self dispels through the owner boundary for current caster resistance" do
+      spell = %Spell{id: 527, effects: [%Effect{type: :dispel, misc_value: 1}]}
+      holder = %Holder{spell: %Spell{id: 10, dispel_type: 1}, caster_guid: 2, negative?: true}
+      casting = %Cast{spell: spell, targets: Target.unit(1), ends_at: 1_000}
+
+      mob = %Mob{
+        object: %Object{guid: 1},
+        unit: %Unit{health: 20, max_health: 20, auras: [holder]},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+        internal: %Internal{world: WorldRef.open(0), casting: casting}
+      }
+
+      mob = Casting.complete(mob, casting, 1_000)
+      assert mob.unit.auras == [holder]
+
+      assert [
+               %Effects.SpellCastResult{},
+               %Effects.SpellGo{},
+               %Effects.DeliverSpell{target_guid: 1, spell: ^spell}
+             ] = mob.internal.events
+    end
   end
 
   describe "Feed Pet" do

@@ -34,6 +34,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.Entity.Logic.Companion
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Death
+  alias ThistleTea.Game.Entity.Logic.DispelResistance
   alias ThistleTea.Game.Entity.Logic.Dueling
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Experience
@@ -62,6 +63,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.Entity.Server.Player.State
   alias ThistleTea.Game.Entity.Server.Player.TickScheduler
   alias ThistleTea.Game.Entity.Server.PlayerSupervisor
+  alias ThistleTea.Game.Entity.SpellReception
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.InventoryUpdate
@@ -1163,6 +1165,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
         crowd_controlled?: Aura.crowd_controlled?(character),
         dispel_options: Aura.dispel_options(character),
         mechanic_resistance: Aura.misc_amounts(character, :mechanic_resistance),
+        dispel_resistance: DispelResistance.projection(character),
         attacker_spell_hit_chance: Aura.attacker_spell_hit_chance(character),
         reputation: PlayerReputation.projection(character),
         condition_subject: ConditionContext.refresh_subject(character, previous_subject)
@@ -1396,14 +1399,14 @@ defmodule ThistleTea.Game.Entity.Server.Player do
           character
         end
 
-      {character, events} = SpellEffect.receive(character, caster, spell, now)
+      {character, events} = SpellReception.receive(character, caster, spell, now)
       notify_spell_hit_target(caster, character.object.guid, spell, events)
       EventSink.emit(character, events)
     end
   end
 
   defp apply_incoming_spell(%Character{} = character, caster, spell, now, false, _alive?) do
-    {character, events} = SpellEffect.receive(character, caster, spell, now)
+    {character, events} = SpellReception.receive(character, caster, spell, now)
     notify_spell_hit_target(caster, character.object.guid, spell, events)
     EventSink.emit(character, events)
   end
