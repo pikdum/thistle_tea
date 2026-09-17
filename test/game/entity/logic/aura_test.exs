@@ -2106,7 +2106,15 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
       school: :arcane,
       duration_ms: 60_000,
       effects: [
-        %Effect{index: 0, type: :apply_aura, base_points: 119, die_sides: 0, aura: :mana_shield, misc_value: 1}
+        %Effect{
+          index: 0,
+          type: :apply_aura,
+          base_points: 119,
+          die_sides: 0,
+          aura: :mana_shield,
+          misc_value: 1,
+          multiple_value: 2.0
+        }
       ]
     }
   end
@@ -2218,7 +2226,7 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
     }
   end
 
-  describe "absorb_damage/3" do
+  describe "absorb_damage/4" do
     test "fire ward absorbs fire damage and tracks remaining amount" do
       {entity, _events} = apply_spell(fixture_entity(), 1, 1, fire_ward_fixture())
 
@@ -2245,7 +2253,7 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
       assert entity.unit.auras == []
     end
 
-    test "mana shield absorbs any school and drains mana" do
+    test "mana shield absorbs physical damage and drains mana" do
       entity = fixture_entity()
       entity = %{entity | unit: %{entity.unit | power1: 100, max_power1: 100}}
       {entity, _events} = apply_spell(entity, 1, 1, mana_shield_fixture())
@@ -2261,7 +2269,7 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
       entity = %{entity | unit: %{entity.unit | power1: 20, max_power1: 100}}
       {entity, _events} = apply_spell(entity, 1, 1, mana_shield_fixture())
 
-      {entity, remaining} = Aura.absorb_damage(entity, 30, :fire, 2_000)
+      {entity, remaining} = Aura.absorb_damage(entity, 30, :physical, 2_000)
 
       assert remaining == 20
       assert entity.unit.power1 == 0

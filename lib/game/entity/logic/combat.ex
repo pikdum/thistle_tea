@@ -188,7 +188,7 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
       |> Map.put(:absorb, absorbed)
 
     entity = maybe_mark_defense(entity, Map.get(attack, :caster), result.outcome, now)
-    event = attacker_state_update(Map.get(attack, :caster, 0), target_guid, result.damage, attack)
+    event = attacker_state_update(Map.get(attack, :caster, 0), target_guid, max(result.damage - absorbed, 0), attack)
     feedback_events = attack_outcome_events(entity, attack, result, absorbed)
 
     {entity, reaction_events} = attack_reactions(entity, attack, result, now)
