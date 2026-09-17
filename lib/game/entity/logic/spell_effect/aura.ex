@@ -3,6 +3,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.Aura do
 
   alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Logic.Aura
+  alias ThistleTea.Game.Entity.Logic.Aura.Dispel
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Hunter
   alias ThistleTea.Game.Entity.Logic.SpellEffect.Amount
@@ -32,11 +33,11 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.Aura do
   end
 
   def apply(state, %CastContext{} = context, spell, %Effect{type: :dispel, misc_value: dispel_type} = effect, now) do
-    aura_count = length(state.unit.auras || [])
     count = max(Amount.roll(spell, effect, context), 1)
-    {state, events} = Aura.dispel(state, dispel_type, now, dispel_polarity(context), count)
+    {state, events, spell_ids} = Dispel.apply(state, dispel_type, now, dispel_polarity(context), count)
+    events = events ++ dispel_events(state, context, spell_ids)
 
-    case {length(state.unit.auras || []) < aura_count, Warlock.devour_magic_heal(spell)} do
+    case {spell_ids != [], Warlock.devour_magic_heal(spell)} do
       {true, heal_spell_id} when is_integer(heal_spell_id) ->
         {state,
          events ++
@@ -48,6 +49,18 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.Aura do
   end
 
   def apply(state, _context, _spell, _effect, _now), do: {state, []}
+
+  defp dispel_events(_state, _context, []), do: []
+
+  defp dispel_events(state, context, spell_ids) do
+    [
+      %Effects.SpellDispel{
+        source_guid: context.caster_guid,
+        target_guid: state.object.guid,
+        spell_ids: spell_ids
+      }
+    ]
+  end
 
   defp script_trigger_events(target, %CastContext{spell: spell} = context) do
     with trigger_id when is_integer(trigger_id) <- Semantics.rules(spell).apply_trigger_spell_id,

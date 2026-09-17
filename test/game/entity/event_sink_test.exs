@@ -39,6 +39,44 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
   describe "emit/2" do
     setup [:metadata_fixtures]
 
+    test "dispel feedback reaches the target and nearby observers" do
+      owner_guid = Guid.from_low_guid(:player, unique_guid())
+      observer_guid = Guid.from_low_guid(:player, unique_guid())
+
+      for guid <- [owner_guid, observer_guid] do
+        Entity.register(guid)
+        SpatialHash.update(:players, guid, 0, 0.0, 0.0, 0.0)
+      end
+
+      on_exit(fn ->
+        for guid <- [owner_guid, observer_guid] do
+          Entity.unregister(guid)
+          SpatialHash.remove(:players, guid)
+        end
+      end)
+
+      character = %Character{
+        object: %Object{guid: owner_guid},
+        internal: %Internal{world: WorldRef.open(0)},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
+      }
+
+      EventSink.emit(character, %Effects.SpellDispel{
+        source_guid: observer_guid,
+        target_guid: owner_guid,
+        spell_ids: [123, 456]
+      })
+
+      assert_receive {:"$gen_cast",
+                      {:send_packet,
+                       %Message.SmsgSpelldispellog{caster: ^observer_guid, victim: ^owner_guid, spells: [123, 456]},
+                       _opts}}
+
+      assert_receive {:"$gen_cast",
+                      {:send_packet,
+                       %Message.SmsgSpelldispellog{caster: ^observer_guid, victim: ^owner_guid, spells: [123, 456]}}}
+    end
+
     test "damage immunity reaches the owner and nearby observers" do
       owner_guid = Guid.from_low_guid(:player, unique_guid())
       observer_guid = Guid.from_low_guid(:player, unique_guid())

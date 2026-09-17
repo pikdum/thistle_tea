@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Spell.CastValidation do
 
   alias ThistleTea.Game.Duel
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
+  alias ThistleTea.Game.Entity.Logic.Aura.Dispel
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Disarm
   alias ThistleTea.Game.Entity.Logic.EffectImmunity
@@ -438,7 +439,9 @@ defmodule ThistleTea.Game.Spell.CastValidation do
   defp check_dispel_options(options, dispel_types, polarity) do
     matching? =
       Enum.any?(options, fn {type, option_polarity} ->
-        MapSet.member?(dispel_types, type) and option_polarity == polarity
+        Enum.any?(dispel_types, fn dispel_type ->
+          Dispel.matches?(type, option_polarity, dispel_type, polarity)
+        end)
       end)
 
     if matching?, do: :ok, else: {:error, :nothing_to_dispel}

@@ -14,6 +14,17 @@ defmodule ThistleTea.Game.Entity.EventSink.Spells do
 
   @spell_hit_type_crit 0x2
 
+  def emit(entity, %Effects.SpellDispel{} = effect, _context) do
+    %Message.SmsgSpelldispellog{
+      caster: effect.source_guid,
+      victim: effect.target_guid,
+      spells: effect.spell_ids
+    }
+    |> World.broadcast_packet(entity)
+
+    entity
+  end
+
   def emit(entity, %Effects.SpellDamageImmune{} = effect, _context) do
     %Message.SmsgSpellordamageImmune{
       caster: effect.source_guid,

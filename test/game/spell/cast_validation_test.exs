@@ -483,7 +483,7 @@ defmodule ThistleTea.Game.Spell.CastValidationTest do
                  caster(),
                  cleanse,
                  Target.unit(7),
-                 friendly_target(dispel_options: MapSet.new([{3, :positive}])),
+                 friendly_target(dispel_options: MapSet.new([{1, :positive}])),
                  @now
                )
     end
@@ -493,6 +493,20 @@ defmodule ThistleTea.Game.Spell.CastValidationTest do
       target = hostile_target(dispel_options: MapSet.new([{1, :positive}]))
 
       assert :ok = CastValidation.validate(caster(), purge, Target.unit(7), target, @now)
+    end
+
+    test "all-dispel accepts supported categories and excludes enrage" do
+      for type <- [7, -1] do
+        dispel = helpful_spell(effects: [%Effect{type: :dispel, misc_value: type, implicit_target_a: :target_ally}])
+
+        for aura_type <- [1, 2, 3, 4] do
+          target = friendly_target(dispel_options: MapSet.new([{aura_type, :negative}]))
+          assert :ok = CastValidation.validate(caster(), dispel, Target.unit(7), target, @now)
+        end
+
+        target = friendly_target(dispel_options: MapSet.new([{9, :negative}]))
+        assert {:error, :nothing_to_dispel} = CastValidation.validate(caster(), dispel, Target.unit(7), target, @now)
+      end
     end
 
     test "rejects power burn against a different target resource" do
