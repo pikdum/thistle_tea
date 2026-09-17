@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.DispelTest do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.Aura.Dispel
+  alias ThistleTea.Game.Entity.Logic.Aura.Periodic
   alias ThistleTea.Game.Entity.Logic.Aura.UnitSync
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.SpellEffect
@@ -77,6 +78,43 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.DispelTest do
       for type <- [2, 3, 9] do
         assert Dispel.matches?(type, :positive, type, :negative)
       end
+    end
+  end
+
+  describe "tick/2" do
+    test "stacked poison damage decreases after a partial cure and stops on expiry", %{entity: entity} do
+      [holder] = entity.unit.auras
+      aura = %AuraData{type: :periodic_damage, amount: 10, amplitude_ms: 3_000, next_tick_at: 3_000}
+      holder = %{holder | spell: %{holder.spell | dispel_type: 4}, auras: [aura]}
+      entity = %{entity | unit: %{entity.unit | auras: [holder]}}
+
+      {entity, events} = Periodic.tick(entity, 3_000)
+      assert entity.unit.health == 70
+      assert Enum.any?(events, &match?(%Effects.SpellDamage{damage: 30}, &1))
+
+      {entity, _events, [10]} = Dispel.apply(entity, 4, 4_000, :negative, 1)
+      {entity, events} = Periodic.tick(entity, 6_000)
+      assert entity.unit.health == 50
+      assert Enum.any?(events, &match?(%Effects.SpellDamage{damage: 20}, &1))
+
+      {entity, _events, [10]} = Dispel.apply(entity, 4, 7_000, :negative, 1)
+      {entity, events} = Periodic.tick(entity, 9_000)
+      assert entity.unit.health == 40
+      assert Enum.any?(events, &match?(%Effects.SpellDamage{damage: 10}, &1))
+
+      {entity, _events} = Periodic.tick(entity, 10_000)
+      assert entity.unit.auras == []
+      assert {^entity, []} = Periodic.tick(entity, 12_000)
+    end
+
+    test "Ignite's accumulated damage is not multiplied again", %{entity: entity} do
+      [holder] = entity.unit.auras
+      aura = %AuraData{type: :periodic_damage, amount: 10, amplitude_ms: 2_000, next_tick_at: 2_000}
+      holder = %{holder | spell: %{holder.spell | id: 12_654}, auras: [aura]}
+      entity = %{entity | unit: %{entity.unit | auras: [holder]}}
+      {entity, events} = Periodic.tick(entity, 2_000)
+      assert entity.unit.health == 90
+      assert Enum.any?(events, &match?(%Effects.SpellDamage{damage: 10}, &1))
     end
   end
 

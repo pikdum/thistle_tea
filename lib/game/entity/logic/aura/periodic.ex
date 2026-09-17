@@ -274,7 +274,13 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
 
   defp tick_aura(entity, _holder, aura, _now), do: {entity, aura, []}
 
-  defp periodic_damage_amount(%Holder{spell: %Spell{} = spell, applied_at: applied_at}, %Aura{
+  defp periodic_damage_amount(%Holder{spell: %Spell{id: 12_654}}, %Aura{amount: amount}), do: amount
+
+  defp periodic_damage_amount(%Holder{stacks: stacks} = holder, %Aura{} = aura) do
+    base_periodic_damage_amount(holder, aura) * max(stacks || 1, 1)
+  end
+
+  defp base_periodic_damage_amount(%Holder{spell: %Spell{} = spell, applied_at: applied_at}, %Aura{
          amount: amount,
          amplitude_ms: amplitude,
          next_tick_at: next_tick_at
@@ -293,7 +299,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
     end
   end
 
-  defp periodic_damage_amount(_holder, %Aura{amount: amount}), do: amount
+  defp base_periodic_damage_amount(_holder, %Aura{amount: amount}), do: amount
 
   @schools [:physical, :holy, :fire, :nature, :frost, :shadow, :arcane]
 
