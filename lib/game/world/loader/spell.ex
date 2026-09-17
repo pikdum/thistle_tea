@@ -535,6 +535,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp effect_type(63), do: :modify_threat
   defp effect_type(68), do: :interrupt_cast
   defp effect_type(69), do: :distract
+  defp effect_type(71), do: :pickpocket
   defp effect_type(72), do: :add_farsight
   defp effect_type(73), do: :summon_possessed
   defp effect_type(77), do: :script_effect
@@ -782,6 +783,8 @@ defmodule ThistleTea.Game.World.Loader.Spell do
     base
     |> add_if(attrs_ex1, 0x00000020, :allow_while_stealthed)
     |> add_if(attrs_ex1, 0x00000400, :no_threat)
+    |> add_if(attrs_ex1, 0x00001000, :failure_breaks_stealth)
+    |> add_if(attrs_ex1, 0x00200000, :threat_only_on_miss)
     |> add_if(attrs_ex1, @use_all_mana_ex_1, :use_all_mana)
     |> add_if(attrs_ex1, @channeled_ex_1, :channeled)
     |> add_if(attrs_ex1, @channeled_ex_2, :channeled)

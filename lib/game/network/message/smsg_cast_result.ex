@@ -42,6 +42,7 @@ defmodule ThistleTea.Game.Network.Message.SmsgCastResult do
     no_power: 0x4D,
     nothing_to_dispel: 0x4E,
     only_shapeshift: 0x56,
+    only_stealthed: 0x57,
     out_of_range: 0x59,
     pacified: 0x5A,
     reagents: 0x5C,
@@ -58,6 +59,7 @@ defmodule ThistleTea.Game.Network.Message.SmsgCastResult do
     target_friendly: 0x6B,
     target_in_combat: 0x6C,
     target_not_dead: 0x6E,
+    target_no_pockets: 0x72,
     target_not_in_instance: 0x7F,
     wrong_pet_food: 0x7D
   }

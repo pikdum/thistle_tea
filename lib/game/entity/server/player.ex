@@ -786,6 +786,14 @@ defmodule ThistleTea.Game.Entity.Server.Player do
       {:noreply, state}
   end
 
+  def handle_info({:pickpocket, guid, spell_id}, state) do
+    {:noreply, Looting.pickpocket(state, guid, spell_id)}
+  rescue
+    error ->
+      Logger.error("Pickpocket failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
   @impl GenServer
   def handle_info(%Commands.ChargePathResolved{} = command, %{character: %Character{}} = state) do
     {:noreply, ServerMovement.start(state, command)}

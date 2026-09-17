@@ -56,6 +56,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Entity.Server.AIEnvironment
   alias ThistleTea.Game.Entity.Server.Mob.Corpse
   alias ThistleTea.Game.Entity.Server.Mob.Incarnation
+  alias ThistleTea.Game.Entity.Server.Mob.Pockets
   alias ThistleTea.Game.Entity.Server.Mob.Respawn
   alias ThistleTea.Game.Entity.Server.NavigationResolver
   alias ThistleTea.Game.Entity.Server.Player.CompanionOwner.Attachment
@@ -315,7 +316,12 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
   def handle_cast({:receive_spell_outcome, caster_guid, spell, outcome}, state) do
     previous = state
-    state = if Spell.starts_combat?(spell), do: engage_combat(state, caster_guid), else: state
+
+    state =
+      if Spell.starts_combat?(spell, :miss),
+        do: engage_combat(state, caster_guid),
+        else: state
+
     {state, events} = SpellEffect.receive_outcome(state, caster_guid, spell, outcome, Time.now())
 
     state =
@@ -434,12 +440,14 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   end
 
   def handle_cast(%Commit{} = command, %Mob{} = state) do
-    {_result, state} = Corpse.commit(state, command)
+    owner = if Pockets.owns_reservation?(state, command.token), do: Pockets, else: Corpse
+    {_result, state} = owner.commit(state, command)
     {:noreply, state}
   end
 
   def handle_cast(%Release{} = command, %Mob{} = state) do
-    {_result, state} = Corpse.release_reservation(state, command)
+    owner = if Pockets.owns_reservation?(state, command.token), do: Pockets, else: Corpse
+    {_result, state} = owner.release_reservation(state, command)
     {:noreply, state}
   end
 
@@ -506,6 +514,28 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     {:reply, result, state}
   end
 
+  def handle_call({:pickpocket, %Actor{} = actor, level}, _from, %Mob{} = state) do
+    {result, state} = Pockets.open(state, actor, level)
+    {:reply, result, state}
+  rescue
+    error ->
+      Logger.error("Pickpocket failed: #{Exception.message(error)}")
+      {:reply, {:error, :no_loot}, state}
+  end
+
+  def handle_call({:pocket_loot, %Actor{} = actor, :release}, _from, %Mob{} = state) do
+    {:reply, :ok, Pockets.release(state, actor)}
+  end
+
+  def handle_call({:pocket_loot, %Actor{} = actor, command}, {owner_pid, _tag}, %Mob{} = state) do
+    {result, state} = Pockets.interact(state, actor, command, owner_pid)
+    {:reply, result, state}
+  rescue
+    error ->
+      Logger.error("Pocket loot failed: #{Exception.message(error)}")
+      {:reply, {:error, :no_loot}, state}
+  end
+
   def handle_call({:loot_master_give, %Actor{} = giver, slot, %Actor{} = recipient}, _from, %Mob{} = state) do
     {result, state} = Corpse.master_give(state, giver, slot, recipient)
     {:reply, result, state}
@@ -517,7 +547,11 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   end
 
   def handle_call({:loot_validate_commit, %Actor{} = actor, token}, _from, %Mob{} = state) do
-    reply = LootSession.validate_commit(state.internal.loot.session, actor, token)
+    reply =
+      if Pockets.owns_reservation?(state, token),
+        do: Pockets.validate_commit(state, actor, token),
+        else: LootSession.validate_commit(state.internal.loot.session, actor, token)
+
     {:reply, reply, state}
   end
 
@@ -536,7 +570,8 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   end
 
   def handle_info({:DOWN, token, :process, _pid, _reason}, %Mob{} = state) when is_reference(token) do
-    {:noreply, Corpse.reservation_lost(state, token)}
+    owner = if Pockets.owns_reservation?(state, token), do: Pockets, else: Corpse
+    {:noreply, owner.reservation_lost(state, token)}
   end
 
   @impl GenServer

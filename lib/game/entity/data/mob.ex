@@ -168,6 +168,7 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
         },
         loot: %Loot{
           id: ct.loot_id,
+          pickpocket_id: ct.pickpocket_loot_id,
           min_gold: ct.min_loot_gold,
           max_gold: ct.max_loot_gold
         },
@@ -222,13 +223,17 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
 
   def proximity_aggro?(%__MODULE__{}), do: true
 
-  def visibility_metadata(%__MODULE__{unit: %Unit{} = unit, internal: %Internal{creature: %Creature{} = creature}}) do
+  def visibility_metadata(%__MODULE__{
+        unit: %Unit{} = unit,
+        internal: %Internal{creature: %Creature{} = creature, loot: loot}
+      }) do
     %{
       db_guid: creature.db_guid,
       npc_flags: unit.npc_flags || 0,
       spirit_service?: ((unit.npc_flags || 0) &&& @npc_flag_spirit_service) != 0,
       ghost_visible?: ((creature.type_flags || 0) &&& @creature_type_flag_ghost_visible) != 0,
-      creature_type: creature.creature_type
+      creature_type: creature.creature_type,
+      pickpocket_id: if(loot, do: loot.pickpocket_id)
     }
   end
 
@@ -251,7 +256,7 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
         behavior_tree: nil,
         broadcast_update?: false,
         spawn: %{spawn_state | respawn_ref: nil, respawn_pending?: false},
-        loot: %{loot | session: nil, corpse_removed?: false, corpse_token: nil}
+        loot: %{loot | session: nil, pockets: nil, corpse_removed?: false, corpse_token: nil}
     }
 
     %Engagement.Result{entity: mob} =

@@ -19,6 +19,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
   alias ThistleTea.Game.Entity.Logic.MeleeSpell
   alias ThistleTea.Game.Entity.Logic.Mount
   alias ThistleTea.Game.Entity.Logic.Paladin
+  alias ThistleTea.Game.Entity.Logic.Pickpocket
   alias ThistleTea.Game.Entity.Logic.PlayerCombat
   alias ThistleTea.Game.Entity.Logic.Reactive
   alias ThistleTea.Game.Entity.Logic.Resources
@@ -212,6 +213,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
       |> queue_item_enchantments(casting)
       |> queue_feed_pet(casting)
       |> queue_open_object(casting)
+      |> queue_pickpocket(casting)
       |> queue_charge(casting)
       |> release_paladin_seal(casting, resolution.hits, now)
       |> apply_impacts(casting, resolution.impacts, now)
@@ -460,6 +462,21 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
 
   defp queue_feed_pet(character, _casting), do: character
 
+  defp queue_pickpocket(%Character{} = character, %Cast{spell: spell, resolution: resolution}) do
+    if Pickpocket.spell?(spell) do
+      effects =
+        for guid <- resolution.hits,
+            guid != character.object.guid,
+            do: %Effects.PickPocket{target_guid: guid, spell_id: spell.id}
+
+      Effects.enqueue(character, effects)
+    else
+      character
+    end
+  end
+
+  defp queue_pickpocket(character, _casting), do: character
+
   defp queue_item_enchantments(%Character{player: player} = character, %Cast{
          spell: %Spell{} = spell,
          resolution: %CastResolution{followups: %Followups{item_guid: target_item_guid}}
@@ -488,8 +505,10 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
     Effects.enqueue(character, events)
   end
 
-  defp mark_hostile_cast(%Character{object: %{guid: guid}} = character, %Cast{spell: spell}, targets, now) do
-    if Spell.starts_combat?(spell) and Enum.any?(targets, &(&1 != guid)) do
+  defp mark_hostile_cast(%Character{object: %{guid: guid}} = character, %Cast{spell: spell} = casting, targets, now) do
+    missed? = casting.resolution.misses != [] and Spell.starts_combat?(spell, :miss)
+
+    if (Spell.starts_combat?(spell) or missed?) and Enum.any?(targets, &(&1 != guid)) do
       PlayerCombat.mark_initiated(character, now)
     else
       character
@@ -498,14 +517,27 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
 
   defp mark_hostile_cast(character, _casting, _targets, _now), do: character
 
-  defp break_stealth(character, %Cast{spell: %Spell{} = spell}, now) do
-    if Spell.harmful?(spell) and not Spell.attribute?(spell, :allow_while_stealthed) do
-      {character, events} = AuraLogic.remove_with_interrupt_flags(character, AuraLogic.interrupt_mask(:cast), now)
-      Effects.enqueue(character, events)
-    else
-      character
-    end
+  defp break_stealth(character, %Cast{spell: %Spell{} = spell} = casting, now) do
+    {character, events} =
+      cond do
+        failure_breaks_stealth?(casting) ->
+          AuraLogic.remove_aura_types(character, [:mod_stealth], now)
+
+        Spell.harmful?(spell) and not Spell.attribute?(spell, :allow_while_stealthed) ->
+          AuraLogic.remove_with_interrupt_flags(character, AuraLogic.interrupt_mask(:cast), now)
+
+        true ->
+          {character, []}
+      end
+
+    Effects.enqueue(character, events)
   end
+
+  defp failure_breaks_stealth?(%Cast{spell: spell, resolution: %CastResolution{misses: [_ | _]}}) do
+    Spell.attribute?(spell, :failure_breaks_stealth)
+  end
+
+  defp failure_breaks_stealth?(_casting), do: false
 
   defp interrupt_action_auras(entity, action, now) do
     {entity, events} = AuraLogic.remove_with_interrupt_flags(entity, AuraLogic.interrupt_mask(action), now)

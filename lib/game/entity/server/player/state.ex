@@ -44,6 +44,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
     :logout_timer,
     :target,
     :loot_guid,
+    :loot_type,
     :pending_repop,
     :next_exploration_check_at,
     :mail_session_token,

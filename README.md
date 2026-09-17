@@ -91,6 +91,7 @@ nix develop .#wow-tools            # shell with all of the above + sqlite + mari
 - items, bags, equipment, and vendors
 - alcohol intoxication, client drunkenness effects, gradual sobering, and death cleanup
 - looting + group loot
+- Rogue Pick Pocket, with private loot, quest drops, and failed-attempt retaliation
 - quests
 - xp, leveling, and exploration
 - isolated dungeon instances (Ragefire Chasm)

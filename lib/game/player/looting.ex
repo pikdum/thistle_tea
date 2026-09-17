@@ -8,10 +8,12 @@ defmodule ThistleTea.Game.Player.Looting do
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Experience
+  alias ThistleTea.Game.Entity.Logic.Hostility
   alias ThistleTea.Game.Entity.Logic.Loot
   alias ThistleTea.Game.Entity.Logic.Loot.Commit
   alias ThistleTea.Game.Entity.Logic.Loot.Release
   alias ThistleTea.Game.Entity.Logic.Loot.Reservation
+  alias ThistleTea.Game.Entity.Logic.Pickpocket
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Loot.ActorFactory
   alias ThistleTea.Game.Network
@@ -20,6 +22,7 @@ defmodule ThistleTea.Game.Player.Looting do
   alias ThistleTea.Game.Party
   alias ThistleTea.Game.Player.Items
   alias ThistleTea.Game.World
+  alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.System.Instance, as: InstanceSystem
   alias ThistleTea.Game.World.System.Party, as: PartySystem
 
@@ -33,9 +36,41 @@ defmodule ThistleTea.Game.Player.Looting do
 
   def remote_actor(guid, loot_guid), do: ActorFactory.for_guid(guid, loot_guid)
 
+  def pickpocket(%{character: %Character{} = character} = state, guid, spell_id) do
+    metadata = Metadata.get(guid) || %{}
+
+    target =
+      metadata
+      |> Map.put(:guid, guid)
+      |> Map.put(:friendly?, Hostility.friendly?(character, Map.put(metadata, :guid, guid)))
+
+    with false <- Core.dead?(character),
+         :ok <- Pickpocket.validate_target(character, target) do
+      state = release(state)
+
+      case Entity.call(guid, {:pickpocket, actor(state, guid), character.unit.level}) do
+        {:ok, %Loot{} = loot} ->
+          Network.send_packet(%Message.SmsgLootResponse{guid: guid, loot: loot, loot_type: 2})
+          %{state | loot_guid: guid, loot_type: :pickpocket}
+
+        _ ->
+          Network.send_packet(%Message.SmsgLootReleaseResponse{guid: guid})
+          state
+      end
+    else
+      {:error, reason} ->
+        Network.send_packet(Message.SmsgCastResult.failure(spell_id, reason))
+        state
+
+      _ ->
+        state
+    end
+  end
+
   def open(state, guid, opts \\ [])
 
   def open(%{character: %Character{} = character} = state, guid, opts) do
+    state = release(state)
     actor = actor(state, guid)
 
     with false <- Core.dead?(character),
@@ -51,7 +86,7 @@ defmodule ThistleTea.Game.Player.Looting do
       })
 
       maybe_send_master_list(state, guid)
-      %{state | loot_guid: guid}
+      %{state | loot_guid: guid, loot_type: :corpse}
     else
       {:error, :nothing_to_take} ->
         Entity.call(guid, {:loot_release, actor})
@@ -75,9 +110,9 @@ defmodule ThistleTea.Game.Player.Looting do
 
   def release(%{character: %Character{}} = state) when is_integer(state.loot_guid) do
     actor = actor(state, state.loot_guid)
-    Entity.call(state.loot_guid, {:loot_release, actor})
+    loot_call(state, actor, :release)
     Network.send_packet(%Message.SmsgLootReleaseResponse{guid: state.loot_guid})
-    %{state | loot_guid: nil}
+    %{state | loot_guid: nil, loot_type: nil}
   end
 
   def release(state), do: state
@@ -85,7 +120,7 @@ defmodule ThistleTea.Game.Player.Looting do
   def take_item(%{character: %Character{}, loot_guid: loot_guid} = state, slot) when is_integer(loot_guid) do
     actor = actor(state, loot_guid)
 
-    case Entity.call(loot_guid, {:loot_reserve_item, actor, slot}) do
+    case loot_call(state, actor, {:reserve_item, slot}) do
       {:ok, %Reservation{} = reservation} -> accept_reservation(state, loot_guid, reservation)
       _ -> inventory_failure(state, :already_looted)
     end
@@ -126,9 +161,9 @@ defmodule ThistleTea.Game.Player.Looting do
   def take_money(%{character: %Character{} = character, loot_guid: loot_guid} = state) when is_integer(loot_guid) do
     actor = actor(state, loot_guid)
 
-    case Entity.call(loot_guid, {:loot_take_gold, actor}) do
+    case loot_call(state, actor, :take_gold) do
       {:ok, gold} ->
-        share = split_gold(state.guid, character, gold)
+        share = if Map.get(state, :loot_type) == :pickpocket, do: gold, else: split_gold(state.guid, character, gold)
         player = %{character.player | coinage: character.player.coinage + share}
         Network.send_packet(%Message.SmsgLootMoneyNotify{money: share})
         Network.send_packet(%Message.SmsgLootClearMoney{})
@@ -149,6 +184,17 @@ defmodule ThistleTea.Game.Player.Looting do
   end
 
   def master_give(state, _loot_guid, _slot, _target), do: state
+
+  defp loot_call(%{loot_guid: guid, loot_type: :pickpocket}, actor, command) do
+    Entity.call(guid, {:pocket_loot, actor, command})
+  end
+
+  defp loot_call(%{loot_guid: guid}, actor, {:reserve_item, slot}) do
+    Entity.call(guid, {:loot_reserve_item, actor, slot})
+  end
+
+  defp loot_call(%{loot_guid: guid}, actor, :take_gold), do: Entity.call(guid, {:loot_take_gold, actor})
+  defp loot_call(%{loot_guid: guid}, actor, :release), do: Entity.call(guid, {:loot_release, actor})
 
   defp release_reservation(loot_guid, %Reservation{} = reservation) do
     release = %Release{token: reservation.token, actor_guid: reservation.actor_guid}

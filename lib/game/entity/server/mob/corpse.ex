@@ -22,6 +22,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Corpse do
   alias ThistleTea.Game.Entity.Logic.LootRoll
   alias ThistleTea.Game.Entity.Logic.LootSession
   alias ThistleTea.Game.Entity.Registry, as: EntityRegistry
+  alias ThistleTea.Game.Entity.Server.Mob.Pockets
   alias ThistleTea.Game.Entity.Server.Mob.Respawn
   alias ThistleTea.Game.Loot.ActorFactory
   alias ThistleTea.Game.Network
@@ -46,6 +47,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Corpse do
   @corpse_decay_elite_ms 600_000
 
   def prepare(%Mob{internal: %Internal{loot: %InternalLoot{} = internal_loot} = internal} = state, target) do
+    state = Pockets.close(state)
     loot = generate_loot(internal_loot, quest_item_filter(state, target))
     session = LootSession.new(loot, internal_loot.tapped_by)
 
@@ -65,6 +67,10 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Corpse do
   def removed?(%Mob{}), do: false
 
   def pending?(%Mob{} = state) do
+    Pockets.pending?(state) or corpse_pending?(state)
+  end
+
+  defp corpse_pending?(%Mob{} = state) do
     case session(state) do
       %LootSession{} = session -> LootSession.pending?(session)
       _ -> false
@@ -84,6 +90,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Corpse do
         state
 
       true ->
+        state = Pockets.close(state)
         state = resolve_pending_rolls(state)
         close_loot_windows(state)
 
