@@ -28,23 +28,30 @@ defmodule ThistleTea.Game.Spell.ModifiersTest do
     end
 
     test "stacked modifier holders multiply their amounts" do
-      holder = %{modifier_holder(:add_flat_modifier, 10, 7, 0) | stacks: 10}
+      holder = %{modifier_holder(:add_flat_modifier, 10, 7, 1) | stacks: 10}
       entity = entity([holder])
       spell = %Spell{spell_family: 8, family_flags_0: 0x1}
 
       assert Modifiers.value(entity, spell, :critical_chance, 0.0) == 100.0
     end
 
-    test "zero masks affect every spell in the same family" do
+    test "empty masks do not affect spells in the same family" do
       entity = entity([modifier_holder(:add_pct_modifier, -100, 14, 0)])
       spell = %Spell{spell_family: 8, family_flags_0: 0x80000000}
 
+      assert Modifiers.integer_value(entity, spell, :cost, 450) == 450
+    end
+
+    test "matches the upper half of vanilla's 64-bit family mask" do
+      entity = entity([modifier_holder(:add_pct_modifier, -100, 14, 0x100000000)])
+      spell = %Spell{spell_family: 8, family_flags_1: 1}
       assert Modifiers.integer_value(entity, spell, :cost, 450) == 0
+      assert Modifiers.integer_value(entity, %{spell | family_flags_1: 2}, :cost, 450) == 450
     end
 
     test "cost modifiers feed the shared power calculation" do
-      entity = entity([modifier_holder(:add_pct_modifier, -100, 14, 0)])
-      spell = %Spell{spell_family: 8, mana_cost: 450, power_type: 0}
+      entity = entity([modifier_holder(:add_pct_modifier, -100, 14, 1)])
+      spell = %Spell{spell_family: 8, family_flags_0: 1, mana_cost: 450, power_type: 0}
 
       assert Resources.power_cost(entity, spell) == 0
     end

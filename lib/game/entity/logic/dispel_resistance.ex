@@ -4,7 +4,7 @@ defmodule ThistleTea.Game.Entity.Logic.DispelResistance do
   the original aura's spell family, independently of the dispelling spell.
   """
 
-  import Bitwise, only: [&&&: 2]
+  import Bitwise, only: [&&&: 2, |||: 2, <<<: 2]
 
   alias ThistleTea.Game.Aura
   alias ThistleTea.Game.Aura.Holder
@@ -23,11 +23,13 @@ defmodule ThistleTea.Game.Entity.Logic.DispelResistance do
 
   def projection(_entity), do: []
 
-  def chance(projection, %Spell{spell_family: family, family_flags_0: flags}) when is_list(projection) do
+  def chance(projection, %Spell{spell_family: family} = spell) when is_list(projection) do
+    flags = (spell.family_flags_0 || 0) ||| (spell.family_flags_1 || 0) <<< 32
+
     projection
     |> Enum.flat_map(fn
       {^family, %Aura{class_mask: mask} = aura} when family > 0 ->
-        if mask in [nil, 0] or (is_integer(mask) and (mask &&& (flags || 0)) != 0), do: [aura], else: []
+        if is_integer(mask) and (mask &&& flags) != 0, do: [aura], else: []
 
       _modifier ->
         []

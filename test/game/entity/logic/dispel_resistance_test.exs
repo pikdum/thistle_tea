@@ -38,12 +38,14 @@ defmodule ThistleTea.Game.Entity.Logic.DispelResistanceTest do
     end
 
     test "combines flat and percent modifiers and bounds the result" do
-      flat = %Aura{type: :add_flat_modifier, misc_value: 28, class_mask: 0, amount: 40}
+      flat = %Aura{type: :add_flat_modifier, misc_value: 28, class_mask: 1, amount: 40}
       percent = %{flat | type: :add_pct_modifier, amount: 50}
-      spell = %Spell{id: 2, spell_family: 7}
+      spell = %Spell{id: 2, spell_family: 7, family_flags_0: 1}
       assert DispelResistance.chance([{7, flat}, {7, percent}], spell) == 60
       assert DispelResistance.chance([{7, %{flat | amount: 200}}], spell) == 100
       assert DispelResistance.chance([{7, %{flat | amount: -10}}], spell) == 0
+      assert DispelResistance.chance([{7, %{flat | class_mask: 0}}], spell) == 0
+      assert DispelResistance.chance([{7, %{flat | class_mask: 0x100000000}}], %{spell | family_flags_1: 1}) == 40
     end
   end
 end

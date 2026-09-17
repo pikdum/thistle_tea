@@ -100,8 +100,8 @@ defmodule ThistleTea.Game.Entity.Logic.SelfResurrectionTest do
       talent = %Holder{
         spell: %Spell{id: 16_209, spell_family: 11},
         auras: [
-          %Aura{type: :add_flat_modifier, misc_value: 11, amount: -1_200_000, class_mask: 0},
-          %Aura{type: :add_flat_modifier, misc_value: 8, amount: 20, class_mask: 0}
+          %Aura{type: :add_flat_modifier, misc_value: 11, amount: -1_200_000, class_mask: 1},
+          %Aura{type: :add_flat_modifier, misc_value: 8, amount: 20, class_mask: 1}
         ]
       }
 
@@ -162,6 +162,7 @@ defmodule ThistleTea.Game.Entity.Logic.SelfResurrectionTest do
       category: 1161,
       category_recovery_time_ms: 3_600_000,
       spell_family: 11,
+      family_flags_0: 1,
       effects: [%Effect{type: :self_resurrect, base_points: 19, base_dice: 1, die_sides: 1}]
     }
   end

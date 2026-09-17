@@ -3,7 +3,7 @@ defmodule ThistleTea.Game.Spell.Modifiers do
   Applies DBC flat and percent spell modifiers to spells selected by their
   spell-family masks.
   """
-  import Bitwise, only: [&&&: 2]
+  import Bitwise, only: [&&&: 2, |||: 2, <<<: 2]
 
   alias ThistleTea.Game.Aura
   alias ThistleTea.Game.Aura.Holder
@@ -108,9 +108,10 @@ defmodule ThistleTea.Game.Spell.Modifiers do
 
   defp modifier_applies?(_modifier, _spell), do: false
 
-  defp class_mask_applies?(mask, %Spell{}) when mask in [0, nil], do: true
-
-  defp class_mask_applies?(mask, %Spell{family_flags_0: flags}) when is_integer(mask), do: (mask &&& (flags || 0)) != 0
+  defp class_mask_applies?(mask, %Spell{} = spell) when is_integer(mask) do
+    flags = (spell.family_flags_0 || 0) ||| (spell.family_flags_1 || 0) <<< 32
+    (mask &&& flags) != 0
+  end
 
   defp class_mask_applies?(_mask, _spell), do: false
 

@@ -49,10 +49,12 @@ defmodule ThistleTea.Game.World.Loader.SpellEffectOverride do
     |> select(
       [s],
       {s.entry, {s.effect_bonus_coefficient_0, s.effect_bonus_coefficient_1, s.effect_bonus_coefficient_2},
-       s.custom_flags}
+       s.custom_flags, {s.effect_item_type_0, s.effect_item_type_1, s.effect_item_type_2}}
     )
     |> Mangos.Repo.all()
-    |> Enum.each(fn {entry, coefficients, custom_flags} ->
+    |> Enum.each(fn {entry, coefficients, custom_flags, class_masks} ->
+      :ets.insert(__MODULE__, {{:class_masks, entry}, class_masks})
+
       if coefficients != {-1.0, -1.0, -1.0} do
         :ets.insert(__MODULE__, {{:coefficients, entry}, coefficients})
       end
@@ -95,4 +97,13 @@ defmodule ThistleTea.Game.World.Loader.SpellEffectOverride do
   end
 
   def custom_flags(_spell_id), do: 0
+
+  def class_mask(spell_id, effect_index) when is_integer(spell_id) and effect_index in 0..2 do
+    case :ets.lookup(__MODULE__, {:class_masks, spell_id}) do
+      [{_key, masks}] -> elem(masks, effect_index)
+      _ -> nil
+    end
+  rescue
+    ArgumentError -> nil
+  end
 end

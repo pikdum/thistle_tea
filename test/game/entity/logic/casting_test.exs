@@ -152,12 +152,13 @@ defmodule ThistleTea.Game.Entity.Logic.CastingTest do
         spell: %Spell{id: 14_751, spell_family: 6},
         charges: 1,
         slot: 0,
-        auras: [%AuraData{type: :add_pct_modifier, amount: -100, misc_value: 14, class_mask: 0}]
+        auras: [%AuraData{type: :add_pct_modifier, amount: -100, misc_value: 14, class_mask: 1}]
       }
 
       spell = %Spell{
         id: 15_407,
         spell_family: 6,
+        family_flags_0: 1,
         mana_cost: 45,
         power_type: 0,
         duration_ms: 3_000,
@@ -882,10 +883,10 @@ defmodule ThistleTea.Game.Entity.Logic.CastingTest do
         spell: %Spell{id: 14_751, spell_family: 6},
         charges: 1,
         slot: 0,
-        auras: [%AuraData{type: :add_pct_modifier, amount: -100, misc_value: 14, class_mask: 0}]
+        auras: [%AuraData{type: :add_pct_modifier, amount: -100, misc_value: 14, class_mask: 1}]
       }
 
-      spell = %Spell{id: 2061, spell_family: 6, mana_cost: 10, power_type: 0}
+      spell = %Spell{id: 2061, spell_family: 6, family_flags_0: 1, mana_cost: 10, power_type: 0}
       targets = Target.unit(1)
 
       mob = %Mob{

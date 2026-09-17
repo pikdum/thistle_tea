@@ -352,7 +352,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
           amplitude_ms: effect_amplitude(mod, row, index),
           misc_value: effect_misc_value(mod, row, index, type, aura),
           multiple_value: float_field(mod, :effect_multiple_value, row, :"effect_multiple_values_#{index}") || 0.0,
-          class_mask: item_type,
+          class_mask: effect_class_mask(row.id, index, aura, item_type, mod),
           item_type: item_type,
           radius_yards: radius_lookup.(int_field(mod, :effect_radius_index, row, :"effect_radius_#{index}")),
           implicit_target_a: target_type(target_a_int),
@@ -366,6 +366,15 @@ defmodule ThistleTea.Game.World.Loader.Spell do
         }
     end
   end
+
+  defp effect_class_mask(_spell_id, _index, _aura, fallback, %SpellEffectMod{effect_item_type: value})
+       when is_integer(value) and value != -1, do: fallback
+
+  defp effect_class_mask(spell_id, index, aura, fallback, _mod) when aura in [:add_flat_modifier, :add_pct_modifier] do
+    SpellEffectOverrideLoader.class_mask(spell_id, index) || fallback
+  end
+
+  defp effect_class_mask(_spell_id, _index, _aura, fallback, _mod), do: fallback
 
   defp int_field(%SpellEffectMod{} = mod, mod_key, row, row_key) do
     case Map.get(mod, mod_key) do
