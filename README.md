@@ -82,6 +82,7 @@ nix develop .#wow-tools            # shell with all of the above + sqlite + mari
 - main-hand disarm: unarmed player combat, armed-creature damage reduction, weapon ability checks, and off-hand preservation
 - rear-hit daze from uncontrolled creatures, with level and defense-skill scaling
 - mechanic resistance for spells and melee abilities, including Orc Hardiness
+- aura-state and spell-effect immunities, with partial spell blocking, control purges, and expiry cleanup
 - exclusive resistance buffs use the strongest effect per school, with weaker protection resuming on removal
 - crowd-control diminishing returns, shared across casters with recovery after control ends
 - Priest Fade: temporary threat reduction with target switching and restoration on expiry

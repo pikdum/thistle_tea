@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Entity.Logic.EffectImmunityTest do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.Aura
+  alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.EffectImmunity
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.SpellEffect
@@ -61,6 +62,16 @@ defmodule ThistleTea.Game.Entity.Logic.EffectImmunityTest do
       spell = %{stun() | attributes: MapSet.new([:ignore_caster_and_target_restrictions])}
       {updated, _events} = SpellEffect.receive(entity, 2, spell, 100)
       assert Aura.has_aura?(updated, :mod_stun)
+    end
+
+    test "full immunity takes precedence over a melee avoidance roll", %{entity: entity} do
+      entity = protect(entity, :state_immunity, :mod_stun)
+      dodge = %Holder{spell: %Spell{id: 6}, auras: [%AuraData{type: :mod_dodge, amount: 100}]}
+      entity = %{entity | unit: %{entity.unit | auras: [dodge | entity.unit.auras]}}
+      spell = %{stun() | dmg_class: 2}
+
+      {_entity, events} = SpellEffect.receive(entity, 2, spell, 100)
+      assert [%Effects.SpellLogMiss{reason: :immune}] = events
     end
   end
 
@@ -122,6 +133,14 @@ defmodule ThistleTea.Game.Entity.Logic.EffectImmunityTest do
       {entity, _events} = Aura.tick(entity, 1_001)
       {entity, _events} = SpellEffect.receive(entity, 2, stun(), 1_002)
       assert Aura.has_aura?(entity, :mod_stun)
+    end
+
+    test "death clears temporary immunity", %{entity: entity} do
+      entity = protect(entity, :state_immunity, :mod_stun)
+      entity = Core.take_damage(entity, 100, 100)
+      assert entity.unit.health == 0
+      refute Aura.has_spell?(entity, 1)
+      refute EffectImmunity.blocked?(entity, stun(), hd(stun().effects))
     end
 
     test "purge preserves unrelated holders", %{entity: entity} do
