@@ -46,6 +46,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
     :periodic_heal,
     :periodic_energize,
     :periodic_leech,
+    :periodic_mana_leech,
     :periodic_trigger_spell,
     :obs_mod_health
   ]

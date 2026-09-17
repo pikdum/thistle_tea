@@ -580,6 +580,39 @@ defmodule ThistleTea.Game.Entity.Logic.AuraTest do
       assert updated_aura.next_tick_at == first_tick_at + 3_000
     end
 
+    test "schedules mana drain ticks and caps the transfer at available mana" do
+      entity = fixture_entity()
+      entity = %{entity | unit: %{entity.unit | power_type: 0, power1: 30, max_power1: 100}}
+
+      spell = %Spell{
+        id: 5138,
+        school: :shadow,
+        duration_ms: 5_000,
+        effects: [
+          %Effect{
+            index: 0,
+            type: :apply_aura,
+            aura: :periodic_mana_leech,
+            base_points: 20,
+            amplitude_ms: 1_000,
+            misc_value: 0,
+            multiple_value: 2.0
+          }
+        ]
+      }
+
+      {entity, _events} = apply_spell(entity, 999, 1, spell)
+      assert [%Holder{auras: [%AuraData{next_tick_at: 2_000}]}] = entity.unit.auras
+      {entity, events} = Aura.tick(entity, 2_000)
+      assert entity.unit.power1 == 10
+      assert %Effects.GrantPower{target_guid: 999, misc_value: 0, amount: 40} in events
+      {entity, events} = Aura.tick(entity, 3_000)
+      assert entity.unit.power1 == 0
+      assert %Effects.GrantPower{target_guid: 999, misc_value: 0, amount: 20} in events
+      {_entity, events} = Aura.tick(entity, 4_000)
+      refute Enum.any?(events, &match?(%Effects.GrantPower{}, &1))
+    end
+
     test "restores mana and logs periodic energize ticks" do
       entity = %{
         fixture_entity()
