@@ -37,6 +37,7 @@ node_modules/
 *.sqlite*
 
 # Devenv
+.env
 .devenv*
 devenv.local.nix
 devenv.local.yaml
