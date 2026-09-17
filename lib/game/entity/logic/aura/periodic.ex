@@ -16,12 +16,15 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.DamageImmunity
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Logic.PowerBurn
   alias ThistleTea.Game.Entity.Logic.Resources
   alias ThistleTea.Game.Entity.Logic.SpellResist
   alias ThistleTea.Game.Entity.Logic.Threat
   alias ThistleTea.Game.Entity.Logic.Warlock
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
+
+  @harmful_periodics [:periodic_damage, :periodic_leech, :periodic_mana_leech, :periodic_power_burn]
 
   def tick(%{unit: %Unit{auras: holders}} = entity, now) when is_list(holders) and holders != [] do
     entity
@@ -75,7 +78,14 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
 
   defp periodic_taken_reactions(entity, events, now) do
     Enum.reduce(events, {entity, []}, fn
-      %Effects.SpellDamage{periodic?: true, damage: damage, source_guid: caster, spell: %Spell{} = spell},
+      %Effects.SpellDamage{
+        periodic?: true,
+        damage: damage,
+        absorbed: absorbed,
+        crit?: crit?,
+        source_guid: caster,
+        spell: %Spell{} = spell
+      },
       {current, acc}
       when is_integer(damage) and damage > 0 and is_integer(caster) ->
         {current, reaction_events} =
@@ -83,8 +93,8 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
             attacker_guid: caster,
             spell: spell,
             proc_type: :take_harmful_periodic,
-            outcome: :normal,
-            damage: damage,
+            outcome: if(crit?, do: :crit, else: :normal),
+            damage: max(damage - (absorbed || 0), 0),
             now: now
           })
 
@@ -119,7 +129,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
   defp tick_area_refresh(_entity, holder, _now), do: {holder, []}
 
   defp tick_checked_aura(entity, %Holder{} = holder, %Aura{type: type, next_tick_at: at} = aura, now)
-       when type in [:periodic_damage, :periodic_leech, :periodic_mana_leech] and is_integer(at) and now >= at do
+       when type in @harmful_periodics and is_integer(at) and now >= at do
     if DamageImmunity.immune?(entity, holder.spell.school, holder.spell) do
       event = %Effects.SpellDamageImmune{
         source_guid: holder.caster_guid,
@@ -268,6 +278,33 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
         _ ->
           []
       end
+
+    {entity, %{aura | next_tick_at: advance_tick(at, aura.amplitude_ms, now)}, events}
+  end
+
+  defp tick_aura(entity, %Holder{} = holder, %Aura{type: :periodic_power_burn, next_tick_at: at} = aura, now)
+       when is_integer(at) and now >= at do
+    context =
+      holder.cast_context ||
+        %CastContext{
+          caster_guid: holder.caster_guid,
+          caster_owner_guid: holder.caster_owner_guid,
+          reflected_by_guid: holder.reflected_by_guid,
+          caster_level: holder.caster_level
+        }
+
+    {entity, events} =
+      PowerBurn.apply(
+        entity,
+        context,
+        holder.spell,
+        aura.amount,
+        aura,
+        now,
+        periodic?: true,
+        periodic_can_crit?: true,
+        proc_type: :deal_harmful_periodic
+      )
 
     {entity, %{aura | next_tick_at: advance_tick(at, aura.amplitude_ms, now)}, events}
   end

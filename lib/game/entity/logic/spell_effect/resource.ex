@@ -6,10 +6,10 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.Resource do
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Intoxication
+  alias ThistleTea.Game.Entity.Logic.PowerBurn
   alias ThistleTea.Game.Entity.Logic.Resources
   alias ThistleTea.Game.Entity.Logic.SpellEffect.Amount
   alias ThistleTea.Game.Entity.Logic.Warrior
-  alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Effect
 
@@ -66,27 +66,15 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.Resource do
     end
   end
 
-  def apply(state, %CastContext{}, _spell, %Effect{type: :power_burn, misc_value: power_type}, _now)
-      when state.unit.power_type != power_type do
-    {state, []}
-  end
-
   def apply(state, %CastContext{} = context, spell, %Effect{type: :power_burn} = effect, now) do
-    drained = min(Amount.roll(spell, effect, context), max(state.unit.power1 || 0, 0))
-
-    if drained > 0 do
-      state =
-        %{state | unit: %{state.unit | power1: state.unit.power1 - drained}}
-        |> Core.mark_broadcast_update()
-
-      damage = trunc(drained * burn_multiplier(effect))
-      state = Core.take_damage(state, damage, now, [school: school_atom(spell)] ++ damage_source_opts(context))
-      event = Effects.spell_damage(context.caster_guid, state.object.guid, spell, damage)
-
-      {state, [event]}
-    else
-      {state, []}
-    end
+    PowerBurn.apply(
+      state,
+      context,
+      spell,
+      Amount.roll(spell, effect, context),
+      effect,
+      now
+    )
   end
 
   def apply(state, %CastContext{} = context, spell, %Effect{type: :inebriate} = effect, now) do
@@ -109,22 +97,6 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.Resource do
   defp put_power(unit, 4, value), do: %{unit | power5: value}
   defp put_power(unit, _power_type, _value), do: unit
 
-  defp burn_multiplier(%Effect{multiple_value: multiple}) when is_number(multiple) and multiple > 0, do: multiple
-  defp burn_multiplier(_effect), do: 1.0
-
   defp leech_multiplier(%Effect{multiple_value: multiple}) when is_number(multiple) and multiple > 0, do: multiple
   defp leech_multiplier(_effect), do: 1.0
-
-  defp school_atom(%Spell{school: school}) when is_atom(school), do: school
-
-  defp school_atom(%Spell{} = spell),
-    do: Enum.at([:physical, :holy, :fire, :nature, :frost, :shadow, :arcane], Spell.school_index(spell), :physical)
-
-  defp damage_source_opts(%CastContext{} = context) do
-    [
-      source: context.caster_guid,
-      source_owner: context.caster_owner_guid,
-      reflected_by: context.reflected_by_guid
-    ]
-  end
 end

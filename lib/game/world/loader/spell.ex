@@ -714,6 +714,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp aura_type(154), do: :mod_stealth_level
   defp aura_type(156), do: :mod_reputation_gain
   defp aura_type(161), do: :mod_health_regen_in_combat
+  defp aura_type(162), do: :periodic_power_burn
   defp aura_type(166), do: :mod_attack_power_pct
   defp aura_type(168), do: :mod_damage_done_versus
   defp aura_type(169), do: :mod_crit_percent_versus

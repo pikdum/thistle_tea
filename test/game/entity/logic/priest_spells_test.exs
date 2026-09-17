@@ -41,6 +41,7 @@ defmodule ThistleTea.Game.Entity.Logic.PriestSpellsTest do
         max_health: 100,
         power1: Keyword.get(opts, :mana, 0),
         max_power1: Keyword.get(opts, :max_mana, 0),
+        power_type: 0,
         flags: 0,
         auras: []
       },
@@ -334,6 +335,7 @@ defmodule ThistleTea.Game.Entity.Logic.PriestSpellsTest do
           %Effect{
             index: 0,
             type: :power_burn,
+            misc_value: 0,
             base_points: 190,
             die_sides: 13,
             base_dice: 1,

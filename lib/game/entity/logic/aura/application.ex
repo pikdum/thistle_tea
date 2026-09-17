@@ -22,6 +22,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
   alias ThistleTea.Game.Spell.Scripts
 
   @negative_auras [
+    :periodic_power_burn,
     :periodic_damage,
     :periodic_leech,
     :mod_root,
@@ -42,6 +43,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
   @percent_regen_tick_ms 2000
   @regen_auras [:mod_regen, :mod_power_regen, :mod_power_regen_percent]
   @periodic_auras [
+    :periodic_power_burn,
     :periodic_damage,
     :periodic_heal,
     :periodic_energize,
@@ -66,6 +68,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
           reflected_by_guid: context.reflected_by_guid,
           caster_level: context.caster_level,
           caster_faction_template: context.caster_faction_template,
+          cast_context: if(Enum.any?(auras, &(&1.type == :periodic_power_burn)), do: context),
           applied_at: now,
           expires_at: expires_at(now, effective_duration(spell, context)),
           charges: holder_charges(spell),

@@ -167,6 +167,12 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
     base = effect_amount(spell, effect, context)
     rolled = base + damage_bonus(context, spell, effect, opts)
 
+    apply_damage_amount(state, context, spell, rolled, now, opts)
+  end
+
+  def apply_damage_amount(state, %CastContext{} = context, %Spell{} = spell, amount, now, opts \\ []) do
+    rolled = amount
+
     rolled =
       trunc(
         rolled * (context.effect_damage_multiplier || 1.0) * (context.damage_done_multiplier || 1.0) *
@@ -189,6 +195,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
         source: context.caster_guid,
         source_owner: context.caster_owner_guid,
         reflected_by: context.reflected_by_guid,
+        periodic: Keyword.get(opts, :periodic?, false),
         threat_multiplier: damage_threat_multiplier(context)
       )
 
@@ -202,7 +209,13 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
           [resisted: resisted, absorbed: absorbed, crit?: crit?]
       )
 
-    {state, reaction_events} = spell_taken_reactions(state, context, spell, damage, crit?, opts, now)
+    {state, reaction_events} =
+      if Keyword.get(opts, :periodic?, false) do
+        {state, []}
+      else
+        spell_taken_reactions(state, context, spell, damage - absorbed, crit?, opts, now)
+      end
+
     {state, [event | reaction_events]}
   end
 
@@ -252,7 +265,9 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
         Aura.flat_amount(state, :mod_attacker_spell_crit_chance) +
         Critical.target_bonus(context.conditional_crit_modifiers, state)
 
-    chance > 0 and not Keyword.get(opts, :periodic?, false) and not Spell.attribute?(spell, :cant_crit) and
+    chance > 0 and
+      (not Keyword.get(opts, :periodic?, false) or Keyword.get(opts, :periodic_can_crit?, false)) and
+      not Spell.attribute?(spell, :cant_crit) and
       spell.dmg_class in [1, 3] and (chance >= 100 or :rand.uniform() * 100 <= chance)
   end
 

@@ -232,6 +232,36 @@ defmodule ThistleTea.Game.Entity.Logic.Resources do
 
   def drain_power(entity, _power_type), do: entity
 
+  def consume_power(%{unit: %Unit{power_type: power_type} = unit} = entity, power_type, amount)
+      when power_type in 0..4 and is_number(amount) and amount > 0 do
+    available = max(active_power(unit) || 0, 0)
+    consumed = min(trunc(amount), available)
+
+    entity =
+      if consumed > 0 do
+        %{entity | unit: put_active_power(unit, available - consumed)}
+        |> Core.mark_broadcast_update()
+      else
+        entity
+      end
+
+    {entity, consumed}
+  end
+
+  def consume_power(entity, _power_type, _amount), do: {entity, 0}
+
+  defp active_power(%Unit{power_type: 0, power1: power}), do: power
+  defp active_power(%Unit{power_type: 1, power2: power}), do: power
+  defp active_power(%Unit{power_type: 2, power3: power}), do: power
+  defp active_power(%Unit{power_type: 3, power4: power}), do: power
+  defp active_power(%Unit{power_type: 4, power5: power}), do: power
+
+  defp put_active_power(%Unit{power_type: 0} = unit, power), do: %{unit | power1: power}
+  defp put_active_power(%Unit{power_type: 1} = unit, power), do: %{unit | power2: power}
+  defp put_active_power(%Unit{power_type: 2} = unit, power), do: %{unit | power3: power}
+  defp put_active_power(%Unit{power_type: 3} = unit, power), do: %{unit | power4: power}
+  defp put_active_power(%Unit{power_type: 4} = unit, power), do: %{unit | power5: power}
+
   def gain_power(%{unit: %Unit{} = unit} = entity, power_type, amount)
       when is_integer(power_type) and is_number(amount) and amount > 0 do
     field = Map.get(@power_fields, power_type)
