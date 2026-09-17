@@ -12,31 +12,31 @@ defmodule ThistleTea.Game.World.System.DuelTest do
       table = :ets.new(:duel_system_test, [:set, :public])
       world = WorldRef.open(0)
 
-      {:ok, server} =
-        GenServer.start_link(DuelSystem,
-          table: table,
-          countdown_ms: 10,
-          bounds_tick_ms: 60_000,
-          now: fn -> System.monotonic_time(:millisecond) end,
-          online?: fn _guid -> true end,
-          dueling_allowed?: fn _guid -> true end,
-          position: fn
-            1 -> {world, 0.0, 0.0, 0.0}
-            2 -> {world, 2.0, 0.0, 0.0}
-          end,
-          player_name: &"Player#{&1}",
-          spawn_flag: fn attrs ->
-            send(parent, {:spawn_flag, attrs})
-            {:ok, 3}
-          end,
-          despawn_flag: &send(parent, {:despawn_flag, &1}),
-          send_packet: &send(parent, {:packet, &2, &1}),
-          broadcast_winner: &send(parent, {:winner, &2, &1}),
-          sync_player: &send(parent, {:sync, &1, &2}),
-          trigger_spell: &send(parent, {:trigger, &1, &2})
+      server =
+        start_supervised!(
+          {DuelSystem,
+           name: nil,
+           table: table,
+           countdown_ms: 10,
+           bounds_tick_ms: 60_000,
+           now: fn -> System.monotonic_time(:millisecond) end,
+           online?: fn _guid -> true end,
+           dueling_allowed?: fn _guid -> true end,
+           position: fn
+             1 -> {world, 0.0, 0.0, 0.0}
+             2 -> {world, 2.0, 0.0, 0.0}
+           end,
+           player_name: &"Player#{&1}",
+           spawn_flag: fn attrs ->
+             send(parent, {:spawn_flag, attrs})
+             {:ok, 3}
+           end,
+           despawn_flag: &send(parent, {:despawn_flag, &1}),
+           send_packet: &send(parent, {:packet, &2, &1}),
+           broadcast_winner: &send(parent, {:winner, &2, &1}),
+           sync_player: &send(parent, {:sync, &1, &2}),
+           trigger_spell: &send(parent, {:trigger, &1, &2})}
         )
-
-      on_exit(fn -> if Process.alive?(server), do: GenServer.stop(server) end)
 
       attrs = %{
         initiator_guid: 1,
