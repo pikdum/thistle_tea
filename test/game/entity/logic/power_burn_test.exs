@@ -48,7 +48,9 @@ defmodule ThistleTea.Game.Entity.Logic.PowerBurnTest do
     end
 
     test "zero conversion drains without damage", %{entity: entity, context: context} do
-      {entity, []} = SpellEffect.receive(entity, context, burn_spell(:power_burn, multiple_value: 0.0), 100)
+      {entity, [%Effects.SpellDamage{damage: 0}]} =
+        SpellEffect.receive(entity, context, burn_spell(:power_burn, multiple_value: 0.0), 100)
+
       assert entity.unit.power1 == 0
       assert entity.unit.health == 1_000
     end
@@ -148,7 +150,7 @@ defmodule ThistleTea.Game.Entity.Logic.PowerBurnTest do
 
     test "zero-conversion periodic burns still consume mana", %{entity: entity, context: context} do
       {entity, _} = Aura.apply_spell(entity, context, burn_spell(:apply_aura, multiple_value: 0.0), 100)
-      {entity, []} = Aura.tick(entity, 1_100)
+      {entity, [%Effects.SpellDamage{damage: 0}]} = Aura.tick(entity, 1_100)
       assert entity.unit.power1 == 0
       assert entity.unit.health == 1_000
       assert Aura.next_event_at(entity) == 2_100

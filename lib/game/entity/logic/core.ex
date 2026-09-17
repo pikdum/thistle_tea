@@ -84,6 +84,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
     if spirit_damage_immune?(entity, opts) do
       {entity, damage}
     else
+      entity = PlayerCombat.mark_hostile_contact(entity, Keyword.get(opts, :source), now)
       school = Keyword.get(opts, :school, :physical)
       {entity, damage, remaining} = mitigate_damage(entity, damage, school, now, opts)
       %{unit: unit} = entity

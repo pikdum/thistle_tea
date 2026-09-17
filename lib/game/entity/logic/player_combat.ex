@@ -43,6 +43,13 @@ defmodule ThistleTea.Game.Entity.Logic.PlayerCombat do
 
   def mark_initiated(character, now), do: mark_attacked(character, now)
 
+  def mark_hostile_contact(%Character{object: %{guid: guid}, unit: %Unit{health: health}} = character, other_guid, now)
+      when is_integer(other_guid) and other_guid > 0 and other_guid != guid and is_number(health) and health > 0 do
+    mark_attacked(character, now)
+  end
+
+  def mark_hostile_contact(character, _other_guid, _now), do: character
+
   def mark_temporary_at_war(
         %Character{player: %Player{reputation: %Reputation{} = reputation} = player} = character,
         faction_id
