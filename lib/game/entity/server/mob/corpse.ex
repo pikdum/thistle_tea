@@ -58,7 +58,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Corpse do
       |> setup_group_loot(target)
       |> maybe_set_lootable_flag()
 
-    token = corpse_token(state.internal) + 1
+    token = make_ref()
     Process.send_after(self(), {:remove_corpse, token}, decay_ms(internal))
 
     state
@@ -568,8 +568,8 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Corpse do
     state
   end
 
-  defp corpse_token(%Internal{loot: %InternalLoot{corpse_token: token}}) when is_integer(token), do: token
-  defp corpse_token(%Internal{}), do: 0
+  defp corpse_token(%Internal{loot: %InternalLoot{corpse_token: token}}), do: token
+  defp corpse_token(%Internal{}), do: nil
 
   defp decay_ms(%Internal{creature: %Creature{rank: rank}}) when not is_nil(rank) do
     if Experience.elite_rank?(rank) do

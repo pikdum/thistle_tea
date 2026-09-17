@@ -159,6 +159,18 @@ defmodule ThistleTea.Game.Entity.Server.Mob.CorpseTest do
     end
   end
 
+  describe "remove/2" do
+    test "ignores a decay timer from a previous creature life", %{killer: killer} do
+      cache_loot_rows([])
+      previous = Corpse.prepare(skinning_mob(killer), killer)
+      respawned = Mob.respawn(previous)
+      current = Corpse.prepare(%{respawned | unit: %{respawned.unit | health: 0}}, killer)
+
+      refute current.internal.loot.corpse_token == previous.internal.loot.corpse_token
+      assert Corpse.remove(current, previous.internal.loot.corpse_token) == current
+    end
+  end
+
   defp skinning_mob(killer) do
     mob = mob(killer)
     put_in(mob.internal.loot.skinning_id, @loot_id)
