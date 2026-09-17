@@ -52,7 +52,7 @@ defmodule ThistleTea.Game.Entity.EventSink.Spells do
       attacker: effect.source_guid || 0,
       target: effect.target_guid,
       spell_id: effect.spell_id,
-      damage: effect.damage,
+      damage: max(effect.damage - (effect.absorbed || 0), 0),
       school: Spell.school_index(effect.school),
       periodic?: effect.periodic?,
       absorbed: effect.absorbed || 0,

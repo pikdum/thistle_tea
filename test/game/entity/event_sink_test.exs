@@ -39,6 +39,52 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
   describe "emit/2" do
     setup [:metadata_fixtures]
 
+    test "spell damage reports health damage after absorption to both clients" do
+      owner_guid = Guid.from_low_guid(:player, unique_guid())
+      observer_guid = Guid.from_low_guid(:player, unique_guid())
+
+      for guid <- [owner_guid, observer_guid] do
+        Entity.register(guid)
+        SpatialHash.update(:players, guid, 0, 0.0, 0.0, 0.0)
+      end
+
+      on_exit(fn ->
+        for guid <- [owner_guid, observer_guid] do
+          Entity.unregister(guid)
+          SpatialHash.remove(:players, guid)
+        end
+      end)
+
+      character = %Character{
+        object: %Object{guid: owner_guid},
+        internal: %Internal{world: WorldRef.open(0)},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
+      }
+
+      for periodic? <- [false, true], absorbed <- [0, 454, 500] do
+        spell = %Spell{id: 24_619, school: :shadow}
+        effect = Effects.spell_damage(observer_guid, owner_guid, spell, 500, absorbed: absorbed, periodic?: periodic?)
+        EventSink.emit(character, effect)
+        damage = 500 - absorbed
+
+        assert_receive {:"$gen_cast",
+                        {:send_packet,
+                         %Message.SmsgSpellNonMeleeDamageLog{
+                           damage: ^damage,
+                           absorbed: ^absorbed,
+                           periodic?: ^periodic?
+                         }, _opts}}
+
+        assert_receive {:"$gen_cast",
+                        {:send_packet,
+                         %Message.SmsgSpellNonMeleeDamageLog{
+                           damage: ^damage,
+                           absorbed: ^absorbed,
+                           periodic?: ^periodic?
+                         }}}
+      end
+    end
+
     test "dispel feedback reaches the target and nearby observers" do
       owner_guid = Guid.from_low_guid(:player, unique_guid())
       observer_guid = Guid.from_low_guid(:player, unique_guid())
