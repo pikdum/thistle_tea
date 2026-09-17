@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
   alias ThistleTea.Game.Entity.Logic.Aura.Change
   alias ThistleTea.Game.Entity.Logic.Aura.Transition
   alias ThistleTea.Game.Entity.Logic.DiminishingReturns
+  alias ThistleTea.Game.Entity.Logic.EffectImmunity
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
@@ -169,6 +170,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
     existing =
       existing
       |> remove_immune_mechanics(holder)
+      |> EffectImmunity.purge(holder)
 
     holders =
       if holder.spell.id == @ignite_dot do
@@ -482,7 +484,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
 
     spell
     |> Spell.aura_effects()
-    |> Enum.reject(&channel_ticked?(spell, &1))
+    |> Enum.reject(&(EffectImmunity.blocked?(entity, spell, &1) or channel_ticked?(spell, &1)))
     |> Enum.reduce([], fn effect, acc ->
       case build_aura(spell, effect, amount_override, context, now) do
         nil -> acc

@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Spell.CastValidation do
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Disarm
+  alias ThistleTea.Game.Entity.Logic.EffectImmunity
   alias ThistleTea.Game.Entity.Logic.Hunter
   alias ThistleTea.Game.Entity.Logic.Mount
   alias ThistleTea.Game.Entity.Logic.Paladin
@@ -285,18 +286,23 @@ defmodule ThistleTea.Game.Spell.CastValidation do
     immune = immunity_purge_mechanics(spell)
 
     cond do
-      stunned? and @mechanic_stun not in immune ->
+      stunned? and not control_purged?(spell, immune, :mod_stun, [@mechanic_stun]) ->
         {:error, :stunned}
 
-      AuraLogic.has_aura?(caster, :mod_confuse) and Enum.all?(@confuse_mechanics, &(&1 not in immune)) ->
+      AuraLogic.has_aura?(caster, :mod_confuse) and
+          not control_purged?(spell, immune, :mod_confuse, @confuse_mechanics) ->
         {:error, :confused}
 
-      AuraLogic.has_aura?(caster, :mod_fear) and @mechanic_fear not in immune ->
+      AuraLogic.has_aura?(caster, :mod_fear) and not control_purged?(spell, immune, :mod_fear, [@mechanic_fear]) ->
         {:error, :fleeing}
 
       true ->
         :ok
     end
+  end
+
+  defp control_purged?(spell, immune, type, mechanics) do
+    Enum.any?(mechanics, &(&1 in immune)) or EffectImmunity.purges_state?(spell, type)
   end
 
   defp prevention_error(caster, spell, stunned?, now) do

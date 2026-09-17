@@ -110,6 +110,23 @@ defmodule ThistleTea.Game.Spell.CastValidationTest do
       assert :ok = CastValidation.validate(stunned, blink, Target.none(), nil, @now)
     end
 
+    test "state-immunity purges allow casting through matching control only" do
+      for {type, error} <- [{:mod_stun, :stunned}, {:mod_fear, :fleeing}, {:mod_confuse, :confused}] do
+        controlled = caster(auras: [control_holder(type)])
+
+        spell =
+          helpful_spell(
+            attributes: MapSet.new([:immunity_purges_effect]),
+            effects: [%Effect{type: :apply_aura, aura: :state_immunity, misc_value: type, implicit_target_a: :caster}]
+          )
+
+        assert :ok = CastValidation.validate(controlled, spell, Target.none(), nil, @now)
+
+        assert {:error, ^error} =
+                 CastValidation.validate(controlled, %{spell | attributes: MapSet.new()}, Target.none(), nil, @now)
+      end
+    end
+
     test "fear and confusion prevent casting" do
       feared = caster(auras: [control_holder(:mod_fear)])
       confused = caster(auras: [control_holder(:mod_confuse)])

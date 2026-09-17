@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   alias ThistleTea.Game.Entity.Logic.AttackTable
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Core
+  alias ThistleTea.Game.Entity.Logic.EffectImmunity
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.MechanicResistance
   alias ThistleTea.Game.Entity.Logic.Reactive
@@ -59,13 +60,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
         spell = %{spell | effects: effects}
         context = %{context | target_guid: target.object.guid, spell: spell}
 
-        if melee_roll_required?(target, context, spell) do
-          receive_melee_ability(target, context, spell, now)
-        else
-          target
-          |> apply_resisted_effects(context, now)
-          |> with_bonus_threat(context)
-        end
+        receive_unblocked_effects(target, context, now)
     end
   end
 
@@ -214,6 +209,24 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
 
       _no_bonus ->
         {target, events}
+    end
+  end
+
+  defp receive_unblocked_effects(target, %CastContext{spell: spell} = context, now) do
+    effects = Enum.reject(spell.effects, &EffectImmunity.blocked?(target, spell, &1))
+
+    if effects == [] and spell.effects != [] do
+      {target, [Effects.spell_log_miss(context.caster_guid, target.object.guid, spell.id, :immune)]}
+    else
+      context = %{context | spell: %{spell | effects: effects}}
+
+      if melee_roll_required?(target, context, context.spell) do
+        receive_melee_ability(target, context, context.spell, now)
+      else
+        target
+        |> apply_resisted_effects(context, now)
+        |> with_bonus_threat(context)
+      end
     end
   end
 

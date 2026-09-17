@@ -405,6 +405,14 @@ defmodule ThistleTea.Game.World.Loader.Spell do
     int_field(mod, :effect_item_type, row, :"effect_item_type_#{index}") || 0
   end
 
+  defp effect_misc_value(mod, row, index, _type, :state_immunity) do
+    aura_type(int_field(mod, :effect_misc_value, row, :"effect_misc_value_#{index}") || 0)
+  end
+
+  defp effect_misc_value(mod, row, index, _type, :effect_immunity) do
+    effect_type(int_field(mod, :effect_misc_value, row, :"effect_misc_value_#{index}") || 0)
+  end
+
   defp effect_misc_value(mod, row, index, _type, aura) when aura in [:transform, :mounted] do
     transform_display_id(int_field(mod, :effect_misc_value, row, :"effect_misc_value_#{index}") || 0)
   end
@@ -602,6 +610,8 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp aura_type(34), do: :mod_increase_health
   defp aura_type(35), do: :mod_increase_energy
   defp aura_type(36), do: :mod_shapeshift
+  defp aura_type(37), do: :effect_immunity
+  defp aura_type(38), do: :state_immunity
   defp aura_type(39), do: :school_immunity
   defp aura_type(41), do: :dispel_immunity
   defp aura_type(42), do: :proc_trigger_spell
@@ -789,6 +799,8 @@ defmodule ThistleTea.Game.World.Loader.Spell do
     |> add_if(attrs_ex1, @channeled_ex_1, :channeled)
     |> add_if(attrs_ex1, @channeled_ex_2, :channeled)
     |> add_if(attrs_ex1, @immunity_purges_effect_ex_1, :immunity_purges_effect)
+    |> add_if(attrs_ex1, 0x00010000, :immunity_to_hostile_and_friendly_effects)
+    |> add_if(attrs_ex1, 0x00800000, :ignore_caster_and_target_restrictions)
     |> add_if(attrs_ex1, @discount_power_on_miss_ex_1, :discount_power_on_miss)
     |> add_if(attrs_ex1, @finishing_move_damage_ex_1, :finishing_move)
     |> add_if(attrs_ex1, @finishing_move_duration_ex_1, :finishing_move)
@@ -796,6 +808,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
     |> add_if(attrs_ex2, @cant_crit_ex2, :cant_crit)
     |> add_if(attrs_ex2, @allow_while_not_shapeshifted_ex2, :allow_while_not_shapeshifted)
     |> add_if(attrs_ex3, @completely_blocked_ex3, :completely_blocked)
+    |> add_if(attrs_ex3, 0x10000000, :ignore_caster_and_target_restrictions)
     |> add_if(attrs_ex3, @dot_stacking_rule_ex3, :dot_stacking_rule)
   end
 
