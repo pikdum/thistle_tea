@@ -104,6 +104,66 @@ defmodule ThistleTea.Game.Entity.Server.Mob.CorpseTest do
     end
   end
 
+  describe "skin/4" do
+    setup do
+      :ets.insert(LootLoader, {{:skinning, @loot_id}, [grey_row()]})
+      on_exit(fn -> :ets.delete(LootLoader, {:skinning, @loot_id}) end)
+      :ok
+    end
+
+    test "waits for ordinary loot, claims once, and makes the skin private", %{killer: killer} do
+      cache_loot_rows([grey_row()])
+      prepared = Corpse.prepare(skinning_mob(killer), killer)
+      assert {{:error, :target_not_looted}, ^prepared} = Corpse.skin(prepared, actor(killer), 300)
+      assert {{:ok, reservation}, reserved} = Corpse.reserve_item(prepared, actor(killer), 0, self())
+      assert {{:error, :target_not_looted}, ^reserved} = Corpse.skin(reserved, actor(killer), 300)
+      assert {:ok, looted} = Corpse.commit(reserved, %Commit{token: reservation.token, actor_guid: killer})
+      assert (looted.unit.flags &&& 0x04000000) != 0
+      assert %{body_loot?: false} = Metadata.query(looted.object.guid, [:body_loot?])
+
+      skinner = killer + 1
+      assert {{:ok, loot, 1, 0}, skinned} = Corpse.skin(looted, actor(skinner), 300)
+      assert [%{item_id: @grey_item_id}] = loot.items
+      assert loot.gold == 0
+      assert (skinned.unit.flags &&& 0x04000000) == 0
+      assert {{:error, :target_unskinnable}, ^skinned} = Corpse.skin(skinned, actor(killer), 300)
+      assert {{:error, :no_permission}, _} = Corpse.view(skinned, actor(killer))
+      assert {{:error, :no_permission}, _} = Corpse.reserve_item(skinned, actor(killer), 0, self())
+
+      closed = Corpse.release(skinned, actor(skinner))
+      assert {{:ok, ^loot}, reopened} = Corpse.view(closed, actor(skinner))
+      assert {{:ok, skin}, reserved} = Corpse.reserve_item(reopened, actor(skinner), 0, self())
+      assert {:ok, finished} = Corpse.commit(reserved, %Commit{token: skin.token, actor_guid: skinner})
+      assert (finished.unit.flags &&& 0x04000000) == 0
+      assert (finished.unit.dynamic_flags &&& 1) == 0
+      assert finished.internal.loot.skinned?
+      assert {{:error, :target_unskinnable}, ^finished} = Corpse.skin(finished, actor(skinner), 300)
+    end
+
+    test "leaves a failed or out-of-range attempt available for retry", %{killer: killer} do
+      cache_loot_rows([])
+      prepared = Corpse.prepare(skinning_mob(killer), killer)
+      assert {{:error, :out_of_range}, ^prepared} = Corpse.skin(prepared, %{actor(killer) | distance: 6.0}, 1)
+      assert {{:error, :try_again}, ^prepared} = Corpse.skin(prepared, actor(killer), 1, roll: -1)
+      assert {{:ok, _, _, _}, skinned} = Corpse.skin(prepared, actor(killer), 1, roll: 0)
+      assert skinned.internal.loot.skinned?
+    end
+
+    test "empty skin tables cannot be rolled again", %{killer: killer} do
+      cache_loot_rows([])
+      :ets.insert(LootLoader, {{:skinning, @loot_id}, []})
+      prepared = Corpse.prepare(skinning_mob(killer), killer)
+      assert {{:ok, %{items: []}, _, _}, skinned} = Corpse.skin(prepared, actor(killer), 300)
+      assert {{:error, :target_unskinnable}, ^skinned} = Corpse.skin(skinned, actor(killer), 300)
+      assert skinned.internal.loot.session == nil
+    end
+  end
+
+  defp skinning_mob(killer) do
+    mob = mob(killer)
+    put_in(mob.internal.loot.skinning_id, @loot_id)
+  end
+
   defp cache_loot_rows(rows), do: :ets.insert(LootLoader, {{:creature, @loot_id}, rows})
 
   defp actor(guid, needed_items \\ []) do

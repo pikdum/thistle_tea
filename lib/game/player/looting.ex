@@ -79,14 +79,16 @@ defmodule ThistleTea.Game.Player.Looting do
         InstanceSystem.game_object_used(character.internal.world, Guid.entry(guid))
       end
 
+      skinned? = match?(%{skinned?: true}, Metadata.query(guid, [:skinned?]))
+
       Network.send_packet(%Message.SmsgLootResponse{
         guid: guid,
         loot: loot,
-        loot_type: Keyword.get(opts, :loot_type, 1)
+        loot_type: if(skinned?, do: 2, else: Keyword.get(opts, :loot_type, 1))
       })
 
-      maybe_send_master_list(state, guid)
-      %{state | loot_guid: guid, loot_type: :corpse}
+      if !skinned?, do: maybe_send_master_list(state, guid)
+      %{state | loot_guid: guid, loot_type: if(skinned?, do: :skinning, else: :corpse)}
     else
       {:error, :nothing_to_take} ->
         Entity.call(guid, {:loot_release, actor})

@@ -21,6 +21,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Corpse do
   alias ThistleTea.Game.Entity.Logic.Loot.Reservation
   alias ThistleTea.Game.Entity.Logic.LootRoll
   alias ThistleTea.Game.Entity.Logic.LootSession
+  alias ThistleTea.Game.Entity.Logic.Skinning
   alias ThistleTea.Game.Entity.Registry, as: EntityRegistry
   alias ThistleTea.Game.Entity.Server.Mob.Pockets
   alias ThistleTea.Game.Entity.Server.Mob.Respawn
@@ -60,7 +61,35 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Corpse do
     token = corpse_token(state.internal) + 1
     Process.send_after(self(), {:remove_corpse, token}, decay_ms(internal))
 
-    put_internal_loot(state, %{state.internal.loot | corpse_token: token})
+    state
+    |> put_internal_loot(%{state.internal.loot | corpse_token: token})
+    |> publish_skinning()
+  end
+
+  def skin(%Mob{} = state, %Actor{} = actor, skill, opts \\ []) do
+    target = Skinning.projection(state)
+
+    with true <- Actor.within?(actor, 5.0) || {:error, :out_of_range},
+         :ok <- Skinning.validate_target(target, skill),
+         true <- is_nil(state.internal.pet) || {:error, :bad_targets},
+         roll = Keyword.get_lazy(opts, :roll, fn -> Enum.random((skill - 25)..(skill + 37)) end),
+         true <- Skinning.attempt?(state.unit.level, skill, roll) || {:error, :try_again} do
+      loot = LootLoader.generate_skinning(state.internal.loot.skinning_id)
+      session = LootSession.new(loot, actor.guid) |> LootSession.add_viewer(actor)
+
+      state =
+        state
+        |> put_internal_loot(%{state.internal.loot | skinned?: true})
+        |> put_session(session)
+        |> maybe_set_lootable_flag()
+        |> publish_skinning()
+
+      Core.update_object(state, :values) |> World.broadcast_packet(state)
+      rank = if state.internal.creature, do: state.internal.creature.rank, else: 0
+      {{:ok, loot, state.unit.level, rank}, state}
+    else
+      {:error, reason} -> {{:error, reason}, state}
+    end
   end
 
   def removed?(%Mob{internal: %Internal{loot: %InternalLoot{corpse_removed?: removed?}}}), do: removed? == true
@@ -103,7 +132,9 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Corpse do
         state = Visibility.leave_entity(state)
         World.remove_position(state)
 
-        put_internal_loot(state, %{state.internal.loot | session: nil, corpse_removed?: true})
+        state
+        |> put_internal_loot(%{state.internal.loot | session: nil, corpse_removed?: true})
+        |> publish_skinning()
     end
   end
 
@@ -462,6 +493,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Corpse do
         if LootSession.finished?(session) do
           state = put_session(state, nil)
           state = clear_lootable_flag(state)
+          state = publish_skinning(state)
           Core.update_object(state, :values) |> World.broadcast_packet(state)
           state
         else
@@ -527,6 +559,13 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Corpse do
 
   defp put_internal_loot(%Mob{internal: %Internal{} = internal} = state, %InternalLoot{} = internal_loot) do
     %{state | internal: %{internal | loot: internal_loot}}
+  end
+
+  defp publish_skinning(%Mob{} = state) do
+    state = Skinning.sync(state)
+    projection = Map.take(Skinning.projection(state), [:skinning_id, :skinned?, :body_loot?])
+    Metadata.update(state.object.guid, Map.put(projection, :unit_flags, state.unit.flags))
+    state
   end
 
   defp corpse_token(%Internal{loot: %InternalLoot{corpse_token: token}}) when is_integer(token), do: token

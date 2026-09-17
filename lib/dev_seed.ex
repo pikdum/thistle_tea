@@ -5,7 +5,8 @@ defmodule ThistleTea.DevSeed do
   characters for multi-session group testing, plus fast-respawning mobs —
   loot piñatas with guaranteed green drops for roll testing, level-50
   hostiles for combat and XP testing, and a Devilsaur (combat reach 5.0)
-  for big-hitbox spell-range testing, plus a Defias Thug for pickpocketing.
+  for big-hitbox spell-range testing, a Defias Thug for pickpocketing, and a
+  Stonetusk Boar with a three-minute respawn for skinning practice.
   """
   import Ecto.Query
 
@@ -250,6 +251,8 @@ defmodule ThistleTea.DevSeed do
 
     {dx, dy} = @pickpocket_offset
     spawn_mob(@pickpocket_entry, @base_low_guid + 300, {x + dx, y + dy, z}, nil, @hostile_respawn_secs)
+
+    spawn_mob(113, @base_low_guid + 400, {x + 15.0, y - 10.0, z}, nil, 180)
   end
 
   defp spawn_mob(entry, low_guid, {x, y, z}, loot_override, respawn_secs) do

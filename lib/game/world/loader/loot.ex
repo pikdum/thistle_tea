@@ -25,15 +25,17 @@ defmodule ThistleTea.Game.World.Loader.Loot do
     gameobject = Mangos.Repo.all(Mangos.GameObjectLootTemplate)
     fishing = Mangos.Repo.all(Mangos.FishingLootTemplate)
     pickpocket = Mangos.Repo.all(Mangos.PickpocketingLootTemplate)
+    skinning = Mangos.Repo.all(Mangos.SkinningLootTemplate)
     references = Mangos.Repo.all(Mangos.ReferenceLootTemplate)
 
     cache_rows(:creature, creature)
     cache_rows(:gameobject, gameobject)
     cache_rows(:fishing, fishing)
     cache_rows(:pickpocket, pickpocket)
+    cache_rows(:skinning, skinning)
     cache_rows(:reference, references)
 
-    preload_items([creature, gameobject, fishing, pickpocket, references])
+    preload_items([creature, gameobject, fishing, pickpocket, skinning, references])
 
     :ets.insert(__MODULE__, {:loaded, true})
     :ok
@@ -96,6 +98,17 @@ defmodule ThistleTea.Game.World.Loader.Loot do
   def generate_pickpocket(loot_id, creature_level, player_level) do
     gold = 10 * (roll_gold(0, div(creature_level, 2)) + roll_gold(0, div(player_level, 2)))
     %Loot{gold: gold, items: roll_items(loot_id, &pickpocket_rows/1)}
+  end
+
+  def generate_skinning(loot_id) do
+    %Loot{items: roll_items(loot_id, &skinning_rows/1)}
+  end
+
+  defp skinning_rows(loot_id) do
+    case :ets.lookup(__MODULE__, {:skinning, loot_id}) do
+      [{_key, rows}] -> rows
+      _ -> []
+    end
   end
 
   defp pickpocket_rows(loot_id) do

@@ -16,6 +16,7 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
   alias ThistleTea.Game.Entity.Logic.Engagement
+  alias ThistleTea.Game.Entity.Logic.Skinning
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.WorldRef
@@ -169,6 +170,7 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
         loot: %Loot{
           id: ct.loot_id,
           pickpocket_id: ct.pickpocket_loot_id,
+          skinning_id: ct.skinning_loot_id,
           min_gold: ct.min_loot_gold,
           max_gold: ct.max_loot_gold
         },
@@ -233,7 +235,10 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
       spirit_service?: ((unit.npc_flags || 0) &&& @npc_flag_spirit_service) != 0,
       ghost_visible?: ((creature.type_flags || 0) &&& @creature_type_flag_ghost_visible) != 0,
       creature_type: creature.creature_type,
-      pickpocket_id: if(loot, do: loot.pickpocket_id)
+      pickpocket_id: if(loot, do: loot.pickpocket_id),
+      skinning_id: if(loot, do: loot.skinning_id),
+      skinned?: loot && loot.skinned?,
+      body_loot?: loot && not is_nil(loot.session)
     }
   end
 
@@ -256,13 +261,13 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
         behavior_tree: nil,
         broadcast_update?: false,
         spawn: %{spawn_state | respawn_ref: nil, respawn_pending?: false},
-        loot: %{loot | session: nil, pockets: nil, corpse_removed?: false, corpse_token: nil}
+        loot: %{loot | session: nil, pockets: nil, skinned?: false, corpse_removed?: false, corpse_token: nil}
     }
 
     %Engagement.Result{entity: mob} =
       Engagement.reset(%{mob | unit: unit, movement_block: movement_block, internal: internal})
 
-    mob
+    Skinning.sync(mob)
   end
 
   defp effective_scale(%Mangos.CreatureTemplate{scale: scale}, _display_scale) when is_number(scale) and scale > 0,

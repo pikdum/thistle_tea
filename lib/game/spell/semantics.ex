@@ -132,6 +132,7 @@ defmodule ThistleTea.Game.Spell.Semantics do
 
   @inventory [
     :pickpocket,
+    :skinning,
     :create_item,
     :open_lock,
     :activate_object,

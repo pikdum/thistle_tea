@@ -21,6 +21,7 @@ defmodule ThistleTea.Game.Spell.CastValidation do
   alias ThistleTea.Game.Entity.Logic.Pickpocket
   alias ThistleTea.Game.Entity.Logic.Reactive
   alias ThistleTea.Game.Entity.Logic.Resources
+  alias ThistleTea.Game.Entity.Logic.Skinning
   alias ThistleTea.Game.Entity.Logic.Warlock
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Cooldowns
@@ -40,6 +41,7 @@ defmodule ThistleTea.Game.Spell.CastValidation do
          :ok <- check_caster_state(caster, spell, now),
          :ok <- check_combat_state(caster, spell),
          :ok <- Pickpocket.validate(caster, spell, target_info),
+         :ok <- Skinning.validate(caster, spell, target_info, opts),
          :ok <- Mount.validate(caster, spell, opts),
          :ok <- check_stance(caster, spell),
          :ok <- check_caster_aura_state(caster, spell, now),
@@ -386,6 +388,7 @@ defmodule ThistleTea.Game.Spell.CastValidation do
 
   defp check_target(%Spell{} = spell, target_info) do
     cond do
+      Skinning.spell?(spell) -> :ok
       Spell.resurrect_spell?(spell) -> check_resurrect_target(target_info)
       Spell.requires_hostile_target?(spell) -> check_hostile_target(target_info)
       Spell.requires_friendly_target?(spell) -> check_friendly_target(target_info)

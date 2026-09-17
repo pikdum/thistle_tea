@@ -12,9 +12,11 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal.Loot do
     :override,
     :session,
     :pickpocket_id,
+    :skinning_id,
     :pockets,
     :tapped_by,
     :corpse_token,
-    corpse_removed?: false
+    corpse_removed?: false,
+    skinned?: false
   ]
 end

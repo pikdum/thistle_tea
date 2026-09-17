@@ -33,6 +33,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
     Effects.MonsterTalk,
     Effects.OpenGameObject,
     Effects.PickPocket,
+    Effects.SkinCorpse,
     Effects.PlayObjectSound,
     Effects.PlaySound,
     Effects.QuestCastCredit,

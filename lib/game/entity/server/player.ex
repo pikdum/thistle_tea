@@ -85,6 +85,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.Player.Reputation, as: PlayerReputation
   alias ThistleTea.Game.Player.Rest, as: PlayerRest
   alias ThistleTea.Game.Player.SelfResurrection
+  alias ThistleTea.Game.Player.Skinning
   alias ThistleTea.Game.Player.Spellcasting
   alias ThistleTea.Game.Player.Stats, as: PlayerStats
   alias ThistleTea.Game.Player.Taxi, as: PlayerTaxi
@@ -793,6 +794,14 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   rescue
     error ->
       Logger.error("Pickpocket failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
+  def handle_info({:skin_corpse, guid, spell_id}, state) do
+    {:noreply, Skinning.complete(state, guid, spell_id)}
+  rescue
+    error ->
+      Logger.error("Skinning failed: #{Exception.message(error)}")
       {:noreply, state}
   end
 

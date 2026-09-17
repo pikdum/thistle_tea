@@ -214,6 +214,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
       |> queue_feed_pet(casting)
       |> queue_open_object(casting)
       |> queue_pickpocket(casting)
+      |> queue_skinning(casting)
       |> queue_charge(casting)
       |> release_paladin_seal(casting, resolution.hits, now)
       |> apply_impacts(casting, resolution.impacts, now)
@@ -476,6 +477,17 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
   end
 
   defp queue_pickpocket(character, _casting), do: character
+
+  defp queue_skinning(%Character{} = character, %Cast{spell: spell, resolution: resolution}) do
+    if Enum.any?(spell.effects, &(&1.type == :skinning)) do
+      effects = for guid <- resolution.hits, do: %Effects.SkinCorpse{target_guid: guid, spell_id: spell.id}
+      Effects.enqueue(character, effects)
+    else
+      character
+    end
+  end
+
+  defp queue_skinning(character, _casting), do: character
 
   defp queue_item_enchantments(%Character{player: player} = character, %Cast{
          spell: %Spell{} = spell,

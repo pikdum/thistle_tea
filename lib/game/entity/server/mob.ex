@@ -524,6 +524,15 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
       {:reply, {:error, :no_loot}, state}
   end
 
+  def handle_call({:skin_corpse, %Actor{} = actor, skill}, _from, %Mob{} = state) do
+    {result, state} = Corpse.skin(state, actor, skill)
+    {:reply, result, state}
+  rescue
+    error ->
+      Logger.error("Skinning failed: #{Exception.message(error)}")
+      {:reply, {:error, :bad_targets}, state}
+  end
+
   def handle_call({:pocket_loot, %Actor{} = actor, :release}, _from, %Mob{} = state) do
     {:reply, :ok, Pockets.release(state, actor)}
   end
