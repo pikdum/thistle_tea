@@ -16,6 +16,8 @@ defmodule ThistleTea.Game.Player.BankTest do
   alias ThistleTea.Game.Entity.Server.Player.State
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.Message
+  alias ThistleTea.Game.Network.Message.Dispatch
+  alias ThistleTea.Game.Network.Packet
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.Player.Bank
   alias ThistleTea.Game.Player.Inventory, as: PlayerInventory
@@ -137,7 +139,7 @@ defmodule ThistleTea.Game.Player.BankTest do
 
   describe "generic inventory authorization" do
     test "decodes bag auto-storage and rejects remote bank access", %{state: state, banker_guid: banker_guid} do
-      message = Message.CmsgAutostoreBagItem.from_binary(<<255, 39, 255>>)
+      message = Dispatch.to_message(Packet.build(<<255, 39, 255>>, 0x10B))
       assert message == %Message.CmsgAutostoreBagItem{source_bag: 255, source_slot: 39, destination_bag: 255}
       item = ItemStore.create(%ItemTemplate{entry: 20_000}, owner: state.guid)
       state = put_in(state.character.player.bank1, item.object.guid)
