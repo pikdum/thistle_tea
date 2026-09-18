@@ -94,10 +94,11 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
     {Core.heal(state, healing), swiftmend_events ++ events ++ [heal_event]}
   end
 
-  def apply(state, %CastContext{} = context, _spell, %Effect{type: :heal_max_health}, _now) do
+  def apply(state, %CastContext{} = context, spell, %Effect{type: :heal_max_health}, _now) do
     healing = HealingReceived.amount(state, context.caster_max_health || state.unit.max_health || 0)
     events = Threat.heal_threat_events(state, context.caster_guid, healing)
-    {Core.heal(state, healing), events}
+    heal_event = Effects.spell_heal(context.caster_guid, state.object.guid, spell, healing, false)
+    {Core.heal(state, healing), events ++ [heal_event]}
   end
 
   def apply(state, _context, _spell, _effect, _now), do: {state, []}

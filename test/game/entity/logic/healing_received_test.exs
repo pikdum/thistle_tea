@@ -14,6 +14,8 @@ defmodule ThistleTea.Game.Entity.Logic.HealingReceivedTest do
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.HealingReceived
   alias ThistleTea.Game.Entity.Logic.SpellEffect
+  alias ThistleTea.Game.Entity.Server.Mob, as: MobServer
+  alias ThistleTea.Game.Entity.Server.Player, as: PlayerServer
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Effect
@@ -56,8 +58,9 @@ defmodule ThistleTea.Game.Entity.Logic.HealingReceivedTest do
     test "suppresses maximum-health heals", %{entity: entity} do
       context = %CastContext{caster_guid: 2, caster_level: 60, caster_max_health: 800}
       spell = %{heal_spell() | effects: [%Effect{type: :heal_max_health}]}
-      {entity, _events} = SpellEffect.receive(with_modifiers(entity, [-50]), context, spell, 0)
+      {entity, events} = SpellEffect.receive(with_modifiers(entity, [-50]), context, spell, 0)
       assert entity.unit.health == 500
+      assert Enum.any?(events, &match?(%Effects.SpellHeal{damage: 400}, &1))
     end
   end
 
@@ -116,6 +119,31 @@ defmodule ThistleTea.Game.Entity.Logic.HealingReceivedTest do
       assert HealingReceived.heal(player, 200).unit.health == 200
       dead = %{entity | unit: %{entity.unit | health: 0}}
       assert HealingReceived.heal(dead, 200).unit.health == 0
+    end
+  end
+
+  describe "handle_cast/2" do
+    test "player and creature owners apply transferred healing exactly once", %{entity: entity} do
+      entity = with_modifiers(entity, [-50])
+      {:noreply, healed, {:continue, :maybe_broadcast}} = MobServer.handle_cast({:receive_heal, 200}, entity)
+      assert healed.unit.health == 200
+
+      player = %Character{object: entity.object, unit: entity.unit, internal: entity.internal}
+
+      {:noreply, state, {:continue, :maybe_broadcast_update}} =
+        PlayerServer.handle_cast({:receive_heal, 200}, %{character: player})
+
+      assert state.character.unit.health == 200
+    end
+
+    test "a delayed transfer cannot resurrect either owner", %{entity: entity} do
+      dead = %{entity | unit: %{entity.unit | health: 0}}
+      {:noreply, ^dead, {:continue, :maybe_broadcast}} = MobServer.handle_cast({:receive_heal, 200}, dead)
+      player = %Character{object: dead.object, unit: dead.unit, internal: dead.internal}
+      state = %{character: player}
+
+      assert {:noreply, ^state, {:continue, :maybe_broadcast_update}} =
+               PlayerServer.handle_cast({:receive_heal, 200}, state)
     end
   end
 

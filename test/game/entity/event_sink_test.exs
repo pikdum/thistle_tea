@@ -39,6 +39,47 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
   describe "emit/2" do
     setup [:metadata_fixtures]
 
+    test "direct healing reaches the recipient and observers without duplicating periodic logs" do
+      owner_guid = Guid.from_low_guid(:player, unique_guid())
+      observer_guid = Guid.from_low_guid(:player, unique_guid())
+
+      for guid <- [owner_guid, observer_guid] do
+        Entity.register(guid)
+        SpatialHash.update(:players, guid, 0, 0.0, 0.0, 0.0)
+      end
+
+      on_exit(fn ->
+        for guid <- [owner_guid, observer_guid] do
+          Entity.unregister(guid)
+          SpatialHash.remove(:players, guid)
+        end
+      end)
+
+      character = %Character{
+        object: %Object{guid: owner_guid},
+        internal: %Internal{world: WorldRef.open(0)},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
+      }
+
+      spell = %Spell{id: 2050, school: :holy}
+      EventSink.emit(character, Effects.spell_heal(observer_guid, owner_guid, spell, 25, true))
+
+      expected = %Message.SmsgSpellheallog{
+        target: owner_guid,
+        caster: observer_guid,
+        spell_id: 2050,
+        amount: 25,
+        critical?: true
+      }
+
+      assert_receive {:"$gen_cast", {:send_packet, ^expected, _opts}}
+      assert_receive {:"$gen_cast", {:send_packet, ^expected}}
+
+      EventSink.emit(character, Effects.spell_heal(observer_guid, owner_guid, spell, 25, false, periodic?: true))
+      refute_receive {:"$gen_cast", {:send_packet, %Message.SmsgSpellheallog{}, _opts}}
+      refute_receive {:"$gen_cast", {:send_packet, %Message.SmsgSpellheallog{}}}
+    end
+
     test "spell damage reports health damage after absorption to both clients" do
       owner_guid = Guid.from_low_guid(:player, unique_guid())
       observer_guid = Guid.from_low_guid(:player, unique_guid())

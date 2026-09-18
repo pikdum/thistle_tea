@@ -68,6 +68,17 @@ defmodule ThistleTea.Game.Entity.EventSink.Spells do
   end
 
   def emit(entity, %Effects.SpellHeal{} = effect, _context) do
+    if !effect.periodic? do
+      %Message.SmsgSpellheallog{
+        target: effect.target_guid,
+        caster: effect.source_guid,
+        spell_id: effect.spell_id,
+        amount: effect.damage,
+        critical?: effect.crit?
+      }
+      |> World.broadcast_packet(entity)
+    end
+
     notify_spell_outcome(effect)
     entity
   end
