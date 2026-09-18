@@ -26,8 +26,8 @@ defmodule ThistleTea.Game.Entity.UpdateMask do
       defp virtual_field?({_, {:virtual, _default}}), do: true
       defp virtual_field?(_), do: false
 
-      defp private_field?({_, {_, _, _, :private}}), do: true
-      defp private_field?(_), do: false
+      defp visible_field?({_, {_, _, _, visibility}}, target), do: visibility == target
+      defp visible_field?(_entry, _target), do: true
 
       defp strip_visibility({field, {offset, size, type, _vis}}), do: {field, {offset, size, type}}
       defp strip_visibility(entry), do: entry
@@ -50,7 +50,10 @@ defmodule ThistleTea.Game.Entity.UpdateMask do
       end
 
       defp filter_visibility(entries, :self), do: entries
-      defp filter_visibility(entries, :other), do: Enum.reject(entries, &private_field?/1)
+
+      defp filter_visibility(entries, target) when target in [:other, :special_info] do
+        Enum.filter(entries, &visible_field?(&1, target))
+      end
     end
   end
 end

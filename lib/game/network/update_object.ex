@@ -6,7 +6,9 @@ defmodule ThistleTea.Game.Network.UpdateObject do
   use ThistleTea.Game.Network.Opcodes, [:SMSG_UPDATE_OBJECT]
 
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
+  alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Item, as: DataItem
+  alias ThistleTea.Game.Entity.Logic.Empathy
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.BinaryUtils
   alias ThistleTea.Game.Network.Packet
@@ -159,8 +161,7 @@ defmodule ThistleTea.Game.Network.UpdateObject do
   end
 
   defp packet_body(%__MODULE__{update_type: :values, object: object} = obj, recipient_guid) do
-    target = visibility_target(object.guid, recipient_guid)
-    fields = flatten_field_structs(obj, target)
+    fields = recipient_fields(obj, recipient_guid)
     packed_guid = BinaryUtils.pack_guid(object.guid)
     mask_count = mask_blocks_count(fields)
     mask = generate_mask(fields)
@@ -175,8 +176,7 @@ defmodule ThistleTea.Game.Network.UpdateObject do
        )
        when update_type in [:create_object, :create_object2] do
     obj = %{obj | object: %{object | type: object_type_flags(obj)}}
-    target = visibility_target(object.guid, recipient_guid)
-    fields = flatten_field_structs(obj, target)
+    fields = recipient_fields(obj, recipient_guid)
     packed_guid = BinaryUtils.pack_guid(object.guid)
     mask_count = mask_blocks_count(fields)
     mask = generate_mask(fields)
@@ -196,9 +196,18 @@ defmodule ThistleTea.Game.Network.UpdateObject do
       objects
   end
 
-  defp visibility_target(_object_guid, nil), do: :self
-  defp visibility_target(guid, guid), do: :self
-  defp visibility_target(_object_guid, _recipient_guid), do: :other
+  defp recipient_fields(%__MODULE__{} = obj, nil), do: flatten_field_structs(obj, :self)
+
+  defp recipient_fields(%__MODULE__{object: %{guid: guid}} = obj, guid) do
+    flatten_field_structs(obj, :self)
+  end
+
+  defp recipient_fields(%__MODULE__{unit: %Unit{} = unit} = obj, recipient_guid) do
+    target = if Empathy.visible_to?(unit, recipient_guid), do: :special_info, else: :other
+    flatten_field_structs(%{obj | unit: Empathy.project(unit, recipient_guid)}, target)
+  end
+
+  defp recipient_fields(%__MODULE__{} = obj, _recipient_guid), do: flatten_field_structs(obj, :other)
 
   defp packet_header(%__MODULE__{} = obj) do
     <<1::little-size(32), transport_header([obj])>>

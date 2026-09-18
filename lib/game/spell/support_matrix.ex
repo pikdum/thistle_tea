@@ -8,7 +8,6 @@ defmodule ThistleTea.Game.Spell.SupportMatrix do
   can never silently no-op.
 
   Deferred auras that are mapped to atoms but currently inert:
-  empathy,
   auras_visible, and the
   language/reputation cosmetics.
   """
