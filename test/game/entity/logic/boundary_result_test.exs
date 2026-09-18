@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Entity.Logic.BoundaryResultTest do
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.BoundaryResult
+  alias ThistleTea.Game.Entity.Logic.Effects
 
   describe "apply/2" do
     test "applies a resolved charge path atomically" do
@@ -59,6 +60,20 @@ defmodule ThistleTea.Game.Entity.Logic.BoundaryResultTest do
       character = BoundaryResult.apply(character, %Commands.TotemStarted{slot: 1, guid: 20})
 
       assert character.internal.totem_guids == %{1 => 20}
+    end
+
+    test "despawns a totem whose owner died before its start result arrived" do
+      character = %Character{unit: %Unit{health: 0}, player: %Player{}, internal: %Internal{}}
+      character = BoundaryResult.apply(character, %Commands.TotemStarted{slot: 2, guid: 20})
+      assert character.internal.totem_guids == %{}
+      assert [%Effects.DespawnEntity{target_guid: 20}] = character.internal.events
+    end
+
+    test "rejects a late totem after spirit release" do
+      character = %Character{unit: %Unit{health: 1}, player: %Player{flags: 0x10}, internal: %Internal{}}
+      character = BoundaryResult.apply(character, %Commands.TotemStarted{slot: 2, guid: 20})
+      assert character.internal.totem_guids == %{}
+      assert [%Effects.DespawnEntity{target_guid: 20}] = character.internal.events
     end
   end
 end

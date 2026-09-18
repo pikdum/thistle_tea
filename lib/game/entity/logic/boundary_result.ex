@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Entity.Logic.BoundaryResult do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Movement
+  alias ThistleTea.Game.Entity.Logic.Totems
 
   def apply(%Character{} = character, %Commands.ChargePathResolved{} = command) do
     Movement.start_timed_path(character, command.path, command.duration_ms, command.started_at, run?: true)
@@ -32,8 +33,7 @@ defmodule ThistleTea.Game.Entity.Logic.BoundaryResult do
     |> Core.mark_broadcast_update()
   end
 
-  def apply(%Character{internal: %Internal{} = internal} = character, %Commands.TotemStarted{slot: slot, guid: guid}) do
-    totem_guids = Map.put(internal.totem_guids, slot, guid)
-    %{character | internal: %{internal | totem_guids: totem_guids}}
+  def apply(%Character{} = character, %Commands.TotemStarted{slot: slot, guid: guid}) do
+    Totems.started(character, slot, guid)
   end
 end

@@ -142,6 +142,22 @@ defmodule ThistleTea.Game.Entity.Logic.CoreTest do
   end
 
   describe "take_damage_with_absorb/4 pet dismissal" do
+    test "clears all player totem slots only on lethal damage" do
+      entity = player_with_pet(health: 30)
+      entity = %{entity | internal: %{entity.internal | totem_guids: %{1 => 101, 2 => 102}}}
+      {hurt, _} = Core.take_damage_with_absorb(entity, 10, 1_000, source: 777)
+      assert hurt.internal.totem_guids == %{1 => 101, 2 => 102}
+      refute Enum.any?(hurt.internal.events, &match?(%Effects.DespawnEntity{}, &1))
+
+      {dead, _} = Core.take_damage_with_absorb(hurt, 20, 2_000, source: 777)
+      assert dead.internal.totem_guids == %{}
+
+      assert dead.internal.events
+             |> Enum.filter(&match?(%Effects.DespawnEntity{}, &1))
+             |> Enum.map(& &1.target_guid)
+             |> Enum.sort() == [101, 102]
+    end
+
     test "queues a saved pet dismissal when a player dies with a pet out" do
       entity = player_with_pet(health: 30, summon: 123)
 

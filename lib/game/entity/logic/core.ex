@@ -31,6 +31,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
   alias ThistleTea.Game.Entity.Logic.Resources
   alias ThistleTea.Game.Entity.Logic.SelfResurrection
   alias ThistleTea.Game.Entity.Logic.Threat
+  alias ThistleTea.Game.Entity.Logic.Totems
   alias ThistleTea.Game.Math
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.Spell
@@ -372,6 +373,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
     |> Intoxication.clear()
     |> Effects.enqueue(Effects.movement_stopped())
     |> maybe_release_companion()
+    |> Totems.dismiss_all()
     |> Combat.sync_combat_flag()
   end
 

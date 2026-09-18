@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
   alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.Logic.Dueling
   alias ThistleTea.Game.Entity.Logic.PlayerCombat
+  alias ThistleTea.Game.Entity.Logic.Totems
   alias ThistleTea.Game.Entity.Server.Player.CompanionOwner
   alias ThistleTea.Game.Entity.Server.Player.ServerMovement
   alias ThistleTea.Game.Network
@@ -121,6 +122,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
 
   defp disengage(%__MODULE__{character: %Character{} = character} = state) do
     {character, effects} = PlayerCombat.disengage(character)
+    character = character |> Totems.dismiss_all() |> EventSink.emit_pending()
     %{state | character: EventSink.emit(character, effects)}
   end
 

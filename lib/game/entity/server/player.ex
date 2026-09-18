@@ -823,7 +823,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   end
 
   def handle_info(%Commands.TotemStarted{} = command, %{character: %Character{} = character} = state) do
-    character = BoundaryResult.apply(character, command)
+    character = character |> BoundaryResult.apply(command) |> EventSink.emit_pending()
     {:noreply, %{state | character: character}}
   end
 
