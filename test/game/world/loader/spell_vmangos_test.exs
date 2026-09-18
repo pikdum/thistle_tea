@@ -25,7 +25,6 @@ defmodule ThistleTea.Game.World.Loader.SpellVmangosTest do
 
       first = SpellLoader.load(30_003)
       assert first.proc_charges == 1
-      assert first.proc_rule.proc_ex == 0x800
       assert Enum.any?(first.effects, &(&1.aura == :reflect_spells and &1.base_points == 99))
       assert Enum.any?(SpellLoader.load(20_223).effects, &(&1.aura == :reflect_spells))
     end

@@ -13,6 +13,10 @@ defmodule ThistleTea.Game.World.Loader.SpellProcEventVmangosTest do
   end
 
   describe "get/1" do
+    test "loads the guaranteed first reflection restriction" do
+      assert %ProcRule{proc_ex: 0x800} = SpellProcEvent.get(30_003)
+    end
+
     test "loads Combustion's fire-only rule for the supported build" do
       assert %ProcRule{school_mask: 4} = SpellProcEvent.get(11_129)
     end
