@@ -87,6 +87,14 @@ defmodule ThistleTea.Game.Entity.Logic.CombatRatings do
   def parry_chance(class) when class in @parry_classes, do: @base_avoidance_chance
   def parry_chance(_class), do: 0.0
 
+  def block_chance(%{unit: %Unit{} = unit, player: %Player{}} = character) do
+    if block_chance(unit.equipment_bonuses || %{}) > 0 do
+      max(@base_avoidance_chance + Aura.flat_amount(character, :mod_block_percent), 0.0)
+    else
+      0.0
+    end
+  end
+
   def block_chance(%{} = equipment_bonuses) do
     if Map.get(equipment_bonuses, :shields, 0) > 0, do: @base_avoidance_chance, else: 0.0
   end
@@ -135,7 +143,7 @@ defmodule ThistleTea.Game.Entity.Logic.CombatRatings do
         ranged_crit_percentage: crit,
         dodge_percentage: dodge_chance(unit.class, level, agility),
         parry_percentage: if(Disarm.parry_disabled?(character), do: 0.0, else: parry_chance(unit.class)),
-        block_percentage: block_chance(unit.equipment_bonuses || %{})
+        block_percentage: block_chance(character)
     }
 
     %{character | player: player}

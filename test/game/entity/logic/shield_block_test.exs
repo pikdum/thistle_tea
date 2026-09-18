@@ -24,6 +24,25 @@ defmodule ThistleTea.Game.Entity.Logic.ShieldBlockTest do
 
   setup [:character]
 
+  describe "block_chance/1" do
+    test "projects aura bonuses and removes them with the shield", %{character: character} do
+      {buffed, _} = Aura.apply_spell(character, 1, 60, bonus_spell(2565, :mod_block_percent, 75), 0)
+      assert CombatRatings.block_chance(buffed) == 80.0
+      assert buffed.player.block_percentage == 80.0
+      {cancelled, _} = Aura.cancel_spell(buffed, 2565, 1_000)
+      assert cancelled.player.block_percentage == 5.0
+
+      unshielded = %{buffed | unit: %{buffed.unit | equipment_bonuses: %{}}} |> CombatRatings.sync()
+      assert unshielded.player.block_percentage == 0.0
+      assert CombatRatings.block_chance(unshielded) == 0.0
+
+      for level <- [50, 60], roll <- [1_200, 5_000] do
+        attack = %{caster_level: level, caster_player?: false, crit_chance: 0}
+        refute AttackTable.resolve(unshielded, attack, 100, roll: roll).outcome == :block
+      end
+    end
+  end
+
   describe "block_value/1" do
     test "multiplies shield, strength and flat bonuses together", %{character: character} do
       character = with_auras(character, [holder(:mod_shield_block_value, 30), holder(:mod_shield_block_value_pct, 30)])

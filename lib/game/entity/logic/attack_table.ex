@@ -153,8 +153,8 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
       defender_armor: unit.normal_resistance || 0,
       defender_dodge_bonus: Aura.flat_amount(defender, :mod_dodge),
       defender_parry_bonus: Aura.flat_amount(defender, :mod_parry_percent),
-      defender_block_bonus: Aura.flat_amount(defender, :mod_block_percent),
-      defender_bonuses: unit.equipment_bonuses || %{},
+      defender_block_chance: CombatRatings.block_chance(defender),
+      defender_has_shield?: CombatRatings.block_chance(unit.equipment_bonuses || %{}) > 0,
       defender_extra_flags: extra_flags(defender),
       hit_chance_bonus: hit_chance_bonus(attack) + attacker_hit_debuff(defender, attack),
       versus_damage_pct: versus_pct(attack, :damage_done_versus, defender),
@@ -320,9 +320,10 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
   defp block_bp(%{avoidance_disabled?: true}), do: 0
   defp block_bp(%{from_behind?: true}), do: 0
   defp block_bp(%{block_allowed?: false}), do: 0
+  defp block_bp(%{defender_player?: true, defender_has_shield?: false}), do: 0
 
   defp block_bp(%{defender_player?: true} = ctx) do
-    (CombatRatings.block_chance(ctx.defender_bonuses) + ctx.defender_block_bonus - ctx.skill_diff * 0.04)
+    (ctx.defender_block_chance - ctx.skill_diff * 0.04)
     |> max(0.0)
     |> bp()
   end
