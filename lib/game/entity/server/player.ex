@@ -38,6 +38,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.Entity.Logic.Dueling
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Experience
+  alias ThistleTea.Game.Entity.Logic.HealingReceived
   alias ThistleTea.Game.Entity.Logic.Hunter
   alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Entity.Logic.Loot.Release
@@ -257,7 +258,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   end
 
   def handle_cast({:receive_heal, amount}, %{character: %Character{} = character} = state) do
-    character = Core.heal(character, amount)
+    character = HealingReceived.heal(character, amount)
     {:noreply, %{state | character: character}, {:continue, :maybe_broadcast_update}}
   end
 

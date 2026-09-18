@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Druid
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Logic.HealingReceived
   alias ThistleTea.Game.Entity.Logic.Hunter
   alias ThistleTea.Game.Entity.Logic.Paladin
   alias ThistleTea.Game.Entity.Logic.Rogue
@@ -84,7 +85,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
         Aura.flat_modifier(state, :mod_healing, Spell.school_mask(spell)) +
         Paladin.blessing_of_light_bonus(state, spell)
 
-    healing = max(trunc(healing * healing_taken_multiplier(state, spell)), 0)
+    healing = HealingReceived.amount(state, healing)
     crit? = heal_crit?(context, spell)
     healing = if crit?, do: healing + div(healing, 2), else: healing
     events = Threat.heal_threat_events(state, context.caster_guid, healing)
@@ -94,7 +95,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
   end
 
   def apply(state, %CastContext{} = context, _spell, %Effect{type: :heal_max_health}, _now) do
-    healing = max(context.caster_max_health || state.unit.max_health || 0, 0)
+    healing = HealingReceived.amount(state, context.caster_max_health || state.unit.max_health || 0)
     events = Threat.heal_threat_events(state, context.caster_guid, healing)
     {Core.heal(state, healing), events}
   end
@@ -156,11 +157,6 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
   end
 
   defp heal_crit?(_context, _spell), do: false
-
-  defp healing_taken_multiplier(state, spell) do
-    percent = Aura.flat_modifier(state, :mod_healing_pct, Spell.school_mask(spell))
-    max(100 + percent, 0) / 100
-  end
 
   defp apply_damage_effect(state, %CastContext{} = context, spell, %Effect{} = effect, now, opts \\ [])
        when is_integer(now) do
