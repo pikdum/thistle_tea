@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
   alias ThistleTea.Game.Entity.Logic.DiminishingReturns
   alias ThistleTea.Game.Entity.Logic.EffectImmunity
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Logic.TargetSpellPower
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Coefficient
@@ -491,7 +492,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
     |> Spell.aura_effects()
     |> Enum.reject(&(EffectImmunity.blocked?(entity, spell, &1) or channel_ticked?(spell, &1)))
     |> Enum.reduce([], fn effect, acc ->
-      case build_aura(spell, effect, amount_override, context, now) do
+      case build_aura(entity, spell, effect, amount_override, context, now) do
         nil -> acc
         aura -> [aura | acc]
       end
@@ -505,15 +506,15 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
 
   defp channel_ticked?(_spell, _effect), do: false
 
-  defp build_aura(_spell, %Effect{aura: nil}, _amount_override, _context, _now), do: nil
+  defp build_aura(_entity, _spell, %Effect{aura: nil}, _amount_override, _context, _now), do: nil
 
-  defp build_aura(%Spell{} = spell, %Effect{} = effect, amount_override, %CastContext{} = context, now) do
+  defp build_aura(entity, %Spell{} = spell, %Effect{} = effect, amount_override, %CastContext{} = context, now) do
     amplitude_ms = effective_amplitude(effect)
 
     %Aura{
       index: effect.index,
       type: effect.aura,
-      amount: modified_aura_amount(spell, effect, amount_override, context),
+      amount: modified_aura_amount(entity, spell, effect, amount_override, context),
       misc_value: effect.misc_value,
       multiple_value: effect.multiple_value,
       class_mask: effect.class_mask,
@@ -541,10 +542,10 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
     if Scripts.finisher?(spell) and is_integer(points), do: max(points, 0), else: 0
   end
 
-  defp modified_aura_amount(%Spell{} = spell, %Effect{} = effect, amount_override, %CastContext{} = context) do
+  defp modified_aura_amount(entity, %Spell{} = spell, %Effect{} = effect, amount_override, %CastContext{} = context) do
     amount = aura_amount(spell, effect, amount_override, context)
     amount = modify_aura_base_amount(effect.aura, amount, context)
-    amount = amount + periodic_benefit(spell, effect, context)
+    amount = amount + periodic_benefit(entity, spell, effect, context)
 
     multiplier =
       case effect.aura do
@@ -579,23 +580,16 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
 
   defp modify_aura_base_amount(_aura, amount, _context), do: amount
 
-  defp periodic_benefit(%Spell{} = spell, %Effect{aura: aura} = effect, %CastContext{} = context)
+  defp periodic_benefit(entity, %Spell{} = spell, %Effect{aura: aura} = effect, %CastContext{} = context)
        when aura in [:periodic_damage, :periodic_leech] do
-    Coefficient.bonus(school_benefit(context, spell), spell, effect, :dot)
+    Coefficient.bonus(TargetSpellPower.benefit(entity, context, spell), spell, effect, :dot)
   end
 
-  defp periodic_benefit(%Spell{} = spell, %Effect{aura: :periodic_heal} = effect, %CastContext{} = context) do
+  defp periodic_benefit(_entity, %Spell{} = spell, %Effect{aura: :periodic_heal} = effect, %CastContext{} = context) do
     Coefficient.bonus(context.healing_bonus || 0, spell, effect, :dot)
   end
 
-  defp periodic_benefit(_spell, _effect, _context), do: 0
-
-  defp school_benefit(%CastContext{spell_damage_bonus: bonuses}, %Spell{school: school})
-       when is_map(bonuses) and is_atom(school) do
-    Map.get(bonuses, school, 0)
-  end
-
-  defp school_benefit(_context, _spell), do: 0
+  defp periodic_benefit(_entity, _spell, _effect, _context), do: 0
 
   defp effective_amplitude(%Effect{aura: :mod_power_regen_percent, amplitude_ms: amp}) do
     if is_integer(amp) and amp > 0, do: amp, else: @percent_regen_tick_ms

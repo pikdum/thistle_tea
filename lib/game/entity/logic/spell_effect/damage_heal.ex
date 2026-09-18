@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
   alias ThistleTea.Game.Entity.Logic.Rogue
   alias ThistleTea.Game.Entity.Logic.SpellResist
   alias ThistleTea.Game.Entity.Logic.TargetAttackPower
+  alias ThistleTea.Game.Entity.Logic.TargetSpellPower
   alias ThistleTea.Game.Entity.Logic.Threat
   alias ThistleTea.Game.Entity.Logic.Warlock
   alias ThistleTea.Game.Entity.Logic.Warrior
@@ -164,7 +165,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
   defp apply_damage_effect(state, %CastContext{} = context, spell, %Effect{} = effect, now, opts \\ [])
        when is_integer(now) do
     base = effect_amount(spell, effect, context)
-    rolled = base + damage_bonus(context, spell, effect, opts)
+    rolled = base + damage_bonus(state, context, spell, effect, opts)
 
     apply_damage_amount(state, context, spell, rolled, now, Keyword.put(opts, :damage_effect, effect))
   end
@@ -294,12 +295,11 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
     )
   end
 
-  defp damage_bonus(%CastContext{} = context, %Spell{} = spell, %Effect{} = effect, opts) do
+  defp damage_bonus(state, %CastContext{} = context, %Spell{} = spell, %Effect{} = effect, opts) do
     if Keyword.get(opts, :periodic?, false) do
       0
     else
-      school_bonus = Map.get(context.spell_damage_bonus, school_atom(spell), 0)
-      Coefficient.bonus(school_bonus, spell, effect, :direct)
+      Coefficient.bonus(TargetSpellPower.benefit(state, context, spell), spell, effect, :direct)
     end
   end
 

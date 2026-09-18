@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Entity.Logic.EquipmentStatsTest do
   alias ThistleTea.Game.Entity.Data.ItemTemplate
   alias ThistleTea.Game.Entity.Logic.EquipmentStats
   alias ThistleTea.Game.Entity.Logic.Inventory
+  alias ThistleTea.Game.Entity.Logic.TargetSpellPower
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Effect
 
@@ -63,6 +64,19 @@ defmodule ThistleTea.Game.Entity.Logic.EquipmentStatsTest do
   end
 
   describe "bonuses/1" do
+    test "collects conditional spell power from equip triggers only" do
+      spell = %Spell{
+        effects: [%Effect{type: :apply_aura, aura: :mod_flat_spell_damage_versus, base_points: 48, misc_value: 32}]
+      }
+
+      equipped = %ItemTemplate{entry: 19_812, spellid_1: 24_198, spelltrigger_1: 1}
+      usable = %{equipped | spelltrigger_1: 0}
+      bonuses = EquipmentStats.bonuses([equipped, equipped, usable], fn 24_198 -> spell end)
+      assert bonuses.spell_damage_versus == [{32, 48}, {32, 48}]
+      assert bonuses.spell_shadow == 0
+      assert bonuses.healing == 0
+    end
+
     test "collects shield block chance from equip spells" do
       trinket = %ItemTemplate{entry: 23_040, spellid_1: 21_475, spelltrigger_1: 1}
       spell = %Spell{effects: [%Effect{type: :apply_aura, aura: :mod_block_percent, base_points: 3}]}
@@ -100,6 +114,25 @@ defmodule ThistleTea.Game.Entity.Logic.EquipmentStatsTest do
   end
 
   describe "resync/2" do
+    test "equipping and removing conditional spell power preserves displayed school damage", %{character: character} do
+      spell = %Spell{
+        effects: [%Effect{type: :apply_aura, aura: :mod_flat_spell_damage_versus, base_points: 48, misc_value: 32}]
+      }
+
+      item =
+        Item.build(%ItemTemplate{entry: 19_812, inventory_type: 12, spellid_1: 24_198, spelltrigger_1: 1}, 100,
+          owner: 1
+        )
+
+      player = Inventory.equip(character.player, :trinket1, item)
+      equipped = EquipmentStats.resync(%{character | player: player}, get_item_fn([item]), fn 24_198 -> spell end)
+      assert TargetSpellPower.snapshot(equipped) == [{32, 48}]
+      assert equipped.player.mod_damage_done_pos_shadow == 0
+      removed = EquipmentStats.resync(%{equipped | player: %{equipped.player | trinket1: nil}}, get_item_fn([item]))
+      assert TargetSpellPower.snapshot(removed) == []
+      assert removed.player.mod_damage_done_pos_shadow == 0
+    end
+
     test "applies bonuses from equipped items", %{character: character, chest: chest} do
       player = Inventory.equip(character.player, :chest, chest)
       character = EquipmentStats.resync(%{character | player: player}, get_item_fn([chest]))

@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
   alias ThistleTea.Game.Entity.Logic.Mage
   alias ThistleTea.Game.Entity.Logic.Skills
   alias ThistleTea.Game.Entity.Logic.TargetAttackPower
+  alias ThistleTea.Game.Entity.Logic.TargetSpellPower
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Critical
   alias ThistleTea.Game.Spell.Modifiers
@@ -72,6 +73,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
     target_attack_power: %{},
     crit_damage_versus: [],
     spell_damage_bonus: %{},
+    spell_damage_versus: [],
     healing_bonus: 0,
     spell_penetration: 0,
     threat_multiplier: 1.0,
@@ -94,6 +96,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
       target_guid: target_guid,
       spell: spell,
       spell_damage_bonus: spell_damage_bonus(caster),
+      spell_damage_versus: TargetSpellPower.snapshot(caster),
       healing_bonus: healing_bonus(caster),
       spell_penetration: Aura.flat_amount(caster, :mod_target_resistance),
       spell_threat: SpellThreatLoader.get(spell_id(spell)),

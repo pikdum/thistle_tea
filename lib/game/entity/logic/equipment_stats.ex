@@ -40,7 +40,7 @@ defmodule ThistleTea.Game.Entity.Logic.EquipmentStats do
                 :shield_block
               ] ++ @spell_damage_keys
 
-  @zero Map.new(@bonus_keys, fn key -> {key, 0} end)
+  @zero @bonus_keys |> Map.new(fn key -> {key, 0} end) |> Map.put(:spell_damage_versus, [])
 
   @spelltrigger_on_equip 1
 
@@ -111,6 +111,10 @@ defmodule ThistleTea.Game.Entity.Logic.EquipmentStats do
 
       %Effect{type: :apply_aura, aura: :mod_healing_done} = effect, acc ->
         add(acc, :healing, Effect.damage_roll(effect))
+
+      %Effect{type: :apply_aura, aura: :mod_flat_spell_damage_versus, misc_value: mask} = effect, acc
+      when is_integer(mask) ->
+        Map.update!(acc, :spell_damage_versus, &[{mask, Effect.damage_roll(effect)} | &1])
 
       %Effect{type: :apply_aura, aura: :mod_attack_power} = effect, acc ->
         add(acc, :attack_power, Effect.damage_roll(effect))
