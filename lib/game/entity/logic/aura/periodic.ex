@@ -26,6 +26,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
   alias ThistleTea.Game.Spell.CastContext
 
   @harmful_periodics [:periodic_damage, :periodic_leech, :periodic_mana_leech, :periodic_power_burn]
+  @resource_periodics @harmful_periodics ++ [:periodic_heal, :obs_mod_health, :obs_mod_mana, :periodic_energize]
 
   def tick(%{unit: %Unit{auras: holders}} = entity, now) when is_list(holders) and holders != [] do
     entity
@@ -49,10 +50,11 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
   defp tick_periodics(%{unit: %Unit{auras: holders}} = entity, now) do
     result =
       Enum.reduce_while(holders, {entity, [], []}, fn holder, {ent, acc, events} ->
+        was_dead? = Core.dead?(ent)
         {ent, new_holder, holder_events} = tick_holder(ent, holder, now)
         events = events ++ holder_events
 
-        if Core.dead?(ent) do
+        if Core.dead?(ent) and not was_dead? do
           {:halt, {ent, :died, events}}
         else
           {:cont, {ent, [new_holder | acc], events}}
@@ -128,6 +130,16 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
   end
 
   defp tick_area_refresh(_entity, holder, _now), do: {holder, []}
+
+  defp tick_checked_aura(
+         %{unit: %Unit{health: health}} = entity,
+         _holder,
+         %Aura{type: type, next_tick_at: at} = aura,
+         now
+       )
+       when type in @resource_periodics and is_number(health) and health <= 0 and is_integer(at) and now >= at do
+    {entity, %{aura | next_tick_at: advance_tick(at, aura.amplitude_ms, now)}, []}
+  end
 
   defp tick_checked_aura(entity, %Holder{} = holder, %Aura{type: type, next_tick_at: at} = aura, now)
        when type in @harmful_periodics and is_integer(at) and now >= at do

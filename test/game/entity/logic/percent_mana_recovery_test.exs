@@ -93,14 +93,15 @@ defmodule ThistleTea.Game.Entity.Logic.PercentManaRecoveryTest do
       end
     end
 
-    test "ignores units without mana and death-persistent auras on corpses", %{entity: entity} do
-      spell = %{recovery() | attributes: MapSet.new([:death_persistent])}
+    test "ignores units without mana and passive auras on corpses", %{entity: entity} do
+      spell = %{recovery() | attributes: MapSet.new([:passive])}
 
       for unit <- [%{entity.unit | max_power1: 0}, %{entity.unit | health: 0}] do
         {entity, _events} = Aura.apply_spell(%{entity | unit: unit}, 2, 60, spell, 0)
         {entity, events} = Aura.tick(entity, 1_000)
         assert entity.unit.power1 == 100
         refute Enum.any?(events, &match?(%Effects.PeriodicAuraLog{}, &1))
+        assert Aura.next_event_at(entity) == 2_000
       end
     end
 
