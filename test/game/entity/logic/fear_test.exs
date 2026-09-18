@@ -25,6 +25,7 @@ defmodule ThistleTea.Game.Entity.Logic.FearTest do
   alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.Entity.Server.NavigationResolver
   alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.Cast
   alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.WorldRef
 
@@ -127,6 +128,47 @@ defmodule ThistleTea.Game.Entity.Logic.FearTest do
   end
 
   describe "reconcile/4" do
+    test "recklessness suspends fear without removing it and removal resumes it", %{mob: mob} do
+      mob = mob |> apply_fear() |> moving()
+      {mob, events} = Aura.apply_spell(mob, 3, 50, control_spell(2, :prevent_fleeing), 500)
+      assert Enum.any?(events, &is_struct(&1, Effects.MovementStopped))
+      assert Aura.has_aura?(mob, :mod_fear)
+      refute Fear.active?(mob)
+      refute Aura.crowd_controlled?(mob)
+      assert mob.internal.blackboard.fear == nil
+      assert Bitwise.band(mob.unit.flags, 0x00800000) == 0
+      assert {:failure, _mob} = BT.tick(tree(), mob, context(500))
+
+      {mob, _events} = Aura.remove_spells(mob, [2], 600)
+      assert Fear.active?(mob)
+      assert Aura.crowd_controlled?(mob)
+      assert Fear.ready?(mob, 600)
+      assert {{:running, 0, :navigation}, _mob} = BT.tick(tree(), mob, context(600))
+    end
+
+    test "fear applied under recklessness leaves casting intact until suppression ends", %{mob: mob} do
+      {mob, _events} = Aura.apply_spell(mob, 3, 50, control_spell(2, :prevent_fleeing), 0)
+      casting = %Cast{spell: %Spell{id: 3}}
+      mob = %{mob | internal: %{mob.internal | casting: casting}}
+      mob = apply_fear(mob)
+      assert mob.internal.casting == casting
+      refute Fear.active?(mob)
+
+      {mob, _events} = Aura.remove_spells(mob, [2], 600)
+      assert mob.internal.casting == nil
+      assert Fear.active?(mob)
+    end
+
+    test "confusion takes over a fear run and removing it restores fear", %{mob: mob} do
+      mob = mob |> apply_fear() |> moving()
+      {mob, events} = Aura.apply_spell(mob, 3, 50, control_spell(2, :mod_confuse), 500)
+      assert Enum.any?(events, &is_struct(&1, Effects.MovementStopped))
+      assert mob.internal.blackboard.fear == nil
+      refute Movement.moving?(mob, 500)
+      {mob, _events} = Aura.remove_spells(mob, [2], 600)
+      assert Fear.ready?(mob, 600)
+    end
+
     test "application stops old movement and preserves combat and patrol state", %{mob: mob} do
       mob = Movement.move_along_path(mob, [{7.0, 0.0, 0.0}], [], 0)
       {mob, events} = Aura.apply_spell(mob, 2, 50, control_spell(1, :mod_fear), 500)

@@ -52,12 +52,12 @@ defmodule ThistleTea.Game.Entity.Logic.Fear do
     flags = if active?, do: flags ||| @fleeing_flag, else: flags
     mob = %{mob | unit: %{mob.unit | flags: flags}}
 
-    if key(previous) == key(current) do
+    if movement_key(previous) == movement_key(current) do
       {mob, []}
     else
       blackboard = Blackboard.ensure(mob.internal.blackboard)
       running = if blackboard.fear, do: blackboard.fear.previous_running, else: mob.internal.running
-      memory = if active?, do: %FearMemory{next_move_at: now, previous_running: running}
+      memory = if movement_key(current), do: %FearMemory{next_move_at: now, previous_running: running}
       blackboard = %{Blackboard.clear_move_target(blackboard) | fear: memory}
       {mob, events} = Movement.stop_with_effects(mob, now)
       internal = %{mob.internal | blackboard: blackboard, running: running, navigation_intents: []}
@@ -91,7 +91,15 @@ defmodule ThistleTea.Game.Entity.Logic.Fear do
     end
   end
 
-  defp holder(holders), do: Enum.find(holders, &Holder.has_aura_type?(&1, :mod_fear))
+  defp holder(holders) do
+    if !Enum.any?(holders, &Holder.has_aura_type?(&1, :prevent_fleeing)) do
+      Enum.find(holders, &Holder.has_aura_type?(&1, :mod_fear))
+    end
+  end
+
+  defp movement_key(holders) do
+    if !Enum.any?(holders, &Holder.has_aura_type?(&1, :mod_confuse)), do: key(holders)
+  end
 
   defp key(holders) do
     case holder(holders) do

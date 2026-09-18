@@ -138,6 +138,11 @@ defmodule ThistleTea.Game.Spell.CastValidationTest do
                CastValidation.validate(confused, harmful_spell(), Target.unit(7), hostile_target(), @now)
     end
 
+    test "fear suppressed by recklessness permits casting" do
+      suppressed = caster(auras: [control_holder(:mod_fear), control_holder(:prevent_fleeing)])
+      assert :ok = CastValidation.validate(suppressed, harmful_spell(), Target.unit(7), hostile_target(), @now)
+    end
+
     test "silence blocks magic but not physical abilities" do
       silenced = caster(auras: [control_holder(:mod_silence)])
 

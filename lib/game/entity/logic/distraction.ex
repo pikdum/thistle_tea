@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Entity.Logic.Distraction do
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Logic.Fear
   alias ThistleTea.Game.Entity.Logic.Movement
 
   def apply(entity, {x, y, _z}, duration_ms, now) when duration_ms > 0 do
@@ -53,7 +54,7 @@ defmodule ThistleTea.Game.Entity.Logic.Distraction do
   defp pause(entity, _duration_ms, _now), do: entity
 
   defp responsive?(entity) do
-    not Core.dead?(entity) and entity.internal.in_combat != true and
-      not Enum.any?([:mod_stun, :mod_confuse, :mod_fear, :feign_death], &Aura.has_aura?(entity, &1))
+    not Core.dead?(entity) and entity.internal.in_combat != true and not Fear.active?(entity) and
+      not Enum.any?([:mod_stun, :mod_confuse, :feign_death], &Aura.has_aura?(entity, &1))
   end
 end

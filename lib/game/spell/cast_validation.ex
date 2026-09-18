@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.Spell.CastValidation do
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Disarm
   alias ThistleTea.Game.Entity.Logic.EffectImmunity
+  alias ThistleTea.Game.Entity.Logic.Fear
   alias ThistleTea.Game.Entity.Logic.Hunter
   alias ThistleTea.Game.Entity.Logic.Mount
   alias ThistleTea.Game.Entity.Logic.Paladin
@@ -296,7 +297,7 @@ defmodule ThistleTea.Game.Spell.CastValidation do
           not control_purged?(spell, immune, :mod_confuse, @confuse_mechanics) ->
         {:error, :confused}
 
-      AuraLogic.has_aura?(caster, :mod_fear) and not control_purged?(spell, immune, :mod_fear, [@mechanic_fear]) ->
+      Fear.active?(caster) and not control_purged?(spell, immune, :mod_fear, [@mechanic_fear]) ->
         {:error, :fleeing}
 
       true ->

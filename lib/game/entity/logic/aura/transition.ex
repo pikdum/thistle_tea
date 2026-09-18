@@ -44,7 +44,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Transition do
   @furor_energize 17_099
   @furor_rage 17_057
 
-  @cast_breaking_controls [:mod_stun, :mod_fear, :mod_confuse]
+  @cast_breaking_controls [:mod_stun, :mod_confuse]
   @tactical_mastery_scripts 831..835
 
   def run(%{unit: %Unit{} = unit} = entity, %Change{holders: desired, cause: cause, now: now})
@@ -80,6 +80,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Transition do
     {entity, control_events} = ControlSync.sync(entity, now)
     {entity, movement_events} = MovementSync.sync_movement_state(entity, now)
     {entity, fear_events} = Fear.reconcile(entity, previous, holders, now)
+    entity = maybe_interrupt_fear_casting(entity)
     viewpoint_events = ViewpointSync.events(previous, holders, entity_guid(entity))
     release_events = release_controlled_events(entity, removed)
     forced_reaction_events = forced_reaction_events(entity, previous, holders)
@@ -357,6 +358,12 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Transition do
   end
 
   defp maybe_interrupt_casting(entity, _holder), do: entity
+
+  defp maybe_interrupt_fear_casting(%{internal: %{casting: casting}} = entity) when not is_nil(casting) do
+    if Fear.active?(entity), do: clear_casting(entity), else: entity
+  end
+
+  defp maybe_interrupt_fear_casting(entity), do: entity
 
   defp silenceable_cast?(%{spell: %Spell{prevention_type: 1}}), do: true
   defp silenceable_cast?(_casting), do: false

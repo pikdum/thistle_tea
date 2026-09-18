@@ -19,10 +19,11 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
   alias ThistleTea.Game.Entity.Logic.Aura.Transition
   alias ThistleTea.Game.Entity.Logic.Aura.UnitSync
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Logic.Fear
   alias ThistleTea.Game.Spell
 
   @frozen_aura_types [:mod_root, :mod_stun]
-  @crowd_control_aura_types [:mod_charm, :mod_stun, :mod_fear, :mod_confuse]
+  @crowd_control_aura_types [:mod_charm, :mod_stun, :mod_confuse]
 
   defdelegate apply_spell(entity, context, spell, now), to: AuraApplication
   defdelegate apply_spell(entity, caster_guid, caster_level, spell, now), to: AuraApplication
@@ -219,7 +220,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
   def spell_stacks(_entity), do: %{}
 
   def crowd_controlled?(%{unit: %Unit{auras: holders}} = entity) when is_list(holders) do
-    frozen?(entity) or Enum.any?(holders, &Holder.has_any_type?(&1, @crowd_control_aura_types))
+    frozen?(entity) or Fear.active?(entity) or Enum.any?(holders, &Holder.has_any_type?(&1, @crowd_control_aura_types))
   end
 
   def crowd_controlled?(_entity), do: false
