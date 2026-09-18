@@ -110,6 +110,25 @@ defmodule ThistleTea.Game.Entity.Logic.FearTest do
       assert mob.internal.navigation_intents == []
     end
 
+    test "caps the traversed path when navigation returns a distant point", %{mob: mob} do
+      mob = apply_fear(mob)
+      {_, mob} = BT.tick(tree(), mob, context(0, {50.0, 50.0, 0.0}))
+
+      mob =
+        NavigationResolver.resolve(mob, 0, fn _map, _from, _to, _opts ->
+          [{10.0, 0.0, 0.0}, {10.0, 10.0, 0.0}, {50.0, 50.0, 0.0}]
+        end)
+
+      [first, second, {x, y, z}] = mob.movement_block.spline_nodes
+      assert first == {10.0, 0.0, 0.0}
+      assert second == {10.0, 10.0, 0.0}
+      assert_in_delta x, 10.0 + 10.0 / :math.sqrt(2), 0.0001
+      assert_in_delta y, x, 0.0001
+      assert z == 0.0
+      assert_in_delta mob.movement_block.duration, 30.0 / 7.0 * 1_000, 1.0
+      assert [%Effects.MonsterMove{move_opts: []}] = mob.internal.events
+    end
+
     test "roots and stuns halt runs and fear resumes after removal", %{mob: mob} do
       for type <- [:mod_root, :mod_stun] do
         mob = mob |> apply_fear() |> moving()

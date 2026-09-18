@@ -50,7 +50,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Fear do
 
   defp move(mob, %Blackboard{fear: memory} = blackboard, %Context{navigation: %{fear_point: destination}} = context) do
     mob = %{mob | internal: %{mob.internal | running: true}}
-    mob = Navigation.move_to(mob, destination, [allow_steep: false], context)
+    mob = Navigation.move_to(mob, destination, [allow_steep: false, max_distance: 30.0], context)
     blackboard = %{blackboard | fear: %{memory | moving?: true}}
     {BT.running(0, :navigation), mob, blackboard}
   end

@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.Entity.Server.NavigationResolver do
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Logic.AI.NavigationIntent
   alias ThistleTea.Game.Entity.Logic.Movement
+  alias ThistleTea.Game.Math
   alias ThistleTea.Game.World.Pathfinding
 
   def resolve(entity, now, find_path \\ &Pathfinding.find_path/4)
@@ -29,10 +30,27 @@ defmodule ThistleTea.Game.Entity.Server.NavigationResolver do
     {start_x, start_y, start_z, _orientation} = entity.movement_block.position
 
     {allow_steep, opts} = Keyword.pop(opts, :allow_steep, true)
+    {max_distance, opts} = Keyword.pop(opts, :max_distance)
+    start = {start_x, start_y, start_z}
 
-    case find_path.(world.map_id, {start_x, start_y, start_z}, destination, allow_steep: allow_steep) do
-      path when is_list(path) -> Movement.move_along_path(entity, path, opts, now)
+    case find_path.(world.map_id, start, destination, allow_steep: allow_steep) do
+      path when is_list(path) -> Movement.move_along_path(entity, limit_path(path, start, max_distance), opts, now)
       _no_path -> entity
+    end
+  end
+
+  defp limit_path(path, _start, nil), do: path
+  defp limit_path([], _start, _remaining), do: []
+  defp limit_path(_path, _start, remaining) when remaining <= 0, do: []
+
+  defp limit_path([{x, y, z} = point | rest], {sx, sy, sz} = start, remaining) do
+    distance = Math.distance(start, point)
+
+    if distance <= remaining do
+      [point | limit_path(rest, point, remaining - distance)]
+    else
+      fraction = remaining / distance
+      [{sx + (x - sx) * fraction, sy + (y - sy) * fraction, sz + (z - sz) * fraction}]
     end
   end
 end
