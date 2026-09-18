@@ -72,8 +72,12 @@ static bool ok(PathfindResultType result) {
   return result == static_cast<PathfindResultType>(Result::SUCCESS);
 }
 
-static bool buffer_too_small(PathfindResultType result) {
-  return result == static_cast<PathfindResultType>(Result::BUFFER_TOO_SMALL);
+static dtNavMeshQuery &query_for(const pathfind::Map &map) {
+  thread_local dtNavMeshQuery query;
+  if (dtStatusFailed(query.init(&map.GetNavMesh(), pathfind::Map::MaxQueryNodes))) {
+    throw std::runtime_error("Could not initialize private query state");
+  }
+  return query;
 }
 
 static float f(double value) { return static_cast<float>(value); }
@@ -127,7 +131,7 @@ FINE_NIF(load_map_native, ERL_NIF_DIRTY_JOB_CPU_BOUND);
 std::optional<ZoneAndArea> get_zone_and_area_native(ErlNifEnv *,
                                                     MapResource map, double x,
                                                     double y, double z) {
-  auto lock = map->acquire();
+  auto lock = map->acquire_shared();
   unsigned int zone = 0;
   unsigned int area = 0;
   auto result =
@@ -144,18 +148,18 @@ FINE_NIF(get_zone_and_area_native, ERL_NIF_DIRTY_JOB_CPU_BOUND);
 std::optional<Point3>
 find_random_point_around_circle_native(ErlNifEnv *, MapResource map, double x,
                                        double y, double z, double radius) {
-  auto lock = map->acquire();
-  float random_x = 0.0f;
-  float random_y = 0.0f;
-  float random_z = 0.0f;
-  auto result = pathfind_find_random_point_around_circle(
-      map->get(), f(x), f(y), f(z), f(radius), &random_x, &random_y, &random_z);
-
-  if (!ok(result)) {
+  auto lock = map->acquire_shared();
+  math::Vertex point;
+  try {
+    if (!map->get()->FindRandomPointAroundCircle(
+            {f(x), f(y), f(z)}, f(radius), point, query_for(*map->get()))) {
+      return std::nullopt;
+    }
+  } catch (...) {
     return std::nullopt;
   }
 
-  return Point3(random_x, random_y, random_z);
+  return Point3(point.X, point.Y, point.Z);
 }
 FINE_NIF(find_random_point_around_circle_native, ERL_NIF_DIRTY_JOB_CPU_BOUND);
 
@@ -210,31 +214,26 @@ std::optional<std::vector<Point3>>
 find_path_native(ErlNifEnv *, MapResource map, double start_x, double start_y,
                  double start_z, double stop_x, double stop_y, double stop_z,
                  bool allow_steep) {
-  auto lock = map->acquire();
-  unsigned int amount = 0;
-  const uint8_t steep = allow_steep ? 1 : 0;
-  std::vector<Vertex> buffer(256);
-  auto result = pathfind_find_path(map->get(), f(start_x), f(start_y),
-                                   f(start_z), f(stop_x), f(stop_y), f(stop_z),
-                                   steep, buffer.data(), buffer.size(),
-                                   &amount);
-
-  if (buffer_too_small(result) && amount > buffer.size()) {
-    buffer.resize(amount);
-    result = pathfind_find_path(map->get(), f(start_x), f(start_y), f(start_z),
-                                f(stop_x), f(stop_y), f(stop_z), steep,
-                                buffer.data(), buffer.size(), &amount);
-  }
-
-  if (!ok(result)) {
-    return std::nullopt;
+  std::vector<math::Vertex> vertices;
+  {
+    auto lock = map->acquire_shared();
+    try {
+      if (!map->get()->FindPath(
+              {f(start_x), f(start_y), f(start_z)},
+              {f(stop_x), f(stop_y), f(stop_z)}, vertices,
+              query_for(*map->get()), false, allow_steep)) {
+        return std::nullopt;
+      }
+    } catch (...) {
+      return std::nullopt;
+    }
   }
 
   std::vector<Point3> path;
-  path.reserve(amount);
+  path.reserve(vertices.size());
 
-  for (unsigned int i = 0; i < amount; ++i) {
-    path.emplace_back(buffer[i].x, buffer[i].y, buffer[i].z);
+  for (const auto &point : vertices) {
+    path.emplace_back(point.X, point.Y, point.Z);
   }
 
   return path;
@@ -246,7 +245,7 @@ find_point_between_points_native(ErlNifEnv *, MapResource map, double start_x,
                                  double start_y, double start_z, double stop_x,
                                  double stop_y, double stop_z,
                                  double distance) {
-  auto lock = map->acquire();
+  auto lock = map->acquire_shared();
   Vertex point{};
   auto result = pathfind_find_point_in_between_vectors(
       map->get(), f(distance), f(start_x), f(start_y), f(start_z), f(stop_x),
@@ -262,7 +261,7 @@ FINE_NIF(find_point_between_points_native, ERL_NIF_DIRTY_JOB_CPU_BOUND);
 
 std::optional<std::vector<double>>
 find_heights_native(ErlNifEnv *, MapResource map, double x, double y) {
-  auto lock = map->acquire();
+  auto lock = map->acquire_shared();
   unsigned int amount = 0;
   std::vector<float> buffer(4096);
   auto result = pathfind_find_heights(map->get(), f(x), f(y), buffer.data(),
@@ -286,7 +285,7 @@ FINE_NIF(find_heights_native, ERL_NIF_DIRTY_JOB_CPU_BOUND);
 std::optional<double>
 query_liquid_surface_native(ErlNifEnv *, MapResource map, double x, double y,
                             double z) {
-  auto lock = map->acquire();
+  auto lock = map->acquire_shared();
   uint8_t has_liquid = 0;
   float surface_z = 0.0f;
   auto result = pathfind_query_liquid(map->get(), f(x), f(y), f(z),
