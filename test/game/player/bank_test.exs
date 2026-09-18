@@ -136,6 +136,23 @@ defmodule ThistleTea.Game.Player.BankTest do
   end
 
   describe "generic inventory authorization" do
+    test "decodes bag auto-storage and rejects remote bank access", %{state: state, banker_guid: banker_guid} do
+      message = Message.CmsgAutostoreBagItem.from_binary(<<255, 39, 255>>)
+      assert message == %Message.CmsgAutostoreBagItem{source_bag: 255, source_slot: 39, destination_bag: 255}
+      item = ItemStore.create(%ItemTemplate{entry: 20_000}, owner: state.guid)
+      state = put_in(state.character.player.bank1, item.object.guid)
+      rejected = Message.CmsgAutostoreBagItem.handle(message, state)
+      assert rejected.character.player.bank1 == item.object.guid
+      assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgInventoryChangeFailure{code: 35}}}
+      rejected = PlayerInventory.auto_store_in_bag(state, {255, 23}, 63)
+      assert rejected.character.player.bank1 == item.object.guid
+      assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgInventoryChangeFailure{code: 35}}}
+      accepted = Message.CmsgAutostoreBagItem.handle(message, Bank.activate(state, banker_guid))
+      assert accepted.character.player.bank1 == 0
+      assert accepted.character.player.inv1 == item.object.guid
+      assert CharacterStore.get(state.character.id).player.inv1 == item.object.guid
+    end
+
     test "rejects remote bank swaps and allows them through a valid session", %{banker_guid: banker_guid, state: state} do
       item = ItemStore.create(%ItemTemplate{entry: 20_000}, owner: state.guid)
       state = put_in(state.character.player.inv1, item.object.guid)

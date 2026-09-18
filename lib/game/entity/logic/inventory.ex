@@ -369,9 +369,18 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
   end
 
   def auto_store(%Player{} = player, owner_guid, src_pos, scope, get_item) when scope in [:carried, :bank] do
+    auto_store_item(player, owner_guid, src_pos, scope, get_item)
+  end
+
+  def auto_store_in_bag(%Player{} = player, owner_guid, src_pos, bag, get_item) do
+    auto_store_item(player, owner_guid, src_pos, {:bag, bag}, get_item)
+  end
+
+  defp auto_store_item(player, owner_guid, src_pos, scope, get_item) do
     ctx = ctx(player, nil, nil, owner_guid, get_item)
 
     with {:ok, item} <- fetch_item(ctx, src_pos),
+         :ok <- validate_storage_scope(ctx, scope),
          :ok <- validate_auto_store_source(ctx, item, src_pos, scope) do
       ctx = put_pos(ctx, src_pos, nil)
       {ctx, remaining} = merge_into_stacks(ctx, item, scope)
@@ -619,6 +628,15 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
     specialized = eligible_container_positions(ctx, purchased_bank_bag_slots(ctx.player), template, :specialized)
     all_bags = eligible_container_positions(ctx, purchased_bank_bag_slots(ctx.player), template, :all)
     base ++ specialized ++ (all_bags -- specialized)
+  end
+
+  defp stack_positions(ctx, {:bag, bag}, item_or_template) do
+    positions =
+      if bag == @bag_0,
+        do: Enum.map(@backpack_slot_start..(@carried_slot_count - 1), &{@bag_0, &1}),
+        else: container_positions(ctx, [bag])
+
+    Enum.filter(positions, &accepts_item?(ctx, &1, item_or_template))
   end
 
   defp carried_storage_positions(ctx) do
@@ -908,6 +926,12 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
     |> Enum.find(fn position -> guid_at(ctx, position) == nil end)
   end
 
+  defp free_position(ctx, {:bag, _bag} = scope, item_or_template) do
+    ctx
+    |> stack_positions(scope, item_or_template)
+    |> Enum.find(fn position -> guid_at(ctx, position) == nil end)
+  end
+
   defp validate_destructible(ctx, %Item{} = item) do
     cond do
       (Item.template(item).flags &&& @item_flag_indestructible) != 0 -> {:error, :cant_drop_soulbound}
@@ -1034,6 +1058,7 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
 
   defp storage_full_error(:carried), do: :inventory_full
   defp storage_full_error(:bank), do: :bank_full
+  defp storage_full_error({:bag, _bag}), do: :inventory_full
 
   defp item_template(%Item{} = item), do: Item.template(item)
   defp item_template(%ItemTemplate{} = template), do: template
@@ -1070,6 +1095,15 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
       scope == :carried and carried_position?(src_pos) -> {:error, :item_doesnt_go_to_slot}
       Item.container?(item) and not bag_empty?(ctx, item) -> {:error, :can_only_do_with_empty_bags}
       true -> :ok
+    end
+  end
+
+  defp validate_storage_scope(_ctx, scope) when scope in [:carried, :bank, {:bag, @bag_0}], do: :ok
+
+  defp validate_storage_scope(ctx, {:bag, bag}) do
+    case valid_destination(ctx, {bag, 0}) do
+      {:ok, _position} -> :ok
+      {:error, error} -> {:error, error}
     end
   end
 end

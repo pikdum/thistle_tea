@@ -16,6 +16,23 @@ defmodule ThistleTea.Game.Player.Inventory do
   alias ThistleTea.Game.Player.Reputation
   alias ThistleTea.Game.World.ItemStore
 
+  def auto_store_in_bag(%State{} = state, source_position, destination_bag) do
+    case Bank.authorize_positions(state, [source_position, {destination_bag, 0}]) do
+      {:ok, state} ->
+        Inventory.auto_store_in_bag(
+          state.character.player,
+          state.guid,
+          source_position,
+          destination_bag,
+          &ItemStore.get/1
+        )
+        |> then(&InventoryUpdate.apply(state, &1))
+
+      {:error, state} ->
+        reject_remote_bank(state)
+    end
+  end
+
   def auto_equip(%{character: character} = state, source_position) do
     case Bank.authorize_positions(state, [source_position]) do
       {:ok, state} ->

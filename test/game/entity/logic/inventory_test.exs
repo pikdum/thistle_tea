@@ -94,6 +94,119 @@ defmodule ThistleTea.Game.Entity.Logic.InventoryTest do
     end
   end
 
+  describe "auto_store_in_bag/5" do
+    test "unequips into the backpack", %{sword: sword} do
+      player = %Player{mainhand: sword.object.guid}
+
+      assert {:ok, result} =
+               Inventory.auto_store_in_bag(player, @owner, {@bag_0, @mainhand_slot}, @bag_0, get_item_fn([sword]))
+
+      assert result.player.mainhand == 0
+      assert result.player.inv1 == sword.object.guid
+    end
+
+    test "uses only the requested bag", %{sword: sword, bag: bag} do
+      player = %Player{mainhand: sword.object.guid, bag1: bag.object.guid}
+
+      assert {:ok, result} =
+               Inventory.auto_store_in_bag(
+                 player,
+                 @owner,
+                 {@bag_0, @mainhand_slot},
+                 @first_bag_slot,
+                 get_item_fn([sword, bag])
+               )
+
+      assert result.player.mainhand == 0
+      assert result.player.inv1 in [nil, 0]
+      assert updated(result.items, bag).container.slot_1 == sword.object.guid
+    end
+
+    test "merges stacks and preserves the remainder in the requested bag", %{bag: bag} do
+      template = %ItemTemplate{entry: 750, stackable: 10}
+      source = build_item(30, template, stack_count: 7)
+      destination = build_item(31, template, stack_count: 8)
+      bag = %{bag | container: %{bag.container | slot_1: destination.object.guid}}
+      player = %Player{inv1: source.object.guid, bag1: bag.object.guid}
+      get_item = get_item_fn([source, destination, bag])
+
+      assert {:ok, result} =
+               Inventory.auto_store_in_bag(player, @owner, {@bag_0, @backpack_start}, @first_bag_slot, get_item)
+
+      assert result.player.inv1 == 0
+      assert updated(result.items, destination).item.stack_count == 10
+      assert updated(result.items, source).item.stack_count == 5
+      assert updated(result.items, bag).container.slot_2 == source.object.guid
+    end
+
+    test "rejects full, missing, specialized, and self-containing bags atomically", %{sword: sword, bag: bag} do
+      full = %{
+        bag
+        | container: %{
+            bag.container
+            | slot_1: sword.object.guid,
+              slot_2: sword.object.guid,
+              slot_3: sword.object.guid,
+              slot_4: sword.object.guid,
+              slot_5: sword.object.guid,
+              slot_6: sword.object.guid
+          }
+      }
+
+      player = %Player{mainhand: sword.object.guid, bag1: full.object.guid}
+
+      assert {:error, :inventory_full, _, _} =
+               Inventory.auto_store_in_bag(
+                 player,
+                 @owner,
+                 {@bag_0, @mainhand_slot},
+                 @first_bag_slot,
+                 get_item_fn([sword, full])
+               )
+
+      assert {:error, :item_doesnt_go_to_slot, _, _} =
+               Inventory.auto_store_in_bag(
+                 player,
+                 @owner,
+                 {@bag_0, @mainhand_slot},
+                 @first_bag_slot + 1,
+                 get_item_fn([sword, full])
+               )
+
+      assert {:error, :can_only_do_with_empty_bags, _, _} =
+               Inventory.auto_store_in_bag(
+                 player,
+                 @owner,
+                 {@bag_0, @first_bag_slot},
+                 @bag_0,
+                 get_item_fn([sword, full])
+               )
+
+      herb_bag =
+        build_item(32, %ItemTemplate{entry: 801, inventory_type: 18, container_slots: 6, class: 1, bag_family: 32})
+
+      player = %{player | bag1: herb_bag.object.guid}
+
+      assert {:error, :inventory_full, _, _} =
+               Inventory.auto_store_in_bag(
+                 player,
+                 @owner,
+                 {@bag_0, @mainhand_slot},
+                 @first_bag_slot,
+                 get_item_fn([sword, herb_bag])
+               )
+
+      assert {:error, :inventory_full, _, _} =
+               Inventory.auto_store_in_bag(
+                 player,
+                 @owner,
+                 {@bag_0, @first_bag_slot},
+                 @first_bag_slot,
+                 get_item_fn([sword, herb_bag])
+               )
+    end
+  end
+
   describe "remove_count/4" do
     test "reduces a stack partially" do
       pelt = build_item(20, %ItemTemplate{entry: 750, stackable: 10}, stack_count: 5)
