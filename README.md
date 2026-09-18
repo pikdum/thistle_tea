@@ -95,6 +95,7 @@ nix develop .#wow-tools            # shell with all of the above + sqlite + mari
 - crowd-control diminishing returns, shared across casters with recovery after control ends
 - Priest Fade: temporary threat reduction with target switching and restoration on expiry
 - Rogue Distract: ground-targeted facing and timed patrol pauses, preserving stealth
+- Hunter Beast Lore: caster-specific beast damage, armor, and resistance information, with expiry and death cleanup
 - pets
 - typed invisibility and detection, with observer visibility, creature aggro, and action interruption
 - items, bags, equipment, and vendors
