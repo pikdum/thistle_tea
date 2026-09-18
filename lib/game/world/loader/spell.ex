@@ -682,6 +682,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp aura_type(110), do: :mod_power_regen_percent
   defp aura_type(112), do: :override_class_scripts
   defp aura_type(113), do: :mod_ranged_damage_taken
+  defp aura_type(114), do: :mod_ranged_damage_taken_pct
   defp aura_type(115), do: :mod_healing
   defp aura_type(116), do: :mod_regen_during_combat
   defp aura_type(117), do: :mechanic_resistance
@@ -691,6 +692,8 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp aura_type(122), do: :mod_offhand_damage_pct
   defp aura_type(123), do: :mod_target_resistance
   defp aura_type(124), do: :mod_ranged_attack_power
+  defp aura_type(125), do: :mod_melee_damage_taken
+  defp aura_type(126), do: :mod_melee_damage_taken_pct
   defp aura_type(127), do: :ranged_attack_power_attacker_bonus
   defp aura_type(128), do: :mod_possess_pet
   defp aura_type(129), do: :mod_speed_always

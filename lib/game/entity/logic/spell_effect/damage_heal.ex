@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
   @moduledoc false
 
+  alias ThistleTea.Game.Entity.Logic.AttackDamageTaken
   alias ThistleTea.Game.Entity.Logic.AttackTable
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Core
@@ -36,7 +37,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
           {state, []}
 
         Spell.melee_ability?(spell) ->
-          melee_ability_damage(state, context, spell, school_damage_roll(context, spell, effect), now)
+          melee_ability_damage(state, context, spell, school_damage_roll(context, spell, effect), now, effect)
 
         true ->
           apply_damage_effect(state, context, spell, effect, now)
@@ -131,7 +132,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
     damage = rolled_amount(spell, effect, context) + trunc(rage * effect.damage_multiplier)
     damage_spell = %{spell | id: Scripts.execute_damage_spell_id()}
 
-    {state, events} = melee_ability_damage(state, context, damage_spell, damage, now)
+    {state, events} = melee_ability_damage(state, context, damage_spell, damage, now, effect)
     {state, events ++ [Effects.drain_power(context.caster_guid, 1)]}
   end
 
@@ -165,7 +166,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
     base = effect_amount(spell, effect, context)
     rolled = base + damage_bonus(context, spell, effect, opts)
 
-    apply_damage_amount(state, context, spell, rolled, now, opts)
+    apply_damage_amount(state, context, spell, rolled, now, Keyword.put(opts, :damage_effect, effect))
   end
 
   def apply_damage_amount(state, %CastContext{} = context, %Spell{} = spell, amount, now, opts \\ []) do
@@ -176,6 +177,8 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
         rolled * (context.effect_damage_multiplier || 1.0) * (context.damage_done_multiplier || 1.0) *
           versus_damage_multiplier(state, context) * scripted_damage_multiplier(state, spell)
       )
+
+    rolled = AttackDamageTaken.spell_amount(state, rolled, spell, Keyword.get(opts, :damage_effect))
 
     crit? = direct_spell_crit?(state, context, spell, opts)
     rolled = if crit?, do: rolled + versus_crit_bonus(state, context, crit_bonus(context, spell, rolled)), else: rolled
@@ -379,11 +382,13 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
 
   defp attack_power_bonus_ms(context, attack_time_ms), do: attack_power_bonus(context, attack_time_ms / 1_000)
 
-  defp melee_ability_damage(state, %CastContext{} = context, spell, damage, now) do
+  defp melee_ability_damage(state, %CastContext{} = context, spell, damage, now, effect \\ nil) do
     school = school_atom(spell)
 
     damage =
       trunc(damage * (context.effect_damage_multiplier || 1.0) * (context.damage_done_multiplier || 1.0))
+
+    damage = AttackDamageTaken.spell_amount(state, damage, spell, effect)
 
     unmitigated_damage =
       max(damage + Aura.flat_modifier(state, :mod_damage_taken, Spell.school_mask(spell)), 0)

@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Logic.AttackDamageTaken
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.CombatRatings
   alias ThistleTea.Game.Entity.Logic.CreatureType
@@ -90,6 +91,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
   def resolve(defender, attack, damage, opts \\ []) when is_map(attack) do
     ctx = context(defender, attack)
     damage = scale_versus_damage(ctx, max(trunc(damage + target_attack_power_damage(defender, attack)), 0))
+    damage = AttackDamageTaken.amount(defender, damage, if(ctx.ranged?, do: :ranged, else: :melee))
     roll = Keyword.get_lazy(opts, :roll, fn -> Math.random_int(0, 9_999) end)
     outcome = roll_outcome(ctx, roll)
     result = apply_outcome(outcome, ctx, damage, opts)
@@ -111,6 +113,8 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
         %{outcome: outcome, crit?: false}
     end
   end
+
+  def armor_reduced_damage(damage, _armor, _attacker_level) when damage <= 0, do: 0
 
   def armor_reduced_damage(damage, armor, attacker_level)
       when is_integer(damage) and is_integer(attacker_level) and attacker_level > 0 do
@@ -387,11 +391,11 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
 
   defp apply_outcome(:glancing, ctx, damage, opts) do
     factor_roll = Keyword.get_lazy(opts, :glance_roll, fn -> :rand.uniform() end)
-    damage = trunc(mitigated_damage(ctx, damage) * glancing_factor(ctx, factor_roll))
+    damage = max(trunc(mitigated_damage(ctx, damage) * glancing_factor(ctx, factor_roll)), min(damage, 1))
 
     %{
       outcome: :glancing,
-      damage: max(damage, 1),
+      damage: damage,
       blocked_amount: 0,
       hit_info: @hitinfo_affects_victim ||| @hitinfo_glancing,
       victim_state: @victimstate_normal

@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
+  alias ThistleTea.Game.Entity.Logic.AttackDamageTaken
   alias ThistleTea.Game.Entity.Logic.Aura.Change
   alias ThistleTea.Game.Entity.Logic.Aura.Lifecycle
   alias ThistleTea.Game.Entity.Logic.Aura.Reactions
@@ -189,7 +190,19 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
 
   defp tick_aura(entity, %Holder{} = holder, %Aura{type: :periodic_damage, next_tick_at: at} = aura, now)
        when is_integer(at) and now >= at do
-    {entity, damage, log_opts} = apply_periodic_damage(entity, holder, periodic_damage_amount(holder, aura), now)
+    effect = Enum.find(holder.spell.effects, &(&1.index == aura.index))
+
+    amount =
+      AttackDamageTaken.spell_amount(
+        entity,
+        periodic_damage_amount(holder, aura),
+        holder.spell,
+        effect,
+        :dot,
+        max(holder.stacks || 1, 1)
+      )
+
+    {entity, damage, log_opts} = apply_periodic_damage(entity, holder, amount, now)
 
     event =
       Effects.spell_damage(holder.caster_guid, entity.object.guid, holder.spell, damage, log_opts)
