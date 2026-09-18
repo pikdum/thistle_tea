@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
   alias ThistleTea.Game.Entity.Logic.Disarm
   alias ThistleTea.Game.Entity.Logic.Mage
   alias ThistleTea.Game.Entity.Logic.Skills
+  alias ThistleTea.Game.Entity.Logic.TargetAttackPower
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Critical
   alias ThistleTea.Game.Spell.Modifiers
@@ -68,6 +69,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
     spell_modifiers: [],
     conditional_crit_modifiers: [],
     damage_done_versus: [],
+    target_attack_power: %{},
     crit_damage_versus: [],
     spell_damage_bonus: %{},
     healing_bonus: 0,
@@ -100,6 +102,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
       threat_multiplier: threat_multiplier(caster, spell),
       damage_done_multiplier: Aura.percent_multiplier(caster, :mod_damage_percent_done, Spell.school_mask(spell)),
       damage_done_versus: Aura.misc_amounts(caster, :mod_damage_done_versus),
+      target_attack_power: TargetAttackPower.snapshot(caster),
       crit_damage_versus: Aura.misc_amounts(caster, :mod_crit_percent_versus),
       effect_damage_multiplier: effect_multiplier(caster, spell, [:all_effects, :damage]),
       effect_healing_multiplier: healing_done_multiplier(caster, spell),

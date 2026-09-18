@@ -1,10 +1,10 @@
 defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
   @moduledoc false
-  import Bitwise, only: [<<<: 2]
 
   alias ThistleTea.Game.Entity.Logic.AttackTable
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Core
+  alias ThistleTea.Game.Entity.Logic.CreatureType
   alias ThistleTea.Game.Entity.Logic.Druid
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.HealingReceived
@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
   alias ThistleTea.Game.Entity.Logic.Paladin
   alias ThistleTea.Game.Entity.Logic.Rogue
   alias ThistleTea.Game.Entity.Logic.SpellResist
+  alias ThistleTea.Game.Entity.Logic.TargetAttackPower
   alias ThistleTea.Game.Entity.Logic.Threat
   alias ThistleTea.Game.Entity.Logic.Warlock
   alias ThistleTea.Game.Entity.Logic.Warrior
@@ -25,7 +26,6 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
   alias ThistleTea.Game.Spell.Scripts
   alias ThistleTea.Game.Spell.Semantics
 
-  @creature_type_humanoid 7
   @schools [:physical, :holy, :fire, :nature, :frost, :shadow, :arcane]
   @weapon_effect_types [:weapon_damage, :weapon_damage_noschool, :normalized_weapon_damage, :weapon_percent_damage]
 
@@ -105,7 +105,6 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
 
   def apply_weapon_group(state, %CastContext{} = context, spell, now) do
     effects = Enum.filter(context.spell.effects, &weapon_effect?/1)
-    context = apply_target_attack_power_bonus(state, context, spell)
 
     base =
       if Enum.any?(effects, &(&1.type == :normalized_weapon_damage)),
@@ -123,7 +122,8 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
       |> Enum.filter(&(&1.type == :weapon_percent_damage))
       |> Enum.reduce(1.0, fn effect, acc -> acc * rolled_amount(spell, effect, context) / 100 end)
 
-    melee_ability_damage(state, context, spell, trunc((base + flat) * percent), now)
+    bonus = target_attack_power_damage(state, context, spell, effects)
+    melee_ability_damage(state, context, spell, max(trunc((base + flat) * percent + bonus), 0), now)
   end
 
   def execute(state, %CastContext{} = context, spell, %Effect{} = effect, now) do
@@ -141,13 +141,14 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
 
   defp weapon_effect?(%Effect{type: type}), do: type in @weapon_effect_types
 
-  defp apply_target_attack_power_bonus(state, %CastContext{} = context, %Spell{} = spell) do
-    if Spell.ranged_ability?(spell) do
-      bonus = Aura.flat_amount(state, :ranged_attack_power_attacker_bonus)
-      %{context | attack_power: (context.attack_power || 0) + bonus}
-    else
-      context
-    end
+  defp target_attack_power_damage(state, %CastContext{} = context, spell, effects) do
+    speed =
+      if Enum.any?(effects, &(&1.type == :normalized_weapon_damage)) and is_number(context.normalized_speed),
+        do: context.normalized_speed * 1_000,
+        else: context.attack_time_ms
+
+    kind = if Spell.ranged_ability?(spell), do: :ranged, else: :melee
+    TargetAttackPower.damage(state, context.target_attack_power, kind, speed)
   end
 
   defp leech_multiplier(%Effect{multiple_value: multiple}) when is_number(multiple) and multiple > 0, do: multiple
@@ -234,18 +235,12 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
   defp spell_taken_reactions(state, _context, _spell, _damage, _crit?, _opts, _now), do: {state, []}
 
   defp versus_damage_multiplier(state, %CastContext{damage_done_versus: pairs}) do
-    max(100 + Aura.versus_amount(pairs, creature_type_mask(state)), 0) / 100
+    max(100 + Aura.versus_amount(pairs, CreatureType.mask(state)), 0) / 100
   end
 
   defp versus_crit_bonus(state, %CastContext{crit_damage_versus: pairs}, bonus) do
-    trunc(bonus * max(100 + Aura.versus_amount(pairs, creature_type_mask(state)), 0) / 100)
+    trunc(bonus * max(100 + Aura.versus_amount(pairs, CreatureType.mask(state)), 0) / 100)
   end
-
-  defp creature_type_mask(%{creature_type: creature_type}) when is_integer(creature_type) and creature_type > 0 do
-    1 <<< (creature_type - 1)
-  end
-
-  defp creature_type_mask(_state), do: 1 <<< (@creature_type_humanoid - 1)
 
   defp scripted_damage_multiplier(state, %Spell{} = spell) do
     if Semantics.rules(spell).judgement_damage? do

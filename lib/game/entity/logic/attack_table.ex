@@ -8,17 +8,19 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
   (`CalcArmorReducedDamage`) is applied to physical damage before the outcome
   modifiers.
   """
-  import Bitwise, only: [&&&: 2, |||: 2, <<<: 2]
+  import Bitwise, only: [&&&: 2, |||: 2]
 
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.CombatRatings
+  alias ThistleTea.Game.Entity.Logic.CreatureType
   alias ThistleTea.Game.Entity.Logic.Daze
   alias ThistleTea.Game.Entity.Logic.Disarm
   alias ThistleTea.Game.Entity.Logic.MechanicResistance
   alias ThistleTea.Game.Entity.Logic.Skills
+  alias ThistleTea.Game.Entity.Logic.TargetAttackPower
   alias ThistleTea.Game.Math
 
   @hitinfo_affects_victim 0x2
@@ -37,8 +39,6 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
   @extra_flag_no_parry 0x4
   @extra_flag_no_block 0x10
   @extra_flag_always_crush 0x2000
-
-  @creature_type_humanoid 7
 
   @base_miss_chance 5.0
   @default_crit_chance 5.0
@@ -59,6 +59,8 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
       always_crush?: always_crush?(attacker),
       caster_position: attacker_position(attacker),
       damage_done_versus: Aura.misc_amounts(attacker, :mod_damage_done_versus),
+      target_attack_power: TargetAttackPower.snapshot(attacker),
+      attack_power_damage: attack_power_damage(attacker),
       crit_damage_versus: Aura.misc_amounts(attacker, :mod_crit_percent_versus)
     }
   end
@@ -69,9 +71,25 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
   defp caster_owner_guid(%{object: %{guid: guid}}) when is_integer(guid), do: guid
   defp caster_owner_guid(_attacker), do: nil
 
+  defp attack_power_damage(%{unit: %Unit{} = unit} = attacker) do
+    multiplier = Aura.percent_multiplier(attacker, :mod_damage_percent_done, 1)
+    offhand = 0.5 * max(100 + Aura.flat_amount(attacker, :mod_offhand_damage_pct), 0) / 100
+
+    %{
+      mainhand: (unit.base_attack_time || 2_000) / 14_000 * multiplier * Disarm.damage_multiplier(attacker),
+      offhand: (unit.offhand_attack_time || 2_000) / 14_000 * multiplier * offhand
+    }
+  end
+
+  defp target_attack_power_damage(defender, attack) do
+    hand = if Map.get(attack, :offhand?, false), do: :offhand, else: :mainhand
+    factor = attack |> Map.get(:attack_power_damage, %{}) |> Map.get(hand, 0)
+    TargetAttackPower.bonus(defender, Map.get(attack, :target_attack_power, %{}), :melee) * factor
+  end
+
   def resolve(defender, attack, damage, opts \\ []) when is_map(attack) do
     ctx = context(defender, attack)
-    damage = scale_versus_damage(ctx, damage)
+    damage = scale_versus_damage(ctx, max(trunc(damage + target_attack_power_damage(defender, attack)), 0))
     roll = Keyword.get_lazy(opts, :roll, fn -> Math.random_int(0, 9_999) end)
     outcome = roll_outcome(ctx, roll)
     result = apply_outcome(outcome, ctx, damage, opts)
@@ -173,15 +191,8 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
   defp attacker_hit_debuff(_defender, _attack), do: 0
 
   defp versus_pct(attack, key, defender) do
-    Aura.versus_amount(Map.get(attack, key), defender_creature_type_mask(defender))
+    Aura.versus_amount(Map.get(attack, key), CreatureType.mask(defender))
   end
-
-  defp defender_creature_type_mask(%{creature_type: creature_type})
-       when is_integer(creature_type) and creature_type > 0 do
-    1 <<< (creature_type - 1)
-  end
-
-  defp defender_creature_type_mask(_defender), do: 1 <<< (@creature_type_humanoid - 1)
 
   defp scale_versus_damage(%{versus_damage_pct: pct}, damage)
        when is_integer(pct) and pct != 0 and is_integer(damage) do

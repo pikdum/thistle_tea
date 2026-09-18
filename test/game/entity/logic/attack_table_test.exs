@@ -24,7 +24,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTableTest do
       object: %Object{guid: 100},
       unit: struct(unit, Keyword.get(overrides, :unit, [])),
       movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
-      internal: %Internal{creature: struct(%Creature{}, Keyword.get(overrides, :creature, []))}
+      internal: %Internal{creature: struct(%Creature{creature_type: 7}, Keyword.get(overrides, :creature, []))}
     }
   end
 
