@@ -1,0 +1,169 @@
+defmodule ThistleTea.Game.Entity.Logic.ShieldBlockTest do
+  use ExUnit.Case, async: true
+
+  alias ThistleTea.Game.Aura, as: AuraData
+  alias ThistleTea.Game.Aura.Holder
+  alias ThistleTea.Game.Entity.Data.Character
+  alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.Entity.Data.Component.MovementBlock
+  alias ThistleTea.Game.Entity.Data.Component.Object
+  alias ThistleTea.Game.Entity.Data.Component.Player
+  alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Data.Item
+  alias ThistleTea.Game.Entity.Data.ItemTemplate
+  alias ThistleTea.Game.Entity.Data.Mob
+  alias ThistleTea.Game.Entity.Logic.AttackTable
+  alias ThistleTea.Game.Entity.Logic.Aura
+  alias ThistleTea.Game.Entity.Logic.CombatRatings
+  alias ThistleTea.Game.Entity.Logic.Core
+  alias ThistleTea.Game.Entity.Logic.EquipmentStats
+  alias ThistleTea.Game.Entity.Logic.Inventory
+  alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.CastContext
+  alias ThistleTea.Game.Spell.Effect
+
+  setup [:character]
+
+  describe "block_value/1" do
+    test "multiplies shield, strength and flat bonuses together", %{character: character} do
+      character = with_auras(character, [holder(:mod_shield_block_value, 30), holder(:mod_shield_block_value_pct, 30)])
+      assert CombatRatings.block_value(character) == 72
+    end
+
+    test "retains fractional strength until the final truncation", %{character: character} do
+      character = %{character | unit: %{character.unit | strength: 39, equipment_bonuses: %{shield_block: 0}}}
+      character = with_auras(character, [holder(:mod_shield_block_value_pct, 30)])
+      assert CombatRatings.block_value(character) == 1
+    end
+
+    test "scales stacks and multiplies independent percentage bonuses", %{character: character} do
+      character =
+        with_auras(character, [
+          holder(:mod_shield_block_value, 10, 2),
+          holder(:mod_shield_block_value_pct, 10, 2),
+          holder(:mod_shield_block_value_pct, 50)
+        ])
+
+      assert CombatRatings.block_value(character) == 82
+    end
+
+    test "clamps negative values and percentages", %{character: character} do
+      assert CombatRatings.block_value(with_auras(character, [holder(:mod_shield_block_value, -100)])) == 0
+      assert CombatRatings.block_value(with_auras(character, [holder(:mod_shield_block_value_pct, -150)])) == 0
+    end
+
+    test "preserves creature block values", %{character: character} do
+      character = with_auras(character, [holder(:mod_shield_block_value, 235), holder(:mod_shield_block_value_pct, 30)])
+      assert CombatRatings.block_value(%Mob{unit: character.unit}) == 37
+    end
+
+    test "uses current equipment and strength", %{character: character} do
+      character = with_auras(character, [holder(:mod_shield_block_value_pct, 30)])
+      assert CombatRatings.block_value(character) == 33
+      character = %{character | unit: %{character.unit | strength: 180, equipment_bonuses: %{shield_block: 40}}}
+      assert CombatRatings.block_value(character) == 62
+    end
+  end
+
+  describe "resolve/4" do
+    test "blocks the shared value after armor and caps at incoming damage", %{character: character} do
+      character = with_auras(character, [holder(:mod_shield_block_value, 30), holder(:mod_shield_block_value_pct, 30)])
+      attack = %{caster_level: 60, caster_player?: false, crit_chance: 0}
+      result = AttackTable.resolve(character, attack, 100, roll: 1_200)
+      assert result.outcome == :block
+      assert result.blocked_amount == 72
+      assert result.damage == 28
+
+      armored = %{character | unit: %{character.unit | normal_resistance: 5_000}}
+      result = AttackTable.resolve(armored, attack, 100, roll: 1_200)
+      assert result.blocked_amount == AttackTable.armor_reduced_damage(100, 5_000, 60)
+      assert result.damage == 0
+      assert result.victim_state == 5
+    end
+  end
+
+  describe "from_caster/3" do
+    test "snapshots the same block value for Shield Slam", %{character: character} do
+      character = with_auras(character, [holder(:mod_shield_block_value, 30), holder(:mod_shield_block_value_pct, 30)])
+      spell = %Spell{id: 23_922, school: :physical, dmg_class: 2, effects: []}
+      context = CastContext.from_caster(character, spell, 2)
+      assert context.shield_block_value == 72
+      assert context.shield_block_value == CombatRatings.block_value(character)
+    end
+  end
+
+  describe "apply_spell/5" do
+    test "refresh, cancellation, expiry and death restore the derived value", %{character: character} do
+      spell = bonus_spell(28_773, :mod_shield_block_value, 235)
+      {buffed, _} = Aura.apply_spell(character, 1, 60, spell, 0)
+      assert CombatRatings.block_value(buffed) == 261
+      {refreshed, _} = Aura.apply_spell(buffed, 1, 60, spell, 5_000)
+      assert CombatRatings.block_value(refreshed) == 261
+      {expired, _} = Aura.expire_due(refreshed, 25_000)
+      assert CombatRatings.block_value(expired) == 26
+      assert Aura.next_event_at(expired) == nil
+      {cancelled, _} = Aura.cancel_spell(buffed, spell.id, 1_000)
+      assert CombatRatings.block_value(cancelled) == 26
+      dead = Core.take_damage(buffed, 1_000, 1_000)
+      assert dead.unit.health == 0
+      assert CombatRatings.block_value(dead) == 26
+    end
+  end
+
+  describe "resync/3" do
+    test "equipped block-value spells contribute once and disappear on unequip", %{character: character} do
+      shield = Item.build(%ItemTemplate{entry: 100, inventory_type: 14, block: 20}, 100, owner: 1)
+
+      trinket =
+        Item.build(%ItemTemplate{entry: 101, inventory_type: 12, spellid_1: 23_562, spelltrigger_1: 1}, 101, owner: 1)
+
+      use_item = %ItemTemplate{entry: 102, inventory_type: 12, spellid_1: 23_562, spelltrigger_1: 0}
+      get_item = fn guid -> %{100 => shield, 101 => trinket}[guid] end
+      get_spell = fn 23_562 -> bonus_spell(23_562, :mod_shield_block_value, 30) end
+      player = character.player |> Inventory.equip(:offhand, shield) |> Inventory.equip(:trinket1, trinket)
+      equipped = EquipmentStats.resync(%{character | player: player}, get_item, get_spell)
+      assert CombatRatings.block_value(equipped) == 56
+      assert EquipmentStats.resync(equipped, get_item, get_spell) == equipped
+      assert EquipmentStats.bonuses([use_item], get_spell).shield_block == 0
+      unequipped = EquipmentStats.resync(%{equipped | player: %Player{}}, get_item, get_spell)
+      assert CombatRatings.block_value(unequipped) == 6
+      assert unequipped.unit.equipment_bonuses.shield_block == 0
+    end
+  end
+
+  defp character(_context) do
+    character = %Character{
+      object: %Object{guid: 1},
+      movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+      unit: %Unit{
+        health: 1_000,
+        max_health: 1_000,
+        class: 1,
+        level: 60,
+        strength: 140,
+        agility: 0,
+        equipment_bonuses: %{shields: 1, shield_block: 20},
+        auras: []
+      },
+      player: %Player{},
+      internal: %Internal{}
+    }
+
+    %{character: character}
+  end
+
+  defp holder(type, amount, stacks \\ 1) do
+    %Holder{auras: [%AuraData{type: type, amount: amount}], stacks: stacks}
+  end
+
+  defp with_auras(character, holders), do: %{character | unit: %{character.unit | auras: holders}}
+
+  defp bonus_spell(id, type, amount) do
+    %Spell{
+      id: id,
+      school: :physical,
+      duration_ms: 20_000,
+      effects: [%Effect{index: 0, type: :apply_aura, aura: type, base_points: amount, implicit_target_a: :caster}]
+    }
+  end
+end

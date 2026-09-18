@@ -149,7 +149,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
       defender_player?: defender_player?,
       defender_class: unit.class,
       defender_agility: unit.agility || 0,
-      defender_strength: unit.strength || 0,
+      defender_block_value: CombatRatings.block_value(defender),
       defender_armor: unit.normal_resistance || 0,
       defender_dodge_bonus: Aura.flat_amount(defender, :mod_dodge),
       defender_parry_bonus: Aura.flat_amount(defender, :mod_parry_percent),
@@ -399,7 +399,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
 
   defp apply_outcome(:block, ctx, damage, _opts) do
     damage = mitigated_damage(ctx, damage)
-    blocked = min(block_value(ctx), damage)
+    blocked = min(ctx.defender_block_value, damage)
 
     %{
       outcome: :block,
@@ -471,14 +471,6 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
     high = clamp(1.2 - 0.03 * defense_gap, 0.2, 0.99)
 
     low + (high - low) * clamp(factor_roll, 0.0, 1.0)
-  end
-
-  defp block_value(%{defender_player?: true} = ctx) do
-    CombatRatings.block_value(ctx.defender_bonuses, ctx.defender_strength)
-  end
-
-  defp block_value(ctx) do
-    div(ctx.defender_level, 2) + div(ctx.defender_strength, 20)
   end
 
   defp avoidance_skill_bonus(%{defender_player?: true} = ctx), do: ctx.skill_diff * 0.04

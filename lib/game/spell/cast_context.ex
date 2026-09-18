@@ -191,7 +191,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
             normalized_speed: normalized_speed(caster),
             attack_skill: attack_skill(caster),
             melee_crit_chance: melee_crit_chance(caster, spell),
-            shield_block_value: shield_block_value(caster),
+            shield_block_value: CombatRatings.block_value(caster),
             caster_power: caster_power(caster)
         }
 
@@ -278,11 +278,6 @@ defmodule ThistleTea.Game.Spell.CastContext do
   defp caster_power(%{unit: %{power_type: 1, power2: rage}}) when is_integer(rage), do: rage
   defp caster_power(%{unit: %{power_type: 3, power4: energy}}) when is_integer(energy), do: energy
   defp caster_power(_caster), do: nil
-
-  defp shield_block_value(%{unit: unit} = caster) do
-    CombatRatings.block_value(unit.equipment_bonuses || %{}, unit.strength || 0) +
-      Aura.flat_amount(caster, :mod_shield_block_value)
-  end
 
   defp main_hand_template(%Character{player: player}) when is_struct(player) do
     case player.visible_item_16_0 do

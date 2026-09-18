@@ -711,12 +711,13 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp aura_type(144), do: :safe_fall
   defp aura_type(148), do: :retain_combo_points
   defp aura_type(149), do: :reduce_pushback
-  defp aura_type(150), do: :mod_shield_block_value
+  defp aura_type(150), do: :mod_shield_block_value_pct
   defp aura_type(151), do: :track_stealthed
   defp aura_type(153), do: :split_damage_flat
   defp aura_type(155), do: :water_breathing_pct
   defp aura_type(154), do: :mod_stealth_level
   defp aura_type(156), do: :mod_reputation_gain
+  defp aura_type(158), do: :mod_shield_block_value
   defp aura_type(161), do: :mod_health_regen_in_combat
   defp aura_type(162), do: :periodic_power_burn
   defp aura_type(165), do: :melee_attack_power_attacker_bonus

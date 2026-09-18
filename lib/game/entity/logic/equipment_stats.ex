@@ -117,6 +117,9 @@ defmodule ThistleTea.Game.Entity.Logic.EquipmentStats do
       %Effect{type: :apply_aura, aura: :mod_ranged_haste} = effect, acc ->
         add(acc, :ranged_haste, Effect.damage_roll(effect))
 
+      %Effect{type: :apply_aura, aura: :mod_shield_block_value} = effect, acc ->
+        add(acc, :shield_block, Effect.damage_roll(effect))
+
       _effect, acc ->
         acc
     end)

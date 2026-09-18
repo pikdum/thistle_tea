@@ -6,8 +6,11 @@ defmodule ThistleTea.Game.Entity.Logic.CombatRatings do
   from an equipped shield. `sync/1` writes the derived percentages to the
   player component fields shown on the character sheet.
   """
+  alias ThistleTea.Game.Aura, as: AuraData
+  alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Disarm
 
   @warrior 1
@@ -90,12 +93,36 @@ defmodule ThistleTea.Game.Entity.Logic.CombatRatings do
 
   def block_chance(_equipment_bonuses), do: 0.0
 
+  def block_value(%{unit: %Unit{} = unit, player: %Player{}} = character) do
+    flat =
+      Map.get(unit.equipment_bonuses || %{}, :shield_block, 0) + Aura.flat_amount(character, :mod_shield_block_value)
+
+    max(trunc((flat + (unit.strength || 0) / 20 - 1) * block_value_multiplier(unit.auras)), 0)
+  end
+
+  def block_value(%{unit: %Unit{} = unit}) do
+    div(unit.level || 1, 2) + div(unit.strength || 0, 20)
+  end
+
+  def block_value(_entity), do: 0
+
   def block_value(%{} = equipment_bonuses, strength) do
     shield_block = Map.get(equipment_bonuses, :shield_block, 0)
     max(shield_block + div(strength || 0, 20) - 1, 0)
   end
 
   def block_value(_equipment_bonuses, _strength), do: 0
+
+  defp block_value_multiplier(holders) when is_list(holders) do
+    for %Holder{auras: auras, stacks: stacks} <- holders,
+        %AuraData{type: :mod_shield_block_value_pct, amount: amount} <- auras,
+        is_integer(amount),
+        reduce: 1.0 do
+      multiplier -> multiplier * max(100 + amount * max(stacks || 1, 1), 0) / 100
+    end
+  end
+
+  defp block_value_multiplier(_holders), do: 1.0
 
   def sync(%{unit: %Unit{} = unit, player: %Player{} = player} = character) do
     level = unit.level || 1
