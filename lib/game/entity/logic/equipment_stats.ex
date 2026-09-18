@@ -36,6 +36,7 @@ defmodule ThistleTea.Game.Entity.Logic.EquipmentStats do
                 :attack_power,
                 :ranged_haste,
                 :shields,
+                :block_chance,
                 :shield_block
               ] ++ @spell_damage_keys
 
@@ -119,6 +120,9 @@ defmodule ThistleTea.Game.Entity.Logic.EquipmentStats do
 
       %Effect{type: :apply_aura, aura: :mod_shield_block_value} = effect, acc ->
         add(acc, :shield_block, Effect.damage_roll(effect))
+
+      %Effect{type: :apply_aura, aura: :mod_block_percent} = effect, acc ->
+        add(acc, :block_chance, Effect.damage_roll(effect))
 
       _effect, acc ->
         acc

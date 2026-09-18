@@ -35,6 +35,10 @@ defmodule ThistleTea.Game.Entity.Logic.ShieldBlockTest do
       unshielded = %{buffed | unit: %{buffed.unit | equipment_bonuses: %{}}} |> CombatRatings.sync()
       assert unshielded.player.block_percentage == 0.0
       assert CombatRatings.block_chance(unshielded) == 0.0
+      gear = %{buffed | unit: %{buffed.unit | equipment_bonuses: %{shields: 1, block_chance: 3}}}
+      assert CombatRatings.block_chance(gear) == 83.0
+      gear = %{gear | unit: %{gear.unit | equipment_bonuses: %{shields: 0, block_chance: 3}}}
+      assert CombatRatings.block_chance(gear) == 0.0
 
       for level <- [50, 60], roll <- [1_200, 5_000] do
         attack = %{caster_level: level, caster_player?: false, crit_chance: 0}

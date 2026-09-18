@@ -89,7 +89,8 @@ defmodule ThistleTea.Game.Entity.Logic.CombatRatings do
 
   def block_chance(%{unit: %Unit{} = unit, player: %Player{}} = character) do
     if block_chance(unit.equipment_bonuses || %{}) > 0 do
-      max(@base_avoidance_chance + Aura.flat_amount(character, :mod_block_percent), 0.0)
+      bonus = Map.get(unit.equipment_bonuses || %{}, :block_chance, 0)
+      max(@base_avoidance_chance + bonus + Aura.flat_amount(character, :mod_block_percent), 0.0)
     else
       0.0
     end

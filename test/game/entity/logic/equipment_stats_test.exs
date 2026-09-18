@@ -63,6 +63,12 @@ defmodule ThistleTea.Game.Entity.Logic.EquipmentStatsTest do
   end
 
   describe "bonuses/1" do
+    test "collects shield block chance from equip spells" do
+      trinket = %ItemTemplate{entry: 23_040, spellid_1: 21_475, spelltrigger_1: 1}
+      spell = %Spell{effects: [%Effect{type: :apply_aura, aura: :mod_block_percent, base_points: 3}]}
+      assert EquipmentStats.bonuses([trinket], fn 21_475 -> spell end).block_chance == 3
+    end
+
     test "sums stats, armor, and resistances across templates", %{chest: chest} do
       template = Item.template(chest)
 
