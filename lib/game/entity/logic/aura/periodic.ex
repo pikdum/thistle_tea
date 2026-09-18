@@ -1,6 +1,6 @@
 defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
   @moduledoc """
-  Ticks periodic auras (damage, heal, leech, trigger-spell) when their
+  Ticks periodic auras (damage, heal, mana recovery, leech, trigger-spell) when their
   next-tick time comes due, expires elapsed holders afterwards, and reports
   the earliest upcoming tick or expiry for tick scheduling.
   """
@@ -211,6 +211,12 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
     {entity, %{aura | next_tick_at: advance_tick(at, aura.amplitude_ms, now)}, [event, proc_event | threat_events]}
   end
 
+  defp tick_aura(entity, %Holder{} = holder, %Aura{type: :obs_mod_mana, next_tick_at: at} = aura, now)
+       when is_integer(at) and now >= at do
+    {entity, events} = restore_percent_mana(entity, holder, aura)
+    {entity, %{aura | next_tick_at: advance_tick(at, aura.amplitude_ms, now)}, events}
+  end
+
   defp tick_aura(entity, %Holder{} = holder, %Aura{type: :periodic_energize, next_tick_at: at} = aura, now)
        when is_integer(at) and now >= at do
     {entity, events} = apply_energize(entity, holder, power_type(aura.misc_value), aura.amount)
@@ -388,6 +394,30 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
   end
 
   defp leech_heal_events(_holder, _entity, _damage, _aura), do: []
+
+  defp restore_percent_mana(
+         %{unit: %Unit{health: health, power1: mana, max_power1: max_mana}} = entity,
+         %Holder{} = holder,
+         %Aura{} = aura
+       )
+       when is_number(health) and health > 0 and is_integer(mana) and is_integer(max_mana) and max_mana > 0 do
+    amount = div(max_mana * max(aura.amount || 0, 0) * max(holder.stacks || 1, 1), 100)
+    restored = Core.restore_mana(entity, amount)
+    gained = restored.unit.power1 - mana
+
+    event = Effects.periodic_aura_log(holder.caster_guid, entity.object.guid, holder.spell, :obs_mod_mana, amount)
+
+    {restored, [event | mana_recovery_threat(entity, holder.caster_guid, gained)]}
+  end
+
+  defp restore_percent_mana(entity, _holder, _aura), do: {entity, []}
+
+  defp mana_recovery_threat(entity, caster_guid, gained)
+       when gained > 0 and is_integer(caster_guid) and caster_guid > 0 do
+    [Effects.heal_threat(caster_guid, entity.object.guid, gained * Threat.heal_threat_ratio())]
+  end
+
+  defp mana_recovery_threat(_entity, _caster_guid, _gained), do: []
 
   defp apply_energize(entity, %Holder{} = holder, 0, amount) do
     entity = Core.restore_mana(entity, amount)

@@ -5,6 +5,22 @@ defmodule ThistleTea.Game.Network.Message.SmsgPeriodicauralogTest do
   alias ThistleTea.Game.Network.Message.SmsgPeriodicauralog
 
   describe "to_binary/1" do
+    test "encodes percentage mana recovery as aura 21 with mana power type" do
+      binary =
+        SmsgPeriodicauralog.to_binary(%SmsgPeriodicauralog{
+          target: 0x11,
+          caster: 0x22,
+          spell_id: 25_990,
+          auras: [%{aura_type: :obs_mod_mana, misc_value: 0, amount: 50}]
+        })
+
+      assert binary ==
+               BinaryUtils.pack_guid(0x11) <>
+                 BinaryUtils.pack_guid(0x22) <>
+                 <<25_990::little-size(32), 1::little-size(32), 21::little-size(32), 0::little-size(32),
+                   50::little-size(32)>>
+    end
+
     test "encodes periodic heal aura logs" do
       binary =
         SmsgPeriodicauralog.to_binary(%SmsgPeriodicauralog{

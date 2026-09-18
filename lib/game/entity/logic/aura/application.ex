@@ -50,7 +50,8 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
     :periodic_leech,
     :periodic_mana_leech,
     :periodic_trigger_spell,
-    :obs_mod_health
+    :obs_mod_health,
+    :obs_mod_mana
   ]
 
   def apply_spell(entity, %CastContext{} = context, %Spell{} = spell, now) when is_integer(now) do
@@ -598,6 +599,10 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
 
   defp effective_amplitude(%Effect{aura: :mod_power_regen_percent, amplitude_ms: amp}) do
     if is_integer(amp) and amp > 0, do: amp, else: @percent_regen_tick_ms
+  end
+
+  defp effective_amplitude(%Effect{aura: :obs_mod_mana, amplitude_ms: amp}) do
+    if is_integer(amp) and amp > 0, do: amp, else: 1_000
   end
 
   defp effective_amplitude(%Effect{aura: aura, amplitude_ms: amp}) when aura in @regen_auras do

@@ -608,6 +608,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp aura_type(18), do: :mod_invisibility
   defp aura_type(19), do: :mod_invisibility_detect
   defp aura_type(20), do: :obs_mod_health
+  defp aura_type(21), do: :obs_mod_mana
   defp aura_type(22), do: :mod_resistance
   defp aura_type(23), do: :periodic_trigger_spell
   defp aura_type(24), do: :periodic_energize
