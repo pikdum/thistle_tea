@@ -93,6 +93,7 @@ nix develop .#wow-tools            # shell with all of the above + sqlite + mari
 - stacked damage-over-time effects scale with remaining stacks after partial cures
 - exclusive resistance buffs use the strongest effect per school, with weaker protection resuming on removal
 - crowd-control diminishing returns, shared across casters with recovery after control ends
+- creature and pet fear movement, with bounded panic runs, control cleanup, and Curse of Recklessness suppression
 - Priest Fade: temporary threat reduction with target switching and restoration on expiry
 - Rogue Distract: ground-targeted facing and timed patrol pauses, preserving stealth
 - Hunter Beast Lore: caster-specific beast damage, armor, and resistance information, with expiry and death cleanup
