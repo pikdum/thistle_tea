@@ -299,7 +299,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura do
   defp split_damage_aura?(_aura, _school_mask), do: false
 
   def confuse_anchor_key(%{unit: %Unit{auras: holders}}) when is_list(holders) do
-    case Enum.find(holders, &(Holder.has_aura_type?(&1, :mod_confuse) or Holder.has_aura_type?(&1, :mod_fear))) do
+    case Enum.find(holders, &Holder.has_aura_type?(&1, :mod_confuse)) do
       %Holder{applied_at: applied_at, spell: %Spell{id: spell_id}} -> {spell_id, applied_at}
       _ -> nil
     end

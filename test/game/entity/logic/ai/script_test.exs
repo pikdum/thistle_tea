@@ -999,7 +999,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.ScriptTest do
       assert intent.destination == {30.0, 0.0, 0.0}
 
       mob =
-        NavigationResolver.resolve(mob, 5_000, fn map_id, from, to ->
+        NavigationResolver.resolve(mob, 5_000, fn map_id, from, to, _opts ->
           assert map_id == 329
           assert from == {20.0, 0.0, 0.0}
           assert to == {30.0, 0.0, 0.0}

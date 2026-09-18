@@ -1,6 +1,8 @@
 defmodule ThistleTea.Game.Entity.Server.AIEnvironmentTest do
   use ExUnit.Case, async: false
 
+  alias ThistleTea.Game.Aura
+  alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.AIEvent
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
@@ -47,6 +49,25 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironmentTest do
   end
 
   describe "context/3" do
+    test "observes the fear caster beyond ordinary perception range" do
+      actor_guid = Guid.from_low_guid(:player, 98_090)
+      world = WorldRef.open(999)
+      put_actor(:players, actor_guid, world, 150.0)
+      on_exit(fn -> remove_actor(:players, actor_guid) end)
+
+      holder = %Holder{
+        caster_guid: actor_guid,
+        auras: [%Aura{type: :mod_fear}]
+      }
+
+      entity = mob(world)
+      entity = %{entity | unit: %{entity.unit | auras: [holder]}, internal: %{entity.internal | rooted?: true}}
+      context = AIEnvironment.context(entity, 1_000)
+
+      assert Perception.position(context.perception, actor_guid) == {world, 150.0, 0.0, 0.0}
+      assert context.navigation.fear_point == nil
+    end
+
     test "captures an immutable observation of an explicit actor" do
       actor_guid = Guid.from_low_guid(:player, 98_001)
       world = %WorldRef{map_id: 0}

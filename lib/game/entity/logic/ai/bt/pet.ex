@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Combat, as: CombatBT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Fear, as: FearBT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells, as: MobSpells
   alias ThistleTea.Game.Entity.Logic.AI.BT.Navigation
   alias ThistleTea.Game.Entity.Logic.AI.BT.Spell, as: SpellBT
@@ -40,6 +41,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet do
   def tree do
     BT.selector([
       BT.sequence([BT.condition(&dead?/2), BT.action(&idle/2)]),
+      BT.action(&FearBT.tick/3),
       SpellBT.casting_sequence(),
       BT.sequence([
         BT.condition(&in_combat?/2),

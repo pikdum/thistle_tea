@@ -4,7 +4,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Context.Navigation do
   """
 
   @enforce_keys [:random_points]
-  defstruct [:random_points]
+  defstruct [:random_points, :fear_point]
 
   def empty, do: %__MODULE__{random_points: %{}}
   def direct, do: empty()

@@ -45,7 +45,8 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.NavigationTest do
 
       assert destination == {5.0, 0.0, 0.0}
 
-      find_path = fn _map_id, _start, _destination ->
+      find_path = fn _map_id, _start, _destination, opts ->
+        assert opts == [allow_steep: true]
         [{2.0, 0.0, 0.0}, {5.0, 0.0, 0.0}]
       end
 
@@ -56,7 +57,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.NavigationTest do
 
     test "drains a request when no path is available" do
       requested = Navigation.chase(entity(world: %WorldRef{map_id: 1}), 42, {5.0, 0.0, 0.0}, context())
-      unchanged = NavigationResolver.resolve(requested, 0, fn _map_id, _start, _destination -> nil end)
+      unchanged = NavigationResolver.resolve(requested, 0, fn _map_id, _start, _destination, _opts -> nil end)
 
       assert unchanged.movement_block.spline_nodes == []
       assert unchanged.internal.navigation_intents == []

@@ -462,7 +462,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
       assert {{:running, 0, :navigation}, state} =
                BehaviorRunner.tick(MobBT.tree(), state, AIEnvironment.context(state, 1_000))
 
-      state = NavigationResolver.resolve(state, 1_000, fn _map, _from, to -> [to] end)
+      state = NavigationResolver.resolve(state, 1_000, fn _map, _from, to, _opts -> [to] end)
 
       assert state.movement_block.spline_nodes == [{10.0, 0.0, 0.0}]
       assert state.internal.blackboard.navigation.move_target == {10.0, 0.0, 0.0}
@@ -485,7 +485,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
       assert {{:running, 0, :navigation}, state} =
                BehaviorRunner.tick(MobBT.tree(), state, context)
 
-      state = NavigationResolver.resolve(state, 1_000, fn _map, _from, to -> [to] end)
+      state = NavigationResolver.resolve(state, 1_000, fn _map, _from, to, _opts -> [to] end)
 
       assert state.movement_block.spline_nodes == [destination]
       assert state.internal.blackboard.navigation.move_target == destination
@@ -506,7 +506,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
 
       state =
         state
-        |> NavigationResolver.resolve(1_000, fn _map, _from, to -> [to] end)
+        |> NavigationResolver.resolve(1_000, fn _map, _from, to, _opts -> [to] end)
         |> finish_current_move()
 
       {:success, state} =

@@ -20,6 +20,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Random
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Fear, as: FearBT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells, as: MobSpells
   alias ThistleTea.Game.Entity.Logic.AI.BT.Navigation
   alias ThistleTea.Game.Entity.Logic.AI.BT.Spell, as: SpellBT
@@ -95,6 +96,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
         BT.action(&wait_for_arrival_with_context/3),
         BT.action(&set_next_confused_wait/3)
       ]),
+      BT.action(&FearBT.tick/3),
       BT.sequence([
         BT.condition(&not_in_combat?/2),
         SpellBT.casting_sequence()
@@ -229,7 +231,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   def confused_wander_radius, do: @confused_wander_radius
 
   defp confused?(%Mob{} = state, _blackboard) do
-    AuraLogic.has_aura?(state, :mod_confuse) or AuraLogic.has_aura?(state, :mod_fear)
+    AuraLogic.has_aura?(state, :mod_confuse)
   end
 
   defp confused?(_state, _blackboard), do: false

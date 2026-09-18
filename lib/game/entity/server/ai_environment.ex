@@ -29,6 +29,7 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
   alias ThistleTea.Game.Entity.Logic.AI.Script
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Condition.Requirements
+  alias ThistleTea.Game.Entity.Logic.Fear
   alias ThistleTea.Game.Entity.Server.NavigationResolver
   alias ThistleTea.Game.Player.Movement, as: PlayerMovement
   alias ThistleTea.Game.Time
@@ -56,12 +57,14 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
     requirements = Requirements.plan(conditions)
     condition_results = script_condition_results(entity, condition_groups(entity, request))
     condition_target = explicit_actor(actors) || event_ai_target(entity)
+    perception = perception(entity, now, actors, requested_radius, requested_game_object_radius)
+    random = random()
 
     %Context{
       now: now,
-      perception: perception(entity, now, actors, requested_radius, requested_game_object_radius),
-      random: random(),
-      navigation: navigation(entity, now),
+      perception: perception,
+      random: random,
+      navigation: navigation(entity, now, perception, random),
       waypoints: WaypointLoader.context(),
       script_conditions: Map.get(condition_results, condition_target, %{}),
       script_conditions_by_target: condition_results,
@@ -101,7 +104,7 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
     nearby = nearby_guids(entity, radius, game_object_radius)
 
     guids =
-      [own_guid(entity) | direct_guids(entity)]
+      [own_guid(entity), Fear.source_guid(entity) | direct_guids(entity)]
       |> Enum.concat(observed_guids)
       |> Enum.concat(Enum.flat_map(nearby, fn {_kind, entries} -> Enum.map(entries, &elem(&1, 0)) end))
       |> Enum.filter(&(is_integer(&1) and &1 > 0))
@@ -438,13 +441,21 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
     }
   end
 
-  defp navigation(entity, now) do
-    entity
-    |> random_point_requests(now)
-    |> Map.new(fn {map_id, anchor, radius} ->
-      {{map_id, anchor, radius}, Pathfinding.find_random_point_around_circle(map_id, anchor, radius)}
-    end)
-    |> Navigation.new()
+  defp navigation(entity, now, perception, random) do
+    navigation =
+      entity
+      |> random_point_requests(now)
+      |> Map.new(fn {map_id, anchor, radius} ->
+        {{map_id, anchor, radius}, Pathfinding.find_random_point_around_circle(map_id, anchor, radius)}
+      end)
+      |> Navigation.new()
+
+    if Fear.ready?(entity, now) do
+      {map_id, anchor, radius} = Fear.destination_request(entity, perception, random)
+      %{navigation | fear_point: Pathfinding.find_random_point_around_circle(map_id, anchor, radius)}
+    else
+      navigation
+    end
   end
 
   defp random_point_requests(%Mob{} = entity, now) do
@@ -486,7 +497,7 @@ defmodule ThistleTea.Game.Entity.Server.AIEnvironment do
   end
 
   defp confused_wander_ready?(%Mob{} = entity, %Blackboard{} = blackboard, now) do
-    (Aura.has_aura?(entity, :mod_confuse) or Aura.has_aura?(entity, :mod_fear)) and
+    Aura.has_aura?(entity, :mod_confuse) and
       is_nil(blackboard.navigation.target) and
       Blackboard.ready_for?(blackboard, :next_confused_at, now)
   end

@@ -9,10 +9,10 @@ defmodule ThistleTea.Game.Entity.Server.NavigationResolver do
   alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.World.Pathfinding
 
-  def resolve(entity, now, find_path \\ &steep_find_path/3)
+  def resolve(entity, now, find_path \\ &Pathfinding.find_path/4)
 
   def resolve(%{internal: %Internal{}, movement_block: %MovementBlock{}} = entity, now, find_path)
-      when is_integer(now) and is_function(find_path, 3) do
+      when is_integer(now) and is_function(find_path, 4) do
     {entity, intents} = NavigationIntent.drain(entity)
     Enum.reduce(intents, entity, &resolve_intent(&2, &1, now, find_path))
   end
@@ -28,14 +28,11 @@ defmodule ThistleTea.Game.Entity.Server.NavigationResolver do
     entity = Movement.sync_position(entity, now)
     {start_x, start_y, start_z, _orientation} = entity.movement_block.position
 
-    case find_path.(world.map_id, {start_x, start_y, start_z}, destination) do
+    {allow_steep, opts} = Keyword.pop(opts, :allow_steep, true)
+
+    case find_path.(world.map_id, {start_x, start_y, start_z}, destination, allow_steep: allow_steep) do
       path when is_list(path) -> Movement.move_along_path(entity, path, opts, now)
       _no_path -> entity
     end
   end
-
-  # traversal is steep-permitted for entity movement (vmangos lets NPCs climb
-  # to the hard limit); destination generation stays on the strict filter via
-  # Pathfinding.find_random_point_around_circle
-  defp steep_find_path(map_id, from, to), do: Pathfinding.find_path(map_id, from, to, allow_steep: true)
 end

@@ -242,12 +242,12 @@ defmodule ThistleTea.Game.Entity.Logic.PriestSpellsTest do
   end
 
   describe "fear" do
-    test "fear is a negative aura and anchors confused wandering" do
+    test "fear is a negative aura separate from confused wandering" do
       entity = mob_fixture()
       {entity, _events} = Aura.apply_spell(entity, 999, 10, psychic_scream_fixture(), 1_000)
 
       assert [%Holder{negative?: true}] = entity.unit.auras
-      assert Aura.confuse_anchor_key(entity) == {8122, 1_000}
+      assert Aura.confuse_anchor_key(entity) == nil
     end
 
     test "fear without a damage interrupt flag survives damage" do

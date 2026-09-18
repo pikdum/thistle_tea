@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Blackboard do
   alias __MODULE__.Spells
 
   defstruct navigation: %Navigation{},
+            fear: nil,
             combat: %Combat{},
             spells: %Spells{},
             event_ai: %EventAI{},
