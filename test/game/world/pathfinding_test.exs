@@ -41,6 +41,59 @@ defmodule ThistleTea.Game.World.PathfindingTest do
   end
 
   describe "find_path/4" do
+    test "routes from overlapping Deadmines surfaces" do
+      cases = [
+        {{-192.036893, -592.948152, 39.148481}, {-123.865125, -607.068945, 16.866046}},
+        {{-191.786904, -592.680173, 39.258589}, {-126.667646, -594.773328, 19.114894}},
+        {{-191.963134, -592.855987, 39.210442}, {-127.230821, -594.357885, 19.099384}},
+        {{-192.036893, -592.948152, 38.747131}, {-123.865125, -607.068945, 16.866046}}
+      ]
+
+      for {start, destination} <- cases, steep <- [false, true] do
+        assert [_ | _] = path = Pathfinding.find_path(36, start, destination, allow_steep: steep)
+        assert distance(List.last(path), destination) < 1.5
+      end
+    end
+
+    test "keeps chasing after crossing a Deadmines surface overlap" do
+      start = {-192.036893, -592.948152, 38.747131}
+      destination = {-123.865125, -607.068945, 16.866046}
+
+      final =
+        Enum.reduce_while(1..600, start, fn _, position ->
+          if distance(position, destination) < 1.5 do
+            {:halt, position}
+          else
+            assert [next | _] = Pathfinding.find_path(36, position, destination, allow_steep: true)
+            assert distance(position, next) > 0.0001
+            {:cont, advance(position, next, 0.3)}
+          end
+        end)
+
+      assert distance(final, destination) < 1.5
+    end
+
+    test "preserves routes where the closest overlapping surface is disconnected" do
+      start = {-120.521146, -405.568710, 59.121227}
+      destination = {-127.230821, -594.357885, 19.099384}
+      assert [_ | _] = path = Pathfinding.find_path(36, start, destination, allow_steep: true)
+      assert distance(List.last(path), destination) < 1.5
+    end
+
+    test "preserves routes through RFC and the Elwynn mines" do
+      cases = [
+        {389, {-376.811, 209.224, -21.801}, {-244.743, 150.085, -18.7494}},
+        {0, {-8671.72, -124.325, 92.6409}, {-8766.6, -156.686, 82.4446}},
+        {0, {-9796.72, 131.134, 24.4699}, {-9954.19, 221.055, 26.0012}},
+        {0, {-9326.82, -713.03, 67.5269}, {-9088.73, -573.684, 62.5813}}
+      ]
+
+      for {map, start, destination} <- cases, steep <- [false, true] do
+        assert [_ | _] = path = Pathfinding.find_path(map, start, destination, allow_steep: steep)
+        assert distance(List.last(path), destination) < 1.5
+      end
+    end
+
     test "routes the Deadmines alarm pirates to the breached door" do
       destination = {-99.6611, -671.071655, 7.42241}
 
@@ -103,5 +156,14 @@ defmodule ThistleTea.Game.World.PathfindingTest do
       assert_in_delta z, 0.268, 0.01
       assert_in_delta orientation, 0.0, 0.001
     end
+  end
+
+  defp distance({ax, ay, az}, {bx, by, bz}) do
+    :math.sqrt((ax - bx) ** 2 + (ay - by) ** 2 + (az - bz) ** 2)
+  end
+
+  defp advance({ax, ay, az} = start, {bx, by, bz} = target, amount) do
+    ratio = min(1.0, amount / distance(start, target))
+    {ax + (bx - ax) * ratio, ay + (by - ay) * ratio, az + (bz - az) * ratio}
   end
 end
