@@ -85,6 +85,7 @@ nix develop .#wow-tools            # shell with all of the above + sqlite + mari
 - aura-state and spell-effect immunities, with partial spell blocking, control purges, and expiry cleanup
 - school-specific damage immunity, with melee and periodic immune feedback and spell bypass attributes
 - periodic mana drains and life leech, with transfers limited by available mana and actual health lost
+- healing suppression and amplification across direct heals and HoTs, with strongest-effect stacking and live expiry updates
 - stack-aware dispels, with partial cures, Dispel All categories, and client combat-log feedback
 - talent-based dispel resistance, including Vile Poisons, per-stack attempts, and failed-dispel feedback
 - general and school-specific spell reflection, including Sheen of Zanza's guaranteed first reflection and charge consumption
