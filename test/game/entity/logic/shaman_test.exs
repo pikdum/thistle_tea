@@ -45,6 +45,15 @@ defmodule ThistleTea.Game.Entity.Logic.ShamanTest do
       assert [%Effects.TriggerSpell{spell_id: 20_007, target_guid: 1}] = triggered.internal.events
       assert Shaman.trigger_weapon_enchant(shaman(), payload, proc, 0.0, fn -> 0.06 end).internal.events == []
     end
+
+    test "PPM overrides flat chance and successful glancing hits can proc" do
+      proc = %{effect: %{amount: 100, spell_id: 20_007}, attack_time_ms: 3000}
+      payload = %{outcome: :glancing, victim_guid: 2}
+      assert Shaman.trigger_weapon_enchant(shaman(), payload, proc, 1.0, fn -> 0.06 end).internal.events == []
+
+      assert [%Effects.TriggerSpell{}] =
+               Shaman.trigger_weapon_enchant(shaman(), payload, proc, 1.0, fn -> 0.04 end).internal.events
+    end
   end
 
   describe "flametongue_damage/3" do

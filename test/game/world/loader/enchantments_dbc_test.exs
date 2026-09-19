@@ -11,10 +11,33 @@ defmodule ThistleTea.Game.World.Loader.EnchantmentsDbcTest do
   alias ThistleTea.Game.Entity.Data.ItemEnchantment
   alias ThistleTea.Game.Entity.Data.ItemTemplate
   alias ThistleTea.Game.Entity.Logic.EquipmentEnchantments
+  alias ThistleTea.Game.Player.Enchantments
+  alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.ItemEnchantment, as: EnchantmentLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
 
   @moduletag :dbc_db
+
+  describe "weapon_procs/2" do
+    test "uses only the striking hand and excludes feral weapon procs" do
+      id = 998_207
+      definition = %ItemEnchantment{id: id, effects: [%{type: 1, amount: 0, spell_id: 20_007}]}
+      :ets.insert(EnchantmentLoader, {{:enchantment, id}, definition})
+      weapon = ItemStore.create(%ItemTemplate{entry: 998_208, class: 2, delay: 3000})
+      weapon = weapon |> Item.put_permanent_enchantment(id) |> ItemStore.put()
+      character = %Character{player: %Player{mainhand: weapon.object.guid}, unit: %Unit{class: 11, auras: []}}
+
+      on_exit(fn ->
+        ItemStore.delete(weapon.object.guid)
+        :ets.delete(EnchantmentLoader, {:enchantment, id})
+      end)
+
+      assert [%{proc_spell: %{id: 20_007}, attack_time_ms: 3000}] = Enchantments.weapon_procs(character, :mainhand)
+      assert Enchantments.weapon_procs(character, :offhand) == []
+      assert Enchantments.weapon_procs(character, :ranged) == []
+      assert Enchantments.weapon_procs(%{character | unit: %{character.unit | shapeshift_form: 1}}, :mainhand) == []
+    end
+  end
 
   describe "load/1" do
     test "loads the real bracer enchant, target mask, rod and recipe thresholds" do

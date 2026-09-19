@@ -1,7 +1,7 @@
 defmodule ThistleTea.Game.Entity.Logic.Shaman do
   @moduledoc """
-  Pure Shaman weapon-imbue proc decisions. Enchantment and VMangos PPM data
-  are supplied by the player boundary.
+  Weapon enchantment proc decisions, including Shaman imbue effects.
+  Enchantment and VMangos PPM data are supplied by the player boundary.
   """
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Spell
@@ -14,7 +14,8 @@ defmodule ThistleTea.Game.Entity.Logic.Shaman do
   def trigger_weapon_enchant(entity, payload, proc, ppm, roll \\ &:rand.uniform/0)
 
   def trigger_weapon_enchant(entity, %{outcome: outcome, victim_guid: victim_guid}, proc, ppm, roll)
-      when outcome in [:normal, :crit] and is_map(proc) and is_number(ppm) and is_function(roll, 0) do
+      when outcome in [:normal, :crit, :glancing, :crushing, :block] and is_map(proc) and is_number(ppm) and
+             is_function(roll, 0) do
     chance = proc_chance(proc, ppm)
 
     if roll.() <= chance do
@@ -63,6 +64,10 @@ defmodule ThistleTea.Game.Entity.Logic.Shaman do
       when is_number(base_damage) and is_number(fire_bonus) and is_number(attack_time_ms) do
     round((base_damage + 3.85 * fire_bonus) * 0.01 * attack_time_ms / 1_000)
   end
+
+  defp proc_chance(%{attack_time_ms: attack_time_ms}, ppm)
+       when is_number(attack_time_ms) and attack_time_ms > 0 and is_number(ppm) and ppm > 0,
+       do: min(ppm * attack_time_ms / 60_000, 1.0)
 
   defp proc_chance(%{effect: %{amount: amount}}, _ppm) when is_integer(amount) and amount > 0,
     do: min(amount / 100, 1.0)

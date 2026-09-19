@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.Player.Enchantments do
 
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Item
+  alias ThistleTea.Game.Entity.Logic.Disarm
   alias ThistleTea.Game.Entity.Logic.Enchantments, as: EnchantmentLogic
   alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Entity.Logic.Inventory.Batch
@@ -148,6 +149,7 @@ defmodule ThistleTea.Game.Player.Enchantments do
 
   def weapon_procs(%Character{} = character, hand) do
     for {^hand, item, _enchant_slot, enchantment} <- Character.equipment_enchantments(character, Time.now()),
+        weapon_available?(character, hand),
         effect <- enchantment.effects,
         effect.type == 1 do
       %{
@@ -157,6 +159,10 @@ defmodule ThistleTea.Game.Player.Enchantments do
       }
     end
   end
+
+  defp weapon_available?(%Character{unit: %{class: 11, shapeshift_form: form}}, _hand) when form in [1, 5, 8], do: false
+  defp weapon_available?(character, :mainhand), do: not Disarm.unarmed?(character)
+  defp weapon_available?(_character, _hand), do: true
 
   def send_active_timers(%Character{} = character) do
     now = Time.now()

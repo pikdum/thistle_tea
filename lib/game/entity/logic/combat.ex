@@ -251,7 +251,7 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
             Map.get(attack, :queued_spell_id),
             outcome_proc_damage(result, absorbed)
           )
-          | hand: if(Map.get(attack, :offhand?), do: :offhand, else: :mainhand)
+          | hand: attack_hand(attack)
         }
       ]
     else
@@ -260,6 +260,10 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
   end
 
   defp attack_outcome_events(_entity, _attack, _result, _absorbed), do: []
+
+  defp attack_hand(%{ranged?: true}), do: :ranged
+  defp attack_hand(%{offhand?: true}), do: :offhand
+  defp attack_hand(_attack), do: :mainhand
 
   defp outcome_damage_basis(attack, %{outcome: outcome}, _absorbed) when outcome in [:dodge, :parry] do
     attack_damage(attack)
