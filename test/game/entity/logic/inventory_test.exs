@@ -361,6 +361,49 @@ defmodule ThistleTea.Game.Entity.Logic.InventoryTest do
   end
 
   describe "auto_equip/6" do
+    test "binds equipment once and preserves binding through unequip", %{unit: unit} do
+      item = build_item(99, %ItemTemplate{entry: 990, inventory_type: 5, bonding: 2, flags: 4})
+      player = store(%Player{}, @backpack_start, item)
+      get_item = get_item_fn([item])
+      assert {:ok, equipped} = Inventory.auto_equip(player, unit, @prof, @owner, {@bag_0, @backpack_start}, get_item)
+      assert updated(equipped.items, item).item.flags == 5
+      assert item.item.flags == 4
+      get_item = get_item_after(equipped, get_item)
+
+      assert {:ok, removed} =
+               Inventory.swap(equipped.player, unit, @prof, @owner, {@bag_0, 4}, {@bag_0, @backpack_start}, get_item)
+
+      get_item = get_item_after(removed, get_item)
+      assert get_item.(item.object.guid).item.flags == 5
+
+      assert {:ok, restored} =
+               Inventory.auto_equip(removed.player, unit, @prof, @owner, {@bag_0, @backpack_start}, get_item)
+
+      assert restored.player.chest == item.object.guid
+      assert get_item_after(restored, get_item).(item.object.guid).item.flags == 5
+    end
+
+    test "does not bind items on a rejected equip", %{unit: unit} do
+      item = build_item(99, %ItemTemplate{entry: 990, inventory_type: 5, bonding: 2, required_level: 60})
+      player = store(%Player{}, @backpack_start, item)
+
+      assert {:error, :cant_equip_level_i, _, _} =
+               Inventory.auto_equip(player, unit, @prof, @owner, {@bag_0, @backpack_start}, get_item_fn([item]))
+
+      assert item.item.flags == 0
+    end
+
+    test "binds equipped bags through the same transaction", %{unit: unit} do
+      item = build_item(99, %ItemTemplate{entry: 990, inventory_type: 18, container_slots: 6, class: 1, bonding: 2})
+      player = store(%Player{}, @backpack_start, item)
+
+      assert {:ok, equipped} =
+               Inventory.auto_equip(player, unit, @prof, @owner, {@bag_0, @backpack_start}, get_item_fn([item]))
+
+      assert equipped.player.bag1 == item.object.guid
+      assert updated(equipped.items, item).item.flags == 1
+    end
+
     test "equips into the matching empty slot", %{unit: unit, chest: chest} do
       player = store(%Player{}, @backpack_start, chest)
 

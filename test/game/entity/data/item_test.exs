@@ -32,6 +32,24 @@ defmodule ThistleTea.Game.Entity.Data.ItemTest do
     end
   end
 
+  describe "bind_on_equip/1" do
+    test "binds equipment without changing other instance flags" do
+      for bonding <- [1, 2, 4] do
+        item = Item.build(%ItemTemplate{entry: 1, bonding: bonding, flags: 4}, 1)
+        bound = Item.bind_on_equip(item)
+        assert bound.item.flags == 5
+        assert Item.bind_on_equip(bound) == bound
+      end
+    end
+
+    test "leaves unbound and bind-on-use items alone" do
+      for bonding <- [0, 3] do
+        item = Item.build(%ItemTemplate{entry: 1, bonding: bonding}, 1)
+        assert Item.bind_on_equip(item) == item
+      end
+    end
+  end
+
   describe "temporary enchantments" do
     test "permanent and temporary slots coexist through refresh and expiry" do
       item = Item.build(%ItemTemplate{entry: 25}, 1)

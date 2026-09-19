@@ -363,7 +363,10 @@ defmodule ThistleTea.Game.Player.Mail do
     do: {:error, :invalid_item}
 
   defp validate_item(%Item{} = item) do
-    if Bitwise.band(Item.template(item).flags || 0, 0x02) == 0, do: :ok, else: {:error, :invalid_item}
+    if Bitwise.band(Item.template(item).flags || 0, 0x02) == 0 and
+         Bitwise.band(item.item.flags || 0, 0x01) == 0,
+       do: :ok,
+       else: {:error, :invalid_item}
   end
 
   defp mail_attrs(character, recipient, message, item) do

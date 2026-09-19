@@ -1071,7 +1071,10 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
       |> put_visible_entry(slot, item)
 
     ctx = %{ctx | player: player}
-    set_contained(ctx, item, ctx.owner)
+
+    ctx
+    |> set_contained(item, ctx.owner)
+    |> bind_equipped(item, equipment_slot?(slot) or bag_slot?(slot) or bank_bag_slot?(slot))
   end
 
   defp put_pos(ctx, {bag, slot}, item) do
@@ -1080,6 +1083,14 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
     ctx = mark_changed(ctx, %{bag_item | container: container})
     set_contained(ctx, item, bag_item.object.guid)
   end
+
+  defp bind_equipped(ctx, %Item{} = item, true) do
+    item = get_item(ctx, item.object.guid) || item
+    bound = Item.bind_on_equip(item)
+    if bound == item, do: ctx, else: mark_changed(ctx, bound)
+  end
+
+  defp bind_equipped(ctx, _item, _equipped?), do: ctx
 
   defp set_contained(ctx, nil, _contained), do: ctx
 

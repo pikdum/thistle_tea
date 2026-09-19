@@ -48,6 +48,14 @@ defmodule ThistleTea.Game.Entity.Data.Item do
 
   def template(%__MODULE__{internal: %{template: template}}), do: template
 
+  def bind_on_equip(%__MODULE__{} = item) do
+    if template(item).bonding in [1, 2, 4] do
+      %{item | item: %{item.item | flags: (item.item.flags || 0) ||| 1}}
+    else
+      item
+    end
+  end
+
   def container?(%__MODULE__{container: %Container{}}), do: true
   def container?(%__MODULE__{}), do: false
 
