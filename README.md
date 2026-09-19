@@ -115,6 +115,7 @@ nix develop .#wow-tools            # shell with all of the above + sqlite + mari
 - Skinning, with corpse loot prerequisites, profession skill checks and gains, and private leather loot
 - Disenchanting, with exact-item consumption, private material loot, Enchanting skill gains, and recovery when bags are full
 - Permanent equipment enchants, with atomic material costs, profession skill gains, independent equipment bonuses, and weapon procs
+- [Creature-specific flat damage](docs/creature-damage-playtest.md), including Beastslayer and Elemental Slayer enchants across weapon attacks, spells, and periodic damage
 - quests
 - xp, leveling, and exploration
 - isolated dungeon instances (Ragefire Chasm)
