@@ -102,7 +102,8 @@ defmodule ThistleTea.Game.Entity.Logic.DurabilityTest do
       assert synced.broken_equipment == [:mainhand]
       assert synced.visible_item_16_0 == player.visible_item_16_0
       assert Inventory.equipment_entry(synced, :mainhand) == 0
-      assert Inventory.equipped_templates(synced, broken_get) == [Item.template(get.(5))]
+      assert Inventory.usable_equipped_templates(synced, broken_get) == [Item.template(get.(5))]
+      assert Item.template(broken) in Inventory.equipped_templates(synced, broken_get)
       assert Skills.main_hand_weapon_skill(synced, fn _ -> Item.template(broken) end) == 162
       repaired = Inventory.sync_broken_equipment(synced, get)
       assert repaired.broken_equipment == []

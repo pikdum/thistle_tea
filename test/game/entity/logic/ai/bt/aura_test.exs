@@ -34,6 +34,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.AuraTest do
       assert entity.unit.health == 50
 
       assert [
+               %Effects.DurabilityDamage{source_guid: 999, lethal?: false},
                %Effects.SpellDamage{
                  source_guid: 999,
                  target_guid: 1,

@@ -18,6 +18,21 @@ defmodule ThistleTea.Game.Entity.EventSink.Combat do
 
   @victimstate_normal 1
 
+  def emit(entity, %Effects.DurabilityLoss{} = effect, context) do
+    message = {:durability_loss, effect.mode, effect.amount, effect.scope, effect.death?}
+
+    if effect.target_guid == entity.object.guid do
+      Context.send(context, message)
+    else
+      case Entity.pid(effect.target_guid) do
+        pid when is_pid(pid) -> send(pid, message)
+        _missing -> :ok
+      end
+    end
+
+    entity
+  end
+
   def emit(entity, %Effects.EnvironmentalDamage{type: type, damage: damage}, _context) do
     damage_type = %{drowning: 1, fall: 2} |> Map.fetch!(type)
 

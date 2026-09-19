@@ -31,6 +31,7 @@ defmodule ThistleTea.Game.Player.DevCommands do
   alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.Player.Battlegrounds, as: PlayerBattlegrounds
   alias ThistleTea.Game.Player.Characters
+  alias ThistleTea.Game.Player.Durability
   alias ThistleTea.Game.Player.Exploration, as: PlayerExploration
   alias ThistleTea.Game.Player.Items
   alias ThistleTea.Game.Player.Quests
@@ -117,6 +118,7 @@ defmodule ThistleTea.Game.Player.DevCommands do
       ".debug reputation set <faction_id> <standing> - set absolute standing",
       ".debug reputation war <faction_id> <on|off> - toggle at-war",
       ".debug skills - max out known skills for your level",
+      ".debug durability <percent> [carried] - apply durability wear for testing",
       ".debug spells - learn class trainer spells up to your level",
       ".debug events - show active events and the next scheduled change",
       ".debug explore - unlock every world-map area",
@@ -294,6 +296,15 @@ defmodule ThistleTea.Game.Player.DevCommands do
     |> handled()
   end
 
+  def run(state, ".debug durability" <> params) do
+    case String.split(params, trim: true) do
+      [percent] -> debug_durability(state, percent, :equipped)
+      [percent, "carried"] -> debug_durability(state, percent, :carried)
+      _ -> system_message(state, "Use: .debug durability <percent> [carried]")
+    end
+    |> handled()
+  end
+
   def run(state, ".debug random equipment" <> _) do
     state
     |> add_random_equipment()
@@ -446,6 +457,18 @@ defmodule ThistleTea.Game.Player.DevCommands do
   def run(_state, _message), do: :unhandled
 
   defp handled(state), do: {:handled, state}
+
+  defp debug_durability(state, percent, scope) do
+    case Integer.parse(percent) do
+      {amount, ""} when amount in 1..100 ->
+        state
+        |> Durability.lose(:percent, amount, scope)
+        |> system_message("Applied #{amount}% durability wear to #{scope} equipment.")
+
+      _ ->
+        system_message(state, "Durability wear must be between 1 and 100 percent.")
+    end
+  end
 
   defp show_threat(%{target: target} = state) when is_integer(target) and target > 0 do
     with :mob <- Guid.entity_type(target),

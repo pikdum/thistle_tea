@@ -25,6 +25,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.World.Loader.BroadcastText, as: BroadcastTextLoader
   alias ThistleTea.Game.World.Loader.ClassSpell, as: ClassSpellLoader
   alias ThistleTea.Game.World.Loader.CreatureTemplate, as: CreatureTemplateLoader
+  alias ThistleTea.Game.World.Loader.Durability, as: DurabilityLoader
   alias ThistleTea.Game.World.Loader.Exploration, as: ExplorationLoader
   alias ThistleTea.Game.World.Loader.Faction, as: FactionLoader
   alias ThistleTea.Game.World.Loader.Fishing, as: FishingLoader
@@ -145,6 +146,7 @@ defmodule ThistleTea.Application do
     InstanceData.init()
     ItemLoader.init()
     ItemEnchantmentLoader.init()
+    DurabilityLoader.init()
     ItemStore.init()
     CharacterStore.init()
     VendorLoader.init()
@@ -242,6 +244,7 @@ defmodule ThistleTea.Application do
         VendorLoader.load_all()
         AreaTriggerLoader.load_all()
         BankBagSlotPriceLoader.load_all()
+        DurabilityLoader.load_all()
         BattlegroundLoader.load_all()
 
         BroadcastTextLoader.load_all(InstanceScript.broadcast_text_ids() ++ BattlegroundLoader.broadcast_text_ids())

@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.Entity.Logic.Disarm do
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
+  alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Spell
 
   def active?(%{unit: %Unit{} = unit}), do: active?(unit)
@@ -31,13 +32,21 @@ defmodule ThistleTea.Game.Entity.Logic.Disarm do
   def damage_multiplier(_entity), do: 1.0
 
   def parry_disabled?(%Character{unit: %Unit{base_offhand_max_damage: offhand}} = entity) do
-    unarmed?(entity) and not (is_number(offhand) and offhand > 0)
+    (unarmed?(entity) or broken_mainhand?(entity)) and not (is_number(offhand) and offhand > 0)
   end
 
   def parry_disabled?(_entity), do: false
 
+  defp broken_mainhand?(%Character{player: %{broken_equipment: slots} = player}) when is_list(slots) do
+    (:mainhand in slots or :offhand in slots) and Inventory.equipment_entry(player, :mainhand) in [0, nil]
+  end
+
+  defp broken_mainhand?(_entity), do: false
+
   def validate(%Character{} = entity, %Spell{equipped_item_class: 2} = spell) do
-    if active?(entity) and not ranged_weapon?(spell), do: {:error, :equipped_item}, else: :ok
+    if (active?(entity) or broken_mainhand?(entity)) and not ranged_weapon?(spell),
+      do: {:error, :equipped_item},
+      else: :ok
   end
 
   def validate(%Mob{} = entity, %Spell{effects: effects}) do

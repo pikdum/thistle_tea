@@ -75,6 +75,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.Player.CompanionVisibility
   alias ThistleTea.Game.Player.ConditionContext
   alias ThistleTea.Game.Player.Disenchant
+  alias ThistleTea.Game.Player.Durability
   alias ThistleTea.Game.Player.Enchantments
   alias ThistleTea.Game.Player.Exploration, as: PlayerExploration
   alias ThistleTea.Game.Player.GameObjects, as: PlayerGameObjects
@@ -803,6 +804,15 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   rescue
     error ->
       Logger.error("Disenchant failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
+  def handle_info({:durability_loss, mode, amount, scope, death?}, %{character: %Character{}} = state) do
+    state = Durability.lose(state, mode, amount, scope, death?)
+    {:noreply, state, {:continue, :maybe_broadcast_update}}
+  rescue
+    error ->
+      Logger.error("Durability loss failed: #{Exception.message(error)}")
       {:noreply, state}
   end
 

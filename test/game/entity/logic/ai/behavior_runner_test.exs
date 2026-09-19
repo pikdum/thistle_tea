@@ -34,7 +34,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BehaviorRunnerTest do
       assert {:failure, entity} = BehaviorRunner.tick(tree, entity, Context.new(now))
       assert entity.unit.health == 83
 
-      assert [%Effects.SpellDamage{spell_id: 11_366, periodic?: true}] = entity.internal.events
+      assert [
+               %Effects.DurabilityDamage{source_guid: 999, lethal?: false},
+               %Effects.SpellDamage{spell_id: 11_366, periodic?: true}
+             ] = entity.internal.events
     end
   end
 

@@ -2,6 +2,8 @@ defmodule ThistleTea.Game.Entity.Logic.Effects.CombatTypes do
   @moduledoc false
 
   effects = [
+    {:DurabilityDamage, [:source_guid, :lethal?, :environmental?], []},
+    {:DurabilityLoss, [:target_guid, :mode, :amount, :scope], [death?: false]},
     {:EnvironmentalDamage, [:type, :damage], []},
     {:DeliverAttack, [:target_guid, :attack], []},
     {:AttackStart, [:source_guid, :target_guid], []},

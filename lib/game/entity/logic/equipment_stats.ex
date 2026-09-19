@@ -52,7 +52,7 @@ defmodule ThistleTea.Game.Entity.Logic.EquipmentStats do
   def resync(character, get_item, get_spell \\ fn _spell_id -> nil end, enchantments \\ [])
 
   def resync(%{unit: %Unit{} = unit, player: %Player{} = player} = character, get_item, get_spell, enchantments) do
-    bonuses = player |> Inventory.equipped_templates(get_item) |> bonuses(get_spell)
+    bonuses = player |> Inventory.usable_equipped_templates(get_item) |> bonuses(get_spell)
     bonuses = Enum.reduce(enchantments, bonuses, &add_enchantment(&2, &1, unit.class))
     unit = %{unit | equipment_bonuses: bonuses} |> Stats.recompute()
     player = apply_spell_damage_fields(player, bonuses)

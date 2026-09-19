@@ -117,6 +117,7 @@ defmodule ThistleTea.Game.Network.Message.Dispatch do
               CMSG_DESTROYITEM: Message.CmsgDestroyitem,
               CMSG_BANKER_ACTIVATE: Message.CmsgBankerActivate,
               CMSG_BUY_BANK_SLOT: Message.CmsgBuyBankSlot,
+              CMSG_REPAIR_ITEM: Message.CmsgRepairItem,
               CMSG_AUTOBANK_ITEM: Message.CmsgAutobankItem,
               CMSG_AUTOSTORE_BANK_ITEM: Message.CmsgAutostoreBankItem,
               CMSG_AUTOSTORE_BAG_ITEM: Message.CmsgAutostoreBagItem,

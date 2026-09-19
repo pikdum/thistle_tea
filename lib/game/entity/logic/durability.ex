@@ -7,8 +7,34 @@ defmodule ThistleTea.Game.Entity.Logic.Durability do
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Item
   alias ThistleTea.Game.Entity.Data.ItemTemplate
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Entity.Logic.Inventory.Batch
+  alias ThistleTea.Game.Spell
+
+  def on_damage(%{object: %{guid: guid}} = entity, previous_health, remaining, new_health, opts)
+      when previous_health > 0 and remaining > 0 do
+    spell = Keyword.get(opts, :spell)
+    source = Keyword.get(opts, :source)
+    environmental? = Keyword.get(opts, :environmental?, false)
+    applicable? = new_health == 0 or (not environmental? and is_integer(source) and source > 0 and source != guid)
+
+    if not applicable? or (new_health == 0 and no_death_loss?(spell, Keyword.get(opts, :spell_id))) do
+      entity
+    else
+      Effects.enqueue(entity, %Effects.DurabilityDamage{
+        source_guid: source,
+        lethal?: new_health == 0,
+        environmental?: environmental?
+      })
+    end
+  end
+
+  def on_damage(entity, _previous_health, _remaining, _new_health, _opts), do: entity
+
+  defp no_death_loss?(_spell, 27_965), do: true
+  defp no_death_loss?(%Spell{} = spell, _id), do: Spell.attribute?(spell, :no_durability_loss)
+  defp no_death_loss?(_spell, _id), do: false
 
   def lose(%Item{item: component} = item, mode, amount)
       when is_number(amount) and amount > 0 and is_integer(component.max_durability) and component.max_durability > 0 do

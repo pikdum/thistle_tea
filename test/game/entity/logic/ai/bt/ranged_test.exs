@@ -97,6 +97,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.RangedTest do
       spell = %Spell{id: 75, min_range_yards: 8.0, range_yards: 35.0}
 
       character = %Character{
+        player: %Player{},
         object: %Object{guid: 1},
         unit: %Unit{health: 100, level: 50, combat_reach: 1.5, ranged_attack_time: 2_000},
         internal: %Internal{

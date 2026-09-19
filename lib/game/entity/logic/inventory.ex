@@ -178,12 +178,19 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
   end
 
   def equipped_templates(%Player{} = player, get_item) do
+    player |> equipped_items(get_item) |> Enum.map(&Item.template/1)
+  end
+
+  def usable_equipped_templates(%Player{} = player, get_item) do
+    player |> equipped_items(get_item) |> Enum.reject(&Item.broken?/1) |> Enum.map(&Item.template/1)
+  end
+
+  defp equipped_items(player, get_item) do
     (@equipment_fields ++ @bag_fields)
     |> Enum.map(fn field -> Map.get(player, field) end)
     |> Enum.filter(fn guid -> is_integer(guid) and guid > 0 end)
     |> Enum.map(get_item)
-    |> Enum.reject(&(is_nil(&1) or Item.broken?(&1)))
-    |> Enum.map(&Item.template/1)
+    |> Enum.reject(&is_nil/1)
   end
 
   def plan(%Batch{} = batch, get_item) when is_function(get_item, 1) do

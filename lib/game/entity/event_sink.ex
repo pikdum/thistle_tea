@@ -47,6 +47,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
     Effects.ScriptSteps
   ]
   @combat_effects [
+    Effects.DurabilityLoss,
     Effects.AttackNotInRange,
     Effects.AttackOutcome,
     Effects.AttackStart,

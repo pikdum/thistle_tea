@@ -53,7 +53,8 @@ defmodule ThistleTea.Game.Entity.Logic.CoreTest do
                  target_guid: 2,
                  cast_context: %CastContext{caster_guid: 777, target_guid: 2},
                  spell: %Spell{id: 6940, effects: [%Spell.Effect{base_points: 30}]}
-               }
+               },
+               %Effects.DurabilityDamage{source_guid: 777, lethal?: false}
              ] = entity.internal.events
     end
 
@@ -64,7 +65,7 @@ defmodule ThistleTea.Game.Entity.Logic.CoreTest do
       {entity, _absorbed} = Core.take_damage_with_absorb(entity, 2, 1_000, school: :physical, source: 777)
 
       assert entity.unit.health == 98
-      assert entity.internal.events == []
+      assert [%Effects.DurabilityDamage{source_guid: 777, lethal?: false}] = entity.internal.events
     end
   end
 

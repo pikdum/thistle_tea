@@ -4,6 +4,7 @@ defmodule ThistleTea.Game.Entity.EffectResolver do
   """
 
   alias ThistleTea.Game.Entity.EffectResolver.Combat
+  alias ThistleTea.Game.Entity.EffectResolver.Durability
   alias ThistleTea.Game.Entity.EffectResolver.Movement
   alias ThistleTea.Game.Entity.EffectResolver.Spells
   alias ThistleTea.Game.Entity.Logic.Effects
@@ -15,6 +16,8 @@ defmodule ThistleTea.Game.Entity.EffectResolver do
   def resolve(entity, effects) when is_list(effects) do
     Enum.flat_map(effects, &resolve(entity, &1))
   end
+
+  def resolve(entity, %Effects.DurabilityDamage{} = effect), do: Durability.resolve(entity, effect)
 
   def resolve(entity, %{__struct__: effect_module} = effect) when effect_module in @combat_requests do
     Combat.resolve(entity, effect)

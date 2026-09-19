@@ -22,6 +22,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
   alias ThistleTea.Game.Entity.Logic.Companion
   alias ThistleTea.Game.Entity.Logic.DamageImmunity
   alias ThistleTea.Game.Entity.Logic.Dueling
+  alias ThistleTea.Game.Entity.Logic.Durability
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Engagement
   alias ThistleTea.Game.Entity.Logic.Intoxication
@@ -121,6 +122,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
         |> gain_taken_rage(remaining, Keyword.get(opts, :source))
         |> Reactive.sync_health()
         |> Threat.add_damage(Keyword.get(opts, :source), damage * Keyword.get(opts, :threat_multiplier, 1.0))
+        |> Durability.on_damage(health, remaining, new_health, opts)
         |> maybe_enqueue_death_root(health, new_health)
         |> maybe_prepare_self_res(health, new_health, now)
         |> maybe_record_killer(health, new_health, Keyword.get(opts, :source))
