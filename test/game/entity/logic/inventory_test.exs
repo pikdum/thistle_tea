@@ -247,6 +247,32 @@ defmodule ThistleTea.Game.Entity.Logic.InventoryTest do
   end
 
   describe "plan/2" do
+    test "removes the selected instance rather than another item with the same entry" do
+      first = build_item(20, %ItemTemplate{entry: 750})
+      selected = build_item(21, %ItemTemplate{entry: 750})
+      player = %Player{} |> store(@backpack_start, first) |> store(@backpack_start + 1, selected)
+      batch = player |> Batch.new() |> Batch.remove_item(selected.object.guid, 1)
+
+      assert {:ok, changes} = Inventory.plan(batch, get_item_fn([first, selected]))
+      assert changes.player.inv1 == first.object.guid
+      assert [^selected] = ChangeSet.destroyed_items(changes)
+    end
+
+    test "exact removals see prior stack changes and reject replay or excess quantity" do
+      item = build_item(20, %ItemTemplate{entry: 750, stackable: 20}, stack_count: 3)
+      player = store(%Player{}, @backpack_start, item)
+      lookup = get_item_fn([item])
+      batch = player |> Batch.new() |> Batch.remove_item(item.object.guid, 2)
+
+      assert {:ok, changes} = Inventory.plan(batch, lookup)
+      assert [%{item: %{stack_count: 1}}] = ChangeSet.changed_items(changes)
+      assert {:ok, changes} = Inventory.plan(Batch.remove_item(batch, item.object.guid, 1), lookup)
+      assert [%{object: %{guid: guid}}] = ChangeSet.destroyed_items(changes)
+      assert guid == item.object.guid
+      assert {:error, :item_not_found} = Inventory.plan(Batch.remove_item(batch, item.object.guid, 2), lookup)
+      assert {:error, :item_not_found} = Inventory.plan(Batch.remove_item(batch, 9999, 1), lookup)
+    end
+
     test "uses slots freed by removals for additions" do
       required = build_item(20, %ItemTemplate{entry: 750})
       reward = build_item(40, %ItemTemplate{entry: 900})

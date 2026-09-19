@@ -14,6 +14,12 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory.Batch do
     defstruct [:entry, :count]
   end
 
+  defmodule ItemRemoval do
+    @moduledoc false
+    @enforce_keys [:guid, :count]
+    defstruct [:guid, :count]
+  end
+
   @enforce_keys [:player]
   defstruct [:player, removals: [], additions: []]
 
@@ -26,6 +32,11 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory.Batch do
 
   def add(%__MODULE__{additions: additions} = batch, %Item{} = item) do
     %{batch | additions: [item | additions]}
+  end
+
+  def remove_item(%__MODULE__{removals: removals} = batch, guid, count)
+      when is_integer(guid) and guid > 0 and is_integer(count) and count > 0 do
+    %{batch | removals: [%ItemRemoval{guid: guid, count: count} | removals]}
   end
 
   def removals(%__MODULE__{removals: removals}), do: Enum.reverse(removals)
