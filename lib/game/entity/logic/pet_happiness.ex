@@ -67,7 +67,10 @@ defmodule ThistleTea.Game.Entity.Logic.PetHappiness do
 
   def on_death(%Mob{internal: %Internal{pet: %Pet{kind: :hunter}}} = pet, battleground?) do
     pet = if battleground?, do: pet, else: change(pet, -@level_size)
-    schedule(pet, nil)
+
+    pet
+    |> schedule(nil)
+    |> Effects.enqueue(%Effects.PetDied{source_guid: pet.object.guid, target_guid: pet.internal.pet.owner_guid})
   end
 
   def on_death(entity, _battleground?), do: entity

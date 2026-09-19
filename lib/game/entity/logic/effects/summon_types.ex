@@ -21,10 +21,11 @@ defmodule ThistleTea.Game.Entity.Logic.Effects.SummonTypes do
     {:ReleaseControlled, [:source_guid, :target_guid], [spell_id: nil]},
     {:ViewpointGranted, [:source_guid, :target_guid], []},
     {:ViewpointReleased, [:source_guid, :target_guid], []},
-    {:SummonPet, [:source_guid, :entry, :spell_id], []},
+    {:SummonPet, [:source_guid, :entry, :spell_id], [health_percent: 100]},
     {:TameCreature, [:source_guid, :entry], []},
     {:DismissPet, [:target_guid], []},
     {:PetHappinessChanged, [:source_guid, :target_guid, :happiness], []},
+    {:PetDied, [:source_guid, :target_guid], []},
     {:SummonTotem, [:entry, :slot, :duration_ms], []},
     {:DespawnSelf, [:duration_ms, :respawn_delay_ms], []},
     {:RespawnSelf, [:even_if_alive?], []}

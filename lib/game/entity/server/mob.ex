@@ -518,14 +518,8 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
   def handle_call(:feed_info, _from, %Mob{} = state), do: {:reply, {:error, :not_pet}, state}
 
-  def handle_call(:pet_happiness, _from, %Mob{internal: %Internal{pet: %Pet{kind: :hunter}}} = state) do
-    {:reply, {:ok, state.unit.power5}, state}
-  end
-
-  def handle_call(:pet_happiness, _from, %Mob{} = state), do: {:reply, {:error, :not_hunter_pet}, state}
-
   def handle_call(:suspend_hunter_pet, _from, %Mob{internal: %Internal{pet: %Pet{kind: :hunter}}} = state) do
-    {:stop, :normal, {:ok, state.unit.power5}, state}
+    {:stop, :normal, {:ok, state.unit.power5, Core.dead?(state)}, state}
   end
 
   def handle_call(:suspend_hunter_pet, _from, %Mob{} = state), do: {:reply, {:error, :not_hunter_pet}, state}

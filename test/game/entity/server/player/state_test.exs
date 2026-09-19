@@ -28,7 +28,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.StateTest do
     end
 
     @impl true
-    def handle_call(:suspend_hunter_pet, _from, happiness), do: {:stop, :normal, {:ok, happiness}, happiness}
+    def handle_call(:suspend_hunter_pet, _from, happiness), do: {:stop, :normal, {:ok, happiness, true}, happiness}
   end
 
   describe "struct defaults" do
@@ -88,7 +88,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.StateTest do
   end
 
   describe "suspend_companion/1" do
-    test "captures the final pet happiness before stopping its owner process" do
+    test "captures final happiness and death before stopping the pet process" do
       guid = Guid.from_low_guid(:pet, 2960, :erlang.unique_integer([:positive]))
       pid = start_supervised!({HappinessPet, {guid, 700_000}})
       ref = Process.monitor(pid)
@@ -100,6 +100,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.StateTest do
 
       state = CompanionOwner.suspend(%State{character: character})
       assert CompanionLogic.relationship(state.character).happiness == 700_000
+      assert CompanionLogic.relationship(state.character).dead?
       assert CompanionLogic.suspended(state.character) == {:hunter_pet, 2960, 1515}
       assert_receive {:DOWN, ^ref, :process, ^pid, :normal}
     end

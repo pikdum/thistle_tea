@@ -94,6 +94,16 @@ defmodule ThistleTea.Game.Entity.Logic.CompanionTest do
     end
   end
 
+  describe "remember_death/2" do
+    test "retains death through suspension and clears it when revived" do
+      character = character_with_pet() |> Companion.remember_death(44) |> Companion.suspend()
+      assert Companion.relationship(character).dead?
+      restored = Companion.activate(character, :hunter_pet, %EntityRef{guid: 55, entry: 416, spell_id: 982})
+      refute Companion.relationship(restored).dead?
+      assert Companion.remember_death(restored, 44) == restored
+    end
+  end
+
   defp character_with_pet do
     %Character{unit: %Unit{}, internal: %Internal{}}
     |> Companion.activate(:hunter_pet, %EntityRef{guid: 44, entry: 416, spell_id: 688})

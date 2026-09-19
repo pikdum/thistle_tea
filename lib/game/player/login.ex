@@ -177,7 +177,7 @@ defmodule ThistleTea.Game.Player.Login do
       )
       when kind in [:hunter_pet, :guardian] and is_integer(entry) and entry > 0 and is_integer(spell_id) and
              spell_id > 0 do
-    if Death.alive?(character) do
+    if Death.alive?(character) and not character.internal.companion.dead? do
       EventSink.emit(character, Effects.summon_pet(character.object.guid, entry, spell_id))
     end
 

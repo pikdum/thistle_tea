@@ -41,6 +41,17 @@ defmodule ThistleTea.Game.Entity.Logic.Companion do
     end
   end
 
+  def remember_death(%Character{} = character, guid) do
+    if controls?(character, guid), do: capture_death(character, true), else: character
+  end
+
+  def capture_death(%Character{} = character, dead?) when is_boolean(dead?) do
+    case relationship(character) do
+      %Companion{kind: :hunter_pet} = companion -> put_relationship(character, %{companion | dead?: dead?})
+      _ -> character
+    end
+  end
+
   def suspend(%Character{internal: %Internal{companion: %Companion{} = companion}} = character) do
     case companion do
       %Companion{kind: kind, status: {:active, %EntityRef{} = entity_ref}} when kind in @summon_kinds ->

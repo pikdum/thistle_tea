@@ -33,6 +33,18 @@ defmodule ThistleTea.Game.Player.LoginTest do
   end
 
   describe "restore_companion/1" do
+    test "does not resummon a pet that died before logout" do
+      character = character(health: 100)
+
+      character = %{
+        character
+        | internal: %{character.internal | companion: %{character.internal.companion | dead?: true}}
+      }
+
+      state = %{character: character}
+      assert Login.restore_companion(state) == state
+    end
+
     test "does not resummon the saved pet while the character is dead" do
       state = %{character: character(health: 0)}
 

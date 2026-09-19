@@ -116,7 +116,27 @@ defmodule ThistleTea.Game.Entity.Logic.HunterTest do
 
       spell = Hunter.apply_food_benefit(%Spell{effects: [energize, other]}, 35_000)
 
-      assert [%Effect{base_points: 35_000, die_sides: 0}, ^other] = spell.effects
+      assert [%Effect{base_points: 35_000, die_sides: 0} = effect, ^other] = spell.effects
+      assert Effect.roll(effect, 0) == 35_000
+    end
+  end
+
+  describe "validate_companion/2" do
+    test "requires revival after pet death and rejects revival of living pets" do
+      hunter = %Character{unit: %Unit{}, internal: %Internal{}}
+      call = %Spell{effects: [%Effect{type: :summon_pet, misc_value: 0}]}
+      revive = %Spell{effects: [%Effect{type: :revive_pet, misc_value: 0}]}
+      assert Hunter.validate_companion(hunter, call) == {:error, :no_pet}
+      assert Hunter.validate_companion(hunter, revive) == {:error, :no_pet}
+      hunter = Companion.activate(hunter, :hunter_pet, %EntityRef{guid: 99, entry: 1, spell_id: 1515})
+      assert Hunter.validate_companion(hunter, call) == {:error, :already_have_summon}
+      assert Hunter.validate_companion(hunter, revive) == {:error, :target_not_dead}
+      assert Hunter.validate_companion(Companion.suspend(hunter), call) == :ok
+      assert Hunter.validate_companion(Companion.suspend(hunter), revive) == {:error, :target_not_dead}
+      dead = hunter |> Companion.remember_death(99) |> Companion.suspend()
+      assert Hunter.validate_companion(dead, call) == {:error, :targets_dead}
+      assert Hunter.validate_companion(dead, revive) == :ok
+      assert Hunter.validate_companion(dead, %Spell{effects: [%Effect{type: :summon_pet, misc_value: 416}]}) == :ok
     end
   end
 

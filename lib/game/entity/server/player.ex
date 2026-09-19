@@ -989,6 +989,11 @@ defmodule ThistleTea.Game.Entity.Server.Player do
     {:noreply, %{state | character: character}}
   end
 
+  def handle_info(%Effects.PetDied{source_guid: guid}, %State{} = state) do
+    character = Companion.remember_death(state.character, guid)
+    {:noreply, %{state | character: character}}
+  end
+
   def handle_info({:reputation_change, faction_id, value}, %State{} = state) do
     {:noreply, PlayerReputation.reward_spell(state, faction_id, value)}
   end

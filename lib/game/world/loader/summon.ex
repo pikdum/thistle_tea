@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.World.Loader.Summon do
   alias ThistleTea.DBC
   alias ThistleTea.DBC.CreatureFamily
   alias ThistleTea.Game.Entity.Data.Component.Internal.Pet
+  alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.CreatureSpell
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
@@ -116,6 +117,11 @@ defmodule ThistleTea.Game.World.Loader.Summon do
   end
 
   def build_pet(_entry, _owner), do: nil
+
+  def with_health_percent(%Mob{unit: %Unit{} = unit} = pet, percent) when is_number(percent) do
+    health = unit.max_health |> Kernel.*(percent / 100) |> trunc() |> max(1) |> min(unit.max_health)
+    %{pet | unit: %{unit | health: health}}
+  end
 
   defp restore_happiness(%Mob{internal: %{pet: %Pet{kind: :hunter}}} = pet, owner, entry) do
     happiness = Companion.relationship(owner).happiness

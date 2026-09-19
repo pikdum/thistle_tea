@@ -61,11 +61,22 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.SummonControl do
     {state, [Effects.summon_pet(caster_guid, entry, spell_id)]}
   end
 
-  def apply(%Character{} = state, %CastContext{caster_guid: caster_guid}, %Spell{id: spell_id}, effect, _now)
+  def apply(
+        %Character{} = state,
+        %CastContext{caster_guid: caster_guid} = context,
+        %Spell{id: spell_id} = spell,
+        effect,
+        _now
+      )
       when effect.type in [:summon_pet, :revive_pet] and effect.misc_value == 0 do
     case Companion.entry(state) do
-      entry when is_integer(entry) and entry > 0 -> {state, [Effects.summon_pet(caster_guid, entry, spell_id)]}
-      _ -> {state, []}
+      entry when is_integer(entry) and entry > 0 ->
+        health_percent = if effect.type == :revive_pet, do: Amount.roll(spell, effect, context), else: 100
+        summon = %{Effects.summon_pet(caster_guid, entry, spell_id) | health_percent: health_percent}
+        {state, [summon]}
+
+      _ ->
+        {state, []}
     end
   end
 

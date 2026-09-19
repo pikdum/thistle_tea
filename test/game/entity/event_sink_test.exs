@@ -612,7 +612,7 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
     end
 
     @tag :dbc_db
-    test "a summon-pet event starts an owned pet entity" do
+    test "a summon-pet event starts an owned pet with the requested health" do
       caster_guid = Guid.from_low_guid(:player, unique_guid())
       Entity.register(caster_guid)
 
@@ -626,7 +626,7 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
         movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
       }
 
-      event = Effects.summon_pet(caster_guid, 416, 688)
+      event = %{Effects.summon_pet(caster_guid, 416, 688) | health_percent: 15}
 
       assert ^caster = EventSink.emit(caster, event)
 
@@ -635,7 +635,7 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
         entity_ref: %EntityRef{guid: pet_guid, entry: 416, spell_id: 688},
         pid: pet_pid,
         spells: pet_spells,
-        create: %UpdateObject{object: %Object{guid: pet_guid}}
+        create: %UpdateObject{object: %Object{guid: pet_guid}, unit: %Unit{health: 83}}
       }
 
       assert pet_pid == Entity.pid(pet_guid)

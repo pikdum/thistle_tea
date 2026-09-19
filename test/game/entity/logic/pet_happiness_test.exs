@@ -118,6 +118,7 @@ defmodule ThistleTea.Game.Entity.Logic.PetHappinessTest do
       assert dead.unit.power5 == 333_500
       assert dead.internal.pet.next_happiness_at == nil
       assert dead.unit.min_damage == 80
+      assert Enum.any?(dead.internal.events, &match?(%Effects.PetDied{source_guid: 1, target_guid: 10}, &1))
       assert PetHappiness.on_death(pet, true).unit.power5 == pet.unit.power5
       assert PetHappiness.on_death(%{pet | unit: %{pet.unit | power5: 100}}, false).unit.power5 == 0
     end

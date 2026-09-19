@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.Entity.Logic.Hunter do
   import Bitwise, only: [&&&: 2, <<<: 2]
 
   alias ThistleTea.Game.Entity.Data.Character
+  alias ThistleTea.Game.Entity.Data.Companion, as: CompanionData
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.AutoRepeat
   alias ThistleTea.Game.Entity.Logic.Companion
@@ -42,6 +43,15 @@ defmodule ThistleTea.Game.Entity.Logic.Hunter do
   def validate_feed(%Spell{} = spell, feed_context) do
     if feed_pet?(spell), do: validate_feed_context(feed_context), else: :ok
   end
+
+  def validate_companion(%Character{} = caster, %Spell{effects: effects}) do
+    case Enum.find(effects, &(&1.type in [:summon_pet, :revive_pet] and &1.misc_value == 0)) do
+      %Spell.Effect{type: type} -> validate_companion_state(Companion.relationship(caster), type)
+      _ -> :ok
+    end
+  end
+
+  def validate_companion(_caster, _spell), do: :ok
 
   def validate_reactive(caster, %Spell{} = spell, target_guid, now) do
     outcome =
@@ -87,7 +97,7 @@ defmodule ThistleTea.Game.Entity.Logic.Hunter do
     effects =
       Enum.map(spell.effects, fn
         %Spell.Effect{type: :apply_aura, aura: :periodic_energize} = effect ->
-          %{effect | base_points: benefit, die_sides: 0}
+          %{effect | base_points: benefit, base_dice: 0, die_sides: 0}
 
         effect ->
           effect
@@ -142,6 +152,21 @@ defmodule ThistleTea.Game.Entity.Logic.Hunter do
 
     {character, events ++ [Effects.stand_state(7)]}
   end
+
+  defp validate_companion_state(%CompanionData{kind: :hunter_pet, dead?: true}, :revive_pet), do: :ok
+
+  defp validate_companion_state(%CompanionData{kind: :hunter_pet, dead?: true}, :summon_pet),
+    do: {:error, :targets_dead}
+
+  defp validate_companion_state(%CompanionData{kind: :hunter_pet}, :revive_pet), do: {:error, :target_not_dead}
+
+  defp validate_companion_state(%CompanionData{kind: :hunter_pet, status: {:active, _ref}}, :summon_pet),
+    do: {:error, :already_have_summon}
+
+  defp validate_companion_state(%CompanionData{kind: :hunter_pet, status: {:suspended, _entry, _spell}}, :summon_pet),
+    do: :ok
+
+  defp validate_companion_state(_companion, _type), do: {:error, :no_pet}
 
   defp validate_feed_context(nil), do: {:error, :no_pet}
 

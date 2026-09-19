@@ -291,8 +291,9 @@ defmodule ThistleTea.Game.Entity.EventSink.Summons do
     entity
   end
 
-  def emit(%Character{} = entity, %Effects.SummonPet{entry: entry, spell_id: spell_id}, context) do
+  def emit(%Character{} = entity, %Effects.SummonPet{entry: entry, spell_id: spell_id} = effect, context) do
     with %Mob{} = built_pet <- SummonLoader.build_pet(entry, entity),
+         built_pet = SummonLoader.with_health_percent(built_pet, effect.health_percent),
          pet = %{built_pet | unit: %{built_pet.unit | created_by_spell: spell_id}},
          {:ok, pid} <- MobLoader.start_mob(pet) do
       case context do
@@ -327,7 +328,8 @@ defmodule ThistleTea.Game.Entity.EventSink.Summons do
     entity
   end
 
-  def emit(entity, %Effects.PetHappinessChanged{target_guid: guid} = effect, _context) do
+  def emit(entity, %type{target_guid: guid} = effect, _context)
+      when type in [Effects.PetHappinessChanged, Effects.PetDied] do
     case Entity.pid(guid) do
       pid when is_pid(pid) -> send(pid, effect)
       _ -> :ok

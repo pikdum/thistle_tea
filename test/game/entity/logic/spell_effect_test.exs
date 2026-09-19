@@ -1090,9 +1090,9 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
       {_character, events} = SpellEffect.receive(character, context, call_pet, 1_000)
       assert [%Effects.SummonPet{entry: 1234, spell_id: 883}] = events
 
-      revive_pet = %Spell{id: 982, effects: [%Effect{index: 0, type: :revive_pet, misc_value: 0}]}
+      revive_pet = %Spell{id: 982, effects: [%Effect{index: 0, type: :revive_pet, misc_value: 0, base_points: 15}]}
       {_character, events} = SpellEffect.receive(character, context, revive_pet, 1_000)
-      assert [%Effects.SummonPet{entry: 1234, spell_id: 982}] = events
+      assert [%Effects.SummonPet{entry: 1234, spell_id: 982, health_percent: 15}] = events
 
       dismiss_pet = %Spell{id: 2641, effects: [%Effect{index: 0, type: :dismiss_pet}]}
       {character, events} = SpellEffect.receive(character, context, dismiss_pet, 1_000)
