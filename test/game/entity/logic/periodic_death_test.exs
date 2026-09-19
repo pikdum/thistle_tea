@@ -19,6 +19,7 @@ defmodule ThistleTea.Game.Entity.Logic.PeriodicDeathTest do
     test "advances every retained resource aura without affecting corpses", %{entity: entity} do
       types = [
         :periodic_damage,
+        :periodic_damage_percent,
         :periodic_leech,
         :periodic_mana_leech,
         :periodic_power_burn,

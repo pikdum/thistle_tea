@@ -26,7 +26,13 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
 
-  @harmful_periodics [:periodic_damage, :periodic_leech, :periodic_mana_leech, :periodic_power_burn]
+  @harmful_periodics [
+    :periodic_damage,
+    :periodic_damage_percent,
+    :periodic_leech,
+    :periodic_mana_leech,
+    :periodic_power_burn
+  ]
   @resource_periodics @harmful_periodics ++ [:periodic_heal, :obs_mod_health, :obs_mod_mana, :periodic_energize]
 
   def tick(%{unit: %Unit{auras: holders}} = entity, now) when is_list(holders) and holders != [] do
@@ -67,10 +73,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
         {entity, events}
 
       {entity, acc, events} ->
-        new_holders =
-          acc
-          |> Enum.reverse()
-          |> Enum.filter(&holder_still_present?(entity, &1))
+        new_holders = Enum.map(entity.unit.auras, &merge_tick_state(&1, acc))
 
         {entity, transition_events} =
           Transition.run(entity, %Change{holders: new_holders, cause: :ticked, now: now})
@@ -109,8 +112,22 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
     end)
   end
 
-  defp holder_still_present?(%{unit: %Unit{auras: current}}, %Holder{spell: %Spell{id: id}, caster_guid: caster}) do
-    Enum.any?(current, &Holder.same_source?(&1, id, caster))
+  defp merge_tick_state(%Holder{spell: %Spell{id: id}, caster_guid: caster} = current, ticked) do
+    case Enum.find(ticked, &Holder.same_source?(&1, id, caster)) do
+      nil ->
+        current
+
+      %Holder{} = updated ->
+        auras = Enum.map(current.auras, &merge_tick_deadline(&1, updated.auras))
+        %{current | auras: auras, next_area_refresh_at: updated.next_area_refresh_at}
+    end
+  end
+
+  defp merge_tick_deadline(%Aura{index: index} = current, ticked) do
+    case Enum.find(ticked, &(&1.index == index)) do
+      nil -> current
+      %Aura{next_tick_at: at} -> %{current | next_tick_at: at}
+    end
   end
 
   defp tick_holder(entity, %Holder{auras: auras} = holder, now) do
@@ -188,14 +205,14 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
 
   defp party_aura_effects(_entity, _spell, _radius), do: []
 
-  defp tick_aura(entity, %Holder{} = holder, %Aura{type: :periodic_damage, next_tick_at: at} = aura, now)
-       when is_integer(at) and now >= at do
+  defp tick_aura(entity, %Holder{} = holder, %Aura{type: type, next_tick_at: at} = aura, now)
+       when type in [:periodic_damage, :periodic_damage_percent] and is_integer(at) and now >= at do
     effect = Enum.find(holder.spell.effects, &(&1.index == aura.index))
 
     amount =
       AttackDamageTaken.spell_amount(
         entity,
-        periodic_damage_amount(holder, aura),
+        periodic_damage_amount(entity, holder, aura),
         holder.spell,
         effect,
         :dot,
@@ -345,9 +362,16 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
 
   defp tick_aura(entity, _holder, aura, _now), do: {entity, aura, []}
 
-  defp periodic_damage_amount(%Holder{spell: %Spell{id: 12_654}}, %Aura{amount: amount}), do: amount
+  defp periodic_damage_amount(%{unit: %Unit{max_health: max_health}}, %Holder{stacks: stacks}, %Aura{
+         type: :periodic_damage_percent,
+         amount: amount
+       }) do
+    div(max(max_health || 0, 0) * max(amount || 0, 0) * max(stacks || 1, 1), 100)
+  end
 
-  defp periodic_damage_amount(%Holder{stacks: stacks} = holder, %Aura{} = aura) do
+  defp periodic_damage_amount(_entity, %Holder{spell: %Spell{id: 12_654}}, %Aura{amount: amount}), do: amount
+
+  defp periodic_damage_amount(_entity, %Holder{stacks: stacks} = holder, %Aura{} = aura) do
     base_periodic_damage_amount(holder, aura) * max(stacks || 1, 1)
   end
 

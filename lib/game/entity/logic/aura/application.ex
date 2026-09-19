@@ -24,6 +24,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
 
   @negative_auras [
     :periodic_power_burn,
+    :periodic_damage_percent,
     :periodic_damage,
     :periodic_leech,
     :mod_root,
@@ -45,6 +46,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
   @regen_auras [:mod_regen, :mod_power_regen, :mod_power_regen_percent]
   @periodic_auras [
     :periodic_power_burn,
+    :periodic_damage_percent,
     :periodic_damage,
     :periodic_heal,
     :periodic_energize,
@@ -226,6 +228,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
 
   @personal_stack_auras [
     :dummy,
+    :periodic_damage_percent,
     :periodic_damage,
     :periodic_leech,
     :periodic_heal,

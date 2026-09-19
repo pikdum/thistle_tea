@@ -662,6 +662,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp aura_type(85), do: :mod_power_regen
   defp aura_type(86), do: :channel_death_item
   defp aura_type(88), do: :mod_health_regen_percent
+  defp aura_type(89), do: :periodic_damage_percent
   defp aura_type(91), do: :mod_detect_range
   defp aura_type(92), do: :prevent_fleeing
   defp aura_type(93), do: :mod_unattackable

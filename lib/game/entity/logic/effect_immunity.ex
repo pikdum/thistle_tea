@@ -22,6 +22,7 @@ defmodule ThistleTea.Game.Entity.Logic.EffectImmunity do
     :mod_pacify,
     :mod_decrease_speed,
     :periodic_damage,
+    :periodic_damage_percent,
     :periodic_leech,
     :periodic_mana_leech
   ]
