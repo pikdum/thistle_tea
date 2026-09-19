@@ -414,13 +414,17 @@ defmodule ThistleTea.Game.Spell.CastValidation do
       |> Enum.filter(&match?(%{type: :dispel}, &1))
       |> MapSet.new(& &1.misc_value)
 
-    if MapSet.size(dispel_types) == 0 do
+    if MapSet.size(dispel_types) == 0 or not single_target_dispel?(spell) do
       :ok
     else
       options = target_dispel_options(caster, unit_guid, target_info)
       polarity = if match?(%{friendly?: false}, target_info), do: :positive, else: :negative
       check_dispel_options(options, dispel_types, polarity)
     end
+  end
+
+  defp single_target_dispel?(%Spell{effects: effects}) do
+    Enum.all?(effects, fn effect -> effect.type == :dispel and effect.radius_yards in [nil, 0, 0.0] end)
   end
 
   defp check_target_power_type(%Spell{} = spell, %Target{} = targets, %{guid: target_guid} = target_info) do

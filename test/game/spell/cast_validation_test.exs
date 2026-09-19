@@ -500,6 +500,27 @@ defmodule ThistleTea.Game.Spell.CastValidationTest do
       assert :ok = CastValidation.validate(caster(), purge, Target.unit(7), target, @now)
     end
 
+    test "allows attacks with a secondary dispel against an unbuffed target" do
+      shield_slam =
+        harmful_spell(
+          effects: [
+            %Effect{type: :dispel, misc_value: 1, implicit_target_a: :target_enemy},
+            %Effect{type: :school_damage, base_points: 225, implicit_target_a: :target_enemy}
+          ]
+        )
+
+      assert :ok = CastValidation.validate(caster(), shield_slam, Target.unit(7), hostile_target(), @now)
+    end
+
+    test "allows area dispels without a removable aura on the selected target" do
+      dispel =
+        helpful_spell(
+          effects: [%Effect{type: :dispel, misc_value: 1, radius_yards: 15.0, implicit_target_a: :target_ally}]
+        )
+
+      assert :ok = CastValidation.validate(caster(), dispel, Target.unit(7), friendly_target(), @now)
+    end
+
     test "all-dispel accepts supported categories and excludes enrage" do
       for type <- [7, -1] do
         dispel = helpful_spell(effects: [%Effect{type: :dispel, misc_value: type, implicit_target_a: :target_ally}])
