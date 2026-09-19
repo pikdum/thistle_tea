@@ -20,6 +20,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Random
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Detection
   alias ThistleTea.Game.Entity.Logic.AI.BT.Fear, as: FearBT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells, as: MobSpells
   alias ThistleTea.Game.Entity.Logic.AI.BT.Navigation
@@ -35,7 +36,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
   alias ThistleTea.Game.Entity.Logic.Hostility
   alias ThistleTea.Game.Entity.Logic.Invisibility
   alias ThistleTea.Game.Entity.Logic.Movement
-  alias ThistleTea.Game.Entity.Logic.StealthDetection
   alias ThistleTea.Game.Entity.Logic.TemporaryFaction
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Math
@@ -481,7 +481,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
       perception_target(perception, guid)
     ) and
       distance <= aggro_radius(state, guid, perception) and
-      detectable_target?(state, guid, distance, context) and
+      Detection.detectable?(state, guid, context) and
       Perception.line_of_sight?(perception, guid)
   end
 
@@ -493,18 +493,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
 
   defp perception_actor(%Mob{object: %{guid: guid}}, perception) do
     Perception.actor(perception, guid)
-  end
-
-  defp detectable_target?(%Mob{} = state, guid, distance, %Context{now: now, perception: perception}) do
-    detector = StealthDetection.target_metadata(state)
-
-    behind? =
-      case {state.movement_block.position, Perception.position(perception, guid)} do
-        {{x, y, _z, orientation}, {_world, tx, ty, _tz}} -> Math.behind?({x, y, orientation}, {tx, ty})
-        _ -> false
-      end
-
-    StealthDetection.detectable?(detector, Perception.metadata(perception, guid), distance, now, behind?)
   end
 
   defp aggro_radius(%Mob{unit: %Unit{level: level}} = state, target_guid, perception)

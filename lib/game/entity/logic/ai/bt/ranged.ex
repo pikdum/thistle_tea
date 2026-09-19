@@ -8,12 +8,12 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Ranged do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Detection
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.AutoRepeat
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Hunter
-  alias ThistleTea.Game.Entity.Logic.Invisibility
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
 
@@ -29,9 +29,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Ranged do
   defp shoot_with_context(
          %Character{internal: %Internal{auto_shot: auto_shot}} = character,
          %Blackboard{} = blackboard,
-         %Context{now: now, perception: perception}
+         %Context{now: now} = context
        ) do
-    distance = combat_distance(character, auto_shot.target_guid, perception)
+    distance = combat_distance(character, auto_shot.target_guid, context)
     shoot_at_distance(character, blackboard, now, distance, auto_shot)
   end
 
@@ -88,10 +88,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Ranged do
     end
   end
 
-  defp combat_distance(%Character{unit: unit} = character, target_guid, %Perception{} = perception) do
+  defp combat_distance(%Character{unit: unit} = character, target_guid, %Context{perception: perception} = context) do
     with distance when is_number(distance) <- Perception.distance(perception, target_guid),
          target when is_map(target) <- Perception.metadata(perception, target_guid),
-         true <- Invisibility.detectable?(Invisibility.metadata(character), target) do
+         true <- Detection.detectable?(character, target_guid, context) do
       max(distance - combat_reach(unit.combat_reach) - combat_reach(Map.get(target, :combat_reach)), 0.0)
     else
       _unknown -> nil

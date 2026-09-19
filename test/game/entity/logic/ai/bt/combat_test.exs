@@ -13,6 +13,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.CombatTest do
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AI.BT.Combat
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Context
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception.Observation
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Spell
@@ -20,6 +23,43 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.CombatTest do
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.WorldRef
+
+  describe "target_valid_same_map?/3" do
+    test "retained melee targets must still be detectable" do
+      character = %Character{
+        object: %Object{guid: 1},
+        unit: %Unit{target: 2, level: 50, auras: []},
+        internal: %Internal{world: WorldRef.open(0)},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
+      }
+
+      target = %{level: 50, player?: true, stealthed?: true, stealth_skill: 250}
+
+      for {distance, orientation, metadata, los?, detectable?} <- [
+            {5.0, 0.0, target, true, true},
+            {5.0, :math.pi(), target, true, false},
+            {1.0, :math.pi(), target, true, true},
+            {5.0, 0.0, target, false, false},
+            {5.0, 0.0, Map.put(target, :undetectable_until, 1_001), true, false},
+            {5.0, 0.0, Map.put(target, :stalked_by, [1]), true, true},
+            {5.0, 0.0, %{target | stealthed?: false}, true, true}
+          ] do
+        observation = %Observation{
+          guid: 2,
+          position: {WorldRef.open(0), distance, 0.0, 0.0},
+          distance: distance,
+          metadata: metadata,
+          line_of_sight?: los?
+        }
+
+        perception = Perception.new(1_000, nil, %{2 => observation}, %{mobs: [], players: []})
+        context = Context.new(1_000, perception: perception)
+        attacker = %{character | movement_block: %{character.movement_block | position: {0.0, 0.0, 0.0, orientation}}}
+
+        assert Combat.target_valid_same_map?(attacker, Blackboard.new(), context) == detectable?
+      end
+    end
+  end
 
   describe "melee_attack/3" do
     test "replaces a disarmed queued weapon ability with an unarmed swing" do

@@ -1,10 +1,13 @@
 defmodule ThistleTea.Game.Entity.Logic.AI.BT.RangedTest do
   use ExUnit.Case, async: true
 
+  alias ThistleTea.Game.Aura
+  alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Object
+  alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
@@ -35,6 +38,60 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.RangedTest do
   end
 
   describe "sequence/0" do
+    test "stops shooting concealed targets and respects detection and caster-specific marks" do
+      spell = %Spell{id: 75, min_range_yards: 8.0, range_yards: 35.0}
+
+      perception_aura = %Holder{
+        spell: %Spell{id: 20_600},
+        auras: [%Aura{type: :mod_stealth_detect, amount: 50, misc_value: 0}]
+      }
+
+      character = %Character{
+        object: %Object{guid: 1},
+        player: %Player{},
+        unit: %Unit{health: 100, level: 50, combat_reach: 1.5, ranged_attack_time: 2_000, auras: []},
+        internal: %Internal{
+          world: WorldRef.open(0),
+          auto_shot: %{target_guid: 7, next_at: 0, spell: spell, targets: Target.unit(7)}
+        },
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
+      }
+
+      hidden = %{level: 50, player?: true, stealthed?: true, stealth_skill: 250}
+
+      for {metadata, auras, orientation, visible?} <- [
+            {hidden, [], 0.0, false},
+            {hidden, [perception_aura], 0.0, true},
+            {hidden, [perception_aura], :math.pi(), false},
+            {Map.put(hidden, :stalked_by, [1]), [], :math.pi(), true},
+            {Map.put(hidden, :stalked_by, [2]), [], 0.0, false},
+            {Map.put(hidden, :undetectable_until, 1_001), [perception_aura], 0.0, false}
+          ] do
+        observation = %Observation{
+          guid: 7,
+          position: {WorldRef.open(0), 20.0, 0.0, 0.0},
+          distance: 20.0,
+          line_of_sight?: true,
+          metadata: metadata
+        }
+
+        perception = Perception.new(1_000, nil, %{7 => observation}, %{mobs: [], players: []})
+        context = Context.new(1_000, perception: perception)
+
+        caster = %{
+          character
+          | unit: %{character.unit | auras: auras},
+            movement_block: %{character.movement_block | position: {0.0, 0.0, 0.0, orientation}}
+        }
+
+        {_status, result} = BT.tick(Ranged.sequence(), caster, context)
+
+        assert Enum.any?(result.internal.events, &is_struct(&1, Effects.DeliverSpell)) == visible?
+        assert is_nil(result.internal.auto_shot) == not visible?
+        assert Enum.any?(result.internal.events, &is_struct(&1, Effects.CancelAutoRepeat)) == not visible?
+      end
+    end
+
     test "measures the dead zone from the edges of both combat reaches" do
       target_guid = 7
       spell = %Spell{id: 75, min_range_yards: 8.0, range_yards: 35.0}

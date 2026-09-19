@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard.Combat, as: CombatMemory
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Detection
   alias ThistleTea.Game.Entity.Logic.AI.BT.Navigation
   alias ThistleTea.Game.Entity.Logic.AttackTable
   alias ThistleTea.Game.Entity.Logic.Aura
@@ -20,7 +21,6 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
   alias ThistleTea.Game.Entity.Logic.Disarm
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Hostility
-  alias ThistleTea.Game.Entity.Logic.Invisibility
   alias ThistleTea.Game.Entity.Logic.MeleeSpell
   alias ThistleTea.Game.Entity.Logic.PlayerCombat
   alias ThistleTea.Game.Entity.Logic.Resources
@@ -71,7 +71,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
 
   def target_valid_same_map?(%{unit: %Unit{target: target}} = state, _blackboard, %Context{} = context) do
     Navigation.target_valid_same_map?(state, target, context) and
-      Invisibility.detectable?(Invisibility.metadata(state), Perception.metadata(context.perception, target))
+      Detection.detectable?(state, target, context)
   end
 
   def target_valid_same_map?(_state, _blackboard, %Context{}), do: false
