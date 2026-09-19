@@ -26,6 +26,7 @@ defmodule ThistleTea.Game.Player.DurabilityTest do
   alias ThistleTea.Game.Network.Packet
   alias ThistleTea.Game.Player.Durability
   alias ThistleTea.Game.Player.Enchantments
+  alias ThistleTea.Game.Player.SpiritHealer
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.ItemStore
@@ -56,6 +57,7 @@ defmodule ThistleTea.Game.Player.DurabilityTest do
       assert broken.character.unit.base_min_damage == 1.0
       assert broken.character.unit.max_health == 120
       assert broken.character.player.broken_equipment == [:mainhand]
+      assert broken.character.player.parry_percentage == 0.0
       assert broken.character.player.visible_item_16_0 == initial.player.visible_item_16_0
       assert Enchantments.weapon_procs(broken.character, :mainhand) == []
       assert Character.sync_equipment_stats(broken.character).unit.max_health == 120
@@ -66,9 +68,45 @@ defmodule ThistleTea.Game.Player.DurabilityTest do
       assert repaired.character.unit.max_health == 150
       assert repaired.character.player.coinage == 500
       assert repaired.character.player.broken_equipment == []
+      assert repaired.character.player.parry_percentage == 5.0
       assert length(Enchantments.weapon_procs(repaired.character, :mainhand)) == 1
       assert ItemStore.get(item.object.guid).item.durability == 50
       assert Durability.repair(repaired, vendor, 0) == repaired
+    end
+
+    test "a broken shield loses armor and block until repaired", %{state: state, vendor: vendor} do
+      template = %ItemTemplate{
+        entry: @entry + 10,
+        class: 4,
+        subclass: 6,
+        inventory_type: 14,
+        item_level: @level,
+        quality: 1,
+        max_durability: 50,
+        armor: 100,
+        block: 20
+      }
+
+      :ets.insert(ItemLoader, {template.entry, template})
+      :ets.insert(DurabilityLoader, {{@level, 4, 6}, 10})
+      item = ItemStore.create(template, owner: state.guid)
+
+      on_exit(fn ->
+        ItemStore.delete(item.object.guid)
+        :ets.delete(ItemLoader, template.entry)
+        :ets.delete(DurabilityLoader, {@level, 4, 6})
+      end)
+
+      character = %{state.character | player: Inventory.equip(state.character.player, :offhand, item)}
+      character = Character.sync_equipment_stats(character)
+      assert character.player.block_percentage == 5.0
+      assert character.unit.equipment_bonuses.armor == 100
+      broken = Durability.lose(%{state | character: character}, :percent, 100, :offhand)
+      assert broken.character.player.block_percentage == 0.0
+      assert broken.character.unit.equipment_bonuses.armor == 0
+      repaired = Durability.repair(broken, vendor, item.object.guid)
+      assert repaired.character.player.block_percentage == 5.0
+      assert repaired.character.unit.equipment_bonuses.armor == 100
     end
 
     test "an unaffordable repair preserves damage and money", %{state: state, item: item, vendor: vendor} do
@@ -114,6 +152,19 @@ defmodule ThistleTea.Game.Player.DurabilityTest do
   end
 
   describe "death and combat wear" do
+    test "spirit healing requires a ghost and a nearby healer in the same world", %{state: state, vendor: vendor} do
+      ghost = %{state.character | player: %{state.character.player | flags: 0x10}}
+      refute SpiritHealer.valid_healer?(ghost, vendor)
+      Metadata.update(vendor, %{npc_flags: 0x20})
+      assert SpiritHealer.valid_healer?(ghost, vendor)
+      refute SpiritHealer.valid_healer?(state.character, vendor)
+      assert SpiritHealer.activate(state, vendor) == state
+      SpatialHash.update(:mobs, vendor, WorldRef.open(0), 6.0, 0.0, 0.0)
+      refute SpiritHealer.valid_healer?(ghost, vendor)
+      SpatialHash.update(:mobs, vendor, WorldRef.open(1), 2.0, 0.0, 0.0)
+      refute SpiritHealer.valid_healer?(ghost, vendor)
+    end
+
     test "one lethal transition wears equipment once and resurrection permits the next penalty", context do
       %{state: state, item: item, vendor: creature} = context
       dead = Core.take_damage(state.character, 1000, 1000, source: creature)
