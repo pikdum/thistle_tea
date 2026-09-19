@@ -45,7 +45,7 @@ defmodule ThistleTea.Game.Entity.Logic.EquipmentStats do
 
   @zero @bonus_keys
         |> Map.new(fn key -> {key, 0} end)
-        |> Map.merge(%{spell_damage_versus: [], damage_done_creature: []})
+        |> Map.merge(%{spell_damage_versus: [], damage_done_creature: [], resistance_penetration: []})
 
   @spelltrigger_on_equip 1
 
@@ -152,6 +152,10 @@ defmodule ThistleTea.Game.Entity.Logic.EquipmentStats do
 
       %Effect{type: :apply_aura, aura: :mod_attack_power} = effect, acc ->
         add(acc, :attack_power, Effect.damage_roll(effect))
+
+      %Effect{type: :apply_aura, aura: :mod_target_resistance, misc_value: mask} = effect, acc
+      when is_integer(mask) ->
+        Map.update!(acc, :resistance_penetration, &[{mask, Effect.damage_roll(effect)} | &1])
 
       %Effect{type: :apply_aura, aura: :mod_ranged_haste} = effect, acc ->
         add(acc, :ranged_haste, Effect.damage_roll(effect))

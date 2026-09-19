@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
   alias ThistleTea.Game.Entity.Logic.HealingReceived
   alias ThistleTea.Game.Entity.Logic.Hunter
   alias ThistleTea.Game.Entity.Logic.Paladin
+  alias ThistleTea.Game.Entity.Logic.ResistancePenetration
   alias ThistleTea.Game.Entity.Logic.Rogue
   alias ThistleTea.Game.Entity.Logic.SpellResist
   alias ThistleTea.Game.Entity.Logic.TargetAttackPower
@@ -294,7 +295,9 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
     caster_level =
       if is_integer(context.caster_level) and context.caster_level > 0, do: context.caster_level, else: 1
 
-    resistance = max((Map.get(unit, :"#{school}_resistance") || 0) + (context.spell_penetration || 0), 0)
+    resistance =
+      ResistancePenetration.resistance(Map.get(unit, :"#{school}_resistance"), context.resistance_penetration, school)
+
     target_creature? = not is_map(Map.get(state, :player))
     level_diff = (unit.level || 1) - caster_level
 
@@ -500,7 +503,8 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
 
   defp mitigate_physical(%{unit: %{normal_resistance: armor}}, %CastContext{} = context, :physical, damage)
        when damage > 0 do
-    AttackTable.armor_reduced_damage(damage, armor || 0, context.caster_level)
+    armor = ResistancePenetration.resistance(armor, context.resistance_penetration, :physical)
+    AttackTable.armor_reduced_damage(damage, armor, context.caster_level)
   end
 
   defp mitigate_physical(_state, _context, _school, damage), do: damage

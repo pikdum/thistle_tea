@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Entity.Logic.EquipmentStatsTest do
   alias ThistleTea.Game.Entity.Data.ItemTemplate
   alias ThistleTea.Game.Entity.Logic.EquipmentStats
   alias ThistleTea.Game.Entity.Logic.Inventory
+  alias ThistleTea.Game.Entity.Logic.ResistancePenetration
   alias ThistleTea.Game.Entity.Logic.TargetSpellPower
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Effect
@@ -114,6 +115,33 @@ defmodule ThistleTea.Game.Entity.Logic.EquipmentStatsTest do
   end
 
   describe "resync/2" do
+    test "penetration follows equip, break, repair, and unequip", %{character: character} do
+      spell = %Spell{
+        effects: [%Effect{type: :apply_aura, aura: :mod_target_resistance, base_points: -10, misc_value: 124}]
+      }
+
+      item =
+        Item.build(
+          %ItemTemplate{entry: 1, inventory_type: 5, max_durability: 100, spellid_1: 2, spelltrigger_1: 1},
+          100,
+          owner: 1
+        )
+
+      get_item = get_item_fn([item])
+      get_spell = fn 2 -> spell end
+      player = Inventory.equip(character.player, :chest, item)
+      equipped = EquipmentStats.resync(%{character | player: player}, get_item, get_spell)
+      assert ResistancePenetration.snapshot(equipped) == [{124, -10}]
+      assert EquipmentStats.resync(equipped, get_item, get_spell) == equipped
+      broken = %{item | item: %{item.item | durability: 0}}
+      broken_character = EquipmentStats.resync(equipped, get_item_fn([broken]), get_spell)
+      assert ResistancePenetration.snapshot(broken_character) == []
+      repaired = EquipmentStats.resync(broken_character, get_item, get_spell)
+      assert ResistancePenetration.snapshot(repaired) == [{124, -10}]
+      removed = EquipmentStats.resync(%{repaired | player: %{repaired.player | chest: nil}}, get_item, get_spell)
+      assert ResistancePenetration.snapshot(removed) == []
+    end
+
     test "equipping and removing conditional spell power preserves displayed school damage", %{character: character} do
       spell = %Spell{
         effects: [%Effect{type: :apply_aura, aura: :mod_flat_spell_damage_versus, base_points: 48, misc_value: 32}]

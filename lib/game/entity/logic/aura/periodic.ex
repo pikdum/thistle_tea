@@ -19,6 +19,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.HealingReceived
   alias ThistleTea.Game.Entity.Logic.PowerBurn
+  alias ThistleTea.Game.Entity.Logic.ResistancePenetration
   alias ThistleTea.Game.Entity.Logic.Resources
   alias ThistleTea.Game.Entity.Logic.SpellResist
   alias ThistleTea.Game.Entity.Logic.Threat
@@ -401,7 +402,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
   defp apply_periodic_damage(entity, %Holder{} = holder, amount, now) do
     school = school_atom(holder.spell)
     caster_level = if is_integer(holder.caster_level) and holder.caster_level > 0, do: holder.caster_level, else: 1
-    resisted = periodic_resisted_amount(entity, amount, school, caster_level)
+    resisted = periodic_resisted_amount(entity, amount, school, caster_level, holder.resistance_penetration)
     damage = amount - resisted
 
     {entity, damage, absorbed} =
@@ -417,11 +418,11 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
     {entity, damage, [periodic?: true, resisted: resisted, absorbed: absorbed]}
   end
 
-  defp periodic_resisted_amount(_entity, damage, _school, _caster_level) when damage <= 0, do: 0
-  defp periodic_resisted_amount(_entity, _damage, :physical, _caster_level), do: 0
+  defp periodic_resisted_amount(_entity, damage, _school, _caster_level, _penetration) when damage <= 0, do: 0
+  defp periodic_resisted_amount(_entity, _damage, :physical, _caster_level, _penetration), do: 0
 
-  defp periodic_resisted_amount(%{unit: %Unit{} = unit} = entity, damage, school, caster_level) do
-    resistance = Map.get(unit, :"#{school}_resistance") || 0
+  defp periodic_resisted_amount(%{unit: %Unit{} = unit} = entity, damage, school, caster_level, penetration) do
+    resistance = ResistancePenetration.resistance(Map.get(unit, :"#{school}_resistance"), penetration, school)
     target_creature? = not is_map(Map.get(entity, :player))
     level_diff = (unit.level || 1) - caster_level
 

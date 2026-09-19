@@ -28,6 +28,7 @@ defmodule ThistleTea.Game.Aura.Holder do
     :next_area_refresh_at,
     :next_proc_at,
     auras: [],
+    resistance_penetration: [],
     stacks: 1,
     negative?: false
   ]

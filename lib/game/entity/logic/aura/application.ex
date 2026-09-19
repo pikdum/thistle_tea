@@ -73,6 +73,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
           reflected_by_guid: context.reflected_by_guid,
           caster_level: context.caster_level,
           caster_faction_template: context.caster_faction_template,
+          resistance_penetration: context.resistance_penetration,
           cast_context: if(Enum.any?(auras, &(&1.type == :periodic_power_burn)), do: context),
           applied_at: now,
           expires_at: expires_at(now, effective_duration(spell, context)),

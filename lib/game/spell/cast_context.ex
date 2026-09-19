@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
   alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Entity.Logic.Mage
   alias ThistleTea.Game.Entity.Logic.PetHappiness
+  alias ThistleTea.Game.Entity.Logic.ResistancePenetration
   alias ThistleTea.Game.Entity.Logic.Skills
   alias ThistleTea.Game.Entity.Logic.TargetAttackPower
   alias ThistleTea.Game.Entity.Logic.TargetDamage
@@ -79,7 +80,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
     spell_damage_bonus: %{},
     spell_damage_versus: [],
     healing_bonus: 0,
-    spell_penetration: 0,
+    resistance_penetration: [],
     threat_multiplier: 1.0,
     damage_done_multiplier: 1.0,
     happiness_multiplier: 1.0,
@@ -103,7 +104,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
       spell_damage_bonus: spell_damage_bonus(caster),
       spell_damage_versus: TargetSpellPower.snapshot(caster),
       healing_bonus: healing_bonus(caster),
-      spell_penetration: Aura.flat_amount(caster, :mod_target_resistance),
+      resistance_penetration: ResistancePenetration.snapshot(caster),
       spell_threat: SpellThreatLoader.get(spell_id(spell)),
       spell_modifiers: Modifiers.snapshot(caster, spell),
       conditional_crit_modifiers: Critical.snapshot(caster, spell),

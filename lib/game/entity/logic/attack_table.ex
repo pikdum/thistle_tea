@@ -21,6 +21,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
   alias ThistleTea.Game.Entity.Logic.Disarm
   alias ThistleTea.Game.Entity.Logic.MechanicResistance
   alias ThistleTea.Game.Entity.Logic.PetHappiness
+  alias ThistleTea.Game.Entity.Logic.ResistancePenetration
   alias ThistleTea.Game.Entity.Logic.Skills
   alias ThistleTea.Game.Entity.Logic.TargetAttackPower
   alias ThistleTea.Game.Entity.Logic.TargetDamage
@@ -66,6 +67,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
       damage_done_versus: Aura.misc_amounts(attacker, :mod_damage_done_versus),
       target_attack_power: TargetAttackPower.snapshot(attacker),
       target_damage: TargetDamage.snapshot(attacker),
+      resistance_penetration: ResistancePenetration.snapshot(attacker),
       attack_damage_multipliers: multipliers,
       attack_power_damage: attack_power_damage(unit, multipliers),
       crit_damage_versus: Aura.misc_amounts(attacker, :mod_crit_percent_versus)
@@ -176,7 +178,12 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
       defender_class: unit.class,
       defender_agility: unit.agility || 0,
       defender_block_value: CombatRatings.block_value(defender),
-      defender_armor: unit.normal_resistance || 0,
+      defender_armor:
+        ResistancePenetration.resistance(
+          unit.normal_resistance,
+          Map.get(attack, :resistance_penetration, []),
+          :physical
+        ),
       defender_dodge_bonus: Aura.flat_amount(defender, :mod_dodge),
       defender_parry_bonus: Aura.flat_amount(defender, :mod_parry_percent),
       defender_block_chance: CombatRatings.block_chance(defender),
