@@ -31,6 +31,25 @@ defmodule ThistleTea.Game.World.Loader.Skill do
 
   def initial_skills(_spell_ids, _race, _class, _level), do: %{}
 
+  def reward_spells(skill_id, value, race, class) when is_integer(skill_id) and skill_id > 0 do
+    race_mask = 1 <<< (race - 1)
+    class_mask = 1 <<< (class - 1)
+
+    DBC.all(
+      from(s in SkillLineAbility,
+        where: s.skill_line == ^skill_id and s.acquire_method == 1,
+        where: s.min_skill_line_rank <= ^value,
+        where: s.race_mask == 0 or fragment("? & ?", s.race_mask, ^race_mask) != 0,
+        where: s.class_mask == 0 or fragment("? & ?", s.class_mask, ^class_mask) != 0,
+        order_by: s.spell,
+        select: s.spell,
+        distinct: true
+      )
+    )
+  end
+
+  def reward_spells(_skill_id, _value, _race, _class), do: []
+
   defp skill_line_ids([], _race_mask, _class_mask), do: []
 
   defp skill_line_ids(spell_ids, race_mask, class_mask) do

@@ -8,10 +8,12 @@ defmodule ThistleTea.Game.Player.Spells do
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Data.TrainerSpell
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
   alias ThistleTea.Game.Entity.Logic.Casting
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Proficiency
+  alias ThistleTea.Game.Entity.Logic.Skills
   alias ThistleTea.Game.Entity.Logic.SpellBook
   alias ThistleTea.Game.Entity.Server.Player, as: PlayerServer
   alias ThistleTea.Game.Network
@@ -68,6 +70,14 @@ defmodule ThistleTea.Game.Player.Spells do
     new_skills = SkillLoader.initial_skills(internal.spells, unit.race, unit.class, unit.level)
     skills = Map.merge(new_skills, player.skills || %{})
     %{character | player: %{player | skills: skills}}
+  end
+
+  def learn_training(%Character{} = character, %TrainerSpell{} = training) do
+    skills = Skills.learn_rank(character.player.skills, training.skill_id, training.skill_max)
+    value = Skills.value(skills, training.skill_id)
+    rewards = SkillLoader.reward_spells(training.skill_id, value, character.unit.race, character.unit.class)
+    character = %{character | player: %{character.player | skills: skills}}
+    learn(character, [training.learned_spell_id | rewards])
   end
 
   def unlearn(%Character{} = character, spell_ids, now) when is_list(spell_ids) and is_integer(now) do
