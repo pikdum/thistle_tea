@@ -256,6 +256,8 @@ defmodule ThistleTea.DevSeed do
   end
 
   defp spawn_mob(entry, low_guid, {x, y, z}, loot_override, respawn_secs) do
+    {x, y, z} = Pathfinding.snap_to_ground(@map, {x, y, z})
+
     case Mangos.Repo.one(from(c in Mangos.Creature, where: c.id == ^entry, limit: 1, preload: [:creature_template])) do
       %Mangos.Creature{} = creature ->
         creature = %{
