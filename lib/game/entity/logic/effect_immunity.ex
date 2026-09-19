@@ -20,6 +20,7 @@ defmodule ThistleTea.Game.Entity.Logic.EffectImmunity do
     :mod_silence,
     :mod_taunt,
     :mod_pacify,
+    :mod_pacify_silence,
     :mod_decrease_speed,
     :periodic_damage,
     :periodic_damage_percent,

@@ -644,6 +644,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp aura_type(56), do: :transform
   defp aura_type(57), do: :mod_spell_crit_chance
   defp aura_type(58), do: :mod_increase_swim_speed
+  defp aura_type(60), do: :mod_pacify_silence
   defp aura_type(61), do: :mod_scale
   defp aura_type(64), do: :periodic_mana_leech
   defp aura_type(65), do: :mod_casting_speed

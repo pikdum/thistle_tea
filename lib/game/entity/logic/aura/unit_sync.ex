@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.UnitSync do
   alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.Aura.PowerCostSync
+  alias ThistleTea.Game.Entity.Logic.CombatControl
   alias ThistleTea.Game.Entity.Logic.Empathy
   alias ThistleTea.Game.Entity.Logic.Stats
   alias ThistleTea.Game.Spell
@@ -36,6 +37,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.UnitSync do
     |> sync_shapeshift_display()
     |> sync_transform()
     |> sync_disarm()
+    |> CombatControl.sync()
     |> sync_unattackable()
     |> sync_aura_state()
     |> sync_aura_fields()

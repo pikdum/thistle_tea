@@ -22,6 +22,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Transition do
   alias ThistleTea.Game.Entity.Logic.Aura.ThreatSync
   alias ThistleTea.Game.Entity.Logic.Aura.UnitSync
   alias ThistleTea.Game.Entity.Logic.Aura.ViewpointSync
+  alias ThistleTea.Game.Entity.Logic.Casting
   alias ThistleTea.Game.Entity.Logic.Companion
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.DiminishingReturns
@@ -352,9 +353,14 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Transition do
   defp maybe_interrupt_casting(%{internal: %{casting: casting}} = entity, %Holder{} = holder)
        when not is_nil(casting) do
     cond do
-      Holder.has_any_type?(holder, @cast_breaking_controls) -> clear_casting(entity)
-      Holder.has_aura_type?(holder, :mod_silence) and silenceable_cast?(casting) -> clear_casting(entity)
-      true -> entity
+      Holder.has_any_type?(holder, @cast_breaking_controls) ->
+        clear_casting(entity)
+
+      Holder.has_any_type?(holder, [:mod_silence, :mod_pacify_silence]) and silenceable_cast?(casting) ->
+        clear_casting(entity)
+
+      true ->
+        entity
     end
   end
 
@@ -369,9 +375,13 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Transition do
   defp silenceable_cast?(%{spell: %Spell{prevention_type: 1}}), do: true
   defp silenceable_cast?(_casting), do: false
 
-  defp clear_casting(%{internal: internal, unit: unit} = entity) do
-    %{entity | internal: %{internal | casting: nil}, unit: %{unit | channel_spell: 0, channel_object: 0}}
+  defp clear_casting(%{internal: %{casting: %{spell: %Spell{id: id}}}} = entity) do
+    entity
+    |> Effects.enqueue(Effects.spell_cast_failed(id, :interrupted))
+    |> Casting.cancel()
   end
+
+  defp clear_casting(entity), do: Casting.cancel(entity)
 
   defp maybe_heal_increased_health(entity, %Holder{auras: auras}) do
     auras

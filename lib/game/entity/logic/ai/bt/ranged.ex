@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Ranged do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Detection
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.AutoRepeat
+  alias ThistleTea.Game.Entity.Logic.CombatControl
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Hunter
@@ -39,6 +40,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Ranged do
 
   defp shoot_at_distance(character, blackboard, now, distance, auto_shot) do
     cond do
+      CombatControl.pacified?(character) or CombatControl.prevention(character, auto_shot.spell) != :ok ->
+        {:failure, stop(character), blackboard}
+
       :ranged in (character.player.broken_equipment || []) ->
         {:failure, stop(character), blackboard}
 

@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.Spell.CastValidation do
   alias ThistleTea.Game.Duel
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
   alias ThistleTea.Game.Entity.Logic.Aura.Dispel
+  alias ThistleTea.Game.Entity.Logic.CombatControl
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Disarm
   alias ThistleTea.Game.Entity.Logic.Disenchant
@@ -316,20 +317,15 @@ defmodule ThistleTea.Game.Spell.CastValidation do
   end
 
   defp prevention_error(caster, spell, stunned?, now) do
-    cond do
-      spell.prevention_type == 1 and not stunned? and silenced_for?(caster, spell, now) ->
-        {:error, :silenced}
-
-      spell.prevention_type == 2 and AuraLogic.has_aura?(caster, :mod_pacify) ->
-        {:error, :pacified}
-
-      true ->
-        :ok
+    if spell.prevention_type == 1 and not stunned? and silenced_for?(caster, spell, now) do
+      {:error, :silenced}
+    else
+      CombatControl.prevention(caster, spell)
     end
   end
 
   defp silenced_for?(caster, %Spell{} = spell, now) do
-    AuraLogic.has_aura?(caster, :mod_silence) or
+    CombatControl.silenced?(caster) or
       Cooldowns.school_locked?(caster, Spell.school_mask(spell), now)
   end
 

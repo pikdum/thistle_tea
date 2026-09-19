@@ -38,6 +38,25 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.RangedTest do
   end
 
   describe "sequence/0" do
+    test "pacify cancels ranged attacks without firing or consuming ammunition" do
+      spell = %Spell{id: 75, prevention_type: 2}
+
+      for type <- [:mod_pacify, :mod_pacify_silence] do
+        holder = %Holder{spell: %Spell{id: 24_740}, auras: [%Aura{type: type}]}
+
+        character = %Character{
+          object: %Object{guid: 1},
+          unit: %Unit{health: 100, auras: [holder]},
+          player: %Player{},
+          internal: %Internal{auto_shot: %{target_guid: 7, next_at: 0, spell: spell, targets: Target.unit(7)}}
+        }
+
+        {_status, result} = BT.tick(Ranged.sequence(), character, Context.new(1_000))
+        assert result.internal.auto_shot == nil
+        assert [%Effects.CancelAutoRepeat{}] = result.internal.events
+      end
+    end
+
     test "stops shooting concealed targets and respects detection and caster-specific marks" do
       spell = %Spell{id: 75, min_range_yards: 8.0, range_yards: 35.0}
 

@@ -17,6 +17,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
   alias ThistleTea.Game.Entity.Logic.AttackTable
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Combat, as: CombatLogic
+  alias ThistleTea.Game.Entity.Logic.CombatControl
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Disarm
   alias ThistleTea.Game.Entity.Logic.Effects
@@ -168,6 +169,14 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
   def melee_attack_with_context(state, blackboard, %Context{}), do: {:success, state, blackboard}
 
   defp perform_ready_attacks(state, target, blackboard, main_ready?, offhand_ready?, now) do
+    if CombatControl.pacified?(state) do
+      {state, blackboard}
+    else
+      perform_unrestricted_attacks(state, target, blackboard, main_ready?, offhand_ready?, now)
+    end
+  end
+
+  defp perform_unrestricted_attacks(state, target, blackboard, main_ready?, offhand_ready?, now) do
     {state, events} = Aura.remove_with_interrupt_flags(state, Aura.interrupt_mask(:attack), now)
     state = Effects.enqueue(state, events)
     state = PlayerCombat.mark_initiated(state, now)
@@ -262,7 +271,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Combat do
   end
 
   def extra_attacks(state, target, count) when is_integer(target) and target > 0 and is_integer(count) and count > 0 do
-    Enum.reduce(1..count, state, fn _extra, current -> send_white_swing(current, target) end)
+    if CombatControl.pacified?(state),
+      do: state,
+      else: Enum.reduce(1..count, state, fn _extra, current -> send_white_swing(current, target) end)
   end
 
   def extra_attacks(state, _target, _count), do: state
