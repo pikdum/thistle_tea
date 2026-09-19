@@ -11,13 +11,15 @@ defmodule ThistleTea.Game.Entity.Data.Character do
   alias ThistleTea.Game.Entity.Data.ItemTemplate
   alias ThistleTea.Game.Entity.Logic.CombatRatings
   alias ThistleTea.Game.Entity.Logic.Companion
-  alias ThistleTea.Game.Entity.Logic.EquipmentEnchantments
+  alias ThistleTea.Game.Entity.Logic.EquipmentAuras
+  alias ThistleTea.Game.Entity.Logic.EquipmentSets
   alias ThistleTea.Game.Entity.Logic.EquipmentStats
   alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
   alias ThistleTea.Game.World.Loader.ItemEnchantment, as: ItemEnchantmentLoader
+  alias ThistleTea.Game.World.Loader.ItemSet, as: ItemSetLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
 
   defstruct [:id, :account_id, :object, :unit, :player, :movement_block, :internal]
@@ -35,13 +37,15 @@ defmodule ThistleTea.Game.Entity.Data.Character do
     character = %{character | player: Inventory.sync_broken_equipment(character.player, &ItemStore.get/1)}
     now = Time.now()
     enchantments = equipment_enchantments(character, now)
+    templates = Inventory.equipped_templates(character.player, &ItemStore.get/1)
+    set_sources = EquipmentSets.sources(character, templates, &ItemSetLoader.get/1)
 
     character
     |> sync_mainhand_inputs()
     |> sync_offhand_inputs()
     |> sync_ranged_inputs()
     |> EquipmentStats.resync(&ItemStore.get/1, &SpellLoader.load/1, enchantments)
-    |> EquipmentEnchantments.sync(enchantments, &SpellLoader.load/1, now)
+    |> EquipmentAuras.sync(enchantments, &SpellLoader.load/1, now, set_sources)
     |> CombatRatings.sync()
   end
 

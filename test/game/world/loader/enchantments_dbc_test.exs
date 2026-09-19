@@ -10,7 +10,7 @@ defmodule ThistleTea.Game.World.Loader.EnchantmentsDbcTest do
   alias ThistleTea.Game.Entity.Data.Item
   alias ThistleTea.Game.Entity.Data.ItemEnchantment
   alias ThistleTea.Game.Entity.Data.ItemTemplate
-  alias ThistleTea.Game.Entity.Logic.EquipmentEnchantments
+  alias ThistleTea.Game.Entity.Logic.EquipmentAuras
   alias ThistleTea.Game.Player.Enchantments
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.ItemEnchantment, as: EnchantmentLoader
@@ -70,9 +70,9 @@ defmodule ThistleTea.Game.World.Loader.EnchantmentsDbcTest do
 
       for {spell_id, field, expected} <- [{7419, :max_health, 105}, {13_825, :intellect, 27}] do
         enchantment = %ItemEnchantment{effects: [%{type: 3, spell_id: spell_id}]}
-        equipped = EquipmentEnchantments.sync(character, [{:wrists, item, 0, enchantment}], &SpellLoader.load/1, 0)
+        equipped = EquipmentAuras.sync(character, [{:wrists, item, 0, enchantment}], &SpellLoader.load/1, 0)
         assert Map.fetch!(equipped.unit, field) == expected
-        assert EquipmentEnchantments.sync(equipped, [], &SpellLoader.load/1, 10).unit.intellect == 20
+        assert EquipmentAuras.sync(equipped, [], &SpellLoader.load/1, 10).unit.intellect == 20
       end
     end
   end

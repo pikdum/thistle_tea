@@ -155,13 +155,15 @@ defmodule ThistleTea.Game.Entity.Server.Player do
     state =
       %State{account: account, connection_pid: connection_pid}
       |> Login.enter_world(character_guid)
+      |> sync_equipment_requirements()
 
     {:ok, state}
   end
 
   @impl GenServer
   def handle_call({:client_message, message}, _from, state) do
-    {:reply, :ok, Message.handle(message, state)}
+    state = message |> Message.handle(state) |> maybe_broadcast_update()
+    {:reply, :ok, state}
   end
 
   def handle_call(:disconnect, _from, state) do
@@ -1115,12 +1117,29 @@ defmodule ThistleTea.Game.Entity.Server.Player do
     state
     |> cancel_cast_if_dead()
     |> finalize_battleground_death()
+    |> sync_equipment_requirements()
     |> sync_character_metadata()
     |> then(fn state -> %{state | character: EventSink.emit_pending(state.character)} end)
     |> do_broadcast_update()
   end
 
   def maybe_broadcast_update(state), do: state
+
+  defp sync_equipment_requirements(%State{character: %Character{player: %{} = player} = character} = state) do
+    requirements = {character.unit.shapeshift_form, player.skills, player.skill_bonuses}
+
+    character =
+      if state.equipment_requirements != nil and state.equipment_requirements != requirements do
+        Character.sync_equipment_stats(character)
+      else
+        character
+      end
+
+    requirements = {character.unit.shapeshift_form, character.player.skills, character.player.skill_bonuses}
+    %{state | character: character, equipment_requirements: requirements}
+  end
+
+  defp sync_equipment_requirements(state), do: state
 
   defp finalize_battleground_death(
          %{character: %Character{internal: %Internal{death_finalized?: false} = internal} = character} = state

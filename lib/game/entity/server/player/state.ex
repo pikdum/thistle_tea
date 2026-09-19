@@ -40,6 +40,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
     :guid,
     :packed_guid,
     :character,
+    :equipment_requirements,
     :visibility_cells,
     :stealth_detection_ref,
     :player_tick_ref,
