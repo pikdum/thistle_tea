@@ -49,6 +49,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Entity.Logic.Loot.Release
   alias ThistleTea.Game.Entity.Logic.LootSession
   alias ThistleTea.Game.Entity.Logic.Movement
+  alias ThistleTea.Game.Entity.Logic.PetHappiness
   alias ThistleTea.Game.Entity.Logic.SpellEffect
   alias ThistleTea.Game.Entity.Logic.SpellFeedback
   alias ThistleTea.Game.Entity.Logic.StealthDetection
@@ -74,6 +75,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.World.CallForHelp
   alias ThistleTea.Game.World.ChaseWatch
   alias ThistleTea.Game.World.Loader.Faction, as: FactionLoader
+  alias ThistleTea.Game.World.Loader.MapTemplate
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpawnPool
@@ -515,6 +517,12 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   end
 
   def handle_call(:feed_info, _from, %Mob{} = state), do: {:reply, {:error, :not_pet}, state}
+
+  def handle_call(:pet_happiness, _from, %Mob{internal: %Internal{pet: %Pet{kind: :hunter}}} = state) do
+    {:reply, {:ok, state.unit.power5}, state}
+  end
+
+  def handle_call(:pet_happiness, _from, %Mob{} = state), do: {:reply, {:error, :not_hunter_pet}, state}
 
   def handle_call({:loot_view, %Actor{} = actor}, _from, %Mob{} = state) do
     {result, state} = Corpse.view(state, actor)
@@ -1266,6 +1274,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
       Process.send_after(self(), :pet_stop, 100)
 
       state
+      |> PetHappiness.on_death(MapTemplate.battleground?(state.internal.world.map_id))
       |> mark_death_finalized()
       |> EventSink.emit_pending()
       |> Core.mark_broadcast_update()

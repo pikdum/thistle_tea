@@ -73,6 +73,27 @@ defmodule ThistleTea.Game.Entity.Logic.CompanionTest do
     end
   end
 
+  describe "remember_happiness/3" do
+    test "preserves happiness through suspension and rejects stale pet updates" do
+      character = Companion.remember_happiness(character_with_pet(), 44, 750_000)
+      suspended = Companion.suspend(character)
+      restored = Companion.activate(suspended, :hunter_pet, %EntityRef{guid: 55, entry: 416, spell_id: 688})
+
+      assert Companion.relationship(suspended).happiness == 750_000
+      assert Companion.relationship(restored).happiness == 750_000
+      assert Companion.remember_happiness(restored, 44, 100) == restored
+      assert Companion.remember_happiness(suspended, 44, 100) == suspended
+      assert Companion.relationship(Companion.remember_happiness(restored, 55, 700_000)).happiness == 700_000
+    end
+
+    test "forgets happiness when the pet is abandoned or replaced" do
+      character = Companion.remember_happiness(character_with_pet(), 44, 750_000)
+      assert Companion.relationship(Companion.clear(character)).happiness == nil
+      replaced = Companion.activate(character, :hunter_pet, %EntityRef{guid: 55, entry: 417, spell_id: 688})
+      assert Companion.relationship(replaced).happiness == nil
+    end
+  end
+
   defp character_with_pet do
     %Character{unit: %Unit{}, internal: %Internal{}}
     |> Companion.activate(:hunter_pet, %EntityRef{guid: 44, entry: 416, spell_id: 688})

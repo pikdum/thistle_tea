@@ -176,7 +176,8 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
     rolled =
       trunc(
         rolled * (context.effect_damage_multiplier || 1.0) * (context.damage_done_multiplier || 1.0) *
-          versus_damage_multiplier(state, context) * scripted_damage_multiplier(state, spell)
+          context.happiness_multiplier * versus_damage_multiplier(state, context) *
+          scripted_damage_multiplier(state, spell)
       )
 
     rolled = AttackDamageTaken.spell_amount(state, rolled, spell, Keyword.get(opts, :damage_effect))
@@ -386,7 +387,10 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
     school = school_atom(spell)
 
     damage =
-      trunc(damage * (context.effect_damage_multiplier || 1.0) * (context.damage_done_multiplier || 1.0))
+      trunc(
+        damage * (context.effect_damage_multiplier || 1.0) * (context.damage_done_multiplier || 1.0) *
+          context.happiness_multiplier
+      )
 
     damage = AttackDamageTaken.spell_amount(state, damage, spell, effect)
 

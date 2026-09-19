@@ -20,7 +20,25 @@ defmodule ThistleTea.Game.Entity.Logic.Companion do
   def activate(%Character{} = character, kind, %EntityRef{} = entity_ref)
       when kind in @summon_kinds or kind in @control_kinds do
     autocast = activation_autocast(relationship(character), kind, entity_ref.entry)
-    put_relationship(character, %Companion{kind: kind, status: {:active, entity_ref}, autocast: autocast})
+    happiness = if kind == :hunter_pet and entry(character) == entity_ref.entry, do: relationship(character).happiness
+
+    put_relationship(character, %Companion{
+      kind: kind,
+      status: {:active, entity_ref},
+      autocast: autocast,
+      happiness: happiness
+    })
+  end
+
+  def remember_happiness(%Character{} = character, guid, happiness) when is_integer(happiness) and happiness >= 0 do
+    if controls?(character, guid), do: capture_happiness(character, happiness), else: character
+  end
+
+  def capture_happiness(%Character{} = character, happiness) when is_integer(happiness) and happiness >= 0 do
+    case relationship(character) do
+      %Companion{kind: :hunter_pet} = companion -> put_relationship(character, %{companion | happiness: happiness})
+      _ -> character
+    end
   end
 
   def suspend(%Character{internal: %Internal{companion: %Companion{} = companion}} = character) do

@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Regen do
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context
+  alias ThistleTea.Game.Entity.Logic.PetHappiness
   alias ThistleTea.Game.Entity.Logic.Regen, as: RegenLogic
 
   def tick_step do
@@ -15,7 +16,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Regen do
   def tick(entity, %Blackboard{} = blackboard, now) when is_integer(now) do
     {entity, blackboard} = tick_resources(entity, blackboard, now)
     {entity, blackboard} = tick_focus(entity, blackboard, now)
-    {:failure, entity, blackboard}
+    {:failure, PetHappiness.tick(entity, now), blackboard}
   end
 
   defp tick_with_context(entity, %Blackboard{} = blackboard, %Context{now: now}) do

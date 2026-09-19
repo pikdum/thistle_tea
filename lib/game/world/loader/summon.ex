@@ -16,6 +16,8 @@ defmodule ThistleTea.Game.World.Loader.Summon do
   alias ThistleTea.Game.Entity.Data.CreatureSpell
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
+  alias ThistleTea.Game.Entity.Logic.Companion
+  alias ThistleTea.Game.Entity.Logic.Stats
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Spell, as: SpellData
   alias ThistleTea.Game.Time
@@ -52,12 +54,15 @@ defmodule ThistleTea.Game.World.Loader.Summon do
     |> Mob.prepare_summon(opts)
   end
 
-  def build_pet(entry, %{
-        object: %{guid: owner_guid},
-        unit: owner_unit,
-        internal: %{world: world},
-        movement_block: %{position: position}
-      })
+  def build_pet(
+        entry,
+        %{
+          object: %{guid: owner_guid},
+          unit: owner_unit,
+          internal: %{world: world},
+          movement_block: %{position: position}
+        } = owner
+      )
       when is_integer(entry) and is_integer(owner_guid) do
     with %Mob{} = mob <- build(entry, world, position),
          level when is_integer(level) <- owner_unit.level do
@@ -80,7 +85,7 @@ defmodule ThistleTea.Game.World.Loader.Summon do
               faction_template: owner_unit.faction_template,
               pet_number: Guid.low_guid(guid),
               pet_name_timestamp: System.system_time(:second),
-              pet_loyalty: 0,
+              pet_loyalty: if(hunter_pet?, do: 1, else: 0),
               pet_flags: 0
           }
         end)
@@ -102,6 +107,7 @@ defmodule ThistleTea.Game.World.Loader.Summon do
       }
 
       %{mob | object: %{mob.object | guid: guid}, unit: unit, internal: internal}
+      |> restore_happiness(owner, entry)
       |> attach_owner(owner_guid)
       |> apply_pet_passive_auras(entry, level)
     else
@@ -110,6 +116,19 @@ defmodule ThistleTea.Game.World.Loader.Summon do
   end
 
   def build_pet(_entry, _owner), do: nil
+
+  defp restore_happiness(%Mob{internal: %{pet: %Pet{kind: :hunter}}} = pet, owner, entry) do
+    happiness = Companion.relationship(owner).happiness
+
+    if Companion.entry(owner) == entry and is_integer(happiness) do
+      unit = %{pet.unit | power5: min(max(happiness, 0), pet.unit.max_power5)}
+      %{pet | unit: Stats.recompute(unit)}
+    else
+      %{pet | unit: Stats.recompute(pet.unit)}
+    end
+  end
+
+  defp restore_happiness(pet, _owner, _entry), do: pet
 
   def attach_owner(%Mob{} = mob, owner_guid) when is_integer(owner_guid) do
     %{
@@ -428,13 +447,14 @@ defmodule ThistleTea.Game.World.Loader.Summon do
     attack_speed = (unit.base_attack_time || 2_000) / 2_000
     min_damage = unit.level * 1.15 * 1.05 * attack_speed
     max_damage = unit.level * 1.45 * 1.05 * attack_speed
+    attack_power_damage = (unit.attack_power || 0) / 14 * attack_speed * 2
 
     %{
       unit
       | min_damage: min_damage,
         max_damage: max_damage,
-        base_min_damage: min_damage,
-        base_max_damage: max_damage
+        base_min_damage: min_damage - attack_power_damage,
+        base_max_damage: max_damage - attack_power_damage
     }
   end
 

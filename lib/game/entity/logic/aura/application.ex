@@ -582,7 +582,8 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
         amount
       end
 
-    trunc(amount * (multiplier || 1.0))
+    happiness = if effect.aura in [:periodic_damage, :periodic_leech], do: context.happiness_multiplier, else: 1.0
+    trunc(amount * (multiplier || 1.0) * happiness)
   end
 
   defp modify_aura_base_amount(aura, amount, %CastContext{} = context)

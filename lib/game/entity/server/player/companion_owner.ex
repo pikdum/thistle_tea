@@ -46,6 +46,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.CompanionOwner do
   alias ThistleTea.Game.Entity.Server.Player.CompanionOwner.Attachment
   alias ThistleTea.Game.Entity.Server.Player.CompanionOwner.Monitor
   alias ThistleTea.Game.Entity.Server.Player.State
+  alias ThistleTea.Game.Guid
   alias ThistleTea.Game.World
 
   def attach(%State{} = state, %Attachment{pid: pid, entity_ref: %EntityRef{} = entity_ref} = attachment) do
@@ -79,8 +80,9 @@ defmodule ThistleTea.Game.Entity.Server.Player.CompanionOwner do
       %Companion{kind: kind, status: {:active, %EntityRef{guid: guid}}}
       when kind in [:hunter_pet, :guardian] ->
         state = clear_monitor(state)
+        character = capture_happiness(state.character, guid)
         World.stop_entity(guid)
-        %{state | character: CompanionLogic.suspend(state.character)}
+        %{state | character: CompanionLogic.suspend(character)}
 
       %Companion{status: {:active, %EntityRef{} = entity_ref}} ->
         state = clear_monitor(state)
@@ -93,6 +95,19 @@ defmodule ThistleTea.Game.Entity.Server.Player.CompanionOwner do
   end
 
   def suspend(%State{} = state), do: clear_monitor(state)
+
+  def capture_happiness(%Character{} = character, guid) do
+    if CompanionLogic.entry(character) == Guid.entry(guid) do
+      case Entity.call(guid, :pet_happiness) do
+        {:ok, happiness} when is_integer(happiness) -> CompanionLogic.capture_happiness(character, happiness)
+        _ -> character
+      end
+    else
+      character
+    end
+  end
+
+  def capture_happiness(entity, _guid), do: entity
 
   defp replace_previous(%State{} = state, next_guid) do
     case CompanionLogic.relationship(state.character) do

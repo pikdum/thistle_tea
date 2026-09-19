@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.Entity.EventSink.Summons do
   alias ThistleTea.Game.Entity.EventSink.Context
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Server.DynamicObject, as: DynamicObjectServer
+  alias ThistleTea.Game.Entity.Server.Player.CompanionOwner
   alias ThistleTea.Game.Entity.Server.Player.CompanionOwner.Attachment
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Spell
@@ -321,7 +322,17 @@ defmodule ThistleTea.Game.Entity.EventSink.Summons do
   def emit(entity, %Effects.TameCreature{}, _context), do: entity
 
   def emit(entity, %Effects.DismissPet{target_guid: pet_guid}, _context) when is_integer(pet_guid) and pet_guid > 0 do
+    entity = CompanionOwner.capture_happiness(entity, pet_guid)
     World.stop_entity(pet_guid)
+    entity
+  end
+
+  def emit(entity, %Effects.PetHappinessChanged{target_guid: guid} = effect, _context) do
+    case Entity.pid(guid) do
+      pid when is_pid(pid) -> send(pid, effect)
+      _ -> :ok
+    end
+
     entity
   end
 

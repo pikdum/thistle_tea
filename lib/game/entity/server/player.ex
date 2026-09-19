@@ -984,6 +984,11 @@ defmodule ThistleTea.Game.Entity.Server.Player do
     {:noreply, state, {:continue, {:finish_companion_attach, attachment}}}
   end
 
+  def handle_info(%Effects.PetHappinessChanged{source_guid: guid, happiness: happiness}, %State{} = state) do
+    character = Companion.remember_happiness(state.character, guid, happiness)
+    {:noreply, %{state | character: character}}
+  end
+
   def handle_info({:reputation_change, faction_id, value}, %State{} = state) do
     {:noreply, PlayerReputation.reward_spell(state, faction_id, value)}
   end

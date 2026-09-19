@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal.Pet do
     :kind,
     :food_mask,
     :control_spell_id,
+    :next_happiness_at,
     :original_faction_template,
     :original_npc_flags,
     :stay_position,

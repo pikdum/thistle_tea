@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Entity.Logic.Resources do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Core
+  alias ThistleTea.Game.Entity.Logic.PetHappiness
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Modifiers
 
@@ -261,6 +262,10 @@ defmodule ThistleTea.Game.Entity.Logic.Resources do
   defp put_active_power(%Unit{power_type: 2} = unit, power), do: %{unit | power3: power}
   defp put_active_power(%Unit{power_type: 3} = unit, power), do: %{unit | power4: power}
   defp put_active_power(%Unit{power_type: 4} = unit, power), do: %{unit | power5: power}
+
+  def gain_power(entity, 4, amount) when is_number(amount) and amount > 0 do
+    PetHappiness.change(entity, amount)
+  end
 
   def gain_power(%{unit: %Unit{} = unit} = entity, power_type, amount)
       when is_integer(power_type) and is_number(amount) and amount > 0 do

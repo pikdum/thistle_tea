@@ -1107,8 +1107,8 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
         |> then(fn pet ->
           %{
             pet
-            | unit: %{pet.unit | power_type: 2, power2: 100, power5: 166_500},
-              internal: %{pet.internal | pet: %Pet{}}
+            | unit: %{pet.unit | power_type: 2, power2: 100, power5: 166_500, max_power5: 1_050_000},
+              internal: %{pet.internal | pet: %Pet{kind: :hunter}}
           }
         end)
 

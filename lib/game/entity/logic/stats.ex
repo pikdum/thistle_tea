@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Entity.Logic.Stats do
   alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.Disarm
+  alias ThistleTea.Game.Entity.Logic.PetHappiness
   alias ThistleTea.Game.Spell
 
   @resistance_fields [
@@ -40,7 +41,16 @@ defmodule ThistleTea.Game.Entity.Logic.Stats do
     |> derive_max_energy()
     |> derive_attack_power()
     |> derive_weapon_damage()
+    |> derive_happiness_damage()
   end
+
+  defp derive_happiness_damage(%Unit{base_min_damage: base_min, base_max_damage: base_max} = unit)
+       when is_number(base_min) and is_number(base_max) do
+    multiplier = PetHappiness.damage_multiplier(unit)
+    %{unit | min_damage: unit.min_damage * multiplier, max_damage: unit.max_damage * multiplier}
+  end
+
+  defp derive_happiness_damage(%Unit{} = unit), do: unit
 
   def stamina_health_bonus(stamina) when stamina < 20, do: stamina
   def stamina_health_bonus(stamina), do: 20 + (stamina - 20) * 10

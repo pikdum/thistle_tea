@@ -24,6 +24,7 @@ defmodule ThistleTea.Game.Entity.Logic.Effects.SummonTypes do
     {:SummonPet, [:source_guid, :entry, :spell_id], []},
     {:TameCreature, [:source_guid, :entry], []},
     {:DismissPet, [:target_guid], []},
+    {:PetHappinessChanged, [:source_guid, :target_guid, :happiness], []},
     {:SummonTotem, [:entry, :slot, :duration_ms], []},
     {:DespawnSelf, [:duration_ms, :respawn_delay_ms], []},
     {:RespawnSelf, [:even_if_alive?], []}
