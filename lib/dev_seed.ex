@@ -6,7 +6,8 @@ defmodule ThistleTea.DevSeed do
   loot piñatas with guaranteed green drops for roll testing, level-50
   hostiles for combat and XP testing, and a Devilsaur (combat reach 5.0)
   for big-hitbox spell-range testing, a Defias Thug for pickpocketing, and a
-  Stonetusk Boar with a three-minute respawn for skinning practice.
+  Stonetusk Boar with a three-minute respawn for skinning practice. A repair
+  vendor and spirit healer support equipment wear and resurrection testing.
   """
   import Ecto.Query
 
@@ -253,6 +254,8 @@ defmodule ThistleTea.DevSeed do
     spawn_mob(@pickpocket_entry, @base_low_guid + 300, {x + dx, y + dy, z}, nil, @hostile_respawn_secs)
 
     spawn_mob(113, @base_low_guid + 400, {x + 15.0, y - 10.0, z}, nil, 180)
+    spawn_mob(54, @base_low_guid + 500, {x + 4.0, y + 2.0, z}, nil, @respawn_secs)
+    spawn_mob(6491, @base_low_guid + 600, {x + 4.0, y - 2.0, z}, nil, @respawn_secs)
   end
 
   defp spawn_mob(entry, low_guid, {x, y, z}, loot_override, respawn_secs) do
