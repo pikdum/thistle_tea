@@ -297,7 +297,7 @@ defmodule ThistleTea.Game.Player.DevCommands do
   end
 
   def run(state, ".debug durability" <> params) do
-    case String.split(params, trim: true) do
+    case String.split(params) do
       [percent] -> debug_durability(state, percent, :equipped)
       [percent, "carried"] -> debug_durability(state, percent, :carried)
       _ -> system_message(state, "Use: .debug durability <percent> [carried]")

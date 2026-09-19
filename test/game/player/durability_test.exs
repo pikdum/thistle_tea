@@ -24,6 +24,7 @@ defmodule ThistleTea.Game.Player.DurabilityTest do
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Message.Dispatch
   alias ThistleTea.Game.Network.Packet
+  alias ThistleTea.Game.Player.DevCommands
   alias ThistleTea.Game.Player.Durability
   alias ThistleTea.Game.Player.Enchantments
   alias ThistleTea.Game.Player.SpiritHealer
@@ -45,6 +46,13 @@ defmodule ThistleTea.Game.Player.DurabilityTest do
   setup [:equipped_character]
 
   describe "lose/5 and repair/3" do
+    test "debug wear parses whitespace and rejects invalid percentages", %{state: state, item: item} do
+      assert {:handled, worn} = DevCommands.run(state, ".debug durability  10  ")
+      assert ItemStore.get(item.object.guid).item.durability == 45
+      assert {:handled, ^worn} = DevCommands.run(worn, ".debug durability 101")
+      assert {:handled, ^worn} = DevCommands.run(worn, ".debug durability nonsense")
+    end
+
     test "broken enchanted weapons lose stats and procs, then regain them on repair", context do
       %{state: state, item: item, vendor: vendor} = context
       initial = state.character
