@@ -6,11 +6,16 @@ defmodule ThistleTea.Game.Player.Items do
   command.
   """
   alias ThistleTea.Game.Entity.Data.Item, as: DataItem
+  alias ThistleTea.Game.Entity.Data.ItemTemplate
   alias ThistleTea.Game.Entity.Logic.Inventory
+  alias ThistleTea.Game.Entity.Logic.Inventory.Batch
+  alias ThistleTea.Game.Entity.Logic.Inventory.ChangeSet
+  alias ThistleTea.Game.Entity.Logic.Inventory.ChangeSet.Placement
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.InventoryUpdate
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World.ItemStore
+  alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
 
   def give(state, item_id, count) do
     case store(state, item_id, count) do
@@ -26,12 +31,41 @@ defmodule ThistleTea.Game.Player.Items do
     end
   end
 
-  def store(state, item_id, count) do
-    case ItemStore.create(item_id, owner: state.guid, stack_count: count) do
-      %DataItem{} = item -> store_item(state, item)
-      _ -> {:error, :item_not_found, state}
+  def store(state, item_id, count) when is_integer(count) and count > 0 do
+    case ItemLoader.get_template(item_id) do
+      %ItemTemplate{} = template ->
+        items = prepare_stacks(template, state.guid, count)
+        batch = Enum.reduce(items, Batch.new(state.character.player), &Batch.add(&2, &1))
+        commit_stacks(state, batch, hd(items).object.guid)
+
+      _ ->
+        {:error, :item_not_found, state}
     end
   end
+
+  def store(state, _item_id, _count), do: {:error, :item_not_found, state}
+
+  defp prepare_stacks(_template, _owner, 0), do: []
+
+  defp prepare_stacks(%ItemTemplate{} = template, owner, count) do
+    stack_count = min(count, max(template.stackable || 1, 1))
+    item = ItemStore.prepare(template, owner: owner, stack_count: stack_count)
+    [item | prepare_stacks(template, owner, count - stack_count)]
+  end
+
+  defp commit_stacks(state, batch, first_guid) do
+    case Inventory.plan(batch, &ItemStore.get/1) do
+      {:ok, changes} ->
+        position = placement_position(ChangeSet.placement(changes, first_guid))
+        {:ok, InventoryUpdate.apply(state, {:ok, changes}), position}
+
+      {:error, reason} ->
+        {:error, reason, state}
+    end
+  end
+
+  defp placement_position(%Placement{status: :placed, position: position}), do: position
+  defp placement_position(%Placement{status: :merged}), do: {Inventory.bag_0(), 0xFFFFFFFF}
 
   def consume(state, item_guid) when is_integer(item_guid) do
     with %DataItem{} = item <- ItemStore.get(item_guid),
@@ -62,19 +96,6 @@ defmodule ThistleTea.Game.Player.Items do
         _ ->
           state
       end
-    end
-  end
-
-  defp store_item(state, item) do
-    case Inventory.store(state.character.player, state.guid, item, &ItemStore.get/1) do
-      {:ok, result, placement} ->
-        placed_at = InventoryUpdate.commit_placement(item, placement)
-        state = InventoryUpdate.apply(state, {:ok, result}, placement)
-        {:ok, state, placed_at}
-
-      {:error, reason} ->
-        ItemStore.delete(item.object.guid)
-        {:error, reason, state}
     end
   end
 
