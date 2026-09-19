@@ -200,6 +200,21 @@ defmodule ThistleTea.Game.Network.Message.PetMessagesTest do
   end
 
   describe "pet name messages" do
+    test "responds with the published name timestamp and validates the pet number" do
+      pet_guid = 123
+      Metadata.put(pet_guid, %{name: "Wolf", owner_guid: 7, pet_number: 77, pet_name_timestamp: 99})
+      on_exit(fn -> Metadata.delete(pet_guid) end)
+      state = %{guid: 7, character: companion(:hunter_pet, pet_guid)}
+      query = %Message.CmsgPetNameQuery{pet_number: 77, pet_guid: pet_guid}
+      assert Message.CmsgPetNameQuery.handle(query, state) == state
+
+      assert_receive {:"$gen_cast",
+                      {:send_packet, %Message.SmsgPetNameQueryResponse{pet_number: 77, name: "Wolf", timestamp: 99}}}
+
+      assert Message.CmsgPetNameQuery.handle(%{query | pet_number: 78}, state) == state
+      refute_receive {:"$gen_cast", {:send_packet, %Message.SmsgPetNameQueryResponse{}}}
+    end
+
     test "decodes the query and encodes the vanilla name response" do
       query = Message.CmsgPetNameQuery.from_binary(<<77::little-size(32), 123::little-size(64)>>)
       assert query.pet_number == 77

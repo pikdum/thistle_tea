@@ -13,12 +13,13 @@ defmodule ThistleTea.Game.Network.Message.CmsgPetNameQuery do
         %{guid: owner_guid, character: %Character{} = c} = state
       ) do
     if Companion.summon_guid(c) == pet_guid do
-      case Metadata.query(pet_guid, [:name, :owner_guid]) do
-        %{name: name, owner_guid: ^owner_guid} when is_binary(name) ->
+      case Metadata.query(pet_guid, [:name, :owner_guid, :pet_number, :pet_name_timestamp]) do
+        %{name: name, owner_guid: ^owner_guid, pet_number: ^pet_number, pet_name_timestamp: timestamp}
+        when is_binary(name) and is_integer(timestamp) ->
           Network.send_packet(%Message.SmsgPetNameQueryResponse{
             pet_number: pet_number,
             name: name,
-            timestamp: System.system_time(:second)
+            timestamp: timestamp
           })
 
         _ ->

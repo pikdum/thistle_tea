@@ -97,8 +97,13 @@ defmodule ThistleTea.Game.World.Loader.Mob do
     )
   end
 
-  defp pet_metadata(%Mob{internal: %{pet: %{owner_guid: owner_guid, profile: profile}}}) do
-    %{owner_guid: owner_guid, pet_profile: profile}
+  defp pet_metadata(%Mob{internal: %{pet: %{owner_guid: owner_guid, profile: profile}}} = mob) do
+    %{
+      owner_guid: owner_guid,
+      pet_profile: profile,
+      pet_number: mob.unit.pet_number,
+      pet_name_timestamp: mob.unit.pet_name_timestamp
+    }
   end
 
   defp pet_metadata(%Mob{}), do: %{}
