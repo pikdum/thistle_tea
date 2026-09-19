@@ -67,7 +67,7 @@ defmodule ThistleTea.Game.World.Loader.SummonTest do
       pet = Summon.build_pet(69, owner)
 
       assert pet.internal.pet.kind == :hunter
-      assert pet.internal.pet.food_mask == 208
+      assert pet.internal.pet.food_mask == 1
       assert pet.unit.health == 2_215
       assert pet.unit.power_type == 2
       assert pet.unit.power3 == 100

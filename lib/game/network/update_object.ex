@@ -202,6 +202,11 @@ defmodule ThistleTea.Game.Network.UpdateObject do
     flatten_field_structs(obj, :self)
   end
 
+  defp recipient_fields(%__MODULE__{object_type: :unit, unit: %Unit{summoned_by: owner}} = obj, owner)
+       when is_integer(owner) and owner > 0 do
+    flatten_field_structs(obj, :self)
+  end
+
   defp recipient_fields(%__MODULE__{unit: %Unit{} = unit} = obj, recipient_guid) do
     target = if Empathy.visible_to?(unit, recipient_guid), do: :special_info, else: :other
     flatten_field_structs(%{obj | unit: Empathy.project(unit, recipient_guid)}, target)

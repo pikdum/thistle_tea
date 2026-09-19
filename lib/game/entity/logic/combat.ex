@@ -18,6 +18,7 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
   alias ThistleTea.Game.Entity.Logic.Disarm
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.ParryHaste
+  alias ThistleTea.Game.Entity.Logic.PetHappiness
   alias ThistleTea.Game.Entity.Logic.Reactive
   alias ThistleTea.Game.Entity.Logic.Skills
   alias ThistleTea.Game.Guid
@@ -124,6 +125,8 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
 
   defp outgoing_damage_range(entity, {min_damage, max_damage}) do
     flat = Aura.flat_modifier(entity, :mod_damage_done, @physical_school_mask)
+    happiness = PetHappiness.damage_multiplier(entity)
+    flat = if happiness == 1.0, do: flat, else: flat * happiness
 
     {max(min_damage + flat, 0), max(max_damage + flat, 0)}
     |> scale_damage_range(outgoing_damage_multiplier(entity))

@@ -27,6 +27,14 @@ defmodule ThistleTea.Game.Entity.Logic.PetHappinessTest do
   setup [:build_pet]
 
   describe "change/2" do
+    test "scales flat melee buffs along with the pet's weapon damage", %{pet: pet} do
+      effect = %Effect{index: 0, type: :apply_aura, aura: :mod_damage_done, base_points: 20, misc_value: 1}
+      spell = %Spell{id: 1, duration_ms: 5_000, effects: [effect]}
+      {pet, _events} = Aura.apply_spell(pet, 10, 50, spell, 0)
+      assert Combat.damage_range(pet) == {75.0, 105.0}
+      assert Combat.damage_range(PetHappiness.change(pet, 500_000)) == {125.0, 175.0}
+    end
+
     test "crosses exact happiness thresholds and derives damage without compounding", %{pet: pet} do
       for {happiness, multiplier} <- [{0, 0.75}, {332_999, 0.75}, {333_000, 1.0}, {665_999, 1.0}, {666_000, 1.25}] do
         changed = PetHappiness.change(pet, happiness - pet.unit.power5)

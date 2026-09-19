@@ -47,7 +47,12 @@ defmodule ThistleTea.Game.Entity.Logic.Stats do
   defp derive_happiness_damage(%Unit{base_min_damage: base_min, base_max_damage: base_max} = unit)
        when is_number(base_min) and is_number(base_max) do
     multiplier = PetHappiness.damage_multiplier(unit)
-    %{unit | min_damage: unit.min_damage * multiplier, max_damage: unit.max_damage * multiplier}
+
+    if multiplier == 1.0 do
+      unit
+    else
+      %{unit | min_damage: unit.min_damage * multiplier, max_damage: unit.max_damage * multiplier}
+    end
   end
 
   defp derive_happiness_damage(%Unit{} = unit), do: unit

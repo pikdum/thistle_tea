@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.Entity.Server.Player.StateTest do
   use ExUnit.Case, async: false
 
+  alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Companion
   alias ThistleTea.Game.Entity.Data.Companion.EntityRef
@@ -9,9 +10,26 @@ defmodule ThistleTea.Game.Entity.Server.Player.StateTest do
   alias ThistleTea.Game.Entity.Logic.Companion, as: CompanionLogic
   alias ThistleTea.Game.Entity.Server.Player.CompanionOwner
   alias ThistleTea.Game.Entity.Server.Player.State
+  alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World.System.CellActivator
   alias ThistleTea.Game.WorldRef
+
+  defmodule HappinessPet do
+    @moduledoc false
+    use GenServer, restart: :temporary
+
+    def start_link({guid, happiness}), do: GenServer.start_link(__MODULE__, {guid, happiness})
+
+    @impl true
+    def init({guid, happiness}) do
+      Entity.register(guid)
+      {:ok, happiness}
+    end
+
+    @impl true
+    def handle_call(:suspend_hunter_pet, _from, happiness), do: {:stop, :normal, {:ok, happiness}, happiness}
+  end
 
   describe "struct defaults" do
     test "starts not ready with empty world-presence bookkeeping" do
@@ -70,6 +88,22 @@ defmodule ThistleTea.Game.Entity.Server.Player.StateTest do
   end
 
   describe "suspend_companion/1" do
+    test "captures the final pet happiness before stopping its owner process" do
+      guid = Guid.from_low_guid(:pet, 2960, :erlang.unique_integer([:positive]))
+      pid = start_supervised!({HappinessPet, {guid, 700_000}})
+      ref = Process.monitor(pid)
+
+      character =
+        %Character{unit: %Unit{}, internal: %Internal{}}
+        |> CompanionLogic.activate(:hunter_pet, %EntityRef{guid: guid, entry: 2960, spell_id: 1515})
+        |> CompanionLogic.remember_happiness(guid, 300_000)
+
+      state = CompanionOwner.suspend(%State{character: character})
+      assert CompanionLogic.relationship(state.character).happiness == 700_000
+      assert CompanionLogic.suspended(state.character) == {:hunter_pet, 2960, 1515}
+      assert_receive {:DOWN, ^ref, :process, ^pid, :normal}
+    end
+
     test "replaces the active reference with stable restore state" do
       character =
         %Character{unit: %Unit{}, internal: %Internal{}}

@@ -63,6 +63,23 @@ defmodule ThistleTea.UpdateObjectTest do
     end
   end
 
+  describe "to_packet/2" do
+    test "sends full pet stats to its owner and public fields to other players" do
+      pet_guid = Guid.from_low_guid(:pet, 2960, 1)
+
+      obj = %UpdateObject{
+        update_type: :values,
+        object_type: :unit,
+        object: %Object{guid: pet_guid},
+        unit: %Unit{summoned_by: 7, health: 500, min_damage: 50.0, max_damage: 70.0, attack_power: 40, power5: 700_000}
+      }
+
+      owner_packet = UpdateObject.to_packet(obj, 7)
+      assert owner_packet == UpdateObject.to_packet(obj, pet_guid)
+      assert byte_size(owner_packet.payload) > byte_size(UpdateObject.to_packet(obj, 8).payload)
+    end
+  end
+
   describe "visibility filtering" do
     setup [:object, :unit, :player_with_private_fields, :create_object_update]
 

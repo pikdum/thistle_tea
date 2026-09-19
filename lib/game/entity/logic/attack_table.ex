@@ -20,6 +20,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
   alias ThistleTea.Game.Entity.Logic.Daze
   alias ThistleTea.Game.Entity.Logic.Disarm
   alias ThistleTea.Game.Entity.Logic.MechanicResistance
+  alias ThistleTea.Game.Entity.Logic.PetHappiness
   alias ThistleTea.Game.Entity.Logic.Skills
   alias ThistleTea.Game.Entity.Logic.TargetAttackPower
   alias ThistleTea.Game.Math
@@ -73,7 +74,9 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
   defp caster_owner_guid(_attacker), do: nil
 
   defp attack_power_damage(%{unit: %Unit{} = unit} = attacker) do
-    multiplier = Aura.percent_multiplier(attacker, :mod_damage_percent_done, 1)
+    multiplier =
+      Aura.percent_multiplier(attacker, :mod_damage_percent_done, 1) * PetHappiness.damage_multiplier(attacker)
+
     offhand = 0.5 * max(100 + Aura.flat_amount(attacker, :mod_offhand_damage_pct), 0) / 100
 
     %{
