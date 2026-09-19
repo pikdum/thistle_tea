@@ -97,6 +97,13 @@ defmodule ThistleTea.Game.Entity.Logic.DurabilityTest do
       assert Durability.repair_cost(two_points, 49, 1.25, 0.9) == 111
       assert Durability.repair_cost(get.(1), 45, 1.25) == 169
     end
+
+    test "rounds discounted half-copper ties to the nearest even copper", %{get: get} do
+      for {lost, expected} <- [{1, 40}, {3, 122}, {15, 608}, {17, 688}] do
+        item = %{get.(1) | item: %{get.(1).item | durability: 50 - lost}}
+        assert Durability.repair_cost(item, 45, 1.0, 0.9) == expected
+      end
+    end
   end
 
   describe "equipment_entry/2" do
