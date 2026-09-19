@@ -24,7 +24,7 @@ defmodule ThistleTea.Game.World.Loader.DurabilityTest do
         assert Durability.cost(item, 1.0, table) == 0
         cost = Durability.cost(damaged, 1.0, table)
         assert is_integer(cost) and cost > 0
-        assert Durability.cost(damaged, 0.9, table) == max(round(cost * 0.9), 1)
+        assert Durability.cost(damaged, 0.9, table) == max(round(cost * 0.8999999761581421), 1)
       end
     end
   end

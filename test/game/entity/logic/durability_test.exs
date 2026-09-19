@@ -80,12 +80,22 @@ defmodule ThistleTea.Game.Entity.Logic.DurabilityTest do
   end
 
   describe "repair_cost/4" do
-    test "uses DBC factors, truncates before discount, and charges at least one copper", %{get: get} do
+    test "uses DBC factors, rounds before discount, and charges at least one copper", %{get: get} do
       assert Durability.repair_cost(get.(1), 7, 1.25) == 26
       assert Durability.repair_cost(get.(1), 7, 1.25, 0.9) == 23
       assert Durability.repair_cost(get.(1), 0, 0) == 1
       repaired = %{get.(1) | item: %{get.(1).item | durability: 50}}
       assert Durability.repair_cost(repaired, 7, 1.25) == 0
+    end
+
+    test "matches client base rounding and its single-precision reputation discount", %{get: get} do
+      one_point = %{get.(1) | item: %{get.(1).item | durability: 49}}
+      two_points = %{get.(1) | item: %{get.(1).item | durability: 48}}
+      assert Durability.repair_cost(one_point, 45, 1.0, 0.9) == 40
+      assert Durability.repair_cost(one_point, 45, 1.25, 0.9) == 50
+      assert Durability.repair_cost(two_points, 45, 1.25, 0.9) == 102
+      assert Durability.repair_cost(two_points, 49, 1.25, 0.9) == 111
+      assert Durability.repair_cost(get.(1), 45, 1.25) == 169
     end
   end
 

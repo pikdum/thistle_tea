@@ -77,7 +77,12 @@ defmodule ThistleTea.Game.Entity.Logic.Durability do
   def repair_cost(%Item{item: component}, multiplier, quality, discount \\ 1.0)
       when is_number(multiplier) and is_number(quality) and is_number(discount) do
     lost = max((component.max_durability || 0) - (component.durability || 0), 0)
-    if lost > 0, do: max(round(trunc(lost * multiplier * quality) * discount), 1), else: 0
+    if lost > 0, do: max(round(round(lost * multiplier * quality) * client_float(discount)), 1), else: 0
+  end
+
+  defp client_float(value) do
+    <<result::float-size(32)>> = <<value::float-size(32)>>
+    result
   end
 
   def cost_key(%ItemTemplate{item_level: level, quality: quality, class: class, subclass: subclass})
