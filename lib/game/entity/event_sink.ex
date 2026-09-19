@@ -24,6 +24,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
     Effects.CreateItem,
     Effects.Emote,
     Effects.EnchantItem,
+    Effects.DisenchantItem,
     Effects.FactionAtWarChanged,
     Effects.FeedPet,
     Effects.ForcedReactionsChanged,

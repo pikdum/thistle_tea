@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgMoveWorldportAck do
   alias ThistleTea.Game.Entity.Server.Player.State
   alias ThistleTea.Game.Player.CompanionVisibility
   alias ThistleTea.Game.Player.Exploration, as: PlayerExploration
+  alias ThistleTea.Game.Player.ItemLoot
   alias ThistleTea.Game.Player.Login
   alias ThistleTea.Game.World.Visibility
 
@@ -21,6 +22,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgMoveWorldportAck do
     state
     |> CompanionVisibility.defer_restoration()
     |> PlayerExploration.check_current()
+    |> ItemLoot.open()
   end
 
   @impl ClientMessage

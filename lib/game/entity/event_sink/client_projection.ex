@@ -87,6 +87,13 @@ defmodule ThistleTea.Game.Entity.EventSink.ClientProjection do
 
   def emit(entity, %Effects.SkinCorpse{}, _context), do: entity
 
+  def emit(%Character{} = entity, %Effects.DisenchantItem{target_guid: guid, spell_id: spell_id}, context) do
+    Context.send(context, {:disenchant_item, guid, spell_id})
+    entity
+  end
+
+  def emit(entity, %Effects.DisenchantItem{}, _context), do: entity
+
   def emit(entity, %Effects.GiveItem{target_guid: target_guid, item_id: item_id, count: count}, _context)
       when is_integer(target_guid) do
     case Entity.pid(target_guid) do

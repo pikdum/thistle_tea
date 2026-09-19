@@ -1006,6 +1006,29 @@ defmodule ThistleTea.Game.Entity.Logic.CastingTest do
              end)
     end
 
+    test "queues disenchant exactly once after completion and never after cancellation" do
+      spell = %Spell{id: 13_262, cast_time_ms: 3_000, effects: [%Effect{index: 0, type: :disenchant}]}
+
+      character = %Character{
+        object: %Object{guid: 1},
+        unit: %Unit{health: 100, max_health: 100},
+        player: %Player{},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+        internal: %Internal{}
+      }
+
+      casting = Casting.start(character, spell, Target.item(42), 1_000)
+      assert casting.internal.casting.ends_at == 4_000
+      refute Enum.any?(casting.internal.events || [], &is_struct(&1, Effects.DisenchantItem))
+      cancelled = casting |> Casting.cancel() |> Casting.complete(4_000)
+      refute Enum.any?(cancelled.internal.events || [], &is_struct(&1, Effects.DisenchantItem))
+
+      completed = Casting.complete(casting, 4_000)
+      expected = %Effects.DisenchantItem{target_guid: 42, spell_id: 13_262}
+      assert Enum.filter(completed.internal.events, &is_struct(&1, Effects.DisenchantItem)) == [expected]
+      assert Casting.complete(completed, 5_000) == completed
+    end
+
     test "queues self spell hit events after spell go" do
       spell = %Spell{id: 133, school: :fire, effects: [%Effect{type: :school_damage, base_points: 5, die_sides: 0}]}
 

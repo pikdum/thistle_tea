@@ -23,7 +23,10 @@ defmodule ThistleTea.Game.Player.Spellcasting do
   alias ThistleTea.Game.Network.BinaryUtils
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Player.Deadmines
+  alias ThistleTea.Game.Player.Disenchant
   alias ThistleTea.Game.Player.Fishing
+  alias ThistleTea.Game.Player.ItemLoot
+  alias ThistleTea.Game.Player.Looting
   alias ThistleTea.Game.Player.Projectile
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Cast
@@ -88,6 +91,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
 
       {:error, reason} ->
         fail_cast(spell, reason)
+        state = if reason == :already_open, do: state |> Looting.release() |> ItemLoot.open(), else: state
         {:error, state}
     end
   end
@@ -230,6 +234,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
       Time.now(),
       count_item: fn item_id -> Inventory.count_entry(character.player, item_id, &ItemStore.get/1) end,
       equipped_items: equipped_weapon_templates(character),
+      disenchant_item: Disenchant.owned_item(character, Target.item_guid(targets)),
       ammo_id: character.player.ammo_id,
       ammo_template: ItemLoader.get_template(character.player.ammo_id),
       mount_allowed?: MapTemplateLoader.mount_allowed?(character.internal.world.map_id),

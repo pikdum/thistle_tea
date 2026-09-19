@@ -75,6 +75,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.Party.Notifier, as: PartyNotifier
   alias ThistleTea.Game.Player.CompanionVisibility
   alias ThistleTea.Game.Player.ConditionContext
+  alias ThistleTea.Game.Player.Disenchant
   alias ThistleTea.Game.Player.Enchantments
   alias ThistleTea.Game.Player.Exploration, as: PlayerExploration
   alias ThistleTea.Game.Player.GameObjects, as: PlayerGameObjects
@@ -803,6 +804,14 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   rescue
     error ->
       Logger.error("Skinning failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
+  def handle_info({:disenchant_item, guid, spell_id}, state) do
+    {:noreply, Disenchant.complete(state, guid, spell_id)}
+  rescue
+    error ->
+      Logger.error("Disenchant failed: #{Exception.message(error)}")
       {:noreply, state}
   end
 

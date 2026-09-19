@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.Spell.CastValidation do
   alias ThistleTea.Game.Entity.Logic.Aura.Dispel
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Disarm
+  alias ThistleTea.Game.Entity.Logic.Disenchant
   alias ThistleTea.Game.Entity.Logic.EffectImmunity
   alias ThistleTea.Game.Entity.Logic.Fear
   alias ThistleTea.Game.Entity.Logic.Hunter
@@ -43,6 +44,7 @@ defmodule ThistleTea.Game.Spell.CastValidation do
          :ok <- check_combat_state(caster, spell),
          :ok <- Pickpocket.validate(caster, spell, target_info),
          :ok <- Skinning.validate(caster, spell, target_info, opts),
+         :ok <- Disenchant.validate(caster, spell, Keyword.get(opts, :disenchant_item)),
          :ok <- Mount.validate(caster, spell, opts),
          :ok <- check_stance(caster, spell),
          :ok <- check_caster_aura_state(caster, spell, now),

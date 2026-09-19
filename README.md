@@ -110,6 +110,7 @@ nix develop .#wow-tools            # shell with all of the above + sqlite + mari
 - looting + group loot
 - Rogue Pick Pocket, with private loot, quest drops, and failed-attempt retaliation
 - Skinning, with corpse loot prerequisites, profession skill checks and gains, and private leather loot
+- Disenchanting, with exact-item consumption, private material loot, Enchanting skill gains, and recovery when bags are full
 - quests
 - xp, leveling, and exploration
 - isolated dungeon instances (Ragefire Chasm)

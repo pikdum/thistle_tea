@@ -26,6 +26,7 @@ defmodule ThistleTea.Game.World.Loader.Loot do
     fishing = Mangos.Repo.all(Mangos.FishingLootTemplate)
     pickpocket = Mangos.Repo.all(Mangos.PickpocketingLootTemplate)
     skinning = Mangos.Repo.all(Mangos.SkinningLootTemplate)
+    disenchant = Mangos.Repo.all(Mangos.DisenchantLootTemplate)
     references = Mangos.Repo.all(Mangos.ReferenceLootTemplate)
 
     cache_rows(:creature, creature)
@@ -33,9 +34,10 @@ defmodule ThistleTea.Game.World.Loader.Loot do
     cache_rows(:fishing, fishing)
     cache_rows(:pickpocket, pickpocket)
     cache_rows(:skinning, skinning)
+    cache_rows(:disenchant, disenchant)
     cache_rows(:reference, references)
 
-    preload_items([creature, gameobject, fishing, pickpocket, skinning, references])
+    preload_items([creature, gameobject, fishing, pickpocket, skinning, disenchant, references])
 
     :ets.insert(__MODULE__, {:loaded, true})
     :ok
@@ -102,6 +104,17 @@ defmodule ThistleTea.Game.World.Loader.Loot do
 
   def generate_skinning(loot_id) do
     %Loot{items: roll_items(loot_id, &skinning_rows/1)}
+  end
+
+  def generate_disenchant(loot_id) do
+    %Loot{items: roll_items(loot_id, &disenchant_rows/1)}
+  end
+
+  defp disenchant_rows(loot_id) do
+    case :ets.lookup(__MODULE__, {:disenchant, loot_id}) do
+      [{_key, rows}] -> rows
+      _ -> []
+    end
   end
 
   defp skinning_rows(loot_id) do

@@ -23,6 +23,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal do
     :creature,
     :spawn,
     :loot,
+    :item_loot,
     :summon,
     :pet,
     :chair,

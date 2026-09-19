@@ -531,6 +531,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp effect_type(18), do: :resurrect
   defp effect_type(94), do: :self_resurrect
   defp effect_type(95), do: :skinning
+  defp effect_type(99), do: :disenchant
   defp effect_type(22), do: :parry
   defp effect_type(24), do: :create_item
   defp effect_type(25), do: :weapon

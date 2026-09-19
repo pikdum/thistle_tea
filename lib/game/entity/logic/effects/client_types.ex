@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Entity.Logic.Effects.ClientTypes do
     {:OpenGameObject, [:target_guid], [spell_id: nil]},
     {:PickPocket, [:target_guid, :spell_id], []},
     {:SkinCorpse, [:target_guid, :spell_id], []},
+    {:DisenchantItem, [:target_guid, :spell_id], []},
     {:CreateItem, [:item_id, :count], []},
     {:GiveItem, [:target_guid, :item_id, :count], []},
     {:ConsumeReagents, [:reagents], []},

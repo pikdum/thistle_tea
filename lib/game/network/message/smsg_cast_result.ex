@@ -11,6 +11,8 @@ defmodule ThistleTea.Game.Network.Message.SmsgCastResult do
   @cast_failure_reasons %{
     affecting_combat: 0x00,
     already_have_summon: 0x05,
+    already_open: 0x06,
+    cant_be_disenchanted: 0x0C,
     aura_bounced: 0x07,
     bad_implicit_targets: 0x09,
     bad_targets: 0x0A,

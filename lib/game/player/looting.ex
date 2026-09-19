@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Player.Looting do
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Experience
   alias ThistleTea.Game.Entity.Logic.Hostility
+  alias ThistleTea.Game.Entity.Logic.ItemLoot, as: PendingItemLoot
   alias ThistleTea.Game.Entity.Logic.Loot
   alias ThistleTea.Game.Entity.Logic.Loot.Commit
   alias ThistleTea.Game.Entity.Logic.Loot.Release
@@ -20,6 +21,7 @@ defmodule ThistleTea.Game.Player.Looting do
   alias ThistleTea.Game.Network.InventoryUpdate
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Party
+  alias ThistleTea.Game.Player.ItemLoot
   alias ThistleTea.Game.Player.Items
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Metadata
@@ -69,6 +71,10 @@ defmodule ThistleTea.Game.Player.Looting do
 
   def open(state, guid, opts \\ [])
 
+  def open(%{character: %Character{internal: %{item_loot: %PendingItemLoot{guid: guid}}}} = state, guid, _opts) do
+    state |> release() |> ItemLoot.open()
+  end
+
   def open(%{character: %Character{} = character} = state, guid, opts) do
     state = release(state)
     actor = actor(state, guid)
@@ -110,6 +116,12 @@ defmodule ThistleTea.Game.Player.Looting do
     state
   end
 
+  def release(%{loot_type: :item} = state) do
+    state = ItemLoot.release(state)
+    Network.send_packet(%Message.SmsgLootReleaseResponse{guid: state.loot_guid})
+    %{state | loot_guid: nil, loot_type: nil}
+  end
+
   def release(%{character: %Character{}} = state) when is_integer(state.loot_guid) do
     actor = actor(state, state.loot_guid)
     loot_call(state, actor, :release)
@@ -118,6 +130,8 @@ defmodule ThistleTea.Game.Player.Looting do
   end
 
   def release(state), do: state
+
+  def take_item(%{loot_type: :item} = state, slot), do: ItemLoot.take_item(state, slot)
 
   def take_item(%{character: %Character{}, loot_guid: loot_guid} = state, slot) when is_integer(loot_guid) do
     actor = actor(state, loot_guid)
@@ -159,6 +173,8 @@ defmodule ThistleTea.Game.Player.Looting do
     release_reservation(loot_guid, reservation)
     inventory_failure(state, :inventory_full)
   end
+
+  def take_money(%{loot_type: :item} = state), do: state
 
   def take_money(%{character: %Character{} = character, loot_guid: loot_guid} = state) when is_integer(loot_guid) do
     actor = actor(state, loot_guid)
