@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.PercentStatTest do
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.CombatRatings
   alias ThistleTea.Game.Entity.Logic.Core
+  alias ThistleTea.Game.Entity.Logic.Death
   alias ThistleTea.Game.Entity.Logic.Stats
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Effect
@@ -46,6 +47,36 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.PercentStatTest do
       assert dead.unit.health == 0
       assert dead.unit.auras == []
       assert restored_stats(dead) == restored_stats(character)
+    end
+
+    test "death-persistent penalties survive release and resurrection until their original expiry", %{
+      character: character
+    } do
+      sickness = %{
+        spell()
+        | attributes: MapSet.new([:death_persistent, :negative, :cant_cancel]),
+          effects: [%Effect{index: 0, type: :apply_aura, aura: :mod_percent_stat, base_points: -75, misc_value: -1}]
+      }
+
+      {sick, _} = Aura.apply_spell(character, 1, 60, sickness, 100)
+      {cancelled, _} = Aura.cancel_spell(sick, sickness.id, 150)
+      assert cancelled.unit.stamina == 25
+      dead = Core.take_damage(sick, sick.unit.health, 200)
+      assert dead.unit.health == 0
+      assert dead.unit.stamina == 25
+      assert [%{expires_at: 1100}] = dead.unit.auras
+      {ghost, _} = Death.release_spirit(dead, [], 300)
+      {alive, _} = Death.resurrect(ghost, 0.5, 400)
+      assert alive.unit.stamina == 25
+      assert alive.unit.health == 585
+      {expired, _} = Aura.tick(alive, 1100)
+      assert restored_stats(expired) == restored_stats(character)
+      assert expired.unit.health == 585
+      assert Aura.next_event_at(expired) == nil
+
+      {expired_dead, _} = Aura.tick(dead, 1100)
+      assert expired_dead.unit.health == 0
+      assert restored_stats(expired_dead) == restored_stats(character)
     end
 
     test "penalties clamp resources and removal does not refill them", %{character: character} do

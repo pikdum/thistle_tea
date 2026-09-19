@@ -469,7 +469,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
 
   defp death_auras(holders) when is_list(holders) do
     Enum.filter(holders, fn
-      %{spell: %Spell{} = spell} -> Spell.attribute?(spell, :passive)
+      %{spell: %Spell{} = spell} -> Spell.attribute?(spell, :passive) or Spell.attribute?(spell, :death_persistent)
       _holder -> false
     end)
   end

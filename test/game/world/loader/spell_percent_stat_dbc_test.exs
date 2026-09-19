@@ -1,12 +1,18 @@
 defmodule ThistleTea.Game.World.Loader.SpellPercentStatDbcTest do
   use ExUnit.Case, async: false
 
+  alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
 
   @moduletag :dbc_db
 
   describe "load/1" do
+    test "resurrection sickness persists through death while ordinary world buffs do not" do
+      assert Spell.attribute?(SpellLoader.load(15_007), :death_persistent)
+      refute Spell.attribute?(SpellLoader.load(23_735), :death_persistent)
+    end
+
     test "decodes stat percentages and signed selectors from vanilla spells" do
       for {id, amount, stat} <- [
             {2146, -75, -1},

@@ -83,6 +83,7 @@ defmodule ThistleTea.Game.Entity.Logic.PeriodicDeathTest do
         %Effect{index: index, type: :apply_aura, aura: type, base_points: 100, amplitude_ms: 1_000}
       end)
 
-    %Spell{id: id, duration_ms: 3_000, attributes: MapSet.new([:passive]), effects: effects}
+    attribute = if rem(id, 2) == 0, do: :passive, else: :death_persistent
+    %Spell{id: id, duration_ms: 3_000, attributes: MapSet.new([attribute]), effects: effects}
   end
 end

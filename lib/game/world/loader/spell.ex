@@ -835,6 +835,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
     |> add_if(attrs_ex2, @cant_crit_ex2, :cant_crit)
     |> add_if(attrs_ex2, @allow_while_not_shapeshifted_ex2, :allow_while_not_shapeshifted)
     |> add_if(attrs_ex3, @completely_blocked_ex3, :completely_blocked)
+    |> add_if(attrs_ex3, 0x00100000, :death_persistent)
     |> add_if(attrs_ex3, 0x10000000, :ignore_caster_and_target_restrictions)
     |> add_if(attrs_ex3, @dot_stacking_rule_ex3, :dot_stacking_rule)
   end
