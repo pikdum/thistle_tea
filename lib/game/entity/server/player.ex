@@ -984,14 +984,21 @@ defmodule ThistleTea.Game.Entity.Server.Player do
     {:noreply, state, {:continue, {:finish_companion_attach, attachment}}}
   end
 
-  def handle_info(%Effects.PetHappinessChanged{source_guid: guid, happiness: happiness}, %State{} = state) do
+  def handle_info(
+        %Effects.PetHappinessChanged{source_guid: guid, happiness: happiness},
+        %State{character: %Character{}} = state
+      ) do
     character = Companion.remember_happiness(state.character, guid, happiness)
     {:noreply, %{state | character: character}}
   end
 
-  def handle_info(%Effects.PetDied{source_guid: guid}, %State{} = state) do
+  def handle_info(%Effects.PetDied{source_guid: guid}, %State{character: %Character{}} = state) do
     character = Companion.remember_death(state.character, guid)
     {:noreply, %{state | character: character}}
+  end
+
+  def handle_info(%type{}, %State{} = state) when type in [Effects.PetHappinessChanged, Effects.PetDied] do
+    {:noreply, state}
   end
 
   def handle_info({:reputation_change, faction_id, value}, %State{} = state) do

@@ -8,6 +8,9 @@ defmodule ThistleTea.Game.Entity.Server.Player.StateTest do
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.Companion, as: CompanionLogic
+  alias ThistleTea.Game.Entity.Logic.Effects.PetDied
+  alias ThistleTea.Game.Entity.Logic.Effects.PetHappinessChanged
+  alias ThistleTea.Game.Entity.Server.Player
   alias ThistleTea.Game.Entity.Server.Player.CompanionOwner
   alias ThistleTea.Game.Entity.Server.Player.State
   alias ThistleTea.Game.Guid
@@ -88,6 +91,17 @@ defmodule ThistleTea.Game.Entity.Server.Player.StateTest do
   end
 
   describe "suspend_companion/1" do
+    test "ignores pet updates queued before logout completed" do
+      state = %State{}
+
+      for event <- [
+            %PetHappinessChanged{source_guid: 1, target_guid: 7, happiness: 0},
+            %PetDied{source_guid: 1, target_guid: 7}
+          ] do
+        assert Player.handle_info(event, state) == {:noreply, state}
+      end
+    end
+
     test "captures final happiness and death before stopping the pet process" do
       guid = Guid.from_low_guid(:pet, 2960, :erlang.unique_integer([:positive]))
       pid = start_supervised!({HappinessPet, {guid, 700_000}})
