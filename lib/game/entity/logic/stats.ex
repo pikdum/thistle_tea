@@ -86,8 +86,9 @@ defmodule ThistleTea.Game.Entity.Logic.Stats do
     Enum.reduce(@stat_fields, unit, fn {index, field, base_field, bonus_key}, acc ->
       case Map.get(acc, base_field) do
         base when is_integer(base) ->
-          value = base + equipment_bonus(acc, bonus_key) + aura_stat_bonus(acc, index)
-          Map.put(acc, field, trunc(value * aura_stat_multiplier(acc, index)))
+          scaled = (base + equipment_bonus(acc, bonus_key)) * aura_stat_multiplier(acc, index, :mod_percent_stat)
+          value = (scaled + aura_stat_bonus(acc, index)) * aura_stat_multiplier(acc, index, :mod_total_stat_percent)
+          struct!(acc, [{field, trunc(value)}])
 
         _ ->
           acc
@@ -347,19 +348,16 @@ defmodule ThistleTea.Game.Entity.Logic.Stats do
     end)
   end
 
-  defp aura_stat_multiplier(%Unit{} = unit, index) do
-    percent =
-      sum_aura_amounts(unit, fn
-        %Aura{type: :mod_total_stat_percent, amount: amount, misc_value: misc}
-        when is_integer(amount) and (misc == -1 or misc == index) ->
-          amount
-
-        _aura ->
-          0
-      end)
-
-    max(100 + percent, 0) / 100
+  defp aura_stat_multiplier(%Unit{auras: holders}, index, type) when is_list(holders) do
+    for %Holder{auras: auras, stacks: stacks} <- holders,
+        %Aura{type: ^type, amount: amount, misc_value: misc} <- auras,
+        is_integer(amount) and (misc == -1 or misc == index),
+        reduce: 1.0 do
+      multiplier -> multiplier * max(100 + amount * max(stacks || 1, 1), 0) / 100
+    end
   end
+
+  defp aura_stat_multiplier(_unit, _index, _type), do: 1.0
 
   defp aura_resistance_bonus(%Unit{} = unit, bit) do
     additive_resistance_bonus(unit, bit) + exclusive_resistance_bonus(unit, bit)

@@ -32,6 +32,77 @@ defmodule ThistleTea.Game.Entity.Logic.StatsTest do
   defp recompute(unit), do: apply(&Stats.recompute/1, [unit])
 
   describe "recompute/1" do
+    test "scales base and item stats before flat auras and total percentages" do
+      auras = [
+        %Aura{type: :mod_percent_stat, amount: -75, misc_value: -1},
+        %Aura{type: :mod_stat, amount: 31, misc_value: 3},
+        %Aura{type: :mod_total_stat_percent, amount: 10, misc_value: -1}
+      ]
+
+      unit = recompute(%{mage_unit() | equipment_bonuses: %{intellect: 35}, auras: [holder(auras)]})
+
+      assert unit.intellect == 78
+      assert unit.stamina == 12
+      assert unit.max_power1 == 2163
+      assert unit.max_health == 1372
+      assert unit.base_intellect == 125
+      assert unit.equipment_bonuses.intellect == 35
+      assert recompute(unit) == unit
+    end
+
+    test "multiplies independent percentages in both stat layers" do
+      for type <- [:mod_percent_stat, :mod_total_stat_percent] do
+        first = holder([%Aura{type: type, amount: 20, misc_value: 3}])
+        second = holder([%Aura{type: type, amount: 50, misc_value: 3}])
+
+        for holders <- [[first, second], [second, first]] do
+          unit = recompute(%{mage_unit() | auras: holders})
+          assert unit.intellect == 225
+          assert unit.strength == 35
+        end
+      end
+    end
+
+    test "scales a holder's percentage by its remaining stacks" do
+      for type <- [:mod_percent_stat, :mod_total_stat_percent] do
+        stacked = %{holder([%Aura{type: type, amount: 20, misc_value: 3}]) | stacks: 3}
+        base = %{mage_unit() | auras: [stacked]}
+        assert recompute(base).intellect == 200
+        assert recompute(%{base | auras: [%{stacked | stacks: 2}]}).intellect == 175
+        assert recompute(%{base | auras: []}).intellect == 125
+      end
+    end
+
+    test "clamps percentage penalties and ignores invalid stat selectors" do
+      auras = [
+        %Aura{type: :mod_percent_stat, amount: -150, misc_value: 3},
+        %Aura{type: :mod_stat, amount: 31, misc_value: 3},
+        %Aura{type: :mod_percent_stat, amount: 100, misc_value: -2},
+        %Aura{type: :mod_percent_stat, amount: 100, misc_value: 5}
+      ]
+
+      unit = recompute(%{mage_unit() | auras: [holder(auras)]})
+      assert unit.intellect == 31
+      assert unit.stamina == 45
+      assert recompute(%{unit | auras: []}).intellect == 125
+    end
+
+    test "uses changed base stats and gear while percentage auras remain active" do
+      bonus = holder([%Aura{type: :mod_percent_stat, amount: 20, misc_value: 3}])
+      unit = recompute(%{mage_unit() | auras: [bonus]})
+      changed = recompute(%{unit | base_intellect: 150, equipment_bonuses: %{intellect: 50}})
+      assert changed.intellect == 240
+      assert recompute(%{changed | auras: []}).intellect == 200
+    end
+
+    test "does not invent base stats for creatures" do
+      bonus = holder([%Aura{type: :mod_percent_stat, amount: 100, misc_value: -1}])
+      unit = recompute(%Unit{strength: 50, max_health: 500, auras: [bonus]})
+      assert unit.strength == 50
+      assert unit.max_health == 500
+      assert unit.base_strength == nil
+    end
+
     test "selects exclusive resistance bonuses and penalties independently for each school" do
       auras = [
         %Aura{type: :mod_resistance_exclusive, amount: 20, misc_value: 126},
