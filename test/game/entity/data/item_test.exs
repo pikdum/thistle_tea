@@ -33,6 +33,17 @@ defmodule ThistleTea.Game.Entity.Data.ItemTest do
   end
 
   describe "temporary enchantments" do
+    test "permanent and temporary slots coexist through refresh and expiry" do
+      item = Item.build(%ItemTemplate{entry: 25}, 1)
+      item = item |> Item.put_permanent_enchantment(41) |> Item.put_temporary_enchantment(263, 1000, 0, 1000, :token)
+      assert Item.active_enchantments(item, 0) == [{0, 41}, {1, 263}]
+      replaced = Item.put_permanent_enchantment(item, 1883)
+      assert Item.active_enchantments(replaced, 0) == [{0, 1883}, {1, 263}]
+      {expired, nil} = Item.refresh_temporary_enchantment(replaced, 1000)
+      assert Item.active_enchantments(expired, 1000) == [{0, 1883}]
+      assert Item.visible_entry(Item.visible_value(expired)) == 25
+    end
+
     test "stores the enchantment fields and visible enchant id" do
       item = Item.build(%ItemTemplate{entry: 6256}, 1)
       item = Item.put_temporary_enchantment(item, 263, 600_000, 0, 700_000, :token)

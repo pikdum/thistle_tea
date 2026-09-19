@@ -120,6 +120,19 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
 
   def dispel_immune?(_entity, _spell), do: false
 
+  def equipment_holder(entity, %Spell{} = spell, source, now) do
+    context = %CastContext{caster_guid: entity.object.guid, caster_level: entity.unit.level || 1}
+
+    %Holder{
+      spell: %{spell | attributes: MapSet.put(spell.attributes, :passive), spell_visual: 0},
+      caster_guid: context.caster_guid,
+      caster_level: context.caster_level,
+      item_source: source,
+      applied_at: now,
+      auras: build_auras(entity, context, spell, now)
+    }
+  end
+
   defp blocked_by_dispel_immunity?(holders, dispel_type)
        when is_list(holders) and is_integer(dispel_type) and dispel_type > 0 do
     Enum.any?(holders, fn %Holder{auras: auras} ->

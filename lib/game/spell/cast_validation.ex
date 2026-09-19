@@ -16,6 +16,7 @@ defmodule ThistleTea.Game.Spell.CastValidation do
   alias ThistleTea.Game.Entity.Logic.Disarm
   alias ThistleTea.Game.Entity.Logic.Disenchant
   alias ThistleTea.Game.Entity.Logic.EffectImmunity
+  alias ThistleTea.Game.Entity.Logic.Enchantments
   alias ThistleTea.Game.Entity.Logic.Fear
   alias ThistleTea.Game.Entity.Logic.Hunter
   alias ThistleTea.Game.Entity.Logic.Mount
@@ -45,6 +46,8 @@ defmodule ThistleTea.Game.Spell.CastValidation do
          :ok <- Pickpocket.validate(caster, spell, target_info),
          :ok <- Skinning.validate(caster, spell, target_info, opts),
          :ok <- Disenchant.validate(caster, spell, Keyword.get(opts, :disenchant_item)),
+         :ok <- Enchantments.validate(caster, spell, Keyword.get(opts, :enchant_item)),
+         :ok <- check_tools(spell, Keyword.get(opts, :count_item)),
          :ok <- Mount.validate(caster, spell, opts),
          :ok <- check_stance(caster, spell),
          :ok <- check_caster_aura_state(caster, spell, now),
@@ -358,7 +361,8 @@ defmodule ThistleTea.Game.Spell.CastValidation do
 
   defp check_equipped_item(caster, %Spell{equipped_item_class: class} = spell, equipped_items)
        when is_integer(class) and class >= 0 and is_list(equipped_items) do
-    if godmode?(caster) or Enum.any?(equipped_items, &item_fits_requirement?(&1, spell)) do
+    if Enchantments.permanent?(spell) or godmode?(caster) or
+         Enum.any?(equipped_items, &item_fits_requirement?(&1, spell)) do
       :ok
     else
       {:error, :equipped_item_class}
@@ -386,6 +390,12 @@ defmodule ThistleTea.Game.Spell.CastValidation do
   end
 
   defp check_reagents(_caster, _spell, _count_item), do: :ok
+
+  defp check_tools(%Spell{tools: tools}, count_item) when is_function(count_item, 1) do
+    if Enum.all?(tools, &(count_item.(&1) > 0)), do: :ok, else: {:error, :item_gone}
+  end
+
+  defp check_tools(_spell, _count_item), do: :ok
 
   defp check_target(%Spell{}, %{visible?: false}), do: {:error, :bad_targets}
 

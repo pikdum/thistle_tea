@@ -27,6 +27,8 @@ defmodule ThistleTea.Game.Network.Message.SmsgCastResult do
     immune: 0x22,
     interrupted: 0x23,
     item_not_ready: 0x28,
+    item_gone: 0x26,
+    lowlevel: 0x2B,
     line_of_sight: 0x2A,
     low_castlevel: 0x2C,
     target_not_looted: 0x70,

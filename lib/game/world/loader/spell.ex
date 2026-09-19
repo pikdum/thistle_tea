@@ -205,7 +205,8 @@ defmodule ThistleTea.Game.World.Loader.Spell do
       custom_flags: SpellEffectOverrideLoader.custom_flags(row.id),
       effects: build_effects(row, radius_lookup),
       script_steps: SpellScriptLoader.get(row.id),
-      reagents: build_reagents(row)
+      reagents: build_reagents(row),
+      tools: Enum.filter([row.totem_0, row.totem_1], &(&1 > 0))
     }
     |> struct!(cooldown_fields(row))
     |> struct!(equipped_item_fields(row))
@@ -238,7 +239,8 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp equipped_item_fields(row) do
     %{
       equipped_item_class: signed32(row.equipped_item_class, -1),
-      equipped_item_subclass_mask: signed32(row.equipped_item_subclass, 0)
+      equipped_item_subclass_mask: signed32(row.equipped_item_subclass, 0),
+      equipped_item_inventory_type_mask: signed32(row.equipped_item_inventory_type, 0)
     }
   end
 

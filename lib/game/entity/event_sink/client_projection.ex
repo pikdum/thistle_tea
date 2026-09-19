@@ -51,6 +51,15 @@ defmodule ThistleTea.Game.Entity.EventSink.ClientProjection do
 
   def emit(entity, %Effects.FeedPet{}, _context), do: entity
 
+  def emit(%Character{} = entity, %Effects.EnchantItem{effect: %{type: :enchant_item}} = effect, context) do
+    Context.send(
+      context,
+      {:enchant_item_permanent, effect.target_guid, effect.spell, effect.effect.misc_value, effect.cast_item_guid}
+    )
+
+    entity
+  end
+
   def emit(%Character{} = entity, %Effects.EnchantItem{} = effect, context) do
     duration_ms = ItemEnchantmentLoader.duration_ms(effect.spell.id, effect.effect)
     Context.send(context, {:enchant_item, effect.target_guid, effect.spell, effect.effect.misc_value, duration_ms})

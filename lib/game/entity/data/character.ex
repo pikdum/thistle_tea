@@ -11,9 +11,13 @@ defmodule ThistleTea.Game.Entity.Data.Character do
   alias ThistleTea.Game.Entity.Data.ItemTemplate
   alias ThistleTea.Game.Entity.Logic.CombatRatings
   alias ThistleTea.Game.Entity.Logic.Companion
+  alias ThistleTea.Game.Entity.Logic.EquipmentEnchantments
   alias ThistleTea.Game.Entity.Logic.EquipmentStats
+  alias ThistleTea.Game.Entity.Logic.Inventory
+  alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
+  alias ThistleTea.Game.World.Loader.ItemEnchantment, as: ItemEnchantmentLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
 
   defstruct [:id, :account_id, :object, :unit, :player, :movement_block, :internal]
@@ -28,12 +32,26 @@ defmodule ThistleTea.Game.Entity.Data.Character do
   def creature_type(%__MODULE__{}), do: 7
 
   def sync_equipment_stats(%__MODULE__{} = character) do
+    now = Time.now()
+    enchantments = equipment_enchantments(character, now)
+
     character
     |> sync_mainhand_inputs()
     |> sync_offhand_inputs()
     |> sync_ranged_inputs()
-    |> EquipmentStats.resync(&ItemStore.get/1, &SpellLoader.load/1)
+    |> EquipmentStats.resync(&ItemStore.get/1, &SpellLoader.load/1, enchantments)
+    |> EquipmentEnchantments.sync(enchantments, &SpellLoader.load/1, now)
     |> CombatRatings.sync()
+  end
+
+  def equipment_enchantments(%__MODULE__{player: player}, now) do
+    for slot <- Inventory.slots(),
+        guid = Map.get(player, slot),
+        %Item{} = item <- [ItemStore.get(guid)],
+        {enchant_slot, id} <- Item.active_enchantments(item, now),
+        enchantment = ItemEnchantmentLoader.get(id),
+        not is_nil(enchantment),
+        do: {slot, item, enchant_slot, enchantment}
   end
 
   def restore_health_and_mana(%__MODULE__{unit: %Unit{} = unit} = character) do

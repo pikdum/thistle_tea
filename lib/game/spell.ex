@@ -61,6 +61,8 @@ defmodule ThistleTea.Game.Spell do
     channel_interrupt_flags: 0,
     equipped_item_class: -1,
     equipped_item_subclass_mask: 0,
+    equipped_item_inventory_type_mask: 0,
+    tools: [],
     attributes: MapSet.new(),
     effects: [],
     script_steps: [],

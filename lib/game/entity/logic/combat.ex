@@ -242,14 +242,17 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
       damage = outcome_damage_basis(attack, result, absorbed)
 
       [
-        Effects.attack_outcome(
-          caster,
-          victim_guid,
-          result.outcome,
-          damage,
-          Map.get(attack, :queued_spell_id),
-          outcome_proc_damage(result, absorbed)
-        )
+        %{
+          Effects.attack_outcome(
+            caster,
+            victim_guid,
+            result.outcome,
+            damage,
+            Map.get(attack, :queued_spell_id),
+            outcome_proc_damage(result, absorbed)
+          )
+          | hand: if(Map.get(attack, :offhand?), do: :offhand, else: :mainhand)
+        }
       ]
     else
       []

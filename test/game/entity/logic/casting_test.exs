@@ -1029,6 +1029,30 @@ defmodule ThistleTea.Game.Entity.Logic.CastingTest do
       assert Casting.complete(completed, 5_000) == completed
     end
 
+    test "permanent enchants defer material costs to completion and cancel cleanly" do
+      effect = %Effect{type: :enchant_item, misc_value: 41}
+      spell = %Spell{id: 7418, cast_time_ms: 5_000, reagents: [{10_940, 1}], effects: [effect]}
+
+      character = %Character{
+        object: %Object{guid: 1},
+        unit: %Unit{health: 100},
+        player: %Player{},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+        internal: %Internal{}
+      }
+
+      casting = Casting.start(character, spell, Target.item(42), 1_000)
+      cancelled = casting |> Casting.cancel() |> Casting.complete(6_000)
+      refute Enum.any?(cancelled.internal.events, &is_struct(&1, Effects.EnchantItem))
+      completed = Casting.complete(casting, 6_000)
+
+      assert [%Effects.EnchantItem{target_guid: 42, effect: ^effect}] =
+               Enum.filter(completed.internal.events, &is_struct(&1, Effects.EnchantItem))
+
+      refute Enum.any?(completed.internal.events, &is_struct(&1, Effects.ConsumeReagents))
+      assert Casting.complete(completed, 7_000) == completed
+    end
+
     test "queues self spell hit events after spell go" do
       spell = %Spell{id: 133, school: :fire, effects: [%Effect{type: :school_damage, base_points: 5, die_sides: 0}]}
 

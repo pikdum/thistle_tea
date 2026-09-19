@@ -39,6 +39,30 @@ defmodule ThistleTea.Game.World.Loader.ItemEnchantment do
     :ok
   end
 
+  def recipe(spell_id) do
+    case :ets.lookup(__MODULE__, {:recipe, spell_id}) do
+      [{_key, recipe}] ->
+        recipe
+
+      [] ->
+        recipe =
+          DBC.one(
+            from(s in SkillLineAbility,
+              where: s.spell == ^spell_id and s.skill_line == 333,
+              select: %{
+                skill_id: s.skill_line,
+                yellow: s.trivial_skill_line_rank_low,
+                gray: s.trivial_skill_line_rank_high
+              },
+              limit: 1
+            )
+          )
+
+        :ets.insert(__MODULE__, {{:recipe, spell_id}, recipe})
+        recipe
+    end
+  end
+
   def get(enchantment_id) when is_integer(enchantment_id) do
     case :ets.lookup(__MODULE__, {:enchantment, enchantment_id}) do
       [{_key, %ItemEnchantment{} = enchantment}] -> enchantment

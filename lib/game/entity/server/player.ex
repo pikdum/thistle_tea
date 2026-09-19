@@ -49,7 +49,6 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.Entity.Logic.Reactive
   alias ThistleTea.Game.Entity.Logic.Resources
   alias ThistleTea.Game.Entity.Logic.Rest
-  alias ThistleTea.Game.Entity.Logic.Shaman
   alias ThistleTea.Game.Entity.Logic.SpellEffect
   alias ThistleTea.Game.Entity.Logic.SpellFeedback
   alias ThistleTea.Game.Entity.Logic.StealthDetection
@@ -99,7 +98,6 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.ChaseWatch
   alias ThistleTea.Game.World.ItemStore
-  alias ThistleTea.Game.World.Loader.ItemEnchantment, as: ItemEnchantmentLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Loader.SpellPetAura, as: SpellPetAuraLoader
   alias ThistleTea.Game.World.Metadata
@@ -313,18 +311,11 @@ defmodule ThistleTea.Game.Entity.Server.Player do
 
   def handle_cast({:attack_outcome, payload}, %{character: %Character{} = character} = state) do
     spell = spellbook_spell(character, Map.get(payload, :spell_id))
-    weapon_proc = Enchantments.weapon_proc(character)
-
-    ppm =
-      case weapon_proc do
-        %{effect: %{spell_id: spell_id}} -> ItemEnchantmentLoader.proc_ppm(spell_id)
-        _ -> 0.0
-      end
 
     character =
       character
       |> AttackFeedback.receive(payload, spell, Time.now())
-      |> Shaman.trigger_weapon_enchant(payload, weapon_proc, ppm)
+      |> Enchantments.trigger_weapon_procs(payload)
 
     {:noreply, %{state | character: character}, {:continue, :maybe_broadcast_update}}
   end
@@ -913,6 +904,15 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   rescue
     error ->
       Logger.error("enchant_item crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:noreply, state}
+  end
+
+  def handle_info({:enchant_item_permanent, item_guid, spell, enchantment_id, cast_item_guid}, state) do
+    {:noreply, Enchantments.apply_permanent(state, item_guid, spell, enchantment_id, cast_item_guid),
+     {:continue, :maybe_broadcast_update}}
+  rescue
+    error ->
+      Logger.error("Permanent enchant failed: #{Exception.format(:error, error, __STACKTRACE__)}")
       {:noreply, state}
   end
 

@@ -7,6 +7,8 @@ defmodule ThistleTea.Game.Entity.Logic.ShamanTest do
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Shaman
+  alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.Effect
 
   defp shaman do
     %Mob{object: %Object{guid: 1}, unit: %Unit{level: 40}, internal: %Internal{}}
@@ -33,6 +35,15 @@ defmodule ThistleTea.Game.Entity.Logic.ShamanTest do
       proc = %{effect: %{amount: 100, spell_id: 8026}, attack_time_ms: 2000}
 
       assert Shaman.trigger_weapon_enchant(shaman(), payload, proc, 0.0, fn -> 0.0 end).internal.events == []
+    end
+
+    test "beneficial permanent procs target the wielder and default to one PPM" do
+      spell = %Spell{id: 20_007, effects: [%Effect{type: :apply_aura, aura: :mod_stat, implicit_target_a: :caster}]}
+      proc = %{effect: %{amount: 0, spell_id: 20_007}, proc_spell: spell, attack_time_ms: 3000}
+      payload = %{outcome: :normal, victim_guid: 2}
+      triggered = Shaman.trigger_weapon_enchant(shaman(), payload, proc, 0.0, fn -> 0.04 end)
+      assert [%Effects.TriggerSpell{spell_id: 20_007, target_guid: 1}] = triggered.internal.events
+      assert Shaman.trigger_weapon_enchant(shaman(), payload, proc, 0.0, fn -> 0.06 end).internal.events == []
     end
   end
 

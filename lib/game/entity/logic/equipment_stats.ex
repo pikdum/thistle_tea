@@ -37,7 +37,10 @@ defmodule ThistleTea.Game.Entity.Logic.EquipmentStats do
                 :ranged_haste,
                 :shields,
                 :block_chance,
-                :shield_block
+                :shield_block,
+                :mainhand_damage,
+                :offhand_damage,
+                :ranged_damage
               ] ++ @spell_damage_keys
 
   @zero @bonus_keys |> Map.new(fn key -> {key, 0} end) |> Map.put(:spell_damage_versus, [])
@@ -46,15 +49,40 @@ defmodule ThistleTea.Game.Entity.Logic.EquipmentStats do
 
   @stat_mods %{0 => :mana, 1 => :health, 3 => :agility, 4 => :strength, 5 => :intellect, 6 => :spirit, 7 => :stamina}
 
-  def resync(character, get_item, get_spell \\ fn _spell_id -> nil end)
+  def resync(character, get_item, get_spell \\ fn _spell_id -> nil end, enchantments \\ [])
 
-  def resync(%{unit: %Unit{} = unit, player: %Player{} = player} = character, get_item, get_spell) do
+  def resync(%{unit: %Unit{} = unit, player: %Player{} = player} = character, get_item, get_spell, enchantments) do
     bonuses = player |> Inventory.equipped_templates(get_item) |> bonuses(get_spell)
+    bonuses = Enum.reduce(enchantments, bonuses, &add_enchantment(&2, &1, unit.class))
     unit = %{unit | equipment_bonuses: bonuses} |> Stats.recompute()
     player = apply_spell_damage_fields(player, bonuses)
 
     %{character | unit: unit, player: player}
   end
+
+  defp add_enchantment(acc, {slot, item, _enchant_slot, enchantment}, class) do
+    Enum.reduce(enchantment.effects, acc, fn
+      %{type: 2, amount: amount}, acc ->
+        add_weapon_damage(acc, slot, amount)
+
+      %{type: 4, amount: amount, spell_id: school}, acc ->
+        add(acc, Enum.at([:armor | tl(@schools)], school), amount)
+
+      %{type: 5, amount: amount, spell_id: stat}, acc ->
+        add(acc, Map.get(@stat_mods, stat), amount)
+
+      %{type: 6, amount: amount}, acc when class == 7 ->
+        add_weapon_damage(acc, slot, amount * (item.internal.template.delay || 0) / 1_000)
+
+      _effect, acc ->
+        acc
+    end)
+  end
+
+  defp add_weapon_damage(acc, :mainhand, amount), do: add(acc, :mainhand_damage, amount)
+  defp add_weapon_damage(acc, :offhand, amount), do: add(acc, :offhand_damage, amount)
+  defp add_weapon_damage(acc, :ranged, amount), do: add(acc, :ranged_damage, amount)
+  defp add_weapon_damage(acc, _slot, _amount), do: acc
 
   def bonuses(templates, get_spell \\ fn _spell_id -> nil end) do
     Enum.reduce(templates, @zero, &add_template(&2, &1, get_spell))
@@ -155,6 +183,6 @@ defmodule ThistleTea.Game.Entity.Logic.EquipmentStats do
     end)
   end
 
-  defp add(acc, key, value) when is_integer(value), do: Map.update!(acc, key, &(&1 + value))
+  defp add(acc, key, value) when is_number(value) and not is_nil(key), do: Map.update!(acc, key, &(&1 + value))
   defp add(acc, _key, _value), do: acc
 end

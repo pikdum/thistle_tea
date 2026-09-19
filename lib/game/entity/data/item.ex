@@ -51,6 +51,23 @@ defmodule ThistleTea.Game.Entity.Data.Item do
 
   def temporary_enchantment_slot, do: @temporary_enchantment_slot
 
+  def put_permanent_enchantment(%__MODULE__{} = item, enchantment_id) do
+    item
+    |> put_enchantment_word(0, 0, enchantment_id)
+    |> put_enchantment_word(0, 1, 0)
+    |> put_enchantment_word(0, 2, 0)
+  end
+
+  def active_enchantments(%__MODULE__{} = item, now) do
+    permanent = enchantment_word(item, 0, 0)
+    entries = if permanent > 0, do: [{0, permanent}], else: []
+
+    case temporary_enchantment(item) do
+      %{id: id, expires_at: expires_at} when expires_at > now -> entries ++ [{1, id}]
+      _ -> entries
+    end
+  end
+
   def put_temporary_enchantment(%__MODULE__{} = item, enchantment_id, duration_ms, charges, expires_at, token) do
     enchantment = %{id: enchantment_id, expires_at: expires_at, charges: charges, token: token}
     enchantments = Map.put(Map.get(item.internal, :enchantments, %{}), @temporary_enchantment_slot, enchantment)

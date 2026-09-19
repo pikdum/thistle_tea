@@ -30,7 +30,8 @@ defmodule ThistleTea.Game.Entity.Logic.Shaman do
     if flametongue_proc?(spell) do
       trigger_flametongue(entity, victim_guid, spell, proc.attack_time_ms)
     else
-      Effects.enqueue(entity, Effects.trigger_spell(entity.object.guid, entity.unit.level || 1, victim_guid, spell.id))
+      target_guid = if Spell.harmful?(spell), do: victim_guid, else: entity.object.guid
+      Effects.enqueue(entity, Effects.trigger_spell(entity.object.guid, entity.unit.level || 1, target_guid, spell.id))
     end
   end
 
@@ -67,7 +68,7 @@ defmodule ThistleTea.Game.Entity.Logic.Shaman do
     do: min(amount / 100, 1.0)
 
   defp proc_chance(%{attack_time_ms: attack_time_ms}, ppm) when is_number(attack_time_ms) and attack_time_ms > 0,
-    do: min(ppm * attack_time_ms / 60_000, 1.0)
+    do: min(if(ppm > 0, do: ppm, else: 1.0) * attack_time_ms / 60_000, 1.0)
 
   defp proc_chance(_proc, _ppm), do: 0.0
 end

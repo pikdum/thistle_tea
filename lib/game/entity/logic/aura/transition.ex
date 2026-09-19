@@ -222,7 +222,8 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Transition do
     Enum.map(indexed, fn {key, occurrence, holder} -> {{key, occurrence}, holder} end)
   end
 
-  defp holder_key(%Holder{spell: %Spell{id: id}, caster_guid: caster_guid}), do: {id, caster_guid}
+  defp holder_key(%Holder{spell: %Spell{id: id}, caster_guid: caster_guid, item_source: source}),
+    do: {id, caster_guid, source}
 
   defp application_hooks(entity, touched, :applied, now) do
     {entity, immediate_events} =

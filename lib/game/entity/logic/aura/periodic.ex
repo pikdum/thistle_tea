@@ -113,7 +113,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Periodic do
   end
 
   defp merge_tick_state(%Holder{spell: %Spell{id: id}, caster_guid: caster} = current, ticked) do
-    case Enum.find(ticked, &Holder.same_source?(&1, id, caster)) do
+    case Enum.find(ticked, &(Holder.same_source?(&1, id, caster) and &1.item_source == current.item_source)) do
       nil ->
         current
 

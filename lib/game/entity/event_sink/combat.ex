@@ -117,7 +117,8 @@ defmodule ThistleTea.Game.Entity.EventSink.Combat do
       outcome: effect.outcome,
       damage: effect.damage,
       proc_damage: effect.proc_damage,
-      spell_id: effect.spell_id
+      spell_id: effect.spell_id,
+      hand: effect.hand
     })
 
     entity

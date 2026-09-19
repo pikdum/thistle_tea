@@ -267,7 +267,9 @@ defmodule ThistleTea.Game.Entity.Logic.Stats do
   defp derive_ranged_damage(%Unit{} = unit) do
     with base_min when is_number(base_min) <- unit.base_ranged_min_damage,
          base_max when is_number(base_max) <- unit.base_ranged_max_damage do
-      bonus = attack_power_bonus(unit.ranged_attack_power, unit.ranged_attack_time)
+      bonus =
+        attack_power_bonus(unit.ranged_attack_power, unit.ranged_attack_time) + equipment_bonus(unit, :ranged_damage)
+
       %{unit | min_ranged_damage: base_min + bonus, max_ranged_damage: base_max + bonus}
     else
       _ -> unit
@@ -293,7 +295,8 @@ defmodule ThistleTea.Game.Entity.Logic.Stats do
   defp derive_damage(%Unit{} = unit, base_min_field, base_max_field, min_field, max_field, attack_time) do
     with base_min when is_number(base_min) <- Map.get(unit, base_min_field),
          base_max when is_number(base_max) <- Map.get(unit, base_max_field) do
-      bonus = attack_power_bonus(unit.attack_power, attack_time)
+      key = if min_field == :min_offhand_damage, do: :offhand_damage, else: :mainhand_damage
+      bonus = attack_power_bonus(unit.attack_power, attack_time) + equipment_bonus(unit, key)
 
       unit
       |> Map.put(min_field, base_min + bonus)

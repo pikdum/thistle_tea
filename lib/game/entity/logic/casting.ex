@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Disarm
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Logic.Enchantments
   alias ThistleTea.Game.Entity.Logic.Hostility
   alias ThistleTea.Game.Entity.Logic.Hunter
   alias ThistleTea.Game.Entity.Logic.MechanicResistance
@@ -278,9 +279,9 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
       costs: %Costs{
         power: power_cost(entity, spell),
         channel_power: channel_power_cost(entity, casting),
-        reagents: spell.reagents || [],
+        reagents: if(Enchantments.permanent?(spell), do: [], else: spell.reagents || []),
         ammo: Hunter.ammo_reagents(entity, spell),
-        cast_item_guid: cast_item_cost(casting),
+        cast_item_guid: if(!Enchantments.permanent?(spell), do: cast_item_cost(casting)),
         modifier_holder_ids: casting.modifier_holder_ids
       },
       impacts: resolved_impacts(entity, spell, hits, misses),
@@ -516,14 +517,17 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
 
   defp queue_item_enchantments(%Character{player: player} = character, %Cast{
          spell: %Spell{} = spell,
+         cast_item_guid: cast_item_guid,
          resolution: %CastResolution{followups: %Followups{item_guid: target_item_guid}}
        }) do
-    item_guid = if is_integer(target_item_guid), do: target_item_guid, else: player.mainhand
+    item_guid =
+      if is_integer(target_item_guid) or Enchantments.permanent?(spell), do: target_item_guid, else: player.mainhand
 
     events =
-      for %Spell.Effect{type: :enchant_item_temporary} = effect <- spell.effects,
+      for %Spell.Effect{type: type} = effect <- spell.effects,
+          type in [:enchant_item, :enchant_item_temporary],
           is_integer(item_guid) do
-        Effects.enchant_item(item_guid, spell, effect)
+        %{Effects.enchant_item(item_guid, spell, effect) | cast_item_guid: cast_item_guid}
       end
 
     Effects.enqueue(character, events)
