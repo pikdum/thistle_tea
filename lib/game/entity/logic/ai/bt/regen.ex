@@ -13,6 +13,15 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Regen do
     BT.action(&tick_with_context/3)
   end
 
+  def initialize(entity, %Blackboard{} = blackboard, now) when is_integer(now) do
+    blackboard = Blackboard.put_next_at(blackboard, :next_regen_at, RegenLogic.tick_ms(entity), now)
+
+    case RegenLogic.focus_tick_ms(entity) do
+      tick_ms when is_integer(tick_ms) -> Blackboard.put_next_at(blackboard, :next_focus_regen_at, tick_ms, now)
+      _ -> blackboard
+    end
+  end
+
   def tick(entity, %Blackboard{} = blackboard, now) when is_integer(now) do
     {entity, blackboard} = tick_resources(entity, blackboard, now)
     {entity, blackboard} = tick_focus(entity, blackboard, now)

@@ -29,6 +29,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Entity.Logic.AI.BT.Mob, as: MobBT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Mob.Spells, as: MobSpells
   alias ThistleTea.Game.Entity.Logic.AI.BT.Pet, as: PetBT
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Regen, as: RegenBT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Totem, as: TotemBT
   alias ThistleTea.Game.Entity.Logic.AI.EventAI
   alias ThistleTea.Game.Entity.Logic.AI.Script
@@ -98,7 +99,9 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     GameEvent.subscribe(state)
     Process.flag(:trap_exit, true)
     state = Incarnation.ensure(state)
-    state = BT.init(state, behavior_tree(state))
+    now = Time.now()
+    blackboard = RegenBT.initialize(state, Blackboard.new(), now)
+    state = BT.init(state, behavior_tree(state), blackboard)
 
     Metadata.update(
       state.object.guid,
@@ -108,8 +111,6 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     state = sync_orientation_metadata(state)
     World.update_position(state)
     state = Visibility.join_entity(state)
-
-    now = Time.now()
 
     state =
       state
