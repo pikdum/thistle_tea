@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.Player.ItemLoot do
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.InventoryUpdate
   alias ThistleTea.Game.Network.Message
+  alias ThistleTea.Game.Network.UpdateObject
   alias ThistleTea.Game.Player.Items
   alias ThistleTea.Game.World.ItemStore
 
@@ -22,6 +23,7 @@ defmodule ThistleTea.Game.Player.ItemLoot do
     if Core.dead?(character) do
       state
     else
+      if state.loot_guid != pending.guid, do: Network.send_packet(UpdateObject.from_item(pending.source))
       Network.send_packet(%Message.SmsgLootResponse{guid: pending.guid, loot: pending.loot, loot_type: 2})
       %{state | loot_guid: pending.guid, loot_type: :item}
     end
@@ -39,10 +41,14 @@ defmodule ThistleTea.Game.Player.ItemLoot do
   def take_item(state, _slot), do: state
 
   def release(%{character: %Character{internal: %{item_loot: %PendingLoot{loot: loot}}}} = state) do
-    Enum.reduce(loot.items, state, fn
-      %Loot.Item{looted: false, slot: slot}, state -> take_item(state, slot)
-      _item, state -> state
-    end)
+    state =
+      Enum.reduce(loot.items, state, fn
+        %Loot.Item{looted: false, slot: slot}, state -> take_item(state, slot)
+        _item, state -> state
+      end)
+
+    if state.character.internal.item_loot, do: destroy_source(state.loot_guid)
+    state
   end
 
   def release(state), do: state
@@ -56,12 +62,15 @@ defmodule ThistleTea.Game.Player.ItemLoot do
       state = InventoryUpdate.apply(%{state | character: character}, {:ok, changes})
       Network.send_packet(%Message.SmsgLootRemoved{slot: slot})
       Items.send_push_result(state, reward.item_id, reward.count, position(changes, item.object.guid))
+      if is_nil(character.internal.item_loot), do: destroy_source(pending.guid)
       state
     else
       {:error, reason} -> failure(state, reason)
       _ -> failure(state, :already_looted)
     end
   end
+
+  defp destroy_source(guid), do: Network.send_packet(%Message.SmsgDestroyObject{guid: guid})
 
   defp position(changes, guid) do
     case ChangeSet.placement(changes, guid) do

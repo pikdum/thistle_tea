@@ -2,7 +2,9 @@ defmodule ThistleTea.Game.Entity.Logic.ItemLoot do
   @moduledoc """
   Player-owned loot retained after an item is consumed. A claim plans its
   inventory placement and removes the loot slot together, so failed placement
-  leaves the rewards intact. The owning player serializes all claims.
+  leaves the rewards intact. The owning player serializes all claims. The
+  consumed item's snapshot supplies a client loot source without restoring
+  inventory ownership or an ItemStore entry.
   """
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Item
@@ -10,10 +12,10 @@ defmodule ThistleTea.Game.Entity.Logic.ItemLoot do
   alias ThistleTea.Game.Entity.Logic.Inventory.Batch
   alias ThistleTea.Game.Entity.Logic.Loot
 
-  @enforce_keys [:guid, :loot]
-  defstruct [:guid, :loot]
+  @enforce_keys [:guid, :source, :loot]
+  defstruct [:guid, :source, :loot]
 
-  def new(guid, %Loot{} = loot), do: %__MODULE__{guid: guid, loot: loot}
+  def new(%Item{} = item, %Loot{} = loot), do: %__MODULE__{guid: item.object.guid, source: item, loot: loot}
 
   def claim(
         %Character{internal: %{item_loot: %__MODULE__{loot: loot} = pending}} = character,

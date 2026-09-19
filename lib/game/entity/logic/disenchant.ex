@@ -28,6 +28,7 @@ defmodule ThistleTea.Game.Entity.Logic.Disenchant do
       not is_nil(character.internal.item_loot) -> {:error, :already_open}
       Skills.value(character.player.skills, @skill) < 1 -> {:error, :low_castlevel}
       item.item.owner != character.object.guid -> {:error, :cant_be_disenchanted}
+      item.item.stack_count != 1 -> {:error, :cant_be_disenchanted}
       not eligible?(Item.template(item)) -> {:error, :cant_be_disenchanted}
       true -> :ok
     end

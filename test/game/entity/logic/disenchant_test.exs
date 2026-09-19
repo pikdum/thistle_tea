@@ -27,6 +27,7 @@ defmodule ThistleTea.Game.Entity.Logic.DisenchantTest do
       for invalid <- [
             nil,
             %{item | item: %{item.item | owner: 2}},
+            %{item | item: %{item.item | stack_count: 2}},
             Item.build(%ItemTemplate{entry: 1}, 10, owner: 1),
             Item.build(%ItemTemplate{entry: 1, disenchant_id: 1, flags: 0x8000}, 10, owner: 1)
           ] do
@@ -37,7 +38,7 @@ defmodule ThistleTea.Game.Entity.Logic.DisenchantTest do
     test "requires a living enchanter without unclaimed materials", %{character: character, item: item} do
       assert {:error, :low_castlevel} = Disenchant.validate_item(%{character | player: %Player{skills: %{}}}, item)
       assert {:error, :caster_dead} = Disenchant.validate_item(%{character | unit: %{character.unit | health: 0}}, item)
-      pending = ItemLoot.new(9, %Loot{})
+      pending = ItemLoot.new(item, %Loot{})
       character = %{character | internal: %{character.internal | item_loot: pending}}
       assert {:error, :already_open} = Disenchant.validate_item(character, item)
     end

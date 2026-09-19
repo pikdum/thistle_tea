@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgSetActiveMover do
   alias ThistleTea.Game.Entity.Server.Player.State
   alias ThistleTea.Game.Player.CompanionVisibility
   alias ThistleTea.Game.Player.Exploration, as: PlayerExploration
+  alias ThistleTea.Game.Player.ItemLoot
   alias ThistleTea.Game.World.Visibility
 
   defstruct [:guid]
@@ -39,6 +40,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgSetActiveMover do
     state
     |> CompanionVisibility.defer_restoration()
     |> PlayerExploration.check_current()
+    |> ItemLoot.open()
   end
 
   defp set_active_mover(%State{} = state, guid), do: %{state | active_mover_guid: guid}

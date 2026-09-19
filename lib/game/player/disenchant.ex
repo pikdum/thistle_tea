@@ -35,7 +35,7 @@ defmodule ThistleTea.Game.Player.Disenchant do
            character.player |> Batch.new() |> Batch.remove_item(guid, 1) |> Inventory.plan(&ItemStore.get/1) do
       state = Looting.release(state)
       character = DisenchantLogic.skill_up(state.character, :rand.uniform(100) - 1)
-      character = %{character | internal: %{character.internal | item_loot: PendingLoot.new(guid, loot)}}
+      character = %{character | internal: %{character.internal | item_loot: PendingLoot.new(item, loot)}}
       changes = %{changes | player: %{changes.player | skills: character.player.skills}}
 
       %{state | character: character}

@@ -38,6 +38,7 @@ defmodule ThistleTea.Game.Player.DisenchantTest do
       assert completed.character.player.skills[333].value == 2
       assert completed.loot_guid == selected.object.guid
       assert completed.loot_type == :item
+      assert completed.character.internal.item_loot.source == selected
       assert [%{item_id: @material, count: 2}] = completed.character.internal.item_loot.loot.items
       assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgLootResponse{loot_type: 2}}}
 
@@ -64,9 +65,12 @@ defmodule ThistleTea.Game.Player.DisenchantTest do
   describe "take_item/2" do
     test "claims once through inventory updates and clears pending loot", %{state: state, selected: selected} do
       opened = Disenchant.complete(state, selected.object.guid, 13_262)
+      source_guid = selected.object.guid
+      assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgDestroyObject{guid: ^source_guid}}}
       claimed = Looting.take_item(opened, 0)
       assert count(claimed, @material) == 2
       assert claimed.character.internal.item_loot == nil
+      assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgDestroyObject{guid: ^source_guid}}}
       assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgLootRemoved{slot: 0}}}
       assert Looting.take_item(claimed, 0) == claimed
       assert CharacterStore.get(state.guid).internal.item_loot == nil
@@ -155,6 +159,7 @@ defmodule ThistleTea.Game.Player.DisenchantTest do
     CharacterStore.put(character)
 
     on_exit(fn ->
+      :ets.delete(CharacterStore, low)
       :ets.delete(ItemLoader, @material)
       :ets.delete(LootLoader, {:disenchant, @loot})
 
