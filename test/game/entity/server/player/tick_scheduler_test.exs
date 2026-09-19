@@ -58,6 +58,27 @@ defmodule ThistleTea.Game.Entity.Server.Player.TickSchedulerTest do
       assert TickScheduler.ensure_scheduled(state) == state
     end
 
+    test "schedules hidden mana recovery before a long form aura timer" do
+      now = Time.now()
+      character = character([%Holder{expires_at: now + 40_000}])
+
+      character = %{
+        character
+        | unit: %{character.unit | power_type: 3, power1: 50, power4: 100, max_power4: 100},
+          internal: %{
+            character.internal
+            | blackboard: %Blackboard{maintenance: %Blackboard.Maintenance{next_regen_at: now + 50}}
+          }
+      }
+
+      ref = Process.send_after(self(), :player_tick, 40_000)
+      state = TickScheduler.ensure_scheduled(%{character: character, player_tick_ref: ref})
+
+      refute state.player_tick_ref == ref
+      refute Process.read_timer(ref)
+      assert_receive :player_tick, 1_000
+    end
+
     test "starts ticking active auras but leaves idle characters asleep" do
       idle = %{character: character([]), player_tick_ref: nil}
       assert TickScheduler.ensure_scheduled(idle) == idle

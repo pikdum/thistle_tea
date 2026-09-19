@@ -79,6 +79,7 @@ nix develop .#wow-tools            # shell with all of the above + sqlite + mari
 - creature-specific melee and ranged attack power from slaying gear and consumables, with weapon-speed scaling and live target debuffs
 - school-based spell cost reductions, with stacking, client cost displays, and free casts
 - percentage base-stat bonuses and penalties, including world buffs and Resurrection Sickness, with layered stacking and death-persistent aura expiry
+- independent mana and energy regeneration across Druid forms, with the five-second rule, Reflection, and Innervate
 - ground mounts, mounted speed bonuses, and dismounting on cancellation or swimming
 - parry haste for player and mob melee swings, including dual-wield timing
 - shield block value from equipment, enchants, and percentage talents, shared by defensive blocks and Shield Slam

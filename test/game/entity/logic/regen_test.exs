@@ -11,12 +11,14 @@ defmodule ThistleTea.Game.Entity.Logic.RegenTest do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.Regen
+  alias ThistleTea.Game.Entity.Logic.Resources
   alias ThistleTea.Game.Spell
 
   @warrior 1
   @paladin 2
   @rogue 4
   @mage 8
+  @druid 11
 
   defp character(unit_attrs, internal_attrs \\ []) do
     unit =
@@ -241,6 +243,125 @@ defmodule ThistleTea.Game.Entity.Logic.RegenTest do
     end
   end
 
+  describe "tick/2 with multiple power reserves" do
+    test "regenerates mana alongside cat energy and bear rage decay" do
+      for power_type <- [0, 1, 3] do
+        entity =
+          character(
+            class: @druid,
+            spirit: 40,
+            power_type: power_type,
+            power1: 100,
+            max_power1: 200,
+            power2: 30,
+            max_power2: 1_000,
+            power4: 50,
+            max_power4: 100
+          )
+
+        entity = Regen.tick(entity, 10_000)
+
+        assert entity.unit.power1 == 123
+        assert entity.unit.power2 == 10
+        assert entity.unit.power4 == 70
+        assert entity.unit.power_type == power_type
+      end
+    end
+
+    test "keeps the five-second rule independent of energy spending" do
+      entity =
+        character(
+          [class: @druid, spirit: 40, power_type: 3, power1: 100, max_power1: 200, power4: 50, max_power4: 100],
+          last_mana_use_at: 8_000,
+          in_combat: true
+        )
+
+      entity = Regen.tick(entity, 12_999)
+      assert entity.unit.power1 == 100
+      assert entity.unit.power4 == 70
+
+      entity = Resources.spend_cost(entity, 3, 20, 13_000)
+      assert entity.internal.last_mana_use_at == 8_000
+
+      entity = Regen.tick(entity, 13_000)
+      assert entity.unit.power1 == 123
+      assert entity.unit.power4 == 70
+    end
+
+    test "applies mana auras while shifted without changing energy or rage rates" do
+      entity =
+        character(
+          [
+            class: @druid,
+            spirit: 40,
+            power_type: 1,
+            power1: 100,
+            max_power1: 500,
+            power2: 30,
+            power4: 50,
+            max_power4: 100
+          ],
+          last_mana_use_at: 9_000,
+          in_combat: true
+        )
+        |> with_aura(:mod_power_regen, 10, misc_value: 0)
+        |> with_aura(:mod_power_regen_percent, 400, misc_value: 0)
+        |> with_aura(:mod_mana_regen_interrupt, 100)
+
+      entity = Regen.tick(entity, 10_000)
+
+      assert entity.unit.power1 == 219
+      assert entity.unit.power2 == 30
+      assert entity.unit.power4 == 70
+    end
+
+    test "clamps each reserve independently and leaves absent reserves alone" do
+      entity =
+        character(
+          class: @druid,
+          power_type: 3,
+          power1: 195,
+          max_power1: 200,
+          power2: 10,
+          power4: 95,
+          max_power4: 100
+        )
+
+      entity = Regen.tick(entity, 10_000)
+
+      assert entity.unit.power1 == 200
+      assert entity.unit.power2 == 0
+      assert entity.unit.power4 == 100
+      refute Regen.needs_regen?(entity)
+
+      warrior = character(class: @warrior, power_type: 1, power2: 30, power1: nil, max_power1: nil)
+      warrior = Regen.tick(warrior, 10_000)
+      assert warrior.unit.power1 == nil
+      assert warrior.unit.power4 == nil
+      assert warrior.unit.power2 == 10
+    end
+
+    test "never regenerates hidden reserves on a corpse or ghost" do
+      entity =
+        character(
+          class: @druid,
+          health: 0,
+          power_type: 3,
+          power1: 100,
+          max_power1: 200,
+          power4: 50,
+          max_power4: 100
+        )
+
+      assert Regen.tick(entity, 10_000) == entity
+      refute Regen.needs_regen?(entity)
+
+      ghost = %{entity | unit: %{entity.unit | health: 1}, player: %{entity.player | flags: 0x10}}
+      assert Regen.tick(ghost, 10_000) == ghost
+      refute Regen.needs_regen?(ghost)
+    end
+  end
+
   describe "tick/2 for creatures" do
     defp mob(unit_attrs, internal_attrs \\ []) do
       {regenerate_stats, internal_attrs} = Keyword.pop(internal_attrs, :regenerate_stats)
@@ -381,6 +502,28 @@ defmodule ThistleTea.Game.Entity.Logic.RegenTest do
   end
 
   describe "needs_regen?/1" do
+    test "keeps ticking for hidden mana when the active reserve is full" do
+      for {power_type, rage, energy} <- [{1, 0, 100}, {3, 0, 100}] do
+        entity =
+          character(
+            class: @druid,
+            power_type: power_type,
+            power1: 100,
+            max_power1: 200,
+            power2: rage,
+            power4: energy,
+            max_power4: 100
+          )
+
+        assert Regen.needs_regen?(entity)
+      end
+    end
+
+    test "keeps ticking for hidden energy with full mana" do
+      entity = character(class: @druid, power_type: 0, power1: 200, max_power1: 200, power4: 50, max_power4: 100)
+      assert Regen.needs_regen?(entity)
+    end
+
     test "false when health and power are full" do
       refute Regen.needs_regen?(character(class: @mage, power_type: 0, power1: 200, max_power1: 200))
     end
@@ -400,6 +543,14 @@ defmodule ThistleTea.Game.Entity.Logic.RegenTest do
     test "true while rage remains" do
       assert Regen.needs_regen?(character(class: @warrior, power_type: 1, power2: 10, max_power2: 1_000))
       refute Regen.needs_regen?(character(class: @warrior, power_type: 1, power2: 0, max_power2: 1_000))
+    end
+
+    test "does not request resource ticks solely for rage that cannot decay" do
+      entity = character([class: @warrior, power_type: 1, power2: 30], in_combat: true)
+      refute Regen.needs_resource_regen?(entity)
+
+      entity = character(class: @warrior, power_type: 1, power2: 30) |> with_aura(:interrupt_regen, 0)
+      refute Regen.needs_resource_regen?(entity)
     end
 
     test "false when dead or ghost" do

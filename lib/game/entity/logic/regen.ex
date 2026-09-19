@@ -2,8 +2,9 @@ defmodule ThistleTea.Game.Entity.Logic.Regen do
   @moduledoc """
   Blizzlike resource regeneration and decay ticks for players and creatures:
   health/mana/rage regen with the five-second rule, regen-modifying auras, and
-  per-entity-type tick intervals. `needs_regen?/1` gates whether ticking
-  continues at all.
+  per-entity-type tick intervals. Player reserves regenerate independently of
+  the displayed power type, including mana in feral forms. `needs_regen?/1`
+  gates whether ticking continues at all.
   """
   import Bitwise, only: [&&&: 2]
 
@@ -63,7 +64,9 @@ defmodule ThistleTea.Game.Entity.Logic.Regen do
     if Death.alive?(entity) do
       entity
       |> regen_health()
-      |> regen_power(now)
+      |> regen_mana(now)
+      |> regen_energy()
+      |> decay_rage()
     else
       entity
     end
@@ -179,21 +182,29 @@ defmodule ThistleTea.Game.Entity.Logic.Regen do
 
   defp missing_health?(_entity), do: false
 
-  defp missing_power?(%{unit: %Unit{power_type: @mana_power_type, power1: mana, max_power1: max_mana}})
-       when is_integer(mana) and is_integer(max_mana) do
+  defp missing_power?(entity) do
+    missing_mana?(entity) or missing_energy?(entity) or decaying_rage?(entity)
+  end
+
+  defp missing_mana?(%{unit: %Unit{power1: mana, max_power1: max_mana}})
+       when is_integer(mana) and is_integer(max_mana) and max_mana > 0 do
     mana < max_mana
   end
 
-  defp missing_power?(%{unit: %Unit{power_type: @rage_power_type, power2: rage}}) when is_integer(rage) do
-    rage > 0
+  defp missing_mana?(_entity), do: false
+
+  defp decaying_rage?(%{unit: %Unit{power2: rage}} = entity) when is_integer(rage) and rage > 0 do
+    not in_combat?(entity) and not AuraLogic.has_aura?(entity, :interrupt_regen)
   end
 
-  defp missing_power?(%{unit: %Unit{power_type: @energy_power_type, power4: energy, max_power4: max_energy}})
-       when is_integer(energy) and is_integer(max_energy) do
+  defp decaying_rage?(_entity), do: false
+
+  defp missing_energy?(%{unit: %Unit{power4: energy, max_power4: max_energy}})
+       when is_integer(energy) and is_integer(max_energy) and max_energy > 0 do
     energy < max_energy
   end
 
-  defp missing_power?(_entity), do: false
+  defp missing_energy?(_entity), do: false
 
   defp regen_health(%{unit: %Unit{health: health, max_health: max_health}} = entity)
        when is_integer(health) and is_integer(max_health) and health >= max_health do
@@ -249,13 +260,9 @@ defmodule ThistleTea.Game.Entity.Logic.Regen do
     Core.heal(entity, max(trunc(carried), 0))
   end
 
-  defp regen_power(%{unit: %Unit{power_type: @mana_power_type}} = entity, now), do: regen_mana(entity, now)
-  defp regen_power(%{unit: %Unit{power_type: @rage_power_type}} = entity, _now), do: decay_rage(entity)
-  defp regen_power(%{unit: %Unit{power_type: @energy_power_type}} = entity, _now), do: regen_energy(entity)
-  defp regen_power(entity, _now), do: entity
-
-  defp regen_mana(%{unit: %Unit{class: class, spirit: spirit}} = entity, now)
-       when is_integer(class) and is_number(spirit) do
+  defp regen_mana(%{unit: %Unit{class: class, spirit: spirit, power1: mana, max_power1: max_mana}} = entity, now)
+       when is_integer(class) and is_number(spirit) and is_integer(mana) and is_integer(max_mana) and max_mana > 0 and
+              mana < max_mana do
     mp5_per_tick = total_by_misc(entity, :mod_power_regen, @mana_power_type) / 5 * 2
 
     spirit_regen =
