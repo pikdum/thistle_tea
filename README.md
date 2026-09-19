@@ -102,6 +102,7 @@ nix develop .#wow-tools            # shell with all of the above + sqlite + mari
 - Hunter Beast Lore: caster-specific beast damage, armor, and resistance information, with expiry and death cleanup
 - pets
 - typed invisibility and detection, with observer visibility, creature aggro, and action interruption
+- observer-specific stealth detection, with Perception, Paranoia, Track Hidden, facing, line of sight, and caster-specific Hunter's Mark
 - items, bags, equipment, and vendors
 - alcohol intoxication, client drunkenness effects, gradual sobering, and death cleanup
 - looting + group loot

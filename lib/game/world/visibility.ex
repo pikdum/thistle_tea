@@ -12,11 +12,13 @@ defmodule ThistleTea.Game.World.Visibility do
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Corpse
   alias ThistleTea.Game.Entity.Logic.Death
-  alias ThistleTea.Game.Entity.Logic.Invisibility
+  alias ThistleTea.Game.Entity.Logic.StealthDetection
   alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.Math
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.SpatialGrid
+  alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.ChaseWatch
   alias ThistleTea.Game.World.Groups
@@ -29,6 +31,7 @@ defmodule ThistleTea.Game.World.Visibility do
 
   @group Groups
   @range 250
+  @stealth_detection_ms 500
 
   def enter_player(%{visibility_cells: %MapSet{}} = state), do: state
 
@@ -42,6 +45,7 @@ defmodule ThistleTea.Game.World.Visibility do
     |> Map.put(:character, character)
     |> Map.put(:visibility_cells, cells)
     |> sync_visible_entities(guid, cells)
+    |> schedule_stealth_detection()
   end
 
   def enter_player(state), do: state
@@ -89,6 +93,7 @@ defmodule ThistleTea.Game.World.Visibility do
   def reset_viewpoint(state), do: state
 
   def leave_player(%{character: character, visibility_cells: %MapSet{} = cells} = state) do
+    state = cancel_stealth_detection(state)
     ChaseWatch.unwatch(self())
     Enum.each(cells, &Group.demonitor(@group, cell_key(&1)))
     character = leave_entity(character)
@@ -103,6 +108,7 @@ defmodule ThistleTea.Game.World.Visibility do
 
   def leave_player(%{character: character} = state) do
     ChaseWatch.unwatch(self())
+    state = cancel_stealth_detection(state)
     %{state | character: leave_entity(character)}
   end
 
@@ -198,7 +204,7 @@ defmodule ThistleTea.Game.World.Visibility do
 
       not visible? and tracked?(state, guid) ->
         send_destroy(guid)
-        state
+        untrack_entity(state, guid)
 
       true ->
         state
@@ -246,11 +252,68 @@ defmodule ThistleTea.Game.World.Visibility do
         meta = Metadata.get(guid) || %{}
 
         Filter.can_see?(ghost?, type, meta, distance) and
-          (Invisibility.detectable?(Invisibility.metadata(character), meta) or
-             owned_or_grouped?(character.object.guid, guid, meta))
+          (owned_or_grouped?(character.object.guid, guid, meta) or detectable?(character, guid, meta))
 
       _missing ->
         true
+    end
+  end
+
+  def stealth_detection_tick(%{stealth_detection_ref: ref, visibility_cells: %MapSet{}} = state, ref)
+      when is_reference(ref) do
+    (Map.get(state, :player_guids, []) ++ Map.get(state, :mob_guids, []))
+    |> Enum.filter(&match?(%{stealthed?: true}, Metadata.get(&1)))
+    |> Enum.reduce(state, &reevaluate_entity(&2, &1))
+    |> schedule_stealth_detection()
+  end
+
+  def stealth_detection_tick(state, _ref), do: state
+
+  def schedule_stealth_detection(%{visibility_cells: %MapSet{}} = state) do
+    ref = :erlang.start_timer(@stealth_detection_ms, self(), :stealth_detection)
+    Map.put(state, :stealth_detection_ref, ref)
+  end
+
+  def schedule_stealth_detection(state), do: state
+
+  defp cancel_stealth_detection(state) do
+    case Map.get(state, :stealth_detection_ref) do
+      ref when is_reference(ref) -> Process.cancel_timer(ref)
+      _ -> :ok
+    end
+
+    Map.put(state, :stealth_detection_ref, nil)
+  end
+
+  defp detectable?(character, guid, meta) do
+    detector = character |> StealthDetection.target_metadata() |> Map.put(:guid, character.object.guid)
+
+    cond do
+      StealthDetection.marked_by?(meta, character.object.guid) ->
+        true
+
+      Map.get(meta, :stealthed?, false) ->
+        detects_stealth?(character, guid, detector, meta)
+
+      true ->
+        StealthDetection.detectable?(detector, meta, nil, Time.now())
+    end
+  end
+
+  defp detects_stealth?(character, guid, detector, meta) do
+    now = Time.now()
+
+    case {World.position(character, now), World.position(guid, now)} do
+      {{world, x, y, z}, {world, tx, ty, tz}} ->
+        {_x, _y, _z, orientation} = character.movement_block.position
+        behind? = Math.behind?({x, y, orientation}, {tx, ty})
+        distance = Math.distance({x, y, z}, {tx, ty, tz})
+
+        StealthDetection.detectable?(detector, meta, distance, now, behind?) and
+          World.line_of_sight?(character, guid)
+
+      _ ->
+        false
     end
   end
 

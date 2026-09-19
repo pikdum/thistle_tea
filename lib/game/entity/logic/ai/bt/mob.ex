@@ -495,12 +495,16 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Mob do
     Perception.actor(perception, guid)
   end
 
-  defp detectable_target?(%Mob{unit: %Unit{level: level}} = state, guid, distance, %Context{
-         now: now,
-         perception: perception
-       }) do
-    detector = Map.put(Invisibility.metadata(state), :level, level)
-    StealthDetection.detectable?(detector, Perception.metadata(perception, guid), distance, now)
+  defp detectable_target?(%Mob{} = state, guid, distance, %Context{now: now, perception: perception}) do
+    detector = StealthDetection.target_metadata(state)
+
+    behind? =
+      case {state.movement_block.position, Perception.position(perception, guid)} do
+        {{x, y, _z, orientation}, {_world, tx, ty, _tz}} -> Math.behind?({x, y, orientation}, {tx, ty})
+        _ -> false
+      end
+
+    StealthDetection.detectable?(detector, Perception.metadata(perception, guid), distance, now, behind?)
   end
 
   defp aggro_radius(%Mob{unit: %Unit{level: level}} = state, target_guid, perception)

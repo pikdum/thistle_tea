@@ -131,6 +131,19 @@ defmodule ThistleTea.Game.World.AggroProbeTest do
       refute_receive {:"$gen_cast", {:aggro_probe, ^player_guid}}
     end
 
+    test "uses the creature's published stealth detection bonus" do
+      table = table()
+      player_guid = player_guid()
+      mob_guid = mob_guid()
+      put_player(player_guid, stealthed?: true, stealth_skill: 25)
+      put_mob(mob_guid, {5.0, 0.0, 0.0})
+      Metadata.update(mob_guid, %{stealth_detection_bonus: 30})
+
+      AggroProbe.notify_player_moved(player_guid, 0, {0.0, 0.0, 0.0}, table)
+
+      assert_receive {:"$gen_cast", {:aggro_probe, ^player_guid}}
+    end
+
     test "does not probe dead mobs or on behalf of dead players" do
       table = table()
       player_guid = player_guid()

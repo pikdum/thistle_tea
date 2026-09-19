@@ -44,7 +44,6 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Entity.Logic.Experience
   alias ThistleTea.Game.Entity.Logic.HealingReceived
   alias ThistleTea.Game.Entity.Logic.Hostility
-  alias ThistleTea.Game.Entity.Logic.Invisibility
   alias ThistleTea.Game.Entity.Logic.Loot.Actor
   alias ThistleTea.Game.Entity.Logic.Loot.Commit
   alias ThistleTea.Game.Entity.Logic.Loot.Release
@@ -52,6 +51,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.Entity.Logic.SpellEffect
   alias ThistleTea.Game.Entity.Logic.SpellFeedback
+  alias ThistleTea.Game.Entity.Logic.StealthDetection
   alias ThistleTea.Game.Entity.Logic.Threat
   alias ThistleTea.Game.Entity.Registry, as: EntityRegistry
   alias ThistleTea.Game.Entity.Server.AIEnvironment
@@ -97,7 +97,12 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     Process.flag(:trap_exit, true)
     state = Incarnation.ensure(state)
     state = BT.init(state, behavior_tree(state))
-    Metadata.update(state.object.guid, Map.put(Invisibility.metadata(state), :incarnation_id, Incarnation.id(state)))
+
+    Metadata.update(
+      state.object.guid,
+      Map.put(StealthDetection.target_metadata(state), :incarnation_id, Incarnation.id(state))
+    )
+
     state = sync_orientation_metadata(state)
     World.update_position(state)
     state = Visibility.join_entity(state)
@@ -914,7 +919,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
   defp broadcast_if_pending(%Mob{internal: %Internal{broadcast_update?: true}} = state) do
     if !Corpse.removed?(state) do
-      detection = Invisibility.metadata(state)
+      detection = StealthDetection.target_metadata(state)
       previous_detection = Metadata.query(state.object.guid, Map.keys(detection))
 
       metadata =

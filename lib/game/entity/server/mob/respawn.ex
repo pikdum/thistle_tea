@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Respawn do
   alias ThistleTea.Game.Entity.Logic.AI.EventAI
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Core
+  alias ThistleTea.Game.Entity.Logic.StealthDetection
   alias ThistleTea.Game.Entity.Logic.TemporaryFaction
   alias ThistleTea.Game.Entity.Server.AIEnvironment
   alias ThistleTea.Game.Entity.Server.Mob.Corpse
@@ -178,6 +179,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Respawn do
     })
 
     Metadata.update(state.object.guid, Mob.visibility_metadata(state))
+    Metadata.update(state.object.guid, StealthDetection.target_metadata(state))
 
     Metadata.update(state.object.guid, FactionLoader.metadata(state.unit.faction_template))
   end

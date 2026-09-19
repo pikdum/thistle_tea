@@ -1,6 +1,8 @@
 defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
   use ExUnit.Case, async: false
 
+  alias ThistleTea.Game.Aura
+  alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.AIEvent
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
@@ -962,9 +964,36 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.MobTest do
       Metadata.update(target_guid, %{stealthed?: true, stealth_skill: 25})
 
       assert {:failure, state, %Blackboard{combat: %Blackboard.Combat{next_aggro_at: 6_000}}} =
-               MobBT.try_aggro(state, %Blackboard{}, 1_000)
+               MobBT.try_aggro(state, %Blackboard{}, AIEnvironment.context(state, 1_000))
 
       assert state.unit.target == 0
+    end
+
+    test "detection auras reveal nearby stealth only in the creature's facing arc" do
+      source_guid = mob_guid(17)
+      target_guid = player_guid()
+      state = fixture_mob(guid: source_guid, level: 5, faction_template: 17)
+
+      aura = %Holder{
+        auras: [%Aura{type: :mod_stealth_detect, misc_value: 0, amount: 30}]
+      }
+
+      state = %{state | unit: %{state.unit | auras: [aura]}}
+      put_metadata(source_guid, defias(), 5)
+      put_spatial_target(:players, target_guid, {5.0, 0.0, 0.0}, alliance(), 5)
+      Metadata.update(target_guid, %{stealthed?: true, stealth_skill: 25})
+
+      assert {:failure, detected, _blackboard} =
+               MobBT.try_aggro(state, %Blackboard{}, AIEnvironment.context(state, 1_000))
+
+      assert detected.unit.target == target_guid
+
+      state = %{state | movement_block: %{state.movement_block | position: {0.0, 0.0, 0.0, :math.pi()}}}
+
+      assert {:failure, undetected, _blackboard} =
+               MobBT.try_aggro(state, %Blackboard{}, AIEnvironment.context(state, 1_000))
+
+      assert undetected.unit.target == 0
     end
   end
 

@@ -1051,6 +1051,14 @@ defmodule ThistleTea.Game.Entity.Server.Player do
     {:noreply, state}
   end
 
+  def handle_info({:timeout, ref, :stealth_detection}, state) do
+    {:noreply, Visibility.stealth_detection_tick(state, ref)}
+  rescue
+    error ->
+      Logger.error("Stealth detection crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:noreply, Visibility.schedule_stealth_detection(state)}
+  end
+
   @impl GenServer
   def handle_info({:group, events, _info}, state) do
     state = Visibility.handle_events(state, events)
@@ -1144,7 +1152,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
 
   defp sync_character_metadata(%{guid: guid, character: %Character{} = character} = state) when is_integer(guid) do
     detection = StealthDetection.target_metadata(character)
-    detection_keys = [:invisibility, :invisibility_detection, :detects_all_invisibility?]
+    detection_keys = Map.keys(detection)
     previous_detection = Metadata.query(guid, detection_keys)
 
     previous_subject =

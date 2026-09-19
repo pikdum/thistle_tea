@@ -96,7 +96,9 @@ defmodule ThistleTea.Game.World.AggroProbe do
         :proximity_aggro?,
         :invisibility,
         :invisibility_detection,
-        :detects_all_invisibility?
+        :detects_all_invisibility?,
+        :stealth_detection_bonus,
+        :stunned?
       ])
 
     if eligible?(mob, player, distance) do
