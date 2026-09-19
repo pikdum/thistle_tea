@@ -21,7 +21,7 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory.Batch do
   end
 
   @enforce_keys [:player]
-  defstruct [:player, removals: [], additions: []]
+  defstruct [:player, removals: [], additions: [], updates: []]
 
   def new(%Player{} = player), do: %__MODULE__{player: player}
 
@@ -34,6 +34,10 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory.Batch do
     %{batch | additions: [item | additions]}
   end
 
+  def update(%__MODULE__{updates: updates} = batch, %Item{} = item) do
+    %{batch | updates: [item | updates]}
+  end
+
   def remove_item(%__MODULE__{removals: removals} = batch, guid, count)
       when is_integer(guid) and guid > 0 and is_integer(count) and count > 0 do
     %{batch | removals: [%ItemRemoval{guid: guid, count: count} | removals]}
@@ -41,4 +45,5 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory.Batch do
 
   def removals(%__MODULE__{removals: removals}), do: Enum.reverse(removals)
   def additions(%__MODULE__{additions: additions}), do: Enum.reverse(additions)
+  def updates(%__MODULE__{updates: updates}), do: Enum.reverse(updates)
 end

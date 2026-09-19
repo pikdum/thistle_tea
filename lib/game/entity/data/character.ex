@@ -32,6 +32,7 @@ defmodule ThistleTea.Game.Entity.Data.Character do
   def creature_type(%__MODULE__{}), do: 7
 
   def sync_equipment_stats(%__MODULE__{} = character) do
+    character = %{character | player: Inventory.sync_broken_equipment(character.player, &ItemStore.get/1)}
     now = Time.now()
     enchantments = equipment_enchantments(character, now)
 
@@ -48,6 +49,7 @@ defmodule ThistleTea.Game.Entity.Data.Character do
     for slot <- Inventory.slots(),
         guid = Map.get(player, slot),
         %Item{} = item <- [ItemStore.get(guid)],
+        not Item.broken?(item),
         {enchant_slot, id} <- Item.active_enchantments(item, now),
         enchantment = ItemEnchantmentLoader.get(id),
         not is_nil(enchantment),
@@ -85,12 +87,8 @@ defmodule ThistleTea.Game.Entity.Data.Character do
     %{character | unit: unit}
   end
 
-  defp sync_offhand_inputs(%__MODULE__{unit: %Unit{} = unit, player: %Player{visible_item_17_0: entry}} = character) do
-    weapon =
-      case is_integer(entry) and entry > 0 and ItemLoader.get_template(Item.visible_entry(entry)) do
-        %ItemTemplate{class: @item_class_weapon} = template -> template
-        _ -> nil
-      end
+  defp sync_offhand_inputs(%__MODULE__{unit: %Unit{} = unit} = character) do
+    weapon = weapon_template(character, :offhand)
 
     unit =
       if weapon do
@@ -114,20 +112,17 @@ defmodule ThistleTea.Game.Entity.Data.Character do
     %{character | unit: unit}
   end
 
-  defp mainhand_weapon(%__MODULE__{player: %Player{visible_item_16_0: entry}}) when is_integer(entry) and entry > 0 do
-    ItemLoader.get_template(Item.visible_entry(entry))
+  defp mainhand_weapon(character), do: weapon_template(character, :mainhand)
+
+  defp weapon_template(%__MODULE__{player: %Player{} = player}, slot) do
+    case ItemLoader.get_template(Inventory.equipment_entry(player, slot)) do
+      %ItemTemplate{class: @item_class_weapon} = template -> template
+      _ -> nil
+    end
   end
 
-  defp mainhand_weapon(%__MODULE__{}), do: nil
-
-  defp sync_ranged_inputs(
-         %__MODULE__{unit: %Unit{} = unit, player: %Player{visible_item_18_0: entry, ammo_id: ammo_id}} = character
-       ) do
-    weapon =
-      case is_integer(entry) and entry > 0 and ItemLoader.get_template(Item.visible_entry(entry)) do
-        %ItemTemplate{class: @item_class_weapon} = template -> template
-        _ -> nil
-      end
+  defp sync_ranged_inputs(%__MODULE__{unit: %Unit{} = unit, player: %Player{ammo_id: ammo_id}} = character) do
+    weapon = weapon_template(character, :ranged)
 
     ammo_dps = ammo_dps(ammo_id, weapon)
 

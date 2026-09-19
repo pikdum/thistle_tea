@@ -39,6 +39,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Ranged do
 
   defp shoot_at_distance(character, blackboard, now, distance, auto_shot) do
     cond do
+      :ranged in (character.player.broken_equipment || []) ->
+        {:failure, stop(character), blackboard}
+
       not is_number(distance) ->
         {:failure, stop(character), blackboard}
 

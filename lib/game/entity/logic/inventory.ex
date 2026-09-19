@@ -156,6 +156,17 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
   def visible_entry_field(slot) when is_atom(slot), do: visible_entry_field(slot_index(slot))
   def visible_entry_field(slot) when is_integer(slot), do: :"visible_item_#{slot + 1}_0"
 
+  def equipment_entry(%{} = player, slot) do
+    if slot in (Map.get(player, :broken_equipment) || []),
+      do: 0,
+      else: player |> Map.get(visible_entry_field(slot)) |> Item.visible_entry()
+  end
+
+  def sync_broken_equipment(%Player{} = player, get_item) do
+    broken = Enum.filter(@equipment_fields, fn slot -> Item.broken?(get_item.(Map.get(player, slot))) end)
+    %{player | broken_equipment: broken}
+  end
+
   def equip(%Player{} = player, slot, %Item{} = item) when is_atom(slot) do
     equip(player, slot_index(slot), item)
   end
@@ -171,15 +182,29 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
     |> Enum.map(fn field -> Map.get(player, field) end)
     |> Enum.filter(fn guid -> is_integer(guid) and guid > 0 end)
     |> Enum.map(get_item)
-    |> Enum.reject(&is_nil/1)
+    |> Enum.reject(&(is_nil(&1) or Item.broken?(&1)))
     |> Enum.map(&Item.template/1)
   end
 
   def plan(%Batch{} = batch, get_item) when is_function(get_item, 1) do
     change_set = ChangeSet.new(batch.player)
 
-    with {:ok, change_set} <- plan_removals(change_set, Batch.removals(batch), get_item) do
-      plan_additions(change_set, Batch.additions(batch), get_item)
+    with {:ok, change_set} <- plan_removals(change_set, Batch.removals(batch), get_item),
+         {:ok, change_set} <- plan_additions(change_set, Batch.additions(batch), get_item) do
+      plan_updates(change_set, Batch.updates(batch), get_item)
+    end
+  end
+
+  defp plan_updates(change_set, [], _get_item), do: {:ok, change_set}
+
+  defp plan_updates(change_set, [%Item{object: %{guid: guid}} = item | rest], get_item) do
+    lookup = &ChangeSet.get_item(change_set, &1, get_item)
+
+    if find_position(change_set.player, guid, :all_owned, lookup) do
+      result = %{player: change_set.player, items: [item], destroyed: []}
+      plan_updates(ChangeSet.absorb(change_set, result), rest, get_item)
+    else
+      {:error, :item_not_found}
     end
   end
 

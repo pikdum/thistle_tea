@@ -8,7 +8,6 @@ defmodule ThistleTea.Game.Player.Spellcasting do
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Unit
-  alias ThistleTea.Game.Entity.Data.Item
   alias ThistleTea.Game.Entity.Data.Item, as: DataItem
   alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.Logic.AutoRepeat
@@ -307,8 +306,8 @@ defmodule ThistleTea.Game.Player.Spellcasting do
   defp pet_feed_info(_pet_guid), do: nil
 
   defp equipped_weapon_templates(%{player: player}) when is_struct(player) do
-    [player.visible_item_16_0, player.visible_item_17_0, player.visible_item_18_0]
-    |> Enum.map(&Item.visible_entry/1)
+    [:mainhand, :offhand, :ranged]
+    |> Enum.map(&Inventory.equipment_entry(player, &1))
     |> Enum.filter(&(is_integer(&1) and &1 > 0))
     |> Enum.map(&ItemLoader.get_template/1)
     |> Enum.reject(&is_nil/1)

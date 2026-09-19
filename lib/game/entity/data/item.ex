@@ -16,6 +16,11 @@ defmodule ThistleTea.Game.Entity.Data.Item do
             container: nil,
             internal: %{template: nil}
 
+  def broken?(%__MODULE__{item: %ItemComponent{durability: 0, max_durability: maximum}})
+      when is_integer(maximum) and maximum > 0, do: true
+
+  def broken?(_item), do: false
+
   def build(%ItemTemplate{} = template, guid, opts \\ []) do
     owner = Keyword.get(opts, :owner, 0)
     stack_count = Keyword.get(opts, :stack_count, 1)

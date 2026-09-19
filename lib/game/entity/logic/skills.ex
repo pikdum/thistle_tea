@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Entity.Logic.Skills do
   alias ThistleTea.Game.Entity.Data.Item
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Experience
+  alias ThistleTea.Game.Entity.Logic.Inventory
 
   @max_skill_entries 128
 
@@ -69,15 +70,15 @@ defmodule ThistleTea.Game.Entity.Logic.Skills do
   def weapon_skill_for_subclass(subclass), do: Map.get(@weapon_subclass_skills, subclass)
 
   def main_hand_weapon_skill(player, get_template) when is_function(get_template, 1) do
-    equipped_weapon_skill(player.visible_item_16_0, get_template, @unarmed_skill)
+    equipped_weapon_skill(Inventory.equipment_entry(player, :mainhand), get_template, @unarmed_skill)
   end
 
   def off_hand_weapon_skill(player, get_template) when is_function(get_template, 1) do
-    equipped_weapon_skill(player.visible_item_17_0, get_template, @unarmed_skill)
+    equipped_weapon_skill(Inventory.equipment_entry(player, :offhand), get_template, @unarmed_skill)
   end
 
   def ranged_weapon_skill(player, get_template) when is_function(get_template, 1) do
-    equipped_weapon_skill(player.visible_item_18_0, get_template, nil)
+    equipped_weapon_skill(Inventory.equipment_entry(player, :ranged), get_template, nil)
   end
 
   defp equipped_weapon_skill(entry, get_template, fallback) do
