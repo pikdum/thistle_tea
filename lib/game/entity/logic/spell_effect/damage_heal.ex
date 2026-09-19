@@ -190,8 +190,8 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
     resisted = school_resisted_amount(state, damage, school, context, opts)
     damage = damage - resisted
 
-    {state, absorbed} =
-      Core.take_damage_with_absorb(state, damage, now,
+    {state, damage, absorbed} =
+      Core.take_damage_with_mitigation(state, damage, now,
         school: school,
         spell: spell,
         source: context.caster_guid,
@@ -404,8 +404,8 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
 
     proc_damage = if context.melee_crit?, do: unmitigated_damage * 2, else: unmitigated_damage
 
-    {state, absorbed} =
-      Core.take_damage_with_absorb(state, damage, now,
+    {state, damage, absorbed} =
+      Core.take_damage_with_mitigation(state, damage, now,
         school: school,
         spell: spell,
         source: context.caster_guid,

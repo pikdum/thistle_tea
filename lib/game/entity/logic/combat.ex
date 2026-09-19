@@ -168,17 +168,19 @@ defmodule ThistleTea.Game.Entity.Logic.Combat do
     result = resolve_attack(entity, attack, opts)
     entity = ParryHaste.apply(entity, result.outcome, now)
 
-    {entity, absorbed} =
+    {entity, damage, absorbed} =
       if result.damage > 0 do
-        Core.take_damage_with_absorb(entity, result.damage, now,
+        Core.take_damage_with_mitigation(entity, result.damage, now,
           school: attack_school(attack),
           source: Map.get(attack, :caster, 0),
           source_owner: Map.get(attack, :caster_owner_guid),
           threat_multiplier: Map.get(attack, :threat_multiplier, 1.0)
         )
       else
-        {entity, 0}
+        {entity, 0, 0}
       end
+
+    result = %{result | damage: damage}
 
     attack =
       attack

@@ -136,6 +136,16 @@ defmodule ThistleTea.Game.Entity.Logic.PercentDamageTest do
       assert entity.unit.health == 1_000 - dealt
     end
 
+    test "combat feedback matches damage after received modifiers and absorption", %{entity: entity} do
+      {entity, _events} = Aura.apply_spell(entity, 2, 60, damage(), 0)
+      {entity, _events} = Aura.apply_spell(entity, 1, 60, protection(:mod_damage_percent_taken, 1, -50), 0)
+      shield = %{protection(:school_absorb, 1, 30) | id: 3}
+      {entity, _events} = Aura.apply_spell(entity, 1, 60, shield, 0)
+      {entity, events} = Aura.tick(entity, 1_000)
+      assert entity.unit.health == 980
+      assert [%Effects.SpellDamage{damage: 50, absorbed: 30}] = events
+    end
+
     test "delayed ticks advance once and final ticks expire", %{entity: entity} do
       {entity, _events} = Aura.apply_spell(entity, 2, 60, damage(), 0)
       {entity, events} = Aura.tick(entity, 3_500)

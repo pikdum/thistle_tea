@@ -67,23 +67,31 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
     entity
   end
 
-  def take_damage_with_absorb(entity, damage, now, opts \\ [])
+  def take_damage_with_absorb(entity, damage, now, opts \\ []) do
+    {entity, _damage, absorbed} = take_damage_with_mitigation(entity, damage, now, opts)
+    {entity, absorbed}
+  end
 
-  def take_damage_with_absorb(%{internal: %Internal{godmode: true}} = entity, _damage, _now, _opts), do: {entity, 0}
+  @doc "Returns the updated entity, damage after received modifiers and redirection, and absorbed damage."
+  def take_damage_with_mitigation(entity, damage, now, opts \\ [])
 
-  def take_damage_with_absorb(entity, damage, now, opts) when is_number(damage) and damage > 0 and is_integer(now) do
+  def take_damage_with_mitigation(%{internal: %Internal{godmode: true}} = entity, _damage, _now, _opts),
+    do: {entity, 0, 0}
+
+  def take_damage_with_mitigation(entity, damage, now, opts)
+      when is_number(damage) and damage > 0 and is_integer(now) do
     if DamageImmunity.immune?(entity, Keyword.get(opts, :school, :physical), Keyword.get(opts, :spell)) do
-      {entity, damage}
+      {entity, damage, damage}
     else
       take_unblocked_damage(entity, damage, now, opts)
     end
   end
 
-  def take_damage_with_absorb(entity, _damage, _now, _opts), do: {entity, 0}
+  def take_damage_with_mitigation(entity, _damage, _now, _opts), do: {entity, 0, 0}
 
   defp take_unblocked_damage(%{unit: %Unit{health: health}} = entity, damage, now, opts) do
     if spirit_damage_immune?(entity, opts) do
-      {entity, damage}
+      {entity, damage, damage}
     else
       entity = PlayerCombat.mark_hostile_contact(entity, Keyword.get(opts, :source), now)
       school = Keyword.get(opts, :school, :physical)
@@ -120,11 +128,11 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
         |> mark_broadcast_update()
         |> maybe_dead(now)
 
-      {entity, absorbed}
+      {entity, damage, absorbed}
     end
   end
 
-  defp take_unblocked_damage(entity, _damage, _now, _opts), do: {entity, 0}
+  defp take_unblocked_damage(entity, _damage, _now, _opts), do: {entity, 0, 0}
 
   defp mitigate_damage(entity, damage, school, now, opts) do
     if Keyword.get(opts, :environmental?, false) do
