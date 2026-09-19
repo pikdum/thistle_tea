@@ -229,8 +229,9 @@ defmodule ThistleTea.Game.Entity.Data.Component.Player do
     field_combo_target: {0x02CA, 2, :guid, :private},
     xp: {0x02CC, 1, :int, :private},
     next_level_xp: {0x02CD, 1, :int, :private},
-    skill_info: {0x02CE, 384, {:fn, [:skills], &__MODULE__.skill_info/1}, :private},
+    skill_info: {0x02CE, 384, {:fn, [:skills, :skill_bonuses], &__MODULE__.skill_info/1}, :private},
     skills: {:virtual, %{}},
+    skill_bonuses: {:virtual, %{}},
     character_points1: {0x044E, 1, :int, :private},
     character_points2: {0x044F, 1, :int, :private},
     track_creatures: {0x0450, 1, :int, :private},
@@ -330,7 +331,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.Player do
     ])
   end
 
-  def skill_info(%{skills: skills}), do: Skills.encode(skills)
+  def skill_info(%{skills: skills, skill_bonuses: bonuses}), do: Skills.encode(skills, bonuses)
 
   def bytes_3(%{
         gender: gender,

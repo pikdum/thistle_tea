@@ -85,6 +85,14 @@ defmodule ThistleTea.Game.Entity.Logic.SkillsTest do
   end
 
   describe "encode/1" do
+    test "encodes signed skill modifiers separately from learned progress" do
+      skills = %{95 => %{value: 250, max: 250}}
+
+      assert <<95::little-size(32), 250::little-size(16), 250::little-size(16), -5::little-signed-size(16),
+               3::little-signed-size(16), _rest::binary>> =
+               Skills.encode(skills, %{95 => {-5, 3}})
+    end
+
     test "packs id, value, and max into 128 twelve-byte slots" do
       skills = %{43 => Skills.new_entry(:level, false, 2)}
 

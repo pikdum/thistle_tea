@@ -40,19 +40,31 @@ defmodule ThistleTea.Game.Entity.Logic.Skills do
 
   def defense_value(%{player: %{skills: skills}, unit: %{level: level}} = entity) do
     base = value(skills, @defense_skill, max_for_level(level || 1))
-
-    bonus =
-      [:mod_skill, :mod_skill_talent]
-      |> Enum.flat_map(&Aura.auras_of_type(entity, &1))
-      |> Enum.filter(&(&1.misc_value == @defense_skill and is_integer(&1.amount)))
-      |> Enum.reduce(0, &(&1.amount + &2))
-
-    max(base + bonus, 0)
+    {temporary, permanent} = Map.get(bonuses(entity), @defense_skill, {0, 0})
+    max(base + temporary + permanent, 0)
   end
 
   def defense_value(%{unit: %{level: level}}), do: max_for_level(level || 1)
   def unarmed_skill, do: @unarmed_skill
   def fishing_skill, do: @fishing_skill
+
+  def bonuses(entity) do
+    for type <- [:mod_skill, :mod_skill_talent],
+        aura <- Aura.auras_of_type(entity, type),
+        is_integer(aura.misc_value) and is_integer(aura.amount),
+        reduce: %{} do
+      acc -> add_skill_bonus(acc, aura)
+    end
+  end
+
+  defp add_skill_bonus(acc, aura) do
+    {temporary, permanent} = Map.get(acc, aura.misc_value, {0, 0})
+
+    bonus =
+      if aura.type == :mod_skill, do: {temporary + aura.amount, permanent}, else: {temporary, permanent + aura.amount}
+
+    Map.put(acc, aura.misc_value, bonus)
+  end
 
   def weapon_skill_for_subclass(subclass), do: Map.get(@weapon_subclass_skills, subclass)
 
@@ -150,13 +162,18 @@ defmodule ThistleTea.Game.Entity.Logic.Skills do
 
   def learn_rank(skills, _skill_id, _skill_max), do: skills
 
-  def encode(skills) when is_map(skills) and map_size(skills) > 0 do
+  def encode(skills, bonuses \\ %{})
+
+  def encode(skills, bonuses) when is_map(skills) and map_size(skills) > 0 do
     entries =
       skills
       |> Enum.sort_by(fn {id, _entry} -> id end)
       |> Enum.take(@max_skill_entries)
       |> Enum.map(fn {id, entry} ->
-        <<id::little-size(32), entry.value::little-size(16), entry.max::little-size(16), 0::size(32)>>
+        {temporary, permanent} = Map.get(bonuses, id, {0, 0})
+
+        <<id::little-size(32), entry.value::little-size(16), entry.max::little-size(16),
+          temporary::little-signed-size(16), permanent::little-signed-size(16)>>
       end)
       |> IO.iodata_to_binary()
 
@@ -164,7 +181,7 @@ defmodule ThistleTea.Game.Entity.Logic.Skills do
     entries <> <<0::size(padding * 8)>>
   end
 
-  def encode(_skills), do: nil
+  def encode(_skills, _bonuses), do: nil
 
   def combat_skill_up(skills, skill_id, opts) when is_map(skills) do
     player_level = Keyword.fetch!(opts, :player_level)

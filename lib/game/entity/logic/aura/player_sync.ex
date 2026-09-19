@@ -7,13 +7,15 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.PlayerSync do
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Logic.CombatRatings
+  alias ThistleTea.Game.Entity.Logic.Skills
 
   def sync(%Character{unit: %{auras: holders}, player: %Player{}} = character) when is_list(holders) do
     track_stealthed? = Enum.any?(holders, &Holder.has_aura_type?(&1, :track_stealthed))
 
     player = %{
       character.player
-      | track_creatures: tracking_mask(holders, :track_creatures),
+      | skill_bonuses: Skills.bonuses(character),
+        track_creatures: tracking_mask(holders, :track_creatures),
         track_resources: tracking_mask(holders, :track_resources),
         field_bytes_flags: put_flag(character.player.field_bytes_flags, 0x02, track_stealthed?)
     }

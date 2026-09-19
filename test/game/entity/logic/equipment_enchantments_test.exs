@@ -20,6 +20,17 @@ defmodule ThistleTea.Game.Entity.Logic.EquipmentEnchantmentsTest do
   setup [:equipment]
 
   describe "sync/4" do
+    test "projects skill enchant bonuses and clears them on removal", %{character: character, enchants: [entry | _]} do
+      {slot, item, enchant_slot, enchantment} = entry
+      enchantment = %{enchantment | effects: [%{type: 3, spell_id: 3}]}
+      spell = %Spell{id: 3, effects: [%Effect{type: :apply_aura, aura: :mod_skill, misc_value: 95, base_points: 1}]}
+      equipped = EquipmentEnchantments.sync(character, [{slot, item, enchant_slot, enchantment}], fn 3 -> spell end, 0)
+      assert equipped.player.skill_bonuses == %{95 => {1, 0}}
+      assert equipped.player.skills == character.player.skills
+      removed = EquipmentEnchantments.sync(equipped, [], fn _ -> nil end, 100)
+      assert removed.player.skill_bonuses == %{}
+    end
+
     test "stacks identical enchants by source and removes only unequipped sources", %{
       character: character,
       enchants: enchants,
