@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
   alias ThistleTea.Game.Entity.Logic.PetHappiness
   alias ThistleTea.Game.Entity.Logic.Skills
   alias ThistleTea.Game.Entity.Logic.TargetAttackPower
+  alias ThistleTea.Game.Entity.Logic.TargetDamage
   alias ThistleTea.Game.Entity.Logic.TargetSpellPower
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Critical
@@ -73,6 +74,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
     conditional_crit_modifiers: [],
     damage_done_versus: [],
     target_attack_power: %{},
+    target_damage: [],
     crit_damage_versus: [],
     spell_damage_bonus: %{},
     spell_damage_versus: [],
@@ -110,6 +112,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
       happiness_multiplier: PetHappiness.damage_multiplier(caster),
       damage_done_versus: Aura.misc_amounts(caster, :mod_damage_done_versus),
       target_attack_power: TargetAttackPower.snapshot(caster),
+      target_damage: TargetDamage.snapshot(caster),
       crit_damage_versus: Aura.misc_amounts(caster, :mod_crit_percent_versus),
       effect_damage_multiplier: effect_multiplier(caster, spell, [:all_effects, :damage]),
       effect_healing_multiplier: healing_done_multiplier(caster, spell),

@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
   alias ThistleTea.Game.Entity.Logic.DiminishingReturns
   alias ThistleTea.Game.Entity.Logic.EffectImmunity
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Logic.TargetDamage
   alias ThistleTea.Game.Entity.Logic.TargetSpellPower
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
@@ -599,7 +600,8 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
 
   defp periodic_benefit(entity, %Spell{} = spell, %Effect{aura: aura} = effect, %CastContext{} = context)
        when aura in [:periodic_damage, :periodic_leech] do
-    Coefficient.bonus(TargetSpellPower.benefit(entity, context, spell), spell, effect, :dot)
+    Coefficient.bonus(TargetSpellPower.benefit(entity, context, spell), spell, effect, :dot) +
+      TargetDamage.spell_bonus(entity, context.target_damage, spell, effect, :dot)
   end
 
   defp periodic_benefit(_entity, %Spell{} = spell, %Effect{aura: :periodic_heal} = effect, %CastContext{} = context) do

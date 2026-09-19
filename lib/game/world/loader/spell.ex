@@ -644,6 +644,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp aura_type(56), do: :transform
   defp aura_type(57), do: :mod_spell_crit_chance
   defp aura_type(58), do: :mod_increase_swim_speed
+  defp aura_type(59), do: :mod_damage_done_creature
   defp aura_type(60), do: :mod_pacify_silence
   defp aura_type(61), do: :mod_scale
   defp aura_type(64), do: :periodic_mana_leech
@@ -842,6 +843,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
     |> add_if(attrs_ex3, 0x00000020, :no_durability_loss)
     |> add_if(attrs_ex3, 0x00100000, :death_persistent)
     |> add_if(attrs_ex3, 0x10000000, :ignore_caster_and_target_restrictions)
+    |> add_if(attrs_ex3, 0x20000000, :ignore_caster_modifiers)
     |> add_if(attrs_ex3, @dot_stacking_rule_ex3, :dot_stacking_rule)
   end
 

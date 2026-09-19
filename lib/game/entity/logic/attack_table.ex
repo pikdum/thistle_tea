@@ -23,6 +23,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
   alias ThistleTea.Game.Entity.Logic.PetHappiness
   alias ThistleTea.Game.Entity.Logic.Skills
   alias ThistleTea.Game.Entity.Logic.TargetAttackPower
+  alias ThistleTea.Game.Entity.Logic.TargetDamage
   alias ThistleTea.Game.Math
 
   @hitinfo_affects_victim 0x2
@@ -51,6 +52,8 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
   @armor_reduction_cap 0.75
 
   def attacker_context(%{unit: %Unit{} = unit} = attacker) do
+    multipliers = attack_damage_multipliers(attacker)
+
     %{
       caster_level: unit.level || 1,
       caster_owner_guid: caster_owner_guid(attacker),
@@ -62,7 +65,9 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
       caster_position: attacker_position(attacker),
       damage_done_versus: Aura.misc_amounts(attacker, :mod_damage_done_versus),
       target_attack_power: TargetAttackPower.snapshot(attacker),
-      attack_power_damage: attack_power_damage(attacker),
+      target_damage: TargetDamage.snapshot(attacker),
+      attack_damage_multipliers: multipliers,
+      attack_power_damage: attack_power_damage(unit, multipliers),
       crit_damage_versus: Aura.misc_amounts(attacker, :mod_crit_percent_versus)
     }
   end
@@ -73,15 +78,22 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
   defp caster_owner_guid(%{object: %{guid: guid}}) when is_integer(guid), do: guid
   defp caster_owner_guid(_attacker), do: nil
 
-  defp attack_power_damage(%{unit: %Unit{} = unit} = attacker) do
+  defp attack_damage_multipliers(attacker) do
     multiplier =
       Aura.percent_multiplier(attacker, :mod_damage_percent_done, 1) * PetHappiness.damage_multiplier(attacker)
 
     offhand = 0.5 * max(100 + Aura.flat_amount(attacker, :mod_offhand_damage_pct), 0) / 100
 
     %{
-      mainhand: (unit.base_attack_time || 2_000) / 14_000 * multiplier * Disarm.damage_multiplier(attacker),
-      offhand: (unit.offhand_attack_time || 2_000) / 14_000 * multiplier * offhand
+      mainhand: multiplier * Disarm.damage_multiplier(attacker),
+      offhand: multiplier * offhand
+    }
+  end
+
+  defp attack_power_damage(unit, multipliers) do
+    %{
+      mainhand: (unit.base_attack_time || 2_000) / 14_000 * multipliers.mainhand,
+      offhand: (unit.offhand_attack_time || 2_000) / 14_000 * multipliers.offhand
     }
   end
 
@@ -93,13 +105,20 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
 
   def resolve(defender, attack, damage, opts \\ []) when is_map(attack) do
     ctx = context(defender, attack)
-    damage = scale_versus_damage(ctx, max(trunc(damage + target_attack_power_damage(defender, attack)), 0))
+    bonus = target_attack_power_damage(defender, attack) + target_damage(defender, attack)
+    damage = scale_versus_damage(ctx, max(trunc(damage + bonus), 0))
     damage = AttackDamageTaken.amount(defender, damage, if(ctx.ranged?, do: :ranged, else: :melee))
     roll = Keyword.get_lazy(opts, :roll, fn -> Math.random_int(0, 9_999) end)
     outcome = roll_outcome(ctx, roll)
     result = apply_outcome(outcome, ctx, damage, opts)
 
     Map.put(result, :pre_armor_damage, reconstruct_pre_armor_damage(ctx, damage, result.damage))
+  end
+
+  defp target_damage(defender, attack) do
+    hand = if Map.get(attack, :offhand?, false), do: :offhand, else: :mainhand
+    multiplier = attack |> Map.get(:attack_damage_multipliers, %{}) |> Map.get(hand, 1.0)
+    TargetDamage.bonus(defender, Map.get(attack, :target_damage, [])) * multiplier
   end
 
   def roll_special(defender, attack, opts \\ []) when is_map(attack) do

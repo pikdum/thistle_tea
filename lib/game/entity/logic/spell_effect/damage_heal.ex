@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
   alias ThistleTea.Game.Entity.Logic.Rogue
   alias ThistleTea.Game.Entity.Logic.SpellResist
   alias ThistleTea.Game.Entity.Logic.TargetAttackPower
+  alias ThistleTea.Game.Entity.Logic.TargetDamage
   alias ThistleTea.Game.Entity.Logic.TargetSpellPower
   alias ThistleTea.Game.Entity.Logic.Threat
   alias ThistleTea.Game.Entity.Logic.Warlock
@@ -38,7 +39,8 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
           {state, []}
 
         Spell.melee_ability?(spell) ->
-          melee_ability_damage(state, context, spell, school_damage_roll(context, spell, effect), now, effect)
+          damage = school_damage_roll(context, spell, effect) + target_damage_bonus(state, context, spell, effect)
+          melee_ability_damage(state, context, spell, damage, now, effect)
 
         true ->
           apply_damage_effect(state, context, spell, effect, now)
@@ -124,13 +126,20 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
       |> Enum.filter(&(&1.type == :weapon_percent_damage))
       |> Enum.reduce(1.0, fn effect, acc -> acc * rolled_amount(spell, effect, context) / 100 end)
 
-    bonus = target_attack_power_damage(state, context, spell, effects)
+    bonus =
+      target_attack_power_damage(state, context, spell, effects) +
+        TargetDamage.weapon_bonus(state, context.target_damage, spell)
+
     melee_ability_damage(state, context, spell, max(trunc((base + flat) * percent + bonus), 0), now)
   end
 
   def execute(state, %CastContext{} = context, spell, %Effect{} = effect, now) do
     rage = context.caster_power || 0
-    damage = rolled_amount(spell, effect, context) + trunc(rage * effect.damage_multiplier)
+
+    damage =
+      rolled_amount(spell, effect, context) + trunc(rage * effect.damage_multiplier) +
+        target_damage_bonus(state, context, spell, effect)
+
     damage_spell = %{spell | id: Scripts.execute_damage_spell_id()}
 
     {state, events} = melee_ability_damage(state, context, damage_spell, damage, now, effect)
@@ -300,8 +309,13 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
     if Keyword.get(opts, :periodic?, false) do
       0
     else
-      Coefficient.bonus(TargetSpellPower.benefit(state, context, spell), spell, effect, :direct)
+      Coefficient.bonus(TargetSpellPower.benefit(state, context, spell), spell, effect, :direct) +
+        target_damage_bonus(state, context, spell, effect)
     end
+  end
+
+  defp target_damage_bonus(state, context, spell, effect) do
+    TargetDamage.spell_bonus(state, context.target_damage, spell, effect, :direct)
   end
 
   defp school_atom(%Spell{school: school}) when is_atom(school), do: school
