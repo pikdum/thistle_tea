@@ -2,6 +2,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgCharEnum do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :CMSG_CHAR_ENUM
 
+  alias ThistleTea.Game.Entity.Data.Item
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Message.SmsgCharEnum.Character
   alias ThistleTea.Game.Network.Message.SmsgCharEnum.CharacterGear
@@ -49,7 +50,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgCharEnum do
           item_entries
           |> Enum.map(fn entry ->
             if is_integer(entry) and entry > 0 do
-              item = ItemLoader.get_template(entry)
+              item = ItemLoader.get_template(Item.visible_entry(entry))
 
               # credo:disable-for-next-line Credo.Check.Refactor.Nesting
               if item do

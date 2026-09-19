@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.Entity.Logic.Skills do
   from combat use, `:tier` skills use their trained profession cap, `:mono`
   skills stay 1/1, and `:language` skills stay 300/300.
   """
+  alias ThistleTea.Game.Entity.Data.Item
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Experience
 
@@ -69,7 +70,7 @@ defmodule ThistleTea.Game.Entity.Logic.Skills do
 
   defp equipped_weapon_skill(entry, get_template, fallback) do
     with entry when is_integer(entry) and entry > 0 <- entry,
-         %{class: 2, subclass: subclass} <- get_template.(entry),
+         %{class: 2, subclass: subclass} <- get_template.(Item.visible_entry(entry)),
          skill when is_integer(skill) <- weapon_skill_for_subclass(subclass) do
       skill
     else

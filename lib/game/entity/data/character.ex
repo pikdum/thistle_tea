@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.Entity.Data.Character do
   """
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Data.Item
   alias ThistleTea.Game.Entity.Data.ItemTemplate
   alias ThistleTea.Game.Entity.Logic.CombatRatings
   alias ThistleTea.Game.Entity.Logic.Companion
@@ -68,7 +69,7 @@ defmodule ThistleTea.Game.Entity.Data.Character do
 
   defp sync_offhand_inputs(%__MODULE__{unit: %Unit{} = unit, player: %Player{visible_item_17_0: entry}} = character) do
     weapon =
-      case is_integer(entry) and entry > 0 and ItemLoader.get_template(entry) do
+      case is_integer(entry) and entry > 0 and ItemLoader.get_template(Item.visible_entry(entry)) do
         %ItemTemplate{class: @item_class_weapon} = template -> template
         _ -> nil
       end
@@ -96,7 +97,7 @@ defmodule ThistleTea.Game.Entity.Data.Character do
   end
 
   defp mainhand_weapon(%__MODULE__{player: %Player{visible_item_16_0: entry}}) when is_integer(entry) and entry > 0 do
-    ItemLoader.get_template(entry)
+    ItemLoader.get_template(Item.visible_entry(entry))
   end
 
   defp mainhand_weapon(%__MODULE__{}), do: nil
@@ -105,7 +106,7 @@ defmodule ThistleTea.Game.Entity.Data.Character do
          %__MODULE__{unit: %Unit{} = unit, player: %Player{visible_item_18_0: entry, ammo_id: ammo_id}} = character
        ) do
     weapon =
-      case is_integer(entry) and entry > 0 and ItemLoader.get_template(entry) do
+      case is_integer(entry) and entry > 0 and ItemLoader.get_template(Item.visible_entry(entry)) do
         %ItemTemplate{class: @item_class_weapon} = template -> template
         _ -> nil
       end

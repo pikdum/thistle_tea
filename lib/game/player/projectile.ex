@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.Player.Projectile do
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Player
+  alias ThistleTea.Game.Entity.Data.Item
   alias ThistleTea.Game.Entity.Data.ItemTemplate
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
@@ -33,7 +34,7 @@ defmodule ThistleTea.Game.Player.Projectile do
   def fields(_entity, _spell), do: none()
 
   defp projectile_fields(weapon_id, ammo_id) do
-    case ItemLoader.get_cached_template(weapon_id) do
+    case ItemLoader.get_cached_template(Item.visible_entry(weapon_id)) do
       %ItemTemplate{inventory_type: 25} = thrown -> present(thrown)
       %ItemTemplate{} -> ammo_id |> ItemLoader.get_cached_template() |> present()
       _missing_weapon -> present(nil)

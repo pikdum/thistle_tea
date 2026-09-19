@@ -16,6 +16,16 @@ defmodule ThistleTea.Game.Entity.Logic.SkillsTest do
   end
 
   describe "ranged_weapon_skill/2" do
+    test "reads weapon skills independently of permanent and temporary enchants" do
+      packed = 100 + Bitwise.bsl(1900, 32) + Bitwise.bsl(263, 64)
+      player = %{visible_item_16_0: packed, visible_item_17_0: packed, visible_item_18_0: packed}
+      get_template = fn 100 -> %{class: 2, subclass: 7} end
+
+      assert Skills.main_hand_weapon_skill(player, get_template) == 43
+      assert Skills.off_hand_weapon_skill(player, get_template) == 43
+      assert Skills.ranged_weapon_skill(player, get_template) == 43
+    end
+
     test "uses the equipped ranged weapon subclass" do
       player = %{visible_item_18_0: 100}
       get_template = fn 100 -> %{class: 2, subclass: 2} end

@@ -96,6 +96,9 @@ defmodule ThistleTea.Game.Entity.Data.Item do
     object.entry ||| permanent <<< 32 ||| temporary <<< 64
   end
 
+  def visible_entry(value) when is_integer(value), do: value &&& 0xFFFFFFFF
+  def visible_entry(_value), do: nil
+
   defp put_internal_enchantments(%__MODULE__{internal: internal} = item, enchantments) do
     %{item | internal: Map.put(internal, :enchantments, enchantments)}
   end

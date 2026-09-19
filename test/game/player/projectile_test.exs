@@ -34,6 +34,9 @@ defmodule ThistleTea.Game.Player.ProjectileTest do
 
       assert Projectile.fields(character, auto_shot) == expected
       assert Projectile.fields(character, 75) == expected
+
+      enchanted = %{character | player: %{character.player | visible_item_18_0: weapon_id + Bitwise.bsl(32, 32)}}
+      assert Projectile.fields(enchanted, 75) == expected
     end
 
     test "uses the ranged weapon itself for thrown attacks" do
