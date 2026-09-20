@@ -61,7 +61,7 @@ defmodule ThistleTea.Game.World.SpellMagnets do
       Enum.find_value(recipient.magnets, fn protection ->
         source = source_magnet(state, protection)
 
-        if ((active?(protection, now) and source) && active?(source, now)) and
+        if is_map(source) and active?(protection, now) and active?(source, now) and
              valid_target?(caster, spell, target_guid, source) do
           source
         end

@@ -96,7 +96,11 @@ defmodule ThistleTea.Game.World.SpellMagnetsTest do
       assert SpellMagnets.redirect(caster, spell, target) == target
       SpellMagnets.sync(target, self(), [magnet])
       SpellMagnets.sync(totem, self(), [])
-      assert SpellMagnets.redirect(caster, spell, target) == target
+
+      assert ExUnit.CaptureLog.capture_log(fn ->
+               assert SpellMagnets.redirect(caster, spell, target) == target
+             end) == ""
+
       SpellMagnets.sync(totem, self(), [%{magnet | expires_at: Time.now() - 1}])
       assert SpellMagnets.redirect(caster, spell, target) == target
       SpellMagnets.sync(totem, self(), [magnet])
