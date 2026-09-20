@@ -482,6 +482,10 @@ defmodule ThistleTea.Game.World.SpawnPool do
   end
 
   defp member_key(%Mob{internal: %Internal{creature: creature}}), do: {:creature, creature.db_guid}
+
+  defp member_key(%GameObject{internal: %Internal{spawn: %Spawn{pool_member: {:game_object, _id} = member}}}),
+    do: member
+
   defp member_key(%GameObject{object: object}), do: {:game_object, Bitwise.band(object.guid, 0x00FFFFFF)}
 
   defp game_object_group(%GameObject{} = blueprint) do

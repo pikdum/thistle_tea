@@ -17,6 +17,33 @@ defmodule ThistleTea.Game.World.SpawnPoolTest do
   alias ThistleTea.Game.WorldRef
 
   describe "singleton lifecycle" do
+    test "retains database identity across instance refreshes and repeated suspension" do
+      db_guid = 8_000_000 + System.unique_integer([:positive])
+      guid = Guid.from_low_guid(:game_object, 1, db_guid)
+      group = {:singleton, :game_object, db_guid}
+      world = WorldRef.instance(489, System.unique_integer([:positive]))
+      key = {world, group}
+      member = {:game_object, db_guid}
+      on_exit(fn -> SpawnPool.stop_world(world) end)
+
+      :ok = SpawnPool.activate(group, {world, 0, 0}, game_object(guid))
+      [{pool, _value}] = Registry.lookup(SpawnPool.Registry, key)
+      {first_pid, _monitor} = :sys.get_state(pool).running[member]
+      runtime_guid = :sys.get_state(first_pid).object.guid
+      refute runtime_guid == guid
+
+      Enum.reduce(1..3, first_pid, fn _cycle, previous_pid ->
+        GenServer.cast(pool, {:refresh, []})
+        assert SpawnPool.status(key) == %{selected: MapSet.new([member]), running: [member]}
+        assert EntityRegistry.whereis(runtime_guid) == previous_pid
+
+        SpawnPool.suspend_game_object(world, db_guid)
+        await_absent(runtime_guid)
+        SpawnPool.resume_game_object(world, db_guid)
+        await_replacement(runtime_guid, previous_pid)
+      end)
+    end
+
     test "recycles a persistent entity into a fresh process" do
       low_guid = System.unique_integer([:positive])
       guid = Guid.from_low_guid(:game_object, 1, low_guid)
