@@ -128,6 +128,7 @@ nix develop .#wow-tools            # shell with all of the above + sqlite + mari
 - underwater breath timers, drowning, water-breathing effects, and extended breath reserves
 - swimming speed bonuses and snare updates, synchronized with the player and nearby observers
 - gossip + trainers
+- [Innkeeper home binding](docs/home-binding-playtest.md), with confirmation, retained home locations, Hearthstones, Astral Recall, and replacement Hearthstones
 - chests, fishing, and chairs
 - resource tracking for herbs, minerals, and treasure, with exclusive tracking modes
 - mail
