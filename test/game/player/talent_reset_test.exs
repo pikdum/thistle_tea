@@ -112,6 +112,7 @@ defmodule ThistleTea.Game.Player.TalentResetTest do
       assert mail.item_guid == weapon.object.guid
       assert mail.sender == state.guid
       assert mail.stationery == 61
+      assert mail.deliver_at <= ThistleTea.Game.Time.now()
       PostOffice.acknowledge(state.guid, token, [mail.id])
       assert :ok = PostOffice.close(state.guid, token, [])
       assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgDestroyObject{guid: guid}}}

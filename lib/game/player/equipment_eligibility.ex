@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.Player.EquipmentEligibility do
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.InventoryUpdate
   alias ThistleTea.Game.Network.Message
+  alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.PostOffice
 
@@ -59,6 +60,7 @@ defmodule ThistleTea.Game.Player.EquipmentEligibility do
         sender_type: :normal,
         subject: "Not equipped item",
         stationery: 61,
+        deliver_at: Time.now(),
         item_guid: item.object.guid,
         checked: Mail.checked_copied()
       })
