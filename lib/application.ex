@@ -21,6 +21,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.World.InstanceData
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.AreaTrigger, as: AreaTriggerLoader
+  alias ThistleTea.Game.World.Loader.AuctionHouse, as: AuctionHouseLoader
   alias ThistleTea.Game.World.Loader.BankBagSlotPrice, as: BankBagSlotPriceLoader
   alias ThistleTea.Game.World.Loader.Battleground, as: BattlegroundLoader
   alias ThistleTea.Game.World.Loader.BroadcastText, as: BroadcastTextLoader
@@ -160,6 +161,7 @@ defmodule ThistleTea.Application do
     ItemEnchantmentLoader.init()
     ItemSetLoader.init()
     DurabilityLoader.init()
+    AuctionHouseLoader.init()
     ItemStore.init()
     CharacterStore.init()
     HonorStore.init()
@@ -264,6 +266,7 @@ defmodule ThistleTea.Application do
         BankBagSlotPriceLoader.load_all()
         StableSlotPriceLoader.load_all()
         DurabilityLoader.load_all()
+        AuctionHouseLoader.load_all()
         PetLevelLoader.load_all()
         BattlegroundLoader.load_all()
 
