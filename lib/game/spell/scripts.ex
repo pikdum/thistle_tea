@@ -78,6 +78,9 @@ defmodule ThistleTea.Game.Spell.Scripts do
   @tame_beast_completion 13_535
   @tame_beast_ownership 13_481
 
+  def channel_trigger_spell_id(%Spell{id: 1515}, @tame_beast_completion), do: @tame_beast_ownership
+  def channel_trigger_spell_id(_spell, trigger_spell_id), do: trigger_spell_id
+
   def successful_finish_trigger(%Spell{} = spell), do: Priest.holy_nova_heal_id(spell)
   def successful_finish_trigger(_spell), do: nil
 

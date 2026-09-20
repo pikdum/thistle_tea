@@ -209,7 +209,7 @@ defmodule ThistleTea.Game.Entity.Logic.CastingTest do
       assert {:finished, mob} = Casting.advance(mob, 21_000)
       assert mob.internal.casting == nil
 
-      assert [%Effects.TriggerSpell{spell_id: 13_535}, %Effects.ChannelUpdate{channel_time_ms: 0}] =
+      assert [%Effects.TriggerSpell{spell_id: 13_481}, %Effects.ChannelUpdate{channel_time_ms: 0}] =
                mob.internal.events
 
       assert {:idle, ^mob} = Casting.advance(mob, 21_100)
@@ -217,7 +217,7 @@ defmodule ThistleTea.Game.Entity.Logic.CastingTest do
 
     test "delivers the final channel tick when the scheduled callback runs late" do
       assert {:finished, mob} = Casting.advance(final_channel_tick_fixture(), 21_050)
-      assert Enum.count(mob.internal.events, &match?(%Effects.TriggerSpell{spell_id: 13_535}, &1)) == 1
+      assert Enum.count(mob.internal.events, &match?(%Effects.TriggerSpell{spell_id: 13_481}, &1)) == 1
     end
 
     test "does not deliver a tick beyond a shortened channel deadline" do

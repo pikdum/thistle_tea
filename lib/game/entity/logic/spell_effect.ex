@@ -27,6 +27,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Effect
+  alias ThistleTea.Game.Spell.Scripts
   alias ThistleTea.Game.Spell.Semantics
 
   @resurrect_effects [:resurrect, :resurrect_new]
@@ -298,8 +299,10 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   defp apply_one_effect(target, context, effect, events, applied, now) do
     cond do
       channel_ticked_trigger?(context.spell, effect) ->
+        spell_id = Scripts.channel_trigger_spell_id(context.spell, effect.trigger_spell_id)
+
         event =
-          Effects.trigger_spell(context.caster_guid, context.caster_level, target.object.guid, effect.trigger_spell_id)
+          Effects.trigger_spell(context.caster_guid, context.caster_level, target.object.guid, spell_id)
 
         {target, events ++ [event], applied}
 

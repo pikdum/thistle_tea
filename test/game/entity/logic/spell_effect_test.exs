@@ -23,6 +23,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
   alias ThistleTea.Game.Spell.Critical.Modifier
   alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.Spell.ProcRule
+  alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.WorldRef
 
   defp target_fixture do
@@ -1075,6 +1076,23 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
 
       assert [%Effects.TriggerSpell{source_guid: 99, target_guid: target_guid, spell_id: 13_481}] = events
       assert target_guid == target.object.guid
+    end
+
+    @tag :dbc_db
+    test "the DBC Tame Beast channel delivers ownership to the wild creature" do
+      spell = SpellLoader.load(1515)
+      tick_spell = %{spell | effects: Spell.channel_ticked_effects(spell)}
+      target = target_fixture()
+      target = %{target | object: %{target.object | entry: 113}, unit: %{target.unit | level: 6}}
+      context = %CastContext{caster_guid: 99, caster_level: 10, target_role: :other}
+
+      assert {_target, [%Effects.TriggerSpell{spell_id: 13_481, target_guid: 1}]} =
+               SpellEffect.receive(target, context, tick_spell, 21_000)
+
+      ownership = SpellLoader.load(13_481)
+
+      assert {_target, [%Effects.TameCreature{source_guid: 99, entry: 113}]} =
+               SpellEffect.receive(target, context, ownership, 21_000)
     end
 
     test "call, revive, and dismiss use the stable hunter pet entry" do
