@@ -44,37 +44,7 @@ defmodule ThistleTea.Game.Network.InventoryUpdate do
     Enum.each(destroyed, fn item -> ItemStore.delete(item.object.guid) end)
     Enum.each(changed ++ placed, &ItemStore.put/1)
 
-    character =
-      %{state.character | player: change_set.player}
-      |> Character.sync_equipment_stats()
-      |> store_character()
-
-    state =
-      state
-      |> Map.put(:character, character)
-      |> Quests.on_inventory_changed(old_counts)
-
-    Enum.each(destroyed, fn item ->
-      Network.send_packet(%Message.SmsgDestroyObject{guid: item.object.guid})
-    end)
-
-    Enum.each(change_set.placements, fn
-      %Placement{status: :placed, item: %Item{} = item} ->
-        Network.send_packet(UpdateObject.from_item(item))
-
-      %Placement{} ->
-        :ok
-    end)
-
-    Enum.each(changed, fn item ->
-      item
-      |> UpdateObject.item_values_update()
-      |> Network.send_packet()
-    end)
-
-    state = sync_condition_subject(state)
-    broadcast_player(state)
-    state
+    apply_committed(state, change_set, old_counts)
   end
 
   def apply(state, {:ok, %{player: %Player{} = player, items: items} = result}, placement) do
@@ -113,6 +83,43 @@ defmodule ThistleTea.Game.Network.InventoryUpdate do
 
   def apply(state, {:error, error, item1_guid, item2_guid}, _placement) do
     send_failure(error, item1_guid, item2_guid)
+    state
+  end
+
+  def apply_committed(state, %ChangeSet{} = change_set, old_counts, outgoing \\ []) do
+    destroyed = ChangeSet.destroyed_items(change_set)
+    changed = ChangeSet.changed_items(change_set)
+
+    character =
+      %{state.character | player: change_set.player}
+      |> Character.sync_equipment_stats()
+      |> store_character()
+
+    state =
+      state
+      |> Map.put(:character, character)
+      |> Quests.on_inventory_changed(old_counts)
+
+    Enum.each(Enum.uniq(outgoing ++ Enum.map(destroyed, & &1.object.guid)), fn guid ->
+      Network.send_packet(%Message.SmsgDestroyObject{guid: guid})
+    end)
+
+    Enum.each(change_set.placements, fn
+      %Placement{status: :placed, item: %Item{} = item} ->
+        Network.send_packet(UpdateObject.from_item(item))
+
+      %Placement{} ->
+        :ok
+    end)
+
+    Enum.each(changed, fn item ->
+      item
+      |> UpdateObject.item_values_update()
+      |> Network.send_packet()
+    end)
+
+    state = sync_condition_subject(state)
+    broadcast_player(state)
     state
   end
 

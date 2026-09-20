@@ -5,6 +5,9 @@ defmodule ThistleTea.Game.World.ItemStore do
   """
   alias ThistleTea.Game.Entity.Data.Item
   alias ThistleTea.Game.Entity.Data.ItemTemplate
+  alias ThistleTea.Game.Entity.Data.Trade.Exchange
+  alias ThistleTea.Game.Entity.Data.Trade.Receipt
+  alias ThistleTea.Game.Entity.Logic.Inventory.ChangeSet
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
 
@@ -70,6 +73,43 @@ defmodule ThistleTea.Game.World.ItemStore do
 
   def delete(guid) when is_integer(guid) do
     :ets.delete(__MODULE__, guid)
+    :ok
+  end
+
+  def commit_trade(%Exchange{} = exchange, old_counts) do
+    receipts =
+      Enum.map(exchange.changes, fn {guid, changes} ->
+        receipt = %Receipt{
+          id: exchange.id,
+          guid: guid,
+          changes: changes,
+          outgoing: Map.fetch!(exchange.outgoing, guid),
+          old_counts: Map.fetch!(old_counts, guid)
+        }
+
+        {{:trade_pending, guid}, receipt}
+      end)
+
+    rows =
+      Enum.flat_map(exchange.changes, fn {_guid, changes} ->
+        removed = Enum.map(ChangeSet.destroyed_items(changes), &{&1.object.guid, nil})
+        written = Enum.map(ChangeSet.changed_items(changes) ++ ChangeSet.placed_items(changes), &{&1.object.guid, &1})
+        removed ++ written
+      end)
+
+    true = :ets.insert(__MODULE__, rows ++ receipts)
+    :ok
+  end
+
+  def pending_trade(guid) do
+    case :ets.lookup(__MODULE__, {:trade_pending, guid}) do
+      [{_key, %Receipt{} = receipt}] -> receipt
+      _ -> nil
+    end
+  end
+
+  def acknowledge_trade(%Receipt{guid: guid} = receipt) do
+    :ets.delete_object(__MODULE__, {{:trade_pending, guid}, receipt})
     :ok
   end
 

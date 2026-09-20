@@ -21,6 +21,8 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.Entity.Data.Corpse
   alias ThistleTea.Game.Entity.Data.Item, as: DataItem
   alias ThistleTea.Game.Entity.Data.PetProgress
+  alias ThistleTea.Game.Entity.Data.Trade.Decision
+  alias ThistleTea.Game.Entity.Data.Trade.Prepare
   alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.Logic.AI.BehaviorRunner
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
@@ -95,6 +97,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.Player.Spellcasting
   alias ThistleTea.Game.Player.Stats, as: PlayerStats
   alias ThistleTea.Game.Player.Taxi, as: PlayerTaxi
+  alias ThistleTea.Game.Player.Trade
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Modifiers
@@ -627,6 +630,14 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   end
 
   @impl GenServer
+  def handle_info(%Prepare{} = prepare, %State{} = state) do
+    {:noreply, Trade.prepare(state, prepare), {:continue, :maybe_broadcast_update}}
+  rescue
+    error -> {:stop, {:trade_failed, error}, state}
+  end
+
+  def handle_info(%Decision{}, %State{} = state), do: {:noreply, state}
+
   def handle_info(
         {:DOWN, token, :process, _pid, _reason},
         %State{companion_monitor: %CompanionMonitor{token: token}} = state

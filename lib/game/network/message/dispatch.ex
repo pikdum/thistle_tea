@@ -31,6 +31,16 @@ defmodule ThistleTea.Game.Network.Message.Dispatch do
                     |> Map.new(fn opcode -> {opcode, Message.MsgMove} end)
 
   @messages %{
+              CMSG_INITIATE_TRADE: Message.CmsgInitiateTrade,
+              CMSG_BEGIN_TRADE: Message.CmsgBeginTrade,
+              CMSG_ACCEPT_TRADE: Message.CmsgAcceptTrade,
+              CMSG_UNACCEPT_TRADE: Message.CmsgUnacceptTrade,
+              CMSG_CANCEL_TRADE: Message.CmsgCancelTrade,
+              CMSG_BUSY_TRADE: Message.CmsgBusyTrade,
+              CMSG_IGNORE_TRADE: Message.CmsgIgnoreTrade,
+              CMSG_SET_TRADE_GOLD: Message.CmsgSetTradeGold,
+              CMSG_SET_TRADE_ITEM: Message.CmsgSetTradeItem,
+              CMSG_CLEAR_TRADE_ITEM: Message.CmsgClearTradeItem,
               MSG_TALENT_WIPE_CONFIRM: Message.MsgTalentWipeConfirmClient,
               CMSG_AUTH_SESSION: Message.CmsgAuthSession,
               CMSG_CHAR_ENUM: Message.CmsgCharEnum,

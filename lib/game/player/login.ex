@@ -52,6 +52,7 @@ defmodule ThistleTea.Game.Player.Login do
   alias ThistleTea.Game.Player.Rest, as: PlayerRest
   alias ThistleTea.Game.Player.Spells, as: PlayerSpells
   alias ThistleTea.Game.Player.Stats, as: PlayerStats
+  alias ThistleTea.Game.Player.Trade
   alias ThistleTea.Game.Player.WorldStates
   alias ThistleTea.Game.Spell.Cooldowns
   alias ThistleTea.Game.Time
@@ -81,6 +82,7 @@ defmodule ThistleTea.Game.Player.Login do
 
     c =
       c
+      |> Trade.recover()
       |> restore_instance_world(character_guid)
       |> normalize_movement_state()
       |> normalize_combat_stats()
@@ -164,6 +166,7 @@ defmodule ThistleTea.Game.Player.Login do
     }
 
     state
+    |> Trade.finish_recovery()
     |> schedule_aura_tick()
     |> Mail.schedule_delivery()
     |> Quests.restore_timers()

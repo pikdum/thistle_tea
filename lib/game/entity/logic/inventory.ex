@@ -82,6 +82,7 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
     cant_equip_level_i: 1,
     item_doesnt_go_to_slot: 3,
     nonempty_bag_over_other_bag: 5,
+    cant_trade_equip_bags: 6,
     no_required_proficiency: 8,
     you_can_never_use_that_item: 10,
     cant_equip_with_twohanded: 13,
@@ -94,14 +95,17 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
     cant_drop_soulbound: 24,
     tried_to_split_more_than_count: 26,
     couldnt_split_items: 27,
+    not_enough_money: 29,
     not_a_bag: 30,
     can_only_do_with_empty_bags: 31,
+    dont_own_that_item: 32,
     must_purchase_that_bag_slot: 34,
     too_far_away_from_bank: 35,
     int_bag_error: 40,
     already_looted: 49,
     inventory_full: 50,
     bank_full: 51,
+    not_in_combat: 60,
     cant_equip_reputation: 64
   }
 
@@ -466,7 +470,7 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
       true ->
         pos = free_position(ctx, scope, item)
         item = put_stack_count(item, remaining)
-        ctx = put_pos(ctx, pos, item)
+        ctx = ctx |> mark_changed(item) |> put_pos(pos, item)
         {ctx, placed} = pop_changed(ctx, item)
         {:ok, result(ctx), {:placed, pos, placed}}
     end

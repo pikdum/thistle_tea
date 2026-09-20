@@ -30,6 +30,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
   alias ThistleTea.Game.World.System.Duel, as: DuelSystem
   alias ThistleTea.Game.World.System.Instance, as: InstanceSystem
   alias ThistleTea.Game.World.System.Party, as: PartySystem
+  alias ThistleTea.Game.World.System.Trade, as: TradeSystem
   alias ThistleTea.Game.World.Transports
   alias ThistleTea.Game.World.Visibility
   alias ThistleTea.Game.WorldRef
@@ -97,6 +98,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
 
     state =
       if state.guid && state.character do
+        TradeSystem.cancel(state.guid)
         DuelSystem.disconnect(state.guid)
         %{state | character: Dueling.abandon(state.character, Time.now())}
       else
