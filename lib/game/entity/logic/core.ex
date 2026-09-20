@@ -109,6 +109,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
       entity = enqueue_duel_outcome(entity, duel_outcome)
       entity = Aura.enqueue_death_item_rewards(entity, health, new_health)
       entity = HonorCombat.on_damage(entity, health, remaining, new_health, now, opts)
+      entity = maybe_enqueue_player_defeat(entity, health, new_health, opts)
 
       entity =
         if remaining > 0 do
@@ -413,6 +414,15 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
   defp spirit_damage_immune?(entity, opts) do
     Keyword.get(opts, :spell_id) != @spirit_of_redemption_suicide and holder_spell?(entity, @spirit_of_redemption_form)
   end
+
+  defp maybe_enqueue_player_defeat(%Character{} = entity, health, 0, opts) when health > 0 do
+    Effects.enqueue(entity, %Effects.PlayerDefeated{
+      source_guid: Keyword.get(opts, :source),
+      count_death?: !start_spirit_of_redemption?(entity, opts)
+    })
+  end
+
+  defp maybe_enqueue_player_defeat(entity, _health, _new_health, _opts), do: entity
 
   defp maybe_enter_spirit_of_redemption(
          %{player: _player, object: %{guid: guid}, unit: %Unit{}, internal: %Internal{}} = entity,

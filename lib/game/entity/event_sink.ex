@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
   alias ThistleTea.Game.Entity.EventSink.Spells
   alias ThistleTea.Game.Entity.EventSink.Summons
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.World.System.Battleground
 
   @client_effects [
     Effects.StartMirrorTimer,
@@ -181,6 +182,11 @@ defmodule ThistleTea.Game.Entity.EventSink do
 
   defp emit_resolved(entity, %{__struct__: effect_module} = effect, context) when effect_module in @client_effects do
     ClientProjection.emit(entity, effect, context)
+  end
+
+  defp emit_resolved(entity, %Effects.BattlegroundDeath{world: world, defeat: defeat}, _context) do
+    Battleground.player_died(world, defeat)
+    entity
   end
 
   defp emit_resolved(entity, %{__struct__: type} = effect, context)

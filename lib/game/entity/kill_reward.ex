@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Entity.KillReward do
   alias ThistleTea.Game.Entity.Logic.Engagement.Tap
   alias ThistleTea.Game.Entity.Logic.Experience
   alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.Math
   alias ThistleTea.Game.Party.Group
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Metadata
@@ -46,16 +47,25 @@ defmodule ThistleTea.Game.Entity.KillReward do
     end)
   end
 
-  defp controlling_player(guid, metadata) when is_integer(guid) and guid > 0 do
+  def controlling_player(guid, metadata) when is_integer(guid) and guid > 0 do
     if Guid.entity_type(guid) == :player do
       guid
     else
-      case metadata.(guid) do
-        %{owner_guid: owner} when is_integer(owner) and owner > 0 -> owner
-        _unowned -> nil
-      end
+      player_owner(metadata.(guid))
     end
   end
 
-  defp controlling_player(_source, _metadata), do: nil
+  def controlling_player(_source, _metadata), do: nil
+
+  defp player_owner(%{owner_guid: owner}) when is_integer(owner) and owner > 0 do
+    if Guid.entity_type(owner) == :player, do: owner
+  end
+
+  defp player_owner(_metadata), do: nil
+
+  def in_range?(%{internal: %{world: world}, movement_block: %{position: {x, y, z, _o}}}, {world, px, py, pz}) do
+    Math.distance({x, y, z}, {px, py, pz}) <= Experience.group_reward_distance()
+  end
+
+  def in_range?(_entity, _position), do: false
 end

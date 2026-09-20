@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.World.System.Battleground do
   use GenServer
 
   alias ThistleTea.Game.Battleground
+  alias ThistleTea.Game.Battleground.Defeat
   alias ThistleTea.Game.Battleground.Effects.Scoreboard
   alias ThistleTea.Game.Battleground.WarsongGulch
   alias ThistleTea.Game.Entity
@@ -61,9 +62,17 @@ defmodule ThistleTea.Game.World.System.Battleground do
     GenServer.call(server, {:area_trigger, world, guid, trigger_id, position})
   end
 
-  def player_died(%WorldRef{} = world, victim_guid, killer_guid, position, server \\ __MODULE__) do
-    GenServer.cast(server, {:player_died, world, victim_guid, killer_guid, position})
+  def player_died(%WorldRef{} = world, %Defeat{} = defeat, server \\ __MODULE__) do
+    GenServer.cast(server, {:player_died, world, defeat})
   end
+
+  def participants(world, server \\ __MODULE__)
+
+  def participants(%WorldRef{instance_id: id} = world, server) when is_integer(id) do
+    GenServer.call(server, {:participants, world})
+  end
+
+  def participants(_world, _server), do: %{}
 
   def queue_resurrection(%WorldRef{} = world, guid, server \\ __MODULE__) do
     GenServer.cast(server, {:queue_resurrection, world, guid})
@@ -289,6 +298,16 @@ defmodule ThistleTea.Game.World.System.Battleground do
 
   def handle_call({:match_for_world, world}, _from, state), do: {:reply, Map.get(state.worlds, world), state}
 
+  def handle_call({:participants, world}, _from, state) do
+    players =
+      case Map.get(state.worlds, world) do
+        nil -> %{}
+        pid -> Match.snapshot(pid).players |> Map.filter(fn {_guid, player} -> player.status == :inside end)
+      end
+
+    {:reply, players, state}
+  end
+
   def handle_call({:reconnect, guid, world}, _from, state) do
     case {Map.get(state.worlds, world), Map.get(state.players, guid)} do
       {pid, {:invited, pid, team}} when is_pid(pid) ->
@@ -304,9 +323,9 @@ defmodule ThistleTea.Game.World.System.Battleground do
   end
 
   @impl GenServer
-  def handle_cast({:player_died, world, victim_guid, killer_guid, position}, state) do
+  def handle_cast({:player_died, world, defeat}, state) do
     if pid = Map.get(state.worlds, world) do
-      Match.player_died(pid, victim_guid, killer_guid, position, dropped_flag_guid())
+      Match.player_died(pid, defeat, dropped_flag_guid())
     end
 
     {:noreply, state}

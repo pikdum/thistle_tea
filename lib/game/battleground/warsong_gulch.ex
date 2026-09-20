@@ -3,6 +3,7 @@ defmodule ThistleTea.Game.Battleground.WarsongGulch do
   Pure Warsong Gulch match transitions.
   """
 
+  alias ThistleTea.Game.Battleground.Defeat
   alias ThistleTea.Game.Battleground.Effects
   alias ThistleTea.Game.Battleground.Template
   alias ThistleTea.Game.WorldRef
@@ -206,10 +207,18 @@ defmodule ThistleTea.Game.Battleground.WarsongGulch do
 
   def area_trigger(%__MODULE__{}, _guid, _trigger_id, _now), do: :unhandled
 
-  def player_died(%__MODULE__{} = match, victim_guid, killer_guid, position, dropped_guid) do
-    match = update_death_scores(match, victim_guid, killer_guid)
-    drop_carried_flag(match, victim_guid, position, dropped_guid)
+  def player_died(%__MODULE__{phase: :active} = match, %Defeat{} = defeat, dropped_guid) do
+    case Map.get(match.players, defeat.victim_guid) do
+      %Player{status: :inside} ->
+        match = update_death_scores(match, defeat)
+        drop_carried_flag(match, defeat.victim_guid, defeat.position, dropped_guid)
+
+      _absent ->
+        %Result{match: match}
+    end
   end
+
+  def player_died(%__MODULE__{} = match, %Defeat{}, _dropped_guid), do: %Result{match: match}
 
   def queue_resurrection(%__MODULE__{} = match, guid) do
     case Map.get(match.players, guid) do
@@ -555,17 +564,34 @@ defmodule ThistleTea.Game.Battleground.WarsongGulch do
     }
   end
 
-  defp update_death_scores(match, victim_guid, killer_guid) do
-    match = update_player(match, victim_guid, &%{&1 | deaths: &1.deaths + 1})
-    victim = Map.get(match.players, victim_guid)
-    killer = Map.get(match.players, killer_guid)
+  defp update_death_scores(match, %Defeat{} = defeat) do
+    match =
+      if defeat.count_death?,
+        do: update_player(match, defeat.victim_guid, &%{&1 | deaths: &1.deaths + 1}),
+        else: match
 
-    if is_struct(victim, Player) and is_struct(killer, Player) and victim.team != killer.team do
-      update_player(match, killer_guid, fn player ->
-        %{player | killing_blows: player.killing_blows + 1, honorable_kills: player.honorable_kills + 1}
-      end)
-    else
-      match
+    victim = Map.fetch!(match.players, defeat.victim_guid)
+
+    case Map.get(match.players, defeat.killer_guid) do
+      %Player{status: :inside, team: team} when team != victim.team ->
+        match = update_player(match, defeat.killer_guid, &%{&1 | killing_blows: &1.killing_blows + 1})
+
+        [defeat.killer_guid | defeat.nearby_guids]
+        |> Enum.uniq()
+        |> Enum.reduce(match, &credit_team_kill(&2, &1, team))
+
+      _ineligible ->
+        match
+    end
+  end
+
+  defp credit_team_kill(match, guid, team) do
+    case Map.get(match.players, guid) do
+      %Player{status: :inside, team: ^team} ->
+        update_player(match, guid, &%{&1 | honorable_kills: &1.honorable_kills + 1})
+
+      _ineligible ->
+        match
     end
   end
 

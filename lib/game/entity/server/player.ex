@@ -1221,7 +1221,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   def maybe_broadcast_update(%{character: %Character{}} = state) do
     state
     |> cancel_cast_if_dead()
-    |> finalize_battleground_death()
+    |> finalize_death()
     |> sync_equipment_requirements()
     |> sync_character_metadata()
     |> then(fn state -> %{state | character: EventSink.emit_pending(state.character)} end)
@@ -1246,17 +1246,10 @@ defmodule ThistleTea.Game.Entity.Server.Player do
 
   defp sync_equipment_requirements(state), do: state
 
-  defp finalize_battleground_death(
+  defp finalize_death(
          %{character: %Character{internal: %Internal{death_finalized?: false} = internal} = character} = state
        ) do
     if Core.dead?(character) do
-      BattlegroundSystem.player_died(
-        character.internal.world,
-        state.guid,
-        character.internal.killed_by,
-        character.movement_block.position
-      )
-
       character = SelfResurrection.prepare(character, Time.now())
       %{state | character: %{character | internal: %{internal | death_finalized?: true}}}
     else
@@ -1264,7 +1257,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
     end
   end
 
-  defp finalize_battleground_death(
+  defp finalize_death(
          %{character: %Character{internal: %Internal{death_finalized?: true} = internal} = character} = state
        ) do
     if Death.alive?(character) do
@@ -1274,7 +1267,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
     end
   end
 
-  defp finalize_battleground_death(state), do: state
+  defp finalize_death(state), do: state
 
   defp run_script(%State{character: %Character{} = character} = state, steps, target_guid) do
     now = Time.now()

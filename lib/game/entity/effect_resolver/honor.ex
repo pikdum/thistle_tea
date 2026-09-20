@@ -10,14 +10,12 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Honor do
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.KillReward
   alias ThistleTea.Game.Entity.Logic.Effects
-  alias ThistleTea.Game.Entity.Logic.Experience
   alias ThistleTea.Game.Entity.Logic.Honor, as: HonorLogic
   alias ThistleTea.Game.Entity.Logic.Honor.Contribution
-  alias ThistleTea.Game.Guid
-  alias ThistleTea.Game.Math
   alias ThistleTea.Game.Party.Group
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.System.Battleground
   alias ThistleTea.Game.World.System.Party
 
   def resolve(%Effects.HonorDamage{} = effect, opts \\ []) do
@@ -25,7 +23,7 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Honor do
 
     [
       %Effects.HonorContribution{
-        player_guid: controlling_player(effect.source_guid, metadata),
+        player_guid: KillReward.controlling_player(effect.source_guid, metadata),
         damage: effect.damage,
         now: effect.now,
         lethal?: effect.lethal?,
@@ -38,12 +36,14 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Honor do
     group_of = Keyword.get(opts, :group_of, &Party.group_of/1)
     metadata = Keyword.get(opts, :metadata, &Metadata.query(&1, [:race, :alive?]))
     position = Keyword.get(opts, :position, &World.position/1)
+    battleground = Keyword.get(opts, :participants, &Battleground.participants/1)
+    players = battleground.(entity.internal.world)
 
     participants =
       history.by_player
       |> Map.keys()
       |> Enum.filter(&(&1 > 0))
-      |> Enum.flat_map(&members(&1, group_of.(&1)))
+      |> Enum.flat_map(&members(&1, players, group_of))
       |> Map.new()
       |> Enum.map(fn {guid, group_id} ->
         row = metadata.(guid) || %{}
@@ -53,7 +53,7 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Honor do
           team: HonorLogic.team(Map.get(row, :race)),
           group_id: group_id,
           alive?: Map.get(row, :alive?) == true,
-          in_range?: in_range?(entity, position.(guid))
+          in_range?: KillReward.in_range?(entity, position.(guid))
         }
       end)
 
@@ -84,25 +84,15 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Honor do
   defp members(_guid, %Group{id: id, members: members}), do: Enum.map(members, &{&1.guid, id})
   defp members(guid, nil), do: [{guid, nil}]
 
-  defp in_range?(%Character{internal: %{world: world}, movement_block: %{position: {x, y, z, _o}}}, {world, px, py, pz}) do
-    Math.distance({x, y, z}, {px, py, pz}) <= Experience.group_reward_distance()
-  end
+  defp members(guid, players, group_of) do
+    case Map.get(players, guid) do
+      %{team: team} ->
+        players
+        |> Enum.filter(fn {_guid, player} -> player.team == team end)
+        |> Enum.map(fn {guid, _player} -> {guid, {:battleground, team}} end)
 
-  defp in_range?(_entity, _position), do: false
-
-  defp controlling_player(guid, metadata) when is_integer(guid) and guid > 0 do
-    if Guid.entity_type(guid) == :player do
-      guid
-    else
-      player_owner(metadata.(guid))
+      nil ->
+        members(guid, group_of.(guid))
     end
   end
-
-  defp controlling_player(_guid, _metadata), do: nil
-
-  defp player_owner(%{owner_guid: owner}) when is_integer(owner) and owner > 0 do
-    if Guid.entity_type(owner) == :player, do: owner
-  end
-
-  defp player_owner(_metadata), do: nil
 end

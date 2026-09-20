@@ -33,8 +33,8 @@ defmodule ThistleTea.Game.World.Battleground.Match do
     GenServer.call(server, {:area_trigger, guid, trigger_id, position, dropped_guid})
   end
 
-  def player_died(server, victim_guid, killer_guid, position, dropped_guid) do
-    GenServer.cast(server, {:player_died, victim_guid, killer_guid, position, dropped_guid})
+  def player_died(server, defeat, dropped_guid) do
+    GenServer.cast(server, {:player_died, defeat, dropped_guid})
   end
 
   def disconnect(server, guid, position, dropped_guid) do
@@ -136,9 +136,9 @@ defmodule ThistleTea.Game.World.Battleground.Match do
   end
 
   @impl GenServer
-  def handle_cast({:player_died, victim_guid, killer_guid, position, dropped_guid}, state) do
-    dropped_guid = dropped_flag_guid(state.match, victim_guid, dropped_guid)
-    result = WarsongGulch.player_died(state.match, victim_guid, killer_guid, position, dropped_guid)
+  def handle_cast({:player_died, defeat, dropped_guid}, state) do
+    dropped_guid = dropped_flag_guid(state.match, defeat.victim_guid, dropped_guid)
+    result = WarsongGulch.player_died(state.match, defeat, dropped_guid)
     {:noreply, apply_result(state, result)}
   end
 

@@ -17,6 +17,12 @@ in [honor-rewards-playtest.md](honor-rewards-playtest.md).
 - Damage history expires after one minute without damage. Nonplayer damage
   remains in the denominator. Nearby living enemies receive individual or
   group shares, including eligible party members who did not deal damage.
+- Battleground honor shares use the admitted team roster, including raid-size
+  scaling. Scoreboard kills independently credit the killer and nearby online
+  teammates, including dead players near the victim or with a nearby corpse.
+  Pet killing blows credit their controlling player. Spirit of Redemption
+  credits the initial defeat and drops the flag immediately, then records one
+  death when the form expires. Warsong scoring requires an active match.
 - Daily records distinguish honorable kills, dishonorable kills, and bonus
   contribution. Dishonorable kills immediately reduce rank points without
   subtracting weekly contribution or the highest rank previously earned.
@@ -77,12 +83,9 @@ Target, Spirit of Redemption, current player projections, and packet dispatch.
 
 ## Remaining integration and acceptance
 
-1. Complete battleground team sharing and scoreboard kill semantics, including
-   nearby allies, pet killing blows, and Spirit of Redemption. Scoreboard HKs
-   and honor-ledger HKs follow different vanilla eligibility rules.
-2. Apply honor-rank conditions and equipment/vendor requirements, and connect
+1. Apply honor-rank conditions and equipment/vendor requirements, and connect
    automatic Honorless Target application during world-entry transitions.
-3. Extend client acceptance to rank requirements and
+2. Extend client acceptance to rank requirements and
    automatic Honorless Target protection. Calendar/ranking tests cover
    settlement without waiting for a real weekly reset.
 

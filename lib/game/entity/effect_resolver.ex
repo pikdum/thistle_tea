@@ -3,6 +3,7 @@ defmodule ThistleTea.Game.Entity.EffectResolver do
   Resolves semantic gameplay requests into concrete boundary effects.
   """
 
+  alias ThistleTea.Game.Entity.EffectResolver.Battleground
   alias ThistleTea.Game.Entity.EffectResolver.Combat
   alias ThistleTea.Game.Entity.EffectResolver.Durability
   alias ThistleTea.Game.Entity.EffectResolver.Honor
@@ -29,6 +30,7 @@ defmodule ThistleTea.Game.Entity.EffectResolver do
   end
 
   def resolve(entity, %Effects.DurabilityDamage{} = effect), do: Durability.resolve(entity, effect)
+  def resolve(entity, %Effects.PlayerDefeated{} = effect), do: Battleground.resolve(entity, effect)
   def resolve(_entity, %Effects.HonorDamage{} = effect), do: Honor.resolve(effect)
   def resolve(entity, %Effects.HonorCreatureKill{} = effect), do: Honor.creature_kill(entity, effect)
   def resolve(entity, %Effects.PetAbilityUsed{} = effect), do: PetLearning.resolve(entity, effect)

@@ -2,6 +2,8 @@ defmodule ThistleTea.Game.Entity.Logic.Effects.CombatTypes do
   @moduledoc false
 
   effects = [
+    {:PlayerDefeated, [:source_guid, :count_death?], []},
+    {:BattlegroundDeath, [:world, :defeat], []},
     {:HonorDamage, [:source_guid, :damage, :now, :lethal?, :honorless?], []},
     {:HonorContribution, [:player_guid, :damage, :now, :lethal?, :honorless?], []},
     {:HonorCreatureKill, [:source_guid], []},

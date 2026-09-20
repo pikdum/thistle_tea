@@ -351,6 +351,7 @@ defmodule ThistleTea.Game.Entity.Logic.CoreTest do
       assert entity.internal.killed_by == 777
       assert entity.internal.rooted?
       assert entity.unit.auras == [spirit_talent()]
+      assert %Effects.PlayerDefeated{source_guid: 777, count_death?: false} in entity.internal.events
 
       assert [
                %Effects.TriggerSpell{spell_id: 27_827, duration_ms: 15_000, amount: 100, slot: 0},
@@ -381,6 +382,7 @@ defmodule ThistleTea.Game.Entity.Logic.CoreTest do
 
       assert Core.dead?(entity)
       refute Enum.any?(entity.internal.events, &(is_struct(&1, Effects.TriggerSpell) and &1.spell_id == 27_827))
+      assert %Effects.PlayerDefeated{source_guid: entity.object.guid, count_death?: true} in entity.internal.events
     end
   end
 

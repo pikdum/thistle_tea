@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.Battleground.WarsongGulchTest do
   use ExUnit.Case, async: true
 
+  alias ThistleTea.Game.Battleground.Defeat
   alias ThistleTea.Game.Battleground.Effects
   alias ThistleTea.Game.Battleground.Template
   alias ThistleTea.Game.Battleground.WarsongGulch
@@ -114,7 +115,7 @@ defmodule ThistleTea.Game.Battleground.WarsongGulchTest do
       match = match |> active_with_players() |> take_horde_flag()
 
       assert %Result{match: dropped, effects: effects, timers: [{{:flag_return, :horde, generation}, 10_000}]} =
-               WarsongGulch.player_died(match, @alliance, @horde, {4.0, 5.0, 6.0, 0.0}, 999)
+               WarsongGulch.player_died(match, defeat(@alliance, @horde, {4.0, 5.0, 6.0, 0.0}), 999)
 
       assert dropped.flags.horde == %WarsongGulch.Flag{
                state: :ground,
@@ -135,7 +136,7 @@ defmodule ThistleTea.Game.Battleground.WarsongGulchTest do
 
     test "lets the owner return a dropped flag and invalidates the stale timer", %{match: match} do
       match = match |> active_with_players() |> take_alliance_flag()
-      dropped = WarsongGulch.player_died(match, @horde, @alliance, {0.0, 0.0, 0.0, 0.0}, 777).match
+      dropped = WarsongGulch.player_died(match, defeat(@horde, @alliance, {0.0, 0.0, 0.0, 0.0}), 777).match
       generation = dropped.flags.alliance.generation
 
       assert {:handled, %Result{match: returned}} =
@@ -229,16 +230,64 @@ defmodule ThistleTea.Game.Battleground.WarsongGulchTest do
     end
   end
 
-  describe "player_died/5" do
+  describe "player_died/3" do
     test "records opposing killing blows without crediting suicides or teammates", %{match: match} do
       match = active_with_players(match)
-      match = WarsongGulch.player_died(match, @alliance, @horde, nil, nil).match
-      match = WarsongGulch.player_died(match, @horde, @horde, nil, nil).match
+      match = WarsongGulch.player_died(match, defeat(@alliance, @horde), nil).match
+      match = WarsongGulch.player_died(match, defeat(@horde, @horde), nil).match
 
       assert match.players[@alliance].deaths == 1
       assert match.players[@horde].deaths == 1
       assert match.players[@horde].killing_blows == 1
       assert match.players[@horde].honorable_kills == 1
+    end
+
+    test "credits nearby teammates once, excluding absent players and enemies", %{match: match} do
+      match = active_with_players(match)
+
+      players =
+        Map.merge(match.players, %{
+          3 => %{match.players[@horde] | guid: 3},
+          4 => %{match.players[@horde] | guid: 4, status: :invited},
+          5 => %{match.players[@horde] | guid: 5}
+        })
+
+      event = %{defeat(@alliance, @horde) | nearby_guids: [@horde, @alliance, 3, 3, 4, 999]}
+      match = WarsongGulch.player_died(%{match | players: players}, event, nil).match
+
+      assert match.players[@horde].killing_blows == 1
+      assert match.players[@horde].honorable_kills == 1
+      assert match.players[3].honorable_kills == 1
+      assert match.players[3].killing_blows == 0
+      for guid <- [@alliance, 4, 5], do: assert(match.players[guid].honorable_kills == 0)
+    end
+
+    test "credits the initial priest defeat and drops the flag before the final death", %{match: match} do
+      match = match |> active_with_players() |> take_horde_flag()
+      initial = %{defeat(@alliance, @horde) | count_death?: false}
+      match = WarsongGulch.player_died(match, initial, 999).match
+
+      assert match.players[@alliance].deaths == 0
+      assert match.players[@horde].killing_blows == 1
+      assert match.flags.horde.state == :ground
+
+      match = WarsongGulch.player_died(match, defeat(@alliance, @alliance), nil).match
+      assert match.players[@alliance].deaths == 1
+      assert match.players[@horde].killing_blows == 1
+      assert match.players[@horde].honorable_kills == 1
+    end
+
+    test "ignores victims who have not entered the match", %{match: match} do
+      assert WarsongGulch.player_died(match, defeat(@alliance, @horde), nil).match == match
+    end
+
+    test "ignores kills before the gates open and after victory", %{match: match} do
+      match = active_with_players(match)
+
+      for phase <- [:countdown, {:ended, :alliance}] do
+        match = %{match | phase: phase}
+        assert WarsongGulch.player_died(match, defeat(@alliance, @horde), nil).match == match
+      end
     end
   end
 
@@ -253,6 +302,10 @@ defmodule ThistleTea.Game.Battleground.WarsongGulchTest do
     match = WarsongGulch.enter(match, @alliance, return_to(1)).match
     match = WarsongGulch.enter(match, @horde, return_to(2)).match
     WarsongGulch.handle_timer(match, :start, 1_000).match
+  end
+
+  defp defeat(victim, killer, position \\ {0.0, 0.0, 0.0, 0.0}) do
+    %Defeat{victim_guid: victim, killer_guid: killer, position: position}
   end
 
   defp take_horde_flag(match) do

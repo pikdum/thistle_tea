@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.World.System.BattlegroundTest do
   use ExUnit.Case, async: false
 
+  alias ThistleTea.Game.Battleground.Defeat
   alias ThistleTea.Game.Battleground.Effects.OperateGates
   alias ThistleTea.Game.Battleground.Effects.Scoreboard
   alias ThistleTea.Game.Battleground.Effects.UpdateStatus
@@ -127,6 +128,34 @@ defmodule ThistleTea.Game.World.System.BattlegroundTest do
       refute_receive {:DOWN, ^ref, :process, ^pid, _reason}, 50
       assert :ok = BattlegroundSystem.port(2, 0, nil, server)
       assert_receive {:DOWN, ^ref, :process, ^pid, :normal}
+    end
+  end
+
+  describe "player_died/3" do
+    test "routes defeat credit and exposes only the admitted roster", %{server: server} do
+      assert :ok = BattlegroundSystem.join(alliance(1), 489, server)
+      assert :ok = BattlegroundSystem.join(horde(2), 489, server)
+      assert :ok = BattlegroundSystem.join(alliance(3), 489, server)
+      return_to = {WorldRef.open(0), {0.0, 0.0, 0.0, 0.0}}
+
+      assert {:ok, world, _position} = BattlegroundSystem.port(1, 1, return_to, server)
+      assert {:ok, ^world, _position} = BattlegroundSystem.port(2, 1, return_to, server)
+      assert Enum.sort(Map.keys(BattlegroundSystem.participants(world, server))) == [1, 2]
+      assert {:ok, ^world, _position} = BattlegroundSystem.port(3, 1, return_to, server)
+      assert :ok = BattlegroundSystem.debug_start_now(world, server)
+
+      defeat = %Defeat{victim_guid: 2, killer_guid: 1, position: {0.0, 0.0, 0.0, 0.0}, nearby_guids: [1, 3]}
+      BattlegroundSystem.player_died(world, defeat, server)
+      players = BattlegroundSystem.participants(world, server)
+      assert players[1].killing_blows == 1
+      assert players[1].honorable_kills == 1
+      assert players[3].killing_blows == 0
+      assert players[3].honorable_kills == 1
+      assert players[2].deaths == 1
+
+      BattlegroundSystem.disconnect(3, {0.0, 0.0, 0.0, 0.0}, server)
+      refute Map.has_key?(BattlegroundSystem.participants(world, server), 3)
+      assert BattlegroundSystem.participants(WorldRef.instance(489, 99), server) == %{}
     end
   end
 

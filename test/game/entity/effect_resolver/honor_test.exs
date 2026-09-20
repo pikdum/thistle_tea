@@ -26,6 +26,32 @@ defmodule ThistleTea.Game.Entity.EffectResolver.HonorTest do
   end
 
   describe "shares/4" do
+    test "shares battleground team damage with the nearby living roster using raid scaling" do
+      world = WorldRef.instance(489, 1)
+
+      victim = %Character{
+        unit: %Unit{race: 2},
+        internal: %Internal{world: world},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}}
+      }
+
+      history = %Damage{by_player: %{0 => 20, 1 => 40, 9 => 40}, last_damage_at: 100}
+
+      opts = [
+        participants: fn ^world -> Map.new(1..10, &{&1, %{team: :alliance}}) end,
+        group_of: fn _guid -> flunk("battleground membership supplies the group") end,
+        metadata: fn guid -> %{race: 1, alive?: guid != 9} end,
+        position: fn
+          10 -> {world, 75.0, 0.0, 0.0}
+          _guid -> {world, 1.0, 0.0, 0.0}
+        end
+      ]
+
+      shares = Honor.shares(victim, history, 100, opts)
+      assert Enum.sort(Map.keys(shares)) == Enum.to_list(1..8)
+      for {_guid, share} <- shares, do: assert_in_delta(share, 0.8 * 0.6 / 8, 0.0001)
+    end
+
     test "shares group damage with living nearby members, retaining ineligible damage in the denominator" do
       world = WorldRef.open(0)
 
