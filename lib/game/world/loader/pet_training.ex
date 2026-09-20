@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.World.Loader.PetTraining do
   alias ThistleTea.DBC
   alias ThistleTea.DBC.CreatureFamily
   alias ThistleTea.Game.Entity.Data.PetAbility
+  alias ThistleTea.Game.Spell, as: SpellData
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
 
   def init(table \\ __MODULE__) do
@@ -19,15 +20,29 @@ defmodule ThistleTea.Game.World.Loader.PetTraining do
   end
 
   def load_all(table \\ __MODULE__) do
-    families = Map.new(DBC.all(CreatureFamily), &{&1.id, &1.training_skill})
-    skills = Enum.uniq([270 | Map.values(families)])
+    family_rows = DBC.all(CreatureFamily)
+    families = Map.new(family_rows, &{&1.id, &1.training_skill})
+    skills = Enum.uniq([270 | Enum.flat_map(family_rows, &[&1.training_skill, &1.secondary_skill])])
     rows = DBC.all(from(ability in SkillLineAbility, where: ability.skill_line in ^skills))
     spells = rows |> Enum.map(& &1.spell) |> SpellLoader.build_spellbook()
     abilities = build(rows, spells)
 
     :ets.insert(table, [{:abilities, abilities}, {:families, families}])
+
+    Enum.each(family_rows, fn family ->
+      passives = family_passives(rows, spells, [family.training_skill, family.secondary_skill])
+      :ets.insert(table, {{:family_passives, family.id}, passives})
+    end)
+
     :ok
   end
+
+  def family_passives(rows, spells, skills) do
+    ids = for row <- rows, row.skill_line in skills and row.acquire_method == 2, do: row.spell
+    spells |> Map.take(ids) |> Map.filter(fn {_id, spell} -> SpellData.attribute?(spell, :passive) end)
+  end
+
+  def family_passives(family, table \\ __MODULE__), do: lookup(table, {:family_passives, family})
 
   def build(rows, spells) do
     predecessors =

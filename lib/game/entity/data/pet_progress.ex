@@ -4,7 +4,16 @@ defmodule ThistleTea.Game.Entity.Data.PetProgress do
   """
 
   @enforce_keys [:level]
-  defstruct [:level, :spells, xp: 0, loyalty: 1, loyalty_points: 1_000, training_points: 0]
+  defstruct [
+    :level,
+    :spells,
+    :last_untrain_at,
+    xp: 0,
+    loyalty: 1,
+    loyalty_points: 1_000,
+    training_points: 0,
+    last_untrain_cost: 0
+  ]
 
   @type t :: %__MODULE__{
           level: pos_integer(),
@@ -12,7 +21,9 @@ defmodule ThistleTea.Game.Entity.Data.PetProgress do
           spells: [pos_integer()] | nil,
           loyalty: 1..6,
           loyalty_points: non_neg_integer(),
-          training_points: integer()
+          training_points: integer(),
+          last_untrain_at: integer() | nil,
+          last_untrain_cost: non_neg_integer()
         }
 end
 

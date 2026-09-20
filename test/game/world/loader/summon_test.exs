@@ -12,9 +12,11 @@ defmodule ThistleTea.Game.World.Loader.SummonTest do
   alias ThistleTea.Game.Entity.Data.PetProgress
   alias ThistleTea.Game.Entity.Logic.Combat
   alias ThistleTea.Game.Entity.Logic.Companion
+  alias ThistleTea.Game.Entity.Logic.PetProgression
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.World.Loader.PetLevel, as: PetLevelLoader
   alias ThistleTea.Game.World.Loader.PetSpells
+  alias ThistleTea.Game.World.Loader.PetTraining
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Loader.Summon
   alias ThistleTea.Game.WorldRef
@@ -51,6 +53,41 @@ defmodule ThistleTea.Game.World.Loader.SummonTest do
   end
 
   describe "build_pet/2" do
+    test "restores only family passives after untraining and retains the reset price history" do
+      previous = :ets.lookup(PetTraining, {:family_passives, 1})
+      family = SpellLoader.build_spellbook([17_223])
+      :ets.insert(PetTraining, {{:family_passives, 1}, family})
+
+      on_exit(fn ->
+        :ets.delete(PetTraining, {:family_passives, 1})
+        :ets.insert(PetTraining, previous)
+      end)
+
+      progress = %PetProgress{
+        level: 50,
+        spells: [],
+        loyalty: 2,
+        training_points: 50,
+        last_untrain_at: -123_456,
+        last_untrain_cost: 5_000
+      }
+
+      owner = %Character{
+        object: %Object{guid: Guid.from_low_guid(:player, 1)},
+        unit: %Unit{level: 60, faction_template: 1},
+        internal: %Internal{world: WorldRef.open(0)},
+        movement_block: %MovementBlock{position: {1.0, 2.0, 3.0, 0.0}}
+      }
+
+      owner = owner |> Companion.suspend_as(:hunter_pet, 2960, 1515) |> Companion.capture_progress(progress)
+      pet = Summon.build_pet(2960, owner)
+      assert pet.internal.spellbook == family
+      assert pet.internal.pet.family_spells == MapSet.new([17_223])
+      assert PetProgression.snapshot(pet) == progress
+      assert pet.unit.normal_resistance == trunc(3_018 * 1.05)
+      assert Enum.map(pet.unit.auras, & &1.spell.id) == [17_223]
+    end
+
     test "builds an owner-scaled demon from VMangos pet data" do
       owner_guid = Guid.from_low_guid(:player, 1)
 

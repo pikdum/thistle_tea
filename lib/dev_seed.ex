@@ -7,7 +7,8 @@ defmodule ThistleTea.DevSeed do
   hostiles for combat and XP testing, and a Devilsaur (combat reach 5.0)
   for big-hitbox spell-range testing, a Defias Thug for pickpocketing, and a
   Stonetusk Boar with a three-minute respawn for skinning practice. A Prairie
-  Wolf Alpha and Mottled Worg support pet ability discovery and training. A repair
+  Wolf Alpha and Mottled Worg support pet ability discovery and training, with
+  Belia Thundergranite for pet untraining and Jenova Stoneshield for stabling. A repair
   vendor and spirit healer support equipment wear and resurrection testing.
   """
   import Ecto.Query
@@ -273,6 +274,7 @@ defmodule ThistleTea.DevSeed do
     spawn_mob(11_069, @base_low_guid + 700, {x - 3.0, y + 2.0, z}, nil, @respawn_secs)
     spawn_mob(2960, @base_low_guid + 800, {x - 10.0, y - 10.0, z}, nil, 180)
     spawn_mob(1766, @base_low_guid + 900, {x - 20.0, y - 10.0, z}, nil, 180)
+    spawn_mob(10_090, @base_low_guid + 1000, {x + 2.0, y - 3.0, z}, nil, @respawn_secs)
   end
 
   defp spawn_mob(entry, low_guid, {x, y, z}, loot_override, respawn_secs) do

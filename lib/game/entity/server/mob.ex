@@ -55,6 +55,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Entity.Logic.PetLoyalty
   alias ThistleTea.Game.Entity.Logic.PetProgression
   alias ThistleTea.Game.Entity.Logic.PetTraining
+  alias ThistleTea.Game.Entity.Logic.PetUntraining
   alias ThistleTea.Game.Entity.Logic.SpellEffect
   alias ThistleTea.Game.Entity.Logic.SpellFeedback
   alias ThistleTea.Game.Entity.Logic.StealthDetection
@@ -545,6 +546,37 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     error ->
       Logger.error("Pet training failed: #{Exception.format(:error, error, __STACKTRACE__)}")
       {:reply, {:error, :bad_targets}, state}
+  end
+
+  def handle_call({:pet_unlearn_cost, owner}, _from, %Mob{} = state) do
+    {:reply, PetUntraining.quote(state, owner, Time.now()), state}
+  rescue
+    error ->
+      Logger.error("Pet untraining quote failed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:reply, {:error, :no_pet}, state}
+  end
+
+  def handle_call({:unlearn_pet, owner, money, maximum_cost}, _from, %Mob{} = state) do
+    family_spells = ThistleTea.Game.World.Loader.PetTraining.family_passives(state.internal.creature.family)
+
+    case PetUntraining.reset(state, owner, money, maximum_cost, family_spells, Time.now()) do
+      {:ok, updated, cost} ->
+        blackboard = updated.internal.blackboard |> Blackboard.ensure() |> Blackboard.reset_spells()
+        updated = %{updated | internal: %{updated.internal | blackboard: blackboard}}
+        updated = updated |> PetProgression.publish() |> EventSink.emit_pending() |> wake_ai_tick()
+
+        result =
+          {:ok, cost, PetProgression.snapshot(updated), Map.values(updated.internal.spellbook), updated.internal.pet}
+
+        {:reply, result, updated, {:continue, :maybe_broadcast}}
+
+      error ->
+        {:reply, error, state}
+    end
+  rescue
+    error ->
+      Logger.error("Pet untraining failed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:reply, {:error, :no_pet}, state}
   end
 
   def handle_call(

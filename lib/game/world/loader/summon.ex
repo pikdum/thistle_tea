@@ -26,6 +26,7 @@ defmodule ThistleTea.Game.World.Loader.Summon do
   alias ThistleTea.Game.World.Loader.Mob, as: MobLoader
   alias ThistleTea.Game.World.Loader.PetLevel, as: PetLevelLoader
   alias ThistleTea.Game.World.Loader.PetSpells
+  alias ThistleTea.Game.World.Loader.PetTraining, as: PetTrainingLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.WorldRef
 
@@ -74,7 +75,8 @@ defmodule ThistleTea.Game.World.Loader.Summon do
       progress = pet_progress(owner, entry, owner_level, hunter_pet?)
       level = if progress, do: progress.level, else: owner_level
       guid = Guid.from_low_guid(:pet, entry, next_low_guid())
-      spellbook = restored_spellbook(entry, level, progress)
+      family_spells = if hunter_pet?, do: PetTrainingLoader.family_passives(mob.internal.creature.family), else: %{}
+      spellbook = Map.merge(restored_spellbook(entry, level, progress), family_spells)
       creature = %{mob.internal.creature | spells: PetTraining.action_spells(spellbook)}
       creature = normalize_pet_damage_multiplier(creature, hunter_pet?)
       stats = if !hunter_pet?, do: pet_stats(entry, level)
@@ -101,6 +103,7 @@ defmodule ThistleTea.Game.World.Loader.Summon do
             owner_guid: owner_guid,
             profile: :combat,
             kind: if(hunter_pet?, do: :hunter, else: :summon),
+            family_spells: MapSet.new(Map.keys(family_spells)),
             reaction_state: pet_reaction(owner, entry),
             food_mask: if(hunter_pet?, do: pet_food_mask(creature.family), else: 0)
           },

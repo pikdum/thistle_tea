@@ -21,6 +21,14 @@ defmodule ThistleTea.Game.World.Loader.GossipVmangosTest do
   @moduletag :vmangos_db
 
   describe "load_all/0" do
+    test "loads hunter pet trainers and their untraining option" do
+      assert :ok = Gossip.load_all()
+      assert Gossip.pet_trainer?(10_090)
+      refute Gossip.pet_trainer?(295)
+      assert %Menu{options: options} = Gossip.menu_for_creature(10_090)
+      assert %Option{option_id: 17, npc_flag: 0x10} = Enum.find(options, &(&1.option_id == 17))
+    end
+
     test "loads Innkeeper Farley's home-binding option" do
       assert :ok = Gossip.load_all()
       assert %Menu{options: options} = Gossip.menu_for_creature(295)

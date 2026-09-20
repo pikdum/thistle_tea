@@ -23,10 +23,12 @@ defmodule ThistleTea.Game.Entity.Logic.PetProgression do
     %PetProgress{
       level: unit.level,
       xp: unit.pet_experience || 0,
-      spells: Map.keys(spellbook || %{}) |> Enum.sort(),
+      spells: Map.keys(spellbook || %{}) |> Enum.reject(&MapSet.member?(pet.family_spells, &1)) |> Enum.sort(),
       loyalty: unit.pet_loyalty,
       loyalty_points: pet.loyalty_points,
-      training_points: pet.training_points
+      training_points: pet.training_points,
+      last_untrain_at: pet.last_untrain_at,
+      last_untrain_cost: pet.last_untrain_cost
     }
   end
 
@@ -35,6 +37,19 @@ defmodule ThistleTea.Game.Entity.Logic.PetProgression do
   def initialize(%Mob{internal: %Internal{pet: %Pet{kind: :hunter}}} = pet, %PetProgress{} = progress, levels) do
     pet = apply_level(pet, Map.fetch!(levels, progress.level))
     pet = PetLoyalty.initialize(pet, progress)
+
+    pet = %{
+      pet
+      | internal: %{
+          pet.internal
+          | pet: %{
+              pet.internal.pet
+              | last_untrain_at: progress.last_untrain_at,
+                last_untrain_cost: progress.last_untrain_cost
+            }
+        }
+    }
+
     %{pet | unit: %{pet.unit | pet_experience: max(progress.xp, 0)}}
   end
 

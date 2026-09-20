@@ -9,5 +9,6 @@ defmodule ThistleTea.DBC.CreatureFamily do
   schema "CreatureFamily" do
     field(:pet_food_mask, :integer, source: :category)
     field(:training_skill, :integer, source: :pet_food_mask)
+    field(:secondary_skill, :integer, source: :pet_talent_type)
   end
 end
