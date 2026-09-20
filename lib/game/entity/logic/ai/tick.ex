@@ -16,6 +16,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Tick do
   alias ThistleTea.Game.Entity.Logic.Intoxication
   alias ThistleTea.Game.Entity.Logic.PetHappiness
   alias ThistleTea.Game.Entity.Logic.PetLoyalty
+  alias ThistleTea.Game.Entity.Logic.Pvp
   alias ThistleTea.Game.Entity.Logic.Regen
   alias ThistleTea.Game.Spell.Cast
 
@@ -44,7 +45,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Tick do
   def needs_tick?(%{unit: %Unit{auras: [_ | _]}}), do: true
 
   def needs_tick?(character),
-    do: Breathing.needs_tick?(character) or Regen.needs_regen?(character) or Intoxication.needs_tick?(character)
+    do:
+      Breathing.needs_tick?(character) or Regen.needs_regen?(character) or Intoxication.needs_tick?(character) or
+        Pvp.needs_tick?(character)
 
   def plan(entity, status, now) when is_integer(now) do
     TickPlan.new(now)
@@ -55,6 +58,11 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Tick do
     |> schedule_pet_loyalty(entity)
     |> schedule_breathing(entity)
     |> schedule_sobering(entity)
+    |> schedule_pvp(entity)
+  end
+
+  defp schedule_pvp(plan, entity) do
+    if Pvp.needs_tick?(entity), do: TickPlan.schedule_in(plan, :pvp, 1_000), else: plan
   end
 
   defp schedule_pet_happiness(plan, entity) do

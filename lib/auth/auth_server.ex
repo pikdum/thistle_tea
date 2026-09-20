@@ -188,7 +188,7 @@ defmodule ThistleTea.Auth do
     game_server = Application.fetch_env!(:thistle_tea, :game_server)
 
     realm =
-      <<8::little-size(32), 0::little-size(8)>> <>
+      <<ThistleTea.Realm.type()::little-size(32), 0::little-size(8)>> <>
         "Thistle Tea" <>
         <<0>> <>
         "#{game_server}:8085" <>

@@ -31,6 +31,7 @@ defmodule ThistleTea.Game.Player.Login do
   alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Entity.Logic.MovementStats
   alias ThistleTea.Game.Entity.Logic.PlayerFlags
+  alias ThistleTea.Game.Entity.Logic.Pvp
   alias ThistleTea.Game.Entity.Logic.Reputation, as: ReputationLogic
   alias ThistleTea.Game.Entity.Logic.StealthDetection
   alias ThistleTea.Game.Entity.Logic.Talents, as: LogicTalents
@@ -90,6 +91,7 @@ defmodule ThistleTea.Game.Player.Login do
       |> normalize_reputation()
       |> normalize_death_state(character_guid)
       |> Dueling.abandon(Time.now())
+      |> Pvp.reconnect(Time.now())
       |> build_spellbook()
       |> PlayerSpells.apply_passives(Time.now())
       |> PlayerSpells.apply_default_auras(Time.now())

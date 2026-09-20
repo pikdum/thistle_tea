@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.World.Presence do
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
+  alias ThistleTea.Game.Entity.Logic.Pvp
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Position
 
@@ -53,7 +54,10 @@ defmodule ThistleTea.Game.World.Presence do
       area: area,
       orientation: orientation,
       viewpoint: viewpoint(character),
-      creature_type: Character.creature_type(character)
+      creature_type: Character.creature_type(character),
+      pvp?: Pvp.active?(character),
+      free_for_all?: Pvp.free_for_all?(character),
+      contested_pvp?: Pvp.contested?(character)
     }
   end
 

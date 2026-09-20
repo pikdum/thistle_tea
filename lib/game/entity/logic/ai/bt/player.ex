@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Player do
   alias ThistleTea.Game.Entity.Logic.Breathing
   alias ThistleTea.Game.Entity.Logic.Intoxication
   alias ThistleTea.Game.Entity.Logic.PlayerCombat
+  alias ThistleTea.Game.Entity.Logic.Pvp
   alias ThistleTea.Game.Entity.Logic.Reactive
 
   def tree do
@@ -21,6 +22,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Player do
       BT.action(&sobering_tick/3),
       BT.action(&breathing_tick/3),
       BT.action(&sync_combat/2),
+      BT.action(&pvp_tick/3),
       BT.action(&reactive_tick/3),
       SpellBT.casting_sequence(),
       RangedBT.sequence(),
@@ -48,6 +50,10 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Player do
   end
 
   defp sync_combat(state, blackboard), do: {:failure, state, blackboard}
+
+  defp pvp_tick(state, blackboard, %Context{now: now}) do
+    {:failure, Pvp.tick(state, now), blackboard}
+  end
 
   defp reactive_tick(%Character{} = state, %Blackboard{} = blackboard, %Context{now: now}) do
     {:failure, Reactive.tick(state, now), blackboard}

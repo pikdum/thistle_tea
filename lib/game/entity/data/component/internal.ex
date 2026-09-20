@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal do
   """
   alias ThistleTea.Game.Entity.Data.Companion
   alias ThistleTea.Game.Entity.Data.PetStable
+  alias ThistleTea.Game.Entity.Data.Pvp
   alias ThistleTea.Game.Entity.Data.TalentReset
   alias ThistleTea.Game.WorldRef
 
@@ -72,6 +73,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal do
     diminishing_returns: %{},
     companion: Companion.none(),
     pet_stable: %PetStable{},
+    pvp: %Pvp{},
     talent_reset: %TalentReset{},
     forgotten_skills: %{},
     rest_bonus: 0.0,
