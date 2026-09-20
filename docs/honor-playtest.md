@@ -72,3 +72,23 @@ inspection emitted an unimplemented `CMSG_INSPECT` warning even though its
 Honor tab worked; the follow-up adds the vanilla `SMSG_INSPECT` acknowledgement
 and shares the existing distance/hostility admission checks. All three clients
 and the server were stopped after the run; screenshots and logs were retained.
+
+## Inspection follow-up
+
+Commit `972b8fa0` passed all 3,818 tests, compilation with warnings as errors,
+strict Credo, and formatting. A fresh server and two fresh clients then
+repeated ordinary inspection and opened the Honor tab.
+
+Diagnostic tracing recorded the client's `CMSG_INSPECT` payload for GUID 2
+and the server's matching `SMSG_INSPECT` encoding, both
+`02 00 00 00 00 00 00 00`. The Honor tab rendered correctly. The new server
+log had no unimplemented inspection warnings or errors.
+
+- Server log: `/tmp/thistle-honor-inspection-playtest.log`.
+- Packet trace: `/tmp/thistle-inspection-packets.log`.
+- Inspector session: `/home/pikdum/.cache/thistle-wow-playtest.Rtks06`, with
+  `inspect-acknowledged.png` and `inspect-honor.png`.
+- Target session: `/home/pikdum/.cache/thistle-wow-playtest.8XtHhC`.
+- Final gate logs: `/tmp/thistle-honor-inspection-{all,compile,credo,format}.log`.
+
+Both clients and the server were stopped after verification.

@@ -71,9 +71,8 @@ Target, Spirit of Redemption, current player projections, and packet dispatch.
    consistent without counting the same kill twice.
 2. Apply honor-rank conditions and equipment/vendor requirements, and connect
    automatic Honorless Target application during world-entry transitions.
-3. Exercise real opposing players: shared and pet kills, repeat penalties,
-   gray and honorless rejection, client honor totals and combat feedback,
-   reconnect retention, and lifecycle cleanup. Calendar/ranking tests cover
+3. Extend client acceptance to those reward sources, rank requirements, and
+   automatic Honorless Target protection. Calendar/ranking tests cover
    settlement without waiting for a real weekly reset.
 
 Honorless Target rejection has automated coverage; its real-client acceptance
