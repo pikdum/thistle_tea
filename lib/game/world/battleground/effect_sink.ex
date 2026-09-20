@@ -42,13 +42,15 @@ defmodule ThistleTea.Game.World.Battleground.EffectSink do
   end
 
   defp emit_effect(match, %Effects.UpdateStatus{}) do
-    elapsed_ms = max(Time.now() - match.started_at, 0)
+    now = Time.now()
+    elapsed_ms = max(now - match.started_at, 0)
 
     packet = %Message.SmsgBattlefieldStatus{
       map: match.world.map_id,
       bracket: match.bracket,
       client_instance_id: match.client_instance_id,
       status: :in_progress,
+      time_one_ms: WarsongGulch.auto_leave_ms(match, now),
       time_two_ms: elapsed_ms
     }
 

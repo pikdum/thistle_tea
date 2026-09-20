@@ -2,10 +2,12 @@ defmodule ThistleTea.Game.World.System.BattlegroundTest do
   use ExUnit.Case, async: false
 
   alias ThistleTea.Game.Battleground.Effects.OperateGates
+  alias ThistleTea.Game.Battleground.Effects.Scoreboard
   alias ThistleTea.Game.Battleground.Effects.UpdateStatus
   alias ThistleTea.Game.Battleground.Template
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.World.Battleground.Match
   alias ThistleTea.Game.World.System.Battleground, as: BattlegroundSystem
   alias ThistleTea.Game.WorldRef
 
@@ -108,7 +110,7 @@ defmodule ThistleTea.Game.World.System.BattlegroundTest do
 
       assert :ok = BattlegroundSystem.port(1, 0, nil, server)
       assert %{status: :none} = BattlegroundSystem.status(1, server)
-      assert Enum.map(BattlegroundSystem.scoreboard(world, server), & &1.guid) == [2]
+      assert Enum.map(BattlegroundSystem.scoreboard(world, server).players, & &1.guid) == [2]
 
       assert :ok = BattlegroundSystem.join(alliance(3), 489, server)
       assert %{status: :wait_join, client_instance_id: 1} = BattlegroundSystem.status(3, server)
@@ -129,6 +131,31 @@ defmodule ThistleTea.Game.World.System.BattlegroundTest do
   end
 
   describe "debug controls" do
+    test "retains the winner and scores in repeated queries after victory", %{server: server} do
+      assert :ok = BattlegroundSystem.join(alliance(1), 489, server)
+      assert {:ok, _status} = BattlegroundSystem.debug_start_queued(1, server)
+      assert {:ok, world, _position} = BattlegroundSystem.port(1, 1, nil, server)
+      assert :ok = BattlegroundSystem.debug_start_now(world, server)
+      pid = BattlegroundSystem.match_for_world(world, server)
+
+      for capture <- 1..3 do
+        assert :handled = Match.use_game_object(pid, 1, 100, 179_831, {0.0, 0.0, 0.0, 0.0})
+        assert :handled = Match.area_trigger(pid, 1, 3646, nil, nil)
+        if capture < 3, do: send(pid, {:battleground_timer, {:flag_respawn, :horde, capture * 2}})
+      end
+
+      for _query <- 1..2 do
+        assert %Scoreboard{ended?: true, winner: :alliance, players: [player]} =
+                 BattlegroundSystem.scoreboard(world, server)
+
+        assert player.bonus_honor == 1386
+        assert player.fields == [3, 0]
+      end
+
+      assert %{auto_leave_ms: remaining} = BattlegroundSystem.status(1, server)
+      assert remaining > 119_000 and remaining <= 120_000
+    end
+
     test "invites one queued player into an isolated match and starts it immediately", %{server: server} do
       assert :ok = BattlegroundSystem.join(alliance(1), 489, server)
       assert %{status: :wait_queue} = BattlegroundSystem.status(1, server)

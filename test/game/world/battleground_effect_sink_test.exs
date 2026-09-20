@@ -14,6 +14,31 @@ defmodule ThistleTea.Game.World.BattlegroundEffectSinkTest do
   alias ThistleTea.Game.WorldRef
 
   describe "emit/2" do
+    test "publishes the victory exit countdown immediately" do
+      guid = Guid.from_low_guid(:player, System.unique_integer([:positive, :monotonic]))
+      Entity.register(guid)
+      now = Time.now()
+
+      match = %WarsongGulch{
+        world: WorldRef.instance(489, 7),
+        client_instance_id: 7,
+        bracket: 5,
+        template: %Template{},
+        phase: {:ended, :alliance},
+        started_at: now - 180_000,
+        ended_at: now - 1_000,
+        players: %{guid => %Player{guid: guid, name: "Debug", team: :alliance, status: :inside}}
+      }
+
+      EffectSink.emit(match, [%Effects.UpdateStatus{}])
+
+      assert_receive {:"$gen_cast",
+                      {:send_packet, %Message.SmsgBattlefieldStatus{time_one_ms: remaining, time_two_ms: elapsed}}}
+
+      assert remaining > 118_000 and remaining <= 119_000
+      assert elapsed >= 180_000
+    end
+
     test "credits the realm ledger and notifies the owner without adding a kill" do
       guid = Guid.from_low_guid(:player, System.unique_integer([:positive, :monotonic]))
       Entity.register(guid)

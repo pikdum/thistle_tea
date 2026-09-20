@@ -249,7 +249,7 @@ defmodule ThistleTea.Game.Battleground.WarsongGulch do
       match: match,
       effects: [
         %Effects.UpdateStatus{},
-        %Effects.Scoreboard{ended?: false, players: scoreboard(match)}
+        scoreboard_snapshot(match)
       ]
     }
   end
@@ -305,6 +305,18 @@ defmodule ThistleTea.Game.Battleground.WarsongGulch do
       {@world_state_flag_state_horde, carrier_world_state(alliance)}
     ]
   end
+
+  def scoreboard_snapshot(%__MODULE__{} = match) do
+    case match.phase do
+      {:ended, winner} -> %Effects.Scoreboard{ended?: true, winner: winner, players: scoreboard(match)}
+      _active -> %Effects.Scoreboard{ended?: false, players: scoreboard(match)}
+    end
+  end
+
+  def auto_leave_ms(%__MODULE__{ended_at: ended_at}, now) when is_integer(ended_at),
+    do: max(ended_at + @auto_leave_ms - now, 0)
+
+  def auto_leave_ms(%__MODULE__{}, _now), do: 0
 
   def scoreboard(%__MODULE__{} = match) do
     match.players
@@ -526,7 +538,6 @@ defmodule ThistleTea.Game.Battleground.WarsongGulch do
     {match, honor_reward} = reward_team_bonus(match, winner, Enum.at(@win_honor, match.bracket, 0))
     match = %{match | phase: {:ended, winner}, ended_at: now}
     aura_effects = carried_aura_effects(match)
-    players = scoreboard(match)
 
     %Result{
       match: match,
@@ -536,7 +547,8 @@ defmodule ThistleTea.Game.Battleground.WarsongGulch do
           [
             honor_reward,
             announce(win_text(winner), :neutral),
-            %Effects.Scoreboard{ended?: true, winner: winner, players: players},
+            %Effects.UpdateStatus{},
+            scoreboard_snapshot(match),
             %Effects.RewardPlayers{winner: winner, players: Map.values(match.players)}
           ],
       timers: [{:auto_leave, @auto_leave_ms}]

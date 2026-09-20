@@ -5,6 +5,8 @@ defmodule ThistleTea.Game.World.System.Battleground do
   use GenServer
 
   alias ThistleTea.Game.Battleground
+  alias ThistleTea.Game.Battleground.Effects.Scoreboard
+  alias ThistleTea.Game.Battleground.WarsongGulch
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.Battleground.EffectSink
@@ -264,7 +266,7 @@ defmodule ThistleTea.Game.World.System.Battleground do
 
   def handle_call({:scoreboard, world}, _from, state) do
     reply = with pid when is_pid(pid) <- Map.get(state.worlds, world), do: Match.scoreboard(pid)
-    {:reply, reply || [], state}
+    {:reply, reply || %Scoreboard{ended?: false, players: []}, state}
   end
 
   def handle_call({:world_states, world}, _from, state) do
@@ -547,11 +549,7 @@ defmodule ThistleTea.Game.World.System.Battleground do
         info = Map.fetch!(state.matches, pid)
         match = Match.snapshot(pid)
 
-        auto_leave_ms =
-          case match.ended_at do
-            ended_at when is_integer(ended_at) -> max(ended_at + 120_000 - Time.now(), 0)
-            _active -> 0
-          end
+        auto_leave_ms = WarsongGulch.auto_leave_ms(match, Time.now())
 
         %{
           status: :in_progress,

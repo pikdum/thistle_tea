@@ -170,8 +170,14 @@ defmodule ThistleTea.Game.Player.Battlegrounds do
   def queue_resurrection(state, _healer_guid), do: state
 
   def scoreboard(%{ready: true, character: %Character{} = character} = state) do
-    players = BattlegroundSystem.scoreboard(character.internal.world)
-    Network.send_packet(%Message.MsgPvpLogData{players: players})
+    scoreboard = BattlegroundSystem.scoreboard(character.internal.world)
+
+    Network.send_packet(%Message.MsgPvpLogData{
+      ended?: scoreboard.ended?,
+      winner: scoreboard.winner || :none,
+      players: scoreboard.players
+    })
+
     state
   end
 

@@ -129,7 +129,7 @@ defmodule ThistleTea.Game.World.Battleground.Match do
 
   def handle_call(:snapshot, _from, state), do: {:reply, state.match, state}
   def handle_call(:world_states, _from, state), do: {:reply, WarsongGulch.world_states(state.match), state}
-  def handle_call(:scoreboard, _from, state), do: {:reply, WarsongGulch.scoreboard(state.match), state}
+  def handle_call(:scoreboard, _from, state), do: {:reply, WarsongGulch.scoreboard_snapshot(state.match), state}
 
   def handle_call(:spirit_healer_time, _from, state) do
     {:reply, WarsongGulch.next_resurrection_ms(state.match, Time.now()), state}
