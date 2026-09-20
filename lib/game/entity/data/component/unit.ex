@@ -79,7 +79,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.Unit do
     created_by_spell: {0x0092, 1, :int},
     npc_flags: {0x0093, 1, :int},
     npc_emote_state: {0x0094, 1, :int},
-    training_points: {0x0095, 1, :two_short, :private},
+    training_points: {0x0095, 1, :int, :private},
     strength: {0x0096, 1, :int, :private},
     agility: {0x0097, 1, :int, :private},
     stamina: {0x0098, 1, :int, :private},

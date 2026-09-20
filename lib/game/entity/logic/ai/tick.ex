@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Tick do
   alias ThistleTea.Game.Entity.Logic.Breathing
   alias ThistleTea.Game.Entity.Logic.Intoxication
   alias ThistleTea.Game.Entity.Logic.PetHappiness
+  alias ThistleTea.Game.Entity.Logic.PetLoyalty
   alias ThistleTea.Game.Entity.Logic.Regen
   alias ThistleTea.Game.Spell.Cast
 
@@ -51,6 +52,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Tick do
     |> schedule_aura(entity)
     |> schedule_regen(entity)
     |> schedule_pet_happiness(entity)
+    |> schedule_pet_loyalty(entity)
     |> schedule_breathing(entity)
     |> schedule_sobering(entity)
   end
@@ -58,6 +60,13 @@ defmodule ThistleTea.Game.Entity.Logic.AI.Tick do
   defp schedule_pet_happiness(plan, entity) do
     case PetHappiness.next_tick_at(entity) do
       at when is_integer(at) -> TickPlan.schedule_at(plan, :pet_happiness, at)
+      _ -> plan
+    end
+  end
+
+  defp schedule_pet_loyalty(plan, entity) do
+    case PetLoyalty.next_tick_at(entity) do
+      at when is_integer(at) -> TickPlan.schedule_at(plan, :pet_loyalty, at)
       _ -> plan
     end
   end

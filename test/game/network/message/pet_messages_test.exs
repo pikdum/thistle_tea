@@ -14,6 +14,13 @@ defmodule ThistleTea.Game.Network.Message.PetMessagesTest do
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.World.Metadata
 
+  describe "SMSG_PET_BROKEN" do
+    test "encodes the empty vanilla notification" do
+      assert Message.SmsgPetBroken.to_binary(%Message.SmsgPetBroken{}) == <<>>
+      assert Message.SmsgPetBroken.opcode() == Opcodes.get(:SMSG_PET_BROKEN)
+    end
+  end
+
   test "pet client messages are registered for dispatch" do
     assert Dispatch.implemented?(Opcodes.get(:CMSG_PET_ACTION))
     assert Dispatch.implemented?(Opcodes.get(:CMSG_PET_NAME_QUERY))

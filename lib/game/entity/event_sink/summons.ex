@@ -328,6 +328,15 @@ defmodule ThistleTea.Game.Entity.EventSink.Summons do
     entity
   end
 
+  def emit(entity, %Effects.PetBroke{target_guid: guid} = effect, context) do
+    case Entity.pid(guid) do
+      pid when is_pid(pid) -> send(pid, effect)
+      _ -> Context.send(context, :pet_stop)
+    end
+
+    entity
+  end
+
   def emit(entity, %type{target_guid: guid} = effect, _context)
       when type in [
              Effects.PetHappinessChanged,

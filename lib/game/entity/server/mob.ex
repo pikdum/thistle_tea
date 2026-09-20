@@ -532,6 +532,14 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
   def handle_call(:feed_info, _from, %Mob{} = state), do: {:reply, {:error, :not_pet}, state}
 
+  def handle_call(
+        :suspend_hunter_pet,
+        _from,
+        %Mob{internal: %Internal{pet: %Pet{kind: :hunter, broken?: true}}} = state
+      ) do
+    {:stop, :normal, {:error, :pet_broken}, state}
+  end
+
   def handle_call(:suspend_hunter_pet, _from, %Mob{internal: %Internal{pet: %Pet{kind: :hunter}}} = state) do
     snapshot =
       {:ok, state.unit.power5, Core.dead?(state), PetProgression.snapshot(state), state.internal.pet.reaction_state}

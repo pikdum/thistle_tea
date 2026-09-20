@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Entity.Logic.PetHappiness do
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Logic.PetLoyalty
   alias ThistleTea.Game.Entity.Logic.Stats
 
   @level_size 333_000
@@ -70,6 +71,7 @@ defmodule ThistleTea.Game.Entity.Logic.PetHappiness do
 
     pet
     |> schedule(nil)
+    |> PetLoyalty.pause()
     |> Effects.enqueue(%Effects.PetDied{source_guid: pet.object.guid, target_guid: pet.internal.pet.owner_guid})
   end
 

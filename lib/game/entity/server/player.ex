@@ -1013,6 +1013,22 @@ defmodule ThistleTea.Game.Entity.Server.Player do
     {:noreply, %{state | character: character}}
   end
 
+  def handle_info(%Effects.PetBroke{source_guid: guid}, %State{character: %Character{}} = state) do
+    case CompanionOwner.detach(state, guid, :broken) do
+      {:ok, entity_ref, state} ->
+        World.stop_entity(guid)
+        Network.send_packet(%Message.SmsgPetBroken{})
+        {:noreply, project_companion_detachment(state, entity_ref), {:continue, :maybe_broadcast_update}}
+
+      :stale ->
+        {:noreply, state}
+    end
+  rescue
+    error ->
+      Logger.error("pet_broke crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:noreply, state}
+  end
+
   def handle_info(%Effects.PetDied{source_guid: guid}, %State{character: %Character{}} = state) do
     character = Companion.remember_death(state.character, guid)
     {:noreply, %{state | character: character}}
@@ -1039,6 +1055,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
              Effects.PetHappinessChanged,
              Effects.PetProgressChanged,
              Effects.PetReactionChanged,
+             Effects.PetBroke,
              Effects.PetDied
            ] do
     {:noreply, state}

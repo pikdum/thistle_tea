@@ -25,6 +25,7 @@ defmodule ThistleTea.Game.Entity.Logic.PetProgressionTest do
       assert updated.unit.pet_experience == 73
       assert updated.unit.pet_next_level_exp == 1_350
       assert updated.unit.health == pet.unit.health
+      assert updated.internal.pet.loyalty_points == 1_014
 
       assert [%PetProgressChanged{source_guid: 2, target_guid: 1, progress: %PetProgress{level: 8, xp: 73}}] =
                updated.internal.events
@@ -72,6 +73,19 @@ defmodule ThistleTea.Game.Entity.Logic.PetProgressionTest do
       assert updated.unit.health == 226
       assert Stats.recompute(updated.unit) == updated.unit
       assert Stats.recompute(%{updated.unit | auras: []}).max_health == 176
+    end
+
+    test "level gains award training points before the kill loyalty bonus", %{pet: pet, levels: levels} do
+      progress = %PetProgress{level: 8, loyalty: 3, loyalty_points: 16_999, training_points: 7}
+      pet = PetProgression.initialize(pet, progress, levels)
+      updated = PetProgression.gain(pet, 100_000, 10, levels)
+      assert updated.unit.level == 10
+      assert updated.unit.pet_loyalty == 4
+      assert updated.internal.pet.training_points == 21
+      assert updated.internal.pet.loyalty_points == 10_000
+      assert updated.unit.training_points == -22
+      assert length(updated.internal.events) == 1
+      assert PetProgression.gain(updated, 100, 10, levels) == updated
     end
 
     test "ignores corpses, other companions, nonpositive rewards and capped pets", %{pet: pet, levels: levels} do

@@ -14,18 +14,27 @@ defmodule ThistleTea.Game.Entity.Logic.PetProgression do
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Experience
+  alias ThistleTea.Game.Entity.Logic.PetLoyalty
   alias ThistleTea.Game.Entity.Logic.Stats
 
   @max_level 60
 
-  def snapshot(%Mob{internal: %Internal{pet: %Pet{kind: :hunter}, spellbook: spellbook}, unit: %Unit{} = unit}) do
-    %PetProgress{level: unit.level, xp: unit.pet_experience || 0, spells: Map.keys(spellbook || %{}) |> Enum.sort()}
+  def snapshot(%Mob{internal: %Internal{pet: %Pet{kind: :hunter} = pet, spellbook: spellbook}, unit: %Unit{} = unit}) do
+    %PetProgress{
+      level: unit.level,
+      xp: unit.pet_experience || 0,
+      spells: Map.keys(spellbook || %{}) |> Enum.sort(),
+      loyalty: unit.pet_loyalty,
+      loyalty_points: pet.loyalty_points,
+      training_points: pet.training_points
+    }
   end
 
   def snapshot(_entity), do: nil
 
   def initialize(%Mob{internal: %Internal{pet: %Pet{kind: :hunter}}} = pet, %PetProgress{} = progress, levels) do
     pet = apply_level(pet, Map.fetch!(levels, progress.level))
+    pet = PetLoyalty.initialize(pet, progress)
     %{pet | unit: %{pet.unit | pet_experience: max(progress.xp, 0)}}
   end
 
@@ -36,7 +45,8 @@ defmodule ThistleTea.Game.Entity.Logic.PetProgression do
   def reward(_pet, _reward), do: 0
 
   def gain(
-        %Mob{internal: %Internal{pet: %Pet{kind: :hunter}}, unit: %Unit{health: health, level: level}} = pet,
+        %Mob{internal: %Internal{pet: %Pet{kind: :hunter, broken?: false}}, unit: %Unit{health: health, level: level}} =
+          pet,
         amount,
         owner_level,
         levels
@@ -45,6 +55,7 @@ defmodule ThistleTea.Game.Entity.Logic.PetProgression do
              level < owner_level and level < @max_level do
     pet
     |> advance((pet.unit.pet_experience || 0) + amount, min(owner_level, @max_level), levels)
+    |> PetLoyalty.kill_bonus()
     |> publish()
     |> Core.mark_broadcast_update()
   end
@@ -55,14 +66,21 @@ defmodule ThistleTea.Game.Entity.Logic.PetProgression do
     cost = Map.fetch!(levels, level).next_level_xp
 
     cond do
-      level >= cap -> %{pet | unit: %{pet.unit | pet_experience: 0}}
-      cost <= 0 -> pet
-      xp < cost -> %{pet | unit: %{pet.unit | pet_experience: xp, pet_next_level_exp: cost}}
-      true -> pet |> apply_level(Map.fetch!(levels, level + 1)) |> advance(xp - cost, cap, levels)
+      level >= cap ->
+        %{pet | unit: %{pet.unit | pet_experience: 0}}
+
+      cost <= 0 ->
+        pet
+
+      xp < cost ->
+        %{pet | unit: %{pet.unit | pet_experience: xp, pet_next_level_exp: cost}}
+
+      true ->
+        pet |> apply_level(Map.fetch!(levels, level + 1)) |> PetLoyalty.level_up() |> advance(xp - cost, cap, levels)
     end
   end
 
-  defp publish(%Mob{} = pet) do
+  def publish(%Mob{} = pet) do
     Effects.enqueue(pet, %Effects.PetProgressChanged{
       source_guid: pet.object.guid,
       target_guid: pet.internal.pet.owner_guid,

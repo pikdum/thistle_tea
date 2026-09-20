@@ -28,6 +28,7 @@ defmodule ThistleTea.Game.Entity.Logic.Effects.SummonTypes do
     {:PetProgressChanged, [:source_guid, :target_guid, :progress], []},
     {:PetReactionChanged, [:source_guid, :target_guid, :reaction_state], []},
     {:PetDied, [:source_guid, :target_guid], []},
+    {:PetBroke, [:source_guid, :target_guid], []},
     {:SummonTotem, [:entry, :slot, :duration_ms], []},
     {:DespawnSelf, [:duration_ms, :respawn_delay_ms], []},
     {:RespawnSelf, [:even_if_alive?], []}

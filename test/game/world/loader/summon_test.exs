@@ -126,7 +126,14 @@ defmodule ThistleTea.Game.World.Loader.SummonTest do
       owner =
         owner
         |> Companion.suspend_as(:hunter_pet, 2960, 1515)
-        |> Companion.capture_progress(%PetProgress{level: 50, xp: 123, spells: [2649]})
+        |> Companion.capture_progress(%PetProgress{
+          level: 50,
+          xp: 123,
+          spells: [2649],
+          loyalty: 4,
+          loyalty_points: 12_345,
+          training_points: 45
+        })
         |> Companion.capture_reaction(:passive)
 
       pet = Summon.build_pet(2960, owner)
@@ -135,6 +142,11 @@ defmodule ThistleTea.Game.World.Loader.SummonTest do
       assert pet.unit.pet_next_level_exp == 36_875
       assert Map.keys(pet.internal.spellbook) == [2649]
       assert pet.internal.pet.reaction_state == :passive
+      assert pet.unit.pet_loyalty == 4
+      assert pet.internal.pet.loyalty_points == 12_345
+      assert pet.internal.pet.training_points == 45
+      assert pet.unit.training_points == -46
+      assert pet.internal.pet.next_loyalty_at == nil
     end
   end
 end

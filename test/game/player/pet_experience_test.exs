@@ -112,7 +112,7 @@ defmodule ThistleTea.Game.Player.PetExperienceTest do
 
     pet = %Mob{
       object: %Object{guid: guid},
-      unit: %Unit{level: 50, health: 100, pet_experience: 0},
+      unit: %Unit{level: 50, health: 100, pet_experience: 0, pet_loyalty: 1},
       internal: %Internal{pet: %Pet{kind: :hunter, owner_guid: 1}}
     }
 

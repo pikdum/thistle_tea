@@ -111,6 +111,9 @@ defmodule ThistleTea.Game.Entity.Server.Player.CompanionOwner do
           |> CompanionLogic.capture_progress(progress)
           |> CompanionLogic.capture_reaction(reaction)
 
+        {:error, :pet_broken} ->
+          CompanionLogic.clear(character)
+
         _ ->
           character
       end

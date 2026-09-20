@@ -155,6 +155,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Pet do
 
   def restore_autocast(%Mob{} = state, %MapSet{}), do: state
 
+  defp dead?(%Mob{internal: %Internal{pet: %Pet{broken?: true}}}, _blackboard), do: true
   defp dead?(state, _blackboard), do: Core.dead?(state)
 
   defp in_combat?(%Mob{internal: %Internal{in_combat: true}, unit: %Unit{target: target}}, _blackboard)
