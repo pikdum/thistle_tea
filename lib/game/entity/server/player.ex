@@ -274,7 +274,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   end
 
   def handle_cast({:pvp_contact, %Effects.PvpContact{} = effect}, %{character: %Character{} = character} = state) do
-    character = Pvp.contact(character, effect.role, effect.other, effect.now)
+    character = Pvp.contact(character, effect.role, effect.other, effect.now, effect.combat?)
     state = TickScheduler.ensure_scheduled(%{state | character: character})
     {:noreply, state, {:continue, :maybe_broadcast_update}}
   rescue

@@ -11,6 +11,83 @@ defmodule ThistleTea.Game.Entity.EffectResolver.PvpTest do
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Pvp, as: PvpLogic
   alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.Effect
+  alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
+
+  describe "spell_contacts/6" do
+    @tag :dbc_db
+    test "Beast Lore and Mind Vision do not flag their caster" do
+      rows = %{2 => %{pvp?: true, in_combat: true, pvp_combat?: true, contested_pvp?: true}}
+
+      for id <- [1462, 2096] do
+        spell = SpellLoader.load(id)
+        assert Pvp.spell_contacts(character(1), 1, 2, spell, :hit, metadata: &Map.get(rows, &1), now: 0) == []
+      end
+    end
+
+    test "combat-free hostility flags both players without starting combat" do
+      spell = %Spell{
+        effects: [%Effect{type: :apply_aura, implicit_target_a: :target_enemy}],
+        attributes: MapSet.new([:no_threat, :pvp_enabling])
+      }
+
+      rows = %{2 => %{pvp?: true}}
+      effects = Pvp.spell_contacts(character(1), 1, 2, spell, :hit, metadata: &Map.get(rows, &1), now: 0)
+      assert [%Effects.PvpContact{combat?: false} = attack, %Effects.PvpContact{combat?: false} = attacked] = effects
+      caster = EventSink.emit(character(1), attack)
+      victim = EventSink.emit(character(2), attacked)
+      assert PvpLogic.active?(caster)
+      assert PvpLogic.contested?(caster)
+      assert PvpLogic.active?(victim)
+      refute PvpLogic.contested?(victim)
+      refute caster.internal.in_combat
+      refute victim.internal.in_combat
+      refute PvpLogic.combat?(caster)
+      refute PvpLogic.contested?(PvpLogic.tick(caster, 30_000))
+    end
+
+    test "threat-on-miss spells flag and enter combat only on a miss" do
+      spell = %Spell{
+        effects: [%Effect{type: :apply_aura, implicit_target_a: :target_enemy}],
+        attributes: MapSet.new([:threat_only_on_miss])
+      }
+
+      rows = %{2 => %{pvp?: true}}
+      opts = [metadata: &Map.get(rows, &1), now: 0]
+      assert Pvp.spell_contacts(character(1), 1, 2, spell, :hit, opts) == []
+
+      assert [%Effects.PvpContact{combat?: true}, %Effects.PvpContact{combat?: true}] =
+               Pvp.spell_contacts(character(1), 1, 2, spell, :miss, opts)
+    end
+
+    test "no-threat assistance flags without inheriting combat or contested status" do
+      spell = %Spell{
+        effects: [%Effect{type: :apply_aura, implicit_target_a: :target_ally}],
+        attributes: MapSet.new([:no_threat])
+      }
+
+      rows = %{2 => %{pvp?: true, in_combat: true, pvp_combat?: true, contested_pvp?: true}}
+      [effect] = Pvp.spell_contacts(character(1), 1, 2, spell, :hit, metadata: &Map.get(rows, &1), now: 0)
+      caster = EventSink.emit(character(1), effect)
+      assert PvpLogic.active?(caster)
+      refute caster.internal.in_combat
+      refute PvpLogic.contested?(caster)
+    end
+
+    test "no-threat assistance does not flag for a PvP creature" do
+      mob = Guid.from_low_guid(:mob, 1, 1)
+
+      spell = %Spell{
+        effects: [%Effect{type: :heal, implicit_target_a: :target_ally}],
+        attributes: MapSet.new([:no_threat])
+      }
+
+      rows = %{mob => %{unit_flags: 0x1000, in_combat: true}}
+      effects = Pvp.spell_contacts(character(1), 1, mob, spell, :hit, metadata: &Map.get(rows, &1), now: 0)
+      refute character(1) |> EventSink.emit(effects) |> PvpLogic.active?()
+    end
+  end
 
   describe "contacts/5" do
     test "resolves a pet attack to both players and applies the owner's flags" do

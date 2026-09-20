@@ -6,7 +6,7 @@ defmodule ThistleTea.Game.Entity.Logic.Effects.CombatTypes do
     {:DurabilityLoss, [:target_guid, :mode, :amount, :scope], [death?: false]},
     {:EnvironmentalDamage, [:type, :damage], []},
     {:DeliverAttack, [:target_guid, :attack], []},
-    {:PvpContact, [:target_guid, :role, :other, :now], []},
+    {:PvpContact, [:target_guid, :role, :other, :now], [combat?: true]},
     {:PvpFlagsChanged, [:enabled?], []},
     {:AttackStart, [:source_guid, :target_guid], []},
     {:StartAttack, [:target_guid], []},

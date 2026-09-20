@@ -57,6 +57,7 @@ defmodule ThistleTea.Game.World.Presence do
       viewpoint: viewpoint(character),
       creature_type: Character.creature_type(character),
       pvp?: Pvp.active?(character),
+      pvp_combat?: Pvp.combat?(character),
       free_for_all?: Pvp.free_for_all?(character),
       contested_pvp?: Pvp.contested?(character),
       group_id: group_id(character.object.guid)

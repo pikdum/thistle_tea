@@ -82,7 +82,7 @@ defmodule ThistleTea.Game.Entity.Logic.PvpTest do
     end
 
     test "assisting a flagged ally propagates contested combat", %{character: character} do
-      assisted = %{player() | in_combat: true, contested_pvp?: true}
+      assisted = %{player() | in_combat: true, contested_pvp?: true, pvp_combat?: true}
       flagged = Pvp.contact(character, :assist, assisted, 0)
       assert Pvp.active?(flagged)
       assert Pvp.contested?(flagged)
@@ -94,6 +94,14 @@ defmodule ThistleTea.Game.Entity.Logic.PvpTest do
       assert Pvp.active?(flagged)
       refute flagged.internal.pvp.combat?
       refute Pvp.contested?(flagged)
+    end
+
+    test "assisting ordinary creature combat does not pause the PvP countdown", %{character: character} do
+      assisted = %{player() | in_combat: true}
+      flagged = Pvp.contact(character, :assist, assisted, 0)
+      assert flagged.internal.in_combat
+      refute Pvp.combat?(flagged)
+      refute Pvp.active?(Pvp.tick(flagged, 300_000))
     end
 
     test "unflagged targets and own pets do not flag", %{character: character} do
@@ -213,7 +221,7 @@ defmodule ThistleTea.Game.Entity.Logic.PvpTest do
   end
 
   defp player do
-    %{player_guid: 2, pvp?: true, contested_pvp?: false, free_for_all?: false, in_combat: false}
+    %{player_guid: 2, pvp?: true, pvp_combat?: false, contested_pvp?: false, free_for_all?: false, in_combat: false}
   end
 
   defp character(_context) do

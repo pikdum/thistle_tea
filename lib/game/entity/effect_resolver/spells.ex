@@ -22,7 +22,7 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
   def resolve(_entity, %Effects.DeliverSpell{} = effect), do: [effect]
 
   def resolve(entity, %Effects.DeliverSpellOutcome{} = effect) do
-    spell_contacts(entity, effect.source_guid, effect.target_guid, effect.spell) ++ [effect]
+    Pvp.spell_contacts(entity, effect.source_guid, effect.target_guid, effect.spell, :miss) ++ [effect]
   end
 
   def resolve(entity, %Effects.SpellDamage{periodic?: true} = effect) do
@@ -87,16 +87,8 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
   end
 
   def resolved_delivery(entity, %Effects.DeliverSpell{} = effect) do
-    spell_contacts(entity, effect.cast_context.caster_guid, effect.target_guid, effect.spell) ++
+    Pvp.spell_contacts(entity, effect.cast_context.caster_guid, effect.target_guid, effect.spell, :hit) ++
       [%{effect | delay_ms: projectile_delay_ms(entity, effect)}]
-  end
-
-  defp spell_contacts(entity, source, target, spell) do
-    cond do
-      Spell.starts_combat?(spell) -> Pvp.contacts(entity, source, target, :attack)
-      not Spell.harmful?(spell) -> Pvp.contacts(entity, source, target, :assist)
-      true -> []
-    end
   end
 
   defp resolve_trigger(entity, effect, spell) do

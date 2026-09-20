@@ -20,7 +20,7 @@ defmodule ThistleTea.Game.Entity.EventSink.Combat do
   @victimstate_normal 1
 
   def emit(%Character{object: %{guid: guid}} = entity, %Effects.PvpContact{target_guid: guid} = effect, _context) do
-    Pvp.contact(entity, effect.role, effect.other, effect.now)
+    Pvp.contact(entity, effect.role, effect.other, effect.now, effect.combat?)
   end
 
   def emit(entity, %Effects.PvpContact{} = effect, _context) do

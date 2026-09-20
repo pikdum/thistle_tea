@@ -46,31 +46,43 @@ defmodule ThistleTea.Game.Entity.Logic.Pvp do
     put(character, pvp)
   end
 
-  def contact(%Character{} = character, role, other, now) when role in [:attack, :attacked, :assist] do
+  def contact(character, role, other, now, combat? \\ true)
+
+  def contact(%Character{} = character, role, other, now, combat?) when role in [:attack, :attacked, :assist] do
     now = max(now, character.internal.pvp.updated_at || now)
     character = tick(character, now)
 
-    if flags_contact?(character, role, other) do
-      refresh_contact(character, role, other, now)
+    if flags_contact?(character, role, other, combat?) do
+      refresh_contact(character, role, other, now, combat?)
     else
       character
     end
   end
 
-  def contact(entity, _role, _other, _now), do: entity
+  def contact(entity, _role, _other, _now, _combat?), do: entity
 
-  defp refresh_contact(character, role, other, now) do
+  defp refresh_contact(character, role, other, now, combat_allowed?) do
     pvp = character.internal.pvp
-    combat? = role != :assist or Map.get(other, :in_combat, false)
-    remaining = if contested_contact?(role, other), do: @contested_duration_ms, else: pvp.contested_remaining_ms
-    pvp = %{pvp | remaining_ms: @pvp_duration_ms, combat?: pvp.combat? or combat?, contested_remaining_ms: remaining}
+    combat? = combat_allowed? and (role != :assist or Map.get(other, :in_combat, false))
+    pvp_combat? = combat? and (role != :assist or Map.get(other, :pvp_combat?, false))
+
+    remaining =
+      if contested_contact?(role, other, combat?), do: @contested_duration_ms, else: pvp.contested_remaining_ms
+
+    pvp = %{
+      pvp
+      | remaining_ms: @pvp_duration_ms,
+        combat?: pvp.combat? or pvp_combat?,
+        contested_remaining_ms: remaining
+    }
+
     character = put(character, pvp)
     if combat? and not Core.dead?(character), do: PlayerCombat.mark_initiated(character, now), else: character
   end
 
-  defp contested_contact?(:attack, other), do: is_integer(other.player_guid)
-  defp contested_contact?(:assist, other), do: other.in_combat and other.contested_pvp?
-  defp contested_contact?(_role, _other), do: false
+  defp contested_contact?(:attack, other, _combat?), do: is_integer(other.player_guid)
+  defp contested_contact?(:assist, other, combat?), do: combat? and other.contested_pvp?
+  defp contested_contact?(_role, _other, _combat?), do: false
 
   def tick(%Character{} = character, now) when is_integer(now) do
     pvp = character.internal.pvp
@@ -108,6 +120,10 @@ defmodule ThistleTea.Game.Entity.Logic.Pvp do
   def contested?(%Character{internal: %{pvp: %Pvp{contested_remaining_ms: remaining}}}), do: remaining > 0
   def contested?(_entity), do: false
 
+  def combat?(%Character{} = character) do
+    character.internal.pvp.combat? and character.internal.in_combat == true and not Core.dead?(character)
+  end
+
   def needs_tick?(%Character{internal: %{pvp: %Pvp{} = pvp}}) do
     pvp.remaining_ms > 0 or pvp.contested_remaining_ms > 0
   end
@@ -116,7 +132,7 @@ defmodule ThistleTea.Game.Entity.Logic.Pvp do
 
   def unit_flags(flags, enabled), do: set_flag(flags, @unit_pvp, enabled)
 
-  defp flags_contact?(character, role, %{pvp?: true, player_guid: player_guid} = other) do
+  defp flags_contact?(character, role, %{pvp?: true, player_guid: player_guid} = other, combat?) do
     own_guid = character.object.guid
 
     cond do
@@ -124,12 +140,12 @@ defmodule ThistleTea.Game.Entity.Logic.Pvp do
       duel_opponent?(character, player_guid) -> false
       arena_opponents?(character, other) -> false
       role == :attacked -> is_integer(player_guid)
-      role == :assist -> is_integer(player_guid) or Map.get(other, :in_combat, false)
+      role == :assist -> is_integer(player_guid) or (combat? and Map.get(other, :in_combat, false))
       true -> true
     end
   end
 
-  defp flags_contact?(_character, _role, _other), do: false
+  defp flags_contact?(_character, _role, _other, _combat?), do: false
 
   defp duel_opponent?(character, player_guid) do
     Dueling.active?(character) and Dueling.opponent_guid(character) == player_guid
