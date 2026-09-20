@@ -977,6 +977,17 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     {:noreply, state}
   end
 
+  def handle_info(:tame_stop, %Mob{} = state) do
+    state = state |> Engagement.leave(:tamed) |> Map.fetch!(:entity) |> EventSink.emit_pending()
+    pid = self()
+    Task.start(fn -> World.stop_entity(pid) end)
+    {:noreply, state}
+  rescue
+    error ->
+      Logger.error("tame_stop crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:noreply, state}
+  end
+
   def handle_info(:totem_stop, %Mob{internal: %Internal{totem: %Totem{}}} = state) do
     {:stop, :normal, state}
   end

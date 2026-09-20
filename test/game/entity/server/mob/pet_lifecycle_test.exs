@@ -19,6 +19,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob.PetLifecycleTest do
   alias ThistleTea.Game.Entity.EventSink.Context
   alias ThistleTea.Game.Entity.Logic.Companion
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Logic.Engagement
   alias ThistleTea.Game.Entity.Logic.PetLoyalty
   alias ThistleTea.Game.Entity.Server.Mob, as: MobServer
   alias ThistleTea.Game.Entity.Server.Player, as: PlayerServer
@@ -29,13 +30,32 @@ defmodule ThistleTea.Game.Entity.Server.Mob.PetLifecycleTest do
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Player.PetTraining
   alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Loader.PetTraining, as: TrainingLoader
+  alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Presence
   alias ThistleTea.Game.WorldRef
 
   setup [:build_pet]
+
+  describe "taming lifecycle" do
+    test "stops the wild creature without leaving threat or world projections", %{pet: pet, guid: guid, owner: owner} do
+      wild = %{pet | internal: %{pet.internal | pet: nil}}
+      wild = Engagement.enter(wild, owner, ThistleTea.Game.Time.now()).entity
+      {:ok, pid} = World.start_entity(wild)
+      ref = Process.monitor(pid)
+      spell = %Spell{id: 13_481, effects: [%Effect{index: 0, type: :tame_creature}]}
+      Entity.receive_spell(guid, %CastContext{caster_guid: owner, caster_level: 50}, spell)
+      assert_receive {:tame_pet, 2960, 49}, 1_000
+      assert_receive {:DOWN, ^ref, :process, ^pid, :shutdown}, 1_000
+      assert_receive {:"$gen_cast", {:threat_ref_lost, ^guid, _incarnation}}, 1_000
+      refute Entity.online?(guid)
+      assert Metadata.get(guid) == nil
+      assert World.position(guid) == nil
+    end
+  end
 
   describe "pet training lifecycle" do
     setup [:training_catalogue]
