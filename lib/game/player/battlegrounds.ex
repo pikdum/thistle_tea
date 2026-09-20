@@ -4,6 +4,7 @@ defmodule ThistleTea.Game.Player.Battlegrounds do
   """
 
   alias ThistleTea.Game.Battleground
+  alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Logic.Death
   alias ThistleTea.Game.Guid
@@ -131,8 +132,8 @@ defmodule ThistleTea.Game.Player.Battlegrounds do
 
   def leave(%{ready: true, character: %Character{} = character} = state) do
     case BattlegroundSystem.leave(state.guid, character.movement_block.position) do
-      {:ok, {world, {x, y, z, orientation}}} ->
-        GenServer.cast(self(), {:start_teleport, x, y, z, orientation, world})
+      {:ok, {world, position}} ->
+        Entity.battleground_exit(state.guid, world, position)
 
       _ ->
         :ok

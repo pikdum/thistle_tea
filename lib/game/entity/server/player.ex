@@ -532,6 +532,14 @@ defmodule ThistleTea.Game.Entity.Server.Player do
     {:noreply, %{state | character: character}, {:continue, :maybe_broadcast_update}}
   end
 
+  def handle_cast({:battleground_exit, world, {x, y, z, orientation}}, %{character: %Character{} = character} = state) do
+    World.stop_entity(Corpse.guid_for(state.guid))
+    {character, events} = Death.leave_battleground(character, Time.now())
+    state = maybe_broadcast_update(%{state | character: EventSink.emit(character, events)})
+    Visibility.notify_visibility_changed(state.character)
+    handle_cast({:start_teleport, x, y, z, orientation, world}, state)
+  end
+
   def handle_cast({:battleground_resurrect, position}, %{character: %Character{} = character} = state) do
     if Death.alive?(character) do
       {:noreply, state}

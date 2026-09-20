@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Entity.Logic.DeathTest do
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Death
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Spell
@@ -171,6 +172,44 @@ defmodule ThistleTea.Game.Entity.Logic.DeathTest do
       assert character.unit.target == 0
       assert (character.unit.flags &&& 0x00080000) == 0
       assert Enum.any?(events, &match?(%Effects.DropThreat{target_guid: ^mob_guid}, &1))
+    end
+  end
+
+  describe "leave_battleground/2" do
+    test "fully restores dead players and released ghosts without sickness" do
+      {ghost, _events} = Death.release_spirit(fixture_character(), [ghost_spell_fixture()], @now)
+
+      for victim <- [fixture_character(), ghost] do
+        {character, _events} = Death.leave_battleground(victim, @now + 1)
+        assert Death.alive?(character)
+        assert character.unit.health == 100
+        assert character.unit.power1 == 80
+        assert character.unit.auras == []
+        assert character.movement_block.run_speed == 7.0
+      end
+    end
+
+    test "cancels the spirit form and its delayed suicide while retaining the talent" do
+      talent = %Holder{spell: %Spell{id: 20_711, attributes: MapSet.new([:passive])}}
+
+      spirits =
+        Enum.map([27_827, 27_792, 27_795], fn id ->
+          %Holder{spell: %Spell{id: id}, caster_guid: 5, caster_level: 60, expires_at: @now + 15_000}
+        end)
+
+      character = fixture_character(health: 10)
+      character = %{character | unit: %{character.unit | auras: [talent | spirits]}}
+      {character, events} = Death.leave_battleground(character, @now + 1)
+      {character, expiry_events} = Aura.tick(character, @now + 20_000)
+
+      assert character.unit.health == 100
+      assert character.unit.auras == [talent]
+      refute Enum.any?(events ++ expiry_events, &match?(%Effects.TriggerSpell{spell_id: 27_965}, &1))
+    end
+
+    test "does not refill a living participant's health or resources" do
+      character = fixture_character(health: 10)
+      assert Death.leave_battleground(character, @now) == {character, []}
     end
   end
 

@@ -14,6 +14,17 @@ defmodule ThistleTea.Game.World.BattlegroundEffectSinkTest do
   alias ThistleTea.Game.WorldRef
 
   describe "emit/2" do
+    test "routes timed and trigger exits through the player's resurrection cleanup" do
+      guid = Guid.from_low_guid(:player, System.unique_integer([:positive, :monotonic]))
+      Entity.register(guid)
+      world = WorldRef.open(0)
+      position = {1.0, 2.0, 3.0, 4.0}
+      match = %WarsongGulch{world: WorldRef.instance(489, 7), client_instance_id: 7, bracket: 5, template: %Template{}}
+
+      EffectSink.emit(match, [%Effects.ExitPlayers{destinations: %{guid => {world, position}}}])
+      assert_receive {:"$gen_cast", {:battleground_exit, ^world, ^position}}
+    end
+
     test "publishes the victory exit countdown immediately" do
       guid = Guid.from_low_guid(:player, System.unique_integer([:positive, :monotonic]))
       Entity.register(guid)

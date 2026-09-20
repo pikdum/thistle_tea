@@ -23,6 +23,9 @@ in [honor-rewards-playtest.md](honor-rewards-playtest.md).
   Pet killing blows credit their controlling player. Spirit of Redemption
   credits the initial defeat and drops the flag immediately, then records one
   death when the form expires. Warsong scoring requires an active match.
+- Voluntary, exit-trigger, and timed battleground exits share owner cleanup:
+  dead players and ghosts regain full health and resources, corpses disappear,
+  and Spirit of Redemption ends without a delayed suicide outside the match.
 - Daily records distinguish honorable kills, dishonorable kills, and bonus
   contribution. Dishonorable kills immediately reduce rank points without
   subtracting weekly contribution or the highest rank previously earned.

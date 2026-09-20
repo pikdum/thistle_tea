@@ -161,7 +161,7 @@ defmodule ThistleTea.Game.World.Battleground.EffectSink do
   defp emit_effect(_match, %Effects.ExitPlayers{destinations: destinations}) do
     Enum.each(destinations, fn {guid, destination} ->
       case destination do
-        {world, {x, y, z, orientation}} -> Entity.teleport(guid, world, {x, y, z, orientation})
+        {world, {x, y, z, orientation}} -> Entity.battleground_exit(guid, world, {x, y, z, orientation})
         _missing -> :ok
       end
     end)

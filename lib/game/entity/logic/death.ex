@@ -17,6 +17,7 @@ defmodule ThistleTea.Game.Entity.Logic.Death do
   @ghost_spell_id 8326
   @wisp_spell_id 20_584
   @resurrection_sickness_spell_id 15_007
+  @spirit_of_redemption_spells [27_827, 27_792, 27_795]
   @night_elf_race 4
 
   @player_flag_ghost 0x10
@@ -43,6 +44,18 @@ defmodule ThistleTea.Game.Entity.Logic.Death do
   def ghost?(_entity), do: false
 
   def alive?(entity), do: not Core.dead?(entity) and not ghost?(entity)
+
+  def leave_battleground(%{unit: %Unit{auras: holders}} = character, now) do
+    spirit? = Enum.any?(holders || [], &(&1.spell.id in @spirit_of_redemption_spells))
+
+    if spirit? or not alive?(character) do
+      {character, removal_events} = Aura.remove_spells(character, @spirit_of_redemption_spells, now)
+      {character, resurrection_events} = resurrect(character, 1.0, now)
+      {character, removal_events ++ resurrection_events}
+    else
+      {character, []}
+    end
+  end
 
   def release_spirit(%{unit: %Unit{}, player: %Player{}} = character, ghost_spells, now) do
     {character, combat_events} = PlayerCombat.disengage(character)
