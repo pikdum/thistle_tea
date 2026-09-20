@@ -90,8 +90,12 @@ defmodule ThistleTea.Game.Entity.Logic.Companion do
 
   def capture_death(%Character{} = character, dead?) when is_boolean(dead?) do
     case relationship(character) do
-      %Companion{kind: :hunter_pet} = companion -> put_relationship(character, %{companion | dead?: dead?})
-      _ -> character
+      %Companion{kind: :hunter_pet} = companion ->
+        health = if dead?, do: 0, else: companion.health
+        put_relationship(character, %{companion | dead?: dead?, health: health})
+
+      _ ->
+        character
     end
   end
 

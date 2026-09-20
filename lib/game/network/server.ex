@@ -83,11 +83,11 @@ defmodule ThistleTea.Game.Network.Server do
 
   def handle_info(
         {:DOWN, monitor, :process, player_pid, reason},
-        {_socket, %ConnectionState{player_pid: player_pid, player_monitor: monitor} = state}
+        {socket, %ConnectionState{player_pid: player_pid, player_monitor: monitor} = state}
       )
       when reason != :normal do
     Logger.error("player entity stopped: #{inspect(reason)}")
-    {:close, ConnectionState.clear_player(state)}
+    {:stop, {:shutdown, :local_closed}, {socket, ConnectionState.clear_player(state)}}
   end
 
   def handle_info(

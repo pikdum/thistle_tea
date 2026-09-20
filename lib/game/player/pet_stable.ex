@@ -153,6 +153,13 @@ defmodule ThistleTea.Game.Player.PetStable do
 
     state = CompanionOwner.attach(state, attachment)
     send(pid, {:attach_pet, self(), spell_id, attachment.spells})
+
+    Network.send_packet(%Message.SmsgPetNameQueryResponse{
+      pet_number: state.character.internal.companion.pet_number,
+      name: pet.internal.name,
+      timestamp: pet.unit.pet_name_timestamp
+    })
+
     state
   end
 

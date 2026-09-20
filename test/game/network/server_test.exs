@@ -120,8 +120,10 @@ defmodule ThistleTea.Game.Network.ServerTest do
         player_monitor: monitor
       }
 
-      assert {:close, detached} =
-               Server.handle_info({:DOWN, monitor, :process, player_pid, :boom}, {test_socket(), state})
+      socket = test_socket()
+
+      assert {:stop, {:shutdown, :local_closed}, {^socket, detached}} =
+               Server.handle_info({:DOWN, monitor, :process, player_pid, :boom}, {socket, state})
 
       assert detached == %ConnectionState{account: %{id: 1}, latency: state.latency, conn: state.conn}
     end

@@ -162,6 +162,7 @@ defmodule ThistleTea.Game.Player.PetStableTest do
       assert Companion.active_guid(retrieved.character) == pet.object.guid
       assert retrieved.character.internal.companion.pet_number == 77
       assert retrieved.companion_monitor.pid == Entity.pid(pet.object.guid)
+      assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgPetNameQueryResponse{pet_number: 77, name: "Boar"}}}
       assert_receive %Attachment{} = pending
       stored = PetStable.transfer(retrieved, master, :store)
       assert stored.character.internal.pet_stable.pets[1].pet_number == 77
@@ -228,6 +229,7 @@ defmodule ThistleTea.Game.Player.PetStableTest do
       },
       movement_block: character.movement_block,
       internal: %Internal{
+        name: "Boar",
         world: WorldRef.open(451),
         pet: %Pet{owner_guid: owner, kind: :hunter, profile: :combat, training_points: 17, reaction_state: :passive},
         creature: %Creature{},
