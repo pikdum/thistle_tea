@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Player.Enchantments do
   alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Entity.Logic.Inventory.Batch
   alias ThistleTea.Game.Entity.Logic.Inventory.ChangeSet
+  alias ThistleTea.Game.Entity.Logic.ItemUse
   alias ThistleTea.Game.Entity.Logic.Shaman
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.InventoryUpdate
@@ -68,6 +69,7 @@ defmodule ThistleTea.Game.Player.Enchantments do
          {:ok, changes} <- Inventory.plan(batch, &ItemStore.get/1) do
       {:ok, changes}
     else
+      {:error, reason} when reason in [:item_gone, :no_charges_remain] -> {:error, reason}
       _error -> {:error, :reagents}
     end
   end
@@ -84,9 +86,7 @@ defmodule ThistleTea.Game.Player.Enchantments do
              1..5,
              &(Map.fetch!(template, :"spellid_#{&1}") == spell.id and Map.fetch!(template, :"spelltrigger_#{&1}") == 0)
            ) do
-      if Map.fetch!(template, :"spellcharges_#{index}") < 0,
-        do: {:ok, Batch.remove_item(batch, guid, 1)},
-        else: {:ok, batch}
+      ItemUse.plan(batch, item, index)
     else
       _ -> {:error, :item_gone}
     end

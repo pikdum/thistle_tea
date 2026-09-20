@@ -22,6 +22,7 @@ defmodule ThistleTea.Game.Player.Trade do
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Message.SmsgTradeStatus
   alias ThistleTea.Game.Player.Enchantments
+  alias ThistleTea.Game.Player.ItemCosts
   alias ThistleTea.Game.Player.Quests
   alias ThistleTea.Game.Spell.Cooldowns
   alias ThistleTea.Game.Spell.Target
@@ -97,6 +98,7 @@ defmodule ThistleTea.Game.Player.Trade do
   end
 
   def prepare(state, %Prepare{id: id, coordinator: coordinator}) do
+    state = ItemCosts.settle(state)
     monitor = Process.monitor(coordinator)
 
     try do
@@ -215,6 +217,10 @@ defmodule ThistleTea.Game.Player.Trade do
   end
 
   defp spend_enchantment(character, nil, _now), do: character
+
+  defp spend_enchantment(character, %Enchantment{cast_item_guid: guid, spell: spell}, now) when is_integer(guid) do
+    Cooldowns.start(character, spell, now)
+  end
 
   defp spend_enchantment(character, %Enchantment{spell: spell}, now) do
     character |> Resources.spend_power(spell, now) |> Cooldowns.start(spell, now)

@@ -11,6 +11,9 @@ defmodule ThistleTea.Game.Entity.Logic.TradeTest do
   alias ThistleTea.Game.Entity.Data.Trade.Exchange
   alias ThistleTea.Game.Entity.Logic.Inventory.ChangeSet
   alias ThistleTea.Game.Entity.Logic.Trade
+  alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.Cast
+  alias ThistleTea.Game.Spell.Target
 
   setup [:build_trade]
 
@@ -57,6 +60,21 @@ defmodule ThistleTea.Game.Entity.Logic.TradeTest do
   end
 
   describe "plan/5" do
+    test "rejects items committed to an unfinished cast", context do
+      %{trade: trade, first: first, characters: characters, lookup: lookup} = context
+      {:ok, trade} = Trade.put_item(trade, 1, 0, first, 0)
+
+      for casting <- [
+            %Cast{spell: %Spell{}, cast_item_guid: first.object.guid},
+            %Cast{spell: %Spell{}, targets: Target.item(first.object.guid)},
+            %Cast{spell: %Spell{reagents: [{first.object.entry, 1}]}}
+          ] do
+        caster = characters[1]
+        caster = %{caster | internal: %{caster.internal | casting: casting}}
+        assert {:error, 1, :item_locked} = plan(trade, %{characters | 1 => caster}, lookup)
+      end
+    end
+
     test "plans both inventories and coin balances while preserving item identity", context do
       %{trade: trade, first: first, second: second, characters: characters, lookup: lookup} = context
       {:ok, trade} = Trade.put_item(trade, 1, 0, first, 0)

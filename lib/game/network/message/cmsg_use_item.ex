@@ -7,8 +7,10 @@ defmodule ThistleTea.Game.Network.Message.CmsgUseItem do
   alias ThistleTea.Game.Entity.Data.ItemTemplate
   alias ThistleTea.Game.Entity.Logic.Enchantments
   alias ThistleTea.Game.Entity.Logic.Inventory
+  alias ThistleTea.Game.Entity.Logic.ItemUse
   alias ThistleTea.Game.Entity.Logic.Proficiency
   alias ThistleTea.Game.Network.InventoryUpdate
+  alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Player.Bank
   alias ThistleTea.Game.Player.Items
   alias ThistleTea.Game.Player.Reputation
@@ -20,7 +22,6 @@ defmodule ThistleTea.Game.Network.Message.CmsgUseItem do
 
   require Logger
 
-  @spelltrigger_on_use 0
   @invtype_non_equip 0
 
   defstruct [:bag, :slot, :spell_count, :targets]
@@ -49,7 +50,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgUseItem do
          %DataItem{} = item <- ItemStore.get(guid),
          template = DataItem.template(item),
          :ok <- validate_usable(c, template, pos),
-         {:ok, spell_id, spell_index, consumable?} <- on_use_spell(template),
+         {:ok, spell_id, spell_index, consumable?} <- ItemUse.on_use_spell(item),
          %Spell{} = spell <- load_spell.(spell_id) do
       spell = apply_item_cooldowns(spell, template, spell_index)
 
@@ -60,6 +61,10 @@ defmodule ThistleTea.Game.Network.Message.CmsgUseItem do
         {:error, state} -> state
       end
     else
+      {:cast_error, spell_id, reason} ->
+        Network.send_packet(Message.SmsgCastResult.failure(spell_id, reason))
+        state
+
       {:error, error} ->
         InventoryUpdate.send_failure(error, Inventory.item_guid_at(c.player, pos, get_item) || 0, 0)
         state
@@ -98,18 +103,6 @@ defmodule ThistleTea.Game.Network.Message.CmsgUseItem do
     end
   end
 
-  defp on_use_spell(%ItemTemplate{} = template) do
-    Enum.find_value(1..5, {:error, :item_not_found}, fn i ->
-      spell_id = Map.get(template, :"spellid_#{i}")
-      trigger = Map.get(template, :"spelltrigger_#{i}")
-      charges = Map.get(template, :"spellcharges_#{i}")
-
-      if is_integer(spell_id) and spell_id > 0 and trigger == @spelltrigger_on_use do
-        {:ok, spell_id, i, is_integer(charges) and charges < 0}
-      end
-    end)
-  end
-
   defp apply_item_cooldowns(%Spell{} = spell, %ItemTemplate{} = template, index) do
     spell
     |> maybe_put_positive(:category, Map.get(template, :"spellcategory_#{index}"))
@@ -143,11 +136,11 @@ defmodule ThistleTea.Game.Network.Message.CmsgUseItem do
       casting = %{casting | consume_item: true}
       %{state | character: %{c | internal: %{internal | casting: casting}}}
     else
-      Items.consume(state, item_guid)
+      Items.consume_cast_item(state, item_guid)
     end
   end
 
-  defp handle_consumption(state, item_guid, true), do: Items.consume(state, item_guid)
+  defp handle_consumption(state, item_guid, true), do: Items.consume_cast_item(state, item_guid)
 
   defp defer_consumption?(%Cast{cast_time_ms: cast_time_ms} = casting) do
     is_integer(cast_time_ms) and cast_time_ms > 0 and not Cast.channeled?(casting)

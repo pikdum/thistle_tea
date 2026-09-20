@@ -77,12 +77,12 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.Party.Notifier, as: PartyNotifier
   alias ThistleTea.Game.Player.CompanionVisibility
   alias ThistleTea.Game.Player.ConditionContext
-  alias ThistleTea.Game.Player.Disenchant
   alias ThistleTea.Game.Player.Durability
   alias ThistleTea.Game.Player.Enchantments
   alias ThistleTea.Game.Player.Exploration, as: PlayerExploration
   alias ThistleTea.Game.Player.GameObjects, as: PlayerGameObjects
   alias ThistleTea.Game.Player.HomeBind
+  alias ThistleTea.Game.Player.ItemCosts
   alias ThistleTea.Game.Player.Items
   alias ThistleTea.Game.Player.Login
   alias ThistleTea.Game.Player.Looting
@@ -827,8 +827,8 @@ defmodule ThistleTea.Game.Entity.Server.Player do
       {:noreply, state}
   end
 
-  def handle_info({:disenchant_item, guid, spell_id}, state) do
-    {:noreply, Disenchant.complete(state, guid, spell_id)}
+  def handle_info({:disenchant_item, _guid, _spell_id} = command, state) do
+    {:noreply, ItemCosts.apply(state, command)}
   rescue
     error ->
       Logger.error("Disenchant failed: #{Exception.message(error)}")
@@ -866,8 +866,8 @@ defmodule ThistleTea.Game.Entity.Server.Player do
     {:noreply, %{state | character: character}}
   end
 
-  def handle_info({:consume_cast_item, item_guid}, state) do
-    state = Items.consume(state, item_guid)
+  def handle_info({:consume_cast_item, _item_guid} = command, state) do
+    state = ItemCosts.apply(state, command)
     {:noreply, state}
   rescue
     error ->
@@ -937,8 +937,8 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   end
 
   @impl GenServer
-  def handle_info({:enchant_item, item_guid, spell, enchantment_id, duration_ms, cast_item_guid}, state) do
-    state = Enchantments.apply_temporary(state, item_guid, spell, enchantment_id, duration_ms, cast_item_guid)
+  def handle_info({:enchant_item, _item_guid, _spell, _enchantment_id, _duration_ms, _cast_item_guid} = command, state) do
+    state = ItemCosts.apply(state, command)
     {:noreply, state, {:continue, :maybe_broadcast_update}}
   rescue
     error ->
@@ -946,9 +946,8 @@ defmodule ThistleTea.Game.Entity.Server.Player do
       {:noreply, state}
   end
 
-  def handle_info({:enchant_item_permanent, item_guid, spell, enchantment_id, cast_item_guid}, state) do
-    {:noreply, Enchantments.apply_permanent(state, item_guid, spell, enchantment_id, cast_item_guid),
-     {:continue, :maybe_broadcast_update}}
+  def handle_info({:enchant_item_permanent, _item_guid, _spell, _enchantment_id, _cast_item_guid} = command, state) do
+    {:noreply, ItemCosts.apply(state, command), {:continue, :maybe_broadcast_update}}
   rescue
     error ->
       Logger.error("Permanent enchant failed: #{Exception.format(:error, error, __STACKTRACE__)}")
@@ -966,16 +965,8 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   end
 
   @impl GenServer
-  def handle_info({:consume_reagents, reagents}, state) do
-    state =
-      Enum.reduce(reagents, state, fn {item_id, count}, state ->
-        case Inventory.remove_count(state.character.player, item_id, count, &ItemStore.get/1) do
-          {:ok, result} -> InventoryUpdate.apply(state, {:ok, result})
-          _ -> state
-        end
-      end)
-
-    {:noreply, state}
+  def handle_info({:consume_reagents, _reagents} = command, state) do
+    {:noreply, ItemCosts.apply(state, command)}
   rescue
     error ->
       Logger.error("consume_reagents crashed: #{Exception.format(:error, error, __STACKTRACE__)}")

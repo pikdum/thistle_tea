@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Player.Items do
   alias ThistleTea.Game.Entity.Logic.Inventory.Batch
   alias ThistleTea.Game.Entity.Logic.Inventory.ChangeSet
   alias ThistleTea.Game.Entity.Logic.Inventory.ChangeSet.Placement
+  alias ThistleTea.Game.Entity.Logic.ItemUse
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.InventoryUpdate
   alias ThistleTea.Game.Network.Message
@@ -128,6 +129,18 @@ defmodule ThistleTea.Game.Player.Items do
   end
 
   def consume(state, _item_guid), do: state
+
+  def consume_cast_item(state, item_guid) do
+    with %DataItem{} = item <- ItemStore.get(item_guid),
+         {_bag, _slot} <- Inventory.find_position(state.character.player, item_guid, &ItemStore.get/1),
+         {:ok, _spell_id, index, _commit?} <- ItemUse.on_use_spell(item),
+         {:ok, batch} <- ItemUse.plan(Batch.new(state.character.player), item, index),
+         {:ok, changes} <- Inventory.plan(batch, &ItemStore.get/1) do
+      InventoryUpdate.apply(state, {:ok, changes})
+    else
+      _ -> state
+    end
+  end
 
   defp consume_at(state, %DataItem{} = item, pos) do
     get_item = &ItemStore.get/1

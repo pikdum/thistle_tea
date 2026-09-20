@@ -45,6 +45,7 @@ defmodule ThistleTea.Game.Network.Message.SmsgCastResult do
     not_fishable: 0x34,
     not_ready: 0x3C,
     no_ammo: 0x43,
+    no_charges_remain: 0x44,
     no_dueling: 0x47,
     no_pet: 0x4C,
     not_shapeshift: 0x3D,

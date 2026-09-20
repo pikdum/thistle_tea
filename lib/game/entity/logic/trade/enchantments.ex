@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.Entity.Logic.Trade.Enchantments do
   alias ThistleTea.Game.Entity.Logic.Enchantments
   alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Entity.Logic.Inventory.Batch
+  alias ThistleTea.Game.Entity.Logic.ItemUse
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastValidation
   alias ThistleTea.Game.Spell.Target
@@ -66,6 +67,9 @@ defmodule ThistleTea.Game.Entity.Logic.Trade.Enchantments do
 
   defp validate_spell(character, cast, item, get_enchantment) do
     cond do
+      not is_nil(character.internal.casting) ->
+        {:error, :spell_in_progress}
+
       item.object.guid != cast.target_guid ->
         {:error, :item_gone}
 
@@ -75,7 +79,7 @@ defmodule ThistleTea.Game.Entity.Logic.Trade.Enchantments do
       Spell.attribute?(cast.spell, :enchant_own_item_only) ->
         {:error, :not_tradeable}
 
-      is_nil(cast.cast_item_guid) and not Map.has_key?(character.internal.spellbook || %{}, cast.spell.id) ->
+      not known_or_item_cast?(character, cast) ->
         {:error, :not_known}
 
       not Enum.all?(cast.effects, &tradeable_enchantment?(&1, get_enchantment)) ->
@@ -84,6 +88,10 @@ defmodule ThistleTea.Game.Entity.Logic.Trade.Enchantments do
       true ->
         :ok
     end
+  end
+
+  defp known_or_item_cast?(character, cast) do
+    not is_nil(cast.cast_item_guid) or Map.has_key?(character.internal.spellbook || %{}, cast.spell.id)
   end
 
   defp tradeable_enchantment?(%{id: id}, get_enchantment) do
@@ -126,9 +134,7 @@ defmodule ThistleTea.Game.Entity.Logic.Trade.Enchantments do
              1..5,
              &(Map.fetch!(template, :"spellid_#{&1}") == spell.id and Map.fetch!(template, :"spelltrigger_#{&1}") == 0)
            ) do
-      if Map.fetch!(template, :"spellcharges_#{index}") < 0,
-        do: {:ok, Batch.remove_item(batch, guid, 1)},
-        else: {:ok, batch}
+      ItemUse.plan(batch, item, index)
     else
       _ -> {:error, :item_gone}
     end

@@ -59,6 +59,22 @@ defmodule ThistleTea.Game.Entity.Data.Item do
     end
   end
 
+  def bind_on_use(%__MODULE__{} = item) do
+    if template(item).bonding == 3, do: %{item | item: %{item.item | flags: (item.item.flags || 0) ||| 1}}, else: item
+  end
+
+  def spell_charge(%__MODULE__{} = item, index) when index in 1..5 do
+    value = (item.item.spell_charges || 0) >>> ((index - 1) * 32) &&& 0xFFFFFFFF
+    if value >= 0x80000000, do: value - 0x100000000, else: value
+  end
+
+  def put_spell_charge(%__MODULE__{} = item, index, value) when index in 1..5 do
+    shift = (index - 1) * 32
+    mask = 0xFFFFFFFF <<< shift
+    packed = ((item.item.spell_charges || 0) &&& bnot(mask)) ||| (value &&& 0xFFFFFFFF) <<< shift
+    %{item | item: %{item.item | spell_charges: packed}}
+  end
+
   def container?(%__MODULE__{container: %Container{}}), do: true
   def container?(%__MODULE__{}), do: false
 

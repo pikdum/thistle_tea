@@ -101,6 +101,7 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
     dont_own_that_item: 32,
     must_purchase_that_bag_slot: 34,
     too_far_away_from_bank: 35,
+    item_locked: 36,
     int_bag_error: 40,
     already_looted: 49,
     inventory_full: 50,

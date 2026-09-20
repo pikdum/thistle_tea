@@ -14,6 +14,8 @@ defmodule ThistleTea.Game.Entity.Logic.Trade do
   alias ThistleTea.Game.Entity.Logic.Inventory.Batch
   alias ThistleTea.Game.Entity.Logic.Inventory.ChangeSet
   alias ThistleTea.Game.Entity.Logic.Trade.Enchantments, as: TradeEnchantments
+  alias ThistleTea.Game.Spell.Cast
+  alias ThistleTea.Game.Spell.Target
 
   @max_money 2_147_483_647
   @accept_delay_ms 200
@@ -108,7 +110,17 @@ defmodule ThistleTea.Game.Entity.Logic.Trade do
     cond do
       item.item.owner != character.object.guid -> {:error, :dont_own_that_item}
       is_nil(position) -> {:error, :item_not_found}
-      slot == 6 -> :ok
+      casting_uses?(character, item) -> {:error, :item_locked}
+      true -> validate_slot(character, item, position, slot, now, get_enchantment)
+    end
+  end
+
+  def validate_item(_character, _item, _slot, _now, _get_item, _get_enchantment), do: {:error, :item_not_found}
+
+  defp validate_slot(_character, _item, _position, 6, _now, _get_enchantment), do: :ok
+
+  defp validate_slot(character, item, position, _slot, now, get_enchantment) do
+    cond do
       Enchantments.bound?(item, now, get_enchantment) -> {:error, :cant_drop_soulbound}
       equipped_bag?(position) -> {:error, :cant_trade_equip_bags}
       nonempty_bag?(item) -> {:error, :can_only_do_with_empty_bags}
@@ -116,8 +128,6 @@ defmodule ThistleTea.Game.Entity.Logic.Trade do
       true -> :ok
     end
   end
-
-  def validate_item(_character, _item, _slot, _now, _get_item, _get_enchantment), do: {:error, :item_not_found}
 
   def plan(%Trade{phase: :preparing} = trade, characters, now, get_item, get_enchantment) do
     with :ok <- validate_offers(trade, characters, now, get_item, get_enchantment),
@@ -232,7 +242,7 @@ defmodule ThistleTea.Game.Entity.Logic.Trade do
       merged = for %{status: :merged, incoming_guid: guid} <- changes.placements, do: get_item.(guid)
       {:ok, ChangeSet.absorb(changes, %{player: changes.player, items: [], destroyed: merged})}
     else
-      {:error, reason} when reason in [:reagents, :item_gone] ->
+      {:error, reason} when reason in [:reagents, :item_gone, :no_charges_remain] ->
         {:error, character.object.guid, {:cast, own.spell.spell.id, reason}}
 
       error ->
@@ -247,6 +257,19 @@ defmodule ThistleTea.Game.Entity.Logic.Trade do
   defp error_for(guid, {:error, reason}), do: {:error, guid, reason}
   defp equipped_bag?({255, slot}), do: Inventory.bag_slot?(slot)
   defp equipped_bag?(_position), do: false
+
+  defp casting_uses?(%Character{internal: %{casting: %Cast{} = cast}}, item) do
+    target =
+      case cast.targets do
+        %Target{} = targets -> Target.item_guid(targets)
+        _ -> nil
+      end
+
+    item.object.guid in [cast.cast_item_guid, target] or
+      Enum.any?(cast.spell.reagents, fn {entry, _count} -> entry == item.object.entry end)
+  end
+
+  defp casting_uses?(_character, _item), do: false
   defp equipped_in_combat?(%Character{internal: %{in_combat: true}}, {255, slot}), do: slot < 15 or slot == 18
   defp equipped_in_combat?(_character, _position), do: false
   defp nonempty_bag?(%Item{container: nil}), do: false
