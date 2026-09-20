@@ -25,6 +25,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
   alias ThistleTea.Game.Entity.Logic.Reactive
   alias ThistleTea.Game.Entity.Logic.Resources
   alias ThistleTea.Game.Entity.Logic.SpellEffect
+  alias ThistleTea.Game.Entity.Logic.SpellMagnet
   alias ThistleTea.Game.Entity.Logic.SpellResist
   alias ThistleTea.Game.Entity.SpellTargetResolver
   alias ThistleTea.Game.Guid
@@ -287,7 +288,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
       impacts: resolved_impacts(entity, spell, hits, misses),
       followups: %Followups{
         packet_hits: hits ++ object_hit(object_guid),
-        selected_unit_guid: Target.unit_guid(targets),
+        selected_unit_guid: selected_unit_guid(spell, targets, resolved_targets),
         object_guid: object_guid,
         item_guid: Target.item_guid(targets),
         ground_position: Target.ground_location(targets),
@@ -295,6 +296,12 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
       }
     }
   end
+
+  defp selected_unit_guid(spell, %Target{selection: {:unit, guid}}, [resolved | _]) do
+    if SpellMagnet.eligible?(spell), do: resolved, else: guid
+  end
+
+  defp selected_unit_guid(_spell, targets, _resolved), do: Target.unit_guid(targets)
 
   defp resolved_impacts(entity, spell, hits, misses) do
     impacts = Enum.map(hits, &%Impact{target_guid: &1, target_role: target_role(entity, &1)})
@@ -1013,11 +1020,21 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
 
     Effects.enqueue(
       character,
-      Effects.spell_go(guid, spell_id, targets, casting.targets, casting.cast_item_guid, misses)
+      Effects.spell_go(guid, spell_id, targets, launch_targets(casting), casting.cast_item_guid, misses)
     )
   end
 
   defp queue_spell_go(character, _casting, _targets, _misses), do: character
+
+  defp launch_targets(%Cast{
+         targets: %Target{selection: {:unit, _}} = targets,
+         resolution: %CastResolution{followups: %Followups{selected_unit_guid: guid}}
+       })
+       when is_integer(guid) do
+    %{targets | selection: {:unit, guid}}
+  end
+
+  defp launch_targets(%Cast{targets: targets}), do: targets
 
   @spell_miss_reason_miss 1
   @spell_miss_reason_resist 2
@@ -1128,7 +1145,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
     Enum.reduce(impacts, character, fn %Impact{target_guid: target_guid, target_role: target_role} = impact, caster ->
       context = %{
         CastContext.from_caster(caster, spell, target_guid)
-        | selected_target_guid: Target.unit_guid(casting.targets),
+        | selected_target_guid: casting.resolution.followups.selected_unit_guid,
           destination_position: Target.ground_location(casting.targets),
           target_hostile?: target_guid != caster_guid and Hostility.valid_attack_target?(caster, target_guid),
           target_role: target_role,

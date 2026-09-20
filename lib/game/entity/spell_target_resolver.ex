@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.SpellMagnets
   alias ThistleTea.Game.World.System.Party, as: PartySystem
 
   @cone_arc_radians :math.pi() / 3
@@ -25,12 +26,18 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
       |> resolve_query(caster_guid, query)
       |> Enum.filter(&creature_type_allowed?(spell, &1))
 
-    caster
-    |> expand_chain(spell, initial)
-    |> append_caster_execution_target(spell, caster_guid)
+    redirected = redirect_initial(caster, spell, query, initial)
+    targets = if redirected == initial, do: expand_chain(caster, spell, initial), else: redirected
+    append_caster_execution_target(targets, spell, caster_guid)
   end
 
   def resolve(_caster, _spell, _targets), do: []
+
+  defp redirect_initial(caster, spell, {:unit, _guid}, [guid]) do
+    [SpellMagnets.redirect(caster, spell, guid)]
+  end
+
+  defp redirect_initial(_caster, _spell, _query, targets), do: targets
 
   defp expand_chain(caster, %Spell{} = spell, [first | _] = initial) do
     count = spell.effects |> Enum.map(&(&1.chain_targets || 0)) |> Enum.max(fn -> 0 end)

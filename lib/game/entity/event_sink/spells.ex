@@ -11,8 +11,16 @@ defmodule ThistleTea.Game.Entity.EventSink.Spells do
   alias ThistleTea.Game.Player.Projectile
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.World
+  alias ThistleTea.Game.World.SpellMagnets
 
   @spell_hit_type_crit 0x2
+
+  def emit(entity, %Effects.SpellMagnetsChanged{magnets: magnets}, %Context{owner_pid: owner}) do
+    SpellMagnets.sync(entity.object.guid, owner, magnets)
+    entity
+  end
+
+  def emit(entity, %Effects.SpellMagnetsChanged{}, nil), do: entity
 
   def emit(entity, %Effects.DispelFailed{} = effect, _context) do
     %Message.SmsgDispelFailed{

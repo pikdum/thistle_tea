@@ -29,6 +29,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Transition do
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Fear
   alias ThistleTea.Game.Entity.Logic.Reputation, as: ReputationLogic
+  alias ThistleTea.Game.Entity.Logic.SpellMagnet
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Cooldowns
 
@@ -88,7 +89,8 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Transition do
     threat_events = ThreatSync.events(entity, previous, holders)
 
     events =
-      modifier_events ++
+      SpellMagnet.events(previous, holders) ++
+        modifier_events ++
         application_events ++
         cooldown_events ++
         script_events ++

@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
   alias ThistleTea.Game.Spell.Target
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
+  alias ThistleTea.Game.World.SpellMagnets
 
   @heal_threat_radius 100.0
 
@@ -87,6 +88,7 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
         []
 
       target_guid ->
+        target_guid = SpellMagnets.redirect(entity, spell, target_guid)
         effect = %{effect | target_guid: target_guid}
         target = Target.unit(target_guid)
 

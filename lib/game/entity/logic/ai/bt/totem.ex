@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Totem do
 
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Totem
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
@@ -24,9 +25,32 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.Totem do
     BT.selector([
       SpellBT.casting_sequence(),
       BT.action(&select_hostile_target/3),
-      MobSpells.step(),
+      BT.action(&cast/3),
       BT.action(&idle/2)
     ])
+  end
+
+  def cast(%Mob{internal: %Internal{totem: %Totem{passive_spell_started?: true}}} = state, blackboard, _context) do
+    {:failure, state, blackboard}
+  end
+
+  def cast(%Mob{} = state, blackboard, context) do
+    {status, state, blackboard} = MobSpells.try_cast(state, blackboard, context)
+
+    passive_started? =
+      Enum.any?(state.unit.auras || [], fn holder ->
+        holder.caster_guid == state.object.guid and not Spell.requires_hostile_target?(holder.spell)
+      end)
+
+    state =
+      if passive_started? do
+        totem = %{state.internal.totem | passive_spell_started?: true}
+        %{state | internal: %{state.internal | totem: totem}}
+      else
+        state
+      end
+
+    {status, state, blackboard}
   end
 
   defp select_hostile_target(

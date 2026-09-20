@@ -62,6 +62,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.World.PostOffice
   alias ThistleTea.Game.World.SpawnPool
   alias ThistleTea.Game.World.SpawnPool.Catalog, as: SpawnPoolCatalog
+  alias ThistleTea.Game.World.SpellMagnets
   alias ThistleTea.Game.World.System.Battleground, as: BattlegroundSystem
   alias ThistleTea.Game.World.System.CellActivator
   alias ThistleTea.Game.World.System.ChatChannels
@@ -121,6 +122,7 @@ defmodule ThistleTea.Application do
         EntityRegistry,
         PostOffice,
         AreaEffects,
+        SpellMagnets,
         ThistleTea.DBC,
         Repo,
         BattlegroundSupervisor,

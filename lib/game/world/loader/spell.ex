@@ -675,6 +675,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp aura_type(93), do: :mod_unattackable
   defp aura_type(94), do: :interrupt_regen
   defp aura_type(95), do: :ghost
+  defp aura_type(96), do: :spell_magnet
   defp aura_type(97), do: :mana_shield
   defp aura_type(98), do: :mod_skill_talent
   defp aura_type(99), do: :mod_attack_power
@@ -823,6 +824,8 @@ defmodule ThistleTea.Game.World.Loader.Spell do
     base = if from_behind?(attrs_ex1, attrs_ex2), do: MapSet.put(base, :from_behind), else: base
 
     base
+    |> add_if(attrs_ex1, 0x00000008, :no_redirection)
+    |> add_if(attrs_ex3, 0x00020000, :suppress_target_procs)
     |> add_if(attrs_ex1, 0x00000020, :allow_while_stealthed)
     |> add_if(attrs_ex1, 0x00000080, :no_reflection)
     |> add_if(attrs_ex1, 0x00000400, :no_threat)
