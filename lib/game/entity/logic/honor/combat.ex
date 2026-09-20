@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.Entity.Logic.Honor.Combat do
 
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Honor.Damage
+  alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Honor.Contribution
@@ -19,6 +20,15 @@ defmodule ThistleTea.Game.Entity.Logic.Honor.Combat do
       lethal?: new_health == 0,
       honorless?: Aura.has_aura?(entity, :honorless_target)
     })
+  end
+
+  def on_damage(%Mob{internal: %{creature: creature, pet: nil, totem: nil}} = entity, health, damage, 0, _now, opts)
+      when health > 0 and damage > 0 and (creature.civilian? or creature.racial_leader?) do
+    if Aura.has_aura?(entity, :honorless_target) do
+      entity
+    else
+      Effects.enqueue(entity, %Effects.HonorCreatureKill{source_guid: Keyword.get(opts, :source)})
+    end
   end
 
   def on_damage(entity, _previous_health, _damage, _new_health, _now, _opts), do: entity

@@ -1,8 +1,8 @@
 # Honor system implementation
 
-The calculation layer and player-kill integration are implemented. Creature
-rewards, battleground bonuses, honor spells, and rank requirements remain to
-be connected. Player kills, repeat penalties, gray rejection, party and pet
+The calculation layer, player and creature kills, Warsong bonuses, and honor
+spells are implemented. Rank requirements and automatic Honorless Target
+application remain to be connected. Player kills, repeat penalties, gray rejection, party and pet
 credit, inspection, and reconnect retention have real-client acceptance in
 [honor-playtest.md](honor-playtest.md).
 
@@ -18,6 +18,15 @@ credit, inspection, and reconnect retention have real-client acceptance in
 - Daily records distinguish honorable kills, dishonorable kills, and bonus
   contribution. Dishonorable kills immediately reduce rank points without
   subtracting weekly contribution or the highest rank previously earned.
+- Gray civilians and civilians with zero XP multiplier impose the vanilla
+  level-dependent dishonorable penalty. Racial leaders award 488 honor per
+  eligible player, without group division or the player repeat-kill penalty.
+- Creature rewards follow the original tag and its surviving group, including
+  when another player lands the killing blow. Honor excludes dead or distant
+  group members, pets, totems, and Honorless Target victims.
+- Spell effect 45 awards its unscaled DBC amount without a kill. Warsong flag
+  captures and victories award bonus honor to players inside the match;
+  the scoreboard and ledger use the same captured recipient list.
 - Weekly ranking requires fifteen honorable kills, separates factions, uses
   population-sized brackets and interpolation, applies twenty-percent decay,
   halves net losses, caps losses at 2,500 points, and enforces level caps.
@@ -66,12 +75,12 @@ Target, Spirit of Redemption, current player projections, and packet dispatch.
 
 ## Remaining integration and acceptance
 
-1. Connect racial-leader and civilian kills, battleground bonus rewards, and
-   honor-granting spells. Keep battleground scoreboards and character totals
-   consistent without counting the same kill twice.
+1. Complete battleground team sharing and scoreboard kill semantics, including
+   nearby allies, pet killing blows, and Spirit of Redemption. Scoreboard HKs
+   and honor-ledger HKs follow different vanilla eligibility rules.
 2. Apply honor-rank conditions and equipment/vendor requirements, and connect
    automatic Honorless Target application during world-entry transitions.
-3. Extend client acceptance to those reward sources, rank requirements, and
+3. Extend client acceptance to the new reward sources, rank requirements, and
    automatic Honorless Target protection. Calendar/ranking tests cover
    settlement without waiting for a real weekly reset.
 

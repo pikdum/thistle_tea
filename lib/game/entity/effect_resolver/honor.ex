@@ -7,6 +7,8 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Honor do
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Honor.Damage
   alias ThistleTea.Game.Entity.Data.Honor.Participant
+  alias ThistleTea.Game.Entity.Data.Mob
+  alias ThistleTea.Game.Entity.KillReward
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Experience
   alias ThistleTea.Game.Entity.Logic.Honor, as: HonorLogic
@@ -57,6 +59,27 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Honor do
 
     Contribution.shares(history, participants, HonorLogic.team(entity.unit.race), now)
   end
+
+  def creature_kill(%Mob{} = victim, %Effects.HonorCreatureKill{} = effect, opts \\ []) do
+    metadata = Keyword.get(opts, :metadata, &Metadata.query(&1, [:owner_guid, :level, :alive?]))
+
+    recipients =
+      case KillReward.selection(victim, effect.source_guid, opts) do
+        {:group, group} -> KillReward.eligible_members(victim, group, opts)
+        {:solo, guid} -> living_player(guid, metadata.(guid))
+        nil -> []
+      end
+
+    Enum.flat_map(recipients, fn %{guid: guid, level: level} ->
+      case HonorLogic.creature_award(victim, level) do
+        nil -> []
+        award -> [%Effects.HonorAward{target_guid: guid, award: award}]
+      end
+    end)
+  end
+
+  defp living_player(guid, %{level: level, alive?: true}), do: [%{guid: guid, level: level}]
+  defp living_player(_guid, _metadata), do: []
 
   defp members(_guid, %Group{id: id, members: members}), do: Enum.map(members, &{&1.guid, id})
   defp members(guid, nil), do: [{guid, nil}]

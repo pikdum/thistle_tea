@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Entity.Logic.Honor do
   alias ThistleTea.Game.Entity.Data.Honor.Award
   alias ThistleTea.Game.Entity.Data.Honor.Day
   alias ThistleTea.Game.Entity.Data.Honor.Standing
+  alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.Experience
   alias ThistleTea.Game.Entity.Logic.Honor.Rank
 
@@ -19,6 +20,28 @@ defmodule ThistleTea.Game.Entity.Logic.Honor do
   def team(race) when race in [1, 3, 4, 7], do: :alliance
   def team(race) when race in [2, 5, 6, 8], do: :horde
   def team(_race), do: nil
+
+  def creature_award(%Mob{internal: %{creature: creature}} = victim, level) when is_integer(level) do
+    cond do
+      creature.civilian? and
+          (victim.unit.level <= Experience.gray_level(level) or creature.experience_multiplier == 0) ->
+        %Award{type: :dishonorable, points: dishonorable_points(level), victim_guid: victim.object.guid}
+
+      creature.racial_leader? ->
+        %Award{
+          type: :honorable,
+          points: 488,
+          victim_key: {:creature, victim.object.entry},
+          victim_guid: victim.object.guid,
+          victim_rank: 19
+        }
+
+      true ->
+        nil
+    end
+  end
+
+  def creature_award(%Mob{}, _level), do: nil
 
   def award(%Honor{} = honor, %Award{type: type, points: points} = award, day)
       when type in @award_types and is_number(points) and points > 0 and is_integer(day) do

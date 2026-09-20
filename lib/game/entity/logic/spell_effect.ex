@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   alias ThistleTea.Game.Entity.Logic.Rogue
   alias ThistleTea.Game.Entity.Logic.SpellEffect.Aura, as: AuraEffects
   alias ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal
+  alias ThistleTea.Game.Entity.Logic.SpellEffect.Honor, as: HonorEffects
   alias ThistleTea.Game.Entity.Logic.SpellEffect.Inventory, as: InventoryEffects
   alias ThistleTea.Game.Entity.Logic.SpellEffect.Movement, as: MovementEffects
   alias ThistleTea.Game.Entity.Logic.SpellEffect.Reputation, as: ReputationEffects
@@ -355,6 +356,9 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
 
   defp apply_secondary_effect(%Semantics.Reputation{}, state, context, spell, effect, now),
     do: ReputationEffects.apply(state, context, spell, effect, now)
+
+  defp apply_secondary_effect(%Semantics.Honor{}, state, context, spell, effect, now),
+    do: HonorEffects.apply(state, context, spell, effect, now)
 
   defp apply_secondary_effect(%Semantics.SummonControl{}, state, context, spell, effect, now),
     do: SummonControlEffects.apply(state, context, spell, effect, now)

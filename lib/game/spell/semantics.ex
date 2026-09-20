@@ -61,6 +61,12 @@ defmodule ThistleTea.Game.Spell.Semantics.Script do
   defstruct [:kind]
 end
 
+defmodule ThistleTea.Game.Spell.Semantics.Honor do
+  @moduledoc false
+  @enforce_keys [:kind]
+  defstruct [:kind]
+end
+
 defmodule ThistleTea.Game.Spell.Semantics.Reputation do
   @moduledoc false
   @enforce_keys [:kind]
@@ -84,6 +90,7 @@ defmodule ThistleTea.Game.Spell.Semantics do
   alias ThistleTea.Game.Spell.Scripts
   alias ThistleTea.Game.Spell.Semantics.Aura
   alias ThistleTea.Game.Spell.Semantics.DamageHeal
+  alias ThistleTea.Game.Spell.Semantics.Honor
   alias ThistleTea.Game.Spell.Semantics.Inventory
   alias ThistleTea.Game.Spell.Semantics.Movement
   alias ThistleTea.Game.Spell.Semantics.Reputation
@@ -187,6 +194,7 @@ defmodule ThistleTea.Game.Spell.Semantics do
   def effect_rule(%Effect{type: type}) when type in @inventory, do: %Inventory{kind: type}
   def effect_rule(%Effect{type: type}) when type in @script, do: %Script{kind: type}
   def effect_rule(%Effect{type: type}) when type in @reputation, do: %Reputation{kind: type}
+  def effect_rule(%Effect{type: :honor}), do: %Honor{kind: :honor}
   def effect_rule(%Effect{type: type}), do: %Unsupported{kind: type}
 
   def rules(%Spell{semantics: %Rules{} = rules}), do: rules

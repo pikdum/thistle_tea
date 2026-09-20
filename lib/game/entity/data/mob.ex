@@ -146,6 +146,8 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
           experience_multiplier: ct.experience_multiplier,
           extra_flags: ct.extra_flags,
           rank: ct.rank,
+          civilian?: ct.civilian == 1,
+          racial_leader?: ct.racial_leader == 1,
           family: ct.family,
           type_flags: type_flags(ct),
           creature_type: ct.creature_type,

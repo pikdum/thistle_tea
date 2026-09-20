@@ -166,6 +166,7 @@ defmodule ThistleTea.Game.Entity.Logic.ExperienceTest do
     test "applies elite, multiplier, and no-XP flags" do
       assert Experience.kill_xp(1, 1, elite?: true) == 100
       assert Experience.kill_xp(1, 1, experience_multiplier: 1.5) == 75
+      assert Experience.kill_xp(1, 1, experience_multiplier: 0.0) == 0
       assert Experience.kill_xp(1, 1, extra_flags: 0x40) == 0
     end
   end

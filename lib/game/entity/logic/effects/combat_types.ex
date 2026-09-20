@@ -4,6 +4,8 @@ defmodule ThistleTea.Game.Entity.Logic.Effects.CombatTypes do
   effects = [
     {:HonorDamage, [:source_guid, :damage, :now, :lethal?, :honorless?], []},
     {:HonorContribution, [:player_guid, :damage, :now, :lethal?, :honorless?], []},
+    {:HonorCreatureKill, [:source_guid], []},
+    {:HonorAward, [:target_guid, :award], []},
     {:DurabilityDamage, [:source_guid, :lethal?, :environmental?], []},
     {:DurabilityLoss, [:target_guid, :mode, :amount, :scope], [death?: false]},
     {:EnvironmentalDamage, [:type, :damage], []},

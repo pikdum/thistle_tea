@@ -450,9 +450,10 @@ defmodule ThistleTea.Game.Battleground.WarsongGulch do
       match = put_flag(match, captured_flag_team, captured_flag)
       match = put_team_score(match, scoring_team, Map.fetch!(match.team_scores, scoring_team) + 1)
       match = update_player(match, player.guid, &%{&1 | flag_captures: &1.flag_captures + 1})
-      match = reward_team_bonus(match, scoring_team, Enum.at(@flag_capture_honor, match.bracket, 0))
+      {match, honor_reward} = reward_team_bonus(match, scoring_team, Enum.at(@flag_capture_honor, match.bracket, 0))
 
       effects = [
+        honor_reward,
         %Effects.RemoveFlagAura{guid: player.guid, team: captured_flag_team},
         %Effects.HideBaseFlags{},
         announce(capture_text(captured_flag_team), scoring_team, player.guid),
@@ -522,7 +523,7 @@ defmodule ThistleTea.Game.Battleground.WarsongGulch do
   end
 
   defp end_match(match, winner, now, prior_effects) do
-    match = reward_team_bonus(match, winner, Enum.at(@win_honor, match.bracket, 0))
+    {match, honor_reward} = reward_team_bonus(match, winner, Enum.at(@win_honor, match.bracket, 0))
     match = %{match | phase: {:ended, winner}, ended_at: now}
     aura_effects = carried_aura_effects(match)
     players = scoreboard(match)
@@ -533,6 +534,7 @@ defmodule ThistleTea.Game.Battleground.WarsongGulch do
         prior_effects ++
           aura_effects ++
           [
+            honor_reward,
             announce(win_text(winner), :neutral),
             %Effects.Scoreboard{ended?: true, winner: winner, players: players},
             %Effects.RewardPlayers{winner: winner, players: Map.values(match.players)}
@@ -606,13 +608,19 @@ defmodule ThistleTea.Game.Battleground.WarsongGulch do
   defp put_team_score(match, team, score), do: %{match | team_scores: Map.put(match.team_scores, team, score)}
 
   defp reward_team_bonus(match, team, amount) do
+    guids =
+      match.players
+      |> Map.values()
+      |> Enum.filter(&(&1.team == team and &1.status == :inside))
+      |> Enum.map(& &1.guid)
+      |> Enum.sort()
+
     players =
-      Map.new(match.players, fn {guid, player} ->
-        player = if player.team == team, do: %{player | bonus_honor: player.bonus_honor + amount}, else: player
-        {guid, player}
+      Enum.reduce(guids, match.players, fn guid, players ->
+        Map.update!(players, guid, &%{&1 | bonus_honor: &1.bonus_honor + amount})
       end)
 
-    %{match | players: players}
+    {%{match | players: players}, %Effects.RewardHonor{guids: guids, amount: amount}}
   end
 
   defp carried_aura_effects(match) do

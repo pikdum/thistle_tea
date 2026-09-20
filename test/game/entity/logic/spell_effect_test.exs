@@ -980,6 +980,20 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
       assert [%Effects.ReputationChange{faction_id: 730, value: 5}] = events
     end
 
+    test "honor rewards players without scaling by level or awarding a kill" do
+      effect = %Effect{index: 0, type: :honor, base_points: 24, base_dice: 1, die_sides: 1, real_points_per_level: 100}
+      spell = %Spell{id: 24_951, school: :physical, base_level: 1, spell_level: 1, effects: [effect]}
+      context = %CastContext{caster_guid: 1, caster_level: 60}
+
+      {_character, events} = SpellEffect.receive(character_fixture(), context, spell, 1_000)
+
+      assert [%Effects.HonorAward{target_guid: 1, award: %{type: :quest, points: 25, victim_guid: 0}}] = events
+      assert {_mob, []} = SpellEffect.receive(target_fixture(), context, spell, 1_000)
+
+      spell = %{spell | effects: [%{effect | base_points: -1}]}
+      assert {_character, []} = SpellEffect.receive(character_fixture(), context, spell, 1_000)
+    end
+
     test "interrupt_cast clears the target's cast and locks out the school" do
       spell = %Spell{
         id: 2139,

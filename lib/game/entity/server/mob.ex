@@ -23,6 +23,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Entity.Data.CreatureSpell
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.EventSink
+  alias ThistleTea.Game.Entity.KillReward
   alias ThistleTea.Game.Entity.Logic.AI.BehaviorRunner
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
@@ -1551,34 +1552,18 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     %{state | internal: %{internal | death_finalized?: true}}
   end
 
-  defp maybe_reward_kill(%Mob{} = state, target) when is_integer(target) and target > 0 do
-    target = controlling_player(target)
-
-    if Guid.entity_type(target) == :player do
-      case PartySystem.group_of(target) do
-        %Party.Group{} = group -> reward_group_kill(state, group)
-        _ -> Entity.reward_kill(target, state)
-      end
+  defp maybe_reward_kill(%Mob{} = state, target) do
+    case KillReward.selection(state, target) do
+      {:group, group} -> reward_group_kill(state, group)
+      {:solo, guid} -> Entity.reward_kill(guid, state)
+      nil -> :ok
     end
 
     state
   end
 
-  defp maybe_reward_kill(%Mob{} = state, _target), do: state
-
   defp reward_group_kill(%Mob{internal: %Internal{} = internal, unit: %Unit{} = unit} = state, group) do
-    member_guids = MapSet.new(group.members, & &1.guid)
-
-    eligible =
-      state
-      |> World.nearby_players(Experience.group_reward_distance())
-      |> Enum.filter(fn {guid, _distance} -> MapSet.member?(member_guids, guid) end)
-      |> Enum.flat_map(fn {guid, _distance} ->
-        case Metadata.query(guid, [:level, :alive?]) do
-          %{level: level, alive?: true} when is_integer(level) -> [%{guid: guid, level: level}]
-          _ -> []
-        end
-      end)
+    eligible = KillReward.eligible_members(state, group)
 
     opts = [
       experience_multiplier: internal.creature.experience_multiplier,

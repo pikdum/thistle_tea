@@ -183,7 +183,8 @@ defmodule ThistleTea.Game.Entity.EventSink do
     ClientProjection.emit(entity, effect, context)
   end
 
-  defp emit_resolved(entity, %Effects.HonorContribution{} = effect, context) do
+  defp emit_resolved(entity, %{__struct__: type} = effect, context)
+       when type in [Effects.HonorContribution, Effects.HonorAward] do
     Honor.emit(entity, effect, context)
   end
 

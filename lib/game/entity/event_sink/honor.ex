@@ -6,6 +6,11 @@ defmodule ThistleTea.Game.Entity.EventSink.Honor do
   alias ThistleTea.Game.Entity.Logic.Honor.Combat
   alias ThistleTea.Game.World.System.Honor, as: HonorSystem
 
+  def emit(entity, %Effects.HonorAward{target_guid: guid, award: award}, _context) do
+    HonorSystem.award(guid, award)
+    entity
+  end
+
   def emit(entity, %Effects.HonorContribution{} = effect, _context) do
     {entity, history} = Combat.receive_damage(entity, effect)
 

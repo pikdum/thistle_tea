@@ -22,6 +22,8 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal.Creature do
     :script_faction_original,
     :script_faction_value,
     :script_faction_flags,
+    civilian?: false,
+    racial_leader?: false,
     spells: [],
     addon_auras: [],
     ai_events: []

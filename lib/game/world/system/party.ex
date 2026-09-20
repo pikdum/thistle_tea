@@ -51,6 +51,15 @@ defmodule ThistleTea.Game.World.System.Party do
 
   def group_of(_guid), do: nil
 
+  def group(id) when is_integer(id) do
+    case :ets.lookup(__MODULE__, {:group, id}) do
+      [{_key, group}] -> group
+      _missing -> nil
+    end
+  end
+
+  def group(_id), do: nil
+
   @impl GenServer
   def init(nil) do
     :ets.new(__MODULE__, @table_options)

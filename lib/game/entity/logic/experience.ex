@@ -165,6 +165,6 @@ defmodule ThistleTea.Game.Entity.Logic.Experience do
   defp no_xp_extra_flags?(flags) when is_integer(flags), do: (flags &&& @no_xp_at_kill) != 0
   defp no_xp_extra_flags?(_flags), do: false
 
-  defp experience_multiplier(multiplier) when is_number(multiplier) and multiplier > 0, do: multiplier
+  defp experience_multiplier(multiplier) when is_number(multiplier) and multiplier >= 0, do: multiplier
   defp experience_multiplier(_multiplier), do: 1.0
 end

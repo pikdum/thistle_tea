@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Entity.Data.MobTest do
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
+  alias ThistleTea.Game.Entity.Logic.Engagement.Tap
   alias ThistleTea.Game.Entity.Logic.Stats
   alias ThistleTea.Game.Entity.Server.Mob, as: MobServer
   alias ThistleTea.Game.Guid
@@ -101,6 +102,8 @@ defmodule ThistleTea.Game.Entity.Data.MobTest do
             speed_walk: 1.0,
             speed_run: 1.0,
             experience_multiplier: 1.5,
+            civilian: 1,
+            racial_leader: 1,
             extra_flags: 0x40,
             rank: 1,
             damage_multiplier: 2.5
@@ -111,6 +114,8 @@ defmodule ThistleTea.Game.Entity.Data.MobTest do
       mob = Mob.build(creature)
 
       assert mob.internal.creature.experience_multiplier == 1.5
+      assert mob.internal.creature.civilian?
+      assert mob.internal.creature.racial_leader?
       assert mob.internal.creature.extra_flags == 0x40
       assert mob.internal.creature.rank == 1
       assert mob.internal.creature.damage_multiplier == 2.5
@@ -481,6 +486,20 @@ defmodule ThistleTea.Game.Entity.Data.MobTest do
   end
 
   describe "handle_continue/2" do
+    test "credits the original tag when another player lands the killing blow" do
+      tagger = Guid.from_low_guid(:player, System.unique_integer([:positive]))
+      killer = Guid.from_low_guid(:player, System.unique_integer([:positive]))
+      mob_guid = Guid.from_low_guid(:mob, 2, System.unique_integer([:positive]))
+      Entity.register(tagger)
+
+      mob = dead_mob(mob_guid, killed_by: killer, death_finalized?: false)
+      tap = %Tap{player: tagger}
+      mob = %{mob | internal: %{mob.internal | loot: %{mob.internal.loot | tapped_by: tap}}}
+
+      assert {:noreply, %Mob{}} = MobServer.handle_continue(:maybe_broadcast, mob)
+      assert_receive {:"$gen_cast", {:reward_kill, %Mob{object: %Object{guid: ^mob_guid}}}}
+    end
+
     test "projects a fireball tap before the first hostile update" do
       player_guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
       mob_guid = Guid.from_low_guid(:mob, 2, System.unique_integer([:positive]))

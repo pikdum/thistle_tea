@@ -195,6 +195,8 @@ defmodule ThistleTea.Game.Battleground.WarsongGulchTest do
             assert result.timers == [auto_leave: 120_000]
             assert Enum.any?(result.effects, &match?(%Effects.Scoreboard{ended?: true, winner: :alliance}, &1))
             assert Enum.any?(result.effects, &match?(%Effects.RewardPlayers{winner: :alliance}, &1))
+            assert %Effects.RewardHonor{guids: [@alliance], amount: 396} in result.effects
+            assert %Effects.RewardHonor{guids: [@alliance], amount: 198} in result.effects
             result.match
           end
         end)
@@ -202,6 +204,28 @@ defmodule ThistleTea.Game.Battleground.WarsongGulchTest do
       assert ended.phase == {:ended, :alliance}
       assert ended.team_scores.alliance == 3
       assert ended.players[@alliance].bonus_honor == 1_386
+    end
+
+    test "captures reward recipients without crediting offline or reserved teammates", %{match: match} do
+      match = match |> active_with_players() |> take_horde_flag()
+      teammate = match.players[@alliance]
+
+      players =
+        match.players
+        |> Map.put(3, %{teammate | guid: 3, status: :inside})
+        |> Map.put(4, %{teammate | guid: 4, status: :offline})
+        |> Map.put(5, %{teammate | guid: 5, status: :reserved})
+
+      match = %{match | players: players}
+      {:handled, result} = WarsongGulch.area_trigger(match, @alliance, @alliance_capture_trigger, 3_000)
+      assert %Effects.RewardHonor{guids: [@alliance, 3], amount: 396} in result.effects
+      assert result.match.players[3].bonus_honor == 396
+      assert result.match.players[4].bonus_honor == 0
+      assert result.match.players[5].bonus_honor == 0
+      assert result.match.players[@horde].bonus_honor == 0
+
+      assert {:handled, %Result{effects: []}} =
+               WarsongGulch.area_trigger(result.match, @alliance, @alliance_capture_trigger, 3_001)
     end
   end
 

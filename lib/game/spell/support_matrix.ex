@@ -20,7 +20,6 @@ defmodule ThistleTea.Game.Spell.SupportMatrix do
     37 => :spell_defense_dnd,
     39 => :language,
     44 => :skill_step,
-    45 => :honor,
     47 => :tradeskill,
     49 => :detect,
     76 => :summon_object_wild,

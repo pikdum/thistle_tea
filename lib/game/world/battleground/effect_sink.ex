@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.World.Battleground.EffectSink do
   alias ThistleTea.Game.Battleground.WarsongGulch
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.GameObject
+  alias ThistleTea.Game.Entity.Data.Honor.Award
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
@@ -17,6 +18,7 @@ defmodule ThistleTea.Game.World.Battleground.EffectSink do
   alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpawnPool
+  alias ThistleTea.Game.World.System.Honor
 
   @alliance_flag_aura 23_335
   @horde_flag_aura 23_333
@@ -148,6 +150,10 @@ defmodule ThistleTea.Game.World.Battleground.EffectSink do
     |> Map.values()
     |> Enum.filter(&(&1.status == :inside and &1.team == effect.team))
     |> Enum.each(&Entity.reward_reputation(&1.guid, effect.faction_id, effect.amount))
+  end
+
+  defp emit_effect(_match, %Effects.RewardHonor{guids: guids, amount: amount}) do
+    Enum.each(guids, &Honor.award(&1, %Award{type: :bonus, points: amount}))
   end
 
   defp emit_effect(_match, %Effects.ExitPlayers{destinations: destinations}) do

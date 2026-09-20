@@ -10,7 +10,23 @@ defmodule ThistleTea.Game.World.BattlegroundEffectSinkTest do
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.Battleground.EffectSink
+  alias ThistleTea.Game.World.System.Honor
   alias ThistleTea.Game.WorldRef
+
+  describe "emit/2" do
+    test "credits the realm ledger and notifies the owner without adding a kill" do
+      guid = Guid.from_low_guid(:player, System.unique_integer([:positive, :monotonic]))
+      Entity.register(guid)
+      Honor.register(guid, :alliance, 60)
+      match = %WarsongGulch{world: WorldRef.instance(489, 7), client_instance_id: 7, bracket: 5, template: %Template{}}
+
+      assert :ok = EffectSink.emit(match, [%Effects.RewardHonor{guids: [guid], amount: 396}])
+      snapshot = Honor.snapshot(guid)
+      assert snapshot.honor.days[snapshot.day].contribution == 396
+      assert snapshot.honor.lifetime_honorable_kills == 0
+      assert_receive {:"$gen_cast", {:honor_updated, %{type: :bonus, points: 396}}}
+    end
+  end
 
   test "publishes a nonzero active-match runtime to inside players" do
     guid = Guid.from_low_guid(:player, System.unique_integer([:positive, :monotonic]))
