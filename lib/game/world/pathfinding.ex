@@ -5,9 +5,29 @@ defmodule ThistleTea.Game.World.Pathfinding do
   """
   alias ThistleTea.Native.Namigator
 
+  @area_floor_tolerance 0.1
+  @area_surface_distance 3.0
+
   def get_zone_and_area(map_id, {x, y, z}) do
     load_adt_at(map_id, {x, y})
-    Namigator.get_zone_and_area(map_id, x, y, z)
+
+    case Namigator.get_zone_and_area(map_id, x, y, z) do
+      {_zone, area} = result when area > 0 -> result
+      _unknown -> surface_zone_and_area(map_id, {x, y, z})
+    end
+  end
+
+  defp surface_zone_and_area(map_id, {x, y, z}) do
+    map_id
+    |> find_heights({x, y})
+    |> Enum.filter(&(abs(&1 - z) <= @area_surface_distance))
+    |> Enum.sort_by(&abs(&1 - z))
+    |> Enum.find_value(fn height ->
+      case Namigator.get_zone_and_area(map_id, x, y, height - @area_floor_tolerance) do
+        {_zone, area} = result when area > 0 -> result
+        _unknown -> nil
+      end
+    end)
   end
 
   def find_random_point_around_circle(map_id, {x, y, z}, radius) do

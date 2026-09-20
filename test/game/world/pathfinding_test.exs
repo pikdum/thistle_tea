@@ -9,6 +9,18 @@ defmodule ThistleTea.Game.World.PathfindingTest do
 
   @human_start {-8949.95, -132.49, 83.53}
 
+  describe "get_zone_and_area/2" do
+    test "resolves Goldshire across the inn's unlabelled floor surface" do
+      for z <- [56.96, 56.96255874633789, 57.05, 59.0] do
+        assert Pathfinding.get_zone_and_area(0, {-9461.5, 16.190000534057617, z}) == {12, 87}
+      end
+    end
+
+    test "does not invent an area when map geometry is unavailable" do
+      assert Pathfinding.get_zone_and_area(999, {0.0, 0.0, 0.0}) == nil
+    end
+  end
+
   describe "line_of_sight?/3" do
     test "open air is visible" do
       assert Pathfinding.line_of_sight?(0, @human_start, {-8955.0, -140.0, 84.0})
