@@ -4,7 +4,9 @@ The calculation layer, player and creature kills, Warsong bonuses, and honor
 spells are implemented. Rank requirements and automatic Honorless Target
 application remain to be connected. Player kills, repeat penalties, gray rejection, party and pet
 credit, inspection, and reconnect retention have real-client acceptance in
-[honor-playtest.md](honor-playtest.md).
+[honor-playtest.md](honor-playtest.md). Creature kills, honor spells, Warsong
+captures and victories, scoreboard refresh, and exit retention are validated
+in [honor-rewards-playtest.md](honor-rewards-playtest.md).
 
 ## Implemented rules
 
@@ -80,7 +82,7 @@ Target, Spirit of Redemption, current player projections, and packet dispatch.
    and honor-ledger HKs follow different vanilla eligibility rules.
 2. Apply honor-rank conditions and equipment/vendor requirements, and connect
    automatic Honorless Target application during world-entry transitions.
-3. Extend client acceptance to the new reward sources, rank requirements, and
+3. Extend client acceptance to rank requirements and
    automatic Honorless Target protection. Calendar/ranking tests cover
    settlement without waiting for a real weekly reset.
 
