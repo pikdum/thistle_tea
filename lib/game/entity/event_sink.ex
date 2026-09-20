@@ -87,6 +87,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
     Effects.WaterWalkChanged
   ]
   @spell_effects [
+    Effects.PetSpellModifiers,
     Effects.SpellMagnetsChanged,
     Effects.AuraDuration,
     Effects.ChannelStart,

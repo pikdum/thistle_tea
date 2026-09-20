@@ -65,7 +65,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Transition do
 
   defp reconcile(entity, previous, holders, cause, now) do
     {removed, touched} = diff(previous, holders)
-    modifier_events = ModifierSync.events(previous, holders)
+    modifier_events = ModifierSync.events(previous, holders) ++ ModifierSync.pet_events(entity, previous, holders)
 
     entity =
       entity

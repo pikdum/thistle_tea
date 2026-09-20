@@ -15,6 +15,11 @@ defmodule ThistleTea.Game.Entity.Logic.Effects do
     %Effects.CancelAutoRepeat{}
   end
 
+  def pet_spell_modifiers(source_guid, target_guid, holders)
+      when is_integer(source_guid) and is_integer(target_guid) and is_list(holders) do
+    %Effects.PetSpellModifiers{source_guid: source_guid, target_guid: target_guid, holders: holders}
+  end
+
   def spell_damage(source_guid, target_guid, spell, damage, opts \\ []) do
     %Effects.SpellDamage{
       source_guid: source_guid,

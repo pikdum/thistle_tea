@@ -97,6 +97,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.Player.Taxi, as: PlayerTaxi
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
+  alias ThistleTea.Game.Spell.Modifiers
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.AggroProbe
@@ -1414,6 +1415,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
       character
       |> EventSink.emit(aura_events)
       |> EventSink.emit(passive_pet_aura_events(character, guid))
+      |> EventSink.emit(Effects.pet_spell_modifiers(character.object.guid, guid, Modifiers.holders(character)))
       |> Core.mark_broadcast_update()
 
     %{state | character: character}

@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.Entity.Logic.PetTraining do
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.PetLoyalty
+  alias ThistleTea.Game.Entity.Logic.PetSpellModifiers
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Effect
 
@@ -135,8 +136,7 @@ defmodule ThistleTea.Game.Entity.Logic.PetTraining do
   defp chain(%Spell{first_in_chain: first, id: id}), do: first || id
 
   defp apply_passive(pet, spell, now) do
-    {pet, effects} = Aura.apply_spell(pet, pet.object.guid, pet.unit.level, spell, now)
-    Effects.enqueue(pet, effects)
+    PetSpellModifiers.apply_passive(pet, spell, now)
   end
 
   defp replace_controls(%Pet{} = pet, previous, spell, spellbook) do

@@ -16,12 +16,13 @@ defmodule ThistleTea.Game.World.Loader.Summon do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Data.PetProgress
-  alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
   alias ThistleTea.Game.Entity.Logic.Companion
   alias ThistleTea.Game.Entity.Logic.PetProgression
+  alias ThistleTea.Game.Entity.Logic.PetSpellModifiers
   alias ThistleTea.Game.Entity.Logic.PetTraining
   alias ThistleTea.Game.Entity.Logic.Stats
   alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.Spell.Modifiers
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.Loader.Mob, as: MobLoader
   alias ThistleTea.Game.World.Loader.PetLevel, as: PetLevelLoader
@@ -101,6 +102,7 @@ defmodule ThistleTea.Game.World.Loader.Summon do
         mob.internal
         | pet: %Pet{
             owner_guid: owner_guid,
+            owner_spell_modifiers: Modifiers.holders(owner),
             profile: :combat,
             kind: if(hunter_pet?, do: :hunter, else: :summon),
             family_spells: MapSet.new(Map.keys(family_spells)),
@@ -231,8 +233,7 @@ defmodule ThistleTea.Game.World.Loader.Summon do
     entry
     |> pet_passive_spells(level)
     |> Enum.reduce(mob, fn spell, acc ->
-      {acc, _events} = AuraLogic.apply_spell(acc, acc.object.guid, acc.unit.level, spell, Time.now())
-      acc
+      PetSpellModifiers.apply_passive(acc, spell, Time.now())
     end)
   end
 

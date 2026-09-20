@@ -581,7 +581,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
       if effect.aura in [:periodic_damage, :periodic_leech, :periodic_mana_leech, :periodic_heal] do
         Modifiers.value(context.spell_modifiers, :dot, amount * 1.0)
       else
-        amount
+        Modifiers.value(context.spell_modifiers, :all_effects, amount)
       end
 
     happiness = if effect.aura in [:periodic_damage, :periodic_leech], do: context.happiness_multiplier, else: 1.0

@@ -241,6 +241,11 @@ defmodule ThistleTea.Game.Entity.EventSink.Spells do
 
   def emit(entity, %Effects.SpellModifier{}, _context), do: entity
 
+  def emit(entity, %Effects.PetSpellModifiers{} = effect, _context) do
+    Entity.sync_pet_spell_modifiers(effect.target_guid, effect.source_guid, effect.holders)
+    entity
+  end
+
   def emit(%Character{} = entity, %Effects.CooldownEvent{} = effect, context) do
     Context.send_packet(context, %Message.SmsgCooldownEvent{spell_id: effect.spell_id, guid: effect.source_guid})
     entity

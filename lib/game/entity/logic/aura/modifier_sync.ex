@@ -7,7 +7,10 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.ModifierSync do
 
   alias ThistleTea.Game.Aura
   alias ThistleTea.Game.Aura.Holder
+  alias ThistleTea.Game.Entity.Data.Character
+  alias ThistleTea.Game.Entity.Logic.Companion
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Spell.Modifiers
 
   @modifier_types %{add_flat_modifier: :flat, add_pct_modifier: :pct}
   @effect_indexes 0..63
@@ -35,6 +38,24 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.ModifierSync do
   end
 
   def events(_previous_holders, _holders), do: []
+
+  def pet_events(%Character{} = character, previous, holders) do
+    current = Modifiers.holders(holders)
+
+    case Companion.relationship(character) do
+      %{kind: kind, status: {:active, %{guid: guid}}} when kind in [:hunter_pet, :guardian] ->
+        if Modifiers.holders(previous) == current do
+          []
+        else
+          [Effects.pet_spell_modifiers(character.object.guid, guid, current)]
+        end
+
+      _ ->
+        []
+    end
+  end
+
+  def pet_events(_entity, _previous, _holders), do: []
 
   def totals(holders) when is_list(holders) do
     Enum.reduce(holders, %{}, &add_holder/2)

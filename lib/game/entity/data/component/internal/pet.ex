@@ -26,6 +26,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal.Pet do
     training_points: 0,
     last_untrain_cost: 0,
     family_spells: MapSet.new(),
+    owner_spell_modifiers: [],
     broken?: false,
     possessed?: false,
     action_bar: %{},

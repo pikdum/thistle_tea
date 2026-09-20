@@ -54,6 +54,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Entity.Logic.PetHappiness
   alias ThistleTea.Game.Entity.Logic.PetLoyalty
   alias ThistleTea.Game.Entity.Logic.PetProgression
+  alias ThistleTea.Game.Entity.Logic.PetSpellModifiers
   alias ThistleTea.Game.Entity.Logic.PetTraining
   alias ThistleTea.Game.Entity.Logic.PetUntraining
   alias ThistleTea.Game.Entity.Logic.SpellEffect
@@ -515,6 +516,15 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
       |> wake_ai_tick()
 
     {:noreply, state, {:continue, :maybe_broadcast}}
+  end
+
+  def handle_cast({:pet_spell_modifiers, owner, holders}, %Mob{} = state) do
+    updated = state |> PetSpellModifiers.sync(owner, holders, Time.now()) |> EventSink.emit_pending()
+    {:noreply, updated, {:continue, :maybe_broadcast}}
+  rescue
+    error ->
+      Logger.error("Pet spell modifiers failed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:noreply, state}
   end
 
   @impl GenServer

@@ -61,8 +61,8 @@ defmodule ThistleTea.Game.Spell.Modifiers do
 
   def value(_modifiers, _operation, base), do: base
 
-  def snapshot(%{unit: %{auras: holders}}, %Spell{} = spell) when is_list(holders) do
-    for %Holder{} = holder <- holders,
+  def snapshot(%{unit: %{auras: holders}} = entity, %Spell{} = spell) when is_list(holders) do
+    for %Holder{} = holder <- holders ++ inherited_holders(entity),
         modifier_applies?(holder.spell, spell),
         %Aura{type: type, amount: amount, class_mask: class_mask} = aura <- holder.auras,
         type in @modifier_types,
@@ -72,6 +72,22 @@ defmodule ThistleTea.Game.Spell.Modifiers do
   end
 
   def snapshot(_entity, _spell), do: []
+
+  def holders(%{unit: %{auras: holders}}), do: holders(holders)
+
+  def holders(holders) when is_list(holders) do
+    Enum.flat_map(holders, fn %Holder{} = holder ->
+      case Enum.filter(holder.auras, &(&1.type in @modifier_types)) do
+        [] -> []
+        modifiers -> [%{holder | auras: modifiers}]
+      end
+    end)
+  end
+
+  def holders(_entity), do: []
+
+  defp inherited_holders(%{internal: %{pet: %{owner_spell_modifiers: holders}}}), do: holders
+  defp inherited_holders(_entity), do: []
 
   defp holder_stacks(%Holder{stacks: stacks}) when is_integer(stacks) and stacks > 1, do: stacks
   defp holder_stacks(_holder), do: 1
