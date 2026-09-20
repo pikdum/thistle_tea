@@ -21,6 +21,7 @@ defmodule ThistleTea.Game.Player.Gossip do
   alias ThistleTea.Game.Player.Battlegrounds
   alias ThistleTea.Game.Player.ConditionContext
   alias ThistleTea.Game.Player.GossipCondition
+  alias ThistleTea.Game.Player.HomeBind
   alias ThistleTea.Game.Player.Quests
   alias ThistleTea.Game.Player.Reputation
   alias ThistleTea.Game.Player.Taxi
@@ -155,6 +156,9 @@ defmodule ThistleTea.Game.Player.Gossip do
   defp dispatch(state, _character, guid, %Option{option_id: option_id}, %{banker: option_id}),
     do: Bank.activate(state, guid)
 
+  defp dispatch(state, _character, guid, %Option{option_id: option_id}, %{innkeeper: option_id}),
+    do: HomeBind.confirm(state, guid)
+
   defp dispatch(state, character, guid, %Option{option_id: option_id}, %{spirit_healer: option_id}) do
     if not Death.alive?(character), do: Network.send_packet(%Message.SmsgSpiritHealerConfirm{guid: guid})
     state
@@ -240,6 +244,7 @@ defmodule ThistleTea.Game.Player.Gossip do
       taxi: GossipLoader.option_taxi(),
       trainer: GossipLoader.option_trainer(),
       spirit_healer: GossipLoader.option_spirit_healer(),
+      innkeeper: GossipLoader.option_innkeeper(),
       banker: GossipLoader.option_banker(),
       battlefield: GossipLoader.option_battlefield()
     }

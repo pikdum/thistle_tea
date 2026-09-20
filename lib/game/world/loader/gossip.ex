@@ -17,6 +17,7 @@ defmodule ThistleTea.Game.World.Loader.Gossip do
   @option_taxi 4
   @option_trainer 5
   @option_spirit_healer 6
+  @option_innkeeper 8
   @option_banker 9
   @option_battlefield 12
   @supported_option_ids [
@@ -25,6 +26,7 @@ defmodule ThistleTea.Game.World.Loader.Gossip do
     @option_taxi,
     @option_trainer,
     @option_spirit_healer,
+    @option_innkeeper,
     @option_banker,
     @option_battlefield
   ]
@@ -197,6 +199,7 @@ defmodule ThistleTea.Game.World.Loader.Gossip do
   def option_taxi, do: @option_taxi
   def option_trainer, do: @option_trainer
   def option_spirit_healer, do: @option_spirit_healer
+  def option_innkeeper, do: @option_innkeeper
   def option_banker, do: @option_banker
   def option_battlefield, do: @option_battlefield
 end

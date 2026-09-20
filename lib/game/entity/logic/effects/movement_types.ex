@@ -2,6 +2,7 @@ defmodule ThistleTea.Game.Entity.Logic.Effects.MovementTypes do
   @moduledoc false
 
   effects = [
+    {:BindHome, [:binder_guid], []},
     {:Charge, [:target_guid], []},
     {:MovementStopped, [], []},
     {:MovementSpeedChanged, [:speed], [movement_type: :run_speed]},
@@ -14,6 +15,7 @@ defmodule ThistleTea.Game.Entity.Logic.Effects.MovementTypes do
      []},
     {:Teleport, [:position], []},
     {:TeleportToWorld, [:world, :position], []},
+    {:TeleportHome, [], []},
     {:Leap, [:position], []},
     {:TeleportToSpellTarget, [:spell_id], []},
     {:ChargeResolved, [:path, :duration_ms, :destination], []},

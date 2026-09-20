@@ -7,6 +7,10 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.Movement do
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Effect
 
+  def apply(state, %CastContext{caster_guid: guid}, _spell, %Effect{type: :bind}, _now) do
+    {state, [%Effects.BindHome{binder_guid: guid}]}
+  end
+
   def apply(
         %{movement_block: %{position: {x, y, z, orientation}}} = state,
         %CastContext{},
@@ -19,8 +23,13 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.Movement do
     {state, [Effects.leap(destination)]}
   end
 
-  def apply(state, %CastContext{}, %Spell{id: spell_id}, %Effect{type: :teleport_units}, _now) do
-    {state, [Effects.teleport_to_spell_target(spell_id)]}
+  def apply(state, %CastContext{}, %Spell{id: spell_id}, %Effect{type: :teleport_units} = effect, _now) do
+    request =
+      if :home_bind in [effect.implicit_target_a, effect.implicit_target_b],
+        do: %Effects.TeleportHome{},
+        else: Effects.teleport_to_spell_target(spell_id)
+
+    {state, [request]}
   end
 
   def apply(state, %CastContext{destination_position: destination}, _spell, %Effect{type: :distract} = effect, now) do

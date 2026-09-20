@@ -11,6 +11,7 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.GameObject
+  alias ThistleTea.Game.Entity.Data.HomeBind
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.EventSink.Context
@@ -362,9 +363,10 @@ defmodule ThistleTea.Game.Entity.EventSinkTest do
     end
 
     test "hearthstone teleports a character to their home bind" do
-      character = %Character{internal: %Internal{world: %WorldRef{map_id: 1}, home_bind: {0, -8_946.0, -132.0, 84.0}}}
+      home = %HomeBind{map_id: 0, area_id: 9, position: {-8_946.0, -132.0, 84.0}}
+      character = %Character{internal: %Internal{world: %WorldRef{map_id: 1}, home_bind: home}}
 
-      assert ^character = EventSink.emit(character, Effects.teleport_to_spell_target(8690), Context.new(self()))
+      assert ^character = EventSink.emit(character, %Effects.TeleportHome{}, Context.new(self()))
       assert_receive {:"$gen_cast", {:start_teleport, -8_946.0, -132.0, 84.0, 0}}
     end
 

@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.World.Loader.Character do
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Data.HomeBind
   alias ThistleTea.Game.Entity.Data.Taxi.Network, as: TaxiNetwork
   alias ThistleTea.Game.Player.Stats
   alias ThistleTea.Game.World.Loader.Skill, as: SkillLoader
@@ -125,7 +126,11 @@ defmodule ThistleTea.Game.World.Loader.Character do
         name: params.name,
         area: info.zone,
         world: WorldRef.open(info.map),
-        home_bind: {info.map, info.position_x, info.position_y, info.position_z},
+        home_bind: %HomeBind{
+          map_id: info.map,
+          area_id: info.zone,
+          position: {info.position_x, info.position_y, info.position_z}
+        },
         spells: spells,
         starting_items: starting_items,
         action_buttons: action_buttons

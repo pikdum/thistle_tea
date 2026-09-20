@@ -10,7 +10,7 @@ defmodule ThistleTea.Game.Entity.EffectResolver do
   alias ThistleTea.Game.Entity.Logic.Effects
 
   @combat_requests [Effects.BladeFlurry, Effects.DropNearbyThreat, Effects.SecondaryMelee]
-  @movement_requests [Effects.Charge, Effects.Leap, Effects.TeleportToSpellTarget]
+  @movement_requests [Effects.Charge, Effects.Leap, Effects.TeleportHome, Effects.TeleportToSpellTarget]
   @spell_requests [Effects.DeliverSpell, Effects.DeliverSpellToQuery, Effects.HealThreat, Effects.TriggerSpell]
 
   def resolve(entity, effects) when is_list(effects) do

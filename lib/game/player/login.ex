@@ -45,6 +45,7 @@ defmodule ThistleTea.Game.Player.Login do
   alias ThistleTea.Game.Party.Notifier
   alias ThistleTea.Game.Player.ConditionContext
   alias ThistleTea.Game.Player.Enchantments
+  alias ThistleTea.Game.Player.HomeBind
   alias ThistleTea.Game.Player.Mail
   alias ThistleTea.Game.Player.Quests
   alias ThistleTea.Game.Player.Reputation, as: PlayerReputation
@@ -254,17 +255,7 @@ defmodule ThistleTea.Game.Player.Login do
     # maybe useless? mangos sends it, though
     Network.send_packet(%Message.SmsgSetRestStart{unknown1: 0})
 
-    {x, y, z, _o} = c.movement_block.position
-
-    # SMSG_BINDPOINTUPDATE
-    # let's just init it to character's position for now
-    Network.send_packet(%Message.SmsgBindpointupdate{
-      x: x,
-      y: y,
-      z: z,
-      map: c.internal.world.map_id,
-      area: c.internal.area
-    })
+    HomeBind.send_update(c)
 
     # no tutorials
     Network.send_packet(%Message.SmsgTutorialFlags{

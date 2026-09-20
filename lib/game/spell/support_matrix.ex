@@ -40,7 +40,6 @@ defmodule ThistleTea.Game.Spell.SupportMatrix do
   }
 
   @deferred_targets %{
-    9 => :home_bind,
     17 => :database_location,
     23 => :gameobject,
     26 => :locked_object,

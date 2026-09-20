@@ -21,6 +21,12 @@ defmodule ThistleTea.Game.World.Loader.GossipVmangosTest do
   @moduletag :vmangos_db
 
   describe "load_all/0" do
+    test "loads Innkeeper Farley's home-binding option" do
+      assert :ok = Gossip.load_all()
+      assert %Menu{options: options} = Gossip.menu_for_creature(295)
+      assert %Option{option_id: 8, npc_flag: 0x80} = Enum.find(options, &(&1.option_id == 8))
+    end
+
     test "attaches SEND_TAXI_PATH scripts to Moonglade gossip options" do
       assert :ok = Gossip.load_all()
 

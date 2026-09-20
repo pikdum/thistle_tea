@@ -3,6 +3,7 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Movement do
 
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.Entity.Data.HomeBind
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.Math
@@ -44,9 +45,14 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Movement do
 
   def resolve(_entity, %Effects.Leap{}), do: []
 
-  def resolve(%Character{internal: %Internal{home_bind: {map, x, y, z}}}, %Effects.TeleportToSpellTarget{spell_id: 8690}) do
-    [Effects.teleport_to_world(map, {x, y, z})]
+  def resolve(
+        %Character{internal: %Internal{home_bind: %HomeBind{map_id: map, position: position}}},
+        %Effects.TeleportHome{}
+      ) do
+    [Effects.teleport_to_world(map, position)]
   end
+
+  def resolve(_entity, %Effects.TeleportHome{}), do: []
 
   def resolve(%Character{}, %Effects.TeleportToSpellTarget{spell_id: spell_id}) do
     case SpellLoader.target_position(spell_id) do

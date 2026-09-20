@@ -72,6 +72,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
     Effects.ThreatRefLost
   ]
   @movement_effects [
+    Effects.BindHome,
     Effects.ChargeResolved,
     Effects.CreatureTeleported,
     Effects.FeatherFallChanged,

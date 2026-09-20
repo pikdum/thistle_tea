@@ -529,6 +529,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp effect_type(8), do: :power_drain
   defp effect_type(9), do: :health_leech
   defp effect_type(10), do: :heal
+  defp effect_type(11), do: :bind
   defp effect_type(16), do: :quest_complete
   defp effect_type(18), do: :resurrect
   defp effect_type(94), do: :self_resurrect
@@ -752,6 +753,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
   defp target_type(0), do: nil
   defp target_type(1), do: :caster
   defp target_type(6), do: :target_enemy
+  defp target_type(9), do: :home_bind
   defp target_type(21), do: :target_ally
   defp target_type(57), do: :target_ally
   defp target_type(15), do: :aoe_enemy_at_caster

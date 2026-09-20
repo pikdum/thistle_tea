@@ -116,6 +116,7 @@ defmodule ThistleTea.Game.Network.Message.Dispatch do
               CMSG_SPLIT_ITEM: Message.CmsgSplitItem,
               CMSG_DESTROYITEM: Message.CmsgDestroyitem,
               CMSG_BANKER_ACTIVATE: Message.CmsgBankerActivate,
+              CMSG_BINDER_ACTIVATE: Message.CmsgBinderActivate,
               CMSG_BUY_BANK_SLOT: Message.CmsgBuyBankSlot,
               CMSG_REPAIR_ITEM: Message.CmsgRepairItem,
               CMSG_AUTOBANK_ITEM: Message.CmsgAutobankItem,

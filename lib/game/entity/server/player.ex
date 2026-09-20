@@ -79,6 +79,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.Player.Enchantments
   alias ThistleTea.Game.Player.Exploration, as: PlayerExploration
   alias ThistleTea.Game.Player.GameObjects, as: PlayerGameObjects
+  alias ThistleTea.Game.Player.HomeBind
   alias ThistleTea.Game.Player.Items
   alias ThistleTea.Game.Player.Login
   alias ThistleTea.Game.Player.Looting
@@ -344,6 +345,14 @@ defmodule ThistleTea.Game.Entity.Server.Player do
     character = PlayerCombat.lose_threat_ref(character, mob_guid, incarnation_id)
     state = TickScheduler.ensure_scheduled(%{state | character: character})
     {:noreply, state}
+  end
+
+  def handle_cast({:bind_home, guid}, state) do
+    {:noreply, HomeBind.complete(state, guid)}
+  rescue
+    error ->
+      Logger.error("Home binding failed: #{inspect(error)}")
+      {:noreply, state}
   end
 
   def handle_cast({:receive_spell, caster, spell}, %{character: %Character{} = character} = state) do
