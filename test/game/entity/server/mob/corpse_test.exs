@@ -160,6 +160,15 @@ defmodule ThistleTea.Game.Entity.Server.Mob.CorpseTest do
   end
 
   describe "remove/2" do
+    test "removes an unlootable corpse without a loot component", %{killer: killer} do
+      corpse = mob(killer)
+      corpse = %{corpse | internal: %{corpse.internal | loot: nil}}
+      removed = Corpse.remove(corpse)
+      assert Corpse.removed?(removed)
+      assert Corpse.remove(removed) == removed
+      assert removed.internal.loot.session == nil
+    end
+
     test "ignores a decay timer from a previous creature life", %{killer: killer} do
       cache_loot_rows([])
       previous = Corpse.prepare(skinning_mob(killer), killer)

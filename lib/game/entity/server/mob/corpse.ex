@@ -131,9 +131,10 @@ defmodule ThistleTea.Game.Entity.Server.Mob.Corpse do
 
         state = Visibility.leave_entity(state)
         World.remove_position(state)
+        loot = state.internal.loot || %InternalLoot{}
 
         state
-        |> put_internal_loot(%{state.internal.loot | session: nil, corpse_removed?: true})
+        |> put_internal_loot(%{loot | session: nil, corpse_removed?: true})
         |> publish_skinning()
     end
   end
