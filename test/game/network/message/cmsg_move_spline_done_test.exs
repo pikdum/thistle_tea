@@ -8,14 +8,29 @@ defmodule ThistleTea.Game.Network.Message.CmsgMoveSplineDoneTest do
   alias ThistleTea.Game.Network.Opcodes
 
   describe "from_binary/1" do
-    test "decodes movement and the trailing spline identifier" do
+    test "decodes movement, the spline identifier, and the vanilla trailing float" do
       payload =
         <<0::little-size(32), 123::little-size(32), 1.0::little-float-size(32), 2.0::little-float-size(32),
-          3.0::little-float-size(32), 4.0::little-float-size(32), 0::little-size(32), 987::little-size(32)>>
+          3.0::little-float-size(32), 4.0::little-float-size(32), 0::little-size(32), 987::little-size(32),
+          1.0::little-float-size(32)>>
 
       assert %CmsgMoveSplineDone{
                spline_id: 987,
+               unknown: 1.0,
                movement_block: %MovementBlock{timestamp: 123, position: {1.0, 2.0, 3.0, 4.0}, fall_time: 0}
+             } = CmsgMoveSplineDone.from_binary(payload)
+    end
+
+    test "keeps optional swimming data separate from the spline fields" do
+      payload =
+        <<0x200000::little-size(32), 123::little-size(32), 1.0::little-float-size(32), 2.0::little-float-size(32),
+          3.0::little-float-size(32), 4.0::little-float-size(32), 0.5::little-float-size(32), 0::little-size(32),
+          987::little-size(32), 1.0::little-float-size(32)>>
+
+      assert %CmsgMoveSplineDone{
+               spline_id: 987,
+               unknown: 1.0,
+               movement_block: %MovementBlock{pitch: 0.5, fall_time: 0}
              } = CmsgMoveSplineDone.from_binary(payload)
     end
   end
