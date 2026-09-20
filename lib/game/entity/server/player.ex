@@ -1511,7 +1511,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
     state = %{state | character: character}
 
     state =
-      if xp > 0 do
+      if xp > 0 and (character.player.next_level_xp || 0) > 0 do
         {character, rested_bonus} = Rest.spend(state.character, xp, Time.now())
         total_xp = xp + rested_bonus
 
