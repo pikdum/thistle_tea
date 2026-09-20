@@ -199,7 +199,8 @@ defmodule ThistleTea.Game.World.SpellMagnetsTest do
         alive?: true,
         creature_type: 11,
         faction_template: %FactionTemplate{id: faction, faction: faction, enemies_1: 3 - faction},
-        unit_flags: 0
+        unit_flags: 0,
+        pvp?: true
       })
 
       on_exit(fn ->

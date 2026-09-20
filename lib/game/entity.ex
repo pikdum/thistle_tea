@@ -42,6 +42,9 @@ defmodule ThistleTea.Game.Entity do
     dispatch_cast(entity, {:receive_spell, caster, spell})
   end
 
+  def pvp_contact(entity, effect), do: dispatch_cast(entity, {:pvp_contact, effect})
+  def sync_pvp(entity, owner, enabled), do: dispatch_cast(entity, {:sync_pvp, owner, enabled})
+
   def sync_pet_spell_modifiers(entity, owner, holders) do
     dispatch_cast(entity, {:pet_spell_modifiers, owner, holders})
   end

@@ -119,7 +119,7 @@ defmodule ThistleTea.Game.Entity.Data.MobTest do
       assert mob.internal.spawn.movement_block == mob.movement_block
     end
 
-    test "derives tameable and ghost-visible type flags from VMangos static flags" do
+    test "derives tameable, ghost-visible, and PvP flags from VMangos static flags" do
       creature =
         %Mangos.Creature{
           guid: 1,
@@ -136,7 +136,7 @@ defmodule ThistleTea.Game.Entity.Data.MobTest do
             max_level: 1,
             scale: 1.0,
             family: 3,
-            creature_type_flags: 0x00200010
+            creature_type_flags: 0x00600010
           }
         }
         |> Map.put(:equip_items, [nil, nil, nil])
@@ -145,6 +145,7 @@ defmodule ThistleTea.Game.Entity.Data.MobTest do
 
       assert mob.internal.creature.family == 3
       assert mob.internal.creature.type_flags == 0x03
+      assert Bitwise.band(mob.unit.flags, 0x1000) != 0
     end
 
     test "keeps class-level max health untouched by a later stat recompute" do

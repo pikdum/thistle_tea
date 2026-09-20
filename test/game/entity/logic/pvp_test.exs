@@ -51,6 +51,7 @@ defmodule ThistleTea.Game.Entity.Logic.PvpTest do
       assert Pvp.active?(flagged)
       assert Pvp.contested?(flagged)
       assert (flagged.player.flags &&& 0x100) != 0
+      flagged = %{flagged | internal: %{flagged.internal | in_combat: false}}
       assert Pvp.contested?(Pvp.tick(flagged, 29_999))
       refute Pvp.contested?(Pvp.tick(flagged, 30_000))
       assert Pvp.active?(Pvp.tick(flagged, 30_000))
@@ -177,7 +178,9 @@ defmodule ThistleTea.Game.Entity.Logic.PvpTest do
 
   describe "reconnect/2" do
     test "retains countdowns without charging offline time", %{character: character} do
-      flagged = character |> Pvp.contact(:attack, player(), 0) |> Pvp.tick(1_000)
+      flagged = Pvp.contact(character, :attack, player(), 0)
+      flagged = %{flagged | internal: %{flagged.internal | in_combat: false}}
+      flagged = Pvp.tick(flagged, 1_000)
       reconnected = Pvp.reconnect(flagged, 900_000)
       assert reconnected.internal.pvp.remaining_ms == 299_000
       assert reconnected.internal.pvp.contested_remaining_ms == 29_000
@@ -188,6 +191,13 @@ defmodule ThistleTea.Game.Entity.Logic.PvpTest do
   end
 
   describe "tick/2" do
+    test "late contacts cannot rewind the owner clock", %{character: character} do
+      flagged = character |> Pvp.toggle(true, 1_000) |> Pvp.contact(:attack, player(), 900)
+      assert flagged.internal.pvp.updated_at == 1_000
+      assert flagged.internal.last_hostile_time == 1_000
+      assert Pvp.tick(flagged, 800).internal.pvp.updated_at == 1_000
+    end
+
     test "schedules idle timer expiry independently of regeneration", %{character: character} do
       flagged = character |> Pvp.toggle(true, 0) |> Pvp.toggle(false, 0)
       assert Tick.needs_tick?(flagged)

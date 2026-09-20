@@ -49,7 +49,7 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Combat do
          %Spell.Effect{} = effect <- List.first(Spell.damage_effects(spell)) do
       spell = %{spell | effects: [%{effect | base_points: damage, die_sides: 0, base_dice: 0}]}
       context = CastContext.from_caster(entity, spell, secondary)
-      [Spells.resolved_delivery(entity, Effects.deliver_spell(secondary, context, spell))]
+      Spells.resolved_delivery(entity, Effects.deliver_spell(secondary, context, spell))
     else
       _missing -> []
     end

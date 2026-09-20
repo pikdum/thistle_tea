@@ -57,6 +57,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Entity.Logic.PetSpellModifiers
   alias ThistleTea.Game.Entity.Logic.PetTraining
   alias ThistleTea.Game.Entity.Logic.PetUntraining
+  alias ThistleTea.Game.Entity.Logic.Pvp
   alias ThistleTea.Game.Entity.Logic.SpellEffect
   alias ThistleTea.Game.Entity.Logic.SpellFeedback
   alias ThistleTea.Game.Entity.Logic.StealthDetection
@@ -116,13 +117,17 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     GameEvent.subscribe(state)
     Process.flag(:trap_exit, true)
     state = Incarnation.ensure(state)
+    state = sync_owner_pvp(state)
     now = Time.now()
     blackboard = RegenBT.initialize(state, Blackboard.new(), now)
     state = BT.init(state, behavior_tree(state), blackboard)
 
     Metadata.update(
       state.object.guid,
-      Map.put(StealthDetection.target_metadata(state), :incarnation_id, Incarnation.id(state))
+      StealthDetection.target_metadata(state)
+      |> Map.put(:incarnation_id, Incarnation.id(state))
+      |> Map.put(:unit_flags, state.unit.flags)
+      |> Map.merge(control_metadata(state))
     )
 
     state = sync_orientation_metadata(state)
@@ -524,6 +529,15 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   rescue
     error ->
       Logger.error("Pet spell modifiers failed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:noreply, state}
+  end
+
+  def handle_cast({:sync_pvp, owner, enabled}, %Mob{} = state) when is_boolean(enabled) do
+    state = if control_owner(state) == owner, do: set_pvp(state, enabled), else: state
+    {:noreply, state, {:continue, :maybe_broadcast}}
+  rescue
+    error ->
+      Logger.error("Controlled PvP update failed: #{Exception.message(error)}")
       {:noreply, state}
   end
 
@@ -1084,6 +1098,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     state =
       state
       |> EventSink.emit_pending()
+      |> sync_owner_pvp()
       |> maybe_finalize_death()
       |> broadcast_if_pending()
       |> sync_orientation_metadata()
@@ -1185,7 +1200,36 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     %{owner_guid: pet.owner_guid, pet_profile: pet.profile}
   end
 
+  defp control_metadata(%Mob{internal: %Internal{totem: %Totem{owner_guid: owner}}}) do
+    %{owner_guid: owner, pet_profile: nil}
+  end
+
   defp control_metadata(%Mob{}), do: %{owner_guid: nil, pet_profile: nil}
+
+  defp control_owner(%Mob{internal: %Internal{pet: %Pet{owner_guid: owner}}}), do: owner
+  defp control_owner(%Mob{internal: %Internal{totem: %Totem{owner_guid: owner}}}), do: owner
+  defp control_owner(%Mob{}), do: nil
+
+  defp sync_owner_pvp(%Mob{} = state) do
+    case control_owner(state) do
+      owner when is_integer(owner) ->
+        case Metadata.query(owner, [:pvp?]) do
+          %{pvp?: enabled} when is_boolean(enabled) -> set_pvp(state, enabled)
+          _ -> state
+        end
+
+      _ ->
+        state
+    end
+  end
+
+  defp set_pvp(%Mob{} = state, enabled) do
+    flags = Pvp.unit_flags(state.unit.flags, enabled)
+
+    if flags == state.unit.flags,
+      do: state,
+      else: Core.mark_broadcast_update(%{state | unit: %{state.unit | flags: flags}})
+  end
 
   defp schedule_summon_despawn(
          %Mob{internal: %Internal{spawn: %Spawn{temporary?: true, despawn_delay_ms: delay}}} = state

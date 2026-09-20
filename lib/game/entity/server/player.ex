@@ -49,6 +49,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.Entity.Logic.MovementStats
   alias ThistleTea.Game.Entity.Logic.PlayerCombat
   alias ThistleTea.Game.Entity.Logic.PlayerFlags
+  alias ThistleTea.Game.Entity.Logic.Pvp
   alias ThistleTea.Game.Entity.Logic.Reactive
   alias ThistleTea.Game.Entity.Logic.Resources
   alias ThistleTea.Game.Entity.Logic.Rest
@@ -270,6 +271,16 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   def handle_cast({:receive_heal, amount}, %{character: %Character{} = character} = state) do
     character = HealingReceived.heal(character, amount)
     {:noreply, %{state | character: character}, {:continue, :maybe_broadcast_update}}
+  end
+
+  def handle_cast({:pvp_contact, %Effects.PvpContact{} = effect}, %{character: %Character{} = character} = state) do
+    character = Pvp.contact(character, effect.role, effect.other, effect.now)
+    state = TickScheduler.ensure_scheduled(%{state | character: character})
+    {:noreply, state, {:continue, :maybe_broadcast_update}}
+  rescue
+    error ->
+      Logger.error("PvP contact failed: #{Exception.message(error)}")
+      {:noreply, state}
   end
 
   def handle_cast({:drain_power, power_type}, %{character: %Character{} = character} = state) do
@@ -495,7 +506,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
 
   def handle_cast(:party_visibility_changed, %{character: %Character{} = character} = state) do
     Visibility.notify_visibility_changed(character)
-    {:noreply, Visibility.resync_player(state)}
+    {:noreply, Visibility.resync_player(state), {:continue, :maybe_broadcast_update}}
   rescue
     error ->
       Logger.error("Party visibility refresh failed: #{Exception.message(error)}")

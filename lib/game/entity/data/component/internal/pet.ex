@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal.Pet do
     :last_untrain_at,
     :original_faction_template,
     :original_npc_flags,
+    :original_pvp?,
     :stay_position,
     :possession_original_kind,
     :possession_original_owner_guid,

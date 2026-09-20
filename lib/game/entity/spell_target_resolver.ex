@@ -30,6 +30,7 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
 
     redirected = redirect_initial(caster, spell, query, initial)
     targets = if redirected == initial, do: expand_chain(caster, spell, initial), else: redirected
+    targets = if Spell.harmful?(spell), do: targets, else: Enum.filter(targets, &Hostility.can_assist?(caster, &1))
     append_caster_execution_target(targets, spell, caster_guid)
   end
 
@@ -248,7 +249,9 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
   defp hostile_living_guids(results, caster, caster_guid) do
     results
     |> Enum.reject(fn {guid, _distance} -> guid == caster_guid end)
-    |> Enum.filter(fn {guid, _distance} -> Hostility.valid_attack_target?(caster, guid) end)
+    |> Enum.filter(fn {guid, _distance} ->
+      Hostility.valid_attack_target?(caster, guid) and Hostility.can_attack_without_flagging?(caster, guid)
+    end)
     |> Enum.map(fn {guid, _distance} -> guid end)
   end
 

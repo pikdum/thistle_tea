@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
   @moduledoc false
 
+  alias ThistleTea.Game.Entity.EffectResolver.Pvp
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.SpellTarget
   alias ThistleTea.Game.Entity.SpellTargetResolver
@@ -15,10 +16,25 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
   @heal_threat_radius 100.0
 
   def resolve(entity, %Effects.DeliverSpell{delay_ms: nil} = effect) do
-    [resolved_delivery(entity, effect)]
+    resolved_delivery(entity, effect)
   end
 
   def resolve(_entity, %Effects.DeliverSpell{} = effect), do: [effect]
+
+  def resolve(entity, %Effects.DeliverSpellOutcome{} = effect) do
+    spell_contacts(entity, effect.source_guid, effect.target_guid, effect.spell) ++ [effect]
+  end
+
+  def resolve(entity, %Effects.SpellDamage{periodic?: true} = effect) do
+    Pvp.contacts(entity, effect.source_guid, effect.target_guid, :attack) ++ [effect]
+  end
+
+  def resolve(entity, %Effects.SpellHeal{periodic?: true} = effect) do
+    Pvp.contacts(entity, effect.source_guid, effect.target_guid, :assist) ++ [effect]
+  end
+
+  def resolve(_entity, %Effects.SpellDamage{} = effect), do: [effect]
+  def resolve(_entity, %Effects.SpellHeal{} = effect), do: [effect]
 
   def resolve(entity, %Effects.DeliverSpellToQuery{spell: %Spell{} = spell} = effect) do
     excluded = MapSet.new(effect.exclude_guids)
@@ -26,7 +42,7 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
     entity
     |> SpellTargetResolver.resolve_query(effect.query)
     |> Enum.reject(&MapSet.member?(excluded, &1))
-    |> Enum.map(fn target_guid ->
+    |> Enum.flat_map(fn target_guid ->
       context = %CastContext{
         caster_guid: effect.source_guid,
         caster_level: effect.source_level,
@@ -71,7 +87,16 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
   end
 
   def resolved_delivery(entity, %Effects.DeliverSpell{} = effect) do
-    %{effect | delay_ms: projectile_delay_ms(entity, effect)}
+    spell_contacts(entity, effect.cast_context.caster_guid, effect.target_guid, effect.spell) ++
+      [%{effect | delay_ms: projectile_delay_ms(entity, effect)}]
+  end
+
+  defp spell_contacts(entity, source, target, spell) do
+    cond do
+      Spell.starts_combat?(spell) -> Pvp.contacts(entity, source, target, :attack)
+      not Spell.harmful?(spell) -> Pvp.contacts(entity, source, target, :assist)
+      true -> []
+    end
   end
 
   defp resolve_trigger(entity, effect, spell) do
@@ -93,9 +118,8 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
         target = Target.unit(target_guid)
 
         [
-          Effects.spell_go(effect.source_guid || entity.object.guid, effect.spell_id, [target_guid], target),
-          triggered_delivery(entity, effect, spell)
-        ]
+          Effects.spell_go(effect.source_guid || entity.object.guid, effect.spell_id, [target_guid], target)
+        ] ++ triggered_delivery(entity, effect, spell)
     end
   end
 
@@ -109,7 +133,7 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
         targets,
         Target.unit(effect.target_guid)
       )
-      | Enum.map(targets, fn target_guid ->
+      | Enum.flat_map(targets, fn target_guid ->
           triggered_delivery(entity, %{effect | target_guid: target_guid}, spell)
         end)
     ]

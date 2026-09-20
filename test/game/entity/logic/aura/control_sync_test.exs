@@ -98,7 +98,8 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.ControlSyncTest do
       assert (charmed.unit.flags &&& 0x1000) != 0
       assert is_struct(grant, Effects.ControlGranted)
 
-      {released, [release]} = ControlSync.sync(%{charmed | unit: %{charmed.unit | auras: []}})
+      unflagged = %{charmed | unit: %{charmed.unit | flags: 8, auras: []}}
+      {released, [release]} = ControlSync.sync(unflagged)
 
       assert released.internal.pet == nil
       assert released.unit.charmed_by == 0

@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.ControlSync do
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Engagement
   alias ThistleTea.Game.Entity.Logic.Movement
+  alias ThistleTea.Game.Entity.Logic.Pvp
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Spell
 
@@ -56,6 +57,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.ControlSync do
   defp grant_charm(%Mob{} = mob, %Holder{} = holder, previous, events, now) do
     original_faction = original_value(previous, :original_faction_template, mob.unit.faction_template)
     original_npc_flags = original_value(previous, :original_npc_flags, mob.unit.npc_flags)
+    original_pvp? = original_value(previous, :original_pvp?, Pvp.active?(mob))
     %Engagement.Result{entity: mob} = Engagement.leave(mob, :controlled, clear_tap?: false)
 
     pet = %Pet{
@@ -65,7 +67,8 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.ControlSync do
       food_mask: 0,
       control_spell_id: holder.spell.id,
       original_faction_template: original_faction,
-      original_npc_flags: original_npc_flags
+      original_npc_flags: original_npc_flags,
+      original_pvp?: original_pvp?
     }
 
     faction_template = holder.caster_faction_template || mob.unit.faction_template
@@ -100,7 +103,11 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.ControlSync do
           | charmed_by: 0,
             faction_template: pet.original_faction_template,
             npc_flags: pet.original_npc_flags,
-            flags: Bitwise.band(mob.unit.flags || 0, Bitwise.bnot(@unit_flag_player_controlled))
+            flags:
+              mob.unit.flags
+              |> Kernel.||(0)
+              |> Bitwise.band(Bitwise.bnot(@unit_flag_player_controlled))
+              |> Pvp.unit_flags(pet.original_pvp? == true)
         },
         internal: %{mob.internal | pet: nil}
     }

@@ -123,6 +123,31 @@ defmodule ThistleTea.Game.Entity.Logic.HostilityTest do
   end
 
   describe "valid_attack_target?/2" do
+    test "opposing players require a flagged target" do
+      source = player(alliance()) |> Map.put(:pvp?, false)
+      target = player(horde(), 2) |> Map.put(:pvp?, false)
+      assert Hostility.hostile?(source, target)
+      refute Hostility.valid_attack_target?(source, target)
+      refute Hostility.valid_hostile_target?(source, target)
+      refute Hostility.valid_attack_target?(Map.put(source, :pvp?, true), target)
+      assert Hostility.valid_attack_target?(source, Map.put(target, :pvp?, true))
+    end
+
+    test "flagging does not permit attacking friendly players" do
+      source = player(alliance()) |> Map.put(:pvp?, true)
+      target = player(alliance(), 2) |> Map.put(:pvp?, true)
+      refute Hostility.valid_attack_target?(source, target)
+    end
+
+    test "free-for-all allows faction mates but protects group mates" do
+      source = player(alliance()) |> Map.put(:free_for_all?, true)
+      target = player(alliance(), 2) |> Map.put(:free_for_all?, true)
+      assert Hostility.hostile?(source, target)
+      assert Hostility.valid_attack_target?(source, target)
+      refute Hostility.valid_attack_target?(Map.put(source, :group_id, 11), Map.put(target, :group_id, 11))
+      refute Hostility.valid_attack_target?(source, Map.put(target, :free_for_all?, false))
+    end
+
     test "allows players to attack neutral creature factions without reputation" do
       player = player(alliance())
       target = mob(wolf(), faction_can_have_reputation?: false)
@@ -178,6 +203,32 @@ defmodule ThistleTea.Game.Entity.Logic.HostilityTest do
     end
   end
 
+  describe "can_attack_without_flagging?/2" do
+    test "unflagged area damage skips players" do
+      source = player(alliance()) |> Map.put(:pvp?, false)
+      target = player(horde(), 2) |> Map.put(:pvp?, true)
+      refute Hostility.can_attack_without_flagging?(source, target)
+      assert Hostility.can_attack_without_flagging?(Map.put(source, :pvp?, true), target)
+      assert Hostility.can_attack_without_flagging?(source, mob(defias()))
+    end
+
+    test "duel area damage remains available without a world flag" do
+      {source, target} = start_duel()
+      assert Hostility.valid_attack_target?(source, target)
+      assert Hostility.can_attack_without_flagging?(source, target)
+    end
+  end
+
+  describe "can_assist?/2" do
+    test "dueling players cannot receive outside assistance" do
+      caster = player(alliance())
+      duelist = player(alliance(), 2) |> Map.put(:duel_started?, true)
+      refute Hostility.can_assist?(caster, duelist)
+      assert Hostility.can_assist?(duelist, duelist)
+      assert Hostility.can_assist?(caster, Map.put(duelist, :duel_started?, false))
+    end
+  end
+
   describe "can_initiate_attack?/1" do
     test "returns false for neutral factions" do
       refute Hostility.can_initiate_attack?(%{faction_template: neutral_creature()})
@@ -198,6 +249,10 @@ defmodule ThistleTea.Game.Entity.Logic.HostilityTest do
 
   defp alliance do
     %FactionTemplate{id: 1, faction: 1, flags: 72, faction_group: 3, friend_group: 2, enemy_group: 12}
+  end
+
+  defp horde do
+    %FactionTemplate{id: 2, faction: 2, flags: 72, faction_group: 5, friend_group: 4, enemy_group: 10}
   end
 
   defp defias do

@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.World.Presence do
   alias ThistleTea.Game.Entity.Logic.Pvp
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Position
+  alias ThistleTea.Game.World.System.Party
 
   def enter(%Character{} = character, metadata) when is_map(metadata) do
     Metadata.put(character.object.guid, Map.merge(metadata, location_metadata(character)))
@@ -57,8 +58,16 @@ defmodule ThistleTea.Game.World.Presence do
       creature_type: Character.creature_type(character),
       pvp?: Pvp.active?(character),
       free_for_all?: Pvp.free_for_all?(character),
-      contested_pvp?: Pvp.contested?(character)
+      contested_pvp?: Pvp.contested?(character),
+      group_id: group_id(character.object.guid)
     }
+  end
+
+  defp group_id(guid) do
+    case Party.group_of(guid) do
+      %{id: id} -> id
+      _ -> nil
+    end
   end
 
   defp viewpoint(%Character{player: %{farsight: farsight}}) when is_integer(farsight), do: farsight

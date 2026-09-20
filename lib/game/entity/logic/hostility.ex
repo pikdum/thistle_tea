@@ -3,8 +3,11 @@ defmodule ThistleTea.Game.Entity.Logic.Hostility do
 
   import Bitwise, only: [&&&: 2, |||: 2]
 
+  alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.Core
+  alias ThistleTea.Game.Entity.Logic.Dueling
+  alias ThistleTea.Game.Entity.Logic.Pvp
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.System.Duel, as: DuelSystem
@@ -33,6 +36,12 @@ defmodule ThistleTea.Game.Entity.Logic.Hostility do
       duel_opponents?(source, target) ->
         :hostile
 
+      grouped_players?(source, target) ->
+        :friendly
+
+      arena_opponents?(source, target) ->
+        :hostile
+
       true ->
         case reputation_reaction(source, target) do
           {:ok, rank} -> rank
@@ -58,7 +67,7 @@ defmodule ThistleTea.Game.Entity.Logic.Hostility do
   end
 
   def valid_hostile_target?(source, target) do
-    alive?(target) and targetable?(target) and hostile?(source, target)
+    alive?(target) and targetable?(target) and hostile?(source, target) and pvp_attack_allowed?(source, target)
   end
 
   def valid_attack_target?(source, target) when is_integer(target) do
@@ -68,11 +77,28 @@ defmodule ThistleTea.Game.Entity.Logic.Hostility do
   end
 
   def valid_attack_target?(source, target) do
-    alive?(target) and targetable?(target) and attack_reaction_allows?(source, target)
+    alive?(target) and targetable?(target) and attack_reaction_allows?(source, target) and
+      pvp_attack_allowed?(source, target)
+  end
+
+  def can_attack_without_flagging?(source, target) when is_integer(target) do
+    can_attack_without_flagging?(source, target_metadata(target))
+  end
+
+  def can_attack_without_flagging?(source, target) do
+    not both_player_controlled?(source, target) or player_pvp?(source) or
+      duel_opponents?(source, target) or arena_opponents?(source, target)
   end
 
   def attackable?(source, target) do
     valid_attack_target?(source, target)
+  end
+
+  def can_assist?(source, target) when is_integer(target), do: can_assist?(source, target_metadata(target))
+
+  def can_assist?(source, target) do
+    not both_player_controlled?(source, target) or same_controller?(source, target) or
+      player_projection(target, :duel_started?) != true
   end
 
   def faction_template(%FactionTemplate{} = faction_template), do: faction_template
@@ -109,6 +135,10 @@ defmodule ThistleTea.Game.Entity.Logic.Hostility do
            :unit_flags,
            :reputation,
            :owner_guid,
+           :pvp?,
+           :free_for_all?,
+           :group_id,
+           :duel_started?,
            :contested_pvp?
          ]) do
       nil -> %{guid: guid}
@@ -118,6 +148,38 @@ defmodule ThistleTea.Game.Entity.Logic.Hostility do
 
   defp reaction_entity(guid) when is_integer(guid), do: target_metadata(guid)
   defp reaction_entity(entity), do: entity
+
+  defp pvp_attack_allowed?(source, target) do
+    not both_player_controlled?(source, target) or duel_opponents?(source, target) or
+      player_pvp?(target) or arena_opponents?(source, target)
+  end
+
+  defp both_player_controlled?(source, target), do: player_controlled?(source) and player_controlled?(target)
+
+  defp grouped_players?(source, target) do
+    group = player_projection(source, :group_id)
+    not is_nil(group) and group == player_projection(target, :group_id)
+  end
+
+  defp arena_opponents?(source, target) do
+    player_projection(source, :free_for_all?) == true and player_projection(target, :free_for_all?) == true
+  end
+
+  defp player_pvp?(%Character{} = character), do: Pvp.active?(character)
+  defp player_pvp?(entity), do: player_projection(entity, :pvp?) == true
+
+  defp player_projection(%Character{} = character, :free_for_all?), do: Pvp.free_for_all?(character)
+  defp player_projection(%Character{} = character, :duel_started?), do: Dueling.active?(character)
+
+  defp player_projection(entity, key) do
+    owner = player_owner_guid(entity)
+
+    cond do
+      not is_integer(owner) -> nil
+      owner == guid(entity) and is_map(entity) and Map.has_key?(entity, key) -> Map.get(entity, key)
+      true -> (Metadata.query(owner, [key]) || %{}) |> Map.get(key)
+    end
+  end
 
   defp attack_reaction_allows?(source, target) do
     cond do
@@ -157,6 +219,7 @@ defmodule ThistleTea.Game.Entity.Logic.Hostility do
 
   defp owner_guid(%{owner_guid: owner_guid}) when is_integer(owner_guid), do: owner_guid
   defp owner_guid(%{internal: %{pet: %{owner_guid: owner_guid}}}) when is_integer(owner_guid), do: owner_guid
+  defp owner_guid(%{internal: %{totem: %{owner_guid: owner_guid}}}) when is_integer(owner_guid), do: owner_guid
   defp owner_guid(_entity), do: nil
 
   defp player_guid?(guid) when is_integer(guid), do: Guid.entity_type(guid) == :player

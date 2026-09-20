@@ -16,6 +16,7 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
   alias ThistleTea.Game.Entity.Logic.Engagement
+  alias ThistleTea.Game.Entity.Logic.Pvp
   alias ThistleTea.Game.Entity.Logic.Skinning
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Time
@@ -372,8 +373,10 @@ defmodule ThistleTea.Game.Entity.Data.Mob do
 
   defp percent_value(value, _percent), do: value
 
-  defp unit_flags(%Mangos.CreatureTemplate{unit_flags: flags}) when is_integer(flags), do: flags
-  defp unit_flags(_template), do: 0
+  defp unit_flags(%Mangos.CreatureTemplate{unit_flags: flags, creature_type_flags: static_flags}) do
+    pvp? = Bitwise.band(static_flags || 0, 0x00400000) != 0
+    Pvp.unit_flags(flags, pvp?)
+  end
 
   defp type_flags(%Mangos.CreatureTemplate{creature_type_flags: flags}) when is_integer(flags) do
     0

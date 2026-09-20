@@ -415,6 +415,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
           hostile?: Hostility.hostile?(character, metadata),
           friendly?: Hostility.friendly?(character, metadata),
           attackable?: Hostility.attackable?(character, guid),
+          helpful?: Hostility.can_assist?(character, guid),
           health_pct: Map.get(metadata, :health_pct),
           power_type: Map.get(metadata, :power_type),
           level: Map.get(metadata, :level),

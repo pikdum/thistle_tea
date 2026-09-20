@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.Entity.EventSink.Combat do
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.EventSink.Context
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Logic.Pvp
   alias ThistleTea.Game.Entity.Server.Mob.Incarnation
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.Message
@@ -17,6 +18,28 @@ defmodule ThistleTea.Game.Entity.EventSink.Combat do
   alias ThistleTea.Game.World.System.Duel, as: DuelSystem
 
   @victimstate_normal 1
+
+  def emit(%Character{object: %{guid: guid}} = entity, %Effects.PvpContact{target_guid: guid} = effect, _context) do
+    Pvp.contact(entity, effect.role, effect.other, effect.now)
+  end
+
+  def emit(entity, %Effects.PvpContact{} = effect, _context) do
+    Entity.pvp_contact(effect.target_guid, effect)
+    entity
+  end
+
+  def emit(%Character{} = entity, %Effects.PvpFlagsChanged{enabled?: enabled}, _context) do
+    guids = [Character.controlled_guid(entity) | Map.values(entity.internal.totem_guids)]
+
+    guids
+    |> Enum.filter(&is_integer/1)
+    |> Enum.uniq()
+    |> Enum.each(&Entity.sync_pvp(&1, entity.object.guid, enabled))
+
+    entity
+  end
+
+  def emit(entity, %Effects.PvpFlagsChanged{}, _context), do: entity
 
   def emit(entity, %Effects.DurabilityLoss{} = effect, context) do
     message = {:durability_loss, effect.mode, effect.amount, effect.scope, effect.death?}

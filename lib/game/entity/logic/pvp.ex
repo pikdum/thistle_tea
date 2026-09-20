@@ -10,6 +10,8 @@ defmodule ThistleTea.Game.Entity.Logic.Pvp do
   alias ThistleTea.Game.Entity.Data.Pvp
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Dueling
+  alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Logic.PlayerCombat
 
   @pvp_duration_ms 300_000
   @contested_duration_ms 30_000
@@ -45,21 +47,11 @@ defmodule ThistleTea.Game.Entity.Logic.Pvp do
   end
 
   def contact(%Character{} = character, role, other, now) when role in [:attack, :attacked, :assist] do
+    now = max(now, character.internal.pvp.updated_at || now)
     character = tick(character, now)
 
     if flags_contact?(character, role, other) do
-      pvp = character.internal.pvp
-      combat? = role != :assist or Map.get(other, :in_combat, false)
-      contested? = (role == :attack and is_integer(other.player_guid)) or (role == :assist and other.contested_pvp?)
-
-      pvp = %{
-        pvp
-        | remaining_ms: @pvp_duration_ms,
-          combat?: pvp.combat? or combat?,
-          contested_remaining_ms: if(contested?, do: @contested_duration_ms, else: pvp.contested_remaining_ms)
-      }
-
-      put(character, pvp)
+      refresh_contact(character, role, other, now)
     else
       character
     end
@@ -67,8 +59,22 @@ defmodule ThistleTea.Game.Entity.Logic.Pvp do
 
   def contact(entity, _role, _other, _now), do: entity
 
+  defp refresh_contact(character, role, other, now) do
+    pvp = character.internal.pvp
+    combat? = role != :assist or Map.get(other, :in_combat, false)
+    remaining = if contested_contact?(role, other), do: @contested_duration_ms, else: pvp.contested_remaining_ms
+    pvp = %{pvp | remaining_ms: @pvp_duration_ms, combat?: pvp.combat? or combat?, contested_remaining_ms: remaining}
+    character = put(character, pvp)
+    if combat? and not Core.dead?(character), do: PlayerCombat.mark_initiated(character, now), else: character
+  end
+
+  defp contested_contact?(:attack, other), do: is_integer(other.player_guid)
+  defp contested_contact?(:assist, other), do: other.in_combat and other.contested_pvp?
+  defp contested_contact?(_role, _other), do: false
+
   def tick(%Character{} = character, now) when is_integer(now) do
     pvp = character.internal.pvp
+    now = max(now, pvp.updated_at || now)
     elapsed = if is_integer(pvp.updated_at), do: max(now - pvp.updated_at, 0), else: 0
     combat? = pvp.combat? and character.internal.in_combat == true and not Core.dead?(character)
     paused? = combat? or pvp.desired? or pvp.enforced?
@@ -170,6 +176,13 @@ defmodule ThistleTea.Game.Entity.Logic.Pvp do
         unit: unit,
         player: %{character.player | flags: flags}
     }
+
+    updated =
+      if active_flags?(unit.flags) == active_flags?(character.unit.flags) do
+        updated
+      else
+        Effects.enqueue(updated, %Effects.PvpFlagsChanged{enabled?: active_flags?(unit.flags)})
+      end
 
     if unit.flags != character.unit.flags or flags != character.player.flags,
       do: Core.mark_broadcast_update(updated),

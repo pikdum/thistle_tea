@@ -500,6 +500,7 @@ defmodule ThistleTea.Game.Spell.CastValidation do
     cond do
       Map.get(target_info, :alive?) == false -> {:error, :targets_dead}
       Map.get(target_info, :hostile?) == true -> {:error, :target_enemy}
+      Map.get(target_info, :helpful?) == false -> {:error, :bad_targets}
       true -> :ok
     end
   end
