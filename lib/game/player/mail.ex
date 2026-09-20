@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Player.Mail do
   alias ThistleTea.Game.Entity.Data.Item
   alias ThistleTea.Game.Entity.Data.Mail, as: DataMail
   alias ThistleTea.Game.Entity.Data.Quest
+  alias ThistleTea.Game.Entity.Logic.Enchantments
   alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Entity.Logic.Mail, as: MailLogic
   alias ThistleTea.Game.Guid
@@ -21,6 +22,7 @@ defmodule ThistleTea.Game.Player.Mail do
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
+  alias ThistleTea.Game.World.Loader.ItemEnchantment, as: EnchantmentLoader
   alias ThistleTea.Game.World.Loader.Mail, as: MailLoader
   alias ThistleTea.Game.World.PostOffice
 
@@ -364,7 +366,7 @@ defmodule ThistleTea.Game.Player.Mail do
 
   defp validate_item(%Item{} = item) do
     if Bitwise.band(Item.template(item).flags || 0, 0x02) == 0 and
-         Bitwise.band(item.item.flags || 0, 0x01) == 0,
+         not Enchantments.bound?(item, Time.now(), &EnchantmentLoader.get/1),
        do: :ok,
        else: {:error, :invalid_item}
   end

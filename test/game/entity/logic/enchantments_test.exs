@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.Entity.Logic.EnchantmentsTest do
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Item
+  alias ThistleTea.Game.Entity.Data.ItemEnchantment
   alias ThistleTea.Game.Entity.Data.ItemTemplate
   alias ThistleTea.Game.Entity.Logic.Enchantments
   alias ThistleTea.Game.Spell
@@ -15,6 +16,25 @@ defmodule ThistleTea.Game.Entity.Logic.EnchantmentsTest do
   alias ThistleTea.Game.Spell.Target
 
   setup [:character_and_enchant]
+
+  describe "bound?/3" do
+    test "temporary binding lasts only as long as its enchant", %{item: item} do
+      get = fn
+        323 -> %ItemEnchantment{flags: 1}
+        41 -> %ItemEnchantment{flags: 0}
+        _ -> nil
+      end
+
+      poisoned =
+        item |> Item.put_permanent_enchantment(41) |> Item.put_temporary_enchantment(323, 1000, 1, 1000, :token)
+
+      assert Enchantments.bound?(poisoned, 999, get)
+      refute Enchantments.bound?(poisoned, 1000, get)
+      refute Enchantments.bound?(Item.spend_enchantment_charge(poisoned, :token), 999, get)
+      assert Enchantments.bound?(Item.put_permanent_enchantment(item, 323), 2000, get)
+      assert Enchantments.bound?(%{item | item: %{item.item | flags: 1}}, 2000, get)
+    end
+  end
 
   describe "validate/3" do
     test "requires an owned compatible item of sufficient level", %{character: character, item: item, spell: spell} do

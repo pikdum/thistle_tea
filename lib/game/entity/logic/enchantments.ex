@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.Entity.Logic.Enchantments do
 
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Item
+  alias ThistleTea.Game.Entity.Data.ItemEnchantment
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Spell
 
@@ -17,6 +18,16 @@ defmodule ThistleTea.Game.Entity.Logic.Enchantments do
 
   def target_guid(player, spell, target_guid) do
     if is_integer(target_guid) or permanent?(spell), do: target_guid, else: player.mainhand
+  end
+
+  def bound?(%Item{} = item, now, get_enchantment) do
+    ((item.item.flags || 0) &&& 1) != 0 or
+      Enum.any?(Item.active_enchantments(item, now), fn {_slot, id} ->
+        case get_enchantment.(id) do
+          %ItemEnchantment{flags: flags} when is_integer(flags) -> (flags &&& 1) != 0
+          _ -> false
+        end
+      end)
   end
 
   def validate(character, %Spell{} = spell, item) do

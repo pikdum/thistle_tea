@@ -9,16 +9,19 @@ defmodule ThistleTea.Game.Player.MailTest do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.GameObjectTemplate
   alias ThistleTea.Game.Entity.Data.Item
+  alias ThistleTea.Game.Entity.Data.ItemEnchantment
   alias ThistleTea.Game.Entity.Data.ItemTemplate
   alias ThistleTea.Game.Entity.Data.Quest
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.Message.CmsgSendMail
   alias ThistleTea.Game.Network.Message.SmsgSendMailResult
   alias ThistleTea.Game.Player.Mail
+  alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
+  alias ThistleTea.Game.World.Loader.ItemEnchantment, as: EnchantmentLoader
   alias ThistleTea.Game.World.Loader.Mail, as: MailLoader
   alias ThistleTea.Game.World.Position
   alias ThistleTea.Game.World.PostOffice
@@ -49,6 +52,7 @@ defmodule ThistleTea.Game.Player.MailTest do
       Position.put(mailbox, :game_objects)
       item = ItemStore.create(%ItemTemplate{entry: id, inventory_type: 5, bonding: 2}, owner: sender)
       item = item |> Item.bind_on_equip() |> ItemStore.put()
+      :ets.insert(EnchantmentLoader, {{:enchantment, id}, %ItemEnchantment{id: id, flags: 1}})
 
       character = %Character{
         object: %Object{guid: sender},
@@ -72,11 +76,21 @@ defmodule ThistleTea.Game.Player.MailTest do
         ItemStore.delete(item.object.guid)
         :ets.delete(CharacterStore, id)
         :ets.delete(GameObjectTemplateLoader, id)
+        :ets.delete(EnchantmentLoader, {:enchantment, id})
         Position.remove(mailbox, :game_objects)
       end)
 
       assert Mail.send_mail(state, message) == state
       assert ItemStore.get(item.object.guid) == item
+      assert_receive {:"$gen_cast", {:send_packet, %SmsgSendMailResult{action: 0, result: 19}}}
+
+      coated =
+        %{item | item: %{item.item | flags: 0}}
+        |> Item.put_temporary_enchantment(id, 60_000, 40, Time.now() + 60_000, :coating)
+
+      ItemStore.put(coated)
+      assert Mail.send_mail(state, message) == state
+      assert ItemStore.get(item.object.guid) == coated
       assert_receive {:"$gen_cast", {:send_packet, %SmsgSendMailResult{action: 0, result: 19}}}
     end
   end
