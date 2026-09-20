@@ -64,6 +64,36 @@ defmodule ThistleTea.UpdateObjectTest do
   end
 
   describe "to_packet/2" do
+    setup [:player, :unit, :object, :values_update, :create_object_update]
+
+    test "places removals before creates and values in mixed batches", %{
+      create_object_update: create,
+      values_update: values
+    } do
+      removal = UpdateObject.out_of_range([7])
+      <<1::little-size(32), 0, create_body::binary>> = UpdateObject.to_packet(create, 99).payload
+      <<1::little-size(32), 0, values_body::binary>> = UpdateObject.to_packet(values, 99).payload
+
+      packet = UpdateObject.to_packet([create, removal, values], 99)
+
+      assert packet.payload ==
+               <<3::little-size(32), 0, 4, 1::little-size(32), 1, 7>> <> create_body <> values_body
+    end
+
+    test "retains only updates after the last removal for an object", %{
+      create_object_update: create,
+      values_update: values
+    } do
+      removal = UpdateObject.out_of_range([create.object.guid])
+      recreated = %{create | unit: %{create.unit | health: 900}}
+      <<1::little-size(32), 0, removal_body::binary>> = UpdateObject.to_packet(removal, 99).payload
+      <<1::little-size(32), 0, create_body::binary>> = UpdateObject.to_packet(recreated, 99).payload
+
+      packet = UpdateObject.to_packet([create, values, removal, create, removal, recreated], 99)
+
+      assert packet.payload == <<2::little-size(32), 0>> <> removal_body <> create_body
+    end
+
     test "packed short pairs retain both halves and alignment of the following field" do
       guid = 7
       packed_guid = BinaryUtils.pack_guid(guid)

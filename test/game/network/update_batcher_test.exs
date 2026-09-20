@@ -7,7 +7,7 @@ defmodule ThistleTea.Game.Network.UpdateBatcherTest do
   alias ThistleTea.Game.Network.UpdateObject
 
   describe "batch/3" do
-    test "serializes queued removals with ordinary updates" do
+    test "serializes queued removals before ordinary updates" do
       update = values_update(1)
       removal = UpdateObject.out_of_range([0x1FC0000000028427, 0xF12002AFE800496A], has_transport: true)
       GenServer.cast(self(), {:send_packet, removal})
@@ -16,8 +16,22 @@ defmodule ThistleTea.Game.Network.UpdateBatcherTest do
       <<1::little-size(32), 0, values_body::binary>> = UpdateObject.to_packet(update, 99).payload
       <<1::little-size(32), 1, removal_body::binary>> = UpdateObject.to_packet(removal, 99).payload
 
-      assert updates == [update, removal]
-      assert packet.payload == <<2::little-size(32), 1>> <> values_body <> removal_body
+      assert updates == [removal, update]
+      assert packet.payload == <<2::little-size(32), 1>> <> removal_body <> values_body
+    end
+
+    test "combines interleaved removals into one leading block" do
+      first = values_update(1)
+      second = values_update(2)
+      GenServer.cast(self(), {:send_packet, UpdateObject.out_of_range([3])})
+      GenServer.cast(self(), {:send_packet, second})
+      GenServer.cast(self(), {:send_packet, UpdateObject.out_of_range([4, 3], has_transport: true)})
+
+      {packet, updates} = UpdateBatcher.batch(first, 99)
+
+      assert [removal, ^first, ^second] = updates
+      assert removal == UpdateObject.out_of_range([3, 4], has_transport: true)
+      assert <<3::little-size(32), 1, 4, 2::little-size(32), 1, 3, 1, 4, 0, _rest::binary>> = packet.payload
     end
 
     test "personalizes updates drained out of the mailbox too" do

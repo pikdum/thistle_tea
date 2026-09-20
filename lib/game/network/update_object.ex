@@ -2,6 +2,9 @@ defmodule ThistleTea.Game.Network.UpdateObject do
   @moduledoc """
   Builds SMSG_UPDATE_OBJECT blocks: flattens component field structs into
   field values, generates the update mask, and encodes create/values blocks.
+
+  The vanilla client only accepts one leading out-of-range block. Batches
+  merge removals there and discard earlier updates for removed objects.
   """
   use ThistleTea.Game.Network.Opcodes, [:SMSG_UPDATE_OBJECT]
 
@@ -225,6 +228,7 @@ defmodule ThistleTea.Game.Network.UpdateObject do
   def to_packet(obj_or_objects, recipient_guid \\ nil)
 
   def to_packet(objects, recipient_guid) when is_list(objects) do
+    objects = normalize(objects)
     header = packet_header(objects)
 
     payload =
@@ -243,6 +247,42 @@ defmodule ThistleTea.Game.Network.UpdateObject do
       opcode: @smsg_update_object,
       payload: packet_header(obj) <> packet_body(obj, recipient_guid)
     }
+  end
+
+  def normalize(objects) when is_list(objects) do
+    {removals, updates} =
+      objects
+      |> discard_removed_updates()
+      |> Enum.split_with(&match?(%__MODULE__{update_type: :out_of_range_objects}, &1))
+
+    case removals do
+      [] ->
+        updates
+
+      [_ | _] ->
+        guids = removals |> Enum.flat_map(& &1.out_of_range_guids) |> Enum.uniq()
+        [out_of_range(guids, has_transport: Enum.any?(removals, &transport_update?/1)) | updates]
+    end
+  end
+
+  defp discard_removed_updates(objects) do
+    {updates, _removed} =
+      objects
+      |> Enum.reverse()
+      |> Enum.reduce({[], MapSet.new()}, &retain_update/2)
+
+    updates
+  end
+
+  defp retain_update(
+         %__MODULE__{update_type: :out_of_range_objects, out_of_range_guids: guids} = update,
+         {kept, removed}
+       ) do
+    {[update | kept], MapSet.union(removed, MapSet.new(guids))}
+  end
+
+  defp retain_update(%__MODULE__{object: %{guid: guid}} = update, {kept, removed}) do
+    if MapSet.member?(removed, guid), do: {kept, removed}, else: {[update | kept], removed}
   end
 
   def out_of_range(guids, opts \\ []) when is_list(guids) do

@@ -24,6 +24,7 @@ defmodule ThistleTea.Game.Network.UpdateBatcher do
     |> Enum.filter(visible?)
     |> Enum.map(personalize)
     |> dedupe_values()
+    |> UpdateObject.normalize()
   end
 
   defp dedupe_values(updates) do

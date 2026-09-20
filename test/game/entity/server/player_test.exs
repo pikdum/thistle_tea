@@ -179,7 +179,7 @@ defmodule ThistleTea.Game.Entity.Server.PlayerTest do
 
       assert {:noreply, state} = PlayerServer.handle_cast({:send_packet, update_object(:unit, target)}, state)
       assert_receive {:"$gen_cast", {:write_packet, packet}}
-      assert object_count(packet) == 2
+      assert <<1::little-size(32), 0, 4, 1::little-size(32), _guid::binary>> = packet.payload
       refute MapSet.member?(state.tracked_entities, target)
     end
 
@@ -200,6 +200,7 @@ defmodule ThistleTea.Game.Entity.Server.PlayerTest do
       assert {:noreply, state} = PlayerServer.handle_cast({:send_packet, update_object(:player, guid)}, state)
       assert_receive {:"$gen_cast", {:write_packet, packet}}
       assert object_count(packet) == 3
+      assert <<3::little-size(32), 0, 4, 1::little-size(32), _rest::binary>> = packet.payload
       assert MapSet.member?(state.tracked_entities, target)
     end
 
