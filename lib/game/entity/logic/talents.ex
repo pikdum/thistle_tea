@@ -21,6 +21,7 @@ defmodule ThistleTea.Game.Entity.Logic.Talents do
     |> Enum.reduce(0, fn {_talent_id, {_tab_id, rank_index}}, total -> total + rank_index + 1 end)
   end
 
+  def spent_points(%Character{} = character), do: character |> known_talent_spell_ids() |> spent_points()
   def spent_points(_spell_ids), do: 0
 
   def spent_in_tab(spell_ids, tab_id) when is_list(spell_ids) do
@@ -34,8 +35,8 @@ defmodule ThistleTea.Game.Entity.Logic.Talents do
 
   def spent_in_tab(_spell_ids, _tab_id), do: 0
 
-  def unspent(%Character{unit: %{level: level}, internal: %{spells: spell_ids}}) do
-    max(total_points(level || 1) - spent_points(spell_ids || []), 0)
+  def unspent(%Character{unit: %{level: level}} = character) do
+    max(total_points(level || 1) - spent_points(character), 0)
   end
 
   def unspent(_character), do: 0
@@ -52,6 +53,17 @@ defmodule ThistleTea.Game.Entity.Logic.Talents do
 
   def known_talent_spell_ids(spell_ids) when is_list(spell_ids) do
     Enum.filter(spell_ids, &TalentLoader.by_spell/1)
+  end
+
+  def known_talent_spell_ids(%Character{unit: %{class: class}, internal: %{spells: spell_ids}}) do
+    tabs = TalentLoader.tab_ids(class)
+
+    Enum.filter(spell_ids || [], fn spell_id ->
+      case TalentLoader.by_spell(spell_id) do
+        {_talent, tab, _rank} -> tab in tabs
+        _ -> false
+      end
+    end)
   end
 
   def known_talent_spell_ids(_spell_ids), do: []

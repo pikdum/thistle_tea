@@ -60,6 +60,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
     :active_banker_guid,
     :companion_monitor,
     :pet_unlearn_offer,
+    :talent_reset_offer,
     ready: false,
     movement_counter: 0,
     pending_movement_acks: %{},

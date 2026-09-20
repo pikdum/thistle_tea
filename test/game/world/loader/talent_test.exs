@@ -56,6 +56,15 @@ defmodule ThistleTea.Game.World.Loader.TalentTest do
     assert TalentLoader.dependent_spell_ids(16_269) == [197, 199]
   end
 
+  describe "triggered_spell_ids/1" do
+    test "includes triggered buffs independently of learned abilities" do
+      assert TalentLoader.triggered_spell_ids(16_880) == [16_886]
+      assert TalentLoader.dependent_spell_ids(16_880) == []
+      assert TalentLoader.triggered_spell_ids(19_577) == [24_394]
+      assert TalentLoader.triggered_spell_ids(16_269) == [197, 199]
+    end
+  end
+
   test "multi-rank talents list every rank in order" do
     assert %TalentData{rank_spell_ids: [12_285, 12_697]} = TalentLoader.get(126)
   end

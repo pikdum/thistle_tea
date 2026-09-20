@@ -22,6 +22,7 @@ defmodule ThistleTea.Game.World.Loader.Gossip do
   @option_stable 14
   @option_battlefield 12
   @option_pet_untrain 17
+  @option_talent_reset 16
   @supported_option_ids [
     @option_gossip,
     @option_vendor,
@@ -32,7 +33,8 @@ defmodule ThistleTea.Game.World.Loader.Gossip do
     @option_banker,
     @option_stable,
     @option_battlefield,
-    @option_pet_untrain
+    @option_pet_untrain,
+    @option_talent_reset
   ]
 
   @npc_flag_trainer 0x10
@@ -181,6 +183,10 @@ defmodule ThistleTea.Game.World.Loader.Gossip do
     match?([{_key, %{type: 3, class: 3}}], :ets.lookup(__MODULE__, {:trainer, entry}))
   end
 
+  def class_trainer?(entry, class) do
+    match?([{_key, %{type: 0, class: ^class}}], :ets.lookup(__MODULE__, {:trainer, entry}))
+  end
+
   def get_menu(menu_id) do
     case :ets.lookup(__MODULE__, {:menu, menu_id}) do
       [{_key, %Menu{} = menu}] -> menu
@@ -212,4 +218,5 @@ defmodule ThistleTea.Game.World.Loader.Gossip do
   def option_stable, do: @option_stable
   def option_battlefield, do: @option_battlefield
   def option_pet_untrain, do: @option_pet_untrain
+  def option_talent_reset, do: @option_talent_reset
 end

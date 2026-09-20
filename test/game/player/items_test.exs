@@ -83,6 +83,26 @@ defmodule ThistleTea.Game.Player.ItemsTest do
     end
   end
 
+  describe "store_many/2" do
+    test "commits all entries and legal stacks together", %{state: state} do
+      :ets.insert(ItemLoader, {@entry, %ItemTemplate{entry: @entry, stackable: 2}})
+      assert {:ok, stored} = Items.store_many(state, [{@entry, 3}, {@entry, 1}])
+      assert Inventory.count_entry(stored.character.player, @entry, &ItemStore.get/1) == 4
+
+      assert Inventory.owned_items(stored.character.player, &ItemStore.get/1) |> Enum.map(& &1.item.stack_count) == [
+               2,
+               2
+             ]
+    end
+
+    test "does not grant an early entry when a later entry fails", %{state: state} do
+      size = :ets.info(ItemStore, :size)
+      assert {:error, :item_not_found, ^state} = Items.store_many(state, [{@entry, 1}, {@entry + 1, 1}])
+      assert :ets.info(ItemStore, :size) == size
+      assert Inventory.count_entry(state.character.player, @entry, &ItemStore.get/1) == 0
+    end
+  end
+
   defp inventory(_context) do
     ItemStore.init()
     ItemLoader.init()

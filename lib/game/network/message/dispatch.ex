@@ -31,6 +31,7 @@ defmodule ThistleTea.Game.Network.Message.Dispatch do
                     |> Map.new(fn opcode -> {opcode, Message.MsgMove} end)
 
   @messages %{
+              MSG_TALENT_WIPE_CONFIRM: Message.MsgTalentWipeConfirmClient,
               CMSG_AUTH_SESSION: Message.CmsgAuthSession,
               CMSG_CHAR_ENUM: Message.CmsgCharEnum,
               CMSG_CHAR_CREATE: Message.CmsgCharCreate,

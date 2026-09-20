@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal do
   """
   alias ThistleTea.Game.Entity.Data.Companion
   alias ThistleTea.Game.Entity.Data.PetStable
+  alias ThistleTea.Game.Entity.Data.TalentReset
   alias ThistleTea.Game.WorldRef
 
   defstruct [
@@ -70,6 +71,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal do
     diminishing_returns: %{},
     companion: Companion.none(),
     pet_stable: %PetStable{},
+    talent_reset: %TalentReset{},
     rest_bonus: 0.0,
     mailbox: [],
     starting_items: [],

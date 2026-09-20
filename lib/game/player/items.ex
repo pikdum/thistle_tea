@@ -60,6 +60,42 @@ defmodule ThistleTea.Game.Player.Items do
 
   def store(state, _item_id, _count), do: {:error, :item_not_found, state}
 
+  def store_many(state, entries) when is_list(entries) do
+    items =
+      Enum.reduce_while(entries, [], fn {entry, count}, items ->
+        case ItemLoader.get_template(entry) do
+          %ItemTemplate{} = template when is_integer(count) and count > 0 ->
+            {:cont, items ++ prepare_stacks(template, state.guid, count)}
+
+          _ ->
+            {:halt, :item_not_found}
+        end
+      end)
+
+    store_prepared(state, items)
+  end
+
+  defp store_prepared(state, items) when is_list(items) do
+    batch = Enum.reduce(items, Batch.new(state.character.player), &Batch.add(&2, &1))
+
+    case Inventory.plan(batch, &ItemStore.get/1) do
+      {:ok, changes} ->
+        state = InventoryUpdate.apply(state, {:ok, changes})
+
+        Enum.each(items, fn item ->
+          position = placement_position(ChangeSet.placement(changes, item.object.guid))
+          send_push_result(state, item.object.entry, item.item.stack_count, position)
+        end)
+
+        {:ok, state}
+
+      {:error, reason} ->
+        {:error, reason, state}
+    end
+  end
+
+  defp store_prepared(state, reason), do: {:error, reason, state}
+
   defp prepare_stacks(_template, _owner, 0), do: []
 
   defp prepare_stacks(%ItemTemplate{} = template, owner, count) do

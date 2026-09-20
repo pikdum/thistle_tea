@@ -26,10 +26,10 @@ defmodule ThistleTea.Game.World.Loader.Talent do
     tabs = DBC.all(TalentTab)
     talent_rows = DBC.all(Talent)
 
-    learned_spell_ids_by_parent =
+    effects_by_parent =
       talent_rows
       |> Enum.flat_map(&rank_spell_ids/1)
-      |> learned_spell_ids_by_parent()
+      |> effects_by_parent()
 
     successor_by_spell =
       DBC.all(
@@ -61,14 +61,18 @@ defmodule ThistleTea.Game.World.Loader.Talent do
       |> cache_spell_lineage(talent)
 
       Enum.each(talent.rank_spell_ids, fn spell_id ->
-        :ets.insert(
-          __MODULE__,
-          {{:dependent_spells, spell_id}, Map.get(learned_spell_ids_by_parent, spell_id, [])}
-        )
+        cache_effect_spells(spell_id, Map.get(effects_by_parent, spell_id, []))
       end)
     end)
 
     :ok
+  end
+
+  defp cache_effect_spells(spell_id, effects) do
+    learned = for {@learn_spell_effect, id} <- effects, is_integer(id) and id > 0, do: id
+    triggered = for {_type, id} <- effects, is_integer(id) and id > 0, do: id
+    :ets.insert(__MODULE__, {{:dependent_spells, spell_id}, learned})
+    :ets.insert(__MODULE__, {{:triggered_spells, spell_id}, Enum.uniq(triggered)})
   end
 
   def get(talent_id) when is_integer(talent_id) and talent_id > 0 do
@@ -199,9 +203,29 @@ defmodule ThistleTea.Game.World.Loader.Talent do
     |> Enum.take_while(&(is_integer(&1) and &1 > 0))
   end
 
-  defp learned_spell_ids_by_parent([]), do: %{}
+  def triggered_spell_ids(spell_id) do
+    case by_spell(spell_id) do
+      {talent_id, _tab, _rank} ->
+        case get(talent_id) do
+          %TalentData{rank_spell_ids: ids} -> Enum.flat_map(ids, &cached_triggered_spell_ids/1) |> Enum.uniq()
+          _ -> []
+        end
 
-  defp learned_spell_ids_by_parent(spell_ids) do
+      _ ->
+        []
+    end
+  end
+
+  defp cached_triggered_spell_ids(spell_id) do
+    case :ets.lookup(__MODULE__, {:triggered_spells, spell_id}) do
+      [{_key, ids}] -> ids
+      _ -> []
+    end
+  end
+
+  defp effects_by_parent([]), do: %{}
+
+  defp effects_by_parent(spell_ids) do
     DBC.all(
       from(s in Spell,
         where: s.id in ^spell_ids,
@@ -215,14 +239,7 @@ defmodule ThistleTea.Game.World.Loader.Talent do
         }
       )
     )
-    |> Map.new(fn row ->
-      learned_spell_ids =
-        for {@learn_spell_effect, spell_id} <- row.effects,
-            is_integer(spell_id) and spell_id > 0,
-            do: spell_id
-
-      {row.id, learned_spell_ids}
-    end)
+    |> Map.new(&{&1.id, &1.effects})
   end
 
   defp rank_spell_variants(%TalentData{rank_spell_ids: rank_spell_ids}, successor_by_spell) do

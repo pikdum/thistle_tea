@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.Player.Talents do
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
+  alias ThistleTea.Game.Entity.Logic.Casting
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Talents, as: LogicTalents
@@ -30,8 +31,8 @@ defmodule ThistleTea.Game.Player.Talents do
 
   def learn(state, _talent_id, _requested_rank), do: state
 
-  def reset(%{character: %Character{internal: internal} = character} = state) do
-    case LogicTalents.known_talent_spell_ids(internal.spells || []) do
+  def reset(%{character: %Character{} = character} = state) do
+    case LogicTalents.known_talent_spell_ids(character) do
       [] ->
         state
 
@@ -39,6 +40,8 @@ defmodule ThistleTea.Game.Player.Talents do
         now = Time.now()
 
         character
+        |> Casting.cancel()
+        |> remove_triggered_auras(talent_spell_ids, now)
         |> Spells.unlearn(with_dependent_spells(talent_spell_ids), now)
         |> then(&sync_pet_aura_links(character, &1, now))
         |> then(&commit(state, &1))
@@ -47,8 +50,8 @@ defmodule ThistleTea.Game.Player.Talents do
 
   def reset(state), do: state
 
-  def reset_if_overbudget(%{character: %Character{internal: internal}} = state, level) when is_integer(level) do
-    if LogicTalents.spent_points(internal.spells || []) > LogicTalents.total_points(level) do
+  def reset_if_overbudget(%{character: %Character{} = character} = state, level) when is_integer(level) do
+    if LogicTalents.spent_points(character) > LogicTalents.total_points(level) do
       reset(state)
     else
       state
@@ -70,6 +73,12 @@ defmodule ThistleTea.Game.Player.Talents do
 
   defp with_dependent_spells(spell_ids) do
     Enum.flat_map(spell_ids, &[&1 | TalentLoader.dependent_spell_ids(&1)])
+  end
+
+  defp remove_triggered_auras(character, spell_ids, now) do
+    triggered_ids = Enum.flat_map(spell_ids, &TalentLoader.triggered_spell_ids/1)
+    {character, events} = AuraLogic.remove_spells(character, triggered_ids, now)
+    Effects.enqueue(character, events)
   end
 
   defp sync_pet_aura_links(%Character{} = previous, %Character{} = character, now) do

@@ -21,6 +21,17 @@ defmodule ThistleTea.Game.World.Loader.GossipVmangosTest do
   @moduletag :vmangos_db
 
   describe "load_all/0" do
+    test "loads class-trainer talent reset options separately from pet trainers" do
+      assert :ok = Gossip.load_all()
+      assert Gossip.class_trainer?(5515, 3)
+      refute Gossip.class_trainer?(5515, 9)
+      refute Gossip.class_trainer?(10_090, 3)
+      assert %Menu{options: options} = Gossip.menu_for_creature(5515)
+      assert %Option{action_menu_id: 4461} = Enum.find(options, &(&1.id == 1))
+      assert %Menu{options: options} = Gossip.get_menu(4461)
+      assert %Option{option_id: 16, npc_flag: 0x10} = Enum.find(options, &(&1.option_id == 16))
+    end
+
     test "loads hunter pet trainers and their untraining option" do
       assert :ok = Gossip.load_all()
       assert Gossip.pet_trainer?(10_090)
