@@ -2,7 +2,9 @@
 
 The calculation layer and player-kill integration are implemented. Creature
 rewards, battleground bonuses, honor spells, and rank requirements remain to
-be connected. Real-client acceptance is still pending.
+be connected. Player kills, repeat penalties, gray rejection, party and pet
+credit, inspection, and reconnect retention have real-client acceptance in
+[honor-playtest.md](honor-playtest.md).
 
 ## Implemented rules
 
@@ -74,4 +76,5 @@ Target, Spirit of Redemption, current player projections, and packet dispatch.
    reconnect retention, and lifecycle cleanup. Calendar/ranking tests cover
    settlement without waiting for a real weekly reset.
 
-No real-client acceptance has been performed for honor yet.
+Honorless Target rejection has automated coverage; its real-client acceptance
+will accompany automatic application during world-entry transitions.

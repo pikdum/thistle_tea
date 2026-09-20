@@ -108,6 +108,7 @@ defmodule ThistleTea.Game.Network.Message.Dispatch do
               CMSG_AREA_SPIRIT_HEALER_QUEUE: Message.CmsgAreaSpiritHealerQueue,
               MSG_PVP_LOG_DATA: Message.CmsgPvpLogData,
               MSG_INSPECT_HONOR_STATS: Message.CmsgInspectHonorStats,
+              CMSG_INSPECT: Message.CmsgInspect,
               CMSG_TOGGLE_PVP: Message.CmsgTogglePvp,
               MSG_BATTLEGROUND_PLAYER_POSITIONS: Message.CmsgBattlegroundPlayerPositions,
               CMSG_CAST_SPELL: Message.CmsgCastSpell,

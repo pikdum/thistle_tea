@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.Player.HonorTest do
   alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Message.Dispatch
   alias ThistleTea.Game.Network.Opcodes
@@ -67,6 +68,8 @@ defmodule ThistleTea.Game.Player.HonorTest do
       assert %Message.MsgInspectHonorStats{guid: 2} = Honor.inspect_reply(character, 2, opts)
       assert Honor.inspect_reply(character, 2, Keyword.put(opts, :online?, fn _guid -> false end)) == nil
       assert Honor.inspect_reply(character, 2, Keyword.put(opts, :attackable?, fn _character, _guid -> true end)) == nil
+      assert Honor.inspect_reply(character, Guid.from_low_guid(:pet, 1, 1), opts) == nil
+      assert Honor.inspect_reply(character, 0, opts) == nil
 
       for position <- [{world, 10.01, 0.0, 0.0}, {WorldRef.instance(0, 1), 0.0, 0.0, 0.0}, nil] do
         assert Honor.inspect_reply(character, 2, Keyword.put(opts, :position, fn _guid -> position end)) == nil
@@ -75,6 +78,12 @@ defmodule ThistleTea.Game.Player.HonorTest do
   end
 
   describe "honor messages" do
+    test "dispatches ordinary inspection and encodes its acknowledgement" do
+      packet = %Packet{opcode: Opcodes.get(:CMSG_INSPECT), payload: <<7::little-size(64)>>}
+      assert %Message.CmsgInspect{guid: 7} = Dispatch.to_message(packet)
+      assert Message.SmsgInspect.to_binary(%Message.SmsgInspect{guid: 7}) == <<7::little-size(64)>>
+    end
+
     test "dispatches inspection and encodes the build-5875 response" do
       packet = %Packet{opcode: Opcodes.get(:MSG_INSPECT_HONOR_STATS), payload: <<7::little-size(64)>>}
       assert %Message.CmsgInspectHonorStats{guid: 7} = Dispatch.to_message(packet)

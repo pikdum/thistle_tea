@@ -3,19 +3,16 @@ defmodule ThistleTea.Game.Player.Honor do
   Owner-side synchronization of the realm honor ledger into player fields.
   """
 
-  alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Honor.Award
   alias ThistleTea.Game.Entity.Data.Honor.Snapshot
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Honor, as: HonorLogic
-  alias ThistleTea.Game.Entity.Logic.Hostility
-  alias ThistleTea.Game.Math
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message.MsgInspectHonorStats
   alias ThistleTea.Game.Network.Message.SmsgPvpCredit
-  alias ThistleTea.Game.World
+  alias ThistleTea.Game.Player.Inspection
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.System.Honor, as: HonorSystem
 
@@ -54,14 +51,9 @@ defmodule ThistleTea.Game.Player.Honor do
   end
 
   def inspect_reply(%Character{} = character, guid, opts \\ []) do
-    online? = Keyword.get(opts, :online?, &Entity.online?/1)
-    position = Keyword.get(opts, :position, &World.position/1)
-    attackable? = Keyword.get(opts, :attackable?, &Hostility.valid_attack_target?/2)
     snapshot = Keyword.get(opts, :snapshot, &HonorSystem.snapshot/1)
 
-    with true <- online?.(guid),
-         true <- inspect_range?(character, position.(guid)),
-         false <- attackable?.(character, guid),
+    with true <- Inspection.available?(character, guid, opts),
          %Snapshot{} = snapshot <- snapshot.(guid) do
       player = HonorLogic.project(snapshot.honor, %Player{}, snapshot.day, snapshot.week_start)
       %MsgInspectHonorStats{guid: guid, player: player}
@@ -69,13 +61,4 @@ defmodule ThistleTea.Game.Player.Honor do
       _unavailable -> nil
     end
   end
-
-  defp inspect_range?(
-         %Character{internal: %{world: world}, movement_block: %{position: {x, y, z, _o}}},
-         {world, px, py, pz}
-       ) do
-    Math.distance({x, y, z}, {px, py, pz}) <= 10.0
-  end
-
-  defp inspect_range?(_character, _position), do: false
 end
