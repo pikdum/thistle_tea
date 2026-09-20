@@ -123,6 +123,7 @@ defmodule ThistleTea.Game.Network.Message.Dispatch do
               CMSG_MOVE_FEATHER_FALL_ACK: Message.CmsgMoveFeatherFallAck,
               CMSG_FORCE_MOVE_UNROOT_ACK: Message.CmsgForceMoveUnrootAck,
               CMSG_MOVE_TIME_SKIPPED: Message.CmsgMoveTimeSkipped,
+              CMSG_MOVE_SPLINE_DONE: Message.CmsgMoveSplineDone,
               CMSG_LOGOUT_REQUEST: Message.CmsgLogoutRequest,
               CMSG_LOGOUT_CANCEL: Message.CmsgLogoutCancel,
               CMSG_CANCEL_CAST: Message.CmsgCancelCast,

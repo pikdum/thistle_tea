@@ -22,6 +22,7 @@ defmodule ThistleTea.Game.Player.TaxiTest do
   alias ThistleTea.Game.Network.Message.SmsgShowtaxinodes
   alias ThistleTea.Game.Network.Message.SmsgTaxinodeStatus
   alias ThistleTea.Game.Player.Taxi
+  alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.Loader.Reputation, as: ReputationLoader
   alias ThistleTea.Game.World.Metadata
@@ -190,6 +191,42 @@ defmodule ThistleTea.Game.Player.TaxiTest do
     end
   end
 
+  describe "spline_done/2" do
+    setup [:start_flight]
+
+    test "rejects early, obsolete, foreign-mover, and loading acknowledgements", %{flight_state: state} do
+      spline_id = state.character.internal.spline_id
+
+      assert Taxi.spline_done(state, spline_id) == state
+      assert Taxi.spline_done(state, spline_id + 1) == state
+
+      expired = expire_flight(state)
+      loading = %{expired | ready: false}
+      foreign = %{expired | active_mover_guid: state.guid + 1}
+
+      assert Taxi.spline_done(expired, spline_id + 1) == expired
+      assert Taxi.spline_done(loading, spline_id) == loading
+      assert Taxi.spline_done(foreign, spline_id) == foreign
+    end
+
+    test "finishes the matching elapsed flight once at the server destination", %{flight_state: state} do
+      state = expire_flight(state)
+      spline_id = state.character.internal.spline_id
+      landed = Taxi.spline_done(state, spline_id)
+
+      refute landed.character.internal.taxi_flight
+      assert landed.character.movement_block.position == {100.0, 0.0, 0.0, 0.0}
+      assert landed.character.unit.mount_display_id == 0
+      assert landed.character.player.coinage == 75
+      assert CharacterStore.get(state.character.id).movement_block.position == {100.0, 0.0, 0.0, 0.0}
+      assert_receive :restore_companion
+      assert Taxi.spline_done(landed, spline_id) == landed
+      refute_receive :restore_companion
+
+      if is_reference(landed.player_tick_ref), do: Process.cancel_timer(landed.player_tick_ref)
+    end
+  end
+
   describe "start_path/3" do
     test "starts a free scripted path without requiring known nodes", context do
       character = context.character
@@ -251,6 +288,28 @@ defmodule ThistleTea.Game.Player.TaxiTest do
 
   defp put_known(%Character{player: player} = character, nodes) do
     %{character | player: %{player | taxi_nodes: MapSet.new(nodes)}}
+  end
+
+  defp start_flight(context) do
+    character = put_known(context.character, [2, 4])
+    state = %State{ready: true, guid: character.object.guid, character: character, visibility_cells: MapSet.new()}
+    state = Taxi.activate(state, context.flightmaster_guid, [2, 4], network())
+
+    on_exit(fn ->
+      Process.cancel_timer(state.taxi_arrival_ref)
+      if is_reference(state.player_tick_ref), do: Process.cancel_timer(state.player_tick_ref)
+    end)
+
+    %{flight_state: state}
+  end
+
+  defp expire_flight(state) do
+    internal = state.character.internal
+    flight = internal.taxi_flight
+    started_at = Time.now() - flight.duration_ms - 1
+    flight = %{flight | started_at: started_at}
+    internal = %{internal | taxi_flight: flight, movement_start_time: started_at}
+    %{state | character: %{state.character | internal: internal}}
   end
 
   defp network do

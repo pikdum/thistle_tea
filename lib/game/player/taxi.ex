@@ -6,6 +6,8 @@ defmodule ThistleTea.Game.Player.Taxi do
   import Bitwise, only: [&&&: 2]
 
   alias ThistleTea.Game.Entity.Data.Character
+  alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.Entity.Data.Taxi.Flight
   alias ThistleTea.Game.Entity.Data.Taxi.Network, as: TaxiNetwork
   alias ThistleTea.Game.Entity.Data.Taxi.Node
   alias ThistleTea.Game.Entity.Data.Taxi.Path
@@ -15,6 +17,7 @@ defmodule ThistleTea.Game.Player.Taxi do
   alias ThistleTea.Game.Entity.Logic.Taxi, as: TaxiLogic
   alias ThistleTea.Game.Entity.Server.Player, as: PlayerServer
   alias ThistleTea.Game.Entity.Server.Player.CompanionOwner
+  alias ThistleTea.Game.Entity.Server.Player.State
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Math
   alias ThistleTea.Game.Network
@@ -149,6 +152,21 @@ defmodule ThistleTea.Game.Player.Taxi do
   end
 
   def arrive(state, _token), do: state
+
+  def spline_done(
+        %State{
+          ready: true,
+          guid: guid,
+          active_mover_guid: mover_guid,
+          character: %Character{internal: %Internal{spline_id: spline_id, taxi_flight: %Flight{} = flight}}
+        } = state,
+        spline_id
+      )
+      when is_integer(spline_id) and mover_guid in [nil, guid] do
+    if Time.now() >= flight.started_at + flight.duration_ms, do: arrive(state, flight.token), else: state
+  end
+
+  def spline_done(state, _spline_id), do: state
 
   def progress(%{character: %Character{internal: %{taxi_flight: %{token: token}}}} = state, token)
       when is_reference(token) do
