@@ -72,12 +72,9 @@ pause the PvP countdown. Tests cover the actual inspection-spell DBC records.
 
 The first session also exposed a client crash during relocation while guards
 were attacking the shaman. Both clients reported a vector allocation failure.
-The client stack was decoding an object-update movement block with a malformed
-node count. Repeated relocation, combat, death, release, and corpse recovery
-have not reproduced it yet; an independent diagnostic decoder consumed 3,240
-subsequently captured update packets across three captures without a framing
-error. The crash remains unresolved. The fresh player-combat, death, pet
-reconnect, inspection, and assistance sequences did not reproduce it.
+The subsequent investigation identified and fixed object-update removal
+ordering, as detailed below. The fresh player-combat, death, pet reconnect,
+inspection, and assistance sequences did not reproduce the crash.
 
 ## Artifacts
 
@@ -108,9 +105,52 @@ reconnect, inspection, and assistance sequences did not reproduce it.
 All playtest clients, their X displays, and the server were stopped after
 acceptance. The final server log contained no error-level gameplay entries.
 
-## Automated validation after spell corrections
+## Object-update crash diagnosis and fix
 
-- `mix test.all`: 3,767 passed, including DBC, VMangos, and map integration tests.
+The paladin's minidump retained the decompressed packet on its stack at
+`0x0100f6b8`: 1,666 bytes containing eight update blocks. The fifth block, at
+payload offset 1,000, removed transport `0x1fc000000002b0b6` between creature
+creates. Build 5875 consumes an out-of-range block only at the beginning of an
+update packet. Its later dispatch loop skips that block's type byte without
+consuming the count and GUIDs.
+
+Following the actual decoder from that point reproduces all three crash
+values exactly: movement flags `0xb6c70000`, spline node count `0xce000000`, and
+allocation size `0xa8000000`. The apparent movement corruption came from
+reading the removal count as another block type. VMangos also emits one
+leading removal block in `Server/Packets/ObjectUpdate.cpp`.
+
+`UpdateObject.normalize/1` now combines removals into one leading block and
+drops updates preceding a later removal of the same GUID. A subsequent create
+is retained. The batcher returns that same normalized order for visibility
+tracking, so the owner and client agree about removed and recreated objects.
+Regression tests cover direct encoding, interleaved mailbox removals,
+transport headers, stale creates, and remove/recreate tracking.
+
+Two fresh clients then exercised Northshire relocation, guard combat and
+death, nearby creature refreshes, and departures of transport 176310 using
+the existing debug commands. Both clients stayed running without another
+crash. All 229 captured updates passed a decoder that now also requires
+removals to be first. The precise mailbox interleaving did not recur in this
+live pass; automated tests exercise it deterministically. The earlier 3,240
+captured packets also pass the stricter decoder, while the recovered crash
+packet fails it at the exact offending block.
+
+Follow-up artifacts:
+
+- Clients: `/home/pikdum/.cache/thistle-wow-playtest.tn0guN/` and
+  `/home/pikdum/.cache/thistle-wow-playtest.o1tQdI/`; both contain
+  `screenshots/update-order-final.png`.
+- Server log: `/tmp/thistle-update-order-playtest.log`, with no error-level
+  entries. Both clients and the server were stopped afterward.
+- Authority probe: `/tmp/thistle-update-order-final-state.txt`.
+- Packet capture: `/tmp/thistle-update-order-capture.bin`.
+- Recovered crash packet: `/tmp/thistle-pvp-crash-update.bin`, prefixed by its
+  32-bit little-endian length for the diagnostic decoder.
+
+## Automated validation after spell and packet corrections
+
+- `mix test.all`: 3,770 passed, including DBC, VMangos, and map integration tests.
 - `mix compile --warnings-as-errors`: passed.
 - `mix credo --strict`: passed with zero issues.
 - `mix format --check-formatted`: passed.
