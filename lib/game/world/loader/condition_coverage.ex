@@ -114,6 +114,7 @@ defmodule ThistleTea.Game.World.Loader.ConditionCoverage do
                  45,
                  46,
                  48,
+                 51,
                  52,
                  53,
                  55,
@@ -143,7 +144,6 @@ defmodule ThistleTea.Game.World.Loader.ConditionCoverage do
     26 => "holiday projection",
     31 => "typed update-field capability",
     49 => "authoritative VMangos loot-state owner",
-    51 => "authoritative honor rank",
     57 => "creature formation owner",
     58 => "creature formation owner"
   }
@@ -239,8 +239,8 @@ defmodule ThistleTea.Game.World.Loader.ConditionCoverage do
     2. Partial world facts currently collected only by the scripted-event
        boundary or for spawned game objects.
     3. Explicitly blocked owners: saved variables, instance-specific callbacks,
-       unregistered instance fields, raw flags, game-object loot state, honor
-       rank, and creature formations.
+       unregistered instance fields, raw flags, game-object loot state, and
+       creature formations.
 
     The inventory includes every schema column whose normalized name is
     `condition_id`, `conditionId`, `required_condition`, or `RequiredCondition`.

@@ -65,6 +65,18 @@ defmodule ThistleTea.Game.Entity.Logic.Honor.Ledger do
     end
   end
 
+  def debug_rank_points(%__MODULE__{} = ledger, guid, points) when is_integer(points) and points in 0..65_000 do
+    case Map.get(ledger.entries, guid) do
+      %Entry{} = entry ->
+        points = min(points, Rank.maximum(entry.level))
+        honor = %{entry.honor | rank_points: points, highest_rank: max(entry.honor.highest_rank, Rank.number(points))}
+        put_entry(ledger, %{entry | honor: honor})
+
+      nil ->
+        ledger
+    end
+  end
+
   def player_kill(%__MODULE__{} = ledger, killer_guid, victim_guid, share) when is_number(share) and share > 0 do
     case {Map.get(ledger.entries, killer_guid), Map.get(ledger.entries, victim_guid)} do
       {%Entry{} = killer, %Entry{} = victim} when killer.team != victim.team ->

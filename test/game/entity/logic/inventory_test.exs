@@ -423,6 +423,35 @@ defmodule ThistleTea.Game.Entity.Logic.InventoryTest do
   end
 
   describe "auto_equip/6" do
+    test "enforces earned rank in automatic and explicit equipment placement", %{unit: unit} do
+      template = %ItemTemplate{entry: 15_196, inventory_type: 19, required_honor_rank: 5, bonding: 2}
+      item = build_item(99, template)
+      player = store(%Player{}, @backpack_start, item)
+      get_item = get_item_fn([item])
+
+      assert Inventory.error_code(:cant_equip_rank) == 63
+      assert Inventory.can_use(unit, @prof, template, player) == {:error, :cant_equip_rank}
+      assert Inventory.find_equip_slot(player, unit, @prof, item, get_item) == {:error, :cant_equip_rank}
+
+      assert {:error, :cant_equip_rank, _, _} =
+               Inventory.auto_equip(player, unit, @prof, @owner, {@bag_0, @backpack_start}, get_item)
+
+      assert {:error, :cant_equip_rank, _, _} =
+               Inventory.swap(player, unit, @prof, @owner, {@bag_0, @backpack_start}, {@bag_0, 18}, get_item)
+
+      assert item.item.flags == 0
+      assert player.inv1 == item.object.guid
+      earned = %{player | highest_honor_rank: 5, honor_rank: 0}
+      assert Inventory.can_use(unit, @prof, template, earned) == :ok
+      assert Inventory.find_equip_slot(earned, unit, @prof, item, get_item) == {:ok, 18}
+
+      assert {:ok, equipped} =
+               Inventory.auto_equip(earned, unit, @prof, @owner, {@bag_0, @backpack_start}, get_item)
+
+      assert equipped.player.tabard == item.object.guid
+      assert updated(equipped.items, item).item.flags == 1
+    end
+
     test "binds equipment once and preserves binding through unequip", %{unit: unit} do
       item = build_item(99, %ItemTemplate{entry: 990, inventory_type: 5, bonding: 2, flags: 4})
       player = store(%Player{}, @backpack_start, item)

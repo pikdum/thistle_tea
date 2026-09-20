@@ -97,7 +97,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgUseItem do
          not (bag == Inventory.bag_0() and Inventory.equipment_slot?(slot)) do
       {:error, :item_not_found}
     else
-      with :ok <- Inventory.can_use(unit, Proficiency.from_character(character), template) do
+      with :ok <- Inventory.can_use(unit, Proficiency.from_character(character), template, character.player) do
         Reputation.validate_item_requirement(character, template)
       end
     end

@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.Player.Vendor do
   alias ThistleTea.Game.Entity.Logic.Condition
   alias ThistleTea.Game.Entity.Logic.Condition.Subject
   alias ThistleTea.Game.Entity.Logic.Core
+  alias ThistleTea.Game.Entity.Logic.Honor.ItemRequirements
   alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network
@@ -79,6 +80,10 @@ defmodule ThistleTea.Game.Player.Vendor do
 
       not Reputation.item_requirement_met?(character, vendor_guid, template) ->
         send_buy_failed(vendor_guid, template.entry, :reputation_require)
+        state
+
+      not ItemRequirements.can_buy?(character, template) ->
+        send_buy_failed(vendor_guid, template.entry, :rank_require)
         state
 
       character.player.coinage < price ->

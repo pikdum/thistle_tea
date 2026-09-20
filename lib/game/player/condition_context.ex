@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.Player.ConditionContext do
   alias ThistleTea.Game.Entity.Logic.Condition.Subject
   alias ThistleTea.Game.Entity.Logic.Death
   alias ThistleTea.Game.Entity.Logic.Exploration
+  alias ThistleTea.Game.Entity.Logic.Honor.Rank
   alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.Player.Reputation
@@ -138,6 +139,7 @@ defmodule ThistleTea.Game.Player.ConditionContext do
       argent_dawn_commission?: argent_dawn_commission?(holders),
       race: unit.race,
       class: unit.class,
+      honor_rank: Rank.visual_from_number(player.honor_rank || 0),
       team: Graveyard.team_for_race(unit.race),
       group?: group?(character.object.guid, requirements, options),
       skills: player.skills,
@@ -207,6 +209,7 @@ defmodule ThistleTea.Game.Player.ConditionContext do
         zone_id: source.zone_id || zone_id,
         area_id: source.area_id || area_id || Map.get(metadata, :area),
         alive?: fact(source.alive?, metadata, :alive?),
+        honor_rank: honor_rank_fact(source.honor_rank, metadata),
         go_spawned?: fact(source.go_spawned?, metadata, :go_spawned?),
         loot_state: fact(source.loot_state, metadata, :loot_state),
         go_state: fact(source.go_state, metadata, :go_state)
@@ -241,6 +244,9 @@ defmodule ThistleTea.Game.Player.ConditionContext do
 
   defp fact(nil, metadata, key), do: Map.get(metadata, key)
   defp fact(value, _metadata, _key), do: value
+
+  defp honor_rank_fact(nil, metadata), do: Rank.visual_from_number(Map.get(metadata, :honor_rank))
+  defp honor_rank_fact(rank, _metadata), do: rank
 
   defp active_game_events(requirements, options) do
     if Enum.any?(requirements, &match?({:active_game_event, _id}, &1)) do

@@ -44,7 +44,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgReadItem do
   end
 
   defp respond(c, template, guid) do
-    case Inventory.can_use(c.unit, Proficiency.from_character(c), template) do
+    case Inventory.can_use(c.unit, Proficiency.from_character(c), template, c.player) do
       :ok ->
         Network.send_packet(%Message.SmsgReadItemOk{guid: guid})
 

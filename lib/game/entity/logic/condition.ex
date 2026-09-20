@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.Entity.Logic.Condition do
     item_with_bank: :item_counts_with_bank,
     item_equipped: :equipped_item_ids,
     reputation_rank_min: :reputation_ranks,
+    pvp_rank: :honor_rank,
     team: :team,
     skill: :skills,
     quest_rewarded: :rewarded_quests,

@@ -14,7 +14,7 @@ every consumer has migrated.
 - Distinct direct condition roots: 977.
 - Reachable condition IDs: 1776.
 - Reachable definitions with known VMangos numeric mappings: 1776.
-- Reachable definitions handled end to end by the shared evaluator: 1652.
+- Reachable definitions handled end to end by the shared evaluator: 1656.
 - Missing child IDs: none.
 - Cycles: none.
 
@@ -89,7 +89,7 @@ every consumer has migrated.
 | 29 | `skill_below` | 4 | evaluable | - |
 | 35 | `map_event_data` | 4 | partial | scripted-event boundary only |
 | 41 | `health_percent` | 4 | evaluable | - |
-| 51 | `pvp_rank` | 4 | blocked | authoritative honor rank |
+| 51 | `pvp_rank` | 4 | evaluable | - |
 | 53 | `local_time` | 4 | evaluable | - |
 | 28 | `is_player` | 3 | evaluable | - |
 | 38 | `distance_to_target` | 3 | partial | scripted-event boundary only |
@@ -131,8 +131,8 @@ every consumer has migrated.
 2. Partial world facts currently collected only by the scripted-event
    boundary or for spawned game objects.
 3. Explicitly blocked owners: saved variables, instance-specific callbacks,
-   unregistered instance fields, raw flags, game-object loot state, honor
-   rank, and creature formations.
+   unregistered instance fields, raw flags, game-object loot state, and
+   creature formations.
 
 The inventory includes every schema column whose normalized name is
 `condition_id`, `conditionId`, `required_condition`, or `RequiredCondition`.

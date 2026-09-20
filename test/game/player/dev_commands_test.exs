@@ -32,8 +32,42 @@ defmodule ThistleTea.Game.Player.DevCommandsTest do
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.PostOffice
   alias ThistleTea.Game.World.SpatialHash
+  alias ThistleTea.Game.World.System.Honor, as: HonorSystem
   alias ThistleTea.Game.World.Transports
   alias ThistleTea.Game.WorldRef
+
+  describe ".debug honor" do
+    test "changes the ledger and owner projection while retaining the earned rank" do
+      id = System.unique_integer([:positive, :monotonic])
+      guid = Guid.from_low_guid(:player, id)
+
+      character = %{
+        debug_character()
+        | id: id,
+          object: %Object{guid: guid},
+          unit: %Unit{level: 60, race: 1},
+          player: %Player{}
+      }
+
+      state = %{guid: guid, character: character}
+      on_exit(fn -> :ets.delete(CharacterStore, id) end)
+      assert {:handled, ranked} = DevCommands.run(state, ".debug honor points 20000")
+      assert ranked.character.player.honor_rank == 10
+      assert ranked.character.player.highest_honor_rank == 10
+      assert HonorSystem.snapshot(guid).honor.rank_points == 20_000
+      assert CharacterStore.get(id).player.honor_rank == 10
+
+      assert {:handled, demoted} = DevCommands.run(ranked, ".debug honor points 0")
+      assert demoted.character.player.honor_rank == 0
+      assert demoted.character.player.highest_honor_rank == 10
+      assert HonorSystem.snapshot(guid).honor.highest_rank == 10
+
+      for invalid <- ["-1", "65001", "12.5", "no"] do
+        assert DevCommands.run(demoted, ".debug honor points #{invalid}") == {:handled, demoted}
+        assert HonorSystem.snapshot(guid).honor.rank_points == 0
+      end
+    end
+  end
 
   describe ".die" do
     test "bypasses shields without spending mana" do

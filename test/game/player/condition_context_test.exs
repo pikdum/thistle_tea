@@ -21,6 +21,28 @@ defmodule ThistleTea.Game.Player.ConditionContextTest do
   alias ThistleTea.Game.WorldRef
 
   describe "build/3" do
+    test "projects current visible rank and refreshes it after rank loss" do
+      condition = %Condition{type: :pvp_rank, value1: 6, value2: 1}
+      character = character()
+      character = %{character | player: %{character.player | honor_rank: 10, highest_honor_rank: 18}}
+      context = ConditionContext.build(character, [condition])
+      assert context.target.honor_rank == 6
+      assert Evaluator.evaluate(context, condition) == :met
+
+      demoted = %{character | player: %{character.player | honor_rank: 9}}
+      assert ConditionContext.refresh_subject(demoted, context.target).honor_rank == 5
+      assert Evaluator.evaluate(ConditionContext.build(demoted, [condition]), condition) == :unmet
+    end
+
+    test "uses owner-published rank for swapped player sources" do
+      guid = System.unique_integer([:positive, :monotonic])
+      Metadata.put(guid, %{honor_rank: 18})
+      on_exit(fn -> Metadata.delete(guid) end)
+      condition = %Condition{type: :pvp_rank, value1: 14, swap_targets?: true}
+      context = ConditionContext.build(character(), [condition], source: %Subject{guid: guid, kind: :player})
+      assert Evaluator.evaluate(context, condition) == :met
+    end
+
     test "collects requested item totals, catalogs, and world facts once" do
       owner = self()
 

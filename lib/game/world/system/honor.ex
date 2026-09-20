@@ -25,6 +25,10 @@ defmodule ThistleTea.Game.World.System.Honor do
 
   def snapshot(guid, server \\ __MODULE__), do: GenServer.call(server, {:snapshot, guid})
 
+  def debug_rank_points(guid, points, server \\ __MODULE__) when is_integer(points) and points in 0..65_000 do
+    GenServer.call(server, {:debug_rank_points, guid, points})
+  end
+
   def award(guid, %Award{} = award, server \\ __MODULE__) do
     GenServer.cast(server, {:award, guid, award})
   end
@@ -72,6 +76,18 @@ defmodule ThistleTea.Game.World.System.Honor do
   rescue
     error ->
       Logger.error("Honor snapshot failed: #{Exception.message(error)}")
+      {:reply, nil, recover(state)}
+  end
+
+  def handle_call({:debug_rank_points, guid, points}, _from, state) do
+    state = advance(state)
+    ledger = Ledger.debug_rank_points(state.ledger, guid, points)
+    changes = if ledger == state.ledger, do: [], else: [{guid, nil}]
+    state = commit(state, ledger, changes)
+    {:reply, project(ledger, guid), state}
+  rescue
+    error ->
+      Logger.error("Honor debug rank change failed: #{Exception.message(error)}")
       {:reply, nil, recover(state)}
   end
 

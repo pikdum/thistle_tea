@@ -37,6 +37,25 @@ defmodule ThistleTea.Game.World.System.HonorTest do
     end
   end
 
+  describe "debug_rank_points/3" do
+    test "publishes and retains debug ranks through a coordinator restart", %{server: server, opts: opts, table: table} do
+      register_players(server)
+      Honor.award(1, %Award{type: :bonus, points: 100}, server)
+      snapshot = Honor.debug_rank_points(1, 20_000, server)
+      assert snapshot.honor.rank_points == 20_000
+      assert snapshot.honor.highest_rank == 10
+      assert_receive {:honor, 1, nil}
+      assert HonorStore.load(5, 2, table).entries[1].honor == snapshot.honor
+      assert :ok = stop_supervised(Honor)
+      restarted = start_supervised!({Honor, opts})
+      snapshot = Honor.debug_rank_points(1, 0, restarted)
+      assert snapshot.honor.rank_points == 0
+      assert snapshot.honor.highest_rank == 10
+      assert snapshot.honor.days[5].contribution == 100
+      assert Honor.debug_rank_points(999, 100, restarted) == nil
+    end
+  end
+
   describe "calendar settlement" do
     test "settles before the first award after midnight", %{server: server, clock: clock} do
       register_players(server)

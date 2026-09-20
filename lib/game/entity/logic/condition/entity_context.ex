@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.Entity.Logic.Condition.EntityContext do
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Condition.Context
   alias ThistleTea.Game.Entity.Logic.Condition.Subject
+  alias ThistleTea.Game.Entity.Logic.Honor.Rank
   alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Spell
@@ -55,6 +56,7 @@ defmodule ThistleTea.Game.Entity.Logic.Condition.EntityContext do
           player_owned?: true,
           race: unit.race,
           class: unit.class,
+          honor_rank: Rank.visual_from_number(player.honor_rank || 0),
           skills: player.skills,
           spellbook: internal.spellbook,
           quest_log: player.quest_log,
@@ -136,6 +138,7 @@ defmodule ThistleTea.Game.Entity.Logic.Condition.EntityContext do
       level: Map.get(metadata, :level),
       race: Map.get(metadata, :race),
       class: Map.get(metadata, :class),
+      honor_rank: Rank.visual_from_number(Map.get(metadata, :honor_rank)),
       gender: Map.get(metadata, :gender),
       alive?: Map.get(metadata, :alive?),
       moving?: Perception.moving?(perception, guid),

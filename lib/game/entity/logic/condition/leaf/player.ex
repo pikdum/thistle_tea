@@ -13,6 +13,15 @@ defmodule ThistleTea.Game.Entity.Logic.Condition.Leaf.Player do
   alias ThistleTea.Game.Entity.Logic.QuestRequirements
   alias ThistleTea.Game.Entity.Logic.Reputation
 
+  def evaluate(
+        %Context{target: %Subject{kind: :player, honor_rank: rank}},
+        %Condition{type: :pvp_rank, value1: required, value2: comparison} = condition
+      )
+      when is_integer(rank), do: {:handled, Result.compare_result(rank, required, comparison, condition)}
+
+  def evaluate(%Context{target: %Subject{kind: kind}}, %Condition{type: :pvp_rank})
+      when not is_nil(kind) and kind != :player, do: handled(false)
+
   def evaluate(%Context{target: %Subject{item_counts: counts}}, %Condition{
         type: :item,
         value1: item_id,

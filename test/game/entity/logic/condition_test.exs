@@ -10,6 +10,38 @@ defmodule ThistleTea.Game.Entity.Logic.ConditionTest do
   alias ThistleTea.Game.WorldRef
 
   describe "evaluate/2" do
+    test "compares visible PvP rank with inclusive bounds and target swapping" do
+      context =
+        Context.new(
+          target: Subject.new(kind: :player, honor_rank: 6),
+          source: Subject.new(kind: :player, honor_rank: 0)
+        )
+
+      condition = %Condition{type: :pvp_rank, value1: 6}
+
+      for comparison <- 0..2 do
+        assert Evaluator.evaluate(context, %{condition | value2: comparison}) == :met
+      end
+
+      assert Evaluator.evaluate(context, %{condition | value1: 7, value2: 1}) == :unmet
+      assert Evaluator.evaluate(context, %{condition | value1: 5, value2: 2}) == :unmet
+      assert Evaluator.evaluate(context, %{condition | swap_targets?: true}) == :unmet
+      assert Evaluator.evaluate(context, %{condition | swap_targets?: true, reverse?: true}) == :met
+      assert Evaluator.evaluate(context, %{condition | value1: 0, swap_targets?: true}) == :met
+
+      assert {:unknown, [%Reason{capability: :invalid_comparison}]} =
+               Evaluator.evaluate(context, %{condition | value2: 3})
+    end
+
+    test "distinguishes missing rank from unranked players and non-player targets" do
+      condition = %Condition{type: :pvp_rank, value1: 0}
+      assert Evaluator.evaluate(Context.new(target: Subject.new(kind: :player, honor_rank: 0)), condition) == :met
+      assert Evaluator.evaluate(Context.new(target: Subject.new(kind: :creature)), condition) == :unmet
+
+      assert {:unknown, [%Reason{capability: {:missing_fact, :target, :honor_rank}}]} =
+               Evaluator.evaluate(Context.new(target: Subject.new(kind: :player)), condition)
+    end
+
     test "nil and none are met" do
       context = Context.new()
 

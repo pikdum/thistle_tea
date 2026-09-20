@@ -1,8 +1,8 @@
 # Honor system implementation
 
-The calculation layer, player and creature kills, Warsong bonuses, and honor
-spells are implemented. Rank requirements and automatic Honorless Target
-application remain to be connected. Player kills, repeat penalties, gray rejection, party and pet
+The calculation layer, player and creature kills, Warsong bonuses, honor
+spells, and rank requirements are implemented. Automatic Honorless Target
+application remains to be connected. Player kills, repeat penalties, gray rejection, party and pet
 credit, inspection, and reconnect retention have real-client acceptance in
 [honor-playtest.md](honor-playtest.md). Creature kills, honor spells, Warsong
 captures and victories, scoreboard refresh, and exit retention are validated
@@ -49,6 +49,13 @@ resurrection are validated in
   Its default week starts Tuesday; the reset weekday is configurable.
 - Client projection covers today's packed kill counts, yesterday, this week,
   last week, lifetime totals, rank, highest rank, and rank progress.
+- Equipment and item use require the highest rank ever earned. Vendor
+  purchases require the current rank and the item's required level; losing
+  rank preserves use of already-earned equipment but prevents new purchases.
+  Ranked merchandise remains visible and rejected purchases spend no money.
+- Condition 51 compares current visible ranks, from zero through fourteen,
+  with equality or inclusive bounds. Player, AI, and published condition
+  snapshots use the same rank conversion.
 
 The core modules have no database, process, clock, metadata, or packet-send
 dependencies. `World.System.Honor` owns the realm ledger, retained in an
@@ -71,7 +78,14 @@ yards in the same world who cannot be attacked by the inspecting player.
 ## References and validation
 
 References are local VMangos `HonorMgr.cpp`, `Formulas.h`, and the damage and
-honor-reward paths in `Objects/Unit.cpp` and `Objects/Player.cpp`.
+honor-reward paths in `Objects/Unit.cpp` and `Objects/Player.cpp`. Item gates
+follow `Player::CanUseItem` and `Player::BuyItemFromVendorSlot` for patch 1.12;
+condition ranks follow `Conditions.cpp`.
+
+For testing, `.debug honor` reports current and highest rank, and
+`.debug honor points <0..65000>` sets rank points through the realm ledger.
+The command respects level caps, preserves earned rank and contribution
+history, and follows the normal owner projection and change-notice paths.
 
 An independent executable compiled the ranking functions extracted from
 `HonorMgr.cpp`. Across 1,613 standings in pools of 1, 2, 10, 100, 500, and
@@ -89,10 +103,8 @@ Target, Spirit of Redemption, current player projections, and packet dispatch.
 
 ## Remaining integration and acceptance
 
-1. Apply honor-rank conditions and equipment/vendor requirements, and connect
-   automatic Honorless Target application during world-entry transitions.
-2. Extend client acceptance to rank requirements and
-   automatic Honorless Target protection. Calendar/ranking tests cover
+1. Connect automatic Honorless Target application during world-entry transitions.
+2. Extend client acceptance to automatic Honorless Target protection. Calendar/ranking tests cover
    settlement without waiting for a real weekly reset.
 
 Honorless Target rejection has automated coverage; its real-client acceptance

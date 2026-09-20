@@ -17,6 +17,33 @@ defmodule ThistleTea.Game.Player.VendorTest do
   alias ThistleTea.Game.World.Loader.Vendor, as: VendorLoader
   alias ThistleTea.Game.WorldRef
 
+  describe "buy/4" do
+    test "rechecks current rank and level without hiding ranked merchandise" do
+      vendor_entry = System.unique_integer([:positive, :monotonic])
+      vendor_guid = Guid.from_low_guid(:mob, vendor_entry, vendor_entry)
+      template = %ItemTemplate{entry: 15_200, required_honor_rank: 8, required_level: 30, buy_price: 1}
+      :ets.insert(VendorLoader, {vendor_entry, [%VendorItem{index: 1, template: template, max_count: 0}]})
+      on_exit(fn -> :ets.delete(VendorLoader, vendor_entry) end)
+
+      eligible = character(30)
+      eligible = %{eligible | player: %{eligible.player | honor_rank: 8, highest_honor_rank: 18}}
+      demoted = %{eligible | player: %{eligible.player | honor_rank: 7}}
+      too_young = %{eligible | unit: %{eligible.unit | level: 29}}
+
+      for character <- [demoted, too_young] do
+        assert [%VendorItem{template: ^template}] = Vendor.visible_items(character, vendor_guid)
+        state = %{ready: true, guid: 1, character: character}
+        assert Vendor.buy(state, vendor_guid, template.entry, 1) == state
+        assert_receive {:"$gen_cast", {:send_packet, %SmsgBuyFailed{error: :rank_require}}}
+      end
+
+      eligible = %{eligible | player: %{eligible.player | coinage: 0}}
+      state = %{ready: true, guid: 1, character: eligible}
+      assert Vendor.buy(state, vendor_guid, template.entry, 1) == state
+      assert_receive {:"$gen_cast", {:send_packet, %SmsgBuyFailed{error: :not_enough_money}}}
+    end
+  end
+
   describe "condition policy" do
     test "hides, shows, and rejects a stale conditioned purchase" do
       vendor_entry = System.unique_integer([:positive, :monotonic])

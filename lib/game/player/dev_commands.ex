@@ -18,6 +18,7 @@ defmodule ThistleTea.Game.Player.DevCommands do
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Death
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Logic.Honor.Rank
   alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Entity.Logic.MovementStats
   alias ThistleTea.Game.Entity.Logic.Proficiency
@@ -34,6 +35,7 @@ defmodule ThistleTea.Game.Player.DevCommands do
   alias ThistleTea.Game.Player.Characters
   alias ThistleTea.Game.Player.Durability
   alias ThistleTea.Game.Player.Exploration, as: PlayerExploration
+  alias ThistleTea.Game.Player.Honor, as: PlayerHonor
   alias ThistleTea.Game.Player.Items
   alias ThistleTea.Game.Player.Quests
   alias ThistleTea.Game.Player.Reputation, as: PlayerReputation
@@ -56,6 +58,7 @@ defmodule ThistleTea.Game.Player.DevCommands do
   alias ThistleTea.Game.World.PostOffice
   alias ThistleTea.Game.World.System.Battleground, as: BattlegroundSystem
   alias ThistleTea.Game.World.System.GameEvent
+  alias ThistleTea.Game.World.System.Honor, as: HonorSystem
   alias ThistleTea.Game.World.System.Instance, as: InstanceSystem
   alias ThistleTea.Game.World.Transports
   alias ThistleTea.Game.WorldRef
@@ -114,6 +117,7 @@ defmodule ThistleTea.Game.Player.DevCommands do
       ".debug professions - set known professions to 300/300",
       ".debug position <guid> - show an entity's projected world position",
       ".debug reputation <faction_id> - show standing and flags",
+      ".debug honor [points <0..65000>] - show or set honor rank points",
       ".debug reputation add <faction_id> <delta> - change standing",
       ".debug reputation find <name> - find faction ids",
       ".debug reputation set <faction_id> <standing> - set absolute standing",
@@ -250,6 +254,13 @@ defmodule ThistleTea.Game.Player.DevCommands do
     params
     |> String.split(" ", trim: true)
     |> debug_reputation(state)
+    |> handled()
+  end
+
+  def run(state, ".debug honor" <> params) do
+    params
+    |> String.split(" ", trim: true)
+    |> debug_honor(state)
     |> handled()
   end
 
@@ -542,6 +553,37 @@ defmodule ThistleTea.Game.Player.DevCommands do
       %{name: name} when is_binary(name) -> name
       _ -> "guid #{guid}"
     end
+  end
+
+  defp debug_honor([], state) do
+    character = PlayerHonor.sync(state.character)
+    honor_status(%{state | character: character})
+  end
+
+  defp debug_honor(["points", value], state) do
+    case Integer.parse(value) do
+      {points, ""} when points in 0..65_000 ->
+        character = PlayerHonor.sync(state.character)
+        snapshot = HonorSystem.debug_rank_points(character.object.guid, points)
+        character = PlayerHonor.apply_snapshot(character, snapshot)
+        honor_status(%{state | character: character})
+
+      _invalid ->
+        debug_honor(:invalid, state)
+    end
+  end
+
+  defp debug_honor(_params, state), do: system_message(state, "Use: .debug honor [points <0..65000>]")
+
+  defp honor_status(%{character: %Character{} = character} = state) do
+    snapshot = HonorSystem.snapshot(character.object.guid)
+    player = character.player
+
+    system_message(
+      state,
+      "Honor: #{snapshot.honor.rank_points} rank points, rank #{Rank.visual_from_number(player.honor_rank)}, " <>
+        "highest #{Rank.visual_from_number(player.highest_honor_rank)}."
+    )
   end
 
   defp debug_reputation([], state), do: reputation_usage(state)

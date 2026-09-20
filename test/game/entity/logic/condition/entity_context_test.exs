@@ -9,6 +9,8 @@ defmodule ThistleTea.Game.Entity.Logic.Condition.EntityContextTest do
   alias ThistleTea.Game.Entity.Data.Condition
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Logic.AI.BT.Context, as: AIContext
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception
+  alias ThistleTea.Game.Entity.Logic.AI.BT.Context.Perception.Observation
   alias ThistleTea.Game.Entity.Logic.Condition, as: Evaluator
   alias ThistleTea.Game.Entity.Logic.Condition.EntityContext
   alias ThistleTea.Game.Entity.Logic.Condition.InstanceDataSnapshot, as: Snapshot
@@ -16,6 +18,19 @@ defmodule ThistleTea.Game.Entity.Logic.Condition.EntityContextTest do
   alias ThistleTea.Game.WorldRef
 
   describe "build/3" do
+    test "projects observed player rank without inventing a missing fact" do
+      guid = Guid.from_low_guid(:player, 123)
+      observation = %Observation{guid: guid, metadata: %{honor_rank: 18}}
+      perception = Perception.new(1_000, nil, %{guid => observation}, %{})
+      ai_context = AIContext.new(1_000, perception: perception)
+      context = EntityContext.build(mob(WorldRef.open(0)), ai_context, guid)
+      condition = %Condition{type: :pvp_rank, value1: 14}
+      assert Evaluator.evaluate(context, condition) == :met
+
+      context = EntityContext.build(mob(WorldRef.open(0)), ai_context, guid + 1)
+      assert {:unknown, _reasons} = Evaluator.evaluate(context, condition)
+    end
+
     test "projects the boundary-supplied zone and area" do
       world = WorldRef.open(0)
 

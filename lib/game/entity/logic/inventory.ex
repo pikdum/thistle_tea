@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Item
   alias ThistleTea.Game.Entity.Data.ItemTemplate
+  alias ThistleTea.Game.Entity.Logic.Honor.ItemRequirements
   alias ThistleTea.Game.Entity.Logic.Inventory.Batch
   alias ThistleTea.Game.Entity.Logic.Inventory.Batch.Removal
   alias ThistleTea.Game.Entity.Logic.Inventory.ChangeSet
@@ -107,6 +108,7 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
     inventory_full: 50,
     bank_full: 51,
     not_in_combat: 60,
+    cant_equip_rank: 63,
     cant_equip_reputation: 64
   }
 
@@ -591,7 +593,7 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
     ctx = ctx(player, unit, prof, nil, get_item, opts)
     template = Item.template(item)
 
-    with :ok <- can_use(unit, prof, template),
+    with :ok <- can_use(unit, prof, template, player),
          :ok <- ctx.validate_item.(template) do
       case candidate_slots(template, unit.class, prof) do
         [] ->
@@ -609,10 +611,11 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
     end)
   end
 
-  def can_use(%Unit{} = unit, %Proficiency{} = prof, %ItemTemplate{} = template) do
+  def can_use(%Unit{} = unit, %Proficiency{} = prof, %ItemTemplate{} = template, %Player{} = player \\ %Player{}) do
     cond do
       (template.allowable_class &&& 1 <<< (unit.class - 1)) == 0 -> {:error, :you_can_never_use_that_item}
       (template.allowable_race &&& 1 <<< (unit.race - 1)) == 0 -> {:error, :you_can_never_use_that_item}
+      not ItemRequirements.can_use?(player, template) -> {:error, :cant_equip_rank}
       is_integer(template.required_level) and unit.level < template.required_level -> {:error, :cant_equip_level_i}
       true -> Proficiency.can_equip?(prof, template)
     end
@@ -886,7 +889,7 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
   defp validate_bag_cycle(_ctx, _item, _dst_pos), do: :ok
 
   defp validate_equipment_placement(ctx, template, slot) do
-    with :ok <- can_use(ctx.unit, ctx.prof, template),
+    with :ok <- can_use(ctx.unit, ctx.prof, template, ctx.player),
          :ok <- ctx.validate_item.(template) do
       cond do
         offhand_weapon_without_dual_wield?(ctx, template, slot) -> {:error, :cant_dual_wield}

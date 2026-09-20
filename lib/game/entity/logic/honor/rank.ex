@@ -15,7 +15,10 @@ defmodule ThistleTea.Game.Entity.Logic.Honor.Rank do
   def number(points) when points < 2_000, do: 5
   def number(points), do: min(div(trunc(points), 5_000) + 6, 18)
 
-  def visual(points), do: max(number(points) - 4, 0)
+  def visual(points), do: points |> number() |> visual_from_number()
+
+  def visual_from_number(nil), do: nil
+  def visual_from_number(rank) when is_integer(rank), do: max(rank - 4, 0)
 
   def progress(points) do
     {minimum, maximum} = bounds(number(points))

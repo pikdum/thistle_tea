@@ -25,6 +25,20 @@ defmodule ThistleTea.Game.Entity.Logic.Honor.LedgerTest do
     end
   end
 
+  describe "debug_rank_points/3" do
+    test "caps at the character level and preserves highest rank and awards" do
+      ledger = Ledger.new(0) |> Ledger.register(1, :alliance, 30) |> Ledger.award(1, %Award{type: :bonus, points: 100})
+      ranked = Ledger.debug_rank_points(ledger, 1, 65_000)
+      assert ranked.entries[1].honor.rank_points == 7_150
+      assert ranked.entries[1].honor.highest_rank == 7
+      demoted = Ledger.debug_rank_points(ranked, 1, 0)
+      assert demoted.entries[1].honor.rank_points == 0
+      assert demoted.entries[1].honor.highest_rank == 7
+      assert demoted.entries[1].honor.days == ledger.entries[1].honor.days
+      assert Ledger.debug_rank_points(ledger, 2, 100) == ledger
+    end
+  end
+
   describe "advance/2" do
     test "settles the complete faction pool before recording the next week's awards" do
       ledger = Ledger.new(0) |> Ledger.register(1, :alliance, 60) |> Ledger.register(2, :alliance, 60)
