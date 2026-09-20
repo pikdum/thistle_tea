@@ -52,7 +52,8 @@ Dash, and Claw training spells. Existing commands provide repeatable setup:
 The loyalty adjustment promotes a fresh rank-one pet and awards its level in
 training points through the normal transition. The feature consumes training
 spells already known by the hunter. [Wild-pet recipe discovery](pet-discovery-playtest.md)
-now supplies additional recipes; pet untraining remains a separate system.
+now supplies additional recipes, and [pet untraining](pet-untraining-playtest.md)
+lets hunters reset a pet's abilities at a pet trainer.
 
 ## Real-client acceptance
 
