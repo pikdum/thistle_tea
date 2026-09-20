@@ -41,6 +41,7 @@ defmodule ThistleTea.DevSeed do
   @spawn_point {16_303.2, 16_318.1, 69.44}
   @level 50
   @coinage 100_000_000
+  @pet_training_spells [5149, 4195, 4196, 23_100, 23_111, 24_547, 24_440, 2980]
 
   @human 1
   @orc 2
@@ -180,12 +181,15 @@ defmodule ThistleTea.DevSeed do
 
   defp learn_class_spells(%Character{internal: internal, unit: unit} = character) do
     existing = internal.spells || []
-    new_ids = ClassSpell.trainable_spell_ids(unit.class, unit.level)
+    new_ids = ClassSpell.trainable_spell_ids(unit.class, unit.level) ++ debug_training_spells(unit.class)
     superseded_by = SpellLoader.superseded_by_map(existing ++ new_ids)
     {all_ids, _events} = SpellBook.learn(existing, new_ids, superseded_by)
 
     %{character | internal: %{internal | spells: all_ids}}
   end
+
+  defp debug_training_spells(3), do: @pet_training_spells
+  defp debug_training_spells(_class), do: []
 
   defp set_debug_action_bars(
          %Character{internal: internal, player: %Player{} = player, unit: %{class: class}} = character
