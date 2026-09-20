@@ -18,6 +18,29 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolverTest do
   alias ThistleTea.Game.WorldRef
 
   describe "resolve/3" do
+    test "party buffs include the owner's pet and the casting pet" do
+      owner = player_guid()
+      pet = Guid.runtime(:pet, 2960)
+      stranger = player_guid()
+      unrelated = Guid.runtime(:pet, 1766)
+      put_spatial_target(:players, owner, {0.0, 0.0, 0.0})
+      put_spatial_target(:players, stranger, {1.0, 0.0, 0.0})
+      put_spatial_target(:mobs, pet, {2.0, 0.0, 0.0})
+      put_spatial_target(:mobs, unrelated, {3.0, 0.0, 0.0})
+      Metadata.put(pet, %{alive?: true, owner_guid: owner})
+      Metadata.put(unrelated, %{alive?: true, owner_guid: stranger})
+      spell = aoe_spell(:party_around_caster)
+      pet_caster = Map.put(caster(pet, {2.0, 0.0, 0.0}), :unit, %Unit{created_by: owner})
+
+      assert Enum.sort(SpellTargetResolver.resolve(pet_caster, spell, Target.none())) == Enum.sort([owner, pet])
+
+      assert Enum.sort(SpellTargetResolver.resolve(caster(owner, {0.0, 0.0, 0.0}), spell, Target.none())) ==
+               Enum.sort([owner, pet])
+
+      Metadata.put(pet, %{alive?: false, owner_guid: owner})
+      assert SpellTargetResolver.resolve(caster(owner, {0.0, 0.0, 0.0}), spell, Target.none()) == [owner]
+    end
+
     test "returns direct unit targets without world lookup" do
       caster = %{object: %{guid: 1}}
       spell = %Spell{id: 133, effects: []}

@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
   alias ThistleTea.Game.Entity.Logic.Hostility
   alias ThistleTea.Game.Entity.Logic.PetTraining
   alias ThistleTea.Game.Entity.Logic.SpellTarget
+  alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Party
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Target
@@ -257,20 +258,27 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
 
     members =
       case PartySystem.group_of(party_guid) do
-        %Party.Group{} = group ->
-          member_guids = MapSet.new(group.members, & &1.guid)
-
-          nearby_guids
-          |> Enum.filter(fn guid -> MapSet.member?(member_guids, guid) and alive?(guid) end)
-
-        _ ->
-          Enum.filter(nearby_guids, &(&1 == party_guid and alive?(&1)))
+        %Party.Group{} = group -> MapSet.new(group.members, & &1.guid)
+        _ -> MapSet.new([party_guid])
       end
 
-    if party_guid == caster_guid, do: Enum.uniq([caster_guid | members]), else: Enum.uniq(members)
+    [caster_guid | nearby_guids]
+    |> Enum.uniq()
+    |> Enum.filter(fn guid ->
+      (guid == caster_guid and party_guid == caster_guid) or
+        (alive?(guid) and (MapSet.member?(members, guid) or party_pet?(guid, members)))
+    end)
   end
 
   defp nearby_party_guids(_caster, caster_guid, _radius), do: [caster_guid]
+
+  defp party_pet?(guid, members) do
+    Guid.high_guid(guid) == Guid.high_guid(:pet) and
+      case Metadata.query(guid, [:owner_guid]) do
+        %{owner_guid: owner} -> MapSet.member?(members, owner)
+        _ -> false
+      end
+  end
 
   defp party_owner_guid(%{unit: %{created_by: owner_guid}}, _caster_guid)
        when is_integer(owner_guid) and owner_guid > 0, do: owner_guid

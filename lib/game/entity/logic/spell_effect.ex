@@ -173,7 +173,8 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   end
 
   defp melee_roll_required?(%{object: %{guid: target_guid}}, %CastContext{caster_guid: caster_guid}, spell) do
-    (Spell.melee_ability?(spell) or ranged_weapon_ability?(spell)) and target_guid != caster_guid
+    Spell.harmful?(spell) and (Spell.melee_ability?(spell) or ranged_weapon_ability?(spell)) and
+      target_guid != caster_guid
   end
 
   defp ranged_weapon_ability?(%Spell{effects: effects} = spell) do

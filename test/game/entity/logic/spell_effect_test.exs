@@ -137,6 +137,33 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
   end
 
   describe "receive/4" do
+    test "positive melee-class buffs cannot be dodged by their recipient" do
+      spell = %Spell{
+        id: 24_604,
+        school: :physical,
+        dmg_class: 2,
+        duration_ms: 10_000,
+        effects: [
+          %Effect{
+            index: 0,
+            type: :apply_aura,
+            aura: :mod_damage_done,
+            base_points: 8,
+            misc_value: 1,
+            implicit_target_a: :party_around_caster
+          }
+        ]
+      }
+
+      context = %CastContext{caster_guid: 999, caster_level: 1, attack_skill: 5, hit_chance_bonus: -100}
+      target = avoided_melee_ability_target(:dodge)
+      {result, events} = SpellEffect.receive(target, context, spell, 1_000)
+      assert Aura.has_spell?(result, 24_604)
+      assert Aura.flat_amount(result, :mod_damage_done) == 8
+      refute Enum.any?(events, &is_struct(&1, Effects.SpellLogMiss))
+      refute Enum.any?(events, &is_struct(&1, Effects.AttackOutcome))
+    end
+
     test "resists a melee stun without applying it or reporting a successful attack" do
       target = mechanic_resistance_target(12)
       spell = mechanic_stun_spell(12, 12)

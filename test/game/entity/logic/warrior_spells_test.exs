@@ -402,7 +402,17 @@ defmodule ThistleTea.Game.Entity.Logic.WarriorSpellsTest do
         name: "Execute",
         school: :physical,
         dmg_class: 2,
-        effects: [%Effect{index: 0, type: :dummy, base_points: 124, die_sides: 1, base_dice: 1, damage_multiplier: 0.3}]
+        effects: [
+          %Effect{
+            index: 0,
+            type: :dummy,
+            base_points: 124,
+            die_sides: 1,
+            base_dice: 1,
+            damage_multiplier: 0.3,
+            implicit_target_a: :target_enemy
+          }
+        ]
       }
 
       context = %{melee_context(spell) | caster_power: 200}
