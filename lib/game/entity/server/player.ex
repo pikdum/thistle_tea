@@ -1026,8 +1026,21 @@ defmodule ThistleTea.Game.Entity.Server.Player do
     {:noreply, %{state | character: character}}
   end
 
+  def handle_info(
+        %Effects.PetReactionChanged{source_guid: guid, reaction_state: reaction},
+        %State{character: %Character{}} = state
+      ) do
+    character = Companion.remember_reaction(state.character, guid, reaction)
+    {:noreply, %{state | character: character}}
+  end
+
   def handle_info(%type{}, %State{} = state)
-      when type in [Effects.PetHappinessChanged, Effects.PetProgressChanged, Effects.PetDied] do
+      when type in [
+             Effects.PetHappinessChanged,
+             Effects.PetProgressChanged,
+             Effects.PetReactionChanged,
+             Effects.PetDied
+           ] do
     {:noreply, state}
   end
 

@@ -104,11 +104,12 @@ defmodule ThistleTea.Game.Entity.Server.Player.CompanionOwner do
   def suspend_hunter_pet(%Character{} = character, guid) do
     if CompanionLogic.entry(character) == Guid.entry(guid) do
       case Entity.call(guid, :suspend_hunter_pet) do
-        {:ok, happiness, dead?, progress} when is_integer(happiness) ->
+        {:ok, happiness, dead?, progress, reaction} when is_integer(happiness) ->
           character
           |> CompanionLogic.capture_happiness(happiness)
           |> CompanionLogic.capture_death(dead?)
           |> CompanionLogic.capture_progress(progress)
+          |> CompanionLogic.capture_reaction(reaction)
 
         _ ->
           character

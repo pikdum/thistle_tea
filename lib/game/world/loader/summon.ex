@@ -101,6 +101,7 @@ defmodule ThistleTea.Game.World.Loader.Summon do
             owner_guid: owner_guid,
             profile: :combat,
             kind: if(hunter_pet?, do: :hunter, else: :summon),
+            reaction_state: pet_reaction(owner, entry),
             food_mask: if(hunter_pet?, do: pet_food_mask(creature.family), else: 0)
           },
           spawn: %{mob.internal.spawn | temporary?: true, respawn_delay_ms: nil},
@@ -129,6 +130,10 @@ defmodule ThistleTea.Game.World.Loader.Summon do
   end
 
   defp pet_progress(_owner, _entry, _owner_level, false), do: nil
+
+  defp pet_reaction(owner, entry) do
+    if Companion.entry(owner) == entry, do: Companion.relationship(owner).reaction_state, else: :defensive
+  end
 
   defp restored_spellbook(_entry, _level, %PetProgress{spells: spells}) when is_list(spells) do
     key = {:restored_pet_spellbook, Enum.sort(spells)}

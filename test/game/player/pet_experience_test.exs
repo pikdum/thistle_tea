@@ -14,11 +14,15 @@ defmodule ThistleTea.Game.Player.PetExperienceTest do
   alias ThistleTea.Game.Entity.Data.PetProgress
   alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.Logic.Companion
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Effects.PetProgressChanged
   alias ThistleTea.Game.Entity.Server.Mob, as: MobServer
   alias ThistleTea.Game.Entity.Server.Player, as: PlayerServer
+  alias ThistleTea.Game.Entity.Server.Player.CompanionOwner.Attachment
   alias ThistleTea.Game.Entity.Server.Player.State
   alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.Network.Message.SmsgPetSpells
+  alias ThistleTea.Game.Player.CompanionVisibility
   alias ThistleTea.Game.Player.PetExperience
   alias ThistleTea.Game.World.Loader.PetLevel, as: PetLevelLoader
 
@@ -69,6 +73,27 @@ defmodule ThistleTea.Game.Player.PetExperienceTest do
       assert {:noreply, ^pet} = MobServer.handle_info({:reward_pet_kill, 9, 60, {:group, 137}}, pet)
       dead = %{pet | unit: %{pet.unit | health: 0}}
       assert {:noreply, ^dead, _} = MobServer.handle_info({:reward_pet_kill, 1, 60, {:group, 137}}, dead)
+    end
+  end
+
+  describe "taming" do
+    test "forwards the wild creature's level to its new owner", %{pet: pet} do
+      Entity.register(1)
+      pet = %{pet | object: %{pet.object | guid: Guid.runtime(:mob, 2960)}, unit: %{pet.unit | level: 8}}
+      EventSink.emit(pet, Effects.tame_creature(1, 2960))
+      assert_receive {:tame_pet, 2960, 8}
+    end
+  end
+
+  describe "companion restoration" do
+    test "projects the retained passive stance on the client pet bar", %{character: character} do
+      character = Companion.capture_reaction(character, :passive)
+      entity_ref = Companion.active_ref(character)
+      attachment = %Attachment{kind: :hunter_pet, entity_ref: entity_ref, pid: self(), spells: []}
+      state = %State{character: character}
+      assert CompanionVisibility.finish_attachment(state, attachment) == state
+      assert_receive {:pet_restore_autocast, _}
+      assert_receive {:"$gen_cast", {:send_packet, %SmsgPetSpells{reaction_state: 0}}}
     end
   end
 

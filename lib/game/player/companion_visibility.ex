@@ -23,7 +23,9 @@ defmodule ThistleTea.Game.Player.CompanionVisibility do
   def finish_attachment(%State{} = state, %Attachment{entity_ref: entity_ref, pid: pid, spells: spells}) do
     autocast = Companion.autocast(state.character)
     send(pid, {:pet_restore_autocast, autocast})
-    Network.send_packet(Message.SmsgPetSpells.for_pet(entity_ref.guid, spells, autocast))
+    packet = Message.SmsgPetSpells.for_pet(entity_ref.guid, spells, autocast)
+    reaction = Companion.relationship(state.character).reaction_state
+    Network.send_packet(%{packet | reaction_state: reaction_code(reaction)})
     state
   end
 
@@ -36,4 +38,8 @@ defmodule ThistleTea.Game.Player.CompanionVisibility do
     send(self(), :restore_companion)
     state
   end
+
+  defp reaction_code(:passive), do: 0
+  defp reaction_code(:defensive), do: 1
+  defp reaction_code(:aggressive), do: 2
 end

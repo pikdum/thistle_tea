@@ -533,7 +533,10 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   def handle_call(:feed_info, _from, %Mob{} = state), do: {:reply, {:error, :not_pet}, state}
 
   def handle_call(:suspend_hunter_pet, _from, %Mob{internal: %Internal{pet: %Pet{kind: :hunter}}} = state) do
-    {:stop, :normal, {:ok, state.unit.power5, Core.dead?(state), PetProgression.snapshot(state)}, state}
+    snapshot =
+      {:ok, state.unit.power5, Core.dead?(state), PetProgression.snapshot(state), state.internal.pet.reaction_state}
+
+    {:stop, :normal, snapshot, state}
   end
 
   def handle_call(:suspend_hunter_pet, _from, %Mob{} = state), do: {:reply, {:error, :not_hunter_pet}, state}
@@ -806,7 +809,14 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
   def handle_info({:pet_reaction, reaction}, %Mob{internal: %Internal{pet: %Pet{}}} = state) do
     state = state |> PetBT.reaction(reaction) |> wake_ai_tick()
-    {:noreply, state}
+
+    effect = %Effects.PetReactionChanged{
+      source_guid: state.object.guid,
+      target_guid: state.internal.pet.owner_guid,
+      reaction_state: state.internal.pet.reaction_state
+    }
+
+    {:noreply, EventSink.emit(state, effect)}
   end
 
   def handle_info({:pet_set_actions, actions}, %Mob{internal: %Internal{pet: %Pet{}}} = state) do

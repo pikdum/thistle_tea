@@ -71,12 +71,27 @@ defmodule ThistleTea.UpdateObjectTest do
         update_type: :values,
         object_type: :unit,
         object: %Object{guid: pet_guid},
-        unit: %Unit{summoned_by: 7, health: 500, min_damage: 50.0, max_damage: 70.0, attack_power: 40, power5: 700_000}
+        unit: %Unit{
+          summoned_by: 7,
+          health: 500,
+          min_damage: 50.0,
+          max_damage: 70.0,
+          attack_power: 40,
+          power5: 700_000,
+          pet_experience: 123,
+          pet_next_level_exp: 35_300
+        }
       }
 
       owner_packet = UpdateObject.to_packet(obj, 7)
       assert owner_packet == UpdateObject.to_packet(obj, pet_guid)
       assert byte_size(owner_packet.payload) > byte_size(UpdateObject.to_packet(obj, 8).payload)
+
+      owner_fields = UpdateObject.flatten_field_structs([obj.unit], :self)
+      observer_fields = UpdateObject.flatten_field_structs([obj.unit], :other)
+      assert {:pet_experience, 123, _} = Enum.find(owner_fields, &(elem(&1, 0) == :pet_experience))
+      assert {:pet_next_level_exp, 35_300, _} = Enum.find(owner_fields, &(elem(&1, 0) == :pet_next_level_exp))
+      refute Enum.any?(observer_fields, &(elem(&1, 0) in [:pet_experience, :pet_next_level_exp]))
     end
   end
 

@@ -41,8 +41,8 @@ defmodule ThistleTea.Game.Entity.Logic.PetProgression do
         owner_level,
         levels
       )
-      when is_integer(amount) and amount > 0 and health > 0 and is_integer(owner_level) and level < owner_level and
-             level < @max_level do
+      when is_integer(amount) and amount > 0 and is_number(health) and health > 0 and is_integer(owner_level) and
+             level < owner_level and level < @max_level do
     pet
     |> advance((pet.unit.pet_experience || 0) + amount, min(owner_level, @max_level), levels)
     |> publish()

@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.StateTest do
   alias ThistleTea.Game.Entity.Logic.Effects.PetDied
   alias ThistleTea.Game.Entity.Logic.Effects.PetHappinessChanged
   alias ThistleTea.Game.Entity.Logic.Effects.PetProgressChanged
+  alias ThistleTea.Game.Entity.Logic.Effects.PetReactionChanged
   alias ThistleTea.Game.Entity.Server.Player
   alias ThistleTea.Game.Entity.Server.Player.CompanionOwner
   alias ThistleTea.Game.Entity.Server.Player.State
@@ -34,7 +35,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.StateTest do
 
     @impl true
     def handle_call(:suspend_hunter_pet, _from, happiness),
-      do: {:stop, :normal, {:ok, happiness, true, %PetProgress{level: 49, xp: 1_234}}, happiness}
+      do: {:stop, :normal, {:ok, happiness, true, %PetProgress{level: 49, xp: 1_234}, :passive}, happiness}
   end
 
   describe "struct defaults" do
@@ -100,6 +101,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.StateTest do
       for event <- [
             %PetHappinessChanged{source_guid: 1, target_guid: 7, happiness: 0},
             %PetProgressChanged{source_guid: 1, target_guid: 7, progress: %PetProgress{level: 49}},
+            %PetReactionChanged{source_guid: 1, target_guid: 7, reaction_state: :passive},
             %PetDied{source_guid: 1, target_guid: 7}
           ] do
         assert Player.handle_info(event, state) == {:noreply, state}
@@ -119,6 +121,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.StateTest do
       state = CompanionOwner.suspend(%State{character: character})
       assert CompanionLogic.relationship(state.character).happiness == 700_000
       assert CompanionLogic.relationship(state.character).progress == %PetProgress{level: 49, xp: 1_234}
+      assert CompanionLogic.relationship(state.character).reaction_state == :passive
       assert CompanionLogic.relationship(state.character).dead?
       assert CompanionLogic.suspended(state.character) == {:hunter_pet, 2960, 1515}
       assert_receive {:DOWN, ^ref, :process, ^pid, :normal}

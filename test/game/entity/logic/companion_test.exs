@@ -120,6 +120,19 @@ defmodule ThistleTea.Game.Entity.Logic.CompanionTest do
     end
   end
 
+  describe "remember_reaction/3" do
+    test "retains stance through suspension and ignores replaced pets" do
+      character = character_with_pet() |> Companion.remember_reaction(44, :passive) |> Companion.suspend()
+      restored = Companion.activate(character, :hunter_pet, %EntityRef{guid: 55, entry: 416, spell_id: 688})
+      assert Companion.relationship(restored).reaction_state == :passive
+      assert Companion.remember_reaction(restored, 44, :aggressive) == restored
+      changed = Companion.remember_reaction(restored, 55, :aggressive)
+      assert Companion.relationship(changed).reaction_state == :aggressive
+      replaced = Companion.activate(changed, :hunter_pet, %EntityRef{guid: 66, entry: 417, spell_id: 688})
+      assert Companion.relationship(replaced).reaction_state == :defensive
+    end
+  end
+
   defp character_with_pet do
     %Character{unit: %Unit{}, internal: %Internal{}}
     |> Companion.activate(:hunter_pet, %EntityRef{guid: 44, entry: 416, spell_id: 688})

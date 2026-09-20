@@ -38,7 +38,10 @@ defmodule ThistleTea.Game.Entity.Server.Mob.PetLifecycleTest do
       {:ok, pid} = World.start_entity(pet)
       on_exit(fn -> if Entity.online?(guid), do: World.stop_entity(guid) end)
       ref = Process.monitor(pid)
-      assert {:ok, 166_500, false, %PetProgress{level: 49, xp: 123}} = Entity.call(guid, :suspend_hunter_pet)
+
+      assert {:ok, 166_500, false, %PetProgress{level: 49, xp: 123}, :defensive} =
+               Entity.call(guid, :suspend_hunter_pet)
+
       assert_receive {:DOWN, ^ref, :process, ^pid, :normal}
       assert MobServer.child_spec(pet).restart == :temporary
       refute Entity.online?(guid)
