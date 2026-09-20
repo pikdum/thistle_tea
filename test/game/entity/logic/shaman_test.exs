@@ -1,6 +1,8 @@
 defmodule ThistleTea.Game.Entity.Logic.ShamanTest do
   use ExUnit.Case, async: true
 
+  alias ThistleTea.Game.Aura
+  alias ThistleTea.Game.Aura.Holder
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Unit
@@ -60,6 +62,26 @@ defmodule ThistleTea.Game.Entity.Logic.ShamanTest do
     test "matches the VMangos weapon-speed and fire-power coefficient" do
       assert Shaman.flametongue_damage(325, 100, 2_000) == 14
       assert Shaman.flametongue_damage(325, 0, 4_000) == 13
+    end
+  end
+
+  describe "resolve_weapon_enchant/5" do
+    test "applies poison chance talents only to the matching spell family" do
+      poison = %Spell{id: 8680, spell_family: 8, family_flags_0: 0x1000}
+
+      talent = %Holder{
+        spell: %Spell{id: 14_116, spell_family: 8},
+        auras: [%Aura{type: :add_flat_modifier, misc_value: 18, amount: 10, class_mask: 0x1000}]
+      }
+
+      rogue = shaman()
+      rogue = %{rogue | unit: %{rogue.unit | auras: [talent]}}
+      proc = %{effect: %{amount: 20, spell_id: 8680}, proc_spell: poison, attack_time_ms: 2000}
+      payload = %{outcome: :normal, victim_guid: 2}
+      assert {_character, true} = Shaman.resolve_weapon_enchant(rogue, payload, proc, 0.0, fn -> 0.25 end)
+      assert {^rogue, false} = Shaman.resolve_weapon_enchant(rogue, payload, proc, 0.0, fn -> 0.31 end)
+      other = %{proc | proc_spell: %{poison | spell_family: 11}}
+      assert {^rogue, false} = Shaman.resolve_weapon_enchant(rogue, payload, other, 0.0, fn -> 0.25 end)
     end
   end
 end

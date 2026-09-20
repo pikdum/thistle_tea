@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
   alias ThistleTea.Game.Entity.Logic.AutoRepeat
   alias ThistleTea.Game.Entity.Logic.Casting
   alias ThistleTea.Game.Entity.Logic.Companion
+  alias ThistleTea.Game.Entity.Logic.Enchantments
   alias ThistleTea.Game.Entity.Logic.Hostility
   alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Entity.Logic.MeleeSpell
@@ -226,6 +227,8 @@ defmodule ThistleTea.Game.Player.Spellcasting do
   end
 
   defp validate_cast(%{character: character} = state, %Spell{} = spell, %Target{} = targets) do
+    enchant_guid = Enchantments.target_guid(character.player, spell, Target.item_guid(targets))
+
     CastValidation.validate(
       character,
       spell,
@@ -235,7 +238,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
       count_item: fn item_id -> Inventory.count_entry(character.player, item_id, &ItemStore.get/1) end,
       equipped_items: equipped_weapon_templates(character),
       disenchant_item: Disenchant.owned_item(character, Target.item_guid(targets)),
-      enchant_item: Disenchant.owned_item(character, Target.item_guid(targets)),
+      enchant_item: Disenchant.owned_item(character, enchant_guid),
       ammo_id: character.player.ammo_id,
       ammo_template: ItemLoader.get_template(character.player.ammo_id),
       mount_allowed?: MapTemplateLoader.mount_allowed?(character.internal.world.map_id),

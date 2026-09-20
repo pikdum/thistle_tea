@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgUseItem do
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Item, as: DataItem
   alias ThistleTea.Game.Entity.Data.ItemTemplate
+  alias ThistleTea.Game.Entity.Logic.Enchantments
   alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Entity.Logic.Proficiency
   alias ThistleTea.Game.Network.InventoryUpdate
@@ -55,7 +56,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgUseItem do
       Logger.info("CMSG_USE_ITEM: #{template.name} casting #{spell.name}")
 
       case Spellcasting.cast_result(state, spell, message.targets, guid) do
-        {:ok, state} -> handle_consumption(state, guid, consumable?)
+        {:ok, state} -> handle_consumption(state, guid, consumable? and not Enchantments.item_enchant?(spell))
         {:error, state} -> state
       end
     else

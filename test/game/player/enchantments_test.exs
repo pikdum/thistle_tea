@@ -101,7 +101,13 @@ defmodule ThistleTea.Game.Player.EnchantmentsTest do
   defp inventory(_context) do
     guid = System.unique_integer([:positive, :monotonic])
     item = ItemStore.create(%ItemTemplate{entry: 998_205, class: 4, inventory_type: 5, item_level: 10}, owner: guid)
-    dust = ItemStore.create(%ItemTemplate{entry: @dust, stackable: 20}, owner: guid, stack_count: 2)
+
+    dust =
+      ItemStore.create(
+        %ItemTemplate{entry: @dust, stackable: 20, spellid_1: @spell, spelltrigger_1: 0, spellcharges_1: -1},
+        owner: guid,
+        stack_count: 2
+      )
 
     :ets.insert(
       EnchantmentLoader,

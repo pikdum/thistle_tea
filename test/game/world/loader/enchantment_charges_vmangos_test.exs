@@ -1,6 +1,7 @@
 defmodule ThistleTea.Game.World.Loader.EnchantmentChargesVmangosTest do
   use ExUnit.Case, async: false
 
+  alias ThistleTea.DB.Mangos
   alias ThistleTea.Game.World.Loader.ItemEnchantment
 
   @moduletag :vmangos_db
@@ -15,6 +16,7 @@ defmodule ThistleTea.Game.World.Loader.EnchantmentChargesVmangosTest do
 
       assert ItemEnchantment.charges(8232) == 0
       assert ItemEnchantment.charges(8024) == 0
+      assert Mangos.Repo.get_by!(Mangos.SpellTemplate, entry: 14_117, build: 5875).effect_item_type_0 == 268_558_336
     end
   end
 end

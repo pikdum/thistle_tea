@@ -358,7 +358,7 @@ defmodule ThistleTea.Game.Spell.CastValidation do
 
   defp check_equipped_item(caster, %Spell{equipped_item_class: class} = spell, equipped_items)
        when is_integer(class) and class >= 0 and is_list(equipped_items) do
-    if Enchantments.permanent?(spell) or godmode?(caster) or
+    if Enchantments.item_enchant?(spell) or godmode?(caster) or
          Enum.any?(equipped_items, &item_fits_requirement?(&1, spell)) do
       :ok
     else

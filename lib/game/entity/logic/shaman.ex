@@ -7,25 +7,41 @@ defmodule ThistleTea.Game.Entity.Logic.Shaman do
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Effect
+  alias ThistleTea.Game.Spell.Modifiers
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
 
   @flametongue_damage_spell 10_444
 
   def trigger_weapon_enchant(entity, payload, proc, ppm, roll \\ &:rand.uniform/0)
 
-  def trigger_weapon_enchant(entity, %{outcome: outcome, victim_guid: victim_guid}, proc, ppm, roll)
+  def trigger_weapon_enchant(entity, payload, proc, ppm, roll) do
+    {entity, _triggered?} = resolve_weapon_enchant(entity, payload, proc, ppm, roll)
+    entity
+  end
+
+  def resolve_weapon_enchant(entity, payload, proc, ppm, roll \\ &:rand.uniform/0)
+
+  def resolve_weapon_enchant(entity, %{outcome: outcome, victim_guid: victim_guid}, proc, ppm, roll)
       when outcome in [:normal, :crit, :glancing, :crushing, :block] and is_map(proc) and is_number(ppm) and
              is_function(roll, 0) do
-    chance = proc_chance(proc, ppm)
+    chance = modified_proc_chance(entity, proc, ppm)
 
-    if roll.() <= chance do
-      trigger_proc(entity, victim_guid, proc)
+    if chance > 0 and roll.() <= chance do
+      {trigger_proc(entity, victim_guid, proc), true}
     else
-      entity
+      {entity, false}
     end
   end
 
-  def trigger_weapon_enchant(entity, _payload, _proc, _ppm, _roll), do: entity
+  def resolve_weapon_enchant(entity, _payload, _proc, _ppm, _roll), do: {entity, false}
+
+  defp modified_proc_chance(entity, %{proc_spell: %Spell{} = spell} = proc, ppm) do
+    (Modifiers.value(entity, spell, :chance_of_success, proc_chance(proc, ppm) * 100) / 100)
+    |> max(0.0)
+    |> min(1.0)
+  end
+
+  defp modified_proc_chance(_entity, proc, ppm), do: proc_chance(proc, ppm)
 
   defp trigger_proc(entity, victim_guid, %{proc_spell: %Spell{} = spell} = proc) do
     if flametongue_proc?(spell) do

@@ -12,8 +12,15 @@ defmodule ThistleTea.Game.Entity.Logic.Enchantments do
 
   def permanent?(%Spell{effects: effects}), do: Enum.any?(effects, &(&1.type == :enchant_item))
 
+  def item_enchant?(%Spell{effects: effects}),
+    do: Enum.any?(effects, &(&1.type in [:enchant_item, :enchant_item_temporary]))
+
+  def target_guid(player, spell, target_guid) do
+    if is_integer(target_guid) or permanent?(spell), do: target_guid, else: player.mainhand
+  end
+
   def validate(character, %Spell{} = spell, item) do
-    if permanent?(spell), do: validate_item(character, spell, item), else: :ok
+    if item_enchant?(spell), do: validate_item(character, spell, item), else: :ok
   end
 
   def validate_item(%Character{} = character, %Spell{} = spell, %Item{} = item) do
@@ -24,7 +31,7 @@ defmodule ThistleTea.Game.Entity.Logic.Enchantments do
       item.item.owner != character.object.guid -> {:error, :bad_targets}
       item.item.stack_count != 1 -> {:error, :bad_targets}
       not matches?(template, spell) -> {:error, :bad_targets}
-      template.item_level < spell.base_level -> {:error, :lowlevel}
+      permanent?(spell) and template.item_level < spell.base_level -> {:error, :lowlevel}
       true -> :ok
     end
   end

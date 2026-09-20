@@ -279,9 +279,9 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
       costs: %Costs{
         power: power_cost(entity, spell),
         channel_power: channel_power_cost(entity, casting),
-        reagents: if(Enchantments.permanent?(spell), do: [], else: spell.reagents || []),
+        reagents: if(Enchantments.item_enchant?(spell), do: [], else: spell.reagents || []),
         ammo: Hunter.ammo_reagents(entity, spell),
-        cast_item_guid: if(!Enchantments.permanent?(spell), do: cast_item_cost(casting)),
+        cast_item_guid: if(!Enchantments.item_enchant?(spell), do: cast_item_cost(casting)),
         modifier_holder_ids: casting.modifier_holder_ids
       },
       impacts: resolved_impacts(entity, spell, hits, misses),
@@ -520,8 +520,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
          cast_item_guid: cast_item_guid,
          resolution: %CastResolution{followups: %Followups{item_guid: target_item_guid}}
        }) do
-    item_guid =
-      if is_integer(target_item_guid) or Enchantments.permanent?(spell), do: target_item_guid, else: player.mainhand
+    item_guid = Enchantments.target_guid(player, spell, target_item_guid)
 
     events =
       for %Spell.Effect{type: type} = effect <- spell.effects,

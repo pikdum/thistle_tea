@@ -1,12 +1,11 @@
 defmodule ThistleTea.Game.Player.Enchantments do
   @moduledoc """
-  Applies owned item enchants, commits permanent enchant costs atomically,
-  and restores temporary enchant timers. Equipment owns all passive bonuses.
+  Applies owned item enchants and their costs atomically, spends weapon-proc
+  charges, and restores temporary timers. Equipment owns all passive bonuses.
   """
-  import Bitwise, only: [&&&: 2, <<<: 2]
-
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Item
+  alias ThistleTea.Game.Entity.Logic.Death
   alias ThistleTea.Game.Entity.Logic.Disarm
   alias ThistleTea.Game.Entity.Logic.Enchantments, as: EnchantmentLogic
   alias ThistleTea.Game.Entity.Logic.Inventory
@@ -65,11 +64,31 @@ defmodule ThistleTea.Game.Player.Enchantments do
         Batch.remove(batch, entry, count)
       end)
 
-    batch = if is_integer(cast_item_guid), do: Batch.remove_item(batch, cast_item_guid, 1), else: batch
-
-    case Inventory.plan(batch, &ItemStore.get/1) do
-      {:ok, changes} -> {:ok, changes}
+    with {:ok, batch} <- plan_cast_item(batch, character, spell, cast_item_guid),
+         {:ok, changes} <- Inventory.plan(batch, &ItemStore.get/1) do
+      {:ok, changes}
+    else
       _error -> {:error, :reagents}
+    end
+  end
+
+  defp plan_cast_item(batch, _character, _spell, nil), do: {:ok, batch}
+
+  defp plan_cast_item(batch, character, spell, guid) do
+    with {_bag, _slot} <- Inventory.find_position(character.player, guid, &ItemStore.get/1),
+         %Item{} = item <- ItemStore.get(guid),
+         true <- item.item.owner == character.object.guid,
+         template = Item.template(item),
+         index when is_integer(index) <-
+           Enum.find(
+             1..5,
+             &(Map.fetch!(template, :"spellid_#{&1}") == spell.id and Map.fetch!(template, :"spelltrigger_#{&1}") == 0)
+           ) do
+      if Map.fetch!(template, :"spellcharges_#{index}") < 0,
+        do: {:ok, Batch.remove_item(batch, guid, 1)},
+        else: {:ok, batch}
+    else
+      _ -> {:error, :item_gone}
     end
   end
 
@@ -89,21 +108,28 @@ defmodule ThistleTea.Game.Player.Enchantments do
         item_guid,
         %Spell{} = spell,
         enchantment_id,
-        duration_ms
+        duration_ms,
+        cast_item_guid \\ nil
       ) do
     with %Item{} = item <- ItemStore.get(item_guid),
          {_bag, _slot} = position <- Inventory.find_position(character.player, item_guid, &ItemStore.get/1),
-         true <- valid_target?(item, spell),
-         true <- not is_nil(ItemEnchantmentLoader.get(enchantment_id)) do
+         :ok <- EnchantmentLogic.validate_item(character, spell, item),
+         true <- not is_nil(ItemEnchantmentLoader.get(enchantment_id)),
+         true <- tools_present?(character, spell),
+         {:ok, changes} <- plan_costs(character, spell, cast_item_guid),
+         %Item{} <- ChangeSet.get_item(changes, item_guid, &ItemStore.get/1) do
       token = make_ref()
-      item = Item.put_temporary_enchantment(item, enchantment_id, duration_ms, 0, Time.now() + duration_ms, token)
-      ItemStore.put(item)
+      charges = ItemEnchantmentLoader.charges(spell.id)
+      item = Item.put_temporary_enchantment(item, enchantment_id, duration_ms, charges, Time.now() + duration_ms, token)
+      character = sync_visible_item(%{character | player: changes.player}, position, item)
+      changes = ChangeSet.absorb(changes, %{player: character.player, items: [item], destroyed: []})
+      state = InventoryUpdate.apply(state, {:ok, changes})
       Process.send_after(self(), {:expire_item_enchantment, item_guid, token}, duration_ms)
-      character = character |> sync_visible_item(position, item) |> Character.sync_equipment_stats()
-      send_updates(character, item, duration_ms)
-      %{state | character: character}
+      send_enchant_time(state.character, item, duration_ms)
+      state
     else
-      _ -> state
+      {:error, reason} -> fail(state, spell, reason)
+      _ -> fail(state, spell, :item_gone)
     end
   end
 
@@ -139,20 +165,71 @@ defmodule ThistleTea.Game.Player.Enchantments do
     end)
   end
 
-  def trigger_weapon_procs(%Character{} = character, payload) do
+  def trigger_weapon_procs(%Character{} = character, payload, roll \\ &:rand.uniform/0) do
     hand = Map.get(payload, :hand, :mainhand)
 
-    Enum.reduce(weapon_procs(character, hand), character, fn proc, character ->
-      Shaman.trigger_weapon_enchant(character, payload, proc, ItemEnchantmentLoader.proc_ppm(proc.effect.spell_id))
-    end)
+    if Death.alive?(character) do
+      Enum.reduce(weapon_procs(character, hand), character, fn proc, character ->
+        trigger_weapon_proc(character, payload, proc, roll)
+      end)
+    else
+      character
+    end
   end
 
+  defp trigger_weapon_proc(character, payload, proc, roll) do
+    if active_proc?(proc) do
+      ppm = ItemEnchantmentLoader.proc_ppm(proc.effect.spell_id)
+      {character, triggered?} = Shaman.resolve_weapon_enchant(character, payload, proc, ppm, roll)
+      if triggered?, do: spend_proc_charge(character, proc), else: character
+    else
+      character
+    end
+  end
+
+  defp active_proc?(%{item_guid: guid, enchantment_slot: slot, enchantment_id: id, token: token}) do
+    with %Item{} = item <- ItemStore.get(guid),
+         true <- {slot, id} in Item.active_enchantments(item, Time.now()) do
+      slot != Item.temporary_enchantment_slot() or Item.temporary_enchantment(item).token == token
+    else
+      _ -> false
+    end
+  end
+
+  defp spend_proc_charge(character, %{enchantment_slot: 1, item_guid: guid, token: token}) do
+    item = ItemStore.get(guid)
+    updated = Item.spend_enchantment_charge(item, token)
+
+    cond do
+      updated == item ->
+        character
+
+      Item.temporary_enchantment(updated) != nil ->
+        ItemStore.put(updated)
+        Network.send_packet(UpdateObject.item_values_update(updated))
+        character
+
+      true ->
+        ItemStore.put(updated)
+        position = Inventory.find_position(character.player, guid, &ItemStore.get/1)
+        character = character |> sync_visible_item(position, updated) |> Character.sync_equipment_stats()
+        send_updates(character, updated, 0)
+        character
+    end
+  end
+
+  defp spend_proc_charge(character, _proc), do: character
+
   def weapon_procs(%Character{} = character, hand) do
-    for {^hand, item, _enchant_slot, enchantment} <- Character.equipment_enchantments(character, Time.now()),
+    for {^hand, item, enchant_slot, enchantment} <- Character.equipment_enchantments(character, Time.now()),
         weapon_available?(character, hand),
         effect <- enchantment.effects,
         effect.type == 1 do
       %{
+        item_guid: item.object.guid,
+        enchantment_slot: enchant_slot,
+        enchantment_id: enchantment.id,
+        token: if(enchant_slot == Item.temporary_enchantment_slot(), do: Item.temporary_enchantment(item).token),
         effect: effect,
         proc_spell: SpellLoader.load(effect.spell_id),
         attack_time_ms: Item.template(item).delay || 2_000
@@ -190,11 +267,6 @@ defmodule ThistleTea.Game.Player.Enchantments do
     end
 
     sync_visible_item(character, position, item)
-  end
-
-  defp valid_target?(item, %Spell{equipped_item_class: class, equipped_item_subclass_mask: mask}) do
-    template = Item.template(item)
-    (class < 0 or template.class == class) and (mask in [0, nil] or (mask &&& 1 <<< template.subclass) != 0)
   end
 
   defp sync_visible_item(%Character{} = character, {bag, slot}, item) when bag in [0, 255] do

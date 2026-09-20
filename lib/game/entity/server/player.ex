@@ -910,9 +910,9 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   end
 
   @impl GenServer
-  def handle_info({:enchant_item, item_guid, spell, enchantment_id, duration_ms}, state) do
-    state = Enchantments.apply_temporary(state, item_guid, spell, enchantment_id, duration_ms)
-    {:noreply, state}
+  def handle_info({:enchant_item, item_guid, spell, enchantment_id, duration_ms, cast_item_guid}, state) do
+    state = Enchantments.apply_temporary(state, item_guid, spell, enchantment_id, duration_ms, cast_item_guid)
+    {:noreply, state, {:continue, :maybe_broadcast_update}}
   rescue
     error ->
       Logger.error("enchant_item crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
@@ -931,7 +931,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   @impl GenServer
   def handle_info({:expire_item_enchantment, item_guid, token}, state) do
     state = Enchantments.expire(state, item_guid, token)
-    {:noreply, state}
+    {:noreply, state, {:continue, :maybe_broadcast_update}}
   rescue
     error ->
       Logger.error("expire_item_enchantment crashed: #{Exception.format(:error, error, __STACKTRACE__)}")

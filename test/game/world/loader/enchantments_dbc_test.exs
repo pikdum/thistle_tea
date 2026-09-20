@@ -10,11 +10,14 @@ defmodule ThistleTea.Game.World.Loader.EnchantmentsDbcTest do
   alias ThistleTea.Game.Entity.Data.Item
   alias ThistleTea.Game.Entity.Data.ItemEnchantment
   alias ThistleTea.Game.Entity.Data.ItemTemplate
+  alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.EquipmentAuras
+  alias ThistleTea.Game.Entity.Logic.Shaman
   alias ThistleTea.Game.Player.Enchantments
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.ItemEnchantment, as: EnchantmentLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
+  alias ThistleTea.Game.World.Loader.SpellEffectOverride
 
   @moduletag :dbc_db
 
@@ -40,6 +43,35 @@ defmodule ThistleTea.Game.World.Loader.EnchantmentsDbcTest do
   end
 
   describe "load/1" do
+    test "real Improved Poisons increases Instant Poison's weapon proc chance" do
+      key = {:class_masks, 14_117}
+      previous = :ets.lookup(SpellEffectOverride, key)
+      :ets.insert(SpellEffectOverride, {key, {268_558_336, 0, 0}})
+
+      on_exit(fn ->
+        :ets.delete(SpellEffectOverride, key)
+        :ets.insert(SpellEffectOverride, previous)
+      end)
+
+      poison = SpellLoader.load(8680)
+      talent = SpellLoader.load(14_117)
+
+      character = %Character{
+        object: %Object{guid: 1},
+        player: %Player{},
+        internal: %Internal{},
+        movement_block: %MovementBlock{},
+        unit: %Unit{health: 100, max_health: 100, level: 50, auras: []}
+      }
+
+      {talented, _events} = Aura.apply_spell(character, 1, 50, talent, 0)
+      proc = %{effect: %{amount: 20, spell_id: 8680}, proc_spell: poison, attack_time_ms: 1700}
+      payload = %{outcome: :normal, victim_guid: 2}
+      assert {^character, false} = Shaman.resolve_weapon_enchant(character, payload, proc, 0.0, fn -> 0.25 end)
+      assert {_character, true} = Shaman.resolve_weapon_enchant(talented, payload, proc, 0.0, fn -> 0.25 end)
+      assert {^talented, false} = Shaman.resolve_weapon_enchant(talented, payload, proc, 0.0, fn -> 0.31 end)
+    end
+
     test "loads the real bracer enchant, target mask, rod and recipe thresholds" do
       spell = SpellLoader.load(7418)
       assert spell.tools == [6218]

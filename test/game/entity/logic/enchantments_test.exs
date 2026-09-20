@@ -39,6 +39,16 @@ defmodule ThistleTea.Game.Entity.Logic.EnchantmentsTest do
       opts = Keyword.put(opts, :count_item, fn _ -> 0 end)
       assert {:error, :item_gone} = CastValidation.validate(character, spell, Target.item(10), nil, 0, opts)
     end
+
+    test "temporary coatings validate their target without permanent enchant level restrictions", context do
+      %{character: character, item: item, spell: spell} = context
+      spell = %{spell | base_level: 60, effects: [%Effect{type: :enchant_item_temporary}]}
+      assert :ok = CastValidation.validate(character, spell, Target.item(10), nil, 0, enchant_item: item)
+      assert {:error, :item_gone} = Enchantments.validate(character, spell, nil)
+      assert {:error, :bad_targets} = Enchantments.validate(character, %{spell | equipped_item_class: 2}, item)
+      assert Enchantments.target_guid(%Player{mainhand: 10}, spell, nil) == 10
+      assert Enchantments.target_guid(%Player{mainhand: 10}, spell, 20) == 20
+    end
   end
 
   describe "skill_up/3" do
