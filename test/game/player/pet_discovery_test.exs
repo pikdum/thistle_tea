@@ -48,11 +48,11 @@ defmodule ThistleTea.Game.Player.PetDiscoveryTest do
   describe "discover_passives/2" do
     @tag :dbc_db
     test "learns innate passive recipes on attachment without teaching active recipes", %{state: state} do
-      previous = :ets.lookup(PetSpells, :profiles)
-      :ets.insert(PetSpells, {:profiles, %{113 => %{recipes: %{4187 => 4195, 7371 => 7370}}}})
+      previous = :ets.lookup(PetSpells, {:profile, 113})
+      :ets.insert(PetSpells, {{:profile, 113}, %{recipes: %{4187 => 4195, 7371 => 7370}}})
 
       on_exit(fn ->
-        :ets.delete(PetSpells, :profiles)
+        :ets.delete(PetSpells, {:profile, 113})
         :ets.insert(PetSpells, previous)
       end)
 

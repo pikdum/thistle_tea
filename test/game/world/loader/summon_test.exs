@@ -38,12 +38,12 @@ defmodule ThistleTea.Game.World.Loader.SummonTest do
 
     :ets.insert(PetLevelLoader, {:levels, %{50 => stats}})
     on_exit(fn -> :ets.insert(PetLevelLoader, {:levels, previous}) end)
-    previous_profiles = :ets.lookup(PetSpells, :profiles)
+    previous_profiles = :ets.lookup(PetSpells, {:profile, 2960})
     profile = %{spellbook: SpellLoader.build_spellbook([17_255, 24_604]), training_points: -14, recipes: %{}}
-    :ets.insert(PetSpells, {:profiles, %{2960 => profile}})
+    :ets.insert(PetSpells, {{:profile, 2960}, profile})
 
     on_exit(fn ->
-      :ets.delete(PetSpells, :profiles)
+      :ets.delete(PetSpells, {:profile, 2960})
       :ets.insert(PetSpells, previous_profiles)
     end)
 

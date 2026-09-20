@@ -50,6 +50,13 @@ defmodule ThistleTea.Game.Player.PetTraining do
   defp learn_recipes(character, []), do: character
 
   defp learn_recipes(character, recipes) do
+    unknown = recipes -- (character.internal.spells || [])
+    learn_unknown_recipes(character, unknown)
+  end
+
+  defp learn_unknown_recipes(character, []), do: character
+
+  defp learn_unknown_recipes(character, recipes) do
     case Spells.learn(character, recipes) do
       {:ok, character, _events} -> character
       :already_known -> character

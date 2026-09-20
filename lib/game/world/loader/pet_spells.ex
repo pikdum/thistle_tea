@@ -54,8 +54,8 @@ defmodule ThistleTea.Game.World.Loader.PetSpells do
       |> Enum.uniq()
       |> SpellLoader.build_spellbook()
 
-    profiles = Map.new(sources, fn {entry, ids} -> {entry, build(ids, spells, teaching, abilities)} end)
-    :ets.insert(table, {:profiles, profiles})
+    profiles = Enum.map(sources, fn {entry, ids} -> {{:profile, entry}, build(ids, spells, teaching, abilities)} end)
+    :ets.insert(table, profiles)
     :ok
   end
 
@@ -83,8 +83,8 @@ defmodule ThistleTea.Game.World.Loader.PetSpells do
   end
 
   def profile(entry, table \\ __MODULE__) do
-    case :ets.lookup(table, :profiles) do
-      [{:profiles, profiles}] -> Map.get(profiles, entry, empty())
+    case :ets.lookup(table, {:profile, entry}) do
+      [{_key, profile}] -> profile
       _ -> empty()
     end
   end
