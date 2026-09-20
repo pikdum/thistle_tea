@@ -20,8 +20,14 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory.Batch do
     defstruct [:guid, :count]
   end
 
+  defmodule Relocation do
+    @moduledoc false
+    @enforce_keys [:guid, :destination]
+    defstruct @enforce_keys
+  end
+
   @enforce_keys [:player]
-  defstruct [:player, removals: [], additions: [], updates: []]
+  defstruct [:player, removals: [], relocations: [], additions: [], updates: []]
 
   def new(%Player{} = player), do: %__MODULE__{player: player}
 
@@ -44,6 +50,13 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory.Batch do
   end
 
   def removals(%__MODULE__{removals: removals}), do: Enum.reverse(removals)
+
+  def relocate(%__MODULE__{relocations: relocations} = batch, guid, destination)
+      when is_integer(guid) and guid > 0 and destination in [:carried, :detached] do
+    %{batch | relocations: [%Relocation{guid: guid, destination: destination} | relocations]}
+  end
+
+  def relocations(%__MODULE__{relocations: relocations}), do: Enum.reverse(relocations)
   def additions(%__MODULE__{additions: additions}), do: Enum.reverse(additions)
   def updates(%__MODULE__{updates: updates}), do: Enum.reverse(updates)
 end

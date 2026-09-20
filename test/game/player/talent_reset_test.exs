@@ -27,6 +27,7 @@ defmodule ThistleTea.Game.Player.TalentResetTest do
   alias ThistleTea.Game.Player.TalentReset
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Cast
+  alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.ItemStore
@@ -34,6 +35,7 @@ defmodule ThistleTea.Game.Player.TalentResetTest do
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
   alias ThistleTea.Game.World.Loader.Talent, as: TalentLoader
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.PostOffice
   alias ThistleTea.Game.World.Presence
   alias ThistleTea.Game.World.SpatialHash
   alias ThistleTea.Game.WorldRef
@@ -77,6 +79,45 @@ defmodule ThistleTea.Game.Player.TalentResetTest do
   end
 
   describe "complete/2" do
+    test "unequips a weapon whose talent proficiency is lost and retains its skill history", %{
+      state: state,
+      trainer: trainer
+    } do
+      {state, weapon} = with_weapon(state)
+      completed = state |> TalentReset.confirm(trainer) |> TalentReset.complete(trainer)
+      assert completed.character.player.mainhand == 0
+      assert completed.character.player.inv1 == weapon.object.guid
+      assert completed.character.player.visible_item_16_0 == 0
+      refute Map.has_key?(completed.character.player.skills, 172)
+      assert completed.character.internal.forgotten_skills[172].value == 245
+      assert ItemStore.get(weapon.object.guid).item.owner == state.guid
+      assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgSetProficiency{item_class: 2, subclass_mask: 0}}}
+    end
+
+    test "returns an unusable weapon by mail when all bags are full", %{state: state, trainer: trainer} do
+      {state, weapon} = with_weapon(state)
+
+      player =
+        Enum.reduce(1..16, state.character.player, fn slot, player ->
+          item = ItemStore.create(%ItemTemplate{entry: @reagent}, owner: state.guid)
+          Map.replace!(player, :"inv#{slot}", item.object.guid)
+        end)
+
+      state = %{state | character: %{state.character | player: player}}
+      completed = state |> TalentReset.confirm(trainer) |> TalentReset.complete(trainer)
+      assert completed.character.player.mainhand == 0
+      assert ItemStore.get(weapon.object.guid) == weapon
+      assert Inventory.find_position(completed.character.player, weapon.object.guid, &ItemStore.get/1) == nil
+      {token, [mail]} = PostOffice.open(state.guid)
+      assert mail.item_guid == weapon.object.guid
+      assert mail.sender == state.guid
+      assert mail.stationery == 61
+      PostOffice.acknowledge(state.guid, token, [mail.id])
+      assert :ok = PostOffice.close(state.guid, token, [])
+      assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgDestroyObject{guid: guid}}}
+      assert guid == weapon.object.guid
+    end
+
     test "charges once, refunds points, removes dependent buffs, and preserves other classes' spells", %{
       state: state,
       trainer: trainer
@@ -192,6 +233,42 @@ defmodule ThistleTea.Game.Player.TalentResetTest do
     on_exit(fn -> World.stop_entity(guid) end)
     character = Companion.activate(state.character, kind, %EntityRef{guid: guid, entry: 69, spell_id: @summon})
     %{state | character: character}
+  end
+
+  defp with_weapon(state) do
+    template = %ItemTemplate{
+      entry: @reagent + 100,
+      class: 2,
+      subclass: 1,
+      inventory_type: 17,
+      delay: 3_000,
+      dmg_min1: 50.0,
+      dmg_max1: 60.0
+    }
+
+    cache(ItemLoader, [{template.entry, template}])
+    weapon = ItemStore.create(template, owner: state.guid)
+
+    spell = %Spell{
+      id: @dependent,
+      equipped_item_class: 2,
+      equipped_item_subclass_mask: 2,
+      effects: [%Effect{type: :proficiency}]
+    }
+
+    character = state.character
+    skills = %{172 => %{value: 245, max: 250, range: :level, always_max?: false}}
+
+    player =
+      %{character.player | mainhand: weapon.object.guid, skills: skills} |> Inventory.sync_visible_item(15, weapon)
+
+    character = %{
+      character
+      | player: player,
+        internal: %{character.internal | spellbook: Map.put(character.internal.spellbook, @dependent, spell)}
+    }
+
+    {%{state | character: character}, weapon}
   end
 
   defp build_state(_context) do

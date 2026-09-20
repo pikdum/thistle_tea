@@ -93,6 +93,22 @@ defmodule ThistleTea.Game.Entity.Logic.Skills do
 
   def max_for_level(level), do: max(level, 1) * 5
 
+  def forget(skills, ids, forgotten) do
+    {Map.drop(skills, ids), Map.merge(forgotten, Map.take(skills, ids))}
+  end
+
+  def restore(skills, forgotten) do
+    restored =
+      Map.new(skills, fn {id, entry} ->
+        case Map.get(forgotten, id) do
+          %{value: value} -> {id, %{entry | value: min(max(entry.value, value), entry.max)}}
+          _ -> {id, entry}
+        end
+      end)
+
+    {restored, Map.drop(forgotten, Map.keys(skills))}
+  end
+
   def new_entry(range, always_max?, level) do
     case range do
       :language -> %{value: 300, max: 300, range: range, always_max?: always_max?}

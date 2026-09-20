@@ -247,6 +247,31 @@ defmodule ThistleTea.Game.Entity.Logic.InventoryTest do
   end
 
   describe "plan/2" do
+    test "relocates equipment and detaches overflow without destroying item instances" do
+      first = build_item(20, %ItemTemplate{entry: 901, class: 2, subclass: 1, inventory_type: 17})
+      second = build_item(21, %ItemTemplate{entry: 902, class: 2, subclass: 5, inventory_type: 17})
+      player = %Player{mainhand: first.object.guid, offhand: second.object.guid}
+
+      batch =
+        player
+        |> Batch.new()
+        |> Batch.relocate(first.object.guid, :carried)
+        |> Batch.relocate(second.object.guid, :detached)
+
+      assert {:ok, changes} = Inventory.plan(batch, get_item_fn([first, second]))
+      assert changes.player.mainhand == 0
+      assert changes.player.offhand == 0
+      assert changes.player.inv1 == first.object.guid
+      assert ChangeSet.destroyed_items(changes) == []
+      assert changes.placements == []
+      assert ChangeSet.get_item(changes, second.object.guid, get_item_fn([second])) == second
+
+      assert {:error, :item_not_found} =
+               Inventory.plan(Batch.relocate(batch, second.object.guid, :carried), get_item_fn([first, second]))
+
+      assert player.mainhand == first.object.guid
+    end
+
     test "enforces unique limits against preceding additions and rolls back removals" do
       template = %ItemTemplate{entry: 6948, max_count: 1}
       first = build_item(20, template)

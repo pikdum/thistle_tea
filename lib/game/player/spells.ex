@@ -68,8 +68,9 @@ defmodule ThistleTea.Game.Player.Spells do
 
   defp learn_skills(%Character{unit: unit, player: player, internal: internal} = character) do
     new_skills = SkillLoader.initial_skills(internal.spells, unit.race, unit.class, unit.level)
+    {new_skills, forgotten} = Skills.restore(new_skills, internal.forgotten_skills)
     skills = Map.merge(new_skills, player.skills || %{})
-    %{character | player: %{player | skills: skills}}
+    %{character | player: %{player | skills: skills}, internal: %{internal | forgotten_skills: forgotten}}
   end
 
   def learn_training(%Character{} = character, %TrainerSpell{} = training) do
@@ -81,6 +82,7 @@ defmodule ThistleTea.Game.Player.Spells do
   end
 
   def unlearn(%Character{} = character, spell_ids, now) when is_list(spell_ids) and is_integer(now) do
+    previous_skills = character |> Proficiency.from_character() |> Proficiency.weapon_skills()
     {character, aura_events} = AuraLogic.remove_spells(character, spell_ids, now)
     character = Effects.enqueue(character, aura_events)
     internal = character.internal
@@ -94,8 +96,24 @@ defmodule ThistleTea.Game.Player.Spells do
         }
     }
 
+    current_skills = character |> Proficiency.from_character() |> Proficiency.weapon_skills()
+
+    {skills, forgotten} =
+      Skills.forget(
+        character.player.skills || %{},
+        previous_skills -- current_skills,
+        character.internal.forgotten_skills
+      )
+
+    character = %{
+      character
+      | player: %{character.player | skills: skills},
+        internal: %{character.internal | forgotten_skills: forgotten}
+    }
+
     CharacterStore.put(character)
     Enum.each(spell_ids, &Network.send_packet(%Message.SmsgRemovedSpell{spell_id: &1}))
+    send_proficiencies(character)
     character
   end
 

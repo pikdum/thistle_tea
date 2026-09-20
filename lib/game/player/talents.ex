@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Player.Talents do
   alias ThistleTea.Game.Entity.Logic.Talents, as: LogicTalents
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network
+  alias ThistleTea.Game.Player.EquipmentEligibility
   alias ThistleTea.Game.Player.Spells
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.CharacterStore
@@ -45,6 +46,7 @@ defmodule ThistleTea.Game.Player.Talents do
         |> Spells.unlearn(with_dependent_spells(talent_spell_ids), now)
         |> then(&sync_pet_aura_links(character, &1, now))
         |> then(&commit(state, &1))
+        |> EquipmentEligibility.reconcile(character)
     end
   end
 

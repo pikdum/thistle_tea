@@ -27,6 +27,14 @@ defmodule ThistleTea.Game.Entity.Logic.Proficiency do
   def item_class_weapon, do: @item_class_weapon
   def item_class_armor, do: @item_class_armor
 
+  def weapon_skills(%__MODULE__{weapon_mask: mask}) do
+    for subclass <- 0..19,
+        (mask &&& 1 <<< subclass) != 0,
+        skill = Skills.weapon_skill_for_subclass(subclass),
+        is_integer(skill),
+        do: skill
+  end
+
   def all, do: %__MODULE__{weapon_mask: -1, armor_mask: -1, skill_values: :all, dual_wield?: true}
 
   def from_character(%Character{player: player, internal: internal}) do

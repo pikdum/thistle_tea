@@ -15,6 +15,22 @@ defmodule ThistleTea.Game.Entity.Logic.SkillsTest do
     end
   end
 
+  describe "forget/3 and restore/2" do
+    test "retains learned weapon values and restores only newly available skills" do
+      axe = %{value: 240, max: 250, range: :level, always_max?: false}
+      mace = %{axe | value: 190}
+      {known, forgotten} = Skills.forget(%{172 => axe, 160 => mace}, [172], %{})
+      assert known == %{160 => mace}
+      assert forgotten == %{172 => axe}
+      assert Skills.restore(known, forgotten) == {known, forgotten}
+      assert {restored, %{}} = Skills.restore(%{172 => Skills.new_entry(:level, false, 60)}, forgotten)
+      assert restored[172].value == 240
+      assert restored[172].max == 300
+      assert {capped, %{}} = Skills.restore(%{172 => Skills.new_entry(:level, false, 40)}, forgotten)
+      assert capped[172].value == 200
+    end
+  end
+
   describe "ranged_weapon_skill/2" do
     test "reads weapon skills independently of permanent and temporary enchants" do
       packed = 100 + Bitwise.bsl(1900, 32) + Bitwise.bsl(263, 64)

@@ -198,8 +198,34 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
     change_set = ChangeSet.new(batch.player)
 
     with {:ok, change_set} <- plan_removals(change_set, Batch.removals(batch), get_item),
+         {:ok, change_set} <- plan_relocations(change_set, Batch.relocations(batch), get_item),
          {:ok, change_set} <- plan_additions(change_set, Batch.additions(batch), get_item) do
       plan_updates(change_set, Batch.updates(batch), get_item)
+    end
+  end
+
+  defp plan_relocations(change_set, [], _get_item), do: {:ok, change_set}
+
+  defp plan_relocations(change_set, [%Batch.Relocation{guid: guid, destination: destination} | rest], get_item) do
+    lookup = &ChangeSet.get_item(change_set, &1, get_item)
+
+    with %Item{} = item <- lookup.(guid),
+         {_bag, _slot} = position <- find_position(change_set.player, guid, lookup),
+         {:ok, result} <- relocate_item(change_set.player, item, position, destination, lookup) do
+      plan_relocations(ChangeSet.absorb(change_set, result), rest, get_item)
+    else
+      {:error, reason, _first, _second} -> {:error, reason}
+      _ -> {:error, :item_not_found}
+    end
+  end
+
+  defp relocate_item(player, item, position, :carried, lookup),
+    do: auto_store_item(player, item.item.owner, position, :carried, lookup, true)
+
+  defp relocate_item(player, _item, position, :detached, lookup) do
+    case detach(player, position, lookup) do
+      {:ok, result, _item} -> {:ok, result}
+      error -> error
     end
   end
 
@@ -454,12 +480,12 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
     auto_store_item(player, owner_guid, src_pos, {:bag, bag}, get_item)
   end
 
-  defp auto_store_item(player, owner_guid, src_pos, scope, get_item) do
+  defp auto_store_item(player, owner_guid, src_pos, scope, get_item, allow_carried_source? \\ false) do
     ctx = ctx(player, nil, nil, owner_guid, get_item)
 
     with {:ok, item} <- fetch_item(ctx, src_pos),
          :ok <- validate_storage_scope(ctx, scope),
-         :ok <- validate_auto_store_source(ctx, item, src_pos, scope) do
+         :ok <- validate_auto_store_source(ctx, item, src_pos, scope, allow_carried_source?) do
       ctx = put_pos(ctx, src_pos, nil)
       {ctx, remaining} = merge_into_stacks(ctx, item, scope)
 
@@ -1180,12 +1206,19 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
     match?({:ok, _position}, valid_destination(ctx, {bag, slot}))
   end
 
-  defp validate_auto_store_source(ctx, item, src_pos, scope) do
+  defp validate_auto_store_source(ctx, item, src_pos, scope, allow_carried_source?) do
     cond do
-      scope == :bank and bank_position?(src_pos) -> {:error, :item_doesnt_go_to_slot}
-      scope == :carried and carried_position?(src_pos) -> {:error, :item_doesnt_go_to_slot}
-      Item.container?(item) and not bag_empty?(ctx, item) -> {:error, :can_only_do_with_empty_bags}
-      true -> :ok
+      scope == :bank and bank_position?(src_pos) ->
+        {:error, :item_doesnt_go_to_slot}
+
+      scope == :carried and carried_position?(src_pos) and not allow_carried_source? ->
+        {:error, :item_doesnt_go_to_slot}
+
+      Item.container?(item) and not bag_empty?(ctx, item) ->
+        {:error, :can_only_do_with_empty_bags}
+
+      true ->
+        :ok
     end
   end
 

@@ -72,6 +72,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal do
     companion: Companion.none(),
     pet_stable: %PetStable{},
     talent_reset: %TalentReset{},
+    forgotten_skills: %{},
     rest_bonus: 0.0,
     mailbox: [],
     starting_items: [],
