@@ -9,7 +9,10 @@ captures and victories, scoreboard refresh, and exit retention are validated
 in [honor-rewards-playtest.md](honor-rewards-playtest.md). Team kill sharing,
 pet killing blows, dead teammate credit, Spirit of Redemption, and exit
 resurrection are validated in
-[honor-battleground-playtest.md](honor-battleground-playtest.md).
+[honor-battleground-playtest.md](honor-battleground-playtest.md). Rank-gated
+purchases, earned equipment eligibility after demotion, Champions' Hall
+entry, and reconnect are validated in
+[honor-rank-playtest.md](honor-rank-playtest.md).
 
 ## Implemented rules
 
@@ -104,8 +107,8 @@ Target, Spirit of Redemption, current player projections, and packet dispatch.
 ## Remaining integration and acceptance
 
 1. Connect automatic Honorless Target application during world-entry transitions.
-2. Extend client acceptance to automatic Honorless Target protection. Calendar/ranking tests cover
-   settlement without waiting for a real weekly reset.
+2. Extend client acceptance to automatic Honorless Target protection.
+   Calendar/ranking tests cover settlement without waiting for a real weekly reset.
 
 Honorless Target rejection has automated coverage; its real-client acceptance
 will accompany automatic application during world-entry transitions.
