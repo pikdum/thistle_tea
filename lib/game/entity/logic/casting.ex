@@ -222,7 +222,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
       |> queue_disenchant(casting)
       |> queue_charge(casting)
       |> release_paladin_seal(casting, resolution.hits, now)
-      |> apply_impacts(casting, resolution.impacts, now)
+      |> apply_initial_impacts(casting, now)
       |> consume_spell_modifiers(casting, now)
 
     if Cast.channeled?(casting) do
@@ -1119,6 +1119,11 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
 
   defp caster_level(%{unit: %{level: level}}) when is_integer(level) and level > 0, do: level
   defp caster_level(_caster), do: 1
+
+  defp apply_initial_impacts(character, %Cast{spell: %Spell{} = spell} = casting, now) do
+    effects = Enum.reject(spell.effects, &Spell.channel_ticked_effect?(spell, &1))
+    apply_impacts(character, %{casting | spell: %{spell | effects: effects}}, casting.resolution.impacts, now)
+  end
 
   defp apply_channel_tick_effects(
          character,

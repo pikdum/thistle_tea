@@ -34,6 +34,22 @@ defmodule ThistleTea.Game.Entity.Logic.CastingTest do
   alias ThistleTea.Game.WorldRef
 
   describe "start/5" do
+    test "waits for the scheduled tick before delivering a periodic channel trigger" do
+      fixture = final_channel_tick_fixture()
+      spell = fixture.internal.casting.spell
+      mob = %{fixture | internal: %{fixture.internal | casting: nil}}
+
+      mob = Casting.start(mob, spell, Target.unit(1), 1_000)
+      refute Enum.any?(mob.internal.events, &is_struct(&1, Effects.TriggerSpell))
+
+      mob = %{mob | internal: %{mob.internal | events: []}}
+      assert {:waiting, mob, _delay} = Casting.advance(mob, 20_999)
+      refute Enum.any?(mob.internal.events, &is_struct(&1, Effects.TriggerSpell))
+
+      assert {:finished, mob} = Casting.advance(mob, 21_000)
+      assert Enum.count(mob.internal.events, &is_struct(&1, Effects.TriggerSpell)) == 1
+    end
+
     test "queues on-next-swing spells instead of starting a cast" do
       spell = %Spell{id: 78, attributes: MapSet.new([:on_next_swing])}
       mob = %Mob{internal: %Internal{}}
