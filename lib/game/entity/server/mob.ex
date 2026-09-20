@@ -52,6 +52,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Entity.Logic.LootSession
   alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.Entity.Logic.PetHappiness
+  alias ThistleTea.Game.Entity.Logic.PetLoyalty
   alias ThistleTea.Game.Entity.Logic.PetProgression
   alias ThistleTea.Game.Entity.Logic.SpellEffect
   alias ThistleTea.Game.Entity.Logic.SpellFeedback
@@ -517,6 +518,24 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   @impl GenServer
   def handle_call(:threat_table, _from, %Mob{} = state) do
     {:reply, {:ok, %{victim: state.unit.target, entries: Threat.entries(state)}}, state}
+  end
+
+  def handle_call(
+        {:debug_pet, owner_guid, adjustment},
+        _from,
+        %Mob{internal: %Internal{pet: %Pet{kind: :hunter, owner_guid: owner_guid, broken?: false}}} = state
+      ) do
+    state = adjust_debug_pet(state, adjustment)
+    info = state |> PetProgression.snapshot() |> Map.from_struct() |> Map.put(:happiness, state.unit.power5)
+    {:reply, {:ok, info}, state, {:continue, :maybe_broadcast}}
+  rescue
+    error ->
+      Logger.error("debug_pet crashed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:reply, {:error, :invalid_pet}, state}
+  end
+
+  def handle_call({:debug_pet, _owner_guid, _adjustment}, _from, %Mob{} = state) do
+    {:reply, {:error, :not_hunter_pet}, state}
   end
 
   def handle_call(:feed_info, _from, %Mob{internal: %Internal{pet: %Pet{} = pet}} = state) do
@@ -1089,6 +1108,13 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   end
 
   defp release_victim(_state), do: :ok
+
+  defp adjust_debug_pet(state, {:loyalty, amount}) when is_integer(amount) do
+    state |> PetLoyalty.change(amount) |> PetProgression.publish()
+  end
+
+  defp adjust_debug_pet(state, {:happiness, amount}) when is_integer(amount), do: PetHappiness.change(state, amount)
+  defp adjust_debug_pet(state, _adjustment), do: state
 
   defp wake_ai_tick(%Mob{} = state) do
     if Core.dead?(state), do: deactivate_ai(state), else: schedule_ai_tick(state, 0)

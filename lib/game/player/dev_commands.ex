@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Player.DevCommands do
   alias ThistleTea.Game.Entity.Data.Reputation.Definition
   alias ThistleTea.Game.Entity.Data.Reputation.State, as: ReputationState
   alias ThistleTea.Game.Entity.EventSink
+  alias ThistleTea.Game.Entity.Logic.Companion
   alias ThistleTea.Game.Entity.Logic.Condition.InstanceDataSnapshot, as: Snapshot
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Death
@@ -119,6 +120,7 @@ defmodule ThistleTea.Game.Player.DevCommands do
       ".debug reputation war <faction_id> <on|off> - toggle at-war",
       ".debug skills - max out known skills for your level",
       ".debug durability <percent> [carried] - apply durability wear for testing",
+      ".debug pet [loyalty|happiness <delta>] - inspect or adjust your hunter pet",
       ".debug spells - learn class trainer spells up to your level",
       ".debug events - show active events and the next scheduled change",
       ".debug explore - unlock every world-map area",
@@ -296,6 +298,18 @@ defmodule ThistleTea.Game.Player.DevCommands do
     |> handled()
   end
 
+  def run(state, ".debug pet" <> params) do
+    adjustment =
+      case String.split(params) do
+        [] -> :status
+        ["loyalty", delta] -> pet_adjustment(:loyalty, delta)
+        ["happiness", delta] -> pet_adjustment(:happiness, delta)
+        _ -> :invalid
+      end
+
+    state |> debug_pet(adjustment) |> handled()
+  end
+
   def run(state, ".debug durability" <> params) do
     case String.split(params) do
       [percent] -> debug_durability(state, percent, :equipped)
@@ -457,6 +471,28 @@ defmodule ThistleTea.Game.Player.DevCommands do
   def run(_state, _message), do: :unhandled
 
   defp handled(state), do: {:handled, state}
+
+  defp pet_adjustment(kind, delta) do
+    case Integer.parse(delta) do
+      {amount, ""} when amount in -1_050_000..1_050_000 -> {kind, amount}
+      _ -> :invalid
+    end
+  end
+
+  defp debug_pet(state, :invalid), do: system_message(state, "Use: .debug pet [loyalty|happiness <delta>]")
+
+  defp debug_pet(%{character: %Character{} = character} = state, adjustment) do
+    with %{guid: guid} <- Companion.active_ref(character),
+         {:ok, info} <- Entity.call(guid, {:debug_pet, character.object.guid, adjustment}) do
+      system_message(
+        state,
+        "Pet level #{info.level}: loyalty #{info.loyalty}/6, #{info.loyalty_points} loyalty points, " <>
+          "#{info.training_points} training points, #{info.happiness} happiness, #{info.xp} XP."
+      )
+    else
+      _ -> system_message(state, "No active hunter pet.")
+    end
+  end
 
   defp debug_durability(state, percent, scope) do
     case Integer.parse(percent) do
