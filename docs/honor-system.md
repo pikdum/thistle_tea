@@ -1,8 +1,8 @@
 # Honor system implementation
 
 The calculation layer, player and creature kills, Warsong bonuses, honor
-spells, and rank requirements are implemented. Automatic Honorless Target
-application remains to be connected. Player kills, repeat penalties, gray rejection, party and pet
+spells, rank requirements, and travel-arrival Honorless Target are implemented.
+Player kills, repeat penalties, gray rejection, party and pet
 credit, inspection, and reconnect retention have real-client acceptance in
 [honor-playtest.md](honor-playtest.md). Creature kills, honor spells, Warsong
 captures and victories, scoreboard refresh, and exit retention are validated
@@ -12,7 +12,9 @@ resurrection are validated in
 [honor-battleground-playtest.md](honor-battleground-playtest.md). Rank-gated
 purchases, earned equipment eligibility after demotion, Champions' Hall
 entry, and reconnect are validated in
-[honor-rank-playtest.md](honor-rank-playtest.md).
+[honor-rank-playtest.md](honor-rank-playtest.md). Travel protection, expiry,
+hostile casts, Blink, and protected kill accounting are validated in
+[honorless-target-playtest.md](honorless-target-playtest.md).
 
 ## Implemented rules
 
@@ -59,6 +61,14 @@ entry, and reconnect are validated in
 - Condition 51 compares current visible ranks, from zero through fourteen,
   with equality or inclusive bounds. Player, AI, and published condition
   snapshots use the same rank conversion.
+- Acknowledged near and cross-map travel, and taxi landing, apply spell 2479
+  to living players in enforced PvP territory. Its loaded duration is thirty
+  seconds. Repeated arrivals refresh one holder; login and combat leaps do
+  not grant it. Stale travel acknowledgements cannot refresh protection.
+- Hostile spell completion and attacks remove attack-interrupted auras.
+  Incoming damage preserves Honorless Target; lethal damage still kills but
+  awards no honor and consumes no repeat-kill credit. Blink preserves combat
+  and companion state through the movement boundary.
 
 The core modules have no database, process, clock, metadata, or packet-send
 dependencies. `World.System.Honor` owns the realm ledger, retained in an
@@ -83,7 +93,10 @@ yards in the same world who cannot be attacked by the inspecting player.
 References are local VMangos `HonorMgr.cpp`, `Formulas.h`, and the damage and
 honor-reward paths in `Objects/Unit.cpp` and `Objects/Player.cpp`. Item gates
 follow `Player::CanUseItem` and `Player::BuyItemFromVendorSlot` for patch 1.12;
-condition ranks follow `Conditions.cpp`.
+condition ranks follow `Conditions.cpp`. Travel protection follows the
+delayed operations in `Player.cpp`, near/far teleport acknowledgement in
+`Unit.cpp` and `MovementHandler.cpp`, and flight arrival in
+`WaypointMovementGenerator.cpp`. Hostile-cast interruption follows `Spell.cpp`.
 
 For testing, `.debug honor` reports current and highest rank, and
 `.debug honor points <0..65000>` sets rank points through the realm ledger.
@@ -104,11 +117,4 @@ level caps, idempotent weekly settlement, missed weeks, coordinator restart,
 pet ownership, absorption and overkill, one-time death credit, Honorless
 Target, Spirit of Redemption, current player projections, and packet dispatch.
 
-## Remaining integration and acceptance
-
-1. Connect automatic Honorless Target application during world-entry transitions.
-2. Extend client acceptance to automatic Honorless Target protection.
-   Calendar/ranking tests cover settlement without waiting for a real weekly reset.
-
-Honorless Target rejection has automated coverage; its real-client acceptance
-will accompany automatic application during world-entry transitions.
+Calendar/ranking tests cover settlement without waiting for a real weekly reset.
