@@ -97,6 +97,10 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     Map.put(super(state), :restart, :temporary)
   end
 
+  def child_spec(%Mob{internal: %Internal{pet: %Pet{}}} = state) do
+    Map.put(super(state), :restart, :temporary)
+  end
+
   def child_spec(state), do: super(state)
 
   def start_link(%Mob{} = state) do

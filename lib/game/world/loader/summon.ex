@@ -131,7 +131,17 @@ defmodule ThistleTea.Game.World.Loader.Summon do
   defp pet_progress(_owner, _entry, _owner_level, false), do: nil
 
   defp restored_spellbook(_entry, _level, %PetProgress{spells: spells}) when is_list(spells) do
-    SpellLoader.build_spellbook(spells)
+    key = {:restored_pet_spellbook, Enum.sort(spells)}
+
+    case :ets.lookup(__MODULE__, key) do
+      [{^key, spellbook}] ->
+        spellbook
+
+      _ ->
+        spellbook = SpellLoader.build_spellbook(spells)
+        :ets.insert(__MODULE__, {key, spellbook})
+        spellbook
+    end
   end
 
   defp restored_spellbook(entry, level, _progress), do: pet_spellbook(entry, level)

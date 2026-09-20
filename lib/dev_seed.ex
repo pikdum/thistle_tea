@@ -17,6 +17,7 @@ defmodule ThistleTea.DevSeed do
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Mob
+  alias ThistleTea.Game.Entity.Data.PetProgress
   alias ThistleTea.Game.Entity.Logic.Companion
   alias ThistleTea.Game.Entity.Logic.Skills
   alias ThistleTea.Game.Entity.Logic.SpellBook
@@ -27,6 +28,7 @@ defmodule ThistleTea.DevSeed do
   alias ThistleTea.Game.World.Loader.Character, as: CharacterLoader
   alias ThistleTea.Game.World.Loader.ClassSpell
   alias ThistleTea.Game.World.Loader.Mob, as: MobLoader
+  alias ThistleTea.Game.World.Loader.PetLevel, as: PetLevelLoader
   alias ThistleTea.Game.World.Loader.Skill, as: SkillLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Pathfinding
@@ -152,7 +154,14 @@ defmodule ThistleTea.DevSeed do
 
   defp set_debug_ammo(character, _class), do: character
 
-  defp set_debug_pet(%Character{} = character, 3), do: Companion.suspend_as(character, :hunter_pet, 2960, 1515)
+  defp set_debug_pet(%Character{} = character, 3) do
+    level = @level - 1
+    xp = PetLevelLoader.levels()[level].next_level_xp - 500
+
+    character
+    |> Companion.suspend_as(:hunter_pet, 2960, 1515)
+    |> Companion.capture_progress(%PetProgress{level: level, xp: xp})
+  end
 
   defp set_debug_pet(character, _class), do: character
 
