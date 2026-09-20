@@ -6,7 +6,10 @@ application remain to be connected. Player kills, repeat penalties, gray rejecti
 credit, inspection, and reconnect retention have real-client acceptance in
 [honor-playtest.md](honor-playtest.md). Creature kills, honor spells, Warsong
 captures and victories, scoreboard refresh, and exit retention are validated
-in [honor-rewards-playtest.md](honor-rewards-playtest.md).
+in [honor-rewards-playtest.md](honor-rewards-playtest.md). Team kill sharing,
+pet killing blows, dead teammate credit, Spirit of Redemption, and exit
+resurrection are validated in
+[honor-battleground-playtest.md](honor-battleground-playtest.md).
 
 ## Implemented rules
 
