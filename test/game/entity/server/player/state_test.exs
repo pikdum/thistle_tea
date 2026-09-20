@@ -7,9 +7,11 @@ defmodule ThistleTea.Game.Entity.Server.Player.StateTest do
   alias ThistleTea.Game.Entity.Data.Companion.EntityRef
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Data.PetProgress
   alias ThistleTea.Game.Entity.Logic.Companion, as: CompanionLogic
   alias ThistleTea.Game.Entity.Logic.Effects.PetDied
   alias ThistleTea.Game.Entity.Logic.Effects.PetHappinessChanged
+  alias ThistleTea.Game.Entity.Logic.Effects.PetProgressChanged
   alias ThistleTea.Game.Entity.Server.Player
   alias ThistleTea.Game.Entity.Server.Player.CompanionOwner
   alias ThistleTea.Game.Entity.Server.Player.State
@@ -31,7 +33,8 @@ defmodule ThistleTea.Game.Entity.Server.Player.StateTest do
     end
 
     @impl true
-    def handle_call(:suspend_hunter_pet, _from, happiness), do: {:stop, :normal, {:ok, happiness, true}, happiness}
+    def handle_call(:suspend_hunter_pet, _from, happiness),
+      do: {:stop, :normal, {:ok, happiness, true, %PetProgress{level: 49, xp: 1_234}}, happiness}
   end
 
   describe "struct defaults" do
@@ -96,6 +99,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.StateTest do
 
       for event <- [
             %PetHappinessChanged{source_guid: 1, target_guid: 7, happiness: 0},
+            %PetProgressChanged{source_guid: 1, target_guid: 7, progress: %PetProgress{level: 49}},
             %PetDied{source_guid: 1, target_guid: 7}
           ] do
         assert Player.handle_info(event, state) == {:noreply, state}
@@ -114,6 +118,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.StateTest do
 
       state = CompanionOwner.suspend(%State{character: character})
       assert CompanionLogic.relationship(state.character).happiness == 700_000
+      assert CompanionLogic.relationship(state.character).progress == %PetProgress{level: 49, xp: 1_234}
       assert CompanionLogic.relationship(state.character).dead?
       assert CompanionLogic.suspended(state.character) == {:hunter_pet, 2960, 1515}
       assert_receive {:DOWN, ^ref, :process, ^pid, :normal}

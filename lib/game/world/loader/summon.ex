@@ -16,13 +16,16 @@ defmodule ThistleTea.Game.World.Loader.Summon do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.CreatureSpell
   alias ThistleTea.Game.Entity.Data.Mob
+  alias ThistleTea.Game.Entity.Data.PetProgress
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
   alias ThistleTea.Game.Entity.Logic.Companion
+  alias ThistleTea.Game.Entity.Logic.PetProgression
   alias ThistleTea.Game.Entity.Logic.Stats
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Spell, as: SpellData
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.Loader.Mob, as: MobLoader
+  alias ThistleTea.Game.World.Loader.PetLevel, as: PetLevelLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.WorldRef
 
@@ -66,19 +69,20 @@ defmodule ThistleTea.Game.World.Loader.Summon do
       )
       when is_integer(entry) and is_integer(owner_guid) do
     with %Mob{} = mob <- build(entry, world, position),
-         level when is_integer(level) <- owner_unit.level do
+         owner_level when is_integer(owner_level) <- owner_unit.level do
+      hunter_pet? = hunter_pet?(mob.internal.creature)
+      progress = pet_progress(owner, entry, owner_level, hunter_pet?)
+      level = if progress, do: progress.level, else: owner_level
       guid = Guid.from_low_guid(:pet, entry, next_low_guid())
-      spellbook = pet_spellbook(entry, level)
+      spellbook = restored_spellbook(entry, level, progress)
       creature = %{mob.internal.creature | spells: pet_action_spells(spellbook)}
-      hunter_pet? = hunter_pet?(creature)
       creature = normalize_pet_damage_multiplier(creature, hunter_pet?)
-      stats = pet_stats(if(hunter_pet?, do: 1, else: entry), level)
+      stats = if !hunter_pet?, do: pet_stats(entry, level)
 
       unit =
         mob.unit
         |> apply_pet_stats(stats, level)
         |> apply_pet_resources(hunter_pet?)
-        |> apply_hunter_pet_damage(hunter_pet?)
         |> then(fn unit ->
           %{
             unit
@@ -108,6 +112,7 @@ defmodule ThistleTea.Game.World.Loader.Summon do
       }
 
       %{mob | object: %{mob.object | guid: guid}, unit: unit, internal: internal}
+      |> PetProgression.initialize(progress, PetLevelLoader.levels())
       |> restore_happiness(owner, entry)
       |> attach_owner(owner_guid)
       |> apply_pet_passive_auras(entry, level)
@@ -117,6 +122,19 @@ defmodule ThistleTea.Game.World.Loader.Summon do
   end
 
   def build_pet(_entry, _owner), do: nil
+
+  defp pet_progress(owner, entry, owner_level, true) do
+    progress = if Companion.entry(owner) == entry, do: Companion.relationship(owner).progress
+    progress || %PetProgress{level: owner_level}
+  end
+
+  defp pet_progress(_owner, _entry, _owner_level, false), do: nil
+
+  defp restored_spellbook(_entry, _level, %PetProgress{spells: spells}) when is_list(spells) do
+    SpellLoader.build_spellbook(spells)
+  end
+
+  defp restored_spellbook(entry, level, _progress), do: pet_spellbook(entry, level)
 
   def with_health_percent(%Mob{unit: %Unit{} = unit} = pet, percent) when is_number(percent) do
     health = unit.max_health |> Kernel.*(percent / 100) |> trunc() |> max(1) |> min(unit.max_health)
@@ -448,21 +466,4 @@ defmodule ThistleTea.Game.World.Loader.Summon do
   end
 
   defp apply_pet_resources(unit, false), do: unit
-
-  defp apply_hunter_pet_damage(unit, true) do
-    attack_speed = (unit.base_attack_time || 2_000) / 2_000
-    min_damage = unit.level * 1.15 * 1.05 * attack_speed
-    max_damage = unit.level * 1.45 * 1.05 * attack_speed
-    attack_power_damage = (unit.attack_power || 0) / 14 * attack_speed * 2
-
-    %{
-      unit
-      | min_damage: min_damage,
-        max_damage: max_damage,
-        base_min_damage: min_damage - attack_power_damage,
-        base_max_damage: max_damage - attack_power_damage
-    }
-  end
-
-  defp apply_hunter_pet_damage(unit, false), do: unit
 end

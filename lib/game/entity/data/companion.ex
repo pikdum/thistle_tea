@@ -20,17 +20,19 @@ defmodule ThistleTea.Game.Entity.Data.Companion do
   """
 
   alias ThistleTea.Game.Entity.Data.Companion.EntityRef
+  alias ThistleTea.Game.Entity.Data.PetProgress
 
   @type kind :: :hunter_pet | :guardian | :enslaved | :charm | :possession
   @type status :: :none | {:active, EntityRef.t()} | {:suspended, non_neg_integer(), non_neg_integer()}
 
   @enforce_keys [:kind, :status]
-  defstruct [:kind, :status, :happiness, dead?: false, autocast: MapSet.new()]
+  defstruct [:kind, :status, :happiness, :progress, dead?: false, autocast: MapSet.new()]
 
   @type t :: %__MODULE__{
           kind: kind() | nil,
           status: status(),
           happiness: non_neg_integer() | nil,
+          progress: PetProgress.t() | nil,
           dead?: boolean(),
           autocast: MapSet.t(non_neg_integer())
         }

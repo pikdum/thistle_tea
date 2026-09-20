@@ -312,7 +312,7 @@ defmodule ThistleTea.Game.Entity.EventSink.Summons do
 
   def emit(%Mob{object: %{guid: guid}} = entity, %Effects.TameCreature{source_guid: owner_guid, entry: entry}, _context) do
     case Entity.pid(owner_guid) do
-      pid when is_pid(pid) -> send(pid, {:tame_pet, entry})
+      pid when is_pid(pid) -> send(pid, {:tame_pet, entry, entity.unit.level})
       _ -> nil
     end
 
@@ -329,7 +329,7 @@ defmodule ThistleTea.Game.Entity.EventSink.Summons do
   end
 
   def emit(entity, %type{target_guid: guid} = effect, _context)
-      when type in [Effects.PetHappinessChanged, Effects.PetDied] do
+      when type in [Effects.PetHappinessChanged, Effects.PetProgressChanged, Effects.PetDied] do
     case Entity.pid(guid) do
       pid when is_pid(pid) -> send(pid, effect)
       _ -> :ok

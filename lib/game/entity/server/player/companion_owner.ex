@@ -4,7 +4,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.CompanionOwner.Attachment do
   alias ThistleTea.Game.Entity.Data.Companion
 
   @enforce_keys [:kind, :entity_ref, :pid, :spells]
-  defstruct [:kind, :entity_ref, :pid, :spells, :create]
+  defstruct [:kind, :entity_ref, :pid, :spells, :create, :progress]
 
   @type t :: %__MODULE__{
           kind: Companion.kind(),
@@ -52,7 +52,12 @@ defmodule ThistleTea.Game.Entity.Server.Player.CompanionOwner do
   def attach(%State{} = state, %Attachment{pid: pid, entity_ref: %EntityRef{} = entity_ref} = attachment) do
     state = replace_previous(state, entity_ref.guid)
     monitor = monitor(state.companion_monitor, pid, entity_ref)
-    character = CompanionLogic.activate(state.character, attachment.kind, entity_ref)
+
+    character =
+      state.character
+      |> CompanionLogic.activate(attachment.kind, entity_ref)
+      |> CompanionLogic.capture_progress(attachment.progress)
+
     %{state | character: character, companion_monitor: monitor}
   end
 
@@ -99,8 +104,11 @@ defmodule ThistleTea.Game.Entity.Server.Player.CompanionOwner do
   def suspend_hunter_pet(%Character{} = character, guid) do
     if CompanionLogic.entry(character) == Guid.entry(guid) do
       case Entity.call(guid, :suspend_hunter_pet) do
-        {:ok, happiness, dead?} when is_integer(happiness) ->
-          character |> CompanionLogic.capture_happiness(happiness) |> CompanionLogic.capture_death(dead?)
+        {:ok, happiness, dead?, progress} when is_integer(happiness) ->
+          character
+          |> CompanionLogic.capture_happiness(happiness)
+          |> CompanionLogic.capture_death(dead?)
+          |> CompanionLogic.capture_progress(progress)
 
         _ ->
           character

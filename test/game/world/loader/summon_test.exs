@@ -8,12 +8,36 @@ defmodule ThistleTea.Game.World.Loader.SummonTest do
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Object
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Data.PetLevel
+  alias ThistleTea.Game.Entity.Data.PetProgress
   alias ThistleTea.Game.Entity.Logic.Combat
+  alias ThistleTea.Game.Entity.Logic.Companion
   alias ThistleTea.Game.Guid
+  alias ThistleTea.Game.World.Loader.PetLevel, as: PetLevelLoader
   alias ThistleTea.Game.World.Loader.Summon
   alias ThistleTea.Game.WorldRef
 
   @moduletag :dbc_db
+
+  setup do
+    previous = PetLevelLoader.levels()
+
+    stats = %PetLevel{
+      level: 50,
+      health: 2_215,
+      armor: 3_018,
+      strength: 113,
+      agility: 82,
+      stamina: 207,
+      intellect: 43,
+      spirit: 67,
+      next_level_xp: 36_875
+    }
+
+    :ets.insert(PetLevelLoader, {:levels, %{50 => stats}})
+    on_exit(fn -> :ets.insert(PetLevelLoader, {:levels, previous}) end)
+    :ok
+  end
 
   describe "build_pet/2" do
     test "builds an owner-scaled demon from VMangos pet data" do
@@ -89,6 +113,26 @@ defmodule ThistleTea.Game.World.Loader.SummonTest do
       assert_in_delta min_damage, 42.2625 * 0.75, 0.0001
       assert_in_delta max_damage, 53.2875 * 0.75, 0.0001
       assert Map.keys(pet.internal.spellbook) |> Enum.sort() == [14_920, 17_260, 24_603]
+    end
+
+    test "restores pet level XP and learned spells instead of scaling to the owner" do
+      owner = %Character{
+        object: %Object{guid: Guid.from_low_guid(:player, 1)},
+        unit: %Unit{level: 60, faction_template: 1},
+        internal: %Internal{world: WorldRef.open(0)},
+        movement_block: %MovementBlock{position: {1.0, 2.0, 3.0, 0.0}}
+      }
+
+      owner =
+        owner
+        |> Companion.suspend_as(:hunter_pet, 2960, 1515)
+        |> Companion.capture_progress(%PetProgress{level: 50, xp: 123, spells: [2649]})
+
+      pet = Summon.build_pet(2960, owner)
+      assert pet.unit.level == 50
+      assert pet.unit.pet_experience == 123
+      assert pet.unit.pet_next_level_exp == 36_875
+      assert Map.keys(pet.internal.spellbook) == [2649]
     end
   end
 end

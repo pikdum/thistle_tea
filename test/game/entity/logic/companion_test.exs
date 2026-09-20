@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.Entity.Logic.CompanionTest do
   alias ThistleTea.Game.Entity.Data.Companion.EntityRef
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Data.PetProgress
   alias ThistleTea.Game.Entity.Logic.Companion
   alias ThistleTea.Game.Entity.Logic.Effects
 
@@ -91,6 +92,21 @@ defmodule ThistleTea.Game.Entity.Logic.CompanionTest do
       assert Companion.relationship(Companion.clear(character)).happiness == nil
       replaced = Companion.activate(character, :hunter_pet, %EntityRef{guid: 55, entry: 417, spell_id: 688})
       assert Companion.relationship(replaced).happiness == nil
+    end
+  end
+
+  describe "remember_progress/3" do
+    test "retains progress through suspension and rejects departed pet updates" do
+      progress = %PetProgress{level: 49, xp: 123, spells: [2649]}
+      character = Companion.remember_progress(character_with_pet(), 44, progress)
+      suspended = Companion.suspend(character)
+      restored = Companion.activate(suspended, :hunter_pet, %EntityRef{guid: 55, entry: 416, spell_id: 688})
+      assert Companion.relationship(restored).progress == progress
+      assert Companion.remember_progress(restored, 44, %PetProgress{level: 1}) == restored
+      assert Companion.remember_progress(suspended, 44, %PetProgress{level: 1}) == suspended
+      replaced = Companion.activate(restored, :hunter_pet, %EntityRef{guid: 66, entry: 417, spell_id: 688})
+      assert Companion.relationship(replaced).progress == nil
+      assert Companion.relationship(Companion.clear(restored)).progress == nil
     end
   end
 

@@ -52,6 +52,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Entity.Logic.LootSession
   alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.Entity.Logic.PetHappiness
+  alias ThistleTea.Game.Entity.Logic.PetProgression
   alias ThistleTea.Game.Entity.Logic.SpellEffect
   alias ThistleTea.Game.Entity.Logic.SpellFeedback
   alias ThistleTea.Game.Entity.Logic.StealthDetection
@@ -78,6 +79,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.World.ChaseWatch
   alias ThistleTea.Game.World.Loader.Faction, as: FactionLoader
   alias ThistleTea.Game.World.Loader.MapTemplate
+  alias ThistleTea.Game.World.Loader.PetLevel, as: PetLevelLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.SpawnPool
@@ -527,7 +529,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   def handle_call(:feed_info, _from, %Mob{} = state), do: {:reply, {:error, :not_pet}, state}
 
   def handle_call(:suspend_hunter_pet, _from, %Mob{internal: %Internal{pet: %Pet{kind: :hunter}}} = state) do
-    {:stop, :normal, {:ok, state.unit.power5, Core.dead?(state)}, state}
+    {:stop, :normal, {:ok, state.unit.power5, Core.dead?(state), PetProgression.snapshot(state)}, state}
   end
 
   def handle_call(:suspend_hunter_pet, _from, %Mob{} = state), do: {:reply, {:error, :not_hunter_pet}, state}
@@ -826,12 +828,28 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
       entity_ref: %EntityRef{guid: state.object.guid, entry: Guid.entry(state.object.guid), spell_id: spell_id},
       pid: self(),
       spells: pet_spells,
-      create: Core.update_object(state)
+      create: Core.update_object(state),
+      progress: PetProgression.snapshot(state)
     }
 
     send(owner_pid, attachment)
     {:noreply, state}
   end
+
+  def handle_info(
+        {:reward_pet_kill, owner_guid, owner_level, reward},
+        %Mob{internal: %Internal{pet: %Pet{kind: :hunter, owner_guid: owner_guid}}} = state
+      ) do
+    amount = PetProgression.reward(state, reward)
+    state = PetProgression.gain(state, amount, owner_level, PetLevelLoader.levels())
+    {:noreply, state, {:continue, :maybe_broadcast}}
+  rescue
+    error ->
+      Logger.error("Pet experience failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
+  def handle_info({:reward_pet_kill, _owner_guid, _owner_level, _reward}, %Mob{} = state), do: {:noreply, state}
 
   def handle_info({:owner_attacked, attacker_guid}, %Mob{internal: %Internal{pet: %Pet{}}} = state)
       when is_integer(attacker_guid) do
@@ -945,6 +963,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
       metadata =
         %{
           alive?: not Core.dead?(state),
+          level: state.unit.level,
           in_combat: state.internal.in_combat == true,
           rooted?: state.internal.rooted? == true,
           health_pct: Core.health_pct(state),

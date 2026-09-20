@@ -205,6 +205,10 @@ defmodule ThistleTea.Game.Entity.Logic.Stats do
 
   defp derive_attack_power(%Unit{} = unit), do: unit
 
+  defp unit_attack_power(%Unit{max_power5: capacity, strength: strength}) when is_integer(capacity) and capacity > 0 do
+    max(strength * 2 - 20, 0)
+  end
+
   defp unit_attack_power(%Unit{class: @druid, shapeshift_form: 1} = unit) do
     max((unit.strength || 0) * 2 + (unit.agility || 0) - 20, 0) + predatory_strikes_bonus(unit)
   end

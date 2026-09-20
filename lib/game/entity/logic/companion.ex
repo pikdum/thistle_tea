@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Entity.Logic.Companion do
   alias ThistleTea.Game.Entity.Data.Companion.EntityRef
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Data.PetProgress
   alias ThistleTea.Game.Entity.Logic.Effects
 
   @summon_kinds [:hunter_pet, :guardian]
@@ -21,14 +22,29 @@ defmodule ThistleTea.Game.Entity.Logic.Companion do
       when kind in @summon_kinds or kind in @control_kinds do
     autocast = activation_autocast(relationship(character), kind, entity_ref.entry)
     happiness = if kind == :hunter_pet and entry(character) == entity_ref.entry, do: relationship(character).happiness
+    progress = if kind == :hunter_pet and entry(character) == entity_ref.entry, do: relationship(character).progress
 
     put_relationship(character, %Companion{
       kind: kind,
       status: {:active, entity_ref},
       autocast: autocast,
-      happiness: happiness
+      happiness: happiness,
+      progress: progress
     })
   end
+
+  def remember_progress(%Character{} = character, guid, %PetProgress{} = progress) do
+    if controls?(character, guid), do: capture_progress(character, progress), else: character
+  end
+
+  def capture_progress(%Character{} = character, %PetProgress{} = progress) do
+    case relationship(character) do
+      %Companion{kind: :hunter_pet} = companion -> put_relationship(character, %{companion | progress: progress})
+      _ -> character
+    end
+  end
+
+  def capture_progress(%Character{} = character, _progress), do: character
 
   def remember_happiness(%Character{} = character, guid, happiness) when is_integer(happiness) and happiness >= 0 do
     if controls?(character, guid), do: capture_happiness(character, happiness), else: character

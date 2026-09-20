@@ -20,6 +20,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Corpse
   alias ThistleTea.Game.Entity.Data.Item, as: DataItem
+  alias ThistleTea.Game.Entity.Data.PetProgress
   alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.Logic.AI.BehaviorRunner
   alias ThistleTea.Game.Entity.Logic.AI.BT.Blackboard
@@ -84,6 +85,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.Player.Login
   alias ThistleTea.Game.Player.Looting
   alias ThistleTea.Game.Player.Mail
+  alias ThistleTea.Game.Player.PetExperience
   alias ThistleTea.Game.Player.Quests
   alias ThistleTea.Game.Player.Reputation, as: PlayerReputation
   alias ThistleTea.Game.Player.Rest, as: PlayerRest
@@ -426,12 +428,14 @@ defmodule ThistleTea.Game.Entity.Server.Player do
     xp = kill_xp(character, victim)
     state = if xp > 0, do: trigger_kill_procs(state, victim), else: state
     state = apply_kill_reward(state, victim, xp)
+    PetExperience.reward_kill(state.character, victim, xp, :solo)
     {:noreply, state}
   end
 
   @impl GenServer
   def handle_cast({:reward_kill_share, victim, xp}, %{character: %Character{}} = state) do
     state = apply_kill_reward(state, victim, xp)
+    PetExperience.reward_kill(state.character, victim, xp, :group)
     {:noreply, state}
   end
 
@@ -966,8 +970,13 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   end
 
   @impl GenServer
-  def handle_info({:tame_pet, entry}, %{character: %Character{} = character} = state)
-      when is_integer(entry) and entry > 0 do
+  def handle_info({:tame_pet, entry, level}, %{character: %Character{} = character} = state)
+      when is_integer(entry) and entry > 0 and is_integer(level) and level > 0 do
+    character =
+      character
+      |> Companion.suspend_as(:hunter_pet, entry, 1515)
+      |> Companion.capture_progress(%PetProgress{level: level})
+
     character = EventSink.emit(character, Effects.summon_pet(character.object.guid, entry, 1515))
     {:noreply, %{state | character: character}}
   rescue
@@ -1009,7 +1018,16 @@ defmodule ThistleTea.Game.Entity.Server.Player do
     {:noreply, %{state | character: character}}
   end
 
-  def handle_info(%type{}, %State{} = state) when type in [Effects.PetHappinessChanged, Effects.PetDied] do
+  def handle_info(
+        %Effects.PetProgressChanged{source_guid: guid, progress: progress},
+        %State{character: %Character{}} = state
+      ) do
+    character = Companion.remember_progress(state.character, guid, progress)
+    {:noreply, %{state | character: character}}
+  end
+
+  def handle_info(%type{}, %State{} = state)
+      when type in [Effects.PetHappinessChanged, Effects.PetProgressChanged, Effects.PetDied] do
     {:noreply, state}
   end
 

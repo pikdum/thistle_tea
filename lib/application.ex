@@ -41,6 +41,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.World.Loader.ModelGeometry, as: ModelGeometryLoader
   alias ThistleTea.Game.World.Loader.NpcText, as: NpcTextLoader
   alias ThistleTea.Game.World.Loader.PageText, as: PageTextLoader
+  alias ThistleTea.Game.World.Loader.PetLevel, as: PetLevelLoader
   alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader
   alias ThistleTea.Game.World.Loader.Reputation, as: ReputationLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
@@ -185,6 +186,7 @@ defmodule ThistleTea.Application do
     BattlegroundLoader.init()
     BroadcastTextLoader.init()
     SummonLoader.init()
+    PetLevelLoader.init()
     TaxiLoader.init()
     TransportLoader.init()
     WaypointLoader.init()
@@ -249,6 +251,7 @@ defmodule ThistleTea.Application do
         AreaTriggerLoader.load_all()
         BankBagSlotPriceLoader.load_all()
         DurabilityLoader.load_all()
+        PetLevelLoader.load_all()
         BattlegroundLoader.load_all()
 
         BroadcastTextLoader.load_all(InstanceScript.broadcast_text_ids() ++ BattlegroundLoader.broadcast_text_ids())
