@@ -30,6 +30,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
   alias ThistleTea.Game.Player.Looting
   alias ThistleTea.Game.Player.PetTraining
   alias ThistleTea.Game.Player.Projectile
+  alias ThistleTea.Game.Player.Trade
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Cast
   alias ThistleTea.Game.Spell.CastValidation
@@ -82,6 +83,14 @@ defmodule ThistleTea.Game.Player.Spellcasting do
       target_name: Target.unit_guid(targets)
     )
 
+    cast_target(state, spell, targets, cast_item_guid)
+  end
+
+  defp cast_target(state, spell, %Target{selection: {:trade_item, slot}}, cast_item_guid) do
+    Trade.enchant(state, spell, slot, cast_item_guid)
+  end
+
+  defp cast_target(state, spell, targets, cast_item_guid) do
     with :ok <- Deadmines.validate_cast(state, spell, targets, cast_item_guid),
          :ok <- validate_cast(state, spell, targets),
          :ok <- PetTraining.validate(state.character, spell),

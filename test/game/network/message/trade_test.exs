@@ -6,8 +6,17 @@ defmodule ThistleTea.Game.Network.Message.TradeTest do
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.Message.Dispatch
   alias ThistleTea.Game.Network.Packet
+  alias ThistleTea.Game.Spell.Target
+  alias ThistleTea.Game.Spell.TargetCodec
 
   describe "trade packets" do
+    test "parses the seventh trade slot as a slot rather than an item GUID" do
+      target = %Target{selection: {:trade_item, 6}}
+      assert TargetCodec.encode(target) == <<0x1000::little-16, 1, 6>>
+      assert TargetCodec.parse(<<0x1000::little-16, 1, 6>>, 123) == target
+      assert Target.item_guid(target) == nil
+    end
+
     test "dispatches every vanilla client trade opcode" do
       packets = [
         {0x116, <<123::little-64>>, %Message.CmsgInitiateTrade{player_guid: 123}},

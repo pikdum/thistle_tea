@@ -842,6 +842,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
     |> add_if(attrs_ex1, @finishing_move_damage_ex_1, :finishing_move)
     |> add_if(attrs_ex1, @finishing_move_duration_ex_1, :finishing_move)
     |> add_if(attrs_ex2, @ignore_line_of_sight_ex2, :ignore_line_of_sight)
+    |> add_if(attrs_ex2, 0x00002000, :enchant_own_item_only)
     |> add_if(attrs_ex2, 0x04000000, :no_school_immunities)
     |> add_if(attrs_ex2, @cant_crit_ex2, :cant_crit)
     |> add_if(attrs_ex2, @allow_while_not_shapeshifted_ex2, :allow_while_not_shapeshifted)

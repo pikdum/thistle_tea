@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.World.System.Trade do
   alias ThistleTea.Game.Entity.Logic.Trade, as: TradeLogic
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message.SmsgAreaTriggerMessage
+  alias ThistleTea.Game.Network.Message.SmsgCastResult
   alias ThistleTea.Game.Network.Message.SmsgTradeStatus
   alias ThistleTea.Game.Network.Message.SmsgTradeStatusExtended
   alias ThistleTea.Game.Party
@@ -169,6 +170,12 @@ defmodule ThistleTea.Game.World.System.Trade do
     {:ok, cancel_session(state, session.trade.id, reason)}
   end
 
+  defp update(state, %{trade: %Trade{phase: :open} = trade}, guid, :enchant_target) do
+    {{:ok, trade.id, TradeLogic.target_item(trade, guid), Map.fetch!(trade.offers, guid)}, state}
+  end
+
+  defp update(state, _session, _guid, :enchant_target), do: {{:error, :not_trading}, state}
+
   defp update(state, session, guid, :accept) do
     case TradeLogic.accept(session.trade, guid, state.now.()) do
       {:ok, trade} ->
@@ -211,6 +218,8 @@ defmodule ThistleTea.Game.World.System.Trade do
   defp edit(trade, guid, {:item, slot, item}, now), do: TradeLogic.put_item(trade, guid, slot, item, now)
   defp edit(trade, guid, {:clear, slot}, now), do: TradeLogic.clear_item(trade, guid, slot, now)
   defp edit(trade, guid, :unaccept, _now), do: TradeLogic.unaccept(trade, guid)
+  defp edit(%Trade{id: id} = trade, guid, {:enchant, id, cast}, now), do: TradeLogic.enchant(trade, guid, cast, now)
+  defp edit(_trade, _guid, _action, _now), do: {:error, :trade_canceled}
 
   defp complete(state, session) do
     characters = Map.new(session.prepared, fn {guid, {character, _counts}} -> {guid, character} end)
@@ -229,6 +238,10 @@ defmodule ThistleTea.Game.World.System.Trade do
 
       {:error, guid, :too_much_gold} ->
         state.packet.(%SmsgAreaTriggerMessage{message: "You cannot carry any more gold."}, guid)
+        cancel_session(state, session.trade.id)
+
+      {:error, guid, {:cast, spell_id, reason}} ->
+        state.packet.(SmsgCastResult.failure(spell_id, reason), guid)
         cancel_session(state, session.trade.id)
 
       {:error, guid, reason} ->
@@ -290,12 +303,20 @@ defmodule ThistleTea.Game.World.System.Trade do
     Enum.each(trade.offers, fn {guid, offer} ->
       Enum.each(TradeLogic.participants(trade), fn receiver ->
         state.packet.(
-          %SmsgTradeStatusExtended{other?: receiver != guid, money: offer.money, items: offer.items},
+          %SmsgTradeStatusExtended{
+            other?: receiver != guid,
+            money: offer.money,
+            items: offer.items,
+            spell_id: enchant_spell_id(offer)
+          },
           receiver
         )
       end)
     end)
   end
+
+  defp enchant_spell_id(%{spell: nil}), do: 0
+  defp enchant_spell_id(%{spell: %{spell: spell}}), do: spell.id
 
   defp status_both(state, trade, status) do
     Enum.each(TradeLogic.participants(trade), &state.packet.(%SmsgTradeStatus{status: status}, &1))

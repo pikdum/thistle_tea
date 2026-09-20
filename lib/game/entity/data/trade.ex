@@ -15,7 +15,7 @@ end
 defmodule ThistleTea.Game.Entity.Data.Trade.Exchange do
   @moduledoc false
   @enforce_keys [:id, :changes, :outgoing]
-  defstruct @enforce_keys
+  defstruct @enforce_keys ++ [casts: %{}, committed_at: nil]
 end
 
 defmodule ThistleTea.Game.Entity.Data.Trade.Prepare do
@@ -33,5 +33,11 @@ end
 defmodule ThistleTea.Game.Entity.Data.Trade.Receipt do
   @moduledoc false
   @enforce_keys [:id, :guid, :changes, :outgoing, :old_counts]
-  defstruct @enforce_keys
+  defstruct @enforce_keys ++ [cast: nil, committed_at: nil]
+end
+
+defmodule ThistleTea.Game.Entity.Data.Trade.Enchantment do
+  @moduledoc false
+  @enforce_keys [:spell, :target_guid, :effects]
+  defstruct @enforce_keys ++ [cast_item_guid: nil, recipe: nil, skill_roll: 99]
 end

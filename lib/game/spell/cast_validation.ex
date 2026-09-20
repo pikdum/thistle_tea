@@ -47,7 +47,13 @@ defmodule ThistleTea.Game.Spell.CastValidation do
          :ok <- Pickpocket.validate(caster, spell, target_info),
          :ok <- Skinning.validate(caster, spell, target_info, opts),
          :ok <- Disenchant.validate(caster, spell, Keyword.get(opts, :disenchant_item)),
-         :ok <- Enchantments.validate(caster, spell, Keyword.get(opts, :enchant_item)),
+         :ok <-
+           Enchantments.validate(
+             caster,
+             spell,
+             Keyword.get(opts, :enchant_item),
+             Keyword.get(opts, :enchant_ownership, :owned)
+           ),
          :ok <- check_tools(spell, Keyword.get(opts, :count_item)),
          :ok <- Mount.validate(caster, spell, opts),
          :ok <- check_stance(caster, spell),

@@ -30,16 +30,20 @@ defmodule ThistleTea.Game.Entity.Logic.Enchantments do
       end)
   end
 
-  def validate(character, %Spell{} = spell, item) do
-    if item_enchant?(spell), do: validate_item(character, spell, item), else: :ok
+  def validate(character, spell, item, ownership \\ :owned)
+
+  def validate(character, %Spell{} = spell, item, ownership) do
+    if item_enchant?(spell), do: validate_item(character, spell, item, ownership), else: :ok
   end
 
-  def validate_item(%Character{} = character, %Spell{} = spell, %Item{} = item) do
+  def validate_item(character, spell, item, ownership \\ :owned)
+
+  def validate_item(%Character{} = character, %Spell{} = spell, %Item{} = item, ownership) do
     template = Item.template(item)
 
     cond do
       Core.dead?(character) -> {:error, :caster_dead}
-      item.item.owner != character.object.guid -> {:error, :bad_targets}
+      ownership == :owned and item.item.owner != character.object.guid -> {:error, :bad_targets}
       item.item.stack_count != 1 -> {:error, :bad_targets}
       not matches?(template, spell) -> {:error, :bad_targets}
       permanent?(spell) and template.item_level < spell.base_level -> {:error, :lowlevel}
@@ -47,7 +51,7 @@ defmodule ThistleTea.Game.Entity.Logic.Enchantments do
     end
   end
 
-  def validate_item(_character, _spell, _item), do: {:error, :item_gone}
+  def validate_item(_character, _spell, _item, _ownership), do: {:error, :item_gone}
 
   defp matches?(template, spell) do
     (spell.equipped_item_class < 0 or template.class == spell.equipped_item_class) and

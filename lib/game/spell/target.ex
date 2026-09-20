@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Spell.Target do
           | {:self, guid()}
           | {:unit, guid()}
           | {:item, guid()}
+          | {:trade_item, non_neg_integer()}
           | {:object, guid(), :open | :locked}
           | {:corpse, guid(), guid()}
 

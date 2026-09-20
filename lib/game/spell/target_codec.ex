@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.Spell.TargetCodec do
   @source_location 0x00000020
   @destination_location 0x00000040
   @object 0x00000800
+  @trade_item 0x00001000
   @object_locked 0x00004000
   @corpse 0x00008000
 
@@ -29,6 +30,7 @@ defmodule ThistleTea.Game.Spell.TargetCodec do
       [
         {@unit, &parse_unit/2},
         {@item, &parse_item/2},
+        {@trade_item, &parse_trade_item/2},
         {@object, &parse_object/2},
         {@object_locked, &parse_locked_object/2},
         {@source_location, &parse_source_location/2},
@@ -60,6 +62,7 @@ defmodule ThistleTea.Game.Spell.TargetCodec do
 
   defp parse_unit(rest, target), do: parse_guid(rest, target, &%{&1 | selection: {:unit, &2}})
   defp parse_item(rest, target), do: parse_guid(rest, target, &%{&1 | selection: {:item, &2}})
+  defp parse_trade_item(rest, target), do: parse_guid(rest, target, &%{&1 | selection: {:trade_item, &2}})
   defp parse_object(rest, target), do: parse_guid(rest, target, &%{&1 | selection: {:object, &2, :open}})
   defp parse_locked_object(rest, target), do: parse_guid(rest, target, &%{&1 | selection: {:object, &2, :locked}})
 
@@ -105,6 +108,7 @@ defmodule ThistleTea.Game.Spell.TargetCodec do
   defp encode_selection({:self, _guid}), do: {@self, <<>>, <<>>}
   defp encode_selection({:unit, guid}), do: {@unit, BinaryUtils.pack_guid(guid), <<>>}
   defp encode_selection({:item, guid}), do: {@item, BinaryUtils.pack_guid(guid), <<>>}
+  defp encode_selection({:trade_item, slot}), do: {@trade_item, BinaryUtils.pack_guid(slot), <<>>}
   defp encode_selection({:object, guid, :open}), do: {@object, BinaryUtils.pack_guid(guid), <<>>}
   defp encode_selection({:object, guid, :locked}), do: {@object_locked, BinaryUtils.pack_guid(guid), <<>>}
   defp encode_selection({:corpse, guid, _player_guid}), do: {@corpse, <<>>, BinaryUtils.pack_guid(guid)}

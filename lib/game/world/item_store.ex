@@ -84,7 +84,9 @@ defmodule ThistleTea.Game.World.ItemStore do
           guid: guid,
           changes: changes,
           outgoing: Map.fetch!(exchange.outgoing, guid),
-          old_counts: Map.fetch!(old_counts, guid)
+          old_counts: Map.fetch!(old_counts, guid),
+          cast: Map.get(exchange.casts, guid),
+          committed_at: exchange.committed_at
         }
 
         {{:trade_pending, guid}, receipt}
