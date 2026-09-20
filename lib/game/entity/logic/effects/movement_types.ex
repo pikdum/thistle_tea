@@ -14,7 +14,7 @@ defmodule ThistleTea.Game.Entity.Logic.Effects.MovementTypes do
     {:CreatureTeleported, [:world, :from_position, :position, :movement_block, :script_id, :declared_map_id, :options],
      []},
     {:Teleport, [:position], []},
-    {:TeleportToWorld, [:world, :position], []},
+    {:TeleportToWorld, [:world, :position], [preserve_combat?: false]},
     {:TeleportHome, [], []},
     {:Leap, [:position], []},
     {:TeleportToSpellTarget, [:spell_id], []},

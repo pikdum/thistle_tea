@@ -2,28 +2,13 @@ defmodule ThistleTea.Game.Network.Message.CmsgMoveTeleportAck do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :MSG_MOVE_TELEPORT_ACK
 
-  alias ThistleTea.Game.Network.MovementControl
-  alias ThistleTea.Game.Player.CompanionVisibility
-  alias ThistleTea.Game.Player.Exploration, as: PlayerExploration
-  alias ThistleTea.Game.World.Visibility
+  alias ThistleTea.Game.Player.Travel
 
   defstruct [:guid, :counter, :time]
 
   @impl ClientMessage
   def handle(%__MODULE__{guid: guid, counter: counter}, %{guid: guid} = state) do
-    case MovementControl.acknowledge(state, guid, counter, :teleport) do
-      {:ok, state} ->
-        state = Visibility.refresh_player(state)
-
-        state = CompanionVisibility.defer_restoration(state)
-
-        state
-        |> MovementControl.maybe_finish_repop()
-        |> PlayerExploration.check_current()
-
-      {:error, state} ->
-        state
-    end
+    Travel.teleport_ack(state, guid, counter)
   end
 
   def handle(_message, state), do: state

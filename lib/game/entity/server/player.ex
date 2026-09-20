@@ -572,41 +572,26 @@ defmodule ThistleTea.Game.Entity.Server.Player do
         {:start_teleport, x, y, z, orientation, world},
         %{character: %Character{internal: %Internal{world: world}}} = state
       ) do
-    state = state |> cancel_authoritative_movement() |> detach_transport()
-    state = state |> disengage_for_world_transition() |> suspend_companion_for_teleport()
-    character = state.character
-
-    {zone, area} = destination_zone_and_area(character, world.map_id, {x, y, z})
-
-    character =
-      character
-      |> PlayerRest.evaluate_zone(zone)
-      |> mark_rest_transition(character)
-      |> then(fn character ->
-        %{
-          character
-          | internal: %{character.internal | area: area, fall: nil},
-            movement_block: %{character.movement_block | position: {x, y, z, orientation}, movement_flags: 0}
-        }
-      end)
-
-    Presence.relocate(character)
-
-    Network.send_packet(%Message.MsgMoveTeleportAck{
-      guid: state.guid,
-      position: {x, y, z, orientation},
-      timestamp: character.movement_block.timestamp || 0,
-      fall_time: character.movement_block.fall_time || 0
-    })
-
-    state =
-      %{state | character: character}
-      |> Visibility.refresh_player()
-      |> Visibility.resync_player()
-      |> maybe_broadcast_update()
-
-    {:noreply, state}
+    {:noreply, teleport_within_world(state, {x, y, z, orientation}, false)}
+  rescue
+    error ->
+      Logger.error("Near teleport failed: #{Exception.message(error)}")
+      {:noreply, state}
   end
+
+  def handle_cast(
+        {:combat_teleport, x, y, z, world},
+        %State{character: %Character{internal: %Internal{world: world}} = character} = state
+      ) do
+    {_x, _y, _z, orientation} = character.movement_block.position
+    {:noreply, teleport_within_world(state, {x, y, z, orientation}, true)}
+  rescue
+    error ->
+      Logger.error("Combat teleport failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
+
+  def handle_cast({:combat_teleport, _x, _y, _z, _world}, state), do: {:noreply, state}
 
   def handle_cast({:start_teleport, x, y, z, orientation, %WorldRef{} = world}, state) do
     state = state |> cancel_authoritative_movement() |> detach_transport()
@@ -1635,6 +1620,45 @@ defmodule ThistleTea.Game.Entity.Server.Player do
         zone = PlayerRest.default_zone(map_id)
         {zone, fallback_destination_area(character, map_id, zone)}
     end
+  end
+
+  defp teleport_within_world(%State{} = state, {x, y, z, orientation} = position, preserve_combat?) do
+    state = state |> cancel_authoritative_movement() |> detach_transport()
+
+    state =
+      if preserve_combat?,
+        do: state,
+        else: state |> disengage_for_world_transition() |> suspend_companion_for_teleport()
+
+    character = state.character
+    {zone, area} = destination_zone_and_area(character, character.internal.world.map_id, {x, y, z})
+
+    character =
+      character
+      |> PlayerRest.evaluate_zone(zone)
+      |> mark_rest_transition(character)
+      |> then(fn character ->
+        %{
+          character
+          | internal: %{character.internal | area: area, fall: nil},
+            movement_block: %{character.movement_block | position: position, movement_flags: 0}
+        }
+      end)
+
+    Presence.relocate(character)
+
+    Network.send_packet(%Message.MsgMoveTeleportAck{
+      guid: state.guid,
+      position: {x, y, z, orientation},
+      timestamp: character.movement_block.timestamp || 0,
+      fall_time: character.movement_block.fall_time || 0,
+      preserve_combat?: preserve_combat?
+    })
+
+    %{state | character: character}
+    |> Visibility.refresh_player()
+    |> Visibility.resync_player()
+    |> maybe_broadcast_update()
   end
 
   defp fallback_destination_area(

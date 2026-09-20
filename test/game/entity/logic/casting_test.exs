@@ -502,6 +502,42 @@ defmodule ThistleTea.Game.Entity.Logic.CastingTest do
   end
 
   describe "complete/3" do
+    test "enemy-targeted spells interrupt attack auras on completion, including misses" do
+      holder = %Holder{
+        spell: %Spell{id: 2479, aura_interrupt_flags: 0x1000},
+        auras: [%AuraData{type: :honorless_target}]
+      }
+
+      character = %Character{
+        object: %Object{guid: 1},
+        unit: %Unit{health: 100, auras: [holder]},
+        player: %Player{},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+        internal: %Internal{world: WorldRef.open(0)}
+      }
+
+      for target <- [:target_enemy, :aoe_enemy_at_dest, :caster, :target_ally], missed? <- [false, true] do
+        spell = %Spell{id: 123, cast_time_ms: 1_000, effects: [%Effect{type: :dummy, implicit_target_a: target}]}
+        preparing = Casting.start(character, spell, Target.unit(7), 1_000)
+        assert Aura.has_aura?(preparing, :honorless_target)
+        assert Aura.has_aura?(Casting.cancel(preparing), :honorless_target)
+
+        resolution =
+          if missed?,
+            do: %{channel_resolution() | hits: [], misses: [%{guid: 7, reason: 2}], impacts: []},
+            else: channel_resolution()
+
+        casting =
+          spell
+          |> Cast.new(Target.unit(7), 1_000)
+          |> Cast.transition(:launch)
+          |> Cast.put_resolution(resolution)
+
+        completed = Casting.complete(character, casting, 2_000)
+        assert Aura.has_aura?(completed, :honorless_target) == target in [:caster, :target_ally]
+      end
+    end
+
     test "a no-threat distraction preserves stealth and avoids combat" do
       stealth = %Holder{
         spell: %Spell{id: 1784, aura_interrupt_flags: Aura.interrupt_mask(:cast)},

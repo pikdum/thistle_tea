@@ -42,7 +42,10 @@ defmodule ThistleTea.Game.Network.MovementControl do
   end
 
   def prepare(%Message.MsgMoveTeleportAck{} = packet, %State{} = state) do
-    stamp(state, :teleport, &%{packet | counter: &1})
+    kind = if packet.preserve_combat?, do: :combat_teleport, else: :teleport
+    pending = Map.reject(state.pending_movement_acks, fn {_counter, kind} -> kind in [:teleport, :combat_teleport] end)
+    state = %{state | pending_movement_acks: pending}
+    stamp(state, kind, &%{packet | counter: &1})
   end
 
   def prepare(%Message.SmsgMoveWaterWalk{} = packet, %State{} = state) do
@@ -86,6 +89,19 @@ defmodule ThistleTea.Game.Network.MovementControl do
   end
 
   def acknowledge(state, _guid, _counter, _expected), do: {:error, state}
+
+  def acknowledge_teleport(%State{} = state, guid, counter) do
+    case Map.get(state.pending_movement_acks, counter) do
+      kind when kind in [:teleport, :combat_teleport] ->
+        case acknowledge(state, guid, counter, kind) do
+          {:ok, state} -> {:ok, state, kind}
+          {:error, state} -> {:error, state}
+        end
+
+      _invalid ->
+        {:error, state}
+    end
+  end
 
   def acknowledge_speed(%State{} = state, guid, counter, type, speed) do
     case acknowledge(state, guid, counter, {type, speed}) do

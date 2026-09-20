@@ -8,6 +8,17 @@ defmodule ThistleTea.Game.Network.MovementControlTest do
   alias ThistleTea.Game.WorldRef
 
   describe "prepare/2" do
+    test "supersedes older teleports and distinguishes combat relocation" do
+      {older, state} = MovementControl.prepare(%Message.MsgMoveTeleportAck{guid: 1}, %State{guid: 1})
+      {root, state} = MovementControl.prepare(%Message.SmsgForceMoveRoot{guid: 1}, state)
+      {blink, state} = MovementControl.prepare(%Message.MsgMoveTeleportAck{guid: 1, preserve_combat?: true}, state)
+      assert state.pending_movement_acks == %{root.move_event => :root, blink.counter => :combat_teleport}
+      assert MovementControl.acknowledge_teleport(state, 1, older.counter) == {:error, state}
+      assert MovementControl.acknowledge_teleport(state, 2, blink.counter) == {:error, state}
+      assert {:ok, acknowledged, :combat_teleport} = MovementControl.acknowledge_teleport(state, 1, blink.counter)
+      assert MovementControl.acknowledge_teleport(acknowledged, 1, blink.counter) == {:error, acknowledged}
+    end
+
     test "assigns one sequence across acknowledged movement changes" do
       state = %State{guid: 1}
 

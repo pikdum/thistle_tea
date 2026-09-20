@@ -63,6 +63,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
     :pet_unlearn_offer,
     :talent_reset_offer,
     ready: false,
+    pending_worldport?: false,
     movement_counter: 0,
     pending_movement_acks: %{},
     tracked_entities: MapSet.new(),
@@ -76,19 +77,19 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
         instance_id: nil
       })
       when is_integer(instance_id) do
-    %{state | pending_last_instance_map: map_id, active_banker_guid: nil, pending_repop: nil}
+    %{state | pending_last_instance_map: map_id, active_banker_guid: nil, pending_repop: nil, pending_worldport?: true}
   end
 
   def prepare_worldport(%__MODULE__{} = state, %WorldRef{}, %WorldRef{}) do
-    %{state | pending_last_instance_map: nil, active_banker_guid: nil, pending_repop: nil}
+    %{state | pending_last_instance_map: nil, active_banker_guid: nil, pending_repop: nil, pending_worldport?: true}
   end
 
   def complete_worldport(%__MODULE__{pending_last_instance_map: map_id} = state) when is_integer(map_id) do
     Network.send_packet(%Message.SmsgUpdateLastInstance{map: map_id})
-    %{state | pending_last_instance_map: nil}
+    %{state | pending_last_instance_map: nil, pending_worldport?: false}
   end
 
-  def complete_worldport(%__MODULE__{} = state), do: state
+  def complete_worldport(%__MODULE__{} = state), do: %{state | pending_worldport?: false}
 
   def leave_world(%__MODULE__{} = state) do
     case state.player_tick_ref do

@@ -594,10 +594,17 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
     preserved_types = if Spell.attribute?(spell, :allow_while_stealthed), do: [:mod_stealth], else: []
 
     {entity, events} =
-      AuraLogic.remove_with_interrupt_flags(entity, AuraLogic.interrupt_mask(action), now, preserved_types)
+      AuraLogic.remove_with_interrupt_flags(entity, action_interrupt_mask(action, spell), now, preserved_types)
 
     Effects.enqueue(entity, events)
   end
+
+  defp action_interrupt_mask(:action_complete, spell) do
+    mask = AuraLogic.interrupt_mask(:action_complete)
+    if Spell.targets_hostile_units?(spell), do: Bitwise.bor(mask, AuraLogic.interrupt_mask(:attack)), else: mask
+  end
+
+  defp action_interrupt_mask(action, _spell), do: AuraLogic.interrupt_mask(action)
 
   def cancel(%{internal: %Internal{} = internal} = character) do
     case internal.casting do

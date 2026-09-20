@@ -4,12 +4,14 @@ defmodule ThistleTea.Game.Player.Pvp do
   """
 
   alias ThistleTea.Game.Entity.Data.Character
+  alias ThistleTea.Game.Entity.Logic.Honor.Protection
   alias ThistleTea.Game.Entity.Logic.Pvp, as: PvpLogic
   alias ThistleTea.Game.Entity.Server.Player, as: PlayerServer
   alias ThistleTea.Game.Entity.Server.Player.TickScheduler
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.Loader.Exploration
+  alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Realm
 
   def toggle(%{ready: true, character: %Character{} = character} = state, desired)
@@ -18,6 +20,19 @@ defmodule ThistleTea.Game.Player.Pvp do
   end
 
   def toggle(state, _desired), do: state
+
+  def arrive(state, spell_lookup \\ &SpellLoader.load/1)
+
+  def arrive(%{ready: true, character: %Character{} = character} = state, spell_lookup) do
+    if Protection.eligible?(character) do
+      character = Protection.apply(character, spell_lookup.(Protection.spell_id()), Time.now())
+      apply_transition(state, character)
+    else
+      state
+    end
+  end
+
+  def arrive(state, _spell_lookup), do: state
 
   def update_territory(%{character: %Character{} = character} = state, zone_id, area_id) do
     zone = Exploration.area(zone_id)

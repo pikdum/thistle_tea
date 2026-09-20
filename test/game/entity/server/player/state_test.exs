@@ -78,7 +78,8 @@ defmodule ThistleTea.Game.Entity.Server.Player.StateTest do
         )
 
       assert state.pending_last_instance_map == 389
-      assert %State{pending_last_instance_map: nil} = State.complete_worldport(state)
+      assert state.pending_worldport?
+      assert %State{pending_last_instance_map: nil, pending_worldport?: false} = State.complete_worldport(state)
       assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgUpdateLastInstance{map: 389}}}
     end
 

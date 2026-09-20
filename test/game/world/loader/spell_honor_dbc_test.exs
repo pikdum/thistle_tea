@@ -8,6 +8,13 @@ defmodule ThistleTea.Game.World.Loader.SpellHonorDbcTest do
   @moduletag :dbc_db
 
   describe "load/1" do
+    test "decodes Honorless Target duration and attack interruption" do
+      spell = SpellLoader.load(2479)
+      assert spell.duration_ms == 30_000
+      assert spell.aura_interrupt_flags == 0x1000
+      assert [%{type: :apply_aura, aura: :honorless_target, implicit_target_a: :caster}] = spell.effects
+    end
+
     test "decodes honor rewards with their unscaled DBC amounts" do
       for {id, points} <- [{31_415, 25}, {24_960, 50}, {24_965, 398}, {24_966, 2388}] do
         spell = SpellLoader.load(id)

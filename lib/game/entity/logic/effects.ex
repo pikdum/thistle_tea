@@ -366,8 +366,12 @@ defmodule ThistleTea.Game.Entity.Logic.Effects do
     %Effects.Teleport{position: position}
   end
 
-  def teleport_to_world(world, {_x, _y, _z} = position) do
-    %Effects.TeleportToWorld{world: world, position: position}
+  def teleport_to_world(world, {_x, _y, _z} = position, opts \\ []) do
+    %Effects.TeleportToWorld{
+      world: world,
+      position: position,
+      preserve_combat?: Keyword.get(opts, :preserve_combat?, false)
+    }
   end
 
   def charge_resolved(path, duration_ms, {_x, _y, _z, _o} = destination)

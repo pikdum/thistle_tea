@@ -386,6 +386,36 @@ defmodule ThistleTea.Game.Entity.Server.PlayerTest do
       refute_receive :restore_companion
     end
 
+    test "combat relocation preserves combat, threat references, target, and pet" do
+      guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
+      pet_guid = Guid.from_low_guid(:pet, 1863, System.unique_integer([:positive]))
+      mob_guid = Guid.from_low_guid(:mob, 1, System.unique_integer([:positive]))
+
+      character =
+        character(guid, health: 100, max_health: 100, summon: pet_guid)
+        |> PlayerCombat.mark_attacked(Time.now())
+        |> PlayerCombat.gain_threat_ref(mob_guid, 1)
+        |> then(fn character -> %{character | unit: %{character.unit | target: mob_guid}} end)
+
+      state = %State{connection_pid: self(), guid: guid, character: character, ready: true}
+
+      on_exit(fn ->
+        Metadata.delete(guid)
+        SpatialHash.remove(:players, guid)
+      end)
+
+      assert {:noreply, moved} =
+               PlayerServer.handle_cast({:combat_teleport, -8_949.95, -132.493, 83.5312, WorldRef.open(0)}, state)
+
+      assert moved.character.internal.in_combat
+      assert moved.character.internal.threat_refs == character.internal.threat_refs
+      assert moved.character.unit.target == mob_guid
+      assert moved.character.unit.summon == pet_guid
+      assert_receive {:"$gen_cast", {:send_packet, %Message.MsgMoveTeleportAck{preserve_combat?: true}}}
+      refute_receive {:"$gen_cast", {:send_packet, %Message.SmsgPetSpells{pet_guid: 0}}}
+      assert PlayerServer.handle_cast({:combat_teleport, 1.0, 2.0, 3.0, WorldRef.open(1)}, state) == {:noreply, state}
+    end
+
     test "ordinary teleports detach from a transport" do
       guid = Guid.from_low_guid(:player, System.unique_integer([:positive]))
       transport_guid = Guid.from_low_guid(:mo_transport, 164_871)

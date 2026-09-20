@@ -124,6 +124,7 @@ defmodule ThistleTea.Game.Player.TaxiTest do
 
       token = state.character.internal.taxi_flight.token
       state = Taxi.arrive(state, token)
+      assert Taxi.arrive(state, token) == state
 
       assert state.character.movement_block.position == {100.0, 0.0, 0.0, 0.0}
       assert state.character.unit.mount_display_id == 0

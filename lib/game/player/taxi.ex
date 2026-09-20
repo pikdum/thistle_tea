@@ -19,6 +19,8 @@ defmodule ThistleTea.Game.Player.Taxi do
   alias ThistleTea.Game.Math
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
+  alias ThistleTea.Game.Player.Exploration
+  alias ThistleTea.Game.Player.Pvp
   alias ThistleTea.Game.Player.Reputation
   alias ThistleTea.Game.Player.Spellcasting
   alias ThistleTea.Game.Time
@@ -137,6 +139,8 @@ defmodule ThistleTea.Game.Player.Taxi do
 
     state =
       %{state | character: character, taxi_arrival_ref: nil}
+      |> Exploration.check_current()
+      |> Pvp.arrive()
       |> PlayerServer.maybe_broadcast_update()
 
     CharacterStore.put(state.character)

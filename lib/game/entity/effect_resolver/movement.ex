@@ -38,7 +38,7 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Movement do
 
   def resolve(%Character{internal: %Internal{world: world}} = entity, %Effects.Leap{position: {x, y, z, _o}}) do
     case clamp_leap_destination(entity, world.map_id, {x, y, z}) do
-      {nx, ny, nz} -> [Effects.teleport_to_world(world, {nx, ny, nz})]
+      {nx, ny, nz} -> [Effects.teleport_to_world(world, {nx, ny, nz}, preserve_combat?: true)]
       nil -> []
     end
   end

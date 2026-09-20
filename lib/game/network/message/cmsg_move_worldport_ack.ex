@@ -2,28 +2,12 @@ defmodule ThistleTea.Game.Network.Message.CmsgMoveWorldportAck do
   @moduledoc false
   use ThistleTea.Game.Network.ClientMessage, :MSG_MOVE_WORLDPORT_ACK
 
-  alias ThistleTea.Game.Entity.Server.Player.State
-  alias ThistleTea.Game.Player.CompanionVisibility
-  alias ThistleTea.Game.Player.Exploration, as: PlayerExploration
-  alias ThistleTea.Game.Player.ItemLoot
-  alias ThistleTea.Game.Player.Login
-  alias ThistleTea.Game.World.Visibility
+  alias ThistleTea.Game.Player.Travel
 
   defstruct []
 
   @impl ClientMessage
-  def handle(%__MODULE__{}, state) do
-    character = Login.send_worldport_packets(state.character)
-    state = %{state | character: character}
-
-    state = State.complete_worldport(state)
-    state = Visibility.enter_player(%{state | ready: true})
-
-    state
-    |> CompanionVisibility.defer_restoration()
-    |> PlayerExploration.check_current()
-    |> ItemLoot.open()
-  end
+  def handle(%__MODULE__{}, state), do: Travel.worldport_ack(state)
 
   @impl ClientMessage
   def from_binary(_payload) do

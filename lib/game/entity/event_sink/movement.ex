@@ -186,6 +186,15 @@ defmodule ThistleTea.Game.Entity.EventSink.Movement do
 
   def emit(entity, %Effects.BindHome{}, _context), do: entity
 
+  def emit(
+        %Character{} = entity,
+        %Effects.TeleportToWorld{world: world, position: {x, y, z}, preserve_combat?: true},
+        context
+      ) do
+    Context.cast(context, {:combat_teleport, x, y, z, world})
+    entity
+  end
+
   def emit(%Character{} = entity, %Effects.TeleportToWorld{world: world, position: {x, y, z}}, context) do
     Context.cast(context, {:start_teleport, x, y, z, world})
     entity
