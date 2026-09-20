@@ -30,6 +30,18 @@ defmodule ThistleTea.Game.Entity.Data.ItemTest do
       assert item.item.owner == 0
       assert item.item.stack_count == 5
     end
+
+    test "binds pickup and quest items when their instances are created" do
+      for bonding <- [1, 4] do
+        item = Item.build(%ItemTemplate{entry: 25, bonding: bonding, flags: 4}, 1, owner: 99)
+        assert item.item.flags == 5
+      end
+
+      for bonding <- [0, 2, 3] do
+        item = Item.build(%ItemTemplate{entry: 25, bonding: bonding, flags: 4}, 1, owner: 99)
+        assert item.item.flags == 4
+      end
+    end
   end
 
   describe "bind_on_equip/1" do

@@ -37,7 +37,7 @@ defmodule ThistleTea.Game.Entity.Data.Item do
         stack_count: stack_count,
         duration: template.duration,
         spell_charges: pack_spell_charges(template),
-        flags: template.flags,
+        flags: initial_flags(template),
         durability: template.max_durability,
         max_durability: template.max_durability
       },
@@ -47,6 +47,9 @@ defmodule ThistleTea.Game.Entity.Data.Item do
   end
 
   def template(%__MODULE__{internal: %{template: template}}), do: template
+
+  defp initial_flags(%ItemTemplate{bonding: bonding, flags: flags}) when bonding in [1, 4], do: flags ||| 1
+  defp initial_flags(%ItemTemplate{flags: flags}), do: flags
 
   def bind_on_equip(%__MODULE__{} = item) do
     if template(item).bonding in [1, 2, 4] do
