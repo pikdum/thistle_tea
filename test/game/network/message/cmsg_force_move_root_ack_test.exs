@@ -10,6 +10,8 @@ defmodule ThistleTea.Game.Network.Message.CmsgForceMoveRootAckTest do
   alias ThistleTea.Game.Network.Message.CmsgForceMoveRootAck
   alias ThistleTea.Game.Network.Message.CmsgForceMoveUnrootAck
   alias ThistleTea.Game.Network.Message.Dispatch
+  alias ThistleTea.Game.Network.Message.SmsgNewWorld
+  alias ThistleTea.Game.Network.MovementControl
   alias ThistleTea.Game.Network.Opcodes
   alias ThistleTea.Game.WorldRef
 
@@ -32,6 +34,37 @@ defmodule ThistleTea.Game.Network.Message.CmsgForceMoveRootAckTest do
   end
 
   describe "handle/2" do
+    test "acknowledges unroot without replacing the destination while loading a new map" do
+      state = %{ack_state(%{3 => :unroot}) | ready: false}
+      destination = %MovementBlock{position: {-9002.0, -450.0, 85.0, 0.0}}
+      state = %{state | character: %{state.character | movement_block: destination}}
+
+      state =
+        CmsgForceMoveUnrootAck.handle(
+          %CmsgForceMoveUnrootAck{guid: 1, counter: 3, movement_payload: movement_payload()},
+          state
+        )
+
+      assert state.pending_movement_acks == %{}
+      assert state.character.movement_block == destination
+    end
+
+    test "rejects an old-map acknowledgement even after the new world is ready" do
+      state = ack_state(%{3 => :unroot})
+      destination = %MovementBlock{position: {-9002.0, -450.0, 85.0, 0.0}}
+      state = %{state | character: %{state.character | movement_block: destination}}
+      {_packet, state} = MovementControl.prepare(%SmsgNewWorld{map: 0}, state)
+
+      state =
+        CmsgForceMoveUnrootAck.handle(
+          %CmsgForceMoveUnrootAck{guid: 1, counter: 3, movement_payload: movement_payload()},
+          state
+        )
+
+      assert state.character.movement_block == destination
+      assert state.pending_movement_acks == %{}
+    end
+
     test "updates movement state from force root acknowledgements" do
       state = ack_state(%{2 => :root})
 
@@ -79,6 +112,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgForceMoveRootAckTest do
 
       state = %State{
         guid: player_guid,
+        ready: true,
         character: %Character{
           object: %Object{guid: player_guid},
           movement_block: %MovementBlock{position: {1.0, 2.0, 3.0, 4.0}},
@@ -129,6 +163,7 @@ defmodule ThistleTea.Game.Network.Message.CmsgForceMoveRootAckTest do
   defp ack_state(pending) do
     %State{
       guid: 1,
+      ready: true,
       character: %Character{movement_block: %MovementBlock{run_speed: 7.0}},
       pending_movement_acks: pending
     }

@@ -13,6 +13,10 @@ defmodule ThistleTea.Game.Network.MovementControl do
   @ack_timeout_ms 4_000
   @max_counter 0xFFFFFFFF
 
+  def prepare(%Message.SmsgNewWorld{} = packet, %State{} = state) do
+    {packet, %{state | pending_movement_acks: %{}, pending_repop: nil}}
+  end
+
   def prepare(%Message.SmsgForceMoveRoot{} = packet, %State{} = state) do
     stamp(state, :root, &%{packet | move_event: &1})
   end
@@ -89,6 +93,8 @@ defmodule ThistleTea.Game.Network.MovementControl do
       {:error, state} -> state
     end
   end
+
+  def reconcile_movement(%State{ready: false} = state, _payload), do: state
 
   def reconcile_movement(
         %State{character: %Character{movement_block: %MovementBlock{} = previous} = character} = state,

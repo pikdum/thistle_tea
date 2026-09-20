@@ -76,11 +76,11 @@ defmodule ThistleTea.Game.Entity.Server.Player.State do
         instance_id: nil
       })
       when is_integer(instance_id) do
-    %{state | pending_last_instance_map: map_id, active_banker_guid: nil}
+    %{state | pending_last_instance_map: map_id, active_banker_guid: nil, pending_repop: nil}
   end
 
   def prepare_worldport(%__MODULE__{} = state, %WorldRef{}, %WorldRef{}) do
-    %{state | pending_last_instance_map: nil, active_banker_guid: nil}
+    %{state | pending_last_instance_map: nil, active_banker_guid: nil, pending_repop: nil}
   end
 
   def complete_worldport(%__MODULE__{pending_last_instance_map: map_id} = state) when is_integer(map_id) do

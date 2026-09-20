@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.Network.MovementControlTest do
   alias ThistleTea.Game.Entity.Server.Player.State
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Network.MovementControl
+  alias ThistleTea.Game.WorldRef
 
   describe "prepare/2" do
     test "assigns one sequence across acknowledged movement changes" do
@@ -60,6 +61,18 @@ defmodule ThistleTea.Game.Network.MovementControlTest do
   end
 
   describe "repop sequencing" do
+    test "a worldport cancels a pending graveyard relocation" do
+      state = %State{guid: 1, pending_movement_acks: %{4 => :unroot}}
+      state = MovementControl.defer_repop(state, {10.0, 20.0, 30.0, 489})
+      token = state.pending_repop.token
+      assert_receive {:"$gen_cast", {:finish_repop, ^token}}
+
+      state = State.prepare_worldport(state, WorldRef.instance(489, 1), WorldRef.open(0))
+      assert state.pending_repop == nil
+      assert MovementControl.finish_repop(state, token, true) == state
+      refute_receive {:"$gen_cast", {:start_teleport, _, _, _, _}}
+    end
+
     test "waits for earlier movement acknowledgements before teleporting" do
       state = %State{guid: 1, pending_movement_acks: %{4 => :unroot}}
       state = MovementControl.defer_repop(state, {10.0, 20.0, 30.0, 1})
