@@ -1,6 +1,6 @@
 defmodule ThistleTea.Game.World.Loader.ItemEnchantment do
   @moduledoc """
-  Preloaded item-enchantment definitions and VMangos temporary-duration overrides.
+  Preloaded item-enchantment definitions, durations, charges, and proc rates.
   """
   import Ecto.Query
 
@@ -36,7 +36,21 @@ defmodule ThistleTea.Game.World.Loader.ItemEnchantment do
     Mangos.Repo.all(Mangos.SpellProcItemEnchant)
     |> Enum.each(&:ets.insert(__MODULE__, {{:proc_ppm, &1.entry}, &1.ppm_rate}))
 
+    load_charges()
+
     :ok
+  end
+
+  def load_charges do
+    Mangos.Repo.all(Mangos.SpellEnchantCharges)
+    |> Enum.each(&:ets.insert(__MODULE__, {{:charges, &1.entry}, &1.charges}))
+  end
+
+  def charges(spell_id) do
+    case :ets.lookup(__MODULE__, {:charges, spell_id}) do
+      [{_key, charges}] -> charges
+      [] -> 0
+    end
   end
 
   def recipe(spell_id) do

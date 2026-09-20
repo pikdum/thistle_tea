@@ -106,6 +106,24 @@ defmodule ThistleTea.Game.Entity.Data.Item do
     internal |> Map.get(:enchantments, %{}) |> Map.get(@temporary_enchantment_slot)
   end
 
+  def spend_enchantment_charge(%__MODULE__{} = item, token) do
+    case temporary_enchantment(item) do
+      %{token: ^token, charges: 1} ->
+        clear_temporary_enchantment(item)
+
+      %{token: ^token, charges: charges} = enchantment when charges > 1 ->
+        enchantments =
+          Map.put(item.internal.enchantments, @temporary_enchantment_slot, %{enchantment | charges: charges - 1})
+
+        item
+        |> put_enchantment_word(@temporary_enchantment_slot, 2, charges - 1)
+        |> put_internal_enchantments(enchantments)
+
+      _ ->
+        item
+    end
+  end
+
   def refresh_temporary_enchantment(%__MODULE__{} = item, now) do
     case temporary_enchantment(item) do
       %{expires_at: expires_at} when expires_at <= now ->

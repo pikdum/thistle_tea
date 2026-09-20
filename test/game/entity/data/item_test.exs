@@ -50,7 +50,30 @@ defmodule ThistleTea.Game.Entity.Data.ItemTest do
     end
   end
 
-  describe "temporary enchantments" do
+  describe "spend_enchantment_charge/2" do
+    test "spends charges without resetting time and clears only the exhausted slot" do
+      item = Item.build(%ItemTemplate{entry: 25}, 1)
+      item = item |> Item.put_permanent_enchantment(41) |> Item.put_temporary_enchantment(323, 1000, 2, 1000, :token)
+      charged = Item.spend_enchantment_charge(item, :token)
+      assert Item.temporary_enchantment(charged) == %{id: 323, expires_at: 1000, charges: 1, token: :token}
+      assert (charged.item.enchantment >>> 160 &&& 0xFFFFFFFF) == 1
+      depleted = Item.spend_enchantment_charge(charged, :token)
+      assert Item.temporary_enchantment(depleted) == nil
+      assert Item.active_enchantments(depleted, 0) == [{0, 41}]
+      assert Item.visible_value(depleted) == (25 ||| 41 <<< 32)
+    end
+
+    test "zero means unlimited and stale procs cannot spend replacement charges" do
+      item = Item.build(%ItemTemplate{entry: 25}, 1)
+      unlimited = Item.put_temporary_enchantment(item, 283, 1000, 0, 1000, :token)
+      assert Item.spend_enchantment_charge(unlimited, :token) == unlimited
+      replacement = Item.put_temporary_enchantment(item, 323, 1000, 40, 1000, :new)
+      assert Item.spend_enchantment_charge(replacement, :token) == replacement
+      assert Item.spend_enchantment_charge(item, :token) == item
+    end
+  end
+
+  describe "refresh_temporary_enchantment/2" do
     test "permanent and temporary slots coexist through refresh and expiry" do
       item = Item.build(%ItemTemplate{entry: 25}, 1)
       item = item |> Item.put_permanent_enchantment(41) |> Item.put_temporary_enchantment(263, 1000, 0, 1000, :token)
