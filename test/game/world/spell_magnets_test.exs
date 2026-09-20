@@ -4,6 +4,11 @@ defmodule ThistleTea.Game.World.SpellMagnetsTest do
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
+  alias ThistleTea.Game.Entity.Data.Component.Object
+  alias ThistleTea.Game.Entity.Data.Component.Unit
+  alias ThistleTea.Game.Entity.Data.Mob
+  alias ThistleTea.Game.Entity.Logic.Casting
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.SpellTargetResolver
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Spell
@@ -121,6 +126,12 @@ defmodule ThistleTea.Game.World.SpellMagnetsTest do
   end
 
   describe "resolve/3" do
+    test "an intercepted chain stops at the magnet", context do
+      %{caster: caster, spell: spell, target: target, totem: totem} = context
+      spell = %{spell | effects: [%{hd(spell.effects) | chain_targets: 3}]}
+      assert SpellTargetResolver.resolve(caster, spell, Target.unit(target)) == [totem]
+    end
+
     test "launch resolution substitutes the magnet for every effect in a cast", context do
       %{caster: caster, spell: spell, target: target, totem: totem} = context
 
@@ -132,6 +143,36 @@ defmodule ThistleTea.Game.World.SpellMagnetsTest do
 
       assert SpellTargetResolver.resolve(caster, spell, Target.unit(target)) == [totem]
       assert SpellTargetResolver.resolve(caster, spell, Target.unit(target)) == [target]
+    end
+  end
+
+  describe "complete/2" do
+    test "launch packets and delivery use the redirected target while caster effects remain local", context do
+      %{caster: caster, spell: spell, target: target, totem: totem} = context
+
+      caster = %Mob{
+        object: %Object{guid: caster.object.guid},
+        unit: %Unit{health: 100, max_health: 100, level: 50, power1: 100, max_power1: 100, auras: []},
+        internal: caster.internal,
+        movement_block: caster.movement_block
+      }
+
+      spell = %{
+        spell
+        | attributes: MapSet.new([:ignore_line_of_sight]),
+          effects:
+            spell.effects ++ [%Effect{type: :energize, implicit_target_a: :caster, misc_value: 0, base_points: 1}]
+      }
+
+      now = Time.now()
+      result = caster |> Casting.start(spell, Target.unit(target), now) |> Casting.complete(now)
+      go = Enum.find(result.internal.events, &match?(%Effects.SpellGo{}, &1))
+      assert totem in go.hit_guids
+      refute target in go.hit_guids
+      assert go.targets == Target.unit(totem)
+      delivery = Enum.find(result.internal.events, &match?(%Effects.DeliverSpell{}, &1))
+      assert delivery.target_guid == totem
+      assert delivery.cast_context.selected_target_guid == totem
     end
   end
 

@@ -21,6 +21,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   alias ThistleTea.Game.Entity.Logic.SpellEffect.Script, as: ScriptEffects
   alias ThistleTea.Game.Entity.Logic.SpellEffect.SummonControl, as: SummonControlEffects
   alias ThistleTea.Game.Entity.Logic.Threat
+  alias ThistleTea.Game.Entity.Logic.Totems
   alias ThistleTea.Game.Entity.Logic.Warrior
   alias ThistleTea.Game.Math
   alias ThistleTea.Game.Spell
@@ -231,7 +232,11 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   end
 
   defp receive_unblocked_effects(target, %CastContext{spell: spell} = context, now) do
-    effects = Enum.reject(spell.effects, &EffectImmunity.blocked?(target, spell, &1))
+    effects =
+      Enum.reject(
+        spell.effects,
+        &(EffectImmunity.blocked?(target, spell, &1) or Totems.immune_effect?(target, context, spell, &1))
+      )
 
     if effects == [] and spell.effects != [] do
       {target, [Effects.spell_log_miss(context.caster_guid, target.object.guid, spell.id, :immune)]}

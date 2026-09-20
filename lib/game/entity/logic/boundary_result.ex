@@ -36,4 +36,8 @@ defmodule ThistleTea.Game.Entity.Logic.BoundaryResult do
   def apply(%Character{} = character, %Commands.TotemStarted{slot: slot, guid: guid}) do
     Totems.started(character, slot, guid)
   end
+
+  def apply(%Character{} = character, %Commands.TotemStopped{guid: guid}) do
+    Totems.stopped(character, guid)
+  end
 end

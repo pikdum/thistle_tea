@@ -53,6 +53,11 @@ defmodule ThistleTea.Game.Spell.Scripts do
   @allow_while_mounted 0x01000000
   @no_autocast_ai 0x00020000
 
+  @immediate_periodic_spells [8145, 6474, 8179, 8172, 8167, 8515, 10_609, 10_612]
+
+  def initial_periodic_delay(%Spell{id: id}, _interval) when id in @immediate_periodic_spells, do: 0
+  def initial_periodic_delay(%Spell{}, interval), do: interval
+
   def apply_trigger(%Spell{} = spell) do
     cond do
       trigger_id = Priest.shield_trigger_id(spell) -> trigger_id

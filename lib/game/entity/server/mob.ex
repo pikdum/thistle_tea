@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   import Bitwise, only: [&&&: 2]
 
   alias ThistleTea.Game.Entity
+  alias ThistleTea.Game.Entity.Commands
   alias ThistleTea.Game.Entity.Data.Companion.EntityRef
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
@@ -869,6 +870,10 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
     {:noreply, state}
   end
 
+  def handle_info(:totem_stop, %Mob{internal: %Internal{totem: %Totem{}}} = state) do
+    {:stop, :normal, state}
+  end
+
   def handle_info({:event_stop, _event}, state) do
     case SpawnPool.deactivate(state) do
       :pooled -> {:noreply, state}
@@ -977,12 +982,22 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
   @impl GenServer
   def terminate(_reason, state) do
+    notify_totem_owner(state)
     release_victim(state)
     unwatch_chase(state)
     World.remove_position(state)
     Visibility.leave_entity(state)
     Metadata.delete(state.object.guid)
   end
+
+  defp notify_totem_owner(%Mob{object: %{guid: guid}, internal: %Internal{totem: %Totem{owner_guid: owner}}}) do
+    case Entity.pid(owner) do
+      pid when is_pid(pid) -> send(pid, %Commands.TotemStopped{guid: guid})
+      _ -> :ok
+    end
+  end
+
+  defp notify_totem_owner(_state), do: :ok
 
   defp behavior_tree(%Mob{internal: %Internal{totem: %Totem{}}}), do: TotemBT.tree()
 
@@ -1269,6 +1284,15 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   defp maybe_tap(%Mob{} = state, _caster), do: state
 
   defp maybe_finalize_death(%Mob{internal: %Internal{death_finalized?: true}} = state), do: state
+
+  defp maybe_finalize_death(%Mob{internal: %Internal{totem: %Totem{}}} = state) do
+    if Core.dead?(state) do
+      send(self(), :totem_stop)
+      state |> mark_death_finalized() |> Core.mark_broadcast_update()
+    else
+      state
+    end
+  end
 
   defp maybe_finalize_death(%Mob{internal: %Internal{pet: %Pet{}}} = state) do
     if Core.dead?(state) do

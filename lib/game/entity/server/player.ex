@@ -843,7 +843,8 @@ defmodule ThistleTea.Game.Entity.Server.Player do
     {:noreply, %{state | character: character}, {:continue, :maybe_broadcast_update}}
   end
 
-  def handle_info(%Commands.TotemStarted{} = command, %{character: %Character{} = character} = state) do
+  def handle_info(%type{} = command, %{character: %Character{} = character} = state)
+      when type in [Commands.TotemStarted, Commands.TotemStopped] do
     character = character |> BoundaryResult.apply(command) |> EventSink.emit_pending()
     {:noreply, %{state | character: character}}
   end

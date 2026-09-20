@@ -7,6 +7,8 @@ defmodule ThistleTea.Game.World.SpellMagnets do
 
   use GenServer
 
+  import Bitwise, only: [&&&: 2]
+
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Logic.Hostility
   alias ThistleTea.Game.Entity.Logic.SpellMagnet
@@ -14,6 +16,8 @@ defmodule ThistleTea.Game.World.SpellMagnets do
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Metadata
+
+  require Logger
 
   def start_link(opts \\ []), do: GenServer.start_link(__MODULE__, %{}, Keyword.put_new(opts, :name, __MODULE__))
 
@@ -34,13 +38,20 @@ defmodule ThistleTea.Game.World.SpellMagnets do
 
   @impl GenServer
   def handle_call({:sync, guid, owner, magnets}, _from, state) do
-    previous = Map.get(state.entities, guid, %{magnets: [], owner: owner})
-    magnets = Enum.map(magnets, &retain_charges(&1, previous.magnets, guid))
+    previous =
+      case Map.get(state.entities, guid) do
+        %{owner: ^owner, magnets: previous} -> previous
+        _ -> []
+      end
+
+    magnets = Enum.map(magnets, &retain_charges(&1, previous, guid))
     state = monitor_owner(state, guid, owner)
     entities = Map.put(state.entities, guid, %{magnets: magnets, owner: owner})
     {:reply, :ok, %{state | entities: entities}}
   rescue
-    error -> {:reply, {:error, error}, state}
+    error ->
+      Logger.error("Spell-magnet publication failed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:reply, {:error, error}, state}
   end
 
   def handle_call({:redirect, caster, spell, target_guid, now}, _from, state) do
@@ -61,7 +72,9 @@ defmodule ThistleTea.Game.World.SpellMagnets do
       magnet -> {:reply, magnet.source_guid, consume(state, magnet)}
     end
   rescue
-    _error -> {:reply, target_guid, state}
+    error ->
+      Logger.error("Spell-magnet redirection failed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:reply, target_guid, state}
   end
 
   @impl GenServer
@@ -76,17 +89,31 @@ defmodule ThistleTea.Game.World.SpellMagnets do
   end
 
   defp monitor_owner(state, guid, owner) do
-    if Map.has_key?(state.entities, guid) do
-      state
-    else
-      %{state | monitors: Map.put(state.monitors, Process.monitor(owner), guid)}
+    case Map.get(state.entities, guid) do
+      %{owner: ^owner} -> state
+      _ -> replace_monitor(state, guid, owner)
     end
+  end
+
+  defp replace_monitor(state, guid, owner) do
+    monitors =
+      Map.reject(state.monitors, fn {ref, monitored} ->
+        if monitored == guid do
+          Process.demonitor(ref, [:flush])
+          true
+        else
+          false
+        end
+      end)
+
+    %{state | monitors: Map.put(monitors, Process.monitor(owner), guid)}
   end
 
   defp source_magnet(state, protection) do
     case Map.get(state.entities, protection.source_guid) do
-      %{magnets: magnets} ->
-        Enum.find(magnets, &(&1.source_guid == protection.source_guid and &1.spell_id == protection.spell_id))
+      %{magnets: magnets, owner: owner} ->
+        if Process.alive?(owner),
+          do: Enum.find(magnets, &(&1.source_guid == protection.source_guid and &1.spell_id == protection.spell_id))
 
       _ ->
         nil
@@ -100,10 +127,10 @@ defmodule ThistleTea.Game.World.SpellMagnets do
   defp valid_target?(caster, spell, target_guid, magnet) do
     guid = magnet.source_guid
 
-    with true <- guid != target_guid,
-         %{alive?: true, creature_type: creature_type} <- Metadata.get(guid),
-         true <- Spell.creature_type_mask_ignored?(spell) or Spell.creature_type_allowed?(spell, creature_type),
-         true <- Hostility.valid_attack_target?(caster, guid),
+    with %{alive?: true} = metadata <- Metadata.get(guid),
+         true <- ((Map.get(metadata, :unit_flags) || 0) &&& 0x02010002) == 0,
+         true <- creature_type_allowed?(spell, metadata),
+         true <- Hostility.valid_attack_target?(caster, target_guid),
          {world, _, _, _} <- World.position(caster),
          {^world, x, y, z} <- World.position(guid),
          {^world, tx, ty, tz} <- World.position(target_guid) do
@@ -112,6 +139,11 @@ defmodule ThistleTea.Game.World.SpellMagnets do
     else
       _ -> false
     end
+  end
+
+  defp creature_type_allowed?(spell, metadata) do
+    Enum.any?(Map.get(metadata, :aura_sources, []), fn {id, _, _, _, _} -> id == 8179 end) or
+      Spell.creature_type_mask_ignored?(spell) or Spell.creature_type_allowed?(spell, Map.get(metadata, :creature_type))
   end
 
   defp consume(state, %{charges: charges} = magnet) when is_integer(charges) and charges > 0 do

@@ -288,7 +288,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
       impacts: resolved_impacts(entity, spell, hits, misses),
       followups: %Followups{
         packet_hits: hits ++ object_hit(object_guid),
-        selected_unit_guid: selected_unit_guid(spell, targets, resolved_targets),
+        selected_unit_guid: selected_unit_guid(entity.object.guid, spell, targets, resolved_targets),
         object_guid: object_guid,
         item_guid: Target.item_guid(targets),
         ground_position: Target.ground_location(targets),
@@ -297,11 +297,11 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
     }
   end
 
-  defp selected_unit_guid(spell, %Target{selection: {:unit, guid}}, [resolved | _]) do
-    if SpellMagnet.eligible?(spell), do: resolved, else: guid
+  defp selected_unit_guid(caster, spell, %Target{selection: {:unit, guid}}, resolved) when caster != guid do
+    if SpellMagnet.eligible?(spell), do: Enum.find(resolved, guid, &(&1 != caster)), else: guid
   end
 
-  defp selected_unit_guid(_spell, targets, _resolved), do: Target.unit_guid(targets)
+  defp selected_unit_guid(_caster, _spell, targets, _resolved), do: Target.unit_guid(targets)
 
   defp resolved_impacts(entity, spell, hits, misses) do
     impacts = Enum.map(hits, &%Impact{target_guid: &1, target_role: target_role(entity, &1)})

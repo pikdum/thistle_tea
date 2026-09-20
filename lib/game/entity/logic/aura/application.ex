@@ -538,7 +538,7 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
       class_mask: effect.class_mask,
       item_type: effect.item_type,
       amplitude_ms: amplitude_ms,
-      next_tick_at: next_tick(effect, amplitude_ms, now),
+      next_tick_at: next_tick(spell, effect, amplitude_ms, now),
       trigger_spell_id: effect.trigger_spell_id
     }
   end
@@ -625,10 +625,10 @@ defmodule ThistleTea.Game.Entity.Logic.Aura.Application do
 
   defp effective_amplitude(%Effect{amplitude_ms: amp}), do: amp
 
-  defp next_tick(%Effect{aura: aura}, amplitude_ms, now)
+  defp next_tick(spell, %Effect{aura: aura}, amplitude_ms, now)
        when aura in @periodic_auras and is_integer(amplitude_ms) and amplitude_ms > 0 do
-    now + amplitude_ms
+    now + Scripts.initial_periodic_delay(spell, amplitude_ms)
   end
 
-  defp next_tick(_effect, _amplitude_ms, _now), do: nil
+  defp next_tick(_spell, _effect, _amplitude_ms, _now), do: nil
 end

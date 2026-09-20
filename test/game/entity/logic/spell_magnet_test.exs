@@ -12,7 +12,9 @@ defmodule ThistleTea.Game.Entity.Logic.SpellMagnetTest do
   alias ThistleTea.Game.Entity.Logic.Aura
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Entity.Logic.SpellEffect
   alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.CastContext
   alias ThistleTea.Game.Spell.Effect
 
   describe "aura lifecycle" do
@@ -56,6 +58,52 @@ defmodule ThistleTea.Game.Entity.Logic.SpellMagnetTest do
 
       blackboard = Blackboard.new()
       assert {:failure, ^totem, ^blackboard} = TotemBT.cast(totem, blackboard, Context.new(2000))
+    end
+  end
+
+  describe "receive/4" do
+    test "totems reject redirected debuffs while still receiving direct damage" do
+      totem = %Mob{
+        object: %Object{guid: 1},
+        unit: %Unit{health: 100, max_health: 100, level: 50, auras: []},
+        internal: %Internal{totem: %Totem{owner_guid: 2}}
+      }
+
+      context = %CastContext{caster_guid: 3, caster_level: 50, target_guid: 1, target_hostile?: true}
+
+      debuff = %Spell{
+        id: 116,
+        school: :physical,
+        dmg_class: 1,
+        effects: [%Effect{index: 0, type: :apply_aura, aura: :mod_decrease_speed, implicit_target_a: :target_enemy}]
+      }
+
+      {unchanged, events} = SpellEffect.receive(totem, context, debuff, 100)
+      assert unchanged.unit.auras == []
+      assert [%Effects.SpellLogMiss{reason: :immune}] = events
+
+      mixed = %{debuff | effects: [%Effect{index: 1, type: :school_damage, base_points: 20} | debuff.effects]}
+      {damaged, events} = SpellEffect.receive(totem, context, mixed, 100)
+      assert damaged.unit.health == 80
+      assert damaged.unit.auras == []
+      assert Enum.any?(events, &match?(%Effects.SpellDamage{damage: 20}, &1))
+    end
+
+    test "totem regeneration immunity preserves self casts and Shaman totem healing" do
+      totem = %Mob{
+        object: %Object{guid: 1},
+        unit: %Unit{health: 50, max_health: 100, level: 50, auras: []},
+        internal: %Internal{totem: %Totem{owner_guid: 2}}
+      }
+
+      context = %CastContext{caster_guid: 2, caster_level: 50, target_guid: 1}
+      heal = %Spell{id: 10, effects: [%Effect{index: 0, type: :heal, base_points: 20}]}
+      {unchanged, [%Effects.SpellLogMiss{reason: :immune}]} = SpellEffect.receive(totem, context, heal, 100)
+      assert unchanged.unit.health == 50
+      {self_healed, _} = SpellEffect.receive(totem, %{context | caster_guid: 1}, heal, 100)
+      assert self_healed.unit.health == 70
+      {healed, _} = SpellEffect.receive(totem, context, %{heal | spell_family: 11, family_flags_0: 0x2000}, 100)
+      assert healed.unit.health == 70
     end
   end
 

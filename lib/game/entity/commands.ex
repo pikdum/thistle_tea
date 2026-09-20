@@ -21,3 +21,9 @@ defmodule ThistleTea.Game.Entity.Commands.TotemStarted do
   @enforce_keys [:slot, :guid]
   defstruct [:slot, :guid]
 end
+
+defmodule ThistleTea.Game.Entity.Commands.TotemStopped do
+  @moduledoc false
+  @enforce_keys [:guid]
+  defstruct [:guid]
+end
