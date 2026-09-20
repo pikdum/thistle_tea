@@ -23,8 +23,9 @@ Taming preserves the wild creature's level. The companion relationship retains
 level, XP, and learned spell IDs through dismissal, death, revival, teleport,
 and reconnect. Recreating a pet does not scale it to the owner's level or
 automatically teach new spell ranks. This uses the existing in-memory character
-store; server restart still resets runtime state. Loyalty progression and pet
-training remain separate systems.
+store; server restart still resets runtime state. [Loyalty progression and
+training-point earnings](pet-loyalty-playtest.md) are now implemented; spending
+points on trained pet abilities remains separate.
 
 The debug Hunter starts with a level-49 Prairie Wolf Alpha at 34,800/35,300 XP,
 500 XP below its next level, to make normal kill acceptance repeatable.
