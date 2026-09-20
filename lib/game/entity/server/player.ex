@@ -997,13 +997,17 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   end
 
   def handle_info(%Attachment{} = attachment, %State{character: %Character{}} = state) do
-    state =
-      state
-      |> CompanionVisibility.prepare_attachment(attachment)
-      |> CompanionOwner.attach(attachment)
-      |> project_companion_attachment(attachment)
+    if Process.alive?(attachment.pid) do
+      state =
+        state
+        |> CompanionVisibility.prepare_attachment(attachment)
+        |> CompanionOwner.attach(attachment)
+        |> project_companion_attachment(attachment)
 
-    {:noreply, state, {:continue, {:finish_companion_attach, attachment}}}
+      {:noreply, state, {:continue, {:finish_companion_attach, attachment}}}
+    else
+      {:noreply, state}
+    end
   end
 
   def handle_info(

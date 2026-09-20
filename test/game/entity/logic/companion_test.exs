@@ -18,7 +18,7 @@ defmodule ThistleTea.Game.Entity.Logic.CompanionTest do
       assert character.unit.summon == 0
 
       assert character.internal.companion ==
-               %CompanionData{kind: :hunter_pet, status: {:suspended, 416, 688}}
+               %CompanionData{kind: :hunter_pet, status: {:suspended, 416, 688}, pet_number: 44}
     end
 
     test "suspends a hunter pet when the owner dies" do
@@ -28,7 +28,7 @@ defmodule ThistleTea.Game.Entity.Logic.CompanionTest do
       assert character.unit.summon == 0
 
       assert character.internal.companion ==
-               %CompanionData{kind: :hunter_pet, status: {:suspended, 416, 688}}
+               %CompanionData{kind: :hunter_pet, status: {:suspended, 416, 688}, pet_number: 44}
     end
 
     test "ignores a stale summon projection without an active relationship" do

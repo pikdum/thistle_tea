@@ -35,7 +35,7 @@ defmodule ThistleTea.Game.Entity.Server.Player.StateTest do
 
     @impl true
     def handle_call(:suspend_hunter_pet, _from, happiness),
-      do: {:stop, :normal, {:ok, happiness, true, %PetProgress{level: 49, xp: 1_234}, :passive}, happiness}
+      do: {:stop, :normal, {:ok, happiness, true, %PetProgress{level: 49, xp: 1_234}, :passive, 0}, happiness}
   end
 
   describe "struct defaults" do

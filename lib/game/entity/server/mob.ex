@@ -588,12 +588,27 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
 
   def handle_call(:suspend_hunter_pet, _from, %Mob{internal: %Internal{pet: %Pet{kind: :hunter}}} = state) do
     snapshot =
-      {:ok, state.unit.power5, Core.dead?(state), PetProgression.snapshot(state), state.internal.pet.reaction_state}
+      {:ok, state.unit.power5, Core.dead?(state), PetProgression.snapshot(state), state.internal.pet.reaction_state,
+       state.unit.health}
 
     {:stop, :normal, snapshot, state}
   end
 
   def handle_call(:suspend_hunter_pet, _from, %Mob{} = state), do: {:reply, {:error, :not_hunter_pet}, state}
+
+  def handle_call(
+        :hunter_pet_snapshot,
+        _from,
+        %Mob{internal: %Internal{pet: %Pet{kind: :hunter, broken?: false}}} = state
+      ) do
+    snapshot =
+      {:ok, state.unit.power5, Core.dead?(state), PetProgression.snapshot(state), state.internal.pet.reaction_state,
+       state.unit.health}
+
+    {:reply, snapshot, state}
+  end
+
+  def handle_call(:hunter_pet_snapshot, _from, %Mob{} = state), do: {:reply, {:error, :not_hunter_pet}, state}
 
   def handle_call({:loot_view, %Actor{} = actor}, _from, %Mob{} = state) do
     {result, state} = Corpse.view(state, actor)

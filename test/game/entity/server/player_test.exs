@@ -879,7 +879,13 @@ defmodule ThistleTea.Game.Entity.Server.PlayerTest do
                PlayerServer.handle_info(down, attached)
 
       assert detached.companion_monitor == nil
-      assert detached.character.internal.companion == %Companion{kind: :hunter_pet, status: {:suspended, 1, 1515}}
+
+      assert detached.character.internal.companion == %Companion{
+               kind: :hunter_pet,
+               status: {:suspended, 1, 1515},
+               pet_number: Guid.low_guid(pet_guid)
+             }
+
       assert detached.character.unit.summon == 0
       assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgPetSpells{pet_guid: 0}}}
     end

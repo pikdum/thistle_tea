@@ -166,7 +166,7 @@ defmodule ThistleTea.Game.Entity.Logic.CoreTest do
 
       assert Core.dead?(entity)
       assert entity.unit.summon == 0
-      assert entity.internal.companion == %Companion{kind: :hunter_pet, status: {:suspended, 416, 688}}
+      assert entity.internal.companion == %Companion{kind: :hunter_pet, status: {:suspended, 416, 688}, pet_number: 123}
 
       assert Enum.any?(
                entity.internal.events,

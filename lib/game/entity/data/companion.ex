@@ -26,11 +26,23 @@ defmodule ThistleTea.Game.Entity.Data.Companion do
   @type status :: :none | {:active, EntityRef.t()} | {:suspended, non_neg_integer(), non_neg_integer()}
 
   @enforce_keys [:kind, :status]
-  defstruct [:kind, :status, :happiness, :progress, dead?: false, reaction_state: :defensive, autocast: MapSet.new()]
+  defstruct [
+    :kind,
+    :status,
+    :pet_number,
+    :health,
+    :happiness,
+    :progress,
+    dead?: false,
+    reaction_state: :defensive,
+    autocast: MapSet.new()
+  ]
 
   @type t :: %__MODULE__{
           kind: kind() | nil,
           status: status(),
+          pet_number: pos_integer() | nil,
+          health: non_neg_integer() | nil,
           happiness: non_neg_integer() | nil,
           progress: PetProgress.t() | nil,
           dead?: boolean(),

@@ -22,6 +22,7 @@ defmodule ThistleTea.Game.Player.Gossip do
   alias ThistleTea.Game.Player.ConditionContext
   alias ThistleTea.Game.Player.GossipCondition
   alias ThistleTea.Game.Player.HomeBind
+  alias ThistleTea.Game.Player.PetStable
   alias ThistleTea.Game.Player.Quests
   alias ThistleTea.Game.Player.Reputation
   alias ThistleTea.Game.Player.Taxi
@@ -156,6 +157,9 @@ defmodule ThistleTea.Game.Player.Gossip do
   defp dispatch(state, _character, guid, %Option{option_id: option_id}, %{banker: option_id}),
     do: Bank.activate(state, guid)
 
+  defp dispatch(state, _character, guid, %Option{option_id: option_id}, %{stable: option_id}),
+    do: PetStable.list(state, guid)
+
   defp dispatch(state, _character, guid, %Option{option_id: option_id}, %{innkeeper: option_id}),
     do: HomeBind.confirm(state, guid)
 
@@ -191,6 +195,7 @@ defmodule ThistleTea.Game.Player.Gossip do
   defp visible_options(options, npc_guid, %Character{unit: unit} = character, context) do
     trainer = GossipLoader.option_trainer()
     spirit_healer = GossipLoader.option_spirit_healer()
+    stable = GossipLoader.option_stable()
 
     Enum.filter(options, fn option ->
       npc_flag_allowed?(option, npc_guid) and option_allowed?(context, option, :deny_unknown) and
@@ -205,6 +210,9 @@ defmodule ThistleTea.Game.Player.Gossip do
 
           ^spirit_healer ->
             not Death.alive?(character)
+
+          ^stable ->
+            unit.class == 3
 
           _option_id ->
             true
@@ -246,6 +254,7 @@ defmodule ThistleTea.Game.Player.Gossip do
       spirit_healer: GossipLoader.option_spirit_healer(),
       innkeeper: GossipLoader.option_innkeeper(),
       banker: GossipLoader.option_banker(),
+      stable: GossipLoader.option_stable(),
       battlefield: GossipLoader.option_battlefield()
     }
   end

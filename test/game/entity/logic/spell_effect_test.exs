@@ -1115,7 +1115,13 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
       dismiss_pet = %Spell{id: 2641, effects: [%Effect{index: 0, type: :dismiss_pet}]}
       {character, events} = SpellEffect.receive(character, context, dismiss_pet, 1_000)
       assert character.unit.summon == 0
-      assert character.internal.companion == %Companion{kind: :hunter_pet, status: {:suspended, 1234, 1515}}
+
+      assert character.internal.companion == %Companion{
+               kind: :hunter_pet,
+               status: {:suspended, 1234, 1515},
+               pet_number: 44
+             }
+
       assert [%Effects.DismissPet{target_guid: 44}] = events
     end
 

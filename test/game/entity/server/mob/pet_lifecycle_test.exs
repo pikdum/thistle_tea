@@ -102,7 +102,8 @@ defmodule ThistleTea.Game.Entity.Server.Mob.PetLifecycleTest do
       ref = Process.monitor(pid)
 
       assert {:ok, 166_500, false,
-              %PetProgress{level: 49, xp: 123, loyalty: 4, loyalty_points: 12_345, training_points: 45}, :defensive} =
+              %PetProgress{level: 49, xp: 123, loyalty: 4, loyalty_points: 12_345, training_points: 45}, :defensive,
+              100} =
                Entity.call(guid, :suspend_hunter_pet)
 
       assert_receive {:DOWN, ^ref, :process, ^pid, :normal}

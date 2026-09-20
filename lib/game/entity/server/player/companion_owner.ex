@@ -101,15 +101,34 @@ defmodule ThistleTea.Game.Entity.Server.Player.CompanionOwner do
 
   def suspend(%State{} = state), do: clear_monitor(state)
 
-  def suspend_hunter_pet(%Character{} = character, guid) do
-    if CompanionLogic.entry(character) == Guid.entry(guid) do
-      case Entity.call(guid, :suspend_hunter_pet) do
-        {:ok, happiness, dead?, progress, reaction} when is_integer(happiness) ->
+  def refresh(%State{character: %Character{} = character} = state) do
+    case Entity.call(CompanionLogic.active_guid(character), :hunter_pet_snapshot) do
+      {:ok, happiness, dead?, progress, reaction, health} ->
+        character =
           character
           |> CompanionLogic.capture_happiness(happiness)
           |> CompanionLogic.capture_death(dead?)
           |> CompanionLogic.capture_progress(progress)
           |> CompanionLogic.capture_reaction(reaction)
+          |> CompanionLogic.capture_health(health)
+
+        %{state | character: character}
+
+      _ ->
+        state
+    end
+  end
+
+  def suspend_hunter_pet(%Character{} = character, guid) do
+    if CompanionLogic.entry(character) == Guid.entry(guid) do
+      case Entity.call(guid, :suspend_hunter_pet) do
+        {:ok, happiness, dead?, progress, reaction, health} when is_integer(happiness) ->
+          character
+          |> CompanionLogic.capture_happiness(happiness)
+          |> CompanionLogic.capture_death(dead?)
+          |> CompanionLogic.capture_progress(progress)
+          |> CompanionLogic.capture_reaction(reaction)
+          |> CompanionLogic.capture_health(health)
 
         {:error, :pet_broken} ->
           CompanionLogic.clear(character)

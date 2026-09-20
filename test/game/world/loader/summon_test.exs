@@ -135,8 +135,16 @@ defmodule ThistleTea.Game.World.Loader.SummonTest do
           training_points: 45
         })
         |> Companion.capture_reaction(:passive)
+        |> Companion.capture_health(777)
+
+      owner = put_in(owner.internal.companion.pet_number, 707)
 
       pet = Summon.build_pet(2960, owner)
+      assert pet.unit.health == 777
+      assert pet.unit.pet_number == 707
+      assert Summon.with_health_percent(pet, nil).unit.health == 777
+      assert Summon.with_health_percent(pet, 15).unit.health == 332
+      assert Summon.build_pet(2960, Companion.capture_health(owner, 99_999)).unit.health == 2_215
       assert pet.unit.level == 50
       assert pet.unit.pet_experience == 123
       assert pet.unit.pet_next_level_exp == 36_875

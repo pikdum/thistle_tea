@@ -87,7 +87,7 @@ defmodule ThistleTea.Game.World.Loader.Summon do
             unit
             | summon: 0,
               faction_template: owner_unit.faction_template,
-              pet_number: Guid.low_guid(guid),
+              pet_number: pet_number(owner, entry, guid),
               pet_name_timestamp: System.system_time(:second),
               pet_loyalty: if(hunter_pet?, do: 1, else: 0),
               pet_flags: 0
@@ -117,12 +117,18 @@ defmodule ThistleTea.Game.World.Loader.Summon do
       |> attach_owner(owner_guid)
       |> apply_pet_passive_auras(entry, level)
       |> PetTraining.restore_passives(Time.now())
+      |> restore_health(owner, entry)
     else
       _ -> nil
     end
   end
 
   def build_pet(_entry, _owner), do: nil
+
+  defp pet_number(owner, entry, guid) do
+    number = if Companion.entry(owner) == entry, do: Companion.relationship(owner).pet_number
+    number || Guid.low_guid(guid)
+  end
 
   defp pet_progress(owner, entry, owner_level, true) do
     progress = if Companion.entry(owner) == entry, do: Companion.relationship(owner).progress
@@ -155,6 +161,20 @@ defmodule ThistleTea.Game.World.Loader.Summon do
     health = unit.max_health |> Kernel.*(percent / 100) |> trunc() |> max(1) |> min(unit.max_health)
     %{pet | unit: %{unit | health: health}}
   end
+
+  def with_health_percent(%Mob{} = pet, nil), do: pet
+
+  defp restore_health(%Mob{internal: %{pet: %Pet{kind: :hunter}}} = pet, owner, entry) do
+    health = Companion.relationship(owner).health
+
+    if Companion.entry(owner) == entry and is_integer(health) do
+      %{pet | unit: %{pet.unit | health: min(health, pet.unit.max_health)}}
+    else
+      pet
+    end
+  end
+
+  defp restore_health(pet, _owner, _entry), do: pet
 
   defp restore_happiness(%Mob{internal: %{pet: %Pet{kind: :hunter}}} = pet, owner, entry) do
     happiness = Companion.relationship(owner).happiness

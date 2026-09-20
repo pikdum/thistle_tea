@@ -21,7 +21,7 @@ defmodule ThistleTea.Game.Entity.Logic.Effects.SummonTypes do
     {:ReleaseControlled, [:source_guid, :target_guid], [spell_id: nil]},
     {:ViewpointGranted, [:source_guid, :target_guid], []},
     {:ViewpointReleased, [:source_guid, :target_guid], []},
-    {:SummonPet, [:source_guid, :entry, :spell_id], [health_percent: 100]},
+    {:SummonPet, [:source_guid, :entry, :spell_id], [health_percent: nil]},
     {:TameCreature, [:source_guid, :entry], []},
     {:DismissPet, [:target_guid], []},
     {:LearnPetSpell, [:target_guid, :spell], []},

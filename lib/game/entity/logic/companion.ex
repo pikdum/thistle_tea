@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.Entity.Logic.Companion do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.PetProgress
   alias ThistleTea.Game.Entity.Logic.Effects
+  alias ThistleTea.Game.Guid
 
   @summon_kinds [:hunter_pet, :guardian]
   @control_kinds [:enslaved, :charm, :possession]
@@ -28,6 +29,8 @@ defmodule ThistleTea.Game.Entity.Logic.Companion do
     put_relationship(character, %Companion{
       kind: kind,
       status: {:active, entity_ref},
+      pet_number: activation_number(character, kind, entity_ref),
+      health: retained_health(character, entity_ref.entry),
       autocast: autocast,
       happiness: happiness,
       progress: progress,
@@ -47,6 +50,13 @@ defmodule ThistleTea.Game.Entity.Logic.Companion do
   end
 
   def capture_progress(%Character{} = character, _progress), do: character
+
+  def capture_health(%Character{} = character, health) when is_integer(health) and health >= 0 do
+    case relationship(character) do
+      %Companion{kind: :hunter_pet} = companion -> put_relationship(character, %{companion | health: health})
+      _ -> character
+    end
+  end
 
   def remember_reaction(%Character{} = character, guid, reaction)
       when reaction in [:passive, :defensive, :aggressive] do
@@ -153,6 +163,10 @@ defmodule ThistleTea.Game.Entity.Logic.Companion do
     put_relationship(character, Companion.none())
   end
 
+  def restore(%Character{} = character, %Companion{status: {:suspended, _, _}} = companion) do
+    put_relationship(character, companion)
+  end
+
   def set_autocast(%Character{} = character, actions) when is_list(actions) do
     case relationship(character) do
       %Companion{kind: kind, status: {:active, %EntityRef{}}, autocast: autocast} = companion
@@ -250,6 +264,17 @@ defmodule ThistleTea.Game.Entity.Logic.Companion do
   end
 
   defp activation_autocast(%Companion{}, _kind, _entry), do: MapSet.new()
+
+  defp activation_number(character, :hunter_pet, entity_ref) do
+    number = if entry(character) == entity_ref.entry, do: relationship(character).pet_number
+    number || Guid.low_guid(entity_ref.guid)
+  end
+
+  defp activation_number(_character, _kind, _entity_ref), do: nil
+
+  defp retained_health(character, entry) do
+    if entry(character) == entry, do: relationship(character).health
+  end
 
   defp update_autocast(%{action: spell_id, action_type: @act_enabled}, autocast)
        when is_integer(spell_id) and spell_id > 0, do: MapSet.put(autocast, spell_id)

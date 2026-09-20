@@ -269,6 +269,7 @@ defmodule ThistleTea.DevSeed do
     spawn_mob(113, @base_low_guid + 400, {x + 15.0, y - 10.0, z}, nil, 180)
     spawn_mob(54, @base_low_guid + 500, {x + 4.0, y + 2.0, z}, nil, @respawn_secs)
     spawn_mob(6491, @base_low_guid + 600, {x + 4.0, y - 2.0, z}, nil, @respawn_secs)
+    spawn_mob(11_069, @base_low_guid + 700, {x - 3.0, y + 2.0, z}, nil, @respawn_secs)
   end
 
   defp spawn_mob(entry, low_guid, {x, y, z}, loot_override, respawn_secs) do
