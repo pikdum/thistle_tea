@@ -64,6 +64,31 @@ defmodule ThistleTea.UpdateObjectTest do
   end
 
   describe "to_packet/2" do
+    test "packed short pairs retain both halves and alignment of the following field" do
+      guid = 7
+      packed_guid = BinaryUtils.pack_guid(guid)
+      guid_size = byte_size(packed_guid)
+
+      obj = %UpdateObject{
+        update_type: :values,
+        object_type: :unit,
+        object: %Object{guid: guid},
+        unit: %Unit{attack_power_mods: 0xFEDC1234, attack_power_multiplier: 1.25}
+      }
+
+      assert <<1::little-size(32), 0, 0, ^packed_guid::binary-size(^guid_size), mask_count, rest::binary>> =
+               UpdateObject.to_packet(obj, guid).payload
+
+      mask_size = mask_count * 4
+      <<mask::binary-size(^mask_size), values::binary>> = rest
+
+      word_count = for <<bit::1 <- mask>>, reduce: 0, do: (total -> total + bit)
+      prefix_size = (word_count - 2) * 4
+
+      assert <<_preceding::binary-size(^prefix_size), 0x1234::little-size(16), 0xFEDC::little-size(16),
+               1.25::little-float-size(32)>> = values
+    end
+
     test "sends full pet stats to its owner and public fields to other players" do
       pet_guid = Guid.from_low_guid(:pet, 2960, 1)
 

@@ -144,7 +144,7 @@ defmodule ThistleTea.Game.Network.UpdateObject do
   def field({_, value, {_, size, :int}}), do: <<value::little-size(32 * size)>>
   def field({_, value, {_, size, :float}}), do: <<value::little-float-size(32 * size)>>
   def field({_, value, {_, size, :byte}}), do: <<value::binary-size(4 * size)>>
-  def field({_, value, {_, size, :two_short}}), do: <<value::little-size(16 * size)>>
+  def field({_, value, {_, size, :two_short}}), do: <<value::little-size(32 * size)>>
   def field({_, value, {_, _size, :bytes}}), do: value
 
   def build_bytes([]), do: <<>>
