@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.Entity.EffectResolver do
   alias ThistleTea.Game.Entity.EffectResolver.Combat
   alias ThistleTea.Game.Entity.EffectResolver.Durability
   alias ThistleTea.Game.Entity.EffectResolver.Movement
+  alias ThistleTea.Game.Entity.EffectResolver.PetLearning
   alias ThistleTea.Game.Entity.EffectResolver.Spells
   alias ThistleTea.Game.Entity.Logic.Effects
 
@@ -18,6 +19,7 @@ defmodule ThistleTea.Game.Entity.EffectResolver do
   end
 
   def resolve(entity, %Effects.DurabilityDamage{} = effect), do: Durability.resolve(entity, effect)
+  def resolve(entity, %Effects.PetAbilityUsed{} = effect), do: PetLearning.resolve(entity, effect)
 
   def resolve(entity, %{__struct__: effect_module} = effect) when effect_module in @combat_requests do
     Combat.resolve(entity, effect)

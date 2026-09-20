@@ -11,7 +11,50 @@ defmodule ThistleTea.Game.Player.PetTraining do
   alias ThistleTea.Game.Entity.Server.Player.State
   alias ThistleTea.Game.Network
   alias ThistleTea.Game.Network.Message
+  alias ThistleTea.Game.Player.Spells
   alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.World.Loader.PetSpells
+
+  def discover(%State{character: %Character{} = character} = state, %Effects.LearnPetRecipe{} = effect) do
+    if effect.target_guid == character.object.guid and Companion.summon_guid(character) == effect.source_guid do
+      %{state | character: learn_recipes(character, [effect.spell_id])}
+    else
+      state
+    end
+  end
+
+  def discover(state, _effect), do: state
+
+  def discover_passives(%State{character: %Character{} = character} = state, %{
+        kind: :hunter_pet,
+        entity_ref: ref,
+        spells: spells
+      }) do
+    profile = PetSpells.profile(ref.entry)
+
+    recipes =
+      spells
+      |> Enum.filter(&Spell.attribute?(&1, :passive))
+      |> Enum.flat_map(fn spell ->
+        case Map.get(profile.recipes, spell.id) do
+          id when is_integer(id) -> [id]
+          _ -> []
+        end
+      end)
+
+    %{state | character: learn_recipes(character, recipes)}
+  end
+
+  def discover_passives(state, _attachment), do: state
+
+  defp learn_recipes(character, []), do: character
+
+  defp learn_recipes(character, recipes) do
+    case Spells.learn(character, recipes) do
+      {:ok, character, _events} -> character
+      :already_known -> character
+    end
+  end
 
   def validate(%Character{} = character, %Spell{} = spell) do
     if Training.ability_id(spell) do

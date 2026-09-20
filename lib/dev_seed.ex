@@ -6,7 +6,8 @@ defmodule ThistleTea.DevSeed do
   loot piñatas with guaranteed green drops for roll testing, level-50
   hostiles for combat and XP testing, and a Devilsaur (combat reach 5.0)
   for big-hitbox spell-range testing, a Defias Thug for pickpocketing, and a
-  Stonetusk Boar with a three-minute respawn for skinning practice. A repair
+  Stonetusk Boar with a three-minute respawn for skinning practice. A Prairie
+  Wolf Alpha and Mottled Worg support pet ability discovery and training. A repair
   vendor and spirit healer support equipment wear and resurrection testing.
   """
   import Ecto.Query
@@ -161,7 +162,7 @@ defmodule ThistleTea.DevSeed do
 
     character
     |> Companion.suspend_as(:hunter_pet, 2960, 1515)
-    |> Companion.capture_progress(%PetProgress{level: level, xp: xp})
+    |> Companion.capture_progress(%PetProgress{level: level, xp: xp, spells: [14_919, 17_260, 24_603]})
   end
 
   defp set_debug_pet(character, _class), do: character
@@ -270,6 +271,8 @@ defmodule ThistleTea.DevSeed do
     spawn_mob(54, @base_low_guid + 500, {x + 4.0, y + 2.0, z}, nil, @respawn_secs)
     spawn_mob(6491, @base_low_guid + 600, {x + 4.0, y - 2.0, z}, nil, @respawn_secs)
     spawn_mob(11_069, @base_low_guid + 700, {x - 3.0, y + 2.0, z}, nil, @respawn_secs)
+    spawn_mob(2960, @base_low_guid + 800, {x - 10.0, y - 10.0, z}, nil, 180)
+    spawn_mob(1766, @base_low_guid + 900, {x - 20.0, y - 10.0, z}, nil, 180)
   end
 
   defp spawn_mob(entry, low_guid, {x, y, z}, loot_override, respawn_secs) do

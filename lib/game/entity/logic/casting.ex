@@ -20,6 +20,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
   alias ThistleTea.Game.Entity.Logic.MeleeSpell
   alias ThistleTea.Game.Entity.Logic.Mount
   alias ThistleTea.Game.Entity.Logic.Paladin
+  alias ThistleTea.Game.Entity.Logic.PetLearning
   alias ThistleTea.Game.Entity.Logic.Pickpocket
   alias ThistleTea.Game.Entity.Logic.PlayerCombat
   alias ThistleTea.Game.Entity.Logic.Reactive
@@ -202,6 +203,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
       |> break_stealth(casting, now)
       |> interrupt_action_auras(:action_complete, casting.spell, now)
       |> mark_hostile_cast(casting, attempted_targets, now)
+      |> PetLearning.used(casting.spell)
 
     casting = Cast.transition(casting, :impact)
     entity |> put_cast(casting) |> advance_phase(casting, now)

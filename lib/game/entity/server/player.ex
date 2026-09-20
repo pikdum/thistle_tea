@@ -1003,6 +1003,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
         |> CompanionVisibility.prepare_attachment(attachment)
         |> CompanionOwner.attach(attachment)
         |> project_companion_attachment(attachment)
+        |> PetTraining.discover_passives(attachment)
 
       {:noreply, state, {:continue, {:finish_companion_attach, attachment}}}
     else
@@ -1044,6 +1045,14 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   rescue
     error ->
       Logger.error("Pet training failed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:noreply, state}
+  end
+
+  def handle_info(%Effects.LearnPetRecipe{} = effect, %State{} = state) do
+    {:noreply, PetTraining.discover(state, effect)}
+  rescue
+    error ->
+      Logger.error("Pet recipe discovery failed: #{Exception.format(:error, error, __STACKTRACE__)}")
       {:noreply, state}
   end
 

@@ -347,6 +347,7 @@ defmodule ThistleTea.Game.Entity.EventSink.Summons do
              Effects.PetHappinessChanged,
              Effects.PetProgressChanged,
              Effects.PetReactionChanged,
+             Effects.LearnPetRecipe,
              Effects.PetDied
            ] do
     case Entity.pid(guid) do

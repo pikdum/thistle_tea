@@ -25,6 +25,7 @@ defmodule ThistleTea.Game.World.Loader.Summon do
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.Loader.Mob, as: MobLoader
   alias ThistleTea.Game.World.Loader.PetLevel, as: PetLevelLoader
+  alias ThistleTea.Game.World.Loader.PetSpells
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.WorldRef
 
@@ -132,10 +133,20 @@ defmodule ThistleTea.Game.World.Loader.Summon do
 
   defp pet_progress(owner, entry, owner_level, true) do
     progress = if Companion.entry(owner) == entry, do: Companion.relationship(owner).progress
-    progress || %PetProgress{level: owner_level}
+    initialize_spells(progress || %PetProgress{level: owner_level}, PetSpells.profile(entry))
   end
 
   defp pet_progress(_owner, _entry, _owner_level, false), do: nil
+
+  defp initialize_spells(%PetProgress{spells: nil} = progress, profile) do
+    %{
+      progress
+      | spells: Enum.sort(Map.keys(profile.spellbook)),
+        training_points: progress.training_points + profile.training_points
+    }
+  end
+
+  defp initialize_spells(%PetProgress{} = progress, _profile), do: progress
 
   defp pet_reaction(owner, entry) do
     if Companion.entry(owner) == entry, do: Companion.relationship(owner).reaction_state, else: :defensive
@@ -210,6 +221,8 @@ defmodule ThistleTea.Game.World.Loader.Summon do
       flags
     end
   end
+
+  defp apply_pet_passive_auras(%Mob{internal: %{pet: %Pet{kind: :hunter}}} = mob, _entry, _level), do: mob
 
   defp apply_pet_passive_auras(%Mob{} = mob, entry, level) do
     entry

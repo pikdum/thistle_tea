@@ -14,6 +14,8 @@ defmodule ThistleTea.Game.World.Loader.SummonTest do
   alias ThistleTea.Game.Entity.Logic.Companion
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.World.Loader.PetLevel, as: PetLevelLoader
+  alias ThistleTea.Game.World.Loader.PetSpells
+  alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Loader.Summon
   alias ThistleTea.Game.WorldRef
 
@@ -36,6 +38,15 @@ defmodule ThistleTea.Game.World.Loader.SummonTest do
 
     :ets.insert(PetLevelLoader, {:levels, %{50 => stats}})
     on_exit(fn -> :ets.insert(PetLevelLoader, {:levels, previous}) end)
+    previous_profiles = :ets.lookup(PetSpells, :profiles)
+    profile = %{spellbook: SpellLoader.build_spellbook([17_255, 24_604]), training_points: -14, recipes: %{}}
+    :ets.insert(PetSpells, {:profiles, %{2960 => profile}})
+
+    on_exit(fn ->
+      :ets.delete(PetSpells, :profiles)
+      :ets.insert(PetSpells, previous_profiles)
+    end)
+
     :ok
   end
 
@@ -99,7 +110,7 @@ defmodule ThistleTea.Game.World.Loader.SummonTest do
       assert pet.unit.power5 == 166_500
     end
 
-    test "builds the debug hunter pet with VMangos damage and max-rank family abilities" do
+    test "keeps a freshly tamed beast's exact ranks and training debt at a higher owner level" do
       owner = %Character{
         object: %Object{guid: Guid.from_low_guid(:player, 1)},
         unit: %Unit{level: 50, faction_template: 1},
@@ -112,7 +123,8 @@ defmodule ThistleTea.Game.World.Loader.SummonTest do
 
       assert_in_delta min_damage, 42.2625 * 0.75, 0.0001
       assert_in_delta max_damage, 53.2875 * 0.75, 0.0001
-      assert Map.keys(pet.internal.spellbook) |> Enum.sort() == [14_920, 17_260, 24_603]
+      assert Map.keys(pet.internal.spellbook) |> Enum.sort() == [17_255, 24_604]
+      assert pet.internal.pet.training_points == -14
     end
 
     test "restores pet level XP and learned spells instead of scaling to the owner" do
