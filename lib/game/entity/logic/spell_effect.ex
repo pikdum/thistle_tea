@@ -10,6 +10,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   alias ThistleTea.Game.Entity.Logic.EffectImmunity
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.MechanicResistance
+  alias ThistleTea.Game.Entity.Logic.PetTraining
   alias ThistleTea.Game.Entity.Logic.Reactive
   alias ThistleTea.Game.Entity.Logic.Rogue
   alias ThistleTea.Game.Entity.Logic.SpellEffect.Aura, as: AuraEffects
@@ -148,7 +149,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   defp caster_trigger_effect?(_effect), do: false
 
   defp caster_execution_effect?(%Effect{type: :dismiss_pet}), do: true
-  defp caster_execution_effect?(_effect), do: false
+  defp caster_execution_effect?(effect), do: PetTraining.training_effect?(effect)
 
   defp pet_target_effect?(%Effect{} = effect) do
     effect.implicit_target_a == :pet or effect.implicit_target_b == :pet

@@ -24,6 +24,7 @@ defmodule ThistleTea.Game.Entity.Logic.Effects.SummonTypes do
     {:SummonPet, [:source_guid, :entry, :spell_id], [health_percent: 100]},
     {:TameCreature, [:source_guid, :entry], []},
     {:DismissPet, [:target_guid], []},
+    {:LearnPetSpell, [:target_guid, :spell], []},
     {:PetHappinessChanged, [:source_guid, :target_guid, :happiness], []},
     {:PetProgressChanged, [:source_guid, :target_guid, :progress], []},
     {:PetReactionChanged, [:source_guid, :target_guid, :reaction_state], []},

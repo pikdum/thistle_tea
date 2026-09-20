@@ -75,6 +75,9 @@ defmodule ThistleTea.Game.Entity.Logic.PetLoyalty do
 
   def level_up(%Mob{unit: %Unit{pet_loyalty: rank}} = entity), do: add_training_points(entity, rank - 1)
 
+  def spend_training_points(%Mob{} = entity, amount) when is_integer(amount) and amount >= 0,
+    do: add_training_points(entity, -amount)
+
   defp tick_amount(happiness) when happiness >= 666_000, do: 20
   defp tick_amount(happiness) when happiness >= 333_000, do: 10
   defp tick_amount(_happiness), do: -20

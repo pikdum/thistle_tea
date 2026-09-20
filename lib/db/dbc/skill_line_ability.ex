@@ -13,5 +13,6 @@ defmodule SkillLineAbility do
     field(:trivial_skill_line_rank_high, :integer)
     field(:superseded_by, :integer)
     field(:acquire_method, :integer)
+    field(:training_points, :integer, source: :num_skills_up)
   end
 end

@@ -148,6 +148,7 @@ defmodule ThistleTea.Game.Spell.Semantics do
     :dummy,
     :script_effect,
     :learn_spell,
+    :learn_pet_spell,
     :parry,
     :dual_wield,
     :proficiency,

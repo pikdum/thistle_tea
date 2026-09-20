@@ -54,6 +54,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   alias ThistleTea.Game.Entity.Logic.PetHappiness
   alias ThistleTea.Game.Entity.Logic.PetLoyalty
   alias ThistleTea.Game.Entity.Logic.PetProgression
+  alias ThistleTea.Game.Entity.Logic.PetTraining
   alias ThistleTea.Game.Entity.Logic.SpellEffect
   alias ThistleTea.Game.Entity.Logic.SpellFeedback
   alias ThistleTea.Game.Entity.Logic.StealthDetection
@@ -518,6 +519,32 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   @impl GenServer
   def handle_call(:threat_table, _from, %Mob{} = state) do
     {:reply, {:ok, %{victim: state.unit.target, entries: Threat.entries(state)}}, state}
+  end
+
+  def handle_call({command, owner, %Spell{} = spell}, _from, %Mob{} = state)
+      when command in [:validate_pet_training, :learn_pet_spell] do
+    abilities = ThistleTea.Game.World.Loader.PetTraining.abilities()
+    skill = ThistleTea.Game.World.Loader.PetTraining.family_skill(state.internal.creature.family)
+
+    if command == :validate_pet_training do
+      {:reply, PetTraining.validate(state, owner, spell, abilities, skill), state}
+    else
+      case PetTraining.learn(state, owner, spell, abilities, skill, Time.now()) do
+        {:ok, updated} ->
+          blackboard = updated.internal.blackboard |> Blackboard.ensure() |> Blackboard.reset_spells()
+          updated = %{updated | internal: %{updated.internal | blackboard: blackboard}}
+          updated = updated |> PetProgression.publish() |> EventSink.emit_pending() |> wake_ai_tick()
+          result = {:ok, Map.values(updated.internal.spellbook), updated.internal.pet}
+          {:reply, result, updated, {:continue, :maybe_broadcast}}
+
+        {:error, reason} ->
+          {:reply, {:error, reason}, state}
+      end
+    end
+  rescue
+    error ->
+      Logger.error("Pet training failed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:reply, {:error, :bad_targets}, state}
   end
 
   def handle_call(

@@ -14,15 +14,14 @@ defmodule ThistleTea.Game.World.Loader.Summon do
   alias ThistleTea.DBC.CreatureFamily
   alias ThistleTea.Game.Entity.Data.Component.Internal.Pet
   alias ThistleTea.Game.Entity.Data.Component.Unit
-  alias ThistleTea.Game.Entity.Data.CreatureSpell
   alias ThistleTea.Game.Entity.Data.Mob
   alias ThistleTea.Game.Entity.Data.PetProgress
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
   alias ThistleTea.Game.Entity.Logic.Companion
   alias ThistleTea.Game.Entity.Logic.PetProgression
+  alias ThistleTea.Game.Entity.Logic.PetTraining
   alias ThistleTea.Game.Entity.Logic.Stats
   alias ThistleTea.Game.Guid
-  alias ThistleTea.Game.Spell, as: SpellData
   alias ThistleTea.Game.Time
   alias ThistleTea.Game.World.Loader.Mob, as: MobLoader
   alias ThistleTea.Game.World.Loader.PetLevel, as: PetLevelLoader
@@ -75,7 +74,7 @@ defmodule ThistleTea.Game.World.Loader.Summon do
       level = if progress, do: progress.level, else: owner_level
       guid = Guid.from_low_guid(:pet, entry, next_low_guid())
       spellbook = restored_spellbook(entry, level, progress)
-      creature = %{mob.internal.creature | spells: pet_action_spells(spellbook)}
+      creature = %{mob.internal.creature | spells: PetTraining.action_spells(spellbook)}
       creature = normalize_pet_damage_multiplier(creature, hunter_pet?)
       stats = if !hunter_pet?, do: pet_stats(entry, level)
 
@@ -117,6 +116,7 @@ defmodule ThistleTea.Game.World.Loader.Summon do
       |> restore_happiness(owner, entry)
       |> attach_owner(owner_guid)
       |> apply_pet_passive_auras(entry, level)
+      |> PetTraining.restore_passives(Time.now())
     else
       _ -> nil
     end
@@ -371,16 +371,6 @@ defmodule ThistleTea.Game.World.Loader.Summon do
     do: (attributes &&& @spell_attr_passive) != 0
 
   defp passive_spell?(_spell), do: false
-
-  defp pet_action_spells(spellbook) when is_map(spellbook) do
-    spellbook
-    |> Map.values()
-    |> Enum.sort_by(& &1.id)
-    |> Enum.map(fn spell ->
-      cast_target = if SpellData.harmful?(spell), do: :victim, else: :self
-      %CreatureSpell{spell_id: spell.id, cast_target: cast_target}
-    end)
-  end
 
   defp template(entry) do
     case :ets.lookup(__MODULE__, entry) do

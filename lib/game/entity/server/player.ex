@@ -86,6 +86,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.Player.Looting
   alias ThistleTea.Game.Player.Mail
   alias ThistleTea.Game.Player.PetExperience
+  alias ThistleTea.Game.Player.PetTraining
   alias ThistleTea.Game.Player.Quests
   alias ThistleTea.Game.Player.Reputation, as: PlayerReputation
   alias ThistleTea.Game.Player.Rest, as: PlayerRest
@@ -1032,6 +1033,14 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   def handle_info(%Effects.PetDied{source_guid: guid}, %State{character: %Character{}} = state) do
     character = Companion.remember_death(state.character, guid)
     {:noreply, %{state | character: character}}
+  end
+
+  def handle_info(%Effects.LearnPetSpell{} = effect, %State{} = state) do
+    {:noreply, PetTraining.learn(state, effect)}
+  rescue
+    error ->
+      Logger.error("Pet training failed: #{Exception.format(:error, error, __STACKTRACE__)}")
+      {:noreply, state}
   end
 
   def handle_info(

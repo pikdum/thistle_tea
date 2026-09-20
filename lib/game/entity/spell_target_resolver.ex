@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
   """
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Logic.Hostility
+  alias ThistleTea.Game.Entity.Logic.PetTraining
   alias ThistleTea.Game.Entity.Logic.SpellTarget
   alias ThistleTea.Game.Party
   alias ThistleTea.Game.Spell
@@ -63,7 +64,7 @@ defmodule ThistleTea.Game.Entity.SpellTargetResolver do
   defp caster_execution_effect?(%{implicit_target_b: :caster}), do: true
   defp caster_execution_effect?(%{type: :dismiss_pet}), do: true
   defp caster_execution_effect?(%{type: :summon_demon, implicit_target_a: nil, implicit_target_b: nil}), do: true
-  defp caster_execution_effect?(_effect), do: false
+  defp caster_execution_effect?(effect), do: PetTraining.training_effect?(effect)
 
   defp chain_targets(_caster, _spell, _previous, selected, remaining) when remaining <= 0, do: selected
 

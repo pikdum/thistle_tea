@@ -179,6 +179,19 @@ defmodule ThistleTea.Game.Network.Message.PetMessagesTest do
   end
 
   describe "SMSG_PET_SPELLS" do
+    test "includes passive spells beyond the four active buttons" do
+      active = Enum.map(1..4, &%Spell{id: &1})
+      passive = Enum.map(5..8, &%Spell{id: &1, attributes: MapSet.new([:passive])})
+      message = Message.SmsgPetSpells.for_pet(123, passive ++ active)
+      binary = Message.SmsgPetSpells.to_binary(message)
+      assert <<_header_and_bar::binary-size(56), 8, known::binary-size(32), 0>> = binary
+
+      assert for(<<id::little-size(24), type::size(8) <- known>>, do: {id, type}) ==
+               Enum.map(1..4, &{&1, 0x81}) ++ Enum.map(5..8, &{&1, 0x01})
+
+      assert Enum.map(Enum.slice(message.action_bars, 3, 4), &Bitwise.band(&1, 0xFFFFFF)) == [1, 2, 3, 4]
+    end
+
     test "encodes the vanilla action bar and known spell list" do
       message = Message.SmsgPetSpells.for_pet(123, [%CreatureSpell{spell_id: 3110}])
       binary = Message.SmsgPetSpells.to_binary(message)

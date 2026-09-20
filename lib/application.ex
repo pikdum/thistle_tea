@@ -42,6 +42,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.World.Loader.NpcText, as: NpcTextLoader
   alias ThistleTea.Game.World.Loader.PageText, as: PageTextLoader
   alias ThistleTea.Game.World.Loader.PetLevel, as: PetLevelLoader
+  alias ThistleTea.Game.World.Loader.PetTraining, as: PetTrainingLoader
   alias ThistleTea.Game.World.Loader.Quest, as: QuestLoader
   alias ThistleTea.Game.World.Loader.Reputation, as: ReputationLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
@@ -187,6 +188,7 @@ defmodule ThistleTea.Application do
     BroadcastTextLoader.init()
     SummonLoader.init()
     PetLevelLoader.init()
+    PetTrainingLoader.init()
     TaxiLoader.init()
     TransportLoader.init()
     WaypointLoader.init()
@@ -275,6 +277,7 @@ defmodule ThistleTea.Application do
         SpellScriptNameLoader.load_all()
         SpellThreatLoader.load_all()
         TalentLoader.load_all()
+        PetTrainingLoader.load_all()
         TaxiLoader.load_all()
         Logger.info("Starting transports...")
         :ok = Transports.start_all()

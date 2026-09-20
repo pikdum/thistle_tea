@@ -13,6 +13,7 @@ defmodule ThistleTea.Game.Entity.Server.Mob.PetLifecycleTest do
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Mob
+  alias ThistleTea.Game.Entity.Data.PetAbility
   alias ThistleTea.Game.Entity.Data.PetProgress
   alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.EventSink.Context
@@ -26,10 +27,73 @@ defmodule ThistleTea.Game.Entity.Server.Mob.PetLifecycleTest do
   alias ThistleTea.Game.Entity.Server.Player.State
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.Message
+  alias ThistleTea.Game.Player.PetTraining
+  alias ThistleTea.Game.Spell
+  alias ThistleTea.Game.Spell.Effect
   alias ThistleTea.Game.World
+  alias ThistleTea.Game.World.Loader.PetTraining, as: TrainingLoader
+  alias ThistleTea.Game.World.Presence
   alias ThistleTea.Game.WorldRef
 
   setup [:build_pet]
+
+  describe "pet training lifecycle" do
+    setup [:training_catalogue]
+
+    test "commits once, publishes ordered progress, and snapshots the purchase on suspension", %{
+      pet: pet,
+      guid: guid,
+      teaching: teaching
+    } do
+      {:ok, pid} = World.start_entity(pet)
+      state = attach_owner(pet, pid)
+      effect = %Effects.LearnPetSpell{target_guid: guid, spell: teaching}
+      assert :ok = PetTraining.validate(state.character, teaching)
+      state = PetTraining.learn(state, effect)
+
+      assert_receive %Effects.PetProgressChanged{source_guid: ^guid, progress: %{spells: [900], training_points: 0}} =
+                       changed
+
+      assert {:noreply, state} = PlayerServer.handle_info(changed, state)
+      assert Companion.relationship(state.character).progress.spells == [900]
+      assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgPetSpells{pet_guid: ^guid, spells: [_]}}}
+      assert PetTraining.learn(state, effect) == state
+      assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgCastResult{reason: 0x62}}}
+
+      state = CompanionOwner.suspend(state)
+      assert Companion.relationship(state.character).progress.spells == [900]
+      assert PetTraining.validate(state.character, teaching) == {:error, :no_pet}
+      refute Entity.online?(guid)
+    end
+
+    test "revalidates health at completion and ignores requests for a replaced pet", %{
+      pet: pet,
+      guid: guid,
+      teaching: teaching
+    } do
+      state = attach_owner(pet, self())
+      stale = %Effects.LearnPetSpell{target_guid: guid + 1, spell: teaching}
+      assert PetTraining.learn(state, stale) == state
+      assert_receive {:"$gen_cast", {:send_packet, %Message.SmsgCastResult{reason: 0x4C}}}
+
+      dead = %{pet | unit: %{pet.unit | health: 0}}
+
+      assert {:reply, {:error, :targets_dead}, ^dead} =
+               MobServer.handle_call({:learn_pet_spell, state.guid, teaching}, nil, dead)
+
+      assert {:reply, {:error, :no_pet}, ^pet} =
+               MobServer.handle_call({:learn_pet_spell, state.guid + 1, teaching}, nil, pet)
+    end
+
+    test "delivers the purchase through the supplied owner context", %{pet: pet, teaching: teaching} do
+      parent = self()
+      receiver = spawn(fn -> receive do: (message -> send(parent, {:forwarded, message})) end)
+      effect = %Effects.LearnPetSpell{target_guid: pet.object.guid, spell: teaching}
+      EventSink.emit(pet, effect, Context.new(receiver))
+      assert_receive {:forwarded, ^effect}
+      refute_receive ^effect, 0
+    end
+  end
 
   describe "child_spec/1" do
     test "suspension snapshots final progress without restarting the supervised pet", %{pet: pet, guid: guid} do
@@ -109,6 +173,24 @@ defmodule ThistleTea.Game.Entity.Server.Mob.PetLifecycleTest do
       pid: pid,
       spells: []
     })
+  end
+
+  defp training_catalogue(%{pet: pet, owner: owner}) do
+    character = %Character{
+      object: %Object{guid: owner},
+      unit: %Unit{health: 100},
+      player: %Player{},
+      internal: %Internal{world: pet.internal.world},
+      movement_block: pet.movement_block
+    }
+
+    Presence.enter(character, %{alive?: true, faction_template: 1})
+    on_exit(fn -> Presence.leave(character) end)
+    previous = TrainingLoader.abilities()
+    spell = %Spell{id: 900}
+    :ets.insert(TrainingLoader, {:abilities, %{900 => %PetAbility{spell: spell, cost: 0, skills: [270]}}})
+    on_exit(fn -> :ets.insert(TrainingLoader, {:abilities, previous}) end)
+    %{teaching: %Spell{id: 901, effects: [%Effect{type: :learn_spell, implicit_target_a: :pet, trigger_spell_id: 900}]}}
   end
 
   defp build_pet(_context) do

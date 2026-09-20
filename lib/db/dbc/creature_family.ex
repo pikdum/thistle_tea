@@ -8,5 +8,6 @@ defmodule ThistleTea.DBC.CreatureFamily do
   @primary_key {:id, :integer, autogenerate: false}
   schema "CreatureFamily" do
     field(:pet_food_mask, :integer, source: :category)
+    field(:training_skill, :integer, source: :pet_food_mask)
   end
 end

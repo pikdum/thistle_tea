@@ -3,10 +3,12 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.Script do
 
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.ScriptStep
+  alias ThistleTea.Game.Entity.Logic.Companion
   alias ThistleTea.Game.Entity.Logic.Druid
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Hunter
   alias ThistleTea.Game.Entity.Logic.Mage
+  alias ThistleTea.Game.Entity.Logic.PetTraining
   alias ThistleTea.Game.Entity.Logic.Rogue
   alias ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal
   alias ThistleTea.Game.Entity.Logic.Warlock
@@ -18,6 +20,17 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.Script do
   alias ThistleTea.Game.Spell.Scripts
   alias ThistleTea.Game.Spell.Semantics
   alias ThistleTea.Game.World.Loader.SpellPetAura, as: SpellPetAuraLoader
+
+  def apply(%Character{} = state, %CastContext{caster_guid: guid}, spell, %Effect{type: type} = effect, _now)
+      when type in [:learn_spell, :learn_pet_spell] and guid == state.object.guid do
+    pet_guid = Companion.summon_guid(state)
+
+    if PetTraining.training_effect?(effect) and is_integer(pet_guid) do
+      {state, [%Effects.LearnPetSpell{target_guid: pet_guid, spell: spell}]}
+    else
+      {state, []}
+    end
+  end
 
   def apply(state, %CastContext{} = context, _spell, %Effect{type: :quest_complete, misc_value: quest_id}, _now)
       when is_integer(quest_id) and quest_id > 0 do

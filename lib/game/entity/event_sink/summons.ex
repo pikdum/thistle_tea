@@ -322,6 +322,11 @@ defmodule ThistleTea.Game.Entity.EventSink.Summons do
 
   def emit(entity, %Effects.TameCreature{}, _context), do: entity
 
+  def emit(entity, %Effects.LearnPetSpell{} = effect, context) do
+    Context.send(context, effect)
+    entity
+  end
+
   def emit(entity, %Effects.DismissPet{target_guid: pet_guid}, _context) when is_integer(pet_guid) and pet_guid > 0 do
     entity = CompanionOwner.suspend_hunter_pet(entity, pet_guid)
     World.stop_entity(pet_guid)
