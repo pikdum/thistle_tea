@@ -17,6 +17,17 @@ defmodule ThistleTea.Game.Player.Items do
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
 
+  def create(state, item_id, count) do
+    case ItemLoader.get_template(item_id) do
+      %ItemTemplate{} = template ->
+        count = Inventory.limit_new_count(state.character.player, template, count, &ItemStore.get/1)
+        if count > 0, do: give(state, item_id, count), else: state
+
+      _missing ->
+        state
+    end
+  end
+
   def give(state, item_id, count) do
     case store(state, item_id, count) do
       {:ok, state, placed_at} ->
@@ -25,6 +36,10 @@ defmodule ThistleTea.Game.Player.Items do
 
       {:error, :item_not_found, state} ->
         system_message(state, "Item #{item_id} not found.")
+
+      {:error, :cant_carry_more_of_this, state} ->
+        InventoryUpdate.send_failure(:cant_carry_more_of_this, 0, 0)
+        state
 
       {:error, _reason, state} ->
         system_message(state, "Inventory full.")

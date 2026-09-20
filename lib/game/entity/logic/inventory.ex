@@ -86,6 +86,7 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
     you_can_never_use_that_item: 10,
     cant_equip_with_twohanded: 13,
     cant_dual_wield: 14,
+    cant_carry_more_of_this: 17,
     item_cant_be_equipped: 20,
     items_cant_be_swapped: 21,
     slot_is_empty: 22,
@@ -411,6 +412,21 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
   end
 
   def store(%Player{} = player, owner_guid, %Item{} = item, scope, get_item) when scope in [:carried, :bank] do
+    if limit_new_count(player, Item.template(item), stack_count(item), get_item) < stack_count(item) do
+      {:error, :cant_carry_more_of_this}
+    else
+      store_available(player, owner_guid, item, scope, get_item)
+    end
+  end
+
+  def limit_new_count(%Player{} = player, %ItemTemplate{entry: entry, max_count: limit}, count, get_item)
+      when is_integer(limit) and limit > 0 do
+    min(count, max(limit - count_entry_with_bank(player, entry, get_item), 0))
+  end
+
+  def limit_new_count(%Player{}, %ItemTemplate{}, count, _get_item), do: count
+
+  defp store_available(player, owner_guid, item, scope, get_item) do
     ctx = ctx(player, nil, nil, owner_guid, get_item)
     {ctx, remaining} = merge_into_stacks(ctx, item, scope)
 
@@ -494,7 +510,9 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
 
   def can_store?(%Player{} = player, %ItemTemplate{} = template, count, get_item) do
     ctx = ctx(player, nil, nil, nil, get_item)
-    free_position(ctx, :carried, template) != nil or stack_room(ctx, template, :carried) >= count
+
+    limit_new_count(player, template, count, get_item) == count and
+      (free_position(ctx, :carried, template) != nil or stack_room(ctx, template, :carried) >= count)
   end
 
   def split(%Player{} = player, owner_guid, src_pos, dst_pos, %Item{} = new_item, get_item) do

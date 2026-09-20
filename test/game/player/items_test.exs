@@ -19,6 +19,36 @@ defmodule ThistleTea.Game.Player.ItemsTest do
 
   setup [:inventory]
 
+  describe "create/3" do
+    test "silently preserves an existing unique item in the bank", %{state: state} do
+      template = %ItemTemplate{entry: @entry, max_count: 1}
+      :ets.insert(ItemLoader, {@entry, template})
+      existing = ItemStore.create(template, owner: state.guid)
+      state = put_in(state.character.player.bank1, existing.object.guid)
+      size = :ets.info(ItemStore, :size)
+
+      assert Items.create(state, @entry, 1) == state
+      assert :ets.info(ItemStore, :size) == size
+      refute_received {:"$gen_cast", {:send_packet, _}}
+    end
+
+    test "replaces a missing unique item once", %{state: state} do
+      :ets.insert(ItemLoader, {@entry, %ItemTemplate{entry: @entry, max_count: 1}})
+      created = Items.create(state, @entry, 1)
+      assert Inventory.count_entry(created.character.player, @entry, &ItemStore.get/1) == 1
+      assert Items.create(created, @entry, 1) == created
+    end
+
+    test "clamps spell-created stacks to the remaining unique allowance", %{state: state} do
+      template = %ItemTemplate{entry: @entry, max_count: 5, stackable: 20}
+      :ets.insert(ItemLoader, {@entry, template})
+      existing = ItemStore.create(template, owner: state.guid, stack_count: 3)
+      state = put_in(state.character.player.inv1, existing.object.guid)
+      created = Items.create(state, @entry, 4)
+      assert Inventory.count_entry(created.character.player, @entry, &ItemStore.get/1) == 5
+    end
+  end
+
   describe "store/3" do
     test "creates separate instances of non-stackable equipment", %{state: state} do
       assert {:ok, stored, {255, 23}} = Items.store(state, @entry, 2)

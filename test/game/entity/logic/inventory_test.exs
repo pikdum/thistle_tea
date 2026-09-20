@@ -247,6 +247,43 @@ defmodule ThistleTea.Game.Entity.Logic.InventoryTest do
   end
 
   describe "plan/2" do
+    test "enforces unique limits against preceding additions and rolls back removals" do
+      template = %ItemTemplate{entry: 6948, max_count: 1}
+      first = build_item(20, template)
+      second = build_item(21, template)
+      reagent = build_item(22, %ItemTemplate{entry: 900})
+      player = store(%Player{}, @backpack_start, reagent)
+      batch = player |> Batch.new() |> Batch.remove(900, 1) |> Batch.add(first) |> Batch.add(second)
+
+      assert {:error, :cant_carry_more_of_this} = Inventory.plan(batch, get_item_fn([reagent]))
+      assert player.inv1 == reagent.object.guid
+    end
+
+    test "allows replacing a unique item consumed in the same transaction" do
+      template = %ItemTemplate{entry: 6948, max_count: 1}
+      first = build_item(20, template)
+      second = build_item(21, template)
+      player = store(%Player{}, @backpack_start, first)
+      batch = player |> Batch.new() |> Batch.remove_item(first.object.guid, 1) |> Batch.add(second)
+
+      assert {:ok, changes} = Inventory.plan(batch, get_item_fn([first]))
+      assert changes.player.inv1 == second.object.guid
+      assert [^first] = ChangeSet.destroyed_items(changes)
+    end
+
+    test "counts banked unique items and stack quantities" do
+      template = %ItemTemplate{entry: 900, max_count: 3, stackable: 20}
+      existing = build_item(20, template, stack_count: 2)
+      incoming = build_item(21, template, stack_count: 2)
+      player = store_bank(%Player{}, @bank_start, existing)
+      lookup = get_item_fn([existing])
+
+      assert Inventory.limit_new_count(player, template, 5, lookup) == 1
+      assert Inventory.can_store?(player, template, 1, lookup)
+      refute Inventory.can_store?(player, template, 2, lookup)
+      assert {:error, :cant_carry_more_of_this} = Inventory.plan(Batch.add(Batch.new(player), incoming), lookup)
+    end
+
     test "removes the selected instance rather than another item with the same entry" do
       first = build_item(20, %ItemTemplate{entry: 750})
       selected = build_item(21, %ItemTemplate{entry: 750})

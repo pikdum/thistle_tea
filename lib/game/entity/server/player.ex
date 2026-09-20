@@ -767,7 +767,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
 
   @impl GenServer
   def handle_info({:create_item, item_id, count}, state) do
-    state = Items.give(state, item_id, count)
+    state = Items.create(state, item_id, count)
     {:noreply, state}
   rescue
     error ->
