@@ -64,11 +64,13 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.World.Loader.Transport, as: TransportLoader
   alias ThistleTea.Game.World.Loader.Vendor, as: VendorLoader
   alias ThistleTea.Game.World.Loader.Waypoint, as: WaypointLoader
+  alias ThistleTea.Game.World.MailStore
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.PostOffice
   alias ThistleTea.Game.World.SpawnPool
   alias ThistleTea.Game.World.SpawnPool.Catalog, as: SpawnPoolCatalog
   alias ThistleTea.Game.World.SpellMagnets
+  alias ThistleTea.Game.World.System.Auction, as: AuctionSystem
   alias ThistleTea.Game.World.System.Battleground, as: BattlegroundSystem
   alias ThistleTea.Game.World.System.CellActivator
   alias ThistleTea.Game.World.System.ChatChannels
@@ -131,6 +133,7 @@ defmodule ThistleTea.Application do
         HonorSystem,
         TradeSystem,
         PostOffice,
+        AuctionSystem,
         AreaEffects,
         SpellMagnets,
         ThistleTea.DBC,
@@ -163,6 +166,7 @@ defmodule ThistleTea.Application do
     DurabilityLoader.init()
     AuctionHouseLoader.init()
     ItemStore.init()
+    MailStore.init()
     CharacterStore.init()
     HonorStore.init()
     VendorLoader.init()

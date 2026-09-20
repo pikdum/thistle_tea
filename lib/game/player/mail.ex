@@ -34,8 +34,9 @@ defmodule ThistleTea.Game.Player.Mail do
   def open_session(%Character{internal: internal} = character, guid) when is_integer(guid) do
     {token, pending} = PostOffice.open(guid)
     mailbox = MailLogic.merge(internal.mailbox, pending)
+    character = CharacterStore.put(%{character | internal: %{internal | mailbox: mailbox}})
     PostOffice.acknowledge(guid, token, Enum.map(pending, & &1.id))
-    {%{character | internal: %{internal | mailbox: mailbox}}, token}
+    {character, token}
   end
 
   def send_quest_reward(state, _sender_guid, %Quest{reward_mail_template_id: 0}), do: state
@@ -91,11 +92,16 @@ defmodule ThistleTea.Game.Player.Mail do
         token,
         %DataMail{} = mail
       ) do
-    mailbox = MailLogic.add(internal.mailbox, mail)
-    PostOffice.acknowledge(guid, token, [mail.id])
-    state = %{state | character: %{character | internal: %{internal | mailbox: mailbox}}}
-    if MailLogic.visible?(mail, Time.now()), do: ClientProjection.received()
-    schedule_delivery(state)
+    if PostOffice.pending?(guid, token, mail.id) do
+      mailbox = MailLogic.add(internal.mailbox, mail)
+      character = CharacterStore.put(%{character | internal: %{internal | mailbox: mailbox}})
+      PostOffice.acknowledge(guid, token, [mail.id])
+      state = %{state | character: character}
+      if MailLogic.visible?(mail, Time.now()), do: ClientProjection.received()
+      schedule_delivery(state)
+    else
+      state
+    end
   end
 
   def receive_delivery(state, _token, %DataMail{}), do: state
