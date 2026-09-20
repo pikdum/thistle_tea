@@ -202,6 +202,7 @@ defmodule ThistleTea.Game.Entity.Logic.Hunter do
 
   defp validate_tame_level(_caster, _target), do: {:error, :bad_targets}
 
+  defp tame_creature?(%Spell{id: 1515}), do: true
   defp tame_creature?(%Spell{effects: effects}), do: Enum.any?(effects, &(&1.type == :tame_creature))
   defp feed_pet?(%Spell{effects: effects}), do: Enum.any?(effects, &(&1.type == :feed_pet))
 

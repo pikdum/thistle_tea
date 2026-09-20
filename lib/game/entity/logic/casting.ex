@@ -139,16 +139,18 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
   end
 
   defp advance_phase(entity, %Cast{phase: :channel_tick} = casting, now) do
-    if now >= casting.ends_at do
-      casting = Cast.transition(casting, :finish)
-      entity |> put_cast(casting) |> advance_phase(casting, now)
-    else
-      {entity, delay_ms} = channel_tick(entity, casting, now)
+    {entity, delay_ms} = channel_tick(entity, casting, min(now, casting.ends_at))
 
-      case entity.internal.casting do
-        %Cast{} -> {:waiting, entity, delay_ms}
-        nil -> {:finished, entity}
-      end
+    case entity.internal.casting do
+      %Cast{ends_at: ends_at} = casting when now >= ends_at ->
+        casting = Cast.transition(casting, :finish)
+        entity |> put_cast(casting) |> advance_phase(casting, now)
+
+      %Cast{} ->
+        {:waiting, entity, delay_ms}
+
+      nil ->
+        {:finished, entity}
     end
   end
 

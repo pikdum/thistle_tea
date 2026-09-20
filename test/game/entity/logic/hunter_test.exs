@@ -48,6 +48,18 @@ defmodule ThistleTea.Game.Entity.Logic.HunterTest do
   end
 
   describe "validate_tame/3" do
+    test "validates the initial Tame Beast channel before its ownership trigger" do
+      hunter = %Character{unit: %Unit{level: 10}, internal: %Internal{}}
+      spell = %Spell{id: 1515, effects: [%Effect{type: :apply_aura, aura: :periodic_trigger_spell}]}
+
+      assert Hunter.validate_tame(hunter, spell, %{tameable?: true, level: 6}) == :ok
+      assert Hunter.validate_tame(hunter, spell, %{tameable?: true, level: 11}) == {:error, :bad_targets}
+      assert Hunter.validate_tame(hunter, spell, %{tameable?: false, level: 6}) == {:error, :bad_targets}
+
+      hunter = Companion.activate(hunter, :hunter_pet, %EntityRef{guid: 99, entry: 1, spell_id: 1515})
+      assert Hunter.validate_tame(hunter, spell, %{tameable?: true, level: 6}) == {:error, :already_have_summon}
+    end
+
     test "requires a tameable beast at or below the hunter level and no active pet" do
       hunter = %Character{unit: %Unit{level: 20}, internal: %Internal{}}
       spell = %Spell{effects: [%Effect{type: :tame_creature}]}

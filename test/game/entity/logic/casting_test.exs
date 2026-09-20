@@ -203,6 +203,49 @@ defmodule ThistleTea.Game.Entity.Logic.CastingTest do
   end
 
   describe "cast_tick/3" do
+    test "delivers a channel tick at its exact completion deadline only once" do
+      mob = final_channel_tick_fixture()
+
+      assert {:finished, mob} = Casting.advance(mob, 21_000)
+      assert mob.internal.casting == nil
+
+      assert [%Effects.TriggerSpell{spell_id: 13_535}, %Effects.ChannelUpdate{channel_time_ms: 0}] =
+               mob.internal.events
+
+      assert {:idle, ^mob} = Casting.advance(mob, 21_100)
+    end
+
+    test "delivers the final channel tick when the scheduled callback runs late" do
+      assert {:finished, mob} = Casting.advance(final_channel_tick_fixture(), 21_050)
+      assert Enum.count(mob.internal.events, &match?(%Effects.TriggerSpell{spell_id: 13_535}, &1)) == 1
+    end
+
+    test "does not deliver a tick beyond a shortened channel deadline" do
+      mob = final_channel_tick_fixture()
+      casting = %{mob.internal.casting | ends_at: 20_000}
+      mob = %{mob | internal: %{mob.internal | casting: casting}}
+
+      assert {:finished, mob} = Casting.advance(mob, 21_050)
+      refute Enum.any?(mob.internal.events, &is_struct(&1, Effects.TriggerSpell))
+    end
+
+    test "a cancelled channel cannot deliver its pending completion tick" do
+      mob = Casting.cancel(final_channel_tick_fixture())
+
+      assert {:idle, ^mob} = Casting.advance(mob, 21_000)
+      refute Enum.any?(mob.internal.events, &is_struct(&1, Effects.TriggerSpell))
+    end
+
+    test "does not deliver the final channel tick without its resource cost" do
+      mob = final_channel_tick_fixture()
+      resolution = channel_resolution(channel_power: %PowerCost{power_type: 0, amount: 10})
+      casting = %{mob.internal.casting | resolution: resolution}
+      mob = %{mob | unit: %{mob.unit | power1: 0}, internal: %{mob.internal | casting: casting}}
+
+      assert {:finished, mob} = Casting.advance(mob, 21_000)
+      refute Enum.any?(mob.internal.events, &is_struct(&1, Effects.TriggerSpell))
+    end
+
     test "ending a channel clears casting without applying a final spell hit" do
       now = 1_000
       spell = %Spell{id: 10, attributes: MapSet.new([:channeled])}
@@ -1354,6 +1397,32 @@ defmodule ThistleTea.Game.Entity.Logic.CastingTest do
       {mob, _events} = Aura.tick(mob, now + 8_001)
       assert mob.unit.auras == []
     end
+  end
+
+  defp final_channel_tick_fixture do
+    spell = %Spell{
+      id: 1515,
+      duration_ms: 20_000,
+      attributes: MapSet.new([:channeled]),
+      effects: [
+        %Effect{
+          type: :apply_aura,
+          aura: :periodic_trigger_spell,
+          trigger_spell_id: 13_535,
+          implicit_target_a: :caster,
+          amplitude_ms: 20_000
+        }
+      ]
+    }
+
+    casting = %{Cast.new(spell, Target.unit(1), 1_000) | phase: :channel_tick, resolution: channel_resolution()}
+
+    %Mob{
+      object: %Object{guid: 1},
+      unit: %Unit{level: 10, health: 100, max_health: 100},
+      movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+      internal: %Internal{world: %WorldRef{map_id: 0}, casting: casting}
+    }
   end
 
   defp channel_resolution(opts \\ []) do
