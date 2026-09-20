@@ -91,6 +91,12 @@ defmodule ThistleTea.Game.Entity.Server.Mob do
   @creature_flag_extra_no_assist 0x00010000
   @summon_despawn_retry_ms 10_000
 
+  def child_spec(%Mob{internal: %Internal{totem: %Totem{}}} = state) do
+    Map.put(super(state), :restart, :temporary)
+  end
+
+  def child_spec(state), do: super(state)
+
   def start_link(%Mob{} = state) do
     GenServer.start_link(__MODULE__, state, name: EntityRegistry.via(state.object.guid))
   end

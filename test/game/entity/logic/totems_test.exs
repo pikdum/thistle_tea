@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.Entity.Logic.TotemsTest do
   alias ThistleTea.Game.Entity.Commands
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Data.Component.Internal
+  alias ThistleTea.Game.Entity.Data.Component.Internal.Creature
   alias ThistleTea.Game.Entity.Data.Component.Internal.Spawn
   alias ThistleTea.Game.Entity.Data.Component.Internal.Totem
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
@@ -88,6 +89,34 @@ defmodule ThistleTea.Game.Entity.Logic.TotemsTest do
       assert {:stop, :normal, ^stopped} = MobServer.handle_info(:totem_stop, stopped)
       MobServer.terminate(:normal, stopped)
       assert_receive %Commands.TotemStopped{guid: ^guid}
+    end
+  end
+
+  describe "child_spec/1" do
+    test "a stopped supervised totem never respawns from its original state" do
+      guid = Guid.runtime(:mob, 5925)
+      owner = System.unique_integer([:positive]) + 10_000_000
+      Entity.register(owner)
+
+      totem = %Mob{
+        object: %Object{guid: guid, entry: 5925},
+        unit: %Unit{health: 70, max_health: 70, level: 50, auras: []},
+        movement_block: %MovementBlock{position: {0.0, 0.0, 0.0, 0.0}},
+        internal: %Internal{
+          world: WorldRef.open(451),
+          totem: %Totem{owner_guid: owner},
+          creature: %Creature{},
+          spawn: %Spawn{}
+        }
+      }
+
+      {:ok, pid} = World.start_entity(totem)
+      ref = Process.monitor(pid)
+      send(pid, :totem_stop)
+      assert_receive {:DOWN, ^ref, :process, ^pid, :normal}
+      assert_receive %Commands.TotemStopped{guid: ^guid}
+      assert MobServer.child_spec(totem).restart == :temporary
+      refute Entity.online?(guid)
     end
   end
 
