@@ -17,6 +17,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.World.ChaseWatch
   alias ThistleTea.Game.World.EntitySupervisor
   alias ThistleTea.Game.World.Groups
+  alias ThistleTea.Game.World.HonorStore
   alias ThistleTea.Game.World.InstanceData
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.AreaTrigger, as: AreaTriggerLoader
@@ -72,6 +73,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.World.System.ChatChannels
   alias ThistleTea.Game.World.System.Duel, as: DuelSystem
   alias ThistleTea.Game.World.System.GameEvent, as: GameEventSystem
+  alias ThistleTea.Game.World.System.Honor, as: HonorSystem
   alias ThistleTea.Game.World.System.Instance, as: InstanceSystem
   alias ThistleTea.Game.World.System.Party, as: PartySystem
   alias ThistleTea.Game.World.System.ScriptedEvent, as: ScriptedEventSystem
@@ -125,6 +127,7 @@ defmodule ThistleTea.Application do
         DuelSystem,
         {Group, name: Groups, log: false},
         EntityRegistry,
+        HonorSystem,
         TradeSystem,
         PostOffice,
         AreaEffects,
@@ -159,6 +162,7 @@ defmodule ThistleTea.Application do
     DurabilityLoader.init()
     ItemStore.init()
     CharacterStore.init()
+    HonorStore.init()
     VendorLoader.init()
     QuestLoader.init()
     ReputationLoader.init()

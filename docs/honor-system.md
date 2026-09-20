@@ -1,7 +1,8 @@
 # Honor system implementation
 
-The calculation layer is implemented. Gameplay awards and client delivery are
-still being integrated; honor is not yet awarded by live combat.
+The calculation layer and player-kill integration are implemented. Creature
+rewards, battleground bonuses, honor spells, and rank requirements remain to
+be connected. Real-client acceptance is still pending.
 
 ## Implemented rules
 
@@ -25,8 +26,22 @@ still being integrated; honor is not yet awarded by live combat.
   last week, lifetime totals, rank, highest rank, and rank progress.
 
 The core modules have no database, process, clock, metadata, or packet-send
-dependencies. A runtime coordinator will own the realm ledger; player owners
-will apply the resulting field projections and publish their own metadata.
+dependencies. `World.System.Honor` owns the realm ledger, retained in an
+application-owned ETS table across coordinator restarts. Calendar settlement
+precedes each request and runs during idle periods. Player owners fetch the
+current projection for change notices, login, and level changes, then save
+their own character and publish rank metadata through `World.Presence`.
+
+The damage funnel captures effective damage, overkill, and Honorless Target
+before death removes auras. The receiving boundary resolves pets to their
+controlling players. A lethal request consumes damage history once, resolves
+nearby living group recipients in the same world, and submits their shares
+together. Duels do not produce lethal credit; Spirit of Redemption consumes
+the original kill history before its final self-inflicted death.
+
+Recipients receive `SMSG_PVP_CREDIT` and updated honor fields. Honor inspection
+uses the build-5875 packet layout and requires an online target within ten
+yards in the same world who cannot be attacked by the inspecting player.
 
 ## References and validation
 
@@ -41,23 +56,20 @@ eligible pool earns 3,000 points, rather than the full-pool maximum of 13,000.
 The temporary oracle source and output are `/tmp/thistle-honor-rank-oracle.cpp`
 and `/tmp/thistle-honor-rank-oracle.txt`.
 
-Core tests cover repeat victims, day changes, zero awards, contribution shares,
+Tests cover repeat victims, day changes, zero awards, contribution shares,
 group eligibility, faction separation, tied scores, rank boundaries, decay,
-level caps, idempotent weekly settlement, and missed weeks.
+level caps, idempotent weekly settlement, missed weeks, coordinator restart,
+pet ownership, absorption and overkill, one-time death credit, Honorless
+Target, Spirit of Redemption, current player projections, and packet dispatch.
 
 ## Remaining integration and acceptance
 
-1. Add the runtime ledger coordinator and retained ETS state, with serialized
-   awards and weekly settlement, login synchronization, and offline rankings.
-2. Capture effective damage and controlling-player identity at the receiving
-   boundary. Use the shared death transition to distribute credit exactly
-   once; preserve the Honorless Target fact before death removes auras.
-3. Connect racial-leader and civilian kills, battleground bonus rewards, and
+1. Connect racial-leader and civilian kills, battleground bonus rewards, and
    honor-granting spells. Keep battleground scoreboards and character totals
    consistent without counting the same kill twice.
-4. Deliver PvP-credit and honor-inspection messages, project rank metadata,
-   and apply honor-rank conditions and equipment/vendor requirements.
-5. Exercise real opposing players: shared and pet kills, repeat penalties,
+2. Apply honor-rank conditions and equipment/vendor requirements, and connect
+   automatic Honorless Target application during world-entry transitions.
+3. Exercise real opposing players: shared and pet kills, repeat penalties,
    gray and honorless rejection, client honor totals and combat feedback,
    reconnect retention, and lifecycle cleanup. Calendar/ranking tests cover
    settlement without waiting for a real weekly reset.

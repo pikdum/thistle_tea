@@ -16,6 +16,7 @@ defmodule ThistleTea.Game.Player.Login do
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.Corpse
+  alias ThistleTea.Game.Entity.Data.Honor.Damage, as: HonorDamage
   alias ThistleTea.Game.Entity.Data.Reputation
   alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.Logic.AI.BT
@@ -47,6 +48,7 @@ defmodule ThistleTea.Game.Player.Login do
   alias ThistleTea.Game.Player.ConditionContext
   alias ThistleTea.Game.Player.Enchantments
   alias ThistleTea.Game.Player.HomeBind
+  alias ThistleTea.Game.Player.Honor
   alias ThistleTea.Game.Player.Mail
   alias ThistleTea.Game.Player.Quests
   alias ThistleTea.Game.Player.Reputation, as: PlayerReputation
@@ -98,6 +100,7 @@ defmodule ThistleTea.Game.Player.Login do
       |> LogicTalents.sync_points()
       |> Enchantments.restore()
       |> evaluate_login_rest()
+      |> Honor.sync()
       |> BT.init(PlayerBT.tree())
 
     c = PlayerFlags.set_group_leader(c, party_leader?(character_guid))
@@ -423,7 +426,7 @@ defmodule ThistleTea.Game.Player.Login do
     MovementStats.recompute(%{
       character
       | movement_block: movement_block,
-        internal: %{internal | visibility_cell: nil, breath: nil}
+        internal: %{internal | visibility_cell: nil, breath: nil, honor_damage: %HonorDamage{}}
     })
   end
 

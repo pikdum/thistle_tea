@@ -83,6 +83,7 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   alias ThistleTea.Game.Player.Exploration, as: PlayerExploration
   alias ThistleTea.Game.Player.GameObjects, as: PlayerGameObjects
   alias ThistleTea.Game.Player.HomeBind
+  alias ThistleTea.Game.Player.Honor
   alias ThistleTea.Game.Player.ItemCosts
   alias ThistleTea.Game.Player.Items
   alias ThistleTea.Game.Player.Login
@@ -183,6 +184,16 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   def handle_cast({:send_packet, message, opts}, state), do: {:noreply, PacketSink.send(state, message, opts)}
 
   def handle_cast({:send_packet, message}, state), do: {:noreply, PacketSink.send(state, message)}
+
+  def handle_cast({:honor_updated, award}, %{character: %Character{} = character} = state) do
+    state = %{state | character: Honor.sync(character)}
+    state = if is_nil(award), do: state, else: PacketSink.send(state, Honor.credit(award))
+    {:noreply, maybe_broadcast_update(state)}
+  rescue
+    error ->
+      Logger.error("Honor update failed: #{Exception.message(error)}")
+      {:noreply, state}
+  end
 
   def handle_cast({:start_script, steps, target_guid}, %State{character: %Character{}} = state)
       when is_list(steps) and is_integer(target_guid) do
@@ -1300,6 +1311,13 @@ defmodule ThistleTea.Game.Entity.Server.Player do
   defp do_broadcast_update(state), do: state
 
   defp sync_character_metadata(%{guid: guid, character: %Character{} = character} = state) when is_integer(guid) do
+    character =
+      case Metadata.query(guid, [:level]) do
+        %{level: level} when level != character.unit.level -> Honor.sync(character)
+        _unchanged -> character
+      end
+
+    state = %{state | character: character}
     detection = StealthDetection.target_metadata(character)
     detection_keys = Map.keys(detection)
     previous_detection = Metadata.query(guid, detection_keys)

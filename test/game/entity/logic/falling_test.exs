@@ -26,7 +26,12 @@ defmodule ThistleTea.Game.Entity.Logic.FallingTest do
       assert landed.unit.health == 703
       assert landed.internal.fall == nil
       assert landed.internal.broadcast_update?
-      assert [%Effects.EnvironmentalDamage{type: :fall, damage: 297}] = landed.internal.events
+
+      assert [
+               %Effects.EnvironmentalDamage{type: :fall, damage: 297},
+               %Effects.HonorDamage{source_guid: nil, damage: 297, lethal?: false}
+             ] = landed.internal.events
+
       assert land(landed, 5.0) == landed
     end
 
@@ -90,7 +95,7 @@ defmodule ThistleTea.Game.Entity.Logic.FallingTest do
     test "physical damage reduction applies once", %{character: character} do
       landed = character |> with_aura(:mod_damage_percent_taken, -50, 1) |> move(30.0, 0x4000) |> land(0.0)
       assert landed.unit.health == 852
-      assert [%Effects.EnvironmentalDamage{damage: 148}] = landed.internal.events
+      assert [%Effects.EnvironmentalDamage{damage: 148}, %Effects.HonorDamage{damage: 148}] = landed.internal.events
     end
 
     test "dead players, ghosts and god mode cannot take fall damage", %{character: character} do

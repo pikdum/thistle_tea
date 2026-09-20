@@ -56,6 +56,7 @@ defmodule ThistleTea.Game.World.Presence do
       orientation: orientation,
       viewpoint: viewpoint(character),
       creature_type: Character.creature_type(character),
+      honor_rank: honor_rank(character),
       pvp?: Pvp.active?(character),
       pvp_combat?: Pvp.combat?(character),
       free_for_all?: Pvp.free_for_all?(character),
@@ -63,6 +64,9 @@ defmodule ThistleTea.Game.World.Presence do
       group_id: group_id(character.object.guid)
     }
   end
+
+  defp honor_rank(%Character{player: %{honor_rank: rank}}), do: rank || 0
+  defp honor_rank(%Character{}), do: 0
 
   defp group_id(guid) do
     case Party.group_of(guid) do

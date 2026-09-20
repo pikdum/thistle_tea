@@ -35,7 +35,6 @@ defmodule ThistleTea.Game.Spell.SupportMatrix do
     75 => :mod_language,
     100 => :auras_visible,
     156 => :mod_reputation_gain,
-    159 => :honorless_target,
     192 => :vmangos_linked_aura
   }
 

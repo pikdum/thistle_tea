@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.Entity.EffectResolver do
 
   alias ThistleTea.Game.Entity.EffectResolver.Combat
   alias ThistleTea.Game.Entity.EffectResolver.Durability
+  alias ThistleTea.Game.Entity.EffectResolver.Honor
   alias ThistleTea.Game.Entity.EffectResolver.Movement
   alias ThistleTea.Game.Entity.EffectResolver.PetLearning
   alias ThistleTea.Game.Entity.EffectResolver.Pvp
@@ -28,6 +29,7 @@ defmodule ThistleTea.Game.Entity.EffectResolver do
   end
 
   def resolve(entity, %Effects.DurabilityDamage{} = effect), do: Durability.resolve(entity, effect)
+  def resolve(_entity, %Effects.HonorDamage{} = effect), do: Honor.resolve(effect)
   def resolve(entity, %Effects.PetAbilityUsed{} = effect), do: PetLearning.resolve(entity, effect)
 
   def resolve(entity, %Effects.DeliverAttack{} = effect) do

@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Entity.EventSink do
   alias ThistleTea.Game.Entity.EventSink.ClientProjection
   alias ThistleTea.Game.Entity.EventSink.Combat
   alias ThistleTea.Game.Entity.EventSink.Context
+  alias ThistleTea.Game.Entity.EventSink.Honor
   alias ThistleTea.Game.Entity.EventSink.InstanceData
   alias ThistleTea.Game.Entity.EventSink.Movement
   alias ThistleTea.Game.Entity.EventSink.ScriptedEvents
@@ -180,6 +181,10 @@ defmodule ThistleTea.Game.Entity.EventSink do
 
   defp emit_resolved(entity, %{__struct__: effect_module} = effect, context) when effect_module in @client_effects do
     ClientProjection.emit(entity, effect, context)
+  end
+
+  defp emit_resolved(entity, %Effects.HonorContribution{} = effect, context) do
+    Honor.emit(entity, effect, context)
   end
 
   defp emit_resolved(entity, %{__struct__: effect_module} = effect, context) when effect_module in @combat_effects do

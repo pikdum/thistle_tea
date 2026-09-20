@@ -25,6 +25,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
   alias ThistleTea.Game.Entity.Logic.Durability
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Engagement
+  alias ThistleTea.Game.Entity.Logic.Honor.Combat, as: HonorCombat
   alias ThistleTea.Game.Entity.Logic.Intoxication
   alias ThistleTea.Game.Entity.Logic.Movement
   alias ThistleTea.Game.Entity.Logic.PlayerCombat
@@ -107,6 +108,7 @@ defmodule ThistleTea.Game.Entity.Logic.Core do
       entity = %{entity | unit: %{unit | health: new_health}}
       entity = enqueue_duel_outcome(entity, duel_outcome)
       entity = Aura.enqueue_death_item_rewards(entity, health, new_health)
+      entity = HonorCombat.on_damage(entity, health, remaining, new_health, now, opts)
 
       entity =
         if remaining > 0 do

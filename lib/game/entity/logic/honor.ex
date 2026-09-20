@@ -16,6 +16,10 @@ defmodule ThistleTea.Game.Entity.Logic.Honor do
 
   @award_types [:honorable, :dishonorable, :bonus, :quest, :other]
 
+  def team(race) when race in [1, 3, 4, 7], do: :alliance
+  def team(race) when race in [2, 5, 6, 8], do: :horde
+  def team(_race), do: nil
+
   def award(%Honor{} = honor, %Award{type: type, points: points} = award, day)
       when type in @award_types and is_number(points) and points > 0 and is_integer(day) do
     totals = honor.days |> Map.get(day, %Day{}) |> add_award(award)
