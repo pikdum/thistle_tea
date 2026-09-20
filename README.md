@@ -95,6 +95,7 @@ nix develop .#wow-tools            # shell with all of the above + sqlite + mari
 - stack-aware dispels, with partial cures, Dispel All categories, and client combat-log feedback
 - talent-based dispel resistance, including Vile Poisons, per-stack attempts, and failed-dispel feedback
 - general and school-specific spell reflection, including Sheen of Zanza's guaranteed first reflection and charge consumption
+- [Grounding Totem and spell magnets](docs/grounding-totem-playtest.md), with shared interception charges, periodic protection, and totem immunity and destruction cleanup
 - spell modifiers use VMangos family masks, including all 64 bits, to affect only the intended abilities
 - stacked damage-over-time effects scale with remaining stacks after partial cures
 - exclusive resistance buffs use the strongest effect per school, with weaker protection resuming on removal
