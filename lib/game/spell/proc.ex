@@ -23,7 +23,7 @@ defmodule ThistleTea.Game.Spell.Proc do
   end
 
   def eligible?(%Spell{} = proc_spell, nil, proc_type, outcome) do
-    proc_flag?(proc_spell, proc_type) and unrestricted_trigger?(proc_spell.proc_rule) and
+    proc_flag?(proc_spell, proc_type) and school_allowed?(proc_spell.proc_rule, nil) and
       outcome_allowed?(proc_spell.proc_rule, proc_type, outcome)
   end
 
@@ -70,6 +70,8 @@ defmodule ThistleTea.Game.Spell.Proc do
   defp proc_mask(_proc_type), do: 0
 
   defp school_allowed?(%ProcRule{school_mask: 0}, _spell), do: true
+
+  defp school_allowed?(%ProcRule{school_mask: mask}, nil) when is_integer(mask), do: (mask &&& 1) != 0
 
   defp school_allowed?(%ProcRule{school_mask: mask}, %Spell{} = spell) when is_integer(mask),
     do: (mask &&& Spell.school_mask(spell)) != 0
@@ -122,11 +124,6 @@ defmodule ThistleTea.Game.Spell.Proc do
   defp outcome_mask(:block), do: 0x40
   defp outcome_mask(:reflect), do: 0x800
   defp outcome_mask(_outcome), do: 0
-
-  defp unrestricted_trigger?(%ProcRule{school_mask: 0, spell_family: 0, family_mask_0: 0, family_mask_1: 0}), do: true
-
-  defp unrestricted_trigger?(nil), do: true
-  defp unrestricted_trigger?(_rule), do: false
 
   defp proc_chance(%Spell{proc_rule: %ProcRule{ppm_rate: ppm}}, attack_time_ms)
        when ppm > 0 and is_number(attack_time_ms) and attack_time_ms > 0 do

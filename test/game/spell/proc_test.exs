@@ -52,6 +52,19 @@ defmodule ThistleTea.Game.Spell.ProcTest do
       refute Proc.eligible?(proc_spell, nil, :take_melee_swing, :normal)
     end
 
+    test "ordinary weapon swings satisfy physical school restrictions" do
+      for proc_type <- [:deal_melee_swing, :take_melee_swing, :deal_ranged_attack, :take_ranged_attack] do
+        for mask <- [1, 5, 127] do
+          proc_spell = %Spell{proc_type_mask: 0xCC, proc_rule: %ProcRule{school_mask: mask}}
+          assert Proc.eligible?(proc_spell, nil, proc_type, :normal)
+          refute Proc.eligible?(proc_spell, nil, proc_type, :miss)
+        end
+
+        magic_only = %Spell{proc_type_mask: 0xCC, proc_rule: %ProcRule{school_mask: 4}}
+        refute Proc.eligible?(magic_only, nil, proc_type, :normal)
+      end
+    end
+
     test "maps ranged attack and ability proc flags on both sides" do
       proc_spell = %Spell{proc_type_mask: 0x3C0}
 

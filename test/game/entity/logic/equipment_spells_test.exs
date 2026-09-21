@@ -203,7 +203,7 @@ defmodule ThistleTea.Game.Entity.Logic.EquipmentSpellsTest do
         id: 1,
         proc_type_mask: 4,
         proc_chance: 100,
-        proc_rule: %ProcRule{cooldown_ms: 1_000},
+        proc_rule: %ProcRule{school_mask: 1, cooldown_ms: 1_000},
         effects: [%Effect{type: :apply_aura, aura: :proc_trigger_spell, trigger_spell_id: 5}]
       }
 

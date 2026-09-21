@@ -13,6 +13,10 @@ defmodule ThistleTea.Game.World.Loader.SpellProcEventVmangosTest do
   end
 
   describe "get/1" do
+    test "loads Heart of Wyrmthalak physical-school PPM restriction" do
+      assert %ProcRule{school_mask: 1, ppm_rate: 1.0} = SpellProcEvent.get(27_656)
+    end
+
     test "loads the guaranteed first reflection restriction" do
       assert %ProcRule{proc_ex: 0x800} = SpellProcEvent.get(30_003)
     end

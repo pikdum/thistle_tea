@@ -13,6 +13,8 @@ defmodule ThistleTea.Game.World.Loader.EquipmentSpellsDbcTest do
   alias ThistleTea.Game.Entity.Logic.Regen
   alias ThistleTea.Game.Entity.Server.Player, as: PlayerServer
   alias ThistleTea.Game.Entity.Server.Player.State
+  alias ThistleTea.Game.Spell.Proc
+  alias ThistleTea.Game.Spell.ProcRule
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
@@ -89,6 +91,19 @@ defmodule ThistleTea.Game.World.Loader.EquipmentSpellsDbcTest do
       assert character.unit.equipment_bonuses.healing == 29
       assert character.player.mod_damage_done_pos_fire == 29
       assert character.unit.auras == []
+    end
+
+    test "Heart of Wyrmthalak can proc from normal swings at its configured rate", %{character: character} do
+      equipped =
+        character
+        |> equip(:trinket1, %ItemTemplate{entry: 22_321, spellid_1: 27_656, spelltrigger_1: 1})
+        |> Character.sync_equipment_stats()
+
+      assert [%{spell: spell, auras: [%{type: :proc_trigger_spell, trigger_spell_id: 27_655}]}] = equipped.unit.auras
+      spell = %{spell | proc_rule: %ProcRule{school_mask: 1, ppm_rate: 1.0}}
+      assert Proc.eligible?(spell, nil, :deal_melee_swing, :normal)
+      assert Proc.roll?(spell, 3_000, fn -> 0.04 end)
+      refute Proc.roll?(spell, 3_000, fn -> 0.06 end)
     end
 
     test "owner publication activates feral weapon attack power only in the allowed forms", %{character: character} do
