@@ -181,12 +181,8 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   end
 
   defp melee_roll_required?(%{object: %{guid: target_guid}}, %CastContext{caster_guid: caster_guid}, spell) do
-    Spell.harmful?(spell) and (Spell.melee_ability?(spell) or ranged_weapon_ability?(spell)) and
+    Spell.harmful?(spell) and (Spell.melee_ability?(spell) or Spell.ranged_attack?(spell)) and
       target_guid != caster_guid
-  end
-
-  defp ranged_weapon_ability?(%Spell{effects: effects} = spell) do
-    Spell.ranged_attack?(spell) and Enum.any?(effects, &(&1.type in @weapon_effect_types))
   end
 
   defp receive_melee_ability(target, %CastContext{} = context, spell, now) do
@@ -427,7 +423,9 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
       caster_player?: context.caster_type == :player,
       caster_attack_skill: context.attack_skill,
       weapon_skill_id: context.weapon_skill_id,
-      skill_training?: spell.equipped_item_class == 2 and (Spell.melee_ability?(spell) or Spell.ranged_attack?(spell)),
+      skill_training?:
+        spell.equipped_item_class == 2 and Spell.harmful?(spell) and
+          (Spell.melee_ability?(spell) or Spell.ranged_attack?(spell)),
       hit_chance_bonus: context.hit_chance_bonus,
       crit_chance: context.melee_crit_chance,
       caster_position: attack_position(context.caster_position),

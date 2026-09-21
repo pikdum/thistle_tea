@@ -208,6 +208,70 @@ defmodule ThistleTea.Game.Entity.Logic.CombatSkillsTest do
       end
     end
 
+    test "spell-damage shots and ranged debuffs train once unless immune or already dead", %{mob: mob} do
+      context = %CastContext{caster_guid: 5, caster_type: :player, caster_level: 60, weapon_skill_id: 45}
+
+      for effects <- [
+            [%Effect{type: :school_damage, base_points: 500}, %Effect{type: :school_damage, base_points: 500}],
+            [%Effect{type: :apply_aura, aura: :mod_decrease_speed, base_points: -50, implicit_target_a: :target_enemy}]
+          ] do
+        spell = %Spell{
+          id: 900_003,
+          dmg_class: 3,
+          equipped_item_class: 2,
+          school: :arcane,
+          duration_ms: 10_000,
+          effects: effects
+        }
+
+        {_target, events} = SpellEffect.receive(mob, context, spell, 1_000)
+
+        assert [%Effects.AdvanceCombatSkill{skill_id: 45}] =
+                 Enum.filter(events, &is_struct(&1, Effects.AdvanceCombatSkill))
+
+        immune = with_auras(mob, [%Aura{type: :school_immunity, misc_value: 64}])
+        dead = %{mob | unit: %{mob.unit | health: 0}}
+
+        for target <- [immune, dead] do
+          {_target, events} = SpellEffect.receive(target, context, spell, 1_000)
+          refute Enum.any?(events, &is_struct(&1, Effects.AdvanceCombatSkill))
+        end
+      end
+    end
+
+    test "ranged spell damage uses weapon accuracy and trains on misses", %{mob: mob} do
+      spell = %Spell{
+        id: 3044,
+        dmg_class: 3,
+        equipped_item_class: 2,
+        school: :arcane,
+        effects: [%Effect{type: :school_damage, base_points: 10}]
+      }
+
+      context = %CastContext{
+        caster_guid: 5,
+        caster_type: :player,
+        caster_level: 60,
+        attack_skill: 1,
+        weapon_skill_id: 45,
+        hit_chance_bonus: -100
+      }
+
+      :rand.seed(:exsss, {1, 2, 3})
+      results = for _ <- 1..30, do: SpellEffect.receive(mob, context, spell, 1_000)
+
+      assert Enum.any?(results, fn {target, events} ->
+               target == mob and Enum.any?(events, &match?(%Effects.SpellLogMiss{reason: :miss}, &1))
+             end)
+
+      assert Enum.any?(results, fn {target, _events} -> target.unit.health < mob.unit.health end)
+
+      for {_target, events} <- results do
+        assert [%Effects.AdvanceCombatSkill{skill_id: 45}] =
+                 Enum.filter(events, &is_struct(&1, Effects.AdvanceCombatSkill))
+      end
+    end
+
     test "typed feedback reaches the registered player owner and publishes progress", %{character: character, mob: mob} do
       guid = Guid.from_low_guid(:player, System.unique_integer([:positive]) + 10_000_000)
       Entity.register(guid)
