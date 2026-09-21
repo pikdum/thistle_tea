@@ -957,6 +957,26 @@ defmodule ThistleTea.Game.Entity.Logic.InventoryTest do
   end
 
   describe "split/6" do
+    test "preserves the source instance fields in the new stack" do
+      template = %ItemTemplate{entry: 2000, stackable: 20, duration: 300}
+      source = build_item(20, template, stack_count: 10)
+      source = %{source | item: %{source.item | flags: 1, duration: 45, creator: 99}}
+      incoming = build_item(21, template, stack_count: 3)
+      player = store(%Player{}, @backpack_start, source)
+
+      assert {:ok, result, placed} =
+               Inventory.split(player, @owner, {255, 23}, {255, 24}, incoming, get_item_fn([source]))
+
+      assert placed.object.guid == incoming.object.guid
+      assert placed.item.stack_count == 3
+      assert placed.item.duration == 45
+      assert placed.item.flags == 1
+      assert placed.item.creator == 99
+      assert placed.internal == source.internal
+      assert updated(result.items, source).item.stack_count == 7
+      assert updated(result.items, source).item.duration == 45
+    end
+
     test "splits a stack into an empty slot" do
       src = build_item(20, %ItemTemplate{entry: 2000, stackable: 10}, stack_count: 8)
       new_item = build_item(21, %ItemTemplate{entry: 2000, stackable: 10}, stack_count: 3)

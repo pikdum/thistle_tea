@@ -571,6 +571,12 @@ defmodule ThistleTea.Game.Entity.Logic.Inventory do
 
     with {:ok, src_item} <- fetch_item(ctx, src_pos),
          :ok <- validate_split(ctx, src_item, dst_pos, count) do
+      new_item = %{
+        src_item
+        | object: %{src_item.object | guid: new_item.object.guid},
+          item: %{src_item.item | stack_count: count}
+      }
+
       ctx = mark_changed(ctx, add_stack(src_item, -count))
       ctx = put_pos(ctx, dst_pos, new_item)
       {ctx, placed} = pop_changed(ctx, new_item)
