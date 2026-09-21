@@ -4,6 +4,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellRemoval do
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
   alias ThistleTea.Game.Entity.Logic.CombatRatings
+  alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Language
   alias ThistleTea.Game.Entity.Logic.Proficiency
@@ -39,7 +40,9 @@ defmodule ThistleTea.Game.Entity.Logic.SpellRemoval do
         internal: %{character.internal | forgotten_skills: forgotten}
     }
 
-    CombatRatings.sync(character)
+    character
+    |> CombatRatings.sync()
+    |> Core.mark_broadcast_update()
   end
 
   defp granted_skills(character) do

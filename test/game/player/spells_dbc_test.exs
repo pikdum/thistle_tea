@@ -34,6 +34,20 @@ defmodule ThistleTea.Game.Player.SpellsDbcTest do
       assert {:ok, learned, [{:learned, 5697}]} = Spells.learn(character, [5697])
       assert learned.unit.auras == []
     end
+
+    test "publishes language skill changes on learning and removal", %{character: character} do
+      character = %{character | internal: %{character.internal | broadcast_update?: false}}
+      assert {:ok, learned, [{:learned, 672}]} = Spells.learn(character, [672])
+      assert learned.internal.broadcast_update?
+      assert %{value: 300, max: 300, range: :language} = learned.player.skills[111]
+      assert CharacterStore.get(learned.id) == learned
+
+      learned = %{learned | internal: %{learned.internal | broadcast_update?: false}}
+      removed = Spells.unlearn(learned, [672], 1_000)
+      assert removed.internal.broadcast_update?
+      refute Map.has_key?(removed.player.skills, 111)
+      assert CharacterStore.get(removed.id) == removed
+    end
   end
 
   describe "learn_training/2" do

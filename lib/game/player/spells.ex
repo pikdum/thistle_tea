@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.Player.Spells do
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
   alias ThistleTea.Game.Entity.Logic.Casting
   alias ThistleTea.Game.Entity.Logic.CombatRatings
+  alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Proficiency
   alias ThistleTea.Game.Entity.Logic.Skills
@@ -60,6 +61,7 @@ defmodule ThistleTea.Game.Player.Spells do
           %{character | internal: %{internal | spells: all_ids, spellbook: spellbook}}
           |> learn_skills()
           |> apply_passives(Time.now())
+          |> Core.mark_broadcast_update()
 
         CharacterStore.put(character)
         Enum.each(events, &send_event_packet/1)
