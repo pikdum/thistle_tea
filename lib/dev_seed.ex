@@ -235,8 +235,8 @@ defmodule ThistleTea.DevSeed do
     derived = SkillLoader.initial_skills(internal.spells, unit.race, unit.class, unit.level)
 
     skills =
-      derived
-      |> Map.merge(player.skills || %{})
+      (player.skills || %{})
+      |> Skills.merge(derived)
       |> Skills.max_out()
 
     %{character | player: %{player | skills: skills}}

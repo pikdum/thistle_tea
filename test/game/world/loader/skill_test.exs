@@ -51,7 +51,7 @@ defmodule ThistleTea.Game.World.Loader.SkillTest do
   describe "initial_skills/5" do
     test "derives weapon skills without recreating tiered professions", %{table: table} do
       assert Skill.initial_skills([201, 2575], 1, 1, 20, table) ==
-               %{43 => %{value: 1, max: 100, range: :level, always_max?: false}}
+               %{43 => %{value: 1, max: 100, range: :level, always_max?: false, slot: 0}}
     end
   end
 

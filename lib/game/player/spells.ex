@@ -70,7 +70,7 @@ defmodule ThistleTea.Game.Player.Spells do
   defp learn_skills(%Character{unit: unit, player: player, internal: internal} = character) do
     new_skills = SkillLoader.initial_skills(internal.spells, unit.race, unit.class, unit.level)
     {new_skills, forgotten} = Skills.restore(new_skills, internal.forgotten_skills)
-    skills = Map.merge(new_skills, player.skills || %{})
+    skills = Skills.merge(player.skills || %{}, new_skills)
     %{character | player: %{player | skills: skills}, internal: %{internal | forgotten_skills: forgotten}}
   end
 

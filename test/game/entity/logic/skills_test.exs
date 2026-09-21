@@ -175,9 +175,23 @@ defmodule ThistleTea.Game.Entity.Logic.SkillsTest do
   end
 
   describe "learn_rank/3" do
+    test "keeps existing slots stable when a lower-numbered skill is learned or abandoned" do
+      original = Skills.learn_rank(%{}, 333, 75)
+      added = Skills.learn_rank(original, 186, 75)
+      assert added[333].slot == 0
+      assert added[186].slot == 1
+      assert binary_part(Skills.encode(added), 0, 12) == binary_part(Skills.encode(original), 0, 12)
+      removed = Map.delete(added, 333)
+      assert binary_part(Skills.encode(removed), 0, 12) == <<0::size(96)>>
+      assert binary_part(Skills.encode(removed), 12, 12) == binary_part(Skills.encode(added), 12, 12)
+      relearned = Skills.learn_rank(removed, 333, 75)
+      assert relearned[333].slot == 0
+      assert relearned[186].slot == 1
+    end
+
     test "learns apprentice fishing and raises later rank caps without resetting progress" do
       skills = Skills.learn_rank(%{}, Skills.fishing_skill(), 75)
-      assert skills[356] == %{value: 1, max: 75, range: :tier, always_max?: false, step: 1}
+      assert skills[356] == %{value: 1, max: 75, range: :tier, always_max?: false, step: 1, slot: 0}
 
       skills = Map.update!(skills, 356, &%{&1 | value: 50})
       assert Skills.learn_rank(skills, 356, 150)[356].value == 50
@@ -194,6 +208,21 @@ defmodule ThistleTea.Game.Entity.Logic.SkillsTest do
       assert Skills.rank_known?(skills, 186, 75)
       assert Skills.rank_known?(skills, 186, 150)
       refute Skills.rank_known?(skills, 186, 225)
+    end
+  end
+
+  describe "merge/2" do
+    test "preserves current values and slots while assigning unused slots to derived skills" do
+      known = Skills.learn_rank(%{}, 186, 75)
+
+      derived =
+        Skills.with_slots(%{43 => Skills.new_entry(:level, false, 60), 95 => Skills.new_entry(:level, false, 60)})
+
+      merged = Skills.merge(known, derived)
+      assert merged[186] == known[186]
+      assert merged[43].slot == 1
+      assert merged[95].slot == 2
+      assert Skills.merge(merged, derived) == merged
     end
   end
 

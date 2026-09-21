@@ -37,6 +37,7 @@ defmodule ThistleTea.Game.World.Loader.Skill do
     |> Enum.uniq()
     |> Enum.flat_map(&build_entry(&1, race, class, level, table))
     |> Map.new()
+    |> Skills.with_slots()
   end
 
   def initial_skills(_spell_ids, _race, _class, _level, _table), do: %{}

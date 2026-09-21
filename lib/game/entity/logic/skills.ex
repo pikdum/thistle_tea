@@ -1,7 +1,7 @@
 defmodule ThistleTea.Game.Entity.Logic.Skills do
   @moduledoc """
   Player skill lines as data: a map of skill id to value, maximum, range,
-  always-max flag, and trained tier step, encoded into PLAYER_SKILL_INFO.
+  always-max flag, trained tier step, and stable PLAYER_SKILL_INFO slot.
   Ranges follow vmangos: `:level` skills cap at 5 x level and gain points
   from combat use, `:tier` skills use their trained profession cap, `:mono`
   skills stay 1/1, and `:language` skills stay 300/300.
@@ -102,6 +102,28 @@ defmodule ThistleTea.Game.Entity.Logic.Skills do
 
   def max_for_level(level), do: max(level, 1) * 5
 
+  def merge(existing, derived) do
+    additions = derived |> Map.drop(Map.keys(existing)) |> Map.new(fn {id, entry} -> {id, Map.delete(entry, :slot)} end)
+    existing |> with_slots() |> Map.merge(additions) |> with_slots()
+  end
+
+  def with_slots(skills) when is_map(skills) do
+    used = MapSet.new(Map.values(skills), &Map.get(&1, :slot))
+
+    skills
+    |> Enum.sort_by(fn {id, _entry} -> id end)
+    |> Enum.map_reduce(used, fn {id, entry}, occupied ->
+      if is_integer(Map.get(entry, :slot)) do
+        {{id, entry}, occupied}
+      else
+        slot = Enum.find(0..(@max_skill_entries - 1), &(not MapSet.member?(occupied, &1)))
+        {{id, Map.put(entry, :slot, slot)}, MapSet.put(occupied, slot)}
+      end
+    end)
+    |> elem(0)
+    |> Map.new()
+  end
+
   def forget(skills, ids, forgotten) do
     {Map.drop(skills, ids), Map.merge(forgotten, Map.take(skills, ids))}
   end
@@ -182,9 +204,10 @@ defmodule ThistleTea.Game.Entity.Logic.Skills do
   def known?(_skills, _skill_id), do: false
 
   def learn_rank(skills, skill_id, skill_max) when is_map(skills) and is_integer(skill_id) and skill_id > 0 do
+    skills = with_slots(skills)
     entry = Map.get(skills, skill_id, %{value: 1, max: skill_max, range: :tier, always_max?: false})
     entry = Map.put(entry, :step, max(Map.get(entry, :step, 0), div(skill_max, 75)))
-    Map.put(skills, skill_id, %{entry | max: max(entry.max, skill_max), range: :tier})
+    skills |> Map.put(skill_id, %{entry | max: max(entry.max, skill_max), range: :tier}) |> with_slots()
   end
 
   def learn_rank(skills, _skill_id, _skill_max), do: skills
@@ -203,22 +226,22 @@ defmodule ThistleTea.Game.Entity.Logic.Skills do
   def encode(skills, bonuses) when is_map(skills) do
     entries =
       skills
-      |> Enum.sort_by(fn {id, _entry} -> id end)
-      |> Enum.take(@max_skill_entries)
-      |> Enum.map(fn {id, entry} ->
-        {temporary, permanent} = Map.get(bonuses, id, {0, 0})
-        step = Map.get(entry, :step, 0)
+      |> with_slots()
+      |> Enum.reject(fn {_id, entry} -> is_nil(entry.slot) end)
+      |> Map.new(fn {id, entry} -> {entry.slot, encode_entry(id, entry, bonuses)} end)
 
-        <<id::little-size(16), step::little-size(16), entry.value::little-size(16), entry.max::little-size(16),
-          temporary::little-signed-size(16), permanent::little-signed-size(16)>>
-      end)
-      |> IO.iodata_to_binary()
-
-    padding = @max_skill_entries * 12 - byte_size(entries)
-    entries <> <<0::size(padding * 8)>>
+    for slot <- 0..(@max_skill_entries - 1), into: <<>>, do: Map.get(entries, slot, <<0::size(96)>>)
   end
 
   def encode(_skills, _bonuses), do: nil
+
+  defp encode_entry(id, entry, bonuses) do
+    {temporary, permanent} = Map.get(bonuses, id, {0, 0})
+    step = Map.get(entry, :step, 0)
+
+    <<id::little-size(16), step::little-size(16), entry.value::little-size(16), entry.max::little-size(16),
+      temporary::little-signed-size(16), permanent::little-signed-size(16)>>
+  end
 
   def combat_skill_up(skills, skill_id, opts) when is_map(skills) do
     player_level = Keyword.fetch!(opts, :player_level)
