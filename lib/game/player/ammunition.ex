@@ -9,6 +9,7 @@ defmodule ThistleTea.Game.Player.Ammunition do
   alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.Logic.AI.BT.Ranged
   alias ThistleTea.Game.Entity.Logic.Ammunition, as: Ammo
+  alias ThistleTea.Game.Entity.Logic.AutoRepeat
   alias ThistleTea.Game.Entity.Logic.Casting
   alias ThistleTea.Game.Entity.Logic.CombatControl
   alias ThistleTea.Game.Entity.Logic.Core
@@ -16,11 +17,13 @@ defmodule ThistleTea.Game.Player.Ammunition do
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Entity.Logic.Proficiency
+  alias ThistleTea.Game.Entity.Logic.WeaponDamage
   alias ThistleTea.Game.Entity.Server.Player.TickScheduler
   alias ThistleTea.Game.Network.InventoryUpdate
   alias ThistleTea.Game.Player.ItemCosts
   alias ThistleTea.Game.Player.Projectile
   alias ThistleTea.Game.Player.Reputation
+  alias ThistleTea.Game.Player.Spellcasting
   alias ThistleTea.Game.Spell.Cast
   alias ThistleTea.Game.World.ItemStore
 
@@ -61,11 +64,22 @@ defmodule ThistleTea.Game.Player.Ammunition do
   def launch(%{character: %Character{}} = state, %Effects.LaunchRanged{} = request) do
     state = ItemCosts.settle(state)
 
-    if current?(state.character, request) do
-      state |> launch_current(request) |> TickScheduler.ensure_scheduled()
-    else
-      state
+    cond do
+      not current?(state.character, request) -> state
+      busy?(state.character, request) -> pause(state, request.now)
+      true -> state |> launch_current(request) |> TickScheduler.ensure_scheduled()
     end
+  end
+
+  defp busy?(character, %Effects.LaunchRanged{kind: :repeat}) do
+    AutoRepeat.moving?(character) or not is_nil(character.internal.casting)
+  end
+
+  defp busy?(_character, _request), do: false
+
+  defp pause(state, now) do
+    character = state.character |> AutoRepeat.interrupt(now) |> EventSink.emit_pending()
+    %{state | character: character} |> TickScheduler.ensure_scheduled()
   end
 
   defp current?(%Character{internal: %{casting: casting}}, %Effects.LaunchRanged{kind: :cast, request: casting}),
@@ -76,6 +90,7 @@ defmodule ThistleTea.Game.Player.Ammunition do
 
   defp launch_current(state, %Effects.LaunchRanged{request: %{spell: spell}} = request) do
     with :ok <- available(state.character, spell),
+         :ok <- validate_repeat(state, request),
          :ok <- Ammo.validate(state.character, spell, &ItemStore.get/1) do
       character = prepare(state.character, request)
 
@@ -88,6 +103,13 @@ defmodule ThistleTea.Game.Player.Ammunition do
       {:error, reason} -> fail(state, spell.id, reason, request.kind)
     end
   end
+
+  defp validate_repeat(state, %Effects.LaunchRanged{kind: :repeat, request: shot}) do
+    spell = WeaponDamage.prepare_spell(state.character, shot.spell)
+    Spellcasting.validate_repeat(state, spell, shot.targets)
+  end
+
+  defp validate_repeat(_state, _request), do: :ok
 
   defp available(character, spell) do
     with false <- Core.dead?(character),

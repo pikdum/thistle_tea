@@ -164,7 +164,7 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
       caster_player?: Map.get(attack, :caster_player?, false),
       crit_chance:
         (Map.get(attack, :crit_chance) || @default_crit_chance) +
-          Aura.flat_amount(defender, :mod_attacker_melee_crit_chance),
+          attacker_crit_bonus(defender, attack),
       always_crush?: Map.get(attack, :always_crush?, false),
       spell_swing?: is_integer(Map.get(attack, :queued_spell_id)),
       block_allowed?: Map.get(attack, :block_allowed?, true),
@@ -222,6 +222,13 @@ defmodule ThistleTea.Game.Entity.Logic.AttackTable do
   end
 
   defp attacker_hit_debuff(_defender, _attack), do: 0
+
+  defp attacker_crit_bonus(defender, attack) do
+    type =
+      if Map.get(attack, :ranged?, false), do: :mod_attacker_ranged_crit_chance, else: :mod_attacker_melee_crit_chance
+
+    Aura.flat_amount(defender, type)
+  end
 
   defp versus_pct(attack, key, defender) do
     Aura.versus_amount(Map.get(attack, key), CreatureType.mask(defender))

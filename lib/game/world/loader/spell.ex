@@ -810,6 +810,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
 
     base =
       MapSet.new()
+      |> add_if(attrs, 0x00000002, :uses_ranged_slot)
       |> add_if(attrs, @on_next_swing_1, :on_next_swing)
       |> add_if(attrs, @on_next_swing_2, :on_next_swing)
       |> add_if(attrs, @passive, :passive)
@@ -845,6 +846,7 @@ defmodule ThistleTea.Game.World.Loader.Spell do
     |> add_if(attrs_ex1, @finishing_move_damage_ex_1, :finishing_move)
     |> add_if(attrs_ex1, @finishing_move_duration_ex_1, :finishing_move)
     |> add_if(attrs_ex2, @ignore_line_of_sight_ex2, :ignore_line_of_sight)
+    |> add_if(attrs_ex2, 0x00000020, :auto_repeat)
     |> add_if(attrs_ex2, 0x00002000, :enchant_own_item_only)
     |> add_if(attrs_ex2, 0x00400000, :no_initial_threat)
     |> add_if(attrs_ex2, 0x04000000, :no_school_immunities)

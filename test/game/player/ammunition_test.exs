@@ -87,6 +87,40 @@ defmodule ThistleTea.Game.Player.AmmunitionTest do
   end
 
   describe "launch/2" do
+    test "wand repeats use the equipped school and skill without consuming ammunition", context do
+      %{state: state, arrows: arrows} = context
+      {state, spell, wand} = wand_weapon(state)
+      {state, request} = repeat(state, spell, 2_000)
+      fired = Ammunition.launch(state, request)
+
+      assert_receive {:"$gen_cast", {:receive_spell, cast, delivered}}
+      assert delivered.school == 6
+      assert cast.spell == delivered
+      assert cast.attack_power == 0
+      assert cast.attack_skill == 217
+      assert cast.weapon_base_min == 20.0
+      assert ItemStore.get(wand.object.guid).item.durability == 50
+      assert ItemStore.get(arrows.object.guid).item.stack_count == 2
+      assert Ammunition.launch(fired, request) == fired
+      refute_received {:"$gen_cast", {:receive_spell, _, _}}
+    end
+
+    test "queued wand shots recheck movement, broken gear, and weapon replacement", %{state: state, bow: bow} do
+      {state, spell, wand} = wand_weapon(state)
+      {state, request} = repeat(state, spell, 2_000)
+      moving = %{state.character | movement_block: %{state.character.movement_block | movement_flags: 1}}
+      assert Ammunition.launch(%{state | character: moving}, request).character.internal.auto_shot == nil
+      refute_received {:"$gen_cast", {:receive_spell, _, _}}
+
+      ItemStore.put(%{wand | item: %{wand.item | durability: 0}})
+      assert Ammunition.launch(state, request).character.internal.auto_shot == nil
+      refute_received {:"$gen_cast", {:receive_spell, _, _}}
+
+      character = %{state.character | player: Inventory.equip(state.character.player, :ranged, bow)}
+      assert Ammunition.launch(%{state | character: character}, request).character.internal.auto_shot == nil
+      refute_received {:"$gen_cast", {:receive_spell, _, _}}
+    end
+
     test "two arrows pay for exactly two repeats and depletion cancels without another projectile", context do
       %{state: state, arrows: arrows, spell: spell} = context
       state = Ammunition.select(state, arrows.object.entry)
@@ -254,6 +288,35 @@ defmodule ThistleTea.Game.Player.AmmunitionTest do
     thrown = create_item(template, state.guid)
     character = %{state.character | player: Inventory.equip(state.character.player, :ranged, thrown)}
     {%{state | character: Character.sync_equipment_stats(character)}, thrown}
+  end
+
+  defp wand_weapon(state) do
+    template = %ItemTemplate{
+      entry: 997_984,
+      class: 2,
+      subclass: 19,
+      inventory_type: 26,
+      dmg_type1: 6,
+      dmg_min1: 20.0,
+      dmg_max1: 30.0,
+      delay: 1_500,
+      max_durability: 50
+    }
+
+    wand = create_item(template, state.guid)
+    player = state.character.player |> Inventory.equip(:ranged, wand) |> then(&%{&1 | skills: %{228 => %{value: 217}}})
+    character = Character.sync_equipment_stats(%{state.character | player: player})
+
+    spell = %Spell{
+      id: 5019,
+      dmg_class: 1,
+      school: :physical,
+      equipped_item_class: 2,
+      equipped_item_subclass_mask: 524_288,
+      attributes: MapSet.new([:auto_repeat, :uses_ranged_slot, :ignore_line_of_sight])
+    }
+
+    {%{state | character: character}, spell, wand}
   end
 
   defp create_item(template, owner, count \\ 1) do

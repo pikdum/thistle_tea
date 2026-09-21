@@ -159,8 +159,8 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
         do: context.normalized_speed * 1_000,
         else: context.attack_time_ms
 
-    kind = if Spell.ranged_ability?(spell), do: :ranged, else: :melee
-    TargetAttackPower.damage(state, context.target_attack_power, kind, speed)
+    kind = if Spell.ranged_attack?(spell), do: :ranged, else: :melee
+    if Spell.wand?(spell), do: 0, else: TargetAttackPower.damage(state, context.target_attack_power, kind, speed)
   end
 
   defp leech_multiplier(%Effect{multiple_value: multiple}) when is_number(multiple) and multiple > 0, do: multiple
@@ -418,12 +418,18 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
 
     damage =
       if context.melee_crit? do
-        damage + trunc(Modifiers.value(context.spell_modifiers, :crit_damage_bonus, damage * 1.0))
+        damage + weapon_crit_bonus(context, spell, damage)
       else
         damage
       end
 
-    proc_damage = if context.melee_crit?, do: unmitigated_damage * 2, else: unmitigated_damage
+    proc_damage =
+      if context.melee_crit?,
+        do: unmitigated_damage + weapon_crit_bonus(context, spell, unmitigated_damage),
+        else: unmitigated_damage
+
+    resisted = school_resisted_amount(state, damage, school, context, [])
+    damage = max(damage - resisted, 0)
 
     {state, damage, absorbed} =
       Core.take_damage_with_mitigation(state, damage, now,
@@ -439,6 +445,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
       Effects.spell_damage(context.caster_guid, state.object.guid, spell, damage,
         absorbed: absorbed,
         crit?: context.melee_crit? || false,
+        resisted: resisted,
         proc_damage: proc_damage,
         proc_type: dealt_attack_proc_type(spell)
       )
@@ -453,6 +460,11 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
   end
 
   defp melee_ability_reactions(state, _context, _spell, _damage, _now), do: {state, []}
+
+  defp weapon_crit_bonus(context, spell, damage) do
+    bonus = if Spell.wand?(spell), do: damage * 0.5, else: damage * 1.0
+    trunc(Modifiers.value(context.spell_modifiers, :crit_damage_bonus, bonus))
+  end
 
   defp incoming_melee_ability_reactions(state, %CastContext{} = context, %Spell{} = spell, outcome, now) do
     if Core.dead?(state) do
@@ -487,7 +499,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
 
   defp dealt_attack_proc_type(%Spell{} = spell) do
     cond do
-      Hunter.auto_shot?(spell) -> :deal_ranged_attack
+      Spell.auto_repeat?(spell) or Hunter.auto_shot?(spell) -> :deal_ranged_attack
       Spell.ranged_ability?(spell) -> :deal_ranged_ability
       true -> :deal_melee_ability
     end
@@ -495,7 +507,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect.DamageHeal do
 
   defp taken_attack_proc_type(%Spell{} = spell) do
     cond do
-      Hunter.auto_shot?(spell) -> :take_ranged_attack
+      Spell.auto_repeat?(spell) or Hunter.auto_shot?(spell) -> :take_ranged_attack
       Spell.ranged_ability?(spell) -> :take_ranged_ability
       true -> :take_melee_ability
     end

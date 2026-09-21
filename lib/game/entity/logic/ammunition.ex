@@ -8,15 +8,19 @@ defmodule ThistleTea.Game.Entity.Logic.Ammunition do
   alias ThistleTea.Game.Entity.Logic.Durability
   alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Entity.Logic.Inventory.Batch
+  alias ThistleTea.Game.Entity.Logic.WeaponDamage
   alias ThistleTea.Game.Spell
 
   def required?(%Spell{id: id}) when id in [2094, 13_099, 13_119, 23_577], do: false
-  def required?(%Spell{} = spell), do: Spell.ranged_ability?(spell)
+  def required?(%Spell{} = spell), do: Spell.ranged_attack?(spell)
 
   def validate(%Spell{} = spell, ammo_id, ammo, equipped, count_item) do
     if required?(spell) do
       weapon = Enum.find(equipped, &match?(%{class: 2, inventory_type: type} when type in [15, 25, 26], &1))
-      validate_weapon(weapon, ammo_id, ammo, count_item)
+
+      if WeaponDamage.fits?(weapon, spell),
+        do: validate_weapon(weapon, ammo_id, ammo, count_item),
+        else: {:error, :equipped_item}
     else
       :ok
     end
@@ -67,7 +71,6 @@ defmodule ThistleTea.Game.Entity.Logic.Ammunition do
     |> Enum.find(&(&1.object.entry == player.ammo_id))
   end
 
-  defp validate_weapon(nil, _ammo_id, _ammo, _count_item), do: {:error, :equipped_item}
   defp validate_weapon(%{inventory_type: 25}, _ammo_id, _ammo, _count_item), do: :ok
   defp validate_weapon(%{subclass: 19}, _ammo_id, _ammo, _count_item), do: :ok
 

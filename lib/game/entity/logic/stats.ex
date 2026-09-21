@@ -12,6 +12,7 @@ defmodule ThistleTea.Game.Entity.Logic.Stats do
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Logic.Disarm
   alias ThistleTea.Game.Entity.Logic.PetHappiness
+  alias ThistleTea.Game.Entity.Logic.WeaponDamage
   alias ThistleTea.Game.Spell
 
   @resistance_fields [
@@ -287,9 +288,15 @@ defmodule ThistleTea.Game.Entity.Logic.Stats do
     with base_min when is_number(base_min) <- unit.base_ranged_min_damage,
          base_max when is_number(base_max) <- unit.base_ranged_max_damage do
       bonus =
-        attack_power_bonus(unit.ranged_attack_power, unit.ranged_attack_time) + equipment_bonus(unit, :ranged_damage)
+        attack_power_bonus(WeaponDamage.ranged_attack_power(unit), unit.ranged_attack_time) +
+          equipment_bonus(unit, :ranged_damage)
 
-      %{unit | min_ranged_damage: base_min + bonus, max_ranged_damage: base_max + bonus}
+      multiplier =
+        if WeaponDamage.wand?(unit.ranged_weapon),
+          do: WeaponDamage.multiplier(%{unit: unit}, unit.ranged_weapon.dmg_type1, unit.ranged_weapon),
+          else: 1.0
+
+      %{unit | min_ranged_damage: (base_min + bonus) * multiplier, max_ranged_damage: (base_max + bonus) * multiplier}
     else
       _ -> unit
     end

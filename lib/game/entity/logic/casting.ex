@@ -10,13 +10,13 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
   alias ThistleTea.Game.Entity.Logic.AI.BT
   alias ThistleTea.Game.Entity.Logic.Ammunition
   alias ThistleTea.Game.Entity.Logic.Aura, as: AuraLogic
+  alias ThistleTea.Game.Entity.Logic.AutoRepeat
   alias ThistleTea.Game.Entity.Logic.Companion
   alias ThistleTea.Game.Entity.Logic.Core
   alias ThistleTea.Game.Entity.Logic.Disarm
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Enchantments
   alias ThistleTea.Game.Entity.Logic.Hostility
-  alias ThistleTea.Game.Entity.Logic.Hunter
   alias ThistleTea.Game.Entity.Logic.MechanicResistance
   alias ThistleTea.Game.Entity.Logic.MeleeSpell
   alias ThistleTea.Game.Entity.Logic.Mount
@@ -30,6 +30,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
   alias ThistleTea.Game.Entity.Logic.SpellEffect
   alias ThistleTea.Game.Entity.Logic.SpellMagnet
   alias ThistleTea.Game.Entity.Logic.SpellResist
+  alias ThistleTea.Game.Entity.Logic.WeaponDamage
   alias ThistleTea.Game.Entity.SpellTargetResolver
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Spell
@@ -64,11 +65,18 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
 
   defp start_available_spell(character, spell, targets, now, cast_item_guid) do
     character = character |> Mount.prepare_cast(spell, now) |> interrupt_action_auras(:action, spell, now)
+    character = AutoRepeat.interrupt(character, now)
+    spell = WeaponDamage.prepare_spell(character, spell)
 
-    if Spell.attribute?(spell, :on_next_swing) do
-      MeleeSpell.queue_next_swing(character, spell)
-    else
-      do_start(character, character.internal, spell, targets, now, cast_item_guid)
+    cond do
+      Spell.auto_repeat?(spell) and match?(%Character{}, character) ->
+        AutoRepeat.start(character, spell, targets, now)
+
+      Spell.attribute?(spell, :on_next_swing) ->
+        MeleeSpell.queue_next_swing(character, spell)
+
+      true ->
+        do_start(character, character.internal, spell, targets, now, cast_item_guid)
     end
   end
 
@@ -259,14 +267,13 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
     end
   end
 
-  defp finish(entity, %Cast{resolution: %CastResolution{} = resolution} = casting, now) do
+  defp finish(entity, %Cast{resolution: %CastResolution{} = resolution} = casting, _now) do
     entity =
       entity
       |> queue_successful_finish_trigger(casting)
       |> queue_quest_cast_credit(casting, resolution)
       |> stop_breakable_control_attack(casting, resolution.hits)
       |> consume_unavoidable_finisher(casting)
-      |> activate_auto_shot(casting, now)
 
     if Cast.channeled?(casting) do
       stop_channel(entity, casting, :completed)
@@ -414,29 +421,6 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
   end
 
   defp queue_successful_finish_trigger(character, _casting), do: character
-
-  defp activate_auto_shot(
-         %Character{internal: %Internal{} = internal} = character,
-         %Cast{spell: %Spell{} = spell, targets: %Target{} = targets},
-         now
-       ) do
-    target_guid = Target.unit_guid(targets)
-
-    if Hunter.auto_shot?(spell) and is_integer(target_guid) and target_guid > 0 do
-      auto_shot = %{
-        spell: spell,
-        target_guid: target_guid,
-        targets: targets,
-        next_at: now + character.unit.ranged_attack_time
-      }
-
-      %{character | internal: %{internal | auto_shot: auto_shot}}
-    else
-      character
-    end
-  end
-
-  defp activate_auto_shot(character, _casting, _now), do: character
 
   defp release_paladin_seal(character, %Cast{spell: %Spell{} = spell}, [target_guid | _rest], now) do
     Paladin.release_seal(character, spell, target_guid, now)

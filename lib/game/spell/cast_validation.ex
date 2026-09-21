@@ -208,9 +208,16 @@ defmodule ThistleTea.Game.Spell.CastValidation do
     cond do
       Spell.attribute?(spell, :from_behind) and not behind_target?(caster, target_info) -> {:error, :not_behind}
       Spell.attribute?(spell, :target_facing_caster) and behind_target?(caster, target_info) -> {:error, :not_infront}
+      Spell.auto_repeat?(spell) and not facing_target?(caster, target_info) -> {:error, :not_infront}
       true -> :ok
     end
   end
+
+  defp facing_target?(%{movement_block: %{position: {x, y, _z, orientation}}}, %{position: {_world, tx, ty, _tz}}) do
+    :math.cos(:math.atan2(ty - y, tx - x) - orientation) >= 0
+  end
+
+  defp facing_target?(_caster, _target), do: true
 
   defp behind_target?(%{movement_block: %{position: {caster_x, caster_y, _caster_z, _caster_o}}}, %{
          position: {_map, target_x, target_y, _target_z},

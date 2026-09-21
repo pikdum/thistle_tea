@@ -137,9 +137,9 @@ defmodule ThistleTea.Game.Entity.Logic.AI.BT.RangedTest do
       perception = Perception.new(1_000, nil, %{target_guid => observation}, %{mobs: [], players: []})
       context = Context.new(1_000, perception: perception)
 
-      assert {{:running, 0}, result} = BT.tick(Ranged.sequence(), character, context)
+      assert {:failure, result} = BT.tick(Ranged.sequence(), character, context)
       refute Enum.any?(result.internal.events, &is_struct(&1, Effects.DeliverSpell))
-      assert result.internal.auto_shot.next_at == 0
+      assert result.internal.auto_shot == nil
     end
   end
 end

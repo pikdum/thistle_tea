@@ -71,6 +71,13 @@ defmodule ThistleTea.Game.Spell do
 
   def attribute?(%__MODULE__{attributes: attrs}, attr), do: MapSet.member?(attrs, attr)
 
+  def auto_repeat?(%__MODULE__{} = spell), do: attribute?(spell, :uses_ranged_slot) and attribute?(spell, :auto_repeat)
+
+  def wand?(%__MODULE__{dmg_class: 1} = spell), do: auto_repeat?(spell)
+  def wand?(_spell), do: false
+
+  def ranged_attack?(%__MODULE__{} = spell), do: ranged_ability?(spell) or auto_repeat?(spell)
+
   def reflectable?(%__MODULE__{dmg_class: 1} = spell) do
     harmful?(spell) and
       not Enum.any?([:ability, :no_reflection, :no_immunities, :passive], &attribute?(spell, &1))

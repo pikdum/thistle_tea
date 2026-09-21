@@ -179,7 +179,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
   end
 
   defp ranged_weapon_ability?(%Spell{effects: effects} = spell) do
-    Spell.ranged_ability?(spell) and Enum.any?(effects, &(&1.type in @weapon_effect_types))
+    Spell.ranged_attack?(spell) and Enum.any?(effects, &(&1.type in @weapon_effect_types))
   end
 
   defp receive_melee_ability(target, %CastContext{} = context, spell, now) do
@@ -418,7 +418,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffect do
       spell_school_mask: Spell.school_mask(spell),
       mechanic: spell.mechanic,
       block_allowed?: Spell.attribute?(spell, :completely_blocked),
-      ranged?: Spell.ranged_ability?(spell)
+      ranged?: Spell.ranged_attack?(spell)
     }
   end
 

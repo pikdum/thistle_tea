@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.Player.Movement do
 
   alias ThistleTea.Game.Entity.Data.Character
   alias ThistleTea.Game.Entity.EventSink
+  alias ThistleTea.Game.Entity.Logic.AutoRepeat
   alias ThistleTea.Game.Entity.Logic.Breathing
   alias ThistleTea.Game.Entity.Logic.Falling
   alias ThistleTea.Game.Entity.Server.Player, as: PlayerServer
@@ -23,6 +24,9 @@ defmodule ThistleTea.Game.Player.Movement do
       body_height(character)
     )
   end
+
+  def interrupt_attacks(character, false, _now), do: character
+  def interrupt_attacks(character, true, now), do: AutoRepeat.interrupt(character, now)
 
   def body_height(%Character{} = character), do: ModelGeometry.height(character.unit.display_id)
   def body_height(_entity), do: 2.0

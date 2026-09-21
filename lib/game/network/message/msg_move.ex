@@ -110,6 +110,7 @@ defmodule ThistleTea.Game.Network.Message.MsgMove do
     moving_or_turning? = moved? or Bitwise.band(movement_block.movement_flags || 0, 0x3F) != 0
     character = Emote.move(character, moved?, moving_or_turning?, now)
     character = PlayerMovement.apply_environment(character, message.opcode, now)
+    character = PlayerMovement.interrupt_attacks(character, moved? or MovementBlock.airborne?(movement_block), now)
     character = interrupt_auras(character, moved?)
     character = interrupt_water_auras(character, movement_block, state.character.movement_block)
 

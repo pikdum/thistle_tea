@@ -19,6 +19,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
   alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Entity.Logic.MeleeSpell
   alias ThistleTea.Game.Entity.Logic.Warlock
+  alias ThistleTea.Game.Entity.Logic.WeaponDamage
   alias ThistleTea.Game.Entity.Server.Player.TickScheduler
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network
@@ -119,6 +120,8 @@ defmodule ThistleTea.Game.Player.Spellcasting do
   end
 
   defp cast_target(state, spell, targets, cast_item_guid) do
+    spell = WeaponDamage.prepare_spell(state.character, spell)
+
     with :ok <- Deadmines.validate_cast(state, spell, targets, cast_item_guid),
          :ok <- validate_cast(state, spell, targets, cast_item_guid),
          :ok <- PetTraining.validate(state.character, spell),
@@ -259,11 +262,14 @@ defmodule ThistleTea.Game.Player.Spellcasting do
     state = %{state | character: character} |> Fishing.start_cast(spell)
 
     cond do
+      Spell.auto_repeat?(spell) -> TickScheduler.schedule_now(state)
       Spell.attribute?(spell, :on_next_swing) -> TickScheduler.schedule_now(state)
       cast_time_ms == 0 and not Spell.attribute?(spell, :channeled) -> complete(state)
       true -> TickScheduler.schedule_now(state)
     end
   end
+
+  def validate_repeat(state, spell, targets), do: validate_cast(state, spell, targets, nil)
 
   defp validate_cast(%{character: character} = state, %Spell{} = spell, %Target{} = targets, cast_item_guid) do
     enchant_guid = Enchantments.target_guid(character.player, spell, Target.item_guid(targets))

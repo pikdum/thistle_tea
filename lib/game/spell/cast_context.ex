@@ -18,6 +18,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
   alias ThistleTea.Game.Entity.Logic.TargetAttackPower
   alias ThistleTea.Game.Entity.Logic.TargetDamage
   alias ThistleTea.Game.Entity.Logic.TargetSpellPower
+  alias ThistleTea.Game.Entity.Logic.WeaponDamage
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Critical
   alias ThistleTea.Game.Spell.Modifiers
@@ -91,6 +92,8 @@ defmodule ThistleTea.Game.Spell.CastContext do
 
   def from_caster(%{object: %{guid: guid}, unit: %{level: level}} = caster, spell, target_guid)
       when is_integer(guid) and is_integer(level) do
+    spell = WeaponDamage.prepare_spell(caster, spell)
+
     %__MODULE__{
       caster_guid: guid,
       caster_owner_guid: caster_owner_guid(caster),
@@ -109,7 +112,7 @@ defmodule ThistleTea.Game.Spell.CastContext do
       spell_modifiers: Modifiers.snapshot(caster, spell),
       conditional_crit_modifiers: Critical.snapshot(caster, spell),
       threat_multiplier: threat_multiplier(caster, spell),
-      damage_done_multiplier: Aura.percent_multiplier(caster, :mod_damage_percent_done, Spell.school_mask(spell)),
+      damage_done_multiplier: WeaponDamage.multiplier(caster, spell.school, attack_weapon(caster, spell)),
       happiness_multiplier: PetHappiness.damage_multiplier(caster),
       damage_done_versus: Aura.misc_amounts(caster, :mod_damage_done_versus),
       target_attack_power: TargetAttackPower.snapshot(caster),
@@ -179,10 +182,10 @@ defmodule ThistleTea.Game.Spell.CastContext do
 
   defp put_attack_snapshot(%__MODULE__{} = context, caster, %Spell{} = spell) do
     cond do
-      Spell.ranged_ability?(spell) ->
+      Spell.ranged_attack?(spell) ->
         %{
           context
-          | attack_power: caster.unit.ranged_attack_power || 0,
+          | attack_power: WeaponDamage.ranged_attack_power(caster.unit),
             weapon_base_min: caster.unit.base_ranged_min_damage || caster.unit.min_ranged_damage || 0,
             weapon_base_max: caster.unit.base_ranged_max_damage || caster.unit.max_ranged_damage || 0,
             attack_time_ms: caster.unit.ranged_attack_time,
@@ -298,6 +301,14 @@ defmodule ThistleTea.Game.Spell.CastContext do
   end
 
   defp main_hand_template(_caster), do: nil
+
+  defp attack_weapon(caster, %Spell{} = spell) do
+    cond do
+      Spell.ranged_attack?(spell) -> caster.unit.ranged_weapon
+      melee_snapshot?(spell) -> main_hand_template(caster)
+      true -> nil
+    end
+  end
 
   defp ranged_attack_skill(%Character{unit: unit, player: player} = caster) when is_struct(player) do
     skill_id = Skills.ranged_weapon_skill(player, &ItemLoader.get_template/1)

@@ -38,6 +38,7 @@ defmodule ThistleTea.Game.Entity.Data.Component.Internal do
     :totem,
     :duel,
     :auto_shot,
+    :ranged_attack_at,
     :fishing,
     :gathering,
     :taxi_flight,
