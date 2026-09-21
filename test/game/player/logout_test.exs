@@ -19,6 +19,7 @@ defmodule ThistleTea.Game.Player.LogoutTest do
   alias ThistleTea.Game.Entity.Logic.Rest
   alias ThistleTea.Game.Entity.Server.Player, as: PlayerServer
   alias ThistleTea.Game.Entity.Server.Player.State
+  alias ThistleTea.Game.Network.ConnectionState
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.Player.Logout
   alias ThistleTea.Game.Player.Movement
@@ -112,6 +113,13 @@ defmodule ThistleTea.Game.Player.LogoutTest do
   end
 
   describe "request/1 and cancel/1" do
+    test "late packets after the player leaves keep the character-selection connection alive" do
+      connection = %ConnectionState{player_pid: nil, player_monitor: nil}
+      assert Message.CmsgLogoutCancel.handle(%Message.CmsgLogoutCancel{}, connection) == connection
+      assert Message.CmsgLogoutRequest.handle(%Message.CmsgLogoutRequest{}, connection) == connection
+      refute_receive {:"$gen_cast", {:send_packet, %Message.SmsgLogoutCancelAck{}}}
+    end
+
     test "schedules twenty seconds and starts offline rest only on world departure", %{state: state} do
       waiting = Message.CmsgLogoutRequest.handle(%Message.CmsgLogoutRequest{}, state)
       assert Process.read_timer(waiting.logout_timer.ref) in 19_000..20_000

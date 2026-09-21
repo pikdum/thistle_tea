@@ -31,11 +31,15 @@ defmodule ThistleTea.Game.Player.Logout do
     end
   end
 
+  def request(state), do: state
+
   def cancel(%State{} = state) do
     state = clear(state)
     Network.send_packet(%Message.SmsgLogoutCancelAck{})
     state
   end
+
+  def cancel(state), do: state
 
   def clear(%State{} = state) do
     case state.logout_timer do
