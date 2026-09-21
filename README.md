@@ -129,6 +129,7 @@ nix develop .#wow-tools            # shell with all of the above + sqlite + mari
 - [Creature-specific flat damage](docs/creature-damage-playtest.md), including Beastslayer and Elemental Slayer enchants across weapon attacks, spells, and periodic damage
 - quests
 - [Quest sharing](docs/quest-sharing-playtest.md), with party confirmations, eligibility feedback, inherited timers, source-item lifecycle, and stale-offer cleanup
+- [Item-started quests](docs/item-quests-playtest.md), with owned starter validation, atomic item exchanges, retained objectives, full-bag rejection, and party confirmation
 - xp, leveling, and exploration
 - isolated dungeon instances (Ragefire Chasm)
 - Deadmines boss doors and gunpowder cannon breach, with Smite's alarms and pirate response
