@@ -119,8 +119,8 @@ defmodule ThistleTea.Game.Entity.EventSink.ClientProjection do
     entity
   end
 
-  def emit(%Character{} = entity, %Effects.CreateItem{item_id: item_id, count: count}, context) do
-    Context.send(context, {:create_item, item_id, count})
+  def emit(%Character{} = entity, %Effects.CreateItem{item_id: item_id, count: count, spell_id: spell_id}, context) do
+    Context.send(context, {:create_item, item_id, count, spell_id})
     entity
   end
 

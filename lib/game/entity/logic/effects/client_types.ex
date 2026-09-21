@@ -12,7 +12,7 @@ defmodule ThistleTea.Game.Entity.Logic.Effects.ClientTypes do
     {:PickPocket, [:target_guid, :spell_id], []},
     {:SkinCorpse, [:target_guid, :spell_id], []},
     {:DisenchantItem, [:target_guid, :spell_id], []},
-    {:CreateItem, [:item_id, :count], []},
+    {:CreateItem, [:item_id, :count], [spell_id: nil]},
     {:GiveItem, [:target_guid, :item_id, :count], []},
     {:ConsumeReagents, [:reagents], []},
     {:MonsterTalk, [:text, :chat_type, :target_guid], []},

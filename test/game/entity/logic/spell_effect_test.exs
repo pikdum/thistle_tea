@@ -960,7 +960,7 @@ defmodule ThistleTea.Game.Entity.Logic.SpellEffectTest do
 
       {_caster, events} = SpellEffect.receive(target_fixture(), context, spell, 1_000)
 
-      assert [%Effects.CreateItem{item_id: 5350, count: 2}] = events
+      assert [%Effects.CreateItem{item_id: 5350, count: 2, spell_id: 5504}] = events
     end
 
     test "reputation effect emits a typed standing change for players" do

@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.Player.Items do
   """
   alias ThistleTea.Game.Entity.Data.Item, as: DataItem
   alias ThistleTea.Game.Entity.Data.ItemTemplate
+  alias ThistleTea.Game.Entity.Logic.Crafting
   alias ThistleTea.Game.Entity.Logic.Inventory
   alias ThistleTea.Game.Entity.Logic.Inventory.Batch
   alias ThistleTea.Game.Entity.Logic.Inventory.ChangeSet
@@ -17,20 +18,23 @@ defmodule ThistleTea.Game.Player.Items do
   alias ThistleTea.Game.Network.Message
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
+  alias ThistleTea.Game.World.Loader.Skill, as: SkillLoader
 
-  def create(state, item_id, count) do
+  def create(state, item_id, count, spell_id \\ nil) do
     case ItemLoader.get_template(item_id) do
       %ItemTemplate{} = template ->
         count = Inventory.limit_new_count(state.character.player, template, count, &ItemStore.get/1)
-        if count > 0, do: give(state, item_id, count), else: state
+        if count > 0, do: give(state, item_id, count, SkillLoader.recipe(spell_id)), else: state
 
       _missing ->
         state
     end
   end
 
-  def give(state, item_id, count) do
-    case store(state, item_id, count) do
+  def give(state, item_id, count), do: give(state, item_id, count, nil)
+
+  defp give(state, item_id, count, recipe) do
+    case store(state, item_id, count, recipe) do
       {:ok, state, placed_at} ->
         send_push_result(state, item_id, count, placed_at, 1)
         state
@@ -47,19 +51,21 @@ defmodule ThistleTea.Game.Player.Items do
     end
   end
 
-  def store(state, item_id, count) when is_integer(count) and count > 0 do
+  def store(state, item_id, count, recipe \\ nil)
+
+  def store(state, item_id, count, recipe) when is_integer(count) and count > 0 do
     case ItemLoader.get_template(item_id) do
       %ItemTemplate{} = template ->
         items = prepare_stacks(template, state.guid, count)
         batch = Enum.reduce(items, Batch.new(state.character.player), &Batch.add(&2, &1))
-        commit_stacks(state, batch, hd(items).object.guid)
+        commit_stacks(state, batch, hd(items).object.guid, recipe)
 
       _ ->
         {:error, :item_not_found, state}
     end
   end
 
-  def store(state, _item_id, _count), do: {:error, :item_not_found, state}
+  def store(state, _item_id, _count, _recipe), do: {:error, :item_not_found, state}
 
   def store_many(state, entries) when is_list(entries) do
     items =
@@ -105,9 +111,11 @@ defmodule ThistleTea.Game.Player.Items do
     [item | prepare_stacks(template, owner, count - stack_count)]
   end
 
-  defp commit_stacks(state, batch, first_guid) do
+  defp commit_stacks(state, batch, first_guid, recipe) do
     case Inventory.plan(batch, &ItemStore.get/1) do
       {:ok, changes} ->
+        character = Crafting.skill_up(%{state.character | player: changes.player}, recipe, :rand.uniform(100) - 1)
+        changes = ChangeSet.put_player(changes, character.player)
         position = placement_position(ChangeSet.placement(changes, first_guid))
         {:ok, InventoryUpdate.apply(state, {:ok, changes}), position}
 

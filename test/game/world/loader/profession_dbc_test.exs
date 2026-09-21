@@ -8,6 +8,16 @@ defmodule ThistleTea.Game.World.Loader.ProfessionDBCTest do
   @moduletag :dbc_db
 
   describe "vanilla profession catalog" do
+    test "loads item-producing recipes and excludes ordinary class spells" do
+      table = :ets.new(__MODULE__, [:set, :public])
+      Skill.load_all(table)
+      assert Skill.recipe(2657, table) == %{skill_id: 186, yellow: 25, gray: 70}
+      assert Skill.recipe(2330, table) == %{skill_id: 171, yellow: 55, gray: 95}
+      assert Skill.recipe(2538, table) == %{skill_id: 185, yellow: 45, gray: 85}
+      assert Skill.recipe(5504, table) == nil
+      assert Skill.recipe(nil, table) == nil
+    end
+
     test "primary profession rules match every DBC skill category" do
       for line <- DBC.all(SkillLine) do
         assert Skills.primary_profession?(line.id) == (line.category == 11)

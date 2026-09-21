@@ -8,16 +8,64 @@ defmodule ThistleTea.Game.Player.ItemsTest do
   alias ThistleTea.Game.Entity.Data.Component.Player
   alias ThistleTea.Game.Entity.Data.Component.Unit
   alias ThistleTea.Game.Entity.Data.ItemTemplate
+  alias ThistleTea.Game.Entity.EventSink
+  alias ThistleTea.Game.Entity.EventSink.Context
+  alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.Inventory
+  alias ThistleTea.Game.Entity.Logic.Skills
+  alias ThistleTea.Game.Entity.Server.Player, as: PlayerServer
   alias ThistleTea.Game.Entity.Server.Player.State
   alias ThistleTea.Game.Player.Items
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.ItemStore
   alias ThistleTea.Game.World.Loader.Item, as: ItemLoader
+  alias ThistleTea.Game.World.Loader.Skill, as: SkillLoader
 
   @entry 987_950
 
   setup [:inventory]
+
+  describe "create/4" do
+    setup [:recipe]
+
+    test "carries the recipe through owner delivery and commits one gain for a product stack", %{state: state} do
+      event = %{Effects.create_item(@entry, 5) | spell_id: @entry + 1}
+      EventSink.emit(state.character, event, Context.new(self()))
+      assert_received {:create_item, @entry, 5, recipe_id} = message
+      assert recipe_id == @entry + 1
+      assert {:noreply, created} = PlayerServer.handle_info(message, state)
+      assert Inventory.count_entry(created.character.player, @entry, &ItemStore.get/1) == 5
+      assert created.character.player.skills[599].value == 2
+      assert created.character.player.skills[599].step == 1
+      assert CharacterStore.get(state.guid).player.skills[599].value == 2
+    end
+
+    test "does not gain skill from ordinary grants, missing professions, capped skills, or unique limits", %{
+      state: state
+    } do
+      plain = Items.create(state, @entry, 1)
+      assert plain.character.player.skills[599].value == 1
+      missing = %{state | character: %{state.character | player: %{state.character.player | skills: %{}}}}
+      assert Items.create(missing, @entry, 1, @entry + 1).character.player.skills == %{}
+      capped = put_in(state.character.player.skills[599].value, 75)
+      assert Items.create(capped, @entry, 1, @entry + 1).character.player.skills[599].value == 75
+      :ets.insert(ItemLoader, {@entry, %ItemTemplate{entry: @entry, max_count: 1}})
+      assert Items.create(plain, @entry, 1, @entry + 1) == plain
+    end
+
+    test "leaves the skill unchanged when the complete product cannot fit", %{state: state} do
+      player =
+        Enum.reduce(1..16, state.character.player, fn slot, player ->
+          item = ItemStore.create(%ItemTemplate{entry: @entry + 2}, owner: state.guid)
+          Map.replace!(player, :"inv#{slot}", item.object.guid)
+        end)
+
+      state = %{state | character: %{state.character | player: player}}
+      unchanged = Items.create(state, @entry, 1, @entry + 1)
+      assert unchanged == state
+      assert Inventory.count_entry(unchanged.character.player, @entry, &ItemStore.get/1) == 0
+    end
+  end
 
   describe "create/3" do
     test "silently preserves an existing unique item in the bank", %{state: state} do
@@ -101,6 +149,29 @@ defmodule ThistleTea.Game.Player.ItemsTest do
       assert :ets.info(ItemStore, :size) == size
       assert Inventory.count_entry(state.character.player, @entry, &ItemStore.get/1) == 0
     end
+  end
+
+  defp recipe(%{state: state}) do
+    keys = [{:category, 599}, {:spell_skills, @entry + 1}]
+    previous = Enum.flat_map(keys, &:ets.lookup(SkillLoader, &1))
+
+    :ets.insert(SkillLoader, [
+      {{:category, 599}, 11},
+      {{:spell_skills, @entry + 1},
+       [
+         %{skill_line: 599, trivial_skill_line_rank_low: 25, trivial_skill_line_rank_high: 70}
+       ]}
+    ])
+
+    :ets.insert(ItemLoader, {@entry, %ItemTemplate{entry: @entry, stackable: 20}})
+
+    on_exit(fn ->
+      Enum.each(keys, &:ets.delete(SkillLoader, &1))
+      :ets.insert(SkillLoader, previous)
+    end)
+
+    player = %{state.character.player | skills: Skills.learn_rank(%{}, 599, 75)}
+    %{state: %{state | character: %{state.character | player: player}}}
   end
 
   defp inventory(_context) do

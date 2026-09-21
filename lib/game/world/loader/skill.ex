@@ -54,6 +54,22 @@ defmodule ThistleTea.Game.World.Loader.Skill do
     table |> lookup({:abilities, skill_id}, []) |> Enum.map(& &1.spell) |> Enum.uniq() |> Enum.sort()
   end
 
+  def recipe(spell_id, table \\ __MODULE__) do
+    table
+    |> lookup({:spell_skills, spell_id}, [])
+    |> Enum.find(fn row ->
+      lookup(table, {:category, row.skill_line}, nil) in [9, 11] and
+        is_integer(row.trivial_skill_line_rank_low) and is_integer(row.trivial_skill_line_rank_high)
+    end)
+    |> case do
+      nil ->
+        nil
+
+      row ->
+        %{skill_id: row.skill_line, yellow: row.trivial_skill_line_rank_low, gray: row.trivial_skill_line_rank_high}
+    end
+  end
+
   def unlearnable?(skill_id, race, class, table \\ __MODULE__) do
     case race_class_info(skill_id, race, class, table) do
       %{flags: flags} -> (flags &&& 0x20) != 0
