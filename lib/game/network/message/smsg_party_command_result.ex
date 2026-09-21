@@ -15,6 +15,7 @@ defmodule ThistleTea.Game.Network.Message.SmsgPartyCommandResult do
   def code(:not_in_group), do: 5
   def code(:not_leader), do: 6
   def code(:wrong_faction), do: 7
+  def code(:ignoring_you), do: 8
 
   @impl ServerMessage
   def to_binary(%__MODULE__{operation: operation, name: name, result: result}) do

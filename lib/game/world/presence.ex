@@ -7,6 +7,7 @@ defmodule ThistleTea.Game.World.Presence do
   alias ThistleTea.Game.Entity.Data.Component.Internal
   alias ThistleTea.Game.Entity.Data.Component.MovementBlock
   alias ThistleTea.Game.Entity.Logic.Pvp
+  alias ThistleTea.Game.Social.Notifier, as: SocialNotifier
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.Position
   alias ThistleTea.Game.World.System.Party
@@ -14,6 +15,7 @@ defmodule ThistleTea.Game.World.Presence do
   def enter(%Character{} = character, metadata) when is_map(metadata) do
     Metadata.put(character.object.guid, Map.merge(metadata, location_metadata(character)))
     put_position(character)
+    SocialNotifier.online(character.object.guid)
     :ok
   end
 
@@ -36,8 +38,10 @@ defmodule ThistleTea.Game.World.Presence do
   end
 
   def leave(%Character{} = character) do
+    published? = Metadata.get(character.object.guid) != nil
     Metadata.delete(character.object.guid)
     Position.remove(character, :players)
+    if published?, do: SocialNotifier.offline(character.object.guid)
     :ok
   end
 

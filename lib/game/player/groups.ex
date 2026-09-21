@@ -14,7 +14,37 @@ defmodule ThistleTea.Game.Player.Groups do
   alias ThistleTea.Game.Party.Member
   alias ThistleTea.Game.Party.Notifier
   alias ThistleTea.Game.World.Loader.MapTemplate
+  alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.SocialStore
   alias ThistleTea.Game.World.System.Party, as: PartySystem
+
+  def invite(%{ready: true, guid: guid, character: %Character{} = character} = state, name) do
+    name = String.capitalize(name)
+    invitee_guid = Metadata.find_guid_by(:name, name)
+
+    result =
+      cond do
+        invitee_guid == nil or invitee_guid == guid -> {:error, :bad_player_name}
+        not same_team?(character.unit.race, invitee_guid) -> {:error, :wrong_faction}
+        SocialStore.ignores?(invitee_guid, guid) -> {:error, :ignoring_you}
+        true -> PartySystem.invite(guid, character.internal.name, invitee_guid)
+      end
+
+    reason =
+      case result do
+        :ok ->
+          Network.send_packet(%Message.SmsgGroupInvite{name: character.internal.name}, invitee_guid)
+          :ok
+
+        {:error, reason} ->
+          reason
+      end
+
+    Network.send_packet(%Result{operation: Result.op_invite(), name: name, result: Result.code(reason)}, guid)
+    state
+  end
+
+  def invite(state, _name), do: state
 
   def convert_raid(%{ready: true, guid: guid, character: %Character{} = character} = state) do
     if !MapTemplate.battleground?(character.internal.world.map_id) do
@@ -112,5 +142,12 @@ defmodule ThistleTea.Game.Player.Groups do
 
   defp named_member(guid, name) do
     with %Group{} = group <- PartySystem.group_of(guid), do: Party.member_by_name(group, name)
+  end
+
+  defp same_team?(race, invitee_guid) do
+    case Metadata.query(invitee_guid, [:race]) do
+      %{race: target_race} when is_integer(target_race) -> Party.same_team?(race, target_race)
+      _ -> false
+    end
   end
 end

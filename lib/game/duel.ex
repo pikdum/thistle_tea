@@ -48,7 +48,8 @@ defmodule ThistleTea.Game.Duel do
       :opponent_allowed?,
       :same_world?,
       :initiator_busy?,
-      :opponent_busy?
+      :opponent_busy?,
+      opponent_ignores?: false
     ]
   end
 
@@ -76,6 +77,7 @@ defmodule ThistleTea.Game.Duel do
 
   def validate_admission(%Admission{initiator_player?: false}), do: {:error, :invalid_players}
   def validate_admission(%Admission{opponent_player?: false}), do: {:error, :invalid_players}
+  def validate_admission(%Admission{opponent_ignores?: true}), do: {:error, :ignored}
   def validate_admission(%Admission{initiator_online?: false}), do: {:error, :not_online}
   def validate_admission(%Admission{opponent_online?: false}), do: {:error, :not_online}
   def validate_admission(%Admission{initiator_allowed?: false}), do: {:error, :no_dueling}

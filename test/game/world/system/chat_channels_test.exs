@@ -4,6 +4,9 @@ defmodule ThistleTea.Game.World.System.ChatChannelsTest do
   alias ThistleTea.Game.Chat.Channel.Member
   alias ThistleTea.Game.Entity.Registry, as: EntityRegistry
   alias ThistleTea.Game.Network.Message
+  alias ThistleTea.Game.Social
+  alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.SocialStore
   alias ThistleTea.Game.World.System.ChatChannels
 
   describe "join/3" do
@@ -43,6 +46,42 @@ defmodule ThistleTea.Game.World.System.ChatChannelsTest do
   end
 
   describe "say/4" do
+    test "filters ignored senders while preserving moderator delivery" do
+      owner = member("Owner")
+      sender = member("Sender")
+      target = member("Target")
+      actors = [owner, sender, target]
+
+      receivers = [
+        start_receiver(owner.guid, :owner),
+        start_receiver(sender.guid, :sender),
+        start_receiver(target.guid, :target)
+      ]
+
+      channel = unique_name("Ignored")
+
+      on_exit(fn ->
+        cleanup(actors, receivers)
+        :ets.delete(SocialStore, target.guid)
+      end)
+
+      for actor <- actors, do: ChatChannels.join(actor, channel, "")
+      {:ok, social} = Social.add(SocialStore.get(target.guid), :ignore, sender.guid)
+      SocialStore.put(social)
+      assert :ok = ChatChannels.say(sender, channel, 7, "filtered")
+      assert_receive {:owner, {:"$gen_cast", {:send_packet, %Message.SmsgMessagechat{message: "filtered"}}}}
+      assert_receive {:sender, {:"$gen_cast", {:send_packet, %Message.SmsgMessagechat{message: "filtered"}}}}
+      refute_receive {:target, {:"$gen_cast", {:send_packet, %Message.SmsgMessagechat{message: "filtered"}}}}
+
+      assert :ok = ChatChannels.set_moderator(owner, channel, sender.name, true)
+      assert :ok = ChatChannels.say(sender, channel, 7, "moderator")
+      assert_receive {:target, {:"$gen_cast", {:send_packet, %Message.SmsgMessagechat{message: "moderator"}}}}
+      social |> Social.remove(:ignore, sender.guid) |> SocialStore.put()
+      assert :ok = ChatChannels.set_moderator(owner, channel, sender.name, false)
+      assert :ok = ChatChannels.say(sender, channel, 7, "restored")
+      assert_receive {:target, {:"$gen_cast", {:send_packet, %Message.SmsgMessagechat{message: "restored"}}}}
+    end
+
     test "uses the current chat tag after joining" do
       actor = member("Status")
       receiver = start_receiver(actor.guid, :actor)
@@ -70,6 +109,34 @@ defmodule ThistleTea.Game.World.System.ChatChannelsTest do
       refute_receive {:actor, {:"$gen_cast", {:send_packet, %Message.SmsgMessagechat{}}}}
 
       cleanup([actor], [receiver])
+    end
+  end
+
+  describe "invite/3" do
+    test "acknowledges the inviter while suppressing an ignored invitation" do
+      owner = member("Owner")
+      target = member("Target")
+      receivers = [start_receiver(owner.guid, :owner), start_receiver(target.guid, :target)]
+      channel = unique_name("Invite")
+      Metadata.put(target.guid, %{name: target.name, race: 1})
+
+      on_exit(fn ->
+        cleanup([owner, target], receivers)
+        :ets.delete(SocialStore, target.guid)
+        Metadata.delete(target.guid)
+      end)
+
+      ChatChannels.join(owner, channel, "")
+      {:ok, social} = Social.add(SocialStore.get(target.guid), :ignore, owner.guid)
+      SocialStore.put(social)
+      assert :ok = ChatChannels.invite(owner, channel, target.name)
+      invited = Message.SmsgChannelNotify.notice(:player_invited)
+      invite = Message.SmsgChannelNotify.notice(:invite)
+      assert_receive {:owner, {:"$gen_cast", {:send_packet, %Message.SmsgChannelNotify{notify_type: ^invited}}}}
+      refute_receive {:target, {:"$gen_cast", {:send_packet, %Message.SmsgChannelNotify{notify_type: ^invite}}}}
+      social |> Social.remove(:ignore, owner.guid) |> SocialStore.put()
+      assert :ok = ChatChannels.invite(owner, channel, target.name)
+      assert_receive {:target, {:"$gen_cast", {:send_packet, %Message.SmsgChannelNotify{notify_type: ^invite}}}}
     end
   end
 

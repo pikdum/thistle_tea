@@ -22,6 +22,7 @@ defmodule ThistleTea.Game.World.System.Duel do
   alias ThistleTea.Game.World.Loader.Exploration, as: ExplorationLoader
   alias ThistleTea.Game.World.Loader.GameObjectTemplate, as: GameObjectTemplateLoader
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.SocialStore
   alias ThistleTea.Game.WorldRef
 
   @countdown_ms 3_000
@@ -284,7 +285,8 @@ defmodule ThistleTea.Game.World.System.Duel do
       opponent_allowed?: state.dueling_allowed?.(opponent_guid),
       same_world?: participants_in_world?(state, [initiator_guid, opponent_guid], world),
       initiator_busy?: Duel.busy?(state.duels, initiator_guid),
-      opponent_busy?: Duel.busy?(state.duels, opponent_guid)
+      opponent_busy?: Duel.busy?(state.duels, opponent_guid),
+      opponent_ignores?: SocialStore.ignores?(opponent_guid, initiator_guid)
     }
   end
 

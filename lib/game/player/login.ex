@@ -56,6 +56,7 @@ defmodule ThistleTea.Game.Player.Login do
   alias ThistleTea.Game.Player.Quests
   alias ThistleTea.Game.Player.Reputation, as: PlayerReputation
   alias ThistleTea.Game.Player.Rest, as: PlayerRest
+  alias ThistleTea.Game.Player.Social
   alias ThistleTea.Game.Player.Spells, as: PlayerSpells
   alias ThistleTea.Game.Player.Stats, as: PlayerStats
   alias ThistleTea.Game.Player.Trade
@@ -159,6 +160,7 @@ defmodule ThistleTea.Game.Player.Login do
     })
 
     send_init_packets(c)
+    Social.send_lists(c)
     Enchantments.send_active_timers(c)
 
     case PartySystem.group_of(character_guid) do

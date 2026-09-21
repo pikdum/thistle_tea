@@ -14,6 +14,7 @@ defmodule ThistleTea.Game.World.System.ChatChannels do
   alias ThistleTea.Game.World.CharacterStore
   alias ThistleTea.Game.World.Loader.ChatChannel, as: ChatChannelLoader
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.SocialStore
 
   require Logger
 
@@ -100,7 +101,7 @@ defmodule ThistleTea.Game.World.System.ChatChannels do
         tag: actor.chat_tag
       }
 
-      send_to_members(members, packet)
+      members |> chat_recipients(channel, actor.guid) |> send_to_members(packet)
       {:reply, :ok, state}
     else
       {:error, reason} ->
@@ -174,7 +175,10 @@ defmodule ThistleTea.Game.World.System.ChatChannels do
     with {:ok, channel} <- Channels.fetch(state.channels, actor, name),
          {:ok, target} <- find_player(target_name),
          :ok <- Channel.invite(channel, actor.guid, target) do
-      Network.send_packet(notice(channel, :invite, guid: actor.guid), target.guid)
+      if not SocialStore.ignores?(target.guid, actor.guid) do
+        Network.send_packet(notice(channel, :invite, guid: actor.guid), target.guid)
+      end
+
       Network.send_packet(notice(channel, :player_invited, player_name: target.name), actor.guid)
       {:reply, :ok, state}
     else
@@ -346,6 +350,15 @@ defmodule ThistleTea.Game.World.System.ChatChannels do
   end
 
   defp send_to_channel(channel, packet), do: send_to_members(Map.values(channel.members), packet)
+
+  defp chat_recipients(members, channel, sender) do
+    if Channel.moderator?(channel.members[sender]) do
+      members
+    else
+      Enum.reject(members, &SocialStore.ignores?(&1.guid, sender))
+    end
+  end
+
   defp send_to_members(members, packet), do: members |> Enum.map(& &1.guid) |> send_to_guids(packet)
   defp send_to_guids(guids, packet), do: Enum.each(guids, &Network.send_packet(packet, &1))
 

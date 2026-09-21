@@ -68,6 +68,7 @@ defmodule ThistleTea.Application do
   alias ThistleTea.Game.World.MailStore
   alias ThistleTea.Game.World.Metadata
   alias ThistleTea.Game.World.PostOffice
+  alias ThistleTea.Game.World.SocialStore
   alias ThistleTea.Game.World.SpawnPool
   alias ThistleTea.Game.World.SpawnPool.Catalog, as: SpawnPoolCatalog
   alias ThistleTea.Game.World.SpellMagnets
@@ -170,6 +171,7 @@ defmodule ThistleTea.Application do
     ItemStore.init()
     MailStore.init()
     CharacterStore.init()
+    SocialStore.init()
     HonorStore.init()
     VendorLoader.init()
     QuestLoader.init()
