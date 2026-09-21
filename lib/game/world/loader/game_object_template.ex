@@ -5,6 +5,7 @@ defmodule ThistleTea.Game.World.Loader.GameObjectTemplate do
   """
   alias ThistleTea.DB.Mangos
   alias ThistleTea.Game.Entity.Data.GameObjectTemplate
+  alias ThistleTea.Game.Spell.Focus
   alias ThistleTea.Game.World.Loader.Faction
 
   @table_options [:named_table, :public, read_concurrency: true, write_concurrency: :auto]
@@ -47,6 +48,24 @@ defmodule ThistleTea.Game.World.Loader.GameObjectTemplate do
 
   def cached(_entry), do: nil
 
+  def put(%GameObjectTemplate{} = template) do
+    :ets.insert(__MODULE__, {template.entry, template})
+
+    case Focus.definition(template) do
+      {id, radius} -> :ets.insert(__MODULE__, {{:focus_radius, id}, max(radius, focus_radius(id))})
+      nil -> :ok
+    end
+
+    template
+  end
+
+  def focus_radius(id) do
+    case :ets.lookup(__MODULE__, {:focus_radius, id}) do
+      [{_key, radius}] -> radius
+      [] -> 0
+    end
+  end
+
   defp load(entry) do
     case Mangos.Repo.get(Mangos.GameObjectTemplate, entry) do
       %Mangos.GameObjectTemplate{} = row -> cache(row, load_bounds(row.display_id))
@@ -65,7 +84,6 @@ defmodule ThistleTea.Game.World.Loader.GameObjectTemplate do
     Faction.metadata(row.faction)
     template = GameObjectTemplate.build(row)
     template = %{template | bounds: bounds}
-    :ets.insert(__MODULE__, {template.entry, template})
-    template
+    put(template)
   end
 end

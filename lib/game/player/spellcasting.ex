@@ -47,6 +47,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
   alias ThistleTea.Game.World.Loader.MapTemplate, as: MapTemplateLoader
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
   alias ThistleTea.Game.World.Metadata
+  alias ThistleTea.Game.World.SpellFocus
   alias ThistleTea.Game.World.System.Duel, as: DuelSystem
   alias ThistleTea.Game.World.System.Party, as: PartySystem
   alias ThistleTea.Game.World.Visibility
@@ -282,6 +283,7 @@ defmodule ThistleTea.Game.Player.Spellcasting do
       Time.now(),
       count_item: fn item_id -> Inventory.count_entry(character.player, item_id, &ItemStore.get/1) end,
       equipped_items: equipped_weapon_templates(character),
+      spell_focus: SpellFocus.find(character, spell),
       lock_context: Gathering.context(state, spell, targets, cast_item_guid),
       disenchant_item: Disenchant.owned_item(character, Target.item_guid(targets)),
       enchant_item: Disenchant.owned_item(character, enchant_guid),
@@ -478,20 +480,9 @@ defmodule ThistleTea.Game.Player.Spellcasting do
   defp selected_target(%{unit: %Unit{target: target}}), do: target
   defp selected_target(_character), do: nil
 
-  defp fail_cast(%Spell{id: spell_id} = spell, :equipped_item_class) do
-    failure = %{
-      Message.SmsgCastResult.failure(spell_id, :equipped_item_class)
-      | equipped_item_class: spell.equipped_item_class,
-        equipped_item_subclass_mask: spell.equipped_item_subclass_mask,
-        equipped_item_inventory_type_mask: 0
-    }
-
-    Network.send_packet(failure)
-  end
-
-  defp fail_cast(%Spell{id: spell_id}, reason) do
+  defp fail_cast(%Spell{id: spell_id} = spell, reason) do
     Logger.warning("Spell #{spell_id} failed validation: #{reason}")
-    Network.send_packet(Message.SmsgCastResult.failure(spell_id, reason))
+    Network.send_packet(Message.SmsgCastResult.failure(spell, reason))
   end
 
   defp unknown_spell(state, spell_id) do

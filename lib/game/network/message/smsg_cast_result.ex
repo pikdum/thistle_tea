@@ -2,6 +2,8 @@ defmodule ThistleTea.Game.Network.Message.SmsgCastResult do
   @moduledoc false
   use ThistleTea.Game.Network.ServerMessage, :SMSG_CAST_RESULT
 
+  alias ThistleTea.Game.Spell
+
   @simple_spell_cast_result_failure 2
 
   @cast_failure_reason_requires_spell_focus 0x5E
@@ -90,6 +92,16 @@ defmodule ThistleTea.Game.Network.Message.SmsgCastResult do
     :equipped_item_subclass_mask,
     :equipped_item_inventory_type_mask
   ]
+
+  def failure(%Spell{} = spell, reason) when is_atom(reason) do
+    %{
+      failure(spell.id, reason)
+      | required_spell_focus: spell.required_focus_id,
+        equipped_item_class: spell.equipped_item_class,
+        equipped_item_subclass_mask: spell.equipped_item_subclass_mask,
+        equipped_item_inventory_type_mask: 0
+    }
+  end
 
   def failure(spell_id, reason) when is_integer(spell_id) and is_atom(reason) do
     %__MODULE__{

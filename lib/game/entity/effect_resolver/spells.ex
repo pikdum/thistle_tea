@@ -5,15 +5,22 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Entity.Logic.SpellTarget
   alias ThistleTea.Game.Entity.SpellTargetResolver
+  alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.CastContext
+  alias ThistleTea.Game.Spell.Focus
   alias ThistleTea.Game.Spell.Scripts
   alias ThistleTea.Game.Spell.Target
   alias ThistleTea.Game.World
   alias ThistleTea.Game.World.Loader.Spell, as: SpellLoader
+  alias ThistleTea.Game.World.SpellFocus
   alias ThistleTea.Game.World.SpellMagnets
 
   @heal_threat_radius 100.0
+
+  def resolve(entity, %Effects.CheckSpellFocus{cast: cast, now: now}) do
+    [%Effects.SpellFocusResolved{cast: cast, now: now, focus: SpellFocus.find(entity, cast.spell)}]
+  end
 
   def resolve(entity, %Effects.DeliverSpell{delay_ms: nil} = effect) do
     resolved_delivery(entity, effect)
@@ -92,10 +99,36 @@ defmodule ThistleTea.Game.Entity.EffectResolver.Spells do
   end
 
   defp resolve_trigger(entity, effect, spell) do
-    if effect.resolve_targets? or SpellTarget.area_targeted?(spell) do
-      resolve_area_trigger(entity, effect, spell)
+    if foreign_player_focus?(entity, effect, spell) do
+      [
+        Effects.trigger_spell_request(effect.source_guid, effect.spell_id, effect.target_guid,
+          base_points: effect.amount,
+          effect_index: effect.slot,
+          resolve_targets?: true,
+          triggered_by_spell_id: effect.triggering_spell_id
+        )
+      ]
     else
-      resolve_single_trigger(entity, effect, spell)
+      validate_trigger_focus(entity, effect, spell)
+    end
+  end
+
+  defp foreign_player_focus?(entity, effect, spell) do
+    Focus.required?(spell) and is_integer(effect.source_guid) and
+      effect.source_guid != entity.object.guid and Guid.entity_type(effect.source_guid) == :player
+  end
+
+  defp validate_trigger_focus(entity, effect, spell) do
+    case Focus.validate(entity, spell, SpellFocus.find(entity, spell)) do
+      :ok ->
+        if effect.resolve_targets? or SpellTarget.area_targeted?(spell) do
+          resolve_area_trigger(entity, effect, spell)
+        else
+          resolve_single_trigger(entity, effect, spell)
+        end
+
+      {:error, reason} ->
+        [Effects.spell_cast_failed(spell, reason)]
     end
   end
 

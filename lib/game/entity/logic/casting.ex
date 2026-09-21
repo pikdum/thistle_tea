@@ -43,6 +43,7 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
   alias ThistleTea.Game.Spell.CastResolution.PowerCost
   alias ThistleTea.Game.Spell.CastValidation
   alias ThistleTea.Game.Spell.Cooldowns
+  alias ThistleTea.Game.Spell.Focus
   alias ThistleTea.Game.Spell.Modifiers
   alias ThistleTea.Game.Spell.Scripts
   alias ThistleTea.Game.Spell.Semantics
@@ -133,7 +134,17 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
 
   def complete(entity, _casting, _now), do: entity
 
+  def resolve_focus(%{internal: %Internal{casting: cast}} = entity, %Cast{} = cast, focus, now) do
+    case Focus.validate(entity, cast.spell, focus) do
+      :ok -> complete(entity, %{cast | spell_focus: focus}, now)
+      {:error, reason} -> entity |> cancel(now) |> Effects.enqueue(Effects.spell_cast_failed(cast.spell, reason))
+    end
+  end
+
+  def resolve_focus(entity, _cast, _focus, _now), do: entity
+
   defp advance_phase(entity, %Cast{ammunition: :pending}, _now), do: {:waiting, entity, 50}
+  defp advance_phase(entity, %Cast{spell_focus: :pending}, _now), do: {:waiting, entity, 50}
 
   defp advance_phase(entity, %Cast{phase: :preparing} = casting, now) do
     if now >= Cast.launch_at(casting) do
@@ -169,6 +180,26 @@ defmodule ThistleTea.Game.Entity.Logic.Casting do
 
   defp advance_phase(entity, %Cast{phase: :finish} = casting, now) do
     {:finished, finish(entity, casting, now)}
+  end
+
+  defp launch(
+         %Character{} = entity,
+         %Cast{spell_focus: :unchecked, spell: %Spell{required_focus_id: id}} = casting,
+         now
+       )
+       when is_integer(id) and id > 0 do
+    if Focus.required?(entity, casting.spell) do
+      casting = %{casting | spell_focus: :pending}
+
+      entity =
+        entity
+        |> put_cast(casting)
+        |> Effects.enqueue(%Effects.CheckSpellFocus{cast: casting, now: now})
+
+      {:waiting, entity, 50}
+    else
+      launch(entity, %{casting | spell_focus: nil}, now)
+    end
   end
 
   defp launch(entity, %Cast{} = casting, now) do

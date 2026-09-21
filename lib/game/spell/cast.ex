@@ -27,6 +27,7 @@ defmodule ThistleTea.Game.Spell.Cast do
     :cast_item_guid,
     phase: :preparing,
     ammunition: :unpaid,
+    spell_focus: :unchecked,
     modifier_holder_ids: [],
     consume_item: false,
     pushback_count: 0,

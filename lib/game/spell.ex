@@ -52,6 +52,7 @@ defmodule ThistleTea.Game.Spell do
     caster_aura_state: 0,
     target_aura_state: 0,
     target_creature_type_mask: 0,
+    required_focus_id: 0,
     stack_amount: 0,
     category: 0,
     recovery_time_ms: 0,

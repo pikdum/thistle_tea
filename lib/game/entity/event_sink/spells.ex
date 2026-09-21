@@ -3,7 +3,9 @@ defmodule ThistleTea.Game.Entity.EventSink.Spells do
 
   alias ThistleTea.Game.Entity
   alias ThistleTea.Game.Entity.Data.Character
+  alias ThistleTea.Game.Entity.EventSink
   alias ThistleTea.Game.Entity.EventSink.Context
+  alias ThistleTea.Game.Entity.Logic.Casting
   alias ThistleTea.Game.Entity.Logic.Effects
   alias ThistleTea.Game.Guid
   alias ThistleTea.Game.Network.BinaryUtils
@@ -165,8 +167,19 @@ defmodule ThistleTea.Game.Entity.EventSink.Spells do
 
   def emit(entity, %Effects.SpellCastResult{}, _context), do: entity
 
+  def emit(entity, %Effects.SpellFocusResolved{cast: cast, focus: focus, now: now}, context) do
+    entity
+    |> Casting.resolve_focus(cast, focus, now)
+    |> EventSink.emit_pending(context)
+  end
+
   def emit(%Character{object: %{guid: guid}} = entity, %Effects.SpellCastFailed{} = effect, context) do
-    Context.send_packet(context, Message.SmsgCastResult.failure(effect.spell_id, effect.reason))
+    result = %{
+      Message.SmsgCastResult.failure(effect.spell_id, effect.reason)
+      | required_spell_focus: effect.required_focus_id
+    }
+
+    Context.send_packet(context, result)
 
     Context.send_packet(context, %Message.SmsgSpellFailure{
       guid: guid,

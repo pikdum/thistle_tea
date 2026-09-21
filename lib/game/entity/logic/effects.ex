@@ -6,6 +6,7 @@ defmodule ThistleTea.Game.Entity.Logic.Effects do
   """
   alias __MODULE__, as: Effects
   alias ThistleTea.Game.Entity.Data.CreatureSpell
+  alias ThistleTea.Game.Spell
   alias ThistleTea.Game.Spell.Target
 
   def scripted_cast(%CreatureSpell{} = entry, target_guid) when is_integer(target_guid) and target_guid > 0 do
@@ -167,6 +168,10 @@ defmodule ThistleTea.Game.Entity.Logic.Effects do
 
   def spell_cast_result(spell_id) when is_integer(spell_id) do
     %Effects.SpellCastResult{spell_id: spell_id}
+  end
+
+  def spell_cast_failed(%Spell{} = spell, reason) when is_atom(reason) do
+    %Effects.SpellCastFailed{spell_id: spell.id, reason: reason, required_focus_id: spell.required_focus_id}
   end
 
   def spell_cast_failed(spell_id, reason) when is_integer(spell_id) and is_atom(reason) do

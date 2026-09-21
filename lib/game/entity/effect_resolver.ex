@@ -18,6 +18,7 @@ defmodule ThistleTea.Game.Entity.EffectResolver do
   @combat_requests [Effects.BladeFlurry, Effects.DropNearbyThreat, Effects.SecondaryMelee]
   @movement_requests [Effects.Charge, Effects.Leap, Effects.TeleportHome, Effects.TeleportToSpellTarget]
   @spell_requests [
+    Effects.CheckSpellFocus,
     Effects.DeliverSpell,
     Effects.DeliverSpellOutcome,
     Effects.DeliverSpellToQuery,

@@ -17,6 +17,16 @@ defmodule ThistleTea.Game.World.Loader.SpellVmangosTest do
 
   @moduletag :dbc_db
 
+  describe "spell focus requirements" do
+    test "loads forge, cooking fire, anvil and quest focus identifiers" do
+      for {id, focus} <- [{2657, 3}, {2538, 4}, {15_292, 623}, {4975, 6}] do
+        assert SpellLoader.load(id).required_focus_id == focus
+      end
+
+      assert SpellLoader.load(7183).required_focus_id == 0
+    end
+  end
+
   describe "wild object summons" do
     test "loads temporary quest chests and environmental traps" do
       egg = SpellLoader.load(13_563)
