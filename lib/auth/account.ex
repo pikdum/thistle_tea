@@ -6,6 +6,7 @@ defmodule ThistleTea.Account do
   """
   alias ThistleTea.Auth.SRP
 
+  @derive {Inspect, except: [:password_hash, :password_salt, :password_verifier]}
   defstruct [:id, :username, :password_hash, :password_salt, :password_verifier]
 
   @table_options [:named_table, :public, read_concurrency: true, write_concurrency: :auto]

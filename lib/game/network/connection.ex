@@ -8,6 +8,7 @@ defmodule ThistleTea.Game.Network.Connection do
   alias ThistleTea.Game.Network.Connection.Crypto
   alias ThistleTea.Game.Network.Packet
 
+  @derive {Inspect, except: [:session_key, :binary_stream, :packet_queue]}
   defstruct [
     :session_key,
     binary_stream: <<>>,
